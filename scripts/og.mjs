@@ -1,4 +1,4 @@
-/** Capture public/og.jpg (1200×630) from ?cam=lijiang&time=17.5 after a production build. */
+/** Capture public/og.jpg (1200×630) from ?cam=elephant&time=17.5 after a production build. */
 import {chromium} from 'playwright'
 import {preview} from 'vite'
 import {mkdir, copyFile} from 'node:fs/promises'
@@ -6,7 +6,7 @@ import {dirname, join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const out = join(root, 'public/og.jpg')
+const out = process.env.OG_OUT ?? join(root, 'public/og.jpg')
 const distOut = join(root, 'dist/og.jpg')
 
 const server = await preview({root: 'web', configFile: 'web/vite.config.ts', preview: {host: '127.0.0.1', port: 0}})
@@ -18,7 +18,7 @@ try {
   })
   const page = await browser.newPage({viewport: {width: 1200, height: 630}})
   const port = server.httpServer.address().port
-  await page.goto(`http://127.0.0.1:${port}/?verify&cam=lijiang&time=17.5`)
+  await page.goto(`http://127.0.0.1:${port}/?verify&${process.env.OG_QUERY ?? 'cam=elephant&time=17.5'}`)
   await page.waitForFunction(() => window.viewer?.stats.firstMs > 0, null, {timeout: 60000})
   await page.waitForFunction(() => {
     const {stats, stream, camera, manifest} = window.viewer

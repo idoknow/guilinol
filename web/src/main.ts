@@ -54,7 +54,6 @@ async function start() {
   setPreset(camera,params.get('cam'))
   const radius = Number(params.get('radius')??480)
   const stream = new Stream(scene,manifest,base,THREE.MathUtils.clamp(Number.isFinite(radius)?radius:480,192,1600),camera)
-  void import('./ui/about').then(mod=>mod.aboutPanel())
   const output = document.querySelector('output')!
   let previous=0, first=0, frame=0, sum=0, samples=0
   const stats = {firstMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0}
@@ -108,7 +107,7 @@ async function start() {
   renderer.setAnimationLoop(now=>{
     const elapsed = previous?now-previous:0;previous=now
     if(walker?.active)walker.tick(elapsed/1000);else if(!switching)controls(elapsed/1000)
-    if(frame===1) {first=performance.now();stats.firstMs=first;stats.firstWorldBytes=bytes;bootProgress('载入街区', 100);bootDismiss()}
+    if(frame===1) {first=performance.now();stats.firstMs=first;stats.firstWorldBytes=bytes;bootProgress('载入街区', 100);bootDismiss();setTimeout(()=>void import('./ui/about').then(mod=>mod.aboutPanel()),500)}
     if(first&&!switching) stream.tick(walker?.active?walker.position:camera.position)
     clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/1200))
     atmo.uTime.value = now/1000
@@ -128,4 +127,4 @@ async function start() {
   })
   if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }
-start().catch(error=>{document.querySelector('output')!.value=`无法加载：${error.message}`;console.error(error)})
+start().catch(error=>{document.querySelector('output')!.value=`无法加载：${error.message}`;bootProgress(`无法加载：${error.message}`,0);console.error(error)})

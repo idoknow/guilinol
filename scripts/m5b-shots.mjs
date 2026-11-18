@@ -33,14 +33,14 @@ async function shot(name, {width, height, isMobile = false, touch = false}, acti
 }
 
 await shot('boot-desktop', {width: 1280, height: 720}, async page => {
-  await page.route('**/world/**', route => route.abort())
+  await page.route('**/world/**', () => {}) // hold world requests so the boot layer stays up
   await page.goto(base, {waitUntil: 'domcontentloaded'})
   await page.waitForSelector('#boot:not(.out)')
   await page.waitForTimeout(200)
 })
 
 await shot('boot-phone', {width: 390, height: 844, isMobile: true, touch: true}, async page => {
-  await page.route('**/world/**', route => route.abort())
+  await page.route('**/world/**', () => {}) // hold world requests so the boot layer stays up
   await page.goto(base, {waitUntil: 'domcontentloaded'})
   await page.waitForSelector('#boot:not(.out)')
   await page.waitForTimeout(200)
