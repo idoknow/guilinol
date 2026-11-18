@@ -23,6 +23,7 @@ dark pitched roofs and a roof pavilion.
 
 Colors: roof #393943, column #9a3832, library wall #adaaa6, column #a7a4a1.
 """
+import math
 import sys
 from pathlib import Path
 
@@ -33,10 +34,11 @@ from c_kit import (
 
 
 def board(mesh, x, y, z, w, h, region, axis='z'):
+    uvs = [(0.01, 0.99), (0.99, 0.99), (0.99, 0.01), (0.01, 0.01)]
     if axis == 'z':
-        mesh.face([(x - w / 2, y - h / 2, z), (x + w / 2, y - h / 2, z), (x + w / 2, y + h / 2, z), (x - w / 2, y + h / 2, z)], (0, 0, 1), region, None)
+        mesh.face([(x - w / 2, y - h / 2, z), (x + w / 2, y - h / 2, z), (x + w / 2, y + h / 2, z), (x - w / 2, y + h / 2, z)], (0, 0, 1), region, uvs=uvs)
     else:
-        mesh.face([(x, y - h / 2, z - w / 2), (x, y - h / 2, z + w / 2), (x, y + h / 2, z + w / 2), (x, y + h / 2, z - w / 2)], (1, 0, 0), region, None)
+        mesh.face([(x, y - h / 2, z - w / 2), (x, y - h / 2, z + w / 2), (x, y + h / 2, z + w / 2), (x, y + h / 2, z - w / 2)], (1, 0, 0), region, uvs=uvs)
 
 
 def pavilion(b, x, y, z, span=5.4, column_h=2.75, roof='blacktile'):
@@ -44,18 +46,17 @@ def pavilion(b, x, y, z, span=5.4, column_h=2.75, roof='blacktile'):
     deck = y + 0.72
     extrude(wall, [(x - span / 2, z - span / 2), (x + span / 2, z - span / 2), (x + span / 2, z + span / 2), (x - span / 2, z + span / 2)], y, deck, 'ashlar', 1.2)
     stairs(wall, (x, y, z + span / 2 + 2.4), (x, deck, z + span / 2 - 0.2), 1.8, 5 if b.detail else 3, 'granite')
-    inset = span / 2 - 0.42
+    inset = span / 2 - 0.55
     for dx, dz in ((-inset, -inset), (inset, -inset), (inset, inset), (-inset, inset)):
-        cylinder(wall, (x + dx, deck, z + dz), 0.2, 0.85, 'bark', 6, 0.5)
-        cylinder(wall, (x + dx, deck + 0.85, z + dz), 0.16, column_h - 0.85, 'vermilion', 8 if b.detail else 5, 0.6)
-    post = 0.7 if b.detail else 2.2
-    for a, c in (((-span / 2, -span / 2), (span / 2, -span / 2)), ((span / 2, -span / 2), (span / 2, span / 2 - 0.8)),
-                 ((-span / 2, span / 2 - 0.8), (-span / 2, -span / 2))):
-        railing(wall, (x + a[0], z + a[1]), (x + c[0], z + c[1]), deck, 0.92, 'ashlar', post)
-        if b.detail:
-            box(wall, (x + (a[0] + c[0]) / 2, deck + 0.42, z + (a[1] + c[1]) / 2), (abs(c[0] - a[0]) + 0.2, 0.08, abs(c[1] - a[1]) + 0.2), 'wood', 0.5)
-    hip_roof(wall, (x, z), deck + column_h, span - 0.3, span - 0.3, 1.15, 0.85, 0.58, roof, 'soffit')
-    board(wall, x, deck + column_h - 0.35, z + span / 2 - 0.7, 1.6, 0.45, 'wood')
+        cylinder(wall, (x + dx, deck, z + dz), 0.22, 0.4, 'bark', 6, 0.4)
+        cylinder(wall, (x + dx, deck + 0.4, z + dz), 0.2, column_h - 0.4, 'vermilion', 8 if b.detail else 5, 0.6)
+    # 美人靠: a wood rail at seat-back height on three sides, open toward the steps.
+    for a, c in (((-span / 2 + 0.15, -span / 2 + 0.15), (span / 2 - 0.15, -span / 2 + 0.15)),
+                 ((span / 2 - 0.15, -span / 2 + 0.15), (span / 2 - 0.15, span / 2 - 0.9)),
+                 ((-span / 2 + 0.15, span / 2 - 0.9), (-span / 2 + 0.15, -span / 2 + 0.15))):
+        railing(wall, (x + a[0], z + a[1]), (x + c[0], z + c[1]), deck, 0.9, 'wood', 1.15)
+    hip_roof(wall, (x, z), deck + column_h, span - 0.2, span - 0.2, 1.85, 1.05, 0.7, roof, 'vermilion')
+    board(wall, x, deck + column_h - 0.15, z + span / 2 - 0.55, 1.8, 0.55, 'wood')
     if b.collide:
         solid(b.hit, (x, y + 0.36, z), (span, 0.72, span), 'ashlar')
         ramp(b.hit, (x, y + 0.05, z + span / 2 + 2.4), (x, deck, z + span / 2 - 0.1), 1.6)
@@ -64,28 +65,38 @@ def pavilion(b, x, y, z, span=5.4, column_h=2.75, roof='blacktile'):
 
 
 def island(b):
-    """Double-eave pavilion and a short gallery, from the 2017 night photograph."""
+    """Double-eave hexagonal pavilion and a glazed corridor, from the 2017 night photograph."""
     wall, lit = b.parts['atlas'], b.parts['lit']
     x, y, z = 98.8, 0.3, 137.6
-    extrude(wall, [(x - 4.2, z - 3.2), (x + 7.5, z - 3.2), (x + 7.5, z + 3.2), (x - 4.2, z + 3.2)], y, y + 0.7, 'ashlar')
-    pavilion(b, x + 4.6, y, z, 4.6, 3.05, 'graytile')
-    hip_roof(wall, (x + 4.6, z), y + 0.7 + 3.05 + 1.35, 3.2, 3.2, 0.95, 0.45, 0.4, 'graytile', 'soffit')
-    # Gallery running west from the pavilion, lattice bays, lower roof.
-    box(wall, (x - 0.6, y + 0.7 + 1.3, z), (8.2, 0.18, 2.6), 'ashlar')
-    for i in range(5 if b.detail else 2):
-        cx = x - 3.4 + i * 1.6
-        cylinder(wall, (cx, y + 0.7, z - 1.05), 0.1, 2.3, 'wood', 6, 0.4)
-        cylinder(wall, (cx, y + 0.7, z + 1.05), 0.1, 2.3, 'wood', 6, 0.4)
-        if b.detail:
-            grille(wall, cx, y + 1.9, z, 1.2, 1.6, 'lattice', 2)
-            box(lit, (cx, y + 2.7, z + 1.15), (0.28, 0.4, 0.28), 'vermilion')
-    hip_roof(wall, (x - 0.6, z), y + 3.05, 8.4, 2.8, 0.7, 0.4, 0.2, 'graytile', 'soffit')
-    if b.detail:
-        railing(wall, (x - 4.2, z + 3.2), (x + 2.2, z + 3.2), y + 0.7, 0.85, 'ashlar', 0.9)
-    banyan(wall, (x - 6, y, z + 2), 12, 9, 21, b.detail)
-    banyan(wall, (x + 7, y, z - 3), 10, 7.5, 22, b.detail)
+    deck = y + 0.85
+    radius = 3.15
+    pad = []
+    for i in range(6):
+        angle = math.pi / 6 + i * math.tau / 6
+        pad.append((x + 4.2 + (radius + 1.1) * math.cos(angle), z + (radius + 1.1) * math.sin(angle)))
+    extrude(wall, pad, y, deck, 'ashlar', 1.2)
+    stairs(wall, (x + 4.2, y, z + radius + 2.6), (x + 4.2, deck, z + radius - 0.2), 1.8, 5 if b.detail else 3, 'granite')
+    for i in range(6):
+        angle = math.pi / 6 + i * math.tau / 6
+        cx, cz = x + 4.2 + radius * math.cos(angle), z + radius * math.sin(angle)
+        cylinder(wall, (cx, deck, cz), 0.2, 3.15, 'vermilion', 8 if b.detail else 5, 0.55)
+    hip_roof(wall, (x + 4.2, z), deck + 3.15, 6.4, 6.4, 2.15, 0.85, 0.65, 'blacktile', 'vermilion', tiers=2, sides=6)
+    # Glazed corridor running west: floor, columns, lattice windows, its own roof.
+    box(wall, (x - 1.2, y + 0.42, z), (9.4, 0.16, 3.0), 'ashlar')
+    bays = 5 if b.detail else 3
+    for i in range(bays):
+        cx = x - 4.6 + i * (8.2 / max(bays - 1, 1))
+        cylinder(wall, (cx, y + 0.5, z - 1.15), 0.14, 2.55, 'vermilion', 6, 0.4)
+        cylinder(wall, (cx, y + 0.5, z + 1.15), 0.14, 2.55, 'vermilion', 6, 0.4)
+        box(lit, (cx, y + 1.85, z - 1.15), (1.15, 1.7, 0.06), 'glass', None)
+        box(lit, (cx, y + 1.85, z + 1.15), (1.15, 1.7, 0.06), 'glass', None)
+    hip_roof(wall, (x - 1.2, z), y + 3.15, 9.6, 3.5, 1.25, 0.55, 0.5, 'graytile', 'vermilion')
+    banyan(wall, (x - 8, y, z - 6), 12, 9, 21, b.detail)
+    banyan(wall, (x + 10, y, z - 7), 10, 7.5, 22, b.detail)
     if b.collide:
-        solid(b.hit, (x + 1.5, y + 0.35, z), (12, 0.7, 6.2), 'ashlar')
+        solid(b.hit, (x + 4.2, y + 0.42, z), (7.2, 0.85, 7.2), 'ashlar')
+        solid(b.hit, (x - 1.2, y + 0.3, z), (9.4, 0.2, 3.0), 'ashlar')
+        ramp(b.hit, (x + 4.2, y + 0.05, z + radius + 2.6), (x + 4.2, deck, z + radius - 0.1), 1.6)
 
 
 def library(b):
@@ -95,19 +106,19 @@ def library(b):
     box(wall, (x, y + 4.3, z - 3.2), (20, 8.6, 10), 'cream', 2.2)
     stairs(wall, (x, y, z + 2.6), (x, y + 0.9, z + 1.6), 8.5, 5 if b.detail else 2, 'granite')
     for dx in (-6.3, -2.1, 2.1, 6.3):
-        cylinder(wall, (x + dx, y + 0.9, z + 1.55), 0.55, 6.4, 'ashlar', 10 if b.detail else 6, 1.5)
-        if b.detail:
-            cylinder(wall, (x + dx, y + 7.15, z + 1.55), 0.72, 0.35, 'ashlar', 8, 0.4)
-    # Pediment
-    wall.face([(x - 8.2, y + 8.7, z + 1.9), (x + 8.2, y + 8.7, z + 1.9), (x, y + 11.6, z + 1.9)], (0, 0, 1), 'cream', None)
-    wall.face([(x + 8.2, y + 8.7, z + 0.6), (x - 8.2, y + 8.7, z + 0.6), (x, y + 11.6, z + 0.6)], (0, 0, -1), 'cream', None)
-    wall.face([(x - 8.2, y + 8.7, z + 1.9), (x, y + 11.6, z + 1.9), (x, y + 11.6, z + 0.6), (x - 8.2, y + 8.7, z + 0.6)], (-1, 1, 0), 'cream', None)
-    wall.face([(x + 8.2, y + 8.7, z + 0.6), (x, y + 11.6, z + 0.6), (x, y + 11.6, z + 1.9), (x + 8.2, y + 8.7, z + 1.9)], (1, 1, 0), 'cream', None)
-    star(wall, (x, y + 10.2, z + 2.05), 0.85, 0.12, 'vermilion')
-    board(wall, x, y + 8.15, z + 2.05, 14.5, 0.7, 'sign_lib')
+        cylinder(wall, (x + dx, y + 0.9, z + 2.15), 0.72, 7.45, 'granite', 12 if b.detail else 6, 1.6)
+        cylinder(wall, (x + dx, y + 8.4, z + 2.15), 0.98, 0.28, 'granite', 8, 0.4)
+        box(wall, (x + dx, y + 8.75, z + 2.15), (1.7, 0.28, 1.7), 'granite', 0.4)
+    # Pediment proud of the columns, star in front of the triangle.
+    wall.face([(x - 8.6, y + 8.9, z + 3.15), (x + 8.6, y + 8.9, z + 3.15), (x, y + 12.4, z + 3.15)], (0, 0, 1), 'cream', None)
+    wall.face([(x + 8.6, y + 8.9, z + 2.3), (x - 8.6, y + 8.9, z + 2.3), (x, y + 12.4, z + 2.3)], (0, 0, -1), 'cream', None)
+    wall.face([(x - 8.6, y + 8.9, z + 3.15), (x, y + 12.4, z + 3.15), (x, y + 12.4, z + 2.3), (x - 8.6, y + 8.9, z + 2.3)], (-1, 1, 0), 'cream', None)
+    wall.face([(x + 8.6, y + 8.9, z + 2.3), (x, y + 12.4, z + 2.3), (x, y + 12.4, z + 3.15), (x + 8.6, y + 8.9, z + 3.15)], (1, 1, 0), 'cream', None)
+    star(wall, (x, y + 10.6, z + 3.4), 1.15, 0.16, 'vermilion')
+    board(wall, x, y + 8.35, z + 3.35, 12.5, 0.85, 'sign_lib')
     if b.detail:
         for col, row in ((-3.2, 2.4), (0, 2.4), (3.2, 2.4), (-3.2, 5.2), (0, 5.2), (3.2, 5.2)):
-            box(lit, (x + col, y + row, z + 1.95), (1.15, 1.7, 0.08), 'glass', None)
+            box(lit, (x + col, y + row, z + 1.85), (1.15, 1.7, 0.08), 'glass', None)
         arch_wall(wall, (x, y + 0.9, z + 1.7), 2.2, 2.6, 0.4, 1.3, 2.3, 'cream', 6)
     if b.collide:
         # Leave a 2 m doorway in the south front. Side masses and the back wall stay solid.
@@ -126,20 +137,24 @@ def hotel(b):
     box(wall, (x, y + 8.0, z - 4), (46, 16.0, 14), 'cream', 3)
     box(wall, (x - 28, y + 5.6, z - 4), (12, 11.2, 12), 'cream', 2.5)
     box(wall, (x + 28, y + 5.6, z - 4), (12, 11.2, 12), 'cream', 2.5)
-    hip_roof(wall, (x, z - 4), y + 16.0, 40, 12, 2.4, 1.1, 0.35, 'graytile', 'soffit')
-    hip_roof(wall, (x - 28, z - 4), y + 11.2, 12, 12, 1.6, 0.6, 0.25, 'graytile', 'soffit')
-    hip_roof(wall, (x + 28, z - 4), y + 11.2, 12, 12, 1.6, 0.6, 0.25, 'graytile', 'soffit')
-    hip_roof(wall, (x, z - 4), y + 18.6, 8, 6, 1.5, 0.4, 0.35, 'blacktile', 'soffit')
-    board(wall, x, y + 17.3, z + 2.3, 6.5, 1.1, 'sign_hotel')
+    hip_roof(wall, (x, z - 4), y + 16.05, 42, 13, 2.7, 1.3, 0.6, 'graytile', 'vermilion')
+    hip_roof(wall, (x - 28, z - 4), y + 11.25, 13, 12, 1.9, 0.75, 0.5, 'graytile', 'vermilion')
+    hip_roof(wall, (x + 28, z - 4), y + 11.25, 13, 12, 1.9, 0.75, 0.5, 'graytile', 'vermilion')
+    # Stacked pavilion roofs on the main block, each one smaller than the one below.
+    hip_roof(wall, (x, z - 4), y + 19.0, 22, 11, 2.8, 0.9, 0.55, 'blacktile', 'vermilion')
+    hip_roof(wall, (x, z - 4), y + 22.0, 12, 7, 2.2, 0.6, 0.5, 'blacktile', 'vermilion')
+    board(wall, x, y + 17.2, z + 3.4, 6.5, 1.1, 'sign_hotel')
     floors = 5 if b.detail else 2
     cols = 11 if b.detail else 4
     for row in range(floors):
-        box(wall, (x, y + 1.6 + row * 3.05, z + 3.15), (44, 0.12, 0.9), 'cream', 2)
+        eave_y = y + 3.05 * (row + 1)
+        box(wall, (x, eave_y, z + 3.85), (46.5, 0.32, 1.7), 'cream', 2)
+        box(wall, (x, eave_y + 0.22, z + 4.45), (47.2, 0.14, 0.7), 'graytile', 1.2)
         for col in range(cols):
             cx = x - 20 + 40 * col / (cols - 1)
-            box(lit, (cx, y + 2.3 + row * 3.05, z + 3.55), (1.5, 1.5, 0.06), 'glass', None)
-    banyan(wall, (x - 16, y, z + 10), 13, 10, 31, b.detail)
-    banyan(wall, (x + 14, y, z + 12), 12, 9, 32, b.detail)
+            box(lit, (cx, y + 2.15 + row * 3.05, z + 3.08), (1.45, 1.45, 0.06), 'glass', None)
+    banyan(wall, (x - 34, y, z - 2), 13, 10, 31, b.detail)
+    banyan(wall, (x + 34, y, z - 2), 12, 9, 32, b.detail)
     if b.collide:
         solid(b.hit, (x, y + 8, z - 4), (46, 16, 14), 'cream')
         solid(b.hit, (x - 28, y + 5.6, z - 4), (12, 11.2, 12), 'cream')
@@ -176,15 +191,16 @@ def steel_bridge(b):
 
 def shore(b):
     wall = b.parts['atlas']
-    post = 1.3 if b.detail else 6
+    post = 0.95 if b.detail else 8
     # North bank between the pavilion and 古南门, with a gap in front of the steps.
-    railing(wall, (-36, 7.2), (-2.2, 7.2), 0, 0.9, 'ashlar', post)
-    railing(wall, (2.2, 7.2), (72, 7.2), 0, 0.9, 'ashlar', post)
-    banyan(wall, (-8, 0, 4.5), 14, 11, 41, b.detail)
-    banyan(wall, (18, 0, 5.5), 13, 10, 42, b.detail)
+    railing(wall, (-36, 7.2), (-2.2, 7.2), 0, 0.95, 'granite', post, stone=True)
+    railing(wall, (2.2, 7.2), (72, 7.2), 0, 0.95, 'granite', post, stone=True)
+    # North of the pavilion, so a camera standing beside the pavilion is not inside a crown.
+    banyan(wall, (-16, 0, -8), 14, 11, 41, b.detail)
+    banyan(wall, (20, 0, -7), 13, 10, 42, b.detail)
     if b.detail:
-        banyan(wall, (48, 0, 6.0), 12, 9, 43, True)
-        banyan(wall, (-30, 0, 5), 11, 8, 44, True)
+        banyan(wall, (48, 0, -4), 12, 9, 43, True)
+        banyan(wall, (-34, 0, -6), 11, 8, 44, True)
 
 
 def build(b: Builder):

@@ -22,33 +22,36 @@ RECTS = {
     'rubble': (256, 0, 256, 256),
     'graytile': (512, 0, 256, 256),
     'blacktile': (768, 0, 256, 256),
-    'yellow': (0, 256, 256, 256),
-    'cream': (256, 256, 256, 256),
-    'vermilion': (512, 256, 256, 256),
-    'door': (768, 256, 256, 256),
-    'wood': (0, 512, 256, 256),
-    'lattice': (256, 512, 256, 256),
-    'granite': (512, 512, 256, 256),
-    'foliage': (768, 512, 256, 256),
-    'bark': (0, 768, 128, 128),
-    'steel': (128, 768, 128, 128),
-    'glaze': (256, 768, 192, 128),
-    'brick': (448, 768, 192, 128),
-    'glass': (640, 768, 128, 128),
-    'soffit': (768, 768, 128, 128),
-    'sign_kui': (896, 768, 128, 128),
-    'sign_gate': (0, 896, 256, 128),
-    'sign_school': (256, 896, 320, 128),
-    'sign_lib': (576, 896, 320, 128),
-    'sign_hotel': (896, 896, 128, 128),
+    'yellow': (0, 256, 256, 192),
+    'cream': (256, 256, 256, 192),
+    'vermilion': (512, 256, 256, 192),
+    'door': (768, 256, 256, 192),
+    'wood': (0, 448, 256, 192),
+    'lattice': (256, 448, 256, 192),
+    'granite': (512, 448, 256, 192),
+    'foliage': (768, 448, 256, 192),
+    'bark': (0, 640, 128, 128),
+    'steel': (128, 640, 128, 128),
+    'glaze': (256, 640, 128, 128),
+    'brick': (384, 640, 128, 128),
+    'glass': (512, 640, 128, 128),
+    'soffit': (640, 640, 128, 128),
+    # Plaques are 512 px wide so three characters stay readable from about 10 m.
+    'sign_gate': (0, 768, 512, 128),
+    'sign_school': (512, 768, 512, 128),
+    'sign_lib': (0, 896, 640, 128),
+    'sign_kui': (640, 896, 192, 128),
+    'sign_hotel': (832, 896, 192, 128),
 }
 
 
-def _font(size):
+def _font(size, bold=False):
+    if bold and Path('/System/Library/Fonts/Supplemental/Songti.ttc').exists():
+        return ImageFont.truetype('/System/Library/Fonts/Supplemental/Songti.ttc', size, index=0)
     for path in (
         '/System/Library/Fonts/Supplemental/Songti.ttc',
         '/System/Library/Fonts/Hiragino Sans GB.ttc',
-        '/System/Library/Fonts/STHeiti Light.ttc',
+        '/System/Library/Fonts/STHeiti Medium.ttc',
     ):
         if Path(path).exists():
             return ImageFont.truetype(path, size)
@@ -60,7 +63,7 @@ def _fill(img, rect, color):
     img[y:y + h, x:x + w] = color
 
 
-def _bricks(img, rect, color, mortar, bw, bh, seed, moss=0):
+def _bricks(img, rect, color, mortar, bw, bh, seed, moss=0, shade=16):
     x, y, w, h = rect
     rng = np.random.default_rng(seed)
     patch = np.empty((h, w, 3), np.uint8)
@@ -71,17 +74,17 @@ def _bricks(img, rect, color, mortar, bw, bh, seed, moss=0):
         offset = bw // 2 if row % 2 else 0
         xx = -offset
         while xx < w:
-            shade = rng.integers(-16, 17, 3)
+            jitter = rng.integers(-shade, shade + 1, 3)
             x0, x1 = max(0, xx + 2), min(w, xx + bw - 1)
             y0, y1 = min(h, yy + 2), min(h, yy + bh - 1)
             if x1 > x0 and y1 > y0:
-                patch[y0:y1, x0:x1] = np.clip(np.array(color) + shade, 0, 255)
+                patch[y0:y1, x0:x1] = np.clip(np.array(color) + jitter, 0, 255)
             xx += bw
         if moss and row % 3 == 0:
             for _ in range(moss):
                 mx = int(rng.integers(0, w))
                 my = min(h - 1, yy + bh - 1)
-                patch[max(0, my - 1):min(h, my + 2), max(0, mx - 2):min(w, mx + 3)] = (92, 108, 72)
+                patch[max(0, my - 1):min(h, my + 2), max(0, mx - 2):min(w, mx + 3)] = (118, 122, 118)
         yy += bh
         row += 1
     img[y:y + h, x:x + w] = patch
@@ -175,10 +178,10 @@ def _sign(img, rect, text, fill, bg, size):
     mode = Image.fromarray(img[y:y + h, x:x + w])
     draw = ImageDraw.Draw(mode)
     draw.rectangle((0, 0, w - 1, h - 1), fill=bg)
-    font = _font(size)
+    font = _font(size, bold=True)
     box = draw.textbbox((0, 0), text, font=font)
     tw, th = box[2] - box[0], box[3] - box[1]
-    draw.text(((w - tw) / 2 - box[0], (h - th) / 2 - box[1]), text, font=font, fill=fill)
+    draw.text(((w - tw) / 2 - box[0], (h - th) / 2 - box[1]), text, font=font, fill=fill, stroke_width=max(1, size // 18), stroke_fill=fill)
     img[y:y + h, x:x + w] = np.asarray(mode)
 
 
@@ -194,7 +197,7 @@ def paint_atlas():
     #7a4038 (03-2019 lattice shadow #593d32, brick #8b887f).
     """
     img = np.zeros((ATLAS, ATLAS, 3), np.uint8)
-    _bricks(img, RECTS['ashlar'], (186, 182, 170), (214, 210, 198), 46, 24, 3)
+    _bricks(img, RECTS['ashlar'], (198, 196, 188), (158, 156, 148), 92, 48, 3, moss=4)
     _rubble(img, RECTS['rubble'])
     _tiles(img, RECTS['graytile'], (104, 108, 110), (72, 74, 76), 4)
     _tiles(img, RECTS['blacktile'], (58, 60, 64), (36, 38, 42), 5)
@@ -208,7 +211,7 @@ def paint_atlas():
     _fill(img, RECTS['wood'], (122, 64, 56))
     _noise(img, RECTS['wood'], 8, 12)
     _lattice(img, RECTS['lattice'], (62, 36, 32), (148, 86, 72))
-    _bricks(img, RECTS['granite'], (168, 164, 150), (140, 136, 124), 64, 40, 15)
+    _bricks(img, RECTS['granite'], (174, 176, 172), (158, 160, 156), 48, 32, 15, shade=6)
     _foliage(img, RECTS['foliage'])
     _fill(img, RECTS['bark'], (92, 74, 56))
     _noise(img, RECTS['bark'], 12, 16)
@@ -216,20 +219,20 @@ def paint_atlas():
     _noise(img, RECTS['steel'], 6, 17)
     _tiles(img, RECTS['glaze'], (78, 128, 96), (48, 82, 64), 18)
     _bricks(img, RECTS['brick'], (150, 148, 140), (196, 194, 186), 28, 14, 19)
-    _fill(img, RECTS['glass'], (214, 196, 150))
-    _lattice(img, RECTS['glass'], (214, 196, 150), (120, 96, 72))
+    # Dark glass in daylight. Night glow stays on the window_lit material; the engine scales it.
+    _fill(img, RECTS['glass'], (42, 50, 58))
+    _lattice(img, RECTS['glass'], (42, 50, 58), (78, 86, 94))
     sx, sy, sw, sh = RECTS['soffit']
     soffit = np.empty((sh, sw, 3), np.uint8)
     for i in range(0, sh, 16):
         soffit[i:i + 8] = (168, 54, 48)
         soffit[i + 8:i + 16] = (236, 230, 220)
     img[sy:sy + sh, sx:sx + sw] = soffit
-    # Photo shows the stone plaque read right-to-left: 門南古.
-    _sign(img, RECTS['sign_gate'], '門南古', (36, 122, 96), (196, 194, 186), 48)
-    _sign(img, RECTS['sign_school'], '桂林中学', (154, 36, 34), (236, 234, 230), 64)
-    _sign(img, RECTS['sign_lib'], '图书馆榕湖分部', (138, 42, 40), (236, 232, 222), 36)
-    _sign(img, RECTS['sign_kui'], '奎光楼', (36, 110, 84), (122, 78, 62), 32)
-    _sign(img, RECTS['sign_hotel'], '榕湖饭店', (168, 42, 40), (236, 232, 220), 22)
+    _sign(img, RECTS['sign_gate'], '古南门', (24, 92, 70), (214, 212, 204), 78)
+    _sign(img, RECTS['sign_school'], '桂林中学', (154, 36, 34), (244, 242, 236), 72)
+    _sign(img, RECTS['sign_lib'], '图书馆榕湖分部', (138, 42, 40), (244, 240, 232), 48)
+    _sign(img, RECTS['sign_kui'], '奎光楼', (244, 236, 220), (122, 64, 52), 36)
+    _sign(img, RECTS['sign_hotel'], '榕湖饭店', (168, 42, 40), (244, 240, 232), 32)
     return Image.fromarray(img)
 
 
@@ -245,6 +248,7 @@ def ensure_textures(folder=None):
 class Mesh:
     def __init__(self):
         self.pos, self.nrm, self.uv, self.faces = [], [], [], []
+        self.detail = True
 
     def __len__(self):
         return len(self.faces)
@@ -255,7 +259,7 @@ class Mesh:
         self.uv.append((float(uv[0]), float(uv[1])))
         return len(self.pos) - 1
 
-    def face(self, pts, outward, region, tile=None):
+    def face(self, pts, outward, region, tile=None, uvs=None):
         pts = [np.asarray(p, np.float64) for p in pts]
         if len(pts) < 3:
             return
@@ -266,23 +270,28 @@ class Mesh:
         normal /= length
         if np.dot(normal, np.asarray(outward, np.float64)) < 0:
             pts = list(reversed(pts))
+            if uvs is not None:
+                uvs = list(reversed(uvs))
             normal = -normal
-        helper = np.array([0.0, 1.0, 0.0]) if abs(normal[1]) < 0.85 else np.array([1.0, 0.0, 0.0])
-        tangent = np.cross(helper, normal)
-        tangent /= np.linalg.norm(tangent)
-        bitangent = np.cross(normal, tangent)
-        raw = [(float(np.dot(p, tangent)), float(np.dot(p, bitangent))) for p in pts]
-        if tile is None:
-            us, vs = [u for u, _ in raw], [v for _, v in raw]
-            minu, maxu, minv, maxv = min(us), max(us), min(vs), max(vs)
-            du, dv = max(maxu - minu, 1e-6), max(maxv - minv, 1e-6)
-            local = [((u - minu) / du, (v - minv) / dv) for u, v in raw]
+        if uvs is not None:
+            local = [(float(u), float(v)) for u, v in uvs]
         else:
-            local = [(u / tile, v / tile) for u, v in raw]
+            helper = np.array([0.0, 1.0, 0.0]) if abs(normal[1]) < 0.85 else np.array([1.0, 0.0, 0.0])
+            tangent = np.cross(helper, normal)
+            tangent /= np.linalg.norm(tangent)
+            bitangent = np.cross(normal, tangent)
+            raw = [(float(np.dot(p, tangent)), float(np.dot(p, bitangent))) for p in pts]
+            if tile is None:
+                us, vs = [u for u, _ in raw], [v for _, v in raw]
+                minu, maxu, minv, maxv = min(us), max(us), min(vs), max(vs)
+                du, dv = max(maxu - minu, 1e-6), max(maxv - minv, 1e-6)
+                local = [((u - minu) / du, (v - minv) / dv) for u, v in raw]
+            else:
+                local = [(u / tile, v / tile) for u, v in raw]
         x, y, w, h = RECTS[region]
 
         def pack(u, v):
-            if tile is not None:
+            if tile is not None or uvs is not None:
                 u, v = u % 1.0, v % 1.0
             # three.js samples glTF UVs with v = 0 at the bottom of the image.
             return ((x + u * w) / ATLAS, 1.0 - (y + v * h) / ATLAS)
@@ -423,7 +432,7 @@ def extrude(mesh, polygon, y0, y1, region, tile=1.8):
         mesh.face([(a[0], y0, a[1]), (b[0], y0, b[1]), (b[0], y1, b[1]), (a[0], y1, a[1])], outward, region, tile)
 
 
-def arch_wall(mesh, center, width, height, thick, arch_w, arch_h, region, segments=10):
+def arch_wall(mesh, center, width, height, thick, arch_w, arch_h, region, segments=10, tile=1.3):
     """Wall along X, front toward +Z. `center` is the base center. Opening is empty."""
     ox, oy, oz = center
     radius = arch_w / 2
@@ -432,17 +441,17 @@ def arch_wall(mesh, center, width, height, thick, arch_w, arch_h, region, segmen
     inner_l, inner_r = ox - arch_w / 2, ox + arch_w / 2
     z0, z1 = oz - thick / 2, oz + thick / 2
     y1 = oy + height
-    box(mesh, ((left + inner_l) / 2, oy + height / 2, oz), (inner_l - left, height, thick), region, 1.3)
-    box(mesh, ((right + inner_r) / 2, oy + height / 2, oz), (right - inner_r, height, thick), region, 1.3)
+    box(mesh, ((left + inner_l) / 2, oy + height / 2, oz), (inner_l - left, height, thick), region, tile)
+    box(mesh, ((right + inner_r) / 2, oy + height / 2, oz), (right - inner_r, height, thick), region, tile)
     for i in range(segments):
         a0 = math.pi - math.pi * i / segments
         a1 = math.pi - math.pi * (i + 1) / segments
         x0, y_a = ox + radius * math.cos(a0), spring + radius * math.sin(a0)
         x1, y_b = ox + radius * math.cos(a1), spring + radius * math.sin(a1)
-        mesh.face([(x0, y_a, z1), (x1, y_b, z1), (x1, y1, z1), (x0, y1, z1)], (0, 0, 1), region, 1.2)
-        mesh.face([(x1, y_b, z0), (x0, y_a, z0), (x0, y1, z0), (x1, y1, z0)], (0, 0, -1), region, 1.2)
-        mesh.face([(x0, y_a, z1), (x0, y_a, z0), (x1, y_b, z0), (x1, y_b, z1)], (0, -1, 0), region, 1.2)
-        mesh.face([(x0, y1, z0), (x0, y1, z1), (x1, y1, z1), (x1, y1, z0)], (0, 1, 0), region, 1.2)
+        mesh.face([(x0, y_a, z1), (x1, y_b, z1), (x1, y1, z1), (x0, y1, z1)], (0, 0, 1), region, tile)
+        mesh.face([(x1, y_b, z0), (x0, y_a, z0), (x0, y1, z0), (x1, y1, z0)], (0, 0, -1), region, tile)
+        mesh.face([(x0, y_a, z1), (x0, y_a, z0), (x1, y_b, z0), (x1, y_b, z1)], (0, -1, 0), region, tile)
+        mesh.face([(x0, y1, z0), (x0, y1, z1), (x1, y1, z1), (x1, y1, z0)], (0, 1, 0), region, tile)
 
 
 def segment_wall(mesh, a, b, y0, y1, thick, region):
@@ -463,48 +472,198 @@ def segment_wall(mesh, a, b, y0, y1, thick, region):
               (0, 1, 0), region, 1.3)
 
 
-def hip_roof(mesh, center, y, width, depth, rise, overhang, lift, tile_region, soffit_region):
+def _course(mesh, quad, outward, region, along):
+    """Tile rows run along `along` (metres per repeat) and up the slope."""
+    pts = [np.asarray(p, np.float64) for p in quad]
+    span = np.linalg.norm(pts[1] - pts[0])
+    climb = np.linalg.norm(pts[3] - pts[0])
+    u = max(span / 0.46, 0.4)
+    v = max(climb / 0.32, 0.4)
+    mesh.face(quad, outward, region, uvs=[(0, 0), (u, 0), (u, v), (0, v)])
+    del along
+
+
+def _fascia(mesh, a, b, drop, region):
+    """Outward board under one eave segment. Thickness keeps the corner from reading as a spike."""
+    a, b = np.asarray(a, np.float64), np.asarray(b, np.float64)
+    edge = b - a
+    edge[1] = 0.0
+    length = float(np.linalg.norm(edge))
+    if length < 1e-4:
+        return
+    tangent = edge / length
+    outward = np.array([-tangent[2], 0.0, tangent[0]])
+    thick = 0.16
+    down = np.array([0.0, -drop, 0.0])
+    shift = outward * thick
+    ao, bo = a + shift, b + shift
+    mesh.face([ao, bo, bo + down, ao + down], outward, region, 0.55)
+    mesh.face([ao + down, bo + down, b + down, a + down], (0, -1, 0), region, 0.45)
+    mesh.face([a, b, bo, ao], (0, 1, 0), region, 0.4)
+
+
+def _soffit(mesh, a, b, center, reach):
+    """Underside of the overhang, so the eave has depth when seen from below."""
+    a, b = np.asarray(a, np.float64), np.asarray(b, np.float64)
+    mid = (a + b) / 2
+    inward = np.array([center[0] - mid[0], 0.0, center[1] - mid[2]])
+    norm = float(np.linalg.norm(inward))
+    if norm < 1e-4:
+        return
+    inward = inward / norm * min(reach, 0.9)
+    drop = np.array([0.0, -0.05, 0.0])
+    shift = np.array([inward[0], 0.0, inward[2]])
+    mesh.face([a + drop, b + drop, b + drop + shift, a + drop + shift], (0, -1, 0), 'soffit', 0.4)
+
+
+def _chiwen(mesh, origin, direction, region):
+    """Simplified 吻兽: three blocks stepping up and out from the ridge end."""
+    ox, oy, oz = origin
+    dx, dz = direction
+    box(mesh, (ox + dx * 0.2, oy + 0.55, oz + dz * 0.2), (0.46, 1.05, 0.34), region, 0.35)
+    box(mesh, (ox + dx * 0.62, oy + 1.2, oz + dz * 0.62), (0.34, 0.7, 0.26), region, 0.3)
+    box(mesh, (ox + dx * 0.98, oy + 1.65, oz + dz * 0.98), (0.24, 0.4, 0.2), region, 0.25)
+
+
+def xieshan(mesh, center, y, width, depth, rise, overhang, lift, tile_region, fascia_region, tiers=1, gable_region='wood', sides=4):
+    """Traditional roof shared by the C-group landmarks.
+
+    Rectangular plan is a 歇山顶: four lower slopes, then a gable (山花) and a
+    ridge with a horn at each end. `sides=6` is a hexagonal pavilion roof.
+    Corners of the eave are lifted 0.4–0.8 m. `tiers=2` stacks a smaller upper roof.
+    """
+    lift = float(min(0.8, max(0.4, lift)))
+    if not getattr(mesh, 'detail', True):
+        tiers = 1
+    for tier in range(max(1, tiers)):
+        scale = 0.74 ** tier
+        _one_roof(
+            mesh, center, y + tier * rise * 0.78, width * scale, depth * scale,
+            rise * (0.7 if tier else 1), overhang * scale, lift, tile_region, fascia_region, gable_region, sides,
+        )
+
+
+def _one_roof(mesh, center, y, width, depth, rise, overhang, lift, tile_region, fascia_region, gable_region, sides):
     x, z = center
+    if sides >= 6:
+        _hex_roof(mesh, center, y, min(width, depth) / 2 + overhang, rise, lift, tile_region, fascia_region)
+        return
     hw, hd = width / 2 + overhang, depth / 2 + overhang
-    ridge = max(width - depth, 0.6) / 2
-    y1 = y + rise
-    sw, se = (x - hw, y + lift, z + hd), (x + hw, y + lift, z + hd)
-    ne, nw = (x + hw, y + lift, z - hd), (x - hw, y + lift, z - hd)
-    rw, re = (x - ridge, y1, z), (x + ridge, y1, z)
-    mesh.face([sw, se, re, rw], (0, rise, hd), tile_region, 0.7)
-    mesh.face([ne, nw, rw, re], (0, rise, -hd), tile_region, 0.7)
-    mesh.face([se, ne, re], (hw, rise, 0), tile_region, 0.7)
-    mesh.face([nw, sw, rw], (-hw, rise, 0), tile_region, 0.7)
-    # Soffit a little inside the eave so the underside reads red/white from below.
-    inset = 0.15
-    ssw, sse = (x - hw + inset, y - 0.02, z + hd - inset), (x + hw - inset, y - 0.02, z + hd - inset)
-    sne, snw = (x + hw - inset, y - 0.02, z - hd + inset), (x - hw + inset, y - 0.02, z - hd + inset)
-    mesh.face([sse, ssw, snw, sne], (0, -1, 0), soffit_region, None)
-    for corner, outward in ((sw, (-1, 0, 1)), (se, (1, 0, 1)), (ne, (1, 0, -1)), (nw, (-1, 0, -1))):
-        tip = (corner[0] + outward[0] * 0.55, corner[1] + 0.7, corner[2] + outward[2] * 0.55)
-        mesh.face([corner, (corner[0], corner[1] + 0.15, corner[2]), tip], outward, tile_region, None)
+    detail = getattr(mesh, 'detail', True)
+    segments = (8 if min(hw, hd) >= 3.2 else 5) if detail else 2
+
+    def edge(p0, p1):
+        pts = []
+        for i in range(segments + 1):
+            t = i / segments
+            point = p0 * (1 - t) + p1 * t
+            corner = min(t, 1 - t) / 0.16
+            point[1] = y + lift * max(0.0, 1 - corner) ** 2
+            pts.append(point)
+        return pts
+
+    south = edge(np.array([x - hw, y, z + hd]), np.array([x + hw, y, z + hd]))
+    east = edge(np.array([x + hw, y, z + hd]), np.array([x + hw, y, z - hd]))
+    north = edge(np.array([x + hw, y, z - hd]), np.array([x - hw, y, z - hd]))
+    west = edge(np.array([x - hw, y, z - hd]), np.array([x - hw, y, z + hd]))
+    if detail:
+        for ring in (south, east, north, west):
+            for a, b in zip(ring, ring[1:]):
+                _fascia(mesh, a, b, 0.46, fascia_region)
+                _soffit(mesh, a, b, (x, z), overhang * 0.9)
+    # 收山: hips stop and the gable starts, far enough in that the 山花 reads.
+    gy = y + rise * 0.5
+    ix, iz = max(hw * 0.46, hw - 2.6), hd * 0.34
+    ring_top = {
+        's': (np.array([x - ix, gy, z + iz]), np.array([x + ix, gy, z + iz])),
+        'n': (np.array([x + ix, gy, z - iz]), np.array([x - ix, gy, z - iz])),
+        'e': (np.array([x + ix, gy, z + iz]), np.array([x + ix, gy, z - iz])),
+        'w': (np.array([x - ix, gy, z - iz]), np.array([x - ix, gy, z + iz])),
+    }
+    for name, ring in (('s', south), ('e', east), ('n', north), ('w', west)):
+        top0, top1 = ring_top[name]
+        outward = {'s': (0, rise, hd), 'n': (0, rise, -hd), 'e': (hw, rise, 0), 'w': (-hw, rise, 0)}[name]
+        for i in range(segments):
+            t0, t1 = i / segments, (i + 1) / segments
+            a, b = ring[i], ring[i + 1]
+            c = top0 * (1 - t1) + top1 * t1
+            d = top0 * (1 - t0) + top1 * t0
+            _course(mesh, [a, b, c, d], outward, tile_region, 0.46)
+    ridge_y = y + rise
+    half = ix * 0.96
+    rw, re = np.array([x - half, ridge_y, z]), np.array([x + half, ridge_y, z])
+    s0, s1 = ring_top['s']
+    n0, n1 = ring_top['n']
+    _course(mesh, [s0, s1, re, rw], (0, rise, iz), tile_region, 0.46)
+    _course(mesh, [n1, n0, rw, re], (0, rise, -iz), tile_region, 0.46)
+    # 山花, the vertical triangle on each gable end.
+    mesh.face([ring_top['e'][0], ring_top['e'][1], re], (1, 0, 0), gable_region, None)
+    mesh.face([ring_top['w'][0], ring_top['w'][1], rw], (-1, 0, 0), gable_region, None)
+    if detail:
+        span = float(np.linalg.norm(re - rw))
+        box(mesh, ((rw[0] + re[0]) / 2, ridge_y + 0.18, z), (span, 0.36, 0.42), tile_region, 0.45)
+        _chiwen(mesh, re, (1, 0), tile_region)
+        _chiwen(mesh, rw, (-1, 0), tile_region)
 
 
-def railing(mesh, a, b, y, height, region, post=0.8):
+def _hex_roof(mesh, center, y, radius, rise, lift, tile_region, fascia_region):
+    x, z = center
+    corners = []
+    for i in range(6):
+        angle = math.pi / 6 + i * math.pi / 3
+        corners.append(np.array([x + radius * math.cos(angle), y, z + radius * math.sin(angle)]))
+    edges = []
+    for i, a in enumerate(corners):
+        b = corners[(i + 1) % 6]
+        steps = 4 if getattr(mesh, 'detail', True) else 2
+        pts = []
+        for step in range(steps):
+            t = step / (steps - 1)
+            point = a * (1 - t) + b * t
+            corner = min(t, 1 - t) / 0.16
+            point[1] = y + lift * max(0.0, 1 - corner) ** 2
+            pts.append(point)
+        edges.append(pts)
+        if getattr(mesh, 'detail', True):
+            for p, q in zip(pts, pts[1:]):
+                _fascia(mesh, p, q, 0.4, fascia_region)
+                _soffit(mesh, p, q, (x, z), radius * 0.28)
+    apex = np.array([x, y + rise, z])
+    for pts in edges:
+        for p, q in zip(pts, pts[1:]):
+            span = np.linalg.norm(q - p)
+            climb = np.linalg.norm(apex - (p + q) / 2)
+            mesh.face([p, q, apex], q + p - 2 * np.array([x, y, z]), tile_region,
+                      uvs=[(0, 0), (max(span / 0.46, 0.4), 0), (max(span / 0.92, 0.2), max(climb / 0.32, 0.4))])
+    box(mesh, (x, y + rise + 0.28, z), (0.28, 0.5, 0.28), tile_region, 0.3)
+
+
+def hip_roof(mesh, center, y, width, depth, rise, overhang, lift, tile_region, soffit_region, tiers=1, sides=4):
+    xieshan(mesh, center, y, width, depth, rise, overhang, lift, tile_region, soffit_region, tiers=tiers, sides=sides)
+
+
+def railing(mesh, a, b, y, height, region, post=0.8, stone=False):
     a, b = np.asarray(a, np.float64), np.asarray(b, np.float64)
     delta = b - a
     length = np.linalg.norm(delta)
     if length < 0.2:
         return
     direction = delta / length
-    side = np.array([-direction[1], direction[0]])
     count = max(2, int(length / post) + 1)
+    yaw = math.atan2(-direction[1], direction[0])
+    mid = (a + b) / 2
+    if stone:
+        for i in range(count):
+            p = a + delta * (i / (count - 1))
+            box(mesh, (p[0], y + height * 0.42, p[1]), (0.26, height * 0.84, 0.26), region, 0.4)
+            box(mesh, (p[0], y + height - 0.08, p[1]), (0.4, 0.16, 0.4), region, 0.3)
+        yaw_box(mesh, (mid[0], y + height - 0.02, mid[1]), (length, 0.2, 0.28), yaw, region, 0.6)
+        return
     for i in range(count):
         p = a + delta * (i / (count - 1))
         box(mesh, (p[0], y + height * 0.45, p[1]), (0.12, height * 0.9, 0.12), region, 0.5)
-    mid = (a + b) / 2
-    along = length
-    thick = 0.1
-    # Top and bottom rails as yaw-aligned boxes.
-    yaw = math.atan2(-direction[1], direction[0])
-    yaw_box(mesh, (mid[0], y + height - 0.06, mid[1]), (along, 0.1, thick), yaw, region, 0.8)
-    yaw_box(mesh, (mid[0], y + 0.28, mid[1]), (along, 0.08, 0.08), yaw, region, 0.8)
-    del side
+    yaw_box(mesh, (mid[0], y + height - 0.06, mid[1]), (length, 0.1, 0.1), yaw, region, 0.8)
+    yaw_box(mesh, (mid[0], y + 0.28, mid[1]), (length, 0.08, 0.08), yaw, region, 0.8)
 
 
 def stairs(mesh, a, b, width, count, region):
@@ -538,32 +697,49 @@ def ramp(mesh, a, b, width, thickness=0.28):
     mesh.face([c0 - normal, c3 - normal, c2 - normal, c1 - normal], (0, -1, 0), 'granite', 1.0)
 
 
+def _canopy(mesh, center, rx, ry, rz, region, bands, segments):
+    """One flattened crown. Wider than it is tall, not a stack of balls."""
+    cx, cy, cz = center
+    rings = []
+    for i in range(bands + 1):
+        v = i / bands
+        lat = math.radians(-18 + 100 * v)
+        rad_y = math.sin(lat)
+        rad_h = math.cos(lat)
+        ring = []
+        for j in range(segments):
+            u = j / segments * math.tau
+            ring.append((cx + rx * rad_h * math.cos(u), cy + ry * rad_y, cz + rz * rad_h * math.sin(u)))
+        rings.append(ring)
+    for i in range(bands):
+        for j in range(segments):
+            k = (j + 1) % segments
+            mesh.face([rings[i][j], rings[i][k], rings[i + 1][k], rings[i + 1][j]],
+                      np.mean([rings[i][j], rings[i + 1][k]], axis=0) - np.array(center), region, 2.4)
+
+
 def banyan(mesh, origin, height, crown, seed, detail):
     rng = np.random.default_rng(seed)
     x, y, z = origin
-    trunk_h = height * 0.46
-    cylinder(mesh, (x, y, z), 0.55 * (height / 14), trunk_h, 'bark', 8 if detail else 5, 1.4)
-    blob = trimesh.creation.icosphere(subdivisions=1 if detail else 0, radius=1.0)
-    centers = [(0, trunk_h + crown * 0.25, 0), (-crown * 0.28, trunk_h + crown * 0.05, crown * 0.1),
-               (crown * 0.3, trunk_h + crown * 0.12, -crown * 0.05), (0.05, trunk_h + crown * 0.42, -crown * 0.18),
-               (-0.1, trunk_h + crown * 0.38, crown * 0.22)]
-    scales = [crown * 0.55, crown * 0.42, crown * 0.4, crown * 0.36, crown * 0.32]
-    if not detail:
-        centers, scales = centers[:2], scales[:2]
-    for (dx, dy, dz), scale in zip(centers, scales):
-        for face in blob.faces:
-            pts = [blob.vertices[i] * scale + (x + dx, y + dy, z + dz) for i in face]
-            mesh.face(pts, np.mean(pts, axis=0) - (x + dx, y + dy, z + dz), 'foliage', 3.0)
+    spread = max(crown, height * 0.95)
+    trunk_h = height * 0.38
+    cylinder(mesh, (x, y, z), 0.62 * (height / 14), trunk_h, 'bark', 8 if detail else 5, 1.4)
     if not detail:
         return
-    for n in range(8):
-        angle = n / 8 * math.tau + float(rng.random())
-        reach = crown * (0.35 + 0.25 * float(rng.random()))
-        top = (x + math.cos(angle) * 0.4, y + trunk_h * 0.85, z + math.sin(angle) * 0.4)
-        mid = (x + math.cos(angle) * reach, y + trunk_h * 0.45, z + math.sin(angle) * reach)
-        end = (x + math.cos(angle) * reach * 0.85, y, z + math.sin(angle) * reach * 0.85)
-        tube(mesh, top, mid, 0.06, 'bark', 4)
-        tube(mesh, mid, end, 0.045, 'bark', 4)
+    crown_h = spread * 0.36
+    _canopy(mesh, (x, y + trunk_h + crown_h * 0.31, z), spread * 0.92, crown_h, spread * 0.78, 'foliage', 6, 14)
+    branch_y = y + trunk_h + crown_h * 0.42
+    count = 16
+    for n in range(count):
+        angle = n / count * math.tau + float(rng.uniform(-0.08, 0.08))
+        reach = spread * float(rng.uniform(0.42, 0.78))
+        tip = np.array([x + math.cos(angle) * reach, branch_y - 0.15, z + math.sin(angle) * reach])
+        root = np.array([x + math.cos(angle) * 0.35, branch_y, z + math.sin(angle) * 0.35])
+        tube(mesh, root, tip, 0.07, 'bark', 4)
+        thick = n < 3
+        radius = 0.16 if thick else 0.04
+        drop = branch_y - y if thick else branch_y * 0 + float(rng.uniform(1.4, trunk_h * 0.7))
+        tube(mesh, tip, (tip[0], tip[1] - drop, tip[2]), radius, 'bark', 5 if thick else 4)
 
 
 def star(mesh, center, radius, depth, region):
@@ -622,6 +798,8 @@ class Builder:
         self.collide = collide
         self.parts = {'atlas': Mesh(), 'lit': Mesh(), 'steel': Mesh()}
         self.hit = Mesh()
+        for part in self.parts.values():
+            part.detail = self.lod == 0
 
     @property
     def detail(self):

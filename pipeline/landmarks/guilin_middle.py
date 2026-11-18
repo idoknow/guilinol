@@ -30,64 +30,66 @@ from c_kit import (
 
 
 def board(mesh, x, y, z, w, h, region):
-    mesh.face([(x - w / 2, y - h / 2, z), (x + w / 2, y - h / 2, z), (x + w / 2, y + h / 2, z), (x - w / 2, y + h / 2, z)], (0, 0, 1), region, None)
+    mesh.face(
+        [(x - w / 2, y - h / 2, z), (x + w / 2, y - h / 2, z), (x + w / 2, y + h / 2, z), (x - w / 2, y + h / 2, z)],
+        (0, 0, 1), region, uvs=[(0.01, 0.99), (0.99, 0.99), (0.99, 0.01), (0.01, 0.01)],
+    )
 
 
-def lion(mesh, x, z, yaw):
-    # Blocky seated lion, about 1.35 m, gray stone. Yaw turns the head toward the road.
-    box(mesh, (x, 0.18, z), (0.7, 0.28, 1.05), 'ashlar', 0.4)
-    box(mesh, (x, 0.62, z + 0.05), (0.55, 0.6, 0.85), 'ashlar', 0.4)
-    head = (x + math.sin(yaw) * 0.15, 1.15, z + math.cos(yaw) * 0.35)
-    box(mesh, head, (0.38, 0.36, 0.42), 'ashlar', 0.3)
-    box(mesh, (head[0], 1.28, head[2] - 0.05), (0.46, 0.16, 0.28), 'ashlar', 0.3)
+def lion(mesh, x, y, z, yaw, scale=1.0):
+    """Blocky seated lion. `scale` 1 is about 1.6 m, gray stone. Yaw turns the head toward the road."""
+    s = scale
+    box(mesh, (x, y + 0.22 * s, z), (0.85 * s, 0.36 * s, 1.25 * s), 'granite', 0.4)
+    box(mesh, (x, y + 0.75 * s, z + 0.05 * s), (0.68 * s, 0.7 * s, 1.0 * s), 'granite', 0.4)
+    head = (x + math.sin(yaw) * 0.18 * s, y + 1.35 * s, z + math.cos(yaw) * 0.42 * s)
+    box(mesh, head, (0.46 * s, 0.42 * s, 0.5 * s), 'granite', 0.3)
+    box(mesh, (head[0], head[1] + 0.16 * s, head[2] - 0.04 * s), (0.55 * s, 0.18 * s, 0.32 * s), 'granite', 0.3)
 
 
 def gate(b, z=32.9):
     wall, lit = b.parts['atlas'], b.parts['lit']
-    # Two gray cylinders and a white beam. Opening between the columns is about 6.4 m.
-    for x in (-3.55, 3.55):
-        cylinder(wall, (x, 0, z), 0.52, 6.15, 'ashlar', 10 if b.detail else 6, 1.2)
-    box(wall, (0, 6.85, z), (13.6, 1.35, 1.7), 'cream', 1.4)
-    board(wall, 0, 6.9, z + 0.95, 8.2, 0.95, 'sign_school')
-    hip_roof(wall, (0, z), 7.55, 12.4, 2.4, 0.85, 0.35, 0.18, 'glaze', 'glaze')
-    # Side piers and white wings. The central path stays open toward 奎光楼.
-    for x in (-6.6, 6.6):
-        box(wall, (x, 3.4, z), (1.3, 6.8, 1.5), 'cream', 1.2)
-        if b.detail:
-            box(wall, (x, 7.55, z), (0.7, 0.45, 0.7), 'ashlar', 0.3)
-    box(wall, (-11.2, 6.2, z - 1.5), (8.5, 12.4, 8), 'cream', 2)
-    box(wall, (11.2, 6.2, z - 1.5), (8.5, 12.4, 8), 'cream', 2)
-    hip_roof(wall, (-11.2, z - 1.5), 12.4, 8.8, 8.2, 1.3, 0.4, 0.15, 'glaze', 'glaze')
-    hip_roof(wall, (11.2, z - 1.5), 12.4, 8.8, 8.2, 1.3, 0.4, 0.15, 'glaze', 'glaze')
+    # Two gray stone columns, a lion on each capital, a white beam with red 桂林中学.
+    for x in (-3.85, 3.85):
+        cylinder(wall, (x, 0, z), 0.92, 6.15, 'granite', 16 if b.detail else 8, 2.4)
+        box(wall, (x, 6.32, z), (2.15, 0.42, 2.15), 'granite', 0.8)
+        lion(wall, x, 6.48, z + 1.45, 0.25 if x < 0 else -0.25, 0.78)
+    box(wall, (0, 6.7, z), (14.4, 1.15, 1.9), 'cream', 1.4)
+    board(wall, 0, 6.72, z + 1.08, 8.8, 0.95, 'sign_school')
+    hip_roof(wall, (0, z), 8.05, 15.6, 4.6, 2.05, 0.75, 0.55, 'glaze', 'cream')
+    # White teaching block behind the columns. Side wings stay behind the columns,
+    # so the pair of piers reads as the gate and not as two beige towers.
+    box(wall, (0, 5.4, z - 11), (22, 10.8, 14), 'cream', 2.2)
+    hip_roof(wall, (0, z - 11), 10.9, 23, 15, 2.8, 0.85, 0.5, 'glaze', 'cream')
+    for x in (-12.4, 12.4):
+        box(wall, (x, 3.5, z - 12), (6.4, 7.0, 10), 'cream', 1.6)
+        hip_roof(wall, (x, z - 12), 7.1, 7.2, 11, 1.7, 0.5, 0.45, 'glaze', 'cream')
     if b.detail:
-        for x in (-11.2, 11.2):
-            for row in (2.2, 5.4, 8.6):
-                box(lit, (x, row, z + 2.6), (1.3, 1.6, 0.08), 'glass', None)
-        for i in range(4):
-            box(lit, (-1.6 + i * 1.05, 6.35, z + 0.2), (0.45, 0.7, 0.45), 'vermilion')
-    lion(wall, -2.15, z + 2.4, 0.4)
-    lion(wall, 2.15, z + 2.4, -0.4)
+        for x in (-6, -2, 2, 6):
+            for row in (2.4, 5.6, 8.6):
+                box(lit, (x, row, z - 3.4), (1.4, 1.55, 0.08), 'glass', None)
+    lion(wall, -5.4, 0, z + 3.4, 0.5, 1.25)
+    lion(wall, 5.4, 0, z + 3.4, -0.5, 1.25)
     if b.collide:
-        for x in (-3.55, 3.55, -6.6, 6.6):
-            solid(b.hit, (x, 3.4, z), (1.15, 6.8, 1.4), 'ashlar')
-        solid(b.hit, (0, 6.9, z), (13.6, 1.4, 1.7), 'cream')
-        solid(b.hit, (-11.2, 6.2, z - 1.5), (8.5, 12.4, 8), 'cream')
-        solid(b.hit, (11.2, 6.2, z - 1.5), (8.5, 12.4, 8), 'cream')
-        solid(b.hit, (-2.15, 0.6, z + 2.4), (0.7, 1.2, 1.0), 'ashlar')
-        solid(b.hit, (2.15, 0.6, z + 2.4), (0.7, 1.2, 1.0), 'ashlar')
+        for x in (-3.85, 3.85):
+            solid(b.hit, (x, 3.3, z), (1.9, 6.6, 1.9), 'granite')
+        solid(b.hit, (0, 6.7, z), (14.4, 1.2, 1.9), 'cream')
+        solid(b.hit, (0, 5.4, z - 11), (22, 10.8, 14), 'cream')
+        solid(b.hit, (-12.4, 3.5, z - 12), (6.4, 7.0, 10), 'cream')
+        solid(b.hit, (12.4, 3.5, z - 12), (6.4, 7.0, 10), 'cream')
+        solid(b.hit, (-5.4, 0.8, z + 3.4), (1.0, 1.6, 1.4), 'granite')
+        solid(b.hit, (5.4, 0.8, z + 3.4), (1.0, 1.6, 1.4), 'granite')
 
 
 def kuiguang(b):
     wall = b.parts['atlas']
     # Front gallery faces south. Gable wall is the east end, with the round window.
     width, depth = 13.5, 8.2
-    box(wall, (0, 4.6, -1.2), (width, 9.2, depth), 'brick', 1.6)
-    # Gable raised on the east, curved top approximated by a stepped wall.
-    box(wall, (width / 2 - 0.2, 6.2, -1.2), (0.55, 12.4, depth), 'brick', 1.2)
+    box(wall, (0, 3.55, -1.2), (width, 7.1, depth), 'brick', 1.6)
+    # Round window sits on the east wall, inside the building height. The old slab
+    # that rose past the roof was this model's own gable, not a leftover OSM block.
     if b.detail:
-        box(wall, (width / 2 - 0.2, 11.6, -1.2), (0.55, 1.6, depth * 0.55), 'brick', 0.8)
-        ring(wall, (width / 2 + 0.1, 7.4, -1.2), 0.85, 0.55, 'brick', 'x', 12 if b.detail else 8)
-        disc(wall, (width / 2 + 0.16, 7.4, -1.2), 0.5, 'wood', 10, 'x')
+        ring(wall, (width / 2 + 0.04, 4.7, -1.2), 0.95, 0.62, 'brick', 'x', 12)
+        disc(wall, (width / 2 + 0.1, 4.7, -1.2), 0.55, 'wood', 10, 'x')
     # Two-storey wooden gallery proud of the south face.
     for x in (-4.8, -2.4, 0, 2.4, 4.8):
         cylinder(wall, (x, 0.35, 3.55), 0.16, 3.3, 'wood', 8 if b.detail else 5, 0.6)
@@ -101,18 +103,17 @@ def kuiguang(b):
         for x in (-4.6, -3.1, -1.5, 0, 1.5, 3.1, 4.6):
             grille(wall, x, 1.7, 4.45, 1.15, 2.5, 'lattice', 4)
             grille(wall, x, 5.15, 4.45, 1.15, 1.7, 'lattice', 4)
-        railing(wall, (-6, 8), (-6, 30), 0, 0.85, 'ashlar', 0.65)
-        railing(wall, (6, 8), (6, 30), 0, 0.85, 'ashlar', 0.65)
+        railing(wall, (-6, 6.2), (-6, 14), 0, 0.9, 'granite', 1.6, stone=True)
+        railing(wall, (6, 6.2), (6, 14), 0, 0.9, 'granite', 1.6, stone=True)
     stairs(wall, (0, 0, 6.3), (0, 0.35, 4.6), 3.2, 3, 'granite')
-    hip_roof(wall, (0, -0.4), 7.15, 14.2, 9.4, 2.5, 0.85, 0.45, 'blacktile', 'soffit')
-    board(wall, 0, 6.55, 4.55, 1.8, 0.6, 'sign_kui')
-    # 文保碑, a small stone slab in front of the gable, from 02-2019.jpg.
-    box(wall, (5.2, 0.85, 6.4), (0.9, 1.7, 0.18), 'ashlar', None)
-    banyan(wall, (-8, 0, 8), 9, 6.5, 51, b.detail)
+    hip_roof(wall, (0, -0.4), 7.15, 14.8, 9.8, 3.6, 1.15, 0.65, 'blacktile', 'cream')
+    board(wall, 0, 6.55, 4.55, 2.2, 0.7, 'sign_kui')
+    # 文保碑, a small stone slab in front of the gallery, from 02-2019.jpg.
+    box(wall, (5.2, 0.85, 6.4), (0.9, 1.7, 0.18), 'granite', None)
+    banyan(wall, (-14, 0, -6), 9, 6.5, 51, b.detail)
     if b.collide:
-        # Back and gable stop you; the south gallery is a porch you can step into.
-        solid(b.hit, (0, 4.6, -2.6), (width, 9.2, 5.2), 'brick')
-        solid(b.hit, (width / 2 - 0.2, 6, -1.2), (0.55, 12, depth), 'brick')
+        # Back wall stops you; the south gallery is a porch you can step into.
+        solid(b.hit, (0, 3.55, -2.6), (width, 7.1, 5.2), 'brick')
         for x in (-4.8, -2.4, 0, 2.4, 4.8):
             solid(b.hit, (x, 3.4, 3.55), (0.28, 6.6, 0.28), 'wood')
         solid(b.hit, (0, 4.2, 3.55), (11, 0.16, 1.6), 'wood')
