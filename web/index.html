@@ -19,12 +19,15 @@
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="preload" as="fetch" crossorigin href="./world/manifest.json"><link rel="preload" as="fetch" crossorigin href="./world/underlay.i16"><link rel="preload" as="fetch" crossorigin href="./world/overview.png">
 <style>body{margin:0;font-family:"Noto Serif SC","Source Han Serif SC","Songti SC",serif}canvas{display:block;touch-action:none}
+.vehicle-action{position:fixed;right:calc(20px + env(safe-area-inset-right));bottom:calc(194px + env(safe-area-inset-bottom));padding:9px 16px;border-radius:18px;z-index:2;font-size:14px;letter-spacing:.08em}
+body[data-aboard] .btn-jump{display:none}
 output,footer,.hint{position:fixed;left:10px;background:rgba(28,44,42,.42);color:#eef3ee;font:11px/1.4 ui-monospace,monospace;padding:3px 8px;border-radius:10px;pointer-events:none;backdrop-filter:blur(4px)}output{top:10px}footer{left:auto;right:10px;bottom:10px;font-size:10px;opacity:.8}
 .hint{left:50%;bottom:36px;transform:translateX(-50%);font:12px/1.5 "Noto Serif SC","Source Han Serif SC","Songti SC",serif;letter-spacing:.06em;padding:4px 14px;white-space:nowrap;opacity:.9}
 .toast{position:fixed;left:50%;top:18%;transform:translate(-50%,-8px);background:rgba(28,44,42,.62);color:#f4efe2;font-size:15px;letter-spacing:.08em;padding:10px 20px;border-radius:14px;backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .35s,transform .35s}
 .toast.show{opacity:1;transform:translate(-50%,0)}
-.walk-ui button,.btn-mode,.btn-about{font-family:inherit;color:#f4efe2;background:rgba(28,44,42,.42);border:1px solid rgba(244,239,226,.38);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:background .15s,transform .15s}
-.walk-ui button:active,.btn-mode:active,.btn-about:active{background:rgba(169,80,60,.62);transform:scale(.94)}
+.walk-ui button,.btn-mode,.btn-about,.vehicle-action{font-family:inherit;color:#f4efe2;background:rgba(28,44,42,.42);border:1px solid rgba(244,239,226,.38);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;transition:background .15s,transform .15s}
+.vehicle-action{border-color:rgba(214,120,92,.85)}
+.walk-ui button:active,.btn-mode:active,.btn-about:active,.vehicle-action:active{background:rgba(169,80,60,.62);transform:scale(.94)}
 .joystick{position:fixed;left:calc(22px + env(safe-area-inset-left));bottom:calc(30px + env(safe-area-inset-bottom));width:124px;height:124px;border-radius:50%;display:grid;place-items:center;touch-action:none;
   background:radial-gradient(circle,rgba(28,44,42,.18) 0 55%,rgba(28,44,42,.36) 56% 100%);border:1px solid rgba(244,239,226,.38);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .joystick::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid rgba(169,80,60,0);transition:border-color .2s}

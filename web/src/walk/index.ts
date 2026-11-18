@@ -7,6 +7,8 @@ import {walkInput} from '../ui/walk'
 import {avatar} from '../look/avatar'
 import {walkConfig as cfg} from './config'
 import {createPhysics} from './physics'
+import {look} from '../look/config'
+import type {vehicles} from './vehicles'
 
 export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canvas:HTMLCanvasElement,manifest:Manifest,stream:Stream,peaks:THREE.Group,verify:boolean){
   const [sim,model]=await Promise.all([createPhysics(manifest,stream,peaks),new GLTFLoader().loadAsync(avatar.path)])
@@ -20,6 +22,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const safe=new THREE.Vector3(),focus=new THREE.Vector3(),direction=new THREE.Vector3();const spawns:object[]=[]
   let external:{x:number,z:number,run:boolean}|null=null,blockedWater=false,held=false
   const still={right:0,forward:0,run:false,jump:false}
+  let rides:Awaited<ReturnType<typeof vehicles>>|null=null,loading=false
+  function loadRides(){if(loading||rides||!active||!manifest.vehicles)return;loading=true
+    const file=manifest.vehicles.file
+    void import('./vehicles').then(module=>module.vehicles(scene,file,(x,z)=>{sim.sync(x,z);return place(x,z,'dismount')})).then(loaded=>{rides=loaded;rides.show(active)})
+      .catch(error=>console.warn('Vehicles unavailable:',error)).finally(()=>{loading=false})}
+  let wasBoat=false,wasBike=false,bikeObstacle=''
   function place(x:number,z:number,reason:string,override=false){const found=sim.findWalkableSpawn(x,z,override)
     if(verify)spawns.push({reason,from:[x,z],to:found?[found.x,found.z]:null,distance:found?Math.hypot(found.x-x,found.z-z):null,rule:found?.rule??'none'})
     if(!found)return false
@@ -29,26 +37,40 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const deadline=performance.now()+15000
     while(needed.some(tile=>!stream.loaded.has(tile))&&performance.now()<deadline){stream.tick(focus);await new Promise(resolve=>setTimeout(resolve,12))}
     sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
-    active=true;figure.visible=true;yaw=heading;figure.rotation.y=yaw+avatar.yaw;input.show(true);accumulator=0;camera.near=.08;camera.updateProjectionMatrix();follow();return true
+    active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;yaw=heading;figure.rotation.y=yaw+avatar.yaw;input.show(true);accumulator=0;camera.near=.08;camera.updateProjectionMatrix();follow();return true
   }
-  function leave(){active=false;figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function leave(){active=false;rides?.show(false);wasBoat=wasBike=false;figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function follow(){const pos=sim.body.translation();figure.position.set(pos.x,pos.y-cfg.height/2,pos.z)
+    if(rides?.boat){figure.position.copy(rides.boat.position);figure.position.y+=rides.boat.name==='raft'?-.44:-.18;figure.rotation.y=rides.heading}
+    rides?.park(figure.position)
+    if(rides?.bike){figure.rotation.y=rides.heading;figure.position.z+=Math.cos(rides.heading)*.23;figure.position.x+=Math.sin(rides.heading)*.23}
     focus.copy(figure.position);focus.y+=1.4;direction.set(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch))
-    const hit=sim.world.castRay(new R.Ray(focus,direction),arm,true,undefined,undefined,sim.capsule)
-    camera.position.copy(focus).addScaledVector(direction,Math.max(.02,(hit?.timeOfImpact??arm)-.18));camera.lookAt(focus)
+    const distance=arm+(rides?.bike?2.8:0),hit=sim.world.castRay(new R.Ray(focus,direction),distance,true,undefined,undefined,sim.capsule)
+    camera.position.copy(focus).addScaledVector(direction,Math.max(.02,(hit?.timeOfImpact??distance)-.18));camera.lookAt(focus)
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
+  function boatClearance(){const boat=rides?.boat;if(!boat)return null
+    const roof=new THREE.Box3().setFromObject(boat,true).max.y,head=new THREE.Box3().setFromObject(figure,true).max.y
+    let underside=Infinity
+    for(const along of [-2.3,-1,0,1,2.3])for(const across of [-1,0,1]){const point=boat.localToWorld(new THREE.Vector3(across,0,along)),deck=sim.surface(point.x,point.z,'deck');if(deck)underside=Math.min(underside,deck.y-look.bridgeDepth)}
+    return {kind:boat.name,head,roof,underside,clearance:underside-Math.max(head,roof)}}
+  function sit(){mixer.stopAllAction();action=undefined;for(const side of ['L','R'])for(const [part,value] of Object.entries({Thigh:1.25,Shin:-1.4,Arm:.9,Forearm:.35})){
+    const joint=figure.getObjectByName(part+side);if(joint)joint.rotation.x=value}}
   function probe(){const pos=sim.body.translation(),foot=pos.y-cfg.height/2,peak=sim.surface(pos.x,pos.z,'peak')
     const tile=sim.tileAt(pos.x,pos.z),mesh=tile&&stream.loaded.get(tile)?.groundMesh
     terrainRay.ray.origin.set(pos.x,4000,pos.z);mesh?.updateWorldMatrix(true,false)
     const renderY=mesh?terrainRay.intersectObject(mesh,false)[0]?.point.y:undefined
     return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
       inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits}}
-  function tick(dt:number){if(!active)return;const before=performance.now(),start=sim.body.translation();sim.sync(start.x,start.z)
+  function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);rides?.nearby(start.x,start.z)
+    if(rides?.boat){if(!held)rides.advance(Math.min(.25,dt));if(!wasBoat){yaw=rides.heading+.95;sit()}wasBoat=!!rides.boat;follow();return}wasBoat=false
     const read=input.read(),keys=held?still:read,delta=new THREE.Vector2(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))
     if(external)delta.set(external.x,external.z);delta.divideScalar(Math.max(1,delta.length()))
-    const speed=external?.run??keys.run?cfg.run:cfg.walk,step=1/60;let traveled=0;lastHits=[];blockedWater=false
-    if(keys.jump&&grounded)velocity=Math.sqrt(-2*cfg.gravity*cfg.jump)
+    let speed=external?.run??keys.run?cfg.run:cfg.walk;const step=1/60;let traveled=0;lastHits=[];blockedWater=false
+    if(rides?.bike){const previous=rides.heading;speed=rides.steer(keys.forward,keys.right,Math.min(.12,dt));delta.set(-Math.sin(rides.heading),-Math.cos(rides.heading));yaw=wasBike?yaw+rides.heading-previous:rides.heading
+      if(!wasBike)sit()}
+    wasBike=!!rides?.bike
+    if(keys.jump&&grounded&&!wasBike)velocity=Math.sqrt(-2*cfg.gravity*cfg.jump)
     accumulator+=Math.min(.12,dt)
     while(accumulator>=step){accumulator-=step;steps++;elapsed+=step
       const pos=sim.body.translation();velocity+=cfg.gravity*step
@@ -59,17 +81,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const ground=sim.surface(next.x,next.z,'ground')
       if(!ground||next.y-cfg.height/2<ground.y-3){if(place(safe.x,safe.z,'rescue'))resets++;break}
       if(sim.wet(next.x,next.z)){const deck=sim.surface(next.x,next.z,'deck');if(!deck||next.y-cfg.height/2<deck.y-.35){next.x=pos.x;next.z=pos.z;blockedWater=true}}
+      if(rides?.bike){const reason=sim.insideHouse(next.x+delta.x*.72,next.z+delta.y*.72)?'building':!rides.pavement(next.x,next.z)?'off-road':Math.hypot(move.x,move.z)<speed*step*.35?'collision':''
+        if(reason){bikeObstacle=reason;next.x=pos.x;next.z=pos.z;rides.stop();speed=0}}
       traveled+=Math.hypot(next.x-pos.x,next.z-pos.z);sim.body.setNextKinematicTranslation(next);sim.world.step();if(grounded&&!blockedWater)safe.set(next.x,next.y,next.z)
     }
     physicsMs+=performance.now()-before
     if(traveled>.001)figure.rotation.y=Math.atan2(-delta.x,-delta.y)+avatar.yaw
     const nextAction=actions.get(avatar.clips[!grounded?'jump':traveled<.001?'idle':speed===cfg.run?'run':'walk'])
-    if(nextAction&&action!==nextAction){action?.fadeOut(.2);nextAction.reset().fadeIn(.2).play();action=nextAction}
+    if(!wasBike&&nextAction&&action!==nextAction){action?.fadeOut(.2);nextAction.reset().fadeIn(.2).play();action=nextAction}
     mixer.update(dt);follow()
   }
-  return {enter,leave,tick,spawns,probe,get active(){return active},get yaw(){return yaw},
-    // M4 photo mode / viewpoints: freeze movement (camera still orbits), aim the camera, hide the figure.
-    hold(on:boolean){held=on;external=null},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow()},
-    showFigure(on:boolean){figure.visible=on&&active},drive(x:number,z:number,run=true){external={x,z,run}},
-    get position(){const pos=sim.body.translation();return focus.set(pos.x,pos.y,pos.z)}}
+  return {enter,leave,tick,spawns,probe,boatClearance,get obstacle(){return bikeObstacle},get vehicle(){return rides?.bike?'bike':rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+    get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on)rides?.stop()},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow()},showFigure(on:boolean){figure.visible=on&&active},
+    get position(){const pos=rides?.boat?.position??sim.body.translation();return focus.set(pos.x,pos.y,pos.z)}}
 }
