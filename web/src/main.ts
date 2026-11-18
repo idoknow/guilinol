@@ -33,7 +33,8 @@ async function start() {
   scene.add(outerGround(manifest.extent))
   camera.position.set(left+width*.55,420,top+depth*.62)
   let walker:Awaited<ReturnType<typeof import('./walk').walk>>|undefined, switching=false
-  const controls = flight(camera,renderer.domElement,manifest.extent,()=>!walker?.active&&!switching)
+  let tour:Awaited<ReturnType<typeof import('./ui/tour').tour>>|undefined
+  const controls = flight(camera,renderer.domElement,manifest.extent,()=>!walker?.active&&!switching&&tour?.mode!=='map')
   camera.lookAt(left+width*.47,150,top+depth*.45)
   function resize() {
     renderer.setPixelRatio(Math.min(devicePixelRatio,1.5)); renderer.setSize(innerWidth,innerHeight)
@@ -51,7 +52,7 @@ async function start() {
   let previous=0, first=0, frame=0, sum=0, samples=0
   const stats = {firstMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0}
   async function toggle(initial=false){
-    if(switching)return
+    if(switching||tour?.mode)return
     if(walker?.active){walker.leave();return}
     switching=true
     try{
@@ -74,7 +75,7 @@ async function start() {
     clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>toast.classList.remove('show'),3200)})
   if(touch){modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton)}
   showMode()
-  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,clock,env,get walk(){return walker},probeFoot(){
+  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,clock,env,get tour(){return tour},get walk(){return walker},probeFoot(){
     const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
     const clearance = ray.intersectObjects(scene.children)[0]?.distance
     ray.setFromCamera(new THREE.Vector2(0,0),camera)
@@ -83,8 +84,14 @@ async function start() {
   }}})
   renderer.setAnimationLoop(now=>{
     const elapsed = previous?now-previous:0;previous=now
-    if(walker?.active)walker.tick(elapsed/1000);else if(!switching)controls(elapsed/1000)
-    if(frame===1) {first=performance.now();stats.firstMs=first;stats.firstWorldBytes=bytes}
+    if(!switching&&tour?.mode!=='map'){if(walker?.active)walker.tick(elapsed/1000);else controls(elapsed/1000)}
+    if(frame===1) {first=performance.now();stats.firstMs=first;stats.firstWorldBytes=bytes
+      void import('./ui/tour').then(module=>module.tour(manifest,camera,renderer.domElement,clock,()=>walker?.active?walker.position:undefined,async site=>{
+        switching=true;try{const heading=site.yaw??camera.rotation.y
+          if(walker?.active)await walker.enter(site.x,site.z,heading,'tour',false,site.n==='独秀峰顶'||site.n==='叠彩山 · 明月峰')
+          else{camera.position.set(site.x+100*Math.sin(heading),360,site.z+100*Math.cos(heading));camera.lookAt(site.x,180,site.z)}
+        }finally{switching=false}},on=>walker?.photo(on),()=>renderer.render(scene,camera))).then(value=>tour=value).catch(error=>console.warn('观光地图加载失败',error))}
+    tour?.tick(now)
     if(first&&!switching) stream.tick(walker?.active?walker.position:camera.position)
     clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/1200))
     atmo.uTime.value = now/1000

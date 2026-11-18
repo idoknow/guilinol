@@ -17,8 +17,12 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   joystick.onlostpointercapture=()=>{stick.x=stick.y=0;knob.style.transform='';joystick.classList.remove('running')}
   window.addEventListener('keydown',event=>{if(!active())return;keys.add(event.code);if(!event.repeat&&event.code==='Space'){jump=true;event.preventDefault()}if(!event.repeat&&event.code==='KeyC')view()})
   window.addEventListener('keyup',event=>keys.delete(event.code));window.addEventListener('blur',()=>{keys.clear();jump=false})
-  canvas.addEventListener('pointerdown',event=>{if(active()&&(event.pointerType==='mouse'||event.clientX>innerWidth/2))canvas.setPointerCapture(event.pointerId)})
-  canvas.addEventListener('pointermove',event=>{if(active()&&(document.pointerLockElement===canvas||canvas.hasPointerCapture(event.pointerId)))rotate(event.movementX,event.movementY)})
+  const fingers=new Map<number,[number,number]>()
+  const span=()=>{const [first,second]=fingers.values();return second?Math.hypot(first[0]-second[0],first[1]-second[1]):0}
+  canvas.addEventListener('pointerdown',event=>{if(active()&&(document.body.dataset.tour==='photo'||event.pointerType==='mouse'||event.clientX>innerWidth/2)){canvas.setPointerCapture(event.pointerId);fingers.set(event.pointerId,[event.clientX,event.clientY])}})
+  canvas.addEventListener('lostpointercapture',event=>fingers.delete(event.pointerId))
+  canvas.addEventListener('pointermove',event=>{if(!active()||!(document.pointerLockElement===canvas||canvas.hasPointerCapture(event.pointerId)))return
+    const before=span();if(fingers.has(event.pointerId))fingers.set(event.pointerId,[event.clientX,event.clientY]);if(before)zoom((before-span())*5);else rotate(event.movementX,event.movementY)})
   canvas.addEventListener('wheel',event=>{if(active()){event.preventDefault();zoom(event.deltaY)}},{passive:false})
   return {show(on:boolean){panel.hidden=!on||!matchMedia('(pointer:coarse)').matches;keys.clear();jump=false;stick.x=stick.y=0},
     read(){const input={right:+keys.has('KeyD')-+keys.has('KeyA')+stick.x,forward:+keys.has('KeyW')-+keys.has('KeyS')-stick.y,

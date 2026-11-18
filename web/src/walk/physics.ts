@@ -112,11 +112,11 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.
         const [ax,az]=loop[at],[bx,bz]=loop[prev];if((az>pz)!==(bz>pz)&&px<(bx-ax)*(pz-az)/(bz-az)+ax)inside=!inside
       }return inside})??false
   }
-  function findWalkableSpawn(east:number,south:number,override=false){
+  function findWalkableSpawn(east:number,south:number,override=false,summit=false){
     for(const {dx,dz} of override?[candidates[0]]:candidates){const x=east+dx,z=south+dz,tile=tileAt(x,z)
       if(!tile||!stream.loaded.has(tile)||insideHouse(x,z))continue
-      const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
-      const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05)continue
+      const peak=surface(x,z,'peak'),deck=surface(x,z,'deck'),support=(summit?peak:null)??deck??surface(x,z,'sidewalk')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
+      if(peak&&peak.y>support.y+.05)continue
       const y=support.y+cfg.height/2+.055
       if(world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule))continue
       return {x,y,z,rule:(dx||dz?'search-':'')+(deck?'bridge':'land')}

@@ -19,15 +19,16 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     delta=>{arm=THREE.MathUtils.clamp(arm+delta*.013,cfg.zoomMin,cfg.zoomMax)},()=>{arm=arm>(cfg.far+cfg.near)/2?cfg.near:cfg.far})
   const safe=new THREE.Vector3(),focus=new THREE.Vector3(),direction=new THREE.Vector3();const spawns:object[]=[]
   let external:{x:number,z:number,run:boolean}|null=null,blockedWater=false
-  function place(x:number,z:number,reason:string,override=false){const found=sim.findWalkableSpawn(x,z,override)
+  let savedView:number[]|null=null
+  function place(x:number,z:number,reason:string,override=false,summit=false){const found=sim.findWalkableSpawn(x,z,override,summit)
     if(verify)spawns.push({reason,from:[x,z],to:found?[found.x,found.z]:null,distance:found?Math.hypot(found.x-x,found.z-z):null,rule:found?.rule??'none'})
     if(!found)return false
     sim.body.setTranslation(found,true);sim.body.setNextKinematicTranslation(found);sim.world.step();safe.set(found.x,found.y,found.z);velocity=0;grounded=false;return true}
-  async function enter(x:number,z:number,heading:number,reason:string,override=false){
+  async function enter(x:number,z:number,heading:number,reason:string,override=false,summit=false){
     focus.set(x,0,z);const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
     const deadline=performance.now()+15000
     while(needed.some(tile=>!stream.loaded.has(tile))&&performance.now()<deadline){stream.tick(focus);await new Promise(resolve=>setTimeout(resolve,12))}
-    sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
+    sim.sync(x,z);if(!place(x,z,reason,override,summit)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
     active=true;figure.visible=true;yaw=heading;figure.rotation.y=yaw+avatar.yaw;input.show(true);accumulator=0;camera.near=.08;camera.updateProjectionMatrix();follow();return true
   }
   function leave(){active=false;figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
@@ -43,7 +44,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const renderY=mesh?terrainRay.intersectObject(mesh,false)[0]?.point.y:undefined
     return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
       inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits}}
-  function tick(dt:number){if(!active)return;const before=performance.now(),start=sim.body.translation();sim.sync(start.x,start.z)
+  function tick(dt:number){if(!active)return;if(savedView){follow();return}const before=performance.now(),start=sim.body.translation();sim.sync(start.x,start.z)
     const keys=input.read(),delta=new THREE.Vector2(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))
     if(external)delta.set(external.x,external.z);delta.divideScalar(Math.max(1,delta.length()))
     const speed=external?.run??keys.run?cfg.run:cfg.walk,step=1/60;let traveled=0;lastHits=[];blockedWater=false
@@ -66,6 +67,6 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(nextAction&&action!==nextAction){action?.fadeOut(.2);nextAction.reset().fadeIn(.2).play();action=nextAction}
     mixer.update(dt);follow()
   }
-  return {enter,leave,tick,spawns,probe,get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  return {enter,leave,tick,spawns,probe,photo(on:boolean){if(!active)return;if(on)savedView=[yaw,pitch,arm];else if(savedView){[yaw,pitch,arm]=savedView;savedView=null;follow()}},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     get position(){const pos=sim.body.translation();return focus.set(pos.x,pos.y,pos.z)}}
 }
