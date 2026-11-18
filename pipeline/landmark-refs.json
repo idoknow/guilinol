@@ -1,0 +1,1647 @@
+[
+ {
+  "id": "jingjiang",
+  "name": "靖江王城（王府）",
+  "osm": [
+   "way/258909996",
+   "way/1008248059",
+   "way/1008248065",
+   "way/679734442"
+  ],
+  "group": "A",
+  "refs": [
+   {
+    "title": "Jingjiang Princes City 89785-Guilin (49040802591).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Jingjiang_Princes_City_89785-Guilin_(49040802591).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/58/Jingjiang_Princes_City_89785-Guilin_%2849040802591%29.jpg/1280px-Jingjiang_Princes_City_89785-Guilin_%2849040802591%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Jingjiang Princes City 89789-Guilin (49040802801).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Jingjiang_Princes_City_89789-Guilin_(49040802801).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8d/Jingjiang_Princes_City_89789-Guilin_%2849040802801%29.jpg/1280px-Jingjiang_Princes_City_89789-Guilin_%2849040802801%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Jingjiang Princes City 89790-Guilin (49040297928).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Jingjiang_Princes_City_89790-Guilin_(49040297928).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bb/Jingjiang_Princes_City_89790-Guilin_%2849040297928%29.jpg/1280px-Jingjiang_Princes_City_89790-Guilin_%2849040297928%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Jingjiang Princes City 89797-Guilin (49040298303).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Jingjiang_Princes_City_89797-Guilin_(49040298303).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/46/Jingjiang_Princes_City_89797-Guilin_%2849040298303%29.jpg/1280px-Jingjiang_Princes_City_89797-Guilin_%2849040298303%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Jingjiang Princes City 89798-Guilin (49041016052).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Jingjiang_Princes_City_89798-Guilin_(49041016052).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/Jingjiang_Princes_City_89798-Guilin_%2849041016052%29.jpg/1280px-Jingjiang_Princes_City_89798-Guilin_%2849041016052%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Jingjiang Princes City 89799-Guilin (49041016252).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Jingjiang_Princes_City_89799-Guilin_(49041016252).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6b/Jingjiang_Princes_City_89799-Guilin_%2849041016252%29.jpg/1280px-Jingjiang_Princes_City_89799-Guilin_%2849041016252%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Jingjiang Princes City 89803-Guilin (49041016477).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Jingjiang_Princes_City_89803-Guilin_(49041016477).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/ca/Jingjiang_Princes_City_89803-Guilin_%2849041016477%29.jpg/1280px-Jingjiang_Princes_City_89803-Guilin_%2849041016477%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Jingjiang Princes City 89808-Guilin (49040299628).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Jingjiang_Princes_City_89808-Guilin_(49040299628).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fa/Jingjiang_Princes_City_89808-Guilin_%2849040299628%29.jpg/1280px-Jingjiang_Princes_City_89808-Guilin_%2849040299628%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Jingjiang Princes City 89809-Guilin (49040805091).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Jingjiang_Princes_City_89809-Guilin_(49040805091).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f2/Jingjiang_Princes_City_89809-Guilin_%2849040805091%29.jpg/1280px-Jingjiang_Princes_City_89809-Guilin_%2849040805091%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Jingjiang Princes City 89810-Guilin (49041017827).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Jingjiang_Princes_City_89810-Guilin_(49041017827).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c3/Jingjiang_Princes_City_89810-Guilin_%2849041017827%29.jpg/1280px-Jingjiang_Princes_City_89810-Guilin_%2849041017827%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Jingjiang Princes City 89811-Guilin (49040300573).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Jingjiang_Princes_City_89811-Guilin_(49040300573).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/31/Jingjiang_Princes_City_89811-Guilin_%2849040300573%29.jpg/1280px-Jingjiang_Princes_City_89811-Guilin_%2849040300573%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Jingjiang Princes City 89813-Guilin (49040806076).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Jingjiang_Princes_City_89813-Guilin_(49040806076).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/40/Jingjiang_Princes_City_89813-Guilin_%2849040806076%29.jpg/1280px-Jingjiang_Princes_City_89813-Guilin_%2849040806076%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "C61-390.jpg",
+    "year": 2017,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:C61-390.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d1/C61-390.jpg/1280px-C61-390.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "C61-420.jpg",
+    "year": 2017,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:C61-420.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f4/C61-420.jpg/1280px-C61-420.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Jingjiang Princes' City.jpg",
+    "year": 2017,
+    "license": "Public domain",
+    "page": "https://commons.wikimedia.org/wiki/File:Jingjiang_Princes%27_City.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/Jingjiang_Princes%27_City.jpg/1280px-Jingjiang_Princes%27_City.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "C61-270.jpg",
+    "year": 2017,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:C61-270.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0c/C61-270.jpg/1280px-C61-270.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "C61-300.jpg",
+    "year": 2017,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:C61-300.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d3/C61-300.jpg/1280px-C61-300.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "C61-360.jpg",
+    "year": 2017,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:C61-360.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/09/C61-360.jpg/1280px-C61-360.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "C61-410.jpg",
+    "year": 2017,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:C61-410.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/C61-410.jpg/1280px-C61-410.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "C61-450.jpg",
+    "year": 2017,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:C61-450.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/23/C61-450.jpg/1280px-C61-450.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "靖江王府东华门正面题字.JPG",
+    "year": 2013,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E9%9D%96%E6%B1%9F%E7%8E%8B%E5%BA%9C%E4%B8%9C%E5%8D%8E%E9%97%A8%E6%AD%A3%E9%9D%A2%E9%A2%98%E5%AD%97.JPG",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9d/%E9%9D%96%E6%B1%9F%E7%8E%8B%E5%BA%9C%E4%B8%9C%E5%8D%8E%E9%97%A8%E6%AD%A3%E9%9D%A2%E9%A2%98%E5%AD%97.JPG/1280px-%E9%9D%96%E6%B1%9F%E7%8E%8B%E5%BA%9C%E4%B8%9C%E5%8D%8E%E9%97%A8%E6%AD%A3%E9%9D%A2%E9%A2%98%E5%AD%97.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "靖江王府东门.JPG",
+    "year": 2013,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E9%9D%96%E6%B1%9F%E7%8E%8B%E5%BA%9C%E4%B8%9C%E9%97%A8.JPG",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6e/%E9%9D%96%E6%B1%9F%E7%8E%8B%E5%BA%9C%E4%B8%9C%E9%97%A8.JPG/1280px-%E9%9D%96%E6%B1%9F%E7%8E%8B%E5%BA%9C%E4%B8%9C%E9%97%A8.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "靖江王府西华门正面题字.JPG",
+    "year": 2013,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E9%9D%96%E6%B1%9F%E7%8E%8B%E5%BA%9C%E8%A5%BF%E5%8D%8E%E9%97%A8%E6%AD%A3%E9%9D%A2%E9%A2%98%E5%AD%97.JPG",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ae/%E9%9D%96%E6%B1%9F%E7%8E%8B%E5%BA%9C%E8%A5%BF%E5%8D%8E%E9%97%A8%E6%AD%A3%E9%9D%A2%E9%A2%98%E5%AD%97.JPG/1280px-%E9%9D%96%E6%B1%9F%E7%8E%8B%E5%BA%9C%E8%A5%BF%E5%8D%8E%E9%97%A8%E6%AD%A3%E9%9D%A2%E9%A2%98%E5%AD%97.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 12-10-50.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_12-10-50.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/ca/Guilin_Jingjiang_Wangfu_2012.09.28_12-10-50.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_12-10-50.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 12-11-14.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_12-11-14.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/79/Guilin_Jingjiang_Wangfu_2012.09.28_12-11-14.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_12-11-14.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 12-11-58.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_12-11-58.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/93/Guilin_Jingjiang_Wangfu_2012.09.28_12-11-58.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_12-11-58.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 12-12-43.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_12-12-43.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1e/Guilin_Jingjiang_Wangfu_2012.09.28_12-12-43.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_12-12-43.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 12-13-34.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_12-13-34.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/92/Guilin_Jingjiang_Wangfu_2012.09.28_12-13-34.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_12-13-34.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 12-16-40.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_12-16-40.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b1/Guilin_Jingjiang_Wangfu_2012.09.28_12-16-40.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_12-16-40.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 12-17-40.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_12-17-40.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/Guilin_Jingjiang_Wangfu_2012.09.28_12-17-40.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_12-17-40.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 12-58-32.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_12-58-32.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dd/Guilin_Jingjiang_Wangfu_2012.09.28_12-58-32.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_12-58-32.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 13-00-49.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_13-00-49.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f2/Guilin_Jingjiang_Wangfu_2012.09.28_13-00-49.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_13-00-49.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 13-02-30.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_13-02-30.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c0/Guilin_Jingjiang_Wangfu_2012.09.28_13-02-30.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_13-02-30.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 13-16-56.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_13-16-56.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/73/Guilin_Jingjiang_Wangfu_2012.09.28_13-16-56.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_13-16-56.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 13-17-27.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_13-17-27.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/11/Guilin_Jingjiang_Wangfu_2012.09.28_13-17-27.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_13-17-27.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 13-17-45.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_13-17-45.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0d/Guilin_Jingjiang_Wangfu_2012.09.28_13-17-45.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_13-17-45.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 13-18-18.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_13-18-18.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/Guilin_Jingjiang_Wangfu_2012.09.28_13-18-18.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_13-18-18.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.09.28 13-18-26.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.09.28_13-18-26.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fb/Guilin_Jingjiang_Wangfu_2012.09.28_13-18-26.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.09.28_13-18-26.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Jingjiang Wangfu 2012.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Jingjiang_Wangfu_2012.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ac/Guilin_Jingjiang_Wangfu_2012.jpg/1280px-Guilin_Jingjiang_Wangfu_2012.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "靖江王府北門 The North Gate of Prince Jingjiang`s Palace - panoramio.jpg",
+    "year": 2011,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E9%9D%96%E6%B1%9F%E7%8E%8B%E5%BA%9C%E5%8C%97%E9%96%80_The_North_Gate_of_Prince_Jingjiang%60s_Palace_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/68/%E9%9D%96%E6%B1%9F%E7%8E%8B%E5%BA%9C%E5%8C%97%E9%96%80_The_North_Gate_of_Prince_Jingjiang%60s_Palace_-_panoramio.jpg/1280px-%E9%9D%96%E6%B1%9F%E7%8E%8B%E5%BA%9C%E5%8C%97%E9%96%80_The_North_Gate_of_Prince_Jingjiang%60s_Palace_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "dongxixiang",
+  "name": "东西巷",
+  "osm": [
+   "relation/13507181",
+   "way/686154940"
+  ],
+  "group": "A",
+  "refs": [
+   {
+    "title": "桂林东西巷.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f9/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 01.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_01.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a7/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_01.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 02.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_02.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7e/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_02.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 03.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_03.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bb/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_03.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 04.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_04.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e8/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_04.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_04.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 05.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_05.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c7/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_05.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_05.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 06.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_06.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6b/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_06.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_06.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 07.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_07.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/04/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_07.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_07.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 08.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_08.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/04/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_08.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_08.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 09.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_09.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/af/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_09.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_09.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 10.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_10.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_10.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_10.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 11.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_11.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8a/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_11.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_11.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 12.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_12.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bb/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_12.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_12.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 13.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_13.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0c/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_13.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_13.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 14.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_14.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/60/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_14.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_14.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 15.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_15.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f2/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_15.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_15.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林东西巷 16.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_16.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f0/%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_16.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%9C%E8%A5%BF%E5%B7%B7_16.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "East-West Alley 89743-Guilin (49040797371).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:East-West_Alley_89743-Guilin_(49040797371).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e3/East-West_Alley_89743-Guilin_%2849040797371%29.jpg/1280px-East-West_Alley_89743-Guilin_%2849040797371%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "East-West Alley 89744-Guilin (49040292928).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:East-West_Alley_89744-Guilin_(49040292928).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fe/East-West_Alley_89744-Guilin_%2849040292928%29.jpg/1280px-East-West_Alley_89744-Guilin_%2849040292928%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "East-West Alley 89746-Guilin (49040293153).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:East-West_Alley_89746-Guilin_(49040293153).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/East-West_Alley_89746-Guilin_%2849040293153%29.jpg/1280px-East-West_Alley_89746-Guilin_%2849040293153%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "East-West Alley 89748-Guilin (49041010817).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:East-West_Alley_89748-Guilin_(49041010817).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/93/East-West_Alley_89748-Guilin_%2849041010817%29.jpg/1280px-East-West_Alley_89748-Guilin_%2849041010817%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "East-West Alley 89749-Guilin (49040798786).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:East-West_Alley_89749-Guilin_(49040798786).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/fe/East-West_Alley_89749-Guilin_%2849040798786%29.jpg/1280px-East-West_Alley_89749-Guilin_%2849040798786%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "East-West Alley 89756-Guilin (49040799246).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:East-West_Alley_89756-Guilin_(49040799246).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e0/East-West_Alley_89756-Guilin_%2849040799246%29.jpg/1280px-East-West_Alley_89756-Guilin_%2849040799246%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "East-West Alley 89760-Guilin (49040800081).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:East-West_Alley_89760-Guilin_(49040800081).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/88/East-West_Alley_89760-Guilin_%2849040800081%29.jpg/1280px-East-West_Alley_89760-Guilin_%2849040800081%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "East-West Alley 89762-Guilin (49040800321).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:East-West_Alley_89762-Guilin_(49040800321).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f5/East-West_Alley_89762-Guilin_%2849040800321%29.jpg/1280px-East-West_Alley_89762-Guilin_%2849040800321%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "East-West Alley 89763-Guilin (49040800571).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:East-West_Alley_89763-Guilin_(49040800571).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/99/East-West_Alley_89763-Guilin_%2849040800571%29.jpg/1280px-East-West_Alley_89763-Guilin_%2849040800571%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "East-West Alley 89764-Guilin (49040295833).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:East-West_Alley_89764-Guilin_(49040295833).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/East-West_Alley_89764-Guilin_%2849040295833%29.jpg/1280px-East-West_Alley_89764-Guilin_%2849040295833%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "East-West Alley 89766-Guilin (49041013162).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:East-West_Alley_89766-Guilin_(49041013162).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/78/East-West_Alley_89766-Guilin_%2849041013162%29.jpg/1280px-East-West_Alley_89766-Guilin_%2849041013162%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "East-West Alley 89773-Guilin (49040801826).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:East-West_Alley_89773-Guilin_(49040801826).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/42/East-West_Alley_89773-Guilin_%2849040801826%29.jpg/1280px-East-West_Alley_89773-Guilin_%2849040801826%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "东西巷.jpg",
+    "year": 2016,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E4%B8%9C%E8%A5%BF%E5%B7%B7.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b4/%E4%B8%9C%E8%A5%BF%E5%B7%B7.jpg/1280px-%E4%B8%9C%E8%A5%BF%E5%B7%B7.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "东西巷玻璃地面.jpg",
+    "year": 2016,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E4%B8%9C%E8%A5%BF%E5%B7%B7%E7%8E%BB%E7%92%83%E5%9C%B0%E9%9D%A2.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5a/%E4%B8%9C%E8%A5%BF%E5%B7%B7%E7%8E%BB%E7%92%83%E5%9C%B0%E9%9D%A2.jpg/1280px-%E4%B8%9C%E8%A5%BF%E5%B7%B7%E7%8E%BB%E7%92%83%E5%9C%B0%E9%9D%A2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "zhengyang",
+  "name": "正阳路步行街（含钟楼、正阳路地下通道口）",
+  "osm": [
+   "way/221821082",
+   "way/675600128",
+   "way/258909973",
+   "way/258909992"
+  ],
+  "group": "A",
+  "refs": [
+   {
+    "title": "89730-Guilin (49040794056).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89730-Guilin_(49040794056).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/42/89730-Guilin_%2849040794056%29.jpg/1280px-89730-Guilin_%2849040794056%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89731-Guilin (49040289103).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89731-Guilin_(49040289103).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/75/89731-Guilin_%2849040289103%29.jpg/1280px-89731-Guilin_%2849040289103%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89733-Guilin (49040289333).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89733-Guilin_(49040289333).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/ca/89733-Guilin_%2849040289333%29.jpg/1280px-89733-Guilin_%2849040289333%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89735-Guilin (49040289608).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89735-Guilin_(49040289608).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8b/89735-Guilin_%2849040289608%29.jpg/1280px-89735-Guilin_%2849040289608%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89736-Guilin (49040795616).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89736-Guilin_(49040795616).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3f/89736-Guilin_%2849040795616%29.jpg/1280px-89736-Guilin_%2849040795616%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89738-Guilin (49040795886).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89738-Guilin_(49040795886).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/89738-Guilin_%2849040795886%29.jpg/1280px-89738-Guilin_%2849040795886%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89739-Guilin (49040290878).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89739-Guilin_(49040290878).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/89739-Guilin_%2849040290878%29.jpg/1280px-89739-Guilin_%2849040290878%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89740-Guilin (49041008517).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89740-Guilin_(49041008517).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/de/89740-Guilin_%2849041008517%29.jpg/1280px-89740-Guilin_%2849041008517%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89741-Guilin (49040291383).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89741-Guilin_(49040291383).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d5/89741-Guilin_%2849040291383%29.jpg/1280px-89741-Guilin_%2849040291383%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89734-Guilin (43743831550).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89734-Guilin_(43743831550).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/49/89734-Guilin_%2843743831550%29.jpg/1280px-89734-Guilin_%2843743831550%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "shizijie",
+  "name": "十字街路口",
+  "osm": [
+   "node/8230814937",
+   "way/258911170",
+   "way/221821072",
+   "way/258909993"
+  ],
+  "group": "B",
+  "refs": []
+ },
+ {
+  "id": "nikoniko",
+  "name": "微笑堂商厦",
+  "osm": [
+   "way/253743030"
+  ],
+  "group": "B",
+  "refs": [
+   {
+    "title": "大商集团桂林微笑堂商厦.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E5%A4%A7%E5%95%86%E9%9B%86%E5%9B%A2%E6%A1%82%E6%9E%97%E5%BE%AE%E7%AC%91%E5%A0%82%E5%95%86%E5%8E%A6.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8d/%E5%A4%A7%E5%95%86%E9%9B%86%E5%9B%A2%E6%A1%82%E6%9E%97%E5%BE%AE%E7%AC%91%E5%A0%82%E5%95%86%E5%8E%A6.jpg/1280px-%E5%A4%A7%E5%95%86%E9%9B%86%E5%9B%A2%E6%A1%82%E6%9E%97%E5%BE%AE%E7%AC%91%E5%A0%82%E5%95%86%E5%8E%A6.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "central_square",
+  "name": "中心广场（含体育馆、小香港商业城）",
+  "osm": [
+   "node/3121657314",
+   "way/675177179",
+   "way/1521982963"
+  ],
+  "group": "B",
+  "refs": [
+   {
+    "title": "Guilin Central Square Fire Station 1.jpg",
+    "year": 2026,
+    "license": "CC BY 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Central_Square_Fire_Station_1.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/42/Guilin_Central_Square_Fire_Station_1.jpg/1280px-Guilin_Central_Square_Fire_Station_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Central Square Fire Station GWM Cannon 1.jpg",
+    "year": 2026,
+    "license": "CC BY 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Central_Square_Fire_Station_GWM_Cannon_1.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/70/Guilin_Central_Square_Fire_Station_GWM_Cannon_1.jpg/1280px-Guilin_Central_Square_Fire_Station_GWM_Cannon_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Central Square Fire Station GWM Cannon 2.jpg",
+    "year": 2026,
+    "license": "CC BY 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Central_Square_Fire_Station_GWM_Cannon_2.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f5/Guilin_Central_Square_Fire_Station_GWM_Cannon_2.jpg/1280px-Guilin_Central_Square_Fire_Station_GWM_Cannon_2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "ronghu",
+  "name": "榕湖（系舟亭、湖心岛、榕湖饭店、图书馆榕湖分部、榕湖钢桥）",
+  "osm": [
+   "relation/9373836",
+   "way/674682348",
+   "way/679990105",
+   "way/155148522",
+   "way/674872547"
+  ],
+  "group": "C",
+  "refs": [
+   {
+    "title": "双象戏水雕塑 01.jpg",
+    "year": 2025,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E5%8F%8C%E8%B1%A1%E6%88%8F%E6%B0%B4%E9%9B%95%E5%A1%91_01.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/31/%E5%8F%8C%E8%B1%A1%E6%88%8F%E6%B0%B4%E9%9B%95%E5%A1%91_01.jpg/1280px-%E5%8F%8C%E8%B1%A1%E6%88%8F%E6%B0%B4%E9%9B%95%E5%A1%91_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "广西壮族自治区桂林图书馆榕湖分部.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E5%B9%BF%E8%A5%BF%E5%A3%AE%E6%97%8F%E8%87%AA%E6%B2%BB%E5%8C%BA%E6%A1%82%E6%9E%97%E5%9B%BE%E4%B9%A6%E9%A6%86%E6%A6%95%E6%B9%96%E5%88%86%E9%83%A8.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6f/%E5%B9%BF%E8%A5%BF%E5%A3%AE%E6%97%8F%E8%87%AA%E6%B2%BB%E5%8C%BA%E6%A1%82%E6%9E%97%E5%9B%BE%E4%B9%A6%E9%A6%86%E6%A6%95%E6%B9%96%E5%88%86%E9%83%A8.jpg/1280px-%E5%B9%BF%E8%A5%BF%E5%A3%AE%E6%97%8F%E8%87%AA%E6%B2%BB%E5%8C%BA%E6%A1%82%E6%9E%97%E5%9B%BE%E4%B9%A6%E9%A6%86%E6%A6%95%E6%B9%96%E5%88%86%E9%83%A8.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林榕湖.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E6%A6%95%E6%B9%96.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c5/%E6%A1%82%E6%9E%97%E6%A6%95%E6%B9%96.jpg/1280px-%E6%A1%82%E6%9E%97%E6%A6%95%E6%B9%96.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林榕湖系舟亭.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E6%A6%95%E6%B9%96%E7%B3%BB%E8%88%9F%E4%BA%AD.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f7/%E6%A1%82%E6%9E%97%E6%A6%95%E6%B9%96%E7%B3%BB%E8%88%9F%E4%BA%AD.jpg/1280px-%E6%A1%82%E6%9E%97%E6%A6%95%E6%B9%96%E7%B3%BB%E8%88%9F%E4%BA%AD.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Ronghu Lake Guilin November 2017 HDR.jpg",
+    "year": 2017,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Ronghu_Lake_Guilin_November_2017_HDR.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dd/Ronghu_Lake_Guilin_November_2017_HDR.jpg/1280px-Ronghu_Lake_Guilin_November_2017_HDR.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Banyan Lake 桂林榕湖 - panoramio.jpg",
+    "year": 2011,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Banyan_Lake_%E6%A1%82%E6%9E%97%E6%A6%95%E6%B9%96_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0f/Guilin_Banyan_Lake_%E6%A1%82%E6%9E%97%E6%A6%95%E6%B9%96_-_panoramio.jpg/1280px-Guilin_Banyan_Lake_%E6%A1%82%E6%9E%97%E6%A6%95%E6%B9%96_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "榕湖夜景 Banyan Lake at Night - panoramio.jpg",
+    "year": 2011,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A6%95%E6%B9%96%E5%A4%9C%E6%99%AF_Banyan_Lake_at_Night_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b1/%E6%A6%95%E6%B9%96%E5%A4%9C%E6%99%AF_Banyan_Lake_at_Night_-_panoramio.jpg/1280px-%E6%A6%95%E6%B9%96%E5%A4%9C%E6%99%AF_Banyan_Lake_at_Night_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "榕湖饭店 - panoramio.jpg",
+    "year": 2010,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A6%95%E6%B9%96%E9%A5%AD%E5%BA%97_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/81/%E6%A6%95%E6%B9%96%E9%A5%AD%E5%BA%97_-_panoramio.jpg/1280px-%E6%A6%95%E6%B9%96%E9%A5%AD%E5%BA%97_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "gunanmen",
+  "name": "古南门（含古榕）",
+  "osm": [
+   "node/2596945561"
+  ],
+  "group": "C",
+  "refs": [
+   {
+    "title": "桂林古南门 20210705.jpg",
+    "year": 2021,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E5%8F%A4%E5%8D%97%E9%97%A8_20210705.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/93/%E6%A1%82%E6%9E%97%E5%8F%A4%E5%8D%97%E9%97%A8_20210705.jpg/1280px-%E6%A1%82%E6%9E%97%E5%8F%A4%E5%8D%97%E9%97%A8_20210705.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林古南门匾额.jpg",
+    "year": 2021,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E5%8F%A4%E5%8D%97%E9%97%A8%E5%8C%BE%E9%A2%9D.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/%E6%A1%82%E6%9E%97%E5%8F%A4%E5%8D%97%E9%97%A8%E5%8C%BE%E9%A2%9D.jpg/1280px-%E6%A1%82%E6%9E%97%E5%8F%A4%E5%8D%97%E9%97%A8%E5%8C%BE%E9%A2%9D.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林古南门.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E5%8F%A4%E5%8D%97%E9%97%A8.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5e/%E6%A1%82%E6%9E%97%E5%8F%A4%E5%8D%97%E9%97%A8.jpg/1280px-%E6%A1%82%E6%9E%97%E5%8F%A4%E5%8D%97%E9%97%A8.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "guilin_middle",
+  "name": "桂林中学解西校区（校门、奎光楼）",
+  "osm": [
+   "way/253811718",
+   "way/690980799"
+  ],
+  "group": "C",
+  "refs": [
+   {
+    "title": "桂林中学解西校区校门.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E4%B8%AD%E5%AD%A6%E8%A7%A3%E8%A5%BF%E6%A0%A1%E5%8C%BA%E6%A0%A1%E9%97%A8.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6a/%E6%A1%82%E6%9E%97%E4%B8%AD%E5%AD%A6%E8%A7%A3%E8%A5%BF%E6%A0%A1%E5%8C%BA%E6%A0%A1%E9%97%A8.jpg/1280px-%E6%A1%82%E6%9E%97%E4%B8%AD%E5%AD%A6%E8%A7%A3%E8%A5%BF%E6%A0%A1%E5%8C%BA%E6%A0%A1%E9%97%A8.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林奎光楼侧面.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E5%A5%8E%E5%85%89%E6%A5%BC%E4%BE%A7%E9%9D%A2.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c1/%E6%A1%82%E6%9E%97%E5%A5%8E%E5%85%89%E6%A5%BC%E4%BE%A7%E9%9D%A2.jpg/1280px-%E6%A1%82%E6%9E%97%E5%A5%8E%E5%85%89%E6%A5%BC%E4%BE%A7%E9%9D%A2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林奎光楼文保标志碑.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E5%A5%8E%E5%85%89%E6%A5%BC%E6%96%87%E4%BF%9D%E6%A0%87%E5%BF%97%E7%A2%91.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0c/%E6%A1%82%E6%9E%97%E5%A5%8E%E5%85%89%E6%A5%BC%E6%96%87%E4%BF%9D%E6%A0%87%E5%BF%97%E7%A2%91.jpg/1280px-%E6%A1%82%E6%9E%97%E5%A5%8E%E5%85%89%E6%A5%BC%E6%96%87%E4%BF%9D%E6%A0%87%E5%BF%97%E7%A2%91.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林奎光楼正面.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E5%A5%8E%E5%85%89%E6%A5%BC%E6%AD%A3%E9%9D%A2.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/10/%E6%A1%82%E6%9E%97%E5%A5%8E%E5%85%89%E6%A5%BC%E6%AD%A3%E9%9D%A2.jpg/1280px-%E6%A1%82%E6%9E%97%E5%A5%8E%E5%85%89%E6%A5%BC%E6%AD%A3%E9%9D%A2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "shanhu_pagodas",
+  "name": "杉湖与日月双塔",
+  "osm": [
+   "relation/9373634",
+   "way/674587990",
+   "way/162798058"
+  ],
+  "group": "D",
+  "refs": [
+   {
+    "title": "夕阳下的桂林月塔.jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E5%A4%95%E9%98%B3%E4%B8%8B%E7%9A%84%E6%A1%82%E6%9E%97%E6%9C%88%E5%A1%94.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/10/%E5%A4%95%E9%98%B3%E4%B8%8B%E7%9A%84%E6%A1%82%E6%9E%97%E6%9C%88%E5%A1%94.jpg/1280px-%E5%A4%95%E9%98%B3%E4%B8%8B%E7%9A%84%E6%A1%82%E6%9E%97%E6%9C%88%E5%A1%94.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林日塔.jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E6%97%A5%E5%A1%94.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/81/%E6%A1%82%E6%9E%97%E6%97%A5%E5%A1%94.jpg/1280px-%E6%A1%82%E6%9E%97%E6%97%A5%E5%A1%94.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林月塔.jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E6%9C%88%E5%A1%94.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/%E6%A1%82%E6%9E%97%E6%9C%88%E5%A1%94.jpg/1280px-%E6%A1%82%E6%9E%97%E6%9C%88%E5%A1%94.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Sol y Luna hechos pagoda (48691123791).jpg",
+    "year": 2019,
+    "license": "CC BY-SA 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Sol_y_Luna_hechos_pagoda_(48691123791).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/59/Sol_y_Luna_hechos_pagoda_%2848691123791%29.jpg/1280px-Sol_y_Luna_hechos_pagoda_%2848691123791%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89185-Guilin (49041005217).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89185-Guilin_(49041005217).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a9/89185-Guilin_%2849041005217%29.jpg/1280px-89185-Guilin_%2849041005217%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89224-Guilin (49040793371).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89224-Guilin_(49040793371).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/89224-Guilin_%2849040793371%29.jpg/1280px-89224-Guilin_%2849040793371%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89180-Guilin (44892406095).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89180-Guilin_(44892406095).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/91/89180-Guilin_%2844892406095%29.jpg/1280px-89180-Guilin_%2844892406095%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89217-Guilin (45194381372).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89217-Guilin_(45194381372).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/67/89217-Guilin_%2845194381372%29.jpg/1280px-89217-Guilin_%2845194381372%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89223-Guilin (49040273968).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89223-Guilin_(49040273968).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/68/89223-Guilin_%2849040273968%29.jpg/1280px-89223-Guilin_%2849040273968%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89225-Guilin (31370012158).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89225-Guilin_(31370012158).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f9/89225-Guilin_%2831370012158%29.jpg/1280px-89225-Guilin_%2831370012158%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89230-Guilin (45194406342).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89230-Guilin_(45194406342).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/89230-Guilin_%2845194406342%29.jpg/1280px-89230-Guilin_%2845194406342%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89232-Guilin (45194412752).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89232-Guilin_(45194412752).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f9/89232-Guilin_%2845194412752%29.jpg/1280px-89232-Guilin_%2845194412752%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "89234-Guilin (31688953378).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:89234-Guilin_(31688953378).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/78/89234-Guilin_%2831688953378%29.jpg/1280px-89234-Guilin_%2831688953378%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Sun and Moon Pagoda at Day.jpg",
+    "year": 2018,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Sun_and_Moon_Pagoda_at_Day.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f8/Sun_and_Moon_Pagoda_at_Day.jpg/1280px-Sun_and_Moon_Pagoda_at_Day.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Pagodas.jpg",
+    "year": 2017,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Pagodas.jpg",
+    "thumb": "https://upload.wikimedia.org/wikipedia/commons/c/c3/Guilin_Pagodas.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled"
+   },
+   {
+    "title": "Sun and Moon Pagodas Guilin November 2017 HDR.jpg",
+    "year": 2017,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Sun_and_Moon_Pagodas_Guilin_November_2017_HDR.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2d/Sun_and_Moon_Pagodas_Guilin_November_2017_HDR.jpg/1280px-Sun_and_Moon_Pagodas_Guilin_November_2017_HDR.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Sun and Moon Pagodas Guilin November 2017 HDR panorama.jpg",
+    "year": 2017,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Sun_and_Moon_Pagodas_Guilin_November_2017_HDR_panorama.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6b/Sun_and_Moon_Pagodas_Guilin_November_2017_HDR_panorama.jpg/1280px-Sun_and_Moon_Pagodas_Guilin_November_2017_HDR_panorama.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林-杉湖公园-日月双塔 - panoramio.jpg",
+    "year": 2011,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97-%E6%9D%89%E6%B9%96%E5%85%AC%E5%9B%AD-%E6%97%A5%E6%9C%88%E5%8F%8C%E5%A1%94_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/67/%E6%A1%82%E6%9E%97-%E6%9D%89%E6%B9%96%E5%85%AC%E5%9B%AD-%E6%97%A5%E6%9C%88%E5%8F%8C%E5%A1%94_-_panoramio.jpg/1280px-%E6%A1%82%E6%9E%97-%E6%9D%89%E6%B9%96%E5%85%AC%E5%9B%AD-%E6%97%A5%E6%9C%88%E5%8F%8C%E5%A1%94_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "elephant_hill",
+  "name": "象鼻山景区（象鼻、水月洞、普贤塔、云峰寺、桃花江口）",
+  "osm": [
+   "node/344461733"
+  ],
+  "group": "D",
+  "refs": [
+   {
+    "title": "Elefantenrüsselberg.jpg",
+    "year": 2025,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elefantenr%C3%BCsselberg.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c2/Elefantenr%C3%BCsselberg.jpg/1280px-Elefantenr%C3%BCsselberg.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "(CHN-Guangxi) Elephant Trunk Hill 2024-11-25 - 1.jpg",
+    "year": 2024,
+    "license": "CC BY 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:(CHN-Guangxi)_Elephant_Trunk_Hill_2024-11-25_-_1.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/%28CHN-Guangxi%29_Elephant_Trunk_Hill_2024-11-25_-_1.jpg/1280px-%28CHN-Guangxi%29_Elephant_Trunk_Hill_2024-11-25_-_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "(CHN-Guangxi) Elephant Trunk Hill 2024-11-25 - 2.jpg",
+    "year": 2024,
+    "license": "CC BY 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:(CHN-Guangxi)_Elephant_Trunk_Hill_2024-11-25_-_2.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3a/%28CHN-Guangxi%29_Elephant_Trunk_Hill_2024-11-25_-_2.jpg/1280px-%28CHN-Guangxi%29_Elephant_Trunk_Hill_2024-11-25_-_2.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "(CHN-Guangxi) Elephant Trunk Hill 2024-11-25 - 5.jpg",
+    "year": 2024,
+    "license": "CC BY 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:(CHN-Guangxi)_Elephant_Trunk_Hill_2024-11-25_-_5.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7c/%28CHN-Guangxi%29_Elephant_Trunk_Hill_2024-11-25_-_5.jpg/1280px-%28CHN-Guangxi%29_Elephant_Trunk_Hill_2024-11-25_-_5.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "(CHN-Guangxi) Elephant Trunk Hill 2024-11-25 - 6.jpg",
+    "year": 2024,
+    "license": "CC BY 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:(CHN-Guangxi)_Elephant_Trunk_Hill_2024-11-25_-_6.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b1/%28CHN-Guangxi%29_Elephant_Trunk_Hill_2024-11-25_-_6.jpg/1280px-%28CHN-Guangxi%29_Elephant_Trunk_Hill_2024-11-25_-_6.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "(CHN-Guangxi) Elephant Trunk Hill 2024-11-25 - 7.jpg",
+    "year": 2024,
+    "license": "CC BY 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:(CHN-Guangxi)_Elephant_Trunk_Hill_2024-11-25_-_7.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/68/%28CHN-Guangxi%29_Elephant_Trunk_Hill_2024-11-25_-_7.jpg/1280px-%28CHN-Guangxi%29_Elephant_Trunk_Hill_2024-11-25_-_7.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "(CHN-Guangxi) Elephant Trunk Hill Elephant Sculptures 2024-11-25.jpg",
+    "year": 2024,
+    "license": "CC BY 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:(CHN-Guangxi)_Elephant_Trunk_Hill_Elephant_Sculptures_2024-11-25.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c8/%28CHN-Guangxi%29_Elephant_Trunk_Hill_Elephant_Sculptures_2024-11-25.jpg/1280px-%28CHN-Guangxi%29_Elephant_Trunk_Hill_Elephant_Sculptures_2024-11-25.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "(CHN-Guangxi) Water cannons at Elephant Trunk Hill 2024-11-25.jpg",
+    "year": 2024,
+    "license": "CC BY 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:(CHN-Guangxi)_Water_cannons_at_Elephant_Trunk_Hill_2024-11-25.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/32/%28CHN-Guangxi%29_Water_cannons_at_Elephant_Trunk_Hill_2024-11-25.jpg/1280px-%28CHN-Guangxi%29_Water_cannons_at_Elephant_Trunk_Hill_2024-11-25.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Elephant Hill at night (20240217201207).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Elephant_Hill_at_night_(20240217201207).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2f/Guilin_Elephant_Hill_at_night_%2820240217201207%29.jpg/1280px-Guilin_Elephant_Hill_at_night_%2820240217201207%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Elephant Hill at night (20240217201449).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Elephant_Hill_at_night_(20240217201449).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/84/Guilin_Elephant_Hill_at_night_%2820240217201449%29.jpg/1280px-Guilin_Elephant_Hill_at_night_%2820240217201449%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Elephant Hill at night (20240217201733).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Elephant_Hill_at_night_(20240217201733).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b4/Guilin_Elephant_Hill_at_night_%2820240217201733%29.jpg/1280px-Guilin_Elephant_Hill_at_night_%2820240217201733%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Bamboo raft at Elephant Trunk Hill scenic park.jpg",
+    "year": 2018,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Bamboo_raft_at_Elephant_Trunk_Hill_scenic_park.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e5/Bamboo_raft_at_Elephant_Trunk_Hill_scenic_park.jpg/1280px-Bamboo_raft_at_Elephant_Trunk_Hill_scenic_park.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Base of Pagoda at Elephant Trunk Hill.jpg",
+    "year": 2018,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Base_of_Pagoda_at_Elephant_Trunk_Hill.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c2/Base_of_Pagoda_at_Elephant_Trunk_Hill.jpg/1280px-Base_of_Pagoda_at_Elephant_Trunk_Hill.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89514-Guilin (49040277798).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89514-Guilin_(49040277798).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1f/Elephant_Hill_89514-Guilin_%2849040277798%29.jpg/1280px-Elephant_Hill_89514-Guilin_%2849040277798%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89520-Guilin (49040783101).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89520-Guilin_(49040783101).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6e/Elephant_Hill_89520-Guilin_%2849040783101%29.jpg/1280px-Elephant_Hill_89520-Guilin_%2849040783101%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89523-Guilin (49040278448).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89523-Guilin_(49040278448).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/Elephant_Hill_89523-Guilin_%2849040278448%29.jpg/1280px-Elephant_Hill_89523-Guilin_%2849040278448%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89526-Guilin (49040783656).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89526-Guilin_(49040783656).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c9/Elephant_Hill_89526-Guilin_%2849040783656%29.jpg/1280px-Elephant_Hill_89526-Guilin_%2849040783656%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89531-Guilin (49040783891).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89531-Guilin_(49040783891).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/83/Elephant_Hill_89531-Guilin_%2849040783891%29.jpg/1280px-Elephant_Hill_89531-Guilin_%2849040783891%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89533-Guilin (49040997272).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89533-Guilin_(49040997272).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/Elephant_Hill_89533-Guilin_%2849040997272%29.jpg/1280px-Elephant_Hill_89533-Guilin_%2849040997272%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89537-Guilin (49040785521).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89537-Guilin_(49040785521).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/18/Elephant_Hill_89537-Guilin_%2849040785521%29.jpg/1280px-Elephant_Hill_89537-Guilin_%2849040785521%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89543-Guilin (49040997937).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89543-Guilin_(49040997937).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/55/Elephant_Hill_89543-Guilin_%2849040997937%29.jpg/1280px-Elephant_Hill_89543-Guilin_%2849040997937%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89544-Guilin (49040280838).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89544-Guilin_(49040280838).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Elephant_Hill_89544-Guilin_%2849040280838%29.jpg/1280px-Elephant_Hill_89544-Guilin_%2849040280838%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89549-Guilin (49040786641).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89549-Guilin_(49040786641).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a0/Elephant_Hill_89549-Guilin_%2849040786641%29.jpg/1280px-Elephant_Hill_89549-Guilin_%2849040786641%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Trunk Hill, 2018.jpg",
+    "year": 2018,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Trunk_Hill,_2018.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/69/Elephant_Trunk_Hill%2C_2018.jpg/1280px-Elephant_Trunk_Hill%2C_2018.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant shaped brush sculpture at Elephant Trunk Hill.jpg",
+    "year": 2018,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_shaped_brush_sculpture_at_Elephant_Trunk_Hill.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Elephant_shaped_brush_sculpture_at_Elephant_Trunk_Hill.jpg/1280px-Elephant_shaped_brush_sculpture_at_Elephant_Trunk_Hill.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Far view of Elephant Trunk Hill.jpg",
+    "year": 2018,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Far_view_of_Elephant_Trunk_Hill.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/af/Far_view_of_Elephant_Trunk_Hill.jpg/1280px-Far_view_of_Elephant_Trunk_Hill.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Pagoda at Elephant Trunk Hill.jpg",
+    "year": 2018,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Pagoda_at_Elephant_Trunk_Hill.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/ea/Pagoda_at_Elephant_Trunk_Hill.jpg/1280px-Pagoda_at_Elephant_Trunk_Hill.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Water level markers at Elephant Trunk Hill.jpg",
+    "year": 2018,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Water_level_markers_at_Elephant_Trunk_Hill.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/99/Water_level_markers_at_Elephant_Trunk_Hill.jpg/1280px-Water_level_markers_at_Elephant_Trunk_Hill.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Xiangshan Scenic Area 89468-Guilin (31130832628).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Xiangshan_Scenic_Area_89468-Guilin_(31130832628).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bb/Xiangshan_Scenic_Area_89468-Guilin_%2831130832628%29.jpg/1280px-Xiangshan_Scenic_Area_89468-Guilin_%2831130832628%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "2018.08.27 广西桂林 象鼻山.jpg",
+    "year": 2018,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:2018.08.27_%E5%B9%BF%E8%A5%BF%E6%A1%82%E6%9E%97_%E8%B1%A1%E9%BC%BB%E5%B1%B1.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/67/2018.08.27_%E5%B9%BF%E8%A5%BF%E6%A1%82%E6%9E%97_%E8%B1%A1%E9%BC%BB%E5%B1%B1.jpg/1280px-2018.08.27_%E5%B9%BF%E8%A5%BF%E6%A1%82%E6%9E%97_%E8%B1%A1%E9%BC%BB%E5%B1%B1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89522-Guilin (49040783271).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89522-Guilin_(49040783271).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/77/Elephant_Hill_89522-Guilin_%2849040783271%29.jpg/1280px-Elephant_Hill_89522-Guilin_%2849040783271%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89527-Guilin (49040996997).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89527-Guilin_(49040996997).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/be/Elephant_Hill_89527-Guilin_%2849040996997%29.jpg/1280px-Elephant_Hill_89527-Guilin_%2849040996997%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89535-Guilin (49040785286).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89535-Guilin_(49040785286).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f3/Elephant_Hill_89535-Guilin_%2849040785286%29.jpg/1280px-Elephant_Hill_89535-Guilin_%2849040785286%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Hill 89567-Guilin (49040281703).jpg",
+    "year": 2018,
+    "license": "CC BY 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Hill_89567-Guilin_(49040281703).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d4/Elephant_Hill_89567-Guilin_%2849040281703%29.jpg/1280px-Elephant_Hill_89567-Guilin_%2849040281703%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Trunk Hill -Cage -Guilin -China - panoramio.jpg",
+    "year": 2012,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Trunk_Hill_-Cage_-Guilin_-China_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b4/Elephant_Trunk_Hill_-Cage_-Guilin_-China_-_panoramio.jpg/1280px-Elephant_Trunk_Hill_-Cage_-Guilin_-China_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant trunk hill.Guilin.China - panoramio.jpg",
+    "year": 2012,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_trunk_hill.Guilin.China_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/dc/Elephant_trunk_hill.Guilin.China_-_panoramio.jpg/1280px-Elephant_trunk_hill.Guilin.China_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Elephant Trunk Hill 象鼻山 - panoramio.jpg",
+    "year": 2011,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Elephant_Trunk_Hill_%E8%B1%A1%E9%BC%BB%E5%B1%B1_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/51/Elephant_Trunk_Hill_%E8%B1%A1%E9%BC%BB%E5%B1%B1_-_panoramio.jpg/1280px-Elephant_Trunk_Hill_%E8%B1%A1%E9%BC%BB%E5%B1%B1_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "象鼻山 Elephant Trunk Hill - panoramio.jpg",
+    "year": 2011,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E8%B1%A1%E9%BC%BB%E5%B1%B1_Elephant_Trunk_Hill_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f6/%E8%B1%A1%E9%BC%BB%E5%B1%B1_Elephant_Trunk_Hill_-_panoramio.jpg/1280px-%E8%B1%A1%E9%BC%BB%E5%B1%B1_Elephant_Trunk_Hill_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "象鼻山 Elephant Trunk Hill - panoramio (1).jpg",
+    "year": 2011,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E8%B1%A1%E9%BC%BB%E5%B1%B1_Elephant_Trunk_Hill_-_panoramio_(1).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/64/%E8%B1%A1%E9%BC%BB%E5%B1%B1_Elephant_Trunk_Hill_-_panoramio_%281%29.jpg/1280px-%E8%B1%A1%E9%BC%BB%E5%B1%B1_Elephant_Trunk_Hill_-_panoramio_%281%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "象鼻山 Elephant Trunk Hill - panoramio (2).jpg",
+    "year": 2011,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E8%B1%A1%E9%BC%BB%E5%B1%B1_Elephant_Trunk_Hill_-_panoramio_(2).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/09/%E8%B1%A1%E9%BC%BB%E5%B1%B1_Elephant_Trunk_Hill_-_panoramio_%282%29.jpg/1280px-%E8%B1%A1%E9%BC%BB%E5%B1%B1_Elephant_Trunk_Hill_-_panoramio_%282%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "jiefang_bridge",
+  "name": "解放桥（含两岸桥头、逍遥楼对景）",
+  "osm": [
+   "way/693451306",
+   "way/49322149",
+   "way/258899702"
+  ],
+  "group": "E",
+  "refs": [
+   {
+    "title": "桂林解放桥下夜景.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E4%B8%8B%E5%A4%9C%E6%99%AF.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/64/%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E4%B8%8B%E5%A4%9C%E6%99%AF.jpg/1280px-%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E4%B8%8B%E5%A4%9C%E6%99%AF.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林解放桥夜景 01.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_01.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/90/%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_01.jpg/1280px-%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林解放桥夜景 02.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_02.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/54/%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_02.jpg/1280px-%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林解放桥夜景 03.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_03.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/91/%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_03.jpg/1280px-%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_03.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林解放桥夜景 04.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_04.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9c/%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_04.jpg/1280px-%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_04.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林解放桥夜景 05.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_05.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/73/%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_05.jpg/1280px-%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_05.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林解放桥夜景 06.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_06.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/36/%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_06.jpg/1280px-%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_06.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林解放桥夜景 07.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_07.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/53/%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_07.jpg/1280px-%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_07.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林解放桥夜景 08.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_08.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/91/%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_08.jpg/1280px-%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_08.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林解放桥夜景 09.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_09.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_09.jpg/1280px-%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_09.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林解放桥夜景 10.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_10.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e4/%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_10.jpg/1280px-%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_10.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林解放桥夜景 11.jpg",
+    "year": 2019,
+    "license": "CC0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_11.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5b/%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_11.jpg/1280px-%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_11.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "xiaoyao_tower",
+  "name": "逍遥楼",
+  "osm": [
+   "way/702352884"
+  ],
+  "group": "E",
+  "refs": []
+ },
+ {
+  "id": "fubo",
+  "name": "伏波山（还珠洞、听涛阁、山门）",
+  "osm": [
+   "node/1618571712",
+   "way/485320268"
+  ],
+  "group": "F",
+  "refs": [
+   {
+    "title": "Hill Fuboshan in Guilin.jpg",
+    "year": 2025,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Hill_Fuboshan_in_Guilin.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b9/Hill_Fuboshan_in_Guilin.jpg/1280px-Hill_Fuboshan_in_Guilin.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "紹興四年（1134）孫覿等伏波山題名.jpg",
+    "year": 2025,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E7%B4%B9%E8%88%88%E5%9B%9B%E5%B9%B4%EF%BC%881134%EF%BC%89%E5%AD%AB%E8%A6%BF%E7%AD%89%E4%BC%8F%E6%B3%A2%E5%B1%B1%E9%A1%8C%E5%90%8D.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e8/%E7%B4%B9%E8%88%88%E5%9B%9B%E5%B9%B4%EF%BC%881134%EF%BC%89%E5%AD%AB%E8%A6%BF%E7%AD%89%E4%BC%8F%E6%B3%A2%E5%B1%B1%E9%A1%8C%E5%90%8D.jpg/1280px-%E7%B4%B9%E8%88%88%E5%9B%9B%E5%B9%B4%EF%BC%881134%EF%BC%89%E5%AD%AB%E8%A6%BF%E7%AD%89%E4%BC%8F%E6%B3%A2%E5%B1%B1%E9%A1%8C%E5%90%8D.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "紹興甲戌（1154）吕願忠等伏波山題記.jpg",
+    "year": 2025,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E7%B4%B9%E8%88%88%E7%94%B2%E6%88%8C%EF%BC%881154%EF%BC%89%E5%90%95%E9%A1%98%E5%BF%A0%E7%AD%89%E4%BC%8F%E6%B3%A2%E5%B1%B1%E9%A1%8C%E8%A8%98.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2a/%E7%B4%B9%E8%88%88%E7%94%B2%E6%88%8C%EF%BC%881154%EF%BC%89%E5%90%95%E9%A1%98%E5%BF%A0%E7%AD%89%E4%BC%8F%E6%B3%A2%E5%B1%B1%E9%A1%8C%E8%A8%98.jpg/1280px-%E7%B4%B9%E8%88%88%E7%94%B2%E6%88%8C%EF%BC%881154%EF%BC%89%E5%90%95%E9%A1%98%E5%BF%A0%E7%AD%89%E4%BC%8F%E6%B3%A2%E5%B1%B1%E9%A1%8C%E8%A8%98.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "桂林叠彩山远眺伏波山.jpg",
+    "year": 2020,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E5%8F%A0%E5%BD%A9%E5%B1%B1%E8%BF%9C%E7%9C%BA%E4%BC%8F%E6%B3%A2%E5%B1%B1.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/08/%E6%A1%82%E6%9E%97%E5%8F%A0%E5%BD%A9%E5%B1%B1%E8%BF%9C%E7%9C%BA%E4%BC%8F%E6%B3%A2%E5%B1%B1.jpg/1280px-%E6%A1%82%E6%9E%97%E5%8F%A0%E5%BD%A9%E5%B1%B1%E8%BF%9C%E7%9C%BA%E4%BC%8F%E6%B3%A2%E5%B1%B1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "General Fubo, Guilin (20354614576).jpg",
+    "year": 2015,
+    "license": "CC BY-SA 2.0",
+    "page": "https://commons.wikimedia.org/wiki/File:General_Fubo,_Guilin_(20354614576).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0b/General_Fubo%2C_Guilin_%2820354614576%29.jpg/1280px-General_Fubo%2C_Guilin_%2820354614576%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "伏波山公園 Fuposhan Park - panoramio.jpg",
+    "year": 2011,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E4%BC%8F%E6%B3%A2%E5%B1%B1%E5%85%AC%E5%9C%92_Fuposhan_Park_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/70/%E4%BC%8F%E6%B3%A2%E5%B1%B1%E5%85%AC%E5%9C%92_Fuposhan_Park_-_panoramio.jpg/1280px-%E4%BC%8F%E6%B3%A2%E5%B1%B1%E5%85%AC%E5%9C%92_Fuposhan_Park_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "diecai",
+  "name": "叠彩山（风洞、拿云亭、明月峰）",
+  "osm": [
+   "way/188580617"
+  ],
+  "group": "F",
+  "refs": [
+   {
+    "title": "桂林叠彩山远眺伏波山.jpg",
+    "year": 2020,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E5%8F%A0%E5%BD%A9%E5%B1%B1%E8%BF%9C%E7%9C%BA%E4%BC%8F%E6%B3%A2%E5%B1%B1.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/08/%E6%A1%82%E6%9E%97%E5%8F%A0%E5%BD%A9%E5%B1%B1%E8%BF%9C%E7%9C%BA%E4%BC%8F%E6%B3%A2%E5%B1%B1.jpg/1280px-%E6%A1%82%E6%9E%97%E5%8F%A0%E5%BD%A9%E5%B1%B1%E8%BF%9C%E7%9C%BA%E4%BC%8F%E6%B3%A2%E5%B1%B1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "duxiu",
+  "name": "独秀峰（读书岩、太平岩、峰顶亭）",
+  "osm": [
+   "node/5981119758"
+  ],
+  "group": "A",
+  "refs": [
+   {
+    "title": "Guilin Duxiu Feng 2012.09.28 13-57-40.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Duxiu_Feng_2012.09.28_13-57-40.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/48/Guilin_Duxiu_Feng_2012.09.28_13-57-40.jpg/1280px-Guilin_Duxiu_Feng_2012.09.28_13-57-40.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Duxiu Feng 2012.09.28 13-26-46.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Duxiu_Feng_2012.09.28_13-26-46.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6b/Guilin_Duxiu_Feng_2012.09.28_13-26-46.jpg/1280px-Guilin_Duxiu_Feng_2012.09.28_13-26-46.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Duxiu Feng 2012.09.28 13-26-59.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Duxiu_Feng_2012.09.28_13-26-59.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/2c/Guilin_Duxiu_Feng_2012.09.28_13-26-59.jpg/1280px-Guilin_Duxiu_Feng_2012.09.28_13-26-59.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Duxiu Feng 2012.09.28 13-27-06.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Duxiu_Feng_2012.09.28_13-27-06.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0d/Guilin_Duxiu_Feng_2012.09.28_13-27-06.jpg/1280px-Guilin_Duxiu_Feng_2012.09.28_13-27-06.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Duxiu Feng 2012.09.28 13-27-13.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Duxiu_Feng_2012.09.28_13-27-13.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7a/Guilin_Duxiu_Feng_2012.09.28_13-27-13.jpg/1280px-Guilin_Duxiu_Feng_2012.09.28_13-27-13.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Duxiu Feng 2012.09.28 13-27-51.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Duxiu_Feng_2012.09.28_13-27-51.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a0/Guilin_Duxiu_Feng_2012.09.28_13-27-51.jpg/1280px-Guilin_Duxiu_Feng_2012.09.28_13-27-51.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Duxiu Feng 2012.09.28 13-28-02.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Duxiu_Feng_2012.09.28_13-28-02.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3c/Guilin_Duxiu_Feng_2012.09.28_13-28-02.jpg/1280px-Guilin_Duxiu_Feng_2012.09.28_13-28-02.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Duxiu Feng 2012.09.28 13-28-36.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Duxiu_Feng_2012.09.28_13-28-36.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/bc/Guilin_Duxiu_Feng_2012.09.28_13-28-36.jpg/1280px-Guilin_Duxiu_Feng_2012.09.28_13-28-36.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Duxiu Feng 2012.09.28 13-55-53.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Duxiu_Feng_2012.09.28_13-55-53.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e1/Guilin_Duxiu_Feng_2012.09.28_13-55-53.jpg/1280px-Guilin_Duxiu_Feng_2012.09.28_13-55-53.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Duxiu Feng 2012.09.28 13-56-38.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Duxiu_Feng_2012.09.28_13-56-38.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c7/Guilin_Duxiu_Feng_2012.09.28_13-56-38.jpg/1280px-Guilin_Duxiu_Feng_2012.09.28_13-56-38.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Duxiu Feng 2012.09.28 13-56-53.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Duxiu_Feng_2012.09.28_13-56-53.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/95/Guilin_Duxiu_Feng_2012.09.28_13-56-53.jpg/1280px-Guilin_Duxiu_Feng_2012.09.28_13-56-53.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guilin Duxiu Feng 2012.09.28 13-57-10.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Duxiu_Feng_2012.09.28_13-57-10.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/49/Guilin_Duxiu_Feng_2012.09.28_13-57-10.jpg/1280px-Guilin_Duxiu_Feng_2012.09.28_13-57-10.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "卧龙谷口独秀峰 - panoramio.jpg",
+    "year": 2011,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E5%8D%A7%E9%BE%99%E8%B0%B7%E5%8F%A3%E7%8B%AC%E7%A7%80%E5%B3%B0_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/%E5%8D%A7%E9%BE%99%E8%B0%B7%E5%8F%A3%E7%8B%AC%E7%A7%80%E5%B3%B0_-_panoramio.jpg/1280px-%E5%8D%A7%E9%BE%99%E8%B0%B7%E5%8F%A3%E7%8B%AC%E7%A7%80%E5%B3%B0_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "卧龙谷独秀峰 - panoramio.jpg",
+    "year": 2011,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E5%8D%A7%E9%BE%99%E8%B0%B7%E7%8B%AC%E7%A7%80%E5%B3%B0_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8c/%E5%8D%A7%E9%BE%99%E8%B0%B7%E7%8B%AC%E7%A7%80%E5%B3%B0_-_panoramio.jpg/1280px-%E5%8D%A7%E9%BE%99%E8%B0%B7%E7%8B%AC%E7%A7%80%E5%B3%B0_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "灵岩独秀峰 - panoramio.jpg",
+    "year": 2011,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E7%81%B5%E5%B2%A9%E7%8B%AC%E7%A7%80%E5%B3%B0_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/44/%E7%81%B5%E5%B2%A9%E7%8B%AC%E7%A7%80%E5%B3%B0_-_panoramio.jpg/1280px-%E7%81%B5%E5%B2%A9%E7%8B%AC%E7%A7%80%E5%B3%B0_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "独秀峰 - panoramio.jpg",
+    "year": 2011,
+    "license": "CC BY 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:%E7%8B%AC%E7%A7%80%E5%B3%B0_-_panoramio.jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/%E7%8B%AC%E7%A7%80%E5%B3%B0_-_panoramio.jpg/1280px-%E7%8B%AC%E7%A7%80%E5%B3%B0_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ },
+ {
+  "id": "mulong",
+  "name": "木龙湖（木龙塔、宋城墙、东镇门）",
+  "osm": [
+   "way/674638582",
+   "way/674909120"
+  ],
+  "group": "F",
+  "refs": []
+ },
+ {
+  "id": "huaqiao",
+  "name": "花桥（七星公园）",
+  "osm": [
+   "way/246520676"
+  ],
+  "group": "F",
+  "refs": []
+ },
+ {
+  "id": "zhongshan_road",
+  "name": "中山中路（阳桥—十字街—微笑堂段街景）",
+  "osm": [
+   "way/191185446",
+   "way/701820462"
+  ],
+  "group": "B",
+  "refs": [
+   {
+    "title": "Guì C08300D at Yangqiao (20240218080024).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Gu%C3%AC_C08300D_at_Yangqiao_(20240218080024).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/74/Gu%C3%AC_C08300D_at_Yangqiao_%2820240218080024%29.jpg/1280px-Gu%C3%AC_C08300D_at_Yangqiao_%2820240218080024%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guì C08335D at Yangqiao (20240218081245).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Gu%C3%AC_C08335D_at_Yangqiao_(20240218081245).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6d/Gu%C3%AC_C08335D_at_Yangqiao_%2820240218081245%29.jpg/1280px-Gu%C3%AC_C08335D_at_Yangqiao_%2820240218081245%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guì C08366D at Yangqiao (20240218081905).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Gu%C3%AC_C08366D_at_Yangqiao_(20240218081905).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/98/Gu%C3%AC_C08366D_at_Yangqiao_%2820240218081905%29.jpg/1280px-Gu%C3%AC_C08366D_at_Yangqiao_%2820240218081905%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guì C11323D at Yangqiao (20240218080623).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Gu%C3%AC_C11323D_at_Yangqiao_(20240218080623).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/64/Gu%C3%AC_C11323D_at_Yangqiao_%2820240218080623%29.jpg/1280px-Gu%C3%AC_C11323D_at_Yangqiao_%2820240218080623%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guì C11326D at Yangqiao (20240218081239).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Gu%C3%AC_C11326D_at_Yangqiao_(20240218081239).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/Gu%C3%AC_C11326D_at_Yangqiao_%2820240218081239%29.jpg/1280px-Gu%C3%AC_C11326D_at_Yangqiao_%2820240218081239%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guì C11351D at Yangqiao (20240218081901).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Gu%C3%AC_C11351D_at_Yangqiao_(20240218081901).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/40/Gu%C3%AC_C11351D_at_Yangqiao_%2820240218081901%29.jpg/1280px-Gu%C3%AC_C11351D_at_Yangqiao_%2820240218081901%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guì C11672D at Yangqiao (20240218080011).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Gu%C3%AC_C11672D_at_Yangqiao_(20240218080011).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/40/Gu%C3%AC_C11672D_at_Yangqiao_%2820240218080011%29.jpg/1280px-Gu%C3%AC_C11672D_at_Yangqiao_%2820240218080011%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guì C12035D at Yangqiao (20240218075118).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Gu%C3%AC_C12035D_at_Yangqiao_(20240218075118).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/Gu%C3%AC_C12035D_at_Yangqiao_%2820240218075118%29.jpg/1280px-Gu%C3%AC_C12035D_at_Yangqiao_%2820240218075118%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guì C12192D at Yangqiao (20240218082158).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Gu%C3%AC_C12192D_at_Yangqiao_(20240218082158).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/56/Gu%C3%AC_C12192D_at_Yangqiao_%2820240218082158%29.jpg/1280px-Gu%C3%AC_C12192D_at_Yangqiao_%2820240218082158%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guì C12345D at Yangqiao (20240218071757).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Gu%C3%AC_C12345D_at_Yangqiao_(20240218071757).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/71/Gu%C3%AC_C12345D_at_Yangqiao_%2820240218071757%29.jpg/1280px-Gu%C3%AC_C12345D_at_Yangqiao_%2820240218071757%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guì C12352D at Yangqiao (20240218071742).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Gu%C3%AC_C12352D_at_Yangqiao_(20240218071742).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6e/Gu%C3%AC_C12352D_at_Yangqiao_%2820240218071742%29.jpg/1280px-Gu%C3%AC_C12352D_at_Yangqiao_%2820240218071742%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Guì C12738D at Yangqiao (20240218072618).jpg",
+    "year": 2024,
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Gu%C3%AC_C12738D_at_Yangqiao_(20240218072618).jpg",
+    "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b5/Gu%C3%AC_C12738D_at_Yangqiao_%2820240218072618%29.jpg/1280px-Gu%C3%AC_C12738D_at_Yangqiao_%2820240218072618%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   }
+  ]
+ }
+]
