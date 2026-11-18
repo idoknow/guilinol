@@ -21,7 +21,7 @@ try{
     if(!mobile){lake=await lakeChecks(page,data,output);console.log('painted boat',lake)}
     async function fixture(x,z){assert(await page.evaluate(async([x,z])=>{const walker=window.viewer.walk;walker.leave();return walker.enter(x,z,0,'ride-fixture')},[x,z]))}
     const button=page.locator('.vehicle-action')
-    async function interact(label){await page.waitForFunction(label=>document.querySelector('.vehicle-action')?.textContent.includes(label),label);if(mobile)await button.tap();else await page.keyboard.press('e')}
+    async function interact(label){const close=page.locator('.spot-card.show .card-close');if(await close.isVisible())await close.click();await page.waitForFunction(label=>document.querySelector('.vehicle-action')?.textContent.includes(label),label);if(mobile)await button.tap();else await page.keyboard.press('e')}
     async function shot(name){await page.screenshot({path:`${output}/${name}.png`})}
     async function timings(){return page.evaluate(async()=>{const samples=[];for(let frame=0;frame<24;frame++){await new Promise(requestAnimationFrame);samples.push(window.viewer.stats.ms)}return samples.sort((a,b)=>a-b)[12]})}
     const gate=[-588,-212],distance=bike=>Math.hypot(bike[0]-gate[0],bike[2]-gate[1]);const bike=[...data.bikes].sort((first,second)=>distance(first)-distance(second))[0]
