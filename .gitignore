@@ -1,0 +1,6 @@
+raw/
+public/world/
+node_modules/
+dist/
+__pycache__/
+.venv/
