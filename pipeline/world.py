@@ -19,6 +19,7 @@ from scatter import CONFIG, scatter
 from streets import chunks as street_chunks
 from atlas import write_atlas
 from vehicles import write_vehicles
+from shoreline import report_water
 
 DRY = -32768
 
@@ -62,6 +63,7 @@ def build(bbox, output, palette):
                 if wet.any():
                     patch[wet] = round(np.median(terrain[row:row+patch.shape[0],col:col+patch.shape[1]][wet]))
     wet = surface != DRY
+    report_water(surface, terrain, bounds, stencil)
     terrain[wet] = np.minimum(terrain[wet],surface[wet]-20)
     output.mkdir(parents=True, exist_ok=True)
     original = terrain.copy()
