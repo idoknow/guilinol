@@ -64,17 +64,19 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
   signal.throwIfAborted()
   const view = new DataView(buffer)
-  if(view.getUint32(0)!==0x474c3032) throw Error('Invalid GL02 tile')
-  const [vertices,count,collision,imageBytes] = [4,8,12,16].map(offset=>view.getUint32(offset,true))
-  let offset = 20
+  if(view.getUint32(0)!==0x474c3033) throw Error('Invalid GL03 tile')
+  const [vertices,count,collision,imageBytes,triangles] = [4,8,12,16,20].map(offset=>view.getUint32(offset,true))
+  let offset = 24
   const terrain = new Int16Array(buffer,offset,4225); offset+=8450
   const water = new Int16Array(buffer,offset,4225); offset+=8450
   const positions = new Int16Array(buffer,offset,vertices*3); offset+=vertices*6
   const normals = new Int8Array(buffer,offset,vertices*3); offset+=vertices*3
-  const indices = new Uint32Array(buffer.slice(offset,offset+count*4)); offset+=count*4+collision
-  const end = offset+imageBytes, extra = buffer.byteLength-end
-  if(extra!==0 && extra!==8450) throw Error('Invalid GL02 sections')
-  const underlay = extra ? new Int16Array(buffer.slice(end)) : terrain
+  const indices = new Uint32Array(buffer.slice(offset,offset+count*4)); offset+=count*4
+  const rings = new Uint8Array(buffer,offset,collision); offset+=collision
+  const end = offset+imageBytes, tail = end+triangles*18, extra = buffer.byteLength-tail
+  if(extra!==0 && extra!==8450) throw Error('Invalid GL03 sections')
+  const deck = Float32Array.from(new Int16Array(buffer.slice(end,tail)),(value,index)=>value/(index%3===1?10:100))
+  const underlay = extra ? new Int16Array(buffer.slice(tail)) : terrain
   const material = await surfaceMaterial(buffer.slice(offset,end))
   const sample = (col:number,row:number)=>{
     const index = row*65+col
@@ -101,5 +103,8 @@ export async function detail(tile:Tile, signal:AbortSignal) {
     walls.setIndex(new THREE.BufferAttribute(indices,1))
     group.add(new THREE.Mesh(walls,buildings))
   }
-  return {group,dispose(){geometry.dispose(); walls.dispose(); material.map!.image.close(); material.map!.dispose(); material.dispose()}}
+  const bridge = new THREE.BufferGeometry()
+  if(deck.length){bridge.setAttribute('position',new THREE.BufferAttribute(deck,3)); bridge.computeVertexNormals(); group.add(new THREE.Mesh(bridge,deckMaterial))}
+  return {group,terrain,water,rings,deck,dispose(){bridge.dispose();geometry.dispose(); walls.dispose(); material.map!.image.close(); material.map!.dispose(); material.dispose()}}
 }
+const deckMaterial = new THREE.MeshStandardMaterial()

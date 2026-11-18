@@ -1,7 +1,8 @@
 import type {PerspectiveCamera} from 'three'
 
 type Point = [number,number,number]
-const presets:Record<string,[Point,Point]> = {
+type Preset = [Point,Point] & {walk?:{x:number,z:number,yaw:number}}
+export const presets:Record<string,Preset> = {
   lijiang:[[85,173,-340],[-110,180,-810]],
   palace:[[-490,171,-485],[-513,194,-679]],
   elephant:[[-740,171,868],[-855,179,1098]],

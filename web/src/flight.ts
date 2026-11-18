@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-export function flight(camera:THREE.PerspectiveCamera, canvas:HTMLCanvasElement, extent:number[]) {
+export function flight(camera:THREE.PerspectiveCamera, canvas:HTMLCanvasElement, extent:number[],enabled:()=>boolean) {
   const keys = new Set<string>(), touches = new Map<number,[number,number]>()
   camera.rotation.order = 'YXZ'
   const clamp = THREE.MathUtils.clamp
@@ -18,10 +18,12 @@ export function flight(camera:THREE.PerspectiveCamera, canvas:HTMLCanvasElement,
   window.addEventListener('keyup',event=>keys.delete(event.code))
   window.addEventListener('blur',()=>{keys.clear();touches.clear()})
   canvas.addEventListener('pointerdown',event=>{
+    if(!enabled())return
     if(event.pointerType==='mouse') {canvas.requestPointerLock()?.catch(()=>{});return}
     canvas.setPointerCapture(event.pointerId);touches.set(event.pointerId,[event.clientX,event.clientY])
   })
   canvas.addEventListener('pointermove',event=>{
+    if(!enabled())return
     if(event.pointerType==='mouse') {
       if(document.pointerLockElement===canvas||event.buttons===1) rotate(event.movementX,event.movementY)
       return
