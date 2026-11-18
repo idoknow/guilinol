@@ -15,6 +15,7 @@ async function start() {
   scene.background = new THREE.Color(look.sky); scene.fog = new THREE.Fog(look.sky,look.fogNear,look.fogFar)
   const light = new THREE.DirectionalLight(look.sunColor,look.sunPower)
   light.position.set(...look.sunPosition); scene.add(light)
+  scene.add(new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower))
   const [left,top,width,depth] = manifest.extent
   camera.position.set(left+width*.55,420,top+depth*.62)
   const controls = flight(camera,renderer.domElement,manifest.extent)
