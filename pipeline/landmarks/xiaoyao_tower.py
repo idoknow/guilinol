@@ -13,6 +13,19 @@ import trimesh
 from jingjiang import Model, SWATCHES, atlas
 
 
+class LandmarkModel(Model):
+    def __init__(self, detail):
+        super().__init__(detail)
+        self.lamps=[]
+
+    def mesh(self, vertices, faces, color, collide=False):
+        if isinstance(color,str) and color=='lamp':
+            super().mesh(vertices,faces,'gold',collide)
+            self.lamps.append((self.visible.pop(),self.uv.pop()))
+        else:
+            super().mesh(vertices,faces,color,collide)
+
+
 def facade(model, base, half, height, upstairs):
     for side in range(4):
         model.pose = (0, 0, 0, side * np.pi / 2)
@@ -59,32 +72,39 @@ def tower(model):
     model.swept_roof(0,19.25,0,15.5,14.9,4.15)
 
 
-def generate():
+def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None):
     image = atlas()
-    target = Path(__file__).resolve().parents[2]/'public/textures/landmarks/E'
+    target = Path(__file__).resolve().parents[2]/'public/textures/landmarks'/folder
     target.mkdir(parents=True, exist_ok=True)
     image.save(target/'timber-and-tile.png', optimize=True)
     scene = trimesh.Scene()
     for level in (0,1):
-        model = Model(level==0)
-        tower(model)
+        model = LandmarkModel(level==0)
+        build(model)
         group = f'lod{level}'
         scene.graph.update(frame_to=group)
         def add(parts, uvs, texture, name):
             vertices = np.concatenate(parts).reshape(-1,3)
+            if lift is not None:
+                vertices[:,1]+=lift(vertices[:,0])
             mesh = trimesh.Trimesh(vertices, np.arange(len(vertices)).reshape(-1,3), process=False)
             if texture is not None:
                 material = trimesh.visual.material.PBRMaterial(name=name,baseColorTexture=texture,roughnessFactor=1,metallicFactor=0,doubleSided=True)
+                if name.endswith('_lit'):
+                    material.emissiveFactor=[.85,.57,.24]
                 mesh.visual = trimesh.visual.TextureVisuals(uv=np.concatenate(uvs).reshape(-1,2),material=material)
             scene.add_geometry(mesh,node_name=group+'_'+name if texture else 'collision_surface',parent_node_name=group if texture else scene.graph.base_frame)
-        add(model.visible,model.uv,image,'joinery')
+        if model.visible:
+            add(model.visible,model.uv,image,'joinery')
+        if model.lamps:
+            faces,uvs=zip(*model.lamps);add(faces,uvs,image,'lamp_lit')
         for key, parts in model.tile_parts.items():
             if parts:
                 cell = list(SWATCHES).index(key); left,top=128*(cell%4),128*(cell//4)
                 add([tri for tri,uv in parts],[uv for tri,uv in parts],image.crop((left,top,left+128,top+128)),key)
         if not level:
             add(model.solid,None,None,'collision_surface')
-    scene.export(Path(sys.argv[1])/'xiaoyao_tower.glb')
+    scene.export(Path(sys.argv[1])/(name+'.glb'))
 
 
 if __name__ == '__main__':
