@@ -11,6 +11,7 @@
     "verify:flight": "node scripts/flight.mjs",
     "verify:atlas": "node --experimental-strip-types scripts/atlas.mjs",
     "verify:walk": "node scripts/walk.mjs",
+    "verify:ride": "node scripts/ride.mjs",
     "shoot": "node scripts/shoot.mjs"
   },
   "dependencies": {

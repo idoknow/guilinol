@@ -6,17 +6,38 @@ import type {Stream} from '../stream'
 import {walkInput} from '../ui/walk'
 import {avatar} from '../look/avatar'
 import {walkConfig as cfg} from './config'
+import {createEbikeSystem} from './ebike'
 import {createPhysics} from './physics'
 
 export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canvas:HTMLCanvasElement,manifest:Manifest,stream:Stream,peaks:THREE.Group,verify:boolean){
   const [sim,model]=await Promise.all([createPhysics(manifest,stream,peaks),new GLTFLoader().loadAsync(avatar.path)])
   const figure=model.scene;scene.add(figure);figure.visible=false;figure.scale.setScalar(avatar.scale)
   if(avatar.color)figure.traverse(node=>{if(node instanceof THREE.Mesh)node.material.color.set(avatar.color)})
+  const ebikes=await createEbikeSystem(scene,manifest,sim,figure)
   const mixer=new THREE.AnimationMixer(figure),actions=new Map(model.animations.map(clip=>[clip.name,mixer.clipAction(clip)]))
+  const hintEl=document.querySelector<HTMLElement>('.hint')
   let action:THREE.AnimationAction|undefined,active=false,yaw=0,pitch=cfg.pitch,arm=cfg.far,velocity=0,grounded=false,accumulator=0
-  let resets=0,steps=0,physicsMs=0,elapsed=0,lastHits:string[]=[]
+  let resets=0,steps=0,physicsMs=0,elapsed=0,lastHits:string[]=[],lastHint=''
+
+  function toggleRide(){
+    if(!active)return false
+    if(ebikes.riding){
+      const ok=ebikes.dismount()
+      if(ok){action?.reset().fadeIn(.15).play();follow()}
+      return ok
+    }
+    const pos=sim.body.translation()
+    const bikeYaw=ebikes.mount(pos.x,pos.z)
+    if(bikeYaw!==null){
+      yaw=bikeYaw;velocity=0;action?.stop();action=undefined;follow()
+      return true
+    }
+    return false
+  }
+
   const input=walkInput(canvas,()=>active,(dx,dy)=>{yaw-=dx*cfg.sensitivity;pitch=THREE.MathUtils.clamp(pitch+dy*cfg.sensitivity,-.8,1.3)},
-    delta=>{arm=THREE.MathUtils.clamp(arm+delta*.013,cfg.zoomMin,cfg.zoomMax)},()=>{arm=arm>(cfg.far+cfg.near)/2?cfg.near:cfg.far})
+    delta=>{arm=THREE.MathUtils.clamp(arm+delta*.013,cfg.zoomMin,cfg.zoomMax)},()=>{arm=arm>(cfg.far+cfg.near)/2?cfg.near:cfg.far},
+    ()=>{toggleRide()})
   const safe=new THREE.Vector3(),focus=new THREE.Vector3(),direction=new THREE.Vector3();const spawns:object[]=[]
   let external:{x:number,z:number,run:boolean}|null=null,blockedWater=false
   function place(x:number,z:number,reason:string,override=false){const found=sim.findWalkableSpawn(x,z,override)
@@ -24,15 +45,18 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(!found)return false
     sim.body.setTranslation(found,true);sim.body.setNextKinematicTranslation(found);sim.world.step();safe.set(found.x,found.y,found.z);velocity=0;grounded=false;return true}
   async function enter(x:number,z:number,heading:number,reason:string,override=false){
+    if(ebikes.riding)ebikes.dismount()
     focus.set(x,0,z);const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
     const deadline=performance.now()+15000
     while(needed.some(tile=>!stream.loaded.has(tile))&&performance.now()<deadline){stream.tick(focus);await new Promise(resolve=>setTimeout(resolve,12))}
     sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
-    active=true;figure.visible=true;yaw=heading;figure.rotation.y=yaw+avatar.yaw;input.show(true);accumulator=0;camera.near=.08;camera.updateProjectionMatrix();follow();return true
+    const p=sim.body.translation();ebikes.syncParked(p.x,p.z)
+    active=true;figure.visible=true;yaw=heading;figure.rotation.set(0,yaw+avatar.yaw,0);input.show(true);accumulator=0;camera.near=.08;camera.updateProjectionMatrix();follow();return true
   }
-  function leave(){active=false;figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
-  function follow(){const pos=sim.body.translation();figure.position.set(pos.x,pos.y-cfg.height/2,pos.z)
-    focus.copy(figure.position);focus.y+=1.4;direction.set(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch))
+  function leave(){if(ebikes.riding)ebikes.dismount();active=false;figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function follow(){const pos=sim.body.translation()
+    if(!ebikes.riding)figure.position.set(pos.x,pos.y-cfg.height/2,pos.z)
+    focus.set(pos.x,pos.y-cfg.height/2+1.4,pos.z);direction.set(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch))
     const hit=sim.world.castRay(new R.Ray(focus,direction),arm,true,undefined,undefined,sim.capsule)
     camera.position.copy(focus).addScaledVector(direction,Math.max(.02,(hit?.timeOfImpact??arm)-.18));camera.lookAt(focus)
   }
@@ -42,9 +66,30 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     terrainRay.ray.origin.set(pos.x,4000,pos.z);mesh?.updateWorldMatrix(true,false)
     const renderY=mesh?terrainRay.intersectObject(mesh,false)[0]?.point.y:undefined
     return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
-      inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits}}
-  function tick(dt:number){if(!active)return;const before=performance.now(),start=sim.body.translation();sim.sync(start.x,start.z)
-    const keys=input.read(),delta=new THREE.Vector2(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))
+      inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits,
+      riding:ebikes.riding,speed:ebikes.speed,canMount:ebikes.canMount(pos.x,pos.z),road:ebikes.road}}
+  function updateHint(canMount:boolean,riding:boolean){
+    input.setRideState(canMount,riding)
+    if(!hintEl)return
+    const next=riding?'WASD 骑行 · 空格 刹车 · E 下车 · 滚轮远近 · V 起飞':
+      canMount?'按 E 骑电驴 · WASD 走 · Shift 跑 · 空格 跳 · V 起飞':
+      'WASD 走 · Shift 跑 · 空格 跳 · 拖动转视角 · 滚轮远近 · V 起飞'
+    if(next!==lastHint){hintEl.textContent=next;lastHint=next}
+  }
+  function tick(dt:number){if(!active)return;const before=performance.now(),start=sim.body.translation();sim.sync(start.x,start.z);ebikes.syncParked(start.x,start.z)
+    const keys=input.read()
+    if(ebikes.riding){
+      const stepCount=Math.floor((accumulator+Math.min(.12,dt))/(1/60))
+      const totalDt=Math.min(.12,dt)
+      steps+=Math.max(1,stepCount);elapsed+=totalDt
+      const res=ebikes.stepRide(totalDt,keys,external,yaw,velocity,safe,verify,()=>{if(place(safe.x,safe.z,'rescue'))resets++})
+      yaw=res.yaw;velocity=res.velocity;lastHits=res.hits;blockedWater=res.blockedWater
+      physicsMs+=performance.now()-before
+      updateHint(false,true)
+      follow()
+      return
+    }
+    const delta=new THREE.Vector2(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))
     if(external)delta.set(external.x,external.z);delta.divideScalar(Math.max(1,delta.length()))
     const speed=external?.run??keys.run?cfg.run:cfg.walk,step=1/60;let traveled=0;lastHits=[];blockedWater=false
     if(keys.jump&&grounded)velocity=Math.sqrt(-2*cfg.gravity*cfg.jump)
@@ -64,8 +109,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(traveled>.001)figure.rotation.y=Math.atan2(-delta.x,-delta.y)+avatar.yaw
     const nextAction=actions.get(avatar.clips[!grounded?'jump':traveled<.001?'idle':speed===cfg.run?'run':'walk'])
     if(nextAction&&action!==nextAction){action?.fadeOut(.2);nextAction.reset().fadeIn(.2).play();action=nextAction}
-    mixer.update(dt);follow()
+    mixer.update(dt)
+    const cur=sim.body.translation();updateHint(ebikes.canMount(cur.x,cur.z),false)
+    follow()
   }
-  return {enter,leave,tick,spawns,probe,get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  return {enter,leave,tick,spawns,probe,toggleRide,get riding(){return ebikes.riding},get ebikes(){return ebikes.spots},
+    get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     get position(){const pos=sim.body.translation();return focus.set(pos.x,pos.y,pos.z)}}
 }

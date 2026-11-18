@@ -1,1 +1,2 @@
 `public/avatar/figure.glb`：本项目原创低多边形角色“城市漫游者”（短发、橙色外套、牛仔裤、运动鞋、双肩包；含 idle、walk、run、jump 动画），以 CC0 1.0 提供。由 [`pipeline/avatar.py`](https://github.com/idoknow/guilinol/blob/main/pipeline/avatar.py) 生成（`uv run python pipeline/avatar.py`），未使用外部角色或动作。许可证：https://creativecommons.org/publicdomain/zero/1.0/ 。世界数据署名见 README。
+`public/avatar/ebike.glb`：本项目原创程序化低多边形路面电动车“小电驴”（踏板车身、前后轮、车把后视镜、双人座垫、尾箱与前后车灯），由 `pipeline/ebike.py` 生成，以 CC0 1.0 提供。
