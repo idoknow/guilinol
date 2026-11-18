@@ -1,9 +1,18 @@
-// Placeholder look for M0; colours follow docs/style.md. M1 settles the final palette.
+// M1 look: 青绿山水 · 低多边形. All colours/atmosphere knobs live here; docs/style.md mirrors the palette.
 export const look = {
-  peakVegetation: 0x758374, peakRock: 0x92948c,
-  sky: 0xcfdde3, fogNear: 1800, fogFar: 6200,
-  sunColor: 0xfff6e8, sunPower: 2.2, sunPosition: [1, 3, 2] as const,
-  // Sky/ground fill so walls facing away from the sun are not pure black.
-  hemiSky: 0xdfe9ee, hemiGround: 0x5f6b5a, hemiPower: 1.4,
-  building: 0xe8e4da, roughness: 1, metalness: 0,
+  // Peaks: 赭石 foot → 石绿 body → 石青 crown, bare limestone on steep walls (aRock).
+  peakFoot: 0x9a8a63, peakGreen: 0x5a8b5e, peakCrown: 0x4a7f86, peakRock: 0xa3aca0, peakRockDark: 0x7c8780,
+  peakRockShare: 1.05, peakJitter: .06,
+  // Sky dome gradient.
+  skyZenith: 0x7aa3bb, skyHorizon: 0xdbe4e0, skyGlow: 0xf4ead2, sunDirection: [-.55, .62, .56] as const,
+  // Layered atmosphere: near haze → far 石青 blue → horizon. Distances in metres.
+  hazeNear: 0xd6e0dc, hazeFar: 0x9db5bf, fogLength: 2600, fogBlueFrom: 500, fogBlueTo: 3200,
+  fogHorizonFrom: 4200, fogHorizonTo: 7500,
+  heightFogBase: 150, heightFogFalloff: 55, heightFogBoost: 1.3, airScaleHeight: 900,
+  // Plain beyond the data box so the world edge sinks into haze instead of floating.
+  outerGround: 0xaeb09b, outerGroundY: 136,
+  sunColor: 0xfff0d8, sunPower: 2.1,
+  hemiSky: 0xd8e6e6, hemiGround: 0x8a9172, hemiPower: 1.7,
+  exposure: 1.0,
+  wall: 0xe9e5da, roof: 0x646b6d, roughness: 1, metalness: 0,
 }

@@ -3,22 +3,26 @@ import {bytes, fetchAsset, overview, type Manifest} from './world'
 import {Stream} from './stream'
 import {flight} from './flight'
 import {look} from './look/config'
+import {installAtmosphere, outerGround, sky} from './look/atmosphere'
 import {loadPeaks} from './peaks'
 import {setPreset} from './presets'
 
+installAtmosphere()
 async function start() {
   const manifest:Manifest = JSON.parse(new TextDecoder().decode(await fetchAsset('manifest.json')))
   if(manifest.version!==2 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
   const basePromise = Promise.all([overview(manifest),loadPeaks(manifest.peaks)])
   const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
+  renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure
   document.body.prepend(renderer.domElement)
-  const camera = new THREE.PerspectiveCamera(60,1,1,10000)
+  const camera = new THREE.PerspectiveCamera(55,1,1,12000)
   const scene = new THREE.Scene()
-  scene.background = new THREE.Color(look.sky); scene.fog = new THREE.Fog(look.sky,look.fogNear,look.fogFar)
+  scene.fog = new THREE.Fog(look.hazeNear,0,1); scene.add(sky())
   const light = new THREE.DirectionalLight(look.sunColor,look.sunPower)
-  light.position.set(...look.sunPosition); scene.add(light)
+  light.position.set(...look.sunDirection); scene.add(light)
   scene.add(new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower))
   const [left,top,width,depth] = manifest.extent
+  scene.add(outerGround(manifest.extent))
   camera.position.set(left+width*.55,420,top+depth*.62)
   const controls = flight(camera,renderer.domElement,manifest.extent)
   camera.lookAt(left+width*.47,150,top+depth*.45)
