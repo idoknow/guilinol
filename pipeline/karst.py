@@ -22,6 +22,9 @@ def profile(sample, east, south, angles):
 
 def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, far):
     summit = peak['target']
+    shoulder,taper = peak['shoulder'],peak['taper']
+    lean = radii.mean()*(.08+.045*np.cos(phases[1]))
+    lean_x,lean_z = lean*np.cos(phases[0]),lean*np.sin(phases[0])
     stride = 4 if far else 1
     angles, radii = angles[::stride], radii[::stride]
     count = len(angles)
@@ -30,9 +33,11 @@ def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, f
         ridge = np.zeros_like(angles)
     relief = summit-floor
     skirt = min(4/relief,.09)
-    rings = [(1,0),(.92,skirt),(.918,.19),(.923,.33),(.912,.48),(.903,.62),(.89,.74)]
-    for latitude in (.30,.61,.91,1.18,1.42):
-        rings.append((.89*np.cos(latitude),.74+.26*np.sin(latitude)))
+    rings = [(1,0),(.916,skirt)]
+    for progress in (.20,.40,.60,.80,1):
+        rings.append((.916+(.084-taper)*progress,skirt+(shoulder-skirt)*progress))
+    for latitude in (.30,.61,.91,1.18,1.39):
+        rings.append(((1-taper)*np.cos(latitude),shoulder+(1-shoulder)*np.sin(latitude)))
     if far:
         rings = [rings[index] for index in [0,1,4,6,8,10]]
     vertices, faces = [], []
@@ -45,7 +50,8 @@ def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, f
             height = np.minimum(ground,floor)-4
         elif level==1:
             height = np.minimum(height,ground_at(east+radius*np.cos(angles),south+radius*np.sin(angles))+4)
-        vertices.extend(zip(east+radius*np.cos(angles), height, south+radius*np.sin(angles)))
+        vertices.extend(zip(east+radius*np.cos(angles)+lean_x*fraction**2, height,
+                            south+radius*np.sin(angles)+lean_z*fraction**2))
         if level:
             for col in range(count):
                 outer = (level-1)*count + col
@@ -53,7 +59,7 @@ def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, f
                 faces.extend([(outer,outer+count,adjacent),(adjacent,outer+count,adjacent+count)])
     cap = len(vertices)
     faces.extend((cap-count+col,cap,cap-count+(col+1)%count) for col in range(count))
-    vertices = np.asarray([*vertices,(east,summit,south)],dtype='<f4')
+    vertices = np.asarray([*vertices,(east+lean_x,summit,south+lean_z)],dtype='<f4')
     vertices[:,[0,2]] = np.rint(vertices[:,[0,2]]*256)/256
     faces = np.asarray(faces,dtype='<u2')
     tris = vertices[faces]
@@ -89,7 +95,7 @@ def imprint(terrain, left, top, triangles):
         patch[inside] = np.maximum(patch[inside],np.rint(10*surface[inside]))
 
 
-def generate(original, terrain, left, top, bbox, output):
+def generate(original, terrain, left, top, bbox, output, wet):
     catalog = json.loads(Path(__file__).with_name('peaks.json').read_text())
     south,west,north,east = bbox
     entries, payload = [], bytearray(b'PK01')
@@ -114,7 +120,7 @@ def generate(original, terrain, left, top, bbox, output):
             entry['model'] = peak['model']
             continue
         shape,floor = profile(sample,cx,cz,angles)
-        aspect = peak.get('aspect',1.2)
+        aspect = peak.get('aspect',.8)
         relief = peak['target']-floor
         radius_budget = aspect*relief
         radii = shape/shape.mean()*radius_budget*.98
@@ -136,15 +142,17 @@ def generate(original, terrain, left, top, bbox, output):
             limit = np.where(delta>0,maximum,-minimum)/np.maximum(np.abs(delta),1e-9)
             radii = np.minimum(radii,limit)
         entry['baseHeight'] = float(floor)
-        reach = radii.max()+GRID
+        reach = 1.8*radii.max()+GRID
         rows,cols = original.shape
         row0,col0 = max(0,int((cz-reach-top)//GRID)),max(0,int((cx-reach-left)//GRID))
         row1,col1 = min(rows,int((cz+reach-top)//GRID)+2),min(cols,int((cx+reach-left)//GRID)+2)
         window = np.s_[row0:row1,col0:col1]
         row,col = np.ogrid[window]
         dx,dz = left+col*GRID-cx,top+row*GRID-cz
-        fraction = np.hypot(dx,dz)/np.interp(np.arctan2(dz,dx),angles,radii,period=2*np.pi)
-        weight = np.clip((1-fraction)*4,0,1)
+        radial_extent = np.interp(np.arctan2(dz,dx),angles,radii,period=2*np.pi)
+        fraction = np.hypot(dx,dz)/np.maximum(radial_extent,radii.mean())
+        blend = np.clip((1.8-fraction)/.65,0,1)
+        weight = np.where(wet[window],0,blend*blend*(3-2*blend))
         original[window] = np.minimum(original[window],np.rint(dem[window]*(1-weight)+floor*10*weight))
         shapes.append((entry,peak,cx,cz,radii,floor))
     terrain[:] = original
@@ -161,5 +169,6 @@ def generate(original, terrain, left, top, bbox, output):
             entry['lods'].append(dict(offset=len(payload),vertices=len(data),indices=faces.size))
             payload.extend(data.tobytes()+faces.tobytes())
     compressed = gzip.compress(payload,compresslevel=6,mtime=0)
+    terrain[wet] = dem[wet]
     (output/'peaks.bin').write_bytes(compressed)
     return dict(file='peaks.bin',bytes=len(compressed),entries=entries), footprints

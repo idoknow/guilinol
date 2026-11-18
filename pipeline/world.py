@@ -60,9 +60,7 @@ def build(bbox, output, palette):
     terrain[wet] = np.minimum(terrain[wet],surface[wet]-20)
     output.mkdir(parents=True, exist_ok=True)
     original = terrain.copy()
-    peaks, peak_shapes = generate(original,terrain,left,top,bbox,output)
-    surface[wet & (terrain > surface)] = DRY
-    wet = surface != DRY
+    peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet)
     footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes))
     index = STRtree(footprints)
     def asset(name):
