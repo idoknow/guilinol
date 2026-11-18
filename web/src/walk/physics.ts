@@ -13,11 +13,21 @@ for(let dx=-cfg.search;dx<=cfg.search;dx+=2) for(let dz=-cfg.search;dz<=cfg.sear
   if((dx||dz)&&Math.hypot(dx,dz)<=cfg.search)candidates.push({dx,dz})
 candidates.sort((first,second)=>Math.hypot(first.dx,first.dz)-Math.hypot(second.dx,second.dz))
 
-function field(values:Int16Array, cells:number, stride=cells+1, start=0){
+function field(cells:number,sample:(col:number,row:number)=>number){
   const heights = new Float32Array((cells+1)**2)
   for(let col=0;col<=cells;col++)for(let row=0;row<=cells;row++)
-    heights[col*(cells+1)+row]=values[start+row*stride+col]/10
+    heights[col*(cells+1)+row]=sample(col,row)
   return R.ColliderDesc.heightfield(cells,cells,heights,{x:256,y:1,z:256},R.HeightFieldFlags.FIX_INTERNAL_EDGES)
+}
+function fineField(data:Awaited<ReturnType<typeof import('../world').detail>>){
+  const geometry=data.groundMesh.geometry, positions=geometry.getAttribute('position')
+  const stride=geometry.parameters.widthSegments+1
+  return field(64,(col,row)=>{
+    const at=row*65+col, coarse=(row>>1)*stride+(col>>1)
+    const visible=(col%2&&row%2)?(positions.getY(coarse+1)+positions.getY(coarse+stride))/2:
+      (positions.getY(coarse)+positions.getY(coarse+(col%2)+(row%2)*stride))/2
+    return Math.max(visible,(data.water[at]===-32768?data.terrain[at]:data.water[at])/10)
+  })
 }
 function houses(rings:Outline[]){
   const verts:number[]=[], indices:number[]=[]
@@ -55,7 +65,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.
       if(region&&(!near||region.fine!==!!data)){region.colliders.forEach(remove);regions.delete(tile);changed=true}
       if(!near||regions.has(tile))continue
       const stride=width/32+1,start=(tile.z-top)/32*stride+(tile.x-left)/32
-      const ground=data?field(data.terrain,64):field(overview,8,stride,start)
+      const ground=data?fineField(data):field(8,(col,row)=>overview[start+row*stride+col]/10)
       const colliders=[add(ground.setTranslation(tile.x+128,0,tile.z+128),data?'ground':'overview')]
       const rings:Outline[]=data?JSON.parse(new TextDecoder().decode(data.rings)):[]
       if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
@@ -70,7 +80,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.
         const geom=(peak.levels[0].object as THREE.Mesh).geometry,pos=geom.getAttribute('position')
         const verts=new Float32Array(pos.count*3)
         for(let at=0;at<pos.count;at++)verts.set([pos.getX(at),pos.getY(at),pos.getZ(at)],at*3)
-        mountains.set(peak,add(R.ColliderDesc.trimesh(verts,Uint32Array.from(geom.index!.array)),'peak'));changed=true
+        const mesh=R.ColliderDesc.trimesh(verts,Uint32Array.from(geom.index!.array))
+        mountains.set(peak,add(mesh.setTranslation(peak.position.x,peak.position.y,peak.position.z),'peak'));changed=true
       }
     }
     if(changed)world.step()

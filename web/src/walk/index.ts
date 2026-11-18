@@ -36,8 +36,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const hit=sim.world.castRay(new R.Ray(focus,direction),arm,true,undefined,undefined,sim.capsule)
     camera.position.copy(focus).addScaledVector(direction,Math.max(.02,(hit?.timeOfImpact??arm)-.18));camera.lookAt(focus)
   }
+  const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
   function probe(){const pos=sim.body.translation(),foot=pos.y-cfg.height/2,peak=sim.surface(pos.x,pos.z,'peak')
-    return {x:pos.x,z:pos.z,foot,clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
+    const tile=sim.tileAt(pos.x,pos.z),mesh=tile&&stream.loaded.get(tile)?.groundMesh
+    terrainRay.ray.origin.set(pos.x,4000,pos.z);mesh?.updateWorldMatrix(true,false)
+    const renderY=mesh?terrainRay.intersectObject(mesh,false)[0]?.point.y:undefined
+    return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
       inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits}}
   function tick(dt:number){if(!active)return;const before=performance.now(),start=sim.body.translation();sim.sync(start.x,start.z)
     const keys=input.read(),delta=new THREE.Vector2(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))

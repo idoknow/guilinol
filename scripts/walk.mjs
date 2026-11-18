@@ -11,6 +11,18 @@ page.on('pageerror',error=>errors.push(error.message))
 const output='captures/walk';await mkdir(output,{recursive:true})
 async function shot(name){await page.screenshot({path:`${output}/${name}.png`})}
 try{
+  const renderStats={}
+  await page.addInitScript(()=>{
+    window.renderStats={}
+    window.checkedProbe=label=>{
+      const probe=window.viewer.walk.probe(),clearance=probe.renderClearance
+      if(!Number.isFinite(clearance)||clearance<-.15)throw Error(`${label}: visible ground ${JSON.stringify(probe)}`)
+      const stats=window.renderStats[label]??={frames:0,minClearance:Infinity,maxSink:0}
+      stats.frames++;stats.minClearance=Math.min(stats.minClearance,clearance);stats.maxSink=Math.max(stats.maxSink,-clearance)
+      return probe
+    }
+  })
+  const collect=async()=>Object.assign(renderStats,await page.evaluate(()=>window.renderStats))
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?mode=walk&verify`)
   await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:45000})
   await shot('palace')
@@ -19,10 +31,10 @@ try{
     return page.evaluate(async({points,kind})=>{
       const {walk,stats}=window.viewer
       let min=Infinity,frames=0,wetFrames=0,last=null
-      for(const [x,z] of points){const start=walk.probe();const limit=5+Math.hypot(x-start.x,z-start.z)/3
+      for(const [x,z] of points){const start=window.checkedProbe(kind);const limit=5+Math.hypot(x-start.x,z-start.z)/3
         do{
-          await new Promise(requestAnimationFrame);last=walk.probe();frames++;min=Math.min(min,last.clearance)
-          window.walkFrames.push([last.steps,last.x,last.z,last.clearance,last.inHouse,last.inPeak,last.resets,stats.ms])
+          await new Promise(requestAnimationFrame);last=window.checkedProbe(kind);frames++;min=Math.min(min,last.clearance)
+          window.walkFrames.push([last.steps,last.x,last.z,last.clearance,last.inHouse,last.inPeak,last.resets,stats.ms,last.renderClearance])
           if(last.clearance<-.3||last.inHouse||last.inPeak||last.resets)throw Error(`unsafe ${JSON.stringify(last)}`)
           if(last.wet){wetFrames++;if(last.deck==null||Math.abs(last.foot-last.deck)>.3)throw Error(`off deck ${JSON.stringify(last)}`)}
           const dx=x-last.x,dz=z-last.z,distance=Math.hypot(dx,dz)
@@ -34,21 +46,30 @@ try{
       }return {kind,min,frames,wetFrames,last}
     },{points,kind})
   }
-  const start=await page.evaluate(()=>window.viewer.walk.probe()),time=Date.now()
-  const first=await drive(route.slice(0,18));await shot('street')
+  const start=await page.evaluate(()=>window.checkedProbe('spawn:gate')),time=Date.now()
+  const first=await drive(route.slice(0,17));const binjiang=await drive(route.slice(17,18),'binjiang');await shot('street')
   const second=await drive(route.slice(18));await shot('elephant')
   const trace=await page.evaluate(()=>window.walkFrames);await writeFile(`${output}/frames.json`,JSON.stringify(trace))
-  console.log('route',JSON.stringify({seconds:(Date.now()-time)/1000,simSeconds:second.last.elapsed-start.elapsed,min:Math.min(first.min,second.min),resets:second.last.resets,frames:trace.length,msPerFrame:trace.reduce((sum,row)=>sum+row[7],0)/trace.length,msPerStep:(second.last.physicsMs-start.physicsMs)/(second.last.steps-start.steps)}))
+  console.log('route',JSON.stringify({seconds:(Date.now()-time)/1000,simSeconds:second.last.elapsed-start.elapsed,min:Math.min(first.min,binjiang.min,second.min),resets:second.last.resets,frames:trace.length,msPerFrame:trace.reduce((sum,row)=>sum+row[7],0)/trace.length,msPerStep:(second.last.physicsMs-start.physicsMs)/(second.last.steps-start.steps)}))
   assert(Math.hypot(second.last.x+962,second.last.z-1096)<1)
   assert(Math.hypot(second.last.x+958.008,second.last.z-1102.738)<30,'outside Elephant Hill foot')
-  async function fixture(x,z){assert(await page.evaluate(async([x,z])=>{const walk=window.viewer.walk;walk.leave();return walk.enter(x,z,0,'fixture')},[x,z]))}
-  async function press(x,z,seconds){return page.evaluate(async({x,z,seconds})=>{const walk=window.viewer.walk,start=walk.probe(),hits=new Set();let shore=false,last=start
-    walk.drive(x,z);while(last.elapsed-start.elapsed<seconds){await new Promise(requestAnimationFrame);last=walk.probe();for(const hit of last.hits)hits.add(hit);shore||=last.blockedWater;if(last.inHouse||last.inPeak||last.resets||last.clearance<-.3)throw Error(JSON.stringify(last))}
-    walk.drive(0,0);return {last,hits:[...hits],shore,distance:Math.hypot(last.x-start.x,last.z-start.z)}},{x,z,seconds})}
-  await fixture(-588,-212);const building=await press(0,-1,7);assert(building.hits.includes('building')&&building.distance<55,JSON.stringify(building))
-  await fixture(-962,1096);const cliff=await press(.8,.6,9);assert(cliff.hits.includes('peak')&&cliff.distance<72,JSON.stringify(cliff))
+  async function fixture(x,z){assert(await page.evaluate(async([x,z])=>{const walk=window.viewer.walk;walk.leave();const ok=await walk.enter(x,z,0,'fixture');if(ok)window.checkedProbe(`spawn:${x},${z}`);return ok},[x,z]))}
+  async function press(x,z,seconds,label){return page.evaluate(async({x,z,seconds,label})=>{const walk=window.viewer.walk,start=window.checkedProbe(label),hits=new Set();let shore=false,last=start
+    walk.drive(x,z);while(last.elapsed-start.elapsed<seconds){await new Promise(requestAnimationFrame);last=window.checkedProbe(label);for(const hit of last.hits)hits.add(hit);shore||=last.blockedWater;if(last.inHouse||last.inPeak||last.resets||last.clearance<-.3)throw Error(JSON.stringify(last))}
+    walk.drive(0,0);return {last,hits:[...hits],shore,distance:Math.hypot(last.x-start.x,last.z-start.z)}},{x,z,seconds,label})}
+  await fixture(-588,-212);const building=await press(0,-1,7,'building');assert(building.hits.includes('building')&&building.distance<55,JSON.stringify(building))
+  await fixture(-962,1096);const cliff=await press(.8,.6,9,'cliff');assert(cliff.hits.includes('peak')&&cliff.distance<72,JSON.stringify(cliff))
   await fixture(-309,-1);const bridge=await drive([[-174,44]],'bridge');await shot('bridge');const far=await drive([[-30,92]],'bridge');assert(bridge.wetFrames+far.wetFrames>0)
   console.log({building,cliff,bridge:bridge.wetFrames+far.wetFrames})
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?spawn=elephant&verify`);await page.waitForFunction(()=>window.viewer?.walk?.active)
-  console.log('elephant spawn',await page.evaluate(()=>window.viewer.walk.spawns));const spawn=await page.evaluate(()=>window.viewer.walk.probe());const shore=await press((-740-spawn.x)/26,(868-spawn.z)/26,6);assert(shore.shore&&!shore.last.wet,JSON.stringify(shore));assert.deepEqual(errors,[])
+  await collect()
+  for(const name of ['palace','lijiang','elephant']){
+    await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?spawn=${name}&verify`);await page.waitForFunction(()=>window.viewer?.walk?.active)
+    const spawn=await page.evaluate(name=>window.checkedProbe(`spawn:${name}`),name)
+    if(name==='elephant'){
+      await shot('elephant-spawn');console.log('elephant spawn',spawn,await page.evaluate(()=>window.viewer.walk.spawns))
+      const shore=await press((-740-spawn.x)/26,(868-spawn.z)/26,6,'shore');assert(shore.shore&&!shore.last.wet,JSON.stringify(shore))
+    }
+    await collect()
+  }
+  console.log('render ground',JSON.stringify(renderStats),'maxSink',Math.max(...Object.values(renderStats).map(stats=>stats.maxSink)));assert.deepEqual(errors,[])
 }finally{await browser.close();await server.close()}

@@ -90,7 +90,8 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   })
   const group = new THREE.Group()
   group.position.set(tile.x,0,tile.z)
-  group.add(new THREE.Mesh(geometry,material))
+  const groundMesh = new THREE.Mesh(geometry,material)
+  group.add(groundMesh)
   const walls = new THREE.BufferGeometry()
   if(vertices) {
     const meters = Float32Array.from(positions,(value,index)=>value/(index%3===1?10:100))
@@ -105,6 +106,6 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   }
   const bridge = new THREE.BufferGeometry()
   if(deck.length){bridge.setAttribute('position',new THREE.BufferAttribute(deck,3)); bridge.computeVertexNormals(); group.add(new THREE.Mesh(bridge,deckMaterial))}
-  return {group,terrain,water,rings,deck,dispose(){bridge.dispose();geometry.dispose(); walls.dispose(); material.map!.image.close(); material.map!.dispose(); material.dispose()}}
+  return {group,groundMesh,terrain,water,rings,deck,dispose(){bridge.dispose();geometry.dispose(); walls.dispose(); material.map!.image.close(); material.map!.dispose(); material.dispose()}}
 }
 const deckMaterial = new THREE.MeshStandardMaterial()
