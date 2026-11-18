@@ -1,4 +1,6 @@
+import json
 import re
+from pathlib import Path
 
 import numpy as np
 from shapely import STRtree
@@ -11,9 +13,17 @@ from features import points, polygons
 
 def bridge_tiles(bounds, sample):
     spans, profiles, owners, emitted = [], [], [], []
+    # Landmark GLBs already contain these spans. A second procedural deck would z-fight.
+    replaced = set()
+    for entry in json.loads((Path(__file__).resolve().parent/'landmarks.json').read_text()):
+        replace = entry.get('replace', [])
+        if isinstance(replace, list):
+            replaced.update(key for key in replace if isinstance(key, str))
     for way in load_osm():
         tags = way.get('tags', {})
         if way['type'] != 'way' or tags.get('bridge', 'no') == 'no' or 'highway' not in tags:
+            continue
+        if f"way/{way['id']}" in replaced:
             continue
         coords = points(way)
         if len(coords) < 2:

@@ -38,9 +38,15 @@ class Layout:
             else:
                 for key in replace:
                     if key in osm:
-                        areas.append(area(osm[key]))
+                        # A bridge way is a line. Skip it here; bridges.py drops the deck.
+                        shape = area(osm[key])
+                        if not shape.is_empty:
+                            areas.append(shape)
                     else:
                         self.ids.add(key)
+            # Extra footprints when one OSM way is the whole grounds, not the modeled mass.
+            for ring in entry.get('replacePolygons',[]):
+                areas.append(polygon(ring))
             if 'flatten' in entry:
                 patch = entry['flatten']
                 self.flatten.append((polygon(patch['polygon']),patch['elevation']))
