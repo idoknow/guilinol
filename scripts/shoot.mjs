@@ -11,6 +11,6 @@ for (const spec of names) {
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
   await page.waitForFunction(()=>{const {stats,stream,camera,manifest}=window.viewer;return !stats.pending && manifest.chunks.every(t=>Math.hypot(t.x+128-camera.position.x,t.z+128-camera.position.z)>stream.radius||stream.loaded.has(t))},{timeout:120000})
   await page.waitForTimeout(500)
-  await page.screenshot({path:`${out}/${name}.png`}); console.log('shot',name)
+  const file=spec.replace(/[?&=]/g,"_");await page.screenshot({path:`${out}/${file}.png`}); console.log("shot",file)
 }
 await browser.close(); server.httpServer.close()

@@ -7,6 +7,11 @@ import {installAtmosphere, outerGround, sky} from './look/atmosphere'
 import {loadPeaks} from './peaks'
 import {presets,setPreset} from './presets'
 import {walkConfig} from './walk/config'
+import {atmo, env, evaluate} from './look/time'
+import {renderMirror, WATER_LAYER} from './look/water'
+import {rain} from './look/rain'
+import {windowLight} from './look/buildings'
+import {skyClock} from './ui/sky'
 
 installAtmosphere()
 async function start() {
@@ -18,10 +23,12 @@ async function start() {
   document.body.prepend(renderer.domElement)
   const camera = new THREE.PerspectiveCamera(55,1,1,12000)
   const scene = new THREE.Scene()
-  scene.fog = new THREE.Fog(look.hazeNear,0,1); scene.add(sky())
+  scene.fog = new THREE.Fog(look.hazeNear,0,1)
+  const dome = sky(), drops = rain(); scene.add(dome,drops)
+  camera.layers.enable(WATER_LAYER)
   const light = new THREE.DirectionalLight(look.sunColor,look.sunPower)
   light.position.set(...look.sunDirection); scene.add(light)
-  scene.add(new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower))
+  const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const [left,top,width,depth] = manifest.extent
   scene.add(outerGround(manifest.extent))
   camera.position.set(left+width*.55,420,top+depth*.62)
@@ -36,6 +43,7 @@ async function start() {
   const [base,peaks] = await basePromise
   scene.add(base.mesh,peaks)
   const params = new URLSearchParams(location.search)
+  const clock = skyClock(params)
   setPreset(camera,params.get('cam'))
   const radius = Number(params.get('radius')??480)
   const stream = new Stream(scene,manifest,base,THREE.MathUtils.clamp(Number.isFinite(radius)?radius:480,192,1600),camera)
@@ -66,7 +74,7 @@ async function start() {
     clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>toast.classList.remove('show'),3200)})
   if(touch){modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton)}
   showMode()
-  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,get walk(){return walker},probeFoot(){
+  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,clock,env,get walk(){return walker},probeFoot(){
     const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
     const clearance = ray.intersectObjects(scene.children)[0]?.distance
     ray.setFromCamera(new THREE.Vector2(0,0),camera)
@@ -78,6 +86,13 @@ async function start() {
     if(walker?.active)walker.tick(elapsed/1000);else if(!switching)controls(elapsed/1000)
     if(frame===1) {first=performance.now();stats.firstMs=first;stats.firstWorldBytes=bytes}
     if(first&&!switching) stream.tick(walker?.active?walker.position:camera.position)
+    clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/1200))
+    atmo.uTime.value = now/1000
+    light.position.copy(env.sunDir); light.color.copy(env.sunColor); light.intensity = env.sunPower
+    hemi.color.copy(env.hemiSky); hemi.groundColor.copy(env.hemiGround); hemi.intensity = env.hemiPower
+    renderer.toneMappingExposure = env.exposure; windowLight.value = env.night
+    dome.update(); drops.update()
+    renderMirror(renderer,scene,camera,frame<2)
     renderer.render(scene,camera)
     frame++; sum+=elapsed;samples++
     Object.assign(stats,{ms:elapsed,calls:renderer.info.render.calls,frame,loaded:stream.loaded.size,pending:stream.pending.size,

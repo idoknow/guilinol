@@ -48,9 +48,10 @@ export function sky() {
       void main(){
         vec3 dir = normalize(vDir);
         float up = clamp(dir.y, 0.0, 1.0);
-        vec3 col = mix(horizon, zenith, pow(up, 0.55));
+        vec3 col = mix(horizon, zenith, 1.0 - pow(1.0 - up, 3.2));   // finite slope at the horizon: no seam
         float toward = max(dot(dir, uSun), 0.0);
-        col = mix(col, glow, pow(toward, 6.0) * 0.5 * (1.0 - up * 0.6));
+        float lift = smoothstep(-0.01, 0.1, dir.y);   // at the horizon the sky must equal the fog's horizon colour
+        col = mix(col, glow, pow(toward, 6.0) * 0.5 * (1.0 - up * 0.6) * lift);
         // Stars and moon at night; sun disc by day.
         vec2 cell = floor(dir.xz / (dir.y + 0.25) * 260.0);
         float star = step(0.9965, hash(cell)) * smoothstep(0.05, 0.35, dir.y) * uNight;
@@ -62,7 +63,7 @@ export function sky() {
         if (dir.y > 0.0) {
           vec2 p = dir.xz / (dir.y + 0.12) * 1.6 + vec2(uTime * 0.004, uTime * 0.0015);
           float shape = fbm(p) + 0.18 * fbm(p * 3.1 - uTime * 0.006);
-          float mask = smoothstep(1.02 - cover, 1.32 - cover * 0.6, shape) * smoothstep(0.0, 0.18, dir.y);
+          float mask = smoothstep(1.02 - cover, 1.32 - cover * 0.6, shape) * smoothstep(0.03, 0.3, dir.y);
           vec3 cloud = mix(cloudShade, cloudLit, clamp(0.35 + 0.65 * pow(toward, 3.0) + (shape - 0.6), 0.0, 1.0));
           col = mix(col, cloud, mask * 0.88);
         }
@@ -72,7 +73,9 @@ export function sky() {
   })
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(9000,32,16),material)
   mesh.frustumCulled=false; mesh.renderOrder=-1
-  mesh.onBeforeRender=(_r,_s,camera)=>mesh.position.copy(camera.position)
+  // Re-centre on whichever camera is rendering (main or water mirror) and refresh the matrix now —
+  // matrixWorld was computed before this pass started.
+  mesh.onBeforeRender=(_r,_s,camera)=>{mesh.position.copy(camera.position);mesh.updateMatrixWorld()}
   return Object.assign(mesh,{update(){uniforms.sunUp.value=env.sunUp;uniforms.cover.value=env.clouds}})
 }
 

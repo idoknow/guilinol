@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import {look} from './look/config'
+import {nightPeaks} from './look/night'
 import {fetchAsset} from './world'
 
 interface Section {offset:number; vertices:number; indices:number; indexOffset:number}
@@ -15,6 +16,7 @@ export async function loadPeaks(asset:Peaks) {
   const shared = new Map<number,THREE.BufferAttribute>()
   const group = new THREE.Group()
   const material = new THREE.MeshStandardMaterial({flatShading:true,vertexColors:true,roughness:look.roughness,metalness:look.metalness})
+  nightPeaks(material)
   const [foot,green,dark,light,rock,rockDark,ochre] = [look.peakFoot,look.peakGreen,look.peakGreenDark,look.peakGreenLight,
     look.peakRock,look.peakRockDark,look.peakRockOchre].map(value=>new THREE.Color(value))
   const smooth = (a:number,b:number,x:number)=>{const t=THREE.MathUtils.clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)}

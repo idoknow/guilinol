@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import {look} from './config'
+import {shareAtmosphere} from './atmosphere'
 
 // M2.5 facades (docs/reference.md R2/R6/R9/R12): procedural windows, floor lines and a ground-floor
 // shop band drawn from the GL04 wall attributes — no textures. aFloor = storeys above the footprint
@@ -14,6 +15,7 @@ export const buildingMaterial = new THREE.MeshStandardMaterial({
 })
 const hex = (v:number) => new THREE.Color(v)
 buildingMaterial.onBeforeCompile = shader => {
+  shareAtmosphere(shader)
   Object.assign(shader.uniforms, {
     uGlass: {value: hex(b.glass)}, uGlassLit: {value: hex(b.glassLit)}, uTimber: {value: hex(b.timber)},
     uShop: {value: hex(b.shop)}, uLine: {value: b.floorLine}, uWindowLight: windowLight,
@@ -64,10 +66,11 @@ if (vRoof < .5) {
   }
   float fw = max(fwidth(u), fwidth(f));
   diffuseColor.rgb = mix(c, avg, smoothstep(.18, .45, fw));
-  winMask = win * (1. - smoothstep(.3, .6, fw)); winHash = h;
+  // Lit share: exact window shapes up close, the bay's average glass cover once windows blur.
+  winMask = mix(win, cover, smoothstep(.18, .45, fw)); winHash = h;
 }`)
     .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-totalEmissiveRadiance += uWarm * uWindowLight * step(.45, winHash) * mix(.35, 1., winMask);`)
+totalEmissiveRadiance += uWarm * uWindowLight * step(.45, winHash) * winMask;`)
 }
 buildingMaterial.customProgramCacheKey = () => 'guilinol-facade-1'
 

@@ -4,6 +4,8 @@ import {streetGeometry,type Streets} from './streets'
 import {bridgeGeometry, bridgeMaterial} from './look/bridge'
 import {buildingMaterial} from './look/buildings'
 import {look} from './look/config'
+import {nightGround} from './look/night'
+import {chunkWater, farWater} from './look/water'
 import type {Peaks} from './peaks'
 
 interface Asset {file:string; bytes:number}
@@ -26,7 +28,9 @@ async function surfaceMaterial(data:ArrayBuffer) {
   const map = new THREE.Texture(bitmap)
   map.colorSpace = THREE.SRGBColorSpace
   map.needsUpdate = true
-  return new THREE.MeshStandardMaterial({map, roughness:look.roughness, metalness:look.metalness})
+  const material = new THREE.MeshStandardMaterial({map, roughness:look.roughness, metalness:look.metalness})
+  nightGround(material)
+  return material
 }
 
 function ground(width:number, depth:number, step:number, height:(col:number,row:number)=>number) {
@@ -46,6 +50,7 @@ export async function overview(manifest:Manifest) {
   const samples = new Int16Array(values), cols = width/step
   const geometry = ground(width,depth,step,(col,row)=>samples[row*(cols+1)+col]/10)
   const mesh = new THREE.Mesh(geometry,await surfaceMaterial(image))
+  const lake = await farWater(manifest,image,samples)
   mesh.position.set(left,0,top)
   const indices = geometry.index!, original = indices.array.slice(), side = manifest.chunkSize/step
   function toggle(tile:Tile, show:boolean) {
@@ -57,8 +62,10 @@ export async function overview(manifest:Manifest) {
       indices.addUpdateRange(from,to-from)
     }
     indices.needsUpdate = true
+    lake.toggle(tile,show)
   }
-  return {mesh,toggle}
+  mesh.add(lake.mesh); lake.mesh.position.set(0,0,0)
+  return {mesh,toggle,water:lake.mesh}
 }
 
 const buildings = buildingMaterial
@@ -95,6 +102,8 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   group.position.set(tile.x,0,tile.z)
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
+  const pond = chunkWater(water,0,0)
+  if(pond) group.add(pond.mesh)
   const walls = buildingGeometry(positions,normals,indices,rings)
   if(vertices)group.add(new THREE.Mesh(walls,buildings))
   const heights=geometry.getAttribute('position')
@@ -105,5 +114,5 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   });group.add(streets.group)
   const bridge = new THREE.BufferGeometry()
   if(deck.length) group.add(new THREE.Mesh(bridge.copy(bridgeGeometry(deck)),bridgeMaterial))
-  return {group,groundMesh,terrain,water,rings,deck,streets,dispose(){streets.dispose();bridge.dispose();geometry.dispose(); walls.dispose(); material.map!.image.close(); material.map!.dispose(); material.dispose()}}
+  return {group,groundMesh,terrain,water,rings,deck,streets,dispose(){pond?.dispose();streets.dispose();bridge.dispose();geometry.dispose(); walls.dispose(); material.map!.image.close(); material.map!.dispose(); material.dispose()}}
 }

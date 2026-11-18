@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import {look} from './look/config'
+import {nightStreets} from './look/night'
 
 type Pair=[number,number]
 type Path=[number,...Pair[][]]
@@ -7,6 +8,7 @@ export type Streets=[Path[],Pair[],number[][]]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const material=new THREE.MeshStandardMaterial({vertexColors:true,side:THREE.DoubleSide})
 const cube=new THREE.BoxGeometry(),metal=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.8})
+nightStreets(material,metal)
 
 export function streetGeometry([paths,lamps,banks]:Streets,ground:(x:number,z:number)=>number){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],boxes:THREE.Matrix4[]=[],tints:THREE.Color[]=[]

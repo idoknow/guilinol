@@ -20,18 +20,18 @@ const day:Key = {
 const k = (patch:Partial<Key>):Key=>({...day,...patch})
 // hour → mood. 晨雾偏冷青、正午通透、黄昏暖金、夜晚深蓝加暖色灯 (docs/style.md 原则 5).
 const keys:[number,Key][] = [
-  [0, k({sun:[.35,.62,-.45],sunColor:0x9db3d8,sunPower:.32,hemiSky:0x31415e,hemiGround:0x15191d,hemiPower:.62,
-    zenith:0x07111f,horizon:0x1f2b40,glow:0x30405a,hazeNear:0x1f2838,hazeFar:0x182334,fogLength:3200,fogBoost:1.6,
-    night:1,exposure:1.25,clouds:.28,cloudLit:0x3a4760,cloudShade:0x111a28,water:0x10202a})],
-  [4.6, k({sun:[.35,.62,-.45],sunColor:0x9db3d8,sunPower:.32,hemiSky:0x31415e,hemiGround:0x15191d,hemiPower:.62,
-    zenith:0x07111f,horizon:0x1f2b40,glow:0x30405a,hazeNear:0x1f2838,hazeFar:0x182334,fogLength:3200,fogBoost:1.6,
-    night:1,exposure:1.25,clouds:.28,cloudLit:0x3a4760,cloudShade:0x111a28,water:0x10202a})],
+  [0, k({sun:[.35,.62,-.45],sunColor:0xa9bde0,sunPower:.55,hemiSky:0x4a5f86,hemiGround:0x1c2228,hemiPower:.95,
+    zenith:0x0a1626,horizon:0x2a3a55,glow:0x3a4c6a,hazeNear:0x283449,hazeFar:0x1f2c42,fogLength:3200,fogBoost:1.6,
+    night:1,exposure:1.3,clouds:.26,cloudLit:0x56637e,cloudShade:0x1e2a3e,water:0x122430})],
+  [4.6, k({sun:[.35,.62,-.45],sunColor:0xa9bde0,sunPower:.55,hemiSky:0x4a5f86,hemiGround:0x1c2228,hemiPower:.95,
+    zenith:0x0a1626,horizon:0x2a3a55,glow:0x3a4c6a,hazeNear:0x283449,hazeFar:0x1f2c42,fogLength:3200,fogBoost:1.6,
+    night:1,exposure:1.3,clouds:.26,cloudLit:0x56637e,cloudShade:0x1e2a3e,water:0x122430})],
   [5.6, k({sun:[.95,.04,.1],sunColor:0xb7a6c8,sunPower:.35,hemiSky:0x6c7f97,hemiGround:0x2c3132,hemiPower:.9,
     zenith:0x34506e,horizon:0x9aa6b4,glow:0xd7a99a,hazeNear:0x8593a2,hazeFar:0x5f7186,fogLength:1300,fogBoost:3.2,fogFalloff:45,
     night:.75,exposure:1.15,clouds:.34,cloudLit:0xd2a9a2,cloudShade:0x56637a,water:0x2c4048})],
   // 晨雾: low cold-cyan sun, valleys filled with milk, peaks rising out of it.
   [6.6, k({sun:[.93,.2,.3],sunColor:0xffd8b4,sunPower:1.15,hemiSky:0xc6dbe0,hemiGround:0x76847a,hemiPower:1.4,
-    zenith:0x86aabd,horizon:0xe2ebe9,glow:0xf7dcc2,hazeNear:0xdde8e6,hazeFar:0xb1c8cd,fogLength:900,fogBoost:5,fogFalloff:38,
+    zenith:0x86aabd,horizon:0xe2ebe9,glow:0xf7dcc2,hazeNear:0xdde8e6,hazeFar:0xb1c8cd,fogLength:1000,fogBoost:3.6,fogFalloff:40,
     night:0,exposure:1.02,clouds:.3,cloudLit:0xfff1e4,cloudShade:0xb4c2cc,water:0x5f8e8d})],
   [8.6, k({sun:[.75,.45,.45],sunColor:0xfff0dc,sunPower:1.8,fogLength:1900,fogBoost:2.4,fogFalloff:48,hazeNear:0xdbe5e2})],
   [11.5, k({sun:[-.2,.86,.45],sunPower:2.25,fogLength:2900,fogBoost:1.1,zenith:0x6f9fbd,clouds:.38})],
@@ -44,9 +44,9 @@ const keys:[number,Key][] = [
   [19.1, k({sun:[-.95,-.02,.25],sunColor:0xd88a7c,sunPower:.5,hemiSky:0x5c6a8c,hemiGround:0x2b2a2e,hemiPower:.85,
     zenith:0x22365a,horizon:0xb98f86,glow:0xd8826a,hazeNear:0x6c6a7c,hazeFar:0x45506a,fogLength:2600,fogBoost:1.6,
     night:.85,exposure:1.18,clouds:.36,cloudLit:0xc98a7e,cloudShade:0x3a3f58,water:0x223139})],
-  [20.4, k({sun:[.35,.62,-.45],sunColor:0x9db3d8,sunPower:.32,hemiSky:0x31415e,hemiGround:0x15191d,hemiPower:.62,
-    zenith:0x07111f,horizon:0x1f2b40,glow:0x30405a,hazeNear:0x1f2838,hazeFar:0x182334,fogLength:3200,fogBoost:1.6,
-    night:1,exposure:1.25,clouds:.28,cloudLit:0x3a4760,cloudShade:0x111a28,water:0x10202a})],
+  [20.4, k({sun:[.35,.62,-.45],sunColor:0xa9bde0,sunPower:.55,hemiSky:0x4a5f86,hemiGround:0x1c2228,hemiPower:.95,
+    zenith:0x0a1626,horizon:0x2a3a55,glow:0x3a4c6a,hazeNear:0x283449,hazeFar:0x1f2c42,fogLength:3200,fogBoost:1.6,
+    night:1,exposure:1.3,clouds:.26,cloudLit:0x56637e,cloudShade:0x1e2a3e,water:0x122430})],
 ]
 keys.push([24,keys[0][1]])
 

@@ -1,10 +1,12 @@
 import * as THREE from 'three'
 import {look} from './config'
+import {nightBridge} from './night'
 
 // 石桥: the GL03 deck is a top surface only. Give it a stone colour and a fascia hanging from every
 // open edge so bridges read as solid slabs from the bank. Visual only — collision stays the deck.
 const top = new THREE.Color(), side = new THREE.Color()
 export const bridgeMaterial = new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,side:THREE.DoubleSide})
+nightBridge(bridgeMaterial)
 
 export function bridgeGeometry(deck:Float32Array) {
   top.set(look.bridgeTop); side.set(look.bridgeSide)
@@ -16,7 +18,7 @@ export function bridgeGeometry(deck:Float32Array) {
     if(seen) seen[2]++; else edges.set(id,[a,b,1])
   }
   const open = [...edges.values()].filter(edge=>edge[2]===1)
-  const positions = new Float32Array(deck.length+open.length*18), colors = new Float32Array(positions.length)
+  const positions = new Float32Array(deck.length+open.length*18), colors = new Float32Array(positions.length), edge = new Float32Array(positions.length/3)
   positions.set(deck)
   for(let at=0;at<deck.length;at+=3) top.toArray(colors,at)
   let out = deck.length
@@ -24,12 +26,13 @@ export function bridgeGeometry(deck:Float32Array) {
   for(const [a,b] of open) {
     const ax=deck[a],ay=deck[a+1],az=deck[a+2],bx=deck[b],by=deck[b+1],bz=deck[b+2]
     for(const [x,y,z] of [[ax,ay,az],[bx,by-depth,bz],[bx,by,bz],[ax,ay,az],[ax,ay-depth,az],[bx,by-depth,bz]]) {
-      positions[out]=x;positions[out+1]=y;positions[out+2]=z;side.toArray(colors,out);out+=3
+      positions[out]=x;positions[out+1]=y;positions[out+2]=z;side.toArray(colors,out);edge[out/3]=y===ay||y===by?1:0;out+=3
     }
   }
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position',new THREE.BufferAttribute(positions,3))
   geometry.setAttribute('color',new THREE.BufferAttribute(colors,3))
+  geometry.setAttribute('aEdge',new THREE.BufferAttribute(edge,1))
   geometry.computeVertexNormals()
   return geometry
 }
