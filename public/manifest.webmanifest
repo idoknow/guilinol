@@ -1,0 +1,20 @@
+{
+  "name": "网上桂林",
+  "short_name": "网上桂林",
+  "description": "真实地理布局的桂林第三人称 3D 城市漫游。飞、走、看山水。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "theme_color": "#4f7f7a",
+  "background_color": "#d9e4e6",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
