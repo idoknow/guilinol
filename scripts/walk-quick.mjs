@@ -26,13 +26,15 @@ try {
       for(let step=0;step<seconds*10;step++){
         walk.tick(.1);const probe=walk.probe()
         if(probe.resets||probe.inHouse||probe.inPeak||probe.renderClearance<-.15)throw Error(JSON.stringify(probe))
-        hit ||= target==='shore'?probe.blockedWater&&!probe.wet:target==='deck'?probe.wet&&probe.deck!==undefined:probe.hits.includes(target)
+        hit ||= target==='gate'?spawn.z-probe.z>39:target==='shore'?probe.blockedWater&&!probe.wet:target==='deck'?probe.wet&&probe.deck!==undefined:probe.hits.includes(target)
         if(hit)break
       }
       walk.drive(0,0);return {hit,last:walk.probe()}
     },{start,direction,seconds,target});assert(result.hit,`${target}: ${JSON.stringify(result)}`);console.log(target,'OK')
   }
-  await fixture([-588,-212],[0,-1],7,'building')
+  await page.waitForFunction(()=>[...window.viewer.stream.landmarks.keys()].some(entry=>entry.id==='jingjiang'))
+  await fixture([-588,-212],[.145,-.989],7,'gate')
+  await fixture([-730.68,-277.1],[-.166,.986],2,'building')
   await fixture([-577,-209],[1,0],2,'tree')
   await page.waitForFunction(()=>window.viewer.stream.landmarks.size>0)
   await fixture([-884,-169.63],[1,0],1,'landmark')
