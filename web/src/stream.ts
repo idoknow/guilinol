@@ -1,0 +1,34 @@
+import * as THREE from 'three'
+import {detail, type Manifest, type Tile, overview} from './world'
+
+export class Stream {
+  loaded = new Map<Tile,Awaited<ReturnType<typeof detail>>>()
+  pending = new Map<Tile,AbortController>()
+  failures = new Map<Tile,number>()
+  visited = new Set<Tile>()
+  constructor(private scene:THREE.Scene, private manifest:Manifest, private base:Awaited<ReturnType<typeof overview>>,public radius:number) {}
+  tick(position:THREE.Vector3) {
+    const distance = (tile:Tile)=>Math.hypot(tile.x+128-position.x,tile.z+128-position.z)
+    for(const [tile,item] of this.loaded) if(distance(tile)>this.radius+190) {
+      this.base.toggle(tile,true); this.scene.remove(item.group); item.dispose(); this.loaded.delete(tile)
+    }
+    for(const [tile,controller] of this.pending) if(distance(tile)>this.radius+190) controller.abort()
+    if(this.pending.size>=2) return
+    let nearest:Tile|undefined, best = this.radius
+    for(const tile of this.manifest.chunks) {
+      const dist = distance(tile)
+      if(dist<=best && !this.loaded.has(tile) && !this.pending.has(tile) && (this.failures.get(tile)??0)<=performance.now()) {
+        nearest=tile; best=dist
+      }
+    }
+    if(!nearest) return
+    const tile = nearest, controller = new AbortController()
+    this.pending.set(tile,controller)
+    detail(tile,controller.signal).then(item=>{
+      if(controller.signal.aborted) {item.dispose();return}
+      this.scene.add(item.group); this.base.toggle(tile,false); this.loaded.set(tile,item); this.visited.add(tile); this.failures.delete(tile)
+    }).catch(error=>{
+      if(!controller.signal.aborted) {console.error(tile.file,error); this.failures.set(tile,performance.now()+10000)}
+    }).finally(()=>this.pending.delete(tile))
+  }
+}
