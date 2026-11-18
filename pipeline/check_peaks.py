@@ -39,7 +39,7 @@ def verify():
     houses = []
     for tile in manifest['chunks']:
         blob = gzip.decompress((output/tile['file']).read_bytes())
-        assert blob[:4]==b'GL03'
+        assert blob[:4]==b'GL04'
         row,col = (tile['z']-top)//4,(tile['x']-left)//4
         ground,water = np.frombuffer(blob,'<i2',8450,24).reshape(2,65,65)
         window = np.s_[row:row+65,col:col+65]
@@ -52,7 +52,7 @@ def verify():
         tail = start+collision+png+triangles*18
         fine_underlay[window] = np.frombuffer(blob,'<i2',4225,tail).reshape(65,65) if tail<len(blob) else ground
         dry[window] = water==-32768
-        for _,_,rings in json.loads(blob[start:start+collision]):
+        for _,_,rings,*_attrs in json.loads(blob[start:start+collision])[0]:
             rings = [np.asarray(ring)/100+[tile['x'],tile['z']] for ring in rings]
             houses.append(Polygon(rings[0],rings[1:]))
     house_index = STRtree(houses)

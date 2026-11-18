@@ -1,0 +1,12 @@
+{
+  "species": ["camphor", "banyan", "osmanthus", "palm", "conifer", "shrub"],
+  "weights": {"mixed":[45,18,30,3,4,0], "river":[14,8,7,68,3,0], "lake":[19,62,14,2,3,0], "shan":[10,12,5,0,73,0], "peak":[5,0,15,0,0,80]},
+  "width": {"trunk":18,"primary":14,"secondary":12,"tertiary":10,"residential":6,"pedestrian":6},
+  "street": {"spacing":7,"jitter":1,"offset":1.7,"junction":12},
+  "bank": {"spacing":9,"offset":[3,10]},
+  "waterwayBankOffset":{"stream":6,"river":10},
+  "patchSpacing": {"wood":8,"park":11,"grass":19,"residential":20,"school":17,"university":17},
+  "treeRowSpacing":7,"peakAreaPerTree":40,"minSeparation":3,
+  "urbanBanks":["漓江","桃花江","榕湖","杉湖","桂湖","木龙湖"],"riverRoadProximity":55,
+  "mainStreets":["trunk","primary","secondary"],"lampSpacing":25
+}

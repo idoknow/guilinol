@@ -55,9 +55,13 @@ try{
   assert(Math.hypot(second.last.x+958.008,second.last.z-1102.738)<30,'outside Elephant Hill foot')
   async function fixture(x,z){assert(await page.evaluate(async([x,z])=>{const walk=window.viewer.walk;walk.leave();const ok=await walk.enter(x,z,0,'fixture');if(ok)window.checkedProbe(`spawn:${x},${z}`);return ok},[x,z]))}
   async function press(x,z,seconds,label){return page.evaluate(async({x,z,seconds,label})=>{const walk=window.viewer.walk,start=window.checkedProbe(label),hits=new Set();let shore=false,last=start
-    walk.drive(x,z);while(last.elapsed-start.elapsed<seconds){await new Promise(requestAnimationFrame);last=window.checkedProbe(label);for(const hit of last.hits)hits.add(hit);shore||=last.blockedWater;if(last.inHouse||last.inPeak||last.resets||last.clearance<-.3)throw Error(JSON.stringify(last))}
+    walk.drive(x,z);while(last.elapsed-start.elapsed<seconds){await new Promise(requestAnimationFrame);last=window.checkedProbe(label);for(const hit of last.hits)hits.add(hit);shore||=last.blockedWater;if(last.inHouse||last.inPeak||last.resets||last.clearance<-.3)throw Error(JSON.stringify(last))
+      if(label==='tree'&&Math.hypot(last.x+574.24,last.z+208.51)<.59)throw Error(`trunk penetration: ${JSON.stringify(last)}`)}
     walk.drive(0,0);return {last,hits:[...hits],shore,distance:Math.hypot(last.x-start.x,last.z-start.z)}},{x,z,seconds,label})}
   await fixture(-588,-212);const building=await press(0,-1,7,'building');assert(building.hits.includes('building')&&building.distance<55,JSON.stringify(building))
+  await fixture(-577.24,-208.51);const trunk=await press(1,0,1.25,'tree');assert(trunk.hits.includes('tree'),JSON.stringify(trunk))
+  await fixture(-756.17,-253.92);const curb=await press(.989,.150,1,'curb');assert(curb.distance>3&&curb.hits.includes('sidewalk'),JSON.stringify(curb))
+  await fixture(-1021.82,435.97);const rail=await press(.967,-.254,2,'rail');assert(rail.hits.includes('rail')&&!rail.last.wet&&rail.distance<4.5,JSON.stringify(rail));await shot('bank')
   await fixture(-962,1096);const cliff=await press(.8,.6,9,'cliff');assert(cliff.hits.includes('peak')&&cliff.distance<72,JSON.stringify(cliff))
   await fixture(-309,-1);const bridge=await drive([[-174,44]],'bridge');await shot('bridge');const far=await drive([[-30,92]],'bridge');assert(bridge.wetFrames+far.wetFrames>0)
   console.log({building,cliff,bridge:bridge.wetFrames+far.wetFrames})

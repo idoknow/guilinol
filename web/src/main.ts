@@ -11,7 +11,7 @@ import {walkConfig} from './walk/config'
 installAtmosphere()
 async function start() {
   const manifest:Manifest = JSON.parse(new TextDecoder().decode(await fetchAsset('manifest.json')))
-  if(manifest.version!==3 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
+  if(manifest.version!==4 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
   const basePromise = Promise.all([overview(manifest),loadPeaks(manifest.peaks)])
   const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
   renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure
@@ -38,7 +38,7 @@ async function start() {
   const params = new URLSearchParams(location.search)
   setPreset(camera,params.get('cam'))
   const radius = Number(params.get('radius')??480)
-  const stream = new Stream(scene,manifest,base,THREE.MathUtils.clamp(Number.isFinite(radius)?radius:480,192,1600))
+  const stream = new Stream(scene,manifest,base,THREE.MathUtils.clamp(Number.isFinite(radius)?radius:480,192,1600),camera)
   const output = document.querySelector('output')!
   let previous=0, first=0, frame=0, sum=0, samples=0
   const stats = {firstMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0}

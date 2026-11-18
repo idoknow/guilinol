@@ -96,7 +96,7 @@ def imprint(terrain, left, top, triangles):
         patch[inside] = np.maximum(patch[inside],np.rint(10*surface[inside]))
 
 
-def generate(original, terrain, left, top, bbox, output, wet):
+def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=None, area_per_tree=40):
     catalog = json.loads(Path(__file__).with_name('peaks.json').read_text())
     south,west,north,east = bbox
     entries, payload = [], bytearray(b'PK02')
@@ -179,6 +179,19 @@ def generate(original, terrain, left, top, bbox, output, wet):
             footprints.append(Polygon(data[:segments][:,[0,2]]))
             if not far:
                 imprint(terrain,left,top,data[faces,:3])
+                if mountain_trees is not None:
+                    rng = np.random.default_rng(peak.get('seed',peak.get('osm')))
+                    triangles = data[faces]
+                    cross = np.cross(triangles[:,1,:3]-triangles[:,0,:3],triangles[:,2,:3]-triangles[:,0,:3])
+                    areas = np.linalg.norm(cross,axis=1)/2
+                    for tri,normal,size in zip(triangles,cross,areas):
+                        if size==0 or tri[:,6].min()>=.5:
+                            continue
+                        normal = normal/(2*size)
+                        for _ in range(rng.poisson(size/area_per_tree)):
+                            weights = rng.dirichlet([1,1,1])
+                            if weights@tri[:,6]<.5:
+                                mountain_trees.append((weights@tri[:,:3]-.3*normal,normal))
             if far not in index_offsets:
                 index_offsets[far] = len(payload)
                 payload.extend(faces.tobytes())

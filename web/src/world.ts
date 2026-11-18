@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import {buildingGeometry,type Building} from './buildings'
+import {streetGeometry,type Streets} from './streets'
 import {bridgeGeometry, bridgeMaterial} from './look/bridge'
 import {look} from './look/config'
 import type {Peaks} from './peaks'
@@ -58,14 +60,13 @@ export async function overview(manifest:Manifest) {
   return {mesh,toggle}
 }
 
-const buildings = new THREE.MeshStandardMaterial({vertexColors:true,roughness:look.roughness,metalness:look.metalness})
-const wall = new THREE.Color(look.wall), roof = new THREE.Color(look.roof)
+const buildings = new THREE.MeshStandardMaterial({vertexColors:true,roughness:look.roughness,metalness:look.metalness,side:THREE.DoubleSide})
 export async function detail(tile:Tile, signal:AbortSignal) {
   const compressed = await fetchAsset(tile.file,signal)
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
   signal.throwIfAborted()
   const view = new DataView(buffer)
-  if(view.getUint32(0)!==0x474c3033) throw Error('Invalid GL03 tile')
+  if(view.getUint32(0)!==0x474c3034) throw Error('Invalid GL04 tile')
   const [vertices,count,collision,imageBytes,triangles] = [4,8,12,16,20].map(offset=>view.getUint32(offset,true))
   let offset = 24
   const terrain = new Int16Array(buffer,offset,4225); offset+=8450
@@ -73,9 +74,9 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   const positions = new Int16Array(buffer,offset,vertices*3); offset+=vertices*6
   const normals = new Int8Array(buffer,offset,vertices*3); offset+=vertices*3
   const indices = new Uint32Array(buffer.slice(offset,offset+count*4)); offset+=count*4
-  const rings = new Uint8Array(buffer,offset,collision); offset+=collision
+  const [rings,paths]:[Building[],Streets]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
   const end = offset+imageBytes, tail = end+triangles*18, extra = buffer.byteLength-tail
-  if(extra!==0 && extra!==8450) throw Error('Invalid GL03 sections')
+  if(extra!==0 && extra!==8450) throw Error('Invalid GL04 sections')
   const deck = Float32Array.from(new Int16Array(buffer.slice(end,tail)),(value,index)=>value/(index%3===1?10:100))
   const underlay = extra ? new Int16Array(buffer.slice(tail)) : terrain
   const material = await surfaceMaterial(buffer.slice(offset,end))
@@ -93,19 +94,15 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   group.position.set(tile.x,0,tile.z)
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
-  const walls = new THREE.BufferGeometry()
-  if(vertices) {
-    const meters = Float32Array.from(positions,(value,index)=>value/(index%3===1?10:100))
-    walls.setAttribute('position',new THREE.BufferAttribute(meters,3))
-    walls.setAttribute('normal',new THREE.BufferAttribute(normals,3,true))
-    // 白墙灰瓦: upward faces take the tile grey, walls stay lime-white.
-    const colors = new Float32Array(vertices*3)
-    for(let index=0;index<vertices;index++) (normals[index*3+1]>90?roof:wall).toArray(colors,index*3)
-    walls.setAttribute('color',new THREE.BufferAttribute(colors,3))
-    walls.setIndex(new THREE.BufferAttribute(indices,1))
-    group.add(new THREE.Mesh(walls,buildings))
-  }
+  const walls = buildingGeometry(positions,normals,indices,rings)
+  if(vertices)group.add(new THREE.Mesh(walls,buildings))
+  const heights=geometry.getAttribute('position')
+  const streets=streetGeometry(paths,(x,z)=>{
+    const col=Math.min(31,Math.max(0,Math.floor(x/8))),row=Math.min(31,Math.max(0,Math.floor(z/8))),at=row*33+col
+    const u=x/8-col,v=z/8-row,a=heights.getY(at),b=heights.getY(at+1),c=heights.getY(at+33),d=heights.getY(at+34)
+    return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
+  });group.add(streets.group)
   const bridge = new THREE.BufferGeometry()
   if(deck.length) group.add(new THREE.Mesh(bridge.copy(bridgeGeometry(deck)),bridgeMaterial))
-  return {group,groundMesh,terrain,water,rings,deck,dispose(){bridge.dispose();geometry.dispose(); walls.dispose(); material.map!.image.close(); material.map!.dispose(); material.dispose()}}
+  return {group,groundMesh,terrain,water,rings,deck,streets,dispose(){streets.dispose();bridge.dispose();geometry.dispose(); walls.dispose(); material.map!.image.close(); material.map!.dispose(); material.dispose()}}
 }

@@ -1,10 +1,12 @@
 import csv
+import json
+from collections import Counter
 import zlib
 from pathlib import Path
 
 import mapbox_earcut
 import numpy as np
-from shapely import from_wkt, make_valid
+from shapely import STRtree, from_wkt, make_valid
 from shapely.affinity import affine_transform
 from shapely.geometry import LineString, Polygon
 from shapely.geometry.polygon import orient
@@ -61,6 +63,11 @@ def ground_features(bounds):
 
 def buildings(bounds, elevation, peaks):
     footprints, heights = [], []
+    rules = json.loads(Path(__file__).with_name('building-kinds.json').read_text())
+    districts = unary_union([Polygon([ll2xz(*ll) for ll in ring]) for ring in rules['oldDistrictsLatLon']])
+    campuses = STRtree([area(el) for el in load_osm() if el['type']!='node' and any(
+        el.get('tags',{}).get(tag) in rules['glazedUses'] for tag in ['building','amenity','office','tourism'])])
+    kinds = Counter()
     with (Path(RAW)/'overture_buildings.csv').open() as source:
         for row in csv.DictReader(source, delimiter='\t'):
             geometry = affine_transform(from_wkt(row['wkt']), [MLON, 0, 0, -MLAT, -LON0*MLON, LAT0*MLAT])
@@ -70,19 +77,31 @@ def buildings(bounds, elevation, peaks):
                 if peaks.query(poly,predicate='intersects').size:
                     continue
                 center = poly.representative_point()
-                variation = zlib.crc32(row['id'].encode()) % 3
+                seed = zlib.crc32(row['id'].encode())
+                variation = seed % 3
                 floors = min(7, 1 + int(np.sqrt(poly.area)/10) + variation)
                 if -1700 < center.x < 300 and -1800 < center.y < 700:
                     floors = min(floors, 4)
                 base = elevation(center.x, center.y)
                 footprints.append(poly)
-                heights.append((base, base + 3.1*floors))
+                kind = 0
+                if floors<=rules['oldMaxFloors'] and districts.covers(center):
+                    kind = 1
+                elif floors<=rules['glazedMaxFloors'] and seed%100<rules['glazedPercent'] and campuses.query(center,predicate='intersects').size:
+                    kind = 2
+                rectangle=[]
+                if kind:
+                    rect=poly.minimum_rotated_rectangle
+                    rectangle=[np.rint((np.array(pt)-center.coords[0])*100).astype(int).tolist() for pt in list(rect.exterior.coords)[:4]]
+                heights.append((base,base+3.1*floors,kind,floors,seed,center,rectangle,poly.area/poly.minimum_rotated_rectangle.area<.78))
+                kinds[kind]+=1
+    print('Building kinds:',dict(kinds))
     return footprints, heights
 
 
 def building_mesh(parts, origin):
     positions, normals, indices, collision = [], [], [], []
-    for polygon, (base, roof) in parts:
+    for polygon, (base, roof, kind, floors, seed, center, rectangle, complex_shape) in parts:
         polygon = orient(polygon, sign=1)
         rings = [np.asarray(ring.coords)[:-1] - origin for ring in [polygon.exterior, *polygon.interiors]]
         coords = np.concatenate(rings)
@@ -90,7 +109,10 @@ def building_mesh(parts, origin):
         indices.extend((triangles.reshape(-1,3)[:, ::-1]+len(positions)).ravel())
         positions.extend((east, roof, south) for east, south in coords)
         normals.extend([(0,127,0)]*len(coords))
-        collision.append([round(base*10), round(roof*10), [np.rint(ring*100).astype(int).tolist() for ring in rings]])
+        anchor=np.rint((np.asarray(center.coords[0])-origin)*100).astype(int).tolist()
+        owner=0<=center.x-origin[0]<256 and 0<=center.y-origin[1]<256 and polygon.covers(center)
+        collision.append([round(base*10),round(roof*10),[np.rint(ring*100).astype(int).tolist() for ring in rings],
+                          kind,floors,seed,anchor if owner else [],rectangle if owner else [],int(complex_shape)])
         for ring in rings:
             for start, end in zip(ring, np.roll(ring, -1, axis=0)):
                 delta = end - start
