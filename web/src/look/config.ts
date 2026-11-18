@@ -1,8 +1,13 @@
 // M1 look: 青绿山水 · 低多边形. All colours/atmosphere knobs live here; docs/style.md mirrors the palette.
 export const look = {
-  // Peaks: 赭石 foot → 石绿 body → 石青 crown, bare limestone on steep walls (aRock).
-  peakFoot: 0x9a8a63, peakGreen: 0x5a8b5e, peakCrown: 0x4a7f86, peakRock: 0xa3aca0, peakRockDark: 0x7c8780,
-  peakRockShare: 1.05, peakJitter: .06,
+  // Peaks (M2.5, docs/reference.md R3/R7/R14): canopy-wrapped karst. Deep broadleaf green in clumps
+  // (dark under-canopy ↔ sunlit yellow-green), olive scrub at the foot; steep faces are grey-white
+  // limestone with dark vertical runnels and ochre rust. 石青 now comes only from aerial perspective.
+  peakFoot: 0x5d6b3e, peakGreen: 0x3a6334, peakGreenDark: 0x203d26, peakGreenLight: 0x62873f,
+  peakRock: 0xbab8ae, peakRockDark: 0x57544c, peakRockOchre: 0x9f8b60,
+  peakRockShare: 1, peakJitter: .05,
+  // Band-noise threshold above which steep faces show bare rock; lower = more cliff, higher = more green.
+  peakBareFrom: .5,
   // Sky dome gradient.
   skyZenith: 0x7aa3bb, skyHorizon: 0xdbe4e0, skyGlow: 0xf4ead2, sunDirection: [-.55, .62, .56] as const,
   // Layered atmosphere: near haze → far 石青 blue → horizon. Distances in metres.
