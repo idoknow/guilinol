@@ -12,10 +12,10 @@ from PIL import Image, ImageDraw
 import trimesh
 
 
-SWATCHES = dict(stone='#99998c', brick='#687073', tile='#555c5f', wood='#674a3c',
-                red='#9d4636', yellow='#d9ae60', granite='#b4ada1', pave='#9b9d95',
-                white='#e3decc', glass='#46595a', green='#71835a', gold='#bb9859',
-                leaf='#4d6a46', earth='#ae795f', clock='#f1e5c9', sign='#5a3931')
+SWATCHES = dict(stone='#c1c1bc', brick='#727c86', tile='#525b65', wood='#613c32',
+                red='#bd392d', yellow='#f3bd38', granite='#b7b6b3', pave='#9ca1a6',
+                white='#f2ece2', glass='#7797a4', green='#71835a', gold='#d5ab54',
+                leaf='#4d6a46', earth='#ba7662', clock='#3585bf', sign='#50332d')
 
 
 def atlas():
@@ -55,6 +55,7 @@ class Model:
         self.visible=[]
         self.uv=[]
         self.solid=[]
+        self.tile_parts={key:[] for key in ('stone','brick','pave')}
         self.pose=(0,0,0,0)
 
     def mesh(self, vertices, faces, color, collide=False):
@@ -65,11 +66,14 @@ class Model:
         triangles[:,:,0]=local[:,:,0]*cosine-local[:,:,2]*sine+dx
         triangles[:,:,2]=local[:,:,0]*sine+local[:,:,2]*cosine+dz
         triangles[:,:,1]+=dy
-        self.visible.append(triangles)
         if collide: self.solid.append(triangles)
         normal=np.abs(np.cross(local[:,1]-local[:,0],local[:,2]-local[:,0])).argmax(axis=1)
         axes=np.array([[2,1],[0,2],[0,1]])[normal]
         coords=np.take_along_axis(local,axes[:,None,:],axis=2)
+        if color in self.tile_parts:
+            scale={'stone':(3.2,1.2),'brick':(1.04,.448),'pave':(3.2,1.6)}[color]
+            self.tile_parts[color].append((triangles,coords/scale));return
+        self.visible.append(triangles)
         coords=(coords-coords.min(axis=1,keepdims=True))/np.maximum(coords.max(axis=1,keepdims=True)-coords.min(axis=1,keepdims=True),1e-6)
         cell=list(SWATCHES).index(color)
         self.uv.append((coords*.94+.03+[cell%4,3-cell//4])/4)
@@ -88,9 +92,28 @@ class Model:
             w*=.96;d*=.96
         if self.detail:self.beam([x-w*.29,y+h+.2,z],[x+w*.29,y+h+.2,z],.21,'granite')
 
+    def swept_roof(self,x,y,z,width,depth,rise):
+        if not self.detail:
+            self.roof(x,y,z,width,depth,rise)
+            return
+        perimeter=np.array([[-1,-1],[-.68,-1],[0,-1],[.68,-1],[1,-1],[1,0],[1,1],[.68,1],[0,1],[-.68,1],[-1,1],[-1,0]])
+        rings=[]
+        for scale,lift,upturn in ((1,-.38,.94),(1,0,.94),(.77,.27,.27),(.42,rise*.67,.06),(.07,rise,0)):
+            ring=[]
+            for east,south in perimeter:
+                ring.append([x+east*(width*.30+(width*.20)*scale),y+lift+upturn*(abs(east*south)**4),z+south*depth*.5*scale])
+            rings.append(ring)
+        for level in range(4):
+            for index in range(len(perimeter)):
+                nxt=(index+1)%len(perimeter)
+                self.mesh([rings[level][index],rings[level+1][index],rings[level+1][nxt],rings[level][nxt]],[[0,1,2],[0,2,3]],'red' if not level else 'tile')
+        self.beam([x-width*.32,y+rise,z],[x+width*.32,y+rise,z],.27,'granite')
+        for side in (-1,1):self.beam([x+side*width*.31,y+rise,z],[x+side*width*.34,y+rise+.67,z],.19,'tile')
+
     def arcade(self,x,z,width,depth,height,openings,radius,color):
         cursor=x-width/2
-        for center in openings:
+        for center,rad in zip(openings,np.broadcast_to(radius,(len(openings),))):
+            radius=rad
             left=center-radius
             self.box((cursor+left)/2,0,z,left-cursor,height,depth,color,True)
             spring=height*.32
@@ -112,7 +135,12 @@ def generate(name,build):
         def packed(parts):
             vertices=np.concatenate(parts).reshape(-1,3);return trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
         mesh=packed(model.visible);mesh.visual=trimesh.visual.TextureVisuals(uv=np.concatenate(model.uv).reshape(-1,2),material=mat)
-        scene.add_geometry(mesh,node_name=f'lod{lod}')
+        layer=f'lod{lod}';scene.graph.update(frame_to=layer)
+        scene.add_geometry(mesh,node_name=layer+'_joinery',parent_node_name=layer)
+        for key,parts in model.tile_parts.items():
+            if not parts:continue
+            cell=list(SWATCHES).index(key);left=128*(cell%4);top=128*(cell//4)
+            texture=image.crop((left,top,left+128,top+128));surface=packed([tri for tri,uv in parts]);surface.visual=trimesh.visual.TextureVisuals(uv=np.concatenate([uv for tri,uv in parts]).reshape(-1,2),material=trimesh.visual.material.PBRMaterial(name=key,baseColorTexture=texture,metallicFactor=0,roughnessFactor=1,doubleSided=True));scene.add_geometry(surface,node_name=layer+'_'+key,parent_node_name=layer)
         if lod==0 and model.solid:scene.add_geometry(packed(model.solid),node_name='collision_surface')
     scene.export(Path(sys.argv[1])/f'{name}.glb')
 
@@ -128,10 +156,44 @@ def palace(m):
             for zz in range(0,548,5):m.box(side*163,6.5,-zz,1,1.1,2.7,'stone')
             for xx in range(-160,161,5):
                 if side<0 or abs(xx)>20:m.box(xx,6.5,0 if side>0 else -548,2.7,1.1,1,'stone')
-    m.arcade(0,-9,40,19,9,[-11,0,11],3.1,'stone')
+    m.box(0,-.65,16,47,.82,33,'pave',True)
+    m.arcade(0,-9,40,19,6.8,[-11,0,11],[2.0,3.75,2.0],'stone')
+    m.box(0,6.8,-9,40,2.25,19,'brick',True)
+    for east in np.arange(-18.8,20,2.5):m.box(east,9.05,.12,1.45,1.1,.8,'brick')
+    for center,radius in ((-11,2),(0,3.75),(11,2)):
+        for angle in (np.arange(18)*math.pi/18 if m.detail else []):
+            following=angle+math.pi/18
+            verts=[[center+rad*math.cos(theta),2.176+rad*math.sin(theta),.66] for theta,rad in ((angle,radius),(angle,radius+.46),(following,radius+.46),(following,radius))];m.mesh(verts,[[0,1,2],[0,2,3]],'granite' if round(angle*18/math.pi)%2 else 'white')
+        if center:
+            if not m.detail:
+                m.box(center,0,-.32,3.6,3,.24,'red');continue
+            for column in range(8):
+                offset=(column-3.5)*.49; height=2.17+math.sqrt(radius**2-offset**2)
+                m.box(center+offset,0,-.32,.49,height,.24,'red',True)
+                if m.detail:
+                    for row in range(4):m.box(center+offset,.6+row*.65,-.17,.09,.09,.10,'gold')
+    if m.detail:
+        for index in range(38):
+            east=math.sin(index*54.1)*19; height=5.9+(index%5)*.37
+            m.mesh([[east,height,.7],[east+.35,height+.18,.74],[east+.16,height-.63,.72]],[[0,1,2]],'leaf')
     m.arcade(0,-147,27,11,8,[0],3.4,'yellow')
-    m.box(0,8,-147,24,2.6,10,'red');m.roof(0,9,-147,31,16,3.2)
-    m.box(0,11,-147,18,2.5,7,'yellow');m.roof(0,13,-147,24,12,3.6)
+    m.box(0,8,-147,22,4.8,9,'red');m.swept_roof(0,8.5,-147,32,17,2.5)
+    m.swept_roof(0,13,-147,26,14,3.8)
+    for east in (-12,-4,4,12):
+        m.beam([east,.85,-140],[east,8.5,-140],.4,'red',10,True)
+        m.box(east,7.7,-140,1.4,.55,1.4,'red')
+    for east in (-7,0,7):
+        m.box(east,10.25,-142.3,5,2.42,.45,'wood')
+        if m.detail:
+            for bar in np.linspace(-2,2,7):m.box(east+bar,10.25,-141.99,.15,2.42,.18,'red')
+    m.box(0,7.22,-139.8,4.3,1.15,.24,'sign')
+    for east in (-1,0,1):m.box(east,7.48,-139.62,.34,.58,.12,'gold')
+    for side in (-1,1):
+        m.box(side*9,0,-138.4,10,.9,7,'granite',True)
+        for step in range(5):m.box(side*9,0,-132.9-step*.48,7,.18*(step+1),.5,'granite',True)
+        for east in (side*5.25,side*12.75):
+            m.beam([east,.86,-132.7],[east,1.77,-135.15],.13,'white');m.box(east,0,-133,.33,.94,.33,'white')
+        m.box(side*22,0,-147,14,4.35,10,'yellow',True);m.swept_roof(side*22,4.35,-147,16,12,2.5)
     for zz in (-65,-108):
         for side in (-1,1):m.box(side*20,0,zz,25,.12,39,'green')
     m.box(0,0,-79,12,.12,135,'pave',True)

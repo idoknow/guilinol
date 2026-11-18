@@ -67,15 +67,16 @@ def build(bbox, output, palette):
     report_water(surface, terrain, bounds, stencil)
     terrain[wet] = np.minimum(terrain[wet],surface[wet]-20)
     layout = Layout()
-    for region,level in layout.flatten:
-        for part in polygons(region.intersection(bounds)):
-            mask,(col,row) = stencil(part,left,top,GRID)
-            patch = terrain[row:row+mask.height,col:col+mask.width]
-            patch[np.asarray(mask,dtype=bool)[:patch.shape[0],:patch.shape[1]]] = round(level*10)
     output.mkdir(parents=True, exist_ok=True)
     original = terrain.copy()
     mountain_trees = []
     peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet,mountain_trees,CONFIG['peakAreaPerTree'])
+    for region,level in layout.flatten:
+        for part in polygons(region.intersection(bounds)):
+            mask,(col,row) = stencil(part,left,top,GRID)
+            for field in (terrain,original):
+                patch = field[row:row+mask.height,col:col+mask.width]
+                patch[np.asarray(mask,dtype=bool)[:patch.shape[0],:patch.shape[1]]] = round(level*10)
     footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes),layout)
     index = STRtree(footprints)
     trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees,layout.exclude)

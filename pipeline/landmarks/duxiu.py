@@ -32,22 +32,45 @@ def summit(model):
         radial=point[[0,2]]-tip[[0,2]];radial/=np.linalg.norm(radial)
         point[[0,2]]+=radial*1.15
         return point,math.atan2(radial[1],radial[0])
-    steps=430 if model.detail else 62
+    steps=430 if model.detail else 45
     for index in range(steps):
         start,angle=tread(index/steps);end,_=tread((index+1)/steps)
         model.pose=(*((start+end)/2),angle);depth=np.linalg.norm((end-start)[[0,2]])+.12
-        model.box(0,-.35,0,2.4,.64,depth,'granite',True)
+        support=2.1+3.6*math.sin(math.pi*index/steps)
+        model.box(-.65,-support,0,3.7,support+.29,depth+.35,'stone',True)
+        model.box(0,.23,0,2.5,.08,depth+.22,'granite',True)
         if model.detail and index%6==0:
             model.beam([1,.12,0],[1,1.25,0],.09,'stone')
-    start,angle=tread(0);model.pose=(*start,angle+math.pi/2)
-    model.arcade(0,2.4,10,2.8,5,[0],2,'stone');model.box(0,4.1,4,4,.68,.22,'red')
-    if model.detail:
-        for col in range(9):
-            for line in range(3):model.box(4.9+col*.34,1.4+line*.45,3.9,.14,.33,.08,'red')
-    model.pose=(*tip,0);model.box(0,-.25,0,6,.58,6,'granite',True)
-    for east in (-2.2,2.2):
-        for south in (-2.2,2.2):model.beam([east,0,south],[east,3.6,south],.23,'red',8,True)
-    model.roof(0,3.6,0,6.8,6.8,2.1)
+    start,angle=tread(0);model.pose=(*start,angle-math.pi/2)
+    lip=[(-6,-1),(-5.4,2.2),(-4.1,3.75),(-1.8,4.2),(.4,3.8),(2.7,3.7),(4.6,2.85),(5.4,-1)]
+    for index,((left,low),(right,high)) in enumerate(zip(lip,lip[1:])):
+        front=2.8+.35*math.cos(index*2);back=-1.35
+        model.mesh([(left,low,front),(right,high,front),(right,high-.55,back),(left,low-.55,back)],[[0,1,2],[0,2,3]],'sign')
+        model.mesh([(left,low,front),(right,high,front),(right*1.27,high+2.4,front-.7),(left*1.27,low+2.4,front-.7), (right*1.4,high+3.1,-2.8),(left*1.4,low+3.1,-2.8)],[[0,1,2],[0,2,3],[3,2,4],[3,4,5]],'stone')
+    model.box(0,-1,-1.5,10,5,.32,'sign',True)
+    for east in np.linspace(-4,4,15):model.box(east,-.4,2.6,.065,1.9,.07,'tile',True)
+    model.box(0,1.35,2.6,8.4,.11,.09,'tile')
+    for east,height in ((-3,4.9),(0,4.6),(2.7,4.55)):
+        model.box(east,height,2.25,1.9,1.1,.18,'tile')
+        if model.detail:
+            for mark in range(5):model.box(east+(mark-2)*.28,height+.18,2.37,.09,.54,.045,'white')
+    model.pose=(*tip,0)
+    def ring(radius,height):return [(radius*math.cos(n*math.pi/4),height,radius*math.sin(n*math.pi/4)) for n in range(8)]
+    model.beam([0,-2.8,0],[0,.48,0],5.2,'stone',8,True)
+    for index,(east,_,south) in enumerate(ring(4.8,.48)):
+        nxt=ring(4.8,1.56)[(index+1)%8];model.beam([east,.48,south],[east,1.7,south],.16,'white')
+        if index!=4:model.beam([east,1.48,south],nxt,.12,'white')
+    for east,_,south in ring(2.75,.48):
+        model.beam([east,.48,south],[east,5.25,south],.22,'red',8,True)
+        model.box(east,3.25,south,.68,.45,.68,'wood')
+    for bottom,radius,rise in ((3.45,4.25,1.8),(5.18,3.45,2.9)):
+        for index in range(8):
+            angle=index*math.pi/4;angles=np.array([angle,angle+math.pi/8,angle+math.pi/4]);rings=[]
+            for scale,lift,curve in ((1,-.27,.93),(1,0,.93),(.75,.3,.25),(.34,rise*.65,.04),(.06,rise,0)):
+                rings.append([(radius*scale*math.cos(a),bottom+lift+curve*(i!=1),radius*scale*math.sin(a)) for i,a in enumerate(angles)])
+            for row in range(4):
+                for col in range(2):model.mesh([rings[row][col],rings[row][col+1],rings[row+1][col+1],rings[row+1][col]],[[0,1,2],[0,2,3]],'red' if row==0 else 'tile')
+    model.beam([0,7.8,0],[0,8.8,0],.19,'gold',8)
 
 
 if __name__=='__main__':generate('duxiu',summit)

@@ -7,7 +7,7 @@ from jingjiang import generate
 
 
 def frontage(model):
-    path=[(10.7,-122),(2.1,-59),(0,0),(37.8,7.3),(47.2,9.8)]
+    path=[(21.67,-121.76),(13.12,-58.68),(0,0),(37.8,7.3),(47.2,9.8)]
     for first,last in zip(path,path[1:]):
         dx,dz=np.subtract(last,first);length=math.hypot(dx,dz);angle=math.atan2(-dx,dz)
         count=max(1,round(length/10));width=length/count
@@ -33,12 +33,21 @@ def frontage(model):
                     model.box(side*2.22,4.25,zz,.16,.13,width/3,'wood')
                 model.box(side*2.95,2.4,0,.24,.64,2.6,'sign')
                 for glyph in (-.72,0,.72):model.box(side*2.79,2.54,glyph,.1,.32,.24,'gold')
-                model.beam([side*2.18,3.3,1.9],[side*2.18,3.9,1.9],.34,'red',10)
-                model.box(side*2.18,3,1.9,.08,.35,.08,'gold')
-    model.pose=(10.7,0,-122,.14)
-    for east in (-2.6,2.6):
+                if high>8:
+                    model.box(side*2.9,6.15,0,1.6,.32,width,'wood')
+                    for zz in (-2.8,0,2.8):
+                        model.box(side*3.1,6.75,zz,.24,1.6,2.25,'glass')
+                        for bar in (-.8,0,.8):model.box(side*2.93,6.75,zz+bar,.12,1.6,.12,'wood')
+                for zz in (-2.6,0,2.6):
+                    model.beam([side*2.18,2.85,zz],[side*2.18,3.43,zz],.37,'red',8)
+                    model.box(side*2.18,2.62,zz,.12,.24,.12,'gold')
+    model.pose=(21.67,0,-123,.14)
+    for east in (-5.25,-2.35,2.35,5.25):
         model.box(east,0,0,.65,5.8,.72,'white',True);model.box(east,0,0,1.1,.5,1.2,'granite',True)
-    model.box(0,4.2,0,6.4,1.15,.65,'white');model.roof(0,5.4,0,7.6,2.3,.95)
+    for east,width,height in ((-3.8,3.25,3.8),(0,5.5,5.15),(3.8,3.25,3.8)):
+        model.box(east,height-.66,0,width,.72,.65,'white');model.box(east,height+.12,0,width+.48,.28,.86,'granite');model.swept_roof(east,height+.45,0,width+.6,1.8,.68)
+    model.box(0,4.53,-.39,2.15,.6,.18,'granite')
+    for east in (-.56,0,.56):model.box(east,4.62,-.51,.18,.37,.09,'gold')
 
 
 if __name__=='__main__':generate('dongxixiang',frontage)
