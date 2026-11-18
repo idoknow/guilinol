@@ -17,6 +17,7 @@ from karst import generate
 from bridges import bridge_tiles
 from scatter import CONFIG, scatter
 from streets import chunks as street_chunks
+from atlas import write_atlas
 
 DRY = -32768
 
@@ -102,7 +103,9 @@ def build(bbox, output, palette):
             (output/name).write_bytes(gzip.compress(payload+underlay,compresslevel=5,mtime=0))
             (output/name.replace('.glc','.trees')).write_bytes(gzip.compress(trees[origin],mtime=0))
             chunks.append(dict(x=origin[0],z=origin[1],**asset(name)))
-    manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=[left,top,width,depth],chunkSize=CHUNK,peaks=peaks,
+    extent = [left,top,width,depth]
+    write_atlas(output,extent,bounds,layers,footprints,peaks)
+    manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=extent,chunkSize=CHUNK,peaks=peaks,atlas=asset('atlas.bin'),
                     grid=GRID,overview=dict(step=32, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png')),chunks=chunks)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')

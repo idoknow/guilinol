@@ -12,7 +12,7 @@ interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number}
 export interface Manifest {
   version:number; extent:[number,number,number,number]; grid:number; chunkSize:number; chunks:Tile[];
-  peaks:Peaks; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset}
+  peaks:Peaks; atlas:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset}
 }
 export let bytes = 0
 export async function fetchAsset(file:string, signal?:AbortSignal) {
