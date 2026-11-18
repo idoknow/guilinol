@@ -14,6 +14,7 @@ from shapely.geometry import LineString, Point
 
 from common import GRID, ll2xz, load_osm
 from features import area, points
+from navigation import limit_routes
 
 
 def write_vehicles(output, bounds, surface, roads, buildings, sample):
@@ -95,5 +96,5 @@ def write_vehicles(output, bounds, surface, roads, buildings, sample):
                     if node==nodes[start]:break
                     node=prev[node]
                 routes.append(dict(kind=kind,start=start,end=end,path=path[::-1]))
-    data=dict(bikes=bikes,docks=docks,routes=routes,grid=[left,top,cols,rows,GRID],mask=base64.b64encode(np.packbits(mask).tobytes()).decode())
+    data=dict(bikes=bikes,docks=docks,routes=limit_routes(routes,sample),grid=[left,top,cols,rows,GRID],mask=base64.b64encode(np.packbits(mask).tobytes()).decode())
     (output/'vehicles.bin').write_bytes(gzip.compress(json.dumps(data,ensure_ascii=False,separators=(',',':')).encode(),mtime=0))

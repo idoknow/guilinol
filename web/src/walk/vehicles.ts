@@ -48,7 +48,8 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
       if(distance<gap){mesh.position.lerp(new T.Vector3(x,y,z),distance/gap);return}
       mesh.position.set(x,y,z);distance-=gap;segment++
     }
-    const [x,,z]=data.docks[leg.end],next=data.routes.findIndex(other=>other.start===leg.end&&other.kind===leg.kind)
+    const [x,,z]=data.docks[leg.end],departures=data.routes.filter(other=>other.start===leg.end&&other.kind===leg.kind)
+    const next=data.routes.indexOf(departures.find(other=>other.end!==leg.start)??departures[0])
     if(disembark||next<0){if(land(x,z))reset();return}
     if(next>=0){mesh.position.fromArray(leg.path[0]);route=next;segment=1}
   }

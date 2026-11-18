@@ -53,5 +53,5 @@ try{
     await page.close()
   }
   assert.deepEqual(errors,[])
-  assert(lake.samples>0&&lake.minimum>=.3,`insufficient bridge clearance: ${lake.minimum} m`)
+  assert(lake.samples>0&&lake.minimum>=.3,lake.reason??`insufficient bridge clearance: ${lake.minimum} m`)
 }finally{await browser.close();await server.close()}

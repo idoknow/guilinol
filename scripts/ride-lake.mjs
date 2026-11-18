@@ -7,6 +7,7 @@ export async function lakeChecks(page,data,output){
   await enter(-115,-798);await photo('parked-four',[-112.75,149.65,-794],[5,2.6,2.2])
   const dock=data.docks['杉湖'],leg=data.routes.find(route=>route.start==='杉湖');await enter(dock[0],dock[2]);await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent.includes('杉湖'))
   const [x,y,z]=leg.path[0];await photo('painted-boat-dock',[x,y+.8,z],[8,4,6]);await page.keyboard.press('e')
+  if(leg.end!=='榕湖')return {samples:0,minimum:null,reason:`杉湖 → 榕湖已截航，下一站：${leg.end}`}
   return page.evaluate(async()=>{const {walk,stream}=window.viewer;let samples=0,minimum=Infinity,last=null;for(let step=0;step<4000;step++){
     walk.tick(.2);const probe=walk.boatClearance();if(!probe||probe.kind!=='boat')throw Error('not on sightseeing boat')
     if(Number.isFinite(probe.clearance)){samples++;minimum=Math.min(minimum,probe.clearance);last=probe}else if(samples)return {samples,minimum,last}
