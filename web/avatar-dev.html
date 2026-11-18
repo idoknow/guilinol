@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>avatar turntable</title>
+<style>body{margin:0;background:#cfd9d6}canvas{display:block}</style>
+<script type="module">
+import * as THREE from 'three'
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
+// Dev-only look-dev page: ?clip=walk&yaw=0.6&t=0.3 renders one frozen frame of the avatar.
+const q=new URLSearchParams(location.search)
+const renderer=new THREE.WebGLRenderer({antialias:true}); renderer.setSize(innerWidth,innerHeight); document.body.append(renderer.domElement)
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0xcfd9d6)
+scene.add(new THREE.HemisphereLight(0xd8e6e6,0x8a9172,1.7)); const sun=new THREE.DirectionalLight(0xfff0d8,2.1); sun.position.set(-.55,.62,.56); scene.add(sun)
+const cam=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,.1,50); cam.position.set(0,1.05,-4.6); cam.lookAt(0,.9,0)
+const ground=new THREE.Mesh(new THREE.CircleGeometry(1.2,32),new THREE.MeshStandardMaterial({color:0xb7b4a6})); ground.rotation.x=-Math.PI/2; scene.add(ground)
+const g=await new GLTFLoader().loadAsync('/avatar/figure.glb'); g.scene.rotation.y=Number(q.get('yaw')??0); scene.add(g.scene)
+g.scene.traverse(o=>{if(o.material)o.material.flatShading=true})
+const mixer=new THREE.AnimationMixer(g.scene); const clip=g.animations.find(c=>c.name===(q.get('clip')??'idle'))
+mixer.clipAction(clip).play(); mixer.setTime(Number(q.get('t')??0)*clip.duration)
+renderer.render(scene,cam); document.title='ready'
+</script>

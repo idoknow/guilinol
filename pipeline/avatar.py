@@ -1,8 +1,9 @@
-"""Build the walking avatar: an original CC0 low-poly traveller (斗笠 hat, 朱 jacket).
+"""Build the walking avatar: an original CC0 low-poly modern city walker (short hair, open shell jacket over a
+white tee, slim jeans, white sneakers, small daypack).
 
 Rigid flat-shaded parts on a small joint tree (hips → torso → head/arms, hips → thighs → shins),
 facing -Z with feet at the origin, 1.7 m tall without the hat. Clips: idle, walk, run, jump.
-Colours follow docs/style.md: a warm vermilion jacket reads against the 石绿/石青 landscape.
+Colours follow docs/style.md: a warm orange shell jacket reads against the green karst and jade water.
 """
 import json
 import math
@@ -12,8 +13,8 @@ from pathlib import Path
 import numpy as np
 
 COLORS = dict(  # sRGB hex → linear factors in material()
-    jacket=0xa9503c, sash=0xe6dfcc, trousers=0x4d5a57, skin=0xdcb48e, hat=0xc8a565,
-    hatBand=0x7a5a32, shoe=0x3a322b, bundle=0x46708a, hair=0x2a2624)
+    jacket=0xf09a4a, jacketDark=0xc06a2c, tee=0xf2efe8, jeans=0x55708f, skin=0xdcb48e, hair=0x1f1b19,
+    shoe=0xeeeae2, sole=0xc49a6c, pack=0x66737b, strap=0x343b40)
 
 binary = bytearray()
 views, accessors, nodes, meshes, materials, animations = [], [], [], [], [], []
@@ -106,30 +107,54 @@ def node(name, translation, mesh=None, children=()):
 
 
 # --- geometry (joint-local, hanging down from the pivot unless noted) ----------------------------
+# Body faces -Z; the back (daypack) is +Z.
 HIP_Y, KNEE, SHOULDER_Y = .9, .45, 1.43
-shin = part([('trousers', loft([ring(.07, -.38, 6), ring(.082, 0, 6)])),
-             ('shoe', box(.11, .08, .22, -.45, -.04))])
-thigh = part([('trousers', loft([ring(.085, -KNEE, 6), ring(.105, 0, 6)]))])
-forearm = part([('jacket', loft([ring(.05, -.2, 6), ring(.06, 0, 6)])),
-                ('skin', loft([ring(.038, -.3, 5), ring(.045, -.2, 5)]))])
-upperarm = part([('jacket', loft([ring(.06, -.29, 6), ring(.07, 0, 6)]))])
-# Torso from the waist (pivot) up: jacket flaring into a short skirt below the sash; bundle on the back (+Z).
-bundle = [(x, y, z+.16) for x, y, z in np.asarray(loft([ring(.11, .1, 6, (1, .55)), ring(.12, .3, 6, (1, .6)),
-                                                         ring(.07, .4, 6, (1, .5))])).reshape(-1, 3)]
+
+
+def shift(tris, dx=0., dy=0., dz=0.):
+    return [tuple((x+dx, y+dy, z+dz) for x, y, z in t) for t in tris]
+
+
+# Slim jeans and a chunky white sneaker with a gum sole (toe toward -Z).
+shin = part([('jeans', loft([ring(.062, -.4, 7), ring(.078, 0, 7)])),
+             ('shoe', loft([[(-.055, -.455, -.15), (-.055, -.455, .07), (.055, -.455, .07), (.055, -.455, -.15)],
+                            [(-.05, -.39, -.1), (-.05, -.38, .07), (.05, -.38, .07), (.05, -.39, -.1)]])),
+             ('sole', box(.12, .03, .24, -.48, -.04))])
+thigh = part([('jeans', loft([ring(.075, -KNEE, 7), ring(.1, 0, 7)]))])
+forearm = part([('jacket', loft([ring(.05, -.2, 7), ring(.058, 0, 7)])),
+                ('jacketDark', loft([ring(.052, -.22, 7), ring(.052, -.19, 7)], False, False)),
+                ('skin', loft([ring(.036, -.3, 6), ring(.042, -.21, 6)]))])
+upperarm = part([('jacket', loft([ring(.058, -.29, 7), ring(.068, -.03, 7), ring(.045, .03, 7)]))])
+# Torso from the waist (pivot) up: jeans waistband, then an open shell jacket over a tee, hood bunched at the
+# collar, a small daypack on the back with shoulder straps crossing the front.
+oval = (1, .66)
 torso = part([
-    ('jacket', loft([ring(.2, -.2, 8, (1, .78), math.pi/8), ring(.165, -.04, 8, (1, .72), math.pi/8)], cap_top=False)),
-    ('sash', loft([ring(.165, -.04, 8, (1, .72), math.pi/8), ring(.16, .05, 8, (1, .72), math.pi/8)], False, False)),
-    ('jacket', loft([ring(.16, .05, 8, (1, .72), math.pi/8), ring(.2, .4, 8, (1, .68), math.pi/8),
-                     ring(.13, .5, 8, (1, .7), math.pi/8)])),
-    ('bundle', [tuple(map(tuple, bundle[k:k+3])) for k in range(0, len(bundle), 3)]),
+    ('jeans', loft([ring(.165, -.2, 8, oval, math.pi/8), ring(.158, -.1, 8, oval, math.pi/8)], cap_top=False)),
+    ('jacket', loft([ring(.172, -.12, 8, oval, math.pi/8), ring(.162, .05, 8, oval, math.pi/8),
+                     ring(.19, .36, 8, oval, math.pi/8), ring(.125, .5, 8, oval, math.pi/8)])),
+    ('jacketDark', loft([ring(.176, -.13, 8, oval, math.pi/8), ring(.174, -.09, 8, oval, math.pi/8)], False, False)),
+    # Tee showing through the open front.
+    ('tee', box(.11, .38, .02, -.08, -.112)),
+    ('jacketDark', box(.012, .5, .022, -.12, -.118)),
+    # Hood rolled behind the neck.
+    ('jacket', shift(loft([ring(.11, .44, 8, (1, .55)), ring(.13, .52, 8, (1, .6)), ring(.07, .57, 8, (1, .5))]),
+                     dz=.06)),
+    # Daypack: rounded box on the back, darker straps over the shoulders and down the chest.
+    ('pack', shift(loft([ring(.13, .02, 8, (1, .5), math.pi/8), ring(.14, .3, 8, (1, .55), math.pi/8),
+                         ring(.1, .42, 8, (1, .45), math.pi/8)]), dz=.15)),
+    ('strap', shift(box(.2, .045, .05, .05, 0), dz=.2)),
+    ('strap', shift(box(.035, .36, .016, .1, -.118), dx=-.085)),
+    ('strap', shift(box(.035, .36, .016, .1, -.118), dx=.085)),
 ])
-# Head pivot at the neck; 斗笠: wide shallow cone with a band.
+# Head pivot at the neck: short textured hair with a side-swept fringe, no hat.
 head = part([
     ('skin', loft([ring(.045, 0, 6), ring(.05, .06, 6)], False, False)),
-    ('skin', loft([ring(.07, .05, 7), ring(.1, .12, 7), ring(.095, .2, 7), ring(.06, .26, 7)])),
-    ('hair', loft([ring(.1, .17, 7, phase=.2), ring(.08, .25, 7, phase=.2)], False, False)),
-    ('hatBand', loft([ring(.105, .22, 10), ring(.1, .26, 10)], False, False)),
-    ('hat', loft([ring(.36, .2, 12), ring(.3, .24, 12), ring(.012, .4, 12)])),
+    ('skin', loft([ring(.07, .05, 8), ring(.098, .12, 8), ring(.094, .2, 8), ring(.06, .26, 8)])),
+    ('hair', shift(loft([ring(.1, .13, 9, (1, 1.05), .3), ring(.108, .2, 9, (1, 1.05), .3), ring(.09, .26, 9, (1, 1.02), .6),
+                         ring(.05, .29, 9, phase=.9)], cap_bottom=False), dz=.012)),
+    # Side-swept fringe: a short brim of hair across the forehead, lower on the left.
+    ('hair', loft([[(-.095, .2, -.06), (-.05, .195, -.098), (.03, .215, -.102), (.09, .23, -.07)],
+                   [(-.095, .25, -.05), (-.05, .255, -.085), (.03, .26, -.088), (.09, .26, -.06)]], False, False)),
 ])
 
 legs, arms = [], []
@@ -137,7 +162,7 @@ for side, sign in [('L', -1), ('R', 1)]:
     shin_node = node(f'Shin{side}', (0, -KNEE, 0), shin)
     legs.append(node(f'Thigh{side}', (sign*.1, -.02, 0), thigh, [shin_node]))
     fore_node = node(f'Forearm{side}', (0, -.29, 0), forearm)
-    arms.append(node(f'Arm{side}', (sign*.21, SHOULDER_Y-HIP_Y-.04, 0), upperarm, [fore_node]))
+    arms.append(node(f'Arm{side}', (sign*.19, SHOULDER_Y-HIP_Y-.07, 0), upperarm, [fore_node]))
 head_node = node('Head', (0, .52, 0), head)
 torso_node = node('Torso', (0, .04, 0), torso, [head_node]+arms)
 hips = node('Hips', (0, HIP_Y, 0), None, [torso_node]+legs)
