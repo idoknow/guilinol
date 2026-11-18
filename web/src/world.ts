@@ -57,7 +57,8 @@ export async function overview(manifest:Manifest) {
   return {mesh,toggle}
 }
 
-const buildings = new THREE.MeshStandardMaterial({color:look.building,roughness:look.roughness,metalness:look.metalness})
+const buildings = new THREE.MeshStandardMaterial({vertexColors:true,roughness:look.roughness,metalness:look.metalness})
+const wall = new THREE.Color(look.wall), roof = new THREE.Color(look.roof)
 export async function detail(tile:Tile, signal:AbortSignal) {
   const compressed = await fetchAsset(tile.file,signal)
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
@@ -93,6 +94,10 @@ export async function detail(tile:Tile, signal:AbortSignal) {
     const meters = Float32Array.from(positions,(value,index)=>value/(index%3===1?10:100))
     walls.setAttribute('position',new THREE.BufferAttribute(meters,3))
     walls.setAttribute('normal',new THREE.BufferAttribute(normals,3,true))
+    // 白墙灰瓦: upward faces take the tile grey, walls stay lime-white.
+    const colors = new Float32Array(vertices*3)
+    for(let index=0;index<vertices;index++) (normals[index*3+1]>90?roof:wall).toArray(colors,index*3)
+    walls.setAttribute('color',new THREE.BufferAttribute(colors,3))
     walls.setIndex(new THREE.BufferAttribute(indices,1))
     group.add(new THREE.Mesh(walls,buildings))
   }
