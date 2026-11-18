@@ -1,5 +1,6 @@
 raw/
 public/world/
+public/basis/
 node_modules/
 dist/
 __pycache__/

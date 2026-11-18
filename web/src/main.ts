@@ -14,6 +14,7 @@ import {windowLight} from './look/buildings'
 import {skyClock} from './ui/sky'
 import type {Host} from './play/host'
 import {bootDismiss, bootLoaded, bootProgress} from './ui/boot'
+import {loadTiles} from './look/tiles'
 
 installAtmosphere()
 async function start() {
@@ -61,6 +62,7 @@ async function start() {
   setPreset(camera,params.get('cam'))
   const radius = Number(params.get('radius')??480)
   const stream = new Stream(scene,manifest,base,THREE.MathUtils.clamp(Number.isFinite(radius)?radius:480,192,1600),camera)
+  let updateLandmarks:((eye:THREE.Vector3)=>void)|undefined
   const output = document.querySelector('output')!
   let previous=0, first=0, frame=0, sum=0, samples=0
   const stats = {firstMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0}
@@ -124,7 +126,10 @@ async function start() {
       void import('./play').then(mod=>{tour=mod.play(host)})
       setTimeout(()=>void import('./ui/about').then(mod=>mod.aboutPanel()),500)
     }
+    if(frame===2&&manifest.landmarks?.length)void import('./landmarks').then(module=>{updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks)})
+    if(frame===2)void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))
     if(first&&!switching) {
+      updateLandmarks?.(walker?.active?walker.position:camera.position)
       stream.tick(walker?.active?walker.position:camera.position)
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
     }

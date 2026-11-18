@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "basis": "node scripts/basis.mjs",
+    "predev": "npm run basis",
+    "prebuild": "npm run basis",
+    "landmarks": "uv run --locked python pipeline/pack_landmarks.py",
     "world": "uv run --locked python pipeline/world.py",
     "credits": "node scripts/photo-credits.mjs",
     "og": "node scripts/og.mjs",
@@ -12,7 +16,9 @@
     "preview": "vite preview web --config web/vite.config.ts",
     "verify:flight": "node scripts/flight.mjs",
     "verify:atlas": "node --experimental-strip-types scripts/atlas.mjs",
-    "verify:walk": "node scripts/walk.mjs",
+    "verify:walk": "npm run verify:walk:quick",
+    "verify:walk:quick": "node scripts/walk-quick.mjs",
+    "verify:walk:full": "node scripts/walk.mjs",
     "verify:ride": "node scripts/ride.mjs",
     "perf": "node scripts/perf.mjs",
     "shoot": "node scripts/shoot.mjs"

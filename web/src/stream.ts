@@ -5,6 +5,7 @@ import {currentMirrorLevel, isWaterInView} from './look/water'
 import {detail, type Manifest, type Tile, overview} from './world'
 
 export class Stream {
+  landmarks:import('./landmarks').LoadedLandmarks=new Map()
   loaded = new Map<Tile,Awaited<ReturnType<typeof detail>>>()
   pending = new Map<Tile,AbortController>()
   failures = new Map<Tile,number>()

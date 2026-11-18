@@ -6,7 +6,7 @@ import {fetchAsset,type Manifest,type Tile} from '../world'
 import {walkConfig as cfg} from './config'
 
 type Outline = import('../buildings').Building
-type Kind = 'ground'|'overview'|'deck'|'building'|'peak'|'tree'|'rail'|'sidewalk'
+type Kind = 'ground'|'overview'|'deck'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
 type Region = {fine:boolean,colliders:R.Collider[],rings:Outline[]}
 const identity = {x:0,y:0,z:0,w:1}, down = {x:0,y:-1,z:0}
 const candidates = [{dx:0,dz:0}]
@@ -59,8 +59,28 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function add(desc:R.ColliderDesc,kind:Kind){const coll=world.createCollider(desc);kinds.set(coll.handle,kind);return coll}
   function remove(coll:R.Collider){kinds.delete(coll.handle);world.removeCollider(coll,false)}
   const trunks=new Map<import('../forest').Tree,R.Collider>()
+  const landmarks=new Map<THREE.Group,R.Collider[]>()
   function sync(east:number,south:number){
     let changed=false
+    const nearLandmarks=new Set<THREE.Group>()
+    for(const [entry,root] of stream.landmarks){
+      if(entry.collision==='none'||Math.hypot(east-root.position.x,south-root.position.z)>cfg.collisionRadius+entry.sphere[3])continue
+      nearLandmarks.add(root);if(landmarks.has(root))continue
+      const colliders:R.Collider[]=[]
+      if(entry.collision==='box'){
+        const bounds=new THREE.Box3().setFromObject(root,true),center=bounds.getCenter(new THREE.Vector3()),half=bounds.getSize(new THREE.Vector3()).multiplyScalar(.5)
+        colliders.push(add(R.ColliderDesc.cuboid(half.x,half.y,half.z).setTranslation(center.x,center.y,center.z),'landmark'))
+      }else root.traverse(node=>{
+        if(!(node instanceof THREE.Mesh))return
+        let parent:THREE.Object3D|null=node;while(parent&&parent!==root&&!/^collision/i.test(parent.name))parent=parent.parent
+        if(!parent||parent===root)return
+        const pos=node.geometry.getAttribute('position'),vertices=new Float32Array(pos.count*3),point=new THREE.Vector3()
+        for(let index=0;index<pos.count;index++)point.fromBufferAttribute(pos,index).applyMatrix4(node.matrixWorld).toArray(vertices,3*index)
+        colliders.push(add(R.ColliderDesc.trimesh(vertices,node.geometry.index?Uint32Array.from(node.geometry.index.array):Uint32Array.from({length:pos.count},(_,index)=>index)),'landmark'))
+      })
+      landmarks.set(root,colliders);changed=true
+    }
+    for(const [root,colliders] of landmarks)if(!nearLandmarks.has(root)){colliders.forEach(remove);landmarks.delete(root);changed=true}
     for(const [tree,collider] of trunks)if(Math.hypot(east-tree.x,south-tree.z)>48){remove(collider);trunks.delete(tree);changed=true}
     for(const tile of manifest.chunks){
       const near=Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))<=cfg.collisionRadius
@@ -136,6 +156,6 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     }return null
   }
   function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)}
-  function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear()}
+  function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear()}
   return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,surface,wet,insideHouse,findWalkableSpawn}
 }

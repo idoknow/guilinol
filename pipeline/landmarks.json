@@ -1,0 +1,3 @@
+[
+  {"id":"placeholder","name":"十字街占位","anchor":[110.2912601,25.28153405],"model":"landmarks/placeholder.glb","collision":"mesh","replace":{"polygon":[[110.29124,25.28152],[110.29128,25.28152],[110.29128,25.28155],[110.29124,25.28155]]}}
+]

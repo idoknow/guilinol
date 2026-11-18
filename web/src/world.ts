@@ -11,6 +11,7 @@ import type {Peaks} from './peaks'
 interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number}
 export interface Manifest {
+  landmarks?:import('./landmarks').Landmark[]
   version:number; extent:[number,number,number,number]; grid:number; chunkSize:number; chunks:Tile[];
   peaks:Peaks; atlas:Asset; vehicles?:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset}
 }
