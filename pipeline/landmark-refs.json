@@ -1462,6 +1462,48 @@
     "license": "CC0",
     "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_11.jpg",
     "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5b/%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_11.jpg/1280px-%E6%A1%82%E6%9E%97%E8%A7%A3%E6%94%BE%E6%A1%A5%E5%A4%9C%E6%99%AF_11.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Puente Jiefang",
+    "year": 2025,
+    "dateTaken": "2025-03-29",
+    "page": "https://www.flickr.com/photos/64304536@N04/54636305581/",
+    "viewOnly": true
+   },
+   {
+    "title": "guilin jiefang bridge",
+    "year": 2022,
+    "dateTaken": "2022-09-25",
+    "page": "https://www.flickr.com/photos/148340824@N05/52410438123/",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林解放桥 · 游客图组 166232062（待逐张核对）",
+    "year": null,
+    "published": "2021-04-15",
+    "page": "https://you.ctrip.com/sight/guilin28/1830869.html",
+    "commentId": 166232062,
+    "images": [
+     "https://dimg04.c-ctrip.com/images/0105q120008k7lq327A03_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0100e120008k7q13j116B_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0101k120008k7lwms281E_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/01047120008k7jexj0E10_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0101h120008k7qxs19622_W_640_10000.jpg?proc=autoorient"
+    ],
+    "viewOnly": true
+   },
+   {
+    "title": "桂林解放桥 · 游客图组 170100172（待逐张核对）",
+    "year": null,
+    "published": "2022-04-01",
+    "page": "https://you.ctrip.com/sight/guilin28/1830869.html",
+    "commentId": 170100172,
+    "images": [
+     "https://dimg04.c-ctrip.com/images/0106z120009e2gaje566A_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0105n120009e2c4nfEB8C_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0100t120009e2f8qc42BC_W_640_10000.jpg?proc=autoorient"
+    ],
+    "viewOnly": true
    }
   ]
  },
@@ -1472,7 +1514,50 @@
    "way/702352884"
   ],
   "group": "E",
-  "refs": []
+  "refs": [
+   {
+    "title": "Xiaoyao Tower",
+    "year": 2025,
+    "dateTaken": "2025-10-03",
+    "page": "https://www.flickr.com/photos/101561334@N08/54829699172/",
+    "viewOnly": true
+   },
+   {
+    "title": "XiaoYao Tower, Guilin, GuangXi. ( 逍遥楼, 桂林，广西）",
+    "year": 2025,
+    "dateTaken": "2025-01-28",
+    "page": "https://www.flickr.com/photos/35427444@N08/54456132154/",
+    "viewOnly": true
+   },
+   {
+    "title": "XiaoYao Tower, Guilin, GuangXi. ( 逍遥楼, 桂林，广西）",
+    "year": 2025,
+    "dateTaken": "2025-01-28",
+    "page": "https://www.flickr.com/photos/35427444@N08/54455941526/",
+    "viewOnly": true
+   },
+   {
+    "title": "Historic Architecture - Xiaoyao (Carefree) Tower, Guilin, Guangxi, China - 桂林逍遙樓",
+    "year": 2025,
+    "dateTaken": "2025-03-07",
+    "page": "https://www.flickr.com/photos/198657403@N05/54477426984/",
+    "viewOnly": true
+   },
+   {
+    "title": "XiaoYao Tower, Guilin, GuangXi. ( 逍遥楼, 桂林，广西）",
+    "year": 2025,
+    "dateTaken": "2025-01-28",
+    "page": "https://www.flickr.com/photos/35427444@N08/54456195893/",
+    "viewOnly": true
+   },
+   {
+    "title": "XiaoYao Tower, Guilin, GuangXi. ( 逍遥楼, 桂林，广西）",
+    "year": 2025,
+    "dateTaken": "2025-01-28",
+    "page": "https://www.flickr.com/photos/35427444@N08/54455097497/",
+    "viewOnly": true
+   }
+  ]
  },
  {
   "id": "fubo",
@@ -1524,6 +1609,44 @@
     "license": "CC BY 3.0",
     "page": "https://commons.wikimedia.org/wiki/File:%E4%BC%8F%E6%B3%A2%E5%B1%B1%E5%85%AC%E5%9C%92_Fuposhan_Park_-_panoramio.jpg",
     "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/70/%E4%BC%8F%E6%B3%A2%E5%B1%B1%E5%85%AC%E5%9C%92_Fuposhan_Park_-_panoramio.jpg/1280px-%E4%BC%8F%E6%B3%A2%E5%B1%B1%E5%85%AC%E5%9C%92_Fuposhan_Park_-_panoramio.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Landscape - Blessing within Fubo (Wave Subduing) Mountain. Guilin, Gangxi, China 廣西桂林伏波山 - [福在山中]",
+    "year": 2025,
+    "dateTaken": "2025-03-06",
+    "page": "https://www.flickr.com/photos/198657403@N05/54477426434/",
+    "viewOnly": true
+   },
+   {
+    "title": "Sword-Testing Stone at Fubo (Wave Subduing) Mountain. Guilin, Gangxi, China 廣西桂林伏波山 - 試劍石",
+    "year": 2025,
+    "dateTaken": "2025-03-06",
+    "page": "https://www.flickr.com/photos/198657403@N05/54477505783/",
+    "viewOnly": true
+   },
+   {
+    "title": "伏波山 · 游客图组 877732381（待逐张核对）",
+    "year": null,
+    "published": "2026-11-18",
+    "page": "https://you.ctrip.com/sight/guilin28/2883.html",
+    "commentId": 877732381,
+    "images": [
+     "https://dimg04.c-ctrip.com/images/0EQ4t224x9bbfikck7A80_W_640_10000.jpg?proc=autoorient"
+    ],
+    "viewOnly": true
+   },
+   {
+    "title": "伏波山 · 游客图组 818273744（待逐张核对）",
+    "year": null,
+    "published": "2026-09-07",
+    "page": "https://you.ctrip.com/sight/guilin28/2883.html",
+    "commentId": 818273744,
+    "images": [
+     "https://dimg04.c-ctrip.com/images/1mh6y12000trycf7aF77F_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/1mh2e12000try84946FA0_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/1mh1x12000try8s8c25FE_W_640_10000.jpg?proc=autoorient"
+    ],
+    "viewOnly": true
    }
   ]
  },
@@ -1541,6 +1664,48 @@
     "license": "CC BY-SA 4.0",
     "page": "https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E5%8F%A0%E5%BD%A9%E5%B1%B1%E8%BF%9C%E7%9C%BA%E4%BC%8F%E6%B3%A2%E5%B1%B1.jpg",
     "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/08/%E6%A1%82%E6%9E%97%E5%8F%A0%E5%BD%A9%E5%B1%B1%E8%BF%9C%E7%9C%BA%E4%BC%8F%E6%B3%A2%E5%B1%B1.jpg/1280px-%E6%A1%82%E6%9E%97%E5%8F%A0%E5%BD%A9%E5%B1%B1%E8%BF%9C%E7%9C%BA%E4%BC%8F%E6%B3%A2%E5%B1%B1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+   },
+   {
+    "title": "Sunrise over Diecai Hill",
+    "year": 2021,
+    "dateTaken": "2021-01-21",
+    "page": "https://www.flickr.com/photos/105498794@N02/50860763961/",
+    "viewOnly": true
+   },
+   {
+    "title": "叠彩山 · 游客图组 228884132（待逐张核对）",
+    "year": null,
+    "published": "2025-10-16",
+    "page": "https://you.ctrip.com/sight/guilin28/2879.html",
+    "commentId": 228884132,
+    "images": [
+     "https://dimg04.c-ctrip.com/images/0EQ1612000p2uy5sb0F86_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ1112000p2uzxoc5A4D_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ0a12000p2v2ul404E3_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ4l12000p2uzxok1046_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ5112000p2vao6506BA_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ1m12000p2vcmv3F789_W_640_10000.jpg?proc=autoorient"
+    ],
+    "viewOnly": true
+   },
+   {
+    "title": "叠彩山 · 游客图组 214440934（待逐张核对）",
+    "year": null,
+    "published": "2025-06-12",
+    "page": "https://you.ctrip.com/sight/guilin28/2879.html",
+    "commentId": 214440934,
+    "images": [
+     "https://dimg04.c-ctrip.com/images/0EQ6j12000lcdl2um729A_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ2212000lcdnfwa276F_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ3a12000lcdl563F572_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ4u12000lce20c3846A_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ0812000lcdulysF946_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ3912000lcei20dED81_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ5q12000lccjfnnB87B_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ5d12000lcd1ve014D0_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ4o12000lcdpewy2C70_W_640_10000.jpg?proc=autoorient"
+    ],
+    "viewOnly": true
    }
   ]
  },
@@ -1793,7 +1958,43 @@
    "way/674909120"
   ],
   "group": "F",
-  "refs": []
+  "refs": [
+   {
+    "title": "Mulong Pagodas, Guilin, GuangXi. （木龍塔， 桂林，广西）",
+    "year": 2025,
+    "dateTaken": "2025-01-29",
+    "page": "https://www.flickr.com/photos/35427444@N08/54455955196/",
+    "viewOnly": true
+   },
+   {
+    "title": "木龙湖景区 · 游客图组 203948382（待逐张核对）",
+    "year": null,
+    "published": "2025-02-12",
+    "page": "https://you.ctrip.com/sight/guilin28/140482.html",
+    "commentId": 203948382,
+    "images": [
+     "https://dimg04.c-ctrip.com/images/1mh2x12000ih9rr3fB4B8_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/1mh6r12000ih951234852_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/1mh1w12000ih9z8nh5A54_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/1mh1712000ih9vst960EB_W_640_10000.jpg?proc=autoorient"
+    ],
+    "viewOnly": true
+   },
+   {
+    "title": "木龙湖景区 · 游客图组 203567967（待逐张核对）",
+    "year": null,
+    "published": "2025-02-08",
+    "page": "https://you.ctrip.com/sight/guilin28/140482.html",
+    "commentId": 203567967,
+    "images": [
+     "https://dimg04.c-ctrip.com/images/0EQ1412000iebnh7h49CA_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ4w12000iebth9c8046_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ5x12000ieboges175B_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ0712000iecaexg206F_W_640_10000.jpg?proc=autoorient"
+    ],
+    "viewOnly": true
+   }
+  ]
  },
  {
   "id": "huaqiao",
@@ -1802,7 +2003,53 @@
    "way/246520676"
   ],
   "group": "F",
-  "refs": []
+  "refs": [
+   {
+    "title": "七星景区 · 游客图组 827030919（待逐张核对）",
+    "year": null,
+    "published": "2026-09-15",
+    "page": "https://you.ctrip.com/sight/guilin28/2882.html",
+    "commentId": 827030919,
+    "images": [
+     "https://dimg04.c-ctrip.com/images/0EQ3n12000tuwvqsvEEF5_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ2r12000tuwvt3y6ABC_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ4i12000tuwrad01EA8_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ3012000tuwqxj91B54_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ6612000tuwwq1d4AF6_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ4012000tuwiv122E14_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ0r12000tuw9snk1C1D_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ4w12000tuwiv1305A5_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ0t12000tuwy5axD7C7_W_640_10000.jpg?proc=autoorient"
+    ],
+    "viewOnly": true
+   },
+   {
+    "title": "七星景区 · 游客图组 680644532（待逐张核对）",
+    "year": null,
+    "published": "2026-04-24",
+    "page": "https://you.ctrip.com/sight/guilin28/2882.html",
+    "commentId": 680644532,
+    "images": [
+     "https://dimg04.c-ctrip.com/images/0EQ3j12000s95rfy8F20D_W_640_10000.jpg?proc=autoorient",
+     "https://dimg04.c-ctrip.com/images/0EQ5v12000s95pgqv95A8_W_640_10000.jpg?proc=autoorient"
+    ],
+    "viewOnly": true
+   },
+   {
+    "title": "Guilin Hua Qiao 2012.09.28 16-54-54.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Hua_Qiao_2012.09.28_16-54-54.jpg",
+    "viewOnly": true
+   },
+   {
+    "title": "Guilin Hua Qiao 2012.09.28 16-57-25.jpg",
+    "year": 2012,
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Guilin_Hua_Qiao_2012.09.28_16-57-25.jpg",
+    "viewOnly": true
+   }
+  ]
  },
  {
   "id": "zhongshan_road",

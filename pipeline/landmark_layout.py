@@ -56,3 +56,4 @@ class Layout:
                     rotation=entry.get('rotation',0),collision=entry['collision'],bytes=model.stat().st_size,
                     **json.loads(model.with_suffix('.json').read_text()))))
         self.exclude = unary_union(areas)
+        self.tree_exclude = unary_union([self.exclude, *(region for region, _ in self.flatten)]).buffer(2)
