@@ -55,6 +55,7 @@ async function start() {
   resize(); window.addEventListener('resize',resize)
   bootProgress('载入山体', 45)
   const [base,peaks] = await basePromise
+  peaks.loadModels(renderer)
   scene.add(base.mesh,peaks)
   bootProgress('载入街区', 78)
   const params = new URLSearchParams(location.search)

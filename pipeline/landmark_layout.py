@@ -20,6 +20,7 @@ class Layout:
         self.flatten = []
         areas = []
         osm = {f"{item['type']}/{item['id']}":item for item in load_osm()}
+        peak_models = {peak['model'] for peak in json.loads((root/'peaks.json').read_text()) if peak.get('model')}
         for entry in json.loads((root/'landmarks.json').read_text()):
             anchor = entry['anchor']
             if isinstance(anchor,str):
@@ -51,6 +52,8 @@ class Layout:
                 patch = entry['flatten']
                 self.flatten.append((polygon(patch['polygon']),patch['elevation']))
             model = root.parent/'public'/entry['model']
+            if entry['model'] in peak_models:
+                continue
             if model.exists():
                 self.entries.append((x,z,dict(id=entry['id'],name=entry['name'],file=entry['model'],
                     rotation=entry.get('rotation',0),collision=entry['collision'],bytes=model.stat().st_size,
