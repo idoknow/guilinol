@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import {look} from './config'
 
-const hex = (value:number)=>{const c=new THREE.Color(value);return `vec3(${c.r.toFixed(4)},${c.g.toFixed(4)},${c.b.toFixed(4)})`}
+// three applies fog after colorspace conversion, so fog colours are baked in sRGB output space.
+const hex = (value:number)=>{const c=new THREE.Color().setHex(value,THREE.SRGBColorSpace).convertLinearToSRGB();return `vec3(${c.r.toFixed(4)},${c.g.toFixed(4)},${c.b.toFixed(4)})`}
 
 // Replace three's linear fog with layered aerial perspective: exponential distance fog,
 // extra density near the valley floor, and a colour that walks from warm haze to 石青 blue
@@ -27,7 +28,7 @@ export function installAtmosphere() {
 export function sky() {
   const sun = new THREE.Vector3(...look.sunDirection).normalize()
   const material = new THREE.ShaderMaterial({
-    side:THREE.BackSide, depthWrite:false, fog:false,
+    side:THREE.BackSide, depthWrite:false, fog:false, toneMapped:false,
     uniforms:{zenith:{value:new THREE.Color(look.skyZenith)},horizon:{value:new THREE.Color(look.skyHorizon)},
       glow:{value:new THREE.Color(look.skyGlow)},sun:{value:sun}},
     vertexShader:`varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; }`,
@@ -38,7 +39,6 @@ export function sky() {
         float halo = pow(max(dot(normalize(vDir), sun), 0.0), 6.0);
         col = mix(col, glow, halo * 0.45 * (1.0 - up * 0.6));
         gl_FragColor = vec4(col, 1.0);
-        #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
   })
