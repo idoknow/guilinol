@@ -16,7 +16,7 @@ try{
   for(const mobile of [false,true]){
     const page=await browser.newPage({viewport:mobile?{width:420,height:740}:{width:800,height:450},hasTouch:mobile,isMobile:mobile})
     page.on('pageerror',error=>errors.push(error.message))
-    await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?mode=walk&verify&radius=480`)
+    await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?mode=walk&verify&probeSuspendedRide&radius=480`)
     await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
     if(!mobile){lake=await lakeChecks(page,data,output);console.log('painted boat',lake)}
     async function fixture(x,z){assert(await page.evaluate(async([x,z])=>{const walker=window.viewer.walk;walker.leave();return walker.enter(x,z,0,'ride-fixture')},[x,z]))}
@@ -54,4 +54,5 @@ try{
   }
   assert.deepEqual(errors,[])
   assert(lake.samples>0&&lake.minimum>=.3,lake.reason??`insufficient bridge clearance: ${lake.minimum} m`)
+  assert(!data.routes.find(route=>route.start==='榕湖'&&route.end==='榕湖西码头')?.suspended,'glass bridge service suspended')
 }finally{await browser.close();await server.close()}
