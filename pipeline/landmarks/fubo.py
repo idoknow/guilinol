@@ -53,9 +53,9 @@ def grotto(model,half,height,depth):
 
 def build(model):
     rings,tip=mountain('伏波山');model.pose=(*tip,0);pavilion(model,5.2,3.6)
-    east=rings[1,:,0].argmax();base=rings[1,east].copy();base[0]+=5
-    model.pose=(*base,math.pi/2);grotto(model,5.3,4.2,6)
-    model.beam([1,.35,3],[.8,4.1,3.4],.72,'stone',7,True)
+    base=rings[1,0].copy();base[0]=rings[2,0,0]
+    model.pose=(*base,math.pi/2)
+    model.beam([1,-.85,6],[.8,3.5,6.4],.72,'granite',7,True)
     model.pose=(base[0]+1.5,base[1],base[2]+15,0);pavilion(model,6.4,4)
     model.pose=(base[0]-1,base[1],base[2]+31,0)
     model.arcade(0,0,14,2.7,4.3,[0],2.3,'brick');model.swept_roof(0,4.45,0,16,5,2.1)
@@ -67,25 +67,11 @@ def build(model):
         model.box(shore,base[1]-.34,south,3.25,.34,2.04,'wood',True)
         model.box(shore+1.49,base[1],south,.14,1.08,.14,'red',True)
         model.box(shore+1.49,base[1]+.98,south,.14,.14,2.14,'wood',True)
-    # Rock mantle follows the existing east wall, leaving the cave aperture free.
-    columns=83 if model.detail else 16;rows=52 if model.detail else 9
-    vertices=[];faces=[];colors=[]
-    for row in range(rows+1):
-        layer=1+8*row/rows;lower=int(layer);weight=layer-lower
-        for col in range(columns+1):
-            phase=(east+(col/columns-.5)*29)%rings.shape[1];idx=int(phase);frac=phase-idx
-            strip=rings[:,idx]*(1-frac)+rings[:,(idx+1)%rings.shape[1]]*frac
-            point=strip[lower]*(1-weight)+strip[min(11,lower+1)]*weight
-            z=point[2];y=point[1]
-            bed=math.sin(y*2.2+.56*math.sin(z*.27)+z*.09)
-            stain=max(0,math.cos(z*.41+.3*math.sin(y*.27)))**9
-            point[0]+=1.1+.8*bed+.58*math.sin(z*.75+y*1.17)
-            shade=int(186+24*bed-40*stain+9*math.sin(z*2+y))
-            colors.append([shade,shade-2,shade-6,255])
-            vertices.append(point)
-            if row and col:
-                at=len(vertices)-1;faces.extend([[at-columns-2,at-1,at],[at-columns-2,at,at-columns-1]])
-    model.mesh(vertices,faces,np.asarray(colors,dtype=np.uint8))
+        if model.detail:
+            for offset in np.linspace(-.88,.88,8):
+                model.box(shore,base[1],south+offset,3.28,.06,.22,'wood')
+                model.box(shore+1.49,base[1]+.12,south+offset,.065,.82,.065,'red')
+            for side in (-1,1):model.beam([shore+side*1.25,base[1]-4,south],[shore+side*1.25,base[1]-.3,south],.21,'wood',8)
 
 
 if __name__=='__main__':generate('fubo',build,'F')

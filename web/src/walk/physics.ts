@@ -130,9 +130,9 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   }
   const tiles=new Map(manifest.chunks.map(tile=>[`${tile.x},${tile.z}`,tile]))
   const tileAt=(east:number,south:number)=>tiles.get(`${Math.floor(east/256)*256},${Math.floor(south/256)*256}`)
-  function surface(east:number,south:number,kind:Kind){
-    const hit=world.castRayAndGetNormal(new R.Ray({x:east,y:4000,z:south},down),6000,false,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)
-    return hit?{y:4000-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y)))}:null
+  function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
+    const hit=world.castRayAndGetNormal(new R.Ray({x:east,y:origin,z:south},down),reach,false,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)
+    return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y)))}:null
   }
   function wet(east:number,south:number){const tile=tileAt(east,south),data=tile&&stream.loaded.get(tile);if(!tile||!data)return true
     const at=Math.round((south-tile.z)/4)*65+Math.round((east-tile.x)/4)

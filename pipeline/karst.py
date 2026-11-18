@@ -52,6 +52,17 @@ def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, f
             height = np.minimum(ground,floor)-4
         elif level==1:
             height = np.minimum(height,ground_at(east+radius*np.cos(angles),south+radius*np.sin(angles))+4)
+        if peak['name']=='伏波山':
+            river=np.clip((np.cos(angles)-.08)/.68,0,1)
+            fold=1.7*np.sin(9*angles+fraction)+.8*np.sin(23*angles-3*fraction)
+            radius+=river*(5*np.sin(np.pi*fraction)+fold+4*fraction)
+            mouth=np.exp(-(np.sin(angles/2)/.15)**4)*river
+            if level==1:
+                radius-=mouth*12
+                height+=mouth*1.2
+            elif level==2:
+                height-=mouth*4.3
+                radius+=mouth*2
         vertices.extend(zip(east+radius*np.cos(angles)+lean_x*fraction**2, height,
                             south+radius*np.sin(angles)+lean_z*fraction**2))
         if level:
@@ -172,6 +183,7 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
     terrain[:] = original
     ground_at = sampler(original)
     skirt_at = sampler(minimum_filter(original,size=17,mode='nearest'))
+    trail_points=[]
     for entry,peak,cx,cz,radii,floor in shapes:
         phases = np.random.default_rng(peak.get('seed',peak.get('osm'))).uniform(0,2*np.pi,3)
         for far in [False,True]:
@@ -180,8 +192,14 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
             footprints.append(Polygon(data[:segments][:,[0,2]]))
             if not far:
                 imprint(terrain,left,top,data[faces,:3])
+                if entry['name']=='伏波山':
+                    rows,cols=np.ogrid[:terrain.shape[0],:terrain.shape[1]]
+                    shore=(left+cols*GRID>cx+12)&(left+cols*GRID<cx+65)&(abs(top+rows*GRID-cz)<22)
+                    terrain[shore]=original[shore]
                 if entry['name']=='明月峰':
                     faces=wind_cave.cut(data,faces,terrain,left,top,GRID)
+                    path=wind_cave.trail(data[:-1,:3].reshape(12,128,3),data[-1,:3])
+                    trail_points=[path(fraction) for fraction in np.linspace(0,1,600)]
                 if mountain_trees is not None:
                     rng = np.random.default_rng(peak.get('seed',peak.get('osm')))
                     triangles = data[faces]
@@ -208,5 +226,9 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
             payload.extend(np.rint(data[:,6:]*255).astype('u1').tobytes())
     compressed = gzip.compress(payload,compresslevel=6,mtime=0)
     terrain[wet] = dem[wet]
+    for px,py,pz in trail_points:
+        col,row=round((px-left)/GRID),round((pz-top)/GRID)
+        window=np.s_[row-2:row+3,col-2:col+3]
+        terrain[window]=np.minimum(terrain[window],round((py-.65)*10))
     (output/'peaks.bin').write_bytes(compressed)
     return dict(file='peaks.bin',bytes=len(compressed),autoCatalog=auto_file,entries=entries), footprints

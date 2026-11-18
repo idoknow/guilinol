@@ -1,3 +1,4 @@
+import math
 import numpy as np
 
 
@@ -29,3 +30,30 @@ def cut(data, faces, terrain, left, top, grid):
         start = 2*(RING*128+index-1)
         keep[start:start+4] = False
     return faces[keep]
+
+
+def trail(rings,tip):
+    count=rings.shape[1]
+    first,last=mouths(rings)
+    def point(progress):
+        if progress<.32:
+            phase=np.interp(progress,[0,.27,.32],[79,94,94]);index=int(phase);weight=phase-index
+            base=(1-weight)*rings[1,index]+weight*rings[1,index+1]
+            radial=base[[0,2]]-[rings[0,count//4,0],rings[0,0,2]];radial/=np.linalg.norm(radial)
+            base[[0,2]]+=radial*np.interp(progress,[0,.2,.27,.32],[16,12,10,0])
+            base[1]=np.interp(progress,[0,.015,.27,.32],[first[1]-26.55,first[1]-26.55,first[1]-2,first[1]])
+            if progress>.27:base[[0,2]]+=(first-rings[1,94])[[0,2]]*(progress-.27)/.05
+            return base
+        if .32 <= progress <= .42:
+            return first+(last-first)*(progress-.32)/.1
+        part=min(1,(progress-.42)/.54);height=RING+(11-RING)*part;phase=PORTALS[1]+part*45
+        index=math.floor(phase)%count;fraction=phase%1
+        strip=rings[:,index]*(1-fraction)+rings[:,(index+1)%count]*fraction
+        layer=min(10,int(height));fraction=height-layer
+        position=strip[layer]*(1-fraction)+strip[layer+1]*fraction
+        radial=position[[0,2]]-tip[[0,2]];radial/=np.linalg.norm(radial)
+        position[[0,2]]+=radial*6*min(1,(progress-.42)*70)
+        if progress>.96:
+            position+=(tip-position)*((progress-.96)/.04)
+        return position
+    return point

@@ -58,9 +58,9 @@ def bridge(model):
         for end in (-1,1):
             east=end*133
             for foot in (14.3,19.4):
-                model.box(east,.18,side*foot,.83,6.85,.63,'white',True)
-                model.box(east,.18,side*foot,1.12,.77,.96,'granite',True)
-            model.box(east,6.91,side*16.85,.84,.71,5.76,'white')
+                model.box(east,.18,side*foot,.35,6.85,.31,'white',True)
+                model.box(east,.18,side*foot,.52,.38,.48,'granite',True)
+            model.box(east,6.91,side*16.85,.38,.34,5.46,'white')
             model.box(east,6.82,side*16.85,.47,.13,4.48,'lamp')
         for east in np.linspace(-136,136,35 if model.detail else 13):
             model.box(east,1.26,side*21.1,.55,.24,.39,'lamp')

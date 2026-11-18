@@ -15,7 +15,7 @@ def bridge(model):
     for left,right in zip(piers,piers[1:]):
         wet = left >= water[0]
         center = (left+right)/2
-        spring = -4.9 if wet else -3.75
+        spring = -4.9 if wet else -4.15
         arch(model,center,(right-left)/2-.48,7.2,spring,-spring-.98,-.38,True)
         for side in (-1,1):
             model.box(center,-1.02,side*3.65,.56,.67,.24,'granite')
@@ -30,6 +30,9 @@ def bridge(model):
     model.pose=(center,0,0,0)
     rail(model,125,3.45,.1,2,True)
     model.pose=(0,0,0,0)
+    for edge,direction in ((piers[0],-1),(piers[-1],1)):
+        for step in range(34):
+            model.box(edge+direction*(step+.5)*.36,-6.3,0,.37,6.4-.16*(step+1),7.35,'pave',True)
     for east in np.linspace(-33.8,33.8,19 if model.detail else 9):
         for side in (-1,1):
             model.beam([east,.1,side*2.72],[east,3.45,side*2.72],.19,'red',8 if model.detail else 4,True)
@@ -43,4 +46,4 @@ def bridge(model):
                 for side in (-1,1):model.beam([east,3.8,side*3.6],[east,5.29,side*.35],.07,'tile',4)
 
 
-if __name__=='__main__':generate('huaqiao',bridge,'F',lambda east:np.interp(east,[-35,0,35],[4.02,4.02,3.02]))
+if __name__=='__main__':generate('huaqiao',bridge,'F',lambda east:np.full_like(east,8.45))

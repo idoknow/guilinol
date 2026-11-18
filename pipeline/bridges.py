@@ -47,6 +47,9 @@ def bridge_tiles(bounds, sample):
                 _, water = sample(*test)
                 if water != -32768:
                     height = max(height,water/10+2)
+            if way['id']==246520676:
+                height=156.48
+                side*=6.8/width
             sections.append((coord+side,coord-side,height))
         for first, second in zip(sections,sections[1:]):
             for pts, levels in [([first[0],first[1],second[0]],[first[2],first[2],second[2]]),
