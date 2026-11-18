@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import {look} from './look/config'
 import {fetchAsset} from './world'
 
-interface Section {offset:number; vertices:number; indices:number}
+interface Section {offset:number; vertices:number; indices:number; indexOffset:number}
 export interface Peaks {
   file:string; entries:{name:string; center:[number,number,number]; lods:Section[]; model?:string}[]
 }
@@ -10,7 +10,9 @@ export interface Peaks {
 export async function loadPeaks(asset:Peaks) {
   const packed = await fetchAsset(asset.file)
   const buffer = await new Response(new Blob([packed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
-  if(new DataView(buffer).getUint32(0)!==0x504b3031) throw Error('Invalid PK01 header')
+  const view = new DataView(buffer)
+  if(view.getUint32(0)!==0x504b3032) throw Error('Invalid PK02 header')
+  const shared = new Map<number,THREE.BufferAttribute>()
   const group = new THREE.Group()
   const material = new THREE.MeshStandardMaterial({flatShading:true,vertexColors:true,roughness:look.roughness,metalness:look.metalness})
   const [foot,green,crown,rock,rockDark] = [look.peakFoot,look.peakGreen,look.peakCrown,look.peakRock,look.peakRockDark].map(value=>new THREE.Color(value))
@@ -33,23 +35,26 @@ export async function loadPeaks(asset:Peaks) {
     }
     const lod = new THREE.LOD()
     lod.name=entry.name; lod.position.set(...entry.center)
-    entry.lods.forEach(({offset,vertices,indices},level)=>{
+    entry.lods.forEach(({offset,vertices,indices,indexOffset},level)=>{
       const geometry = new THREE.BufferGeometry()
-      const data = new THREE.InterleavedBuffer(new Float32Array(buffer,offset,vertices*8),8)
-      geometry.setAttribute('position',new THREE.InterleavedBufferAttribute(data,3,0))
-      geometry.setAttribute('normal',new THREE.InterleavedBufferAttribute(data,3,3))
-      geometry.setAttribute('aRock',new THREE.InterleavedBufferAttribute(data,1,6))
-      geometry.setAttribute('aHeight',new THREE.InterleavedBufferAttribute(data,1,7))
-      geometry.setIndex(new THREE.BufferAttribute(new Uint16Array(buffer,offset+vertices*32,indices),1))
+      const positions = new Float32Array(vertices*3)
+      for(let index=0;index<positions.length;index++) positions[index]=view.getInt16(offset+index*2,true)/100
+      geometry.setAttribute('position',new THREE.BufferAttribute(positions,3))
+      geometry.setAttribute('normal',new THREE.BufferAttribute(new Int8Array(buffer,offset+vertices*6,vertices*3),3,true))
+      const weights = new Uint8Array(buffer,offset+vertices*9,vertices*2)
+      const attrs = new THREE.InterleavedBuffer(weights,2)
+      geometry.setAttribute('aRock',new THREE.InterleavedBufferAttribute(attrs,1,0,true))
+      geometry.setAttribute('aHeight',new THREE.InterleavedBufferAttribute(attrs,1,1,true))
+      if(!shared.has(indexOffset)) shared.set(indexOffset,new THREE.BufferAttribute(new Uint16Array(buffer.slice(indexOffset,indexOffset+indices*2)),1))
+      geometry.setIndex(shared.get(indexOffset)!)
       const colors = new Float32Array(vertices*3), color = new THREE.Color()
       for(let index=0;index<vertices;index++) {
-        const at = index*8
-        paint(color,data.array[at+6],data.array[at+7],data.array[at]-entry.center[0],data.array[at+2]-entry.center[2])
+        paint(color,weights[index*2]/255,weights[index*2+1]/255,positions[index*3],positions[index*3+2])
         color.toArray(colors,index*3)
       }
       geometry.setAttribute('color',new THREE.BufferAttribute(colors,3))
       const mesh = new THREE.Mesh(geometry,material)
-      mesh.position.copy(lod.position).negate(); lod.addLevel(mesh,level*800,.05)
+      lod.addLevel(mesh,level*800,.05)
     })
     group.add(lod)
   }))

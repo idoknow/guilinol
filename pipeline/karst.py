@@ -7,6 +7,7 @@ from scipy.ndimage import gaussian_filter1d, map_coordinates, minimum_filter
 from shapely.geometry import Polygon
 
 from common import GRID, ll2xz
+from auto_peaks import detect, suppress
 
 
 def profile(sample, east, south, angles):
@@ -98,7 +99,8 @@ def imprint(terrain, left, top, triangles):
 def generate(original, terrain, left, top, bbox, output, wet):
     catalog = json.loads(Path(__file__).with_name('peaks.json').read_text())
     south,west,north,east = bbox
-    entries, payload = [], bytearray(b'PK01')
+    entries, payload = [], bytearray(b'PK02')
+    index_offsets = {}
     angles = np.arange(128)*2*np.pi/128
     shapes, footprints = [], []
     dem = original.copy()
@@ -110,16 +112,15 @@ def generate(original, terrain, left, top, bbox, output, wet):
             return map_coordinates(field, [(zs-top)/GRID,(xs-left)/GRID], order=1,mode='nearest')/10
         return sample
     sample = sampler(dem)
-    for peak in catalog:
-        if not (south <= peak['lat'] <= north and west <= peak['lon'] <= east):
-            continue
+    def plan(peak,sample):
         cx,cz = ll2xz(peak['lat'],peak['lon'])
         entry = dict(name=peak['name'],center=[cx,peak['target'],cz],lods=[])
         entries.append(entry)
         if 'model' in peak:
             entry['model'] = peak['model']
-            continue
+            return
         shape,floor = profile(sample,cx,cz,angles)
+        floor = peak.get('baseHeight',floor)
         aspect = peak.get('aspect',.8)
         relief = peak['target']-floor
         radius_budget = aspect*relief
@@ -140,7 +141,8 @@ def generate(original, terrain, left, top, bbox, output, wet):
         for delta,minimum,maximum in [(np.cos(angles),left-cx,left+(original.shape[1]-1)*GRID-cx),
                                       (np.sin(angles),top-cz,top+(original.shape[0]-1)*GRID-cz)]:
             limit = np.where(delta>0,maximum,-minimum)/np.maximum(np.abs(delta),1e-9)
-            radii = np.minimum(radii,limit)
+            if 'baseHeight' not in peak:
+                radii = np.minimum(radii,limit)
         entry['baseHeight'] = float(floor)
         reach = 1.8*radii.max()+GRID
         rows,cols = original.shape
@@ -155,20 +157,39 @@ def generate(original, terrain, left, top, bbox, output, wet):
         weight = np.where(wet[window],0,blend*blend*(3-2*blend))
         original[window] = np.minimum(original[window],np.rint(dem[window]*(1-weight)+floor*10*weight))
         shapes.append((entry,peak,cx,cz,radii,floor))
+    for peak in catalog:
+        if south <= peak['lat'] <= north and west <= peak['lon'] <= east:
+            plan(peak,sample)
+    auto,ground = detect(original,wet,left,top,centers.values())
+    residual_sample = sampler(original.copy())
+    centers.update({peak['name']:ll2xz(peak['lat'],peak['lon']) for peak in auto})
+    for peak in auto:
+        plan(peak,residual_sample)
+    auto_file = 'auto-peaks.json'
+    (output/auto_file).write_text(json.dumps(auto,ensure_ascii=False,separators=(',',':'))+'\n')
+    suppress(original,wet,ground)
     terrain[:] = original
     ground_at = sampler(original)
     skirt_at = sampler(minimum_filter(original,size=17,mode='nearest'))
     for entry,peak,cx,cz,radii,floor in shapes:
-        phases = np.random.default_rng(peak.get('seed',peak['osm'])).uniform(0,2*np.pi,3)
+        phases = np.random.default_rng(peak.get('seed',peak.get('osm'))).uniform(0,2*np.pi,3)
         for far in [False,True]:
             data,faces = mesh(cx,cz,peak,ground_at,skirt_at,angles,radii,floor,phases,far)
             segments = len(angles)//(4 if far else 1)
             footprints.append(Polygon(data[:segments][:,[0,2]]))
             if not far:
                 imprint(terrain,left,top,data[faces,:3])
-            entry['lods'].append(dict(offset=len(payload),vertices=len(data),indices=faces.size))
-            payload.extend(data.tobytes()+faces.tobytes())
+            if far not in index_offsets:
+                index_offsets[far] = len(payload)
+                payload.extend(faces.tobytes())
+            entry['lods'].append(dict(offset=len(payload),vertices=len(data),indices=faces.size,indexOffset=index_offsets[far]))
+            cm = np.rint((data[:,:3]-entry['center'])*100)
+            if cm.min() < -32768 or cm.max() > 32767:
+                raise ValueError(f"PK02 position out of range: {entry['name']}")
+            payload.extend(cm.astype('<i2').tobytes())
+            payload.extend(np.rint(data[:,3:6]*127).astype('i1').tobytes())
+            payload.extend(np.rint(data[:,6:]*255).astype('u1').tobytes())
     compressed = gzip.compress(payload,compresslevel=6,mtime=0)
     terrain[wet] = dem[wet]
     (output/'peaks.bin').write_bytes(compressed)
-    return dict(file='peaks.bin',bytes=len(compressed),entries=entries), footprints
+    return dict(file='peaks.bin',bytes=len(compressed),autoCatalog=auto_file,entries=entries), footprints

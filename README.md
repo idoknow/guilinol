@@ -28,4 +28,4 @@ npm run preview
 - 地面颜色见 `pipeline/palette.json`，修改后重新生成；材质、光照、雾见 `web/src/look/config.ts`。
 - 生产包飞越测试：构建后运行 `npx playwright install chromium`、`npm run verify:flight`（已有系统 Chromium 可用 `CHROMIUM=/usr/bin/chromium npm run verify:flight`）。脚本自行启动/关闭本地预览服务，输出首屏与帧时间指标、校验全框逐块加载，截图保存至 `captures/`。采用空浏览器上下文、960×540、SwiftShader；首屏时间从导航开始到画过总览后的下一次动画回调，不把 HTML 文案当首屏。
 
-M1a 默认南界 25.250，包含塔山、穿山和其余 25 座峰。用 `?cam=lijiang`、`palace`、`elephant`、`overview`、`south` 切换启动机位；`foot` 是独秀峰近景。`verify:flight` 保存这六张截图。`uv run --locked python pipeline/check_peaks.py` 从成品检查共享边、高度场、LOD 与属性，输出逐峰高程和面数表。来源见 `pipeline/peaks.json`，地形估算并非测绘值。水面用独立高程层显示，暂无独立水材质、碰撞响应或桥面模型。二进制读取约定见 `docs/chunk-format.md`。
+M1a 默认南界 25.250，包含 27 座具名峰及从 DEM 检出的无名峰（本框 37 座）。用 `?cam=lijiang`、`palace`、`elephant`、`overview`、`south` 切换启动机位；`foot` 是独秀峰近景。`verify:flight` 保存这六张截图。`uv run --locked python pipeline/check_peaks.py` 从成品检查共享边、高度场、400 m 内底面残留、LOD 与量化属性，输出逐峰高程和面数表。具名峰来源见 `pipeline/peaks.json`，自动峰见生成目录的 `auto-peaks.json`；地形估算并非测绘值。水面用独立高程层显示，暂无独立水材质、碰撞响应或桥面模型。二进制读取约定见 `docs/chunk-format.md`。
