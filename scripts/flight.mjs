@@ -23,14 +23,19 @@ try {
     const {stats,stream,camera,manifest}=window.viewer
     return !stats.pending && manifest.chunks.every(tile=>Math.hypot(tile.x+128-camera.position.x,tile.z+128-camera.position.z)>stream.radius||stream.loaded.has(tile))
   })
-  for(const [name,eye,target] of [
-    ['overview',[-500,1450,1450],[-500,150,-250]],
-    ['river',[-240,200,40],[120,150,-350]],
-    ['palace',[-610,245,-90],[-530,155,-680]],
-  ]) {
-    await page.evaluate(([eye,target])=>{const {camera}=window.viewer;camera.position.set(...eye);camera.lookAt(...target)},[eye,target])
-    await settled();await page.screenshot({path:`${out}/${name}.png`})
+  for(const name of ['lijiang','elephant','overview','south','foot','palace']) {
+    await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&cam=${name}`)
+    await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
+    await settled()
+    if(name==='foot') {
+      const probe = await page.evaluate(()=>window.viewer.probeFoot())
+      console.log('foot',probe)
+      assert.ok(probe.clearance>=2 && probe.clearance<=5)
+      assert.equal(probe.lookingAt,'独秀峰')
+    }
+    await page.screenshot({path:`${out}/${name}.png`})
   }
+  await page.evaluate(()=>{const {camera}=window.viewer;camera.position.set(-610,245,-90);camera.lookAt(-530,155,-680)})
   const before=await page.evaluate(()=>window.viewer.camera.position.toArray())
   await page.keyboard.down('KeyW');await page.waitForFunction(pos=>window.viewer.camera.position.distanceTo({x:pos[0],y:pos[1],z:pos[2]})>15,before)
   const normalFlight = await page.evaluate(async()=>{

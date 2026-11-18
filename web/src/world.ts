@@ -1,11 +1,12 @@
 import * as THREE from 'three'
 import {look} from './look/config'
+import type {Peaks} from './peaks'
 
 interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number}
 export interface Manifest {
   version:number; extent:[number,number,number,number]; grid:number; chunkSize:number; chunks:Tile[];
-  overview:{step:number; heights:Asset; texture:Asset}
+  peaks:Peaks; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset}
 }
 export let bytes = 0
 export async function fetchAsset(file:string, signal?:AbortSignal) {
@@ -35,9 +36,9 @@ function ground(width:number, depth:number, step:number, height:(col:number,row:
 }
 
 export async function overview(manifest:Manifest) {
-  const {heights,texture,step} = manifest.overview
+  const {underlay,texture,step} = manifest.overview
   const [left,top,width,depth] = manifest.extent
-  const [values,image] = await Promise.all([fetchAsset(heights.file),fetchAsset(texture.file)])
+  const [values,image] = await Promise.all([fetchAsset(underlay.file),fetchAsset(texture.file)])
   const samples = new Int16Array(values), cols = width/step
   const geometry = ground(width,depth,step,(col,row)=>samples[row*(cols+1)+col]/10)
   const mesh = new THREE.Mesh(geometry,await surfaceMaterial(image))
@@ -62,7 +63,7 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
   signal.throwIfAborted()
   const view = new DataView(buffer)
-  if(view.getUint32(0)!==0x474c3031) throw Error('Invalid GL01 tile')
+  if(view.getUint32(0)!==0x474c3032) throw Error('Invalid GL02 tile')
   const [vertices,count,collision,imageBytes] = [4,8,12,16].map(offset=>view.getUint32(offset,true))
   let offset = 20
   const terrain = new Int16Array(buffer,offset,4225); offset+=8450
@@ -70,11 +71,13 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   const positions = new Int16Array(buffer,offset,vertices*3); offset+=vertices*6
   const normals = new Int8Array(buffer,offset,vertices*3); offset+=vertices*3
   const indices = new Uint32Array(buffer.slice(offset,offset+count*4)); offset+=count*4+collision
-  if(offset+imageBytes!==buffer.byteLength) throw Error('Invalid GL01 sections')
-  const material = await surfaceMaterial(buffer.slice(offset))
+  const end = offset+imageBytes, extra = buffer.byteLength-end
+  if(extra!==0 && extra!==8450) throw Error('Invalid GL02 sections')
+  const underlay = extra ? new Int16Array(buffer.slice(end)) : terrain
+  const material = await surfaceMaterial(buffer.slice(offset,end))
   const sample = (col:number,row:number)=>{
     const index = row*65+col
-    return (water[index]===-32768?terrain[index]:water[index])/10
+    return (water[index]===-32768?underlay[index]:water[index])/10
   }
   const geometry = ground(256,256,8,(column,line)=>{
     const col=column*2,row=line*2

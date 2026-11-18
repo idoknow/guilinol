@@ -40,6 +40,6 @@ export function flight(camera:THREE.PerspectiveCamera, canvas:HTMLCanvasElement,
     const axis = (plus:string,minus:string)=>Number(keys.has(plus))-Number(keys.has(minus))
     move(axis('KeyW','KeyS')*speed,axis('KeyD','KeyA')*speed)
     camera.position.y += axis('KeyE','KeyQ')*speed
-    camera.position.clamp(new THREE.Vector3(extent[0],120,extent[1]),new THREE.Vector3(extent[0]+extent[2],2200,extent[1]+extent[3]))
+    camera.position.clamp(new THREE.Vector3(extent[0],120,extent[1]),new THREE.Vector3(extent[0]+extent[2],6000,extent[1]+extent[3]))
   }
 }
