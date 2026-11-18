@@ -74,7 +74,14 @@ export function play(host:Host) {
   async function goTo(spot:Spot) {
     closeAll()
     await travel(spot.name,async()=>{leaveSummit(false)
-      if(await host.walkTo(spot.x,spot.z,yawToward(spot.x,spot.z,spot.at),'spot:'+spot.id)) host.walker()?.face(yawToward(spot.x,spot.z,spot.at),.16)})
+      if(await host.walkTo(spot.x,spot.z,yawToward(spot.x,spot.z,spot.at),'spot:'+spot.id)) {
+        host.walker()?.face(yawToward(spot.x,spot.z,spot.at),.16); arrive(marks.find(m=>m.spot===spot)!)}})
+  }
+  // Stamp + card. Walking into the ring does it; so does travelling there (the spawn search may land a few metres off).
+  function arrive(m:typeof marks[number]) {
+    m.armed = false; const fresh = !stamps.has(m.spot.id)
+    if(fresh){stamps.add(m.spot.id); save(); restamp(m.spot.id); refreshCount()}
+    showCard(m.spot,fresh)
   }
 
   // Teleport to an arbitrary map point. Peaks, lakes and parks resolve to the nearest road vertex first,
@@ -194,11 +201,7 @@ export function play(host:Host) {
         ;(m.ring.material as THREE.MeshBasicMaterial).opacity = .35+.25*Math.sin(pulse*2.4)
         m.ring.position.y = .18
       }
-      if(walking&&d<ARRIVE&&m.armed&&!photo.active) {
-        m.armed = false; const fresh = !stamps.has(m.spot.id)
-        if(fresh){stamps.add(m.spot.id); save(); restamp(m.spot.id); refreshCount()}
-        showCard(m.spot,fresh)
-      }
+      if(walking&&d<ARRIVE&&m.armed&&!photo.active) arrive(m)
       if(d>REARM) {m.armed = true; if(shown===m.spot&&walking) closeCard()}
     }
     if(summit&&host.camera.position.distanceTo(summit.eye)>220) leaveSummit()
