@@ -1,5 +1,6 @@
 import R from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
+import type {PeakColliderData, PeaksGroup} from '../peaks'
 import type {Stream} from '../stream'
 import {fetchAsset,type Manifest,type Tile} from '../world'
 import {walkConfig as cfg} from './config'
@@ -45,8 +46,8 @@ function houses(rings:Outline[]){
   return R.ColliderDesc.trimesh(Float32Array.from(verts),Uint32Array.from(indices))
 }
 
-export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.Group){
-  const [,buffer]=await Promise.all([R.init(),fetchAsset(manifest.overview.heights.file)])
+export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksGroup,rapierInit?:Promise<void>){
+  const [,buffer]=await Promise.all([rapierInit??R.init(),fetchAsset(manifest.overview.heights.file)])
   const overview=new Int16Array(buffer), [left,top,width]=manifest.extent
   const world=new R.World({x:0,y:cfg.gravity,z:0}), controller=world.createCharacterController(.025)
   controller.setMaxSlopeClimbAngle(cfg.slope);controller.setMinSlopeSlideAngle(cfg.slope)
@@ -54,7 +55,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.
   const shape=new R.Capsule(cfg.height/2-cfg.radius,cfg.radius)
   const body=world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(0,-500,0))
   const capsule=world.createCollider(new R.ColliderDesc(shape),body)
-  const regions=new Map<Tile,Region>(), mountains=new Map<THREE.Object3D,R.Collider>(), kinds=new Map<number,Kind>()
+  const regions=new Map<Tile,Region>(), mountains=new Map<PeakColliderData,R.Collider>(), modelMountains=new Map<THREE.Object3D,R.Collider[]>(), kinds=new Map<number,Kind>()
   function add(desc:R.ColliderDesc,kind:Kind){const coll=world.createCollider(desc);kinds.set(coll.handle,kind);return coll}
   function remove(coll:R.Collider){kinds.delete(coll.handle);world.removeCollider(coll,false)}
   const trunks=new Map<import('../forest').Tree,R.Collider>()
@@ -82,15 +83,27 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.
         colliders.push(add(R.ColliderDesc.trimesh(data.deck,Uint32Array.from({length:count},(_,at)=>at)).setTranslation(tile.x,0,tile.z),'deck'))}
       regions.set(tile,{colliders,rings,fine:!!data});changed=true
     }
-    for(const peak of peaks.children){
-      const near=Math.hypot(east-peak.position.x,south-peak.position.z)<=cfg.peakRadius
+    for(const peak of peaks.colliders){
+      const near=Math.hypot(east-peak.center[0],south-peak.center[2])<=cfg.peakRadius
       if(!near&&mountains.has(peak)){remove(mountains.get(peak)!);mountains.delete(peak);changed=true}
-      if(near&&!mountains.has(peak)&&peak instanceof THREE.LOD){
-        const geom=(peak.levels[0].object as THREE.Mesh).geometry,pos=geom.getAttribute('position')
-        const verts=new Float32Array(pos.count*3)
-        for(let at=0;at<pos.count;at++)verts.set([pos.getX(at),pos.getY(at),pos.getZ(at)],at*3)
-        const mesh=R.ColliderDesc.trimesh(verts,Uint32Array.from(geom.index!.array))
-        mountains.set(peak,add(mesh.setTranslation(peak.position.x,peak.position.y,peak.position.z),'peak'));changed=true
+      if(near&&!mountains.has(peak)){
+        mountains.set(peak,add(R.ColliderDesc.trimesh(peak.vertices,peak.indices),'peak'));changed=true
+      }
+    }
+    for(const model of peaks.modelPeaks){
+      const near=Math.hypot(east-model.position.x,south-model.position.z)<=cfg.peakRadius
+      if(!near&&modelMountains.has(model)){modelMountains.get(model)!.forEach(remove);modelMountains.delete(model);changed=true}
+      if(near&&!modelMountains.has(model)){
+        const list:R.Collider[]=[],pt=new THREE.Vector3()
+        model.updateWorldMatrix(true,true)
+        model.traverse(node=>{
+          if(!(node instanceof THREE.Mesh))return
+          const pos=node.geometry.getAttribute('position'),verts=new Float32Array(pos.count*3)
+          for(let i=0;i<pos.count;i++)pt.fromBufferAttribute(pos,i).applyMatrix4(node.matrixWorld).toArray(verts,i*3)
+          const idx=node.geometry.index?Uint32Array.from(node.geometry.index.array):Uint32Array.from({length:pos.count},(_,i)=>i)
+          list.push(add(R.ColliderDesc.trimesh(verts,idx),'peak'))
+        })
+        modelMountains.set(model,list);changed=true
       }
     }
     if(changed)world.step()
@@ -123,6 +136,6 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.
     }return null
   }
   function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)}
-  function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();trunks.forEach(remove);trunks.clear()}
+  function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear()}
   return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,surface,wet,insideHouse,findWalkableSpawn}
 }

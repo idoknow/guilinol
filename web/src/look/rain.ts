@@ -3,16 +3,22 @@ import {atmo} from './time'
 import {WATER_LAYER} from './water'
 
 // 小雨: light slanted streaks in a 70 m box that wraps around the camera. One draw call, GPU-animated.
+// Geometry is populated lazily on first rainy frame so clear-sky startup pays zero allocation cost.
 export function rain() {
   const count = 5000, box = 70
-  const base = new Float32Array(count*2*3), end = new Float32Array(count*2)
-  for(let i=0;i<count;i++) {
-    const x = Math.random()*box, y = Math.random()*box, z = Math.random()*box
-    base.set([x,y,z,x,y,z],i*6); end[i*2+1] = 1
-  }
   const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position',new THREE.BufferAttribute(base,3))
-  geometry.setAttribute('aEnd',new THREE.BufferAttribute(end,1))
+  let built = false
+  function ensureBuilt() {
+    if(built) return
+    built = true
+    const base = new Float32Array(count*2*3), end = new Float32Array(count*2)
+    for(let i=0;i<count;i++) {
+      const x = Math.random()*box, y = Math.random()*box, z = Math.random()*box
+      base.set([x,y,z,x,y,z],i*6); end[i*2+1] = 1
+    }
+    geometry.setAttribute('position',new THREE.BufferAttribute(base,3))
+    geometry.setAttribute('aEnd',new THREE.BufferAttribute(end,1))
+  }
   const material = new THREE.ShaderMaterial({
     transparent:true, depthWrite:false, fog:false,
     uniforms:{uTime:atmo.uTime,uRain:atmo.uRain,uBox:{value:box},uColor:{value:new THREE.Color(0xdfe7ea)}},
@@ -29,6 +35,10 @@ export function rain() {
       void main(){ gl_FragColor = vec4(uColor, uRain * vFade * mix(.38, .05, vEnd)); }`,
   })
   const lines = new THREE.LineSegments(geometry,material)
-  lines.frustumCulled = false; lines.layers.set(WATER_LAYER); lines.renderOrder = 10
-  return Object.assign(lines,{update(){lines.visible = atmo.uRain.value>.02}})
+  lines.frustumCulled = false; lines.layers.set(WATER_LAYER); lines.renderOrder = 10; lines.visible = false
+  return Object.assign(lines,{update(){
+    const on = atmo.uRain.value>.02
+    if(on) ensureBuilt()
+    lines.visible = on
+  }})
 }

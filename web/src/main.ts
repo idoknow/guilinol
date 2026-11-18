@@ -1,27 +1,29 @@
 import * as THREE from 'three'
-import {bytes, fetchAsset, overview, type Manifest} from './world'
+import {bytes, fetchAsset, startOverview, type Manifest} from './world'
 import {Stream} from './stream'
 import {flight} from './flight'
 import {look} from './look/config'
 import {installAtmosphere, outerGround, sky} from './look/atmosphere'
-import {loadPeaks} from './peaks'
+import {startPeaks} from './peaks'
 import {presets,setPreset} from './presets'
 import {walkConfig} from './walk/config'
 import {atmo, env, evaluate} from './look/time'
-import {renderMirror, WATER_LAYER} from './look/water'
+import {currentMirrorLevel, isWaterInView, renderMirror, WATER_LAYER} from './look/water'
 import {rain} from './look/rain'
 import {windowLight} from './look/buildings'
 import {skyClock} from './ui/sky'
-import {play} from './play'
 import type {Host} from './play/host'
-import {bootDismiss, bootProgress} from './ui/boot'
+import {bootDismiss, bootLoaded, bootProgress} from './ui/boot'
 
 installAtmosphere()
 async function start() {
   bootProgress('载入地形', 12)
   const manifest:Manifest = JSON.parse(new TextDecoder().decode(await fetchAsset('manifest.json')))
   if(manifest.version!==4 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
-  const basePromise = Promise.all([overview(manifest),loadPeaks(manifest.peaks)])
+  const ovTask = startOverview(manifest), pkTask = startPeaks(manifest.peaks)
+  await Promise.all([ovTask.dispatched, pkTask.dispatched])
+  bootLoaded()
+  const basePromise = Promise.all([ovTask.finish, pkTask.finish])
   const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
   renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure
   document.body.prepend(renderer.domElement)
@@ -38,6 +40,11 @@ async function start() {
   camera.position.set(left+width*.55,420,top+depth*.62)
   let walker:Awaited<ReturnType<typeof import('./walk').walk>>|undefined, switching=false
   let cinema=false
+  let walkModPromise:Promise<typeof import('./walk')>|undefined
+  const prefetchWalk = ()=>{
+    walkModPromise ??= import('./walk').then(mod=>{void mod.preloadWalk();return mod})
+    return walkModPromise
+  }
   const controls = flight(camera,renderer.domElement,manifest.extent,()=>!walker?.active&&!switching&&!cinema)
   camera.lookAt(left+width*.47,150,top+depth*.45)
   function resize() {
@@ -58,7 +65,7 @@ async function start() {
   let previous=0, first=0, frame=0, sum=0, samples=0
   const stats = {firstMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0}
   type Walker=Awaited<ReturnType<typeof import('./walk').walk>>
-  async function loadWalker():Promise<Walker>{return walker??=await (await import('./walk')).walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))}
+  async function loadWalker():Promise<Walker>{return walker??=await (await prefetchWalk()).walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))}
   async function walkTo(x:number,z:number,yaw:number,reason:string){
     if(switching)return false
     switching=true
@@ -80,6 +87,8 @@ async function start() {
   window.addEventListener('keydown',event=>{if(event.code==='KeyV'&&!event.repeat)void toggle().then(showMode)})
   const touch=matchMedia('(pointer:coarse)').matches,hint=document.querySelector<HTMLElement>('.hint')!,toast=document.querySelector<HTMLElement>('.toast')!
   const modeButton=document.createElement('button');modeButton.className='btn-mode'
+  modeButton.addEventListener('pointerenter',()=>void prefetchWalk())
+  modeButton.addEventListener('touchstart',()=>void prefetchWalk(),{passive:true})
   function showMode(){const walking=!!walker?.active;document.body.dataset.mode=walking?'walk':'fly'
     modeButton.textContent=walking?'起飞':'落地步行';modeButton.setAttribute('aria-label',walking?'切换到飞行':'切换到步行')
     hint.textContent=walking?'WASD 走 · Shift 跑 · 空格 跳 · 拖动转视角 · 滚轮远近 · V 起飞 · J 景册 · P 拍照':'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · J 景册 · P 拍照'}
@@ -88,7 +97,7 @@ async function start() {
     clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>toast.classList.remove('show'),3200)})
   modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton);void touch
   showMode()
-  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,clock,env,get tour(){return tour},get walk(){return walker},probeFoot(){
+  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},probeFoot(){
     const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
     const clearance = ray.intersectObjects(scene.children)[0]?.distance
     ray.setFromCamera(new THREE.Vector2(0,0),camera)
@@ -100,22 +109,32 @@ async function start() {
     }
     return {clearance,lookingAt,wallDistance:hits[0]?.distance}
   }}})
-  function draw(){renderMirror(renderer,scene,camera,frame<2);renderer.render(scene,camera)}
+  function draw(){
+    const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
+    peaks.update(camera,mirror); renderMirror(renderer,scene,camera,!Number.isFinite(mirror)); renderer.render(scene,camera)
+  }
   const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
     fly(){if(walker?.active)walker.leave();showMode()},get cinema(){return cinema},set cinema(on){cinema=on}}
-  const tour=play(host)
+  let tour:Awaited<ReturnType<typeof import('./play').play>>|undefined
   renderer.setAnimationLoop(now=>{
     const elapsed = previous?now-previous:0;previous=now
     if(walker?.active)walker.tick(elapsed/1000);else if(!switching)controls(elapsed/1000)
-    if(frame===1) {first=performance.now();stats.firstMs=first;stats.firstWorldBytes=bytes;bootProgress('载入街区', 100);bootDismiss();setTimeout(()=>void import('./ui/about').then(mod=>mod.aboutPanel()),500)}
-    if(first&&!switching) stream.tick(walker?.active?walker.position:camera.position)
+    if(frame===1) {
+      first=performance.now();stats.firstMs=first;stats.firstWorldBytes=bytes;bootProgress('载入街区', 100);bootDismiss()
+      void import('./play').then(mod=>{tour=mod.play(host)})
+      setTimeout(()=>void import('./ui/about').then(mod=>mod.aboutPanel()),500)
+    }
+    if(first&&!switching) {
+      stream.tick(walker?.active?walker.position:camera.position)
+      if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
+    }
     clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/1200))
     atmo.uTime.value = now/1000
     light.position.copy(env.sunDir); light.color.copy(env.sunColor); light.intensity = env.sunPower
     hemi.color.copy(env.hemiSky); hemi.groundColor.copy(env.hemiGround); hemi.intensity = env.hemiPower
     renderer.toneMappingExposure = env.exposure; windowLight.value = env.night
     dome.update(); drops.update()
-    tour.tick(elapsed/1000)
+    tour?.tick(elapsed/1000)
     draw()
     frame++; sum+=elapsed;samples++
     Object.assign(stats,{ms:elapsed,calls:renderer.info.render.calls,frame,loaded:stream.loaded.size,pending:stream.pending.size,

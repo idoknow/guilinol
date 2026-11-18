@@ -74,23 +74,27 @@ Object.assign(waterMaterial.uniforms,atmo,{uBody:body,uSunLight:sunLight})
 waterMaterial.uniforms.tMirror.value = mirrorTarget.texture
 waterMaterial.uniforms.textureMatrix.value = textureMatrix
 
-type WaterMesh = THREE.Mesh & {userData:{level:number}}
-const live = new Set<WaterMesh>()
+type WaterPatch = {x:number; z:number; level:number; box:THREE.Box3}
+type FarWaterPatch = {box:THREE.Box3; hidden:boolean}
+const live = new Set<WaterPatch>()
+let farPatches:FarWaterPatch[] = []
 
-function finish(positions:number[], level:number, x:number, z:number):WaterMesh|null {
+function finish(positions:Float32Array, level:number, x:number, z:number) {
   if(!positions.length) return null
   const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3))
+  geometry.setAttribute('position',new THREE.BufferAttribute(positions,3))
   geometry.computeBoundingSphere()
-  const mesh = new THREE.Mesh(geometry,waterMaterial) as unknown as WaterMesh
+  const mesh = new THREE.Mesh(geometry,waterMaterial)
   mesh.layers.set(WATER_LAYER); mesh.userData.level = level; mesh.position.set(x,0,z)
   return mesh
 }
 
 // Per-chunk water from the GL0x 65×65 water grid (4 m): a flat quad at the water level for every cell
-// touching a wet sample. The terrain rises through it at the banks, which draws the shoreline.
+// touching a wet sample. Positions are shifted into world space so Stream's ChunkBatcher draws all
+// loaded river/lake tiles in one draw call.
 export function chunkWater(water:Int16Array, x:number, z:number) {
   const positions:number[] = [], counts = new Map<number,number>()
+  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity, minZ=Infinity, maxZ=-Infinity
   for(let row=0;row<64;row++) for(let col=0;col<64;col++) {
     // Cells with ≥3 wet corners only: low riverside ground (below the water level but dry in the data,
     // so walkable) must never be flooded. The bank shader (night.ts nightGround) paints the rest.
@@ -98,51 +102,69 @@ export function chunkWater(water:Int16Array, x:number, z:number) {
     for(const at of [row*65+col,row*65+col+1,(row+1)*65+col,(row+1)*65+col+1]) if(water[at]!==-32768) {wet++; level = Math.max(level,water[at]/10)}
     if(wet<3) continue
     counts.set(level,(counts.get(level)??0)+1)
-    const x0=col*4,z0=row*4,x1=x0+4,z1=z0+4
+    const x0=x+col*4,z0=z+row*4,x1=x0+4,z1=z0+4
+    if(x0<minX) minX=x0; if(x1>maxX) maxX=x1
+    if(level<minY) minY=level; if(level>maxY) maxY=level
+    if(z0<minZ) minZ=z0; if(z1>maxZ) maxZ=z1
     positions.push(x0,level,z0, x0,level,z1, x1,level,z0, x1,level,z0, x0,level,z1, x1,level,z1)
   }
+  if(!positions.length) return null
   const dominant = [...counts].sort((a,b)=>b[1]-a[1])[0]?.[0] ?? 0
-  const mesh = finish(positions,dominant,x,z)
-  if(mesh) {
-    live.add(mesh)
-    const dispose = ()=>{live.delete(mesh);mesh.geometry.dispose()}
-    return {mesh,dispose}
-  }
-  return null
+  const box = new THREE.Box3(new THREE.Vector3(minX,minY-.5,minZ),new THREE.Vector3(maxX,maxY+.5,maxZ))
+  const patch:WaterPatch = {x, z, level:dominant, box}
+  live.add(patch)
+  return {positions:Float32Array.from(positions), level:dominant, dispose(){live.delete(patch)}}
 }
+
+const srgbLut = Float32Array.from({length:256},(_,i)=>{
+  const c = i/255
+  return c<=.04045 ? c/12.92 : Math.pow((c+.055)/1.055,2.4)
+})
 
 // Far water under the overview terrain: water pixels of overview.png (4 m/px) decide which 32 m cells
 // hold water; the underlay grid equals the water level there. Cells under a loaded chunk are hidden.
-export async function farWater(manifest:{extent:[number,number,number,number],chunkSize:number,overview:{step:number}}, image:ArrayBuffer, underlay:Int16Array) {
+export async function farWater(manifest:{extent:[number,number,number,number],chunkSize:number,overview:{step:number}}, bitmap:ImageBitmap, underlay:Int16Array) {
   const [left,top,width,depth] = manifest.extent, step = manifest.overview.step, cols = width/step, rows = depth/step
-  const bitmap = await createImageBitmap(new Blob([image],{type:'image/png'}))
   const canvas = new OffscreenCanvas(bitmap.width,bitmap.height), ctx = canvas.getContext('2d')!
   ctx.drawImage(bitmap,0,0); bitmap.close()
   const pixels = ctx.getImageData(0,0,canvas.width,canvas.height).data, px = canvas.width/width
-  const target = new THREE.Color(look.waterBaked), probe = new THREE.Color()
-  const wet = (x:number,z:number)=>{const i=(Math.min(canvas.height-1,Math.floor(z*px))*canvas.width+Math.min(canvas.width-1,Math.floor(x*px)))*4
-    probe.setRGB(pixels[i]/255,pixels[i+1]/255,pixels[i+2]/255,THREE.SRGBColorSpace)
-    return Math.abs(probe.r-target.r)+Math.abs(probe.g-target.g)+Math.abs(probe.b-target.b)<.06}
-  const per = manifest.chunkSize/step, positions:number[] = [], ranges = new Map<string,[number,number]>()
+  const target = new THREE.Color(look.waterBaked), tr = target.r, tg = target.g, tb = target.b
+  const cw = canvas.width, ch = canvas.height
+  const wet = (x:number,z:number)=>{
+    const i = ((z*px|0)<ch ? (z*px|0) : ch-1)*cw + ((x*px|0)<cw ? (x*px|0) : cw-1) << 2
+    return Math.abs(srgbLut[pixels[i]]-tr)+Math.abs(srgbLut[pixels[i+1]]-tg)+Math.abs(srgbLut[pixels[i+2]]-tb)<.06
+  }
+  const per = manifest.chunkSize/step, positions:number[] = [], ranges = new Map<string,[number,number,FarWaterPatch|null]>()
+  const nextFar:FarWaterPatch[] = []
   for(let tz=0;tz<rows;tz+=per) for(let tx=0;tx<cols;tx+=per) {
     const start = positions.length/3
+    let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity, minZ=Infinity, maxZ=-Infinity
     for(let row=tz;row<Math.min(rows,tz+per);row++) for(let col=tx;col<Math.min(cols,tx+per);col++) {
-      const level = Math.min(...[row*(cols+1)+col,row*(cols+1)+col+1,(row+1)*(cols+1)+col,(row+1)*(cols+1)+col+1].map(at=>underlay[at]/10))
+      const r0 = row*(cols+1)+col, r1 = (row+1)*(cols+1)+col
+      const level = Math.min(underlay[r0],underlay[r0+1],underlay[r1],underlay[r1+1])/10
       // 8 m sub-cells (2×2 texels each) so the far river follows its banks instead of 32 m stairs.
       for(let sz=0;sz<step;sz+=8) for(let sx=0;sx<step;sx+=8) {
         const x0=col*step+sx,z0=row*step+sz,x1=x0+8,z1=z0+8
         if(!wet(x0+2,z0+2)&&!wet(x0+6,z0+6)) continue
+        if(left+x0<minX) minX=left+x0; if(left+x1>maxX) maxX=left+x1
+        if(level<minY) minY=level; if(level>maxY) maxY=level
+        if(top+z0<minZ) minZ=top+z0; if(top+z1>maxZ) maxZ=top+z1
         positions.push(x0,level,z0, x0,level,z1, x1,level,z0, x1,level,z0, x0,level,z1, x1,level,z1)
       }
     }
-    ranges.set(`${left+tx*step},${top+tz*step}`,[start,positions.length/3-start])
+    const count = positions.length/3-start
+    const fp:FarWaterPatch|null = count ? {box:new THREE.Box3(new THREE.Vector3(minX,minY-.5,minZ),new THREE.Vector3(maxX,maxY+.5,maxZ)), hidden:false} : null
+    if(fp) nextFar.push(fp)
+    ranges.set(`${left+tx*step},${top+tz*step}`,[start,count,fp])
   }
-  const mesh = finish(positions,148,left,top)!
-  const geometry = mesh.geometry, original = (geometry.getAttribute('position').array as Float32Array).slice()
-  const attr = geometry.getAttribute('position') as THREE.BufferAttribute
+  farPatches = nextFar
+  const original = Float32Array.from(positions)
+  const mesh = finish(original.slice(),148,left,top)!
+  const attr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute
   return {mesh,toggle(tile:{x:number,z:number},show:boolean){
     const range = ranges.get(`${tile.x},${tile.z}`); if(!range||!range[1]) return
-    const [from,count] = range, array = attr.array as Float32Array
+    const [from,count,fp] = range, array = attr.array as Float32Array
+    if(fp) fp.hidden = !show
     if(show) array.set(original.subarray(from*3,(from+count)*3),from*3); else array.fill(0,from*3,(from+count)*3)
     attr.addUpdateRange(from*3,count*3); attr.needsUpdate = true
   }}
@@ -152,17 +174,31 @@ export async function farWater(manifest:{extent:[number,number,number,number],ch
 // below it, render at half resolution into the mirror target.
 const mirrorCamera = new THREE.PerspectiveCamera(), clip = new THREE.Plane(), q = new THREE.Vector4(), c4 = new THREE.Vector4()
 const size = new THREE.Vector2(), target = new THREE.Vector3(), forward = new THREE.Vector3()
+const mainFrustum = new THREE.Frustum(), mainProj = new THREE.Matrix4()
 let level = 148
+export function isWaterInView(camera:THREE.PerspectiveCamera) {
+  camera.updateMatrixWorld()
+  mainFrustum.setFromProjectionMatrix(mainProj.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
+  for(const patch of live) if(mainFrustum.intersectsBox(patch.box)) return true
+  for(const fp of farPatches) if(!fp.hidden && mainFrustum.intersectsBox(fp.box)) return true
+  return false
+}
+export function currentMirrorLevel(camera:THREE.PerspectiveCamera) {
+  let best = Infinity
+  for(const patch of live) {
+    const d = patch.x+128-camera.position.x, e = patch.z+128-camera.position.z, dist = d*d+e*e
+    if(dist<best){best=dist;level=patch.level}
+  }
+  return level
+}
 // skip: the first frame is budgeted (≤2 s), so the mirror starts one frame later with a sky-tint fallback.
 export function renderMirror(renderer:THREE.WebGLRenderer, scene:THREE.Scene, camera:THREE.PerspectiveCamera, skip=false) {
   body.value.copy(env.water).convertLinearToSRGB()
   sunLight.value.copy(atmo.uSunColor.value).convertLinearToSRGB()
   if(env.night>.5) sunLight.value.setRGB(.5,.55,.65).multiplyScalar(env.night*.6)
-  let best = Infinity
-  for(const mesh of live) {const d = mesh.position.x+128-camera.position.x, e = mesh.position.z+128-camera.position.z, dist = d*d+e*e
-    if(dist<best){best=dist;level=mesh.userData.level}}
+  currentMirrorLevel(camera)
   waterMaterial.uniforms.uMirrorLevel.value = level
-  if(skip||camera.position.y<level+.2||camera.position.y>4000) {waterMaterial.uniforms.uMirrorReady.value = 0; return}
+  if(skip||camera.position.y<level+.2||camera.position.y>4000||!isWaterInView(camera)) {waterMaterial.uniforms.uMirrorReady.value = 0; return}
   waterMaterial.uniforms.uMirrorReady.value = 1
   renderer.getDrawingBufferSize(size)
   const w = Math.max(1,Math.round(size.x*.5)), h = Math.max(1,Math.round(size.y*.5))
