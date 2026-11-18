@@ -1,5 +1,6 @@
 // Placeholder look for M0; colours follow docs/style.md. M1 settles the final palette.
 export const look = {
+  peakVegetation: 0x758374, peakRock: 0x92948c,
   sky: 0xcfdde3, fogNear: 1800, fogFar: 6200,
   sunColor: 0xfff6e8, sunPower: 2.2, sunPosition: [1, 3, 2] as const,
   // Sky/ground fill so walls facing away from the sun are not pure black.

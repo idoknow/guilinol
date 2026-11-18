@@ -3,11 +3,13 @@ import {bytes, fetchAsset, overview, type Manifest} from './world'
 import {Stream} from './stream'
 import {flight} from './flight'
 import {look} from './look/config'
+import {loadPeaks} from './peaks'
+import {setPreset} from './presets'
 
 async function start() {
   const manifest:Manifest = JSON.parse(new TextDecoder().decode(await fetchAsset('manifest.json')))
-  if(manifest.version!==1 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
-  const basePromise = overview(manifest)
+  if(manifest.version!==2 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
+  const basePromise = Promise.all([overview(manifest),loadPeaks(manifest.peaks)])
   const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
   document.body.prepend(renderer.domElement)
   const camera = new THREE.PerspectiveCamera(60,1,1,10000)
@@ -25,9 +27,10 @@ async function start() {
     camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix()
   }
   resize(); window.addEventListener('resize',resize)
-  const base = await basePromise
-  scene.add(base.mesh)
+  const [base,peaks] = await basePromise
+  scene.add(base.mesh,peaks)
   const params = new URLSearchParams(location.search)
+  setPreset(camera,params.get('cam'))
   const radius = Number(params.get('radius')??480)
   const stream = new Stream(scene,manifest,base,THREE.MathUtils.clamp(Number.isFinite(radius)?radius:480,192,1600))
   const output = document.querySelector('output')!
