@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw
 from shapely import STRtree
 from shapely.geometry import box
 
-from common import CHUNK, GRID, LAT0, LON0, OUT, ll2xz, load_dem
+from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem
 from features import building_mesh, buildings, ground_features, polygons
 from karst import generate
 from bridges import bridge_tiles
@@ -91,7 +91,7 @@ def build(bbox, output, palette):
         mid = road.line.length/2
         anchor = road.line.interpolate(mid)
         ahead = road.line.interpolate(mid+1)
-        report.append(dict(name=road.name,kind=road.kind,lanes=road.lanes,width=round(road.width,1),
+        report.append(dict(way=road.way,samples=[[round(LON0+x/MLON,7),round(LAT0-z/MLAT,7),round(gap,1)] for x,z,gap in road.samples],name=road.name,kind=road.kind,lanes=road.lanes,width=round(road.width,1),
             frontage=round(road.frontage,1) if road.frontage else None,source=road.source,
             length=round(road.line.length),x=anchor.x,z=anchor.y,yaw=math.atan2(anchor.x-ahead.x,anchor.y-ahead.y)))
     (output/'street-report.json').write_text(json.dumps(report,ensure_ascii=False))

@@ -26,6 +26,8 @@ class Road:
     frontage: float | None
     source: str
     oneway: bool
+    way: int
+    samples: tuple
 
 
 def facade_gap(line, index):
@@ -46,11 +48,11 @@ def facade_gap(line, index):
             if distances:
                 hits.append(min(distances))
         if len(hits) == 2:
-            gaps.append(sum(hits))
-    return median(gaps) if gaps else None
+            gaps.append((center.x,center.y,sum(hits)))
+    return tuple(gaps)
 
 
-def profile(line, tags, index):
+def profile(line, tags, index,way=0):
     kind = tags['highway']
     pedestrian = kind == 'pedestrian'
     one_way = tags.get('oneway', 'yes' if tags.get('junction') == 'roundabout' else 'no') in ('yes','1','true','-1')
@@ -64,7 +66,8 @@ def profile(line, tags, index):
         default = 'yes' if sidewalk in ('both', side, 'yes') else 'no'
         return RULES['sidewalkWidth'] if not pedestrian and tags.get('sidewalk:'+side, default) == 'yes' else 0
     left, right = edge('left'), edge('right')
-    gap = facade_gap(line, index) if not width and (pedestrian or not lanes) else None
+    samples = facade_gap(line, index) if not width and (pedestrian or not lanes) else ()
+    gap = median(sample[2] for sample in samples) if samples else None
     if width:
         source = 'width'
     elif lanes and not pedestrian:
@@ -80,7 +83,7 @@ def profile(line, tags, index):
         if source == 'frontage':
             width = min(width, lanes * lane)
     divided = not pedestrian and tags.get('divider', 'yes' if not one_way and lanes >= 4 and kind in ('trunk','primary','secondary') else 'no') not in ('no','none','line')
-    return Road(line, width, kind, tags.get('name',''), lanes, left, right, divided, gap, source, one_way)
+    return Road(line, width, kind, tags.get('name',''), lanes, left, right, divided, gap, source, one_way,way,samples)
 
 
 def pair_carriageways(roads):

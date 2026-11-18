@@ -43,7 +43,7 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees,exclude):
                 intersections[coord] += 1
             kind = tags['highway']
             if kind in RULES['defaultWidth'] and tags.get('bridge','no') == 'no' and tags.get('tunnel','no') == 'no':
-                roads.append(profile(LineString(coords), tags, facades))
+                roads.append(profile(LineString(coords), tags, facades,elem['id']))
         elif tags.get('water') or tags.get('natural')=='water' or tags.get('waterway')=='riverbank':
             for poly in polygons(area(elem)):
                 banks.append((poly,tags.get('name',''),tags.get('water','')))

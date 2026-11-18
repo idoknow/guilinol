@@ -13,7 +13,7 @@ from scatter import CONFIG, walk_line
 
 def chunks(roads,banks,bounds,water,sample,exclude):
     surfaces, sidewalks, stripes, medians, gaps = [],[],[],[],[]
-    fixtures = defaultdict(lambda: [[],[],[]])
+    fixtures = defaultdict(lambda: [[],[],[],[]])
     lengths = dict(road=0,bank=0)
     def store(which,pt,item):
         if bounds.contains(pt) and (which!=0 or not exclude.covers(pt)):
@@ -29,6 +29,10 @@ def chunks(roads,banks,bounds,water,sample,exclude):
     controls = [(Point(ll2xz(node['lat'],node['lon'])),node['tags']['highway']) for node in load_osm()
                 if node['type']=='node' and node.get('tags',{}).get('highway') in ('crossing','traffic_signals','bus_stop','street_lamp')]
     control_index = STRtree([pt for pt,_ in controls])
+    for point,feature in controls:
+        slot={'street_lamp':0,'traffic_signals':2,'bus_stop':3}.get(feature)
+        if slot is not None:
+            store(slot,point,lambda origin:[round((v-o)*10) for v,o in zip(point.coords[0],origin)])
     crosswalks = set()
     for road in roads:
         line,width,kind = road.line,road.width,road.kind
@@ -50,7 +54,6 @@ def chunks(roads,banks,bounds,water,sample,exclude):
             point,feature = controls[index]
             along = line.project(point)
             if feature=='street_lamp':
-                store(0,point,lambda origin:[round((v-o)*10) for v,o in zip(point.coords[0],origin)])
                 continue
             if feature=='bus_stop':
                 if point.distance(line)>1:
@@ -78,8 +81,6 @@ def chunks(roads,banks,bounds,water,sample,exclude):
                 if feature=='traffic_signals':
                     stop=mid+tangent*2.4
                     stripes.append(LineString([stop,stop+normal*width/2]).buffer(.2,cap_style='flat'))
-                    pole=Point(mid+normal*(width/2+1))
-                    store(2,pole,lambda origin:[round((v-o)*10) for v,o in zip(pole.coords[0],origin)])
         if kind in CONFIG['mainStreets']:
             for side in [-1,1]:
                 for pt in walk_line(line,CONFIG['lampSpacing'],side*(width/2+2.6)):

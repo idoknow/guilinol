@@ -30,7 +30,7 @@ class LayoutTests(unittest.TestCase):
         with patch('streets.load_osm',return_value=[node]):
             encode,_=chunks(roads,[],box(-80,-80,80,80),[box(60,60,70,70)],lambda *_:(150,-32768),Polygon())
             signals=sum(len(encode(box(x,z,x+256,z+256),(x,z))[3]) for x in (-256,0) for z in (-256,0))
-        self.assertEqual(signals,4)
+        self.assertEqual(signals,1)
 
     def test_packed_assets(self):
         public=Path(__file__).resolve().parents[1]/'public'

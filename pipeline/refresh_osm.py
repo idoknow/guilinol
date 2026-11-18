@@ -48,5 +48,5 @@ def refresh(endpoint):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--endpoint', default='https://overpass.private.coffee/api/interpreter')
+    parser.add_argument('--endpoint', default='https://maps.mail.ru/osm/tools/overpass/api/interpreter')
     refresh(parser.parse_args().endpoint)

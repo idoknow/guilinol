@@ -5,7 +5,7 @@ import {tileMaterial} from './look/tiles'
 
 type Pair=[number,number]
 type Path=[number,...Pair[][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 export const streetSurfaceMat=new THREE.MeshStandardMaterial({vertexColors:true,side:THREE.DoubleSide})
 export const streetFurnitureGeo=new THREE.BoxGeometry()
@@ -14,7 +14,7 @@ nightStreets(streetSurfaceMat,streetFurnitureMat)
 
 tileMaterial(streetSurfaceMat,false)
 
-export function streetGeometry([paths,lamps,banks,signals=[]]:Streets,ground:(x:number,z:number)=>number){
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[]]:Streets,ground:(x:number,z:number)=>number){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],mats:number[]=[],cols:number[]=[]
   const vector=(pt:THREE.Vector2,offset:number)=>new THREE.Vector3(pt.x,ground(pt.x,pt.y)+offset,pt.y)
   const surfaceKinds:number[]=[]
@@ -52,6 +52,7 @@ export function streetGeometry([paths,lamps,banks,signals=[]]:Streets,ground:(x:
     box(px,y+.3,pz,.34,.6,.34,0,tone.lampPole);box(px,y+2.9,pz,.14,5.2,.14,0,tone.lampPole);box(px,y+5.3,pz,1.6,.08,.08,yaw,tone.lampPole)
     for(const side of [-.75,.75])box(px+Math.cos(yaw)*side,y+5.05,pz-Math.sin(yaw)*side,.32,.42,.32,yaw,tone.lampHead)}
   for(const [east,south] of signals){const x=east/10,z=south/10,y=ground(x,z);box(x,y+2.5,z,.16,5,.16);box(x,y+4.7,z,.4,.9,.3)}
+  for(const [east,south] of stops){const x=east/10,z=south/10,y=ground(x,z);box(x,y+1.3,z,.12,2.6,.12);box(x,y+2.15,z,.65,.85,.12)}
   for(const [ax,az,bx,bz,top,bottom] of banks){
     const a=new THREE.Vector3(ax/10,top/10,az/10),b=new THREE.Vector3(bx/10,top/10,bz/10)
     const foot=a.clone();foot.y=bottom/10;const end=b.clone();end.y=bottom/10
