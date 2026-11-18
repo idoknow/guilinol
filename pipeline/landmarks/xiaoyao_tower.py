@@ -37,7 +37,7 @@ def facade(model, base, half, height, upstairs):
             if bay or upstairs:
                 if model.detail:
                     model.box(east, base, half-1.4, width-.14, 1.05, .18, 'wood', True)
-                    model.box(east, base+1.05, half-1.4, width-.14, height-1.35, .12, 'glass', True)
+                    model.box(east, base+1.05, half-1.55, width-.14, height-1.35, .12, 'sign', True)
                 else:
                     model.box(east, base, half-1.4, width-.14, height-.3, .18, 'wood')
                 if model.detail:
@@ -59,17 +59,19 @@ def facade(model, base, half, height, upstairs):
 
 
 def tower(model):
-    model.box(0,-.2,0,22,1.56,22,'stone',True)
+    model.box(0,-.25,0,22.4,3.65,22.4,'brick',True)
+    model.box(0,3.4,0,22.8,.32,22.8,'pave',True)
     for side in (-1,1):
-        for step in range(8):
-            model.box(0,-.04,side*(11+(7.5-step)*.34),6,.04+(step+1)*.17,.34,'pave',True)
-    facade(model,1.36,8.5,5.9,False)
-    model.swept_roof(0,7.25,0,22,22,2.55)
-    model.box(0,9.65,0,16.8,.45,16.8,'pave',True)
-    facade(model,10.1,6.85,5.45,True)
-    model.swept_roof(0,15.55,0,18.9,18.9,2.9)
-    model.box(0,18.05,0,11.4,1.2,10.6,'wood')
-    model.swept_roof(0,19.25,0,15.5,14.9,4.15)
+        for step in range(22):
+            model.box(0,-.04,side*(11.4+(21.5-step)*.36),6.2,.04+(step+1)*3.72/22,.36,'pave',True)
+    facade(model,3.72,7.55,5.05,False)
+    model.swept_roof(0,8.77,0,22.4,22.4,2.1)
+    model.box(0,10.67,0,16.6,.45,16.6,'wood',True)
+    facade(model,11.12,6.65,4.9,True)
+    model.swept_roof(0,16.02,0,19.8,19.8,2.65)
+    model.box(0,18.33,0,11.4,1.05,10.6,'wood')
+    model.swept_roof(0,19.38,0,16.8,15.9,3.7)
+    model.beam([0,23.08,0],[0,24.15,0],.29,'gold',8)
 
 
 def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None):
@@ -96,6 +98,12 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None):
             scene.add_geometry(mesh,node_name=group+'_'+name if texture else 'collision_surface',parent_node_name=group if texture else scene.graph.base_frame)
         if model.visible:
             add(model.visible,model.uv,image,'joinery')
+        if model.pigmented:
+            triangles,colors=zip(*model.pigmented)
+            vertices=np.concatenate(triangles).reshape(-1,3)
+            rock=trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
+            rock.visual.vertex_colors=np.concatenate(colors).reshape(-1,4)
+            scene.add_geometry(rock,node_name=group+'_limestone',parent_node_name=group)
         if model.lamps:
             faces,uvs=zip(*model.lamps);add(faces,uvs,image,'lamp_lit')
         for key, parts in model.tile_parts.items():

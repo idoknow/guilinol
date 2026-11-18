@@ -12,7 +12,7 @@ def pagoda(model):
     model.beam([0,-.6,0],[0,.8,0],6.1,'stone',8,True)
     base=.8
     for tier in range(7):
-        radius=5.4-tier*.48;height=5.15-tier*.27
+        radius=6.5-tier*.43;height=5.15-tier*.27
         model.beam([0,base,0],[0,base+height,0],radius*.67,'brick',8,True)
         for face in range(8):
             angle=face*math.pi/4;cosine,sine=math.cos(angle),math.sin(angle)
@@ -24,10 +24,23 @@ def pagoda(model):
                 model.box(0,.45,0,radius*.44,height*.6,.15,'wood')
                 for offset in np.linspace(-.16,.16,5):model.box(offset*radius,.58,.11,.075,height*.51,.09,'red')
                 model.pose=(0,0,0,0)
-            for outer,inner,low,high in [(1.13,1.13,-.26,0),(1.13,.91,0,.29),(.91,.56,.29,1.36)]:
-                points=[(radius*scale*math.cos(theta),base+height+level,radius*scale*math.sin(theta))
-                        for scale,level,theta in [(outer,low,angle),(outer,low,angle+math.pi/4),(inner,high,angle+math.pi/4),(inner,high,angle)]]
-                model.mesh(points,[[0,1,2],[0,2,3]],'wood' if low<0 else 'tile')
+            for outer,inner,low,high in [(1.28,1.28,-.35,0),(1.28,1.03,0,.26),(1.03,.56,.26,1.68)]:
+                ends=np.array([[math.cos(theta),math.sin(theta)] for theta in (angle,angle+math.pi/4)])
+                section=[]
+                for along in np.linspace(0,1,7 if model.detail else 3):
+                    direction=(1-along)*ends[0]+along*ends[1]
+                    for scale,level in ((outer,low),(inner,high)):
+                        east,south=radius*scale*direction
+                        lift=.57*abs(2*along-1)**4*(scale/1.28)**4
+                        section.append([east,base+height+level+lift,south])
+                faces=[[i,i+1,i+2] for i in range(len(section)-2)]
+                for i in range(1,len(faces),2):faces[i].reverse()
+                model.mesh(section,faces,'wood' if low<0 else 'tile')
+            if model.detail:
+                model.pose=(radius*.78*cosine,base,radius*.78*sine,angle-math.pi/2)
+                model.box(0,.8,0,radius*.65,.12,.16,'red')
+                for baluster in np.linspace(-.29,.29,6):model.box(radius*baluster,0,0,.08,.8,.1,'wood')
+                model.pose=(0,0,0,0)
         base+=height+.75
     model.beam([0,base,0],[0,base+3.6,0],.26,'gold',8)
 

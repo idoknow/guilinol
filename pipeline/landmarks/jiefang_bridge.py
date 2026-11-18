@@ -27,7 +27,7 @@ def rail(model, length, offset, height, step, stone=False):
     for side in (-1,1):
         south=side*offset
         model.box(0,height+.92,south,length,.16,.2,'white' if stone else 'granite',True)
-        for east in np.linspace(-length/2,length/2,max(2,int(length/(step if model.detail else step*4)))):
+        for east in np.linspace(-length/2,length/2,max(2,int(length/(step if model.detail else step*6)))):
             model.box(east,height,south,.24,1.1,.24,'stone' if stone else 'granite',True)
             if model.detail:
                 model.box(east,height+1.08,south,.31,.12,.31,'white')
@@ -54,6 +54,16 @@ def bridge(model):
         model.box(pier,-8,0,4.4,6.85,width-2,'stone')
         for side in (-1,1):
             model.beam([pier,-8,side*(width/2-1)],[pier,-1.1,side*(width/2-1)],2.2,'stone',10)
+    for side in (-1,1):
+        for end in (-1,1):
+            east=end*133
+            for foot in (14.3,19.4):
+                model.box(east,.18,side*foot,.83,6.85,.63,'white',True)
+                model.box(east,.18,side*foot,1.12,.77,.96,'granite',True)
+            model.box(east,6.91,side*16.85,.84,.71,5.76,'white')
+            model.box(east,6.82,side*16.85,.47,.13,4.48,'lamp')
+        for east in np.linspace(-136,136,35 if model.detail else 13):
+            model.box(east,1.26,side*21.1,.55,.24,.39,'lamp')
     for start,end in zip((-140.5,-92,0,92),(-92,0,92,140.5)):
         arch(model,(start+end)/2,(end-start)/2,width-2,-5.5,4.1,-1.2)
     rail(model,length,21.1,.18,2.1)

@@ -8,6 +8,7 @@ from shapely.geometry import Polygon
 
 from common import GRID, ll2xz
 from auto_peaks import detect, suppress
+import wind_cave
 
 
 def profile(sample, east, south, angles):
@@ -179,6 +180,8 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
             footprints.append(Polygon(data[:segments][:,[0,2]]))
             if not far:
                 imprint(terrain,left,top,data[faces,:3])
+                if entry['name']=='明月峰':
+                    faces=wind_cave.cut(data,faces,terrain,left,top,GRID)
                 if mountain_trees is not None:
                     rng = np.random.default_rng(peak.get('seed',peak.get('osm')))
                     triangles = data[faces]
@@ -192,10 +195,11 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
                             weights = rng.dirichlet([1,1,1])
                             if weights@tri[:,6]<.5:
                                 mountain_trees.append((weights@tri[:,:3]-.3*normal,normal))
-            if far not in index_offsets:
-                index_offsets[far] = len(payload)
+            template = 'wind_cave' if not far and entry['name']=='明月峰' else far
+            if template not in index_offsets:
+                index_offsets[template] = len(payload)
                 payload.extend(faces.tobytes())
-            entry['lods'].append(dict(offset=len(payload),vertices=len(data),indices=faces.size,indexOffset=index_offsets[far]))
+            entry['lods'].append(dict(offset=len(payload),vertices=len(data),indices=faces.size,indexOffset=index_offsets[template]))
             cm = np.rint((data[:,:3]-entry['center'])*100)
             if cm.min() < -32768 or cm.max() > 32767:
                 raise ValueError(f"PK02 position out of range: {entry['name']}")
