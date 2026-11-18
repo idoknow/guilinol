@@ -139,7 +139,7 @@ def _guardrail_run(m: Builder, p0, p1):
     dx, dz = p1[0] - p0[0], p1[1] - p0[1]
     length = math.hypot(dx, dz)
     segs = max(1, round(length / 2.6))
-    yaw = math.atan2(-dx, dz)
+    yaw = math.atan2(dx, dz)
     mx, mz = (p0[0] + p1[0]) / 2.0, (p0[1] + p1[1]) / 2.0
     m.pose = (mx, 0.0, mz, yaw)
     # Top and bottom rails
@@ -296,7 +296,7 @@ def build_shizijie(m: Builder):
     m.cylinder_y(34.5, 23.8, 1.6, 60.5, 10.6, 'beige', sections=16 if m.detail else 8)
     _commercial_strip(m, (13.90, 65.34), (7.28, 90.65), 1, 4.6, 22.6, 'beige', ['red', 'terra', 'dark'], 4)
     _commercial_strip(m, (82.39, 54.74), (50.92, 46.35), 1, 4.6, 22.6, 'beige', ['blue', 'dark', 'red'], 6)
-    _commercial_strip(m, (69.26, 102.78), (82.39, 54.74), -1, 4.6, 22.6, 'beige', ['terra', 'red'], 7)
+    _commercial_strip(m, (69.26, 102.78), (82.39, 54.74), 1, 4.6, 22.6, 'beige', ['terra', 'red'], 7)
 
     # ------------------------------------------------------------------
     # 5. NE Corner Block & East Jiefang Wing (way/691576457, way/675759091)
@@ -310,20 +310,20 @@ def build_shizijie(m: Builder):
     m.prism(NE_CORNER, -2.0, 6.4, 'dark', collide=True, cap_mat='alum')
     m.prism(NE_CORNER, 4.4, 17.0, 'white', collide=True, cap_mat='roof')
     # Stepped corner tower crown with green rooftop sign frame (00-2019.jpg right)
-    m.pose = (60.5, 0.0, -24.5, -0.65)
+    m.pose = (60.5, 0.0, -24.5, math.atan2(-1.0, 0.85))
     m.box(0, 21.4, 0, 14.0, 3.2, 12.0, 'alum')
     if m.detail:
         m.box(0, 24.6, 5.8, 8.5, 1.5, 0.24, 'hedge')
         for gx in (-2.6, -0.9, 0.9, 2.6):
             m.box(gx, 24.9, 5.96, 0.82, 0.88, 0.08, 'white_lit')
     m.pose = (0.0, 0.0, 0.0, 0.0)
-    _commercial_strip(m, (49.35, -43.56), (65.01, -10.57), -1, 4.4, 21.4, 'white', ['hedge', 'blue', 'red'], 6)
-    _commercial_strip(m, (61.23, -84.32), (49.35, -43.56), -1, 4.4, 21.4, 'white', ['blue', 'dark'], 7)
+    _commercial_strip(m, (49.35, -43.56), (65.01, -10.57), 1, 4.4, 21.4, 'white', ['hedge', 'blue', 'red'], 6)
+    _commercial_strip(m, (61.23, -84.32), (49.35, -43.56), 1, 4.4, 21.4, 'white', ['blue', 'dark'], 7)
 
     # 4-storey Jiefang East Road arcade annex (way/675759091)
     m.prism(NE_ANNEX, -2.0, 4.5, 'dark', collide=True, cap_mat='beige')
     m.prism(NE_ANNEX, 2.5, 12.3, 'white', collide=True, cap_mat='roof')
-    _commercial_strip(m, (76.25, 1.14), (130.47, 13.93), -1, 4.2, 14.8, 'white', ['red', 'blue', 'terra'], 9)
+    _commercial_strip(m, (76.25, 1.14), (130.47, 13.93), 1, 4.2, 14.8, 'white', ['red', 'blue', 'terra'], 9)
 
     # Sidewalk camphor street trees & multi-globe lamps around the 3 corners
     if m.detail:

@@ -195,16 +195,16 @@ def build_central_square(m: Builder):
     # Central musical fountain basin & concentric illuminated water-jet rings (restored Oct 2024)
     m.cylinder_y(fcx, 0.13, 0.08, fcz, 12.5, 'dark', sections=24 if m.detail else 10)
     m.cylinder_y(fcx, 0.21, 0.06, fcz, 9.2, 'glass', sections=20 if m.detail else 10)
-    # Central vertical water spire + concentric fountain jets (translucent blue/white lit)
-    m.cylinder_y(fcx, 0.25, 5.6, fcz, 0.36, 'white_lit', sections=8 if m.detail else 5)
+    # Slender central vertical water spire + concentric fountain jets
+    m.cylinder_y(fcx, 0.25, 3.8, fcz, 0.09, 'white_lit', sections=8 if m.detail else 5)
     if m.detail:
-        for ring_r, jet_h, count in ((3.6, 3.6, 8), (7.4, 2.2, 14)):
+        for ring_r, jet_h, count in ((3.6, 2.3, 8), (7.4, 1.35, 14)):
             for i in range(count):
                 ang = i * (2 * math.pi / count)
                 jx = fcx + math.cos(ang) * ring_r
                 jz = fcz + math.sin(ang) * ring_r
-                m.cylinder_y(jx, 0.24, jet_h, jz, 0.16, 'white_lit', sections=6)
-                m.cylinder_y(jx, 0.21, 0.12, jz, 0.34, 'bronze', sections=6)
+                m.cylinder_y(jx, 0.24, jet_h, jz, 0.055, 'white_lit', sections=6)
+                m.cylinder_y(jx, 0.21, 0.08, jz, 0.22, 'bronze', sections=6)
 
     # Crescent green lawns & sculpted topiary hedges framing North & South of the 80 m circle
     for side in (-1, 1):

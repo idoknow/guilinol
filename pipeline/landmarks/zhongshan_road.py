@@ -174,7 +174,7 @@ def _median_segment(m: Builder, p0, p1):
     length = math.hypot(dx, dz)
     if length < 6.0:
         return
-    yaw = math.atan2(-dx, dz)
+    yaw = math.atan2(dx, dz)
     mx, mz = (p0[0] + p1[0]) / 2.0, (p0[1] + p1[1]) / 2.0
     y0 = _local_ground_y(mz)
 
@@ -209,7 +209,7 @@ def _planter_divider_run(m: Builder, p0, p1):
         return
     dx, dz = p1[0] - p0[0], p1[1] - p0[1]
     length = math.hypot(dx, dz)
-    yaw = math.atan2(-dx, dz)
+    yaw = math.atan2(dx, dz)
     count = max(1, int(length // 6.5))
     for i in range(count):
         t = (i + 0.5) / count

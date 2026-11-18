@@ -251,8 +251,8 @@ class Builder:
         dx, dy, dz, angle = self.pose
         if angle:
             c, s = math.cos(angle), math.sin(angle)
-            tris[:, :, 0] = local[:, :, 0] * c - local[:, :, 2] * s + dx
-            tris[:, :, 2] = local[:, :, 0] * s + local[:, :, 2] * c + dz
+            tris[:, :, 0] = local[:, :, 0] * c + local[:, :, 2] * s + dx
+            tris[:, :, 2] = -local[:, :, 0] * s + local[:, :, 2] * c + dz
         else:
             tris[:, :, 0] += dx
             tris[:, :, 2] += dz
@@ -662,7 +662,7 @@ def build_nikoniko(m: Builder):
     n_edges = len(FOOTPRINT)
     ground_mask = [i not in (9, 10, 11, 12) for i in range(n_edges)]
     m.prism(FOOTPRINT, -2.0, 6.8, 'dark', collide=True, cap_mat='alum', wall_mask=ground_mask)
-    m.prism(FOOTPRINT, 4.8, 18.2, 'stone', collide=True, cap_mat='roof')
+    m.prism(FOOTPRINT, 4.8, 18.2, 'alum', collide=True, cap_mat='roof')
 
     # Rooftop mechanical penthouse & skylight atrium curb (visible in 2024 aerials)
     m.pose = (-8.0, 0.0, -4.0, 0.22)
@@ -672,7 +672,8 @@ def build_nikoniko(m: Builder):
 
     # 3. East Wing (along Zhongshan Middle Rd) & North Wing (along Jiefang West Rd) curtain walls
     _facade_run(m, (38.80, 52.82), (53.67, -2.19), ground_h=4.8, upper_h=18.2, bays=9, brand_seed=1)
-    _facade_run(m, (29.09, -33.31), (-40.41, -46.09), ground_h=4.8, upper_h=18.2, bays=11, brand_seed=3)
+    _facade_run(m, (53.67, -2.19), (50.70, -14.83), ground_h=4.8, upper_h=18.2, bays=2, brand_seed=0)
+    _facade_run(m, (27.48, -26.63), (-40.41, -46.09), ground_h=4.8, upper_h=18.2, bays=11, brand_seed=3)
     # West return & south stepped return glass bands
     _facade_run(m, (-44.00, -43.57), (-55.60, 8.50), ground_h=4.8, upper_h=18.2, bays=7, brand_seed=2)
     _facade_run(m, (13.38, 46.01), (38.80, 52.82), ground_h=4.8, upper_h=18.2, bays=4, brand_seed=0)
