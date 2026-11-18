@@ -36,7 +36,13 @@ async function start() {
   const output = document.querySelector('output')!
   let previous=0, first=0, frame=0, sum=0, samples=0
   const stats = {firstMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0}
-  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats}})
+  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,probeFoot(){
+    const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
+    const clearance = ray.intersectObjects(scene.children)[0]?.distance
+    ray.setFromCamera(new THREE.Vector2(0,0),camera)
+    const hit = ray.intersectObjects(scene.children)[0]
+    return {clearance,lookingAt:hit?.object.parent?.name,wallDistance:hit?.distance}
+  }}})
   renderer.setAnimationLoop(now=>{
     const elapsed = previous?now-previous:0;previous=now
     controls(elapsed/1000)

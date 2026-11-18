@@ -7,7 +7,7 @@ const presets:Record<string,[Point,Point]> = {
   elephant:[[-740,171,868],[-855,179,1098]],
   overview:[[-512,5550,480],[-512,145,478]],
   south:[[-300,181,3090],[-287,202,2780]],
-  foot:[[-511,160,-575],[-513,169,-676]],
+  foot:[[-448,158.3,-728],[-499,166,-687]],
 }
 export function setPreset(camera:PerspectiveCamera,name:string|null) {
   if(name && Object.hasOwn(presets,name)) {

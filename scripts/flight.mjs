@@ -26,7 +26,14 @@ try {
   for(const name of ['lijiang','elephant','overview','south','foot','palace']) {
     await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&cam=${name}`)
     await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
-    await settled();await page.screenshot({path:`${out}/${name}.png`})
+    await settled()
+    if(name==='foot') {
+      const probe = await page.evaluate(()=>window.viewer.probeFoot())
+      console.log('foot',probe)
+      assert.ok(probe.clearance>=2 && probe.clearance<=5)
+      assert.equal(probe.lookingAt,'独秀峰')
+    }
+    await page.screenshot({path:`${out}/${name}.png`})
   }
   await page.evaluate(()=>{const {camera}=window.viewer;camera.position.set(-610,245,-90);camera.lookAt(-530,155,-680)})
   const before=await page.evaluate(()=>window.viewer.camera.position.toArray())

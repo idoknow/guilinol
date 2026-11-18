@@ -42,7 +42,7 @@ def build(bbox, output, palette):
     def elevation(east,south):
         row = np.clip(round((south-top)/GRID),0,depth//GRID)
         col = np.clip(round((east-left)/GRID),0,width//GRID)
-        return terrain[row,col]/10
+        return original[row,col]/10
     layers = ground_features(bounds)
     surface = np.full_like(terrain, DRY)
     texture = Image.new('RGB',(width,depth),palette['ground'])
@@ -60,10 +60,10 @@ def build(bbox, output, palette):
     terrain[wet] = np.minimum(terrain[wet],surface[wet]-20)
     output.mkdir(parents=True, exist_ok=True)
     original = terrain.copy()
-    peaks = generate(original,terrain,left,top,bbox,output)
+    peaks, peak_shapes = generate(original,terrain,left,top,bbox,output)
     surface[wet & (terrain > surface)] = DRY
     wet = surface != DRY
-    footprints, heights = buildings(bounds, elevation)
+    footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes))
     index = STRtree(footprints)
     def asset(name):
         return {'file':name,'bytes':(output/name).stat().st_size}

@@ -59,7 +59,7 @@ def ground_features(bounds):
     return layers
 
 
-def buildings(bounds, elevation):
+def buildings(bounds, elevation, peaks):
     footprints, heights = [], []
     with (Path(RAW)/'overture_buildings.csv').open() as source:
         for row in csv.DictReader(source, delimiter='\t'):
@@ -67,6 +67,8 @@ def buildings(bounds, elevation):
             if not geometry.intersects(bounds):
                 continue
             for poly in polygons(make_valid(geometry)):
+                if peaks.query(poly,predicate='intersects').size:
+                    continue
                 center = poly.representative_point()
                 variation = zlib.crc32(row['id'].encode()) % 3
                 floors = min(7, 1 + int(np.sqrt(poly.area)/10) + variation)
