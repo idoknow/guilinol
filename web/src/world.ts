@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {bridgeGeometry, bridgeMaterial} from './look/bridge'
 import {look} from './look/config'
 import type {Peaks} from './peaks'
 
@@ -105,7 +106,6 @@ export async function detail(tile:Tile, signal:AbortSignal) {
     group.add(new THREE.Mesh(walls,buildings))
   }
   const bridge = new THREE.BufferGeometry()
-  if(deck.length){bridge.setAttribute('position',new THREE.BufferAttribute(deck,3)); bridge.computeVertexNormals(); group.add(new THREE.Mesh(bridge,deckMaterial))}
+  if(deck.length) group.add(new THREE.Mesh(bridge.copy(bridgeGeometry(deck)),bridgeMaterial))
   return {group,groundMesh,terrain,water,rings,deck,dispose(){bridge.dispose();geometry.dispose(); walls.dispose(); material.map!.image.close(); material.map!.dispose(); material.dispose()}}
 }
-const deckMaterial = new THREE.MeshStandardMaterial()

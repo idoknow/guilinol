@@ -14,5 +14,7 @@ export const look = {
   sunColor: 0xfff0d8, sunPower: 2.1,
   hemiSky: 0xd8e6e6, hemiGround: 0x8a9172, hemiPower: 1.7,
   exposure: 1.0,
+  // 石桥 decks (GL03): warm limestone top, shaded fascia hanging bridgeDepth metres below the deck.
+  bridgeTop: 0xc4bca8, bridgeSide: 0x938d7e, bridgeDepth: 1.2,
   wall: 0xe9e5da, roof: 0x646b6d, roughness: 1, metalness: 0,
 }

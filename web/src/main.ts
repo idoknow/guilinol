@@ -55,8 +55,17 @@ async function start() {
         await walker.enter(gate.x,gate.z,gate.yaw,'fallback')
     }finally{switching=false}
   }
-  window.addEventListener('keydown',event=>{if(event.code==='KeyV'&&!event.repeat)void toggle()})
-  if(matchMedia('(pointer:coarse)').matches){const button=document.createElement('button');button.className='btn-mode';button.textContent='飞行 / 步行';button.style.cssText='position:fixed;right:16px;top:16px';button.onclick=()=>void toggle();document.body.append(button)}
+  window.addEventListener('keydown',event=>{if(event.code==='KeyV'&&!event.repeat)void toggle().then(showMode)})
+  const touch=matchMedia('(pointer:coarse)').matches,hint=document.querySelector<HTMLElement>('.hint')!,toast=document.querySelector<HTMLElement>('.toast')!
+  const modeButton=document.createElement('button');modeButton.className='btn-mode'
+  function showMode(){const walking=!!walker?.active;document.body.dataset.mode=walking?'walk':'fly'
+    modeButton.textContent=walking?'起飞':'落地步行';modeButton.setAttribute('aria-label',walking?'切换到飞行':'切换到步行')
+    hint.textContent=walking?'WASD 走 · Shift 跑 · 空格 跳 · 拖动转视角 · 滚轮远近 · V 起飞':'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行'}
+  let toastTimer=0
+  window.addEventListener('walk:spawn-failed',()=>{toast.textContent='这里没有可以落脚的地方，飞近岸边或街道再试';toast.classList.add('show')
+    clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>toast.classList.remove('show'),3200)})
+  if(touch){modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton)}
+  showMode()
   if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,get walk(){return walker},probeFoot(){
     const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
     const clearance = ray.intersectObjects(scene.children)[0]?.distance
@@ -78,6 +87,6 @@ async function start() {
       sum=0;samples=0
     }
   })
-  if(params.get('mode')==='walk'||params.has('spawn'))await toggle(true)
+  if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }
 start().catch(error=>{document.querySelector('output')!.value=`无法加载：${error.message}`;console.error(error)})
