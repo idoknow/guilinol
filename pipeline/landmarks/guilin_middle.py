@@ -53,29 +53,26 @@ def gate(b, z=32.9):
         cylinder(wall, (x, 0, z), 0.92, 6.15, 'granite', 16 if b.detail else 8, 2.4)
         box(wall, (x, 6.32, z), (2.15, 0.42, 2.15), 'granite', 0.8)
         lion(wall, x, 6.48, z + 1.45, 0.25 if x < 0 else -0.25, 0.78)
-    box(wall, (0, 6.7, z), (14.4, 1.15, 1.9), 'cream', 1.4)
+    box(wall, (0, 6.7, z), (14.4, 1.15, 1.9), 'white', 1.6)
     board(wall, 0, 6.72, z + 1.08, 8.8, 0.95, 'sign_school')
-    hip_roof(wall, (0, z), 8.05, 15.6, 4.6, 2.05, 0.75, 0.55, 'glaze', 'cream')
-    # White teaching block behind the columns. Side wings stay behind the columns,
-    # so the pair of piers reads as the gate and not as two beige towers.
-    box(wall, (0, 5.4, z - 11), (22, 10.8, 14), 'cream', 2.2)
-    hip_roof(wall, (0, z - 11), 10.9, 23, 15, 2.8, 0.85, 0.5, 'glaze', 'cream')
-    for x in (-12.4, 12.4):
-        box(wall, (x, 3.5, z - 12), (6.4, 7.0, 10), 'cream', 1.6)
-        hip_roof(wall, (x, z - 12), 7.1, 7.2, 11, 1.7, 0.5, 0.45, 'glaze', 'cream')
+    hip_roof(wall, (0, z), 8.05, 15.6, 4.6, 2.05, 0.75, 0.55, 'glaze', 'white')
+    # White tile blocks on either side of the beam. The span between the columns
+    # stays open, so the gate is a passage and the campus shows through it.
+    for x in (-9.0, 9.0):
+        box(wall, (x, 5.2, z - 6), (8.0, 10.4, 12), 'white', 2.2)
+        hip_roof(wall, (x, z - 6), 10.55, 8.6, 13, 1.55, 0.5, 0.45, 'glaze', 'white')
     if b.detail:
-        for x in (-6, -2, 2, 6):
-            for row in (2.4, 5.6, 8.6):
-                box(lit, (x, row, z - 3.4), (1.4, 1.55, 0.08), 'glass', None)
+        for x in (-11.2, -7.2, 7.2, 11.2):
+            for row in (2.4, 5.6, 8.4):
+                box(lit, (x, row, z + 0.06), (1.35, 1.4, 0.08), 'glass', None)
     lion(wall, -5.4, 0, z + 3.4, 0.5, 1.25)
     lion(wall, 5.4, 0, z + 3.4, -0.5, 1.25)
     if b.collide:
         for x in (-3.85, 3.85):
             solid(b.hit, (x, 3.3, z), (1.9, 6.6, 1.9), 'granite')
-        solid(b.hit, (0, 6.7, z), (14.4, 1.2, 1.9), 'cream')
-        solid(b.hit, (0, 5.4, z - 11), (22, 10.8, 14), 'cream')
-        solid(b.hit, (-12.4, 3.5, z - 12), (6.4, 7.0, 10), 'cream')
-        solid(b.hit, (12.4, 3.5, z - 12), (6.4, 7.0, 10), 'cream')
+        solid(b.hit, (0, 6.7, z), (14.4, 1.2, 1.9), 'white')
+        solid(b.hit, (-9.0, 5.2, z - 6), (8.0, 10.4, 12), 'white')
+        solid(b.hit, (9.0, 5.2, z - 6), (8.0, 10.4, 12), 'white')
         solid(b.hit, (-5.4, 0.8, z + 3.4), (1.0, 1.6, 1.4), 'granite')
         solid(b.hit, (5.4, 0.8, z + 3.4), (1.0, 1.6, 1.4), 'granite')
 

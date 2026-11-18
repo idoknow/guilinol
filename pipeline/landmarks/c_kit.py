@@ -25,7 +25,8 @@ RECTS = {
     'yellow': (0, 256, 256, 192),
     'cream': (256, 256, 256, 192),
     'vermilion': (512, 256, 256, 192),
-    'door': (768, 256, 256, 192),
+    'door': (768, 256, 256, 128),
+    'white': (768, 384, 256, 64),
     'wood': (0, 448, 256, 192),
     'lattice': (256, 448, 256, 192),
     'granite': (512, 448, 256, 192),
@@ -46,16 +47,33 @@ RECTS = {
 
 
 def _font(size, bold=False):
-    if bold and Path('/System/Library/Fonts/Supplemental/Songti.ttc').exists():
-        return ImageFont.truetype('/System/Library/Fonts/Supplemental/Songti.ttc', size, index=0)
-    for path in (
-        '/System/Library/Fonts/Supplemental/Songti.ttc',
-        '/System/Library/Fonts/Hiragino Sans GB.ttc',
-        '/System/Library/Fonts/STHeiti Medium.ttc',
-    ):
-        if Path(path).exists():
-            return ImageFont.truetype(path, size)
-    return ImageFont.load_default()
+    """CJK face for the plaques. The bitmap default font has no Chinese glyphs, so a miss is a hard error."""
+    noto = '/usr/share/fonts/opentype/noto'
+    candidates = []
+    if bold:
+        candidates.append(('/System/Library/Fonts/Supplemental/Songti.ttc', 0))
+    candidates.extend((
+        (f'{noto}/NotoSerifCJK-Bold.ttc', 2),
+        (f'{noto}/NotoSansCJK-Bold.ttc', 2),
+        (f'{noto}/NotoSerifCJK-Regular.ttc', 2),
+        ('/System/Library/Fonts/Supplemental/Songti.ttc', 0 if bold else 1),
+        ('/System/Library/Fonts/Hiragino Sans GB.ttc', 0),
+        ('/System/Library/Fonts/STHeiti Medium.ttc', 0),
+    ))
+    for path, index in candidates:
+        if not Path(path).exists():
+            continue
+        try:
+            return ImageFont.truetype(path, size, index=index)
+        except OSError:
+            try:
+                return ImageFont.truetype(path, size, index=0)
+            except OSError:
+                continue
+    raise SystemExit(
+        'c_kit: no CJK font for landmark signs. '
+        'Need NotoSerifCJK-Bold.ttc (or Songti); refusing ImageFont.load_default().'
+    )
 
 
 def _fill(img, rect, color):
@@ -63,7 +81,7 @@ def _fill(img, rect, color):
     img[y:y + h, x:x + w] = color
 
 
-def _bricks(img, rect, color, mortar, bw, bh, seed, moss=0, shade=16):
+def _bricks(img, rect, color, mortar, bw, bh, seed, moss=0, shade=16, neutral=False):
     x, y, w, h = rect
     rng = np.random.default_rng(seed)
     patch = np.empty((h, w, 3), np.uint8)
@@ -74,19 +92,29 @@ def _bricks(img, rect, color, mortar, bw, bh, seed, moss=0, shade=16):
         offset = bw // 2 if row % 2 else 0
         xx = -offset
         while xx < w:
-            jitter = rng.integers(-shade, shade + 1, 3)
+            if neutral:
+                delta = int(rng.integers(-shade, shade + 1))
+                jitter = np.array([delta, delta, delta])
+            else:
+                jitter = rng.integers(-shade, shade + 1, 3)
             x0, x1 = max(0, xx + 2), min(w, xx + bw - 1)
             y0, y1 = min(h, yy + 2), min(h, yy + bh - 1)
             if x1 > x0 and y1 > y0:
                 patch[y0:y1, x0:x1] = np.clip(np.array(color) + jitter, 0, 255)
             xx += bw
-        if moss and row % 3 == 0:
+        if moss and row % 3 == 0 and not neutral:
             for _ in range(moss):
                 mx = int(rng.integers(0, w))
                 my = min(h - 1, yy + bh - 1)
                 patch[max(0, my - 1):min(h, my + 2), max(0, mx - 2):min(w, mx + 3)] = (118, 122, 118)
         yy += bh
         row += 1
+    if neutral and moss:
+        for _ in range(moss * 3):
+            sw, sh = int(rng.integers(14, 34)), int(rng.integers(8, 18))
+            sx = int(rng.integers(0, max(1, w - sw)))
+            sy = int(rng.integers(0, max(1, h - sh)))
+            patch[sy:sy + sh, sx:sx + sw] = np.clip(patch[sy:sy + sh, sx:sx + sw].astype(np.int16) - 32, 0, 255)
     img[y:y + h, x:x + w] = patch
 
 
@@ -197,7 +225,8 @@ def paint_atlas():
     #7a4038 (03-2019 lattice shadow #593d32, brick #8b887f).
     """
     img = np.zeros((ATLAS, ATLAS, 3), np.uint8)
-    _bricks(img, RECTS['ashlar'], (198, 196, 188), (158, 156, 148), 92, 48, 3, moss=4)
+    # Neutral limestone, about 0.5 x 0.3 m at the bastion's 2.6 m tile. Brightness only, ±8%.
+    _bricks(img, RECTS['ashlar'], (186, 186, 184), (158, 158, 156), 50, 30, 3, moss=5, shade=14, neutral=True)
     _rubble(img, RECTS['rubble'])
     _tiles(img, RECTS['graytile'], (104, 108, 110), (72, 74, 76), 4)
     _tiles(img, RECTS['blacktile'], (58, 60, 64), (36, 38, 42), 5)
@@ -208,6 +237,7 @@ def paint_atlas():
     _fill(img, RECTS['vermilion'], (150, 48, 46))
     _noise(img, RECTS['vermilion'], 7, 8)
     _studs(img, RECTS['door'], (142, 48, 52), (196, 164, 92))
+    _bricks(img, RECTS['white'], (246, 246, 244), (226, 226, 224), 48, 24, 21, shade=4, neutral=True)
     _fill(img, RECTS['wood'], (122, 64, 56))
     _noise(img, RECTS['wood'], 8, 12)
     _lattice(img, RECTS['lattice'], (62, 36, 32), (148, 86, 72))
@@ -502,6 +532,13 @@ def _fascia(mesh, a, b, drop, region):
     mesh.face([a, b, bo, ao], (0, 1, 0), region, 0.4)
 
 
+def _ceiling(mesh, quad):
+    """Wooden 望板 just under a roof slope, facing down, so the eave is not a culled hole."""
+    pts = [np.asarray(p, np.float64) + np.array([0.0, -0.08, 0.0]) for p in quad]
+    a, b, c, d = pts
+    mesh.face([a, d, c, b], (0, -1, 0), 'wood', 0.8)
+
+
 def _soffit(mesh, a, b, center, reach):
     """Underside of the overhang, so the eave has depth when seen from below."""
     a, b = np.asarray(a, np.float64), np.asarray(b, np.float64)
@@ -525,7 +562,7 @@ def _chiwen(mesh, origin, direction, region):
     box(mesh, (ox + dx * 0.98, oy + 1.65, oz + dz * 0.98), (0.24, 0.4, 0.2), region, 0.25)
 
 
-def xieshan(mesh, center, y, width, depth, rise, overhang, lift, tile_region, fascia_region, tiers=1, gable_region='wood', sides=4):
+def xieshan(mesh, center, y, width, depth, rise, overhang, lift, tile_region, fascia_region, tiers=1, gable_region='wood', sides=4, ceiling=False):
     """Traditional roof shared by the C-group landmarks.
 
     Rectangular plan is a 歇山顶: four lower slopes, then a gable (山花) and a
@@ -539,11 +576,11 @@ def xieshan(mesh, center, y, width, depth, rise, overhang, lift, tile_region, fa
         scale = 0.74 ** tier
         _one_roof(
             mesh, center, y + tier * rise * 0.78, width * scale, depth * scale,
-            rise * (0.7 if tier else 1), overhang * scale, lift, tile_region, fascia_region, gable_region, sides,
+            rise * (0.7 if tier else 1), overhang * scale, lift, tile_region, fascia_region, gable_region, sides, ceiling,
         )
 
 
-def _one_roof(mesh, center, y, width, depth, rise, overhang, lift, tile_region, fascia_region, gable_region, sides):
+def _one_roof(mesh, center, y, width, depth, rise, overhang, lift, tile_region, fascia_region, gable_region, sides, ceiling=False):
     x, z = center
     if sides >= 6:
         _hex_roof(mesh, center, y, min(width, depth) / 2 + overhang, rise, lift, tile_region, fascia_region)
@@ -570,7 +607,8 @@ def _one_roof(mesh, center, y, width, depth, rise, overhang, lift, tile_region, 
         for ring in (south, east, north, west):
             for a, b in zip(ring, ring[1:]):
                 _fascia(mesh, a, b, 0.46, fascia_region)
-                _soffit(mesh, a, b, (x, z), overhang * 0.9)
+                if not ceiling:
+                    _soffit(mesh, a, b, (x, z), overhang * 0.9)
     # 收山: hips stop and the gable starts, far enough in that the 山花 reads.
     gy = y + rise * 0.5
     ix, iz = max(hw * 0.46, hw - 2.6), hd * 0.34
@@ -589,6 +627,8 @@ def _one_roof(mesh, center, y, width, depth, rise, overhang, lift, tile_region, 
             c = top0 * (1 - t1) + top1 * t1
             d = top0 * (1 - t0) + top1 * t0
             _course(mesh, [a, b, c, d], outward, tile_region, 0.46)
+            if ceiling:
+                _ceiling(mesh, [a, b, c, d])
     ridge_y = y + rise
     half = ix * 0.96
     rw, re = np.array([x - half, ridge_y, z]), np.array([x + half, ridge_y, z])
@@ -596,6 +636,9 @@ def _one_roof(mesh, center, y, width, depth, rise, overhang, lift, tile_region, 
     n0, n1 = ring_top['n']
     _course(mesh, [s0, s1, re, rw], (0, rise, iz), tile_region, 0.46)
     _course(mesh, [n1, n0, rw, re], (0, rise, -iz), tile_region, 0.46)
+    if ceiling:
+        _ceiling(mesh, [s0, s1, re, rw])
+        _ceiling(mesh, [n1, n0, rw, re])
     # 山花, the vertical triangle on each gable end.
     mesh.face([ring_top['e'][0], ring_top['e'][1], re], (1, 0, 0), gable_region, None)
     mesh.face([ring_top['w'][0], ring_top['w'][1], rw], (-1, 0, 0), gable_region, None)
@@ -638,8 +681,11 @@ def _hex_roof(mesh, center, y, radius, rise, lift, tile_region, fascia_region):
     box(mesh, (x, y + rise + 0.28, z), (0.28, 0.5, 0.28), tile_region, 0.3)
 
 
-def hip_roof(mesh, center, y, width, depth, rise, overhang, lift, tile_region, soffit_region, tiers=1, sides=4):
-    xieshan(mesh, center, y, width, depth, rise, overhang, lift, tile_region, soffit_region, tiers=tiers, sides=sides)
+def hip_roof(mesh, center, y, width, depth, rise, overhang, lift, tile_region, soffit_region, tiers=1, sides=4, ceiling=False):
+    xieshan(
+        mesh, center, y, width, depth, rise, overhang, lift, tile_region, soffit_region,
+        tiers=tiers, sides=sides, ceiling=ceiling,
+    )
 
 
 def railing(mesh, a, b, y, height, region, post=0.8, stone=False):
