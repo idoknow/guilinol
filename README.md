@@ -22,6 +22,8 @@ npm run preview
 
 打开终端显示的本地地址。`public/world/` 是可重建产物；静态站点为 `dist/`（含 world），不提交原始数据或构建产物。开发模式用 `npm run dev`。
 
+`npm run world` 同时生成 `manifest.atlas` 指向的 gzip JSON 地图数据。按需调用 `loadAtlas(manifest)` 后可使用 `roadAt(x,z,max=18)` 查询路名、`search(query,limit?)` 搜索地标；坐标为场景 x/z 米。`npm run verify:atlas` 在 Node 中验证生成物与查询结果，无需浏览器。
+
 - 桌面：点击画面进入鼠标视角，Esc 释放；WASD 飞行，Q/E 降升，左 Shift 加速。手机：单指转向、双指一起拖动前后/横移。
 - 加载半径默认 480 m，可在网址后加 `?radius=750`，范围 192–1600 m。调试栏的 B 是累计成功读取的 world 文件大小，不含 JS/HTML。
 - 默认市中心框，自定义例：`npm run world -- --bbox 25.275 110.29 25.285 110.30 --output public/sample`。南西北东顺序；需自行提供覆盖对齐后区域的数据。不同框建议用新的空目录，避免残留不再被 manifest 引用的旧块。

@@ -9,6 +9,7 @@
     "build": "tsc -p web && vite build web --config web/vite.config.ts",
     "preview": "vite preview web --config web/vite.config.ts",
     "verify:flight": "node scripts/flight.mjs",
+    "verify:atlas": "node --experimental-strip-types scripts/atlas.mjs",
     "verify:walk": "node scripts/walk.mjs",
     "shoot": "node scripts/shoot.mjs"
   },
