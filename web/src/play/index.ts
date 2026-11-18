@@ -95,9 +95,11 @@ export function play(host:Host) {
     await travel(name,async()=>{leaveSummit(); await host.walkTo(tx,tz,tx===x&&tz===z?(host.walker()?.yaw??0):yaw,'map')})
   }
   let atlas:import('../map/atlas').Atlas|undefined, map:ReturnType<typeof mapView>|undefined
-  if((host.manifest as {atlas?:unknown}).atlas) setTimeout(()=>void import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
+  // Atlas loads only after the scene has been running a couple of seconds, never inside the first-frame budget.
+  const loadMap = ()=>void import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
     atlas = loaded; map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s)})
-  }).catch(error=>console.warn('atlas',error)),600)
+  }).catch(error=>console.warn('atlas',error))
+  let mapRequested = !(host.manifest as {atlas?:unknown}).atlas
 
   // --- Card
   const card = document.createElement('aside'); card.className = 'spot-card'; card.hidden = true; card.setAttribute('role','dialog')
@@ -185,6 +187,7 @@ export function play(host:Host) {
   let pulse = 0
   function tick(dt:number) {
     pulse += dt
+    if(!mapRequested&&pulse>2.5){mapRequested = true; loadMap()}
     const walker = host.walker(), walking = !!walker?.active, p = walking?walker!.position:host.camera.position
     for(const m of marks) {
       const d = Math.hypot(m.spot.x-p.x,m.spot.z-p.z)
