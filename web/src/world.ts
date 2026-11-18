@@ -1,0 +1,97 @@
+import * as THREE from 'three'
+import {look} from './look/config'
+
+interface Asset {file:string; bytes:number}
+export interface Tile extends Asset {x:number; z:number}
+export interface Manifest {
+  version:number; extent:[number,number,number,number]; grid:number; chunkSize:number; chunks:Tile[];
+  overview:{step:number; heights:Asset; texture:Asset}
+}
+export let bytes = 0
+export async function fetchAsset(file:string, signal?:AbortSignal) {
+  const response = await fetch(`./world/${file}`, {signal})
+  if (!response.ok) throw Error(`${file}: HTTP ${response.status}`)
+  const data = await response.arrayBuffer()
+  bytes += data.byteLength
+  return data
+}
+
+async function surfaceMaterial(data:ArrayBuffer) {
+  const bitmap = await createImageBitmap(new Blob([data],{type:'image/png'}),{imageOrientation:'flipY'})
+  const map = new THREE.Texture(bitmap)
+  map.colorSpace = THREE.SRGBColorSpace
+  map.needsUpdate = true
+  return new THREE.MeshStandardMaterial({map, roughness:look.roughness, metalness:look.metalness})
+}
+
+function ground(width:number, depth:number, step:number, height:(col:number,row:number)=>number) {
+  const geometry = new THREE.PlaneGeometry(width,depth,width/step,depth/step)
+  geometry.rotateX(-Math.PI/2).translate(width/2,0,depth/2)
+  const positions = geometry.getAttribute('position')
+  for(let row=0;row<=depth/step;row++) for(let col=0;col<=width/step;col++)
+    positions.setY(row*(width/step+1)+col,height(col,row))
+  geometry.computeVertexNormals()
+  return geometry
+}
+
+export async function overview(manifest:Manifest) {
+  const {heights,texture,step} = manifest.overview
+  const [left,top,width,depth] = manifest.extent
+  const [values,image] = await Promise.all([fetchAsset(heights.file),fetchAsset(texture.file)])
+  const samples = new Int16Array(values), cols = width/step
+  const geometry = ground(width,depth,step,(col,row)=>samples[row*(cols+1)+col]/10)
+  const mesh = new THREE.Mesh(geometry,await surfaceMaterial(image))
+  mesh.position.set(left,0,top)
+  const indices = geometry.index!, original = indices.array.slice(), side = manifest.chunkSize/step
+  function toggle(tile:Tile, show:boolean) {
+    const first = ((tile.z-top)/step*cols+(tile.x-left)/step)*6
+    for(let row=0;row<side;row++) {
+      const from = first+row*cols*6, to = from+side*6
+      if(show) indices.array.set(original.subarray(from,to),from)
+      else indices.array.fill(0,from,to)
+      indices.addUpdateRange(from,to-from)
+    }
+    indices.needsUpdate = true
+  }
+  return {mesh,toggle}
+}
+
+const buildings = new THREE.MeshStandardMaterial({color:look.building,roughness:look.roughness,metalness:look.metalness})
+export async function detail(tile:Tile, signal:AbortSignal) {
+  const compressed = await fetchAsset(tile.file,signal)
+  const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
+  signal.throwIfAborted()
+  const view = new DataView(buffer)
+  if(view.getUint32(0)!==0x474c3031) throw Error('Invalid GL01 tile')
+  const [vertices,count,collision,imageBytes] = [4,8,12,16].map(offset=>view.getUint32(offset,true))
+  let offset = 20
+  const terrain = new Int16Array(buffer,offset,4225); offset+=8450
+  const water = new Int16Array(buffer,offset,4225); offset+=8450
+  const positions = new Int16Array(buffer,offset,vertices*3); offset+=vertices*6
+  const normals = new Int8Array(buffer,offset,vertices*3); offset+=vertices*3
+  const indices = new Uint32Array(buffer.slice(offset,offset+count*4)); offset+=count*4+collision
+  if(offset+imageBytes!==buffer.byteLength) throw Error('Invalid GL01 sections')
+  const material = await surfaceMaterial(buffer.slice(offset))
+  const sample = (col:number,row:number)=>{
+    const index = row*65+col
+    return (water[index]===-32768?terrain[index]:water[index])/10
+  }
+  const geometry = ground(256,256,8,(column,line)=>{
+    const col=column*2,row=line*2
+    if(col===0||col===64) return THREE.MathUtils.lerp(sample(col,row&~7),sample(col,Math.min(64,(row&~7)+8)),(row%8)/8)
+    if(row===0||row===64) return THREE.MathUtils.lerp(sample(col&~7,row),sample(Math.min(64,(col&~7)+8),row),(col%8)/8)
+    return sample(col,row)
+  })
+  const group = new THREE.Group()
+  group.position.set(tile.x,0,tile.z)
+  group.add(new THREE.Mesh(geometry,material))
+  const walls = new THREE.BufferGeometry()
+  if(vertices) {
+    const meters = Float32Array.from(positions,(value,index)=>value/(index%3===1?10:100))
+    walls.setAttribute('position',new THREE.BufferAttribute(meters,3))
+    walls.setAttribute('normal',new THREE.BufferAttribute(normals,3,true))
+    walls.setIndex(new THREE.BufferAttribute(indices,1))
+    group.add(new THREE.Mesh(walls,buildings))
+  }
+  return {group,dispose(){geometry.dispose(); walls.dispose(); material.map!.image.close(); material.map!.dispose(); material.dispose()}}
+}
