@@ -48,4 +48,6 @@ def load_dem(gx=None, gz=None):
     return result
 
 def load_osm():
-    return json.load(open(os.path.join(RAW, 'osm.json')))['elements']
+    snapshot = os.path.join(RAW, 'osm-2026-11.json')
+    with open(snapshot if os.path.isfile(snapshot) else os.path.join(RAW, 'osm.json')) as source:
+        return json.load(source)['elements']

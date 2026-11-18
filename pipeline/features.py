@@ -13,6 +13,7 @@ from shapely.geometry.polygon import orient
 from shapely.ops import polygonize, unary_union
 
 from common import LAT0, LON0, MLAT, MLON, RAW, ll2xz, load_osm
+from road_profile import RULES
 
 
 def polygons(geometry):
@@ -50,6 +51,8 @@ def ground_features(bounds):
               or tags.get('landuse') in ('forest','grass','meadow','recreation_ground','village_green')):
             key = 'green'
         elif 'highway' in tags and element['type'] == 'way':
+            if tags['highway'] in RULES['defaultWidth'] and tags.get('bridge','no')=='no' and tags.get('tunnel','no')=='no':
+                continue
             coords = points(element)
             if len(coords) > 1:
                 road = LineString(coords).buffer(widths.get(tags['highway'], 3)/2, quad_segs=2)
@@ -61,7 +64,7 @@ def ground_features(bounds):
     return layers
 
 
-def buildings(bounds, elevation, peaks):
+def buildings(bounds, elevation, peaks,layout):
     footprints, heights = [], []
     rules = json.loads(Path(__file__).with_name('building-kinds.json').read_text())
     districts = unary_union([Polygon([ll2xz(*ll) for ll in ring]) for ring in rules['oldDistrictsLatLon']])
@@ -71,7 +74,10 @@ def buildings(bounds, elevation, peaks):
     with (Path(RAW)/'overture_buildings.csv').open() as source:
         for row in csv.DictReader(source, delimiter='\t'):
             geometry = affine_transform(from_wkt(row['wkt']), [MLON, 0, 0, -MLAT, -LON0*MLON, LAT0*MLAT])
-            if not geometry.intersects(bounds):
+            if row['id'] in layout.ids:
+                layout.exclude = layout.exclude.union(geometry)
+                continue
+            if not geometry.intersects(bounds) or layout.exclude.intersects(geometry):
                 continue
             for poly in polygons(make_valid(geometry)):
                 if peaks.query(poly,predicate='intersects').size:

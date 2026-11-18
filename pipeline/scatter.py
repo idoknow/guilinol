@@ -12,6 +12,7 @@ from shapely.ops import unary_union
 
 from common import CHUNK, ll2xz, load_osm
 from features import area, points, polygons
+from road_profile import pair_carriageways, profile, RULES
 
 CONFIG = json.loads(Path(__file__).with_name('vegetation.json').read_text())
 
@@ -27,10 +28,11 @@ def walk_line(line, spacing, offset=0, jitter=0, rng=None):
         yield Point(center.x-offset*math.sin(angle), center.y+offset*math.cos(angle))
 
 
-def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees):
+def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees,exclude):
     rng = random.Random(110300)
     elements = load_osm()
     roads, intersections, banks, waterways = [], Counter(), [], []
+    facades = STRtree(footprints)
     for elem in elements:
         tags = elem.get('tags', {})
         if tags.get('waterway') in ('river','stream') and len(points(elem))>1:
@@ -40,25 +42,22 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees):
             for coord in set(coords):
                 intersections[coord] += 1
             kind = tags['highway']
-            if kind in CONFIG['width'] and tags.get('bridge','no') == 'no' and tags.get('tunnel','no') == 'no':
-                try:
-                    width = float(tags.get('width', CONFIG['width'][kind]))
-                except ValueError:
-                    width = CONFIG['width'][kind]
-                roads.append((LineString(coords), max(2,min(36,width)), kind,tags.get('name','')))
+            if kind in RULES['defaultWidth'] and tags.get('bridge','no') == 'no' and tags.get('tunnel','no') == 'no':
+                roads.append(profile(LineString(coords), tags, facades))
         elif tags.get('water') or tags.get('natural')=='water' or tags.get('waterway')=='riverbank':
             for poly in polygons(area(elem)):
                 banks.append((poly,tags.get('name',''),tags.get('water','')))
+    roads = list(pair_carriageways(roads))
     named = [(line,name) for line,name,_ in waterways if name]
     banks = [(poly,name or (max(((poly.intersection(line).length,label) for line,label in named if poly.intersects(line)),default=(0,''))[1] if kind=='river' else ''),kind) for poly,name,kind in banks]
     junctions = STRtree([Point(coord) for coord,count in intersections.items() if count>1])
-    blocked = STRtree([*footprints,*wet,*peaks,*(line.buffer(width/2) for line,width,_,_ in roads)])
+    blocked = STRtree([*footprints,*wet,*peaks,*(road.line.buffer(road.width/2) for road in roads)])
     tiles, occupancy, stats = defaultdict(bytearray), defaultdict(list), Counter()
     spacing = CONFIG['minSeparation']
 
     def tree(pt, profile, source, height=None, normal=(0,1,0), separation=spacing):
         east,south = pt.x,pt.y
-        if not bounds.contains(pt) or (height is None and blocked.query(pt,predicate='intersects').size):
+        if not bounds.contains(pt) or exclude.covers(pt) or (height is None and blocked.query(pt,predicate='intersects').size):
             return
         col,row = math.floor(east/spacing),math.floor(south/spacing)
         radius = math.ceil(separation/spacing)
@@ -83,7 +82,8 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees):
             for pt in walk_line(LineString(points(elem)),CONFIG['treeRowSpacing']):
                 tree(pt,'mixed','osmRow')
     street = CONFIG['street']
-    for line,width,kind,name in roads:
+    for road in roads:
+        line,width,name = road.line,road.width,road.name
         if not bounds.intersects(line):
             continue
         for side in [-1,1]:

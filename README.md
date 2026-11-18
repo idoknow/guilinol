@@ -38,4 +38,4 @@ npm run preview
 
 重新生成 GL04 世界后，用 `?mode=walk` 从王城正阳门外出发，或用 `?spawn=palace|elephant|lijiang`。V 在当前地点切换飞行与步行。WASD 移动，Shift 跑、空格跳；拖动转向、滚轮缩放、C 切换跟随距离。手机左摇杆推满即跑，右半屏拖动转向。深水区只允许在桥上通行；不能原地站立时在 64 m 内找落脚点，无解时派发 `walk:spawn-failed`。
 
-生产包验收：`npm run world && npm run build && CHROMIUM=/usr/bin/chromium npm run verify:walk`。脚本沿街实走约 3 分钟，逐帧验证胶囊与地形、建筑、山体的关系，另测撞楼、陡壁、解放桥、拒水岸线和象鼻山预设出生。`captures/walk/` 中有四张截图及帧记录（步编号、x、z、脚底余量、是否在楼/山内、救援次数、帧时间毫秒）。角色模型与材质入口在 `web/src/look/avatar.ts`；速度、跳高与相机参数在 `web/src/walk/config.ts`；授权见 `docs/credits.md`。
+生产包验收：`npm run world && npm run build && CHROMIUM=/usr/bin/chromium npm run verify:walk`。默认快速版覆盖撞楼、地标、树、栏杆、陡壁、桥和拒水。`verify:walk:full` 保留原有沿街长路线、逐帧检查、截图及帧记录（`captures/walk/`）。角色模型与材质入口在 `web/src/look/avatar.ts`；速度、跳高与相机参数在 `web/src/walk/config.ts`；授权见 `docs/credits.md`。地标构建和街道数据约定见 `docs/landmark-pipeline.md`。

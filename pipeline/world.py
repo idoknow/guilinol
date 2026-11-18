@@ -20,6 +20,7 @@ from streets import chunks as street_chunks
 from atlas import write_atlas
 from vehicles import write_vehicles
 from shoreline import report_water
+from landmark_layout import Layout
 
 DRY = -32768
 
@@ -65,20 +66,42 @@ def build(bbox, output, palette):
     wet = surface != DRY
     report_water(surface, terrain, bounds, stencil)
     terrain[wet] = np.minimum(terrain[wet],surface[wet]-20)
+    layout = Layout()
+    for region,level in layout.flatten:
+        for part in polygons(region.intersection(bounds)):
+            mask,(col,row) = stencil(part,left,top,GRID)
+            patch = terrain[row:row+mask.height,col:col+mask.width]
+            patch[np.asarray(mask,dtype=bool)[:patch.shape[0],:patch.shape[1]]] = round(level*10)
     output.mkdir(parents=True, exist_ok=True)
     original = terrain.copy()
     mountain_trees = []
     peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet,mountain_trees,CONFIG['peakAreaPerTree'])
-    footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes))
+    footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes),layout)
     index = STRtree(footprints)
-    trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees)
+    trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees,layout.exclude)
+    for road in roads:
+        for part in polygons(road.line.buffer(road.width/2,quad_segs=2).intersection(bounds)):
+            mask,corner = stencil(part,left,top,1)
+            texture.paste(palette['road'],corner,mask)
+            layers['road'].append(part)
+    report = []
+    for road in roads:
+        if road.name not in ('中山中路','解放东路','解放西路','滨江路','依仁路','榕湖北路','杉湖北路','正阳步行街') or not bounds.intersects(road.line):
+            continue
+        mid = road.line.length/2
+        anchor = road.line.interpolate(mid)
+        ahead = road.line.interpolate(mid+1)
+        report.append(dict(name=road.name,kind=road.kind,lanes=road.lanes,width=round(road.width,1),
+            frontage=round(road.frontage,1) if road.frontage else None,source=road.source,
+            length=round(road.line.length),x=anchor.x,z=anchor.y,yaw=math.atan2(anchor.x-ahead.x,anchor.y-ahead.y)))
+    (output/'street-report.json').write_text(json.dumps(report,ensure_ascii=False))
     print('Vegetation:',dict(sorted(tree_stats.items())))
     def sample(east,south):
         row = min(depth//GRID,max(0,round((south-top)/GRID)))
         col = min(width//GRID,max(0,round((east-left)/GRID)))
         return terrain[row,col]/10,surface[row,col]
     decks, triangles = bridge_tiles(bounds,sample)
-    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample)
+    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude)
     print('Lengths (m):',lengths)
     def asset(name):
         return {'file':name,'bytes':(output/name).stat().st_size}
@@ -111,6 +134,7 @@ def build(bbox, output, palette):
     write_vehicles(output,bounds,surface,layers['road'],footprints,sample,triangles)
     manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=extent,chunkSize=CHUNK,peaks=peaks,atlas=asset('atlas.bin'),
                     vehicles=asset('vehicles.bin'),grid=GRID,overview=dict(step=32, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png')),chunks=chunks)
+    manifest['landmarks'] = [dict(position=[x,sample(x,z)[0],z],**entry) for x,z,entry in layout.entries]
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 

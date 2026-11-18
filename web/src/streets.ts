@@ -1,20 +1,25 @@
 import * as THREE from 'three'
 import {look} from './look/config'
 import {nightStreets} from './look/night'
+import {tileMaterial} from './look/tiles'
 
 type Pair=[number,number]
 type Path=[number,...Pair[][]]
-export type Streets=[Path[],Pair[],number[][]]
+export type Streets=[Path[],Pair[],number[][],Pair[]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 export const streetSurfaceMat=new THREE.MeshStandardMaterial({vertexColors:true,side:THREE.DoubleSide})
 export const streetFurnitureGeo=new THREE.BoxGeometry()
 export const streetFurnitureMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.8})
 nightStreets(streetSurfaceMat,streetFurnitureMat)
 
-export function streetGeometry([paths,lamps,banks]:Streets,ground:(x:number,z:number)=>number){
+tileMaterial(streetSurfaceMat,false)
+
+export function streetGeometry([paths,lamps,banks,signals=[]]:Streets,ground:(x:number,z:number)=>number){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],mats:number[]=[],cols:number[]=[]
   const vector=(pt:THREE.Vector2,offset:number)=>new THREE.Vector3(pt.x,ground(pt.x,pt.y)+offset,pt.y)
+  const surfaceKinds:number[]=[]
   function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number){
+    surfaceKinds.push(kind,kind,kind)
     const c=colors[kind]
     for(const pt of [first,second,third]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(kind===1)sidewalk.push(pt.x,pt.y,pt.z)}
   }
@@ -46,6 +51,7 @@ export function streetGeometry([paths,lamps,banks]:Streets,ground:(x:number,z:nu
   for(const [x,z] of lamps){const y=ground(x/10,z/10),px=x/10,pz=z/10,yaw=(x*7+z*13)%6/6*Math.PI
     box(px,y+.3,pz,.34,.6,.34,0,tone.lampPole);box(px,y+2.9,pz,.14,5.2,.14,0,tone.lampPole);box(px,y+5.3,pz,1.6,.08,.08,yaw,tone.lampPole)
     for(const side of [-.75,.75])box(px+Math.cos(yaw)*side,y+5.05,pz-Math.sin(yaw)*side,.32,.42,.32,yaw,tone.lampHead)}
+  for(const [east,south] of signals){const x=east/10,z=south/10,y=ground(x,z);box(x,y+2.5,z,.16,5,.16);box(x,y+4.7,z,.4,.9,.3)}
   for(const [ax,az,bx,bz,top,bottom] of banks){
     const a=new THREE.Vector3(ax/10,top/10,az/10),b=new THREE.Vector3(bx/10,top/10,bz/10)
     const foot=a.clone();foot.y=bottom/10;const end=b.clone();end.y=bottom/10
@@ -58,6 +64,7 @@ export function streetGeometry([paths,lamps,banks]:Streets,ground:(x:number,z:nu
     surface=new THREE.BufferGeometry()
     surface.setAttribute('position',new THREE.Float32BufferAttribute(xyz,3))
     surface.setAttribute('color',new THREE.Float32BufferAttribute(rgb,3))
+    surface.setAttribute('aSurface',new THREE.Uint8BufferAttribute(surfaceKinds,1))
     surface.computeVertexNormals()
   }
   return {

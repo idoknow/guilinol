@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import {look} from './config'
+import {tileMaterial} from './tiles'
 import {shareAtmosphere} from './atmosphere'
 
 // M2.5 facades (docs/reference.md R2/R6/R9/R12): procedural windows, floor lines and a ground-floor
@@ -73,6 +74,7 @@ if (vRoof < .5) {
 totalEmissiveRadiance += uWarm * uWindowLight * step(.45, winHash) * winMask;`)
 }
 buildingMaterial.customProgramCacheKey = () => 'guilinol-facade-1'
+tileMaterial(buildingMaterial,true)
 
 // Vertex colours for GL04 building meshes: roofs by kind, parapets and roof boxes keep the wall colour.
 const walls = b.walls.map(hex), roofs = b.roofs.map(hex)
