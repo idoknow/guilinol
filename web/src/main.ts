@@ -14,9 +14,11 @@ import {windowLight} from './look/buildings'
 import {skyClock} from './ui/sky'
 import {play} from './play'
 import type {Host} from './play/host'
+import {bootDismiss, bootProgress} from './ui/boot'
 
 installAtmosphere()
 async function start() {
+  bootProgress('载入地形', 12)
   const manifest:Manifest = JSON.parse(new TextDecoder().decode(await fetchAsset('manifest.json')))
   if(manifest.version!==4 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
   const basePromise = Promise.all([overview(manifest),loadPeaks(manifest.peaks)])
@@ -43,13 +45,16 @@ async function start() {
     camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix()
   }
   resize(); window.addEventListener('resize',resize)
+  bootProgress('载入山体', 45)
   const [base,peaks] = await basePromise
   scene.add(base.mesh,peaks)
+  bootProgress('载入街区', 78)
   const params = new URLSearchParams(location.search)
   const clock = skyClock(params)
   setPreset(camera,params.get('cam'))
   const radius = Number(params.get('radius')??480)
   const stream = new Stream(scene,manifest,base,THREE.MathUtils.clamp(Number.isFinite(radius)?radius:480,192,1600),camera)
+  void import('./ui/about').then(mod=>mod.aboutPanel())
   const output = document.querySelector('output')!
   let previous=0, first=0, frame=0, sum=0, samples=0
   const stats = {firstMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0}
@@ -88,8 +93,13 @@ async function start() {
     const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
     const clearance = ray.intersectObjects(scene.children)[0]?.distance
     ray.setFromCamera(new THREE.Vector2(0,0),camera)
-    const hit = ray.intersectObjects(scene.children)[0]
-    return {clearance,lookingAt:hit?.object.parent?.name,wallDistance:hit?.distance}
+    const hits = ray.intersectObjects(scene.children)
+    let lookingAt:string|undefined
+    for(const hit of hits){
+      for(let obj:THREE.Object3D|null=hit.object;obj;obj=obj.parent) if(obj.name){lookingAt=obj.name;break}
+      if(lookingAt) break
+    }
+    return {clearance,lookingAt,wallDistance:hits[0]?.distance}
   }}})
   function draw(){renderMirror(renderer,scene,camera,frame<2);renderer.render(scene,camera)}
   const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
@@ -98,7 +108,7 @@ async function start() {
   renderer.setAnimationLoop(now=>{
     const elapsed = previous?now-previous:0;previous=now
     if(walker?.active)walker.tick(elapsed/1000);else if(!switching)controls(elapsed/1000)
-    if(frame===1) {first=performance.now();stats.firstMs=first;stats.firstWorldBytes=bytes}
+    if(frame===1) {first=performance.now();stats.firstMs=first;stats.firstWorldBytes=bytes;bootProgress('载入街区', 100);bootDismiss()}
     if(first&&!switching) stream.tick(walker?.active?walker.position:camera.position)
     clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/1200))
     atmo.uTime.value = now/1000
