@@ -3,6 +3,7 @@ import './play.css'
 import {spots, yawToward, type Spot} from './spots'
 import type {Host} from './host'
 import {photoMode} from './photo'
+import {mapView} from './map'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
 const ease = (t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2
@@ -53,9 +54,11 @@ export function play(host:Host) {
   const dock = document.createElement('nav'); dock.className = 'dock'
   const book = button('景册','打开景册（J）','dock-book'), shutter = button('拍照','拍照模式（P）','dock-photo')
   const count = document.createElement('small'); book.append(count)
-  dock.append(book,shutter); document.body.append(dock)
+  const slot = document.createElement('div'); slot.className = 'dock-mini'
+  const buttons = document.createElement('div'); buttons.className = 'dock-buttons'
+  buttons.append(book,shutter); dock.append(slot,buttons); document.body.append(dock)
   const modeButton = document.querySelector<HTMLButtonElement>('.btn-mode')
-  if(modeButton) dock.prepend(modeButton)
+  if(modeButton) buttons.prepend(modeButton)
   function button(text:string,label:string,cls:string){const b = document.createElement('button'); b.className = cls; b.textContent = text
     b.setAttribute('aria-label',label); b.title = label; return b}
   const refreshCount = ()=>{count.textContent = `${stamps.size}/${spots.length}`}
@@ -73,6 +76,21 @@ export function play(host:Host) {
     await travel(spot.name,async()=>{leaveSummit(false)
       if(await host.walkTo(spot.x,spot.z,yawToward(spot.x,spot.z,spot.at),'spot:'+spot.id)) host.walker()?.face(yawToward(spot.x,spot.z,spot.at),.16)})
   }
+
+  // Teleport to an arbitrary map point. Peaks, lakes and parks resolve to the nearest road vertex first,
+  // because their centres are rarely walkable.
+  async function goPoint(x:number,z:number,name:string) {
+    closeAll()
+    let tx = x, tz = z
+    if(atlas&&!atlas.roadAt(x,z,30)) {let best = 320
+      for(const r of atlas.roads) if(r.c<=2) for(let i=0;i<r.p.length;i+=2){const d = Math.hypot(r.p[i]-x,r.p[i+1]-z); if(d<best){best = d; tx = r.p[i]; tz = r.p[i+1]}}}
+    const yaw = Math.atan2(-(x-tx),-(z-tz))
+    await travel(name,async()=>{leaveSummit(); await host.walkTo(tx,tz,tx===x&&tz===z?(host.walker()?.yaw??0):yaw,'map')})
+  }
+  let atlas:import('../map/atlas').Atlas|undefined, map:ReturnType<typeof mapView>|undefined
+  if((host.manifest as {atlas?:unknown}).atlas) setTimeout(()=>void import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
+    atlas = loaded; map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s)})
+  }).catch(error=>console.warn('atlas',error)),600)
 
   // --- Card
   const card = document.createElement('aside'); card.className = 'spot-card'; card.hidden = true; card.setAttribute('role','dialog')
@@ -145,7 +163,7 @@ export function play(host:Host) {
     if(event.repeat||(event.target as HTMLElement)?.tagName==='INPUT') return
     if(event.code==='KeyJ') sheet.hidden?openBook():closeBook()
     if(event.code==='KeyP') photo.active?photo.close():photo.open()
-    if(event.code==='Escape') {if(photo.active) photo.close(); else closeAll()}
+    if(event.code==='Escape') {if(photo.active) photo.close(); else if(!map?.active) closeAll()}
   })
 
   function nearestName() {
@@ -153,7 +171,7 @@ export function play(host:Host) {
     if(summit&&p.distanceTo(summit.eye)<60) return summit.spot.summit!.label
     let best:Spot|null = null, dist = 450
     for(const s of spots){const d = Math.hypot(s.x-p.x,s.z-p.z); if(d<dist){dist = d; best = s}}
-    return best?.name ?? ''
+    return best?.name ?? map?.roadName() ?? ''
   }
 
   // --- Per-frame: marker placement/fade, arrival, summit pill.
@@ -184,7 +202,7 @@ export function play(host:Host) {
       if(d>REARM) {m.armed = true; if(shown===m.spot&&walking) closeCard()}
     }
     if(summit&&host.camera.position.distanceTo(summit.eye)>220) leaveSummit()
-    photo.tick()
+    photo.tick(); map?.tick(dt)
   }
-  return {tick, spots, goTo, openBook, photo, stamps}
+  return {tick, spots, goTo, goPoint, openBook, photo, stamps, get map(){return map}}
 }
