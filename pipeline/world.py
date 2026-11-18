@@ -14,6 +14,7 @@ from shapely.geometry import box
 from common import CHUNK, GRID, LAT0, LON0, OUT, ll2xz, load_dem
 from features import building_mesh, buildings, ground_features, polygons
 from karst import generate
+from bridges import bridge_tiles
 
 DRY = -32768
 
@@ -63,6 +64,11 @@ def build(bbox, output, palette):
     peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet)
     footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes))
     index = STRtree(footprints)
+    def sample(east,south):
+        row = min(depth//GRID,max(0,round((south-top)/GRID)))
+        col = min(width//GRID,max(0,round((east-left)/GRID)))
+        return terrain[row,col]/10,surface[row,col]
+    decks = bridge_tiles(bounds,sample)
     def asset(name):
         return {'file':name,'bytes':(output/name).stat().st_size}
     np.where(wet,surface,terrain)[::8,::8].astype('<i2').tofile(output/'overview.i16')
@@ -82,12 +88,13 @@ def build(bbox, output, palette):
             image = png.getvalue()
             window = np.s_[south//GRID:south//GRID+65,east//GRID:east//GRID+65]
             underlay = original[window].tobytes() if np.any(original[window]!=terrain[window]) else b''
-            header = struct.pack('<4s4I',b'GL02',len(vertices)//6,len(indices)//4,len(collision),len(image))
+            deck = decks(tile,origin)
+            header = struct.pack('<4s5I',b'GL03',len(vertices)//6,len(indices)//4,len(collision),len(image),len(deck)//18)
             name = f'{east//CHUNK}_{south//CHUNK}.glc'
-            payload = header+terrain[window].tobytes()+surface[window].tobytes()+vertices+normals+indices+collision+image
+            payload = header+terrain[window].tobytes()+surface[window].tobytes()+vertices+normals+indices+collision+image+deck
             (output/name).write_bytes(gzip.compress(payload+underlay,compresslevel=5,mtime=0))
             chunks.append(dict(x=origin[0],z=origin[1],**asset(name)))
-    manifest = dict(version=2,bbox=bbox,origin=[LAT0,LON0],extent=[left,top,width,depth],chunkSize=CHUNK,peaks=peaks,
+    manifest = dict(version=3,bbox=bbox,origin=[LAT0,LON0],extent=[left,top,width,depth],chunkSize=CHUNK,peaks=peaks,
                     grid=GRID,overview=dict(step=32, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png')),chunks=chunks)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')

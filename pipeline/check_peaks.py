@@ -39,17 +39,17 @@ def verify():
     houses = []
     for tile in manifest['chunks']:
         blob = gzip.decompress((output/tile['file']).read_bytes())
-        assert blob[:4]==b'GL02'
+        assert blob[:4]==b'GL03'
         row,col = (tile['z']-top)//4,(tile['x']-left)//4
-        ground,water = np.frombuffer(blob,'<i2',8450,20).reshape(2,65,65)
+        ground,water = np.frombuffer(blob,'<i2',8450,24).reshape(2,65,65)
         window = np.s_[row:row+65,col:col+65]
         previous = field[window]
         assert ((previous==-32768)|(previous==ground)).all(), tile['file']
         field[window] = ground
         display[window] = np.where(water==-32768,ground,water)
-        vertices,indices,collision,png = struct.unpack_from('<4I',blob,4)
-        start = 20+16900+vertices*9+indices*4
-        tail = start+collision+png
+        vertices,indices,collision,png,triangles = struct.unpack_from('<5I',blob,4)
+        start = 24+16900+vertices*9+indices*4
+        tail = start+collision+png+triangles*18
         fine_underlay[window] = np.frombuffer(blob,'<i2',4225,tail).reshape(65,65) if tail<len(blob) else ground
         dry[window] = water==-32768
         for _,_,rings in json.loads(blob[start:start+collision]):

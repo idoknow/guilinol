@@ -28,4 +28,10 @@ npm run preview
 - 地面颜色见 `pipeline/palette.json`，修改后重新生成；材质、光照、雾见 `web/src/look/config.ts`。
 - 生产包飞越测试：构建后运行 `npx playwright install chromium`、`npm run verify:flight`（已有系统 Chromium 可用 `CHROMIUM=/usr/bin/chromium npm run verify:flight`）。脚本自行启动/关闭本地预览服务，输出首屏与帧时间指标、校验全框逐块加载，截图保存至 `captures/`。采用空浏览器上下文、960×540、SwiftShader；首屏时间从导航开始到画过总览后的下一次动画回调，不把 HTML 文案当首屏。
 
-M1a 默认南界 25.250，包含 27 座具名峰及从 DEM 检出的无名峰（本框 37 座）。用 `?cam=lijiang`、`palace`、`elephant`、`overview`、`south` 切换启动机位；`foot` 是独秀峰近景。`verify:flight` 保存这六张截图。`uv run --locked python pipeline/check_peaks.py` 从成品检查共享边、高度场、400 m 内底面残留、LOD 与量化属性，输出逐峰高程和面数表。具名峰来源见 `pipeline/peaks.json`，自动峰见生成目录的 `auto-peaks.json`；地形估算并非测绘值。水面用独立高程层显示，暂无独立水材质、碰撞响应或桥面模型。二进制读取约定见 `docs/chunk-format.md`。
+默认南界 25.250，包含 27 座具名峰及从 DEM 检出的无名峰（本框 37 座）。用 `?cam=lijiang`、`palace`、`elephant`、`overview`、`south` 切换启动机位；`foot` 是独秀峰近景。`verify:flight` 保存这六张截图。`uv run --locked python pipeline/check_peaks.py` 从成品检查共享边、高度场、400 m 内底面残留、LOD 与量化属性，输出逐峰高程和面数表。具名峰来源见 `pipeline/peaks.json`，自动峰见生成目录的 `auto-peaks.json`；地形估算并非测绘值。二进制读取约定见 `docs/chunk-format.md`。
+
+## 第三人称步行
+
+重新生成 GL03 世界后，用 `?mode=walk` 从王城正阳门外出发，或用 `?spawn=palace|elephant|lijiang`。V 在当前地点切换飞行与步行。WASD 移动，Shift 跑、空格跳；拖动转向、滚轮缩放、C 切换跟随距离。手机左摇杆推满即跑，右半屏拖动转向。深水区只允许在桥上通行；不能原地站立时在 64 m 内找落脚点，无解时派发 `walk:spawn-failed`。
+
+生产包验收：`npm run world && npm run build && CHROMIUM=/usr/bin/chromium npm run verify:walk`。脚本沿街实走约 3 分钟，逐帧验证胶囊与地形、建筑、山体的关系，另测撞楼、陡壁、解放桥、拒水岸线和象鼻山预设出生。`captures/walk/` 中有四张截图及帧记录（步编号、x、z、脚底余量、是否在楼/山内、救援次数、帧时间毫秒）。角色模型与材质入口在 `web/src/look/avatar.ts`；速度、跳高与相机参数在 `web/src/walk/config.ts`；授权见 `docs/credits.md`。
