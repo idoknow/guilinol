@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {Forest} from './forest'
 import {detail, type Manifest, type Tile, overview} from './world'
 
 export class Stream {
@@ -6,8 +7,11 @@ export class Stream {
   pending = new Map<Tile,AbortController>()
   failures = new Map<Tile,number>()
   visited = new Set<Tile>()
-  constructor(private scene:THREE.Scene, private manifest:Manifest, private base:Awaited<ReturnType<typeof overview>>,public radius:number) {}
+  forest:Forest
+  constructor(private scene:THREE.Scene, private manifest:Manifest, private base:Awaited<ReturnType<typeof overview>>,public radius:number,camera:THREE.PerspectiveCamera) {this.forest=new Forest(scene,manifest.chunks,camera)}
   tick(position:THREE.Vector3) {
+    this.forest.tick(position)
+    for(const [tile,item] of this.loaded)item.streets.group.visible=Math.hypot(Math.max(0,Math.abs(position.x-tile.x-128)-128),Math.max(0,Math.abs(position.z-tile.z-128)-128),position.y-item.groundMesh.geometry.getAttribute('position').getY(544))<=300
     const distance = (tile:Tile)=>Math.hypot(tile.x+128-position.x,tile.z+128-position.z)
     for(const [tile,item] of this.loaded) if(distance(tile)>this.radius+190) {
       this.base.toggle(tile,true); this.scene.remove(item.group); item.dispose(); this.loaded.delete(tile)

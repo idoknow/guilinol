@@ -4,8 +4,8 @@ import type {Stream} from '../stream'
 import {fetchAsset,type Manifest,type Tile} from '../world'
 import {walkConfig as cfg} from './config'
 
-type Outline = [number,number,Array<Array<[number,number]>>]
-type Kind = 'ground'|'overview'|'deck'|'building'|'peak'
+type Outline = import('../buildings').Building
+type Kind = 'ground'|'overview'|'deck'|'building'|'peak'|'tree'|'rail'|'sidewalk'
 type Region = {fine:boolean,colliders:R.Collider[],rings:Outline[]}
 const identity = {x:0,y:0,z:0,w:1}, down = {x:0,y:-1,z:0}
 const candidates = [{dx:0,dz:0}]
@@ -57,17 +57,26 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.
   const regions=new Map<Tile,Region>(), mountains=new Map<THREE.Object3D,R.Collider>(), kinds=new Map<number,Kind>()
   function add(desc:R.ColliderDesc,kind:Kind){const coll=world.createCollider(desc);kinds.set(coll.handle,kind);return coll}
   function remove(coll:R.Collider){kinds.delete(coll.handle);world.removeCollider(coll,false)}
+  const trunks=new Map<import('../forest').Tree,R.Collider>()
   function sync(east:number,south:number){
     let changed=false
+    for(const [tree,collider] of trunks)if(Math.hypot(east-tree.x,south-tree.z)>48){remove(collider);trunks.delete(tree);changed=true}
     for(const tile of manifest.chunks){
       const near=Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))<=cfg.collisionRadius
       const data=stream.loaded.get(tile), region=regions.get(tile)
+      const trees=stream.forest.loaded.get(tile)
+      if(trees&&Math.max(Math.abs(east-tile.x-128),Math.abs(south-tile.z-128))<168)for(const tree of trees){
+        if(tree.kind!==5&&!trunks.has(tree)&&Math.hypot(east-tree.x,south-tree.z)<40){trunks.set(tree,add(R.ColliderDesc.cylinder(1.8,.42*tree.scale).setTranslation(tree.x,tree.y+1.8,tree.z),'tree'));changed=true}}
       if(region&&(!near||region.fine!==!!data)){region.colliders.forEach(remove);regions.delete(tile);changed=true}
       if(!near||regions.has(tile))continue
       const stride=width/32+1,start=(tile.z-top)/32*stride+(tile.x-left)/32
       const ground=data?fineField(data):field(8,(col,row)=>overview[start+row*stride+col]/10)
       const colliders=[add(ground.setTranslation(tile.x+128,0,tile.z+128),data?'ground':'overview')]
-      const rings:Outline[]=data?JSON.parse(new TextDecoder().decode(data.rings)):[]
+      const rings=data?.rings??[]
+      if(data){const {sidewalk,banks}=data.streets
+        if(sidewalk.length)colliders.push(add(R.ColliderDesc.trimesh(sidewalk,Uint32Array.from({length:sidewalk.length/3},(_,i)=>i)).setTranslation(tile.x,0,tile.z),'sidewalk'))
+        for(const [ax,az,bx,bz,top,bottom] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=(top-bottom)/10+1.25
+          colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
       if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
       if(data?.deck.length){const count=data.deck.length/3
         colliders.push(add(R.ColliderDesc.trimesh(data.deck,Uint32Array.from({length:count},(_,at)=>at)).setTranslation(tile.x,0,tile.z),'deck'))}
@@ -106,7 +115,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.
   function findWalkableSpawn(east:number,south:number,override=false){
     for(const {dx,dz} of override?[candidates[0]]:candidates){const x=east+dx,z=south+dz,tile=tileAt(x,z)
       if(!tile||!stream.loaded.has(tile)||insideHouse(x,z))continue
-      const deck=surface(x,z,'deck'),support=deck??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
+      const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
       const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05)continue
       const y=support.y+cfg.height/2+.055
       if(world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule))continue
@@ -114,6 +123,6 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.
     }return null
   }
   function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)}
-  function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear()}
+  function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();trunks.forEach(remove);trunks.clear()}
   return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,surface,wet,insideHouse,findWalkableSpawn}
 }
