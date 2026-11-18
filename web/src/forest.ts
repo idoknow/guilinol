@@ -1,8 +1,10 @@
 import * as THREE from 'three'
 import {treeGeometry} from './look/trees'
+import {look} from './look/config'
 import {fetchAsset,type Tile} from './world'
 
-export type Tree={x:number,y:number,z:number,kind:number,scale:number,seed:number,matrix:THREE.Matrix4}
+export type Tree={x:number,y:number,z:number,kind:number,scale:number,seed:number,matrix:THREE.Matrix4,tint:THREE.Color}
+const lean=new THREE.Quaternion()
 export async function readTrees(tile:Tile,signal:AbortSignal){
   const raw=await fetchAsset(tile.file.replace('.glc','.trees'),signal)
   const data=new DataView(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
@@ -13,9 +15,13 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
     const kind=data.getUint8(i+6),scale=data.getUint8(i+7)/100,seed=data.getUint8(i+9)
     const nx=data.getInt8(i+10)/127,nz=data.getInt8(i+11)/127
     object.position.set(x,y,z);object.scale.setScalar(scale)
-    object.quaternion.setFromUnitVectors(up,new THREE.Vector3(nx,Math.sqrt(Math.max(0,1-nx*nx-nz*nz)),nz).normalize())
+    lean.setFromUnitVectors(up,new THREE.Vector3(nx,Math.sqrt(Math.max(0,1-nx*nx-nz*nz)),nz).normalize())
+    // Trees grow towards the sky: keep at most look.treeLean of the slope normal.
+    const angle=2*Math.acos(Math.min(1,Math.abs(lean.w)));object.quaternion.identity().slerp(lean,angle>look.treeLean?look.treeLean/angle:1)
     object.rotateY(data.getUint8(i+8)*Math.PI/128);object.updateMatrix()
-    trees.push({x,y,z,kind,scale,seed,matrix:object.matrix.clone()})
+    const j=look.trees.treeJitter,h=((seed*37)%256)/255-.5,v=((seed*101)%256)/255-.5
+    const tint=new THREE.Color(1+v*j*2+h*j,1+v*j*2,1+v*j*2-h*j*1.5)
+    trees.push({x,y,z,kind,scale,seed,matrix:object.matrix.clone(),tint})
   }return trees
 }
 
@@ -42,12 +48,15 @@ export class Forest{
     if(next&&this.pending.size<3){const tile=next,control=new AbortController();this.pending.set(tile,control)
       readTrees(tile,control.signal).then(trees=>{if(!control.signal.aborted){this.loaded.set(tile,trees);this.dirty=true}})
         .catch(err=>{if(!control.signal.aborted){console.error(err);this.retry.set(tile,performance.now()+10000)}}).finally(()=>this.pending.delete(tile))}
-    if(!this.dirty&&position.distanceToSquared(this.anchor)<16&&this.rotation.angleTo(this.camera.quaternion)<.016)return
-    this.anchor.copy(position);this.dirty=false
+    if(!this.dirty&&this.camera.position.distanceToSquared(this.anchor)<4&&this.rotation.angleTo(this.camera.quaternion)<.016)return
+    this.anchor.copy(this.camera.position);this.dirty=false
     this.rotation.copy(this.camera.quaternion);this.camera.updateMatrixWorld();this.frustum.setFromProjectionMatrix(this.matrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse))
+    const cam=this.camera.position
     const groups:Tree[][]=Array.from({length:12},()=>[])
     for(const trees of this.loaded.values())for(const tree of trees){const d=(tree.x-position.x)**2+(tree.y-position.y)**2+(tree.z-position.z)**2
       if(d>=1500**2)continue
+      // Never let a crown swallow the follow camera: drop trees whose canopy the camera is inside.
+      if((tree.x-cam.x)**2+(tree.z-cam.z)**2<look.treeCameraClear**2&&cam.y-tree.y<14*tree.scale)continue
       this.point.set(tree.x,tree.y+4,tree.z)
       if(this.frustum.planes.every(plane=>plane.distanceToPoint(this.point)>-40))groups[tree.kind+(d<600**2?0:6)].push(tree)}
     groups.forEach((group,i)=>{let mesh=this.batches[i];const asset=this.assets[i%6]
@@ -56,7 +65,7 @@ export class Forest{
         mesh=new THREE.InstancedMesh(i<6?asset.near:asset.far,asset.material,2**Math.ceil(Math.log2(group.length)))
         this.scene.add(mesh);this.batches[i]=mesh;mesh.frustumCulled=false
       }
-      if(mesh){mesh.count=group.length;mesh.visible=!!group.length;group.forEach((tree,j)=>mesh!.setMatrixAt(j,tree.matrix));mesh.instanceMatrix.needsUpdate=true}
+      if(mesh){mesh.count=group.length;mesh.visible=!!group.length;group.forEach((tree,j)=>{mesh!.setMatrixAt(j,tree.matrix);mesh!.setColorAt(j,tree.tint)});mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true}
     })
   }
 }

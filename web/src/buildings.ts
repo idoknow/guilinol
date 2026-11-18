@@ -1,9 +1,9 @@
 import * as THREE from 'three'
+import {buildingColor} from './look/buildings'
 
 type Pair=[number,number]
 type Vertex=[number,number,number]
 export type Building=[number,number,Pair[][],number,number,number,number[],Pair[],number]
-const palette=[0xaaaaaa,0x56575a,0x437750].map(value=>new THREE.Color(value)), white=new THREE.Color(0xefeee9)
 
 export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:Uint32Array,parts:Building[]){
   const xyz=Array.from(positions,(v,i)=>v/(i%3===1?10:100)),normal=Array.from(normals,v=>v/127),faces=Array.from(indices)
@@ -44,8 +44,8 @@ export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:
     const start=pt(-ridge,height,0),end=pt(ridge,height,0)
     face([a,b,end,start]);face([d,start,end,c]);face([a,start,d]);face([b,c,end])
   }
-  const geom=new THREE.BufferGeometry(),colors=new Float32Array(kinds.length*3)
-  kinds.forEach((kind,i)=>(roofs[i]?palette[kind]??palette[0]:white).toArray(colors,i*3))
+  const geom=new THREE.BufferGeometry(),colors:number[]=new Array(kinds.length*3)
+  kinds.forEach((kind,i)=>buildingColor(kind,!!roofs[i],normal[3*i+1],colors,i*3))
   for(const [name,values,size] of [['position',xyz,3],['normal',normal,3],['color',colors,3],['aFloor',floor,1],['aFacade',facade,1]] as const)
     geom.setAttribute(name,new THREE.Float32BufferAttribute(values,size))
   geom.setAttribute('aKind',new THREE.Uint8BufferAttribute(kinds,1));geom.setAttribute('aRoof',new THREE.Uint8BufferAttribute(roofs,1));geom.setIndex(faces);return geom

@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import {buildingGeometry,type Building} from './buildings'
 import {streetGeometry,type Streets} from './streets'
 import {bridgeGeometry, bridgeMaterial} from './look/bridge'
+import {buildingMaterial} from './look/buildings'
 import {look} from './look/config'
 import type {Peaks} from './peaks'
 
@@ -60,7 +61,7 @@ export async function overview(manifest:Manifest) {
   return {mesh,toggle}
 }
 
-const buildings = new THREE.MeshStandardMaterial({vertexColors:true,roughness:look.roughness,metalness:look.metalness,side:THREE.DoubleSide})
+const buildings = buildingMaterial
 export async function detail(tile:Tile, signal:AbortSignal) {
   const compressed = await fetchAsset(tile.file,signal)
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()

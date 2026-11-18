@@ -22,4 +22,31 @@ export const look = {
   // 石桥 decks (GL03): warm limestone top, shaded fascia hanging bridgeDepth metres below the deck.
   bridgeTop: 0xc4bca8, bridgeSide: 0x938d7e, bridgeDepth: 1.2,
   wall: 0xe9e5da, roof: 0x646b6d, roughness: 1, metalness: 0,
+  // M2.5 trees (docs/reference.md): crowns #2f5a2c–#4c7a3a, sunlit #6f9445, under-canopy #1f3a22.
+  // Each species shades canopyDark → base → lit with height; instances get ±treeJitter hue/value from their seed.
+  trees: {
+    trunk: 0x4a3f33, canopyDark: 0x1a3320, treeJitter: .09,
+    camphor: 0x3d6a33, camphorLit: 0x648a40,
+    banyan: 0x2e5a2c, banyanLit: 0x4c7a3a,
+    osmanthus: 0x2a5229, osmanthusLit: 0x416e35,
+    palm: 0x557d36, palmLit: 0x7a9a4a, palmDark: 0x33532a, palmTrunk: 0x857b6b,
+    conifer: 0x264a2d, coniferLit: 0x3f6840,
+    shrub: 0x375f30, shrubLit: 0x56803c,
+  },
+  // M2.5 buildings (look/buildings.ts), indexed by GL04 kind: 0 white-tile flat, 1 old grey-tile pitched,
+  // 2 green-glazed hip (R2), 3 landmark placeholder (王城 yellow/red, R16).
+  buildings: {
+    walls: [0xe6e3da, 0xd9d4c8, 0xe9e4d6, 0xc9a46a], roofs: [0xa3a19a, 0x55595b, 0x3c7a55, 0x5d6062],
+    glass: 0x4d5b62, glassLit: 0x8d9ea3, timber: 0x6e5444, shop: 0x4a4744, floorLine: .84,
+    signs: [0x9a5246, 0xb39452, 0x52708a, 0x5f7d56], windowWarm: 0xffc979,
+  },
+  // M2.5 streets (streets.ts): GL04 path kinds 0 carriageway, 1 sidewalk+kerb, 2 lane markings, 3 stone embankment.
+  streets: {
+    surfaces: [0x6a6b6b, 0xb7b3a8, 0xe6e2d4, 0x8f897b],
+    railing: 0xd9d5ca, lampPole: 0x3e4743, lampHead: 0xe7dcbc,
+  },
+  // Max lean of slope-planted trees towards the surface normal (radians); trees grow up, not out.
+  treeLean: .14,
+  // Trees within this horizontal radius of the camera (and above it) are hidden so crowns never fill the screen.
+  treeCameraClear: 7,
 }

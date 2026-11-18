@@ -6,11 +6,11 @@ const hex = (value:number)=>{const c=new THREE.Color().setHex(value,THREE.SRGBCo
 
 // Replace three's linear fog with layered aerial perspective: exponential distance fog,
 // extra density near the valley floor, and a colour that walks from warm haze to 石青 blue
-// to the sky horizon. Constants are baked from look/config at startup (M3 turns them into uniforms).
+// to the sky horizon. Instanced meshes (trees, street furniture) must fold instanceMatrix into the fog position. Constants are baked from look/config at startup (M3 turns them into uniforms).
 export function installAtmosphere() {
   const chunk = THREE.ShaderChunk
   chunk.fog_pars_vertex = `#ifdef USE_FOG\nvarying float vFogDepth;\nvarying vec3 vFogWorld;\n#endif`
-  chunk.fog_vertex = `#ifdef USE_FOG\nvFogDepth = - mvPosition.z;\nvFogWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;\n#endif`
+  chunk.fog_vertex = `#ifdef USE_FOG\nvFogDepth = - mvPosition.z;\n#ifdef USE_INSTANCING\nvFogWorld = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;\n#else\nvFogWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;\n#endif\n#endif`
   chunk.fog_pars_fragment = `#ifdef USE_FOG\nuniform vec3 fogColor;\nvarying float vFogDepth;\nvarying vec3 vFogWorld;\n#ifdef FOG_EXP2\nuniform float fogDensity;\n#else\nuniform float fogNear;\nuniform float fogFar;\n#endif\n#endif`
   chunk.fog_fragment = `#ifdef USE_FOG
     float fogDist = length(vFogWorld - cameraPosition);
