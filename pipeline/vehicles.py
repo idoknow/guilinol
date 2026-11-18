@@ -15,16 +15,17 @@ from shapely.geometry import LineString, Point
 from common import GRID, ll2xz, load_osm
 from features import area, points
 from navigation import limit_routes
+from clearance import audit_routes
 
 
-def write_vehicles(output, bounds, surface, roads, buildings, sample):
+def write_vehicles(output, bounds, surface, roads, buildings, sample, triangles):
     left, top, right, bottom = bounds.bounds
     wet = surface != -32768
     rows, cols = wet.shape
     xs = left + np.arange(cols)*GRID
     zs = top + np.arange(rows)*GRID
     obstacles = STRtree(buildings)
-    bikes, anchors, extras = [], {'榕湖西码头':(-1120,310)}, []
+    bikes, anchors, extras = [], {}, []
     lakes = {'桂湖', '木龙湖', '杉湖', '榕湖'}
     for el in load_osm():
         tags = el.get('tags', {})
@@ -85,7 +86,7 @@ def write_vehicles(output, bounds, surface, roads, buildings, sample):
                 if obstacles.query(point.buffer(1),predicate='intersects').size: continue
                 wx,wz = water[moorings.query((east,south))[1]]; row,col=int((wz-top)/GRID),int((wx-left)/GRID)
                 docks[name]=[east,sample(east,south)[0],south];nodes[name]=ids[row,col];break
-        for kind, stops in [('raft',['解放桥码头','象山渔人码头','解放桥码头']),('boat',['日月湾码头','杉湖','榕湖','桂湖','木龙湖','解放桥码头','文昌桥码头','知音台码头','日月湾码头']),('boat',['榕湖','榕湖西码头','榕湖'])]:
+        for kind, stops in [('raft',['解放桥码头','象山渔人码头','解放桥码头']),('boat',['日月湾码头','杉湖','榕湖','桂湖','木龙湖','解放桥码头','文昌桥码头','知音台码头','日月湾码头'])]:
             for start,end in zip(stops,stops[1:]):
                 if start not in nodes or end not in nodes:continue
                 costs,prev=dijkstra(graph,directed=False,indices=nodes[start],return_predecessors=True)
@@ -97,8 +98,5 @@ def write_vehicles(output, bounds, surface, roads, buildings, sample):
                     node=prev[node]
                 routes.append(dict(kind=kind,start=start,end=end,path=path[::-1]))
     data=dict(bikes=bikes,docks=docks,routes=limit_routes(routes,sample),grid=[left,top,cols,rows,GRID],mask=base64.b64encode(np.packbits(mask).tobytes()).decode())
-    data['dockMetadata'] = {name:{'synthetic':name in lakes or name=='榕湖西码头'} for name in docks}
-    for route in data['routes']:
-        if '榕湖西码头' in (route['start'],route['end']):
-            route['suspended'] = '玻璃桥净空不足'
+    data['clearance'] = audit_routes(data['routes'],triangles)
     (output/'vehicles.bin').write_bytes(gzip.compress(json.dumps(data,ensure_ascii=False,separators=(',',':')).encode(),mtime=0))

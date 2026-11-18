@@ -3,7 +3,7 @@ import {fetchAsset} from '../world'
 import {vehicleModel} from './vehicle-model'
 
 type Position=[number,number,number]
-type Route={kind:string,start:string,end:string,path:Position[],suspended?:string}
+type Route={kind:string,start:string,end:string,path:Position[]}
 interface Data {bikes:[number,number,number,number,number][];docks:Record<string,Position>;routes:Route[];grid:number[];mask:string}
 export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number)=>boolean){
   const buffer=await fetchAsset(file), data:Data=JSON.parse(await new Response(new Blob([buffer]).stream().pipeThrough(new DecompressionStream('gzip'))).text())
@@ -13,8 +13,6 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     let cell=cells.get(key);if(!cell){cell=new T.Group();cells.set(key,cell)}cell.add(mesh)}
   for(const [x,y,z,angle,paint] of data.bikes){const mesh=vehicleModel('bike',paint);mesh.position.set(x,y,z);mesh.rotation.y=angle;store(mesh)}
   const vessels=data.routes.map(route=>{const mesh=vehicleModel(route.kind);mesh.position.fromArray(route.path[0]);group.add(mesh);return mesh})
-  const diagnostic=new URLSearchParams(location.search).has('probeSuspendedRide')&&new URLSearchParams(location.search).has('verify')
-  const available=(leg:Route)=>!leg.suspended||diagnostic
   const piers=new Map<string,T.Mesh>(),pierShape=new T.BoxGeometry(1,1,1),pierMaterial=new T.MeshStandardMaterial({color:0x816a50})
   for(const leg of data.routes){if(piers.has(leg.start))continue
     const [x,,z]=data.docks[leg.start],[waterX,waterY,waterZ]=leg.path[0],dx=waterX-x,dz=waterZ-z,length=Math.hypot(dx,dz)
@@ -40,7 +38,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     for(const cell of visibleCells)if(!nextCells.has(cell)){group.remove(cell);visibleCells.delete(cell)}
     let nearestDock=9
     data.routes.forEach((leg,index)=>{const [dx,,dz]=data.docks[leg.start],distance=Math.hypot(dx-x,dz-z);vessels[index].visible=route===index||(moored[index]&&distance<200);piers.get(leg.start)!.visible=distance<200
-      if(available(leg)&&distance<nearestDock){nearRoute=index;nearestDock=distance}})
+      if(distance<nearestDock){nearRoute=index;nearestDock=distance}})
     const label=bike?'下车':route>=0?(disembark?'下一站下船':'下站下船'):nearBike?'骑行':nearRoute>=0?'上船 · '+data.routes[nearRoute].start:''
     document.body.toggleAttribute('data-aboard',!!bike||route>=0);button.hidden=!label;if(button.textContent!==label)button.textContent=label
   }
@@ -50,7 +48,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
       if(distance<gap){mesh.position.lerp(new T.Vector3(x,y,z),distance/gap);return}
       mesh.position.set(x,y,z);distance-=gap;segment++
     }
-    const [x,,z]=data.docks[leg.end],departures=data.routes.filter(other=>available(other)&&other.start===leg.end&&other.kind===leg.kind)
+    const [x,,z]=data.docks[leg.end],departures=data.routes.filter(other=>other.start===leg.end&&other.kind===leg.kind)
     const next=data.routes.indexOf(departures.find(other=>other.end!==leg.start)??departures[0])
     if(disembark||next<0){if(land(x,z))reset();return}
     if(next>=0){mesh.position.fromArray(leg.path[0]);route=next;segment=1}

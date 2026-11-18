@@ -10,7 +10,7 @@ from features import points, polygons
 
 
 def bridge_tiles(bounds, sample):
-    spans, profiles = [], []
+    spans, profiles, owners, emitted = [], [], [], []
     for way in load_osm():
         tags = way.get('tags', {})
         if way['type'] != 'way' or tags.get('bridge', 'no') == 'no' or 'highway' not in tags:
@@ -55,6 +55,7 @@ def bridge_tiles(bounds, sample):
                 if poly.area < .001:
                     continue
                 spans.append(poly)
+                owners.append(way['id'])
                 profiles.append(np.linalg.solve(np.column_stack((pts,np.ones(3))),levels))
     tree = STRtree(spans)
 
@@ -67,5 +68,6 @@ def bridge_tiles(bounds, sample):
                     for east,south in (ring[0],ring[at],ring[at+1]):
                         height = profiles[index] @ [east,south,1]
                         triangles.append([round((east-origin[0])*100),round(height*10),round((south-origin[1])*100)])
+                    emitted.append((owners[index],np.array(triangles[-3:])/[100,10,100]+[origin[0],0,origin[1]]))
         return np.asarray(triangles,dtype='<i2').tobytes()
-    return encode
+    return encode, emitted

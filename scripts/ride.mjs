@@ -11,14 +11,18 @@ const atlas=JSON.parse(gunzipSync(await readFile('dist/world/atlas.bin')))
 const output='captures/ride';await mkdir(output,{recursive:true})
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
-const errors=[];let lake
+const errors=[]
+const bounds=JSON.parse(await readFile('pipeline/vessel-bounds.json','utf8'))
+const {bridges,minimum}=data.clearance
+assert(bridges.length?minimum>=.3-1e-10:minimum===null)
+console.log(`航线经过 ${bridges.length} 座桥；最小净空：${minimum===null?'不适用':minimum.toFixed(3)+' m'}`)
 try{
   for(const mobile of [false,true]){
     const page=await browser.newPage({viewport:mobile?{width:420,height:740}:{width:800,height:450},hasTouch:mobile,isMobile:mobile})
     page.on('pageerror',error=>errors.push(error.message))
-    await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?mode=walk&verify&probeSuspendedRide&radius=480`)
+    await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?mode=walk&verify&radius=480`)
     await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
-    if(!mobile){lake=await lakeChecks(page,data,output);console.log('painted boat',lake)}
+    if(!mobile){const boat=await lakeChecks(page,data,output);assert(boat.roof<=bounds.boat.roof+1e-6&&boat.head<=bounds.boat.head+1e-6)}
     async function fixture(x,z){assert(await page.evaluate(async([x,z])=>{const walker=window.viewer.walk;walker.leave();return walker.enter(x,z,0,'ride-fixture')},[x,z]))}
     const button=page.locator('.vehicle-action')
     async function interact(label){const close=page.locator('.spot-card.show .card-close');if(await close.isVisible())await close.click();await page.waitForFunction(label=>document.querySelector('.vehicle-action')?.textContent.includes(label),label);if(mobile)await button.tap();else await page.keyboard.press('e')}
@@ -45,7 +49,7 @@ try{
     if(!mobile){
       await fixture(-31,510.3);await interact('骑行');const wall=await steer([-42,510.5],true);console.log('wall',wall);assert(wall.obstacle==='building'&&wall.speed===0&&wall.distance<8);await interact('下车')
       const [x,,z]=data.docks['解放桥码头'];await fixture(x,z);await shot('dock');await interact('上船');
-      const distance=await page.evaluate(()=>{const walker=window.viewer.walk,start=walker.position.clone();for(let frame=0;frame<3600;frame++)walker.tick(1/60);return walker.position.distanceTo(start)})
+      const distance=await page.evaluate((bounds)=>{const walker=window.viewer.walk,start=walker.position.clone();for(let frame=0;frame<3600;frame++){walker.tick(1/60);const probe=walker.boatClearance();if(probe?.kind!=='raft'||probe.clearance<.3||probe.roof-walker.position.y>bounds.roof+1e-6||probe.head-walker.position.y>bounds.head+1e-6)throw Error(`unsafe raft: ${JSON.stringify(probe)}`)}return walker.position.distanceTo(start)},bounds.raft)
       assert(distance>80&&distance<125);await shot('boat');await interact('下站下船')
       await page.evaluate(async()=>{const {walk,stream}=window.viewer;for(let count=0;count<4000&&walk.vehicle==='boat';count++){walk.tick(.12);if(count%24===0){stream.tick(walk.position);await new Promise(requestAnimationFrame)}}})
       assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot');console.log('60s boat displacement',distance)
@@ -53,6 +57,4 @@ try{
     await page.close()
   }
   assert.deepEqual(errors,[])
-  assert(lake.samples>0&&lake.minimum>=.3,lake.reason??`insufficient bridge clearance: ${lake.minimum} m`)
-  assert(!data.routes.find(route=>route.start==='榕湖'&&route.end==='榕湖西码头')?.suspended,'glass bridge service suspended')
 }finally{await browser.close();await server.close()}

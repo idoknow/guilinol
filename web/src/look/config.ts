@@ -1,4 +1,5 @@
 // M1 look: 青绿山水 · 低多边形. All colours/atmosphere knobs live here; docs/style.md mirrors the palette.
+import vesselBounds from '../../../pipeline/vessel-bounds.json'
 export const look = {
   // Peaks (M2.5, docs/reference.md R3/R7/R14): canopy-wrapped karst. Deep broadleaf green in clumps
   // (dark under-canopy ↔ sunlit yellow-green), olive scrub at the foot; steep faces are grey-white
@@ -20,7 +21,7 @@ export const look = {
   hemiSky: 0xd8e6e6, hemiGround: 0x8a9172, hemiPower: 1.7,
   exposure: 1.0,
   // 石桥 decks (GL03): warm limestone top, shaded fascia hanging bridgeDepth metres below the deck.
-  bridgeTop: 0xc4bca8, bridgeSide: 0x938d7e, bridgeDepth: 1.2,
+  bridgeTop: 0xc4bca8, bridgeSide: 0x938d7e, bridgeDepth: vesselBounds.bridgeDepth,
   // M3 water: jade body under the mirror; night lights.
   waterBody: 0x4f8580, waterBaked: 0x6c9c97, waterBank: 0x8a876f, windowLight: 0xffc27a, roadLight: 0xffb55e, bridgeLamp: 0xffd08a,
   peakUplightWarm: 0xffd9a0, peakUplightJade: 0x9fd8c0,

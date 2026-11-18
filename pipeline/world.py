@@ -77,7 +77,7 @@ def build(bbox, output, palette):
         row = min(depth//GRID,max(0,round((south-top)/GRID)))
         col = min(width//GRID,max(0,round((east-left)/GRID)))
         return terrain[row,col]/10,surface[row,col]
-    decks = bridge_tiles(bounds,sample)
+    decks, triangles = bridge_tiles(bounds,sample)
     streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample)
     print('Lengths (m):',lengths)
     def asset(name):
@@ -108,7 +108,7 @@ def build(bbox, output, palette):
             chunks.append(dict(x=origin[0],z=origin[1],**asset(name)))
     extent = [left,top,width,depth]
     write_atlas(output,extent,bounds,layers,footprints,peaks)
-    write_vehicles(output,bounds,surface,layers['road'],footprints,sample)
+    write_vehicles(output,bounds,surface,layers['road'],footprints,sample,triangles)
     manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=extent,chunkSize=CHUNK,peaks=peaks,atlas=asset('atlas.bin'),
                     vehicles=asset('vehicles.bin'),grid=GRID,overview=dict(step=32, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png')),chunks=chunks)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
