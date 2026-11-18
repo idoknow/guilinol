@@ -12,6 +12,8 @@ import {renderMirror, WATER_LAYER} from './look/water'
 import {rain} from './look/rain'
 import {windowLight} from './look/buildings'
 import {skyClock} from './ui/sky'
+import {play} from './play'
+import type {Host} from './play/host'
 
 installAtmosphere()
 async function start() {
@@ -33,7 +35,8 @@ async function start() {
   scene.add(outerGround(manifest.extent))
   camera.position.set(left+width*.55,420,top+depth*.62)
   let walker:Awaited<ReturnType<typeof import('./walk').walk>>|undefined, switching=false
-  const controls = flight(camera,renderer.domElement,manifest.extent,()=>!walker?.active&&!switching)
+  let cinema=false
+  const controls = flight(camera,renderer.domElement,manifest.extent,()=>!walker?.active&&!switching&&!cinema)
   camera.lookAt(left+width*.47,150,top+depth*.45)
   function resize() {
     renderer.setPixelRatio(Math.min(devicePixelRatio,1.5)); renderer.setSize(innerWidth,innerHeight)
@@ -50,17 +53,24 @@ async function start() {
   const output = document.querySelector('output')!
   let previous=0, first=0, frame=0, sum=0, samples=0
   const stats = {firstMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0}
+  type Walker=Awaited<ReturnType<typeof import('./walk').walk>>
+  async function loadWalker():Promise<Walker>{return walker??=await (await import('./walk')).walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))}
+  async function walkTo(x:number,z:number,yaw:number,reason:string){
+    if(switching)return false
+    switching=true
+    try{await loadWalker();if(walker!.active)walker!.leave();return await walker!.enter(x,z,yaw,reason)}finally{switching=false;showMode()}
+  }
   async function toggle(initial=false){
     if(switching)return
     if(walker?.active){walker.leave();return}
     switching=true
     try{
-      walker??=await (await import('./walk')).walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))
+      const walking=await loadWalker()
       const name=params.get('spawn'),preset=initial&&name&&Object.hasOwn(presets,name)?presets[name]:null
       const original=camera.clone();if(preset)setPreset(original,name)
       const gate=walkConfig.gate,point=preset?.walk??(initial&&!preset?gate:{x:original.position.x,z:original.position.z,yaw:original.rotation.y})
-      if(!await walker.enter(point.x,point.z,point.yaw,initial?name??'default':'flight',!!preset?.walk)&&initial)
-        await walker.enter(gate.x,gate.z,gate.yaw,'fallback')
+      if(!await walking.enter(point.x,point.z,point.yaw,initial?name??'default':'flight',!!preset?.walk)&&initial)
+        await walking.enter(gate.x,gate.z,gate.yaw,'fallback')
     }finally{switching=false}
   }
   window.addEventListener('keydown',event=>{if(event.code==='KeyV'&&!event.repeat)void toggle().then(showMode)})
@@ -68,19 +78,23 @@ async function start() {
   const modeButton=document.createElement('button');modeButton.className='btn-mode'
   function showMode(){const walking=!!walker?.active;document.body.dataset.mode=walking?'walk':'fly'
     modeButton.textContent=walking?'起飞':'落地步行';modeButton.setAttribute('aria-label',walking?'切换到飞行':'切换到步行')
-    hint.textContent=walking?'WASD 走 · Shift 跑 · 空格 跳 · 拖动转视角 · 滚轮远近 · V 起飞':'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行'}
+    hint.textContent=walking?'WASD 走 · Shift 跑 · 空格 跳 · 拖动转视角 · 滚轮远近 · V 起飞 · J 景册 · P 拍照':'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · J 景册 · P 拍照'}
   let toastTimer=0
   window.addEventListener('walk:spawn-failed',()=>{toast.textContent='这里没有可以落脚的地方，飞近岸边或街道再试';toast.classList.add('show')
     clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>toast.classList.remove('show'),3200)})
-  if(touch){modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton)}
+  modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton);void touch
   showMode()
-  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,clock,env,get walk(){return walker},probeFoot(){
+  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,clock,env,get tour(){return tour},get walk(){return walker},probeFoot(){
     const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
     const clearance = ray.intersectObjects(scene.children)[0]?.distance
     ray.setFromCamera(new THREE.Vector2(0,0),camera)
     const hit = ray.intersectObjects(scene.children)[0]
     return {clearance,lookingAt:hit?.object.parent?.name,wallDistance:hit?.distance}
   }}})
+  function draw(){renderMirror(renderer,scene,camera,frame<2);renderer.render(scene,camera)}
+  const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
+    fly(){if(walker?.active)walker.leave();showMode()},get cinema(){return cinema},set cinema(on){cinema=on}}
+  const tour=play(host)
   renderer.setAnimationLoop(now=>{
     const elapsed = previous?now-previous:0;previous=now
     if(walker?.active)walker.tick(elapsed/1000);else if(!switching)controls(elapsed/1000)
@@ -92,8 +106,8 @@ async function start() {
     hemi.color.copy(env.hemiSky); hemi.groundColor.copy(env.hemiGround); hemi.intensity = env.hemiPower
     renderer.toneMappingExposure = env.exposure; windowLight.value = env.night
     dome.update(); drops.update()
-    renderMirror(renderer,scene,camera,frame<2)
-    renderer.render(scene,camera)
+    tour.tick(elapsed/1000)
+    draw()
     frame++; sum+=elapsed;samples++
     Object.assign(stats,{ms:elapsed,calls:renderer.info.render.calls,frame,loaded:stream.loaded.size,pending:stream.pending.size,
       visited:stream.visited.size,failures:stream.failures.size})

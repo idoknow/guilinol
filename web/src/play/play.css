@@ -1,0 +1,115 @@
+/* M4 sightseeing HUD. Same language as the M2/M3 HUD: dark jade glass for controls on the scene,
+   rice paper (#f4efe2) for things you read, vermilion seal (#a9503c) for the one thing that matters. */
+[hidden]{display:none!important}
+:root{--glass:rgba(28,44,42,.42);--glass-strong:rgba(28,44,42,.66);--paper:#f4efe2;--paper-deep:#e9e1cf;--ink:#2a302c;--ink-soft:#5d655f;
+  --seal:#a9503c;--seal-light:#d0694c;--line:rgba(244,239,226,.38);--serif:"Noto Serif SC","Source Han Serif SC","Songti SC",serif}
+
+/* Dock: top-right column — mode, 景册, 拍照 (the map joins it once the atlas lands). */
+.dock{position:fixed;right:calc(12px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));display:flex;flex-direction:column;align-items:flex-end;gap:8px;z-index:5}
+.dock>button{font-family:var(--serif);color:var(--paper);background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  border-radius:18px;padding:7px 14px;font-size:14px;letter-spacing:.1em;cursor:pointer;display:flex;align-items:center;gap:6px;
+  -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;transition:background .15s,transform .15s}
+.dock>button:hover{background:var(--glass-strong)}.dock>button:active{background:rgba(169,80,60,.62);transform:scale(.95)}
+.dock small{font:11px/1 ui-monospace,monospace;letter-spacing:0;background:var(--seal);border-radius:8px;padding:3px 5px}
+.dock .btn-mode{position:static}
+body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-card,.book,.summit-pill,.minimap,.road-name){display:none!important}
+
+/* Teleport veil: fades to the horizon haze colour with the destination written large. */
+.veil{position:fixed;inset:0;z-index:20;display:grid;place-items:center;pointer-events:none;opacity:0;transition:opacity .5s ease;
+  background:radial-gradient(ellipse at 50% 55%,rgba(232,236,230,.97),rgba(205,218,214,.98))}
+.veil.show{opacity:1;pointer-events:auto}
+.veil span{font:600 44px/1 var(--serif);letter-spacing:.5em;padding-left:.5em;color:#3b4a45;opacity:.85;transform:translateY(8px);transition:transform .9s ease}
+.veil.show span{transform:none}
+
+/* Spot card: rice paper sheet sliding in from the right; bottom sheet on phones. */
+.spot-card{position:fixed;right:calc(16px + env(safe-area-inset-right));top:50%;width:300px;box-sizing:border-box;z-index:6;
+  background:var(--paper);color:var(--ink);font-family:var(--serif);padding:22px 22px 18px;border-radius:6px;
+  box-shadow:0 18px 50px rgba(20,30,28,.28),inset 0 0 0 1px rgba(90,80,60,.12);
+  background-image:linear-gradient(180deg,rgba(255,255,255,.35),rgba(255,255,255,0) 40%),radial-gradient(circle at 80% 0,rgba(169,80,60,.06),transparent 50%);
+  transform:translate(24px,-50%);opacity:0;transition:transform .32s cubic-bezier(.2,.8,.2,1),opacity .25s}
+.spot-card.show{transform:translate(0,-50%);opacity:1}
+.spot-card h2{margin:0;font-size:26px;letter-spacing:.18em;font-weight:600}
+.card-sub{margin:4px 0 12px;color:var(--ink-soft);font-size:13px;letter-spacing:.08em}
+.card-intro{margin:0 0 14px;font-size:14px;line-height:1.85;text-align:justify}
+.card-best{display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:8px 0;border-top:1px solid rgba(60,60,50,.14);border-bottom:1px solid rgba(60,60,50,.14);font-size:13px}
+.card-best span{color:var(--ink-soft)}.card-best b{font-weight:600;flex:1}
+.spot-card button,.book button{font-family:var(--serif);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.card-best button{border:1px solid rgba(169,80,60,.5);color:var(--seal);background:none;border-radius:14px;padding:4px 10px;font-size:12px}
+.card-actions{display:flex;gap:8px}
+.card-actions button{flex:1;border:0;border-radius:4px;padding:9px 0;font-size:14px;letter-spacing:.2em;background:var(--paper-deep);color:var(--ink);transition:background .15s}
+.card-actions button:first-child{background:var(--seal);color:var(--paper)}
+.card-actions button:hover{filter:brightness(1.05)}
+.card-close{position:absolute;right:8px;top:6px;width:32px;height:32px;border:0;background:none;color:var(--ink-soft);font-size:22px;line-height:1;cursor:pointer}
+.card-seal{position:absolute;right:22px;top:20px;width:46px;height:46px;display:grid;place-items:center;border-radius:6px;box-sizing:border-box;
+  font:600 24px/1 var(--serif);color:rgba(169,80,60,.55);border:2px dashed rgba(169,80,60,.45);transform:rotate(-4deg)}
+.spot-card .card-seal{right:44px}
+.card-seal.done{color:var(--paper);background:var(--seal);border:2px solid var(--seal);box-shadow:inset 0 0 0 3px var(--seal),inset 0 0 0 4.5px rgba(244,239,226,.85)}
+.card-seal.fresh{animation:stamp .55s cubic-bezier(.3,1.4,.5,1) .25s both}
+@keyframes stamp{0%{transform:scale(2.2) rotate(-14deg);opacity:0}60%{opacity:1}100%{transform:scale(1) rotate(-4deg);opacity:1}}
+
+/* 景册 */
+.book{position:fixed;left:50%;top:50%;width:min(560px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:auto;box-sizing:border-box;z-index:7;
+  background:var(--paper);color:var(--ink);font-family:var(--serif);border-radius:6px;padding:20px 22px;box-shadow:0 24px 70px rgba(20,30,28,.35);
+  transform:translate(-50%,-46%);opacity:0;transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .25s}
+.book.show{transform:translate(-50%,-50%);opacity:1}
+.book header{position:relative;margin-bottom:10px}.book h2{margin:0;font-size:24px;letter-spacing:.3em}
+.book header p{margin:4px 0 0;font-size:13px;color:var(--ink-soft)}.book header b{color:var(--seal)}
+.book ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.book li{position:relative;display:flex;align-items:center;gap:12px;padding:10px 10px 10px 12px;border-radius:5px;background:rgba(255,255,255,.4);box-shadow:inset 0 0 0 1px rgba(60,60,50,.1)}
+.book li .card-seal{position:static;flex:none;width:40px;height:40px;font-size:21px}
+.book li>div:nth-child(2){flex:1;min-width:0}.book h3{margin:0;font-size:16px;letter-spacing:.1em}
+.book li p{margin:2px 0 0;font-size:11.5px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.book li button{border:1px solid rgba(169,80,60,.5);background:none;color:var(--seal);border-radius:14px;padding:4px 10px;font-size:12px;flex:none}
+.book li button:hover{background:var(--seal);color:var(--paper)}
+
+/* Summit pill */
+.summit-pill{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:10px;
+  padding:5px 6px 5px 16px;border-radius:20px;background:var(--glass);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:var(--paper);font:15px var(--serif);letter-spacing:.2em}
+.summit-pill button{font:13px var(--serif);letter-spacing:.15em;border:0;border-radius:15px;padding:6px 12px;background:var(--seal);color:var(--paper);cursor:pointer}
+
+/* Photo mode */
+.photo-bar{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:8;box-sizing:border-box;
+  width:min(720px,calc(100vw - 24px));padding:10px 96px 10px 14px;border-radius:16px;background:var(--glass-strong);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  color:var(--paper);font:13px var(--serif);display:flex;flex-direction:column;gap:8px;user-select:none;-webkit-user-select:none}
+.photo-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.photo-hour{display:flex;align-items:center;gap:10px;flex:1;min-width:220px}.photo-hour span{min-width:7.4em;letter-spacing:.06em}
+.photo-hour input{flex:1;accent-color:var(--seal-light)}
+.chips{display:flex;gap:2px;padding:2px;border-radius:13px;background:rgba(244,239,226,.08)}
+.chips button{font:13px var(--serif);color:var(--paper);background:none;border:0;border-radius:11px;padding:4px 9px;cursor:pointer;opacity:.72;-webkit-tap-highlight-color:transparent}
+.chips button:hover{opacity:1}.chips button.on{background:rgba(169,80,60,.75);opacity:1}
+.photo-shutter{position:absolute;right:14px;top:50%;transform:translateY(-50%);width:64px;height:64px;border-radius:50%;border:3px solid var(--paper);background:none;padding:0;cursor:pointer;display:grid;place-items:center}
+.photo-shutter i{display:block;width:50px;height:50px;border-radius:50%;background:var(--seal);transition:transform .12s}
+.photo-shutter:active i{transform:scale(.86)}
+.photo-exit{position:fixed;right:calc(14px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));width:40px;height:40px;border-radius:50%;
+  border:1px solid var(--line);background:var(--glass);color:var(--paper);font-size:22px;line-height:1;cursor:pointer;backdrop-filter:blur(6px)}
+.photo-flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:30}
+.photo-flash.go{animation:flash .45s ease-out}
+@keyframes flash{0%{opacity:.85}100%{opacity:0}}
+.photo-shot{position:fixed;left:calc(14px + env(safe-area-inset-left));top:calc(14px + env(safe-area-inset-top));margin:0;z-index:9;width:200px;padding:6px 6px 0;background:var(--paper);border-radius:4px;
+  box-shadow:0 14px 40px rgba(0,0,0,.3);transform:rotate(-2deg)}
+.photo-shot.in{animation:drop .5s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes drop{0%{transform:translate(30vw,30vh) rotate(8deg) scale(1.6);opacity:0}100%{transform:rotate(-2deg);opacity:1}}
+.photo-shot img{display:block;width:100%;border-radius:2px}
+.photo-shot figcaption{display:flex;gap:6px;align-items:center;padding:6px 0;font:13px var(--serif)}
+.photo-shot a,.photo-shot button{flex:1;text-align:center;text-decoration:none;color:var(--paper);background:var(--seal);border:0;border-radius:3px;padding:6px 0;font:13px var(--serif);letter-spacing:.15em;cursor:pointer}
+.photo-shot .shot-close{flex:none;width:30px;background:none;color:var(--ink-soft);font-size:18px;letter-spacing:0}
+
+/* Phones */
+@media (pointer:coarse){
+  .dock{gap:6px}.dock>button{padding:6px 12px;font-size:13px}
+  .spot-card{left:50%;right:auto;top:auto;bottom:calc(10px + env(safe-area-inset-bottom));width:min(420px,calc(100vw - 20px));padding:16px 18px 14px;
+    transform:translate(-50%,24px)}
+  .spot-card.show{transform:translate(-50%,0)}
+  .spot-card h2{font-size:22px}.card-intro{font-size:13px;line-height:1.7;margin-bottom:10px}.card-best{margin-bottom:10px;padding:6px 0}
+  .card-actions button{padding:10px 0}
+  .photo-bar{padding:8px 84px 8px 10px;gap:6px}.photo-shutter{width:58px;height:58px}.photo-shutter i{width:44px;height:44px}
+  .chips button{padding:6px 9px}.photo-hour{min-width:180px}
+  .photo-shot{width:150px}
+  .summit-pill{top:auto;bottom:calc(24px + env(safe-area-inset-bottom))}
+}
+@media (pointer:coarse) and (max-height:500px){
+  .spot-card{max-height:calc(100vh - 20px);overflow:auto;width:min(560px,calc(100vw - 260px))}
+  .card-intro{font-size:12.5px;line-height:1.6}
+  .book ol{grid-template-columns:1fr 1fr 1fr}.book li{flex-direction:column;text-align:center;gap:6px;padding:8px}.book li p{display:none}
+}
+@media (max-width:520px){.book ol{grid-template-columns:1fr}.spot-card{width:calc(100vw - 20px)}}

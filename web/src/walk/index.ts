@@ -18,7 +18,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const input=walkInput(canvas,()=>active,(dx,dy)=>{yaw-=dx*cfg.sensitivity;pitch=THREE.MathUtils.clamp(pitch+dy*cfg.sensitivity,-.8,1.3)},
     delta=>{arm=THREE.MathUtils.clamp(arm+delta*.013,cfg.zoomMin,cfg.zoomMax)},()=>{arm=arm>(cfg.far+cfg.near)/2?cfg.near:cfg.far})
   const safe=new THREE.Vector3(),focus=new THREE.Vector3(),direction=new THREE.Vector3();const spawns:object[]=[]
-  let external:{x:number,z:number,run:boolean}|null=null,blockedWater=false
+  let external:{x:number,z:number,run:boolean}|null=null,blockedWater=false,held=false
+  const still={right:0,forward:0,run:false,jump:false}
   function place(x:number,z:number,reason:string,override=false){const found=sim.findWalkableSpawn(x,z,override)
     if(verify)spawns.push({reason,from:[x,z],to:found?[found.x,found.z]:null,distance:found?Math.hypot(found.x-x,found.z-z):null,rule:found?.rule??'none'})
     if(!found)return false
@@ -44,7 +45,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
       inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits}}
   function tick(dt:number){if(!active)return;const before=performance.now(),start=sim.body.translation();sim.sync(start.x,start.z)
-    const keys=input.read(),delta=new THREE.Vector2(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))
+    const read=input.read(),keys=held?still:read,delta=new THREE.Vector2(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))
     if(external)delta.set(external.x,external.z);delta.divideScalar(Math.max(1,delta.length()))
     const speed=external?.run??keys.run?cfg.run:cfg.walk,step=1/60;let traveled=0;lastHits=[];blockedWater=false
     if(keys.jump&&grounded)velocity=Math.sqrt(-2*cfg.gravity*cfg.jump)
@@ -66,6 +67,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(nextAction&&action!==nextAction){action?.fadeOut(.2);nextAction.reset().fadeIn(.2).play();action=nextAction}
     mixer.update(dt);follow()
   }
-  return {enter,leave,tick,spawns,probe,get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  return {enter,leave,tick,spawns,probe,get active(){return active},get yaw(){return yaw},
+    // M4 photo mode / viewpoints: freeze movement (camera still orbits), aim the camera, hide the figure.
+    hold(on:boolean){held=on;external=null},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow()},
+    showFigure(on:boolean){figure.visible=on&&active},drive(x:number,z:number,run=true){external={x,z,run}},
     get position(){const pos=sim.body.translation();return focus.set(pos.x,pos.y,pos.z)}}
 }

@@ -17,7 +17,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   joystick.onlostpointercapture=()=>{stick.x=stick.y=0;knob.style.transform='';joystick.classList.remove('running')}
   window.addEventListener('keydown',event=>{if(!active())return;keys.add(event.code);if(!event.repeat&&event.code==='Space'){jump=true;event.preventDefault()}if(!event.repeat&&event.code==='KeyC')view()})
   window.addEventListener('keyup',event=>keys.delete(event.code));window.addEventListener('blur',()=>{keys.clear();jump=false})
-  canvas.addEventListener('pointerdown',event=>{if(active()&&(event.pointerType==='mouse'||event.clientX>innerWidth/2))canvas.setPointerCapture(event.pointerId)})
+  canvas.addEventListener('pointerdown',event=>{if(active()&&(event.pointerType==='mouse'||event.clientX>innerWidth/2||document.body.dataset.photo==='on'))canvas.setPointerCapture(event.pointerId)})
   canvas.addEventListener('pointermove',event=>{if(active()&&(document.pointerLockElement===canvas||canvas.hasPointerCapture(event.pointerId)))rotate(event.movementX,event.movementY)})
   canvas.addEventListener('wheel',event=>{if(active()){event.preventDefault();zoom(event.deltaY)}},{passive:false})
   return {show(on:boolean){panel.hidden=!on||!matchMedia('(pointer:coarse)').matches;keys.clear();jump=false;stick.x=stick.y=0},

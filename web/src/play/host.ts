@@ -1,0 +1,24 @@
+import type * as THREE from 'three'
+import type {Manifest} from '../world'
+import type {Stream} from '../stream'
+import type {Weather} from '../look/time'
+
+// What the sightseeing layer (M4) needs from the viewer. main.ts builds it; play/* never reaches into main.
+export interface Walker {
+  active:boolean; yaw:number; position:THREE.Vector3
+  hold(on:boolean):void; face(yaw:number,pitch?:number):void; showFigure(on:boolean):void
+}
+export interface Clock {hour:number; weather:Weather; flowing:boolean; goal:number|null; set(hour:number,weather?:Weather):void}
+export interface Host {
+  scene:THREE.Scene; camera:THREE.PerspectiveCamera; renderer:THREE.WebGLRenderer
+  manifest:Manifest; stream:Stream; peaks:THREE.Group; clock:Clock
+  walker():Walker|undefined
+  /** Walk mode at x/z (searches nearby for footing). Loads the walker on first use. */
+  walkTo(x:number,z:number,yaw:number,reason:string):Promise<boolean>
+  /** Leave walk mode; flight controls are suspended while `cinema` is on. */
+  fly():void
+  cinema:boolean
+  /** Render one frame (mirror + scene) right now, for the shutter. */
+  draw():void
+  refreshMode():void
+}
