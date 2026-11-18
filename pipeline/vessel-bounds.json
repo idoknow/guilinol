@@ -1,0 +1,5 @@
+{
+  "bridgeDepth": 1.2,
+  "boat": {"width": 2.42, "length": 5.8, "roof": 1.895, "head": 1.57},
+  "raft": {"width": 1.4, "length": 4.3, "roof": 0.46, "head": 1.31}
+}
