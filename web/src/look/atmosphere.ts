@@ -38,7 +38,7 @@ export function sky() {
     cloudLit:{value:env.cloudLit},cloudShade:{value:env.cloudShade},sunUp:{value:0},cover:{value:0},
     uSun:atmo.uSun,uNight:atmo.uNight,uTime:atmo.uTime}
   const material = new THREE.ShaderMaterial({
-    side:THREE.BackSide, depthWrite:false, fog:false, toneMapped:false, uniforms,
+    side:THREE.BackSide, depthWrite:false, depthFunc:THREE.LessEqualDepth, fog:false, toneMapped:false, uniforms,
     vertexShader:`varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; }`,
     fragmentShader:`uniform vec3 zenith, horizon, glow, cloudLit, cloudShade, uSun; uniform float sunUp, cover, uNight, uTime; varying vec3 vDir;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -72,7 +72,7 @@ export function sky() {
       }`,
   })
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(9000,32,16),material)
-  mesh.frustumCulled=false; mesh.renderOrder=-1
+  mesh.frustumCulled=false; mesh.renderOrder=1
   // Re-centre on whichever camera is rendering (main or water mirror) and refresh the matrix now —
   // matrixWorld was computed before this pass started.
   mesh.onBeforeRender=(_r,_s,camera)=>{mesh.position.copy(camera.position);mesh.updateMatrixWorld()}

@@ -15,8 +15,8 @@ export function nightPeaks(material:THREE.Material) {
     shareAtmosphere(shader)
     Object.assign(shader.uniforms,{uWarm:{value:c(look.peakUplightWarm)},uJade:{value:c(look.peakUplightJade)}})
     shader.vertexShader = shader.vertexShader.replace('#include <common>',`#include <common>
-attribute float aHeight; varying float vUp; varying float vPick;`).replace('#include <begin_vertex>',`#include <begin_vertex>
-vUp = aHeight; vPick = fract(sin(dot(modelMatrix[3].xz, vec2(12.9898, 78.233))) * 43758.5453);`)
+attribute float aHeight; attribute float aPick; varying float vUp; varying float vPick;`).replace('#include <begin_vertex>',`#include <begin_vertex>
+vUp = aHeight; vPick = aPick;`)
     shader.fragmentShader = shader.fragmentShader.replace('#include <common>',`#include <common>
 uniform float uNight; uniform vec3 uWarm; uniform vec3 uJade; varying float vUp; varying float vPick;`)
       .replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>

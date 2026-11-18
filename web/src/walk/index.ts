@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import R from '@dimforge/rapier3d-compat'
-import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
+import {GLTFLoader, type GLTF} from 'three/addons/loaders/GLTFLoader.js'
+import type {PeaksGroup} from '../peaks'
 import type {Manifest} from '../world'
 import type {Stream} from '../stream'
 import {walkInput} from '../ui/walk'
@@ -10,10 +11,80 @@ import {createPhysics} from './physics'
 import {look} from '../look/config'
 import type {vehicles} from './vehicles'
 
-export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canvas:HTMLCanvasElement,manifest:Manifest,stream:Stream,peaks:THREE.Group,verify:boolean){
-  const [sim,model]=await Promise.all([createPhysics(manifest,stream,peaks),new GLTFLoader().loadAsync(avatar.path)])
-  const figure=model.scene;scene.add(figure);figure.visible=false;figure.scale.setScalar(avatar.scale)
-  if(avatar.color)figure.traverse(node=>{if(node instanceof THREE.Mesh)node.material.color.set(avatar.color)})
+let rapierReady:Promise<void>|undefined
+let avatarReady:Promise<GLTF>|undefined
+
+export function preloadWalk() {
+  rapierReady ??= R.init()
+  avatarReady ??= new GLTFLoader().loadAsync(avatar.path)
+  return Promise.all([rapierReady,avatarReady])
+}
+
+function mergeAvatar(root:THREE.Group, tintHex:string|null) {
+  if(root.userData.merged) return root.userData.skinned as THREE.SkinnedMesh|undefined
+  root.userData.merged = true
+  root.position.set(0,0,0); root.rotation.set(0,0,0); root.scale.setScalar(1)
+  root.updateMatrixWorld(true)
+
+  const bones:THREE.Bone[] = []
+  const boneInverses:THREE.Matrix4[] = []
+  const boneIndex = new Map<THREE.Object3D,number>()
+  const posList:number[] = [], normList:number[] = [], colList:number[] = []
+  const skinIdx:number[] = [], skinWgt:number[] = []
+  const oldMeshes:THREE.Mesh[] = []
+  const v = new THREE.Vector3(), n = new THREE.Vector3(), col = new THREE.Color()
+  const override = tintHex ? new THREE.Color(tintHex) : null
+
+  root.traverse(node=>{
+    if(!(node instanceof THREE.Mesh) || (node instanceof THREE.SkinnedMesh)) return
+    oldMeshes.push(node)
+    const joint = node.parent ?? root
+    let bIdx = boneIndex.get(joint)
+    if(bIdx===undefined) {
+      bIdx = bones.length
+      boneIndex.set(joint,bIdx)
+      bones.push(joint as unknown as THREE.Bone)
+      boneInverses.push(joint.matrixWorld.clone().invert())
+    }
+    const g = node.geometry.index ? node.geometry.toNonIndexed() : node.geometry
+    const pos = g.getAttribute('position'), norm = g.getAttribute('normal')
+    const mat = node.material as THREE.MeshStandardMaterial
+    col.copy(override ?? mat.color)
+    for(let i=0;i<pos.count;i++) {
+      v.fromBufferAttribute(pos,i).applyMatrix4(node.matrixWorld)
+      posList.push(v.x,v.y,v.z)
+      if(norm) n.fromBufferAttribute(norm,i).transformDirection(node.matrixWorld)
+      else n.set(0,1,0)
+      normList.push(n.x,n.y,n.z)
+      colList.push(col.r,col.g,col.b)
+      skinIdx.push(bIdx,0,0,0)
+      skinWgt.push(1,0,0,0)
+    }
+    if(g!==node.geometry) g.dispose()
+  })
+  if(!oldMeshes.length) return undefined
+  for(const m of oldMeshes) { m.parent?.remove(m); m.geometry.dispose() }
+
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position',new THREE.Float32BufferAttribute(posList,3))
+  geom.setAttribute('normal',new THREE.Float32BufferAttribute(normList,3))
+  geom.setAttribute('color',new THREE.Float32BufferAttribute(colList,3))
+  geom.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(skinIdx,4))
+  geom.setAttribute('skinWeight',new THREE.Float32BufferAttribute(skinWgt,4))
+  const mat = new THREE.MeshStandardMaterial({vertexColors:true,roughness:.95,metalness:0})
+  const skinned = new THREE.SkinnedMesh(geom,mat)
+  skinned.frustumCulled = false
+  root.add(skinned)
+  skinned.bind(new THREE.Skeleton(bones,boneInverses),new THREE.Matrix4())
+  root.userData.skinned = skinned
+  return skinned
+}
+
+export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canvas:HTMLCanvasElement,manifest:Manifest,stream:Stream,peaks:PeaksGroup,verify:boolean){
+  rapierReady ??= R.init()
+  avatarReady ??= new GLTFLoader().loadAsync(avatar.path)
+  const [sim,model]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady])
+  const figure=model.scene,skinned=mergeAvatar(figure,avatar.color);scene.add(figure);figure.visible=false;figure.scale.setScalar(avatar.scale)
   const mixer=new THREE.AnimationMixer(figure),actions=new Map(model.animations.map(clip=>[clip.name,mixer.clipAction(clip)]))
   let action:THREE.AnimationAction|undefined,active=false,yaw=0,pitch=cfg.pitch,arm=cfg.far,velocity=0,grounded=false,accumulator=0
   let resets=0,steps=0,physicsMs=0,elapsed=0,lastHits:string[]=[]
@@ -50,6 +121,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
   function boatClearance(){const boat=rides?.boat;if(!boat)return null
+    figure.updateWorldMatrix(true,true);skinned?.skeleton.update()
     const roof=new THREE.Box3().setFromObject(boat,true).max.y,head=new THREE.Box3().setFromObject(figure,true).max.y
     let underside=Infinity
     for(const along of [-2.3,-1,0,1,2.3])for(const across of [-1,0,1]){const point=boat.localToWorld(new THREE.Vector3(across,0,along)),deck=sim.surface(point.x,point.z,'deck');if(deck)underside=Math.min(underside,deck.y-look.bridgeDepth)}
