@@ -1,1 +1,2 @@
 `public/avatar/figure.glb`：本项目原创低多边形角色“城市漫游者”（短发、橙色外套、牛仔裤、运动鞋、双肩包；含 idle、walk、run、jump 动画），以 CC0 1.0 提供。由 [`pipeline/avatar.py`](https://github.com/idoknow/guilinol/blob/main/pipeline/avatar.py) 生成（`uv run python pipeline/avatar.py`），未使用外部角色或动作。许可证：https://creativecommons.org/publicdomain/zero/1.0/ 。世界数据署名见 README。
+`public/landmarks/twin_pagodas.glb`、`public/landmarks/elephant_hill.glb`：本项目原创程序化低多边形地标模型（杉湖日月双塔与湖岸石栏杆、象鼻山水月洞与普贤塔及岸边步道竹筏），由 `pipeline/landmarks/twin_pagodas.py` 与 `pipeline/landmarks/elephant_hill.py` 生成，以 CC0 1.0 提供；实景照片仅作尺寸与配色参考，未入库或用作贴图。

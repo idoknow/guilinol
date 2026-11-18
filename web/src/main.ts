@@ -11,6 +11,7 @@ import {atmo, env, evaluate} from './look/time'
 import {renderMirror, WATER_LAYER} from './look/water'
 import {rain} from './look/rain'
 import {windowLight} from './look/buildings'
+import {createLandmarks} from './look/landmarks'
 import {skyClock} from './ui/sky'
 
 installAtmosphere()
@@ -42,6 +43,7 @@ async function start() {
   resize(); window.addEventListener('resize',resize)
   const [base,peaks] = await basePromise
   scene.add(base.mesh,peaks)
+  const landmarks = createLandmarks(scene,manifest.landmarks)
   const params = new URLSearchParams(location.search)
   const clock = skyClock(params)
   setPreset(camera,params.get('cam'))
@@ -91,11 +93,15 @@ async function start() {
     light.position.copy(env.sunDir); light.color.copy(env.sunColor); light.intensity = env.sunPower
     hemi.color.copy(env.hemiSky); hemi.groundColor.copy(env.hemiGround); hemi.intensity = env.hemiPower
     renderer.toneMappingExposure = env.exposure; windowLight.value = env.night
+    if(frame>=2) peaks.userData.loadDeferred?.()
+    peaks.userData.tick?.(camera.position)
+    landmarks.tick(frame,camera.position)
     dome.update(); drops.update()
     renderMirror(renderer,scene,camera,frame<2)
     renderer.render(scene,camera)
     frame++; sum+=elapsed;samples++
-    Object.assign(stats,{ms:elapsed,calls:renderer.info.render.calls,frame,loaded:stream.loaded.size,pending:stream.pending.size,
+    Object.assign(stats,{ms:elapsed,calls:renderer.info.render.calls,frame,loaded:stream.loaded.size,
+      pending:stream.pending.size+landmarks.pending+(peaks.userData.pending??0),
       visited:stream.visited.size,failures:stream.failures.size})
     if(sum>=400||frame===1) {
       output.value=`${Math.round(samples*1000/(sum||16.7))} FPS · ${stats.calls} calls · ${stats.loaded} 块 · ${bytes.toLocaleString()} B`

@@ -1,11 +1,12 @@
 import * as THREE from 'three'
+import {shareAtmosphere} from './look/atmosphere'
 import {look} from './look/config'
 import {nightPeaks} from './look/night'
 import {fetchAsset} from './world'
 
 interface Section {offset:number; vertices:number; indices:number; indexOffset:number}
 export interface Peaks {
-  file:string; entries:{name:string; center:[number,number,number]; lods:Section[]; model?:string}[]
+  file:string; entries:{name:string; center:[number,number,number]; baseHeight?:number; lods:Section[]; model?:string}[]
 }
 
 export async function loadPeaks(asset:Peaks) {
@@ -21,7 +22,6 @@ export async function loadPeaks(asset:Peaks) {
     look.peakRock,look.peakRockDark,look.peakRockOchre].map(value=>new THREE.Color(value))
   const smooth = (a:number,b:number,x:number)=>{const t=THREE.MathUtils.clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)}
   const hash = (x:number,z:number)=>{const v=Math.sin(x*12.9898+z*78.233)*43758.5453; return v-Math.floor(v)}
-  // Value noise on a few-metre lattice so canopy reads as clumps of tree crowns, not per-facet speckle.
   const noise = (x:number,z:number,cell:number)=>{
     const gx=x/cell, gz=z/cell, ix=Math.floor(gx), iz=Math.floor(gz), fx=gx-ix, fz=gz-iz
     const u=fx*fx*(3-2*fx), v=fz*fz*(3-2*fz)
@@ -32,8 +32,6 @@ export async function loadPeaks(asset:Peaks) {
     const clump = noise(x+y*.3,z-y*.3,7)*.65+noise(x,z,2.5)*.35
     target.copy(dark).lerp(green,smooth(.2,.75,clump)).lerp(light,smooth(.62,.95,clump)*(.35+.4*height))
     target.lerp(foot,(1-smooth(.03,.18,height))*.7)
-    // Bare limestone only in vertical bands where the wall is steepest (R3/R7): vegetation drapes down
-    // between bands and over ledges. Bands follow the angle so they read as cliff faces, not stripes.
     const angle = Math.atan2(z,x)
     const band = noise(angle*9,y*.04,1)*.7+noise(angle*30,y*.12,1)*.3
     const ledge = noise(angle*22,y*.35,1)
@@ -44,11 +42,41 @@ export async function loadPeaks(asset:Peaks) {
     target.lerp(stone,THREE.MathUtils.clamp(bare*look.peakRockShare,0,1))
     target.multiplyScalar(1+(hash(x,z)-.5)*2*look.peakJitter)
   }
-  await Promise.all(asset.entries.map(async entry=>{
+  const detailMeshes:{mesh:THREE.Object3D; anchor:THREE.Vector3}[] = []
+  const deferred:(()=>Promise<void>)[] = []
+  for(const entry of asset.entries) {
     if(entry.model) {
-      const {GLTFLoader} = await import('three/addons/loaders/GLTFLoader.js')
-      const {scene} = await new GLTFLoader().loadAsync(`./world/${entry.model}`)
-      scene.name=entry.name; group.add(scene); return
+      const holder = new THREE.Group()
+      holder.name = entry.name
+      holder.position.set(entry.center[0],entry.baseHeight??entry.center[1],entry.center[2])
+      group.add(holder)
+      const url = entry.model.includes('/')?`./${entry.model}`:`./world/${entry.model}`
+      deferred.push(async()=>{
+        const {GLTFLoader} = await import('three/addons/loaders/GLTFLoader.js')
+        const {scene} = await new GLTFLoader().loadAsync(url)
+        const patched = new Set<THREE.Material>()
+        scene.traverse(node=>{
+          if(!(node instanceof THREE.Mesh)) {node.name=entry.name; return}
+          if(node.userData?.noPeakCollider || node.parent?.userData?.noPeakCollider) detailMeshes.push({mesh:node, anchor:holder.position})
+          const hasGlow = node.geometry.hasAttribute('_glow')
+          for(const mat of Array.isArray(node.material)?node.material:[node.material]) {
+            if(patched.has(mat)) continue
+            patched.add(mat)
+            if(hasGlow) {
+              mat.onBeforeCompile = (shader:THREE.WebGLProgramParametersWithUniforms)=>{
+                shareAtmosphere(shader)
+                shader.vertexShader = shader.vertexShader.replace('#include <common>','#include <common>\nattribute vec4 _glow; varying vec3 vPeakGlow;')
+                  .replace('#include <begin_vertex>','#include <begin_vertex>\nvPeakGlow = _glow.rgb;')
+                shader.fragmentShader = shader.fragmentShader.replace('#include <common>','#include <common>\nuniform float uNight; varying vec3 vPeakGlow;')
+                  .replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance += vPeakGlow * uNight;')
+              }
+              mat.customProgramCacheKey = ()=>'guilinol-peak-glow'
+            } else nightPeaks(mat as THREE.MeshStandardMaterial)
+          }
+        })
+        holder.add(scene)
+      })
+      continue
     }
     const lod = new THREE.LOD()
     lod.name=entry.name; lod.position.set(...entry.center)
@@ -70,10 +98,21 @@ export async function loadPeaks(asset:Peaks) {
         color.toArray(colors,index*3)
       }
       geometry.setAttribute('color',new THREE.BufferAttribute(colors,3))
-      const mesh = new THREE.Mesh(geometry,material)
-      lod.addLevel(mesh,level*800,.05)
+      lod.addLevel(new THREE.Mesh(geometry,material),level*800,.05)
     })
     group.add(lod)
-  }))
+  }
+  let resolveReady!:()=>void
+  group.userData.pending = 0
+  group.userData.ready = deferred.length ? new Promise<void>(r=>{resolveReady=r}) : Promise.resolve()
+  group.userData.loadDeferred = ()=>{
+    if(!deferred.length) return
+    group.userData.pending = deferred.length
+    const tasks = deferred.splice(0)
+    void Promise.all(tasks.map(fn=>fn().finally(()=>{group.userData.pending--}))).finally(()=>resolveReady?.())
+  }
+  group.userData.tick = (camPos:THREE.Vector3)=>{
+    for(const d of detailMeshes) d.mesh.visible = camPos.distanceToSquared(d.anchor) <= 680*680
+  }
   return group
 }

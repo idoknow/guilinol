@@ -10,9 +10,17 @@ import type {Peaks} from './peaks'
 
 interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number}
+export type LandmarkColliderSpec =
+  | {shape:'cylinder'; kind:'building'; dx:number; dy:number; dz:number; halfHeight:number; radius:number}
+  | {shape:'box'; kind:'building'|'rail'|'deck'; dx:number; dy:number; dz:number; hx:number; hy:number; hz:number; yaw?:number}
+export interface LandmarkTreeSpec {kind:'willow'|'metasequoia'; dx:number; dy:number; dz:number; scale:number; yaw:number}
+export interface LandmarkEntry {
+  id:string; name:string; model:string; position:[number,number,number]; yaw?:number; radius?:number;
+  colliders?:LandmarkColliderSpec[]; trees?:LandmarkTreeSpec[]
+}
 export interface Manifest {
   version:number; extent:[number,number,number,number]; grid:number; chunkSize:number; chunks:Tile[];
-  peaks:Peaks; atlas:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset}
+  peaks:Peaks; landmarks?:LandmarkEntry[]; atlas:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset}
 }
 export let bytes = 0
 export async function fetchAsset(file:string, signal?:AbortSignal) {

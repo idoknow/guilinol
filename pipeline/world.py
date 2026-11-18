@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 from shapely import STRtree
-from shapely.geometry import box
+from shapely.geometry import Point, Polygon, box
 
 from common import CHUNK, GRID, LAT0, LON0, OUT, ll2xz, load_dem
 from features import building_mesh, buildings, ground_features, polygons
@@ -60,15 +60,65 @@ def build(bbox, output, palette):
                 wet = np.asarray(mask,dtype=bool)[:patch.shape[0],:patch.shape[1]]
                 if wet.any():
                     patch[wet] = round(np.median(terrain[row:row+patch.shape[0],col:col+patch.shape[1]][wet]))
+    peak_catalog = json.loads(Path(__file__).with_name('peaks.json').read_text())
+    landmark_specs = json.loads(Path(__file__).with_name('landmarks.json').read_text())
+    landmark_waters, water_flattens = [], []
+    for p in peak_catalog:
+        px, pz = ll2xz(p['lat'], p['lon'])
+        if 'waterChannel' in p:
+            wc = p['waterChannel']
+            landmark_waters.append((Polygon([(px + dx, pz + dz) for dx, dz in wc['poly']]), round(wc['level'] * 10)))
+        if 'waterFlatten' in p:
+            wf = p['waterFlatten']
+            bx0, bz0, bx1, bz1 = wf['box']
+            water_flattens.append((px + bx0, pz + bz0, px + bx1, pz + bz1, round(wf['level'] * 10)))
+    landmark_entries, pagoda_shapes = [], []
+    for spec in landmark_specs:
+        lx, lz = ll2xz(spec['lat'], spec['lon'])
+        if not bounds.contains(Point(lx, lz)):
+            continue
+        for b in spec.get('blockers', ()):
+            bp = Point(lx + b['dx'], lz + b['dz']).buffer(b['r'], quad_segs=8)
+            pagoda_shapes.append(bp)
+            if 'water' in b:
+                landmark_waters.append((bp, round(b['water'] * 10)))
+        entry = dict(id=spec['id'], name=spec['name'], model=spec['model'],
+                     position=[round(lx, 2), spec.get('water'), round(lz, 2)],
+                     yaw=spec.get('yaw', 0), radius=spec.get('radius', 900))
+        if 'colliders' in spec:
+            entry['colliders'] = spec['colliders']
+        if 'trees' in spec:
+            entry['trees'] = spec['trees']
+        landmark_entries.append(entry)
+    for wpoly, wlevel in landmark_waters:
+        clipped_w = wpoly.intersection(bounds)
+        if clipped_w.is_empty:
+            continue
+        layers['water'].append(clipped_w)
+        mask1, corner1 = stencil(clipped_w, left, top, 1)
+        texture.paste(palette['water'], corner1, mask1)
+        maskg, (col, row) = stencil(clipped_w, left, top, GRID)
+        patch = surface[row:row+maskg.height, col:col+maskg.width]
+        wmask = np.asarray(maskg, dtype=bool)[:patch.shape[0], :patch.shape[1]]
+        patch[wmask] = wlevel
+    for wx0, wz0, wx1, wz1, wlevel in water_flattens:
+        mr0, mr1 = max(0, int((wz0-top)//GRID)), min(surface.shape[0], int((wz1-top)//GRID)+1)
+        mc0, mc1 = max(0, int((wx0-left)//GRID)), min(surface.shape[1], int((wx1-left)//GRID)+1)
+        mouth = surface[mr0:mr1, mc0:mc1]
+        mouth[mouth != DRY] = wlevel
     wet = surface != DRY
     terrain[wet] = np.minimum(terrain[wet],surface[wet]-20)
     output.mkdir(parents=True, exist_ok=True)
     original = terrain.copy()
+    for item in landmark_entries:
+        if item['position'][1] is None:
+            item['position'][1] = round(elevation(item['position'][0], item['position'][2]), 2)
     mountain_trees = []
     peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet,mountain_trees,CONFIG['peakAreaPerTree'])
-    footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes))
+    landmark_blockers = [*peak_shapes, *pagoda_shapes]
+    footprints, heights = buildings(bounds, elevation, STRtree(landmark_blockers))
     index = STRtree(footprints)
-    trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees)
+    trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],landmark_blockers,elevation,mountain_trees)
     print('Vegetation:',dict(sorted(tree_stats.items())))
     def sample(east,south):
         row = min(depth//GRID,max(0,round((south-top)/GRID)))
@@ -105,7 +155,7 @@ def build(bbox, output, palette):
             chunks.append(dict(x=origin[0],z=origin[1],**asset(name)))
     extent = [left,top,width,depth]
     write_atlas(output,extent,bounds,layers,footprints,peaks)
-    manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=extent,chunkSize=CHUNK,peaks=peaks,atlas=asset('atlas.bin'),
+    manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=extent,chunkSize=CHUNK,peaks=peaks,landmarks=landmark_entries,atlas=asset('atlas.bin'),
                     grid=GRID,overview=dict(step=32, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png')),chunks=chunks)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')

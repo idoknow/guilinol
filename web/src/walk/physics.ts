@@ -46,7 +46,8 @@ function houses(rings:Outline[]){
 }
 
 export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.Group){
-  const [,buffer]=await Promise.all([R.init(),fetchAsset(manifest.overview.heights.file)])
+  peaks.userData.loadDeferred?.()
+  const [,buffer]=await Promise.all([R.init(),fetchAsset(manifest.overview.heights.file),peaks.userData.ready])
   const overview=new Int16Array(buffer), [left,top,width]=manifest.extent
   const world=new R.World({x:0,y:cfg.gravity,z:0}), controller=world.createCharacterController(.025)
   controller.setMaxSlopeClimbAngle(cfg.slope);controller.setMinSlopeSlideAngle(cfg.slope)
@@ -54,13 +55,29 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.
   const shape=new R.Capsule(cfg.height/2-cfg.radius,cfg.radius)
   const body=world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(0,-500,0))
   const capsule=world.createCollider(new R.ColliderDesc(shape),body)
-  const regions=new Map<Tile,Region>(), mountains=new Map<THREE.Object3D,R.Collider>(), kinds=new Map<number,Kind>()
+  const regions=new Map<Tile,Region>(), mountains=new Map<THREE.Object3D,R.Collider>(), landmarks=new Map<object,R.Collider>(), kinds=new Map<number,Kind>()
   function add(desc:R.ColliderDesc,kind:Kind){const coll=world.createCollider(desc);kinds.set(coll.handle,kind);return coll}
   function remove(coll:R.Collider){kinds.delete(coll.handle);world.removeCollider(coll,false)}
+  const landmarkColliders = (manifest.landmarks??[]).flatMap(entry=>{
+    const [ox,oy,oz] = entry.position
+    return (entry.colliders??[]).map(c=>({...c, x:ox+c.dx, y:oy+c.dy, z:oz+c.dz}))
+  })
   const trunks=new Map<import('../forest').Tree,R.Collider>()
   function sync(east:number,south:number){
     let changed=false
     for(const [tree,collider] of trunks)if(Math.hypot(east-tree.x,south-tree.z)>48){remove(collider);trunks.delete(tree);changed=true}
+    for(const item of landmarkColliders){
+      const near=Math.hypot(east-item.x,south-item.z)<=cfg.collisionRadius
+      if(!near&&landmarks.has(item)){remove(landmarks.get(item)!);landmarks.delete(item);changed=true}
+      if(near&&!landmarks.has(item)){
+        if(item.shape==='cylinder') landmarks.set(item,add(R.ColliderDesc.cylinder(item.halfHeight,item.radius).setTranslation(item.x,item.y,item.z),item.kind))
+        else {
+          const a=-(item.yaw??0)
+          landmarks.set(item,add(R.ColliderDesc.cuboid(item.hx,item.hy,item.hz).setRotation({x:0,y:Math.sin(a/2),z:0,w:Math.cos(a/2)}).setTranslation(item.x,item.y,item.z),item.kind))
+        }
+        changed=true
+      }
+    }
     for(const tile of manifest.chunks){
       const near=Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))<=cfg.collisionRadius
       const data=stream.loaded.get(tile), region=regions.get(tile)
@@ -85,12 +102,31 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.
     for(const peak of peaks.children){
       const near=Math.hypot(east-peak.position.x,south-peak.position.z)<=cfg.peakRadius
       if(!near&&mountains.has(peak)){remove(mountains.get(peak)!);mountains.delete(peak);changed=true}
-      if(near&&!mountains.has(peak)&&peak instanceof THREE.LOD){
-        const geom=(peak.levels[0].object as THREE.Mesh).geometry,pos=geom.getAttribute('position')
-        const verts=new Float32Array(pos.count*3)
-        for(let at=0;at<pos.count;at++)verts.set([pos.getX(at),pos.getY(at),pos.getZ(at)],at*3)
-        const mesh=R.ColliderDesc.trimesh(verts,Uint32Array.from(geom.index!.array))
-        mountains.set(peak,add(mesh.setTranslation(peak.position.x,peak.position.y,peak.position.z),'peak'));changed=true
+      if(near&&!mountains.has(peak)){
+        if(peak instanceof THREE.LOD){
+          const geom=(peak.levels[0].object as THREE.Mesh).geometry,pos=geom.getAttribute('position')
+          const verts=new Float32Array(pos.count*3)
+          for(let at=0;at<pos.count;at++)verts.set([pos.getX(at),pos.getY(at),pos.getZ(at)],at*3)
+          const mesh=R.ColliderDesc.trimesh(verts,Uint32Array.from(geom.index!.array))
+          mountains.set(peak,add(mesh.setTranslation(peak.position.x,peak.position.y,peak.position.z),'peak'));changed=true
+        }else{
+          peak.updateMatrixWorld(true)
+          const inv=peak.matrixWorld.clone().invert(), v=new THREE.Vector3(), m=new THREE.Matrix4()
+          const verts:number[]=[], indices:number[]=[]
+          peak.traverse(node=>{
+            if(!(node instanceof THREE.Mesh)||node.userData?.noPeakCollider||node.parent?.userData?.noPeakCollider)return
+            const pos=node.geometry.getAttribute('position'), idx=node.geometry.index
+            m.multiplyMatrices(inv,node.matrixWorld)
+            const base=verts.length/3
+            for(let at=0;at<pos.count;at++){v.fromBufferAttribute(pos,at).applyMatrix4(m);verts.push(v.x,v.y,v.z)}
+            if(idx)for(let at=0;at<idx.count;at++)indices.push(base+idx.getX(at))
+            else for(let at=0;at<pos.count;at++)indices.push(base+at)
+          })
+          if(verts.length){
+            const mesh=R.ColliderDesc.trimesh(Float32Array.from(verts),Uint32Array.from(indices))
+            mountains.set(peak,add(mesh.setTranslation(peak.position.x,peak.position.y,peak.position.z),'peak'));changed=true
+          }
+        }
       }
     }
     if(changed)world.step()
@@ -123,6 +159,6 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:THREE.
     }return null
   }
   function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)}
-  function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();trunks.forEach(remove);trunks.clear()}
+  function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();landmarks.forEach(remove);landmarks.clear();trunks.forEach(remove);trunks.clear()}
   return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,surface,wet,insideHouse,findWalkableSpawn}
 }

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "twin_pagodas",
+    "name": "日月双塔",
+    "model": "landmarks/twin_pagodas.glb",
+    "lat": 25.2742943,
+    "lon": 110.2902930,
+    "yaw": 0,
+    "water": 150.1,
+    "radius": 900,
+    "blockers": [
+      {"dx": 13.98, "dz": -13.33, "r": 14.5, "water": 150.1},
+      {"dx": -13.98, "dz": 13.33, "r": 15.5}
+    ],
+    "colliders": [
+      {"shape": "cylinder", "kind": "building", "dx": 13.98, "dy": 11.9, "dz": -13.33, "halfHeight": 16.0, "radius": 7.9},
+      {"shape": "cylinder", "kind": "building", "dx": -13.98, "dy": 11.9, "dz": 13.33, "halfHeight": 14.0, "radius": 6.4},
+      {"shape": "box", "kind": "deck", "dx": -14.4, "dy": -0.25, "dz": 14.1, "hx": 13.0, "hy": 0.80, "hz": 14.2, "yaw": 0},
+      {"shape": "box", "kind": "rail", "dx": -27.7, "dy": 1.06, "dz": 10.9, "hx": 0.16, "hy": 0.65, "hz": 6.2, "yaw": 0.08},
+      {"shape": "box", "kind": "rail", "dx": -16.7, "dy": 1.06, "dz": -0.8, "hx": 6.5, "hy": 0.65, "hz": 0.16, "yaw": -0.18},
+      {"shape": "box", "kind": "rail", "dx": -0.9, "dy": 1.06, "dz": 12.9, "hx": 0.16, "hy": 0.65, "hz": 7.5, "yaw": -0.12}
+    ],
+    "trees": [
+      {"kind": "willow", "dx": -26.8, "dy": 0.55, "dz": 8.5, "scale": 1.0, "yaw": 0.6},
+      {"kind": "willow", "dx": -25.8, "dy": 0.55, "dz": 22.0, "scale": 0.92, "yaw": 2.1},
+      {"kind": "willow", "dx": -18.5, "dy": 0.55, "dz": 31.2, "scale": 1.02, "yaw": -0.8},
+      {"kind": "willow", "dx": -19.5, "dy": 0.55, "dz": 0.8, "scale": 0.88, "yaw": -1.7},
+      {"kind": "metasequoia", "dx": -29.0, "dy": 0.55, "dz": 31.5, "scale": 0.94, "yaw": 0.3},
+      {"kind": "metasequoia", "dx": -23.5, "dy": 0.55, "dz": 36.2, "scale": 1.0, "yaw": 1.2}
+    ]
+  }
+]
