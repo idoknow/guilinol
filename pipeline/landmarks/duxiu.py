@@ -12,6 +12,38 @@ import numpy as np
 from jingjiang import generate
 
 
+def rock_shelter(model):
+    samples=41 if model.detail else 15
+    widths=np.linspace(-8.6,8.6,samples)
+    profile=[(-3.8,1.5,18),(-2.15,1.45,24),(-1.52,2.0,38),(-1.35,2.9,56),
+             (-1.17,3.85,91),(-.81,3.95,161),(-.38,3.69,183),(.28,3.4,172),
+             (1.21,3.05,188),(2.26,1.82,173),(3.3,-.72,157),(3.85,-4.1,148)]
+    vertices=[];colors=[];faces=[]
+    for row,(height,depth,light) in enumerate(profile):
+        for col,east in enumerate(widths):
+            shoulder=np.clip((abs(east)-5.45)/2.85,0,1)
+            fold=.14*np.sin(east*1.4+row*.27)+.075*np.sin(east*3.1-row*.31)
+            lip_drop=shoulder*(1.9 if row<7 else .72)
+            vertices.append([east,height-lip_drop+fold,depth+.25*np.sin(east*.86+row*.22)-1.85*shoulder])
+            shade=light+(4 if row<4 else 16)*(np.sin(east*1.79+.35*row)*.6+np.sin(east*4.13-row*.63)*.4)
+            linear=255*((np.clip(np.array([shade+1,shade+1,shade]),0,255)/255+.055)/1.055)**2.4
+            colors.append([*linear.round().astype(int),255])
+            if row and col:
+                end=row*samples+col;faces.extend([[end-samples-1,end-samples,end],[end-samples-1,end,end-1]])
+    model.mesh(vertices,faces,np.asarray(colors,dtype=np.uint8))
+    model.box(0,-4.45,7.15,11,.53,4.8,'pave',True)
+    for step in range(4):model.box(0,-4.3,4.75-step*.44,8.8,.52+step*.14,.46,'granite',True)
+    model.box(0,-4.2,2.38,9,.84,2.28,'pave',True)
+    for east in np.linspace(-4.4,4.4,17):model.box(east,-3.36,3.15,.065,1.35,.07,'tile',True)
+    model.box(0,-2.06,3.15,8.85,.085,.085,'tile')
+    for east,base in ((-3.4,-.32),(-.9,-.23),(2.5,-.36)):
+        front=3.98+.25*np.sin(east*.86+1.5)
+        model.box(east,base,front,.82,1.65,.14,'tile')
+        if model.detail:
+            for line in range(4):
+                for column in (-.16,.12):model.box(east+column,base+.25+line*.31,front+.083,.085,.17,.035,'granite')
+
+
 def summit(model):
     world=Path(__file__).resolve().parents[2]/'public/world'
     if not (world/'manifest.json').exists():raise RuntimeError('Run npm run world before building Duxiu')
@@ -42,18 +74,7 @@ def summit(model):
         if model.detail and index%6==0:
             model.beam([1,.12,0],[1,1.25,0],.09,'stone')
     start,angle=tread(0);model.pose=(*start,angle-math.pi/2)
-    lip=[(-6,-1),(-5.4,2.2),(-4.1,3.75),(-1.8,4.2),(.4,3.8),(2.7,3.7),(4.6,2.85),(5.4,-1)]
-    for index,((left,low),(right,high)) in enumerate(zip(lip,lip[1:])):
-        front=2.8+.35*math.cos(index*2);back=-1.35
-        model.mesh([(left,low,front),(right,high,front),(right,high-.55,back),(left,low-.55,back)],[[0,1,2],[0,2,3]],'sign')
-        model.mesh([(left,low,front),(right,high,front),(right*1.27,high+2.4,front-.7),(left*1.27,low+2.4,front-.7), (right*1.4,high+3.1,-2.8),(left*1.4,low+3.1,-2.8)],[[0,1,2],[0,2,3],[3,2,4],[3,4,5]],'stone')
-    model.box(0,-1,-1.5,10,5,.32,'sign',True)
-    for east in np.linspace(-4,4,15):model.box(east,-.4,2.6,.065,1.9,.07,'tile',True)
-    model.box(0,1.35,2.6,8.4,.11,.09,'tile')
-    for east,height in ((-3,4.9),(0,4.6),(2.7,4.55)):
-        model.box(east,height,2.25,1.9,1.1,.18,'tile')
-        if model.detail:
-            for mark in range(5):model.box(east+(mark-2)*.28,height+.18,2.37,.09,.54,.045,'white')
+    rock_shelter(model)
     model.pose=(*tip,0)
     def ring(radius,height):return [(radius*math.cos(n*math.pi/4),height,radius*math.sin(n*math.pi/4)) for n in range(8)]
     model.beam([0,-2.8,0],[0,.48,0],5.2,'stone',8,True)

@@ -55,6 +55,7 @@ class Model:
         self.visible=[]
         self.uv=[]
         self.solid=[]
+        self.pigmented=[]
         self.tile_parts={key:[] for key in ('stone','brick','pave')}
         self.pose=(0,0,0,0)
 
@@ -67,6 +68,8 @@ class Model:
         triangles[:,:,2]=local[:,:,0]*sine+local[:,:,2]*cosine+dz
         triangles[:,:,1]+=dy
         if collide: self.solid.append(triangles)
+        if isinstance(color,np.ndarray):
+            self.pigmented.append((triangles,color[faces]));return
         normal=np.abs(np.cross(local[:,1]-local[:,0],local[:,2]-local[:,0])).argmax(axis=1)
         axes=np.array([[2,1],[0,2],[0,1]])[normal]
         coords=np.take_along_axis(local,axes[:,None,:],axis=2)
@@ -137,6 +140,9 @@ def generate(name,build):
         mesh=packed(model.visible);mesh.visual=trimesh.visual.TextureVisuals(uv=np.concatenate(model.uv).reshape(-1,2),material=mat)
         layer=f'lod{lod}';scene.graph.update(frame_to=layer)
         scene.add_geometry(mesh,node_name=layer+'_joinery',parent_node_name=layer)
+        if model.pigmented:
+            rock=packed([triangles for triangles,colors in model.pigmented]);rock.visual.vertex_colors=np.concatenate([colors for triangles,colors in model.pigmented]).reshape(-1,4)
+            scene.add_geometry(rock,node_name=layer+'_rock',parent_node_name=layer)
         for key,parts in model.tile_parts.items():
             if not parts:continue
             cell=list(SWATCHES).index(key);left=128*(cell%4);top=128*(cell//4)

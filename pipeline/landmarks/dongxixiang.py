@@ -6,6 +6,19 @@ import numpy as np
 from jingjiang import generate
 
 
+def lantern(model,east,south):
+    rings=[(2.51,.035),(2.63,.035),(2.65,.105),(2.69,.105),(2.73,.175),
+           (2.91,.175),(2.96,.105),(3,.105),(3.01,.016),(3.16,.016)]
+    surfaces=['gold','wood','wood','red','red','red','wood','wood','wood']
+    for (lower,inner),(upper,outer),color in zip(rings,rings[1:],surfaces):
+        corners=[(east+radius*math.cos(index*math.pi/3),height,south+radius*math.sin(index*math.pi/3))
+                 for height,radius in ((lower,inner),(upper,outer)) for index in range(6)]
+        faces=[]
+        for index in range(6):
+            following=(index+1)%6;faces.extend([[index,index+6,following+6],[index,following+6,following]])
+        model.mesh(corners,faces,color)
+
+
 def frontage(model):
     path=[(21.67,-121.76),(13.12,-58.68),(0,0),(37.8,7.3),(47.2,9.8)]
     for first,last in zip(path,path[1:]):
@@ -16,7 +29,8 @@ def frontage(model):
             model.box(0,0,0,4.5,.17,width+.12,'pave',True)
             for side in (-1,1):
                 east=side*6.4; high=6.1+(bay%3==1)*2.9
-                model.box(east,0,0,6.5,high,width-.16,'brick',True)
+                model.box(east,3,0,6.5,high-3,width-.16,'brick',True)
+                model.box(side*6.97,0,0,5.36,3,width-.16,'brick',True)
                 model.roof(east,high,0,7.8,width,1.8)
                 model.box(side*2.9,3.15,0,1.7,.35,width,'wood')
                 if not model.detail:continue
@@ -25,27 +39,30 @@ def frontage(model):
                     for lift in range(3):model.box(east,high+.7+lift*.43,end*(width/2-.16),6-lift*1.6,.47,.32,'brick')
                 for cell in range(3):
                     zz=(cell-1)*width/3
-                    model.box(side*3.10,.3,zz,.2,2.45,width/3-.28,'wood')
+                    model.box(side*3.66,0,zz-width/6+.19,1.22,3,.31,'brick',True)
+                    model.box(side*4.13,.37,zz,.16,2.0,width/3-.60,'glass')
+                    model.box(side*3.65,.27,zz,1.20,.14,width/3-.30,'wood')
+                    model.box(side*4.01,.38,zz,.10,1.97,.07,'wood')
+                    model.box(side*3.23,2.54,zz,.29,.38,1.22,'sign')
+                    for mark in (-.28,0,.28):model.box(side*3.06,2.63,zz+mark,.07,.15,.11,'gold')
                     model.box(side*3.10,3.8,zz,.22,1.8,width/3-.38,'glass')
                     for bar in range(4):model.box(side*2.94,3.8,zz+(bar-1.5)*.46,.13,1.85,.10,'wood')
                     model.box(side*2.95,4.6,zz,.14,.12,width/3-.3,'wood')
                     model.box(side*2.22,3.45,zz,.12,.9,.12,'wood')
                     model.box(side*2.22,4.25,zz,.16,.13,width/3,'wood')
-                model.box(side*2.95,2.4,0,.24,.64,2.6,'sign')
-                for glyph in (-.72,0,.72):model.box(side*2.79,2.54,glyph,.1,.32,.24,'gold')
                 if high>8:
                     model.box(side*2.9,6.15,0,1.6,.32,width,'wood')
                     for zz in (-2.8,0,2.8):
                         model.box(side*3.1,6.75,zz,.24,1.6,2.25,'glass')
                         for bar in (-.8,0,.8):model.box(side*2.93,6.75,zz+bar,.12,1.6,.12,'wood')
-                for zz in (-2.6,0,2.6):
-                    model.beam([side*2.18,2.85,zz],[side*2.18,3.43,zz],.37,'red',8)
-                    model.box(side*2.18,2.62,zz,.12,.24,.12,'gold')
+                for zz in (-.85,0,.85):lantern(model,side*2.18,zz)
     model.pose=(21.67,0,-123,.14)
     for east in (-5.25,-2.35,2.35,5.25):
-        model.box(east,0,0,.65,5.8,.72,'white',True);model.box(east,0,0,1.1,.5,1.2,'granite',True)
+        top=6.25 if abs(east)<3 else 4.97
+        model.box(east,0,0,.65,top,.72,'white',True);model.box(east,0,0,1.1,.5,1.2,'granite',True)
+        model.box(east,top-.18,0,.8,.2,.86,'granite');model.box(east,top,0,.48,.35,.52,'white')
     for east,width,height in ((-3.8,3.25,3.8),(0,5.5,5.15),(3.8,3.25,3.8)):
-        model.box(east,height-.66,0,width,.72,.65,'white');model.box(east,height+.12,0,width+.48,.28,.86,'granite');model.swept_roof(east,height+.45,0,width+.6,1.8,.68)
+        model.box(east,height-.66,0,width,.72,.65,'white');model.box(east,height+.12,0,width+.28,.19,.73,'white')
     model.box(0,4.53,-.39,2.15,.6,.18,'granite')
     for east in (-.56,0,.56):model.box(east,4.62,-.51,.18,.37,.09,'gold')
 
