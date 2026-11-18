@@ -170,7 +170,10 @@ self.onmessage = async (event: MessageEvent<PeakWorkerInput>) => {
   for (const entry of procedural) {
     const [cx, cy, cz] = entry.center
     const rawPick = Math.sin(cx * 12.9898 + cz * 78.233) * 43758.5453
-    const pickFrac = rawPick - Math.floor(rawPick)
+    const hash = rawPick - Math.floor(rawPick)
+    // night.ts: pick < .25 → unlit, .25–.55 → warm uplight, > .55 → jade. Named scenic peaks are always lit
+    // (as in the real city at night); generated DEM peaks keep the random mix including unlit ones.
+    const pickFrac = entry.name.startsWith('auto-') ? hash : .25 + hash * .75
     const pickVal = Math.round(pickFrac * 65535)
 
     const lod0 = entry.lods[0], lod1 = entry.lods[1]
