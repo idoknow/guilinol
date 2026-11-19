@@ -14,6 +14,7 @@ from shapely.geometry import box, Point
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem, load_osm
 from features import building_mesh, buildings, game_court, ground_features, points, polygons, raw_overture_footprints, rongyin_sidewalk
 from karst import generate
+from landmarks.jiefang_layout import bank_paving, grade_banks
 from bridges import bridge_tiles
 from road_grading import build_ground_mesh_lookup, eval_bspline_grid, solve_road_and_bridge_elevations
 from scatter import CONFIG, extract_road_network, scatter
@@ -91,6 +92,21 @@ def build(bbox, output, palette):
     wet = surface != DRY
     terrain[wet] = original[wet] = np.minimum(terrain[wet], surface[wet] - 20)
 
+    interchange=None
+    bank_pavement=None
+    west_portal=None
+    for x,z,entry in layout.entries:
+        if entry['id']=='jiefang_bridge' and bounds.covers(Point(x,z)):
+            x_jb, z_jb = x, z
+            datum=previous_bed[round((z-top)/GRID),round((x-left)/GRID)]/10
+            angle=-np.deg2rad(entry['rotation'])
+            bank_pavement=bank_paving((x,z),angle)
+            axes=np.array([[np.cos(angle),np.sin(angle)],[-np.sin(angle),np.cos(angle)]])
+            corners=np.array([[-136,-21.5],[-103,-21.5],[-103,21.5],[-136,21.5]])
+            west_portal=ShapelyPolygon(corners@axes+[x,z])
+            interchange=((x,z),angle,bank_pavement)
+            grade_banks(terrain,original,wet,left,top,GRID,(x,z),angle,datum)
+
     def sample(east, south):
         row = min(depth // GRID, max(0, round((south - top) / GRID)))
         col = min(width // GRID, max(0, round((east - left) / GRID)))
@@ -142,6 +158,15 @@ def build(bbox, output, palette):
         roads, ped_areas, layout, Path(__file__).resolve().parents[1],
         vessel_routes=candidate_routes, previous_bed=previous_bed,
     )
+    if interchange is not None:
+        # Keep the terrain mesh below the modeled lower roadway after imprinting
+        # the city road field. Include one mesh cell beyond the paving boundary.
+        lower_road = LineString(np.array([[-122, -43], [-122, 43]]) @ axes + [x_jb, z_jb])
+        cols = left + np.arange(terrain.shape[1]) * GRID
+        rows = top + np.arange(terrain.shape[0]) * GRID
+        dry = ~wet & intersects_xy(lower_road.buffer(9), cols[None, :], rows[:, None])
+        for field in (original, terrain):
+            field[dry] = np.minimum(field[dry], round((datum + .72) * 10))
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 
@@ -201,9 +226,9 @@ def build(bbox, output, palette):
         return round(gm_y, 2)
     landmarks = [dict(position=[x, lm_elevation(x, z, entry), z], **entry) for x, z, entry in layout.entries]
     landmark_faces = list(landmark_triangles(landmarks))
-    vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces)
-    decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans)
-    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints)
+    vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange)
+    decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal)
+    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,modeled_paving=bank_pavement)
     (output/'marking-audit.json').write_text(json.dumps(lengths.pop('markingOverlap')))
     print('Lengths (m):',lengths)
     def asset(name):

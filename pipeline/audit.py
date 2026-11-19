@@ -18,6 +18,7 @@ from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import nearest_points, polygonize, unary_union
 import trimesh
 
+from landmarks.jiefang_layout import DECK_WAYS
 from common import CHUNK, GRID, OUT, load_osm, xz2ll
 from features import area, points, polygons
 from road_profile import RULES
@@ -606,6 +607,11 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                 if ly is not None:
                     return ly
             dy = deck_y_at(x, z, tol=0.45)
+            if way_id in DECK_WAYS:
+                # The upper road is jointly supplied by GL04 and the landmark.
+                modeled = lm_walk_y_at(x, z)
+                if modeled is not None:
+                    return max(dy, modeled) if dy is not None else modeled
             if dy is not None:
                 return dy
         return road_base_y(x, z) + 0.045
@@ -886,6 +892,8 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                 continue
             bp = bline.interpolate(into_bridge_dist)
             by = lm_walk_y_at(bp.x, bp.y) if f'way/{wid}' in replaced_ways else deck_y_at(bp.x, bp.y, tol=0.45)
+            if wid in DECK_WAYS:
+                by = road_surface_y(bp.x, bp.y, True, wid)
             if by is None:
                 continue
             # Sample 1.0m along the connecting land road

@@ -12,7 +12,7 @@ from features import points, polygons, rongyin_photo, rongyin_sidewalk
 from scatter import CONFIG, walk_line
 
 
-def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=()):
+def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),modeled_paving=None):
     surfaces, sidewalks, stripes, medians, gaps = [],[],[],[],[]
     sidewalks.append(rongyin_sidewalk())
     rep_excl = replace_exclude if replace_exclude is not None else Polygon()
@@ -23,6 +23,8 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     fixtures = defaultdict(lambda: [[],[],[],[],[]])
     lengths = dict(road=0,bank=0)
     def store(which,pt,item):
+        if which==0 and modeled_paving is not None and modeled_paving.distance(pt)<2.5:
+            return
         if bounds.contains(pt) and (which!=0 or not exclude.covers(pt)):
             origin = tuple(math.floor(v/CHUNK)*CHUNK for v in pt.coords[0])
             fixtures[origin][which].append(item(origin))
@@ -282,6 +284,8 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         shapes = [unary_union([layer.geometries[idx].intersection(tile) for idx in sorted(layer.query(tile))]) for layer in layers]
         shapes[1]=shapes[1].difference(shapes[0]).union(shapes[3]).difference(shapes[4])
         shapes[2]=shapes[2].difference(shapes[3])
+        if modeled_paving is not None and tile.intersects(modeled_paving):
+            shapes[:3]=[shape.difference(modeled_paving) for shape in shapes[:3]]
         items=[]
         for kind,shape in enumerate(shapes[:3]):
             for poly in polygons(shape):

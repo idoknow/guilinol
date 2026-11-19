@@ -9,9 +9,10 @@ from shapely.geometry.polygon import orient
 
 from common import load_osm
 from features import points, polygons
+from landmarks.jiefang_layout import DECK_WAYS
 
 
-def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None):
+def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=None):
     spans, profiles, owners, emitted = [], [], [], []
     thin_spans = []
     tracks = [
@@ -30,6 +31,7 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None):
             continue
         if f"way/{way['id']}" in replaced:
             continue
+        portal_deck = west_portal is not None and way['id'] in DECK_WAYS
         coords = points(way)
         if len(coords) < 2:
             continue
@@ -97,11 +99,17 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None):
                 if way['id'] in raised:
                     height = raised[way['id']][1][index] / 10
                 sections.append((coord + side, coord - side, height))
+        if portal_deck and not (plans and way['id'] in plans):
+            sections = [(left, right, height - .65 * max(0, 1 - west_portal.distance(Point((left + right) / 2)) / 18))
+                        for left, right, height in sections]
         for first, second in zip(sections, sections[1:]):
             for pts, levels in [([first[0], first[1], second[0]], [first[2], first[2], second[2]]),
                                 ([second[1], second[0], first[1]], [second[2], second[2], first[2]])]:
                 poly = Polygon(pts)
                 if poly.area < 0.001:
+                    continue
+                # The landmark supplies the deck, vaulted underside and collision here.
+                if portal_deck and west_portal.covers(poly):
                     continue
                 spans.append(poly)
                 thin_spans.append(any(poly.intersects(part) for part in crossings))

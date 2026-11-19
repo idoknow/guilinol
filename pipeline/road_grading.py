@@ -15,6 +15,7 @@ from shapely import STRtree, intersects_xy
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
+from landmarks.jiefang_layout import DECK_WAYS, deck_level
 from common import CHUNK, GRID, load_osm
 from features import points, rongyin_sidewalk
 from road_profile import RULES
@@ -434,6 +435,11 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
     fixed_clusters = set()
     cluster_h = {cid: float(np.mean([dem_at(px, pz) for px, pz in cpts])) for cid, cpts in cluster_pts.items()}
     jb_pos = lm_meshes['jiefang_bridge']['entry']['position'] if 'jiefang_bridge' in lm_meshes else None
+    def jiefang_level(x, z):
+        radians = np.deg2rad(lm_meshes['jiefang_bridge']['entry']['rotation'])
+        along = (x - jb_pos[0]) * np.cos(radians) - (z - jb_pos[2]) * np.sin(radians)
+        return jb_pos[1] + deck_level(along)
+
     for wid in bridge_way_ids:
         if wid == 246520676:
             for ei in (0, 1):
@@ -553,8 +559,10 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
         line = LineString(pts)
         if not bounds_poly.intersects(line) or line.length < 1.0:
             continue
-        if f'way/{wid}' in replaced_ways:
+        if f'way/{wid}' in replaced_ways or wid in DECK_WAYS:
             owner_lm = next((e['id'] for e in landmarks_cfg if isinstance(e.get('replace'), list) and f'way/{wid}' in e['replace']), None)
+            if wid in DECK_WAYS:
+                owner_lm = 'jiefang_bridge'
             if owner_lm:
                 for end_idx, into_d in ((0, min(0.5, line.length * 0.2)), (-1, max(0.0, line.length - min(0.5, line.length * 0.2)))):
                     end_pt = pts[end_idx]
@@ -562,14 +570,15 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
                     if not cland:
                         continue
                     bp = line.interpolate(into_d)
-                    ly_deck = lm_deck_y(owner_lm, bp.x, bp.y)
+                    ly_deck = jiefang_level(bp.x, bp.y) if wid in DECK_WAYS else lm_deck_y(owner_lm, bp.x, bp.y)
                     if ly_deck is not None:
                         lpts = osm_ways[cland[0]][0]
                         lline = LineString(lpts if lpts[0] == end_pt else lpts[::-1])
                         for d_pin in (0.0, min(1.0, lline.length * 0.5), min(2.5, lline.length * 0.8)):
                             pp = lline.interpolate(d_pin)
                             bridge_targets.append((pp.x, pp.y, ly_deck - 0.045, 1200.0))
-            continue
+            if wid not in DECK_WAYS:
+                continue
         if wid not in raw_bridge_info:
             continue
         pts, tags, line, b_width, n_b, s_b, max_water_req = raw_bridge_info[wid]
@@ -591,6 +600,8 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
 
         bridge_plans[wid] = (line, b_width, s_b, h_prof)
         bridge_end_land[wid] = (cland0, cland1)
+        if wid in DECK_WAYS:
+            continue  # The land approaches were pinned to the upper landmark deck above.
         for end_pt, h_end, cland in ((pts[0], float(h_prof[0]), cland0), (pts[-1], float(h_prof[-1]), cland1)):
             if cland:
                 lpts = osm_ways[cland[0]][0]
@@ -911,6 +922,12 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
         motor_road_tree = STRtree(motor_road_lines) if motor_road_lines else None
 
         for wid, (line, b_width, s_b, h_prof) in list(bridge_plans.items()):
+            if wid in DECK_WAYS:
+                # The two carriageways and cycleways share one sloping slab.
+                # Keep GL04 just under its skin, including at the vaulted portal.
+                profile = np.array([jiefang_level(*line.interpolate(station).coords[0]) - .04 for station in s_b])
+                bridge_plans[wid] = (line, b_width, s_b, profile)
+                continue
             if wid == 246520676:
                 continue
             cland0, cland1 = bridge_end_land.get(wid, ([], []))
