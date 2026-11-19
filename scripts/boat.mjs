@@ -11,7 +11,7 @@ import {preview} from 'vite'
  *   2. 自由划行物理（前划加速、松手惯性滑行、左右转向、倒桨后退）
  *   3. 斜撞岸贴边滑行不卡死（不穿岸、不触发 rescue）
  *   4. 高桥正常穿行（榕湖玻璃桥、漓江解放桥）
- *   5. 低桥拦截并发 walk:toast + .toast.show（北斗桥南跨、杉湖九曲桥）
+ *   5. 低桥拦截并发 walk:toast + .toast.show（榕杉连桥矮跨、杉湖九曲桥）
  *   6. 湖心拒下 + 靠岸下船
  *   7. 跨湖穿行榕湖 → 桂湖（Route 3 经迎宾桥/丽泽桥微阶 <= 1.2 m）
  *   8. 闸坝拦停并发 walk:toast + .toast.show（木龙湖闸 3.9 m 跌水）
@@ -354,14 +354,69 @@ try {
     } finally {
       for (const [t, bak] of waterBackups) stream.loaded.get(t)?.water.set(bak)
     }
-    return {deferredWhenMissingNeighbor, resolvedOnceRestored, getCallsIn20Frames, lcpRuns, maxExpectedGets: manifest.chunks.length * 25}
+    let lcpRecovered = false
+    let lcpRunsAfterRestore = -1
+    if (lcpTiles.length > 0) {
+      const t0 = lcpTiles[0]
+      const saved0 = stream.loaded.get(t0)
+      if (saved0) {
+        stream.loaded.delete(t0)
+        try {
+          advance(1 / 60)
+        } finally {
+          stream.loaded.set(t0, saved0)
+        }
+        advance(1 / 60)
+        const lcpAfter = walk.freeMoorings.find(m => m.name === '龙船坪码头')
+        lcpRecovered = !!lcpAfter && lcpAfter.resolved && Array.isArray(lcpAfter.bank) && Array.isArray(lcpAfter.mooring)
+        lcpRunsAfterRestore = lcpAfter?.resolveRuns ?? -1
+      }
+    }
+    return {
+      deferredWhenMissingNeighbor,
+      resolvedOnceRestored,
+      getCallsIn20Frames,
+      lcpRuns,
+      lcpRecovered,
+      lcpRunsAfterRestore,
+      maxExpectedGets: manifest.chunks.length * 25,
+    }
   })
   assert(slotCacheCheck.deferredWhenMissingNeighbor && slotCacheCheck.resolvedOnceRestored, `邻片 (28m 处) 未加载防护或恢复解析异常: ${JSON.stringify(slotCacheCheck)}`)
   assert(slotCacheCheck.getCallsIn20Frames < slotCacheCheck.maxExpectedGets && slotCacheCheck.lcpRuns === 1, `未解泊位每帧暴力重扫未缓存: ${JSON.stringify(slotCacheCheck)}`)
+  assert(slotCacheCheck.lcpRecovered && slotCacheCheck.lcpRunsAfterRestore === 2, `龙船坪码头恢复水深后未能恢复解析: ${JSON.stringify(slotCacheCheck)}`)
   console.log('1a-cache. 泊位 ±40m 邻片防护与失败缓存通过:', {
     deferred: slotCacheCheck.deferredWhenMissingNeighbor,
     lcpRuns: slotCacheCheck.lcpRuns,
+    lcpRecovered: slotCacheCheck.lcpRecovered,
     gets20f: slotCacheCheck.getCallsIn20Frames,
+  })
+
+  // 全量检查 10 个 walk.freeMoorings 在正常水域下全部 resolved（含 1a-cache 之后的龙船坪码头）
+  const allMooringsCheck = await runInPage(page, async ({walk, advance, ensureTileLoaded}) => {
+    const initial = walk.freeMoorings
+    for (const m of initial) {
+      const [dx, , dz] = m.dock
+      for (const ox of [-40, 0, 40]) {
+        for (const oz of [-40, 0, 40]) {
+          await ensureTileLoaded(dx + ox, dz + oz)
+        }
+      }
+      walk.leave()
+      const entered = await walk.enter(dx, dz, 0, `mooring-all-${m.name}`)
+      if (!entered) throw new Error(`无法在码头 ${m.name} (${dx}, ${dz}) 附近落脚`)
+      advance(1 / 60)
+    }
+    return walk.freeMoorings
+  })
+  assert.equal(allMooringsCheck.length, 10, `自由码头总数应为 10，实际 ${allMooringsCheck.length}`)
+  const unresolvedMoorings = allMooringsCheck.filter(m => !m.resolved || !Array.isArray(m.bank) || !Array.isArray(m.mooring))
+  assert.deepEqual(unresolvedMoorings, [], `存在正常水域下未解析成功的自由码头: ${JSON.stringify(unresolvedMoorings)}`)
+  const lcpMooring = allMooringsCheck.find(m => m.name === '龙船坪码头')
+  assert(lcpMooring?.resolved, `龙船坪码头在 1a-cache 后未保持 resolved: ${JSON.stringify(lcpMooring)}`)
+  console.log('1a-moorings. 10 处自由码头正常水域全量解析与龙船坪恢复通过:', {
+    resolved: `${allMooringsCheck.filter(m => m.resolved).length}/${allMooringsCheck.length}`,
+    lcpBank: lcpMooring.bank.map(v => +v.toFixed(1)),
   })
 
   await enterSpot(page, ...FREE_DOCKS.ronghu.freeBank, 0, 'ronghu-free-bank')
@@ -534,7 +589,7 @@ try {
     lateSlide: +shoreSteerSlide.lateSlide.toFixed(2),
   })
 
-  // --- 用例 3：高桥穿行（玻璃桥）+ 低桥拦截（北斗桥南跨）并发 walk:toast + 湖心拒下 & 靠岸下船 ---
+  // --- 用例 3：高桥穿行（玻璃桥）+ 低桥拦截（榕杉连桥矮跨）并发 walk:toast + 湖心拒下 & 靠岸下船 ---
   await clearToasts(page)
   const glassBridge = await runInPage(page, async ({steerTo, readBoat}) => {
     await steerTo([[-1300, 315], [-1260, 298], [-1210, 286]], {arriveDist: 2.8})
