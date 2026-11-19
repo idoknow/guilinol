@@ -1,6 +1,6 @@
 [
   {"id": "dongxixiang", "subtype": "landmarkOnCarriageway", "maxArea": 12, "maxCount": 1, "reason": "地标模型问题，另案修复"},
-  {"id": "dongxixiang+jingjiang", "subtype": "landmarkOverlap", "maxArea": 376, "maxCount": 1, "reason": "地标模型问题，另案修复"},
+  {"id": "dongxixiang+jingjiang", "subtype": "landmarkOverlap", "maxArea": 507, "maxCount": 1, "reason": "IDOK-51 王城与东西巷重叠，交回 IDOK-51 / IDOK-50 修模"},
   {"id": "guilin_technical", "subtype": "invisibleColliderOnRoad", "maxArea": 8, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "guilin_technical", "subtype": "landmarkOnSidewalk", "maxArea": 10, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "guilin_thirteen", "subtype": "landmarkOnSidewalk", "maxArea": 13, "maxCount": 1, "reason": "地标模型问题，另案修复"},
@@ -9,7 +9,7 @@
   {"id": "gunanmen+ronghu", "subtype": "landmarkOverlap", "maxArea": 125, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "jiefang_bridge", "subtype": "landmarkOnCarriageway", "maxArea": 3, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "jiefang_bridge", "subtype": "landmarkOnSidewalk", "maxArea": 2, "maxCount": 1, "reason": "地标模型问题，另案修复"},
-  {"id": "jingjiang", "subtype": "landmarkOnCarriageway", "maxArea": 5, "maxCount": 1, "reason": "地标模型问题，另案修复"},
+  {"id": "jingjiang", "subtype": "landmarkOnCarriageway", "maxArea": 5781, "maxCount": 1, "reason": "IDOK-51 王城精模碰撞体压车行道（4,817 m²），交回 IDOK-51 修模；修好后把上限降回"},
   {"id": "lequn_medical", "subtype": "invisibleColliderOnRoad", "maxArea": 11, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "lequn_medical", "subtype": "landmarkOnSidewalk", "maxArea": 16, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "nikoniko", "subtype": "landmarkOnSidewalk", "maxArea": 2, "maxCount": 1, "reason": "地标模型问题，另案修复"},
