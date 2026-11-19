@@ -4,6 +4,7 @@ import numpy as np
 import trimesh
 from jingjiang import Model,generate
 from shop_lettering import letters
+from dongxi_layout import registered_market
 
 
 def row(model, first, last, count, side, depth=6, arcade=False, gap=3.45,tall=False):
@@ -80,24 +81,11 @@ def market(model):
     for first,last,width,level in [((-106,15),(-26,28),17,.09),((-28,22),(6,25),22,.10),
         ((-6,24),(5,-15),10,.13),((0,28),(54,39),9,.12),((54,39),(63,-4),10,.14),
         ((63,-4),(3,-13),10,.15),((5,-14),(13,-62),32,.16),((58,18.5),(7,3.8),9,.17)]:slab(model,first,last,width,level)
-    row(model,(-106,9),(-38,19),8,-1,8,True)
     for east,south in [(-92,31),(-72,34),(-52,37),(-35,39)]:
         model.pose=(east,0,south,0);model.beam([0,.1,0],[0,4.2,0],.22,'wood',8,True)
         crown=trimesh.creation.icosphere(subdivisions=1);model.mesh(crown.vertices*[2.3,2.15,2.55]+[0,5.2,0],crown.faces,'leaf')
-    for side in (-1,1):
-        row(model,(6,29),(50,38.4),6,side,5)
-        if side==1:row(model,(54.5,34),(60.7,5),4,side,4.7)
-        else:
-            row(model,(54.5,34),(56.8,23.5),2,side,4.7)
-            row(model,(59.2,12),(60.7,5),1,side,4.7)
-        row(model,(12,5.2),(49,15.9),5,side,4.7)
-        row(model,(55,-4.8),(10,-11.6),6,side,4.7)
-        row(model,(-2.6,13),(1.2,-6),3,side,4.5)
-        row(model,(6,-14),(13,-57),6,side,6,gap=14.5)
-        row(model,(61,41),(83,49.7),3,side,6,tall=True)
     slab(model,(56,39),(85,50.5),8,.14)
-    row(model,(-36,28),(-23,35),2,1,5)
-    screen_house(model)
+    registered_market(model)
     model.pose=(-4.7,0,17,.14)
     for east,top in [(-6.5,5.15),(-3.4,6.6),(3.4,6.6),(6.5,5.15)]:
         model.box(east,0,0,.66,top,.78,'white',True)
