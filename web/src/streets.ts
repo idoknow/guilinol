@@ -46,14 +46,15 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       if(ny<0){const tmp=p2;p2=p3;p3=tmp;const tu=a2;a2=a3;a3=tu}
       void y1;void y2;void y3
     }
-    surfaceKinds.push(kind,kind,kind);alongVals.push(a1,a2,a3)
+    const channel=kind===4||kind===6?1:kind===5?0:kind
+    surfaceKinds.push(channel,channel,channel);alongVals.push(a1,a2,a3)
     const c=colors[kind]
-    for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(kind===1)sidewalk.push(pt.x,pt.y,pt.z)}
+    for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(channel===1)sidewalk.push(pt.x,pt.y,pt.z)}
   }
   for(const [kind,...rings] of paths){
     const loops=rings.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
     const tris=THREE.ShapeUtils.triangulateShape(loops[0],loops.slice(1)),points=loops.flat()
-    const height=[.045,.195,.065][kind]
+    const height=[.045,.195,.065,0,.195,.06,.195][kind]
     function tessellate(a:THREE.Vector2,b:THREE.Vector2,c:THREE.Vector2){
       const ab=a.distanceToSquared(b),bc=b.distanceToSquared(c),ca=c.distanceToSquared(a)
       if(Math.max(ab,bc,ca)<=16){triangle(vector(a,height),vector(c,height),vector(b,height),kind);return}

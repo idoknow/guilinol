@@ -10,6 +10,7 @@ from markings import junction_cores, violations
 from common import CHUNK, ll2xz, load_osm
 from features import points, polygons, rongyin_photo, rongyin_sidewalk
 from scatter import CONFIG, walk_line
+from sections import section_layers, clipped, RULES
 
 
 def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),modeled_paving=None):
@@ -93,7 +94,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         if not surf_poly.is_empty:
             paving.append(surf_poly)
         for side,extra in ((-1,road.left),(1,road.right)):
-            if extra:
+            if extra and kind not in RULES['sectionClasses']:
                 sw_p = line.buffer(side*(width/2+extra),single_sided=True,quad_segs=2)
                 if not rep_excl.is_empty:
                     sw_p = sw_p.difference(rep_excl)
@@ -282,14 +283,23 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                                 pos_s += 3.1
 
     layers=[STRtree(values) for values in (surfaces,sidewalks,stripes,medians,gaps)]
+    bands = section_layers(roads)
+    obstacles = STRtree([*footprints, *water, *bridge.geometries, exclude, rep_excl, *clear.geometries])
     def encode(tile,origin):
         shapes = [unary_union([layer.geometries[idx].intersection(tile) for idx in sorted(layer.query(tile))]) for layer in layers]
         shapes[1]=shapes[1].difference(shapes[0]).union(shapes[3]).difference(shapes[4])
         shapes[2]=shapes[2].difference(shapes[3])
         if modeled_paving is not None and tile.intersects(modeled_paving):
             shapes[:3]=[shape.difference(modeled_paving) for shape in shapes[:3]]
+        blocked = unary_union([shapes[0], shapes[4], clipped(obstacles, tile)])
+        if modeled_paving is not None:
+            blocked = blocked.union(modeled_paving.intersection(tile))
+        walk, verge, cycle, tactile = [clipped(layer, tile).difference(blocked) for layer in bands]
+        walk = walk.difference(cycle).difference(verge)
+        tactile = tactile.intersection(walk)
+        shapes[1] = shapes[1].union(walk.difference(tactile))
         items=[]
-        for kind,shape in enumerate(shapes[:3]):
+        for kind,shape in [*enumerate(shapes[:3]), (4,verge), (5,cycle.difference(verge)), (6,tactile)]:
             for poly in polygons(shape):
                 if poly.area<.005:
                     continue
