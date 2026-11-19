@@ -1,99 +1,138 @@
-"""龙隐小学 (桂林市龙隐小学), OSM way/1027048356 (七星路 5 号).
+"""Guilin Longyin Primary School (桂林市龙隐小学).
 
-游戏布局，非实地导览。临街外观与公开活动照可见要素按实拍参考还原：
-- 西南侧朝七星路 5 号校门（local (-52.0, 34.0), yaw=-0.95）：青灰花岗岩门柱配绿琉璃坡檐门楼（参考图 #00）、
-  “桂林市龙隐小学”校名匾、关闭状态不锈钢伸缩门，无岗亭/门禁/监控/侧后门。
-- 校内沿 OSM 既有楼座与运动场轮廓采用游戏布局：入口香樟林荫道内设银色腾龙主题雕塑（参考图 #08），
-  西侧设暖黄立面崇文楼（4 层，参考图 #05/#10），中部设白墙陶红饰带明德楼（4 层）与北侧陶橙山墙博学楼
-  （4 层，参考图 #11/#14）。
-- 东侧按 OSM way/1474986236–1474986237 及实拍图 #18 还原四道红色塑胶跑道、绿色人工草坪小足球场、
-  篮球场及升旗台。
+Restores the Qixing Rd stepped green-glazed-eave gate with beige ceramic-tile
+pillars & vertical gold '桂林市龙隐小学' lettering (ref #00), silver dragon
+courtyard sculpture (ref #05, #08), all 8 exact OSM + 2 Overture building
+footprints, and the 4-lane parallel-striped track & basketball court (ref #18).
 """
 import math
-import sys
 from pathlib import Path
+import sys
 
-from g3_kit import Builder, ensure_textures, export_school
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from g3_kit import Builder, export_school
 
-GATE_YAW = -0.95  # Faces SW onto 七星路
+SIGNS = [
+    dict(key='ly_vert',  title='桂林市龙隐小学', sub='', fg=(186, 142, 34), bg=(227, 217, 193), orient='v', sans=False, raised=True),
+    dict(key='ly_motto', title='进 取', sub='', fg=(196, 46, 38), bg=(230, 210, 134), sans=True),
+]
+
+PAVE_PTS = [
+    (-78.84, -0.41), (-77.24, -0.07), (-31.69, 64.67), (28.84, 35.03),
+    (36.6, 41.0), (70.1, 43.14), (73.68, -48.57), (64.46, -51.79),
+    (38.05, -54.27), (-36.36, -38.21), (-36.01, -31.73), (-36.47, -30.83),
+    (-50.6, -26.73), (-86.35, -23.42), (-101.86, -11.23), (-89.12, 5.77),
+]
+
+# All 8 exact OSM + 2 exact Overture footprints
+OSM_1488495381 = [(16.79, -1.28), (28.13, -3.33), (32.27, 19.32), (-1.87, 25.48), (-4.34, 11.98), (3.71, 10.52), (3.96, 11.91), (18.72, 9.25)]
+OSM_1488495382 = [(-14.73, -20.1), (-9.37, 7.97), (-0.87, 6.38), (-6.23, -21.7)]
+OSM_1488495383 = [(-4.33, -19.91), (27.05, -26.4), (28.83, -17.89), (-2.55, -11.4)]
+OSM_1488495384 = [(1.55, -8.78), (29.52, -14.84), (31.57, -5.45), (3.62, 0.6)]
+OSM_1488495385 = [(-57.93, 5.57), (-56.12, 14.84), (-26.09, 9.05), (-27.9, -0.23)]
+OSM_1488495386 = [(-63.06, -26.09), (-61.62, -16.19), (-28.7, -20.91), (-30.14, -30.82)]
+OSM_1488495387 = [(20.67, -47.36), (22.44, -39.02), (36.78, -42.02), (35.0, -50.35)]
+OSM_1488495388 = [(-52.69, 29.27), (-50.96, 38.91), (-18.68, 33.21), (-20.4, 23.58)]
+OV_B3F9 = [(-10.59, -22.36), (3.81, -25.91), (1.32, -36.16), (-13.29, -32.6)]
+OV_CB0F = [(5.81, -28.27), (19.32, -31.15), (16.73, -42.16), (3.33, -39.29)]
+
+
+def _build_qixing_gate(b: Builder):
+    """Qixing Rd No.5 entrance gate at west entrance snout (-93.5, -4.5), facing SW (yaw = -0.92 rad, ref #00):
+    - Left (-X): tall beige ceramic-tile main pillar ('米黄面砖门柱') with vertical gold
+      '桂林市龙隐小学' characters ('竖排校名') and stepped green glazed-tile eave ('绿琉璃坡檐'),
+      plus an open pedestrian sub-archway with lower green glazed-tile eave!
+    - Center-Right (+X): closed stainless-steel retractable gate across vehicle driveway + right beige-brick wall."""
+    prev = b.pose
+    b.pose = (-93.5, 0.0, -4.5, -0.92)
+    b.box(0.0, 0.02, 0.0, 15.6, 0.04, 6.2, 'pave_plaza', tile=2.5)
+
+    # Tall beige ceramic-tile left main pillar (x = -4.6) + vertical gold school name
+    b.box(-4.6, 0.0, 0.0, 2.05, 0.45, 1.55, 'granite', tile=1.4)
+    b.box(-4.6, 0.45, 0.0, 1.88, 4.35, 1.38, 'cream', tile=1.5, collide=True)
+    b.box(-4.6, 4.80, 0.0, 2.30, 0.28, 1.78, 'white', tile=1.4)
+    b.pitched_roof(-4.6, 5.08, 0.0, 2.45, 1.85, 0.82, overhang=0.45, tile_region='green_glaze', fascia_region='white')
+    b.sign_board(-4.6, 2.65, 0.72, 0.68, 3.15, 'ly_vert', backing=None, depth=0)
+
+    # Open pedestrian side archway [-3.6 .. -1.3] with lower green glazed-tile eave (walkable, ref #00!)
+    b.box(-1.05, 0.0, 0.0, 0.82, 3.35, 1.10, 'cream', tile=1.5, collide=True)
+    b.box(-2.45, 3.05, 0.0, 3.35, 0.36, 1.22, 'cream', cap_region='white', tile=1.5)
+    b.pitched_roof(-2.45, 3.41, 0.0, 3.55, 1.35, 0.65, overhang=0.38, tile_region='green_glaze', fascia_region='white')
+
+    # Closed retractable gate across main vehicle driveway [-0.55 .. +5.15] + right beige-tile pier (+5.65)
+    b.retractable_gate(-0.52, 5.12, 0.0, h=1.32)
+    b.box(5.68, 0.0, 0.0, 1.25, 2.85, 1.25, 'cream', cap_region='white', tile=1.5, collide=True)
+    b.pitched_roof(5.68, 2.85, 0.0, 1.45, 1.45, 0.48, overhang=0.28, tile_region='green_glaze', fascia_region='white')
+    b.pose = prev
 
 
 def _build_dragon_sculpture(b: Builder, cx, cz):
-    """银色现代腾龙/火炬不锈钢雕塑与深色花岗岩基座（参考图 #08）."""
+    """Brushed stainless-steel soaring dragon sculpture in circular flowerbed (ref #05, #08)."""
     prev = b.pose
-    b.pose = (cx, 0.0, cz, GATE_YAW)
-    b.cylinder_y(0, 0.0, 0.30, 0, 2.8, 'granite', sections=12)
-    b.cylinder_y(0, 0.30, 0.18, 0, 2.4, 'foliage', sections=12)
-    b.box(0, 0.32, 0, 1.8, 0.95, 1.4, 'dark_stone', tile=1.2, collide=True)
-    b.sign_board(0, 0.78, 0.72, 1.5, 0.55, 'longyin_motto', backing=None, depth=0)
-    # Swept silver sculpture blades rising 3.4m
-    b.tube((-0.35, 1.25, 0.0), (0.45, 3.85, 0.15), 0.18, 'steel', 6)
-    b.tube((0.35, 1.25, -0.1), (-0.30, 3.45, -0.15), 0.15, 'steel', 6)
-    if b.detail:
-        b.cylinder_y(0.1, 2.4, 1.1, 0.0, 0.42, 'steel', sections=8)
+    b.pose = (cx, 0.0, cz, 0.0)
+    b.cylinder_y(0, 0.02, 0.26, 0, 3.1, 'granite', sections=14)
+    b.cylinder_y(0, 0.28, 0.14, 0, 2.7, 'lawn', sections=14)
+    b.box(0, 0.32, 0, 1.5, 0.68, 1.5, 'brick_red', tile=1.2, collide=True)
+    # Spiraling silver stainless-steel ribbon sculpture
+    pts = [
+        (0.0, 1.0, 0.0), (0.65, 1.85, 0.35), (-0.55, 2.75, 0.45),
+        (0.45, 3.65, -0.30), (-0.15, 4.55, 0.10), (0.35, 5.15, 0.25),
+    ]
+    for i in range(len(pts) - 1):
+        b.tube(pts[i], pts[i + 1], 0.28 - i * 0.025, 'steel', sections=8 if b.detail else 5)
     b.pose = prev
 
 
-def build(b: Builder):
-    # 1. Southwest Street-facing Glazed-Eave Gate on 七星路 5 号 (#00)
-    b.school_gate(
-        -52.0, 34.0, GATE_YAW, 'longyin_gate',
-        total_w=15.5, veh_span=6.0, ped_open_w=2.3,
-        pillar_h=5.0, beam_h=1.15, style='glazed',
-        pillar_mat='granite', accent_mat='cream', roof_tile='green_glaze',
-        closed_retractable=True,
+def build_longyin(b: Builder):
+    # 1. Campus-wide grey hard paving + terracotta plaza bricks & greenbelts
+    b.pave_polygon(PAVE_PTS, y=0.03, region='pave')
+    b.walkway((-93.5, -4.5), (-32.0, -8.0), width=7.5, y=0.045, region='pave_plaza')
+    b.lawn_patch(-44.0, -7.5, -0.18, 24.0, 6.5, curb=True)
+    b.lawn_patch(-38.0, 19.5, -0.18, 22.0, 6.0, curb=True)
+    b.lawn_patch(12.0, 32.0, -0.18, 24.0, 6.5, curb=True)
+
+    # 2. Qixing Rd Gate + Dragon Sculpture + Perimeter Wall
+    _build_qixing_gate(b)
+    _build_dragon_sculpture(b, -70.5, -10.5)
+    b.perimeter_wall(
+        [(-89.1, 5.8), (-78.8, -0.4), (-31.7, 64.7), (28.8, 35.0), (36.6, 41.0),
+         (70.1, 43.1), (73.7, -48.6), (38.0, -54.3), (-36.4, -38.2), (-36.5, -30.8),
+         (-86.3, -23.4), (-101.8, -11.2)],
+        h=2.10, wall_mat='cream', base_mat='granite', cap_mat='green_glaze',
     )
 
-    # 2. Perimeter fence safely inside campus boundary (clear of 七星路)
-    b.perimeter_wall([
-        (-86.0, -18.0), (-74.0, 2.0), (-58.0, 25.0),
-    ], h=2.15, wall_mat='cream', base_mat='granite', cap_mat='green_glaze')
-    b.perimeter_wall([
-        (-44.0, 44.5), (-30.0, 58.0), (28.0, 34.0), (68.0, 40.0),
-        (71.0, -46.0), (36.0, -51.0), (-38.0, -35.0), (-86.0, -18.0),
-    ], h=2.15, wall_mat='cream', base_mat='granite', cap_mat='green_glaze')
+    # 3. All 8 exact OSM + 2 Overture buildings (0.0m offset, 0.0 deg yaw diff)
+    # NW warm-yellow Chongwen Building (way/1488495386, ref #05, #10)
+    b.footprint_building(OSM_1488495386, floors=4, floor_h=3.45, wall='yellow_wall', accent='white', roof_kind='pitched', roof_tile='gray_tile')
+    b.pose = (-62.4, 0.0, -21.1, -1.72)
+    b.sign_board(0, 11.8, 0.15, 2.8, 1.05, 'ly_motto', backing=None, depth=0)
+    b.pose = (0.0, 0.0, 0.0, 0.0)
 
-    # 3. Entrance Camphor Avenue & Silver Dragon Sculpture (#08)
-    prev = b.pose
-    b.pose = (-40.0, 0.0, 25.0, GATE_YAW)
-    b.box(0, 0.0, -10.0, 8.0, 0.04, 28.0, 'pave', tile=2.2)
-    b.pose = prev
-    _build_dragon_sculpture(b, -32.0, 20.0)
+    # West-mid pinkish-cream wing visible through gate in ref #00 (way/1488495385)
+    b.footprint_building(OSM_1488495385, floors=3, floor_h=3.45, wall='pink_wall', accent='blue_facade', roof_kind='flat', roof_tile='gray_tile')
+    # SW wing (way/1488495388)
+    b.footprint_building(OSM_1488495388, floors=4, floor_h=3.45, wall='cream', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
+    # Central N-S wing (way/1488495382)
+    b.footprint_building(OSM_1488495382, floors=3, floor_h=3.45, wall='white', accent='ochre', roof_kind='flat', roof_tile='gray_tile')
+    # East teaching wings (way/1488495383, 1488495384, 1488495381, 1488495387, ref #14, #18)
+    b.footprint_building(OSM_1488495383, floors=4, floor_h=3.45, wall='white', accent='terracotta', roof_kind='pitched', roof_tile='red_tile')
+    b.footprint_building(OSM_1488495384, floors=4, floor_h=3.45, wall='white', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
+    b.footprint_building(OSM_1488495381, floors=4, floor_h=3.50, wall='white', accent='terracotta', roof_kind='flat', roof_tile='red_tile')
+    b.footprint_building(OSM_1488495387, floors=2, floor_h=3.40, wall='cream', accent='terracotta', roof_kind='pitched', roof_tile='gray_tile')
+    b.footprint_building(OV_B3F9, floors=3, floor_h=3.40, wall='cream', accent='ochre', roof_kind='flat', roof_tile='gray_tile')
+    b.footprint_building(OV_CB0F, floors=3, floor_h=3.40, wall='cream', accent='ochre', roof_kind='flat', roof_tile='gray_tile')
 
-    # 4. Teaching Buildings (following OSM blocks & photo colors #05/#11/#14)
-    # West ochre-yellow block — 崇文楼 (4F, photo #05/#10)
-    b.teaching_block(
-        -38.0, -12.0, 0.15, width=32.0, depth=13.0, floors=4, floor_h=3.4,
-        wall='ochre', accent='white', roof_kind='flat', corridor=True, portico=True, sign_key='bld_chongwen',
-    )
-    # North terracotta-gable block — 博学楼 (4F, photo #11/#14 facing east sports field)
-    b.teaching_block(
-        10.0, -24.0, 0.05, width=34.0, depth=13.5, floors=4, floor_h=3.4,
-        wall='cream', accent='terracotta', roof_kind='pitched', roof_tile='red_tile',
-        corridor=True, portico=False, sign_key='bld_boxue',
-    )
-    # Central-south white & terracotta block — 明德楼 (4F, OSM way/1488495381)
-    b.teaching_block(
-        8.0, 14.0, math.pi + 0.05, width=34.0, depth=13.5, floors=4, floor_h=3.4,
-        wall='white', accent='terracotta', roof_kind='flat', corridor=True, portico=True, sign_key='bld_mingde',
-    )
+    # 4. Exact OSM Pitches: 4-lane red running track + parallel-striped soccer pitch (way/1474986237) + north basketball court (way/1474986236, ref #18)
+    b.track_field(53.3, 13.9, 0.01, straight_len=24.0, inner_r=10.2, track_w=4.6, stand_side=0, y0=0.05)
+    b.basketball_court(53.3, -24.5, 0.01, surface='court_green', apron='track_red', y0=0.05, scale=0.82)
+    b.flagpole_plinth(38.0, 2.0, math.pi / 2, poles=1, height=11.0)
 
-    # 5. East Sports Field: 4-lane Red EPDM Track + Green Soccer Turf + Basketball Court (#18)
-    b.track_field(50.0, 10.0, 0.04, straight_len=26.0, inner_r=11.5, track_w=4.2, stand_side=0)
-    b.basketball_court(48.0, -28.0, math.pi / 2 + 0.04, surface='court_green', apron='track_red')
-    b.flagpole_plinth(30.0, 6.0, math.pi / 2, poles=1, height=11.0)
-
-    # 6. Lush old camphor & banyan trees (#00/#08/#24)
-    for tx, tz in ((-44.0, 16.0), (-24.0, 32.0), (-14.0, 0.0), (-64.0, -6.0), (28.0, -40.0), (26.0, 28.0)):
-        b.campus_tree(tx, tz, h=9.2, spread=4.2, seed=int(abs(tx * 5 + tz)), kind='banyan' if tx < -20 else 'camphor')
-
-
-def main():
-    folder = Path(sys.argv[1])
-    folder.mkdir(parents=True, exist_ok=True)
-    image = ensure_textures(folder)
-    export_school(folder / 'longyin_primary.glb', image, build)
+    # 5. Camphor Trees in Stone Planters (matching lush canopy in ref #00, #05, #08, #18)
+    for idx, (tx, tz) in enumerate([(-79, -17), (-66, -2), (-54, -8), (-24, -12), (37, -12), (-32, 46)]):
+        b.campus_tree(tx, tz, h=8.4 + (idx % 3) * 0.8, spread=3.3, seed=idx + 71, planter=True)
 
 
 if __name__ == '__main__':
-    main()
+    out_dir = Path(sys.argv[1])
+    out_dir.mkdir(parents=True, exist_ok=True)
+    export_school(out_dir / 'longyin_primary.glb', build_longyin, signs=SIGNS)
