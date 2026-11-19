@@ -17,6 +17,7 @@ vermilion door #8e3034, ochre wall #d2ae58, gray tile #58595b, plaza #989389.
 """
 import math
 import sys
+from rong_street import shops, signs
 from pathlib import Path
 
 from c_kit import (
@@ -97,6 +98,7 @@ def build(b: Builder):
     detail = b.detail
     deck = 6.7
     courtyard(b, deck)
+    shops(b)
     # Solid platform. South face is one wall with the arch; the other three sides
     # are single faces, chamfered at the corners and inset 0.45 m at the top.
     front_z = 9.4
@@ -175,6 +177,7 @@ def build(b: Builder):
 def main():
     folder = Path(sys.argv[1])
     image = ensure_textures(folder)
+    signs(image)
     hi, lo = Builder(0, True), Builder(1, False)
     build(hi)
     build(lo)
