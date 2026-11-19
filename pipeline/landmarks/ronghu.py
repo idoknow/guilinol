@@ -56,6 +56,7 @@ def pavilion(b, x, z, span=5.4, column_h=2.75, roof='blacktile'):
                  ((span / 2 - 0.15, -span / 2 + 0.15), (span / 2 - 0.15, span / 2 - 0.9)),
                  ((-span / 2 + 0.15, span / 2 - 0.9), (-span / 2 + 0.15, -span / 2 + 0.15))):
         railing(wall, (x + a[0], z + a[1]), (x + c[0], z + c[1]), deck, 0.9, 'wood', 1.15)
+    box(wall,(x,deck+column_h-.04,z),(span+.15,.28,span+.15),'wood')
     hip_roof(wall, (x, z), deck + column_h, span - 0.2, span - 0.2, 1.85, 1.05, 0.7, roof, 'vermilion', ceiling=True)
     board(wall, x, deck + column_h - 0.15, z + span / 2 - 0.55, 1.8, 0.55, 'wood')
     if b.collide:
@@ -215,6 +216,7 @@ def library(b):
     wall, lit = b.parts['atlas'], b.parts['lit']
     x, z = -26.0, -50.0
     y = ground(x,z)
+    starts = [(m,len(m.pos)) for m in [*b.parts.values(),b.hit]]
     rear = [(35.06, -26.94), (19.06, -28.04), (17.94, -12.52), (4.99, -13.4), (5.36, -18.43), (-7.89, -19.34), (-8.26, -14.3), (-28.73, -15.7), (-28.11, -24.24), (-16.06, -23.42), (-15.26, -34.35), (-37.94, -35.89), (-39.68, -12.0), (33.96, -12.0)]
     rear = [(x+east,z+south) for east,south in rear]
     extrude(wall,rear,y,y+10.8,'cream')
@@ -292,6 +294,12 @@ def library(b):
         solid(b.hit, (x, y + 4.3, z - 8.0), (20, 8.6, 0.45), 'cream')
         ramp(b.hit, (x, y + 0.05, z + 7.2), (x, y + 0.95, z + 2.4), 14.8)
 
+    for mesh,start in starts:
+        for i in range(start,len(mesh.pos)):
+            px,py,pz = mesh.pos[i]
+            if abs(py-y)<.005:
+                mesh.pos[i] = (px,grade(px,pz)-.04,pz)
+
 
 def hotel(b):
     wall, lit = b.parts['atlas'], b.parts['lit']
@@ -305,6 +313,9 @@ def hotel(b):
     hip_roof(wall, (x, z - 4), y + 16.05, 42, 13, 2.7, 1.3, 0.6, 'graytile', 'vermilion')
     hip_roof(wall, (x - 28, z - 4), y + 11.25, 13, 12, 1.9, 0.75, 0.5, 'graytile', 'vermilion')
     hip_roof(wall, (x + 28, z - 4), y + 11.25, 13, 12, 1.9, 0.75, 0.5, 'graytile', 'vermilion')
+    for cx,level,width,depth in [(x,16,43,14),(x-28,11.2,13,12),(x+28,11.2,13,12),
+                                 (x,18.7,22,11),(x,21.4,12,7)]:
+        box(wall,(cx,y+level-.10,z-4),(width,1.5 if cx==x and level>18 else .36,depth),'wood')
     # Stacked pavilion roofs on the main block, each one smaller than the one below.
     hip_roof(wall, (x, z - 4), y + 19.0, 22, 11, 2.8, 0.9, 0.55, 'blacktile', 'vermilion')
     hip_roof(wall, (x, z - 4), y + 22.0, 12, 7, 2.2, 0.6, 0.5, 'blacktile', 'vermilion')
@@ -389,6 +400,7 @@ def glass_bridge(builder):
     for mesh,start in starts:
         mesh.pos[start:] = [(x,y-.76+near+(far-near)*(z-145.5)/29,z) for x,y,z in mesh.pos[start:]]
     east,south=470,196.5
+    tower_meshes = [(m,len(m.pos)) for m in (stone,builder.hit)]
     tower_ground = ground(east,south)-1.8
     box(stone,(east,tower_ground+14.8,south),(23,26,15),'bank_blue',None)
     box(stone,(east,tower_ground+27.5,south),(23.4,1.3,15.4),'white',None)
@@ -400,6 +412,12 @@ def glass_bridge(builder):
         box(stone,(east+offset,tower_ground+14.8,south-7.55),(.13,26,.18),'white')
     if builder.collide:
         solid(builder.hit,(east,tower_ground+14.8,south),(23,26,15),'glass')
+
+    for mesh,start in tower_meshes:
+        for i in range(start,len(mesh.pos)):
+            px,py,pz = mesh.pos[i]
+            if py < tower_ground+2.6:
+                mesh.pos[i] = (px,ground(px,pz)+py-tower_ground-1.84,pz)
 
 
 def shore(b):
@@ -420,6 +438,7 @@ def shore(b):
     for index in range(10):
         east=-82+index*5
         south=min(-16,shoreline_z(east)-3.5)
+        start=len(wall.pos)
         level=ground(east,south)+.20
         for side in (-1,1):
             box(wall,(east,level,south+side*1.79),(5,.4,2.18),'granite')
@@ -427,6 +446,9 @@ def shore(b):
         box(wall,(east,level+.03,south),(5,.08,1.4),'rill_water')
         for offset in (-1.3,1.3):
             box(wall,(east+offset,level+.17,south),(.63,.32,.6),'ashlar')
+        for i in range(start,len(wall.pos)):
+            px,py,pz = wall.pos[i]
+            wall.pos[i] = (px,py+ground(px,pz)-level+.20,pz)
         if index in (0,3):
             solid_tree(wall,(east,ground(east,south-5),south-5),9,5,90+index,b.detail,lobed=False)
     px, pz = -46, shoreline_z(-46)-2

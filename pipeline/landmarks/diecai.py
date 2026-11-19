@@ -66,6 +66,8 @@ def build(model):
         previous=section
     start=point(.015);direction=point(.016)-start
     model.pose=(*start,math.atan2(direction[2],direction[0])-math.pi/2)
+    for side in (-1,1):
+        model.foundation(surface,side*3.25,-.3,0,2.5,.55,1.5,'stone')
     model.arcade(0,0,9,1.5,4.4,[0],2,'brick');model.box(0,4.28,0,10.4,.23,3.4,'wood');model.swept_roof(0,4.4,0,10.4,3.4,1.4)
     model.pose=(*tip,0);pavilion(model,6.25,3.8,landmark_surface('diecai'))
     model.box(0,3.1,2.55,2.1,.55,.14,'sign')

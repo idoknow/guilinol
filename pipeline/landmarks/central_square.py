@@ -302,12 +302,13 @@ def build_central_square(m: Builder):
         m.box(side * 13.8, 1.2, 29.7, 4.2, 3.6, 0.25, 'dark')
 
     # Giant dark glossy SMD LED screen + red slogan frieze + rooftop gold '体育馆'
+    m.box(0, .2, 24.9, 22, 20.55, 1.7, 'alum', collide=True, footing=True)
     m.box(0, 4.8, 25.8, 19.6, 9.4, 0.85, 'dark')
     m.sign_quad(0, 5.25, 26.28, 18.4, 8.4, 'led_screen')
     m.box(0, 15.15, 25.6, 20.5, 1.45, 0.35, 'alum')
     m.sign_quad(0, 15.22, 25.82, 19.2, 1.30, 'gym_slogan')
-    m.box(0, 18.6, 24.8, 9.8, 2.15, 0.28, 'dark')
-    m.sign_quad(0, 18.66, 24.98, 9.5, 2.02, 'gym_title')
+    m.box(0, 18.6, 25.7, 9.8, 2.15, 0.28, 'dark')
+    m.sign_quad(0, 18.66, 25.88, 9.5, 2.02, 'gym_title')
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
     # ------------------------------------------------------------------
@@ -315,7 +316,7 @@ def build_central_square(m: Builder):
     # ------------------------------------------------------------------
     hcx, hcz = _ax_pt(-54.0, -76.0)
     m.pose = (hcx, 0.0, hcz, AXIS_YAW + math.pi / 2.0)
-    m.box(0, -2.0, 0, 56.0, 22.8, 16.5, 'wood', collide=True)
+    m.box(0, -2.0, 0, 56.0, 22.8, 16.5, 'wood', collide=True, footing=True)
     m.box(0, 4.5, 8.35, 52.0, 14.8, 0.28, 'glass')
     m.box(0, 20.8, 0, 57.2, 1.8, 17.4, 'roof')
     if m.detail:

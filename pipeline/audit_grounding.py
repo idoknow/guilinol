@@ -120,7 +120,11 @@ def bearing_components(assembly, low):
 
 def measurements(model, surface):
     raw = subprocess.check_output(['node', ROOT/'pipeline/glb-triangles.mjs', model, '--visible'], timeout=90)
-    vertices, index = np.unique(np.frombuffer(raw, '<f4').reshape(-1, 3), axis=0, return_inverse=True)
+    source = np.frombuffer(raw,'<f4').reshape(-1,3,3)
+    # Quantization can collapse tiny lettering triangles onto one edge.
+    # Such triangles have neither a rendered area nor a bearing surface.
+    area = np.cross(source[:,1]-source[:,0],source[:,2]-source[:,0])
+    vertices, index = np.unique(source[np.any(area!=0,axis=1)].reshape(-1,3),axis=0,return_inverse=True)
     faces = index.reshape(-1, 3)
     edges = coo_matrix((np.ones(faces.size, dtype=bool),
                         (faces.ravel(), np.roll(faces, 1, axis=1).ravel())), shape=(len(vertices),)*2)
@@ -156,7 +160,7 @@ def measurements(model, surface):
     # cannot distinguish a railing on a deck from one underneath it.
     triangles = vertices[faces].astype(float)
     normal = np.cross(triangles[:, 1]-triangles[:, 0], triangles[:, 2]-triangles[:, 0])
-    ids = np.flatnonzero(normal[:, 1] > 1e-6)
+    ids = np.flatnonzero(abs(normal[:, 1]) > 1e-6)
     tree = shapely.STRtree(shapely.polygons(triangles[ids][:, :, ::2]))
     for start in range(0, len(pts), 512):
         p, t = tree.query(shapely.points(pts[start:start+512, ::2]), predicate='intersects')
@@ -171,6 +175,14 @@ def measurements(model, surface):
         ceiling = np.where(low[carrier] < low[carried]-.015, SINK, .015)
         usable = (carrier != carried) & (height <= pts[p, 1]+ceiling)
         usable &= np.isnan(levels[p]) | (pts[p,1] >= levels[p])
+        # Some double-sided assets wind their top faces down. At each XZ
+        # the upper envelope of a carrier is exposed from above regardless
+        # of winding. Do not accept its underside beneath a higher face.
+        keys = np.column_stack((p,carrier))
+        _, inverse = np.unique(keys,axis=0,return_inverse=True)
+        top = np.full(inverse.max()+1 if len(inverse) else 0,-np.inf)
+        np.maximum.at(top,inverse,height)
+        usable &= (normal[t,1]>0) | (height >= top[inverse]-.0001)
         np.maximum.at(support, p[usable], height[usable])
     for number,(_,_,_,draft,_) in enumerate(boats):
         mask = craft[component[base]]==number

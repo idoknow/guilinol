@@ -64,7 +64,9 @@ def hall(model):
             model.box(station-2.3,5.8,-.30,.53,.53,.12,'granite')
         model.pose=(0,0,0,0)
     for row in range(7):
-        for col in range(10):model.box(-12.3,.24+row*.31,-7+col*.85+(row%2)*.35,.35,.30,.66,'earth')
+        for col in range(10):
+            z=-7+col*.85+(row%2)*.35
+            model.box(-12.3,surface.ground(-12.3,z)+row*.30,z,.35,.30,.87,'earth')
     for index in range(64):
         start,end=math.tau*index/64,math.tau*(index+1)/64
         points=[(radius*math.cos(angle),.42,-29+radius*math.sin(angle)) for radius,angle in [(3.85,start),(3.85,end),(4.25,end),(4.25,start)]]

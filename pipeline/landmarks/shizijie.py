@@ -80,7 +80,7 @@ def _commercial_strip(m: Builder, p0, p1, outward_sign, podium_h, total_h, wall_
         m.box(lx, -1.2, 0.22, 0.62, total_h + 1.2, 0.62, wall_mat, collide=True, footing=True)
         if i < bays:
             cx = lx + bay_w / 2.0
-            m.box(cx, 0.15, -0.05, bay_w - 0.72, 3.15, 0.22, 'glass')
+            m.box(cx, 0.11, -0.05, bay_w - 0.72, 3.15, 0.22, 'glass')
             m.box(cx, 3.15, 0.65, bay_w - 0.45, 0.18, 1.25, 'alum')
             m.box(cx, 3.45, 0.28, bay_w - 0.68, 0.92, 0.26, 'dark')
             m.sign_quad(cx, 3.48, 0.43, bay_w - 0.74, 0.86, f'shop_{(i + shop_seed) % 8}')
@@ -143,14 +143,14 @@ def _guardrail_run(m: Builder, p0, p1):
     m.box(0, 0.05, 0, 0.12, 0.93, length, 'alum', collide=True)
     if m.detail:
         m.box(0, 0.92, 0, 0.09, 0.07, length, 'alum')
-        m.box(0, 0.22, 0, 0.08, 0.05, length, 'alum')
+        m.box(.061, .22, 0, .018, .05, length-.06, 'alum')
         for i in range(segs + 1):
             lz = -length / 2.0 + i * (length / segs)
             m.box(0, 0.0, lz, 0.18, 1.02, 0.12, 'dark')
             if i < segs:
                 cz = lz + 0.5 * (length / segs)
-                m.box(0, 0.38, cz, 0.14, 0.42, 0.42, 'white')
-                m.box(0, 0.46, cz, 0.16, 0.24, 0.24, 'dark')
+                m.box(.063, .38, cz, .04, .42, .42, 'white')
+                m.box(.087, .46, cz, .025, .24, .24, 'dark')
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
 

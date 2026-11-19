@@ -565,8 +565,11 @@ def build_trees(terrace, outline):
                 ang = k*math.tau/5
                 dx,dz = .55*math.cos(ang),.55*math.sin(ang)
                 add_tris(tree,'bark',segment_bar(0,0,dx,dz,height*.40-.05,height*.40+.08,.07,cap=True))
-                add_tris(tree,'leaf',cylinder_at(dx,dz,.07,.035,height*.40,.32,5,cap_bottom=True))
+                add_tris(tree,'leaf',cylinder_at(dx,dz,.07,.035,height*.40,.87,5,cap_bottom=True))
                 add_tris(tree,'leaf',cylinder_at(dx,dz,.9,.15,height*.30,height*.65,6))
+        if not island.covers(Point(x,z)):
+            tree['bark'] = [tuple((px,ground(x+px,z+pz)-foot-.045 if py<0 else py,pz)
+                                  for px,py,pz in tri) for tri in tree['bark']]
         for key,tris in shift(tree,x,foot,z).items():
             add_tris(b,key,tris)
     return b

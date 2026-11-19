@@ -283,6 +283,7 @@ def build_trunk_and_water_moon_cave(geo: Collector):
     16 m high, lumpy rather than a semicircle. East of it the trunk is 8 m
     thick under the head and 4 m at the water.
     """
+    start = len(geo.tris)
     y_bot = -2.2
     cave_cx, cave_rx = 66.0, 6.0
     y_spring = WATER_Y - 1.5
@@ -503,6 +504,13 @@ def build_trunk_and_water_moon_cave(geo: Collector):
         add_foliage_clump(geo, x, roof_y(x, z, z0) + 1.7, z, 3.6, 2.3, 3.2, seed=3.0 + i)
 
 
+    # Sample the actual contact ring where the limestone enters the river.
+    for triangle in geo.tris[start:]:
+        for vertex in triangle:
+            if abs(vertex[1]-y_bot)<1e-8:
+                vertex[1] = surface.ground(vertex[0],vertex[2])-.08
+
+
 def add_foliage_clump(geo: Collector, cx, cy, cz, rx, ry, rz, seed=0.0):
     """Low-poly icosahedron broadleaf shrub/tree crown matching web/src/look/trees.ts."""
     phi = (1.0 + math.sqrt(5.0)) * 0.5
@@ -560,7 +568,7 @@ def build_draped_canopy(geo: Collector):
                               rx * 0.7, ry * 0.66, rz * 0.7, seed=i * 1.17 + 2.0)
 
 
-def add_prism_frustum(geo: Collector, cx, cz, r0, r1, y0, y1, sides, col, yaw=0.0, cap_top=True, cap_bottom=False):
+def add_prism_frustum(geo: Collector, cx, cz, r0, r1, y0, y1, sides, col, yaw=0.0, cap_top=True, cap_bottom=True):
     pts0, pts1 = [], []
     for i in range(sides):
         a = yaw + 2.0 * math.pi * i / sides
@@ -683,11 +691,11 @@ def add_bamboo_raft(geo: Collector, cx, cz, yaw):
         bx, _, bz = to_w(2.85, y0 + 0.12, lz)
         add_oriented_box(geo, bx, y0 + 0.08, bz, 0.85, 0.15, 0.20, yaw, PAL['bamboo'])
 
-    for lx in (-2.4, -0.8, 0.8, 2.2):
+    for lx in (-2.4, -1.45, -.8, .8, 1.15, 2.2):
         px, _, pz = to_w(lx, y0 + 0.15, 0.0)
-        add_oriented_box(geo, px, y0 + 0.15, pz, 0.16, 0.08, 2.15, yaw, PAL['bambooDark'])
+        add_oriented_box(geo, px, y0 + 0.13, pz, 0.16, 0.08, 2.15, yaw, PAL['bambooDark'])
 
-    cabin_y = y0 + 0.22
+    cabin_y = y0 + 0.20
     for lx in (-1.45, 1.15):
         for lz in (-0.82, 0.82):
             px, _, pz = to_w(lx, cabin_y, lz)
@@ -729,6 +737,7 @@ def build_shore_balustrade(geo: Collector):
         ( -3.0, -29.2),
         ( 11.5, -28.4),
     ]
+    terrace_y = max(terrace_y,max(surface.ground(x,z+dz) for x,z in shore_pts for dz in (0,1.5,3.2))+.08)
     for i in range(len(shore_pts) - 1):
         ax, az = shore_pts[i]
         bx, bz = shore_pts[i + 1]

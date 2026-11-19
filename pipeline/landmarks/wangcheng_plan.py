@@ -89,7 +89,7 @@ def inner_court(m, plan):
     for key, base, height in [(679734442,2,7.2),(679734417,.65,7.8)]:
         x,z,angle,width,depth = plan.frame(key)
         m.pose = (x,plan.ground(x,z),z,angle)
-        m.box(0,0,0,width+1.8,base,depth+2,'white' if key==679734442 else 'granite',True)
+        m.foundation(plan.surface,0,0,0,width+1.8,base,depth+2,'white' if key==679734442 else 'granite')
         if key==679734442:
             m.box(0,base,0,width-6,height,depth-6,'red',True)
             m.tiled_roof(0,base+height,0,width+2,depth+2,6.7)
@@ -128,13 +128,15 @@ def inner_court(m, plan):
     # The Gongyuan POI is just east of this roof. The bay divisions are estimated.
     x,z,angle,width,depth = plan.frame(1471532482)
     m.pose = (x,plan.ground(x,z),z,angle)
-    m.box(0,-.3,0,width,.6,depth,'stone',True)
+    m.foundation(plan.surface,0,-.3,0,width,.6,depth,'stone')
     m.box(0,.3,-depth*.43,width,3.1,.5,'white',True)
+    m.box(0,3.31,0,width,.31,depth,'wood')
     m.swept_roof(0,3.45,0,width,depth,1.9)
     for east in np.linspace(-width*.48,width*.48,11):
         m.box(east,.3,-depth*.1,.22,2.65,depth*.7,'wood',True)
         m.beam([east,.3,depth*.4],[east,3.45,depth*.4],.14,'red',8,True)
-    m.box(0,2.55,depth*.42,4.4,.85,.22,'sign')
+    m.box(0,2.55,depth*.42,4.4,1.02,.24,'sign')
+    for ex in (-1.6,1.6):m.box(ex,3.35,depth*.42,.14,.35,.16,'wood')
     letters(m,'广西贡院',(0,2.69,depth*.42+.12),3.6,.55,'gold')
     x,z = plan.shapes[5981119756].coords[0]
     m.pose=(x,plan.ground(x,z),z,0)
@@ -144,10 +146,11 @@ def inner_court(m, plan):
     for key in (5981119755,6364816780):
         x,z = plan.shapes[key].coords[0]
         m.pose = (x,plan.ground(x,z),z,0)
-        m.box(0,-.4,0,5,.8,5,'stone',True)
+        m.foundation(plan.surface,0,-.4,0,5,.8,5,'stone')
         for east in (-1.8,1.8):
             for south in (-1.8,1.8):
                 m.beam([east,.4,south],[east,3.6,south],.18,'red',8,True)
+        m.box(0,3.48,0,5.9,.25,5.9,'wood')
         m.swept_roof(0,3.6,0,5.9,5.9,1.8)
     x,z = plan.shapes[14088892740].coords[0]
     m.pose = (x,plan.ground(x,z),z,0)

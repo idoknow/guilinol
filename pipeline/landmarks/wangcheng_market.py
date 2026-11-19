@@ -117,9 +117,10 @@ def market(model):
         model.box(0,4.4,0,8.5,2.2,1.1,'wood');model.roof(0,6.55,0,9.4,3.4,1.3)
         for side in (-1,1):letters(model,'东西巷',(0,4.9,side*.59),4.7,1.05,'gold',side)
     for east,south in [(7+index*1.05+side*10,-18-index*6.1) for side in (-1,1) for index in range(6)]:
-        model.pose=(east,0,south,.14)
+        model.pose=(east,landmark_surface('wangcheng_market').ground(east,south),south,.14)
         model.box(0,0,0,3.1,1.03,1.8,'wood',True)
         for post in (-1.46,1.46):model.box(post,1,-.64,.11,1.35,.11,'wood')
+        model.box(0,2.28,0,4.15,.14,3.6,'wood')
         model.roof(0,2.29,0,4.15,3.6,.52)
 
 

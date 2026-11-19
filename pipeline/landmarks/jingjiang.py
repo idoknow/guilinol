@@ -67,6 +67,7 @@ class Model:
         self.pose=(0,0,0,0)
         self.templates={}
         self.placements=[]
+        self.ground_offset=None
 
     def mesh(self, vertices, faces, color, collide=False):
         triangles=np.asarray(vertices,dtype=float)[faces]
@@ -76,6 +77,10 @@ class Model:
         triangles[:,:,0]=local[:,:,0]*cosine-local[:,:,2]*sine+dx
         triangles[:,:,2]=local[:,:,0]*sine+local[:,:,2]*cosine+dz
         triangles[:,:,1]+=dy
+        if self.ground_offset:
+            points,indices=np.unique(triangles[:,:,[0,2]].reshape(-1,2),axis=0,return_inverse=True)
+            offsets=np.array([self.ground_offset(x,z) for x,z in points])
+            triangles[:,:,1]+=offsets[indices].reshape(triangles.shape[:2])
         if collide: self.solid.append(triangles)
         if isinstance(color,np.ndarray):
             self.pigmented.append((triangles,color[faces]));return
@@ -242,14 +247,15 @@ def banyan(m,x,z,index):
     m.mesh(crown.vertices*[6,3.8,6]+[x,9.2,z],crown.faces,'leaf')
 
 
-def gate_furniture(m):
+def gate_furniture(m,plan_surface):
     for side in (-1,1):
         x=side*9.5
-        m.box(x,.1,-137.2,2.45,.95,2.45,'red',True)
+        m.foundation(plan_surface,x,.1,-137.2,2.45,.95,2.45,'red')
         for offset in (-1.08,1.08):
             for dz in (-1.08,1.08):
                 m.box(x+offset,.95,-137.2+dz,.16,1.85,.16,'red',True)
         m.box(x,1.05,-137.2,2.5,.12,2.5,'wood')
+        m.box(x,2.76,-137.2,3.25,.24,3.2,'wood')
         m.tiled_roof(x,2.8,-137.2,3.25,3.2,1.05)
         # The information boards are set back on either side of the kiosks.
         x=side*13.1
@@ -264,9 +270,9 @@ def gate_furniture(m):
     rim=[[-2.8+1.95*math.cos(i*math.pi/4),2.55,-153.8+1.95*math.sin(i*math.pi/4)] for i in range(8)]
     m.mesh([[-2.8,3.08,-153.8],*rim],[[0,i+1,(i+1)%8+1] for i in range(8)],'yellow')
     for n in range(8):
-        m.box(-8,.15,-38-n*.94,.82,1.9,.9,'yellow',True)
+        m.foundation(plan_surface,-8,.15,-38-n*.94,.82,1.9,.9,'yellow')
         for y in (.28,1.15):
-            m.box(-7.55,y,-38-n*.94,.05,.73,.79,'white')
+            m.box(-7.59,y,-38-n*.94,.04,.73,.79,'white')
 
 
 def palace(m):
@@ -342,6 +348,8 @@ def palace(m):
                 for n in range(7):
                     m.box(side*4.6,1.9+n*.37,-141.14,.22,.07,.05,'gold')
         lantern=trimesh.creation.icosphere(subdivisions=int(m.detail))
+        m.beam([side*2.45,6.58,-141.85],[side*2.45,6.58,-140.95],.065,'wood')
+        m.beam([side*2.45,5.8,-140.95],[side*2.45,6.58,-140.95],.04,'wood')
         m.mesh(lantern.vertices*[.47,.38,.47]+[side*2.45,5.5,-140.95],lantern.faces,'red')
     m.box(0,5.35,-147,10.7,3.05,10,'yellow',True)
     m.tiled_roof(0,8.4,-147,13.0,12,3.7)
@@ -354,7 +362,7 @@ def palace(m):
         for east in (side*5.25,side*12.75):
             m.beam([east,.86,-132.7],[east,1.77,-135.15],.13,'white');m.box(east,0,-133,.33,.94,.33,'white')
         m.box(side*10.5,0,-147,6,3.15,10,'yellow',True);m.tiled_roof(side*10.5,3.15,-147,7.1,11.5,2.3)
-    gate_furniture(m)
+    gate_furniture(m,plan.surface)
     m.pose=(0,0,0,0)
     for side in (-1,1):
         for i,z in enumerate((-30,-54,-78,-101,-123)):

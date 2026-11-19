@@ -32,7 +32,7 @@ def apartments(m, x, z, length, floors):
                 m.box(px,base+.98,face+facade*.20,.09,1.52,.08,'white')
     for end in (-1,1):
         for level in range(floors):
-            m.box(x+end*(length/2-.31),level*storey+1.1,z, .29,1.48,3.3,'glass')
+            m.box(x+end*(length/2-(.02 if level==0 else .37)),level*storey+1.1,z, .29,1.48,3.3,'glass')
 
 
 def gallery(m):
@@ -99,6 +99,7 @@ def gallery(m):
     for dx in (-2.8,2.8):
         for z in (-2.45,2.45):
             m.beam([x+dx,.13,z],[x+dx,3.65,z],.21,'wood',10,True)
+    m.box(x,3.58,0,8.5,.42,7.5,'wood')
     tiled_roof(m,x,3.63,0,8.45,7.5,3.25,2.15,.55)
     # Rounded crown and two-tier base leave a passage on either side.
     m.box(x,.13,1.05,1.9,.23,1.2,'stone',True)

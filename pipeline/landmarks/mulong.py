@@ -10,7 +10,13 @@ from c_kit import landmark_surface
 
 
 def pagoda(model):
-    model.beam([0,landmark_surface('mulong').ground(0,0)-.12,0],[0,.8,0],6.1,'stone',8,True)
+    surface = landmark_surface('mulong')
+    rim = [(6.1*math.cos(a),6.1*math.sin(a)) for a in np.arange(8)*math.tau/8]
+    for i,(x,z) in enumerate(rim):
+        u,v = rim[(i+1)%8]
+        model.mesh([(x,surface.ground(x,z)-.04,z),(u,surface.ground(u,v)-.04,v),
+                    (u,.8,v),(x,.8,z)],[[0,1,2],[0,2,3]],'stone',True)
+        model.mesh([(0,.8,0),(x,.8,z),(u,.8,v)],[[0,2,1]],'pave',True)
     base=.8
     for tier in range(7):
         radius=6.5-tier*.43;height=5.15-tier*.27
