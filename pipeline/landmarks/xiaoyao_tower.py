@@ -13,15 +13,18 @@ import trimesh
 from jingjiang import Model, SWATCHES, atlas
 
 
+LIGHTS = {'lamp': [.85,.57,.24], 'violet': [.78,.045,.92], 'jade': [.18,.94,.38]}
+
+
 class LandmarkModel(Model):
     def __init__(self, detail):
         super().__init__(detail)
-        self.lamps=[]
+        self.lamps={}
 
     def mesh(self, vertices, faces, color, collide=False):
-        if isinstance(color,str) and color=='lamp':
+        if isinstance(color,str) and color in LIGHTS:
             super().mesh(vertices,faces,'gold',collide)
-            self.lamps.append((self.visible.pop(),self.uv.pop()))
+            self.lamps.setdefault(color, []).append((self.visible.pop(),self.uv.pop()))
         else:
             super().mesh(vertices,faces,color,collide)
 
@@ -93,7 +96,7 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
             if texture is not None:
                 material = trimesh.visual.material.PBRMaterial(name=name,baseColorTexture=texture,roughnessFactor=1,metallicFactor=0,doubleSided=True)
                 if name.endswith('_lit'):
-                    material.emissiveFactor=[.85,.57,.24]
+                    material.emissiveFactor=LIGHTS[name.removesuffix('_lit')]
                 mesh.visual = trimesh.visual.TextureVisuals(uv=np.concatenate(uvs).reshape(-1,2),material=material)
             scene.add_geometry(mesh,node_name=group+'_'+name if texture else 'collision_surface',parent_node_name=group if texture else scene.graph.base_frame)
         if model.visible:
@@ -104,8 +107,9 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
             rock=trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
             rock.visual.vertex_colors=np.concatenate(colors).reshape(-1,4)
             scene.add_geometry(rock,node_name=group+'_limestone',parent_node_name=group)
-        if model.lamps:
-            faces,uvs=zip(*model.lamps);add(faces,uvs,image,'lamp_lit')
+        for light, parts in model.lamps.items():
+            faces,uvs=zip(*parts)
+            add(faces,uvs,image,light+'_lit')
         for key, parts in model.tile_parts.items():
             if parts:
                 cell = list(SWATCHES).index(key); left,top=128*(cell%4),128*(cell//4)

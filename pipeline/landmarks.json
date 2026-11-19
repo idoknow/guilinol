@@ -16,7 +16,7 @@
   {"id":"guangxi_arts","name":"广西省立艺术馆","anchor":"way/682942533","rotation":-24,"model":"landmarks/guangxi_arts.glb","replace":["way/682942533"],"collision":"mesh"},
   {"id":"yiwu_street","name":"翊武路街景","anchor":[110.284794,25.28045],"rotation":79.8,"model":"landmarks/yiwu_street.glb","collision":"mesh"},
   {"id":"lize_bridge","name":"丽泽桥","anchor":[110.284118,25.281672],"rotation":-14.5,"model":"landmarks/lize_bridge.glb","collision":"mesh"},
-  {"id":"jiefang_bridge","name":"解放桥","anchor":[110.298331,25.2796383],"rotation":-18.45,"model":"landmarks/jiefang_bridge.glb","collision":"mesh","replace":["way/693451306"]},
+  {"id":"jiefang_bridge","name":"解放桥","anchor":[110.298331,25.2796383],"rotation":-18.45,"model":"landmarks/jiefang_bridge.glb","collision":"mesh","replace":["way/693451306"],"flatten":{"polygon":[[110.29732592,25.28041071],[110.29746728,25.28036777],[110.29715916,25.27952705],[110.2970178,25.27956998]],"elevation":148.0}},
   {"id":"huaqiao","name":"花桥","anchor":[110.3041155,25.2770013],"rotation":-58.92,"model":"landmarks/huaqiao.glb","collision":"mesh"},
   {"id":"fubo","name":"伏波山","anchor":"node/1618571712","model":"landmarks/fubo.glb","collision":"mesh"},
   {"id":"diecai","name":"叠彩山·明月峰","anchor":"node/4780961462","model":"landmarks/diecai.glb","collision":"mesh"},
