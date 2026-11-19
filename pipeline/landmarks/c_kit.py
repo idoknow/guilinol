@@ -6,6 +6,12 @@ of the atlas; packed UVs flip v, because three.js reads glTF v from the bottom.
 """
 import math
 from pathlib import Path
+from functools import cache
+
+if __package__:
+    from .world_surface import LandmarkSurface, Surface
+else:
+    from world_surface import LandmarkSurface, Surface
 
 import mapbox_earcut
 import numpy as np
@@ -15,6 +21,11 @@ from PIL import Image, ImageDraw, ImageFont
 ATLAS = 1024
 ROOT = Path(__file__).resolve().parents[2]
 TEX_DIR = ROOT / 'public' / 'textures' / 'landmarks' / 'c'
+
+@cache
+def landmark_surface(landmark):
+    return LandmarkSurface(Surface(), landmark)
+
 
 # Pixel rects (x, y, w, h), y from the top of the atlas.
 RECTS = {
