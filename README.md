@@ -22,6 +22,10 @@ npm run preview
 
 打开终端显示的本地地址。`public/world/` 是可重建产物；静态站点为 `dist/`（含 world），不提交原始数据或构建产物。开发模式用 `npm run dev`。
 
+测试邮箱账号时，准备好 world 和 Chromium 后运行 `npm run dev:full`。该命令构建主站、迁移本地 D1，并仅在本地 Wrangler 日志显示验证码。`npm run test:api` 使用一次性本地数据库；`npm run verify:auth` 测试已构建的 `dist/` 并在 `captures/auth/` 保存三张截图。
+
+部署前须将 `wrangler.toml` 的占位 D1 ID 替换为 `glol` 实际 ID，应用 `migrations/0001_auth.sql`，绑定私有桶 `glol-feedback`，设置 Pages secret `RESEND_API_KEY`。生产不要设置 `EMAIL_DEV_LOG=1`。阶段 1 不使用桶、也不接受反馈上传。
+
 `npm run world` 同时生成 `manifest.atlas` 指向的 gzip JSON 地图数据。按需调用 `loadAtlas(manifest)` 后可使用 `roadAt(x,z,max=18)` 查询路名、`search(query,limit?)` 搜索地标；坐标为场景 x/z 米。`npm run verify:atlas` 在 Node 中验证生成物与查询结果，无需浏览器。
 
 - 桌面：点击画面进入鼠标视角，Esc 释放；WASD 飞行，Q/E 降升，左 Shift 加速。手机：单指转向、双指一起拖动前后/横移。

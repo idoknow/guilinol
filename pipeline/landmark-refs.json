@@ -365,6 +365,14 @@
   "group": "A",
   "refs": [
    {
+    "title": "东西巷—靖江王城片区俯瞰（World Imagery，Vantor WV03，2024-12-24，0.31 m/px；仅核对布局）",
+    "year": 2024,
+    "author": "Esri / Vantor",
+    "viewOnly": true,
+    "page": "https://www.arcgis.com/apps/mapviewer/index.html?basemap=satellite&center=110.294,25.282&level=18",
+    "metadata": "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/3/query?geometry=110.294,25.282&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&returnGeometry=false&outFields=SRC_DATE,SRC_RES,SRC_ACC,ReleaseName&f=pjson"
+   },
+   {
     "title": "桂林东西巷.jpg",
     "year": 2019,
     "license": "CC0",
