@@ -42,6 +42,19 @@ for (const name of ['桂林市奎光学校','桂林市第十三中学','乐群�
   assert.equal(results.length,1,name)
   assert.ok(atlas.roadAt(results[0].x,results[0].z)?.name,name)
 }
+for(const [query,name,road] of [
+  ['桂林医科大学','桂林医科大学（东城校区）','环城北二路'],
+  ['理工大附小','桂林理工大学附属小学','建干路'],
+  ['田家炳','桂林市田家炳中学','屏风路'],
+  ['辰山小学','桂林市辰山小学',null],
+  ['漓江小学','漓江小学','芳香路'],
+  ['龙隐小学','龙隐小学','七星路'],
+]) {
+  const hit=atlas.search(query)[0]
+  assert.equal(hit?.n,name)
+  assert.equal(hit?.k,'school')
+  if(road) assert.equal(atlas.roadAt(hit.x,hit.z,30)?.name,road)
+}
 const yixian = atlas.search('桂林市逸仙中学')[0]
 assert.equal(yixian.k,'school')
 for (const alias of ['桂林市第二中学','桂林二中','二中']) assert.deepEqual(atlas.search(alias),[yixian])
