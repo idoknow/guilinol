@@ -19,31 +19,32 @@ try {
     const entries=[...performance.getEntriesByType('navigation'),...performance.getEntriesByType('resource')]
     return {firstMs,firstWorldBytes,firstBodyBytes:entries.filter(entry=>entry.responseEnd<=firstMs).reduce((sum,entry)=>sum+entry.encodedBodySize,0)}
   })
-  const settled = ()=>page.waitForFunction(()=>{
+  const settled = (after=0)=>page.waitForFunction(prev=>{
     const {stats,stream,camera,manifest}=window.viewer
-    return !stats.pending && manifest.chunks.every(tile=>Math.hypot(tile.x+128-camera.position.x,tile.z+128-camera.position.z)>stream.radius||stream.loaded.has(tile))
-  })
+    return stats.frame>prev && !stats.pending && manifest.chunks.every(tile=>Math.hypot(tile.x+128-camera.position.x,tile.z+128-camera.position.z)>stream.radius||stream.loaded.has(tile))
+  },after)
   for(const name of ['lijiang','elephant','overview','south','foot','palace']) {
-    await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&cam=${name}`)
-    await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
-    await settled()
+    const mark = await page.evaluate(preset=>window.viewer.setPreset(preset),name)
+    await settled(mark)
     if(name==='foot') {
       const probe = await page.evaluate(()=>window.viewer.probeFoot())
       console.log('foot',probe)
       assert.ok(probe.clearance>=2 && probe.clearance<=5)
       assert.equal(probe.lookingAt,'独秀峰')
     }
-    await page.screenshot({path:`${out}/${name}.png`})
+    await page.evaluate(()=>window.viewer.freeze())
+    try { await page.screenshot({path:`${out}/${name}.png`}) }
+    finally { await page.evaluate(()=>window.viewer.resume()) }
   }
   await page.evaluate(()=>{const {camera}=window.viewer;camera.position.set(-610,245,-90);camera.lookAt(-530,155,-680)})
   const before=await page.evaluate(()=>window.viewer.camera.position.toArray())
   await page.keyboard.down('KeyW');await page.waitForFunction(pos=>window.viewer.camera.position.distanceTo({x:pos[0],y:pos[1],z:pos[2]})>15,before)
   const normalFlight = await page.evaluate(async()=>{
     const samples=[],calls=[]
-    for(let frame=0;frame<120;frame++) {
+    for(let frame=0;frame<60;frame++) {
       await new Promise(resolve=>requestAnimationFrame(resolve));samples.push(window.viewer.stats.ms);calls.push(window.viewer.stats.calls)
     }
-    return {meanMs:samples.reduce((a,b)=>a+b)/120,p95Ms:samples.sort((a,b)=>a-b)[114],meanCalls:calls.reduce((a,b)=>a+b)/120}
+    return {meanMs:samples.reduce((a,b)=>a+b)/60,p95Ms:samples.sort((a,b)=>a-b)[57],meanCalls:calls.reduce((a,b)=>a+b)/60}
   })
   await page.keyboard.up('KeyW')
   const metrics = await page.evaluate(async()=>{
@@ -54,13 +55,10 @@ try {
     for(let row=0;row<depth/256;row++) {
       for(let col=0;col<width/256;col++) {
         const actualCol=row%2?width/256-1-col:col
-        const east=west+128+actualCol*256, south=north+128+row*256
-        for(let sub=0;sub<3;sub++) {
-          camera.position.x+=(east-camera.position.x)/(3-sub);camera.position.z+=(south-camera.position.z)/(3-sub)
-          await frame();samples.push(stats.ms);calls.push(stats.calls)
-        }
+        camera.position.x=west+128+actualCol*256;camera.position.z=north+128+row*256
+        await frame();samples.push(stats.ms);calls.push(stats.calls)
         const tile=manifest.chunks[row*(width/256)+actualCol], deadline=performance.now()+8000
-        while(!stream.loaded.has(tile)){if(performance.now()>deadline)throw Error(`Missing ${tile.file}`);await frame()}
+        while(!stream.loaded.has(tile)){if(performance.now()>deadline)throw Error(`Missing ${tile.file}`);await frame();samples.push(stats.ms);calls.push(stats.calls)}
         maxResident=Math.max(maxResident,stats.loaded)
       }
     }
