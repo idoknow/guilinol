@@ -32,6 +32,6 @@ try{
     if(!success){console.error('No walkable spawn',id);continue}
     await page.waitForFunction(()=>!window.viewer.stats.pending,null,{timeout:90000})
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
-    await page.locator('canvas').first().screenshot({path:`${output}/${id}.jpg`,quality:88});console.log(id,view)
+    await page.screenshot({path:`${output}/${id}.jpg`,quality:88,timeout:90000});console.log(id,view)
   }
 }finally{await browser?.close();await server.close()}
