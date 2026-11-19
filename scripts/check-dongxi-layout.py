@@ -24,6 +24,7 @@ config = json.loads((root/'pipeline/landmarks.json').read_text())
 anchor = next(item['anchor'] for item in config if item['id']=='wangcheng_market')
 origin = np.array(ll2xz(*reversed(anchor)))
 features = json.loads((root/'docs/layout/dongxi-layout.geojson').read_text())['features']
+features += json.loads((root/'docs/layout/dongxi-infill.geojson').read_text())['features']
 
 
 def axis(polygon):
@@ -43,7 +44,8 @@ for item in features:
     props = item['properties']
     if props['kind']!='roof':continue
     assert props['render'],props['name']
-    expected = Polygon([ll2xz(*reversed(corner))-origin for corner in item['geometry']['coordinates'][0]])
+    rings = [[ll2xz(*reversed(corner))-origin for corner in ring] for ring in item['geometry']['coordinates']]
+    expected = Polygon(rings[0],rings[1:])
     floor=props['ground_m']-157.7
     actual = union_all([slabs[key] for key in index.query(expected.buffer(.02)) if abs(triangles[key,0,1]-floor)<.002 and slabs[key].area>.001 and expected.buffer(.02).covers(slabs[key])]);expected_roofs.append(expected);actual_roofs.append(actual)
     if actual.is_empty:raise ValueError('Missing floor: '+props['name'])

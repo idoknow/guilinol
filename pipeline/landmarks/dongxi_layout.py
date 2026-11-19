@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / 'pipeline'))
 from common import ll2xz
 
 LAYOUT = json.loads((ROOT / 'docs/layout/dongxi-layout.geojson').read_text())['features']
+INFILL = json.loads((ROOT / 'docs/layout/dongxi-infill.geojson').read_text())['features']
 MARKET = next(entry for entry in json.loads((ROOT / 'pipeline/landmarks.json').read_text())
               if entry['id'] == 'wangcheng_market')
 ORIGIN = np.array(ll2xz(*reversed(MARKET['anchor'])))
@@ -56,14 +57,16 @@ def historic_bays(model,length,height,levels):
 def envelope(model, feature):
     attributes = feature['properties']
     corners = np.array([point(coords) for coords in feature['geometry']['coordinates'][0][:-1]])
-    polygon = orient(Polygon(corners),sign=-1)
+    holes=[[point(coords) for coords in ring] for ring in feature['geometry']['coordinates'][1:]]
+    polygon = orient(Polygon(corners,holes),sign=-1)
     corners = np.asarray(polygon.exterior.coords)[:-1]
     height = attributes['eave_m']
     offset = attributes['ground_m']-157.7
     model.pose = (0, offset, 0, 0)
     volume = trimesh.creation.extrude_polygon(polygon, height, engine='earcut')
     vertices = volume.vertices[:, [0, 2, 1]].copy()
-    model.mesh(vertices, volume.faces[:, ::-1], 'brick', True)
+    modern=attributes.get('modern_front',False) or (attributes['name'].startswith('N') and polygon.bounds[2]+ORIGIN[0] < -600)
+    model.mesh(vertices, volume.faces[:, ::-1], 'white' if modern else 'brick', True)
     historic=attributes.get('historic',True)
     for start, end in zip(corners, np.roll(corners, -1, axis=0)):
         delta = end-start
@@ -71,6 +74,13 @@ def envelope(model, feature):
         center = (start+end)/2
         angle = math.atan2(delta[1],delta[0])
         model.pose = (center[0], offset, center[1], angle)
+        if modern:
+            model.box(0,height,0,length,.45,.28,'white')
+            for level in range(attributes['levels']):
+                model.box(0,level*3.45+.45,.08,length*.91,2.05,.17,'glass')
+                for slot in range(max(1,round(length/2.4))):
+                    model.box(((slot+.5)/max(1,round(length/2.4))-.5)*length,level*3.45+.44,.18,.10,2.08,.10,'granite')
+            continue
         model.box(0,height,0,length+.18,.28,.66,'tile')
         model.box(0,3.05,.32,length,.25,1.35,'wood')
         if historic:
@@ -92,7 +102,7 @@ def envelope(model, feature):
         if attributes['screen'] and delta[0]>10:
             model.box(0,5.8,.35,12.8,4.05,.55,'sign')
             model.box(0,6.1,.65,12.2,3.5,.12,'glass')
-    if polygon.area>0:
+    if polygon.area>0 and not modern:
         rectangle = np.array(polygon.minimum_rotated_rectangle.exterior.coords)[:-1]
         short_side=min(np.linalg.norm(rectangle[1]-rectangle[0]),np.linalg.norm(rectangle[2]-rectangle[1]))
         model.pose = (0,offset,0,0)
@@ -124,21 +134,7 @@ def registered_market(model):
         heights=(1-v)*((1-u)*grid[row,col]+u*grid[row,col+1])+v*((1-u)*grid[row+1,col]+u*grid[row+1,col+1])
         plaza=-514<x+ORIGIN[0]<-496 and -186<z+ORIGIN[1]<-174
         model.mesh(np.column_stack((vertices[:,0],heights-157.7+.12,vertices[:,1])),faces[:,::-1],'ruinGlass' if plaza else 'pave')
-    lanes = [(feature,LineString([point(coords) for coords in feature['geometry']['coordinates']])) for feature in LAYOUT if feature['properties']['kind']=='lane']
-    occupied = unary_union([Polygon([point(coords) for coords in feature['geometry']['coordinates'][0]]) for feature in LAYOUT if feature['properties']['kind'] in ('roof','mall')])
-    clear = unary_union([lane.buffer(feature['properties']['width_m']/2+.8) for feature,lane in lanes])
-    from common import xz2ll
-    for feature,lane in lanes:
-        if feature['properties']['name']!='未命名连通道':continue
-        for side in (-1,1):
-            strip=lane.buffer(side*8,single_sided=True).intersection(Polygon([point(coords) for coords in MARKET['flatten']['polygon']])).difference(clear).difference(occupied.buffer(.4))
-            for part in getattr(strip,'geoms',[strip]):
-                if part.geom_type!='Polygon' or part.area<42 or part.minimum_rotated_rectangle.area>part.area*1.8:continue
-                if part.centroid.x<8 or part.centroid.y < -12:continue
-                outline=[list(reversed(xz2ll(*(np.asarray(vertex)+ORIGIN)))) for vertex in part.exterior.coords]
-                envelope(model,{'properties':{'ground_m':157.7,'eave_m':6.9,'levels':2,'screen':False},'geometry':{'coordinates':[outline]}})
-                occupied=occupied.union(part)
-    for feature in LAYOUT:
+    for feature in LAYOUT+INFILL:
         attrs = feature['properties']
         if attrs['kind']=='roof' and attrs['render']:
             envelope(model, feature)

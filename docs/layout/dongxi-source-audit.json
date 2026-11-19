@@ -1,0 +1,470 @@
+[
+  {
+    "source": "OSM",
+    "id": "way/1008248072",
+    "inside_m2": 367.2,
+    "new_m2": 367.2
+  },
+  {
+    "source": "OSM",
+    "id": "way/1008248073",
+    "inside_m2": 521.6,
+    "new_m2": 521.6
+  },
+  {
+    "source": "OSM",
+    "id": "way/1554170683",
+    "inside_m2": 67.0,
+    "new_m2": 0
+  },
+  {
+    "source": "OSM",
+    "id": "way/1578277088",
+    "inside_m2": 186.3,
+    "new_m2": 186.3
+  },
+  {
+    "source": "OSM",
+    "id": "way/1578277089",
+    "inside_m2": 39.8,
+    "new_m2": 21.7
+  },
+  {
+    "source": "Overture",
+    "id": "709acd0a-675d-413e-b95c-92f7df1b8d8c",
+    "inside_m2": 15.9,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "34dbefcb-fc9b-4494-ab7c-ad43c1162b99",
+    "inside_m2": 3.4,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "44733345-ee3c-49cd-8148-d5321e947b78",
+    "inside_m2": 161.3,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "54dc8805-fb30-4ca8-920b-eb4d6eb8d0a3",
+    "inside_m2": 287.5,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "440fe4d2-8108-4b57-b568-3d5d8253bd39",
+    "inside_m2": 370.5,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "e3536345-80f0-489b-a308-ddf93bfade8a",
+    "inside_m2": 420.0,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "5b11c919-0346-46e0-95de-2d4c55d254f4",
+    "inside_m2": 3.2,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "ef2e172e-b074-40ae-a80a-9dd633f1f895",
+    "inside_m2": 26.9,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "24317150-9cb9-4bf8-8cfb-a6758b718541",
+    "inside_m2": 161.7,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "82cd3637-e086-426e-86f1-1381c86b4755",
+    "inside_m2": 161.7,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "5de97aaa-2fca-4018-8da7-db964a24e949",
+    "inside_m2": 13.5,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "b053f157-ad15-47de-a7cf-e8e50cde1236",
+    "inside_m2": 122.3,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "844a2cb7-7823-4709-bbb1-419d96deafbe",
+    "inside_m2": 28.1,
+    "new_m2": 27.5
+  },
+  {
+    "source": "Overture",
+    "id": "dc486edc-1e63-4573-8389-ea93227f4de8",
+    "inside_m2": 367.2,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "98c0acc9-40ff-4f3a-83b1-4d015107fb2b",
+    "inside_m2": 96.0,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "438157dd-d489-4f70-9876-163e691311fd",
+    "inside_m2": 649.2,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "ccd96fb7-22f0-46da-91f6-472ad969b66f",
+    "inside_m2": 251.5,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "acfac673-15c5-47a1-8153-beabad0caaca",
+    "inside_m2": 17.9,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "4585d3a5-172c-4a7b-a0dd-d0d7f714aced",
+    "inside_m2": 438.1,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "35100b7b-63ef-4485-b4cd-311059a7383d",
+    "inside_m2": 137.1,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "9465ffd6-0a1a-441e-87de-3004e5da0ee1",
+    "inside_m2": 80.9,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "348ef592-ab3f-41ca-aaf4-b0630a9d74c1",
+    "inside_m2": 132.0,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "f6841cca-db0e-4ab3-8dba-3050f5e550dd",
+    "inside_m2": 521.6,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "72673c30-ad05-42a7-9b2e-f8dd2f91de78",
+    "inside_m2": 71.9,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "b0c412b7-f2f8-4cfd-9785-fc1422294f65",
+    "inside_m2": 134.7,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "e91549e2-8a6b-4516-a2f4-9ca6734d5e03",
+    "inside_m2": 152.7,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "abfd272f-1e3d-460b-ac2f-81a2f691a8f1",
+    "inside_m2": 67.0,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "3717179c-8086-45e7-be16-777f5a77c2c2",
+    "inside_m2": 34.0,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "6ed87b21-7d32-4ecd-a212-b43d329aeed9",
+    "inside_m2": 57.3,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "e270d497-c0a5-41d1-a802-4e0be7aa0479",
+    "inside_m2": 78.6,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "ac66f4a0-cb84-4dcf-a6b6-2b5aa2f56042",
+    "inside_m2": 13.2,
+    "new_m2": 10.9
+  },
+  {
+    "source": "Overture",
+    "id": "5e184161-9951-402a-8cc4-3aef6e13cee8",
+    "inside_m2": 306.3,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "101e8021-b53e-4d0e-838a-8529e9f2f038",
+    "inside_m2": 112.3,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "80e4cc2a-365c-42eb-ac75-19ec1f8185ad",
+    "inside_m2": 107.8,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture",
+    "id": "d4880b9b-ec6a-4d44-b4a8-287222c3a59c",
+    "inside_m2": 494.0,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "44733345-ee3c-49cd-8148-d5321e947b78",
+    "inside_m2": 162.0,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "4585d3a5-172c-4a7b-a0dd-d0d7f714aced",
+    "inside_m2": 439.4,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "24317150-9cb9-4bf8-8cfb-a6758b718541",
+    "inside_m2": 161.9,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "844a2cb7-7823-4709-bbb1-419d96deafbe",
+    "inside_m2": 28.7,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "f6841cca-db0e-4ab3-8dba-3050f5e550dd",
+    "inside_m2": 517.4,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "ccd96fb7-22f0-46da-91f6-472ad969b66f",
+    "inside_m2": 252.5,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "35100b7b-63ef-4485-b4cd-311059a7383d",
+    "inside_m2": 138.1,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "d4880b9b-ec6a-4d44-b4a8-287222c3a59c",
+    "inside_m2": 494.7,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "98c0acc9-40ff-4f3a-83b1-4d015107fb2b",
+    "inside_m2": 97.9,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "dc486edc-1e63-4573-8389-ea93227f4de8",
+    "inside_m2": 372.5,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "72673c30-ad05-42a7-9b2e-f8dd2f91de78",
+    "inside_m2": 74.1,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "e270d497-c0a5-41d1-a802-4e0be7aa0479",
+    "inside_m2": 78.2,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "34dbefcb-fc9b-4494-ab7c-ad43c1162b99",
+    "inside_m2": 4.4,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "54dc8805-fb30-4ca8-920b-eb4d6eb8d0a3",
+    "inside_m2": 282.1,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "b0c412b7-f2f8-4cfd-9785-fc1422294f65",
+    "inside_m2": 135.3,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "101e8021-b53e-4d0e-838a-8529e9f2f038",
+    "inside_m2": 112.4,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "6dbf8421-a8f6-43d8-9373-507ce4e46e38",
+    "inside_m2": 718.4,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "9465ffd6-0a1a-441e-87de-3004e5da0ee1",
+    "inside_m2": 81.7,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "3717179c-8086-45e7-be16-777f5a77c2c2",
+    "inside_m2": 34.1,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "4c79ac11-00c0-44fe-93c8-6cb05bac6d5a",
+    "inside_m2": 1574.9,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "709acd0a-675d-413e-b95c-92f7df1b8d8c",
+    "inside_m2": 15.0,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "5de97aaa-2fca-4018-8da7-db964a24e949",
+    "inside_m2": 15.1,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "acfac673-15c5-47a1-8153-beabad0caaca",
+    "inside_m2": 16.2,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "abfd272f-1e3d-460b-ac2f-81a2f691a8f1",
+    "inside_m2": 66.1,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "75bd2307-45ff-40d9-b5e9-e00ddd06e1b4",
+    "inside_m2": 195.4,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "b053f157-ad15-47de-a7cf-e8e50cde1236",
+    "inside_m2": 121.3,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "438157dd-d489-4f70-9876-163e691311fd",
+    "inside_m2": 645.6,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "ac66f4a0-cb84-4dcf-a6b6-2b5aa2f56042",
+    "inside_m2": 10.9,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "6ed87b21-7d32-4ecd-a212-b43d329aeed9",
+    "inside_m2": 58.5,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "348ef592-ab3f-41ca-aaf4-b0630a9d74c1",
+    "inside_m2": 131.5,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "e91549e2-8a6b-4516-a2f4-9ca6734d5e03",
+    "inside_m2": 154.1,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "440fe4d2-8108-4b57-b568-3d5d8253bd39",
+    "inside_m2": 361.6,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "5e184161-9951-402a-8cc4-3aef6e13cee8",
+    "inside_m2": 302.3,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "80e4cc2a-365c-42eb-ac75-19ec1f8185ad",
+    "inside_m2": 110.3,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "92b88849-47b2-406b-a8af-332784f1b9de",
+    "inside_m2": 1271.3,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "ef2e172e-b074-40ae-a80a-9dd633f1f895",
+    "inside_m2": 27.8,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "e3536345-80f0-489b-a308-ddf93bfade8a",
+    "inside_m2": 414.2,
+    "new_m2": 0
+  },
+  {
+    "source": "Overture tiles",
+    "id": "82cd3637-e086-426e-86f1-1381c86b4755",
+    "inside_m2": 162.3,
+    "new_m2": 0
+  }
+]

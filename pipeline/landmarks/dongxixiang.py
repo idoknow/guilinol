@@ -2,7 +2,11 @@
 estimated against doors in the 2019 series. Bend modules follow way nodes.
 """
 import math
+import json
+from pathlib import Path
+import sys
 import numpy as np
+from shapely.geometry import Point, Polygon
 from jingjiang import generate
 
 
@@ -20,6 +24,12 @@ def lantern(model,east,south):
 
 
 def frontage(model):
+    pipeline = Path(__file__).resolve().parents[1]
+    sys.path.insert(0,str(pipeline))
+    from common import ll2xz
+    landmarks = {entry['id']:entry for entry in json.loads((pipeline/'landmarks.json').read_text())}
+    origin = np.array(ll2xz(*reversed(landmarks['dongxixiang']['anchor'])))
+    replaced = Polygon([np.array(ll2xz(*reversed(point)))-origin for point in landmarks['wangcheng_market']['replace']['polygon']])
     path=[(21.67,-121.76),(13.12,-58.68),(0,0),(37.8,7.3),(47.2,9.8)]
     for first,last in zip(path,path[1:]):
         dx,dz=np.subtract(last,first);length=math.hypot(dx,dz);angle=math.atan2(-dx,dz)
@@ -29,6 +39,7 @@ def frontage(model):
             model.box(0,0,0,4.5,.17,width+.12,'pave',True)
             for side in (-1,1):
                 east=side*6.4; high=6.1+(bay%3==1)*2.9
+                if replaced.covers(Point(model.pose[0]+east*math.cos(angle),model.pose[2]+east*math.sin(angle))):continue
                 model.box(east,3,0,6.5,high-3,width-.16,'brick',True)
                 model.box(side*6.97,0,0,5.36,3,width-.16,'brick',True)
                 model.roof(east,high,0,7.8,width,1.8)
