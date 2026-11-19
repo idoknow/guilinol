@@ -19,6 +19,9 @@ def signs(image):
                 draw.text((left+width/2,top+(index+.5)*height/4),char,anchor='mm',font=_font(size),fill='white')
         else:
             draw.text((left+width/2,top+height/2),text,font=_font(size),anchor='mm',fill='white')
+    RECTS['inn_board'] = (768,736,128,32)
+    draw.rectangle((768,736,895,767),fill='#273748')
+    draw.text((832,752),'涵栅雅居',anchor='mm',font=_font(19),fill='white')
     sign=Image.new('RGB',(128,512),'#171819')
     brush=ImageDraw.Draw(sign)
     for index,char in enumerate('涵栅雅居'):
@@ -31,6 +34,28 @@ from c_kit import landmark_surface
 
 
 def shops(builder):
+    # IMG_1302, east sidewalk of Rongyin Road (way/221349761). Only model
+    # the visible street frontage where the snapshot has no building outline.
+    with align_front(builder, (63,-116), -111.9):
+        mesh, glass = builder.parts['atlas'], builder.parts['lit']
+        box(mesh, (63,10.1,-117.8), (14.4,14.2,3.6), 'cream')
+        box(mesh, (63,5.9,-115.85), (12.4,.85,.36), 'wood')
+        for east in (58,61.3,64.7,68):
+            box(glass,(east,4.5,-115.9),(2.8,2.6,.24),'glass')
+        for level in (7.4,10.6,13.8,16):
+            for east in (57.6,68.4):
+                box(glass,(east,level,-115.87),(2.9,1.85,.25),'glass')
+        if builder.collide:
+            solid(builder.hit,(63,10.1,-117.8),(14.4,14.2,3.6),'cream')
+    # The small street-facing volume on way/521248452 stands in front of the hotel.
+    with align_front(builder, (-4.5, -43.6), -20):
+        mesh = builder.parts['atlas']
+        box(mesh, (-4.5, 6.1, -43.6), (7.25, 9.6, 6.65), 'brick')
+        for level in (2.7, 6.1, 9.15):
+            for east in (-6.25, -2.75):
+                box(builder.parts['lit'], (east, level, -40.2), (2.65, 1.82, .14), 'glass')
+        if builder.collide:
+            solid(builder.hit, (-4.5, 6.1, -43.6), (7.25, 9.6, 6.65), 'brick')
     for east,south,width,length,floors,kind in [(10,-51,17,24,4,'rong'),(10,-86,26.3,8.5,3,'inn'),(32,-115,15,19,3,'hall')]:
         base = landmark_surface('gunanmen').ground(east,south)
         meshes = [*builder.parts.values(),builder.hit]
@@ -82,6 +107,12 @@ def shop(builder, east, base, south, width, length, floors, kind):
         else:
             box(stone,center,size,'rubble' if kind=='hall' else 'brick')
             if builder.collide:solid(builder.hit,center,size,'brick')
+        if kind == 'rong':
+            # The south return of way/521248450 faces the approach in IMG_1307.
+            for floor in range(floors):
+                for dx in (1.8, 5, 8):
+                    box(glass, (east+dx, base+1.7+floor*3.25, south+13.7),
+                        (2.45, 1.7, .16), 'glass')
         face=east+width/2
         if kind=='hall':
             box(glass,(face+.15,base+5,south),(.3,9.8,6.2),'glass',None)
@@ -104,6 +135,14 @@ def shop(builder, east, base, south, width, length, floors, kind):
                 offset=south+col*length*.245
                 box(stone,(face+.08,level,offset),(.18,1.8,length*.44),'wood')
                 box(glass,(face+.2,level,offset),(.09,1.53,length*.42),'glass',None)
+        if kind == 'inn':
+            corner = south+length/2
+            box(stone,(face+.9,base+3.5,corner),(1.8,.82,.13),'wood')
+            for side in (-1,1):
+                z = corner + side*.073
+                stone.face([(face,y,z) for y in (base+3.1,base+3.9)]
+                           + [(face+1.8,y,z) for y in (base+3.9,base+3.1)],
+                           (0,0,side),'inn_board',uvs=[(.01,.99),(.01,.01),(.99,.01),(.99,.99)])
         span,high=(9,1.15) if kind=='rong' else (1.55,5.8)
         offset=south+length*.36 if kind=='inn' else south
         level=base+3.2
@@ -154,7 +193,7 @@ def approach(builder):
         base = ground(east+5,south)+.12
         start=len(mesh.pos)
         box(mesh,(east+5,base,south),(2.3,.24,2.3),'granite')
-        banyan(mesh,(east+5,base+.12,south),9+index%3,4.9,77+index,builder.detail)
+        banyan(mesh,(east+5,base+.12,south),9+index%3,4.9,77+index,builder.detail,lobed=False)
         for i in range(start,len(mesh.pos)):
             px,py,pz=mesh.pos[i]
             outside=max(abs(px-east-5),abs(pz-south))>1.15

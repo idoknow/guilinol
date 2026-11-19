@@ -16,6 +16,7 @@ Colors: roof #393943, column #9a3832, library wall #adaaa6, column #a7a4a1.
 import math
 import random
 import sys
+from rong_paving import slab_texture
 from rong_bridges import nine_bends, ancient_bridge
 from rong_surface import ground, water, bank_top, bank_strip, shoreline_z, island_top
 from rong_street import scooter
@@ -109,9 +110,10 @@ def island(b):
         for south in (138.6,153.1):
             box(wall,(east,.38,south),(2.02,.32,3.5),'foliage',None)
             oval(wall,(east,.65,south),(.97,.48,.85),'foliage',7)
-    torus(wall,(123,2.5,136),1.94,.35,.39,'white')
+    # IMG_1324 sees this pierced limestone at the island landing, north of the wall.
+    torus(wall,(116,1.93,126),1.43,.39,.48,'limestone', .14, stretch=1.14)
     for offset in (-.7,0,.7):
-        torus(wall,(123+offset,2.5,136),.72,.12,.15,'white')
+        oval(wall,(116+offset,.5,126),(.85,.45,.6),'limestone',8)
     arch_wall(wall,(130,.24,132),4.2,3.2,.48,2.2,2.75,'garden_brick',tile=None)
     for east in (125.8,134.2):
         box(wall,(east,.82,132),(4.2,1.16,.48),'garden_brick',None)
@@ -263,7 +265,13 @@ def library(b):
         box(wall,(x+direction*9,y+.75,z+5.4),(5.2,.32,1.9),'foliage')
         for plant in range(9 if b.detail else 4):
             oval(wall,(x+direction*9+2*math.cos(plant*2.4),y+1,z+5.4+.55*math.sin(plant*2.4)),(.4,.25,.37),'foliage',6)
-    solid_tree(wall,(x-14,grade(x-14,z+9),z+9),16,12.6,54,b.detail,grade=grade)
+    solid_tree(wall,(x-21,grade(x-21,z+5),z+5),12.8,8.6,54,b.detail,lobed=False,grade=grade)
+    for index in range(12):
+        east = x - 30 + index * 1.65
+        box(wall, (east,grade(east,z+6)+.19,z+6), (1.68,.42,2.4), 'granite')
+        oval(wall, (east,grade(east,z+6)+.55,z+6), (1.02,.6,.95), 'foliage', 8)
+    for east in (x-25,x-23,x-21):
+        oval(wall,(east,grade(east,z+7.2)+.52,z+7.2),(1.12,.84,.75),'limestone',7)
     box(wall,(x+17,y+1.1,z+9),(8.4,2.2,.45),'white')
     for index in range(7):
         east=x+14+index*.95
@@ -452,23 +460,19 @@ def shore(b):
             wall.face(arc(face,2.48)+arc(face,4.32)[::-1],(face+116,0,0),'white')
         for radius,side in ((2.48,-1),(4.32,1)):
             wall.face(arc(-117.15,radius)+arc(-114.85,radius)[::-1],(0,side*math.sin(angles[0]),side*math.cos(angles[0])),'white')
-    for index in range(10):
-        east=-82+index*5
-        south=min(-16,shoreline_z(east)-3.5)
-        start=len(wall.pos)
-        level=ground(east,south)+.20
-        for side in (-1,1):
-            box(wall,(east,level,south+side*1.79),(5,.4,2.18),'granite')
-            box(wall,(east,level+.16,south+side*.75),(5,.22,.15),'white')
-        box(wall,(east,level-.08,south),(5,.18,1.55),'granite')
-        box(wall,(east,level+.03,south),(5,.08,1.4),'rill_water')
-        for offset in (-1.3,1.3):
-            box(wall,(east+offset,level+.07,south),(.63,.52,.6),'ashlar')
-        for i in range(start,len(wall.pos)):
-            px,py,pz = wall.pos[i]
-            wall.pos[i] = (px,py+ground(px,pz)-level+.20,pz)
-        if index in (0,3):
-            solid_tree(wall,(east,ground(east,south-5),south-5),9,5,90+index,b.detail,lobed=False,grade=ground)
+    # IMG_1334–36 look along the strip between ways 684511179 and 686230933.
+    rill_start=len(wall.pos)
+    with align_front(b, (0, -17.5), -21):
+        for index in range(10):
+            level=.18
+            east = -16 + index * 4
+            for side in (-1, 1):
+                box(wall, (east, level, -17.5+side*1.24), (4.02,.48,.36), 'granite')
+            box(wall, (east,level+.08,-17.5), (4,.1,2.2), 'rill_water')
+            box(wall, (east-1.8,level+.17,-17.5), (.36,.3,2.25), 'ashlar')
+    for i in range(rill_start,len(wall.pos)):
+        px,py,pz=wall.pos[i]
+        wall.pos[i]=(px,py+ground(px,pz),pz)
     px, pz = -46, shoreline_z(-46)-2
     outline = [(px+3*math.cos(i*math.tau/6), pz+3*math.sin(i*math.tau/6)) for i in range(6)]
     level = max(bank_top(x,z) for x,z in outline)
@@ -514,11 +518,33 @@ def build(b: Builder):
     hotel(b)
     steel_bridge(b)
     shore(b)
+    # IMG_1343 shows a two-storey pale frontage across Yiwu Road. The east
+    # face follows the west sidewalk of way/221349755 at the park junction.
+    with align_front(b, (-84,-86), 69):
+        mesh = b.parts['atlas']
+        box(mesh,(-84,5.1,-87.5),(13.8,8.2,3),'cream')
+        box(mesh,(-84,1.8,-85.95),(14,1.6,.25),'ashlar')
+        for east in (-89.4,-86.7,-84,-81.3,-78.6):
+            for level in (3.8,7.2):
+                box(b.parts['lit'],(east,level,-85.93),(1.35,1.92,.18),'glass')
+        box(mesh,(-84,9.25,-87.4),(14.3,.34,3.4),'graytile')
+        if b.collide:
+            solid(b.hit,(-84,5.1,-87.5),(13.8,8.2,3),'ashlar')
+    # Approach to Yingbin Bridge (way/221349753), descending west from Yiwu Road.
+    points = [(-83.3,-53.2,-.72),(-95.8,-57.9,-1.55),(-108.1,-62.4,-2.88)]
+    for start, end in zip(points,points[1:]):
+        a = (start[0],ground(start[0],start[1])+.09,start[1])
+        c = (end[0],ground(end[0],end[1])+.09,end[1])
+        ramp(b.parts['atlas'],a,c,3.8)
+        if b.collide:
+            ramp(b.hit,a,c,3.8)
+
 
 
 def main():
     folder = Path(sys.argv[1])
     image = ensure_textures(folder)
+    slab_texture(image,512,768)
     draw=ImageDraw.Draw(image)
     for index,(name,base) in enumerate([('limestone',(187,190,183)),('garden_brick',(130,133,132)),('paver',(155,158,154)),('bank_blue',(45,133,187)),('star_red',(211,34,36))]):
         left,top=768+48*index,696
