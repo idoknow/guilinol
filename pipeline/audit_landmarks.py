@@ -307,6 +307,11 @@ def main():
     text=json.dumps(report,indent=2,ensure_ascii=False)
     if args.out:args.out.write_text(text+'\n')
     print(text)
+    if args.strict:
+        from audit_grounding import run
+        grounding = run(ROOT/"captures/grounding")
+        if grounding["failures"]:
+            raise SystemExit(f"{grounding['failures']} grounding failures (captures/grounding/grounding.json)")
     if args.strict and any(row['status'] not in ('pass','deferred') for row in report):raise SystemExit(1)
 
 
