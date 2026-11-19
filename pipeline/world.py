@@ -137,7 +137,7 @@ def build(bbox, output, palette):
         return {'file':name,'bytes':(output/name).stat().st_size}
     np.where(wet,surface,terrain)[::8,::8].astype('<i2').tofile(output/'overview.i16')
     np.where(wet,surface,original)[::8,::8].astype('<i2').tofile(output/'underlay.i16')
-    texture.resize((width//4,depth//4), Image.Resampling.BOX).quantize(32).save(output/'overview.png')
+    texture.resize((width//4,depth//4), Image.Resampling.BOX).quantize(32).save(output/'overview.png', optimize=True)
     chunks = []
     for south in range(0,depth,CHUNK):
         for east in range(0,width,CHUNK):
