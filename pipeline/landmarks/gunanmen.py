@@ -21,7 +21,7 @@ from pathlib import Path
 
 from c_kit import (
     Builder, arch_wall, banyan, box, cylinder, ensure_textures, export_landmark, solid,
-    extrude, grille, hip_roof, railing, ramp, stairs, tri_count, yaw_box, segment_wall,
+    extrude, grille, hip_roof, railing, ramp, stairs, tri_count, yaw_box, segment_wall, tube, _canopy,
 )
 
 
@@ -39,6 +39,30 @@ def _battered(mesh, p0, p1, q1, q0, y0, y1, region='ashlar'):
         [(p0[0], y0, p0[1]), (p1[0], y0, p1[1]), (q1[0], y1, q1[1]), (q0[0], y1, q0[1])],
         ((p0[0] + p1[0]) * 0.5, (y0 + y1) * 0.5, (p0[1] + p1[1]) * 0.5), region, 2.6,
     )
+
+
+def ancient_banyan(builder, east, south):
+    wood = builder.parts['atlas']
+    iron = builder.parts['steel']
+    count = 9 if builder.detail else 5
+    for index in range(count):
+        angle = math.tau * index/count
+        dx, dz = math.cos(angle), math.sin(angle)
+        elbow = (east+4*dx-dz,6.8,south+4*dz+dx)
+        tip = (east+10*dx,8.7,south+9*dz)
+        tube(wood,(east+1.35*dx,0,south+1.35*dz),elbow,.83,'bark',7)
+        tube(wood,elbow,tip,.55,'bark',6)
+        tube(wood,tip,(tip[0]+.45,0,tip[2]-.28),.23,'bark',5)
+        _canopy(wood,tip,10.5,4.4,9.6,'foliage',4 if builder.detail else 2,10 if builder.detail else 6)
+    _canopy(wood,(east,11,south),12,5,11,'foliage',4,10)
+    count = 32 if builder.detail else 16
+    for index in range(count):
+        ends = [(east+11.6*math.cos(math.tau*t/count),south+10.6*math.sin(math.tau*t/count)) for t in (index,index+1)]
+        segment_wall(wood,*ends,0,.4,.8,'rubble')
+        segment_wall(wood,*ends,.4,.72,.64,'foliage')
+        railing(iron,*ends,.42,.74,'steel',1.25)
+        if builder.collide:
+            segment_wall(builder.hit,*ends,0,1.1,.62,'granite')
 
 
 def courtyard(builder, deck):
@@ -128,7 +152,7 @@ def build(b: Builder):
     # Plaza paving sits a few centimetres above the flattened ground.
     extrude(wall, [(-20, 11), (18, 11), (18, 28), (-20, 28)], 0.02, 0.1, 'granite', 1.6)
     # Banyans stand off the south axis so a front camera is not inside the crown.
-    banyan(wall, (-22, 0, 20), 14, 10, 4, detail)
+    ancient_banyan(b, -22, 20)
     banyan(wall, (20, 0, 22), 12, 8.5, 8, detail)
     if not b.collide:
         return
