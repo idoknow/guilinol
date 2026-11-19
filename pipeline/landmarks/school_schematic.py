@@ -88,7 +88,18 @@ def generate(identifier, catalog=CATALOG):
                 block((10,.17,2),(13,.02,.1),'white')
             for side in (-1,1):
                 block((side*5,2.35,17),(1,4.7,1),'granite',True)
-                block((side*10,.7,17),(9,1.4,.45),'white',True)
+                if school.get('notice_wall'):
+                    block((side*12,1,17),(13,2,.48),'cream',True)
+                    for pier in (6,10,14,18):
+                        block((side*pier,1.25,17),(.72,2.5,.78),'brick')
+                        block((side*pier,2.54,17),(.85,.12,.87),'granite')
+                    for panel in (8,12,16):
+                        block((side*panel,1.15,17.27),(2.9,1.4,.12),'steel')
+                        block((side*panel,1.15,17.36),(2.65,1.16,.08),'glass')
+                        for sheet in (-.7,0,.7):
+                            block((side*panel+sheet,1.15,17.42),(.5,.76,.04),'white')
+                else:
+                    block((side*10,.7,17),(9,1.4,.45),'white',True)
             block((0,1.0,17),(9.1,1.9,.24),'steel',True)
             if builder.detail:
                 for column in range(-4,4):

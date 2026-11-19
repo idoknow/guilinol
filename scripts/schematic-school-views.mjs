@@ -34,7 +34,7 @@ try {
         label('游戏布局，非实地导览',50,93)
         school.blocks.forEach(([x,z,,floors],index)=>{
           const point=camera.position.clone().set(...world([x*scale,floors*3.2,z*scale])).project(camera)
-          label((heritage?['三教楼','四教楼','五教楼']:['教学楼甲','教学楼乙'])[index],(1+point.x)*50,(1-point.y)*50)
+          label(heritage?['三教楼','四教楼','五教楼'][index]:`教学楼${'甲乙丙丁戊'[index]}`, (1+point.x)*50,(1-point.y)*50)
         })
       }
     },{school,view})

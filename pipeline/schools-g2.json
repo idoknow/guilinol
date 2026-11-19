@@ -1,5 +1,5 @@
 [
   {"id":"libin_middle","name":"桂林市中山中学漓滨校区","osm":"way/675588260","scale":1.8,"band":"#a26652","arcade":true,"sports":"athletics","paved":true,"blocks":[[-11,-10,12,4],[3,-11,13,5],[14,-13,7,4],[-9,-18,14,5],[8,-19,12,4]],"facade":"photo-informed"},
   {"id":"ronghu_primary","name":"榕湖小学","osm":"way/686230935","scale":1.38,"paved":true,"band":"#a9826d","blocks":[[1,-12,33,3],[-12,0,12,2]],"facade":"schematic"},
-  {"id":"minzhu_primary","name":"民主小学","osm":"way/970311799","scale":1.05,"band":"#6f8993","blocks":[[2,-11,28,4],[-11,1,12,2]],"facade":"schematic"}
+  {"id":"minzhu_primary","name":"民主小学","osm":"way/970311799","scale":1.05,"paved":true,"notice_wall":true,"band":"#6f8993","blocks":[[2,-11,28,4],[-11,1,12,2]],"facade":"photo-informed frontage"}
 ]
