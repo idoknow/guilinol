@@ -2,8 +2,10 @@ import math
 
 import numpy as np
 
-from c_kit import box, cylinder, tube, yaw_box, ramp
-from rong_solids import oval, banyan
+from c_kit import box, cylinder, tube, yaw_box, ramp, segment_wall
+from rong_paving import pave
+from rong_ground import BANK, BANK_EDGE, BANK_Y, FORECOURT, FORECOURT_Y, BRIDGE_AXIS, BRIDGE_SIDE, bridge_xz
+from rong_solids import oval, loft
 
 
 NINE_BENDS = [(75.2,38.2),(76.9,45.3),(88.7,53.5),(103.1,49.9),(109.4,63.1),
@@ -53,10 +55,9 @@ def crossing(builder,path,widths,heights,arch_segment=None):
             for start,end,side in ((near_left,far_left,-1),(near_right,far_right,1)):
                 normal = (near_right-near_left)*side
                 stone.face([start-[0,.55,0],end-[0,.55,0],end,start],normal,'ashlar',1.2)
-                panel_face = [start+[0,.12,0],end+[0,.12,0],end+[0,.81,0],start+[0,.81,0]]
-                stone.face(panel_face,normal,'white',1.2)
-                stone.face(panel_face,-normal,'white',1.2)
-                tube(stone,start+[0,.89,0],end+[0,.89,0],.095,'white',4)
+                # Rock's bridge views show the water through two stone rails.
+                for level in (.36,.89):
+                    tube(stone,start+[0,level,0],end+[0,level,0],.095,'white',4)
                 if builder.collide:
                     builder.hit.face([start,end,end+[0,.98,0],start+[0,.98,0]],-normal,'ashlar',None)
                 high = 1.17 if panel==0 else .99
@@ -68,17 +69,31 @@ def crossing(builder,path,widths,heights,arch_segment=None):
 
 
 def nine_bends(builder):
+    # Landward end of way/684946201, meeting the first deck of way/221475379.
+    stone = builder.parts['atlas']
+    pave(builder,BANK,BANK_Y)
+    for start,end in zip(BANK_EDGE,BANK_EDGE[1:]):
+        segment_wall(stone,start,end,BANK_Y-1.15,BANK_Y,.3,'ashlar')
+    for i,(x,z) in enumerate(((79,39.6),(82,38.6),(85,37.8),(90,33.3),(94,30))):
+        # Layered, low limestone outcrops straddle the mapped waterline.
+        reach = 1.65+i%2*.35
+        loft(stone,[(x,BANK_Y-1.1,z+1.3,reach,1.1),
+                    (x-.15,BANK_Y-.3,z+.9,reach+.4,1.35),
+                    (x+.18,BANK_Y+.12,z+.7,reach,.95),
+                    (x+.38,BANK_Y+.3+i%3*.16,z+.5,reach*.52,.55)],'rubble',9)
+    ramp(stone,(75.1,BANK_Y,34.4),(75.2,-3.9,38.2),2.8)
+    if builder.collide:
+        ramp(builder.hit,(75.1,BANK_Y,34.4),(75.2,-3.9,38.2),2.8)
     crossing(builder,NINE_BENDS,[2.8,2.8,2.8,2.8,4.2,4.2,2.8,2.8,2.8,2.8],
              [-3.9,-2.75,-2.55,-2.4,-1.9,-1.9,-1.65,-1.1,-.65,.25],5)
 
 
 def ancient_bridge(builder):
     stone = builder.parts['atlas']
-    axis = np.array([-.51,.86]); axis /= np.linalg.norm(axis)
-    side = np.array([axis[1],-axis[0]])
+    axis, side = BRIDGE_AXIS, BRIDGE_SIDE
     yaw = math.atan2(*axis)
     def point(distance,level,offset=0):
-        east,south = [31.4,82.1]+axis*distance+side*offset
+        east,south = bridge_xz(distance,offset)
         return np.array([east,level,south])
     def height(distance):
         return -3.05+6.6*max(0,1-(abs(distance)/17)**1.55)
@@ -89,24 +104,41 @@ def ancient_bridge(builder):
         start,end = -17+34*index/count,-17+34*(index+1)/count
         middle = (start+end)/2
         top = height(middle)
-        yaw_box(stone,point(middle,top-.10),(6.8,.2,end-start+.015),yaw,'granite')
+        for offset in (-2.65,2.65):
+            yaw_box(stone,point(middle,top-.14,offset),(4.0,.28,end-start+.02),yaw,'granite')
+            edge_station = start if middle < 0 else end
+            yaw_box(stone,point(edge_station,top-.015,offset),(4.04,.055,.075),yaw,'limestone')
+        yaw_box(stone,point(middle,top+.10),(1.4,.46,end-start+.025),yaw,'ashlar')
+        yaw_box(stone,point(middle,top+.43),(1.26,.36,end-start+.03),yaw,'foliage')
+        if index % (3 if builder.detail else 2) == 0:
+            oval(stone,point(middle,top+.62),(.66,.26,.78),'foliage',7)
         if builder.collide:
-            ramp(builder.hit,point(start,height(start)),point(end,height(end)),6.8)
+            for offset in (-2.65,2.65):
+                ramp(builder.hit,point(start,height(start),offset),point(end,height(end),offset),4.0)
+            yaw_box(builder.hit,point(middle,top+.21),(1.4,.68,end-start+.03),yaw,'ashlar')
         inside_start,inside_end = soffit(start),soffit(end)
-        stone.face([point(start,inside_start,-3.4),point(end,inside_end,-3.4),point(end,inside_end,3.4),point(start,inside_start,3.4)],(0,-1,0),'ashlar')
+        stone.face([point(start,inside_start,-4.65),point(end,inside_end,-4.65),point(end,inside_end,4.65),point(start,inside_start,4.65)],(0,-1,0),'ashlar')
         for sign in (-1,1):
-            edge=sign*3.4
+            tube(stone,point(start,height(start)+.48,sign*.78),
+                 point(end,height(end)+.48,sign*.78),.11,'white',5)
+            edge=sign*4.65
             stone.face([point(start,inside_start,edge),point(end,inside_end,edge),point(end,top,edge),point(start,top,edge)],(sign*side[0],0,sign*side[1]),'white')
             tube(stone,point(start,height(start)+.92,edge),point(end,height(end)+.92,edge),.12,'white',5)
             if index%2==0:
                 box(stone,point(start,height(start)+.48,edge),(.27,.96,.27),'white')
-        if abs(middle)>9:
-            yaw_box(stone,point(middle,top+.19),(.85,.38,end-start+.02),yaw,'rubble')
-            yaw_box(stone,point(middle,top+.45),(.76,.16,end-start+.02),yaw,'foliage')
-    for sign in (-1,1):
-        yaw_box(stone,point(sign*19,-3.22),(9,.45,4.4),yaw,'granite')
-    for offset in (-7,7):
-        banyan(stone,point(-20,-3.2,offset),9,5,32+offset,builder.detail)
+    pave(builder,FORECOURT,FORECOURT_Y)
+    for step in range(3):
+        start = -23+step*2
+        level = FORECOURT_Y + (height(-17)-FORECOURT_Y)*(step+1)/3
+        yaw_box(stone,point(start+1,(level+FORECOURT_Y)/2),
+                (13.0-step,level-FORECOURT_Y,2.03),yaw,'granite')
+    yaw_box(stone,point(-18.2,height(-17)+.23),(2.1,.52,2.6),yaw,'ashlar')
+    for offset in (-.55,0,.55):
+        oval(stone,point(-18.2,height(-17)+.77,offset),(.52,.55,1.22),'foliage',9)
+    if builder.collide:
+        yaw_box(builder.hit,point(-18.2,height(-17)+.39),(2.1,.8,2.6),yaw,'ashlar')
+        ramp(builder.hit,point(-23,FORECOURT_Y),point(-17,height(-17)),11)
+    yaw_box(stone,point(19,-3.22),(9,.45,4.4),yaw,'granite')
     colors=('lantern_red','lantern_gold','lantern_cyan','lantern_pink','lantern_orange')
     for strand in range(4):
         previous=None
