@@ -183,7 +183,6 @@ def build(bbox, output, palette):
     footprints, heights = buildings(bounds, ground_mesh_at, peak_tree, layout, carriageway_mask, sidewalk_mask)
     index = STRtree(footprints)
     shop_rows = shopfronts(footprints, heights, roads)
-<<<<<<< HEAD
     for campus in layout.allow_unmapped_court:
         if not bounds.covers(campus) or any(campus.covers(field.representative_point())
                 for layer in ('schoolTrack','schoolCourt') for field in layers[layer]):
@@ -192,12 +191,9 @@ def build(bbox, output, palette):
         if court is not None:
             mask,corner = stencil(court,left,top,1)
             texture.paste(palette['schoolCourt'],corner,mask)
-    trees, roads, banks, tree_stats, beds = scatter(bounds, footprints, layers['water'], peak_shapes, tree_support_at, mountain_trees, unary_union([layout.tree_exclude, bank_pavement.buffer(2)]) if bank_pavement is not None else layout.tree_exclude, precomputed=road_net, extra_blocked=[*(court.buffer(1.5) for court in layers["schoolTrack"] + layers["schoolCourt"]), *bridge_polys, *road_surfs])
-=======
     bands = section_layers(roads)
     cycle_clearance = [band.buffer(.08) for band in bands[2].geometries]
-    trees, roads, banks, tree_stats, beds = scatter(bounds, footprints, layers['water'], peak_shapes, tree_support_at, mountain_trees, layout.tree_exclude, precomputed=road_net, extra_blocked=[*bridge_polys, *road_surfs, *cycle_clearance])
->>>>>>> b8d7f43 (Check actual raised planting and paving support and keep cycle lanes clear)
+    trees, roads, banks, tree_stats, beds = scatter(bounds, footprints, layers['water'], peak_shapes, tree_support_at, mountain_trees, unary_union([layout.tree_exclude, bank_pavement.buffer(2)]) if bank_pavement is not None else layout.tree_exclude, precomputed=road_net, extra_blocked=[*(court.buffer(1.5) for court in layers["schoolTrack"] + layers["schoolCourt"]), *bridge_polys, *road_surfs, *cycle_clearance])
     for road in roads:
         for part in polygons(road.line.buffer(road.width/2,quad_segs=2).intersection(bounds)):
             mask,corner = stencil(part,left,top,1)
@@ -239,16 +235,12 @@ def build(bbox, output, palette):
             return round(max(gm_y, float(fl['elevation'])), 2)
         return round(gm_y, 2)
     landmarks = [dict(position=[x, lm_elevation(x, z, entry), z], **entry) for x, z, entry in layout.entries]
-<<<<<<< HEAD
     landmark_faces = list(landmark_triangles(landmarks))
     vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange)
     decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal)
     modeled_paving = unary_union([*rong_pavement, modeled_paving if modeled_paving is not None else ShapelyPolygon()])
-    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,modeled_paving=modeled_paving)
+    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving)
     (output/'marking-audit.json').write_text(json.dumps(lengths.pop('markingOverlap')))
-=======
-    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands)
->>>>>>> b8d7f43 (Check actual raised planting and paving support and keep cycle lanes clear)
     print('Lengths (m):',lengths)
     def asset(name):
         return {'file':name,'bytes':(output/name).stat().st_size}

@@ -13,13 +13,9 @@ from scatter import CONFIG, walk_line
 from sections import section_layers, clipped, speed_paint, RULES
 
 
-<<<<<<< HEAD
-def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),modeled_paving=None):
-=======
-def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None):
+def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None):
     if bands is None:
         bands = section_layers(roads)
->>>>>>> b8d7f43 (Check actual raised planting and paving support and keep cycle lanes clear)
     surfaces, sidewalks, stripes, medians, gaps = [],[],[],[],[]
     sidewalks.append(rongyin_sidewalk())
     rep_excl = replace_exclude if replace_exclude is not None else Polygon()
