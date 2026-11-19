@@ -5,6 +5,7 @@ are estimates from bank views, not engineering sections.
 """
 import math
 import numpy as np
+import trimesh
 from xiaoyao_tower import generate
 
 
@@ -23,6 +24,23 @@ def arch(model, center, radius, width, spring, rise, top, blocks=False):
                 model.mesh(face,[[0,1,2],[0,2,3]],'white' if idx%4==0 else 'granite')
 
 
+def river_ribs(model, start, end, width):
+    # Paired ribs branch out above each springing in the river views (41/49).
+    count = 28 if model.detail else 10
+    for side in (-1,1):
+        z=side*(width/2-.35)
+        for idx in range(count):
+            span=np.array([idx,idx+1])/count
+            x=start+(end-start)*span
+            low=-5.55+4.15*(1-(2*span-1)**2)
+            section=[(px,py+dy,z+dz) for dz in (-.38,.38)
+                     for px,py,dy in ((x[0],low[0],0),(x[1],low[1],0),
+                                      (x[1],low[1],.55),(x[0],low[0],.55))]
+            model.mesh(section,[[0,1,2],[0,2,3],[4,6,5],[4,7,6],[0,4,5],[0,5,1],[2,6,7],[2,7,3]],'white')
+        for x,direction in ((start,1),(end,-1)):
+            model.beam([x,-5.35,z],[x+direction*(end-start)*.17,-1.17,z],.28,'granite',6)
+
+
 def rail(model, length, offset, height, step, stone=False):
     for side in (-1,1):
         south=side*offset
@@ -37,14 +55,18 @@ def rail(model, length, offset, height, step, stone=False):
 
 def pillar(model, x, z, tone):
     # Open rectangular lantern tower, with nested peaked outlines in 37/42/45.
-    model.box(x,0,z,3.4,.44,2.4,'granite',True)
+    model.box(x,-.45,z,3.4,.89,2.4,'granite',True)
+    model.box(x,.44,z,3.05,.22,2.08,'stone')
+    model.box(x,6.03,z,2.6,1.17,1.6,'glass')
     for depth in (-.72,.72):
         for offset in (-1.2,1.2):
-            model.box(x+offset,.44,z+depth,.22,6.8,.21,tone,True)
+            model.box(x+offset,.44,z+depth,.33,6.8,.31,tone,True)
             model.beam([x+offset,7.24,z+depth],[x,8.48,z+depth],.15,tone)
         model.box(x,6.3,z+depth,2.45,.2,.18,'granite')
     for y in np.arange(1.45,6,.8):
-        model.box(x,y,z,.55,.5,.35,'lamp')
+        for col in (-.66,0,.66):
+            if y>2.2+abs(col)*2:
+                model.box(x+col,y,z,.36,.43,.32,'lamp')
 
 
 def pendant(model, x, y, z):
@@ -58,15 +80,21 @@ def pendant(model, x, y, z):
 def west_bank(model):
     # Both paths leave the deck tangentially, descend around the planted
     # islands, and meet the straight lower promenade at x=-116.
-    for side, tone in ((-1,'jade'),(1,'violet')):
-        for x in (-139,-126):
-            pillar(model,x,side*19,tone)
+    for side, tone in ((-1,'violet'),(1,'jade')):
+        for x in (-113,-128):
+            model.pose=(x,-3.48,side*35,0)
+            pillar(model,0,0,tone)
+        model.pose=(0,0,0,0)
+        # Sampled deck heights above the bridge datum, including the crest of
+        # each island. The low end runs under the paved landing.
+        grade=[6.45,7.45,8.25,8.5,8.65,8.65,8.6,8.5,8.45,8.05,7.65,5.8,2.16]
+        stations=np.linspace(0,1,len(grade))
         points=[]
         for angle in np.linspace(0,math.pi*1.5,37 if model.detail else 17):
             t=angle/(math.pi*1.5)
             x=-140-24*math.sin(angle)
             z=side*(41-24*math.cos(angle))
-            y=.18+2*math.sin(math.pi*t)-4.1*t
+            y=np.interp(t,stations,grade)-(5.62-x*1.3/281)
             points.append((x,y,z))
         for index,(a,b) in enumerate(zip(points,points[1:])):
             def edge(point, at, sign):
@@ -74,17 +102,25 @@ def west_bank(model):
                 return [point[0]-sign*2.5*math.sin(angle),point[1],point[2]-sign*side*2.5*math.cos(angle)]
             left,right=edge(a,index,-1),edge(a,index,1)
             far_left,far_right=edge(b,index+1,-1),edge(b,index+1,1)
-            model.mesh([left,right,far_right,far_left],[[0,1,2],[0,2,3],[2,1,0],[3,2,0]],'pave',True)
+            faces=[[0,1,2],[0,2,3]] if side>0 else [[2,1,0],[3,2,0]]
+            model.mesh([left,right,far_right,far_left],faces,'pave',True)
+            for near,far in ((left,far_left),(right,far_right)):
+                skirting=[near,far,np.subtract(far,[0,1.4,0]),np.subtract(near,[0,1.4,0])]
+                model.mesh(skirting,[[0,1,2],[0,2,3]],'stone')
             model.beam(np.add(right,[0,.93,0]),np.add(far_right,[0,.93,0]),.09,'granite',6,True)
             model.beam(right,np.add(right,[0,1,0]),.075,'granite')
             if model.detail and index in (6,17,29):
                 pendant(model,*left)
-        model.box(-151,1.3,side*42,9,.65,13,'leaf')
+        for idx in range(11):
+            axis=math.pi*(.12+idx*.075)
+            center=np.array([-141-16*math.sin(axis),1.45,side*(41-16*math.cos(axis))])
+            shrub=trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
+            model.mesh(shrub.vertices*[1.8,.75,1.65]+center,shrub.faces,'leaf' if idx%3 else 'green')
         model.beam([-143,.2,side*12],[-143,5.2,side*12],.14,'granite')
         model.box(-143,4.3,side*12,.48,1.23,.4,'sign')
         model.box(-143.26,5.12,side*12,.08,.25,.25,'red')
-    model.box(-116,-4.25,0,5,.33,82,'pave',True)
-    model.box(-113.6,-3.92,0,.25,.38,82,'granite',True)
+    model.box(-116,-4.25,0,5,.64,82,'pave',True)
+    model.box(-113.6,-3.61,0,.25,.52,82,'granite',True)
     model.box(-113.6,-3.05,0,.12,.12,82,'granite',True)
     for z in range(-40,41,4):
         model.box(-113.6,-3.54,z,.16,.6,.16,'granite')
@@ -98,12 +134,18 @@ def bridge(model):
     model.box(0,-.03,0,length,.08,23,'tile')
     for side in (-1,1):
         model.box(0,0,side*16.5,length,.18,9.8,'pave',True)
+        model.box(0,.055,side*.18,length,.015,.13,'yellow')
+        model.box(0,.18,side*16,length,.025,.54,'yellow')
         if model.detail:
+            for offset in (-.17,0,.17):
+                model.box(0,.205,side*16+offset,length,.013,.044,'granite')
             for lane in (3.7,7.4):
                 for east in np.arange(-135,138,9):model.box(east,.055,side*lane,3,.02,.13,'white')
         for east in np.arange(-126,127,21 if model.detail else 42):
             model.beam([east,.18,side*18],[east,6.2,side*18],.14,'wood',8 if model.detail else 4)
             model.beam([east,6,side*18],[east,6.65,side*16.4],.09,'granite')
+            if model.detail:
+                model.box(east,3.2,side*18,.08,1.8,.49,'red')
             model.box(east,6.55,side*16.4,.35,.17,.9,'lamp')
     for pier in (-92,0,92):
         model.box(pier,-8,0,4.4,6.85,width-2,'stone')
@@ -114,9 +156,11 @@ def bridge(model):
         for east in np.linspace(-136,136,35 if model.detail else 13):
             model.box(east,1.26,side*21.1,.55,.24,.39,'lamp')
     for start,end in ((-92,0),(0,92),(92,140.5)):
-        arch(model,(start+end)/2,(end-start)/2,width-2,-5.5,4.1,-1.2)
+        river_ribs(model,start,end,width)
     rail(model,length,21.1,.18,2.1)
     west_bank(model)
 
 
-if __name__=='__main__':generate('jiefang_bridge',bridge,lift=lambda east:5.62-east*1.3/281)
+if __name__=='__main__':
+    generate('jiefang_bridge',bridge,lift=lambda east:5.62-east*1.3/281,
+             colors={'tile':'#393e45','pave':'#c4bbae','wood':'#78818a','granite':'#a9a5a0'},smooth=('tile','wood'))
