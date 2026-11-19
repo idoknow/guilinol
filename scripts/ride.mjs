@@ -88,18 +88,18 @@ try{
       assert(mobileRideCheck.dist>.8&&mobileRideCheck.spd>2&&mobileRideCheck.dh>.08,`mobile stick drive failed: ${JSON.stringify(mobileRideCheck)}`)
       await fixture(bike[0],bike[2]);await interact('骑行')
     }
-    async function steer(target,wall=false){return page.evaluate(({target,wall})=>{
+    async function steer(target,wall=false,arrive=3){return page.evaluate(({target,wall,arrive})=>{
       const walker=window.viewer.walk,keys=new Set(),start=walker.position.clone()
       function press(code,on){if(keys.has(code)===on)return;window.dispatchEvent(new KeyboardEvent(on?'keydown':'keyup',{code}));if(on)keys.add(code);else keys.delete(code)}
       for(let frame=0;frame<1200;frame++){
         const pos=walker.position,dx=target[0]-pos.x,dz=target[1]-pos.z,angle=Math.atan2(-dx,-dz)-walker.heading,error=Math.atan2(Math.sin(angle),Math.cos(angle))
-        if(!wall&&Math.hypot(dx,dz)<3)break
+        if(!wall&&Math.hypot(dx,dz)<arrive)break
         press('KeyA',error>.05);press('KeyD',error<-.05);press('KeyW',Math.abs(error)<.65);walker.tick(1/60)
         if(walker.probe().inHouse||walker.speed>25/3.6+.001)throw Error('unsafe ride')
       }
       for(const key of [...keys])press(key,false)
       const end=walker.position.clone();return {distance:end.distanceTo(start),targetDistance:Math.hypot(end.x-target[0],end.z-target[1]),end:end.toArray(),obstacle:walker.obstacle,speed:walker.speed}
-    },{target,wall})}
+    },{target,wall,arrive})}
     const ride=await rideToCrossroads(page,atlas);console.log('ride',ride);assert(ride.main>=500&&ride.crossed&&ride.targetDistance<=10)
     await shot(mobile?'bike-mobile':'bike-desktop');if(!mobile)console.log('median frame ms',{foot,bike:await timings()})
     if(!mobile){
@@ -140,14 +140,49 @@ try{
     await interact('下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
     if(!mobile){
       await fixture(189.1,-42);await interact('骑行');const escape=await steer([189.1,-52]);console.log('off-pavement escape',escape);assert(escape.distance>4.5&&escape.speed>2&&!escape.obstacle,`off-pavement bike stuck: ${JSON.stringify(escape)}`)
+      const roamOut=await steer([176,-34]);console.log('off-pavement >6.5m turn',roamOut);assert(roamOut.distance>10&&roamOut.speed>2&&roamOut.speed<=4.35&&!roamOut.obstacle,`off-pavement >6.5m locked: ${JSON.stringify(roamOut)}`)
+      await interact('下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
+      await fixture(-778.5,402.1);await interact('骑行');const diag=await steer([-764,398]);console.log('diagonal road edge',diag);assert(diag.distance>10&&diag.speed>2.5&&!diag.obstacle,`diagonal road edge stuck: ${JSON.stringify(diag)}`)
       await interact('下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
       await fixture(-31,510.3);await interact('骑行');const wall=await steer([-42,510.5],true);console.log('wall',wall);assert(wall.obstacle==='building'&&wall.speed===0&&wall.distance<8)
       await page.evaluate(()=>{const w=window.viewer.walk;w.face(w.heading-.4,.22)})
       await shot('bike-ride-action')
+      const wallReverse=await page.evaluate(()=>{
+        const w=window.viewer.walk,start=w.position.clone()
+        window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyS'}))
+        for(let i=0;i<60;i++)w.tick(1/60)
+        const speed=w.speed,moved=w.position.distanceTo(start),inHouse=w.probe().inHouse
+        window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyS'}))
+        return {speed,moved,inHouse}
+      })
+      console.log('wall reverse escape',wallReverse);assert(wallReverse.speed<-.5&&wallReverse.moved>.5&&!wallReverse.inHouse,`wall reverse stuck: ${JSON.stringify(wallReverse)}`)
       const bikePos=await page.evaluate(()=>window.viewer.walk.position.toArray())
       await interact('下车')
-      const dismount=await page.evaluate(bp=>{const p=window.viewer.walk.probe();return {dist:Math.hypot(p.x-bp[0],p.z-bp[2]),inHouse:p.inHouse}},bikePos)
-      console.log('wall dismount',dismount);assert(dismount.dist<=2.5&&!dismount.inHouse,`dismount teleport/house: ${JSON.stringify(dismount)}`)
+      const dismount=await page.evaluate(bp=>{
+        const w=window.viewer.walk,p0=w.probe()
+        window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyC'}))
+        window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyC'}))
+        window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyW'}))
+        for(let i=0;i<12;i++)w.tick(1/60)
+        window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyW'}))
+        const p1=w.probe()
+        return {dist:Math.hypot(p0.x-bp[0],p0.z-bp[2]),stepWalk:Math.hypot(p1.x-p0.x,p1.z-p0.z),inHouse:p0.inHouse||p1.inHouse}
+      },bikePos)
+      console.log('wall dismount',dismount);assert(dismount.dist<=2.5&&dismount.stepWalk>.3&&!dismount.inHouse,`dismount teleport/house: ${JSON.stringify(dismount)}`)
+      await fixture(43.8,360.7);await interact('骑行');await steer([36.3,359],false,.8);await steer([36.8,356.6],false,.8)
+      const parkedWall=await page.evaluate(()=>window.viewer.walk.position.toArray())
+      await interact('下车')
+      await fixture(39.3,355.5);await page.evaluate(()=>window.viewer.walk.tick(1/60))
+      const wallMountBlocked=await page.evaluate(async()=>{
+        const {walk}=window.viewer
+        await new Promise(r=>setTimeout(r,30))
+        const label=document.querySelector('.vehicle-action')?.textContent??''
+        window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyE'}))
+        walk.tick(1/60)
+        window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyE'}))
+        return {vehicle:walk.vehicle,label,pos:[walk.probe().x,walk.probe().z],toast:document.querySelector('.toast')?.classList.contains('show')??false}
+      })
+      console.log('wall-blocked mount',parkedWall,wallMountBlocked);assert(wallMountBlocked.vehicle==='foot'&&wallMountBlocked.label.includes('骑行')&&wallMountBlocked.toast,`should not mount across building wall: ${JSON.stringify(wallMountBlocked)}`)
       const [x,,z]=data.docks['解放桥码头'];await fixture(x,z);await shot('dock');await interact('上船');
       const distance=await page.evaluate((bounds)=>{const walker=window.viewer.walk,start=walker.position.clone();for(let frame=0;frame<3600;frame++){walker.tick(1/60);const probe=walker.boatClearance();if(probe?.kind!=='raft'||probe.clearance<.3||probe.roof-walker.position.y>bounds.roof+1e-6||probe.head-walker.position.y>bounds.head+1e-6)throw Error(`unsafe raft: ${JSON.stringify(probe)}`)}return walker.position.distanceTo(start)},bounds.raft)
       assert(distance>80&&distance<125);await shot('boat');await interact('下站下船')

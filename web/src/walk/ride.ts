@@ -28,12 +28,25 @@ export interface BikeMoveContext {
   step: number
   pavement: (x:number, z:number)=>boolean
   insideHouse: (x:number, z:number)=>boolean
-  collisionKind: ()=>'building'|'collision'|''
+  blockedAt: (x:number, y:number, z:number)=>boolean
+  collisionKind: (dirX:number, dirZ:number)=>'building'|'collision'|''
   stopBike: ()=>void
   dampBike: (step:number)=>number
+  capOffRoad: (step:number, limit:number)=>number
 }
 
+export type MountCheckResult =
+  | {ok: true; x: number; y: number; z: number; bikeY: number; shifted: boolean}
+  | {ok: false; reason: 'height'|'blocked'|'narrow'}
+
 const IDENTITY = {x:0, y:0, z:0, w:1}
+const OFF_ROAD_CAP = 4.2
+const MOUNT_OFFSETS: readonly [number, number][] = [
+  [.45, 0], [-.45, 0], [0, .45], [0, -.45],
+  [.35, .35], [-.35, .35], [.35, -.35], [-.35, -.35],
+  [.85, 0], [-.85, 0], [0, .85], [0, -.85],
+  [.6, .6], [-.6, .6], [.6, -.6], [-.6, -.6],
+]
 const DISMOUNT_OFFSETS: readonly [number, number][] = [
   [-1.05, -.2],
   [1.05, -.2],
@@ -70,17 +83,50 @@ function turnRate(speed: number) {
   return T.MathUtils.lerp(bcfg.peakTurn, bcfg.topTurn, smoothstep((s - .4) / .6))
 }
 
-/** Shows non-intrusive toast when all local 7-point bike dismount spots are obstructed. */
-export function notifyDismountBlocked() {
+/** Shows non-intrusive toast when mounting/dismounting a bike is blocked by walls or narrow obstacles. */
+export function notifyDismountBlocked(message = '这里太窄了，挪一挪再下车') {
   const toast = document.querySelector<HTMLElement>('.toast')
   if (!toast) return
-  toast.textContent = '这里太窄了，挪一挪再下车'
+  toast.textContent = message
   toast.classList.add('show')
   clearTimeout(toastTimer)
   toastTimer = window.setTimeout(() => toast.classList.remove('show'), 2400)
 }
 
-/** Probes 7 local spots beside the parked bike with support, ray LOS, and capsule checks (never 64m teleport). */
+function isWallBlocker(kind: Kind | undefined) {
+  return kind === 'building' || kind === 'rail' || kind === 'peak' || kind === 'landmark' || kind === 'tree' || kind === 'deck'
+}
+
+function localSupport(ctx: DismountContext, x: number, z: number, refY: number) {
+  const deck = ctx.surface(x, z, 'deck', refY + .35, 1.4)
+  const validDeck = deck && deck.y <= refY + .35 ? deck : null
+  const support = validDeck ?? ctx.surface(x, z, 'sidewalk') ?? ctx.surface(x, z, 'ground')
+  if (!support || support.slope > wcfg.slope || (!validDeck && ctx.wet(x, z))) return null
+  const peak = ctx.surface(x, z, 'peak')
+  if (peak && peak.y > support.y + .05) return null
+  return support
+}
+
+function segmentBlocked(ctx: DismountContext, x0: number, z0: number, x1: number, z1: number, baseY: number, trimEnd = 0) {
+  const dx = x1 - x0, dz = z1 - z0, dist = Math.hypot(dx, dz)
+  const len = dist - trimEnd
+  if (len <= .05) return false
+  wallRay ??= new R.Ray({x: 0, y: 0, z: 0}, {x: 0, y: 0, z: -1})
+  wallRay.dir.x = dx / dist; wallRay.dir.y = 0; wallRay.dir.z = dz / dist
+  for (const offset of [.5, 1.25]) {
+    wallRay.origin.x = x0; wallRay.origin.y = baseY + offset; wallRay.origin.z = z0
+    if (ctx.world.castRay(wallRay, len, true, undefined, undefined, ctx.capsule, undefined, coll => isWallBlocker(ctx.kinds.get(coll.handle)))) {
+      return true
+    }
+  }
+  return false
+}
+
+function standClear(ctx: DismountContext, x: number, y: number, z: number) {
+  return !ctx.world.intersectionWithShape({x, y, z}, IDENTITY, ctx.shape, undefined, undefined, ctx.capsule)
+}
+
+/** Probes 7 local spots beside the parked bike with height-diff, horizontal dual-ray LOS, and capsule checks. */
 export function probeLocalDismount(ctx: DismountContext, cx: number, cz: number, heading: number, bikeY: number) {
   const fx = -Math.sin(heading), fz = -Math.cos(heading)
   const rx = Math.cos(heading), rz = -Math.sin(heading)
@@ -90,39 +136,49 @@ export function probeLocalDismount(ctx: DismountContext, cx: number, cz: number,
     const x = cx + dx, z = cz + dz
     const tile = ctx.tileAt(x, z)
     if (!tile || !ctx.stream.loaded.has(tile) || ctx.insideHouse(x, z)) continue
-    const deck = ctx.surface(x, z, 'deck', bikeY + .75, 3.5)
-    const support = deck ?? ctx.surface(x, z, 'sidewalk') ?? ctx.surface(x, z, 'ground')
-    if (!support || support.slope > wcfg.slope || (!deck && ctx.wet(x, z))) continue
-    const peak = ctx.surface(x, z, 'peak')
-    if (peak && peak.y > support.y + .05) continue
-    const ty = support.y - bikeY, len = Math.hypot(dx, ty, dz)
-    if (len >= .05) {
-      wallRay ??= new R.Ray({x:0, y:0, z:0}, {x:0, y:0, z:-1})
-      wallRay.origin.x = cx; wallRay.origin.y = bikeY + .9; wallRay.origin.z = cz
-      wallRay.dir.x = dx / len; wallRay.dir.y = ty / len; wallRay.dir.z = dz / len
-      const blocker = ctx.world.castRay(wallRay, len, true, undefined, undefined, ctx.capsule, undefined, coll => {
-        const kind = ctx.kinds.get(coll.handle)
-        return kind === 'building' || kind === 'rail' || kind === 'peak' || kind === 'landmark'
-      })
-      if (blocker) continue
-    }
+    const support = localSupport(ctx, x, z, bikeY)
+    if (!support || Math.abs(support.y - bikeY) > .85) continue
+    if (segmentBlocked(ctx, cx, cz, x, z, Math.max(bikeY, support.y))) continue
     const y = support.y + wcfg.height / 2 + .055
-    if (ctx.world.intersectionWithShape({x, y, z}, IDENTITY, ctx.shape, undefined, undefined, ctx.capsule)) continue
+    if (!standClear(ctx, x, y, z)) continue
     return {x, y, z, rule: i === DISMOUNT_OFFSETS.length - 1 ? 'local-origin' : `local-${i}`}
   }
   return null
 }
 
+/** Validates Y elevation gap, wall/rail LOS between player and bike, and capsule clearance before mounting. */
+export function probeLocalMount(ctx: DismountContext, px: number, py: number, pz: number, bx: number, by: number, bz: number): MountCheckResult {
+  if (Math.abs(by - py) > 1.5) return {ok: false, reason: 'height'}
+  if (segmentBlocked(ctx, px, pz, bx, bz, Math.max(py, by), .2)) return {ok: false, reason: 'blocked'}
+
+  const tryPlace = (x: number, z: number, shifted: boolean): MountCheckResult | null => {
+    const tile = ctx.tileAt(x, z)
+    if (!tile || !ctx.stream.loaded.has(tile) || ctx.insideHouse(x, z)) return null
+    const support = localSupport(ctx, x, z, by)
+    if (!support || Math.abs(support.y - by) > .55) return null
+    if (shifted && segmentBlocked(ctx, px, pz, x, z, Math.max(py, support.y), .15)) return null
+    const y = support.y + wcfg.height / 2 + .055
+    if (!standClear(ctx, x, y, z)) return null
+    return {ok: true, x, y, z, bikeY: support.y, shifted}
+  }
+
+  const direct = tryPlace(bx, bz, false)
+  if (direct) return direct
+  for (const [ox, oz] of MOUNT_OFFSETS) {
+    const res = tryPlace(bx + ox, bz + oz, true)
+    if (res) return res
+  }
+  return {ok: false, reason: 'narrow'}
+}
+
 /** Manages e-bike acceleration, coasting drag, 0.22s reverse delay, speed-tuned steering, and lean/pitch. */
 export function createBikeControl() {
-  let speed = 0, heading = 0, lean = 0, pitch = 0, steerInput = 0, revHold = 0, offRoadSteps = 0
+  let speed = 0, heading = 0, lean = 0, pitch = 0, steerInput = 0, revHold = 0
   let onPavement = false
-  let offRoadOrigin: {x:number; z:number} | null = null
 
   function reset() {
-    speed = lean = pitch = steerInput = revHold = offRoadSteps = 0
+    speed = lean = pitch = steerInput = revHold = 0
     onPavement = false
-    offRoadOrigin = null
   }
 
   return {
@@ -131,11 +187,20 @@ export function createBikeControl() {
     get lean() { return lean },
     get pitch() { return pitch },
     get steerInput() { return steerInput },
-    mount(yaw: number) { heading = yaw; reset() },
+    mount(yaw: number, initialPitch = 0) {
+      heading = yaw
+      reset()
+      pitch = initialPitch
+    },
     stop() { speed = 0 },
     reset,
     dampSpeed(step: number) {
       speed *= Math.max(0, 1 - bcfg.slideDamp * step)
+      return speed
+    },
+    capSpeed(step: number, limit: number) {
+      const abs = Math.abs(speed)
+      if (abs > limit) speed = Math.sign(speed) * Math.max(limit, abs - 6.5 * step)
       return speed
     },
     steer(forward: number, right: number, dt: number, mounted = true) {
@@ -187,7 +252,7 @@ export function createBikeControl() {
       return speed
     },
     setPitch(frontY: number | undefined, backY: number | undefined, dt: number) {
-      const target = frontY !== undefined && backY !== undefined && Math.abs(frontY - backY) < .8
+      const target = frontY !== undefined && backY !== undefined && Math.abs(frontY - backY) < .45
         ? T.MathUtils.clamp(Math.atan2(frontY - backY, 1.1), -bcfg.pitchMax, bcfg.pitchMax)
         : 0
       pitch = T.MathUtils.damp(pitch, target, bcfg.pitchDamp, Math.min(.12, Math.max(0, dt)))
@@ -196,47 +261,63 @@ export function createBikeControl() {
       const fwdX = -Math.sin(ctx.heading), fwdZ = -Math.cos(ctx.heading), sign = ctx.speed >= 0 ? 1 : -1
       const probeX = ctx.next.x + fwdX * sign * .72, probeZ = ctx.next.z + fwdZ * sign * .72
       if (Math.abs(ctx.speed) > 1e-4 && ctx.insideHouse(probeX, probeZ)) {
-        offRoadSteps = 0; ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z; ctx.stopBike()
+        ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z; ctx.stopBike()
         return {blocked: true, reason: 'building', speed: 0}
       }
       if (Math.hypot(ctx.move.x, ctx.move.z) < Math.abs(ctx.speed) * ctx.step * .35) {
-        const hit = ctx.collisionKind()
+        const hit = ctx.collisionKind(fwdX * sign, fwdZ * sign)
         if (hit) {
-          offRoadSteps = 0; ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z; ctx.stopBike()
+          ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z; ctx.stopBike()
           return {blocked: true, reason: hit, speed: 0}
         }
       }
       if (ctx.pavement(ctx.next.x, ctx.next.z)) {
-        onPavement = true; offRoadOrigin = null; offRoadSteps = 0
+        onPavement = true
         return {blocked: false, reason: '', speed: ctx.speed}
       }
-      if (!onPavement && !ctx.pavement(ctx.pos.x, ctx.pos.z)) {
-        offRoadOrigin ??= {x: ctx.pos.x, z: ctx.pos.z}
-        const nextDist = Math.hypot(ctx.next.x - offRoadOrigin.x, ctx.next.z - offRoadOrigin.z)
-        const curDist = Math.hypot(ctx.pos.x - offRoadOrigin.x, ctx.pos.z - offRoadOrigin.z)
-        if (nextDist <= 6.5 || nextDist < curDist) {
-          offRoadSteps = 0
-          return {blocked: false, reason: '', speed: ctx.speed}
+
+      // Leaving pavement: try orthogonal axis slide, then local diagonal tangential glide before soft off-road cap.
+      if (onPavement) {
+        const safeAt = (sx: number, sz: number) =>
+          ctx.pavement(sx, sz)
+          && !ctx.insideHouse(sx + fwdX * sign * .72, sz + fwdZ * sign * .72)
+          && !ctx.blockedAt(sx, ctx.pos.y, sz)
+
+        const canX = ctx.next.x !== ctx.pos.x && safeAt(ctx.next.x, ctx.pos.z)
+        const canZ = ctx.next.z !== ctx.pos.z && safeAt(ctx.pos.x, ctx.next.z)
+        if (canX && (!canZ || Math.abs(ctx.next.x - ctx.pos.x) >= Math.abs(ctx.next.z - ctx.pos.z))) {
+          ctx.next.z = ctx.pos.z
+          return {blocked: false, reason: '', speed: ctx.dampBike(ctx.step * .5)}
+        }
+        if (canZ) {
+          ctx.next.x = ctx.pos.x
+          return {blocked: false, reason: '', speed: ctx.dampBike(ctx.step * .5)}
+        }
+
+        let inX = 0, inZ = 0
+        for (const ox of [-4, 0, 4]) for (const oz of [-4, 0, 4]) {
+          if ((ox || oz) && ctx.pavement(ctx.next.x + ox, ctx.next.z + oz)) {
+            inX += ox; inZ += oz
+          }
+        }
+        const inLen = Math.hypot(inX, inZ)
+        if (inLen > 1e-4) {
+          const nx = inX / inLen, nz = inZ / inLen
+          const mx = ctx.next.x - ctx.pos.x, mz = ctx.next.z - ctx.pos.z, mLen = Math.hypot(mx, mz)
+          const outDot = mx * nx + mz * nz
+          let tx = outDot < 0 ? mx - outDot * nx : mx
+          let tz = outDot < 0 ? mz - outDot * nz : mz
+          tx += nx * mLen * .35; tz += nz * mLen * .35
+          const sx = ctx.pos.x + tx, sz = ctx.pos.z + tz
+          if (safeAt(sx, sz)) {
+            ctx.next.x = sx; ctx.next.z = sz
+            return {blocked: false, reason: '', speed: ctx.dampBike(ctx.step * .5)}
+          }
         }
       }
-      const canX = ctx.next.x !== ctx.pos.x && ctx.pavement(ctx.next.x, ctx.pos.z)
-        && !ctx.insideHouse(ctx.next.x + fwdX * sign * .72, ctx.pos.z + fwdZ * sign * .72)
-      const canZ = ctx.next.z !== ctx.pos.z && ctx.pavement(ctx.pos.x, ctx.next.z)
-        && !ctx.insideHouse(ctx.pos.x + fwdX * sign * .72, ctx.next.z + fwdZ * sign * .72)
-      if (canX && (!canZ || Math.abs(ctx.next.x - ctx.pos.x) >= Math.abs(ctx.next.z - ctx.pos.z))) {
-        ctx.next.z = ctx.pos.z; offRoadSteps = 0
-        return {blocked: false, reason: '', speed: ctx.dampBike(ctx.step)}
-      }
-      if (canZ) {
-        ctx.next.x = ctx.pos.x; offRoadSteps = 0
-        return {blocked: false, reason: '', speed: ctx.dampBike(ctx.step)}
-      }
-      ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z
-      if (++offRoadSteps >= 2) {
-        ctx.stopBike()
-        return {blocked: true, reason: 'off-road', speed: 0}
-      }
-      return {blocked: false, reason: '', speed: ctx.speed}
+
+      onPavement = false
+      return {blocked: false, reason: '', speed: ctx.capOffRoad(ctx.step, OFF_ROAD_CAP)}
     },
   }
 }
@@ -245,8 +326,8 @@ export function createBikeControl() {
 export function createRiderPose(figure: T.Group) {
   const joints = Object.fromEntries(JOINT_NAMES.map(name => [name, figure.getObjectByName(name)])) as Record<JointName, T.Object3D | undefined>
   const startPos = new T.Vector3(), startRot = new Map<JointName, [number, number, number]>()
-  const stepOff = new T.Vector3()
-  let startYaw = 0, mountElapsed = bcfg.mountDuration, dismountElapsed = bcfg.dismountDuration, camArmOffset = 0
+  const dismountFrom = new T.Vector3()
+  let startYaw = 0, dismountFromYaw = 0, mountElapsed = bcfg.mountDuration, dismountElapsed = bcfg.dismountDuration, camArmOffset = 0
   let footWeight = 1
 
   function clearJoints() {
@@ -293,15 +374,15 @@ export function createRiderPose(figure: T.Group) {
       startYaw = yawYaw
       mountElapsed = 0
       dismountElapsed = bcfg.dismountDuration
-      stepOff.set(0, 0, 0)
       footWeight = 1
       for (const name of JOINT_NAMES) {
         const r = joints[name]?.rotation
         startRot.set(name, r ? [r.x, r.y, r.z] : [0, 0, 0])
       }
     },
-    startDismount(prevVisualPos: T.Vector3, landPos: {x:number; y:number; z:number}, landHeight: number) {
-      stepOff.set(prevVisualPos.x - landPos.x, prevVisualPos.y - (landPos.y - landHeight / 2), prevVisualPos.z - landPos.z)
+    startDismount(prevVisualPos: T.Vector3, prevVisualYaw: number) {
+      dismountFrom.copy(prevVisualPos)
+      dismountFromYaw = prevVisualYaw
       dismountElapsed = 0
       mountElapsed = bcfg.mountDuration
       figure.rotation.x = figure.rotation.z = 0
@@ -310,7 +391,6 @@ export function createRiderPose(figure: T.Group) {
     reset() {
       mountElapsed = bcfg.mountDuration
       dismountElapsed = bcfg.dismountDuration
-      stepOff.set(0, 0, 0)
       camArmOffset = 0
       figure.rotation.x = figure.rotation.z = 0
       clearJoints()
@@ -341,11 +421,13 @@ export function createRiderPose(figure: T.Group) {
       }
       applySeatedPose(speed, steerInput, t, dt)
     },
-    applyDismountOffset(dt: number) {
+    applyDismount(currentFootPos: T.Vector3, targetYaw: number, dt: number) {
       if (dismountElapsed >= bcfg.dismountDuration) return
-      dismountElapsed = Math.min(bcfg.dismountDuration, dismountElapsed + Math.max(0, dt))
-      const remain = 1 - smoothstep(dismountElapsed / bcfg.dismountDuration)
-      figure.position.addScaledVector(stepOff, remain)
+      if (dt > 0) dismountElapsed = Math.min(bcfg.dismountDuration, dismountElapsed + Math.min(.12, dt))
+      const t = smoothstep(dismountElapsed / bcfg.dismountDuration)
+      figure.position.lerpVectors(dismountFrom, currentFootPos, t)
+      figure.position.y += Math.sin(t * Math.PI) * .12
+      figure.rotation.y = dismountFromYaw + shortestAngle(dismountFromYaw, targetYaw) * t
     },
     clearJoints,
   }
