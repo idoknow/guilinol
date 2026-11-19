@@ -1,4 +1,3 @@
-import os
 """Scene quality audit on shipped world + landmark assets (IDOK-28)."""
 
 import argparse
@@ -6,6 +5,7 @@ from collections import defaultdict
 import gzip
 import json
 import math
+import os
 from pathlib import Path
 import re
 import struct
@@ -262,8 +262,8 @@ def run_audit(world_dir: Path, root: Path) -> dict:
 
         for lx, lz in streets[1]:
             lamps.append((tx + lx / 10.0, tz + lz / 10.0))
-        for ax, az, bx, bz, btop, bbot in streets[2]:
-            banks.append((tx + ax / 10.0, tz + az / 10.0, tx + bx / 10.0, tz + bz / 10.0, btop / 10.0, bbot / 10.0))
+        for ax, az, bx, bz, btop, bbot, *end in streets[2]:
+            banks.append((tx + ax / 10.0, tz + az / 10.0, tx + bx / 10.0, tz + bz / 10.0, btop / 10.0, bbot / 10.0, (end[0] if end else btop) / 10.0))
         if len(streets) > 3:
             for sx, sz in streets[3]:
                 signals.append((tx + sx / 10.0, tz + sz / 10.0))
@@ -658,6 +658,8 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     #    bank & wall UV stretch, and roadGap.
     # =========================================================================
     texture_issues = list(gap_issues)
+    for x, z, overlap in json.loads((world_dir / 'marking-audit.json').read_text()):
+        texture_issues.append(make_issue('markingOverlap', x, z, overlap, 'Marking overlap before tile union'))
     metres_cfg = read_tile_metres(root)
 
     # 3a. KTX2 files check (header, budget, non-placeholder check)
@@ -697,7 +699,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     tiles_ts_src = (root / 'web/src/look/tiles.ts').read_text()
     uses_x_plus_z_bank = 'vFogWorld.x+vFogWorld.z' in tiles_ts_src.replace(' ', '')
     if uses_x_plus_z_bank:
-        for ax, az, bx, bz, btop, bbot in banks:
+        for ax, az, bx, bz, btop, bbot, end_top in banks:
             seg_len = math.hypot(bx - ax, bz - az)
             if seg_len < 0.2 or btop - bbot < 0.2:
                 continue
@@ -787,15 +789,17 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                 other_issues.append(make_issue('floatingOrBuried', tx_i, tz_i, abs(diff),
                                                f'Tree (kind={tkind}) y={ty_i:.2f} vs support={sup:.2f} (diff={diff:+.2f}m)'))
 
-    # Bank railings: top vs dry bank groundMesh at endpoints
-    for ax, az, bx, bz, btop, bbot in banks:
-        mx, mz = (ax + bx) / 2.0, (az + bz) / 2.0
-        # Sample dry ground at midpoint / endpoints
-        gm = max(ground_mesh_y(ax, az), ground_mesh_y(bx, bz), ground_mesh_y(mx, mz))
-        diff = btop - gm
-        if diff > 0.20 or diff < -0.50:
-            other_issues.append(make_issue('floatingOrBuried', mx, mz, abs(diff),
-                                           f'Bank railing top={btop:.2f} vs groundMesh={gm:.2f} (diff={diff:+.2f}m)'))
+    endpoints = defaultdict(list)
+    for ax, az, bx, bz, start_top, _, end_top in banks:
+        for x, z, height in ((ax, az, start_top), (bx, bz, end_top)):
+            endpoints[round(x, 1), round(z, 1)].append(height)
+            delta = height - ground_mesh_y(x, z)
+            if delta > .20 or delta < -.50:
+                other_issues.append(make_issue('floatingOrBuried', x, z, abs(delta), 'Bank endpoint vs ground mesh'))
+    for (x, z), heights in endpoints.items():
+        step = max(heights) - min(heights)
+        if step > .05:
+            other_issues.append(make_issue('railStep', x, z, step, 'Shared bank endpoint height mismatch'))
 
     # Landmarks vertical placement check
     peak_lm_map = {'fubo': '伏波山', 'diecai': '明月峰', 'duxiu': '独秀峰'}
@@ -936,6 +940,20 @@ def run_audit(world_dir: Path, root: Path) -> dict:
 
     other_issues.sort(key=lambda r: r['value'], reverse=True)
 
+    approved = json.loads((root / 'pipeline/audit-allow.json').read_text())
+    allowed = []
+    for issues in (bldg_issues, other_issues):
+        for issue in issues[:]:
+            identity = '+'.join(sorted(issue.get('landmarks', [issue.get('landmark', '')])))
+            for rule in approved:
+                if (identity == rule['id'] and issue['subtype'] == rule['subtype']
+                        and issue['x'] == rule['x'] and issue['z'] == rule['z']
+                        and abs(issue['value'] - rule['area']) <= .0501):
+                    approved.remove(rule)
+                    allowed.append({**issue, 'reason': rule['reason']})
+                    issues.remove(issue)
+                    break
+
     def summarize(items):
         by_sub = defaultdict(int)
         sub_samples = defaultdict(list)
@@ -953,6 +971,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
 
     return {
         'source': 'pipeline',
+        'approvedExceptions': allowed,
         'counts': {
             'buildingOnRoad': len(bldg_issues),
             'unevenRoad': len(uneven_issues),

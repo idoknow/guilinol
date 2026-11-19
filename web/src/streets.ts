@@ -71,8 +71,8 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     }
   }
   const object=new THREE.Object3D()
-  function box(x:number,y:number,z:number,w:number,h:number,d:number,yaw=0,tint=tone.railing){
-    object.position.set(x,y,z);object.scale.set(w,h,d);object.rotation.y=yaw;object.updateMatrix()
+  function box(x:number,y:number,z:number,w:number,h:number,d:number,yaw=0,tint=tone.railing,pitch=0){
+    object.position.set(x,y,z);object.scale.set(w,h,d);object.rotation.set(0,yaw,pitch,'YXZ');object.updateMatrix()
     mats.push(...object.matrix.elements);cols.push(tint.r,tint.g,tint.b)
   }
   for(const [x,z] of lamps){const px=x/10,pz=z/10,y=baseLevel(px,pz),yaw=(x*7+z*13)%6/6*Math.PI
@@ -81,13 +81,13 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   for(const [east,south] of signals){const x=east/10,z=south/10,y=baseLevel(x,z);box(x,y+2.5,z,.16,5,.16);box(x,y+4.7,z,.4,.9,.3)}
   for(const [east,south] of stops){const x=east/10,z=south/10,y=baseLevel(x,z);box(x,y+1.3,z,.12,2.6,.12);box(x,y+2.15,z,.65,.85,.12)}
   let bankAlong=0
-  for(const [ax,az,bx,bz,top,bottom] of banks){
-    const a=new THREE.Vector3(ax/10,top/10,az/10),b=new THREE.Vector3(bx/10,top/10,bz/10)
+  for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){
+    const a=new THREE.Vector3(ax/10,top/10,az/10),b=new THREE.Vector3(bx/10,endTop/10,bz/10)
     const span=Math.hypot(b.x-a.x,b.z-a.z),u0=bankAlong,u1=bankAlong+span;bankAlong=u1
     const foot=a.clone();foot.y=bottom/10;const end=b.clone();end.y=bottom/10
     triangle(a,b,end,3,u0,u1,u1);triangle(a,end,foot,3,u0,u1,u0)
     const angle=-Math.atan2(b.z-a.z,b.x-a.x);box(a.x,a.y+.55,a.z,.15,1.1,.15)
-    for(const y of [.5,1])box((a.x+b.x)/2,a.y+y,(a.z+b.z)/2,span,.09,.09,angle)
+    for(const y of [.5,1])box((a.x+b.x)/2,(a.y+b.y)/2+y,(a.z+b.z)/2,a.distanceTo(b),.09,.09,angle,tone.railing,Math.atan2(b.y-a.y,span))
   }
   for(const [ax,az,bx,bz] of stoneRails){
     const x1=ax/10,z1=az/10,x2=bx/10,z2=bz/10,span=Math.hypot(x2-x1,z2-z1)

@@ -54,6 +54,7 @@ const server = await preview({root: 'web', configFile: 'web/vite.config.ts', pre
 const port = server.httpServer.address().port
 let browser
 let browserReport
+const photo = JSON.parse(await readFile('docs/refs/rock/photo-locations.json', 'utf8'))['IMG_1299.jpg']
 const namedViews = [
   {id: 'shizijie', label: '十字街', x: -891, z: -165, yaw: -1.2},
   {id: 'zhongshan', label: '中山中路', x: -935, z: -20, yaw: -0.18},
@@ -61,7 +62,7 @@ const namedViews = [
   {id: 'ronghu', label: '榕湖北路', x: -1360, z: 105, yaw: 1.75},
   {id: 'binjiang', label: '滨江路', x: -255, z: 95, yaw: 0.25},
   {id: 'zhengyang', label: '正阳步行街', x: -612, z: -70, yaw: 0.12},
-  {id: 'gunanmen', label: '走向古南门路口（榕荫路×三多路）', x: -1315.5, z: -87.5, yaw: 2.28},
+  {id: 'gunanmen', label: '走向古南门路口（榕荫路×三多路）', x: photo.x, z: photo.z, yaw: -photo.heading * Math.PI / 180, focal35: photo.focal35},
 ]
 
 function pickDistinct(items, count, minSep = 15) {
@@ -323,14 +324,17 @@ try {
   }
 
   // Helper to take an eye-level pedestrian-view screenshot (1.65 m eye height) looking at (tx, tz)
-  async function shootPedestrian(tx, tz, filePath, fixedYaw = null) {
-    await page.evaluate(async ({tx, tz, fixedYaw}) => {
+  async function shootPedestrian(tx, tz, filePath, fixedYaw = null, focal35 = null) {
+    await page.evaluate(async ({tx, tz, fixedYaw, focal35}) => {
       const {walk, stream, camera, manifest} = window.viewer
       if (walk?.active) walk.leave()
       const yaw = fixedYaw ?? 0.25
       const back = fixedYaw !== null ? 0 : 10
       const ex = tx + Math.sin(yaw) * back
       const ez = tz + Math.cos(yaw) * back
+      window.auditDefaultFov ??= camera.fov
+      camera.fov = focal35 ? 2 * Math.atan(18 / (focal35 * camera.aspect)) * 180 / Math.PI : window.auditDefaultFov
+      camera.updateProjectionMatrix()
       camera.position.set(ex, 155, ez)
       const tile = manifest.chunks.find(t => ex >= t.x && ex < t.x + 256 && ez >= t.z && ez < t.z + 256)
       const deadline = performance.now() + 6000
@@ -353,7 +357,7 @@ try {
         const wAt = Math.min(64, Math.round(lz / 4)) * 65 + Math.min(64, Math.round(lx / 4))
         return d.water[wAt] !== -32768 ? Math.max(gy, d.water[wAt] / 10) : gy
       }
-      const ey = groundY(ex, ez) + 1.68
+      const ey = groundY(ex, ez) + (focal35 ? 1.5 : 1.68)
       camera.position.set(ex, ey, ez)
       if (fixedYaw !== null) {
         const lx = ex - Math.sin(fixedYaw) * 18
@@ -366,7 +370,7 @@ try {
         stream.tick(camera.position)
         await new Promise(r => requestAnimationFrame(r))
       }
-    }, {tx, tz, fixedYaw})
+    }, {tx, tz, fixedYaw, focal35})
     await page.waitForFunction(() => {
       const {stats, stream, camera, manifest} = window.viewer
       return !stats.pending && manifest.chunks.every(
@@ -424,7 +428,7 @@ try {
     }
 
     for (const v of namedViews) {
-      await shootPedestrian(v.x, v.z, join(namedDir, `street_${v.id}_x${Math.round(v.x)}_z${Math.round(v.z)}.png`), v.yaw)
+      await shootPedestrian(v.x, v.z, join(namedDir, `street_${v.id}_x${Math.round(v.x)}_z${Math.round(v.z)}.png`), v.yaw, v.focal35)
     }
     for (const sp of top5Spots) {
       await shootPedestrian(sp.x, sp.z, join(namedDir, `${sp.id}_x${Math.round(sp.x)}_z${Math.round(sp.z)}.png`))
@@ -444,6 +448,7 @@ try {
   const finalAudit = {
     timestamp: new Date().toISOString(),
     counts: finalCounts,
+    approvedExceptions: pipelineReport.approvedExceptions,
     totalIssues: Object.values(finalCounts).reduce((a, b) => a + b, 0),
     pipelineCounts: pipelineReport.counts,
     browserCounts: browserReport.counts,

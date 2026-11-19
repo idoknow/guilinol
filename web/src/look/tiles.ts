@@ -6,7 +6,7 @@ const textures=Object.fromEntries(Object.keys(tileConfig.metres).map(key=>[key,{
 const ready={value:false}
 let ktx2Promise:Promise<import('three/addons/loaders/KTX2Loader.js').KTX2Loader>|null=null
 export function sharedKtx2Loader(renderer:THREE.WebGLRenderer){
-  return ktx2Promise??=import('three/addons/loaders/KTX2Loader.js').then(({KTX2Loader})=>new KTX2Loader().setTranscoderPath('./basis/').detectSupport(renderer))
+  return ktx2Promise??=import('three/addons/loaders/KTX2Loader.js').then(({KTX2Loader})=>new KTX2Loader().setTranscoderPath('./basis/').setWorkerLimit(2).detectSupport(renderer))
 }
 export async function loadTiles(renderer:THREE.WebGLRenderer){
   if(!tileConfig.enabled)return

@@ -20,7 +20,7 @@ def ll2xz(lat, lon):
 def xz2ll(x, z):
     return LAT0 - z / MLAT, LON0 + x / MLON
 
-def load_dem():
+def load_dem(gx=None, gz=None):
     """Return float32 array [GH, GW] of elevation in metres sampled on the world grid."""
     z = 14
     tiles = {}
@@ -28,21 +28,26 @@ def load_dem():
         _, tx, ty = f[:-4].split('_')
         tiles[(int(tx), int(ty))] = f
     xs = sorted({k[0] for k in tiles}); ys = sorted({k[1] for k in tiles})
-    mos = np.zeros((len(ys) * 256, len(xs) * 256), np.float32)
+    mos = np.full(((ys[-1]-ys[0]+1)*256, (xs[-1]-xs[0]+1)*256), np.nan, np.float32)
     for (tx, ty), f in tiles.items():
         a = np.asarray(Image.open(os.path.join(RAW, 'dem', f)).convert('RGB')).astype(np.float32)
         e = a[..., 0] * 256 + a[..., 1] + a[..., 2] / 256 - 32768
         mos[(ty - ys[0]) * 256:(ty - ys[0] + 1) * 256, (tx - xs[0]) * 256:(tx - xs[0] + 1) * 256] = e
     n = 2 ** z
-    gx = X0 + np.arange(GW) * GRID
-    gz = Z0 + np.arange(GH) * GRID
+    if gx is None: gx = X0 + np.arange(GW) * GRID
+    if gz is None: gz = Z0 + np.arange(GH) * GRID
     lon = LON0 + gx / MLON
     lat = LAT0 - gz / MLAT
     px = (lon + 180) / 360 * n * 256 - xs[0] * 256 - 0.5
     py = (1 - np.arcsinh(np.tan(np.radians(lat))) / math.pi) / 2 * n * 256 - ys[0] * 256 - 0.5
     from scipy.ndimage import map_coordinates
     PY, PX = np.meshgrid(py, px, indexing='ij')
-    return map_coordinates(mos, [PY, PX], order=1, mode='nearest').astype(np.float32)
+    result = map_coordinates(mos, [PY, PX], order=1, mode='constant', cval=np.nan)
+    if not np.isfinite(result).all():
+        raise ValueError('Aligned bbox is outside supplied DEM coverage or has missing tiles')
+    return result
 
 def load_osm():
-    return json.load(open(os.path.join(RAW, 'osm.json')))['elements']
+    snapshot = os.path.join(RAW, 'osm-2026-11.json')
+    with open(snapshot if os.path.isfile(snapshot) else os.path.join(RAW, 'osm.json')) as source:
+        return json.load(source)['elements']

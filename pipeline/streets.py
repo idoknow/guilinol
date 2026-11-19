@@ -6,6 +6,7 @@ from shapely import STRtree
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import nearest_points, unary_union
 
+from markings import junction_cores, violations
 from common import CHUNK, ll2xz, load_osm
 from features import points, polygons
 from scatter import CONFIG, walk_line
@@ -43,27 +44,38 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     control_index = STRtree([pt for pt,_ in controls])
     xing_pts = [pt for pt, feat in controls if feat in ('crossing', 'traffic_signals')]
     xing_tree = STRtree(xing_pts) if xing_pts else None
-    crosswalks = set()
+    cores = junction_cores(roads)
+    crosswalk_groups = []
+    crossing_centres = []
+    lane_stripes = []
     lamp_candidates = []
 
-    def emit_crosswalk(line, width, left_w, right_w, dist, sign_away, with_stop):
+    def emit_crosswalk(line, width, left_w, right_w, dist, sign_away, with_stop, search=0):
         if not 0 <= dist <= line.length:
             return
         mid = np.array(line.interpolate(dist).coords[0])
-        key = tuple(np.rint(mid / 2.0).astype(int))
-        if key in crosswalks:
-            return
-        crosswalks.add(key)
         delta = np.subtract(line.interpolate(min(line.length, dist + .25)).coords[0], line.interpolate(max(0, dist - .25)).coords[0])
         tangent = sign_away * delta / max(.001, np.linalg.norm(delta))
         normal = np.array([-tangent[1], tangent[0]])
+        bars = []
         for span in np.arange(-width / 2 + .55, width / 2 - .35, 1.0):
             center = mid + normal * span
-            stripes.append(LineString([center - tangent * 1.9, center + tangent * 1.9]).buffer(.24, cap_style='flat'))
-        gaps.append(LineString([mid - normal * (width / 2 + left_w + 1), mid + normal * (width / 2 + right_w + 1)]).buffer(2.05, cap_style='flat'))
+            bars.append(LineString([center - tangent * 1.9, center + tangent * 1.9]).buffer(.24, cap_style='flat'))
         if with_stop:
             stop = mid + tangent * 2.5
-            stripes.append(LineString([stop, stop + normal * width / 2]).buffer(.22, cap_style='flat'))
+            bars.append(LineString([stop, stop + normal * width / 2]).buffer(.22, cap_style='flat'))
+        group = unary_union(bars)
+        if cores.query(group, predicate='intersects').size:
+            if search < 24:
+                emit_crosswalk(line, width, left_w, right_w, dist + sign_away * 2, sign_away, with_stop, search + 2)
+            return
+        if any(Point(mid).distance(c) < 8 for c in crossing_centres):
+            return
+        if any(group.intersects(other) for other in crosswalk_groups):
+            return
+        crossing_centres.append(Point(mid))
+        crosswalk_groups.append(group)
+        gaps.append(LineString([mid - normal * (width / 2 + left_w + 1), mid + normal * (width / 2 + right_w + 1)]).buffer(2.05, cap_style='flat'))
 
     for road in roads:
         line,width,kind = road.line,road.width,road.kind
@@ -86,7 +98,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         for lane in range(1,road.lanes):
             offset = width*(lane/road.lanes-.5)
             stripe = line.offset_curve(offset).buffer(.09,quad_segs=1).difference(masks)
-            stripes.append(stripe)
+            lane_stripes.append(stripe)
         if road.divided:
             medians.append(line.buffer(.55).difference(masks))
         for index in control_index.query(line,predicate='dwithin',distance=max(2,width/2+3)):
@@ -122,6 +134,12 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             dist = s_jct + step_dir * (other_w / 2.0 + 2.8)
             if 2.2 <= dist <= arm_road.line.length - 2.2:
                 emit_crosswalk(arm_road.line, arm_road.width, arm_road.left, arm_road.right, dist, step_dir, len(arms) >= 4)
+    # Reserve the approach from the first stripe through the stop line.
+    reserved = STRtree([*cores.geometries, *(g.convex_hull.buffer(.05) for g in crosswalk_groups)])
+    lanes = unary_union([lane.difference(unary_union(reserved.geometries.take(reserved.query(lane))))
+                         for lane in lane_stripes])
+    stripes = [*polygons(lanes), *crosswalk_groups]
+    lengths['markingOverlap'] = list(violations(stripes, cores, bounds))
     bridge_ways = [LineString(points(el)) for el in load_osm() if el['type']=='way' and
                    el.get('tags',{}).get('bridge','no')!='no' and 'highway' in el.get('tags',{}) and len(points(el))>1]
     bridge = STRtree([bw.buffer(11) for bw in bridge_ways])
@@ -188,15 +206,15 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             lengths['bank']+=length
             qa_x, qa_z = round(a.x * 10) / 10.0, round(a.y * 10) / 10.0
             qb_x, qb_z = round(b.x * 10) / 10.0, round(b.y * 10) / 10.0
-            qm_x, qm_z = 0.5 * (qa_x + qb_x), 0.5 * (qa_z + qb_z)
             if ground_mesh_fn is not None:
-                gm_top = max(ground_mesh_fn(qa_x, qa_z), ground_mesh_fn(qb_x, qb_z), ground_mesh_fn(qm_x, qm_z))
-                top_dm = round(gm_top * 10)
+                top_dm = round(ground_mesh_fn(qa_x, qa_z) * 10)
+                end_dm = round(ground_mesh_fn(qb_x, qb_z) * 10)
             else:
                 top_dm = max(round(ground*10)+1,int(water_y)+1)
-            bot_dm = min(top_dm - 12, int(water_y) - 10)
-            def segment(origin, ax=qa_x, az=qa_z, bx=qb_x, bz=qb_z, t_dm=top_dm, b_dm=bot_dm):
-                return [round((ax-origin[0])*10), round((az-origin[1])*10), round((bx-origin[0])*10), round((bz-origin[1])*10), t_dm, b_dm]
+                end_dm = top_dm
+            bot_dm = min(min(top_dm, end_dm) - 12, int(water_y) - 10)
+            def segment(origin, ax=qa_x, az=qa_z, bx=qb_x, bz=qb_z, t_dm=top_dm, b_dm=bot_dm, end=end_dm):
+                return [round((ax-origin[0])*10), round((az-origin[1])*10), round((bx-origin[0])*10), round((bz-origin[1])*10), t_dm, b_dm, end]
             store(1,mid,segment)
 
     # Granite stone curb bench-rails & drum bollards around historic banyan crossroads (榕荫路 × 三多路, IMG_1299.jpg)
