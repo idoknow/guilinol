@@ -92,6 +92,7 @@ def grade_banks(terrain,original,wet,left,top,step,anchor,angle,datum):
     x=east*np.cos(angle)+south*np.sin(angle)
     z=-east*np.sin(angle)+south*np.cos(angle)
     limit=np.full(x.shape,np.inf)
+    approach_fill=np.full(x.shape,-np.inf)
     shore=(x>-114)&(x<-56)&(abs(z)<76)
     limit[shore]=(datum+LOWER-.17-np.maximum(0,x+90)*.10+np.maximum(0,abs(z)-68)*.3)[shore]
     for way in RAMPS+UPPER_ROADS+LOWER_ROADS+SIDE_ROAD+FOOTWAYS:
@@ -104,10 +105,16 @@ def grade_banks(terrain,original,wet,left,top,step,anchor,angle,datum):
             dist=np.hypot(x-a[0]-t*dx,z-a[1]-t*dz)
             level=datum+h0+t*(h1-h0)-.20+np.maximum(0,dist-radius-2)*.40
             limit=np.where(dist<radius+18,np.minimum(limit,level),limit)
+            if way in UPPER_ROADS:
+                # The western approach sits on an embankment until the bridge portal.
+                fill=datum+h0+t*(h1-h0)-.07-np.maximum(0,dist-radius)*.6
+                approach_fill=np.where((x<-139)&(dist<radius+9),np.maximum(approach_fill,fill),approach_fill)
     mask=np.isfinite(limit)&~wet[rows,cols]
     for field in (terrain,original):
         patch=field[rows,cols]
         patch[mask]=np.minimum(patch[mask],np.rint(10*limit[mask]))
+        fill_mask=np.isfinite(approach_fill)&mask
+        patch[fill_mask]=np.maximum(patch[fill_mask],np.rint(10*approach_fill[fill_mask]))
     # Blend the ends of the modeled road into the heightfield outside the site.
     for way in UPPER_ROADS+LOWER_ROADS+SIDE_ROAD:
         xy,_,_,levels=section(way)
