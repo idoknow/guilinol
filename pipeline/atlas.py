@@ -124,7 +124,7 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
              'way/646911647': Point(ll2xz(25.25156339,110.31056078))}
     for key, campus in campuses.items():
         reference = gates.get(key, campus.boundary)
-        segments = [line for _,line in public_streets if line.disjoint(campus.buffer(1))]
+        segments = [line for _,_,line in public_streets if line.disjoint(campus.buffer(1))]
         closest = min(segments, key=reference.distance)
         place(g4[key], 'school', nearest_points(reference, closest)[1])
     for key,center in school_centers.items():
