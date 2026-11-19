@@ -90,7 +90,7 @@ export async function feedback(request: Request, env: Env, path: string) {
       return json(
         (
           await stmt(
-            'SELECT id,title,status,updated_at FROM feedback WHERE user_id=? ORDER BY updated_at DESC,rowid DESC',
+            'SELECT id,title,kind,status,updated_at FROM feedback WHERE user_id=? ORDER BY updated_at DESC,rowid DESC',
             user,
           ).all()
         ).results,

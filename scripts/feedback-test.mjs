@@ -102,11 +102,33 @@ export async function apiTest({ api, origin, cookie, sql }) {
 }
 export async function uiTest(page, origin) {
   await mkdir('captures/feedback', { recursive: true })
-  const shot = (name) => page.screenshot({ path: `captures/feedback/${name}.png` })
+  const shot = async (name) => {
+    // Pause the WebGL loop so screenshots don't time out on a loaded software-GL host.
+    await page.evaluate(() => window.viewer.freeze?.())
+    try {
+      await page.screenshot({ path: `captures/feedback/${name}.png`, timeout: 120000 })
+    } finally {
+      await page.evaluate(() => window.viewer.resume?.())
+    }
+  }
   const fb = page.locator('.fb-panel')
   const click = (name) => fb.getByRole('button', { name, exact: true }).click()
   await page.evaluate(() => window.viewer.camera.position.set(-685, 420, 1182))
   await page.locator('.dock-feedback').click()
+  await fb.locator('.fb-map canvas').waitFor({ timeout: 60000 })
+  await page.waitForTimeout(400)
+  await fb.getByRole('radio', { name: '沿路拍摄' }).click()
+  await fb.getByLabel('行走路径和方向').fill('从十字街沿解放东路向东走到解放桥西桥头')
+  // The pin starts at the walker; zoom in once and check the painter drew map pixels (not a blank canvas).
+  await fb.getByRole('button', { name: '放大' }).click()
+  assert.ok(
+    await fb.locator('.fb-map canvas').evaluate((c) => {
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+      const seen = new Set()
+      for (let i = 0; i < d.length; i += 4 * 97) seen.add(d[i] >> 4 << 8 | d[i + 1] >> 4 << 4 | d[i + 2] >> 4)
+      return seen.size > 6
+    }),
+  )
   await fb.getByLabel('标题').fill(draft.title)
   await fb.getByLabel('描述').fill(draft.body)
   await shot('desktop')
@@ -119,19 +141,30 @@ export async function uiTest(page, origin) {
       })),
     ),
   )
+  // Paste a screenshot from the clipboard into the panel.
+  const pasted = (await readFile('public/og.jpg')).toString('base64')
+  await fb.evaluate((panel, data) => {
+    const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0))
+    const transfer = new DataTransfer()
+    transfer.items.add(new File([bytes], 'clipboard.jpg', { type: 'image/jpeg' }))
+    panel.dispatchEvent(new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }))
+  }, pasted)
+  assert.equal(await fb.locator('.fb-photo').count(), 4)
   await fb.getByLabel('拍摄视角').first().selectOption('正面')
   await fb.locator('.fb-grid').scrollIntoViewIfNeeded()
   await fb.locator('.fb-grid img').evaluateAll((images) => Promise.all(images.map((image) => image.decode())))
   await shot('photos')
   await click('提交反馈')
   await fb
-    .locator('.fb-status--submitted')
+    .locator('.fb-pill.fb-status--submitted')
     .waitFor({ timeout: 120000 })
     .catch(async (error) => {
       throw Error(`${error.message}: ${await fb.innerText()}`)
     })
+  assert.match(await fb.locator('.fb-facts').innerText(), /解放东路向东/)
   await click('我的反馈')
-  await click(draft.title + ' · 已提交')
+  await shot('list')
+  await fb.locator('.fb-card').first().click()
   const [item] = await (await page.request.get(origin + '/api/feedback?mine=1')).json()
   for (const status of ['queued', 'modelling', 'reviewing', 'live']) {
     const response = await page.request.post(`${origin}/api/bridge/feedback/${item.id}/status`, {
@@ -141,7 +174,7 @@ export async function uiTest(page, origin) {
     assert.equal(response.status(), 200)
   }
   await click('刷新进度')
-  await fb.locator('.fb-status--live').waitFor()
+  await fb.locator('.fb-pill.fb-status--live').waitFor()
   assert.equal(await fb.locator('.fb-timeline li').count(), 5)
   await shot('timeline')
   await page.evaluate(() => window.viewer.camera.position.set(0, 500, 0))
@@ -155,6 +188,8 @@ export async function uiTest(page, origin) {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.locator('.dock-feedback').click()
   await fb.getByLabel('标题').waitFor()
+  await fb.locator('.fb-map canvas').waitFor()
+  await page.waitForTimeout(400)
   await shot('mobile')
   await click('关闭')
 }
