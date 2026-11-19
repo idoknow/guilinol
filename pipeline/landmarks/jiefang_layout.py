@@ -35,6 +35,14 @@ def grade_banks(terrain, original, wet, left, top, step, anchor, angle, datum):
     south = top + yy*step - bz
     x = east*np.cos(angle) + south*np.sin(angle)
     z = -east*np.sin(angle) + south*np.cos(angle)
+    # The coarse DEM leaves a ridge between the stepped lookouts and the water.
+    # Grade the dry foreshore down from the promenade; keep both loop islands.
+    waterward=(x>-114) & (x<-56) & (abs(z)<76)
+    shore_limit=datum+LOWER-.17-np.maximum(0,x+90)*.10+np.maximum(0,abs(z)-68)*.3
+    for field in (terrain,original):
+        patch=field[rows,cols]
+        mask=waterward & ~wet[rows,cols]
+        patch[mask]=np.minimum(patch[mask],np.rint(10*shore_limit[mask]))
     for side in (-1,1):
         dx, dz = -140-x, 41-side*z
         phase = np.arctan2(dx,dz) % (2*np.pi)
