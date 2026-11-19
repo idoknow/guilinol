@@ -136,8 +136,10 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   }
   const tiles=new Map(manifest.chunks.map(tile=>[`${tile.x},${tile.z}`,tile]))
   const tileAt=(east:number,south:number)=>tiles.get(`${Math.floor(east/256)*256},${Math.floor(south/256)*256}`)
+  const surfaceRay=new R.Ray({x:0,y:0,z:0},down)
   function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
-    const hit=world.castRayAndGetNormal(new R.Ray({x:east,y:origin,z:south},down),reach,false,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)
+    surfaceRay.origin.x=east;surfaceRay.origin.y=origin;surfaceRay.origin.z=south
+    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)
     const tile=kind==='deck'?tileAt(east,south):undefined
     const thin=tile&&hit?.featureId!==undefined&&stream.loaded.get(tile)?.thin.has(hit.featureId)
     return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}:null
