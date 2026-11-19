@@ -210,213 +210,117 @@ def loft_karst_rings(geo: Collector, rings, cap_top=True, cave_vault=False):
                 geo.add_karst_tri(b, a, tc)
 
 
+# Body sits on the west bank. +X is east, into the Li River (OSM water begins near
+# local x=72 at z=0 and x=64 at z=16). North (−Z) is the Taohua River mouth.
+BODY_CX, BODY_CZ = -8.0, 2.0
+RX_BODY, RZ_BODY = 58.0, 32.0
+
+
+def body_vertex(ang, t):
+    """Rounded hump: north crest is highest, south back falls away. t=0 foot, t=1 crown."""
+    ca, sa = math.cos(ang), math.sin(ang)
+    rib = 0.12 * math.sin(2.0 * ang + 0.5) + 0.07 * math.cos(5.0 * ang - 0.7) + 0.04 * math.sin(8.0 * ang)
+    z_guess = BODY_CZ + RZ_BODY * sa
+    north = smoothstep(24.0, -18.0, z_guess)
+    # Steep lower cliff, then a round shoulder so the crest is a hump rather than a flat lid.
+    if t < 0.40:
+        rad = 1.0 - 0.06 * (t / 0.40)
+    else:
+        u = (t - 0.40) / 0.60
+        rad = 0.94 * (math.cos(u * math.pi * 0.5) ** lerp(0.72, 0.95, north))
+    hang = 0.20 * math.sin(3.0 * ang + 0.6) * (math.sin(t * math.pi) ** 0.85)
+    hang -= 0.15 * max(0.0, math.cos(4.0 * ang - 1.1)) * smoothstep(0.12, 0.48, t) * (1.0 - smoothstep(0.78, 0.96, t))
+    rad = max(0.06, rad * (1.0 + hang + rib * (1.0 - 0.4 * t)))
+    x = BODY_CX + RX_BODY * ca * rad
+    z = BODY_CZ + RZ_BODY * sa * (0.82 + 0.18 * rad) * (1.0 + 0.35 * rib)
+    crest = lerp(22.0, SUMMIT_Y, smoothstep(30.0, -16.0, z) ** 0.85)
+    if t <= 0.0:
+        y = SKIRT_Y
+    else:
+        y = lerp(0.0, crest, math.sin(t * math.pi * 0.5) ** lerp(0.72, 1.05, 1.0 - north))
+    # Walk-quick starts at local (−107, −2) heading (0.8, 0.6) and must meet rock near x=−80.5.
+    h_prog = t
+    z = max(z, -25.2 + h_prog * 3.0)
+    toe = -80.5 + h_prog * 4.2
+    if y < 9.0 and -8.0 < z < 26.0 and x < toe + 24.0:
+        x = toe
+    else:
+        x = max(x, toe)
+    return x, y, z
+
+
 def build_main_body(geo: Collector):
-    """Build the main Elephant Body / Back (象身与象背) keeping the Water-Moon Cave southern sightline completely clear."""
-    segs = 64
-    angles = [2.0 * math.pi * i / segs for i in range(segs)]
-    uc, vc = -26.5, 5.5
-    rx_base, rz_south, rz_north = 50.0, 38.0, 31.0
-
-    fracs = [0.0, *(0.04 + 0.96 * (k / 16.0) for k in range(17))]
+    """Camel-back karst: high at the north head, falling south, with an irregular cliff."""
+    segs = 42
+    levels = 13
     rings = []
-    prev_scale = 1.05
-    for li, f in enumerate(fracs):
-        if li == 0:
-            y = SKIRT_Y
-            scale = 1.03
-        else:
-            t = (f - 0.04) / 0.96
-            y = lerp(0.0, SUMMIT_Y, math.sin(t * math.pi * 0.5) ** 0.86)
-            cliff_taper = 1.0 - 0.16 * smoothstep(0.0, 0.68, t)
-            dome_taper = 1.0 - 0.76 * (smoothstep(0.64, 1.0, t) ** 1.45)
-            ledge = -0.007 * (0.5 - 0.5 * math.cos(t * 16.0)) * (1.0 - smoothstep(0.65, 0.9, t))
-            scale = min(prev_scale - 0.006, cliff_taper * dome_taper + ledge)
-        prev_scale = scale
-
-        summit_pull = smoothstep(0.50, 1.0, f) ** 1.25
-        u_shift = 12.5 * summit_pull
-        v_shift = -3.0 * summit_pull
-        h_prog = li / (len(fracs) - 1)
-
+    peak = (BODY_CX, 0.0, BODY_CZ)
+    for level in range(levels):
+        t = 0.0 if level == 0 else level / (levels - 1)
         ring = []
-        for a in angles:
-            ca, sa = math.cos(a), math.sin(a)
-            rib = (
-                0.058 * math.sin(3.0 * a + 0.6)
-                + 0.036 * math.cos(5.0 * a - 1.1)
-                + 0.022 * math.sin(9.0 * a + 2.0)
-                + 0.012 * math.sin(19.0 * a + 0.6 * math.sin(3.0 * a)) * (1.0 - 0.6 * h_prog)
-            )
-            east_flat = smoothstep(0.50, 0.95, ca)
-            rib *= (1.0 - 0.68 * east_flat)
-
-            rz = rz_south if sa >= 0.0 else rz_north
-            du = rx_base * ca * (1.0 + rib) * scale + u_shift
-            dv = rz * sa * (1.0 + 0.85 * rib) * scale + v_shift
-
-            u_pt = uc + du
-            v_pt = vc + dv
-            # Recede the east flank south of the arch so the entire Water-Moon Cave stays 100% unobstructed
-            east_cap = 22.8 - 0.24 * max(0.0, v_pt - 3.5) - 0.5 * smoothstep(0.0, 24.0, y)
-            if ca > 0.15 and y < 32.0:
-                u_pt = min(u_pt, east_cap)
-
-            x_w, z_w = uv_to_xz(u_pt, v_pt)
-            # Keep >=26 m clear of walk start (-962, 1096) -> local (-107.4, -1.7).
-            # The quick-walk heading (0.8, 0.6) crosses x=-80.5 near z=18, so the low
-            # landward face stays on that line instead of peeling away to the southeast.
-            z_w = max(z_w, -25.2 + h_prog * 3.0)
-            toe = -80.5 + h_prog * 3.8
-            if y < 8 and -8.0 < z_w < 26.0 and x_w < toe + 22.0:
-                x_w = toe
-            else:
-                x_w = max(x_w, toe)
-            ring.append((x_w, y, z_w))
+        for i in range(segs):
+            x, y, z = body_vertex(2.0 * math.pi * i / segs, t)
+            ring.append((x, y, z))
+            if y > peak[1]:
+                peak = (x, y, z)
         rings.append(ring)
-
     loft_karst_rings(geo, rings, cap_top=True)
+    return peak
 
 
 def build_trunk_and_water_moon_cave(geo: Collector):
-    """Build the sheer Elephant Trunk pier (象鼻) + Forehead Arch Bridge + full-moon Water-Moon Cave (水月洞)."""
-    # Full semicircular Water-Moon Cave arch matching 00-2025.jpg:
-    # Span u in [23.2, 44.4] (width 21.2 m), crown at y = 17.0 m (~14.9 m above the 147.7 m river mirror!).
-    u_west = 23.2
-    u_east = 44.4
-    u_mid = 0.5 * (u_west + u_east)  # 33.8
-    r_arch = 0.5 * (u_east - u_west)  # 10.6 m
-    y_spring = WATER_Y + 3.6          # 5.7 m
-    r_vert = 11.3                     # crown at 5.7 + 11.3 = 17.0 m
+    """Ridge from the hillside out to a round arch standing in the Li River.
 
-    # 1. East Elephant Trunk Column (象鼻墩, u in [44.0, 61.8])
-    trunk_segs = 28
-    t_angles = [2.0 * math.pi * i / trunk_segs for i in range(trunk_segs)]
-    trunk_levels = [SKIRT_Y, 0.5, WATER_Y - 0.2, WATER_Y + 1.2, WATER_Y + 3.2, 9.2, 14.8, 19.6, 23.6]
-    trunk_rings = []
-    for y in trunk_levels:
-        notch = 1.0 - 0.085 * (1.0 - smoothstep(0.0, 2.2, abs(y - (WATER_Y + 0.8))))
+    Rendered water (clearance probe) starts near local x=120 for z=0..16. The open
+    span is x=126..150, z=2..15, feet below the waterline, no floor and no end cap.
+    The east pier is the trunk: the arch spring itself, narrowing into the water.
+    """
+    def shoulder_ring(t):
+        cx = lerp(46.0, 120.0, t)
+        cz = 7.4
+        half_w = lerp(9.0, 6.8, t)
+        top = lerp(27.0, 16.5, t)
         ring = []
-        for a in t_angles:
-            ca, sa = math.cos(a), math.sin(a)
-            rib = 0.05 * math.sin(4.0 * a + 0.9) + 0.03 * math.cos(7.0 * a - 0.4)
-            rx = 8.9 * notch * (1.0 + 0.6 * rib)
-            rz = 7.4 * notch * (1.0 + 0.65 * rib)
-            u_pt = 53.0 + rx * ca
-            if ca < -0.25 and y < 18.5:
-                u_pt = max(u_pt, u_east - 0.2)
-            v_pt = 0.0 + rz * sa * (1.0 - 0.15 * max(0.0, ca))
-            x_w, z_w = uv_to_xz(u_pt, v_pt)
-            ring.append((x_w, y, z_w))
-        trunk_rings.append(ring)
-    loft_karst_rings(geo, trunk_rings, cap_top=True)
+        for k in range(12):
+            a = math.pi * k / 11.0
+            z = cz + half_w * math.cos(a)
+            y = 0.4 + (top - 0.4) * (math.sin(a) ** 0.82)
+            x = cx + 2.4 * math.sin(a)
+            ring.append((x, y, z))
+        ring.append((cx - 1.2, 0.35, cz - half_w * 0.6))
+        ring.append((cx - 1.2, 0.35, cz + half_w * 0.6))
+        return ring
 
-    # 2. Low wet-rock footing at West inner base of Water-Moon Cave (kept compact so river flows wide through cave)
-    ledge_rings = []
-    for y, s in [(SKIRT_Y, 1.04), (WATER_Y + 0.25, 0.95), (WATER_Y + 0.95, 0.65), (WATER_Y + 1.45, 0.35)]:
-        ring = []
-        for a in [2.0 * math.pi * i / 12 for i in range(12)]:
-            u_pt = 23.0 + 2.1 * s * (math.cos(a) * 0.5 + 0.5)
-            v_pt = 0.0 + 5.2 * s * math.sin(a)
-            x_w, z_w = uv_to_xz(u_pt, v_pt)
-            ring.append((x_w, y, z_w))
-        ledge_rings.append(ring)
-    loft_karst_rings(geo, ledge_rings, cap_top=True, cave_vault=True)
+    loft_karst_rings(geo, [shoulder_ring(i / 7.0) for i in range(8)], cap_top=False)
 
-    # 3. Overhead Forehead Bridge & Water-Moon Cave Arch Vault (象额横梁与水月洞拱顶)
-    u_samples = [
-        16.5, 20.2, 23.2,
-        24.2, 25.8, 27.8, 30.2, 32.6, 33.8, 35.0, 37.4, 39.8, 41.8, 43.4,
-        44.4, 48.0, 52.2, 56.5, 60.0, 61.5,
-    ]
+    def vault_ring(z):
+        phase = (z - 8.0) * 0.35
+        inner = []
+        for k in range(9):
+            a = math.pi * (1.0 - k / 8.0)
+            wobble = 1.0 + 0.04 * math.sin(3.0 * a + phase)
+            x = 138.0 + 12.0 * math.cos(a) * wobble
+            y = (WATER_Y - 1.6) + 14.8 * math.sin(a)
+            inner.append((x, y, z))
+        outer = []
+        for k in range(9):
+            a = math.pi * (k / 8.0)
+            wobble = 1.0 + 0.05 * math.cos(2.0 * a - phase)
+            # East spring (the trunk) reaches a little further and lower than the west pier.
+            east = max(0.0, math.cos(a))
+            x = 136.0 + (17.5 + 4.5 * east) * math.cos(a) * wobble
+            y = (WATER_Y - 2.6) + (19.0 - 3.0 * east) * math.sin(a)
+            if east > 0.65:
+                y = min(y, lerp(WATER_Y - 1.2, -3.2, (east - 0.65) / 0.35))
+            outer.append((x, y, z))
+        return inner + outer
 
-    def brow_top_y(u):
-        t = np.clip((61.5 - u) / (61.5 - 16.5), 0.0, 1.0)
-        base = 23.4 + 22.4 * (t ** 1.18)
-        forehead = 2.5 * math.exp(-((u - 44.5) / 9.5) ** 2)
-        return base + forehead
-
-    def arch_bottom_y(u):
-        if u <= u_west:
-            return 14.8
-        if u >= u_east:
-            return 15.6
-        dx_norm = np.clip((u - u_mid) / r_arch, -1.0, 1.0)
-        return y_spring + r_vert * math.sqrt(max(0.0, 1.0 - dx_norm * dx_norm))
-
-    def half_depth_v(u):
-        # Crisp natural karst arch thickness (~13.2 m across cave crown) so oblique views still pierce wide through
-        t = np.clip((u - 16.5) / (61.5 - 16.5), 0.0, 1.0)
-        arch_pinch = 1.4 * math.exp(-((u - u_mid) / 9.0) ** 2)
-        return lerp(12.2, 6.8, t ** 0.72) - arch_pinch
-
-    slice_loops = []
-    for u in u_samples:
-        yb = arch_bottom_y(u)
-        yt = brow_top_y(u)
-        hv = half_depth_v(u)
-        relief_n = 0.45 * math.sin(u * 0.27 + 0.4) + 0.25 * math.cos(u * 0.61)
-        relief_s = 0.45 * math.cos(u * 0.25 - 0.7) + 0.25 * math.sin(u * 0.57)
-        vn = -(hv + relief_n)
-        vs = +(hv + relief_s)
-
-        pts_vy = [
-            (vs * 0.94, yb + 0.35),
-            (vs * 0.48, yb - 0.15),
-            (0.0,       yb - 0.28),
-            (vn * 0.48, yb - 0.15),
-            (vn * 0.94, yb + 0.35),
-            (vn * 1.02, lerp(yb, yt, 0.28)),
-            (vn * 1.00, lerp(yb, yt, 0.56)),
-            (vn * 0.88, lerp(yb, yt, 0.80)),
-            (vn * 0.58, yt - 0.9),
-            (0.0,       yt),
-            (vs * 0.58, yt - 0.9),
-            (vs * 0.88, lerp(yb, yt, 0.80)),
-            (vs * 1.00, lerp(yb, yt, 0.56)),
-            (vs * 1.02, lerp(yb, yt, 0.28)),
-        ]
-        loop_xyz = []
-        for vp, yp in pts_vy:
-            xw, zw = uv_to_xz(u, vp)
-            loop_xyz.append((xw, yp, zw, vp, yp, yb))
-        slice_loops.append((u, loop_xyz))
-
-    m = len(slice_loops[0][1])
-    for k in range(len(slice_loops) - 1):
-        u0, l0 = slice_loops[k]
-        u1, l1 = slice_loops[k + 1]
-        in_arch = (max(u0, u1) > u_west + 0.1) and (min(u0, u1) < u_east - 0.1)
-        c0 = np.mean([[p[0], p[1], p[2]] for p in l0], axis=0)
-        c1 = np.mean([[p[0], p[1], p[2]] for p in l1], axis=0)
-        seg_center = 0.5 * (c0 + c1)
-        for i in range(m):
-            j = (i + 1) % m
-            p00 = l0[i][:3]
-            p01 = l0[j][:3]
-            p11 = l1[j][:3]
-            p10 = l1[i][:3]
-            is_vault_face = in_arch and (i in (0, 1, 2, 3, 13))
-            tri_mid = (np.asarray(p00) + np.asarray(p01) + np.asarray(p11)) / 3.0
-            n_test = np.cross(np.asarray(p01) - np.asarray(p00), np.asarray(p11) - np.asarray(p00))
-            if np.dot(n_test, tri_mid - seg_center) >= 0:
-                geo.add_karst_tri(p00, p01, p11, cave_vault=is_vault_face)
-                geo.add_karst_tri(p00, p11, p10, cave_vault=is_vault_face)
-            else:
-                geo.add_karst_tri(p00, p11, p01, cave_vault=is_vault_face)
-                geo.add_karst_tri(p00, p10, p11, cave_vault=is_vault_face)
-
-    _, tip_loop = slice_loops[-1]
-    tip_pts = [p[:3] for p in tip_loop]
-    tc = np.mean(tip_pts, axis=0)
-    xw_out, zw_out = uv_to_xz(slice_loops[-1][0] + 0.6, 0.0)
-    tc[0], tc[2] = xw_out, zw_out
-    for i in range(m):
-        j = (i + 1) % m
-        a, b = np.asarray(tip_pts[i]), np.asarray(tip_pts[j])
-        if np.dot(np.cross(b - a, tc - a), tc - np.mean(tip_pts, axis=0)) >= 0:
-            geo.add_karst_tri(a, b, tc)
-        else:
-            geo.add_karst_tri(b, a, tc)
+    loft_karst_rings(
+        geo,
+        [vault_ring(2.0 + 13.0 * i / 10.0) for i in range(11)],
+        cap_top=False,
+        cave_vault=True,
+    )
 
 
 def add_foliage_clump(geo: Collector, cx, cy, cz, rx, ry, rz, seed=0.0):
@@ -455,37 +359,35 @@ def add_foliage_clump(geo: Collector, cx, cy, cz, rx, ry, rz, seed=0.0):
 
 
 def build_draped_canopy(geo: Collector):
-    """Add sculpted broadleaf tree/shrub crowns along the elephant brow, trunk head, ledges, and summit."""
-    specs = [
-        (58.5, 24.4,  0.0, 4.4, 2.9, 4.2),
-        (54.0, 26.8, -3.2, 4.8, 3.3, 4.4),
-        (52.5, 26.5,  3.4, 4.5, 3.1, 4.2),
-        (47.5, 30.2, -1.8, 5.4, 3.8, 4.8),
-        (45.0, 29.8,  3.8, 4.8, 3.4, 4.5),
-        (40.0, 32.8, -2.8, 5.6, 4.0, 5.0),
-        (35.5, 34.8,  2.2, 5.8, 4.1, 5.2),
-        (30.5, 37.8, -2.2, 6.0, 4.3, 5.4),
-        (25.5, 41.2,  2.5, 6.2, 4.4, 5.6),
-        (33.0, 21.8, -6.4, 2.7, 2.0, 2.2),
-        (21.5, 25.2, -12.0, 3.4, 2.4, 2.9),
-        (11.0, 29.5, -16.5, 3.9, 2.7, 3.3),
-        (-3.0, 32.0, -18.5, 4.3, 2.9, 3.6),
-        (15.5, 24.0,  13.5, 3.4, 2.4, 3.0),
-        (13.5, 45.8, -2.5, 6.4, 4.4, 5.8),
-        ( 5.5, 48.2, -5.5, 6.2, 4.2, 5.6),
-        ( 3.5, 48.0,  8.5, 6.0, 4.1, 5.5),
-        (-4.5, 50.2, -6.5, 5.8, 4.0, 5.2),
-        (-6.0, 49.8, 10.5, 5.8, 3.9, 5.2),
-        (-21.0, 50.6, -3.5, 6.5, 4.5, 6.0),
-        (-22.5, 50.2,  9.5, 6.2, 4.2, 5.8),
-        (-32.0, 48.5,  2.5, 6.8, 4.6, 6.2),
-        (-42.0, 45.0, -2.5, 6.4, 4.3, 5.8),
-        (-44.0, 44.5,  9.5, 6.0, 4.1, 5.5),
-        (-54.0, 39.5,  3.5, 5.8, 3.9, 5.4),
-    ]
-    for idx, (u, y, v, rx, ry, rz) in enumerate(specs):
-        xw, zw = uv_to_xz(u, v)
-        add_foliage_clump(geo, xw, y, zw, rx, ry, rz, seed=idx * 1.37 + 0.4)
+    """Clustered broadleaf crowns down the upper slopes. Lower cliff and the trunk face stay bare rock."""
+    for i in range(96):
+        ang = (i * 2.399963) % (2.0 * math.pi)
+        t = 0.30 + 0.64 * (((i * 5) % 13) / 12.0)
+        x, y, z = body_vertex(ang, t)
+        ox, oz = x - BODY_CX, z - BODY_CZ
+        reach = math.hypot(ox, oz) or 1.0
+        x += ox / reach * 2.8
+        z += oz / reach * 1.8
+        if x > 108.0 or y < 9.0:
+            continue
+        scale = 0.85 + 0.7 * ((i * 3) % 5) / 4.0
+        rx = 3.6 * scale
+        ry = 2.5 * scale
+        rz = 3.3 * scale
+        add_foliage_clump(geo, x, y + ry * 0.28, z, rx, ry, rz, seed=i * 0.73)
+        if i % 2 == 0:
+            add_foliage_clump(geo, x + 2.4 * math.cos(ang), y + ry * 0.05, z + 1.8 * math.sin(ang),
+                              rx * 0.7, ry * 0.66, rz * 0.7, seed=i * 1.17 + 2.0)
+    # Crowns along the rock shoulder that runs out to the cave, stopping short of the bare trunk.
+    for i in range(9):
+        t = i / 8.0
+        if t > 0.62:
+            continue
+        x = lerp(50.0, 108.0, t)
+        y = lerp(28.0, 17.0, t)
+        z = 7.5 + 2.4 * math.sin(t * 4.0)
+        scale = 1.15 - 0.35 * t
+        add_foliage_clump(geo, x, y, z, 4.2 * scale, 2.6 * scale, 3.6 * scale, seed=3.0 + i)
 
 
 def add_prism_frustum(geo: Collector, cx, cz, r0, r1, y0, y1, sides, col, yaw=0.0, cap_top=True, cap_bottom=False):
@@ -513,8 +415,9 @@ def add_prism_frustum(geo: Collector, cx, cz, r0, r1, y0, y1, sides, col, yaw=0.
 
 def build_puxian_pagoda(geo: Collector):
     """Build Ming bottle-shaped brick Puxian Pagoda (普贤塔) on the summit shoulder (04-2024.jpg)."""
-    px, pz = uv_to_xz(-14.0, 2.5)
-    y_base = 50.6
+    # North crest of the hump (象头), not the flat middle of the old drum.
+    px, _y, pz = body_vertex(math.pi * 1.15, 0.92)
+    y_base = _y - 1.4
 
     oct_yaw = math.pi / 8.0
     add_prism_frustum(geo, px, pz, 3.85, 3.65, y_base - 1.8, y_base + 1.15, 8, PAL['stoneBase'], oct_yaw)
@@ -673,12 +576,12 @@ def build_shore_balustrade(geo: Collector):
 
 def build_rafts(geo: Collector):
     """Three Guilin sightseeing bamboo rafts floating on the 147.7 m Li River mirror."""
-    for u, v, ryaw in [
-        (34.5, -21.0,  1.32),   # Approaching Water-Moon Cave from north confluence
-        (65.0,  -6.0, -1.65),   # Off the Elephant Trunk tip in Li River
-        (42.5,  19.5,  2.10),   # South side of Water-Moon Cave
-    ]:
-        rx, rz = uv_to_xz(u, v)
+    # In the river: one north of the cave mouth, one in front of the arch, one south of the trunk.
+    for rx, rz, ryaw in (
+        (134.0, -14.0, 0.3),
+        (152.0, 20.0, 1.4),
+        (118.0, 24.0, 2.0),
+    ):
         add_bamboo_raft(geo, rx, rz, ryaw)
 
 
@@ -695,8 +598,7 @@ def build_glb():
     build_rafts(decor)
     tris = np.concatenate([np.asarray(cliff.tris, dtype=np.float64), np.asarray(decor.tris, dtype=np.float64)])
     cols = np.concatenate([np.asarray(cliff.cols, dtype=np.float64), np.asarray(decor.cols, dtype=np.float64)])
-    cx, cz = uv_to_xz(33.8, 0.0)
-    cave = np.array([cx, WATER_Y + 7.5, cz])
+    cave = np.array([138.0, WATER_Y + 8.0, 8.0])
     center = tris.mean(axis=1)
     lit = np.linalg.norm(center - cave, axis=1) < 15.5
     lit |= np.linalg.norm(center - pagoda, axis=1) < 5.5
