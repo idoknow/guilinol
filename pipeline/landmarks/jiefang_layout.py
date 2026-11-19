@@ -38,11 +38,22 @@ def section(way):
     if way in (RAMPS[0],RAMPS[3]): t=1-t
     y=LOWER+(UPPER-LOWER)*t if way in RAMPS else np.full(len(xy),UPPER if way in UPPER_ROADS else LOWER)
     if way in SIDE_ROAD:
-        line,_,_,levels=section(258909978)
-        at=np.argmin(np.linalg.norm(line-xy[-1],axis=1))
-        # Outer DEM station is at 153.3 m, 7.7 m above the bridge datum.
-        y=np.interp(along,[0,along[-1]-8,along[-1]],[7.7,levels[at],levels[at]])
+        y=libin_levels(xy)
     return xy,edges,along,y
+
+
+def libin_levels(points):
+    # Libin meets the outer ramp tangentially. Match its slope throughout the
+    # shared mouth, then blend up to the native street beyond the junction.
+    xy,_,station,height=section(258909978)
+    road=LineString(xy)
+    levels=[]
+    for coords in points:
+        p=Point(coords)
+        ramp_height=np.interp(road.project(p),station,height)
+        blend=np.clip((road.distance(p)-11)/21,0,1)
+        levels.append((1-blend)*ramp_height+blend*7.7)
+    return np.asarray(levels)
 
 
 def widths(way):
@@ -53,7 +64,7 @@ def widths(way):
     if way in UPPER_ROADS:
         blend=np.clip((section(way)[0][:,0]+265)/23,0,1)
         native=4.7 if way==UPPER_ROADS[0] else 4.9
-        return -native-(6-native)*blend,native+(10.1-native)*blend,3.
+        return -native-(6-native)*blend,native+(9.85-native)*blend,3.
     if way in SIDE_ROAD:return -3.,3.,0.
     # Binjiang's OSM way runs north: its river-side pavement is on the right.
     if way in LOWER_ROADS:return -3.6,3.6,3.6

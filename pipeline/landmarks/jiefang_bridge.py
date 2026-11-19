@@ -163,8 +163,8 @@ def west_bank(model):
         if side==1:
             model.box(-110.8,-5.83,36.8,7.8,.82,21,'stone',True)
             model.box(-110.8,-5.01,36.8,7.8,.10,21,'pave',True)
-            model.box(-107,-4.91,36.8,.36,.57,21,'stone',True)
-            model.beam([-107,-4,26.3],[-107,-4,47.3],.085,'white',8,True)
+            model.box(-107,-4.91,38.55,.36,.57,17.5,'stone',True)
+            model.beam([-107,-4,29.8],[-107,-4,47.3],.085,'white',8,True)
             for z in (30.4,36.8,43.2):
                 model.pose=(-109.5,-4.90,z,{30.4:-.67,36.8:0,43.2:.99}[z])
                 pillar(model,'violet',flat=z==36.8)

@@ -1,6 +1,7 @@
 """West-bank carriageways and pedestrian surfaces built from the OSM survey."""
 import numpy as np
-from jiefang_layout import OSM, RAMPS, UPPER_ROADS, LOWER_ROADS, SIDE_ROAD, FOOTWAYS, LOWER, UPPER, section, widths
+from shapely.geometry import LineString, Point
+from jiefang_layout import OSM, RAMPS, UPPER_ROADS, LOWER_ROADS, SIDE_ROAD, FOOTWAYS, LOWER, UPPER, section, widths, libin_levels
 
 
 def vertex(p,h):
@@ -17,7 +18,8 @@ def street(model,way):
     l,r,w=widths(way)
     def edge(offset,up=0):
         points=xy+n*np.broadcast_to(offset,len(xy))[:,None]
-        return np.array([vertex(p,h) for p,h in zip(points,y+up)])
+        levels=libin_levels(points) if way in SIDE_ROAD else y
+        return np.array([vertex(p,h) for p,h in zip(points,levels+up)])
     if way in FOOTWAYS+SIDE_ROAD:
         raise_by=.12 if way in FOOTWAYS else 0
         surface(model,edge(l,raise_by),edge(r,raise_by),'pave' if way in FOOTWAYS else 'tile')
@@ -42,7 +44,9 @@ def street(model,way):
         curb*=np.clip((along-(15 if down else 4))/3,0,1)
         curb*=np.clip((along[-1]-along-(4 if down else 15))/3,0,1)
         if way==258909978:
-            curb*=np.clip((np.linalg.norm(xy-OSM[SIDE_ROAD[0]][-1],axis=1)-4)/3,0,1)
+            branch=LineString(OSM[SIDE_ROAD[0]])
+            distance=np.array([branch.distance(Point(p)) for p in xy+n*(r+w)[:,None]])
+            curb*=np.clip((distance-4)/3,0,1)
     left,right=edge(l),edge(r)
     outer=edge(r+w,curb)
     surface(model,left,right,'tile')

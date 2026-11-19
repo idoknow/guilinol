@@ -107,7 +107,7 @@ try {
           reach(x+(a[0]+b[0])*offset/m,z+(a[1]+b[1])*offset/m,String(id))
           const t=Math.max(0,Math.min(1,(station-(down?19:8))/(total-27)))
           const expected=146.56+5.30*(down?1-t:t)+(riding?0:.12)
-          if(Math.abs(walk.probe().foot-expected)>.33)throw Error('Wrong ramp level at '+id+' station '+station)
+          if(Math.abs(walk.probe().foot-expected)>.33)throw Error(JSON.stringify({id,station,expected,actual:walk.probe().foot,x,z}))
           station+=lengths[i]??0
         }
       }
@@ -122,8 +122,9 @@ try {
       link(258909975)
       binjiang(-94,'north landing')
       link(258909976)
-      reach(-272,-lane,'west road seam')
-      reach(-272,lane,'west turnaround')
+      // Follow the widening sidewalk through the transition to the native street.
+      for(const [x,z] of [[-239,-17],[-253,-15],[-265,-12.7],[-272,-12.7],[-272,11.8],[-265,11.8],[-253,14],[-239,17]])
+        reach(x,riding?Math.sign(z)*6:z,'west road seam')
       link(258909978)
       for(const z of [94,77,45,25,0,-27])binjiang(z,'return bank')
       if(!riding){
