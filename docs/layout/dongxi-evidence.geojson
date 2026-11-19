@@ -766,8 +766,8 @@
         "name": "候选屋顶 B",
         "source": "Overture 5e184161-9951-402a-8cc4-3aef6e13cee8",
         "upstream": "doi:10.5281/zenodo.8174931",
-        "check": "07/10 视线诊断；不是组团号",
-        "role": "candidate_roof"
+        "check": "已排除为星巴克铺面：正阳路西侧，与 POI 不符",
+        "role": "excluded_roof"
       }
     },
     {
@@ -803,8 +803,8 @@
         "name": "候选屋顶 A",
         "source": "Overture 80e4cc2a-365c-42eb-ac75-19ec1f8185ad",
         "upstream": "doi:10.5281/zenodo.8174931",
-        "check": "07/10 视线诊断；不是组团号",
-        "role": "candidate_roof"
+        "check": "已排除为星巴克铺面：正阳路西侧，与 POI 不符",
+        "role": "excluded_roof"
       }
     },
     {
@@ -817,21 +817,23 @@
             25.2811083
           ],
           [
-            110.29374182793963,
-            25.28164127601387
+            110.29407132,
+            25.28114627
           ]
         ]
       },
       "properties": {
         "name": "照片 07 招牌视线",
         "source": "walk-shizijie-wangcheng/07_IMG_1396.jpg",
-        "heading_deg": 351.44,
+        "heading_deg": 80.29,
         "pixel_x": [
           1300,
           1473
         ],
         "camera_accuracy_m": 4.7,
-        "role": "diagnostic_ray"
+        "role": "diagnostic_ray",
+        "optical_heading_deg": 50.55,
+        "exif_deg": 321.7
       }
     },
     {
@@ -844,21 +846,23 @@
             25.2811194
           ],
           [
-            110.2937976027784,
-            25.281643024833404
+            110.29407132,
+            25.28114627
           ]
         ]
       },
       "properties": {
         "name": "照片 10 招牌视线",
         "source": "walk-shizijie-wangcheng/10_IMG_1399.jpg",
-        "heading_deg": 346.29,
+        "heading_deg": 77.53,
         "pixel_x": [
           1347,
           1706
         ],
         "camera_accuracy_m": 4.7,
-        "role": "diagnostic_ray"
+        "role": "diagnostic_ray",
+        "optical_heading_deg": 40.34,
+        "exif_deg": 309.1
       }
     }
   ]

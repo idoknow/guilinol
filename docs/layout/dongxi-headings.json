@@ -1,0 +1,576 @@
+{
+  "01": {
+    "original": 106.5,
+    "heading": 97.8,
+    "quadrants": [
+      7.800000000000001,
+      97.8,
+      187.8,
+      277.8
+    ],
+    "lines": 114,
+    "support": 0.35,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -8.7,
+    "adopted": false
+  },
+  "02": {
+    "original": 41.8,
+    "heading": 27.3,
+    "quadrants": [
+      297.3,
+      27.299999999999997,
+      117.3,
+      207.3
+    ],
+    "lines": 82,
+    "support": 0.11,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -14.5,
+    "adopted": false
+  },
+  "03": {
+    "original": 89.4,
+    "heading": 87.8,
+    "quadrants": [
+      357.8,
+      87.8,
+      177.8,
+      267.8
+    ],
+    "lines": 55,
+    "support": 0.21,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -1.6,
+    "adopted": false
+  },
+  "04": {
+    "original": 128.9,
+    "heading": 169.3,
+    "quadrants": [
+      349.3,
+      79.3,
+      169.3,
+      259.3
+    ],
+    "lines": 26,
+    "support": 0.14,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": 40.4,
+    "adopted": false
+  },
+  "05": {
+    "original": 66.4,
+    "heading": 32.3,
+    "quadrants": [
+      302.3,
+      32.3,
+      122.3,
+      212.3
+    ],
+    "lines": 17,
+    "support": 0.09,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -34.1,
+    "adopted": false
+  },
+  "06": {
+    "original": 134.4,
+    "heading": 136.55,
+    "quadrants": [
+      316.55,
+      46.55,
+      136.55,
+      226.55
+    ],
+    "lines": 25,
+    "support": 0.15,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": 2.15,
+    "adopted": false
+  },
+  "07": {
+    "original": 321.7,
+    "heading": 50.55,
+    "quadrants": [
+      320.55,
+      50.55,
+      140.55,
+      230.55
+    ],
+    "lines": 125,
+    "support": 0.28,
+    "basis": "街区平行线消失点；07→10 的 GPS 基线与双视几何消除 90° 歧义",
+    "stereo": 50.72,
+    "stereo_inliers": 55,
+    "delta": 88.85,
+    "adopted": true
+  },
+  "08": {
+    "original": 234.4,
+    "heading": 219.55,
+    "quadrants": [
+      309.55,
+      39.55,
+      129.55,
+      219.55
+    ],
+    "lines": 15,
+    "support": 0.07,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -14.85,
+    "adopted": false
+  },
+  "09": {
+    "original": 176.3,
+    "heading": 173.8,
+    "quadrants": [
+      353.8,
+      83.8,
+      173.8,
+      263.8
+    ],
+    "lines": 49,
+    "support": 0.2,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -2.5,
+    "adopted": false
+  },
+  "10": {
+    "original": 309.1,
+    "heading": 40.34,
+    "quadrants": [
+      349.3,
+      79.3,
+      169.3,
+      259.3
+    ],
+    "lines": 48,
+    "support": 0.38,
+    "basis": "07 街轴 + 双视相对转角；不采纳 10 主导线簇",
+    "stereo": 40.51,
+    "stereo_inliers": 55,
+    "delta": 91.24,
+    "adopted": true
+  },
+  "11": {
+    "original": 342.0,
+    "heading": 338.55,
+    "quadrants": [
+      338.55,
+      68.55,
+      158.55,
+      248.55
+    ],
+    "lines": 187,
+    "support": 0.41,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -3.45,
+    "adopted": false
+  },
+  "12": {
+    "original": 7.4,
+    "heading": 8.05,
+    "quadrants": [
+      8.05,
+      98.05,
+      188.05,
+      278.05
+    ],
+    "lines": 148,
+    "support": 0.56,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": 0.65,
+    "adopted": false
+  },
+  "13": {
+    "original": 358.1,
+    "heading": 357.05,
+    "quadrants": [
+      357.05,
+      87.05,
+      177.05,
+      267.05
+    ],
+    "lines": 108,
+    "support": 0.35,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -1.05,
+    "adopted": false
+  },
+  "14": {
+    "original": 285.4,
+    "heading": 278.55,
+    "quadrants": [
+      8.55,
+      98.55,
+      188.55,
+      278.55
+    ],
+    "lines": 81,
+    "support": 0.29,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -6.85,
+    "adopted": false
+  },
+  "15": {
+    "original": 336.1,
+    "heading": 331.55,
+    "quadrants": [
+      331.55,
+      61.55,
+      151.55,
+      241.55
+    ],
+    "lines": 171,
+    "support": 0.54,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -4.55,
+    "adopted": false
+  },
+  "16": {
+    "original": 79.9,
+    "heading": 77.8,
+    "quadrants": [
+      347.8,
+      77.8,
+      167.8,
+      257.8
+    ],
+    "lines": 79,
+    "support": 0.18,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -2.1,
+    "adopted": false
+  },
+  "17": {
+    "original": 111.9,
+    "heading": 106.05,
+    "quadrants": [
+      286.05,
+      16.049999999999997,
+      106.05,
+      196.05
+    ],
+    "lines": 72,
+    "support": 0.14,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -5.85,
+    "adopted": false
+  },
+  "18": {
+    "original": 286.1,
+    "heading": 285.05,
+    "quadrants": [
+      285.05,
+      15.049999999999997,
+      105.05,
+      195.05
+    ],
+    "lines": 116,
+    "support": 0.2,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -1.05,
+    "adopted": false
+  },
+  "19": {
+    "original": 184.3,
+    "heading": 148.05,
+    "quadrants": [
+      328.05,
+      58.05,
+      148.05,
+      238.05
+    ],
+    "lines": 52,
+    "support": 0.14,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -36.25,
+    "adopted": false
+  },
+  "20": {
+    "original": 351.7,
+    "heading": 347.0,
+    "quadrants": [
+      347.0,
+      77.0,
+      167.0,
+      257.0
+    ],
+    "lines": 112,
+    "support": 0.35,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -4.7,
+    "adopted": false
+  },
+  "21": {
+    "original": 353.3,
+    "heading": 11.5,
+    "quadrants": [
+      281.5,
+      11.5,
+      101.5,
+      191.5
+    ],
+    "lines": 15,
+    "support": 0.19,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": 18.2,
+    "adopted": false
+  },
+  "22": {
+    "original": 355.9,
+    "heading": 356.0,
+    "quadrants": [
+      356.0,
+      86.0,
+      176.0,
+      266.0
+    ],
+    "lines": 107,
+    "support": 0.33,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": 0.1,
+    "adopted": false
+  },
+  "23": {
+    "original": 14.7,
+    "heading": 10.5,
+    "quadrants": [
+      280.5,
+      10.5,
+      100.5,
+      190.5
+    ],
+    "lines": 25,
+    "support": 0.16,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -4.2,
+    "adopted": false
+  },
+  "24": {
+    "original": 351.8,
+    "heading": 351.5,
+    "quadrants": [
+      351.5,
+      81.5,
+      171.5,
+      261.5
+    ],
+    "lines": 123,
+    "support": 0.45,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -0.3,
+    "adopted": false
+  },
+  "25": {
+    "original": 10.8,
+    "heading": 6.75,
+    "quadrants": [
+      6.75,
+      96.75,
+      186.75,
+      276.75
+    ],
+    "lines": 65,
+    "support": 0.25,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -4.05,
+    "adopted": false
+  },
+  "26": {
+    "original": 8.8,
+    "heading": 8.5,
+    "quadrants": [
+      8.5,
+      98.5,
+      188.5,
+      278.5
+    ],
+    "lines": 127,
+    "support": 0.42,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -0.3,
+    "adopted": false
+  },
+  "27": {
+    "original": 9.0,
+    "heading": 8.25,
+    "quadrants": [
+      8.25,
+      98.25,
+      188.25,
+      278.25
+    ],
+    "lines": 88,
+    "support": 0.31,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -0.75,
+    "adopted": false
+  },
+  "28": {
+    "original": 323.7,
+    "heading": 323.0,
+    "quadrants": [
+      323.0,
+      53.0,
+      143.0,
+      233.0
+    ],
+    "lines": 68,
+    "support": 0.27,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -0.7,
+    "adopted": false
+  },
+  "29": {
+    "original": 61.7,
+    "heading": 57.75,
+    "quadrants": [
+      327.75,
+      57.75,
+      147.75,
+      237.75
+    ],
+    "lines": 78,
+    "support": 0.39,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -3.95,
+    "adopted": false
+  },
+  "30": {
+    "original": 67.9,
+    "heading": 62.5,
+    "quadrants": [
+      332.5,
+      62.5,
+      152.5,
+      242.5
+    ],
+    "lines": 47,
+    "support": 0.27,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -5.4,
+    "adopted": false
+  },
+  "31": {
+    "original": 20.3,
+    "heading": 15.75,
+    "quadrants": [
+      285.75,
+      15.75,
+      105.75,
+      195.75
+    ],
+    "lines": 107,
+    "support": 0.34,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -4.55,
+    "adopted": false
+  },
+  "32": {
+    "original": 340.4,
+    "heading": 337.5,
+    "quadrants": [
+      337.5,
+      67.5,
+      157.5,
+      247.5
+    ],
+    "lines": 58,
+    "support": 0.26,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -2.9,
+    "adopted": false
+  },
+  "33": {
+    "original": 89.2,
+    "heading": 92.25,
+    "quadrants": [
+      2.25,
+      92.25,
+      182.25,
+      272.25
+    ],
+    "lines": 44,
+    "support": 0.16,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": 3.05,
+    "adopted": false
+  },
+  "34": {
+    "original": 0.7,
+    "heading": 2.75,
+    "quadrants": [
+      2.75,
+      92.75,
+      182.75,
+      272.75
+    ],
+    "lines": 52,
+    "support": 0.18,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": 2.05,
+    "adopted": false
+  },
+  "35": {
+    "original": 7.7,
+    "heading": 26.75,
+    "quadrants": [
+      296.75,
+      26.75,
+      116.75,
+      206.75
+    ],
+    "lines": 28,
+    "support": 0.14,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": 19.05,
+    "adopted": false
+  },
+  "36": {
+    "original": 344.4,
+    "heading": 5.5,
+    "quadrants": [
+      5.5,
+      95.5,
+      185.5,
+      275.5
+    ],
+    "lines": 19,
+    "support": 0.13,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": 21.1,
+    "adopted": false
+  },
+  "37": {
+    "original": 146.5,
+    "heading": 137.5,
+    "quadrants": [
+      317.5,
+      47.5,
+      137.5,
+      227.5
+    ],
+    "lines": 25,
+    "support": 0.12,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": -9.0,
+    "adopted": false
+  },
+  "38": {
+    "original": 178.2,
+    "heading": 181.5,
+    "quadrants": [
+      1.5,
+      91.5,
+      181.5,
+      271.5
+    ],
+    "lines": 59,
+    "support": 0.2,
+    "basis": "建筑平行边/街区轴；象限由 EXIF 近邻选取",
+    "delta": 3.3,
+    "adopted": false
+  }
+}
