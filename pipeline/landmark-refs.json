@@ -1,16 +1,118 @@
 [
- {"id":"guilin_thirteen","name":"桂林市第十三中学","osm":["way/669069474"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},
- {"id":"lequn_primary","name":"乐群小学","osm":["way/684946203"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},
- {"id":"baoxian_school","name":"宝贤中学","osm":["way/669065609"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},
- {"id":"zhonghua_primary","name":"桂林市中华小学","osm":["way/1531318258"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},
- {"id":"lequn_medical","name":"桂林医科大学（乐群校区）","osm":["way/627527309"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},
- {"id":"wangcheng_teaching","name":"广西师范大学（王城校区）","osm":["way/885083147"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},
- {"id":"guilin_fifth","name":"桂林市第五中学","osm":["way/683286832"],"group":"G1","facade":"schematic","viewOnly":true,"refs":[
-  {"title":"桂林市第五中学鸟瞰图（报道配图，仅作整体配色参考）","year":2024,"page":"https://epaper.guilinlife.com/glrbpc/glrb/20240708/Articel06001NR.htm","thumb":"https://epaper.guilinlife.com/glrbpc/glrb/20240708/06_06_3697.jpg","viewOnly":true}]},
- {"id":"kuiguang_school","name":"桂林市奎光学校","osm":["way/253811717"],"group":"G1","viewOnly":true,"refs":[
-  {"title":"临街建筑外观","page":"docs/refs/rock/IMG_1295.jpg","author":"Chin Rock","viewOnly":true},
-  {"title":"树木、绿篱与红砖色调","page":"docs/refs/rock/IMG_1297.jpg","author":"Chin Rock","viewOnly":true},
-  {"title":"球场配色和四层外廊立面","page":"docs/refs/rock/IMG_1298.jpg","author":"Chin Rock","viewOnly":true}]},
+ {
+  "id": "guilin_thirteen",
+  "name": "桂林市第十三中学",
+  "osm": [
+   "way/669069474"
+  ],
+  "group": "G1",
+  "viewOnly": true,
+  "facade": "schematic",
+  "refs": []
+ },
+ {
+  "id": "lequn_primary",
+  "name": "乐群小学",
+  "osm": [
+   "way/684946203"
+  ],
+  "group": "G1",
+  "viewOnly": true,
+  "facade": "schematic",
+  "refs": []
+ },
+ {
+  "id": "baoxian_school",
+  "name": "宝贤中学",
+  "osm": [
+   "way/669065609"
+  ],
+  "group": "G1",
+  "viewOnly": true,
+  "facade": "schematic",
+  "refs": []
+ },
+ {
+  "id": "zhonghua_primary",
+  "name": "桂林市中华小学",
+  "osm": [
+   "way/1531318258"
+  ],
+  "group": "G1",
+  "viewOnly": true,
+  "facade": "schematic",
+  "refs": []
+ },
+ {
+  "id": "lequn_medical",
+  "name": "桂林医科大学（乐群校区）",
+  "osm": [
+   "way/627527309"
+  ],
+  "group": "G1",
+  "viewOnly": true,
+  "facade": "schematic",
+  "refs": []
+ },
+ {
+  "id": "wangcheng_teaching",
+  "name": "广西师范大学（王城校区）",
+  "osm": [
+   "way/885083147"
+  ],
+  "group": "G1",
+  "viewOnly": true,
+  "facade": "schematic",
+  "refs": []
+ },
+ {
+  "id": "guilin_fifth",
+  "name": "桂林市第五中学",
+  "osm": [
+   "way/683286832"
+  ],
+  "group": "G1",
+  "facade": "schematic",
+  "viewOnly": true,
+  "refs": [
+   {
+    "title": "桂林市第五中学鸟瞰图（报道配图，仅作整体配色参考）",
+    "year": 2024,
+    "page": "https://epaper.guilinlife.com/glrbpc/glrb/20240708/Articel06001NR.htm",
+    "thumb": "https://epaper.guilinlife.com/glrbpc/glrb/20240708/06_06_3697.jpg",
+    "viewOnly": true
+   }
+  ]
+ },
+ {
+  "id": "kuiguang_school",
+  "name": "桂林市奎光学校",
+  "osm": [
+   "way/253811717"
+  ],
+  "group": "G1",
+  "viewOnly": true,
+  "refs": [
+   {
+    "title": "临街建筑外观",
+    "page": "docs/refs/rock/IMG_1295.jpg",
+    "author": "Chin Rock",
+    "viewOnly": true
+   },
+   {
+    "title": "树木、绿篱与红砖色调",
+    "page": "docs/refs/rock/IMG_1297.jpg",
+    "author": "Chin Rock",
+    "viewOnly": true
+   },
+   {
+    "title": "球场配色和四层外廊立面",
+    "page": "docs/refs/rock/IMG_1298.jpg",
+    "author": "Chin Rock",
+    "viewOnly": true
+   }
+  ]
+ },
  {
   "id": "jingjiang",
   "name": "靖江王城（王府）",
@@ -2366,8 +2468,157 @@
  {
   "id": "minzhu_primary",
   "name": "民主小学",
-  "osm": ["way/970311799"],
+  "osm": [
+   "way/970311799"
+  ],
   "group": "G2",
-  "refs": [{"title":"民主小学临街照片（游拥军摄，按报道图注区分逸仙中学）","year":2024,"viewOnly":true,"page":"https://gxxwfb.gxnews.com.cn/staticpages/20241006/newgx6701f190-21638051.shtml","images":["https://static.gxrb.com.cn/image/uploadpic/20241006/b8999cb68166eb26f12c37e1016b5a80.jpg"]}]
+  "refs": [
+   {
+    "title": "民主小学临街照片（游拥军摄，按报道图注区分逸仙中学）",
+    "year": 2024,
+    "viewOnly": true,
+    "page": "https://gxxwfb.gxnews.com.cn/staticpages/20241006/newgx6701f190-21638051.shtml",
+    "images": [
+     "https://static.gxrb.com.cn/image/uploadpic/20241006/b8999cb68166eb26f12c37e1016b5a80.jpg"
+    ]
+   }
+  ]
+ },
+ {
+  "id": "ningyuan_primary",
+  "name": "桂林市宁远小学",
+  "osm": [
+   "way/1001796192"
+  ],
+  "group": "M2.7-G2b",
+  "viewOnly": true,
+  "refs": [
+   {
+    "title": "桂林市宁远小学_百度百科 桂林市宁远小学 _百度百科",
+    "year": 2024,
+    "page": "https://baike.baidu.com/item/桂林市宁远小学/9825207",
+    "thumb": "https://bkimg.cdn.bcebos.com/pic/ac345982b2b7d0a2cfab9bb6c8ef76094b369abf?x-bce-process=image/resize,m_lfit,w_536,limit_1/quality,Q_70",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市宁远小学举行“家长成长中心”成立仪式暨专题学习活动_教育 桂林市宁远小学 举行“家长成长中心”成立仪式暨专题学习活动_教育",
+    "year": 2021,
+    "page": "https://www.sohu.com/a/469922871_446313",
+    "thumb": "https://p1.itc.cn/images01/20210602/ad9293931e764fa3b7eee9748d1d56b7.jpeg",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林宁远小学庆祝建党100周年、建校30周年 第二届校园摄影展|桂林市|裁剪|学校|足球|党史_新浪新闻 桂林宁远小学 庆祝建党100周年、建校30周年 第二届校园摄影展| 桂林市",
+    "year": 2021,
+    "page": "https://k.sina.cn/article_3991635461_edeb8605001013ong.html",
+    "thumb": "https://n.sinaimg.cn/sinakd10109/419/w1280h739/20210524/518c-kqpyffz0586892.png",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市宁远小学举行“家长成长中心”成立仪式暨专题学习活动_教育 桂林市宁远小学 举行“家长成长中心”成立仪式暨专题学习活动_教育",
+    "year": 2021,
+    "page": "https://www.sohu.com/a/469922871_446313",
+    "thumb": "https://p8.itc.cn/images01/20210602/4495fb644df64a6ca707570181a5a7e1.jpeg",
+    "viewOnly": true
+   },
+   {
+    "title": "市中西医结合医院与宁远小学 合作建立中医药文化传承基地 -2024年12月27日-桂林日报 市 中西医结合医院与 宁远小学 合作建立中医药文化传承基地 -2024年12月27日- ",
+    "year": 2024,
+    "page": "https://epaper.guilinlife.com/glrbh5/glrb/20241227/Articel05002NR.htm",
+    "thumb": "https://epaper.guilinlife.com/glrbh5/glrb/20241227/05_05_3851.jpg",
+    "viewOnly": true
+   },
+   {
+    "title": "社会丨桂林宁远小学校门口这幅字火了！市民都竖起大拇指！_文化 社会丨 桂林宁远小学 校门口这幅字火了！市民都竖起大拇指！_文化",
+    "year": 2021,
+    "page": "https://www.sohu.com/a/444551139_100144123",
+    "thumb": "https://p5.itc.cn/q_70/images03/20210114/0c4460227d394f5da3af8772895fc692.jpeg",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市宁远小学举行2024年三月三传统文化月启动仪式",
+    "year": 2024,
+    "page": "http://k.sina.com.cn/article_5643229651_1505cd9d3027011dtu.html",
+    "thumb": "https://k.sinaimg.cn/n/sinakd20120/290/w1080h810/20240408/1883-63bdec9db3d8314628241bc1196fa88a.jpg/w700d1q75cms.jpg?by=cms_fixed_width",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林宁远小学秋季游学:从陶行知理念到清廉教育的深度探索",
+    "year": 2024,
+    "page": "http://baijiahao.baidu.com/s?id=1850563953044608826&wfr=spider&for=pc",
+    "thumb": "https://pic.rmb.bdstatic.com/bjh/news/5cac65708f7b98c7c37c431b9bdf2cbb.png",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市宁远小学",
+    "year": 2024,
+    "page": "http://baike.baidu.com/item/%E6%A1%82%E6%9E%97%E5%B8%82%E5%AE%81%E8%BF%9C%E5%B0%8F%E5%AD%A6/9825207",
+    "thumb": "https://bkimg.cdn.bcebos.com/pic/ac345982b2b7d0a2cfab9bb6c8ef76094b369abf",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市宁远小学举行2024年三月三传统文化月启动仪式",
+    "year": 2024,
+    "page": "http://weibo.com/ttarticle/p/show?id=2309405020983391290031",
+    "thumb": "https://img1.baidu.com/it/u=245790274,2188884836&fm=253&fmt=auto&app=138&f=JPEG?w=890&h=500",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市宁远小学举行2024年庆\"六一\"系列活动",
+    "year": 2024,
+    "page": "http://baijiahao.baidu.com/s?id=1800669746243194239&wfr=spider&for=pc",
+    "thumb": "https://pics3.baidu.com/feed/63d0f703918fa0ecb3ee834baf6140e03c6ddb54.jpeg@f_auto?token=f629711eb574957e672ff9c3b2794770",
+    "viewOnly": true
+   },
+   {
+    "title": "宁远小学开学盛典:传统开笔礼引领新生启航求学之路",
+    "year": 2024,
+    "page": "http://baijiahao.baidu.com/s?id=1842305149213977633&wfr=spider&for=pc",
+    "thumb": "https://img0.baidu.com/it/u=438225811,2148594737&fm=253&fmt=auto?w=1026&h=741",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市宁远小学\"体育超市\"\"开张\"了!",
+    "year": 2024,
+    "page": "http://baijiahao.baidu.com/s?id=1717595016753528041",
+    "thumb": "https://pic.rmb.bdstatic.com/bjh/news/61e38438d27285d675053cdbacc50910.jpeg",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市宁远小学推普周:普通话推广与文化传承并行",
+    "year": 2024,
+    "page": "http://baijiahao.baidu.com/s?id=1843766813942873017&wfr=spider&for=pc",
+    "thumb": "https://pic.rmb.bdstatic.com/bjh/news/bf5cb45da6ea92119d7806ba4001327f.png",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市宁远小学举行2024年三月三传统文化月启动仪式",
+    "year": 2024,
+    "page": "http://www.sohu.com/a/770095138_597046",
+    "thumb": "https://img2.baidu.com/it/u=2557915933,1812966788&fm=253&fmt=auto&app=138&f=JPEG?w=667&h=500",
+    "viewOnly": true
+   },
+   {
+    "title": "童音嘹亮 歌唱祖国!桂林市宁远小学2016级(2)班同学这样向祖国表白",
+    "year": 2024,
+    "page": "http://www.meipian.cn/2fb2fse6",
+    "thumb": "https://ss-mpvolc.meipian.me/users/63371006/0fd604bf25f0e3ae8e078c559c5635af__jpg.heic~tplv-s1ctq42ewb-s2-cC-q:750:0:0:0:q80.webp",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市宁远小学开展\"不忘初心,牢记使命\"主题教育之红色音乐节",
+    "year": 2024,
+    "page": "http://baijiahao.baidu.com/s?id=1646119164374910737",
+    "thumb": "https://pic.rmb.bdstatic.com/39e03d32b2b8a1d49d4eb9beaf993125.jpeg@wm_2,t_55m+5a625Y+3L+WbvueJh+aVheS6iw==,fc_ffffff,ff_U2ltSGVp",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市宁远小学举行2024年庆\"六一\"系列活动",
+    "year": 2024,
+    "page": "http://baijiahao.baidu.com/s?id=1800669746243194239&wfr=spider&for=pc",
+    "thumb": "https://pics1.baidu.com/feed/9213b07eca806538d7337a291e2bb84aac348230.jpeg@f_auto?token=d9590cf2a7ef9a428c531000b9e9b892",
+    "viewOnly": true
+   }
+  ]
  }
 ]
