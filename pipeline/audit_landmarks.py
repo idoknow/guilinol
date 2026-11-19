@@ -79,6 +79,8 @@ def metrics(shape,reference):
 
 
 def shoreline_axis(shape):
+    if shape.geom_type == "MultiPolygon":
+        shape = max(shape.geoms,key=lambda part:part.area)
     ring=shape.exterior
     samples=np.array([ring.interpolate(fraction,normalized=True).coords[0] for fraction in np.arange(256)/256])
     _,vectors=np.linalg.eigh(np.cov(samples.T))
@@ -229,8 +231,20 @@ def main():
                 ('library',key,'way/679990105',(-26,-65,54),5),
                 ('rong_hotel','gunanmen','way/521248450',(10,-51,17),8),
                 ('inn','gunanmen','way/521248446',(10,-86,16),8),
-                ('island',key,'way/674611987',(136,142,48),-.2)):
+                ('island',key,'way/674611987',(136,142,48),None)):
                 placement=entries[instance]
+                if name=='island':
+                    # Measure the masonry just below its cap, after packing. The
+                    # island elevation varies with the generated world's shoreline.
+                    raw=subprocess.check_output(['node',ROOT/'pipeline/glb-triangles.mjs',ROOT/'public'/placement['file'],'--visible'],timeout=90)
+                    faces=np.frombuffer(raw,'<f4').reshape(-1,3,3)
+                    area_y=np.cross(faces[:,1]-faces[:,0],faces[:,2]-faces[:,0])[:,1]
+                    near=np.linalg.norm(faces.mean(axis=1)[:,::2]-window[:2],axis=1)<window[2]
+                    flat=near & (np.ptp(faces[:,:,1],axis=1)<.03) & (area_y>0)
+                    if not flat.any():
+                        components.append(dict(component=name,status='missing-cap'));continue
+                    levels,indices=np.unique(np.round(faces[flat,:,1].mean(axis=1),1),return_inverse=True)
+                    height=float(levels[np.bincount(indices,weights=area_y[flat]).argmax()]-.08)
                 section=footprint(ROOT/'public'/placement['file'],placement,window,height)
                 if source in osm:target=area(osm[source])
                 else:
