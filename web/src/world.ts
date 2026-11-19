@@ -101,7 +101,7 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   const positions = new Int16Array(buffer,offset,vertices*3); offset+=vertices*6
   const normals = new Int8Array(buffer,offset,vertices*3); offset+=vertices*3
   const indices = new Uint32Array(buffer.slice(offset,offset+count*4)); offset+=count*4
-  const [rings,paths,thinIndices=[]]:[Building[],Streets,number[]?]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
+  const [rings,paths,thinIndices=[],asphalt=[]]:[Building[],Streets,number[]?,number[]?]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
   const thin=new Set(thinIndices)
   const end = offset+imageBytes, tail = end+triangles*18, extra = buffer.byteLength-tail
   if(extra!==0 && extra!==8450) throw Error('Invalid GL04 sections')
@@ -139,7 +139,7 @@ export async function detail(tile:Tile, signal:AbortSignal) {
     const u=x/step-col,v=z/step-row,a=heights.getY(at),b=heights.getY(at+1),c=heights.getY(at+stride),d=heights.getY(at+stride+1)
     return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
   })
-  const bridge = deck.length ? bridgeGeometry(deck,thin) : null
+  const bridge = deck.length ? bridgeGeometry(deck,thin,asphalt) : null
   const batch:TileBatchInput = {
     tile, minY, maxY, midY:heights.getY(segments/2*(stride+1)),
     walls, pond:pond?.positions ?? null, bridge,

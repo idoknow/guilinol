@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw
-from shapely import STRtree, intersects_xy
+from shapely import STRtree, intersects_xy, unary_union
 from shapely.geometry import box, Point
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem
@@ -105,11 +105,11 @@ def build(bbox, output, palette):
         if court is not None:
             mask,corner = stencil(court,left,top,1)
             texture.paste(palette['schoolCourt'],corner,mask)
-    trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees,layout.tree_exclude)
+    trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees,unary_union([layout.tree_exclude,*(court.buffer(1.5) for court in layers['schoolTrack']+layers['schoolCourt'])]))
     for road in roads:
         for part in polygons(road.line.buffer(road.width/2,quad_segs=2).intersection(bounds)):
             mask,corner = stencil(part,left,top,1)
-            texture.paste(palette['road'],corner,mask)
+            texture.paste('#484b4d' if road.name=='翊武路' else palette['road'],corner,mask)
             layers['road'].append(part)
     report = []
     for road in roads:
@@ -146,8 +146,8 @@ def build(bbox, output, palette):
             parts = ((poly,heights[key]) for key in sorted(index.query(tile))
                      for poly in polygons(footprints[key].intersection(tile)) if poly.area >= .01)
             vertices, normals, indices, rings = building_mesh(parts, origin)
-            deck,thin = decks(tile,origin)
-            collision = json.dumps([rings,streets(tile,origin),thin],separators=(',',':')).encode()
+            deck,thin,asphalt = decks(tile,origin)
+            collision = json.dumps([rings,streets(tile,origin),thin,asphalt],separators=(',',':')).encode()
             png = io.BytesIO()
             texture.crop((east,south,east+CHUNK,south+CHUNK)).save(png,format='PNG')
             image = png.getvalue()

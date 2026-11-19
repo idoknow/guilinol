@@ -22,6 +22,7 @@ class Layout:
         self.allow_unmapped_court = []
         tree_free = []
         areas = []
+        tree_clearings = []
         osm = {f"{item['type']}/{item['id']}":item for item in load_osm()}
         peak_models = {peak['model'] for peak in json.loads((root/'peaks.json').read_text()) if peak.get('model')}
         for entry in json.loads((root/'landmarks.json').read_text()):
@@ -36,6 +37,8 @@ class Layout:
                     x,z=center.coords[0]
             else:
                 x,z = ll2xz(anchor[1],anchor[0])
+            for ring in entry.get('treeClearingsMeters',[]):
+                tree_clearings.append(Polygon([(x+east,z+south) for east,south in ring]))
             replace = entry.get('replace',[])
             if isinstance(replace,dict):
                 areas.append(polygon(replace['polygon']))
@@ -66,4 +69,4 @@ class Layout:
                     rotation=entry.get('rotation',0),collision=entry['collision'],bytes=model.stat().st_size,
                     **json.loads(model.with_suffix('.json').read_text()))))
         self.exclude = unary_union(areas)
-        self.tree_exclude = unary_union([self.exclude, *tree_free]).buffer(2)
+        self.tree_exclude = unary_union([self.exclude,*tree_free,*tree_clearings]).buffer(2)

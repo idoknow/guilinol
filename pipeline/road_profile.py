@@ -82,7 +82,8 @@ def profile(line, tags, index,way=0):
         lanes = min(RULES['maxLanes'][kind], max(1 if one_way else 2, round(width / lane)))
         if source == 'frontage':
             width = min(width, lanes * lane)
-    divided = not pedestrian and tags.get('divider', 'yes' if not one_way and lanes >= 4 and kind in ('trunk','primary','secondary') else 'no') not in ('no','none','line')
+    inferred_divider = way != 221349755 and not one_way and lanes >= 4 and kind in ('trunk','primary','secondary')
+    divided = not pedestrian and tags.get('divider', 'yes' if inferred_divider else 'no') not in ('no','none','line')
     return Road(line, width, kind, tags.get('name',''), lanes, left, right, divided, gap, source, one_way,way,samples)
 
 

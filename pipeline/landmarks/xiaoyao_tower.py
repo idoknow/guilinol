@@ -74,11 +74,11 @@ def tower(model):
     model.beam([0,23.08,0],[0,24.15,0],.29,'gold',8)
 
 
-def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None):
-    image = atlas()
+def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=()):
+    image = atlas(colors,smooth)
     target = Path(__file__).resolve().parents[2]/'public/textures/landmarks'/folder
     target.mkdir(parents=True, exist_ok=True)
-    image.save(target/'timber-and-tile.png', optimize=True)
+    if colors is None: image.save(target/'timber-and-tile.png', optimize=True)
     scene = trimesh.Scene()
     for level in (0,1):
         model = LandmarkModel(level==0)
