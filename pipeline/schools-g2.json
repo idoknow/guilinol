@@ -107,5 +107,11 @@
     "osm": "way/647471576",
     "facade": "photo-informed",
     "street": "雉山路"
+  },
+  {
+    "id": "minzu_middle",
+    "name": "桂林市民族中学",
+    "osm": "way/647468207",
+    "facade": "photo-informed"
   }
 ]
