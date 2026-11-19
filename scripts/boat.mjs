@@ -406,10 +406,49 @@ try {
   })
   assert(shoreSlide.totalDist > 6 && shoreSlide.lateSlide > 1.5 && shoreSlide.eastGain > 4, `斜撞岸贴边滑行疑似卡死: ${JSON.stringify(shoreSlide)}`)
   assert(shoreSlide.allWet && !shoreSlide.anyReset && !shoreSlide.anyHouse, `斜撞岸穿岸或触发重置: ${JSON.stringify(shoreSlide)}`)
-  console.log('2. 斜撞岸贴边滑行通过:', {
+  console.log('2a. 斜撞岸贴边滑行通过:', {
     totalDist: +shoreSlide.totalDist.toFixed(2),
     lateSlide: +shoreSlide.lateSlide.toFixed(2),
     eastGain: +shoreSlide.eastGain.toFixed(2),
+  })
+
+  // Bug 2 回归用例: 微偏舵 (|inRight| > 0.05 压向岸侧) 与无推力漂移擦撞 4m 水面网格锯齿岸线仍顺岸滑行不卡死
+  const shoreSteerSlide = await runInPage(page, async ({steerTo, faceTarget, step, readBoat}) => {
+    await steerTo([[-1324, 322]], {arriveDist: 2.5})
+    await faceTarget(-1304, 358)
+    const joy = document.querySelector('.walk-ui .joystick')
+    const jr = joy.getBoundingClientRect()
+    const half = Math.max(1, jr.width / 2)
+    const cx = jr.left + half, cy = jr.top + half
+    const start = readBoat()
+    let mid = null
+    let allSafe = true
+    try {
+      // 模拟摇杆前推同时向岸侧微偏 ~25% (inRight > 0.05)，验证不会因偏舵禁用顺岸偏转而死卡在 4m 网格阶梯角
+      joy.dispatchEvent(new PointerEvent('pointerdown', {pointerId: 42, pointerType: 'touch', clientX: cx, clientY: cy, bubbles: true}))
+      joy.dispatchEvent(new PointerEvent('pointermove', {pointerId: 42, pointerType: 'touch', clientX: cx + half * 0.28, clientY: cy - half * 0.95, bubbles: true}))
+      for (let i = 0; i < 240; i++) {
+        step(1)
+        if (i === 120) mid = readBoat()
+        const cur = readBoat()
+        if (cur.probe.wet === false || cur.probe.resets > 0 || cur.probe.inHouse) allSafe = false
+      }
+    } finally {
+      joy.dispatchEvent(new PointerEvent('pointerup', {pointerId: 42, pointerType: 'touch', bubbles: true}))
+    }
+    const end = readBoat()
+    return {
+      totalDist: Math.hypot(end.x - start.x, end.z - start.z),
+      lateSlide: Math.hypot(end.x - mid.x, end.z - mid.z),
+      eastGain: end.x - start.x,
+      allSafe,
+    }
+  })
+  assert(shoreSteerSlide.totalDist > 5 && shoreSteerSlide.lateSlide > 1.2 && shoreSteerSlide.eastGain > 3, `微偏舵斜撞 4m 锯齿岸线卡死: ${JSON.stringify(shoreSteerSlide)}`)
+  assert(shoreSteerSlide.allSafe, `微偏舵贴岸滑行发生穿岸或重置: ${JSON.stringify(shoreSteerSlide)}`)
+  console.log('2b. 微偏舵斜撞 4m 锯齿岸线滑行通过:', {
+    totalDist: +shoreSteerSlide.totalDist.toFixed(2),
+    lateSlide: +shoreSteerSlide.lateSlide.toFixed(2),
   })
 
   // --- 用例 3：高桥穿行（玻璃桥）+ 低桥拦截（北斗桥南跨）并发 walk:toast + 湖心拒下 & 靠岸下船 ---

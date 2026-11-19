@@ -659,58 +659,120 @@ export function createFreeBoats(env: BoatEnv) {
       }
 
       const postFwdX = -Math.sin(heading), postFwdZ = -Math.cos(heading)
-      const dx = vx * sub, dz = vz * sub
-      let blockedX = false, blockedZ = false
+      const wantVx = vx, wantVz = vz, wantSpeed = Math.hypot(wantVx, wantVz)
+      const dx = wantVx * sub, dz = wantVz * sub, stepLen = Math.hypot(dx, dz)
+      let blockedX = false, blockedZ = false, cornerSlid = false
       let blockedKindX: BoatBlockReason = '', blockedKindZ: BoatBlockReason = ''
+      let cornerGlideHeading = heading
 
-      if (Math.abs(dx) > 1e-7) {
-        const useAheadX = dx * postFwdX > 1e-6 && inFwd >= -0.05
-        const evalX = evaluateHull(spec, boatX + dx, boatZ, heading, waterY, useAheadX)
-        if (evalX.ok) {
+      if (stepLen > 1e-7) {
+        const useAheadBoth = dx * postFwdX + dz * postFwdZ > 1e-6 && inFwd >= -0.05
+        const evalBoth = evaluateHull(spec, boatX + dx, boatZ + dz, heading, waterY, useAheadBoth)
+        if (evalBoth.ok) {
           boatX += dx
-          targetWaterY = evalX.waterY
-        } else {
-          vx = 0
-          blockedX = true
-          blockedKindX = evalX.reason
-          anyBlocked = true
-          if (!stepReason || evalX.reason === 'bridge' || evalX.reason === 'lock') {
-            stepReason = evalX.reason
-            stepAvailable = evalX.available
-          }
-        }
-      }
-
-      if (Math.abs(dz) > 1e-7) {
-        const useAheadZ = dz * postFwdZ > 1e-6 && inFwd >= -0.05
-        const evalZ = evaluateHull(spec, boatX, boatZ + dz, heading, waterY, useAheadZ)
-        if (evalZ.ok) {
           boatZ += dz
-          targetWaterY = evalZ.waterY
+          targetWaterY = evalBoth.waterY
         } else {
-          vz = 0
-          blockedZ = true
-          blockedKindZ = evalZ.reason
-          anyBlocked = true
-          if (!stepReason || evalZ.reason === 'bridge' || evalZ.reason === 'lock') {
-            stepReason = evalZ.reason
-            stepAvailable = evalZ.available
+          if (Math.abs(dx) > 1e-7) {
+            const useAheadX = dx * postFwdX > 1e-6 && inFwd >= -0.05
+            const evalX = evaluateHull(spec, boatX + dx, boatZ, heading, waterY, useAheadX)
+            if (evalX.ok) {
+              boatX += dx
+              targetWaterY = evalX.waterY
+            } else {
+              vx = 0
+              blockedX = true
+              blockedKindX = evalX.reason
+              anyBlocked = true
+              if (!stepReason || evalX.reason === 'bridge' || evalX.reason === 'lock') {
+                stepReason = evalX.reason
+                stepAvailable = evalX.available
+              }
+            }
+          } else {
+            blockedX = true
+            blockedKindX = evalBoth.reason
+          }
+
+          if (Math.abs(dz) > 1e-7) {
+            const useAheadZ = dz * postFwdZ > 1e-6 && inFwd >= -0.05
+            const evalZ = evaluateHull(spec, boatX, boatZ + dz, heading, waterY, useAheadZ)
+            if (evalZ.ok) {
+              boatZ += dz
+              targetWaterY = evalZ.waterY
+            } else {
+              vz = 0
+              blockedZ = true
+              blockedKindZ = evalZ.reason
+              anyBlocked = true
+              if (!stepReason || evalZ.reason === 'bridge' || evalZ.reason === 'lock') {
+                stepReason = evalZ.reason
+                stepAvailable = evalZ.available
+              }
+            }
+          } else {
+            blockedZ = true
+            blockedKindZ = evalBoth.reason
+          }
+
+          const hardBlock =
+            blockedKindX === 'bridge' || blockedKindX === 'lock' ||
+            blockedKindZ === 'bridge' || blockedKindZ === 'lock'
+          if (blockedX && blockedZ && !hardBlock && wantSpeed > 0.05) {
+            const ux = dx / stepLen, uz = dz / stepLen
+            const baseAngles = [Math.PI * 0.25, -Math.PI * 0.25, Math.PI * 0.38, -Math.PI * 0.38, Math.PI * 0.5, -Math.PI * 0.5]
+            baseAngles.sort((a, b) => {
+              const ax = ux * Math.cos(a) - uz * Math.sin(a), az = ux * Math.sin(a) + uz * Math.cos(a)
+              const bx = ux * Math.cos(b) - uz * Math.sin(b), bz = ux * Math.sin(b) + uz * Math.cos(b)
+              return (bx * postFwdX + bz * postFwdZ) - (ax * postFwdX + az * postFwdZ)
+            })
+            for (const angOff of baseAngles) {
+              const c = Math.cos(angOff), sOff = Math.sin(angOff)
+              const rx = ux * c - uz * sOff, rz = ux * sOff + uz * c
+              const scale = Math.max(0.32, Math.cos(Math.min(Math.PI * 0.40, Math.abs(angOff))))
+              const cx = rx * stepLen * scale, cz = rz * stepLen * scale
+              const evalCorner = evaluateHull(spec, boatX + cx, boatZ + cz, heading, waterY, false)
+              if (evalCorner.ok) {
+                boatX += cx
+                boatZ += cz
+                targetWaterY = evalCorner.waterY
+                vx = cx / sub
+                vz = cz / sub
+                cornerSlid = true
+                cornerGlideHeading = Math.atan2(-rx, -rz)
+                break
+              }
+            }
           }
         }
       }
 
-      grazingAxis = blockedX && !blockedZ ? 'x' : blockedZ && !blockedX ? 'z' : ''
+      const hardBlocked =
+        blockedKindX === 'bridge' || blockedKindX === 'lock' ||
+        blockedKindZ === 'bridge' || blockedKindZ === 'lock'
+      grazingAxis = cornerSlid ? 'x' : (blockedX && !blockedZ ? 'x' : blockedZ && !blockedX ? 'z' : '')
       const grazeKind = blockedX ? blockedKindX : blockedKindZ
-      if (blockedX !== blockedZ && (grazeKind === 'shallow' || grazeKind === 'obstacle') && inFwd > 0.05 && Math.abs(inRight) <= 0.05) {
-        const glideHeading = blockedZ ? (vx >= 0 ? -Math.PI / 2 : Math.PI / 2) : (vz >= 0 ? Math.PI : 0)
+      if (
+        !hardBlocked &&
+        (blockedX !== blockedZ || cornerSlid) &&
+        (grazeKind === 'shallow' || grazeKind === 'obstacle') &&
+        (inFwd > 0.05 || wantSpeed > 0.06)
+      ) {
+        const glideHeading = cornerSlid
+          ? cornerGlideHeading
+          : blockedZ
+            ? ((Math.abs(wantVx) > 0.03 ? wantVx : postFwdX) >= 0 ? -Math.PI / 2 : Math.PI / 2)
+            : ((Math.abs(wantVz) > 0.03 ? wantVz : postFwdZ) >= 0 ? Math.PI : 0)
         const err = Math.atan2(Math.sin(glideHeading - heading), Math.cos(glideHeading - heading))
-        if (Math.abs(err) > 0.04) {
-          const deflected = heading + Math.sign(err) * Math.min(Math.abs(err), 2.4 * sub)
-          const offX = blockedX ? -Math.sign(dx) * 0.08 : 0
-          const offZ = blockedZ ? -Math.sign(dz) * 0.08 : 0
+        const steerIntent = -inRight * Math.sign(err || 1)
+        if (Math.abs(err) > 0.04 && steerIntent >= -0.60) {
+          if (angVel * err < 0) angVel *= 0.35
+          const deflected = heading + Math.sign(err) * Math.min(Math.abs(err), 3.2 * sub)
+          const offX = blockedX && Math.abs(dx) > 1e-7 ? -Math.sign(dx) * 0.08 : 0
+          const offZ = blockedZ && Math.abs(dz) > 1e-7 ? -Math.sign(dz) * 0.08 : 0
           if (evaluateHull(spec, boatX, boatZ, deflected, waterY, false).ok) {
             heading = deflected
-          } else if (evaluateHull(spec, boatX + offX, boatZ + offZ, deflected, waterY, false).ok) {
+          } else if ((offX !== 0 || offZ !== 0) && evaluateHull(spec, boatX + offX, boatZ + offZ, deflected, waterY, false).ok) {
             boatX += offX
             boatZ += offZ
             heading = deflected
