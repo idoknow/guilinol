@@ -22,11 +22,13 @@ try {
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&radius=384&time=12`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
   await page.addStyleTag({content:'body > :not(canvas):not(script){visibility:hidden}'})
-  for(const [file,shot] of Object.entries(catalog).filter(([file])=>!planOnly&&file.startsWith('walk-shizijie-wangcheng/')).sort()){
+  for(const [file,recorded] of Object.entries(catalog).filter(([file])=>!planOnly&&file.startsWith('walk-shizijie-wangcheng/')).sort()){
     const number=file.split('/')[1].slice(0,2)
+    // 33 faces the hall through the arch. 36 looks back toward the southern gate.
+    const shot={...recorded,heading:({'33':3,'36':187})[number]??recorded.heading}
     if(selected&&!selected.includes(number))continue
-    const pitch=({'27':6,'31':3,'34':8,'35':8})[number]??0
-    if(process.argv.includes('--resume') && !['34','35'].includes(number) && await access(`${output}/${number}.jpg`).then(()=>true,()=>false)){
+    const pitch=({'27':6,'31':3,'33':7,'34':8,'35':8,'36':6})[number]??0
+    if(process.argv.includes('--resume') && !['27','31','33','34','35','36'].includes(number) && await access(`${output}/${number}.jpg`).then(()=>true,()=>false)){
       trace.push({number,...shot,pitch});continue
     }
     const bytes=await readFile(`docs/refs/rock/${file}`)
@@ -42,7 +44,7 @@ try {
       const heights=geometry.getAttribute('position'),[a,b,c,d]=[at,at+1,at+stride,at+stride+1].map(i=>heights.getY(i))
       const ground=u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
       const angle=heading*Math.PI/180
-      camera.layers.disable(2);camera.position.set(x,ground+1.5,z);camera.near=.12;camera.fov=2*Math.atan(18/focal35/camera.aspect)*180/Math.PI;camera.updateProjectionMatrix()
+      camera.layers.disable(2);camera.position.set(x,ground+1.5,z);camera.near=.12;camera.fov=2*Math.atan(43.27/(2*focal35*Math.hypot(1,camera.aspect)))*180/Math.PI;camera.updateProjectionMatrix()
       camera.lookAt(x+Math.sin(angle),ground+1.5+Math.tan(pitch*Math.PI/180),z-Math.cos(angle))
       camera.updateMatrixWorld(true)
       const probe=window.viewer.probeFoot()
@@ -62,6 +64,18 @@ try {
       })
       trace.at(-1).peakProbe=probe;console.log('Gate sightline',number,probe)
     }
+  }
+  if(process.argv.includes('--hall-facade')){
+    await page.setViewportSize({width:720,height:480})
+    await page.evaluate(()=>{
+      const {camera}=window.viewer
+      camera.layers.disable(2)
+      camera.position.set(-554.7,160.3,-447.0)
+      camera.fov=41;camera.updateProjectionMatrix()
+      camera.lookAt(-550.4,165.8,-477)
+    })
+    await page.waitForFunction(()=>[...window.viewer.stream.landmarks].some(([e,g])=>e.id==='jingjiang'&&g.getObjectByName('lod0')?.visible))
+    await saveFrame(`${output}/hall-facade.jpg`)
   }
   await page.setViewportSize({width:700,height:700})
   await page.evaluate(wide=>{

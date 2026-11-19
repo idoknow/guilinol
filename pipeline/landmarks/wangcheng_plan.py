@@ -109,9 +109,22 @@ def inner_court(m, plan):
     for key, base, height in [(679734442,2,7.2),(679734417,.65,7.8)]:
         x,z,angle,width,depth = plan.frame(key)
         m.pose = (x,plan.ground(x,z),z,angle)
-        m.box(0,0,0,width+1.8,base,depth+2,'granite',True)
-        m.box(0,base,0,width-4,height,depth-5,'yellow',True)
-        m.swept_roof(0,base+height,0,width,depth,3.4)
+        m.box(0,0,0,width+1.8,base,depth+2,'white' if key==679734442 else 'granite',True)
+        if key==679734442:
+            m.box(0,base,0,width-6,height,depth-6,'red',True)
+            m.tiled_roof(0,base+height,0,width+2,depth+2,6.7)
+            m.box(0,base+3.4,depth/2-1.8,width-4,.42,2.5,'white')
+            for east in np.linspace(-width*.44,width*.44,33):
+                m.box(east,base+3.8,depth/2-.7,.14,1,.14,'white')
+            m.box(0,base+4.72,depth/2-.7,width*.9,.14,.2,'white')
+            for east in np.linspace(-width*.38,width*.38,9):
+                m.box(east,base+.75,depth/2-2.92,2.8,4.6,.22,'wood')
+                if m.detail:
+                    for bar in (-.9,-.3,.3,.9):
+                        m.box(east+bar,base+2.7,depth/2-2.75,.10,2.5,.14,'red')
+        else:
+            m.box(0,base,0,width-4,height,depth-5,'yellow',True)
+            m.swept_roof(0,base+height,0,width,depth,3.4)
         for side in (-1,1):
             for col in np.linspace(-width*.44,width*.44,9):
                 m.beam([col,base,side*(depth/2-1)],[col,base+height,side*(depth/2-1)],.32,'red',8,True)

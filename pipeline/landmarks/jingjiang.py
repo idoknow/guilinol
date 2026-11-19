@@ -116,6 +116,38 @@ class Model:
         self.beam([x-width*.32,y+rise,z],[x+width*.32,y+rise,z],.27,'granite')
         for side in (-1,1):self.beam([x+side*width*.31,y+rise,z],[x+side*width*.34,y+rise+.67,z],.19,'tile')
 
+    def tiled_roof(self,x,y,z,width,depth,rise,material='tile',gable=True):
+        """Curved tiled slopes with raised hips and a recessed gable at each end."""
+        half, run = width/2, depth/2
+        ridge = max(half*.32, half-run*.78)
+        upper = .68 if gable else 1
+        def surface(u,t,side):
+            extent = half-(half-ridge)*min(t/upper,1)
+            lift = (.09*rise+.12)*abs(u)**6*(1-t)**3
+            return [x+u*extent,y+rise*(.55*t+.45*t*t)+lift,z+side*run*(1-t)]
+        bands = [0,.22,.45,upper,1] if gable else [0,.25,.60,1]
+        across = np.linspace(-1,1,13)
+        for side in (-1,1):
+            for a,b in zip(bands,bands[1:]):
+                for u,v in zip(across,across[1:]):
+                    self.mesh([surface(u,a,side),surface(v,a,side),surface(v,b,side),surface(u,b,side)],
+                              [[0,1,2],[0,2,3]],material)
+            if self.detail:
+                # Raised half-round barrel tiles read as parallel highlights at street level.
+                for u in np.linspace(-.99,.99,max(8,round(width/.42))):
+                    for a,b in zip(bands,bands[1:]):
+                        start,end=np.array(surface(u,a,side)),np.array(surface(u,b,side))
+                        r=.075
+                        verts=[p+[dx,dy,0] for p in (start,end) for dx,dy in [(-r,0),(0,r),(r,0)]]
+                        self.mesh(verts,[[0,3,4],[0,4,1],[1,4,5],[1,5,2]],material)
+        for end in (-1,1):
+            for a,b in zip(bands,bands[1:]):
+                points=[surface(end,a,-1),surface(end,a,1),surface(end,b,1),surface(end,b,-1)]
+                self.mesh(points,[[0,1,2],[0,2,3]],'wood' if gable and a>=upper else material)
+                for side in (-1,1):
+                    self.beam(surface(end,a,side),surface(end,b,side),.13,'white' if gable else material)
+        self.beam([x-ridge-.22,y+rise,z],[x+ridge+.22,y+rise,z],.20,'white' if gable else material,8)
+
     def arcade(self,x,z,width,depth,height,openings,radius,color):
         cursor=x-width/2
         for center,rad in zip(openings,np.broadcast_to(radius,(len(openings),))):
@@ -167,6 +199,55 @@ def generate(name,build):
     scene.export(Path(sys.argv[1])/f'{name}.glb')
 
 
+def banyan(m,x,z,index):
+    rng=np.random.default_rng(2400+index)
+    crown=trimesh.creation.icosphere(subdivisions=1 if m.detail else 0)
+    m.beam([x,0,z],[x+.45,5.5,z-.2],1.05,'wood',9,True)
+    for n in range(7):
+        angle=(n+rng.uniform(-.2,.2))*2*math.pi/7
+        dx,dz=math.cos(angle),math.sin(angle)
+        reach=rng.uniform(5.6,7.1)
+        end=[x+reach*dx,rng.uniform(6.2,8.6),z+reach*dz]
+        fork=[x+2.7*dx,5.6,z+2.7*dz]
+        m.beam([x,3.4,z],fork,.55,'wood',7)
+        m.beam(fork,end,.30,'wood',6)
+        # Stagger the lobes so sky and branch silhouettes show through the crown.
+        for k in range(3 if m.detail else 2):
+            offset=rng.uniform([-2.3,-.7,-2.3],[2.3,1.9,2.3])
+            radii=rng.uniform([2.9,1.8,2.9],[4.2,2.9,4.2])
+            foliage='leaf' if (k+n)%4 else 'green'
+            m.mesh(crown.vertices*radii+end+offset,crown.faces,foliage)
+        if m.detail:
+            for f in (.63,.82,.96):
+                xx,zz=x+reach*f*dx,z+reach*f*dz
+                m.beam([xx,rng.uniform(2.1,4.3),zz],[xx+.05,end[1],zz+.08],.055,'wood',4)
+    m.mesh(crown.vertices*[6,3.8,6]+[x,9.2,z],crown.faces,'leaf')
+
+
+def gate_furniture(m):
+    for side in (-1,1):
+        x=side*11.5
+        m.box(x,.3,-137.2,2.5,2.45,2.45,'red',True)
+        m.box(x,1.2,-135.94,2.02,1.15,.1,'glass')
+        m.tiled_roof(x,2.8,-137.2,3.25,3.2,1.05)
+        # The information boards are set back on either side of the kiosks.
+        x=side*17
+        m.box(x,.45,-137,5.4,2.45,.35,'wood',True)
+        m.box(x,.65,-136.8,5.1,2.05,.12,'glass' if side<0 else 'white')
+        for n in range(4):
+            m.box(x,.88+n*.37,-136.70,3.8-n*.27,.10,.07,'red' if side<0 else 'wood')
+    for x in (-2.3,-.95,1.7):
+        m.box(x,0,-148.8,.24,.95,1.3,'granite')
+        m.box(x,.95,-148.8,.26,.12,.42,'glass')
+    m.beam([-2.8,0,-153.8],[-2.8,2.9,-153.8],.045,'wood',6)
+    rim=[[-2.8+1.95*math.cos(i*math.pi/4),2.55,-153.8+1.95*math.sin(i*math.pi/4)] for i in range(8)]
+    m.mesh([[-2.8,3.08,-153.8],*rim],[[0,i+1,(i+1)%8+1] for i in range(8)],'yellow')
+    for n in range(8):
+        m.box(-8,.15,-38-n*.94,.82,1.9,.9,'yellow',True)
+        for y in (.28,1.15):
+            m.box(-7.55,y,-38-n*.94,.05,.73,.79,'white')
+
+
 def palace(m):
     from wangcheng_plan import PalacePlan, enclosure, inner_court
     plan = PalacePlan()
@@ -209,37 +290,63 @@ def palace(m):
             m.mesh(shrub.vertices*[.85,.53,.74]+[east,height,.21],shrub.faces,'leaf')
             if index%3!=1:m.mesh(shrub.vertices*[.42,1.05,.28]+[east,height-.91,.69],shrub.faces,'green')
     # Rock 27 and 31 show a narrow, stepped ochre tower over the through arch.
-    for south in (-152.1,-141.9):
-        m.arcade(0,south,15,1.05,5.8,[0],2.25,'yellow')
+    for south in (-155.3,-142.1):
+        m.arcade(0,south,15,.8,6.3,[0],2.85,'yellow')
+    for side in (-1,1):
+        m.box(side*3.10,0,-148.7,.48,2.02,12.5,'yellow',True)
+    for a,b in zip(np.linspace(0,math.pi,21),np.linspace(0,math.pi,21)[1:]):
+        arch=[(2.85*math.cos(t),2.02+2.85*math.sin(t)) for t in (a,b)]
+        soffit=[(x,y,z) for z in (-154.92,-142.48) for x,y in arch]
+        m.mesh(soffit,[[0,1,3],[0,3,2]],'white',True)
+    m.beam([0,4.78,-151.9],[0,4.47,-151.9],.035,'wood')
+    m.beam([0,4.46,-151.9],[0,4.17,-151.9],.20,'wood',8)
     for side in (-1,1):
         m.box(side*6.8,0,-147,1.4,5.8,10,'yellow',True)
         m.box(side*5.3,4.9,-147,3.7,2.05,10,'yellow')
-        m.swept_roof(side*5.3,6.95,-147,4.7,12,1.15)
-        m.box(side*2.5,5.75,-141.72,1.2,1.7,.15,'wood')
+        m.tiled_roof(side*5.3,6.95,-147,5.4,12,1.7)
+        m.box(side*2.8,6.35,-141.84,1.55,2.05,.2,'wood')
+        for u in (-.51,-.17,.17,.51):
+            m.box(side*2.8+u,6.52,-141.70,.07,1.72,.09,'red')
+        m.box(side*2.8,7.35,-141.68,1.45,.12,.09,'red')
         m.box(side*4.6,1.6,-141.25,.8,3.2,.14,'sign')
+        if m.detail:
+            for n in range(7):
+                m.box(side*4.6+.045*(-1)**n,1.9+n*.37,-141.14,.23,.09,.05,'gold')
         lantern=trimesh.creation.icosphere(subdivisions=int(m.detail))
         m.mesh(lantern.vertices*[.47,.38,.47]+[side*2.45,5.5,-140.95],lantern.faces,'red')
-    m.box(0,4.75,-147,10.1,3.6,10,'yellow',True)
-    m.swept_roof(0,8.35,-147,12.7,13,1.85)
+    m.box(0,5.35,-147,10.7,3.45,10,'yellow',True)
+    m.tiled_roof(0,8.8,-147,13.7,13,2.6)
     m.box(0,5.55,-141.7,.82,1.85,.19,'sign')
-    for index,char in enumerate('承运门'):
-        letters(m,char,(0,6.83-index*.52,-141.58),.44,.44,'gold')
+    for index,char in enumerate('靖江王府'):
+        letters(m,char,(0,7.03-index*.44,-141.58),.44,.44,'gold')
     for side in (-1,1):
         m.box(side*9,0,-138.4,10,.9,7,'granite',True)
         for step in range(5):m.box(side*9,0,-132.9-step*.48,7,.18*(step+1),.5,'granite',True)
         for east in (side*5.25,side*12.75):
             m.beam([east,.86,-132.7],[east,1.77,-135.15],.13,'white');m.box(east,0,-133,.33,.94,.33,'white')
-        m.box(side*10.5,0,-147,6,3.15,10,'yellow',True);m.swept_roof(side*10.5,3.15,-147,7.1,11.5,1.45)
-    for zz in (-65,-108):
-        for side in (-1,1):m.box(side*20,0,zz,25,.12,39,'green')
-    for index,zz in enumerate(range(-37,-130,-14)):
-        for side in (-1,1):
-            east=side*(9.4+index%2*.7)
-            m.beam([east,0,zz],[east,6,zz],.5,'wood',8,True)
-            for branch in (-1,1):
-                m.beam([east,4,zz],[east+branch*1.8,7.5,zz+branch],.22,'wood')
-                crown=trimesh.creation.icosphere(subdivisions=int(m.detail))
-                m.mesh(crown.vertices*[3.4,3.7,4.2]+[east+branch*1.6,8.5,zz+branch],crown.faces,'leaf')
+        m.box(side*10.5,0,-147,6,3.15,10,'yellow',True);m.tiled_roof(side*10.5,3.15,-147,7.1,11.5,2.3)
+    gate_furniture(m)
+    for side in (-1,1):
+        for i,z in enumerate((-30,-54,-78,-101,-123)):
+            banyan(m,side*(13.8 if i==4 else 9.6+.6*(i%2)),z+side*1.5,i+10*(side+1))
+        banyan(m,side*23,-136,37+side)
+        for i,z in enumerate((-173,-214,-236)):
+            banyan(m,side*25,z,i+43+side)
+        banyan(m,142,-121+side*10,56+side)
+    m.box(0,-.45,-132,71,.57,29,'pave',True)
+    for side in (-1,1):
+        lo,hi=side*18-16,side*18+16
+        sand=np.array([[173,146,107,255]]*4,dtype=np.uint8)
+        m.mesh([[lo,.16,-216.5],[lo,.16,-163.5],[hi,.16,-163.5],[hi,.16,-216.5]],
+               [[0,1,2],[0,2,3]],sand,True)
+    m.box(0,-.36,-192,4,.54,78,'pave',True)
+    for i,x in enumerate((-18,-8,9,19)):
+        # Front garden screening the lower part of the hall in Rock 34–35.
+        crown=trimesh.creation.icosphere(subdivisions=int(m.detail))
+        z=-230+(i%2)*1.1
+        m.beam([x,0,z],[x,4,z],.3,'wood',7)
+        for shift in (-1.5,1.5):
+            m.mesh(crown.vertices*[3.5,2.9,3.3]+[x+shift,5.4,z],crown.faces,'leaf')
     m.pose=(-.54,0,-125.45,.12)
     m.box(0,0,0,2.12,.17,.78,'granite',True)
     m.box(0,.17,0,1.96,.39,.6,'yellow',True)
