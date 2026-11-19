@@ -57,6 +57,24 @@ def contour_ronghu(surface, terrain, original, bounds):
                     window[bank_cells] = np.minimum(window[bank_cells],level+7)
                     field[patch] = window
 
+    # Low landings at the Glass Bridge (Rock IMG_1328). Grade back into
+    # the existing banks on each side, retaining the water mask and lake bed.
+    bridge = next((w for w in load_osm() if w['type']=='way' and w['id']==836701791), None)
+    if bridge:
+        for end in (points(bridge)[0], points(bridge)[-1]):
+            x,z=end
+            cols=np.flatnonzero(abs(west+GRID*np.arange(surface.shape[1])-x)<25)
+            rows=np.flatnonzero(abs(north+GRID*np.arange(surface.shape[0])-z)<25)
+            if not len(rows) or not len(cols): continue
+            dist=np.hypot(west+GRID*cols-x,north+GRID*rows[:,None]-z)
+            patch=np.ix_(rows,cols)
+            water=surface[patch]
+            near=water[(water!=-32768)&(dist<15)]
+            if not len(near): continue
+            limit=np.median(near)+8+np.maximum(dist-8,0)*3
+            for field in (original,terrain):
+                field[patch]=np.where(water==-32768,np.minimum(field[patch],np.rint(limit)),field[patch])
+
 
 def correct_water(surface, terrain, original, bounds, stencil):
     dry = surface == -32768

@@ -65,6 +65,27 @@ def pavilion(b, x, z, span=5.4, column_h=2.75, roof='blacktile'):
             solid(b.hit, (x + dx, deck + column_h / 2, z + dz), (0.32, column_h, 0.32), 'wood')
 
 
+def island_paving(mesh, outline, top):
+    """Clipped stone paving, with flush joints at the irregular island edge."""
+    import mapbox_earcut
+    import numpy as np
+    from shapely.geometry import Polygon, box as rectangle
+    footprint = Polygon(outline)
+    # Broad slabs following the paths between the pavilion, bamboo and resting area.
+    for row in range(108,178,2):
+        stagger = (row//2)%2
+        for col in range(92+stagger,175,3):
+            patch=footprint.intersection(rectangle(col,row,col+3,row+2))
+            for part in getattr(patch,'geoms',(patch,)):
+                if part.geom_type!='Polygon' or part.area<.02: continue
+                # Clipping at a concave shoreline can produce a non-convex slab.
+                pts=np.array(part.exterior.coords[:-1])
+                faces=mapbox_earcut.triangulate_float64(pts,np.array([len(pts)],np.uint32))
+                for face in faces.reshape(-1,3):
+                    uv = [(.01+.98*(pts[i,0]-col)/3,.01+.98*(pts[i,1]-row)/2) for i in face]
+                    mesh.face([(pts[i,0],top,pts[i,1]) for i in face],(0,1,0),'paver',uvs=uv)
+
+
 def island(b):
     """Double-eave hexagonal pavilion and a glazed corridor, from the 2017 night photograph."""
     wall, lit = b.parts['atlas'], b.parts['lit']
@@ -73,13 +94,12 @@ def island(b):
     bank = [(121.57, 120.07), (129.25, 120.5), (133.71, 112.64), (136.39, 108.83), (143.94, 110.85), (150.4, 113.19), (151.31, 117.09), (152.91, 119.96), (155.49, 123.16), (157.69, 127.5), (155.77, 128.08), (154.81, 133.6), (158.65, 136.84), (162.95, 142.03), (166.5, 148.68), (168.34, 154.07), (171.37, 154.24), (170.89, 158.71), (167.96, 159.17), (166.4, 158.39), (164.79, 161.26), (166.24, 164.12), (169.49, 167.52), (172.55, 167.07), (173.69, 171.8), (154.23, 176.66), (153.14, 170.79), (162.11, 168.87), (162.0, 167.63), (155.98, 167.3), (148.82, 166.73), (140.88, 165.72), (136.62, 162.72), (133.61, 165.72), (130.9, 165.83), (129.87, 164.03), (126.42, 164.09), (122.94, 165.15), (121.62, 164.09), (119.13, 160.66), (111.45, 154.95), (107.61, 155.51), (105.5, 153.22), (107.61, 144.27), (101.14, 140.47), (99.67, 142.49), (94.68, 139.1), (98.79, 133.03), (100.9, 134.17), (110.34, 118.02)]
     top = island_top()
     lift = top - .24
-    bank_strip(wall, bank, lambda x, z: top, 'rubble')
+    bank_strip(wall, bank, lambda x, z: top, 'rubble', cap=False)
+    island_paving(wall,bank,top)
     if b.collide:
         bank_strip(b.hit, bank, lambda x, z: top, 'ashlar')
     starts = [(m, len(m.pos)) for m in [*b.parts.values(), b.hit]]
     for east in range(117,153,2):
-        for south in (141,143,145,147,149,151):
-            box(wall,(east,.41,south),(1.98,.24,1.98),'paver',None)
         for south in (138.6,153.1):
             box(wall,(east,.38,south),(2.02,.32,3.5),'foliage',None)
             oval(wall,(east,.65,south),(.97,.48,.85),'foliage',7)
@@ -101,12 +121,15 @@ def island(b):
             torus(wall,(east+.28*math.sin(index+step),1+step*.98,south+.13*step),
                   .65-.06*step,.24,.45,'limestone',.23,stretch=1.36,phase=index+step)
         oval(wall,(east-.4,.56,south+.24),(.94,.43,.68),'limestone',8)
+    # Low planting beds share the plaza datum; roots enter the soil.
+    for east,south in ((141.5,133.6),(146,133.4)):
+        oval(wall,(east,.30,south),(3.1,.18,1.65),'garden_brick',10)
     for clump in range(5):
         for stem in range(8 if b.detail else 4):
             angle=stem*2.4+clump
             east,south=140+clump*1.5+math.sin(angle)*.6,133+clump%2+math.cos(angle)*.55
             tip=(east+.6*math.sin(angle),4.7+stem%3,south+.6*math.cos(angle))
-            tube(wall,(east,.24,south),tip,.065,'foliage',5)
+            tube(wall,(east,.235,south),tip,.065,'foliage',5)
             oval(wall,tip,(.74,.34,.58),'foliage',6)
             if b.detail:
                 for node in (2.2,3.5):
@@ -115,6 +138,10 @@ def island(b):
                     for direction in (-1,1):
                         leaf,spray_y,stem_z=spray
                         wall.face([spray,(leaf+.22*direction,spray_y+.16,stem_z+.14),(leaf+.54*direction,spray_y-.05,stem_z+.28),(leaf+.19*direction,spray_y+.01,stem_z+.1)],(0,1,0),'foliage')
+    for east,south in ((135.8,125.5),(139,128.3),(152.5,151)):
+        for dx in (-.8,.8):
+            box(wall,(east+dx,.47,south),(.31,.46,.55),'ashlar')
+        box(wall,(east,.76,south),(2.3,.14,.68),'wood')
     for index in range(5):
         east,south=130+index*2.4,153+index%2
         cylinder(wall,(east,.25,south),.12,.8,'steel',5)
@@ -127,6 +154,11 @@ def island(b):
         island_corridor(b, x,y,z,deck)
     banyan(wall, (113,.24,136), 12, 9, 21, b.detail)
     banyan(wall, (117,.24,147), 10, 7.5, 22, b.detail)
+    for east,south,h,r in ((123,125,11,6.5),(136,121,12,7),(146,130,12,7),
+                           (152,146,15,8),(161,153,12,7),(141,158,11,6),(116,150,11,6)):
+        solid_tree(wall,(east,.24,south),h,r,int(east+south),b.detail,lobed=False)
+    for east,south in ((143,138),(148,139),(146,146),(151,144)):
+        oval(wall,(east,.79,south),(1.12,1.05,.83),'limestone',8)
     for mesh, start in starts:
         mesh.pos[start:] = [(x, y+lift, z) for x, y, z in mesh.pos[start:]]
 
@@ -135,6 +167,16 @@ def island(b):
            for dx,dz in ((-6,-1.55),(3.5,-1.55),(3.5,1.55),(-6,1.55))]
     for mesh in ([wall,b.hit] if b.collide else [wall]):
         bank_strip(mesh,toe,lambda x,z: top+.39,'ashlar')
+
+    # Carry all six corners of the pavilion to the finished terrain. Part of
+    # its hexagon projects beyond the mapped island, beside the corridor.
+    pad=[]
+    for i in range(6):
+        az=math.pi/6+i*math.tau/6
+        dx,dz=4.2+4.25*math.cos(az),4.25*math.sin(az)
+        pad.append((x+dx*math.cos(angle)+dz*math.sin(angle),z-dx*math.sin(angle)+dz*math.cos(angle)))
+    for mesh in ([wall,b.hit] if b.collide else [wall]):
+        bank_strip(mesh,pad,lambda x,z: y+lift,'ashlar')
 
 
 def island_corridor(b, x,y,z,deck):
@@ -444,6 +486,11 @@ def main():
         for dot in range(550):
             shift=rng.randrange(-11,12)
             draw.point((left+rng.randrange(46),top+rng.randrange(62)),fill=tuple(channel+shift for channel in base))
+        if name=='paver':
+            for row in range(4):
+                draw.line((left,top+row*15,left+45,top+row*15),fill='#838680')
+                for u in range(8*(row%2),46,16):
+                    draw.line((left+u,top+row*15,left+u,top+row*15+14),fill='#8a8d87')
         if name=='garden_brick':
             for row in range(8):
                 draw.line((left,top+row*8,left+45,top+row*8),fill='#5b5d5c')

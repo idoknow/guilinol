@@ -54,16 +54,23 @@ def crossing(builder,path,widths,heights,arch_segment=None):
             for start,end,side in ((near_left,far_left,-1),(near_right,far_right,1)):
                 normal = (near_right-near_left)*side
                 stone.face([start-[0,.55,0],end-[0,.55,0],end,start],normal,'ashlar',1.2)
-                panel_face = [start+[0,.12,0],end+[0,.12,0],end+[0,.81,0],start+[0,.81,0]]
-                stone.face(panel_face,normal,'white',1.2)
-                stone.face(panel_face,-normal,'white',1.2)
+                if index >= len(path)-3:
+                    # Open balustrade by the island landing leaves the pavilion visible.
+                    tube(stone,start+[0,.43,0],end+[0,.43,0],.075,'white',4)
+                else:
+                    panel_face = [start+[0,.12,0],end+[0,.12,0],end+[0,.81,0],start+[0,.81,0]]
+                    stone.face(panel_face,normal,'white',1.2)
+                    stone.face(panel_face,-normal,'white',1.2)
                 tube(stone,start+[0,.89,0],end+[0,.89,0],.095,'white',4)
                 if builder.collide:
                     builder.hit.face([start,end,end+[0,.98,0],start+[0,.98,0]],-normal,'ashlar',None)
                 high = 1.17 if panel==0 else .99
                 box(stone,start+[0,high/2,0],(.24,high,.24),'white')
                 box(stone,start+[0,high,0],(.31,.12,.31),'white')
-            if not arched and panel%3==0:
+            # The two straight spans at the island landing bear on the bend
+            # piers and the island abutment; keep their midspans open.
+            pier_station = panel==0 if index>=len(path)-3 else panel%3==0
+            if not arched and pier_station:
                 middle = (near_left+near_right)/2
                 x, top, z = middle
                 bed = min(ground(x,z)-.15, top-.56)

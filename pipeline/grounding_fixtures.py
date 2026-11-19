@@ -80,6 +80,13 @@ def ronghu_footings(vertices, surface):
     pz = north_bank(px)-2
     for i in range(6):
         foot('library pavilion plinth',px+3*cos(i*tau/6),pz+3*sin(i*tau/6),.11,True)
+    # Six corners of the island pavilion overhang the irregular shoreline.
+    yaw = 55.92*tau/360
+    for i in range(6):
+        angle = tau/12+i*tau/6
+        dx,dz = 4.2+4.25*cos(angle),4.25*sin(angle)
+        foot('island pavilion plinth',98.8+dx*cos(yaw)+dz*sin(yaw),
+             137.6-dx*sin(yaw)+dz*cos(yaw),.12,True)
     for first,last in ((-36,-2.2),(2.2,72)):
         count=ceil((last-first)/1.6)
         for i in range(count+1):
