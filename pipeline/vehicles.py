@@ -70,14 +70,9 @@ def plan_vehicles(bounds, surface, roads, buildings, sample):
                 placed.extend(group)
                 groups.append(group)
             distance += rng.uniform(150,250)
-    protected = [(-538.9,-95.4),(-112.7,-794.0),(189.1,-42.0),(-778.5,402.1),(-31.0,510.3),(43.8,360.7),(-326.5,97.9),(-743.5,-1829.6)]
     bikes, bicycles = [], []
     for idx, group in enumerate(groups):
-        gx, _, gz, _, _ = group[0]
-        if idx > 0 and idx % 3 == 0 and all(math.hypot(gx-px, gz-pz) > 15 for px, pz in protected):
-            bicycles.extend(group)
-        else:
-            bikes.extend(group)
+        (bicycles if idx % 3 == 2 else bikes).extend(group)
     pavement = union_all(roads+extras).buffer(3)
     mask = intersects_xy(pavement,xs[None,:],zs[:,None])
     clearance = distance_transform_edt(wet)

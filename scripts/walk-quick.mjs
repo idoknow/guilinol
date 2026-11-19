@@ -16,7 +16,7 @@ try {
   await page.route('**/favicon.ico',route=>route.fulfill({status:204}))
   page.on('console',message=>{if(message.type()==='error')errors.push(message.location().url+': '+message.text())})
   await page.goto(`${baseUrl}/?verify&mode=walk&flow=0`)
-  await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:45000})
+  await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
 
   async function fixture(origin,direction,seconds,target){
     const result=await page.evaluate(async({origin,direction,seconds,target})=>{
@@ -254,6 +254,7 @@ try {
   console.log('under-bridge camera OK',JSON.stringify({deckY:+underBridge.deckY.toFixed(2),maxCamY:+underBridge.maxCamY.toFixed(2),minCeil:+underBridge.minCeil.toFixed(2)}))
 
   await fixture([-740,868],[0,0],6,'shore')
+  await page.close()
 
   // M6-1: Mobile 390x844 HUD layout non-overlap, touch joystick + sprint/jump buttons + touch camera drag, and screenshot.
   const mobileCtx=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,isMobile:true,hasTouch:true})
@@ -261,7 +262,7 @@ try {
   mobile.on('pageerror',error=>errors.push('mobile: '+error.message))
   await mobile.route('**/favicon.ico',route=>route.fulfill({status:204}))
   await mobile.goto(`${baseUrl}/?verify&mode=walk&flow=0&time=10.5`)
-  await mobile.waitForFunction(()=>window.viewer?.walk?.active&&window.viewer?.tour?.map&&document.querySelector('.vehicle-action'),null,{timeout:45000})
+  await mobile.waitForFunction(()=>window.viewer?.walk?.active&&window.viewer?.tour?.map&&document.querySelector('.vehicle-action'),null,{timeout:90000})
   await mobile.evaluate(async()=>{for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
 
   const hud=await mobile.evaluate(()=>{

@@ -24,16 +24,51 @@ try{
     await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
     if(!mobile){const boat=await lakeChecks(page,data,output);assert(boat.roof<=bounds.boat.roof+1e-6&&boat.head<=bounds.boat.head+1e-6)}
     async function fixture(x,z){assert(await page.evaluate(async([x,z])=>{const walker=window.viewer.walk;walker.leave();return walker.enter(x,z,0,'ride-fixture')},[x,z]))}
+    await page.waitForFunction(()=>window.viewer?.walk?.parked().length>0)
+    async function fixtureNear(x,z,kind){
+      const picked=await page.evaluate(([tx,tz,k])=>{
+        const list=window.viewer.walk.parked(k)
+        return [...list].sort((a,b)=>Math.hypot(a[0]-tx,a[2]-tz)-Math.hypot(b[0]-tx,b[2]-tz))[0]??null
+      },[x,z,kind])
+      assert(picked,`no parked ${kind??'vehicle'} near ${x},${z}`)
+      await fixture(picked[0],picked[2])
+      return picked
+    }
     const button=page.locator('.vehicle-action')
     async function closeCard(){const close=page.locator('.spot-card.show .card-close');if(await close.isVisible())await close.click()}
-    async function interact(label){await closeCard();await page.waitForFunction(label=>document.querySelector('.vehicle-action')?.textContent.includes(label),label);if(mobile)await button.tap();else await page.keyboard.press('f')}
+    async function interact(label){await closeCard();await page.waitForFunction(label=>{const t=document.querySelector('.vehicle-action')?.textContent??'';return t&&!t.startsWith('F ')&&t.includes(label)},label);if(mobile)await button.tap();else await page.keyboard.press('f')}
     async function shot(name){await closeCard();await page.screenshot({path:`${output}/${name}.png`})}
     async function timings(){return page.evaluate(async()=>{const samples=[];for(let frame=0;frame<24;frame++){await new Promise(requestAnimationFrame);samples.push(window.viewer.stats.ms)}return samples.sort((a,b)=>a-b)[12]})}
-    const gate=[-588,-212],distance=bike=>Math.hypot(bike[0]-gate[0],bike[2]-gate[1]);const bike=[...data.bikes].sort((first,second)=>distance(first)-distance(second))[0]
-    await fixture(bike[0],bike[2]);const foot=mobile?0:await timings()
+    const gate=[-588,-212],bike=await fixtureNear(gate[0],gate[1],'bike')
+    const foot=mobile?0:await timings()
+    await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent==='骑电动车')
+    if(!mobile){
+      const deskKeycapAndTyping=await page.evaluate(()=>{
+        const {walk}=window.viewer,btn=document.querySelector('.vehicle-action')
+        const shortcut=btn?.getAttribute('aria-keyshortcuts'),text=btn?.textContent,before=btn?getComputedStyle(btn,'::before').content:''
+        const host=document.createElement('div')
+        host.innerHTML='<input><textarea></textarea><select><option>a</option></select><div contenteditable="true"><span>txt</span></div>'
+        document.body.append(host)
+        for(const el of host.querySelectorAll('input,textarea,select,[contenteditable],span')){
+          el.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyF',bubbles:true}))
+          walk.tick(1/60)
+          el.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyF',bubbles:true}))
+        }
+        host.remove()
+        return {shortcut,text,before,vehicleAfterTyping:walk.vehicle}
+      })
+      console.log('desktop keycap & typing guard',deskKeycapAndTyping)
+      assert.equal(deskKeycapAndTyping.shortcut,'F')
+      assert.equal(deskKeycapAndTyping.text,'骑电动车')
+      assert.equal(deskKeycapAndTyping.before,'"F"',`desktop ::before should be "F": ${JSON.stringify(deskKeycapAndTyping)}`)
+      assert.equal(deskKeycapAndTyping.vehicleAfterTyping,'foot','KeyF inside form/contenteditable should not trigger vehicle interact')
+    }
     if(mobile){
       await closeCard()
       const preHud=await page.evaluate(()=>{
+        const btn=document.querySelector('.vehicle-action')
+        const before=btn?getComputedStyle(btn,'::before').content:''
+        const shortcut=btn?.getAttribute('aria-keyshortcuts'),text=btn?.textContent
         const sels=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.btn-about']
         const boxes=sels.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
           return st.display==='none'||st.visibility==='hidden'||el.hasAttribute('hidden')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
@@ -42,11 +77,15 @@ try{
           const ox=Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left)),oy=Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top))
           if(ox*oy>0)overlaps.push({a:a.sel,b:b.sel,area:+(ox*oy).toFixed(1)})}
         const outOfBounds=boxes.filter(b=>b.left<0||b.top<0||b.right>390.5||b.bottom>844.5)
-        return {count:boxes.length,overlaps,outOfBounds}
+        return {count:boxes.length,overlaps,outOfBounds,before,shortcut,text}
       })
+      console.log('mobile keycap & HUD',{before:preHud.before,shortcut:preHud.shortcut,text:preHud.text,count:preHud.count})
       assert(preHud.count>=8&&preHud.overlaps.length===0&&preHud.outOfBounds.length===0,`mobile pre-mount HUD: ${JSON.stringify(preHud)}`)
+      assert.equal(preHud.shortcut,'F')
+      assert.equal(preHud.text,'骑电动车')
+      assert.equal(preHud.before,'none',`mobile 390x844 ::before should be none: ${JSON.stringify(preHud)}`)
     }
-    await interact('F 骑电动车')
+    await interact('骑电动车')
     assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'bike')
     if(!mobile){
       const mountLockSpeed=await page.evaluate(()=>{
@@ -86,7 +125,7 @@ try{
       assert.deepEqual(mobileRideCheck.overlaps,[],`mobile ride HUD overlap: ${JSON.stringify(mobileRideCheck)}`)
       assert(mobileRideCheck.ringAlpha.endsWith(', 0)')||mobileRideCheck.ringAlpha==='transparent',`joystick running ring should stay hidden while riding: ${mobileRideCheck.ringAlpha}`)
       assert(mobileRideCheck.dist>.8&&mobileRideCheck.spd>2&&mobileRideCheck.dh>.08,`mobile stick drive failed: ${JSON.stringify(mobileRideCheck)}`)
-      await fixture(bike[0],bike[2]);await interact('F 骑电动车')
+      await fixture(bike[0],bike[2]);await interact('骑电动车')
     }
     async function steer(target,wall=false,arrive=3){return page.evaluate(({target,wall,arrive})=>{
       const walker=window.viewer.walk,keys=new Set(),start=walker.position.clone()
@@ -146,14 +185,14 @@ try{
       assert(feelCheck.brakeSpeed>=0&&feelCheck.brakeSpeed<feelCheck.coastEndSpeed-1.2,`brake: ${JSON.stringify(feelCheck)}`)
       assert(feelCheck.tapRevSpeed===0&&feelCheck.revSpeed<-.5&&feelCheck.revSpeed>=-1.85&&feelCheck.repressRevSpeed<-.3&&feelCheck.revDist>.35&&!feelCheck.inHouse,`reverse: ${JSON.stringify(feelCheck)}`)
     }
-    await interact('F 下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
+    await interact('下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
     if(!mobile){
-      await fixture(189.1,-42);await interact('F 骑电动车');const escape=await steer([189.1,-52]);console.log('off-pavement escape',escape);assert(escape.distance>4.5&&escape.speed>2&&!escape.obstacle,`off-pavement bike stuck: ${JSON.stringify(escape)}`)
+      await fixtureNear(189.1,-42);await interact('骑');const escape=await steer([189.1,-52]);console.log('off-pavement escape',escape);assert(escape.distance>4.5&&escape.speed>2&&!escape.obstacle,`off-pavement bike stuck: ${JSON.stringify(escape)}`)
       const roamOut=await steer([176,-34]);console.log('off-pavement >6.5m turn',roamOut);assert(roamOut.distance>10&&roamOut.speed>2&&roamOut.speed<=4.35&&!roamOut.obstacle,`off-pavement >6.5m locked: ${JSON.stringify(roamOut)}`)
-      await interact('F 下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
-      await fixture(-778.5,402.1);await interact('F 骑电动车');const diag=await steer([-764,398]);console.log('diagonal road edge',diag);assert(diag.distance>10&&diag.speed>2.5&&!diag.obstacle,`diagonal road edge stuck: ${JSON.stringify(diag)}`)
-      await interact('F 下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
-      await fixture(-31,510.3);await interact('F 骑电动车');const wall=await steer([-42,510.5],true);console.log('wall',wall);assert(wall.obstacle==='building'&&wall.speed===0&&wall.distance<8)
+      await interact('下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
+      await fixtureNear(-778.5,402.1);await interact('骑');const diag=await steer([-764,398]);console.log('diagonal road edge',diag);assert(diag.distance>10&&diag.speed>2.5&&!diag.obstacle,`diagonal road edge stuck: ${JSON.stringify(diag)}`)
+      await interact('下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
+      await fixtureNear(-31,510.3);await interact('骑');const wall=await steer([-42,510.5],true);console.log('wall',wall);assert(wall.obstacle==='building'&&wall.speed===0&&wall.distance<8)
       await page.evaluate(()=>{const w=window.viewer.walk;w.face(w.heading-.4,.22)})
       await shot('bike-ride-action')
       const wallReverse=await page.evaluate(()=>{
@@ -166,7 +205,7 @@ try{
       })
       console.log('wall reverse escape',wallReverse);assert(wallReverse.speed<-.5&&wallReverse.moved>.5&&!wallReverse.inHouse,`wall reverse stuck: ${JSON.stringify(wallReverse)}`)
       const bikePos=await page.evaluate(()=>window.viewer.walk.position.toArray())
-      await interact('F 下车')
+      await interact('下车')
       const dismount=await page.evaluate(bp=>{
         const w=window.viewer.walk,p0=w.probe(),fig0=p0.figPos
         window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyC'}))
@@ -187,10 +226,10 @@ try{
         return {dist:Math.hypot(p0.x-bp[0],p0.z-bp[2]),cJump,maxStep,endGap,stepWalk:Math.hypot(p1.x-p0.x,p1.z-p0.z),inHouse}
       },bikePos)
       console.log('wall dismount',dismount);assert(dismount.dist<=2.5&&dismount.cJump<.15&&dismount.maxStep<.3&&dismount.endGap<.05&&dismount.stepWalk>.3&&!dismount.inHouse,`dismount teleport/visual jump: ${JSON.stringify(dismount)}`)
-      await fixture(43.8,360.7);await interact('F 骑电动车');await steer([35,358.2],false,.8);await steer([36.2,356.2],false,.6)
+      await fixtureNear(43.8,360.7);await interact('骑');await steer([35,358.2],false,.8);await steer([36.2,356.2],false,.6)
       const parkedWall=await page.evaluate(()=>window.viewer.walk.position.toArray())
       assert(Math.hypot(parkedWall[0]-35.8,parkedWall[2]-356)<1.2,`wall-blocked bike parked off target: ${JSON.stringify(parkedWall)}`)
-      await interact('F 下车')
+      await interact('下车')
       await fixture(39.1,355.5);await page.evaluate(()=>window.viewer.walk.tick(1/60))
       const wallMountBlocked=await page.evaluate(async()=>{
         const {walk}=window.viewer
@@ -201,9 +240,9 @@ try{
         window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyF'}))
         return {vehicle:walk.vehicle,label,pos:[walk.probe().x,walk.probe().z],toast:document.querySelector('.toast')?.classList.contains('show')??false}
       })
-      console.log('wall-blocked mount',parkedWall,wallMountBlocked);assert(wallMountBlocked.vehicle==='foot'&&wallMountBlocked.label.includes('F 骑电动车')&&wallMountBlocked.toast,`should not mount across building wall: ${JSON.stringify(wallMountBlocked)}`)
-      await fixture(-326.5,97.9);await interact('F 骑电动车');await steer([-316,94],false,1.5)
-      await interact('F 下车')
+      console.log('wall-blocked mount',parkedWall,wallMountBlocked);assert(wallMountBlocked.vehicle==='foot'&&/^骑(电动车|单车)$/.test(wallMountBlocked.label)&&wallMountBlocked.toast,`should not mount across building wall: ${JSON.stringify(wallMountBlocked)}`)
+      await fixtureNear(-326.5,97.9);await interact('骑');await steer([-316,94],false,1.5)
+      await interact('下车')
       const slopePark=await page.evaluate(()=>{const w=window.viewer.walk;w.tick(1/60);const p=w.probe();return {vehicle:w.vehicle,pitch:p.bikePitch,bikeY:p.bikeY,renderY:p.renderY,inHouse:p.inHouse}})
       console.log('slope park',slopePark);assert(slopePark.vehicle==='foot'&&Math.abs(slopePark.pitch)>.025&&Math.abs(slopePark.bikeY-slopePark.renderY)<.05&&!slopePark.inHouse,`slope bike pitch/height bad: ${JSON.stringify(slopePark)}`)
       await fixture(-743.45,-1833.01);await page.evaluate(()=>window.viewer.walk.tick(1/60))
@@ -211,7 +250,7 @@ try{
         const {walk}=window.viewer
         await new Promise(r=>setTimeout(r,30))
         const btn=document.querySelector('.vehicle-action')
-        const visible=!!btn&&!btn.hidden&&btn.textContent?.includes('F 骑电动车')
+        const visible=!!btn&&!btn.hidden&&/^骑(电动车|单车)$/.test(btn.textContent??'')
         window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyF'}))
         walk.tick(1/60)
         window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyF'}))
@@ -219,16 +258,19 @@ try{
       })
       console.log('high-diff mount blocked',highDiffBlocked);assert(!highDiffBlocked.visible&&highDiffBlocked.vehicle==='foot',`should reject >1.5m vertical bike mount: ${JSON.stringify(highDiffBlocked)}`)
 
-      // --- 新增单车 (bicycle) 专项验收：F 上下车 + 平路峰速 4.5–5.1 m/s + 踩踏循环 + 同坡慢于电动车 ---
-      assert(Array.isArray(data.bicycles)&&data.bicycles.length>100,`bicycles data missing: ${data.bicycles?.length}`)
-      await fixture(-1047.4,-185.3)
+      // --- 新增单车 (bicycle) 专项验收：walk.parked('bicycle') 寻车 + F 上下车 + 平路峰速 4.5–5.1 m/s + 踩踏循环 + 同坡慢于电动车 ---
+      const bicycleCount=await page.evaluate(()=>window.viewer.walk.parked('bicycle').length)
+      assert(bicycleCount>100,`bicycles parked count missing: ${bicycleCount}`)
+      const waitSlopeChunks=()=>page.waitForFunction(()=>{const {stream,manifest,walk}=window.viewer;stream.tick(walk.position.clone().set(300,0,1901));return manifest.chunks.filter(t=>Math.hypot(t.x+128-300,t.z+128-1901)<300).every(t=>stream.loaded.has(t))})
+      await fixtureNear(385,1901,'bicycle')
+      await waitSlopeChunks()
       const bicycleBtnLabel=await page.evaluate(()=>{window.viewer.walk.tick(1/60);return document.querySelector('.vehicle-action')?.textContent??''})
-      assert.equal(bicycleBtnLabel,'F 骑单车',`bicycle prompt mismatch: ${bicycleBtnLabel}`)
-      await interact('F 骑单车')
+      assert.equal(bicycleBtnLabel,'骑单车',`bicycle prompt mismatch: ${bicycleBtnLabel}`)
+      await interact('骑单车')
       assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'bicycle')
-      await steer([-1052,-200],false,1.5)
+      await steer([384,1901],false,1.5)
       const bicycleFlat=await page.evaluate(()=>{
-        const {walk}=window.viewer,keys=new Set(),target=[-1115,-200]
+        const {walk}=window.viewer,keys=new Set(),target=[434,1901]
         function press(code,on){if(keys.has(code)===on)return;window.dispatchEvent(new KeyboardEvent(on?'keydown':'keyup',{code}));if(on)keys.add(code);else keys.delete(code)}
         walk.hold(true);walk.hold(false)
         for(let i=0;i<90;i++){
@@ -258,7 +300,7 @@ try{
       assert(bicycleFlat.peakSpeed>=4.5&&bicycleFlat.peakSpeed<=5.1,`bicycle peak speed out of 4.5-5.1 m/s: ${JSON.stringify(bicycleFlat)}`)
       assert(bicycleFlat.speed1s<ebikeSpeed1s-.5,`bicycle launch should be slower than e-bike: ${JSON.stringify({bicycle1s:bicycleFlat.speed1s,ebike1s:ebikeSpeed1s})}`)
       assert(bicycleFlat.thighLRange>.45&&bicycleFlat.thighRRange>.45&&!bicycleFlat.inHouse,`bicycle pedaling cycle missing: ${JSON.stringify(bicycleFlat)}`)
-      await interact('F 下车')
+      await interact('下车')
       assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
 
       async function measureUphillRun(target){
@@ -289,24 +331,27 @@ try{
           return {dist,seconds,avgSpeed:dist/Math.max(1/60,seconds),peakUphill,endSpeed,climbY:walk.probe().foot-startFoot}
         },target)
       }
+      async function rideToSlopeBase(startX){
+        if(startX>260){await steer([Math.min(startX,380),1901],false,1.8);await steer([285,1901],false,2.5)}
+        await steer([190,1901],false,1.2)
+      }
 
-      // 同一上坡路段 (190, 1901) -> (222, 1901) [+2.4m 爬升]: 对比单车 vs 电动车
-      const waitSlopeChunks=()=>page.waitForFunction(()=>{const {stream,manifest,walk}=window.viewer;stream.tick(walk.position.clone().set(256,0,1901));return manifest.chunks.filter(t=>Math.hypot(t.x+128-256,t.z+128-1901)<260).every(t=>stream.loaded.has(t))})
-      await fixture(188.7,1892.3);await waitSlopeChunks();await interact('F 骑单车')
-      await steer([190,1901],false,1.2)
+      // 同一上坡路段 (190, 1901) -> (222, 1901) [+2.5m 爬升]: 按车型查最近停放点对比单车 vs 电动车
+      const bcSpot=await fixtureNear(190,1901,'bicycle');await waitSlopeChunks();await interact('骑单车')
+      await rideToSlopeBase(bcSpot[0])
       const bicycleUphill=await measureUphillRun([222,1901])
-      await interact('F 下车')
-      await fixture(386.6,1891.7);await waitSlopeChunks();await interact('F 骑电动车')
-      await steer([380,1901],false,1.5);await steer([285,1901],false,2.5);await steer([190,1901],false,1.2)
+      await interact('下车')
+      const ebSpot=await fixtureNear(190,1901,'bike');await waitSlopeChunks();await interact('骑电动车')
+      await rideToSlopeBase(ebSpot[0])
       const ebikeUphill=await measureUphillRun([222,1901])
-      await interact('F 下车')
+      await interact('下车')
       console.log('same-slope uphill comparison',{bicycle:bicycleUphill,ebike:ebikeUphill})
       assert(bicycleUphill.climbY>1.8&&ebikeUphill.climbY>1.8,`slope climb elevation insufficient: ${JSON.stringify({bicycleUphill,ebikeUphill})}`)
       assert(bicycleUphill.avgSpeed<ebikeUphill.avgSpeed*.82&&bicycleUphill.endSpeed<ebikeUphill.endSpeed-1.4&&bicycleUphill.seconds>ebikeUphill.seconds*1.2,`bicycle should climb slower than e-bike on same slope: ${JSON.stringify({bicycleUphill,ebikeUphill})}`)
 
-      const [x,,z]=data.docks['解放桥码头'];await fixture(x,z);await shot('dock');await interact('F 上船');
+      const [x,,z]=data.docks['解放桥码头'];await fixture(x,z);await shot('dock');await interact('上船');
       const distance=await page.evaluate((bounds)=>{const walker=window.viewer.walk,start=walker.position.clone();for(let frame=0;frame<3600;frame++){walker.tick(1/60);const probe=walker.boatClearance();if(probe?.kind!=='raft'||probe.clearance<.3||probe.roof-walker.position.y>bounds.roof+1e-6||probe.head-walker.position.y>bounds.head+1e-6)throw Error(`unsafe raft: ${JSON.stringify(probe)}`)}return walker.position.distanceTo(start)},bounds.raft)
-      assert(distance>80&&distance<125);await shot('boat');await interact('F 下站下船')
+      assert(distance>80&&distance<125);await shot('boat');await interact('下站下船')
       await page.evaluate(async()=>{const {walk,stream}=window.viewer;for(let count=0;count<4000&&walk.vehicle==='boat';count++){walk.tick(.12);if(count%24===0){stream.tick(walk.position);await new Promise(requestAnimationFrame)}}})
       assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot');console.log('60s boat displacement',distance)
     }

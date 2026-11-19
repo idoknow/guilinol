@@ -34,15 +34,15 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
   }
   const departures=new Set<string>(),moored=data.routes.map(leg=>{const first=!departures.has(leg.start);departures.add(leg.start);return first})
   const freeBoats=env?createFreeBoats({group,docks:data.docks,routes:data.routes,sim:env.sim,stream:env.stream}):null
-  const button=document.createElement('button');button.className='vehicle-action';button.hidden=true;document.body.append(button)
+  const button=document.createElement('button');button.className='vehicle-action';button.setAttribute('aria-keyshortcuts','F');button.hidden=true;document.body.append(button)
   const bikeCtrl=createBikeControl()
   let bike:T.Mesh|null=null,lastBike:T.Mesh|null=null,route=-1,nearBike:T.Mesh|null=null,nearRoute=-1,nearRouteDist=Infinity,segment=1,disembark=false,active=false,heading=0
   let nearFree:{slot:MooringSlot|null,distance:number,atBank:boolean}={slot:null,distance:Infinity,atBank:false}
   function syncHud(){
     const preferFree=!!nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)
-    const freePrompt=nearFree.slot?(nearFree.slot.kind==='freeRaft'?'F 划竹筏 · ':'F 划小船 · ')+nearFree.slot.name:''
-    const ridePrompt=nearBike?(nearBike.name==='bicycle'?'F 骑单车':'F 骑电动车'):''
-    const label=bike?'F 下车':freeBoats?.active?'F 靠岸下船':route>=0?(disembark?'F 下一站下船':'F 下站下船'):ridePrompt||(preferFree?freePrompt:nearRoute>=0?'F 上船 · '+data.routes[nearRoute].start:'')
+    const freePrompt=nearFree.slot?(nearFree.slot.kind==='freeRaft'?'划竹筏 · ':'划小船 · ')+nearFree.slot.name:''
+    const ridePrompt=nearBike?(nearBike.name==='bicycle'?'骑单车':'骑电动车'):''
+    const label=bike?'下车':freeBoats?.active?'靠岸下船':route>=0?(disembark?'下一站下船':'下站下船'):ridePrompt||(preferFree?freePrompt:nearRoute>=0?'上船 · '+data.routes[nearRoute].start:'')
     document.body.toggleAttribute('data-aboard',!!bike||route>=0||!!freeBoats?.active);button.hidden=!label;if(button.textContent!==label)button.textContent=label
   }
   function reset(){if(route>=0)vessels[route].position.fromArray(data.routes[route].path[0]);freeBoats?.reset();if(bike){bike.rotation.set(bikeCtrl.pitch,bikeCtrl.heading,0,'YXZ');store(bike);if(active&&bike.parent&&!visibleCells.has(bike.parent as T.Group)){visibleCells.add(bike.parent as T.Group);group.add(bike.parent)}}bike=null;route=-1;nearFree={slot:null,distance:Infinity,atBank:false};disembark=false;segment=1;bikeCtrl.reset()}
@@ -60,7 +60,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     else if(nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)){freeBoats!.mount(nearFree.slot,nearFree.atBank);syncHud()}
     else if(nearRoute>=0){route=nearRoute;segment=1;disembark=false}
   }
-  button.onclick=interact;window.addEventListener('keydown',event=>{if(event.code==='KeyF'&&!event.repeat&&(event.target as HTMLElement)?.tagName!=='INPUT')interact()})
+  button.onclick=interact;window.addEventListener('keydown',event=>{if(event.code==='KeyF'&&!event.repeat&&!(event.target as Element)?.closest?.('input,textarea,select,[contenteditable]'))interact()})
   function nearby(x:number,z:number,footY?:number){nearBike=null;nearRoute=-1;nearRouteDist=Infinity;let best=4.2
     const nextCells=new Set<T.Group>()
     for(let col=Math.floor((x-110)/cellSize);col<=Math.floor((x+110)/cellSize);col++)for(let row=Math.floor((z-110)/cellSize);row<=Math.floor((z+110)/cellSize);row++){
@@ -100,6 +100,11 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     boatClearance(figure:T.Group,skinned?:T.SkinnedMesh){return freeBoats?.clearance(figure,skinned)??null},
     boatProbe(){return freeBoats?.probe()??null},
     freeMoorings(){return freeBoats?.moorings()??[]},
+    parked(kind?:RideKind):Position[]{
+      const out:Position[]=[]
+      for(const cell of cells.values())for(const child of cell.children)if(!kind||child.name===kind)out.push([child.position.x,child.position.y,child.position.z])
+      return out
+    },
     park(pos:T.Vector3){if(bike){bike.position.copy(pos);bike.rotation.set(bikeCtrl.pitch,bikeCtrl.heading,bikeCtrl.lean,'YXZ')}},
     pavement(x:number,z:number){const col=Math.round((x-left)/step),row=Math.round((z-top)/step),index=row*width+col
       return col>=0&&row>=0&&col<width&&row<height&&!!(mask.charCodeAt(index>>3)&(128>>(index&7)))} }

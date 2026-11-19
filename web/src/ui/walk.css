@@ -10,6 +10,9 @@
 body[data-aboard] :is(.btn-jump,.btn-run){display:none}
 body[data-aboard] .joystick.running::after{border-color:rgba(169,80,60,0)}
 .toast{z-index:6;box-sizing:border-box;width:max-content;max-width:min(520px,calc(100vw - 32px));text-align:center;line-height:1.45;border:1px solid rgba(244,239,226,.34)}
+@media (hover:hover) and (pointer:fine){
+  .vehicle-action::before{content:attr(aria-keyshortcuts);display:inline-grid;place-items:center;min-width:1.4em;height:1.4em;margin-right:.5em;padding:0 .22em;border-radius:5px;border:1px solid rgba(244,239,226,.55);background:rgba(244,239,226,.14);box-shadow:0 1px 0 rgba(244,239,226,.28);font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:0;vertical-align:1px}
+}
 @media (pointer:coarse){
   .vehicle-action{bottom:calc(170px + env(safe-area-inset-bottom));max-width:calc(100vw - 168px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .toast{max-width:calc(100vw - 32px);font-size:13.5px;padding:8px 16px}
