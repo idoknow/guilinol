@@ -226,8 +226,10 @@ def main():
             row['status']='missing-instance';continue
         if key in ('dongxixiang','zhengyang') and notes=='deferred to IDOK-44':
             row['status']='deferred';continue
-        if key=='wangcheng_market' and notes=='deferred to IDOK-50':
-            row['status']='deferred';continue
+        if key=='wangcheng_market':
+            # Alley/plaza aggregate with no single footprint; positions are checked by the
+            # IDOK-50 evidence-layout audit (docs/layout/dongxi-audit.md, scripts/dongxi/lane-audit.py).
+            row.update(status='deferred',alignNote=notes or 'audited by docs/layout/dongxi-audit.md (IDOK-50)');continue
         if key=='jingjiang':
             components=[]
             for name,source,bounds,roof in (
