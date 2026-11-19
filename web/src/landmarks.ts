@@ -11,7 +11,7 @@ export interface Landmark {
 export type LoadedLandmarks = Map<Landmark,THREE.Group>
 
 export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,entries:Landmark[],loaded:LoadedLandmarks){
-  const basis=new KTX2Loader().setTranscoderPath('./basis/').detectSupport(renderer)
+  const basis=new KTX2Loader().setTranscoderPath('./basis/').setWorkerLimit(2).detectSupport(renderer)
   const loader=new GLTFLoader().setKTX2Loader(basis).setMeshoptDecoder(MeshoptDecoder)
   const pending=new Set<Landmark>(), retry=new Map<Landmark,number>()
   function dispose(root:THREE.Group){

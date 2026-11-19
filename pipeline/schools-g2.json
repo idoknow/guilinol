@@ -1,5 +1,124 @@
 [
-  {"id":"libin_middle","name":"桂林市中山中学漓滨校区","osm":"way/675588260","scale":1.8,"band":"#a26652","arcade":true,"sports":"athletics","paved":true,"blocks":[[-11,-10,12,4],[3,-11,13,5],[14,-13,7,4],[-9,-18,14,5],[8,-19,12,4]],"facade":"photo-informed"},
-  {"id":"ronghu_primary","name":"榕湖小学","osm":"way/686230935","scale":1.38,"paved":true,"band":"#a9826d","blocks":[[1,-12,33,3],[-12,0,12,2]],"facade":"schematic"},
-  {"id":"minzhu_primary","name":"民主小学","osm":"way/970311799","scale":1.05,"paved":true,"notice_wall":true,"band":"#6f8993","blocks":[[2,-11,28,4],[-11,1,12,2]],"facade":"photo-informed frontage"}
+  {
+    "id": "libin_middle",
+    "name": "桂林市中山中学漓滨校区",
+    "osm": "way/675588260",
+    "scale": 1.8,
+    "band": "#a26652",
+    "arcade": true,
+    "sports": "athletics",
+    "paved": true,
+    "blocks": [
+      [
+        -11,
+        -10,
+        12,
+        4
+      ],
+      [
+        3,
+        -11,
+        13,
+        5
+      ],
+      [
+        14,
+        -13,
+        7,
+        4
+      ],
+      [
+        -9,
+        -18,
+        14,
+        5
+      ],
+      [
+        8,
+        -19,
+        12,
+        4
+      ]
+    ],
+    "facade": "photo-informed"
+  },
+  {
+    "id": "ronghu_primary",
+    "name": "榕湖小学",
+    "osm": "way/686230935",
+    "scale": 1.38,
+    "paved": true,
+    "band": "#a9826d",
+    "blocks": [
+      [
+        1,
+        -12,
+        33,
+        3
+      ],
+      [
+        -12,
+        0,
+        12,
+        2
+      ]
+    ],
+    "facade": "schematic"
+  },
+  {
+    "id": "minzhu_primary",
+    "name": "民主小学",
+    "osm": "way/970311799",
+    "scale": 1.05,
+    "paved": true,
+    "notice_wall": true,
+    "band": "#6f8993",
+    "blocks": [
+      [
+        2,
+        -11,
+        28,
+        4
+      ],
+      [
+        -11,
+        1,
+        12,
+        2
+      ]
+    ],
+    "facade": "photo-informed frontage"
+  },
+  {
+    "id": "ningyuan_primary",
+    "name": "桂林市宁远小学",
+    "osm": "way/1001796192",
+    "facade": "photo-informed"
+  },
+  {
+    "id": "peizhi_special",
+    "name": "桂林市培智学校",
+    "osm": "way/1001796193",
+    "facade": "photo-informed"
+  },
+  {
+    "id": "yixian_high",
+    "name": "桂林市逸仙中学",
+    "osm": "way/647471576",
+    "facade": "photo-informed",
+    "street": "雉山路"
+  },
+  {
+    "id": "minzu_middle",
+    "name": "桂林市民族中学",
+    "osm": "way/647468207",
+    "facade": "photo-informed"
+  },
+  {
+    "id": "nanxishan_primary",
+    "name": "桂林市南溪山小学",
+    "osm": "way/1037119966",
+    "facade": "photo-informed",
+    "street": "中山南路"
+  }
 ]
