@@ -19,6 +19,8 @@ try {
   browser = await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
   const page = await browser.newPage({viewport:{width:960,height:600}})
   for (const [name,eye,target,hour] of views) {
+    const portrait=['42','43','58'].includes(name)
+    await page.setViewportSize(portrait?{width:570,height:760}:{width:960,height:720})
     await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&radius=512&time=${hour}`)
     await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
     await page.addStyleTag({content:'body > :not(canvas) { visibility:hidden!important }'})
