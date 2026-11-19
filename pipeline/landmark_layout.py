@@ -19,6 +19,7 @@ class Layout:
         self.ids = set()
         self.flatten = []
         self.school_grounds = []
+        self.allow_unmapped_court = []
         tree_free = []
         areas = []
         osm = {f"{item['type']}/{item['id']}":item for item in load_osm()}
@@ -53,6 +54,8 @@ class Layout:
             if 'flatten' in entry:
                 patch = entry['flatten']
                 region = polygon(patch['polygon'])
+                if entry.get('allowUnmappedCourt'):
+                    self.allow_unmapped_court.append(region)
                 self.flatten.append((region,patch['elevation']))
                 (self.school_grounds if entry.get('schoolGround') else tree_free).append(region)
             model = root.parent/'public'/entry['model']

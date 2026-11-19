@@ -97,7 +97,7 @@ def build(bbox, output, palette):
     if raised:
         footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes),layout)
     index = STRtree(footprints)
-    for campus in layout.school_grounds:
+    for campus in layout.allow_unmapped_court:
         if not bounds.covers(campus) or any(campus.covers(field.representative_point())
                 for layer in ('schoolTrack','schoolCourt') for field in layers[layer]):
             continue

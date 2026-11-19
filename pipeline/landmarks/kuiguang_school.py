@@ -72,19 +72,6 @@ def build(builder):
             start, end = offset-sign*1.7, offset+sign*1.7
             mesh.face([(start-.06,.08,23.85),(start+.06,.08,23.85),(end+.06,.08,28.35),(end-.06,.08,28.35)],(0,1,0),'yellow',None)
 
-    block((-10,6.6,-12),(31,13.2,9),'white',True)
-    for floor in range(4):
-        height = floor*3.3
-        block((-10,height+1.8,-7.43),(29,1.5,.18),'glass')
-        block((-10,height+.24,-6.65),(32,.3,2.1),'cream')
-        block((-10,height+1.13,-5.65),(31.4,.13,.15),'steel')
-        for column in range(-25,6,2 if builder.detail else 5):
-            block((column,height+.7,-5.65),(.12,.85,.12),'steel')
-    block((16,.06,0),(14,.12,24),'glaze')
-    for side in (-1,1):
-        block((16+side*6.35,.135,0),(.12,.02,22.2),'white')
-        block((16,.135,side*11),(12.8,.02,.12),'white')
-    block((16,.135,0),(12.8,.02,.12),'white')
     block((-16,1.05,4),(14,2.1,.6),'brick',True)
     block((-16,.68,5),(14,1.36,1.4),'foliage')
     for index, east in enumerate((-24,-11,3)):

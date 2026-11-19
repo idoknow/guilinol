@@ -135,36 +135,6 @@ def buildings(bounds, elevation, peaks,layout):
             base = elevation(center.x,center.y)
             footprints.append(poly)
             heights.append((base,base+3.1*floors,3,floors,element['id']%65536,center,[],False))
-    all_buildings = STRtree(footprints)
-    fields = [area(el) for el in load_osm() if el['type']!='node' and el.get('tags',{}).get('leisure') in ('pitch','track')]
-    for campus in layout.school_grounds:
-        if not bounds.covers(campus) or layout.exclude.intersects(campus.representative_point()):
-            continue
-        nearby = [footprints[idx] for idx in all_buildings.query(campus)]
-        count = sum(campus.covers(shape.representative_point()) for shape in nearby)
-        if count > 2:
-            continue
-        reserved = unary_union([layout.exclude,*nearby,*fields]).buffer(2)
-        free = campus.buffer(-3).difference(reserved)
-        for index in range(max(0,min(6,round(campus.area/1200))-count)):
-            candidates = []
-            length = min(26,max(14,np.sqrt(campus.area)*.25))
-            for east in np.arange(campus.bounds[0],campus.bounds[2],4):
-                for south in np.arange(campus.bounds[1],campus.bounds[3],4):
-                    shape = box(east-length/2,south-4,east+length/2,south+4)
-                    for angle in (0,45,90,135):
-                        block = rotate(shape,angle)
-                        if free.covers(block):
-                            candidates.append((free.boundary.distance(block),block))
-            if not candidates:
-                break
-            footprint = max(candidates,key=lambda candidate:candidate[0])[1]
-            center = footprint.centroid
-            base = elevation(center.x,center.y)
-            floors = 3+index%2
-            footprints.append(footprint)
-            heights.append((base,base+3.1*floors,3,floors,index,center,[],False))
-            free = free.difference(footprint.buffer(4))
     print('Building kinds:',dict(kinds))
     return footprints, heights
 

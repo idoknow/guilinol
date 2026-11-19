@@ -137,53 +137,9 @@ def kuiguang(b):
         ramp(b.hit, (0, 0.02, 6.3), (0, 0.35, 4.7), 3.0)
 
 
-def schoolyard(b):
-    wall = b.parts['atlas']
-    for center_x, center_z, width, floors in ((-31, -108, 64, 4), (34, -82, 47, 3), (47, -38, 39, 3)):
-        height = floors * 3.3
-        box(wall, (center_x, height / 2, center_z), (width, height, 13), 'cream', None)
-        box(wall, (center_x, height, center_z), (width + 1, 0.4, 14), 'glaze', None)
-        for floor in range(floors):
-            sill = floor * 3.3 + 1.6
-            for side in (-1, 1):
-                facade_z = center_z + side * 6.6
-                box(b.parts['lit'], (center_x, sill, facade_z), (width - 2, 1.5, 0.12), 'glass', None)
-                if b.detail:
-                    for offset in range(3, int(width) - 1, 3):
-                        box(wall, (center_x - width / 2 + offset, sill, facade_z + side * 0.1), (0.34, 1.65, 0.12), 'white', None)
-        if b.collide:
-            solid(b.hit, (center_x, height / 2, center_z), (width, height, 13), 'cream', 5)
-
-    def oval(radius, y):
-        result = []
-        steps = 20 if b.detail else 8
-        for center_x, start in ((-47, -math.pi / 2), (-78, math.pi / 2)):
-            for index in range(steps + 1):
-                angle = start + math.pi * index / steps
-                result.append((center_x + radius * math.cos(angle), y, -60 + radius * math.sin(angle)))
-        return result
-
-    def band(outer, inner, region):
-        for index in range(len(outer)):
-            before = index - 1
-            wall.face([outer[before], outer[index], inner[index], inner[before]], (0, 1, 0), region, None)
-
-    band(oval(20, 0.08), oval(15, 0.08), 'vermilion')
-    inside = oval(15, 0.08)
-    for index, vertex in enumerate(inside):
-        wall.face([(-62.5, 0.08, -60), inside[index - 1], vertex], (0, 1, 0), 'glaze', None)
-    for radius in ((16, 17, 18, 19) if b.detail else (18,)):
-        band(oval(radius + 0.05, 0.1), oval(radius - 0.05, 0.1), 'white')
-    cylinder(wall, (-36, 0, -33), 0.1, 9, 'steel', 6)
-    box(wall, (-34.9, 8.2, -33), (2.2, 1.4, 0.05), 'vermilion', None)
-    for index, (tree_x, tree_z) in enumerate(((-25,-34),(-14,-34),(1,-34),(16,-34),(64,-72))):
-        banyan(wall, (tree_x, 0, tree_z), 6, 3, 49 + index, b.detail)
-
-
 def build(b: Builder):
     kuiguang(b)
     gate(b)
-    schoolyard(b)
     if b.detail:
         extrude_plaza(b)
 

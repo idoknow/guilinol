@@ -29,7 +29,7 @@ try {
     if(name==='overview') await page.evaluate(({id,kuiguang})=>{
       const {camera,manifest}=window.viewer
       const {position}=manifest.landmarks.find(entry=>entry.id===id)
-      const labels=kuiguang ? [['外廊教学楼',-10,13,-12],['球场',16,0,0],['临街住宅楼',0,15,17],['游戏布局，非实地导览',0,0,33]] : [['教学楼甲',-31,14,-108],['教学楼乙',34,10,-82],['教学楼丙',47,10,-38],['操场',-62,0,-60],['奎光楼',0,8,0],['游戏布局，非实地导览',-15,0,20]]
+      const labels=kuiguang ? [['临街住宅楼',0,15,17],['游戏布局，非实地导览',0,0,33]] : [['奎光楼',0,8,0],['游戏布局，非实地导览',-15,0,20]]
       for (const [text,east,height,south] of labels) {
         const pixel=camera.position.clone().set(position[0]+east,position[1]+height,position[2]+south).project(camera)
         const label=document.createElement('span'); label.textContent=text

@@ -58,6 +58,16 @@ def generate(identifier, catalog):
             if collision and builder.collide:
                 solid(builder.hit, pos, dim, cell=4)
 
+        if 'wallStreet' in school:
+            if school['wallStreet']:
+                block((0,1.15,17),(14,2.3,.45),'white',True)
+                mesh.face([(-half_width,.75,17*scale+.24*scale),(half_width,.75,17*scale+.24*scale),
+                           (half_width,1.99,17*scale+.24*scale),(-half_width,1.99,17*scale+.24*scale)],
+                          (0,0,1),'schematic_plaque',uvs=[(.001,.999),(.999,.999),(.999,.001),(.001,.001)])
+            else:
+                block((0,.35,0),(3,.7,1),'foliage')
+            continue
+
         for east, south, length, floors in school['blocks']:
             height = floors * 3.2
             block((east,height/2,south),(length,height,7),'brick' if athletics and east<0 else 'white',True)
