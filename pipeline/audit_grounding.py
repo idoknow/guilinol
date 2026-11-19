@@ -25,8 +25,8 @@ def facade_joints(vertices, tris, component, face_group):
     """Attach planar window/sign decals to their backing vertical wall.
 
     The G3 builder offsets strips 0.06–0.14 m along the wall normal. Require
-    every decal vertex to project inside the same backing component. Solid
-    columns and box-shaped foundations cannot meet the planar test.
+    every decal vertex to project inside the same backing component. Thin framed panels can bear against the same wall through their rear face.
+    A pier or a footing must retain its independent base check.
     """
     normals = np.cross(tris[:,1]-tris[:,0], tris[:,2]-tris[:,0])
     lengths = np.linalg.norm(normals,axis=1)
@@ -43,13 +43,12 @@ def facade_joints(vertices, tris, component, face_group):
         pts = vertices[indices].astype(float)
         if len(pts)<3 or len(pts)>32 or np.ptp(pts[:,1])<.05:
             continue
-        xz = pts[:,::2]-pts[0,::2]
-        axis = xz[np.linalg.norm(xz,axis=1).argmax()]
-        length = np.linalg.norm(axis)
-        if length<.3:
-            continue
-        side = np.array([-axis[1],axis[0]])/length
-        if np.abs(xz@side).max()>.012:
+        xz = pts[:,::2]-pts[:,::2].mean(axis=0)
+        _,axes = np.linalg.eigh(xz.T@xz)
+        side,axis = axes.T
+        width = np.ptp(xz@axis)
+        thick = np.ptp(xz@side)
+        if width<.3 or thick>min(.22,width*.12,np.ptp(pts[:,1])*.15):
             continue
         v, f = tree.query(shapely.points(pts[:,::2]))
         f=walls[f]
@@ -61,17 +60,22 @@ def facade_joints(vertices, tris, component, face_group):
         match=np.linalg.norm(closest-pts[v],axis=1)<=margin
         pairs=np.unique(np.column_stack((face_group[f[match]],v[match])),axis=0)
         backing,counts=np.unique(pairs[:,0],return_counts=True)
-        bonds.extend((group,w) for w in backing[counts==len(pts)])
+        for wall in backing[counts==len(pts)]:
+            wall_pts=vertices[groups[wall]]
+            if wall_pts[:,1].min() < pts[:,1].min()-.15 and wall_pts[:,1].max()>=pts[:,1].max()-.02:
+                bonds.append((group,wall))
     return bonds
 
 
-def assemblies(vertices, faces, component, count):
+def assemblies(vertices, faces, component, count, mounts=None):
     """Join components at physical contacts, including UV/material seams and T joints."""
     tris = vertices[faces].astype(float)
     lo, hi = tris.min(axis=1), tris.max(axis=1)
     tree = shapely.STRtree(shapely.box(lo[:,0]-CONTACT,lo[:,2]-CONTACT,
                                        hi[:,0]+CONTACT,hi[:,2]+CONTACT))
     bonds = facade_joints(vertices, tris, component, component[faces[:,0]])
+    if mounts is not None:
+        mounts.update(bonds)
     for start in range(0, len(vertices), 512):
         v, f = tree.query(shapely.points(vertices[start:start+512,::2]))
         v += start
@@ -109,7 +113,8 @@ def measurements(model, surface):
     count, component = connected_components(edges, directed=False)
     low = np.full(count, np.inf)
     np.minimum.at(low, component, vertices[:, 1])
-    assembly = assemblies(vertices, faces, component, count)
+    mounts = {}
+    assembly = assemblies(vertices, faces, component, count, mounts)
     bearing = bearing_components(assembly, low)
     craft = np.full(count,-1)
     centers = np.column_stack([np.bincount(component,weights=vertices[:,axis])/np.bincount(component)
@@ -153,7 +158,23 @@ def measurements(model, surface):
         if not np.isfinite(levels[mask]).all():
             raise ValueError(f'Floating craft leaves water: {surface.name} {number}')
         support[mask] = levels[mask]-draft
+    # In-band wall finish still has to touch its support. Check the physical
+    # interface against the backing wall instead of treating a window sill
+    # as a column foot. Its carrier has an independently checked foundation.
+    wall_samples = {}
+    for group, wall in mounts.items():
+        chosen=np.flatnonzero(component[base]==group)
+        if not len(chosen):
+            continue
+        wall_faces=triangles[component[faces[:,0]]==wall]
+        for at in chosen:
+            repeated=np.broadcast_to(pts[at],(len(wall_faces),3))
+            nearest=trimesh.triangles.closest_point(wall_faces,repeated)
+            dist=np.linalg.norm(nearest-pts[at],axis=1).min()
+            wall_samples[at]=dist
     gap = pts[:, 1]-support
+    for at,dist in wall_samples.items():
+        gap[at]=dist
     rows = []
     labels, sizes = np.unique(component[base], return_counts=True)
     groups = np.split(np.argsort(component[base]), np.cumsum(sizes)[:-1])
@@ -166,6 +187,8 @@ def measurements(model, surface):
                          ground=round(terrain[worst],3), support=round(support[worst],3),
                          water=None if np.isnan(levels[worst]) else round(levels[worst],3),
                          status='fail' if max(values)>FLOAT or min(values)<-SINK else 'pass'))
+        if group in mounts:
+            rows[-1].update(rule='wall attachment',backing=int(mounts[group]),support=None)
         if craft[group] >= 0:
             rows[-1]['rule'] = boats[craft[group]][4]
     for role,stations in [('bridge-end',ENDS),('pier',PIERS)]:
