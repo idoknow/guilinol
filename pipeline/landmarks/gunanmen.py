@@ -20,6 +20,8 @@ import random
 import sys
 from PIL import Image, ImageDraw
 from c_kit import RECTS, ATLAS, _font
+from rong_paving import pave, slab_texture
+from rong_ground import GATE_PLAZA
 from rong_street import shops, signs, approach
 from rong_solids import loft, oval, banyan as solid_tree, align_front
 from pathlib import Path
@@ -101,11 +103,15 @@ def courtyard(builder, deck):
     for offset in (-4.5, -1.5, 1.5, 4.5):
         cylinder(wall, (offset, deck + 2.48, 7.6), .24, .45, 'vermilion', 8)
         cylinder(wall, (offset, deck + 2.34, 7.6), .045, .14, 'yellow', 5)
-    box(wall, (-15, 1.15, 9), (12, 2.3, 1.15), 'ashlar')
-    box(wall,(0,deck/2,-4.5),(22,deck,3.4),'ashlar')
-    _battered(wall,(-11,-6.8),(11,-6.8),(11,-6.21),(-11,-6.21),0,deck,'ivywall')
-    railing(wall,(-10.7,-6.05),(10.7,-6.05),deck,.95,'white',1.2,stone=True)
-    box(wall,(-2,.55,-7.9),(20,1.1,1.2),'foliage')
+    # South curtain runs from the west enclosure to the stair, below the west
+    # hall. IMG_1313 shows the uninterrupted stone face to the left of the arch.
+    curtain = [(-30,8.6),(-10.2,8.6),(-10.2,9.6),(-30,9.6)]
+    extrude(wall,curtain,0,4.65,'coursed',None)
+    box(wall,(-20.1,4.74,9.1),(19.9,.18,1.14),'ashlar')
+    if builder.collide:
+        extrude(builder.hit,curtain,0,4.83,'ashlar')
+    # The rear face of the bastion closes the platform. IMG_1315/16 show
+    # open space east of it; the former 22 m backing box extended past the side.
     if builder.collide:
         solid(builder.hit, (-31, 1.45, 3.5), (.52, 2.9, 21), 'ashlar')
     for row in range(7):
@@ -126,6 +132,7 @@ def courtyard(builder, deck):
 
 
 def build(b: Builder):
+    pave(b, GATE_PLAZA, .13)
     shops(b)
     approach(b)
     # The eastern hall sits on way/684946200, the western hall on way/521248472.
@@ -219,11 +226,6 @@ def gate(b: Builder):
     # West stair, about 30 degrees. It lands on the west edge of the terrace.
     stairs(wall, (-12.2, 0, 16.5), (-7.2, deck, 5.2), 2.6, 22 if detail else 8, 'ashlar')
     railing(wall, (-13.4, 16.5), (-8.4, 5.2), 0, 0.9, 'ashlar', post, stone=True)
-    # Plaza paving sits a few centimetres above the flattened ground.
-    for east in range(-20,18,2):
-        for south in range(11,29,2):
-            wall.face([(east,.22,south),(east+2,.22,south),(east+2,.22,south+2),(east,.22,south+2)],(0,1,0),'granite',None)
-    # Banyans stand off the south axis so a front camera is not inside the crown.
     if not b.collide:
         return
     for side in (-1,1):
@@ -236,6 +238,7 @@ def main():
     image = ensure_textures(folder)
     signs(image)
     stone_cells(image)
+    slab_texture(image,896,896)
     RECTS['park_map'] = (640, 896, 256, 128)
     panel = Image.new('RGB', (256,128), '#efe8d4')
     draw = ImageDraw.Draw(panel)

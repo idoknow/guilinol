@@ -26,6 +26,7 @@ Colors: roof #393943, column #9a3832, library wall #adaaa6, column #a7a4a1.
 import math
 import random
 import sys
+from rong_paving import slab_texture
 from rong_bridges import nine_bends, ancient_bridge
 from rong_street import scooter
 from rong_solids import oval, torus, banyan as solid_tree
@@ -409,6 +410,7 @@ def build(b: Builder):
 def main():
     folder = Path(sys.argv[1])
     image = ensure_textures(folder)
+    slab_texture(image,512,768)
     draw=ImageDraw.Draw(image)
     for index,(name,base) in enumerate([('limestone',(187,190,183)),('garden_brick',(130,133,132)),('paver',(155,158,154)),('bank_blue',(45,133,187)),('star_red',(211,34,36))]):
         left,top=768+48*index,696
