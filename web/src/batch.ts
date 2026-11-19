@@ -4,6 +4,7 @@ import {bridgeMaterial} from './look/bridge'
 import {WATER_LAYER, waterMaterial} from './look/water'
 import {streetFurnitureGeo, streetFurnitureMat, streetSurfaceMat} from './streets'
 import type {Tile} from './world'
+import {vehicleModel} from './walk/vehicle-model'
 
 export interface TileBatchInput {
   tile:Tile
@@ -16,6 +17,7 @@ export interface TileBatchInput {
   streetSurface:THREE.BufferGeometry|null
   furnitureMatrices:Float32Array
   furnitureColors:Float32Array
+  parked:Float32Array
 }
 
 interface IndexedSlice {
@@ -165,6 +167,7 @@ export class ChunkBatcher {
   ])
 
   private furniture:THREE.InstancedMesh|null = null
+  private parked:THREE.InstancedMesh|null = null
   private lastFurnitureMask = ''
 
   constructor(private scene:THREE.Scene) {
@@ -176,8 +179,7 @@ export class ChunkBatcher {
     if(input.walls) shiftPositions(input.walls,tile.x,tile.z)
     if(input.bridge) shiftPositions(input.bridge,tile.x,tile.z)
     if(input.streetSurface) shiftPositions(input.streetSurface,tile.x,tile.z)
-    const mats = input.furnitureMatrices
-    for(let i=0;i<mats.length;i+=16) { mats[i+12]+=tile.x; mats[i+14]+=tile.z }
+    for(const mats of [input.furnitureMatrices,input.parked])for(let i=0;i<mats.length;i+=16) { mats[i+12]+=tile.x; mats[i+14]+=tile.z }
     this.items.set(tile,input)
     this.dirty = true
   }
@@ -214,6 +216,7 @@ export class ChunkBatcher {
     if(!this.items.size) {
       if(this.dirty) this.rebuildStatic()
       if(this.furniture) this.furniture.visible = false
+      if(this.parked) this.parked.visible=false
       return
     }
     const moved = focus.distanceToSquared(this.lastFocus)>=4 ||
@@ -267,6 +270,18 @@ export class ChunkBatcher {
 
     if(furnMask!==this.lastFurnitureMask) {
       this.lastFurnitureMask = furnMask
+      const groups=Array.from(visibleStreets,tile=>this.items.get(tile)!.parked),count=groups.reduce((sum,group)=>sum+group.length/16,0)
+      if(count && (!this.parked || this.parked.instanceMatrix.count<count)){
+        if(this.parked){this.scene.remove(this.parked);this.parked.dispose()}
+        const bike=vehicleModel('bike',1)
+        this.parked=new THREE.InstancedMesh(bike.geometry,bike.material,2**Math.ceil(Math.log2(count)))
+        this.parked.frustumCulled=false;this.scene.add(this.parked)
+      }
+      if(this.parked){
+        this.parked.visible=!!count;this.parked.count=count;let offset=0
+        for(const group of groups){this.parked.instanceMatrix.array.set(group,offset);offset+=group.length}
+        this.parked.instanceMatrix.needsUpdate=true
+      }
       let boxCount = 0
       for(const tile of visibleStreets) boxCount += (this.items.get(tile)?.furnitureMatrices.length ?? 0)/16
       if(!boxCount) {

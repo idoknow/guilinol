@@ -256,12 +256,11 @@ def build(bbox, output, palette):
             vertices, normals, indices, rings = building_mesh(parts, origin)
             deck, thin, asphalt = decks(tile, origin)
             st_data = streets(tile, origin)
-            if beds.get(origin):
-                st_data.extend([None, []][len(st_data)-5:])
-                st_data.append(beds[origin])
-            if shop_rows.get(origin):
-                st_data.extend([None, [], []][len(st_data)-5:])
-                st_data.append(shop_rows[origin])
+            for slot, rows in ((7,beds),(8,shop_rows)):
+                if rows.get(origin):
+                    while len(st_data)<=slot:
+                        st_data.append(None if len(st_data)==5 else [])
+                    st_data[slot]=rows[origin]
             collision = json.dumps([rings, st_data, thin, asphalt], separators=(',', ':')).encode()
             tbuf = trees[origin]
             if tbuf:

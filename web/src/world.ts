@@ -146,6 +146,7 @@ export async function detail(tile:Tile, signal:AbortSignal) {
     streetSurface:streets.surface,
     furnitureMatrices:streets.furnitureMatrices,
     furnitureColors:streets.furnitureColors,
+    parked:streets.parked,
   }
   return {
     group,groundMesh,terrain,water,rings,deck,thin,streets,batch,

@@ -285,6 +285,41 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     layers=[STRtree(values) for values in (surfaces,sidewalks,stripes,medians,gaps)]
     bands = section_layers(roads)
     obstacles = STRtree([*footprints, *water, *bridge.geometries, exclude, rep_excl, *clear.geometries])
+    decor = defaultdict(list)
+    def anchor(pt, heading, kind, span=0):
+        if not bounds.contains(pt):
+            return
+        origin = tuple(math.floor(v/CHUNK)*CHUNK for v in pt.coords[0])
+        decor[origin].append([kind,round((pt.x-origin[0])*10),round((pt.y-origin[1])*10),round(heading*100),round(span*10)])
+
+    for road in roads:
+        section = RULES['sections'].get(RULES['sectionClasses'].get(road.kind))
+        if not section or not bounds.intersects(road.line):
+            continue
+        line = road.line
+        def frame(distance):
+            center = line.interpolate(distance)
+            before, after = line.interpolate(max(0,distance-.2)), line.interpolate(min(line.length,distance+.2))
+            heading = math.atan2(after.y-before.y,after.x-before.x)
+            return center,heading
+        density = RULES['fixtures']
+        if road.divided and road.kind in ('trunk','primary'):
+            span = density['railSpan']
+            for seq, along in enumerate(np.arange(span/2,line.length-span/2,span)):
+                center,heading = frame(along)
+                segment = LineString([line.interpolate(along-span/2),line.interpolate(along+span/2)])
+                if not any(tree.query(segment,predicate='intersects').size for tree in (obstacles,layers[4])):
+                    anchor(center,heading,1 if seq%10 else 2,span)
+        for side,available in ((-1,road.left),(1,road.right)):
+            if not available:
+                continue
+            offset = side*(road.width/2+section['verge']+section['cycle']+section['curb']+section['walk']-.7)
+            for fixture,spacing in ((3,density['parkingInterval']),(4,density['signInterval'])):
+                for along in np.arange(spacing/2,line.length-2,spacing):
+                    center,heading = frame(along)
+                    pt = Point(center.x-offset*math.sin(heading),center.y+offset*math.cos(heading))
+                    if not any(tree.query(pt,predicate='dwithin',distance=2).size for tree in (obstacles,layers[0],layers[4])):
+                        anchor(pt,heading,fixture)
     def encode(tile,origin):
         shapes = [unary_union([layer.geometries[idx].intersection(tile) for idx in sorted(layer.query(tile))]) for layer in layers]
         shapes[1]=shapes[1].difference(shapes[0]).union(shapes[3]).difference(shapes[4])
@@ -318,5 +353,8 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             out.append(ctrl_patch)
         if fx[4]:
             out.append(fx[4])
+        if decor.get(origin):
+            out.extend([None, [], [], []][len(out)-5:])
+            out.append(decor[origin])
         return out
     return encode,lengths
