@@ -18,6 +18,7 @@ vermilion door #8e3034, ochre wall #d2ae58, gray tile #58595b, plaza #989389.
 import math
 import sys
 from rong_street import shops, signs, approach
+from rong_solids import loft, oval, banyan as solid_tree
 from pathlib import Path
 
 from c_kit import (
@@ -45,17 +46,7 @@ def _battered(mesh, p0, p1, q1, q0, y0, y1, region='ashlar'):
 def ancient_banyan(builder, east, south):
     wood = builder.parts['atlas']
     iron = builder.parts['steel']
-    count = 9 if builder.detail else 5
-    for index in range(count):
-        angle = math.tau * index/count
-        dx, dz = math.cos(angle), math.sin(angle)
-        elbow = (east+4*dx-dz,6.8,south+4*dz+dx)
-        tip = (east+10*dx,8.7,south+9*dz)
-        tube(wood,(east+1.35*dx,0,south+1.35*dz),elbow,.83,'bark',7)
-        tube(wood,elbow,tip,.55,'bark',6)
-        tube(wood,tip,(tip[0]+.45,0,tip[2]-.28),.23,'bark',5)
-        _canopy(wood,tip,10.5,4.4,9.6,'foliage',4 if builder.detail else 2,10 if builder.detail else 6)
-    _canopy(wood,(east,11,south),12,5,11,'foliage',4,10)
+    solid_tree(wood,(east,0,south),14.8,16.7,4,builder.detail)
     count = 32 if builder.detail else 16
     for index in range(count):
         ends = [(east+11.6*math.cos(math.tau*t/count),south+10.6*math.sin(math.tau*t/count)) for t in (index,index+1)]
@@ -69,8 +60,8 @@ def ancient_banyan(builder, east, south):
 def courtyard(builder, deck):
     wall = builder.parts['atlas']
     for center in (-6.5, 6.5):
-        cylinder(wall, (center, 0, 7.9), 2.65, deck, 'ashlar', 18 if builder.detail else 9, 2.4)
-    banyan(wall, (7.2, deck, 6.7), 5.6, 3.2, 82, builder.detail)
+        loft(wall,[(center,0,7.9,3.75,3.45),(center,deck,7.9,2.35,2.1)],'rubble',24 if builder.detail else 12)
+    solid_tree(wall, (7.2, deck, 6.7), 5.6, 3.2, 82, builder.detail)
     for offset in (-4.5, -1.5, 1.5, 4.5):
         cylinder(wall, (offset, deck + 2.48, 7.6), .24, .45, 'vermilion', 8)
         cylinder(wall, (offset, deck + 2.34, 7.6), .045, .14, 'yellow', 5)
@@ -78,16 +69,31 @@ def courtyard(builder, deck):
     curve = [(11*math.cos(angle), -1.6-6*math.sin(angle)) for angle in
              [math.pi*index/12 for index in range(13)]]
     for start, end in zip(curve, curve[1:]):
-        segment_wall(wall, start, end, 0, 2.5, .6, 'rubble')
-        segment_wall(wall, start, end, 2.5, 5.3, .45, 'vermilion')
-        segment_wall(wall, start, end, 5.3, 5.55, .82, 'glaze')
+        segment_wall(wall, start, end, 0, deck, .8, 'rubble')
+        for fraction in (.12,.42,.72):
+            east=start[0]+(end[0]-start[0])*fraction
+            south=start[1]+(end[1]-start[1])*fraction
+            oval(wall,(east,4.5+math.sin(east),south-.48),(.62,1.23,.22),'foliage',7)
+        if start[0]>6:
+            short=[(east*1.21,south*1.22) for east,south in (start,end)]
+            segment_wall(wall,*short,0,2.4,.56,'vermilion')
+            segment_wall(wall,*short,2.4,2.62,.78,'glaze')
         hedge = [(east*1.12,north*1.12) for east,north in (start,end)]
         segment_wall(wall, *hedge, 0, .85, 1, 'foliage')
         if builder.collide:
             segment_wall(builder.hit, start, end, 0, 5.55, .6, 'rubble')
-    extrude(wall, [(-19,-24),(19,-24),(19,-10),(-19,-10)], .02,.1,'granite')
+    for row in range(7):
+        front=-10-row*2
+        for east in range(-19,19,2):
+            corners=[(east,front),(east+2,front),(east+2,front-2),(east,front-2)]
+            wall.face([(xx,.22+max(0,-zz-10)*.092,zz) for xx,zz in corners],(0,1,0),'granite',None)
     box(wall, (14.2,1.5,4.34),(2.2,3,.22),'wood')
-    hip_roof(wall,(14.2,4),3.24,3.8,1.7,.95,.35,.25,'glaze','vermilion')
+    for south in (2.75,5.25):
+        wall.face([(11.9,3.28,south),(16.5,3.28,south),(16.5,4.25,4),(11.9,4.25,4)],(0,1,south-4),'glaze',None)
+    box(wall,(14.2,3.24,4),(4.65,.22,2.65),'vermilion')
+    box(wall,(14.2,4.28,4),(4.7,.22,.25),'glaze')
+    for east in (13,15.4):
+        box(wall,(east,1.5,4.56),(.2,3.05,.18),'wood')
     for east,height in ((16.4,1.45),(17.6,.95)):
         box(wall,(east,height/2,4.85),(.78,height,.32),'granite')
         box(wall,(east,height*.7,5.03),(.54,.38,.04),'blacktile')
@@ -104,7 +110,7 @@ def build(b: Builder):
     # are single faces, chamfered at the corners and inset 0.45 m at the top.
     front_z = 9.4
     arch_wall(wall, (0, 0, front_z), 15.6, deck, 2.6, 3.6, 4.6, 'ashlar', 8 if detail else 4, tile=2.6)
-    inset = 0.45
+    inset = 1.15
     # bottom (x, z), top (x, z). Order walks the outside from the front corners back.
     foot = [(-7.6, 8.1), (-8.6, 6.6), (-8.6, -1.4), (-7.2, -2.8), (7.2, -2.8), (8.6, -1.4), (8.6, 6.6), (7.6, 8.1)]
     head = [(-7.6 + inset, 8.1 - inset), (-8.6 + inset, 6.6 - inset), (-8.6 + inset, -1.4 + inset),
@@ -126,7 +132,7 @@ def build(b: Builder):
     box(wall, (14.2, 1.55, 4.0), (7.5, 3.1, 0.55), 'vermilion', 1.5)
     box(wall, (14.2, 3.2, 4.0), (8.0, 0.28, 0.9), 'glaze', 0.6)
     # Gatehouse: yellow hall, vermilion colonnade, gray xieshan, stone rail on the terrace.
-    box(wall, (0, deck + 1.55, 2.2), (12.2, 3.1, 0.45), 'yellow', 1.6)
+    box(wall, (0, deck + 1.55, 3.15), (11.8, 3.1, 4.25), 'yellow', 1.6)
     box(wall, (-6.05, deck + 1.55, 4.5), (0.42, 3.1, 4.6), 'yellow', 1.4)
     box(wall, (6.05, deck + 1.55, 4.5), (0.42, 3.1, 4.6), 'yellow', 1.4)
     if detail:
@@ -137,7 +143,8 @@ def build(b: Builder):
         x = -4.4 + 8.8 * i / (columns - 1)
         cylinder(wall, (x, deck, 6.35), 0.28, 3.05, 'vermilion', 10 if detail else 6, 0.7)
         box(wall, (x, deck + 3.1, 6.35), (0.62, 0.16, 0.62), 'vermilion', 0.3)
-    hip_roof(wall, (0, 4.3), deck + 3.15, 13.4, 7.4, 3.6, 1.15, 0.65, 'graytile', 'vermilion')
+    box(wall,(0,deck+3.09,4.3),(14.7,.32,8.8),'wood')
+    hip_roof(wall, (0, 4.3), deck + 3.15, 13.4, 7.4, 3.6, 1.15, 0.65, 'graytile', 'vermilion',ceiling=True)
     # Open vermilion doors, studs in the door texture. Leaves swing inward so the arch can be walked.
     yaw_box(wall, (-0.78, 1.85, 8.7), (1.45, 3.5, 0.08), 0.55, 'door', None)
     yaw_box(wall, (0.78, 1.85, 8.7), (1.45, 3.5, 0.08), math.pi - 0.55, 'door', None)
@@ -153,7 +160,9 @@ def build(b: Builder):
     stairs(wall, (-12.2, 0, 16.5), (-7.2, deck, 5.2), 2.6, 22 if detail else 8, 'ashlar')
     railing(wall, (-13.4, 16.5), (-8.4, 5.2), 0, 0.9, 'ashlar', post, stone=True)
     # Plaza paving sits a few centimetres above the flattened ground.
-    extrude(wall, [(-20, 11), (18, 11), (18, 28), (-20, 28)], 0.02, 0.1, 'granite', 1.6)
+    for east in range(-20,18,2):
+        for south in range(11,29,2):
+            wall.face([(east,.22,south),(east+2,.22,south),(east+2,.22,south+2),(east,.22,south+2)],(0,1,0),'granite',None)
     # Banyans stand off the south axis so a front camera is not inside the crown.
     ancient_banyan(b, -22, 20)
     banyan(wall, (20, 0, 22), 12, 8.5, 8, detail)
