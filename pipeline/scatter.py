@@ -131,14 +131,27 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
             for pt in walk_line(LineString(points(elem)),CONFIG['treeRowSpacing']):
                 tree(pt,'mixed','osmRow')
     street = CONFIG['street']
+    beds = defaultdict(list)
     for road in roads:
         line,width,name = road.line,road.width,road.name
         if not bounds.intersects(line):
             continue
-        for side in [-1,1]:
-            for pt in walk_line(line,street['spacing'],side*(width/2+street['offset']),street['jitter'],rng):
+        section = RULES['sections'].get(RULES['sectionClasses'].get(road.kind))
+        for side, available in ((-1,road.left),(1,road.right)):
+            if section and not available:
+                continue
+            arterial = road.kind in ('trunk','primary')
+            offset = (section['verge']/2 if arterial else section['verge']+section['cycle']+section['curb']+.58) if section else street['offset']
+            for pt in walk_line(line,street['spacing'],side*(width/2+offset),0 if section else street['jitter'],rng):
                 if not junctions.query(pt,predicate='dwithin',distance=street['junction']).size:
-                    tree(pt,'river' if '滨江' in name else 'lake' if '榕' in name else 'mixed','street')
+                    if not section:
+                        tree(pt,'river' if '滨江' in name else 'lake' if '榕' in name else 'mixed','street')
+                    elif not blocked.query(pt.buffer(.52), predicate='intersects').size and tree(pt,'mixed','street',force_kind=rng.randrange(2),force_scale=120):
+                        origin = tuple(math.floor(value/CHUNK)*CHUNK for value in pt.coords[0])
+                        along = line.project(pt)
+                        before, after = line.interpolate(max(0,along-.2)), line.interpolate(min(line.length,along+.2))
+                        angle = math.atan2(after.y-before.y,after.x-before.x)
+                        beds[origin].append([round((pt.x-origin[0])*10),round((pt.y-origin[1])*10),round(angle*100),int(arterial)])
     shore = unary_union(wet).boundary
     for poly,name,water in banks:
         for pt in walk_line(poly.exterior,CONFIG['bank']['spacing']):
@@ -173,4 +186,4 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
                     tree(pt,'mixed','waterway')
     for pos,normal in mountain_trees:
         tree(Point(pos[0],pos[2]),'peak','mountain',pos[1],normal)
-    return tiles, roads, banks, stats
+    return tiles, roads, banks, stats, beds

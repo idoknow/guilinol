@@ -6,7 +6,7 @@ import {tileMaterial} from './look/tiles'
 type Pair=[number,number]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 export const streetSurfaceMat=new THREE.MeshStandardMaterial({
@@ -30,7 +30,7 @@ function evalRoadCtrl([baseMm,deltas]:RoadCtrl,lx:number,lz:number){
   return (baseMm+sum)/1000
 }
 
-export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[]]:Streets,ground:(x:number,z:number)=>number){
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[]]:Streets,ground:(x:number,z:number)=>number){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],mats:number[]=[],cols:number[]=[]
   const baseLevel=(x:number,z:number)=>{const g=ground(x,z);return roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g}
   const vector=(pt:THREE.Vector2,offset:number)=>new THREE.Vector3(pt.x,baseLevel(pt.x,pt.y)+offset,pt.y)
@@ -75,6 +75,21 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   function box(x:number,y:number,z:number,w:number,h:number,d:number,yaw=0,tint=tone.railing,pitch=0){
     object.position.set(x,y,z);object.scale.set(w,h,d);object.rotation.set(0,yaw,pitch,'YXZ');object.updateMatrix()
     mats.push(...object.matrix.elements);cols.push(tint.r,tint.g,tint.b)
+  }
+  const hedge=new THREE.Color(look.streets.hedge),iron=new THREE.Color(look.streets.iron)
+  for(const [east,south,heading,arterial] of beds){
+    const x=east/10,z=south/10,y=baseLevel(x,z)+.195,angle=-heading/100
+    if(arterial){
+      box(x,y+.32,z,3.8,.64,1,angle,hedge)
+      box(x,y+.75,z,3.8,.07,.08,angle,iron)
+      for(const side of [-1,1])box(x+side*1.8*Math.cos(angle),y+.4,z-side*1.8*Math.sin(angle),.08,.8,.08,angle,iron)
+    }else{
+      for(const side of [-1,1]){
+        box(x+side*.45*Math.sin(angle),y+.1,z+side*.45*Math.cos(angle),1,.2,.1,angle,stoneMid)
+        box(x+side*.45*Math.cos(angle),y+.1,z-side*.45*Math.sin(angle),.1,.2,.8,angle,stoneMid)
+      }
+      box(x+.4*Math.cos(angle),y+.25,z-.4*Math.sin(angle),.25,.5,.25,angle,stoneLight)
+    }
   }
   for(const [x,z] of lamps){const px=x/10,pz=z/10,y=baseLevel(px,pz),yaw=(x*7+z*13)%6/6*Math.PI
     box(px,y+.3,pz,.34,.6,.34,0,tone.lampPole);box(px,y+2.9,pz,.14,5.2,.14,0,tone.lampPole);box(px,y+5.3,pz,1.6,.08,.08,yaw,tone.lampPole)

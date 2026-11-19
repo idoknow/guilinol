@@ -189,7 +189,7 @@ def build(bbox, output, palette):
         if court is not None:
             mask,corner = stencil(court,left,top,1)
             texture.paste(palette['schoolCourt'],corner,mask)
-    trees, roads, banks, tree_stats = scatter(bounds, footprints, layers['water'], peak_shapes, tree_support_at, mountain_trees, unary_union([layout.tree_exclude, bank_pavement.buffer(2)]) if bank_pavement is not None else layout.tree_exclude, precomputed=road_net, extra_blocked=[*(court.buffer(1.5) for court in layers["schoolTrack"] + layers["schoolCourt"]), *bridge_polys, *road_surfs])
+    trees, roads, banks, tree_stats, beds = scatter(bounds, footprints, layers['water'], peak_shapes, tree_support_at, mountain_trees, unary_union([layout.tree_exclude, bank_pavement.buffer(2)]) if bank_pavement is not None else layout.tree_exclude, precomputed=road_net, extra_blocked=[*(court.buffer(1.5) for court in layers["schoolTrack"] + layers["schoolCourt"]), *bridge_polys, *road_surfs])
     for road in roads:
         for part in polygons(road.line.buffer(road.width/2,quad_segs=2).intersection(bounds)):
             mask,corner = stencil(part,left,top,1)
@@ -254,19 +254,22 @@ def build(bbox, output, palette):
             vertices, normals, indices, rings = building_mesh(parts, origin)
             deck, thin, asphalt = decks(tile, origin)
             st_data = streets(tile, origin)
+            if beds.get(origin):
+                st_data.extend([None, []][len(st_data)-5:])
+                st_data.append(beds[origin])
             collision = json.dumps([rings, st_data, thin, asphalt], separators=(',', ':')).encode()
             tbuf = trees[origin]
             if tbuf:
                 sw_tile_polys, rd_tile_polys = [], []
                 for s_item in st_data[0]:
                     skind, ext, *holes = s_item
-                    if skind not in (0, 1) or len(ext) < 3:
+                    if skind not in (0, 1, 4, 6) or len(ext) < 3:
                         continue
                     ext_w = [(origin[0] + p[0] / 100.0, origin[1] + p[1] / 100.0) for p in ext]
                     holes_w = [[(origin[0] + p[0] / 100.0, origin[1] + p[1] / 100.0) for p in h] for h in holes if len(h) >= 3]
                     sp = ShapelyPolygon(ext_w, holes_w).buffer(0)
                     if not sp.is_empty:
-                        (sw_tile_polys if skind == 1 else rd_tile_polys).append(sp)
+                        (sw_tile_polys if skind != 0 else rd_tile_polys).append(sp)
                 u_sw_tile = unary_union(sw_tile_polys) if sw_tile_polys else ShapelyPolygon()
                 u_rd_tile = unary_union(rd_tile_polys) if rd_tile_polys else ShapelyPolygon()
                 n_trees = len(tbuf) // 12
