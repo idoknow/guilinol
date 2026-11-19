@@ -7,7 +7,7 @@ export async function apiTest({ api, origin, cookie, sql }) {
   const other = '1'.repeat(64),
     digest = createHash('sha256').update(other).digest('hex')
   sql(
-    `INSERT INTO users VALUES('other','other@example.test','other','','',1,0,0); INSERT INTO sessions VALUES('${digest}','other',unixepoch()+3600)`,
+    `INSERT INTO users(id,email,nickname,salt,digest,verified) VALUES('other','other@example.test','other','','',1); INSERT INTO sessions VALUES('${digest}','other',unixepoch()+3600)`,
   )
   const second = { Cookie: `glol_session=${other}` },
     picture = await readFile('public/og.jpg')
@@ -93,6 +93,7 @@ export async function apiTest({ api, origin, cookie, sql }) {
     ['submitted', 'queued', 'reviewing', 'modelling', 'need_info', 'submitted', 'queued', 'live'],
   )
   assert.equal(detail.photos.length, 4)
+  await (await import('./admin-test.mjs')).apiTest({api,sql,id,second,photo})
   for (let count = 1; count <= 5; count++) {
     const next = await create()
     await photo(next, 1, 200)

@@ -1,6 +1,7 @@
 import { type Env, Problem, equal, hash, invalid, limited, now, sessionHash, unauthorized } from './auth'
 import { ll2xz } from './projection'
 import { edges, kinds, labels, views } from './feedback-contract'
+import { adminList } from './admin'
 
 const json = (value: unknown) => Response.json(value, { headers: { 'Cache-Control': 'private, no-store' } })
 function missing(): never {
@@ -33,7 +34,8 @@ export async function feedback(request: Request, env: Env, path: string) {
   const method = request.method,
     bridge = path.startsWith('bridge/'),
     auth = request.headers.get('Authorization')
-  const machine = bridge || !!auth
+  const admin = path.startsWith('admin/') || path === 'admin'
+  const machine = !admin && (bridge || !!auth)
   const comparison = /^(bridge|feedback)\/comparisons\/([0-9a-f]{64})$/.exec(path)
   if (comparison?.[1] === 'feedback' && method === 'GET') {
     const object = await env.FEEDBACK.get(`public/comparisons/${comparison[2]}.png`)
@@ -48,6 +50,7 @@ export async function feedback(request: Request, env: Env, path: string) {
   }
   const stmt = (sql: string, ...args: (number | string | null)[]) => env.DB.prepare(sql).bind(...args)
   let user = ''
+  let isAdmin = false
   if (machine) {
     if (!env.BRIDGE_TOKEN || !auth || !equal(await hash(auth), await hash(`Bearer ${env.BRIDGE_TOKEN}`)))
       unauthorized()
@@ -67,15 +70,25 @@ export async function feedback(request: Request, env: Env, path: string) {
       return json({ ok: true })
     }
   } else {
+    const account = await stmt(
+      'SELECT users.id,role FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.digest=? AND expires>? AND verified=1',
+      await sessionHash(request),
+      now(),
+    ).first<{ id: string; role: string }>()
+    if (!account) unauthorized()
+    user = account.id
+    isAdmin = account.role === 'admin'
+    if (admin && !isAdmin) throw new Problem(403, 'forbidden', '无权限')
     if (method !== 'GET' && request.headers.get('Origin') !== new URL(request.url).origin)
       throw new Problem(403, 'origin', '请求来源不符')
-    user =
-      (await stmt(
-        'SELECT users.id FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.digest=? AND expires>? AND verified=1',
-        await sessionHash(request),
-        now(),
-      ).first<string>('id')) ?? ''
-    if (!user) unauthorized()
+    if (admin && method === 'GET' && ['admin/stats', 'admin/users', 'admin/feedback'].includes(path))
+      return adminList(env.DB, path, new URL(request.url).searchParams)
+    if (
+      admin &&
+      !(method === 'GET' && /^admin\/feedback\/[\w-]+$/.test(path)) &&
+      !(method === 'POST' && /^admin\/feedback\/[\w-]+\/status$/.test(path))
+    )
+      missing()
   }
   if (path === 'bridge/pending' && method === 'GET')
     return json(
@@ -125,15 +138,19 @@ export async function feedback(request: Request, env: Env, path: string) {
     return json({ id })
   }
   const match =
-    /^(bridge\/)?feedback\/([\w-]+)(?:\/(submit|supplement|status|photos\/(?:[1-9]|1\d|20)))?$/.exec(path)
-  if (!match || bridge !== (match[3] === 'status')) missing()
+    /^(bridge\/|admin\/)?feedback\/([\w-]+)(?:\/(submit|supplement|status|photos\/(?:[1-9]|1\d|20)))?$/.exec(
+      path,
+    )
+  if (!match || (!admin && bridge !== (match[3] === 'status'))) missing()
   const [, , id, action] = match,
     row = await stmt(
-      'SELECT * FROM feedback WHERE id=? AND (user_id=? OR ?=1)',
+      (admin
+        ? 'SELECT f.*,u.email,u.nickname FROM feedback f JOIN users u ON u.id=f.user_id WHERE f.id=?'
+        : 'SELECT * FROM feedback WHERE id=?') + ' AND (user_id=? OR ?=1)',
       id,
       user,
-      Number(machine),
-    ).first<{ status: string }>()
+      Number(machine || admin || (isAdmin && method === 'GET' && action?.startsWith('photos/')) || false),
+    ).first<{ status: string; multica_issue: string | null }>()
   if (!row) missing()
   if (!action && method === 'DELETE') {
     if (row.status !== 'draft') conflict()
@@ -157,6 +174,13 @@ export async function feedback(request: Request, env: Env, path: string) {
   if (!action && method === 'GET')
     return json({
       ...row,
+      ...(admin
+        ? {
+            issue_url: row.multica_issue
+              ? `https://multica.ai/idoknow/issues/${encodeURIComponent(row.multica_issue)}`
+              : null,
+          }
+        : {}),
       photos: (await photos()).results,
       events: (await stmt('SELECT * FROM feedback_events WHERE feedback_id=? ORDER BY id', id).all()).results,
     })
@@ -289,21 +313,23 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (row.status !== 'need_info') conflict()
     target = 'submitted'
     message = text((await fields(request)).body, 2000, true)!
-  } else if (bridge) {
+  } else if (bridge || admin) {
     const data = await fields(request)
     target = String(data.status)
     if (!edges[row.status]) conflict()
-    if (target === row.status) return json({ ok: true })
+    if (bridge && target === row.status) return json({ ok: true })
     if (!edges[row.status].includes(target)) conflict()
     message =
       text(data.message, 2000, ['need_info', 'rejected', 'duplicate'].includes(target)) || labels[target]
-    screenshot =
-      typeof data.screenshot_url === 'string' &&
-      /^\/api\/feedback\/comparisons\/[a-f0-9]{64}$/.test(data.screenshot_url)
-        ? data.screenshot_url
-        : link(data.screenshot_url)
-    issue = text(data.multica_issue, 128)
-    pr = link(data.pr_url)
+    if (bridge) {
+      screenshot =
+        typeof data.screenshot_url === 'string' &&
+        /^\/api\/feedback\/comparisons\/[a-f0-9]{64}$/.test(data.screenshot_url)
+          ? data.screenshot_url
+          : link(data.screenshot_url)
+      issue = text(data.multica_issue, 128)
+      pr = link(data.pr_url)
+    }
   } else missing()
   const [changed] = await env.DB.batch([
     stmt(
