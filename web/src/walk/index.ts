@@ -124,7 +124,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     figure.updateWorldMatrix(true,true);skinned?.skeleton.update()
     const roof=new THREE.Box3().setFromObject(boat,true).max.y,head=new THREE.Box3().setFromObject(figure,true).max.y
     let underside=Infinity
-    for(const along of [-2.3,-1,0,1,2.3])for(const across of [-1,0,1]){const point=boat.localToWorld(new THREE.Vector3(across,0,along)),deck=sim.surface(point.x,point.z,'deck');if(deck)underside=Math.min(underside,deck.y-look.bridgeDepth)}
+    for(const along of [-2.3,-1,0,1,2.3])for(const across of [-1,0,1]){const point=boat.localToWorld(new THREE.Vector3(across,0,along)),deck=sim.surface(point.x,point.z,'deck');if(deck)underside=Math.min(underside,deck.y-(deck.thin?.6:look.bridgeDepth))}
     return {kind:boat.name,head,roof,underside,clearance:underside-Math.max(head,roof)}}
   function sit(){mixer.stopAllAction();action=undefined;for(const side of ['L','R'])for(const [part,value] of Object.entries({Thigh:1.25,Shin:-1.4,Arm:.9,Forearm:.35})){
     const joint=figure.getObjectByName(part+side);if(joint)joint.rotation.x=value}}

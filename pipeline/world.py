@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 from shapely import STRtree
-from shapely.geometry import box
+from shapely.geometry import box, Point
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem
 from features import building_mesh, buildings, ground_features, polygons
@@ -18,8 +18,9 @@ from bridges import bridge_tiles
 from scatter import CONFIG, scatter
 from streets import chunks as street_chunks
 from atlas import write_atlas
-from vehicles import write_vehicles
-from shoreline import report_water
+from vehicles import plan_vehicles, write_vehicles
+from clearance import landmark_triangles
+from shoreline import correct_water
 from landmark_layout import Layout
 
 DRY = -32768
@@ -64,11 +65,10 @@ def build(bbox, output, palette):
                 if wet.any():
                     patch[wet] = round(np.median(terrain[row:row+patch.shape[0],col:col+patch.shape[1]][wet]))
     wet = surface != DRY
-    report_water(surface, terrain, bounds, stencil)
-    terrain[wet] = np.minimum(terrain[wet],surface[wet]-20)
+    previous_bed = np.where(wet,np.minimum(terrain,surface-20),terrain)
     layout = Layout()
     output.mkdir(parents=True, exist_ok=True)
-    original = terrain.copy()
+    original = previous_bed.copy()
     mountain_trees = []
     peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet,mountain_trees,CONFIG['peakAreaPerTree'])
     for region,level in layout.flatten:
@@ -77,6 +77,8 @@ def build(bbox, output, palette):
             for field in (terrain,original):
                 patch = field[row:row+mask.height,col:col+mask.width]
                 patch[np.asarray(mask,dtype=bool)[:patch.shape[0],:patch.shape[1]]] = round(level*10)
+    correct_water(surface, terrain, bounds, stencil)
+    terrain[wet]=original[wet]=np.minimum(terrain[wet],surface[wet]-20)
     footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes),layout)
     index = STRtree(footprints)
     trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees,layout.tree_exclude)
@@ -101,7 +103,14 @@ def build(bbox, output, palette):
         row = min(depth//GRID,max(0,round((south-top)/GRID)))
         col = min(width//GRID,max(0,round((east-left)/GRID)))
         return terrain[row,col]/10,surface[row,col]
-    decks, triangles = bridge_tiles(bounds,sample)
+    vehicles=plan_vehicles(bounds,surface,layers['road'],footprints,sample)
+    decks, triangles = bridge_tiles(bounds,sample,vehicles['routes'])
+    landmarks=[]
+    for x,z,entry in layout.entries:
+        height=sample(x,z)[0]
+        if entry['id'] in ('jiefang_bridge','ronghu') and bounds.covers(Point(x,z)) and sample(x,z)[1]!=DRY:
+            height=previous_bed[round((z-top)/GRID),round((x-left)/GRID)]/10
+        landmarks.append(dict(position=[x,height,z],**entry))
     streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude)
     print('Lengths (m):',lengths)
     def asset(name):
@@ -117,13 +126,13 @@ def build(bbox, output, palette):
             parts = ((poly,heights[key]) for key in sorted(index.query(tile))
                      for poly in polygons(footprints[key].intersection(tile)) if poly.area >= .01)
             vertices, normals, indices, rings = building_mesh(parts, origin)
-            collision = json.dumps([rings,streets(tile,origin)],separators=(',',':')).encode()
+            deck,thin = decks(tile,origin)
+            collision = json.dumps([rings,streets(tile,origin),thin],separators=(',',':')).encode()
             png = io.BytesIO()
             texture.crop((east,south,east+CHUNK,south+CHUNK)).save(png,format='PNG')
             image = png.getvalue()
             window = np.s_[south//GRID:south//GRID+65,east//GRID:east//GRID+65]
             underlay = original[window].tobytes() if np.any(original[window]!=terrain[window]) else b''
-            deck = decks(tile,origin)
             header = struct.pack('<4s5I',b'GL04',len(vertices)//6,len(indices)//4,len(collision),len(image),len(deck)//18)
             name = f'{east//CHUNK}_{south//CHUNK}.glc'
             payload = header+terrain[window].tobytes()+surface[window].tobytes()+vertices+normals+indices+collision+image+deck
@@ -132,10 +141,11 @@ def build(bbox, output, palette):
             chunks.append(dict(x=origin[0],z=origin[1],**asset(name)))
     extent = [left,top,width,depth]
     write_atlas(output,extent,bounds,layers,footprints,peaks)
-    write_vehicles(output,bounds,surface,layers['road'],footprints,sample,triangles)
+    triangles.extend(landmark_triangles(landmarks))
+    write_vehicles(output,vehicles,triangles)
     manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=extent,chunkSize=CHUNK,peaks=peaks,atlas=asset('atlas.bin'),
                     vehicles=asset('vehicles.bin'),grid=GRID,overview=dict(step=32, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png')),chunks=chunks)
-    manifest['landmarks'] = [dict(position=[x,sample(x,z)[0],z],**entry) for x,z,entry in layout.entries]
+    manifest['landmarks'] = landmarks
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 

@@ -7,6 +7,19 @@ export async function lakeChecks(page,data,output){
   await enter(-115,-798);await photo('parked-four',[-112.75,149.65,-794],[5,2.6,2.2])
   const dock=data.docks['杉湖'],leg=data.routes.find(route=>route.start==='杉湖');await enter(dock[0],dock[2]);await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent.includes('杉湖'))
   const [x,y,z]=leg.path[0];await photo('painted-boat-dock',[x,y+.8,z],[8,4,6]);await page.keyboard.press('e')
-  return page.evaluate(()=>{const {walk}=window.viewer;walk.tick(.2);const probe=walk.boatClearance();assertBoat(probe);return {roof:probe.roof-walk.position.y,head:probe.head-walk.position.y}
-    function assertBoat(value){if(value?.kind!=='boat')throw Error('not on sightseeing boat')}})
+  assert.equal(leg.end,'榕湖')
+  const measurement=await page.evaluate(async endpoint=>{
+    const {walk,stream}=window.viewer;let samples=0,minimum=Infinity,roof=0,head=0
+    for(let tick=0;tick<8000;tick++){
+      walk.tick(.25)
+      if(tick%32===0){stream.tick(walk.position);await new Promise(requestAnimationFrame)}
+      if(tick%2===0){const probe=walk.boatClearance();if(probe?.kind!=='boat')throw Error('not on sightseeing boat')
+        roof=Math.max(roof,probe.roof-walk.position.y);head=Math.max(head,probe.head-walk.position.y)
+        if(Number.isFinite(probe.clearance)){samples++;minimum=Math.min(minimum,probe.clearance)}}
+      if(Math.hypot(walk.position.x-endpoint[0],walk.position.z-endpoint[2])<2)return {samples,minimum,roof,head}
+    }
+    throw Error('未到达榕湖')
+  },leg.path.at(-1))
+  assert(measurement.samples>0&&measurement.minimum>=.4,JSON.stringify(measurement));console.log('杉湖 → 榕湖实船',measurement)
+  return measurement
 }
