@@ -46,7 +46,12 @@ def pavilion(b, x, z, span=5.4, column_h=2.75, roof='blacktile'):
     deck = max(bank_top(px,pz) for px,pz in pad)+.24
     y = ground(x,z+half+2.4)
     bank_strip(wall, pad, lambda px,pz: deck, 'ashlar')
+    start=len(wall.pos)
     stairs(wall, (x, y, z+half+2.4), (x, deck, z+half-.2), 1.8, 5 if b.detail else 3, 'granite')
+    for i in range(start,len(wall.pos)):
+        px,py,pz=wall.pos[i]
+        if abs(py-y)<.01:
+            wall.pos[i]=(px,ground(px,pz)-.04,pz)
     inset = span / 2 - 0.55
     for dx, dz in ((-inset, -inset), (inset, -inset), (inset, inset), (-inset, inset)):
         cylinder(wall, (x + dx, deck, z + dz), 0.22, 0.4, 'bark', 6, 0.4)
@@ -56,7 +61,7 @@ def pavilion(b, x, z, span=5.4, column_h=2.75, roof='blacktile'):
                  ((span / 2 - 0.15, -span / 2 + 0.15), (span / 2 - 0.15, span / 2 - 0.9)),
                  ((-span / 2 + 0.15, span / 2 - 0.9), (-span / 2 + 0.15, -span / 2 + 0.15))):
         railing(wall, (x + a[0], z + a[1]), (x + c[0], z + c[1]), deck, 0.9, 'wood', 1.15)
-    box(wall,(x,deck+column_h-.04,z),(span+.15,.28,span+.15),'wood')
+    box(wall,(x,deck+column_h-.04,z),(span+1.75,.28,span+1.75),'wood')
     hip_roof(wall, (x, z), deck + column_h, span - 0.2, span - 0.2, 1.85, 1.05, 0.7, roof, 'vermilion', ceiling=True)
     board(wall, x, deck + column_h - 0.15, z + span / 2 - 0.55, 1.8, 0.55, 'wood')
     if b.collide:
@@ -184,6 +189,7 @@ def island(b):
 
 def island_corridor(b, x,y,z,deck):
     wall, lit = b.parts['atlas'], b.parts['lit']
+    box(wall,(x-1.1,y+2.84,z+1.15),(8.8,.23,.32),'wood')
     for east in (x-4,x-1,x+2):
         box(wall,(east,y+2.85,z+1.32),(.12,.12,.5),'wood')
         cylinder(wall,(east,3.02,z+1.48),.04,y+2.85-3.02,'steel',6)
@@ -199,6 +205,8 @@ def island_corridor(b, x,y,z,deck):
         angle = math.pi / 6 + i * math.tau / 6
         cx, cz = x + 4.2 + radius * math.cos(angle), z + radius * math.sin(angle)
         cylinder(wall, (cx, deck, cz), 0.2, 3.15, 'vermilion', 8 if b.detail else 5, 0.55)
+    cylinder(wall,(x+4.2,deck+3.05,z),3.6,.3,'wood',6)
+    cylinder(wall,(x+4.2,deck+3.10,z),.32,3.35,'wood',8)
     hip_roof(wall, (x + 4.2, z), deck + 3.15, 6.4, 6.4, 2.15, 0.85, 0.65, 'blacktile', 'vermilion', tiers=2, sides=6)
     # Glazed corridor running west: floor, columns, lattice windows, its own roof.
     box(wall, (x - 1.2, y + 0.42, z), (9.4, 0.16, 3.0), 'ashlar')
@@ -254,7 +262,7 @@ def library(b):
         box(wall,(x+direction*9,y+.75,z+5.4),(5.2,.32,1.9),'foliage')
         for plant in range(9 if b.detail else 4):
             oval(wall,(x+direction*9+2*math.cos(plant*2.4),y+1,z+5.4+.55*math.sin(plant*2.4)),(.4,.25,.37),'foliage',6)
-    solid_tree(wall,(x-14,grade(x-14,z+9),z+9),16,12.6,54,b.detail)
+    solid_tree(wall,(x-14,grade(x-14,z+9),z+9),16,12.6,54,b.detail,grade=grade)
     box(wall,(x+17,y+1.1,z+9),(8.4,2.2,.45),'white')
     for index in range(7):
         east=x+14+index*.95
@@ -323,6 +331,7 @@ def hotel(b):
     # Stacked pavilion roofs on the main block, each one smaller than the one below.
     hip_roof(wall, (x, z - 4), y + 19.0, 22, 11, 2.8, 0.9, 0.55, 'blacktile', 'vermilion')
     hip_roof(wall, (x, z - 4), y + 22.0, 12, 7, 2.2, 0.6, 0.5, 'blacktile', 'vermilion')
+    box(wall,(x,y+16.86,z+3.12),(6.6,1.9,.54),'wood')
     board(wall, x, y + 17.2, z + 3.4, 6.5, 1.1, 'sign_hotel')
     floors = 5 if b.detail else 2
     cols = 11 if b.detail else 4
@@ -400,9 +409,9 @@ def glass_bridge(builder):
         railing(stone,(east,146),(east,174),.76,1.02,'white',1.15,stone=True)
     for south in (146.4,160,173.6):
         box(stone,(304,4.45,south),(4.4,.38,.56),'white')
-    near, far = ground(304,145.5), ground(304,174.5)
+    near, far = max(ground(x,145.5) for x in (301.8,306.2))+.10, max(ground(x,174.5) for x in (301.8,306.2))+.10
     for mesh,start in starts:
-        mesh.pos[start:] = [(x,y-.76+near+(far-near)*(z-145.5)/29,z) for x,y,z in mesh.pos[start:]]
+        mesh.pos[start:] = [(x,ground(x,z)-.05 if abs(y-.20)<.01 else y-.76+near+(far-near)*(z-145.5)/29,z) for x,y,z in mesh.pos[start:]]
     east,south=470,196.5
     tower_meshes = [(m,len(m.pos)) for m in (stone,builder.hit)]
     tower_ground = ground(east,south)-1.8
@@ -451,12 +460,12 @@ def shore(b):
         box(wall,(east,level-.08,south),(5,.18,1.55),'granite')
         box(wall,(east,level+.03,south),(5,.08,1.4),'rill_water')
         for offset in (-1.3,1.3):
-            box(wall,(east+offset,level+.17,south),(.63,.32,.6),'ashlar')
+            box(wall,(east+offset,level+.07,south),(.63,.52,.6),'ashlar')
         for i in range(start,len(wall.pos)):
             px,py,pz = wall.pos[i]
             wall.pos[i] = (px,py+ground(px,pz)-level+.20,pz)
         if index in (0,3):
-            solid_tree(wall,(east,ground(east,south-5),south-5),9,5,90+index,b.detail,lobed=False)
+            solid_tree(wall,(east,ground(east,south-5),south-5),9,5,90+index,b.detail,lobed=False,grade=ground)
     px, pz = -46, shoreline_z(-46)-2
     outline = [(px+3*math.cos(i*math.tau/6), pz+3*math.sin(i*math.tau/6)) for i in range(6)]
     level = max(bank_top(x,z) for x,z in outline)
@@ -467,6 +476,7 @@ def shore(b):
         angle = i*math.tau/6
         cylinder(wall,(px+2.25*math.cos(angle),level,pz+2.25*math.sin(angle)),.19,3,'vermilion',8)
     cylinder(wall,(px,level+2.94,pz),2.8,.24,'wood',6)
+    cylinder(wall,(px,level+3,pz),.24,3.4,'wood',8)
     hip_roof(wall,(px,pz),level+3,5.3,5.3,2,.7,.5,'graytile','vermilion',tiers=2,sides=6)
     for first, last in ((-36,-2.2),(2.2,72)):
         count = math.ceil((last-first)/1.6)
@@ -485,9 +495,9 @@ def shore(b):
         for a,c in zip(points,points[1:]):
             tube(wall,a,c,.14,'granite',4)
     # North of the pavilion, so a camera standing beside the pavilion is not inside a crown.
-    banyan(wall, (20, ground(20,-7), -7), 13, 10, 42, b.detail)
+    banyan(wall, (20, ground(20,-7), -7), 13, 10, 42, b.detail,grade=ground)
     if b.detail:
-        banyan(wall, (48, ground(48,-4), -4), 12, 9, 43, True)
+        banyan(wall, (48, ground(48,-4), -4), 12, 9, 43, True,grade=ground)
 
 
 def build(b: Builder):

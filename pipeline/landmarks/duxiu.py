@@ -14,7 +14,7 @@ from c_kit import landmark_surface
 from wangcheng_plan import ROOT, ll2xz
 
 
-def rock_shelter(model, inscription):
+def rock_shelter(model, inscription,surface):
     samples=41 if model.detail else 15
     widths=np.linspace(-8.6,8.6,samples)
     profile=[(-3.8,1.5,18),(-2.15,1.45,24),(-1.52,2.0,38),(-1.35,2.9,56),
@@ -27,6 +27,11 @@ def rock_shelter(model, inscription):
             fold=.14*np.sin(east*1.4+row*.27)+.075*np.sin(east*3.1-row*.31)
             lip_drop=shoulder*(1.9 if row<7 else .72)
             vertices.append([east,height-lip_drop+fold,depth+.25*np.sin(east*.86+row*.22)-1.85*shoulder])
+            if row==0:
+                px,_,pz=vertices[-1]
+                cx,cy,cz,angle=model.pose
+                c,s=math.cos(angle),math.sin(angle)
+                vertices[-1][1]=surface.ground(cx+c*px-s*pz,cz+s*px+c*pz)-cy-.04
             shade=light+(4 if row<4 else 16)*(np.sin(east*1.79+.35*row)*.6+np.sin(east*4.13-row*.63)*.4)
             linear=255*((np.clip(np.array([shade+1,shade+1,shade]),0,255)/255+.055)/1.055)**2.4
             colors.append([*linear.round().astype(int),255])
@@ -95,10 +100,10 @@ def summit(model):
         if model.detail and index%6==0:
             model.beam([1,.12,0],[1,1.25,0],.09,'stone')
     start,angle=tread(0);model.pose=(*start,angle-math.pi/2)
-    rock_shelter(model,'太平岩')  # Taiping Cave, west foot at the stair entrance.
+    rock_shelter(model,'太平岩',surface)  # Taiping Cave, west foot at the stair entrance.
     southeast = rings[1,cliff_column('读书岩')]
     model.pose = (*southeast, -math.pi/4)
-    rock_shelter(model,'颜公读书岩')  # Dushu Cave and cliff inscriptions, southeast foot.
+    rock_shelter(model,'颜公读书岩',surface)  # Dushu Cave and cliff inscriptions, southeast foot.
     model.pose=(*tip,0)
     def ring(radius,height):return [(radius*math.cos(n*math.pi/4),height,radius*math.sin(n*math.pi/4)) for n in range(8)]
     model.beam([0,-2.8,0],[0,.48,0],5.2,'stone',8,True)
@@ -109,6 +114,7 @@ def summit(model):
         model.beam([east,.48,south],[east,5.25,south],.22,'red',8,True)
         model.box(east,3.25,south,.68,.45,.68,'wood')
     for bottom,radius,rise in ((3.45,4.25,1.8),(5.18,3.45,2.9)):
+        model.beam([0,bottom-.25,0],[0,bottom+.25,0],radius,'wood',8)
         for index in range(8):
             angle=index*math.pi/4;angles=np.array([angle,angle+math.pi/8,angle+math.pi/4]);rings=[]
             for scale,lift,curve in ((1,-.27,.93),(1,0,.93),(.75,.3,.25),(.34,rise*.65,.04),(.06,rise,0)):

@@ -171,12 +171,17 @@ class Model:
                     self.beam(surface(end,a,side),surface(end,b,side),.13,'white' if gable else material)
         self.beam([x-ridge-.22,y+rise,z],[x+ridge+.22,y+rise,z],.20,'white' if gable else material,8)
 
-    def arcade(self,x,z,width,depth,height,openings,radius,color):
+    def arcade(self,x,z,width,depth,height,openings,radius,color,surface=None):
+        def pier(cx,w):
+            if surface:
+                self.foundation(surface,cx,0,z,w,height,depth,color)
+            else:
+                self.box(cx,0,z,w,height,depth,color,True)
         cursor=x-width/2
         for center,rad in zip(openings,np.broadcast_to(radius,(len(openings),))):
             radius=rad
             left=center-radius
-            self.box((cursor+left)/2,0,z,left-cursor,height,depth,color,True)
+            pier((cursor+left)/2,left-cursor)
             spring=height*.32
             for angle1,angle2 in zip(np.linspace(0,math.pi,13)[:-1],np.linspace(0,math.pi,13)[1:]):
                 a,b=center+radius*math.cos(angle1),center+radius*math.cos(angle2)
@@ -184,7 +189,7 @@ class Model:
                 verts=[(px,py,z+side*depth/2) for side in (-1,1) for px,py in ((a,low),(b,high),(b,height),(a,height))]
                 self.mesh(verts,[[0,1,2],[0,2,3],[4,6,5],[4,7,6],[0,4,5],[0,5,1],[3,2,6],[3,6,7]],color,True)
             cursor=center+radius
-        self.box((cursor+x+width/2)/2,0,z,x+width/2-cursor,height,depth,color,True)
+        pier((cursor+x+width/2)/2,x+width/2-cursor)
 
 
 def generate(name,build):
@@ -295,7 +300,7 @@ def palace(m):
     for center,radius in ((-11,2),(0,3.75)):
         for angle in (np.arange(18)*math.pi/18 if m.detail else []):
             following=angle+math.pi/18
-            verts=[[center+rad*math.cos(theta),2.176+rad*math.sin(theta),.66] for theta,rad in ((angle,radius),(angle,radius+.46),(following,radius+.46),(following,radius))];m.mesh(verts,[[0,1,2],[0,2,3]],'granite' if round(angle*18/math.pi)%2 else 'white')
+            verts=[[center+rad*math.cos(theta),2.176+rad*math.sin(theta),.515] for theta,rad in ((angle,radius),(angle,radius+.46),(following,radius+.46),(following,radius))];m.mesh(verts,[[0,1,2],[0,2,3]],'granite' if round(angle*18/math.pi)%2 else 'white')
     # Rock 22: paired guardian lions flank the large southern arch.
     lion = trimesh.creation.icosphere(subdivisions=int(m.detail))
     for east in (-5.0,5.0):
@@ -327,7 +332,7 @@ def palace(m):
         arch=[(2.85*math.cos(t),2.02+2.85*math.sin(t)) for t in (a,b)]
         soffit=[(x,y,z) for z in (-154.92,-142.48) for x,y in arch]
         m.mesh(soffit,[[0,1,3],[0,3,2]],'white',True)
-    m.beam([0,4.78,-151.9],[0,4.47,-151.9],.035,'wood')
+    m.beam([0,4.95,-151.9],[0,4.47,-151.9],.035,'wood')
     m.beam([0,4.46,-151.9],[0,4.17,-151.9],.20,'wood',8)
     for side in (-1,1):
         m.box(side*6.8,0,-147,1.4,5.8,10,'yellow',True)
@@ -370,7 +375,9 @@ def palace(m):
         banyan(m,side*23,-136,37+side)
         for i,z in enumerate((-173,-214,-236)):
             banyan(m,side*25,z,i+43+side)
+        m.pose=(0,plan.ground(142,-121+side*10),0,0)
         banyan(m,142,-121+side*10,56+side)
+        m.pose=(0,0,0,0)
     m.box(0,-.45,-123,71,.59,48,'pave',True)
     for side in (-1,1):
         lo,hi=side*18-16,side*18+16

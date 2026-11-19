@@ -512,8 +512,8 @@ class Builder:
                     (p_start[0], wy1, p_start[1]),
                 ], (nx, 0.0, nz), 'glass', tile=2.2, lit=True)
                 if self.detail and sill_bands:
-                    sx0, sz0 = a[0] + ux * (inset * 0.6) + nx * 0.08, a[1] + uz * (inset * 0.6) + nz * 0.08
-                    sx1, sz1 = b[0] - ux * (inset * 0.6) + nx * 0.08, b[1] - uz * (inset * 0.6) + nz * 0.08
+                    sx0, sz0 = a[0] + ux * (inset * 0.6) + nx * 0.018, a[1] + uz * (inset * 0.6) + nz * 0.018
+                    sx1, sz1 = b[0] - ux * (inset * 0.6) + nx * 0.018, b[1] - uz * (inset * 0.6) + nz * 0.018
                     self.face([
                         (sx0, wy0 - 0.14, sz0), (sx1, wy0 - 0.14, sz1),
                         (sx1, wy0, sz1), (sx0, wy0, sz0),
@@ -794,7 +794,7 @@ class Builder:
             for step in range(4):
                 self.box(sx + stand_side * step * 0.85, 0.0, 0, 0.9, 0.45 * (step + 1), sw, 'granite', tile=2.0, collide=(step == 3))
             self.box(sx + stand_side * 1.6, 1.8, 0, 3.8, 2.8, min(12.0, sw * 0.5), 'white', tile=2.0)
-            self.box(sx + stand_side * 1.2, 4.5, 0, 5.2, 0.28, min(13.2, sw * 0.55), 'terracotta', tile=2.0)
+            self.box(sx + stand_side * 1.2, 4.5, 0, 5.2, 0.28, min(13.2, sw * 0.55), 'terracotta', tile=2.0,bottom=True)
 
         self.pose = prev
 

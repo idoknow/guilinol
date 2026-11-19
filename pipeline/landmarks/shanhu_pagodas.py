@@ -380,7 +380,7 @@ def build_sun_pagoda():
 
         if idx == 2:
             for ca in (0.0, math.pi):
-                add_tris(b, 'goldBronze', radial_panel(r_wall + 0.25, ca, y_cur + th * 0.62, 1.65, 0.68, 0.14))
+                add_tris(b, 'goldBronze', radial_panel(r_wall * .91, ca, y_cur + th * 0.62, 1.65, 0.68, 0.18))
 
         add_eave_roof(
             b, r_wall=r_wall, r_eave=r_eave, y_base=y_next - 0.25, roof_h=1.25 - 0.25 * t,

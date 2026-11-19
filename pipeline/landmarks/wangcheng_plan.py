@@ -78,7 +78,7 @@ def enclosure(m, plan):
         if (-x)*(-math.sin(angle)) + (-260-z)*math.cos(angle) < 0:
             angle += math.pi
         m.pose = (x,plan.ground(x,z),z,angle)
-        m.arcade(0,0,w,d,6.8,[0],min(w*.23,3.2),'stone')
+        m.arcade(0,0,w,d,6.8,[0],min(w*.23,3.2),'stone',surface=plan.surface)
         m.box(0,6.8,0,w,1.1,d,'brick')
         m.box(0,5.6,d/2,5.6,1.1,.4,'granite')
         letters(m,plaque,(0,5.8,d/2+.22),4.4,.65,'wood')
@@ -104,6 +104,7 @@ def inner_court(m, plan):
                         m.box(east+bar,base+2.7,depth/2-2.75,.10,2.5,.14,'red')
         else:
             m.box(0,base,0,width-4,height,depth-5,'yellow',True)
+            m.box(0,base+height-.16,0,width,.35,depth,'wood')
             m.swept_roof(0,base+height,0,width,depth,3.4)
         for side in (-1,1):
             for col in np.linspace(-width*.44,width*.44,9):

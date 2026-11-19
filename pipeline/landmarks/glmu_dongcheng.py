@@ -128,7 +128,7 @@ def _build_main_gate(b: Builder):
     # Right (+X): long crimson granite monument wall ('桂林医科大学 / GUILIN MEDICAL UNIVERSITY')
     b.box(7.8, 0.0, 0.4, 15.6, 0.58, 2.2, 'dark_stone', tile=1.8, collide=True)
     b.box(7.8, 0.58, 0.4, 14.8, 2.35, 1.15, 'brick_red', tile=2.0, collide=True)
-    b.box(7.8, 2.93, 0.4, 15.2, 0.18, 1.35, 'granite', tile=1.6)
+    b.box(7.8, 2.93, 0.4, 15.2, 0.18, 1.35, 'granite', tile=1.6,bottom=True)
     b.sign_board(7.8, 1.78, 1.02, 12.6, 1.62, 'glmu_gate', backing=None, depth=0)
     # Low green hedge strip in front of monument wall (matching ref #00)
     b.lawn_patch(7.8, 2.1, 0.0, 14.6, 1.5, y=0.04, curb=True, shrubs=True)
@@ -166,14 +166,14 @@ def _build_library_portal(b: Builder):
     # Sculptural curved roof wave crown above '图书馆'
     if b.detail:
         b.box(0, 25.8, 1.2, 10.6, 1.35, 3.6, 'white', tile=2.0)
-        b.box(0, 27.15, 1.4, 12.2, 0.35, 4.4, 'silver_roof', tile=2.0)
+        b.box(0, 27.15, 1.4, 12.2, 0.35, 4.4, 'silver_roof', tile=2.0,bottom=True)
     b.sign_board(0, 23.6, 4.30, 7.6, 1.75, 'bld_lib', backing=None, depth=0)
     # Grand entrance steps + silver-framed glass canopy (matching ref #03)
     for st in range(4):
         b.box(0, st * 0.22, 6.8 - st * 0.7, 11.4, 0.24, 1.4, 'pave_plaza', tile=2.0)
     b.box(0, 4.25, 6.2, 10.6, 0.24, 4.4, 'glass', cap_region='silver_roof', tile=2.0)
     for sx in (-3.8, 3.8):
-        b.cylinder_y(sx, 0.4, 3.85, 7.4, 0.28, 'steel', sections=8)
+        b.cylinder_y(sx, 0.04, 4.21, 7.4, 0.28, 'steel', sections=8)
     b.pose = prev
 
 

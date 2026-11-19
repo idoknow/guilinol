@@ -43,8 +43,9 @@ def oval(mesh, center, radii, region, sides=12):
     loft(mesh,sections,region,sides)
 
 
-def banyan(mesh,origin,height,crown,seed,detail,lobed=True):
+def banyan(mesh,origin,height,crown,seed,detail,lobed=True,grade=None):
     east,level,south=origin
+    start=len(mesh.pos)
     scale=height/14
     girth=scale*(2.18 if lobed else 1)
     loft(mesh,[(east,level,south,1.65*girth,1.55*girth),
@@ -71,6 +72,13 @@ def banyan(mesh,origin,height,crown,seed,detail,lobed=True):
         offset=.53 if index<6 else 0
         middle=(east+crown*offset*math.cos(phase),level+height*(.70+.075*math.sin(phase*2) if index<6 else .92),south+crown*offset*math.sin(phase))
         oval(mesh,middle,(crown*.56,height*(.23+.04*(index%3)),crown*.50),'foliage',10 if detail else 7)
+
+
+    if grade:
+        for i in range(start,len(mesh.pos)):
+            x,y,z=mesh.pos[i]
+            if abs(y-level)<.01:
+                mesh.pos[i]=(x,grade(x,z)-.05,z)
 
 
 def torus(mesh,center,radius,thickness,depth,region,wobble=0,stretch=1,phase=0):

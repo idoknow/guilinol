@@ -97,8 +97,8 @@ def ancient_bridge(builder):
         return north+(south-north)*min(1,max(0,(distance+17)/34))
     def height(distance):
         return grade(distance)+6.6*max(0,1-(abs(distance)/17)**1.55)
-    def soffit(distance):
-        return min(ground(*point(distance,0)[::2])-.15, grade(distance)-1.8)+math.sqrt(max(0,7.45**2-distance**2))
+    def soffit(distance,edge):
+        return ground(*point(distance,0,edge)[::2])-.09+math.sqrt(max(0,7.45**2-distance**2))
     count = 64 if builder.detail else 24
     for index in range(count):
         start,end = -17+34*index/count,-17+34*(index+1)/count
@@ -107,10 +107,10 @@ def ancient_bridge(builder):
         yaw_box(stone,point(middle,top-.10),(6.8,.2,end-start+.015),yaw,'granite')
         if builder.collide:
             ramp(builder.hit,point(start,height(start)),point(end,height(end)),6.8)
-        inside_start,inside_end = soffit(start),soffit(end)
-        stone.face([point(start,inside_start,-3.4),point(end,inside_end,-3.4),point(end,inside_end,3.4),point(start,inside_start,3.4)],(0,-1,0),'ashlar')
+        stone.face([point(d,soffit(d,e),e) for d,e in ((start,-3.4),(end,-3.4),(end,3.4),(start,3.4))],(0,-1,0),'ashlar')
         for sign in (-1,1):
             edge=sign*3.4
+            inside_start,inside_end=soffit(start,edge),soffit(end,edge)
             stone.face([point(start,inside_start,edge),point(end,inside_end,edge),point(end,top,edge),point(start,top,edge)],(sign*side[0],0,sign*side[1]),'white')
             tube(stone,point(start,height(start)+.92,edge),point(end,height(end)+.92,edge),.12,'white',5)
             if index%2==0:
