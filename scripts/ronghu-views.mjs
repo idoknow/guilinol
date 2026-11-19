@@ -20,13 +20,14 @@ const views={
   1340:[13,4,-19,-8,7,-37],1341:[1,4,-18,-6,3,-27],1342:[-97,.8,-25,-116,2.4,-24],
   1343:[-83,1,-49,-68,3,-62],
 }
-const out='captures/rock'
+const out=process.env.CAPTURES??'captures/rock'
 await mkdir(out,{recursive:true})
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 let browser
 try{
   browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
   const page=await browser.newPage({viewport:{width:768,height:512}})
+  await page.route('**/__survey_core.mjs',route=>route.fulfill({path:'node_modules/three/build/three.core.js',contentType:'text/javascript'}))
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&radius=256&time=12`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
   for(const [number,coords] of Object.entries(views)){
@@ -40,6 +41,17 @@ try{
     },[id,coords,number])
     await page.waitForFunction(id=>{const {stream,stats}=window.viewer;return !stats.pending&&[...stream.landmarks].some(([entry,root])=>entry.id===id&&root.getObjectByName('lod0')?.visible)},id,{timeout:60000})
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
+    if(['1300','1303','1307','1313','1315','1328','1337','1339','1342'].includes(number)){
+      const hit=await page.evaluate(async(id)=>{
+        const {Raycaster,Vector2}=await import('/__survey_core.mjs')
+        const {stream,camera}=window.viewer
+        const [entry,root]=[...stream.landmarks].find(([entry])=>entry.id===id)
+        const meshes=[];root.parent.traverseVisible(node=>{if(node.isMesh&&!node.isSprite&&node.material?.depthWrite!==false)meshes.push(node)})
+        const ray=new Raycaster();ray.setFromCamera(new Vector2(0,0),camera)
+        return ray.intersectObjects(meshes,false).slice(0,2).map(({object,point,distance})=>({mesh:object.parent?.name,material:object.material?.name,distance:Math.round(distance),local:point.toArray().map((value,index)=>Math.round(value-entry.position[index]))}))
+      },id)
+      console.log(number,JSON.stringify(hit))
+    }
     await page.locator('canvas').first().screenshot({path:`${out}/${number}.jpg`,quality:89})
   }
 }finally{await browser?.close();await server.close()}
