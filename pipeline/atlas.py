@@ -58,6 +58,10 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
     school_names = {item['osm']:item['name'] for item in catalog}
     school_names.update({'way/253811717':'桂林市奎光学校','node/2597936167':'桂林小学（待核）','node/6342889660':'凌风高中（待核）'})
     school_centers, public_streets = {}, []
+    g4 = {'way/647468198':'桂林市旅游职业中等专业学校（穿山校区）','way/646911647':'桂林技师学院',
+          'way/1001796191':'穿山小学','way/1494945227':'穿山中学','way/1476020022':'塔山小学',
+          'way/1487482928':'桂林市英才教育集团樟木小学'}
+    campuses = {}
 
     def place(name, kind, point):
         record = dict(n=name, k=kind, x=round(point.x), z=round(point.y))
@@ -69,6 +73,8 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
         tags = element.get('tags', {})
         name = tags.get('name', '')
         key = f"{element['type']}/{element['id']}"
+        if key in g4:
+            campuses[key] = area(element)
         if key in schools:
             shape = (Point(ll2xz(element['lat'],element['lon'])) if element['type']=='node' else area(element)).intersection(bounds)
             if not shape.is_empty: school_centers[key] = shape.centroid
@@ -111,6 +117,13 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
     for name,line in longest.items():
         place(name,'road',line.interpolate(.5,normalized=True))
     place('桂林中学解西校区', 'school', Point(-1244, -242))
+    gates = {'way/647468198': Point(ll2xz(25.2599762,110.3055395)),
+             'way/646911647': Point(ll2xz(25.2515171,110.3096307))}
+    for key, campus in campuses.items():
+        reference = gates.get(key, campus.boundary)
+        segments = [line for _,line in public_streets if line.disjoint(campus.buffer(1))]
+        closest = min(segments, key=reference.distance)
+        place(g4[key], 'school', nearest_points(reference, closest)[1])
     for key,center in school_centers.items():
         segments = [line for name,line in public_streets if key != 'way/675588260' or name == '漓滨路']
         if segments:
