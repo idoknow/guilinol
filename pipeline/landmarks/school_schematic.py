@@ -6,10 +6,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 from c_kit import ATLAS, RECTS, Builder, _font, arch_wall, banyan, box, cylinder, export_landmark, solid, tube
 
-CATALOG = Path(__file__).resolve().parents[1] / 'schools-g1.json'
-
-
-def generate(identifier, catalog=CATALOG):
+def generate(identifier, catalog):
     school = next(item for item in json.loads(catalog.read_text()) if item['id'] == identifier)
     image = Image.new('RGB', (ATLAS, ATLAS), '#e6e5dc')
     draw = ImageDraw.Draw(image)
@@ -39,10 +36,14 @@ def generate(identifier, catalog=CATALOG):
     RECTS['schematic_plaque'] = (0, 768, ATLAS, 256)
     left, top, width, height = RECTS['schematic_plaque']
     title = '三教楼' if school.get('heritage') else school['name'].split('（')[0]
-    font = _font(min(height-36, (width-48)//len(title)), bold=True)
-    draw.text((left+width/2, top+height/2), title, anchor='mm', fill='#87342e', font=font)
-    near, far = Builder(0, True), Builder(1, False)
     scale = school['scale']
+    half_width = (2.4 if school.get('heritage') else 6.8 if athletics else 5)*scale
+    half_height = 1.1 if athletics else .62
+    plaque = Image.new('RGB',(round(height*half_width/half_height),height),'#e6e5dc')
+    font = _font(min(height-36, (plaque.width-48)//len(title)), bold=True)
+    ImageDraw.Draw(plaque).text((plaque.width/2,height/2), title, anchor='mm', fill='#68241e', font=font)
+    image.paste(plaque.resize((width,height), Image.Resampling.LANCZOS), (left,top))
+    near, far = Builder(0, True), Builder(1, False)
     for builder in (near, far):
         mesh = builder.parts['atlas']
 
@@ -121,8 +122,6 @@ def generate(identifier, catalog=CATALOG):
             block((-5,6.8,7),(2,1.2,.06),'vermilion')
         else:
             board_z, board_y = school['blocks'][0][1]+3.8, 2.2
-        half_width = (2.4 if school.get('heritage') else 6.8 if athletics else 5)*scale
-        half_height = 1.1 if athletics else .62
         mesh.face([(-half_width,board_y-half_height,board_z*scale),(half_width,board_y-half_height,board_z*scale),
                    (half_width,board_y+half_height,board_z*scale),(-half_width,board_y+half_height,board_z*scale)],
                   (0,0,1),'schematic_plaque',uvs=[(.001,.999),(.999,.999),(.999,.001),(.001,.001)])
