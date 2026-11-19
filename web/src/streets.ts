@@ -104,7 +104,8 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   for(const [kind,east,south,heading,span] of decor){
     if(kind===5||kind===6||kind===7){
       const x=east/10,z=south/10,y=baseLevel(x,z)+.195
-      box(x,y+(kind===7?.35:.22),z,span/10+.04,kind===7?.70:.44,kind===7?.74:.95,-heading/100,hedge)
+      const height=kind===7?.68+.06*Math.sin(east*.13+south*.07):.44
+      box(x,y+height/2,z,span/10+.04,height,kind===7?.74:.95,-heading/100,hedge)
       continue
     }
     if(kind!==1&&kind!==2)continue
@@ -125,6 +126,13 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       const fx=x+offset*Math.sin(angle),fz=z+offset*Math.cos(angle)
       for(const level of [.24,.60])box(fx,y+level,fz,length+.04,.055,.055,angle,iron)
       for(const shift of [-.4,0,.4])box(fx+shift*length*Math.cos(angle),y+.31,fz-shift*length*Math.sin(angle),.055,.62,.055,angle,iron)
+    }else if(kind===8){
+      const length=span/10
+      box(x-length*.5*Math.cos(angle),y+.62,z+length*.5*Math.sin(angle),.32,1.24,.32,angle,stoneMid)
+      for(const level of [.32,1.05])box(x,y+level,z,length,.06,.07,angle,iron)
+      for(const fraction of [-.32,-.12,.12,.32])box(x+fraction*length*Math.cos(angle),y+.69,z-fraction*length*Math.sin(angle),.04,.78,.04,angle,iron)
+    }else if(kind===9){
+      box(x,y+.012,z,span/10+.01,.018,.12,angle,stoneLight)
     }else if(kind===7){
       continue
     }else if(kind===4){

@@ -10,14 +10,15 @@ from markings import junction_cores, violations
 from common import CHUNK, ll2xz, load_osm
 from features import points, polygons, rongyin_photo, rongyin_sidewalk
 from scatter import CONFIG, walk_line
-from sections import section_layers, clipped, speed_paint, RULES
+from sections import section_layers, clipped, speed_paint, yiwu_frontage, RULES
 
 
-def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None):
+def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None,structures=None):
     if bands is None:
         bands = section_layers(roads)
     surfaces, sidewalks, stripes, medians, gaps = [],[],[],[],[]
     sidewalks.append(rongyin_sidewalk())
+    frontage = yiwu_frontage(roads)
     rep_excl = replace_exclude if replace_exclude is not None else Polygon()
     for pa in ped_areas:
         clipped_pa = pa.difference(rep_excl) if not rep_excl.is_empty else pa
@@ -65,9 +66,12 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         tangent = sign_away * delta / max(.001, np.linalg.norm(delta))
         normal = np.array([-tangent[1], tangent[0]])
         bars = []
-        for span in np.arange(-width / 2 + .55, width / 2 - .35, 1.0):
+        corner = Point(mid).distance(Point(-1331.2,-103.5)) < 28
+        half_bar = .34 if corner else .24
+        spans = np.linspace(-width/2+half_bar,width/2-half_bar,max(2,round(width/1.15))) if corner else np.arange(-width / 2 + .55, width / 2 - .35, 1.0)
+        for span in spans:
             center = mid + normal * span
-            bars.append(LineString([center - tangent * 1.9, center + tangent * 1.9]).buffer(.24, cap_style='flat'))
+            bars.append(LineString([center - tangent * 1.9, center + tangent * 1.9]).buffer(half_bar, cap_style='flat'))
         if with_stop:
             stop = mid + tangent * 2.5
             bars.append(LineString([stop, stop + normal * width / 2]).buffer(.22, cap_style='flat'))
@@ -388,6 +392,13 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                     elif any(tree.query(pt,predicate='dwithin',distance=1.8).size for tree in (obstacles,layers[0],layers[4])):
                         continue
                     anchor(pt,heading,fixture)
+    if frontage:
+        for kind,line in ((8,frontage[2]),(9,frontage[3])):
+            for start in np.arange(0,line.length,2.8):
+                first,last = line.interpolate(start),line.interpolate(min(start+2.8,line.length))
+                segment = LineString([first,last])
+                if segment.length>.15 and not any(mask.query(segment,predicate='intersects').size for mask in (layers[0],layers[4])):
+                    anchor(segment.centroid,math.atan2(last.y-first.y,last.x-first.x),kind,segment.length)
     def encode(tile,origin):
         shapes = [unary_union([layer.geometries[idx].intersection(tile) for idx in sorted(layer.query(tile))]) for layer in layers]
         shapes[1]=shapes[1].difference(shapes[0]).union(shapes[3]).difference(shapes[4])
@@ -400,6 +411,15 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         if modeled_paving is not None:
             blocked = blocked.union(modeled_paving.intersection(tile))
         walk, verge, cycle, tactile = [clipped(layer, tile).difference(blocked) for layer in bands]
+        if frontage and frontage[0].intersects(tile):
+            free = frontage[0].intersection(tile).difference(shapes[0]).difference(shapes[4])
+            for mask in (bldg_tree,water_tree):
+                if mask is not None:
+                    free = free.difference(clipped(mask,tile))
+            if structures is not None:
+                free = free.difference(structures)
+            tactile = tactile.difference(free).union(frontage[1].intersection(free))
+            walk = walk.union(free)
         walk = walk.difference(cycle).difference(verge)
         tactile = tactile.intersection(walk)
         shapes[1] = shapes[1].union(walk.difference(tactile))

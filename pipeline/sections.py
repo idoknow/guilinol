@@ -5,10 +5,35 @@ from shapely import STRtree
 from shapely.geometry import LineString, Point
 from shapely.affinity import affine_transform
 from shapely.geometry import box
-from shapely.ops import unary_union
+from shapely.ops import unary_union, substring
 
 from road_profile import RULES
 from common import CHUNK
+
+
+def yiwu_frontage(roads):
+    road = next((road for road in roads if road.way == 221349755), None)
+    if road is None or road.line.length < 140:
+        return None
+    guide = substring(road.line, 70, 140)
+    half = road.width / 2
+    walk, tactile = [], []
+    for side in (-1, 1):
+        outer = [guide.interpolate(station).coords[0] for station in (0, 12, 55, 70)]
+        for index, station in enumerate((0, 12, 55, 70)):
+            before, after = guide.interpolate(max(0,station-.1)), guide.interpolate(min(70,station+.1))
+            angle = math.atan2(after.y-before.y,after.x-before.x)
+            width = half + (4 if index in (0,3) else 5)
+            east,south = outer[index]
+            outer[index] = (east-side*width*math.sin(angle),south+side*width*math.cos(angle))
+        boundary = LineString(outer)
+        curb = guide.offset_curve(side*half)
+        from shapely.geometry import Polygon
+        walk.append(Polygon([*curb.coords,*reversed(boundary.coords)]).buffer(0))
+        tactile.append(guide.offset_curve(side*(half+2.5)).buffer(.175,cap_style='flat'))
+        if side == -1:
+            fence = boundary
+    return unary_union(walk), unary_union(tactile), fence, guide.offset_curve(-(half+.32))
 
 
 def section_layers(roads):

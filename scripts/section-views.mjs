@@ -1,11 +1,15 @@
 import {mkdir,readFile} from 'node:fs/promises'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
+import {sectionCamera} from './section-camera.mjs'
 
 const output=process.argv[2]??'captures/sections'
 const locations=JSON.parse(await readFile(new URL('../docs/refs/rock/photo-locations.json',import.meta.url),'utf8'))
-const photos=[1345,1346,1359,1360,1380,1382,1385].map(id=>{
-  const {x,z,heading,headingRef,focal35}=locations[`IMG_${id}.jpg`]
+// Acceptance-only offsets: 1299 ESE 3.22 m to the corner; 1365 SSW 13.49 m to the
+// sidewalk edge; 1380 SSW 9.26 m to the nearest cycle lane. Original EXIF is unchanged.
+const photos=[1299,1301,1345,1346,1359,1360,1365,1380,1381,1382,1384,1385].map(id=>{
+  const key=`IMG_${id}.jpg`
+  const {x,z,heading,headingRef,focal35}=sectionCamera(key,locations[key])
   if(headingRef!=='T'||![x,z,heading,focal35].every(Number.isFinite)||focal35<=0)throw Error(`Invalid camera for IMG_${id}`)
   return [`IMG_${id}`,[x,z,heading,focal35]]
 })
