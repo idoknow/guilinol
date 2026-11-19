@@ -126,17 +126,21 @@ try{
         const revStart=walk.position.clone()
         for(let i=0;i<12;i++)walk.tick(.06)
         const revSpeed=walk.speed, revDist=walk.position.distanceTo(revStart), inHouse=walk.probe().inHouse
+        press('KeyS',false);walk.tick(.06);press('KeyS',true);walk.tick(.06)
+        const repressRevSpeed=walk.speed
         press('KeyS',false)
-        return {peakSpeed,coastDist,coastEndSpeed,brakeSpeed,tapRevSpeed,revSpeed,revDist,inHouse}
+        return {peakSpeed,coastDist,coastEndSpeed,brakeSpeed,tapRevSpeed,revSpeed,repressRevSpeed,revDist,inHouse}
       })
       console.log('ride feel',feelCheck)
       assert(feelCheck.peakSpeed>=5.5&&feelCheck.peakSpeed<=25/3.6+1e-4,`accel/cap: ${JSON.stringify(feelCheck)}`)
       assert(feelCheck.coastDist>=2.2&&feelCheck.coastEndSpeed>1.5&&feelCheck.coastEndSpeed<feelCheck.peakSpeed,`coast: ${JSON.stringify(feelCheck)}`)
       assert(feelCheck.brakeSpeed>=0&&feelCheck.brakeSpeed<feelCheck.coastEndSpeed-1.2,`brake: ${JSON.stringify(feelCheck)}`)
-      assert(feelCheck.tapRevSpeed===0&&feelCheck.revSpeed<-.5&&feelCheck.revSpeed>=-1.85&&feelCheck.revDist>.35&&!feelCheck.inHouse,`reverse: ${JSON.stringify(feelCheck)}`)
+      assert(feelCheck.tapRevSpeed===0&&feelCheck.revSpeed<-.5&&feelCheck.revSpeed>=-1.85&&feelCheck.repressRevSpeed<-.3&&feelCheck.revDist>.35&&!feelCheck.inHouse,`reverse: ${JSON.stringify(feelCheck)}`)
     }
     await interact('下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
     if(!mobile){
+      await fixture(189.1,-42);await interact('骑行');const escape=await steer([189.1,-52]);console.log('off-pavement escape',escape);assert(escape.distance>4.5&&escape.speed>2&&!escape.obstacle,`off-pavement bike stuck: ${JSON.stringify(escape)}`)
+      await interact('下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
       await fixture(-31,510.3);await interact('骑行');const wall=await steer([-42,510.5],true);console.log('wall',wall);assert(wall.obstacle==='building'&&wall.speed===0&&wall.distance<8)
       await page.evaluate(()=>{const w=window.viewer.walk;w.face(w.heading-.4,.22)})
       await shot('bike-ride-action')
