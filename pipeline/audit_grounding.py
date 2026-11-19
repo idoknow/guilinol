@@ -118,7 +118,7 @@ def bearing_components(assembly, low):
     return low <= floor[assembly]+BEARING_BAND
 
 
-def measurements(model, surface):
+def measurements(model, surface, sample_region=None, wall_corners=None):
     raw = subprocess.check_output(['node', ROOT/'pipeline/glb-triangles.mjs', model, '--visible'], timeout=90)
     source = np.frombuffer(raw,'<f4').reshape(-1,3,3)
     # Quantization can collapse tiny lettering triangles onto one edge.
@@ -146,6 +146,22 @@ def measurements(model, surface):
         bearing[inside] = low[inside] <= low[inside].min()+BEARING_BAND
         craft[inside] = number
     base = np.flatnonzero(bearing[component] & (vertices[:, 1] <= low[component]+.025))
+    if wall_corners is not None:
+        from scipy.spatial import cKDTree
+        wall=faces[np.ptp(vertices[faces,1],axis=1)>3]
+        edges=np.column_stack((wall.ravel(),np.roll(wall,1,axis=1).ravel()))
+        ends=vertices[edges]
+        upright=(np.linalg.norm(ends[:,0,::2]-ends[:,1,::2],axis=1)<.08)&(np.ptp(ends[:,:,1],axis=1)>3)
+        edges=edges[upright]
+        feet=np.unique(edges[np.arange(len(edges)),vertices[edges,1].argmin(axis=1)])
+        tree=cKDTree(vertices[feet][:,::2]); extra=[]
+        for corner in wall_corners:
+            matches=feet[tree.query_ball_point(corner,.08)]
+            if not len(matches):raise ValueError(f'Missing packed wall foot at {corner}')
+            extra.append(matches[np.argmin(vertices[matches,1])])
+        base=np.union1d(base,np.asarray(extra,dtype=int))
+    if sample_region is not None:
+        base=base[shapely.intersects_xy(sample_region,vertices[base,0],vertices[base,2])]
     pts = vertices[base].astype(float)
     samples = [surface.sample(x, z) for x, _, z in pts]
     terrain = np.array([g for g, _ in samples])
@@ -296,9 +312,12 @@ def run(directory):
         heatmap(directory/(name+'.png'), coords, gap, name, np.radians(entry['rotation']))
         failures = sum(r['status']=='fail' for r in rows)
         item = dict(id=name, aboveBearingBand=aboveBand, components=rows, failures=failures)
-        if name == 'dongxixiang':
-            item.update(status='deferred',reason='IDOK-50 owns model; see IDOK-50 grounding note',
-                        deferredFailures=failures,failures=0)
+        if name == 'dongxixiang' and failures:
+            item.update(
+                status='deferred',
+                reason=('IDOK-50 owns model; see IDOK-50 grounding note. Remaining contacts '
+                        'are outside the registered market replacement polygon.'),
+                deferredFailures=failures, failures=0)
         report.append(item)
     result = dict(failures=sum(r['failures'] for r in report), landmarks=report,
                   tolerances=dict(bearingBand=BEARING_BAND, land=[-SINK,FLOAT], bridgeEnd=.30),

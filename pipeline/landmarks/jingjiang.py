@@ -81,6 +81,14 @@ class Model:
             points,indices=np.unique(triangles[:,:,[0,2]].reshape(-1,2),axis=0,return_inverse=True)
             offsets=np.array([self.ground_offset(x,z) for x,z in points])
             triangles[:,:,1]+=offsets[indices].reshape(triangles.shape[:2])
+        if getattr(self,'grade',None) is not None:
+            reference=self.grade_reference
+            flat=triangles.reshape(-1,3)
+            weights=np.clip(1-(flat[:,1]-reference)/3.2,0,1)
+            active=weights>0
+            if active.any():
+                offsets=np.fromiter((self.grade(x,z)-reference-.035 for x,z in flat[active][:,::2].round(4)),float)
+                flat[active,1]+=weights[active]*offsets
         if collide: self.solid.append(triangles)
         if isinstance(color,np.ndarray):
             self.pigmented.append((triangles,color[faces]));return
@@ -88,7 +96,7 @@ class Model:
         axes=np.array([[2,1],[0,2],[0,1]])[normal]
         coords=np.take_along_axis(local,axes[:,None,:],axis=2)
         if color in self.tile_parts:
-            scale={'stone':(3.2,1.2),'brick':(1.04,.448),'pave':(3.2,1.6)}[color]
+            scale={'stone':(3.2,1.2),'brick':(1.04,.448),'pave':(3.2,1.6),'ruinGlass':(1.5,1.5)}[color]
             self.tile_parts[color].append((triangles,coords/scale));return
         self.visible.append(triangles)
         coords=(coords-coords.min(axis=1,keepdims=True))/np.maximum(coords.max(axis=1,keepdims=True)-coords.min(axis=1,keepdims=True),1e-6)
@@ -192,9 +200,10 @@ class Model:
         pier((cursor+x+width/2)/2,x+width/2-cursor)
 
 
-def generate(name,build):
-    scene=trimesh.Scene(); image=atlas({'tile':'#747b80'} if name=='jingjiang' else None,canopy=name=='jingjiang'); path=Path(__file__).resolve().parents[2]/'public/textures/landmarks/A'
-    path.mkdir(exist_ok=True,parents=True); image.save(path/'surfaces.png',optimize=True)
+def generate(name,build,colors=None):
+    scene=trimesh.Scene(); image=atlas(colors or ({'tile':'#747b80'} if name=='jingjiang' else None),canopy=name=='jingjiang'); path=Path(__file__).resolve().parents[2]/'public/textures/landmarks/A'
+    if not colors:
+        path.mkdir(exist_ok=True,parents=True); image.save(path/'surfaces.png',optimize=True)
     mat=trimesh.visual.material.PBRMaterial(name='A_surfaces',baseColorTexture=image,roughnessFactor=1,metallicFactor=0,doubleSided=True)
     def packed(parts):
         vertices=np.concatenate(parts).reshape(-1,3);return trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
@@ -206,10 +215,22 @@ def generate(name,build):
             scene.add_geometry(rock,node_name=layer+'_rock',parent_node_name=parent)
         for key,parts in model.tile_parts.items():
             if not parts:continue
-            cell=list(SWATCHES).index(key);left=128*(cell%4);top=128*(cell//4)
-            texture=image.crop((left,top,left+128,top+128));surface=packed([tri for tri,uv in parts]);surface.visual=trimesh.visual.TextureVisuals(uv=np.concatenate([uv for tri,uv in parts]).reshape(-1,2),material=trimesh.visual.material.PBRMaterial(name=key,baseColorTexture=texture,metallicFactor=0,roughnessFactor=1,doubleSided=True));scene.add_geometry(surface,geom_name=layer+'_'+key,node_name=layer+'_'+key,parent_node_name=parent)
+            reflective=key=='ruinGlass'
+            if reflective:
+                texture=Image.new('RGB',(128,128),'#2c393a')
+                ImageDraw.Draw(texture).rectangle((0,0,127,127),outline='#657072',width=2)
+            else:
+                cell=list(SWATCHES).index(key);left=128*(cell%4);top=128*(cell//4)
+                texture=image.crop((left,top,left+128,top+128))
+            surface=packed([tri for tri,uv in parts]);surface.visual=trimesh.visual.TextureVisuals(uv=np.concatenate([uv for tri,uv in parts]).reshape(-1,2),material=trimesh.visual.material.PBRMaterial(name=key,baseColorTexture=texture,metallicFactor=.35 if reflective else 0,roughnessFactor=.16 if reflective else 1,doubleSided=True));scene.add_geometry(surface,geom_name=layer+'_'+key,node_name=layer+'_'+key,parent_node_name=parent)
     for lod in (0,1):
-        model=Model(lod==0);build(model)
+        model=Model(lod==0)
+        if name in ('wangcheng_market','dongxixiang'):
+            from functools import lru_cache
+            from world_surface import LandmarkSurface,Surface
+            model.grade=lru_cache(maxsize=262144)(LandmarkSurface(Surface(),name).ground)
+            model.grade_reference=0
+        build(model)
         layer=f'lod{lod}';scene.graph.update(frame_to=layer)
         emit(model,layer,layer)
         groups={}

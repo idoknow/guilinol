@@ -101,6 +101,45 @@ def component_result(name,source,shape,reference):
     return result
 
 
+def market_roofs(model, entry):
+    """Match the packed upper faces to IDOK-50's registered exterior and courtyard rings."""
+    from shapely import STRtree
+    from common import ll2xz
+    triangles = visible_triangles(model)
+    level = triangles[:,:,1]
+    flat = triangles[np.ptp(level,axis=1)<.05]
+    shapes = triangle_polygons(flat[:,:,::2].astype(float))
+    index = STRtree(shapes)
+    results = []
+    for catalog in ('layout','infill'):
+        source = f'docs/layout/dongxi-{catalog}.geojson'
+        for feature in json.loads((ROOT/source).read_text())['features']:
+            props = feature['properties']
+            if props['kind'] != 'roof':
+                continue
+            rings = [[ll2xz(lat,lon) for lon,lat in ring] for ring in feature['geometry']['coordinates']]
+            reference = translate(Polygon(rings[0],rings[1:]),-entry['position'][0],-entry['position'][2])
+            reference = rotate(reference,entry['rotation'],origin=(0,0))
+            eave = props['ground_m']+props['eave_m']-entry['position'][1]
+            # Allow for packed vertex quantization at roof edges and eave height.
+            ids = index.query(reference.buffer(.08),predicate='covers')
+            ids = ids[flat[ids,:,1].min(axis=1)>=eave-.08]
+            shape = union_all(shapes[ids],grid_size=.01)
+            measured = dict(component=props['name'],reference=source,status='missing-component')
+            if not shape.is_empty:
+                iou,center,angle = metrics(shape,reference)
+                edge = shape.boundary.hausdorff_distance(reference.boundary)
+                # Two surveyed lane slivers are only 6–10 cm wide. Measure their
+                # outline to within one packed XZ grid step (4 cm across this GLB).
+                thin = 2*reference.area/reference.length<=.10
+                matches = iou>=.95 or (thin and edge<=.04)
+                passed = matches and center<=3 and (angle<=3 or edge<=.12)
+                measured.update(iou=round(iou,3),centroidM=round(center,2),angleDeg=round(angle,2),
+                                boundaryM=round(edge,3),status='pass' if passed else 'fail')
+            results.append(measured)
+    return results
+
+
 def chunk_building(manifest,source,reference):
     pieces=[]
     for tile in manifest['chunks']:
@@ -228,8 +267,10 @@ def main():
             row['status']='missing-instance';continue
         if key in ('dongxixiang','zhengyang') and notes=='deferred to IDOK-44':
             row['status']='deferred';continue
-        if key=='wangcheng_market' and notes=='deferred to IDOK-50':
-            row['status']='deferred';continue
+        if key=='wangcheng_market':
+            components=market_roofs(ROOT/'public'/spec['model'],entry)
+            row.update(components=components,status='pass' if components and all(c['status']=='pass' for c in components) else 'fail')
+            continue
         if key=='jingjiang':
             components=[]
             for name,source,bounds,roof in (

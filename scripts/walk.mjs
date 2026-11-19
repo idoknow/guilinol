@@ -4,13 +4,14 @@ import {mkdir,writeFile} from 'node:fs/promises'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
 
-const route=[[-582,-206],[-548,-202],[-532,-182],[-536,-154],[-540,-131],[-540,-113],[-538,-109],[-520,-100],[-486,-92],[-456,-82],[-452,-78],[-442,-78],[-398,-32],[-390,-30],[-372,-12],[-372,6],[-376,16],[-376,52],[-340,90],[-340,110],[-586,540],[-610,564],[-640,586],[-680,588],[-700,580],[-716,580],[-728,592],[-860,864],[-868,888],[-872,920],[-876,924],[-876,960],[-882,988],[-906,1012],[-926,1020],[-968,1022],[-984,1040],[-982,1076],[-962,1096]]
+const route=[[-582,-206],[-548,-202],[-534,-188],[-534,-114],[-520,-100],[-486,-92],[-456,-82],[-452,-78],[-442,-78],[-398,-32],[-390,-30],[-372,-12],[-372,6],[-376,16],[-376,52],[-340,90],[-340,110],[-586,540],[-610,564],[-640,586],[-680,588],[-700,580],[-716,580],[-728,592],[-860,864],[-868,888],[-872,920],[-876,924],[-876,960],[-882,988],[-906,1012],[-926,1020],[-968,1022],[-984,1040],[-982,1076],[-962,1096]]
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 const browser=await chromium.launch(browserOptions())
 const page=await browser.newPage({viewport:{width:640,height:360}}),errors=[]
 page.on('pageerror',error=>errors.push(error.message))
 const output='captures/walk';await mkdir(output,{recursive:true})
 const mainOnly=process.env.WALK_MAIN_ONLY==='1'
+const fixedStep=mainOnly||process.env.WALK_FIXED_STEP==='1'
 const treeOnly=process.argv.includes('--tree-only')
 async function shot(name){await page.screenshot({path:`${output}/${name}.png`})}
 try{
@@ -32,12 +33,12 @@ try{
   await shot('palace')
   await page.evaluate(()=>{window.walkFrames=[]})
   async function drive(points,kind='route'){
-    return page.evaluate(async({points,kind,mainOnly})=>{
+    return page.evaluate(async({points,kind,fixedStep})=>{
       const {walk,stats,stream}=window.viewer
       let min=Infinity,frames=0,wetFrames=0,last=null
       for(const [x,z] of points){const start=window.checkedProbe(kind);const limit=5+Math.hypot(x-start.x,z-start.z)/3
         do{
-          if(mainOnly&&frames%60!==0){walk.tick(.1);stream.tick(walk.position)}else await new Promise(requestAnimationFrame)
+          if(fixedStep&&frames%60!==0&&!stream.pending.size){walk.tick(.1);stream.tick(walk.position)}else await new Promise(requestAnimationFrame)
           last=window.checkedProbe(kind);frames++;min=Math.min(min,last.clearance)
           window.walkFrames.push([last.steps,last.x,last.z,last.clearance,last.inHouse,last.inPeak,last.resets,stats.ms,last.renderClearance])
           if(last.clearance<-.3||last.inHouse||last.inPeak||last.resets)throw Error(`unsafe ${JSON.stringify(last)}`)
@@ -49,12 +50,13 @@ try{
         }while(true)
         walk.drive(0,0)
       }return {kind,min,frames,wetFrames,last}
-    },{points,kind,mainOnly})
+    },{points,kind,fixedStep})
   }
   if(!treeOnly){
   const start=await page.evaluate(()=>window.checkedProbe('spawn:gate')),time=Date.now()
-  const first=await drive(route.slice(0,20));const binjiang=await drive(route.slice(20,21),'binjiang');await shot('street')
-  const second=await drive(route.slice(21));await shot('elephant')
+  const binjiangIndex=route.findIndex(([x,z])=>x===-586&&z===540)
+  const first=await drive(route.slice(0,binjiangIndex));const binjiang=await drive(route.slice(binjiangIndex,binjiangIndex+1),'binjiang');await shot('street')
+  const second=await drive(route.slice(binjiangIndex+1));await shot('elephant')
   const trace=await page.evaluate(()=>window.walkFrames);await writeFile(`${output}/frames.json`,JSON.stringify(trace))
   console.log('route',JSON.stringify({seconds:(Date.now()-time)/1000,simSeconds:second.last.elapsed-start.elapsed,min:Math.min(first.min,binjiang.min,second.min),resets:second.last.resets,frames:trace.length,msPerFrame:trace.reduce((sum,row)=>sum+row[7],0)/trace.length,msPerStep:(second.last.physicsMs-start.physicsMs)/(second.last.steps-start.steps)}))
   assert(Math.hypot(second.last.x+962,second.last.z-1096)<1)

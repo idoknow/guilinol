@@ -3,8 +3,8 @@ import math
 import numpy as np
 import trimesh
 from jingjiang import Model,generate
-from c_kit import landmark_surface
 from shop_lettering import letters
+from dongxi_layout import registered_market
 
 
 def row(model, first, last, count, side, depth=6, arcade=False, gap=3.45,tall=False):
@@ -17,24 +17,7 @@ def row(model, first, last, count, side, depth=6, arcade=False, gap=3.45,tall=Fa
         key=(arcade,height)
         matrix=trimesh.transformations.rotation_matrix(-angle+(math.pi if side<0 else 0),[0,1,0])
         matrix[:3,3]=[first[0]+dx*center-math.sin(angle)*side*gap,0,first[1]+dz*center+math.cos(angle)*side*gap]
-        x, _, z = matrix[:3,3]
-        matrix[1,3] = landmark_surface('wangcheng_market').ground(x,z)
         matrix[:3,0]*=pitch/7;matrix[:3,2]*=depth/5
-        surface = landmark_surface('wangcheng_market')
-        def grade(px,pz):
-            wx,wy,wz,_ = matrix @ [px,0,pz,1]
-            return surface.ground(wx,wz)-wy
-        corners = [grade(px,pz) for px in (-3.5,3.5) for pz in (-1.1,5)]
-        if min(corners)<-.10 or max(corners)>.20:
-            key=(*key,len(model.placements))
-            template=Model(model.detail)
-            shop(template,height,arcade)
-            # Solid and visible arrays share storage. Adjust each lower corner once.
-            for triangles in template.solid:
-                for point in triangles.reshape(-1,3):
-                    if abs(point[1])<1e-8:
-                        point[1]=grade(point[0],point[2])-.04
-            model.templates[key]=template
         model.placements.append((key,matrix))
         if key not in model.templates:
             template=Model(model.detail);shop(template,height,arcade);model.templates[key]=template
@@ -50,7 +33,6 @@ def shop(model,height,arcade):
             model.swept_roof(0,height,back,pitch+.4,depth+1.5,1.65)
             for step in range(3):
                 model.box(-pitch/2,height+step*.42,back,.36,.47,depth-step*1.4,'brick')
-        model.box(0,2.42,-.09,pitch-.18,.63,.24,'wood')
         model.box(0,3.05,side*(gap-.35),pitch,.35,1.9,'wood')
         for pier in (-.38,.38):
             model.box(pier*pitch,0,side*(gap-.9),.3,3.1,.31,'wood',True)
@@ -95,28 +77,24 @@ def screen_house(model):
         for claw in (-1,1):model.beam([side*1.35,1.25,.69],[side*(1.35+claw*.16),1.57,.7],.085,'red')
 
 
+def seated_roof(model,height,width,depth,rise):
+    corners=np.array([[-width/2,0,-depth/2],[width/2,0,-depth/2],[width/2,0,depth/2],[-width/2,0,depth/2],[-width*.27,rise,0],[width*.27,rise,0]])
+    base=corners[:4].copy();base[:,1]=-.18
+    faces=[[0,4,5],[0,5,1],[1,5,2],[2,5,4],[2,4,3],[3,4,0],[6,7,8],[6,8,9]]
+    for side in range(4):
+        end=(side+1)%4;faces.extend([[side,end,end+6],[side,end+6,side+6]])
+    model.mesh(np.vstack((corners,base))+[0,height,0],faces,'tile')
+
+
 def market(model):
     for first,last,width,level in [((-106,15),(-26,28),17,.09),((-28,22),(6,25),22,.10),
         ((-6,24),(5,-15),10,.13),((0,28),(54,39),9,.12),((54,39),(63,-4),10,.14),
         ((63,-4),(3,-13),10,.15),((5,-14),(13,-62),32,.16),((58,18.5),(7,3.8),9,.17)]:slab(model,first,last,width,level)
-    row(model,(-106,9),(-38,19),8,-1,8,True)
     for east,south in [(-92,31),(-72,34),(-52,37),(-35,39)]:
         model.pose=(east,0,south,0);model.beam([0,.1,0],[0,4.2,0],.22,'wood',8,True)
         crown=trimesh.creation.icosphere(subdivisions=1);model.mesh(crown.vertices*[2.3,2.15,2.55]+[0,5.2,0],crown.faces,'leaf')
-    for side in (-1,1):
-        row(model,(6,29),(50,38.4),6,side,5)
-        if side==1:row(model,(54.5,34),(60.7,5),4,side,4.7)
-        else:
-            row(model,(54.5,34),(56.8,23.5),2,side,4.7)
-            row(model,(59.2,12),(60.7,5),1,side,4.7)
-        row(model,(12,5.2),(49,15.9),5,side,4.7)
-        row(model,(55,-4.8),(10,-11.6),6,side,4.7)
-        row(model,(-2.6,13),(1.2,-6),3,side,4.5)
-        row(model,(6,-14),(13,-57),6,side,6,gap=14.5)
-        row(model,(61,41),(83,49.7),3,side,6,tall=True)
     slab(model,(56,39),(85,50.5),8,.14)
-    row(model,(-36,28),(-23,35),2,1,5)
-    screen_house(model)
+    registered_market(model)
     model.pose=(-4.7,0,17,.14)
     for east,top in [(-6.5,5.15),(-3.4,6.6),(3.4,6.6),(6.5,5.15)]:
         model.box(east,0,0,.66,top,.78,'white',True)
@@ -128,15 +106,28 @@ def market(model):
     letters(model,'东西巷',(0,5.26,.52),2.3,.43,'gold')
     for gateway in [(62,0,41,-1.39),(42,0,13.9,-1.29)]:
         model.pose=gateway
+        if gateway[0]==62:
+            for side in (-1,1):
+                model.box(side*4.1,0,0,.65,4.25,4.8,'brick',True)
+            model.box(0,4.25,0,8.85,3.1,4.8,'white',True)
+            for side in (-1,1):
+                for column in (-2.9,-1,1,2.9):
+                    model.box(column,5.12,side*2.43,1.24,1.42,.13,'wood')
+                    model.box(column,5.22,side*2.5,.96,1.22,.08,'glass')
+                    model.box(column,5.22,side*2.56,.08,1.22,.06,'wood')
+            seated_roof(model,7.35,9.65,5.7,1.15)
+            continue
         for east in (-3.9,3.9):model.box(east,0,0,.74,6.7,1.1,'brick',True)
         model.box(0,4.4,0,8.5,2.2,1.1,'wood');model.roof(0,6.55,0,9.4,3.4,1.3)
         for side in (-1,1):letters(model,'东西巷',(0,4.9,side*.59),4.7,1.05,'gold',side)
     for east,south in [(7+index*1.05+side*10,-18-index*6.1) for side in (-1,1) for index in range(6)]:
-        model.pose=(east,landmark_surface('wangcheng_market').ground(east,south),south,.14)
+        if south < -48:continue
+        model.pose=(east,0,south,.14)
         model.box(0,0,0,3.1,1.03,1.8,'wood',True)
         for post in (-1.46,1.46):model.box(post,1,-.64,.11,1.35,.11,'wood')
-        model.box(0,2.28,0,4.15,.14,3.6,'wood')
-        model.roof(0,2.29,0,4.15,3.6,.52)
+        seated_roof(model,2.29,4.15,3.6,.52)
 
 
-if __name__=='__main__': generate('wangcheng_market',market)
+if __name__=='__main__':
+    generate('wangcheng_market',market,dict(brick='#7a7d7b',white='#e8e4da',tile='#3b3e42',
+             wood='#5a3a22',sign='#282420',pave='#8f8f88'))

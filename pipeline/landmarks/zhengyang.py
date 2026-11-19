@@ -30,16 +30,19 @@ def boulevard(model):
     model.pose=(0,0,0,.16)
     for block in range(4):
         center=block*25
-        model.box(0,0,center,18,.14,25,'pave',True)
+        for station in np.linspace(center-12.5,center+12.5,17)[:-1]:
+            model.box(0,0,station+25/32,18,.14,25/16,'pave',True)
         for stripe in (-5.6,0,5.6):
             for zz in np.linspace(center-12.5,center+12.5,17)[:-1]:
                 strip=[]
                 for station in (zz,zz+25/16):
                     offset=stripe+.82*math.sin(station*math.pi/9)
-                    strip.extend([(offset-.27,.155,station),(offset+.27,.155,station)])
+                    strip.extend([(offset-.27,.146,station),(offset+.27,.146,station)])
                 model.mesh(strip,[[0,2,3],[0,3,1]],'tile')
         for side in (-1,1):
             model.box(side*7.6,.14,center,1.3,.04,25,'granite')
+            if block == 0 or (block == 1 and side == 1):
+                continue
             model.box(side*14.4,0,center,7.4,10.2,22,'white' if block%2==0 else 'earth',True)
             for floor in (3.35,6.65):model.box(side*10.1,floor,center,3.5,.32,22.3,'white')
             for offset in np.linspace(-10,10,5 if model.detail else 2):

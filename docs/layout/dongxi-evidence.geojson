@@ -1,0 +1,869 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2939344,
+            25.2808583
+          ],
+          [
+            110.2939188,
+            25.2807739
+          ],
+          [
+            110.2939061,
+            25.280705
+          ],
+          [
+            110.293783,
+            25.2800382
+          ],
+          [
+            110.2936501,
+            25.2791443
+          ],
+          [
+            110.2935232,
+            25.2782902
+          ]
+        ]
+      },
+      "properties": {
+        "name": "正阳步行街",
+        "source": "OSM way/221821082",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2939541,
+            25.2809488
+          ],
+          [
+            110.2939805,
+            25.281095
+          ],
+          [
+            110.2940143,
+            25.2812822
+          ],
+          [
+            110.2940481,
+            25.2814732
+          ],
+          [
+            110.2941012,
+            25.2817729
+          ],
+          [
+            110.2941144,
+            25.2818382
+          ],
+          [
+            110.2941449,
+            25.2820049
+          ],
+          [
+            110.2941488,
+            25.2820264
+          ],
+          [
+            110.2941529,
+            25.2820492
+          ]
+        ]
+      },
+      "properties": {
+        "name": "正阳路",
+        "source": "OSM way/258909992",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2940844,
+              25.2806401
+            ],
+            [
+              110.2946058,
+              25.2805267
+            ],
+            [
+              110.2944823,
+              25.2800244
+            ],
+            [
+              110.2942466,
+              25.2800648
+            ],
+            [
+              110.2941894,
+              25.2800259
+            ],
+            [
+              110.2940741,
+              25.2800466
+            ],
+            [
+              110.2939352,
+              25.2800706
+            ],
+            [
+              110.2938502,
+              25.2800855
+            ],
+            [
+              110.2939339,
+              25.2804877
+            ],
+            [
+              110.2940408,
+              25.2804671
+            ],
+            [
+              110.2940844,
+              25.2806401
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "王城商厦",
+        "source": "OSM way/264901525",
+        "check": "Rock 06/09",
+        "levels": 9
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2941449,
+            25.2820049
+          ],
+          [
+            110.2932071,
+            25.282142
+          ],
+          [
+            110.29247,
+            25.2822497
+          ]
+        ]
+      },
+      "properties": {
+        "name": "未命名连通道",
+        "source": "OSM way/265604723",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2965874,
+            25.2816638
+          ],
+          [
+            110.2962737,
+            25.281726
+          ],
+          [
+            110.2962314,
+            25.2815844
+          ],
+          [
+            110.2963802,
+            25.2815226
+          ],
+          [
+            110.2963042,
+            25.2812556
+          ],
+          [
+            110.2962263,
+            25.2810406
+          ],
+          [
+            110.2961174,
+            25.2809923
+          ],
+          [
+            110.2960116,
+            25.2809853
+          ],
+          [
+            110.2959086,
+            25.2809833
+          ],
+          [
+            110.2957864,
+            25.2806374
+          ],
+          [
+            110.2957337,
+            25.2804883
+          ]
+        ]
+      },
+      "properties": {
+        "name": "福棠巷",
+        "source": "OSM way/675603501",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2960206,
+            25.2829157
+          ],
+          [
+            110.2959356,
+            25.2823453
+          ],
+          [
+            110.2958053,
+            25.2818146
+          ],
+          [
+            110.2961806,
+            25.2817483
+          ],
+          [
+            110.2962737,
+            25.281726
+          ]
+        ]
+      },
+      "properties": {
+        "name": "江南巷",
+        "source": "OSM way/686154940",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2941144,
+            25.2818382
+          ],
+          [
+            110.2947335,
+            25.2817588
+          ],
+          [
+            110.295762,
+            25.2816274
+          ]
+        ]
+      },
+      "properties": {
+        "name": "仁寿巷",
+        "source": "OSM way/686307032",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2961806,
+            25.2817483
+          ],
+          [
+            110.2963614,
+            25.2822599
+          ],
+          [
+            110.2959356,
+            25.2823453
+          ]
+        ]
+      },
+      "properties": {
+        "name": "兰井巷",
+        "source": "OSM way/686307041",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2940143,
+            25.2812822
+          ],
+          [
+            110.2939491,
+            25.2812909
+          ],
+          [
+            110.2939242,
+            25.2811728
+          ],
+          [
+            110.2939868,
+            25.2808086
+          ],
+          [
+            110.2939709,
+            25.2806956
+          ],
+          [
+            110.2939061,
+            25.280705
+          ]
+        ]
+      },
+      "properties": {
+        "name": "未命名连通道",
+        "source": "OSM way/702246904",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2940481,
+            25.2814732
+          ],
+          [
+            110.2946764,
+            25.2813956
+          ],
+          [
+            110.2950005,
+            25.2813689
+          ],
+          [
+            110.2952357,
+            25.2813367
+          ],
+          [
+            110.2952502,
+            25.2814123
+          ],
+          [
+            110.2956935,
+            25.281355
+          ],
+          [
+            110.295762,
+            25.2816274
+          ],
+          [
+            110.2958053,
+            25.2818146
+          ]
+        ]
+      },
+      "properties": {
+        "name": "未命名连通道",
+        "source": "OSM way/885083148",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2939695,
+              25.2820737
+            ],
+            [
+              110.2941529,
+              25.2820492
+            ],
+            [
+              110.2943455,
+              25.2820229
+            ],
+            [
+              110.2943697,
+              25.2822012
+            ],
+            [
+              110.2941794,
+              25.2822252
+            ],
+            [
+              110.2939956,
+              25.2822484
+            ],
+            [
+              110.2939695,
+              25.2820737
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "正阳门",
+        "source": "OSM way/1008248059",
+        "check": "Esri; Rock 22/23",
+        "levels": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2932071,
+            25.282142
+          ],
+          [
+            110.2931676,
+            25.2819009
+          ],
+          [
+            110.2941012,
+            25.2817729
+          ]
+        ]
+      },
+      "properties": {
+        "name": "未命名连通道",
+        "source": "OSM way/1008909364",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2947335,
+            25.2817588
+          ],
+          [
+            110.2947192,
+            25.2816493
+          ],
+          [
+            110.2946764,
+            25.2813956
+          ]
+        ]
+      },
+      "properties": {
+        "name": "未命名连通道",
+        "source": "OSM way/1008909365",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2946764,
+            25.2813956
+          ],
+          [
+            110.2946373,
+            25.2811776
+          ],
+          [
+            110.294601,
+            25.2809651
+          ],
+          [
+            110.2939805,
+            25.281095
+          ]
+        ]
+      },
+      "properties": {
+        "name": "未命名连通道",
+        "source": "OSM way/1008909366",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.294601,
+            25.2809651
+          ],
+          [
+            110.2951714,
+            25.2808145
+          ],
+          [
+            110.2957864,
+            25.2806374
+          ]
+        ]
+      },
+      "properties": {
+        "name": "未命名连通道",
+        "source": "OSM way/1008909367",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2970663,
+            25.2815651
+          ],
+          [
+            110.2969691,
+            25.2813016
+          ],
+          [
+            110.297014,
+            25.2811207
+          ],
+          [
+            110.2970036,
+            25.281049
+          ],
+          [
+            110.2967519,
+            25.2809866
+          ],
+          [
+            110.2965898,
+            25.2811706
+          ],
+          [
+            110.2963042,
+            25.2812556
+          ]
+        ]
+      },
+      "properties": {
+        "name": "未命名连通道",
+        "source": "OSM way/1008909370",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2958053,
+            25.2818146
+          ],
+          [
+            110.295646,
+            25.2818294
+          ],
+          [
+            110.2951397,
+            25.2818924
+          ],
+          [
+            110.2941488,
+            25.2820264
+          ]
+        ]
+      },
+      "properties": {
+        "name": "未命名连通道",
+        "source": "OSM way/1531319101",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2947192,
+            25.2816493
+          ],
+          [
+            110.2950351,
+            25.2816153
+          ],
+          [
+            110.2950005,
+            25.2813689
+          ],
+          [
+            110.2946764,
+            25.2813956
+          ],
+          [
+            110.2947192,
+            25.2816493
+          ]
+        ]
+      },
+      "properties": {
+        "name": "未命名连通道",
+        "source": "OSM way/1531319161",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2969929,
+            25.2815809
+          ],
+          [
+            110.2965874,
+            25.2816638
+          ]
+        ]
+      },
+      "properties": {
+        "name": "福棠巷",
+        "source": "OSM way/1531321914",
+        "check": null,
+        "width_m": null,
+        "role": "mapped_axis"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2941688,
+          25.2821368
+        ]
+      },
+      "properties": {
+        "name": "正阳门城台中心",
+        "source": "OSM way/1008248059",
+        "check": "Esri",
+        "wall_bearing_deg": 98.5
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.29405625,
+          25.28108805
+        ]
+      },
+      "properties": {
+        "name": "星巴克（POI，不是门脸）",
+        "source": "百度 c31e0d4f9c2775cb430245c7",
+        "check": "Rock 07/10：品牌，不证图钉所在立面",
+        "floor": 1,
+        "unit": "D107/115"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.29359340667725,
+              25.281478906366257
+            ],
+            [
+              110.29388308525085,
+              25.28143040018111
+            ],
+            [
+              110.29386699199677,
+              25.281338238375902
+            ],
+            [
+              110.29357194900513,
+              25.281386744597896
+            ],
+            [
+              110.29359340667725,
+              25.281478906366257
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "候选屋顶 B",
+        "source": "Overture 5e184161-9951-402a-8cc4-3aef6e13cee8",
+        "upstream": "doi:10.5281/zenodo.8174931",
+        "check": "已排除为星巴克铺面：正阳路西侧，与 POI 不符",
+        "role": "excluded_roof"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.29374897480011,
+              25.281173317076036
+            ],
+            [
+              110.29377043247223,
+              25.281280030883906
+            ],
+            [
+              110.29386162757874,
+              25.281260628380366
+            ],
+            [
+              110.29383480548859,
+              25.281153914555432
+            ],
+            [
+              110.29374897480011,
+              25.281173317076036
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "候选屋顶 A",
+        "source": "Overture 80e4cc2a-365c-42eb-ac75-19ec1f8185ad",
+        "upstream": "doi:10.5281/zenodo.8174931",
+        "check": "已排除为星巴克铺面：正阳路西侧，与 POI 不符",
+        "role": "excluded_roof"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2938306,
+            25.2811083
+          ],
+          [
+            110.29407132,
+            25.28114627
+          ]
+        ]
+      },
+      "properties": {
+        "name": "照片 07 招牌视线",
+        "source": "walk-shizijie-wangcheng/07_IMG_1396.jpg",
+        "heading_deg": 80.29,
+        "pixel_x": [
+          1300,
+          1473
+        ],
+        "camera_accuracy_m": 4.7,
+        "role": "diagnostic_ray",
+        "optical_heading_deg": 50.55,
+        "exif_deg": 321.7
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2939389,
+            25.2811194
+          ],
+          [
+            110.29407132,
+            25.28114627
+          ]
+        ]
+      },
+      "properties": {
+        "name": "照片 10 招牌视线",
+        "source": "walk-shizijie-wangcheng/10_IMG_1399.jpg",
+        "heading_deg": 77.53,
+        "pixel_x": [
+          1347,
+          1706
+        ],
+        "camera_accuracy_m": 4.7,
+        "role": "diagnostic_ray",
+        "optical_heading_deg": 40.34,
+        "exif_deg": 309.1
+      }
+    }
+  ]
+}

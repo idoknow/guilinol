@@ -17,8 +17,14 @@ def mall(model):
     way=next(item for item in load_osm() if item['type']=='way' and item['id']==264901525)
     points=np.array([ll2xz(vertex['lat'],vertex['lon']) for vertex in way['geometry'][:-1]])
     points-=Polygon(points).centroid.coords[0]
-    model.prism(points.tolist(),0,36.9,'beige',True,footing=True)
-    for first,last in [(points[0],points[1]),(points[7],points[8]),(points[8],points[9]),(points[9],points[0])]:
+    corner = points[0]
+    start = corner + 4 * (points[-1]-corner) / np.linalg.norm(points[-1]-corner)
+    end = corner + 4 * (points[1]-corner) / np.linalg.norm(points[1]-corner)
+    glazing = [(1-fraction)**2*start + 2*fraction*(1-fraction)*corner + fraction**2*end
+               for fraction in np.linspace(0,1,5)]
+    model.prism([*glazing,*points[1:]],0,36.9,'beige',True,footing=True)
+    street = [*points[7:],*glazing,points[1]]
+    for first,last in zip(street,street[1:]):
         dx,dz=last-first; length=math.hypot(dx,dz); angle=math.atan2(-dz,dx)
         center=(first+last)/2
         model.pose=(center[0],0,center[1],angle)
