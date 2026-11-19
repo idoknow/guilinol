@@ -302,6 +302,60 @@ try {
   )
   console.log('1a. 防回归抢键通过: 榕湖自动码头仍显示 上船 · 榕湖')
 
+  // Bug 3 回归用例: ±40m 邻片未齐备不提前残缺解析 + 未解出泊位失败缓存防每帧暴力重扫
+  const slotCacheCheck = await runInPage(page, async ({walk, stream, manifest, advance, ensureTileLoaded}) => {
+    // 1) 木龙湖码头 (-336, -1564) 距北邻片 z=-1536 仅 28m (>22m, <40m)：北邻片未加载时不应提前执行解析
+    await ensureTileLoaded(-336, -1564)
+    await ensureTileLoaded(-336, -1530)
+    const northTile = manifest.chunks.find(t => -336 >= t.x && -336 < t.x + 256 && -1530 >= t.z && -1530 < t.z + 256)
+    const savedNorth = northTile ? stream.loaded.get(northTile) : null
+    let deferredWhenMissingNeighbor = false
+    if (northTile && savedNorth) {
+      stream.loaded.delete(northTile)
+      try {
+        walk.leave()
+        await walk.enter(-344, -1570, 0, 'bug3-neighbor-guard')
+        advance(1 / 60)
+        const mulongMoor = walk.freeMoorings.find(m => m.name === '木龙湖')
+        deferredWhenMissingNeighbor = !!mulongMoor && !mulongMoor.resolved && (mulongMoor.resolveRuns ?? 0) === 0
+      } finally {
+        stream.loaded.set(northTile, savedNorth)
+      }
+    }
+
+    // 2) 龙船坪码头 (-1340, 2916) 模拟无水不可解出泊位：首帧失败后，后续 20 帧不得重复全环暴力扫描
+    const lcpTiles = manifest.chunks.filter(t =>
+      Math.hypot(Math.max(0, Math.abs(-1340 - t.x - 128) - 128), Math.max(0, Math.abs(2916 - t.z - 128) - 128)) <= 64,
+    )
+    for (const t of lcpTiles) await ensureTileLoaded(t.x + 128, t.z + 128)
+    const waterBackups = lcpTiles.map(t => [t, Int16Array.from(stream.loaded.get(t).water)])
+    for (const [t] of waterBackups) stream.loaded.get(t).water.fill(-32768)
+    let getCallsIn20Frames = 0
+    let lcpRuns = -1
+    try {
+      walk.leave()
+      await walk.enter(-1340, 2906, 0, 'bug3-fail-cache')
+      advance(1 / 60) // 首帧尝试解析失败并写入缓存
+      const origGet = stream.loaded.get.bind(stream.loaded)
+      stream.loaded.get = k => {
+        getCallsIn20Frames++
+        return origGet(k)
+      }
+      try {
+        for (let i = 0; i < 20; i++) advance(1 / 60)
+      } finally {
+        stream.loaded.get = origGet
+      }
+      lcpRuns = walk.freeMoorings.find(m => m.name === '龙船坪码头')?.resolveRuns ?? -1
+    } finally {
+      for (const [t, bak] of waterBackups) stream.loaded.get(t).water.set(bak)
+    }
+    return {deferredWhenMissingNeighbor, getCallsIn20Frames, lcpRuns}
+  })
+  assert(slotCacheCheck.deferredWhenMissingNeighbor, `邻片 (28m 处) 未加载时提前执行了残缺解析: ${JSON.stringify(slotCacheCheck)}`)
+  assert(slotCacheCheck.getCallsIn20Frames < 150 && slotCacheCheck.lcpRuns === 1, `未解泊位每帧暴力重扫未缓存: ${JSON.stringify(slotCacheCheck)}`)
+  console.log('1a-cache. 泊位 ±40m 邻片防护与失败缓存通过:', slotCacheCheck)
+
   await enterSpot(page, ...FREE_DOCKS.ronghu.freeBank, 0, 'ronghu-free-bank')
   await triggerAction(page, FREE_DOCKS.ronghu.label)
 

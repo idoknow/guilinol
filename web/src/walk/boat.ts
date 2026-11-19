@@ -55,6 +55,8 @@ export interface MooringSlot {
   dockPos: Position
   autoStarts: [number, number][]
   resolved: boolean
+  resolveKey: string
+  resolveRuns: number
   bank: Position | null
   mooring: Position | null
   heading: number
@@ -228,6 +230,8 @@ export function createFreeBoats(env: BoatEnv) {
       dockPos,
       autoStarts,
       resolved: false,
+      resolveKey: '',
+      resolveRuns: 0,
       bank: null,
       mooring: null,
       heading: 0,
@@ -480,12 +484,21 @@ export function createFreeBoats(env: BoatEnv) {
 
   function resolveSlot(slot: MooringSlot) {
     const [dx,, dz] = slot.dockPos
-    for (const ox of [-22, 0, 22]) {
-      for (const oz of [-22, 0, 22]) {
+    const nearTiles = new Set<string>()
+    // Bank (<=22 m) + pier (<=10.5 m) + hull/ahead probe (~4.5 m) reaches ~37 m; guard ±40 m neighborhood.
+    for (const ox of [-40, 0, 40]) {
+      for (const oz of [-40, 0, 40]) {
         const t = sim.tileAt(dx + ox, dz + oz)
-        if (t && !stream.loaded.has(t)) return
+        if (t) {
+          if (!stream.loaded.has(t)) return
+          nearTiles.add(`${t.x},${t.z}`)
+        }
       }
     }
+    const key = [...nearTiles].sort().join(';')
+    if (slot.resolveKey === key) return
+    slot.resolveKey = key
+    slot.resolveRuns++
 
     const prior = PRIOR_MOORINGS[slot.name]
     if (prior) {
@@ -542,7 +555,7 @@ export function createFreeBoats(env: BoatEnv) {
         const dBoat = Math.hypot(slot.parkedPos[0] - x, slot.parkedPos[2] - z)
         const bankOk = dBank <= 5.5 && (y === undefined || (
           Math.abs(slot.bank[1] - y) <= 2.4 &&
-          !sim.pathBlocked(x, z, slot.bank[0], slot.bank[2], Math.min(y, slot.bank[1]) + 0.85)
+          !sim.pathBlocked(x, z, slot.bank[0], slot.bank[2], Math.max(y, slot.bank[1]) + 0.85)
         ))
         const boatOk = dBoat <= 6.5 && (y === undefined || (
           Math.abs(slot.parkedPos[1] - y) <= 2.4 &&
@@ -999,6 +1012,7 @@ export function createFreeBoats(env: BoatEnv) {
         name: s.name,
         kind: s.kind,
         resolved: s.resolved,
+        resolveRuns: s.resolveRuns,
         dock: s.dockPos,
         bank: s.bank,
         mooring: s.mooring,
