@@ -125,7 +125,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const cur=sim.body.translation(),check=sim.findLocalMount(cur.x,cur.y-cfg.height/2,cur.z,bx,by,bz)
       if(!check.ok){notifyDismountBlocked(check.reason==='blocked'?'中间有遮挡，绕过去再骑':'这里太窄了，挪一挪再骑');return null}
       return check
-    })).then(loaded=>{rides=loaded;rides.show(active)})
+    },{sim,stream,landFree:spot=>{sim.sync(spot.x,spot.z);rides?.clearBoatPose(figure)
+      if(!place(spot.x,spot.z,spot.rule,true,spot))return false
+      facing=spot.heading+avatar.yaw;figure.rotation.y=facing;wasBoat=false;input.clearRun();follow(0,true);return true}})).then(loaded=>{rides=loaded;rides.show(active)
+      if(active){const p=sim.body.translation();sim.sync(p.x,p.z);loaded.nearby(p.x,p.z,p.y-cfg.height/2)}})
       .catch(error=>console.warn('Vehicles unavailable:',error)).finally(()=>{loading=false})}
   let wasBoat=false,wasBike=false,bikeObstacle=''
   function place(x:number,z:number,reason:string,override=false,prefound?:ReturnType<typeof sim.findWalkableSpawn>){const found=prefound??sim.findWalkableSpawn(x,z,override)
@@ -141,9 +144,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true);return true
   }
-  function leave(){active=false;rides?.show(false);wasBoat=wasBike=false;bikeObstacle='';ridePose.reset();resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function leave(){active=false;rides?.clearBoatPose(figure);rides?.show(false);wasBoat=wasBike=false;bikeObstacle='';ridePose.reset();resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function follow(dt=0,snap=false){const pos=sim.body.translation();figure.position.set(pos.x,pos.y-cfg.height/2,pos.z)
-    if(rides?.boat){figure.position.copy(rides.boat.position);figure.position.y+=rides.boat.name==='raft'?-.44:-.18;figure.rotation.y=rides.heading}
+    if(rides?.boat){figure.position.copy(rides.boat.position);figure.position.y+=rides.boatSeatOffset;figure.rotation.y=rides.heading}
     if(rides?.bike){
       const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading),baseY=pos.y-cfg.height/2
       const cSup=supportAt(pos.x,pos.z,baseY)
@@ -163,7 +166,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     rig.update(camera,figure.position,yaw,pitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap),dt,snap)
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
-  function boatClearance(){const boat=rides?.boat;if(!boat)return null
+  function boatClearance(){
+    const freeClear=rides?.boatClearance(figure,skinned);if(freeClear)return freeClear
+    const boat=rides?.boat;if(!boat)return null
     figure.updateMatrixWorld(true);skinned?.skeleton.update()
     const roof=new THREE.Box3().setFromObject(boat,true).max.y,head=new THREE.Box3().setFromObject(figure,true).max.y
     let underside=Infinity
@@ -179,8 +184,22 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
       inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits,
       planarSpeed:Math.hypot(vx,vz),grounded,verticalVelocity:velocity,facing,figPos:figure.position.toArray(),figYaw:figure.rotation.y,bikePitch:rides?.bikePitch??0,bikeY:rides?.bikeY??0,
-      camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z)}}
+      camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z),
+      boat:rides?.boatProbe()??null}}
   function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);rides?.nearby(start.x,start.z,rides?.boat?start.y:start.y-cfg.height/2)
+    if(rides?.freeBoat){
+      const read=held?still:input.read(), firstFrame=!wasBoat
+      if(firstFrame){yaw=rides.heading;mixer.stopAllAction();action=undefined;bankLean=strideLean=0
+        figure.rotation.x=figure.rotation.z=0;if(traveller)traveller.rotation.set(0,0,0);ridePose.clearJoints();input.clearRun()}
+      const prevHeading=rides.heading
+      if(!held)rides.steerBoat(read.forward,read.right,Math.min(.25,dt))
+      yaw+=rides.heading-prevHeading
+      rides.poseBoat(figure,read.forward,read.right,Math.min(.12,dt))
+      const bpos=rides.freeBoat.position, bp=rides.boatProbe(), wy=bp?bp.y:bpos.y
+      sim.body.setTranslation({x:bpos.x,y:wy+cfg.height/2,z:bpos.z},true)
+      sim.body.setNextKinematicTranslation({x:bpos.x,y:wy+cfg.height/2,z:bpos.z})
+      wasBoat=true;follow(dt,firstFrame);return
+    }
     if(rides?.boat){if(!held)rides.advance(Math.min(.25,dt));if(!wasBoat){yaw=rides.heading+.95;sit()}wasBoat=!!rides.boat;follow(dt);return}wasBoat=false
     const read=input.read(),keys=held?still:read
     wish.set(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))
@@ -254,7 +273,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const move=sim.controller.computedMovement(),next={x:pos.x+move.x,y:pos.y+move.y,z:pos.z+move.z}
       const nowGrounded=sim.controller.computedGrounded()
       if(velocity<=0){grounded=nowGrounded;if(grounded&&velocity<0)velocity=0}else if(move.y<velocity*step*.25)velocity=0
-      if(verify)for(let at=0;at<sim.controller.numComputedCollisions();at++){const coll=sim.controller.computedCollision(at)?.collider;if(coll)lastHits.push(sim.kinds.get(coll.handle)??'')}
+      if(verify)for(let at=0;at<sim.controller.numComputedCollisions();at++){const coll=sim.controller.computedCollision(at)?.collider;if(coll){const k=sim.kinds.get(coll.handle);lastHits.push(k==='deckThin'?'deck':k??'')}}
       const nextTile=sim.tileAt(next.x,next.z)
       if(nextTile&&!stream.loaded.has(nextTile)){next.x=pos.x;next.z=pos.z;vx=vz=0;rides?.stop();bikeSpeed=0}
       const ground=sim.surface(next.x,next.z,'ground')
@@ -339,7 +358,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     mixer.update(dt);follow(dt)
   }
-  return {enter,leave,tick,spawns,probe,boatClearance,get obstacle(){return bikeObstacle},get vehicle(){return rides?.bike?'bike':rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  return {enter,leave,tick,spawns,probe,boatClearance,get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.bike?'bike':rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}
 }

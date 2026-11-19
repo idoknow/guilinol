@@ -1,0 +1,771 @@
+import assert from 'node:assert/strict'
+import {readFile} from 'node:fs/promises'
+import {gunzipSync} from 'node:zlib'
+import {chromium} from 'playwright'
+import {preview} from 'vite'
+
+/**
+ * M6-3 自由划船全自动验证脚本 (`verify:boat`)。
+ * 覆盖施工图 (boat-spec.md) 与派工单全部验收点：
+ *   1. 码头防抢键回归 + 上自由小船 (rowboat) / 竹筏 (freeRaft)
+ *   2. 自由划行物理（前划加速、松手惯性滑行、左右转向、倒桨后退）
+ *   3. 斜撞岸贴边滑行不卡死（不穿岸、不触发 rescue）
+ *   4. 高桥正常穿行（榕湖玻璃桥、漓江解放桥）
+ *   5. 低桥拦截并发 walk:toast + .toast.show（北斗桥南跨、杉湖九曲桥）
+ *   6. 湖心拒下 + 靠岸下船
+ *   7. 跨湖穿行榕湖 → 桂湖（Route 3 经迎宾桥/丽泽桥微阶 <= 1.2 m）
+ *   8. 闸坝拦停并发 walk:toast + .toast.show（木龙湖闸 3.9 m 跌水）
+ *   9. 漓江自由竹筏顺流漂移（1.2–2.0 m 区间）
+ *  10. 手机 390×844 船上按钮与摇杆/HUD 不重叠 + 触屏摇杆划船
+ */
+
+const BOUNDS = JSON.parse(await readFile('pipeline/vessel-bounds.json', 'utf8'))
+const VEHICLES = JSON.parse(gunzipSync(await readFile('dist/world/vehicles.bin')))
+
+// 由 dist/world/vehicles.bin Route 3（榕湖 → 桂湖）提取实测全通航中心线
+const RONGHU_TO_GUIHU_ROUTE = VEHICLES.routes.find(r => r.start === '榕湖' && r.end === '桂湖')
+assert(RONGHU_TO_GUIHU_ROUTE?.path?.length > 10, 'vehicles.bin 缺少 榕湖 → 桂湖 航线')
+
+// 施工图第 5.1 节码头自由栈桥岸点（freeBank）与泊位参考坐标
+const FREE_DOCKS = {
+  ronghu: {name: '榕湖', kind: 'rowboat', label: '划小船', freeBank: [-1340, 326], mooring: [-1340, 322]},
+  mulong: {name: '木龙湖', kind: 'rowboat', label: '划小船', freeBank: [-344, -1570], mooring: [-344, -1574]},
+  jiefang: {name: '解放桥码头', kind: 'freeRaft', label: '划竹筏', freeBank: [-164, 162], mooring: [-170, 162]},
+  shanhu: {name: '杉湖', kind: 'rowboat', label: '划小船', freeBank: [-842, 546], mooring: [-844, 550]},
+}
+
+function sampleWaypoints(path, minStep = 8) {
+  const pts = []
+  let last = null
+  for (let i = 0; i < path.length; i++) {
+    const p = [path[i][0], path[i][2]]
+    if (!last || i === path.length - 1 || Math.hypot(p[0] - last[0], p[1] - last[1]) >= minStep) {
+      pts.push(p)
+      last = p
+    }
+  }
+  return pts
+}
+
+const server = await preview({root: 'web', configFile: 'web/vite.config.ts', preview: {host: '127.0.0.1', port: 0}})
+const baseUrl = `http://127.0.0.1:${server.httpServer.address().port}`
+const errors = []
+let browser
+
+try {
+  browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM,
+    args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+  })
+
+  // ---------- 通用页面辅助工具 ----------
+  async function attachHelpers(page) {
+    await page.addInitScript(() => {
+      window.__boatToasts = []
+      window.addEventListener('walk:toast', ev => {
+        const detail = ev.detail || {}
+        window.__boatToasts.push({
+          text: String(detail.text ?? ''),
+          ms: detail.ms ?? null,
+          at: performance.now(),
+        })
+      })
+    })
+  }
+
+  async function gotoWalk(page, urlQuery = 'mode=walk&verify&flow=0') {
+    await page.route('**/favicon.ico', route => route.fulfill({status: 204}))
+    await page.goto(`${baseUrl}/?${urlQuery}`)
+    await page.waitForFunction(() => window.viewer?.walk?.active, null, {timeout: 90000})
+    await page.waitForSelector('.vehicle-action', {state: 'attached', timeout: 45000})
+  }
+
+  async function closeSpotCard(page) {
+    const close = page.locator('.spot-card.show .card-close')
+    if (await close.isVisible().catch(() => false)) await close.click()
+  }
+
+  async function clearToasts(page) {
+    await page.evaluate(() => {
+      window.__boatToasts = []
+      document.querySelector('.toast')?.classList.remove('show')
+    })
+  }
+
+  async function enterSpot(page, x, z, heading = 0, reason = 'boat-test') {
+    const ok = await page.evaluate(async ([px, pz, h, tag]) => {
+      const {walk, stream, manifest} = window.viewer
+      walk.leave()
+      const res = await walk.enter(px, pz, h, tag)
+      if (!res) return false
+      const nearby = manifest.chunks.filter(tile =>
+        Math.hypot(Math.max(0, Math.abs(px - tile.x - 128) - 128), Math.max(0, Math.abs(pz - tile.z - 128) - 128)) <= 64,
+      )
+      const deadline = performance.now() + 15000
+      while (nearby.some(tile => !stream.loaded.has(tile)) && performance.now() < deadline) {
+        stream.tick(walk.position)
+        await new Promise(r => setTimeout(r, 16))
+      }
+      for (let i = 0; i < 6; i++) {
+        walk.tick(1 / 60)
+        await new Promise(requestAnimationFrame)
+      }
+      return true
+    }, [x, z, heading, reason])
+    assert(ok, `无法在 (${x}, ${z}) 落脚 [${reason}]`)
+  }
+
+  async function triggerAction(page, expectedText, mobile = false) {
+    await closeSpotCard(page)
+    await page.waitForFunction(
+      text => {
+        const btn = document.querySelector('.vehicle-action')
+        return btn && !btn.hidden && btn.textContent?.includes(text)
+      },
+      expectedText,
+      {timeout: 15000},
+    )
+    if (mobile) {
+      await page.locator('.vehicle-action').tap()
+    } else {
+      await page.keyboard.press('e')
+    }
+    await page.evaluate(async () => {
+      const {walk} = window.viewer
+      for (let i = 0; i < 6; i++) {
+        walk.tick(1 / 60)
+        await new Promise(requestAnimationFrame)
+      }
+    })
+  }
+
+  /**
+   * 页面内确定性步进器与舵机引导。
+   * 冻结 rAF 中的 walk.tick，使用固定 1/60s 驱动，并在中途同步 stream.tick。
+   * 兼容读取 walk.probe().boat 与既有 walk.boatClearance() 字段，待与 Hy-agy 群里字段最终对齐。
+   */
+  async function runInPage(page, fn, arg) {
+    return page.evaluate(async ({fnSrc, arg}) => {
+      const {walk, stream, manifest} = window.viewer
+      const advance = walk.tick
+      walk.tick = () => {}
+      const keys = new Set()
+
+      function press(code, on) {
+        if (keys.has(code) === on) return
+        window.dispatchEvent(new KeyboardEvent(on ? 'keydown' : 'keyup', {code}))
+        if (on) keys.add(code)
+        else keys.delete(code)
+      }
+
+      function releaseAll() {
+        for (const k of [...keys]) press(k, false)
+      }
+
+      function readBoat() {
+        const p = walk.probe()
+        const b = p.boat ?? null
+        const clr = walk.boatClearance()
+        const pos = walk.position
+        return {
+          probe: p,
+          boat: b,
+          clearanceInfo: clr,
+          kind: b?.kind ?? b?.vessel ?? clr?.kind ?? null,
+          speed: b?.speed ?? b?.vLong ?? walk.speed ?? 0,
+          vLong: b?.vLong ?? b?.speed ?? walk.speed ?? 0,
+          vLat: b?.vLat ?? 0,
+          waterY: b?.waterY ?? b?.currentWaterY ?? null,
+          clearance: b?.clearance ?? clr?.clearance ?? null,
+          blocked: b?.blocked ?? b?.reason ?? b?.obstacle ?? null,
+          x: pos.x,
+          y: pos.y,
+          z: pos.z,
+          heading: walk.heading,
+        }
+      }
+
+      async function ensureTileLoaded(x, z) {
+        const tile = manifest.chunks.find(t => x >= t.x && x < t.x + 256 && z >= t.z && z < t.z + 256)
+        if (!tile || stream.loaded.has(tile)) return
+        const deadline = performance.now() + 15000
+        const pt = walk.position.clone().set(tile.x + 128, walk.position.y, tile.z + 128)
+        while (!stream.loaded.has(tile) && performance.now() < deadline) {
+          stream.tick(pt)
+          await new Promise(r => setTimeout(r, 20))
+        }
+      }
+
+      function step(n = 1, dt = 1 / 60) {
+        for (let i = 0; i < n; i++) advance(dt)
+      }
+
+      async function faceTarget(tx, tz, maxSteps = 240) {
+        for (let i = 0; i < maxSteps; i++) {
+          const pos = walk.position
+          const angle = Math.atan2(-(tx - pos.x), -(tz - pos.z)) - walk.heading
+          const err = Math.atan2(Math.sin(angle), Math.cos(angle))
+          if (Math.abs(err) < 0.04) break
+          press('KeyA', err > 0.025)
+          press('KeyD', err < -0.025)
+          advance(1 / 60)
+        }
+        press('KeyA', false)
+        press('KeyD', false)
+      }
+
+      async function steerTo(waypoints, opts = {}) {
+        const {
+          arriveDist = 2.6,
+          maxSecondsPerLeg = 45,
+          allowBlockStop = false,
+          turnOnlyAngle = 0.42,
+        } = opts
+        let minClearance = Infinity
+        let sawUnsafeProbe = false
+        let sawResetOrHouse = false
+        const history = []
+
+        for (let wi = 0; wi < waypoints.length; wi++) {
+          const [tx, tz] = waypoints[wi]
+          await ensureTileLoaded(tx, tz)
+          const limit = Math.ceil(maxSecondsPerLeg * 60)
+          let arrived = false
+          for (let i = 0; i < limit; i++) {
+            const pos = walk.position
+            const dx = tx - pos.x, dz = tz - pos.z
+            const dist = Math.hypot(dx, dz)
+            if (dist < arriveDist) {
+              arrived = true
+              break
+            }
+            if (i % 60 === 0) {
+              await ensureTileLoaded(pos.x, pos.z)
+              stream.tick(pos)
+              await new Promise(r => setTimeout(r, 0))
+            }
+            const angle = Math.atan2(-dx, -dz) - walk.heading
+            const err = Math.atan2(Math.sin(angle), Math.cos(angle))
+            press('KeyA', err > 0.04)
+            press('KeyD', err < -0.04)
+            press('KeyW', Math.abs(err) < turnOnlyAngle)
+            advance(1 / 60)
+
+            const info = readBoat()
+            if (info.clearance !== null && Number.isFinite(info.clearance)) {
+              minClearance = Math.min(minClearance, info.clearance)
+            }
+            if (info.probe.resets > 0 || info.probe.inHouse) sawResetOrHouse = true
+            if (info.probe.wet === false) sawUnsafeProbe = true
+            if (i % 15 === 0) history.push({x: +info.x.toFixed(2), z: +info.z.toFixed(2), waterY: info.waterY})
+          }
+          if (!arrived && !allowBlockStop) {
+            releaseAll()
+            const last = readBoat()
+            throw Error(`航路点 #${wi} (${tx}, ${tz}) 未能到达，停在 (${last.x.toFixed(1)}, ${last.z.toFixed(1)}), blocked=${last.blocked}`)
+          }
+        }
+        releaseAll()
+        return {minClearance, sawUnsafeProbe, sawResetOrHouse, history, end: readBoat()}
+      }
+
+      const fn = eval(`(${fnSrc})`)
+      try {
+        return await fn({
+          walk, stream, manifest, advance, step, press, releaseAll,
+          readBoat, ensureTileLoaded, faceTarget, steerTo, arg,
+        })
+      } finally {
+        releaseAll()
+        walk.tick = advance
+      }
+    }, {fnSrc: fn.toString(), arg})
+  }
+
+  // ==================== 桌面端 800×450 验收 ====================
+  const page = await browser.newPage({viewport: {width: 800, height: 450}})
+  page.on('pageerror', err => errors.push(`desktop pageerror: ${err.message}`))
+  page.on('console', msg => {
+    if (msg.type() === 'error') errors.push(`desktop console: ${msg.location().url}: ${msg.text()}`)
+  })
+  await attachHelpers(page)
+  await gotoWalk(page)
+
+  // --- 用例 1：防抢键回归 + 榕湖上自由小船 (rowboat) + 自由划行物理 ---
+  const [autoDockX, , autoDockZ] = VEHICLES.docks['榕湖']
+  await enterSpot(page, autoDockX, autoDockZ, 0, 'ronghu-auto-dock')
+  await closeSpotCard(page)
+  await page.waitForFunction(
+    () => document.querySelector('.vehicle-action')?.textContent?.includes('上船 · 榕湖'),
+    null,
+    {timeout: 15000},
+  )
+  console.log('1a. 防回归抢键通过: 榕湖自动码头仍显示 上船 · 榕湖')
+
+  await enterSpot(page, ...FREE_DOCKS.ronghu.freeBank, 0, 'ronghu-free-bank')
+  await triggerAction(page, FREE_DOCKS.ronghu.label)
+
+  const mountInfo = await runInPage(page, ({readBoat}) => ({
+    vehicle: window.viewer.walk.vehicle,
+    boatState: readBoat(),
+  }))
+  assert.equal(mountInfo.vehicle, 'boat', '登上自由小船后 walk.vehicle 应为 boat')
+  assert(mountInfo.boatState.boat !== null, 'walk.probe().boat 应已就绪并包含自由船探测字段')
+  assert.equal(mountInfo.boatState.kind, 'rowboat', `榕湖自由船型应为 rowboat，实际: ${mountInfo.boatState.kind}`)
+
+  // 自由划行物理检查：朝东偏北开阔水面 (-1270, 304)
+  const physicsRes = await runInPage(page, async ({faceTarget, press, step, readBoat}) => {
+    await faceTarget(-1270, 304)
+    const start = readBoat()
+    press('KeyW', true)
+    step(150) // 2.5s 前进加速
+    const peak = readBoat()
+    press('KeyW', false)
+
+    // 松手惯性滑行 0.6s (36步) + 再滑行 1.4s
+    step(36)
+    const coast06 = readBoat()
+    step(84)
+    const coast20 = readBoat()
+
+    // 转向检查 (KeyA 左转 heading 增大, KeyD 右转 heading 减小)
+    const h0 = coast20.heading
+    press('KeyA', true)
+    step(36)
+    const hAfterA = readBoat().heading
+    press('KeyA', false)
+    press('KeyD', true)
+    step(36)
+    const hAfterD = readBoat().heading
+    press('KeyD', false)
+
+    // 倒桨检查 (KeyS)
+    const revStart = readBoat()
+    press('KeyS', true)
+    step(72) // 1.2s
+    const revEnd = readBoat()
+    press('KeyS', false)
+    const revFwd = [-Math.sin(revStart.heading), -Math.cos(revStart.heading)]
+    const revMoveAlong = (revEnd.x - revStart.x) * revFwd[0] + (revEnd.z - revStart.z) * revFwd[1]
+
+    return {
+      peakSpeed: peak.speed,
+      driftDist06: Math.hypot(coast06.x - peak.x, coast06.z - peak.z),
+      coast06Speed: coast06.speed,
+      coast20Speed: coast20.speed,
+      turnLeftDelta: Math.atan2(Math.sin(hAfterA - h0), Math.cos(hAfterA - h0)),
+      turnRightDelta: Math.atan2(Math.sin(hAfterD - hAfterA), Math.cos(hAfterD - hAfterA)),
+      revSpeed: revEnd.vLong,
+      revMoveAlong,
+      wet: peak.probe.wet && coast06.probe.wet && revEnd.probe.wet,
+      inHouse: peak.probe.inHouse || revEnd.probe.inHouse,
+      resets: revEnd.probe.resets,
+    }
+  })
+  assert(physicsRes.peakSpeed >= 2.6 && physicsRes.peakSpeed <= 3.9, `rowboat 静水极速异常: ${JSON.stringify(physicsRes)}`)
+  assert(physicsRes.driftDist06 > 0.4, `松手 0.6s 惯性滑行不足: ${JSON.stringify(physicsRes)}`)
+  assert(physicsRes.coast06Speed > 0.3 && physicsRes.coast06Speed < physicsRes.peakSpeed, `惯性衰减异常: ${JSON.stringify(physicsRes)}`)
+  assert(physicsRes.coast20Speed < physicsRes.coast06Speed, `水阻未继续收敛: ${JSON.stringify(physicsRes)}`)
+  assert(physicsRes.turnLeftDelta > 0.25 && physicsRes.turnRightDelta < -0.25, `左右转向异常: ${JSON.stringify(physicsRes)}`)
+  assert(physicsRes.revSpeed < -0.5 || physicsRes.revMoveAlong < -0.5, `倒桨后退异常: ${JSON.stringify(physicsRes)}`)
+  assert(physicsRes.wet && !physicsRes.inHouse && physicsRes.resets === 0, `自由划行状态不安全: ${JSON.stringify(physicsRes)}`)
+  console.log('1b. 自由划行物理通过:', {
+    peakSpeed: +physicsRes.peakSpeed.toFixed(2),
+    drift06m: +physicsRes.driftDist06.toFixed(2),
+    revAlong: +physicsRes.revMoveAlong.toFixed(2),
+  })
+
+  // --- 用例 2：斜撞岸贴边滑行不卡死 ---
+  const shoreSlide = await runInPage(page, async ({steerTo, faceTarget, press, step, readBoat}) => {
+    // 驶向榕湖南岸斜坡岸线前开阔位置 (-1324, 322)
+    await steerTo([[-1324, 322]], {arriveDist: 2.5})
+    // 瞄准南偏东 (-1304, 358)，以约 30° 斜角撞击东南走向驳岸，保持 KeyW 推力 4s
+    await faceTarget(-1304, 358)
+    const start = readBoat()
+    const samples = []
+    press('KeyW', true)
+    for (let i = 0; i < 240; i++) {
+      step(1)
+      if (i % 15 === 0) {
+        const s = readBoat()
+        samples.push({x: s.x, z: s.z, speed: s.speed, wet: s.probe.wet, resets: s.probe.resets, inHouse: s.probe.inHouse})
+      }
+    }
+    press('KeyW', false)
+    const end = readBoat()
+    const halfIdx = Math.floor(samples.length / 2)
+    const lateSlide = Math.hypot(end.x - samples[halfIdx].x, end.z - samples[halfIdx].z)
+    return {
+      totalDist: Math.hypot(end.x - start.x, end.z - start.z),
+      lateSlide,
+      eastGain: end.x - start.x,
+      allWet: samples.every(s => s.wet !== false),
+      anyReset: samples.some(s => s.resets > 0),
+      anyHouse: samples.some(s => s.inHouse),
+    }
+  })
+  assert(shoreSlide.totalDist > 6 && shoreSlide.lateSlide > 1.5 && shoreSlide.eastGain > 4, `斜撞岸贴边滑行疑似卡死: ${JSON.stringify(shoreSlide)}`)
+  assert(shoreSlide.allWet && !shoreSlide.anyReset && !shoreSlide.anyHouse, `斜撞岸穿岸或触发重置: ${JSON.stringify(shoreSlide)}`)
+  console.log('2. 斜撞岸贴边滑行通过:', {
+    totalDist: +shoreSlide.totalDist.toFixed(2),
+    lateSlide: +shoreSlide.lateSlide.toFixed(2),
+    eastGain: +shoreSlide.eastGain.toFixed(2),
+  })
+
+  // --- 用例 3：高桥穿行（玻璃桥）+ 低桥拦截（北斗桥南跨）并发 walk:toast + 湖心拒下 & 靠岸下船 ---
+  await clearToasts(page)
+  const glassBridge = await runInPage(page, async ({steerTo, readBoat}) => {
+    await steerTo([[-1300, 315], [-1260, 298], [-1210, 286]], {arriveDist: 2.8})
+    const west = readBoat()
+    const res = await steerTo([[-1174, 286], [-1156, 286]], {arriveDist: 2.5})
+    return {
+      westX: west.x,
+      eastX: res.end.x,
+      minClearance: res.minClearance,
+      toasts: [...window.__boatToasts],
+      sawUnsafe: res.sawUnsafeProbe || res.sawResetOrHouse,
+    }
+  })
+  assert(glassBridge.westX < -1195 && glassBridge.eastX > -1158, `未能完整穿过玻璃桥: ${JSON.stringify(glassBridge)}`)
+  assert(glassBridge.minClearance >= 0.30, `玻璃桥净空不足: ${JSON.stringify(glassBridge)}`)
+  assert.equal(glassBridge.toasts.length, 0, `过玻璃桥不应触发拦截 toast: ${JSON.stringify(glassBridge.toasts)}`)
+  assert(!glassBridge.sawUnsafe, '过玻璃桥期间发生异常落水/进屋/重置')
+  console.log('3a. 高桥穿行通过 (玻璃桥):', {eastX: +glassBridge.eastX.toFixed(1), minClearance: +glassBridge.minClearance.toFixed(2)})
+
+  // 倒退转头绕过湖心岛东侧深水区，前往北斗桥南跨 (-1380, 174)
+  await runInPage(page, async ({steerTo}) => {
+    await steerTo([[-1210, 286], [-1288, 284], [-1296, 256], [-1312, 232], [-1340, 212], [-1356, 198]], {arriveDist: 2.8})
+  })
+  await clearToasts(page)
+  const lowBridge = await runInPage(page, async ({faceTarget, press, step, readBoat}) => {
+    await faceTarget(-1380, 174)
+    let minClearance = Infinity
+    let maxTravelDist = 0
+    const start = readBoat()
+    press('KeyW', true)
+    for (let i = 0; i < 330; i++) { // 5.5s 持续撞向矮桥
+      step(1)
+      const cur = readBoat()
+      if (cur.clearance !== null && Number.isFinite(cur.clearance)) minClearance = Math.min(minClearance, cur.clearance)
+      maxTravelDist = Math.max(maxTravelDist, Math.hypot(cur.x - start.x, cur.z - start.z))
+    }
+    press('KeyW', false)
+    const end = readBoat()
+    const toastEl = document.querySelector('.toast')
+    const toastVisible = toastEl?.classList.contains('show') ?? false
+    const toastText = toastEl?.textContent ?? ''
+    return {
+      endX: end.x,
+      endZ: end.z,
+      minClearance,
+      maxTravelDist,
+      toastVisible,
+      toastText,
+      events: [...window.__boatToasts],
+      blocked: end.blocked,
+      inHouse: end.probe.inHouse,
+      resets: end.probe.resets,
+    }
+  })
+  assert(lowBridge.endX > -1374 || lowBridge.endZ > 176, `船体越过了北斗桥南跨轴线: ${JSON.stringify(lowBridge)}`)
+  assert(lowBridge.minClearance >= 0, `矮桥穿模！最小净空小于 0: ${JSON.stringify(lowBridge)}`)
+  assert(lowBridge.events.length > 0 && lowBridge.toastVisible, `低桥拦截未发 walk:toast 或未显示 .toast.show: ${JSON.stringify(lowBridge)}`)
+  assert(/净高|无法通过/.test(lowBridge.toastText) && /净高|无法通过/.test(lowBridge.events[0].text), `低桥提示文案不符合施工图: ${JSON.stringify(lowBridge)}`)
+  console.log('3b. 低桥拦截通过 (北斗桥南跨):', {
+    stopAt: [+lowBridge.endX.toFixed(1), +lowBridge.endZ.toFixed(1)],
+    toast: lowBridge.toastText,
+  })
+
+  // 倒桨脱困 -> 湖心拒下 -> 回自由栈桥靠岸下船
+  await runInPage(page, async ({press, step, steerTo}) => {
+    press('KeyS', true)
+    step(72)
+    press('KeyS', false)
+    await steerTo([[-1300, 304]], {arriveDist: 3})
+  })
+  await clearToasts(page)
+  await triggerAction(page, '靠岸下船')
+  const midLakeDismount = await page.evaluate(() => ({
+    vehicle: window.viewer.walk.vehicle,
+    toastVisible: document.querySelector('.toast')?.classList.contains('show') ?? false,
+    toastText: document.querySelector('.toast')?.textContent ?? '',
+    events: [...window.__boatToasts],
+  }))
+  assert.equal(midLakeDismount.vehicle, 'boat', `湖心深水不应允许下船: ${JSON.stringify(midLakeDismount)}`)
+  assert(midLakeDismount.toastVisible && /岸|码头|太远/.test(midLakeDismount.toastText), `湖心拒下缺少提示: ${JSON.stringify(midLakeDismount)}`)
+
+  await runInPage(page, async ({steerTo}) => {
+    await steerTo([FREE_DOCKS.ronghu.mooring], {arriveDist: 2.5})
+  })
+  await triggerAction(page, '靠岸下船')
+  const landed = await page.evaluate(() => ({
+    vehicle: window.viewer.walk.vehicle,
+    probe: window.viewer.walk.probe(),
+  }))
+  assert.equal(landed.vehicle, 'foot', '靠岸下船后应恢复步行状态')
+  assert.equal(landed.probe.wet, false, `下船应落在干地上: ${JSON.stringify(landed.probe)}`)
+  assert(Math.abs(landed.probe.renderClearance) < 0.25 && !landed.probe.inHouse, `下船落点不安全: ${JSON.stringify(landed.probe)}`)
+  console.log('3c. 湖心拒下 + 靠岸下船通过')
+
+  // --- 用例 4：榕湖 → 桂湖跨湖全线通航（微阶 <= 1.2 m 放行） ---
+  await enterSpot(page, ...FREE_DOCKS.ronghu.freeBank, 0, 'ronghu-to-guihu')
+  await triggerAction(page, FREE_DOCKS.ronghu.label)
+  await clearToasts(page)
+  const crossWaypoints = sampleWaypoints(RONGHU_TO_GUIHU_ROUTE.path, 6)
+  const crossLake = await runInPage(page, async ({steerTo, arg}) => {
+    const start = arg[0]
+    const res = await steerTo(arg, {arriveDist: 2.2, maxSecondsPerLeg: 30})
+    const waterYs = res.history.map(h => h.waterY).filter(v => v !== null)
+    return {
+      start,
+      end: res.end,
+      minClearance: res.minClearance,
+      sawUnsafe: res.sawUnsafeProbe || res.sawResetOrHouse,
+      minWaterY: waterYs.length ? Math.min(...waterYs) : null,
+      maxWaterY: waterYs.length ? Math.max(...waterYs) : null,
+      toasts: [...window.__boatToasts],
+    }
+  }, crossWaypoints)
+  const targetEnd = RONGHU_TO_GUIHU_ROUTE.path.at(-1)
+  const guihuGap = Math.hypot(crossLake.end.x - targetEnd[0], crossLake.end.z - targetEnd[2])
+  assert(guihuGap < 8, `榕湖 → 桂湖 未能抵达终点，距终点 ${guihuGap.toFixed(1)} m`)
+  assert(crossLake.minClearance >= 0.30, `榕湖 → 桂湖 跨湖过桥净空异常: ${crossLake.minClearance}`)
+  assert(!crossLake.sawUnsafe, '榕湖 → 桂湖 途中发生异常落水/进屋/重置')
+  if (crossLake.minWaterY !== null && crossLake.maxWaterY !== null) {
+    assert(crossLake.maxWaterY - crossLake.minWaterY >= 1.1, `应经历榕湖(~148.1m)到桂湖(~149.5m)水位升阶，实际 ${crossLake.minWaterY}..${crossLake.maxWaterY}`)
+  }
+  assert.equal(crossLake.toasts.length, 0, `榕湖 → 桂湖 正常微阶不应弹窗拦截: ${JSON.stringify(crossLake.toasts)}`)
+  console.log('4. 榕湖 → 桂湖跨湖通航通过:', {
+    end: [+crossLake.end.x.toFixed(1), +crossLake.end.z.toFixed(1)],
+    waterSpan: [crossLake.minWaterY, crossLake.maxWaterY],
+  })
+
+  // --- 用例 5：闸坝拦停并发 walk:toast（木龙湖闸 145.6 m -> 149.5 m，落差 3.9 m） ---
+  await enterSpot(page, ...FREE_DOCKS.mulong.freeBank, 0, 'mulong-dam')
+  await triggerAction(page, FREE_DOCKS.mulong.label)
+  await clearToasts(page)
+  const damCheck = await runInPage(page, async ({steerTo, faceTarget, press, step, readBoat}) => {
+    await steerTo([[-356, -1584], [-400, -1590]], {arriveDist: 2.6})
+    const before = readBoat()
+    await faceTarget(-448, -1590)
+    press('KeyW', true)
+    step(270) // 4.5s 直推向 3.9m 闸坝交界 x ≈ -432..-436
+    press('KeyW', false)
+    const after = readBoat()
+    const toastEl = document.querySelector('.toast')
+    return {
+      beforeX: before.x,
+      beforeWaterY: before.waterY,
+      afterX: after.x,
+      afterZ: after.z,
+      afterWaterY: after.waterY,
+      blocked: after.blocked,
+      toastVisible: toastEl?.classList.contains('show') ?? false,
+      toastText: toastEl?.textContent ?? '',
+      events: [...window.__boatToasts],
+      resets: after.probe.resets,
+      inHouse: after.probe.inHouse,
+    }
+  })
+  assert(damCheck.afterX > -436, `船体越过了木龙湖闸坝跌水线！停在 x=${damCheck.afterX}`)
+  if (damCheck.afterWaterY !== null) {
+    assert(damCheck.afterWaterY < 147.0, `水位不应跨越闸坝跳变到 149.5 m，实际 ${damCheck.afterWaterY}`)
+  }
+  assert(damCheck.events.length > 0 && damCheck.toastVisible, `闸坝拦截未发 walk:toast 或未显示 .toast.show: ${JSON.stringify(damCheck)}`)
+  assert(/水闸|落差|划过/.test(damCheck.toastText) && /水闸|落差|划过/.test(damCheck.events[0].text), `闸坝拦截文案不符合施工图: ${JSON.stringify(damCheck)}`)
+  assert(damCheck.resets === 0 && !damCheck.inHouse, '撞闸坝触发了异常重置或进屋')
+  console.log('5. 闸坝拦停通过 (木龙湖闸):', {stopX: +damCheck.afterX.toFixed(1), toast: damCheck.toastText})
+
+  // --- 用例 6：漓江自由竹筏水流漂移 + 解放桥穿行 + 杉湖九曲桥矮桥验证 ---
+  await enterSpot(page, ...FREE_DOCKS.jiefang.freeBank, 0, 'jiefang-free-raft')
+  await triggerAction(page, FREE_DOCKS.jiefang.label)
+  await clearToasts(page)
+  const raftDrift = await runInPage(page, async ({steerTo, press, step, readBoat}) => {
+    const startKind = readBoat().kind
+    await steerTo([[-180, 140]], {arriveDist: 2.6})
+    // 先松手等待自身推进惯性彻底归零，再测 4.0s 纯水流顺流漂移
+    step(180)
+    const driftStart = readBoat()
+    step(240) // 4.0s 无输入漂移
+    const driftEnd = readBoat()
+    const driftDist = Math.hypot(driftEnd.x - driftStart.x, driftEnd.z - driftStart.z)
+    const driftDx = driftEnd.x - driftStart.x
+    const driftDz = driftEnd.z - driftStart.z
+
+    // 向北穿行解放桥 (landmark 桥底净高 ~6.1 m)
+    const bridgeRes = await steerTo([[-176, 80], [-170, 40], [-168, 14]], {arriveDist: 2.8})
+    return {
+      startKind,
+      driftDist,
+      driftDx,
+      driftDz,
+      bridgeEndZ: bridgeRes.end.z,
+      minClearance: bridgeRes.minClearance,
+      toasts: [...window.__boatToasts],
+    }
+  })
+  assert(raftDrift.startKind === 'freeRaft' || raftDrift.startKind === 'raft', `解放桥自由船型应为 freeRaft/raft，实际 ${raftDrift.startKind}`)
+  assert(raftDrift.driftDist >= 1.1 && raftDrift.driftDist <= 2.3, `漓江 4s 水流漂移距离应约 1.2–2.0 m，实际 ${raftDrift.driftDist.toFixed(2)} m`)
+  assert(raftDrift.driftDz > 0.8 && raftDrift.driftDx < -0.2, `漓江此段水流方向应为南偏西 (+z, -x)，实际 dx=${raftDrift.driftDx.toFixed(2)}, dz=${raftDrift.driftDz.toFixed(2)}`)
+  assert(raftDrift.bridgeEndZ < 20 && raftDrift.minClearance >= 0.30, `未能顺利穿过解放桥: ${JSON.stringify(raftDrift)}`)
+  assert.equal(raftDrift.toasts.length, 0, `穿过解放桥不应触发矮桥 toast: ${JSON.stringify(raftDrift.toasts)}`)
+  console.log('6a. 漓江竹筏水流漂移 + 解放桥穿行通过:', {
+    driftDist: +raftDrift.driftDist.toFixed(2),
+    minClearance: +raftDrift.minClearance.toFixed(2),
+  })
+
+  // 补充校验杉湖九曲桥矮桥拦截 (全跨净高 0.80 m)
+  await enterSpot(page, ...FREE_DOCKS.shanhu.freeBank, 0, 'shanhu-jiuqu')
+  await triggerAction(page, FREE_DOCKS.shanhu.label)
+  await clearToasts(page)
+  const jiuqu = await runInPage(page, async ({steerTo, faceTarget, press, step, readBoat}) => {
+    await steerTo([[-990, 616], [-1016, 620]], {arriveDist: 2.6})
+    await faceTarget(-1016, 684)
+    press('KeyW', true)
+    step(360) // 6.0s
+    press('KeyW', false)
+    const end = readBoat()
+    const toastEl = document.querySelector('.toast')
+    return {
+      endZ: end.z,
+      clearance: end.clearance,
+      toastVisible: toastEl?.classList.contains('show') ?? false,
+      toastText: toastEl?.textContent ?? '',
+      events: [...window.__boatToasts],
+    }
+  })
+  assert(jiuqu.endZ < 684, `船体越过了杉湖九曲桥: ${JSON.stringify(jiuqu)}`)
+  assert(jiuqu.events.length > 0 && jiuqu.toastVisible && /净高|无法通过/.test(jiuqu.toastText), `杉湖九曲桥未触发矮桥 toast: ${JSON.stringify(jiuqu)}`)
+  console.log('6b. 杉湖九曲桥矮桥拦截通过:', {stopZ: +jiuqu.endZ.toFixed(1), toast: jiuqu.toastText})
+
+  await page.close()
+
+  // ==================== 手机端 390×844 HUD 防重叠与触屏划船验收 ====================
+  const mobileCtx = await browser.newContext({
+    viewport: {width: 390, height: 844},
+    deviceScaleFactor: 1,
+    isMobile: true,
+    hasTouch: true,
+  })
+  const mobile = await mobileCtx.newPage()
+  mobile.on('pageerror', err => errors.push(`mobile pageerror: ${err.message}`))
+  mobile.on('console', msg => {
+    if (msg.type() === 'error') errors.push(`mobile console: ${msg.location().url}: ${msg.text()}`)
+  })
+  await attachHelpers(mobile)
+  await gotoWalk(mobile)
+
+  await enterSpot(mobile, ...FREE_DOCKS.ronghu.freeBank, 0, 'mobile-ronghu-bank')
+  await closeSpotCard(mobile)
+  await mobile.waitForFunction(
+    t => document.querySelector('.vehicle-action')?.textContent?.includes(t),
+    FREE_DOCKS.ronghu.label,
+    {timeout: 15000},
+  )
+
+  async function measureHud(targetPage, selectors) {
+    return targetPage.evaluate(sels => {
+      const boxes = sels.map(sel => {
+        const el = document.querySelector(sel)
+        if (!el) return null
+        const st = getComputedStyle(el)
+        const r = el.getBoundingClientRect()
+        if (st.display === 'none' || st.visibility === 'hidden' || el.hasAttribute('hidden') || r.width === 0 || r.height === 0) {
+          return null
+        }
+        return {
+          sel,
+          left: +r.left.toFixed(1),
+          top: +r.top.toFixed(1),
+          right: +r.right.toFixed(1),
+          bottom: +r.bottom.toFixed(1),
+        }
+      }).filter(Boolean)
+      const overlaps = []
+      for (let i = 0; i < boxes.length; i++) {
+        for (let j = i + 1; j < boxes.length; j++) {
+          const a = boxes[i], b = boxes[j]
+          const ox = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left))
+          const oy = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top))
+          if (ox * oy > 0) overlaps.push({a: a.sel, b: b.sel, area: +(ox * oy).toFixed(1)})
+        }
+      }
+      const outOfBounds = boxes.filter(b => b.left < 0 || b.top < 0 || b.right > 390.5 || b.bottom > 844.5)
+      return {boxes, overlaps, outOfBounds}
+    }, selectors)
+  }
+
+  const preHud = await measureHud(mobile, [
+    '.walk-ui .joystick', '.walk-ui .btn-run', '.walk-ui .btn-jump',
+    '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.btn-about',
+  ])
+  assert(preHud.boxes.some(b => b.sel === '.vehicle-action'), '手机端自由栈桥旁未显示 .vehicle-action')
+  assert.deepEqual(preHud.overlaps, [], `手机端上船前按钮重叠: ${JSON.stringify(preHud)}`)
+  assert.deepEqual(preHud.outOfBounds, [], `手机端上船前按钮出界: ${JSON.stringify(preHud)}`)
+
+  // 触屏点击上船按钮，检查船上按钮不重叠 + 左摇杆划船
+  await triggerAction(mobile, FREE_DOCKS.ronghu.label, true)
+  const aboardHud = await measureHud(mobile, [
+    '.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action',
+    '.dock', '.sky-ui', 'output', '.btn-about',
+  ])
+  const aboardState = await mobile.evaluate(() => ({
+    vehicle: window.viewer.walk.vehicle,
+    aboardAttr: document.body.hasAttribute('data-aboard'),
+    jumpHidden: getComputedStyle(document.querySelector('.walk-ui .btn-jump')).display === 'none',
+    runHidden: getComputedStyle(document.querySelector('.walk-ui .btn-run')).display === 'none',
+    actionText: document.querySelector('.vehicle-action')?.textContent ?? '',
+  }))
+  assert.equal(aboardState.vehicle, 'boat', '手机端点击后应成功上船')
+  assert(aboardState.aboardAttr && aboardState.jumpHidden && aboardState.runHidden, `船上状态或跳跑按钮隐藏异常: ${JSON.stringify(aboardState)}`)
+  assert(aboardState.actionText.includes('靠岸下船'), `船上按钮文案应含 靠岸下船，实际 ${aboardState.actionText}`)
+  assert.deepEqual(aboardHud.overlaps, [], `手机 390×844 船上按钮重叠: ${JSON.stringify(aboardHud)}`)
+  assert.deepEqual(aboardHud.outOfBounds, [], `手机 390×844 船上按钮出界: ${JSON.stringify(aboardHud)}`)
+
+  // 左摇杆触控划船
+  const stickDrive = await mobile.evaluate(() => {
+    const {walk} = window.viewer
+    const advance = walk.tick
+    walk.tick = () => {}
+    const joy = document.querySelector('.walk-ui .joystick')
+    const jr = joy.getBoundingClientRect()
+    const cx = jr.left + jr.width / 2, cy = jr.top + jr.height / 2
+    const p0 = walk.position.clone()
+    const h0 = walk.heading
+    try {
+      joy.dispatchEvent(new PointerEvent('pointerdown', {pointerId: 31, pointerType: 'touch', clientX: cx, clientY: cy, bubbles: true}))
+      joy.dispatchEvent(new PointerEvent('pointermove', {pointerId: 31, pointerType: 'touch', clientX: cx + jr.width * 0.2, clientY: cy - jr.height * 0.5, bubbles: true}))
+      for (let i = 0; i < 60; i++) advance(1 / 60)
+      const ringColor = getComputedStyle(joy, '::after').borderColor
+      const dist = walk.position.distanceTo(p0)
+      const spd = walk.speed
+      const dh = Math.abs(Math.atan2(Math.sin(walk.heading - h0), Math.cos(walk.heading - h0)))
+      return {ringColor, dist, spd, dh}
+    } finally {
+      joy.dispatchEvent(new PointerEvent('pointerup', {pointerId: 31, pointerType: 'touch', bubbles: true}))
+      walk.tick = advance
+    }
+  })
+  assert(stickDrive.ringColor.endsWith(', 0)') || stickDrive.ringColor === 'transparent', `船上摇杆不应亮跑步红圈: ${stickDrive.ringColor}`)
+  assert(stickDrive.dist > 0.6 && stickDrive.spd > 1.2 && stickDrive.dh > 0.08, `手机左摇杆划船未生效: ${JSON.stringify(stickDrive)}`)
+
+  // 触屏划回泊位或靠岸下船
+  await runInPage(mobile, async ({steerTo, arg}) => {
+    await steerTo([arg], {arriveDist: 2.5})
+  }, FREE_DOCKS.ronghu.mooring)
+  await triggerAction(mobile, '靠岸下船', true)
+  const mobileLanded = await mobile.evaluate(() => ({
+    vehicle: window.viewer.walk.vehicle,
+    aboardAttr: document.body.hasAttribute('data-aboard'),
+  }))
+  assert.equal(mobileLanded.vehicle, 'foot', '手机端靠岸下船应恢复步行')
+  assert.equal(mobileLanded.aboardAttr, false, '下船后应移除 data-aboard')
+  console.log('7. 手机 390×844 船上按钮不重叠 + 摇杆划船 + 触屏下船通过')
+
+  await mobileCtx.close()
+  assert.deepEqual(errors, [], `存在运行错误: ${JSON.stringify(errors)}`)
+  console.log('ALL verify:boat checks passed!')
+} finally {
+  await browser?.close()
+  await server?.close()
+}
