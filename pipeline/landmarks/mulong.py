@@ -1,15 +1,16 @@
 """OSM 1432324255 (octagonal tower footprint), 686005456 (East Town Gate)
 and the through road 686005455. Wall runs across, not along, that road.
 Roof tiers, crenellations and stair rises are visual estimates; the gate
-is 4.3 m lower than the pagoda base in the world heightfield.
+and pagoda stand at separately sampled terrain levels.
 """
 import math
 import numpy as np
 from xiaoyao_tower import generate
+from c_kit import landmark_surface
 
 
 def pagoda(model):
-    model.beam([0,-.6,0],[0,.8,0],6.1,'stone',8,True)
+    model.beam([0,landmark_surface('mulong').ground(0,0)-.12,0],[0,.8,0],6.1,'stone',8,True)
     base=.8
     for tier in range(7):
         radius=6.5-tier*.43;height=5.15-tier*.27
@@ -47,7 +48,7 @@ def pagoda(model):
 
 def build(model):
     pagoda(model)
-    model.pose=(112.565,-4.3,-127.411,1.26)
+    model.pose=(112.565,landmark_surface('mulong').ground(112.565,-127.411),-127.411,1.26)
     model.arcade(0,0,15,11.8,6.6,[0],2.6,'stone')
     model.box(0,6.6,0,15.6,.48,12.2,'pave',True)
     model.box(0,7.08,0,7.2,3.2,5.4,'red',True)

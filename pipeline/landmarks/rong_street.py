@@ -24,8 +24,12 @@ def signs(image):
     image.paste(sign.transpose(Image.Transpose.ROTATE_90),(512,768))
 
 
+from c_kit import landmark_surface
+
+
 def shops(builder):
-    for east,base,south,width,length,floors,kind in [(10,1.7,-51,17,24,4,'rong'),(10,4,-86,26.3,8.5,3,'inn'),(32,3.8,-115,15,19,3,'hall')]:
+    for east,south,width,length,floors,kind in [(10,-51,17,24,4,'rong'),(10,-86,26.3,8.5,3,'inn'),(32,-115,15,19,3,'hall')]:
+        base = landmark_surface('gunanmen').ground(east,south)
         with align_front(builder, (east, south), -21.92):
             shop(builder, east, base, south, width, length, floors, kind)
 
@@ -85,14 +89,16 @@ def scooter(mesh,east,base,south,color):
 
 def approach(builder):
     mesh=builder.parts['atlas']
-    path=[(18,1,-30),(23,1.9,-45),(31,2.9,-60),(37,3.9,-76),(44,4.5,-93),(51,4,-110),(57,3.4,-126)]
-    for index,(east,base,south) in enumerate(path):
+    ground = landmark_surface('gunanmen').ground
+    path=[(18,-30),(23,-45),(31,-60),(37,-76),(44,-93),(51,-110),(57,-126)]
+    for index,(east,south) in enumerate(path):
+        base = ground(east+5,south)+.12
         box(mesh,(east+5,base,south),(2.3,.24,2.3),'granite')
         banyan(mesh,(east+5,base+.12,south),9+index%3,4.9,77+index,builder.detail)
         for offset in range(7 if builder.detail else 3):
-            scooter(mesh,east+5,base,south+2+offset*.77,('steel','vermilion','cream')[offset%3])
+            scooter(mesh,east+5,ground(east+5,south+2+offset*.77),south+2+offset*.77,('steel','vermilion','cream')[offset%3])
     for index in range(6):
-        box(mesh,(15+index*.95,.85,-24),(.5,.07,4.3),'white')
+        box(mesh,(15+index*.95,ground(15+index*.95,-24)+.035,-24),(.5,.07,4.3),'white')
     for index in range(5):
         for sign in (-1,1):
             tube(mesh,(16+index,1.1,-31),(16+index+sign*3.4,1.32,-34.4),.085,'yellow',4)

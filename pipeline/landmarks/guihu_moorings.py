@@ -1,13 +1,18 @@
 """Two moored passenger boats seen between Lize and Guanyi; not navigable craft."""
 import math
+from c_kit import landmark_surface
 from xiaoyao_tower import generate
 
 
 def cruisers(model):
+    surface = landmark_surface('guihu_moorings')
     for east,station,yaw in [(-83.015,-70.074,.488),(-88.105,-54.923,.264),
                              (-92.539,-38.511,.264),(2.944,64.129,-3.019)]:
         small=station>0
-        model.pose=(east,2.0,station,yaw)
+        water = surface.water(east, station)
+        if water is None:
+            raise ValueError(f'Moored hull outside Guihu at {(east, station)}')
+        model.pose=(east,water,station,yaw)
         perimeter=[(-1.9,6.6),(1.9,6.6)]+[(2.05*math.cos(angle*math.pi/12),-4.7-2.75*math.sin(angle*math.pi/12)) for angle in range(13)]
         count=len(perimeter)
         hull=[(east*scale,height,south*scale) for scale,height in [(.82,-.32),(1,.75)] for east,south in perimeter]
@@ -33,7 +38,8 @@ def cruisers(model):
             model.box(.43,3.08,-4,.86,.56,.025,'red')
             model.box(.19,3.43,-4,.09,.09,.031,'yellow')
     model.pose=(0,0,0,0)
-    model.box(3,-.5,0,.20,2.3,2,'wood',True)
+    bed, level = surface.sample(3, 0)
+    model.box(3,bed-.10,0,.20,level-bed+.65,2,'wood',True)
 
 
 if __name__=='__main__':generate('guihu_moorings',cruisers,colors=dict(earth='#dc92ab',green='#133d73'))

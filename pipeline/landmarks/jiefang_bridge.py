@@ -208,6 +208,8 @@ def west_bank(model):
 
 
 def bridge(model):
+    from c_kit import landmark_surface
+    surface = landmark_surface('jiefang_bridge')
     length=281; width=43
     # The west portal has a curved soffit and a thinner slab above the crown.
     for left,right,depth in ((-140.5,-136,1.22),(-136,-103,.36),(-103,140.5,1.22)):
@@ -232,7 +234,10 @@ def bridge(model):
         # stays visible through the arch from the oblique bank stations.
         for side in (-1,1):
             z=side*(width/2-.35)
-            model.beam([pier,-8,z],[pier,-5.63,z],1.84,'stone',10)
+            bed, water = surface.sample(pier,z)
+            base = bed-(5.62-pier*1.3/281)-.12
+            if base < -5.63:
+                model.beam([pier,base,z],[pier,-5.63,z],1.84,'stone',10)
             model.box(pier,-5.69,z,3.65,.5,3.2,'granite')
 
     for side in (-1,1):

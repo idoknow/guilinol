@@ -22,6 +22,11 @@ class Surface:
         self.files = {(c['x'], c['z']): c['file'] for c in manifest['chunks']}
         self.entries = {p['id']: p for p in manifest['landmarks']}
 
+        for peak in manifest['peaks']['entries']:
+            if model := peak.get('model'):
+                x, y, z = peak['center']
+                self.entries[Path(model).stem] = dict(file=model, position=[x, peak.get('baseHeight', y), z], rotation=0)
+
     @lru_cache(maxsize=96)
     def tile(self, origin):
         data = gzip.decompress((self.directory / self.files[origin]).read_bytes())
@@ -64,6 +69,7 @@ class Surface:
 
 class LandmarkSurface:
     def __init__(self, surface, landmark):
+        self.name = landmark
         self.surface = surface
         entry = surface.entries[landmark]
         self.x, self.y, self.z = entry['position']

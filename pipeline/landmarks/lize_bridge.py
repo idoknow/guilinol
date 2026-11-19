@@ -4,6 +4,11 @@ import math
 import numpy as np
 
 from xiaoyao_tower import generate
+from c_kit import landmark_surface
+
+
+def deck_grade(station):
+    return 8.55 + np.minimum(.05*station, 2-.045*(station-40))
 
 
 def cable_height(station):
@@ -15,7 +20,8 @@ def cable_height(station):
 
 def towers(model, lateral):
     for station in (-40, 40):
-        for bottom, width, height in [(-4, 2.1, 6), (2, 1.5, 15), (17, 1.8, .4), (17.4, 1.5, .9)]:
+        foot = landmark_surface('lize_bridge').ground(station,lateral)-deck_grade(station)-.12
+        for bottom, width, height in [(foot, 2.1, 2-foot), (2, 1.5, 15), (17, 1.8, .4), (17.4, 1.5, .9)]:
             model.box(station, bottom, lateral, width, height, width, 'red', True)
         vertices = [(station + dx, 18.3, lateral + dz) for dx, dz in [(-.95,-.95),(.95,-.95),(.95,.95),(-.95,.95)]]
         vertices.append((station, 19.8, lateral))
@@ -33,11 +39,15 @@ def towers(model, lateral):
 
 
 def promenade(model, side):
-    for direction, outer_height in [(-1,150.1),(1,154.7)]:
+    for direction in (-1,1):
         inner=direction*61.5
         outer=direction*74.5
-        height=outer_height-146.6-(8.55+min(.05*outer,2-.045*(outer-40)))
-        corners=[(station,y,side*9.6+offset) for station,y in [(inner,.15),(outer,height)] for offset in (-1.9,1.9)]
+        corners=[]
+        for station in (inner,outer):
+            for offset in (-1.9,1.9):
+                z = side*9.6+offset
+                y = .15 if station==inner else landmark_surface('lize_bridge').ground(station,z)-deck_grade(station)
+                corners.append((station,y,z))
         faces=[[0,2,3],[0,3,1]] if direction<0 else [[0,3,2],[0,1,3]]
         model.mesh(corners,faces,'pave',True)
     for start, end in [(-61.5,40),(40,61.5)]:
@@ -72,4 +82,4 @@ def bridge(model):
 
 
 if __name__ == '__main__':
-    generate('lize_bridge', bridge, smooth=('red',),colors=dict(red='#d4733a',green='#bc5140',yellow='#d79547',earth='#a76358',granite='#828484'), lift=lambda east: 8.55 + np.minimum(.05*east, 2-.045*(east-40)))
+    generate('lize_bridge', bridge, smooth=('red',),colors=dict(red='#d4733a',green='#bc5140',yellow='#d79547',earth='#a76358',granite='#828484'), lift=deck_grade)

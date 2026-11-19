@@ -22,6 +22,8 @@ import numpy as np
 
 # World midpoint (-977.10, 630.90) from Overture footprints in guilinol XZ:
 # Sun Pagoda (-963.12, 617.57), Moon Pagoda (-991.08, 644.22).
+from c_kit import landmark_surface
+
 SUN_OFFSET = (13.98, 0.0, -13.33)
 MOON_OFFSET = (-13.98, 0.0, 13.33)
 
@@ -516,14 +518,16 @@ def build_lakeside_railings():
                  island_pts[(i + 1) % len(island_pts)][0] * island_pts[i][1]) for i in range(len(island_pts)))
     if area2 < 0:
         island_pts.reverse()
-    bot_ring = [(x, -1.60, z) for x, z in island_pts]
-    top_ring = [(x, 0.55, z) for x, z in island_pts]
+    ground = landmark_surface('shanhu_pagodas').ground
+    bot_ring = [(x, ground(x,z)-.12, z) for x, z in island_pts]
+    terrace = max(ground(x,z) for x,z in island_pts)+.12
+    top_ring = [(x, terrace, z) for x, z in island_pts]
     add_tris(b, 'stoneDeck', loft([bot_ring, top_ring], cap_bottom=True, cap_top=True))
 
     # Perimeter carved stone balustrade along the lakeside water edge,
     # leaving a walkway gap on the south-east shore neck (between idx 7 and 9).
-    add_carved_stone_balustrade_chain(b, island_pts[9:] + island_pts[:8], y_deck=0.55, closed=False, post_spacing=2.8)
-    return make_mesh('LakesideRailingsMesh', b)
+    add_carved_stone_balustrade_chain(b, island_pts[9:] + island_pts[:8], y_deck=terrace, closed=False, post_spacing=2.8)
+    return b, terrace
 
 
 def shift(buckets, dx, dy, dz):
@@ -585,17 +589,21 @@ def build_glb():
     from d_export import export_buckets
     from pathlib import Path
     import sys
+    ground = landmark_surface('shanhu_pagodas').ground
+    sun = (SUN_OFFSET[0], ground(SUN_OFFSET[0],SUN_OFFSET[2])+1.48, SUN_OFFSET[2])
+    bank, terrace = build_lakeside_railings()
+    moon = (MOON_OFFSET[0], terrace-.45, MOON_OFFSET[2])
     buckets = merge(
-        shift(build_sun_pagoda(), *SUN_OFFSET),
-        shift(build_moon_pagoda(), *MOON_OFFSET),
-        build_lakeside_railings(),
+        shift(build_sun_pagoda(), *sun),
+        shift(build_moon_pagoda(), *moon),
+        bank,
         build_trees(),
         build_tunnel(),
     )
     collision = []
-    collision += box_at(SUN_OFFSET[0], -1.2, SUN_OFFSET[2], 10, 28, 10)
-    collision += box_at(MOON_OFFSET[0], 0.4, MOON_OFFSET[2], 9, 24, 9)
-    collision += box_at(MOON_OFFSET[0], -1.4, MOON_OFFSET[2] + 4, 22, 1.9, 26)
+    collision += box_at(sun[0], sun[1]-1.2, SUN_OFFSET[2], 10, 28, 10)
+    collision += box_at(moon[0], moon[1]+.4, MOON_OFFSET[2], 9, 24, 9)
+    collision += box_at(moon[0], terrace-1.9, MOON_OFFSET[2] + 4, 22, 1.9, 26)
     out = Path(sys.argv[1]) / 'shanhu_pagodas.glb'
     export_buckets(out, buckets, collision)
 

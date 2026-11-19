@@ -15,9 +15,11 @@ import struct
 from pathlib import Path
 
 import numpy as np
+from c_kit import landmark_surface
 
 # Local Y of the 147.7 m ASL Li River surface relative to 145.6 m baseHeight
-WATER_Y = 2.10
+surface = landmark_surface('elephant_hill')
+WATER_Y = surface.water(134,-14)
 SKIRT_Y = -4.50
 SUMMIT_Y = 52.40
 
@@ -246,6 +248,8 @@ def body_vertex(ang, t):
         x = toe
     else:
         x = max(x, toe)
+    if t <= 0:
+        y = surface.ground(x,z)-.12
     return x, y, z
 
 
@@ -623,12 +627,14 @@ def build_puxian_pagoda(geo: Collector):
     return (px, y_base + 6.5, pz)
 
 
-def add_oriented_box(geo: Collector, cx, y0, cz, sx, sy, sz, yaw, col, cap_bottom=False):
+def add_oriented_box(geo: Collector, cx, y0, cz, sx, sy, sz, yaw, col, cap_bottom=False, foundation=False):
     ca, sa = math.cos(yaw), math.sin(yaw)
     hx, hz = sx * 0.5, sz * 0.5
     corners = [(-hx, -hz), (-hx, hz), (hx, hz), (hx, -hz)]
     bot = [(cx + lx * ca - lz * sa, y0, cz + lx * sa + lz * ca) for lx, lz in corners]
     top = [(x, y0 + sy, z) for x, _, z in bot]
+    if foundation:
+        bot = [(x,surface.ground(x,z)-.12,z) for x,_,z in bot]
     for i in range(4):
         j = (i + 1) % 4
         geo.add_quad(bot[i], bot[j], top[j], top[i], col)
@@ -665,7 +671,7 @@ def add_balustrade_chain(geo: Collector, pts, y_deck, post_spacing=2.8):
 
 def add_bamboo_raft(geo: Collector, cx, cz, yaw):
     """Guilin sightseeing bamboo raft (竹筏) floating at WATER_Y (147.7 m ASL), matching 00-2025.jpg."""
-    y0 = WATER_Y - 0.06
+    y0 = surface.water(cx,cz) - 0.06
     ca, sa = math.cos(yaw), math.sin(yaw)
 
     def to_w(lx, ly, lz):
@@ -729,7 +735,7 @@ def build_shore_balustrade(geo: Collector):
         mx, mz = 0.5 * (ax + bx), 0.5 * (az + bz)
         yaw = math.atan2(bz - az, bx - ax)
         slen = math.hypot(bx - ax, bz - az) + 0.35
-        add_oriented_box(geo, mx, SKIRT_Y, mz + 1.5, slen, terrace_y - SKIRT_Y, 3.4, yaw, PAL['stoneDeck'])
+        add_oriented_box(geo, mx, SKIRT_Y, mz + 1.5, slen, terrace_y - SKIRT_Y, 3.4, yaw, PAL['stoneDeck'], foundation=True)
     add_balustrade_chain(geo, shore_pts, y_deck=terrace_y, post_spacing=2.8)
 
     # White-stone elephant sculpture on plinth along the riverside promenade (docs/landmarks.md)

@@ -3,6 +3,7 @@ import math
 import numpy as np
 import trimesh
 from xiaoyao_tower import generate
+from c_kit import landmark_surface
 
 
 def monument(model, station, lateral):
@@ -65,4 +66,8 @@ def bridge(model):
 
 
 if __name__=='__main__':
-    generate('guanyi_bridge',bridge,lift=lambda station:np.interp(station,[-51,-30,0,30,51],[152.7,153.5,154.85,156.0,155.2])-147.5)
+    surface=landmark_surface('guanyi_bridge')
+    ends=[np.mean([surface.ground(x,z) for z in (-16,16)])-.16 for x in (-55,53)]
+    # Preserve the navigable midspan camber and meet the actual bank at each end.
+    profile=[ends[0],6.0,7.35,8.50,ends[1]]
+    generate('guanyi_bridge',bridge,lift=lambda x:np.interp(x,[-55,-30,0,30,53],profile))
