@@ -73,7 +73,20 @@ def ground_features(bounds, school_grounds=()):
         else:
             continue
         layers[key].extend(polygons(area(element).intersection(bounds)))
+    for props, footprint in palace_features():
+        if props['kind'] in ('pond','leisure'):
+            layer = 'water' if props['kind'] == 'pond' else 'schoolCourt'
+            layers[layer].extend(polygons(footprint.intersection(bounds)))
     return layers
+
+
+def palace_features():
+    path = Path(__file__).resolve().parents[1] / 'docs/layout/wangcheng.geojson'
+    for feature in json.loads(path.read_text())['features']:
+        if feature['geometry']['type'] == 'Polygon':
+            props = feature['properties']
+            ring = feature['geometry']['coordinates'][0]
+            yield props, Polygon([ll2xz(lat, lon) for lon, lat in ring])
 
 
 def rongyin_photo():
@@ -133,6 +146,64 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
     sw_tree = STRtree(list(polygons(sidewalk_mask))) if sidewalk_mask and not sidewalk_mask.is_empty else None
     kinds = Counter()
     removed_road, clipped_road, clipped_sw = 0, 0, 0
+    def clipped_footprints(raw_poly):
+        nonlocal removed_road, clipped_road, clipped_sw
+        orig_area = raw_poly.area
+        if orig_area < 4.0:
+            return []
+        cand_polys = [raw_poly]
+        if not model_excl.is_empty and raw_poly.intersects(model_excl):
+            diff_m = make_valid(raw_poly.difference(model_excl))
+            if diff_m.is_empty or (orig_area - diff_m.area) / orig_area > 0.40:
+                return []
+            cand_polys = [p for p in polygons(diff_m) if p.area >= 4.0]
+        if road_tree is not None:
+            next_polys = []
+            for cp in cand_polys:
+                hits = road_tree.query(cp, predicate='intersects')
+                if not hits.size:
+                    next_polys.append(cp)
+                    continue
+                local_road = unary_union(road_tree.geometries.take(hits))
+                trimmed = make_valid(cp.difference(local_road))
+                if trimmed.is_empty or (cp.area - trimmed.area) / cp.area > 0.40:
+                    removed_road += 1
+                    continue
+                clipped_road += 1
+                next_polys.extend(p for p in polygons(trimmed) if p.area >= 6.0)
+            cand_polys = next_polys
+        if sw_tree is not None and cand_polys:
+            next_polys = []
+            for cp in cand_polys:
+                hits = sw_tree.query(cp, predicate='intersects')
+                if not hits.size:
+                    next_polys.append(cp)
+                    continue
+                local_sw = unary_union(sw_tree.geometries.take(hits))
+                trimmed = make_valid(cp.difference(local_sw))
+                if not trimmed.is_empty:
+                    clipped_sw += 1
+                    next_polys.extend(p for p in polygons(trimmed) if p.area >= 4.0)
+            cand_polys = next_polys
+        return cand_polys
+
+    palace = []
+    custom = {1008248059, 1008248065, 1008248057, 684987708, 885083143,
+              679734442, 679734417, 1471532482, 674165595, 674165596, 674165597}
+    for props, poly in palace_features():
+        if props['kind'] != 'building' or not bounds.covers(poly.centroid):
+            continue
+        ident = int(props['osm'].split('/')[-1])
+        palace.append(poly)
+        if ident in custom:
+            continue
+        for footprint in clipped_footprints(poly):
+            center = footprint.representative_point()
+            base = elevation(center.x, center.y)
+            floors = int(props['floors'])
+            footprints.append(footprint)
+            heights.append((base, base+3.2*floors, 3, floors, ident%65536, center, [], False))
+    palace_index = STRtree(palace)
     with (Path(RAW)/'overture_buildings.csv').open() as source:
         for row in csv.DictReader(source, delimiter='\t'):
             geometry = overture_geometry(row)
@@ -140,49 +211,13 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
                 replace_excl = replace_excl.union(geometry)
                 layout.exclude = layout.exclude.union(geometry)
                 continue
-            if not geometry.intersects(bounds) or replace_excl.intersects(geometry):
+            if (not geometry.intersects(bounds) or replace_excl.intersects(geometry)
+                    or palace_index.query(geometry, predicate="intersects").size):
                 continue
             for raw_poly in polygons(make_valid(geometry)):
                 if peaks.query(raw_poly,predicate='intersects').size:
                     continue
-                orig_area = raw_poly.area
-                if orig_area < 4.0:
-                    continue
-                cand_polys = [raw_poly]
-                if not model_excl.is_empty and raw_poly.intersects(model_excl):
-                    diff_m = make_valid(raw_poly.difference(model_excl))
-                    if diff_m.is_empty or (orig_area - diff_m.area) / orig_area > 0.40:
-                        continue
-                    cand_polys = [p for p in polygons(diff_m) if p.area >= 4.0]
-                if road_tree is not None:
-                    next_polys = []
-                    for cp in cand_polys:
-                        hits = road_tree.query(cp, predicate='intersects')
-                        if not hits.size:
-                            next_polys.append(cp)
-                            continue
-                        local_road = unary_union(road_tree.geometries.take(hits))
-                        trimmed = make_valid(cp.difference(local_road))
-                        if trimmed.is_empty or (cp.area - trimmed.area) / cp.area > 0.40:
-                            removed_road += 1
-                            continue
-                        clipped_road += 1
-                        next_polys.extend(p for p in polygons(trimmed) if p.area >= 6.0)
-                    cand_polys = next_polys
-                if sw_tree is not None and cand_polys:
-                    next_polys = []
-                    for cp in cand_polys:
-                        hits = sw_tree.query(cp, predicate='intersects')
-                        if not hits.size:
-                            next_polys.append(cp)
-                            continue
-                        local_sw = unary_union(sw_tree.geometries.take(hits))
-                        trimmed = make_valid(cp.difference(local_sw))
-                        if not trimmed.is_empty:
-                            clipped_sw += 1
-                            next_polys.extend(p for p in polygons(trimmed) if p.area >= 4.0)
-                    cand_polys = next_polys
-                for poly in cand_polys:
+                for poly in clipped_footprints(raw_poly):
                     poly = poly.buffer(0)
                     if poly.is_empty or poly.area < 4.0:
                         continue

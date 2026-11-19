@@ -100,6 +100,8 @@ export function play(host:Host) {
     atlas = loaded; map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s)})
   }).catch(error=>console.warn('atlas',error))
   let mapRequested = !(host.manifest as {atlas?:unknown}).atlas
+  const feedbackEntry=button('反馈','反馈','dock-feedback');buttons.append(feedbackEntry)
+  feedbackEntry.onclick=()=>void import('../ui/feedback').then(module=>module.openFeedback(host,atlas))
 
   // --- Card
   const card = document.createElement('aside'); card.className = 'spot-card'; card.hidden = true; card.setAttribute('role','dialog')
