@@ -5,7 +5,7 @@ compatibility_date = "2026-05-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "glol"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "ec5170ef-2449-495c-8dad-2eb00f32582d"
 
 [[r2_buckets]]
 binding = "FEEDBACK"
