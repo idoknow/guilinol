@@ -69,14 +69,18 @@ def screen_house(model):
 def market(model):
     for first,last,width,level in [((-106,15),(-26,28),17,.09),((-28,22),(6,25),22,.10),
         ((-6,24),(5,-15),10,.13),((0,28),(54,39),9,.12),((54,39),(63,-4),10,.14),
-        ((63,-4),(3,-13),10,.15),((5,-14),(13,-62),32,.16)]:slab(model,first,last,width,level)
+        ((63,-4),(3,-13),10,.15),((5,-14),(13,-62),32,.16),((58,18.5),(7,3.8),9,.17)]:slab(model,first,last,width,level)
     row(model,(-106,9),(-38,19),8,-1,8,True)
     for east,south in [(-92,31),(-72,34),(-52,37),(-35,39)]:
         model.pose=(east,0,south,0);model.beam([0,.1,0],[0,4.2,0],.22,'wood',8,True)
         crown=trimesh.creation.icosphere(subdivisions=1);model.mesh(crown.vertices*[2.3,2.15,2.55]+[0,5.2,0],crown.faces,'leaf')
     for side in (-1,1):
         row(model,(6,29),(50,38.4),6,side,5)
-        row(model,(54.5,34),(60.7,5),4,side,4.7)
+        if side==1:row(model,(54.5,34),(60.7,5),4,side,4.7)
+        else:
+            row(model,(54.5,34),(56.8,23.5),2,side,4.7)
+            row(model,(59.2,12),(60.7,5),1,side,4.7)
+        row(model,(12,5.2),(49,15.9),5,side,4.7)
         row(model,(55,-4.8),(10,-11.6),6,side,4.7)
         row(model,(-2.6,13),(1.2,-6),3,side,4.5)
         row(model,(6,-14),(13,-57),6,side,6,gap=14.5)
@@ -91,10 +95,11 @@ def market(model):
         model.box(east,top+.07,0,width+.48,.23,1.02,'granite')
     model.box(0,5.18,.45,2.95,.61,.12,'sign')
     letters(model,'东西巷',(0,5.26,.52),2.3,.43,'gold')
-    model.pose=(54,0,39,-1.39)
-    for east in (-3.9,3.9):model.box(east,0,0,.74,6.7,1.1,'brick',True)
-    model.box(0,4.4,0,8.5,2.2,1.1,'wood');model.roof(0,6.55,0,9.4,3.4,1.3)
-    for side in (-1,1):letters(model,'东西巷',(0,4.9,side*.59),4.7,1.05,'gold',side)
+    for gateway in [(62,0,41,-1.39),(42,0,13.9,-1.29)]:
+        model.pose=gateway
+        for east in (-3.9,3.9):model.box(east,0,0,.74,6.7,1.1,'brick',True)
+        model.box(0,4.4,0,8.5,2.2,1.1,'wood');model.roof(0,6.55,0,9.4,3.4,1.3)
+        for side in (-1,1):letters(model,'东西巷',(0,4.9,side*.59),4.7,1.05,'gold',side)
     for east,south in [(7+index*1.05+side*10,-18-index*6.1) for side in (-1,1) for index in range(6)]:
         model.pose=(east,0,south,.14)
         model.box(0,0,0,3.1,1.03,1.8,'wood',True)
