@@ -8,6 +8,9 @@ let browser
 try {
   browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
   const page=await browser.newPage({viewport:{width:480,height:270}}),errors=[]
+  let releaseBridge
+  const coldBridge=new Promise(resolve=>{releaseBridge=resolve})
+  await page.route('**/jiefang_bridge.glb',async route=>{await coldBridge;await route.continue()})
   page.on('pageerror',error=>errors.push(error.message))
   await page.route('**/favicon.ico',route=>route.fulfill({status:204}))
   page.on('console',message=>{if(message.type()==='error')errors.push(message.location().url+': '+message.text())})
@@ -26,7 +29,7 @@ try {
       for(let step=0;step<seconds*10;step++){
         walk.tick(.1);const probe=walk.probe()
         if(probe.resets||probe.inHouse||probe.inPeak||probe.renderClearance<-.15)throw Error(JSON.stringify(probe))
-        hit ||= target==='gate'?spawn.z-probe.z>39:target==='shore'?probe.blockedWater&&!probe.wet:target==='deck'?probe.wet&&probe.deck!==undefined:probe.hits.includes(target)
+        hit ||= target==='gate'?spawn.z-probe.z>39:target==='shore'?probe.blockedWater&&!probe.wet:target==='deck'?probe.wet&&probe.deck!==undefined&&probe.foot>=probe.deck-.35&&!probe.blockedWater:probe.hits.includes(target)
         if(hit)break
       }
       walk.drive(0,0);return {hit,last:walk.probe()}
@@ -40,6 +43,7 @@ try {
   await fixture([-873,-197.63],[1,0],1,'landmark')
   await fixture([-1021.82,435.97],[.967,-.254],2,'rail')
   await fixture([-962,1096],[.8,.6],9,'peak')
+  releaseBridge()
   await fixture([-309,-1],[.95,.32],18,'deck')
   await fixture([-740,868],[0,0],6,'shore')
   assert.deepEqual(errors,[]);console.log('seconds',(performance.now()-start)/1000);assert(performance.now()-start<180000)
