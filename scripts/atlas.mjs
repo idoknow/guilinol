@@ -24,11 +24,15 @@ const campus = atlas.search('中山中学漓滨校区')[0]
 assert.equal(campus.k,'school')
 for (const alias of ['桂林市第九中学','桂林九中','九中']) assert.deepEqual(atlas.search(alias),[campus])
 assert.equal(atlas.roadAt(campus.x,campus.z)?.name,'漓滨路')
-for (const name of ['榕湖小学','民主小学']) {
+for (const name of ['榕湖小学','民主小学','少年宫','回民小学']) {
   const hits=atlas.search(name)
   assert.equal(hits.length,1)
   assert.equal(hits[0].k,'school')
   assert.ok(atlas.roadAt(hits[0].x,hits[0].z,2))
+  if (['少年宫','回民小学'].includes(name)) {
+    assert.ok(hits[0].n.includes('待核'))
+    assert.ok(!manifest.landmarks.some(entry=>entry.name.includes(name)))
+  }
 }
 const junction=atlas.roadAt(-881,-165)?.name
 assert.ok(['中山中路','解放东路','解放西路'].includes(junction))

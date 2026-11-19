@@ -2346,5 +2346,12 @@
     ]
    }
   ]
+ },
+ {
+  "id": "minzhu_primary",
+  "name": "民主小学",
+  "osm": ["way/970311799"],
+  "group": "G2",
+  "refs": [{"title":"民主小学临街照片（游拥军摄，按报道图注区分逸仙中学）","year":2024,"viewOnly":true,"page":"https://gxxwfb.gxnews.com.cn/staticpages/20241006/newgx6701f190-21638051.shtml","images":["https://static.gxrb.com.cn/image/uploadpic/20241006/b8999cb68166eb26f12c37e1016b5a80.jpg"]}]
  }
 ]

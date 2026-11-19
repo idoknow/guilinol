@@ -52,6 +52,8 @@ def kind_of(tags):
 def write_atlas(output, extent, bounds, layers, footprints, peaks):
     roads, places, longest = [], [], {}
     schools = {item['osm']:item for item in json.loads(Path(__file__).with_name('schools-g2.json').read_text())}
+    schools.update({'node/2597936160': {'name':'少年宫（地块待核）'},
+                    'node/3170011400': {'name':'回民小学（地块待核）'}})
     school_centers, public_streets = {}, []
 
     def place(name, kind, point):
@@ -65,7 +67,7 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
         name = tags.get('name', '')
         key = f"{element['type']}/{element['id']}"
         if key in schools:
-            shape = area(element).intersection(bounds)
+            shape = (Point(ll2xz(element['lat'],element['lon'])) if element['type']=='node' else area(element)).intersection(bounds)
             if not shape.is_empty: school_centers[key] = shape.centroid
         coords = points(element)
         highway = tags.get('highway','').removesuffix('_link')
