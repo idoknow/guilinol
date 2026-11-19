@@ -247,11 +247,12 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
         cnorms = lm_meshes[lid]['coll_normals']
         if not len(ctris):
             return None
-        walk = ctris[cnorms[:, 1] > (0.35 if lid in ('ronghu', 'huaqiao') else 0.65)]
+        walk = ctris[np.abs(cnorms[:, 1]) > (0.35 if lid in ('ronghu', 'huaqiao') else 0.65)]
         if not len(walk):
             return None
         pt = Point(x, z)
         exact = []
+        covered = []
         for tri in walk:
             p2 = Polygon(tri[:, [0, 2]])
             if p2.is_valid and p2.area > (1.5 if lid == 'jiefang_bridge' else 0.05) and p2.buffer(5.0).contains(pt):
@@ -264,7 +265,12 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
                 if abs(det) > 1e-8:
                     w1 = ((qx - x0) * dz2 - (qz - z0) * dx2) / det
                     w2 = (dx1 * (qz - z0) - dz1 * (qx - x0)) / det
-                    exact.append((p2.area, float(tri[0, 1] + w1 * (tri[1, 1] - tri[0, 1]) + w2 * (tri[2, 1] - tri[0, 1]))))
+                    height = float(tri[0, 1] + w1 * (tri[1, 1] - tri[0, 1]) + w2 * (tri[2, 1] - tri[0, 1]))
+                    if p2.covers(pt):
+                        covered.append(height)
+                    exact.append((p2.area, height))
+        if covered:
+            return max(covered)
         if exact:
             exact.sort(key=lambda t: t[0], reverse=True)
             return exact[0][1]

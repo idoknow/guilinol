@@ -378,7 +378,9 @@ try {
       )
     }, null, {timeout: 3500}).catch(() => {})
     await page.waitForTimeout(60)
-    await page.screenshot({path: filePath})
+    await page.evaluate(() => window.viewer.freeze())
+    try { await page.screenshot({path: filePath}) }
+    finally { await page.evaluate(() => window.viewer.resume()) }
     return true
   }
 

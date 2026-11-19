@@ -140,7 +140,7 @@ async function start() {
     if(frame===2)void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))
     if(first&&!switching) {
       updateLandmarks?.(walker?.active?walker.position:camera.position)
-      stream.tick(walker?.active?walker.position:camera.position)
+      stream.tick(walker?.destination??(walker?.active?walker.position:camera.position))
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
     }
     clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/1200))
