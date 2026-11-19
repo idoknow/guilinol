@@ -47,7 +47,8 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       void y1;void y2;void y3
     }
     const channel=kind===4||kind===6?1:kind===5?0:kind
-    surfaceKinds.push(channel,channel,channel);alongVals.push(a1,a2,a3)
+    const textureChannel=kind===6?6:channel
+    surfaceKinds.push(textureChannel,textureChannel,textureChannel);alongVals.push(a1,a2,a3)
     const c=colors[kind]
     for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(channel===1)sidewalk.push(pt.x,pt.y,pt.z)}
   }
@@ -86,6 +87,12 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
         const px=x+along*Math.cos(angle),pz=z-along*Math.sin(angle)
         object.position.set(px,baseLevel(px,pz)+.195,pz);object.rotation.y=angle+.75;object.scale.setScalar(1);object.updateMatrix();parked.push(...object.matrix.elements)
       }
+    }else if(kind===5||kind===6){
+      const length=span/10,offset=kind===5?.58:-.58
+      box(x,y+.22,z,length+.06,.44,.95,angle,hedge)
+      const fx=x+offset*Math.sin(angle),fz=z+offset*Math.cos(angle)
+      for(const level of [.24,.60])box(fx,y+level,fz,length+.04,.055,.055,angle,iron)
+      for(const shift of [-.4,0,.4])box(fx+shift*length*Math.cos(angle),y+.31,fz-shift*length*Math.sin(angle),.055,.62,.055,angle,iron)
     }else if(kind===4){
       box(x,y+1.5,z,.12,3,.12,angle);box(x,y+2.7,z,.09,.65,1.35,angle,blue)
       box(x,y+2.72,z,.1,.045,.85,angle,stoneLight)
@@ -103,16 +110,12 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   }
   for(const [east,south,heading,arterial] of beds){
     const x=east/10,z=south/10,y=baseLevel(x,z)+.195,angle=-heading/100
-    if(arterial){
-      box(x,y+.32,z,3.8,.64,1,angle,hedge)
-      box(x,y+.75,z,3.8,.07,.08,angle,iron)
-      for(const side of [-1,1])box(x+side*1.8*Math.cos(angle),y+.4,z-side*1.8*Math.sin(angle),.08,.8,.08,angle,iron)
-    }else{
+    if(!arterial){
       for(const side of [-1,1]){
         box(x+side*.45*Math.sin(angle),y+.1,z+side*.45*Math.cos(angle),1,.2,.1,angle,stoneMid)
         box(x+side*.45*Math.cos(angle),y+.1,z-side*.45*Math.sin(angle),.1,.2,.8,angle,stoneMid)
       }
-      box(x+.4*Math.cos(angle),y+.25,z-.4*Math.sin(angle),.25,.5,.25,angle,stoneLight)
+      for(const corner of [-.58,.58])box(x+corner*Math.cos(angle),y+.25,z-corner*Math.sin(angle),.28,.5,.28,angle,stoneLight)
     }
   }
   for(const [x,z] of lamps){const px=x/10,pz=z/10,y=baseLevel(px,pz),yaw=(x*7+z*13)%6/6*Math.PI

@@ -1,22 +1,13 @@
-import {mkdir,readFile} from 'node:fs/promises'
+import {mkdir} from 'node:fs/promises'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
 
 const output=process.argv[2]??'captures/sections'
-const report=JSON.parse(await readFile('public/world/street-report.json'))
-function onRoad(name,forward=0,lateral=0,turn=0){
-  const road=report.filter(item=>item.name===name).sort((a,b)=>b.length-a.length)[0]
-  return [road.x-Math.sin(road.yaw)*forward+Math.cos(road.yaw)*lateral,road.z-Math.cos(road.yaw)*forward-Math.sin(road.yaw)*lateral,road.yaw+turn]
-}
-function yiwu(x,z){
-  const angle=79.8*Math.PI/180
-  return [(110.284794-110.300)*111320*Math.cos(25.28*Math.PI/180)+x*Math.cos(angle)+z*Math.sin(angle),-.00045*110574-x*Math.sin(angle)+z*Math.cos(angle),angle-Math.PI/2]
-}
 const views={
-  '1345':yiwu(-58,0),'1346':yiwu(-45,-8.2),
-  '1359-example':onRoad('三多路',12,7),'1360-example':onRoad('三多路',-22,-8,.55),
-  '1380-example':onRoad('解放西路',8,8),'1382-example':onRoad('中山中路',56,8,-1.05),'1385-example':onRoad('解放东路',-22,6,.42),
-  crossroads:[-891,-165,-1.2],zhongshan:onRoad('中山中路'),jiefang:onRoad('解放东路'),yiwu:yiwu(18,3),
+  '1345-翊武路':[-1539.5,13.5,2.8,24],'1346-翊武路':[-1539.5,-17.2,23.5,14],
+  '1359-三多路':[-1228.3,-34.7,112,24],'1360-三多路':[-1254.3,-61.3,80,24],
+  '1380-中山中路':[-780,-553,8.9,24],'1382-中山中路':[-773,-602.3,69,24],'1385-解放东路':[-560.2,-98.7,260,24],
+  crossroads:[-891,-165,69,24],zhongshan:[-789.5,-548.2,9,24],jiefang:[-583,-98.4,284,24],yiwu:[-1524.5,-66.9,10,24],
 }
 await mkdir(output,{recursive:true})
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
@@ -28,9 +19,14 @@ try{
   await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
   await page.addStyleTag({content:'body > :not(canvas):not(script){visibility:hidden} canvas{visibility:visible}'})
   for(const [id,view] of Object.entries(views)){
-    const success=await page.evaluate(async coords=>{const {walk}=window.viewer;walk.leave();return walk.enter(...coords,'screenshot')},view)
-    if(!success){console.error('No walkable spawn',id);continue}
-    await page.waitForFunction(()=>!window.viewer.stats.pending,null,{timeout:90000})
+    await page.evaluate(async ([east,south,bearing,focal])=>{
+      const {walk,camera}=window.viewer,angle=bearing*Math.PI/180
+      walk.leave();if(!await walk.enter(east,south,-angle,'screenshot'))throw Error('No walkable spawn')
+      const height=walk.probe().foot+1.5;walk.leave();camera.position.set(east,height,south)
+      camera.near=.1;camera.fov=2*Math.atan(18/(focal*camera.aspect))*180/Math.PI;camera.updateProjectionMatrix()
+      camera.lookAt(east+Math.sin(angle),height,south-Math.cos(angle))
+    },view)
+    await page.waitForFunction(()=>{const {stats,camera,stream,manifest}=window.viewer;return !stats.pending&&manifest.chunks.every(tile=>Math.hypot(tile.x+128-camera.position.x,tile.z+128-camera.position.z)>stream.radius||stream.loaded.has(tile))},null,{timeout:90000})
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
     await page.screenshot({path:`${output}/${id}.jpg`,quality:88,timeout:90000});console.log(id,view)
   }

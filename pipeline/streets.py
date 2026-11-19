@@ -295,6 +295,8 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         origin = tuple(math.floor(v/CHUNK)*CHUNK for v in pt.coords[0])
         decor[origin].append([kind,round((pt.x-origin[0])*10),round((pt.y-origin[1])*10),round(heading*100),round(span*10)])
 
+    arterial_roads = [road for road in roads if road.oneway and road.kind in ('trunk','primary')]
+    arterial_index = STRtree([road.line for road in arterial_roads])
     for road in roads:
         section = RULES['sections'].get(RULES['sectionClasses'].get(road.kind))
         if not section or not bounds.intersects(road.line):
@@ -306,22 +308,56 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             heading = math.atan2(after.y-before.y,after.x-before.x)
             return center,heading
         density = RULES['fixtures']
-        if road.divided and road.kind in ('trunk','primary'):
+        def shifted(distance,offset):
+            center,heading = frame(distance)
+            return Point(center.x-offset*math.sin(heading),center.y+offset*math.cos(heading))
+
+        def paired_midpoint(center,heading):
+            hits = []
+            for index in arterial_index.query(center,predicate='dwithin',distance=24):
+                other = arterial_roads[index]
+                if other.name!=road.name or other.way==road.way:
+                    continue
+                along = other.line.project(center)
+                near = other.line.interpolate(along)
+                before,after = other.line.interpolate(max(0,along-.2)),other.line.interpolate(min(other.line.length,along+.2))
+                delta = math.atan2(after.y-before.y,after.x-before.x)-heading
+                if math.cos(delta)<-.85 and abs(center.distance(near)-(road.width+other.width)/2)<3:
+                    hits.append((center.distance(near),other.way,near))
+            if not hits:
+                return None
+            _,owner,near=min(hits,key=lambda hit:hit[:2])
+            return Point((center.x+near.x)/2,(center.y+near.y)/2) if road.way<owner else None
+
+        if (road.divided or road.oneway and road.name) and road.kind in ('trunk','primary'):
             span = density['railSpan']
             for seq, along in enumerate(np.arange(span/2,line.length-span/2,span)):
                 center,heading = frame(along)
-                segment = LineString([line.interpolate(along-span/2),line.interpolate(along+span/2)])
+                if road.oneway:
+                    center = paired_midpoint(center,heading)
+                    if center is None:
+                        continue
+                half = np.array([math.cos(heading),math.sin(heading)])*span/2
+                segment = LineString([np.asarray(center.coords[0])-half,np.asarray(center.coords[0])+half])
                 if not any(tree.query(segment,predicate='intersects').size for tree in (obstacles,layers[4])):
                     anchor(center,heading,1 if seq%10 else 2,span)
         for side,available in ((-1,road.left),(1,road.right)):
             if not available:
                 continue
             offset = side*(road.width/2+section['verge']+section['cycle']+section['curb']+section['walk']-.7)
-            for fixture,spacing in ((3,density['parkingInterval']),(4,density['signInterval'])):
+            if road.kind in ('trunk','primary'):
+                verge_offset = side*(road.width/2+section['verge']/2)
+                for start in np.arange(0,line.length,4):
+                    first,last = shifted(start,verge_offset),shifted(min(start+4,line.length),verge_offset)
+                    segment = LineString([first,last])
+                    if segment.length>.25 and not any(tree.query(segment,predicate='dwithin',distance=.45).size for tree in (obstacles,layers[0],layers[4])):
+                        anchor(segment.centroid,math.atan2(last.y-first.y,last.x-first.x),5 if side>0 else 6,segment.length)
+            interval = density['parkingInterval'] if road.kind in ('trunk','primary') else density['localParkingInterval']
+            for fixture,spacing in ((3,interval),(4,density['signInterval'])):
                 for along in np.arange(spacing/2,line.length-2,spacing):
                     center,heading = frame(along)
                     pt = Point(center.x-offset*math.sin(heading),center.y+offset*math.cos(heading))
-                    if not any(tree.query(pt,predicate='dwithin',distance=2).size for tree in (obstacles,layers[0],layers[4])):
+                    if not any(tree.query(pt,predicate='dwithin',distance=1.8).size for tree in (obstacles,layers[0],layers[4])):
                         anchor(pt,heading,fixture)
     def encode(tile,origin):
         shapes = [unary_union([layer.geometries[idx].intersection(tile) for idx in sorted(layer.query(tile))]) for layer in layers]

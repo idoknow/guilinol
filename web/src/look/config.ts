@@ -50,7 +50,7 @@ export const look = {
     directionSign: 0x3279a7,
     sharedBike: 0x72d5b0,
     awnings: [0x557650,0x506f94,0x9c4a46,0x878981], shutter:0x858b88,
-    surfaces: [0x6a6b6b, 0x999894, 0xe6e2d4, 0x8f897b, 0x737962, 0x626365, 0xd5ae55],
+    surfaces: [0x6a6b6b, 0x999894, 0xe6e2d4, 0x8f897b, 0x737962, 0x626365, 0xa18b55],
     railing: 0xd9d5ca, lampPole: 0x3e4743, lampHead: 0xe7dcbc,
   },
   // Max lean of slope-planted trees towards the surface normal (radians); trees grow up, not out.

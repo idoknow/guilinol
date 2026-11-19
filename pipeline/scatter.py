@@ -70,7 +70,7 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
     tiles, occupancy, stats = defaultdict(bytearray), defaultdict(list), Counter()
     spacing = CONFIG['minSeparation']
 
-    def tree(pt, profile, source, height=None, normal=(0,1,0), separation=spacing, force_kind=None, force_scale=None):
+    def tree(pt, profile, source, height=None, normal=(0,1,0), separation=spacing, force_kind=None, force_scale=None, yaw=None):
         east,south = pt.x,pt.y
         if not bounds.contains(pt) or exclude.covers(pt) or road_only.query(pt, predicate='intersects').size:
             return False
@@ -90,7 +90,7 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
         final_y = ground_y if height is None else (max(height, ground_y) if height < ground_y - 0.35 else height)
         tiles[left,top].extend(struct.pack('<HHhBBBBbb',min(CHUNK*100-1,max(0,round((east-left)*100))),min(CHUNK*100-1,max(0,round((south-top)*100))),
             round(10*final_y),kind,scale,
-            rng.randrange(256),rng.randrange(256),round(normal[0]*127),round(normal[2]*127)))
+            rng.randrange(256) if yaw is None else round(yaw*128/math.pi)%256,rng.randrange(256),round(normal[0]*127),round(normal[2]*127)))
         stats[source]+=1
         stats[CONFIG['species'][kind]]+=1
         return True
@@ -146,11 +146,13 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
                 if not junctions.query(pt,predicate='dwithin',distance=street['junction']).size:
                     if not section:
                         tree(pt,'river' if '滨江' in name else 'lake' if '榕' in name else 'mixed','street')
-                    elif not blocked.query(pt.buffer(.52), predicate='intersects').size and tree(pt,'mixed','street',force_kind=rng.randrange(2),force_scale=120):
+                    elif not blocked.query(pt.buffer(.52), predicate='intersects').size:
                         origin = tuple(math.floor(value/CHUNK)*CHUNK for value in pt.coords[0])
                         along = line.project(pt)
                         before, after = line.interpolate(max(0,along-.2)), line.interpolate(min(line.length,along+.2))
                         angle = math.atan2(after.y-before.y,after.x-before.x)
+                        if not tree(pt,'mixed','street',force_kind=0 if arterial else rng.randrange(2),force_scale=100 if arterial else 120,yaw=-angle-side*math.pi/2 if arterial else None):
+                            continue
                         beds[origin].append([round((pt.x-origin[0])*10),round((pt.y-origin[1])*10),round(angle*100),int(arterial)])
     shore = unary_union(wet).boundary
     for poly,name,water in banks:

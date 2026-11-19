@@ -9,7 +9,7 @@
   },
   "tactileWidth":0.35,
   "shops":{"bay":5,"setback":14},
-  "fixtures":{"railSpan":3,"parkingInterval":52,"signInterval":130,"speedInterval":160},
+  "fixtures":{"railSpan":3,"parkingInterval":22,"localParkingInterval":9,"signInterval":130,"speedInterval":160},
   "defaultWidth": {"trunk":18,"primary":14,"secondary":12,"tertiary":10,"residential":6,"pedestrian":6,"trunk_link":7,"primary_link":6.5,"secondary_link":6,"tertiary_link":5.5},
   "maxLanes": {"trunk":8,"primary":8,"secondary":6,"tertiary":4,"residential":2,"trunk_link":2,"primary_link":2,"secondary_link":2,"tertiary_link":1}
 }
