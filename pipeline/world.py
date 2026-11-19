@@ -96,6 +96,7 @@ def build(bbox, output, palette):
     interchange=None
     bank_pavement=None
     west_portal=None
+    modeled_paving=None
     for x,z,entry in layout.entries:
         if entry['id']=='jiefang_bridge' and bounds.covers(Point(x,z)):
             x_jb, z_jb = x, z
@@ -105,6 +106,10 @@ def build(bbox, output, palette):
             axes=np.array([[np.cos(angle),np.sin(angle)],[-np.sin(angle),np.cos(angle)]])
             corners=np.array([[-136,-21.5],[-103,-21.5],[-103,21.5],[-136,21.5]])
             west_portal=ShapelyPolygon(corners@axes+[x,z])
+            # Wide native Binjiang sidewalks extend past the modeled lower road.
+            # Clip their overhang across the upper slab, including the portal.
+            slab = np.array([[-140.5,-21.5],[140.5,-21.5],[140.5,21.5],[-140.5,21.5]])
+            modeled_paving = bank_pavement.union(ShapelyPolygon(slab @ axes + [x,z]))
             interchange=((x,z),angle,bank_pavement)
             grade_banks(terrain,original,wet,left,top,GRID,(x,z),angle,datum)
 
@@ -227,7 +232,7 @@ def build(bbox, output, palette):
     landmark_faces = list(landmark_triangles(landmarks))
     vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange)
     decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal)
-    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,modeled_paving=bank_pavement)
+    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,modeled_paving=modeled_paving)
     (output/'marking-audit.json').write_text(json.dumps(lengths.pop('markingOverlap')))
     print('Lengths (m):',lengths)
     def asset(name):
