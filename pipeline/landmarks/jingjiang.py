@@ -19,7 +19,7 @@ SWATCHES = dict(stone='#c1c1bc', brick='#727c86', tile='#525b65', wood='#613c32'
                 leaf='#4d6a46', earth='#ba7662', clock='#3585bf', sign='#50332d')
 
 
-def atlas(colors=None,smooth=()):
+def atlas(colors=None,smooth=(),canopy=False):
     rng = np.random.default_rng(18)
     sheet = Image.new('RGB', (512, 512))
     for index, (key, color) in enumerate((SWATCHES | (colors or {})).items()):
@@ -39,6 +39,12 @@ def atlas(colors=None,smooth=()):
         if key in ('wood','tile','red') and key not in smooth:
             for col in range(0,128,8 if key=='tile' else 16):
                 draw.line((col,0,col,127),fill=tuple(int(v*.85) for v in panel.getpixel((1,1))))
+        if canopy and key in ('leaf','green'):
+            base=np.asarray(panel.getpixel((0,0)))
+            for _ in range(1500):
+                u,v=rng.integers(0,128,2)
+                rgb=tuple(np.clip(base+rng.integers(-26,35),0,255).tolist())
+                draw.ellipse((u,v,u+int(rng.integers(1,5)),v+2),fill=rgb)
         if key=='clock':
             draw.ellipse((3,3,124,124),outline='#715d48',width=5)
             for tick in range(12):
@@ -165,7 +171,7 @@ class Model:
 
 
 def generate(name,build):
-    scene=trimesh.Scene(); image=atlas(); path=Path(__file__).resolve().parents[2]/'public/textures/landmarks/A'
+    scene=trimesh.Scene(); image=atlas({'tile':'#747b80'} if name=='jingjiang' else None,canopy=name=='jingjiang'); path=Path(__file__).resolve().parents[2]/'public/textures/landmarks/A'
     path.mkdir(exist_ok=True,parents=True); image.save(path/'surfaces.png',optimize=True)
     mat=trimesh.visual.material.PBRMaterial(name='A_surfaces',baseColorTexture=image,roughnessFactor=1,metallicFactor=0,doubleSided=True)
     def packed(parts):
@@ -226,12 +232,15 @@ def banyan(m,x,z,index):
 
 def gate_furniture(m):
     for side in (-1,1):
-        x=side*11.5
-        m.box(x,.3,-137.2,2.5,2.45,2.45,'red',True)
-        m.box(x,1.2,-135.94,2.02,1.15,.1,'glass')
+        x=side*9.5
+        m.box(x,.1,-137.2,2.45,.95,2.45,'red',True)
+        for offset in (-1.08,1.08):
+            for dz in (-1.08,1.08):
+                m.box(x+offset,.95,-137.2+dz,.16,1.85,.16,'red',True)
+        m.box(x,1.05,-137.2,2.5,.12,2.5,'wood')
         m.tiled_roof(x,2.8,-137.2,3.25,3.2,1.05)
         # The information boards are set back on either side of the kiosks.
-        x=side*17
+        x=side*13.1
         m.box(x,.45,-137,5.4,2.45,.35,'wood',True)
         m.box(x,.65,-136.8,5.1,2.05,.12,'glass' if side<0 else 'white')
         for n in range(4):
@@ -303,6 +312,8 @@ def palace(m):
     for side in (-1,1):
         m.box(side*6.8,0,-147,1.4,5.8,10,'yellow',True)
         m.box(side*5.3,4.9,-147,3.7,2.05,10,'yellow')
+        m.box(side*5.5,.2,-142.0,2,6.6,1.6,'yellow')
+        m.box(side*5.5,6.52,-142.0,2.4,.34,1.9,'wood')
         m.tiled_roof(side*5.3,6.95,-147,5.4,12,1.7)
         m.box(side*2.8,6.35,-141.84,1.55,2.05,.2,'wood')
         for u in (-.51,-.17,.17,.51):
@@ -310,18 +321,22 @@ def palace(m):
         m.box(side*2.8,7.35,-141.68,1.45,.12,.09,'red')
         m.box(side*4.6,1.6,-141.25,.8,3.2,.14,'sign')
         if m.detail:
-            for n in range(7):
-                m.box(side*4.6+.045*(-1)**n,1.9+n*.37,-141.14,.23,.09,.05,'gold')
+            if side>0:
+                for n,char in enumerate('广西师范大学'):
+                    letters(m,char,(side*4.6,4.17-n*.45,-141.14),.46,.40,'gold')
+            else:
+                for n in range(7):
+                    m.box(side*4.6,1.9+n*.37,-141.14,.22,.07,.05,'gold')
         lantern=trimesh.creation.icosphere(subdivisions=int(m.detail))
         m.mesh(lantern.vertices*[.47,.38,.47]+[side*2.45,5.5,-140.95],lantern.faces,'red')
-    m.box(0,5.35,-147,10.7,3.45,10,'yellow',True)
-    m.tiled_roof(0,8.8,-147,13.7,13,2.6)
+    m.box(0,5.35,-147,10.7,3.05,10,'yellow',True)
+    m.tiled_roof(0,8.4,-147,13.0,12,3.7)
     m.box(0,5.55,-141.7,.82,1.85,.19,'sign')
     for index,char in enumerate('靖江王府'):
         letters(m,char,(0,7.03-index*.44,-141.58),.44,.44,'gold')
     for side in (-1,1):
-        m.box(side*9,0,-138.4,10,.9,7,'granite',True)
-        for step in range(5):m.box(side*9,0,-132.9-step*.48,7,.18*(step+1),.5,'granite',True)
+        m.box(side*8.5,0,-138.4,11,.9,7,'granite',True)
+        for step in range(5):m.box(side*8.1,0,-132.9-step*.48,9.4,.18*(step+1),.5,'granite',True)
         for east in (side*5.25,side*12.75):
             m.beam([east,.86,-132.7],[east,1.77,-135.15],.13,'white');m.box(east,0,-133,.33,.94,.33,'white')
         m.box(side*10.5,0,-147,6,3.15,10,'yellow',True);m.tiled_roof(side*10.5,3.15,-147,7.1,11.5,2.3)
@@ -333,7 +348,7 @@ def palace(m):
         for i,z in enumerate((-173,-214,-236)):
             banyan(m,side*25,z,i+43+side)
         banyan(m,142,-121+side*10,56+side)
-    m.box(0,-.45,-132,71,.57,29,'pave',True)
+    m.box(0,-.45,-123,71,.59,48,'pave',True)
     for side in (-1,1):
         lo,hi=side*18-16,side*18+16
         sand=np.array([[173,146,107,255]]*4,dtype=np.uint8)
