@@ -1,3 +1,4 @@
+import {browserOptions, recordFrames} from './qa-browser.mjs'
 import assert from 'node:assert/strict'
 import {mkdir,writeFile} from 'node:fs/promises'
 import {chromium} from 'playwright'
@@ -5,7 +6,7 @@ import {preview} from 'vite'
 
 const route=[[-582,-206],[-548,-202],[-534,-188],[-534,-114],[-520,-100],[-486,-92],[-456,-82],[-452,-78],[-442,-78],[-398,-32],[-390,-30],[-372,-12],[-372,6],[-376,16],[-376,52],[-340,90],[-340,110],[-586,540],[-610,564],[-640,586],[-680,588],[-700,580],[-716,580],[-728,592],[-860,864],[-868,888],[-872,920],[-876,924],[-876,960],[-882,988],[-906,1012],[-926,1020],[-968,1022],[-984,1040],[-982,1076],[-962,1096]]
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
-const browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
+const browser=await chromium.launch(browserOptions())
 const page=await browser.newPage({viewport:{width:640,height:360}}),errors=[]
 page.on('pageerror',error=>errors.push(error.message))
 const output='captures/walk';await mkdir(output,{recursive:true})
@@ -27,6 +28,7 @@ try{
   const collect=async()=>Object.assign(renderStats,await page.evaluate(()=>window.renderStats))
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?mode=walk&verify`)
   await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:45000})
+  await recordFrames(page)
   await shot('palace')
   await page.evaluate(()=>{window.walkFrames=[]})
   async function drive(points,kind='route'){

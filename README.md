@@ -39,3 +39,19 @@ npm run preview
 重新生成 GL04 世界后，用 `?mode=walk` 从王城正阳门外出发，或用 `?spawn=palace|elephant|lijiang`。V 在当前地点切换飞行与步行。WASD 移动，Shift 跑、空格跳；拖动转向、滚轮缩放、C 切换跟随距离。手机左摇杆推满即跑，右半屏拖动转向。深水区只允许在桥上通行；不能原地站立时在 64 m 内找落脚点，无解时派发 `walk:spawn-failed`。
 
 生产包验收：`npm run world && npm run build && CHROMIUM=/usr/bin/chromium npm run verify:walk`。默认快速版覆盖撞楼、地标、树、栏杆、陡壁、桥和拒水。`verify:walk:full` 保留原有沿街长路线、逐帧检查、截图及帧记录（`captures/walk/`）。角色模型与材质入口在 `web/src/look/avatar.ts`；速度、跳高与相机参数在 `web/src/walk/config.ts`；授权见 `docs/credits.md`。地标构建和街道数据约定见 `docs/landmark-pipeline.md`。
+
+### 实拍同机位与完整回归
+
+在仓库根目录安装依赖（`npm ci`、`uv sync --locked`、`npx playwright install chromium`），准备 `raw/` 及 11 月 OSM 快照，按 `docs/landmark-pipeline.md` 配置原生 gltfpack。Mac 上需确保 Pillow 能打开 `NotoSansCJK-Regular.ttc`（也可把同名字体放在仓库根目录）。
+
+```sh
+npm run qa
+# 已完成 world、landmarks、build 后，可单独重拍
+npm run photo-match -- IMG_1313.jpg IMG_1314 --yaw-offset=-5 --height=1.7
+npm run photo-match -- walk-shizijie-wangcheng
+npm run photo-match -- --all
+```
+
+在 `captures/photo-match/index.html` 查看本次选择的机位。左图是实拍，右图是游戏，点击「50% 叠加」检查轮廓。相机放在 EXIF 坐标处，按已加载的地形三角面取高（默认加 1.5 m），俯仰固定为 0°，统一正午晴天。正的朝向修正向右转。两张磁北照片（IMG_1425、1426）按拍摄地点与日期的 WMM2025 磁偏角 −3.08° 换算为真北。水平视场角按等效焦距换算，长边最多 960 px。桥面高差、拍摄者仰俯和 GPS 误差都可能影响叠合。
+
+`npm run qa` 依次重建世界、地标与生产包，跑飞行、完整步行、骑行、导览、严格体检及全量照片。当前分支尚无 `audit` 时会在报告中标为跳过。各阶段耗时、浏览器首帧、draw calls 和错误摘要见 `captures/qa/report.md`，同目录保留逐项日志。Mac QA 使用 Metal，Linux 使用 SwiftShader。浏览器基线取连续 12 帧，照片步骤按全部机位平均。任一步骤失败或累计超过 40 分钟会返回非零。地标和分享图构建会写入 `public/`，建议在专用工作树运行。
