@@ -100,18 +100,27 @@ async function start() {
     clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>toast.classList.remove('show'),3200)})
   modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton);void touch
   showMode()
-  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},probeFoot(){
-    const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
-    const clearance = ray.intersectObjects(scene.children)[0]?.distance
-    ray.setFromCamera(new THREE.Vector2(0,0),camera)
-    const hits = ray.intersectObjects(scene.children)
-    let lookingAt:string|undefined
-    for(const hit of hits){
-      for(let obj:THREE.Object3D|null=hit.object;obj;obj=obj.parent) if(obj.name){lookingAt=obj.name;break}
-      if(lookingAt) break
-    }
-    return {clearance,lookingAt,wallDistance:hits[0]?.distance}
-  }}})
+  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},
+    setPreset(name:string){setPreset(camera,name);camera.updateMatrixWorld();return stats.frame},
+    freeze(){return new Promise<void>(resolve=>requestAnimationFrame(()=>{
+      renderer.setAnimationLoop(null)
+      const gl=renderer.getContext()
+      gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4))
+      resolve()
+    }))},
+    resume(){previous=0;renderer.setAnimationLoop(animate)},
+    probeFoot(){
+      const ray = new THREE.Raycaster(camera.position,new THREE.Vector3(0,-1,0))
+      const clearance = ray.intersectObjects(scene.children)[0]?.distance
+      ray.setFromCamera(new THREE.Vector2(0,0),camera)
+      const hits = ray.intersectObjects(scene.children)
+      let lookingAt:string|undefined
+      for(const hit of hits){
+        for(let obj:THREE.Object3D|null=hit.object;obj;obj=obj.parent) if(obj.name){lookingAt=obj.name;break}
+        if(lookingAt) break
+      }
+      return {clearance,lookingAt,wallDistance:hits[0]?.distance}
+    }}})
   function draw(){
     const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
     peaks.update(camera,mirror); renderMirror(renderer,scene,camera,!Number.isFinite(mirror)); renderer.render(scene,camera)
@@ -119,7 +128,7 @@ async function start() {
   const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
     fly(){if(walker?.active)walker.leave();showMode()},get cinema(){return cinema},set cinema(on){cinema=on}}
   let tour:Awaited<ReturnType<typeof import('./play').play>>|undefined
-  renderer.setAnimationLoop(now=>{
+  function animate(now:number){
     const elapsed = previous?now-previous:0;previous=now
     if(walker?.active)walker.tick(elapsed/1000);else if(!switching)controls(elapsed/1000)
     if(frame===1) {
@@ -149,7 +158,8 @@ async function start() {
       output.value=`${Math.round(samples*1000/(sum||16.7))} FPS · ${stats.calls} calls · ${stats.loaded} 块 · ${bytes.toLocaleString()} B`
       sum=0;samples=0
     }
-  })
+  }
+  renderer.setAnimationLoop(animate)
   if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }
 start().catch(error=>{document.querySelector('output')!.value=`无法加载：${error.message}`;bootProgress(`无法加载：${error.message}`,0);console.error(error)})

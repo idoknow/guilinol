@@ -255,24 +255,27 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
         import('three/addons/loaders/KTX2Loader.js'),
         import('three/addons/libs/meshopt_decoder.module.js'),
       ])
-      const loader = new GLTFLoader().setKTX2Loader(new KTX2Loader().setTranscoderPath('./basis/').detectSupport(renderer)).setMeshoptDecoder(MeshoptDecoder)
-      for(const entry of entries){
-        if(!entry.model) continue
-        const url = entry.model.includes('/')?`./${entry.model}`:`./world/${entry.model}`
-        try{
-          const {scene} = await loader.loadAsync(url)
-          const holder = new THREE.Group()
-          holder.name = entry.name
-          holder.position.set(entry.center[0], entry.baseHeight??entry.center[1], entry.center[2])
-          scene.traverse(node=>{
-            if(/^collision/i.test(node.name)||node.name==='lod1'||node.name==='lod2') node.visible = false
-            if(node instanceof THREE.Mesh) for(const material of [node.material].flat()) nightLit(material)
-          })
-          holder.add(scene)
-          group.add(holder)
-          models.push(holder)
-        }catch(error){console.warn(entry.name, error)}
-      }
+      const basis = new KTX2Loader().setTranscoderPath('./basis/').setWorkerLimit(2).detectSupport(renderer)
+      const loader = new GLTFLoader().setKTX2Loader(basis).setMeshoptDecoder(MeshoptDecoder)
+      try{
+        for(const entry of entries){
+          if(!entry.model) continue
+          const url = entry.model.includes('/')?`./${entry.model}`:`./world/${entry.model}`
+          try{
+            const {scene} = await loader.loadAsync(url)
+            const holder = new THREE.Group()
+            holder.name = entry.name
+            holder.position.set(entry.center[0], entry.baseHeight??entry.center[1], entry.center[2])
+            scene.traverse(node=>{
+              if(/^collision/i.test(node.name)||node.name==='lod1'||node.name==='lod2') node.visible = false
+              if(node instanceof THREE.Mesh) for(const material of [node.material].flat()) nightLit(material)
+            })
+            holder.add(scene)
+            group.add(holder)
+            models.push(holder)
+          }catch(error){console.warn(entry.name, error)}
+        }
+      }finally{basis.dispose()}
     })()
   }
   return group
