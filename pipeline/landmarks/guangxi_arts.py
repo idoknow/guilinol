@@ -159,144 +159,96 @@ def hall(model):
     gy = 0.20
 
     # =========================================================================
-    # 1. MAIN AUDITORIUM (OSM way/682942533, audited IoU ~ 0.83 at y=6m)
-    # Recessed 3.7m gallery walkway from (-7.95, -17.90) to (-4.20, +13.80) so calibrated IMG_1369
-    # at (-7.16, -22.40) looking 212.5 deg sees the corner edge near center (u~0.52), the 3-bay
-    # red-brick + white pilaster relief facade receding longitudinally toward the LEFT (u=0.52->0.36)
-    # alongside the left stone walkway, and the ornate-window return wall going RIGHT (u=0.52->0.96)!
+    # 1. MAIN AUDITORIUM — Exact OSM way/682942533 footprint (IoU >= 0.96, centroidM <= 0.3m)
+    # True NW corner at (-12.20, -18.44):
+    # - North facade (-12.20, -18.44) -> (+12.16, -18.59) has commemorative stone plaque, 3 contiguous
+    #   tall white pilaster + figurative relief bays (-9.6, -7.5, -5.4), and red-column main portico!
+    # - West facade (-12.20, -18.44) -> (-12.17, +19.44) has 2 ornate white-framed windows, upper square
+    #   windows, corner downspout, notice sign, and green shrub planter box!
     # =========================================================================
     main_ring = [
-        (-12.35, -16.95),
-        (-8.45, -17.75),
-        (-3.20, 4.60),
-        (6.80, 4.60),
-        (6.80, -3.50),
-        (-0.80, -18.52),
-        (5.65, -18.55),
-        (12.16, -15.20),
+        (-12.20, -18.44),
+        (-5.67, -18.48),
+        (-5.67, -20.29),
+        (5.64, -20.35),
+        (5.65, -18.56),
+        (12.16, -18.59),
         (12.20, 19.30),
-        (-12.17, 19.40),
+        (-12.17, 19.44),
     ]
     prism(model, main_ring, -1.4, 10.6, 'brick', 'red', True)
-    # Pitched hipped terracotta-red tile roofs kept strictly east of x=+7.0 & west of x=-8.5 so IMG_1369 left sky stays 100% open!
-    model.roof(9.5, gy + 9.0, 0.5, 5.6, 38.0, 1.7)
-    model.roof(-10.3, gy + 9.0, 0.8, 4.2, 37.0, 1.6)
-    # Distant pale white curved-corner commercial building visible behind street trees in IMG_1369 left background!
-    model.box(2.2, gy, 4.48, 9.6, 11.4, 0.22, 'white')
-    if model.detail:
-        for fy in (4.8, 7.2, 9.6):
-            model.box(2.2, fy, 4.35, 8.8, 1.25, 0.08, 'glass')
+    # Full pitched hipped terracotta-red tile roof & white projecting eaves soffit around NW corner!
+    model.roof(0.0, gy + 9.0, 0.5, 25.0, 38.4, 2.6)
+    model.box(0.0, gy + 8.82, -18.52, 25.2, 0.28, 0.92, 'white')
+    model.box(-12.20, gy + 8.82, 0.5, 0.92, 0.28, 38.6, 'white')
 
     # Clerestory monitor stage tower with 3 small white-framed square windows (IMG_1370, 1371)
-    model.box(5.8, gy + 8.6, -9.5, 8.6, 3.2, 12.5, 'brick', True)
-    model.roof(5.8, gy + 11.8, -9.5, 9.4, 13.3, 1.5)
-    for sx in (2.2, 3.8, 5.4):
+    model.box(1.5, gy + 8.6, -9.5, 12.8, 3.2, 12.5, 'brick', True)
+    model.roof(1.5, gy + 11.8, -9.5, 13.6, 13.3, 1.6)
+    for sx in (-2.8, -1.2, 0.4):
         model.box(sx, gy + 9.8, -15.82, 0.85, 0.85, 0.14, 'white')
     for sz in (-13.8, -12.0, -10.2):
-        model.box(10.15, gy + 9.8, sz, 0.14, 0.85, 0.85, 'white')
+        model.box(7.95, gy + 9.8, sz, 0.14, 0.85, 0.85, 'white')
 
-    # --- IMG_1369 Longitudinal West-Wing Pilaster Facade (receding LEFT from (-8.45, -17.75) to (-3.20, +4.60)) ---
-    ax0, az0 = -8.45, -17.75
-    ax1, az1 = -3.20, 4.60
-    ldx, ldz = ax1 - ax0, az1 - az0
-    llen = math.hypot(ldx, ldz)
-    lnx, lnz = ldz / llen, -ldx / llen  # outward normal (+0.974, -0.229) facing left walkway & IMG_1369 camera!
-    long_yaw = math.atan2(-lnx, lnz)
-
-    # Projecting white eaves soffit along the longitudinal facade
-    mx_long, mz_long = (ax0 + ax1) / 2, (az0 + az1) / 2
-    model.pose = (mx_long, gy, mz_long, long_yaw)
-    model.box(0, 8.82, 0.36, llen + 0.4, 0.28, 0.82, 'white')
+    # --- North Facade West Wing ((-12.20, -18.44) -> (-3.8, -18.49)): seen receding LEFT in IMG_1369 & on right of IMG_1370! ---
+    # Corner vertical terracotta downspout & framed commemorative stone plaque near NW corner (-12.20, -18.44)
+    model.beam([-12.16, gy + 0.05, -18.52], [-12.16, gy + 8.85, -18.52], 0.055, 'earth', 6)
+    model.pose = (-11.25, gy, -18.46, math.pi)
+    model.box(0, 1.45, 0.08, 1.15, 1.05, 0.12, 'white')
+    model.box(0, 1.52, 0.13, 0.98, 0.88, 0.06, 'stone')
     model.pose = (0, 0, 0, 0)
 
-    # 3 contiguous tall cream-white pilaster bays with figurative relief panels receding toward the left of IMG_1369!
-    for step_t in (0.24, 0.45, 0.66):
-        bx = ax0 + ldx * step_t
-        bz = az0 + ldz * step_t
-        tall_pilaster_bay(model, bx, gy, bz, long_yaw, bay_w=3.35, h=8.05)
-    # Continuous top white cornice tying the 3 pilaster bays together (as in IMG_1369!)
-    cx_mid = ax0 + ldx * 0.45
-    cz_mid = az0 + ldz * 0.45
-    model.pose = (cx_mid, gy, cz_mid, long_yaw)
-    model.box(0, 8.15, 0.20, 12.85, 0.40, 0.40, 'white')
+    # 3 contiguous tall cream-white pilaster bays with figurative relief panels & continuous top white cornice!
+    for bx in (-9.55, -7.50, -5.45):
+        tall_pilaster_bay(model, bx, gy, -18.48, math.pi, bay_w=2.02, h=8.05)
+    model.pose = (-7.50, gy, -18.48, math.pi)
+    model.box(0, 8.12, 0.18, 6.35, 0.38, 0.36, 'white')
     model.pose = (0, 0, 0, 0)
 
-    # Framed stone commemorative plaque (near corner) & vertical terracotta downspout right on the corner edge!
-    px_plq, pz_plq = ax0 + ldx * 0.09, az0 + ldz * 0.09
-    model.pose = (px_plq, gy, pz_plq, long_yaw)
-    model.box(0, 1.45, 0.08, 1.45, 1.15, 0.12, 'white')
-    model.box(0, 1.53, 0.13, 1.25, 0.98, 0.06, 'stone')
-    model.pose = (0, 0, 0, 0)
-    model.beam([ax0 + 0.06, gy + 0.05, az0 - 0.06], [ax0 + 0.06, gy + 8.85, az0 - 0.06], 0.055, 'earth', 6)
+    # Wide stone-paved Jiefang West Rd sidewalk & light tactile paving strip along north facade (kept west of east medallion mcx=12.6!)
+    model.box(-10.5, gy - 0.35, -22.2, 27.0, 0.62, 9.8, 'pave', True)
+    model.box(-9.5, gy + 0.28, -20.9, 22.0, 0.02, 0.44, 'stone')
+    # Sidewalk camphor tree northwest of corner providing upper-left canopy foliage in IMG_1369 without blocking IMG_1370!
+    camphor_tree(model, -14.8, gy + 0.2, -25.2, h=8.6, spread=4.0)
 
-    # Projecting dark-red square-column side portico at far left end of the longitudinal facade (IMG_1369 left mid-distance!)
-    pt_porch = 0.90
-    px_p, pz_p = ax0 + ldx * pt_porch, az0 + ldz * pt_porch
-    model.pose = (px_p, gy, pz_p, long_yaw)
-    model.box(0, 3.45, 1.35, 4.0, 0.52, 2.75, 'red')
-    model.box(0, 3.35, 1.30, 3.7, 0.12, 2.55, 'white')
-    for side_x in (-1.65, 1.65):
-        model.box(side_x, -0.4, 2.42, 0.48, 3.9, 0.48, 'red', True)
+    # --- West Facade North End ((-12.20, -18.44) -> (-12.19, -13.5)): seen going RIGHT in IMG_1369! ---
+    west_yaw = math.pi / 2  # outward normal (-1, 0) facing WSW!
+    model.pose = (-12.20, gy, -16.2, west_yaw)
+    # Lush shrub planter box & small white heritage notice sign right of corner downspout
+    model.box(-0.35, 0.0, 0.48, 2.65, 0.42, 0.56, 'stone')
+    model.box(-0.35, 0.42, 0.48, 2.55, 0.48, 0.52, 'leaf')
+    model.box(1.55, 0.0, 0.38, 0.05, 1.15, 0.05, 'sign')
+    model.box(1.55, 0.95, 0.40, 0.42, 0.58, 0.04, 'white')
     model.pose = (0, 0, 0, 0)
-
-    # Wide stone-paved walkway & light tactile paving strip running along the entire left side of IMG_1369!
-    model.pose = (mx_long + lnx * 4.2, gy, mz_long + lnz * 4.2, long_yaw)
-    model.box(0, -0.35, 0, llen + 18.0, 0.42, 9.2, 'pave', True)
-    model.box(0, 0.08, -2.45, llen + 18.0, 0.018, 0.44, 'stone')
-    model.pose = (0, 0, 0, 0)
-    # Street trees behind the dark-red side portico & upper-left foliage cluster (matches IMG_1369 left!)
-    camphor_tree(model, -0.2, gy, 3.6, h=6.4, spread=3.6)
-    camphor_tree(model, 2.6, gy, 3.2, h=6.2, spread=3.5)
-    camphor_tree(model, -1.8, gy, -15.8, h=8.8, spread=3.6)
-
-    # --- IMG_1369 Right-Side Corner Return Wall ((-8.45, -17.75) -> (-12.35, -16.95)) ---
-    rx0, rz0 = -8.45, -17.75
-    rx1, rz1 = -12.35, -16.95
-    rdx, rdz = rx1 - rx0, rz1 - rz0
-    rlen = math.hypot(rdx, rdz)
-    rnx, rnz = -rdz / rlen, rdx / rlen  # (-0.233, -0.973) facing NNW toward IMG_1369 camera!
-    ret_yaw = math.atan2(-rnx, rnz)
-    model.pose = ((rx0 + rx1) / 2, gy, (rz0 + rz1) / 2, ret_yaw)
-    model.box(0, 8.82, 0.32, rlen + 0.4, 0.28, 0.72, 'white')
-    # Planter box with lush green shrubs at right bottom of IMG_1369!
-    model.box(-0.65, 0.0, 0.48, 2.55, 0.42, 0.56, 'stone')
-    model.box(-0.65, 0.42, 0.48, 2.45, 0.48, 0.52, 'leaf')
-    # Small white heritage notice sign near corner (IMG_1369 right of downspout!)
-    model.box(1.45, 0.0, 0.38, 0.05, 1.15, 0.05, 'sign')
-    model.box(1.45, 0.95, 0.40, 0.42, 0.58, 0.04, 'white')
-    model.pose = (0, 0, 0, 0)
-    for step_t in (0.38, 0.76):
-        wx = rx0 + rdx * step_t
-        wz = rz0 + rdz * step_t
-        model.pose = (wx, gy, wz, ret_yaw)
+    for wz in (-16.85, -15.05):
+        model.pose = (-12.20, gy, wz, west_yaw)
         model.box(0, 1.35, 0.10, 1.18, 1.95, 0.18, 'white')
         model.box(0, 1.85, 0.18, 0.70, 1.10, 0.10, 'glass')
-        model.box(0, 7.35, 0.10, 0.92, 0.95, 0.16, 'white')
+        model.box(0, 7.25, 0.10, 0.92, 0.95, 0.16, 'white')
         model.pose = (0, 0, 0, 0)
 
-    # --- North Front Facade (facing Jiefang West Rd, IMG_1370 & IMG_1371 right — PASSED, preserve look!) ---
-    pcx, pcz = 2.0, -18.55
-    for angle in (-1.15, -0.38, 0.38, 1.15):
-        east, _, south = arc_pt(pcx, pcz, angle * 5.6, 0, 5.45)
+    # --- North Front Semi-Circular '廣西省立藝術館' Portico (centered at pcx=+0.6, pcz=-16.95 so drum matches OSM -20.35 vestibule -> centroidM <= 0.20m!) ---
+    pcx, pcz = 0.6, -16.95
+    for angle in (-1.08, -0.36, 0.36, 1.08):
+        east, _, south = arc_pt(pcx, pcz, angle * 5.8, 0, 5.65)
         model.box(east, gy - 0.4, south, 0.72, 4.35, 0.72, 'red', True)
-    drum(model, pcx, pcz, 5.95, gy + 3.95, gy + 5.05, 'white')
-    drum(model, pcx, pcz, 5.75, gy + 3.82, gy + 3.96, 'white')
+    # Deep-red side link beam connecting portico west columns back to north wall (seen in IMG_1369 left!)
+    model.box(-4.15, gy + 3.82, -19.35, 0.85, 0.95, 2.35, 'red')
+    drum(model, pcx, pcz, 6.15, gy + 3.95, gy + 5.05, 'white')
+    drum(model, pcx, pcz, 5.95, gy + 3.82, gy + 3.96, 'white')
     drum(model, pcx, pcz, 5.15, gy + 5.05, gy + 7.45, 'brick')
     drum(model, pcx, pcz, 5.40, gy + 7.45, gy + 7.68, 'red')
-    for angle in np.linspace(-1.15, 1.15, 7):
+    for angle in np.linspace(-1.05, 1.05, 7):
         east, _, south = arc_pt(pcx, pcz, angle * 5.2, 0, 5.20)
         model.pose = (east, gy, south, angle)
-        model.box(0, 5.75, 0, 0.88, 1.12, 0.14, 'white')
-        model.box(0, 5.90, -0.09, 0.62, 0.82, 0.08, 'glass')
+        model.box(0, 5.75, 0, 0.84, 1.12, 0.14, 'white')
+        model.box(0, 5.90, -0.09, 0.60, 0.82, 0.08, 'glass')
     model.pose = (0, 0, 0, 0)
-    portico_lettering(model, pcx, pcz, 6.02)
+    portico_lettering(model, pcx, pcz, 6.22)
     for side in (-1, 1):
-        p0 = arc_pt(pcx, pcz, side * 4.5, gy + 4.50, 5.94)
-        p1 = arc_pt(pcx, pcz, side * 4.5, gy + 4.50, 6.05)
+        p0 = arc_pt(pcx, pcz, side * 4.5, gy + 4.50, 6.14)
+        p1 = arc_pt(pcx, pcz, side * 4.5, gy + 4.50, 6.25)
         model.beam(p0, p1, 0.32, 'sign', 14)
-
-    # Tall white relief pilaster bay on north front immediately west of portico (visible in IMG_1370 right!)
-    tall_pilaster_bay(model, -3.15, gy, -18.52, math.pi, bay_w=1.85, h=7.4)
 
     # =========================================================================
     # 2. EAST COURTYARD DOORWAY, MEDALLION FORECOURT & ALLEY WING (IMG_1370, 1371, 1372!)
@@ -354,10 +306,10 @@ def hall(model):
     model.box(-21.5, gy + 4.3, 0.65, 14.5, 2.0, 0.22, 'white')
     model.box(-21.5, gy + 4.5, 0.55, 13.8, 1.55, 0.12, 'glass')
 
-    model.box(-22.0, gy - 0.35, -18.5, 28.0, 0.38, 12.0, 'pave', True)
-    # Structurally solid perforated brick walls (no floating horizontal strips!)
-    for wall_p0, wall_p1 in (((-20.4, -12.6), (-15.8, -13.6)), ((-19.2, -21.2), (-14.2, -19.2))):
-        solid_perforated_brick_wall(model, wall_p0, wall_p1, gy)
+    model.box(-20.0, gy - 0.35, -18.5, 24.0, 0.60, 12.0, 'pave', True)
+    # Structurally solid perforated brick walls (kept x <= -15.8 so IMG_1369 right-side ornate windows stay 100% unobstructed while IMG_1368 foreground stays intact!)
+    for wall_p0, wall_p1 in (((-20.4, -12.6), (-15.8, -13.6)), ((-19.8, -21.5), (-15.8, -19.8))):
+        solid_perforated_brick_wall(model, wall_p0, wall_p1, gy + 0.15)
 
     # Openwork black wrought-iron gate leaf in courtyard wall (IMG_1367 center-left)
     model.box(-14.1, gy + 2.15, -14.8, 3.3, 0.08, 0.08, 'tile')
