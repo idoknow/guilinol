@@ -15,10 +15,10 @@ from shapely.geometry import LineString, Point
 from common import GRID, ll2xz, load_osm
 from features import area, points
 from navigation import return_trips
-from clearance import audit_routes
+from clearance import audit_routes, navigable_edges
 
 
-def plan_vehicles(bounds, surface, roads, buildings, sample):
+def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=()):
     left, top, right, bottom = bounds.bounds
     wet = surface != -32768
     rows, cols = wet.shape
@@ -83,6 +83,16 @@ def plan_vehicles(bounds, surface, roads, buildings, sample):
     graph = coo_matrix((weights,(sources,targets)),shape=(len(cells),len(cells))).tocsr()
     def locations(condition):
         row,col = np.where(condition);return np.column_stack((xs[col],zs[row]))
+    graphs = {}
+    if landmark_faces:
+        edges = graph.tocoo()
+        row, col = np.unravel_index(cells, wet.shape)
+        coords = np.column_stack((xs[col], zs[row]))
+        levels = surface[row, col]
+        for kind in ('boat', 'raft'):
+            keep = navigable_edges(landmark_faces, coords[edges.row], coords[edges.col],
+                                   np.maximum(levels[edges.row], levels[edges.col]), kind)
+            graphs[kind] = coo_matrix((edges.data[keep], (edges.row[keep], edges.col[keep])), shape=graph.shape).tocsr()
     docks, nodes, routes = {}, {}, []
     if wet.any() and (~wet).any():
         bank = locations((~wet)&(distance_transform_edt(~wet)<=2)); water = locations(clearance>=2) if clearance.max()>=2 else locations(wet)
@@ -97,9 +107,11 @@ def plan_vehicles(bounds, surface, roads, buildings, sample):
         for kind, stops in [('raft',['解放桥码头','象山渔人码头','解放桥码头']),('boat',['日月湾码头','杉湖','榕湖','桂湖','木龙湖','解放桥码头','文昌桥码头','知音台码头','日月湾码头'])]:
             for start,end in zip(stops,stops[1:]):
                 if start not in nodes or end not in nodes:continue
-                costs,prev=dijkstra(graph,directed=False,indices=nodes[start],return_predecessors=True)
+                costs,prev=dijkstra(graphs.get(kind, graph),directed=False,indices=nodes[start],return_predecessors=True)
                 node=nodes[end]; path=[]
-                if not np.isfinite(costs[node]) or node==nodes[start]:continue
+                if not np.isfinite(costs[node]):
+                    raise ValueError(f"{start} → {end}: 截航，无可通行的水路")
+                if node==nodes[start]:continue
                 while True:
                     row,col=divmod(cells[node],cols);path.append([int(xs[col]),int(surface[row,col])/10,int(zs[row])])
                     if node==nodes[start]:break
@@ -109,6 +121,9 @@ def plan_vehicles(bounds, surface, roads, buildings, sample):
 
 
 def write_vehicles(output,data,triangles):
-    data['routes']=return_trips(audit_routes(data['routes'],triangles,select=True))
+    checked = audit_routes(data['routes'], triangles, select=True)
+    if len(checked) != len(data['routes']):
+        raise ValueError('航道核查失败，有航段净空不足')
+    data['routes'] = return_trips(checked)
     data['clearance'] = audit_routes(data['routes'],triangles)
     (output/'vehicles.bin').write_bytes(gzip.compress(json.dumps(data,ensure_ascii=False,separators=(',',':')).encode(),mtime=0))

@@ -181,8 +181,6 @@ def build(bbox, output, palette):
             length=round(road.line.length),x=anchor.x,z=anchor.y,yaw=math.atan2(anchor.x-ahead.x,anchor.y-ahead.y)))
     (output/'street-report.json').write_text(json.dumps(report,ensure_ascii=False))
     print('Vegetation:',dict(sorted(tree_stats.items())))
-    vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample)
-    decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans)
     peak_centers = {p['name']: p['center'] for p in peaks['entries']}
     peak_lm_names = {'fubo': '伏波山', 'diecai': '明月峰', 'duxiu': '独秀峰'}
     def lm_elevation(x, z, entry):
@@ -202,6 +200,9 @@ def build(bbox, output, palette):
             return round(max(gm_y, float(fl['elevation'])), 2)
         return round(gm_y, 2)
     landmarks = [dict(position=[x, lm_elevation(x, z, entry), z], **entry) for x, z, entry in layout.entries]
+    landmark_faces = list(landmark_triangles(landmarks))
+    vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces)
+    decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans)
     streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints)
     (output/'marking-audit.json').write_text(json.dumps(lengths.pop('markingOverlap')))
     print('Lengths (m):',lengths)
@@ -266,7 +267,7 @@ def build(bbox, output, palette):
             chunks.append(dict(x=origin[0],z=origin[1],**asset(name)))
     extent = [left,top,width,depth]
     write_atlas(output,extent,bounds,layers,footprints,peaks)
-    triangles.extend(landmark_triangles(landmarks))
+    triangles.extend(landmark_faces)
     write_vehicles(output,vehicles,triangles)
     manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=extent,chunkSize=CHUNK,peaks=peaks,atlas=asset('atlas.bin'),
                     vehicles=asset('vehicles.bin'),grid=GRID,overview=dict(step=32, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png')),chunks=chunks)

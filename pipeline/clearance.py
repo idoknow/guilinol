@@ -3,7 +3,7 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
-from shapely import STRtree, get_coordinates
+from shapely import STRtree, get_coordinates, union_all, polygons, intersects
 from shapely.geometry import Polygon, LineString
 from features import area, points
 from common import load_osm
@@ -29,6 +29,45 @@ def landmark_triangles(landmarks):
             nearby=(vertices[:,:,0].min(axis=1)<=east)&(vertices[:,:,0].max(axis=1)>=west)&(vertices[:,:,2].min(axis=1)<=south)&(vertices[:,:,2].max(axis=1)>=north)
             if not nearby.any(): raise ValueError(f'No GLB faces near {ref}')
             for face in vertices[nearby]: yield way['id'],face,0
+
+
+def low_projection(triangle, ceiling):
+    """Clip a bridge face at the maximum permissible hull-top elevation."""
+    vertices = []
+    for start, end in zip(triangle, np.roll(triangle, -1, axis=0)):
+        if start[1] < ceiling:
+            vertices.append(start[[0, 2]])
+        if (start[1] < ceiling) != (end[1] < ceiling):
+            t = (ceiling - start[1]) / (end[1] - start[1])
+            vertices.append((start + t * (end - start))[[0, 2]])
+    return Polygon(vertices).convex_hull
+
+
+def navigable_edges(faces, first, last, levels, kind):
+    """Check water-graph edges against low landmark geometry before routing."""
+    vessel = BOUNDS[kind]
+    margin = max(vessel['roof'], vessel['head']) + (.4 if kind == 'boat' else .3)
+    radius = np.hypot(vessel['width'], vessel['length']) / 2
+    keep = np.ones(len(first), dtype=bool)
+    for bridge in sorted({ref for ref, _, _ in faces}):
+        triangles = np.array([tri for ref, tri, _ in faces if ref == bridge])
+        coords = triangles[:, :, [0, 2]]
+        near = np.flatnonzero(((np.maximum(first, last) >= coords.min(axis=(0, 1)) - radius) &
+                               (np.minimum(first, last) <= coords.max(axis=(0, 1)) + radius)).all(axis=1))
+        min_y = triangles[:, :, 1].min(axis=1)
+        for level in np.unique(levels[near]):
+            indices = near[levels[near] == level]
+            ceiling = level / 10 + margin
+            obstacle = union_all([low_projection(t, ceiling) for t in triangles[min_y < ceiling]])
+            if obstacle.is_empty:
+                continue
+            a, b = first[indices], last[indices]
+            direction = (b - a) / np.linalg.norm(b - a, axis=1)[:, None]
+            side = direction[:, ::-1] * [-1, 1] * vessel['width'] / 2
+            nose = direction * vessel['length'] / 2
+            swept = polygons(np.stack([a-nose-side, a-nose+side, b+nose+side, b+nose-side], axis=1))
+            keep[indices] &= ~intersects(obstacle, swept)
+    return keep
 
 
 def audit_routes(routes, triangles, select=False, failed_ids=None):

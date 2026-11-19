@@ -160,6 +160,25 @@ def load_landmark_meshes(root: Path, manifest: dict):
     return out
 
 
+def apply_landmark_exceptions(rules, *categories):
+    limits = {(rule['id'], rule['subtype']): rule for rule in rules}
+    allowed = []
+    hits = defaultdict(int)
+    for findings in categories:
+        remaining = []
+        for issue in findings:
+            identity = '+'.join(sorted(issue.get('landmarks', [issue.get('landmark', '')])))
+            key = identity, issue['subtype']
+            rule = limits.get(key)
+            if rule and issue['value'] <= rule['maxArea'] and hits[key] < rule['maxCount']:
+                hits[key] += 1
+                allowed.append({**issue, 'reason': rule['reason']})
+            else:
+                remaining.append(issue)
+        findings[:] = remaining
+    return allowed
+
+
 def run_audit(world_dir: Path, root: Path) -> dict:
     manifest = json.loads((world_dir / 'manifest.json').read_text())
     left, top, width, depth = manifest['extent']
@@ -941,18 +960,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     other_issues.sort(key=lambda r: r['value'], reverse=True)
 
     approved = json.loads((root / 'pipeline/audit-allow.json').read_text())
-    allowed = []
-    for issues in (bldg_issues, other_issues):
-        for issue in issues[:]:
-            identity = '+'.join(sorted(issue.get('landmarks', [issue.get('landmark', '')])))
-            for rule in approved:
-                if (identity == rule['id'] and issue['subtype'] == rule['subtype']
-                        and issue['x'] == rule['x'] and issue['z'] == rule['z']
-                        and abs(issue['value'] - rule['area']) <= .0501):
-                    approved.remove(rule)
-                    allowed.append({**issue, 'reason': rule['reason']})
-                    issues.remove(issue)
-                    break
+    allowed = apply_landmark_exceptions(approved, bldg_issues, other_issues)
 
     def summarize(items):
         by_sub = defaultdict(int)
