@@ -76,6 +76,14 @@ class Model:
         triangles[:,:,0]=local[:,:,0]*cosine-local[:,:,2]*sine+dx
         triangles[:,:,2]=local[:,:,0]*sine+local[:,:,2]*cosine+dz
         triangles[:,:,1]+=dy
+        if getattr(self,'grade',None) is not None:
+            reference=self.grade_reference
+            flat=triangles.reshape(-1,3)
+            weights=np.clip(1-(flat[:,1]-reference)/3.2,0,1)
+            active=weights>0
+            if active.any():
+                offsets=np.fromiter((self.grade(x,z)-reference-.035 for x,z in flat[active][:,::2].round(4)),float)
+                flat[active,1]+=weights[active]*offsets
         if collide: self.solid.append(triangles)
         if isinstance(color,np.ndarray):
             self.pigmented.append((triangles,color[faces]));return
@@ -194,7 +202,13 @@ def generate(name,build,colors=None):
                 texture=image.crop((left,top,left+128,top+128))
             surface=packed([tri for tri,uv in parts]);surface.visual=trimesh.visual.TextureVisuals(uv=np.concatenate([uv for tri,uv in parts]).reshape(-1,2),material=trimesh.visual.material.PBRMaterial(name=key,baseColorTexture=texture,metallicFactor=.35 if reflective else 0,roughnessFactor=.16 if reflective else 1,doubleSided=True));scene.add_geometry(surface,geom_name=layer+'_'+key,node_name=layer+'_'+key,parent_node_name=parent)
     for lod in (0,1):
-        model=Model(lod==0);build(model)
+        model=Model(lod==0)
+        if name in ('wangcheng_market','dongxixiang'):
+            from functools import lru_cache
+            from world_surface import LandmarkSurface,Surface
+            model.grade=lru_cache(maxsize=262144)(LandmarkSurface(Surface(),name).ground)
+            model.grade_reference=0
+        build(model)
         layer=f'lod{lod}';scene.graph.update(frame_to=layer)
         emit(model,layer,layer)
         groups={}

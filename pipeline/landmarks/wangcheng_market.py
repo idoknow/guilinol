@@ -77,6 +77,15 @@ def screen_house(model):
         for claw in (-1,1):model.beam([side*1.35,1.25,.69],[side*(1.35+claw*.16),1.57,.7],.085,'red')
 
 
+def seated_roof(model,height,width,depth,rise):
+    corners=np.array([[-width/2,0,-depth/2],[width/2,0,-depth/2],[width/2,0,depth/2],[-width/2,0,depth/2],[-width*.27,rise,0],[width*.27,rise,0]])
+    base=corners[:4].copy();base[:,1]=-.18
+    faces=[[0,4,5],[0,5,1],[1,5,2],[2,5,4],[2,4,3],[3,4,0],[6,7,8],[6,8,9]]
+    for side in range(4):
+        end=(side+1)%4;faces.extend([[side,end,end+6],[side,end+6,side+6]])
+    model.mesh(np.vstack((corners,base))+[0,height,0],faces,'tile')
+
+
 def market(model):
     for first,last,width,level in [((-106,15),(-26,28),17,.09),((-28,22),(6,25),22,.10),
         ((-6,24),(5,-15),10,.13),((0,28),(54,39),9,.12),((54,39),(63,-4),10,.14),
@@ -106,16 +115,17 @@ def market(model):
                     model.box(column,5.12,side*2.43,1.24,1.42,.13,'wood')
                     model.box(column,5.22,side*2.5,.96,1.22,.08,'glass')
                     model.box(column,5.22,side*2.56,.08,1.22,.06,'wood')
-            model.roof(0,7.35,0,9.65,5.7,1.15)
+            seated_roof(model,7.35,9.65,5.7,1.15)
             continue
         for east in (-3.9,3.9):model.box(east,0,0,.74,6.7,1.1,'brick',True)
         model.box(0,4.4,0,8.5,2.2,1.1,'wood');model.roof(0,6.55,0,9.4,3.4,1.3)
         for side in (-1,1):letters(model,'东西巷',(0,4.9,side*.59),4.7,1.05,'gold',side)
     for east,south in [(7+index*1.05+side*10,-18-index*6.1) for side in (-1,1) for index in range(6)]:
+        if south < -48:continue
         model.pose=(east,0,south,.14)
         model.box(0,0,0,3.1,1.03,1.8,'wood',True)
         for post in (-1.46,1.46):model.box(post,1,-.64,.11,1.35,.11,'wood')
-        model.roof(0,2.29,0,4.15,3.6,.52)
+        seated_roof(model,2.29,4.15,3.6,.52)
 
 
 if __name__=='__main__':

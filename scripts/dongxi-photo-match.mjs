@@ -61,10 +61,13 @@ try {
         const entry=manifest.landmarks.find(entry=>entry.id==='wangcheng_market')
         const center=camera.position.clone().set((lon-110.300)*111320*Math.cos(25.280*Math.PI/180)+.25*Math.sin(normal),entry.position[1]+2.76,-(lat-25.280)*110574-.25*Math.cos(normal))
         const u=(center.project(camera).x+1)/2,target=(number==='07'?(1300+1473):(1347+1706))/3840
-        shopCheck={sign:'STARBUCKS COFFEE',u,target,errorWidth:Math.abs(u-target),threshold:.05}
+        shopCheck={sign:'STARBUCKS COFFEE',u,target,errorWidth:Math.abs(u-target),threshold:.01}
       }
       return {number,x,z,ground,heading,focal35,pitch,first:probe.lookingAt,landmark:probe.landmark,distance:probe.wallDistance,shopCheck}
     },{shot,number,pitch,coffee}))
+    const check=trace.at(-1)
+    if(check.shopCheck && !(check.shopCheck.errorWidth<check.shopCheck.threshold))throw Error(`Sign mismatch: ${number}`)
+    if(['Y03','Y05','Y06'].includes(number) && !(check.landmark && check.distance>=3))throw Error(`Obstructed view: ${JSON.stringify(check)}`)
     trace.at(-1).originalHeading=originalHeading
     trace.at(-1).recordedPosition=recordedPosition
     await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))))

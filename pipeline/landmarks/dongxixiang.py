@@ -39,7 +39,8 @@ def frontage(model):
             model.box(0,0,0,4.5,.17,width+.12,'pave',True)
             for side in (-1,1):
                 east=side*6.4; high=6.1+(bay%3==1)*2.9
-                if replaced.covers(Point(model.pose[0]+east*math.cos(angle),model.pose[2]+east*math.sin(angle))):continue
+                corners=[(model.pose[0]+xx*math.cos(angle)-zz*math.sin(angle),model.pose[2]+xx*math.sin(angle)+zz*math.cos(angle)) for xx in (east-3.9,east+3.9) for zz in (-width/2,width/2)]
+                if replaced.intersection(Polygon(corners).convex_hull).area>.01:continue
                 model.box(east,3,0,6.5,high-3,width-.16,'brick',True)
                 model.box(side*6.97,0,0,5.36,3,width-.16,'brick',True)
                 model.roof(east,high,0,7.8,width,1.8)

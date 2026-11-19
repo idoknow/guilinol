@@ -107,3 +107,9 @@
 | D-west | 157.70 | 6.90 | 164.60 |
 
 绝对标高取游戏地形，层高按照片估值；不是测绘成果。坡屋脊高出檐口 1.55 m。商厦沿用原地标，不重复生成。正阳门由 IDOK-51 拥有，市场屋面与城台面积交集为零；其间是门前步行空间，不应补楼。
+
+## 合并验收：巷道与地面
+
+先运行 `npm run world` 生成 GL04 地表，再生成市场模型。`npm run audit:grounding:market` 在最终打包的 LOD0 上执行 PR #47 `efcf56b` 的接触面审计：两个模型都参与，不使用全城报告的 deferred 项；仅限制底面采样范围，不裁切可能承重的相邻构件。另从高于 3 m 的实际墙边定位登记墙脚，以免相连铺地在计算承重组时漏采。允许范围为 −0.30 至 +0.15 m。
+
+`python scripts/dongxi/lane-audit.py --raw-models <生成器输出目录> raw/osm.json raw/osm-2026-11.json <OSM导出.osm>` 逐条对照步行轴线两侧 1.5 m。屋面及挑檐以 LOD0 几何的水平投影计算；仅横巷回望门楼、东西巷横巷封闭过街楼按各自屋顶外轮廓豁免。`node scripts/dongxi-photo-match.mjs --dongxi` 另测同机位中心射线，不将平面轮廓距离当作游戏中的可见距离。主线 `npm run photo-match` 仍使用 IDOK-46 的机位。
