@@ -298,7 +298,7 @@ try {
 
   const touchTest=await mobile.evaluate(async()=>{
     const {walk}=window.viewer, canvas=document.querySelector('canvas'), joy=document.querySelector('.walk-ui .joystick'), jumpBtn=document.querySelector('.walk-ui .btn-jump')
-    const yaw0=walk.yaw, dist0=walk.probe().camDist, pos0=walk.probe()
+    const yaw0=walk.yaw, dist0=walk.probe().camDist
     canvas.dispatchEvent(new PointerEvent('pointerdown',{pointerId:10,pointerType:'touch',clientX:148,clientY:740,bubbles:true}))
     canvas.dispatchEvent(new PointerEvent('pointerdown',{pointerId:11,pointerType:'touch',clientX:210,clientY:400,bubbles:true}))
     canvas.dispatchEvent(new PointerEvent('pointermove',{pointerId:11,pointerType:'touch',clientX:290,clientY:385,bubbles:true}))
@@ -306,6 +306,9 @@ try {
     canvas.dispatchEvent(new PointerEvent('pointerup',{pointerId:10,pointerType:'touch',clientX:148,clientY:740,bubbles:true}))
     const yawTurn=Math.abs(walk.yaw-yaw0), pinchDrift=Math.abs(walk.probe().camDist-dist0)
 
+    // Aim down the open street the feel test runs along; the post-look yaw points at an IDOK-38/40 frontage 1–2 m away.
+    walk.face(Math.atan2(-.145,.989))
+    const fwd=[-Math.sin(walk.yaw),-Math.cos(walk.yaw)], runFrom=walk.probe()
     const jr=joy.getBoundingClientRect(), cx=jr.left+jr.width/2, cy=jr.top+jr.height/2
     joy.dispatchEvent(new PointerEvent('pointerdown',{pointerId:12,pointerType:'touch',clientX:cx,clientY:cy-jr.height*.55,bubbles:true}))
     // Peak, not last-frame speed: the run may graze a roadside prop near the end; we test that the joystick reaches sprint.
@@ -317,9 +320,10 @@ try {
     jumpBtn.dispatchEvent(new PointerEvent('pointerdown',{pointerId:13,pointerType:'touch',bubbles:true}))
     let jumped=false
     for(let i=0;i<20;i++){walk.tick(1/60);if(!walk.probe().grounded)jumped=true}
-    return {yawTurn,pinchDrift,dist:Math.hypot(moved.x-pos0.x,moved.z-pos0.z),speed:moved.planarSpeed,peakSpeed,jumped}
+    const dx=moved.x-runFrom.x, dz=moved.z-runFrom.z, dist=Math.hypot(dx,dz)
+    return {yawTurn,pinchDrift,dist,along:dist?(dx*fwd[0]+dz*fwd[1])/dist:0,speed:moved.planarSpeed,peakSpeed,jumped}
   })
-  assert(touchTest.yawTurn>.2&&touchTest.pinchDrift<.01&&touchTest.dist>1.2&&touchTest.peakSpeed>6&&touchTest.jumped,`touchTest: ${JSON.stringify(touchTest)}`)
+  assert(touchTest.yawTurn>.2&&touchTest.pinchDrift<.01&&touchTest.dist>3.5&&touchTest.along>.9&&touchTest.peakSpeed>6&&touchTest.jumped,`touchTest: ${JSON.stringify(touchTest)}`)
 
   // Also verify 390x844 coexistence when standing next to a parked e-bike AND next to a boat dock (.vehicle-action visible).
   const bikeCoexist=await mobile.evaluate(async()=>{
@@ -368,7 +372,7 @@ try {
     assert.equal(await mobile.evaluate(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on')),false,'runLock should clear after boarding e-bike')
     assert.equal(await mobile.evaluate(()=>document.querySelector('.walk-ui .btn-run')?.getAttribute('aria-pressed')),'false')
   }
-  console.log('mobile 390x844 HUD & touch OK',mobileShot)
+  console.log('mobile 390x844 HUD & touch OK',JSON.stringify({run:+touchTest.dist.toFixed(2),along:+touchTest.along.toFixed(3),peak:touchTest.peakSpeed}),mobileShot)
   await mobileCtx.close()
 
   assert.deepEqual(errors,[]);console.log('seconds',(performance.now()-start)/1000);assert(performance.now()-start<180000)
