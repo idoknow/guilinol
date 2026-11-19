@@ -116,13 +116,19 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       if(near&&!modelMountains.has(model)){
         const list:R.Collider[]=[],pt=new THREE.Vector3()
         model.updateWorldMatrix(true,true)
-        model.traverse(node=>{
-          if(!(node instanceof THREE.Mesh))return
+        const meshes:THREE.Mesh[]=[]
+        model.traverse(node=>{if(node instanceof THREE.Mesh)meshes.push(node)})
+        const collision=meshes.filter(node=>{
+          let parent:THREE.Object3D|null=node
+          while(parent&&parent!==model){if(/^collision/i.test(parent.name))return true;parent=parent.parent}
+          return /^collision/i.test(node.name)
+        })
+        for(const node of (collision.length?collision:meshes)){
           const pos=node.geometry.getAttribute('position'),verts=new Float32Array(pos.count*3)
           for(let i=0;i<pos.count;i++)pt.fromBufferAttribute(pos,i).applyMatrix4(node.matrixWorld).toArray(verts,i*3)
           const idx=node.geometry.index?Uint32Array.from(node.geometry.index.array):Uint32Array.from({length:pos.count},(_,i)=>i)
           list.push(add(R.ColliderDesc.trimesh(verts,idx),'peak'))
-        })
+        }
         modelMountains.set(model,list);changed=true
       }
     }

@@ -128,9 +128,6 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
         cx,cz = ll2xz(peak['lat'],peak['lon'])
         entry = dict(name=peak['name'],center=[cx,peak['target'],cz],lods=[])
         entries.append(entry)
-        if 'model' in peak:
-            entry['model'] = peak['model']
-            return
         shape,floor = profile(sample,cx,cz,angles)
         floor = peak.get('baseHeight',floor)
         aspect = peak.get('aspect',.8)
@@ -168,6 +165,10 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
         blend = np.clip((1.8-fraction)/.65,0,1)
         weight = np.where(wet[window],0,blend*blend*(3-2*blend))
         original[window] = np.minimum(original[window],np.rint(dem[window]*(1-weight)+floor*10*weight))
+        if 'model' in peak:
+            entry['model'] = peak['model']
+            footprints.append(Polygon(np.column_stack((cx+radii*np.cos(angles), cz+radii*np.sin(angles)))))
+            return
         shapes.append((entry,peak,cx,cz,radii,floor))
     for peak in catalog:
         if south <= peak['lat'] <= north and west <= peak['lon'] <= east:

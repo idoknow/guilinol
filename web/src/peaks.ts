@@ -1,12 +1,12 @@
 import * as THREE from 'three'
 import {look} from './look/config'
-import {nightPeaks} from './look/night'
+import {nightLit, nightPeaks} from './look/night'
 import {fetchAsset} from './world'
 import type {PeakWorkerInput, PeakWorkerOutput} from './peaks-worker'
 
 interface Section {offset:number; vertices:number; indices:number; indexOffset:number}
 export interface Peaks {
-  file:string; entries:{name:string; center:[number,number,number]; lods:Section[]; model?:string}[]
+  file:string; entries:{name:string; center:[number,number,number]; baseHeight?:number; lods:Section[]; model?:string}[]
 }
 export interface PeakColliderData {
   name:string
@@ -18,6 +18,7 @@ export interface PeaksGroup extends THREE.Group {
   colliders:PeakColliderData[]
   modelPeaks:THREE.Object3D[]
   stats:{calls:number; lod0Peaks:number; lod1Peaks:number}
+  loadModels(renderer:THREE.WebGLRenderer):void
   update(camera:THREE.PerspectiveCamera, mirrorLevel?:number):void
 }
 
@@ -57,16 +58,11 @@ export function startPeaks(asset:Peaks) {
   }).catch(err=>{markDispatched();throw err})
 
   const modelEntries = asset.entries.filter(e=>e.model)
-  const modelLoaded = modelEntries.length
-    ? Promise.all(modelEntries.map(async entry=>{
-        const {GLTFLoader} = await import('three/addons/loaders/GLTFLoader.js')
-        const {scene} = await new GLTFLoader().loadAsync(`./world/${entry.model}`)
-        scene.name = entry.name
-        return scene
-      }))
-    : Promise.resolve([] as THREE.Object3D[])
-
-  const finish = Promise.all([workerDone, modelLoaded]).then(([data, models])=>assemblePeaks(data,models))
+  const finish = workerDone.then(data=>{
+    const group = assemblePeaks(data,[])
+    group.userData.modelEntries = modelEntries
+    return group
+  })
   return {dispatched, finish}
 }
 
@@ -223,7 +219,7 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
       stats.lod1Peaks = vis1.length
       stats.calls = (mesh0.visible?1:0)+(mesh1.visible?1:0)+models.length
     },
-  })
+  }) as PeaksGroup
 
   const raySphere = new THREE.Sphere(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3(), hitVec = new THREE.Vector3()
   group.raycast = (raycaster:THREE.Raycaster, intersects:THREE.Intersection[])=>{
@@ -249,5 +245,35 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
   }
 
   group.add(mesh0,mesh1,...models)
+  group.loadModels = renderer => {
+    const entries = group.userData.modelEntries as Peaks['entries']|undefined
+    if(!entries?.length || group.userData.modelsStarted) return
+    group.userData.modelsStarted = true
+    void (async()=>{
+      const [{GLTFLoader},{KTX2Loader},{MeshoptDecoder}] = await Promise.all([
+        import('three/addons/loaders/GLTFLoader.js'),
+        import('three/addons/loaders/KTX2Loader.js'),
+        import('three/addons/libs/meshopt_decoder.module.js'),
+      ])
+      const loader = new GLTFLoader().setKTX2Loader(new KTX2Loader().setTranscoderPath('./basis/').detectSupport(renderer)).setMeshoptDecoder(MeshoptDecoder)
+      for(const entry of entries){
+        if(!entry.model) continue
+        const url = entry.model.includes('/')?`./${entry.model}`:`./world/${entry.model}`
+        try{
+          const {scene} = await loader.loadAsync(url)
+          const holder = new THREE.Group()
+          holder.name = entry.name
+          holder.position.set(entry.center[0], entry.baseHeight??entry.center[1], entry.center[2])
+          scene.traverse(node=>{
+            if(/^collision/i.test(node.name)||node.name==='lod1'||node.name==='lod2') node.visible = false
+            if(node instanceof THREE.Mesh) for(const material of [node.material].flat()) nightLit(material)
+          })
+          holder.add(scene)
+          group.add(holder)
+          models.push(holder)
+        }catch(error){console.warn(entry.name, error)}
+      }
+    })()
+  }
   return group
 }
