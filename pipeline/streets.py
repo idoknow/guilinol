@@ -41,7 +41,9 @@ def chunks(roads,banks,bounds,water,sample,exclude,modeled_paving=None):
         if not line.intersects(bounds):
             continue
         lengths['road']+=line.intersection(bounds).length
-        surfaces.append(line.buffer(width/2,quad_segs=2))
+        # Stone pedestrian approaches around Gunanmen and the north bank of Ronghu.
+        paving = sidewalks if road.way in (221349750, 684511179, 221882718) else surfaces
+        paving.append(line.buffer(width/2,quad_segs=2))
         for side,extra in ((-1,road.left),(1,road.right)):
             if extra:
                 sidewalks.append(line.buffer(side*(width/2+extra),single_sided=True,quad_segs=2))

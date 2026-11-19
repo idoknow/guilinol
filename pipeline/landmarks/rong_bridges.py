@@ -68,6 +68,18 @@ def crossing(builder,path,widths,heights,arch_segment=None):
 
 
 def nine_bends(builder):
+    # Landward end of way/684946201, meeting the first deck of way/221475379.
+    approach = [(67.2, 17.9), (75.1, 22.9), NINE_BENDS[0]]
+    heights = [.85, .85, -3.9]
+    sections = list(section_edges(approach, [3, 3, 2.8]))
+    for index in range(2):
+        left, right = sections[index]
+        end_left, end_right = sections[index+1]
+        vertices = [(p[0], h, p[1]) for p,h in zip(
+            (left,right,end_right,end_left), (heights[index],heights[index],heights[index+1],heights[index+1]))]
+        builder.parts['atlas'].face(vertices,(0,1,0),'granite',1.4)
+        if builder.collide:
+            builder.hit.face(vertices,(0,1,0),'granite')
     crossing(builder,NINE_BENDS,[2.8,2.8,2.8,2.8,4.2,4.2,2.8,2.8,2.8,2.8],
              [-3.9,-2.75,-2.55,-2.4,-1.9,-1.9,-1.65,-1.1,-.65,.25],5)
 
@@ -104,9 +116,9 @@ def ancient_bridge(builder):
             yaw_box(stone,point(middle,top+.19),(.85,.38,end-start+.02),yaw,'rubble')
             yaw_box(stone,point(middle,top+.45),(.76,.16,end-start+.02),yaw,'foliage')
     for sign in (-1,1):
-        yaw_box(stone,point(sign*19,-3.22),(9,.45,4.4),yaw,'granite')
-    for offset in (-7,7):
-        banyan(stone,point(-20,-3.2,offset),9,5,32+offset,builder.detail)
+        yaw_box(stone,point(sign*23,-3.22),(9,.45,12.4),yaw,'granite')
+    for offset in (-11,11):
+        banyan(stone,point(-17,-3.2,offset),9,5,32+offset,builder.detail)
     colors=('lantern_red','lantern_gold','lantern_cyan','lantern_pink','lantern_orange')
     for strand in range(4):
         previous=None

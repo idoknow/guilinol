@@ -86,9 +86,10 @@ def island(b):
         for south in (138.6,153.1):
             box(wall,(east,.38,south),(2.02,.32,3.5),'foliage',None)
             oval(wall,(east,.65,south),(.97,.48,.85),'foliage',7)
-    torus(wall,(123,2.5,136),1.94,.35,.39,'white')
+    # IMG_1324 sees this pierced limestone at the island landing, north of the wall.
+    torus(wall,(116,1.93,126),1.43,.39,.48,'limestone', .14, stretch=1.14)
     for offset in (-.7,0,.7):
-        torus(wall,(123+offset,2.5,136),.72,.12,.15,'white')
+        oval(wall,(116+offset,.5,126),(.85,.45,.6),'limestone',8)
     arch_wall(wall,(130,.24,132),4.2,3.2,.48,2.2,2.75,'garden_brick',tile=None)
     for east in (125.8,134.2):
         box(wall,(east,.82,132),(4.2,1.16,.48),'garden_brick',None)
@@ -195,7 +196,13 @@ def library(b):
         box(wall,(x+direction*9,y+.75,z+5.4),(5.2,.32,1.9),'foliage')
         for plant in range(9 if b.detail else 4):
             oval(wall,(x+direction*9+2*math.cos(plant*2.4),y+1,z+5.4+.55*math.sin(plant*2.4)),(.4,.25,.37),'foliage',6)
-    solid_tree(wall,(x-14,y,z+9),16,12.6,54,b.detail)
+    solid_tree(wall,(x-21,y,z+5),12.8,8.6,54,b.detail,lobed=False)
+    for index in range(12):
+        east = x - 30 + index * 1.65
+        box(wall, (east,y+.19,z+6), (1.68,.42,2.4), 'granite')
+        oval(wall, (east,y+.55,z+6), (1.02,.6,.95), 'foliage', 8)
+    for east in (x-25,x-23,x-21):
+        oval(wall,(east,y+.52,z+7.2),(1.12,.84,.75),'limestone',7)
     box(wall,(x+17,y+1.1,z+9),(8.4,2.2,.45),'white')
     for index in range(7):
         east=x+14+index*.95
@@ -344,21 +351,17 @@ def shore(b):
             wall.face(arc(face,2.48)+arc(face,4.32)[::-1],(face+116,0,0),'white')
         for radius,side in ((2.48,-1),(4.32,1)):
             wall.face(arc(-117.15,radius)+arc(-114.85,radius)[::-1],(0,side*math.sin(angles[0]),side*math.cos(angles[0])),'white')
-    for index in range(10):
-        east=-82+index*5
-        level=-.7+index*.09
-        for side in (-1,1):
-            box(wall,(east,level,-16+side*1.79),(5,.4,2.18),'granite')
-            box(wall,(east,level+.16,-16+side*.75),(5,.22,.15),'white')
-        box(wall,(east,level+.03,-16),(5,.08,1.4),'rill_water')
-        for offset in (-1.3,1.3):
-            box(wall,(east+offset,level+.17,-16),(.63,.32,.6),'ashlar')
-        if index in (0,3):
-            solid_tree(wall,(east,level,-21),9,5,90+index,b.detail,lobed=False)
-    for index in range(6):
-        angle=index*math.tau/6
-        cylinder(wall,(-46+2.25*math.cos(angle),0,-10+2.25*math.sin(angle)),.19,3,'vermilion',8)
-    hip_roof(wall,(-46,-10),3,5.3,5.3,2,.7,.5,'graytile','vermilion',tiers=2,sides=6)
+    # IMG_1334–36 look along the strip between ways 684511179 and 686230933.
+    with align_front(b, (0, -17.5), -21):
+        # Finished-ground samples along the pedestrian strip; keep lips above paving.
+        levels = [1.99,1.99,1.99,1.89,1.69,1.49,1.19,.89,.39,.39]
+        for index, level in enumerate(levels):
+            east = -16 + index * 4
+            for side in (-1, 1):
+                box(wall, (east, level, -17.5+side*1.24), (4.02,.48,.36), 'granite')
+            box(wall, (east,level+.08,-17.5), (4,.1,2.2), 'rill_water')
+            box(wall, (east-1.8,level+.17,-17.5), (.36,.3,2.25), 'ashlar')
+    pavilion(b, 24, .35, -6, span=4.4)
     post = 0.95 if b.detail else 8
     # North bank between the pavilion and 古南门, with a gap in front of the steps.
     railing(wall, (-36, 7.2), (-2.2, 7.2), 0, 0.95, 'granite', post, stone=True)
@@ -380,6 +383,27 @@ def build(b: Builder):
     hotel(b)
     steel_bridge(b)
     shore(b)
+    # IMG_1343 shows a two-storey pale frontage across Yiwu Road. The east
+    # face follows the west sidewalk of way/221349755 at the park junction.
+    with align_front(b, (-84,-86), 69):
+        mesh = b.parts['atlas']
+        box(mesh,(-84,5.1,-87.5),(13.8,8.2,3),'cream')
+        box(mesh,(-84,1.8,-85.95),(14,1.6,.25),'ashlar')
+        for east in (-89.4,-86.7,-84,-81.3,-78.6):
+            for level in (3.8,7.2):
+                box(b.parts['lit'],(east,level,-85.93),(1.35,1.92,.18),'glass')
+        box(mesh,(-84,9.25,-87.4),(14.3,.34,3.4),'graytile')
+        if b.collide:
+            solid(b.hit,(-84,5.1,-87.5),(13.8,8.2,3),'ashlar')
+    # Approach to Yingbin Bridge (way/221349753), descending west from Yiwu Road.
+    points = [(-83.3,-53.2,-.72),(-95.8,-57.9,-1.55),(-108.1,-62.4,-2.88)]
+    for start, end in zip(points,points[1:]):
+        a = (start[0],start[2],start[1])
+        c = (end[0],end[2],end[1])
+        ramp(b.parts['atlas'],a,c,3.8)
+        if b.collide:
+            ramp(b.hit,a,c,3.8)
+
 
 
 def main():
