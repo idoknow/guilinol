@@ -272,6 +272,18 @@ def glass_bridge(builder):
 
 def shore(b):
     wall = b.parts['atlas']
+    for south in (-27.4,-20.6):
+        box(wall,(-116,1.6,south),(2.3,5.6,1.85),'white')
+        box(wall,(-116,-.84,south),(2.8,.82,2.36),'ashlar')
+        box(wall,(-116,4.28,south),(2.68,.42,2.13),'white')
+        if b.collide:
+            solid(b.hit,(-116,1.6,south),(2.3,5.6,1.85),'ashlar')
+    for face in (-117.15,-114.85):
+        for index in range(16):
+            angles=(index*math.pi/16,(index+1)*math.pi/16)
+            corners=[(face,2.6+2.52*math.sin(angle),-24+2.52*math.cos(angle)) for angle in angles]
+            wall.face([*corners,(face,5.8,corners[1][2]),(face,5.8,corners[0][2])],(face+116,0,0),'white')
+    box(wall,(-116,5.85,-24),(2.65,.38,9.35),'white')
     for index in range(10):
         east=-82+index*5
         level=-.7+index*.09
