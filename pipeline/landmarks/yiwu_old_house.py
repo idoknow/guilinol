@@ -40,4 +40,4 @@ def house(model):
         for start,end in zip(scroll,scroll[1:]):model.beam(start,end,.024,'tile',4)
 
 
-if __name__=='__main__':generate('yiwu_old_house',house,colors=dict(brick='#53595c',tile='#292b2c',earth='#98523e'))
+if __name__=='__main__':generate('yiwu_old_house',house,colors=dict(brick='#57534d',tile='#292b2c',earth='#98523e'))
