@@ -123,6 +123,17 @@ def inner_court(m, plan):
                 m.box(side*(6+rail_width/2),base+.85,depth/2+.65,rail_width,.2,.28,'white')
                 for east in np.arange(6,width/2,2):
                     m.box(side*east,base,depth/2+.65,.32,1.15,.32,'white')
+    # The Gongyuan POI is just east of this roof. The bay divisions are estimated.
+    x,z,angle,width,depth = plan.frame(1471532482)
+    m.pose = (x,plan.ground(x,z),z,angle)
+    m.box(0,-.3,0,width,.6,depth,'stone',True)
+    m.box(0,.3,-depth*.43,width,3.1,.5,'white',True)
+    m.swept_roof(0,3.45,0,width,depth,1.9)
+    for east in np.linspace(-width*.48,width*.48,11):
+        m.box(east,.3,-depth*.1,.22,2.65,depth*.7,'wood',True)
+        m.beam([east,.3,depth*.4],[east,3.45,depth*.4],.14,'red',8,True)
+    m.box(0,2.55,depth*.42,4.4,.85,.22,'sign')
+    letters(m,'广西贡院',(0,2.69,depth*.42+.12),3.6,.55,'gold')
     x,z = plan.shapes[5981119756].coords[0]
     m.pose=(x,plan.ground(x,z),z,0)
     for width,base,height in [(4.6,0,.45),(3.8,.45,.45),(2.5,.9,1.2),(1.15,2.1,5.2)]:

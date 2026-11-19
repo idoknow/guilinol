@@ -99,7 +99,7 @@ def buildings(bounds, elevation, peaks,layout):
     kinds = Counter()
     palace = []
     custom = {1008248059, 1008248065, 1008248057, 684987708, 885083143,
-              679734442, 679734417, 674165595, 674165596, 674165597}
+              679734442, 679734417, 1471532482, 674165595, 674165596, 674165597}
     for props, poly in palace_features():
         if props['kind'] != 'building' or not bounds.covers(poly.centroid):
             continue

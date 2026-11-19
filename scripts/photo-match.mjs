@@ -3,6 +3,7 @@ import {chromium} from 'playwright'
 import {preview} from 'vite'
 
 const output=process.env.CAPTURES??'captures/wangcheng'
+const palaceOverview=process.argv.includes('--palace-overview')
 const planOnly=process.argv.includes('--plan-only')
 const selected=process.env.PHOTO_NUMBERS?.split(',')
 await mkdir(output,{recursive:true})
@@ -58,8 +59,12 @@ try {
     }
   }
   await page.setViewportSize({width:700,height:700})
-  await page.evaluate(()=>{const {camera}=window.viewer;camera.fov=55;camera.updateProjectionMatrix();camera.position.set(-610,360,-150);camera.lookAt(-610,150,-150.01)})
-  await page.waitForFunction(before=>{const {stats,stream}=window.viewer;return !stats.pending&&[...stream.landmarks].some(([entry,group])=>entry.id===(before?'jingjiang':'wangcheng_market')&&group.getObjectByName('lod0')?.visible)},planOnly,{timeout:90000})
+  await page.evaluate(wide=>{
+    const {camera}=window.viewer
+    const [x,y,z]=wide?[-548,798,-498]:[-610,360,-150]
+    camera.fov=55;camera.updateProjectionMatrix();camera.position.set(x,y,z);camera.lookAt(x,150,z-.01)
+  },palaceOverview)
+  await page.waitForFunction(before=>{const {stats,stream}=window.viewer;return !stats.pending&&[...stream.landmarks].some(([entry,group])=>entry.id===(before?'jingjiang':'wangcheng_market')&&(group.getObjectByName('lod0')?.visible||group.getObjectByName('lod1')?.visible))},planOnly||palaceOverview,{timeout:90000})
   await page.waitForTimeout(400)
   await page.screenshot({path:`${output}/plan.jpg`})
   if(!planOnly)await writeFile(`${output}/cameras.json`,JSON.stringify(trace,null,2))

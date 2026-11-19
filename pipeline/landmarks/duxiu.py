@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from jingjiang import generate
+from wangcheng_plan import ROOT, ll2xz
 
 
 def rock_shelter(model):
@@ -56,8 +57,15 @@ def summit(model):
     lod=peak['lods'][0]; payload=gzip.decompress((world/manifest['peaks']['file']).read_bytes())
     vertices=np.frombuffer(payload,'<i2',lod['vertices']*3,lod['offset']).reshape(-1,3)/100;vertices[:,1]+=height-anchor
     rings=vertices[:-1].reshape(12,-1,3); tip=vertices[-1]; count=rings.shape[1]
+    pois=json.loads((ROOT/'docs/layout/wangcheng.geojson').read_text())['features']
+    def cliff_column(name):
+        poi=next(f for f in pois if f['properties']['name']==name)
+        east,south=ll2xz(*reversed(poi['geometry']['coordinates']))
+        offset=rings[1][:,[0,2]]+[x,z]-[east,south]
+        return int(np.argmin(np.linalg.norm(offset,axis=1)))
+    entrance=cliff_column('太平岩')
     def tread(progress):
-        phase=(.50+progress*1.37)*count; col=int(phase)%count
+        phase=entrance+progress*1.37*count; col=int(phase)%count
         level=1+progress*10; row=min(10,int(level)); weight=level-row
         strip=rings[:,col]*(1-phase%1)+rings[:,(col+1)%count]*(phase%1)
         point=strip[row]*(1-weight)+strip[row+1]*weight
@@ -75,7 +83,7 @@ def summit(model):
             model.beam([1,.12,0],[1,1.25,0],.09,'stone')
     start,angle=tread(0);model.pose=(*start,angle-math.pi/2)
     rock_shelter(model)  # Taiping Cave, west foot at the stair entrance.
-    southeast = rings[1,round(count/8)]
+    southeast = rings[1,cliff_column('读书岩')]
     model.pose = (*southeast, -math.pi/4)
     rock_shelter(model)  # Dushu Cave and cliff inscriptions, southeast foot.
     model.pose=(*tip,0)

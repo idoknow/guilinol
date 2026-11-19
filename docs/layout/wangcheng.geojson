@@ -640,7 +640,7 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/674165590",
         "floors": 3,
-        "facade_bearing": null,
+        "facade_bearing": 278.8,
         "photo": null,
         "imagery_center": [
           110.29615246,
@@ -650,7 +650,8 @@
         "axis_deg": 98.8,
         "floors_estimated": true,
         "position_confidence": "高",
-        "name_confidence": "中"
+        "name_confidence": "中",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -687,7 +688,7 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/674165591",
         "floors": 3,
-        "facade_bearing": null,
+        "facade_bearing": 278.8,
         "photo": null,
         "imagery_center": [
           110.29613879,
@@ -697,7 +698,8 @@
         "axis_deg": 98.8,
         "floors_estimated": true,
         "position_confidence": "高",
-        "name_confidence": "中"
+        "name_confidence": "中",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -734,7 +736,7 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/674165592",
         "floors": 3,
-        "facade_bearing": null,
+        "facade_bearing": 278.8,
         "photo": null,
         "imagery_center": [
           110.29611828,
@@ -744,7 +746,8 @@
         "axis_deg": 98.8,
         "floors_estimated": true,
         "position_confidence": "高",
-        "name_confidence": "中"
+        "name_confidence": "中",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -781,7 +784,7 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/674165593",
         "floors": 3,
-        "facade_bearing": null,
+        "facade_bearing": 188.8,
         "photo": null,
         "imagery_center": [
           110.29609777,
@@ -791,7 +794,8 @@
         "axis_deg": 98.8,
         "floors_estimated": true,
         "position_confidence": "高",
-        "name_confidence": "中"
+        "name_confidence": "中",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -828,7 +832,7 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/674165594",
         "floors": 3,
-        "facade_bearing": null,
+        "facade_bearing": 188.8,
         "photo": null,
         "imagery_center": [
           110.29607043,
@@ -838,7 +842,8 @@
         "axis_deg": 98.8,
         "floors_estimated": true,
         "position_confidence": "高",
-        "name_confidence": "中"
+        "name_confidence": "中",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -875,7 +880,7 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/674165595",
         "floors": 3,
-        "facade_bearing": null,
+        "facade_bearing": 98.9,
         "photo": null,
         "imagery_center": [
           110.2935,
@@ -885,7 +890,8 @@
         "axis_deg": 98.9,
         "floors_estimated": true,
         "position_confidence": "高",
-        "name_confidence": "中"
+        "name_confidence": "中",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -922,7 +928,7 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/674165596",
         "floors": 3,
-        "facade_bearing": null,
+        "facade_bearing": 98.9,
         "photo": null,
         "imagery_center": [
           110.2934248,
@@ -932,7 +938,8 @@
         "axis_deg": 98.9,
         "floors_estimated": true,
         "position_confidence": "高",
-        "name_confidence": "中"
+        "name_confidence": "中",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -969,7 +976,7 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/674165597",
         "floors": 3,
-        "facade_bearing": null,
+        "facade_bearing": 188.9,
         "photo": null,
         "imagery_center": [
           110.29334277,
@@ -979,7 +986,8 @@
         "axis_deg": 98.9,
         "floors_estimated": true,
         "position_confidence": "高",
-        "name_confidence": "中"
+        "name_confidence": "中",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1016,7 +1024,7 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734417",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 188.5,
         "photo": null,
         "imagery_center": [
           110.294669,
@@ -1026,7 +1034,8 @@
         "axis_deg": 8.5,
         "floors_estimated": true,
         "position_confidence": "高",
-        "name_confidence": "高"
+        "name_confidence": "高",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1067,7 +1076,7 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734418",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 8.8,
         "photo": null,
         "imagery_center": [
           110.29405374,
@@ -1077,7 +1086,8 @@
         "axis_deg": 98.8,
         "floors_estimated": true,
         "position_confidence": "高",
-        "name_confidence": "中"
+        "name_confidence": "中",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1146,12 +1156,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734419",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 278.9,
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1188,12 +1199,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734420",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 98.9,
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1230,12 +1242,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734421",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 98.1,
         "photo": null,
         "axis_deg": 98.1,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1272,12 +1285,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734422",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 98.2,
         "photo": null,
         "axis_deg": 8.2,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1314,12 +1328,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734423",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 280.0,
         "photo": null,
         "axis_deg": 100.0,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1356,12 +1371,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734424",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 99.2,
         "photo": null,
         "axis_deg": 99.2,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1398,12 +1414,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734425",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 99.3,
         "photo": null,
         "axis_deg": 9.3,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1440,12 +1457,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734426",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 189.3,
         "photo": null,
         "axis_deg": 9.3,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1486,12 +1504,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734427",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 99.3,
         "photo": null,
         "axis_deg": 9.3,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1528,12 +1547,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734428",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 9.3,
         "photo": null,
         "axis_deg": 9.3,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1570,12 +1590,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734429",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 189.2,
         "photo": null,
         "axis_deg": 99.2,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1612,12 +1633,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734430",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 99.2,
         "photo": null,
         "axis_deg": 99.2,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1654,12 +1676,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734433",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 278.9,
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1696,12 +1719,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734434",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 278.9,
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1738,12 +1762,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734435",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 278.9,
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1780,12 +1805,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734436",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 190.0,
         "photo": null,
         "axis_deg": 100.0,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1822,12 +1848,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734437",
         "floors": 3,
-        "facade_bearing": null,
+        "facade_bearing": 276.8,
         "photo": null,
         "axis_deg": 96.8,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "中"
+        "name_confidence": "中",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1880,12 +1907,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734438",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 8.5,
         "photo": null,
         "axis_deg": 8.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1930,12 +1958,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734439",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 7.8,
         "photo": null,
         "axis_deg": 7.8,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -1972,12 +2001,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734440",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 190.3,
         "photo": null,
         "axis_deg": 10.3,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2014,12 +2044,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734441",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 7.7,
         "photo": null,
         "axis_deg": 97.7,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2056,7 +2087,7 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734442",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 188.5,
         "photo": null,
         "imagery_center": [
           110.29455278,
@@ -2066,7 +2097,8 @@
         "axis_deg": 98.5,
         "floors_estimated": true,
         "position_confidence": "高",
-        "name_confidence": "高"
+        "name_confidence": "高",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2103,12 +2135,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734443",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 8.9,
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2145,12 +2178,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734449",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 278.1,
         "photo": null,
         "axis_deg": 8.1,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2187,12 +2221,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734451",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 8.3,
         "photo": null,
         "axis_deg": 98.3,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2229,12 +2264,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734452",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 188.6,
         "photo": null,
         "axis_deg": 98.6,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2303,12 +2339,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734453",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 188.5,
         "photo": null,
         "axis_deg": 98.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2345,12 +2382,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734454",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 188.5,
         "photo": null,
         "axis_deg": 98.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2387,12 +2425,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734455",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 8.5,
         "photo": null,
         "axis_deg": 98.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2461,7 +2500,7 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734456",
         "floors": 3,
-        "facade_bearing": null,
+        "facade_bearing": 8.5,
         "photo": null,
         "imagery_center": [
           110.29541415,
@@ -2471,7 +2510,8 @@
         "axis_deg": 98.5,
         "floors_estimated": true,
         "position_confidence": "高",
-        "name_confidence": "中"
+        "name_confidence": "中",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2508,12 +2548,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679734457",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 8.8,
         "photo": null,
         "axis_deg": 98.8,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "中"
+        "name_confidence": "中",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2614,12 +2655,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990114",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 7.4,
         "photo": null,
         "axis_deg": 97.4,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2688,12 +2730,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990115",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 97.5,
         "photo": null,
         "axis_deg": 7.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2730,12 +2773,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990116",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 97.5,
         "photo": null,
         "axis_deg": 7.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2772,12 +2816,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990117",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 97.5,
         "photo": null,
         "axis_deg": 7.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2814,12 +2859,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990118",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 7.5,
         "photo": null,
         "axis_deg": 7.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2856,12 +2902,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990119",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 97.5,
         "photo": null,
         "axis_deg": 7.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2898,12 +2945,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990120",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 97.5,
         "photo": null,
         "axis_deg": 7.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -2940,12 +2988,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990121",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 98.9,
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -3014,12 +3063,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990122",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 8.2,
         "photo": null,
         "axis_deg": 98.2,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -3056,12 +3106,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990123",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 7.9,
         "photo": null,
         "axis_deg": 97.9,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -3098,12 +3149,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990124",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 9.3,
         "photo": null,
         "axis_deg": 99.3,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -3188,12 +3240,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990125",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 10.3,
         "photo": null,
         "axis_deg": 100.3,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -3278,12 +3331,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990126",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 6.6,
         "photo": null,
         "axis_deg": 96.6,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -3368,12 +3422,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990127",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 9.4,
         "photo": null,
         "axis_deg": 99.4,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -3458,12 +3513,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990128",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 6.6,
         "photo": null,
         "axis_deg": 96.6,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -3548,12 +3604,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/679990130",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 6.6,
         "photo": null,
         "axis_deg": 96.6,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -3638,12 +3695,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/684987708",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 278.4,
         "photo": null,
         "axis_deg": 8.4,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "高"
+        "name_confidence": "高",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -3748,12 +3806,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/885083143",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 8.1,
         "photo": null,
         "axis_deg": 98.1,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "高"
+        "name_confidence": "高",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -3798,12 +3857,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1008248057",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 97.7,
         "photo": null,
         "axis_deg": 7.7,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "高"
+        "name_confidence": "高",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -3872,7 +3932,7 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1008248059",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 187.9,
         "photo": "22–23",
         "imagery_center": [
           110.29416995,
@@ -3882,7 +3942,8 @@
         "axis_deg": 97.9,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "高"
+        "name_confidence": "高",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -4137,12 +4198,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1008248065",
         "floors": 2,
-        "facade_bearing": null,
+        "facade_bearing": 189.8,
         "photo": "31–35",
         "axis_deg": 99.8,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "高"
+        "name_confidence": "高",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -4227,12 +4289,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1008248068",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 6.4,
         "photo": null,
         "axis_deg": 96.4,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -4269,12 +4332,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1008248069",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 6.4,
         "photo": null,
         "axis_deg": 96.4,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -4311,12 +4375,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1008248070",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 8.2,
         "photo": null,
         "axis_deg": 98.2,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -4353,12 +4418,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1008248071",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 7.5,
         "photo": null,
         "axis_deg": 97.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -4395,12 +4461,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1008248072",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 8.6,
         "photo": null,
         "axis_deg": 98.6,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -4445,12 +4512,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1008248073",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 9.6,
         "photo": null,
         "axis_deg": 99.6,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -4899,12 +4967,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1471513677",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 189.1,
         "photo": null,
         "axis_deg": 99.1,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -4941,12 +5010,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1471513678",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 189.3,
         "photo": null,
         "axis_deg": 99.3,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -5011,12 +5081,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1471513680",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 188.0,
         "photo": null,
         "axis_deg": 98.0,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -5053,12 +5124,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1471513681",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 98.5,
         "photo": null,
         "axis_deg": 98.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -5123,12 +5195,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1471513683",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 187.5,
         "photo": null,
         "axis_deg": 97.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -5269,12 +5342,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1471513686",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 189.6,
         "photo": null,
         "axis_deg": 99.6,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -5629,12 +5703,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1471528915",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 7.5,
         "photo": null,
         "axis_deg": 97.5,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -5713,12 +5788,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1471528918",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 10.2,
         "photo": null,
         "axis_deg": 10.2,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -5771,12 +5847,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1471528919",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 189.2,
         "photo": null,
         "axis_deg": 9.2,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -5841,12 +5918,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1471528921",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 188.4,
         "photo": null,
         "axis_deg": 98.4,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -5911,12 +5989,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1471530355",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 188.7,
         "photo": null,
         "axis_deg": 98.7,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -5953,12 +6032,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1471530955",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 279.3,
         "photo": null,
         "axis_deg": 9.3,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -6059,12 +6139,13 @@
         "kind": "building",
         "osm": "https://www.openstreetmap.org/way/1471532482",
         "floors": 1,
-        "facade_bearing": null,
+        "facade_bearing": 189.1,
         "photo": null,
         "axis_deg": 99.1,
         "floors_estimated": true,
         "position_confidence": "中",
-        "name_confidence": "未具名"
+        "name_confidence": "未具名",
+        "facade_estimated": true
       },
       "geometry": {
         "type": "Polygon",
@@ -6266,6 +6347,66 @@
         "coordinates": [
           110.294389,
           25.2846439
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "贡院",
+        "kind": "poi",
+        "source": "百度地图 POI + 桂林景区游线",
+        "bd09mc": [
+          12279314.67,
+          2893012.04
+        ],
+        "position_confidence": "中"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.29472528226613,
+          25.28685446466248
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "太平岩",
+        "kind": "poi",
+        "source": "百度地图 POI + 桂林景区游线",
+        "bd09mc": [
+          12279301.41,
+          2892900.85
+        ],
+        "position_confidence": "中"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.29460654013015,
+          25.285944652423574
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "读书岩",
+        "kind": "poi",
+        "source": "百度地图 POI + 桂林景区游线",
+        "bd09mc": [
+          12279341.06,
+          2892903.02
+        ],
+        "position_confidence": "中"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.29496087750975,
+          25.28596707873748
         ]
       }
     }
