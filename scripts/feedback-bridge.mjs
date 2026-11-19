@@ -134,27 +134,38 @@ async function queue(row, journal, save) {
   const detail = await (await request(`/api/feedback/${row.id}`)).json(),
     body = evidence(detail)
   if (dry) return console.log(body)
+  async function dispatch(...args) {
+    try {
+      return cli(...args)
+    } catch (error) {
+      journal.failures = (journal.failures || 0) + 1
+      await save()
+      throw error
+    }
+  }
   const title = `[反馈 ${row.id}] 桂林地标建模`,
     file = join(work, 'task.md')
   let issue = row.multica_issue || journal.issue || children().find((child) => child.title === title)?.id
   if (!issue) {
     await writeFile(file, body)
-    issue = cli(
-      'issue',
-      'create',
-      '--title',
-      title,
-      '--project',
-      env.BRIDGE_PROJECT,
-      '--parent',
-      env.BRIDGE_PARENT,
-      '--assignee-id',
-      env.BRIDGE_AGENT,
-      '--status',
-      'todo',
-      '--description-file',
-      file,
-      ...(await files(detail)),
+    issue = (
+      await dispatch(
+        'issue',
+        'create',
+        '--title',
+        title,
+        '--project',
+        env.BRIDGE_PROJECT,
+        '--parent',
+        env.BRIDGE_PARENT,
+        '--assignee-id',
+        env.BRIDGE_AGENT,
+        '--status',
+        'todo',
+        '--description-file',
+        file,
+        ...(await files(detail)),
+      )
     ).id
     if (!issue) throw Error('No created issue ID')
   } else if (row.multica_issue) {
@@ -165,12 +176,13 @@ async function queue(row, journal, save) {
         file,
         `${marker}\n[@建模 agent](mention://agent/${env.BRIDGE_AGENT}) 请按补充证据继续。\n${body}`,
       )
-      cli('issue', 'comment', 'add', issue, '--content-file', file, ...(await files(detail)))
+      await dispatch('issue', 'comment', 'add', issue, '--content-file', file, ...(await files(detail)))
     }
     journal.since = event.created_at
     journal.previousDecision = journal.lastDecision
   }
   journal.issue = issue
+  delete journal.failures
   await save()
   await post(row.id, 'queued', { multica_issue: issue })
 }
@@ -241,12 +253,18 @@ async function sync(row, journal, save) {
     pr && (await deployed(pr.html_url))
       ? 'live'
       : { in_progress: 'modelling', in_review: 'reviewing', done: 'reviewing' }[current.status]
-  if (
-    !['live', 'reviewing'].includes(status) &&
-    cli('issue', 'runs', issue).filter((run) => run.status === 'failed' && run.agent_id === env.BRIDGE_AGENT)
-      .length >= 2
-  ) {
-    if (row.status !== 'modelling') await post(row.id, 'modelling')
+  const recent = ['live', 'reviewing'].includes(status)
+    ? []
+    : cli('issue', 'runs', issue)
+        .filter(
+          (run) =>
+            run.agent_id === env.BRIDGE_AGENT &&
+            run.completed_at &&
+            Date.parse(run.completed_at) > (journal.runsAfter || 0),
+        )
+        .sort((left, right) => Date.parse(right.completed_at) - Date.parse(left.completed_at))
+        .slice(0, 2)
+  if (recent.length === 2 && recent.every((run) => run.status === 'failed')) {
     journal.failures = 2
     await save()
   } else if (status && status !== row.status)
@@ -271,21 +289,13 @@ async function processRow(row) {
     }
   }
   if (!(journal.failures >= 2)) {
-    try {
-      if (row.status === 'submitted') await queue(row, journal, save)
-      else await sync(row, journal, save)
-    } catch (error) {
-      if (!dry && error.path === env.MULTICA_CLI_PATH) {
-        journal.failures = (journal.failures || 0) + 1
-        await save()
-      }
-      throw error
-    }
+    if (row.status === 'submitted') await queue(row, journal, save)
+    else await sync(row, journal, save)
   }
   if (journal.failures >= 2 && !journal.alerted && !dry) {
     const file = join(work, 'alert.md'),
       issue = row.multica_issue || journal.issue || env.BRIDGE_PARENT,
-      marker = `反馈 ${row.id} 自动处理已暂停。`
+      marker = `反馈 ${row.id} 自动处理已暂停。${journal.runsAfter ? `（恢复批次 ${journal.runsAfter}）` : ''}`
     if (!comments(issue).some((c) => c.content.startsWith(marker))) {
       await writeFile(
         file,

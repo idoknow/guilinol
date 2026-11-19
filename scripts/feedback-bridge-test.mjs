@@ -12,6 +12,7 @@ export async function bridgeTest({ api, origin, cookie, state, staticDir }) {
     cli,
     `#!/usr/bin/env node
 const fs=require('fs'), args=process.argv.slice(2), data=JSON.parse(fs.readFileSync(process.env.FIXTURE)), val=k=>args[args.indexOf(k)+1]; let result
+if(data.failCommand && args.join(' ').startsWith(data.failCommand+' '))process.exit(1)
 switch (args.slice(0,2).join(' ')) {
 case 'issue children':result={stages:[],unstaged:data.created?[data.created]:[]};break
 case 'issue create':data.creates++;data.created={id:'model-1',title:val('--title')};data.args=args;data.body=fs.readFileSync(val('--description-file'),'utf8');data.sizes=args.flatMap((value,index)=>value==='--attachment'?[fs.statSync(args[index+1]).size]:[]);result=data.created;break
@@ -78,7 +79,15 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
   console.log('DRY RUN BEGIN\n' + dry + 'DRY RUN END')
   assert.equal((await load()).creates, 0)
   assert.throws(() => run())
+  const journalPath = (feedbackId) => join(env.BRIDGE_STATE, feedbackId + '.json')
+  const journal = async (feedbackId) => JSON.parse(await readFile(journalPath(feedbackId)))
+  await set({ failCommand: 'issue children' })
+  assert.throws(() => run())
+  assert.throws(() => run())
+  assert.equal((await journal(id)).failures, 1)
+  await set({ failCommand: null })
   run()
+  assert.equal((await journal(id)).failures, undefined)
   run()
   let data = await load()
   assert.equal(data.creates, 1)
@@ -127,7 +136,12 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
   assert.equal(detail.events.at(-1).message, '请补充背面照片。')
   assert.equal(detail.multica_issue, 'model-1')
   await api(path + '/supplement', { body: '已核对背面' })
+  await set({ failCommand: 'issue comment add' })
+  assert.throws(() => run())
+  assert.equal((await journal(id)).failures, 1)
+  await set({ failCommand: null })
   run()
+  assert.equal((await journal(id)).failures, undefined)
   await set({ status: 'in_progress' })
   run()
   assert.match((await load()).replies[0], /已核对背面/)
@@ -174,13 +188,33 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
     comments: [],
     created: null,
     status: 'in_progress',
-    runs: Array(2).fill({ agent_id: 'agent', status: 'failed' }),
+    runs: [2000, 1000].map((time) => ({
+      agent_id: 'agent',
+      status: 'failed',
+      completed_at: new Date(time).toISOString(),
+    })),
   })
   assert.throws(() => run())
   run()
   run()
   run()
-  assert.equal((await api('feedback/' + next)).status, 'modelling')
+  assert.deepEqual(
+    (await api('feedback/' + next)).events.map((event) => event.status),
+    ['submitted', 'queued'],
+  )
+  assert.equal((await load()).replies.filter((message) => message.includes('自动处理已暂停')).length, 1)
+  const recovered = await journal(next)
+  assert.equal(recovered.failures, 2)
+  delete recovered.failures
+  delete recovered.alerted
+  recovered.runsAfter = Date.now()
+  await writeFile(journalPath(next), JSON.stringify(recovered))
+  run()
+  run()
+  assert.deepEqual(
+    (await api('feedback/' + next)).events.map((event) => event.status),
+    ['submitted', 'queued', 'modelling'],
+  )
   assert.equal((await load()).replies.filter((message) => message.includes('自动处理已暂停')).length, 1)
   console.log(
     'Bridge: dry run, ambiguous create recovery, attachments, supplement and deployment timeline passed',

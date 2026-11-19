@@ -17,4 +17,15 @@ systemctl --user list-timers glol-feedback-bridge.timer
 journalctl --user -u glol-feedback-bridge.service
 ```
 
-开关改回 0 后下次直接退出；卸载用 `systemctl --user disable --now glol-feedback-bridge.timer`。`--dry-run` 只读取远端数据，将含用户私有信息的描述打印到本地，请勿分享真实输出。状态保存在 `~/.local/state/glol-feedback-bridge`；不要清空。两次 Multica 失败后暂停该反馈并在关联任务（尚未建单则在汇总父 issue）提醒 sg claude。人工核对任务、照片和时间线后，停 timer 并等 service 退出，只清该反馈 JSON 的 `failures` 和 `alerted` 字段，再启动 timer。未建单时反馈保持 submitted，不伪报已开始建模。409 不重试。用户原照片始终从受鉴权的接口读取；仅明确标记可公开的成果 PNG 进入 `public/comparisons/`。
+开关改回 0 后下次直接退出；卸载用 `systemctl --user disable --now glol-feedback-bridge.timer`。`--dry-run` 只读取远端数据，将含用户私有信息的描述打印到本地，请勿分享真实输出。409 不重试。用户原照片始终从受鉴权的接口读取；仅明确标记可公开的成果 PNG 进入 `public/comparisons/`。
+
+连续两次派发写入（建单或补充材料评论）失败，或建模 agent 最近两次已结束的运行均失败时，bridge 暂停该反馈并提醒 sg claude。查询失败下轮重试，不计数；成功派发或找回已成功的写入会清零。暂停不改用户时间线。
+
+**恢复单条反馈**：先停 timer，确认 service 已退出，并核对关联任务、照片和时间线。以下命令保留建单关联和补充材料去重记录，将 `runsAfter` 设为恢复时的 Unix 毫秒数，只统计此后结束的建模运行。不要删除整个状态文件。
+
+```sh
+systemctl --user stop glol-feedback-bridge.timer
+# 等 systemctl --user is-active glol-feedback-bridge.service 返回 inactive 后执行
+file="$HOME/.local/state/glol-feedback-bridge/<反馈 ID>.json"  # 若配置 BRIDGE_STATE，使用实际目录
+(umask 077; jq 'del(.failures,.alerted) | .runsAfter = (now * 1000 | floor)' "$file" > "$file.new" && mv "$file.new" "$file") && systemctl --user start glol-feedback-bridge.timer
+```
