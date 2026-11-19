@@ -57,7 +57,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const capsule=world.createCollider(new R.ColliderDesc(shape),body)
   const regions=new Map<Tile,Region>(), mountains=new Map<PeakColliderData,R.Collider>(), modelMountains=new Map<THREE.Object3D,R.Collider[]>(), kinds=new Map<number,Kind>()
   function add(desc:R.ColliderDesc,kind:Kind){const coll=world.createCollider(desc);kinds.set(coll.handle,kind);return coll}
-  function remove(coll:R.Collider){kinds.delete(coll.handle);world.removeCollider(coll,false)}
+  const thinDecks=new Set<number>()
+  function remove(coll:R.Collider){thinDecks.delete(coll.handle);kinds.delete(coll.handle);world.removeCollider(coll,false)}
   const trunks=new Map<import('../forest').Tree,R.Collider>()
   const landmarks=new Map<THREE.Group,R.Collider[]>()
   function sync(east:number,south:number){
@@ -99,8 +100,20 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         for(const [ax,az,bx,bz,top,bottom] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=(top-bottom)/10+1.25
           colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
       if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
-      if(data?.deck.length){const count=data.deck.length/3
-        colliders.push(add(R.ColliderDesc.trimesh(data.deck,Uint32Array.from({length:count},(_,at)=>at),R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(tile.x,0,tile.z),'deck'))}
+      if(data?.deck.length){
+        // Keep the rendered slab thickness on the collider. Rapier feature IDs
+        // on a trimesh ray hit need not index the original GL04 triangles.
+        const indices:[number[],number[]]=[[],[]]
+        for(let face=0;face<data.deck.length/9;face++){
+          indices[data.thin.has(face)?1:0].push(face*3,face*3+1,face*3+2)
+        }
+        for(const [thin,faces] of indices.entries()){
+          if(!faces.length)continue
+          const collider=add(R.ColliderDesc.trimesh(data.deck,Uint32Array.from(faces),R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(tile.x,0,tile.z),'deck')
+          colliders.push(collider)
+          if(thin)thinDecks.add(collider.handle)
+        }
+      }
       regions.set(tile,{colliders,rings,fine:!!data});changed=true
     }
     for(const peak of peaks.colliders){
@@ -138,8 +151,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const tileAt=(east:number,south:number)=>tiles.get(`${Math.floor(east/256)*256},${Math.floor(south/256)*256}`)
   function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
     const hit=world.castRayAndGetNormal(new R.Ray({x:east,y:origin,z:south},down),reach,false,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)
-    const tile=kind==='deck'?tileAt(east,south):undefined
-    const thin=tile&&hit?.featureId!==undefined&&stream.loaded.get(tile)?.thin.has(hit.featureId)
+    const thin=!!hit&&thinDecks.has(hit.collider.handle)
     return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}:null
   }
   function wet(east:number,south:number){const tile=tileAt(east,south),data=tile&&stream.loaded.get(tile);if(!tile||!data)return true
