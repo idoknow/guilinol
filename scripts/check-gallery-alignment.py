@@ -27,7 +27,7 @@ def check(entry, way):
     if entry["id"] == "zhuangyuan_gallery":
         keep = (tri[:,:,1].min(axis=1)>3.32) & (tri[:,:,1].max(axis=1)<4.50) & (tri[:,:,0].max(axis=1)<21.4)
     else:
-        keep = (tri[:,:,1].min(axis=1)>10.29) & (tri[:,:,1].max(axis=1)<13.51)
+        keep = (tri[:,:,1].min(axis=1)>14.49) & (tri[:,:,1].max(axis=1)<17.71)
     local = tri[keep][:,:,[0,2]]
     angle = np.radians(entry["rotation"])
     c,s = np.cos(angle), np.sin(angle)

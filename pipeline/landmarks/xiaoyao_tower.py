@@ -103,13 +103,18 @@ def white_rail(m, x, z, dx, dz, bays, base):
 
 
 def tower(model):
-    court, platform = 4.2, 5.64
+    court, platform = 8.4, 9.84
     model.box(0,-.36,-8,34,court+.36,48,'stone',True)
     model.box(0,court-.16,-8,34,.16,48,'pave',True)
     # From the gallery pavilion, ascend east to the open northern court.
-    steps(model,0,court,-27.08,-21, .42,0,24,4.2)
+    # Two flights turn south at a level landing outside the west curtain.
+    steps(model,0,2.8,-27.08,-21,.38,0,16,4.2)
+    model.box(-19,0,-21,4,2.8,4.2,'stone',True)
+    steps(model,2.8,court,-19,-18.9,0,.38,32,4)
+    model.box(-19,0,-5.24,4,court,3,'stone',True)
+    model.box(0,court-.55,-8,34.16,.24,48.16,'granite')
     # Riverside stair follows the eastern face, ending on an upper landing.
-    steps(model,0,court,18.68,5,0,-.42,24,3.36)
+    steps(model,0,court,18.68,15.08,0,-.42,48,3.36)
     model.box(18.68,-.25,-7.06,3.36,court+.25,4,'stone',True)
     for z in np.arange(-30,15,2.15):
         if -10 < z < -5:

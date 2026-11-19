@@ -28,7 +28,7 @@ try {
     }
     if(!await walk.enter(...start,0,'gallery'))throw Error('gallery spawn failed')
     const initial=walk.probe(), levels=[]
-    for(const [x,z] of [gallery(-10,0),gallery(20,0),gallery(28,-.5),tower(-28,-21),tower(-16,-21),tower(0,-20),tower(0,-10),tower(0,-16),tower(14,-16),tower(14,-7.7),tower(18.7,-7.7),tower(18.7,6.5)]){
+    for(const [x,z] of [gallery(-10,0),gallery(20,0),gallery(28,-.5),tower(-28,-21),tower(-19,-21),tower(-19,-5.25),tower(-15,-5.25),tower(0,-20),tower(0,-10),tower(0,-16),tower(14,-16),tower(14,-7.7),tower(18.7,-7.7),tower(18.7,16.2)]){
       let reached=false
       for(let attempt=0;attempt<350;attempt++){
         const pos=walk.probe(),dx=x-pos.x,dz=z-pos.z,dist=Math.hypot(dx,dz)
@@ -42,6 +42,8 @@ try {
   })
   console.log(report)
   assert.equal(report.resets,0)
-  assert.ok(Math.max(...report.levels)>5)
+  assert.ok(Math.abs(report.levels[4]-2.8)<.35)
+  assert.ok(Math.abs(report.levels[5]-8.4)<.35)
+  assert.ok(Math.abs(Math.max(...report.levels)-9.84)<.35)
   assert.ok(Math.abs(report.levels.at(-1))<.4)
 } finally {await browser?.close();await server.close()}
