@@ -55,6 +55,18 @@ for(const [query,name,road] of [
   assert.equal(hit?.k,'school')
   if(road) assert.equal(atlas.roadAt(hit.x,hit.z,30)?.name,road)
 }
+const yixian = atlas.search('桂林市逸仙中学')[0]
+assert.equal(yixian.k,'school')
+for (const alias of ['桂林市第二中学','桂林二中','二中']) assert.deepEqual(atlas.search(alias),[yixian])
+const peizhi = atlas.search('桂林市培智学校')[0]
+assert.equal(peizhi.k,'school')
+assert.deepEqual(atlas.search('特殊教育学校'),[peizhi])
+for (const [name,street] of [['宁远小学','安新北路'],['桂林市培智学校','雉山路'],['桂林市逸仙中学','雉山路'],['桂林市民族中学','民主路'],['南溪山小学','中山南路']]) {
+  const hits=atlas.search(name)
+  assert.equal(hits.length,1)
+  assert.equal(hits[0].k,'school')
+  assert.equal(atlas.roadAt(hits[0].x,hits[0].z,2)?.name,street)
+}
 const junction=atlas.roadAt(-881,-165)?.name
 assert.ok(['中山中路','解放东路','解放西路'].includes(junction))
 const river=atlas.roadAt(-1205,2740)
