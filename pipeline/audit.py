@@ -18,7 +18,7 @@ from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import nearest_points, polygonize, unary_union
 import trimesh
 
-from landmarks.jiefang_layout import DECK_WAYS
+from landmarks.jiefang_layout import SPAN_WAYS, world_road_sections
 from common import CHUNK, GRID, OUT, load_osm, xz2ll
 from features import area, points, polygons
 from road_profile import RULES
@@ -600,14 +600,31 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         rc = road_ctrl_y(x, z)
         return max(rc, g) if rc is not None else g
 
+    interchange = {}
+    if 'jiefang_bridge' in landmarks:
+        bridge = landmarks['jiefang_bridge']['entry']
+        bx, datum, bz = bridge['position']
+        for way, line, stations, levels, left_edge, right_edge in world_road_sections(
+                (bx, bz), -np.deg2rad(bridge['rotation'])):
+            pavement = Polygon(np.vstack([left_edge, right_edge[::-1]])).buffer(.025)
+            interchange[way] = line, stations, datum + levels, pavement, left_edge, right_edge
+
     def road_surface_y(x: float, z: float, is_bridge: bool, way_id: int) -> float:
+        if way_id in interchange:
+            line, stations, levels, pavement, _, _ = interchange[way_id]
+            point = Point(x, z)
+            if pavement.covers(point):
+                ref = np.interp(line.project(point), stations, levels)
+                modeled = lm_walk_y_at(x, z, ref)
+                if modeled is not None:
+                    return modeled
         if is_bridge:
             if f'way/{way_id}' in replaced_ways:
                 ly = lm_walk_y_at(x, z)
                 if ly is not None:
                     return ly
             dy = deck_y_at(x, z, tol=0.45)
-            if way_id in DECK_WAYS:
+            if way_id in SPAN_WAYS:
                 # The upper road is jointly supplied by GL04 and the landmark.
                 modeled = lm_walk_y_at(x, z)
                 if modeled is not None:
@@ -639,10 +656,22 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                 nx_d, nz_d = -tz_d / t_len, tx_d / t_len
                 lx, lz = pt.x - nx_d * half_span, pt.y - nz_d * half_span
                 rx, rz = pt.x + nx_d * half_span, pt.y + nz_d * half_span
+                span = 2.0 * half_span
+                if way_id in interchange:
+                    line, stations, _, pavement, left_edge, right_edge = interchange[way_id]
+                    if pavement.covers(pt):
+                        # Paired one-way ramps have asymmetric lanes. Sample across
+                        # this carriageway rather than across its inner retaining wall.
+                        station = line.project(pt)
+                        left_pt, right_pt = (np.array([np.interp(station, stations, axis) for axis in edge.T])
+                                             for edge in (left_edge, right_edge))
+                        lx, lz = .95 * left_pt + .05 * right_pt
+                        rx, rz = .05 * left_pt + .95 * right_pt
+                        span = math.hypot(rx - lx, rz - lz)
                 if bounds.contains(Point(lx, lz)) and bounds.contains(Point(rx, rz)):
                     hl = road_surface_y(lx, lz, False, way_id)
                     hr = road_surface_y(rx, rz, False, way_id)
-                    tilt = abs(hr - hl) / (2.0 * half_span)
+                    tilt = abs(hr - hl) / span
                     if tilt > 0.03:
                         uneven_issues.append(make_issue('crossTilt', pt.x, pt.y, tilt,
                                                         f'way/{way_id} {name or hw} cross-tilt {tilt*100:.1f}% (>3%)', way=way_id))
@@ -892,7 +921,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                 continue
             bp = bline.interpolate(into_bridge_dist)
             by = lm_walk_y_at(bp.x, bp.y) if f'way/{wid}' in replaced_ways else deck_y_at(bp.x, bp.y, tol=0.45)
-            if wid in DECK_WAYS:
+            if wid in SPAN_WAYS:
                 by = road_surface_y(bp.x, bp.y, True, wid)
             if by is None:
                 continue
@@ -901,7 +930,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             lpts = osm_ways[lid_way][0]
             lline = LineString(lpts if lpts[0] == end_pt else lpts[::-1])
             lp = lline.interpolate(min(1.0, lline.length * 0.5))
-            ly = road_base_y(lp.x, lp.y) + 0.045
+            ly = road_surface_y(lp.x, lp.y, False, lid_way)
             step = abs(by - ly)
             if step > 0.10:
                 other_issues.append(make_issue('bridgeJointStep', end_pt[0], end_pt[1], step,

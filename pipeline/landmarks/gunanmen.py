@@ -21,11 +21,11 @@ import sys
 from PIL import Image, ImageDraw
 from c_kit import RECTS, ATLAS
 from rong_street import shops, signs, approach
-from rong_solids import loft, oval, banyan as solid_tree
+from rong_solids import loft, oval, banyan as solid_tree, align_front
 from pathlib import Path
 
 from c_kit import (
-    Builder, arch_wall, banyan, box, cylinder, ensure_textures, export_landmark, solid,
+    Builder, arch_wall, box, cylinder, ensure_textures, export_landmark, solid,
     extrude, grille, hip_roof, railing, ramp, stairs, tri_count, yaw_box, segment_wall, tube, _canopy,
 )
 
@@ -83,8 +83,6 @@ def ancient_banyan(builder, east, south):
         segment_wall(wood,*ends,0,.4,.8,'rubble')
         segment_wall(wood,*ends,.4,.72,.64,'foliage')
         railing(iron,*ends,.42,.74,'steel',1.25)
-        if builder.collide:
-            segment_wall(builder.hit,*ends,0,1.1,.62,'granite')
 
 
 def courtyard(builder, deck):
@@ -108,14 +106,10 @@ def courtyard(builder, deck):
     _battered(wall,(-11,-6.8),(11,-6.8),(11,-6.21),(-11,-6.21),0,deck,'ivywall')
     railing(wall,(-10.7,-6.05),(10.7,-6.05),deck,.95,'white',1.2,stone=True)
     box(wall,(-2,.55,-7.9),(20,1.1,1.2),'foliage')
-    if builder.collide:
-        box(builder.hit,(0,deck/2,-4.5),(22,deck,3.4),'ashlar')
     curve=[(3+index*1.6,-9.8+.04*(index-4)**2) for index in range(10)]
     for start,end in zip(curve,curve[1:]):
         segment_wall(wall,start,end,0,1.8,.42,'vermilion')
         segment_wall(wall,start,end,1.8,2.02,.64,'glaze')
-        if builder.collide:
-            segment_wall(builder.hit,start,end,0,2,.42,'ashlar')
     for row in range(7):
         front=-10-row*2
         for east in range(-19,19,2):
@@ -134,12 +128,17 @@ def courtyard(builder, deck):
 
 
 def build(b: Builder):
+    shops(b)
+    approach(b)
+    with align_front(b, (0, 0), -26.8, shift=(.95,-15.8)):
+        gate(b)
+
+
+def gate(b: Builder):
     wall = b.parts['atlas']
     detail = b.detail
     deck = 6.7
     courtyard(b, deck)
-    shops(b)
-    approach(b)
     # Solid platform. South face is one wall with the arch; the other three sides
     # are single faces, chamfered at the corners and inset 0.45 m at the top.
     front_z = 9.4
@@ -209,23 +208,12 @@ def build(b: Builder):
             wall.face([(east,.22,south),(east+2,.22,south),(east+2,.22,south+2),(east,.22,south+2)],(0,1,0),'granite',None)
     # Banyans stand off the south axis so a front camera is not inside the crown.
     ancient_banyan(b, -22, 20)
-    banyan(wall, (20, 0, 22), 12, 8.5, 8, detail)
+    solid_tree(wall, (20, 0, 22), 12, 8.5, 8, detail)
     if not b.collide:
         return
-    # Jambs and lintel leave a 3.6 m by 4.6 m arch. Stair is a ramp the walker can climb.
-    solid(b.hit, (-4.8, 3.35, front_z), (6.0, 6.7, 2.6), 'ashlar')
-    solid(b.hit, (4.8, 3.35, front_z), (6.0, 6.7, 2.6), 'ashlar')
-    solid(b.hit, (0, 5.65, front_z), (3.6, 2.1, 2.6), 'ashlar')
-    solid(b.hit, (-8.2, 3.35, 2.6), (1.3, 6.7, 8.4), 'ashlar')
-    solid(b.hit, (8.2, 3.35, 2.6), (1.3, 6.7, 8.4), 'ashlar')
-    solid(b.hit, (0, 3.35, -2.4), (14.5, 6.7, 1.4), 'ashlar')
-    solid(b.hit, (0, deck + 0.12, 2.6), (13.5, 0.24, 9.2), 'ashlar')
-    ramp(b.hit, (-12.2, 0.15, 16.5), (-7.2, deck, 5.2), 2.4)
-    solid(b.hit, (-15.2, 3.5, 3.2), (8.2, 7.0, 7.4), 'yellow')
-    solid(b.hit, (14.2, 1.55, 4.0), (7.5, 3.1, 0.55), 'yellow')
-    solid(b.hit, (0, deck + 1.55, 2.2), (12.2, 3.1, 0.45), 'yellow')
-    for x, z in ((-6.4, 7.4), (6.4, 7.4), (-6.4, -1.2), (6.4, -1.2)):
-        solid(b.hit, (x, deck + 0.5, z), (0.4, 1.0, 0.4), 'ashlar')
+    for side in (-1,1):
+        solid(b.hit,(side*4.25,deck/2,5.7),(4.5,deck,6.6),'ashlar')
+    solid(b.hit,(0,(deck+4.6)/2,5.7),(4,deck-4.6,6.6),'ashlar')
 
 
 def main():

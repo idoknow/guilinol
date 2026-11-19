@@ -15,7 +15,7 @@ from shapely import STRtree, intersects_xy
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
-from landmarks.jiefang_layout import DECK_WAYS, deck_level
+from landmarks.jiefang_layout import LOWER_ROADS, SPAN_WAYS, deck_level, world_road_sections
 from common import CHUNK, GRID, load_osm
 from features import points, rongyin_sidewalk
 from road_profile import RULES
@@ -220,6 +220,7 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
             replaced_ways.update(k for k in rep if isinstance(k, str))
 
     from audit import load_landmark_meshes
+    initial_ground = build_ground_mesh_lookup(original_dm, surface_dm, left, top, width, depth)
     def _lm_init_y(x: float, z: float, entry: dict) -> float:
         r = int(np.clip(round((z - top) / GRID), 0, gh4 - 1))
         c = int(np.clip(round((x - left) / GRID), 0, gw4 - 1))
@@ -229,6 +230,8 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
             if entry['id'] == 'shanhu_pagodas':
                 return float(surface_dm[r, c]) / 10.0
             return float(terrain_dm[r, c]) / 10.0
+        if entry['id'] == 'ronghu':
+            return initial_ground(x, z)
         fl = specifications[entry['id']].get('flatten')
         if isinstance(fl, dict) and 'elevation' in fl:
             return float(fl['elevation'])
@@ -528,6 +531,52 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
 
     bridge_targets = []  # (x, z, road_base_y, weight)
     bridge_plans = {}
+    if jb_pos is not None:
+        anchor = np.asarray(jb_pos)[[0, 2]]
+        angle = -np.deg2rad(lm_meshes['jiefang_bridge']['entry']['rotation'])
+        for way, line, _, levels, edge_l, edge_r in world_road_sections(anchor, angle):
+            if way not in osm_ways or not line.intersects(bounds_poly):
+                continue
+            # Pin the full carriageway at each junction with the native road.
+            for i in (0, -1):
+                if not bounds_poly.covers(Point(line.coords[i])):
+                    continue
+                for x, z in (line.coords[i], edge_l[i], edge_r[i]):
+                    bridge_targets.append((x, z, jb_pos[1] + levels[i] - .045, 1200.0))
+                # Hold the native road level through the modeled landing, then
+                # let the spline transition into its existing longitudinal grade.
+                pt = np.array(line.coords[i])
+                local = (pt - anchor) @ np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+                if min(abs(local[0] + 265), abs(abs(local[1]) - 120)) < .01:
+                    outward = pt - line.coords[1 if i == 0 else -2]
+                    outward /= np.linalg.norm(outward)
+                    native = LineString(osm_ways[way][0])
+                    seam = native.project(Point(pt))
+                    sign = 1 if native.project(Point(pt + outward)) > seam else -1
+                    available = native.length - seam if sign == 1 else seam
+                    base = jb_pos[1] + levels[i]
+                    if way in LOWER_ROADS:
+                        # The depressed Binjiang road climbs back to the DEM over
+                        # a longer run. Follow its curve beyond the modeled bank.
+                        run = min(80, available)
+                        if run < 1:
+                            continue
+                        far = native.interpolate(seam + sign * run)
+                        rise = dem_at(far.x, far.y) - base
+                        targets = []
+                        for t in np.linspace(0, 1, 11)[1:]:
+                            center = native.interpolate(seam + sign * t * run).coords[0]
+                            targets.append((center, base + rise * t*t*(3-2*t), 900.0))
+                    else:
+                        # Upper and side approaches continue over the embankment.
+                        targets = [(pt + d * outward, base, 1200.0)
+                                   for d in (6, 14, 24) if d <= available]
+                    for center, height, weight in targets:
+                        for edge in (pt, edge_l[i], edge_r[i]):
+                            x, z = center + edge - pt
+                            if bounds_poly.covers(Point(x, z)):
+                                bridge_targets.append((x, z, height - .045, weight))
+
     bridge_end_land = {}
 
     twin_arch = defaultdict(float)
@@ -559,9 +608,9 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
         line = LineString(pts)
         if not bounds_poly.intersects(line) or line.length < 1.0:
             continue
-        if f'way/{wid}' in replaced_ways or wid in DECK_WAYS:
+        if f'way/{wid}' in replaced_ways or wid in SPAN_WAYS:
             owner_lm = next((e['id'] for e in landmarks_cfg if isinstance(e.get('replace'), list) and f'way/{wid}' in e['replace']), None)
-            if wid in DECK_WAYS:
+            if wid in SPAN_WAYS:
                 owner_lm = 'jiefang_bridge'
             if owner_lm:
                 for end_idx, into_d in ((0, min(0.5, line.length * 0.2)), (-1, max(0.0, line.length - min(0.5, line.length * 0.2)))):
@@ -570,14 +619,14 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
                     if not cland:
                         continue
                     bp = line.interpolate(into_d)
-                    ly_deck = jiefang_level(bp.x, bp.y) if wid in DECK_WAYS else lm_deck_y(owner_lm, bp.x, bp.y)
+                    ly_deck = jiefang_level(bp.x, bp.y) if wid in SPAN_WAYS else lm_deck_y(owner_lm, bp.x, bp.y)
                     if ly_deck is not None:
                         lpts = osm_ways[cland[0]][0]
                         lline = LineString(lpts if lpts[0] == end_pt else lpts[::-1])
                         for d_pin in (0.0, min(1.0, lline.length * 0.5), min(2.5, lline.length * 0.8)):
                             pp = lline.interpolate(d_pin)
                             bridge_targets.append((pp.x, pp.y, ly_deck - 0.045, 1200.0))
-            if wid not in DECK_WAYS:
+            if wid not in SPAN_WAYS:
                 continue
         if wid not in raw_bridge_info:
             continue
@@ -600,7 +649,7 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
 
         bridge_plans[wid] = (line, b_width, s_b, h_prof)
         bridge_end_land[wid] = (cland0, cland1)
-        if wid in DECK_WAYS:
+        if wid in SPAN_WAYS:
             continue  # The land approaches were pinned to the upper landmark deck above.
         for end_pt, h_end, cland in ((pts[0], float(h_prof[0]), cland0), (pts[-1], float(h_prof[-1]), cland1)):
             if cland:
@@ -922,7 +971,7 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
         motor_road_tree = STRtree(motor_road_lines) if motor_road_lines else None
 
         for wid, (line, b_width, s_b, h_prof) in list(bridge_plans.items()):
-            if wid in DECK_WAYS:
+            if wid in SPAN_WAYS:
                 # The two carriageways and cycleways share one sloping slab.
                 # Keep GL04 just under its skin, including at the vaulted portal.
                 profile = np.array([jiefang_level(*line.interpolate(station).coords[0]) - .04 for station in s_b])

@@ -155,6 +155,7 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
     for elem in elements:
         tags = elem.get('tags',{})
         key = next((tags[tag] for tag in ('natural','leisure','landuse','amenity') if tags.get(tag) in CONFIG['patchSpacing']),None)
+        if elem['type']=='way' and elem['id'] in (1382487359,1382487360):key='park'
         if key is None or elem['type']=='node':
             continue
         distance = CONFIG['patchSpacing'][key]

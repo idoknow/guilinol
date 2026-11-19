@@ -1,4 +1,5 @@
-from g4_frontage import generate
+from school_plaque import main
 
-if __name__ == '__main__':
-    generate('chuanshan_tourism')
+
+if __name__ == "__main__":
+    main("chuanshan_tourism")

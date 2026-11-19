@@ -1,4 +1,4 @@
-"""Assemble prints from photo-match.mjs. All satellite pixels remain view-only."""
+"""Assemble prints from wangcheng-photo-match.mjs. All satellite pixels remain view-only."""
 import argparse
 from pathlib import Path
 import json

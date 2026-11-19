@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:bridge": "node scripts/auth-test.mjs --bridge",
     "dev:full": "npm run build && wrangler d1 migrations apply glol --local && wrangler pages dev dist --binding EMAIL_DEV_LOG=1",
     "test:api": "node --test scripts/test-projection.mjs && node scripts/auth-test.mjs",
     "verify:feedback": "node scripts/auth-test.mjs --feedback-ui",
@@ -14,6 +15,7 @@
     "prebuild": "npm run basis",
     "landmarks": "uv run --locked python pipeline/pack_landmarks.py",
     "world": "uv run --locked python pipeline/world.py",
+    "audit:landmarks": "uv run --locked python pipeline/audit_landmarks.py",
     "credits": "node scripts/photo-credits.mjs",
     "og": "node scripts/og.mjs",
     "dev": "vite web --config web/vite.config.ts",
@@ -27,7 +29,10 @@
     "verify:ride": "node scripts/ride.mjs",
     "perf": "node scripts/perf.mjs",
     "shoot": "node scripts/shoot.mjs",
-    "audit": "node scripts/audit.mjs"
+    "audit": "node scripts/audit.mjs",
+    "qa": "node scripts/qa.mjs",
+    "photo-match": "node scripts/photo-match.mjs",
+    "verify:tour": "node scripts/tour.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.21.0",

@@ -9,7 +9,7 @@ from shapely.geometry.polygon import orient
 
 from common import load_osm
 from features import points, polygons
-from landmarks.jiefang_layout import DECK_WAYS
+from landmarks.jiefang_layout import SPAN_WAYS
 
 
 def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=None):
@@ -31,7 +31,7 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=N
             continue
         if f"way/{way['id']}" in replaced:
             continue
-        portal_deck = west_portal is not None and way['id'] in DECK_WAYS
+        portal_deck = west_portal is not None and way['id'] in SPAN_WAYS
         coords = points(way)
         if len(coords) < 2:
             continue

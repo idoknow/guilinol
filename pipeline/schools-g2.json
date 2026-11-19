@@ -8,38 +8,6 @@
     "arcade": true,
     "sports": "athletics",
     "paved": true,
-    "blocks": [
-      [
-        -11,
-        -10,
-        12,
-        4
-      ],
-      [
-        3,
-        -11,
-        13,
-        5
-      ],
-      [
-        14,
-        -13,
-        7,
-        4
-      ],
-      [
-        -9,
-        -18,
-        14,
-        5
-      ],
-      [
-        8,
-        -19,
-        12,
-        4
-      ]
-    ],
     "facade": "photo-informed"
   },
   {
@@ -49,20 +17,6 @@
     "scale": 1.38,
     "paved": true,
     "band": "#a9826d",
-    "blocks": [
-      [
-        1,
-        -12,
-        33,
-        3
-      ],
-      [
-        -12,
-        0,
-        12,
-        2
-      ]
-    ],
     "facade": "schematic"
   },
   {
@@ -73,20 +27,6 @@
     "paved": true,
     "notice_wall": true,
     "band": "#6f8993",
-    "blocks": [
-      [
-        2,
-        -11,
-        28,
-        4
-      ],
-      [
-        -11,
-        1,
-        12,
-        2
-      ]
-    ],
     "facade": "photo-informed frontage"
   },
   {
