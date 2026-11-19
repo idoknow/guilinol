@@ -9,7 +9,7 @@ import sys
 
 import numpy as np
 import trimesh
-from PIL import ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 
 from xiaoyao_roof import tiled_roof
 from jingjiang import Model, SWATCHES, atlas
@@ -24,7 +24,7 @@ class LandmarkModel(Model):
 
     def mesh(self, vertices, faces, color, collide=False):
         if isinstance(color,str) and color=='lamp':
-            super().mesh(vertices,faces,'gold',collide)
+            super().mesh(vertices,faces,'wood' if self.flood_roof else 'gold',collide)
             self.lamps.append((self.visible.pop(),self.uv.pop()))
         elif self.flood_roof and isinstance(color,str) and color=='tile':
             super().mesh(vertices,faces,color,collide)
@@ -48,7 +48,29 @@ def inscription(image, text, foreground, background, vertical=False):
         for row,letter in enumerate(text):
             face.text((x+64,y+26+row*37),letter,font=font,anchor='mm',fill=foreground)
     else:
-        face.text((x+64,y+64),text,font=font,anchor='mm',fill=foreground)
+        # Paint at the plaque aspect ratio before packing into the square atlas cell.
+        panel=Image.new('RGB',(480,112),background)
+        brush=ImageDraw.Draw(panel)
+        brush.rectangle((6,5,473,106),outline=foreground,width=3)
+        brush.text((240,55),text,font=font.font_variant(size=87),anchor='mm',fill=foreground)
+        image.paste(panel.resize((128,128),Image.Resampling.LANCZOS),(x,y))
+
+
+def carve_medallion(image):
+    index=list(SWATCHES).index('leaf')
+    panel=Image.new('RGB',(128,128),'#eef0fa')
+    brush=ImageDraw.Draw(panel)
+    for inset in (7,12):
+        brush.ellipse((inset,inset,127-inset,127-inset),outline='#c6cbd5',width=2)
+    for angle in np.linspace(0,2*np.pi,8,endpoint=False):
+        outline=[]
+        for t in np.linspace(0,2*np.pi,30):
+            r=20+12*np.cos(t)
+            outline.append((64+r*np.cos(angle)-7*np.sin(t)*np.sin(angle),
+                            64+r*np.sin(angle)+7*np.sin(t)*np.cos(angle)))
+        brush.line(outline,fill='#c9ced8',width=2)
+    brush.ellipse((57,57,71,71),outline='#bcc3cd',width=2)
+    image.paste(panel,((index%4)*128,(index//4)*128))
 
 
 def facade(model, base, half, height, upstairs):
@@ -78,8 +100,6 @@ def facade(model, base, half, height, upstairs):
                 for offset in ([-.4,-.2,0,.2,.4] if model.detail else [0]):
                     model.box(east+offset*width, base, half+.82, .11, .94, .11, 'wood')
         model.box(0, base+height-.3, half, half*2+.5, .48, .52, 'wood')
-        if not upstairs:
-            model.box(0,base+height-.98,half+.28,2.5,.7,.14,'sign')
     model.pose = (0,0,0,0)
 
 
@@ -151,12 +171,13 @@ def tower(model):
                 continue
             model.box(center,court+.13,edge,2.07,1.12,.11,'white')
             if model.detail:
-                for radius,offset,color in ((.38,.10,'granite'),(.32,.14,'white'),(.12,.17,'granite')):
-                    model.beam([center,court+.70,edge+offset-.04],[center,court+.70,edge+offset],radius,color,24)
+                model.mesh([[center+dx,court+.70+dy,edge+.058] for dx,dy in
+                            ((-.43,-.43),(.43,-.43),(.43,.43),(-.43,.43))],
+                           [[0,1,2],[0,2,3]],'leaf')
         model.box(0,platform-.18,edge,half*2,.18,.28,'white')
     model.pose=(0,0,0,0)
     facade(model,platform,8.85,5.05,False)
-    tiled_roof(model,0,platform+5.05,0,24.3,23.1,2.1,1.65,porch_recess=1.9)
+    tiled_roof(model,0,platform+5.05,0,24.3,23.1,2.1,1.65,porch_recess=1.9,lit_edge=True)
     # Projecting central porch and its gable break the first eave (19–22).
     for side in (-1,1):
         for x in (-2.6,2.6):
@@ -164,7 +185,7 @@ def tower(model):
         # The porch ridge points out towards the steps. Its gable rises above
         # the main eave and its fascia projects beyond the outer column line.
         model.pose=(0,0,side*9.36,np.pi/2)
-        tiled_roof(model,0,platform+5.17,0,5.45,8.3,2.02,.72,.84)
+        tiled_roof(model,0,platform+5.17,0,5.45,8.3,2.45,.85,.84)
         model.pose=(0,0,0,0 if side>0 else np.pi)
         model.box(0,platform+4.0,11.72,4.6,1.05,.22,'wood')
         model.mesh([[-2.17,platform+4.06,11.84],[2.17,platform+4.06,11.84],
@@ -175,21 +196,20 @@ def tower(model):
     upper = platform+7.4
     model.box(0,upper-.45,0,17.9,.45,17.9,'wood',True)
     facade(model,upper,7.9,4.85,True)
-    tiled_roof(model,0,upper+4.85,0,21.5,20.2,2.65,1.60)
+    tiled_roof(model,0,upper+4.85,0,21.5,20.2,2.65,1.60,lit_edge=True)
     model.box(0,upper+7.12,0,12,1.05,11,'wood')
-    tiled_roof(model,0,upper+8.17,0,18.4,17.5,3.7,1.50,.76)
+    tiled_roof(model,0,upper+8.17,0,18.4,17.5,3.7,1.50,.76,lit_edge=True)
     if model.detail:
         for side in (-1,1):
             for x in (-6,-3,3,6):
                 model.beam([x,platform+3.65,side*8.9],[x,platform+4.25,side*8.9],.28,'red',10)
-            model.box(0,upper+3.22,side*8.1,4.5,1.35,.22,'sign')
-        for y,w,d in ((platform+5.03,24.3,23.1),(upper+4.83,21.5,20.2),(upper+8.15,18.4,17.5)):
-            for side in (-1,1):
-                model.box(0,y,side*d*.5,w*.67,.06,.07,'lamp')
+
 
 
 def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None):
     image = atlas(colors,smooth)
+    if flood_roof:
+        carve_medallion(image)
     if lettering:
         inscription(image, **lettering)
     target = Path(__file__).resolve().parents[2]/'public/textures/landmarks'/folder
@@ -235,5 +255,5 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
 
 if __name__ == '__main__':
     generate(colors={"wood":"#302d30","red":"#70312f","stone":"#cccddb","brick":"#646777",
-                     "white":"#eef0fa","granite":"#c9cbd6","earth":"#383b43","tile":"#343943"}, flood_roof=True,
+                     "white":"#eef0fa","granite":"#c9cbd6","earth":"#383b43","sign":"#363337","tile":"#404650"}, flood_roof=True,
              lettering=dict(text="逍遙樓",foreground="#ceb17c",background="#392e29"))

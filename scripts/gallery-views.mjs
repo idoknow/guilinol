@@ -16,7 +16,7 @@ const shots = {
   xiaoyao_tower: [
     ['16', [-14,10.05,-30], [0,19.2,0]],
     ['19', [0,10.05,-31], [0,20.2,0]],
-    ['20', [9.8,10.05,-20.5], [0,17,-2]],
+    ['20', [-12.6,10.05,-24.6], [0,18.2,-2]],
     ['22', [-13.7,10.05,-17], [0,19,0]],
     ['25', [14.6,10.05,-8], [9,16.45,1]],
     ['31', [25.5,1.65,-20], [6,13,-7]],
@@ -45,7 +45,7 @@ try {
       const {manifest,camera,clock}=window.viewer,entry=manifest.landmarks.find(item=>item.id===id)
       const angle=entry.rotation*Math.PI/180
       const point=([x,y,z])=>[entry.position[0]+x*Math.cos(angle)+z*Math.sin(angle),entry.position[1]+y,entry.position[2]-x*Math.sin(angle)+z*Math.cos(angle)]
-      camera.fov=['16','19','22'].includes(name)?84:72
+      camera.fov=['16','19','20','22'].includes(name)?84:72
       delete camera.updateProjectionMatrix
       camera.near=.15;camera.updateProjectionMatrix()
       camera.position.set(...point(eye));camera.lookAt(...point(target));clock.set(hour)

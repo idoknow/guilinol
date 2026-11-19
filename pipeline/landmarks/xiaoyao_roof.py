@@ -2,7 +2,7 @@
 import numpy as np
 
 
-def tiled_roof(model, x, y, z, width, depth, rise, wing, ridge_fraction=.63, porch_recess=0):
+def tiled_roof(model, x, y, z, width, depth, rise, wing, ridge_fraction=.63, porch_recess=0, lit_edge=False):
     # Cross-sections from the drip edge to the ridge. The last two have the
     # same span along the ridge, giving each end a vertical triangular gable.
     rings = [(1,1,0,wing),(.91,.84,.06*rise,.52*wing),
@@ -22,7 +22,7 @@ def tiled_roof(model, x, y, z, width, depth, rise, wing, ridge_fraction=.63, por
     for side in range(4):
         span=width if side%2==0 else depth
         # One continuous sheet per slope with a rounded crest on each tile run.
-        n=max(7,round(span/(.40 if model.detail else 1.15)))
+        n=max(4,round(span/(.59 if model.detail else 2.8)))
         us=np.linspace(-1,1,2*n+1)
         for ring in range(len(rings)-1):
             gable=side%2==1 and ring>=3
@@ -38,10 +38,21 @@ def tiled_roof(model, x, y, z, width, depth, rise, wing, ridge_fraction=.63, por
             surface=np.concatenate(rows)
             model.mesh(surface,faces,'wood' if gable else 'tile')
             if not gable:
-                model.mesh(surface-[0,.17,0],faces,'wood')
+                # A smooth dark soffit needs only enough segments to follow the sweep.
+                profile=np.linspace(-1,1,11 if model.detail else 7)
+                underside=np.array([point(side,u,k) for k in (ring,ring+1) for u in profile])
+                m=len(profile)
+                quads=[[i,i+1,i+m+1] for i in range(m-1)]+[[i,i+m+1,i+m] for i in range(m-1)]
+                model.mesh(underside-[0,.17,0],quads,'wood')
             if ring==0:
                 edge=rows[0]
                 model.mesh(np.concatenate([edge,edge-[0,.19,0]]),faces,'wood')
+                if lit_edge and model.detail:
+                    # Inset luminaires follow the eave, including the porch return.
+                    lip=edge.copy()
+                    lip[:,0]=x+.996*(lip[:,0]-x)
+                    lip[:,2]=z+.996*(lip[:,2]-z)
+                    model.mesh(np.concatenate([lip-[0,.18,0],lip-[0,.22,0]]),faces,'lamp')
         # Raised diagonal hip ridges follow the same swept corner profile.
         for ring in range(3):
             a=point(side,-1,ring); b=point(side,-1,ring+1)
