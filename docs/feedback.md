@@ -75,7 +75,9 @@ sg 主机 systemd timer：feedback-bridge（每 5 分钟）
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | POST | /api/feedback | 建草稿 → 返回 id |
-| PUT | /api/feedback/:id/photos/:n | 上传单张（流式写 R2，key `fb/<id>/<n>.<ext>`），带 EXIF 元数据头 |
+| PUT | /api/feedback/:id/photos/:n | 上传或替换单张（流式写 R2，每次写独立对象），带 EXIF 元数据头 |
+| DELETE | /api/feedback/:id/photos/:n | 在 draft / need_info 时移除单张（含未完成的上传） |
+| DELETE | /api/feedback/:id | 删除本人的草稿及照片 |
 | POST | /api/feedback/:id/submit | 校验后 submitted |
 | GET | /api/feedback?mine=1 | 我的反馈列表 |
 | GET | /api/feedback/:id | 详情 + 时间线（仅本人或 bridge） |
@@ -85,6 +87,8 @@ sg 主机 systemd timer：feedback-bridge（每 5 分钟）
 | POST | /api/bridge/feedback/:id/status | bridge 回写状态 + 时间线 |
 
 ### D1 表（草案）
+
+每人最多保留 3 条草稿。滚动 24 小时上传限额为 300 MiB，在开始写 R2 前按本次字节数计入；替换、删除、上传中断均不退回额度。达到上限返回 429，不改变该照片原有状态。
 
 普通会话跨用户访问返回 404。创建草稿的 JSON 字段为 `kind,title,body,lat,lon`，可选 `heading,landmark_id`。照片编号 1–20，PUT 发送原始图片，`X-Photo-Meta` 为 URI 编码的 JSON（`view_label,exif_lat,exif_lon,exif_dir,exif_time`）。详情包含 `photos` 和 `events` 数组。列表、pending 均直接返回数组；pending 也包含已关联且未终结的记录供轮询。补充用 `{body}`，可先上传新编号的照片。
 

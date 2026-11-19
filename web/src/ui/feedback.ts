@@ -128,6 +128,13 @@ export async function openFeedback(host: Host, atlas: Atlas | undefined) {
     }
     body.append(timeline)
     button(body, '刷新进度', () => detail(id))
+    if (item.status === 'draft')
+      button(body, '删除草稿', async () => {
+        if (!confirm('确定删除草稿和照片？')) return
+        const response = await fetch(`/api/feedback/${id}`, { method: 'DELETE' })
+        if (!response.ok) throw Error((await response.json()).error.message)
+        await list()
+      })
     if (item.status === 'need_info' || item.status === 'draft')
       button(body, item.status === 'draft' ? '继续上传' : '补充信息', () => form(item))
     if (item.status === 'live')
@@ -224,6 +231,8 @@ export async function openFeedback(host: Host, atlas: Atlas | undefined) {
       photos,
       item?.photos.map((photo) => photo.n) ?? [],
       (message) => (note.textContent = message),
+      () => id,
+      run,
     )
     dispose = picker.dispose
     form.onsubmit = (event) => {

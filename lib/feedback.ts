@@ -81,8 +81,9 @@ export async function feedback(request: Request, env: Env, path: string) {
     )
       invalid()
     const id = crypto.randomUUID()
-    await stmt(
-      'INSERT INTO feedback(id,user_id,kind,title,body,lat,lon,heading,landmark_id) VALUES(?,?,?,?,?,?,?,?,?)',
+    const created = await stmt(
+      `INSERT INTO feedback(id,user_id,kind,title,body,lat,lon,heading,landmark_id) SELECT ?,?,?,?,?,?,?,?,?
+       WHERE (SELECT count(*) FROM feedback WHERE user_id=? AND status='draft')<3`,
       id,
       user,
       String(data.kind),
@@ -92,7 +93,9 @@ export async function feedback(request: Request, env: Env, path: string) {
       lon,
       data.heading == null ? null : number(data.heading, 0, 360),
       text(data.landmark_id, 120),
+      user,
     ).run()
+    if (!created.meta.changes) throw new Problem(429, 'draft_limit', '最多保留 3 条草稿，请先提交或删除草稿')
     return json({ id })
   }
   const match =
@@ -106,6 +109,20 @@ export async function feedback(request: Request, env: Env, path: string) {
       Number(machine),
     ).first<{ status: string }>()
   if (!row) missing()
+  if (!action && method === 'DELETE') {
+    if (row.status !== 'draft') conflict()
+    const [photos, removed] = await env.DB.batch<{ r2_key: string }>([
+      stmt(
+        `DELETE FROM feedback_photos WHERE feedback_id=? AND EXISTS(SELECT 1 FROM feedback WHERE id=? AND status='draft') RETURNING r2_key`,
+        id,
+        id,
+      ),
+      stmt(`DELETE FROM feedback WHERE id=? AND status='draft'`, id),
+    ])
+    if (!removed.meta.changes) conflict()
+    if (photos.results.length) await env.FEEDBACK.delete(photos.results.map((photo) => String(photo.r2_key)))
+    return json({ ok: true })
+  }
   const photos = () =>
     stmt(
       'SELECT n,bytes,mime,view_label,exif_lat,exif_lon,exif_dir,exif_time FROM feedback_photos WHERE feedback_id=? AND ready=1 ORDER BY n',
@@ -137,8 +154,20 @@ export async function feedback(request: Request, env: Env, path: string) {
         },
       })
     }
-    if (method !== 'PUT') missing()
     if (!['draft', 'need_info'].includes(row.status)) conflict()
+    if (method === 'DELETE') {
+      const photo = await stmt(
+        `DELETE FROM feedback_photos WHERE feedback_id=? AND n=? AND EXISTS(SELECT 1 FROM feedback WHERE id=? AND status=?) RETURNING r2_key`,
+        id,
+        slot,
+        id,
+        row.status,
+      ).first<{ r2_key: string }>()
+      if (!photo) missing()
+      await env.FEEDBACK.delete(photo.r2_key)
+      return json({ ok: true })
+    }
+    if (method !== 'PUT') missing()
     const size = Number(request.headers.get('content-length')),
       mime = request.headers.get('content-type') ?? '',
       extensions: Record<string, string> = {
@@ -162,30 +191,58 @@ export async function feedback(request: Request, env: Env, path: string) {
       invalid()
     }
     if (!meta || typeof meta !== 'object' || (meta.view_label && !views.includes(meta.view_label))) invalid()
-    const key = `fb/${id}/${slot}.${extensions[mime]}`,
+    const key = `fb/${id}/${slot}/${crypto.randomUUID()}.${extensions[mime]}`,
       num = (key: string, min: number, max: number) =>
         meta[key] == null ? null : number(meta[key], min, max)
-    const reserved = await stmt(
-      `INSERT OR IGNORE INTO feedback_photos(feedback_id,n,r2_key,bytes,mime,view_label,exif_lat,exif_lon,exif_dir,exif_time) SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM feedback WHERE id=? AND status=?)`,
-      id,
-      slot,
-      key,
-      size,
-      mime,
-      meta.view_label || null,
-      num('exif_lat', -90, 90),
-      num('exif_lon', -180, 180),
-      num('exif_dir', 0, 360),
-      text(meta.exif_time, 64),
-      id,
-      row.status,
-    ).run()
-    if (!reserved.meta.changes) conflict()
+    const [, prior, reserved] = await env.DB.batch<{ r2_key: string }>([
+      stmt('DELETE FROM feedback_upload_usage WHERE uploaded_at<=unixepoch()-86400'),
+      stmt('SELECT r2_key FROM feedback_photos WHERE feedback_id=? AND n=?', id, slot),
+      stmt(
+        `INSERT INTO feedback_photos(feedback_id,n,r2_key,bytes,mime,view_label,exif_lat,exif_lon,exif_dir,exif_time)
+       SELECT ?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM feedback WHERE id=? AND status=?)
+       AND (SELECT coalesce(sum(bytes),0) FROM feedback_upload_usage WHERE user_id=?) + ? <= 314572800
+       ON CONFLICT(feedback_id,n) DO UPDATE SET r2_key=excluded.r2_key,bytes=excluded.bytes,mime=excluded.mime,
+       view_label=excluded.view_label,exif_lat=excluded.exif_lat,exif_lon=excluded.exif_lon,exif_dir=excluded.exif_dir,
+       exif_time=excluded.exif_time,uploaded_at=excluded.uploaded_at,ready=0`,
+        id,
+        slot,
+        key,
+        size,
+        mime,
+        meta.view_label || null,
+        num('exif_lat', -90, 90),
+        num('exif_lon', -180, 180),
+        num('exif_dir', 0, 360),
+        text(meta.exif_time, 64),
+        id,
+        row.status,
+        user,
+        size,
+      ),
+    ])
+    if (!reserved.meta.changes) {
+      if ((await stmt('SELECT status FROM feedback WHERE id=?', id).first('status')) !== row.status)
+        conflict()
+      throw new Problem(429, 'upload_limit', '24 小时内最多上传 300 MB，请稍后再试')
+    }
     try {
+      if (prior.results.length) await env.FEEDBACK.delete(String(prior.results[0].r2_key))
       await env.FEEDBACK.put(key, request.body)
-      await stmt('UPDATE feedback_photos SET ready=1 WHERE feedback_id=? AND n=?', id, slot).run()
+      const completed = await stmt(
+        'UPDATE feedback_photos SET ready=1 WHERE feedback_id=? AND n=? AND r2_key=?',
+        id,
+        slot,
+        key,
+      ).run()
+      if (!completed.meta.changes) conflict()
     } catch (error) {
-      await stmt('DELETE FROM feedback_photos WHERE feedback_id=? AND n=? AND ready=0', id, slot).run()
+      await env.FEEDBACK.delete(key)
+      await stmt(
+        'DELETE FROM feedback_photos WHERE feedback_id=? AND n=? AND r2_key=? AND ready=0',
+        id,
+        slot,
+        key,
+      ).run()
       throw error
     }
     return json({ n: slot })
