@@ -351,8 +351,12 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                         continue
                 half = np.array([math.cos(heading),math.sin(heading)])*span/2
                 segment = LineString([np.asarray(center.coords[0])-half,np.asarray(center.coords[0])+half])
-                if not any(tree.query(segment,predicate='intersects').size for tree in (obstacles,layers[4])):
-                    anchor(center,heading,1 if seq%10 else 2,span)
+                for masks in (obstacles,layers[4]):
+                    for index in masks.query(segment,predicate='intersects'):
+                        segment = segment.difference(masks.geometries[index])
+                for piece in getattr(segment,'geoms',[segment]):
+                    if piece.length>=.35:
+                        anchor(piece.centroid,heading,1 if seq%10 or piece.length<1.5 else 2,piece.length)
         for side,available in ((-1,road.left),(1,road.right)):
             if not available:
                 continue

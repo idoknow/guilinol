@@ -16,6 +16,27 @@ export const streetFurnitureGeo=new THREE.BoxGeometry()
 export const streetFurnitureMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.8})
 nightStreets(streetSurfaceMat,streetFurnitureMat)
 
+const compileFurniture=streetFurnitureMat.onBeforeCompile
+let sloganTexture:THREE.CanvasTexture|undefined
+streetFurnitureMat.onBeforeCompile=function(shader,renderer){
+  compileFurniture.call(this,shader,renderer)
+  if(!sloganTexture){
+    const canvas=document.createElement('canvas');canvas.width=256;canvas.height=80
+    const ctx=canvas.getContext('2d')!;ctx.fillStyle='black';ctx.fillRect(0,0,256,80)
+    ctx.font='bold 37px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='white';ctx.fillText('文明  公正法治',128,40,246)
+    sloganTexture=new THREE.CanvasTexture(canvas)
+  }
+  shader.uniforms.uSlogan={value:sloganTexture}
+  shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 vSlogan;').replace('#include <begin_vertex>',`#include <begin_vertex>
+    vSlogan=vec3(uv,0.);
+    #ifdef USE_INSTANCING
+    vSlogan.z=step(abs(length(instanceMatrix[0].xyz)-1.35),.001)*step(abs(length(instanceMatrix[1].xyz)-.42),.001)*abs(normal.z);
+    #endif`)
+  shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 vSlogan; uniform sampler2D uSlogan;').replace('#include <color_fragment>',`#include <color_fragment>
+    if(vSlogan.z>.5)diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.93),texture2D(uSlogan,vSlogan.xy).r);`)
+}
+streetFurnitureMat.customProgramCacheKey=()=>'street-furniture-night-slogan'
+
 tileMaterial(streetSurfaceMat,false)
 
 function evalRoadCtrl([baseMm,deltas]:RoadCtrl,lx:number,lz:number){
@@ -81,6 +102,13 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const awnings=look.streets.awnings.map(value=>new THREE.Color(value)),shutter=new THREE.Color(look.streets.shutter)
   const parked:number[]=[],blue=new THREE.Color(look.streets.directionSign)
   for(const [kind,east,south,heading,span] of decor){
+    if(kind!==1&&kind!==2)continue
+    const x=east/10,z=south/10,angle=-heading/100,y=baseLevel(x,z)+.195
+    box(x,y+.88,z,span/10,.085,.07,angle,stoneLight)
+    if(kind===2)box(x,y+.59,z,1.35,.42,.09,angle,awnings[2])
+  }
+  const railLodCount=mats.length/16
+  for(const [kind,east,south,heading,span] of decor){
     const x=east/10,z=south/10,angle=-heading/100,y=baseLevel(x,z)+.195
     if(kind===3){
       for(const along of [-1.25,0,1.25]){
@@ -97,9 +125,8 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       box(x,y+1.5,z,.12,3,.12,angle);box(x,y+2.7,z,.09,.65,1.35,angle,blue)
       box(x,y+2.72,z,.1,.045,.85,angle,stoneLight)
     }else{
-      for(const height of [.28,.88])box(x,y+height,z,span/10,.065,.07,angle)
+      box(x,y+.28,z,span/10,.065,.07,angle)
       for(const along of [-.35,0,.35])box(x+along*span/10*Math.cos(angle),y+.58,z-along*span/10*Math.sin(angle),.05,.6,.05,angle)
-      if(kind===2)box(x,y+.59,z,1.35,.42,.09,angle,awnings[2])
     }
   }
   for(const [east,south,base,heading,width,variant,arterial] of shops){
@@ -162,6 +189,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   return {
     banks,
     detailCount,
+    railLodCount,
     parked:Float32Array.from(parked),
     sidewalk:Float32Array.from(sidewalk),
     surface,

@@ -19,6 +19,7 @@ export interface TileBatchInput {
   furnitureMatrices:Float32Array
   furnitureColors:Float32Array
   detailCount:number
+  railLodCount:number
   parked:Float32Array
 }
 
@@ -274,16 +275,20 @@ export class ChunkBatcher {
     if(furnMask!==this.lastFurnitureMask || camera.position.distanceToSquared(this.lastFurniturePos)>=4) {
       this.lastFurnitureMask = furnMask
       this.lastFurniturePos.copy(camera.position)
-      const near=(matrices:Float32Array,index:number)=>{
+      const near=(matrices:Float32Array,index:number,radius=30)=>{
         const offset=index*16,position=camera.position
-        return (matrices[offset+12]-position.x)**2+(matrices[offset+13]-position.y)**2+(matrices[offset+14]-position.z)**2<=30**2
+        return (matrices[offset+12]-position.x)**2+(matrices[offset+13]-position.y)**2+(matrices[offset+14]-position.z)**2<=radius**2
       }
       const selections=Array.from(visibleStreets,tile=>{
         const item=this.items.get(tile)!, bikes:number[]=[],boxes:number[]=[]
         const position=camera.position
-        if(Math.max(tile.x-position.x,position.x-tile.x-256,tile.z-position.z,position.z-tile.z-256)<=32){
+        const tileDistance=Math.max(tile.x-position.x,position.x-tile.x-256,tile.z-position.z,position.z-tile.z-256)
+        if(tileDistance<=122){
+          for(let index=0;index<item.railLodCount;index++)if(near(item.furnitureMatrices,index,120))boxes.push(index)
+        }
+        if(tileDistance<=32){
           for(let index=0;index<item.parked.length/16;index++)if(near(item.parked,index))bikes.push(index)
-          for(let index=0;index<item.detailCount;index++)if(near(item.furnitureMatrices,index))boxes.push(index)
+          for(let index=item.railLodCount;index<item.detailCount;index++)if(near(item.furnitureMatrices,index))boxes.push(index)
         }
         return {item,bikes,boxes}
       })

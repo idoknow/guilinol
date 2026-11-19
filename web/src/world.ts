@@ -145,6 +145,7 @@ export async function detail(tile:Tile, signal:AbortSignal) {
     walls, pond:pond?.positions ?? null, bridge,
     streetSurface:streets.surface,
     detailCount:streets.detailCount,
+    railLodCount:streets.railLodCount,
     furnitureMatrices:streets.furnitureMatrices,
     furnitureColors:streets.furnitureColors,
     parked:streets.parked,

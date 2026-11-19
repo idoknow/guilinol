@@ -57,7 +57,7 @@ def extract_road_network(frontage_footprints):
     return elements, roads, intersections, banks, waterways, ped_areas
 
 
-def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, precomputed=None, extra_blocked=()):
+def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, precomputed=None, extra_blocked=(), structure_exclude=None):
     rng = random.Random(110300)
     if precomputed is not None:
         elements, roads, intersections, banks, waterways, _ped_areas = precomputed
@@ -70,9 +70,10 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
     tiles, occupancy, stats = defaultdict(bytearray), defaultdict(list), Counter()
     spacing = CONFIG['minSeparation']
 
-    def tree(pt, profile, source, height=None, normal=(0,1,0), separation=spacing, force_kind=None, force_scale=None, yaw=None):
+    def tree(pt, profile, source, height=None, normal=(0,1,0), separation=spacing, force_kind=None, force_scale=None, yaw=None, planting_mask=None):
         east,south = pt.x,pt.y
-        if not bounds.contains(pt) or exclude.covers(pt) or road_only.query(pt, predicate='intersects').size:
+        mask = exclude if planting_mask is None else planting_mask
+        if not bounds.contains(pt) or mask.covers(pt) or road_only.query(pt, predicate='intersects').size:
             return False
         if height is None and blocked.query(pt,predicate='intersects').size:
             return False
@@ -146,7 +147,8 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
                 offset = section.get('treeInset',offset)
             line = road.side_line(side)
             for pt in walk_line(line,street['spacing'],side*(width/2+offset),0 if section else street['jitter'],rng,phase=0 if section and 'treeInset' in section else None):
-                if not junctions.query(pt,predicate='dwithin',distance=street['junction']).size:
+                fitted_verge = road.widening and road.widening[0]==side and road.line.project(pt)<RULES['outerWidening'][str(road.way)]['stationMetres'][-1]
+                if not junctions.query(pt,predicate='dwithin',distance=4 if fitted_verge else street['junction']).size:
                     if not section:
                         tree(pt,'river' if '滨江' in name else 'lake' if '榕' in name else 'mixed','street')
                     elif not blocked.query(pt.buffer(.52), predicate='intersects').size:
@@ -155,7 +157,7 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
                         before, after = line.interpolate(max(0,along-.2)), line.interpolate(min(line.length,along+.2))
                         angle = math.atan2(after.y-before.y,after.x-before.x)
                         canopy = 'treeInset' in section
-                        if not tree(pt,'mixed','street',force_kind=1 if canopy else 0 if arterial else rng.randrange(2),force_scale=125 if canopy else 100 if arterial else 120,yaw=-angle-side*math.pi/2 if arterial else None):
+                        if not tree(pt,'mixed','street',force_kind=1 if canopy else 0 if arterial else rng.randrange(2),force_scale=125 if canopy else 100 if arterial else 120,yaw=-angle-side*math.pi/2 if arterial else None,planting_mask=structure_exclude if fitted_verge else None):
                             continue
                         beds[origin].append([round((pt.x-origin[0])*10),round((pt.y-origin[1])*10),round(angle*100),int(arterial)])
     shore = unary_union(wet).boundary

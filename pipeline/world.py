@@ -193,7 +193,7 @@ def build(bbox, output, palette):
             texture.paste(palette['schoolCourt'],corner,mask)
     bands = section_layers(roads)
     cycle_clearance = [band.buffer(.08) for band in bands[2].geometries]
-    trees, roads, banks, tree_stats, beds = scatter(bounds, footprints, layers['water'], peak_shapes, tree_support_at, mountain_trees, unary_union([layout.tree_exclude, bank_pavement.buffer(2)]) if bank_pavement is not None else layout.tree_exclude, precomputed=road_net, extra_blocked=[*(court.buffer(1.5) for court in layers["schoolTrack"] + layers["schoolCourt"]), *bridge_polys, *road_surfs, *cycle_clearance])
+    trees, roads, banks, tree_stats, beds = scatter(bounds, footprints, layers['water'], peak_shapes, tree_support_at, mountain_trees, unary_union([layout.tree_exclude, bank_pavement.buffer(2)]) if bank_pavement is not None else layout.tree_exclude, precomputed=road_net, extra_blocked=[*(court.buffer(1.5) for court in layers["schoolTrack"] + layers["schoolCourt"]), *bridge_polys, *road_surfs, *cycle_clearance], structure_exclude=layout.exclude.buffer(.52))
     for road in roads:
         for part in polygons(road.pavement.intersection(bounds)):
             mask,corner = stencil(part,left,top,1)

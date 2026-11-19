@@ -23,6 +23,7 @@ try{
   await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
   await page.addStyleTag({content:'body > :not(canvas):not(script){visibility:hidden} canvas{visibility:visible}'})
   for(const [id,view] of Object.entries(views)){
+    if(process.argv.length>3&&!process.argv.slice(3).includes(id))continue
     await page.evaluate(([east,south])=>{
       const {walk,camera}=window.viewer
       if(walk.active)walk.leave()
