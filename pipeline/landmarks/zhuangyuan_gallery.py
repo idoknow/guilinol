@@ -3,6 +3,7 @@ Rock 09–15 supplies the open bays, lanterns, raised pavilion and stele.
 """
 import numpy as np
 
+from xiaoyao_roof import tiled_roof
 from xiaoyao_tower import generate
 
 
@@ -51,10 +52,13 @@ def gallery(m):
         m.box(0, .6, side*1.72, length-.3, .13, .46, 'wood')
     # A continuous gable ridge runs parallel to the passage.
     for side in (-1, 1):
-        vertices = [[x,h,z*side] for x in (-length/2,length/2)
+        vertices = [[x,h,z*side] for x in (-18.95,18.95)
                     for z,h in ((0,4.48),(1.4,3.52),(2.06,3.36))]
-        m.mesh(vertices, [[0,1,4],[0,4,3],[1,2,5],[1,5,4]], 'tile')
-    m.beam([-21.2,4.48,0],[21.2,4.48,0],.1,'granite')
+        faces=[[0,1,4],[0,4,3],[1,2,5],[1,5,4]]
+        m.mesh(vertices,faces,'tile')
+        # Pale underside boards follow the two roof pitches behind the rafters.
+        m.mesh(np.array(vertices)-[0,.085,0],faces,'white')
+    m.beam([-18.95,4.48,0],[18.95,4.48,0],.1,'granite')
     if m.detail:
         for x in np.linspace(-18.8,18.8,6):
             m.box(x,2.68,0,.08,.48,.08,'wood')
@@ -62,7 +66,8 @@ def gallery(m):
             m.box(x,2.29,0,.16,.07,.16,'gold')
         for x in np.linspace(-19.5,19.5,42):
             for side in (-1,1):
-                m.beam([x,4.41,0],[x,3.31,side*2.0],.055,'wood',4)
+                m.beam([x,4.34,0],[x,3.40,side*1.4],.064,'wood',6)
+                m.beam([x,3.40,side*1.4],[x,3.23,side*2.0],.064,'wood',6)
         for x in np.linspace(-18.8,18.8,10):
             for side in (-1,1):
                 z=side*1.48
@@ -71,9 +76,9 @@ def gallery(m):
                 for offset in (-.75,-.25,.25,.75):
                     m.box(x+offset,.7,z,.055,.50,.065,'wood')
                 m.box(x,.73+.48,z,3.9,.08,.10,'wood')
-    for end in (-21.0,21.0):
-        m.mesh([[end,3.28,-1.84],[end,3.28,1.84],[end,4.43,0]],[[0,1,2]],'white')
-        m.box(end,3.12,0,.21,.16,3.8,'wood')
+    for end in (-1,1):
+        tiled_roof(m,end*18.95,3.39,0,4.4,4.35,1.18,.38,.75)
+        m.box(end*20.70,3.06,0,.24,.23,3.85,'red')
     # The photograph back toward the gallery looks across a low planted bed.
     m.box(25,-.16,-.9,9,.29,7.1,'pave',True)
     m.pose=(1.8,0,-2.8,0)
@@ -89,7 +94,7 @@ def gallery(m):
     for dx in (-2.8,2.8):
         for z in (-2.45,2.45):
             m.beam([x+dx,.13,z],[x+dx,3.65,z],.21,'wood',10,True)
-    m.swept_roof(x,3.63,0,8.45,7.5,3.25)
+    tiled_roof(m,x,3.63,0,8.45,7.5,3.25,2.15,.55)
     # Rounded crown and two-tier base leave a passage on either side.
     m.box(x,.13,1.05,1.9,.23,1.2,'stone',True)
     m.box(x,.36,1.05,1.6,.36,.92,'granite',True)
@@ -120,5 +125,5 @@ def gallery(m):
 
 
 if __name__ == '__main__':
-    generate('zhuangyuan_gallery', gallery, colors={'wood':'#46302b','tile':'#484a4c','pave':'#373a3b'},
+    generate('zhuangyuan_gallery', gallery, colors={'wood':'#312c30','tile':'#333943','white':'#dedfe1','pave':'#373a3b'},
              lettering=dict(text='逍遙樓',foreground='#93928b',background='#b7b6ae',vertical=True))

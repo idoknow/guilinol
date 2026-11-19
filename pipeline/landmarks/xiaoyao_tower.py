@@ -11,6 +11,7 @@ import numpy as np
 import trimesh
 from PIL import ImageDraw, ImageFont
 
+from xiaoyao_roof import tiled_roof
 from jingjiang import Model, SWATCHES, atlas
 
 
@@ -71,12 +72,12 @@ def facade(model, base, half, height, upstairs):
                         model.box(east, base+lift, half-1.3, width-.14, .07, .075, 'wood')
             if model.detail:
                 for tier in range(3):
-                    model.box(post, base+height-.6+tier*.19, half, .45+tier*.33, .19, .55+tier*.41, 'red')
+                    model.box(post, base+height-.6+tier*.19, half, .45+tier*.33, .19, .55+tier*.41, 'wood')
             if upstairs:
-                model.box(east, base+.94, half+.82, width+.04, .14, .14, 'red', True)
+                model.box(east, base+.94, half+.82, width+.04, .14, .14, 'wood', True)
                 for offset in ([-.4,-.2,0,.2,.4] if model.detail else [0]):
                     model.box(east+offset*width, base, half+.82, .11, .94, .11, 'wood')
-        model.box(0, base+height-.3, half, half*2+.5, .48, .52, 'red')
+        model.box(0, base+height-.3, half, half*2+.5, .48, .52, 'wood')
         if not upstairs:
             model.box(0,base+height-.98,half+.28,2.5,.7,.14,'sign')
     model.pose = (0,0,0,0)
@@ -124,7 +125,7 @@ def tower(model):
     # Shallow recessed panels and stone door surround on the riverside wall (30–34).
     for z in (-18,6):
         model.box(17.01,.68,z,.12,2.32,6.6,'granite')
-        model.box(17.09,.82,z,.08,2.02,6.25,'sign')
+        model.box(17.09,.82,z,.08,2.02,6.25,'earth')
         if model.detail:
             for i in range(18):
                 model.box(17.14,1.36+(i%3)*.09,z-2.8+i*.33,.05,.54,.055,'granite')
@@ -135,35 +136,48 @@ def tower(model):
     for z in (-29,-17,-3,11):
         model.beam([16.55,court,z],[16.55,court+3.5,z],.055,'wood')
         model.mesh([[16.55,court+3.45,z],[16.55,court+2.45,z],[16.48,court+2.85,z+1.48]],[[0,1,2]],'yellow')
-    model.box(0,court,0,23.8,platform-court,22.6,'stone',True)
+    model.box(0,court,0,23.8,platform-court,22.6,'white',True)
     for sign in (-1,1):
         steps(model,court,platform,0,sign*14.5,0,-sign*.4,8,5)
         white_rail(model,-11.75,sign*11.1,2.28,0,4,platform)
         white_rail(model,2.63,sign*11.1,2.28,0,4,platform)
         white_rail(model,sign*11.75,-11.1,0,2.22,10,platform)
+    # Pale dressed slabs with circular reliefs, facing the promenade (20/21/25).
+    for face in range(4):
+        model.pose=(0,0,0,face*np.pi/2)
+        half,edge=(11.9,11.3) if face%2==0 else (11.3,11.9)
+        for center in np.linspace(-half+1.1,half-1.1,10):
+            if face%2==0 and abs(center)<2.9:
+                continue
+            model.box(center,court+.13,edge,2.07,1.12,.11,'white')
+            if model.detail:
+                for radius,offset,color in ((.38,.10,'granite'),(.32,.14,'white'),(.12,.17,'granite')):
+                    model.beam([center,court+.70,edge+offset-.04],[center,court+.70,edge+offset],radius,color,24)
+        model.box(0,platform-.18,edge,half*2,.18,.28,'white')
+    model.pose=(0,0,0,0)
     facade(model,platform,8.85,5.05,False)
-    model.swept_roof(0,platform+5.05,0,24.3,23.1,2.1)
+    tiled_roof(model,0,platform+5.05,0,24.3,23.1,2.1,1.65,porch_recess=1.9)
     # Projecting central porch and its gable break the first eave (19–22).
     for side in (-1,1):
         for x in (-2.6,2.6):
             model.beam([x,platform,side*10.7],[x,platform+5.25,side*10.7],.26,'wood',10,True)
-        model.swept_roof(0,platform+5.25,side*8.95,7.1,6.0,1.85)
+        # The porch ridge points out towards the steps. Its gable rises above
+        # the main eave and its fascia projects beyond the outer column line.
+        model.pose=(0,0,side*9.36,np.pi/2)
+        tiled_roof(model,0,platform+5.17,0,5.45,8.3,2.02,.72,.84)
         model.pose=(0,0,0,0 if side>0 else np.pi)
-        model.box(0,platform+3.88,10.55,3.6,1.0,.20,'sign')
-        model.mesh([[-1.7,platform+3.94,10.66],[1.7,platform+3.94,10.66],
-                    [1.7,platform+4.83,10.66],[-1.7,platform+4.83,10.66]],
+        model.box(0,platform+4.0,11.72,4.6,1.05,.22,'wood')
+        model.mesh([[-2.17,platform+4.06,11.84],[2.17,platform+4.06,11.84],
+                    [2.17,platform+4.99,11.84],[-2.17,platform+4.99,11.84]],
                    [[0,1,2],[0,2,3]],'clock')
         model.pose=(0,0,0,0)
     model.box(0,platform,0,8.2,4.8,.26,'wood',True)
     upper = platform+7.4
     model.box(0,upper-.45,0,17.9,.45,17.9,'wood',True)
     facade(model,upper,7.9,4.85,True)
-    model.swept_roof(0,upper+4.85,0,21.5,20.2,2.65)
+    tiled_roof(model,0,upper+4.85,0,21.5,20.2,2.65,1.60)
     model.box(0,upper+7.12,0,12,1.05,11,'wood')
-    model.swept_roof(0,upper+8.17,0,18.4,17.5,3.7)
-    # Cap the narrow horizontal ridge openings visible from the square.
-    for y,w,d in ((platform+7.15,24.3,23.1),(upper+7.5,21.5,20.2),(upper+11.87,18.4,17.5)):
-        model.box(0,y-.08,0,w*.64,.1,d*.073,'tile')
+    tiled_roof(model,0,upper+8.17,0,18.4,17.5,3.7,1.50,.76)
     if model.detail:
         for side in (-1,1):
             for x in (-6,-3,3,6):
@@ -220,5 +234,6 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
 
 
 if __name__ == '__main__':
-    generate(colors={"wood":"#44322e","red":"#78362d","stone":"#b8b5b0","tile":"#44454a"}, flood_roof=True,
+    generate(colors={"wood":"#302d30","red":"#70312f","stone":"#cccddb","brick":"#646777",
+                     "white":"#eef0fa","granite":"#c9cbd6","earth":"#383b43","tile":"#343943"}, flood_roof=True,
              lettering=dict(text="逍遙樓",foreground="#ceb17c",background="#392e29"))
