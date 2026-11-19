@@ -269,117 +269,234 @@ def build_main_body(geo: Collector):
 
 
 def build_trunk_and_water_moon_cave(geo: Collector):
-    """Solid head with a tunnel carved through it.
+    """Solid head, then one tunnel. The shell is rounded, not a box.
 
-    The old loft was a bent strip, so the roof was open and a second arch showed
-    inside. This block is closed: 30 m east–west, 18 m north–south, top about
-    38 m above the river. The north and south faces are filled rock with one
-    opening. The tunnel is a single arch, 11 m wide and 14 m high, feet below
-    the water. East of the opening the remaining column is the trunk: 8 m thick
-    under the head, 4 m at the waterline. Nothing is lofted as a second shell.
+    The mass is still closed rock: about 30 m east–west and 18 m north–south,
+    with a single north–south tunnel. The outer shape is a karst cliff. The
+    top rolls back and rises west into the hill, the vertical corners are
+    rounded about 4 m, and the north face is several offset rock facets. The
+    brow sticks 2–3 m out over the mouth. The mouth is about 12 m wide and
+    16 m high, lumpy rather than a semicircle. East of it the trunk is 8 m
+    thick under the head and 4 m at the water.
     """
-    x0, x1 = 50.0, 80.0
-    z0, z1 = -9.0, 9.0
     y_bot = -2.2
-    y_top = 40.0
-    cave_cx, cave_rx = 66.0, 5.5
-    y_spring = WATER_Y - 1.3
-    y_crown = y_spring + 13.6
-    east_foot = cave_cx + cave_rx + 4.0
+    cave_cx, cave_rx = 66.0, 6.0
+    y_spring = WATER_Y - 1.5
+    cave_h = 17.4
+    body_pts = [body_vertex(2.0 * math.pi * i / 72.0, j / 16.0) for i in range(72) for j in range(17)]
 
-    def roof_y(x, z):
-        u = (x - 65.0) / 16.0
-        v = z / 9.0
-        return y_top + 2.4 * max(0.0, 1.0 - u * u - v * v)
+    def body_top(x, z, radius=5.5):
+        best = None
+        for px, py, pz in body_pts:
+            if abs(px - x) < radius and abs(pz - z) < radius and py > 6.0:
+                if best is None or py > best:
+                    best = py
+        return best
 
-    def east_x(y):
-        if y >= y_crown:
-            return x1
-        t = float(np.clip((y - y_bot) / (y_crown - y_bot), 0.0, 1.0))
-        return lerp(east_foot, x1, t)
+    def y_sky(x):
+        """North silhouette: low at the trunk tip, higher as it joins the hill."""
+        t = float(smoothstep(84.0, 38.0, x))
+        y = lerp(30.0, 48.0, t)
+        # Extra rock over the mouth so the cave is about 40% of this end's height.
+        y += 7.0 * math.exp(-((x - 64.0) / 12.0) ** 2)
+        y += 1.3 * math.sin(x * 0.42 + 0.8)
+        y += 0.55 * math.sin(x * 1.17 + 2.1)
+        if x < 48.0:
+            bh = body_top(x, -4.0)
+            if bh is not None:
+                y = lerp(y, bh + 0.6, float(smoothstep(48.0, 34.0, x)))
+        return y
 
-    def arch_xy(n=8):
+    def corner_wrap(x):
+        """Pull the face back at the two vertical edges, about a 4 m round."""
+        radius = 4.2
+        extra = 0.0
+        for edge, side in ((42.0, 1.0), (80.0, -1.0)):
+            dx = (edge + radius - x) if side > 0 else (x - (edge - radius))
+            if 0.0 < dx < radius * 2.0:
+                dx = min(dx, radius)
+                extra += radius - math.sqrt(max(0.0, radius * radius - dx * dx))
+        return extra
+
+    def z_north(x, y):
+        z = -8.4 + corner_wrap(x)
+        edges = (36.0, 46.0, 55.0, 63.0, 72.0, 79.0, 86.0)
+        offs = (1.2, -1.4, 0.7, -0.9, 1.3, -0.6)
+        for i in range(6):
+            if edges[i] <= x < edges[i + 1]:
+                span = edges[i + 1] - edges[i]
+                z += lerp(offs[i], offs[i] * 0.35 + offs[(i + 1) % 6] * 0.65, (x - edges[i]) / span)
+                break
+        # Brow: the lip just above the mouth sticks out 2.5 m.
+        span = float(smoothstep(58.5, 61.0, x) * (1.0 - smoothstep(73.0, 75.5, x)))
+        lip = float(smoothstep(y_spring + cave_h - 2.0, y_spring + cave_h + 0.6, y))
+        lip *= float(1.0 - smoothstep(y_spring + cave_h + 1.2, y_spring + cave_h + 8.0, y))
+        z -= 2.6 * span * lip
+        sky = y_sky(x)
+        if y > sky - 5.5:
+            t = float(np.clip((y - (sky - 5.5)) / 5.5, 0.0, 1.0))
+            z += 4.4 * t * t
+        z += 1.15 * math.sin(0.81 * x + 0.29 * y)
+        z += 0.55 * math.sin(1.55 * x - 0.44 * y + 1.7)
+        return z
+
+    def z_back(x, y=0.0):
+        return lerp(13.0, 6.0, float(smoothstep(36.0, 80.0, x))) + 0.7 * math.sin(x * 0.47 + 0.15 * y)
+
+    def roof_y(x, z, z_rim):
+        back = z_back(x)
+        t = float(smoothstep(z_rim, back, z)) if back != z_rim else 1.0
+        west = float(smoothstep(76.0, 40.0, x))
+        y = y_sky(x) + (2.2 + 5.5 * west) * t
+        y += 0.85 * math.sin(0.31 * x + 0.46 * z) * t
+        if x < 50.0:
+            bh = body_top(x, z)
+            if bh is not None:
+                y = lerp(y, bh + 0.45, float(smoothstep(50.0, 36.0, x)))
+        return y
+
+    def east_outer(y):
+        foot = cave_cx + cave_rx + 4.0
+        crown = cave_cx + cave_rx + 8.0
+        if y <= y_spring + cave_h:
+            t = float(np.clip((y - y_bot) / (y_spring + cave_h - y_bot), 0.0, 1.0))
+            return lerp(foot, crown, t)
+        sky = y_sky(78.0)
+        t = float(np.clip((y - (y_spring + cave_h)) / max(1.0, sky - y_spring - cave_h), 0.0, 1.0))
+        return lerp(crown, 77.5, t * t)
+
+    def arch_xy(n=12):
         pts = []
         for k in range(n + 1):
-            a = math.pi * (1.0 - k / n)
-            pts.append((
-                cave_cx + cave_rx * math.cos(a),
-                y_spring + (y_crown - y_spring) * math.sin(a),
-            ))
+            ang = math.pi * (1.0 - k / n)
+            wob = 1.0 + 0.05 * math.sin(3.0 * ang + 0.6) + 0.035 * math.cos(5.0 * ang - 0.4)
+            x = cave_cx + (cave_rx + 0.55 * math.sin(2.0 * ang)) * math.cos(ang)
+            s = math.sin(ang)
+            y = y_spring + cave_h * (s ** 0.70) * wob
+            if s > 0.92:
+                y -= 0.7
+            pts.append((x, y))
+        pts[0] = (pts[0][0], y_spring)
+        pts[-1] = (pts[-1][0], y_spring)
         return pts
 
     def wall(a, b, c, d, cave_vault=False):
         geo.add_karst_tri(a, b, c, cave_vault=cave_vault)
         geo.add_karst_tri(a, c, d, cave_vault=cave_vault)
 
-    def cap_tri(z, outward, a, b, c):
-        pa, pb, pc = (a[0], a[1], z), (b[0], b[1], z), (c[0], c[1], z)
-        if outward < 0:
-            geo.add_karst_tri(pa, pc, pb)
-        else:
-            geo.add_karst_tri(pa, pb, pc)
-
-    # Roof. Sealed, so a top view hits rock rather than the river.
-    nx, nz = 8, 5
-    for i in range(nx):
-        for j in range(nz):
-            def corner(ii, jj, i=i, j=j):
-                x = lerp(x0, x1, ii / nx)
-                z = lerp(z0, z1, jj / nz)
-                return (x, roof_y(x, z), z)
-            wall(corner(i, j), corner(i, j + 1), corner(i + 1, j + 1), corner(i + 1, j))
-
-    # West cliff face, buried in the hill.
-    ys = [y_bot, 6.0, 16.0, 28.0, y_top]
-    for y_a, y_b in zip(ys, ys[1:]):
-        wall((x0, y_a, z0), (x0, y_b, z0), (x0, y_b, z1), (x0, y_a, z1))
-
-    # East trunk. Thick under the head, narrow at the water, no end disc.
-    y_east = [y_bot, y_spring, 6.0, 10.0, y_crown, 24.0, 32.0, y_top]
-    for y_a, y_b in zip(y_east, y_east[1:]):
-        wall(
-            (east_x(y_a), y_a, z1), (east_x(y_b), y_b, z1),
-            (east_x(y_b), y_b, z0), (east_x(y_a), y_a, z0),
-        )
-
-    # Underside of the cliff toe and of the trunk only. The tunnel has no floor.
-    west_spring = cave_cx - cave_rx
-    wall((x0, y_bot, z0), (west_spring, y_bot, z0), (west_spring, y_bot, z1), (x0, y_bot, z1))
-    wall((cave_cx + cave_rx, y_bot, z1), (east_foot, y_bot, z1), (east_foot, y_bot, z0), (cave_cx + cave_rx, y_bot, z0))
+    def column_face(xs, z_of, rows=6):
+        cols = []
+        for x in xs:
+            y_hi = y_sky(x)
+            cols.append([(x, lerp(y_bot, y_hi, i / rows), ) for i in range(rows + 1)])
+        for c0, c1 in zip(cols, cols[1:]):
+            for i in range(len(c0) - 1):
+                x0, y0 = c0[i]
+                y1 = c0[i + 1][1]
+                x1, y0r = c1[i]
+                y1r = c1[i + 1][1]
+                wall(
+                    (x0, y0, z_of(x0, y0)), (x0, y1, z_of(x0, y1)),
+                    (x1, y1r, z_of(x1, y1r)), (x1, y0r, z_of(x1, y0r)),
+                )
 
     arch = arch_xy()
-    for z, outward in ((z0, -1.0), (z1, 1.0)):
-        # Rock above the opening, up to the roof.
-        for i in range(nx):
-            xa, xb = lerp(x0, x1, i / nx), lerp(x0, x1, (i + 1) / nx)
-            cap_tri(z, outward, (xa, y_crown), (xb, y_crown), (xb, y_top))
-            cap_tri(z, outward, (xa, y_crown), (xb, y_top), (xa, y_top))
-        # Cliff to the west of the hole, trunk to the east.
-        cap_tri(z, outward, (x0, y_bot), (west_spring, y_bot), (west_spring, y_crown))
-        cap_tri(z, outward, (x0, y_bot), (west_spring, y_crown), (x0, y_crown))
-        for y_a, y_b in zip(y_east, y_east[1:]):
-            if y_b > y_crown + 0.01:
-                break
-            cap_tri(z, outward, (cave_cx + cave_rx, y_a), (east_x(y_a), y_a), (east_x(y_b), y_b))
-            cap_tri(z, outward, (cave_cx + cave_rx, y_a), (east_x(y_b), y_b), (cave_cx + cave_rx, y_b))
-        # Spandrel: the only edges of the hole. No inner arch.
-        for (ax, ay), (bx, by) in zip(arch, arch[1:]):
-            cap_tri(z, outward, (ax, ay), (bx, by), (bx, y_crown))
-            cap_tri(z, outward, (ax, ay), (bx, y_crown), (ax, y_crown))
+    west_spring, east_spring = arch[0][0], arch[-1][0]
 
-    # One tunnel, open at both ends, no second shell and no floor.
-    slices = [z0 + (z1 - z0) * i / 6.0 for i in range(7)]
-    for z_a, z_b in zip(slices, slices[1:]):
-        for (ax, ay), (bx, by) in zip(arch, arch[1:]):
-            geo.add_karst_tri((ax, ay, z_a), (bx, by, z_a), (bx, by, z_b), cave_vault=True)
-            geo.add_karst_tri((ax, ay, z_a), (bx, by, z_b), (ax, ay, z_b), cave_vault=True)
+    # West cliff, faceted, top already filleted into the hill.
+    west_xs = [36.0, 42.0, 48.0, 54.0, west_spring]
+    column_face(west_xs, z_north)
+    column_face(west_xs, z_back)
 
-    # Crowns on the new head only. The slope scatter is unchanged.
-    for i in range(8):
+    # Trunk. Inner edge is the spring, outer edge tapers.
+    trunk_ys = [y_bot, y_spring, 6.0, 11.0, y_spring + cave_h, y_spring + cave_h + 7.0, 30.0]
+    for x_top in (east_spring,):
+        trunk_ys.append(y_sky(x_top))
+    trunk_ys = sorted(set(round(y, 3) for y in trunk_ys))
+    for y0, y1 in zip(trunk_ys, trunk_ys[1:]):
+        for z_of in (z_north, z_back):
+            wall(
+                (east_spring, y0, z_of(east_spring, y0)),
+                (east_spring, y1, z_of(east_spring, y1)),
+                (east_outer(y1), y1, z_of(east_outer(y1), y1)),
+                (east_outer(y0), y0, z_of(east_outer(y0), y0)),
+            )
+        # Outer trunk face, rounded into the roof by east_outer.
+        wall(
+            (east_outer(y0), y0, z_back(east_outer(y0))),
+            (east_outer(y1), y1, z_back(east_outer(y1))),
+            (east_outer(y1), y1, z_north(east_outer(y1), y1)),
+            (east_outer(y0), y0, z_north(east_outer(y0), y0)),
+        )
+
+    # Brow and the rock above the mouth. Bottom edge is the lumpy arch.
+    brow = []
+    for x, y0 in arch:
+        y_hi = y_sky(x)
+        brow.append([(x, lerp(y0, y_hi, i / 5.0)) for i in range(6)])
+    for c0, c1 in zip(brow, brow[1:]):
+        for i in range(len(c0) - 1):
+            x0, y0 = c0[i]
+            y1 = c0[i + 1][1]
+            x1, y0r = c1[i]
+            y1r = c1[i + 1][1]
+            for z_of in (z_north, z_back):
+                wall(
+                    (x0, y0, z_of(x0, y0)), (x0, y1, z_of(x0, y1)),
+                    (x1, y1r, z_of(x1, y1r)), (x1, y0r, z_of(x1, y0r)),
+                )
+
+    # Roof, from the rolled north lip back onto the hill. Shares the skyline.
+    roof_xs = [36.0, 42.0, 48.0, 54.0, west_spring]
+    roof_xs += [p[0] for p in arch[1:-1]]
+    roof_xs += [east_spring, 76.0, 80.0]
+    rim_z = [z_north(x, y_sky(x)) for x in roof_xs]
+    rows = []
+    for x, z0 in zip(roof_xs, rim_z):
+        row = [(x, y_sky(x), z0)]
+        for i in range(1, 6):
+            z = lerp(z0, z_back(x), i / 5.0)
+            row.append((x, roof_y(x, z, z0), z))
+        rows.append(row)
+    for r0, r1 in zip(rows, rows[1:]):
+        for i in range(len(r0) - 1):
+            wall(r0[i], r0[i + 1], r1[i + 1], r1[i])
+
+    # Underside of the toe and the trunk. The tunnel has no floor.
+    wall(
+        (36.0, y_bot, z_north(36.0, y_bot)), (west_spring, y_bot, z_north(west_spring, y_bot)),
+        (west_spring, y_bot, z_back(west_spring)), (36.0, y_bot, z_back(36.0)),
+    )
+    wall(
+        (east_spring, y_bot, z_back(east_spring)), (east_outer(y_bot), y_bot, z_back(east_outer(y_bot))),
+        (east_outer(y_bot), y_bot, z_north(east_outer(y_bot), y_bot)), (east_spring, y_bot, z_north(east_spring, y_bot)),
+    )
+
+    # One tunnel. North ring sits on the overhanging lip, south ring on the back mouth.
+    north_ring = [(x, y, z_north(x, y)) for x, y in arch]
+    south_ring = [(x, y, z_back(x)) for x, y in arch]
+    steps = 6
+    rings = []
+    for s in range(steps + 1):
+        t = s / steps
+        rings.append([
+            (lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t))
+            for a, b in zip(north_ring, south_ring)
+        ])
+    for ra, rb in zip(rings, rings[1:]):
+        for i in range(len(ra) - 1):
+            a, b = ra[i], ra[i + 1]
+            c, d = rb[i], rb[i + 1]
+            geo.add_karst_tri(a, b, d, cave_vault=True)
+            geo.add_karst_tri(a, d, c, cave_vault=True)
+
+    # Crowns along the new ridge, denser toward the hill so they meet the slope trees.
+    for i in range(16):
         ang = i * 2.399963
-        x = 58.0 + 9.0 * math.cos(ang)
-        z = 3.5 * math.sin(ang)
-        add_foliage_clump(geo, x, roof_y(x, z) + 1.6, z, 3.4, 2.2, 3.0, seed=4.0 + i)
+        x = 44.0 + 16.0 * ((i * 5) % 11) / 10.0
+        z = -2.0 + 7.0 * math.sin(ang)
+        z0 = z_north(x, y_sky(x))
+        add_foliage_clump(geo, x, roof_y(x, z, z0) + 1.7, z, 3.6, 2.3, 3.2, seed=3.0 + i)
 
 
 def add_foliage_clump(geo: Collector, cx, cy, cz, rx, ry, rz, seed=0.0):
@@ -647,7 +764,7 @@ def build_glb():
     build_rafts(decor)
     tris = np.concatenate([np.asarray(cliff.tris, dtype=np.float64), np.asarray(decor.tris, dtype=np.float64)])
     cols = np.concatenate([np.asarray(cliff.cols, dtype=np.float64), np.asarray(decor.cols, dtype=np.float64)])
-    cave = np.array([66.0, WATER_Y + 6.0, 0.0])
+    cave = np.array([66.0, 9.0, 0.0])
     center = tris.mean(axis=1)
     lit = np.linalg.norm(center - cave, axis=1) < 15.5
     lit |= np.linalg.norm(center - pagoda, axis=1) < 5.5
