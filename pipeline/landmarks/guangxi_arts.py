@@ -70,4 +70,4 @@ def hall(model):
         model.mesh(points,[[0,1,2],[0,2,3]],'white' if index%2 else 'granite')
 
 
-if __name__=='__main__':generate('guangxi_arts',hall,smooth=('red',),colors=dict(brick='#7a302a',red='#843832',white='#e9dfcc',glass='#343434',wood='#5c4235',sign='#282323',earth='#a45443'))
+if __name__=='__main__':generate('guangxi_arts',hall,smooth=('red',),colors=dict(brick='#5e2522',red='#6c2a27',white='#e9dfcc',glass='#343434',wood='#5c4235',sign='#282323',earth='#a45443'))
