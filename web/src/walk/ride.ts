@@ -149,14 +149,17 @@ export function probeLocalDismount(ctx: DismountContext, cx: number, cz: number,
 /** Validates Y elevation gap, wall/rail LOS between player and bike, and capsule clearance before mounting. */
 export function probeLocalMount(ctx: DismountContext, px: number, py: number, pz: number, bx: number, by: number, bz: number): MountCheckResult {
   if (Math.abs(by - py) > 1.5) return {ok: false, reason: 'height'}
-  if (segmentBlocked(ctx, px, pz, bx, bz, Math.max(py, by), .2)) return {ok: false, reason: 'blocked'}
+  if (segmentBlocked(ctx, px, pz, bx, bz, Math.max(py, by))) return {ok: false, reason: 'blocked'}
 
   const tryPlace = (x: number, z: number, shifted: boolean): MountCheckResult | null => {
     const tile = ctx.tileAt(x, z)
     if (!tile || !ctx.stream.loaded.has(tile) || ctx.insideHouse(x, z)) return null
     const support = localSupport(ctx, x, z, by)
     if (!support || Math.abs(support.y - by) > .55) return null
-    if (shifted && segmentBlocked(ctx, px, pz, x, z, Math.max(py, support.y), .15)) return null
+    if (shifted && (
+      segmentBlocked(ctx, px, pz, x, z, Math.max(py, support.y))
+      || segmentBlocked(ctx, bx, bz, x, z, Math.max(by, support.y))
+    )) return null
     const y = support.y + wcfg.height / 2 + .055
     if (!standClear(ctx, x, y, z)) return null
     return {ok: true, x, y, z, bikeY: support.y, shifted}

@@ -24,7 +24,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
   const departures=new Set<string>(),moored=data.routes.map(leg=>{const first=!departures.has(leg.start);departures.add(leg.start);return first})
   const button=document.createElement('button');button.className='vehicle-action';button.hidden=true;document.body.append(button)
   const bikeCtrl=createBikeControl()
-  let bike:T.Mesh|null=null,route=-1,nearBike:T.Mesh|null=null,nearRoute=-1,segment=1,disembark=false,active=false,heading=0
+  let bike:T.Mesh|null=null,lastBike:T.Mesh|null=null,route=-1,nearBike:T.Mesh|null=null,nearRoute=-1,segment=1,disembark=false,active=false,heading=0
   function reset(){if(route>=0)vessels[route].position.fromArray(data.routes[route].path[0]);if(bike){bike.rotation.set(bikeCtrl.pitch,bikeCtrl.heading,0,'YXZ');store(bike);if(active&&bike.parent&&!visibleCells.has(bike.parent as T.Group)){visibleCells.add(bike.parent as T.Group);group.add(bike.parent)}}bike=null;route=-1;disembark=false;segment=1;bikeCtrl.reset()}
   function interact(){if(!active)return
     if(bike){if(land(bike.position.x,bike.position.z,bikeCtrl.heading,bike.position.y))reset()}
@@ -33,7 +33,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
       const safePos=board?board(nearBike.position.x,nearBike.position.y,nearBike.position.z):{x:nearBike.position.x,y:nearBike.position.y,z:nearBike.position.z,bikeY:nearBike.position.y}
       if(!safePos)return
       nearBike.position.set(safePos.x,safePos.bikeY,safePos.z)
-      bike=nearBike;group.add(bike);bikeCtrl.mount(bike.rotation.y,bike.rotation.x)
+      bike=lastBike=nearBike;group.add(bike);bikeCtrl.mount(bike.rotation.y,bike.rotation.x)
     }
     else if(nearRoute>=0){route=nearRoute;segment=1;disembark=false}
   }
@@ -63,7 +63,8 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
   }
   return {nearby,advance,get bike(){return bike},get boat(){return route>=0?vessels[route]:null},get heading(){return bike?bikeCtrl.heading:heading},get speed(){return bike?bikeCtrl.speed:0},
     get lean(){return bikeCtrl.lean},get pitch(){return bikeCtrl.pitch},get steerInput(){return bikeCtrl.steerInput},
-    show(on:boolean){reset();document.body.removeAttribute('data-aboard');active=group.visible=on;button.hidden=true;if(!on)button.textContent=''},stop(){bikeCtrl.stop()},
+    get bikePitch(){return lastBike?.rotation.x??0},get bikeY(){return lastBike?.position.y??0},
+    show(on:boolean){reset();document.body.removeAttribute('data-aboard');active=group.visible=on;button.hidden=true;if(!on){button.textContent='';lastBike=null}},stop(){bikeCtrl.stop()},
     dampSpeed(step:number){return bikeCtrl.dampSpeed(step)},
     capSpeed(step:number,limit:number){return bikeCtrl.capSpeed(step,limit)},
     setPitch(frontY:number|undefined,backY:number|undefined,dt:number){bikeCtrl.setPitch(frontY,backY,dt)},
