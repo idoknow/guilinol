@@ -152,7 +152,11 @@ def build(bbox, output, palette):
         height=sample(x,z)[0]
         if entry['id'] in ('jiefang_bridge','ronghu') and bounds.covers(Point(x,z)) and sample(x,z)[1]!=DRY:
             height=previous_bed[round((z-top)/GRID),round((x-left)/GRID)]/10
-        landmarks.append(dict(position=[x,height,z],**entry))
+        item=dict(position=[x,height,z],**entry)
+        if entry['id']=='guilin_theater':
+            from landmarks.guilin_theater import OSM_WORLD_PTS
+            item['solid']=[[round(height-6.5,2),round(height+12.6,2),[[round(px,2),round(pz,2)] for px,pz in OSM_WORLD_PTS]]]
+        landmarks.append(item)
     modeled_paving = unary_union([*rong_pavement, bank_pavement if bank_pavement is not None else Polygon()])
     streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,modeled_paving)
     print('Lengths (m):',lengths)

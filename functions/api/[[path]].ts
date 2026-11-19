@@ -64,7 +64,8 @@ async function handle(request:Request,env:Env) {
     }
     writes.push(stmt('INSERT OR REPLACE INTO email_codes VALUES(?,?,?,?,0)',email,purpose,await hash(`${email}:${purpose}:${code}`),now()+600))
     await db.batch(writes); await deliver(env,email,purpose,code)
-    return json({ok:true})
+    const devCode=env.EMAIL_DEV_LOG==='1'&&env.INSECURE_LOCAL_COOKIE==='1'&&url.protocol==='http:'?code:undefined
+    return json(devCode?{ok:true,devCode}:{ok:true})
   }
   const login=path==='auth/login', reset=path==='auth/reset'
   await limit(db,`${login?'login':'code'}:${ip}`,60,900)

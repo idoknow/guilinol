@@ -197,14 +197,31 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const at=Math.round((south-tile.z)/4)*65+Math.round((east-tile.x)/4)
     return data.water[at]!==-32768&&data.water[at]-data.terrain[at]>5
   }
+  const solidLandmarks=(manifest.landmarks??[]).flatMap(entry=>(entry.solid??[]).map(([bottom,top,loop])=>{
+    let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity
+    for(const [lx,lz] of loop){if(lx<minX)minX=lx;if(lx>maxX)maxX=lx;if(lz<minZ)minZ=lz;if(lz>maxZ)maxZ=lz}
+    return {bottom,top,loop,minX,maxX,minZ,maxZ}
+  }))
   function insideHouse(east:number,south:number,y?:number){const tile=tileAt(east,south);if(!tile)return false
     const px=(east-tile.x)*100,pz=(south-tile.z)*100
-    return regions.get(tile)?.rings.some(([bottom,top,loops])=>{
+    const inRing=regions.get(tile)?.rings.some(([bottom,top,loops])=>{
       if(y!==undefined&&(y<bottom/10||y>top/10))return false
       let inside=false
       for(const loop of loops)for(let at=0,prev=loop.length-1;at<loop.length;prev=at++){
         const [ax,az]=loop[at],[bx,bz]=loop[prev];if((az>pz)!==(bz>pz)&&px<(bx-ax)*(pz-az)/(bz-az)+ax)inside=!inside
       }return inside})??false
+    if(inRing)return true
+    for(const solid of solidLandmarks){
+      if(east<solid.minX||east>solid.maxX||south<solid.minZ||south>solid.maxZ)continue
+      if(y!==undefined&&(y<solid.bottom||y>solid.top))continue
+      let inside=false
+      const loop=solid.loop
+      for(let at=0,prev=loop.length-1;at<loop.length;prev=at++){
+        const [ax,az]=loop[at],[bx,bz]=loop[prev];if((az>south)!==(bz>south)&&east<(bx-ax)*(south-az)/(bz-az)+ax)inside=!inside
+      }
+      if(inside)return true
+    }
+    return false
   }
   function findWalkableSpawn(east:number,south:number,override=false){
     for(const {dx,dz} of override?[candidates[0]]:candidates){const x=east+dx,z=south+dz,tile=tileAt(x,z)

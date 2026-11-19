@@ -7,6 +7,7 @@ import {nightLit} from './look/night'
 export interface Landmark {
   id:string; file:string; position:[number,number,number]; rotation:number; collision:'mesh'|'box'|'none'; lods:string[]
   sphere:[number,number,number,number]; bytes:number
+  solid?:[number,number,[number,number][]][]
 }
 export type LoadedLandmarks = Map<Landmark,THREE.Group>
 

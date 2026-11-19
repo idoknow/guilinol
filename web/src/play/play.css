@@ -151,4 +151,5 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
   .card-intro{font-size:12.5px;line-height:1.6}
   .book ol{grid-template-columns:1fr 1fr 1fr}.book li{flex-direction:column;text-align:center;gap:6px;padding:8px}.book li p{display:none}
 }
+@media (pointer:coarse) and (max-width:520px){.dock .minimap{width:108px;height:108px}}
 @media (max-width:520px){.book ol{grid-template-columns:1fr}.spot-card{width:calc(100vw - 20px)}}

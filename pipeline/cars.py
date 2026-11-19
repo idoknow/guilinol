@@ -16,6 +16,7 @@ from shapely.ops import unary_union
 
 from common import ll2xz, load_osm
 from features import points
+from landmarks.jiefang_layout import motor_carriageways
 from road_profile import RULES, Road, facade_gap, pair_carriageways
 
 MOTOR_STEP = 2
@@ -93,7 +94,7 @@ def _pedestrian_landmark_exclusions() -> Polygon:
     return unary_union(polys) if polys else Polygon()
 
 
-def plan_cars(bounds, surface, buildings, sample, existing_bikes=(), docks=None):
+def plan_cars(bounds, surface, buildings, sample, existing_bikes=(), docks=None, interchange=None):
     left, top, right, bottom = bounds.bounds
     cols = int((right - left) // MOTOR_STEP) + 1
     rows = int((bottom - top) // MOTOR_STEP) + 1
@@ -201,6 +202,14 @@ def plan_cars(bounds, surface, buildings, sample, existing_bikes=(), docks=None)
             bw = min(7.0, total_bw * 0.55) if one_way else max(5.5, total_bw - 3.5)
             bridge_polys.append(ln.buffer(bw * 0.5, quad_segs=2))
 
+    if interchange is not None:
+        anchor, angle, _ = interchange
+        ic_motor = motor_carriageways(anchor, angle)
+        if not ped_excl.is_empty:
+            ic_motor = ic_motor.difference(ped_excl)
+        if not ic_motor.is_empty:
+            bridge_polys.append(ic_motor)
+
     ground_polys = []
     for r in ground_roads:
         if not r.line.intersects(bounds):
@@ -210,6 +219,60 @@ def plan_cars(bounds, surface, buildings, sample, existing_bikes=(), docks=None)
             gp = gp.difference(ped_excl)
         if not gp.is_empty:
             ground_polys.append(gp)
+
+    # Bridge the narrow centerline gap between paired opposing one-way ground carriageways (e.g. Jiefang East Rd).
+    oneway_ground = [r for r in ground_roads if r.oneway and r.kind in ('trunk', 'primary', 'secondary', 'tertiary') and r.line.intersects(bounds)]
+    if len(oneway_ground) >= 2:
+        og_tree = STRtree([r.line for r in oneway_ground])
+        og_handled = set()
+        for idx, ra in enumerate(oneway_ground):
+            mid = ra.line.interpolate(0.5, normalized=True)
+            a_tan = np.subtract(
+                ra.line.interpolate(min(ra.line.length, ra.line.length * 0.5 + 0.5)).coords[0],
+                ra.line.interpolate(max(0.0, ra.line.length * 0.5 - 0.5)).coords[0],
+            )
+            best_j = None
+            best_sep = None
+            for j in og_tree.query(mid, predicate='dwithin', distance=18.0):
+                if j == idx:
+                    continue
+                rb = oneway_ground[j]
+                along = rb.line.project(mid)
+                if not 0.0 < along < rb.line.length:
+                    continue
+                b_tan = np.subtract(
+                    rb.line.interpolate(min(rb.line.length, along + 0.5)).coords[0],
+                    rb.line.interpolate(max(0.0, along - 0.5)).coords[0],
+                )
+                norm_prod = max(1e-4, np.linalg.norm(a_tan) * np.linalg.norm(b_tan))
+                if np.dot(a_tan, b_tan) < -0.7 * norm_prod:
+                    d = rb.line.distance(mid)
+                    if 3.0 <= d <= 15.0 and (best_sep is None or d < best_sep):
+                        best_sep = d
+                        best_j = j
+            if best_j is not None:
+                pair_key = (min(idx, best_j), max(idx, best_j))
+                if pair_key in og_handled:
+                    continue
+                og_handled.add(pair_key)
+                rb = oneway_ground[best_j]
+                steps = max(4, int(min(ra.line.length, rb.line.length) // 6) + 1)
+                mid_pts = []
+                for frac in np.linspace(0.0, 1.0, steps):
+                    pa = ra.line.interpolate(frac, normalized=True)
+                    pb = rb.line.interpolate(rb.line.project(pa))
+                    if pa.distance(pb) <= 16.0:
+                        mid_pts.append(((pa.x + pb.x) * 0.5, (pa.y + pb.y) * 0.5))
+                if len(mid_pts) >= 2:
+                    gap_half = max(1.2, (best_sep - (ra.width + rb.width) * 0.5) * 0.5 + 0.9)
+                    strip = LineString(mid_pts).buffer(gap_half, quad_segs=2, cap_style='flat')
+                    if not ped_excl.is_empty:
+                        strip = strip.difference(ped_excl)
+                    hits = [buildings[k] for k in facades.query(strip, predicate='intersects')]
+                    if hits:
+                        strip = strip.difference(unary_union(hits))
+                    if not strip.is_empty:
+                        ground_polys.append(strip)
 
     motor_geom = unary_union([*ground_polys, *bridge_polys])
     if not motor_geom.is_empty:

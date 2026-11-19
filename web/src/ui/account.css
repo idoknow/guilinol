@@ -1,6 +1,6 @@
-.btn-about.account-entry{top:calc(54px + env(safe-area-inset-top));right:calc(14px + env(safe-area-inset-right));bottom:auto;left:auto;max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* Phones: the top-right corner belongs to the minimap, so the entry sits under the sky controls in every mode. */
-@media (pointer:coarse){body .btn-about.account-entry{left:calc(12px + env(safe-area-inset-left));right:auto;top:calc(112px + env(safe-area-inset-top))}}
+/* Keep top-right clear for the .dock / .minimap in every viewport and mode. */
+.btn-about.account-entry{top:calc(74px + env(safe-area-inset-top));left:calc(10px + env(safe-area-inset-left));right:auto;bottom:auto;max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (pointer:coarse){body .btn-about.account-entry{left:calc(12px + env(safe-area-inset-left));right:auto;top:calc(114px + env(safe-area-inset-top))}}
 dialog.account{padding:0;width:min(24rem,calc(100% - 32px));margin:auto}
 .account::backdrop{background:rgba(16,24,24,.48);backdrop-filter:blur(4px)}
 .account form,.account label{display:grid;gap:.4rem}.account form{gap:.8rem;padding-top:.7rem}
