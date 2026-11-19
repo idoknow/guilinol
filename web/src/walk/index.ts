@@ -10,6 +10,7 @@ import {walkConfig as cfg} from './config'
 import {createPhysics} from './physics'
 import {createCameraRig} from './camera'
 import {look} from '../look/config'
+import {createRiderPose,notifyDismountBlocked} from './ride'
 import type {vehicles} from './vehicles'
 
 let rapierReady:Promise<void>|undefined
@@ -90,7 +91,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   avatarReady ??= new GLTFLoader().loadAsync(avatar.path)
   const [sim,model]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady])
   const rig=createCameraRig(sim)
-  const figure=model.scene,skinned=mergeAvatar(figure,avatar.color),traveller=figure.getObjectByName('Traveller')
+  const figure=model.scene,skinned=mergeAvatar(figure,avatar.color),traveller=figure.getObjectByName('Traveller'),ridePose=createRiderPose(figure)
   scene.add(figure);figure.visible=false;figure.scale.setScalar(avatar.scale)
   const mixer=new THREE.AnimationMixer(figure),actions=new Map(model.animations.map(clip=>[clip.name,mixer.clipAction(clip)]))
   let action:THREE.AnimationAction|undefined,active=false,yaw=0,pitch=cfg.pitch,arm=cfg.far,facing=0,bankLean=0,strideLean=0,prevSpeed=0
@@ -104,13 +105,30 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const still={right:0,forward:0,run:false,jump:false}
   let rides:Awaited<ReturnType<typeof vehicles>>|null=null,loading=false
   function setSnap(on:boolean){if(snapEnabled===on)return;snapEnabled=on;if(on)sim.controller.enableSnapToGround(cfg.snap);else sim.controller.disableSnapToGround()}
-  function resetMotion(){vx=vz=velocity=coyoteTimer=jumpTimer=bankLean=strideLean=prevSpeed=0;grounded=false;setSnap(true);if(traveller)traveller.rotation.set(0,0,0)}
+  function resetMotion(){vx=vz=velocity=coyoteTimer=jumpTimer=bankLean=strideLean=prevSpeed=0;grounded=false;setSnap(true);figure.rotation.x=figure.rotation.z=0;if(traveller)traveller.rotation.set(0,0,0)}
+  function supportAt(x:number,z:number,refY:number){
+    const deck=sim.surface(x,z,'deck',refY+.35,1.4)
+    const validDeck=deck&&deck.y<=refY+.35?deck:null
+    return validDeck??sim.surface(x,z,'sidewalk')??sim.surface(x,z,'ground')
+  }
   function loadRides(){if(loading||rides||!active||!manifest.vehicles)return;loading=true
     const file=manifest.vehicles.file
-    void import('./vehicles').then(module=>module.vehicles(scene,file,(x,z)=>{sim.sync(x,z);return place(x,z,'dismount')})).then(loaded=>{rides=loaded;rides.show(active)})
+    void import('./vehicles').then(module=>module.vehicles(scene,file,(x,z,bikeHeading,bikeY)=>{sim.sync(x,z)
+      if(bikeHeading===undefined)return place(x,z,'dismount')
+      const found=sim.findLocalDismount(x,z,bikeHeading,bikeY??safe.y-cfg.height/2)
+      if(!found){notifyDismountBlocked();return false}
+      const prevFoot=figure.position.clone(),prevYaw=figure.rotation.y
+      if(!place(x,z,'dismount',true,found))return false
+      facing=bikeHeading+avatar.yaw
+      ridePose.startDismount(prevFoot,prevYaw);input.clearRun();return true
+    },(bx,by,bz)=>{sim.sync(bx,bz)
+      const cur=sim.body.translation(),check=sim.findLocalMount(cur.x,cur.y-cfg.height/2,cur.z,bx,by,bz)
+      if(!check.ok){notifyDismountBlocked(check.reason==='blocked'?'中间有遮挡，绕过去再骑':'这里太窄了，挪一挪再骑');return null}
+      return check
+    })).then(loaded=>{rides=loaded;rides.show(active)})
       .catch(error=>console.warn('Vehicles unavailable:',error)).finally(()=>{loading=false})}
   let wasBoat=false,wasBike=false,bikeObstacle=''
-  function place(x:number,z:number,reason:string,override=false){const found=sim.findWalkableSpawn(x,z,override)
+  function place(x:number,z:number,reason:string,override=false,prefound?:ReturnType<typeof sim.findWalkableSpawn>){const found=prefound??sim.findWalkableSpawn(x,z,override)
     if(verify)spawns.push({reason,from:[x,z],to:found?[found.x,found.z]:null,distance:found?Math.hypot(found.x-x,found.z-z):null,rule:found?.rule??'none'})
     if(!found)return false
     sim.body.setTranslation(found,true);sim.body.setNextKinematicTranslation(found);sim.world.step();safe.set(found.x,found.y,found.z);resetMotion();return true}
@@ -123,12 +141,26 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true);return true
   }
-  function leave(){active=false;rides?.show(false);wasBoat=wasBike=false;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function leave(){active=false;rides?.show(false);wasBoat=wasBike=false;bikeObstacle='';ridePose.reset();resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function follow(dt=0,snap=false){const pos=sim.body.translation();figure.position.set(pos.x,pos.y-cfg.height/2,pos.z)
     if(rides?.boat){figure.position.copy(rides.boat.position);figure.position.y+=rides.boat.name==='raft'?-.44:-.18;figure.rotation.y=rides.heading}
-    rides?.park(figure.position)
-    if(rides?.bike){figure.rotation.y=rides.heading;figure.position.z+=Math.cos(rides.heading)*.23;figure.position.x+=Math.sin(rides.heading)*.23}
-    rig.update(camera,figure.position,yaw,pitch,arm+(rides?.bike?2.8:0),dt,snap)
+    if(rides?.bike){
+      const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading),baseY=pos.y-cfg.height/2
+      const cSup=supportAt(pos.x,pos.z,baseY)
+      const groundY=cSup&&baseY-cSup.y<=.12&&baseY>=cSup.y-.05?cSup.y:baseY-.03
+      figure.position.y=groundY
+      if(dt>0){
+        const fSup=supportAt(pos.x+fx*.55,pos.z+fz*.55,groundY)
+        const bSup=supportAt(pos.x-fx*.55,pos.z-fz*.55,groundY)
+        rides.setPitch(fSup?.y,bSup?.y,dt)
+      }
+      rides.park(figure.position)
+      ridePose.updateRiding(figure.position,rides.heading,rides.lean,rides.pitch,rides.speed,rides.steerInput,dt)
+    }else{
+      rides?.park(figure.position)
+      ridePose.applyDismount(figure.position,facing,dt)
+    }
+    rig.update(camera,figure.position,yaw,pitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap),dt,snap)
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
   function boatClearance(){const boat=rides?.boat;if(!boat)return null
@@ -137,7 +169,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     let underside=Infinity
     for(const along of [-2.3,-1,0,1,2.3])for(const across of [-1,0,1]){const point=boat.localToWorld(new THREE.Vector3(across,0,along)),deck=sim.surface(point.x,point.z,'deck');if(deck)underside=Math.min(underside,deck.y-(deck.thin?.6:look.bridgeDepth))}
     return {kind:boat.name,head,roof,underside,clearance:underside-Math.max(head,roof)}}
-  function sit(){mixer.stopAllAction();action=undefined;bankLean=strideLean=0;if(traveller)traveller.rotation.set(0,0,0)
+  function sit(){mixer.stopAllAction();action=undefined;bankLean=strideLean=0;figure.rotation.x=figure.rotation.z=0;if(traveller)traveller.rotation.set(0,0,0);ridePose.clearJoints()
     for(const side of ['L','R'])for(const [part,value] of Object.entries({Thigh:1.25,Shin:-1.4,Arm:.9,Forearm:.35})){
       const joint=figure.getObjectByName(part+side);if(joint)joint.rotation.x=value}}
   function probe(){const pos=sim.body.translation(),foot=pos.y-cfg.height/2,peak=sim.surface(pos.x,pos.z,'peak')
@@ -146,8 +178,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const renderY=mesh?terrainRay.intersectObject(mesh,false)[0]?.point.y:undefined
     return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
       inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits,
-      planarSpeed:Math.hypot(vx,vz),grounded,verticalVelocity:velocity,facing,camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z)}}
-  function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);rides?.nearby(start.x,start.z)
+      planarSpeed:Math.hypot(vx,vz),grounded,verticalVelocity:velocity,facing,figPos:figure.position.toArray(),figYaw:figure.rotation.y,bikePitch:rides?.bikePitch??0,bikeY:rides?.bikeY??0,
+      camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z)}}
+  function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);rides?.nearby(start.x,start.z,rides?.boat?start.y:start.y-cfg.height/2)
     if(rides?.boat){if(!held)rides.advance(Math.min(.25,dt));if(!wasBoat){yaw=rides.heading+.95;sit()}wasBoat=!!rides.boat;follow(dt);return}wasBoat=false
     const read=input.read(),keys=held?still:read
     wish.set(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))
@@ -156,14 +189,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(rawLen>1e-5)wish.divideScalar(rawLen);else wish.set(0,0)
     const maxSpeed=(external?external.run:keys.run)?cfg.run:cfg.walk
     const step=1/60;let traveled=0,simSteps=0;lastHits=[];blockedWater=false
-    let bikeSpeed=0
-    if(rides?.bike){
-      const previous=rides.heading
-      bikeSpeed=rides.steer(keys.forward,keys.right,Math.min(.12,dt))
-      wish.set(-Math.sin(rides.heading),-Math.cos(rides.heading))
-      yaw=wasBike?yaw+rides.heading-previous:rides.heading
-      vx=wish.x*bikeSpeed;vz=wish.y*bikeSpeed
-      if(!wasBike)sit()
+    let bikeSpeed=rides?.bike?rides.speed:0
+    if(rides?.bike&&!wasBike){
+      const bx=rides.bike.position.x,bz=rides.bike.position.z,cur=sim.body.translation()
+      sim.sync(bx,bz)
+      const sup=supportAt(bx,bz,rides.bike.position.y)
+      const by=sup?sup.y:rides.bike.position.y
+      ridePose.startMount({x:cur.x,y:cur.y-cfg.height/2,z:cur.z},figure.rotation.y)
+      const dest={x:bx,y:by+cfg.height/2+.055,z:bz}
+      sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest);sim.world.step()
+      safe.set(dest.x,dest.y,dest.z);resetMotion();input.clearRun()
+      mixer.stopAllAction();action=undefined;bikeObstacle='';bikeSpeed=0
     }
     wasBike=!!rides?.bike
     if(keys.jump&&!wasBike)jumpTimer=cfg.jumpBuffer
@@ -176,7 +212,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }else jumpTimer=Math.max(0,jumpTimer-step)
       if(velocity<=0)setSnap(true)
 
-      if(!wasBike){
+      if(wasBike&&rides?.bike){
+        const previous=rides.heading
+        ridePose.advanceMount(step)
+        bikeSpeed=rides.steer(keys.forward,keys.right,step,ridePose.mounted)
+        wish.set(-Math.sin(rides.heading),-Math.cos(rides.heading))
+        if(ridePose.mounted)yaw+=rides.heading-previous
+        vx=wish.x*bikeSpeed;vz=wish.y*bikeSpeed
+      }else if(!wasBike){
         const tgtSpd=maxSpeed*inputMag
         if(!grounded){
           const targetVx=wish.x*tgtSpd, targetVz=wish.y*tgtSpd
@@ -213,7 +256,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(velocity<=0){grounded=nowGrounded;if(grounded&&velocity<0)velocity=0}else if(move.y<velocity*step*.25)velocity=0
       if(verify)for(let at=0;at<sim.controller.numComputedCollisions();at++){const coll=sim.controller.computedCollision(at)?.collider;if(coll)lastHits.push(sim.kinds.get(coll.handle)??'')}
       const nextTile=sim.tileAt(next.x,next.z)
-      if(nextTile&&!stream.loaded.has(nextTile)){next.x=pos.x;next.z=pos.z;vx=vz=0}
+      if(nextTile&&!stream.loaded.has(nextTile)){next.x=pos.x;next.z=pos.z;vx=vz=0;rides?.stop();bikeSpeed=0}
       const ground=sim.surface(next.x,next.z,'ground')
       if(!ground||next.y-cfg.height/2<ground.y-3){if(place(safe.x,safe.z,'rescue'))resets++;break}
       if(sim.wet(next.x,next.z)){
@@ -221,16 +264,35 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         if(!deck||foot<deck.y-.35){
           const tread=sim.surface(next.x,next.z,'landmark',foot+.6,1.4),tile=sim.tileAt(next.x,next.z),water=tile&&stream.loaded.get(tile)?.water
           const level=tile&&water?water[Math.round((next.z-tile.z)/4)*65+Math.round((next.x-tile.x)/4)]/10:Infinity
-          if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;vx=vz=0;blockedWater=true}
+          if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;vx=vz=0;blockedWater=true;rides?.stop();bikeSpeed=0}
         }
       }
-      if(rides?.bike){let obstacle=false
-        if(Math.hypot(move.x,move.z)<bikeSpeed*step*.35)for(let at=0;at<sim.controller.numComputedCollisions();at++){
-          const contact=sim.controller.computedCollision(at)
-          if(contact&&contact.normal1.y<Math.cos(cfg.slope)){obstacle=true;break}
-        }
-        const reason=sim.insideHouse(next.x+wish.x*.72,next.z+wish.y*.72)?'building':!rides.pavement(next.x,next.z)?'off-road':obstacle?'collision':''
-        if(reason){bikeObstacle=reason;next.x=pos.x;next.z=pos.z;rides.stop();bikeSpeed=0;vx=vz=0}}
+      if(rides?.bike){
+        const res=rides.resolveMove({
+          pos,next,move,heading:rides.heading,speed:bikeSpeed,step,
+          pavement:rides.pavement,insideHouse:sim.insideHouse,
+          blockedAt:(x,y,z)=>sim.isBlockedAt(x,y,z),
+          collisionKind:(dirX,dirZ)=>{
+            let hit:''|'collision'|'building'=''
+            for(let at=0;at<sim.controller.numComputedCollisions();at++){
+              const contact=sim.controller.computedCollision(at)
+              if(!contact||contact.normal1.y>=Math.cos(cfg.slope))continue
+              if(contact.normal1.x*dirX+contact.normal1.z*dirZ>=-.2)continue
+              const kind=contact.collider?sim.kinds.get(contact.collider.handle):undefined
+              if(kind==='sidewalk')continue
+              if(kind==='building')return 'building'
+              hit='collision'
+            }
+            return hit
+          },
+          stopBike:()=>rides!.stop(),
+          dampBike:s=>rides!.dampSpeed(s),
+          capOffRoad:(s,lim)=>rides!.capSpeed(s,lim),
+        })
+        bikeSpeed=res.speed
+        if(res.blocked){bikeObstacle=res.reason;vx=vz=0}
+        else{vx=wish.x*bikeSpeed;vz=wish.y*bikeSpeed;if(Math.abs(bikeSpeed)>.15)bikeObstacle=''}
+      }
       else{
         for(let at=0;at<sim.controller.numComputedCollisions();at++){
           const contact=sim.controller.computedCollision(at)

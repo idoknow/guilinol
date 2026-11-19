@@ -4,6 +4,7 @@ import type {PeakColliderData, PeaksGroup} from '../peaks'
 import type {Stream} from '../stream'
 import {fetchAsset,type Manifest,type Tile} from '../world'
 import {walkConfig as cfg} from './config'
+import {probeLocalDismount, probeLocalMount} from './ride'
 
 type Outline = import('../buildings').Building
 type Kind = 'ground'|'overview'|'deck'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
@@ -168,5 +169,17 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function hasDeck(east:number,south:number){const tile=tileAt(east,south);return !!(tile&&stream.loaded.get(tile)?.deck.length)}
   function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)}
   function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear()}
-  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,hasDeck,surface,wet,insideHouse,findWalkableSpawn}
+  function findLocalDismount(cx:number,cz:number,heading:number,bikeY:number){
+    return probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,bikeY)
+  }
+  function findLocalMount(px:number,py:number,pz:number,bx:number,by:number,bz:number){
+    return probeLocalMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},px,py,pz,bx,by,bz)
+  }
+  function isBlockedAt(x:number,y:number,z:number){
+    return !!world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule,undefined,coll=>{
+      const k=kinds.get(coll.handle)
+      return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
+    })
+  }
+  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,hasDeck,surface,wet,insideHouse,findWalkableSpawn,findLocalDismount,findLocalMount,isBlockedAt}
 }
