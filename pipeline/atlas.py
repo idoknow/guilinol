@@ -118,7 +118,7 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
         place(name,'road',line.interpolate(.5,normalized=True))
     place('桂林中学解西校区', 'school', Point(-1244, -242))
     gates = {'way/647468198': Point(ll2xz(25.2599762,110.3055395)),
-             'way/646911647': Point(ll2xz(25.2515171,110.3096307))}
+             'way/646911647': Point(ll2xz(25.25156339,110.31056078))}
     for key, campus in campuses.items():
         reference = gates.get(key, campus.boundary)
         segments = [line for _,line in public_streets if line.disjoint(campus.buffer(1))]
