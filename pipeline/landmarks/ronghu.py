@@ -243,6 +243,33 @@ def steel_bridge(b):
         solid(b.hit, (x + width / 2, y + 0.7, z), (0.16, 1.1, length), 'steel')
 
 
+def glass_bridge(builder):
+    stone=builder.parts['atlas']
+    box(stone,(304,.48,160),(4.4,.56,29),'white')
+    if builder.collide:
+        solid(builder.hit,(304,.48,160),(4.4,.56,29),'white')
+        for end,ground in ((145.5,0),(174.5,.3)):
+            ramp(builder.hit,(304,ground,end+(-2 if end<160 else 2)),(304,.76,end),4.4)
+    for east in (302,306):
+        for index in range(9):
+            south=146.4+3.4*index
+            box(stone,(east,.98,south),(.68,.45,.68),'white')
+            cylinder(stone,(east,1.18,south),.22,2.92,'white',8)
+            box(stone,(east,4.18,south),(.65,.22,.65),'white')
+        box(stone,(east,4.45,160),(.65,.42,29),'white')
+        railing(stone,(east,146),(east,174),.76,1.02,'white',1.15,stone=True)
+    for south in (146.4,160,173.6):
+        box(stone,(304,4.45,south),(4.4,.38,.56),'white')
+    east,south=470,196.5
+    box(builder.parts['lit'],(east,14.8,south),(23,26,15),'glass')
+    for level in range(9):
+        box(stone,(east,2+3.1*level,south),(23.3,.18,15.3),'steel')
+    for offset in range(-10,11,4):
+        box(stone,(east+offset,14.8,south-7.55),(.13,26,.18),'white')
+    if builder.collide:
+        solid(builder.hit,(east,14.8,south),(23,26,15),'glass')
+
+
 def shore(b):
     wall = b.parts['atlas']
     post = 0.95 if b.detail else 8
@@ -260,6 +287,7 @@ def shore(b):
 def build(b: Builder):
     nine_bends(b)
     ancient_bridge(b)
+    glass_bridge(b)
     pavilion(b, 0, 0, 0)
     island(b)
     library(b)
