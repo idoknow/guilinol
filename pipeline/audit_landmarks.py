@@ -319,6 +319,43 @@ def main():
                 components.append(dict(reference=source,iou=round(iou,3),centroidM=round(center,2),angleDeg=round(delta,2),
                                        status='pass' if iou>=.7 and center<=5 and delta<=5 else 'fail'))
             row.update(components=components,status='pass' if components and all(item['status']=='pass' for item in components) else 'fail');continue
+        if key in ('libin_middle','guilin_book_market'):
+            from common import ll2xz
+            shape=footprint(ROOT/'public'/spec['model'],entry,elevation=2)
+            parts=list(getattr(shape,'geoms',[shape]));components=[]
+            pairs=(('north_teaching','way/683033662'),('mid_teaching','way/683033663')) if key=='libin_middle' else (
+                  ('universal_hotel','way/675919397'),('yunman_hotel','c1096f2a-0237-419b-8fce-7ac49da6ad10'))
+            for comp,source in pairs:
+                target=area(osm[source]) if source in osm else overture.get(source,Polygon())
+                if target.is_empty or not parts:
+                    components.append({'component':comp,'reference':source,'status':'missing-reference'});continue
+                selected=max(parts,key=lambda part:part.intersection(target).area)
+                if not selected.intersects(target):
+                    components.append({'component':comp,'reference':source,'status':'no-overlap'});continue
+                iou,center,delta=metrics(selected,target)
+                components.append(dict(component=comp,reference=source,iou=round(iou,3),centroidM=round(center,2),angleDeg=round(delta,2),
+                                       status='pass' if iou>=.7 and center<=5 and delta<=5 else 'fail'))
+            road=LineString(points(osm['way/675174045']))
+            front_win=(128.5,-11.5,16) if key=='libin_middle' else (-12,5,28)
+            front_name='street_gate' if key=='libin_middle' else 'book_market_binjiang'
+            front=footprint(ROOT/'public'/spec['model'],entry,window=front_win,elevation=5)
+            if front.is_empty:
+                components.append(dict(component=front_name,reference='way/675174045',status='empty-geometry'))
+            else:
+                station=road.project(front.centroid)
+                tangent=LineString([road.interpolate(max(0,station-10)),road.interpolate(min(road.length,station+10))])
+                delta=abs((axis(front)-axis(tangent)+90)%180-90)
+                gap=front.distance(road)
+                item=dict(component=front_name,reference='way/675174045',roadDistanceM=round(gap,2),angleDeg=round(delta,2))
+                ok=gap<=25 and delta<=5
+                if key=='libin_middle':
+                    node=osm['node/9214622462']
+                    ndist=front.distance(Point(ll2xz(node['lat'],node['lon'])))
+                    item['nodeReference']='node/9214622462';item['nodeDistanceM']=round(ndist,2)
+                    ok=ok and ndist<=12
+                item['status']='pass' if ok else 'fail'
+                components.append(item)
+            row.update(components=components,status='pass' if all(item['status']=='pass' for item in components) else 'fail');continue
         window=None
         if key=='gunanmen':ref='way/521248472';window=(-.8,-12,12);row['component']='gate'
         if key=='central_square':ref='way/675177179';row['component']='gymnasium'
