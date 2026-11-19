@@ -7,6 +7,7 @@ import tempfile
 
 import numpy as np
 from shapely.geometry import Polygon, Point
+from shapely import union_all
 from shapely.ops import unary_union
 import trimesh
 
@@ -48,7 +49,7 @@ def _model_structure_footprint(glb_path: Path, px: float, pz: float, rot_deg: fl
                 tp = Polygon(tri[:, [0, 2]])
                 if tp.is_valid and tp.area > 1e-3:
                     tpolys.append(tp)
-        return unary_union(tpolys).buffer(0) if tpolys else Polygon()
+        return union_all(tpolys, grid_size=.01).buffer(0) if tpolys else Polygon()
 
 
 class Layout:

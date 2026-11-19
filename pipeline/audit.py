@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 
 import numpy as np
-from shapely import STRtree, contains_xy
+from shapely import STRtree, contains_xy, union_all
 from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import nearest_points, polygonize, unary_union
 import trimesh
@@ -915,7 +915,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             continue
         above = vtris[vtris[:, :, 1].max(axis=1) > py + 0.6]
         tpolys = [Polygon(t[:, [0, 2]]) for t in above if Polygon(t[:, [0, 2]]).is_valid and Polygon(t[:, [0, 2]]).area > 1e-3]
-        lm_struct_polys[lid] = unary_union(tpolys).buffer(0) if tpolys else Polygon()
+        lm_struct_polys[lid] = union_all(tpolys, grid_size=.01).buffer(0) if tpolys else Polygon()
 
     lids = list(lm_struct_polys.keys())
     for i, lid_a in enumerate(lids):
