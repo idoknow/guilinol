@@ -26,6 +26,22 @@ function mergeAvatar(root:THREE.Group, tintHex:string|null) {
   if(root.userData.merged) return root.userData.skinned as THREE.SkinnedMesh|undefined
   root.userData.merged = true
   root.position.set(0,0,0); root.rotation.set(0,0,0); root.scale.setScalar(1)
+
+  // Single-primitive glTF joint nodes (ThighL/R, ArmL/R) load as Mesh rather than Group; wrap them so joints stay live.
+  const jointMeshes:THREE.Mesh[] = []
+  root.traverse(n=>{
+    if(n instanceof THREE.Mesh && !(n instanceof THREE.SkinnedMesh) && n.name && !n.name.startsWith('mesh_')) jointMeshes.push(n)
+  })
+  for(const m of jointMeshes) {
+    const grp = new THREE.Group()
+    grp.name = m.name
+    grp.position.copy(m.position); grp.quaternion.copy(m.quaternion); grp.scale.copy(m.scale)
+    const prim = new THREE.Mesh(m.geometry, m.material)
+    prim.name = 'mesh_' + m.name
+    grp.add(prim)
+    for(const c of [...m.children]) grp.add(c)
+    m.parent?.add(grp); m.parent?.remove(m)
+  }
   root.updateMatrixWorld(true)
 
   const bones:THREE.Bone[] = []
@@ -158,7 +174,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         rides.setPitch(fSup?.y,bSup?.y,dt)
       }
       rides.park(figure.position)
-      ridePose.updateRiding(figure.position,rides.heading,rides.lean,rides.pitch,rides.speed,rides.steerInput,dt)
+      ridePose.updateRiding(figure.position,rides.heading,rides.lean,rides.pitch,rides.speed,rides.steerInput,dt,rides.rideKind??'bike',rides.bike)
     }else{
       rides?.park(figure.position)
       ridePose.applyDismount(figure.position,facing,dt)
@@ -184,6 +200,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
       inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits,
       planarSpeed:Math.hypot(vx,vz),grounded,verticalVelocity:velocity,facing,figPos:figure.position.toArray(),figYaw:figure.rotation.y,bikePitch:rides?.bikePitch??0,bikeY:rides?.bikeY??0,
+      pedalPhase:ridePose.pedalPhase,thighL:figure.getObjectByName('ThighL')?.rotation.x??0,thighR:figure.getObjectByName('ThighR')?.rotation.x??0,
       camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z),
       boat:rides?.boatProbe()??null}}
   function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);rides?.nearby(start.x,start.z,rides?.boat?start.y:start.y-cfg.height/2)
@@ -358,7 +375,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     mixer.update(dt);follow(dt)
   }
-  return {enter,leave,tick,spawns,probe,boatClearance,get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.bike?'bike':rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  return {enter,leave,tick,spawns,probe,boatClearance,get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}
 }

@@ -2,8 +2,9 @@ import R from '@dimforge/rapier3d-compat'
 import * as T from 'three'
 import type {Stream} from '../stream'
 import type {Tile} from '../world'
-import {bikeConfig as bcfg, walkConfig as wcfg} from './config'
+import {bicycleConfig, bikeConfig as bcfg, walkConfig as wcfg} from './config'
 
+export type RideKind = 'bike' | 'bicycle'
 type Kind = 'ground'|'overview'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
 type SurfaceHit = {y:number; slope:number} | null
 
@@ -76,10 +77,10 @@ function shortestAngle(from: number, to: number) {
   return Math.atan2(Math.sin(to - from), Math.cos(to - from))
 }
 
-function turnRate(speed: number) {
-  const s = T.MathUtils.clamp(Math.abs(speed) / bcfg.maxSpeed, 0, 1)
-  if (s <= .4) return T.MathUtils.lerp(bcfg.pivotTurn, bcfg.peakTurn, smoothstep(s / .4))
-  return T.MathUtils.lerp(bcfg.peakTurn, bcfg.topTurn, smoothstep((s - .4) / .6))
+function turnRate(speed: number, spec = bcfg) {
+  const s = T.MathUtils.clamp(Math.abs(speed) / spec.maxSpeed, 0, 1)
+  if (s <= .4) return T.MathUtils.lerp(spec.pivotTurn, spec.peakTurn, smoothstep(s / .4))
+  return T.MathUtils.lerp(spec.peakTurn, spec.topTurn, smoothstep((s - .4) / .6))
 }
 
 /** Shows non-intrusive toast when mounting/dismounting a bike is blocked by walls or narrow obstacles. */
@@ -168,31 +169,38 @@ export function probeLocalMount(ctx: DismountContext, px: number, py: number, pz
   return {ok: false, reason: 'narrow'}
 }
 
-/** Manages e-bike acceleration, coasting drag, 0.22s reverse delay, speed-tuned steering, and lean/pitch. */
+/** Manages e-bike and pedal-bicycle acceleration, uphill drag, coasting, steering, and lean/pitch. */
 export function createBikeControl() {
   let speed = 0, heading = 0, lean = 0, pitch = 0, steerInput = 0, revHold = 0
-  let onPavement = false
+  let onPavement = false, kind: RideKind = 'bike'
+
+  function spec() {
+    return kind === 'bicycle' ? bicycleConfig : bcfg
+  }
 
   function reset() {
     speed = lean = pitch = steerInput = revHold = 0
     onPavement = false
+    kind = 'bike'
   }
 
   return {
+    get kind() { return kind },
     get speed() { return speed },
     get heading() { return heading },
     get lean() { return lean },
     get pitch() { return pitch },
     get steerInput() { return steerInput },
-    mount(yaw: number, initialPitch = 0) {
+    mount(yaw: number, initialPitch = 0, rideKind: RideKind = 'bike') {
       heading = yaw
       reset()
+      kind = rideKind
       pitch = initialPitch
     },
     stop() { speed = 0 },
     reset,
     dampSpeed(step: number) {
-      speed *= Math.max(0, 1 - bcfg.slideDamp * step)
+      speed *= Math.max(0, 1 - spec().slideDamp * step)
       return speed
     },
     capSpeed(step: number, limit: number) {
@@ -201,58 +209,66 @@ export function createBikeControl() {
       return speed
     },
     steer(forward: number, right: number, dt: number, mounted = true) {
+      const s = spec()
       const cdt = Math.min(.12, Math.max(0, dt))
       if (!mounted) {
         revHold = 0
-        steerInput = T.MathUtils.damp(steerInput, 0, bcfg.steerDamp, cdt)
-        lean = T.MathUtils.damp(lean, 0, bcfg.leanDamp, cdt)
+        steerInput = T.MathUtils.damp(steerInput, 0, s.steerDamp, cdt)
+        lean = T.MathUtils.damp(lean, 0, s.leanDamp, cdt)
         return speed
       }
-      const uFwd = deadzone(T.MathUtils.clamp(forward, -1, 1), bcfg.stickDeadFwd)
-      const uTurn = deadzone(T.MathUtils.clamp(right, -1, 1), bcfg.stickDeadTurn)
-      steerInput = T.MathUtils.damp(steerInput, uTurn, bcfg.steerDamp, cdt)
+      const uFwd = deadzone(T.MathUtils.clamp(forward, -1, 1), s.stickDeadFwd)
+      const uTurn = deadzone(T.MathUtils.clamp(right, -1, 1), s.stickDeadTurn)
+      steerInput = T.MathUtils.damp(steerInput, uTurn, s.steerDamp, cdt)
+      const uphillSin = s.uphillDrag > 0 ? Math.max(0, Math.sin(pitch) - .012) : 0
+      const effMax = uphillSin > 0 ? Math.max(2.1, s.maxSpeed * (1 - s.uphillCapScale * uphillSin)) : s.maxSpeed
 
       if (uFwd > .05) {
         revHold = 0
-        if (speed < 0) speed = Math.min(0, speed + bcfg.brake * uFwd * cdt)
+        if (speed < 0) speed = Math.min(0, speed + s.brake * uFwd * cdt)
         else {
-          const ratio = Math.max(0, speed) / bcfg.maxSpeed
-          const drive = bcfg.accel * (1 - bcfg.torqueDecay * Math.pow(ratio, bcfg.torquePow)) * uFwd
-          speed = Math.min(bcfg.maxSpeed, speed + drive * cdt)
+          const ratio = Math.max(0, speed) / s.maxSpeed
+          const rawDrive = s.accel * (1 - s.torqueDecay * Math.pow(ratio, s.torquePow)) * uFwd
+          const slopeLoss = uphillSin > 0 ? Math.min(rawDrive * .68, s.uphillDrag * uphillSin) : 0
+          const nextSpd = speed + (rawDrive - slopeLoss) * cdt
+          speed = nextSpd <= effMax
+            ? nextSpd
+            : Math.max(effMax, speed - (s.rollDrag + s.uphillDrag * uphillSin) * cdt)
         }
       } else if (uFwd < -.05) {
         if (speed > .05) {
           revHold = 0
-          speed = Math.max(0, speed + bcfg.brake * uFwd * cdt)
+          speed = Math.max(0, speed + s.brake * uFwd * cdt)
         } else if (speed < -.01) {
-          revHold = bcfg.revHold
-          speed = T.MathUtils.clamp(speed + bcfg.revAccel * uFwd * cdt, bcfg.reverseMax, 0)
+          revHold = s.revHold
+          speed = T.MathUtils.clamp(speed + s.revAccel * uFwd * cdt, s.reverseMax, 0)
         } else {
           revHold += cdt
-          if (revHold >= bcfg.revHold) speed = T.MathUtils.clamp(speed + bcfg.revAccel * uFwd * cdt, bcfg.reverseMax, 0)
+          if (revHold >= s.revHold) speed = T.MathUtils.clamp(speed + s.revAccel * uFwd * cdt, s.reverseMax, 0)
           else speed = 0
         }
       } else {
         revHold = 0
-        if (speed > 0) speed = Math.max(0, speed - (bcfg.rollDrag + bcfg.aeroDrag * speed) * cdt)
-        else if (speed < 0) speed = Math.min(0, speed + (bcfg.rollDrag * 1.8 - bcfg.aeroDrag * speed) * cdt)
+        if (speed > 0) speed = Math.max(0, speed - (s.rollDrag + s.aeroDrag * speed + (uphillSin > 0 ? 9.8 * uphillSin : 0)) * cdt)
+        else if (speed < 0) speed = Math.min(0, speed + (s.rollDrag * 1.8 - s.aeroDrag * speed) * cdt)
       }
 
-      const omega = turnRate(speed)
+      const omega = turnRate(speed, s)
       const dirSign = speed < -.05 ? -1 : 1
       heading -= steerInput * omega * dirSign * cdt
 
       const targetLean = speed > .4
-        ? T.MathUtils.clamp(-steerInput * (speed / bcfg.maxSpeed) * (omega / bcfg.peakTurn) * bcfg.leanMax, -bcfg.leanMax, bcfg.leanMax)
+        ? T.MathUtils.clamp(-steerInput * (speed / s.maxSpeed) * (omega / s.peakTurn) * s.leanMax, -s.leanMax, s.leanMax)
         : 0
-      lean = T.MathUtils.damp(lean, targetLean, bcfg.leanDamp, cdt)
+      lean = T.MathUtils.damp(lean, targetLean, s.leanDamp, cdt)
       return speed
     },
     setPitch(frontY: number | undefined, backY: number | undefined, dt: number) {
+      const s = spec()
       const target = frontY !== undefined && backY !== undefined && Math.abs(frontY - backY) < .45
-        ? T.MathUtils.clamp(Math.atan2(frontY - backY, 1.1), -bcfg.pitchMax, bcfg.pitchMax)
+        ? T.MathUtils.clamp(Math.atan2(frontY - backY, 1.1), -s.pitchMax, s.pitchMax)
         : 0
-      pitch = T.MathUtils.damp(pitch, target, bcfg.pitchDamp, Math.min(.12, Math.max(0, dt)))
+      pitch = T.MathUtils.damp(pitch, target, s.pitchDamp, Math.min(.12, Math.max(0, dt)))
     },
     resolveMove(ctx: BikeMoveContext) {
       const fwdX = -Math.sin(ctx.heading), fwdZ = -Math.cos(ctx.heading), sign = ctx.speed >= 0 ? 1 : -1
@@ -316,38 +332,70 @@ export function createBikeControl() {
       }
 
       onPavement = false
-      return {blocked: false, reason: '', speed: ctx.capOffRoad(ctx.step, OFF_ROAD_CAP)}
+      return {blocked: false, reason: '', speed: ctx.capOffRoad(ctx.step, spec().offRoadCap || OFF_ROAD_CAP)}
     },
   }
 }
 
-/** Handles smooth 0.18s mount, dynamic rider joint pose (lean/steer/kickstand foot), and 0.15s step-off. */
+function solvePedalIK(phase: number): [number, number] {
+  const dy = (.33 + .15 * Math.cos(phase)) - .88
+  const dz = (.05 - .15 * Math.sin(phase)) - .23
+  const d = T.MathUtils.clamp(Math.hypot(dy, dz), .24, .88)
+  const alpha = Math.atan2(-dz, -dy)
+  const L1 = .45, L2 = .45
+  const cosKnee = T.MathUtils.clamp((L1 * L1 + L2 * L2 - d * d) / (2 * L1 * L2), -1, 1)
+  const beta = Math.acos(T.MathUtils.clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -1, 1))
+  return [alpha + beta, -(Math.PI - Math.acos(cosKnee))]
+}
+
+/** Handles smooth 0.18s mount, dynamic rider joint pose (static footboard on e-bike vs pedaling cycle on bicycle), and 0.15s step-off. */
 export function createRiderPose(figure: T.Group) {
   const joints = Object.fromEntries(JOINT_NAMES.map(name => [name, figure.getObjectByName(name)])) as Record<JointName, T.Object3D | undefined>
   const startPos = new T.Vector3(), startRot = new Map<JointName, [number, number, number]>()
   const dismountFrom = new T.Vector3()
   let startYaw = 0, dismountFromYaw = 0, mountElapsed = bcfg.mountDuration, dismountElapsed = bcfg.dismountDuration, camArmOffset = 0
-  let footWeight = 1
+  let footWeight = 1, pedalPhase = 0
 
   function clearJoints() {
     for (const name of JOINT_NAMES) joints[name]?.rotation.set(0, 0, 0)
   }
 
-  function applySeatedPose(speed: number, steerInput: number, blend: number, dt: number) {
+  function applySeatedPose(speed: number, steerInput: number, blend: number, dt: number, kind: RideKind) {
+    const cdt = Math.min(.12, Math.max(0, dt))
     const idleFoot = smoothstep((.35 - Math.abs(speed)) / .35)
-    footWeight = T.MathUtils.damp(footWeight, idleFoot, 10, Math.min(.12, Math.max(0, dt)))
-    const spdRatio = Math.max(0, speed) / bcfg.maxSpeed
-    const targets: Record<JointName, [number, number, number]> = {
-      ThighL: [T.MathUtils.lerp(1.25, .56, footWeight), 0, T.MathUtils.lerp(0, -.22, footWeight)],
-      ShinL: [T.MathUtils.lerp(-1.4, -.55, footWeight), 0, 0],
-      ThighR: [1.25, 0, 0],
-      ShinR: [-1.4, 0, 0],
-      ArmL: [.9 + steerInput * .14, -steerInput * .12, 0],
-      ArmR: [.9 - steerInput * .14, -steerInput * .12, 0],
-      ForearmL: [.35, 0, 0],
-      ForearmR: [.35, 0, 0],
-      Torso: [-.09 - spdRatio * .06, 0, 0],
-      Head: [0, -steerInput * .18, 0],
+    footWeight = T.MathUtils.damp(footWeight, idleFoot, 10, cdt)
+    let targets: Record<JointName, [number, number, number]>
+    if (kind === 'bicycle') {
+      const spdRatio = Math.max(0, speed) / bicycleConfig.maxSpeed
+      const [thighLPedal, shinLPedal] = solvePedalIK(pedalPhase)
+      const [thighRPedal, shinRPedal] = solvePedalIK(pedalPhase + Math.PI)
+      const cadenceSway = (1 - footWeight) * Math.sin(pedalPhase) * .035 * T.MathUtils.clamp(Math.abs(speed) / 2.5, 0, 1)
+      targets = {
+        ThighL: [T.MathUtils.lerp(thighLPedal, .52, footWeight), 0, T.MathUtils.lerp(0, -.20, footWeight)],
+        ShinL: [T.MathUtils.lerp(shinLPedal, -.50, footWeight), 0, 0],
+        ThighR: [thighRPedal, 0, 0],
+        ShinR: [shinRPedal, 0, 0],
+        ArmL: [.86 + steerInput * .14, -steerInput * .12, 0],
+        ArmR: [.86 - steerInput * .14, -steerInput * .12, 0],
+        ForearmL: [.32, 0, 0],
+        ForearmR: [.32, 0, 0],
+        Torso: [-.14 - spdRatio * .08, cadenceSway * .5, cadenceSway],
+        Head: [.05, -steerInput * .18, 0],
+      }
+    } else {
+      const spdRatio = Math.max(0, speed) / bcfg.maxSpeed
+      targets = {
+        ThighL: [T.MathUtils.lerp(1.25, .56, footWeight), 0, T.MathUtils.lerp(0, -.22, footWeight)],
+        ShinL: [T.MathUtils.lerp(-1.4, -.55, footWeight), 0, 0],
+        ThighR: [1.25, 0, 0],
+        ShinR: [-1.4, 0, 0],
+        ArmL: [.9 + steerInput * .14, -steerInput * .12, 0],
+        ArmR: [.9 - steerInput * .14, -steerInput * .12, 0],
+        ForearmL: [.35, 0, 0],
+        ForearmR: [.35, 0, 0],
+        Torso: [-.09 - spdRatio * .06, 0, 0],
+        Head: [0, -steerInput * .18, 0],
+      }
     }
     for (const name of JOINT_NAMES) {
       const joint = joints[name]
@@ -368,12 +416,14 @@ export function createRiderPose(figure: T.Group) {
 
   return {
     get mounted() { return mountElapsed >= bcfg.mountDuration },
+    get pedalPhase() { return pedalPhase },
     startMount(footPos: {x:number; y:number; z:number}, yawYaw: number) {
       startPos.set(footPos.x, footPos.y, footPos.z)
       startYaw = yawYaw
       mountElapsed = 0
       dismountElapsed = bcfg.dismountDuration
       footWeight = 1
+      pedalPhase = 0
       for (const name of JOINT_NAMES) {
         const r = joints[name]?.rotation
         startRot.set(name, r ? [r.x, r.y, r.z] : [0, 0, 0])
@@ -391,6 +441,7 @@ export function createRiderPose(figure: T.Group) {
       mountElapsed = bcfg.mountDuration
       dismountElapsed = bcfg.dismountDuration
       camArmOffset = 0
+      pedalPhase = 0
       figure.rotation.x = figure.rotation.z = 0
       clearJoints()
     },
@@ -403,22 +454,32 @@ export function createRiderPose(figure: T.Group) {
       else camArmOffset = T.MathUtils.damp(camArmOffset, target, riding ? 12 : 10, Math.min(.12, Math.max(0, dt)))
       return camArmOffset
     },
-    updateRiding(bikePos: T.Vector3, heading: number, lean: number, pitch: number, speed: number, steerInput: number, dt: number) {
+    updateRiding(bikePos: T.Vector3, heading: number, lean: number, pitch: number, speed: number, steerInput: number, dt: number, kind: RideKind = 'bike', bikeMesh?: T.Object3D | null) {
+      const cdt = Math.min(.12, Math.max(0, dt))
+      if (kind === 'bicycle') {
+        pedalPhase = (pedalPhase + (speed / .33) * cdt * .48) % (Math.PI * 2)
+        if (pedalPhase < 0) pedalPhase += Math.PI * 2
+        const crank = bikeMesh?.getObjectByName('Crank')
+        if (crank) crank.rotation.x = -pedalPhase
+      }
       const t = smoothstep(mountElapsed / bcfg.mountDuration)
-      const seatX = bikePos.x + Math.sin(heading) * .23
-      const seatZ = bikePos.z + Math.cos(heading) * .23
+      const seatOffset = kind === 'bicycle' ? .22 : .23
+      const seatLift = kind === 'bicycle' ? .035 : 0
+      const seatX = bikePos.x + Math.sin(heading) * seatOffset
+      const seatZ = bikePos.z + Math.cos(heading) * seatOffset
+      const seatY = bikePos.y + seatLift
       if (t < 1) {
         figure.position.set(
           T.MathUtils.lerp(startPos.x, seatX, t),
-          T.MathUtils.lerp(startPos.y, bikePos.y, t),
+          T.MathUtils.lerp(startPos.y, seatY, t),
           T.MathUtils.lerp(startPos.z, seatZ, t),
         )
         figure.rotation.set(0, startYaw + shortestAngle(startYaw, heading) * t, 0, 'YXZ')
       } else {
-        figure.position.set(seatX, bikePos.y, seatZ)
+        figure.position.set(seatX, seatY, seatZ)
         figure.rotation.set(pitch * .45, heading, lean * .9, 'YXZ')
       }
-      applySeatedPose(speed, steerInput, t, dt)
+      applySeatedPose(speed, steerInput, t, dt, kind)
     },
     applyDismount(currentFootPos: T.Vector3, targetYaw: number, dt: number) {
       if (dismountElapsed >= bcfg.dismountDuration) return

@@ -3,7 +3,7 @@ import type {Stream} from '../stream'
 import {fetchAsset} from '../world'
 import {createFreeBoats,type MooringSlot} from './boat'
 import type {createPhysics} from './physics'
-import {createBikeControl} from './ride'
+import {createBikeControl,type RideKind} from './ride'
 import {vehicleModel} from './vehicle-model'
 
 type Position=[number,number,number]
@@ -16,7 +16,7 @@ export interface VehiclesEnv {
   stream: Stream
   landFree: (spot:FreeDismountTarget)=>boolean
 }
-interface Data {bikes:[number,number,number,number,number][];docks:Record<string,Position>;routes:Route[];grid:number[];mask:string}
+interface Data {bikes:[number,number,number,number,number][];bicycles?:[number,number,number,number,number][];docks:Record<string,Position>;routes:Route[];grid:number[];mask:string}
 export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number,bikeHeading?:number,bikeY?:number)=>boolean,board?:(bx:number,by:number,bz:number)=>BoardPos|null,env?:VehiclesEnv){
   const buffer=await fetchAsset(file), data:Data=JSON.parse(await new Response(new Blob([buffer]).stream().pipeThrough(new DecompressionStream('gzip'))).text())
   const mask=atob(data.mask),[left,top,width,height,step]=data.grid,group=new T.Group();scene.add(group)
@@ -24,6 +24,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
   function store(mesh:T.Mesh){const key=`${Math.floor(mesh.position.x/cellSize)},${Math.floor(mesh.position.z/cellSize)}`
     let cell=cells.get(key);if(!cell){cell=new T.Group();cells.set(key,cell)}cell.add(mesh)}
   for(const [x,y,z,angle,paint] of data.bikes){const mesh=vehicleModel('bike',paint);mesh.position.set(x,y,z);mesh.rotation.y=angle;store(mesh)}
+  for(const [x,y,z,angle,paint] of data.bicycles??[]){const mesh=vehicleModel('bicycle',paint);mesh.position.set(x,y,z);mesh.rotation.y=angle;store(mesh)}
   const vessels=data.routes.map(route=>{const pink=route.kind==='boat'&&[route.start,route.end].includes('桂湖');const mesh=vehicleModel(route.kind,pink?1:0);mesh.position.fromArray(route.path[0]);group.add(mesh);return mesh})
   const piers=new Map<string,T.Mesh>(),pierShape=new T.BoxGeometry(1,1,1),pierMaterial=new T.MeshStandardMaterial({color:0x816a50})
   for(const leg of data.routes){if(piers.has(leg.start))continue
@@ -39,8 +40,9 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
   let nearFree:{slot:MooringSlot|null,distance:number,atBank:boolean}={slot:null,distance:Infinity,atBank:false}
   function syncHud(){
     const preferFree=!!nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)
-    const freePrompt=nearFree.slot?(nearFree.slot.kind==='freeRaft'?'划竹筏 · ':'划小船 · ')+nearFree.slot.name:''
-    const label=bike?'下车':freeBoats?.active?'靠岸下船':route>=0?(disembark?'下一站下船':'下站下船'):nearBike?'骑行':preferFree?freePrompt:nearRoute>=0?'上船 · '+data.routes[nearRoute].start:''
+    const freePrompt=nearFree.slot?(nearFree.slot.kind==='freeRaft'?'F 划竹筏 · ':'F 划小船 · ')+nearFree.slot.name:''
+    const ridePrompt=nearBike?(nearBike.name==='bicycle'?'F 骑单车':'F 骑电动车'):''
+    const label=bike?'F 下车':freeBoats?.active?'F 靠岸下船':route>=0?(disembark?'F 下一站下船':'F 下站下船'):ridePrompt||(preferFree?freePrompt:nearRoute>=0?'F 上船 · '+data.routes[nearRoute].start:'')
     document.body.toggleAttribute('data-aboard',!!bike||route>=0||!!freeBoats?.active);button.hidden=!label;if(button.textContent!==label)button.textContent=label
   }
   function reset(){if(route>=0)vessels[route].position.fromArray(data.routes[route].path[0]);freeBoats?.reset();if(bike){bike.rotation.set(bikeCtrl.pitch,bikeCtrl.heading,0,'YXZ');store(bike);if(active&&bike.parent&&!visibleCells.has(bike.parent as T.Group)){visibleCells.add(bike.parent as T.Group);group.add(bike.parent)}}bike=null;route=-1;nearFree={slot:null,distance:Infinity,atBank:false};disembark=false;segment=1;bikeCtrl.reset()}
@@ -52,12 +54,13 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
       const safePos=board?board(nearBike.position.x,nearBike.position.y,nearBike.position.z):{x:nearBike.position.x,y:nearBike.position.y,z:nearBike.position.z,bikeY:nearBike.position.y}
       if(!safePos)return
       nearBike.position.set(safePos.x,safePos.bikeY,safePos.z)
-      bike=lastBike=nearBike;group.add(bike);bikeCtrl.mount(bike.rotation.y,bike.rotation.x)
+      const rideKind:RideKind=nearBike.name==='bicycle'?'bicycle':'bike'
+      bike=lastBike=nearBike;group.add(bike);bikeCtrl.mount(bike.rotation.y,bike.rotation.x,rideKind)
     }
     else if(nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)){freeBoats!.mount(nearFree.slot,nearFree.atBank);syncHud()}
     else if(nearRoute>=0){route=nearRoute;segment=1;disembark=false}
   }
-  button.onclick=interact;window.addEventListener('keydown',event=>{if(event.code==='KeyE'&&!event.repeat)interact()})
+  button.onclick=interact;window.addEventListener('keydown',event=>{if(event.code==='KeyF'&&!event.repeat&&(event.target as HTMLElement)?.tagName!=='INPUT')interact()})
   function nearby(x:number,z:number,footY?:number){nearBike=null;nearRoute=-1;nearRouteDist=Infinity;let best=4.2
     const nextCells=new Set<T.Group>()
     for(let col=Math.floor((x-110)/cellSize);col<=Math.floor((x+110)/cellSize);col++)for(let row=Math.floor((z-110)/cellSize);row<=Math.floor((z+110)/cellSize);row++){
@@ -82,7 +85,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     if(disembark||next<0){if(land(x,z))reset();return}
     if(next>=0){mesh.position.fromArray(leg.path[0]);route=next;segment=1}
   }
-  return {nearby,advance,get bike(){return bike},get boat(){return freeBoats?.boat??(route>=0?vessels[route]:null)},get freeBoat(){return freeBoats?.boat??null},get freeKind(){return freeBoats?.boatKind??null},get boatSeatOffset(){return freeBoats?.active?freeBoats.seatOffset:(route>=0&&vessels[route].name==='raft'?-.44:-.18)},get heading(){return bike?bikeCtrl.heading:freeBoats?.active?freeBoats.heading:heading},get speed(){return bike?bikeCtrl.speed:freeBoats?.active?freeBoats.speed:0},
+  return {nearby,advance,get bike(){return bike},get rideKind():RideKind|null{return bike?bikeCtrl.kind:null},get boat(){return freeBoats?.boat??(route>=0?vessels[route]:null)},get freeBoat(){return freeBoats?.boat??null},get freeKind(){return freeBoats?.boatKind??null},get boatSeatOffset(){return freeBoats?.active?freeBoats.seatOffset:(route>=0&&vessels[route].name==='raft'?-.44:-.18)},get heading(){return bike?bikeCtrl.heading:freeBoats?.active?freeBoats.heading:heading},get speed(){return bike?bikeCtrl.speed:freeBoats?.active?freeBoats.speed:0},
     get lean(){return bikeCtrl.lean},get pitch(){return bikeCtrl.pitch},get steerInput(){return bikeCtrl.steerInput},
     get bikePitch(){return lastBike?.rotation.x??0},get bikeY(){return lastBike?.position.y??0},
     show(on:boolean){reset();document.body.removeAttribute('data-aboard');active=group.visible=on;button.hidden=true;if(!on){button.textContent='';lastBike=null}},stop(){bikeCtrl.stop();freeBoats?.stop()},

@@ -128,7 +128,7 @@ try {
     if (mobile) {
       await page.locator('.vehicle-action').tap()
     } else {
-      await page.keyboard.press('e')
+      await page.keyboard.press('f')
     }
     await page.evaluate(async () => {
       const {walk} = window.viewer
@@ -701,9 +701,9 @@ try {
       }
     }
     try {
-      // 不跑 walk.tick，直接触发 KeyE 下船：dismount 必须自行 sync 并拒绝全部受阻岸点，保留 activeSlot
-      window.dispatchEvent(new KeyboardEvent('keydown', {code: 'KeyE'}))
-      window.dispatchEvent(new KeyboardEvent('keyup', {code: 'KeyE'}))
+      // 不跑 walk.tick，直接触发 KeyF 下船：dismount 必须自行 sync 并拒绝全部受阻岸点，保留 activeSlot
+      window.dispatchEvent(new KeyboardEvent('keydown', {code: 'KeyF'}))
+      window.dispatchEvent(new KeyboardEvent('keyup', {code: 'KeyF'}))
       const cur = readBoat()
       return {
         vehicle: walk.vehicle,

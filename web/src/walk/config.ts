@@ -16,4 +16,16 @@ export const bikeConfig = {
   leanMax:.26, leanDamp:7.5, pitchMax:.18, pitchDamp:8,
   mountDuration:.18, dismountDuration:.15,
   stickDeadFwd:.1, stickDeadTurn:.12, slideDamp:1.8,
+  uphillDrag:0, uphillCapScale:0, offRoadCap:4.2,
+}
+
+/** Pedal bicycle dynamics (~5.0 m/s = 18 km/h cap, gentler human launch, noticeable uphill gravity drag). */
+export const bicycleConfig: typeof bikeConfig = {
+  maxSpeed:18/3.6, reverseMax:-1.3, accel:2.35, torqueDecay:.45, torquePow:.85,
+  brake:6.8, revHold:.22, revAccel:1.9, rollDrag:.36, aeroDrag:.08,
+  pivotTurn:.95, peakTurn:1.72, topTurn:1.18, steerDamp:10,
+  leanMax:.24, leanDamp:7.5, pitchMax:.18, pitchDamp:8,
+  mountDuration:.18, dismountDuration:.15,
+  stickDeadFwd:.1, stickDeadTurn:.12, slideDamp:1.8,
+  uphillDrag:13.5, uphillCapScale:3.2, offRoadCap:3.4,
 }

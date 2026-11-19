@@ -21,7 +21,7 @@ try{
       await page.waitForFunction(()=>window.viewer?.walk?.active)
       await page.evaluate(async([x,z])=>{const {walk}=window.viewer;walk.leave();if(!await walk.enter(x,z,0,'lize'))throw Error('spawn failed')},[x,z])
       await page.waitForFunction(()=>[...window.viewer.stream.landmarks.keys()].some(entry=>entry.id==='lize_bridge'))
-      if(bike){await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent==='骑行');await page.keyboard.press('e');await page.keyboard.down('w')}
+      if(bike){await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent?.includes('F 骑电动车'));await page.keyboard.press('f');await page.keyboard.down('w')}
       const result=await page.evaluate(({dx,dz,x,z,bike})=>{
         const {walk}=window.viewer,start=walk.position.clone(),startOffset=Math.hypot(start.x-x,start.z-z);let maximumOffset=0,wetSamples=0
         if(bike&&walk.vehicle!=='bike')throw Error('bike mount failed');if(!bike)walk.drive(dx,dz,false)
