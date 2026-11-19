@@ -33,13 +33,13 @@ def river_ribs(model, start, end, width):
         for idx in range(count):
             span=np.array([idx,idx+1])/count
             x=start+(end-start)*span
-            low=-5.55+4.15*(1-(2*span-1)**2)
-            section=[(px,py+dy,z+dz) for dz in (-.38,.38)
+            low=-6.35+4.15*(1-(2*span-1)**2)
+            section=[(px,py+dy,z+dz) for dz in (-.65,.65)
                      for px,py,dy in ((x[0],low[0],0),(x[1],low[1],0),
-                                      (x[1],low[1],.55),(x[0],low[0],.55))]
+                                      (x[1],low[1],1.35),(x[0],low[0],1.35))]
             model.mesh(section,[[0,1,2],[0,2,3],[4,6,5],[4,7,6],[0,4,5],[0,5,1],[2,6,7],[2,7,3]],'white')
-            edge=[(px,py+dy,z+side*.40) for px,py,dy in
-                  ((x[0],low[0],.26),(x[1],low[1],.26),(x[1],low[1],.46),(x[0],low[0],.46))]
+            edge=[(px,py+dy,z+side*.665) for px,py,dy in
+                  ((x[0],low[0],.04),(x[1],low[1],.04),(x[1],low[1],.22),(x[0],low[0],.22))]
             model.mesh(edge,[[0,1,2],[0,2,3]],'ice')
         for t in (.09,.19,.31,.69,.81,.91):
             x=start+(end-start)*t
@@ -76,17 +76,31 @@ def lantern(model,x,y,z,size):
             model.mesh(face,[[0,1,2],[0,2,3]],'wood')
 
 
-def pillar(model,tone):
+def pillar(model,tone,flat=False):
     for width,depth,y in ((3.5,2.7,-.18),(3.15,2.4,.02),(2.82,2.12,.22)):
         model.box(0,y,0,width,.2,depth,'stone',True)
+    model.box(0,.42,0,2.44,1.72,1.76,'stone',True)
+    model.box(0,2.08,0,2.48,.16,1.78,'granite')
+    # Four tinted faces enclose the hanging lamps above a continuous plinth.
+    model.box(0,2.24,0,2.24,5.15,1.44,'glazing',True)
+    if flat:
+        model.box(0,7.39,0,2.48,.25,1.70,'granite')
+        model.box(0,7.64,0,2.39,.10,1.61,tone)
     for x in (-1.12,1.12):
         model.box(x,.42,0,.48,.48,1.85,'granite',True)
         for z in (-.72,.72):
             model.box(x,.88,z,.22,6.52,.2,'white',True)
             model.box(x+np.sign(x)*.10,.88,z+np.sign(z)*.105,.16,6.54,.16,tone)
+            if flat:continue
             model.beam([x,7.39,z],[0,8.56,z],.13,'white',6)
             model.beam([x,7.39,z+np.sign(z)*.15],[0,8.56,z+np.sign(z)*.15],.105,tone,6)
-    model.box(0,6.04,0,2.15,1.33,1.28,'glazing')
+    if not flat:
+        for x in (-1.12,1.12):
+            slope=[(x,7.39,-.72),(0,8.56,-.72),(0,8.56,.72),(x,7.39,.72)]
+            model.mesh(slope,[[0,1,2],[0,2,3]],'glazing')
+        model.beam([0,8.56,-.75],[0,8.56,.75],.08,tone,6)
+        for z in (-.72,.72):
+            model.mesh([(-1.12,7.39,z),(1.12,7.39,z),(0,8.56,z)],[[0,1,2]],'glazing')
     for z in (-.71,.71):
         diamond=[(0,7.28,z),(.58,6.73,z),(0,6.16,z),(-.58,6.73,z),(0,7.28,z)]
         for a,b in zip(diamond,diamond[1:]):model.beam(a,b,.047,'granite',5)
@@ -151,9 +165,15 @@ def bank_stairs(model,side):
     model.box(-102,-2.48,side*32.95,10.9,.18,1.8,'pave',True)
     model.box(-110,-5.2,side*27,9.5,.18,2.8,'pave',True)
     for x in (-99.45,-96.55):
-        model.beam([x,1.25,side*21],[x,-1.42,side*32],.075,'granite',8,True)
+        model.beam([x,1.25,side*21],[x,-1.42,side*32],.075,'white',8,True)
     for x in (-107.45,-104.55):
-        model.beam([x,-1.42,side*32],[x,-4.1,side*27],.075,'granite',8,True)
+        model.beam([x,-1.42,side*32],[x,-4.1,side*27],.075,'white',8,True)
+    for x,start,end,z0,z1 in ((-99.45,1.25,-1.42,21,32),(-96.55,1.25,-1.42,21,32),
+                              (-107.45,-1.42,-4.1,32,27),(-104.55,-1.42,-4.1,32,27)):
+        for t in np.linspace(0,1,7):
+            top=start+(end-start)*t
+            z=side*(z0+(z1-z0)*t)
+            model.box(x,top-1.0,z,.10,1.0,.10,'white')
 
 
 def west_bank(model):
@@ -168,7 +188,7 @@ def west_bank(model):
             model.beam([-107,-4,26.3],[-107,-4,47.3],.085,'white',8,True)
             for z in (30.4,36.8,43.2):
                 model.pose=(-109.5,-4.90,z,{30.4:-.67,36.8:0,43.2:.99}[z])
-                pillar(model,'violet')
+                pillar(model,'violet',flat=z==36.8)
         # Bank lookouts project toward the water; the end tower frames the span.
         model.pose=(0,0,0,0)
         model.box(-97,-5.5,side*61,25,.98,14,'stone',True)
@@ -228,10 +248,10 @@ def west_bank(model):
     # of the three river-side lantern towers from the opposite kerb.
     for x in np.arange(-125,-118.4,1):
         model.box(x,-3.73,36,.48,.035,3.4,'white')
-    model.beam([-118.7,-3.8,34],[-118.7,1.7,34],.14,'granite')
-    model.beam([-118.7,1.65,34],[-115.5,1.65,34],.1,'granite')
-    model.box(-115.5,.55,34,.42,1.25,.42,'sign')
-    model.box(-115.74,1.4,34,.09,.28,.28,'knot')
+    model.beam([-113.9,-3.8,38.35],[-113.9,1.7,38.35],.14,'granite')
+    model.beam([-113.9,1.65,38.35],[-113.9,1.65,39.05],.1,'granite')
+    model.box(-113.9,.55,39.05,.42,1.25,.42,'sign')
+    model.box(-114.14,1.4,39.05,.09,.28,.28,'knot')
     model.box(-116,-4.25,0,5,.64,82,'pave',True)
     for start,end in ((-41,-29),(-25,25),(29,41)):
         model.box(-113.6,-3.61,(start+end)/2,.36,.67,end-start,'stone',True)
@@ -239,7 +259,7 @@ def west_bank(model):
     pendant(model,-114.35,-3.72,29.4)
     for z in range(-40,41,4):
         model.box(-113.6,-3,z,.1,.4,.1,'white')
-        if abs(z)>22 and z%12==0:
+        if z in (-36,-24,24):
             pendant(model,-118.3,-3.92,z)
     model.pose=(0,0,0,0)
 
@@ -291,9 +311,10 @@ def bridge(model):
     # Shallow barrel vault over Binjiang Road; road and walk pass below its crown.
     for xa,xb in zip(np.linspace(-136,-103,19)[:-1],np.linspace(-136,-103,19)[1:]):
         def soffit(x):
-            return -.47-1.55*((x+119.5)/16.5)**2
+            u=(x+119.5)/16.5
+            return -.47-1.55*u*u-.85*u**4
         face=[(x,soffit(x),z) for x,z in ((xa,-21.45),(xb,-21.45),(xb,21.45),(xa,21.45))]
-        model.mesh(face,[[0,1,2],[0,2,3]],'granite',True)
+        model.mesh(face,[[0,1,2],[0,2,3]],'concrete',True)
         for side in (-1,1):
             z=side*21.45
             model.mesh([(xa,soffit(xa),z),(xb,soffit(xb),z),(xb,-.36,z),(xa,-.36,z)],[[0,1,2],[0,2,3]],'white')

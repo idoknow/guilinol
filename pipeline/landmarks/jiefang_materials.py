@@ -4,6 +4,7 @@ import sys
 
 import numpy as np
 import trimesh
+from PIL import Image, ImageDraw
 from jingjiang import Model, SWATCHES, atlas
 
 COLORS = dict(tile='#4c535b', pave='#c3c5c5', stone='#c9ced0', granite='#d9dcdb',
@@ -18,8 +19,14 @@ class BridgeModel(Model):
         super().__init__(detail)
         self.lights=[]
         self.glass=[]
+        self.concrete=[]
 
     def mesh(self, vertices, faces, color, collide=False):
+        if color=='concrete':
+            # Preserve metre-based UVs for the curved formwork panels.
+            super().mesh(vertices,faces,'stone',collide)
+            self.concrete.append(self.tile_parts['stone'].pop())
+            return
         group=self.lights if color in LIGHT else self.glass if color=='glazing' else None
         super().mesh(vertices,faces,LIGHT.get(color,'white' if color=='glazing' else color),collide)
         if group is not None:
@@ -35,7 +42,13 @@ def generate_bridge(build):
             metallicFactor=0,roughnessFactor=.78,**params)
     finishes={'finish':finish('bridge_finish',image), 'lights':finish('bridge_lit',image,1)}
     finishes['glass']=trimesh.visual.material.PBRMaterial(name='lantern_glass',
-        baseColorFactor=[207,232,245,56],emissiveFactor=[.12,.16,.19],alphaMode='BLEND',doubleSided=True,roughnessFactor=.18,metallicFactor=.1)
+        baseColorFactor=[44,35,99,146],emissiveFactor=[.027,.018,.071],alphaMode='BLEND',doubleSided=True,roughnessFactor=.18,metallicFactor=.1)
+    grain=np.random.default_rng(43).normal(0,3,(128,128,1))
+    panel=Image.fromarray(np.uint8(np.clip([139,102,84]+grain,0,255)))
+    seams=ImageDraw.Draw(panel)
+    seams.line((0,0,127,0),fill=(103,76,65))
+    seams.line((0,0,0,127),fill=(113,83,70))
+    finishes['concrete']=finish('soffit_concrete',panel,.10)
     for key in ('stone','pave'):
         cell=list(SWATCHES).index(key);x,y=128*(cell%4),128*(cell//4)
         finishes[key]=finish(key,image.crop((x,y,x+128,y+128)))
@@ -53,7 +66,7 @@ def generate_bridge(build):
             scene.add_geometry(mesh,node_name=group+'_'+name if uvs is not None else 'collision_surface',
                                parent_node_name=group if uvs is not None else scene.graph.base_frame)
         emit(model.visible,model.uv,'finish')
-        for name,parts in [('lights',model.lights),('glass',model.glass),*model.tile_parts.items()]:
+        for name,parts in [('lights',model.lights),('glass',model.glass),('concrete',model.concrete),*model.tile_parts.items()]:
             if parts:
                 triangles,uvs=zip(*parts)
                 emit(triangles,uvs,name)
