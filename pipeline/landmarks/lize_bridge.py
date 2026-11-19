@@ -23,11 +23,13 @@ def towers(model, lateral):
         model.box(station + .765, 2, lateral, .035, 15, .16, 'lamp')
     samples = np.unique(np.r_[np.linspace(-61, 61, 63 if model.detail else 17), -40, 40])
     for start, end in zip(samples, samples[1:]):
-        model.beam([start,cable_height(start),lateral], [end,cable_height(end),lateral], .13, 'red')
-        model.beam([start,cable_height(start)+.12,lateral], [end,cable_height(end)+.12,lateral], .055, 'lamp')
+        model.beam([start,cable_height(start),lateral], [end,cable_height(end),lateral], .072, 'red')
+        model.beam([start,cable_height(start)+.068,lateral], [end,cable_height(end)+.068,lateral], .022, 'lamp')
     for station in range(-56, 57, 4 if model.detail else 8):
         if abs(station) != 40:
             model.beam([station,.2,lateral],[station,cable_height(station),lateral],.055,'red')
+            model.box(station,.16,lateral,.38,.30,.38,'red')
+            model.box(station,cable_height(station)-.12,lateral,.28,.22,.22,'red')
 
 
 def promenade(model, side):
@@ -41,18 +43,20 @@ def promenade(model, side):
     for start, end in [(-61.5,40),(40,61.5)]:
         center, length = (start+end)/2, end-start
         model.box(center,-.48,side*9.6,length,.63,3.8,'pave',True)
-        model.box(center,.15,side*9.55,length,.018,.34,'yellow')
-        model.box(center,.15,side*11.35,length,1.08,.32,'red',True)
-        model.box(center,1.23,side*11.35,length,.12,.42,'earth')
+        for rib in range(5):
+            model.box(center,.165,side*(10.63+.064*rib),length,.025,.035,'granite')
         model.box(center,.12,side*7.8,length,.22,.3,'yellow',True)
         model.box(center,.71,side*7.8,length,.16,.18,'yellow',True)
     for station in range(-60,61,3 if model.detail else 6):
         model.box(station,.2,side*7.8,.14,.56,.15,'yellow')
-        if model.detail:
-            for angle in np.linspace(0, math.pi, 9)[:-1]:
-                strip = [(station+r*math.cos(theta),.155,side*(10.95-r*math.sin(theta)))
-                         for theta,r in [(angle,1.18),(angle,1.42),(angle+math.pi/8,1.42),(angle+math.pi/8,1.18)]]
-                model.mesh(strip,[[0,1,2],[0,2,3]],'earth')
+    for station in range(-60,61,3):
+        model.box(station,.15,side*11.35,2.75,1.03,.26,'red',True)
+        model.box(station,1.18,side*11.35,2.86,.13,.39,'red')
+        model.box(station+1.42,.15,side*11.35,.25,1.25,.42,'red',True)
+    for station in range(-58,60,6):
+        for angle in np.linspace(0,math.pi,13)[:-1]:
+            points=[(station,.161,side*7.94)]+[(station+2.92*math.cos(theta),.161,side*(7.94+3.16*math.sin(theta))) for theta in (angle,angle+math.pi/12)]
+            model.mesh(points,[[0,1,2]],'earth')
 
 
 def bridge(model):
@@ -68,4 +72,4 @@ def bridge(model):
 
 
 if __name__ == '__main__':
-    generate('lize_bridge', bridge, lift=lambda east: 8.55 + np.minimum(.05*east, 2-.045*(east-40)))
+    generate('lize_bridge', bridge, colors=dict(red='#d4733a',yellow='#d79547',earth='#a76358',granite='#828484'), lift=lambda east: 8.55 + np.minimum(.05*east, 2-.045*(east-40)))

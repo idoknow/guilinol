@@ -18,10 +18,10 @@ SWATCHES = dict(stone='#c1c1bc', brick='#727c86', tile='#525b65', wood='#613c32'
                 leaf='#4d6a46', earth='#ba7662', clock='#3585bf', sign='#50332d')
 
 
-def atlas():
+def atlas(colors=None):
     rng = np.random.default_rng(18)
     sheet = Image.new('RGB', (512, 512))
-    for index, (key, color) in enumerate(SWATCHES.items()):
+    for index, (key, color) in enumerate((SWATCHES | (colors or {})).items()):
         panel = Image.new('RGB', (128,128), color)
         draw = ImageDraw.Draw(panel)
         if key in ('stone','brick','pave'):

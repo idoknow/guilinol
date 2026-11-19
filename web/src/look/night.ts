@@ -34,6 +34,10 @@ export function nightStreets(surface:THREE.Material, furniture:THREE.Material) {
 uniform float uNight; uniform vec3 uLamp;`).replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
 #ifdef USE_FOG
 { vec2 cell = floor(vFogWorld.xz / 22.), f = vFogWorld.xz / 22. - cell - .5;
+  vec2 bridgeDelta=vFogWorld.xz-vec2(-1598.667,-184.880);
+  float station=dot(bridgeDelta,vec2(.96815,.25038));
+  if(vSurface<.5 && station>65. && station<71. && abs(dot(bridgeDelta,vec2(-.25038,.96815)))<7.4)
+    diffuseColor.rgb=vec3(.37,.095,.075);
   float pool = 1. - smoothstep(.05, .32, length(f));
   // Only the walking surfaces catch lamp light; embankment faces stay dark.
   vec3 gn = normalize(cross(dFdx(vFogWorld), dFdy(vFogWorld)));
@@ -86,8 +90,15 @@ vEdge = aEdge;`)
 uniform float uNight; uniform vec3 uLamp; varying float vEdge;`).replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
 #ifdef USE_FOG
 { float along = fract((vFogWorld.x + vFogWorld.z) / 4.);
+  if(vEdge < -.5 && distance(vFogWorld.xz,vec2(-1598.667,-184.880)) < 80.) {
+    vec2 delta=vFogWorld.xz-vec2(-1598.667,-184.880);
+    vec2 axis=vec2(.96815,.25038);
+    float across=dot(delta,vec2(-axis.y,axis.x));
+    float stripe=abs(mod(across+1.8,3.6)-1.8);
+    if(abs(across)<6. && stripe<.09 && mod(dot(delta,axis),8.)<4.) diffuseColor.rgb=vec3(.8);
+  }
   float lamp = smoothstep(.82, .95, vEdge) * (1. - smoothstep(.08, .2, abs(along - .5)));
-  totalEmissiveRadiance += uLamp * uNight * (lamp * 3. + vEdge * vEdge * .3); }
+  totalEmissiveRadiance += uLamp * uNight * (lamp * 3. + max(vEdge,0.) * max(vEdge,0.) * .3); }
 #endif`)
   }
   material.customProgramCacheKey = ()=>'guilinol-bridge-night'

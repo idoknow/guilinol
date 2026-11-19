@@ -22,6 +22,13 @@ def house(model):
     for east in range(-7,8):model.box(east,11.1,-4.76,.24,.39,.36,'gold')
     for east in np.arange(-3,3.1,.24):model.box(east,0,-7.1,.045,1.9+.32*math.cos(east),.06,'tile')
     for height in (.4,1.6):model.box(0,height,-7.1,6.2,.09,.08,'tile')
+    for east in (-3.2,3.2):
+        model.box(east,0,-7.1,.48,2.45,.5,'brick',True)
+        model.box(east,2.45,-7.1,.63,.14,.62,'granite')
+    for east in np.arange(-2.8,3,.4):
+        angle=np.linspace(0,math.tau,9)
+        scroll=[(east+.17*math.cos(t),1.2+.31*math.sin(t),-7.16) for t in angle]
+        for start,end in zip(scroll,scroll[1:]):model.beam(start,end,.024,'tile',4)
 
 
-if __name__=='__main__':generate('yiwu_old_house',house)
+if __name__=='__main__':generate('yiwu_old_house',house,colors=dict(brick='#53595c',tile='#292b2c',earth='#98523e'))

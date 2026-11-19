@@ -41,7 +41,7 @@ def scooter(model, station, paint):
 def directions(model):
     station = 89
     model.box(station,0,5.5,.17,5,.17,'granite',True)
-    model.box(station,3.45,5.5,.15,1.5,3.12,'clock')
+    model.box(station,3.45,5.5,.15,1.5,3.12,'glass')
     if not model.detail:
         return
     font = ImageFont.truetype('NotoSansCJK-Regular.ttc', 15)
@@ -85,4 +85,4 @@ def street(model):
 if __name__ == '__main__':
     stations = np.arange(-70,101,10)
     heights = [158,157.9,158,157.9,157.7,157.3,157.3,157,156.9,156.9,157.2,157.4,157.6,157.4,157.1,156.8,156.7,156.7]
-    generate('yiwu_street',street,lift=lambda east: np.interp(east,stations,heights)-157)
+    generate('yiwu_street',street,colors=dict(granite='#757979',glass='#2169a2'),lift=lambda east: np.interp(east,stations,heights)-157)
