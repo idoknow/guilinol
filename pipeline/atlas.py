@@ -1,6 +1,7 @@
 import gzip
 import json
 import math
+from pathlib import Path
 
 from shapely.geometry import LineString, Point
 from shapely.ops import nearest_points
@@ -50,8 +51,8 @@ def kind_of(tags):
 
 def write_atlas(output, extent, bounds, layers, footprints, peaks):
     roads, places, longest = [], [], {}
-    libin_road = []
-    libin_campus = None
+    schools = {item['osm']:item for item in json.loads(Path(__file__).with_name('schools-g2.json').read_text())}
+    school_centers, public_streets = {}, []
 
     def place(name, kind, point):
         record = dict(n=name, k=kind, x=round(point.x), z=round(point.y))
@@ -62,8 +63,10 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
     for element in load_osm():
         tags = element.get('tags', {})
         name = tags.get('name', '')
-        if (element['type'], element['id']) == ('way', 675588260):
-            libin_campus = area(element).intersection(bounds)
+        key = f"{element['type']}/{element['id']}"
+        if key in schools:
+            shape = area(element).intersection(bounds)
+            if not shape.is_empty: school_centers[key] = shape.centroid
         coords = points(element)
         highway = tags.get('highway','').removesuffix('_link')
         if highway in CLASSES and len(coords) >= 2:
@@ -80,7 +83,8 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
                 road = dict(n=name, c=CLASSES[highway], w=width if math.isfinite(width) and width > 0 else default, p=path)
                 if tags.get('bridge','no') != 'no': road['b'] = 1
                 roads.append(road)
-                if name == '漓滨路': libin_road.append(line)
+                if name and highway in ('residential','living_street','tertiary','secondary','pedestrian') and tags.get('access') not in ('private','no'):
+                    public_streets.append((name,line))
                 if name and (name not in longest or line.length > longest[name].length): longest[name] = line
         kind = kind_of(tags)
         if not kind or not name: continue
@@ -99,10 +103,10 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
         place(name,kind,point)
     for name,line in longest.items():
         place(name,'road',line.interpolate(.5,normalized=True))
-    if libin_campus is not None and not libin_campus.is_empty and libin_road:
-        center = libin_campus.centroid
-        segment = min(libin_road, key=center.distance)
-        place('桂林市中山中学漓滨校区','school',nearest_points(center, segment)[1])
+    for key,center in school_centers.items():
+        segments = [line for name,line in public_streets if key != 'way/675588260' or name == '漓滨路']
+        if segments:
+            place(schools[key]['name'],'school',nearest_points(center, min(segments,key=center.distance))[1])
 
     data = dict(extent=extent,roads=roads,places=places)
     for layer in ('water','green'):
