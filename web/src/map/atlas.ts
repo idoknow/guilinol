@@ -1,6 +1,6 @@
 import type {Manifest} from '../world'
 
-const kinds = ['scenic','peak','gate','bridge','museum','park','water','memorial','road'] as const
+const kinds = ['scenic','peak','gate','bridge','museum','park','water','memorial','road','school'] as const
 export type Kind = typeof kinds[number]
 export interface Place {n:string; k:Kind; x:number; z:number; a?:string[]}
 interface Road {n:string; c:0|1|2|3; w:number; b?:1; p:number[]}

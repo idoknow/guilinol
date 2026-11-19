@@ -3,6 +3,7 @@ import json
 import math
 
 from shapely.geometry import LineString, Point
+from shapely.ops import nearest_points
 
 from common import ll2xz, load_osm
 from features import area, points, polygons
@@ -16,7 +17,8 @@ CLASSES = {kind: rank for rank, kinds in enumerate((
 ALIASES = {'象鼻山': ['象山', '水月洞'], '日塔': ['日月双塔'], '月塔': ['日月双塔'],
            '靖江王城': ['王城', '靖江王府', '独秀峰'], '叠彩山公园': ['叠彩山', '明月峰'],
            '伏波山公园': ['伏波山', '还珠洞'], '正阳门': ['王城正门'], '依仁路步行街': ['正阳路步行街'],
-           '正阳路': ['正阳路步行街'], '榕杉湖景区': ['两江四湖', '榕湖', '杉湖']}
+           '正阳路': ['正阳路步行街'], '榕杉湖景区': ['两江四湖', '榕湖', '杉湖'],
+           '桂林市中山中学漓滨校区': ['桂林市第九中学', '桂林九中', '九中']}
 
 
 def flat(curve):
@@ -48,6 +50,8 @@ def kind_of(tags):
 
 def write_atlas(output, extent, bounds, layers, footprints, peaks):
     roads, places, longest = [], [], {}
+    libin_road = []
+    libin_campus = None
 
     def place(name, kind, point):
         record = dict(n=name, k=kind, x=round(point.x), z=round(point.y))
@@ -58,6 +62,8 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
     for element in load_osm():
         tags = element.get('tags', {})
         name = tags.get('name', '')
+        if (element['type'], element['id']) == ('way', 675588260):
+            libin_campus = area(element).intersection(bounds)
         coords = points(element)
         highway = tags.get('highway','').removesuffix('_link')
         if highway in CLASSES and len(coords) >= 2:
@@ -74,6 +80,7 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
                 road = dict(n=name, c=CLASSES[highway], w=width if math.isfinite(width) and width > 0 else default, p=path)
                 if tags.get('bridge','no') != 'no': road['b'] = 1
                 roads.append(road)
+                if name == '漓滨路': libin_road.append(line)
                 if name and (name not in longest or line.length > longest[name].length): longest[name] = line
         kind = kind_of(tags)
         if not kind or not name: continue
@@ -92,6 +99,10 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
         place(name,kind,point)
     for name,line in longest.items():
         place(name,'road',line.interpolate(.5,normalized=True))
+    if libin_campus is not None and not libin_campus.is_empty and libin_road:
+        center = libin_campus.centroid
+        segment = min(libin_road, key=center.distance)
+        place('桂林市中山中学漓滨校区','school',nearest_points(center, segment)[1])
 
     data = dict(extent=extent,roads=roads,places=places)
     for layer in ('water','green'):

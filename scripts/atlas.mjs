@@ -20,6 +20,10 @@ assert.equal(atlas.search('象鼻',1)[0].n,'象鼻山')
 assert.ok(atlas.search('双塔').some(place=>['日塔','月塔'].includes(place.n)))
 assert.equal(atlas.search('王城')[0].n,'靖江王城')
 assert.equal(atlas.search('解放桥')[0].k,'bridge')
+const campus = atlas.search('中山中学漓滨校区')[0]
+assert.equal(campus.k,'school')
+for (const alias of ['桂林市第九中学','桂林九中','九中']) assert.deepEqual(atlas.search(alias),[campus])
+assert.equal(atlas.roadAt(campus.x,campus.z)?.name,'漓滨路')
 const junction=atlas.roadAt(-881,-165)?.name
 assert.ok(['中山中路','解放东路','解放西路'].includes(junction))
 const river=atlas.roadAt(-1205,2740)
