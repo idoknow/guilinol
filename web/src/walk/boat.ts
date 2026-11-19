@@ -120,7 +120,7 @@ const RIVER_DOCKS = new Set(['解放桥码头', '象山渔人码头', '文昌桥
 // Pre-validated shore/water pairs outside auto-dock < 9 m radius with >= 7.5 m separation from auto routes.
 const PRIOR_MOORINGS: Record<string, {bank: [number, number]; mooring: [number, number]}> = {
   '榕湖': {bank: [-1340, 326], mooring: [-1340, 320.5]},
-  '杉湖': {bank: [-842, 546], mooring: [-844, 550]},
+  '杉湖': {bank: [-842, 542], mooring: [-844, 550]},
   '日月湾码头': {bank: [-918, 514], mooring: [-918, 521.5]},
   '知音台码头': {bank: [-826, 636], mooring: [-832.9, 633.1]},
   '桂湖': {bank: [-1572, -358], mooring: [-1566.7, -352.7]},
@@ -250,7 +250,6 @@ export function createFreeBoats(env: BoatEnv) {
   let lastToastReason: BoatBlockReason = ''
   let lastToastText = ''
   const flowTmp = {vx: 0, vz: 0}
-  const worldPt = new THREE.Vector3()
   const boxMeasure = new THREE.Box3()
   const figMeasure = new THREE.Box3()
 
@@ -386,7 +385,7 @@ export function createFreeBoats(env: BoatEnv) {
     lastToastText = ''
   }
 
-  function emitToast(reason: BoatBlockReason, text: string, ms = 3600) {
+  function emitToast(reason: BoatBlockReason, text: string, ms = 4500) {
     if (reason !== 'offshore' && reason === lastToastReason && waveTime - lastToastAt < 2.5) return
     lastToastAt = waveTime
     lastToastReason = reason
@@ -520,7 +519,7 @@ export function createFreeBoats(env: BoatEnv) {
     }
   }
 
-  function nearby(x: number, z: number) {
+  function nearby(x: number, z: number, y?: number) {
     let bestSlot: MooringSlot | null = null, bestDist = Infinity, bestAtBank = false
     for (const slot of slots) {
       const [dx,, dz] = slot.dockPos
@@ -541,12 +540,19 @@ export function createFreeBoats(env: BoatEnv) {
       if (!activeSlot) {
         const dBank = Math.hypot(slot.bank[0] - x, slot.bank[2] - z)
         const dBoat = Math.hypot(slot.parkedPos[0] - x, slot.parkedPos[2] - z)
-        const nearBank = dBank <= 5.5
-        const triggerDist = nearBank ? dBank : dBoat <= 6.5 ? dBoat : Infinity
+        const bankOk = dBank <= 5.5 && (y === undefined || (
+          Math.abs(slot.bank[1] - y) <= 2.4 &&
+          !sim.pathBlocked(x, z, slot.bank[0], slot.bank[2], Math.min(y, slot.bank[1]) + 0.85)
+        ))
+        const boatOk = dBoat <= 6.5 && (y === undefined || (
+          Math.abs(slot.parkedPos[1] - y) <= 2.4 &&
+          !sim.pathBlocked(x, z, slot.parkedPos[0], slot.parkedPos[2], Math.max(y, slot.parkedPos[1]) + 0.85)
+        ))
+        const triggerDist = bankOk ? dBank : boatOk ? dBoat : Infinity
         if (triggerDist < bestDist) {
           bestDist = triggerDist
           bestSlot = slot
-          bestAtBank = nearBank
+          bestAtBank = bankOk
         }
       }
     }
@@ -791,11 +797,13 @@ export function createFreeBoats(env: BoatEnv) {
     const head = figMeasure.setFromObject(figure, true).max.y
 
     const hw = slot.spec.width * 0.5, hl = slot.spec.length * 0.5
+    const fwdX = -Math.sin(heading), fwdZ = -Math.cos(heading)
+    const rightX = Math.cos(heading), rightZ = -Math.sin(heading)
     let underside = Infinity
     for (const along of [-hl, 0, hl]) {
       for (const across of [-hw, 0, hw]) {
-        worldPt.set(across, 0, along).applyAxisAngle(THREE.Object3D.DEFAULT_UP, heading)
-        const wx = boatX + worldPt.x, wz = boatZ + worldPt.z
+        const wx = boatX + rightX * across + fwdX * along
+        const wz = boatZ + rightZ * across + fwdZ * along
         const localWater = waterAt(wx, wz) ?? waterY
         const bottom = sim.waterCeiling(wx, wz, Math.max(waterY, localWater))
         if (bottom < underside) underside = bottom

@@ -68,7 +68,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     data.routes.forEach((leg,index)=>{const [dx,,dz]=data.docks[leg.start],distance=Math.hypot(dx-x,dz-z);vessels[index].visible=route===index||(moored[index]&&distance<200);piers.get(leg.start)!.visible=distance<200
       if(distance<nearestDock){nearRoute=index;nearestDock=distance}})
     nearRouteDist=nearRoute>=0?nearestDock:Infinity
-    nearFree=freeBoats?freeBoats.nearby(x,z):{slot:null,distance:Infinity,atBank:false}
+    nearFree=freeBoats?freeBoats.nearby(x,z,footY):{slot:null,distance:Infinity,atBank:false}
     syncHud()
   }
   function advance(dt:number){const leg=data.routes[route],mesh=vessels[route];let distance=2*dt

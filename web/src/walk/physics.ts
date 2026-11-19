@@ -152,6 +152,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const hullBoxes=new Map<string,R.Cuboid>()
   const deckFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='deck'||k==='deckThin'}
   const spanFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'}
+  const wallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='building'}
   const hullFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='rail'||k==='building'}
   function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
     surfaceRay.origin.x=east;surfaceRay.origin.y=origin;surfaceRay.origin.z=south
@@ -182,7 +183,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     if(len<1e-3)return false
     segmentRay.origin.x=x0;segmentRay.origin.y=y;segmentRay.origin.z=z0
     segmentRay.dir.x=dx/len;segmentRay.dir.y=0;segmentRay.dir.z=dz/len
-    return !!world.castRay(segmentRay,len,true,undefined,undefined,capsule,undefined,hullFilter)
+    return !!world.castRay(segmentRay,len,true,undefined,undefined,capsule,undefined,wallFilter)
   }
   function freeCapsule(x:number,y:number,z:number){
     return !world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule)
