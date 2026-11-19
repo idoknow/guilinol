@@ -211,6 +211,7 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
         return None if val == -32768 else val / 10.0
 
     landmarks_cfg = json.loads((root / 'pipeline/landmarks.json').read_text())
+    specifications = {entry['id']: entry for entry in landmarks_cfg}
     replaced_ways = set()
     for entry in landmarks_cfg:
         rep = entry.get('replace', [])
@@ -227,7 +228,7 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
             if entry['id'] == 'shanhu_pagodas':
                 return float(surface_dm[r, c]) / 10.0
             return float(terrain_dm[r, c]) / 10.0
-        fl = entry.get('flatten')
+        fl = specifications[entry['id']].get('flatten')
         if isinstance(fl, dict) and 'elevation' in fl:
             return float(fl['elevation'])
         return dem_at(x, z)
@@ -567,7 +568,7 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
                         lline = LineString(lpts if lpts[0] == end_pt else lpts[::-1])
                         for d_pin in (0.0, min(1.0, lline.length * 0.5), min(2.5, lline.length * 0.8)):
                             pp = lline.interpolate(d_pin)
-                            bridge_targets.append((pp.x, pp.y, ly_deck - 0.045, 420.0))
+                            bridge_targets.append((pp.x, pp.y, ly_deck - 0.045, 1200.0))
             continue
         if wid not in raw_bridge_info:
             continue
