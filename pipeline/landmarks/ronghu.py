@@ -25,6 +25,7 @@ Colors: roof #393943, column #9a3832, library wall #adaaa6, column #a7a4a1.
 """
 import math
 import sys
+from rong_bridges import nine_bends
 from pathlib import Path
 
 from c_kit import (
@@ -204,6 +205,7 @@ def shore(b):
 
 
 def build(b: Builder):
+    nine_bends(b)
     pavilion(b, 0, 0, 0)
     island(b)
     library(b)
