@@ -76,8 +76,18 @@ def generate(identifier, catalog=CATALOG):
                         arch_wall(mesh,position,pitch,3.2,.32,min(4.8,pitch*.83),3,'wood',6 if builder.detail else 3,None)
         if not school.get('heritage'):
             if school.get('paved'):
-                block((0,.015,0),(38,.03,35),'granite')
+                rear = min(row[1] for row in school['blocks']) - 4.5
+                depth = 17 - rear
+                middle = (rear+17)/2
+                block((0,.015,middle),(38,.03,depth),'granite')
                 block((0,.045,14),(36,.03,3),'foliage')
+                for side in (-1,1):
+                    block((side*19,.6,middle),(.36,1.2,depth),'white',True)
+                    block((side*19,1.28,middle),(.42,.16,depth),'steel')
+                    start = 18 if school.get('notice_wall') else 14.5
+                    block((side*(start+19)/2,.7,17),(19-start,1.4,.45),'white',True)
+                block((0,.6,rear),(38,1.2,.36),'white',True)
+                block((0,1.28,rear),(38,.16,.42),'steel')
             if athletics:
                 mesh.face([(east*scale,.085,south*scale) for east,south in [(-18,-4),(18,-4),(18,12),(-18,12)]],(0,1,0),'athletics',uvs=[(.001,.001),(.999,.001),(.999,.999),(.001,.999)])
             else:
