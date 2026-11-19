@@ -229,7 +229,7 @@ def library(b):
     if b.collide:
         solid(b.hit,(-66,annex+4,-61),(9,8,13),'yellow')
     for index in range(9 if b.detail else 3):
-        scooter(wall,-73+index*.36,grade(-73+index*.36,-58-index*.94),-58-index*.94,'steel' if index%2 else 'cream')
+        scooter(wall,-73+index*.36,grade,-58-index*.94,'steel' if index%2 else 'cream')
     banyan(wall,(-71,grade(-71,-56),-56),12,10,123,b.detail)
     for direction in (-1,1):
         wing=x+direction*19

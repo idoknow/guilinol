@@ -19,7 +19,7 @@ import math
 import random
 import sys
 from PIL import Image, ImageDraw
-from c_kit import RECTS, ATLAS
+from c_kit import RECTS, ATLAS, landmark_surface
 from rong_street import shops, signs, approach
 from rong_solids import loft, oval, banyan as solid_tree, align_front
 from pathlib import Path
@@ -114,7 +114,7 @@ def courtyard(builder, deck):
         front=-10-row*2
         for east in range(-19,19,2):
             corners=[(east,front),(east+2,front),(east+2,front-2),(east,front-2)]
-            wall.face([(xx,.54+max(0,-zz-10)*.092,zz) for xx,zz in corners],(0,1,0),'granite',None)
+            wall.face([(xx,.035,zz) for xx,zz in corners],(0,1,0),'granite',None)
     box(wall, (14.2,1.5,4.34),(2.2,3,.22),'wood')
     for south in (2.75,5.25):
         wall.face([(11.9,3.28,south),(16.5,3.28,south),(16.5,4.25,4),(11.9,4.25,4)],(0,1,south-4),'glaze',None)
@@ -130,8 +130,22 @@ def courtyard(builder, deck):
 def build(b: Builder):
     shops(b)
     approach(b)
+    meshes = [*b.parts.values(), b.hit]
+    starts = [len(mesh.pos) for mesh in meshes]
+    ground = landmark_surface('gunanmen').ground
     with align_front(b, (0, 0), -26.8, shift=(.95,-15.8)):
         gate(b)
+    # Sample feet after rotating into landmark space. Keep the terrace and
+    # gatehouse level, tapering the change up the battered masonry walls.
+    terrace_datum = ground(.95, -15.8)
+    for mesh, start in zip(meshes, starts):
+        for i in range(start, len(mesh.pos)):
+            x, y, z = mesh.pos[i]
+            blend = max(0, 1 - max(0, y) / 6.7)
+            datum = terrace_datum
+            if blend:
+                datum += blend * (ground(x, z) - terrace_datum)
+            mesh.pos[i] = (x, y + datum, z)
 
 
 def gate(b: Builder):
@@ -205,7 +219,7 @@ def gate(b: Builder):
     # Plaza paving sits a few centimetres above the flattened ground.
     for east in range(-20,18,2):
         for south in range(11,29,2):
-            wall.face([(east,.22,south),(east+2,.22,south),(east+2,.22,south+2),(east,.22,south+2)],(0,1,0),'granite',None)
+            wall.face([(east,.035,south),(east+2,.035,south),(east+2,.035,south+2),(east,.035,south+2)],(0,1,0),'granite',None)
     # Banyans stand off the south axis so a front camera is not inside the crown.
     ancient_banyan(b, -22, 20)
     solid_tree(wall, (20, 0, 22), 12, 8.5, 8, detail)

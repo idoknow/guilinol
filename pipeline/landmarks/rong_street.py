@@ -77,14 +77,23 @@ def shop(builder, east, base, south, width, length, floors, kind):
         stone.face([(face+.3,level-high/2,offset+span/2),(face+.3,level-high/2,offset-span/2),(face+.3,level+high/2,offset-span/2),(face+.3,level+high/2,offset+span/2)],(1,0,0),kind,uvs=coords)
 
 
-def scooter(mesh,east,base,south,color):
+def scooter(mesh,east,grade,south,color):
+    first = len(mesh.pos)
+    rear = grade(east-.56, south)
+    front = grade(east+.56, south)
+    base = (rear + front) / 2
     for offset in (-.56,.56):
+        tube(mesh,(east+offset,base+.24,south-.06),(east+offset,base+.24,south+.06),.24,'blacktile',8)
         for depth in (-.06,.06):
             ring(mesh,(east+offset,base+.24,south+depth),.24,.14,'blacktile',sides=8)
+    tube(mesh,(east-.56,base+.24,south),(east-.22,base+.64,south),.09,color,6)
     box(mesh,(east,base+.40,south),(.98,.18,.34),color)
     box(mesh,(east-.26,base+.71,south),(.51,.17,.34),'blacktile')
     tube(mesh,(east+.53,base+.24,south),(east+.43,base+1.06,south),.06,'steel',5)
     tube(mesh,(east+.43,base+1.06,south-.24),(east+.43,base+1.06,south+.24),.045,'blacktile',4)
+    for i in range(first, len(mesh.pos)):
+        x, y, z = mesh.pos[i]
+        mesh.pos[i] = (x, y + (front-rear)*(x-east)/1.12, z)
 
 
 def approach(builder):
@@ -96,7 +105,7 @@ def approach(builder):
         box(mesh,(east+5,base,south),(2.3,.24,2.3),'granite')
         banyan(mesh,(east+5,base+.12,south),9+index%3,4.9,77+index,builder.detail)
         for offset in range(7 if builder.detail else 3):
-            scooter(mesh,east+5,ground(east+5,south+2+offset*.77),south+2+offset*.77,('steel','vermilion','cream')[offset%3])
+            scooter(mesh,east+5,ground,south+2+offset*.77,('steel','vermilion','cream')[offset%3])
     for index in range(6):
         box(mesh,(15+index*.95,ground(15+index*.95,-24)+.035,-24),(.5,.07,4.3),'white')
     for index in range(5):

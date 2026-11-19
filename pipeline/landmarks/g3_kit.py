@@ -664,6 +664,8 @@ class Builder:
             yaw = math.atan2(-dx, -dz) + math.pi / 2
             prev = self.pose
             self.pose = (float((a[0] + b[0]) / 2), 0.0, float((a[1] + b[1]) / 2), yaw)
+            parts = [self.atlas,self.lit,self.hit]
+            starts = [len(part.pos) for part in parts]
             self.box(0, 0.0, 0, ln, 0.68, 0.32, base_mat, tile=1.8, collide=True)
             if self.detail:
                 n_bays = max(1, int(ln / 4.5))
@@ -671,7 +673,7 @@ class Builder:
                 for bi in range(n_bays + 1):
                     px = -ln / 2 + bi * step
                     self.box(px, 0.68, 0, 0.38, h - 0.68, 0.38, wall_mat, tile=1.5)
-                    self.box(px, h, 0, 0.48, 0.12, 0.46, cap_mat, tile=1.0)
+                    self.box(px, h, 0, 0.48, 0.12, 0.46, cap_mat, tile=1.0, bottom=True)
                 self.box(0, h - 0.16, 0, ln, 0.06, 0.07, 'dark_stone', tile=1.0)
                 self.box(0, 0.82, 0, ln, 0.05, 0.07, 'dark_stone', tile=1.0)
                 for rx in np.arange(-ln / 2 + 0.4, ln / 2 - 0.3, 0.55):
@@ -680,6 +682,10 @@ class Builder:
                 self.box(0, 0.68, 0, ln, h - 0.68, 0.26, wall_mat, tile=2.2)
             if self.collide:
                 self.solid_box(0, 0.0, 0, ln, h, 0.36)
+            for part,start in zip(parts,starts):
+                for k in range(start,len(part.pos)):
+                    x,y,z = part.pos[k]
+                    part.pos[k]=(x,y+self.surface.ground(x,z),z)
             self.pose = prev
 
     def track_field(self, cx, cz, yaw, straight_len, inner_r, track_w=5.2, stand_side=0, y0=0.05):
