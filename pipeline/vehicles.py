@@ -14,11 +14,11 @@ from shapely.geometry import LineString, Point
 
 from common import GRID, ll2xz, load_osm
 from features import area, points
-from navigation import limit_routes
+from navigation import return_trips
 from clearance import audit_routes
 
 
-def write_vehicles(output, bounds, surface, roads, buildings, sample, triangles):
+def plan_vehicles(bounds, surface, roads, buildings, sample):
     left, top, right, bottom = bounds.bounds
     wet = surface != -32768
     rows, cols = wet.shape
@@ -97,6 +97,10 @@ def write_vehicles(output, bounds, surface, roads, buildings, sample, triangles)
                     if node==nodes[start]:break
                     node=prev[node]
                 routes.append(dict(kind=kind,start=start,end=end,path=path[::-1]))
-    data=dict(bikes=bikes,docks=docks,routes=limit_routes(routes,sample),grid=[left,top,cols,rows,GRID],mask=base64.b64encode(np.packbits(mask).tobytes()).decode())
+    return dict(bikes=bikes,docks=docks,routes=routes,grid=[left,top,cols,rows,GRID],mask=base64.b64encode(np.packbits(mask).tobytes()).decode())
+
+
+def write_vehicles(output,data,triangles):
+    data['routes']=return_trips(audit_routes(data['routes'],triangles,select=True))
     data['clearance'] = audit_routes(data['routes'],triangles)
     (output/'vehicles.bin').write_bytes(gzip.compress(json.dumps(data,ensure_ascii=False,separators=(',',':')).encode(),mtime=0))

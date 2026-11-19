@@ -27,3 +27,9 @@ class ClearanceTest(unittest.TestCase):
         result = self.audit('boat',[(17,103.395),(17,103.6)])
         self.assertEqual(result['bridges'],[17])
         self.assertAlmostEqual(result['minimum'],.3)
+
+    def test_landmark_uses_actual_underside_and_boat_design_margin(self):
+        passage=dict(start='A',end='B',kind='boat',path=[[0,100,0],[0,100,8]])
+        underside=np.array([[-2,102.25,2],[2,102.25,2],[0,102.25,6]])
+        self.assertEqual(audit_routes([passage],[(7,underside,0)],select=True),[])
+        self.assertEqual(audit_routes([passage],[(7,underside+[0,.1,0],0)],select=True),[passage])

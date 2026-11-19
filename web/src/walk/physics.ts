@@ -25,7 +25,7 @@ function fineField(data:Awaited<ReturnType<typeof import('../world').detail>>){
   const stride=geometry.parameters.widthSegments+1
   return field(64,(col,row)=>{
     const at=row*65+col, coarse=(row>>1)*stride+(col>>1)
-    const visible=(col%2&&row%2)?(positions.getY(coarse+1)+positions.getY(coarse+stride))/2:
+    const visible=stride===65?positions.getY(at):(col%2&&row%2)?(positions.getY(coarse+1)+positions.getY(coarse+stride))/2:
       (positions.getY(coarse)+positions.getY(coarse+(col%2)+(row%2)*stride))/2
     return Math.max(visible,(data.water[at]===-32768?data.terrain[at]:data.water[at])/10)
   })
@@ -100,7 +100,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
           colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
       if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
       if(data?.deck.length){const count=data.deck.length/3
-        colliders.push(add(R.ColliderDesc.trimesh(data.deck,Uint32Array.from({length:count},(_,at)=>at)).setTranslation(tile.x,0,tile.z),'deck'))}
+        colliders.push(add(R.ColliderDesc.trimesh(data.deck,Uint32Array.from({length:count},(_,at)=>at),R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(tile.x,0,tile.z),'deck'))}
       regions.set(tile,{colliders,rings,fine:!!data});changed=true
     }
     for(const peak of peaks.colliders){
@@ -138,7 +138,9 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const tileAt=(east:number,south:number)=>tiles.get(`${Math.floor(east/256)*256},${Math.floor(south/256)*256}`)
   function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
     const hit=world.castRayAndGetNormal(new R.Ray({x:east,y:origin,z:south},down),reach,false,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)
-    return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y)))}:null
+    const tile=kind==='deck'?tileAt(east,south):undefined
+    const thin=tile&&hit?.featureId!==undefined&&stream.loaded.get(tile)?.thin.has(hit.featureId)
+    return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}:null
   }
   function wet(east:number,south:number){const tile=tileAt(east,south),data=tile&&stream.loaded.get(tile);if(!tile||!data)return true
     const at=Math.round((south-tile.z)/4)*65+Math.round((east-tile.x)/4)

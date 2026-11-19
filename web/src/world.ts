@@ -101,7 +101,8 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   const positions = new Int16Array(buffer,offset,vertices*3); offset+=vertices*6
   const normals = new Int8Array(buffer,offset,vertices*3); offset+=vertices*3
   const indices = new Uint32Array(buffer.slice(offset,offset+count*4)); offset+=count*4
-  const [rings,paths]:[Building[],Streets]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
+  const [rings,paths,thinIndices=[]]:[Building[],Streets,number[]?]=JSON.parse(new TextDecoder().decode(new Uint8Array(buffer,offset,collision))); offset+=collision
+  const thin=new Set(thinIndices)
   const end = offset+imageBytes, tail = end+triangles*18, extra = buffer.byteLength-tail
   if(extra!==0 && extra!==8450) throw Error('Invalid GL04 sections')
   const deck = Float32Array.from(new Int16Array(buffer.slice(end,tail)),(value,index)=>value/(index%3===1?10:100))
@@ -109,14 +110,17 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   const material = await surfaceMaterial(buffer.slice(offset,end))
   const sample = (col:number,row:number)=>{
     const index = row*65+col
-    return (water[index]===-32768?underlay[index]:water[index])/10
+    return underlay[index]/10
   }
   let minY = Infinity, maxY = -Infinity
-  const geometry = ground(256,256,8,(column,line)=>{
-    const col=column*2,row=line*2
+  const step=water.some(value=>value!==-32768)?4:8, segments=256/step, stride=segments+1
+  const edgeWet=(vertical:boolean,edge:number)=>Array.from({length:65},(_,at)=>water[vertical?at*65+edge:edge*65+at]).some(value=>value!==-32768)
+  const wetEdges=[edgeWet(true,0),edgeWet(true,64),edgeWet(false,0),edgeWet(false,64)]
+  const geometry = ground(256,256,step,(column,line)=>{
+    const col=column*step/4,row=line*step/4
     let y:number
-    if(col===0||col===64) y = THREE.MathUtils.lerp(sample(col,row&~7),sample(col,Math.min(64,(row&~7)+8)),(row%8)/8)
-    else if(row===0||row===64) y = THREE.MathUtils.lerp(sample(col&~7,row),sample(Math.min(64,(col&~7)+8),row),(col%8)/8)
+    if((col===0&&!wetEdges[0])||(col===64&&!wetEdges[1])) y = THREE.MathUtils.lerp(sample(col,row&~7),sample(col,Math.min(64,(row&~7)+8)),(row%8)/8)
+    else if((row===0&&!wetEdges[2])||(row===64&&!wetEdges[3])) y = THREE.MathUtils.lerp(sample(col&~7,row),sample(Math.min(64,(col&~7)+8),row),(col%8)/8)
     else y = sample(col,row)
     if(y<minY) minY = y
     if(y>maxY) maxY = y
@@ -131,20 +135,20 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   const walls = vertices ? buildingGeometry(positions,normals,indices,rings) : null
   const heights = geometry.getAttribute('position')
   const streets = streetGeometry(paths,(x,z)=>{
-    const col=Math.min(31,Math.max(0,Math.floor(x/8))),row=Math.min(31,Math.max(0,Math.floor(z/8))),at=row*33+col
-    const u=x/8-col,v=z/8-row,a=heights.getY(at),b=heights.getY(at+1),c=heights.getY(at+33),d=heights.getY(at+34)
+    const col=Math.min(segments-1,Math.max(0,Math.floor(x/step))),row=Math.min(segments-1,Math.max(0,Math.floor(z/step))),at=row*stride+col
+    const u=x/step-col,v=z/step-row,a=heights.getY(at),b=heights.getY(at+1),c=heights.getY(at+stride),d=heights.getY(at+stride+1)
     return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
   })
-  const bridge = deck.length ? bridgeGeometry(deck) : null
+  const bridge = deck.length ? bridgeGeometry(deck,thin) : null
   const batch:TileBatchInput = {
-    tile, minY, maxY, midY:heights.getY(544),
+    tile, minY, maxY, midY:heights.getY(segments/2*(stride+1)),
     walls, pond:pond?.positions ?? null, bridge,
     streetSurface:streets.surface,
     furnitureMatrices:streets.furnitureMatrices,
     furnitureColors:streets.furnitureColors,
   }
   return {
-    group,groundMesh,terrain,water,rings,deck,streets,batch,
+    group,groundMesh,terrain,water,rings,deck,thin,streets,batch,
     dispose(){
       pond?.dispose(); streets.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
       material.map!.image.close(); material.map!.dispose(); material.dispose()

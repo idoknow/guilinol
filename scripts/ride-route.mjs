@@ -2,7 +2,9 @@ import route from './ride-path.json' with {type:'json'}
 const [approach,zhongshan]=route
 
 export async function rideToCrossroads(page,atlas){
-  const end=atlas.places.find(place=>place.n==='十字街'),roads=atlas.roads.filter(road=>road.n==='中山中路').map(road=>road.p)
+  const position=await page.evaluate(()=>window.viewer.manifest.landmarks.find(entry=>entry.id==='shizijie')?.position)
+  if(!position)throw Error('Missing manifest landmark: shizijie')
+  const end={x:position[0],z:position[2]},roads=atlas.roads.filter(road=>road.n==='中山中路').map(road=>road.p)
   return page.evaluate(async({approach,zhongshan,end,roads})=>{
     const {walk,stream}=window.viewer,keys=new Set(),distanceToRoad=(x,z)=>Math.min(...roads.flatMap(path=>{
       const distances=[];for(let index=0;index+3<path.length;index+=2){const dx=path[index+2]-path[index],dz=path[index+3]-path[index+1],offsetX=x-path[index],offsetZ=z-path[index+1],fraction=Math.max(0,Math.min(1,(offsetX*dx+offsetZ*dz)/(dx*dx+dz*dz||1)));distances.push(Math.hypot(offsetX-dx*fraction,offsetZ-dz*fraction))}return distances}))

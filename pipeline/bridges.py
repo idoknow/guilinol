@@ -11,8 +11,10 @@ from common import load_osm
 from features import points, polygons
 
 
-def bridge_tiles(bounds, sample):
+def bridge_tiles(bounds, sample, routes, raised=()):
     spans, profiles, owners, emitted = [], [], [], []
+    thin_spans=[]
+    tracks=[(LineString([(east,south) for east,level,south in leg['path']]).buffer(4.2),leg['path']) for leg in routes if leg['kind']=='boat']
     # Landmark GLBs already contain these spans. A second procedural deck would z-fight.
     replaced = set()
     for entry in json.loads((Path(__file__).resolve().parent/'landmarks.json').read_text()):
@@ -28,6 +30,7 @@ def bridge_tiles(bounds, sample):
         coords = points(way)
         if len(coords) < 2:
             continue
+        if way['id'] in raised: coords=raised[way['id']][0]
         line = LineString(coords)
         if not bounds.intersects(line) or not line.length:
             continue
@@ -44,6 +47,10 @@ def bridge_tiles(bounds, sample):
                     break
             ends.append(height)
         coords = list(line.segmentize(4).coords)
+        zone=line.buffer(width/2)
+        crossings=[track.intersection(zone) for track,path in tracks if track.intersects(zone)]
+        targets=[(line.project(Point(east,south)),level+3.0) for track,path in tracks if track.intersects(zone)
+                 for east,level,south in path if line.distance(Point(east,south))<=width/2+6]
         sections = []
         for index, coord in enumerate(coords):
             tangent = np.subtract(coords[min(index+1,len(coords)-1)],coords[max(index-1,0)])
@@ -57,9 +64,16 @@ def bridge_tiles(bounds, sample):
                 _, water = sample(*test)
                 if water != -32768:
                     height = max(height,water/10+2)
+            if targets and abs(ends[1]-ends[0])<=.055*line.length:
+                station=frac*line.length
+                ceiling=min(ends[0]+station*.045,ends[1]+(line.length-station)*.045)
+                target=max(level-.045*max(0,abs(station-crossing)-5) for crossing,level in targets)
+                height=max(height,min(ceiling,target))
             if way['id']==246520676:
                 height=156.48
                 side*=6.8/width
+            if way['id'] in raised:
+                height=raised[way['id']][1][index]/10
             sections.append((coord+side,coord-side,height))
         for first, second in zip(sections,sections[1:]):
             for pts, levels in [([first[0],first[1],second[0]],[first[2],first[2],second[2]]),
@@ -68,19 +82,22 @@ def bridge_tiles(bounds, sample):
                 if poly.area < .001:
                     continue
                 spans.append(poly)
+                thin_spans.append(any(poly.intersects(part) for part in crossings))
                 owners.append(way['id'])
                 profiles.append(np.linalg.solve(np.column_stack((pts,np.ones(3))),levels))
     tree = STRtree(spans)
 
     def encode(tile, origin):
         triangles = []
+        thin=[]
         for index in sorted(tree.query(tile)):
             for poly in polygons(spans[index].intersection(tile)):
                 ring = list(orient(poly,sign=-1).exterior.coords)[:-1]
                 for at in range(1,len(ring)-1):
+                    if thin_spans[index]: thin.append(len(triangles)//3)
                     for east,south in (ring[0],ring[at],ring[at+1]):
                         height = profiles[index] @ [east,south,1]
                         triangles.append([round((east-origin[0])*100),round(height*10),round((south-origin[1])*100)])
-                    emitted.append((owners[index],np.array(triangles[-3:])/[100,10,100]+[origin[0],0,origin[1]]))
-        return np.asarray(triangles,dtype='<i2').tobytes()
+                    emitted.append((owners[index],np.array(triangles[-3:])/[100,10,100]+[origin[0],0,origin[1]],.6 if thin_spans[index] else 1.2))
+        return np.asarray(triangles,dtype='<i2').tobytes(),thin
     return encode, emitted
