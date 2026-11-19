@@ -52,6 +52,6 @@ try{
       },id)
       console.log(number,JSON.stringify(hit))
     }
-    await page.locator('canvas').first().screenshot({path:`${out}/${number}.jpg`,quality:89})
+    await page.screenshot({path:`${out}/${number}.jpg`,quality:89,timeout:120000})
   }
 }finally{await browser?.close();await server.close()}
