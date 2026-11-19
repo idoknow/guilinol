@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 from shapely import STRtree
-from shapely.geometry import Point, LineString
+from shapely.geometry import Point, LineString, Polygon
 from shapely.ops import unary_union
 
 from common import CHUNK, ll2xz, load_osm
@@ -167,7 +167,7 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
             angle = math.atan2(ahead.y-center.y,ahead.x-center.x)
             inset = ry_road.width/2+2.85
             point = Point(center.x-inset*math.sin(angle),center.y+inset*math.cos(angle))
-            if tree(point,'lake','street',force_kind=1,force_scale=125,yaw=-angle,separation=3):
+            if tree(point,'lake','street',force_kind=1,force_scale=125,yaw=-angle,separation=3,planting_mask=Polygon()):
                 origin = tuple(math.floor(value/CHUNK)*CHUNK for value in point.coords[0])
                 beds[origin].append([round((point.x-origin[0])*10),round((point.y-origin[1])*10),round(angle*100),0])
     shore = unary_union(wet).boundary

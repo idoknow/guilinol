@@ -6,7 +6,7 @@ import {sectionCamera} from './section-camera.mjs'
 const output=process.argv[2]??'captures/sections'
 const locations=JSON.parse(await readFile(new URL('../docs/refs/rock/photo-locations.json',import.meta.url),'utf8'))
 // Acceptance-only offsets: 1299 ESE 3.22 m to the corner; 1365 SSW 13.49 m to the
-// sidewalk edge; 1380 SSW 9.26 m to the nearest cycle lane; 1301 WSW 2.79 m
+// sidewalk edge; 1380 SSW 9.26 m to the nearest cycle lane; 1301 WSW 1.97 m
 // beside the banyan pit; 1384 NNE 5.36 m to the sidewalk. Original EXIF is unchanged.
 const photos=[1299,1301,1345,1346,1359,1360,1365,1380,1381,1382,1384,1385].map(id=>{
   const key=`IMG_${id}.jpg`

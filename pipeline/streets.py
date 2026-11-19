@@ -4,7 +4,7 @@ from collections import defaultdict
 import numpy as np
 from shapely import STRtree
 from shapely.geometry import LineString, Point, Polygon
-from shapely.ops import nearest_points, unary_union
+from shapely.ops import nearest_points, unary_union, substring
 
 from markings import junction_cores, violations
 from common import CHUNK, ll2xz, load_osm
@@ -19,6 +19,11 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     surfaces, sidewalks, stripes, medians, gaps = [],[],[],[],[]
     sidewalks.append(rongyin_sidewalk())
     frontage = yiwu_frontage(roads)
+    parking_walk = Polygon()
+    rongyin = next((road for road in roads if road.way==221349761),None)
+    if rongyin and rongyin.line.length>284:
+        kerb = substring(rongyin.line,248,284).offset_curve(rongyin.width/2+2.02)
+        parking_walk = kerb.buffer(4.5,single_sided=True,quad_segs=2)
     rep_excl = replace_exclude if replace_exclude is not None else Polygon()
     for pa in ped_areas:
         clipped_pa = pa.difference(rep_excl) if not rep_excl.is_empty else pa
@@ -431,6 +436,12 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         if modeled_paving is not None:
             blocked = blocked.union(modeled_paving.intersection(tile))
         walk, verge, cycle, tactile = [clipped(layer, tile).difference(blocked) for layer in bands]
+        if parking_walk.intersects(tile):
+            bay = parking_walk.intersection(tile).difference(shapes[0]).difference(shapes[4]).difference(rep_excl)
+            for mask in (bldg_tree,water_tree):
+                if mask is not None:
+                    bay = bay.difference(clipped(mask,tile))
+            walk = walk.union(bay)
         if frontage and frontage[0].intersects(tile):
             free = frontage[0].intersection(tile).difference(shapes[0]).difference(shapes[4])
             for mask in (bldg_tree,water_tree):
