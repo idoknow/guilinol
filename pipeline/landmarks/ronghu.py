@@ -135,6 +135,27 @@ def island(b):
 def library(b):
     wall, lit = b.parts['atlas'], b.parts['lit']
     x, y, z = -22.0, 1.75, -36.0
+    for direction in (-1,1):
+        wing=x+direction*19
+        box(wall,(wing,y+5.4,z-6),(18,10.8,12),'cream',2.1)
+        box(wall,(wing,y+10.8,z-6),(18.6,.36,12.5),'white')
+        if b.collide:
+            solid(b.hit,(wing,y+5.4,z-6),(18,10.8,12),'cream')
+        for bay in range(6 if b.detail else 3):
+            east=wing-7.1+bay*(2.84 if b.detail else 7.1)
+            cylinder(wall,(east,y,z+1),.32,3.4,'white',8)
+            for level in (1.8,5.4,9):
+                box(wall,(east,y+level,z+.03),(1.48,2.55,.15),'vermilion')
+                box(lit,(east,y+level,z+.14),(1.24,2.31,.08),'glass')
+        box(wall,(wing,y+3.45,z+.5),(18.5,.28,2.5),'cream')
+        box(wall,(x+direction*9,y+.32,z+5.4),(5.5,.64,2.1),'granite')
+        box(wall,(x+direction*9,y+.75,z+5.4),(5.2,.32,1.9),'foliage')
+    banyan(wall,(x-14,y,z+9),15,13,54,b.detail)
+    box(wall,(x+17,y+1.1,z+9),(8.4,2.2,.45),'white')
+    for index in range(7):
+        east=x+14+index*.95
+        cylinder(wall,(east,y+1.45,z+9.27),.22,.39,'cream',7)
+        tube(wall,(east-.18,y+.55,z+9.26),(east,y+1.48,z+9.26),.26,'cream',6)
     # South front faces the lake (+Z). Body is 20 m wide, two storeys plus pediment.
     box(wall, (x, y + 4.3, z - 3.2), (20, 8.6, 10), 'cream', 2.2)
     stairs(wall, (x, y, z + 2.6), (x, y + 0.9, z + 1.6), 8.5, 5 if b.detail else 2, 'granite')
