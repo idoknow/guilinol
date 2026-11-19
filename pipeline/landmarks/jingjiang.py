@@ -168,16 +168,9 @@ def generate(name,build):
 
 
 def palace(m):
-    # Positive local z is south, along the enclosure axis, bearing ~188.4°.
-    for side in (-1,1):
-        m.box(side*162,-1,-274,4,7.5,548,'stone',True)
-        m.box(side*91,-1,0,142,7.5,4,'stone',True)
-    m.box(0,-1,-548,324,7.5,4,'stone',True)
-    if m.detail:
-        for side in (-1,1):
-            for zz in range(0,548,5):m.box(side*163,6.5,-zz,1,1.1,2.7,'stone')
-            for xx in range(-160,161,5):
-                if side<0 or abs(xx)>20:m.box(xx,6.5,0 if side>0 else -548,2.7,1.1,1,'stone')
+    from wangcheng_plan import PalacePlan, enclosure, inner_court
+    plan = PalacePlan()
+    enclosure(m, plan)
     m.box(0,-.65,16,47,.82,33,'pave',True)
     m.arcade(0,-11,40,23,6.8,[-11,0],[2.0,3.75],'stone')
     m.box(0,6.8,-11,40,2.25,23,'brick',True)
@@ -262,18 +255,10 @@ def palace(m):
                 end=(index+2)%64;m.mesh([rear[index],rear[end],ring[end],ring[index]],[[0,1,2],[0,2,3]],'gold')
     m.pose=(0,0,0,0)
     m.box(0,0,-79,12,.12,135,'pave',True)
-    m.box(0,0,-252,52,2,29,'granite',True)
-    for step in range(10):m.box(0,0,-232-step*.52,12,(step+1)*.20,.55,'granite',True)
-    for xx,zz,width in ((0,-252,42),(-49,-202,23),(49,-202,23)):
-        base=2 if not xx else 0
-        m.box(xx,base,zz,width-4,6,13,'yellow',True);m.roof(xx,base+6,zz,width+5,21,4)
-        for col in np.linspace(xx-width/2,xx+width/2,9 if m.detail else 3):
-            m.beam([col,base,zz+8],[col,base+6,zz+8],.35,'red')
-            if m.detail:m.box(col,base+5.3,zz+8,1.3,.5,1.3,'wood')
+    inner_court(m, plan)
+    m.box(0,6.2,-22.55,6.1,1.4,.25,'granite')
+    letters(m,'三元及第',(0,6.42,-22.7),5.15,.86,'wood',facing=-1)
     if m.detail:
-        for side in (-1,1):
-            for xx in np.arange(8,26,1.8):m.box(side*xx,2,-238,.32,1.25,.32,'white')
-            m.box(side*17,3,-238,18,.22,.36,'white')
         for step in range(33):m.box(-24-step*.5,0,-3, .52,(33-step)*.197,3,'stone',True)
 
 

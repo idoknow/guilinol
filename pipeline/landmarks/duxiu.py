@@ -57,14 +57,14 @@ def summit(model):
     vertices=np.frombuffer(payload,'<i2',lod['vertices']*3,lod['offset']).reshape(-1,3)/100;vertices[:,1]+=height-anchor
     rings=vertices[:-1].reshape(12,-1,3); tip=vertices[-1]; count=rings.shape[1]
     def tread(progress):
-        phase=(.28+progress*1.37)*count; col=int(phase)%count
+        phase=(.50+progress*1.37)*count; col=int(phase)%count
         level=1+progress*10; row=min(10,int(level)); weight=level-row
         strip=rings[:,col]*(1-phase%1)+rings[:,(col+1)%count]*(phase%1)
         point=strip[row]*(1-weight)+strip[row+1]*weight
         radial=point[[0,2]]-tip[[0,2]];radial/=np.linalg.norm(radial)
         point[[0,2]]+=radial*1.15
         return point,math.atan2(radial[1],radial[0])
-    steps=430 if model.detail else 45
+    steps=306 if model.detail else 45
     for index in range(steps):
         start,angle=tread(index/steps);end,_=tread((index+1)/steps)
         model.pose=(*((start+end)/2),angle);depth=np.linalg.norm((end-start)[[0,2]])+.12
@@ -74,7 +74,10 @@ def summit(model):
         if model.detail and index%6==0:
             model.beam([1,.12,0],[1,1.25,0],.09,'stone')
     start,angle=tread(0);model.pose=(*start,angle-math.pi/2)
-    rock_shelter(model)
+    rock_shelter(model)  # Taiping Cave, west foot at the stair entrance.
+    southeast = rings[1,round(count/8)]
+    model.pose = (*southeast, -math.pi/4)
+    rock_shelter(model)  # Dushu Cave and cliff inscriptions, southeast foot.
     model.pose=(*tip,0)
     def ring(radius,height):return [(radius*math.cos(n*math.pi/4),height,radius*math.sin(n*math.pi/4)) for n in range(8)]
     model.beam([0,-2.8,0],[0,.48,0],5.2,'stone',8,True)
