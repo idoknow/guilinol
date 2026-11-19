@@ -23,6 +23,7 @@ and NE traffic police booth ('桂林交警').
 import math
 import numpy as np
 
+from c_kit import landmark_surface
 from nikoniko import Builder, export_landmark
 
 
@@ -76,7 +77,7 @@ def _commercial_strip(m: Builder, p0, p1, outward_sign, podium_h, total_h, wall_
     fl_h = (total_h - podium_h - 1.1) / floors
     for i in range(bays + 1):
         lx = -length / 2.0 + i * bay_w
-        m.box(lx, -1.2, 0.22, 0.62, total_h + 1.2, 0.62, wall_mat, collide=True)
+        m.box(lx, -1.2, 0.22, 0.62, total_h + 1.2, 0.62, wall_mat, collide=True, footing=True)
         if i < bays:
             cx = lx + bay_w / 2.0
             m.box(cx, 0.15, -0.05, bay_w - 0.72, 3.15, 0.22, 'glass')
@@ -184,6 +185,7 @@ def _colored_crosswalk_approach(m: Builder, cx, cz, yaw, road_w=24.0, zebra_len=
 
 
 def build_shizijie(m: Builder):
+    m.surface = landmark_surface('shizijie')
     # ------------------------------------------------------------------
     # 1. Four corner channelizing refuge islands + sidewalks + guardrails
     # (Center of intersection around (0, 0) is completely clear asphalt.)
@@ -199,7 +201,7 @@ def build_shizijie(m: Builder):
         [(-34.5, -3.5), (-21.0, 16.5), (-37.5, 11.5)],
     ]
     for tri in islands:
-        m.prism(tri, -1.2, 1.35, 'pave', collide=True, cap_mat='pave')
+        m.prism(tri, -1.2, 1.35, 'pave', collide=True, cap_mat='pave', paving=True)
         cx = sum(p[0] for p in tri) / 3.0
         cz = sum(p[1] for p in tri) / 3.0
         shrunk = [(cx + (p[0] - cx) * 0.58, cz + (p[1] - cz) * 0.58) for p in tri]
@@ -248,8 +250,8 @@ def build_shizijie(m: Builder):
         (-87.0, -40.5), (-42.0, -30.5), (-22.0, -41.5), (-8.5, -49.5),
         (5.0, -100.5), (-50.5, -117.5),
     ]
-    m.prism(nw_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave')
-    m.prism(NW_NANFANG, -2.0, 6.8, 'dark', collide=True, cap_mat='alum')
+    m.prism(nw_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave', paving=True)
+    m.prism(NW_NANFANG, -2.0, 6.8, 'dark', collide=True, cap_mat='alum', footing=True)
     m.prism(NW_NANFANG, 4.8, 20.4, 'white', collide=True, cap_mat='roof')
     m.cylinder_y(-24.5, 4.8, 22.4, -46.0, 9.6, 'glass', sections=16 if m.detail else 8, collide=True)
     m.cylinder_y(-24.5, 27.2, 2.2, -46.0, 8.8, 'white', sections=16 if m.detail else 8)
@@ -267,8 +269,8 @@ def build_shizijie(m: Builder):
         (4.0, 92.5), (67.5, 108.5), (85.5, 52.5), (48.0, 42.5),
         (32.0, 61.5), (10.5, 62.0),
     ]
-    m.prism(se_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave')
-    m.prism(SE_WENHUA, -2.0, 6.6, 'dark', collide=True, cap_mat='beige')
+    m.prism(se_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave', paving=True)
+    m.prism(SE_WENHUA, -2.0, 6.6, 'dark', collide=True, cap_mat='beige', footing=True)
     m.prism(SE_WENHUA, 4.6, 18.0, 'beige', collide=True, cap_mat='roof')
     m.cylinder_y(34.5, 4.6, 19.2, 60.5, 10.2, 'glass', sections=16 if m.detail else 8, collide=True)
     m.cylinder_y(34.5, 23.8, 1.6, 60.5, 10.6, 'beige', sections=16 if m.detail else 8)
@@ -287,8 +289,8 @@ def build_shizijie(m: Builder):
         (46.0, -45.5), (53.5, -23.0), (63.5, -7.5), (135.5, 16.5),
         (137.0, -2.5), (94.5, -78.5), (59.5, -87.0),
     ]
-    m.prism(ne_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave')
-    m.prism(NE_CORNER, -2.0, 6.4, 'dark', collide=True, cap_mat='alum')
+    m.prism(ne_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave', paving=True)
+    m.prism(NE_CORNER, -2.0, 6.4, 'dark', collide=True, cap_mat='alum', footing=True)
     m.prism(NE_CORNER, 4.4, 17.0, 'white', collide=True, cap_mat='roof')
     m.pose = (60.5, 0.0, -24.5, math.atan2(-1.0, 0.85))
     m.box(0, 21.4, 0, 14.0, 3.2, 12.0, 'alum')
@@ -298,7 +300,7 @@ def build_shizijie(m: Builder):
     _commercial_strip(m, (49.35, -43.56), (65.01, -10.57), 1, 4.4, 21.4, 'white', 4, 6)
     _commercial_strip(m, (61.23, -84.32), (49.35, -43.56), 1, 4.4, 21.4, 'white', 6, 7)
 
-    m.prism(NE_ANNEX, -2.0, 4.5, 'dark', collide=True, cap_mat='beige')
+    m.prism(NE_ANNEX, -2.0, 4.5, 'dark', collide=True, cap_mat='beige', footing=True)
     m.prism(NE_ANNEX, 2.5, 12.3, 'white', collide=True, cap_mat='roof')
     _commercial_strip(m, (76.25, 1.14), (130.47, 13.93), 1, 4.2, 14.8, 'white', 1, 9)
 

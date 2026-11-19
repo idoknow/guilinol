@@ -7,6 +7,7 @@ import numpy as np
 import sys
 from pathlib import Path
 from fubo import mountain,pavilion
+from c_kit import landmark_surface
 from xiaoyao_tower import generate
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from wind_cave import PORTALS, RING, trail
@@ -56,7 +57,7 @@ def build(model):
     start=point(.015);direction=point(.016)-start
     model.pose=(*start,math.atan2(direction[2],direction[0])-math.pi/2)
     model.arcade(0,0,9,1.5,4.4,[0],2,'brick');model.swept_roof(0,4.4,0,10.4,3.4,1.4)
-    model.pose=(*tip,0);pavilion(model,6.25,3.8)
+    model.pose=(*tip,0);pavilion(model,6.25,3.8,landmark_surface('diecai'))
     model.box(0,3.1,2.55,2.1,.55,.14,'sign')
 
 

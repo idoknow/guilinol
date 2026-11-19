@@ -25,8 +25,16 @@ def mountain(name):
     return vertices[:-1].reshape(12,-1,3),vertices[-1]
 
 
-def pavilion(model,width,height):
-    model.box(0,-.65,0,width+1.5,.75,width+1.5,'pave',True)
+def pavilion(model,width,height,surface):
+    x,y,z,_ = model.pose
+    half = (width+1.5)/2
+    corners = [(-half,-half),(half,-half),(half,half),(-half,half)]
+    foot = [(dx,surface.ground(x+dx,z+dz)-y-.04,dz) for dx,dz in corners]
+    top = [(dx,.1,dz) for dx,dz in corners]
+    model.mesh(top, [[0,2,1],[0,3,2]], 'pave', True)
+    for i in range(4):
+        j = (i+1)%4
+        model.mesh([foot[i],top[i],top[j],foot[j]],[[0,1,2],[0,2,3]],'granite',True)
     for side in (-1,1):
         for end in (-1,1):
             east,south=side*width*.38,end*width*.38
@@ -34,6 +42,7 @@ def pavilion(model,width,height):
             if model.detail:
                 for tier in range(3):model.box(east,height-.65+tier*.21,south,.48+tier*.35,.2,.52+tier*.32,'wood')
         model.box(0,height-.35,side*width*.38,width-.5,.38,.38,'red')
+    model.box(0,height-.19,0,width+1.8,.22,width+1.8,'wood')
     model.swept_roof(0,height,0,width+1.8,width+1.8,width*.3)
 
 
@@ -53,13 +62,13 @@ def grotto(model,half,height,depth):
 
 def build(model):
     surface=landmark_surface('fubo')
-    rings,tip=mountain('伏波山');model.pose=(*tip,0);pavilion(model,5.2,3.6)
+    rings,tip=mountain('伏波山');model.pose=(*tip,0);pavilion(model,5.2,3.6,surface)
     base=rings[1,0].copy();base[0]=rings[2,0,0]
-    model.pose=(*base,math.pi/2)
-    model.beam([1,-.85,6],[.8,3.5,6.4],.72,'granite',7,True)
-    model.pose=(base[0]+1.5,surface.ground(base[0]+1.5,base[2]+15),base[2]+15,0);pavilion(model,6.4,4)
+    model.pose=(base[0]+10,surface.ground(base[0]+4,base[2]+1),base[2],math.pi/2)
+    model.beam([1,-.08,6],[.8,3.5,6.4],.72,'granite',7,True)
+    model.pose=(base[0]+4.5,surface.ground(base[0]+4.5,base[2]+15),base[2]+15,0);pavilion(model,6.4,4,surface)
     model.pose=(base[0]-1,surface.ground(base[0]-1,base[2]+31),base[2]+31,0)
-    model.arcade(0,0,14,2.7,4.3,[0],2.3,'brick');model.swept_roof(0,4.45,0,16,5,2.1)
+    model.arcade(0,0,14,2.7,4.3,[0],2.3,'brick');model.box(0,4.25,0,16,.22,5,'wood');model.swept_roof(0,4.45,0,16,5,2.1)
     model.box(0,3.35,1.45,2.6,.68,.14,'sign')
     model.pose=(0,0,0,0)
     for index in range(19):

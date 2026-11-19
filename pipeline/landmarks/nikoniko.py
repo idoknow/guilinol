@@ -642,9 +642,18 @@ class Builder:
             self.visible.append(tris)
             self.uv.append(mapped_uv)
 
-    def box(self, x, y, z, w, h, d, mat, collide=False, uv_scale=None):
+    def feet_at_grade(self, vertices):
+        """Return local Y of the final surface at each posed XZ coordinate."""
+        return np.array([self.surface.ground(x,z)-self.pose[1]
+                         for x, _, z in self._transform(vertices)])
+
+    def box(self, x, y, z, w, h, d, mat, collide=False, uv_scale=None, footing=False):
         cube = trimesh.creation.box([w, h, d])
-        self.mesh(cube.vertices + [x, y + h / 2.0, z], cube.faces, mat, collide, uv_scale)
+        vertices = cube.vertices + [x, y + h / 2.0, z]
+        if footing:
+            bottom = vertices[:,1] < y + h/2
+            vertices[bottom,1] = self.feet_at_grade(vertices[bottom]) - .04
+        self.mesh(vertices, cube.faces, mat, collide, uv_scale)
 
     def beam(self, start, end, r, mat, sections=8, collide=False):
         seg = np.asarray([start, end], dtype=float)
@@ -660,7 +669,7 @@ class Builder:
         verts += [x, y0 + h / 2.0, z]
         self.mesh(verts, cyl.faces, mat, collide, uv_scale)
 
-    def prism(self, poly_xz, y0, h, mat, collide=False, cap_mat=None, uv_scale=None, wall_mask=None):
+    def prism(self, poly_xz, y0, h, mat, collide=False, cap_mat=None, uv_scale=None, wall_mask=None, footing=False, paving=False):
         """Extrude a 2D polygon [(x, z), ...] vertically from y0 to y0 + h."""
         pts = np.asarray(poly_xz, dtype=float)
         if np.allclose(pts[0], pts[-1]):
@@ -675,6 +684,11 @@ class Builder:
                 wall_mask = list(reversed(wall_mask))
         tris_2d = mapbox_earcut.triangulate_float64(pts, np.array([n], dtype=np.uint32)).reshape(-1, 3)
         top_verts = np.column_stack([pts[:, 0], np.full(n, y0 + h), pts[:, 1]])
+        bottom = np.full(n, y0, dtype=float)
+        if footing or paving:
+            bottom = self.feet_at_grade(top_verts) - .04
+        if paving:
+            top_verts[:,1] = bottom + .10
         self.mesh(top_verts, tris_2d[:, ::-1], cap_mat or mat, collide, uv_scale)
         for i in range(n):
             if wall_mask is not None and not wall_mask[i]:
@@ -683,10 +697,10 @@ class Builder:
             x0, z0 = pts[i]
             x1, z1 = pts[j]
             quad_v = [
-                (x0, y0, z0),
-                (x1, y0, z1),
-                (x1, y0 + h, z1),
-                (x0, y0 + h, z0),
+                (x0, bottom[i], z0),
+                (x1, bottom[j], z1),
+                top_verts[j],
+                top_verts[i],
             ]
             self.mesh(quad_v, [[0, 2, 1], [0, 3, 2]], mat, collide, uv_scale)
 
@@ -913,7 +927,7 @@ def _facade_run(m: Builder, p0, p1, ground_h=4.8, upper_h=18.2, bays=8, brand_se
 
     for i in range(bays + 1):
         lx = -length / 2.0 + i * bay_w
-        m.box(lx, -1.5, 0.25, 0.72, ground_h + 1.5, 0.85, 'dark', collide=True)
+        m.box(lx, -1.5, 0.25, 0.72, ground_h + 1.5, 0.85, 'dark', collide=True, footing=True)
         m.box(lx, ground_h + 0.5, 0.44, 0.24, upper_h - 0.5, 0.22, 'alum')
         if i < bays:
             cx = lx + bay_w / 2.0
@@ -928,7 +942,7 @@ def _facade_run(m: Builder, p0, p1, ground_h=4.8, upper_h=18.2, bays=8, brand_se
 def _buttress_pylon(m: Builder, cx, cz, yaw):
     """Flanking chamfered silver-grey aluminum stair/elevator pylon (27.0 m)."""
     m.pose = (cx, 0.0, cz, yaw)
-    m.box(0, -2.0, 0, 10.6, 28.6, 9.2, 'alum', collide=True)
+    m.box(0, -2.0, 0, 10.6, 28.6, 9.2, 'alum', collide=True, footing=True)
     m.box(0, 26.6, 0, 9.2, 0.85, 8.0, 'alum')
     if m.detail:
         m.box(0, 2.2, 4.48, 3.8, 22.8, 0.35, 'glass')
@@ -943,6 +957,8 @@ def _buttress_pylon(m: Builder, cx, cz, yaw):
 
 
 def build_nikoniko(m: Builder):
+    from c_kit import landmark_surface
+    m.surface = landmark_surface('nikoniko')
     # 1. Granite sidewalk & corner forecourt plaza (flush at ground y=0, skirt to -2.0 m)
     apron = [
         (-46.5, -49.5),
@@ -957,12 +973,12 @@ def build_nikoniko(m: Builder):
         (33.5, -38.0),
         (-18.0, -47.0),
     ]
-    m.prism(apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave')
+    m.prism(apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave', paving=True)
 
     # 2. Main 6-storey retail body extruded from exact OSM footprint
     n_edges = len(FOOTPRINT)
     ground_mask = [i not in (9, 10, 11, 12) for i in range(n_edges)]
-    m.prism(FOOTPRINT, -2.0, 6.8, 'dark', collide=True, cap_mat='alum', wall_mask=ground_mask)
+    m.prism(FOOTPRINT, -2.0, 6.8, 'dark', collide=True, cap_mat='alum', wall_mask=ground_mask, footing=True)
     m.prism(FOOTPRINT, 4.8, 18.2, 'alum', collide=True, cap_mat='roof')
 
     m.pose = (-8.0, 0.0, -4.0, 0.22)

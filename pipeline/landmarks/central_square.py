@@ -28,6 +28,7 @@ import math
 import numpy as np
 import trimesh
 
+from c_kit import landmark_surface
 from nikoniko import Builder, export_landmark
 
 
@@ -157,6 +158,7 @@ def _fire_station(m: Builder, cx, cz, yaw):
 
 
 def build_central_square(m: Builder):
+    m.surface = landmark_surface('central_square')
     # ------------------------------------------------------------------
     # 1. Master Granite Civic Plaza Deck
     # ------------------------------------------------------------------
@@ -166,7 +168,7 @@ def build_central_square(m: Builder):
         _ax_pt(92.0, 68.0),
         _ax_pt(-118.0, 68.0),
     ]
-    m.prism(plaza_ring, -2.2, 2.26, 'pave', collide=True, cap_mat='pave')
+    m.prism(plaza_ring, -2.2, 2.26, 'pave', collide=True, cap_mat='pave', paving=True)
 
     # ------------------------------------------------------------------
     # 2. Circular Musical Fountain Assembly Plaza (center at along=+22, across=0)
@@ -283,7 +285,7 @@ def build_central_square(m: Builder):
     # ------------------------------------------------------------------
     # 5. Guilin Gymnasium (桂林市体育馆, exact OSM way/675177179)
     # ------------------------------------------------------------------
-    m.prism(GYM_675177179, -2.2, 6.2, 'beige', collide=True, cap_mat='alum')
+    m.prism(GYM_675177179, -2.2, 6.2, 'beige', collide=True, cap_mat='alum', footing=True)
     m.prism(GYM_675177179, 4.0, 14.6, 'alum', collide=True, cap_mat='roof')
     gcx, gcz = _ax_pt(96.5, 16.5)
     m.pose = (gcx, 0.0, gcz, AXIS_YAW)
@@ -322,9 +324,9 @@ def build_central_square(m: Builder):
         m.box(4.0, 22.6, 8.0, 14.0, 1.6, 0.24, 'hedge')
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
-    m.prism(NE_HALL_1493030771, -2.0, 15.8, 'white', collide=True, cap_mat='roof')
+    m.prism(NE_HALL_1493030771, -2.0, 15.8, 'white', collide=True, cap_mat='roof', footing=True)
     m.prism(NE_HALL_1493030771, 13.8, 1.9, 'terra', collide=False, cap_mat='roof')
-    m.prism(SE_ANNEX_675106655, -2.0, 16.4, 'white', collide=True, cap_mat='roof')
+    m.prism(SE_ANNEX_675106655, -2.0, 16.4, 'white', collide=True, cap_mat='roof', footing=True)
 
     fsx, fsz = _ax_pt(52.0, -68.0)
     _fire_station(m, fsx, fsz, AXIS_YAW + math.pi)
