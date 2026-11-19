@@ -4,6 +4,7 @@ import {preview} from 'vite'
 
 const output=process.env.CAPTURES??'captures/wangcheng'
 const planOnly=process.argv.includes('--plan-only')
+const selected=process.env.PHOTO_NUMBERS?.split(',')
 await mkdir(output,{recursive:true})
 const catalog=JSON.parse(await readFile('docs/refs/rock/photo-locations.json','utf8'))
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
@@ -17,6 +18,7 @@ try {
   await page.addStyleTag({content:'body > :not(canvas):not(script){visibility:hidden}'})
   for(const [file,shot] of Object.entries(catalog).filter(([file])=>!planOnly&&file.startsWith('walk-shizijie-wangcheng/')).sort()){
     const number=file.split('/')[1].slice(0,2)
+    if(selected&&!selected.includes(number))continue
     const pitch=['34','35'].includes(number)?8:0
     if(process.argv.includes('--resume') && !['34','35'].includes(number) && await access(`${output}/${number}.jpg`).then(()=>true,()=>false)){
       trace.push({number,...shot,pitch});continue
@@ -38,7 +40,7 @@ try {
       camera.lookAt(x+Math.sin(angle),ground+1.5+Math.tan(pitch*Math.PI/180),z-Math.cos(angle))
       camera.updateMatrixWorld(true)
       const probe=window.viewer.probeFoot()
-      return {number,x,z,ground,heading,focal35,pitch,first:probe.lookingAt,distance:probe.wallDistance}
+      return {number,x,z,ground,heading,focal35,pitch,first:probe.lookingAt,landmark:probe.landmark,distance:probe.wallDistance}
     },{shot,number,pitch}))
     await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))))
     await page.screenshot({path:`${output}/${number}.jpg`,quality:90})

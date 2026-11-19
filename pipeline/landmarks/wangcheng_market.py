@@ -2,19 +2,29 @@
 import math
 import numpy as np
 import trimesh
-from jingjiang import generate
+from jingjiang import Model,generate
 from shop_lettering import letters
 
 
-def row(model, first, last, count, side, depth=6, arcade=False, gap=3.45):
+def row(model, first, last, count, side, depth=6, arcade=False, gap=3.45,tall=False):
     dx, dz = last[0]-first[0], last[1]-first[1]
     angle = math.atan2(dz,dx)
     pitch = math.hypot(dx,dz)/count
     for index in range(count):
         center = (index+.5)/count
-        model.pose = (first[0]+dx*center,0,first[1]+dz*center,angle)
-        back = side*(gap+depth/2)
-        height = 6.4 + (index%3==1)*2.7
+        height=9.1 if tall or index%3==1 else 6.4
+        key=(arcade,height)
+        matrix=trimesh.transformations.rotation_matrix(-angle+(math.pi if side<0 else 0),[0,1,0])
+        matrix[:3,3]=[first[0]+dx*center-math.sin(angle)*side*gap,0,first[1]+dz*center+math.cos(angle)*side*gap]
+        matrix[:3,0]*=pitch/7;matrix[:3,2]*=depth/5
+        model.placements.append((key,matrix))
+        if key not in model.templates:
+            template=Model(model.detail);shop(template,height,arcade);model.templates[key]=template
+
+
+def shop(model,height,arcade):
+        pitch,depth,side,gap=7,5,1,0
+        back=depth/2
         model.box(0,0,back,pitch-.16,height,depth,'brick',True)
         if arcade:
             model.box(0,height,back,pitch+.1,.48,depth+.8,'white')
@@ -25,7 +35,7 @@ def row(model, first, last, count, side, depth=6, arcade=False, gap=3.45):
         model.box(0,3.05,side*(gap-.35),pitch,.35,1.9,'wood')
         for pier in (-.38,.38):
             model.box(pier*pitch,0,side*(gap-.9),.3,3.1,.31,'wood',True)
-        if not model.detail: continue
+        if not model.detail: return
         for division in (-1,0,1):
             east=division*pitch/3
             model.box(east,.32,side*(gap-.06),pitch/3-.28,2.05,.12,'glass')
@@ -84,7 +94,9 @@ def market(model):
         row(model,(55,-4.8),(10,-11.6),6,side,4.7)
         row(model,(-2.6,13),(1.2,-6),3,side,4.5)
         row(model,(6,-14),(13,-57),6,side,6,gap=14.5)
-    row(model,(-19,42),(1,45),3,1,5)
+        row(model,(61,41),(83,49.7),3,side,6,tall=True)
+    slab(model,(56,39),(85,50.5),8,.14)
+    row(model,(-36,28),(-23,35),2,1,5)
     screen_house(model)
     model.pose=(-4.7,0,17,.14)
     for east,top in [(-6.5,5.15),(-3.4,6.6),(3.4,6.6),(6.5,5.15)]:

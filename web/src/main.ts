@@ -55,7 +55,6 @@ async function start() {
   resize(); window.addEventListener('resize',resize)
   bootProgress('载入山体', 45)
   const [base,peaks] = await basePromise
-  peaks.loadModels(renderer)
   scene.add(base.mesh,peaks)
   bootProgress('载入街区', 78)
   const params = new URLSearchParams(location.search)
@@ -119,7 +118,10 @@ async function start() {
         for(let obj:THREE.Object3D|null=hit.object;obj;obj=obj.parent) if(obj.name){lookingAt=obj.name;break}
         if(lookingAt) break
       }
-      return {clearance,lookingAt,wallDistance:hits[0]?.distance}
+    const roots=new Map([...stream.landmarks].map(([entry,root])=>[root as THREE.Object3D,entry.id]))
+    let landmark:string|undefined
+    for(let obj:THREE.Object3D|null=hits[0]?.object??null;obj;obj=obj.parent){landmark=roots.get(obj);if(landmark)break}
+    return {clearance,lookingAt,landmark,wallDistance:hits[0]?.distance}
     }}})
   function draw(){
     const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
@@ -137,7 +139,10 @@ async function start() {
       setTimeout(()=>void import('./ui/about').then(mod=>mod.aboutPanel()),500)
     }
     if(frame===2&&manifest.landmarks?.length)void import('./landmarks').then(module=>{updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks)})
-    if(frame===2)void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))
+    if(frame===2){
+      peaks.loadModels(renderer)
+      void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))
+    }
     if(first&&!switching) {
       updateLandmarks?.(walker?.active?walker.position:camera.position)
       stream.tick(walker?.active?walker.position:camera.position)

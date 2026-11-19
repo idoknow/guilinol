@@ -59,6 +59,8 @@ class Model:
         self.pigmented=[]
         self.tile_parts={key:[] for key in ('stone','brick','pave')}
         self.pose=(0,0,0,0)
+        self.templates={}
+        self.placements=[]
 
     def mesh(self, vertices, faces, color, collide=False):
         triangles=np.asarray(vertices,dtype=float)[faces]
@@ -134,20 +136,33 @@ def generate(name,build):
     scene=trimesh.Scene(); image=atlas(); path=Path(__file__).resolve().parents[2]/'public/textures/landmarks/A'
     path.mkdir(exist_ok=True,parents=True); image.save(path/'surfaces.png',optimize=True)
     mat=trimesh.visual.material.PBRMaterial(name='A_surfaces',baseColorTexture=image,roughnessFactor=1,metallicFactor=0,doubleSided=True)
-    for lod in (0,1):
-        model=Model(lod==0);build(model)
-        def packed(parts):
-            vertices=np.concatenate(parts).reshape(-1,3);return trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
+    def packed(parts):
+        vertices=np.concatenate(parts).reshape(-1,3);return trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
+    def emit(model,layer,parent):
         mesh=packed(model.visible);mesh.visual=trimesh.visual.TextureVisuals(uv=np.concatenate(model.uv).reshape(-1,2),material=mat)
-        layer=f'lod{lod}';scene.graph.update(frame_to=layer)
-        scene.add_geometry(mesh,node_name=layer+'_joinery',parent_node_name=layer)
+        scene.add_geometry(mesh,geom_name=layer+'_joinery',node_name=layer+'_joinery',parent_node_name=parent)
         if model.pigmented:
             rock=packed([triangles for triangles,colors in model.pigmented]);rock.visual.vertex_colors=np.concatenate([colors for triangles,colors in model.pigmented]).reshape(-1,4)
-            scene.add_geometry(rock,node_name=layer+'_rock',parent_node_name=layer)
+            scene.add_geometry(rock,node_name=layer+'_rock',parent_node_name=parent)
         for key,parts in model.tile_parts.items():
             if not parts:continue
             cell=list(SWATCHES).index(key);left=128*(cell%4);top=128*(cell//4)
-            texture=image.crop((left,top,left+128,top+128));surface=packed([tri for tri,uv in parts]);surface.visual=trimesh.visual.TextureVisuals(uv=np.concatenate([uv for tri,uv in parts]).reshape(-1,2),material=trimesh.visual.material.PBRMaterial(name=key,baseColorTexture=texture,metallicFactor=0,roughnessFactor=1,doubleSided=True));scene.add_geometry(surface,node_name=layer+'_'+key,parent_node_name=layer)
+            texture=image.crop((left,top,left+128,top+128));surface=packed([tri for tri,uv in parts]);surface.visual=trimesh.visual.TextureVisuals(uv=np.concatenate([uv for tri,uv in parts]).reshape(-1,2),material=trimesh.visual.material.PBRMaterial(name=key,baseColorTexture=texture,metallicFactor=0,roughnessFactor=1,doubleSided=True));scene.add_geometry(surface,geom_name=layer+'_'+key,node_name=layer+'_'+key,parent_node_name=parent)
+    for lod in (0,1):
+        model=Model(lod==0);build(model)
+        layer=f'lod{lod}';scene.graph.update(frame_to=layer)
+        emit(model,layer,layer)
+        groups={}
+        for index,(key,matrix) in enumerate(model.placements):
+            template=model.templates[key];node=f'{layer}_bay{index}'
+            scene.graph.update(frame_from=layer,frame_to=node,matrix=matrix)
+            if key not in groups:
+                prefix=node+'_shared';emit(template,prefix,node)
+                groups[key]=[part for part in scene.geometry if part.startswith(prefix+'_')]
+            else:
+                for part in groups[key]:scene.graph.update(frame_from=node,frame_to=node+'_'+part,geometry=part)
+            if lod==0:
+                for triangles in template.solid:model.solid.append(triangles@matrix[:3,:3].T+matrix[:3,3])
         if lod==0 and model.solid:scene.add_geometry(packed(model.solid),node_name='collision_surface')
     scene.export(Path(sys.argv[1])/f'{name}.glb')
 
