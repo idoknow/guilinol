@@ -246,7 +246,9 @@ def west_bank(model):
 
 def bridge(model):
     length=281; width=43
-    model.box(0,-1.22,0,length,1.22,width,'stone',True)
+    # The west portal has a curved soffit and a thinner slab above the crown.
+    for left,right,depth in ((-140.5,-136,1.22),(-136,-103,.36),(-103,140.5,1.22)):
+        model.box((left+right)/2,-depth,0,right-left,depth,width,'stone',True)
     model.box(0,-.03,0,length,.08,32.2,'tile')
     for side in (-1,1):
         model.box(0,0,side*18.8,length,.18,5.25,'pave',True)
@@ -271,7 +273,7 @@ def bridge(model):
             model.box(pier,-5.69,z,3.65,.5,3.2,'granite')
 
     for side in (-1,1):
-        model.box(0,-.65,side*21.4,length,.12,.15,'lamp')
+        model.box(0,-.28,side*21.4,length,.12,.15,'lamp')
         for east in np.linspace(-136,136,35 if model.detail else 13):
             model.box(east,1.26,side*21.1,.55,.24,.39,'lamp')
     for start,end in zip(springings,springings[1:]):
@@ -289,12 +291,12 @@ def bridge(model):
     # Shallow barrel vault over Binjiang Road; road and walk pass below its crown.
     for xa,xb in zip(np.linspace(-136,-103,19)[:-1],np.linspace(-136,-103,19)[1:]):
         def soffit(x):
-            return -1.29-1.24*((x+119.5)/16.5)**2
+            return -.47-1.55*((x+119.5)/16.5)**2
         face=[(x,soffit(x),z) for x,z in ((xa,-21.45),(xb,-21.45),(xb,21.45),(xa,21.45))]
         model.mesh(face,[[0,1,2],[0,2,3]],'granite',True)
         for side in (-1,1):
             z=side*21.45
-            model.mesh([(xa,soffit(xa),z),(xb,soffit(xb),z),(xb,-1.2,z),(xa,-1.2,z)],[[0,1,2],[0,2,3]],'white')
+            model.mesh([(xa,soffit(xa),z),(xb,soffit(xb),z),(xb,-.36,z),(xa,-.36,z)],[[0,1,2],[0,2,3]],'white')
     west_bank(model)
 
 

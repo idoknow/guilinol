@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 from shapely import STRtree, intersects_xy, unary_union
-from shapely.geometry import box, Point
+from shapely.geometry import box, Point, Polygon
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem
 from features import building_mesh, buildings, game_court, ground_features, polygons
@@ -90,11 +90,15 @@ def build(bbox, output, palette):
     terrain[wet]=original[wet]=np.minimum(terrain[wet],surface[wet]-20)
     interchange=None
     bank_pavement=None
+    west_portal=None
     for x,z,entry in layout.entries:
         if entry['id']=='jiefang_bridge' and bounds.covers(Point(x,z)):
             datum=previous_bed[round((z-top)/GRID),round((x-left)/GRID)]/10
             angle=-np.deg2rad(entry['rotation'])
             bank_pavement=bank_paving((x,z),angle)
+            axes=np.array([[np.cos(angle),np.sin(angle)],[-np.sin(angle),np.cos(angle)]])
+            corners=np.array([[-136,-21.5],[-103,-21.5],[-103,21.5],[-136,21.5]])
+            west_portal=Polygon(corners@axes+[x,z])
             interchange=((x,z),angle,bank_pavement)
             grade_banks(terrain,original,wet,left,top,GRID,(x,z),angle,datum)
     footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes),layout)
@@ -134,7 +138,7 @@ def build(bbox, output, palette):
     (output/'street-report.json').write_text(json.dumps(report,ensure_ascii=False))
     print('Vegetation:',dict(sorted(tree_stats.items())))
     vehicles=plan_vehicles(bounds,surface,layers['road'],footprints,sample,interchange)
-    decks, triangles = bridge_tiles(bounds,sample,vehicles['routes'],raised)
+    decks, triangles = bridge_tiles(bounds,sample,vehicles['routes'],raised,west_portal)
     landmarks=[]
     for x,z,entry in layout.entries:
         height=sample(x,z)[0]

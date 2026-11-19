@@ -11,7 +11,7 @@ from common import load_osm
 from features import points, polygons
 
 
-def bridge_tiles(bounds, sample, routes, raised=()):
+def bridge_tiles(bounds, sample, routes, raised=(), west_portal=None):
     spans, profiles, owners, emitted = [], [], [], []
     thin_spans=[]
     tracks=[(LineString([(east,south) for east,level,south in leg['path']]).buffer(4.2),leg['path']) for leg in routes if leg['kind']=='boat']
@@ -80,6 +80,10 @@ def bridge_tiles(bounds, sample, routes, raised=()):
                                 ([second[1],second[0],first[1]],[second[2],second[2],first[2]])]:
                 poly = Polygon(pts)
                 if poly.area < .001:
+                    continue
+                # The landmark supplies the deck, vaulted underside and collision here.
+                if (west_portal is not None and way['id'] in (49322149,258899702,1531308751,1531308752)
+                        and west_portal.covers(poly)):
                     continue
                 spans.append(poly)
                 thin_spans.append(any(poly.intersects(part) for part in crossings))
