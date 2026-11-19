@@ -1005,6 +1005,7 @@ try {
 
   await enterSpot(mobile, ...FREE_DOCKS.ronghu.freeBank, 0, 'mobile-ronghu-bank')
   await closeSpotCard(mobile)
+  await mobile.waitForSelector('.btn-about.account-entry', {state: 'attached', timeout: 10000})
   await mobile.waitForFunction(
     t => document.querySelector('.vehicle-action')?.textContent?.includes(t),
     FREE_DOCKS.ronghu.label,
@@ -1013,21 +1014,27 @@ try {
 
   async function measureHud(targetPage, selectors) {
     return targetPage.evaluate(sels => {
-      const boxes = sels.map(sel => {
-        const el = document.querySelector(sel)
-        if (!el) return null
-        const st = getComputedStyle(el)
-        const r = el.getBoundingClientRect()
-        if (st.display === 'none' || st.visibility === 'hidden' || el.hasAttribute('hidden') || r.width === 0 || r.height === 0) {
-          return null
-        }
-        return {
-          sel,
-          left: +r.left.toFixed(1),
-          top: +r.top.toFixed(1),
-          right: +r.right.toFixed(1),
-          bottom: +r.bottom.toFixed(1),
-        }
+      const boxes = sels.flatMap(sel => {
+        const els = sel === '.btn-about'
+          ? [...document.querySelectorAll(sel)]
+          : [...document.querySelectorAll(sel)].slice(0, 1)
+        return els.map((el, idx) => {
+          const st = getComputedStyle(el)
+          const r = el.getBoundingClientRect()
+          if (st.display === 'none' || st.visibility === 'hidden' || el.hasAttribute('hidden') || r.width === 0 || r.height === 0) {
+            return null
+          }
+          const label = els.length > 1
+            ? (el.classList.contains('account-entry') ? `${sel}.account-entry` : `${sel}[${idx}]`)
+            : sel
+          return {
+            sel: label,
+            left: +r.left.toFixed(1),
+            top: +r.top.toFixed(1),
+            right: +r.right.toFixed(1),
+            bottom: +r.bottom.toFixed(1),
+          }
+        })
       }).filter(Boolean)
       const overlaps = []
       for (let i = 0; i < boxes.length; i++) {
@@ -1048,6 +1055,7 @@ try {
     '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.btn-about',
   ])
   assert(preHud.boxes.some(b => b.sel === '.vehicle-action'), '手机端自由栈桥旁未显示 .vehicle-action')
+  assert(preHud.boxes.filter(b => b.sel.startsWith('.btn-about')).length >= 2, `手机端 .btn-about 未完整覆盖两个按钮: ${JSON.stringify(preHud.boxes)}`)
   assert.deepEqual(preHud.overlaps, [], `手机端上船前按钮重叠: ${JSON.stringify(preHud)}`)
   assert.deepEqual(preHud.outOfBounds, [], `手机端上船前按钮出界: ${JSON.stringify(preHud)}`)
 
@@ -1096,6 +1104,21 @@ try {
   })
   assert(stickDrive.ringColor.endsWith(', 0)') || stickDrive.ringColor === 'transparent', `船上摇杆不应亮跑步红圈: ${stickDrive.ringColor}`)
   assert(stickDrive.dist > 0.6 && stickDrive.spd > 1.2 && stickDrive.dh > 0.08, `手机左摇杆划船未生效: ${JSON.stringify(stickDrive)}`)
+
+  // 划入湖心触发离岸拒下提示，校验手机端 .toast.show 不与 .dock / .vehicle-action / .joystick 重叠
+  await clearToasts(mobile)
+  await runInPage(mobile, async ({steerTo}) => {
+    await steerTo([[-1340, 304]], {arriveDist: 2.0})
+  })
+  await triggerAction(mobile, '靠岸下船', true)
+  await mobile.waitForSelector('.toast.show', {state: 'visible', timeout: 5000})
+  const toastHud = await measureHud(mobile, [
+    '.toast.show', '.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action',
+    '.dock', '.sky-ui', 'output', '.btn-about',
+  ])
+  assert(toastHud.boxes.some(b => b.sel === '.toast.show'), `手机端未测到激活态 .toast.show: ${JSON.stringify(toastHud)}`)
+  assert.deepEqual(toastHud.overlaps, [], `手机 390×844 .toast.show 与 HUD 控件重叠: ${JSON.stringify(toastHud)}`)
+  assert.deepEqual(toastHud.outOfBounds, [], `手机 390×844 .toast.show 出界: ${JSON.stringify(toastHud)}`)
 
   // 触屏划回泊位或靠岸下船
   await runInPage(mobile, async ({steerTo, arg}) => {
