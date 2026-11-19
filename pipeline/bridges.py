@@ -11,7 +11,7 @@ from common import load_osm
 from features import points, polygons
 
 
-def bridge_tiles(bounds, sample, routes, raised=()):
+def bridge_tiles(bounds, sample, routes, raised=(), west_portal=None):
     spans, profiles, owners, emitted = [], [], [], []
     thin_spans=[]
     tracks=[(LineString([(east,south) for east,level,south in leg['path']]).buffer(4.2),leg['path']) for leg in routes if leg['kind']=='boat']
@@ -27,6 +27,7 @@ def bridge_tiles(bounds, sample, routes, raised=()):
             continue
         if f"way/{way['id']}" in replaced:
             continue
+        portal_deck = west_portal is not None and way['id'] in (49322149,258899702,1531308751,1531308752)
         coords = points(way)
         if len(coords) < 2:
             continue
@@ -74,12 +75,20 @@ def bridge_tiles(bounds, sample, routes, raised=()):
                 side*=6.8/width
             if way['id'] in raised:
                 height=raised[way['id']][1][index]/10
+            if portal_deck:
+                # Overlap the landmark slab before its edge. A protruding OSM
+                # cycleway otherwise creates a 20 cm lip across the bike lane.
+                distance = west_portal.distance(Point(coord))
+                height -= .65*max(0,1-distance/18)
             sections.append((coord+side,coord-side,height))
         for first, second in zip(sections,sections[1:]):
             for pts, levels in [([first[0],first[1],second[0]],[first[2],first[2],second[2]]),
                                 ([second[1],second[0],first[1]],[second[2],second[2],first[2]])]:
                 poly = Polygon(pts)
                 if poly.area < .001:
+                    continue
+                # The landmark supplies the deck, vaulted underside and collision here.
+                if portal_deck and west_portal.covers(poly):
                     continue
                 spans.append(poly)
                 thin_spans.append(any(poly.intersects(part) for part in crossings))

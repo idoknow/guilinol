@@ -1,3 +1,4 @@
+import {browserOptions, recordFrames} from './qa-browser.mjs'
 import assert from 'node:assert/strict'
 import {mkdir,readFile} from 'node:fs/promises'
 import {gunzipSync} from 'node:zlib'
@@ -10,7 +11,7 @@ const data=JSON.parse(gunzipSync(await readFile('dist/world/vehicles.bin')))
 const atlas=JSON.parse(gunzipSync(await readFile('dist/world/atlas.bin')))
 const output='captures/ride';await mkdir(output,{recursive:true})
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
-const browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
+const browser=await chromium.launch(browserOptions())
 const errors=[]
 const bounds=JSON.parse(await readFile('pipeline/vessel-bounds.json','utf8'))
 const {bridges,minimum}=data.clearance
@@ -22,8 +23,9 @@ try{
     page.on('pageerror',error=>errors.push(error.message))
     await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?mode=walk&verify&radius=480`)
     await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
+    await recordFrames(page)
     if(!mobile){const boat=await lakeChecks(page,data,output);assert(boat.roof<=bounds.boat.roof+1e-6&&boat.head<=bounds.boat.head+1e-6)}
-    async function fixture(x,z){assert(await page.evaluate(async([x,z])=>{const walker=window.viewer.walk;walker.leave();return walker.enter(x,z,0,'ride-fixture')},[x,z]))}
+    async function fixture(x,z){assert(await page.evaluate(([x,z])=>window.viewer.walkTo(x,z,0,'ride-fixture'),[x,z]))}
     await page.waitForFunction(()=>window.viewer?.walk?.parked().length>0)
     async function fixtureNear(x,z,kind){
       const picked=await page.evaluate(([tx,tz,k])=>{

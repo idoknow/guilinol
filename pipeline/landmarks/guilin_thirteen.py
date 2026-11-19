@@ -1,7 +1,5 @@
-from pathlib import Path
-
-from school_schematic import generate
+from school_plaque import main
 
 
-if __name__ == '__main__':
-    generate(Path(__file__).stem, Path(__file__).resolve().parents[1] / 'schools-g1.json')
+if __name__ == "__main__":
+    main("guilin_thirteen")

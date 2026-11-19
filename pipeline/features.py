@@ -73,7 +73,20 @@ def ground_features(bounds, school_grounds=()):
         else:
             continue
         layers[key].extend(polygons(area(element).intersection(bounds)))
+    for props, footprint in palace_features():
+        if props['kind'] in ('pond','leisure'):
+            layer = 'water' if props['kind'] == 'pond' else 'schoolCourt'
+            layers[layer].extend(polygons(footprint.intersection(bounds)))
     return layers
+
+
+def palace_features():
+    path = Path(__file__).resolve().parents[1] / 'docs/layout/wangcheng.geojson'
+    for feature in json.loads(path.read_text())['features']:
+        if feature['geometry']['type'] == 'Polygon':
+            props = feature['properties']
+            ring = feature['geometry']['coordinates'][0]
+            yield props, Polygon([ll2xz(lat, lon) for lon, lat in ring])
 
 
 def buildings(bounds, elevation, peaks,layout):
@@ -84,13 +97,30 @@ def buildings(bounds, elevation, peaks,layout):
     campuses = STRtree([area(el) for el in load_osm() if el['type']!='node' and any(
         el.get('tags',{}).get(tag) in rules['glazedUses'] for tag in ['building','amenity','office','tourism'])])
     kinds = Counter()
+    palace = []
+    custom = {1008248059, 1008248065, 1008248057, 684987708, 885083143,
+              679734442, 679734417, 1471532482, 674165595, 674165596, 674165597}
+    for props, poly in palace_features():
+        if props['kind'] != 'building' or not bounds.covers(poly.centroid):
+            continue
+        ident = int(props['osm'].split('/')[-1])
+        palace.append(poly)
+        if ident in custom:
+            continue
+        center = poly.representative_point()
+        base = elevation(center.x, center.y)
+        floors = int(props['floors'])
+        footprints.append(poly)
+        heights.append((base, base+3.2*floors, 3, floors, ident%65536, center, [], False))
+    palace_index = STRtree(palace)
     with (Path(RAW)/'overture_buildings.csv').open() as source:
         for row in csv.DictReader(source, delimiter='\t'):
             geometry = affine_transform(from_wkt(row['wkt']), [MLON, 0, 0, -MLAT, -LON0*MLON, LAT0*MLAT])
             if row['id'] in layout.ids:
                 layout.exclude = layout.exclude.union(geometry)
                 continue
-            if not geometry.intersects(bounds) or layout.exclude.intersects(geometry):
+            if (not geometry.intersects(bounds) or layout.exclude.intersects(geometry)
+                    or palace_index.query(geometry, predicate="intersects").size):
                 continue
             for poly in polygons(make_valid(geometry)):
                 if peaks.query(poly,predicate='intersects').size:

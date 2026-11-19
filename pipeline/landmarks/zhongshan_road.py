@@ -310,6 +310,8 @@ def build_zhongshan_road(m: Builder):
     # ------------------------------------------------------------------
     m.prism(WEST_JINMA_OV, -2.5, 7.0, 'dark', collide=True, cap_mat='white')
     m.prism(WEST_JINMA_OV, 4.5, 22.7, 'white', collide=True, cap_mat='roof')
+    annex = [(-93.23,170.59),(-87.41,157.37),(-96.83,153.17),(-102.55,166.72)]
+    m.prism(annex, -2.5, 10.5, 'white', collide=True, cap_mat='roof')
     _street_facade(m, (-84.53, 195.61), (-48.10, 101.30), 1, 0.0, 4.5, 27.2, 'white', 4, 12)
     m.pose = (-64.6, 0.0, 144.0, math.atan2(0.933, 0.360))
     m.box(-2.0, 5.0, 0.85, 3.8, 23.2, 0.85, 'dark')

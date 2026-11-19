@@ -9,11 +9,12 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 from shapely import STRtree, intersects_xy, unary_union
-from shapely.geometry import box, Point
+from shapely.geometry import box, Point, Polygon
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem
 from features import building_mesh, buildings, game_court, ground_features, polygons
 from karst import generate
+from landmarks.jiefang_layout import bank_paving, grade_banks
 from bridges import bridge_tiles
 from scatter import CONFIG, scatter
 from streets import chunks as street_chunks
@@ -21,7 +22,7 @@ from atlas import write_atlas
 from vehicles import plan_vehicles, write_vehicles
 from clearance import landmark_triangles
 from bridgeheads import raise_approaches
-from shoreline import correct_water
+from shoreline import correct_water, contour_ronghu
 from landmark_layout import Layout
 
 DRY = -32768
@@ -87,6 +88,20 @@ def build(bbox, output, palette):
                 patch[np.asarray(mask,dtype=bool)[:patch.shape[0],:patch.shape[1]]] = round(level*10)
     correct_water(surface, terrain, original, bounds, stencil)
     terrain[wet]=original[wet]=np.minimum(terrain[wet],surface[wet]-20)
+    contour_ronghu(surface, terrain, original, bounds)
+    interchange=None
+    bank_pavement=None
+    west_portal=None
+    for x,z,entry in layout.entries:
+        if entry['id']=='jiefang_bridge' and bounds.covers(Point(x,z)):
+            datum=previous_bed[round((z-top)/GRID),round((x-left)/GRID)]/10
+            angle=-np.deg2rad(entry['rotation'])
+            bank_pavement=bank_paving((x,z),angle)
+            axes=np.array([[np.cos(angle),np.sin(angle)],[-np.sin(angle),np.cos(angle)]])
+            corners=np.array([[-136,-21.5],[-103,-21.5],[-103,21.5],[-136,21.5]])
+            west_portal=Polygon(corners@axes+[x,z])
+            interchange=((x,z),angle,bank_pavement)
+            grade_banks(terrain,original,wet,left,top,GRID,(x,z),angle,datum)
     footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes),layout)
     def sample(east,south):
         row = min(depth//GRID,max(0,round((south-top)/GRID)))
@@ -105,12 +120,17 @@ def build(bbox, output, palette):
         if court is not None:
             mask,corner = stencil(court,left,top,1)
             texture.paste(palette['schoolCourt'],corner,mask)
-    trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees,unary_union([layout.tree_exclude,*(court.buffer(1.5) for court in layers['schoolTrack']+layers['schoolCourt'])]))
+    trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees,unary_union([layout.tree_exclude,bank_pavement.buffer(2) if bank_pavement is not None else Polygon(),*(court.buffer(1.5) for court in layers['schoolTrack']+layers['schoolCourt'])]))
     for road in roads:
         for part in polygons(road.line.buffer(road.width/2,quad_segs=2).intersection(bounds)):
             mask,corner = stencil(part,left,top,1)
             texture.paste('#484b4d' if road.name=='翊武路' else palette['road'],corner,mask)
             layers['road'].append(part)
+    if bank_pavement is not None:
+        # Replace the baked flat road colour underneath the elevated strips.
+        for part in polygons(bank_pavement.intersection(bounds)):
+            mask,corner=stencil(part,left,top,1)
+            texture.paste(palette['green'],corner,mask)
     report = []
     for road in roads:
         if road.name not in ('中山中路','解放东路','解放西路','滨江路','依仁路','榕湖北路','杉湖北路','正阳步行街') or not bounds.intersects(road.line):
@@ -123,15 +143,15 @@ def build(bbox, output, palette):
             length=round(road.line.length),x=anchor.x,z=anchor.y,yaw=math.atan2(anchor.x-ahead.x,anchor.y-ahead.y)))
     (output/'street-report.json').write_text(json.dumps(report,ensure_ascii=False))
     print('Vegetation:',dict(sorted(tree_stats.items())))
-    vehicles=plan_vehicles(bounds,surface,layers['road'],footprints,sample)
-    decks, triangles = bridge_tiles(bounds,sample,vehicles['routes'],raised)
+    vehicles=plan_vehicles(bounds,surface,layers['road'],footprints,sample,interchange)
+    decks, triangles = bridge_tiles(bounds,sample,vehicles['routes'],raised,west_portal)
     landmarks=[]
     for x,z,entry in layout.entries:
         height=sample(x,z)[0]
         if entry['id'] in ('jiefang_bridge','ronghu') and bounds.covers(Point(x,z)) and sample(x,z)[1]!=DRY:
             height=previous_bed[round((z-top)/GRID),round((x-left)/GRID)]/10
         landmarks.append(dict(position=[x,height,z],**entry))
-    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude)
+    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,bank_pavement)
     print('Lengths (m):',lengths)
     def asset(name):
         return {'file':name,'bytes':(output/name).stat().st_size}

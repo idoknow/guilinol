@@ -5,5 +5,5 @@
   {"id":"zhonghua_primary","wallStreet":"","name":"桂林市中华小学","osm":"way/1531318258","worldGround":true,"scale":1.23,"band":"#667c96","blocks":[],"heritage":false},
   {"id":"guilin_fifth","wallStreet":"","name":"桂林市第五中学","osm":"way/683286832","worldGround":true,"scale":2.1,"band":"#955b54","blocks":[],"heritage":false},
   {"id":"lequn_medical","name":"桂林医科大学（乐群校区）","osm":"way/627527309","worldGround":true,"scale":2.1,"band":"#708699","blocks":[],"heritage":false},
-  {"id":"wangcheng_teaching","name":"广西师范大学（王城校区）","osm":"way/885083147","worldGround":true,"scale":1,"band":"#9b5b52","blocks":[[0.0,0.0,52,3],[7.2,-48.0,52,3],[-8.2,46.1,52,3]],"heritage":true}
+  {"id":"wangcheng_teaching","name":"广西师范大学（王城校区）","osm":"way/885083147","worldGround":true,"scale":1,"band":"#9b5b52","blockDepth":12.5,"blocks":[[0,0,53.9,3],[-0.3,-48.5,53.9,3],[-1.0,46.8,53.9,3]],"heritage":true}
 ]

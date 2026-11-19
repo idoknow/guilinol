@@ -1,5 +1,6 @@
 import {defineConfig, type Plugin} from 'vite'
 import {readFileSync} from 'node:fs'
+import {execFileSync} from 'node:child_process'
 import {dirname, join} from 'node:path'
 import {fileURLToPath} from 'node:url'
 
@@ -24,9 +25,14 @@ function rapierExternalWasm(): Plugin {
 
 export default defineConfig({
   publicDir: '../public',
-  plugins: [rapierExternalWasm()],
+  plugins: [rapierExternalWasm(), {name:'deploy-version', generateBundle(){
+    const sha = execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()
+    this.emitFile({type:'asset',fileName:'version.json',source:JSON.stringify({sha})})
+  }}],
   optimizeDeps: {exclude: ['@dimforge/rapier3d-compat']},
-  build: {outDir: '../dist', emptyOutDir: true},
+  build: {outDir: '../dist', emptyOutDir: true, rollupOptions: {input: {
+    index: join(root,'web/index.html'), admin: join(root,'web/admin/index.html'),
+  }}},
   define: {
     __APP_VERSION__: JSON.stringify(version),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),

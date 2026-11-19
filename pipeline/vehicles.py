@@ -18,7 +18,7 @@ from navigation import return_trips
 from clearance import audit_routes
 
 
-def plan_vehicles(bounds, surface, roads, buildings, sample):
+def plan_vehicles(bounds, surface, roads, buildings, sample, interchange=None):
     left, top, right, bottom = bounds.bounds
     wet = surface != -32768
     rows, cols = wet.shape
@@ -73,6 +73,14 @@ def plan_vehicles(bounds, surface, roads, buildings, sample):
     bikes, bicycles = [], []
     for idx, group in enumerate(groups):
         (bicycles if idx % 3 == 2 else bikes).extend(group)
+    if interchange is not None:
+        origin,angle,bank_pavement=interchange
+        transform=np.array([[math.cos(angle),math.sin(angle)],[-math.sin(angle),math.cos(angle)]])
+        axis=np.array([[-140,0],[140,0]])@transform+origin
+        extras.extend((LineString(axis).buffer(21.5,cap_style='flat'),bank_pavement))
+        # Lower bike stand beside the northern landing, approached on foot.
+        x,z=np.array([-118,-31])@transform+origin
+        bikes.append([round(x,2),sample(x,z)[0]+.2,round(z,2),round(angle,3),1])
     pavement = union_all(roads+extras).buffer(3)
     mask = intersects_xy(pavement,xs[None,:],zs[:,None])
     clearance = distance_transform_edt(wet)

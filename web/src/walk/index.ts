@@ -155,6 +155,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     posOut.set(x,0,z);const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
     const deadline=performance.now()+15000
     while(needed.some(tile=>!stream.loaded.has(tile))&&performance.now()<deadline){stream.tick(posOut);await new Promise(resolve=>setTimeout(resolve,12))}
+    const bridge=manifest.landmarks?.find(entry=>entry.id==='jiefang_bridge'&&Math.hypot(entry.position[0]-x,entry.position[2]-z)<=entry.sphere[3]+cfg.search)
+    if(bridge){
+      posOut.y=bridge.position[1]
+      while(!stream.landmarks.has(bridge)&&performance.now()<deadline){stream.updateLandmarks?.(posOut,bridge);await new Promise(resolve=>setTimeout(resolve,12))}
+      if(!stream.landmarks.has(bridge))return false
+    }
     sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
@@ -375,7 +381,44 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     mixer.update(dt);follow(dt)
   }
-  return {enter,leave,tick,spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  function photoSupport(x:number,z:number,bridgeRadius?:number){
+    const tile=sim.tileAt(x,z), data=tile&&stream.loaded.get(tile)
+    if(!tile||!data)throw Error(`Missing detail at ${x},${z}`)
+    sim.sync(x,z)
+    const water=data.water[Math.round((z-tile.z)/4)*65+Math.round((x-tile.x)/4)]
+    const waterY=water===-32768?-Infinity:water/10
+    function deckAt(east:number,south:number){
+      const deck=sim.surface(east,south,'deck')
+      if(deck)return deck
+      // Guanyi's pedestrian promenade is a landmark tread over a dry bank tile.
+      if(bridgeRadius!==undefined || Number.isFinite(waterY)){
+        const tread=sim.surface(east,south,'landmark')
+        if(tread && tread.slope<=cfg.slope && tread.y>waterY)return tread
+      }
+      return null
+    }
+    const deck=deckAt(x,z)
+    if(deck)return {kind:'deck',y:Math.max(deck.y,waterY),sampleDistance:0}
+    // Known on-bridge photo, but the recorded point lies beside the narrow span.
+    // Borrow only elevation inside the EXIF uncertainty circle. Keep the original X/Z.
+    if(bridgeRadius!==undefined && bridgeRadius>0 && Number.isFinite(waterY)){
+      let nearest:null|{kind:string,y:number,sampleDistance:number}=null
+      const steps=Math.ceil(bridgeRadius/.5)
+      for(let i=-steps;i<=steps;i++)for(let j=-steps;j<=steps;j++){
+        const d=Math.hypot(i,j)*.5
+        if(!d||d>bridgeRadius||(nearest&&d>=nearest.sampleDistance))continue
+        const hit=deckAt(x+i*.5,z+j*.5)
+        if(hit)nearest={kind:'deck',y:Math.max(hit.y,waterY),sampleDistance:d}
+      }
+      if(nearest)return nearest
+    }
+    for(const kind of ['sidewalk','ground'] as const){
+      const hit=sim.surface(x,z,kind)
+      if(hit)return {kind,y:Math.max(hit.y,waterY),sampleDistance:0}
+    }
+    throw Error(`Missing support at ${x},${z}`)
+  }
+  return {photoSupport,enter,leave,tick,spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}
 }

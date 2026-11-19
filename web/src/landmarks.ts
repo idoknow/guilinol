@@ -44,8 +44,8 @@ export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,en
     }})
     scene.remove(root);for(const asset of assets)asset.dispose()
   }
-  return (eye:THREE.Vector3)=>{
-    for(const entry of entries){
+  return (eye:THREE.Vector3, priority?:Landmark)=>{
+    for(const entry of priority?[priority]:entries){
       const distance=Math.hypot(eye.x-entry.position[0],eye.y-entry.position[1],eye.z-entry.position[2])-entry.sphere[3]
       const root=loaded.get(entry)
       if(root){
@@ -53,7 +53,7 @@ export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,en
         const level=distance>650?'lod2':distance>350?'lod1':'lod0'
         if(entry.lods.length){for(const name of entry.lods){const node=root.getObjectByName(name);if(node)node.visible=name===level}}
         else root.visible=distance<=650
-      }else if(distance<=900&&!pending.has(entry)&&pending.size<2&&performance.now()>=(retry.get(entry)??0)){
+      }else if(distance<=900&&!pending.has(entry)&&(priority||pending.size<2)&&performance.now()>=(retry.get(entry)??0)){
         pending.add(entry)
         loader.loadAsync('./'+entry.file).then(({scene:group})=>{
           if(entry.id==='wangcheng_market')batchShopBays(group)

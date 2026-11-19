@@ -1,7 +1,8 @@
 import {type Env,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCode,now,passwordHash,random,reserveMail,sessionHash,unauthorized} from '../../lib/auth'
 
-type User={id:string;email:string;nickname:string;verified:number;salt:string;digest:string;locked_until:number}
-const profile=(user:User)=>({id:user.id,email:user.email,nickname:user.nickname,verified:!!user.verified})
+import {feedback} from '../../lib/feedback'
+type User={id:string;email:string;nickname:string;verified:number;role:string;salt:string;digest:string;locked_until:number}
+const profile=(user:User)=>({id:user.id,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role})
 const json=(data:unknown,status=200,session?:string)=>Response.json(data,{status,headers:{'Cache-Control':'no-store',...(session?{'Set-Cookie':session}:{})}})
 function nickname(value:unknown) {
   if(typeof value!=='string'||!value.trim()||value.trim().length>32) invalid()
@@ -16,6 +17,7 @@ const methods:Record<string,string[]>={me:['GET','PATCH'],...Object.fromEntries(
 async function handle(request:Request,env:Env) {
   const url=new URL(request.url), path=url.pathname.slice(5), method=request.method, db=env.DB
   const stmt=(sql:string,...args:(string|number)[])=>db.prepare(sql).bind(...args)
+  if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(!Object.hasOwn(methods,path)) throw new Problem(404,'not_found','接口不存在')
   if(!methods[path].includes(method)) throw new Problem(405,'method','不支持的请求方式')
   if(method!=='GET'&&request.headers.get('Origin')!==url.origin) throw new Problem(403,'origin','请求来源不符')

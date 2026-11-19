@@ -3,9 +3,37 @@ from collections import defaultdict, deque
 from PIL import Image, ImageDraw
 from scipy.ndimage import label, maximum_filter, minimum_filter, binary_dilation, find_objects
 from shapely.geometry import LineString
+from shapely import distance, points as grid_points
 
 from common import GRID, load_osm
 from features import area, polygons, points
+
+
+def contour_ronghu(surface, terrain, original, bounds):
+    from scipy.ndimage import distance_transform_edt
+
+    lake = next((area(item) for item in load_osm() if item.get('tags', {}).get('name') == '榕湖'
+                 and item['tags'].get('natural') == 'water'), None)
+    if lake is None or not lake.intersects(bounds):
+        return
+    west, north = bounds.bounds[:2]
+    wet = surface != -32768
+    rows, cols = np.nonzero(binary_dilation(wet) != wet)
+    locations = grid_points(west + GRID*cols, north + GRID*rows)
+    offsets = distance(locations, lake.boundary)
+    near = offsets < GRID*1.5
+    rows, cols, offsets = rows[near], cols[near], offsets[near]
+    wet_indices = distance_transform_edt(~wet, return_distances=False, return_indices=True)
+    levels = surface[tuple(wet_indices[:,rows,cols])]
+    for field in (original, terrain):
+        field[rows,cols] = np.minimum(field[rows,cols], levels + np.maximum(3, np.rint(offsets*8)))
+    rows, cols = np.nonzero(wet & binary_dilation(~wet))
+    offsets = distance(grid_points(west + GRID*cols, north + GRID*rows), lake.boundary)
+    near = offsets < GRID*1.5
+    rows, cols = rows[near], cols[near]
+    bed = surface[rows,cols] - np.maximum(1, np.rint(offsets[near]*8))
+    for field in (original, terrain):
+        field[rows,cols] = bed
 
 
 def correct_water(surface, terrain, original, bounds, stencil):

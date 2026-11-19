@@ -96,10 +96,14 @@ export function play(host:Host) {
   }
   let atlas:import('../map/atlas').Atlas|undefined, map:ReturnType<typeof mapView>|undefined
   // Atlas loads only after the scene has been running a couple of seconds, never inside the first-frame budget.
-  const loadMap = ()=>void import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
-    atlas = loaded; map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s)})
-  }).catch(error=>console.warn('atlas',error))
+  let mapLoading:Promise<ReturnType<typeof mapView>|undefined>|undefined
+  const ensureMap = ()=>mapLoading ??= import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
+    atlas = loaded; return map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s)})
+  }).catch(error=>{console.warn('atlas',error); mapLoading = undefined; return undefined})
+  const loadMap = ()=>void ensureMap()
   let mapRequested = !(host.manifest as {atlas?:unknown}).atlas
+  const feedbackEntry=button('反馈','反馈','dock-feedback');buttons.append(feedbackEntry)
+  feedbackEntry.onclick=()=>void import('../ui/feedback').then(module=>module.openFeedback(host,()=>{mapRequested = true; return ensureMap()}))
 
   // --- Card
   const card = document.createElement('aside'); card.className = 'spot-card'; card.hidden = true; card.setAttribute('role','dialog')
