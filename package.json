@@ -17,6 +17,7 @@
     "landmarks": "uv run --locked python pipeline/pack_landmarks.py",
     "world": "uv run --locked python pipeline/world.py",
     "audit:landmarks": "uv run --locked python pipeline/audit_landmarks.py",
+    "audit:grounding:market": "uv run --locked python scripts/dongxi/grounding.py",
     "credits": "node scripts/photo-credits.mjs",
     "og": "node scripts/og.mjs",
     "dev": "vite web --config web/vite.config.ts",

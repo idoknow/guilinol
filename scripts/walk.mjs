@@ -11,6 +11,7 @@ const page=await browser.newPage({viewport:{width:640,height:360}}),errors=[]
 page.on('pageerror',error=>errors.push(error.message))
 const output='captures/walk';await mkdir(output,{recursive:true})
 const mainOnly=process.env.WALK_MAIN_ONLY==='1'
+const fixedStep=mainOnly||process.env.WALK_FIXED_STEP==='1'
 const treeOnly=process.argv.includes('--tree-only')
 async function shot(name){await page.screenshot({path:`${output}/${name}.png`})}
 try{
@@ -32,12 +33,12 @@ try{
   await shot('palace')
   await page.evaluate(()=>{window.walkFrames=[]})
   async function drive(points,kind='route'){
-    return page.evaluate(async({points,kind,mainOnly})=>{
+    return page.evaluate(async({points,kind,fixedStep})=>{
       const {walk,stats,stream}=window.viewer
       let min=Infinity,frames=0,wetFrames=0,last=null
       for(const [x,z] of points){const start=window.checkedProbe(kind);const limit=5+Math.hypot(x-start.x,z-start.z)/3
         do{
-          if(mainOnly&&frames%60!==0){walk.tick(.1);stream.tick(walk.position)}else await new Promise(requestAnimationFrame)
+          if(fixedStep&&frames%60!==0&&!stream.pending.size){walk.tick(.1);stream.tick(walk.position)}else await new Promise(requestAnimationFrame)
           last=window.checkedProbe(kind);frames++;min=Math.min(min,last.clearance)
           window.walkFrames.push([last.steps,last.x,last.z,last.clearance,last.inHouse,last.inPeak,last.resets,stats.ms,last.renderClearance])
           if(last.clearance<-.3||last.inHouse||last.inPeak||last.resets)throw Error(`unsafe ${JSON.stringify(last)}`)
@@ -49,12 +50,13 @@ try{
         }while(true)
         walk.drive(0,0)
       }return {kind,min,frames,wetFrames,last}
-    },{points,kind,mainOnly})
+    },{points,kind,fixedStep})
   }
   if(!treeOnly){
   const start=await page.evaluate(()=>window.checkedProbe('spawn:gate')),time=Date.now()
-  const first=await drive(route.slice(0,17));const binjiang=await drive(route.slice(17,18),'binjiang');await shot('street')
-  const second=await drive(route.slice(18));await shot('elephant')
+  const binjiangIndex=route.findIndex(([x,z])=>x===-586&&z===540)
+  const first=await drive(route.slice(0,binjiangIndex));const binjiang=await drive(route.slice(binjiangIndex,binjiangIndex+1),'binjiang');await shot('street')
+  const second=await drive(route.slice(binjiangIndex+1));await shot('elephant')
   const trace=await page.evaluate(()=>window.walkFrames);await writeFile(`${output}/frames.json`,JSON.stringify(trace))
   console.log('route',JSON.stringify({seconds:(Date.now()-time)/1000,simSeconds:second.last.elapsed-start.elapsed,min:Math.min(first.min,binjiang.min,second.min),resets:second.last.resets,frames:trace.length,msPerFrame:trace.reduce((sum,row)=>sum+row[7],0)/trace.length,msPerStep:(second.last.physicsMs-start.physicsMs)/(second.last.steps-start.steps)}))
   assert(Math.hypot(second.last.x+962,second.last.z-1096)<1)
