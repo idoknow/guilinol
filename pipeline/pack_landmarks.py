@@ -10,6 +10,10 @@ from tempfile import TemporaryDirectory
 
 root = Path(__file__).resolve().parent
 for entry in json.loads((root/'landmarks.json').read_text()):
+    if entry.get('noStreetSign'):
+        continue
+    if len(sys.argv)>1 and entry['id'] not in sys.argv[1:]:
+        continue
     generator = root/'landmarks'/f"{entry['id']}.py"
     if not generator.exists():
         continue

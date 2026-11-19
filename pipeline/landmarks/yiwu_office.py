@@ -3,9 +3,10 @@ from xiaoyao_tower import generate
 
 
 def office(model):
-    model.box(0,-.45,0,43,4.35,7.4,'glass',True)
-    model.box(0,3.32,0,43.12,.58,7.52,'earth')
-    model.box(0,3.9,0,43,15,7.4,'white',True)
+    model.pose=(0,0,-1.3,0)
+    model.box(0,-.45,1.3,43,4.35,10,'glass',True)
+    model.box(0,3.32,1.3,43.12,.58,10.12,'earth')
+    model.box(0,3.9,1.3,43,15,10,'white',True)
     for level in range(5):
         bottom=4.55+3*level
         model.box(0,bottom,-3.76,40.7,1.7,.12,'glass')
@@ -24,7 +25,7 @@ def office(model):
     for offset in (.13,.41,.69):
         model.box(-19.9,3.02,-3.76-offset,3.65,.15,.12,'red')
         model.box(-21.5-offset,3.02,-2.65,.12,.15,2.5,'red')
-    model.box(0,18.90,0,43.35,.32,7.65,'white')
+    model.box(0,18.90,1.3,43.35,.32,10.25,'white')
 
 
 if __name__=='__main__':

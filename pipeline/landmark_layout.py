@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 
 from shapely.geometry import Polygon, Point
@@ -6,6 +7,7 @@ from shapely.ops import unary_union
 
 from common import ll2xz, load_osm
 from features import area, points
+from school_frontage import frontage
 
 
 def polygon(coords):
@@ -62,11 +64,21 @@ class Layout:
                 self.flatten.append((region,patch['elevation']))
                 (self.school_grounds if entry.get('schoolGround') else tree_free).append(region)
             model = root.parent/'public'/entry['model']
+            if 'schematicCampus' in entry:
+                site = frontage(osm[entry['schematicCampus']], osm)
+                if site is None:
+                    continue
+                _, _, midpoint, entry['rotation'], _ = site
+                x,z = midpoint.coords[0]
             if entry['model'] in peak_models:
                 continue
             if model.exists():
+                metadata = json.loads(model.with_suffix('.json').read_text())
+                *center, radius = metadata['sphere']
+                rounded = [round(value, 3) for value in center]
+                metadata['sphere'] = [*rounded, math.ceil((radius+math.dist(center,rounded))*1000)/1000]
                 self.entries.append((x,z,dict(id=entry['id'],name=entry['name'],file=entry['model'],
                     rotation=entry.get('rotation',0),collision=entry['collision'],bytes=model.stat().st_size,
-                    **json.loads(model.with_suffix('.json').read_text()))))
+                    **metadata)))
         self.exclude = unary_union(areas)
         self.tree_exclude = unary_union([self.exclude,*tree_free,*tree_clearings]).buffer(2)

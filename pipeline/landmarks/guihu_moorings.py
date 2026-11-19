@@ -4,9 +4,10 @@ from xiaoyao_tower import generate
 
 
 def cruisers(model):
-    for east,station in [(-67.6,-49.6),(-62.0,-48.3),(-56.4,-47.0),(-34.1,59.9)]:
+    for east,station,yaw in [(-83.015,-70.074,.488),(-88.105,-54.923,.264),
+                             (-92.539,-38.511,.264),(2.944,64.129,-3.019)]:
         small=station>0
-        model.pose=(east,2.0,station,1.05 if small else .23)
+        model.pose=(east,2.0,station,yaw)
         perimeter=[(-1.9,6.6),(1.9,6.6)]+[(2.05*math.cos(angle*math.pi/12),-4.7-2.75*math.sin(angle*math.pi/12)) for angle in range(13)]
         count=len(perimeter)
         hull=[(east*scale,height,south*scale) for scale,height in [(.82,-.32),(1,.75)] for east,south in perimeter]

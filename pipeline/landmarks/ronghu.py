@@ -29,12 +29,13 @@ import sys
 from rong_bridges import nine_bends, ancient_bridge
 from rong_street import scooter
 from rong_solids import oval, torus, banyan as solid_tree
+from rong_solids import banyan, align_front
 from c_kit import RECTS
 from PIL import ImageDraw
 from pathlib import Path
 
 from c_kit import (
-    Builder, arch_wall, banyan, box, cylinder, ensure_textures, export_landmark, solid,
+    Builder, arch_wall, box, cylinder, ensure_textures, export_landmark, solid,
     extrude, grille, hip_roof, railing, ramp, stairs, star, tri_count, tube, ring,
 )
 
@@ -75,10 +76,7 @@ def island(b):
     wall, lit = b.parts['atlas'], b.parts['lit']
     x, y, z = 98.8, 0.3, 137.6
     deck = y + 0.85
-    bank = [(110,118),(129,121),(136,109),(150,113),(158,128),(155,134),(163,142),
-            (171,155),(165,161),(174,172),(154,177),(153,171),(162,168),(141,166),
-            (136,163),(132,166),(123,165),(111,155),(106,153),(108,144),(101,140),
-            (99,142),(95,139),(99,133),(101,134)]
+    bank = [(121.57, 120.07), (129.25, 120.5), (133.71, 112.64), (136.39, 108.83), (143.94, 110.85), (150.4, 113.19), (151.31, 117.09), (152.91, 119.96), (155.49, 123.16), (157.69, 127.5), (155.77, 128.08), (154.81, 133.6), (158.65, 136.84), (162.95, 142.03), (166.5, 148.68), (168.34, 154.07), (171.37, 154.24), (170.89, 158.71), (167.96, 159.17), (166.4, 158.39), (164.79, 161.26), (166.24, 164.12), (169.49, 167.52), (172.55, 167.07), (173.69, 171.8), (154.23, 176.66), (153.14, 170.79), (162.11, 168.87), (162.0, 167.63), (155.98, 167.3), (148.82, 166.73), (140.88, 165.72), (136.62, 162.72), (133.61, 165.72), (130.9, 165.83), (129.87, 164.03), (126.42, 164.09), (122.94, 165.15), (121.62, 164.09), (119.13, 160.66), (111.45, 154.95), (107.61, 155.51), (105.5, 153.22), (107.61, 144.27), (101.14, 140.47), (99.67, 142.49), (94.68, 139.1), (98.79, 133.03), (100.9, 134.17), (110.34, 118.02)]
     extrude(wall,bank,-2.8,.24,'rubble',2.4)
     if b.collide:
         extrude(b.hit,bank,-.18,.24,'ashlar')
@@ -128,6 +126,12 @@ def island(b):
             box(wall,(east+shift,.55,south),(.45,.55,.46),'wood')
     for index in range(10):
         box(wall,(122+index*.32,.43,148),( .30,.30,2),'wood')
+    with align_front(b, (x,z), 55.92):
+        island_corridor(b, x,y,z,deck)
+
+
+def island_corridor(b, x,y,z,deck):
+    wall, lit = b.parts['atlas'], b.parts['lit']
     for east in (x-4,x-1,x+2):
         cylinder(lit,(east,2.64,z+1.48),.21,.38,'vermilion',8)
     radius = 3.15
@@ -162,7 +166,11 @@ def island(b):
 
 def library(b):
     wall, lit = b.parts['atlas'], b.parts['lit']
-    x, y, z = -22.0, 1.75, -36.0
+    x, y, z = -26.0, 1.75, -50.0
+    rear = [(35.06, -26.94), (19.06, -28.04), (17.94, -12.52), (4.99, -13.4), (5.36, -18.43), (-7.89, -19.34), (-8.26, -14.3), (-28.73, -15.7), (-28.11, -24.24), (-16.06, -23.42), (-15.26, -34.35), (-37.94, -35.89), (-39.68, -12.0), (33.96, -12.0)]
+    rear = [(x+east,z+south) for east,south in rear]
+    extrude(wall,rear,y,y+10.8,'cream')
+    if b.collide:extrude(b.hit,rear,y,y+10.8,'cream')
     box(wall,(-66,3.9,-61),(9,8.0,13),'yellow')
     hip_roof(wall,(-66,-61),8.0,9.2,13.4,2.1,.6,.22,'graytile','wood')
     if b.collide:
@@ -367,7 +375,8 @@ def build(b: Builder):
     glass_bridge(b)
     pavilion(b, 0, 0, 0)
     island(b)
-    library(b)
+    with align_front(b, (-26, -50), -19.13):
+        library(b)
     hotel(b)
     steel_bridge(b)
     shore(b)

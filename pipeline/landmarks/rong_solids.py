@@ -1,6 +1,23 @@
 import math
+from contextlib import contextmanager
 
 from c_kit import tube
+
+
+@contextmanager
+def align_front(builder, pivot, yaw, shift=(0,0)):
+    meshes = [*builder.parts.values(), builder.hit]
+    starts = [len(mesh.pos) for mesh in meshes]
+    yield
+    cosine, sine = math.cos(math.radians(yaw)), math.sin(math.radians(yaw))
+    for mesh, start in zip(meshes, starts):
+        for index in range(start, len(mesh.pos)):
+            east, level, south = mesh.pos[index]
+            east -= pivot[0]
+            south -= pivot[1]
+            mesh.pos[index] = (shift[0]+pivot[0]+cosine*east+sine*south, level, shift[1]+pivot[1]-sine*east+cosine*south)
+            east, level, south = mesh.nrm[index]
+            mesh.nrm[index] = (cosine*east+sine*south, level, -sine*east+cosine*south)
 
 
 def loft(mesh, sections, region, sides=12):
@@ -43,15 +60,12 @@ def banyan(mesh,origin,height,crown,seed,detail,lobed=True):
         tube(mesh,fork,tip,.34*girth,'bark',6)
         if detail:
             for root in range(5):
-                if lobed and root!=2:
+                if root not in (0,2,4):
                     continue
                 fraction=.22+root*.17
                 anchor=tuple(start+(end-start)*fraction for start,end in zip(fork,tip))
                 endlevel=level if root==2 and index in (1,4) else anchor[1]-height*(.11+.05*((index+root)%4))
                 tube(mesh,anchor,(anchor[0],endlevel,anchor[2]),.14*scale if endlevel==level else .035*scale,'bark',5)
-    if not lobed:
-        oval(mesh,(east,level+height*.72,south),(crown,height*.31,crown*.86),'foliage',22 if detail else 10)
-        return
     for index in range(7):
         phase=seed*.55+index*math.tau/6
         offset=.53 if index<6 else 0
