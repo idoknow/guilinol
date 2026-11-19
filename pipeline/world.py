@@ -5,7 +5,7 @@ import json
 import math
 import struct
 from pathlib import Path
-from sections import section_layers, shopfronts
+from sections import section_layers, shopfronts, RULES
 
 import numpy as np
 from PIL import Image, ImageDraw
@@ -124,6 +124,9 @@ def build(bbox, output, palette):
     raw_foots = raw_overture_footprints(bounds)
     road_net = extract_road_network(raw_foots)
     _, roads, _, banks, _, ped_areas = road_net
+    grade_roads = roads
+    roads = [road.aligned_section() for road in roads]
+    road_net = (road_net[0], roads, *road_net[2:])
     bridge_polys = []
     bus_pads = []
     for el in load_osm():
@@ -150,6 +153,8 @@ def build(bbox, output, palette):
             road_surfs.append(sp)
         for side, extra in ((-1, road.left), (1, road.right)):
             if extra:
+                if str(road.way) in RULES['frontageSections']:
+                    extra = sum(road.dimensions[key] for key in ('verge','cycle','curb','walk'))
                 sw_p = road.side_line(side).buffer(side*(road.width/2+extra), single_sided=True, quad_segs=2)
                 if not comp_excl.is_empty:
                     sw_p = sw_p.difference(comp_excl)
@@ -164,7 +169,7 @@ def build(bbox, output, palette):
 
     road_ctrl, bridge_plans, finalize_bridges = solve_road_and_bridge_elevations(
         original, terrain, surface, left, top, width, depth,
-        roads, ped_areas, layout, Path(__file__).resolve().parents[1],
+        grade_roads, ped_areas, layout, Path(__file__).resolve().parents[1],
         vessel_routes=candidate_routes, previous_bed=previous_bed,
     )
     if interchange is not None:

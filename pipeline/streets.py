@@ -105,7 +105,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                     sidewalks.append(sw_p)
         masks = unary_union(clear.geometries.take(clear.query(line.buffer(width/2))))
         if road.way in speed_limits and road.kind in RULES['sectionClasses']:
-            stripes.extend(shape for shape in speed_paint(road,speed_limits[road.way],RULES['fixtures']['speedInterval']) if not shape.intersects(masks))
+            lane_stripes.extend(shape for shape in speed_paint(road,speed_limits[road.way],RULES['fixtures']['speedInterval']) if not shape.intersects(masks))
         for lane in range(1,road.lanes):
             offset = width*(lane/road.lanes-.5)
             stripe = line.offset_curve(offset).buffer(.09,quad_segs=1).difference(masks)
@@ -356,7 +356,9 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                         segment = segment.difference(masks.geometries[index])
                 for piece in getattr(segment,'geoms',[segment]):
                     if piece.length>=.35:
-                        anchor(piece.centroid,heading,1 if seq%10 or piece.length<1.5 else 2,piece.length)
+                        planting = RULES['plantedMedian'].get(str(road.way))
+                        green = planting and planting['stationMetres'][0]<=along<=planting['stationMetres'][1]
+                        anchor(piece.centroid,heading,7 if green else 1 if seq%10 or piece.length<1.5 else 2,piece.length)
         for side,available in ((-1,road.left),(1,road.right)):
             if not available:
                 continue
@@ -367,8 +369,12 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                 for start in np.arange(0,line.length,4):
                     first,last = shifted(start,verge_offset),shifted(min(start+4,line.length),verge_offset)
                     segment = LineString([first,last])
-                    if segment.length>.25 and not any(tree.query(segment,predicate='dwithin',distance=.45).size for tree in (obstacles,layers[0],layers[4])):
-                        anchor(segment.centroid,math.atan2(last.y-first.y,last.x-first.x),5 if side>0 else 6,segment.length)
+                    for tree in (obstacles,layers[0],layers[4]):
+                        for index in tree.query(segment,predicate='dwithin',distance=.45):
+                            segment = segment.difference(tree.geometries[index].intersection(segment.envelope.buffer(1)).buffer(.45))
+                    for piece in getattr(segment,'geoms',[segment]):
+                        if piece.length>.25:
+                            anchor(piece.centroid,math.atan2(last.y-first.y,last.x-first.x),5 if side>0 else 6,piece.length)
             interval = density['parkingInterval'] if road.kind in ('trunk','primary') else density['localParkingInterval']
             for fixture,spacing in ((3,interval),(4,density['signInterval'])):
                 for along in np.arange(spacing/2,line.length-2,spacing):

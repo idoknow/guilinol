@@ -102,6 +102,11 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   const awnings=look.streets.awnings.map(value=>new THREE.Color(value)),shutter=new THREE.Color(look.streets.shutter)
   const parked:number[]=[],blue=new THREE.Color(look.streets.directionSign)
   for(const [kind,east,south,heading,span] of decor){
+    if(kind===5||kind===6||kind===7){
+      const x=east/10,z=south/10,y=baseLevel(x,z)+.195
+      box(x,y+(kind===7?.35:.22),z,span/10+.04,kind===7?.70:.44,kind===7?.74:.95,-heading/100,hedge)
+      continue
+    }
     if(kind!==1&&kind!==2)continue
     const x=east/10,z=south/10,angle=-heading/100,y=baseLevel(x,z)+.195
     box(x,y+.88,z,span/10,.085,.07,angle,stoneLight)
@@ -117,10 +122,11 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       }
     }else if(kind===5||kind===6){
       const length=span/10,offset=kind===5?.58:-.58
-      box(x,y+.22,z,length+.06,.44,.95,angle,hedge)
       const fx=x+offset*Math.sin(angle),fz=z+offset*Math.cos(angle)
       for(const level of [.24,.60])box(fx,y+level,fz,length+.04,.055,.055,angle,iron)
       for(const shift of [-.4,0,.4])box(fx+shift*length*Math.cos(angle),y+.31,fz-shift*length*Math.sin(angle),.055,.62,.055,angle,iron)
+    }else if(kind===7){
+      continue
     }else if(kind===4){
       box(x,y+1.5,z,.12,3,.12,angle);box(x,y+2.7,z,.09,.65,1.35,angle,blue)
       box(x,y+2.72,z,.1,.045,.85,angle,stoneLight)

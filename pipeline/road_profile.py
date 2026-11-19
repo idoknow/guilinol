@@ -39,7 +39,22 @@ class Road:
     def dimensions(self):
         section = RULES['sections'].get(self.section)
         override = RULES['photoOverrides'].get(str(self.way), {})
-        return {**section, **{key:override[key] for key in ('walk','treeInset') if key in override}} if section else None
+        frontage = RULES['frontageSections'].get(str(self.way), {})
+        return {**section, **{key:frontage[key] for key in ('walk','cycle') if key in frontage}, **{key:override[key] for key in ('walk','treeInset') if key in override}} if section else None
+
+    def aligned_section(self):
+        config = RULES['sectionAlignment'].get(str(self.way))
+        if not config:
+            return self
+        coords = np.asarray(self.line.coords)
+        vertices = np.r_[0,np.cumsum(np.linalg.norm(np.diff(coords,axis=0),axis=1))]
+        shifted = []
+        for station in sorted(set(vertices).union(config['stationMetres'])):
+            center = self.line.interpolate(station)
+            tangent = np.subtract(self.line.interpolate(min(self.line.length,station+.1)).coords[0],self.line.interpolate(max(0,station-.1)).coords[0])
+            normal = np.array([-tangent[1],tangent[0]])/max(.001,np.linalg.norm(tangent))
+            shifted.append(center.coords[0]+normal*np.interp(station,config['stationMetres'],config['offsetMetres']))
+        return replace(self,line=LineString(shifted))
 
     @cached_property
     def widening(self):

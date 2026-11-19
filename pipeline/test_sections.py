@@ -21,6 +21,14 @@ class SectionTests(unittest.TestCase):
             self.assertAlmostEqual(left.union(right).area,200*width)
             self.assertGreaterEqual(left.bounds[1],7)
 
+    def test_yiwu_curb_alignment_preserves_1345_and_grade_guide(self):
+        road = profile(LineString([(0,0),(200,0)]),{'highway':'residential'},STRtree([]),221349755)
+        aligned = road.aligned_section()
+        self.assertEqual(road.line.distance(Point(89,0)),0)
+        self.assertEqual(aligned.line.distance(Point(59,0)),0)
+        self.assertAlmostEqual(aligned.line.distance(Point(89,0)),1.35)
+        self.assertFalse(aligned.pavement.covers(Point(89,-3.1)))
+
     def test_jiefang_widens_outer_edge_only(self):
         road = profile(LineString([(0,0),(250,0)]),{'highway':'primary','width':'9','oneway':'yes','sidewalk':'right'},STRtree([]),727682110)
         _,verge,cycle,_ = section_layers([road])
