@@ -7,6 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
+import shapely
 
 WORLD = Path(__file__).resolve().parents[2] / 'public/world'
 DRY = -32768
@@ -22,10 +23,27 @@ class Surface:
         self.files = {(c['x'], c['z']): c['file'] for c in manifest['chunks']}
         self.entries = {p['id']: p for p in manifest['landmarks']}
 
+        self.peak_tiles = {}
+        packed = gzip.decompress((self.directory / manifest['peaks']['file']).read_bytes())
+        if packed[:4] != b'PK02':
+            raise ValueError('Invalid packed mountain header')
         for peak in manifest['peaks']['entries']:
             if model := peak.get('model'):
                 x, y, z = peak['center']
                 self.entries[Path(model).stem] = dict(file=model, position=[x, peak.get('baseHeight', y), z], rotation=0)
+            elif peak['lods']:
+                lod = peak['lods'][0]
+                vertices = np.frombuffer(packed,'<i2',lod['vertices']*3,lod['offset']).reshape(-1,3)/100 + peak['center']
+                faces = np.frombuffer(packed,'<u2',lod['indices'],lod['indexOffset']).reshape(-1,3)
+                tris = vertices[faces]
+                normal = np.cross(tris[:,1]-tris[:,0],tris[:,2]-tris[:,0])
+                valid = normal[:,1]>1e-8
+                tris, normal = tris[valid], normal[valid]
+                tree = shapely.STRtree(shapely.polygons(tris[:,:,::2]))
+                lo,hi = np.floor((vertices[:,::2].min(axis=0)-[self.left,self.top])/self.size).astype(int), np.floor((vertices[:,::2].max(axis=0)-[self.left,self.top])/self.size).astype(int)
+                for row in range(lo[1],hi[1]+1):
+                    for col in range(lo[0],hi[0]+1):
+                        self.peak_tiles.setdefault((col,row),[]).append((tree,tris[:,0],normal))
 
     @lru_cache(maxsize=96)
     def tile(self, origin):
@@ -62,6 +80,13 @@ class Surface:
         i, j, u, v = cell(step)
         (a, b), (c, d) = ground[j:j+2, i:i+2]
         y = a+(b-a)*u+(c-a)*v if u+v <= 1 else d+(c-d)*(1-u)+(b-d)*(1-v)
+        key = ((ox-self.left)//self.size,(oz-self.top)//self.size)
+        for tree,points,normal in self.peak_tiles.get(key,()):
+            faces = tree.query(shapely.Point(x,z),predicate='intersects')
+            if len(faces):
+                a, n = points[faces], normal[faces]
+                heights = a[:,1]-((x-a[:,0])*n[:,0]+(z-a[:,2])*n[:,2])/n[:,1]
+                y=max(y,float(heights.max()))
         i, j, _, _ = cell(self.grid)
         level = water[j:j+2, i:i+2].max()
         return float(y), None if level == DRY else float(level)/10

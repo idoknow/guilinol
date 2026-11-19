@@ -112,7 +112,15 @@ def ancient_bridge(builder):
             yaw_box(stone,point(middle,top+.19),(.85,.38,end-start+.02),yaw,'rubble')
             yaw_box(stone,point(middle,top+.45),(.76,.16,end-start+.02),yaw,'foliage')
     for sign in (-1,1):
-        yaw_box(stone,point(sign*19,grade(sign*19)-.225),(9,.45,4.4),yaw,'granite')
+        top = []
+        for station, lateral in ((17,-4.5),(17,4.5),(21.2,4.5),(21.2,-4.5)):
+            x, _, z = point(sign*station,0,lateral)
+            y = grade(sign*17) if station==17 else ground(x,z)
+            top.append(np.array([x,y,z]))
+        stone.face(top,(0,1,0),'granite')
+        if builder.collide: builder.hit.face(top,(0,1,0),'granite')
+        for a,c in zip(top,top[1:]+top[:1]):
+            stone.face([a,c,c-[0,.45,0],a-[0,.45,0]],(a+c)/2-point(sign*19,0),'ashlar')
     for offset in (-7,7):
         banyan(stone,point(-20,ground(*point(-20,0,offset)[::2]),offset),9,5,32+offset,builder.detail)
     colors=('lantern_red','lantern_gold','lantern_cyan','lantern_pink','lantern_orange')
