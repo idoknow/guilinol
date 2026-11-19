@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw
-from shapely import STRtree
+from shapely import STRtree, intersects_xy
 from shapely.geometry import box, Point
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem
@@ -62,7 +62,8 @@ def build(bbox, output, palette):
             if layer == 'water':
                 mask, (col,row) = stencil(poly,left,top,GRID)
                 patch = surface[row:row+mask.height,col:col+mask.width]
-                wet = np.asarray(mask,dtype=bool)[:patch.shape[0],:patch.shape[1]]
+                wet = intersects_xy(poly, left+(col+np.arange(patch.shape[1]))*GRID,
+                                    top+(row+np.arange(patch.shape[0])[:,None])*GRID)
                 if wet.any():
                     patch[wet] = round(np.median(terrain[row:row+patch.shape[0],col:col+patch.shape[1]][wet]))
     wet = surface != DRY
@@ -78,7 +79,7 @@ def build(bbox, output, palette):
             for field in (terrain,original):
                 patch = field[row:row+mask.height,col:col+mask.width]
                 patch[np.asarray(mask,dtype=bool)[:patch.shape[0],:patch.shape[1]]] = round(level*10)
-    correct_water(surface, terrain, bounds, stencil)
+    correct_water(surface, terrain, original, bounds, stencil)
     terrain[wet]=original[wet]=np.minimum(terrain[wet],surface[wet]-20)
     footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes),layout)
     def sample(east,south):

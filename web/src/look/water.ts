@@ -96,11 +96,9 @@ export function chunkWater(water:Int16Array, x:number, z:number) {
   const positions:number[] = [], counts = new Map<number,number>()
   let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity, minZ=Infinity, maxZ=-Infinity
   for(let row=0;row<64;row++) for(let col=0;col<64;col++) {
-    // Cells with ≥3 wet corners only: low riverside ground (below the water level but dry in the data,
-    // so walkable) must never be flooded. The bank shader (night.ts nightGround) paints the rest.
     let level = -Infinity, wet = 0
     for(const at of [row*65+col,row*65+col+1,(row+1)*65+col,(row+1)*65+col+1]) if(water[at]!==-32768) {wet++; level = Math.max(level,water[at]/10)}
-    if(wet<3) continue
+    if(!wet) continue
     counts.set(level,(counts.get(level)??0)+1)
     const x0=x+col*4,z0=z+row*4,x1=x0+4,z1=z0+4
     if(x0<minX) minX=x0; if(x1>maxX) maxX=x1

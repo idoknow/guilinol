@@ -121,7 +121,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
   function boatClearance(){const boat=rides?.boat;if(!boat)return null
-    figure.updateWorldMatrix(true,true);skinned?.skeleton.update()
+    figure.updateMatrixWorld(true);skinned?.skeleton.update()
     const roof=new THREE.Box3().setFromObject(boat,true).max.y,head=new THREE.Box3().setFromObject(figure,true).max.y
     let underside=Infinity
     for(const along of [-2.3,-1,0,1,2.3])for(const across of [-1,0,1]){const point=boat.localToWorld(new THREE.Vector3(across,0,along)),deck=sim.surface(point.x,point.z,'deck');if(deck)underside=Math.min(underside,deck.y-(deck.thin?.6:look.bridgeDepth))}
@@ -160,7 +160,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;blockedWater=true}
         }
       }
-      if(rides?.bike){const reason=sim.insideHouse(next.x+delta.x*.72,next.z+delta.y*.72)?'building':!rides.pavement(next.x,next.z)?'off-road':Math.hypot(move.x,move.z)<speed*step*.35?'collision':''
+      if(rides?.bike){let obstacle=false
+        if(Math.hypot(move.x,move.z)<speed*step*.35)for(let at=0;at<sim.controller.numComputedCollisions();at++){
+          const contact=sim.controller.computedCollision(at)
+          if(contact&&contact.normal1.y<Math.cos(cfg.slope)){obstacle=true;break}
+        }
+        const reason=sim.insideHouse(next.x+delta.x*.72,next.z+delta.y*.72)?'building':!rides.pavement(next.x,next.z)?'off-road':obstacle?'collision':''
         if(reason){bikeObstacle=reason;next.x=pos.x;next.z=pos.z;rides.stop();speed=0}}
       traveled+=Math.hypot(next.x-pos.x,next.z-pos.z);sim.body.setNextKinematicTranslation(next);sim.world.step();if(grounded&&!blockedWater)safe.set(next.x,next.y,next.z)
     }

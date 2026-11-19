@@ -11,7 +11,7 @@ try {
   const page=await browser.newPage({viewport:{width:800,height:450}})
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&mode=walk&time=15&radius=480`)
   await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
-  for(const [name,x,z,eye,target] of [['shan',-832,544,[-807,163,519],[-855,146,569]],['rong',-1336,332,[-1310,160,359],[-1365,145,304]]]){
+  for(const [name,x,z,eye,target] of [['shan',-1022,436,[-983,157,476],[-1019,150,433]],['rong',-1336,332,[-1310,160,359],[-1365,145,304]]]){
     assert(await page.evaluate(async({x,z,eye,target})=>{
       const {walk,camera}=window.viewer;window.restoreView?.();walk.leave()
       if(!await walk.enter(x,z,0,'shore-photo'))return false

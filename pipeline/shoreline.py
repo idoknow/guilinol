@@ -1,17 +1,18 @@
 import numpy as np
 from collections import defaultdict, deque
 from PIL import Image, ImageDraw
-from scipy.ndimage import label, maximum_filter, minimum_filter
+from scipy.ndimage import label, maximum_filter, minimum_filter, binary_dilation, find_objects
 from shapely.geometry import LineString
 
 from common import GRID, load_osm
 from features import area, polygons, points
 
 
-def correct_water(surface, terrain, bounds, stencil):
+def correct_water(surface, terrain, original, bounds, stencil):
     dry = surface == -32768
     sentinel = np.iinfo(terrain.dtype).max
-    bank = minimum_filter(np.where(dry, terrain, sentinel),
+    bank_ground = np.minimum(original,terrain)
+    bank = minimum_filter(np.where(dry, bank_ground, sentinel),
                           footprint=[[0,1,0],[1,0,1],[0,1,0]], mode='constant', cval=sentinel)
     before = surface.copy()
     labels = np.zeros(surface.shape, dtype=np.int32)
@@ -49,7 +50,15 @@ def correct_water(surface, terrain, bounds, stencil):
             extra,number = label(missing); components[missing] = count+extra[missing]; count+=number; break
         components[missing] = neighbors[missing]
     levels = np.full(count+1,sentinel,dtype=terrain.dtype)
-    np.minimum.at(levels,components[~dry],bank[~dry])
+    shores = {}
+    for segment,region in enumerate(find_objects(components),1):
+        if region is None: continue
+        window = tuple(slice(max(0,s.start-1),min(n,s.stop+1)) for s,n in zip(region,dry.shape))
+        edge = binary_dilation(components[window]==segment) & dry[window]
+        rows,cols = np.nonzero(edge)
+        shore = (rows+window[0].start,cols+window[1].start)
+        shores[segment] = shore
+        if len(rows): levels[segment] = np.percentile(bank_ground[shore],15,method='lower')
     levels -= 3
     edges = set()
     for first,second in [(components[1:],components[:-1]),(components[:,1:],components[:,:-1])]:
@@ -85,17 +94,26 @@ def correct_water(surface, terrain, bounds, stencil):
         for other in graph[segment]:
             if index[other]>index[segment]: levels[other]=min(levels[segment],levels[other])
     surface[~dry]=levels[components[~dry]]
-    if np.any(surface[~dry] > bank[~dry]-3): raise ValueError('岸边余量不足')
+    for segment,shore in shores.items():
+        terrain[shore] = np.maximum(terrain[shore],levels[segment]+3)
+        original[shore] = np.maximum(original[shore],levels[segment]+3)
+    corrected = np.minimum(original,terrain)
+    lift = corrected-bank_ground
+    final_bank = minimum_filter(np.where(dry,corrected,sentinel),footprint=[[0,1,0],[1,0,1],[0,1,0]],mode='constant',cval=sentinel)
+    if np.any(surface[~dry] > final_bank[~dry]-3): raise ValueError('岸边余量不足')
+    for row,col in zip(*np.nonzero(lift>15)):
+        print(f'高驳岸 x={left+col*GRID:g} z={top+row*GRID:g} +{lift[row,col]/10:.1f} m')
     for segment in order:
         cells=components==segment; prior=before[cells]; banks=bank[cells]; level=levels[segment]
-        print(f'水段 {segment}: {prior.min()/10:.1f}–{prior.max()/10:.1f} → {level/10:.1f} m, 高水格 {sum(prior>banks)} → {sum(level>banks)}')
+        raised=lift[shores[segment]]
+        print(f'水段 {segment}: {prior.min()/10:.1f}–{prior.max()/10:.1f} → {level/10:.1f} m, 高水格 {sum(prior>banks)} → {sum(level>final_bank[cells])}, 抬岸 {np.count_nonzero(raised)} 格, 最大 {raised.max(initial=0)/10:.1f} m')
         for other in sorted(graph[segment]):
             if index[other]>index[segment]: print(f'桥闸台阶 {segment} → {other}: {(level-levels[other])/10:.1f} m')
     for index, name in enumerate(names):
         cells = (~dry) & (labels == index)
         if not cells.any():
             continue
-        def summary(field):
+        def summary(field,bank):
             values = field[cells]
             return f'{values.min()/10:.1f}–{values.max()/10:.1f} m, 高于岸地 {np.sum(values > bank[cells])} 格'
-        print(f'水位核查 {name}: {summary(before)} → {summary(surface)}')
+        print(f'水位核查 {name}: {summary(before,bank)} → {summary(surface,final_bank)}')
