@@ -67,7 +67,7 @@ def envelope(model, feature):
     volume = trimesh.creation.extrude_polygon(polygon, height, engine='earcut')
     vertices = volume.vertices[:, [0, 2, 1]].copy()
     name=attributes['name']
-    modern=name=='R67'
+    modern=name in ('R67','R2')
     shopfront=name in ('D-west','N011')
     model.mesh(vertices, volume.faces[:, ::-1], 'stone' if name=='N011' else 'white' if modern or name=='R17' else 'brick', True)
     historic=attributes.get('historic',True)
@@ -84,7 +84,7 @@ def envelope(model, feature):
             for tier in range(3):
                 model.box(0,height+.5+tier*.55,.03,length*(.82-tier*.22),.6,.55,'white')
             model.box(0,3.55,.24,min(7.5,length-.4),3.06,.45,'sign')
-            model.box(0,3.73,.49,min(7.1,length-.8),2.7,.09,'glass')
+            model.box(0,3.73,.49,min(7.1,length-.8),2.7,.09,'red')
             letters(model,'东西巷',(0,4.32,.56),4.3,.85,'gold')
         if name=='R17' and outward[0]<-.7:
             model.box(0,3.25,.45,length,2.9,.95,'white')
@@ -99,19 +99,37 @@ def envelope(model, feature):
                 model.beam([along,.18,3.1],[along,3.7,3.1],.16,'wood',8,True)
                 crown=trimesh.creation.icosphere(subdivisions=1)
                 model.mesh(crown.vertices*[1.4,1.35,1.3]+[along,4.6,3.1],crown.faces,'leaf')
-        if name=='N011' and center[0]+ORIGIN[0]>-618 and -151<center[1]+ORIGIN[1]<-130 and outward[0]>.5 and length>3:
+        if name=='N011' and center[0]+ORIGIN[0]>-627 and -174<center[1]+ORIGIN[1]<-130 and outward[0]>.35 and length>3:
             model.box(0,0,.95,length,3.1,1.9,'wood',True)
             model.swept_roof(0,3.1,.85,length+.2,2.4,.8)
             for bay in range(max(1,round(length/3))):
                 count=max(1,round(length/3));along=(bay+.5)*length/count-length/2
                 model.box(along,.35,1.93,length/count*.77,2.2,.12,'glass')
+        if name=='N011' and outward[1]>.65 and center[1]+ORIGIN[1]>-144 and length>3:
+            spans=max(3,round(length/1.2))
+            for index in range(spans):
+                depth=.75+1.05*math.sin(math.pi*(index+.5)/spans)
+                model.box(((index+.5)/spans-.5)*length,3.12,depth/2,length/spans+.02,.32,depth,'granite')
+        if name=='N022' and outward[0]<-.7 and center[1]+ORIGIN[1]<-134:
+            model.box(0,height,.02,length,.82,.25,'brick')
+            model.box(0,height+.82,.02,length,.17,.38,'stone')
+        if name=='R33' and outward[0]<-.4 and length>3:
+            model.box(0,height,0,length,.95,.32,'brick')
+            model.box(0,height+.95,0,length,.17,.36,'stone')
         if name=='N022' and outward[1]<-.6 and length>2:
             model.box(0,0,.3,length,height,.6,'brick',True)
             model.box(0,height,.25,length+.14,.27,.95,'tile')
         if modern:
             model.box(0,height,0,length,.45,.28,'white')
+            if name=='R67' and (outward[0]>.6 or outward[1]>.6):
+                model.box(0,height-.32,.35,length,.28,.9,'granite')
+                count=max(2,round(length/3.2))
+                for bay in range(count):
+                    along=((bay+.5)/count-.5)*length
+                    model.box(along,.02,.38,.28,height-.34,.34,'stone')
+                    model.box(along,2.52,.16,length/count-.30,.46,.31,'sign')
             for level in range(attributes['levels']):
-                model.box(0,level*3.45+.45,.08,length*(.99 if name=='R4' else .91),2.55 if name=='R4' else 2.05,.17,'glass')
+                model.box(0,level*3.45+.45,.08,length*(.99 if name=='R2' else .91),2.85 if name=='R2' else 2.05,.17,'glass')
                 for slot in range(max(1,round(length/2.4))):
                     model.box(((slot+.5)/max(1,round(length/2.4))-.5)*length,level*3.45+.44,.18,.10,2.08,.10,'granite')
             continue

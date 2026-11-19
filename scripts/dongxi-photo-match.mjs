@@ -8,6 +8,12 @@ const planOnly=process.argv.includes('--plan-only')
 const selected=process.env.PHOTO_NUMBERS?.split(',')
 await mkdir(output,{recursive:true})
 const catalog=JSON.parse(await readFile('docs/layout/dongxi-photo-locations.json','utf8'))
+const official=JSON.parse(await readFile('docs/refs/rock/photo-locations.json','utf8'))
+for(const [key,shot] of Object.entries(catalog)){
+  if(!key.startsWith('walk-shizijie-wangcheng/'))continue
+  if(official[key]?.heading!==shot.heading || official[key]?.heading_exif!==shot.heading_exif)
+    throw Error(`District and official headings differ for ${key}`)
+}
 const estimatedPath=process.env.ESTIMATED_CAMERAS??(process.argv.includes('--dongxi')?'docs/layout/dongxi-estimated-cameras.json':null)
 const estimates=estimatedPath?JSON.parse(await readFile(estimatedPath,'utf8')):{}
 const shopLayout=JSON.parse(await readFile('docs/layout/dongxi-layout.geojson','utf8'))
@@ -32,7 +38,7 @@ try {
     const originalHeading=shot.heading_exif
     const recordedPosition=[shot.x,shot.z]
     if(shot.renderXZ)[shot.x,shot.z]=shot.renderXZ
-    if(number==='36')shot.heading=187
+    if(number==='36'&&!process.argv.includes('--dongxi'))shot.heading=187
     const pitch=({'27':6,'31':3,'33':7,'34':8,'35':8,'36':6})[number]??0
     if(process.argv.includes('--resume') && !['27','31','33','34','35','36'].includes(number) && await access(`${output}/${number}.jpg`).then(()=>true,()=>false)){
       trace.push({number,...shot,pitch});continue

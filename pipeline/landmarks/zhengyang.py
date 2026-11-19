@@ -38,6 +38,8 @@ def boulevard(model):
                 model.mesh(strip,[[0,2,3],[0,3,1]],'tile')
         for side in (-1,1):
             model.box(side*7.6,.14,center,1.3,.04,25,'granite')
+            if block == 0 or (block == 1 and side == 1):
+                continue
             model.box(side*14.4,0,center,7.4,10.2,22,'white' if block%2==0 else 'earth',True)
             for floor in (3.35,6.65):model.box(side*10.1,floor,center,3.5,.32,22.3,'white')
             for offset in np.linspace(-10,10,5 if model.detail else 2):
