@@ -274,55 +274,69 @@ def build_flanking_facades(model):
     model.box(0, 0.2, 2.82, 6.2, 3.1, 0.14, 'clock')
     model.pose = (0, 0, 0, 0)
 
-    # 3. TALL MODERN TEACHING COMPLEX BEHIND GATE/EAST (IMG_1373, 1374, 1376, 1377, 1378!)
-    # Exact OVT f97d45ef audited block + curved flying-roof entrance wing right behind gate east side!
+    # 3. TALL MODERN TEACHING COMPLEX ON EXACT OVT f97d45ef (IMG_1373, 1374, 1376, 1377, 1378!)
+    # Keeps the entire entrance axis x in [5..35], z in [-36..+25] 100% open for the tree-lined avenue & Kuiguang Lou!
     f97_ring = [(60.44, 13.23), (64.56, 2.91), (68.86, -7.87), (46.42, -16.48), (42.60, -6.48), (36.78, 8.61)]
-    prism(model, f97_ring, -1.0, 21.5, 'white', 'granite', True)
+    prism(model, f97_ring, -1.0, 21.8, 'white', 'granite', True)
 
-    # Prominent 6-storey curved-canopy & teal-glass stair tower wing standing at (24.5, 9.5) (IMG_1373, 1374 center-right!)
-    # Separated from Kuiguang Lou and f97d45ef so y=6m audit slices stay independent!
-    model.pose = (23.8, -0.2, 9.2, yaw)
-    model.box(3.5, -0.6, 0, 16.5, 21.2, 11.5, 'white', True)
-    # Tall vertical concrete stair tower + teal glass curtain strip (IMG_1373, 1374!)
-    model.box(-4.2, -0.6, 2.5, 4.6, 24.8, 5.2, 'stone', True)
-    model.box(-6.6, 24.0, 2.5, 6.8, 0.45, 6.4, 'granite')
-    model.box(-4.2, 4.0, 5.15, 2.2, 18.8, 0.16, 'clock')
-    # Sweeping curved concrete flying roof canopy & tall cylindrical column to the left of tower (IMG_1373, 1374, 1376!)
-    model.beam([-9.2, -0.4, 4.2], [-9.2, 17.8, 4.2], 0.45, 'stone', 10, True)
+    # Architectural details on the SW/W face of f97_ring (all cantilevered roof elements at y >= 16.0m above y=6m slice!)
+    f97_ang = math.atan2(13.23 - 8.61, 60.44 - 36.78)
+    model.pose = (48.6, -0.2, 10.9, f97_ang)
+    # Rooftop stair bulkhead & vertical teal-glass curtain strip near west end (visible behind gate in IMG_1373 & 1374!)
+    model.box(-9.2, 21.8, -2.0, 5.2, 3.8, 5.4, 'stone')
+    model.box(-9.8, 25.4, -2.0, 6.8, 0.42, 6.4, 'granite')
+    model.box(-9.2, 3.5, 0.12, 2.4, 21.2, 0.14, 'clock')
+    # Sweeping curved concrete flying roof canopy projecting west of f97_ring (seen at right edge of IMG_1377/1378 & center of 1373/1374!)
+    model.beam([-14.6, -0.4, 0.5], [-14.6, 18.2, 0.5], 0.42, 'stone', 10, True)
     for idx in range(8):
         t0, t1 = idx / 8, (idx + 1) / 8
-        x0, x1 = -13.5 + 8.0 * t0, -13.5 + 8.0 * t1
-        y0_c = 16.2 + 2.4 * math.sin(t0 * math.pi * 0.75)
-        y1_c = 16.2 + 2.4 * math.sin(t1 * math.pi * 0.75)
-        can_q = [(x0, y0_c, 6.5), (x1, y1_c, 6.5), (x1, y1_c, -1.5), (x0, y0_c, -1.5)]
+        x0, x1 = -18.2 + 8.5 * t0, -18.2 + 8.5 * t1
+        y0_c = 16.8 + 2.4 * math.sin(t0 * math.pi * 0.75)
+        y1_c = 16.8 + 2.4 * math.sin(t1 * math.pi * 0.75)
+        can_q = [(x0, y0_c, 3.2), (x1, y1_c, 3.2), (x1, y1_c, -4.8), (x0, y0_c, -4.8)]
         model.mesh(can_q, [[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]], 'granite')
-    # Rooftop open pergola louver frame on right wing (IMG_1373, 1374!)
-    for px in (0.5, 4.5, 8.5, 11.2):
-        model.box(px, 20.6, 5.2, 0.38, 2.4, 0.38, 'stone')
-    model.box(5.8, 22.8, 5.2, 12.2, 0.35, 6.5, 'granite')
+    # Rooftop open pergola louver frame on south face
+    for px in (-3.5, 1.0, 5.5, 9.5):
+        model.box(px, 21.8, -1.5, 0.38, 2.3, 0.38, 'stone')
+    model.box(3.0, 24.0, -1.5, 14.5, 0.35, 6.2, 'granite')
     for fl in range(5):
-        fy = 3.2 + fl * 3.3
-        model.box(4.2, fy, 5.82, 12.6, 1.65, 0.14, 'glass')
-        model.box(4.2, fy - 0.18, 5.92, 13.2, 0.22, 0.35, 'white')
+        fy = 3.2 + fl * 3.4
+        model.box(2.5, fy, 0.10, 16.5, 1.65, 0.12, 'glass')
     model.pose = (0, 0, 0, 0)
 
-    # 4. Clean white 5-storey north teaching block behind courtyard (framing IMG_1378 & IMG_1379 background!)
-    model.box(12.0, -0.6, -24.0, 34.0, 18.5, 10.5, 'white', True)
-    model.roof(12.0, 17.9, -24.0, 35.0, 11.5, 1.8)
-    for fl in range(4):
-        fy = 3.5 + fl * 3.4
-        model.box(12.0, fy, -18.68, 30.0, 1.6, 0.14, 'glass')
+    # 4. Paved granite tree-lined campus courtyard & avenue seamlessly flush across the 158.4m flattened ground!
+    model.box(13.0, -0.34, 2.0, 32.0, 0.39, 72.0, 'pave', True)
+    model.pose = (16.2, 0.05, -6.0, 0.10)
+    for kerb_x in (-6.8, 6.8):
+        model.box(kerb_x, 0.0, 0.0, 0.24, 0.06, 44.0, 'granite')
+    model.pose = (0, 0, 0, 0)
 
-    # 5. Campus avenue trees & street trees framing the gate (IMG_1373, 1374, 1377, 1378!)
+    # Distant 5-storey teaching wing with blue pitched roof at z = -42 (framing distant background of IMG_1378 & 1379!)
+    model.box(10.0, -0.6, -42.0, 36.0, 17.5, 10.5, 'white', True)
+    pts_br = [(-8.5, 16.9, -36.5), (28.5, 16.9, -36.5), (28.5, 19.6, -42.0), (-8.5, 19.6, -42.0)]
+    model.mesh(pts_br, [[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]], 'clock')
+    for fl in range(4):
+        fy = 3.4 + fl * 3.3
+        model.box(10.0, fy, -36.68, 31.0, 1.55, 0.14, 'glass')
+
+    # 5. Twin rows of tall avenue camphor trees & low shrub planters framing the open vista in IMG_1377 & IMG_1378!
     for tx, tz, th in (
         (-1.2, 23.8, 7.6),   # compact tree just left of gate column (IMG_1373, 1374!)
-        (24.5, 24.5, 9.4),   # lush tree right of east white annex (IMG_1373, 1374!)
-        (7.5, 11.5, 10.5),   # campus avenue trees seen through gate in IMG_1377 & 1378!
-        (9.5, 2.5, 10.8),
-        (16.5, 6.5, 9.8),
-        (18.0, -4.0, 10.2),
+        (27.5, 25.5, 9.4),   # lush tree right of east white annex (IMG_1373, 1374!)
+        (11.4, 7.8, 11.2),   # left row of avenue trees + planters (set north of z=7.8 so Kuiguang Lou is clearly visible in both IMG_1377 & 1378!)
+        (12.2, -2.0, 11.6),
+        (13.0, -12.0, 11.4),
+        (13.8, -22.0, 11.0),
+        (22.2, 11.0, 11.0),  # right row of avenue trees + planters!
+        (23.2, 0.5, 11.4),
+        (24.2, -10.5, 11.2),
+        (25.2, -21.5, 10.8),
     ):
-        camphor_tree(model, tx, gy if tz > 20 else 0.0, tz, h=th, spread=3.5)
+        y_tree = gy if tz > 20 else 0.0
+        camphor_tree(model, tx, y_tree, tz, h=th, spread=3.4)
+        if tz < 18:
+            model.box(tx, -0.1, tz, 1.85, 0.48, 1.85, 'granite')
+            model.box(tx, 0.38, tz, 1.62, 0.42, 1.62, 'leaf')
 
 
 def school(model):

@@ -166,22 +166,28 @@ def school(model):
     model.pose = (0, 0, 0, 0)
 
     # =========================================================================
-    # 3. CAMPUS AVENUE LOW RED-BRICK NOTICE WALLS & TREE CORRIDOR (IMG_1297, 1298!)
-    # Replaces 4-storey yellow procedural block on way/683033677 with true 1-storey red-brick wing!
+    # 3. CAMPUS BLUESTONE AVENUE, HEDGES & TREE CORRIDOR (IMG_1297, 1298!)
     # Angle -1.147 rad aligns -lz directly along WNW sightline (-0.912, -0.410) toward Boxue Lou!
     # =========================================================================
     cy = 0.30
     model.pose = (-28.7, cy, 6.73, -1.147)
-    model.box(0, -0.35, -26.0, 12.6, 0.38, 62.0, 'pave', True)
-    # Right-hand (+lx) low red-brick pitched-eave ceremonial wall wing (IMG_1297 right foreground, clear of 1298!)
-    model.box(6.4, -0.3, -10.5, 3.2, 3.45, 15.0, 'brick', True)
-    model.box(6.0, 3.05, -10.5, 4.2, 0.24, 15.6, 'earth')
-    # Left-hand (-lx) low red-brick propaganda notice room (IMG_1297 left foreground!)
-    model.box(-6.6, -0.3, -14.0, 3.0, 3.15, 22.0, 'brick', True)
-    model.box(-5.05, 0.9, -14.0, 0.10, 1.35, 12.0, 'red')
-    # Trimmed green hedge strip along right side of avenue & court (IMG_1297, 1298 bottom-right!)
-    model.box(5.2, 0.0, -34.0, 1.5, 0.85, 38.0, 'green')
-    # Festive overhead triangular bunting flags across campus court (IMG_1297, 1298!)
+    # Continuous bluestone walkway extending all the way from inner gate (+22) to Boxue Lou (-126)
+    model.box(0, -0.35, -52.0, 11.0, 0.38, 148.0, 'pave', True)
+    for kerb_x in (-5.62, 5.62):
+        model.box(kerb_x, 0.03, -46.0, 0.24, 0.09, 124.0, 'granite')
+
+    # Right-hand (+lx) short red-brick pitched-eave corner end at entrance (occupying only ~8% right edge in IMG_1297!)
+    model.box(5.85, -0.3, -0.2, 2.2, 2.85, 5.2, 'brick', True)
+    model.box(5.45, 2.55, -0.2, 3.1, 0.22, 5.8, 'earth')
+    # Left-hand (-lx) short low red-brick notice wall at entrance (occupying left foreground edge in IMG_1297!)
+    model.box(-6.35, -0.3, 1.8, 2.3, 2.75, 6.8, 'brick', True)
+    model.box(-5.15, 0.85, 1.8, 0.10, 1.25, 5.2, 'red')
+
+    # Continuous trimmed green hedges flanking BOTH sides of the bluestone avenue all the way to the court!
+    model.box(6.15, 0.0, -46.0, 1.45, 0.86, 96.0, 'green')
+    model.box(-6.15, 0.0, -49.0, 1.45, 0.80, 90.0, 'green')
+
+    # Festive overhead triangular bunting flags across campus avenue (IMG_1297, 1298!)
     for fz in (-16.0, -28.0):
         for fx in np.linspace(-5.2, 5.2, 11):
             col = ('red', 'yellow', 'clock', 'green')[int(abs(fx * 3)) % 4]
@@ -189,20 +195,15 @@ def school(model):
             model.mesh(pts, [[0, 1, 2], [0, 2, 1]], col)
     model.pose = (0, 0, 0, 0)
 
-    # Dense avenue & court-flanking tall camphor trees framing the sightline to Boxue Lou (IMG_1297, 1298!)
-    for tx, tz, th, tsp in (
-        (-5.5, 36.5, 9.5, 4.2),   # street tree right of gate (IMG_1295!)
-        (-13.5, 22.0, 9.2, 3.8),  # street tree left of gate (IMG_1295!)
-        (-28.0, -2.5, 11.5, 4.8), # tall right-hand tree row along way/683033677 (IMG_1297, 1298 right!)
-        (-42.0, -8.5, 13.5, 5.2),
-        (-58.0, -14.5, 14.2, 5.4),
-        (-76.0, -20.0, 13.0, 5.0),
-        (-95.0, -25.0, 12.5, 4.8),
-        (-46.0, 14.0, 11.2, 4.6), # left-hand tree row (IMG_1297, 1298 left!)
-        (-68.0, 8.0, 11.8, 4.8),
-        (-125.0, -22.0, 11.0, 4.6),
-    ):
-        camphor_tree(model, tx, cy if tx < -18 else 0.0, tz, h=th, spread=tsp)
+    # Street trees at Rongyin Rd gate + continuous twin rows of avenue camphor trees along both hedges!
+    ca, sa = math.cos(-1.147), math.sin(-1.147)
+    for tx, tz, th, tsp in ((-5.5, 36.5, 9.5, 4.2), (-13.5, 22.0, 9.2, 3.8)):
+        camphor_tree(model, tx, 0.0, tz, h=th, spread=tsp)
+    for idx, az_loc in enumerate(np.linspace(-3.5, -92.0, 8)):
+        for side_x, h_add in ((8.1, 1.2), (-8.2, 0.4)):
+            wx = -28.7 + side_x * ca - az_loc * sa
+            wz = 6.73 + side_x * sa + az_loc * ca
+            camphor_tree(model, wx, cy, wz, h=11.8 + h_add + (idx % 2) * 1.1, spread=4.7)
 
     # =========================================================================
     # 4. AUDITED 5-STOREY WHITE '博学楼' AT EXACT OSM way/683033673 (IMG_1297, 1298 focal point!)
