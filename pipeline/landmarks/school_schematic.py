@@ -39,10 +39,14 @@ def generate(identifier, catalog):
     scale = school['scale']
     half_width = (2.4 if school.get('heritage') else 6.8 if athletics else 5)*scale
     half_height = 1.1 if athletics else .62
-    plaque = Image.new('RGB',(round(height*half_width/half_height),height),'#e6e5dc')
-    font = _font(min(height-36, (plaque.width-48)//len(title)), bold=True)
-    ImageDraw.Draw(plaque).text((plaque.width/2,height/2), title, anchor='mm', fill='#68241e', font=font)
-    image.paste(plaque.resize((width,height), Image.Resampling.LANCZOS), (left,top))
+    if school.get('worldGround'):
+        font = _font(min(height-36, (width-48)//len(title)), bold=True)
+        draw.text((left+width/2, top+height/2), title, anchor='mm', fill='#87342e', font=font)
+    else:
+        plaque = Image.new('RGB',(round(height*half_width/half_height),height),'#e6e5dc')
+        font = _font(min(height-36, (plaque.width-48)//len(title)), bold=True)
+        ImageDraw.Draw(plaque).text((plaque.width/2,height/2), title, anchor='mm', fill='#68241e', font=font)
+        image.paste(plaque.resize((width,height), Image.Resampling.LANCZOS), (left,top))
     near, far = Builder(0, True), Builder(1, False)
     for builder in (near, far):
         mesh = builder.parts['atlas']
@@ -91,7 +95,7 @@ def generate(identifier, catalog):
                 block((0,1.28,rear),(38,.16,.42),'steel')
             if athletics:
                 mesh.face([(east*scale,.085,south*scale) for east,south in [(-18,-4),(18,-4),(18,12),(-18,12)]],(0,1,0),'athletics',uvs=[(.001,.001),(.999,.001),(.999,.999),(.001,.999)])
-            else:
+            elif not school.get('worldGround'):
                 block((10,.08,2),(14,.16,19),'glaze')
                 for side in (-1,1):
                     block((10+side*6.5,.17,2),(.1,.02,18),'white')

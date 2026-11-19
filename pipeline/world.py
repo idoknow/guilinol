@@ -12,7 +12,7 @@ from shapely import STRtree, intersects_xy
 from shapely.geometry import box, Point
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem
-from features import building_mesh, buildings, ground_features, polygons
+from features import building_mesh, buildings, game_court, ground_features, polygons
 from karst import generate
 from bridges import bridge_tiles
 from scatter import CONFIG, scatter
@@ -52,9 +52,16 @@ def build(bbox, output, palette):
         row = np.clip(round((south-top)/GRID),0,depth//GRID)
         col = np.clip(round((east-left)/GRID),0,width//GRID)
         return original[row,col]/10
-    layers = ground_features(bounds)
+    layout = Layout()
+    layers = ground_features(bounds,layout.school_grounds)
     surface = np.full_like(terrain, DRY)
     texture = Image.new('RGB',(width,depth),palette['ground'])
+    for region in layout.school_grounds:
+        for part in polygons(region.intersection(bounds)):
+            for surface_area, color in ((part, palette['green']), (part.buffer(-3), '#bdbcb5')):
+                for paved in polygons(surface_area):
+                    mask, corner = stencil(paved,left,top,1)
+                    texture.paste(color,corner,mask)
     for layer, features in layers.items():
         for poly in features:
             mask, corner = stencil(poly,left,top,1)
@@ -68,7 +75,6 @@ def build(bbox, output, palette):
                     patch[wet] = round(np.median(terrain[row:row+patch.shape[0],col:col+patch.shape[1]][wet]))
     wet = surface != DRY
     previous_bed = np.where(wet,np.minimum(terrain,surface-20),terrain)
-    layout = Layout()
     output.mkdir(parents=True, exist_ok=True)
     original = previous_bed.copy()
     mountain_trees = []
@@ -91,6 +97,14 @@ def build(bbox, output, palette):
     if raised:
         footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes),layout)
     index = STRtree(footprints)
+    for campus in layout.school_grounds:
+        if not bounds.covers(campus) or any(campus.covers(field.representative_point())
+                for layer in ('schoolTrack','schoolCourt') for field in layers[layer]):
+            continue
+        court = game_court(campus,[footprints[key] for key in index.query(campus)])
+        if court is not None:
+            mask,corner = stencil(court,left,top,1)
+            texture.paste(palette['schoolCourt'],corner,mask)
     trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees,layout.tree_exclude)
     for road in roads:
         for part in polygons(road.line.buffer(road.width/2,quad_segs=2).intersection(bounds)):
