@@ -238,6 +238,6 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     if(e.code==='Escape'&&!sheet.hidden) close()})
 
   let clock = 0
-  return {open, close, get active(){return !sheet.hidden}, roadName:()=>lastRoad, search:(q:string)=>{input.value = q; input.oninput?.(new Event('input'))},
+  return {paint, extent:atlas.extent, roadAt:atlas.roadAt.bind(atlas), open, close, get active(){return !sheet.hidden}, roadName:()=>lastRoad, search:(q:string)=>{input.value = q; input.oninput?.(new Event('input'))},
     tick(dt:number){clock += dt; if(clock<.2) return; clock = 0; if(document.body.dataset.photo!=='on') drawMini(); if(!sheet.hidden&&!pointers.size) redraw()}}
 }
