@@ -3,10 +3,10 @@ import {chromium} from 'playwright'
 import {preview} from 'vite'
 
 const shots = {
-  yiwu_office: [['1344',[-28,2.1,-22],[-13,6.4,-3.8]]],
+  yiwu_office: [['1344',[-36,1.65,-19],[-14,8.6,-3.1]]],
   yiwu_old_house: [
-    ['1351',[-11,2.1,-18],[0,5.3,1.5]], ['1352',[4,2,-13],[0,5.6,1.5]],
-    ['1353',[13,2,-15],[1,4.6,1.5]],
+    ['1351',[10.2,1.65,-1.5],[4.1,3.7,2.0]], ['1352',[-8.7,1.65,-1.4],[-4.9,4.7,2.3]],
+    ['1353',[-12.6,1.65,-1.5],[-8.1,4.6,2.7]],
   ],
   guanyi_bridge: [
     ['1361',[76,9.7,9],[45,10,15]], ['1362',[55,9.7,11],[49,12.3,17.3]],
@@ -44,16 +44,18 @@ try {
   for(const [id,views] of Object.entries(shots))for(const [name,eye,target,hour=12] of views){
     if(process.env.LANDMARKS&&!process.env.LANDMARKS.split(',').includes(id))continue
     if(process.env.VIEWS&&!process.env.VIEWS.split(',').includes(name))continue
-    await page.evaluate(([id,eye,target,hour])=>{
+    await page.evaluate(([id,eye,target,hour,name])=>{
       const {manifest,camera,clock}=window.viewer,entry=manifest.landmarks.find(item=>item.id===id)
       const angle=entry.rotation*Math.PI/180
       const point=([x,y,z])=>[entry.position[0]+x*Math.cos(angle)+z*Math.sin(angle),entry.position[1]+y,entry.position[2]-x*Math.sin(angle)+z*Math.cos(angle)]
+      const focal={'1344':24,'1351':14,'1352':14,'1353':14}[name]
+      camera.fov=focal?2*Math.atan(36/(2*focal))*180/Math.PI:55
       camera.near=.15;camera.updateProjectionMatrix()
       camera.position.set(...point(eye));camera.lookAt(...point(target));clock.set(hour)
-    },[id,eye,target,hour])
+    },[id,eye,target,hour,name])
     await page.waitForFunction(id=>!window.viewer.stats.pending&&[...window.viewer.stream.landmarks].some(([entry,root])=>entry.id===id&&root.getObjectByName('lod0')?.visible),id,{timeout:90000})
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
-    await page.evaluate(name=>{for(const mesh of window.viewer.stream.forest.batches)if(mesh)mesh.layers.set(['1367','1368','1369','1370','1371','1372'].includes(name)?31:0)},name)
+    await page.evaluate(name=>{for(const mesh of window.viewer.stream.forest.batches)if(mesh)mesh.layers.set(['1344','1367','1368','1369','1370','1371','1372'].includes(name)?31:0)},name)
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
     await page.locator('canvas').first().screenshot({path:`${output}/${name}.jpg`,quality:90})
     if(process.env.VISIBILITY_CHECK){

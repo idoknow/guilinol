@@ -15,7 +15,7 @@ for name in (sys.argv[3:] or views):
         image=ImageOps.contain(photo,(540,720))
         page.paste(image,((540-image.width)//2,60+(720-image.height)//2));page.paste(game,(540,60))
         label=f'Rock 实拍 IMG_{name}                         游戏 · 机位按画面估计'
-        if '1367'<=name<='1372':label+='（截图隐藏树冠）'
+        if name=='1344' or '1367'<=name<='1372':label+='（截图隐藏树冠）'
     else:
         page.paste(game,(270,60));label='补充机位（无实拍对应） · '+('侧面远景' if name=='side' else '夜景')
     draw.text((14,10),label,font=font,fill='black');pages.append(page)
