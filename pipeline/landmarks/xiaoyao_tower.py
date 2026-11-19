@@ -14,14 +14,19 @@ from jingjiang import Model, SWATCHES, atlas
 
 
 class LandmarkModel(Model):
-    def __init__(self, detail):
+    def __init__(self, detail, flood_roof=False):
         super().__init__(detail)
         self.lamps=[]
+        self.lit_tiles=[]
+        self.flood_roof=flood_roof
 
     def mesh(self, vertices, faces, color, collide=False):
         if isinstance(color,str) and color=='lamp':
             super().mesh(vertices,faces,'gold',collide)
             self.lamps.append((self.visible.pop(),self.uv.pop()))
+        elif self.flood_roof and isinstance(color,str) and color=='tile':
+            super().mesh(vertices,faces,color,collide)
+            self.lit_tiles.append((self.visible.pop(),self.uv.pop()))
         else:
             super().mesh(vertices,faces,color,collide)
 
@@ -58,30 +63,89 @@ def facade(model, base, half, height, upstairs):
     model.pose = (0,0,0,0)
 
 
+def steps(m, start, end, x, z, dx, dz, count, width):
+    for index in range(count):
+        distance = index + .5
+        top = start + (end-start)*(index+1)/count
+        m.box(x+distance*dx, start-.12, z+distance*dz,
+              abs(dx) or width, top-start+.12, abs(dz) or width, 'pave', True)
+
+
+def white_rail(m, x, z, dx, dz, bays, base):
+    for k in range(bays+1):
+        px,pz = x+k*dx,z+k*dz
+        m.box(px,base,pz,.24,1.12,.24,'white',True)
+        m.box(px,base+1.12,pz,.3,.13,.3,'white')
+        if k < bays:
+            for y,h in ((.28,.12),(.84,.16)):
+                m.box(px+dx/2,base+y,pz+dz/2,abs(dx) or .16,h,abs(dz) or .16,'white',True)
+            if m.detail:
+                m.box(px+dx/2,base+.4,pz+dz/2,abs(dx)*.46 or .11,.44,abs(dz)*.46 or .11,'white')
+
+
 def tower(model):
-    model.box(0,-.25,0,22.4,3.65,22.4,'brick',True)
-    model.box(0,3.4,0,22.8,.32,22.8,'pave',True)
+    court, platform = 4.2, 5.64
+    model.box(0,-.36,-8,34,court+.36,48,'stone',True)
+    model.box(0,court-.16,-8,34,.16,48,'pave',True)
+    # From the gallery pavilion, ascend east to the open northern court.
+    steps(model,0,court,-27.08,-21, .42,0,24,4.2)
+    # Riverside stair follows the eastern face, ending on an upper landing.
+    steps(model,0,court,18.68,5,0,-.42,24,3.36)
+    model.box(18.68,-.25,-7.06,3.36,court+.25,4,'stone',True)
+    for z in np.arange(-30,15,2.15):
+        if -10 < z < -5:
+            continue
+        model.box(16.7,court,z,.6,.88,2.15,'brick',True)
+        model.box(16.7,court+.88,z,.62,.38,1.04,'brick')
+    # Shallow recessed panels and stone door surround on the riverside wall (30–34).
+    for z in (-18,6):
+        model.box(17.01,.68,z,.12,2.32,6.6,'granite')
+        model.box(17.09,.82,z,.08,2.02,6.25,'sign')
+    model.box(17.08,0,12,.22,2.42,1.8,'wood')
+    for z in (10.94,13.06):
+        model.box(17.25,0,z,.5,2.58,.34,'granite')
+    model.box(17.21,2.55,12,.56,.30,2.65,'granite')
+    for z in (-29,-17,-3,11):
+        model.beam([16.55,court,z],[16.55,court+3.5,z],.055,'wood')
+        model.mesh([[16.55,court+3.45,z],[16.55,court+2.45,z],[16.48,court+2.85,z+1.48]],[[0,1,2]],'yellow')
+    model.box(0,court,0,23.8,platform-court,22.6,'stone',True)
+    for sign in (-1,1):
+        steps(model,court,platform,0,sign*14.5,0,-sign*.4,8,5)
+        white_rail(model,-11.75,sign*11.1,2.28,0,4,platform)
+        white_rail(model,2.63,sign*11.1,2.28,0,4,platform)
+        white_rail(model,sign*11.75,-11.1,0,2.22,10,platform)
+    facade(model,platform,8.85,5.05,False)
+    model.swept_roof(0,platform+5.05,0,24.3,23.1,2.1)
+    # Projecting central porch and its gable break the first eave (19–22).
     for side in (-1,1):
-        for step in range(22):
-            model.box(0,-.04,side*(11.4+(21.5-step)*.36),6.2,.04+(step+1)*3.72/22,.36,'pave',True)
-    facade(model,3.72,7.55,5.05,False)
-    model.swept_roof(0,8.77,0,22.4,22.4,2.1)
-    model.box(0,10.67,0,16.6,.45,16.6,'wood',True)
-    facade(model,11.12,6.65,4.9,True)
-    model.swept_roof(0,16.02,0,19.8,19.8,2.65)
-    model.box(0,18.33,0,11.4,1.05,10.6,'wood')
-    model.swept_roof(0,19.38,0,16.8,15.9,3.7)
-    model.beam([0,23.08,0],[0,24.15,0],.29,'gold',8)
+        for x in (-2.6,2.6):
+            model.beam([x,platform,side*10.7],[x,platform+5.25,side*10.7],.26,'wood',10,True)
+        model.swept_roof(0,platform+5.25,side*9.1,7.1,6.6,1.85)
+        model.box(0,platform+3.88,side*10.55,3.6,1.0,.20,'sign')
+    upper = platform+7.4
+    model.box(0,upper-.45,0,17.9,.45,17.9,'wood',True)
+    facade(model,upper,7.9,4.85,True)
+    model.swept_roof(0,upper+4.85,0,21.5,20.2,2.65)
+    model.box(0,upper+7.12,0,12,1.05,11,'wood')
+    model.swept_roof(0,upper+8.17,0,18.4,17.5,3.7)
+    if model.detail:
+        for side in (-1,1):
+            for x in (-6,-3,3,6):
+                model.beam([x,platform+3.65,side*8.9],[x,platform+4.25,side*8.9],.28,'red',10)
+            model.box(0,upper+3.22,side*8.1,4.5,1.35,.22,'sign')
+        for y,w,d in ((platform+5.03,24.3,23.1),(upper+4.83,21.5,20.2),(upper+8.15,18.4,17.5)):
+            for side in (-1,1):
+                model.box(0,y,side*d*.5,w*.67,.06,.07,'lamp')
 
 
-def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=()):
+def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False):
     image = atlas(colors,smooth)
     target = Path(__file__).resolve().parents[2]/'public/textures/landmarks'/folder
     target.mkdir(parents=True, exist_ok=True)
     if colors is None: image.save(target/'timber-and-tile.png', optimize=True)
     scene = trimesh.Scene()
     for level in (0,1):
-        model = LandmarkModel(level==0)
+        model = LandmarkModel(level==0, flood_roof)
         build(model)
         group = f'lod{level}'
         scene.graph.update(frame_to=group)
@@ -93,7 +157,7 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
             if texture is not None:
                 material = trimesh.visual.material.PBRMaterial(name=name,baseColorTexture=texture,roughnessFactor=1,metallicFactor=0,doubleSided=True)
                 if name.endswith('_lit'):
-                    material.emissiveFactor=[.85,.57,.24]
+                    material.emissiveFactor=[.58,.24,.055] if name=='roof_lit' else [.85,.57,.24]
                 mesh.visual = trimesh.visual.TextureVisuals(uv=np.concatenate(uvs).reshape(-1,2),material=material)
             scene.add_geometry(mesh,node_name=group+'_'+name if texture else 'collision_surface',parent_node_name=group if texture else scene.graph.base_frame)
         if model.visible:
@@ -104,6 +168,8 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
             rock=trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
             rock.visual.vertex_colors=np.concatenate(colors).reshape(-1,4)
             scene.add_geometry(rock,node_name=group+'_limestone',parent_node_name=group)
+        if model.lit_tiles:
+            faces,uvs=zip(*model.lit_tiles);add(faces,uvs,image,'roof_lit')
         if model.lamps:
             faces,uvs=zip(*model.lamps);add(faces,uvs,image,'lamp_lit')
         for key, parts in model.tile_parts.items():
@@ -116,4 +182,4 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
 
 
 if __name__ == '__main__':
-    generate()
+    generate(colors={"wood":"#44322e","red":"#78362d","stone":"#b8b5b0","tile":"#44454a"}, flood_roof=True)

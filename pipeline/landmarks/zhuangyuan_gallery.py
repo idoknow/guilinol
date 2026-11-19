@@ -32,6 +32,17 @@ def gallery(m):
             m.box(x,2.68,0,.08,.48,.08,'wood')
             m.beam([x,2.35,0],[x,2.68,0],.22,'red',10)
             m.box(x,2.29,0,.16,.07,.16,'gold')
+        for x in np.linspace(-19.5,19.5,42):
+            for side in (-1,1):
+                m.beam([x,4.41,0],[x,3.31,side*2.0],.055,'wood',4)
+        for x in np.linspace(-18.8,18.8,10):
+            for side in (-1,1):
+                z=side*1.48
+                m.beam([x,2.43,z],[x,2.86,z],.12,'red',10)
+                m.box(x,2.34,z,.06,.1,.06,'gold')
+                for offset in (-.75,-.25,.25,.75):
+                    m.box(x+offset,.7,z,.055,.50,.065,'wood')
+                m.box(x,.73+.48,z,3.9,.08,.10,'wood')
     x = 25
     m.box(x,-.2,0,7.7,.33,6.8,'pave',True)
     for dx in (-2.8,2.8):
@@ -41,6 +52,17 @@ def gallery(m):
     # Rounded crown and two-tier base leave a passage on either side.
     m.box(x,.13,1.05,1.9,.23,1.2,'stone',True)
     m.box(x,.36,1.05,1.6,.36,.92,'granite',True)
+    # Rock 15 shows the turtle stele bearer projecting beyond the slab.
+    if m.detail:
+        import trimesh
+        for center, scale in [((x,.64,1.0),(.86,.45,.92)),((x,.73,.10),(.30,.25,.44))]:
+            shell = trimesh.creation.icosphere(subdivisions=2)
+            m.mesh(shell.vertices*np.array(scale)+center,shell.faces,'granite')
+        for dx in (-1.1,1.1):
+            for z in (-.72,2.15):
+                m.beam([x+dx,.13,z],[x+dx,1.05,z],.034,'granite')
+            m.beam([x+dx,1.05,-.72],[x+dx,1.05,2.15],.033,'granite')
+        m.beam([x-1.1,1.05,-.72],[x+1.1,1.05,-.72],.033,'granite')
     outline = [(-.65,0),(.65,0)] + [
         (.65*np.cos(a),1.78+.65*np.sin(a)) for a in np.linspace(0,np.pi,13)]
     vertices = [[x+dx,.72+h,1.05+dz] for dz in (-.19,.19) for dx,h in outline]
@@ -55,4 +77,4 @@ def gallery(m):
 
 
 if __name__ == '__main__':
-    generate('zhuangyuan_gallery', gallery, colors={'wood':'#46302b','tile':'#484a4c'})
+    generate('zhuangyuan_gallery', gallery, colors={'wood':'#46302b','tile':'#484a4c','pave':'#373a3b'})
