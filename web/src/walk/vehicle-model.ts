@@ -29,6 +29,10 @@ function getBicycleCrank(){
 
 export function vehicleModel(kind:string,paint=0){
   const key=kind+paint
+  if(kind==='car'){
+    if(!cache.has(key))cache.set(key,buildCarGeometry(paint))
+    const mesh=new T.Mesh(cache.get(key),material);mesh.name=kind;return mesh
+  }
   if(!cache.has(key)){
     const parts:T.BufferGeometry[]=[]
     function part(shape:T.BufferGeometry,color:number,x:number,y:number,z:number){parts.push(paintGeom(shape,color,x,y,z))}
@@ -138,4 +142,301 @@ export function vehicleModel(kind:string,paint=0){
     mesh.add(crank)
   }
   return mesh
+}
+
+// Four understated Guilin street sedan finishes: pearl ivory, Lijiang slate blue, karst silver, osmanthus burgundy.
+const CAR_PAINTS=[0xf0ede6,0x365b77,0x8c949c,0x8f3330] as const
+
+function buildCarGeometry(paint=0):T.BufferGeometry{
+  const bodyHex=CAR_PAINTS[((paint%4)+4)%4]
+  const bodyCol=new T.Color(bodyHex)
+  const shadeHex=bodyCol.clone().multiplyScalar(.88).getHex()
+  const trimDark=0x222528,underbody=0x191b1d,glass=0x20343f,glassTop=0x16242c,pillarBlack=0x1c2024
+  const chrome=0xc5cdd3,alloy=0xcfd5da,alloyInner=0x7c838a,tireRubber=0x26292c
+  const headlamp=0xf8f4e3,drlIce=0xe3f2f8,amber=0xe59a38,tailRed=0xcc332b,brakeBright=0xe8483e
+  const reverseWhite=0xefeee8,mirrorGlass=0xadc3cf,plateBlue=0x2a579e
+  const parts:T.BufferGeometry[]=[]
+
+  function emit(raw:T.BufferGeometry,color:number,x=0,y=0,z=0){
+    const g=raw.index?raw.toNonIndexed():raw
+    if(g!==raw)raw.dispose()
+    if(x||y||z)g.translate(x,y,z)
+    g.deleteAttribute('uv')
+    const count=g.attributes.position.count,c=new T.Color(color),colors=new Float32Array(count*3)
+    for(let i=0;i<count;i++){colors[i*3]=c.r;colors[i*3+1]=c.g;colors[i*3+2]=c.b}
+    g.setAttribute('color',new T.BufferAttribute(colors,3))
+    parts.push(g)
+  }
+
+  function box(w:number,h:number,d:number,x:number,y:number,z:number,color:number,rx=0,ry=0,rz=0){
+    const g=new T.BoxGeometry(w,h,d)
+    if(rx)g.rotateX(rx);if(ry)g.rotateY(ry);if(rz)g.rotateZ(rz)
+    emit(g,color,x,y,z)
+  }
+
+  function archLift(z:number):[number,number]{
+    for(const wz of [-1.34,1.31]){
+      const dz=Math.abs(z-wz)
+      if(dz<.375){
+        const h=Math.sqrt(Math.max(0,.375*.375-dz*dz))
+        return [.175+h*1.02,.022*(h/.375)]
+      }
+    }
+    return [0,0]
+  }
+
+  const rawStations:[number,number,number,number,number,number,number,number][]=[
+    [-2.23,.23,.63,.68,.66,.74,.72,.58],
+    [-2.15,.19,.69,.75,.76,.84,.82,.68],
+    [-1.96,.18,.75,.80,.82,.89,.86,.75],
+    [-1.68,.175,.80,.83,.84,.905,.875,.78],
+    [-1.51,.175,.82,.845,.84,.91,.88,.79],
+    [-1.34,.175,.835,.86,.84,.91,.885,.795],
+    [-1.17,.175,.845,.87,.84,.91,.885,.80],
+    [-.98,.17,.855,.88,.84,.91,.885,.80],
+    [-.84,.17,.865,.89,.84,.91,.885,.795],
+    [-.55,.17,.88,1.16,.84,.91,.88,.72],
+    [-.25,.17,.895,1.415,.84,.91,.875,.645],
+    [.16,.17,.91,1.445,.84,.91,.875,.645],
+    [.58,.17,.925,1.41,.84,.91,.875,.64],
+    [.92,.175,.94,1.19,.84,.91,.875,.69],
+    [1.14,.18,.95,.98,.84,.91,.88,.76],
+    [1.31,.18,.955,.98,.84,.91,.88,.765],
+    [1.48,.185,.96,.98,.835,.905,.875,.76],
+    [1.68,.19,.965,.985,.825,.895,.865,.75],
+    [1.98,.205,.955,.99,.79,.86,.83,.71],
+    [2.16,.225,.90,.94,.74,.81,.78,.66],
+    [2.23,.26,.80,.85,.65,.72,.69,.57],
+  ]
+
+  const stations=rawStations.map(([z,yBot,yBelt,yTop,wBot,wFlank,wBelt,wTop])=>{
+    const [archY,flare]=archLift(z)
+    const ySill=Math.max(yBot+.04,archY),yWaist=Math.max(ySill+.07,yBelt-.15)
+    return {z,yBot,ySill,yWaist,yBelt,yTop,wBot,wFlank:wFlank+flare,wBelt,wTop}
+  })
+
+  const rings=stations.map(s=>{
+    const z=s.z,crown=s.yTop>1.02?.022:.014
+    return [
+      [-s.wBot*.55,s.yBot,z],
+      [-s.wBot,s.ySill,z],
+      [-s.wFlank,(s.ySill+s.yWaist)*.5,z],
+      [-s.wFlank,s.yWaist,z],
+      [-s.wBelt,s.yBelt,z],
+      [-(s.wBelt*.32+s.wTop*.68),(s.yBelt*.35+s.yTop*.65),z],
+      [-s.wTop,s.yTop-crown*.45,z],
+      [-s.wTop*.42,s.yTop+crown,z],
+      [s.wTop*.42,s.yTop+crown,z],
+      [s.wTop,s.yTop-crown*.45,z],
+      [(s.wBelt*.32+s.wTop*.68),(s.yBelt*.35+s.yTop*.65),z],
+      [s.wBelt,s.yBelt,z],
+      [s.wFlank,s.yWaist,z],
+      [s.wFlank,(s.ySill+s.yWaist)*.5,z],
+      [s.wBot,s.ySill,z],
+      [s.wBot*.55,s.yBot,z],
+    ] as [number,number,number][]
+  })
+
+  const shellPos:number[]=[],shellCol:number[]=[],tmpCol=new T.Color()
+  function pushTri(a:[number,number,number],b:[number,number,number],c:[number,number,number],hex:number){
+    tmpCol.setHex(hex)
+    shellPos.push(a[0],a[1],a[2],b[0],b[1],b[2],c[0],c[1],c[2])
+    for(let i=0;i<3;i++)shellCol.push(tmpCol.r,tmpCol.g,tmpCol.b)
+  }
+  function pushQuadOut(a:[number,number,number],b:[number,number,number],c:[number,number,number],d:[number,number,number],nx:number,ny:number,nz:number,hex:number){
+    const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2]
+    const cx=uy*vz-uz*vy,cy=uz*vx-ux*vz,cz=ux*vy-uy*vx
+    if(cx*nx+cy*ny+cz*nz>=0){pushTri(a,b,c,hex);pushTri(a,c,d,hex)}
+    else{pushTri(a,c,b,hex);pushTri(a,d,c,hex)}
+  }
+  function stationAt(z:number){
+    if(z<=stations[0].z)return {...stations[0]}
+    const last=stations[stations.length-1]
+    if(z>=last.z)return {...last}
+    for(let i=0;i<stations.length-1;i++){
+      const s0=stations[i],s1=stations[i+1]
+      if(z<=s1.z){
+        const t=(z-s0.z)/Math.max(1e-6,s1.z-s0.z)
+        return {
+          z,
+          yBot:s0.yBot+(s1.yBot-s0.yBot)*t,
+          ySill:s0.ySill+(s1.ySill-s0.ySill)*t,
+          yWaist:s0.yWaist+(s1.yWaist-s0.yWaist)*t,
+          yBelt:s0.yBelt+(s1.yBelt-s0.yBelt)*t,
+          yTop:s0.yTop+(s1.yTop-s0.yTop)*t,
+          wBot:s0.wBot+(s1.wBot-s0.wBot)*t,
+          wFlank:s0.wFlank+(s1.wFlank-s0.wFlank)*t,
+          wBelt:s0.wBelt+(s1.wBelt-s0.wBelt)*t,
+          wTop:s0.wTop+(s1.wTop-s0.wTop)*t,
+        }
+      }
+    }
+    return {...last}
+  }
+  function roofPt(z:number,xFrac:number,ny:number,nz:number,lift:number):[number,number,number]{
+    const s=stationAt(z),crown=s.yTop>1.02?.022:.014,ax=Math.abs(xFrac)
+    const yBase=ax<=.42?s.yTop+crown:s.yTop+crown-((ax-.42)/.58)*crown*1.45
+    return [xFrac*s.wTop,yBase+ny*lift,z+nz*lift]
+  }
+  function emitRoofGlass(zStops:number[],wFrac:number,ny:number,nz:number,lift:number,hex:number){
+    const xStops=[-wFrac,-wFrac*.42,wFrac*.42,wFrac]
+    for(let iz=0;iz<zStops.length-1;iz++){
+      const z0=zStops[iz],z1=zStops[iz+1]
+      for(let ix=0;ix<xStops.length-1;ix++){
+        const x0=xStops[ix],x1=xStops[ix+1]
+        pushQuadOut(roofPt(z0,x0,ny,nz,lift),roofPt(z1,x0,ny,nz,lift),roofPt(z1,x1,ny,nz,lift),roofPt(z0,x1,ny,nz,lift),0,ny,nz,hex)
+      }
+    }
+  }
+  function sideGlassPt(side:number,z:number,u:number,lift:number):[number,number,number]{
+    const s=stationAt(z),crown=s.yTop>1.02?.022:.014
+    const w4=s.wBelt,y4=s.yBelt
+    const w5=s.wBelt*.32+s.wTop*.68,y5=s.yBelt*.35+s.yTop*.65
+    const w6=s.wTop,y6=s.yTop-crown*.45
+    let w:number,y:number
+    if(u<=.65){const t=u/.65;w=w4+(w5-w4)*t;y=y4+(y5-y4)*t}
+    else{const t=(u-.65)/.35;w=w5+(w6-w5)*t;y=y5+(y6-y5)*t}
+    return [side*(w+lift*.92),y+lift*.38,z]
+  }
+  function emitSideWindow(side:number,z0Bot:number,z0Top:number,z1Bot:number,z1Top:number,u0Bot:number,u0Top:number,u1Bot:number,u1Top:number,lift:number,hex:number,cols=4){
+    for(let c=0;c<cols;c++){
+      const t0=c/cols,t1=(c+1)/cols
+      const zb0=z0Bot+(z1Bot-z0Bot)*t0,zt0=z0Top+(z1Top-z0Top)*t0
+      const zb1=z0Bot+(z1Bot-z0Bot)*t1,zt1=z0Top+(z1Top-z0Top)*t1
+      const ub0=u0Bot+(u1Bot-u0Bot)*t0,ut0=u0Top+(u1Top-u0Top)*t0
+      const ub1=u0Bot+(u1Bot-u0Bot)*t1,ut1=u0Top+(u1Top-u0Top)*t1
+      const uMid0=ub0<.65&&ut0>.65?.65:(ub0+ut0)*.5
+      const uMid1=ub1<.65&&ut1>.65?.65:(ub1+ut1)*.5
+      const f0=(uMid0-ub0)/Math.max(1e-5,ut0-ub0),f1=(uMid1-ub1)/Math.max(1e-5,ut1-ub1)
+      const zm0=zb0+(zt0-zb0)*f0,zm1=zb1+(zt1-zb1)*f1
+      pushQuadOut(sideGlassPt(side,zb0,ub0,lift),sideGlassPt(side,zb1,ub1,lift),sideGlassPt(side,zm1,uMid1,lift),sideGlassPt(side,zm0,uMid0,lift),side,.35,0,hex)
+      pushQuadOut(sideGlassPt(side,zm0,uMid0,lift),sideGlassPt(side,zm1,uMid1,lift),sideGlassPt(side,zt1,ut1,lift),sideGlassPt(side,zt0,ut0,lift),side,.35,0,hex)
+    }
+  }
+
+  const M=rings[0].length
+  for(let i=0;i<rings.length-1;i++){
+    const r0=rings[i],r1=rings[i+1],zMid=(stations[i].z+stations[i+1].z)*.5
+    for(let k=0;k<M;k++){
+      const k1=(k+1)%M
+      const hex=(k===0||k===14||k===15)?underbody:(k===1||k===13)?(zMid>-1.72&&zMid<1.72?trimDark:shadeHex):(k===2||k===12)?shadeHex:bodyHex
+      pushTri(r0[k],r1[k],r1[k1],hex)
+      pushTri(r0[k],r1[k1],r0[k1],hex)
+    }
+  }
+  const fCenter:[number,number,number]=[0,.36,stations[0].z]
+  for(let k=0;k<M;k++)pushTri(fCenter,rings[0][k],rings[0][(k+1)%M],k===15?underbody:bodyHex)
+  const bIdx=rings.length-1,bCenter:[number,number,number]=[0,.36,stations[bIdx].z]
+  for(let k=0;k<M;k++)pushTri(bCenter,rings[bIdx][(k+1)%M],rings[bIdx][k],k===15?underbody:bodyHex)
+
+  // Flush-fitted front & rear windshields (following greenhouse loft planes, zero protrusion)
+  emitRoofGlass([-.82,-.55,-.26],.89,.80,-.60,.005,pillarBlack)
+  emitRoofGlass([-.79,-.55,-.28],.82,.80,-.60,.008,glass)
+  emitRoofGlass([-.36,-.28],.81,.80,-.60,.010,glassTop)
+  emitRoofGlass([.59,.92,1.12],.87,.83,.55,.005,pillarBlack)
+  emitRoofGlass([.62,.92,1.09],.80,.83,.55,.008,glass)
+  for(const ix of [-.34,.34]){
+    const x0=ix<0?-.34:0,x1=ix<0?0:.34
+    pushQuadOut(roofPt(.625,x0,.83,.55,.011),roofPt(.665,x0,.83,.55,.011),roofPt(.665,x1,.83,.55,.011),roofPt(.625,x1,.83,.55,.011),0,.83,.55,brakeBright)
+  }
+
+  // Flush-fitted trapezoidal side windows, gloss-black B-pillars, quarter glass, and chrome beltline trim
+  for(const side of [-1,1]){
+    emitSideWindow(side,-.76,-.26,1.00,.58,.05,.90,.05,.90,.005,pillarBlack,5)
+    emitSideWindow(side,-.70,-.23,.07,.07,.11,.84,.11,.84,.008,glass,2)
+    emitSideWindow(side,.075,.075,.165,.165,.06,.89,.06,.89,.009,pillarBlack,1)
+    emitSideWindow(side,.17,.17,.68,.55,.11,.84,.11,.84,.008,glass,2)
+    emitSideWindow(side,.73,.59,.95,.87,.11,.81,.14,.42,.008,glass,2)
+    emitSideWindow(side,-.76,-.74,1.00,.98,.025,.068,.025,.068,.010,chrome,4)
+  }
+
+  const shellGeom=new T.BufferGeometry()
+  shellGeom.setAttribute('position',new T.Float32BufferAttribute(shellPos,3))
+  shellGeom.setAttribute('color',new T.Float32BufferAttribute(shellCol,3))
+  shellGeom.computeVertexNormals()
+  parts.push(shellGeom)
+
+  for(const side of [-1,1])for(const wz of [-1.34,1.31]){
+    const arch=new T.CylinderGeometry(.34,.34,.24,8,1,true,-Math.PI/2,Math.PI)
+    arch.rotateX(-Math.PI/2);arch.rotateY(Math.PI/2)
+    emit(arch,underbody,side*.78,.32,wz)
+  }
+
+  // Windshield wipers, flush door handles, dual-tone aerodynamic wing mirrors, and roof fin
+  for(const wx of [-.26,.18])box(.40,.014,.020,wx,.905,-.805,trimDark,0,.08,-.04)
+  for(const side of [-1,1]){
+    for(const hz of [-.10,.56]){
+      box(.020,.034,.155,side*.892,.855,hz,pillarBlack)
+      box(.028,.024,.165,side*.902,.858,hz,bodyHex)
+    }
+    box(.065,.038,.09,side*.845,.92,-.64,pillarBlack)
+    box(.075,.024,.038,side*.888,.942,-.63,pillarBlack,0,0,side*.16)
+    box(.135,.084,.105,side*.945,.962,-.61,bodyHex,.06,side*-.18,0)
+    box(.122,.070,.018,side*.944,.962,-.558,mirrorGlass,0,side*-.18,0)
+    box(.126,.014,.024,side*.952,.958,-.658,amber,0,side*-.18,0)
+  }
+  box(.034,.056,.15,0,1.464,.44,bodyHex,-.20)
+
+  // Front grille (emblem-free), splitter, headlamps, and DRLs
+  box(.96,.20,.05,0,.53,-2.205,pillarBlack,.08)
+  for(const gy of [.475,.53,.585])box(.88,.018,.058,0,gy,-2.212,chrome)
+  box(1.16,.11,.05,0,.29,-2.19,underbody)
+  box(1.56,.032,.12,0,.195,-2.17,trimDark)
+  box(.42,.115,.03,0,.38,-2.225,plateBlue)
+  for(const side of [-1,1]){
+    const yaw=side*.22
+    box(.34,.125,.13,side*.635,.64,-2.165,pillarBlack,.09,yaw,0)
+    box(.095,.070,.045,side*.565,.642,-2.222,headlamp,.08,yaw,0)
+    box(.090,.066,.045,side*.675,.646,-2.198,headlamp,.08,yaw,0)
+    box(.32,.024,.048,side*.63,.698,-2.208,drlIce,.08,yaw,side*-.08)
+    box(.060,.062,.052,side*.765,.648,-2.158,amber,.08,yaw,0)
+    box(.20,.075,.05,side*.66,.305,-2.195,trimDark,0,yaw,0)
+    box(.115,.036,.056,side*.66,.305,-2.212,drlIce,0,yaw,0)
+  }
+
+  // Rear deck spoiler, two-tone LED tail lamps, diffuser fins, and twin exhausts
+  box(1.36,.032,.09,0,.992,2.02,bodyHex,.18)
+  box(1.42,.042,.04,0,.82,2.21,pillarBlack)
+  box(.42,.115,.03,0,.66,2.222,plateBlue)
+  box(1.46,.13,.08,0,.27,2.185,trimDark,-.12)
+  for(const fx of [-.42,-.14,.14,.42])box(.024,.11,.09,fx,.255,2.205,underbody)
+  for(const side of [-1,1]){
+    const yaw=-side*.20
+    box(.38,.13,.12,side*.62,.815,2.155,tailRed,-.06,yaw,0)
+    box(.34,.045,.04,side*.61,.85,2.208,brakeBright,-.06,yaw,0)
+    box(.24,.032,.042,side*.57,.775,2.21,reverseWhite,-.06,yaw,0)
+    box(.22,.024,.03,side*.62,.34,2.205,tailRed,0,yaw,0)
+    const pipe=new T.CylinderGeometry(.044,.044,.11,8);pipe.rotateX(Math.PI/2)
+    emit(pipe,chrome,side*.54,.235,2.20)
+    const bore=new T.CylinderGeometry(.032,.032,.116,6);bore.rotateX(Math.PI/2)
+    emit(bore,underbody,side*.54,.235,2.204)
+  }
+
+  // 5-spoke alloy wheels with rounded tires, rim lips, brake discs, and calipers
+  for(const side of [-1,1])for(const wz of [-1.34,1.31]){
+    const wx=side*.795,wy=.306
+    const tireTorus=new T.TorusGeometry(.232,.074,4,10);tireTorus.rotateY(Math.PI/2)
+    emit(tireTorus,tireRubber,wx,wy,wz)
+    const tread=new T.CylinderGeometry(.244,.244,.195,10,1,true);tread.rotateZ(Math.PI/2)
+    emit(tread,tireRubber,wx,wy,wz)
+    const rimLip=new T.TorusGeometry(.184,.015,3,8);rimLip.rotateY(Math.PI/2)
+    emit(rimLip,alloy,wx+side*.086,wy,wz)
+    const barrel=new T.CylinderGeometry(.182,.182,.15,8,1,true);barrel.rotateZ(Math.PI/2)
+    emit(barrel,underbody,wx,wy,wz)
+    const rotor=new T.CylinderGeometry(.140,.140,.022,7);rotor.rotateZ(Math.PI/2)
+    emit(rotor,alloyInner,wx+side*.046,wy,wz)
+    box(.045,.092,.062,wx+side*.052,wy+.02,wz-.09,brakeBright)
+    for(let s=0;s<5;s++){
+      const ang=(s*Math.PI*2)/5+.18,rMid=.10
+      const spoke=new T.BoxGeometry(.026,.158,.034);spoke.rotateX(ang)
+      emit(spoke,alloy,wx+side*.088,wy+Math.cos(ang)*rMid,wz+Math.sin(ang)*rMid)
+    }
+    const hub=new T.CylinderGeometry(.044,.048,.030,6);hub.rotateZ(Math.PI/2)
+    emit(hub,chrome,wx+side*.092,wy,wz)
+  }
+
+  const merged=mergeGeometries(parts,false)
+  for(const p of parts)p.dispose()
+  merged.computeVertexNormals()
+  return merged
 }

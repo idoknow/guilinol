@@ -16,6 +16,7 @@ from common import GRID, ll2xz, load_osm
 from features import area, points
 from navigation import return_trips
 from clearance import audit_routes
+from cars import plan_cars
 
 
 def plan_vehicles(bounds, surface, roads, buildings, sample, interchange=None):
@@ -117,7 +118,7 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, interchange=None):
                     if node==nodes[start]:break
                     node=prev[node]
                 routes.append(dict(kind=kind,start=start,end=end,path=path[::-1]))
-    return dict(bikes=bikes,bicycles=bicycles,docks=docks,routes=routes,grid=[left,top,cols,rows,GRID],mask=base64.b64encode(np.packbits(mask).tobytes()).decode())
+    return dict(bikes=bikes,bicycles=bicycles,docks=docks,routes=routes,grid=[left,top,cols,rows,GRID],mask=base64.b64encode(np.packbits(mask).tobytes()).decode(),**plan_cars(bounds,surface,buildings,sample,placed,docks))
 
 
 def write_vehicles(output,data,triangles):

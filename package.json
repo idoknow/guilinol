@@ -28,6 +28,7 @@
     "verify:walk:quick": "node scripts/walk-quick.mjs",
     "verify:walk:full": "node scripts/walk.mjs",
     "verify:ride": "node scripts/ride.mjs",
+    "verify:car": "node scripts/car.mjs",
     "verify:boat": "node scripts/boat.mjs",
     "perf": "node scripts/perf.mjs",
     "shoot": "node scripts/shoot.mjs",

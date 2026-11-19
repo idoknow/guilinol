@@ -29,3 +29,15 @@ export const bicycleConfig: typeof bikeConfig = {
   stickDeadFwd:.1, stickDeadTurn:.12, slideDamp:1.8,
   uphillDrag:13.5, uphillCapScale:3.2, offRoadCap:3.4,
 }
+
+/** Passenger car dynamics (40 km/h cap, Ackermann steering R_min ~ 4.85m, delayed -12 km/h reverse). */
+export const carConfig = {
+  maxSpeed:40/3.6, reverseMax:-12/3.6, accel:5.2, torqueDecay:.58, torquePow:.75,
+  brake:11.5, revHold:.24, revAccel:3.6, rollDrag:.35, aeroDrag:.06,
+  wheelbase:2.65, halfWidth:.91, halfLength:2.24,
+  maxSteerAngle:.50, speedSteer:2.2, steerDamp:8.5,
+  bodyRollMax:.035, rollDamp:8, pitchMax:.22, pitchDamp:9,
+  maxSlope:.32, slideDamp:2.2,
+  mountDuration:.24, dismountDuration:.20, cameraArmOffset:4.2,
+  stickDeadFwd:.1, stickDeadTurn:.12, strictMotorway:true,
+}

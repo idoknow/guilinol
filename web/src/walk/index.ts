@@ -6,10 +6,11 @@ import type {Manifest} from '../world'
 import type {Stream} from '../stream'
 import {walkInput} from '../ui/walk'
 import {avatar} from '../look/avatar'
-import {walkConfig as cfg} from './config'
+import {carConfig, walkConfig as cfg} from './config'
 import {createPhysics} from './physics'
 import {createCameraRig} from './camera'
 import {look} from '../look/config'
+import {createDriverPose} from './car'
 import {createRiderPose,notifyDismountBlocked} from './ride'
 import type {vehicles} from './vehicles'
 
@@ -107,7 +108,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   avatarReady ??= new GLTFLoader().loadAsync(avatar.path)
   const [sim,model]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady])
   const rig=createCameraRig(sim)
-  const figure=model.scene,skinned=mergeAvatar(figure,avatar.color),traveller=figure.getObjectByName('Traveller'),ridePose=createRiderPose(figure)
+  const figure=model.scene,skinned=mergeAvatar(figure,avatar.color),traveller=figure.getObjectByName('Traveller'),ridePose=createRiderPose(figure),driverPose=createDriverPose(figure)
   scene.add(figure);figure.visible=false;figure.scale.setScalar(avatar.scale)
   const mixer=new THREE.AnimationMixer(figure),actions=new Map(model.animations.map(clip=>[clip.name,mixer.clipAction(clip)]))
   let action:THREE.AnimationAction|undefined,active=false,yaw=0,pitch=cfg.pitch,arm=cfg.far,facing=0,bankLean=0,strideLean=0,prevSpeed=0
@@ -127,18 +128,41 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const validDeck=deck&&deck.y<=refY+.35?deck:null
     return validDeck??sim.surface(x,z,'sidewalk')??sim.surface(x,z,'ground')
   }
+  function carSupportAt(x:number,z:number,refY:number){
+    const deck=sim.surface(x,z,'deck',refY+.55,1.8)
+    const validDeck=deck&&deck.y<=refY+.55?deck:null
+    const lm=sim.surface(x,z,'landmark',refY+.55,1.8)
+    const validLm=lm&&lm.y<=refY+.55&&lm.slope<=cfg.slope?lm:null
+    const bridgeHit=validDeck&&validLm?(validLm.y>validDeck.y?validLm:validDeck):(validDeck??validLm)
+    return bridgeHit??sim.surface(x,z,'ground')??sim.surface(x,z,'sidewalk')
+  }
   function loadRides(){if(loading||rides||!active||!manifest.vehicles)return;loading=true
     const file=manifest.vehicles.file
-    void import('./vehicles').then(module=>module.vehicles(scene,file,(x,z,bikeHeading,bikeY)=>{sim.sync(x,z)
+    void import('./vehicles').then(module=>module.vehicles(scene,file,(x,z,bikeHeading,bikeY,kind)=>{sim.sync(x,z)
       if(bikeHeading===undefined)return place(x,z,'dismount')
+      if(kind==='car'){
+        const carY=bikeY??safe.y-cfg.height/2
+        const found=sim.findCarDismount(x,z,bikeHeading,carY)
+        if(!found){notifyDismountBlocked();return false}
+        const prevCarPos=new THREE.Vector3(x,carY,z)
+        if(!place(x,z,'dismount',true,found))return false
+        facing=bikeHeading+avatar.yaw
+        driverPose.startDismount(prevCarPos,bikeHeading,active);input.clearRun();return true
+      }
       const found=sim.findLocalDismount(x,z,bikeHeading,bikeY??safe.y-cfg.height/2)
       if(!found){notifyDismountBlocked();return false}
       const prevFoot=figure.position.clone(),prevYaw=figure.rotation.y
       if(!place(x,z,'dismount',true,found))return false
       facing=bikeHeading+avatar.yaw
       ridePose.startDismount(prevFoot,prevYaw);input.clearRun();return true
-    },(bx,by,bz)=>{sim.sync(bx,bz)
-      const cur=sim.body.translation(),check=sim.findLocalMount(cur.x,cur.y-cfg.height/2,cur.z,bx,by,bz)
+    },(bx,by,bz,kind)=>{sim.sync(bx,bz)
+      const cur=sim.body.translation()
+      if(kind==='car'){
+        const check=sim.findCarMount(cur.x,cur.y-cfg.height/2,cur.z,bx,by,bz)
+        if(!check.ok){notifyDismountBlocked(check.reason==='blocked'?'中间有遮挡，绕过去再上车':'这里太窄了，换个角度上车');return null}
+        return check
+      }
+      const check=sim.findLocalMount(cur.x,cur.y-cfg.height/2,cur.z,bx,by,bz)
       if(!check.ok){notifyDismountBlocked(check.reason==='blocked'?'中间有遮挡，绕过去再骑':'这里太窄了，挪一挪再骑');return null}
       return check
     },{sim,stream,landFree:spot=>{sim.sync(spot.x,spot.z)
@@ -146,7 +170,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       rides?.clearBoatPose(figure);facing=spot.heading+avatar.yaw;figure.rotation.y=facing;wasBoat=false;input.clearRun();follow(0,true);return true}})).then(loaded=>{rides=loaded;rides.show(active)
       if(active){const p=sim.body.translation();sim.sync(p.x,p.z);loaded.nearby(p.x,p.z,p.y-cfg.height/2)}})
       .catch(error=>console.warn('Vehicles unavailable:',error)).finally(()=>{loading=false})}
-  let wasBoat=false,wasBike=false,bikeObstacle=''
+  let wasBoat=false,wasBike=false,wasCar=false,bikeObstacle=''
   function place(x:number,z:number,reason:string,override=false,prefound?:ReturnType<typeof sim.findWalkableSpawn>){const found=prefound??sim.findWalkableSpawn(x,z,override)
     if(verify)spawns.push({reason,from:[x,z],to:found?[found.x,found.z]:null,distance:found?Math.hypot(found.x-x,found.z-z):null,rule:found?.rule??'none'})
     if(!found)return false
@@ -166,10 +190,23 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true);return true
   }
-  function leave(){active=false;rides?.clearBoatPose(figure);rides?.show(false);wasBoat=wasBike=false;bikeObstacle='';ridePose.reset();resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function leave(){active=false;rides?.clearBoatPose(figure);rides?.show(false);if(wasCar){sim.controller.enableAutostep(cfg.step,.18,false);sim.controller.setMaxSlopeClimbAngle(cfg.slope)}wasBoat=wasBike=wasCar=false;bikeObstacle='';ridePose.reset();driverPose.reset(false);resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function follow(dt=0,snap=false){const pos=sim.body.translation();figure.position.set(pos.x,pos.y-cfg.height/2,pos.z)
     if(rides?.boat){figure.position.copy(rides.boat.position);figure.position.y+=rides.boatSeatOffset;figure.rotation.y=rides.heading}
-    if(rides?.bike){
+    if(rides?.car){
+      const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading),baseY=pos.y-cfg.height/2
+      const cSup=carSupportAt(pos.x,pos.z,baseY)
+      const groundY=cSup&&baseY-cSup.y<=.16&&baseY>=cSup.y-.08?cSup.y:baseY-.03
+      figure.position.y=groundY
+      if(dt>0){
+        const halfWb=carConfig.wheelbase*.5
+        const fSup=carSupportAt(pos.x+fx*halfWb,pos.z+fz*halfWb,groundY)
+        const bSup=carSupportAt(pos.x-fx*halfWb,pos.z-fz*halfWb,groundY)
+        rides.setCarPitch(fSup?.y,bSup?.y,dt)
+      }
+      rides.park(figure.position)
+      driverPose.updateDriving(figure.position,rides.heading,active)
+    }else if(rides?.bike){
       const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading),baseY=pos.y-cfg.height/2
       const cSup=supportAt(pos.x,pos.z,baseY)
       const groundY=cSup&&baseY-cSup.y<=.12&&baseY>=cSup.y-.05?cSup.y:baseY-.03
@@ -184,8 +221,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }else{
       rides?.park(figure.position)
       ridePose.applyDismount(figure.position,facing,dt)
+      driverPose.applyDismount(figure.position,facing,dt)
     }
-    rig.update(camera,figure.position,yaw,pitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap),dt,snap)
+    rig.update(camera,figure.position,yaw,pitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap),dt,snap)
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
   function boatClearance(){
@@ -205,7 +243,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const renderY=mesh?terrainRay.intersectObject(mesh,false)[0]?.point.y:undefined
     return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
       inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits,
-      planarSpeed:Math.hypot(vx,vz),grounded,verticalVelocity:velocity,facing,figPos:figure.position.toArray(),figYaw:figure.rotation.y,bikePitch:rides?.bikePitch??0,bikeY:rides?.bikeY??0,
+      planarSpeed:Math.hypot(vx,vz),grounded,verticalVelocity:velocity,facing,figPos:figure.position.toArray(),figYaw:figure.rotation.y,bikePitch:rides?.bikePitch??0,bikeY:rides?.bikeY??0,carPitch:rides?.carPitch??0,carY:rides?.carY??0,
       pedalPhase:ridePose.pedalPhase,thighL:figure.getObjectByName('ThighL')?.rotation.x??0,thighR:figure.getObjectByName('ThighR')?.rotation.x??0,
       camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z),
       boat:rides?.boatProbe()??null}}
@@ -213,7 +251,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(rides?.freeBoat){
       const read=held?still:input.read(), firstFrame=!wasBoat
       if(firstFrame){yaw=rides.heading;mixer.stopAllAction();action=undefined;bankLean=strideLean=0
-        wasBike=false;if(traveller)traveller.rotation.set(0,0,0);ridePose.reset();input.clearRun()}
+        if(wasCar){sim.controller.enableAutostep(cfg.step,.18,false);sim.controller.setMaxSlopeClimbAngle(cfg.slope)}
+        wasBike=wasCar=false;if(traveller)traveller.rotation.set(0,0,0);ridePose.reset();driverPose.reset(active);input.clearRun()}
       const prevHeading=rides.heading
       if(!held)rides.steerBoat(read.forward,read.right,Math.min(.12,dt))
       yaw+=rides.heading-prevHeading
@@ -223,7 +262,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       sim.body.setNextKinematicTranslation({x:bpos.x,y:wy+cfg.height/2,z:bpos.z})
       wasBoat=true;follow(dt,firstFrame);return
     }
-    if(rides?.boat){if(!held)rides.advance(Math.min(.25,dt));if(!wasBoat){yaw=rides.heading+.95;sit()}wasBoat=!!rides.boat;follow(dt);return}wasBoat=false
+    if(rides?.boat){if(!held)rides.advance(Math.min(.25,dt));if(!wasBoat){if(wasCar){sim.controller.enableAutostep(cfg.step,.18,false);sim.controller.setMaxSlopeClimbAngle(cfg.slope);wasCar=false;driverPose.reset(active)}yaw=rides.heading+.95;sit()}wasBoat=!!rides.boat;follow(dt);return}wasBoat=false
     const read=input.read(),keys=held?still:read
     wish.set(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))
     if(external)wish.set(external.x,external.z)
@@ -231,7 +270,25 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(rawLen>1e-5)wish.divideScalar(rawLen);else wish.set(0,0)
     const maxSpeed=(external?external.run:keys.run)?cfg.run:cfg.walk
     const step=1/60;let traveled=0,simSteps=0;lastHits=[];blockedWater=false
-    let bikeSpeed=rides?.bike?rides.speed:0
+    let bikeSpeed=(rides?.car||rides?.bike)?rides.speed:0
+    if(wasCar&&!rides?.car){
+      sim.controller.enableAutostep(cfg.step,.18,false)
+      sim.controller.setMaxSlopeClimbAngle(cfg.slope)
+      figure.visible=active
+    }
+    if(rides?.car&&!wasCar){
+      const cx=rides.car.position.x,cz=rides.car.position.z,cur=sim.body.translation()
+      sim.sync(cx,cz)
+      const sup=carSupportAt(cx,cz,rides.car.position.y)
+      const cy=sup?sup.y:rides.car.position.y
+      driverPose.startMount({x:cur.x,y:cur.y-cfg.height/2,z:cur.z},figure.rotation.y)
+      sim.controller.enableAutostep(.10,.18,false)
+      sim.controller.setMaxSlopeClimbAngle(carConfig.maxSlope)
+      const dest={x:cx,y:cy+cfg.height/2+.055,z:cz}
+      sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest);sim.world.step()
+      safe.set(dest.x,dest.y,dest.z);resetMotion();input.clearRun()
+      mixer.stopAllAction();action=undefined;bikeObstacle='';bikeSpeed=0;yaw=rides.heading
+    }
     if(rides?.bike&&!wasBike){
       const bx=rides.bike.position.x,bz=rides.bike.position.z,cur=sim.body.translation()
       sim.sync(bx,bz)
@@ -243,25 +300,34 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       safe.set(dest.x,dest.y,dest.z);resetMotion();input.clearRun()
       mixer.stopAllAction();action=undefined;bikeObstacle='';bikeSpeed=0
     }
+    wasCar=!!rides?.car
     wasBike=!!rides?.bike
-    if(keys.jump&&!wasBike)jumpTimer=cfg.jumpBuffer
+    const aboardGround=wasCar||wasBike
+    if(keys.jump&&!aboardGround)jumpTimer=cfg.jumpBuffer
     accumulator+=Math.min(.12,dt)
     while(accumulator>=step-1e-7){accumulator=Math.max(0,accumulator-step);steps++;simSteps++;elapsed+=step
       if(grounded)coyoteTimer=cfg.coyote;else coyoteTimer=Math.max(0,coyoteTimer-step)
-      if(!wasBike&&jumpTimer>0&&coyoteTimer>0){
+      if(!aboardGround&&jumpTimer>0&&coyoteTimer>0){
         velocity=Math.sqrt(-2*cfg.gravity*cfg.jump)
         grounded=false;coyoteTimer=0;jumpTimer=0;setSnap(false)
       }else jumpTimer=Math.max(0,jumpTimer-step)
       if(velocity<=0)setSnap(true)
 
-      if(wasBike&&rides?.bike){
+      if(wasCar&&rides?.car){
+        const previous=rides.heading
+        driverPose.advanceMount(step)
+        bikeSpeed=rides.steerCar(keys.forward,keys.right,step,driverPose.mounted)
+        wish.set(-Math.sin(rides.heading),-Math.cos(rides.heading))
+        if(driverPose.mounted)yaw+=rides.heading-previous
+        vx=wish.x*bikeSpeed;vz=wish.y*bikeSpeed
+      }else if(wasBike&&rides?.bike){
         const previous=rides.heading
         ridePose.advanceMount(step)
         bikeSpeed=rides.steer(keys.forward,keys.right,step,ridePose.mounted)
         wish.set(-Math.sin(rides.heading),-Math.cos(rides.heading))
         if(ridePose.mounted)yaw+=rides.heading-previous
         vx=wish.x*bikeSpeed;vz=wish.y*bikeSpeed
-      }else if(!wasBike){
+      }else if(!aboardGround){
         const tgtSpd=maxSpeed*inputMag
         if(!grounded){
           const targetVx=wish.x*tgtSpd, targetVz=wish.y*tgtSpd
@@ -291,7 +357,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
 
       const pos=sim.body.translation()
       velocity+=(velocity>0?cfg.gravity:cfg.fallGravity)*step
-      const stepDx=(wasBike?wish.x*bikeSpeed:vx)*step, stepDz=(wasBike?wish.y*bikeSpeed:vz)*step
+      const stepDx=(aboardGround?wish.x*bikeSpeed:vx)*step, stepDz=(aboardGround?wish.y*bikeSpeed:vz)*step
       sim.controller.computeColliderMovement(sim.capsule,{x:stepDx,y:velocity*step,z:stepDz})
       const move=sim.controller.computedMovement(),next={x:pos.x+move.x,y:pos.y+move.y,z:pos.z+move.z}
       const nowGrounded=sim.controller.computedGrounded()
@@ -309,7 +375,31 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;vx=vz=0;blockedWater=true;rides?.stop();bikeSpeed=0}
         }
       }
-      if(rides?.bike){
+      if(rides?.car){
+        const res=rides.resolveCarMove({
+          pos,next,move,heading:rides.heading,speed:bikeSpeed,step,
+          motorPavement:rides.motorPavement,insideHouse:sim.insideHouse,
+          carBlockedAt:(x,footY,z,hdg,sgn)=>sim.carOverlap(x,footY,z,hdg,sgn),
+          collisionKind:(dirX,dirZ)=>{
+            let hit:''|'collision'|'building'=''
+            for(let at=0;at<sim.controller.numComputedCollisions();at++){
+              const contact=sim.controller.computedCollision(at)
+              if(!contact||contact.normal1.y>=Math.cos(carConfig.maxSlope))continue
+              if(contact.normal1.x*dirX+contact.normal1.z*dirZ>=-.2)continue
+              const kind=contact.collider?sim.kinds.get(contact.collider.handle):undefined
+              if(kind==='building')return 'building'
+              hit='collision'
+            }
+            return hit
+          },
+          stopCar:()=>rides!.stop(),
+          dampCar:s=>rides!.dampCarSpeed(s),
+        })
+        bikeSpeed=res.speed
+        if(res.blocked){bikeObstacle=res.reason;vx=vz=0}
+        else{vx=wish.x*bikeSpeed;vz=wish.y*bikeSpeed;if(Math.abs(bikeSpeed)>.15)bikeObstacle=''}
+      }
+      else if(rides?.bike){
         const res=rides.resolveMove({
           pos,next,move,heading:rides.heading,speed:bikeSpeed,step,
           pavement:rides.pavement,insideHouse:sim.insideHouse,
@@ -350,7 +440,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     physicsMs+=performance.now()-before
     const actualSpeed=simSteps>0?traveled/(simSteps*step):Math.hypot(vx,vz)
     let turnDiff=0
-    if(!wasBike){
+    if(!aboardGround){
       const velLen=Math.hypot(vx,vz)
       const dirX=velLen>.08?vx/velLen:inputMag>.05?wish.x:0, dirZ=velLen>.08?vz/velLen:inputMag>.05?wish.y:0
       if(dirX||dirZ){
@@ -418,7 +508,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     throw Error(`Missing support at ${x},${z}`)
   }
-  return {photoSupport,enter,leave,tick,spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  return {photoSupport,enter,leave,tick,spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}
 }

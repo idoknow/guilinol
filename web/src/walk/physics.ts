@@ -5,6 +5,7 @@ import type {Stream} from '../stream'
 import {fetchAsset,type Manifest,type Tile} from '../world'
 import {look} from '../look/config'
 import {walkConfig as cfg} from './config'
+import {probeCarDismount, probeCarMount} from './car'
 import {probeLocalDismount, probeLocalMount} from './ride'
 
 type Outline = import('../buildings').Building
@@ -154,6 +155,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const spanFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'}
   const wallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='building'}
   const hullFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='rail'||k==='building'}
+  const carWallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='building'||k==='rail'||k==='peak'||k==='tree'}
+  const landmarkFilter=(coll:R.Collider)=>kinds.get(coll.handle)==='landmark'
   function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
     surfaceRay.origin.x=east;surfaceRay.origin.y=origin;surfaceRay.origin.z=south
     const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)
@@ -220,11 +223,38 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function findLocalMount(px:number,py:number,pz:number,bx:number,by:number,bz:number){
     return probeLocalMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},px,py,pz,bx,by,bz)
   }
+  function findCarDismount(cx:number,cz:number,heading:number,carY:number){
+    return probeCarDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,carY)
+  }
+  function findCarMount(px:number,py:number,pz:number,cx:number,cy:number,cz:number){
+    return probeCarMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},px,py,pz,cx,cy,cz)
+  }
+  function carOverlap(x:number,footY:number,z:number,heading:number,dirSign:-1|0|1=0){
+    const fx=-Math.sin(heading),fz=-Math.cos(heading),rx=Math.cos(heading),rz=-Math.sin(heading)
+    const halfL=dirSign===0?2.12:1.62,shift=dirSign*.52
+    const key=`car:${halfL.toFixed(2)}`
+    let box=hullBoxes.get(key)
+    if(!box){box=new R.Cuboid(.86,.48,halfL);hullBoxes.set(key,box)}
+    const half=heading*.5
+    if(world.intersectionWithShape({x:x+fx*shift,y:footY+.82,z:z+fz*shift},{x:0,y:Math.sin(half),z:0,w:Math.cos(half)},box,undefined,undefined,capsule,undefined,carWallFilter))return true
+    const dirs:[number,number,number][]=[]
+    if(dirSign>=0)dirs.push([fx,fz,2.18],[fx*2.14-rx*.84,fz*2.14-rz*.84,1],[fx*2.14+rx*.84,fz*2.14+rz*.84,1])
+    if(dirSign<=0)dirs.push([-fx,-fz,2.18],[-fx*2.14-rx*.84,-fz*2.14-rz*.84,1],[-fx*2.14+rx*.84,-fz*2.14+rz*.84,1])
+    for(const oy of [.65,1.15]){
+      segmentRay.origin.x=x;segmentRay.origin.y=footY+oy;segmentRay.origin.z=z
+      for(const [dx,dz,scale] of dirs){
+        const len=scale===1?Math.hypot(dx,dz):scale
+        segmentRay.dir.x=dx/(scale===1?len:1);segmentRay.dir.y=0;segmentRay.dir.z=dz/(scale===1?len:1)
+        if(world.castRay(segmentRay,len,true,undefined,undefined,capsule,undefined,landmarkFilter))return true
+      }
+    }
+    return false
+  }
   function isBlockedAt(x:number,y:number,z:number){
     return !!world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule,undefined,coll=>{
       const k=kinds.get(coll.handle)
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,hasDeck,surface,waterCeiling,waterOverlap,pathBlocked,freeCapsule,wet,insideHouse,findWalkableSpawn,findLocalDismount,findLocalMount,isBlockedAt}
+  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,hasDeck,surface,waterCeiling,waterOverlap,carOverlap,pathBlocked,freeCapsule,wet,insideHouse,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
 }
