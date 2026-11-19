@@ -17,7 +17,7 @@ try {
   for (const [name,eye,target] of views) {
     if(!kuiguang && name==='front') {
       await page.setViewportSize({width:960,height:720})
-      eye.splice(0,3,2,1.65,74); target.splice(0,3,0,10.4,33)
+      eye.splice(0,3,4,2.1,53); target.splice(0,3,0,5.5,32.9)
     } else if(!kuiguang) await page.setViewportSize({width:960,height:640})
     await page.evaluate(({eye,target,id})=>{
       const {camera,manifest}=window.viewer
