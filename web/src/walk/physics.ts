@@ -30,6 +30,16 @@ function fineField(data:Awaited<ReturnType<typeof import('../world').detail>>){
     return Math.max(visible,(data.water[at]===-32768?data.terrain[at]:data.water[at])/10)
   })
 }
+function weldedDeck(raw:Float32Array){
+  const verts:number[]=[],indices=new Uint32Array(raw.length/3),seen=new Map<string,number>()
+  for(let i=0;i<raw.length;i+=3){
+    const key=`${Math.round(raw[i]*100)},${Math.round(raw[i+1]*100)},${Math.round(raw[i+2]*100)}`
+    let idx=seen.get(key)
+    if(idx===undefined){idx=verts.length/3;seen.set(key,idx);verts.push(raw[i],raw[i+1],raw[i+2])}
+    indices[i/3]=idx
+  }
+  return R.ColliderDesc.trimesh(Float32Array.from(verts),indices,R.TriMeshFlags.FIX_INTERNAL_EDGES)
+}
 function houses(rings:Outline[]){
   const verts:number[]=[], indices:number[]=[]
   for(const [bottom,top,loops] of rings){
@@ -74,9 +84,18 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         if(!(node instanceof THREE.Mesh))return
         let parent:THREE.Object3D|null=node;while(parent&&parent!==root&&!/^collision/i.test(parent.name))parent=parent.parent
         if(!parent||parent===root)return
-        const pos=node.geometry.getAttribute('position'),vertices=new Float32Array(pos.count*3),point=new THREE.Vector3()
+        const pos=node.geometry.getAttribute('position'),rawIdx=node.geometry.index?node.geometry.index.array:null
+        const vertices=new Float32Array(pos.count*3),point=new THREE.Vector3()
         for(let index=0;index<pos.count;index++)point.fromBufferAttribute(pos,index).applyMatrix4(node.matrixWorld).toArray(vertices,3*index)
-        colliders.push(add(R.ColliderDesc.trimesh(vertices,node.geometry.index?Uint32Array.from(node.geometry.index.array):Uint32Array.from({length:pos.count},(_,index)=>index)),'landmark'))
+        const triCount=rawIdx?rawIdx.length/3:pos.count/3,filtered:number[]=[],slabCap=root.position.y+.22
+        const keepLowSlab=/bridge|huaqiao|ronghu|mulong/.test(entry.id)
+        for(let t=0;t<triCount;t++){
+          const i0=rawIdx?rawIdx[t*3]:t*3,i1=rawIdx?rawIdx[t*3+1]:t*3+1,i2=rawIdx?rawIdx[t*3+2]:t*3+2
+          const y0=vertices[i0*3+1],y1=vertices[i1*3+1],y2=vertices[i2*3+1],hi=Math.max(y0,y1,y2)
+          if(!keepLowSlab&&hi<=slabCap)continue
+          filtered.push(i0,i1,i2)
+        }
+        if(filtered.length)colliders.push(add(R.ColliderDesc.trimesh(vertices,Uint32Array.from(filtered)),'landmark'))
       })
       landmarks.set(root,colliders);changed=true
     }
@@ -99,8 +118,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         for(const [ax,az,bx,bz,top,bottom] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=(top-bottom)/10+1.25
           colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
       if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
-      if(data?.deck.length){const count=data.deck.length/3
-        colliders.push(add(R.ColliderDesc.trimesh(data.deck,Uint32Array.from({length:count},(_,at)=>at),R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(tile.x,0,tile.z),'deck'))}
+      if(data?.deck.length){
+        colliders.push(add(weldedDeck(data.deck).setTranslation(tile.x,0,tile.z),'deck'))}
       regions.set(tile,{colliders,rings,fine:!!data});changed=true
     }
     for(const peak of peaks.colliders){
@@ -136,11 +155,23 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   }
   const tiles=new Map(manifest.chunks.map(tile=>[`${tile.x},${tile.z}`,tile]))
   const tileAt=(east:number,south:number)=>tiles.get(`${Math.floor(east/256)*256},${Math.floor(south/256)*256}`)
+  function isThinDeckAt(tile:Tile|undefined,east:number,south:number,hitY:number){
+    const loaded=tile&&stream.loaded.get(tile);if(!loaded||!loaded.thin.size)return false
+    const lx=east-tile.x,lz=south-tile.z,d=loaded.deck
+    for(const ti of loaded.thin){
+      const o=ti*9,ax=d[o],ay=d[o+1],az=d[o+2],bx=d[o+3],by=d[o+4],bz=d[o+5],cx=d[o+6],cy=d[o+7],cz=d[o+8]
+      const det=(bx-ax)*(cz-az)-(cx-ax)*(bz-az);if(Math.abs(det)<1e-6)continue
+      const w1=((lx-ax)*(cz-az)-(cx-ax)*(lz-az))/det,w2=((bx-ax)*(lz-az)-(lx-ax)*(bz-az))/det
+      if(w1>=-.02&&w2>=-.02&&w1+w2<=1.02&&Math.abs(ay+w1*(by-ay)+w2*(cy-ay)-hitY)<.08)return true
+    }
+    return false
+  }
   function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
     const hit=world.castRayAndGetNormal(new R.Ray({x:east,y:origin,z:south},down),reach,false,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)
-    const tile=kind==='deck'?tileAt(east,south):undefined
-    const thin=tile&&hit?.featureId!==undefined&&stream.loaded.get(tile)?.thin.has(hit.featureId)
-    return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}:null
+    if(!hit)return null
+    const y=origin-hit.timeOfImpact,tile=kind==='deck'?tileAt(east,south):undefined
+    const thin=kind==='deck'&&isThinDeckAt(tile,east,south,y)
+    return {y,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}
   }
   function wet(east:number,south:number){const tile=tileAt(east,south),data=tile&&stream.loaded.get(tile);if(!tile||!data)return true
     const at=Math.round((south-tile.z)/4)*65+Math.round((east-tile.x)/4)

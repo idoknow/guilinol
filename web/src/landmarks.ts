@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
-import {KTX2Loader} from 'three/addons/loaders/KTX2Loader.js'
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js'
 import {nightLit} from './look/night'
+import {sharedKtx2Loader} from './look/tiles'
 
 export interface Landmark {
   id:string; file:string; position:[number,number,number]; rotation:number; collision:'mesh'|'box'|'none'; lods:string[]
@@ -11,8 +11,7 @@ export interface Landmark {
 export type LoadedLandmarks = Map<Landmark,THREE.Group>
 
 export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,entries:Landmark[],loaded:LoadedLandmarks){
-  const basis=new KTX2Loader().setTranscoderPath('./basis/').setWorkerLimit(2).detectSupport(renderer)
-  const loader=new GLTFLoader().setKTX2Loader(basis).setMeshoptDecoder(MeshoptDecoder)
+  const loaderReady=sharedKtx2Loader(renderer).then(basis=>new GLTFLoader().setKTX2Loader(basis).setMeshoptDecoder(MeshoptDecoder))
   const pending=new Set<Landmark>(), retry=new Map<Landmark,number>()
   function dispose(root:THREE.Group){
     const assets=new Set<THREE.BufferGeometry|THREE.Material|THREE.Texture>()
@@ -32,7 +31,7 @@ export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,en
         else root.visible=distance<=650
       }else if(distance<=900&&!pending.has(entry)&&pending.size<2&&performance.now()>=(retry.get(entry)??0)){
         pending.add(entry)
-        loader.loadAsync('./'+entry.file).then(({scene:group})=>{
+        loaderReady.then(loader=>loader.loadAsync('./'+entry.file)).then(({scene:group})=>{
           group.position.fromArray(entry.position);group.rotation.y=THREE.MathUtils.degToRad(entry.rotation)
           group.traverse(node=>{
             if(/^collision/i.test(node.name))node.visible=false

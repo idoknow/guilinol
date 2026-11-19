@@ -125,6 +125,8 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
         place(name,kind,point)
     for name,line in longest.items():
         place(name,'road',line.interpolate(.5,normalized=True))
+    if not any(p['n'] == '十字街' for p in places):
+        place('十字街', 'scenic', Point(-881, -165))
     place('桂林中学解西校区', 'school', Point(-1244, -242))
     gates = {'way/647468198': Point(ll2xz(25.2599762,110.3055395)),
              'way/646911647': Point(ll2xz(25.25156339,110.31056078))}

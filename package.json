@@ -21,7 +21,8 @@
     "verify:walk:full": "node scripts/walk.mjs",
     "verify:ride": "node scripts/ride.mjs",
     "perf": "node scripts/perf.mjs",
-    "shoot": "node scripts/shoot.mjs"
+    "shoot": "node scripts/shoot.mjs",
+    "audit": "node scripts/audit.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.21.0",

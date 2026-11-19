@@ -158,6 +158,7 @@ export class ChunkBatcher {
   ])
   private streets = new StaticLayerBatch(streetSurfaceMat,[
     {name:'aSurface',size:1,ctor:'u8'},
+    {name:'aAlong',size:1,ctor:'f32'},
     {name:'position',size:3,ctor:'f32'},
     {name:'normal',size:3,ctor:'f32'},
     {name:'color',size:3,ctor:'f32'},
