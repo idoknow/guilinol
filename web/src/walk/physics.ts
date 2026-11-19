@@ -215,10 +215,10 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)}
   function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear()}
   function findLocalDismount(cx:number,cz:number,heading:number,bikeY:number){
-    return probeLocalDismount({world,capsule,shape,kinds:kinds as Parameters<typeof probeLocalDismount>[0]['kinds'],stream,tileAt,surface,wet,insideHouse},cx,cz,heading,bikeY)
+    return probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,bikeY)
   }
   function findLocalMount(px:number,py:number,pz:number,bx:number,by:number,bz:number){
-    return probeLocalMount({world,capsule,shape,kinds:kinds as Parameters<typeof probeLocalMount>[0]['kinds'],stream,tileAt,surface,wet,insideHouse},px,py,pz,bx,by,bz)
+    return probeLocalMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},px,py,pz,bx,by,bz)
   }
   function isBlockedAt(x:number,y:number,z:number){
     return !!world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule,undefined,coll=>{

@@ -4,7 +4,7 @@ import type {Stream} from '../stream'
 import type {Tile} from '../world'
 import {bikeConfig as bcfg, walkConfig as wcfg} from './config'
 
-type Kind = 'ground'|'overview'|'deck'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
+type Kind = 'ground'|'overview'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
 type SurfaceHit = {y:number; slope:number} | null
 
 export interface DismountContext {
@@ -94,7 +94,7 @@ export function notifyDismountBlocked(message = '这里太窄了，挪一挪再�
 }
 
 function isWallBlocker(kind: Kind | undefined) {
-  return kind === 'building' || kind === 'rail' || kind === 'peak' || kind === 'landmark' || kind === 'tree' || kind === 'deck'
+  return kind === 'building' || kind === 'rail' || kind === 'peak' || kind === 'landmark' || kind === 'tree' || kind === 'deck' || kind === 'deckThin'
 }
 
 function localSupport(ctx: DismountContext, x: number, z: number, refY: number) {
