@@ -271,7 +271,7 @@ def library(b):
         box(wall, (east,grade(east,z+6)+.19,z+6), (1.68,.42,2.4), 'granite')
         oval(wall, (east,grade(east,z+6)+.55,z+6), (1.02,.6,.95), 'foliage', 8)
     for east in (x-25,x-23,x-21):
-        oval(wall,(east,grade(east,z+7.2)+.52,z+7.2),(1.12,.84,.75),'limestone',7)
+        oval(wall,(east,grade(east,z+7.2)+.79,z+7.2),(1.12,.84,.75),'limestone',7)
     box(wall,(x+17,y+1.1,z+9),(8.4,2.2,.45),'white')
     for index in range(7):
         east=x+14+index*.95
@@ -520,6 +520,7 @@ def build(b: Builder):
     shore(b)
     # IMG_1343 shows a two-storey pale frontage across Yiwu Road. The east
     # face follows the west sidewalk of way/221349755 at the park junction.
+    starts=[(m,len(m.pos)) for m in (b.parts['atlas'],b.hit)]
     with align_front(b, (-84,-86), 69):
         mesh = b.parts['atlas']
         box(mesh,(-84,5.1,-87.5),(13.8,8.2,3),'cream')
@@ -530,14 +531,24 @@ def build(b: Builder):
         box(mesh,(-84,9.25,-87.4),(14.3,.34,3.4),'graytile')
         if b.collide:
             solid(b.hit,(-84,5.1,-87.5),(13.8,8.2,3),'ashlar')
+    for m,start in starts:
+        for i in range(start,len(m.pos)):
+            x,y,z=m.pos[i]
+            if abs(y-1)<.01:
+                m.pos[i]=(x,ground(x,z)-.04,z)
     # Approach to Yingbin Bridge (way/221349753), descending west from Yiwu Road.
     points = [(-83.3,-53.2,-.72),(-95.8,-57.9,-1.55),(-108.1,-62.4,-2.88)]
     for start, end in zip(points,points[1:]):
         a = (start[0],ground(start[0],start[1])+.09,start[1])
         c = (end[0],ground(end[0],end[1])+.09,end[1])
-        ramp(b.parts['atlas'],a,c,3.8)
-        if b.collide:
-            ramp(b.hit,a,c,3.8)
+        for mesh in ([b.parts['atlas'],b.hit] if b.collide else [b.parts['atlas']]):
+            first=len(mesh.pos)
+            ramp(mesh,a,c,3.8,.12)
+            for i in range(first,len(mesh.pos)):
+                x,y,z=mesh.pos[i]
+                t=((x-a[0])*(c[0]-a[0])+(z-a[2])*(c[2]-a[2]))/((c[0]-a[0])**2+(c[2]-a[2])**2)
+                mheight=a[1]+t*(c[1]-a[1])
+                mesh.pos[i]=(x,ground(x,z)+(.05 if y>=mheight-.01 else -.07),z)
 
 
 

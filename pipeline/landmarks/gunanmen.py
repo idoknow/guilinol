@@ -83,7 +83,7 @@ def ancient_banyan(builder, east, south):
     for index in range(count):
         ends = [(east+11.6*math.cos(math.tau*t/count),south+10.6*math.sin(math.tau*t/count)) for t in (index,index+1)]
         segment_wall(wood,*ends,-.04,.43,.8,'rubble')
-        segment_wall(wood,*ends,.12,.72,.64,'foliage')
+        segment_wall(wood,*ends,-.04,.72,.64,'foliage')
         railing(iron,*ends,.42,.74,'steel',1.25)
 
 
@@ -177,11 +177,12 @@ def west_hall(b):
     if b.collide:
         extrude(b.hit, west, 0, deck, 'ashlar')
     box(wall, (-16.3,deck+1.2,2.8), (12.5,2.4,8.2), 'yellow')
+    box(wall,(-16.3,deck+2.4,2.8),(13.8,.26,9.45),'wood')
     hip_roof(wall, (-16.3,2.8), deck+2.4, 12.6,8.3,1.85,.65,.38,'graytile','wood')
     if b.detail:
         for east in (-20.5,-17.7,-14.9,-12.1):
-            for south in (-1.4,7.0):
-                grille(wall,east,deck+1.2,south,1.4,1.6,'lattice',3)
+            for south in (-1.30,6.90):
+                grille(wall,east,deck+1.2,south,1.4,1.6,'lattice',3,depth=.13)
 
 
 def gate(b: Builder):

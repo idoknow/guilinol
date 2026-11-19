@@ -81,7 +81,7 @@ def crossing(builder,path,widths,heights,arch_segment=None):
 
 def nine_bends(builder):
     lengths = np.r_[0, np.cumsum(np.linalg.norm(np.diff(NINE_BENDS,axis=0),axis=1))]
-    near, far = bank_top(*NINE_BENDS[0]), island_top()
+    near, far = ground(*NINE_BENDS[0])+.07, island_top()
     # Landward end of way/684946201, meeting the first deck of way/221475379.
     stone = builder.parts['atlas']
     pave(builder,BANK,lambda x,z: ground(x,z)+.05)
@@ -171,8 +171,12 @@ def ancient_bridge(builder):
         for index in range(count):
             fraction=index/(count-1)
             knot=point(-23+strand*1.65,3.8-1.15*math.sin(math.pi*fraction),-7+14*fraction)
-            if previous is not None: tube(stone,previous,knot,.025,'wood',4)
+            if index in (0,count-1):
+                x,y,z=knot
+                bed=ground(x,z)-.05
+                cylinder(stone,(x,bed,z),.14,y-bed+.06,'wood',6)
+            if previous is not None: tube(stone,previous,knot,.055,'wood',6)
             center=knot-[0,.32,0]
-            tube(stone,knot,center,.026,'wood',4)
+            tube(stone,knot,center,.055,'wood',6)
             oval(builder.parts['lit'],center,(.24,.24,.24),colors[(index+strand*2)%len(colors)],8 if builder.detail else 5)
             previous=knot

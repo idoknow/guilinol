@@ -5,7 +5,7 @@ import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js'
 import {nightLit} from './look/night'
 
 export interface Landmark {
-  id:string; file:string; position:[number,number,number]; rotation:number; collision:'mesh'|'box'|'none'; lods:string[]
+  id:string; name?:string; file:string; position:[number,number,number]; rotation:number; collision:'mesh'|'box'|'none'; lods:string[]
   sphere:[number,number,number,number]; bytes:number
 }
 export type LoadedLandmarks = Map<Landmark,THREE.Group>

@@ -391,7 +391,7 @@ def main():
             if not photos_pass(row['photos']):row['status']='fail'
             continue
         if key=='zhuangyuan_gallery':row['measurement']='gallery roof projection'
-        if key in ('central_square','gunanmen','xiaoyao_tower'):
+        if key in ('central_square','gunanmen','xiaoyao_tower','guilin_theater'):
             parts=list(getattr(shape,'geoms',[shape]));shape=max(parts,key=lambda part:part.intersection(reference).area)
         if shape.is_empty:row['status']='empty-geometry';continue
         iou,center,delta=metrics(shape,reference)

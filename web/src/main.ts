@@ -114,15 +114,20 @@ async function start() {
       const clearance = ray.intersectObjects(scene.children)[0]?.distance
       ray.setFromCamera(new THREE.Vector2(0,0),camera)
       const hits = ray.intersectObjects(scene.children)
+      const roots=new Map([...stream.landmarks].map(([entry,root])=>[root as THREE.Object3D,entry]))
       let lookingAt:string|undefined
-      for(const hit of hits){
-        for(let obj:THREE.Object3D|null=hit.object;obj;obj=obj.parent) if(obj.name){lookingAt=obj.name;break}
-        if(lookingAt) break
+      let landmark:string|undefined
+      for(let obj:THREE.Object3D|null=hits[0]?.object??null;obj;obj=obj.parent){
+        if(obj.name && !lookingAt) lookingAt=obj.name
+        const entry=roots.get(obj)
+        if(!entry) continue
+        landmark=entry.id
+        // A modeled cave or pavilion and the PK02 mesh share the peak's map location.
+        const peak=manifest.peaks.entries.find(p=>Math.hypot(p.center[0]-entry.position[0],p.center[2]-entry.position[2])<.1)
+        lookingAt=peak?.name??entry.name??entry.id
+        break
       }
-    const roots=new Map([...stream.landmarks].map(([entry,root])=>[root as THREE.Object3D,entry.id]))
-    let landmark:string|undefined
-    for(let obj:THREE.Object3D|null=hits[0]?.object??null;obj;obj=obj.parent){landmark=roots.get(obj);if(landmark)break}
-    return {clearance,lookingAt,landmark,wallDistance:hits[0]?.distance}
+      return {clearance,lookingAt,landmark,wallDistance:hits[0]?.distance}
     }}})
   function draw(){
     const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity

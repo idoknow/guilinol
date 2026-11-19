@@ -34,6 +34,7 @@ from c_kit import landmark_surface
 
 
 def shops(builder):
+    extras=[(m,len(m.pos)) for m in [*builder.parts.values(),builder.hit]]
     # IMG_1302, east sidewalk of Rongyin Road (way/221349761). Only model
     # the visible street frontage where the snapshot has no building outline.
     with align_front(builder, (63,-116), -111.9):
@@ -56,6 +57,11 @@ def shops(builder):
                 box(builder.parts['lit'], (east, level, -40.2), (2.65, 1.82, .14), 'glass')
         if builder.collide:
             solid(builder.hit, (-4.5, 6.1, -43.6), (7.25, 9.6, 6.65), 'brick')
+    for mesh,start in extras:
+        for i in range(start,len(mesh.pos)):
+            px,py,pz=mesh.pos[i]
+            if abs(py-(3.0 if px>25 else 1.3))<.01 or (px>25 and abs(py-3.2)<.01):
+                mesh.pos[i]=(px,landmark_surface('gunanmen').ground(px,pz)-.04,pz)
     for east,south,width,length,floors,kind in [(10,-51,17,24,4,'rong'),(10,-86,26.3,8.5,3,'inn'),(32,-115,15,19,3,'hall')]:
         base = landmark_surface('gunanmen').ground(east,south)
         meshes = [*builder.parts.values(),builder.hit]
@@ -193,7 +199,7 @@ def approach(builder):
         base = ground(east+5,south)+.12
         start=len(mesh.pos)
         box(mesh,(east+5,base,south),(2.3,.24,2.3),'granite')
-        banyan(mesh,(east+5,base+.12,south),9+index%3,4.9,77+index,builder.detail,lobed=False)
+        banyan(mesh,(east+5,base+.12,south),9+index%3,4.9,77+index,builder.detail,lobed=False,grade=ground)
         for i in range(start,len(mesh.pos)):
             px,py,pz=mesh.pos[i]
             outside=max(abs(px-east-5),abs(pz-south))>1.15

@@ -209,11 +209,11 @@ def _build_campus_interior(b: SceneBuilder):
         (-67.33, 69.71), (36.51, 87.43), (56.59, -17.83),
         (67.03, -72.52), (-37.25, -85.04), (-51.37, -12.52),
     ]
-    b.prism(campus_ring, -0.60, 0.62, 'granite', cap_region='pave_light', tile=4.5, collide=False)
+    b.prism(campus_ring, -0.60, 0.62, 'granite', cap_region='pave_light', tile=4.5, collide=False, paving=True)
 
     for bldg_pts, floors, wall_col in ((BLDG_NORTH, 5, 'campus_white'), (BLDG_MID, 4, 'campus_white')):
         h_tot = floors * 3.45
-        b.prism(bldg_pts, -0.50, 0.90, 'dark_stone', cap_region='dark_stone', tile=2.5, collide=False)
+        b.prism(bldg_pts, -0.50, 0.90, 'dark_stone', cap_region='dark_stone', tile=2.5, collide=False,footing=True)
         b.prism(bldg_pts, 0.40, h_tot - 0.40, wall_col, cap_region='granite', tile=3.0, collide=True)
         b.prism(bldg_pts, h_tot, 0.45, 'campus_brick', cap_region='granite', tile=2.5, collide=False)
         pts = np.asarray(bldg_pts, dtype=np.float64)
@@ -355,8 +355,8 @@ def _build_street_gate(b: SceneBuilder):
     b.box(0.0, 0.22, -0.65, 14.10, 2.15, 0.14, 'iron_grille', tile=2.2, collide=True)
     b.box(-6.20, 0.18, -5.20, 3.60, 3.80, 6.20, 'gate_stone', tile=2.4, collide=True)
     b.sign_quad(-4.36, 2.15, -4.60, 4.20, 1.65, 'inner_shop', normal=(1, 0, 0), lit=True)
-    b.tree_cluster(-4.5, 0.18, -10.5, h=11.0, spread=4.5, foliage='foliage', bark='bark')
-    b.tree_cluster(4.2, 0.18, -11.5, h=10.5, spread=4.2, foliage='foliage', bark='bark')
+    b.tree_cluster(-4.5, b.grade(-4.5,-10.5), -10.5, h=11.0, spread=4.5, foliage='foliage', bark='bark')
+    b.tree_cluster(4.2, b.grade(4.2,-11.5), -11.5, h=10.5, spread=4.2, foliage='foliage', bark='bark')
 
     # --- 6. FRONT HEDGE PLANTER & GUARDIAN STONE LION (photos 52, 53, 55!) ---
     px, pz = 3.45, 3.15
