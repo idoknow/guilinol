@@ -1,0 +1,4 @@
+dialog.fb-panel{width:min(36rem,calc(100% - 24px));max-height:85dvh}
+.fb-panel fieldset{min-width:0;margin:0}.fb-panel textarea{min-height:4em}.fb-panel progress,.fb-panel select{max-width:100%}
+.fb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:.5rem}.fb-grid img{width:100%;height:72px;object-fit:contain}.fb-photo{display:grid;min-width:0}
+.fb-panel .fb-map{position:static;width:100%;height:140px;touch-action:manipulation}.fb-panel output,.fb-panel .about-body>button{display:block}.fb-panel>[role=status]{padding:0 1rem}
