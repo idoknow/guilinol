@@ -43,7 +43,20 @@ def gallery(m):
                 for offset in (-.75,-.25,.25,.75):
                     m.box(x+offset,.7,z,.055,.50,.065,'wood')
                 m.box(x,.73+.48,z,3.9,.08,.10,'wood')
+    for end in (-21.0,21.0):
+        m.mesh([[end,3.28,-1.84],[end,3.28,1.84],[end,4.43,0]],[[0,1,2]],'white')
+        m.box(end,3.12,0,.21,.16,3.8,'wood')
+    # The photograph back toward the gallery looks across a low planted bed.
+    m.box(25,-.16,-.9,9,.29,7.1,'pave',True)
+    m.pose=(1.8,0,-2.8,0)
     x = 25
+    for sign in (-1,1):
+        z=sign*4.05
+        m.box(x,.01,z,6.2,.44,1.2,'granite',True)
+        m.box(x,.45,z,6.1,.53,1.16,'leaf',True)
+        if m.detail:
+            for k in range(9):
+                m.box(x-2.72+k*.68,.92,z,.7,.07+.07*(k%3),1.0,'leaf')
     m.box(x,-.2,0,7.7,.33,6.8,'pave',True)
     for dx in (-2.8,2.8):
         for z in (-2.45,2.45):
