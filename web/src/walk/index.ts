@@ -174,7 +174,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     let underside=Infinity
     for(const along of [-2.3,-1,0,1,2.3])for(const across of [-1,0,1]){const point=boat.localToWorld(new THREE.Vector3(across,0,along)),deck=sim.surface(point.x,point.z,'deck');if(deck)underside=Math.min(underside,deck.y-(deck.thin?.6:look.bridgeDepth))}
     return {kind:boat.name,head,roof,underside,clearance:underside-Math.max(head,roof)}}
-  function sit(){mixer.stopAllAction();action=undefined;bankLean=strideLean=0;figure.rotation.x=figure.rotation.z=0;if(traveller)traveller.rotation.set(0,0,0);ridePose.clearJoints()
+  function sit(){mixer.stopAllAction();action=undefined;bankLean=strideLean=0;wasBike=false;if(traveller)traveller.rotation.set(0,0,0);ridePose.reset()
     for(const side of ['L','R'])for(const [part,value] of Object.entries({Thigh:1.25,Shin:-1.4,Arm:.9,Forearm:.35})){
       const joint=figure.getObjectByName(part+side);if(joint)joint.rotation.x=value}}
   function probe(){const pos=sim.body.translation(),foot=pos.y-cfg.height/2,peak=sim.surface(pos.x,pos.z,'peak')
@@ -190,7 +190,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(rides?.freeBoat){
       const read=held?still:input.read(), firstFrame=!wasBoat
       if(firstFrame){yaw=rides.heading;mixer.stopAllAction();action=undefined;bankLean=strideLean=0
-        figure.rotation.x=figure.rotation.z=0;if(traveller)traveller.rotation.set(0,0,0);ridePose.clearJoints();input.clearRun()}
+        wasBike=false;if(traveller)traveller.rotation.set(0,0,0);ridePose.reset();input.clearRun()}
       const prevHeading=rides.heading
       if(!held)rides.steerBoat(read.forward,read.right,Math.min(.12,dt))
       yaw+=rides.heading-prevHeading
