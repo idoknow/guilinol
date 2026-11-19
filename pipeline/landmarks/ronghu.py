@@ -272,6 +272,18 @@ def glass_bridge(builder):
 
 def shore(b):
     wall = b.parts['atlas']
+    for index in range(10):
+        east=-82+index*5
+        level=-.7+index*.09
+        box(wall,(east,level,-16),(5.1,.27,5.8),'granite')
+        box(wall,(east,level+.15,-16),(5.05,.05,.85),'glaze')
+        box(wall,(east,level+.23,-16),(.4,.2,.64),'ashlar')
+        if index%3==0:
+            banyan(wall,(east,level,-20),11,8,90+index,b.detail)
+    for index in range(6):
+        angle=index*math.tau/6
+        cylinder(wall,(-46+2.25*math.cos(angle),0,-10+2.25*math.sin(angle)),.19,3,'vermilion',8)
+    hip_roof(wall,(-46,-10),3,5.3,5.3,2,.7,.5,'graytile','vermilion',tiers=2,sides=6)
     post = 0.95 if b.detail else 8
     # North bank between the pavilion and 古南门, with a gap in front of the steps.
     railing(wall, (-36, 7.2), (-2.2, 7.2), 0, 0.95, 'granite', post, stone=True)
