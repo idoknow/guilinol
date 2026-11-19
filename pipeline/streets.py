@@ -371,6 +371,8 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     def encode(tile,origin):
         shapes = [unary_union([layer.geometries[idx].intersection(tile) for idx in sorted(layer.query(tile))]) for layer in layers]
         shapes[1]=shapes[1].difference(shapes[0]).union(shapes[3]).difference(shapes[4])
+        if bldg_tree is not None:
+            shapes[1] = shapes[1].difference(clipped(bldg_tree,tile))
         shapes[2]=shapes[2].difference(shapes[3])
         if modeled_paving is not None and tile.intersects(modeled_paving):
             shapes[:3]=[shape.difference(modeled_paving) for shape in shapes[:3]]
