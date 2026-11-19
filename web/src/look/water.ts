@@ -123,7 +123,7 @@ const srgbLut = Float32Array.from({length:256},(_,i)=>{
 // hold water; the underlay grid equals the water level there. Cells under a loaded chunk are hidden.
 export async function farWater(manifest:{extent:[number,number,number,number],chunkSize:number,overview:{step:number}}, bitmap:ImageBitmap, underlay:Int16Array) {
   const [left,top,width,depth] = manifest.extent, step = manifest.overview.step, cols = width/step, rows = depth/step
-  const canvas = new OffscreenCanvas(bitmap.width,bitmap.height), ctx = canvas.getContext('2d')!
+  const canvas = new OffscreenCanvas(bitmap.width,bitmap.height), ctx = canvas.getContext('2d',{willReadFrequently:true})!
   ctx.drawImage(bitmap,0,0); bitmap.close()
   const pixels = ctx.getImageData(0,0,canvas.width,canvas.height).data, px = canvas.width/width
   const target = new THREE.Color(look.waterBaked), tr = target.r, tg = target.g, tb = target.b
@@ -137,17 +137,25 @@ export async function farWater(manifest:{extent:[number,number,number,number],ch
   for(let tz=0;tz<rows;tz+=per) for(let tx=0;tx<cols;tx+=per) {
     const start = positions.length/3
     let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity, minZ=Infinity, maxZ=-Infinity
-    for(let row=tz;row<Math.min(rows,tz+per);row++) for(let col=tx;col<Math.min(cols,tx+per);col++) {
-      const r0 = row*(cols+1)+col, r1 = (row+1)*(cols+1)+col
-      const level = Math.min(underlay[r0],underlay[r0+1],underlay[r1],underlay[r1+1])/10
-      // 8 m sub-cells (2×2 texels each) so the far river follows its banks instead of 32 m stairs.
-      for(let sz=0;sz<step;sz+=8) for(let sx=0;sx<step;sx+=8) {
-        const x0=col*step+sx,z0=row*step+sz,x1=x0+8,z1=z0+8
-        if(!wet(x0+2,z0+2)&&!wet(x0+6,z0+6)) continue
+    const endX=Math.min(cols,tx+per)*step
+    for(let z0=tz*step;z0<Math.min(rows,tz+per)*step;z0+=8){
+      const row=Math.floor(z0/step),z1=z0+8
+      let startX=tx*step,level=NaN
+      for(let x1=tx*step;x1<=endX;x1+=8){
+        let next=NaN
+        if(x1<endX&&(wet(x1+2,z0+2)||wet(x1+6,z0+6))){
+          const cell=row*(cols+1)+Math.floor(x1/step),below=cell+cols+1
+          next=Math.min(underlay[cell],underlay[cell+1],underlay[below],underlay[below+1])/10
+        }
+        if(Object.is(level,next))continue
+        const x0=startX;startX=x1
+        if(Number.isFinite(level)){
         if(left+x0<minX) minX=left+x0; if(left+x1>maxX) maxX=left+x1
         if(level<minY) minY=level; if(level>maxY) maxY=level
         if(top+z0<minZ) minZ=top+z0; if(top+z1>maxZ) maxZ=top+z1
         positions.push(x0,level,z0, x0,level,z1, x1,level,z0, x1,level,z0, x0,level,z1, x1,level,z1)
+        }
+        level=next
       }
     }
     const count = positions.length/3-start
