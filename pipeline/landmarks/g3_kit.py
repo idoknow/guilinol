@@ -510,8 +510,8 @@ class Builder:
                     (p_start[0], wy1, p_start[1]),
                 ], (nx, 0.0, nz), 'glass', tile=2.2, lit=True)
                 if self.detail and sill_bands:
-                    sx0, sz0 = a[0] + ux * (inset * 0.6) + nx * 0.14, a[1] + uz * (inset * 0.6) + nz * 0.14
-                    sx1, sz1 = b[0] - ux * (inset * 0.6) + nx * 0.14, b[1] - uz * (inset * 0.6) + nz * 0.14
+                    sx0, sz0 = a[0] + ux * (inset * 0.6) + nx * 0.08, a[1] + uz * (inset * 0.6) + nz * 0.08
+                    sx1, sz1 = b[0] - ux * (inset * 0.6) + nx * 0.08, b[1] - uz * (inset * 0.6) + nz * 0.08
                     self.face([
                         (sx0, wy0 - 0.14, sz0), (sx1, wy0 - 0.14, sz1),
                         (sx1, wy0, sz1), (sx0, wy0, sz0),

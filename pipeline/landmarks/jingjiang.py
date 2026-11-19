@@ -90,6 +90,18 @@ class Model:
         cell=list(SWATCHES).index(color)
         self.uv.append((coords*.94+.03+[cell%4,3-cell//4])/4)
 
+    def foundation(self, surface, x, y, z, w, h, d, color):
+        """Adjust the four lower corners in posed landmark coordinates."""
+        cube = trimesh.creation.box([w,h,d])
+        vertices = cube.vertices + [x,y+h/2,z]
+        dx,dy,dz,angle = self.pose
+        c, s = np.cos(angle), np.sin(angle)
+        for point in vertices:
+            if point[1] < y+h/2:
+                px,_,pz = point
+                point[1] = surface.ground(dx+c*px-s*pz,dz+s*px+c*pz)-dy-.04
+        self.mesh(vertices,cube.faces,color,True)
+
     def box(self,x,y,z,w,h,d,color,collide=False):
         cube=trimesh.creation.box([w,h,d]); self.mesh(cube.vertices+[x,y+h/2,z],cube.faces,color,collide)
 

@@ -23,18 +23,6 @@ class LandmarkModel(Model):
         self.lit_tiles=[]
         self.flood_roof=flood_roof
 
-    def foundation(self, surface, x, y, z, w, h, d, color):
-        """Adjust the four lower corners in posed landmark coordinates."""
-        cube = trimesh.creation.box([w,h,d])
-        vertices = cube.vertices + [x,y+h/2,z]
-        dx,dy,dz,angle = self.pose
-        c, s = np.cos(angle), np.sin(angle)
-        for point in vertices:
-            if point[1] < y+h/2:
-                px,_,pz = point
-                point[1] = surface.ground(dx+c*px-s*pz,dz+s*px+c*pz)-dy-.04
-        self.mesh(vertices,cube.faces,color,True)
-
     def mesh(self, vertices, faces, color, collide=False):
         if isinstance(color,str) and color=='lamp':
             super().mesh(vertices,faces,'wood' if self.flood_roof else 'gold',collide)

@@ -37,7 +37,7 @@ def monument(model, station, lateral):
 def promenade(model,side):
     for station in range(-54,53,2):
         for row in range(4):
-            model.box(station,-.5,side*(13+row*2),2,.66,2,'pave' if (station//2+row)%2 else 'granite',True)
+            model.box(station,-.06,side*(13+row*2+(0.2 if row==3 else 0)),2,.22,2.4 if row==3 else 2,'pave' if (station//2+row)%2 else 'granite',True)
         model.box(station,.16,side*20,2,1.0,.30,'white',True)
         model.box(station,1.16,side*20,2,.18,.42,'stone')
         if station%4==0:
@@ -45,8 +45,8 @@ def promenade(model,side):
         elif model.detail:
             for shift in (-1,0,1):
                 for reach in (-.48,-.26,0,.26,.48):
-                    base=station+shift; z=side*19.82; tip=.99-.37*abs(reach)
-                    model.mesh([(base,.42,z),(base+reach*.55-.075,.68,z),(base+reach,tip,z),(base+reach*.55+.075,.68,z),(base+reach*.55,.70,z-side*.1)],[[0,1,4],[1,2,4],[2,3,4],[3,0,4]],'granite')
+                    base=station+shift; z=side*19.85; tip=.99-.37*abs(reach)
+                    model.mesh([(base,.42,z),(base+reach*.55-.075,.68,z),(base+reach,tip,z),(base+reach*.55+.075,.68,z),(base+reach*.55,.70,z+side*.1)],[[0,1,4],[1,2,4],[2,3,4],[3,0,4]],'granite')
     for station in (-35,0,35):
         points=[[station,0,side*17.4],[station,4.2,side*17.4],[station,5.0,side*17.1],[station,5.45,side*16.3],[station,5.50,side*15.6]]
         for start,end in zip(points,points[1:]):model.beam(start,end,.09,'tile')
@@ -58,7 +58,7 @@ def bridge(model):
         promenade(model,side)
         monument(model,side*50,side*17.3)
     shrub=trimesh.creation.icosphere(subdivisions=1)
-    model.mesh(shrub.vertices*[4,.95,1.8]+[59,.4,0],shrub.faces,'leaf')
+    model.mesh(shrub.vertices*[4,.95,1.8]+[59,.95,0],shrub.faces,'leaf')
     model.box(58,0,2.8,.14,4.1,.14,'granite')
     model.box(58,2.85,2.8,.11,1.0,2.4,'clock')
     model.box(60,0,4.7,.16,4.5,.16,'tile')
@@ -67,7 +67,10 @@ def bridge(model):
 
 if __name__=='__main__':
     surface=landmark_surface('guanyi_bridge')
-    ends=[np.mean([surface.ground(x,z) for z in (-16,16)])-.16 for x in (-55,53)]
-    # Preserve the navigable midspan camber and meet the actual bank at each end.
-    profile=[ends[0],6.0,7.35,8.50,ends[1]]
-    generate('guanyi_bridge',bridge,lift=lambda x:np.interp(x,[-55,-30,0,30,53],profile))
+    def approach_height(x,z):
+        if x > 54:
+            return surface.ground(x,z)
+        near = surface.ground(-55,z)-.16
+        far = surface.ground(53,z)-.16
+        return np.interp(x,[-55,-30,0,30,53],[near,6,7.35,8.5,far])
+    generate('guanyi_bridge',bridge,terrain_offset=approach_height)

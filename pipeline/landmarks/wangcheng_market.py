@@ -3,6 +3,7 @@ import math
 import numpy as np
 import trimesh
 from jingjiang import Model,generate
+from c_kit import landmark_surface
 from shop_lettering import letters
 
 
@@ -16,6 +17,8 @@ def row(model, first, last, count, side, depth=6, arcade=False, gap=3.45,tall=Fa
         key=(arcade,height)
         matrix=trimesh.transformations.rotation_matrix(-angle+(math.pi if side<0 else 0),[0,1,0])
         matrix[:3,3]=[first[0]+dx*center-math.sin(angle)*side*gap,0,first[1]+dz*center+math.cos(angle)*side*gap]
+        x, _, z = matrix[:3,3]
+        matrix[1,3] = landmark_surface('wangcheng_market').ground(x,z)
         matrix[:3,0]*=pitch/7;matrix[:3,2]*=depth/5
         model.placements.append((key,matrix))
         if key not in model.templates:
@@ -32,6 +35,7 @@ def shop(model,height,arcade):
             model.swept_roof(0,height,back,pitch+.4,depth+1.5,1.65)
             for step in range(3):
                 model.box(-pitch/2,height+step*.42,back,.36,.47,depth-step*1.4,'brick')
+        model.box(0,2.42,-.09,pitch-.18,.63,.24,'wood')
         model.box(0,3.05,side*(gap-.35),pitch,.35,1.9,'wood')
         for pier in (-.38,.38):
             model.box(pier*pitch,0,side*(gap-.9),.3,3.1,.31,'wood',True)

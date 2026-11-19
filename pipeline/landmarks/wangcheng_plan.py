@@ -1,8 +1,5 @@
 """Place Wangcheng architecture in the palace GLB's rotated local frame."""
-import gzip
 import json
-import struct
-from functools import lru_cache
 import math
 import sys
 from pathlib import Path
@@ -13,6 +10,7 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 from shop_lettering import letters
+from c_kit import landmark_surface
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "pipeline"))
@@ -26,12 +24,7 @@ class PalacePlan:
         angle = math.radians(entry["rotation"])
         c, s = math.cos(angle), math.sin(angle)
         inverse = np.array([[c, -s], [s, c]])
-        self.origin = origin
-        self.forward = inverse.T
-        world = ROOT / "public/world"
-        self.world = world
-        self.manifest = json.loads((world / "manifest.json").read_text())
-        self.base = self.height(0, 0)
+        self.surface = landmark_surface('jingjiang')
         features = json.loads((ROOT / "docs/layout/wangcheng.geojson").read_text())["features"]
         self.shapes = {}
         for feature in features:
@@ -48,21 +41,8 @@ class PalacePlan:
             key = int(feature["properties"]["osm"].split("/")[-1])
             self.shapes[key] = construct[geom["type"]](points)
 
-    @lru_cache(maxsize=16)
-    def chunk(self, col, row):
-        return gzip.decompress((self.world / f'{col}_{row}.glc').read_bytes())
-
-    def height(self, x, z):
-        east, south = self.origin + self.forward @ [x, z]
-        west, north = self.manifest['extent'][:2]
-        size, grid = self.manifest['chunkSize'], self.manifest['grid']
-        col, dx = divmod(east-west, size)
-        row, dz = divmod(south-north, size)
-        index = round(dz/grid)*(size//grid+1) + round(dx/grid)
-        return struct.unpack_from('<h', self.chunk(int(col), int(row)), 24+2*index)[0]/10
-
-    def ground(self, x, z):
-        return self.height(x, z) - self.base
+    def ground(self,x,z):
+        return self.surface.ground(x,z)
 
     def frame(self, key):
         rect = self.shapes[key].minimum_rotated_rectangle
@@ -89,7 +69,7 @@ def enclosure(m, plan):
                 t = (i+.5)/count
                 x,z = a[0]+t*dx, a[1]+t*dz
                 m.pose = (x,plan.ground(x,z),z,math.atan2(dz,dx))
-                m.box(0,-2,0,width/count+.12,8.5,5,'stone',True)
+                m.foundation(plan.surface,0,-2,0,width/count+.12,8.5,5,'stone')
                 if m.detail:
                     m.box(0,6.5,0,min(2.7,width/count),1.1,1,'stone')
     for key, plaque in zip(gates[1:], ['状元及第','榜眼及第','后贡门']):
