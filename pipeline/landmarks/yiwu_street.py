@@ -60,20 +60,26 @@ def street(model):
         model.box(station,-.35,-7.3,5,.51,4.4,'tile',True)
         model.box(station,.16,-8.1,5,.018,.32,'yellow')
         model.box(station,.16,-6.0,5,.012,.10,'white')
-        model.box(station,-.25,-9.45,5,.93,.5,'brick',True)
-        model.box(station,.68,-9.45,.48,1.55,.48,'granite',True)
-        model.box(station,2.20,-9.45,.69,.14,.69,'tile')
-        model.roof(station,2.34,-9.45,.75,.75,.24)
+        for left,right in ((station-2.5,min(station+2.5,52.5)),(max(station-2.5,79),station+2.5)):
+            if right>left:model.box((left+right)/2,-.25,-9.45,right-left,.93,.5,'brick',True)
+        if not 52.5<station<79:
+            model.box(station,.68,-9.45,.48,1.55,.48,'granite',True)
+            model.box(station,2.20,-9.45,.69,.14,.69,'tile')
+            model.roof(station,2.34,-9.45,.75,.75,.24)
         for height in (.82,1.88):
-            model.box(station+2.5,height,-9.45,5,.08,.08,'tile')
+            for left,right in ((station,min(station+5,52.5)),(max(station,79),station+5)):
+                if right>left:model.box((left+right)/2,height,-9.45,right-left,.08,.08,'tile')
         if model.detail:
             for offset in np.arange(.4,4.8,.38):
+                if 52.5<station+offset<79:continue
                 model.box(station+offset,.71,-9.45,.055,1.32,.055,'tile')
+    model.box(65.75,-.2,-10.96,26.5,.36,2.92,'pave',True)
     for station in range(-60,85,12):
         for side in (-1,1):
             canopy(model,station+(10 if station==84 and side>0 else 3 if side>0 else 0),side)
     for station in (-51,-29,4,32,65):
         palm(model,station)
+        if station==65:continue
         for index,paint in enumerate(['white','earth','glass','tile'] if model.detail else ['white']):
             scooter(model,station+index*.96,paint)
     directions(model)
