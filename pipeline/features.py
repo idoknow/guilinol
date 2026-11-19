@@ -41,10 +41,14 @@ def area(element):
 
 
 def ground_features(bounds):
+    landmarks = json.loads(Path(__file__).with_name('landmarks.json').read_text())
+    replaced_pitches = {key for landmark in landmarks for key in landmark.get('replacePitches', [])}
     layers = dict(green=[], water=[], road=[])
     widths = {'primary': 14, 'secondary': 12, 'tertiary': 10, 'trunk': 18, 'residential': 6}
     for element in load_osm():
         tags = element.get('tags', {})
+        if tags.get('leisure') == 'pitch' and f"{element['type']}/{element['id']}" in replaced_pitches:
+            continue
         if tags.get('natural') == 'water' or tags.get('waterway') == 'riverbank' or 'water' in tags:
             key = 'water'
         elif (tags.get('natural') in ('wood', 'grassland', 'scrub') or tags.get('leisure') in ('park','garden','pitch')
