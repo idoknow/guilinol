@@ -23,6 +23,11 @@ class LayoutTests(unittest.TestCase):
         road=profile(self.line,{'highway':'primary','width':'14 m','lanes':'4','sidewalk':'left'},self.facades)
         self.assertEqual((road.width,road.lanes,road.right,road.divided),(14,4,0,True))
 
+    def test_yiwu_has_no_inferred_median(self):
+        tags={'highway':'secondary','lanes':'4'}
+        self.assertFalse(profile(self.line,tags,self.facades,221349755).divided)
+        self.assertTrue(profile(self.line,tags,self.facades,1).divided)
+
     def test_signals(self):
         tags={'highway':'primary','width':'14','lanes':'4'}
         roads=[profile(line,tags,self.facades) for line in (self.line,LineString([(0,-40),(0,0),(0,40)]))]

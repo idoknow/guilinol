@@ -18,7 +18,7 @@ SWATCHES = dict(stone='#c1c1bc', brick='#727c86', tile='#525b65', wood='#613c32'
                 leaf='#4d6a46', earth='#ba7662', clock='#3585bf', sign='#50332d')
 
 
-def atlas(colors=None):
+def atlas(colors=None,smooth=()):
     rng = np.random.default_rng(18)
     sheet = Image.new('RGB', (512, 512))
     for index, (key, color) in enumerate((SWATCHES | (colors or {})).items()):
@@ -35,7 +35,7 @@ def atlas(colors=None):
                     shade = rng.integers(-9,10)
                     rgb = tuple(int(v+shade) for v in Image.new('RGB',(1,1),color).getpixel((0,0)))
                     draw.rectangle((left+1,row*height+1,left+width-1,(row+1)*height-1),fill=rgb)
-        if key in ('wood','tile','red'):
+        if key in ('wood','tile','red') and key not in smooth:
             for col in range(0,128,8 if key=='tile' else 16):
                 draw.line((col,0,col,127),fill=tuple(int(v*.85) for v in panel.getpixel((1,1))))
         if key=='clock':

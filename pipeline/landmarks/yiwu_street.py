@@ -40,22 +40,19 @@ def scooter(model, station, paint):
 
 def directions(model):
     station = 89
-    model.box(station,0,5.5,.17,5,.17,'granite',True)
-    model.box(station,3.45,5.5,.15,1.5,3.12,'glass')
-    if not model.detail:
-        return
-    font = ImageFont.truetype('NotoSansCJK-Regular.ttc', 15)
-    image = Image.new('1',(116,52))
-    draw = ImageDraw.Draw(image)
-    draw.text((23,-4),'↑ 解放西路',font=font,fill=1)
-    draw.text((0,18),'←丽君路 三多路→',font=font,fill=1)
-    for row, pixels in enumerate(np.asarray(image)):
-        edges = np.flatnonzero(np.diff(np.r_[False,pixels,False]))
-        for left,right in edges.reshape(-1,2):
-            z0, z1 = 4.04 + left*.025, 4.04 + right*.025
-            top = 4.84-row*.025
-            model.mesh([(station-.08,top,z0),(station-.08,top,z1),
-                        (station-.08,top-.025,z1),(station-.08,top-.025,z0)],[[0,1,2],[0,2,3]],'white')
+    model.box(station,0,5.5,.14,3.65,.14,'granite',True)
+    font=ImageFont.truetype('NotoSansCJK-Regular.ttc',22)
+    for index,text in enumerate(('↑ 解放西路','← 丽君路','三多路 →')):
+        bottom=3.12-index*.57
+        model.box(station-.09,bottom,5.5,.12,.51,2.54,'glass')
+        if not model.detail:continue
+        image=Image.new('1',(126,26));draw=ImageDraw.Draw(image)
+        draw.text((63,12),text,font=font,anchor='mm',fill=1)
+        for row,pixels in enumerate(np.asarray(image)):
+            for left,right in np.flatnonzero(np.diff(np.r_[False,pixels,False])).reshape(-1,2):
+                z0,z1=5.5+(left-63)*.019,5.5+(right-63)*.019
+                top=bottom+.50-row*.019
+                model.mesh([(station-.17,top,z0),(station-.17,top,z1),(station-.17,top-.019,z1),(station-.17,top-.019,z0)],[[0,1,2],[0,2,3]],'white')
 
 
 def street(model):
@@ -74,7 +71,7 @@ def street(model):
                 model.box(station+offset,.71,-9.45,.055,1.32,.055,'tile')
     for station in range(-60,85,12):
         for side in (-1,1):
-            canopy(model,station+(3 if side>0 else 0),side)
+            canopy(model,station+(10 if station==84 and side>0 else 3 if side>0 else 0),side)
     for station in (-51,-29,4,32,65):
         palm(model,station)
         for index,paint in enumerate(['white','earth','glass','tile'] if model.detail else ['white']):
@@ -85,4 +82,4 @@ def street(model):
 if __name__ == '__main__':
     stations = np.arange(-70,101,10)
     heights = [158,157.9,158,157.9,157.7,157.3,157.3,157,156.9,156.9,157.2,157.4,157.6,157.4,157.1,156.8,156.7,156.7]
-    generate('yiwu_street',street,colors=dict(granite='#757979',glass='#2169a2'),lift=lambda east: np.interp(east,stations,heights)-157)
+    generate('yiwu_street',street,colors=dict(granite='#626971',glass='#185693'),lift=lambda east: np.interp(east,stations,heights)-157)

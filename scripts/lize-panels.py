@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 references=Path(sys.argv[1]); output=Path(sys.argv[2]); pages=[]
 font=ImageFont.truetype('NotoSansCJK-Regular.ttc',24)
 views=['1345','1346','1347','1350','1354','1355','1356','1357','1358','side','night',*map(str,range(1361,1373))]
-for name in views:
+for name in (sys.argv[3:] or views):
     game=Image.open(Path('captures/lize')/(name+'.jpg')).convert('RGB')
     page=Image.new('RGB',(1080,780),'white'); draw=ImageDraw.Draw(page)
     if name.isdecimal():

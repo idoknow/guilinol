@@ -50,9 +50,9 @@ def promenade(model, side):
     for station in range(-60,61,3 if model.detail else 6):
         model.box(station,.2,side*7.8,.14,.56,.15,'yellow')
     for station in range(-60,61,3):
-        model.box(station,.15,side*11.35,2.75,1.03,.26,'red',True)
-        model.box(station,1.18,side*11.35,2.86,.13,.39,'red')
-        model.box(station+1.42,.15,side*11.35,.25,1.25,.42,'red',True)
+        model.box(station,.15,side*11.35,2.75,1.03,.26,'green',True)
+        model.box(station,1.18,side*11.35,2.86,.13,.39,'green')
+        model.box(station+1.42,.15,side*11.35,.25,1.25,.42,'green',True)
     for station in range(-58,60,6):
         for angle in np.linspace(0,math.pi,13)[:-1]:
             points=[(station,.161,side*7.94)]+[(station+2.92*math.cos(theta),.161,side*(7.94+3.16*math.sin(theta))) for theta in (angle,angle+math.pi/12)]
@@ -72,4 +72,4 @@ def bridge(model):
 
 
 if __name__ == '__main__':
-    generate('lize_bridge', bridge, colors=dict(red='#d4733a',yellow='#d79547',earth='#a76358',granite='#828484'), lift=lambda east: 8.55 + np.minimum(.05*east, 2-.045*(east-40)))
+    generate('lize_bridge', bridge, smooth=('red',),colors=dict(red='#d4733a',green='#bc5140',yellow='#d79547',earth='#a76358',granite='#828484'), lift=lambda east: 8.55 + np.minimum(.05*east, 2-.045*(east-40)))
