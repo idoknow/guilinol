@@ -136,7 +136,7 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
     name:p.name,
     center:p.center,
     vertices:data.pos0.subarray(p.vStart0*3,(p.vStart0+p.vCount0)*3),
-    indices:data.localIdx0,
+    indices:p.idx0.length===data.localIdx0.length ? data.localIdx0 : p.idx0.map(index=>index-p.vStart0),
   }))
 
   const group = Object.assign(new THREE.Group(),{
@@ -223,13 +223,13 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
 
   const raySphere = new THREE.Sphere(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3(), hitVec = new THREE.Vector3()
   group.raycast = (raycaster:THREE.Raycaster, intersects:THREE.Intersection[])=>{
-    const ray = raycaster.ray, idx = data.localIdx0
+    const ray = raycaster.ray
     for(let i=0;i<data.peaks.length;i++) {
       const p = data.peaks[i]
       raySphere.center.set(p.center[0],p.center[1],p.center[2])
       raySphere.radius = p.radius
       if(!ray.intersectsSphere(raySphere)) continue
-      const verts = colliders[i].vertices
+      const {vertices:verts,indices:idx} = colliders[i]
       for(let t=0;t<idx.length;t+=3) {
         const a = idx[t]*3, b = idx[t+1]*3, c = idx[t+2]*3
         vA.set(verts[a],verts[a+1],verts[a+2])

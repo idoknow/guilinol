@@ -152,7 +152,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(verify)for(let at=0;at<sim.controller.numComputedCollisions();at++){const coll=sim.controller.computedCollision(at)?.collider;if(coll)lastHits.push(sim.kinds.get(coll.handle)??'')}
       const ground=sim.surface(next.x,next.z,'ground')
       if(!ground||next.y-cfg.height/2<ground.y-3){if(place(safe.x,safe.z,'rescue'))resets++;break}
-      if(sim.wet(next.x,next.z)){const deck=sim.surface(next.x,next.z,'deck');if(!deck||next.y-cfg.height/2<deck.y-.35){next.x=pos.x;next.z=pos.z;blockedWater=true}}
+      if(sim.wet(next.x,next.z)){
+        const foot=next.y-cfg.height/2,deck=sim.surface(next.x,next.z,'deck')
+        if(!deck||foot<deck.y-.35){
+          const tread=sim.surface(next.x,next.z,'landmark',foot+.6,1.4),tile=sim.tileAt(next.x,next.z),water=tile&&stream.loaded.get(tile)?.water
+          const level=tile&&water?water[Math.round((next.z-tile.z)/4)*65+Math.round((next.x-tile.x)/4)]/10:Infinity
+          if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;blockedWater=true}
+        }
+      }
       if(rides?.bike){const reason=sim.insideHouse(next.x+delta.x*.72,next.z+delta.y*.72)?'building':!rides.pavement(next.x,next.z)?'off-road':Math.hypot(move.x,move.z)<speed*step*.35?'collision':''
         if(reason){bikeObstacle=reason;next.x=pos.x;next.z=pos.z;rides.stop();speed=0}}
       traveled+=Math.hypot(next.x-pos.x,next.z-pos.z);sim.body.setNextKinematicTranslation(next);sim.world.step();if(grounded&&!blockedWater)safe.set(next.x,next.y,next.z)

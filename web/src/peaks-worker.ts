@@ -90,7 +90,7 @@ self.onmessage = async (event: MessageEvent<PeakWorkerInput>) => {
     lod: {offset: number; vertices: number},
     cx: number, cy: number, cz: number, pickVal: number,
     outPos: Float32Array, outNorm: Int8Array, outCol: Float32Array, outHeight: Uint8Array, outPick: Uint16Array,
-    vStart: number, calcRadius: boolean,
+    vStart: number, calcRadius: boolean, riverCliff: boolean,
   ) {
     const {offset, vertices} = lod
     outNorm.set(new Int8Array(buffer, offset + vertices * 6, vertices * 3), vStart * 3)
@@ -155,6 +155,12 @@ self.onmessage = async (event: MessageEvent<PeakWorkerInput>) => {
         }
       }
 
+      if (riverCliff && lx>0) {
+        const exposure=smooth(.18,.65,lx/Math.max(1,Math.hypot(lx,lz)))*(1-smooth(.78,.95,wHeight))
+        const streak=smooth(.49,.82,noise(lz*.65,ly*.045,2.8))
+        const stone=.81-.25*streak+.055*Math.sin(ly*.89+noise(lx,lz,8)*2)
+        r+=(stone-r)*exposure; g+=(stone-.012-g)*exposure; b+=(stone-.024-b)*exposure
+      }
       const scale = 1 + (hash(lx, lz) - 0.5) * 2 * jitter
       outCol[pAt] = r * scale
       outCol[pAt + 1] = g * scale
@@ -177,8 +183,9 @@ self.onmessage = async (event: MessageEvent<PeakWorkerInput>) => {
     const pickVal = Math.round(pickFrac * 65535)
 
     const lod0 = entry.lods[0], lod1 = entry.lods[1]
-    const radius = fillLevel(lod0, cx, cy, cz, pickVal, pos0, norm0, col0, height0, pick0, cursor0, true)
-    fillLevel(lod1, cx, cy, cz, pickVal, pos1, norm1, col1, height1, pick1, cursor1, false)
+    const riverCliff=entry.name==='伏波山'
+    const radius = fillLevel(lod0, cx, cy, cz, pickVal, pos0, norm0, col0, height0, pick0, cursor0, true,riverCliff)
+    fillLevel(lod1, cx, cy, cz, pickVal, pos1, norm1, col1, height1, pick1, cursor1, false,riverCliff)
 
     const template0 = getShared(lod0.indexOffset, lod0.indices)
     if (!localIdx0.length) localIdx0 = Uint32Array.from(template0)
