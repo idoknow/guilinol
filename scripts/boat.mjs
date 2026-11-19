@@ -607,6 +607,41 @@ try {
   await runInPage(page, async ({steerTo}) => {
     await steerTo([FREE_DOCKS.ronghu.mooring], {arriveDist: 2.5})
   })
+
+  // Bug 5 回归用例: 岸点碰撞未同步或落脚被拒时，不得提前清空 activeSlot 把玩家扔水里或穿进障碍物
+  await clearToasts(page)
+  const blockedShoreDismount = await runInPage(page, ({walk, stream, manifest, advance, readBoat}) => {
+    const pos = walk.position
+    const bankTile = manifest.chunks.find(t => pos.x >= t.x && pos.x < t.x + 256 && pos.z >= t.z && pos.z < t.z + 256)
+    const treeList = bankTile ? stream.forest.loaded.get(bankTile) : null
+    const origLen = treeList ? treeList.length : 0
+    if (treeList) {
+      for (let ox = -12; ox <= 12; ox += 0.9) {
+        for (let oz = -4; oz <= 12; oz += 0.9) {
+          treeList.push({x: pos.x + ox, y: 148.5, z: pos.z + oz, scale: 2.2, kind: 1})
+        }
+      }
+    }
+    try {
+      // 不跑 walk.tick，直接触发 KeyE 下船：dismount 必须自行 sync 并拒绝全部受阻岸点，保留 activeSlot
+      window.dispatchEvent(new KeyboardEvent('keydown', {code: 'KeyE'}))
+      window.dispatchEvent(new KeyboardEvent('keyup', {code: 'KeyE'}))
+      const cur = readBoat()
+      return {
+        vehicle: walk.vehicle,
+        hasBoatProbe: cur.boat !== null,
+        aboardAttr: document.body.hasAttribute('data-aboard'),
+        toasts: [...window.__boatToasts],
+      }
+    } finally {
+      if (treeList) treeList.length = origLen
+      advance(1 / 60)
+    }
+  })
+  assert.equal(blockedShoreDismount.vehicle, 'boat', `岸点全受阻时不应穿模下船或丢船落水: ${JSON.stringify(blockedShoreDismount)}`)
+  assert(blockedShoreDismount.hasBoatProbe && blockedShoreDismount.aboardAttr, `下船被拒后 activeSlot 或 data-aboard 丢失: ${JSON.stringify(blockedShoreDismount)}`)
+  console.log('3c-guard. 岸点受阻安全拒下防落水通过')
+
   await triggerAction(page, '靠岸下船')
   const landed = await page.evaluate(() => ({
     vehicle: window.viewer.walk.vehicle,

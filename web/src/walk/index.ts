@@ -125,9 +125,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const cur=sim.body.translation(),check=sim.findLocalMount(cur.x,cur.y-cfg.height/2,cur.z,bx,by,bz)
       if(!check.ok){notifyDismountBlocked(check.reason==='blocked'?'中间有遮挡，绕过去再骑':'这里太窄了，挪一挪再骑');return null}
       return check
-    },{sim,stream,landFree:spot=>{sim.sync(spot.x,spot.z);rides?.clearBoatPose(figure)
-      if(!place(spot.x,spot.z,spot.rule,true,spot))return false
-      facing=spot.heading+avatar.yaw;figure.rotation.y=facing;wasBoat=false;input.clearRun();follow(0,true);return true}})).then(loaded=>{rides=loaded;rides.show(active)
+    },{sim,stream,landFree:spot=>{sim.sync(spot.x,spot.z)
+      if(sim.insideHouse(spot.x,spot.z)||!sim.freeCapsule(spot.x,spot.y,spot.z)||!place(spot.x,spot.z,spot.rule,true,spot))return false
+      rides?.clearBoatPose(figure);facing=spot.heading+avatar.yaw;figure.rotation.y=facing;wasBoat=false;input.clearRun();follow(0,true);return true}})).then(loaded=>{rides=loaded;rides.show(active)
       if(active){const p=sim.body.translation();sim.sync(p.x,p.z);loaded.nearby(p.x,p.z,p.y-cfg.height/2)}})
       .catch(error=>console.warn('Vehicles unavailable:',error)).finally(()=>{loading=false})}
   let wasBoat=false,wasBike=false,bikeObstacle=''

@@ -919,11 +919,15 @@ export function createFreeBoats(env: BoatEnv) {
     }
   }
 
-  function dismount(allDocks: Record<string, Position>) {
+  function dismount(
+    allDocks: Record<string, Position>,
+    commitLand?: (spot: {x: number; y: number; z: number; rule: string; heading: number}) => boolean,
+  ) {
     const slot = activeSlot
     if (!slot) return null
-    // Arrest fast boat motion immediately on landing request before checking local banks.
+    // Arrest fast boat motion immediately and sync nearby colliders before probing local banks.
     vx = vz = vLong = vLat = angVel = 0
+    sim.sync(boatX, boatZ)
 
     const candidates: [number, number][] = []
     for (const other of slots) {
@@ -950,7 +954,21 @@ export function createFreeBoats(env: BoatEnv) {
       if (!dry) continue
       if (sim.pathBlocked(boatX, boatZ, cx, cz, Math.max(waterY, dry.supportY) + 0.8)) continue
 
-      // Found valid shore support: park boat either back at nearby mooring (<12 m) or in place.
+      const outHeading = Math.atan2(-(cx - boatX), -(cz - boatZ))
+      const target = {
+        x: dry.x,
+        y: dry.y,
+        z: dry.z,
+        rule: 'boat-shore',
+        heading: Number.isFinite(outHeading) ? outHeading : heading,
+      }
+      activeSlot = null
+      if (commitLand && !commitLand(target)) {
+        activeSlot = slot
+        continue
+      }
+
+      // Confirmed valid shore placement: now park boat either back at nearby mooring (<12 m) or in place.
       const m = slot.mooring
       if (m && Math.hypot(boatX - m[0], boatZ - m[2]) < 12.0) {
         slot.parkedPos = [m[0], m[1], m[2]]
@@ -961,10 +979,8 @@ export function createFreeBoats(env: BoatEnv) {
       }
       slot.mesh.position.set(slot.parkedPos[0], slot.parkedPos[1], slot.parkedPos[2])
       slot.mesh.rotation.set(0, slot.parkedHeading, 0, 'YXZ')
-      const outHeading = Math.atan2(-(cx - boatX), -(cz - boatZ))
-      activeSlot = null
       clearState()
-      return {x: dry.x, y: dry.y, z: dry.z, rule: 'boat-shore', heading: Number.isFinite(outHeading) ? outHeading : heading}
+      return target
     }
 
     lastBlocked = true
