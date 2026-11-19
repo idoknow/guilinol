@@ -417,7 +417,7 @@ try {
   const glassBridge = await runInPage(page, async ({steerTo, readBoat}) => {
     await steerTo([[-1300, 315], [-1260, 298], [-1210, 286]], {arriveDist: 2.8})
     const west = readBoat()
-    const res = await steerTo([[-1174, 286], [-1156, 286]], {arriveDist: 2.5})
+    const res = await steerTo([[-1174, 286], [-1148, 284]], {arriveDist: 2.5})
     return {
       westX: west.x,
       eastX: res.end.x,
