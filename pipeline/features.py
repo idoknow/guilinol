@@ -76,9 +76,13 @@ def ground_features(bounds, school_grounds=()):
     return layers
 
 
+def rongyin_photo():
+    return json.loads((Path(__file__).resolve().parents[1] / 'docs/refs/rock/photo-locations.json').read_text())['IMG_1299.jpg']
+
+
 def rongyin_frontage():
-    # IMG_1299 locates the open corner, and the existing facade gives its street axis.
-    photo = json.loads((Path(__file__).resolve().parents[1] / 'docs/refs/rock/photo-locations.json').read_text())['IMG_1299.jpg']
+    # The surveyed open corner and the orientation of its existing east facade.
+    photo = rongyin_photo()
     eye = np.array([photo['x'], photo['z']])
     along = np.array([11.22, -24.99])
     along /= np.linalg.norm(along)

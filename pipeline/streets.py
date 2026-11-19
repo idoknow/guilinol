@@ -8,7 +8,7 @@ from shapely.ops import nearest_points, unary_union
 
 from markings import junction_cores, violations
 from common import CHUNK, ll2xz, load_osm
-from features import points, polygons, rongyin_sidewalk
+from features import points, polygons, rongyin_photo, rongyin_sidewalk
 from scatter import CONFIG, walk_line
 
 
@@ -133,6 +133,18 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             other_w = max((r.width for r, _ in arms if r.way != arm_road.way), default=arm_road.width)
             s_jct = arm_road.line.project(jpt)
             dist = s_jct + step_dir * (other_w / 2.0 + 2.8)
+            if arm_road.way == 221349761 and any(r.way == 121981960 for r, _ in arms):
+                # IMG_1299 shows the crossing on the right side of the frame.
+                # Intersect its estimated image bearing with the OSM centreline.
+                photo = rongyin_photo()
+                eye = np.array([photo['x'], photo['z']])
+                bearing = math.radians(photo['heading']) + math.atan(.4 * 18 / photo['focal35'])
+                ray = LineString([eye, eye + 60 * np.array([math.sin(bearing), -math.cos(bearing)])])
+                crossing = ray.intersection(arm_road.line)
+                if crossing.geom_type == 'Point' and not crossing.is_empty:
+                    station = arm_road.line.project(crossing)
+                    if 0 < step_dir * (station - s_jct) < 40:
+                        dist = station
             if 2.2 <= dist <= arm_road.line.length - 2.2:
                 emit_crosswalk(arm_road.line, arm_road.width, arm_road.left, arm_road.right, dist, step_dir, len(arms) >= 4)
     # Reserve the approach from the first stripe through the stop line.
