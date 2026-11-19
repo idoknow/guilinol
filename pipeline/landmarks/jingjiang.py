@@ -10,6 +10,7 @@ import sys
 import numpy as np
 from PIL import Image, ImageDraw
 import trimesh
+from shop_lettering import letters
 
 
 SWATCHES = dict(stone='#c1c1bc', brick='#727c86', tile='#525b65', wood='#613c32',
@@ -58,6 +59,8 @@ class Model:
         self.pigmented=[]
         self.tile_parts={key:[] for key in ('stone','brick','pave')}
         self.pose=(0,0,0,0)
+        self.templates={}
+        self.placements=[]
 
     def mesh(self, vertices, faces, color, collide=False):
         triangles=np.asarray(vertices,dtype=float)[faces]
@@ -133,20 +136,33 @@ def generate(name,build):
     scene=trimesh.Scene(); image=atlas(); path=Path(__file__).resolve().parents[2]/'public/textures/landmarks/A'
     path.mkdir(exist_ok=True,parents=True); image.save(path/'surfaces.png',optimize=True)
     mat=trimesh.visual.material.PBRMaterial(name='A_surfaces',baseColorTexture=image,roughnessFactor=1,metallicFactor=0,doubleSided=True)
-    for lod in (0,1):
-        model=Model(lod==0);build(model)
-        def packed(parts):
-            vertices=np.concatenate(parts).reshape(-1,3);return trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
+    def packed(parts):
+        vertices=np.concatenate(parts).reshape(-1,3);return trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
+    def emit(model,layer,parent):
         mesh=packed(model.visible);mesh.visual=trimesh.visual.TextureVisuals(uv=np.concatenate(model.uv).reshape(-1,2),material=mat)
-        layer=f'lod{lod}';scene.graph.update(frame_to=layer)
-        scene.add_geometry(mesh,node_name=layer+'_joinery',parent_node_name=layer)
+        scene.add_geometry(mesh,geom_name=layer+'_joinery',node_name=layer+'_joinery',parent_node_name=parent)
         if model.pigmented:
             rock=packed([triangles for triangles,colors in model.pigmented]);rock.visual.vertex_colors=np.concatenate([colors for triangles,colors in model.pigmented]).reshape(-1,4)
-            scene.add_geometry(rock,node_name=layer+'_rock',parent_node_name=layer)
+            scene.add_geometry(rock,node_name=layer+'_rock',parent_node_name=parent)
         for key,parts in model.tile_parts.items():
             if not parts:continue
             cell=list(SWATCHES).index(key);left=128*(cell%4);top=128*(cell//4)
-            texture=image.crop((left,top,left+128,top+128));surface=packed([tri for tri,uv in parts]);surface.visual=trimesh.visual.TextureVisuals(uv=np.concatenate([uv for tri,uv in parts]).reshape(-1,2),material=trimesh.visual.material.PBRMaterial(name=key,baseColorTexture=texture,metallicFactor=0,roughnessFactor=1,doubleSided=True));scene.add_geometry(surface,node_name=layer+'_'+key,parent_node_name=layer)
+            texture=image.crop((left,top,left+128,top+128));surface=packed([tri for tri,uv in parts]);surface.visual=trimesh.visual.TextureVisuals(uv=np.concatenate([uv for tri,uv in parts]).reshape(-1,2),material=trimesh.visual.material.PBRMaterial(name=key,baseColorTexture=texture,metallicFactor=0,roughnessFactor=1,doubleSided=True));scene.add_geometry(surface,geom_name=layer+'_'+key,node_name=layer+'_'+key,parent_node_name=parent)
+    for lod in (0,1):
+        model=Model(lod==0);build(model)
+        layer=f'lod{lod}';scene.graph.update(frame_to=layer)
+        emit(model,layer,layer)
+        groups={}
+        for index,(key,matrix) in enumerate(model.placements):
+            template=model.templates[key];node=f'{layer}_bay{index}'
+            scene.graph.update(frame_from=layer,frame_to=node,matrix=matrix)
+            if key not in groups:
+                prefix=node+'_shared';emit(template,prefix,node)
+                groups[key]=[part for part in scene.geometry if part.startswith(prefix+'_')]
+            else:
+                for part in groups[key]:scene.graph.update(frame_from=node,frame_to=node+'_'+part,geometry=part)
+            if lod==0:
+                for triangles in template.solid:model.solid.append(triangles@matrix[:3,:3].T+matrix[:3,3])
         if lod==0 and model.solid:scene.add_geometry(packed(model.solid),node_name='collision_surface')
     scene.export(Path(sys.argv[1])/f'{name}.glb')
 
@@ -163,26 +179,42 @@ def palace(m):
             for xx in range(-160,161,5):
                 if side<0 or abs(xx)>20:m.box(xx,6.5,0 if side>0 else -548,2.7,1.1,1,'stone')
     m.box(0,-.65,16,47,.82,33,'pave',True)
-    m.arcade(0,-9,40,19,6.8,[-11,0,11],[2.0,3.75,2.0],'stone')
-    m.box(0,6.8,-9,40,2.25,19,'brick',True)
+    m.arcade(0,-11,40,23,6.8,[-11,0],[2.0,3.75],'stone')
+    m.box(0,6.8,-11,40,2.25,23,'brick',True)
+    if m.detail:
+        for start in np.arange(-21.8,-.5,1.5):
+            depth=1.43
+            for side in (-1,1):
+                m.box(side*3.72,0,start,.075,2.18,depth,'brick')
+            for angle in range(0,180,15):
+                end_points=[(3.70*math.cos(theta),2.176+3.70*math.sin(theta)) for theta in np.radians([angle,angle+15])]
+                vertices=[[xx,yy,start+offset] for offset in (-depth/2,depth/2) for xx,yy in end_points]
+                m.mesh(vertices,[[0,1,3],[0,3,2]],'brick')
     for east in np.arange(-18.8,20,2.5):m.box(east,9.05,.12,1.45,1.1,.8,'brick')
-    for center,radius in ((-11,2),(0,3.75),(11,2)):
+    for center,radius in ((-11,2),(0,3.75)):
         for angle in (np.arange(18)*math.pi/18 if m.detail else []):
             following=angle+math.pi/18
             verts=[[center+rad*math.cos(theta),2.176+rad*math.sin(theta),.66] for theta,rad in ((angle,radius),(angle,radius+.46),(following,radius+.46),(following,radius))];m.mesh(verts,[[0,1,2],[0,2,3]],'granite' if round(angle*18/math.pi)%2 else 'white')
-        if center:
-            if not m.detail:
-                m.box(center,0,-.32,3.6,3,.24,'red');continue
-            for column in range(8):
-                offset=(column-3.5)*.49; height=2.17+math.sqrt(radius**2-offset**2)
-                m.box(center+offset,0,-.32,.49,height,.24,'red',True)
-                if m.detail:
-                    for row in range(4):m.box(center+offset,.6+row*.65,-.17,.09,.09,.10,'gold')
+    for east in (-6.5,7.5):
+        m.box(east,.48,.72,3.35,2.3,.23,'wood')
+        m.box(east,.66,.86,3.05,1.96,.09,'white')
+        letters(m,'靖江王城',(east,2.05,.92),2.4,.39,'wood')
+        for line in range(4):m.box(east,.88+line*.24,.92,1.9+(line%2)*.47,.055,.05,'granite')
     if m.detail:
-        for index in range(38):
-            east=math.sin(index*54.1)*19; height=5.9+(index%5)*.37
-            m.mesh([[east,height,.7],[east+.35,height+.18,.74],[east+.16,height-.63,.72]],[[0,1,2]],'leaf')
-    m.arcade(0,-147,27,11,8,[0],3.4,'yellow')
+        shrub=trimesh.creation.icosphere(subdivisions=0)
+        for index in range(48):
+            east=-19+index*.8; height=9.0+.43*math.sin(index*.7)
+            m.mesh(shrub.vertices*[.85,.53,.74]+[east,height,.21],shrub.faces,'leaf')
+            if index%3!=1:m.mesh(shrub.vertices*[.42,1.05,.28]+[east,height-.91,.69],shrub.faces,'green')
+    for south in (-152.6,-141.4):m.arcade(0,south,27,1.3,8,[0],3.65,'yellow')
+    m.box(0,6.4,-147,27,1.6,10,'yellow',True)
+    for side in (-1,1):
+        for south in (-150.6,-143.4):
+            m.box(side*7,0,south,.63,6.4,.63,'red',True)
+        m.box(side*13.2,0,-147,.5,5.5,9,'wood',True)
+        for south in np.linspace(-150.3,-143.7,6):
+            m.box(side*12.9,.75,south,.13,3.35,.83,'glass')
+            m.box(side*12.78,1.8,south,.15,.12,.91,'red')
     m.box(0,8,-147,22,4.8,9,'red');m.swept_roof(0,8.5,-147,32,17,2.5)
     m.swept_roof(0,13,-147,26,14,3.8)
     for east in (-12,-4,4,12):
@@ -202,6 +234,33 @@ def palace(m):
         m.box(side*22,0,-147,14,4.35,10,'yellow',True);m.swept_roof(side*22,4.35,-147,16,12,2.5)
     for zz in (-65,-108):
         for side in (-1,1):m.box(side*20,0,zz,25,.12,39,'green')
+    for index,zz in enumerate(range(-37,-130,-14)):
+        for side in (-1,1):
+            east=side*(9.4+index%2*.7)
+            m.beam([east,0,zz],[east,6,zz],.5,'wood',8,True)
+            for branch in (-1,1):
+                m.beam([east,4,zz],[east+branch*1.8,7.5,zz+branch],.22,'wood')
+                crown=trimesh.creation.icosphere(subdivisions=int(m.detail))
+                m.mesh(crown.vertices*[3.4,3.7,4.2]+[east+branch*1.6,8.5,zz+branch],crown.faces,'leaf')
+    m.pose=(4.8,0,-124.6,1.04)
+    m.box(0,0,0,4.8,.32,1.35,'granite',True)
+    m.box(0,.32,0,4.4,.81,1.05,'yellow',True)
+    letters(m,'桂林中轴线',(0,.47,.55),3.72,.53,'wood')
+    for side in (-1,1):
+        ring=[]
+        for index in range(32):
+            angle=index*2*math.pi/32;horizontal,vertical=math.cos(angle),math.sin(angle)
+            ring.extend([(1.45*horizontal,3.48+1.45*vertical-min(0,vertical)**4*1.07,side*.24),
+                         (.61*horizontal,3.48+.61*vertical,side*.24)])
+        faces=[]
+        for index in range(32):
+            first=index*2;last=(first+2)%64;faces.extend([(first,last,last+1),(first,last+1,first+1)])
+        m.mesh(ring,faces,'yellow')
+        if side<0:rear=ring
+        else:
+            for index in range(64):
+                end=(index+2)%64;m.mesh([rear[index],rear[end],ring[end],ring[index]],[[0,1,2],[0,2,3]],'gold')
+    m.pose=(0,0,0,0)
     m.box(0,0,-79,12,.12,135,'pave',True)
     m.box(0,0,-252,52,2,29,'granite',True)
     for step in range(10):m.box(0,0,-232-step*.52,12,(step+1)*.20,.55,'granite',True)
