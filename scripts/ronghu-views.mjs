@@ -31,6 +31,7 @@ try{
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&radius=256&time=12`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
   for(const [number,coords] of Object.entries(views)){
+    if(process.env.PHOTO && process.env.PHOTO!==number)continue
     if(process.env.RESUME_CAPTURES && existsSync(`${out}/${number}.jpg`))continue
     const id=Number(number)<=1316?'gunanmen':'ronghu'
     await page.evaluate(([id,coords,number])=>{
@@ -42,14 +43,19 @@ try{
     await page.waitForFunction(id=>{const {stream,stats}=window.viewer;return !stats.pending&&[...stream.landmarks].some(([entry,root])=>entry.id===id&&root.getObjectByName('lod0')?.visible)},id,{timeout:60000})
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
     if(['1300','1303','1307','1313','1315','1328','1337','1339','1342'].includes(number)){
-      const hit=await page.evaluate(async(id)=>{
-        const {Raycaster,Vector2}=await import('/__survey_core.mjs')
+      const hit=await page.evaluate(async([id,number])=>{
+        const {Raycaster,Vector2,Vector3}=await import('/__survey_core.mjs')
         const {stream,camera}=window.viewer
         const [entry,root]=[...stream.landmarks].find(([entry])=>entry.id===id)
         const meshes=[];root.parent.traverseVisible(node=>{if(node.isMesh&&!node.isSprite&&node.material?.depthWrite!==false)meshes.push(node)})
         const ray=new Raycaster();ray.setFromCamera(new Vector2(0,0),camera)
-        return ray.intersectObjects(meshes,false).slice(0,2).map(({object,point,distance})=>({mesh:object.parent?.name,material:object.material?.name,distance:Math.round(distance),local:point.toArray().map((value,index)=>Math.round(value-entry.position[index]))}))
-      },id)
+        const survey=()=>ray.intersectObjects(meshes,false).slice(0,1).map(({object,point,distance})=>({mesh:object.parent?.name,material:object.material?.name,distance:Math.round(distance),local:point.toArray().map((value,index)=>Math.round(value-entry.position[index]))}))[0]
+        if(number!=='1328')return survey()
+        return [[302,4.45,160],[458.5,24,196.5]].map(local=>{
+          const point=new Vector3(...entry.position).add(new Vector3(...local)).project(camera)
+          ray.setFromCamera(point,camera);return {ndc:[point.x,point.y],first:survey()}
+        })
+      },[id,number])
       console.log(number,JSON.stringify(hit))
     }
     await page.screenshot({path:`${out}/${number}.jpg`,quality:89,timeout:120000})
