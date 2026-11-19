@@ -1,4 +1,5 @@
 from functools import cache
+import math
 import shapely
 from PIL import Image, ImageDraw
 
@@ -32,8 +33,38 @@ from c_kit import landmark_surface
 def shops(builder):
     for east,south,width,length,floors,kind in [(10,-51,17,24,4,'rong'),(10,-86,26.3,8.5,3,'inn'),(32,-115,15,19,3,'hall')]:
         base = landmark_surface('gunanmen').ground(east,south)
+        meshes = [*builder.parts.values(),builder.hit]
+        starts = [len(mesh.pos) for mesh in meshes]
         with align_front(builder, (east, south), -21.92):
             shop(builder, east, base, south, width, length, floors, kind)
+        for mesh,start in zip(meshes,starts):
+            for i in range(start,len(mesh.pos)):
+                x,y,z = mesh.pos[i]
+                if abs(y-base)<.008:
+                    mesh.pos[i] = (x,landmark_surface('gunanmen').ground(x,z)-.04,z)
+
+
+def hotel_frontage(builder,outline,base,floors):
+    """Fit windows and the hotel sign to the mapped L-shaped footprint."""
+    stone, glass = builder.parts['atlas'],builder.parts['lit']
+    ring = list(shapely.orient_polygons(shapely.Polygon(outline)).exterior.coords)
+    for (x,z),(u,v) in zip(ring,ring[1:]):
+        dx,dz = u-x,v-z
+        length = math.hypot(dx,dz)
+        nx,nz = dz/length,-dx/length
+        mx,mz = (x+u)/2,(z+v)/2
+        with align_front(builder,(mx,mz),math.degrees(math.atan2(nx,nz))):
+            bays = max(1,round(length/4))
+            for row in range(floors):
+                box(stone,(mx,base+(row+1)*3.25,mz),(length,.16,.32),'brick')
+                for i in range(bays):
+                    bx = mx + ((i+.5)/bays-.5)*length
+                    box(glass,(bx,base+row*3.25+1.66,mz+.04),(length/bays*.72,1.53,.12),'glass',None)
+            if nx>.9 and length>15:
+                box(stone,(mx,base+3.2,mz+.12),(9.2,1.3,.26),'wood')
+                stone.face([(mx-4.5,base+2.63,mz+.26),(mx+4.5,base+2.63,mz+.26),
+                            (mx+4.5,base+3.77,mz+.26),(mx-4.5,base+3.77,mz+.26)],
+                           (0,0,1),'rong',uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
 
 
 def shop(builder, east, base, south, width, length, floors, kind):
@@ -46,6 +77,8 @@ def shop(builder, east, base, south, width, length, floors, kind):
             outline=[(east+dx,south+dz) for dx,dz in ring_xz]
             extrude(stone,outline,base,base+height,'brick')
             if builder.collide:extrude(builder.hit,outline,base,base+height,'brick')
+            hotel_frontage(builder,outline,base,floors)
+            return
         else:
             box(stone,center,size,'rubble' if kind=='hall' else 'brick')
             if builder.collide:solid(builder.hit,center,size,'brick')

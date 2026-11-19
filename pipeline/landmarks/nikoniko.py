@@ -503,6 +503,7 @@ class Builder:
 
     def __init__(self, detail=True):
         self.detail = detail
+        self.follow_grade = False
         self.visible = []
         self.uv = []
         self.tiled = {k: [] for k in self.TILED_SCALES}
@@ -525,6 +526,10 @@ class Builder:
             out[..., 0] += dx
             out[..., 2] += dz
         out[..., 1] += dy
+        if self.follow_grade:
+            unique, indices = np.unique(out[...,[0,2]].reshape(-1,2),axis=0,return_inverse=True)
+            offsets = np.array([self.surface.ground(x,z) for x,z in unique])
+            out[...,1] += offsets[indices].reshape(out.shape[:-1])
         return out
 
     def sign_quad(self, x, y0, z, w, h, sign_key, double_sided=False):
@@ -725,7 +730,7 @@ class Builder:
     def cluster_lamp(self, x, y0, z, height=7.2, globes=5, collide=False):
         """Guilin municipal multi-globe decorative streetlamp (玉兰/五头球灯)."""
         self.box(x, y0, z, 0.52, 0.55, 0.52, 'dark', collide=collide)
-        self.beam([x, y0 + 0.55, z], [x, y0 + height - 0.5, z], 0.11, 'bronze', sections=6, collide=collide)
+        self.beam([x, y0 + 0.55, z], [x, y0 + height - 0.12, z], 0.11, 'bronze', sections=6, collide=collide)
         if not self.detail:
             self.box(x, y0 + height - 0.5, z, 0.9, 0.65, 0.9, 'white_lit')
             return
@@ -752,7 +757,7 @@ class Builder:
                 dx, dz = math.cos(ang), math.sin(ang)
                 px, pz = -dz * 0.45, dx * 0.45
                 verts = [
-                    (x, top + 0.15, z),
+                    (x, top - 0.04, z),
                     (x + dx * spread * 0.52 + px, top + 0.85, z + dz * spread * 0.52 + pz),
                     (x + dx * spread, top - 0.65, z + dz * spread),
                     (x + dx * spread * 0.52 - px, top + 0.85, z + dz * spread * 0.52 - pz),
@@ -783,6 +788,8 @@ class Builder:
                 lx = x + math.cos(ang) * spread * 0.52
                 lz = z + math.sin(ang) * spread * 0.52
                 ly = y0 + trunk_h + 0.15
+                self.beam([x,y0+trunk_h-.35,z],[lx,ly+.68,lz],.08,'wood',sections=5)
+                self.beam([lx,ly+.68,lz],[lx,ly+.31,lz],.035,'bronze',sections=4)
                 self.cylinder_y(lx, ly, 0.34, lz, 0.16, 'red_lit', sections=6)
 
 
@@ -1053,7 +1060,7 @@ def build_nikoniko(m: Builder):
     m.cylinder_y(corner_cx, 30.5, 4.45, corner_cz, 11.2, 'white', sections=24 if m.detail else 10)
     m.cylinder_y(corner_cx, 34.85, 0.22, corner_cz, 11.35, 'alum', sections=24 if m.detail else 10)
     m.sign_arc(
-        corner_cx, corner_cz, 11.30, 30.95, 3.55, corner_yaw,
+        corner_cx, corner_cz, 11.30, 30.51, 3.55, corner_yaw,
         span_rad=1.54, sign_key='niko_crown', segs=18 if m.detail else 8,
     )
     if m.detail:

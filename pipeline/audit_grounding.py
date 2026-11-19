@@ -176,7 +176,9 @@ def measurements(model, surface):
         mask = craft[component[base]]==number
         if not np.isfinite(levels[mask]).all():
             raise ValueError(f'Floating craft leaves water: {surface.name} {number}')
-        support[mask] = levels[mask]-draft
+        # Only the hull bears on water. Seat legs and cross-slats can
+        # bear on a measured bamboo/deck surface above the draft line.
+        support[mask] = np.maximum(support[mask], levels[mask]-draft)
     # In-band wall finish still has to touch its support. Check the physical
     # interface against the backing wall instead of treating a window sill
     # as a column foot. Its carrier has an independently checked foundation.

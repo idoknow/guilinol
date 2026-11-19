@@ -7,11 +7,13 @@ from xiaoyao_roof import tiled_roof
 from xiaoyao_tower import generate
 
 
+from c_kit import landmark_surface
+
 def apartments(m, x, z, length, floors):
     """Residential wings bounding the two sides of the roof in photos 08/10/14."""
     depth, storey = 9.2, 3.05
     facade = -np.sign(z)
-    m.box(x,-.65,z,length,.65+3.35,depth,'granite',True)
+    m.foundation(landmark_surface('zhuangyuan_gallery'),x,-.65,z,length,4,depth,'granite')
     top = 3.35+(floors-1)*storey
     m.box(x,3.35,z,length-.8,top-3.35,depth-.55,'white',True)
     m.box(x,top,z,length+.3,.28,depth+.22,'granite')
@@ -24,7 +26,7 @@ def apartments(m, x, z, length, floors):
             if bay%3==0:
                 m.box(px,base,face+facade*.5,3.5,.22,1.65,'granite')
                 m.box(px,base+.22,face+facade*1.25,3.25,.73,.14,'white')
-                face+=facade*.92
+
             m.box(px,base+.98,face+facade*.09,2.72,1.52,.18,'glass')
             if m.detail:
                 m.box(px,base+.98,face+facade*.20,.09,1.52,.08,'white')
@@ -60,6 +62,9 @@ def gallery(m):
         m.mesh(np.array(vertices)-[0,.085,0],faces,'white')
     m.beam([-18.95,4.48,0],[18.95,4.48,0],.1,'granite')
     if m.detail:
+        m.box(0,3.10,0,38.2,.18,.22,'wood')
+        for side in (-1,1):
+            m.box(0,2.85,side*1.48,38.2,.23,.22,'wood')
         for x in np.linspace(-18.8,18.8,6):
             m.box(x,2.68,0,.08,.48,.08,'wood')
             m.beam([x,2.35,0],[x,2.68,0],.22,'red',10)

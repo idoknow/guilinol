@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from jingjiang import generate
+from c_kit import landmark_surface
 from wangcheng_plan import ROOT, ll2xz
 
 
@@ -52,12 +53,11 @@ def summit(model):
     if not (world/'manifest.json').exists():raise RuntimeError('Run npm run world before building Duxiu')
     manifest=json.loads((world/'manifest.json').read_text())
     peak=next(entry for entry in manifest['peaks']['entries'] if entry['name']=='独秀峰')
-    x,height,z=peak['center']; left,top,*_=manifest['extent']; size=manifest['chunkSize']
-    col,row=int((x-left)//size),int((z-top)//size)
-    ground=gzip.decompress((world/f'{col}_{row}.glc').read_bytes()); stride=size//manifest['grid']+1
-    anchor=np.frombuffer(ground,'<i2',stride**2,24).reshape(stride,stride)[round((z-top-row*size)/4),round((x-left-col*size)/4)]/10
+    surface=landmark_surface('duxiu')
+    x,_,z=peak['center']
     lod=peak['lods'][0]; payload=gzip.decompress((world/manifest['peaks']['file']).read_bytes())
-    vertices=np.frombuffer(payload,'<i2',lod['vertices']*3,lod['offset']).reshape(-1,3)/100;vertices[:,1]+=height-anchor
+    vertices=np.frombuffer(payload,'<i2',lod['vertices']*3,lod['offset']).reshape(-1,3)/100
+    vertices += np.subtract(peak['center'],[surface.x,surface.y,surface.z])
     rings=vertices[:-1].reshape(12,-1,3); tip=vertices[-1]; count=rings.shape[1]
     pois=json.loads((ROOT/'docs/layout/wangcheng.geojson').read_text())['features']
     def cliff_column(name):

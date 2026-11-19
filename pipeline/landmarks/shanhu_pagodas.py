@@ -564,7 +564,8 @@ def build_trees(terrace, outline):
             for k in range(5):
                 ang = k*math.tau/5
                 dx,dz = .55*math.cos(ang),.55*math.sin(ang)
-                add_tris(tree,'leaf',cylinder_at(dx,dz,.07,.035,height*.40,.32,5))
+                add_tris(tree,'bark',segment_bar(0,0,dx,dz,height*.40-.05,height*.40+.08,.07,cap=True))
+                add_tris(tree,'leaf',cylinder_at(dx,dz,.07,.035,height*.40,.32,5,cap_bottom=True))
                 add_tris(tree,'leaf',cylinder_at(dx,dz,.9,.15,height*.30,height*.65,6))
         for key,tris in shift(tree,x,foot,z).items():
             add_tris(b,key,tris)
@@ -576,20 +577,27 @@ def build_tunnel():
     b = {}
     sun = np.array(SUN_OFFSET)
     moon = np.array(MOON_OFFSET)
-    direction = moon - sun
-    direction = direction / np.linalg.norm(direction)
-    for origin, reach in ((sun, 9.2), (moon, 8.4)):
-        center = origin + direction * reach
-        base = landmark_surface('shanhu_pagodas').ground(center[0],center[2])
-        yaw = math.atan2(direction[2], direction[0])
-        add_tris(b, 'stoneRail', box_at(center[0], base-.12, center[2], 3.4, 3.1, 1.1, yaw))
-        # Door void is the missing centre: two jambs and a lintel instead of a solid box.
-        add_tris(b, 'stoneDeck', box_at(center[0] - math.sin(yaw) * 1.15, base-.05, center[2] + math.cos(yaw) * 1.15, 0.45, 2.5, 1.15, yaw))
-        add_tris(b, 'stoneDeck', box_at(center[0] + math.sin(yaw) * 1.15, base-.05, center[2] - math.cos(yaw) * 1.15, 0.45, 2.5, 1.15, yaw))
-        add_tris(b, 'granite' if False else 'stoneRail', box_at(center[0], base+2.4, center[2], 3.5, 0.45, 1.2, yaw))
+    ground = landmark_surface('shanhu_pagodas').ground
+    for origin, destination, reach in ((sun,moon,9.2),(moon,sun,8.4)):
+        direction = destination-origin
+        direction = direction/np.linalg.norm(direction)
+        center = origin + direction*reach
+        normal = np.array([-direction[2],0,direction[0]])
+        yaw = math.atan2(normal[2],normal[0])
+        def footing(location,width,depth,top):
+            tris = box_at(location[0],0,location[2],width,1,depth,yaw)
+            for tri in tris:
+                add_tris(b,'stoneDeck',[tuple((x,top if y else ground(x,z)-.06,z) for x,y,z in tri)])
+        corners = box_at(center[0],0,center[2],3.5,.1,1.2,yaw)
+        sill = max(ground(x,z) for tri in corners for x,_,z in tri)
+        for side in (-1,1):
+            footing(center+side*1.35*normal,.52,1.15,sill+2.5)
+        add_tris(b,'stoneRail',box_at(center[0],sill+2.45,center[2],3.5,.45,1.2,yaw))
         for step in range(3):
-            add_tris(b, 'stoneDeck', box_at(center[0] - direction[0] * (1.2 + step * 0.55), base-.05,
-                                            center[2] - direction[2] * (1.2 + step * 0.55), 2.2, 0.22 + step * 0.08, 0.5, yaw))
+            station = center-direction*(1.2+step*.55)
+            top = max(ground(x,z) for tri in box_at(station[0],0,station[2],2.2,.1,.58,yaw)
+                      for x,_,z in tri)+.12
+            footing(station,2.2,.58,top)
     return b
 
 

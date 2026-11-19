@@ -2,6 +2,7 @@
 import math
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+from c_kit import landmark_surface
 from xiaoyao_tower import generate
 
 
@@ -22,8 +23,8 @@ def lettering(model):
     for row,pixels in enumerate(np.asarray(image)):
         edges=np.flatnonzero(np.diff(np.r_[False,pixels,False]))
         for left,right in edges.reshape(-1,2):
-            x0,x1=4-left*.072,4-right*.072;top=4.92-row*.06
-            model.mesh([arc(offset,level,6.26) for offset,level in [(x0,top),(x1,top),(x1,top-.06),(x0,top-.06)]],[[0,1,2],[0,2,3]],'sign')
+            x0,x1=4-left*.072,4-right*.072;top=4.92-row*.045
+            model.mesh([arc(offset,level,6.223) for offset,level in [(x0,top),(x1,top),(x1,top-.045),(x0,top-.045)]],[[0,1,2],[0,2,3]],'sign')
 
 
 def window(model,x,y,z,width,height):
@@ -35,7 +36,8 @@ def window(model,x,y,z,width,height):
 
 
 def hall(model):
-    model.box(0,-.6,0,22,1.25,37,'brick',True)
+    surface = landmark_surface('guangxi_arts')
+    model.foundation(surface,0,-.6,0,22,1.25,37,'brick')
     model.box(0,.65,4.6,21.6,7.2,28,'brick',True)
     model.roof(0,7.85,4.6,22.65,29,3.1)
     model.box(0,.65,-13.1,15.6,10.25,9.0,'brick',True)
@@ -66,7 +68,8 @@ def hall(model):
     for index in range(64):
         start,end=math.tau*index/64,math.tau*(index+1)/64
         points=[(radius*math.cos(angle),.42,-29+radius*math.sin(angle)) for radius,angle in [(3.85,start),(3.85,end),(4.25,end),(4.25,start)]]
-        model.mesh([(0,.42,-29),*points[:2]],[[0,1,2]],'brick')
+        points = [(x,surface.ground(x,z)+.035,z) for x,_,z in points]
+        model.mesh([(0,surface.ground(0,-29)+.035,-29),*points[:2]],[[0,1,2]],'brick')
         model.mesh(points,[[0,1,2],[0,2,3]],'white' if index%2 else 'granite')
 
 

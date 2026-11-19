@@ -200,8 +200,9 @@ def build_shizijie(m: Builder):
         # SW refuge apron tip (leading toward Weixiaotang corner)
         [(-34.5, -3.5), (-21.0, 16.5), (-37.5, 11.5)],
     ]
+    m.follow_grade = True
     for tri in islands:
-        m.prism(tri, -1.2, 1.35, 'pave', collide=True, cap_mat='pave', paving=True)
+        m.prism(tri, -.04, .19, 'pave', collide=True, cap_mat='pave')
         cx = sum(p[0] for p in tri) / 3.0
         cz = sum(p[1] for p in tri) / 3.0
         shrunk = [(cx + (p[0] - cx) * 0.58, cz + (p[1] - cz) * 0.58) for p in tri]
@@ -250,6 +251,7 @@ def build_shizijie(m: Builder):
         (-87.0, -40.5), (-42.0, -30.5), (-22.0, -41.5), (-8.5, -49.5),
         (5.0, -100.5), (-50.5, -117.5),
     ]
+    m.follow_grade = False
     m.prism(nw_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave', paving=True)
     m.prism(NW_NANFANG, -2.0, 6.8, 'dark', collide=True, cap_mat='alum', footing=True)
     m.prism(NW_NANFANG, 4.8, 20.4, 'white', collide=True, cap_mat='roof')

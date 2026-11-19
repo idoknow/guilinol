@@ -174,7 +174,7 @@ def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie'):
     """Guilin Zhongshan Road modern transit bus shelter + CJK station totem."""
     # Local +X of pose points toward carriageway; local +Z runs along sidewalk.
     m.pose = (x, y0, z, yaw)
-    m.box(0, -0.4, 0, 2.5, 0.48, 11.2, 'pave', collide=True)
+    m.box(0, -0.4, 0, 2.5, 0.48, 11.2, 'pave', collide=True, footing=True)
     for sz in (-4.6, -1.5, 1.5, 4.6):
         m.beam([-0.82, 0.08, sz], [-0.82, 2.95, sz], 0.08, 'bronze', sections=6, collide=True)
     m.box(0.05, 2.95, 0, 2.65, 0.16, 11.2, 'alum')
@@ -182,6 +182,8 @@ def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie'):
 
     # Back route-map & transit lightboxes facing +X toward waiting passengers
     for sz, col in ((-3.1, 'blue'), (0.0, 'white'), (3.1, 'red')):
+        for sign in (-1,1):
+            m.box(-.82,.08,sz+sign*.92,.14,2.34,.13,'bronze')
         m.box(-0.78, 0.52, sz, 0.18, 1.85, 2.38, 'dark', collide=True)
         if m.detail:
             m.box(-0.67, 0.65, sz, 0.04, 1.58, 2.16, col)
@@ -213,7 +215,7 @@ def _median_curve(m: Builder, world_line: LineString):
         y0 = m.surface.ground(mx,mz)
         m.pose = (mx, y0, mz, yaw)
         # 1.48 m wide median curb stays strictly inside the paired-carriageway gap
-        m.box(0, -0.5, 0, 1.48, 0.72, seg_len + 0.15, 'beige', collide=True)
+        m.box(0, -0.5, 0, 1.48, 0.72, seg_len + 0.15, 'beige', collide=True, footing=True)
         m.box(0, 0.22, 0, 1.16, 0.56, max(0.5, seg_len - 0.3), 'hedge')
         m.box(0, 0.78, 0, 0.06, 0.36, max(0.5, seg_len - 0.5), 'alum')
         if m.detail:
