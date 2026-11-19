@@ -14,7 +14,7 @@ from common import CHUNK
 def section_layers(roads):
     layers = [[] for _ in range(4)]
     for road in roads:
-        name = RULES['sectionClasses'].get(road.kind)
+        name = road.section
         if not name:
             continue
         section = RULES['sections'][name]

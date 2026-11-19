@@ -118,6 +118,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       for(const corner of [-.58,.58])box(x+corner*Math.cos(angle),y+.25,z-corner*Math.sin(angle),.28,.5,.28,angle,stoneLight)
     }
   }
+  const detailCount=mats.length/16
   for(const [x,z] of lamps){const px=x/10,pz=z/10,y=baseLevel(px,pz),yaw=(x*7+z*13)%6/6*Math.PI
     box(px,y+.3,pz,.34,.6,.34,0,tone.lampPole);box(px,y+2.9,pz,.14,5.2,.14,0,tone.lampPole);box(px,y+5.3,pz,1.6,.08,.08,yaw,tone.lampPole)
     for(const side of [-.75,.75])box(px+Math.cos(yaw)*side,y+5.05,pz-Math.sin(yaw)*side,.32,.42,.32,yaw,tone.lampHead)}
@@ -160,6 +161,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
   }
   return {
     banks,
+    detailCount,
     parked:Float32Array.from(parked),
     sidewalk:Float32Array.from(sidewalk),
     surface,

@@ -136,7 +136,7 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
         line,width,name = road.line,road.width,road.name
         if not bounds.intersects(line):
             continue
-        section = RULES['sections'].get(RULES['sectionClasses'].get(road.kind))
+        section = RULES['sections'].get(road.section)
         for side, available in ((-1,road.left),(1,road.right)):
             if section and not available:
                 continue

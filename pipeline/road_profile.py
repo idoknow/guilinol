@@ -29,6 +29,10 @@ class Road:
     way: int
     samples: tuple
 
+    @property
+    def section(self):
+        return RULES['photoOverrides'].get(str(self.way), {}).get('section', RULES['sectionClasses'].get(self.kind))
+
 
 def facade_gap(line, index):
     gaps = []
@@ -53,6 +57,9 @@ def facade_gap(line, index):
 
 
 def profile(line, tags, index,way=0):
+    override = RULES['photoOverrides'].get(str(way))
+    if override:
+        tags = {**tags, 'lanes': str(override['lanes']), 'width': str(override['lanes'] * RULES['laneWidth']), 'divider': override['divider']}
     kind = tags['highway']
     is_link = kind.endswith('_link')
     pedestrian = kind == 'pedestrian'

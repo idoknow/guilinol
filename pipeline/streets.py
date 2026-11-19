@@ -124,7 +124,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                 offset = (width/2+3) if feature=='traffic_signals' else 0
                 emit_crosswalk(line, width, road.left, road.right, along + direction * offset, direction, feature == 'traffic_signals')
         if kind in CONFIG['mainStreets']:
-            section = RULES['sections'].get(RULES['sectionClasses'].get(kind))
+            section = RULES['sections'].get(road.section)
             for side,available in ((-1,road.left),(1,road.right)):
                 if section and not available:
                     continue
@@ -303,7 +303,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     arterial_roads = [road for road in roads if road.oneway and road.kind in ('trunk','primary')]
     arterial_index = STRtree([road.line for road in arterial_roads])
     for road in roads:
-        section = RULES['sections'].get(RULES['sectionClasses'].get(road.kind))
+        section = RULES['sections'].get(road.section)
         if not section or not bounds.intersects(road.line):
             continue
         line = road.line
