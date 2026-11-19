@@ -574,7 +574,22 @@ try {
   assert(damCheck.events.length > 0 && damCheck.toastVisible, `闸坝拦截未发 walk:toast 或未显示 .toast.show: ${JSON.stringify(damCheck)}`)
   assert(/水闸|落差|划过/.test(damCheck.toastText) && /水闸|落差|划过/.test(damCheck.events[0].text), `闸坝拦截文案不符合施工图: ${JSON.stringify(damCheck)}`)
   assert(damCheck.resets === 0 && !damCheck.inHouse, '撞闸坝触发了异常重置或进屋')
-  console.log('5. 闸坝拦停通过 (木龙湖闸):', {stopX: +damCheck.afterX.toFixed(1), toast: damCheck.toastText})
+  console.log('5a. 闸坝拦停通过 (木龙湖闸):', {stopX: +damCheck.afterX.toFixed(1), toast: damCheck.toastText})
+
+  // Bug 1 回归用例 (闸坝): 顶住闸坝按住 KeyW + KeyA 仍可顺畅转向脱困，不锁死航向
+  const damTurn = await runInPage(page, ({press, step, readBoat}) => {
+    const h0 = readBoat().heading
+    press('KeyW', true)
+    press('KeyA', true)
+    step(72)
+    press('KeyA', false)
+    press('KeyW', false)
+    const after = readBoat()
+    const delta = Math.abs(Math.atan2(Math.sin(after.heading - h0), Math.cos(after.heading - h0)))
+    return {delta, endX: after.x, waterY: after.waterY}
+  })
+  assert(damTurn.delta > 0.65 && damTurn.endX > -436, `顶住闸坝按住 W+A 转向锁死或越界: ${JSON.stringify(damTurn)}`)
+  console.log('5b. 顶住闸坝按住 W+A 转向脱困通过:', {turnRad: +damTurn.delta.toFixed(2), endX: +damTurn.endX.toFixed(1)})
 
   // --- 用例 6：漓江自由竹筏水流漂移 + 解放桥穿行 + 杉湖九曲桥矮桥验证 ---
   await enterSpot(page, ...FREE_DOCKS.jiefang.freeBank, 0, 'jiefang-free-raft')
@@ -637,6 +652,32 @@ try {
   assert(jiuqu.endZ < 684, `船体越过了杉湖九曲桥: ${JSON.stringify(jiuqu)}`)
   assert(jiuqu.events.length > 0 && jiuqu.toastVisible && /净高|无法通过/.test(jiuqu.toastText), `杉湖九曲桥未触发矮桥 toast: ${JSON.stringify(jiuqu)}`)
   console.log('6b. 杉湖九曲桥矮桥拦截通过:', {stopZ: +jiuqu.endZ.toFixed(1), toast: jiuqu.toastText})
+
+  // Bug 1 回归用例 (矮桥): 斜向顶住矮桥时按住 KeyW + KeyD 扫过桥面法向仍可顺畅转向，不因 +0.70m 前瞻锁死航向
+  const lowBridgeTurn = await runInPage(page, async ({press, step, faceTarget, readBoat}) => {
+    press('KeyS', true)
+    step(48)
+    press('KeyS', false)
+    await faceTarget(-1008, 660) // 斜向东南偏南 (~30°) 顶住东西向九曲桥
+    press('KeyW', true)
+    step(150)
+    const hStart = readBoat().heading
+    let minClear = Infinity
+    press('KeyD', true) // 按住 W 不放同时右转扫过正南法线
+    for (let i = 0; i < 84; i++) {
+      step(1)
+      const c = readBoat().clearanceInfo?.clearance
+      if (c !== undefined && Number.isFinite(c)) minClear = Math.min(minClear, c)
+    }
+    press('KeyD', false)
+    press('KeyW', false)
+    const hEnd = readBoat().heading
+    const turnDelta = Math.abs(Math.atan2(Math.sin(hEnd - hStart), Math.cos(hEnd - hStart)))
+    return {hStart, hEnd, turnDelta, minClear, endZ: readBoat().z}
+  })
+  assert(lowBridgeTurn.turnDelta > 0.70, `斜顶矮桥按住 W+D 转向被锁死: ${JSON.stringify(lowBridgeTurn)}`)
+  assert(lowBridgeTurn.minClear >= 0.30 && lowBridgeTurn.endZ < 684, `矮桥前转向期间净空不足或穿桥: ${JSON.stringify(lowBridgeTurn)}`)
+  console.log('6c. 斜顶矮桥按住 W+D 转向脱困通过:', {turnRad: +lowBridgeTurn.turnDelta.toFixed(2), minClear: +lowBridgeTurn.minClear.toFixed(2)})
 
   await page.close()
 

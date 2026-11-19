@@ -627,19 +627,24 @@ export function createFreeBoats(env: BoatEnv) {
 
       if (Math.abs(angVel * sub) > 1e-6) {
         const nextHeading = heading + angVel * sub
-        const turnCheck = evaluateHull(spec, boatX, boatZ, nextHeading, waterY, inFwd > 0.05)
+        const turnCheck = evaluateHull(spec, boatX, boatZ, nextHeading, waterY, false)
         if (turnCheck.ok) {
           heading = nextHeading
           targetWaterY = turnCheck.waterY
         } else {
           let nudged = false
-          if (turnCheck.reason === 'shallow' || turnCheck.reason === 'obstacle') {
-            for (const [nx, nz] of [[fwdX * 0.08, fwdZ * 0.08], [-rightX * 0.08, -rightZ * 0.08], [rightX * 0.08, rightZ * 0.08], [-fwdX * 0.08, -fwdZ * 0.08]] as const) {
-              const tryTurn = evaluateHull(spec, boatX + nx, boatZ + nz, nextHeading, waterY, false)
-              if (tryTurn.ok) {
-                boatX += nx; boatZ += nz; heading = nextHeading; targetWaterY = tryTurn.waterY; nudged = true
-                break
-              }
+          const nudgeOffsets = [
+            [-fwdX * 0.08, -fwdZ * 0.08],
+            [-rightX * 0.08, -rightZ * 0.08],
+            [rightX * 0.08, rightZ * 0.08],
+            [fwdX * 0.08, fwdZ * 0.08],
+            [-fwdX * 0.16, -fwdZ * 0.16],
+          ] as const
+          for (const [nx, nz] of nudgeOffsets) {
+            const tryTurn = evaluateHull(spec, boatX + nx, boatZ + nz, nextHeading, waterY, false)
+            if (tryTurn.ok) {
+              boatX += nx; boatZ += nz; heading = nextHeading; targetWaterY = tryTurn.waterY; nudged = true
+              break
             }
           }
           if (!nudged) {
