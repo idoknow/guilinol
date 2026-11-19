@@ -12,7 +12,7 @@ const views = [
   ['49', [-96,3.4,66.4], [-6,4.8,0], 19.1],
   ['58', [10,7.45,-18], [-125,6.65,-18], 20.3],
   ['60', [98,7.15,-20], [-145,30,-714], 20.3],
-  ['elevation', [0,3,85], [0,3,0], 14],
+  ['elevation', [0,3,85], [0,3,0], 19.1],
   ['aerial', [-220,150,160], [-35,4,0], 14],
 ]
 const server = await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
@@ -34,7 +34,7 @@ try {
       const world=([x,y,z])=>[bridge.position[0]+x*Math.cos(angle)+z*Math.sin(angle),bridge.position[1]+y,bridge.position[2]-x*Math.sin(angle)+z*Math.cos(angle)]
       if(name==='60'){camera.fov=24;camera.updateProjectionMatrix()}
       if(name==='elevation'){
-        camera.projectionMatrix.makeOrthographic(-151,151,33,-33,.1,900,camera.coordinateSystem)
+        camera.projectionMatrix.makeOrthographic(-151,151,33,-33,59,111,camera.coordinateSystem)
         camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert()
       }
       camera.layers.disable(2) // Collectible stamps are HUD markers in photo mode.
