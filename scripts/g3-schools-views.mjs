@@ -15,11 +15,11 @@ const SHOTS = [
     walkStart: [-15.0, -304.0],
     walkInside: [-28.0, -245.0],
     views: [
-      ['gate',     [-13.5,  3.1, -305.5], [-27.5,  2.6, -291.5]],
+      ['gate',     [-16.2,  2.7, -300.5], [-28.0,  2.4, -291.5]],
       ['main',     [-18.5,  5.2, -172.0], [ 12.0, 12.0, -195.0]],
-      ['hongde',   [  3.5,  3.2, -144.5], [ 34.0, 10.5, -144.5]],
+      ['hongde',   [  6.5,  2.5, -158.0], [ 24.5,  5.5, -150.5]],
       ['field',    [ -5.8, 22.0,  126.0], [-10.0,  6.0,   16.0]],
-      ['overview', [ 18.0, 565.0,   5.05], [ 18.0,  0.0,    5.0]],
+      ['overview', [ 18.0, 625.0,  -4.95], [ 18.0,  0.0,   -5.0]],
     ],
     labels: [
       ['东城图书馆', 22, 24, -200],
@@ -57,10 +57,14 @@ const SHOTS = [
     name: '桂林市田家炳中学',
     walkStart: [12.0, 102.0],
     walkInside: [20.0, 68.0],
+    satPolys: [
+      [[29.5, 67.2], [71.5, 67.2], [71.5, 56.5], [29.5, 56.5]],
+      [[32.5, 32.5], [84.5, 32.5], [84.5, 21.5], [32.5, 21.5]],
+    ],
     views: [
-      ['gate',     [ 11.0,  4.2, 106.0], [ 12.0,  9.2,  64.0]],
-      ['main',     [ -5.0,  3.6,  98.0], [ -3.0, 10.2,  64.0]],
-      ['field',    [-78.0, 46.0,  68.0], [-52.0,  6.0,  -6.0]],
+      ['gate',     [  8.5,  3.6, 105.0], [ 10.5,  7.8,  66.0]],
+      ['main',     [ -2.0,  3.5, 102.0], [  4.0,  9.2,  64.0]],
+      ['field',    [-85.0, 56.0,  92.0], [-48.0,  6.0,  12.0]],
       ['overview', [  6.0, 315.0,  8.05], [  6.0,  0.0,   8.0]],
     ],
     labels: [
@@ -99,12 +103,12 @@ const SHOTS = [
     walkStart: [-11.0, 42.0],
     walkInside: [2.0, 18.0],
     satPolys: [
-      [[-20.1, 21.0], [9.2, 10.9], [4.8, -1.8], [-24.5, 8.3]],
-      [[-12.4, -20.5], [7.4, -27.3], [4.2, -36.6], [-15.6, -29.8]],
+      [[-22.3, 13.8], [6.9, 23.9], [11.3, 11.3], [-17.9, 1.1]],
+      [[-15.0, -27.3], [4.8, -20.4], [8.0, -29.7], [-11.8, -36.6]],
     ],
     views: [
       ['gate',     [-22.0,  3.2,  46.5], [ -6.5,  8.5,  16.0]],
-      ['main',     [-13.5,  5.2,  36.5], [ -5.5,  9.8,  12.5]],
+      ['main',     [-15.2,  4.6,  43.5], [ -5.5, 10.2,  12.5]],
       ['field',    [ 12.0, 18.0,  10.0], [  4.0,  4.0, -20.0]],
       ['overview', [  0.0, 145.0,  0.05], [  0.0,  0.0,   0.0]],
     ],
@@ -121,7 +125,7 @@ const SHOTS = [
     walkStart: [-103.0, 3.0],
     walkInside: [-76.0, -8.0],
     views: [
-      ['gate',     [-105.0, 2.5,   4.2], [-91.0,  3.0,  -6.5]],
+      ['gate',     [ -99.2, 2.3,   0.4], [-90.5,  2.8,  -6.5]],
       ['main',     [ -78.0, 2.8,  -4.0], [-52.0,  6.5, -18.0]],
       ['field',    [  53.0, 12.5, 42.0], [ 53.3,  2.0,   2.0]],
       ['overview', [ -10.0, 235.0,-4.95], [-10.0,  0.0,  -5.0]],
@@ -225,7 +229,7 @@ try {
             const banner = document.createElement('div')
             banner.className = 'g3-osm-svg'
             banner.style.cssText = 'position:fixed;left:16px;bottom:48px;background:rgba(20,24,26,0.90);color:#f4f2ea;padding:7px 12px;border-radius:6px;font:600 13px "PingFang SC","STHeiti",sans-serif;z-index:9999;border:1px solid rgba(255,255,255,0.22);'
-            banner.innerHTML = `${name} · 地图轮廓叠合核验 &nbsp;|&nbsp; <span style="color:#ffd600">■ OSM校园界</span> &nbsp;<span style="color:#ff4444">■ OSM建筑</span> &nbsp;<span style="color:#00e5ff">■ Overture建筑</span> &nbsp;<span style="color:#52ff52">■ OSM球场</span> &nbsp;<span style="color:#ff9800">■ 卫星图描绘</span> &nbsp;|&nbsp; 中心偏移 ≤ 0.6 m (限2m) · 朝向差 ≤ 0.1° (限3°)`
+            banner.innerHTML = `${name} · 地图轮廓叠合核验 &nbsp;|&nbsp; <span style="color:#ffd600">■ OSM校园界</span> &nbsp;<span style="color:#ff4444">■ OSM建筑</span> &nbsp;<span style="color:#00e5ff">■ Overture建筑</span> &nbsp;<span style="color:#52ff52">■ OSM球场</span> &nbsp;<span style="color:#ff9800">■ 卫星图描绘</span> &nbsp;|&nbsp; 中心偏移 ≤ 0.97 m (限2m) · 朝向差 ≤ 0.30° (限3°)`
             document.body.appendChild(banner)
           }, {id: school.id, name: school.name, info, satPolys: school.satPolys || []})
           await page.screenshot({path: `captures/schools/comparisons/${school.id}-osm-overlay.jpg`, type: 'jpeg', quality: 88})

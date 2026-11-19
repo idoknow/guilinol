@@ -61,19 +61,24 @@ def _build_pingfeng_gate_and_main(b: Builder):
     b.footprint_building(OV_TJB_MAIN, floors=5, floor_h=3.65, wall='white', accent='white', roof_kind='flat', roof_tile='silver_roof')
     prev = b.pose
     b.pose = (-6.8, 0.0, 74.6, 0.0)
-    # Gently bowed front glass curtain wall across central 24m of south facade (floors 1..5)
+    # Gently bowed front glass curtain wall across central 23m of south facade (floors 2..4) with crisp white spandrels & mullions
     segs = 8 if b.detail else 4
     for i in range(segs):
         t0, t1 = -1.0 + 2.0 * i / segs, -1.0 + 2.0 * (i + 1) / segs
-        x0, x1 = t0 * 12.5, t1 * 12.5
-        z0 = 1.65 * (1.0 - t0 * t0)
-        z1 = 1.65 * (1.0 - t1 * t1)
-        b.face([(x0, 0.6, z0), (x1, 0.6, z1), (x1, 17.8, z1), (x0, 17.8, z0)],
+        x0, x1 = t0 * 11.8, t1 * 11.8
+        z0 = 1.55 * (1.0 - t0 * t0)
+        z1 = 1.55 * (1.0 - t1 * t1)
+        xm, zm = (x0 + x1) / 2, (z0 + z1) / 2
+        seg_w = abs(x1 - x0) + 0.18
+        # White curved ground-floor colonnade band & 5th-floor fascia band (matching ref #00)
+        b.box(xm, 0.0, zm - 0.25, seg_w, 3.65, 0.55, 'white', tile=2.0)
+        b.box(xm, 14.5, zm - 0.25, seg_w, 4.15, 0.55, 'white', tile=2.0)
+        b.face([(x0, 3.65, z0), (x1, 3.65, z1), (x1, 14.5, z1), (x0, 14.5, z0)],
                ((t0 + t1) * 0.25, 0.0, 1.0), 'glass', tile=2.4, lit=True)
         if b.detail:
-            # White horizontal spandrel mullions & vertical frame ribs
-            b.box((x0 + x1) / 2, 17.8, (z0 + z1) / 2, abs(x1 - x0) + 0.2, 0.85, 0.6, 'white', tile=2.0)
-            b.box(x0, 0.5, z0 + 0.06, 0.22, 17.4, 0.22, 'white', tile=1.8)
+            for wy in (7.25, 10.90):
+                b.box(xm, wy, zm + 0.05, seg_w, 0.28, 0.16, 'white', tile=1.8)
+            b.box(x0, 3.6, z0 + 0.06, 0.22, 11.0, 0.18, 'white', tile=1.8)
     # Iconic winged / arched roof overhang ('楼顶弧形挑檐', ref #00)
     for i in range(-4, 5):
         xc = i * 2.6

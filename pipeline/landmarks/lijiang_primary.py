@@ -84,14 +84,12 @@ def _build_main_building_and_gate(b: Builder):
     # Closed stainless-steel retractable gate across vehicle opening [-2.8 .. +3.6]
     b.retractable_gate(-2.75, 3.55, gz_line, h=1.32)
 
-    # Right (+X): White flat-canopy pedestrian portal with red LED banner ('首层门头挂红色 LED 字幕', ref #00 right!)
-    # Open pedestrian bays [4.2 .. 7.8] between white piers so walkability into campus is seamless!
+    # Right (+X): White flat-canopy pedestrian portal with red LED banner ('首层门头挂红色 LED 字幕', ref #00 right; no guardhouse!)
     for px in (4.0, 8.2, 12.2):
-        b.box(px, 0.0, gz_line, 0.85, 3.85, 1.15, 'white', base_mat if False else 'white', tile=1.6, collide=True)
-    # Side wall on far right bay [8.6..12.2] (non-guardhouse architectural wall, open walk bay is [4.4..7.8])
-    b.box(10.2, 0.0, gz_line - 0.6, 3.8, 3.65, 2.2, 'white', tile=1.8, collide=True)
-    b.box(10.2, 0.0, gz_line + 0.52, 3.8, 1.0, 0.12, 'terracotta', tile=1.4)
-    b.box(10.2, 1.2, gz_line + 0.52, 2.4, 1.6, 0.10, 'glass', tile=1.6)
+        b.box(px, 0.0, gz_line, 0.95, 3.85, 1.15, 'white', cap_region='white', tile=1.6, collide=True)
+    # Continuation of low blue-white boundary wall on far right [8.7..15.2] (zero guardhouse/room!)
+    b.box(11.9, 0.0, gz_line, 6.2, 2.25, 0.38, 'white', cap_region='blue_facade', tile=1.8, collide=True)
+    b.box(11.9, 0.65, gz_line + 0.21, 4.8, 1.05, 0.06, 'terracotta', tile=1.4)
     # White flat roof canopy + bright red LED banner across [3.6 .. 12.6]
     b.box(8.1, 3.75, gz_line + 0.15, 9.4, 0.65, 2.8, 'white', cap_region='silver_roof', tile=1.8, bottom=True)
     b.box(8.1, 3.18, gz_line + 1.42, 8.6, 0.62, 0.22, 'led_bg', tile=1.0)

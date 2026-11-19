@@ -200,7 +200,7 @@ def build_glmu(b: Builder):
     b.sign_board(0, 23.2, 0.35, 6.4, 1.45, 'bld_hongde', backing='terracotta', depth=0.15)
     b.pose = prev
     # '弘德善医' natural boulder in circular flowerbed in front of Hongde Building west plaza
-    b.motto_stone(18.5, -144.5, -math.pi / 2, 'glmu_motto', w=4.6, h=2.35)
+    b.motto_stone(17.5, -153.5, -1.35, 'glmu_motto', w=4.8, h=2.55)
 
     # 4. Second Teaching Building (way/671790070)
     b.footprint_building(COLLEGE_671790070, floors=6, floor_h=3.55, wall='cream', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')

@@ -89,6 +89,11 @@ def _font(size, bold=False, sans=False):
                 return ImageFont.truetype(path, size, index=0)
             except OSError:
                 continue
+    for bare in ('NotoSansCJK-Bold.ttc', 'NotoSansCJK-Regular.ttc'):
+        try:
+            return ImageFont.truetype(bare, size)
+        except OSError:
+            continue
     raise SystemExit('g3_kit: no CJK font found for school plaques.')
 
 
@@ -434,7 +439,7 @@ class Builder:
             for i in range(len(pts)):
                 j = (i + 1) % len(pts)
                 a, b = pts[i], pts[j]
-                nrm = (a[1] - b[1], 0.0, b[0] - a[0])
+                nrm = (b[1] - a[1], 0.0, a[0] - b[0])
                 quad = [(a[0], y0, a[1]), (b[0], y0, b[1]), (b[0], y1, b[1]), (a[0], y1, a[1])]
                 self.face(quad, nrm, region, tile=tile)
                 if collide and self.collide and h >= 0.35:
@@ -481,7 +486,7 @@ class Builder:
             if seg_len < 4.8:
                 continue
             ux, uz = dx / seg_len, dz / seg_len
-            nx, nz = (a[1] - b[1]) / seg_len, (b[0] - a[0]) / seg_len
+            nx, nz = (b[1] - a[1]) / seg_len, (a[0] - b[0]) / seg_len
             inset = min(1.1, seg_len * 0.10)
             w_len = seg_len - 2 * inset
             if w_len < 2.2:
