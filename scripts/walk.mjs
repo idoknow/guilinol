@@ -61,17 +61,27 @@ try{
   assert(Math.hypot(second.last.x+958.008,second.last.z-1102.738)<30,'outside Elephant Hill foot')
   }
   if(mainOnly&&!treeOnly){console.log('main route render clearance',await page.evaluate(()=>window.renderStats));assert.deepEqual(errors,[])}else{
-  async function fixture(x,z){assert(await page.evaluate(async([x,z])=>{const walk=window.viewer.walk;walk.leave();const ok=await walk.enter(x,z,0,'fixture');if(ok)window.checkedProbe(`spawn:${x},${z}`);return ok},[x,z]))}
+  async function fixture(x,z){
+    await page.evaluate(async ([x,z])=>{
+      if(!await window.viewer.walkTo(x,z,0,'fixture')) throw Error(`No walkable fixture at ${x},${z}`)
+      window.checkedProbe(`spawn:${x},${z}`)
+    },[x,z])
+  }
   async function press(x,z,seconds,label){return page.evaluate(async({x,z,seconds,label})=>{const walk=window.viewer.walk,start=window.checkedProbe(label),hits=new Set();let shore=false,last=start
     walk.drive(x,z);while(last.elapsed-start.elapsed<seconds){await new Promise(requestAnimationFrame);last=window.checkedProbe(label);for(const hit of last.hits)hits.add(hit);shore||=last.blockedWater;if(last.inHouse||last.inPeak||last.resets||last.clearance<-.3)throw Error(JSON.stringify(last))
       if(label==='tree'&&Math.hypot(last.x-window.trunkFixture.x,last.z-window.trunkFixture.z)<window.trunkFixture.radius)throw Error(`trunk penetration: ${JSON.stringify(last)}`)}
     walk.drive(0,0);return {last,hits:[...hits],shore,distance:Math.hypot(last.x-start.x,last.z-start.z)}},{x,z,seconds,label})}
-  if(!treeOnly){await fixture(-588,-212);const building=await press(0,-1,7,'building');assert(building.hits.includes('building')&&building.distance<55,JSON.stringify(building))}
+  if(!treeOnly){
+    // Same ordinary facade as walk-quick; the old wall is now the open Jingjiang gate.
+    await fixture(-730.68,-277.1)
+    const building=await press(-.166,.986,2,'building')
+    assert(building.hits.includes('building')&&building.distance<12,JSON.stringify(building))
+  }
   await page.waitForFunction(()=>{const {manifest,stream}=window.viewer;return stream.forest.loaded.has(manifest.chunks.find(tile=>tile.x===Math.floor(-577/256)*256&&tile.z===Math.floor(-209/256)*256))})
   const tree=await page.evaluate(()=>{const candidate=[...window.viewer.stream.forest.loaded.values()].flat().filter(item=>item.kind!==5).sort((a,b)=>Math.hypot(a.x+577,a.z+209)-Math.hypot(b.x+577,b.z+209))[0];return window.trunkFixture={x:candidate.x,z:candidate.z,radius:.42*candidate.scale+.29-.04}})
   await fixture(tree.x-2,tree.z);const trunk=await press(1,0,1.25,'tree');assert(trunk.hits.includes('tree'),JSON.stringify(trunk))
   if(treeOnly){console.log('tree-only',JSON.stringify({tree,distance:trunk.distance,hits:trunk.hits}));assert.deepEqual(errors,[])}else{
-  await fixture(-756.17,-253.92);const curb=await press(.989,.150,1,'curb');assert(curb.distance>3&&curb.hits.includes('sidewalk'),JSON.stringify(curb))
+  await fixture(-840,-275);const curb=await press(1,0,1,'curb');assert(curb.distance>3&&curb.hits.includes('sidewalk'),JSON.stringify(curb))
   await fixture(-1021.82,435.97);const rail=await press(.967,-.254,2,'rail');assert(rail.hits.includes('rail')&&!rail.last.wet&&rail.distance<4.5,JSON.stringify(rail));await shot('bank')
   await fixture(-962,1096);const cliff=await press(.8,.6,9,'cliff');assert(cliff.hits.includes('peak')&&cliff.distance<72,JSON.stringify(cliff))
   await fixture(-309,-1);const bridge=await drive([[-174,44]],'bridge');await shot('bridge');const far=await drive([[-30,92]],'bridge');assert(bridge.wetFrames+far.wetFrames>0)

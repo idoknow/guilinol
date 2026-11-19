@@ -4,6 +4,8 @@ import { createWriteStream } from 'node:fs'
 import { once } from 'node:events'
 
 const dir = 'captures/qa'
+const mac = process.platform === 'darwin'
+const timeouts = { 'verify:walk:full': 32, 'photo-match': mac ? 10 : 180 }
 const steps = [
   'world',
   'landmarks',
@@ -40,7 +42,7 @@ async function run(step) {
       timedOut = true
       stop()
     },
-    (step === 'verify:walk:full' ? 32 : 10) * 60000,
+    (timeouts[step] ?? 10) * 60000,
   )
   let output = ''
   for (const stream of [child.stdout, child.stderr])
@@ -91,15 +93,20 @@ for (const step of steps) {
   const report = [
     '# 全量 QA',
     '',
-    revision + ' · ' + new Date(start).toISOString() + ' · ' + seconds.toFixed(1) + ' 秒 / 2400 秒',
+    revision +
+      ' · ' +
+      new Date(start).toISOString() +
+      ' · ' +
+      seconds.toFixed(1) +
+      (mac ? ' 秒 / 2400 秒' : ' 秒'),
     '',
     '步骤 | 结果 | 秒 | 首帧 ms | 平均 draw calls | 原因',
     '---|---|---:|---:|---:|---',
     ...rows,
     '',
-    '照片按地面 +1.5 m、朝向修正 0°。— 表示该步骤未采样。逐项日志保存在本目录。',
+    '照片按步行支撑面 +1.5 m、朝向修正 0°。— 表示该步骤未采样。逐项日志保存在本目录。',
     '',
   ]
   await writeFile(dir + '/report.md', report.join('\n'))
-  if (status === '失败' || seconds > 2400) process.exitCode = 1
+  if (status === '失败' || (mac && seconds > 2400)) process.exitCode = 1
 }

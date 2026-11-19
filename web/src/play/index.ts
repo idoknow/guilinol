@@ -210,5 +210,5 @@ export function play(host:Host) {
     if(summit&&host.camera.position.distanceTo(summit.eye)>220) leaveSummit()
     photo.tick(); map?.tick(dt)
   }
-  return {tick, spots, groundAt, goTo, goPoint, openBook, photo, stamps, get map(){return map}}
+  return {tick, spots, goTo, goPoint, openBook, photo, stamps, get map(){return map}}
 }

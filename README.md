@@ -47,11 +47,11 @@ npm run preview
 ```sh
 npm run qa
 # 已完成 world、landmarks、build 后，可单独重拍
-npm run photo-match -- IMG_1313.jpg IMG_1314 --yaw-offset=-5 --height=1.7
+npm run photo-match -- IMG_1313.jpg IMG_1401 --yaw-offset=-5 --height=1.7
 npm run photo-match -- walk-shizijie-wangcheng
 npm run photo-match -- --all
 ```
 
-在 `captures/photo-match/index.html` 查看本次选择的机位。左图是实拍，右图是游戏，点击「50% 叠加」检查轮廓。相机放在 EXIF 坐标处，按已加载的地形三角面取高（默认加 1.5 m），俯仰固定为 0°，统一正午晴天。正的朝向修正向右转。两张磁北照片（IMG_1425、1426）按拍摄地点与日期的 WMM2025 磁偏角 −3.08° 换算为真北。水平视场角按等效焦距换算，长边最多 960 px。桥面高差、拍摄者仰俯和 GPS 误差都可能影响叠合。
+在 `captures/photo-match/index.html` 查看本次选择的机位。左图是实拍，右图是游戏，点击「50% 叠加」检查轮廓。相机放在 EXIF 坐标处，复用步行物理的支撑面查询，依次取桥面、人行道、地面，并以水位为下限（默认加 1.5 m），标题显示支撑面、支撑高程和相机高程。已知在桥上拍摄且原点落水的照片，仅在 GPS 精度圈内借最近桥面的高度；横向机位保持实测值，并列出借高距离。俯仰固定为 0°，统一正午晴天。正的朝向修正向右转。两张磁北照片（IMG_1425、1426）按拍摄地点与日期的 WMM2025 磁偏角 −3.08° 换算为真北。水平视场角按等效焦距换算，长边最多 960 px。桥面高差、拍摄者仰俯和 GPS 误差都可能影响叠合。
 
-`npm run qa` 依次重建世界、地标与生产包，跑飞行、完整步行、骑行、导览、严格体检及全量照片。当前分支尚无 `audit` 时会在报告中标为跳过。各阶段耗时、浏览器首帧、draw calls 和错误摘要见 `captures/qa/report.md`，同目录保留逐项日志。Mac QA 使用 Metal，Linux 使用 SwiftShader。浏览器基线取连续 12 帧，照片步骤按全部机位平均。任一步骤失败或累计超过 40 分钟会返回非零。地标和分享图构建会写入 `public/`，建议在专用工作树运行。
+`npm run qa` 依次重建世界、地标与生产包，跑飞行、完整步行、骑行、导览、严格体检及全量照片。当前分支尚无 `audit` 时会在报告中标为跳过。各阶段耗时、浏览器首帧、draw calls 和错误摘要见 `captures/qa/report.md`，同目录保留逐项日志。飞行、步行、骑行和导览断言统一使用 SwiftShader。Mac 的同机位截图使用 Metal。浏览器基线取连续 12 帧，照片步骤按全部机位平均。任一步骤失败或 Mac 上累计超过 40 分钟会返回非零。地标和分享图构建会写入 `public/`，建议在专用工作树运行。

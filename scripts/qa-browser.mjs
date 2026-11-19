@@ -1,5 +1,5 @@
 // Linux CI uses SwiftShader. Headless Chromium on Mac can render on the Metal GPU.
-export function browserOptions(nativeMac = Boolean(process.env.QA_METRICS)) {
+export function browserOptions(nativeMac = false) {
   return {
     executablePath: process.env.CHROMIUM,
     args:

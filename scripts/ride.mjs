@@ -25,7 +25,7 @@ try{
     await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
     await recordFrames(page)
     if(!mobile){const boat=await lakeChecks(page,data,output);assert(boat.roof<=bounds.boat.roof+1e-6&&boat.head<=bounds.boat.head+1e-6)}
-    async function fixture(x,z){assert(await page.evaluate(async([x,z])=>{const walker=window.viewer.walk;walker.leave();return walker.enter(x,z,0,'ride-fixture')},[x,z]))}
+    async function fixture(x,z){assert(await page.evaluate(([x,z])=>window.viewer.walkTo(x,z,0,'ride-fixture'),[x,z]))}
     const button=page.locator('.vehicle-action')
     async function interact(label){const close=page.locator('.spot-card.show .card-close');if(await close.isVisible())await close.click();await page.waitForFunction(label=>document.querySelector('.vehicle-action')?.textContent.includes(label),label);if(mobile)await button.tap();else await page.keyboard.press('e')}
     async function shot(name){await page.screenshot({path:`${output}/${name}.png`})}
