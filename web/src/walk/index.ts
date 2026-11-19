@@ -164,15 +164,15 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;blockedWater=true}
         }
       }
-      if(rides?.bike){let obstacle=false;const footY=next.y-cfg.height/2
+      if(rides?.bike){let obstacle='';const footY=next.y-cfg.height/2
         if(Math.hypot(move.x,move.z)<speed*step*.35)for(let at=0;at<sim.controller.numComputedCollisions();at++){
           const contact=sim.controller.computedCollision(at),ckind=contact?.collider&&sim.kinds.get(contact.collider.handle)
           if(contact&&contact.normal1.y<Math.cos(cfg.slope)){
             if((ckind==='deck'||ckind==='ground'||ckind==='sidewalk')&&contact.witness1.y<=footY+cfg.step+.05)continue
-            obstacle=true;break
+            obstacle=ckind==='building'?'building':'collision';break
           }
         }
-        const reason=sim.insideHouse(next.x+delta.x*.72,next.z+delta.y*.72)?'building':!rides.pavement(next.x,next.z)?'off-road':obstacle?'collision':''
+        const reason=sim.insideHouse(next.x+delta.x*.72,next.z+delta.y*.72)?'building':!rides.pavement(next.x,next.z)?'off-road':obstacle
         if(reason){bikeObstacle=reason;next.x=pos.x;next.z=pos.z;rides.stop();speed=0}}
       traveled+=Math.hypot(next.x-pos.x,next.z-pos.z);sim.body.setNextKinematicTranslation(next);sim.world.step();if(grounded&&!blockedWater)safe.set(next.x,next.y,next.z)
     }

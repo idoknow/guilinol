@@ -87,7 +87,7 @@ try {
   const consoleWarnings = []
   page.on('pageerror', err => consoleErrors.push(err.message))
   page.on('console', msg => {
-    if (msg.type() === 'error') consoleErrors.push(msg.text())
+    if (msg.type() === 'error') consoleErrors.push([msg.location().url, msg.text()].filter(Boolean).join(' '))
     else if (msg.type() === 'warning') consoleWarnings.push(msg.text())
   })
   await page.route('**/favicon.ico', route => route.fulfill({status: 204}))

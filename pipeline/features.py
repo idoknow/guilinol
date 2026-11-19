@@ -76,11 +76,29 @@ def ground_features(bounds, school_grounds=()):
     return layers
 
 
+def overture_geometry(row):
+    shape = affine_transform(from_wkt(row['wkt']), [MLON, 0, 0, -MLAT, -LON0*MLON, LAT0*MLAT])
+    if row['id'] == '94d505df-4dd6-4bdf-b242-be218cce7937':
+        # IMG_1299 shows an open sidewalk at the survey point. Set the Rongyin
+        # frontage behind it, parallel to the existing east facade of this block.
+        photo = json.loads((Path(__file__).resolve().parents[1] / 'docs/refs/rock/photo-locations.json').read_text())['IMG_1299.jpg']
+        eye = np.array([photo['x'], photo['z']])
+        along = np.array([11.22, -24.99])
+        along /= np.linalg.norm(along)
+        inward = np.array([along[1], -along[0]])
+        edge = eye + inward * 2
+        reach = shape.length
+        cut = Polygon([edge + a * along + b * inward for a, b in
+                       [(-reach, 0), (reach, 0), (reach, reach), (-reach, reach)]])
+        shape = shape.intersection(cut)
+    return shape
+
+
 def raw_overture_footprints(bounds):
     out = []
     with (Path(RAW)/'overture_buildings.csv').open() as source:
         for row in csv.DictReader(source, delimiter='\t'):
-            geometry = affine_transform(from_wkt(row['wkt']), [MLON, 0, 0, -MLAT, -LON0*MLON, LAT0*MLAT])
+            geometry = overture_geometry(row)
             if geometry.intersects(bounds):
                 out.extend(polygons(make_valid(geometry)))
     return out
@@ -101,7 +119,7 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
     removed_road, clipped_road, clipped_sw = 0, 0, 0
     with (Path(RAW)/'overture_buildings.csv').open() as source:
         for row in csv.DictReader(source, delimiter='\t'):
-            geometry = affine_transform(from_wkt(row['wkt']), [MLON, 0, 0, -MLAT, -LON0*MLON, LAT0*MLAT])
+            geometry = overture_geometry(row)
             if row['id'] in layout.ids:
                 replace_excl = replace_excl.union(geometry)
                 layout.exclude = layout.exclude.union(geometry)
