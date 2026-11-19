@@ -109,7 +109,14 @@ def build(b: Builder):
     # Solid platform. South face is one wall with the arch; the other three sides
     # are single faces, chamfered at the corners and inset 0.45 m at the top.
     front_z = 9.4
+    first_vertex=len(wall.pos)
     arch_wall(wall, (0, 0, front_z), 15.6, deck, 2.6, 3.6, 4.6, 'ashlar', 8 if detail else 4, tile=2.6)
+    for index in range(first_vertex,len(wall.pos)):
+        east,level,south=wall.pos[index]
+        wall.pos[index]=(east,level,south-.19*level)
+        nx,ny,nz=wall.nrm[index];ny+=.19*nz
+        length=math.sqrt(nx*nx+ny*ny+nz*nz)
+        wall.nrm[index]=(nx/length,ny/length,nz/length)
     inset = 1.15
     # bottom (x, z), top (x, z). Order walks the outside from the front corners back.
     foot = [(-7.6, 8.1), (-8.6, 6.6), (-8.6, -1.4), (-7.2, -2.8), (7.2, -2.8), (8.6, -1.4), (8.6, 6.6), (7.6, 8.1)]
@@ -149,7 +156,7 @@ def build(b: Builder):
     yaw_box(wall, (-0.78, 1.85, 8.7), (1.45, 3.5, 0.08), 0.55, 'door', None)
     yaw_box(wall, (0.78, 1.85, 8.7), (1.45, 3.5, 0.08), math.pi - 0.55, 'door', None)
     # 4.8 m plaque. At 10 m and a 60° view it covers ~27° , enough for the three characters.
-    board(wall, 0, 5.55, 10.85, 4.8, 1.45, 'sign_gate')
+    wall.face([(east,level,10.75-.19*level) for east,level in ((-2.4,4.84),(2.4,4.84),(2.4,6.26),(-2.4,6.26))],(0,.19,1),'sign_gate',uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
     post = 0.7 if detail else 4.5
     railing(wall, (-6.4, 7.6), (-1.6, 7.6), deck, 0.95, 'ashlar', post, stone=True)
     railing(wall, (1.6, 7.6), (6.4, 7.6), deck, 0.95, 'ashlar', post, stone=True)
