@@ -16,7 +16,10 @@ Colors: see c_kit.paint_atlas. Rubble #a8a498 with dark joints and moss,
 vermilion door #8e3034, ochre wall #d2ae58, gray tile #58595b, plaza #989389.
 """
 import math
+import random
 import sys
+from PIL import Image, ImageDraw
+from c_kit import RECTS, ATLAS
 from rong_street import shops, signs, approach
 from rong_solids import loft, oval, banyan as solid_tree
 from pathlib import Path
@@ -35,11 +38,38 @@ def board(mesh, x, y, z, w, h, region):
     )
 
 
-def _battered(mesh, p0, p1, q1, q0, y0, y1, region='ashlar'):
+def stone_cells(image):
+    rng = random.Random(1315)
+    for index, name in enumerate(('coursed', 'ivywall')):
+        left, top = index * 320, 896
+        RECTS[name] = (left, top, 320, 128)
+        tile = Image.new('RGB', (320, 128), '#424440')
+        brush = ImageDraw.Draw(tile)
+        row = 0
+        while row < 128:
+            height = rng.randint(10, 15)
+            edge = -rng.randint(0, 38)
+            while edge < 320:
+                width = rng.randint(20, 49)
+                tone = rng.randint(120, 168) - index * 47
+                brush.polygon([(edge+2,row+1),(edge+width-2,row),(edge+width,row+height-3),(edge+width-4,row+height-1),(edge,row+height-2)], fill=(tone,tone+1,tone-2))
+                edge += width
+            row += height
+        if index:
+            for column in range(320):
+                reach = int(39+24*math.sin(column*.033)+14*math.cos(column*.091)+rng.randrange(8))
+                for leaf in range(0,reach,2):
+                    green=rng.randrange(44,84)
+                    brush.ellipse((column-2,leaf,column+2,leaf+3), fill=(green//2,green,green//2-2))
+        image.paste(tile,(left,top))
+
+
+def _battered(mesh, p0, p1, q1, q0, y0, y1, region='coursed', span=(.005,.995)):
     """One wall face. p is the bottom edge, q the top edge, so the wall can lean in."""
     mesh.face(
         [(p0[0], y0, p0[1]), (p1[0], y0, p1[1]), (q1[0], y1, q1[1]), (q0[0], y1, q0[1])],
-        ((p0[0] + p1[0]) * 0.5, (y0 + y1) * 0.5, (p0[1] + p1[1]) * 0.5), region, 2.6,
+        ((p0[0] + p1[0]) * 0.5, 0, (p0[1] + p1[1]) * 0.5), region,
+        uvs=[(span[0],.99),(span[1],.99),(span[1],.01),(span[0],.01)],
     )
 
 
@@ -60,33 +90,37 @@ def ancient_banyan(builder, east, south):
 def courtyard(builder, deck):
     wall = builder.parts['atlas']
     for center in (-6.5, 6.5):
-        loft(wall,[(center,0,7.9,3.75,3.45),(center,deck,7.9,2.35,2.1)],'rubble',24 if builder.detail else 12)
-    solid_tree(wall, (7.2, deck, 6.7), 5.6, 3.2, 82, builder.detail)
+        count = 28 if builder.detail else 16
+        for index in range(count):
+            angles=[step*math.tau/count for step in (index,index+1)]
+            foot=[(center+3.75*math.cos(angle),7.9+3.45*math.sin(angle)) for angle in angles]
+            head=[(center+2.35*math.cos(angle),7.9+2.1*math.sin(angle)) for angle in angles]
+            points=[(east,level,south) for (east,south),level in zip([*foot,*reversed(head)],(0,0,deck,deck))]
+            start=.005+.99*index/count; end=.005+.99*(index+1)/count
+            wall.face(points,(math.cos(sum(angles)/2),0,math.sin(sum(angles)/2)),'coursed',uvs=[(start,.99),(end,.99),(end,.01),(start,.01)])
+        wall.face([(center+2.35*math.cos(step*math.tau/count),deck,7.9+2.1*math.sin(step*math.tau/count)) for step in range(count)],(0,1,0),'granite')
+    solid_tree(wall, (7.2, deck, 6.7), 5.6, 3.2, 82, builder.detail,lobed=False)
     for offset in (-4.5, -1.5, 1.5, 4.5):
         cylinder(wall, (offset, deck + 2.48, 7.6), .24, .45, 'vermilion', 8)
         cylinder(wall, (offset, deck + 2.34, 7.6), .045, .14, 'yellow', 5)
     box(wall, (-15, 1.15, 9), (12, 2.3, 1.15), 'ashlar')
-    curve = [(11*math.cos(angle), -1.6-6*math.sin(angle)) for angle in
-             [math.pi*index/12 for index in range(13)]]
-    for start, end in zip(curve, curve[1:]):
-        segment_wall(wall, start, end, 0, deck, .8, 'rubble')
-        for fraction in (.12,.42,.72):
-            east=start[0]+(end[0]-start[0])*fraction
-            south=start[1]+(end[1]-start[1])*fraction
-            oval(wall,(east,4.5+math.sin(east),south-.48),(.62,1.23,.22),'foliage',7)
-        if start[0]>6:
-            short=[(east*1.21,south*1.22) for east,south in (start,end)]
-            segment_wall(wall,*short,0,2.4,.56,'vermilion')
-            segment_wall(wall,*short,2.4,2.62,.78,'glaze')
-        hedge = [(east*1.12,north*1.12) for east,north in (start,end)]
-        segment_wall(wall, *hedge, 0, .85, 1, 'foliage')
+    box(wall,(0,deck/2,-4.5),(22,deck,3.4),'ashlar')
+    _battered(wall,(-11,-6.8),(11,-6.8),(11,-6.21),(-11,-6.21),0,deck,'ivywall')
+    railing(wall,(-10.7,-6.05),(10.7,-6.05),deck,.95,'white',1.2,stone=True)
+    box(wall,(-2,.55,-7.9),(20,1.1,1.2),'foliage')
+    if builder.collide:
+        box(builder.hit,(0,deck/2,-4.5),(22,deck,3.4),'ashlar')
+    curve=[(3+index*1.6,-9.8+.04*(index-4)**2) for index in range(10)]
+    for start,end in zip(curve,curve[1:]):
+        segment_wall(wall,start,end,0,1.8,.42,'vermilion')
+        segment_wall(wall,start,end,1.8,2.02,.64,'glaze')
         if builder.collide:
-            segment_wall(builder.hit, start, end, 0, 5.55, .6, 'rubble')
+            segment_wall(builder.hit,start,end,0,2,.42,'ashlar')
     for row in range(7):
         front=-10-row*2
         for east in range(-19,19,2):
             corners=[(east,front),(east+2,front),(east+2,front-2),(east,front-2)]
-            wall.face([(xx,.22+max(0,-zz-10)*.092,zz) for xx,zz in corners],(0,1,0),'granite',None)
+            wall.face([(xx,.54+max(0,-zz-10)*.092,zz) for xx,zz in corners],(0,1,0),'granite',None)
     box(wall, (14.2,1.5,4.34),(2.2,3,.22),'wood')
     for south in (2.75,5.25):
         wall.face([(11.9,3.28,south),(16.5,3.28,south),(16.5,4.25,4),(11.9,4.25,4)],(0,1,south-4),'glaze',None)
@@ -113,6 +147,9 @@ def build(b: Builder):
     arch_wall(wall, (0, 0, front_z), 15.6, deck, 2.6, 3.6, 4.6, 'ashlar', 8 if detail else 4, tile=2.6)
     for index in range(first_vertex,len(wall.pos)):
         east,level,south=wall.pos[index]
+        if abs(wall.nrm[index][2])>.9:
+            left,top,width,height=RECTS['coursed']
+            wall.uv[index]=((left+width*(.5+east/16))/ATLAS,1-(top+height*(.99-.98*level/deck))/ATLAS)
         wall.pos[index]=(east,level,south-.19*level)
         nx,ny,nz=wall.nrm[index];ny+=.19*nz
         length=math.sqrt(nx*nx+ny*ny+nz*nz)
@@ -195,6 +232,7 @@ def main():
     folder = Path(sys.argv[1])
     image = ensure_textures(folder)
     signs(image)
+    stone_cells(image)
     hi, lo = Builder(0, True), Builder(1, False)
     build(hi)
     build(lo)

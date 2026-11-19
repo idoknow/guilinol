@@ -26,37 +26,47 @@ def oval(mesh, center, radii, region, sides=12):
     loft(mesh,sections,region,sides)
 
 
-def banyan(mesh,origin,height,crown,seed,detail):
+def banyan(mesh,origin,height,crown,seed,detail,lobed=True):
     east,level,south=origin
     scale=height/14
-    loft(mesh,[(east,level,south,1.65*scale,1.55*scale),
-               (east-.28*scale,level+.95*scale,south,1.34*scale,1.28*scale),
-               (east+.22*scale,level+2.9*scale,south-.18,1.04*scale,.97*scale),
-               (east+.1,level+height*.37,south+.16,.81*scale,.86*scale)],'bark',12 if detail else 7)
+    girth=scale*(2.18 if lobed else 1)
+    loft(mesh,[(east,level,south,1.65*girth,1.55*girth),
+               (east-.28*scale,level+.95*scale,south,1.34*girth,1.28*girth),
+               (east+.22*scale,level+2.9*scale,south-.18,1.04*girth,.97*girth),
+               (east+.1,level+height*.37,south+.16,.81*girth,.86*girth)],'bark',12 if detail else 7)
     for index in range(5):
         angle=index*math.tau/5+seed*.55
         cosine,sine=math.cos(angle),math.sin(angle)
         fork=(east+crown*.34*cosine,level+height*.55,south+crown*.34*sine)
         tip=(east+crown*.65*cosine,level+height*.62,south+crown*.65*sine)
-        tube(mesh,(east,level+height*.31,south),fork,.64*scale,'bark',7)
-        tube(mesh,fork,tip,.34*scale,'bark',6)
+        tube(mesh,(east,level+height*.31,south),fork,.64*girth,'bark',7)
+        tube(mesh,fork,tip,.34*girth,'bark',6)
         if detail:
             for root in range(5):
+                if lobed and root!=2:
+                    continue
                 fraction=.22+root*.17
                 anchor=tuple(start+(end-start)*fraction for start,end in zip(fork,tip))
                 endlevel=level if root==2 and index in (1,4) else anchor[1]-height*(.11+.05*((index+root)%4))
                 tube(mesh,anchor,(anchor[0],endlevel,anchor[2]),.14*scale if endlevel==level else .035*scale,'bark',5)
-    oval(mesh,(east,level+height*.72,south),(crown,height*.31,crown*.86),'foliage',22 if detail else 10)
+    if not lobed:
+        oval(mesh,(east,level+height*.72,south),(crown,height*.31,crown*.86),'foliage',22 if detail else 10)
+        return
+    for index in range(7):
+        phase=seed*.55+index*math.tau/6
+        offset=.53 if index<6 else 0
+        middle=(east+crown*offset*math.cos(phase),level+height*(.70+.075*math.sin(phase*2) if index<6 else .92),south+crown*offset*math.sin(phase))
+        oval(mesh,middle,(crown*.56,height*(.23+.04*(index%3)),crown*.50),'foliage',10 if detail else 7)
 
 
-def torus(mesh,center,radius,thickness,depth,region,wobble=0):
+def torus(mesh,center,radius,thickness,depth,region,wobble=0,stretch=1,phase=0):
     east,level,south=center
     sides,bands=22,8
     def point(index,band):
         angle=index*math.tau/sides
         cross=band*math.tau/bands
-        radial=radius*(1+wobble*math.sin(3*angle))+thickness*math.cos(cross)
-        return east+radial*math.cos(angle),level+radial*math.sin(angle),south+depth*math.sin(cross)
+        radial=radius*(1+wobble*math.sin(3*angle+phase))+thickness*math.cos(cross)
+        return east+radial*math.cos(angle),level+stretch*radial*math.sin(angle),south+depth*math.sin(cross)+wobble*math.cos(2*angle+phase)
     for index in range(sides):
         for band in range(bands):
             angle=(index+.5)*math.tau/sides;cross=(band+.5)*math.tau/bands
