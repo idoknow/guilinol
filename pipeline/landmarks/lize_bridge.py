@@ -24,6 +24,8 @@ def towers(model, lateral):
         for bottom, width, height in [(foot, 2.1, 2-foot), (2, 1.5, 15), (17, 1.8, .4), (17.4, 1.5, .9)]:
             model.box(station, bottom, lateral, width, height, width, 'red', True)
         vertices = [(station + dx, 18.3, lateral + dz) for dx, dz in [(-.95,-.95),(.95,-.95),(.95,.95),(-.95,.95)]]
+        # The cap overhangs the tower shaft. Its soffit bears on the capital.
+        model.mesh(vertices, [[0,1,2],[0,2,3]], 'red')
         vertices.append((station, 19.8, lateral))
         model.mesh(vertices, [[0,4,1],[1,4,2],[2,4,3],[3,4,0]], 'red')
         model.box(station + .765, 2, lateral, .035, 15, .16, 'lamp')
