@@ -121,7 +121,7 @@ def _build_water_tower(b: Builder, cx, cz):
 def build(b: Builder):
     # 1. North Gate on 环城北二路 & Stomatology Hospital building
     _build_north_gate(b)
-    b.teaching_block(48.0, -234.0, 2.34, 34.0, 14.5, 6, floor_h=3.5,
+    b.teaching_block(-58.0, -268.0, 2.34, 32.0, 14.0, 6, floor_h=3.5,
                      wall='white', accent='blue_facade', roof_kind='flat', corridor=False, portico=True, sign_key='bld_stomat')
 
     # 2. Library concave colonnade complex (way/459580291)
@@ -174,12 +174,12 @@ def build(b: Builder):
         (-102.0, -278.0), (-42.0, -300.0),  # NW wall up to North Gate
     ], h=2.2)
     b.perimeter_wall([
-        (2.0, -262.0), (70.0, -192.0), (72.0, -55.0),  # NE & East wall along 环城北二路
+        (-6.0, -270.0), (58.0, -202.0), (68.0, -55.0),  # NE & East wall inset safely inside campus
     ], h=2.2)
 
     # 11. Campus avenue trees (camphor, banyan & palms matching photos)
     for tz in (-265, -240, -210, -180, -70, -25, 25, 75, 125):
-        b.campus_tree(-19.5, tz, h=8.5, spread=3.6, seed=abs(tz), kind='camphor')
+        b.campus_tree(-38.5, tz, h=8.5, spread=3.6, seed=abs(tz), kind='camphor')
     for tx, tz in ((8.0, -168.0), (32.0, -168.0), (-48.0, -96.0), (-30.0, -155.0), (52.0, 196.0), (98.0, 196.0)):
         b.campus_tree(tx, tz, h=9.5, spread=4.4, seed=int(abs(tx + tz)), kind='banyan')
     for tx, tz in ((-10.0, -274.0), (6.0, -258.0), (14.0, -180.0), (28.0, -180.0)):

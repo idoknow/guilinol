@@ -56,8 +56,8 @@ def build(b: Builder):
     b.box(-14.0, 0.0, 34.0, 36.0, 0.04, 38.0, 'pave', tile=2.4)
 
     # 4. Playground: Red EPDM running oval + green turf & green acrylic basketball court (#00/#08/#11)
-    b.track_field(22.0, -38.0, 0.72, straight_len=32.0, inner_r=14.0, track_w=4.2, stand_side=0)
-    b.basketball_court(-24.0, -8.0, 0.0, surface='court_green', apron='track_red')
+    b.track_field(16.0, -24.0, 0.72, straight_len=30.0, inner_r=13.5, track_w=4.0, stand_side=0, y0=0.12)
+    b.basketball_court(-24.0, -6.0, 0.0, surface='court_green', apron='track_red', y0=0.10)
     b.flagpole_plinth(-14.0, 12.0, math.pi, poles=1, height=11.2)
 
     # 5. Campus trees (camphor & banyan along courtyard and fence)
