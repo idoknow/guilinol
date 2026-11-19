@@ -20,6 +20,20 @@ assert.equal(atlas.search('象鼻',1)[0].n,'象鼻山')
 assert.ok(atlas.search('双塔').some(place=>['日塔','月塔'].includes(place.n)))
 assert.equal(atlas.search('王城')[0].n,'靖江王城')
 assert.equal(atlas.search('解放桥')[0].k,'bridge')
+const campus = atlas.search('中山中学漓滨校区')[0]
+assert.equal(campus.k,'school')
+for (const alias of ['桂林市第九中学','桂林九中','九中']) assert.deepEqual(atlas.search(alias),[campus])
+assert.equal(atlas.roadAt(campus.x,campus.z)?.name,'漓滨路')
+for (const name of ['榕湖小学','民主小学','少年宫','回民小学']) {
+  const hits=atlas.search(name)
+  assert.equal(hits.length,1)
+  assert.equal(hits[0].k,'school')
+  assert.ok(atlas.roadAt(hits[0].x,hits[0].z,2))
+  if (['少年宫','回民小学'].includes(name)) {
+    assert.ok(hits[0].n.includes('待核'))
+    assert.ok(!manifest.landmarks.some(entry=>entry.name.includes(name)))
+  }
+}
 for(const [query,name,road] of [
   ['桂林医科大学','桂林医科大学（东城校区）','环城北二路'],
   ['理工大附小','桂林理工大学附属小学','建干路'],
