@@ -119,12 +119,17 @@ def build(bbox, output, palette):
         if court is not None:
             mask,corner = stencil(court,left,top,1)
             texture.paste(palette['schoolCourt'],corner,mask)
-    trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees,unary_union([layout.tree_exclude,*(court.buffer(1.5) for court in layers['schoolTrack']+layers['schoolCourt'])]))
+    trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees,unary_union([layout.tree_exclude,bank_pavement.buffer(2) if bank_pavement is not None else Polygon(),*(court.buffer(1.5) for court in layers['schoolTrack']+layers['schoolCourt'])]))
     for road in roads:
         for part in polygons(road.line.buffer(road.width/2,quad_segs=2).intersection(bounds)):
             mask,corner = stencil(part,left,top,1)
             texture.paste('#484b4d' if road.name=='翊武路' else palette['road'],corner,mask)
             layers['road'].append(part)
+    if bank_pavement is not None:
+        # Replace the baked flat road colour underneath the elevated strips.
+        for part in polygons(bank_pavement.intersection(bounds)):
+            mask,corner=stencil(part,left,top,1)
+            texture.paste(palette['green'],corner,mask)
     report = []
     for road in roads:
         if road.name not in ('中山中路','解放东路','解放西路','滨江路','依仁路','榕湖北路','杉湖北路','正阳步行街') or not bounds.intersects(road.line):

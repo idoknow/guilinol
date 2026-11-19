@@ -7,7 +7,7 @@ import math
 import numpy as np
 import trimesh
 from jiefang_materials import generate_bridge
-from jiefang_layout import ramp
+from jiefang_roads import interchange
 
 
 def arch(model, center, radius, width, spring, rise, top, blocks=False):
@@ -156,29 +156,8 @@ def lamp_post(model,x,side):
         for dz in (-.11,.11):model.box(x,3.16,knot+dz,.08,.66,.1,'knot')
 
 
-def bank_stairs(model,side):
-    # OSM 1382486206/08: two flights and a switchback at the outer landing.
-    # Elevations relative to the deck surface; both flights have 16 risers.
-    for index in range(16):
-        model.box(-98,.18-(index+1)*.166,side*(21+index*.72),2.9,.18,.73,'pave',True)
-        model.box(-106,-2.476-(index+1)*.166,side*(32-index*.34),2.9,.18,.35,'pave',True)
-    model.box(-102,-2.48,side*32.95,10.9,.18,1.8,'pave',True)
-    model.box(-110,-5.2,side*27,9.5,.18,2.8,'pave',True)
-    for x in (-99.45,-96.55):
-        model.beam([x,1.25,side*21],[x,-1.42,side*32],.075,'white',8,True)
-    for x in (-107.45,-104.55):
-        model.beam([x,-1.42,side*32],[x,-4.1,side*27],.075,'white',8,True)
-    for x,start,end,z0,z1 in ((-99.45,1.25,-1.42,21,32),(-96.55,1.25,-1.42,21,32),
-                              (-107.45,-1.42,-4.1,32,27),(-104.55,-1.42,-4.1,32,27)):
-        for t in np.linspace(0,1,7):
-            top=start+(end-start)*t
-            z=side*(z0+(z1-z0)*t)
-            model.box(x,top-1.0,z,.10,1.0,.10,'white')
-
-
 def west_bank(model):
-    # Both paths leave the deck tangentially, descend around the planted
-    # islands, and meet the straight lower promenade at x=-116.
+    # Photo-matched platforms beside the OSM river-bank paths.
     for side, tone in ((-1,'violet'),(1,'jade')):
         # The lower intersection looks across the carriageway at three towers.
         if side==1:
@@ -209,41 +188,11 @@ def west_bank(model):
         model.pose=(-90.7,-4.36,side*57.1,math.pi*.14*side)
         pillar(model,'aqua' if side==1 else 'jade')
         model.pose=(0,0,0,0)
-        fractions=np.linspace(0,1,37 if model.detail else 17)
-        xs, heights, zs=ramp(side,fractions)
-        points=list(zip(xs,heights-(5.62-xs*1.3/281),zs))
-        for index,(a,b) in enumerate(zip(points,points[1:])):
-            def edge(point, at, sign):
-                angle=at/(len(points)-1)*math.pi*1.5
-                return [point[0]-sign*2.5*math.sin(angle),point[1],point[2]-sign*side*2.5*math.cos(angle)]
-            left,right=edge(a,index,-1),edge(a,index,1)
-            far_left,far_right=edge(b,index+1,-1),edge(b,index+1,1)
-            faces=[[0,1,2],[0,2,3]] if side>0 else [[2,1,0],[3,2,0]]
-            model.mesh([left,right,far_right,far_left],faces,'pave',True)
-            for near,far in ((left,far_left),(right,far_right)):
-                skirting=[near,far,np.subtract(far,[0,1.4,0]),np.subtract(near,[0,1.4,0])]
-                model.mesh(skirting,[[0,1,2],[0,2,3]],'stone')
-            model.beam(np.add(right,[0,.93,0]),np.add(far_right,[0,.93,0]),.09,'granite',6,True)
-            model.beam(right,np.add(right,[0,1,0]),.075,'granite')
-            if model.detail and index in (6,17,29):
-                pendant(model,*left)
-        bank_stairs(model,side)
-        for idx in range(11):
-            axis=math.pi*(.12+idx*.075)
-            x=-140-20.6*math.sin(axis)
-            y=(6.45-5.4*axis/(math.pi*1.5))-(5.62-x*1.3/281)
-            center=np.array([x,y+.22,side*(41-20.6*math.cos(axis))])
-            model.box(x,y-.62,center[2],2.5,.84,2.5,'stone')
-            shrub=trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
-            model.mesh(shrub.vertices*[1.8,.75,1.65]+center,shrub.faces,'leaf' if idx%3 else 'green')
         model.beam([-143,.2,side*12],[-143,5.2,side*12],.14,'granite')
         model.box(-143,4.3,side*12,.48,1.23,.4,'sign')
         model.box(-143.26,5.12,side*12,.08,.25,.25,'red')
     model.pose=(0,-1.5,0,0)
     # Two-way lower road, alongside the 5 m pedestrian landing.
-    model.box(-122,-3.99,0,7,.23,86,'tile',True)
-    for z in range(-40,41,8):
-        model.box(-122,-3.754,z,.1,.012,3,'yellow')
     # A paved crossing, with signals on the approach and an unobstructed view
     # of the three river-side lantern towers from the opposite kerb.
     for x in np.arange(-125,-118.4,1):
@@ -252,15 +201,9 @@ def west_bank(model):
     model.beam([-113.9,1.65,38.35],[-113.9,1.65,39.05],.1,'granite')
     model.box(-113.9,.55,39.05,.42,1.25,.42,'sign')
     model.box(-114.14,1.4,39.05,.09,.28,.28,'knot')
-    model.box(-116,-4.25,0,5,.64,82,'pave',True)
-    for start,end in ((-41,-29),(-25,25),(29,41)):
-        model.box(-113.6,-3.61,(start+end)/2,.36,.67,end-start,'stone',True)
-        model.box(-113.6,-2.68,(start+end)/2,.12,.12,end-start,'white',True)
     pendant(model,-114.35,-3.72,29.4)
-    for z in range(-40,41,4):
-        model.box(-113.6,-3,z,.1,.4,.1,'white')
-        if z in (-36,-24,24):
-            pendant(model,-118.3,-3.92,z)
+    for z in (-36,-24,24):
+        pendant(model,-118.3,-3.92,z)
     model.pose=(0,0,0,0)
 
 
@@ -319,6 +262,7 @@ def bridge(model):
             z=side*21.45
             model.mesh([(xa,soffit(xa),z),(xb,soffit(xb),z),(xb,-.36,z),(xa,-.36,z)],[[0,1,2],[0,2,3]],'white')
     west_bank(model)
+    interchange(model)
 
 
 if __name__=='__main__':
