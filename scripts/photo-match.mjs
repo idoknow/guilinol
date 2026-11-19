@@ -25,7 +25,7 @@ try {
   for(const [file,shot] of Object.entries(catalog).filter(([file])=>!planOnly&&file.startsWith('walk-shizijie-wangcheng/')).sort()){
     const number=file.split('/')[1].slice(0,2)
     if(selected&&!selected.includes(number))continue
-    const pitch=['34','35'].includes(number)?8:0
+    const pitch=({'27':6,'31':3,'34':8,'35':8})[number]??0
     if(process.argv.includes('--resume') && !['34','35'].includes(number) && await access(`${output}/${number}.jpg`).then(()=>true,()=>false)){
       trace.push({number,...shot,pitch});continue
     }
@@ -42,7 +42,7 @@ try {
       const heights=geometry.getAttribute('position'),[a,b,c,d]=[at,at+1,at+stride,at+stride+1].map(i=>heights.getY(i))
       const ground=u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
       const angle=heading*Math.PI/180
-      camera.position.set(x,ground+1.5,z);camera.near=.12;camera.fov=2*Math.atan(18/focal35/camera.aspect)*180/Math.PI;camera.updateProjectionMatrix()
+      camera.layers.disable(2);camera.position.set(x,ground+1.5,z);camera.near=.12;camera.fov=2*Math.atan(18/focal35/camera.aspect)*180/Math.PI;camera.updateProjectionMatrix()
       camera.lookAt(x+Math.sin(angle),ground+1.5+Math.tan(pitch*Math.PI/180),z-Math.cos(angle))
       camera.updateMatrixWorld(true)
       const probe=window.viewer.probeFoot()
@@ -66,8 +66,8 @@ try {
   await page.setViewportSize({width:700,height:700})
   await page.evaluate(wide=>{
     const {camera}=window.viewer
-    const [x,y,z]=wide?[-548,798,-498]:[-610,360,-150]
-    camera.fov=55;camera.updateProjectionMatrix();camera.position.set(x,y,z);camera.lookAt(x,150,z-.01)
+    const [x,y,z]=wide?[-548,460,-498]:[-610,360,-150]
+    camera.layers.disable(2);camera.fov=wide?2*Math.atan((798-157.7)*Math.tan(55*Math.PI/360)/(460-157.7))*180/Math.PI:55;camera.updateProjectionMatrix();camera.position.set(x,y,z);camera.lookAt(x,150,z-.01)
   },palaceOverview)
   await page.waitForFunction(before=>{const {stats,stream}=window.viewer;return !stats.pending&&[...stream.landmarks].some(([entry,group])=>entry.id===(before?'jingjiang':'wangcheng_market')&&(group.getObjectByName('lod0')?.visible||group.getObjectByName('lod1')?.visible))},planOnly||palaceOverview,{timeout:90000})
   await page.waitForTimeout(400)

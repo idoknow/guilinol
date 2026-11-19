@@ -208,32 +208,28 @@ def palace(m):
             east=-19+index*.8; height=9.0+.43*math.sin(index*.7)
             m.mesh(shrub.vertices*[.85,.53,.74]+[east,height,.21],shrub.faces,'leaf')
             if index%3!=1:m.mesh(shrub.vertices*[.42,1.05,.28]+[east,height-.91,.69],shrub.faces,'green')
-    for south in (-152.6,-141.4):m.arcade(0,south,27,1.3,8,[0],3.65,'yellow')
-    m.box(0,6.4,-147,27,1.6,10,'yellow',True)
+    # Rock 27 and 31 show a narrow, stepped ochre tower over the through arch.
+    for south in (-152.1,-141.9):
+        m.arcade(0,south,15,1.05,5.8,[0],2.25,'yellow')
     for side in (-1,1):
-        for south in (-150.6,-143.4):
-            m.box(side*7,0,south,.63,6.4,.63,'red',True)
-        m.box(side*13.2,0,-147,.5,5.5,9,'wood',True)
-        for south in np.linspace(-150.3,-143.7,6):
-            m.box(side*12.9,.75,south,.13,3.35,.83,'glass')
-            m.box(side*12.78,1.8,south,.15,.12,.91,'red')
-    m.box(0,8,-147,22,4.8,9,'red');m.swept_roof(0,8.5,-147,32,17,2.5)
-    m.swept_roof(0,13,-147,26,14,3.8)
-    for east in (-12,-4,4,12):
-        m.beam([east,.85,-140],[east,8.5,-140],.4,'red',10,True)
-        m.box(east,7.7,-140,1.4,.55,1.4,'red')
-    for east in (-7,0,7):
-        m.box(east,10.25,-142.3,5,2.42,.45,'wood')
-        if m.detail:
-            for bar in np.linspace(-2,2,7):m.box(east+bar,10.25,-141.99,.15,2.42,.18,'red')
-    m.box(0,7.22,-139.8,4.3,1.15,.24,'sign')
-    for east in (-1,0,1):m.box(east,7.48,-139.62,.34,.58,.12,'gold')
+        m.box(side*6.8,0,-147,1.4,5.8,10,'yellow',True)
+        m.box(side*5.3,4.9,-147,3.7,2.05,10,'yellow')
+        m.swept_roof(side*5.3,6.95,-147,4.7,12,1.15)
+        m.box(side*2.5,5.75,-141.72,1.2,1.7,.15,'wood')
+        m.box(side*4.6,1.6,-141.25,.8,3.2,.14,'sign')
+        lantern=trimesh.creation.icosphere(subdivisions=int(m.detail))
+        m.mesh(lantern.vertices*[.47,.38,.47]+[side*2.45,5.5,-140.95],lantern.faces,'red')
+    m.box(0,4.75,-147,10.1,3.6,10,'yellow',True)
+    m.swept_roof(0,8.35,-147,12.7,13,1.85)
+    m.box(0,5.55,-141.7,.82,1.85,.19,'sign')
+    for index,char in enumerate('承运门'):
+        letters(m,char,(0,6.83-index*.52,-141.58),.44,.44,'gold')
     for side in (-1,1):
         m.box(side*9,0,-138.4,10,.9,7,'granite',True)
         for step in range(5):m.box(side*9,0,-132.9-step*.48,7,.18*(step+1),.5,'granite',True)
         for east in (side*5.25,side*12.75):
             m.beam([east,.86,-132.7],[east,1.77,-135.15],.13,'white');m.box(east,0,-133,.33,.94,.33,'white')
-        m.box(side*22,0,-147,14,4.35,10,'yellow',True);m.swept_roof(side*22,4.35,-147,16,12,2.5)
+        m.box(side*10.5,0,-147,6,3.15,10,'yellow',True);m.swept_roof(side*10.5,3.15,-147,7.1,11.5,1.45)
     for zz in (-65,-108):
         for side in (-1,1):m.box(side*20,0,zz,25,.12,39,'green')
     for index,zz in enumerate(range(-37,-130,-14)):
@@ -244,16 +240,16 @@ def palace(m):
                 m.beam([east,4,zz],[east+branch*1.8,7.5,zz+branch],.22,'wood')
                 crown=trimesh.creation.icosphere(subdivisions=int(m.detail))
                 m.mesh(crown.vertices*[3.4,3.7,4.2]+[east+branch*1.6,8.5,zz+branch],crown.faces,'leaf')
-    m.pose=(4.8,0,-124.6,1.04)
-    m.box(0,0,0,4.8,.32,1.35,'granite',True)
-    m.box(0,.32,0,4.4,.81,1.05,'yellow',True)
-    letters(m,'桂林中轴线',(0,.47,.55),3.72,.53,'wood')
+    m.pose=(-.54,0,-125.45,.12)
+    m.box(0,0,0,2.12,.17,.78,'granite',True)
+    m.box(0,.17,0,1.96,.39,.6,'yellow',True)
+    letters(m,'桂林中轴线',(0,.22,.32),1.73,.27,'wood')
     for side in (-1,1):
         ring=[]
         for index in range(32):
             angle=index*2*math.pi/32;horizontal,vertical=math.cos(angle),math.sin(angle)
-            ring.extend([(1.45*horizontal,3.48+1.45*vertical-min(0,vertical)**4*1.07,side*.24),
-                         (.61*horizontal,3.48+.61*vertical,side*.24)])
+            ring.extend([(.87*horizontal,2.03+.87*vertical-min(0,vertical)**4*.60,side*.14),
+                         (.39*horizontal,2.03+.39*vertical,side*.14)])
         faces=[]
         for index in range(32):
             first=index*2;last=(first+2)%64;faces.extend([(first,last,last+1),(first,last+1,first+1)])
