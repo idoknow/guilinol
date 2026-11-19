@@ -300,6 +300,10 @@ def main():
         group=key+':'+row['component'] if 'component' in row else key
         row['photos']={str(number):photo_hits(shape,photos[f'IMG_{number}.jpg']) for number in PHOTO_TARGETS.get(group,())}
         row['status']='pass' if passed and photos_pass(row['photos'],spec.get('photoExifSuspect')) else 'fail'
+    # Landmarks merged after IDOK-45 keep their measurements but are tracked in IDOK-56.
+    for row in report:
+        if row['status'] in ('fail','missing-reference') and next((s.get('alignNote') for s in specs if s['id']==row['id']),None)=='deferred to IDOK-56':
+            row['measuredStatus']=row['status'];row['status']='deferred'
     text=json.dumps(report,indent=2,ensure_ascii=False)
     if args.out:args.out.write_text(text+'\n')
     print(text)
