@@ -20,7 +20,10 @@
   {"id": "ronghu+zhongshan_road", "subtype": "landmarkOverlap", "maxArea": 357, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "shizijie", "subtype": "landmarkOnCarriageway", "maxArea": 118, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "shizijie", "subtype": "landmarkOnSidewalk", "maxArea": 17, "maxCount": 1, "reason": "地标模型问题，另案修复"},
+  {"id": "wangcheng_mall+zhengyang", "subtype": "landmarkOverlap", "maxArea": 510, "maxCount": 1, "reason": "地标模型问题，另案修复（IDOK-44 合入后新增）"},
+  {"id": "wangcheng_market", "subtype": "landmarkOnCarriageway", "maxArea": 76, "maxCount": 1, "reason": "地标模型问题，另案修复（IDOK-44 合入后新增）"},
   {"id": "xiaoyao_tower", "subtype": "landmarkOnCarriageway", "maxArea": 51, "maxCount": 1, "reason": "地标模型问题，另案修复"},
+  {"id": "xiaoyao_tower+zhuangyuan_gallery", "subtype": "landmarkOverlap", "maxArea": 8, "maxCount": 1, "reason": "地标模型问题，另案修复（IDOK-47 合入后新增）"},
   {"id": "yiwu_old_house+yiwu_street", "subtype": "landmarkOverlap", "maxArea": 5, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "yiwu_street", "subtype": "landmarkOnCarriageway", "maxArea": 42, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "yiwu_street", "subtype": "landmarkOnSidewalk", "maxArea": 126, "maxCount": 1, "reason": "地标模型问题，另案修复"},
@@ -29,5 +32,6 @@
   {"id": "yixian_high", "subtype": "landmarkOnSidewalk", "maxArea": 147, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "zhengyang", "subtype": "landmarkOnCarriageway", "maxArea": 181, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "zhongshan_road", "subtype": "landmarkOnCarriageway", "maxArea": 335, "maxCount": 1, "reason": "地标模型问题，另案修复"},
-  {"id": "zhongshan_road", "subtype": "landmarkOnSidewalk", "maxArea": 9, "maxCount": 1, "reason": "地标模型问题，另案修复"}
+  {"id": "zhongshan_road", "subtype": "landmarkOnSidewalk", "maxArea": 9, "maxCount": 1, "reason": "地标模型问题，另案修复"},
+  {"id": "zhuangyuan_gallery", "subtype": "landmarkOnCarriageway", "maxArea": 102, "maxCount": 1, "reason": "地标模型问题，另案修复（IDOK-47 合入后新增）"}
 ]
