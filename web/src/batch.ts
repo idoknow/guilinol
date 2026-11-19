@@ -5,6 +5,7 @@ import {WATER_LAYER, waterMaterial} from './look/water'
 import {streetFurnitureGeo, streetFurnitureMat, streetSurfaceMat} from './streets'
 import type {Tile} from './world'
 import {vehicleModel} from './walk/vehicle-model'
+import {look} from './look/config'
 
 export interface TileBatchInput {
   tile:Tile
@@ -275,6 +276,9 @@ export class ChunkBatcher {
         if(this.parked){this.scene.remove(this.parked);this.parked.dispose()}
         const bike=vehicleModel('bike',1)
         this.parked=new THREE.InstancedMesh(bike.geometry,bike.material,2**Math.ceil(Math.log2(count)))
+        this.parked.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(this.parked.instanceMatrix.count*3),3)
+        const shared=new THREE.Color(look.streets.sharedBike),privateBike=new THREE.Color(0xffffff)
+        for(let index=0;index<this.parked.instanceMatrix.count;index++)this.parked.setColorAt(index,Math.floor(index/3)%3===0?shared:privateBike)
         this.parked.frustumCulled=false;this.scene.add(this.parked)
       }
       if(this.parked){

@@ -3,6 +3,8 @@ from collections import defaultdict
 
 from shapely import STRtree
 from shapely.geometry import LineString, Point
+from shapely.affinity import affine_transform
+from shapely.geometry import box
 from shapely.ops import unary_union
 
 from road_profile import RULES
@@ -37,6 +39,25 @@ def section_layers(roads):
 
 def clipped(tree, tile):
     return unary_union([tree.geometries[index].intersection(tile) for index in sorted(tree.query(tile))])
+
+
+def speed_paint(road, limit, spacing):
+    if not limit.isdecimal() or len(limit)>2 or not road.lanes:
+        return
+    segments = [(-.24,.88,.24,1),(.18,.04,.29,.87),(.18,-.87,.29,-.04),(-.24,-1,.24,-.88),(-.29,-.87,-.18,-.04),(-.29,.04,-.18,.87),(-.24,-.06,.24,.06)]
+    digits = ['012345','12','01643','01623','5612','05623','056432','012','0123456','012356']
+    for distance in range(spacing//2,int(road.line.length)-4,spacing):
+        center = road.line.interpolate(distance)
+        after = road.line.interpolate(distance+.5)
+        heading = math.atan2(after.y-center.y,after.x-center.x)
+        east, south = math.cos(heading), math.sin(heading)
+        for side in ([1] if road.oneway else [1,-1]):
+            offset = -side*road.width*(.5-.5/road.lanes)
+            for index,digit in enumerate(limit):
+                lateral = offset + side*.76*(index-(len(limit)-1)/2)
+                transform = [-side*south, side*east, side*east,side*south,center.x-lateral*south,center.y+lateral*east]
+                for segment in digits[int(digit)]:
+                    yield affine_transform(box(*segments[int(segment)]),transform)
 
 
 def shopfronts(footprints, heights, roads):

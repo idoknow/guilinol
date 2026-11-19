@@ -10,7 +10,7 @@ from markings import junction_cores, violations
 from common import CHUNK, ll2xz, load_osm
 from features import points, polygons, rongyin_photo, rongyin_sidewalk
 from scatter import CONFIG, walk_line
-from sections import section_layers, clipped, RULES
+from sections import section_layers, clipped, speed_paint, RULES
 
 
 def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),modeled_paving=None):
@@ -32,6 +32,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
 
     junctions = defaultdict(list)
     motor_arms = defaultdict(list)
+    speed_limits = {element['id']:element['tags']['maxspeed'] for element in load_osm() if element['type']=='way' and 'maxspeed' in element.get('tags',{})}
     for road in roads:
         coords = list(road.line.coords)
         for coord in set(coords):
@@ -101,6 +102,8 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                 if not sw_p.is_empty:
                     sidewalks.append(sw_p)
         masks = unary_union(clear.geometries.take(clear.query(line.buffer(width/2))))
+        if road.way in speed_limits and road.kind in RULES['sectionClasses']:
+            stripes.extend(shape for shape in speed_paint(road,speed_limits[road.way],RULES['fixtures']['speedInterval']) if not shape.intersects(masks))
         for lane in range(1,road.lanes):
             offset = width*(lane/road.lanes-.5)
             stripe = line.offset_curve(offset).buffer(.09,quad_segs=1).difference(masks)
