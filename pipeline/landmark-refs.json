@@ -2318,5 +2318,33 @@
     "thumb": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b5/Gu%C3%AC_C12738D_at_Yangqiao_%2820240218072618%29.jpg/1280px-Gu%C3%AC_C12738D_at_Yangqiao_%2820240218072618%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
    }
   ]
+ },
+ {
+  "id": "libin_middle",
+  "name": "桂林市中山中学漓滨校区",
+  "osm": [
+   "way/675588260"
+  ],
+  "group": "G2",
+  "refs": [
+   {
+    "title": "漓滨校区 2022 年高中招生简章：校园及活动图组（候选，未逐图认定立面）",
+    "year": 2022,
+    "viewOnly": true,
+    "page": "https://edu.guilinlife.com/index.php?s=/news/content/id/1111",
+    "images": [
+     "http://img3.guilinlife.com/edu/News/image/202207/20220711143001_51255.png",
+     "http://img3.guilinlife.com/edu/News/image/202207/20220711143008_51363.png",
+     "http://img3.guilinlife.com/edu/News/image/202207/20220711143013_21171.png",
+     "http://img3.guilinlife.com/edu/News/image/202207/20220711143019_16788.png",
+     "http://img3.guilinlife.com/edu/News/image/202207/20220711143031_53289.png",
+     "http://img3.guilinlife.com/edu/News/image/202207/20220711143120_65867.png",
+     "http://img3.guilinlife.com/edu/News/image/202207/20220711143126_80849.png",
+     "http://img3.guilinlife.com/edu/News/image/202207/20220711143134_33805.png",
+     "http://img3.guilinlife.com/edu/News/image/202207/20220711143143_17914.png",
+     "http://img3.guilinlife.com/edu/News/image/202207/20220711143152_53186.png"
+    ]
+   }
+  ]
  }
 ]
