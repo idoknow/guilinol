@@ -100,7 +100,7 @@ async function start() {
   modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton);void touch
   showMode()
   if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,
-    async photoSupport(x:number,z:number,bridgeRadius=0){return (await loadWalker()).photoSupport(x,z,bridgeRadius)},
+    async photoSupport(x:number,z:number,bridgeRadius?:number){return (await loadWalker()).photoSupport(x,z,bridgeRadius)},
     peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},
     setPreset(name:string){setPreset(camera,name);camera.updateMatrixWorld();return stats.frame},
     freeze(){return new Promise<void>(resolve=>requestAnimationFrame(()=>{
