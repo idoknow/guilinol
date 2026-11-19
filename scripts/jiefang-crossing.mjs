@@ -1,6 +1,9 @@
+import {readFileSync} from 'node:fs'
 import assert from 'node:assert/strict'
 import {preview} from 'vite'
 import {chromium} from 'playwright'
+
+const ways=JSON.parse(readFileSync(new URL("../pipeline/landmarks/jiefang_osm.json",import.meta.url)))
 
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 let browser
@@ -39,7 +42,7 @@ try {
       await page.keyboard.press('e')
       assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'bike')
     }
-    const result=await page.evaluate(mode=>{
+    const result=await page.evaluate(([mode,ways])=>{
       const walk=window.viewer.walk, keys=new Set()
       const metrics={}
       function press(code,on){
@@ -67,38 +70,75 @@ try {
         }
         throw Error(JSON.stringify({part,x,z,end:walk.probe(),obstacle:walk.obstacle}))
       }
-      // Lower road/walk north → south, then south ramp up, over the river and back.
-      const lane=mode==='ride'?-121:-116
-      reach(lane,-27,'approach')
-      reach(lane,29,'underpass')
-      reach(-116,41,'south landing')
-      function arc(side,down){
-        for(let i=0;i<=36;i++){
-          const angle=(down?i:36-i)/36*Math.PI*1.5
-          reach(-140-24*Math.sin(angle),side*(41-24*Math.cos(angle)),down?'north ramp':'south ramp')
+      // Follow OSM directions on all four links, including the westbound merge.
+      const riding=mode==='ride'
+      const bank=ways[1531308428]
+      function binjiang(z,part) {
+        for(let i=1;i<bank.length;i++){
+          const [x0,z0]=bank[i-1],[x1,z1]=bank[i]
+          if(z>z0||z<z1)continue
+          reach(x0+(z-z0)/(z1-z0)*(x1-x0)+(riding?0:5.2),z,part)
+          return
+        }
+        throw Error('Station outside Binjiang Road')
+      }
+      function link(id) {
+        const line=ways[id]
+        const lengths=line.slice(1).map(([x,z],i)=>Math.hypot(x-line[i][0],z-line[i][1]))
+        const total=lengths.reduce((a,b)=>a+b,0),down=id===258909975||id===258909978
+        let station=0
+        for(let i=0;i<line.length;i++){
+          const [x,z]=line[i]
+          const normal=(a,b)=>{
+            const dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz)
+            return [-dz/len,dx/len]
+          }
+          const a=normal(line[Math.max(0,i-1)],line[Math.max(1,i)])
+          const b=normal(line[Math.min(line.length-2,i)],line[Math.min(line.length-1,i+1)])
+          const opposite=ways[id%2===1?id+1:id-1]
+          let gap=Infinity
+          for(let j=1;j<opposite.length;j++){
+            const [u,v]=opposite[j-1],dx=opposite[j][0]-u,dz=opposite[j][1]-v
+            const t=Math.max(0,Math.min(1,((x-u)*dx+(z-v)*dz)/(dx*dx+dz*dz)))
+            gap=Math.min(gap,Math.hypot(x-u-t*dx,z-v-t*dz))
+          }
+          const offset=riding?1:8-Math.min(4,gap/2-.08)+1.2
+          const m=1+a[0]*b[0]+a[1]*b[1]
+          reach(x+(a[0]+b[0])*offset/m,z+(a[1]+b[1])*offset/m,String(id))
+          const t=Math.max(0,Math.min(1,(station-(down?19:8))/(total-27)))
+          const expected=146.56+5.30*(down?1-t:t)+(riding?0:.12)
+          if(Math.abs(walk.probe().foot-expected)>.33)throw Error(JSON.stringify({id,station,expected,actual:walk.probe().foot,x,z}))
+          station+=lengths[i]??0
         }
       }
-      arc(1,false)
-      const upperLane=mode==='ride'?14:18
-      reach(-130,upperLane,'upper entry')
-      reach(130,upperLane,'upper deck')
-      reach(130,-upperLane,'upper turnaround')
-      reach(-140,-17,'upper deck')
-      arc(-1,true)
-      reach(-116,-32,'north landing')
-      if(mode==='walk'){
-        reach(-116,-26.2,'stair landing')
-        reach(-106,-26.2,'stair landing')
-        reach(-106,-33.3,'return flight')
-        reach(-98,-33.3,'turning landing')
-        reach(-98,-20,'upper flight')
-        reach(-98,-17,'stair exit')
+      for(const z of [-27,0,29,42,85,94])binjiang(z,z<=29?'underpass':'south bank')
+      link(258909977)
+      const lane=riding?6:17.5
+      reach(-143,lane,'upper entry')
+      reach(130,lane,'upper deck')
+      reach(130,-lane,'upper turnaround')
+      reach(-143,-lane,'upper deck')
+      reach(-184,-lane,'west approach')
+      link(258909975)
+      binjiang(-94,'north landing')
+      link(258909976)
+      // Follow the widening sidewalk through the transition to the native street.
+      for(const [x,z] of [[-239,-17],[-253,-15],[-265,-12.7],[-272,-12.7],[-272,11.8],[-265,11.8],[-253,14],[-239,17]])
+        reach(x,riding?Math.sign(z)*6:z,'west road seam')
+      link(258909978)
+      for(const z of [94,77,45,25,0,-27])binjiang(z,'return bank')
+      if(!riding){
+        reach(-106.5,-27.1,'stair landing')
+        for(const [x,z] of ways[1382486206].slice().reverse())reach(x,z,'north stairs')
+        reach(-97.5,15,'cross deck on foot')
+        for(const [x,z] of ways[1382486208])reach(x,z,'south stairs')
+        reach(-117,27.3,'south stair exit')
       }
       for(const code of [...keys])press(code,false)
       return metrics
-    },mode)
+    },[mode,ways])
     assert.ok(result.underpass[1]<147.4 && result['upper deck'][0]>150,JSON.stringify(result))
-    console.log(mode,JSON.stringify(result))
+    console.log(mode,'zero resets; all four profiles within 0.33 m',JSON.stringify(result))
     await page.close()
   }
 } finally {
