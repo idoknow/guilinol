@@ -197,9 +197,11 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const at=Math.round((south-tile.z)/4)*65+Math.round((east-tile.x)/4)
     return data.water[at]!==-32768&&data.water[at]-data.terrain[at]>5
   }
-  function insideHouse(east:number,south:number){const tile=tileAt(east,south);if(!tile)return false
+  function insideHouse(east:number,south:number,y?:number){const tile=tileAt(east,south);if(!tile)return false
     const px=(east-tile.x)*100,pz=(south-tile.z)*100
-    return regions.get(tile)?.rings.some(([, ,loops])=>{let inside=false
+    return regions.get(tile)?.rings.some(([bottom,top,loops])=>{
+      if(y!==undefined&&(y<bottom/10||y>top/10))return false
+      let inside=false
       for(const loop of loops)for(let at=0,prev=loop.length-1;at<loop.length;prev=at++){
         const [ax,az]=loop[at],[bx,bz]=loop[prev];if((az>pz)!==(bz>pz)&&px<(bx-ax)*(pz-az)/(bz-az)+ax)inside=!inside
       }return inside})??false

@@ -16,6 +16,7 @@ const methods:Record<string,string[]>={me:['GET','PATCH'],...Object.fromEntries(
 
 async function handle(request:Request,env:Env) {
   const url=new URL(request.url), path=url.pathname.slice(5), method=request.method, db=env.DB
+  const secure=!(env.INSECURE_LOCAL_COOKIE==='1'&&url.protocol==='http:')
   const stmt=(sql:string,...args:(string|number)[])=>db.prepare(sql).bind(...args)
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(!Object.hasOwn(methods,path)) throw new Problem(404,'not_found','接口不存在')
@@ -28,7 +29,7 @@ async function handle(request:Request,env:Env) {
   }
   if(path==='auth/logout') {
     await stmt('DELETE FROM sessions WHERE digest=?',await sessionHash(request)).run()
-    return json({ok:true},200,cookie('',0))
+    return json({ok:true},200,cookie('',0,secure))
   }
   if(path==='me') {
     const digest=await sessionHash(request)
@@ -41,7 +42,7 @@ async function handle(request:Request,env:Env) {
       writes.push(stmt('UPDATE users SET nickname=? WHERE id=? AND EXISTS (SELECT 1 FROM sessions WHERE digest=?)',user.nickname,user.id,digest))
     }
     if(!(await db.batch(writes))[0].meta.changes) unauthorized()
-    return json(profile(user),200,cookie(request.headers.get('Cookie')!.match(/(?:^|;\s*)glol_session=([a-f0-9]{64})(?:;|$)/)![1]))
+    return json(profile(user),200,cookie(request.headers.get('Cookie')!.match(/(?:^|;\s*)glol_session=([a-f0-9]{64})(?:;|$)/)![1],lifetime,secure))
   }
   const email=typeof body.email==='string'?body.email.trim().toLowerCase():''
   if(email.length>254||!/^\S+@[^\s@]+\.[^\s@]+$/.test(email)||email.split('@').length!==2) invalid()
@@ -85,7 +86,7 @@ async function handle(request:Request,env:Env) {
     const [session]=await db.batch([stmt(`INSERT INTO sessions SELECT ?,id,? FROM users WHERE id=? AND digest=? AND locked_until<=?`,sessionDigest,now()+lifetime,user.id,user.digest,now()),
       stmt('UPDATE users SET failures=0 WHERE id=? AND EXISTS(SELECT 1 FROM sessions WHERE digest=?)',user.id,sessionDigest)])
     if(!session.meta.changes) unauthorized()
-    return json(profile(user),200,cookie(token))
+    return json(profile(user),200,cookie(token,lifetime,secure))
   }
   const purpose=reset?'reset':'verify', pass=reset?password(body.password):''
   if(typeof body.code!=='string'||!/^\d{6}$/.test(body.code)) invalid()
@@ -108,7 +109,7 @@ async function handle(request:Request,env:Env) {
     stmt('UPDATE users SET verified=1 WHERE id=? AND verified=0 AND changes()=1',user.id),
     stmt('INSERT INTO sessions SELECT ?,?,? WHERE changes()=1',sessionDigest,user.id,now()+lifetime)])
   if(!used.meta.changes) throw bad()
-  return reset?json({ok:true}):json(profile({...user,verified:1}),200,cookie(token))
+  return reset?json({ok:true}):json(profile({...user,verified:1}),200,cookie(token,lifetime,secure))
 }
 export const onRequest:PagesFunction<Env>=async ({request,env})=>{
   try { return await handle(request,env) } catch(error) {

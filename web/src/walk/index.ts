@@ -177,14 +177,15 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     sim.body.setTranslation(found,true);sim.body.setNextKinematicTranslation(found);sim.world.step();safe.set(found.x,found.y,found.z);resetMotion();return true}
   async function enter(x:number,z:number,heading:number,reason:string,override=false){
     posOut.set(x,0,z);const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
+    const covering=manifest.landmarks?.filter(entry=>entry.collision!=='none'&&Math.hypot(entry.position[0]-x,entry.position[2]-z)<=entry.sphere[3]+cfg.search)??[]
+    const strictBridge=covering.some(entry=>entry.id==='jiefang_bridge')
     const deadline=performance.now()+15000
-    while(needed.some(tile=>!stream.loaded.has(tile))&&performance.now()<deadline){stream.tick(posOut);await new Promise(resolve=>setTimeout(resolve,12))}
-    const bridge=manifest.landmarks?.find(entry=>entry.id==='jiefang_bridge'&&Math.hypot(entry.position[0]-x,entry.position[2]-z)<=entry.sphere[3]+cfg.search)
-    if(bridge){
-      posOut.y=bridge.position[1]
-      while(!stream.landmarks.has(bridge)&&performance.now()<deadline){stream.updateLandmarks?.(posOut,bridge);await new Promise(resolve=>setTimeout(resolve,12))}
-      if(!stream.landmarks.has(bridge))return false
+    while((needed.some(tile=>!stream.loaded.has(tile))||covering.some(entry=>!stream.landmarks.has(entry)))&&performance.now()<deadline){
+      posOut.set(x,0,z);stream.tick(posOut)
+      for(const entry of covering)if(!stream.landmarks.has(entry)){posOut.set(x,entry.position[1],z);stream.updateLandmarks?.(posOut,entry)}
+      await new Promise(resolve=>setTimeout(resolve,12))
     }
+    if(strictBridge&&covering.some(entry=>entry.id==='jiefang_bridge'&&!stream.landmarks.has(entry)))return false
     sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
@@ -245,7 +246,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits,
       planarSpeed:Math.hypot(vx,vz),grounded,verticalVelocity:velocity,facing,figPos:figure.position.toArray(),figYaw:figure.rotation.y,bikePitch:rides?.bikePitch??0,bikeY:rides?.bikeY??0,carPitch:rides?.carPitch??0,carY:rides?.carY??0,
       pedalPhase:ridePose.pedalPhase,thighL:figure.getObjectByName('ThighL')?.rotation.x??0,thighR:figure.getObjectByName('ThighR')?.rotation.x??0,
-      camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z),
+      camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z,camera.position.y),
       boat:rides?.boatProbe()??null}}
   function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);rides?.nearby(start.x,start.z,rides?.boat?start.y:start.y-cfg.height/2)
     if(rides?.freeBoat){

@@ -1,4 +1,4 @@
-export interface Env { DB: D1Database; FEEDBACK:R2Bucket; BRIDGE_TOKEN?:string; EMAIL_DEV_LOG?: string; RESEND_API_KEY?: string }
+export interface Env { DB: D1Database; FEEDBACK:R2Bucket; BRIDGE_TOKEN?:string; EMAIL_DEV_LOG?: string; INSECURE_LOCAL_COOKIE?: string; RESEND_API_KEY?: string }
 export const lifetime = 30 * 86400
 export const now = () => Math.floor(Date.now()/1000)
 export class Problem extends Error {
@@ -17,7 +17,7 @@ export async function passwordHash(password:string,salt:string) {
     salt:Uint8Array.from(salt.match(/../g)!,pair=>parseInt(pair,16))},key,256))
 }
 export const equal = (left:string,right:string) => crypto.subtle.timingSafeEqual(encode(left),encode(right))
-export const cookie = (token:string,age=lifetime) => `glol_session=${token}; Path=/; Max-Age=${age}; HttpOnly; Secure; SameSite=Lax`
+export const cookie = (token:string,age=lifetime,secure=true) => `glol_session=${token}; Path=/; Max-Age=${age}; HttpOnly;${secure?' Secure;':''} SameSite=Lax`
 export async function sessionHash(request:Request) {
   const token = request.headers.get('Cookie')?.match(/(?:^|;\s*)glol_session=([a-f0-9]{64})(?:;|$)/)?.[1]
   return token ? hash(token) : ''
