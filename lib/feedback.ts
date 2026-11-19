@@ -34,12 +34,38 @@ export async function feedback(request: Request, env: Env, path: string) {
     bridge = path.startsWith('bridge/'),
     auth = request.headers.get('Authorization')
   const machine = bridge || !!auth
+  const comparison = /^(bridge|feedback)\/comparisons\/([0-9a-f]{64})$/.exec(path)
+  if (comparison?.[1] === 'feedback' && method === 'GET') {
+    const object = await env.FEEDBACK.get(`public/comparisons/${comparison[2]}.png`)
+    if (!object) missing()
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': 'image/png',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; sandbox",
+      },
+    })
+  }
   const stmt = (sql: string, ...args: (number | string | null)[]) => env.DB.prepare(sql).bind(...args)
   let user = ''
   if (machine) {
     if (!env.BRIDGE_TOKEN || !auth || !equal(await hash(auth), await hash(`Bearer ${env.BRIDGE_TOKEN}`)))
       unauthorized()
     if (!bridge && method !== 'GET') missing()
+    if (comparison?.[1] === 'bridge' && method === 'PUT') {
+      const length = Number(request.headers.get('content-length'))
+      if (!Number.isInteger(length) || length < 8 || length > 12 * 1024 * 1024) invalid()
+      const bytes = await request.arrayBuffer(),
+        digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
+      if (
+        bytes.byteLength !== length ||
+        ![137, 80, 78, 71, 13, 10, 26, 10].every((value, index) => new Uint8Array(bytes)[index] === value) ||
+        Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('') !== comparison[2]
+      )
+        invalid()
+      await env.FEEDBACK.put(`public/comparisons/${comparison[2]}.png`, bytes)
+      return json({ ok: true })
+    }
   } else {
     if (method !== 'GET' && request.headers.get('Origin') !== new URL(request.url).origin)
       throw new Problem(403, 'origin', '请求来源不符')
@@ -271,7 +297,11 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (!edges[row.status].includes(target)) conflict()
     message =
       text(data.message, 2000, ['need_info', 'rejected', 'duplicate'].includes(target)) || labels[target]
-    screenshot = link(data.screenshot_url)
+    screenshot =
+      typeof data.screenshot_url === 'string' &&
+      /^\/api\/feedback\/comparisons\/[a-f0-9]{64}$/.test(data.screenshot_url)
+        ? data.screenshot_url
+        : link(data.screenshot_url)
     issue = text(data.multica_issue, 128)
     pr = link(data.pr_url)
   } else missing()
