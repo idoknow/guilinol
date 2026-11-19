@@ -24,7 +24,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
   const button=document.createElement('button');button.className='vehicle-action';button.hidden=true;document.body.append(button)
   const bikeCtrl=createBikeControl()
   let bike:T.Mesh|null=null,route=-1,nearBike:T.Mesh|null=null,nearRoute=-1,segment=1,disembark=false,active=false,heading=0
-  function reset(){if(route>=0)vessels[route].position.fromArray(data.routes[route].path[0]);if(bike){bike.rotation.set(0,bikeCtrl.heading,0);store(bike)}bike=null;route=-1;disembark=false;segment=1;bikeCtrl.reset()}
+  function reset(){if(route>=0)vessels[route].position.fromArray(data.routes[route].path[0]);if(bike){bike.rotation.set(0,bikeCtrl.heading,0);store(bike);if(active&&bike.parent&&!visibleCells.has(bike.parent as T.Group)){visibleCells.add(bike.parent as T.Group);group.add(bike.parent)}}bike=null;route=-1;disembark=false;segment=1;bikeCtrl.reset()}
   function interact(){if(!active)return
     if(bike){if(land(bike.position.x,bike.position.z,bikeCtrl.heading,bike.position.y))reset()}
     else if(route>=0)disembark=true

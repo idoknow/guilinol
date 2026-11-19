@@ -114,6 +114,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(!found){notifyDismountBlocked();return false}
       const prevFoot=figure.position.clone()
       if(!place(x,z,'dismount',true,found))return false
+      facing=bikeHeading+avatar.yaw;figure.rotation.y=facing
       ridePose.startDismount(prevFoot,found,cfg.height);input.clearRun();return true
     })).then(loaded=>{rides=loaded;rides.show(active)})
       .catch(error=>console.warn('Vehicles unavailable:',error)).finally(()=>{loading=false})}
@@ -243,7 +244,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(velocity<=0){grounded=nowGrounded;if(grounded&&velocity<0)velocity=0}else if(move.y<velocity*step*.25)velocity=0
       if(verify)for(let at=0;at<sim.controller.numComputedCollisions();at++){const coll=sim.controller.computedCollision(at)?.collider;if(coll)lastHits.push(sim.kinds.get(coll.handle)??'')}
       const nextTile=sim.tileAt(next.x,next.z)
-      if(nextTile&&!stream.loaded.has(nextTile)){next.x=pos.x;next.z=pos.z;vx=vz=0}
+      if(nextTile&&!stream.loaded.has(nextTile)){next.x=pos.x;next.z=pos.z;vx=vz=0;rides?.stop();bikeSpeed=0}
       const ground=sim.surface(next.x,next.z,'ground')
       if(!ground||next.y-cfg.height/2<ground.y-3){if(place(safe.x,safe.z,'rescue'))resets++;break}
       if(sim.wet(next.x,next.z)){
@@ -251,7 +252,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         if(!deck||foot<deck.y-.35){
           const tread=sim.surface(next.x,next.z,'landmark',foot+.6,1.4),tile=sim.tileAt(next.x,next.z),water=tile&&stream.loaded.get(tile)?.water
           const level=tile&&water?water[Math.round((next.z-tile.z)/4)*65+Math.round((next.x-tile.x)/4)]/10:Infinity
-          if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;vx=vz=0;blockedWater=true;rides?.stop()}
+          if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;vx=vz=0;blockedWater=true;rides?.stop();bikeSpeed=0}
         }
       }
       if(rides?.bike){

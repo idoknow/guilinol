@@ -195,7 +195,7 @@ export function createBikeControl() {
     resolveMove(ctx: BikeMoveContext) {
       const fwdX = -Math.sin(ctx.heading), fwdZ = -Math.cos(ctx.heading), sign = ctx.speed >= 0 ? 1 : -1
       const probeX = ctx.next.x + fwdX * sign * .72, probeZ = ctx.next.z + fwdZ * sign * .72
-      if (ctx.insideHouse(probeX, probeZ)) {
+      if (Math.abs(ctx.speed) > 1e-4 && ctx.insideHouse(probeX, probeZ)) {
         offRoadSteps = 0; ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z; ctx.stopBike()
         return {blocked: true, reason: 'building', speed: 0}
       }
