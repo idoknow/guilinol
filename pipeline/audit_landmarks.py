@@ -172,7 +172,7 @@ def main():
             if not entry:
                 row['status']='missing-instance';continue
             _, source, midpoint, _, road, edge = site
-            shape=footprint(ROOT/'public'/spec['model'],entry,elevation=1)
+            shape=footprint(ROOT/'public'/spec['model'],entry)
             if shape.is_empty:
                 row['status']='empty-geometry';continue
             distance=shape.centroid.distance(midpoint)

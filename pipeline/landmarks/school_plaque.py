@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw
-from c_kit import ATLAS, Builder, RECTS, _font, box, export_landmark
+from c_kit import ATLAS, Builder, RECTS, _font, box, export_landmark, landmark_surface
 
 
 def generate(entry, output):
@@ -12,13 +12,16 @@ def generate(entry, output):
     title = entry['name'].split('（')[0]
     RECTS['plaque'] = (0, 768, ATLAS, 256)
     ImageDraw.Draw(image).text((512,896),title,anchor='mm',font=_font(min(160,960//len(title)),bold=True),fill='#87342e')
+    surface = landmark_surface(entry['id'])
+    crest = max(surface.ground(x,z) for x in (-3,3) for z in (-.12,.12))
     builders = []
     for level in range(2):
         builder = Builder(level, False)
         mesh = builder.parts['atlas']
-        box(mesh,(0,1,0),(6,2,.24),'white',None)
+        box(mesh,(0,crest+1,0),(6,2,.24),'white',None)
+        mesh.pos[:] = [(x,surface.ground(x,z)-.06 if y<crest+1 else y,z) for x,y,z in mesh.pos]
         for side in (-1,1):
-            mesh.face([(-3*side,.1,.121*side),(3*side,.1,.121*side),(3*side,1.9,.121*side),(-3*side,1.9,.121*side)],
+            mesh.face([(-3*side,crest+.1,.121*side),(3*side,crest+.1,.121*side),(3*side,crest+1.9,.121*side),(-3*side,crest+1.9,.121*side)],
                       (0,0,side),'plaque',uvs=[(.001,.999),(.999,.999),(.999,.001),(.001,.001)])
         builders.append((f'lod{level}',builder))
     export_landmark(output/f"{entry['id']}.glb",image,builders)
