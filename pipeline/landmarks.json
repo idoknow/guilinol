@@ -1,4 +1,5 @@
 [
+  {"id":"lize_bridge","name":"丽泽桥","anchor":[110.284118,25.281672],"rotation":-14.5,"model":"landmarks/lize_bridge.glb","collision":"mesh"},
   {"id":"jiefang_bridge","name":"解放桥","anchor":[110.298331,25.2796383],"rotation":-18.45,"model":"landmarks/jiefang_bridge.glb","collision":"mesh","replace":["way/693451306"]},
   {"id":"huaqiao","name":"花桥","anchor":[110.3041155,25.2770013],"rotation":-58.92,"model":"landmarks/huaqiao.glb","collision":"mesh"},
   {"id":"fubo","name":"伏波山","anchor":"node/1618571712","model":"landmarks/fubo.glb","collision":"mesh"},

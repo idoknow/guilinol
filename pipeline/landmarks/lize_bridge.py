@@ -31,12 +31,14 @@ def towers(model, lateral):
 
 
 def promenade(model, side):
-    model.box(0,0,side*9.6,123,.15,3.8,'pave',True)
-    model.box(0,.15,side*9.55,123,.018,.34,'yellow')
-    model.box(0,.15,side*11.35,123,1.08,.32,'red',True)
-    model.box(0,1.23,side*11.35,123,.12,.42,'earth')
-    model.box(0,.12,side*7.8,123,.22,.3,'yellow',True)
-    model.box(0,.71,side*7.8,123,.16,.18,'yellow',True)
+    for start, end in [(-61.5,40),(40,61.5)]:
+        center, length = (start+end)/2, end-start
+        model.box(center,-.48,side*9.6,length,.63,3.8,'pave',True)
+        model.box(center,.15,side*9.55,length,.018,.34,'yellow')
+        model.box(center,.15,side*11.35,length,1.08,.32,'red',True)
+        model.box(center,1.23,side*11.35,length,.12,.42,'earth')
+        model.box(center,.12,side*7.8,length,.22,.3,'yellow',True)
+        model.box(center,.71,side*7.8,length,.16,.18,'yellow',True)
     for station in range(-60,61,3 if model.detail else 6):
         model.box(station,.2,side*7.8,.14,.56,.15,'yellow')
         if model.detail:
@@ -47,7 +49,6 @@ def promenade(model, side):
 
 
 def bridge(model):
-    model.box(0,-.85,0,123,.85,23,'tile',True)
     for station in (-40,40):
         for height in (12.8,16.8):
             model.box(station,height,0,1.1,.85,16.5,'red')
@@ -57,9 +58,7 @@ def bridge(model):
         model.box(side*60,.15,side*8.55,.18,4.8,.18,'granite')
         model.box(side*60,4.35,side*8.55,.44,.98,.34,'tile')
         model.box(side*60.0+.23,4.98,side*8.55,.04,.21,.21,'red')
-    for station in range(-60,61,8):
-        model.box(station,.005,0,4,.015,.13,'yellow')
 
 
 if __name__ == '__main__':
-    generate('lize_bridge', bridge)
+    generate('lize_bridge', bridge, lift=lambda east: 8.55 + np.minimum(.05*east, 2-.045*(east-40)))
