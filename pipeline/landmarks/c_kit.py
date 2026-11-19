@@ -569,8 +569,8 @@ def _chiwen(mesh, origin, direction, region):
     ox, oy, oz = origin
     dx, dz = direction
     box(mesh, (ox + dx * 0.2, oy + 0.55, oz + dz * 0.2), (0.46, 1.05, 0.34), region, 0.35)
-    box(mesh, (ox + dx * 0.62, oy + 1.2, oz + dz * 0.62), (0.34, 0.7, 0.26), region, 0.3)
-    box(mesh, (ox + dx * 0.98, oy + 1.65, oz + dz * 0.98), (0.24, 0.4, 0.2), region, 0.25)
+    box(mesh, (ox + dx * 0.52, oy + 1.2, oz + dz * 0.52), (0.34, 0.7, 0.26), region, 0.3)
+    box(mesh, (ox + dx * 0.75, oy + 1.65, oz + dz * 0.75), (0.24, 0.4, 0.2), region, 0.25)
 
 
 def xieshan(mesh, center, y, width, depth, rise, overhang, lift, tile_region, fascia_region, tiers=1, gable_region='wood', sides=4, ceiling=False):

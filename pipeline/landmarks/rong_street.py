@@ -1,3 +1,5 @@
+from functools import cache
+import shapely
 from PIL import Image, ImageDraw
 
 from c_kit import RECTS, _font, box, solid, stairs, ring, tube, railing, extrude
@@ -77,23 +79,37 @@ def shop(builder, east, base, south, width, length, floors, kind):
         stone.face([(face+.3,level-high/2,offset+span/2),(face+.3,level-high/2,offset-span/2),(face+.3,level+high/2,offset-span/2),(face+.3,level+high/2,offset+span/2)],(1,0,0),kind,uvs=coords)
 
 
+@cache
+def scooter_profile():
+    # Build one continuous side profile from tires, suspension, body and fork.
+    tires = [shapely.Point(x,.24).buffer(.24,quad_segs=3) for x in (-.56,.56)]
+    saddle = shapely.box(-.52,.63,0,.79)
+    frame = shapely.LineString([(-.56,.24),(-.34,.67),(-.21,.44),(.40,.44),(.56,.24)]).buffer(.08,quad_segs=2)
+    fork = shapely.LineString([(.56,.24),(.43,1.06)]).buffer(.055,quad_segs=1)
+    profile = shapely.union_all([*tires,frame,fork,saddle])
+    faces = []
+    for triangle in shapely.constrained_delaunay_triangles(profile).geoms:
+        center = triangle.centroid
+        region = 'blacktile' if any(t.covers(center) for t in [*tires,saddle]) else 'body'
+        xy = list(triangle.exterior.coords)[:-1]
+        for side in (-1,1):
+            faces.append(([(x,y,side*.09) for x,y in xy],(0,0,side),region))
+    ring = list(shapely.orient_polygons(profile).exterior.coords)
+    for (x,y),(u,v) in zip(ring,ring[1:]):
+        faces.append(([(x,y,-.09),(u,v,-.09),(u,v,.09),(x,y,.09)],
+                      (v-y,x-u,0),'blacktile' if max(y,v)<.32 else 'body'))
+    return faces
+
+
 def scooter(mesh,east,grade,south,color):
-    first = len(mesh.pos)
-    rear = grade(east-.56, south)
-    front = grade(east+.56, south)
-    base = (rear + front) / 2
-    for offset in (-.56,.56):
-        tube(mesh,(east+offset,base+.24,south-.06),(east+offset,base+.24,south+.06),.24,'blacktile',8)
-        for depth in (-.06,.06):
-            ring(mesh,(east+offset,base+.24,south+depth),.24,.14,'blacktile',sides=8)
-    tube(mesh,(east-.56,base+.24,south),(east-.22,base+.64,south),.09,color,6)
-    box(mesh,(east,base+.40,south),(.98,.18,.34),color)
-    box(mesh,(east-.26,base+.71,south),(.51,.17,.34),'blacktile')
-    tube(mesh,(east+.53,base+.24,south),(east+.43,base+1.06,south),.06,'steel',5)
-    tube(mesh,(east+.43,base+1.06,south-.24),(east+.43,base+1.06,south+.24),.045,'blacktile',4)
-    for i in range(first, len(mesh.pos)):
-        x, y, z = mesh.pos[i]
-        mesh.pos[i] = (x, y + (front-rear)*(x-east)/1.12, z)
+    rear, front = grade(east-.56,south), grade(east+.56,south)
+    def height(x):
+        return (rear+front)/2 + (front-rear)*x/1.12
+    for vertices,normal,region in scooter_profile():
+        mesh.face([(east+x,height(x)+y,south+z) for x,y,z in vertices],
+                  normal,color if region=='body' else region)
+    y = height(.43)+1.06
+    tube(mesh,(east+.43,y,south-.24),(east+.43,y,south+.24),.045,'blacktile',4)
 
 
 def approach(builder):

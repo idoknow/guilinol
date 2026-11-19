@@ -69,10 +69,13 @@ def lantern(model,x,y,z,size):
         vertices=np.concatenate([bottom,top])
         faces=[[i,i+1,i+8] for i in range(6)]+[[i,i+8,i+7] for i in range(6)]
         model.mesh(vertices,faces,color)
+    for radius,level in ((.18,-.53),(.18,.55),(.5,.32)):
+        cap = rim(radius,level)
+        model.mesh([*cap[:6],(x,y+level*size,z)],[[6,i,(i+1)%6] for i in range(6)],'wood')
     if model.detail:
         for angle in angles[:-1]:
             face=[(x+r*size*math.cos(angle+d),y+h*size,z+r*size*math.sin(angle+d)) for r,h,d in
-                  ((.37,-.38,-.055),(.37,-.38,.055),(.43,.32,.055),(.43,.32,-.055))]
+                  ((.36,-.38,-.055),(.36,-.38,.055),(.42,.32,.055),(.42,.32,-.055))]
             model.mesh(face,[[0,1,2],[0,2,3]],'wood')
 
 
@@ -105,9 +108,10 @@ def pillar(model,tone,flat=False):
         diamond=[(0,7.28,z),(.58,6.73,z),(0,6.16,z),(-.58,6.73,z),(0,7.28,z)]
         for a,b in zip(diamond,diamond[1:]):model.beam(a,b,.047,'granite',5)
         model.box(0,5.94,z,2.16,.14,.14,'white')
+    model.box(0,5.96,0,2.25,.12,1.46,'wood')
     for i,x in enumerate((-.65,0,.65)):
         count=(3,4,3)[i] if model.detail else 2
-        model.beam([x,6.02,0],[x,5.65-(count-1)*.72,0],.025,'wood',5)
+        model.beam([x,6.02,0],[x,5.26-(count-1)*.72,0],.025,'wood',5)
         for j in range(count):
             lantern(model,x,5.6-j*.72,0,.61)
 
@@ -117,7 +121,7 @@ def pendant(model, x, y, z):
     model.beam([x,y,z],[x,y+4.85,z],.115,'white',8)
     for dx in (-.42,.88):
         model.beam([x,y+4.13,z],[x+dx,y+4.77,z],.065,'white')
-        model.beam([x+dx,y+4.77,z],[x+dx,y+4.48,z],.05,'granite')
+        model.beam([x+dx,y+4.77,z],[x+dx,y+4.44,z],.05,'granite')
     lantern(model,x+.88,y+4.03,z,.82)
 
 
@@ -150,6 +154,8 @@ def lamp_post(model,x,side):
     if model.detail:
         knot=z-side*.52
         model.beam([x,4.65,z],[x,4.65,knot],.06,'granite')
+        model.beam([x,4.65,knot],[x,3.77,knot],.035,'knot')
+        model.box(x,3.77,knot,.14,.10,.34,'knot')
         for dy,r in ((0,.27),(-.31,.20)):
             pts=[[x,4.48+dy,knot],[x,4.48+dy-r,knot+r],[x,4.48+dy-2*r,knot],[x,4.48+dy-r,knot-r],[x,4.48+dy,knot]]
             for a,b in zip(pts,pts[1:]):model.beam(a,b,.063,'knot',4)
@@ -188,7 +194,7 @@ def west_bank(model):
         model.pose=(-90.7,-4.36,side*57.1,math.pi*.14*side)
         pillar(model,'aqua' if side==1 else 'jade')
         model.pose=(0,0,0,0)
-        model.beam([-143,.2,side*12],[-143,5.2,side*12],.14,'granite')
+        model.beam([-143,.04,side*12],[-143,5.2,side*12],.14,'granite')
         model.box(-143,4.3,side*12,.48,1.23,.4,'sign')
         model.box(-143.26,5.12,side*12,.08,.25,.25,'red')
     model.pose=(0,-1.5,0,0)
