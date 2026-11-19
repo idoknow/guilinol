@@ -170,7 +170,9 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       if(!tile||!stream.loaded.has(tile)||insideHouse(x,z))continue
       const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
       const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05)continue
-      const y=support.y+cfg.height/2+.055
+      const tread=surface(x,z,'landmark',support.y+cfg.step+.02,cfg.step+.04)
+      const floor=tread&&tread.slope<=cfg.slope?Math.max(tread.y,support.y):support.y
+      const y=floor+cfg.height/2+.055
       if(world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule))continue
       return {x,y,z,rule:(dx||dz?'search-':'')+(deck?'bridge':'land')}
     }return null
