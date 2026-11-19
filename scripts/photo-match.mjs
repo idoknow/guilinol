@@ -17,6 +17,8 @@ const { values, positionals } = parseArgs({
     'yaw-offset': { type: 'string', default: '0' },
   },
 })
+// Loaded SwiftShader hosts (sg at load 30+) render ~0.5 fps; allow a longer settle there.
+const settleMs = Number(process.env.PHOTO_MATCH_TIMEOUT_MS ?? 90000)
 const height = Number(values.height),
   offset = Number(values['yaw-offset'])
 if (!Number.isFinite(height) || !Number.isFinite(offset))
@@ -86,7 +88,7 @@ try {
         )
       },
       null,
-      { timeout: 90000 },
+      { timeout: settleMs },
     )
   for (const key of ordered) {
     currentKey = key
@@ -103,24 +105,35 @@ try {
     const location = locations[key]
     // WMM2025, Guilin (25.2825 N, 110.2942 E), 2026-11-19, 154 m ASL.
     // IMG_1425 and IMG_1426 are the two magnetic headings in this collection.
-    const bridgeRadius = location.support === 'deck' ? location.hAccuracy : 0
+    const pose = location.pose
+    const { dx = 0, dz = 0, dyaw = 0 } = pose ?? {}
+    if (pose && (
+      ![pose.dx, pose.dz, pose.dyaw].every(Number.isFinite) ||
+      typeof pose.basis !== 'string' || !pose.basis.trim() ||
+      Math.hypot(dx, dz) > location.hAccuracy || Math.abs(dyaw) > 25 ||
+      (pose.unusable && (dx !== 0 || dz !== 0 || dyaw !== 0))
+    )) throw Error('Invalid calibration for ' + key)
+    const x = location.x + dx
+    const z = location.z + dz
+    const bridgeRadius = location.support === 'deck' ? Math.max(0, location.hAccuracy - Math.hypot(dx, dz)) : undefined
     const heading = location.heading + (location.headingRef === 'M' ? -3.0763 : 0)
-    await page.evaluate(({ x, z }) => window.viewer.camera.position.set(x, 220, z), location)
+    const renderHeading = (((heading + dyaw + offset) % 360) + 360) % 360
+    await page.evaluate(({ x, z }) => window.viewer.camera.position.set(x, 220, z), { x, z })
     await settle()
     const { support, eyeY } = await page.evaluate(
-      async ({ location, heading, height, offset, bridgeRadius }) => {
-        const { x, z, focal35 } = location
+      async ({ x, z, focal35, heading, height, bridgeRadius }) => {
         const { camera, photoSupport } = window.viewer
         const support = await photoSupport(x, z, bridgeRadius)
         const eyeY = support.y + height
         camera.position.set(x, eyeY, z)
-        camera.rotation.set(0, (-(heading + offset) * Math.PI) / 180, 0, 'YXZ')
+        camera.rotation.set(0, (-heading * Math.PI) / 180, 0, 'YXZ')
         camera.aspect = innerWidth / innerHeight
-        camera.fov = (2 * Math.atan(18 / (focal35 * camera.aspect)) * 180) / Math.PI
+        // 35 mm equivalent is diagonal. The horizontal sensor span changes in portrait.
+        camera.fov = (2 * Math.atan(Math.hypot(36, 24) / (2 * focal35 * Math.hypot(1, camera.aspect))) * 180) / Math.PI
         camera.updateProjectionMatrix()
         return { support, eyeY }
       },
-      { location, heading, height, offset, bridgeRadius },
+      { x, z, focal35: location.focal35, heading: renderHeading, height, bridgeRadius },
     )
     await settle()
     // The loaders publish data between frames. Let the render loop apply LOD and tree batches.
@@ -155,8 +168,10 @@ try {
     const estimate = support.sampleDistance
       ? `（距机位 ${support.sampleDistance.toFixed(1)} m 处桥面估高）`
       : ''
+    const basis = pose?.basis.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+    const calibration = pose ? ` · Δ东/南 (${dx}, ${dz}) m · Δ朝向 ${dyaw}° · ${pose.unusable ? 'GPS 不可用：' : ''}${basis}` : ''
     cards.push(`<figure>
-      <figcaption>${key} · ${support.kind} ${support.y.toFixed(2)} m${estimate} · 机位 ${eyeY.toFixed(2)} m · 真北 ${heading.toFixed(1)}° · ${location.focal35} mm · GPS ±${location.hAccuracy} m · <a href="${overlay}">50% 叠加</a></figcaption>
+      <figcaption>${key} · ${support.kind} ${support.y.toFixed(2)} m${estimate} · 机位 ${eyeY.toFixed(2)} m · 原始 x/z (${location.x}, ${location.z}) m · EXIF ${location.heading}° ${location.headingRef} · 真北 ${heading.toFixed(1)}°${calibration} · 渲染 ${renderHeading.toFixed(1)}° · ${location.focal35} mm · GPS ±${location.hAccuracy} m · <a href="${overlay}">50% 叠加</a></figcaption>
       <a href="${key}"><img loading="lazy" src="${key}" alt="${key} 实拍和游戏对比" width="${viewport.width * 2}" height="${viewport.height}"></a>
     </figure>`)
   }

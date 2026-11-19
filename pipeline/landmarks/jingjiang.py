@@ -299,6 +299,8 @@ def palace(m):
             m.mesh(shrub.vertices*[.85,.53,.74]+[east,height,.21],shrub.faces,'leaf')
             if index%3!=1:m.mesh(shrub.vertices*[.42,1.05,.28]+[east,height-.91,.69],shrub.faces,'green')
     # Rock 27 and 31 show a narrow, stepped ochre tower over the through arch.
+    gate_x,gate_z,gate_angle,_,_=plan.frame(1008248065)
+    m.pose=(gate_x-147*math.sin(gate_angle),0,gate_z+147*math.cos(gate_angle),gate_angle)
     for south in (-155.3,-142.1):
         m.arcade(0,south,15,.8,6.3,[0],2.85,'yellow')
     for side in (-1,1):
@@ -341,6 +343,7 @@ def palace(m):
             m.beam([east,.86,-132.7],[east,1.77,-135.15],.13,'white');m.box(east,0,-133,.33,.94,.33,'white')
         m.box(side*10.5,0,-147,6,3.15,10,'yellow',True);m.tiled_roof(side*10.5,3.15,-147,7.1,11.5,2.3)
     gate_furniture(m)
+    m.pose=(0,0,0,0)
     for side in (-1,1):
         for i,z in enumerate((-30,-54,-78,-101,-123)):
             banyan(m,side*(13.8 if i==4 else 9.6+.6*(i%2)),z+side*1.5,i+10*(side+1))

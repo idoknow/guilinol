@@ -30,7 +30,9 @@ export default defineConfig({
     this.emitFile({type:'asset',fileName:'version.json',source:JSON.stringify({sha})})
   }}],
   optimizeDeps: {exclude: ['@dimforge/rapier3d-compat']},
-  build: {outDir: '../dist', emptyOutDir: true},
+  build: {outDir: '../dist', emptyOutDir: true, rollupOptions: {input: {
+    index: join(root,'web/index.html'), admin: join(root,'web/admin/index.html'),
+  }}},
   define: {
     __APP_VERSION__: JSON.stringify(version),
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),

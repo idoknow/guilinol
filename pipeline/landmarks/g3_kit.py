@@ -416,7 +416,7 @@ class Builder:
             self.box(0, y + 0.12, 0, w - 1.2, 0.42, min(1.0, d * 0.4), 'hedge', tile=1.5)
         self.pose = prev
 
-    def prism(self, poly_xz, y0, h, region, cap_region=None, tile=2.4, collide=False, footing=False):
+    def prism(self, poly_xz, y0, h, region, cap_region=None, tile=2.4, collide=False, holes=(), footing=False):
         pts = np.asarray(poly_xz, dtype=np.float64)
         if len(pts) >= 2 and np.allclose(pts[0], pts[-1]):
             pts = pts[:-1]
@@ -428,24 +428,24 @@ class Builder:
         area2 = np.sum(pts[:, 0] * np.roll(pts[:, 1], -1) - np.roll(pts[:, 0], -1) * pts[:, 1])
         if area2 < 0:
             pts = pts[::-1]
-        tris = mapbox_earcut.triangulate_float64(pts, np.array([len(pts)], np.uint32)).reshape(-1, 3)
+        rings = [pts, *(np.asarray(ring) for ring in holes)]
+        pts = np.concatenate(rings)
+        tris = mapbox_earcut.triangulate_float64(pts, np.cumsum([len(ring) for ring in rings],dtype=np.uint32)).reshape(-1, 3)
         y1 = y0 + h
         for t in tris:
             quad_tri = [(pts[i, 0], y1, pts[i, 1]) for i in t]
             self.face(quad_tri, (0, 1, 0), cap_region or region, tile=tile)
             if collide and self.collide:
                 self.hit.add_poly([self._xf(p) for p in quad_tri], self._xf_dir((0, 1, 0)), None)
-        bottom = np.full(len(pts), y0)
-        if footing:
-            for i, (x, z) in enumerate(pts):
-                px, py, pz = self._xf((x, 0, z))
-                bottom[i] = self.surface.ground(px, pz)-py-.04
+        def bottom(point):
+            if not footing:
+                return y0
+            x,y,z = self._xf((point[0],0,point[1]))
+            return self.surface.ground(x,z)-y-.04
         if h > 0.02:
-            for i in range(len(pts)):
-                j = (i + 1) % len(pts)
-                a, b = pts[i], pts[j]
+            for a,b in (pair for ring in rings for pair in zip(ring,np.roll(ring,-1,axis=0))):
                 nrm = (b[1] - a[1], 0.0, a[0] - b[0])
-                quad = [(a[0], bottom[i], a[1]), (b[0], bottom[j], b[1]), (b[0], y1, b[1]), (a[0], y1, a[1])]
+                quad = [(a[0], bottom(a), a[1]), (b[0], bottom(b), b[1]), (b[0], y1, b[1]), (a[0], y1, a[1])]
                 self.face(quad, nrm, region, tile=tile)
                 if collide and self.collide and h >= 0.35:
                     seg_len = math.hypot(b[0] - a[0], b[1] - a[1])
@@ -461,7 +461,7 @@ class Builder:
     def footprint_building(
         self, poly_xz, floors=4, floor_h=3.45, wall='white', accent='terracotta',
         plinth='dark_stone', roof_kind='flat', roof_tile='gray_tile', y0=0.0,
-        window_edges=None, sill_bands=True,
+        window_edges=None, sill_bands=True, holes=(),
     ):
         """Extrude an exact OSM/Overture polygon with plinth, window bands, sills, and roof.
         Guarantees 0.00 m centroid offset and 0.00 deg orientation difference vs map footprint."""
@@ -477,10 +477,10 @@ class Builder:
         total_h = floors * floor_h
         corners = [self._xf((x, 0, z)) for x, z in pts]
         sill = max(y0+.55, max(self.surface.ground(x,z)-y for x,y,z in corners)+.10)
-        self.prism(pts, y0-.35, sill-y0+.35, plinth, cap_region=plinth, tile=2.0, footing=True)
-        self.prism(pts, sill, y0+total_h-sill, wall, cap_region=roof_tile if roof_kind == 'flat' else wall, tile=2.4, collide=True)
+        self.prism(pts, y0-.35, sill-y0+.35, plinth, cap_region=plinth, tile=2.0, holes=holes, footing=True)
+        self.prism(pts, sill, y0+total_h-sill, wall, cap_region=roof_tile if roof_kind == 'flat' else wall, tile=2.4, collide=True, holes=holes)
         # Parapet band at top
-        self.prism(pts, y0 + total_h, 0.48, accent, cap_region=roof_tile if roof_kind == 'flat' else accent, tile=2.0, collide=False)
+        self.prism(pts, y0 + total_h, 0.48, accent, cap_region=roof_tile if roof_kind == 'flat' else accent, tile=2.0, collide=False, holes=holes)
 
         # Add window strips along polygon edges >= 5.0m
         for i in range(len(pts)):

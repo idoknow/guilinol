@@ -6,6 +6,9 @@ import math
 import os
 from pathlib import Path
 import subprocess
+import gzip
+import struct
+from functools import lru_cache
 
 import numpy as np
 from shapely import polygons as triangle_polygons, union_all, linestrings, polygonize
@@ -41,9 +44,20 @@ def floor_slice(triangles, elevation):
     return union_all(list(polygonize(list(getattr(noded,'geoms',[noded]))).geoms))
 
 
-def footprint(model, entry, window=None, elevation=None):
+@lru_cache(maxsize=1)
+def visible_triangles(model):
     data = subprocess.check_output(['node',ROOT/'pipeline/glb-triangles.mjs',model,'--visible'],timeout=90)
-    triangles = np.frombuffer(data,'<f4').reshape(-1,3,3)
+    return np.frombuffer(data,'<f4').reshape(-1,3,3)
+
+
+def footprint(model, entry, window=None, elevation=None, component_box=None, roof=None):
+    triangles = visible_triangles(model)
+    if roof is not None:
+        triangles=triangles[(abs(triangles[:,:,1]-roof)<.06).all(axis=1)]
+    if component_box:
+        lower,upper=component_box
+        centers=triangles.mean(axis=1)
+        triangles=triangles[((centers>=lower)&(centers<=upper)).all(axis=1)]
     if window:
         east,south,radius = window
         centers = triangles.mean(axis=1)
@@ -76,6 +90,29 @@ def metrics(shape,reference):
     center=shape.centroid.distance(reference.centroid)
     iou=None if isinstance(reference,LineString) else shape.intersection(reference).area/shape.union(reference).area
     return iou,center,delta
+
+
+def component_result(name,source,shape,reference):
+    result=dict(component=name,reference=source,status='missing-component')
+    if shape.is_empty:return result
+    iou,center,delta=metrics(shape,reference)
+    result.update(iou=round(iou,3),centroidM=round(center,2),angleDeg=round(delta,2),
+                  status='pass' if iou>=.7 and center<=5 and delta<=5 else 'fail')
+    return result
+
+
+def chunk_building(manifest,source,reference):
+    pieces=[]
+    for tile in manifest['chunks']:
+        if reference.distance(Point(tile['x']+128,tile['z']+128))>182:continue
+        data=gzip.decompress((ROOT/'public/world'/tile['file']).read_bytes())
+        vertices,indices,size=struct.unpack_from('<III',data,4)
+        offset=24+4*65**2+9*vertices+4*indices
+        for _,_,rings,_,_,seed,*_ in json.loads(data[offset:offset+size])[0]:
+            if seed!=int(source.split('/')[1])%65536:continue
+            coordinates=[np.asarray(ring)/100+[tile['x'],tile['z']] for ring in rings]
+            pieces.append(Polygon(coordinates[0],coordinates[1:]))
+    return union_all(pieces)
 
 
 def shoreline_axis(shape):
@@ -150,6 +187,7 @@ def main():
     schools=[school for catalog in ('schools-g1.json','schools-g2.json')
              for school in json.loads((ROOT/'pipeline'/catalog).read_bytes())]
     wanted={source for spec in specs if isinstance(spec.get('replace'),list) for source in spec['replace'] if source not in osm}
+    wanted.update(source for spec in specs for source in spec.get('auditBuildings',{}) if source not in osm)
     with (Path(RAW)/'overture_buildings.csv').open() as source_file:
         overture={row['id']:affine_transform(from_wkt(row['wkt']),[MLON,0,0,-MLAT,-LON0*MLON,LAT0*MLAT])
                   for row in csv.DictReader(source_file,delimiter='\t') if row['id'] in wanted}
@@ -190,21 +228,29 @@ def main():
             row['status']='missing-instance';continue
         if key in ('dongxixiang','zhengyang') and notes=='deferred to IDOK-44':
             row['status']='deferred';continue
+        if key=='wangcheng_market' and notes=='deferred to IDOK-50':
+            row['status']='deferred';continue
         if key=='jingjiang':
             components=[]
-            for name,source,window,height in (
-                ('south_gate','way/1008248059',(0,-9,28),7.5),('chengyun_gate','way/1008248065',(0,-147,17),7),
-                ('chengyun_hall','way/679734442',(2,-254,30),5),('west_hall','way/679734429',(-71,-192,24),4),
-                ('east_hall','way/679734451',(73,-192,25),4)):
-                shape=footprint(ROOT/'public'/spec['model'],entry,window,height)
-                if shape.is_empty or source not in osm:components.append(dict(component=name,reference=source,status='missing-reference'));continue
-                iou,center,delta=metrics(shape,area(osm[source]))
-                components.append(dict(component=name,reference=source,iou=round(iou,3),centroidM=round(center,2),angleDeg=round(delta,2),
-                                       status='pass' if iou>=.7 and center<=5 and delta<=5 else 'fail'))
+            for name,source,bounds,roof in (
+                ('south_gate','way/1008248059',((-21,8.98,-24),(21,9.12,1)),9.05),
+                ('chengyun_gate','way/1008248065',((-13,1,-156),(17,13,-138)),None),
+                ('chengyun_hall','way/679734442',((-24,.5,-271),(28,2.8,-237)),None),
+                ('west_hall','way/679734429',None,None),('east_hall','way/679734451',None,None)):
+                reference=area(osm[source])
+                shape=(footprint(ROOT/'public'/spec['model'],entry,component_box=bounds,roof=roof) if bounds
+                       else chunk_building(manifest,source,reference))
+                components.append(component_result(name,source,shape,reference))
             row.update(components=components,status='pass' if all(item['status']=='pass' for item in components) else 'fail')
-            if row['status']=='fail' and notes=='deferred to IDOK-51':
-                row['status']='deferred'
             continue
+        if 'auditBuildings' in spec:
+            model=ROOT/'public'/spec['model'];components=[]
+            for source,roof in spec['auditBuildings'].items():
+                reference=area(osm[source]) if source in osm else overture[source]
+                shape=footprint(model,entry,elevation=6 if roof is None else None,roof=roof)
+                selected=max(getattr(shape,'geoms',[shape]),key=lambda part:part.intersection(reference).area,default=Polygon())
+                components.append(component_result('wall' if roof is None else 'roof',source,selected,reference))
+            row.update(components=components,status='pass' if components and all(item['status']=='pass' for item in components) else 'fail');continue
         if key=='yiwu_street':
             components=[]
             for building,source in (('yiwu_old_house','way/702352880'),('yiwu_office','way/675974225')):
@@ -294,8 +340,9 @@ def main():
         if not element:continue
         tags=element.get('tags',{})
         if key not in BRIDGES and not tags.get('building'):continue
-        elevation=None if key in BRIDGES else {'central_square':8,'ronghu':4,'nikoniko':10,'gunanmen':6.6}.get(key,2)
-        shape=footprint(ROOT/'public'/spec['model'],entry,window,elevation)
+        elevation=None if key in BRIDGES or key=='zhuangyuan_gallery' else {'central_square':8,'ronghu':4,'nikoniko':10,'gunanmen':6.6,'xiaoyao_tower':9}.get(key,2)
+        component_box=((-22,3,-3),(22,7,3)) if key=='zhuangyuan_gallery' else None
+        shape=footprint(ROOT/'public'/spec['model'],entry,window,elevation,component_box)
         row['measurement']='visible deck projection' if elevation is None else f'wall section at local y={elevation} m'
         reference=area(element)
         if reference.is_empty:reference=LineString(points(element))
@@ -304,20 +351,18 @@ def main():
             row['photos']={str(number):photo_hits(shape,photos[f'IMG_{number}.jpg']) for number in PHOTO_TARGETS.get(key,())}
             if not photos_pass(row['photos']):row['status']='fail'
             continue
-        if key in ('central_square','gunanmen'):
+        if key=='zhuangyuan_gallery':row['measurement']='gallery roof projection'
+        if key in ('central_square','gunanmen','xiaoyao_tower'):
             parts=list(getattr(shape,'geoms',[shape]));shape=max(parts,key=lambda part:part.intersection(reference).area)
         if shape.is_empty:row['status']='empty-geometry';continue
         iou,center,delta=metrics(shape,reference)
         row.update(reference=ref,iou=round(iou,3) if iou is not None else None,centroidM=round(center,2))
-        if key!='xiaoyao_tower':row['angleDeg']=round(delta,2)
-        passed=center<=5 and (iou is None or iou>=.7) and (key=='xiaoyao_tower' or delta<=5)
+        if key=='xiaoyao_tower':delta=min(delta,90-delta)
+        row['angleDeg']=round(delta,2)
+        passed=center<=5 and (iou is None or iou>=.7) and delta<=5
         group=key+':'+row['component'] if 'component' in row else key
         row['photos']={str(number):photo_hits(shape,photos[f'IMG_{number}.jpg']) for number in PHOTO_TARGETS.get(group,())}
         row['status']='pass' if passed and photos_pass(row['photos'],spec.get('photoExifSuspect')) else 'fail'
-    # Landmarks merged after IDOK-45 keep their measurements but are tracked in IDOK-56.
-    for row in report:
-        if row['status'] in ('fail','missing-reference') and next((s.get('alignNote') for s in specs if s['id']==row['id']),None)=='deferred to IDOK-56':
-            row['measuredStatus']=row['status'];row['status']='deferred'
     text=json.dumps(report,indent=2,ensure_ascii=False)
     if args.out:args.out.write_text(text+'\n')
     print(text)

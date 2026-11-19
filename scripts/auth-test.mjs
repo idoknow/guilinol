@@ -8,7 +8,7 @@ import {createServer} from 'node:net'
 import {setTimeout as delay} from 'node:timers/promises'
 import {chromium} from 'playwright'
 
-const feedbackUI=process.argv.includes('--feedback-ui'),ui=feedbackUI||process.argv.includes('--ui'), email='walker@example.test', password='local-test-password', nickname='漓江访客'
+const adminUI=process.argv.includes('--admin-ui'),feedbackUI=process.argv.includes('--feedback-ui'),ui=adminUI||feedbackUI||process.argv.includes('--ui'), email='walker@example.test', password='local-test-password', nickname='漓江访客'
 const state=await mkdtemp(join(tmpdir(),'glol-auth-')), wrangler='node_modules/.bin/wrangler'
 const local=['--local','--persist-to',state],sql=command=>execFileSync(wrangler,['d1','execute','glol',...local,'--command',command,'--json'],{encoding:'utf8'})
 let child,browser,logs='',closed
@@ -17,7 +17,7 @@ try {
   const probe=createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');const port=probe.address().port;await new Promise(resolve=>probe.close(resolve))
   const origin=`http://127.0.0.1:${port}`
   const staticDir=ui?'dist':join(state,'empty-site');if(!ui)await mkdir(staticDir)
-  child=spawn(wrangler,['pages','dev',staticDir,'--ip','127.0.0.1','--port',String(port),'--persist-to',state,'--binding','EMAIL_DEV_LOG=1','--binding','BRIDGE_TOKEN=local-test'],{stdio:['ignore','pipe','pipe'],detached:true});closed=once(child,'exit')
+  child=spawn(wrangler,['pages','dev',staticDir,'--ip','127.0.0.1','--port',String(port),'--inspector-port','0','--persist-to',state,'--binding','EMAIL_DEV_LOG=1','--binding','BRIDGE_TOKEN=local-test'],{stdio:['ignore','pipe','pipe'],detached:true});closed=once(child,'exit')
   for(const stream of [child.stdout,child.stderr])stream.on('data',chunk=>logs+=chunk)
   for(let attempt=0;attempt<200;attempt++) {
     if(await fetch(origin+'/api/me').then(response=>response.status===401).catch(()=>false))break
@@ -31,7 +31,9 @@ try {
     browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
     await mkdir('captures/auth',{recursive:true})
     const page=await browser.newPage({viewport:{width:feedbackUI?960:1100,height:feedbackUI?620:740}})
-    if(feedbackUI){
+    if(adminUI){
+      await (await import('./admin-test.mjs')).browserTest({page,origin,email,password,nickname,code,sql})
+    }else if(feedbackUI){
       await page.request.post(origin+'/api/auth/register',{headers:{Origin:origin},data:{email,password,nickname}})
       await page.request.post(origin+'/api/auth/verify',{headers:{Origin:origin},data:{email,password,code:await code('verify')}})
       await page.request.post(origin+'/api/auth/logout',{headers:{Origin:origin}})
@@ -71,7 +73,7 @@ try {
     sql('UPDATE mail_events SET sent=sent-61');await api('auth/resend',{email,purpose:'reset'});const reset={email,code:await code('reset'),password:'new-password'};await api('auth/reset',reset);await api('me',null,401,'unauthorized');await api('auth/reset',reset,400,'invalid_code');await api('auth/login',login,401,'credentials');await api('auth/login',reset)
     for(let index=0;index<7;index++)await api('auth/resend',{email:`other${index}@example.test`,purpose:'reset'});await api('auth/resend',{email:'capped@example.test',purpose:'reset'},429,'rate_limited')
   }
-  console.log(ui?'UI registration, login and mobile screenshots passed':'API lifecycle, storage, lockout, cooldown, IP limit and Origin passed')
+  console.log(adminUI?'Admin access, lists, photo viewer, status timeline and three screenshots passed':ui?'UI registration, login and mobile screenshots passed':'API lifecycle, storage, lockout, cooldown, IP limit and Origin passed')
 }finally{
   await browser?.close();if(child&&child.exitCode===null&&child.signalCode===null){process.kill(-child.pid,'SIGTERM');await closed}await rm(state,{recursive:true,force:true})
 }
