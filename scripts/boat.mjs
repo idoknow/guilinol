@@ -896,21 +896,38 @@ try {
     await faceTarget(pos.x + 6, pos.z - 18)
     let minDynClear = Infinity
     let finiteSamples = 0
+    let sawBlocked = false
+    let blockReason = ''
     press('KeyS', true)
-    for (let i = 0; i < 180; i++) {
+    for (let i = 0; i < 260; i++) {
       step(1)
-      const dyn = readBoat().clearanceInfo?.clearance
+      const cur = readBoat()
+      if (cur.blocked) {
+        sawBlocked = true
+        if (cur.boat?.reason) blockReason = cur.boat.reason
+      }
+      const dyn = cur.clearanceInfo?.clearance
       if (dyn !== undefined && Number.isFinite(dyn)) {
         finiteSamples++
         minDynClear = Math.min(minDynClear, dyn)
       }
     }
     press('KeyS', false)
-    return {finiteSamples, minDynClear, endZ: readBoat().z, blocked: readBoat().blocked}
+    const end = readBoat()
+    return {
+      finiteSamples,
+      minDynClear,
+      endZ: end.z,
+      blocked: Boolean(end.blocked || sawBlocked),
+      blockReason: end.boat?.reason || blockReason,
+    }
   })
+  assert(reverseCornerBridge.finiteSamples > 0 || reverseCornerBridge.blocked, `斜角倒船未触达矮桥且未被拦下: ${JSON.stringify(reverseCornerBridge)}`)
   assert(reverseCornerBridge.minDynClear >= 0.30 && reverseCornerBridge.endZ < 684, `斜角倒船船尾角穿入矮桥底 (动态 Box3 净空跌破 0.30m): ${JSON.stringify(reverseCornerBridge)}`)
   console.log('6d. 斜角倒船矮桥船尾角净空防护通过:', {
     finiteSamples: reverseCornerBridge.finiteSamples,
+    blocked: reverseCornerBridge.blocked,
+    reason: reverseCornerBridge.blockReason,
     minDynClear: Number.isFinite(reverseCornerBridge.minDynClear) ? +reverseCornerBridge.minDynClear.toFixed(2) : 'blocked-before-footprint',
   })
 
