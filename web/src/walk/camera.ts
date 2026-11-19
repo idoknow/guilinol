@@ -33,23 +33,27 @@ export function createCameraRig(sim:Physics) {
   function update(camera:THREE.PerspectiveCamera, figurePos:THREE.Vector3, yaw:number, pitch:number, desiredDist:number, dt:number, snap=false) {
     const footY = figurePos.y
     let focusY = footY+1.4
-    const headCeil = ceilingAt(figurePos.x,figurePos.z,footY)
-    if(Number.isFinite(headCeil)) focusY = Math.max(footY+.55,Math.min(focusY,headCeil-.04))
+    const hasStartDeck = sim.hasDeck(figurePos.x,figurePos.z)
+    const headCeil = hasStartDeck?ceilingAt(figurePos.x,figurePos.z,footY):Infinity
+    if(Number.isFinite(headCeil)) focusY = Math.max(footY+.85,Math.min(focusY,headCeil-.04))
     ray.origin.x = figurePos.x; ray.origin.y = footY+.55; ray.origin.z = figurePos.z
     ray.dir.x = 0; ray.dir.y = 1; ray.dir.z = 0
-    const overhead = sim.world.castRay(ray,.95,true,undefined,undefined,sim.capsule,undefined,filter)
-    if(overhead) focusY = Math.max(footY+.55,Math.min(focusY,footY+.55+overhead.timeOfImpact-cfg.camRadius))
+    const overhead = sim.world.castRay(ray,.95,false,undefined,undefined,sim.capsule,undefined,filter)
+    if(overhead) focusY = Math.max(footY+.85,Math.min(focusY,footY+.55+overhead.timeOfImpact-cfg.camRadius))
 
     focus.set(figurePos.x,focusY,figurePos.z)
     dir.set(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch))
     goal.copy(focus).addScaledVector(dir,desiredDist)
 
+    const anyDeck = hasStartDeck||sim.hasDeck(goal.x,goal.z)||sim.hasDeck((focus.x+goal.x)*.5,(focus.z+goal.z)*.5)
     let activeCeil = headCeil
-    const span = Math.hypot(goal.x-focus.x,goal.z-focus.z), samples = Math.max(4,Math.min(20,Math.ceil(span/1.1)))
-    for(let i=1;i<=samples;i++) {
-      const frac = i/samples
-      const ceil = ceilingAt(focus.x+(goal.x-focus.x)*frac,focus.z+(goal.z-focus.z)*frac,footY)
-      if(ceil<activeCeil) activeCeil = ceil
+    if(anyDeck) {
+      const span = Math.hypot(goal.x-focus.x,goal.z-focus.z), samples = Math.max(4,Math.min(20,Math.ceil(span/1.1)))
+      for(let i=1;i<=samples;i++) {
+        const frac = i/samples
+        const ceil = ceilingAt(focus.x+(goal.x-focus.x)*frac,focus.z+(goal.z-focus.z)*frac,footY)
+        if(ceil<activeCeil) activeCeil = ceil
+      }
     }
     let targetDist = desiredDist, ducked = false
     if(Number.isFinite(activeCeil) && goal.y>activeCeil) {
@@ -72,10 +76,10 @@ export function createCameraRig(sim:Physics) {
 
     camera.position.copy(focus).addScaledVector(dir,currentDist)
     let clampedY = false
-    const endCeil = Math.min(activeCeil,ceilingAt(camera.position.x,camera.position.z,footY))
+    const endCeil = anyDeck?Math.min(activeCeil,ceilingAt(camera.position.x,camera.position.z,footY)):Infinity
     if(Number.isFinite(endCeil) && camera.position.y>endCeil) { camera.position.y = endCeil; clampedY = true }
 
-    const camDeck = sim.surface(camera.position.x,camera.position.z,'deck',footY+18,20)
+    const camDeck = anyDeck?sim.surface(camera.position.x,camera.position.z,'deck',footY+18,20):null
     const underDeck = !!camDeck && footY<camDeck.y-.55
     const floor = (!underDeck?camDeck:null)??sim.surface(camera.position.x,camera.position.z,'sidewalk')??sim.surface(camera.position.x,camera.position.z,'ground')
     if(floor) {
@@ -89,11 +93,22 @@ export function createCameraRig(sim:Physics) {
       if(len>1e-3) {
         check.divideScalar(len)
         const rechecked = castClear(check,len)
-        if(rechecked<len) camera.position.copy(focus).addScaledVector(check,rechecked)
+        if(rechecked<len) {
+          camera.position.copy(focus).addScaledVector(check,rechecked)
+          const reCeil = anyDeck?Math.min(activeCeil,ceilingAt(camera.position.x,camera.position.z,footY)):Infinity
+          if(Number.isFinite(reCeil) && camera.position.y>reCeil) camera.position.y = reCeil
+          const reDeck = anyDeck?sim.surface(camera.position.x,camera.position.z,'deck',footY+18,20):null
+          const reUnder = !!reDeck && footY<reDeck.y-.55
+          const reFloor = (!reUnder?reDeck:null)??sim.surface(camera.position.x,camera.position.z,'sidewalk')??sim.surface(camera.position.x,camera.position.z,'ground')
+          if(reFloor) {
+            const reMinY = reFloor.y+cfg.camRadius
+            if(camera.position.y<reMinY) camera.position.y = Number.isFinite(reCeil)?Math.min(reMinY,reCeil):reMinY
+          }
+        }
       }
     }
 
-    const finalCeil = Math.min(activeCeil,ceilingAt(camera.position.x,camera.position.z,footY))
+    const finalCeil = anyDeck?Math.min(activeCeil,ceilingAt(camera.position.x,camera.position.z,footY)):Infinity
     lastCeiling = Number.isFinite(finalCeil)?finalCeil+cfg.camRadius-camera.position.y:Infinity
     check.subVectors(camera.position,focus)
     const losLen = check.length()

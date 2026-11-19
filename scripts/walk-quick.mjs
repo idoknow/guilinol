@@ -298,11 +298,13 @@ try {
 
   const touchTest=await mobile.evaluate(async()=>{
     const {walk}=window.viewer, canvas=document.querySelector('canvas'), joy=document.querySelector('.walk-ui .joystick'), jumpBtn=document.querySelector('.walk-ui .btn-jump')
-    const yaw0=walk.yaw, pos0=walk.probe()
+    const yaw0=walk.yaw, dist0=walk.probe().camDist, pos0=walk.probe()
+    canvas.dispatchEvent(new PointerEvent('pointerdown',{pointerId:10,pointerType:'touch',clientX:148,clientY:740,bubbles:true}))
     canvas.dispatchEvent(new PointerEvent('pointerdown',{pointerId:11,pointerType:'touch',clientX:210,clientY:400,bubbles:true}))
     canvas.dispatchEvent(new PointerEvent('pointermove',{pointerId:11,pointerType:'touch',clientX:290,clientY:385,bubbles:true}))
     canvas.dispatchEvent(new PointerEvent('pointerup',{pointerId:11,pointerType:'touch',clientX:290,clientY:385,bubbles:true}))
-    const yawTurn=Math.abs(walk.yaw-yaw0)
+    canvas.dispatchEvent(new PointerEvent('pointerup',{pointerId:10,pointerType:'touch',clientX:148,clientY:740,bubbles:true}))
+    const yawTurn=Math.abs(walk.yaw-yaw0), pinchDrift=Math.abs(walk.probe().camDist-dist0)
 
     const jr=joy.getBoundingClientRect(), cx=jr.left+jr.width/2, cy=jr.top+jr.height/2
     joy.dispatchEvent(new PointerEvent('pointerdown',{pointerId:12,pointerType:'touch',clientX:cx,clientY:cy-jr.height*.55,bubbles:true}))
@@ -313,9 +315,9 @@ try {
     jumpBtn.dispatchEvent(new PointerEvent('pointerdown',{pointerId:13,pointerType:'touch',bubbles:true}))
     let jumped=false
     for(let i=0;i<20;i++){walk.tick(1/60);if(!walk.probe().grounded)jumped=true}
-    return {yawTurn,dist:Math.hypot(moved.x-pos0.x,moved.z-pos0.z),speed:moved.planarSpeed,jumped}
+    return {yawTurn,pinchDrift,dist:Math.hypot(moved.x-pos0.x,moved.z-pos0.z),speed:moved.planarSpeed,jumped}
   })
-  assert(touchTest.yawTurn>.2&&touchTest.dist>1.2&&touchTest.speed>6&&touchTest.jumped,`touchTest: ${JSON.stringify(touchTest)}`)
+  assert(touchTest.yawTurn>.2&&touchTest.pinchDrift<.01&&touchTest.dist>1.2&&touchTest.speed>6&&touchTest.jumped,`touchTest: ${JSON.stringify(touchTest)}`)
 
   // Also verify 390x844 coexistence when standing next to a parked e-bike AND next to a boat dock (.vehicle-action visible).
   const bikeCoexist=await mobile.evaluate(async()=>{
@@ -354,6 +356,15 @@ try {
   if(!bikeCoexist.bikeRes?.skipped){
     assert.deepEqual(bikeCoexist.bikeRes.overlaps,[],`bike vehicle-action overlap: ${JSON.stringify(bikeCoexist.bikeRes)}`)
     await mobile.screenshot({path:`${outDir}/mobile-390x844-bike-nearby.png`})
+    await mobile.locator('.walk-ui .btn-run').tap()
+    await mobile.waitForFunction(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on'))
+    await mobile.locator('.vehicle-action').tap()
+    await mobile.waitForFunction(()=>window.viewer?.walk?.vehicle==='bike'&&document.body.hasAttribute('data-aboard'))
+    await mobile.evaluate(()=>window.viewer.walk.tick(1/60))
+    await mobile.locator('.vehicle-action').tap()
+    await mobile.waitForFunction(()=>window.viewer?.walk?.vehicle==='foot'&&!document.body.hasAttribute('data-aboard'))
+    assert.equal(await mobile.evaluate(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on')),false,'runLock should clear after boarding e-bike')
+    assert.equal(await mobile.evaluate(()=>document.querySelector('.walk-ui .btn-run')?.getAttribute('aria-pressed')),'false')
   }
   console.log('mobile 390x844 HUD & touch OK',mobileShot)
   await mobileCtx.close()

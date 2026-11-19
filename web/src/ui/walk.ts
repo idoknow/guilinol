@@ -44,16 +44,17 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   joystick.onpointercancel=endStick
   joystick.onlostpointercapture=endStick
   window.addEventListener('pointermove',event=>{if(event.pointerId===stickPointer)drag(event)})
-  window.addEventListener('pointerup',event=>{endStick(event);if(event.pointerId===runPointer)endRun(true)})
-  window.addEventListener('pointercancel',event=>{endStick(event);if(event.pointerId===runPointer)endRun(false)})
+  window.addEventListener('pointerup',event=>{endStick(event);if(event.pointerId===runPointer)endRun(true,event.pointerId)})
+  window.addEventListener('pointercancel',event=>{endStick(event);if(event.pointerId===runPointer)endRun(false,event.pointerId)})
 
   btnJump.onpointerdown=event=>{event.preventDefault();event.stopPropagation();jump=true}
   btnView.onpointerdown=event=>{event.preventDefault();event.stopPropagation();view()}
   btnRun.onpointerdown=event=>{event.preventDefault();event.stopPropagation();runPointer=event.pointerId;safeCapture(btnRun,event.pointerId);runHold=true;runDownAt=performance.now();syncRun()}
-  const endRun=(toggle:boolean)=>{if(!runHold)return;if(toggle&&performance.now()-runDownAt<220)runLock=!runLock;runHold=false;runPointer=-1;syncRun()}
-  btnRun.onpointerup=()=>endRun(true)
-  btnRun.onpointercancel=()=>endRun(false)
-  btnRun.onlostpointercapture=()=>endRun(false)
+  const endRun=(toggle:boolean,pointerId?:number)=>{if(!runHold||(pointerId!==undefined&&pointerId!==runPointer))return;if(toggle&&performance.now()-runDownAt<220)runLock=!runLock;runHold=false;runPointer=-1;syncRun()}
+  btnRun.onpointerup=event=>endRun(true,event.pointerId)
+  btnRun.onpointercancel=event=>endRun(false,event.pointerId)
+  new MutationObserver(()=>{if(document.body.hasAttribute('data-aboard')){runHold=false;runLock=false;runPointer=-1;resetStick()}})
+    .observe(document.body,{attributes:true,attributeFilter:['data-aboard']})
 
   window.addEventListener('keydown',event=>{
     if(!active()||(event.target as HTMLElement)?.tagName==='INPUT')return
@@ -73,6 +74,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     if(event.pointerType==='mouse'){
       mouseDown=true;lastMouse={x:event.clientX,y:event.clientY};safeCapture(canvas,event.pointerId)
     }else{
+      if(!panel.hidden && document.body.dataset.photo!=='on' && event.clientX<innerWidth*.45 && event.clientY>innerHeight*.55)return
       touches.set(event.pointerId,{x:event.clientX,y:event.clientY})
       safeCapture(canvas,event.pointerId)
       if(touches.size===2)pinchDist=touchDistance()
@@ -116,6 +118,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
       keys.clear();jump=false;runHold=false;runLock=false;touches.clear();mouseDown=false;resetStick()
     },
     read(){
+      if(document.body.hasAttribute('data-aboard')&&(runHold||runLock)){runHold=false;runLock=false;runPointer=-1;syncRun()}
       const right=Math.max(-1,Math.min(1,+keys.has('KeyD')-+keys.has('KeyA')+stick.x))
       const forward=Math.max(-1,Math.min(1,+keys.has('KeyW')-+keys.has('KeyS')-stick.y))
       const run=keys.has('ShiftLeft')||keys.has('ShiftRight')||runHold||runLock||stick.mag>.9

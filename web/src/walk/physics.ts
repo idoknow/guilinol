@@ -165,7 +165,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return {x,y,z,rule:(dx||dz?'search-':'')+(deck?'bridge':'land')}
     }return null
   }
+  function hasDeck(east:number,south:number){const tile=tileAt(east,south);return !!(tile&&stream.loaded.get(tile)?.deck.length)}
   function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)}
   function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear()}
-  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,surface,wet,insideHouse,findWalkableSpawn}
+  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,hasDeck,surface,wet,insideHouse,findWalkableSpawn}
 }
