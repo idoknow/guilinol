@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 
-from c_kit import box, cylinder, tube
+from c_kit import box, cylinder, tube, yaw_box, ramp
 
 
 NINE_BENDS = [(75.2,38.2),(76.9,45.3),(88.7,53.5),(103.1,49.9),(109.4,63.1),
@@ -58,4 +58,42 @@ def crossing(builder,path,widths,heights,arch_segment=None):
 
 def nine_bends(builder):
     crossing(builder,NINE_BENDS,[2.8,2.8,2.8,2.8,4.2,4.2,2.8,2.8,2.8,2.8],
-             [.12,.55,.55,.55,.55,.55,.55,.55,.55,.25],5)
+             [-3.9,-2.75,-2.55,-2.4,-1.9,-1.9,-1.65,-1.1,-.65,.25],5)
+
+
+def ancient_bridge(builder):
+    stone = builder.parts['atlas']
+    axis = np.array([-.51,.86]); axis /= np.linalg.norm(axis)
+    side = np.array([axis[1],-axis[0]])
+    yaw = math.atan2(*axis)
+    def point(distance,level,offset=0):
+        east,south = [31.4,82.1]+axis*distance+side*offset
+        return np.array([east,level,south])
+    def height(distance):
+        return -3.05+6.6*max(0,1-(abs(distance)/17)**1.55)
+    def soffit(distance):
+        return -4.85+math.sqrt(max(0,7.45**2-distance**2))
+    count = 64 if builder.detail else 24
+    for index in range(count):
+        start,end = -17+34*index/count,-17+34*(index+1)/count
+        middle = (start+end)/2
+        top = height(middle)
+        yaw_box(stone,point(middle,top-.10),(6.8,.2,end-start+.015),yaw,'granite')
+        if builder.collide:
+            ramp(builder.hit,point(start,height(start)),point(end,height(end)),6.8)
+        inside_start,inside_end = soffit(start),soffit(end)
+        stone.face([point(start,inside_start,-3.4),point(end,inside_end,-3.4),point(end,inside_end,3.4),point(start,inside_start,3.4)],(0,-1,0),'ashlar')
+        for sign in (-1,1):
+            edge=sign*3.4
+            stone.face([point(start,inside_start,edge),point(end,inside_end,edge),point(end,top,edge),point(start,top,edge)],(sign*side[0],0,sign*side[1]),'white')
+            tube(stone,point(start,height(start)+.92,edge),point(end,height(end)+.92,edge),.12,'white',5)
+            if index%2==0:
+                box(stone,point(start,height(start)+.48,edge),(.27,.96,.27),'white')
+        if abs(middle)>9:
+            yaw_box(stone,point(middle,top+.19),(.85,.38,end-start+.02),yaw,'rubble')
+            yaw_box(stone,point(middle,top+.45),(.76,.16,end-start+.02),yaw,'foliage')
+    for sign in (-1,1):
+        yaw_box(stone,point(sign*19,-3.22),(9,.45,4.4),yaw,'granite')
+    for index in range(12 if builder.detail else 5):
+        center=point(-19+(index%3)*1.7,1.1+abs(index%5-2)*.23,(index-5)*.92)
+        cylinder(builder.parts['lit'],center,.23,.45,('vermilion','yellow','glaze')[index%3],8)
