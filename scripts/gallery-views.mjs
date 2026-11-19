@@ -12,11 +12,11 @@ const shots = {
     ['15', [24.85,1.68,-3.85], [26.8,1.65,-1.75]],
   ],
   xiaoyao_tower: [
-    ['16', [-16,5.85,-38], [0,14.5,0]],
-    ['19', [0,5.85,-37], [0,15.8,0]],
-    ['22', [15.5,5.85,-17], [0,15.5,0]],
+    ['16', [-14,5.85,-30], [0,15,0]],
+    ['19', [0,5.85,-31], [0,16,0]],
+    ['22', [-13.7,5.85,-17], [0,14.8,0]],
     ['25', [14.6,5.85,-8], [9,12.25,1]],
-    ['33', [39,1.7,13], [1,11.5,0]],
+    ['33', [33,1.7,13], [1,11.5,0]],
     ['56', [40,2.7,64], [0,15,0], 20],
     ['aerial', [93,91,-111], [-11,0,1]],
   ],
@@ -35,14 +35,14 @@ try {
   await page.addStyleTag({content:'body > :not(canvas):not(script){visibility:hidden} canvas{visibility:visible} .minimap{display:none!important}'})
   for(const [id,views] of Object.entries(shots))for(const [name,eye,target,hour=12] of views){
     if(name==='aerial')await page.setViewportSize({width:1000,height:680})
-    await page.evaluate(([id,eye,target,hour])=>{
+    await page.evaluate(([id,eye,target,hour,name])=>{
       const {manifest,camera,clock}=window.viewer,entry=manifest.landmarks.find(item=>item.id===id)
       const angle=entry.rotation*Math.PI/180
       const point=([x,y,z])=>[entry.position[0]+x*Math.cos(angle)+z*Math.sin(angle),entry.position[1]+y,entry.position[2]-x*Math.sin(angle)+z*Math.cos(angle)]
-      camera.fov=72
+      camera.fov=['16','19','22'].includes(name)?84:72
       camera.near=.15;camera.updateProjectionMatrix()
       camera.position.set(...point(eye));camera.lookAt(...point(target));clock.set(hour)
-    },[id,eye,target,hour])
+    },[id,eye,target,hour,name])
     await page.waitForFunction(id=>!window.viewer.stats.pending&&[...window.viewer.stream.landmarks].some(([entry,root])=>entry.id===id&&root.getObjectByName('lod0')?.visible),id,{timeout:90000})
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
     if(name==='aerial'){

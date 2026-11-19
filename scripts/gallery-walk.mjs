@@ -19,7 +19,13 @@ try {
     const start=gallery(-22,0)
     walk.leave()
     camera.position.set(start[0],160,start[1])
-    while(![...stream.landmarks.keys()].some(e=>e.id==='zhuangyuan_gallery'))await new Promise(requestAnimationFrame)
+    // Fixed-step driving runs synchronously, so finish loading both colliders first.
+    const required=['zhuangyuan_gallery','xiaoyao_tower']
+    const deadline=performance.now()+45000
+    while(!required.every(id=>[...stream.landmarks.keys()].some(e=>e.id===id))){
+      if(performance.now()>deadline)throw Error('gallery or tower failed to stream')
+      await new Promise(requestAnimationFrame)
+    }
     if(!await walk.enter(...start,0,'gallery'))throw Error('gallery spawn failed')
     const initial=walk.probe(), levels=[]
     for(const [x,z] of [gallery(-10,0),gallery(20,0),gallery(28,-.5),tower(-28,-21),tower(-16,-21),tower(0,-20),tower(0,-10),tower(0,-16),tower(14,-16),tower(14,-7.7),tower(18.7,-7.7),tower(18.7,6.5)]){
