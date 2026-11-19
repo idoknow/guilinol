@@ -35,7 +35,7 @@ sg 主机 systemd timer：feedback-bridge（每 5 分钟）
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | POST | /api/auth/register | `{email,password,nickname}` → 发验证码 |
-| POST | /api/auth/verify | `{email,code}` → 激活并登录 |
+| POST | /api/auth/verify | `{email,code,password}` → 校验最近一次注册的密码，激活并登录 |
 | POST | /api/auth/login | `{email,password}` |
 | POST | /api/auth/logout | |
 | POST | /api/auth/resend | `{email,purpose}` |
