@@ -30,7 +30,7 @@ from pathlib import Path
 
 from c_kit import (
     Builder, arch_wall, banyan, box, cylinder, ensure_textures, export_landmark, solid,
-    extrude, grille, hip_roof, railing, ramp, stairs, star, tri_count, tube,
+    extrude, grille, hip_roof, railing, ramp, stairs, star, tri_count, tube, ring,
 )
 
 
@@ -70,6 +70,38 @@ def island(b):
     wall, lit = b.parts['atlas'], b.parts['lit']
     x, y, z = 98.8, 0.3, 137.6
     deck = y + 0.85
+    bank = [(110,118),(129,121),(136,109),(150,113),(158,128),(155,134),(163,142),
+            (171,155),(165,161),(174,172),(154,177),(153,171),(162,168),(141,166),
+            (136,163),(132,166),(123,165),(111,155),(106,153),(108,144),(101,140),
+            (99,142),(95,139),(99,133),(101,134)]
+    extrude(wall,bank,-2.8,.24,'rubble',2.4)
+    if b.collide:
+        extrude(b.hit,bank,-.18,.24,'ashlar')
+    box(wall,(133,.29,142),(36,.1,3.4),'granite')
+    ring(wall,(123,2.5,136),2.3,1.58,'white',sides=24)
+    for offset in (-.7,0,.7):
+        ring(wall,(123+offset,2.5,136),.85,.63,'white')
+    arch_wall(wall,(130,.24,132),12,3.2,.48,2.2,2.75,'rubble')
+    for east in (126,134):
+        grille(wall,east,2,132.27,1.7,1.5,'lattice',4)
+    for index in range(10 if b.detail else 5):
+        east,south=119+3.3*index,142+(-1)**index*3.3
+        tube(wall,(east,.2,south),(east+.6,2.6+(index%3)*.45,south+.25),.72,'rubble',5)
+        ring(wall,(east+.82,1.45,south),1.05,.46,'rubble',sides=8)
+    for index in range(20 if b.detail else 8):
+        angle=index*2.4
+        east,south=142+4*math.sin(angle),134+3*math.cos(angle)
+        tube(wall,(east,.24,south),(east+.4,5+index%3,south-.5),.08,'foliage',5)
+    for index in range(5):
+        east,south=130+index*2.4,153+index%2
+        cylinder(wall,(east,.25,south),.12,.8,'steel',5)
+        cylinder(wall,(east,1.05,south),.64,.09,'wood',8)
+        for shift in (-.9,.9):
+            box(wall,(east+shift,.55,south),(.45,.55,.46),'wood')
+    for index in range(10):
+        box(wall,(122+index*.32,.43,148),( .30,.30,2),'wood')
+    for east in (x-4,x-1,x+2):
+        cylinder(lit,(east,2.64,z+1.48),.21,.38,'vermilion',8)
     radius = 3.15
     pad = []
     for i in range(6):
