@@ -92,4 +92,16 @@ uniform float uNight; uniform vec3 uLamp; varying float vEdge;`).replace('#inclu
   }
   material.customProgramCacheKey = ()=>'guilinol-bridge-night'
 }
+// Landmark materials named `*_lit` carry an emissive factor. Day stays unlit; night multiplies it by uNight.
+export function nightLit(material:THREE.Material) {
+  if(!material.name?.endsWith('_lit')) return
+  material.onBeforeCompile = (shader:Shader)=>{
+    shareAtmosphere(shader)
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>',`#include <common>
+uniform float uNight;`).replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+totalEmissiveRadiance *= uNight;`)
+  }
+  material.customProgramCacheKey = ()=>'guilinol-lit'
+}
+
 export {atmo}

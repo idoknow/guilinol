@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
 import {KTX2Loader} from 'three/addons/loaders/KTX2Loader.js'
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js'
+import {nightLit} from './look/night'
 
 export interface Landmark {
   id:string; file:string; position:[number,number,number]; rotation:number; collision:'mesh'|'box'|'none'; lods:string[]
@@ -33,7 +34,10 @@ export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,en
         pending.add(entry)
         loader.loadAsync('./'+entry.file).then(({scene:group})=>{
           group.position.fromArray(entry.position);group.rotation.y=THREE.MathUtils.degToRad(entry.rotation)
-          group.traverse(node=>{if(/^collision/i.test(node.name))node.visible=false})
+          group.traverse(node=>{
+            if(/^collision/i.test(node.name))node.visible=false
+            if(node instanceof THREE.Mesh) for(const material of [node.material].flat()) nightLit(material)
+          })
           scene.add(group);group.updateMatrixWorld(true);loaded.set(entry,group)
         }).catch(error=>{console.warn(entry.id,error);retry.set(entry,performance.now()+30000)}).finally(()=>pending.delete(entry))
       }

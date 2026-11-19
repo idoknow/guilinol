@@ -1,5 +1,5 @@
 [
-  {"name": "象鼻山", "osm": 344461733, "lat": 25.2700731, "lon": 110.2915099, "target": 198, "source": "资料：中国网 两江四湖·象山景区 (2022-10-17)，周边低地 + 55 m", "footprint": "DEM radial shape, scaled by relief", "aspect": 1.4, "shoulder": 0.522, "taper": 0.109},
+  {"name": "象鼻山", "osm": 344461733, "lat": 25.2700731, "lon": 110.2915099, "target": 198, "source": "资料：中国网 两江四湖·象山景区 (2022-10-17)，周边低地 + 55 m", "footprint": "DEM radial shape, scaled by relief", "aspect": 1.4, "shoulder": 0.522, "taper": 0.109, "baseHeight": 145.6, "model": "landmarks/elephant_hill.glb"},
   {"name": "伏波山", "osm": 1618571712, "lat": 25.2861931, "lon": 110.2991439, "target": 213, "source": "桂林景点资料 newguilin.com/scenery_view.asp?id=4", "footprint": "DEM radial shape, scaled by relief", "shoulder": 0.628, "taper": 0.186},
   {"name": "犁头山", "osm": 3792773488, "lat": 25.2914982, "lon": 110.2813576, "target": 290, "source": "估算：周边地面 + max(22 m, 1.25 × DEM 局部地形起伏)", "footprint": "DEM radial shape, scaled by relief", "shoulder": 0.617, "taper": 0.201},
   {"name": "穿山", "osm": 4553931195, "lat": 25.2539623, "lon": 110.2994789, "target": 224, "source": "OSM ele（未验证测绘来源）", "footprint": "DEM radial shape, scaled by relief", "shoulder": 0.548, "taper": 0.225},
