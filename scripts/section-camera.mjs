@@ -1,7 +1,9 @@
 const offsets = {
   'IMG_1299.jpg': [3.2, 0.4],
+  'IMG_1301.jpg': [-2.6, -1.0],
   'IMG_1365.jpg': [-6.05, 12.06],
   'IMG_1380.jpg': [-1.47, 9.14],
+  'IMG_1384.jpg': [0.8, -5.3],
 }
 
 export function sectionCamera(key, location) {

@@ -58,7 +58,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     lane_stripes = []
     lamp_candidates = []
 
-    def emit_crosswalk(line, width, left_w, right_w, dist, sign_away, with_stop, search=0):
+    def emit_crosswalk(line, width, left_w, right_w, dist, sign_away, with_stop, search=0, approach=None):
         if not 0 <= dist <= line.length:
             return
         mid = np.array(line.interpolate(dist).coords[0])
@@ -69,6 +69,11 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         corner = Point(mid).distance(Point(-1331.2,-103.5)) < 28
         half_bar = .34 if corner else .24
         spans = np.linspace(-width/2+half_bar,width/2-half_bar,max(2,round(width/1.15))) if corner else np.arange(-width / 2 + .55, width / 2 - .35, 1.0)
+        if corner and approach is not None and approach.way == 221349761:
+            extension = approach.side_line(1).distance(Point(mid))
+            low = -width/2 - (extension if sign_away < 0 else 0)
+            high = width/2 + (extension if sign_away > 0 else 0)
+            spans = np.linspace(low+half_bar,high-half_bar,max(2,round((high-low)/1.15)))
         for span in spans:
             center = mid + normal * span
             bars.append(LineString([center - tangent * 1.9, center + tangent * 1.9]).buffer(half_bar, cap_style='flat'))
@@ -78,7 +83,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         group = unary_union(bars)
         if cores.query(group, predicate='intersects').size:
             if search < 24:
-                emit_crosswalk(line, width, left_w, right_w, dist + sign_away * 2, sign_away, with_stop, search + 2)
+                emit_crosswalk(line, width, left_w, right_w, dist + sign_away * 2, sign_away, with_stop, search + 2, approach)
             return
         if any(Point(mid).distance(c) < 8 for c in crossing_centres):
             return
@@ -126,7 +131,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             directions = (-1,1) if feature=='traffic_signals' else (1,)
             for direction in directions:
                 offset = (width/2+3) if feature=='traffic_signals' else 0
-                emit_crosswalk(line, width, road.left, road.right, along + direction * offset, direction, feature == 'traffic_signals')
+                emit_crosswalk(line, width, road.left, road.right, along + direction * offset, direction, feature == 'traffic_signals', approach=road)
         if kind in CONFIG['mainStreets']:
             section = road.dimensions
             for side,available in ((-1,road.left),(1,road.right)):
@@ -166,7 +171,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                     if 0 < step_dir * (station - s_jct) < 40:
                         dist = station
             if 2.2 <= dist <= arm_road.line.length - 2.2:
-                emit_crosswalk(arm_road.line, arm_road.width, arm_road.left, arm_road.right, dist, step_dir, len(arms) >= 4)
+                emit_crosswalk(arm_road.line, arm_road.width, arm_road.left, arm_road.right, dist, step_dir, len(arms) >= 4, approach=arm_road)
     # Reserve the approach from the first stripe through the stop line.
     reserved = STRtree([*cores.geometries, *(g.convex_hull.buffer(.05) for g in crosswalk_groups)])
     lanes = unary_union([lane.difference(unary_union(reserved.geometries.take(reserved.query(lane))))
@@ -344,6 +349,21 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                 return None
             _,owner,near=min(hits,key=lambda hit:hit[:2])
             return Point((center.x+near.x)/2,(center.y+near.y)/2) if road.way<owner else None
+
+        if road.way == 221349761 and line.length>282:
+            for station in np.arange(251,280,2.2):
+                for slope in (-1,1):
+                    first = shifted(station,road.width/2-.16)
+                    last = shifted(station+slope*2.2,road.width/2-2.36)
+                    stripe = LineString([first,last])
+                    if not layers[4].query(stripe,predicate='intersects').size:
+                        anchor(stripe.centroid,math.atan2(last.y-first.y,last.x-first.x),10,stripe.length)
+            for station in (253,257,261):
+                point = shifted(station,road.width/2+4)
+                if not any(tree.query(point,predicate='dwithin',distance=1.1).size for tree in (obstacles,parking_keepout,layers[0])):
+                    anchor(point,frame(station)[1],3)
+        if road.way == 727682110:
+            anchor(Point(-1002.0,-210.5),0,11)
 
         if (road.divided or road.oneway and road.name) and road.kind in ('trunk','primary'):
             span = density['railSpan']

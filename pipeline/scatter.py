@@ -160,6 +160,16 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
                         if not tree(pt,'mixed','street',force_kind=1 if canopy else 0 if arterial else rng.randrange(2),force_scale=125 if canopy else 100 if arterial else 120,yaw=-angle-side*math.pi/2 if arterial else None,planting_mask=structure_exclude if fitted_verge else None):
                             continue
                         beds[origin].append([round((pt.x-origin[0])*10),round((pt.y-origin[1])*10),round(angle*100),int(arterial)])
+    if ry_road is not None and ry_road.line.length>280:
+        for station in (265,273,281):
+            center = ry_road.line.interpolate(station)
+            ahead = ry_road.line.interpolate(station+.1)
+            angle = math.atan2(ahead.y-center.y,ahead.x-center.x)
+            inset = ry_road.width/2+2.85
+            point = Point(center.x-inset*math.sin(angle),center.y+inset*math.cos(angle))
+            if tree(point,'lake','street',force_kind=1,force_scale=125,yaw=-angle,separation=3):
+                origin = tuple(math.floor(value/CHUNK)*CHUNK for value in point.coords[0])
+                beds[origin].append([round((point.x-origin[0])*10),round((point.y-origin[1])*10),round(angle*100),0])
     shore = unary_union(wet).boundary
     for poly,name,water in banks:
         for pt in walk_line(poly.exterior,CONFIG['bank']['spacing']):

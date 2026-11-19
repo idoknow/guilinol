@@ -9,6 +9,7 @@ type RoadCtrl=[number,number[]]
 export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
+const parkingYellow=new THREE.Color(0xe7b62e)
 export const streetSurfaceMat=new THREE.MeshStandardMaterial({
   vertexColors:true,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4,
 })
@@ -131,6 +132,10 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       box(x-length*.5*Math.cos(angle),y+.62,z+length*.5*Math.sin(angle),.32,1.24,.32,angle,stoneMid)
       for(const level of [.32,1.05])box(x,y+level,z,length,.06,.07,angle,iron)
       for(const fraction of [-.32,-.12,.12,.32])box(x+fraction*length*Math.cos(angle),y+.69,z-fraction*length*Math.sin(angle),.04,.78,.04,angle,iron)
+    }else if(kind===10){
+      box(x,baseLevel(x,z)+.075,z,span/10,.012,.1,angle,parkingYellow)
+    }else if(kind===11){
+      for(let band=0;band<5;band++)box(x,y+.09+band*.18,z,.21,.18,.21,angle,band%2?iron:parkingYellow)
     }else if(kind===9){
       box(x,y+.012,z,span/10+.01,.018,.12,angle,stoneLight)
     }else if(kind===7){
