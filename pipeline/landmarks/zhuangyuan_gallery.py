@@ -6,7 +6,35 @@ import numpy as np
 from xiaoyao_tower import generate
 
 
+def apartments(m, x, z, length, floors):
+    """Residential wings bounding the two sides of the roof in photos 08/10/14."""
+    depth, storey = 9.2, 3.05
+    facade = -np.sign(z)
+    m.box(x,-.65,z,length,.65+3.35,depth,'granite',True)
+    top = 3.35+(floors-1)*storey
+    m.box(x,3.35,z,length-.8,top-3.35,depth-.55,'white',True)
+    m.box(x,top,z,length+.3,.28,depth+.22,'granite')
+    m.box(x+length*.22,top+.28,z,5.6,1.75,3.8,'white')
+    m.box(x+length*.22,top+2.03,z,6.0,.21,4.2,'tile')
+    for level in range(1,floors):
+        base = 3.35+(level-1)*storey
+        for bay,px in enumerate(np.linspace(x-length*.42,x+length*.42,9)):
+            face=z+facade*depth*.47
+            if bay%3==0:
+                m.box(px,base,face+facade*.5,3.5,.22,1.65,'granite')
+                m.box(px,base+.22,face+facade*1.25,3.25,.73,.14,'white')
+                face+=facade*.92
+            m.box(px,base+.98,face+facade*.09,2.72,1.52,.18,'glass')
+            if m.detail:
+                m.box(px,base+.98,face+facade*.20,.09,1.52,.08,'white')
+    for end in (-1,1):
+        for level in range(floors):
+            m.box(x+end*(length/2-.31),level*storey+1.1,z, .29,1.48,3.3,'glass')
+
+
 def gallery(m):
+    apartments(m,-1.4,15.1,49,7)
+    apartments(m,-3.6,-15.0,40,6)
     length = 42.3
     m.box(0, -.2, 0, length, .33, 3.85, 'pave', True)
     for x in np.linspace(-20.7, 20.7, 12):
@@ -61,7 +89,7 @@ def gallery(m):
     for dx in (-2.8,2.8):
         for z in (-2.45,2.45):
             m.beam([x+dx,.13,z],[x+dx,3.65,z],.21,'wood',10,True)
-    m.swept_roof(x,3.63,0,8.45,7.5,2.45)
+    m.swept_roof(x,3.63,0,8.45,7.5,3.25)
     # Rounded crown and two-tier base leave a passage on either side.
     m.box(x,.13,1.05,1.9,.23,1.2,'stone',True)
     m.box(x,.36,1.05,1.6,.36,.92,'granite',True)

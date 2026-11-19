@@ -25,7 +25,7 @@ def check(entry, way):
     tri = np.frombuffer(data, "<f4").astype(float).reshape(-1, 3, 3)
     # Select the continuous gallery gable or the tower's lowest roof by height.
     if entry["id"] == "zhuangyuan_gallery":
-        keep = (tri[:,:,1].min(axis=1)>3.32) & (tri[:,:,1].max(axis=1)<4.50) & (tri[:,:,0].max(axis=1)<21.4)
+        keep = (tri[:,:,1].min(axis=1)>3.32) & (tri[:,:,1].max(axis=1)<4.50) & (tri[:,:,0].max(axis=1)<21.4) & (np.abs(tri[:,:,2]).max(axis=1)<2.2)
     else:
         keep = (tri[:,:,1].min(axis=1)>14.49) & (tri[:,:,1].max(axis=1)<17.71)
     local = tri[keep][:,:,[0,2]]
