@@ -666,7 +666,13 @@ class Builder:
             self.pose = (float((a[0] + b[0]) / 2), 0.0, float((a[1] + b[1]) / 2), yaw)
             parts = [self.atlas,self.lit,self.hit]
             starts = [len(part.pos) for part in parts]
-            self.box(0, 0.0, 0, ln, 0.68, 0.32, base_mat, tile=1.8, collide=True)
+            # Sample long runs in short panels so the stone cap follows the
+            # same grade as the pickets between the two road survey vertices.
+            spans = max(1, math.ceil(ln / 1.5))
+            step_len = ln/spans
+            centers = [(i+.5)*step_len-ln/2 for i in range(spans)]
+            for px in centers:
+                self.box(px, 0, 0, step_len, .68, .32, base_mat, tile=1.8, collide=True)
             if self.detail:
                 n_bays = max(1, int(ln / 4.5))
                 step = ln / n_bays
@@ -674,14 +680,17 @@ class Builder:
                     px = -ln / 2 + bi * step
                     self.box(px, 0.68, 0, 0.38, h - 0.68, 0.38, wall_mat, tile=1.5)
                     self.box(px, h, 0, 0.48, 0.12, 0.46, cap_mat, tile=1.0, bottom=True)
-                self.box(0, h - 0.16, 0, ln, 0.06, 0.07, 'dark_stone', tile=1.0)
-                self.box(0, 0.82, 0, ln, 0.05, 0.07, 'dark_stone', tile=1.0)
+                for px in centers:
+                    self.box(px, h-.16, 0, step_len, .06, .07, 'dark_stone', tile=1.0)
+                    self.box(px, .82, 0, step_len, .05, .07, 'dark_stone', tile=1.0)
                 for rx in np.arange(-ln / 2 + 0.4, ln / 2 - 0.3, 0.55):
                     self.box(float(rx), 0.70, 0, 0.035, h - 0.86, 0.045, 'dark_stone', tile=0.8)
             else:
-                self.box(0, 0.68, 0, ln, h - 0.68, 0.26, wall_mat, tile=2.2)
+                for px in centers:
+                    self.box(px, .68, 0, step_len, h-.68, .26, wall_mat, tile=2.2)
             if self.collide:
-                self.solid_box(0, 0.0, 0, ln, h, 0.36)
+                for px in centers:
+                    self.solid_box(px, 0, 0, step_len, h, .36)
             for part,start in zip(parts,starts):
                 for k in range(start,len(part.pos)):
                     x,y,z = part.pos[k]
