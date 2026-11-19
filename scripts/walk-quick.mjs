@@ -40,6 +40,9 @@ try {
   await fixture([-873,-197.63],[1,0],1,'landmark')
   await fixture([-1021.82,435.97],[.967,-.254],2,'rail')
   await fixture([-962,1096],[.8,.6],9,'peak')
+  // The west portal takes its walking surface from the streamed bridge model.
+  await page.evaluate(()=>{const {walk,camera}=window.viewer;walk.leave();camera.position.set(-309,158,-1)})
+  await page.waitForFunction(()=>[...window.viewer.stream.landmarks.keys()].some(entry=>entry.id==='jiefang_bridge'))
   await fixture([-309,-1],[.95,.32],18,'deck')
   await fixture([-740,868],[0,0],6,'shore')
   assert.deepEqual(errors,[]);console.log('seconds',(performance.now()-start)/1000);assert(performance.now()-start<180000)
