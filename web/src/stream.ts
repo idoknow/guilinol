@@ -6,6 +6,7 @@ import {detail, type Manifest, type Tile, overview} from './world'
 
 export class Stream {
   landmarks:import('./landmarks').LoadedLandmarks=new Map()
+  updateLandmarks?:ReturnType<typeof import('./landmarks').landmarkStream>
   loaded = new Map<Tile,Awaited<ReturnType<typeof detail>>>()
   pending = new Map<Tile,AbortController>()
   failures = new Map<Tile,number>()

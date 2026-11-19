@@ -416,7 +416,7 @@ class Builder:
             self.box(0, y + 0.12, 0, w - 1.2, 0.42, min(1.0, d * 0.4), 'hedge', tile=1.5)
         self.pose = prev
 
-    def prism(self, poly_xz, y0, h, region, cap_region=None, tile=2.4, collide=False):
+    def prism(self, poly_xz, y0, h, region, cap_region=None, tile=2.4, collide=False, holes=()):
         pts = np.asarray(poly_xz, dtype=np.float64)
         if len(pts) >= 2 and np.allclose(pts[0], pts[-1]):
             pts = pts[:-1]
@@ -428,7 +428,9 @@ class Builder:
         area2 = np.sum(pts[:, 0] * np.roll(pts[:, 1], -1) - np.roll(pts[:, 0], -1) * pts[:, 1])
         if area2 < 0:
             pts = pts[::-1]
-        tris = mapbox_earcut.triangulate_float64(pts, np.array([len(pts)], np.uint32)).reshape(-1, 3)
+        rings = [pts, *(np.asarray(ring) for ring in holes)]
+        pts = np.concatenate(rings)
+        tris = mapbox_earcut.triangulate_float64(pts, np.cumsum([len(ring) for ring in rings],dtype=np.uint32)).reshape(-1, 3)
         y1 = y0 + h
         for t in tris:
             quad_tri = [(pts[i, 0], y1, pts[i, 1]) for i in t]
@@ -436,9 +438,7 @@ class Builder:
             if collide and self.collide:
                 self.hit.add_poly([self._xf(p) for p in quad_tri], self._xf_dir((0, 1, 0)), None)
         if h > 0.02:
-            for i in range(len(pts)):
-                j = (i + 1) % len(pts)
-                a, b = pts[i], pts[j]
+            for a,b in (pair for ring in rings for pair in zip(ring,np.roll(ring,-1,axis=0))):
                 nrm = (b[1] - a[1], 0.0, a[0] - b[0])
                 quad = [(a[0], y0, a[1]), (b[0], y0, b[1]), (b[0], y1, b[1]), (a[0], y1, a[1])]
                 self.face(quad, nrm, region, tile=tile)
@@ -456,7 +456,7 @@ class Builder:
     def footprint_building(
         self, poly_xz, floors=4, floor_h=3.45, wall='white', accent='terracotta',
         plinth='dark_stone', roof_kind='flat', roof_tile='gray_tile', y0=0.0,
-        window_edges=None, sill_bands=True,
+        window_edges=None, sill_bands=True, holes=(),
     ):
         """Extrude an exact OSM/Overture polygon with plinth, window bands, sills, and roof.
         Guarantees 0.00 m centroid offset and 0.00 deg orientation difference vs map footprint."""
@@ -470,10 +470,10 @@ class Builder:
             pts = pts[::-1]
 
         total_h = floors * floor_h
-        self.prism(pts, y0 - 0.35, 0.90, plinth, cap_region=plinth, tile=2.0, collide=False)
-        self.prism(pts, y0 + 0.55, total_h - 0.55, wall, cap_region=roof_tile if roof_kind == 'flat' else wall, tile=2.4, collide=True)
+        self.prism(pts, y0 - 0.35, 0.90, plinth, cap_region=plinth, tile=2.0, collide=False, holes=holes)
+        self.prism(pts, y0 + 0.55, total_h - 0.55, wall, cap_region=roof_tile if roof_kind == 'flat' else wall, tile=2.4, collide=True, holes=holes)
         # Parapet band at top
-        self.prism(pts, y0 + total_h, 0.48, accent, cap_region=roof_tile if roof_kind == 'flat' else accent, tile=2.0, collide=False)
+        self.prism(pts, y0 + total_h, 0.48, accent, cap_region=roof_tile if roof_kind == 'flat' else accent, tile=2.0, collide=False, holes=holes)
 
         # Add window strips along polygon edges >= 5.0m
         for i in range(len(pts)):

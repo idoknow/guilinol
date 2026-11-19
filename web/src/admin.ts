@@ -1,4 +1,5 @@
 import { edges, labels } from '../../lib/feedback-contract'
+import './admin.css'
 
 const main = document.querySelector('main')!,
   nav = document.querySelector('nav')!
@@ -59,6 +60,11 @@ function table(headers: string[], rows: (string | number | Node)[][]) {
   main.append(grid)
   if (!rows.length) main.append(el('p', '没有符合条件的记录'))
 }
+function pill(status: string) {
+  const node = el('span', labels[status] ?? status)
+  node.className = `adm-pill adm-status--${status}`
+  return node
+}
 function option(value: string, label: string) {
   const node = el('option', label)
   node.value = value
@@ -91,6 +97,7 @@ function filters(users: boolean) {
   const form = el('form'),
     query = el('input'),
     view = el('input')
+  form.className = 'adm-filters'
   view.type = 'hidden'
   view.name = 'view'
   view.value = users ? 'users' : 'feedback'
@@ -131,19 +138,19 @@ async function list(users: boolean) {
       ['已验证', stats.verified],
       ['24 小时新增', stats.new_24h],
     ]) {
-      const card = el('strong', `${name}：${value}　`)
+      const card = el('div')
       card.className = 'adm-stat'
+      card.append(el('b', value), el('span', name))
       cards.append(card)
     }
-    cards.append(
-      el(
-        'p',
-        Object.entries(labels)
-          .map(([key, name]) => `${name} ${stats.feedback[key] || 0}`)
-          .join(' · '),
-      ),
-    )
-    main.append(cards)
+    const counts = el('div')
+    counts.className = 'adm-counts'
+    for (const [key, name] of Object.entries(labels)) {
+      const chip = link(`${name} ${stats.feedback[key] || 0}`, `?view=feedback&status=${key}`)
+      chip.className = `adm-pill adm-status--${key}`
+      counts.append(chip)
+    }
+    main.append(cards, el('h2', '反馈状态'), counts)
   }
   main.append(el('h2', users ? '用户列表' : '反馈列表'))
   filters(users)
@@ -167,7 +174,7 @@ async function list(users: boolean) {
       page.items.map((item: Feedback) => [
         link(item.title, '?id=' + encodeURIComponent(item.id)),
         item.kind,
-        labels[item.status],
+        pill(item.status),
         `${item.nickname} (${item.email})`,
         `${item.lon}, ${item.lat}`,
         item.photo_count,
@@ -190,8 +197,17 @@ async function detail(id: string) {
     item = await api(path)
   main.append(
     el('h2', item.title),
-    el('p', `${item.kind} · ${labels[item.status]} · ${item.nickname} (${item.email})`),
-    el('p', item.body),
+    (() => {
+      const meta = el('p')
+      meta.className = 'adm-meta'
+      meta.append(pill(item.status), ` ${item.kind} · ${item.nickname} (${item.email})`)
+      return meta
+    })(),
+    (() => {
+      const body = el('p', item.body)
+      body.className = 'adm-body'
+      return body
+    })(),
     el(
       'p',
       `经度 ${item.lon}，纬度 ${item.lat}；朝向 ${item.heading ?? '—'}；地标 ${item.landmark_id ?? '—'}`,
@@ -201,12 +217,15 @@ async function detail(id: string) {
   if (item.issue_url) main.append(external('Multica issue', item.issue_url), ' ')
   if (item.pr_url) main.append(external('查看 PR', item.pr_url))
   main.append(el('h3', '照片'))
+  const photos = el('div')
+  photos.className = 'adm-photos'
+  main.append(photos)
   for (const photo of item.photos) {
     const url = `/api/feedback/${encodeURIComponent(id)}/photos/${photo.n}`,
       anchor = external('', url),
       image = el('img')
     image.src = url
-    image.width = 120
+    image.loading = 'lazy'
     image.alt = `照片 ${photo.n}`
     anchor.append(image)
     const figure = el('figure')
@@ -217,10 +236,11 @@ async function detail(id: string) {
         `${photo.view_label ?? '未标注视角'} · ${photo.mime} · ${photo.bytes} 字节 · EXIF 纬度 ${photo.exif_lat ?? '—'}，经度 ${photo.exif_lon ?? '—'}，朝向 ${photo.exif_dir ?? '—'}，时间 ${photo.exif_time ?? '—'}`,
       ),
     )
-    main.append(figure)
+    photos.append(figure)
   }
   main.append(el('h3', '时间线'))
   const events = el('ol')
+  events.className = 'adm-timeline'
   for (const event of item.events) {
     const entry = el('li', `${date(event.created_at)} · ${labels[event.status]} · ${event.message} `)
     if (event.screenshot_url) entry.append(external('查看截图', event.screenshot_url))
@@ -239,6 +259,7 @@ async function detail(id: string) {
   for (const key of edges[item.status]) select.append(option(key, labels[key]))
   statusLabel.append(select)
   messageLabel.append(message)
+  form.className = 'adm-status-form'
   form.append(statusLabel, messageLabel, button)
   main.append(el('h3', '更改状态'), form)
   form.onsubmit = async (event) => {
