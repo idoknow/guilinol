@@ -19,7 +19,10 @@ ALIASES = {'象鼻山': ['象山', '水月洞'], '日塔': ['日月双塔'], '�
            '靖江王城': ['王城', '靖江王府', '独秀峰'], '叠彩山公园': ['叠彩山', '明月峰'],
            '伏波山公园': ['伏波山', '还珠洞'], '正阳门': ['王城正门'], '依仁路步行街': ['正阳路步行街'],
            '正阳路': ['正阳路步行街'], '榕杉湖景区': ['两江四湖', '榕湖', '杉湖'],
-           '桂林市中山中学漓滨校区': ['桂林市第九中学', '桂林九中', '九中']}
+           '桂林市中山中学漓滨校区': ['桂林市第九中学', '桂林九中', '九中'],
+           '桂林市培智学校': ['特殊教育学校', '桂林特殊教育学校'],
+           '桂林市逸仙中学': ['桂林逸仙中学', '桂林市第二中学', '桂林二中', '二中'],
+           '桂林市民族中学': ['桂林民族中学', '逸仙中学初中部']}
 
 
 def flat(curve):
@@ -96,8 +99,8 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
                 road = dict(n=name, c=CLASSES[highway], w=width if math.isfinite(width) and width > 0 else default, p=path)
                 if tags.get('bridge','no') != 'no': road['b'] = 1
                 roads.append(road)
-                if name and highway in ('residential','living_street','tertiary','secondary','pedestrian','primary','unclassified') and tags.get('access') not in ('private','no'):
-                    public_streets.append((name,line))
+                if name and highway in ('residential','living_street','tertiary','secondary','pedestrian','primary','trunk','unclassified') and tags.get('access') not in ('private','no'):
+                    public_streets.append((name,highway,line))
                 if name and (name not in longest or line.length > longest[name].length): longest[name] = line
         kind = kind_of(tags)
         if not kind or not name: continue
@@ -121,11 +124,12 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
              'way/646911647': Point(ll2xz(25.25156339,110.31056078))}
     for key, campus in campuses.items():
         reference = gates.get(key, campus.boundary)
-        segments = [line for _,line in public_streets if line.disjoint(campus.buffer(1))]
+        segments = [line for _,_,line in public_streets if line.disjoint(campus.buffer(1))]
         closest = min(segments, key=reference.distance)
         place(g4[key], 'school', nearest_points(reference, closest)[1])
     for key,center in school_centers.items():
-        segments = [line for name,line in public_streets if key != 'way/675588260' or name == '漓滨路']
+        street = schools.get(key, {}).get('street', '漓滨路' if key == 'way/675588260' else '')
+        segments = [line for name,hw,line in public_streets if (name == street if street else (hw != 'trunk' if key in school_names else hw not in ('primary','trunk')))]
         if segments:
             place(school_names[key] if key in school_names else schools[key]['name'],'school',nearest_points(center, min(segments,key=center.distance))[1])
 
