@@ -1,16 +1,6 @@
 """榕湖. Anchor is OSM node/6320266329 系舟亭 (25.2788955, 110.2853181), ground DEM 153.1 m.
 
-Other pieces are offset in metres from that node (x east, z south) and lifted by the
-DEM difference so each one sits on its own ground:
-
-- 湖心亭 node/6317785656 at (+98.8, +137.6), DEM +0.3 m
-- 榕湖钢桥 way/155148522 midpoint at (-604.1, +87.2). The bridge center is over
-  water (DEM 148 m); the deck is kept near shore height, y=0.6, matching the
-  other footbridges which sit about 2 m above the water.
-- 图书馆榕湖分部 south front at (-22, -36). The parcel centroid is DEM +4.3 m,
-  but the facade sits on the lakeside edge, DEM +1.75 m.
-- 榕湖饭店 lakeside mass at (-190, +55), DEM +1.15 m. The grounds centroid
-  further inland is higher; the modeled block uses the bank height.
+Fixture and foundation heights use the finished world in local coordinates.
 
 系舟亭, from raw/refs/ronghu/03-2019.jpg: square plan about 5.4 m, columns about
 2.8 m (a seated person fixes the 美人靠 at 0.9 m), black tile hip roof with
@@ -27,6 +17,7 @@ import math
 import random
 import sys
 from rong_bridges import nine_bends, ancient_bridge
+from rong_surface import ground, water, bank_top, bank_strip, shoreline_z
 from rong_street import scooter
 from rong_solids import oval, torus, banyan as solid_tree
 from rong_solids import banyan, align_front
@@ -77,9 +68,15 @@ def island(b):
     x, y, z = 98.8, 0.3, 137.6
     deck = y + 0.85
     bank = [(121.57, 120.07), (129.25, 120.5), (133.71, 112.64), (136.39, 108.83), (143.94, 110.85), (150.4, 113.19), (151.31, 117.09), (152.91, 119.96), (155.49, 123.16), (157.69, 127.5), (155.77, 128.08), (154.81, 133.6), (158.65, 136.84), (162.95, 142.03), (166.5, 148.68), (168.34, 154.07), (171.37, 154.24), (170.89, 158.71), (167.96, 159.17), (166.4, 158.39), (164.79, 161.26), (166.24, 164.12), (169.49, 167.52), (172.55, 167.07), (173.69, 171.8), (154.23, 176.66), (153.14, 170.79), (162.11, 168.87), (162.0, 167.63), (155.98, 167.3), (148.82, 166.73), (140.88, 165.72), (136.62, 162.72), (133.61, 165.72), (130.9, 165.83), (129.87, 164.03), (126.42, 164.09), (122.94, 165.15), (121.62, 164.09), (119.13, 160.66), (111.45, 154.95), (107.61, 155.51), (105.5, 153.22), (107.61, 144.27), (101.14, 140.47), (99.67, 142.49), (94.68, 139.1), (98.79, 133.03), (100.9, 134.17), (110.34, 118.02)]
-    extrude(wall,bank,-2.8,.24,'rubble',2.4)
+    levels = [level for x, z in bank if (level := water(x, z)) is not None]
+    lake = min(levels)
+    # IMG_1323 shows a low exposed stone course at the pavilion and a rising garden.
+    island_top = max(lake + 0.85, ground(135, 146))
+    lift = island_top - .24
+    bank_strip(wall, bank, lambda x, z: island_top, 'rubble')
     if b.collide:
-        extrude(b.hit,bank,-.18,.24,'ashlar')
+        bank_strip(b.hit, bank, lambda x, z: island_top, 'ashlar')
+    starts = [(m, len(m.pos)) for m in [*b.parts.values(), b.hit]]
     for east in range(117,153,2):
         for south in (141,143,145,147,149,151):
             box(wall,(east,.41,south),(1.98,.24,1.98),'paver',None)
@@ -128,6 +125,8 @@ def island(b):
         box(wall,(122+index*.32,.43,148),( .30,.30,2),'wood')
     with align_front(b, (x,z), 55.92):
         island_corridor(b, x,y,z,deck)
+    for mesh, start in starts:
+        mesh.pos[start:] = [(x, y+lift, z) for x, y, z in mesh.pos[start:]]
 
 
 def island_corridor(b, x,y,z,deck):
@@ -166,7 +165,8 @@ def island_corridor(b, x,y,z,deck):
 
 def library(b):
     wall, lit = b.parts['atlas'], b.parts['lit']
-    x, y, z = -26.0, 1.75, -50.0
+    x, z = -26.0, -50.0
+    y = ground(x,z)
     rear = [(35.06, -26.94), (19.06, -28.04), (17.94, -12.52), (4.99, -13.4), (5.36, -18.43), (-7.89, -19.34), (-8.26, -14.3), (-28.73, -15.7), (-28.11, -24.24), (-16.06, -23.42), (-15.26, -34.35), (-37.94, -35.89), (-39.68, -12.0), (33.96, -12.0)]
     rear = [(x+east,z+south) for east,south in rear]
     extrude(wall,rear,y,y+10.8,'cream')
@@ -242,7 +242,8 @@ def library(b):
 
 def hotel(b):
     wall, lit = b.parts['atlas'], b.parts['lit']
-    x, y, z = -190.0, 1.15, 55.0
+    x, z = -190.0, 55.0
+    y = ground(x,z)
     # Five floors, white, south front. Wings step down. Dark roofs, a small roof pavilion.
     box(wall, (x, y + 8.0, z - 4), (46, 16.0, 14), 'cream', 3)
     box(wall, (x - 28, y + 5.6, z - 4), (12, 11.2, 12), 'cream', 2.5)
@@ -274,7 +275,8 @@ def hotel(b):
 def steel_bridge(b):
     """North-south footbridge, 44.5 m, the length of way/155148522."""
     steel, wall = b.parts['steel'], b.parts['atlas']
-    x, y, z = -604.1, 0.6, 87.2
+    x, y, z = -604.1, 0.0, 87.2
+    starts = [(m,len(m.pos)) for m in [*b.parts.values(), b.hit]]
     length, width = 44.5, 3.3
     box(steel, (x, y + 0.12, z), (width, 0.24, length), 'steel', 2)
     bays = 14 if b.detail else 4
@@ -297,6 +299,12 @@ def steel_bridge(b):
         solid(b.hit, (x, y + 0.12, z), (width - 0.3, 0.24, length), 'steel')
         solid(b.hit, (x - width / 2, y + 0.7, z), (0.16, 1.1, length), 'steel')
         solid(b.hit, (x + width / 2, y + 0.7, z), (0.16, 1.1, length), 'steel')
+
+    z0, z1 = z-length/2, z+length/2
+    near, far = ground(x,z0), ground(x,z1)
+    for mesh, start in starts:
+        mesh.pos[start:] = [(px, py+near+(far-near)*(pz-z0)/length-.24, pz)
+                            for px,py,pz in mesh.pos[start:]]
 
 
 def glass_bridge(builder):
@@ -346,7 +354,7 @@ def shore(b):
             wall.face(arc(-117.15,radius)+arc(-114.85,radius)[::-1],(0,side*math.sin(angles[0]),side*math.cos(angles[0])),'white')
     for index in range(10):
         east=-82+index*5
-        level=-.7+index*.09
+        level=bank_top(east,-16)+.20
         for side in (-1,1):
             box(wall,(east,level,-16+side*1.79),(5,.4,2.18),'granite')
             box(wall,(east,level+.16,-16+side*.75),(5,.22,.15),'white')
@@ -355,25 +363,38 @@ def shore(b):
             box(wall,(east+offset,level+.17,-16),(.63,.32,.6),'ashlar')
         if index in (0,3):
             solid_tree(wall,(east,level,-21),9,5,90+index,b.detail,lobed=False)
-    for index in range(6):
-        angle=index*math.tau/6
-        cylinder(wall,(-46+2.25*math.cos(angle),0,-10+2.25*math.sin(angle)),.19,3,'vermilion',8)
-    hip_roof(wall,(-46,-10),3,5.3,5.3,2,.7,.5,'graytile','vermilion',tiers=2,sides=6)
-    post = 0.95 if b.detail else 8
-    # North bank between the pavilion and 古南门, with a gap in front of the steps.
-    railing(wall, (-36, 7.2), (-2.2, 7.2), 0, 0.95, 'granite', post, stone=True)
-    railing(wall, (2.2, 7.2), (72, 7.2), 0, 0.95, 'granite', post, stone=True)
+    px, pz = -46, shoreline_z(-46)-2
+    outline = [(px+3*math.cos(i*math.tau/6), pz+3*math.sin(i*math.tau/6)) for i in range(6)]
+    level = max(bank_top(x,z) for x,z in outline)
+    bank_strip(wall, outline, lambda x,z: level, 'granite')
+    if b.collide:
+        bank_strip(b.hit, outline, lambda x,z: level, 'granite')
+    for i in range(6):
+        angle = i*math.tau/6
+        cylinder(wall,(px+2.25*math.cos(angle),level,pz+2.25*math.sin(angle)),.19,3,'vermilion',8)
+    hip_roof(wall,(px,pz),level+3,5.3,5.3,2,.7,.5,'graytile','vermilion',tiers=2,sides=6)
+    for first, last in ((-36,-2.2),(2.2,72)):
+        count = math.ceil((last-first)/1.6)
+        points = []
+        for i in range(count+1):
+            x = first+(last-first)*i/count
+            z = shoreline_z(x)
+            h = ground(x,z)
+            points.append((x,h+.85,z))
+            box(wall,(x,h+.45,z),(.26,.9,.26),'granite')
+        for a,c in zip(points,points[1:]):
+            tube(wall,a,c,.14,'granite',4)
     # North of the pavilion, so a camera standing beside the pavilion is not inside a crown.
-    banyan(wall, (20, 0, -7), 13, 10, 42, b.detail)
+    banyan(wall, (20, ground(20,-7), -7), 13, 10, 42, b.detail)
     if b.detail:
-        banyan(wall, (48, 0, -4), 12, 9, 43, True)
+        banyan(wall, (48, ground(48,-4), -4), 12, 9, 43, True)
 
 
 def build(b: Builder):
     nine_bends(b)
     ancient_bridge(b)
     glass_bridge(b)
-    pavilion(b, 0, 0, 0)
+    pavilion(b, 0, ground(0,0), 0)
     island(b)
     with align_front(b, (-26, -50), -19.13):
         library(b)

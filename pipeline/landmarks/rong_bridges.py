@@ -3,6 +3,7 @@ import math
 import numpy as np
 
 from c_kit import box, cylinder, tube, yaw_box, ramp
+from rong_surface import ground, bank_top
 from rong_solids import oval, banyan
 
 
@@ -64,12 +65,16 @@ def crossing(builder,path,widths,heights,arch_segment=None):
                 box(stone,start+[0,high,0],(.31,.12,.31),'white')
             if not arched and panel%3==0:
                 middle = (near_left+near_right)/2
-                cylinder(stone,middle-[0,4,0],.42,3.8,'ashlar',6)
+                x, top, z = middle
+                bed = min(ground(x,z)-.15, top-.56)
+                cylinder(stone,(x,bed,z),.42,top-bed,'ashlar',6)
 
 
 def nine_bends(builder):
+    lengths = np.r_[0, np.cumsum(np.linalg.norm(np.diff(NINE_BENDS,axis=0),axis=1))]
+    near, far = [bank_top(*p) for p in (NINE_BENDS[0],NINE_BENDS[-1])]
     crossing(builder,NINE_BENDS,[2.8,2.8,2.8,2.8,4.2,4.2,2.8,2.8,2.8,2.8],
-             [-3.9,-2.75,-2.55,-2.4,-1.9,-1.9,-1.65,-1.1,-.65,.25],5)
+             near+(far-near)*lengths/lengths[-1],5)
 
 
 def ancient_bridge(builder):
@@ -80,10 +85,13 @@ def ancient_bridge(builder):
     def point(distance,level,offset=0):
         east,south = [31.4,82.1]+axis*distance+side*offset
         return np.array([east,level,south])
+    north, south = [bank_top(*point(d,0)[::2]) for d in (-17,17)]
+    def grade(distance):
+        return north+(south-north)*min(1,max(0,(distance+17)/34))
     def height(distance):
-        return -3.05+6.6*max(0,1-(abs(distance)/17)**1.55)
+        return grade(distance)+6.6*max(0,1-(abs(distance)/17)**1.55)
     def soffit(distance):
-        return -4.85+math.sqrt(max(0,7.45**2-distance**2))
+        return min(ground(*point(distance,0)[::2])-.15, grade(distance)-1.8)+math.sqrt(max(0,7.45**2-distance**2))
     count = 64 if builder.detail else 24
     for index in range(count):
         start,end = -17+34*index/count,-17+34*(index+1)/count
@@ -104,9 +112,9 @@ def ancient_bridge(builder):
             yaw_box(stone,point(middle,top+.19),(.85,.38,end-start+.02),yaw,'rubble')
             yaw_box(stone,point(middle,top+.45),(.76,.16,end-start+.02),yaw,'foliage')
     for sign in (-1,1):
-        yaw_box(stone,point(sign*19,-3.22),(9,.45,4.4),yaw,'granite')
+        yaw_box(stone,point(sign*19,grade(sign*19)-.225),(9,.45,4.4),yaw,'granite')
     for offset in (-7,7):
-        banyan(stone,point(-20,-3.2,offset),9,5,32+offset,builder.detail)
+        banyan(stone,point(-20,ground(*point(-20,0,offset)[::2]),offset),9,5,32+offset,builder.detail)
     colors=('lantern_red','lantern_gold','lantern_cyan','lantern_pink','lantern_orange')
     for strand in range(4):
         previous=None
