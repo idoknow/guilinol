@@ -163,8 +163,17 @@ def palace(m):
             for xx in range(-160,161,5):
                 if side<0 or abs(xx)>20:m.box(xx,6.5,0 if side>0 else -548,2.7,1.1,1,'stone')
     m.box(0,-.65,16,47,.82,33,'pave',True)
-    m.arcade(0,-9,40,19,6.8,[-11,0,11],[2.0,3.75,2.0],'stone')
-    m.box(0,6.8,-9,40,2.25,19,'brick',True)
+    m.arcade(0,-11,40,23,6.8,[-11,0,11],[2.0,3.75,2.0],'stone')
+    m.box(0,6.8,-11,40,2.25,23,'brick',True)
+    if m.detail:
+        for start in np.arange(-21.8,-.5,1.5):
+            depth=1.43
+            for side in (-1,1):
+                m.box(side*3.72,0,start,.075,2.18,depth,'brick')
+            for angle in range(0,180,15):
+                end_points=[(3.70*math.cos(theta),2.176+3.70*math.sin(theta)) for theta in np.radians([angle,angle+15])]
+                vertices=[[xx,yy,start+offset] for offset in (-depth/2,depth/2) for xx,yy in end_points]
+                m.mesh(vertices,[[0,1,3],[0,3,2]],'brick')
     for east in np.arange(-18.8,20,2.5):m.box(east,9.05,.12,1.45,1.1,.8,'brick')
     for center,radius in ((-11,2),(0,3.75),(11,2)):
         for angle in (np.arange(18)*math.pi/18 if m.detail else []):
@@ -182,7 +191,7 @@ def palace(m):
         for index in range(38):
             east=math.sin(index*54.1)*19; height=5.9+(index%5)*.37
             m.mesh([[east,height,.7],[east+.35,height+.18,.74],[east+.16,height-.63,.72]],[[0,1,2]],'leaf')
-    m.arcade(0,-147,27,11,8,[0],3.4,'yellow')
+    m.arcade(0,-147,27,12.5,8,[0],3.65,'yellow')
     m.box(0,8,-147,22,4.8,9,'red');m.swept_roof(0,8.5,-147,32,17,2.5)
     m.swept_roof(0,13,-147,26,14,3.8)
     for east in (-12,-4,4,12):
@@ -202,6 +211,17 @@ def palace(m):
         m.box(side*22,0,-147,14,4.35,10,'yellow',True);m.swept_roof(side*22,4.35,-147,16,12,2.5)
     for zz in (-65,-108):
         for side in (-1,1):m.box(side*20,0,zz,25,.12,39,'green')
+    for index,zz in enumerate(range(-37,-130,-14)):
+        for side in (-1,1):
+            east=side*(9.4+index%2*.7)
+            m.beam([east,0,zz],[east,6,zz],.5,'wood',8,True)
+            for branch in (-1,1):
+                m.beam([east,4,zz],[east+branch*1.8,7.5,zz+branch],.22,'wood')
+                crown=trimesh.creation.icosphere(subdivisions=int(m.detail))
+                m.mesh(crown.vertices*[3.4,3.7,4.2]+[east+branch*1.6,8.5,zz+branch],crown.faces,'leaf')
+    m.box(10,0,-120,5.4,.35,2,'granite',True)
+    for index,color in enumerate(('red','yellow','red','gold')):
+        m.box(8.2+index*1.1,.35,-120,.82,1.6+(index%2)*.45,.45,color)
     m.box(0,0,-79,12,.12,135,'pave',True)
     m.box(0,0,-252,52,2,29,'granite',True)
     for step in range(10):m.box(0,0,-232-step*.52,12,(step+1)*.20,.55,'granite',True)
