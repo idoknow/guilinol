@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw
-from c_kit import ATLAS, RECTS, Builder, _font, banyan, box, cylinder, export_landmark, solid, tube
+from c_kit import ATLAS, RECTS, Builder, _font, arch_wall, banyan, box, cylinder, export_landmark, solid, tube
 
 CATALOG = Path(__file__).resolve().parents[1] / 'schools-g1.json'
 
@@ -47,6 +47,15 @@ def generate(identifier, catalog=CATALOG):
                         for offset in range(2,int(length)-1,3):
                             block((east-length/2+offset,sill,south+side*3.65),(.2,1.55,.16),'white')
             block((east,height+.15,south),(length+1,.3,8),'granite')
+            if school.get('arcade') and (east,south) == tuple(school['blocks'][0][:2]):
+                bays = 8
+                pitch = length * scale / bays
+                for floor in range(floors):
+                    level = floor * 3.2
+                    block((east,level+.1,south+4.5),(length,.2,2.2),'white')
+                    for bay in range(bays):
+                        position = ((east-length/2)*scale+(bay+.5)*pitch,level,(south+5.45)*scale)
+                        arch_wall(mesh,position,pitch,3.2,.32,min(4.8,pitch*.83),3,'wood',6 if builder.detail else 3,None)
         if not school.get('heritage'):
             block((10,.08,2),(14,.16,19),'glaze')
             for side in (-1,1):

@@ -1,3 +1,3 @@
 [
-  {"id":"libin_middle","name":"桂林市中山中学漓滨校区","osm":"way/675588260","scale":1.8,"band":"#976f61","blocks":[[0,-14,38,4],[-13,0,12,3]],"facade":"schematic"}
+  {"id":"libin_middle","name":"桂林市中山中学漓滨校区","osm":"way/675588260","scale":1.8,"band":"#a26652","arcade":true,"blocks":[[0,-14,38,4],[-13,0,12,3]],"facade":"schematic"}
 ]
