@@ -43,10 +43,10 @@ def tiled_roof(model, x, y, z, width, depth, rise, wing, ridge_fraction=.63, por
                 underside=np.array([point(side,u,k) for k in (ring,ring+1) for u in profile])
                 m=len(profile)
                 quads=[[i,i+1,i+m+1] for i in range(m-1)]+[[i,i+m+1,i+m] for i in range(m-1)]
-                model.mesh(underside-[0,.17,0],quads,'wood')
+                model.mesh(underside-[0,.17,0],quads,'roof_soffit')
             if ring==0:
                 edge=rows[0]
-                model.mesh(np.concatenate([edge,edge-[0,.19,0]]),faces,'wood')
+                model.mesh(np.concatenate([edge,edge-[0,.19,0]]),faces,'roof_soffit')
                 if lit_edge and model.detail:
                     # Inset luminaires follow the eave, including the porch return.
                     lip=edge.copy()
@@ -75,6 +75,12 @@ def tiled_roof(model, x, y, z, width, depth, rise, wing, ridge_fraction=.63, por
                 foot=base+[0,.04,half*t]
                 head=foot+[0,(1-abs(t))*.48*rise,0]
                 model.beam(foot,head,.068,'wood',4)
+    # Close the crown beneath the ridge; its raised ends leave the seam visible from above.
+    profile=np.linspace(-1,1,11)
+    crown=np.array([point(side,u if side==0 else -u,5) for side in (0,2) for u in profile])
+    count=len(profile)
+    model.mesh(crown,[[i,i+1,i+count+1] for i in range(count-1)]+
+               [[i,i+count+1,i+count] for i in range(count-1)],'tile')
     # Bowed ridge and finials stand distinctly above the gable end.
     span=width*ridge_fraction/2
     nodes=[[x+span*u,y+rise+.14+.50*abs(u)**4,z] for u in np.linspace(-1,1,11)]

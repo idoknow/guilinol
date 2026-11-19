@@ -11,6 +11,7 @@ import numpy as np
 import trimesh
 from PIL import Image, ImageDraw, ImageFont
 
+from shop_lettering import letters
 from xiaoyao_roof import tiled_roof
 from jingjiang import Model, SWATCHES, atlas
 
@@ -26,9 +27,10 @@ class LandmarkModel(Model):
         if isinstance(color,str) and color=='lamp':
             super().mesh(vertices,faces,'wood' if self.flood_roof else 'gold',collide)
             self.lamps.append((self.visible.pop(),self.uv.pop()))
-        elif self.flood_roof and isinstance(color,str) and color=='tile':
-            super().mesh(vertices,faces,color,collide)
-            self.lit_tiles.append((self.visible.pop(),self.uv.pop()))
+        elif isinstance(color,str) and color in ('tile','roof_soffit'):
+            super().mesh(vertices,faces,'wood' if color=='roof_soffit' else 'tile',collide)
+            if self.flood_roof:
+                self.lit_tiles.append((self.visible.pop(),self.uv.pop()))
         else:
             super().mesh(vertices,faces,color,collide)
 
@@ -48,12 +50,7 @@ def inscription(image, text, foreground, background, vertical=False):
         for row,letter in enumerate(text):
             face.text((x+64,y+26+row*37),letter,font=font,anchor='mm',fill=foreground)
     else:
-        # Paint at the plaque aspect ratio before packing into the square atlas cell.
-        panel=Image.new('RGB',(480,112),background)
-        brush=ImageDraw.Draw(panel)
-        brush.rectangle((6,5,473,106),outline=foreground,width=3)
-        brush.text((240,55),text,font=font.font_variant(size=87),anchor='mm',fill=foreground)
-        image.paste(panel.resize((128,128),Image.Resampling.LANCZOS),(x,y))
+        face.text((x+64,y+64),text,font=font,anchor='mm',fill=foreground)
 
 
 def carve_medallion(image):
@@ -188,9 +185,8 @@ def tower(model):
         tiled_roof(model,0,platform+5.17,0,5.45,8.3,2.45,.85,.84,gable_material='earth',frame_gable=True)
         model.pose=(0,0,0,0 if side>0 else np.pi)
         model.box(0,platform+4.0,11.72,4.6,1.05,.22,'wood')
-        model.mesh([[-2.17,platform+4.06,11.84],[2.17,platform+4.06,11.84],
-                    [2.17,platform+4.99,11.84],[-2.17,platform+4.99,11.84]],
-                   [[0,1,2],[0,2,3]],'clock')
+        model.box(0,platform+4.06,11.84,4.34,.92,.04,'sign')
+        letters(model,'逍遙樓',(0,platform+4.15,11.88),3.10,.72,'gold')
         model.pose=(0,0,0,0)
     model.box(0,platform,0,8.2,4.8,.26,'wood',True)
     upper = platform+7.4
@@ -255,5 +251,4 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
 
 if __name__ == '__main__':
     generate(colors={"wood":"#302d30","red":"#70312f","stone":"#cccddb","brick":"#646777",
-                     "white":"#eef0fa","granite":"#c9cbd6","earth":"#383b43","sign":"#363337","tile":"#404650"}, flood_roof=True,
-             lettering=dict(text="逍遙樓",foreground="#ceb17c",background="#392e29"))
+                     "white":"#eef0fa","granite":"#c9cbd6","earth":"#383b43","gold":"#e2c996","sign":"#363337","tile":"#404650"}, flood_roof=True)
