@@ -1,3 +1,4 @@
+import {browserOptions, recordFrames} from './qa-browser.mjs'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
 import {mkdir} from 'node:fs/promises'
@@ -6,7 +7,7 @@ import assert from 'node:assert/strict'
 const server = await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 let browser
 try {
-  browser = await chromium.launch({executablePath:process.env.CHROMIUM, args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
+  browser = await chromium.launch(browserOptions())
   const page = await browser.newPage({viewport:{width:960,height:540}})
   const errors = []
   page.on('pageerror',error=>errors.push(error.message))
@@ -14,6 +15,7 @@ try {
   await mkdir(out,{recursive:true})
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
+  await recordFrames(page)
   const first = await page.evaluate(()=>{
     const {firstMs,firstWorldBytes}=window.viewer.stats
     const entries=[...performance.getEntriesByType('navigation'),...performance.getEntriesByType('resource')]

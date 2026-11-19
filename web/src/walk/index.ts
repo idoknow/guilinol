@@ -175,7 +175,44 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(!wasBike&&nextAction&&action!==nextAction){action?.fadeOut(.2);nextAction.reset().fadeIn(.2).play();action=nextAction}
     mixer.update(dt);follow()
   }
-  return {enter,leave,tick,spawns,probe,boatClearance,get obstacle(){return bikeObstacle},get vehicle(){return rides?.bike?'bike':rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  function photoSupport(x:number,z:number,bridgeRadius:number){
+    const tile=sim.tileAt(x,z), data=tile&&stream.loaded.get(tile)
+    if(!tile||!data)throw Error(`Missing detail at ${x},${z}`)
+    sim.sync(x,z)
+    const water=data.water[Math.round((z-tile.z)/4)*65+Math.round((x-tile.x)/4)]
+    const waterY=water===-32768?-Infinity:water/10
+    function deckAt(east:number,south:number){
+      const deck=sim.surface(east,south,'deck')
+      if(deck)return deck
+      // walk.tick also supports landmark treads over water (e.g. the Nine-Bend Bridge).
+      if(Number.isFinite(waterY)){
+        const tread=sim.surface(east,south,'landmark')
+        if(tread && tread.slope<=cfg.slope && tread.y>waterY)return tread
+      }
+      return null
+    }
+    const deck=deckAt(x,z)
+    if(deck)return {kind:'deck',y:Math.max(deck.y,waterY),sampleDistance:0}
+    // Known on-bridge photo, but the recorded point lies beside the narrow span.
+    // Borrow only elevation inside the EXIF uncertainty circle. Keep the original X/Z.
+    if(bridgeRadius>0 && Number.isFinite(waterY)){
+      let nearest:null|{kind:string,y:number,sampleDistance:number}=null
+      const steps=Math.ceil(bridgeRadius/.5)
+      for(let i=-steps;i<=steps;i++)for(let j=-steps;j<=steps;j++){
+        const d=Math.hypot(i,j)*.5
+        if(!d||d>bridgeRadius||(nearest&&d>=nearest.sampleDistance))continue
+        const hit=deckAt(x+i*.5,z+j*.5)
+        if(hit)nearest={kind:'deck',y:Math.max(hit.y,waterY),sampleDistance:d}
+      }
+      if(nearest)return nearest
+    }
+    for(const kind of ['sidewalk','ground'] as const){
+      const hit=sim.surface(x,z,kind)
+      if(hit)return {kind,y:Math.max(hit.y,waterY),sampleDistance:0}
+    }
+    throw Error(`Missing support at ${x},${z}`)
+  }
+  return {photoSupport,enter,leave,tick,spawns,probe,boatClearance,get obstacle(){return bikeObstacle},get vehicle(){return rides?.bike?'bike':rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on)rides?.stop()},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow()},showFigure(on:boolean){figure.visible=on&&active},
     get position(){const pos=rides?.boat?.position??sim.body.translation();return focus.set(pos.x,pos.y,pos.z)}}
 }

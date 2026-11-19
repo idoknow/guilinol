@@ -288,6 +288,7 @@
   "z": 158.2
  },
  "IMG_1319.jpg": {
+  "support": "deck",
   "alt": 158.0,
   "focal35": 25,
   "hAccuracy": 4.7,
@@ -300,6 +301,7 @@
   "z": 171.7
  },
  "IMG_1320.jpg": {
+  "support": "deck",
   "alt": 157.0,
   "focal35": 25,
   "hAccuracy": 4.7,
@@ -312,6 +314,7 @@
   "z": 171.1
  },
  "IMG_1321.jpg": {
+  "support": "deck",
   "alt": 156.6,
   "focal35": 25,
   "hAccuracy": 4.7,
@@ -324,6 +327,7 @@
   "z": 181.2
  },
  "IMG_1322.jpg": {
+  "support": "deck",
   "alt": 154.6,
   "focal35": 25,
   "hAccuracy": 4.7,
@@ -696,6 +700,7 @@
   "z": -160.3
  },
  "IMG_1356.jpg": {
+  "support": "deck",
   "alt": 159.5,
   "focal35": 14,
   "hAccuracy": 4.7,
@@ -708,6 +713,7 @@
   "z": -168.6
  },
  "IMG_1357.jpg": {
+  "support": "deck",
   "alt": 161.3,
   "focal35": 14,
   "hAccuracy": 4.7,
