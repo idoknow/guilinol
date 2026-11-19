@@ -764,13 +764,25 @@ def build_glb():
     build_rafts(decor)
     tris = np.concatenate([np.asarray(cliff.tris, dtype=np.float64), np.asarray(decor.tris, dtype=np.float64)])
     cols = np.concatenate([np.asarray(cliff.cols, dtype=np.float64), np.asarray(decor.cols, dtype=np.float64)])
-    cave = np.array([66.0, 9.0, 0.0])
     center = tris.mean(axis=1)
-    lit = np.linalg.norm(center - cave, axis=1) < 15.5
-    lit |= np.linalg.norm(center - pagoda, axis=1) < 5.5
+    edge1 = tris[:, 1] - tris[:, 0]
+    edge2 = tris[:, 2] - tris[:, 0]
+    normal = np.cross(edge1, edge2)
+    normal /= np.maximum(np.linalg.norm(normal, axis=1, keepdims=True), 1e-8)
+    # Tunnel interior only. The old 15.5 m sphere also lit the cliff outside the mouth.
+    # x is the 12 m opening, z runs from the north lip to the south mouth.
+    inside = (
+        (center[:, 0] > 59.0) & (center[:, 0] < 73.2)
+        & (center[:, 2] > -5.5) & (center[:, 2] < 12.0)
+        & (center[:, 1] < 19.0)
+    )
+    toward_axis = normal[:, 0] * (66.0 - center[:, 0]) > 0.2
+    ceiling = normal[:, 1] < -0.35
+    cave_lit = inside & (toward_axis | ceiling) & (np.abs(normal[:, 2]) < 0.72)
+    pagoda_lit = np.linalg.norm(center - pagoda, axis=1) < 5.5
     from d_export import coarsen, export_colored
     shell = coarsen(np.asarray(cliff.tris, dtype=np.float64), cell=3.4, limit=0.12)
-    export_colored(Path(sys.argv[1]) / 'elephant_hill.glb', tris, cols, shell, lit)
+    export_colored(Path(sys.argv[1]) / 'elephant_hill.glb', tris, cols, shell, cave_lit, pagoda_lit)
 
 
 if __name__ == '__main__':

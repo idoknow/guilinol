@@ -334,12 +334,18 @@ def export_buckets(path, buckets, collision):
     _pack(path, primitives, atlas)
 
 
-def export_colored(path, tris, colors, collision, lit):
-    """Vertex-coloured karst. `lit` is a boolean per triangle (cave / pagoda glow)."""
+def export_colored(path, tris, colors, collision, lit, pagoda=None):
+    """Vertex-coloured karst.
+
+    `lit` is the cave interior. `pagoda` keeps the bottle pagoda on its own
+    material so dimming the cave does not dim the pagoda.
+    """
     image = grain_image()
     tris = np.asarray(tris, dtype=np.float64)
     colors = np.asarray(colors, dtype=np.float64)
     lit = np.asarray(lit, dtype=bool)
+    pagoda = np.zeros(len(tris), dtype=bool) if pagoda is None else np.asarray(pagoda, dtype=bool)
+    plain = ~(lit | pagoda)
     primitives = []
 
     def add(node, faces, cols, material, emissive):
@@ -355,14 +361,18 @@ def export_colored(path, tris, colors, collision, lit):
             cols.reshape(-1, 3), emissive,
         ))
 
-    add('lod0', tris[~lit], colors[~lit], 'd_grain', None)
-    add('lod0', tris[lit], colors[lit], 'cave_lit', [1, 0.62, 0.22])
-    if (~lit).any():
-        far, cols = coarsen(tris[~lit], colors[~lit], cell=2.4)
+    add('lod0', tris[plain], colors[plain], 'd_grain', None)
+    add('lod0', tris[lit], colors[lit], 'cave_lit', [0.55, 0.34, 0.12])
+    add('lod0', tris[pagoda], colors[pagoda], 'pagoda_lit', [1, 0.62, 0.22])
+    if plain.any():
+        far, cols = coarsen(tris[plain], colors[plain], cell=2.4)
         add('lod1', far, cols, 'd_grain', None)
     if lit.any():
         far, cols = coarsen(tris[lit], colors[lit], cell=2.8)
-        add('lod1', far, cols, 'cave_lit', [1, 0.62, 0.22])
+        add('lod1', far, cols, 'cave_lit', [0.55, 0.34, 0.12])
+    if pagoda.any():
+        far, cols = coarsen(tris[pagoda], colors[pagoda], cell=2.8)
+        add('lod1', far, cols, 'pagoda_lit', [1, 0.62, 0.22])
     collision = _as_tris(collision)
     if len(collision):
         dummy = np.ones_like(collision)
