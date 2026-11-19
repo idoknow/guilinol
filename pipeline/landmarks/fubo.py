@@ -9,19 +9,19 @@ from pathlib import Path
 
 import numpy as np
 from xiaoyao_tower import generate
+from c_kit import landmark_surface
 
 
 def mountain(name):
     root=Path(__file__).resolve().parents[2]/'public/world'
     manifest=json.loads((root/'manifest.json').read_text())
     peak=next(entry for entry in manifest['peaks']['entries'] if entry['name']==name)
-    east,summit,south=peak['center'];left,top,*_=manifest['extent']
-    col,row=int((east-left)//256),int((south-top)//256)
-    tile=gzip.decompress((root/f'{col}_{row}.glc').read_bytes())
-    level=np.frombuffer(tile,'<i2',4225,24).reshape(65,65)[round((south-top-row*256)/4),round((east-left-col*256)/4)]/10
+    # PK02 vertices are relative to the peak center. The GLB is mounted at
+    # its landmark anchor, which can be tens of metres away from the summit.
+    surface=landmark_surface({'伏波山':'fubo','明月峰':'diecai'}[name])
     lod=peak['lods'][0];payload=gzip.decompress((root/manifest['peaks']['file']).read_bytes())
     vertices=np.frombuffer(payload,'<i2',lod['vertices']*3,lod['offset']).reshape(-1,3)/100
-    vertices[:,1]+=summit-level
+    vertices += np.subtract(peak['center'],[surface.x,surface.y,surface.z])
     return vertices[:-1].reshape(12,-1,3),vertices[-1]
 
 
@@ -52,26 +52,32 @@ def grotto(model,half,height,depth):
 
 
 def build(model):
+    surface=landmark_surface('fubo')
     rings,tip=mountain('伏波山');model.pose=(*tip,0);pavilion(model,5.2,3.6)
     base=rings[1,0].copy();base[0]=rings[2,0,0]
     model.pose=(*base,math.pi/2)
     model.beam([1,-.85,6],[.8,3.5,6.4],.72,'granite',7,True)
-    model.pose=(base[0]+1.5,base[1],base[2]+15,0);pavilion(model,6.4,4)
-    model.pose=(base[0]-1,base[1],base[2]+31,0)
+    model.pose=(base[0]+1.5,surface.ground(base[0]+1.5,base[2]+15),base[2]+15,0);pavilion(model,6.4,4)
+    model.pose=(base[0]-1,surface.ground(base[0]-1,base[2]+31),base[2]+31,0)
     model.arcade(0,0,14,2.7,4.3,[0],2.3,'brick');model.swept_roof(0,4.45,0,16,5,2.1)
     model.box(0,3.35,1.45,2.6,.68,.14,'sign')
     model.pose=(0,0,0,0)
     for index in range(19):
         south=base[2]-19+index*2
         shore=base[0]+7.1-.006*(south-base[2])**2
-        model.box(shore,base[1]-.34,south,3.25,.34,2.04,'wood',True)
-        model.box(shore+1.49,base[1],south,.14,1.08,.14,'red',True)
-        model.box(shore+1.49,base[1]+.98,south,.14,.14,2.14,'wood',True)
+        ground,water=surface.sample(shore,south)
+        deck=max(ground+.45,water+.75 if water is not None else ground+.45)
+        model.box(shore,deck-.34,south,3.25,.34,2.04,'wood',True)
+        model.box(shore+1.49,deck,south,.14,1.08,.14,'red',True)
+        model.box(shore+1.49,deck+.98,south,.14,.14,2.14,'wood',True)
+        for side in (-1,1):
+            px=shore+side*1.25
+            bed=surface.ground(px,south)-.10
+            model.beam([px,bed,south],[px,deck-.29,south],.21,'wood',8)
         if model.detail:
             for offset in np.linspace(-.88,.88,8):
-                model.box(shore,base[1],south+offset,3.28,.06,.22,'wood')
-                model.box(shore+1.49,base[1]+.12,south+offset,.065,.82,.065,'red')
-            for side in (-1,1):model.beam([shore+side*1.25,base[1]-4,south],[shore+side*1.25,base[1]-.3,south],.21,'wood',8)
+                model.box(shore,deck,south+offset,3.28,.06,.22,'wood')
+                model.box(shore+1.49,deck+.12,south+offset,.065,.82,.065,'red')
 
 
 if __name__=='__main__':generate('fubo',build,'F')
