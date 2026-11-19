@@ -1,4 +1,5 @@
 [
+  {"id":"guihu_moorings","name":"桂湖岸边游船","anchor":[110.28485978,25.28226997],"rotation":-18,"model":"landmarks/guihu_moorings.glb","collision":"none"},
   {"id":"guanyi_bridge","name":"观漪桥","anchor":"way/693754766","rotation":-31.1,"model":"landmarks/guanyi_bridge.glb","collision":"mesh"},
   {"id":"guangxi_arts","name":"广西省立艺术馆","anchor":"way/682942533","rotation":-24,"model":"landmarks/guangxi_arts.glb","replace":["way/682942533"],"collision":"mesh"},
   {"id":"yiwu_street","name":"翊武路街景","anchor":[110.284794,25.28045],"rotation":79.8,"model":"landmarks/yiwu_street.glb","collision":"mesh"},

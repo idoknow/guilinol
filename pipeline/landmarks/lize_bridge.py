@@ -31,6 +31,13 @@ def towers(model, lateral):
 
 
 def promenade(model, side):
+    for direction, outer_height in [(-1,150.1),(1,154.7)]:
+        inner=direction*61.5
+        outer=direction*74.5
+        height=outer_height-146.6-(8.55+min(.05*outer,2-.045*(outer-40)))
+        corners=[(station,y,side*9.6+offset) for station,y in [(inner,.15),(outer,height)] for offset in (-1.9,1.9)]
+        faces=[[0,2,3],[0,3,1]] if direction<0 else [[0,3,2],[0,1,3]]
+        model.mesh(corners,faces,'pave',True)
     for start, end in [(-61.5,40),(40,61.5)]:
         center, length = (start+end)/2, end-start
         model.box(center,-.48,side*9.6,length,.63,3.8,'pave',True)

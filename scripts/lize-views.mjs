@@ -3,6 +3,7 @@ import {chromium} from 'playwright'
 import {preview} from 'vite'
 
 const shots = {
+  guihu_moorings: [['1358',[-52,9,47],[0,4,-7]]],
   guanyi_bridge: [
     ['1361',[76,9.7,9],[45,10,15]], ['1362',[55,9.7,11],[49,12.3,17.3]],
     ['1363',[-8,9.2,18],[45,6,155]], ['1364',[-39,7.7,-16],[28,9,-19]],
