@@ -680,9 +680,43 @@ try {
     assert(crossLake.maxWaterY - crossLake.minWaterY >= 1.1, `应经历榕湖(~148.1m)到桂湖(~149.5m)水位升阶，实际 ${crossLake.minWaterY}..${crossLake.maxWaterY}`)
   }
   assert.equal(crossLake.toasts.length, 0, `榕湖 → 桂湖 正常微阶不应弹窗拦截: ${JSON.stringify(crossLake.toasts)}`)
-  console.log('4. 榕湖 → 桂湖跨湖通航通过:', {
+  console.log('4a. 榕湖 → 桂湖跨湖通航通过:', {
     end: [+crossLake.end.x.toFixed(1), +crossLake.end.z.toFixed(1)],
     waterSpan: [crossLake.minWaterY, crossLake.maxWaterY],
+  })
+
+  // Bug 6a 回归用例: 反向跨湖降阶 (149.5m -> 148.6m -> 148.1m) 桥下阻尼过渡期，物理门禁不得因低位 centerY 虚增净高
+  const downStepCheck = await runInPage(page, async ({steerTo, arg, readBoat, press, faceTarget, advance}) => {
+    const revPts = [...arg].reverse()
+    // 先回驶至迎宾桥北侧高水位段 (-1612, 84) [148.6m]，再穿过迎宾桥降阶至 (-1608, 112) [148.1m]
+    const subIdx = revPts.findIndex(p => p[1] >= 80)
+    const headPts = subIdx >= 0 ? revPts.slice(0, subIdx + 1) : [[-1596, -192], [-1612, 84]]
+    await steerTo(headPts, {arriveDist: 2.6, maxSecondsPerLeg: 30})
+    await faceTarget(-1608, 112)
+    let maxOverestimate = 0
+    let minDynamicClear = Infinity
+    press('KeyW', true)
+    for (let i = 0; i < 240; i++) {
+      advance(1 / 60)
+      const cur = readBoat()
+      const gateClear = cur.boat?.clearance
+      const dynClear = cur.clearanceInfo?.clearance
+      if (dynClear !== undefined && Number.isFinite(dynClear)) {
+        minDynamicClear = Math.min(minDynamicClear, dynClear)
+        if (gateClear !== undefined && Number.isFinite(gateClear)) {
+          maxOverestimate = Math.max(maxOverestimate, gateClear - dynClear)
+        }
+      }
+      if (cur.z >= 110) break
+    }
+    press('KeyW', false)
+    return {maxOverestimate, minDynamicClear, endZ: readBoat().z}
+  }, crossWaypoints)
+  assert(downStepCheck.minDynamicClear >= 0.30, `跨湖降阶过桥动态 Box3 净空不足: ${JSON.stringify(downStepCheck)}`)
+  assert(downStepCheck.maxOverestimate <= 0.08, `降阶水位阻尼滞后导致门禁净高虚增: ${JSON.stringify(downStepCheck)}`)
+  console.log('4b. 反向跨湖降阶桥下净高对齐通过:', {
+    minDynClear: +downStepCheck.minDynamicClear.toFixed(2),
+    maxOverest: +downStepCheck.maxOverestimate.toFixed(3),
   })
 
   // --- 用例 5：闸坝拦停并发 walk:toast（木龙湖闸 145.6 m -> 149.5 m，落差 3.9 m） ---
@@ -823,6 +857,24 @@ try {
   assert(lowBridgeTurn.turnDelta > 0.70, `斜顶矮桥按住 W+D 转向被锁死: ${JSON.stringify(lowBridgeTurn)}`)
   assert(lowBridgeTurn.minClear >= 0.30 && lowBridgeTurn.endZ < 684, `矮桥前转向期间净空不足或穿桥: ${JSON.stringify(lowBridgeTurn)}`)
   console.log('6c. 斜顶矮桥按住 W+D 转向脱困通过:', {turnRad: +lowBridgeTurn.turnDelta.toFixed(2), minClear: +lowBridgeTurn.minClear.toFixed(2)})
+
+  // Bug 6b 回归用例: 斜角倒船退撞矮桥，船尾左右角全采样对齐动态 Box3，杜绝单边船尾角穿入矮桥底
+  const reverseCornerBridge = await runInPage(page, async ({faceTarget, press, step, readBoat}) => {
+    const pos = readBoat()
+    // 船头朝东北偏北 (~20°)，使船尾右后角比船尾中心更靠南侧九曲桥，持续按 KeyS 倒退撞桥
+    await faceTarget(pos.x + 8, pos.z - 22)
+    let minDynClear = Infinity
+    press('KeyS', true)
+    for (let i = 0; i < 150; i++) {
+      step(1)
+      const dyn = readBoat().clearanceInfo?.clearance
+      if (dyn !== undefined && Number.isFinite(dyn)) minDynClear = Math.min(minDynClear, dyn)
+    }
+    press('KeyS', false)
+    return {minDynClear, endZ: readBoat().z, blocked: readBoat().blocked}
+  })
+  assert(reverseCornerBridge.minDynClear >= 0.30 && reverseCornerBridge.endZ < 684, `斜角倒船船尾角穿入矮桥底 (动态 Box3 净空跌破 0.30m): ${JSON.stringify(reverseCornerBridge)}`)
+  console.log('6d. 斜角倒船矮桥船尾角净空防护通过:', {minDynClear: +reverseCornerBridge.minDynClear.toFixed(2)})
 
   await page.close()
 

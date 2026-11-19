@@ -308,14 +308,16 @@ export function createFreeBoats(env: BoatEnv) {
       }
     }
 
-    // 7 points inside actual boat footprint (never clipped by ahead extension when reversing out).
+    // Full 3x3 points inside actual boat footprint (aligned with dynamic clearance() and never clipped by ahead when reversing).
     samplePoint(-hwMesh, hlMesh)
     samplePoint(0, hlMesh)
     samplePoint(hwMesh, hlMesh)
     samplePoint(-hwMesh, 0)
-    samplePoint(hwMesh, 0)
-    samplePoint(0, -hlMesh)
     samplePoint(0, 0)
+    samplePoint(hwMesh, 0)
+    samplePoint(-hwMesh, -hlMesh)
+    samplePoint(0, -hlMesh)
+    samplePoint(hwMesh, -hlMesh)
     const footprintClearance = minClearance
     if (minClearance < spec.requiredClearance) {
       return {ok: false, minClearance, footprintClearance, minAvailable}
@@ -365,15 +367,16 @@ export function createFreeBoats(env: BoatEnv) {
       }
     }
 
-    const baseY = refWaterY === null ? centerY : Math.max(centerY, refWaterY - 1.2)
-    const clearCheck = measureClearancePoints(spec, x, z, h, centerY, includeAhead)
+    // Guard against down-step waterY damping lag: hull & rider sit at max(centerY, refWaterY) until damped down.
+    const effectiveWaterY = refWaterY === null ? centerY : Math.max(centerY, refWaterY)
+    const clearCheck = measureClearancePoints(spec, x, z, h, effectiveWaterY, includeAhead)
     if (!clearCheck.ok) {
       return {ok: false, reason: 'bridge', waterY: centerY, clearance: clearCheck.minClearance, footprintClearance: clearCheck.footprintClearance, available: clearCheck.minAvailable}
     }
 
     const topHeight = Math.max(spec.roof, spec.head)
     const boxH = topHeight - 0.22
-    const boxCenterY = Math.max(baseY, centerY) + 0.22 + boxH * 0.5
+    const boxCenterY = effectiveWaterY + 0.22 + boxH * 0.5
     if (sim.waterOverlap(x, boxCenterY, z, h, hw - 0.15, boxH * 0.5, hl - 0.15)) {
       return {ok: false, reason: 'obstacle', waterY: centerY, clearance: clearCheck.minClearance, footprintClearance: clearCheck.footprintClearance, available: clearCheck.minAvailable}
     }
