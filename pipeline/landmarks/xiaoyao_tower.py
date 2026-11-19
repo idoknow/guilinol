@@ -185,7 +185,7 @@ def tower(model):
         # The porch ridge points out towards the steps. Its gable rises above
         # the main eave and its fascia projects beyond the outer column line.
         model.pose=(0,0,side*9.36,np.pi/2)
-        tiled_roof(model,0,platform+5.17,0,5.45,8.3,2.45,.85,.84)
+        tiled_roof(model,0,platform+5.17,0,5.45,8.3,2.45,.85,.84,gable_material='earth',frame_gable=True)
         model.pose=(0,0,0,0 if side>0 else np.pi)
         model.box(0,platform+4.0,11.72,4.6,1.05,.22,'wood')
         model.mesh([[-2.17,platform+4.06,11.84],[2.17,platform+4.06,11.84],
@@ -198,7 +198,7 @@ def tower(model):
     facade(model,upper,7.9,4.85,True)
     tiled_roof(model,0,upper+4.85,0,21.5,20.2,2.65,1.60,lit_edge=True)
     model.box(0,upper+7.12,0,12,1.05,11,'wood')
-    tiled_roof(model,0,upper+8.17,0,18.4,17.5,3.7,1.50,.76,lit_edge=True)
+    tiled_roof(model,0,upper+8.17,0,18.4,17.5,3.7,1.50,.76,lit_edge=True,gable_material='earth',frame_gable=True)
     if model.detail:
         for side in (-1,1):
             for x in (-6,-3,3,6):

@@ -77,7 +77,7 @@ def gallery(m):
                     m.box(x+offset,.7,z,.055,.50,.065,'wood')
                 m.box(x,.73+.48,z,3.9,.08,.10,'wood')
     for end in (-1,1):
-        tiled_roof(m,end*18.95,3.39,0,4.4,4.35,1.18,.38,.75)
+        tiled_roof(m,end*18.95,3.39,0,4.4,4.35,1.18,.38,.75,gable_material='tile')
         m.box(end*20.70,3.06,0,.24,.23,3.85,'red')
     # The photograph back toward the gallery looks across a low planted bed.
     m.box(25,-.16,-.9,9,.29,7.1,'pave',True)

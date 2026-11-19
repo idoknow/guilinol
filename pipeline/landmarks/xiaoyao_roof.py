@@ -2,7 +2,7 @@
 import numpy as np
 
 
-def tiled_roof(model, x, y, z, width, depth, rise, wing, ridge_fraction=.63, porch_recess=0, lit_edge=False):
+def tiled_roof(model, x, y, z, width, depth, rise, wing, ridge_fraction=.63, porch_recess=0, lit_edge=False, gable_material='wood', frame_gable=False):
     # Cross-sections from the drip edge to the ridge. The last two have the
     # same span along the ridge, giving each end a vertical triangular gable.
     rings = [(1,1,0,wing),(.91,.84,.06*rise,.52*wing),
@@ -36,7 +36,7 @@ def tiled_roof(model, x, y, z, width, depth, rise, wing, ridge_fraction=.63, por
             faces=[[i,i+1,i+count+1] for i in range(count-1)]
             faces.extend([[i,i+count+1,i+count] for i in range(count-1)])
             surface=np.concatenate(rows)
-            model.mesh(surface,faces,'wood' if gable else 'tile')
+            model.mesh(surface,faces,gable_material if gable else 'tile')
             if not gable:
                 # A smooth dark soffit needs only enough segments to follow the sweep.
                 profile=np.linspace(-1,1,11 if model.detail else 7)
@@ -61,6 +61,20 @@ def tiled_roof(model, x, y, z, width, depth, rise, wing, ridge_fraction=.63, por
         direction=tip-np.array([x,tip[1],z])
         direction/=np.linalg.norm(direction)
         model.beam(tip,tip+direction*.13+[0,.23,0],.085,'tile',6)
+    if frame_gable:
+        # Bargeboards outline the triangular upper gable above the hipped skirt.
+        for side in (1,3):
+            e=np.sign(point(side,0,3)[0]-x)
+            offset=np.array([e*.06,0,0])
+            for u in (-1,1):
+                for k in (3,4):
+                    model.beam(point(side,u,k)+offset,point(side,u,k+1)+offset,.10,'tile',6)
+            base=point(side,0,3)+offset
+            half=depth*.47/2
+            for t in (-.58,0,.58):
+                foot=base+[0,.04,half*t]
+                head=foot+[0,(1-abs(t))*.48*rise,0]
+                model.beam(foot,head,.068,'wood',4)
     # Bowed ridge and finials stand distinctly above the gable end.
     span=width*ridge_fraction/2
     nodes=[[x+span*u,y+rise+.14+.50*abs(u)**4,z] for u in np.linspace(-1,1,11)]
