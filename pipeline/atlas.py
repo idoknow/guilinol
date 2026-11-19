@@ -16,7 +16,8 @@ CLASSES = {kind: rank for rank, kinds in enumerate((
 ALIASES = {'象鼻山': ['象山', '水月洞'], '日塔': ['日月双塔'], '月塔': ['日月双塔'],
            '靖江王城': ['王城', '靖江王府', '独秀峰'], '叠彩山公园': ['叠彩山', '明月峰'],
            '伏波山公园': ['伏波山', '还珠洞'], '正阳门': ['王城正门'], '依仁路步行街': ['正阳路步行街'],
-           '正阳路': ['正阳路步行街'], '榕杉湖景区': ['两江四湖', '榕湖', '杉湖']}
+           '正阳路': ['正阳路步行街'], '榕杉湖景区': ['两江四湖', '榕湖', '杉湖'],
+           '桂林医科大学（东城校区）': ['桂林医科大学东城校区', '桂林医科大学', '桂林医学院东城校区', '弘德楼']}
 
 
 def flat(curve):
@@ -92,6 +93,7 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
         place(name,kind,point)
     for name,line in longest.items():
         place(name,'road',line.interpolate(.5,normalized=True))
+    place('桂林医科大学（东城校区）', 'school', Point(678, -1701))
 
     data = dict(extent=extent,roads=roads,places=places)
     for layer in ('water','green'):

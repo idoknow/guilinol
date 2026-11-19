@@ -200,7 +200,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const q = input.value.trim()
     const hits:{name:string,sub:string,x:number,z:number,spot?:Spot}[] = q?[
       ...spots.filter(s=>s.name.includes(q)||s.sub.includes(q)).map(s=>({name:s.name,sub:'观景点 · '+s.sub,x:s.x,z:s.z,spot:s})),
-      ...atlas.search(q,8).map((p:Place)=>({name:p.n,sub:{peak:'山',scenic:'景点',gate:'城门',bridge:'桥',water:'水面',park:'公园',museum:'博物馆',memorial:'纪念地',road:'道路'}[p.k],x:p.x,z:p.z}))]:[]
+      ...atlas.search(q,8).map((p:Place)=>({name:p.n,sub:{peak:'山',scenic:'景点',gate:'城门',bridge:'桥',water:'水面',park:'公园',museum:'博物馆',memorial:'纪念地',road:'道路',school:'学校'}[p.k],x:p.x,z:p.z}))]:[]
     const seen = new Set<string>()
     results.innerHTML = ''
     for(const hit of hits) { if(seen.has(hit.name)||seen.size>=8) continue; seen.add(hit.name)
