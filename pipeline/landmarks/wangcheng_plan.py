@@ -92,7 +92,7 @@ def enclosure(m, plan):
                 m.box(0,-2,0,width/count+.12,8.5,5,'stone',True)
                 if m.detail:
                     m.box(0,6.5,0,min(2.7,width/count),1.1,1,'stone')
-    for key, plaque in zip(gates[1:], ['状元及第','榜眼及第','广智门']):
+    for key, plaque in zip(gates[1:], ['状元及第','榜眼及第','后贡门']):
         x,z,angle,w,d = plan.frame(key)
         # Inner face looks into the enclosure.
         if (-x)*(-math.sin(angle)) + (-260-z)*math.cos(angle) < 0:

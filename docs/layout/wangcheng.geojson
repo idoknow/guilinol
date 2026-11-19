@@ -12,7 +12,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中"
       },
       "geometry": {
@@ -34,7 +34,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中"
       },
       "geometry": {
@@ -56,7 +56,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "高"
       },
       "geometry": {
@@ -78,7 +78,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -100,7 +100,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "高"
       },
       "geometry": {
@@ -122,7 +122,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -144,7 +144,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中"
       },
       "geometry": {
@@ -166,7 +166,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中"
       },
       "geometry": {
@@ -188,7 +188,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中"
       },
       "geometry": {
@@ -210,7 +210,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -232,7 +232,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -254,7 +254,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -276,7 +276,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -298,7 +298,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -320,7 +320,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -342,7 +342,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -364,7 +364,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -436,7 +436,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中"
       },
       "geometry": {
@@ -464,7 +464,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -492,7 +492,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -520,7 +520,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -552,7 +552,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -602,7 +602,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -1160,7 +1160,7 @@
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1203,7 +1203,7 @@
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1246,7 +1246,7 @@
         "photo": null,
         "axis_deg": 98.1,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1289,7 +1289,7 @@
         "photo": null,
         "axis_deg": 8.2,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1332,7 +1332,7 @@
         "photo": null,
         "axis_deg": 100.0,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1375,7 +1375,7 @@
         "photo": null,
         "axis_deg": 99.2,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1418,7 +1418,7 @@
         "photo": null,
         "axis_deg": 9.3,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1461,7 +1461,7 @@
         "photo": null,
         "axis_deg": 9.3,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1508,7 +1508,7 @@
         "photo": null,
         "axis_deg": 9.3,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1551,7 +1551,7 @@
         "photo": null,
         "axis_deg": 9.3,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1594,7 +1594,7 @@
         "photo": null,
         "axis_deg": 99.2,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1637,7 +1637,7 @@
         "photo": null,
         "axis_deg": 99.2,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1680,7 +1680,7 @@
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1723,7 +1723,7 @@
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1766,7 +1766,7 @@
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1809,7 +1809,7 @@
         "photo": null,
         "axis_deg": 100.0,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1852,7 +1852,7 @@
         "photo": null,
         "axis_deg": 96.8,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中",
         "facade_estimated": true
       },
@@ -1911,7 +1911,7 @@
         "photo": null,
         "axis_deg": 8.5,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -1962,7 +1962,7 @@
         "photo": null,
         "axis_deg": 7.8,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2005,7 +2005,7 @@
         "photo": null,
         "axis_deg": 10.3,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2048,7 +2048,7 @@
         "photo": null,
         "axis_deg": 97.7,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2139,7 +2139,7 @@
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2182,7 +2182,7 @@
         "photo": null,
         "axis_deg": 8.1,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2225,7 +2225,7 @@
         "photo": null,
         "axis_deg": 98.3,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2268,7 +2268,7 @@
         "photo": null,
         "axis_deg": 98.6,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2343,7 +2343,7 @@
         "photo": null,
         "axis_deg": 98.5,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2386,7 +2386,7 @@
         "photo": null,
         "axis_deg": 98.5,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2429,7 +2429,7 @@
         "photo": null,
         "axis_deg": 98.5,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2552,7 +2552,7 @@
         "photo": null,
         "axis_deg": 98.8,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中",
         "facade_estimated": true
       },
@@ -2619,7 +2619,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -2659,7 +2659,7 @@
         "photo": null,
         "axis_deg": 97.4,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2734,7 +2734,7 @@
         "photo": null,
         "axis_deg": 7.5,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2777,7 +2777,7 @@
         "photo": null,
         "axis_deg": 7.5,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2820,7 +2820,7 @@
         "photo": null,
         "axis_deg": 7.5,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2863,7 +2863,7 @@
         "photo": null,
         "axis_deg": 7.5,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2906,7 +2906,7 @@
         "photo": null,
         "axis_deg": 7.5,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2949,7 +2949,7 @@
         "photo": null,
         "axis_deg": 7.5,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -2992,7 +2992,7 @@
         "photo": null,
         "axis_deg": 98.9,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -3067,7 +3067,7 @@
         "photo": null,
         "axis_deg": 98.2,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -3110,7 +3110,7 @@
         "photo": null,
         "axis_deg": 97.9,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -3153,7 +3153,7 @@
         "photo": null,
         "axis_deg": 99.3,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -3244,7 +3244,7 @@
         "photo": null,
         "axis_deg": 100.3,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -3335,7 +3335,7 @@
         "photo": null,
         "axis_deg": 96.6,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -3426,7 +3426,7 @@
         "photo": null,
         "axis_deg": 99.4,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -3517,7 +3517,7 @@
         "photo": null,
         "axis_deg": 96.6,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -3608,7 +3608,7 @@
         "photo": null,
         "axis_deg": 96.6,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -3750,7 +3750,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中"
       },
       "geometry": {
@@ -3782,7 +3782,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中"
       },
       "geometry": {
@@ -3908,7 +3908,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中"
       },
       "geometry": {
@@ -3941,9 +3941,10 @@
         "center_delta_m": 3.16,
         "axis_deg": 97.9,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "高",
         "name_confidence": "高",
-        "facade_estimated": true
+        "facade_estimated": true,
+        "edge_delta_max_m": 1.5
       },
       "geometry": {
         "type": "Polygon",
@@ -3992,7 +3993,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -4020,7 +4021,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -4142,7 +4143,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -4170,7 +4171,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中"
       },
       "geometry": {
@@ -4261,7 +4262,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -4293,7 +4294,7 @@
         "photo": null,
         "axis_deg": 96.4,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -4336,7 +4337,7 @@
         "photo": null,
         "axis_deg": 96.4,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -4379,7 +4380,7 @@
         "photo": null,
         "axis_deg": 98.2,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -4422,7 +4423,7 @@
         "photo": null,
         "axis_deg": 98.6,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -4465,7 +4466,7 @@
         "photo": null,
         "axis_deg": 99.1,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -4516,7 +4517,7 @@
         "photo": null,
         "axis_deg": 99.1,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -4575,7 +4576,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -4617,7 +4618,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -4659,7 +4660,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -4691,7 +4692,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -4747,7 +4748,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -4803,7 +4804,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -4835,7 +4836,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -4907,7 +4908,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -4939,7 +4940,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -4987,7 +4988,7 @@
         "photo": null,
         "axis_deg": 99.1,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -5030,7 +5031,7 @@
         "photo": null,
         "axis_deg": 99.3,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -5073,7 +5074,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5101,7 +5102,7 @@
         "photo": null,
         "axis_deg": 98.0,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -5144,7 +5145,7 @@
         "photo": null,
         "axis_deg": 98.5,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -5187,7 +5188,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5215,7 +5216,7 @@
         "photo": null,
         "axis_deg": 97.5,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -5258,7 +5259,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5334,7 +5335,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5362,7 +5363,7 @@
         "photo": null,
         "axis_deg": 99.6,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -5405,7 +5406,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5433,7 +5434,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5461,7 +5462,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5489,7 +5490,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5541,7 +5542,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5569,7 +5570,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5597,7 +5598,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5639,7 +5640,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5683,7 +5684,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5723,7 +5724,7 @@
         "photo": null,
         "axis_deg": 97.5,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -5766,7 +5767,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5808,7 +5809,7 @@
         "photo": null,
         "axis_deg": 10.2,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -5867,7 +5868,7 @@
         "photo": null,
         "axis_deg": 9.2,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -5910,7 +5911,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -5938,7 +5939,7 @@
         "photo": null,
         "axis_deg": 98.4,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -5981,7 +5982,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -6009,7 +6010,7 @@
         "photo": null,
         "axis_deg": 98.7,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -6052,7 +6053,7 @@
         "photo": null,
         "axis_deg": 9.3,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -6095,7 +6096,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -6123,7 +6124,7 @@
         "photo": null,
         "axis_deg": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名"
       },
       "geometry": {
@@ -6159,7 +6160,7 @@
         "photo": null,
         "axis_deg": 99.1,
         "floors_estimated": true,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "facade_estimated": true
       },
@@ -6200,7 +6201,7 @@
         "axis_deg": null,
         "floors": null,
         "floors_estimated": false,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中"
       },
       "geometry": {
@@ -6283,7 +6284,7 @@
         "name": "月牙池",
         "kind": "pond",
         "source": "Esri World Imagery；湖心亭北侧可见水面，树冠下岸线估计",
-        "position_confidence": "中"
+        "position_confidence": "低"
       },
       "geometry": {
         "type": "Polygon",
@@ -6376,13 +6377,17 @@
           12279314.67,
           2893012.04
         ],
-        "position_confidence": "中"
+        "position_confidence": "低",
+        "wgs84_before_registration": [
+          110.29472528226613,
+          25.28685446466248
+        ]
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          110.29472528226613,
-          25.28685446466248
+          110.29468558,
+          25.28682306
         ]
       }
     },
@@ -6396,13 +6401,17 @@
           12279301.41,
           2892900.85
         ],
-        "position_confidence": "中"
+        "position_confidence": "低",
+        "wgs84_before_registration": [
+          110.29460654013015,
+          25.285944652423574
+        ]
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          110.29460654013015,
-          25.285944652423574
+          110.29456684,
+          25.28591325
         ]
       }
     },
@@ -6416,13 +6425,17 @@
           12279341.06,
           2892903.02
         ],
-        "position_confidence": "中"
+        "position_confidence": "低",
+        "wgs84_before_registration": [
+          110.29496087750975,
+          25.28596707873748
+        ]
       },
       "geometry": {
         "type": "Point",
         "coordinates": [
-          110.29496087750975,
-          25.28596707873748
+          110.29492118,
+          25.28593568
         ]
       }
     },
@@ -6436,7 +6449,7 @@
         "floors_estimated": true,
         "facade_estimated": true,
         "photo": null,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "axis_deg": 155.2,
         "facade_bearing": 245.2
@@ -6479,7 +6492,7 @@
         "floors_estimated": true,
         "facade_estimated": true,
         "photo": null,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "axis_deg": 155.2,
         "facade_bearing": 245.2
@@ -6522,7 +6535,7 @@
         "floors_estimated": true,
         "facade_estimated": true,
         "photo": null,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中",
         "axis_deg": 155.2,
         "facade_bearing": 245.2
@@ -6565,7 +6578,7 @@
         "floors_estimated": true,
         "facade_estimated": true,
         "photo": null,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "中",
         "axis_deg": 100.2,
         "facade_bearing": 190.2
@@ -6608,7 +6621,7 @@
         "floors_estimated": true,
         "facade_estimated": true,
         "photo": null,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "axis_deg": 9.4,
         "facade_bearing": 99.4
@@ -6651,7 +6664,7 @@
         "floors_estimated": true,
         "facade_estimated": true,
         "photo": null,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "axis_deg": 9.4,
         "facade_bearing": 99.4
@@ -6694,7 +6707,7 @@
         "floors_estimated": true,
         "facade_estimated": true,
         "photo": null,
-        "position_confidence": "中",
+        "position_confidence": "低",
         "name_confidence": "未具名",
         "axis_deg": 9.5,
         "facade_bearing": 99.5
@@ -6727,5 +6740,17 @@
         ]
       }
     }
-  ]
+  ],
+  "registration": {
+    "reference": "IDOK-50 Esri/OSM",
+    "control_osm": "way/1008248059",
+    "control_lon_lat": [
+      110.2941688,
+      25.2821368
+    ],
+    "after_gcj02_inverse_delta_lon_lat": [
+      -3.97e-05,
+      -3.14e-05
+    ]
+  }
 }
