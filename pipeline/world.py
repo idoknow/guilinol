@@ -5,6 +5,7 @@ import json
 import math
 import struct
 from pathlib import Path
+from sections import shopfronts
 
 import numpy as np
 from PIL import Image, ImageDraw
@@ -181,6 +182,7 @@ def build(bbox, output, palette):
 
     footprints, heights = buildings(bounds, ground_mesh_at, peak_tree, layout, carriageway_mask, sidewalk_mask)
     index = STRtree(footprints)
+    shop_rows = shopfronts(footprints, heights, roads)
     for campus in layout.allow_unmapped_court:
         if not bounds.covers(campus) or any(campus.covers(field.representative_point())
                 for layer in ('schoolTrack','schoolCourt') for field in layers[layer]):
@@ -257,6 +259,9 @@ def build(bbox, output, palette):
             if beds.get(origin):
                 st_data.extend([None, []][len(st_data)-5:])
                 st_data.append(beds[origin])
+            if shop_rows.get(origin):
+                st_data.extend([None, [], []][len(st_data)-5:])
+                st_data.append(shop_rows[origin])
             collision = json.dumps([rings, st_data, thin, asphalt], separators=(',', ':')).encode()
             tbuf = trees[origin]
             if tbuf:

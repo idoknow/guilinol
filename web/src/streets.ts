@@ -6,7 +6,7 @@ import {tileMaterial} from './look/tiles'
 type Pair=[number,number]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 export const streetSurfaceMat=new THREE.MeshStandardMaterial({
@@ -30,7 +30,7 @@ function evalRoadCtrl([baseMm,deltas]:RoadCtrl,lx:number,lz:number){
   return (baseMm+sum)/1000
 }
 
-export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[]]:Streets,ground:(x:number,z:number)=>number){
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[]]:Streets,ground:(x:number,z:number)=>number){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],mats:number[]=[],cols:number[]=[]
   const baseLevel=(x:number,z:number)=>{const g=ground(x,z);return roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g}
   const vector=(pt:THREE.Vector2,offset:number)=>new THREE.Vector3(pt.x,baseLevel(pt.x,pt.y)+offset,pt.y)
@@ -77,6 +77,13 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     mats.push(...object.matrix.elements);cols.push(tint.r,tint.g,tint.b)
   }
   const hedge=new THREE.Color(look.streets.hedge),iron=new THREE.Color(look.streets.iron)
+  const awnings=look.streets.awnings.map(value=>new THREE.Color(value)),shutter=new THREE.Color(look.streets.shutter)
+  for(const [east,south,base,heading,width,variant,arterial] of shops){
+    const normalX=Math.cos(heading/100),normalZ=Math.sin(heading/100),angle=-heading/100+Math.PI/2
+    const panel=(out:number,y:number,w:number,h:number,d:number,tint:THREE.Color)=>box(east/10+normalX*out,base/10+y,south/10+normalZ*out,w,h,d,angle,tint)
+    panel(.58,2.5,width/10-.15,.12,1.1,awnings[variant]);panel(.12,2.84,width/10-.12,.53,.12,awnings[arterial?2:(variant+1)%4])
+    if(variant%2===0){panel(.09,1.25,width/10-.34,2.32,.06,shutter);for(const level of [.48,1.0,1.52,2.04])panel(.14,level,width/10-.38,.035,.03,stoneMid)}
+  }
   for(const [east,south,heading,arterial] of beds){
     const x=east/10,z=south/10,y=baseLevel(x,z)+.195,angle=-heading/100
     if(arterial){

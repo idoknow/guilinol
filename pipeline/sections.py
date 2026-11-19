@@ -1,7 +1,12 @@
+import math
+from collections import defaultdict
+
 from shapely import STRtree
+from shapely.geometry import LineString, Point
 from shapely.ops import unary_union
 
 from road_profile import RULES
+from common import CHUNK
 
 
 def section_layers(roads):
@@ -32,3 +37,35 @@ def section_layers(roads):
 
 def clipped(tree, tile):
     return unary_union([tree.geometries[index].intersection(tile) for index in sorted(tree.query(tile))])
+
+
+def shopfronts(footprints, heights, roads):
+    streets = [road for road in roads if road.kind in RULES['sectionClasses']]
+    index = STRtree([road.line for road in streets])
+    result = defaultdict(list)
+    if not streets:
+        return result
+    for footprint, (base, roof, kind, floors, seed, *_) in zip(footprints, heights):
+        if kind or roof-base < 3:
+            continue
+        coords = list(footprint.exterior.coords)
+        for first, second in zip(coords, coords[1:]):
+            edge = LineString([first,second])
+            bays = int(edge.length / RULES['shops']['bay'])
+            if not bays:
+                continue
+            midpoint = edge.interpolate(.5, normalized=True)
+            road = streets[index.nearest(midpoint)]
+            near = road.line.interpolate(road.line.project(midpoint))
+            distance = near.distance(midpoint)
+            if not road.width/2 < distance < road.width/2 + RULES['shops']['setback']:
+                continue
+            normal = ((near.x-midpoint.x)/distance, (near.y-midpoint.y)/distance)
+            tangent = ((second[0]-first[0])/edge.length,(second[1]-first[1])/edge.length)
+            if abs(sum(a*b for a,b in zip(normal,tangent))) > .35 or footprint.covers(Point(midpoint.x+normal[0]*.2, midpoint.y+normal[1]*.2)):
+                continue
+            for bay in range(bays):
+                center = edge.interpolate((bay+.5)/bays, normalized=True)
+                origin = tuple(math.floor(value/CHUNK)*CHUNK for value in center.coords[0])
+                result[origin].append([round((center.x-origin[0])*10),round((center.y-origin[1])*10),round(base*10),round(math.atan2(normal[1],normal[0])*100),round(edge.length/bays*10),int(seed+bay)%4,int(road.kind in ('trunk','primary'))])
+    return result
