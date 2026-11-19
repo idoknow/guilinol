@@ -65,19 +65,51 @@ def envelope(model, feature):
     model.pose = (0, offset, 0, 0)
     volume = trimesh.creation.extrude_polygon(polygon, height, engine='earcut')
     vertices = volume.vertices[:, [0, 2, 1]].copy()
-    modern=attributes.get('modern_front',False) or (attributes['name'].startswith('N') and polygon.bounds[2]+ORIGIN[0] < -600)
-    model.mesh(vertices, volume.faces[:, ::-1], 'white' if modern else 'brick', True)
+    name=attributes['name']
+    modern=attributes.get('modern_front',False) or name=='R4' or (name.startswith('N') and polygon.bounds[2]+ORIGIN[0] < -600)
+    model.mesh(vertices, volume.faces[:, ::-1], 'glass' if name=='R4' else 'white' if modern or name=='R17' else 'brick', True)
     historic=attributes.get('historic',True)
     for start, end in zip(corners, np.roll(corners, -1, axis=0)):
         delta = end-start
         length = np.linalg.norm(delta)
+        if length<1e-6:continue
         center = (start+end)/2
         angle = math.atan2(delta[1],delta[0])
         model.pose = (center[0], offset, center[1], angle)
+        outward=np.array([-delta[1],delta[0]])/length
+        if name=='D-west' and outward[0]<-.8:
+            model.box(0,height,.03,length,.55,.5,'white')
+            for tier in range(3):
+                model.box(0,height+.5+tier*.55,.03,length*(.82-tier*.22),.6,.55,'white')
+            model.box(0,3.55,.24,min(7.5,length-.4),3.06,.45,'sign')
+            model.box(0,3.73,.49,min(7.1,length-.8),2.7,.09,'glass')
+            letters(model,'东西巷',(0,4.32,.56),4.3,.85,'gold')
+        if name=='R17' and outward[0]<-.7:
+            model.box(0,3.25,.45,length,2.9,.95,'white')
+            model.box(0,3.15,.52,length+.16,.18,1.1,'granite')
+        if name in ('R10','R10-west') and outward[1]>.8 and length>8:
+            steps=max(3,round(length/1.25));pitch=length/steps
+            for index in range(steps):
+                depth=1.55+.95*math.sin(math.pi*(index+.5)/steps)
+                model.box((index+.5)*pitch-length/2,3.25,depth/2,pitch+.02,.42,depth,'white')
+            model.box(0,.06,1.45,length,.12,2.9,'pave')
+            for along in np.arange(-length/2+3,length/2-1,7.2):
+                model.beam([along,.18,3.1],[along,3.7,3.1],.16,'wood',8,True)
+                crown=trimesh.creation.icosphere(subdivisions=1)
+                model.mesh(crown.vertices*[1.4,1.35,1.3]+[along,4.6,3.1],crown.faces,'leaf')
+        if name=='N011' and center[0]+ORIGIN[0]>-618 and -151<center[1]+ORIGIN[1]<-130 and outward[0]>.5 and length>3:
+            model.box(0,0,.95,length,3.1,1.9,'wood',True)
+            model.swept_roof(0,3.1,.85,length+.2,2.4,.8)
+            for bay in range(max(1,round(length/3))):
+                count=max(1,round(length/3));along=(bay+.5)*length/count-length/2
+                model.box(along,.35,1.93,length/count*.77,2.2,.12,'glass')
+        if name=='N022' and outward[1]<-.6 and length>2:
+            model.box(0,0,.3,length,height,.6,'brick',True)
+            model.box(0,height,.25,length+.14,.27,.95,'tile')
         if modern:
             model.box(0,height,0,length,.45,.28,'white')
             for level in range(attributes['levels']):
-                model.box(0,level*3.45+.45,.08,length*.91,2.05,.17,'glass')
+                model.box(0,level*3.45+.45,.08,length*(.99 if name=='R4' else .91),2.55 if name=='R4' else 2.05,.17,'glass')
                 for slot in range(max(1,round(length/2.4))):
                     model.box(((slot+.5)/max(1,round(length/2.4))-.5)*length,level*3.45+.44,.18,.10,2.08,.10,'granite')
             continue
@@ -138,6 +170,11 @@ def registered_market(model):
         attrs = feature['properties']
         if attrs['kind']=='roof' and attrs['render']:
             envelope(model, feature)
+        elif attrs['kind']=='covered_passage':
+            rings=[[point(corner) for corner in ring] for ring in feature['geometry']['coordinates']]
+            deck=trimesh.creation.extrude_polygon(Polygon(rings[0],rings[1:]),.24,engine='earcut')
+            model.pose=(0,attrs['ground_m']-157.7+attrs['eave_m']-.24,0,0)
+            model.mesh(deck.vertices[:,[0,2,1]],deck.faces[:,::-1],'tile',True)
         elif attrs['kind']=='storefront':
             east,south = point(feature['geometry']['coordinates'])
             normal = math.radians(attrs['bearing'])

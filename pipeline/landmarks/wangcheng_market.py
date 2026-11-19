@@ -97,6 +97,17 @@ def market(model):
     letters(model,'东西巷',(0,5.26,.52),2.3,.43,'gold')
     for gateway in [(62,0,41,-1.39),(42,0,13.9,-1.29)]:
         model.pose=gateway
+        if gateway[0]==62:
+            for side in (-1,1):
+                model.box(side*4.1,0,0,.65,4.25,4.8,'brick',True)
+            model.box(0,4.25,0,8.85,3.1,4.8,'white',True)
+            for side in (-1,1):
+                for column in (-2.9,-1,1,2.9):
+                    model.box(column,5.12,side*2.43,1.24,1.42,.13,'wood')
+                    model.box(column,5.22,side*2.5,.96,1.22,.08,'glass')
+                    model.box(column,5.22,side*2.56,.08,1.22,.06,'wood')
+            model.roof(0,7.35,0,9.65,5.7,1.15)
+            continue
         for east in (-3.9,3.9):model.box(east,0,0,.74,6.7,1.1,'brick',True)
         model.box(0,4.4,0,8.5,2.2,1.1,'wood');model.roof(0,6.55,0,9.4,3.4,1.3)
         for side in (-1,1):letters(model,'东西巷',(0,4.9,side*.59),4.7,1.05,'gold',side)

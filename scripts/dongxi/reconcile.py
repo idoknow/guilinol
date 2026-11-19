@@ -37,4 +37,6 @@ with (root/'raw/overture_buildings.csv').open() as file:
 for item in json.loads(Path('overture.json').read_text()):add(transform(project,shape(item['geometry'])),'Overture tiles',item['properties']['id'])
 for part in pieces(trace.intersection(boundary)):
     if part.area>=9:add(part,'Esri','影像屋面候选；单体边界和高度估计')
+from passages import reserve_passages
+rows=reserve_passages(rows)
 (folder/'dongxi-infill.geojson').write_text(json.dumps(dict(type='FeatureCollection',features=rows),ensure_ascii=False,separators=(',',':'))+'\n');(folder/'dongxi-source-audit.json').write_text(json.dumps(sources,ensure_ascii=False,indent=2)+'\n');print('sources',len(sources),'new roofs',len(rows),'maximum envelope vertices',max(len(f['geometry']['coordinates'][0]) for f in rows));print('layout predicted XOR',trace.symmetric_difference(occupied).intersection(boundary).area/boundary.area)
