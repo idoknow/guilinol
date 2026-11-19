@@ -7,8 +7,8 @@ from pathlib import Path
 import mapbox_earcut
 import numpy as np
 from shapely import STRtree, from_wkt, make_valid
-from shapely.affinity import affine_transform
-from shapely.geometry import LineString, Polygon
+from shapely.affinity import affine_transform, rotate
+from shapely.geometry import LineString, Polygon, box
 from shapely.geometry.polygon import orient
 from shapely.ops import polygonize, unary_union
 
@@ -40,15 +40,23 @@ def area(element):
     return rings('outer').difference(rings('inner'))
 
 
-def ground_features(bounds):
+def ground_features(bounds, school_grounds=()):
     landmarks = json.loads(Path(__file__).with_name('landmarks.json').read_text())
     replaced_pitches = {key for landmark in landmarks for key in landmark.get('replacePitches', [])}
     layers = dict(green=[], water=[], road=[])
+    grounds = unary_union(school_grounds)
+    layers.update(schoolTrack=[], schoolCourt=[])
     widths = {'primary': 14, 'secondary': 12, 'tertiary': 10, 'trunk': 18, 'residential': 6}
     for element in load_osm():
         tags = element.get('tags', {})
         if tags.get('leisure') == 'pitch' and f"{element['type']}/{element['id']}" in replaced_pitches:
             continue
+        if element['type'] != 'node' and tags.get('leisure') in ('track','pitch'):
+            shape = area(element)
+            if not shape.is_empty and grounds.covers(shape.representative_point()):
+                key = 'schoolTrack' if tags['leisure']=='track' else 'schoolCourt'
+                layers[key].extend(polygons(shape.intersection(bounds)))
+                continue
         if tags.get('natural') == 'water' or tags.get('waterway') == 'riverbank' or 'water' in tags:
             key = 'water'
         elif (tags.get('natural') in ('wood', 'grassland', 'scrub') or tags.get('leisure') in ('park','garden','pitch')
@@ -70,6 +78,7 @@ def ground_features(bounds):
 
 def buildings(bounds, elevation, peaks,layout):
     footprints, heights = [], []
+    grounds = unary_union(layout.school_grounds)
     rules = json.loads(Path(__file__).with_name('building-kinds.json').read_text())
     districts = unary_union([Polygon([ll2xz(*ll) for ll in ring]) for ring in rules['oldDistrictsLatLon']])
     campuses = STRtree([area(el) for el in load_osm() if el['type']!='node' and any(
@@ -95,18 +104,57 @@ def buildings(bounds, elevation, peaks,layout):
                 base = elevation(center.x, center.y)
                 footprints.append(poly)
                 kind = 0
-                if floors<=rules['oldMaxFloors'] and districts.covers(center):
+                if grounds.covers(center):
+                    kind = 3
+                elif floors<=rules['oldMaxFloors'] and districts.covers(center):
                     kind = 1
                 elif floors<=rules['glazedMaxFloors'] and seed%100<rules['glazedPercent'] and campuses.query(center,predicate='intersects').size:
                     kind = 2
                 rectangle=[]
-                if kind:
+                if kind in (1,2):
                     rect=poly.minimum_rotated_rectangle
                     rectangle=[np.rint((np.array(pt)-center.coords[0])*100).astype(int).tolist() for pt in list(rect.exterior.coords)[:4]]
                 heights.append((base,base+3.1*floors,kind,floors,seed,center,rectangle,poly.area/poly.minimum_rotated_rectangle.area<.78))
                 kinds[kind]+=1
+    existing = STRtree(footprints)
+    for element in load_osm():
+        tags = element.get('tags', {})
+        if element['type']=='node' or not tags.get('building'):
+            continue
+        for poly in polygons(area(element)):
+            center = poly.representative_point()
+            if not (bounds.covers(center) and grounds.covers(center)) or layout.exclude.intersects(poly):
+                continue
+            if any(poly.intersection(footprints[key]).area > .45*min(poly.area,footprints[key].area)
+                   for key in existing.query(poly)):
+                continue
+            try:
+                floors = max(1,round(float(tags['building:levels']))) if 'building:levels' in tags else max(1,round(float(tags['height'])/3.1))
+            except (KeyError,ValueError):
+                floors = min(5,max(3,round(np.sqrt(poly.area)/9)))
+            base = elevation(center.x,center.y)
+            footprints.append(poly)
+            heights.append((base,base+3.1*floors,3,floors,element['id']%65536,center,[],False))
     print('Building kinds:',dict(kinds))
     return footprints, heights
+
+
+def game_court(campus, obstacles):
+    free = campus.buffer(-4).difference(unary_union(obstacles).buffer(3))
+    best = None
+    for part in polygons(free):
+        for east in np.arange(part.bounds[0],part.bounds[2],6):
+            for south in np.arange(part.bounds[1],part.bounds[3],6):
+                for ratio in (.18,.13,.09):
+                    width = min(30,np.sqrt(campus.area)*ratio)
+                    if width < 7 or (best is not None and width*width*1.7 <= best.area):
+                        continue
+                    for breadth,depth in ((width,width*1.7),(width*1.7,width)):
+                        court = box(east-breadth/2,south-depth/2,east+breadth/2,south+depth/2)
+                        if part.covers(court):
+                            best = court
+                            break
+    return best
 
 
 def building_mesh(parts, origin):

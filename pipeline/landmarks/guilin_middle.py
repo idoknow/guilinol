@@ -22,10 +22,11 @@ Colors: beam #c9c8cb, glaze green #4e825f, column gray #8d9094.
 import math
 import sys
 from pathlib import Path
+from PIL import ImageDraw
 
 from c_kit import (
-    Builder, banyan, box, cylinder, disc, ensure_textures, export_landmark, solid,
-    grille, hip_roof, railing, ramp, ring, stairs, tri_count,
+    RECTS, Builder, banyan, box, cylinder, disc, ensure_textures, export_landmark, solid,
+    grille, hip_roof, railing, ramp, ring, stairs, tri_count, tube,
 )
 
 
@@ -48,16 +49,23 @@ def lion(mesh, x, y, z, yaw, scale=1.0):
 
 def gate(b, z=32.9):
     wall, lit = b.parts['atlas'], b.parts['lit']
-    # Two gray stone columns, a lion on each capital, a white beam with red 桂林中学.
     for x in (-3.85, 3.85):
         cylinder(wall, (x, 0, z), 0.92, 6.15, 'granite', 16 if b.detail else 8, 2.4)
         box(wall, (x, 6.32, z), (2.15, 0.42, 2.15), 'granite', 0.8)
-        lion(wall, x, 6.48, z + 1.45, 0.25 if x < 0 else -0.25, 0.78)
+        lantern_x = x * .74
+        cylinder(wall,(lantern_x,5.22,z+.62),.37,.66,'vermilion',12 if b.detail else 6)
+        cylinder(wall,(lantern_x,5.12,z+.62),.09,.12,'yellow',6)
+        cylinder(wall,(lantern_x,5.87,z+.62),.10,.26,'yellow',6)
     box(wall, (0, 6.7, z), (14.4, 1.15, 1.9), 'white', 1.6)
     board(wall, 0, 6.72, z + 1.08, 8.8, 0.95, 'sign_school')
-    hip_roof(wall, (0, z), 8.05, 15.6, 4.6, 2.05, 0.75, 0.55, 'glaze', 'white')
-    # White tile blocks on either side of the beam. The span between the columns
-    # stays open, so the gate is a passage and the campus shows through it.
+    box(wall,(0,7.34,z),(15.4,.24,3.4),'white',None)
+    box(wall,(0,6.09,z-.4),(9.6,.055,3.4),'soffit',1.4)
+    for height in (0.24, 1.38):
+        box(wall, (0, height, z), (6.1, 0.09, 0.15), 'steel', None)
+    for index in range(8):
+        left = -3 + index * 0.75
+        for low, high in ((0.24, 1.38), (1.38, 0.24)):
+            tube(wall, (left, low, z), (left + 0.75, high, z), 0.045, 'steel', 4)
     for x in (-9.0, 9.0):
         box(wall, (x, 5.2, z - 6), (8.0, 10.4, 12), 'white', 2.2)
         hip_roof(wall, (x, z - 6), 10.55, 8.6, 13, 1.55, 0.5, 0.45, 'glaze', 'white')
@@ -67,7 +75,19 @@ def gate(b, z=32.9):
                 box(lit, (x, row, z + 0.06), (1.35, 1.4, 0.08), 'glass', None)
     lion(wall, -5.4, 0, z + 3.4, 0.5, 1.25)
     lion(wall, 5.4, 0, z + 3.4, -0.5, 1.25)
+    for index in range(9):
+        box(wall,(10,.12,z+7+index*.95),(3.3,.04,.45),'white',None)
+    cylinder(wall,(12.3,0,z+5),.11,4.8,'steel',8)
+    box(wall,(12.3,4.2,z+5),(0.52,1.35,.38),'lattice',None)
+    for index,region in enumerate(('vermilion','yellow','glaze')):
+        disc(wall,(12.3,4.60-index*.39,z+5.20),.15,region,8)
+    for side in (-1,1):
+        for stripe in range(8):
+            box(wall,(side*(7+.32*stripe),.49,z+4.3),(.32,.13,.13),'yellow' if stripe%2 else 'lattice',None)
+        for offset in (7,9.2):
+            cylinder(wall,(side*offset,0,z+4.3),.08,.54,'steel',6)
     if b.collide:
+        solid(b.hit, (0, 0.72, z), (6.1, 1.44, 0.24), 'steel')
         for x in (-3.85, 3.85):
             solid(b.hit, (x, 3.3, z), (1.9, 6.6, 1.9), 'granite')
         solid(b.hit, (0, 6.7, z), (14.4, 1.2, 1.9), 'white')
@@ -132,6 +152,14 @@ def extrude_plaza(b):
 def main():
     folder = Path(sys.argv[1])
     image = ensure_textures(folder)
+    brush = ImageDraw.Draw(image)
+    left, top, width, height = RECTS['soffit']
+    brush.rectangle((left,top,left+width-1,top+height-1),fill='#ddbfc3')
+    for offset in range(0,width,16):
+        brush.line((left+offset,top,left+offset,top+height-1),fill='#ad979e')
+    for offset in range(0,height,16):
+        brush.line((left,top+offset,left+width-1,top+offset),fill='#ad979e')
+    image.save(folder/'atlas.png')
     hi, lo = Builder(0, True), Builder(1, False)
     build(hi)
     build(lo)

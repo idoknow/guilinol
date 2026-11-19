@@ -18,6 +18,9 @@ class Layout:
         self.entries = []
         self.ids = set()
         self.flatten = []
+        self.school_grounds = []
+        self.allow_unmapped_court = []
+        tree_free = []
         areas = []
         tree_clearings = []
         osm = {f"{item['type']}/{item['id']}":item for item in load_osm()}
@@ -53,7 +56,11 @@ class Layout:
                 areas.append(polygon(ring))
             if 'flatten' in entry:
                 patch = entry['flatten']
-                self.flatten.append((polygon(patch['polygon']),patch['elevation']))
+                region = polygon(patch['polygon'])
+                if entry.get('allowUnmappedCourt'):
+                    self.allow_unmapped_court.append(region)
+                self.flatten.append((region,patch['elevation']))
+                (self.school_grounds if entry.get('schoolGround') else tree_free).append(region)
             model = root.parent/'public'/entry['model']
             if entry['model'] in peak_models:
                 continue
@@ -62,4 +69,4 @@ class Layout:
                     rotation=entry.get('rotation',0),collision=entry['collision'],bytes=model.stat().st_size,
                     **json.loads(model.with_suffix('.json').read_text()))))
         self.exclude = unary_union(areas)
-        self.tree_exclude = unary_union([self.exclude,*tree_clearings,*(region for region, _ in self.flatten)]).buffer(2)
+        self.tree_exclude = unary_union([self.exclude,*tree_free,*tree_clearings]).buffer(2)
