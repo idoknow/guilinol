@@ -279,16 +279,17 @@ export function createBikeControl() {
         return {blocked: false, reason: '', speed: ctx.speed}
       }
 
-      // Leaving pavement: try orthogonal axis slide, then local diagonal tangential glide before soft off-road cap.
+      // Leaving pavement: glide along shallow road-edge angles; allow steep intentional exits off pavement.
       if (onPavement) {
+        const mx = ctx.next.x - ctx.pos.x, mz = ctx.next.z - ctx.pos.z, mLen = Math.hypot(mx, mz)
         const safeAt = (sx: number, sz: number) =>
           ctx.pavement(sx, sz)
           && !ctx.insideHouse(sx + fwdX * sign * .72, sz + fwdZ * sign * .72)
           && !ctx.blockedAt(sx, ctx.pos.y, sz)
 
-        const canX = ctx.next.x !== ctx.pos.x && safeAt(ctx.next.x, ctx.pos.z)
-        const canZ = ctx.next.z !== ctx.pos.z && safeAt(ctx.pos.x, ctx.next.z)
-        if (canX && (!canZ || Math.abs(ctx.next.x - ctx.pos.x) >= Math.abs(ctx.next.z - ctx.pos.z))) {
+        const canX = mLen > 1e-6 && Math.abs(mx) >= mLen * .45 && safeAt(ctx.next.x, ctx.pos.z)
+        const canZ = mLen > 1e-6 && Math.abs(mz) >= mLen * .45 && safeAt(ctx.pos.x, ctx.next.z)
+        if (canX && (!canZ || Math.abs(mx) >= Math.abs(mz))) {
           ctx.next.z = ctx.pos.z
           return {blocked: false, reason: '', speed: ctx.dampBike(ctx.step * .5)}
         }
@@ -304,17 +305,18 @@ export function createBikeControl() {
           }
         }
         const inLen = Math.hypot(inX, inZ)
-        if (inLen > 1e-4) {
+        if (inLen > 1e-4 && mLen > 1e-6) {
           const nx = inX / inLen, nz = inZ / inLen
-          const mx = ctx.next.x - ctx.pos.x, mz = ctx.next.z - ctx.pos.z, mLen = Math.hypot(mx, mz)
           const outDot = mx * nx + mz * nz
-          let tx = outDot < 0 ? mx - outDot * nx : mx
-          let tz = outDot < 0 ? mz - outDot * nz : mz
-          tx += nx * mLen * .35; tz += nz * mLen * .35
-          const sx = ctx.pos.x + tx, sz = ctx.pos.z + tz
-          if (safeAt(sx, sz)) {
-            ctx.next.x = sx; ctx.next.z = sz
-            return {blocked: false, reason: '', speed: ctx.dampBike(ctx.step * .5)}
+          if (-outDot <= mLen * .82) {
+            let tx = outDot < 0 ? mx - outDot * nx : mx
+            let tz = outDot < 0 ? mz - outDot * nz : mz
+            tx += nx * mLen * .35; tz += nz * mLen * .35
+            const sx = ctx.pos.x + tx, sz = ctx.pos.z + tz
+            if (safeAt(sx, sz)) {
+              ctx.next.x = sx; ctx.next.z = sz
+              return {blocked: false, reason: '', speed: ctx.dampBike(ctx.step * .5)}
+            }
           }
         }
       }
