@@ -269,57 +269,53 @@ def build_main_body(geo: Collector):
 
 
 def build_trunk_and_water_moon_cave(geo: Collector):
-    """Ridge from the hillside out to a round arch standing in the Li River.
+    """One rock: the north-east cliff, the head above the cave, and the trunk.
 
-    Rendered water (clearance probe) starts near local x=120 for z=0..16. The open
-    span is x=126..150, z=2..15, feet below the waterline, no floor and no end cap.
-    The east pier is the trunk: the arch spring itself, narrowing into the water.
+    The rendered Li River (chunk water grid) meets the hill around local x=72 at
+    z≈0 and x=76–80 further north. The previous arch sat on an 80 m beam to reach
+    a wet cell much further east. This opening is cut into the north-east edge
+    itself. West of the hole is the cliff (buried in the body). Above it is a
+    thick head. East of it is a trunk column, thick at the top and narrow where
+    it goes under the water, ending about 18 m past the shore. Depth along the
+    river is 16 m. No floor, no end cap, no beam.
     """
-    def shoulder_ring(t):
-        cx = lerp(46.0, 120.0, t)
-        cz = 7.4
-        half_w = lerp(9.0, 6.8, t)
-        top = lerp(27.0, 16.5, t)
-        ring = []
-        for k in range(12):
-            a = math.pi * k / 11.0
-            z = cz + half_w * math.cos(a)
-            y = 0.4 + (top - 0.4) * (math.sin(a) ** 0.82)
-            x = cx + 2.4 * math.sin(a)
-            ring.append((x, y, z))
-        ring.append((cx - 1.2, 0.35, cz - half_w * 0.6))
-        ring.append((cx - 1.2, 0.35, cz + half_w * 0.6))
-        return ring
-
-    loft_karst_rings(geo, [shoulder_ring(i / 7.0) for i in range(8)], cap_top=False)
-
-    def vault_ring(z):
-        phase = (z - 8.0) * 0.35
+    def head_ring(z):
+        phase = (z + 2.0) * 0.45
+        # North end of the head rises toward the existing crest.
+        lift = 8.0 * float(smoothstep(8.0, -6.0, z))
         inner = []
         for k in range(9):
             a = math.pi * (1.0 - k / 8.0)
-            wobble = 1.0 + 0.04 * math.sin(3.0 * a + phase)
-            x = 138.0 + 12.0 * math.cos(a) * wobble
-            y = (WATER_Y - 1.6) + 14.8 * math.sin(a)
+            wobble = 1.0 + 0.03 * math.sin(3.0 * a + phase)
+            # West spring sits on the cliff (body face ~x=58). East spring is in the river.
+            x = 72.0 + 10.0 * math.cos(a) * wobble
+            y = (WATER_Y - 1.4) + 15.2 * math.sin(a)
             inner.append((x, y, z))
+        # Outer skin. The east side is a column: ~12 m thick under the head, ~4 m at the
+        # waterline, and the tip is below the surface. The west side is buried in the cliff.
+        outer_xy = (
+            (86.0, -3.6),
+            (89.0, 2.2),
+            (93.0, 10.0),
+            (94.0, 18.0),
+            (86.0, 28.0),
+            (72.0, 40.0),
+            (56.0, 42.0),
+            (42.0, 30.0),
+            (40.0, 10.0),
+            (43.0, 0.3),
+        )
         outer = []
-        for k in range(9):
-            a = math.pi * (k / 8.0)
-            wobble = 1.0 + 0.05 * math.cos(2.0 * a - phase)
-            # East spring (the trunk) reaches a little further and lower than the west pier.
-            east = max(0.0, math.cos(a))
-            x = 136.0 + (17.5 + 4.5 * east) * math.cos(a) * wobble
-            y = (WATER_Y - 2.6) + (19.0 - 3.0 * east) * math.sin(a)
-            if east > 0.65:
-                y = min(y, lerp(WATER_Y - 1.2, -3.2, (east - 0.65) / 0.35))
+        for x, y in outer_xy:
+            y = y + lift * smoothstep(10.0, 24.0, y)
+            x += 1.1 * math.sin(phase + y * 0.15)
             outer.append((x, y, z))
         return inner + outer
 
     loft_karst_rings(
         geo,
-        [vault_ring(2.0 + 13.0 * i / 10.0) for i in range(11)],
+        [head_ring(-8.0 + 18.0 * i / 10.0) for i in range(11)],
         cap_top=False,
-        cave_vault=True,
     )
 
 
@@ -378,16 +374,6 @@ def build_draped_canopy(geo: Collector):
         if i % 2 == 0:
             add_foliage_clump(geo, x + 2.4 * math.cos(ang), y + ry * 0.05, z + 1.8 * math.sin(ang),
                               rx * 0.7, ry * 0.66, rz * 0.7, seed=i * 1.17 + 2.0)
-    # Crowns along the rock shoulder that runs out to the cave, stopping short of the bare trunk.
-    for i in range(9):
-        t = i / 8.0
-        if t > 0.62:
-            continue
-        x = lerp(50.0, 108.0, t)
-        y = lerp(28.0, 17.0, t)
-        z = 7.5 + 2.4 * math.sin(t * 4.0)
-        scale = 1.15 - 0.35 * t
-        add_foliage_clump(geo, x, y, z, 4.2 * scale, 2.6 * scale, 3.6 * scale, seed=3.0 + i)
 
 
 def add_prism_frustum(geo: Collector, cx, cz, r0, r1, y0, y1, sides, col, yaw=0.0, cap_top=True, cap_bottom=False):
@@ -598,7 +584,7 @@ def build_glb():
     build_rafts(decor)
     tris = np.concatenate([np.asarray(cliff.tris, dtype=np.float64), np.asarray(decor.tris, dtype=np.float64)])
     cols = np.concatenate([np.asarray(cliff.cols, dtype=np.float64), np.asarray(decor.cols, dtype=np.float64)])
-    cave = np.array([138.0, WATER_Y + 8.0, 8.0])
+    cave = np.array([78.0, WATER_Y + 7.0, 1.0])
     center = tris.mean(axis=1)
     lit = np.linalg.norm(center - cave, axis=1) < 15.5
     lit |= np.linalg.norm(center - pagoda, axis=1) < 5.5
