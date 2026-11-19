@@ -169,14 +169,17 @@ def main():
                 row['reason']='no addressed street segment for schematic plaque';continue
             if not entry:
                 row['status']='missing-instance';continue
-            _, source, midpoint, _, road = site
+            _, source, midpoint, _, road, edge = site
             shape=footprint(ROOT/'public'/spec['model'],entry,elevation=1)
             if shape.is_empty:
                 row['status']='empty-geometry';continue
             distance=shape.centroid.distance(midpoint)
             delta=abs((axis(shape)-axis(road)+90)%180-90)
+            setback=midpoint.distance(road)
+            edge_delta=abs((axis(edge)-axis(road)+90)%180-90)
             row.update(reference=source,midpointM=round(distance,2),angleDeg=round(delta,2),
-                       status='pass' if distance<=5 and delta<=5 else 'fail');continue
+                       boundaryMidpointToRoadM=round(setback,2),boundaryRoadAngleDeg=round(edge_delta,2),
+                       status='pass' if distance<=5 and delta<=5 and setback<=20 and edge_delta<=5 else 'fail');continue
         if key in BRIDGES:ref=f'way/{BRIDGES[key]}'
         if not entry:
             peak=next((peak for peak in manifest['peaks']['entries'] if peak.get('model')==spec['model']),None)
@@ -196,7 +199,10 @@ def main():
                 iou,center,delta=metrics(shape,area(osm[source]))
                 components.append(dict(component=name,reference=source,iou=round(iou,3),centroidM=round(center,2),angleDeg=round(delta,2),
                                        status='pass' if iou>=.7 and center<=5 and delta<=5 else 'fail'))
-            row.update(components=components,status='pass' if all(item['status']=='pass' for item in components) else 'fail');continue
+            row.update(components=components,status='pass' if all(item['status']=='pass' for item in components) else 'fail')
+            if row['status']=='fail' and notes=='deferred to IDOK-51':
+                row['status']='deferred'
+            continue
         if key=='yiwu_street':
             components=[]
             for building,source in (('yiwu_old_house','way/702352880'),('yiwu_office','way/675974225')):

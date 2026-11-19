@@ -22,12 +22,12 @@ def frontage(campus, osm):
         midpoint = edge.interpolate(.5, normalized=True)
         for key, road in roads:
             distance = midpoint.distance(road)
-            if distance > 75:
+            if distance > 20:
                 continue
             start, end = road.coords
             yaw = math.atan2(start[1]-end[1], end[0]-start[0])
             alignment = abs(((last[0]-first[0])*math.cos(yaw)-(last[1]-first[1])*math.sin(yaw))/edge.length)
-            if alignment < .85:
+            if alignment < math.cos(math.radians(5)):
                 continue
-            candidates.append((distance + 10*(1-alignment), key, midpoint, math.degrees(yaw), road))
+            candidates.append((distance, key, midpoint, math.degrees(yaw), road, edge))
     return min(candidates, key=lambda candidate: candidate[0]) if candidates else None

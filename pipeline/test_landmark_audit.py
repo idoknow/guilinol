@@ -4,9 +4,22 @@ from shapely.affinity import rotate, translate
 from shapely.geometry import LineString, box
 
 from audit_landmarks import bridge_axis, metrics, photo_hits, photos_pass, shoreline_axis
+from school_frontage import frontage
+from common import xz2ll
 
 
 class LandmarkMetricsTest(unittest.TestCase):
+    def test_schematic_boundary_requires_both_distance_and_parallelism(self):
+        def geometry(coords):
+            return [dict(zip(('lat','lon'),xz2ll(*point))) for point in coords]
+        campus=dict(type='way',tags={'addr:street':'Demo'},geometry=geometry(box(0,0,40,40).exterior.coords))
+        def check(start,end):
+            road=dict(type='way',tags={'name':'Demo','highway':'residential'},geometry=geometry([start,end]))
+            return frontage(campus,{'way/1':road})
+        self.assertIsNotNone(check((-10,-19),(50,-19)))
+        self.assertIsNone(check((-10,-21),(50,-21)))
+        self.assertIsNone(check((-10,-10),(50,-20)))
+
     def test_suspect_exif_requires_two_independent_views_and_reason(self):
         views = {str(index):dict(inFov=index!=1) for index in (1,2,3)}
         self.assertFalse(photos_pass(views, {'1':' '}))

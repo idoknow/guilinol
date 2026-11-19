@@ -68,7 +68,7 @@ class Layout:
                 site = frontage(osm[entry['schematicCampus']], osm)
                 if site is None:
                     continue
-                _, _, midpoint, entry['rotation'], _ = site
+                _, _, midpoint, entry['rotation'], _, _ = site
                 x,z = midpoint.coords[0]
             if entry['model'] in peak_models:
                 continue
