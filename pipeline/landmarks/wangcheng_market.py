@@ -107,4 +107,6 @@ def market(model):
         model.roof(0,2.29,0,4.15,3.6,.52)
 
 
-if __name__=='__main__': generate('wangcheng_market',market)
+if __name__=='__main__':
+    generate('wangcheng_market',market,dict(brick='#7a7d7b',white='#e8e4da',tile='#3b3e42',
+             wood='#5a3a22',sign='#282420',pave='#8f8f88'))

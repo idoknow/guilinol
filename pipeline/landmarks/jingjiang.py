@@ -83,7 +83,7 @@ class Model:
         axes=np.array([[2,1],[0,2],[0,1]])[normal]
         coords=np.take_along_axis(local,axes[:,None,:],axis=2)
         if color in self.tile_parts:
-            scale={'stone':(3.2,1.2),'brick':(1.04,.448),'pave':(3.2,1.6)}[color]
+            scale={'stone':(3.2,1.2),'brick':(1.04,.448),'pave':(3.2,1.6),'ruinGlass':(1.5,1.5)}[color]
             self.tile_parts[color].append((triangles,coords/scale));return
         self.visible.append(triangles)
         coords=(coords-coords.min(axis=1,keepdims=True))/np.maximum(coords.max(axis=1,keepdims=True)-coords.min(axis=1,keepdims=True),1e-6)
@@ -170,9 +170,10 @@ class Model:
         self.box((cursor+x+width/2)/2,0,z,x+width/2-cursor,height,depth,color,True)
 
 
-def generate(name,build):
-    scene=trimesh.Scene(); image=atlas({'tile':'#747b80'} if name=='jingjiang' else None,canopy=name=='jingjiang'); path=Path(__file__).resolve().parents[2]/'public/textures/landmarks/A'
-    path.mkdir(exist_ok=True,parents=True); image.save(path/'surfaces.png',optimize=True)
+def generate(name,build,colors=None):
+    scene=trimesh.Scene(); image=atlas(colors or ({'tile':'#747b80'} if name=='jingjiang' else None),canopy=name=='jingjiang'); path=Path(__file__).resolve().parents[2]/'public/textures/landmarks/A'
+    if not colors:
+        path.mkdir(exist_ok=True,parents=True); image.save(path/'surfaces.png',optimize=True)
     mat=trimesh.visual.material.PBRMaterial(name='A_surfaces',baseColorTexture=image,roughnessFactor=1,metallicFactor=0,doubleSided=True)
     def packed(parts):
         vertices=np.concatenate(parts).reshape(-1,3);return trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
@@ -184,8 +185,14 @@ def generate(name,build):
             scene.add_geometry(rock,node_name=layer+'_rock',parent_node_name=parent)
         for key,parts in model.tile_parts.items():
             if not parts:continue
-            cell=list(SWATCHES).index(key);left=128*(cell%4);top=128*(cell//4)
-            texture=image.crop((left,top,left+128,top+128));surface=packed([tri for tri,uv in parts]);surface.visual=trimesh.visual.TextureVisuals(uv=np.concatenate([uv for tri,uv in parts]).reshape(-1,2),material=trimesh.visual.material.PBRMaterial(name=key,baseColorTexture=texture,metallicFactor=0,roughnessFactor=1,doubleSided=True));scene.add_geometry(surface,geom_name=layer+'_'+key,node_name=layer+'_'+key,parent_node_name=parent)
+            reflective=key=='ruinGlass'
+            if reflective:
+                texture=Image.new('RGB',(128,128),'#2c393a')
+                ImageDraw.Draw(texture).rectangle((0,0,127,127),outline='#657072',width=2)
+            else:
+                cell=list(SWATCHES).index(key);left=128*(cell%4);top=128*(cell//4)
+                texture=image.crop((left,top,left+128,top+128))
+            surface=packed([tri for tri,uv in parts]);surface.visual=trimesh.visual.TextureVisuals(uv=np.concatenate([uv for tri,uv in parts]).reshape(-1,2),material=trimesh.visual.material.PBRMaterial(name=key,baseColorTexture=texture,metallicFactor=.35 if reflective else 0,roughnessFactor=.16 if reflective else 1,doubleSided=True));scene.add_geometry(surface,geom_name=layer+'_'+key,node_name=layer+'_'+key,parent_node_name=parent)
     for lod in (0,1):
         model=Model(lod==0);build(model)
         layer=f'lod{lod}';scene.graph.update(frame_to=layer)
