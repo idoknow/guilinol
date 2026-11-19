@@ -20,6 +20,7 @@ from streets import chunks as street_chunks
 from atlas import write_atlas
 from vehicles import plan_vehicles, write_vehicles
 from clearance import landmark_triangles
+from bridgeheads import raise_approaches
 from shoreline import correct_water
 from landmark_layout import Layout
 
@@ -80,6 +81,14 @@ def build(bbox, output, palette):
     correct_water(surface, terrain, bounds, stencil)
     terrain[wet]=original[wet]=np.minimum(terrain[wet],surface[wet]-20)
     footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes),layout)
+    def sample(east,south):
+        row = min(depth//GRID,max(0,round((south-top)/GRID)))
+        col = min(width//GRID,max(0,round((east-left)/GRID)))
+        return terrain[row,col]/10,surface[row,col]
+    candidates=plan_vehicles(bounds,surface,layers['road'],footprints,sample)['routes']
+    raised=raise_approaches(bounds,candidates,sample,terrain,original,wet)
+    if raised:
+        footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes),layout)
     index = STRtree(footprints)
     trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees,layout.tree_exclude)
     for road in roads:
@@ -99,12 +108,8 @@ def build(bbox, output, palette):
             length=round(road.line.length),x=anchor.x,z=anchor.y,yaw=math.atan2(anchor.x-ahead.x,anchor.y-ahead.y)))
     (output/'street-report.json').write_text(json.dumps(report,ensure_ascii=False))
     print('Vegetation:',dict(sorted(tree_stats.items())))
-    def sample(east,south):
-        row = min(depth//GRID,max(0,round((south-top)/GRID)))
-        col = min(width//GRID,max(0,round((east-left)/GRID)))
-        return terrain[row,col]/10,surface[row,col]
     vehicles=plan_vehicles(bounds,surface,layers['road'],footprints,sample)
-    decks, triangles = bridge_tiles(bounds,sample,vehicles['routes'])
+    decks, triangles = bridge_tiles(bounds,sample,vehicles['routes'],raised)
     landmarks=[]
     for x,z,entry in layout.entries:
         height=sample(x,z)[0]

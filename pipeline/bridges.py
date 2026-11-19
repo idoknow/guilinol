@@ -11,7 +11,7 @@ from common import load_osm
 from features import points, polygons
 
 
-def bridge_tiles(bounds, sample, routes):
+def bridge_tiles(bounds, sample, routes, raised=()):
     spans, profiles, owners, emitted = [], [], [], []
     thin_spans=[]
     tracks=[(LineString([(east,south) for east,level,south in leg['path']]).buffer(4.2),leg['path']) for leg in routes if leg['kind']=='boat']
@@ -30,6 +30,7 @@ def bridge_tiles(bounds, sample, routes):
         coords = points(way)
         if len(coords) < 2:
             continue
+        if way['id'] in raised: coords=raised[way['id']][0]
         line = LineString(coords)
         if not bounds.intersects(line) or not line.length:
             continue
@@ -71,6 +72,8 @@ def bridge_tiles(bounds, sample, routes):
             if way['id']==246520676:
                 height=156.48
                 side*=6.8/width
+            if way['id'] in raised:
+                height=raised[way['id']][1][index]/10
             sections.append((coord+side,coord-side,height))
         for first, second in zip(sections,sections[1:]):
             for pts, levels in [([first[0],first[1],second[0]],[first[2],first[2],second[2]]),

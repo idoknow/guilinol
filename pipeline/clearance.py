@@ -31,7 +31,7 @@ def landmark_triangles(landmarks):
             for face in vertices[nearby]: yield way['id'],face,0
 
 
-def audit_routes(routes, triangles, select=False):
+def audit_routes(routes, triangles, select=False, failed_ids=None):
     shapes, planes, ids = [], [], []
     for osm_id, vertices, *depth in triangles:
         coords = vertices[:, [0, 2]]
@@ -64,6 +64,7 @@ def audit_routes(routes, triangles, select=False):
         required=.4 if route['kind']=='boat' else .3
         failures={key:round(required-value,3) for key,value in route_min.items() if value<required-1e-10}
         if select:
+            if failed_ids is not None: failed_ids.update(failures)
             print(f"{route['start']} → {route['end']}: "+(f'截航，桥 ID/欠净空(m) {failures}' if failures else f'通航，桥 ID/净空(m) { {key:round(value,3) for key,value in route_min.items()} }'))
             if failures: continue
         kept.append(route)
