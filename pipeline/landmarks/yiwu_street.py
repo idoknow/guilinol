@@ -5,12 +5,13 @@ import numpy as np
 import trimesh
 from PIL import Image, ImageDraw, ImageFont
 
+from c_kit import landmark_surface
 from xiaoyao_tower import generate
 
 
 def canopy(model, station, side):
     lateral = side * 6.4
-    model.beam([station, -.4, lateral], [station, 5.6, lateral], .32, 'wood', 8, True)
+    model.beam([station, -.08, lateral], [station, 5.6, lateral], .32, 'wood', 8, True)
     sphere = trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
     for reach in (-2.3, 1.8):
         tip = [station + reach, 6.2, lateral - side * 2.4]
@@ -57,7 +58,7 @@ def directions(model):
 
 def street(model):
     for station in range(-65,86,5):
-        model.box(station,-.35,-7.3,5,.51,4.4,'tile',True)
+        model.box(station,-.06,-7.3,5,.22,4.4,'tile',True)
         model.box(station,.16,-8.1,5,.018,.32,'yellow')
         model.box(station,.16,-6.0,5,.012,.10,'white')
         for left,right in ((station-2.5,min(station+2.5,52.5)),(max(station-2.5,79),station+2.5)):
@@ -86,6 +87,5 @@ def street(model):
 
 
 if __name__ == '__main__':
-    stations = np.arange(-70,101,10)
-    heights = [158,157.9,158,157.9,157.7,157.3,157.3,157,156.9,156.9,157.2,157.4,157.6,157.4,157.1,156.8,156.7,156.7]
-    generate('yiwu_street',street,colors=dict(granite='#626971',glass='#185693'),lift=lambda east: np.interp(east,stations,heights)-157)
+    generate('yiwu_street',street,colors=dict(granite='#626971',glass='#185693'),
+             terrain_offset=landmark_surface('yiwu_street').ground)

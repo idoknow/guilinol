@@ -23,6 +23,18 @@ class LandmarkModel(Model):
         self.lit_tiles=[]
         self.flood_roof=flood_roof
 
+    def foundation(self, surface, x, y, z, w, h, d, color):
+        """Adjust the four lower corners in posed landmark coordinates."""
+        cube = trimesh.creation.box([w,h,d])
+        vertices = cube.vertices + [x,y+h/2,z]
+        dx,dy,dz,angle = self.pose
+        c, s = np.cos(angle), np.sin(angle)
+        for point in vertices:
+            if point[1] < y+h/2:
+                px,_,pz = point
+                point[1] = surface.ground(dx+c*px-s*pz,dz+s*px+c*pz)-dy-.04
+        self.mesh(vertices,cube.faces,color,True)
+
     def mesh(self, vertices, faces, color, collide=False):
         if isinstance(color,str) and color=='lamp':
             super().mesh(vertices,faces,'wood' if self.flood_roof else 'gold',collide)
@@ -202,7 +214,7 @@ def tower(model):
 
 
 
-def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None):
+def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None, terrain_offset=None):
     image = atlas(colors,smooth)
     if flood_roof:
         carve_medallion(image)
@@ -221,6 +233,9 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
             vertices = np.concatenate(parts).reshape(-1,3)
             if lift is not None:
                 vertices[:,1]+=lift(vertices[:,0])
+            if terrain_offset is not None:
+                points, inverse = np.unique(vertices[:,::2],axis=0,return_inverse=True)
+                vertices[:,1] += np.array([terrain_offset(x,z) for x,z in points])[inverse]
             mesh = trimesh.Trimesh(vertices, np.arange(len(vertices)).reshape(-1,3), process=False)
             if texture is not None:
                 material = trimesh.visual.material.PBRMaterial(name=name,baseColorTexture=texture,roughnessFactor=1,metallicFactor=0,doubleSided=True)
