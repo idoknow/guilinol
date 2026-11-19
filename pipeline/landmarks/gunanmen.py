@@ -21,7 +21,7 @@ from pathlib import Path
 
 from c_kit import (
     Builder, arch_wall, banyan, box, cylinder, ensure_textures, export_landmark, solid,
-    extrude, grille, hip_roof, railing, ramp, stairs, tri_count, yaw_box,
+    extrude, grille, hip_roof, railing, ramp, stairs, tri_count, yaw_box, segment_wall,
 )
 
 
@@ -41,10 +41,38 @@ def _battered(mesh, p0, p1, q1, q0, y0, y1, region='ashlar'):
     )
 
 
+def courtyard(builder, deck):
+    wall = builder.parts['atlas']
+    for center in (-6.5, 6.5):
+        cylinder(wall, (center, 0, 7.9), 2.65, deck, 'ashlar', 18 if builder.detail else 9, 2.4)
+    banyan(wall, (7.2, deck, 6.7), 5.6, 3.2, 82, builder.detail)
+    for offset in (-4.5, -1.5, 1.5, 4.5):
+        cylinder(wall, (offset, deck + 2.48, 7.6), .24, .45, 'vermilion', 8)
+        cylinder(wall, (offset, deck + 2.34, 7.6), .045, .14, 'yellow', 5)
+    box(wall, (-15, 1.15, 9), (12, 2.3, 1.15), 'ashlar')
+    curve = [(11*math.cos(angle), -1.6-6*math.sin(angle)) for angle in
+             [math.pi*index/12 for index in range(13)]]
+    for start, end in zip(curve, curve[1:]):
+        segment_wall(wall, start, end, 0, 2.5, .6, 'rubble')
+        segment_wall(wall, start, end, 2.5, 5.3, .45, 'vermilion')
+        segment_wall(wall, start, end, 5.3, 5.55, .82, 'glaze')
+        hedge = [(east*1.12,north*1.12) for east,north in (start,end)]
+        segment_wall(wall, *hedge, 0, .85, 1, 'foliage')
+        if builder.collide:
+            segment_wall(builder.hit, start, end, 0, 5.55, .6, 'rubble')
+    extrude(wall, [(-19,-24),(19,-24),(19,-10),(-19,-10)], .02,.1,'granite')
+    box(wall, (14.2,1.5,4.34),(2.2,3,.22),'wood')
+    hip_roof(wall,(14.2,4),3.24,3.8,1.7,.95,.35,.25,'glaze','vermilion')
+    for east,height in ((16.4,1.45),(17.6,.95)):
+        box(wall,(east,height/2,4.85),(.78,height,.32),'granite')
+        box(wall,(east,height*.7,5.03),(.54,.38,.04),'blacktile')
+
+
 def build(b: Builder):
     wall = b.parts['atlas']
     detail = b.detail
     deck = 6.7
+    courtyard(b, deck)
     # Solid platform. South face is one wall with the arch; the other three sides
     # are single faces, chamfered at the corners and inset 0.45 m at the top.
     front_z = 9.4
@@ -68,8 +96,8 @@ def build(b: Builder):
         for i in range(12):
             box(wall, (-18.6 + i * 0.62, 7.35, 6.6), (0.1, 0.18, 1.4), 'graytile', 0.3)
     # Low east courtyard wall, yellow with a tile coping.
-    box(wall, (14.2, 1.55, 4.0), (7.5, 3.1, 0.55), 'yellow', 1.5)
-    box(wall, (14.2, 3.2, 4.0), (8.0, 0.28, 0.9), 'graytile', 0.6)
+    box(wall, (14.2, 1.55, 4.0), (7.5, 3.1, 0.55), 'vermilion', 1.5)
+    box(wall, (14.2, 3.2, 4.0), (8.0, 0.28, 0.9), 'glaze', 0.6)
     # Gatehouse: yellow hall, vermilion colonnade, gray xieshan, stone rail on the terrace.
     box(wall, (0, deck + 1.55, 2.2), (12.2, 3.1, 0.45), 'yellow', 1.6)
     box(wall, (-6.05, deck + 1.55, 4.5), (0.42, 3.1, 4.6), 'yellow', 1.4)
