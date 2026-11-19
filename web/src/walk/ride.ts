@@ -14,7 +14,7 @@ export interface DismountContext {
   kinds: Map<number, Kind>
   stream: Stream
   tileAt: (x:number, z:number)=>Tile|undefined
-  surface: (x:number, z:number, kind:Kind)=>SurfaceHit
+  surface: (x:number, z:number, kind:Kind, origin?:number, reach?:number)=>SurfaceHit
   wet: (x:number, z:number)=>boolean
   insideHouse: (x:number, z:number)=>boolean
 }
@@ -28,7 +28,7 @@ export interface BikeMoveContext {
   step: number
   pavement: (x:number, z:number)=>boolean
   insideHouse: (x:number, z:number)=>boolean
-  hasSlopeCollision: ()=>boolean
+  collisionKind: ()=>'building'|'collision'|''
   stopBike: ()=>void
   dampBike: (step:number)=>number
 }
@@ -90,7 +90,7 @@ export function probeLocalDismount(ctx: DismountContext, cx: number, cz: number,
     const x = cx + dx, z = cz + dz
     const tile = ctx.tileAt(x, z)
     if (!tile || !ctx.stream.loaded.has(tile) || ctx.insideHouse(x, z)) continue
-    const deck = ctx.surface(x, z, 'deck')
+    const deck = ctx.surface(x, z, 'deck', bikeY + .75, 3.5)
     const support = deck ?? ctx.surface(x, z, 'sidewalk') ?? ctx.surface(x, z, 'ground')
     if (!support || support.slope > wcfg.slope || (!deck && ctx.wet(x, z))) continue
     const peak = ctx.surface(x, z, 'peak')
@@ -100,7 +100,7 @@ export function probeLocalDismount(ctx: DismountContext, cx: number, cz: number,
       wallRay ??= new R.Ray({x:0, y:0, z:0}, {x:0, y:0, z:-1})
       wallRay.origin.x = cx; wallRay.origin.y = bikeY + .9; wallRay.origin.z = cz
       wallRay.dir.x = dx / len; wallRay.dir.y = ty / len; wallRay.dir.z = dz / len
-      const blocker = ctx.world.castRay(wallRay, len, false, undefined, undefined, ctx.capsule, undefined, coll => {
+      const blocker = ctx.world.castRay(wallRay, len, true, undefined, undefined, ctx.capsule, undefined, coll => {
         const kind = ctx.kinds.get(coll.handle)
         return kind === 'building' || kind === 'rail' || kind === 'peak' || kind === 'landmark'
       })
@@ -116,9 +116,13 @@ export function probeLocalDismount(ctx: DismountContext, cx: number, cz: number,
 /** Manages e-bike acceleration, coasting drag, 0.22s reverse delay, speed-tuned steering, and lean/pitch. */
 export function createBikeControl() {
   let speed = 0, heading = 0, lean = 0, pitch = 0, steerInput = 0, revHold = 0, offRoadSteps = 0
+  let onPavement = false
+  let offRoadOrigin: {x:number; z:number} | null = null
 
   function reset() {
     speed = lean = pitch = steerInput = revHold = offRoadSteps = 0
+    onPavement = false
+    offRoadOrigin = null
   }
 
   return {
@@ -158,10 +162,13 @@ export function createBikeControl() {
         if (speed > .05) {
           revHold = 0
           speed = Math.max(0, speed + bcfg.brake * uFwd * cdt)
+        } else if (speed < -.01) {
+          revHold = bcfg.revHold
+          speed = T.MathUtils.clamp(speed + bcfg.revAccel * uFwd * cdt, bcfg.reverseMax, 0)
         } else {
           revHold += cdt
           if (revHold >= bcfg.revHold) speed = T.MathUtils.clamp(speed + bcfg.revAccel * uFwd * cdt, bcfg.reverseMax, 0)
-          else speed = Math.max(0, speed + bcfg.brake * uFwd * cdt)
+          else speed = 0
         }
       } else {
         revHold = 0
@@ -192,13 +199,25 @@ export function createBikeControl() {
         offRoadSteps = 0; ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z; ctx.stopBike()
         return {blocked: true, reason: 'building', speed: 0}
       }
-      if (Math.hypot(ctx.move.x, ctx.move.z) < Math.abs(ctx.speed) * ctx.step * .35 && ctx.hasSlopeCollision()) {
-        offRoadSteps = 0; ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z; ctx.stopBike()
-        return {blocked: true, reason: 'collision', speed: 0}
+      if (Math.hypot(ctx.move.x, ctx.move.z) < Math.abs(ctx.speed) * ctx.step * .35) {
+        const hit = ctx.collisionKind()
+        if (hit) {
+          offRoadSteps = 0; ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z; ctx.stopBike()
+          return {blocked: true, reason: hit, speed: 0}
+        }
       }
       if (ctx.pavement(ctx.next.x, ctx.next.z)) {
-        offRoadSteps = 0
+        onPavement = true; offRoadOrigin = null; offRoadSteps = 0
         return {blocked: false, reason: '', speed: ctx.speed}
+      }
+      if (!onPavement && !ctx.pavement(ctx.pos.x, ctx.pos.z)) {
+        offRoadOrigin ??= {x: ctx.pos.x, z: ctx.pos.z}
+        const nextDist = Math.hypot(ctx.next.x - offRoadOrigin.x, ctx.next.z - offRoadOrigin.z)
+        const curDist = Math.hypot(ctx.pos.x - offRoadOrigin.x, ctx.pos.z - offRoadOrigin.z)
+        if (nextDist <= 6.5 || nextDist < curDist) {
+          offRoadSteps = 0
+          return {blocked: false, reason: '', speed: ctx.speed}
+        }
       }
       const canX = ctx.next.x !== ctx.pos.x && ctx.pavement(ctx.next.x, ctx.pos.z)
         && !ctx.insideHouse(ctx.next.x + fwdX * sign * .72, ctx.pos.z + fwdZ * sign * .72)

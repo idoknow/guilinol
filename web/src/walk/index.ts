@@ -113,12 +113,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const found=sim.findLocalDismount(x,z,bikeHeading,bikeY??safe.y-cfg.height/2)
       if(!found){notifyDismountBlocked();return false}
       const prevFoot=figure.position.clone()
-      if(!place(found.x,found.z,'dismount',true))return false
+      if(!place(x,z,'dismount',true,found))return false
       ridePose.startDismount(prevFoot,found,cfg.height);input.clearRun();return true
     })).then(loaded=>{rides=loaded;rides.show(active)})
       .catch(error=>console.warn('Vehicles unavailable:',error)).finally(()=>{loading=false})}
   let wasBoat=false,wasBike=false,bikeObstacle=''
-  function place(x:number,z:number,reason:string,override=false){const found=sim.findWalkableSpawn(x,z,override)
+  function place(x:number,z:number,reason:string,override=false,prefound?:ReturnType<typeof sim.findWalkableSpawn>){const found=prefound??sim.findWalkableSpawn(x,z,override)
     if(verify)spawns.push({reason,from:[x,z],to:found?[found.x,found.z]:null,distance:found?Math.hypot(found.x-x,found.z-z):null,rule:found?.rule??'none'})
     if(!found)return false
     sim.body.setTranslation(found,true);sim.body.setNextKinematicTranslation(found);sim.world.step();safe.set(found.x,found.y,found.z);resetMotion();return true}
@@ -135,10 +135,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function follow(dt=0,snap=false){const pos=sim.body.translation();figure.position.set(pos.x,pos.y-cfg.height/2,pos.z)
     if(rides?.boat){figure.position.copy(rides.boat.position);figure.position.y+=rides.boat.name==='raft'?-.44:-.18;figure.rotation.y=rides.heading}
     if(rides?.bike){
-      const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading)
+      const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading),baseY=pos.y-cfg.height/2
       if(dt>0){
-        const fSup=sim.surface(pos.x+fx*.55,pos.z+fz*.55,'deck')??sim.surface(pos.x+fx*.55,pos.z+fz*.55,'sidewalk')??sim.surface(pos.x+fx*.55,pos.z+fz*.55,'ground')
-        const bSup=sim.surface(pos.x-fx*.55,pos.z-fz*.55,'deck')??sim.surface(pos.x-fx*.55,pos.z-fz*.55,'sidewalk')??sim.surface(pos.x-fx*.55,pos.z-fz*.55,'ground')
+        const fSup=sim.surface(pos.x+fx*.55,pos.z+fz*.55,'deck',baseY+.75,3.5)??sim.surface(pos.x+fx*.55,pos.z+fz*.55,'sidewalk')??sim.surface(pos.x+fx*.55,pos.z+fz*.55,'ground')
+        const bSup=sim.surface(pos.x-fx*.55,pos.z-fz*.55,'deck',baseY+.75,3.5)??sim.surface(pos.x-fx*.55,pos.z-fz*.55,'sidewalk')??sim.surface(pos.x-fx*.55,pos.z-fz*.55,'ground')
         rides.setPitch(fSup?.y,bSup?.y,dt)
       }
       rides.park(figure.position)
@@ -180,7 +180,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(!wasBike){
         const bx=rides.bike.position.x,bz=rides.bike.position.z,cur=sim.body.translation()
         sim.sync(bx,bz)
-        const sup=sim.surface(bx,bz,'deck')??sim.surface(bx,bz,'sidewalk')??sim.surface(bx,bz,'ground')
+        const sup=sim.surface(bx,bz,'deck',rides.bike.position.y+.75,3.5)??sim.surface(bx,bz,'sidewalk')??sim.surface(bx,bz,'ground')
         const by=sup?sup.y:rides.bike.position.y
         ridePose.startMount({x:cur.x,y:cur.y-cfg.height/2,z:cur.z},figure.rotation.y)
         const dest={x:bx,y:by+cfg.height/2+.055,z:bz}
@@ -251,19 +251,24 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         if(!deck||foot<deck.y-.35){
           const tread=sim.surface(next.x,next.z,'landmark',foot+.6,1.4),tile=sim.tileAt(next.x,next.z),water=tile&&stream.loaded.get(tile)?.water
           const level=tile&&water?water[Math.round((next.z-tile.z)/4)*65+Math.round((next.x-tile.x)/4)]/10:Infinity
-          if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;vx=vz=0;blockedWater=true}
+          if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;vx=vz=0;blockedWater=true;rides?.stop()}
         }
       }
       if(rides?.bike){
         const res=rides.resolveMove({
           pos,next,move,heading:rides.heading,speed:bikeSpeed,step,
           pavement:rides.pavement,insideHouse:sim.insideHouse,
-          hasSlopeCollision:()=>{
+          collisionKind:()=>{
+            let hit:''|'collision'|'building'=''
             for(let at=0;at<sim.controller.numComputedCollisions();at++){
               const contact=sim.controller.computedCollision(at)
-              if(contact&&contact.normal1.y<Math.cos(cfg.slope))return true
+              if(!contact||contact.normal1.y>=Math.cos(cfg.slope))continue
+              const kind=contact.collider?sim.kinds.get(contact.collider.handle):undefined
+              if(kind==='sidewalk')continue
+              if(kind==='building')return 'building'
+              hit='collision'
             }
-            return false
+            return hit
           },
           stopBike:()=>rides!.stop(),
           dampBike:s=>rides!.dampSpeed(s),
