@@ -1,8 +1,10 @@
 import gzip
 import json
 import math
+from pathlib import Path
 
 from shapely.geometry import LineString, Point
+from shapely.ops import nearest_points
 
 from common import ll2xz, load_osm
 from features import area, points, polygons
@@ -16,7 +18,8 @@ CLASSES = {kind: rank for rank, kinds in enumerate((
 ALIASES = {'象鼻山': ['象山', '水月洞'], '日塔': ['日月双塔'], '月塔': ['日月双塔'],
            '靖江王城': ['王城', '靖江王府', '独秀峰'], '叠彩山公园': ['叠彩山', '明月峰'],
            '伏波山公园': ['伏波山', '还珠洞'], '正阳门': ['王城正门'], '依仁路步行街': ['正阳路步行街'],
-           '正阳路': ['正阳路步行街'], '榕杉湖景区': ['两江四湖', '榕湖', '杉湖']}
+           '正阳路': ['正阳路步行街'], '榕杉湖景区': ['两江四湖', '榕湖', '杉湖'],
+           '桂林市中山中学漓滨校区': ['桂林市第九中学', '桂林九中', '九中']}
 
 
 def flat(curve):
@@ -48,6 +51,10 @@ def kind_of(tags):
 
 def write_atlas(output, extent, bounds, layers, footprints, peaks):
     roads, places, longest = [], [], {}
+    schools = {item['osm']:item for item in json.loads(Path(__file__).with_name('schools-g2.json').read_text())}
+    schools.update({'node/2597936160': {'name':'少年宫（地块待核）'},
+                    'node/3170011400': {'name':'回民小学（地块待核）'}})
+    school_centers, public_streets = {}, []
 
     def place(name, kind, point):
         record = dict(n=name, k=kind, x=round(point.x), z=round(point.y))
@@ -58,6 +65,10 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
     for element in load_osm():
         tags = element.get('tags', {})
         name = tags.get('name', '')
+        key = f"{element['type']}/{element['id']}"
+        if key in schools:
+            shape = (Point(ll2xz(element['lat'],element['lon'])) if element['type']=='node' else area(element)).intersection(bounds)
+            if not shape.is_empty: school_centers[key] = shape.centroid
         coords = points(element)
         highway = tags.get('highway','').removesuffix('_link')
         if highway in CLASSES and len(coords) >= 2:
@@ -74,6 +85,8 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
                 road = dict(n=name, c=CLASSES[highway], w=width if math.isfinite(width) and width > 0 else default, p=path)
                 if tags.get('bridge','no') != 'no': road['b'] = 1
                 roads.append(road)
+                if name and highway in ('residential','living_street','tertiary','secondary','pedestrian') and tags.get('access') not in ('private','no'):
+                    public_streets.append((name,line))
                 if name and (name not in longest or line.length > longest[name].length): longest[name] = line
         kind = kind_of(tags)
         if not kind or not name: continue
@@ -92,6 +105,10 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
         place(name,kind,point)
     for name,line in longest.items():
         place(name,'road',line.interpolate(.5,normalized=True))
+    for key,center in school_centers.items():
+        segments = [line for name,line in public_streets if key != 'way/675588260' or name == '漓滨路']
+        if segments:
+            place(schools[key]['name'],'school',nearest_points(center, min(segments,key=center.distance))[1])
 
     data = dict(extent=extent,roads=roads,places=places)
     for layer in ('water','green'):
