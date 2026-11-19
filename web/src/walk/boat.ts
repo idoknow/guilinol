@@ -744,7 +744,12 @@ export function createFreeBoats(env: BoatEnv) {
             blockedKindZ === 'bridge' || blockedKindZ === 'lock'
           if (blockedX && blockedZ && !hardBlock && wantSpeed > 0.05) {
             const ux = dx / stepLen, uz = dz / stepLen
-            const baseAngles = [Math.PI * 0.25, -Math.PI * 0.25, Math.PI * 0.38, -Math.PI * 0.38, Math.PI * 0.5, -Math.PI * 0.5]
+            const baseAngles = [
+              Math.PI * 0.25, -Math.PI * 0.25,
+              Math.PI * 0.40, -Math.PI * 0.40,
+              Math.PI * 0.55, -Math.PI * 0.55,
+              Math.PI * 0.72, -Math.PI * 0.72,
+            ]
             baseAngles.sort((a, b) => {
               const ax = ux * Math.cos(a) - uz * Math.sin(a), az = ux * Math.sin(a) + uz * Math.cos(a)
               const bx = ux * Math.cos(b) - uz * Math.sin(b), bz = ux * Math.sin(b) + uz * Math.cos(b)
@@ -753,18 +758,27 @@ export function createFreeBoats(env: BoatEnv) {
             for (const angOff of baseAngles) {
               const c = Math.cos(angOff), sOff = Math.sin(angOff)
               const rx = ux * c - uz * sOff, rz = ux * sOff + uz * c
-              const scale = Math.max(0.32, Math.cos(Math.min(Math.PI * 0.40, Math.abs(angOff))))
+              const scale = Math.max(0.35, Math.cos(Math.min(Math.PI * 0.38, Math.abs(angOff))))
               const cx = rx * stepLen * scale, cz = rz * stepLen * scale
-              const evalCorner = evaluateHull(spec, boatX + cx, boatZ + cz, heading, waterY, false)
+              const goalH = Math.atan2(-rx, -rz)
+              const hErr = Math.atan2(Math.sin(goalH - heading), Math.cos(goalH - heading))
+              const rotH = heading + Math.sign(hErr) * Math.min(Math.abs(hErr), 3.0 * sub)
+              let evalCorner = evaluateHull(spec, boatX + cx, boatZ + cz, heading, waterY, false)
+              let usedRot = false
+              if (!evalCorner.ok) {
+                evalCorner = evaluateHull(spec, boatX + cx, boatZ + cz, rotH, waterY, false)
+                usedRot = true
+              }
               if (evalCorner.ok) {
                 boatX += cx
                 boatZ += cz
+                if (usedRot) heading = rotH
                 targetWaterY = evalCorner.waterY
                 cachedFootprintClearance = evalCorner.footprintClearance
                 vx = cx / sub
                 vz = cz / sub
                 cornerSlid = true
-                cornerGlideHeading = Math.atan2(-rx, -rz)
+                cornerGlideHeading = goalH
                 break
               }
             }
@@ -779,20 +793,36 @@ export function createFreeBoats(env: BoatEnv) {
       const grazeKind = blockedX ? blockedKindX : blockedKindZ
       if (
         !hardBlocked &&
-        (blockedX !== blockedZ || cornerSlid) &&
+        (blockedX || blockedZ) &&
         (grazeKind === 'shallow' || grazeKind === 'obstacle') &&
         (inFwd > 0.05 || wantSpeed > 0.06)
       ) {
-        const glideHeading = cornerSlid
-          ? cornerGlideHeading
-          : blockedZ
-            ? ((Math.abs(wantVx) > 0.03 ? wantVx : postFwdX) >= 0 ? -Math.PI / 2 : Math.PI / 2)
-            : ((Math.abs(wantVz) > 0.03 ? wantVz : postFwdZ) >= 0 ? Math.PI : 0)
+        let glideHeading = heading
+        if (cornerSlid) {
+          glideHeading = cornerGlideHeading
+        } else if (blockedZ && !blockedX) {
+          glideHeading = (Math.abs(wantVx) > 0.03 ? wantVx : postFwdX) >= 0 ? -Math.PI / 2 : Math.PI / 2
+        } else if (blockedX && !blockedZ) {
+          glideHeading = (Math.abs(wantVz) > 0.03 ? wantVz : postFwdZ) >= 0 ? Math.PI : 0
+        } else {
+          // Deep 4m grid L-corner where translation is trapped until hull rotates toward open water.
+          let bestDot = -Infinity
+          for (const hCand of HEADING_STEPS) {
+            const fx = -Math.sin(hCand), fz = -Math.cos(hCand)
+            if (evaluateHull(spec, boatX + fx * 0.35, boatZ + fz * 0.35, hCand, waterY, false).ok) {
+              const dot = fx * postFwdX + fz * postFwdZ
+              if (dot > bestDot) {
+                bestDot = dot
+                glideHeading = hCand
+              }
+            }
+          }
+        }
         const err = Math.atan2(Math.sin(glideHeading - heading), Math.cos(glideHeading - heading))
         const steerIntent = -inRight * Math.sign(err || 1)
         if (Math.abs(err) > 0.04 && steerIntent >= -0.60) {
-          if (angVel * err < 0) angVel *= 0.35
-          const deflected = heading + Math.sign(err) * Math.min(Math.abs(err), 3.2 * sub)
+          if (angVel * err < 0) angVel *= 0.25
+          const deflected = heading + Math.sign(err) * Math.min(Math.abs(err), 3.4 * sub)
           const offX = blockedX && Math.abs(dx) > 1e-7 ? -Math.sign(dx) * 0.08 : 0
           const offZ = blockedZ && Math.abs(dz) > 1e-7 ? -Math.sign(dz) * 0.08 : 0
           const defEval = evaluateHull(spec, boatX, boatZ, deflected, waterY, false)
