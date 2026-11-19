@@ -3,6 +3,16 @@ import {chromium} from 'playwright'
 import {preview} from 'vite'
 
 const shots = {
+  guanyi_bridge: [
+    ['1361',[76,9.7,9],[45,10,15]], ['1362',[55,9.7,11],[49,12.3,17.3]],
+    ['1363',[-8,9.2,18],[45,6,155]], ['1364',[-39,7.7,-16],[28,9,-19]],
+  ],
+  guangxi_arts: [
+    ['1365',[-4,1.8,-34],[-18,3,-42]], ['1366',[-4,1.8,-36],[23,3,-41]],
+    ['1367',[-16,1.8,-25],[-10,3,-7]], ['1368',[-16,2,1],[-11,2,-5]],
+    ['1369',[17,2,-15],[10,4,6]], ['1370',[0,1.8,-43],[0,5.5,-16]],
+    ['1371',[-6,1.8,-36],[0,5,-18]], ['1372',[5,2,-32],[0,4.7,-18]],
+  ],
   yiwu_street: [
     ['1345',[-58,2.6,0],[20,2,0]], ['1346',[-45,2.8,-8.2],[-8,2,-8]],
     ['1347',[-34,2.7,-5.7],[-26,3.5,-10.5]], ['1350',[73,1.9,.3],[89,3.8,5.5]],
@@ -24,6 +34,7 @@ try {
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
   await page.addStyleTag({content:'body > :not(canvas):not(script){visibility:hidden} canvas{visibility:visible}'})
   for(const [id,views] of Object.entries(shots))for(const [name,eye,target,hour=12] of views){
+    if(process.env.LANDMARKS&&!process.env.LANDMARKS.split(',').includes(id))continue
     await page.evaluate(([id,eye,target,hour])=>{
       const {manifest,camera,clock}=window.viewer,entry=manifest.landmarks.find(item=>item.id===id)
       const angle=entry.rotation*Math.PI/180
