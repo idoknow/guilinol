@@ -66,7 +66,11 @@ def hall(model):
     for row in range(7):
         for col in range(10):
             z=-7+col*.85+(row%2)*.35
-            model.box(-12.3,surface.ground(-12.3,z)+row*.30,z,.35,.30,.87,'earth')
+            start=max(-7.435,z-.435)
+            end=min(1.085,z+.435)
+            model.ground_offset=surface.ground
+            model.box(-12.3,row*.30,(start+end)/2,.35,.30,end-start,'earth')
+    model.ground_offset=None
     for index in range(64):
         start,end=math.tau*index/64,math.tau*(index+1)/64
         points=[(radius*math.cos(angle),.42,-29+radius*math.sin(angle)) for radius,angle in [(3.85,start),(3.85,end),(4.25,end),(4.25,start)]]

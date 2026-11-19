@@ -20,6 +20,21 @@ def row(model, first, last, count, side, depth=6, arcade=False, gap=3.45,tall=Fa
         x, _, z = matrix[:3,3]
         matrix[1,3] = landmark_surface('wangcheng_market').ground(x,z)
         matrix[:3,0]*=pitch/7;matrix[:3,2]*=depth/5
+        surface = landmark_surface('wangcheng_market')
+        def grade(px,pz):
+            wx,wy,wz,_ = matrix @ [px,0,pz,1]
+            return surface.ground(wx,wz)-wy
+        corners = [grade(px,pz) for px in (-3.5,3.5) for pz in (-1.1,5)]
+        if min(corners)<-.10 or max(corners)>.20:
+            key=(*key,len(model.placements))
+            template=Model(model.detail)
+            shop(template,height,arcade)
+            # Solid and visible arrays share storage. Adjust each lower corner once.
+            for triangles in template.solid:
+                for point in triangles.reshape(-1,3):
+                    if abs(point[1])<1e-8:
+                        point[1]=grade(point[0],point[2])-.04
+            model.templates[key]=template
         model.placements.append((key,matrix))
         if key not in model.templates:
             template=Model(model.detail);shop(template,height,arcade);model.templates[key]=template

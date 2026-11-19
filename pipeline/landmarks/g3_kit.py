@@ -343,7 +343,7 @@ class Builder:
         if collide:
             self.solid_box(x, y0, z, w, h, d)
 
-    def cylinder_y(self, x, y0, h, z, r, region, sections=10, cap=True, collide=False):
+    def cylinder_y(self, x, y0, h, z, r, region, sections=10, cap=True, collide=False, bottom=False):
         y1 = y0 + h
         ring = [(x + r * math.cos(2 * math.pi * i / sections), z + r * math.sin(2 * math.pi * i / sections))
                 for i in range(sections)]
@@ -353,6 +353,8 @@ class Builder:
             x1, z1 = ring[j]
             self.face([(x0, y0, z0), (x1, y0, z1), (x1, y1, z1), (x0, y1, z0)],
                       ((x0 + x1) / 2 - x, 0, (z0 + z1) / 2 - z), region, tile=2.0)
+        if bottom:
+            self.face([(px,y0,pz) for px,pz in ring], (0,-1,0),region,tile=2.0)
         if cap:
             self.face([(px, y1, pz) for px, pz in ring[::-1]], (0, 1, 0), region, tile=2.0)
         if collide:

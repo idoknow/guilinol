@@ -159,8 +159,8 @@ def _street_facade(m: Builder, p0, p1, nx_sign, y0, ground_h, total_h, wall_mat,
         m.box(lx, -1.8, 0.20, 0.58, total_h + 1.8, 0.58, wall_mat, collide=True, footing=True)
         if i < bays:
             cx = lx + bay_w / 2.0
-            m.box(cx, 0.12, -0.04, bay_w - 0.68, 3.05, 0.20, 'glass')
-            m.box(cx, 0.12, 0.08, 0.14, 2.95, 0.14, 'dark')
+            m.box(cx, 0.12, -0.04, bay_w - 0.68, 3.05, 0.20, 'glass', footing=True)
+            m.box(cx, 0.12, 0.08, 0.14, 2.95, 0.14, 'dark', footing=True)
             if canopy:
                 m.box(cx, 3.08, 0.78, bay_w - 0.36, 0.15, 1.45, 'alum')
             m.box(cx, 3.32, 0.28, bay_w - 0.58, 0.88, 0.24, 'dark')
@@ -212,10 +212,10 @@ def _median_curve(m: Builder, world_line: LineString):
             continue
         yaw = math.atan2(dx, dz)
         mx, mz = (p0[0] + p1[0]) / 2.0, (p0[1] + p1[1]) / 2.0
-        y0 = m.surface.ground(mx,mz)
-        m.pose = (mx, y0, mz, yaw)
+        m.follow_grade = True
+        m.pose = (mx, 0, mz, yaw)
         # 1.48 m wide median curb stays strictly inside the paired-carriageway gap
-        m.box(0, -0.5, 0, 1.48, 0.72, seg_len + 0.15, 'beige', collide=True, footing=True)
+        m.box(0, -0.04, 0, 1.48, 0.26, seg_len + 0.15, 'beige', collide=True)
         m.box(0, 0.22, 0, 1.16, 0.56, max(0.5, seg_len - 0.3), 'hedge')
         m.box(0, 0.78, 0, 0.06, 0.36, max(0.5, seg_len - 0.5), 'alum')
         if m.detail:
@@ -225,6 +225,7 @@ def _median_curve(m: Builder, world_line: LineString):
                 m.cylinder_y(0, 0.76, 0.65, sz, 0.68, 'leaf' if k % 2 == 0 else 'hedge', sections=8)
                 if (i + k) % 2 == 1:
                     m.cylinder_y(0, 1.40, 0.34, sz, 0.48, 'red', sections=7)
+        m.follow_grade = False
         m.pose = (0.0, 0.0, 0.0, 0.0)
 
     n_lamps = max(1, int(world_line.length // 28.0))
@@ -249,8 +250,8 @@ def _planter_divider_curve(m: Builder, world_line: LineString):
             continue
         yaw = math.atan2(dx, dz)
         mx, mz = (p0[0] + p1[0]) / 2.0, (p0[1] + p1[1]) / 2.0
-        y0 = m.surface.ground(mx,mz)
-        m.pose = (mx, y0, mz, yaw)
+        m.follow_grade = True
+        m.pose = (mx, 0, mz, yaw)
         # Continuous redwood slat planter wall covering the outer lane stripe (0.64 m wide)
         m.box(0, -0.05, 0, 0.64, 0.67, seg_len, 'wood', collide=True)
         m.box(0, 0.62, 0, 0.70, 0.06, seg_len + 0.06, 'dark')
@@ -264,6 +265,7 @@ def _planter_divider_curve(m: Builder, world_line: LineString):
             m.box(0, 0.64, sz, 0.66, 0.20, 1.24, 'wood')
             m.box(0, 0.84, sz, 0.72, 0.05, 1.30, 'dark')
             m.cylinder_y(0, 0.86, 0.58, sz, 0.44, 'leaf' if k % 2 == 0 else 'hedge', sections=7)
+        m.follow_grade = False
         m.pose = (0.0, 0.0, 0.0, 0.0)
 
 

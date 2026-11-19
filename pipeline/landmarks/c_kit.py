@@ -509,6 +509,7 @@ def segment_wall(mesh, a, b, y0, y1, thick, region):
               (side[0], 0, side[1]), region, 1.3)
     mesh.face([(inner1[0], y0, inner1[1]), (inner0[0], y0, inner0[1]), (inner0[0], y1, inner0[1]), (inner1[0], y1, inner1[1])],
               (-side[0], 0, -side[1]), region, 1.3)
+    mesh.face([(p[0],y0,p[1]) for p in (inner0,inner1,outer1,outer0)], (0,-1,0),region,1.3)
     mesh.face([(outer0[0], y1, outer0[1]), (outer1[0], y1, outer1[1]), (inner1[0], y1, inner1[1]), (inner0[0], y1, inner0[1])],
               (0, 1, 0), region, 1.3)
 

@@ -109,6 +109,7 @@ def shop(builder, east, base, south, width, length, floors, kind):
         level=base+3.2
         coords=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)]
         if kind=='inn': coords=[(v,1-u) for u,v in coords]
+        box(stone,(face+.04,level,offset),(.5,high,span),'wood')
         stone.face([(face+.3,level-high/2,offset+span/2),(face+.3,level-high/2,offset-span/2),(face+.3,level+high/2,offset-span/2),(face+.3,level+high/2,offset+span/2)],(1,0,0),kind,uvs=coords)
 
 
@@ -151,8 +152,14 @@ def approach(builder):
     path=[(18,-30),(23,-45),(31,-60),(37,-76),(44,-93),(51,-110),(57,-126)]
     for index,(east,south) in enumerate(path):
         base = ground(east+5,south)+.12
+        start=len(mesh.pos)
         box(mesh,(east+5,base,south),(2.3,.24,2.3),'granite')
         banyan(mesh,(east+5,base+.12,south),9+index%3,4.9,77+index,builder.detail)
+        for i in range(start,len(mesh.pos)):
+            px,py,pz=mesh.pos[i]
+            outside=max(abs(px-east-5),abs(pz-south))>1.15
+            if abs(py-(base-.12))<.001 or (outside and abs(py-(base+.12))<.001):
+                mesh.pos[i]=(px,ground(px,pz)-.04,pz)
         for offset in range(7 if builder.detail else 3):
             scooter(mesh,east+5,ground,south+2+offset*.77,('steel','vermilion','cream')[offset%3])
     for index in range(6):

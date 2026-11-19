@@ -181,7 +181,7 @@ def gate(b: Builder):
     hip_roof(wall, (-15.2, 3.2), 7.05, 8.6, 7.8, 2.1, 0.7, 0.55, 'graytile', 'vermilion')
     if detail:
         for dx, yy, hh in ((-1.6, 2.1, 2.1), (1.6, 2.1, 2.1), (-1.6, 5.0, 1.35), (1.6, 5.0, 1.35)):
-            grille(wall, -15.2 + dx, yy, 7.1, 1.35, hh, 'lattice', 3)
+            grille(wall, -15.2 + dx, yy, 7.01, 1.35, hh, 'lattice', 3)
         arch_wall(wall, (-15.2, 0, 6.4), 2.4, 3.4, 0.5, 1.5, 2.6, 'yellow', 8)
         for i in range(12):
             box(wall, (-18.6 + i * 0.62, 7.35, 6.6), (0.1, 0.18, 1.4), 'graytile', 0.3)
@@ -194,7 +194,7 @@ def gate(b: Builder):
     box(wall, (6.05, deck + 1.55, 4.5), (0.42, 3.1, 4.6), 'yellow', 1.4)
     if detail:
         for x in (-3.6, -1.2, 1.2, 3.6):
-            grille(wall, x, deck + 1.9, 2.5, 1.2, 1.7, 'lattice', 3)
+            grille(wall, x, deck + 1.9, 5.285, 1.2, 1.7, 'lattice', 3)
     columns = 6 if detail else 4
     for i in range(columns):
         x = -4.4 + 8.8 * i / (columns - 1)
@@ -206,7 +206,7 @@ def gate(b: Builder):
     yaw_box(wall, (-0.78, 1.85, 8.7), (1.45, 3.5, 0.08), 0.55, 'door', None)
     yaw_box(wall, (0.78, 1.85, 8.7), (1.45, 3.5, 0.08), math.pi - 0.55, 'door', None)
     # 4.8 m plaque. At 10 m and a 60° view it covers ~27° , enough for the three characters.
-    wall.face([(east,level,10.75-.19*level) for east,level in ((-2.4,4.84),(2.4,4.84),(2.4,6.26),(-2.4,6.26))],(0,.19,1),'sign_gate',uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
+    wall.face([(east,level,10.71-.19*level) for east,level in ((-2.4,4.84),(2.4,4.84),(2.4,6.26),(-2.4,6.26))],(0,.19,1),'sign_gate',uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
     post = 0.7 if detail else 4.5
     railing(wall, (-6.4, 7.6), (-1.6, 7.6), deck, 0.95, 'ashlar', post, stone=True)
     railing(wall, (1.6, 7.6), (6.4, 7.6), deck, 0.95, 'ashlar', post, stone=True)

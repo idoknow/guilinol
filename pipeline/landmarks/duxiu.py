@@ -34,6 +34,7 @@ def rock_shelter(model, inscription):
                 end=row*samples+col;faces.extend([[end-samples-1,end-samples,end],[end-samples-1,end,end-1]])
     model.mesh(vertices,faces,np.asarray(colors,dtype=np.uint8))
     from shop_lettering import letters
+    model.box(0,.25,3.49,3.4,.85,1.44,'stone')
     letters(model,inscription,(0,.35,4.22),3.2,.65,'red')
     model.box(0,-4.45,7.15,11,.53,4.8,'pave',True)
     for step in range(4):model.box(0,-4.3,4.75-step*.44,8.8,.52+step*.14,.46,'granite',True)
@@ -42,7 +43,7 @@ def rock_shelter(model, inscription):
     model.box(0,-2.06,3.15,8.85,.085,.085,'tile')
     for east,base in ((-3.4,-.32),(-.9,-.23),(2.5,-.36)):
         front=3.98+.25*np.sin(east*.86+1.5)
-        model.box(east,base,front,.82,1.65,.14,'tile')
+        model.box(east,base,front-.64,.82,1.65,1.42,'tile')
         if model.detail:
             for line in range(4):
                 for column in (-.16,.12):model.box(east+column,base+.25+line*.31,front+.083,.085,.17,.035,'granite')
@@ -78,8 +79,18 @@ def summit(model):
     for index in range(steps):
         start,angle=tread(index/steps);end,_=tread((index+1)/steps)
         model.pose=(*((start+end)/2),angle);depth=np.linalg.norm((end-start)[[0,2]])+.12
-        support=2.1+3.6*math.sin(math.pi*index/steps)
-        model.box(-.65,-support,0,3.7,support+.29,depth+.35,'stone',True)
+        # At steep PK02 faces the inner edge of a tread can intersect a
+        # higher ledge. Move the retaining wall out until all four corners clear it.
+        cx,cy,cz,_=model.pose
+        c,s=math.cos(angle),math.sin(angle)
+        for reach in np.arange(0,40,.25):
+            px,pz=cx+c*reach,cz+s*reach
+            heights=[surface.ground(px+c*x-s*z,pz+s*x+c*z)
+                     for x in (-2.5,1.2) for z in (-(depth+.35)/2,(depth+.35)/2)]
+            if max(heights)<=cy+.18:
+                break
+        model.pose=(px,cy,pz,angle)
+        model.foundation(surface,-.65,-1,0,3.7,1.29,depth+.35,'stone')
         model.box(0,.23,0,2.5,.08,depth+.22,'granite',True)
         if model.detail and index%6==0:
             model.beam([1,.12,0],[1,1.25,0],.09,'stone')

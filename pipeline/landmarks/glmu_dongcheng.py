@@ -208,8 +208,8 @@ def build_glmu(b: Builder):
     _build_library_portal(b)
     b.footprint_building(HONGDE_671760495, floors=7, floor_h=3.6, wall='white', accent='terracotta', roof_kind='flat', roof_tile='silver_roof')
     prev = b.pose
-    b.pose = (30.2, 0.0, -144.5, -math.pi / 2)
-    b.sign_board(0, 23.2, 0.35, 6.4, 1.45, 'bld_hongde', backing='terracotta', depth=0.15)
+    b.pose = (30.29, 0.0, -144.5, -math.pi / 2 - .0101)
+    b.sign_board(0, 23.2, 0.08, 6.4, 1.45, 'bld_hongde', backing='terracotta', depth=0.15)
     b.pose = prev
     # '弘德善医' natural boulder in circular flowerbed in front of Hongde Building west plaza
     b.motto_stone(17.5, -153.5, -1.35, 'glmu_motto', w=4.8, h=2.55)
@@ -222,8 +222,8 @@ def build_glmu(b: Builder):
     b.footprint_building(OV_WEST_QUAD, floors=5, floor_h=3.50, wall='cream', accent='terracotta', roof_kind='flat', roof_tile='gray_tile', holes=[WEST_COURTYARD])
     b.cylinder_y(-45.0, 0.0, 8.6, -92.0, 10.2, 'terracotta', sections=8, collide=True)
     b.cylinder_y(-45.0, 8.6, 0.55, -92.0, 10.7, 'white', sections=8)
-    b.pose = (-34.0, 0.0, -150.5, math.pi)
-    b.sign_board(0, 19.6, 0.35, 6.2, 1.35, 'bld_kejiao', backing='terracotta', depth=0.14)
+    b.pose = (-34.0, 0.0, -141.22, math.pi-.0021)
+    b.sign_board(0, 19.6, 0.08, 6.2, 1.35, 'bld_kejiao', backing='terracotta', depth=0.14)
     b.pose = (0.0, 0.0, 0.0, 0.0)
 
     # 6. All 7 West Dormitory & University OSM buildings (exact polygons)
@@ -240,8 +240,8 @@ def build_glmu(b: Builder):
     b.flagpole_plinth(-5.8, -19.5, 0.0, poles=3, height=13.5)
     # Tall white water tower visible in ref #02 NW of track
     b.cylinder_y(-33.5, 0.0, 23.5, -2.5, 1.55, 'white', sections=10, collide=True)
-    b.cylinder_y(-33.5, 23.5, 3.8, -2.5, 3.9, 'white', sections=12)
-    b.cylinder_y(-33.5, 27.3, 0.8, -2.5, 4.2, 'terracotta', sections=12)
+    b.cylinder_y(-33.5, 23.5, 3.8, -2.5, 3.9, 'white', sections=12, bottom=True)
+    b.cylinder_y(-33.5, 27.3, 0.8, -2.5, 4.2, 'terracotta', sections=12, bottom=True)
 
     # 8. NW Sports Courts (way/671760725, 671760840, 671763132)
     b.basketball_court(-62.3, -216.5, 0.0, surface='court_green', apron='track_red', y0=0.05)

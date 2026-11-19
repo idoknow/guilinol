@@ -143,7 +143,7 @@ def _guardrail_run(m: Builder, p0, p1):
     m.box(0, 0.05, 0, 0.12, 0.93, length, 'alum', collide=True)
     if m.detail:
         m.box(0, 0.92, 0, 0.09, 0.07, length, 'alum')
-        m.box(.061, .22, 0, .018, .05, length-.06, 'alum')
+        m.box(0, .05, 0, .15, .22, length, 'alum')
         for i in range(segs + 1):
             lz = -length / 2.0 + i * (length / segs)
             m.box(0, 0.0, lz, 0.18, 1.02, 0.12, 'dark')
@@ -258,7 +258,7 @@ def build_shizijie(m: Builder):
     m.cylinder_y(-24.5, 4.8, 22.4, -46.0, 9.6, 'glass', sections=16 if m.detail else 8, collide=True)
     m.cylinder_y(-24.5, 27.2, 2.2, -46.0, 8.8, 'white', sections=16 if m.detail else 8)
     m.pose = (-24.5, 27.5, -46.0, math.atan2(1.0, 1.1))
-    m.box(0, 0, 8.95, 6.6, 1.65, 0.24, 'dark')
+    m.box(0, 0, 8.43, 6.6, 1.65, 1.28, 'dark')
     m.sign_quad(0, 0.05, 9.10, 6.4, 1.55, 'nanfang_roof')
     m.pose = (0.0, 0.0, 0.0, 0.0)
     _commercial_strip(m, (-84.57, -42.86), (-44.98, -33.52), 1, 4.8, 25.2, 'white', 0, 7)

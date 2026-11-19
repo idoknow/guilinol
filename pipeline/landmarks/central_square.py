@@ -137,7 +137,7 @@ def _karst_stele(m: Builder, cx, cz, yaw):
 def _fire_station(m: Builder, cx, cz, yaw):
     """2-storey Guilin Central Square Fire Rescue Station (2026 Commons 00..02-2026.jpg)."""
     m.pose = (cx, 0.0, cz, yaw)
-    m.box(0, -1.5, 0, 15.6, 9.9, 10.5, 'alum', collide=True)
+    m.box(0, -1.5, 0, 15.6, 9.9, 10.5, 'alum', collide=True, footing=True)
     m.box(0, 4.22, 5.30, 15.8, 1.26, 0.22, 'dark')
     m.sign_quad(0, 4.24, 5.44, 15.6, 1.22, 'fire_fascia')
     m.box(-4.8, 0.1, 5.26, 4.4, 4.05, 0.12, 'terra')
@@ -296,7 +296,7 @@ def build_central_square(m: Builder):
     m.mesh(crown_v, [[0, 4, 5], [0, 5, 1], [1, 5, 2], [2, 5, 4], [2, 4, 3], [3, 4, 0]], 'roof')
 
     for st in range(7):
-        m.box(0, st * 0.17, 29.8 - st * 0.65, 24.0, 0.18, 0.72, 'pave', collide=True)
+        m.box(0, 0, 29.8 - st * 0.65, 24.0, st * 0.17 + 0.18, 0.72, 'pave', collide=True, footing=True)
     for side in (-1, 1):
         m.box(side * 13.8, 0.0, 26.5, 6.4, 20.2, 6.2, 'alum', collide=True)
         m.box(side * 13.8, 1.2, 29.7, 4.2, 3.6, 0.25, 'dark')

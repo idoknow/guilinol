@@ -135,7 +135,9 @@ def island(b):
             if b.detail:
                 for node in (2.2,3.5):
                     spray=(east+math.cos(angle),node+.45,south+math.sin(angle))
-                    tube(wall,(east,node,south),spray,.035,'foliage',4)
+                    fraction=(node-.235)/(tip[1]-.235)
+                    joint=(east+fraction*(tip[0]-east),node,south+fraction*(tip[2]-south))
+                    tube(wall,joint,spray,.035,'foliage',4)
                     for direction in (-1,1):
                         leaf,spray_y,stem_z=spray
                         wall.face([spray,(leaf+.22*direction,spray_y+.16,stem_z+.14),(leaf+.54*direction,spray_y-.05,stem_z+.28),(leaf+.19*direction,spray_y+.01,stem_z+.1)],(0,1,0),'foliage')
@@ -183,6 +185,8 @@ def island(b):
 def island_corridor(b, x,y,z,deck):
     wall, lit = b.parts['atlas'], b.parts['lit']
     for east in (x-4,x-1,x+2):
+        box(wall,(east,y+2.85,z+1.32),(.12,.12,.5),'wood')
+        cylinder(wall,(east,3.02,z+1.48),.04,y+2.85-3.02,'steel',6)
         cylinder(lit,(east,2.64,z+1.48),.21,.38,'vermilion',8)
     radius = 3.15
     pad = []
@@ -221,10 +225,10 @@ def library(b):
     rear = [(x+east,z+south) for east,south in rear]
     extrude(wall,rear,y,y+10.8,'cream')
     if b.collide:extrude(b.hit,rear,y,y+10.8,'cream')
-    angle = math.radians(-19.13)
+    building_angle = math.radians(-19.13)
     def grade(east,south):
         dx,dz=east-x,south-z
-        return ground(x+dx*math.cos(angle)+dz*math.sin(angle),z-dx*math.sin(angle)+dz*math.cos(angle))
+        return ground(x+dx*math.cos(building_angle)+dz*math.sin(building_angle),z-dx*math.sin(building_angle)+dz*math.cos(building_angle))
     annex = grade(-66,-61)
     box(wall,(-66,annex+4,-61),(9,8.0,13),'yellow')
     hip_roof(wall,(-66,-61),annex+8.0,9.2,13.4,2.1,.6,.22,'graytile','wood')
@@ -250,11 +254,11 @@ def library(b):
         box(wall,(x+direction*9,y+.75,z+5.4),(5.2,.32,1.9),'foliage')
         for plant in range(9 if b.detail else 4):
             oval(wall,(x+direction*9+2*math.cos(plant*2.4),y+1,z+5.4+.55*math.sin(plant*2.4)),(.4,.25,.37),'foliage',6)
-    solid_tree(wall,(x-14,y,z+9),16,12.6,54,b.detail)
+    solid_tree(wall,(x-14,grade(x-14,z+9),z+9),16,12.6,54,b.detail)
     box(wall,(x+17,y+1.1,z+9),(8.4,2.2,.45),'white')
     for index in range(7):
         east=x+14+index*.95
-        front=z+9.29
+        front=z+9.225
         oval(wall,(east,y+1.67,front),(.16,.22,.14),'granite',8)
         oval(wall,(east,y+1.22,front),(.27,.37,.17),'cream',8)
         for sign in (-1,1):
@@ -272,7 +276,7 @@ def library(b):
     wall.face([(x + 8.6, y + 8.9, z + 2.3), (x - 8.6, y + 8.9, z + 2.3), (x, y + 12.4, z + 2.3)], (0, 0, -1), 'cream', None)
     wall.face([(x - 8.6, y + 8.9, z + 3.15), (x, y + 12.4, z + 3.15), (x, y + 12.4, z + 2.3), (x - 8.6, y + 8.9, z + 2.3)], (-1, 1, 0), 'cream', None)
     wall.face([(x + 8.6, y + 8.9, z + 2.3), (x, y + 12.4, z + 2.3), (x, y + 12.4, z + 3.15), (x + 8.6, y + 8.9, z + 3.15)], (1, 1, 0), 'cream', None)
-    center=(x,y+10.45,z+3.55)
+    center=(x,y+10.45,z+3.17)
     tips=[]
     for index in range(10):
         angle=math.pi/2+index*math.pi/5
@@ -423,10 +427,11 @@ def glass_bridge(builder):
 def shore(b):
     wall = b.parts['atlas']
     for south in (-27.4,-20.6):
-        box(wall,(-116,.7,south),(2.3,3.8,1.85),'white')
-        box(wall,(-116,-.84,south),(2.8,.82,2.36),'ashlar')
-        if b.collide:
-            solid(b.hit,(-116,.7,south),(2.3,3.8,1.85),'ashlar')
+        corners=[(-116+dx,south+dz) for dx,dz in ((-1.4,-1.18),(1.4,-1.18),(1.4,1.18),(-1.4,1.18))]
+        plinth=max(ground(px,pz) for px,pz in corners)+.18
+        for mesh in ([wall,b.hit] if b.collide else [wall]):
+            bank_strip(mesh,corners,lambda px,pz: plinth,'ashlar')
+            box(mesh,(-116,(2.6+plinth)/2,south),(2.3,2.6-plinth,1.85),'white')
     for index in range(24):
         angles=[step*math.pi/24 for step in (index,index+1)]
         def arc(face,radius):
@@ -443,6 +448,7 @@ def shore(b):
         for side in (-1,1):
             box(wall,(east,level,south+side*1.79),(5,.4,2.18),'granite')
             box(wall,(east,level+.16,south+side*.75),(5,.22,.15),'white')
+        box(wall,(east,level-.08,south),(5,.18,1.55),'granite')
         box(wall,(east,level+.03,south),(5,.08,1.4),'rill_water')
         for offset in (-1.3,1.3):
             box(wall,(east+offset,level+.17,south),(.63,.32,.6),'ashlar')
@@ -460,6 +466,7 @@ def shore(b):
     for i in range(6):
         angle = i*math.tau/6
         cylinder(wall,(px+2.25*math.cos(angle),level,pz+2.25*math.sin(angle)),.19,3,'vermilion',8)
+    cylinder(wall,(px,level+2.94,pz),2.8,.24,'wood',6)
     hip_roof(wall,(px,pz),level+3,5.3,5.3,2,.7,.5,'graytile','vermilion',tiers=2,sides=6)
     for first, last in ((-36,-2.2),(2.2,72)):
         count = math.ceil((last-first)/1.6)
