@@ -1,4 +1,6 @@
 [
+ {"id":"chuanshan_tourism","name":"桂林市旅游职业中等专业学校（穿山校区）","osm":["way/647468198"],"group":"G4","viewOnly":true,"refs":[{"title":"Guilin Vocational Secondary School of Tourism, Chuanshan campus","year":2024,"page":"https://commons.wikimedia.org/wiki/File:Guilin_Vocational_Secondary_School_of_Tourism,_Chuanshan_campus_(20240217164236).jpg","viewOnly":true}]},
+ {"id":"guilin_technical","name":"桂林技师学院","osm":["way/646911647"],"group":"G4","viewOnly":true,"refs":[{"title":"学院正门（桂林技师学院官网校园风光）","page":"https://gljsxy.com/info/image-6.html","viewOnly":true}]},
  {"id":"guilin_thirteen","name":"桂林市第十三中学","osm":["way/669069474"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},
  {"id":"lequn_primary","name":"乐群小学","osm":["way/684946203"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},
  {"id":"baoxian_school","name":"宝贤中学","osm":["way/669065609"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},
