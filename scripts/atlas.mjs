@@ -20,6 +20,19 @@ assert.equal(atlas.search('象鼻',1)[0].n,'象鼻山')
 assert.ok(atlas.search('双塔').some(place=>['日塔','月塔'].includes(place.n)))
 assert.equal(atlas.search('王城')[0].n,'靖江王城')
 assert.equal(atlas.search('解放桥')[0].k,'bridge')
+for(const [query,name,road] of [
+  ['桂林医科大学','桂林医科大学（东城校区）','环城北二路'],
+  ['理工大附小','桂林理工大学附属小学','建干路'],
+  ['田家炳','桂林市田家炳中学','屏风路'],
+  ['辰山小学','桂林市辰山小学',null],
+  ['漓江小学','漓江小学','芳香路'],
+  ['龙隐小学','龙隐小学','七星路'],
+]) {
+  const hit=atlas.search(query)[0]
+  assert.equal(hit?.n,name)
+  assert.equal(hit?.k,'school')
+  if(road) assert.equal(atlas.roadAt(hit.x,hit.z,30)?.name,road)
+}
 const junction=atlas.roadAt(-881,-165)?.name
 assert.ok(['中山中路','解放东路','解放西路'].includes(junction))
 const river=atlas.roadAt(-1205,2740)

@@ -2952,5 +2952,136 @@
     "viewOnly": true
    }
   ]
+ },
+ {
+  "id": "longyin_primary",
+  "name": "龙隐小学",
+  "osm": [
+   "way/1027048356"
+  ],
+  "group": "M2.7-G3",
+  "viewOnly": true,
+  "refs": [
+   {
+    "title": "桂林龙隐小学",
+    "page": "http://baike.baidu.com/item/%E6%A1%82%E6%9E%97%E9%BE%99%E9%9A%90%E5%B0%8F%E5%AD%A6/15502397",
+    "image": "https://img1.baidu.com/it/u=2791811887,1908579545&fm=253&fmt=auto&app=138&f=JPEG?w=836&h=500",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市龙隐小学",
+    "page": "http://baike.baidu.com/item/%E6%A1%82%E6%9E%97%E5%B8%82%E9%BE%99%E9%9A%90%E5%B0%8F%E5%AD%A6/8836710",
+    "image": "https://bkimg.cdn.bcebos.com/pic/7e3e6709c93d70cf941b8f9cf8dcd100bba12bb9",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市龙隐小学启动青蓝结对活动:传承与成长的旅程",
+    "page": "http://baijiahao.baidu.com/s?id=1837122729649566785&wfr=spider&for=pc",
+    "image": "https://pic.rmb.bdstatic.com/bjh/news/c799fb6002fbaeb0f9f2ae3cc9962435.png",
+    "viewOnly": true
+   },
+   {
+    "title": "提升校园安全防护能力 ——桂林市龙隐小学开展 2025 年防恐防暴应急",
+    "page": "http://www.163.com/dy/article/JQ0FOQV60514WM2J.html",
+    "image": "https://img2.baidu.com/it/u=409520560,1112986450&fm=253&fmt=auto&app=120&f=JPEG?w=627&h=470",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林龙隐小学开学日",
+    "page": "https://mbd.baidu.com/newspage/data/dtlandingsuper?nid=dt_2599084788098658533",
+    "image": "https://b0.bdstatic.com/ugc/N5-KMajwohNiaP3HF9XJ6Ac2d1a8b13e448ad5a4420b08a1d47039.jpg@h_1280",
+    "viewOnly": true
+   },
+   {
+    "title": "龙隐开学准备带上理想和目标踏上新征程桂林市龙隐小学2022年春季学期",
+    "page": "http://dy.163.com/article/H0MOSR8C0514WM2J.html",
+    "image": "https://nimg.ws.126.net/?url=http%3A%2F%2Fdingyue.ws.126.net%2F2022%2F0221%2F2856e155j00r7m77r0047d200qo00k0g00qo00k0.jpg&thumbnail=660x2147483647&quality=80&type=jpg",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市龙隐小学举行少先队大队委员竞选大会",
+    "page": "http://www.sohu.com/a/1091037164_120981214",
+    "image": "https://q6.itc.cn/q_70/images03/20261022/0d4ba5c0b706412b8ab70a2b8173ebc7.jpeg",
+    "viewOnly": true
+   },
+   {
+    "title": "龙娃竞技青春赛场 龙隐精神绿地飞扬 ——桂林市龙隐小学2020年秋季",
+    "page": "http://www.sohu.com/a/426677617_777826",
+    "image": "https://p0.itc.cn/q_70/images03/20201023/203490a2f94d4e7d918f307430210fca.jpeg",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市龙隐小学诚聘英才_手机搜狐网",
+    "page": "http://m.sohu.com/a/429276219_777826/",
+    "image": "https://p8.itc.cn/q_70/images03/20201103/de570bdd7e97451fab71b3114bddb9ad.jpeg",
+    "viewOnly": true
+   },
+   {
+    "title": "教师心灵重启:桂林市龙隐小学举办新学期心理团辅活动",
+    "page": "http://baijiahao.baidu.com/s?id=1848247317635539719&wfr=spider&for=pc",
+    "image": "https://pic.rmb.bdstatic.com/bjh/news/4b81e665990dd643a6518ed9560d3718.png",
+    "viewOnly": true
+   },
+   {
+    "title": "防控应急进校园 万众一心控疫情 ——桂林市龙隐小学疫情防控应急演练",
+    "page": "http://www.sohu.com/a/383079175_777826",
+    "image": "https://5b0988e595225.cdn.sohucs.com/images/20200325/520442648dd740099ed11fddc7bbbc5f.jpeg",
+    "viewOnly": true
+   },
+   {
+    "title": "驰骋赛场 奋勇争先——桂林市龙隐小学2024年秋季田径运动会",
+    "page": "http://www.163.com/dy/article/JEFJ69D60514WM2J.html",
+    "image": "https://img1.baidu.com/it/u=3637055725,3979191610&fm=253&fmt=auto&app=120&f=JPEG?w=626&h=448",
+    "viewOnly": true
+   },
+   {
+    "title": "驰骋赛场竞风华——桂林市龙隐小学(龙隐校区)2026年秋季运动会顺利",
+    "page": "http://www.163.com/dy/article/L8T7OM460514WM2J.html",
+    "image": "https://img0.baidu.com/it/u=1943884049,3014956246&fm=253&fmt=auto&app=120&f=JPEG?w=627&h=418",
+    "viewOnly": true
+   },
+   {
+    "title": "勇敢龙娃赛自我 奋勇超越燃梦想——桂林市龙隐小学2021年秋季运动会",
+    "page": "http://www.163.com/dy/article/GLRS200E0514WM2J.html",
+    "image": "https://img2.baidu.com/it/u=685525020,3097918421&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=667",
+    "viewOnly": true
+   },
+   {
+    "title": "龙隐小学民族运动会:把课堂搬到操场,把民族融进童年",
+    "page": "http://baijiahao.baidu.com/s?id=1862442245291634913&wfr=spider&for=pc",
+    "image": "https://pic.rmb.bdstatic.com/bjh/news/a60dd9ba8901ecee8cdb2f12fc01375f.png",
+    "viewOnly": true
+   },
+   {
+    "title": "享受运动赛出自我桂林市龙隐小学2020年秋季田径运动会赛况系列报道",
+    "page": "http://www.163.com/dy/article/FPLHP5IM0514WM2J.html",
+    "image": "https://img2.baidu.com/it/u=1448251157,3244210409&fm=253&fmt=auto&app=138&f=JPEG?w=500&h=667",
+    "viewOnly": true
+   },
+   {
+    "title": "龙隐小学民族运动会:把课堂搬到操场,把民族融进童年",
+    "page": "http://baijiahao.baidu.com/s?id=1862442245291634913&wfr=spider&for=pc",
+    "image": "https://pic.rmb.bdstatic.com/bjh/news/8611b0784deab7e3b583e472bdf3739a.png",
+    "viewOnly": true
+   },
+   {
+    "title": "龙隐小学民族运动会:把课堂搬到操场,把民族融进童年",
+    "page": "http://baijiahao.baidu.com/s?id=1862442245291634913&wfr=spider&for=pc",
+    "image": "https://pic.rmb.bdstatic.com/bjh/news/bfc9459d861561996dbec9466a8b6a42.png",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市龙隐小学诚聘英才 桂林市龙隐小学诚聘英才",
+    "page": "http://www.sohu.com/a/326104083_777826",
+    "image": "https://1714209209,1596374492",
+    "viewOnly": true
+   },
+   {
+    "title": "【博雅少年】骐骥追风,龙跃新程——桂林市龙隐小学春季注册日温情",
+    "page": "http://edu.guilinlife.com/index.php?s=/news/content/id/3364",
+    "image": "https://fm.glshimg.com/image/2026/0303/5c5b1760fccd7c50f506ded31b0aa17b.jpg",
+    "viewOnly": true
+   }
+  ]
  }
 ]

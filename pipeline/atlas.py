@@ -21,7 +21,8 @@ ALIASES = {'象鼻山': ['象山', '水月洞'], '日塔': ['日月双塔'], '�
            '桂林理工大学附属小学': ['理工大附小', '理工附小', '桂工附小'],
            '桂林市田家炳中学': ['田家炳中学', '桂林四中', '桂林市第四中学'],
            '桂林市辰山小学': ['辰山小学'],
-           '漓江小学': ['桂林市漓江小学', '七星区漓江小学', '桂林市七星区漓江小学']}
+           '漓江小学': ['桂林市漓江小学', '七星区漓江小学', '桂林市七星区漓江小学'],
+           '龙隐小学': ['桂林市龙隐小学', '七星区龙隐小学']}
 
 
 def flat(curve):
@@ -102,6 +103,7 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
     place('桂林市田家炳中学', 'school', Point(1032, -965))
     place('桂林市辰山小学', 'school', Point(1110, -2413))
     place('漓江小学', 'school', Point(1111, 102))
+    place('龙隐小学', 'school', Point(835, 1106))
 
     data = dict(extent=extent,roads=roads,places=places)
     for layer in ('water','green'):
