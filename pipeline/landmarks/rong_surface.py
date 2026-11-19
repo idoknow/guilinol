@@ -39,3 +39,10 @@ def shoreline_z(x):
         if water(x, z) is None:
             return z-1
     raise ValueError(f'Missing north bank at {x}')
+
+
+def island_top():
+    level = water(98.8,137.6)
+    if level is None:
+        raise ValueError('Missing water beside the Ronghu island pavilion')
+    return level+.85

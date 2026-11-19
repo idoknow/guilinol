@@ -3,7 +3,7 @@ import math
 import numpy as np
 
 from c_kit import box, cylinder, tube, yaw_box, ramp
-from rong_surface import ground, bank_top
+from rong_surface import ground, bank_top, island_top
 from rong_solids import oval, banyan
 
 
@@ -72,7 +72,7 @@ def crossing(builder,path,widths,heights,arch_segment=None):
 
 def nine_bends(builder):
     lengths = np.r_[0, np.cumsum(np.linalg.norm(np.diff(NINE_BENDS,axis=0),axis=1))]
-    near, far = [bank_top(*p) for p in (NINE_BENDS[0],NINE_BENDS[-1])]
+    near, far = bank_top(*NINE_BENDS[0]), island_top()
     crossing(builder,NINE_BENDS,[2.8,2.8,2.8,2.8,4.2,4.2,2.8,2.8,2.8,2.8],
              near+(far-near)*lengths/lengths[-1],5)
 

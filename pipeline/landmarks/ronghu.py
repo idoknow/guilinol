@@ -17,7 +17,7 @@ import math
 import random
 import sys
 from rong_bridges import nine_bends, ancient_bridge
-from rong_surface import ground, water, bank_top, bank_strip, shoreline_z
+from rong_surface import ground, water, bank_top, bank_strip, shoreline_z, island_top
 from rong_street import scooter
 from rong_solids import oval, torus, banyan as solid_tree
 from rong_solids import banyan, align_front
@@ -68,14 +68,11 @@ def island(b):
     x, y, z = 98.8, 0.3, 137.6
     deck = y + 0.85
     bank = [(121.57, 120.07), (129.25, 120.5), (133.71, 112.64), (136.39, 108.83), (143.94, 110.85), (150.4, 113.19), (151.31, 117.09), (152.91, 119.96), (155.49, 123.16), (157.69, 127.5), (155.77, 128.08), (154.81, 133.6), (158.65, 136.84), (162.95, 142.03), (166.5, 148.68), (168.34, 154.07), (171.37, 154.24), (170.89, 158.71), (167.96, 159.17), (166.4, 158.39), (164.79, 161.26), (166.24, 164.12), (169.49, 167.52), (172.55, 167.07), (173.69, 171.8), (154.23, 176.66), (153.14, 170.79), (162.11, 168.87), (162.0, 167.63), (155.98, 167.3), (148.82, 166.73), (140.88, 165.72), (136.62, 162.72), (133.61, 165.72), (130.9, 165.83), (129.87, 164.03), (126.42, 164.09), (122.94, 165.15), (121.62, 164.09), (119.13, 160.66), (111.45, 154.95), (107.61, 155.51), (105.5, 153.22), (107.61, 144.27), (101.14, 140.47), (99.67, 142.49), (94.68, 139.1), (98.79, 133.03), (100.9, 134.17), (110.34, 118.02)]
-    levels = [level for x, z in bank if (level := water(x, z)) is not None]
-    lake = min(levels)
-    # IMG_1323 shows a low exposed stone course at the pavilion and a rising garden.
-    island_top = max(lake + 0.85, ground(135, 146))
-    lift = island_top - .24
-    bank_strip(wall, bank, lambda x, z: island_top, 'rubble')
+    top = island_top()
+    lift = top - .24
+    bank_strip(wall, bank, lambda x, z: top, 'rubble')
     if b.collide:
-        bank_strip(b.hit, bank, lambda x, z: island_top, 'ashlar')
+        bank_strip(b.hit, bank, lambda x, z: top, 'ashlar')
     starts = [(m, len(m.pos)) for m in [*b.parts.values(), b.hit]]
     for east in range(117,153,2):
         for south in (141,143,145,147,149,151):
@@ -125,8 +122,16 @@ def island(b):
         box(wall,(122+index*.32,.43,148),( .30,.30,2),'wood')
     with align_front(b, (x,z), 55.92):
         island_corridor(b, x,y,z,deck)
+    banyan(wall, (113,.24,136), 12, 9, 21, b.detail)
+    banyan(wall, (117,.24,147), 10, 7.5, 22, b.detail)
     for mesh, start in starts:
         mesh.pos[start:] = [(x, y+lift, z) for x, y, z in mesh.pos[start:]]
+
+    angle = math.radians(55.92)
+    toe = [(x+dx*math.cos(angle)+dz*math.sin(angle), z-dx*math.sin(angle)+dz*math.cos(angle))
+           for dx,dz in ((-6,-1.55),(3.5,-1.55),(3.5,1.55),(-6,1.55))]
+    for mesh in ([wall,b.hit] if b.collide else [wall]):
+        bank_strip(mesh,toe,lambda x,z: top+.39,'ashlar')
 
 
 def island_corridor(b, x,y,z,deck):
@@ -155,8 +160,6 @@ def island_corridor(b, x,y,z,deck):
         box(lit, (cx, y + 1.85, z - 1.15), (1.15, 1.7, 0.06), 'glass', None)
         box(lit, (cx, y + 1.85, z + 1.15), (1.15, 1.7, 0.06), 'glass', None)
     hip_roof(wall, (x - 1.2, z), y + 3.15, 9.6, 3.5, 1.25, 0.55, 0.5, 'graytile', 'vermilion')
-    banyan(wall, (x - 8, y, z - 6), 12, 9, 21, b.detail)
-    banyan(wall, (x + 10, y, z - 7), 10, 7.5, 22, b.detail)
     if b.collide:
         solid(b.hit, (x + 4.2, y + 0.42, z), (7.2, 0.85, 7.2), 'ashlar')
         solid(b.hit, (x - 1.2, y + 0.3, z), (9.4, 0.2, 3.0), 'ashlar')
@@ -357,15 +360,16 @@ def shore(b):
             wall.face(arc(-117.15,radius)+arc(-114.85,radius)[::-1],(0,side*math.sin(angles[0]),side*math.cos(angles[0])),'white')
     for index in range(10):
         east=-82+index*5
-        level=bank_top(east,-16)+.20
+        south=min(-16,shoreline_z(east)-3.5)
+        level=ground(east,south)+.20
         for side in (-1,1):
-            box(wall,(east,level,-16+side*1.79),(5,.4,2.18),'granite')
-            box(wall,(east,level+.16,-16+side*.75),(5,.22,.15),'white')
-        box(wall,(east,level+.03,-16),(5,.08,1.4),'rill_water')
+            box(wall,(east,level,south+side*1.79),(5,.4,2.18),'granite')
+            box(wall,(east,level+.16,south+side*.75),(5,.22,.15),'white')
+        box(wall,(east,level+.03,south),(5,.08,1.4),'rill_water')
         for offset in (-1.3,1.3):
-            box(wall,(east+offset,level+.17,-16),(.63,.32,.6),'ashlar')
+            box(wall,(east+offset,level+.17,south),(.63,.32,.6),'ashlar')
         if index in (0,3):
-            solid_tree(wall,(east,level,-21),9,5,90+index,b.detail,lobed=False)
+            solid_tree(wall,(east,ground(east,south-5),south-5),9,5,90+index,b.detail,lobed=False)
     px, pz = -46, shoreline_z(-46)-2
     outline = [(px+3*math.cos(i*math.tau/6), pz+3*math.sin(i*math.tau/6)) for i in range(6)]
     level = max(bank_top(x,z) for x,z in outline)
