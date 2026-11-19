@@ -11,7 +11,8 @@ from scipy.sparse.csgraph import connected_components
 import shapely
 import trimesh
 
-from grounding_fixtures import CRAFT, ENDS, PIERS
+from grounding_contacts import crossing_joints
+from grounding_fixtures import CRAFT, ENDS, PIERS, ronghu_footings
 from landmarks.world_surface import LandmarkSurface, Surface, WORLD
 
 ROOT = WORLD.parent.parent
@@ -42,26 +43,17 @@ def assemblies(vertices, faces, component, count):
         bonds.extend(zip(component[v[touching]],component[faces[f[touching],0]]))
     i,j = np.asarray(bonds, dtype=int).reshape(-1,2).T
     graph = coo_matrix((np.ones(len(i),dtype=bool),(i,j)),shape=(count,count))
-    return connected_components(graph,directed=False)[1]
+    n, joints=connected_components(graph,directed=False)
+    penetrating=crossing_joints(tris,joints[component[faces[:,0]]],n)
+    return penetrating[joints]
 
 
 
-def bearing_components(vertices,component,assembly,low):
-    """Associate detached cladding with the lower assembly that encloses its plan."""
-    group = assembly[component]
-    n = group.max()+1
-    floor = np.full(n,np.inf)
-    np.minimum.at(floor,assembly,low)
-    indices = np.split(np.argsort(group),np.cumsum(np.bincount(group))[:-1])
-    # A hull across the whole scene would combine separate buildings. Use only
-    # shells that already meet in 3D, then require full footprint containment.
-    shells = np.asarray([shapely.convex_hull(shapely.multipoints(vertices[i,::2])) for i in indices])
-    tree = shapely.STRtree(shells)
-    outer,inner = tree.query(shells,predicate='covers')
-    above = floor[inner] > floor[outer]+BEARING_BAND
-    local_floor = floor.copy()
-    np.minimum.at(local_floor,inner[above],floor[outer[above]])
-    return low <= local_floor[assembly]+BEARING_BAND
+def bearing_components(assembly, low):
+    """Compare each block with the lowest block physically joined to it."""
+    floor = np.full(assembly.max()+1, np.inf)
+    np.minimum.at(floor, assembly, low)
+    return low <= floor[assembly]+BEARING_BAND
 
 
 def measurements(model, surface):
@@ -74,7 +66,7 @@ def measurements(model, surface):
     low = np.full(count, np.inf)
     np.minimum.at(low, component, vertices[:, 1])
     assembly = assemblies(vertices, faces, component, count)
-    bearing = bearing_components(vertices,component,assembly,low)
+    bearing = bearing_components(assembly, low)
     craft = np.full(count,-1)
     centers = np.column_stack([np.bincount(component,weights=vertices[:,axis])/np.bincount(component)
                                for axis in (0,2)])
@@ -92,6 +84,11 @@ def measurements(model, surface):
     terrain = np.array([g for g, _ in samples])
     levels = np.array([np.nan if w is None else w for _, w in samples])
     support = terrain.copy()
+    if surface.name == 'wangcheng_teaching':
+        for i, (x, y, z) in enumerate(pts):
+            roof = surface.roof(x, z)
+            if roof is not None and roof <= y+SINK:
+                support[i] = max(support[i], roof)
     # Intersect vertical rays with other components. Projected areas alone
     # cannot distinguish a railing on a deck from one underneath it.
     triangles = vertices[faces].astype(float)
@@ -164,10 +161,22 @@ def measurements(model, surface):
             else:
                 height=float(min(hits)) if len(hits) else None
                 error=None if height is None else height-ground
+                reached = height
+                if height is not None:
+                    # Intervals must touch from the foot up to the waterline. A detached
+                    # deck over a submerged stump cannot supply the missing shaft.
+                    groups = component[faces[ids,0]]
+                    intervals = sorted((min(hits[groups==g]),max(hits[groups==g])) for g in np.unique(groups))
+                    for bottom,top in intervals:
+                        if bottom > reached+CONTACT:
+                            break
+                        reached=max(reached,top)
                 passed=(height is not None and water is not None and height<water
-                        and -.30<=error<=.015 and max(hits)>=water)
+                        and -.30<=error<=.015 and reached>=water)
             rows.append(dict(rule=role,fixture=label,local=[x,height,z],ground=ground,water=water,
                              support=reference,gap=error,status='pass' if passed else 'fail'))
+    if surface.name=='ronghu':
+        rows.extend(ronghu_footings(vertices,surface))
     station_rows=[r for r in rows if 'fixture' in r]
     stations=np.array([[r['local'][0],r['local'][2]] for r in station_rows]).reshape(-1,2)
     errors=np.array([0 if r['status']=='pass' else r['gap'] if r['gap'] is not None else 1
@@ -197,7 +206,10 @@ def run(directory):
         rows, coords, gap, aboveBand = measurements(ROOT/'public'/entry['file'], LandmarkSurface(world,name))
         heatmap(directory/(name+'.png'), coords, gap, name, np.radians(entry['rotation']))
         report.append(dict(id=name, aboveBearingBand=aboveBand, components=rows, failures=sum(r['status']=='fail' for r in rows)))
-    result = dict(failures=sum(r['failures'] for r in report), landmarks=report)
+    result = dict(failures=sum(r['failures'] for r in report), landmarks=report,
+                  tolerances=dict(bearingBand=BEARING_BAND, land=[-SINK,FLOAT], bridgeEnd=.30),
+                  floatingCraft=[dict(landmark=name,center=[x,z],radius=r,draft=d,reason=why)
+                                 for name, boats in CRAFT.items() for x,z,r,d,why in boats])
     (directory/'grounding.json').write_text(json.dumps(result, separators=(',',':'))+'\n')
     return result
 

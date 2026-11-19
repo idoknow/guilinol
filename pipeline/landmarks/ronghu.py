@@ -388,7 +388,12 @@ def shore(b):
             z = shoreline_z(x)
             h = ground(x,z)
             points.append((x,h+.85,z))
+            start = len(wall.pos)
             box(wall,(x,h+.45,z),(.26,.9,.26),'granite')
+            for at in range(start,len(wall.pos)):
+                px,y,pz = wall.pos[at]
+                if y < h+.45:
+                    wall.pos[at] = (px,ground(px,pz)-.08,pz)
         for a,c in zip(points,points[1:]):
             tube(wall,a,c,.14,'granite',4)
     # North of the pavilion, so a camera standing beside the pavilion is not inside a crown.

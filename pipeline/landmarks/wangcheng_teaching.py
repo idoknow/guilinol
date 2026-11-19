@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from shapely.geometry import Polygon
 from jingjiang import generate
-from wangcheng_plan import PalacePlan
+from c_kit import landmark_surface
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from common import ll2xz,load_osm
@@ -13,8 +13,7 @@ from common import ll2xz,load_osm
 
 def teaching(model):
     anchor=np.asarray(ll2xz(25.2854676,110.2934274))
-    plan=PalacePlan()
-    anchor_ground=plan.height(*(plan.forward.T @ (anchor-plan.origin)))
+    surface=landmark_surface('wangcheng_teaching')
     for way in load_osm():
         if way['type']!='way' or way['id'] not in (674165595,674165596,674165597,679734456,679734455,679734418):continue
         outline=Polygon([ll2xz(vertex['lat'],vertex['lon']) for vertex in way['geometry']])
@@ -26,8 +25,10 @@ def teaching(model):
         angle=math.atan2(axis[1],axis[0])
         if way['id'] in (679734418,679734455,679734456):
             # The chunk renderer supplies the walls and their exact collision outlines.
-            level=plan.height(*(plan.forward.T @ (np.array(outline.representative_point().coords[0])-plan.origin)))
-            roof=level-anchor_ground+(9.6 if way['id']==679734456 else 3.2)
+            sample=np.array(outline.representative_point().coords[0])-anchor
+            roof=surface.roof(*sample)
+            if roof is None:
+                raise ValueError(f'Missing GL04 wall for teaching annex {way["id"]}')
             model.pose=(center[0],roof,center[1],angle)
             if way['id']==679734456:
                 model.tiled_roof(0,0,0,width+1,depth+1,3.3,'earth',gable=False)
@@ -39,7 +40,7 @@ def teaching(model):
                     model.pose=(wing[0],roof,wing[1],angle+math.pi/2)
                     model.tiled_roof(0,0,0,depth+.8,9.6,2.9,'earth',gable=False)
             continue
-        model.pose=(center[0],0,center[1],angle)
+        model.pose=(center[0],surface.ground(*center),center[1],angle)
         model.box(0,0,0,width,9.65,depth,'white',True)
         model.tiled_roof(0,9.65,0,width+1.6,depth+1.2,3.3,'earth',gable=False)
         for side in (-1,1):

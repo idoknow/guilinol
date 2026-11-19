@@ -67,6 +67,27 @@ class Surface:
         stride = 1 if np.any(water != DRY) else 2
         return ground[::stride, ::stride], water, self.grid * stride
 
+    @lru_cache(maxsize=24)
+    def roof_tile(self, origin):
+        data = gzip.decompress((self.directory/self.files[origin]).read_bytes())
+        _, vertices, indices, length, _, _ = struct.unpack_from('<4s5I',data)
+        n = self.size//self.grid+1
+        offset = 24+4*n*n+9*vertices+4*indices
+        rings = json.loads(data[offset:offset+length])[0]
+        shapes, levels = [], []
+        for _,top,loops,*_ in rings:
+            outlines = [np.asarray(loop)/100+origin for loop in loops]
+            shapes.append(shapely.Polygon(outlines[0],outlines[1:]))
+            levels.append(top/10)
+        return shapely.STRtree(shapes),np.array(levels)
+
+    def roof(self,x,z):
+        origin=(self.left+math.floor((x-self.left)/self.size)*self.size,
+                self.top+math.floor((z-self.top)/self.size)*self.size)
+        tree,levels=self.roof_tile(origin)
+        ids=tree.query(shapely.Point(x,z),predicate='intersects')
+        return float(levels[ids].max()) if len(ids) else None
+
     def sample(self, x, z):
         if not (self.left <= x <= self.left+self.width and self.top <= z <= self.top+self.depth):
             raise ValueError(f'Outside world extent at {(x, z)}')
@@ -104,6 +125,10 @@ class LandmarkSurface:
     def sample(self, x, z):
         ground, water = self.surface.sample(self.x+self.cos*x+self.sin*z, self.z-self.sin*x+self.cos*z)
         return ground-self.y, None if water is None else water-self.y
+
+    def roof(self,x,z):
+        height=self.surface.roof(self.x+self.cos*x+self.sin*z,self.z-self.sin*x+self.cos*z)
+        return None if height is None else height-self.y
 
     def ground(self, x, z):
         return self.sample(x, z)[0]
