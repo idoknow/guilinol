@@ -16,6 +16,12 @@ try {
     const angle=-bridge.rotation*Math.PI/180, c=Math.cos(angle),s=Math.sin(angle)
     const x=-116,z=-39
     walk.leave()
+    window.viewer.camera.position.set(bx,bridge.position[1]+8,bz)
+    const deadline=performance.now()+20000
+    while(!window.viewer.stream.landmarks.has(bridge)){
+      if(performance.now()>deadline)throw Error('Bridge collision mesh did not load')
+      await new Promise(resolve=>requestAnimationFrame(resolve))
+    }
     if(!await walk.enter(bx+x*c-z*s,bz+x*s+z*c,0,'underpass'))throw Error('North approach spawn failed')
     walk.drive(-s,c)
     const heights=[]
