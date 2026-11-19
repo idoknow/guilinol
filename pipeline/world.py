@@ -143,14 +143,14 @@ def build(bbox, output, palette):
     for road in roads:
         if not road.line.intersects(bounds):
             continue
-        sp = road.line.buffer(road.width/2, quad_segs=2)
+        sp = road.pavement
         if road.kind == 'pedestrian' and not comp_excl.is_empty:
             sp = sp.difference(comp_excl)
         if not sp.is_empty:
             road_surfs.append(sp)
         for side, extra in ((-1, road.left), (1, road.right)):
             if extra:
-                sw_p = road.line.buffer(side*(road.width/2+extra), single_sided=True, quad_segs=2)
+                sw_p = road.side_line(side).buffer(side*(road.width/2+extra), single_sided=True, quad_segs=2)
                 if not comp_excl.is_empty:
                     sw_p = sw_p.difference(comp_excl)
                 if not sw_p.is_empty:
@@ -195,7 +195,7 @@ def build(bbox, output, palette):
     cycle_clearance = [band.buffer(.08) for band in bands[2].geometries]
     trees, roads, banks, tree_stats, beds = scatter(bounds, footprints, layers['water'], peak_shapes, tree_support_at, mountain_trees, unary_union([layout.tree_exclude, bank_pavement.buffer(2)]) if bank_pavement is not None else layout.tree_exclude, precomputed=road_net, extra_blocked=[*(court.buffer(1.5) for court in layers["schoolTrack"] + layers["schoolCourt"]), *bridge_polys, *road_surfs, *cycle_clearance])
     for road in roads:
-        for part in polygons(road.line.buffer(road.width/2,quad_segs=2).intersection(bounds)):
+        for part in polygons(road.pavement.intersection(bounds)):
             mask,corner = stencil(part,left,top,1)
             texture.paste('#484b4d' if road.name=='翊武路' else palette['road'],corner,mask)
             layers['road'].append(part)

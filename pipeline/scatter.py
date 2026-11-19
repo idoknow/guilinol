@@ -17,9 +17,9 @@ from road_profile import pair_carriageways, profile, RULES
 CONFIG = json.loads(Path(__file__).with_name('vegetation.json').read_text())
 
 
-def walk_line(line, spacing, offset=0, jitter=0, rng=None):
+def walk_line(line, spacing, offset=0, jitter=0, rng=None, phase=None):
     length = line.length
-    for along in np.arange(spacing / 2, length, spacing):
+    for along in np.arange(spacing / 2 if phase is None else phase, length, spacing):
         along += rng.uniform(-jitter, jitter) if jitter else 0
         before = line.interpolate(max(0, along-.25))
         after = line.interpolate(min(length, along+.25))
@@ -136,13 +136,16 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
         line,width,name = road.line,road.width,road.name
         if not bounds.intersects(line):
             continue
-        section = RULES['sections'].get(road.section)
+        section = road.dimensions
         for side, available in ((-1,road.left),(1,road.right)):
             if section and not available:
                 continue
             arterial = road.kind in ('trunk','primary')
             offset = (section['verge']/2 if arterial else section['verge']+section['cycle']+section['curb']+.58) if section else street['offset']
-            for pt in walk_line(line,street['spacing'],side*(width/2+offset),0 if section else street['jitter'],rng):
+            if section:
+                offset = section.get('treeInset',offset)
+            line = road.side_line(side)
+            for pt in walk_line(line,street['spacing'],side*(width/2+offset),0 if section else street['jitter'],rng,phase=0 if section and 'treeInset' in section else None):
                 if not junctions.query(pt,predicate='dwithin',distance=street['junction']).size:
                     if not section:
                         tree(pt,'river' if '滨江' in name else 'lake' if '榕' in name else 'mixed','street')
@@ -151,7 +154,8 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
                         along = line.project(pt)
                         before, after = line.interpolate(max(0,along-.2)), line.interpolate(min(line.length,along+.2))
                         angle = math.atan2(after.y-before.y,after.x-before.x)
-                        if not tree(pt,'mixed','street',force_kind=0 if arterial else rng.randrange(2),force_scale=100 if arterial else 120,yaw=-angle-side*math.pi/2 if arterial else None):
+                        canopy = 'treeInset' in section
+                        if not tree(pt,'mixed','street',force_kind=1 if canopy else 0 if arterial else rng.randrange(2),force_scale=125 if canopy else 100 if arterial else 120,yaw=-angle-side*math.pi/2 if arterial else None):
                             continue
                         beds[origin].append([round((pt.x-origin[0])*10),round((pt.y-origin[1])*10),round(angle*100),int(arterial)])
     shore = unary_union(wet).boundary

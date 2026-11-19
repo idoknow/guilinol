@@ -17,14 +17,14 @@ def section_layers(roads):
         name = road.section
         if not name:
             continue
-        section = RULES['sections'][name]
+        section = road.dimensions
         for side, available in ((-1, road.left), (1, road.right)):
             if not available:
                 continue
             def band(inner, width):
                 start = road.width / 2 + inner
                 def shell(distance):
-                    return road.line.buffer(side * distance, single_sided=True, quad_segs=2)
+                    return road.side_line(side).buffer(side * distance, single_sided=True, quad_segs=2)
                 return shell(start + width).difference(shell(start))
 
             verge, cycle, curb, walk = (section[key] for key in ('verge','cycle','curb','walk'))

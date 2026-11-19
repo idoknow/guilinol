@@ -89,7 +89,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         if not line.intersects(bounds):
             continue
         lengths['road']+=line.intersection(bounds).length
-        surf_poly = line.buffer(width/2,quad_segs=2)
+        surf_poly = road.pavement
         if kind == 'pedestrian' and not rep_excl.is_empty:
             surf_poly = surf_poly.difference(rep_excl)
         # Stone pedestrian approaches around Gunanmen and the north bank of Ronghu.
@@ -124,12 +124,14 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                 offset = (width/2+3) if feature=='traffic_signals' else 0
                 emit_crosswalk(line, width, road.left, road.right, along + direction * offset, direction, feature == 'traffic_signals')
         if kind in CONFIG['mainStreets']:
-            section = RULES['sections'].get(road.section)
+            section = road.dimensions
             for side,available in ((-1,road.left),(1,road.right)):
                 if section and not available:
                     continue
                 offset = section['verge']+section['cycle']+section['curb']+.7 if section else 2.6
-                for pt in walk_line(line,CONFIG['lampSpacing'],side*(width/2+offset)):
+                if section and 'treeInset' in section:
+                    offset = section['walk']-.25
+                for pt in walk_line(road.side_line(side),CONFIG['lampSpacing'],side*(width/2+offset)):
                     lamp_candidates.append(pt)
 
     # Synthesize crosswalks at untagged >=3-arm urban motor intersections (e.g. 榕荫路 × 三多路, IMG_1299.jpg)
@@ -294,6 +296,11 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     layers=[STRtree(values) for values in (surfaces,sidewalks,stripes,medians,gaps)]
     obstacles = STRtree([*footprints, *water, *bridge.geometries, exclude, rep_excl, *clear.geometries])
     decor = defaultdict(list)
+    parking_keepout = STRtree([
+        *(gap.buffer(3) for gap in gaps),
+        *(Point(coord).buffer(max(widths)/2+11) for coord,widths in junctions.items() if len(widths)>2),
+        *(LineString(points(el)).buffer(1.5) for el in load_osm() if el['type']=='way' and el.get('tags',{}).get('highway') in ('footway','path','steps') and len(points(el))>1),
+    ])
     def anchor(pt, heading, kind, span=0):
         if not bounds.contains(pt):
             return
@@ -303,7 +310,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     arterial_roads = [road for road in roads if road.oneway and road.kind in ('trunk','primary')]
     arterial_index = STRtree([road.line for road in arterial_roads])
     for road in roads:
-        section = RULES['sections'].get(road.section)
+        section = road.dimensions
         if not section or not bounds.intersects(road.line):
             continue
         line = road.line
@@ -349,6 +356,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         for side,available in ((-1,road.left),(1,road.right)):
             if not available:
                 continue
+            line = road.side_line(side)
             offset = side*(road.width/2+section['verge']+section['cycle']+section['curb']+section['walk']-.7)
             if road.kind in ('trunk','primary'):
                 verge_offset = side*(road.width/2+section['verge']/2)
@@ -362,8 +370,14 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                 for along in np.arange(spacing/2,line.length-2,spacing):
                     center,heading = frame(along)
                     pt = Point(center.x-offset*math.sin(heading),center.y+offset*math.cos(heading))
-                    if not any(tree.query(pt,predicate='dwithin',distance=1.8).size for tree in (obstacles,layers[0],layers[4])):
-                        anchor(pt,heading,fixture)
+                    if fixture==3:
+                        tangent = np.array([math.cos(heading),math.sin(heading)])*1.25
+                        envelope = LineString([pt.coords[0]-tangent,pt.coords[0]+tangent]).buffer(1.0)
+                        if any(tree.query(envelope,predicate='intersects').size for tree in (parking_keepout,obstacles,layers[0],bands[2])):
+                            continue
+                    elif any(tree.query(pt,predicate='dwithin',distance=1.8).size for tree in (obstacles,layers[0],layers[4])):
+                        continue
+                    anchor(pt,heading,fixture)
     def encode(tile,origin):
         shapes = [unary_union([layer.geometries[idx].intersection(tile) for idx in sorted(layer.query(tile))]) for layer in layers]
         shapes[1]=shapes[1].difference(shapes[0]).union(shapes[3]).difference(shapes[4])

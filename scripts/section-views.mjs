@@ -28,7 +28,7 @@ try{
       if(walk.active)walk.leave()
       camera.position.set(east,200,south)
     },view)
-    await page.waitForFunction(()=>{const {stats,camera,stream,manifest}=window.viewer;return !stats.pending&&manifest.chunks.every(tile=>Math.hypot(tile.x+128-camera.position.x,tile.z+128-camera.position.z)>stream.radius||stream.loaded.has(tile))},null,{timeout:90000})
+    await page.waitForFunction(()=>{const {stats,camera,stream,manifest}=window.viewer;return !stats.pending&&manifest.chunks.every(tile=>Math.hypot(tile.x+128-camera.position.x,tile.z+128-camera.position.z)>stream.radius||(stream.loaded.has(tile)&&stream.forest.loaded.has(tile)))},null,{timeout:90000})
     await page.evaluate(([east,south,bearing,focal])=>{
       const {camera,stream}=window.viewer,angle=bearing*Math.PI/180
       const [tile,data]=[...stream.loaded].find(([tile])=>east>=tile.x&&east<tile.x+256&&south>=tile.z&&south<tile.z+256)??[]
