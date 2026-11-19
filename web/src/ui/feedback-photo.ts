@@ -41,20 +41,33 @@ export function photoPicker(
   warn: (message: string) => void,
   currentId: () => string | undefined,
   run: (work: () => Promise<void>) => Promise<void>,
+  onChange?: (count: number) => void,
 ) {
   const picker = document.createElement('input'),
-    grid = document.createElement('div')
+    grid = document.createElement('div'),
+    zone = document.createElement('label')
   picker.type = 'file'
   picker.multiple = true
   picker.accept = 'image/jpeg,image/png,image/webp,image/heic,.heic,.heif'
   picker.setAttribute('aria-label', '添加照片')
   grid.className = 'fb-grid'
-  container.append(picker, grid)
+  zone.className = 'fb-drop'
+  zone.innerHTML = `<b>拖入、粘贴或点此选择照片</b><span>最多 20 张 · 电脑可直接 Ctrl/⌘ + V 粘贴截图</span>`
+  zone.prepend(picker)
+  container.append(zone, grid)
+  const sync = () => {
+    const total = used.length + entries.size
+    zone.classList.toggle('fb-drop--compact', total > 0)
+    container.dataset.count = String(total)
+    onChange?.(total)
+  }
   const entries = new Map<number, { done: boolean; upload: (id: string) => Promise<void> }>(),
     urls: string[] = []
   function wireRemove(button: HTMLButtonElement, slot: number, cell: HTMLElement) {
     button.type = 'button'
-    button.textContent = '移除'
+    button.className = 'fb-remove'
+    button.textContent = '×'
+    button.setAttribute('aria-label', '移除这张照片')
     button.onclick = () =>
       void run(async () => {
         const id = currentId()
@@ -66,13 +79,14 @@ export function photoPicker(
         if (index >= 0) used.splice(index, 1)
         entries.delete(slot)
         cell.remove()
+        sync()
       })
   }
   for (const slot of used) {
     const cell = document.createElement('div'),
       image = document.createElement('img'),
       remove = document.createElement('button')
-    cell.className = 'fb-photo'
+    cell.className = 'fb-photo fb-photo--done'
     image.src = `/api/feedback/${currentId()}/photos/${slot}`
     image.alt = `照片 ${slot}`
     wireRemove(remove, slot, cell)
@@ -97,9 +111,11 @@ export function photoPicker(
         progress = document.createElement('progress'),
         remove = document.createElement('button'),
         note = document.createElement('small')
-      cell.className = 'fb-photo'
+      cell.className = 'fb-photo fb-photo--new'
+      progress.className = 'fb-progress'
+      note.className = 'fb-photo-note'
       view.setAttribute('aria-label', '拍摄视角')
-      view.add(new Option('视角（可选）', ''))
+      view.add(new Option('视角', ''))
       views.forEach((label) => view.add(new Option(label)))
       progress.max = 100
       progress.value = 0
@@ -139,26 +155,37 @@ export function photoPicker(
             entry.done = true
             progress.value = 100
             note.textContent = '已上传'
+            cell.classList.add('fb-photo--done')
             view.disabled = true
           } catch (error) {
             note.textContent = '失败，重新提交可重试'
+            cell.classList.add('fb-photo--error')
             throw error
           }
         },
       }
       entries.set(slot, entry)
     }
+    sync()
   }
   picker.onchange = () => {
     add(picker.files)
     picker.value = ''
   }
-  container.ondragover = (event) => event.preventDefault()
+  container.ondragover = (event) => {
+    event.preventDefault()
+    zone.classList.add('fb-drop--over')
+  }
+  container.ondragleave = () => zone.classList.remove('fb-drop--over')
   container.ondrop = (event) => {
     event.preventDefault()
+    zone.classList.remove('fb-drop--over')
     if (!picker.disabled) add(event.dataTransfer?.files ?? null)
   }
+  sync()
   return {
+    add: (files: File[]) => add(files as unknown as FileList),
+    pending: () => [...entries.values()].filter((entry) => !entry.done).length,
     count: () => used.length + entries.size,
     async upload(id: string) {
       for (const entry of entries.values()) await entry.upload(id)
