@@ -11,7 +11,7 @@ from features import points, polygons
 from scatter import CONFIG, walk_line
 
 
-def chunks(roads,banks,bounds,water,sample,exclude):
+def chunks(roads,banks,bounds,water,sample,exclude,modeled_paving=None):
     surfaces, sidewalks, stripes, medians, gaps = [],[],[],[],[]
     fixtures = defaultdict(lambda: [[],[],[],[]])
     lengths = dict(road=0,bank=0)
@@ -119,6 +119,8 @@ def chunks(roads,banks,bounds,water,sample,exclude):
         shapes = [unary_union([layer.geometries[idx].intersection(tile) for idx in sorted(layer.query(tile))]) for layer in layers]
         shapes[1]=shapes[1].difference(shapes[0]).union(shapes[3]).difference(shapes[4])
         shapes[2]=shapes[2].difference(shapes[3])
+        if modeled_paving is not None and tile.intersects(modeled_paving):
+            shapes[:3]=[shape.difference(modeled_paving) for shape in shapes[:3]]
         items=[]
         for kind,shape in enumerate(shapes[:3]):
             for poly in polygons(shape):

@@ -7,6 +7,7 @@ import math
 import numpy as np
 import trimesh
 from xiaoyao_tower import generate
+from jiefang_layout import ramp
 
 
 def arch(model, center, radius, width, spring, rise, top, blocks=False):
@@ -77,25 +78,31 @@ def pendant(model, x, y, z):
     model.box(x+.8,y+3.66,z,.46,.09,.46,'wood')
 
 
+def bank_stairs(model,side):
+    # OSM 1382486206/08: two flights and a switchback at the outer landing.
+    # Elevations relative to the deck surface; both flights have 16 risers.
+    for index in range(16):
+        model.box(-98,.18-(index+1)*.166,side*(21+index*.72),2.9,.18,.73,'pave',True)
+        model.box(-106,-2.476-(index+1)*.166,side*(32-index*.34),2.9,.18,.35,'pave',True)
+    model.box(-102,-2.48,side*32.95,10.9,.18,1.8,'pave',True)
+    model.box(-110,-5.2,side*27,9.5,.18,2.8,'pave',True)
+    for x in (-99.45,-96.55):
+        model.beam([x,1.25,side*21],[x,-1.42,side*32],.075,'granite',8,True)
+    for x in (-107.45,-104.55):
+        model.beam([x,-1.42,side*32],[x,-4.1,side*27],.075,'granite',8,True)
+
+
 def west_bank(model):
     # Both paths leave the deck tangentially, descend around the planted
     # islands, and meet the straight lower promenade at x=-116.
     for side, tone in ((-1,'violet'),(1,'jade')):
         for x in (-113,-128):
-            model.pose=(x,-3.48,side*35,0)
+            model.pose=(x,-4.98,side*35,0)
             pillar(model,0,0,tone)
         model.pose=(0,0,0,0)
-        # Sampled deck heights above the bridge datum, including the crest of
-        # each island. The low end runs under the paved landing.
-        grade=[6.45,7.45,8.25,8.5,8.65,8.65,8.6,8.5,8.45,8.05,7.65,5.8,2.16]
-        stations=np.linspace(0,1,len(grade))
-        points=[]
-        for angle in np.linspace(0,math.pi*1.5,37 if model.detail else 17):
-            t=angle/(math.pi*1.5)
-            x=-140-24*math.sin(angle)
-            z=side*(41-24*math.cos(angle))
-            y=np.interp(t,stations,grade)-(5.62-x*1.3/281)
-            points.append((x,y,z))
+        fractions=np.linspace(0,1,37 if model.detail else 17)
+        xs, heights, zs=ramp(side,fractions)
+        points=list(zip(xs,heights-(5.62-xs*1.3/281),zs))
         for index,(a,b) in enumerate(zip(points,points[1:])):
             def edge(point, at, sign):
                 angle=at/(len(points)-1)*math.pi*1.5
@@ -111,21 +118,32 @@ def west_bank(model):
             model.beam(right,np.add(right,[0,1,0]),.075,'granite')
             if model.detail and index in (6,17,29):
                 pendant(model,*left)
+        bank_stairs(model,side)
         for idx in range(11):
             axis=math.pi*(.12+idx*.075)
-            center=np.array([-141-16*math.sin(axis),1.45,side*(41-16*math.cos(axis))])
+            x=-140-20.6*math.sin(axis)
+            y=(6.45-5.4*axis/(math.pi*1.5))-(5.62-x*1.3/281)
+            center=np.array([x,y+.22,side*(41-20.6*math.cos(axis))])
+            model.box(x,y-.62,center[2],2.5,.84,2.5,'stone')
             shrub=trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
             model.mesh(shrub.vertices*[1.8,.75,1.65]+center,shrub.faces,'leaf' if idx%3 else 'green')
         model.beam([-143,.2,side*12],[-143,5.2,side*12],.14,'granite')
         model.box(-143,4.3,side*12,.48,1.23,.4,'sign')
         model.box(-143.26,5.12,side*12,.08,.25,.25,'red')
+    model.pose=(0,-1.5,0,0)
+    # Two-way lower road, alongside the 5 m pedestrian landing.
+    model.box(-122,-3.99,0,7,.23,86,'tile',True)
+    for z in range(-40,41,8):
+        model.box(-122,-3.754,z,.1,.012,3,'yellow')
     model.box(-116,-4.25,0,5,.64,82,'pave',True)
-    model.box(-113.6,-3.61,0,.25,.52,82,'granite',True)
-    model.box(-113.6,-3.05,0,.12,.12,82,'granite',True)
+    for start,end in ((-41,-29),(-25,25),(29,41)):
+        model.box(-113.6,-3.61,(start+end)/2,.25,.52,end-start,'granite',True)
+        model.box(-113.6,-3.05,(start+end)/2,.12,.12,end-start,'granite',True)
     for z in range(-40,41,4):
         model.box(-113.6,-3.54,z,.16,.6,.16,'granite')
         if abs(z)>22 and z%12==0:
             pendant(model,-118.3,-3.92,z)
+    model.pose=(0,0,0,0)
 
 
 def bridge(model):
@@ -157,7 +175,11 @@ def bridge(model):
             model.box(east,1.26,side*21.1,.55,.24,.39,'lamp')
     for start,end in ((-92,0),(0,92),(92,140.5)):
         river_ribs(model,start,end,width)
-    rail(model,length,21.1,.18,2.1)
+    model.box(-138,-5.35,0,3.4,4.13,width-1,'stone',True)
+    for start,end in ((-140.5,-100),(-96,140.5)):
+        model.pose=((start+end)/2,0,0,0)
+        rail(model,end-start,21.1,.18,2.1)
+    model.pose=(0,0,0,0)
     west_bank(model)
 
 
