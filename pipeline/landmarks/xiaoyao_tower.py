@@ -9,6 +9,7 @@ import sys
 
 import numpy as np
 import trimesh
+from PIL import ImageDraw, ImageFont
 
 from jingjiang import Model, SWATCHES, atlas
 
@@ -29,6 +30,24 @@ class LandmarkModel(Model):
             self.lit_tiles.append((self.visible.pop(),self.uv.pop()))
         else:
             super().mesh(vertices,faces,color,collide)
+
+
+def inscription(image, text, foreground, background, vertical=False):
+    # Reuse the unused clock cell so lettering stays in the joinery draw call.
+    index=list(SWATCHES).index('clock')
+    x,y=index%4*128,index//4*128
+    face=ImageDraw.Draw(image)
+    face.rectangle((x,y,x+127,y+127),fill=background)
+    face.rectangle((x+6,y+6,x+121,y+121),outline=foreground,width=2)
+    try:
+        font=ImageFont.truetype('NotoSansCJK-Regular.ttc',32)
+    except OSError:
+        font=ImageFont.truetype('/System/Library/Fonts/STHeiti Medium.ttc',32)
+    if vertical:
+        for row,letter in enumerate(text):
+            face.text((x+64,y+26+row*37),letter,font=font,anchor='mm',fill=foreground)
+    else:
+        face.text((x+64,y+64),text,font=font,anchor='mm',fill=foreground)
 
 
 def facade(model, base, half, height, upstairs):
@@ -101,6 +120,9 @@ def tower(model):
     for z in (-18,6):
         model.box(17.01,.68,z,.12,2.32,6.6,'granite')
         model.box(17.09,.82,z,.08,2.02,6.25,'sign')
+        if model.detail:
+            for i in range(18):
+                model.box(17.14,1.36+(i%3)*.09,z-2.8+i*.33,.05,.54,.055,'granite')
     model.box(17.08,0,12,.22,2.42,1.8,'wood')
     for z in (10.94,13.06):
         model.box(17.25,0,z,.5,2.58,.34,'granite')
@@ -120,14 +142,23 @@ def tower(model):
     for side in (-1,1):
         for x in (-2.6,2.6):
             model.beam([x,platform,side*10.7],[x,platform+5.25,side*10.7],.26,'wood',10,True)
-        model.swept_roof(0,platform+5.25,side*9.1,7.1,6.6,1.85)
-        model.box(0,platform+3.88,side*10.55,3.6,1.0,.20,'sign')
+        model.swept_roof(0,platform+5.25,side*8.95,7.1,6.0,1.85)
+        model.pose=(0,0,0,0 if side>0 else np.pi)
+        model.box(0,platform+3.88,10.55,3.6,1.0,.20,'sign')
+        model.mesh([[-1.7,platform+3.94,10.66],[1.7,platform+3.94,10.66],
+                    [1.7,platform+4.83,10.66],[-1.7,platform+4.83,10.66]],
+                   [[0,1,2],[0,2,3]],'clock')
+        model.pose=(0,0,0,0)
+    model.box(0,platform,0,8.2,4.8,.26,'wood',True)
     upper = platform+7.4
     model.box(0,upper-.45,0,17.9,.45,17.9,'wood',True)
     facade(model,upper,7.9,4.85,True)
     model.swept_roof(0,upper+4.85,0,21.5,20.2,2.65)
     model.box(0,upper+7.12,0,12,1.05,11,'wood')
     model.swept_roof(0,upper+8.17,0,18.4,17.5,3.7)
+    # Cap the narrow horizontal ridge openings visible from the square.
+    for y,w,d in ((platform+7.15,24.3,23.1),(upper+7.5,21.5,20.2),(upper+11.87,18.4,17.5)):
+        model.box(0,y-.08,0,w*.64,.1,d*.073,'tile')
     if model.detail:
         for side in (-1,1):
             for x in (-6,-3,3,6):
@@ -138,8 +169,10 @@ def tower(model):
                 model.box(0,y,side*d*.5,w*.67,.06,.07,'lamp')
 
 
-def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False):
+def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None):
     image = atlas(colors,smooth)
+    if lettering:
+        inscription(image, **lettering)
     target = Path(__file__).resolve().parents[2]/'public/textures/landmarks'/folder
     target.mkdir(parents=True, exist_ok=True)
     if colors is None: image.save(target/'timber-and-tile.png', optimize=True)
@@ -182,4 +215,5 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
 
 
 if __name__ == '__main__':
-    generate(colors={"wood":"#44322e","red":"#78362d","stone":"#b8b5b0","tile":"#44454a"}, flood_roof=True)
+    generate(colors={"wood":"#44322e","red":"#78362d","stone":"#b8b5b0","tile":"#44454a"}, flood_roof=True,
+             lettering=dict(text="逍遙樓",foreground="#ceb17c",background="#392e29"))

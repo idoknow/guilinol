@@ -74,7 +74,10 @@ def gallery(m):
         j = (i+1)%count
         faces.extend([[i,j,j+count],[i,j+count,i+count]])
     m.mesh(vertices,faces,'stone',True)
+    m.mesh([[x+.48,.85,.854],[x-.48,.85,.854],[x-.48,2.65,.854],[x+.48,2.65,.854]],
+           [[0,1,2],[0,2,3]],'clock')
 
 
 if __name__ == '__main__':
-    generate('zhuangyuan_gallery', gallery, colors={'wood':'#46302b','tile':'#484a4c','pave':'#373a3b'})
+    generate('zhuangyuan_gallery', gallery, colors={'wood':'#46302b','tile':'#484a4c','pave':'#373a3b'},
+             lettering=dict(text='逍遙樓',foreground='#93928b',background='#b7b6ae',vertical=True))
