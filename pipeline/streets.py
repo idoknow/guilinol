@@ -13,7 +13,13 @@ from scatter import CONFIG, walk_line
 from sections import section_layers, clipped, speed_paint, RULES
 
 
+<<<<<<< HEAD
 def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),modeled_paving=None):
+=======
+def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None):
+    if bands is None:
+        bands = section_layers(roads)
+>>>>>>> b8d7f43 (Check actual raised planting and paving support and keep cycle lanes clear)
     surfaces, sidewalks, stripes, medians, gaps = [],[],[],[],[]
     sidewalks.append(rongyin_sidewalk())
     rep_excl = replace_exclude if replace_exclude is not None else Polygon()
@@ -122,8 +128,12 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                 offset = (width/2+3) if feature=='traffic_signals' else 0
                 emit_crosswalk(line, width, road.left, road.right, along + direction * offset, direction, feature == 'traffic_signals')
         if kind in CONFIG['mainStreets']:
-            for side in [-1,1]:
-                for pt in walk_line(line,CONFIG['lampSpacing'],side*(width/2+2.6)):
+            section = RULES['sections'].get(RULES['sectionClasses'].get(kind))
+            for side,available in ((-1,road.left),(1,road.right)):
+                if section and not available:
+                    continue
+                offset = section['verge']+section['cycle']+section['curb']+.7 if section else 2.6
+                for pt in walk_line(line,CONFIG['lampSpacing'],side*(width/2+offset)):
                     lamp_candidates.append(pt)
 
     # Synthesize crosswalks at untagged >=3-arm urban motor intersections (e.g. 榕荫路 × 三多路, IMG_1299.jpg)
@@ -164,7 +174,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     bridge_ways = [LineString(points(el)) for el in load_osm() if el['type']=='way' and
                    el.get('tags',{}).get('bridge','no')!='no' and 'highway' in el.get('tags',{}) and len(points(el))>1]
     bridge = STRtree([bw.buffer(11) for bw in bridge_ways])
-    carriageway_union = unary_union([*surfaces, *(bw.buffer(10, quad_segs=2) for bw in bridge_ways)])
+    carriageway_union = unary_union([*surfaces, *bands[2].geometries, *(bw.buffer(10, quad_segs=2) for bw in bridge_ways)])
     carriageway_avoid = carriageway_union.buffer(0.35) if not carriageway_union.is_empty else Polygon()
     curb_shell = carriageway_union.buffer(0.85) if not carriageway_union.is_empty else Polygon()
     bldg_tree = STRtree(footprints) if footprints else None
@@ -286,7 +296,6 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                                 pos_s += 3.1
 
     layers=[STRtree(values) for values in (surfaces,sidewalks,stripes,medians,gaps)]
-    bands = section_layers(roads)
     obstacles = STRtree([*footprints, *water, *bridge.geometries, exclude, rep_excl, *clear.geometries])
     decor = defaultdict(list)
     def anchor(pt, heading, kind, span=0):

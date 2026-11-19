@@ -197,7 +197,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
 
     by_bldg = defaultdict(list)
     bldg_chunk_parts = []
-    roads0_polys, roads1_polys, roads2_polys = [], [], []
+    roads0_polys, roads1_polys, roads2_polys, cycle_polys = [], [], [], []
     chunk_streets = {}
     lamps, signals, stops, banks, stone_rails = [], [], [], [], []
     deck_tris_by_chunk = {}
@@ -275,8 +275,10 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                     continue
                 if skind == 0:
                     roads0_polys.append(poly)
-                elif skind == 1:
+                elif skind in (1, 4, 6):
                     roads1_polys.append(poly)
+                elif skind == 5:
+                    cycle_polys.append(poly)
                 elif skind == 2:
                     roads2_polys.append(poly)
 
@@ -374,7 +376,8 @@ def run_audit(world_dir: Path, root: Path) -> dict:
 
     u_road0 = unary_union(roads0_polys) if roads0_polys else Polygon()
     u_deck = unary_union(deck_polys) if deck_polys else Polygon()
-    u_carriageway = unary_union([u_road0, u_deck])
+    u_cycle = unary_union(cycle_polys) if cycle_polys else Polygon()
+    u_carriageway = unary_union([u_road0, u_deck, u_cycle])
     u_sidewalk = unary_union(roads1_polys) if roads1_polys else Polygon()
     u_all_road_surface = unary_union([u_carriageway, u_sidewalk])
 
@@ -829,11 +832,13 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         tzs = np.array([t[2] for t in trees])
         on_sw = contains_xy(u_sidewalk, txs, tzs)
         on_rd = contains_xy(u_road0, txs, tzs)
+        on_cycle = contains_xy(u_cycle, txs, tzs)
         u_peaks = unary_union(peak_polys_list).buffer(1.0) if peak_polys_list else Polygon()
         in_peak = contains_xy(u_peaks, txs, tzs)
         for i, (tx_i, ty_i, tz_i, tkind, _) in enumerate(trees):
             gm = ground_mesh_y(tx_i, tz_i)
-            sup = (road_base_y(tx_i, tz_i) + 0.195) if on_sw[i] else (road_base_y(tx_i, tz_i) + 0.045) if on_rd[i] else gm
+            offset = 0.195 if on_sw[i] else 0.045 if on_rd[i] else 0.060 if on_cycle[i] else None
+            sup = road_base_y(tx_i, tz_i) + offset if offset is not None else gm
             if in_peak[i]:
                 py_m = nearest_peak_y(tx_i, ty_i, tz_i)
                 if py_m is not None and abs(ty_i - py_m) < abs(ty_i - sup):
