@@ -1,6 +1,7 @@
 import {chromium} from 'playwright'
 import {preview} from 'vite'
 import {mkdir} from 'node:fs/promises'
+import {existsSync} from 'node:fs'
 
 const views={
   1299:[25,3,-34,15,1,-23],1300:[53,11,-113,37,12,-115],1301:[52,8,-104,27,4,-50],
@@ -29,6 +30,7 @@ try{
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&radius=256&time=12`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
   for(const [number,coords] of Object.entries(views)){
+    if(process.env.RESUME_CAPTURES && existsSync(`${out}/${number}.jpg`))continue
     const id=Number(number)<=1316?'gunanmen':'ronghu'
     await page.evaluate(([id,coords])=>{
       const {manifest,camera}=window.viewer
