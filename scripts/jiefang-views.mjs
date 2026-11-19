@@ -5,10 +5,11 @@ import {chromium} from 'playwright'
 const output = process.argv[2] ?? 'captures/jiefang'
 await mkdir(output, {recursive:true})
 const views = [
-  ['37', [-146,7.4,-56], [-113,7,-34], 18.2],
+  ['37', [-130,8.7,-49], [-118,7,-35], 18.2],
+  ['41', [-79,8.9,-65], [5,2.4,0], 18.2],
   ['42', [-116,4.7,-47], [-113,7.5,-35], 18.2],
-  ['43', [-116,3.8,-8], [-116,3.6,52], 18.4],
-  ['49', [-116,5,52], [-94,6,1], 18.15],
+  ['43', [-116,4.2,8], [-116,4.4,-52], 18.4],
+  ['49', [-114.8,4.65,41], [-90,5.8,9], 18.15],
   ['58', [10,7.6,-16], [-122,7.7,-16], 21],
   ['60', [0,7.5,-19], [-145,47,-714], 21],
   ['aerial', [-220,150,160], [-35,4,0], 14],
@@ -19,6 +20,7 @@ try {
   browser = await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
   const page = await browser.newPage({viewport:{width:960,height:600}})
   for (const [name,eye,target,hour] of views) {
+    if(process.argv.length>3 && !process.argv.slice(3).includes(name))continue
     const portrait=['42','43','58'].includes(name)
     await page.setViewportSize(portrait?{width:570,height:760}:{width:960,height:720})
     await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&radius=512&time=${hour}`)
