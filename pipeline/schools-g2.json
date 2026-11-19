@@ -113,5 +113,12 @@
     "name": "桂林市民族中学",
     "osm": "way/647468207",
     "facade": "photo-informed"
+  },
+  {
+    "id": "nanxishan_primary",
+    "name": "桂林市南溪山小学",
+    "osm": "way/1037119966",
+    "facade": "photo-informed",
+    "street": "中山南路"
   }
 ]
