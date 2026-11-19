@@ -7,6 +7,7 @@ const dataLines = [
 ]
 
 export function aboutPanel() {
+  void import('./account').then(module=>module.accountPanel())
   const btn = document.createElement('button')
   btn.className = 'btn-about'
   btn.type = 'button'

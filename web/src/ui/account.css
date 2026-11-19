@@ -1,0 +1,6 @@
+.btn-about.account-entry{top:calc(54px + env(safe-area-inset-top));right:calc(14px + env(safe-area-inset-right));bottom:auto;left:auto;max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+dialog.account{padding:0;width:min(24rem,calc(100% - 32px));margin:auto}
+.account::backdrop{background:rgba(16,24,24,.48);backdrop-filter:blur(4px)}
+.account form,.account label{display:grid;gap:.4rem}.account form{gap:.8rem;padding-top:.7rem}
+.account label{font-size:14px}.account input{box-sizing:border-box;width:100%;padding:.6rem;border-radius:8px;border:1px solid rgba(244,239,226,.38);background:#f4efe2;color:#1c2c2a;font:inherit;font-size:16px}
+.account nav{display:flex;gap:.45rem;flex-wrap:wrap}.account .about-close{min-height:36px}.account .message{min-height:1.6em}
