@@ -416,7 +416,7 @@ class Builder:
             self.box(0, y + 0.12, 0, w - 1.2, 0.42, min(1.0, d * 0.4), 'hedge', tile=1.5)
         self.pose = prev
 
-    def prism(self, poly_xz, y0, h, region, cap_region=None, tile=2.4, collide=False):
+    def prism(self, poly_xz, y0, h, region, cap_region=None, tile=2.4, collide=False, footing=False):
         pts = np.asarray(poly_xz, dtype=np.float64)
         if len(pts) >= 2 and np.allclose(pts[0], pts[-1]):
             pts = pts[:-1]
@@ -435,12 +435,17 @@ class Builder:
             self.face(quad_tri, (0, 1, 0), cap_region or region, tile=tile)
             if collide and self.collide:
                 self.hit.add_poly([self._xf(p) for p in quad_tri], self._xf_dir((0, 1, 0)), None)
+        bottom = np.full(len(pts), y0)
+        if footing:
+            for i, (x, z) in enumerate(pts):
+                px, py, pz = self._xf((x, 0, z))
+                bottom[i] = self.surface.ground(px, pz)-py-.04
         if h > 0.02:
             for i in range(len(pts)):
                 j = (i + 1) % len(pts)
                 a, b = pts[i], pts[j]
                 nrm = (b[1] - a[1], 0.0, a[0] - b[0])
-                quad = [(a[0], y0, a[1]), (b[0], y0, b[1]), (b[0], y1, b[1]), (a[0], y1, a[1])]
+                quad = [(a[0], bottom[i], a[1]), (b[0], bottom[j], b[1]), (b[0], y1, b[1]), (a[0], y1, a[1])]
                 self.face(quad, nrm, region, tile=tile)
                 if collide and self.collide and h >= 0.35:
                     seg_len = math.hypot(b[0] - a[0], b[1] - a[1])
@@ -470,8 +475,10 @@ class Builder:
             pts = pts[::-1]
 
         total_h = floors * floor_h
-        self.prism(pts, y0 - 0.35, 0.90, plinth, cap_region=plinth, tile=2.0, collide=False)
-        self.prism(pts, y0 + 0.55, total_h - 0.55, wall, cap_region=roof_tile if roof_kind == 'flat' else wall, tile=2.4, collide=True)
+        corners = [self._xf((x, 0, z)) for x, z in pts]
+        sill = max(y0+.55, max(self.surface.ground(x,z)-y for x,y,z in corners)+.10)
+        self.prism(pts, y0-.35, sill-y0+.35, plinth, cap_region=plinth, tile=2.0, footing=True)
+        self.prism(pts, sill, y0+total_h-sill, wall, cap_region=roof_tile if roof_kind == 'flat' else wall, tile=2.4, collide=True)
         # Parapet band at top
         self.prism(pts, y0 + total_h, 0.48, accent, cap_region=roof_tile if roof_kind == 'flat' else accent, tile=2.0, collide=False)
 
@@ -824,7 +831,7 @@ class Builder:
     def campus_tree(self, x, z, h=8.0, spread=3.2, seed=1, kind='camphor', y0=0.0, planter=True):
         tx, ty, tz = self._xf((x, y0, z))
         prev = self.pose
-        self.pose = (tx, ty, tz, 0.0)
+        self.pose = (tx, ty+self.surface.ground(tx,tz), tz, 0.0)
         if planter:
             self.box(0, 0.02, 0, 1.85, 0.16, 1.85, 'granite', tile=1.2)
             self.box(0, 0.18, 0, 1.48, 0.04, 1.48, 'lawn', tile=1.2)
@@ -879,6 +886,8 @@ def export_school(path, build_fn, signs=()):
     image, rects = make_school_atlas(signs)
     hi = Builder(rects, lod=0, collide=True)
     lo = Builder(rects, lod=1, collide=False)
+    from c_kit import landmark_surface
+    hi.surface = lo.surface = landmark_surface(Path(path).stem)
     build_fn(hi)
     build_fn(lo)
 

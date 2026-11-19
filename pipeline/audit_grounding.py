@@ -21,13 +21,57 @@ BEARING_BAND = .50
 CONTACT = .035  # Allows GLB quantization and small joints between touching meshes.
 
 
+def facade_joints(vertices, tris, component, face_group):
+    """Attach planar window/sign decals to their backing vertical wall.
+
+    The G3 builder offsets strips 0.06–0.14 m along the wall normal. Require
+    every decal vertex to project inside the same backing component. Solid
+    columns and box-shaped foundations cannot meet the planar test.
+    """
+    normals = np.cross(tris[:,1]-tris[:,0], tris[:,2]-tris[:,0])
+    lengths = np.linalg.norm(normals,axis=1)
+    normals /= np.maximum(lengths[:,None],1e-12)
+    walls = np.flatnonzero((lengths>1e-6) & (abs(normals[:,1])<.02))
+    if not len(walls):
+        return []
+    margin = .17
+    lo, hi = tris[walls].min(axis=1), tris[walls].max(axis=1)
+    tree = shapely.STRtree(shapely.box(lo[:,0]-margin,lo[:,2]-margin,hi[:,0]+margin,hi[:,2]+margin))
+    groups = np.split(np.argsort(component),np.cumsum(np.bincount(component))[:-1])
+    bonds = []
+    for group, indices in enumerate(groups):
+        pts = vertices[indices].astype(float)
+        if len(pts)<3 or len(pts)>32 or np.ptp(pts[:,1])<.05:
+            continue
+        xz = pts[:,::2]-pts[0,::2]
+        axis = xz[np.linalg.norm(xz,axis=1).argmax()]
+        length = np.linalg.norm(axis)
+        if length<.3:
+            continue
+        side = np.array([-axis[1],axis[0]])/length
+        if np.abs(xz@side).max()>.012:
+            continue
+        v, f = tree.query(shapely.points(pts[:,::2]))
+        f=walls[f]
+        usable=(face_group[f]!=group)&(abs(normals[f][:,::2]@side)>.995)
+        v,f=v[usable],f[usable]
+        if not len(f):
+            continue
+        closest=trimesh.triangles.closest_point(tris[f],pts[v])
+        match=np.linalg.norm(closest-pts[v],axis=1)<=margin
+        pairs=np.unique(np.column_stack((face_group[f[match]],v[match])),axis=0)
+        backing,counts=np.unique(pairs[:,0],return_counts=True)
+        bonds.extend((group,w) for w in backing[counts==len(pts)])
+    return bonds
+
+
 def assemblies(vertices, faces, component, count):
     """Join components at physical contacts, including UV/material seams and T joints."""
     tris = vertices[faces].astype(float)
     lo, hi = tris.min(axis=1), tris.max(axis=1)
     tree = shapely.STRtree(shapely.box(lo[:,0]-CONTACT,lo[:,2]-CONTACT,
                                        hi[:,0]+CONTACT,hi[:,2]+CONTACT))
-    bonds = []
+    bonds = facade_joints(vertices, tris, component, component[faces[:,0]])
     for start in range(0, len(vertices), 512):
         v, f = tree.query(shapely.points(vertices[start:start+512,::2]))
         v += start
