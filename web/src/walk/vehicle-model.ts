@@ -20,9 +20,28 @@ export function vehicleModel(kind:string,paint=0){
       box(.18,.56,.14,0,.79,-.45,color);box(.68,.065,.09,0,1.04,-.43,0x474b4b)
       for(const side of [-1,1]){box(.025,.19,.025,side*.29,1.14,-.46,0x535858);box(.13,.08,.04,side*.29,1.25,-.46,0xa8b9bf)}
       for(const side of [-1,1]){box(.03,.2,.28,side*.18,.92,-.65,0x858883);box(.38,.2,.025,0,.92,-.65+side*.14,0x858883)}
-    }else if(kind==='raft'){
+    }else if(kind==='raft'||kind==='freeRaft'){
       for(let pole=-3;pole<=3;pole++)part(new T.CylinderGeometry(.1,.12,4.3,8).rotateX(Math.PI/2),0xae905b,pole*.19,.1,0)
       box(1.1,.26,.46,0,.33,0,0x72573e)
+    }else if(kind==='rowboat'){
+      // Four-Lakes wooden rowboat: 3.40 m x 1.34 m (<= 1.35 m), gunwale/oar top 0.413 m (<= 0.52 m roof even with wave roll), 1 draw call.
+      box(.88,.12,1.96,0,.02,0,0x6b4d35)
+      box(.64,.12,.62,0,.06,-1.24,0x6b4d35)
+      box(.68,.12,.56,0,.06,1.21,0x6b4d35)
+      box(.32,.18,.30,0,.17,-1.55,0x856242)
+      box(.34,.06,.18,0,.29,-1.61,0xa54032)
+      box(.48,.20,.42,0,.16,1.49,0x856242)
+      box(.78,.04,1.90,0,.10,0,0xb8956c)
+      for(const side of [-1,1]){
+        box(.09,.30,1.96,side*.54,.21,0,0x96704c)
+        part(new T.BoxGeometry(.09,.28,.76).rotateY(side*.34),0x96704c,side*.41,.22,-1.24)
+        part(new T.BoxGeometry(.09,.28,.72).rotateY(-side*.30),0x96704c,side*.43,.22,1.22)
+        box(.11,.04,1.98,side*.55,.37,0,0xc4a47a)
+        part(new T.BoxGeometry(.05,.045,1.68).rotateY(-side*.04),0xc9ab81,side*.60,.39,.14)
+        box(.10,.035,.36,side*.62,.39,.86,0xa54032)
+      }
+      box(1.04,.08,.36,0,.24,.06,0x72573e)
+      box(.92,.07,.30,0,.23,-.68,0x72573e)
     }else if(kind==='boat' && paint===1){
       box(2.2,.34,5.8,0,.16,0,0xf2efe6)
       box(1.96,.49,4.95,0,.58,.04,0x72868b)

@@ -4,7 +4,7 @@ import type {Stream} from '../stream'
 import type {Tile} from '../world'
 import {bikeConfig as bcfg, walkConfig as wcfg} from './config'
 
-type Kind = 'ground'|'overview'|'deck'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
+type Kind = 'ground'|'overview'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
 type SurfaceHit = {y:number; slope:number} | null
 
 export interface DismountContext {
@@ -59,7 +59,6 @@ const DISMOUNT_OFFSETS: readonly [number, number][] = [
 const JOINT_NAMES = ['ThighL', 'ThighR', 'ShinL', 'ShinR', 'ArmL', 'ArmR', 'ForearmL', 'ForearmR', 'Torso', 'Head'] as const
 type JointName = (typeof JOINT_NAMES)[number]
 
-let toastTimer = 0
 let wallRay: R.Ray | undefined
 
 function smoothstep(t: number) {
@@ -85,16 +84,11 @@ function turnRate(speed: number) {
 
 /** Shows non-intrusive toast when mounting/dismounting a bike is blocked by walls or narrow obstacles. */
 export function notifyDismountBlocked(message = '这里太窄了，挪一挪再下车') {
-  const toast = document.querySelector<HTMLElement>('.toast')
-  if (!toast) return
-  toast.textContent = message
-  toast.classList.add('show')
-  clearTimeout(toastTimer)
-  toastTimer = window.setTimeout(() => toast.classList.remove('show'), 2400)
+  window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: message, ms: 2400}}))
 }
 
 function isWallBlocker(kind: Kind | undefined) {
-  return kind === 'building' || kind === 'rail' || kind === 'peak' || kind === 'landmark' || kind === 'tree' || kind === 'deck'
+  return kind === 'building' || kind === 'rail' || kind === 'peak' || kind === 'landmark' || kind === 'tree' || kind === 'deck' || kind === 'deckThin'
 }
 
 function localSupport(ctx: DismountContext, x: number, z: number, refY: number) {

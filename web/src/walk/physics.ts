@@ -3,13 +3,14 @@ import * as THREE from 'three'
 import type {PeakColliderData, PeaksGroup} from '../peaks'
 import type {Stream} from '../stream'
 import {fetchAsset,type Manifest,type Tile} from '../world'
+import {look} from '../look/config'
 import {walkConfig as cfg} from './config'
 import {probeLocalDismount, probeLocalMount} from './ride'
 
 type Outline = import('../buildings').Building
-type Kind = 'ground'|'overview'|'deck'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
+type Kind = 'ground'|'overview'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
 type Region = {fine:boolean,colliders:R.Collider[],rings:Outline[]}
-const identity = {x:0,y:0,z:0,w:1}, down = {x:0,y:-1,z:0}
+const identity = {x:0,y:0,z:0,w:1}, down = {x:0,y:-1,z:0}, up = {x:0,y:1,z:0}
 const candidates = [{dx:0,dz:0}]
 for(let dx=-cfg.search;dx<=cfg.search;dx+=2) for(let dz=-cfg.search;dz<=cfg.search;dz+=2)
   if((dx||dz)&&Math.hypot(dx,dz)<=cfg.search)candidates.push({dx,dz})
@@ -101,7 +102,15 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
           colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
       if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
       if(data?.deck.length){const count=data.deck.length/3
-        colliders.push(add(R.ColliderDesc.trimesh(data.deck,Uint32Array.from({length:count},(_,at)=>at),R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(tile.x,0,tile.z),'deck'))}
+        if(!data.thin.size){
+          colliders.push(add(R.ColliderDesc.trimesh(data.deck,Uint32Array.from({length:count},(_,at)=>at),R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(tile.x,0,tile.z),'deck'))
+        }else{
+          const thick:number[]=[], thin:number[]=[]
+          for(let tri=0;tri<count/3;tri++){const dst=data.thin.has(tri)?thin:thick, base=tri*9
+            for(let k=0;k<9;k++)dst.push(data.deck[base+k])}
+          if(thick.length)colliders.push(add(R.ColliderDesc.trimesh(Float32Array.from(thick),Uint32Array.from({length:thick.length/3},(_,at)=>at),R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(tile.x,0,tile.z),'deck'))
+          if(thin.length)colliders.push(add(R.ColliderDesc.trimesh(Float32Array.from(thin),Uint32Array.from({length:thin.length/3},(_,at)=>at),R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(tile.x,0,tile.z),'deckThin'))
+        }}
       regions.set(tile,{colliders,rings,fine:!!data});changed=true
     }
     for(const peak of peaks.colliders){
@@ -138,12 +147,48 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const tiles=new Map(manifest.chunks.map(tile=>[`${tile.x},${tile.z}`,tile]))
   const tileAt=(east:number,south:number)=>tiles.get(`${Math.floor(east/256)*256},${Math.floor(south/256)*256}`)
   const surfaceRay=new R.Ray({x:0,y:0,z:0},down)
+  const upRay=new R.Ray({x:0,y:0,z:0},up)
+  const segmentRay=new R.Ray({x:0,y:0,z:0},{x:1,y:0,z:0})
+  const hullBoxes=new Map<string,R.Cuboid>()
+  const deckFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='deck'||k==='deckThin'}
+  const spanFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'}
+  const wallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='building'}
+  const hullFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='rail'||k==='building'}
   function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
     surfaceRay.origin.x=east;surfaceRay.origin.y=origin;surfaceRay.origin.z=south
-    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)
-    const tile=kind==='deck'?tileAt(east,south):undefined
-    const thin=tile&&hit?.featureId!==undefined&&stream.loaded.get(tile)?.thin.has(hit.featureId)
+    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)
+    const thin=!!hit&&kinds.get(hit.collider.handle)==='deckThin'
     return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}:null
+  }
+  function waterCeiling(east:number,south:number,waterY:number){
+    let bottom=Infinity
+    if(hasDeck(east,south)){
+      upRay.origin.x=east;upRay.origin.y=waterY-.8;upRay.origin.z=south
+      const deckHit=world.castRayAndGetNormal(upRay,16,false,undefined,undefined,capsule,undefined,deckFilter)
+      if(deckHit){const thick=kinds.get(deckHit.collider.handle)==='deckThin'?.6:look.bridgeDepth
+        bottom=Math.min(bottom,waterY-.8+deckHit.timeOfImpact-thick)}
+    }
+    upRay.origin.x=east;upRay.origin.y=waterY+.15;upRay.origin.z=south
+    const spanHit=world.castRayAndGetNormal(upRay,15,false,undefined,undefined,capsule,undefined,spanFilter)
+    if(spanHit)bottom=Math.min(bottom,waterY+.15+spanHit.timeOfImpact)
+    return bottom
+  }
+  function waterOverlap(x:number,y:number,z:number,heading:number,halfW:number,halfH:number,halfL:number){
+    const key=`${halfW.toFixed(3)},${halfH.toFixed(3)},${halfL.toFixed(3)}`
+    let box=hullBoxes.get(key)
+    if(!box){box=new R.Cuboid(halfW,halfH,halfL);hullBoxes.set(key,box)}
+    const half=heading*.5
+    return !!world.intersectionWithShape({x,y,z},{x:0,y:Math.sin(half),z:0,w:Math.cos(half)},box,undefined,undefined,capsule,undefined,hullFilter)
+  }
+  function pathBlocked(x0:number,z0:number,x1:number,z1:number,y:number){
+    const dx=x1-x0,dz=z1-z0,len=Math.hypot(dx,dz)
+    if(len<1e-3)return false
+    segmentRay.origin.x=x0;segmentRay.origin.y=y;segmentRay.origin.z=z0
+    segmentRay.dir.x=dx/len;segmentRay.dir.y=0;segmentRay.dir.z=dz/len
+    return !!world.castRay(segmentRay,len,true,undefined,undefined,capsule,undefined,wallFilter)
+  }
+  function freeCapsule(x:number,y:number,z:number){
+    return !world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule)
   }
   function wet(east:number,south:number){const tile=tileAt(east,south),data=tile&&stream.loaded.get(tile);if(!tile||!data)return true
     const at=Math.round((south-tile.z)/4)*65+Math.round((east-tile.x)/4)
@@ -167,7 +212,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     }return null
   }
   function hasDeck(east:number,south:number){const tile=tileAt(east,south);return !!(tile&&stream.loaded.get(tile)?.deck.length)}
-  function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)}
+  function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)}
   function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear()}
   function findLocalDismount(cx:number,cz:number,heading:number,bikeY:number){
     return probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,bikeY)
@@ -181,5 +226,5 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,hasDeck,surface,wet,insideHouse,findWalkableSpawn,findLocalDismount,findLocalMount,isBlockedAt}
+  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,hasDeck,surface,waterCeiling,waterOverlap,pathBlocked,freeCapsule,wet,insideHouse,findWalkableSpawn,findLocalDismount,findLocalMount,isBlockedAt}
 }
