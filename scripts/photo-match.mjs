@@ -17,6 +17,8 @@ const { values, positionals } = parseArgs({
     'yaw-offset': { type: 'string', default: '0' },
   },
 })
+// Loaded SwiftShader hosts (sg at load 30+) render ~0.5 fps; allow a longer settle there.
+const settleMs = Number(process.env.PHOTO_MATCH_TIMEOUT_MS ?? 90000)
 const height = Number(values.height),
   offset = Number(values['yaw-offset'])
 if (!Number.isFinite(height) || !Number.isFinite(offset))
@@ -86,7 +88,7 @@ try {
         )
       },
       null,
-      { timeout: 90000 },
+      { timeout: settleMs },
     )
   for (const key of ordered) {
     currentKey = key
