@@ -7,3 +7,13 @@ export const walkConfig = {
   pitch:.3, camRadius:.22, camRecover:9,
   gate:{x:-588,z:-212,yaw:Math.PI},
 }
+
+/** E-bike longitudinal dynamics, cornering lean, and transition parameters (25 km/h cap). */
+export const bikeConfig = {
+  maxSpeed:25/3.6, reverseMax:-1.8, accel:4.2, torqueDecay:.65, torquePow:.65,
+  brake:7.5, revHold:.22, revAccel:2.4, rollDrag:.42, aeroDrag:.09,
+  pivotTurn:.9, peakTurn:1.65, topTurn:1.12, steerDamp:10,
+  leanMax:.26, leanDamp:7.5, pitchMax:.18, pitchDamp:8,
+  mountDuration:.18, dismountDuration:.15,
+  stickDeadFwd:.1, stickDeadTurn:.12, slideDamp:1.8,
+}

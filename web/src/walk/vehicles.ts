@@ -1,11 +1,12 @@
 import * as T from 'three'
 import {fetchAsset} from '../world'
+import {createBikeControl} from './ride'
 import {vehicleModel} from './vehicle-model'
 
 type Position=[number,number,number]
 type Route={kind:string,start:string,end:string,path:Position[]}
 interface Data {bikes:[number,number,number,number,number][];docks:Record<string,Position>;routes:Route[];grid:number[];mask:string}
-export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number)=>boolean){
+export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number,bikeHeading?:number,bikeY?:number)=>boolean){
   const buffer=await fetchAsset(file), data:Data=JSON.parse(await new Response(new Blob([buffer]).stream().pipeThrough(new DecompressionStream('gzip'))).text())
   const mask=atob(data.mask),[left,top,width,height,step]=data.grid,group=new T.Group();scene.add(group)
   const cells=new Map<string,T.Group>(),visibleCells=new Set<T.Group>(),cellSize=128
@@ -21,12 +22,13 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
   }
   const departures=new Set<string>(),moored=data.routes.map(leg=>{const first=!departures.has(leg.start);departures.add(leg.start);return first})
   const button=document.createElement('button');button.className='vehicle-action';button.hidden=true;document.body.append(button)
-  let bike:T.Mesh|null=null,route=-1,nearBike:T.Mesh|null=null,nearRoute=-1,segment=1,disembark=false,active=false,speed=0,heading=0,lean=0
-  function reset(){if(route>=0)vessels[route].position.fromArray(data.routes[route].path[0]);if(bike){bike.rotation.z=0;store(bike)}bike=null;route=-1;disembark=false;segment=1;speed=0;lean=0}
+  const bikeCtrl=createBikeControl()
+  let bike:T.Mesh|null=null,route=-1,nearBike:T.Mesh|null=null,nearRoute=-1,segment=1,disembark=false,active=false,heading=0
+  function reset(){if(route>=0)vessels[route].position.fromArray(data.routes[route].path[0]);if(bike){bike.rotation.set(0,bikeCtrl.heading,0);store(bike)}bike=null;route=-1;disembark=false;segment=1;bikeCtrl.reset()}
   function interact(){if(!active)return
-    if(bike){if(land(bike.position.x+Math.cos(heading),bike.position.z-Math.sin(heading))){bike.rotation.z=0;reset()}}
+    if(bike){if(land(bike.position.x,bike.position.z,bikeCtrl.heading,bike.position.y))reset()}
     else if(route>=0)disembark=true
-    else if(nearBike){bike=nearBike;group.add(bike);heading=bike.rotation.y;speed=0}
+    else if(nearBike){bike=nearBike;group.add(bike);bikeCtrl.mount(bike.rotation.y)}
     else if(nearRoute>=0){route=nearRoute;segment=1;disembark=false}
   }
   button.onclick=interact;window.addEventListener('keydown',event=>{if(event.code==='KeyE'&&!event.repeat)interact()})
@@ -53,11 +55,14 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     if(disembark||next<0){if(land(x,z))reset();return}
     if(next>=0){mesh.position.fromArray(leg.path[0]);route=next;segment=1}
   }
-  return {nearby,advance,get bike(){return bike},get boat(){return route>=0?vessels[route]:null},get heading(){return heading},get speed(){return speed},
-    show(on:boolean){reset();document.body.removeAttribute('data-aboard');active=group.visible=on;button.hidden=true},stop(){speed=0},
-    steer(forward:number,right:number,dt:number){speed=T.MathUtils.clamp(speed+(forward>0?2.6*forward:forward<0?5*forward:-1.2)*dt,0,25/3.6)
-      heading-=right*Math.min(1,.5+speed/2)*1.6*dt;lean=T.MathUtils.damp(lean,right*speed*.018,6,dt);return speed},
-    park(pos:T.Vector3){if(bike){bike.position.copy(pos);bike.rotation.set(0,heading,lean,'YXZ')}},
+  return {nearby,advance,get bike(){return bike},get boat(){return route>=0?vessels[route]:null},get heading(){return bike?bikeCtrl.heading:heading},get speed(){return bike?bikeCtrl.speed:0},
+    get lean(){return bikeCtrl.lean},get pitch(){return bikeCtrl.pitch},get steerInput(){return bikeCtrl.steerInput},
+    show(on:boolean){reset();document.body.removeAttribute('data-aboard');active=group.visible=on;button.hidden=true},stop(){bikeCtrl.stop()},
+    dampSpeed(step:number){return bikeCtrl.dampSpeed(step)},
+    setPitch(frontY:number|undefined,backY:number|undefined,dt:number){bikeCtrl.setPitch(frontY,backY,dt)},
+    resolveMove(ctx:Parameters<typeof bikeCtrl.resolveMove>[0]){return bikeCtrl.resolveMove(ctx)},
+    steer(forward:number,right:number,dt:number,mounted=true){return bikeCtrl.steer(forward,right,dt,mounted)},
+    park(pos:T.Vector3){if(bike){bike.position.copy(pos);bike.rotation.set(bikeCtrl.pitch,bikeCtrl.heading,bikeCtrl.lean,'YXZ')}},
     pavement(x:number,z:number){const col=Math.round((x-left)/step),row=Math.round((z-top)/step),index=row*width+col
       return col>=0&&row>=0&&col<width&&row<height&&!!(mask.charCodeAt(index>>3)&(128>>(index&7)))} }
 }

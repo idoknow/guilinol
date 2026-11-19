@@ -23,7 +23,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     const running=runHold||runLock||stick.mag>.9
     btnRun.classList.toggle('on',runHold||runLock)
     btnRun.setAttribute('aria-pressed',String(runHold||runLock))
-    joystick.classList.toggle('running',running&&stick.mag>.1)
+    joystick.classList.toggle('running',running&&stick.mag>.1&&!document.body.hasAttribute('data-aboard'))
   }
   function resetStick(){stick.x=stick.y=stick.mag=0;stickPointer=-1;knob.style.transform='';syncRun()}
   function drag(event:PointerEvent){
@@ -116,6 +116,9 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     show(on:boolean){
       panel.hidden=!on||!matchMedia('(pointer:coarse)').matches
       keys.clear();jump=false;runHold=false;runLock=false;touches.clear();mouseDown=false;resetStick()
+    },
+    clearRun(){
+      runHold=false;runLock=false;runPointer=-1;syncRun()
     },
     read(){
       if(document.body.hasAttribute('data-aboard')&&(runHold||runLock)){runHold=false;runLock=false;runPointer=-1;syncRun()}
