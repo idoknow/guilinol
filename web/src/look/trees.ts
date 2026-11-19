@@ -46,12 +46,19 @@ function camphor() { // 香樟: broad rounded crown of three lumps on a short tr
     far: [{...leaf, geometry:lump(5, .72, 0, 7.2, 0)}],
   }
 }
-function banyan() { // 榕树: very wide, low dome; heavy trunk plus two aerial-root columns
+function rootStrand(x:number, z:number, topY:number, botY:number, rTop:number) {
+  return new THREE.ConeGeometry(rTop, topY - botY, 3, 1, true).rotateX(Math.PI).translate(x, (topY + botY) / 2, z)
+}
+function banyan() { // 榕树: very wide, low dome; fluted root columns by trunk + hanging canopy aerial-root curtains (near = 116 <= 120 faces)
   const leaf = {color:t.banyan, lit:t.banyanLit, dark:t.canopyDark}
   return {
-    near: [{geometry:trunk(4.5, .9, .55, 6), color:t.trunk},
-      {geometry:trunk(4.8, .14, .12, 3).translate(3.4, 0, 1.2), color:t.trunk},
-      {geometry:trunk(4.6, .12, .1, 3).translate(-2.8, 0, -2.4), color:t.trunk},
+    near: [{geometry:trunk(4.5, .92, .56, 6), color:t.trunk},
+      {geometry:trunk(4.7, .17, .12, 3).translate(.88, 0, .42), color:t.trunk},
+      {geometry:trunk(4.6, .16, .11, 3).translate(-.82, 0, -.52), color:t.trunk},
+      {geometry:rootStrand(1.05, -.38, 4.9, .45, .11), color:t.trunk},
+      {geometry:rootStrand(-.45, 1.02, 5.0, .55, .10), color:t.trunk},
+      {geometry:rootStrand(2.2, 1.7, 5.7, 2.35, .10), color:t.trunk},
+      {geometry:rootStrand(-2.1, 1.9, 5.7, 2.45, .10), color:t.trunk},
       {...leaf, geometry:lump(5.6, .5, 0, 7.6, 0)}, {...leaf, geometry:lump(4, .55, 4.6, 6.8, 1.5, 1)},
       {...leaf, geometry:lump(4, .55, -4.2, 6.9, -2, 2)}, {...leaf, geometry:lump(3.4, .6, -.8, 7.4, 4.4, 3)}],
     far: [{...leaf, geometry:lump(8, .45, 0, 7.2, 0)}],

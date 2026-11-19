@@ -89,14 +89,104 @@ def palace_features():
             yield props, Polygon([ll2xz(lat, lon) for lon, lat in ring])
 
 
-def buildings(bounds, elevation, peaks,layout):
+def rongyin_photo():
+    return json.loads((Path(__file__).resolve().parents[1] / 'docs/refs/rock/photo-locations.json').read_text())['IMG_1299.jpg']
+
+
+def rongyin_frontage():
+    # The surveyed open corner and the orientation of its existing east facade.
+    photo = rongyin_photo()
+    eye = np.array([photo['x'], photo['z']])
+    along = np.array([11.22, -24.99])
+    along /= np.linalg.norm(along)
+    inward = np.array([along[1], -along[0]])
+    edge = eye + inward * 2
+    return edge, along, inward
+
+
+def rongyin_sidewalk():
+    edge, along, inward = rongyin_frontage()
+    return Polygon([edge + a * along - b * inward for a, b in
+                    [(-8, 0), (8, 0), (8, 18), (-8, 18)]])
+
+
+def overture_geometry(row):
+    shape = affine_transform(from_wkt(row['wkt']), [MLON, 0, 0, -MLAT, -LON0*MLON, LAT0*MLAT])
+    if row['id'] == '94d505df-4dd6-4bdf-b242-be218cce7937':
+        # IMG_1299 shows an open sidewalk at the survey point. Set the Rongyin
+        # frontage behind it, parallel to the existing east facade of this block.
+        edge, along, inward = rongyin_frontage()
+        reach = shape.length
+        cut = Polygon([edge + a * along + b * inward for a, b in
+                       [(-reach, 0), (reach, 0), (reach, reach), (-reach, reach)]])
+        shape = shape.intersection(cut)
+    return shape
+
+
+def raw_overture_footprints(bounds):
+    out = []
+    with (Path(RAW)/'overture_buildings.csv').open() as source:
+        for row in csv.DictReader(source, delimiter='\t'):
+            geometry = overture_geometry(row)
+            if geometry.intersects(bounds):
+                out.extend(polygons(make_valid(geometry)))
+    return out
+
+
+def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_mask=None):
     footprints, heights = [], []
     grounds = unary_union(layout.school_grounds)
     rules = json.loads(Path(__file__).with_name('building-kinds.json').read_text())
     districts = unary_union([Polygon([ll2xz(*ll) for ll in ring]) for ring in rules['oldDistrictsLatLon']])
     campuses = STRtree([area(el) for el in load_osm() if el['type']!='node' and any(
         el.get('tags',{}).get(tag) in rules['glazedUses'] for tag in ['building','amenity','office','tourism'])])
+    replace_excl = getattr(layout, 'replace_exclude', layout.exclude)
+    model_excl = getattr(layout, 'model_footprints', Polygon()).buffer(0.10)
+    road_tree = STRtree(list(polygons(carriageway_mask))) if carriageway_mask and not carriageway_mask.is_empty else None
+    sw_tree = STRtree(list(polygons(sidewalk_mask))) if sidewalk_mask and not sidewalk_mask.is_empty else None
     kinds = Counter()
+    removed_road, clipped_road, clipped_sw = 0, 0, 0
+    def clipped_footprints(raw_poly):
+        nonlocal removed_road, clipped_road, clipped_sw
+        orig_area = raw_poly.area
+        if orig_area < 4.0:
+            return []
+        cand_polys = [raw_poly]
+        if not model_excl.is_empty and raw_poly.intersects(model_excl):
+            diff_m = make_valid(raw_poly.difference(model_excl))
+            if diff_m.is_empty or (orig_area - diff_m.area) / orig_area > 0.40:
+                return []
+            cand_polys = [p for p in polygons(diff_m) if p.area >= 4.0]
+        if road_tree is not None:
+            next_polys = []
+            for cp in cand_polys:
+                hits = road_tree.query(cp, predicate='intersects')
+                if not hits.size:
+                    next_polys.append(cp)
+                    continue
+                local_road = unary_union(road_tree.geometries.take(hits))
+                trimmed = make_valid(cp.difference(local_road))
+                if trimmed.is_empty or (cp.area - trimmed.area) / cp.area > 0.40:
+                    removed_road += 1
+                    continue
+                clipped_road += 1
+                next_polys.extend(p for p in polygons(trimmed) if p.area >= 6.0)
+            cand_polys = next_polys
+        if sw_tree is not None and cand_polys:
+            next_polys = []
+            for cp in cand_polys:
+                hits = sw_tree.query(cp, predicate='intersects')
+                if not hits.size:
+                    next_polys.append(cp)
+                    continue
+                local_sw = unary_union(sw_tree.geometries.take(hits))
+                trimmed = make_valid(cp.difference(local_sw))
+                if not trimmed.is_empty:
+                    clipped_sw += 1
+                    next_polys.extend(p for p in polygons(trimmed) if p.area >= 4.0)
+            cand_polys = next_polys
+        return cand_polys
+
     palace = []
     custom = {1008248059, 1008248065, 1008248057, 684987708, 885083143,
               679734442, 679734417, 1471532482, 674165595, 674165596, 674165597}
@@ -107,45 +197,56 @@ def buildings(bounds, elevation, peaks,layout):
         palace.append(poly)
         if ident in custom:
             continue
-        center = poly.representative_point()
-        base = elevation(center.x, center.y)
-        floors = int(props['floors'])
-        footprints.append(poly)
-        heights.append((base, base+3.2*floors, 3, floors, ident%65536, center, [], False))
+        for footprint in clipped_footprints(poly):
+            center = footprint.representative_point()
+            base = elevation(center.x, center.y)
+            floors = int(props['floors'])
+            footprints.append(footprint)
+            heights.append((base, base+3.2*floors, 3, floors, ident%65536, center, [], False))
     palace_index = STRtree(palace)
     with (Path(RAW)/'overture_buildings.csv').open() as source:
         for row in csv.DictReader(source, delimiter='\t'):
-            geometry = affine_transform(from_wkt(row['wkt']), [MLON, 0, 0, -MLAT, -LON0*MLON, LAT0*MLAT])
+            geometry = overture_geometry(row)
             if row['id'] in layout.ids:
+                replace_excl = replace_excl.union(geometry)
                 layout.exclude = layout.exclude.union(geometry)
                 continue
-            if (not geometry.intersects(bounds) or layout.exclude.intersects(geometry)
+            if (not geometry.intersects(bounds) or replace_excl.intersects(geometry)
                     or palace_index.query(geometry, predicate="intersects").size):
                 continue
-            for poly in polygons(make_valid(geometry)):
-                if peaks.query(poly,predicate='intersects').size:
+            for raw_poly in polygons(make_valid(geometry)):
+                if peaks.query(raw_poly,predicate='intersects').size:
                     continue
-                center = poly.representative_point()
-                seed = zlib.crc32(row['id'].encode())
-                variation = seed % 3
-                floors = min(7, 1 + int(np.sqrt(poly.area)/10) + variation)
-                if -1700 < center.x < 300 and -1800 < center.y < 700:
-                    floors = min(floors, 4)
-                base = elevation(center.x, center.y)
-                footprints.append(poly)
-                kind = 0
-                if grounds.covers(center):
-                    kind = 3
-                elif floors<=rules['oldMaxFloors'] and districts.covers(center):
-                    kind = 1
-                elif floors<=rules['glazedMaxFloors'] and seed%100<rules['glazedPercent'] and campuses.query(center,predicate='intersects').size:
-                    kind = 2
-                rectangle=[]
-                if kind in (1,2):
-                    rect=poly.minimum_rotated_rectangle
-                    rectangle=[np.rint((np.array(pt)-center.coords[0])*100).astype(int).tolist() for pt in list(rect.exterior.coords)[:4]]
-                heights.append((base,base+3.1*floors,kind,floors,seed,center,rectangle,poly.area/poly.minimum_rotated_rectangle.area<.78))
-                kinds[kind]+=1
+                for poly in clipped_footprints(raw_poly):
+                    poly = poly.buffer(0)
+                    if poly.is_empty or poly.area < 4.0:
+                        continue
+                    for sub in polygons(poly):
+                        if sub.area < 4.0 or sub.minimum_rotated_rectangle.area <= 0:
+                            continue
+                        center = sub.representative_point()
+                        seed = zlib.crc32(f"{row['id']}:{round(center.x,1)}:{round(center.y,1)}".encode())
+                        variation = seed % 3
+                        floors = min(7, 1 + int(np.sqrt(sub.area)/10) + variation)
+                        if -1700 < center.x < 300 and -1800 < center.y < 700:
+                            floors = min(floors, 4)
+                        base = elevation(center.x, center.y)
+                        footprints.append(sub)
+                        kind = 0
+                        if grounds.covers(center):
+                            kind = 3
+                        elif floors<=rules['oldMaxFloors'] and districts.covers(center):
+                            kind = 1
+                        elif floors<=rules['glazedMaxFloors'] and seed%100<rules['glazedPercent'] and campuses.query(center,predicate='intersects').size:
+                            kind = 2
+                        rectangle=[]
+                        if kind in (1,2):
+                            rect=sub.minimum_rotated_rectangle
+                            rectangle=[np.rint((np.array(pt)-center.coords[0])*100).astype(int).tolist() for pt in list(rect.exterior.coords)[:4]]
+                        heights.append((base,base+3.1*floors,kind,floors,seed,center,rectangle,sub.area/sub.minimum_rotated_rectangle.area<.78))
+                        kinds[kind]+=1
+    layout.replace_exclude = replace_excl
+    print(f'Building kinds: {dict(kinds)} (road removed={removed_road}, road clipped={clipped_road}, sidewalk clipped={clipped_sw})')
     existing = STRtree(footprints)
     for element in load_osm():
         tags = element.get('tags', {})
@@ -165,7 +266,6 @@ def buildings(bounds, elevation, peaks,layout):
             base = elevation(center.x,center.y)
             footprints.append(poly)
             heights.append((base,base+3.1*floors,3,floors,element['id']%65536,center,[],False))
-    print('Building kinds:',dict(kinds))
     return footprints, heights
 
 

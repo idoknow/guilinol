@@ -31,6 +31,7 @@
     "verify:ride": "node scripts/ride.mjs",
     "perf": "node scripts/perf.mjs",
     "shoot": "node scripts/shoot.mjs",
+    "audit": "node scripts/audit.mjs",
     "qa": "node scripts/qa.mjs",
     "photo-match": "node scripts/photo-match.mjs",
     "verify:tour": "node scripts/tour.mjs"

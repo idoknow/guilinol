@@ -33,3 +33,24 @@ class ClearanceTest(unittest.TestCase):
         underside=np.array([[-2,102.25,2],[2,102.25,2],[0,102.25,6]])
         self.assertEqual(audit_routes([passage],[(7,underside,0)],select=True),[])
         self.assertEqual(audit_routes([passage],[(7,underside+[0,.1,0],0)],select=True),[passage])
+
+    def test_navigation_uses_height_over_the_swept_hull(self):
+        from clearance import navigable_edges
+        # The high end of this sloping underside is wide enough for the boat.
+        slope = np.array([[-12, 99, 0], [12, 107, 0], [12, 107, 3]])
+        first = np.array([[-8, -1], [8, -1]])
+        last = first + [0, 4]
+        np.testing.assert_array_equal(
+            navigable_edges([(17, slope, 0)], first, last, np.array([1000, 1000]), 'boat'),
+            [False, True])
+
+    def test_world_writer_rejects_a_blocked_leg(self):
+        from vehicles import write_vehicles
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        route = dict(kind='boat', start='A', end='B', path=[[0, 100, 0], [0, 100, 8]])
+        underside = np.array([[-2, 102.25, 2], [2, 102.25, 2], [0, 102.25, 6]])
+        with TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, '航道核查失败'):
+                write_vehicles(Path(directory), {'routes': [route]}, [(17, underside, 0)])
+            self.assertFalse((Path(directory) / 'vehicles.bin').exists())
