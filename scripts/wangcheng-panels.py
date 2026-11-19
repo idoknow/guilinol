@@ -2,6 +2,7 @@
 import argparse
 from pathlib import Path
 import json
+import math
 from PIL import Image,ImageDraw,ImageFont,ImageOps
 
 parser=argparse.ArgumentParser(description=__doc__)
@@ -22,7 +23,18 @@ for camera in json.loads((capture/'cameras.json').read_text()):
     pages.append(page)
 pages[0].save(capture/'photo-match.pdf',save_all=True,append_images=pages[1:],quality=87)
 triptych=Image.new('RGB',(2100,797),'#f8f6ef');draw=ImageDraw.Draw(triptych)
-for index,(file,title) in enumerate([(args.before,'改前 · G1 场景'),(capture/'plan.jpg','改后 · 本次模型'),(args.satellite,'卫星 · Esri / Vantor 2024-12-24')]):
-    triptych.paste(Image.open(file).resize((700,700)),(700*index,53));draw.text((700*index+10,10),title,fill='black',font=font)
-draw.text((12,758),'北向上；游戏两栏同机位。卫星仅核布局，不同比例。© Esri / Vantor',fill='black',font=font)
+def satellite_pixel(east,south,image):
+    merc=lambda lat:math.degrees(math.asinh(math.tan(math.radians(lat))))
+    span=merc(25.287)-merc(25.280)
+    lon=110.300+east/(111320*math.cos(math.radians(25.280)))
+    lat=25.280-south/110574
+    return (image.width*(.5+(lon-110.2935)/span),image.height*(merc(25.287)-merc(lat))/span)
+
+for index,(file,title) in enumerate([(args.before,'改前 · main'),(capture/'plan.jpg','改后 · 本次模型'),(args.satellite,'卫星 · Esri / Vantor 2024-12-24')]):
+    image=Image.open(file)
+    if index==2:
+        half=(360-157.7)*math.tan(math.radians(27.5))
+        image=image.crop((*satellite_pixel(-610-half,-150-half,image),*satellite_pixel(-610+half,-150+half,image)))
+    triptych.paste(image.resize((700,700)),(700*index,53));draw.text((700*index+10,10),title,fill='black',font=font)
+draw.text((12,758),'北向上；同一街区，地面宽约 211 米。卫星仅核布局。© Esri / Vantor',fill='black',font=font)
 triptych.save(capture/'triptych.jpg',quality=92)

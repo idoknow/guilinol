@@ -2,7 +2,8 @@ import {access, mkdir, readFile, writeFile} from 'node:fs/promises'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
 
-const output='captures/wangcheng'
+const output=process.env.CAPTURES??'captures/wangcheng'
+const planOnly=process.argv.includes('--plan-only')
 await mkdir(output,{recursive:true})
 const catalog=JSON.parse(await readFile('docs/refs/rock/photo-locations.json','utf8'))
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
@@ -14,7 +15,7 @@ try {
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&radius=384&time=12`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
   await page.addStyleTag({content:'body > :not(canvas):not(script){visibility:hidden}'})
-  for(const [file,shot] of Object.entries(catalog).filter(([file])=>file.startsWith('walk-shizijie-wangcheng/')).sort()){
+  for(const [file,shot] of Object.entries(catalog).filter(([file])=>!planOnly&&file.startsWith('walk-shizijie-wangcheng/')).sort()){
     const number=file.split('/')[1].slice(0,2)
     const pitch=['34','35'].includes(number)?8:0
     if(process.argv.includes('--resume') && !['34','35'].includes(number) && await access(`${output}/${number}.jpg`).then(()=>true,()=>false)){
@@ -35,7 +36,9 @@ try {
       const angle=heading*Math.PI/180
       camera.position.set(x,ground+1.5,z);camera.near=.12;camera.fov=2*Math.atan(18/focal35/camera.aspect)*180/Math.PI;camera.updateProjectionMatrix()
       camera.lookAt(x+Math.sin(angle),ground+1.5+Math.tan(pitch*Math.PI/180),z-Math.cos(angle))
-      return {number,x,z,ground,heading,focal35,pitch}
+      camera.updateMatrixWorld(true)
+      const probe=window.viewer.probeFoot()
+      return {number,x,z,ground,heading,focal35,pitch,first:probe.lookingAt,distance:probe.wallDistance}
     },{shot,number,pitch}))
     await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))))
     await page.screenshot({path:`${output}/${number}.jpg`,quality:90})
@@ -53,10 +56,10 @@ try {
     }
   }
   await page.setViewportSize({width:700,height:700})
-  await page.evaluate(()=>{const {camera}=window.viewer;camera.fov=55;camera.updateProjectionMatrix();camera.position.set(-676,975,-370);camera.lookAt(-676,150,-370.01)})
-  await page.waitForFunction(()=>!window.viewer.stats.pending)
+  await page.evaluate(()=>{const {camera}=window.viewer;camera.fov=55;camera.updateProjectionMatrix();camera.position.set(-610,360,-150);camera.lookAt(-610,150,-150.01)})
+  await page.waitForFunction(before=>{const {stats,stream}=window.viewer;return !stats.pending&&[...stream.landmarks].some(([entry,group])=>entry.id===(before?'jingjiang':'wangcheng_market')&&group.getObjectByName('lod0')?.visible)},planOnly,{timeout:90000})
   await page.waitForTimeout(400)
   await page.screenshot({path:`${output}/plan.jpg`})
-  await writeFile(`${output}/cameras.json`,JSON.stringify(trace,null,2))
+  if(!planOnly)await writeFile(`${output}/cameras.json`,JSON.stringify(trace,null,2))
   console.log('Captured',trace.length,'camera matches and north-up plan')
 }finally{await browser?.close();await server.close()}
