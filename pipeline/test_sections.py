@@ -29,6 +29,15 @@ class SectionTests(unittest.TestCase):
         self.assertAlmostEqual(aligned.line.distance(Point(89,0)),1.35)
         self.assertFalse(aligned.pavement.covers(Point(89,-3.1)))
 
+    def test_yiwu_sidewalk_under_overhead_exclusion(self):
+        road = profile(LineString([(10,30),(210,30)]),{'highway':'secondary'},STRtree([]),221349755).aligned_section()
+        tile = box(0,0,256,256)
+        with patch('streets.load_osm',return_value=[]):
+            encode,_ = chunks([road],[],tile,[],lambda *_:(150,-32768),box(80,15,145,29))
+            paths = encode(tile,(0,0))[0]
+        self.assertTrue(any(kind==1 and Polygon(shell,holes).covers(Point(9900,2680)) for kind,shell,*holes in paths))
+        self.assertTrue(any(kind==6 and Polygon(shell,holes).covers(Point(9900,2560)) for kind,shell,*holes in paths))
+
     def test_jiefang_widens_outer_edge_only(self):
         road = profile(LineString([(0,0),(250,0)]),{'highway':'primary','width':'9','oneway':'yes','sidewalk':'right'},STRtree([]),727682110)
         _,verge,cycle,_ = section_layers([road])

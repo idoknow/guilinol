@@ -2,7 +2,7 @@ import math
 from collections import defaultdict
 
 from shapely import STRtree
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, Polygon
 from shapely.affinity import affine_transform
 from shapely.geometry import box
 from shapely.ops import unary_union, substring
@@ -28,7 +28,6 @@ def yiwu_frontage(roads):
             outer[index] = (east-side*width*math.sin(angle),south+side*width*math.cos(angle))
         boundary = LineString(outer)
         curb = guide.offset_curve(side*half)
-        from shapely.geometry import Polygon
         walk.append(Polygon([*curb.coords,*reversed(boundary.coords)]).buffer(0))
         tactile.append(guide.offset_curve(side*(half+2.5)).buffer(.175,cap_style='flat'))
         if side == -1:

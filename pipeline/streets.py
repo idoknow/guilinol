@@ -13,7 +13,7 @@ from scatter import CONFIG, walk_line
 from sections import section_layers, clipped, speed_paint, yiwu_frontage, RULES
 
 
-def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None,structures=None):
+def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None):
     if bands is None:
         bands = section_layers(roads)
     surfaces, sidewalks, stripes, medians, gaps = [],[],[],[],[]
@@ -416,8 +416,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             for mask in (bldg_tree,water_tree):
                 if mask is not None:
                     free = free.difference(clipped(mask,tile))
-            if structures is not None:
-                free = free.difference(structures)
+            free = free.difference(rep_excl)
             tactile = tactile.difference(free).union(frontage[1].intersection(free))
             walk = walk.union(free)
         walk = walk.difference(cycle).difference(verge)
