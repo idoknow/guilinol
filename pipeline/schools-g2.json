@@ -94,5 +94,11 @@
     "name": "桂林市宁远小学",
     "osm": "way/1001796192",
     "facade": "photo-informed"
+  },
+  {
+    "id": "peizhi_special",
+    "name": "桂林市培智学校",
+    "osm": "way/1001796193",
+    "facade": "photo-informed"
   }
 ]
