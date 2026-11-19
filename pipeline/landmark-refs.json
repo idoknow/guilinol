@@ -2764,5 +2764,151 @@
     "viewOnly": true
    }
   ]
+ },
+ {
+  "id": "yixian_high",
+  "name": "桂林市逸仙中学（高中部 / 原桂林市第二中学）",
+  "osm": [
+   "way/647471576",
+   "node/9214622460",
+   "node/9214622461"
+  ],
+  "group": "M2.7-G2b",
+  "viewOnly": true,
+  "refs": [
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2022,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/pic/c2cec3fdfc0392456296c57f8f94a4c27d1e259a?x-bce-process=image/format,f_auto/resize,m_lfit,limit_1,w_440",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2022,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/pic/37d12f2eb9389b502844dab18b35e5dde6116e9d?x-bce-process=image/format,f_auto/resize,m_lfit,limit_1,h_327",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学网络学习空间 桂林市逸仙中学 网络学习空间",
+    "year": 2022,
+    "page": "https://022.kouyu100.com/glyxzx/index.jsp",
+    "thumb": "http://static2.kouyu100.com/glyxzx/images/glyxzx_1.jpg",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2022,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/smart/8435e5dde71190ef70692562cc1b9d16fcfa60f8-bkimg-process,v_1,rw_16,rh_9,maxl_504?x-bce-process=image/format,f_auto",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2022,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/smart/3b292df5e0fe9925a1902b9f31a85edf8cb17164-bkimg-process,v_1,rw_4608,rh_2592,maxl_504?x-bce-process=image/format,f_auto",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2016,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/smart/4610b912c8fcc3ce85b87e8e9045d688d43f2016-bkimg-process,v_1,rw_16,rh_9,maxl_504?x-bce-process=image/format,f_auto",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2022,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/smart/b17eca8065380cd77d1fef22a444ad34588281f8-bkimg-process,v_1,rw_4608,rh_2592,maxl_504?x-bce-process=image/format,f_auto",
+    "viewOnly": true
+   },
+   {
+    "title": "“勇敢的走出去!”——桂林市逸仙中学开展军训校外拉练活动-桂林生活网新闻中心 “勇敢的走出去!”—— 桂林市逸仙中学 开展军训校外拉练活动- 桂林 生活网新闻中心",
+    "year": 2021,
+    "page": "https://news.guilinlife.com/article/4iqj364512d263d2130f.html",
+    "thumb": "http://img3.guilinlife.com/cnews/2021/0907/20210907170737289.png",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2022,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/smart/d043ad4bd11373f0f2302350a10f4bfbfaed04f5-bkimg-process,v_1,rw_4608,rh_2592,maxl_504?x-bce-process=image/format,f_auto",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2022,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/smart/7af40ad162d9f2d3fdbb6620acec8a136227cc53-bkimg-process,v_1,rw_4608,rh_2592,maxl_504?x-bce-process=image/format,f_auto",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学 桂林市逸仙中学",
+    "year": 2021,
+    "page": "https://www.zs114.cn/uglsyxzx/",
+    "thumb": "https://www.zs114.cn/upfile/202106/20210616155527372598.jpg",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2022,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/smart/0ff41bd5ad6eddc40a96f6343cdbb6fd5366338f-bkimg-process,v_1,rw_4608,rh_2592,maxl_504?x-bce-process=image/format,f_auto",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学 桂林市逸仙中学",
+    "year": 2021,
+    "page": "https://www.zs114.cn/uglsyxzx/",
+    "thumb": "https://www.zs114.cn/upfile/202106/20210616155515721606.jpg",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2022,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/smart/4610b912c8fcc3ce8d3c8bfc9745d688d53f2004-bkimg-process,v_1,rw_4608,rh_2592,maxl_504?x-bce-process=image/format,f_auto",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2022,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/smart/242dd42a2834349bd433234accea15ce37d3becc-bkimg-process,v_1,rw_4608,rh_2592,maxl_504?x-bce-process=image/format,f_auto",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2022,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/smart/f9198618367adab4e770700188d4b31c8601e4d4-bkimg-process,v_1,rw_640,rh_853,maxl_284?x-bce-process=image/format,f_auto",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2022,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/smart/a71ea8d3fd1f4134a17849b1201f95cad0c85eb5-bkimg-process,v_1,rw_4608,rh_2592,maxl_504?x-bce-process=image/format,f_auto",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学_百度百科 桂林市逸仙中学 _百度百科",
+    "year": 2022,
+    "page": "https://baike.baidu.com/item/桂林市逸仙中学/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/smart/f31fbe096b63f6248dff52418444ebf81b4ca3d6-bkimg-process,v_1,rw_640,rh_853,maxl_284?x-bce-process=image/format,f_auto",
+    "viewOnly": true
+   },
+   {
+    "title": "桂林市逸仙中学",
+    "year": 2022,
+    "page": "http://baike.baidu.com/item/%E6%A1%82%E6%9E%97%E5%B8%82%E9%80%B8%E4%BB%99%E4%B8%AD%E5%AD%A6/4260638",
+    "thumb": "https://bkimg.cdn.bcebos.com/pic/37d12f2eb9389b502844dab18b35e5dde6116e9d",
+    "viewOnly": true
+   }
+  ]
  }
 ]

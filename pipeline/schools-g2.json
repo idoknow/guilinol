@@ -100,5 +100,12 @@
     "name": "桂林市培智学校",
     "osm": "way/1001796193",
     "facade": "photo-informed"
+  },
+  {
+    "id": "yixian_high",
+    "name": "桂林市逸仙中学",
+    "osm": "way/647471576",
+    "facade": "photo-informed",
+    "street": "雉山路"
   }
 ]
