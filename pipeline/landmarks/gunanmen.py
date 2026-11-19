@@ -17,7 +17,7 @@ vermilion door #8e3034, ochre wall #d2ae58, gray tile #58595b, plaza #989389.
 """
 import math
 import sys
-from rong_street import shops, signs
+from rong_street import shops, signs, approach
 from pathlib import Path
 
 from c_kit import (
@@ -99,6 +99,7 @@ def build(b: Builder):
     deck = 6.7
     courtyard(b, deck)
     shops(b)
+    approach(b)
     # Solid platform. South face is one wall with the arch; the other three sides
     # are single faces, chamfered at the corners and inset 0.45 m at the top.
     front_z = 9.4

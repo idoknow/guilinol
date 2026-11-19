@@ -1,6 +1,6 @@
 from PIL import ImageDraw
 
-from c_kit import RECTS, _font, box, solid, stairs
+from c_kit import RECTS, _font, box, solid, stairs, ring, tube, banyan, railing
 
 
 def signs(image):
@@ -39,3 +39,29 @@ def shops(builder):
         offset=south+length*.36 if kind=='inn' else south
         level=base+3.2
         stone.face([(face+.3,level-high/2,offset+span/2),(face+.3,level-high/2,offset-span/2),(face+.3,level+high/2,offset-span/2),(face+.3,level+high/2,offset+span/2)],(1,0,0),kind,uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
+
+
+def scooter(mesh,east,base,south,color):
+    for offset in (-.56,.56):
+        for depth in (-.06,.06):
+            ring(mesh,(east+offset,base+.24,south+depth),.24,.14,'blacktile',sides=8)
+    box(mesh,(east,base+.40,south),(.98,.18,.34),color)
+    box(mesh,(east-.26,base+.71,south),(.51,.17,.34),'blacktile')
+    tube(mesh,(east+.53,base+.24,south),(east+.43,base+1.06,south),.06,'steel',5)
+    tube(mesh,(east+.43,base+1.06,south-.24),(east+.43,base+1.06,south+.24),.045,'blacktile',4)
+
+
+def approach(builder):
+    mesh=builder.parts['atlas']
+    path=[(18,.8,-30),(23,1.6,-45),(31,2.5,-60),(37,3.8,-76),(44,5.6,-93),(51,6.9,-110),(57,7.9,-126)]
+    for index,(east,base,south) in enumerate(path):
+        box(mesh,(east-6,base,south),(2.3,.24,2.3),'granite')
+        banyan(mesh,(east-6,base+.12,south),10+index%3,7.6,77+index,builder.detail)
+        for offset in range(3 if builder.detail else 1):
+            scooter(mesh,east-5.6,base,south+3+offset*.76,('steel','vermilion','cream')[offset])
+    for index in range(6):
+        box(mesh,(17+index*.9,.37,-24),(.49,.035,4.3),'white')
+    for index in range(5):
+        for sign in (-1,1):
+            tube(mesh,(20+index,.89,-31),(20+index+sign*3.4,.89,-34.4),.05,'yellow',4)
+    railing(mesh,(12,-23),(9,-16),.25,.95,'white',1.6,stone=True)
