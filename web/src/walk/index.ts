@@ -107,6 +107,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     focus.set(x,0,z);const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
     const deadline=performance.now()+15000
     while(needed.some(tile=>!stream.loaded.has(tile))&&performance.now()<deadline){stream.tick(focus);await new Promise(resolve=>setTimeout(resolve,12))}
+    const bridge=manifest.landmarks?.find(entry=>entry.id==='jiefang_bridge'&&Math.hypot(entry.position[0]-x,entry.position[2]-z)<=entry.sphere[3]+cfg.search)
+    if(bridge){
+      focus.y=bridge.position[1]
+      while(!stream.landmarks.has(bridge)&&performance.now()<deadline){stream.updateLandmarks?.(focus,bridge);await new Promise(resolve=>setTimeout(resolve,12))}
+      if(!stream.landmarks.has(bridge))return false
+    }
     sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;yaw=heading;figure.rotation.y=yaw+avatar.yaw;input.show(true);accumulator=0;camera.near=.08;camera.updateProjectionMatrix();follow();return true
   }
