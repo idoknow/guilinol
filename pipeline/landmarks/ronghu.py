@@ -39,11 +39,14 @@ def board(mesh, x, y, z, w, h, region, axis='z'):
         mesh.face([(x, y - h / 2, z - w / 2), (x, y - h / 2, z + w / 2), (x, y + h / 2, z + w / 2), (x, y + h / 2, z - w / 2)], (1, 0, 0), region, uvs=uvs)
 
 
-def pavilion(b, x, y, z, span=5.4, column_h=2.75, roof='blacktile'):
+def pavilion(b, x, z, span=5.4, column_h=2.75, roof='blacktile'):
     wall = b.parts['atlas']
-    deck = y + 0.72
-    extrude(wall, [(x - span / 2, z - span / 2), (x + span / 2, z - span / 2), (x + span / 2, z + span / 2), (x - span / 2, z + span / 2)], y, deck, 'ashlar', 1.2)
-    stairs(wall, (x, y, z + span / 2 + 2.4), (x, deck, z + span / 2 - 0.2), 1.8, 5 if b.detail else 3, 'granite')
+    half = span/2
+    pad = [(x-half,z-half),(x+half,z-half),(x+half,z+half),(x-half,z+half)]
+    deck = max(bank_top(px,pz) for px,pz in pad)+.24
+    y = ground(x,z+half+2.4)
+    bank_strip(wall, pad, lambda px,pz: deck, 'ashlar')
+    stairs(wall, (x, y, z+half+2.4), (x, deck, z+half-.2), 1.8, 5 if b.detail else 3, 'granite')
     inset = span / 2 - 0.55
     for dx, dz in ((-inset, -inset), (inset, -inset), (inset, inset), (-inset, inset)):
         cylinder(wall, (x + dx, deck, z + dz), 0.22, 0.4, 'bark', 6, 0.4)
@@ -56,7 +59,7 @@ def pavilion(b, x, y, z, span=5.4, column_h=2.75, roof='blacktile'):
     hip_roof(wall, (x, z), deck + column_h, span - 0.2, span - 0.2, 1.85, 1.05, 0.7, roof, 'vermilion', ceiling=True)
     board(wall, x, deck + column_h - 0.15, z + span / 2 - 0.55, 1.8, 0.55, 'wood')
     if b.collide:
-        solid(b.hit, (x, y + 0.36, z), (span, 0.72, span), 'ashlar')
+        bank_strip(b.hit, pad, lambda px,pz: deck, 'ashlar')
         ramp(b.hit, (x, y + 0.05, z + span / 2 + 2.4), (x, deck, z + span / 2 - 0.1), 1.6)
         for dx, dz in ((-inset, -inset), (inset, -inset), (inset, inset), (-inset, inset)):
             solid(b.hit, (x + dx, deck + column_h / 2, z + dz), (0.32, column_h, 0.32), 'wood')
@@ -174,13 +177,18 @@ def library(b):
     rear = [(x+east,z+south) for east,south in rear]
     extrude(wall,rear,y,y+10.8,'cream')
     if b.collide:extrude(b.hit,rear,y,y+10.8,'cream')
-    box(wall,(-66,3.9,-61),(9,8.0,13),'yellow')
-    hip_roof(wall,(-66,-61),8.0,9.2,13.4,2.1,.6,.22,'graytile','wood')
+    angle = math.radians(-19.13)
+    def grade(east,south):
+        dx,dz=east-x,south-z
+        return ground(x+dx*math.cos(angle)+dz*math.sin(angle),z-dx*math.sin(angle)+dz*math.cos(angle))
+    annex = grade(-66,-61)
+    box(wall,(-66,annex+4,-61),(9,8.0,13),'yellow')
+    hip_roof(wall,(-66,-61),annex+8.0,9.2,13.4,2.1,.6,.22,'graytile','wood')
     if b.collide:
-        solid(b.hit,(-66,3.9,-61),(9,8,13),'yellow')
+        solid(b.hit,(-66,annex+4,-61),(9,8,13),'yellow')
     for index in range(9 if b.detail else 3):
-        scooter(wall,-73+index*.36,-.72+index*.09,-58-index*.94,'steel' if index%2 else 'cream')
-    banyan(wall,(-71,-.8,-56),12,10,123,b.detail)
+        scooter(wall,-73+index*.36,grade(-73+index*.36,-58-index*.94),-58-index*.94,'steel' if index%2 else 'cream')
+    banyan(wall,(-71,grade(-71,-56),-56),12,10,123,b.detail)
     for direction in (-1,1):
         wing=x+direction*19
         box(wall,(wing,y+5.4,z-6),(18,10.8,12),'cream',2.1)
@@ -247,6 +255,7 @@ def hotel(b):
     wall, lit = b.parts['atlas'], b.parts['lit']
     x, z = -190.0, 55.0
     y = ground(x,z)
+    starts = [(mesh,len(mesh.pos)) for mesh in (wall,b.hit)]
     # Five floors, white, south front. Wings step down. Dark roofs, a small roof pavilion.
     box(wall, (x, y + 8.0, z - 4), (46, 16.0, 14), 'cream', 3)
     box(wall, (x - 28, y + 5.6, z - 4), (12, 11.2, 12), 'cream', 2.5)
@@ -267,12 +276,20 @@ def hotel(b):
         for col in range(cols):
             cx = x - 20 + 40 * col / (cols - 1)
             box(lit, (cx, y + 2.15 + row * 3.05, z + 3.08), (1.45, 1.45, 0.06), 'glass', None)
-    banyan(wall, (x - 34, y, z - 2), 13, 10, 31, b.detail)
-    banyan(wall, (x + 34, y, z - 2), 12, 9, 32, b.detail)
+    banyan(wall, (x - 34, ground(x-34,z-2), z - 2), 13, 10, 31, b.detail)
+    banyan(wall, (x + 34, ground(x+34,z-2), z - 2), 12, 9, 32, b.detail)
     if b.collide:
         solid(b.hit, (x, y + 8, z - 4), (46, 16, 14), 'cream')
         solid(b.hit, (x - 28, y + 5.6, z - 4), (12, 11.2, 12), 'cream')
         solid(b.hit, (x + 28, y + 5.6, z - 4), (12, 11.2, 12), 'cream')
+
+    # The three wings share a horizontal floor. Fit their exterior wall feet
+    # individually where the lake bed drops away at the east end of the hotel.
+    for mesh,start in starts:
+        for i in range(start,len(mesh.pos)):
+            px,py,pz = mesh.pos[i]
+            if abs(py-y)<1e-6:
+                mesh.pos[i]=(px,ground(px,pz)-.08,pz)
 
 
 def steel_bridge(b):
@@ -406,7 +423,7 @@ def build(b: Builder):
     nine_bends(b)
     ancient_bridge(b)
     glass_bridge(b)
-    pavilion(b, 0, ground(0,0), 0)
+    pavilion(b, 0, 0)
     island(b)
     with align_front(b, (-26, -50), -19.13):
         library(b)
