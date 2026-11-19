@@ -54,6 +54,8 @@ npm run qa
 npm run photo-match -- IMG_1313.jpg IMG_1401 --yaw-offset=-5 --height=1.7
 npm run photo-match -- walk-shizijie-wangcheng
 npm run photo-match -- --all
+# 负载很高的 Linux 主机（SwiftShader 约 0.5 fps）可放宽每张的加载等待，默认 90000
+PHOTO_MATCH_TIMEOUT_MS=300000 npm run photo-match -- IMG_1313
 ```
 
 在 `captures/photo-match/index.html` 查看本次选择的机位。左图是实拍，右图是游戏，点击「50% 叠加」检查轮廓。相机放在 EXIF 坐标处，复用步行物理的支撑面查询，依次取桥面、人行道、地面，并以水位为下限（默认加 1.5 m），标题显示支撑面、支撑高程和相机高程。已知在桥上拍摄且原点落水的照片，仅在 GPS 精度圈内借最近桥面的高度；横向机位保持实测值，并列出借高距离。俯仰固定为 0°，统一正午晴天。正的朝向修正向右转。两张磁北照片（IMG_1425、1426）按拍摄地点与日期的 WMM2025 磁偏角 −3.08° 换算为真北。水平视场角按等效焦距换算，长边最多 960 px。桥面高差、拍摄者仰俯和 GPS 误差都可能影响叠合。
