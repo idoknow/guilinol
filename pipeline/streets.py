@@ -16,6 +16,8 @@ def chunks(roads,banks,bounds,water,sample,exclude,modeled_paving=None):
     fixtures = defaultdict(lambda: [[],[],[],[]])
     lengths = dict(road=0,bank=0)
     def store(which,pt,item):
+        if which==0 and modeled_paving is not None and modeled_paving.distance(pt)<2.5:
+            return
         if bounds.contains(pt) and (which!=0 or not exclude.covers(pt)):
             origin = tuple(math.floor(v/CHUNK)*CHUNK for v in pt.coords[0])
             fixtures[origin][which].append(item(origin))

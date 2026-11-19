@@ -79,9 +79,10 @@ try {
         }
       }
       arc(1,false)
-      reach(-130,16,'upper entry')
-      reach(130,16,'upper deck')
-      reach(130,-16,'upper turnaround')
+      const upperLane=mode==='ride'?14:18
+      reach(-130,upperLane,'upper entry')
+      reach(130,upperLane,'upper deck')
+      reach(130,-upperLane,'upper turnaround')
       reach(-140,-17,'upper deck')
       arc(-1,true)
       reach(-116,-32,'north landing')

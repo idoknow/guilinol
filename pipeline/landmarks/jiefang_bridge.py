@@ -162,8 +162,12 @@ def west_bank(model):
     for side, tone in ((-1,'violet'),(1,'jade')):
         # The lower intersection looks across the carriageway at three towers.
         if side==1:
+            model.box(-110.8,-5.83,36.8,7.8,.82,21,'stone',True)
+            model.box(-110.8,-5.01,36.8,7.8,.10,21,'pave',True)
+            model.box(-107,-4.91,36.8,.36,.57,21,'stone',True)
+            model.beam([-107,-4,26.3],[-107,-4,47.3],.085,'white',8,True)
             for z in (30.4,36.8,43.2):
-                model.pose=(-109.5,-5.0,z,math.pi*.32 if z!=36.8 else 0)
+                model.pose=(-109.5,-4.90,z,{30.4:-.67,36.8:0,43.2:.99}[z])
                 pillar(model,'violet')
         # Bank lookouts project toward the water; the end tower frames the span.
         model.pose=(0,0,0,0)
@@ -178,6 +182,10 @@ def west_bank(model):
             model.beam([-103.5,-3.49,z],[-84.5,-3.49,z],.08,'white',8,True)
             for x in range(-103,-84,3):
                 model.beam([x,-3.9,z],[x,-3.47,z],.055,'white')
+        model.box(-84.7,-4.36,side*61,.34,.59,14,'stone',True)
+        model.beam([-84.7,-3.46,side*54],[-84.7,-3.46,side*68],.09,'white',8,True)
+        for z in (54,57.5,61,64.5,68):
+            model.beam([-84.7,-3.84,side*z],[-84.7,-3.46,side*z],.06,'white')
         model.pose=(-90.7,-4.36,side*57.1,math.pi*.14*side)
         pillar(model,'aqua' if side==1 else 'jade')
         model.pose=(0,0,0,0)
@@ -220,15 +228,15 @@ def west_bank(model):
     # of the three river-side lantern towers from the opposite kerb.
     for x in np.arange(-125,-118.4,1):
         model.box(x,-3.73,36,.48,.035,3.4,'white')
-    model.beam([-118.7,-3.8,29],[-118.7,1.7,29],.14,'granite')
-    model.beam([-118.7,1.65,29],[-120,1.65,29],.1,'granite')
-    model.box(-120,.55,29,.42,1.25,.42,'sign')
-    model.box(-120.24,1.4,29,.09,.28,.28,'knot')
+    model.beam([-118.7,-3.8,34],[-118.7,1.7,34],.14,'granite')
+    model.beam([-118.7,1.65,34],[-115.5,1.65,34],.1,'granite')
+    model.box(-115.5,.55,34,.42,1.25,.42,'sign')
+    model.box(-115.74,1.4,34,.09,.28,.28,'knot')
     model.box(-116,-4.25,0,5,.64,82,'pave',True)
     for start,end in ((-41,-29),(-25,25),(29,41)):
         model.box(-113.6,-3.61,(start+end)/2,.36,.67,end-start,'stone',True)
         model.box(-113.6,-2.68,(start+end)/2,.12,.12,end-start,'white',True)
-    pendant(model,-115.9,-3.72,28.4)
+    pendant(model,-114.35,-3.72,29.4)
     for z in range(-40,41,4):
         model.box(-113.6,-3,z,.1,.4,.1,'white')
         if abs(z)>22 and z%12==0:
@@ -255,15 +263,26 @@ def bridge(model):
             lamp_post(model,east,side)
     springings=(-92,-46,0,46,92,140.5)
     for pier in springings[:-1]:
-        model.box(pier,-8,0,4.4,6.85,width-2,'stone')
+        # The two rib feet bear on short cutwaters. Open water between them
+        # stays visible through the arch from the oblique bank stations.
         for side in (-1,1):
-            model.beam([pier,-8,side*(width/2-1)],[pier,-1.1,side*(width/2-1)],2.2,'stone',10)
+            z=side*(width/2-.35)
+            model.beam([pier,-8,z],[pier,-5.63,z],1.84,'stone',10)
+            model.box(pier,-5.69,z,3.65,.5,3.2,'granite')
+
     for side in (-1,1):
         model.box(0,-.65,side*21.4,length,.12,.15,'lamp')
         for east in np.linspace(-136,136,35 if model.detail else 13):
             model.box(east,1.26,side*21.1,.55,.24,.39,'lamp')
     for start,end in zip(springings,springings[1:]):
         river_ribs(model,start,end,width)
+    for pier in springings[1:-1]:
+        for side in (-1,1):
+            z=side*21.28
+            xs=np.linspace(-10,10,14 if model.detail else 6)
+            for a,b in zip(xs,xs[1:]):
+                face=[(pier+x,-1.63-1.65*(x/10)**2+h,z) for x,h in ((a,0),(b,0),(b,.28),(a,.28))]
+                model.mesh(face,[[0,1,2],[0,2,3]],'white')
     model.box(-138,-5.35,0,3.4,4.13,width-1,'stone',True)
     for start,end in ((-140.5,-100),(-96,140.5)):
         stone_balustrade(model,start,end)
