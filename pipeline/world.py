@@ -22,7 +22,7 @@ from atlas import write_atlas
 from vehicles import plan_vehicles, write_vehicles
 from clearance import landmark_triangles
 from bridgeheads import raise_approaches
-from shoreline import correct_water
+from shoreline import correct_water, contour_ronghu
 from landmark_layout import Layout
 
 DRY = -32768
@@ -88,6 +88,7 @@ def build(bbox, output, palette):
                 patch[np.asarray(mask,dtype=bool)[:patch.shape[0],:patch.shape[1]]] = round(level*10)
     correct_water(surface, terrain, original, bounds, stencil)
     terrain[wet]=original[wet]=np.minimum(terrain[wet],surface[wet]-20)
+    contour_ronghu(surface, terrain, original, bounds)
     interchange=None
     bank_pavement=None
     west_portal=None

@@ -34,7 +34,7 @@ def monument(model, station, lateral):
 
 
 def promenade(model,side):
-    for station in range(-50,51,2):
+    for station in range(-54,53,2):
         for row in range(4):
             model.box(station,-.5,side*(13+row*2),2,.66,2,'pave' if (station//2+row)%2 else 'granite',True)
         model.box(station,.16,side*20,2,1.0,.30,'white',True)

@@ -8,6 +8,8 @@ from c_kit import ATLAS, RECTS, Builder, _font, arch_wall, banyan, box, cylinder
 
 def generate(identifier, catalog):
     school = next(item for item in json.loads(catalog.read_text()) if item['id'] == identifier)
+    if identifier != 'wangcheng_teaching':
+        raise ValueError('Only the mapped heritage teaching buildings use this generator')
     image = Image.new('RGB', (ATLAS, ATLAS), '#e6e5dc')
     draw = ImageDraw.Draw(image)
     athletics = school.get('sports') == 'athletics'
@@ -58,89 +60,22 @@ def generate(identifier, catalog):
             if collision and builder.collide:
                 solid(builder.hit, pos, dim, cell=4)
 
-        if 'wallStreet' in school:
-            if school['wallStreet']:
-                block((0,1.15,17),(14,2.3,.45),'white',True)
-                mesh.face([(-half_width,.75,17*scale+.24*scale),(half_width,.75,17*scale+.24*scale),
-                           (half_width,1.99,17*scale+.24*scale),(-half_width,1.99,17*scale+.24*scale)],
-                          (0,0,1),'schematic_plaque',uvs=[(.001,.999),(.999,.999),(.999,.001),(.001,.001)])
-            else:
-                block((0,.35,0),(3,.7,1),'foliage')
-            continue
-
         for east, south, length, floors in school['blocks']:
             height = floors * 3.2
-            block((east,height/2,south),(length,height,7),'brick' if athletics and east<0 else 'white',True)
+            depth = school.get('blockDepth',7)
+            block((east,height/2,south),(length,height,depth),'brick' if athletics and east<0 else 'white',True)
             for floor in range(floors):
                 sill = floor*3.2+1.8
                 for side in (-1,1):
-                    block((east,sill,south+side*3.54),(length-1,1.45,.1),'glass')
-                    block((east,sill-1,south+side*3.64),(length,.25,.35),'wood')
+                    block((east,sill,south+side*(depth/2+.04)),(length-1,1.45,.1),'glass')
+                    block((east,sill-1,south+side*(depth/2+.14)),(length,.25,.35),'wood')
                     if builder.detail:
                         for offset in range(2,int(length)-1,3):
-                            block((east-length/2+offset,sill,south+side*3.65),(.2,1.55,.16),'white')
-            block((east,height+.15,south),(length+1,.3,8),'granite')
-            if school.get('arcade') and (east,south) == tuple(school['blocks'][0][:2]):
-                bays = 8
-                pitch = length * scale / bays
-                for floor in range(floors):
-                    level = floor * 3.2
-                    block((east,level+.1,south+4.5),(length,.2,2.2),'white')
-                    for bay in range(bays):
-                        position = ((east-length/2)*scale+(bay+.5)*pitch,level,(south+5.45)*scale)
-                        arch_wall(mesh,position,pitch,3.2,.32,min(4.8,pitch*.83),3,'wood',6 if builder.detail else 3,None)
-        if not school.get('heritage'):
-            if school.get('paved'):
-                rear = min(row[1] for row in school['blocks']) - 4.5
-                depth = 17 - rear
-                middle = (rear+17)/2
-                block((0,.015,middle),(38,.03,depth),'granite')
-                block((0,.045,14),(36,.03,3),'foliage')
-                for side in (-1,1):
-                    block((side*19,.6,middle),(.36,1.2,depth),'white',True)
-                    block((side*19,1.28,middle),(.42,.16,depth),'steel')
-                    start = 18 if school.get('notice_wall') else 14.5
-                    block((side*(start+19)/2,.7,17),(19-start,1.4,.45),'white',True)
-                block((0,.6,rear),(38,1.2,.36),'white',True)
-                block((0,1.28,rear),(38,.16,.42),'steel')
-            if athletics:
-                mesh.face([(east*scale,.085,south*scale) for east,south in [(-18,-4),(18,-4),(18,12),(-18,12)]],(0,1,0),'athletics',uvs=[(.001,.001),(.999,.001),(.999,.999),(.001,.999)])
-            elif not school.get('worldGround'):
-                block((10,.08,2),(14,.16,19),'glaze')
-                for side in (-1,1):
-                    block((10+side*6.5,.17,2),(.1,.02,18),'white')
-                    block((10,.17,2+side*9),(13,.02,.1),'white')
-                block((10,.17,2),(13,.02,.1),'white')
-            for side in (-1,1):
-                block((side*5,2.35,17),(1,4.7,1),'granite',True)
-                if school.get('notice_wall'):
-                    block((side*12,1,17),(13,2,.48),'cream',True)
-                    for pier in (6,10,14,18):
-                        block((side*pier,1.25,17),(.72,2.5,.78),'brick')
-                        block((side*pier,2.54,17),(.85,.12,.87),'granite')
-                    for panel in (8,12,16):
-                        block((side*panel,1.15,17.27),(2.9,1.4,.12),'steel')
-                        block((side*panel,1.15,17.36),(2.65,1.16,.08),'glass')
-                        for sheet in (-.7,0,.7):
-                            block((side*panel+sheet,1.15,17.42),(.5,.76,.04),'white')
-                else:
-                    block((side*10,.7,17),(9,1.4,.45),'white',True)
-            block((0,1.0,17),(9.1,1.9,.24),'steel',True)
-            if builder.detail:
-                for column in range(-4,4):
-                    for bottom,top in ((.25,1.75),(1.75,.25)):
-                        tube(mesh,(column*scale,bottom,17.18*scale),((column+1)*scale,top,17.18*scale),.045,'glass',4)
-            board_z, board_y = 17.7, 4.25
-            block((0,board_y,17),(14 if athletics else 11,2.3 if athletics else 1.35,.8),'white')
-            cylinder(mesh,(-6*scale,0,7*scale),.09,7.5,'steel',6)
-            block((-5,6.8,7),(2,1.2,.06),'vermilion')
-        else:
-            board_z, board_y = school['blocks'][0][1]+3.8, 2.2
+                            block((east-length/2+offset,sill,south+side*(depth/2+.15)),(.2,1.55,.16),'white')
+            block((east,height+.15,south),(length+1,.3,depth+1),'granite')
+        board_z, board_y = school['blocks'][0][1]+depth/2+.3, 2.2
         mesh.face([(-half_width,board_y-half_height,board_z*scale),(half_width,board_y-half_height,board_z*scale),
                    (half_width,board_y+half_height,board_z*scale),(-half_width,board_y+half_height,board_z*scale)],
                   (0,0,1),'schematic_plaque',uvs=[(.001,.999),(.999,.999),(.999,.001),(.001,.001)])
-        if not school.get('heritage'):
-            for index in range(3):
-                banyan(mesh,((-16+index*5)*scale,0,10*scale),6,2,811+index,builder.detail)
     output = Path(sys.argv[1]); image.save(output/'atlas.png')
     export_landmark(output/f'{identifier}.glb',image,(('lod0',near),('lod1',far)))

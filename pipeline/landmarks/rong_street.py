@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw
 
-from c_kit import RECTS, _font, box, solid, stairs, ring, tube, railing
-from rong_solids import banyan
+from c_kit import RECTS, _font, box, solid, stairs, ring, tube, railing, extrude
+from rong_solids import banyan, align_front
 
 
 def signs(image):
@@ -25,14 +25,24 @@ def signs(image):
 
 
 def shops(builder):
-    stone,glass=builder.parts['atlas'],builder.parts['lit']
-    for east,base,south,width,length,floors,kind in [(10,1.7,-51,14,20,4,'rong'),(10,4,-86,11,16,3,'inn'),(32,3.8,-115,15,19,3,'hall')]:
+    for east,base,south,width,length,floors,kind in [(10,1.7,-51,17,24,4,'rong'),(10,4,-86,26.3,8.5,3,'inn'),(32,3.8,-115,15,19,3,'hall')]:
+        with align_front(builder, (east, south), -21.92):
+            shop(builder, east, base, south, width, length, floors, kind)
+
+
+def shop(builder, east, base, south, width, length, floors, kind):
+        stone,glass=builder.parts['atlas'],builder.parts['lit']
         height=floors*3.25
         center=(east,base+height/2,south)
         size=(width,height,length)
-        box(stone,center,size,'rubble' if kind=='hall' else 'brick')
-        if builder.collide:
-            solid(builder.hit,center,size,'brick')
+        if kind=='rong':
+            ring_xz=[(-.1,3.2),(-13.3,3.8),(-13.7,-7.1),(-4.1,-7.5),(-4.2,-10.4),(8.5,-11),(9.4,13.4),(.3,13.8)]
+            outline=[(east+dx,south+dz) for dx,dz in ring_xz]
+            extrude(stone,outline,base,base+height,'brick')
+            if builder.collide:extrude(builder.hit,outline,base,base+height,'brick')
+        else:
+            box(stone,center,size,'rubble' if kind=='hall' else 'brick')
+            if builder.collide:solid(builder.hit,center,size,'brick')
         face=east+width/2
         if kind=='hall':
             box(glass,(face+.15,base+5,south),(.3,9.8,6.2),'glass',None)
@@ -42,8 +52,14 @@ def shops(builder):
                 box(stone,(face+1.2,base+2,south+offset),(2.5,3.8,.31),'vermilion')
             box(stone,(face+1.2,base+4,south),(2.6,.38,7.5),'vermilion')
             stairs(stone,(face+5,base,south),(face+.5,base+1.15,south),8.8,7,'granite')
-            continue
+            return
         for row in range(floors):
+            for side in (-1,1):
+                for bay in (-.28,0,.28):
+                    box(glass,(east+bay*width,base+1.66+row*3.25,south+side*(length/2+.06)),(width*.21,1.53,.12),'glass',None)
+                box(stone,(east,base+(row+1)*3.25,south+side*length/2),(width+.24,.16,.42),'brick')
+            for bay in (-.32,0,.32):
+                box(glass,(east-width/2-.06,base+1.66+row*3.25,south+bay*length),(.12,1.53,length*.23),'glass',None)
             for col in (-1,1):
                 level=base+1.66+row*3.25
                 offset=south+col*length*.245

@@ -18,7 +18,8 @@ scene.traverse(node=>{
   if(!node.isMesh)return
   let high=false
   for(let parent=node;parent;parent=parent.parent)high ||= parent.name.startsWith('lod0')
-  if(!high)return
+  if(!high && (process.argv[3]!=='--visible' || scene.getObjectByName('lod0')))return
+  if(!high){for(let parent=node;parent;parent=parent.parent)if(/^collision|^lod[12]/i.test(parent.name))return}
   const geometry=node.geometry,index=geometry.index,position=geometry.getAttribute('position')
   for(let at=0;at<(index?.count??position.count);at++)coords.push(...vertex.fromBufferAttribute(position,index?index.getX(at):at).applyMatrix4(node.matrixWorld).toArray())
 })
