@@ -13,6 +13,11 @@ let browser
 try {
   browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
   const page=await browser.newPage({viewport:{width:700,height:700}})
+  async function saveFrame(path,quality=90){
+    await page.evaluate(()=>window.viewer.freeze())
+    try{await page.screenshot({path,quality,timeout:60000})}
+    finally{await page.evaluate(()=>window.viewer.resume())}
+  }
   const trace=[]
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&radius=384&time=12`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
@@ -44,7 +49,7 @@ try {
       return {number,x,z,ground,heading,focal35,pitch,first:probe.lookingAt,landmark:probe.landmark,distance:probe.wallDistance}
     },{shot,number,pitch}))
     await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))))
-    await page.screenshot({path:`${output}/${number}.jpg`,quality:90})
+    await saveFrame(`${output}/${number}.jpg`)
     if(['34','35'].includes(number)){
       const probe=await page.evaluate(()=>{
         const viewer=window.viewer,camera=viewer.camera,original=camera.quaternion.clone(),hits=[]
@@ -66,7 +71,7 @@ try {
   },palaceOverview)
   await page.waitForFunction(before=>{const {stats,stream}=window.viewer;return !stats.pending&&[...stream.landmarks].some(([entry,group])=>entry.id===(before?'jingjiang':'wangcheng_market')&&(group.getObjectByName('lod0')?.visible||group.getObjectByName('lod1')?.visible))},planOnly||palaceOverview,{timeout:90000})
   await page.waitForTimeout(400)
-  await page.screenshot({path:`${output}/plan.jpg`})
+  await saveFrame(`${output}/plan.jpg`)
   if(!planOnly)await writeFile(`${output}/cameras.json`,JSON.stringify(trace,null,2))
   console.log('Captured',trace.length,'camera matches and north-up plan')
 }finally{await browser?.close();await server.close()}

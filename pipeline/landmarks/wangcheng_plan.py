@@ -118,6 +118,15 @@ def inner_court(m, plan):
         if key==679734442:
             for step in range(10):
                 m.box(0,0,depth/2+1+(9-step)*.52,12,(step+1)*base/10,.55,'granite',True)
+            foot, head = depth/2+5.9, depth/2+1
+            m.mesh([[-1.2,.25,foot],[1.2,.25,foot],[1.2,2.18,head],[-1.2,2.18,head]],
+                   [[0,1,2],[0,2,3]],'white',True)
+            if m.detail:
+                for step in range(8):
+                    z0 = foot+(head-foot)*step/8
+                    y0 = .29+1.93*step/8
+                    m.beam([-.8,y0,z0],[0,y0+.12,z0-.2],.065,'granite')
+                    m.beam([0,y0+.12,z0-.2],[.8,y0,z0],.065,'granite')
             for side in (-1,1):
                 rail_width=width/2-6
                 m.box(side*(6+rail_width/2),base+.85,depth/2+.65,rail_width,.2,.28,'white')

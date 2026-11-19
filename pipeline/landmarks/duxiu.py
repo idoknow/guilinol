@@ -13,7 +13,7 @@ from jingjiang import generate
 from wangcheng_plan import ROOT, ll2xz
 
 
-def rock_shelter(model):
+def rock_shelter(model, inscription):
     samples=41 if model.detail else 15
     widths=np.linspace(-8.6,8.6,samples)
     profile=[(-3.8,1.5,18),(-2.15,1.45,24),(-1.52,2.0,38),(-1.35,2.9,56),
@@ -32,6 +32,8 @@ def rock_shelter(model):
             if row and col:
                 end=row*samples+col;faces.extend([[end-samples-1,end-samples,end],[end-samples-1,end,end-1]])
     model.mesh(vertices,faces,np.asarray(colors,dtype=np.uint8))
+    from shop_lettering import letters
+    letters(model,inscription,(0,.35,4.22),3.2,.65,'red')
     model.box(0,-4.45,7.15,11,.53,4.8,'pave',True)
     for step in range(4):model.box(0,-4.3,4.75-step*.44,8.8,.52+step*.14,.46,'granite',True)
     model.box(0,-4.2,2.38,9,.84,2.28,'pave',True)
@@ -82,10 +84,10 @@ def summit(model):
         if model.detail and index%6==0:
             model.beam([1,.12,0],[1,1.25,0],.09,'stone')
     start,angle=tread(0);model.pose=(*start,angle-math.pi/2)
-    rock_shelter(model)  # Taiping Cave, west foot at the stair entrance.
+    rock_shelter(model,'太平岩')  # Taiping Cave, west foot at the stair entrance.
     southeast = rings[1,cliff_column('读书岩')]
     model.pose = (*southeast, -math.pi/4)
-    rock_shelter(model)  # Dushu Cave and cliff inscriptions, southeast foot.
+    rock_shelter(model,'颜公读书岩')  # Dushu Cave and cliff inscriptions, southeast foot.
     model.pose=(*tip,0)
     def ring(radius,height):return [(radius*math.cos(n*math.pi/4),height,radius*math.sin(n*math.pi/4)) for n in range(8)]
     model.beam([0,-2.8,0],[0,.48,0],5.2,'stone',8,True)

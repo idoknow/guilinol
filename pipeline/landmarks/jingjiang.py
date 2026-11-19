@@ -188,6 +188,15 @@ def palace(m):
         for angle in (np.arange(18)*math.pi/18 if m.detail else []):
             following=angle+math.pi/18
             verts=[[center+rad*math.cos(theta),2.176+rad*math.sin(theta),.66] for theta,rad in ((angle,radius),(angle,radius+.46),(following,radius+.46),(following,radius))];m.mesh(verts,[[0,1,2],[0,2,3]],'granite' if round(angle*18/math.pi)%2 else 'white')
+    # Rock 22: paired guardian lions flank the large southern arch.
+    lion = trimesh.creation.icosphere(subdivisions=int(m.detail))
+    for east in (-5.0,5.0):
+        m.box(east,0,1.6,1.1,.62,1.45,'granite',True)
+        for dx,y,z,w,h,d in [(0,1.16,1.58,.47,.65,.52),(0,1.88,1.84,.49,.45,.44),
+                               (0,1.78,2.18,.31,.22,.25),(-.28,.95,1.99,.14,.34,.17),
+                               (.28,.95,1.99,.14,.34,.17),(-.31,2.14,1.68,.16,.16,.13),
+                               (.31,2.14,1.68,.16,.16,.13)]:
+            m.mesh(lion.vertices*[w,h,d]+[east+dx,y,z],lion.faces,'granite')
     for east in (-6.5,7.5):
         m.box(east,.48,.72,3.35,2.3,.23,'wood')
         m.box(east,.66,.86,3.05,1.96,.09,'white')
