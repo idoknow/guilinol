@@ -76,17 +76,29 @@ def ground_features(bounds, school_grounds=()):
     return layers
 
 
+def rongyin_frontage():
+    # IMG_1299 locates the open corner, and the existing facade gives its street axis.
+    photo = json.loads((Path(__file__).resolve().parents[1] / 'docs/refs/rock/photo-locations.json').read_text())['IMG_1299.jpg']
+    eye = np.array([photo['x'], photo['z']])
+    along = np.array([11.22, -24.99])
+    along /= np.linalg.norm(along)
+    inward = np.array([along[1], -along[0]])
+    edge = eye + inward * 2
+    return edge, along, inward
+
+
+def rongyin_sidewalk():
+    edge, along, inward = rongyin_frontage()
+    return Polygon([edge + a * along - b * inward for a, b in
+                    [(-8, 0), (8, 0), (8, 18), (-8, 18)]])
+
+
 def overture_geometry(row):
     shape = affine_transform(from_wkt(row['wkt']), [MLON, 0, 0, -MLAT, -LON0*MLON, LAT0*MLAT])
     if row['id'] == '94d505df-4dd6-4bdf-b242-be218cce7937':
         # IMG_1299 shows an open sidewalk at the survey point. Set the Rongyin
         # frontage behind it, parallel to the existing east facade of this block.
-        photo = json.loads((Path(__file__).resolve().parents[1] / 'docs/refs/rock/photo-locations.json').read_text())['IMG_1299.jpg']
-        eye = np.array([photo['x'], photo['z']])
-        along = np.array([11.22, -24.99])
-        along /= np.linalg.norm(along)
-        inward = np.array([along[1], -along[0]])
-        edge = eye + inward * 2
+        edge, along, inward = rongyin_frontage()
         reach = shape.length
         cut = Polygon([edge + a * along + b * inward for a, b in
                        [(-reach, 0), (reach, 0), (reach, reach), (-reach, reach)]])

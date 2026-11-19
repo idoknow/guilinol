@@ -8,12 +8,13 @@ from shapely.ops import nearest_points, unary_union
 
 from markings import junction_cores, violations
 from common import CHUNK, ll2xz, load_osm
-from features import points, polygons
+from features import points, polygons, rongyin_sidewalk
 from scatter import CONFIG, walk_line
 
 
 def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=()):
     surfaces, sidewalks, stripes, medians, gaps = [],[],[],[],[]
+    sidewalks.append(rongyin_sidewalk())
     rep_excl = replace_exclude if replace_exclude is not None else Polygon()
     for pa in ped_areas:
         clipped_pa = pa.difference(rep_excl) if not rep_excl.is_empty else pa

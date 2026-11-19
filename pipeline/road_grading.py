@@ -16,7 +16,7 @@ from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
 from common import CHUNK, GRID, load_osm
-from features import points
+from features import points, rongyin_sidewalk
 from road_profile import RULES
 
 STEP = 8.0  # B-spline knot spacing in metres (matches 8m chunk ground grid; 35x35 per chunk with 1-cell halo)
@@ -806,7 +806,10 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
         zs4 = top + np.arange(gh4, dtype=np.float64) * GRID
         X4, Z4 = np.meshgrid(xs4, zs4)
         lm_keep = getattr(layout, 'exclude', rep_excl)
-        actual_road_geom = u_roads.buffer(1.5, cap_style='flat')
+        # A full ground-mesh cell beyond the photographed sidewalk keeps its
+        # triangulated surface level with the junction even at the facade edge.
+        corner_bed = rongyin_sidewalk().buffer(8)
+        actual_road_geom = u_roads.buffer(1.5, cap_style='flat').union(corner_bed)
         if not lm_keep.is_empty:
             actual_road_geom = actual_road_geom.difference(lm_keep)
         inside_actual = intersects_xy(actual_road_geom, X4, Z4) if not actual_road_geom.is_empty else np.zeros_like(wet)

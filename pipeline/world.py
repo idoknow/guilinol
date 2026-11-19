@@ -12,7 +12,7 @@ from shapely import STRtree, intersects_xy, unary_union
 from shapely.geometry import box, Point
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem, load_osm
-from features import building_mesh, buildings, game_court, ground_features, points, polygons, raw_overture_footprints
+from features import building_mesh, buildings, game_court, ground_features, points, polygons, raw_overture_footprints, rongyin_sidewalk
 from karst import generate
 from bridges import bridge_tiles
 from road_grading import build_ground_mesh_lookup, eval_bspline_grid, solve_road_and_bridge_elevations
@@ -110,7 +110,7 @@ def build(bbox, output, palette):
             bridge_polys.append(LineString(points(el)).buffer(bw/2, quad_segs=2))
     comp_excl = getattr(layout, 'compound_polygons', layout.replace_exclude)
     road_surfs = []
-    sw_surfs = list(bus_pads)
+    sw_surfs = [*bus_pads, rongyin_sidewalk()]
     for pa in ped_areas:
         cpa = pa.difference(comp_excl) if not comp_excl.is_empty else pa
         if not cpa.is_empty:
