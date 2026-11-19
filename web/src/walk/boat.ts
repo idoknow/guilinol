@@ -55,6 +55,7 @@ export interface MooringSlot {
   dockPos: Position
   autoStarts: [number, number][]
   resolved: boolean
+  spiralPending: boolean
   resolveKey: string
   resolveRuns: number
   bank: Position | null
@@ -230,6 +231,7 @@ export function createFreeBoats(env: BoatEnv) {
       dockPos,
       autoStarts,
       resolved: false,
+      spiralPending: false,
       resolveKey: '',
       resolveRuns: 0,
       bank: null,
@@ -487,7 +489,7 @@ export function createFreeBoats(env: BoatEnv) {
     slot.pier.position.set(bx + dx * 0.42, wy + 0.24, bz + dz * 0.42)
   }
 
-  function resolveSlot(slot: MooringSlot) {
+  function neighborTileKey(slot: MooringSlot): string | null {
     const [dx,, dz] = slot.dockPos
     const nearTiles = new Set<string>()
     // Bank (<=22 m) + pier (<=10.5 m) + hull/ahead probe (~4.5 m) reaches ~37 m; guard ±40 m neighborhood.
@@ -495,23 +497,54 @@ export function createFreeBoats(env: BoatEnv) {
       for (const oz of [-40, 0, 40]) {
         const t = sim.tileAt(dx + ox, dz + oz)
         if (t) {
-          if (!stream.loaded.has(t)) return
+          if (!stream.loaded.has(t)) {
+            if (!slot.resolved) slot.resolveKey = ''
+            return null
+          }
           nearTiles.add(`${t.x},${t.z}`)
         }
       }
     }
-    const key = [...nearTiles].sort().join(';')
-    if (slot.resolveKey === key) return
-    slot.resolveKey = key
+    return [...nearTiles].sort().join(';')
+  }
+
+  function treeCollidersReady(bx: number, bz: number, mx: number, mz: number, viewerX: number, viewerZ: number): boolean {
+    // physics.sync adds tree trunk colliders within < 40 m once stream.forest.loaded has the tile.
+    if (Math.hypot(bx - viewerX, bz - viewerZ) > 36 || Math.hypot(mx - viewerX, mz - viewerZ) > 36) return false
+    for (const [px, pz] of [[bx, bz], [mx, mz]] as const) {
+      for (const ox of [-2, 2]) {
+        for (const oz of [-2, 2]) {
+          const t = sim.tileAt(px + ox, pz + oz)
+          if (t && !stream.forest.loaded.has(t)) return false
+        }
+      }
+    }
+    return true
+  }
+
+  function resolveSlot(slot: MooringSlot, viewerX: number, viewerZ: number) {
+    const key = neighborTileKey(slot)
+    if (key === null || slot.resolveKey === key) return
     slot.resolveRuns++
 
+    const [dx,, dz] = slot.dockPos
     const prior = PRIOR_MOORINGS[slot.name]
     if (prior) {
-      if (validateMooringPair(slot, prior.bank[0], prior.bank[1], prior.mooring[0], prior.mooring[1])) return
+      if (validateMooringPair(slot, prior.bank[0], prior.bank[1], prior.mooring[0], prior.mooring[1])) {
+        slot.spiralPending = false
+        slot.resolveKey = key
+        return
+      }
       if (isDrySupport(prior.bank[0], prior.bank[1])) {
         for (const rad of [4, 5.5, 7.5, 9.5]) {
           for (const ang of RING_ANGLES) {
-            if (validateMooringPair(slot, prior.bank[0], prior.bank[1], prior.bank[0] + Math.cos(ang) * rad, prior.bank[1] + Math.sin(ang) * rad)) return
+            const mx = prior.bank[0] + Math.cos(ang) * rad, mz = prior.bank[1] + Math.sin(ang) * rad
+            if (validateMooringPair(slot, prior.bank[0], prior.bank[1], mx, mz)) {
+              const ready = treeCollidersReady(prior.bank[0], prior.bank[1], mx, mz, viewerX, viewerZ)
+              slot.spiralPending = !ready
+              slot.resolveKey = ready ? key : ''
+              return
+            }
           }
         }
       }
@@ -531,10 +564,18 @@ export function createFreeBoats(env: BoatEnv) {
       for (const rad of [4, 5.5, 7.5, 9.5]) {
         for (const ang of RING_ANGLES) {
           const mx = bx + Math.cos(ang) * rad, mz = bz + Math.sin(ang) * rad
-          if (validateMooringPair(slot, bx, bz, mx, mz)) return
+          if (validateMooringPair(slot, bx, bz, mx, mz)) {
+            const ready = treeCollidersReady(bx, bz, mx, mz, viewerX, viewerZ)
+            slot.spiralPending = !ready
+            slot.resolveKey = ready ? key : ''
+            return
+          }
         }
       }
     }
+
+    slot.spiralPending = false
+    slot.resolveKey = key
   }
 
   function nearby(x: number, z: number, y?: number) {
@@ -542,7 +583,32 @@ export function createFreeBoats(env: BoatEnv) {
     for (const slot of slots) {
       const [dx,, dz] = slot.dockPos
       const dockDist = Math.hypot(dx - x, dz - z)
-      if (!slot.resolved && dockDist < 200) resolveSlot(slot)
+      if (!slot.resolved && dockDist < 200) {
+        resolveSlot(slot, x, z)
+      } else if (
+        slot.spiralPending &&
+        activeSlot !== slot &&
+        slot.bank &&
+        slot.mooring &&
+        treeCollidersReady(slot.bank[0], slot.bank[2], slot.mooring[0], slot.mooring[2], x, z)
+      ) {
+        const [bx,, bz] = slot.bank
+        const [mx, wy, mz] = slot.mooring
+        const dry = isDrySupport(bx, bz)
+        if (dry && !sim.pathBlocked(bx, bz, mx, mz, Math.max(dry.supportY, wy) + 0.65)) {
+          slot.bank = [bx, dry.supportY, bz]
+          slot.spiralPending = false
+          slot.resolveKey = neighborTileKey(slot) ?? ''
+        } else {
+          slot.resolved = false
+          slot.spiralPending = false
+          slot.resolveKey = ''
+          slot.bank = null
+          slot.mooring = null
+          slot.parkedPos = null
+          resolveSlot(slot, x, z)
+        }
+      }
 
       const drivingThis = activeSlot === slot
       if (!slot.resolved || !slot.bank || !slot.parkedPos) {
@@ -1082,6 +1148,7 @@ export function createFreeBoats(env: BoatEnv) {
         name: s.name,
         kind: s.kind,
         resolved: s.resolved,
+        spiralPending: s.spiralPending,
         resolveRuns: s.resolveRuns,
         dock: s.dockPos,
         bank: s.bank,
