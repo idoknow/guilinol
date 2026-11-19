@@ -192,7 +192,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(firstFrame){yaw=rides.heading;mixer.stopAllAction();action=undefined;bankLean=strideLean=0
         figure.rotation.x=figure.rotation.z=0;if(traveller)traveller.rotation.set(0,0,0);ridePose.clearJoints();input.clearRun()}
       const prevHeading=rides.heading
-      if(!held)rides.steerBoat(read.forward,read.right,Math.min(.25,dt))
+      if(!held)rides.steerBoat(read.forward,read.right,Math.min(.12,dt))
       yaw+=rides.heading-prevHeading
       rides.poseBoat(figure,read.forward,read.right,Math.min(.12,dt))
       const bpos=rides.freeBoat.position, bp=rides.boatProbe(), wy=bp?bp.y:bpos.y

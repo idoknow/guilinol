@@ -429,6 +429,23 @@ try {
     revAlong: +physicsRes.revMoveAlong.toFixed(2),
   })
 
+  // Bug 4 回归用例: 大帧间隔 dt=0.25s 限幅 <= 0.12s (<=8 子步)，消除低帧率 15 子步射线风暴
+  const dtClampRes = await runInPage(page, async ({faceTarget, press, step, advance, readBoat}) => {
+    await faceTarget(-1270, 304)
+    press('KeyW', true)
+    step(150) // 达静水巡航极速 ~3.3m/s
+    const before = readBoat()
+    advance(0.25) // 单帧卡顿 250ms，应限幅为 120ms
+    const after = readBoat()
+    press('KeyW', false)
+    return {
+      speedBefore: before.speed,
+      stepDist: Math.hypot(after.x - before.x, after.z - before.z),
+    }
+  })
+  assert(dtClampRes.stepDist >= 0.25 && dtClampRes.stepDist <= 0.46, `dt=0.25s 未按 0.12s 限幅 (15子步射线风暴): ${JSON.stringify(dtClampRes)}`)
+  console.log('1c. 大帧间隔 dt=0.25s 步进限幅通过:', {stepDist: +dtClampRes.stepDist.toFixed(3)})
+
   // --- 用例 2：斜撞岸贴边滑行不卡死 ---
   const shoreSlide = await runInPage(page, async ({steerTo, faceTarget, press, step, readBoat}) => {
     // 驶向榕湖南岸斜坡岸线前开阔位置 (-1324, 322)

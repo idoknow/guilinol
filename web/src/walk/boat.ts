@@ -316,8 +316,9 @@ export function createFreeBoats(env: BoatEnv) {
     samplePoint(hwMesh, 0)
     samplePoint(0, -hlMesh)
     samplePoint(0, 0)
+    const footprintClearance = minClearance
     if (minClearance < spec.requiredClearance) {
-      return {ok: false, minClearance, minAvailable}
+      return {ok: false, minClearance, footprintClearance, minAvailable}
     }
 
     if (includeAhead) {
@@ -326,10 +327,10 @@ export function createFreeBoats(env: BoatEnv) {
       samplePoint(0, ahead)
       samplePoint(hwMesh, ahead)
       if (minClearance < spec.requiredClearance) {
-        return {ok: false, minClearance, minAvailable}
+        return {ok: false, minClearance, footprintClearance, minAvailable}
       }
     }
-    return {ok: true, minClearance, minAvailable}
+    return {ok: true, minClearance, footprintClearance, minAvailable}
   }
 
   function evaluateHull(spec: BoatSpec, x: number, z: number, h: number, refWaterY: number | null, includeAhead: boolean): {
@@ -337,6 +338,7 @@ export function createFreeBoats(env: BoatEnv) {
     reason: BoatBlockReason
     waterY: number
     clearance: number
+    footprintClearance: number
     available: number
   } {
     const hw = spec.width * 0.5 + 0.25, hl = spec.length * 0.5 + 0.25
@@ -353,30 +355,30 @@ export function createFreeBoats(env: BoatEnv) {
       const wz = z + rightZ * across + fwdZ * along
       const sample = waterSample(wx, wz)
       if (!sample) {
-        return {ok: false, reason: 'shallow', waterY: refWaterY ?? 0, clearance: Infinity, available: Infinity}
+        return {ok: false, reason: 'shallow', waterY: refWaterY ?? 0, clearance: Infinity, footprintClearance: Infinity, available: Infinity}
       }
       const ptY = sample.waterY
       if (i === 0) centerY = ptY
       const cmpBase = refWaterY ?? centerY
       if (sample.lockJump || Math.abs(ptY - cmpBase) > 1.2 || Math.abs(ptY - centerY) > 1.2) {
-        return {ok: false, reason: 'lock', waterY: cmpBase, clearance: Infinity, available: Infinity}
+        return {ok: false, reason: 'lock', waterY: cmpBase, clearance: Infinity, footprintClearance: Infinity, available: Infinity}
       }
     }
 
     const baseY = refWaterY === null ? centerY : Math.max(centerY, refWaterY - 1.2)
     const clearCheck = measureClearancePoints(spec, x, z, h, centerY, includeAhead)
     if (!clearCheck.ok) {
-      return {ok: false, reason: 'bridge', waterY: centerY, clearance: clearCheck.minClearance, available: clearCheck.minAvailable}
+      return {ok: false, reason: 'bridge', waterY: centerY, clearance: clearCheck.minClearance, footprintClearance: clearCheck.footprintClearance, available: clearCheck.minAvailable}
     }
 
     const topHeight = Math.max(spec.roof, spec.head)
     const boxH = topHeight - 0.22
     const boxCenterY = Math.max(baseY, centerY) + 0.22 + boxH * 0.5
     if (sim.waterOverlap(x, boxCenterY, z, h, hw - 0.15, boxH * 0.5, hl - 0.15)) {
-      return {ok: false, reason: 'obstacle', waterY: centerY, clearance: clearCheck.minClearance, available: clearCheck.minAvailable}
+      return {ok: false, reason: 'obstacle', waterY: centerY, clearance: clearCheck.minClearance, footprintClearance: clearCheck.footprintClearance, available: clearCheck.minAvailable}
     }
 
-    return {ok: true, reason: '', waterY: centerY, clearance: clearCheck.minClearance, available: clearCheck.minAvailable}
+    return {ok: true, reason: '', waterY: centerY, clearance: clearCheck.minClearance, footprintClearance: clearCheck.footprintClearance, available: clearCheck.minAvailable}
   }
 
   function clearState() {
@@ -598,14 +600,16 @@ export function createFreeBoats(env: BoatEnv) {
     const spec = slot.spec
     const inFwd = deadzone(THREE.MathUtils.clamp(forward, -1, 1), 0.10)
     const inRight = deadzone(THREE.MathUtils.clamp(right, -1, 1), 0.10)
-    const clamped = Math.min(0.25, Math.max(0, dt))
+    const clamped = Math.min(0.12, Math.max(0, dt))
     const steps = Math.max(1, Math.ceil(clamped / (1 / 60)))
     const sub = clamped / steps
 
+    const startX = boatX, startZ = boatZ, startH = heading, startWaterY = waterY
     let anyBlocked = false
     let stepReason: BoatBlockReason = ''
     let stepAvailable = Infinity
     let targetWaterY = waterY
+    let cachedFootprintClearance: number | null = null
 
     for (let s = 0; s < steps; s++) {
       waveTime += sub
@@ -644,6 +648,7 @@ export function createFreeBoats(env: BoatEnv) {
         if (turnCheck.ok) {
           heading = nextHeading
           targetWaterY = turnCheck.waterY
+          cachedFootprintClearance = turnCheck.footprintClearance
         } else {
           let nudged = false
           const nudgeOffsets = [
@@ -656,7 +661,7 @@ export function createFreeBoats(env: BoatEnv) {
           for (const [nx, nz] of nudgeOffsets) {
             const tryTurn = evaluateHull(spec, boatX + nx, boatZ + nz, nextHeading, waterY, false)
             if (tryTurn.ok) {
-              boatX += nx; boatZ += nz; heading = nextHeading; targetWaterY = tryTurn.waterY; nudged = true
+              boatX += nx; boatZ += nz; heading = nextHeading; targetWaterY = tryTurn.waterY; cachedFootprintClearance = tryTurn.footprintClearance; nudged = true
               break
             }
           }
@@ -685,6 +690,7 @@ export function createFreeBoats(env: BoatEnv) {
           boatX += dx
           boatZ += dz
           targetWaterY = evalBoth.waterY
+          cachedFootprintClearance = evalBoth.footprintClearance
         } else {
           if (Math.abs(dx) > 1e-7) {
             const useAheadX = dx * postFwdX > 1e-6 && inFwd >= -0.05
@@ -692,6 +698,7 @@ export function createFreeBoats(env: BoatEnv) {
             if (evalX.ok) {
               boatX += dx
               targetWaterY = evalX.waterY
+              cachedFootprintClearance = evalX.footprintClearance
             } else {
               vx = 0
               blockedX = true
@@ -713,6 +720,7 @@ export function createFreeBoats(env: BoatEnv) {
             if (evalZ.ok) {
               boatZ += dz
               targetWaterY = evalZ.waterY
+              cachedFootprintClearance = evalZ.footprintClearance
             } else {
               vz = 0
               blockedZ = true
@@ -749,6 +757,7 @@ export function createFreeBoats(env: BoatEnv) {
                 boatX += cx
                 boatZ += cz
                 targetWaterY = evalCorner.waterY
+                cachedFootprintClearance = evalCorner.footprintClearance
                 vx = cx / sub
                 vz = cz / sub
                 cornerSlid = true
@@ -783,12 +792,18 @@ export function createFreeBoats(env: BoatEnv) {
           const deflected = heading + Math.sign(err) * Math.min(Math.abs(err), 3.2 * sub)
           const offX = blockedX && Math.abs(dx) > 1e-7 ? -Math.sign(dx) * 0.08 : 0
           const offZ = blockedZ && Math.abs(dz) > 1e-7 ? -Math.sign(dz) * 0.08 : 0
-          if (evaluateHull(spec, boatX, boatZ, deflected, waterY, false).ok) {
+          const defEval = evaluateHull(spec, boatX, boatZ, deflected, waterY, false)
+          if (defEval.ok) {
             heading = deflected
-          } else if ((offX !== 0 || offZ !== 0) && evaluateHull(spec, boatX + offX, boatZ + offZ, deflected, waterY, false).ok) {
-            boatX += offX
-            boatZ += offZ
-            heading = deflected
+            cachedFootprintClearance = defEval.footprintClearance
+          } else if (offX !== 0 || offZ !== 0) {
+            const offEval = evaluateHull(spec, boatX + offX, boatZ + offZ, deflected, waterY, false)
+            if (offEval.ok) {
+              boatX += offX
+              boatZ += offZ
+              heading = deflected
+              cachedFootprintClearance = offEval.footprintClearance
+            }
           }
         }
       }
@@ -802,8 +817,14 @@ export function createFreeBoats(env: BoatEnv) {
     vLong = (vx - flowTmp.vx) * finalFwdX + (vz - flowTmp.vz) * finalFwdZ
     vLat = (vx - flowTmp.vx) * finalRightX + (vz - flowTmp.vz) * finalRightZ
 
-    const clearNow = evaluateHull(spec, boatX, boatZ, heading, waterY, false)
-    lastClearance = clearNow.clearance
+    const unmoved = boatX === startX && boatZ === startZ && heading === startH && Math.abs(waterY - startWaterY) < 1e-4
+    if (!unmoved) {
+      if (cachedFootprintClearance !== null && Math.abs(waterY - targetWaterY) < 0.02) {
+        lastClearance = cachedFootprintClearance
+      } else {
+        lastClearance = measureClearancePoints(spec, boatX, boatZ, heading, waterY, false).footprintClearance
+      }
+    }
     lastBlocked = anyBlocked
     lastBlockReason = stepReason
     if (anyBlocked && (stepReason === 'bridge' || stepReason === 'lock')) {

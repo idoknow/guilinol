@@ -162,11 +162,13 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   }
   function waterCeiling(east:number,south:number,waterY:number){
     let bottom=Infinity
-    upRay.origin.x=east;upRay.origin.y=waterY-.8;upRay.origin.z=south
-    const deckHit=world.castRayAndGetNormal(upRay,16,false,undefined,undefined,capsule,undefined,deckFilter)
-    if(deckHit){const thick=kinds.get(deckHit.collider.handle)==='deckThin'?.6:look.bridgeDepth
-      bottom=Math.min(bottom,waterY-.8+deckHit.timeOfImpact-thick)}
-    upRay.origin.y=waterY+.15
+    if(hasDeck(east,south)){
+      upRay.origin.x=east;upRay.origin.y=waterY-.8;upRay.origin.z=south
+      const deckHit=world.castRayAndGetNormal(upRay,16,false,undefined,undefined,capsule,undefined,deckFilter)
+      if(deckHit){const thick=kinds.get(deckHit.collider.handle)==='deckThin'?.6:look.bridgeDepth
+        bottom=Math.min(bottom,waterY-.8+deckHit.timeOfImpact-thick)}
+    }
+    upRay.origin.x=east;upRay.origin.y=waterY+.15;upRay.origin.z=south
     const spanHit=world.castRayAndGetNormal(upRay,15,false,undefined,undefined,capsule,undefined,spanFilter)
     if(spanHit)bottom=Math.min(bottom,waterY+.15+spanHit.timeOfImpact)
     return bottom
