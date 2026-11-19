@@ -74,7 +74,12 @@ def crossing(builder,path,widths,heights,arch_segment=None):
                 middle = (near_left+near_right)/2
                 x, top, z = middle
                 bed = min(ground(x,z)-.15, top-.56)
+                start=len(stone.pos)
                 cylinder(stone,(x,bed,z),.42,top-bed,'ashlar',6)
+                for i in range(start,len(stone.pos)):
+                    px,py,pz=stone.pos[i]
+                    if abs(py-bed)<.01:
+                        stone.pos[i]=(px,ground(px,pz)-.08,pz)
 
 
 def nine_bends(builder):
@@ -129,7 +134,7 @@ def ancient_bridge(builder):
         for a,c in zip(top,top[1:]+top[:1]):
             stone.face([a,c,c-[0,.45,0],a-[0,.45,0]],(a+c)/2-point(sign*19,0),'ashlar')
     for offset in (-7,7):
-        banyan(stone,point(-20,ground(*point(-20,0,offset)[::2]),offset),9,5,32+offset,builder.detail)
+        banyan(stone,point(-20,ground(*point(-20,0,offset)[::2]),offset),9,5,32+offset,builder.detail,grade=ground)
     colors=('lantern_red','lantern_gold','lantern_cyan','lantern_pink','lantern_orange')
     for strand in range(4):
         previous=None

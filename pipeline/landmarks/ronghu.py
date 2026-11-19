@@ -217,6 +217,7 @@ def island_corridor(b, x,y,z,deck):
         cylinder(wall, (cx, y + 0.5, z + 1.15), 0.14, 2.55, 'vermilion', 6, 0.4)
         box(lit, (cx, y + 1.85, z - 1.15), (1.15, 1.7, 0.06), 'glass', None)
         box(lit, (cx, y + 1.85, z + 1.15), (1.15, 1.7, 0.06), 'glass', None)
+    box(wall,(x-1.2,y+3.09,z),(10.35,.35,4.42),'wood')
     hip_roof(wall, (x - 1.2, z), y + 3.15, 9.6, 3.5, 1.25, 0.55, 0.5, 'graytile', 'vermilion')
     if b.collide:
         solid(b.hit, (x + 4.2, y + 0.42, z), (7.2, 0.85, 7.2), 'ashlar')
@@ -379,8 +380,10 @@ def steel_bridge(b):
                 zb = za + length / bays
                 tube(steel, (x + side, y + 0.3, za), (x + side, y + 2.15, zb), 0.04, 'steel', 4)
     if b.detail:
-        railing(wall, (x - width / 2 + 0.15, z - length / 2), (x - width / 2 + 0.15, z + length / 2), y + 0.25, 1.05, 'steel', 1.6)
-        railing(wall, (x + width / 2 - 0.15, z - length / 2), (x + width / 2 - 0.15, z + length / 2), y + 0.25, 1.05, 'steel', 1.6)
+        for side in (-1,1):
+            box(steel,(x+side*(width/2-.15),y+.365,z),(.22,.27,length),'steel')
+        railing(wall, (x - width / 2 + 0.15, z - length / 2 + .22), (x - width / 2 + 0.15, z + length / 2 - .22), y + 0.25, 1.05, 'steel', 1.6)
+        railing(wall, (x + width / 2 - 0.15, z - length / 2 + .22), (x + width / 2 - 0.15, z + length / 2 - .22), y + 0.25, 1.05, 'steel', 1.6)
     if b.collide:
         solid(b.hit, (x, y + 0.12, z), (width - 0.3, 0.24, length), 'steel')
         solid(b.hit, (x - width / 2, y + 0.7, z), (0.16, 1.1, length), 'steel')
@@ -389,16 +392,16 @@ def steel_bridge(b):
     z0, z1 = z-length/2, z+length/2
     near, far = ground(x,z0), ground(x,z1)
     for mesh, start in starts:
-        mesh.pos[start:] = [(px, py+near+(far-near)*(pz-z0)/length-.24, pz)
+        mesh.pos[start:] = [(px, py+near+(far-near)*(pz-z0)/length-.19, pz)
                             for px,py,pz in mesh.pos[start:]]
 
 
 def glass_bridge(builder):
     stone=builder.parts['atlas']
     starts = [(m,len(m.pos)) for m in [*builder.parts.values(), builder.hit]]
-    box(stone,(304,.48,160),(4.4,.56,29),'white')
+    box(stone,(304,.48,160),(4.96,.56,29),'white')
     if builder.collide:
-        solid(builder.hit,(304,.48,160),(4.4,.56,29),'white')
+        solid(builder.hit,(304,.48,160),(4.96,.56,29),'white')
     for east in (302,306):
         for index in range(9):
             south=146.4+3.4*index

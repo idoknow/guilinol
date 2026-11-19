@@ -20,6 +20,16 @@ def rock_shelter(model, inscription,surface):
     profile=[(-3.8,1.5,18),(-2.15,1.45,24),(-1.52,2.0,38),(-1.35,2.9,56),
              (-1.17,3.85,91),(-.81,3.95,161),(-.38,3.69,183),(.28,3.4,172),
              (1.21,3.05,188),(2.26,1.82,173),(3.3,-.72,157),(3.85,-4.1,148)]
+    cx,_,cz,angle=model.pose
+    c,s=math.cos(angle),math.sin(angle)
+    # Put the visitor platform at the toe, outside the steep face of PK02.
+    for offset in np.arange(0,36,.5):
+        ox,oz=cx-s*offset,cz+c*offset
+        levels=[surface.ground(ox+c*x-s*z,oz+s*x+c*z)
+                for x in (-8.6,0,8.6) for z in (0,2,5,9.6)]
+        if max(levels)-min(levels)<.65:
+            break
+    model.pose=(ox,max(levels)+4.4,oz,angle)
     vertices=[];colors=[];faces=[]
     for row,(height,depth,light) in enumerate(profile):
         for col,east in enumerate(widths):
@@ -41,9 +51,9 @@ def rock_shelter(model, inscription,surface):
     from shop_lettering import letters
     model.box(0,.25,3.49,3.4,.85,1.44,'stone')
     letters(model,inscription,(0,.35,4.22),3.2,.65,'red')
-    model.box(0,-4.45,7.15,11,.53,4.8,'pave',True)
-    for step in range(4):model.box(0,-4.3,4.75-step*.44,8.8,.52+step*.14,.46,'granite',True)
-    model.box(0,-4.2,2.38,9,.84,2.28,'pave',True)
+    model.foundation(surface,0,-4.45,7.15,11,.53,4.8,'pave')
+    for step in range(4):model.foundation(surface,0,-4.3,4.75-step*.44,8.8,.52+step*.14,.46,'granite')
+    model.foundation(surface,0,-4.2,2.38,9,.84,2.28,'pave')
     for east in np.linspace(-4.4,4.4,17):model.box(east,-3.36,3.15,.065,1.35,.07,'tile',True)
     model.box(0,-2.06,3.15,8.85,.085,.085,'tile')
     for east,base in ((-3.4,-.32),(-.9,-.23),(2.5,-.36)):

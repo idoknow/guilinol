@@ -690,7 +690,7 @@ def _hex_roof(mesh, center, y, radius, rise, lift, tile_region, fascia_region):
             climb = np.linalg.norm(apex - (p + q) / 2)
             mesh.face([p, q, apex], q + p - 2 * np.array([x, y, z]), tile_region,
                       uvs=[(0, 0), (max(span / 0.46, 0.4), 0), (max(span / 0.92, 0.2), max(climb / 0.32, 0.4))])
-    box(mesh, (x, y + rise + 0.28, z), (0.28, 0.5, 0.28), tile_region, 0.3)
+    box(mesh, (x, y + rise + 0.16, z), (0.28, 0.74, 0.28), tile_region, 0.3)
 
 
 def hip_roof(mesh, center, y, width, depth, rise, overhang, lift, tile_region, soffit_region, tiers=1, sides=4, ceiling=False):

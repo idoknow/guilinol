@@ -80,8 +80,8 @@ def ancient_banyan(builder, east, south):
     count = 32 if builder.detail else 16
     for index in range(count):
         ends = [(east+11.6*math.cos(math.tau*t/count),south+10.6*math.sin(math.tau*t/count)) for t in (index,index+1)]
-        segment_wall(wood,*ends,0,.4,.8,'rubble')
-        segment_wall(wood,*ends,.4,.72,.64,'foliage')
+        segment_wall(wood,*ends,-.04,.43,.8,'rubble')
+        segment_wall(wood,*ends,.12,.72,.64,'foliage')
         railing(iron,*ends,.42,.74,'steel',1.25)
 
 
