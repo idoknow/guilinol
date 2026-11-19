@@ -162,3 +162,7 @@ Rock 2026-11-18 要求：市中心关键地标按**近几年实拍照片**精细
 | 36–38 返回 | 36 在主轴中段，37 向东南，38 朝南。38 定位误差 35.9 m，不作为建筑边界控制点。 |
 
 `scripts/wangcheng-layout.py` 输出改前游戏俯视、同区卫星及相机扇形放大图（需项目 OSM 原始数据，参数见 `--help`）。卫星取自 `pipeline/landmark-refs.json` 的 World Imagery；该片数据采于 2024-12-24，未用作模型纹理或入库底图。
+
+实现分为入口街区 `wangcheng_market` 和独立的 `wangcheng_mall`，旧江南巷保留。01–05 所在街段补连续店面；10–18 的横巷沿地图步行线折回，19–21 广场的摊位避开正阳门中线。旧正阳步行街裁到解放东路南侧，不再让其商业楼和碰撞体跨过横巷。23 的南门拱廊由 19 m 加深至 23 m，保留南口，内侧增加青砖券面。25–32 的树列只布置在承运门以南，门前东侧设置纪念装置；三、四、五教楼分别由各自 OSM 轮廓取向定宽深。楼高、店铺内部和装置是近似表现，不按相机 GPS 推断不可见背面。
+
+生产构建后，`CHROMIUM=/usr/bin/chromium node scripts/wangcheng-walk.mjs` 从入口经牌坊、横巷、广场及两座城门连续步行。`CHROMIUM=/usr/bin/chromium node scripts/photo-match.mjs` 采集 38 张对照，镜头为可见地面上方 1.5 m，水平视场按等效焦距计算；EXIF 无俯仰，34/35 取仰角 8°，其余取水平。`uv run python scripts/wangcheng-panels.py <改前游戏俯视> <卫星参考>` 合成逐页 PDF 及三联图到 `captures/wangcheng/`。机位不为避开树木或建筑而移动；38 的误差仍然保留。
