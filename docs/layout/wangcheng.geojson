@@ -1,0 +1,6760 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "广西师大王城校区",
+        "kind": "amenity",
+        "osm": "https://www.openstreetmap.org/node/3509912537",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "低"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2942408,
+          25.2827818
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "仰止亭",
+        "kind": "amenity",
+        "osm": "https://www.openstreetmap.org/node/5981119755",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "低"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2950641,
+          25.2861143
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "中山纪念碑",
+        "kind": "historic",
+        "osm": "https://www.openstreetmap.org/node/5981119756",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "高"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2952211,
+          25.2859634
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "amenity",
+        "osm": "https://www.openstreetmap.org/node/5981119757",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2954521,
+          25.2858811
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "独秀峰",
+        "kind": "natural",
+        "osm": "https://www.openstreetmap.org/node/5981119758",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "高"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2949077,
+          25.286138
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "amenity",
+        "osm": "https://www.openstreetmap.org/node/5981119759",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2955801,
+          25.283111
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "师大本部邮政所",
+        "kind": "amenity",
+        "osm": "https://www.openstreetmap.org/node/6342633795",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "低"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2951484,
+          25.2857249
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "孔庙",
+        "kind": "amenity",
+        "osm": "https://www.openstreetmap.org/node/6364816777",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "低"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2942108,
+          25.2868909
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "湖心亭",
+        "kind": "amenity",
+        "osm": "https://www.openstreetmap.org/node/6364816780",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "低"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2954067,
+          25.2862829
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "natural",
+        "osm": "https://www.openstreetmap.org/node/9301680724",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2940691,
+          25.2823518
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "natural",
+        "osm": "https://www.openstreetmap.org/node/9301680725",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2943214,
+          25.2823335
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "natural",
+        "osm": "https://www.openstreetmap.org/node/9301680726",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2941735,
+          25.2830729
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "natural",
+        "osm": "https://www.openstreetmap.org/node/9301680727",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2944693,
+          25.2830467
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "amenity",
+        "osm": "https://www.openstreetmap.org/node/13812910501",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.294193,
+          25.2825002
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "amenity",
+        "osm": "https://www.openstreetmap.org/node/13812910502",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2943717,
+          25.2830219
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "amenity",
+        "osm": "https://www.openstreetmap.org/node/13812912601",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.2955178,
+          25.2829513
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/257923246",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2944437,
+            25.2857209
+          ],
+          [
+            110.2942984,
+            25.2859011
+          ],
+          [
+            110.2942064,
+            25.2860398
+          ],
+          [
+            110.2942154,
+            25.2861429
+          ],
+          [
+            110.2942216,
+            25.2862098
+          ],
+          [
+            110.2942895,
+            25.2862043
+          ],
+          [
+            110.2943389,
+            25.286144
+          ],
+          [
+            110.2944129,
+            25.2861262
+          ],
+          [
+            110.2945055,
+            25.2861652
+          ],
+          [
+            110.2946659,
+            25.2861931
+          ],
+          [
+            110.2949189,
+            25.2862154
+          ],
+          [
+            110.2951838,
+            25.2861737
+          ],
+          [
+            110.2952744,
+            25.2861327
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "正阳路",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/258909973",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "低"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2941794,
+            25.2822252
+          ],
+          [
+            110.2943246,
+            25.2831097
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/403448112",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2955432,
+            25.2862291
+          ],
+          [
+            110.295815,
+            25.2861308
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/403448114",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2952744,
+            25.2861327
+          ],
+          [
+            110.2953026,
+            25.2862293
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/403448119",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2953026,
+            25.2862293
+          ],
+          [
+            110.2953658,
+            25.2862764
+          ],
+          [
+            110.2955432,
+            25.2862291
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "amenity",
+        "osm": "https://www.openstreetmap.org/way/674164043",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2952751,
+              25.2868595
+            ],
+            [
+              110.2965058,
+              25.2866892
+            ],
+            [
+              110.2964732,
+              25.2864971
+            ],
+            [
+              110.2958856,
+              25.2865785
+            ],
+            [
+              110.295411,
+              25.2866442
+            ],
+            [
+              110.2952425,
+              25.2866675
+            ],
+            [
+              110.2952751,
+              25.2868595
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "leisure",
+        "osm": "https://www.openstreetmap.org/way/674164045",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.294945,
+              25.2835594
+            ],
+            [
+              110.2953056,
+              25.2835177
+            ],
+            [
+              110.2952809,
+              25.2833432
+            ],
+            [
+              110.2949203,
+              25.2833849
+            ],
+            [
+              110.294945,
+              25.2835594
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "学生公寓3",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/674165590",
+        "floors": 3,
+        "facade_bearing": 278.8,
+        "photo": null,
+        "imagery_center": [
+          110.29615246,
+          25.28644718
+        ],
+        "center_delta_m": 0.55,
+        "axis_deg": 98.8,
+        "floors_estimated": true,
+        "position_confidence": "高",
+        "name_confidence": "低",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2963881,
+              25.2864588
+            ],
+            [
+              110.2963731,
+              25.286372
+            ],
+            [
+              110.2959277,
+              25.286435
+            ],
+            [
+              110.2959427,
+              25.2865218
+            ],
+            [
+              110.2963881,
+              25.2864588
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "学生公寓4",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/674165591",
+        "floors": 3,
+        "facade_bearing": 278.8,
+        "photo": null,
+        "imagery_center": [
+          110.29613879,
+          25.28632974
+        ],
+        "center_delta_m": 0.37,
+        "axis_deg": 98.8,
+        "floors_estimated": true,
+        "position_confidence": "高",
+        "name_confidence": "低",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2963676,
+              25.2863385
+            ],
+            [
+              110.2963526,
+              25.2862517
+            ],
+            [
+              110.2959072,
+              25.2863147
+            ],
+            [
+              110.2959222,
+              25.2864015
+            ],
+            [
+              110.2963676,
+              25.2863385
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "学生公寓5",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/674165592",
+        "floors": 3,
+        "facade_bearing": 278.8,
+        "photo": null,
+        "imagery_center": [
+          110.29611828,
+          25.2862123
+        ],
+        "center_delta_m": 0.4,
+        "axis_deg": 98.8,
+        "floors_estimated": true,
+        "position_confidence": "高",
+        "name_confidence": "低",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2963461,
+              25.2862213
+            ],
+            [
+              110.2963311,
+              25.2861344
+            ],
+            [
+              110.2958857,
+              25.2861974
+            ],
+            [
+              110.2959007,
+              25.2862842
+            ],
+            [
+              110.2963461,
+              25.2862213
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "学生公寓6",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/674165593",
+        "floors": 3,
+        "facade_bearing": 188.8,
+        "photo": null,
+        "imagery_center": [
+          110.29609777,
+          25.28608867
+        ],
+        "center_delta_m": 0.45,
+        "axis_deg": 98.8,
+        "floors_estimated": true,
+        "position_confidence": "高",
+        "name_confidence": "低",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2963247,
+              25.2860979
+            ],
+            [
+              110.2963097,
+              25.2860111
+            ],
+            [
+              110.2958643,
+              25.286074
+            ],
+            [
+              110.2958793,
+              25.2861609
+            ],
+            [
+              110.2963247,
+              25.2860979
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "学生公寓7",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/674165594",
+        "floors": 3,
+        "facade_bearing": 188.8,
+        "photo": null,
+        "imagery_center": [
+          110.29607043,
+          25.28596505
+        ],
+        "center_delta_m": 0.28,
+        "axis_deg": 98.8,
+        "floors_estimated": true,
+        "position_confidence": "高",
+        "name_confidence": "低",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2963033,
+              25.2859766
+            ],
+            [
+              110.2962883,
+              25.2858897
+            ],
+            [
+              110.2958429,
+              25.2859527
+            ],
+            [
+              110.2958579,
+              25.2860395
+            ],
+            [
+              110.2963033,
+              25.2859766
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "四教楼",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/674165595",
+        "floors": 3,
+        "facade_bearing": 98.9,
+        "photo": null,
+        "imagery_center": [
+          110.2935,
+          25.28590942
+        ],
+        "center_delta_m": 0.82,
+        "axis_deg": 98.9,
+        "floors_estimated": true,
+        "position_confidence": "高",
+        "name_confidence": "低",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2932443,
+              25.2859951
+            ],
+            [
+              110.2937733,
+              25.28592
+            ],
+            [
+              110.293754,
+              25.285809
+            ],
+            [
+              110.293225,
+              25.2858841
+            ],
+            [
+              110.2932443,
+              25.2859951
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "三教楼",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/674165596",
+        "floors": 3,
+        "facade_bearing": 98.9,
+        "photo": null,
+        "imagery_center": [
+          110.2934248,
+          25.28547673
+        ],
+        "center_delta_m": 1.04,
+        "axis_deg": 98.9,
+        "floors_estimated": true,
+        "position_confidence": "高",
+        "name_confidence": "低",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2931725,
+              25.2855606
+            ],
+            [
+              110.2937016,
+              25.2854855
+            ],
+            [
+              110.2936823,
+              25.2853746
+            ],
+            [
+              110.2931532,
+              25.2854497
+            ],
+            [
+              110.2931725,
+              25.2855606
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "五教楼",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/674165597",
+        "floors": 3,
+        "facade_bearing": 188.9,
+        "photo": null,
+        "imagery_center": [
+          110.29334277,
+          25.2850564
+        ],
+        "center_delta_m": 0.72,
+        "axis_deg": 98.9,
+        "floors_estimated": true,
+        "position_confidence": "高",
+        "name_confidence": "低",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2930906,
+              25.2851434
+            ],
+            [
+              110.2936197,
+              25.2850683
+            ],
+            [
+              110.2936004,
+              25.2849573
+            ],
+            [
+              110.2930714,
+              25.2850324
+            ],
+            [
+              110.2930906,
+              25.2851434
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "国学堂",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734417",
+        "floors": 1,
+        "facade_bearing": 188.5,
+        "photo": null,
+        "imagery_center": [
+          110.294669,
+          25.28528511
+        ],
+        "center_delta_m": 2.13,
+        "axis_deg": 8.5,
+        "floors_estimated": true,
+        "position_confidence": "高",
+        "name_confidence": "高",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2948447,
+              25.2854441
+            ],
+            [
+              110.2947814,
+              25.285059
+            ],
+            [
+              110.2945173,
+              25.2850945
+            ],
+            [
+              110.2945806,
+              25.2854796
+            ],
+            [
+              110.2947001,
+              25.2854635
+            ],
+            [
+              110.2948447,
+              25.2854441
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "王府密拓博物馆",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734418",
+        "floors": 1,
+        "facade_bearing": 8.8,
+        "photo": null,
+        "imagery_center": [
+          110.29405374,
+          25.28555708
+        ],
+        "center_delta_m": 1.44,
+        "axis_deg": 98.8,
+        "floors_estimated": true,
+        "position_confidence": "高",
+        "name_confidence": "低",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2941768,
+              25.2854412
+            ],
+            [
+              110.2941827,
+              25.2854751
+            ],
+            [
+              110.2938871,
+              25.2855171
+            ],
+            [
+              110.2938811,
+              25.2854829
+            ],
+            [
+              110.2937919,
+              25.2854956
+            ],
+            [
+              110.2938206,
+              25.2856607
+            ],
+            [
+              110.2939098,
+              25.285648
+            ],
+            [
+              110.2939067,
+              25.2856299
+            ],
+            [
+              110.2942023,
+              25.2855879
+            ],
+            [
+              110.2942058,
+              25.285608
+            ],
+            [
+              110.2942915,
+              25.2855958
+            ],
+            [
+              110.2942625,
+              25.285429
+            ],
+            [
+              110.2941768,
+              25.2854412
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734419",
+        "floors": 1,
+        "facade_bearing": 278.9,
+        "photo": null,
+        "axis_deg": 98.9,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2940842,
+              25.2848941
+            ],
+            [
+              110.2937042,
+              25.2849481
+            ],
+            [
+              110.2937248,
+              25.2850671
+            ],
+            [
+              110.2941048,
+              25.2850131
+            ],
+            [
+              110.2940842,
+              25.2848941
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734420",
+        "floors": 1,
+        "facade_bearing": 98.9,
+        "photo": null,
+        "axis_deg": 98.9,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2941312,
+              25.2851908
+            ],
+            [
+              110.293878,
+              25.2852268
+            ],
+            [
+              110.2938952,
+              25.2853254
+            ],
+            [
+              110.2941483,
+              25.2852894
+            ],
+            [
+              110.2941312,
+              25.2851908
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734421",
+        "floors": 1,
+        "facade_bearing": 98.1,
+        "photo": null,
+        "axis_deg": 98.1,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2929637,
+              25.28459
+            ],
+            [
+              110.2931916,
+              25.2845606
+            ],
+            [
+              110.2931724,
+              25.2844388
+            ],
+            [
+              110.2929445,
+              25.2844681
+            ],
+            [
+              110.2929637,
+              25.28459
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734422",
+        "floors": 1,
+        "facade_bearing": 98.2,
+        "photo": null,
+        "axis_deg": 8.2,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.293214,
+              25.2846552
+            ],
+            [
+              110.2933592,
+              25.2846363
+            ],
+            [
+              110.293311,
+              25.284332
+            ],
+            [
+              110.2931657,
+              25.2843508
+            ],
+            [
+              110.293214,
+              25.2846552
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734423",
+        "floors": 1,
+        "facade_bearing": 280.0,
+        "photo": null,
+        "axis_deg": 100.0,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2933564,
+              25.2841776
+            ],
+            [
+              110.2933758,
+              25.2842765
+            ],
+            [
+              110.2936615,
+              25.2842306
+            ],
+            [
+              110.2936421,
+              25.2841317
+            ],
+            [
+              110.2933564,
+              25.2841776
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734424",
+        "floors": 1,
+        "facade_bearing": 99.2,
+        "photo": null,
+        "axis_deg": 99.2,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2929436,
+              25.2842662
+            ],
+            [
+              110.2930822,
+              25.2842458
+            ],
+            [
+              110.293071,
+              25.2841837
+            ],
+            [
+              110.2929325,
+              25.2842041
+            ],
+            [
+              110.2929436,
+              25.2842662
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734425",
+        "floors": 1,
+        "facade_bearing": 99.3,
+        "photo": null,
+        "axis_deg": 9.3,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2929471,
+              25.2838194
+            ],
+            [
+              110.292845,
+              25.2838344
+            ],
+            [
+              110.2929074,
+              25.2841813
+            ],
+            [
+              110.2930095,
+              25.2841663
+            ],
+            [
+              110.2929471,
+              25.2838194
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734426",
+        "floors": 1,
+        "facade_bearing": 189.3,
+        "photo": null,
+        "axis_deg": 9.3,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2928444,
+              25.2838345
+            ],
+            [
+              110.292845,
+              25.2838344
+            ],
+            [
+              110.2929471,
+              25.2838194
+            ],
+            [
+              110.2928799,
+              25.2834458
+            ],
+            [
+              110.2927772,
+              25.2834609
+            ],
+            [
+              110.2928444,
+              25.2838345
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734427",
+        "floors": 1,
+        "facade_bearing": 99.3,
+        "photo": null,
+        "axis_deg": 9.3,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2929443,
+              25.2837847
+            ],
+            [
+              110.2930202,
+              25.2837736
+            ],
+            [
+              110.2929966,
+              25.2836423
+            ],
+            [
+              110.2929207,
+              25.2836534
+            ],
+            [
+              110.2929443,
+              25.2837847
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734428",
+        "floors": 1,
+        "facade_bearing": 9.3,
+        "photo": null,
+        "axis_deg": 9.3,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2931904,
+              25.2837241
+            ],
+            [
+              110.2931471,
+              25.2834833
+            ],
+            [
+              110.292998,
+              25.2835052
+            ],
+            [
+              110.2930413,
+              25.283746
+            ],
+            [
+              110.2931904,
+              25.2837241
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734429",
+        "floors": 1,
+        "facade_bearing": 189.2,
+        "photo": null,
+        "axis_deg": 99.2,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2939099,
+              25.2839018
+            ],
+            [
+              110.2938868,
+              25.2837734
+            ],
+            [
+              110.2935498,
+              25.2838229
+            ],
+            [
+              110.2935729,
+              25.2839513
+            ],
+            [
+              110.2939099,
+              25.2839018
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734430",
+        "floors": 1,
+        "facade_bearing": 99.2,
+        "photo": null,
+        "axis_deg": 99.2,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2932188,
+              25.2838504
+            ],
+            [
+              110.2929713,
+              25.2838868
+            ],
+            [
+              110.2929934,
+              25.2840095
+            ],
+            [
+              110.2932408,
+              25.2839732
+            ],
+            [
+              110.2932188,
+              25.2838504
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734433",
+        "floors": 1,
+        "facade_bearing": 278.9,
+        "photo": null,
+        "axis_deg": 98.9,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2960356,
+              25.2843432
+            ],
+            [
+              110.2958103,
+              25.2843753
+            ],
+            [
+              110.295829,
+              25.2844826
+            ],
+            [
+              110.2960543,
+              25.2844505
+            ],
+            [
+              110.2960356,
+              25.2843432
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734434",
+        "floors": 1,
+        "facade_bearing": 278.9,
+        "photo": null,
+        "axis_deg": 98.9,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2960637,
+              25.2845802
+            ],
+            [
+              110.2961629,
+              25.2845661
+            ],
+            [
+              110.2961529,
+              25.2845087
+            ],
+            [
+              110.2960537,
+              25.2845228
+            ],
+            [
+              110.2960637,
+              25.2845802
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734435",
+        "floors": 1,
+        "facade_bearing": 278.9,
+        "photo": null,
+        "axis_deg": 98.9,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.296051,
+              25.2845954
+            ],
+            [
+              110.2960389,
+              25.2845263
+            ],
+            [
+              110.2958033,
+              25.2845599
+            ],
+            [
+              110.2958154,
+              25.284629
+            ],
+            [
+              110.296051,
+              25.2845954
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734436",
+        "floors": 1,
+        "facade_bearing": 190.0,
+        "photo": null,
+        "axis_deg": 100.0,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2953858,
+              25.2844098
+            ],
+            [
+              110.2954057,
+              25.284511
+            ],
+            [
+              110.295652,
+              25.2844714
+            ],
+            [
+              110.2956321,
+              25.2843703
+            ],
+            [
+              110.2953858,
+              25.2844098
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "学生公寓",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734437",
+        "floors": 3,
+        "facade_bearing": 276.8,
+        "photo": null,
+        "axis_deg": 96.8,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "低",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.295792,
+              25.2852155
+            ],
+            [
+              110.2957761,
+              25.2851148
+            ],
+            [
+              110.2959678,
+              25.2850901
+            ],
+            [
+              110.2959539,
+              25.2850016
+            ],
+            [
+              110.2956886,
+              25.2850212
+            ],
+            [
+              110.2957201,
+              25.2852528
+            ],
+            [
+              110.2959985,
+              25.2852224
+            ],
+            [
+              110.295993,
+              25.2851893
+            ],
+            [
+              110.295792,
+              25.2852155
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734438",
+        "floors": 1,
+        "facade_bearing": 8.5,
+        "photo": null,
+        "axis_deg": 8.5,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2960892,
+              25.2852771
+            ],
+            [
+              110.296042,
+              25.2849906
+            ],
+            [
+              110.295962,
+              25.2850014
+            ],
+            [
+              110.295993,
+              25.2851893
+            ],
+            [
+              110.2959985,
+              25.2852224
+            ],
+            [
+              110.2960093,
+              25.2852879
+            ],
+            [
+              110.2960892,
+              25.2852771
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734439",
+        "floors": 1,
+        "facade_bearing": 7.8,
+        "photo": null,
+        "axis_deg": 7.8,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2961187,
+              25.2849755
+            ],
+            [
+              110.2961716,
+              25.2853283
+            ],
+            [
+              110.2962548,
+              25.2853181
+            ],
+            [
+              110.296202,
+              25.2849653
+            ],
+            [
+              110.2961187,
+              25.2849755
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734440",
+        "floors": 1,
+        "facade_bearing": 190.3,
+        "photo": null,
+        "axis_deg": 10.3,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2933203,
+              25.2866143
+            ],
+            [
+              110.2934036,
+              25.2866006
+            ],
+            [
+              110.2933758,
+              25.2864618
+            ],
+            [
+              110.2932925,
+              25.2864754
+            ],
+            [
+              110.2933203,
+              25.2866143
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734441",
+        "floors": 1,
+        "facade_bearing": 7.7,
+        "photo": null,
+        "axis_deg": 97.7,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2938232,
+              25.286295
+            ],
+            [
+              110.2932888,
+              25.2863604
+            ],
+            [
+              110.2933013,
+              25.2864444
+            ],
+            [
+              110.2938358,
+              25.286379
+            ],
+            [
+              110.2938232,
+              25.286295
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "承运殿",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734442",
+        "floors": 1,
+        "facade_bearing": 188.5,
+        "photo": null,
+        "imagery_center": [
+          110.29455278,
+          25.28431464
+        ],
+        "center_delta_m": 1.38,
+        "axis_deg": 98.5,
+        "floors_estimated": true,
+        "position_confidence": "高",
+        "name_confidence": "高",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2943279,
+              25.2844509
+            ],
+            [
+              110.294785,
+              25.2843886
+            ],
+            [
+              110.2947505,
+              25.2841815
+            ],
+            [
+              110.2942934,
+              25.2842438
+            ],
+            [
+              110.2943279,
+              25.2844509
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734443",
+        "floors": 1,
+        "facade_bearing": 8.9,
+        "photo": null,
+        "axis_deg": 98.9,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2955959,
+              25.2839735
+            ],
+            [
+              110.2955774,
+              25.2838678
+            ],
+            [
+              110.2952965,
+              25.2839078
+            ],
+            [
+              110.2953149,
+              25.2840135
+            ],
+            [
+              110.2955959,
+              25.2839735
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734449",
+        "floors": 1,
+        "facade_bearing": 278.1,
+        "photo": null,
+        "axis_deg": 8.1,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2960151,
+              25.2843182
+            ],
+            [
+              110.296097,
+              25.2843077
+            ],
+            [
+              110.296042,
+              25.2839538
+            ],
+            [
+              110.2959601,
+              25.2839642
+            ],
+            [
+              110.2960151,
+              25.2843182
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734451",
+        "floors": 1,
+        "facade_bearing": 8.3,
+        "photo": null,
+        "axis_deg": 98.3,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2949411,
+              25.2836386
+            ],
+            [
+              110.2949619,
+              25.2837663
+            ],
+            [
+              110.2953496,
+              25.2837145
+            ],
+            [
+              110.2953288,
+              25.2835869
+            ],
+            [
+              110.2949411,
+              25.2836386
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734452",
+        "floors": 1,
+        "facade_bearing": 188.6,
+        "photo": null,
+        "axis_deg": 98.6,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2960698,
+              25.2848403
+            ],
+            [
+              110.2961757,
+              25.2848259
+            ],
+            [
+              110.2961428,
+              25.2846287
+            ],
+            [
+              110.2960369,
+              25.2846432
+            ],
+            [
+              110.2960468,
+              25.2847028
+            ],
+            [
+              110.2957362,
+              25.2847452
+            ],
+            [
+              110.2957264,
+              25.2846863
+            ],
+            [
+              110.2956238,
+              25.2847003
+            ],
+            [
+              110.2956574,
+              25.2849016
+            ],
+            [
+              110.29576,
+              25.2848876
+            ],
+            [
+              110.29575,
+              25.2848274
+            ],
+            [
+              110.2960606,
+              25.2847851
+            ],
+            [
+              110.2960698,
+              25.2848403
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734453",
+        "floors": 1,
+        "facade_bearing": 188.5,
+        "photo": null,
+        "axis_deg": 98.5,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2955407,
+              25.2848282
+            ],
+            [
+              110.2955197,
+              25.284702
+            ],
+            [
+              110.2951276,
+              25.2847555
+            ],
+            [
+              110.2951487,
+              25.2848816
+            ],
+            [
+              110.2955407,
+              25.2848282
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734454",
+        "floors": 1,
+        "facade_bearing": 188.5,
+        "photo": null,
+        "axis_deg": 98.5,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2954877,
+              25.2851101
+            ],
+            [
+              110.2954711,
+              25.2850106
+            ],
+            [
+              110.2951813,
+              25.2850501
+            ],
+            [
+              110.2951979,
+              25.2851496
+            ],
+            [
+              110.2954877,
+              25.2851101
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734455",
+        "floors": 1,
+        "facade_bearing": 8.5,
+        "photo": null,
+        "axis_deg": 98.5,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2956044,
+              25.2852466
+            ],
+            [
+              110.2955189,
+              25.2852582
+            ],
+            [
+              110.2955253,
+              25.2852967
+            ],
+            [
+              110.295223,
+              25.2853379
+            ],
+            [
+              110.2952168,
+              25.2853005
+            ],
+            [
+              110.2951298,
+              25.2853124
+            ],
+            [
+              110.2951578,
+              25.2854806
+            ],
+            [
+              110.2952448,
+              25.2854687
+            ],
+            [
+              110.295241,
+              25.2854455
+            ],
+            [
+              110.2955432,
+              25.2854043
+            ],
+            [
+              110.2955472,
+              25.2854283
+            ],
+            [
+              110.2956327,
+              25.2854166
+            ],
+            [
+              110.2956044,
+              25.2852466
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "学生公寓10",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734456",
+        "floors": 3,
+        "facade_bearing": 8.5,
+        "photo": null,
+        "imagery_center": [
+          110.29541415,
+          25.28571162
+        ],
+        "center_delta_m": 1.21,
+        "axis_deg": 98.5,
+        "floors_estimated": true,
+        "position_confidence": "高",
+        "name_confidence": "低",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2956791,
+              25.2856024
+            ],
+            [
+              110.2951051,
+              25.2856806
+            ],
+            [
+              110.295127,
+              25.2858122
+            ],
+            [
+              110.295701,
+              25.285734
+            ],
+            [
+              110.2956791,
+              25.2856024
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "第一食堂",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679734457",
+        "floors": 1,
+        "facade_bearing": 8.8,
+        "photo": null,
+        "axis_deg": 98.8,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "低",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2962005,
+              25.2855564
+            ],
+            [
+              110.2961819,
+              25.2854486
+            ],
+            [
+              110.2959385,
+              25.285483
+            ],
+            [
+              110.2957667,
+              25.2855073
+            ],
+            [
+              110.2958009,
+              25.2857171
+            ],
+            [
+              110.2958214,
+              25.285836
+            ],
+            [
+              110.2962381,
+              25.2857771
+            ],
+            [
+              110.2962175,
+              25.2856582
+            ],
+            [
+              110.2959061,
+              25.2857022
+            ],
+            [
+              110.2958885,
+              25.2856005
+            ],
+            [
+              110.2962005,
+              25.2855564
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/679990100",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2943246,
+            25.2831097
+          ],
+          [
+            110.294353,
+            25.2833069
+          ],
+          [
+            110.2943708,
+            25.2834036
+          ],
+          [
+            110.2944562,
+            25.2839185
+          ],
+          [
+            110.2945046,
+            25.2841948
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990114",
+        "floors": 1,
+        "facade_bearing": 7.4,
+        "photo": null,
+        "axis_deg": 97.4,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2936891,
+              25.282872
+            ],
+            [
+              110.2937015,
+              25.2829568
+            ],
+            [
+              110.2937441,
+              25.2829518
+            ],
+            [
+              110.2937465,
+              25.282968
+            ],
+            [
+              110.2938263,
+              25.2829585
+            ],
+            [
+              110.2938239,
+              25.2829423
+            ],
+            [
+              110.2938891,
+              25.2829346
+            ],
+            [
+              110.2938914,
+              25.2829506
+            ],
+            [
+              110.2939713,
+              25.2829411
+            ],
+            [
+              110.2939689,
+              25.2829251
+            ],
+            [
+              110.2940043,
+              25.2829209
+            ],
+            [
+              110.293992,
+              25.282836
+            ],
+            [
+              110.2936891,
+              25.282872
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990115",
+        "floors": 1,
+        "facade_bearing": 97.5,
+        "photo": null,
+        "axis_deg": 7.5,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2936525,
+              25.2824056
+            ],
+            [
+              110.2936992,
+              25.2824
+            ],
+            [
+              110.2936838,
+              25.282294
+            ],
+            [
+              110.2936371,
+              25.2822996
+            ],
+            [
+              110.2936525,
+              25.2824056
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990116",
+        "floors": 1,
+        "facade_bearing": 97.5,
+        "photo": null,
+        "axis_deg": 7.5,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2936699,
+              25.2825338
+            ],
+            [
+              110.2937167,
+              25.2825282
+            ],
+            [
+              110.2937012,
+              25.2824217
+            ],
+            [
+              110.2936544,
+              25.2824273
+            ],
+            [
+              110.2936699,
+              25.2825338
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990117",
+        "floors": 1,
+        "facade_bearing": 97.5,
+        "photo": null,
+        "axis_deg": 7.5,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2936888,
+              25.2826595
+            ],
+            [
+              110.2937366,
+              25.2826538
+            ],
+            [
+              110.293721,
+              25.2825469
+            ],
+            [
+              110.2936733,
+              25.2825526
+            ],
+            [
+              110.2936888,
+              25.2826595
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990118",
+        "floors": 1,
+        "facade_bearing": 7.5,
+        "photo": null,
+        "axis_deg": 7.5,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2937084,
+              25.2827896
+            ],
+            [
+              110.2937569,
+              25.2827839
+            ],
+            [
+              110.2937407,
+              25.2826722
+            ],
+            [
+              110.2936922,
+              25.2826779
+            ],
+            [
+              110.2937084,
+              25.2827896
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990119",
+        "floors": 1,
+        "facade_bearing": 97.5,
+        "photo": null,
+        "axis_deg": 7.5,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2939542,
+              25.2827619
+            ],
+            [
+              110.2940256,
+              25.2827534
+            ],
+            [
+              110.2939354,
+              25.2821325
+            ],
+            [
+              110.293864,
+              25.282141
+            ],
+            [
+              110.2939542,
+              25.2827619
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990120",
+        "floors": 1,
+        "facade_bearing": 97.5,
+        "photo": null,
+        "axis_deg": 7.5,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2937931,
+              25.2827745
+            ],
+            [
+              110.2939346,
+              25.2827577
+            ],
+            [
+              110.2938704,
+              25.2823161
+            ],
+            [
+              110.293729,
+              25.2823329
+            ],
+            [
+              110.2937931,
+              25.2827745
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990121",
+        "floors": 1,
+        "facade_bearing": 98.9,
+        "photo": null,
+        "axis_deg": 98.9,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2936044,
+              25.2823844
+            ],
+            [
+              110.2935896,
+              25.2822997
+            ],
+            [
+              110.2933099,
+              25.2823396
+            ],
+            [
+              110.2933247,
+              25.2824243
+            ],
+            [
+              110.2933612,
+              25.2824191
+            ],
+            [
+              110.2933635,
+              25.2824322
+            ],
+            [
+              110.2934431,
+              25.2824208
+            ],
+            [
+              110.2934409,
+              25.2824077
+            ],
+            [
+              110.293509,
+              25.282398
+            ],
+            [
+              110.2935112,
+              25.2824109
+            ],
+            [
+              110.2935888,
+              25.2823998
+            ],
+            [
+              110.2935866,
+              25.2823869
+            ],
+            [
+              110.2936044,
+              25.2823844
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990122",
+        "floors": 1,
+        "facade_bearing": 8.2,
+        "photo": null,
+        "axis_deg": 98.2,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2932907,
+              25.2823033
+            ],
+            [
+              110.2932766,
+              25.282216
+            ],
+            [
+              110.2928514,
+              25.2822721
+            ],
+            [
+              110.2928655,
+              25.2823594
+            ],
+            [
+              110.2932907,
+              25.2823033
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990123",
+        "floors": 1,
+        "facade_bearing": 7.9,
+        "photo": null,
+        "axis_deg": 97.9,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2932119,
+              25.282462
+            ],
+            [
+              110.2931945,
+              25.2823487
+            ],
+            [
+              110.2928721,
+              25.2823892
+            ],
+            [
+              110.2928895,
+              25.2825026
+            ],
+            [
+              110.2932119,
+              25.282462
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990124",
+        "floors": 1,
+        "facade_bearing": 9.3,
+        "photo": null,
+        "axis_deg": 99.3,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2934422,
+              25.2826343
+            ],
+            [
+              110.2935834,
+              25.2826125
+            ],
+            [
+              110.2935808,
+              25.2825988
+            ],
+            [
+              110.2936158,
+              25.2825934
+            ],
+            [
+              110.2936094,
+              25.2825596
+            ],
+            [
+              110.2936285,
+              25.2825566
+            ],
+            [
+              110.2936188,
+              25.2824951
+            ],
+            [
+              110.2935849,
+              25.2825004
+            ],
+            [
+              110.2935876,
+              25.2825146
+            ],
+            [
+              110.2934035,
+              25.282543
+            ],
+            [
+              110.2934006,
+              25.2825277
+            ],
+            [
+              110.2933628,
+              25.2825335
+            ],
+            [
+              110.2933746,
+              25.2825965
+            ],
+            [
+              110.2933948,
+              25.2825934
+            ],
+            [
+              110.2934012,
+              25.2826271
+            ],
+            [
+              110.2934397,
+              25.2826212
+            ],
+            [
+              110.2934422,
+              25.2826343
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990125",
+        "floors": 1,
+        "facade_bearing": 10.3,
+        "photo": null,
+        "axis_deg": 100.3,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2930465,
+              25.2826772
+            ],
+            [
+              110.2931872,
+              25.2826532
+            ],
+            [
+              110.2931844,
+              25.2826396
+            ],
+            [
+              110.2932192,
+              25.2826336
+            ],
+            [
+              110.2932122,
+              25.2825999
+            ],
+            [
+              110.2932313,
+              25.2825967
+            ],
+            [
+              110.2932204,
+              25.2825353
+            ],
+            [
+              110.2931866,
+              25.2825411
+            ],
+            [
+              110.2931896,
+              25.2825553
+            ],
+            [
+              110.2930061,
+              25.2825865
+            ],
+            [
+              110.2930029,
+              25.2825712
+            ],
+            [
+              110.2929651,
+              25.2825776
+            ],
+            [
+              110.2929782,
+              25.2826404
+            ],
+            [
+              110.2929983,
+              25.282637
+            ],
+            [
+              110.2930053,
+              25.2826706
+            ],
+            [
+              110.2930437,
+              25.2826641
+            ],
+            [
+              110.2930465,
+              25.2826772
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990126",
+        "floors": 1,
+        "facade_bearing": 6.6,
+        "photo": null,
+        "axis_deg": 96.6,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2930814,
+              25.2830508
+            ],
+            [
+              110.2932236,
+              25.283035
+            ],
+            [
+              110.2932217,
+              25.2830212
+            ],
+            [
+              110.2932569,
+              25.2830173
+            ],
+            [
+              110.2932523,
+              25.2829832
+            ],
+            [
+              110.2932716,
+              25.2829811
+            ],
+            [
+              110.293265,
+              25.2829193
+            ],
+            [
+              110.2932309,
+              25.282923
+            ],
+            [
+              110.2932329,
+              25.2829374
+            ],
+            [
+              110.2930475,
+              25.282958
+            ],
+            [
+              110.2930454,
+              25.2829425
+            ],
+            [
+              110.2930073,
+              25.2829467
+            ],
+            [
+              110.2930159,
+              25.2830101
+            ],
+            [
+              110.2930362,
+              25.2830078
+            ],
+            [
+              110.2930408,
+              25.2830418
+            ],
+            [
+              110.2930796,
+              25.2830375
+            ],
+            [
+              110.2930814,
+              25.2830508
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990127",
+        "floors": 1,
+        "facade_bearing": 9.4,
+        "photo": null,
+        "axis_deg": 99.4,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2934799,
+              25.2828266
+            ],
+            [
+              110.2936211,
+              25.2828045
+            ],
+            [
+              110.2936184,
+              25.2827907
+            ],
+            [
+              110.2936534,
+              25.2827853
+            ],
+            [
+              110.2936469,
+              25.2827515
+            ],
+            [
+              110.293666,
+              25.2827485
+            ],
+            [
+              110.2936561,
+              25.282687
+            ],
+            [
+              110.2936223,
+              25.2826923
+            ],
+            [
+              110.293625,
+              25.2827065
+            ],
+            [
+              110.293441,
+              25.2827354
+            ],
+            [
+              110.2934381,
+              25.28272
+            ],
+            [
+              110.2934002,
+              25.2827259
+            ],
+            [
+              110.2934123,
+              25.2827889
+            ],
+            [
+              110.2934324,
+              25.2827857
+            ],
+            [
+              110.2934389,
+              25.2828195
+            ],
+            [
+              110.2934774,
+              25.2828134
+            ],
+            [
+              110.2934799,
+              25.2828266
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990128",
+        "floors": 1,
+        "facade_bearing": 6.6,
+        "photo": null,
+        "axis_deg": 96.6,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2934871,
+              25.2829986
+            ],
+            [
+              110.2936293,
+              25.2829829
+            ],
+            [
+              110.2936274,
+              25.2829691
+            ],
+            [
+              110.2936626,
+              25.2829652
+            ],
+            [
+              110.293658,
+              25.2829311
+            ],
+            [
+              110.2936773,
+              25.282929
+            ],
+            [
+              110.2936707,
+              25.2828671
+            ],
+            [
+              110.2936366,
+              25.2828709
+            ],
+            [
+              110.2936386,
+              25.2828853
+            ],
+            [
+              110.2934532,
+              25.2829058
+            ],
+            [
+              110.2934511,
+              25.2828903
+            ],
+            [
+              110.293413,
+              25.2828946
+            ],
+            [
+              110.2934216,
+              25.2829579
+            ],
+            [
+              110.2934419,
+              25.2829557
+            ],
+            [
+              110.2934465,
+              25.2829897
+            ],
+            [
+              110.2934853,
+              25.2829854
+            ],
+            [
+              110.2934871,
+              25.2829986
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/679990130",
+        "floors": 1,
+        "facade_bearing": 6.6,
+        "photo": null,
+        "axis_deg": 96.6,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2930748,
+              25.2828851
+            ],
+            [
+              110.293217,
+              25.2828693
+            ],
+            [
+              110.2932151,
+              25.2828555
+            ],
+            [
+              110.2932503,
+              25.2828516
+            ],
+            [
+              110.2932457,
+              25.2828176
+            ],
+            [
+              110.293265,
+              25.2828154
+            ],
+            [
+              110.2932585,
+              25.2827536
+            ],
+            [
+              110.2932244,
+              25.2827574
+            ],
+            [
+              110.2932263,
+              25.2827717
+            ],
+            [
+              110.293041,
+              25.2827923
+            ],
+            [
+              110.2930389,
+              25.2827768
+            ],
+            [
+              110.2930007,
+              25.282781
+            ],
+            [
+              110.2930093,
+              25.2828444
+            ],
+            [
+              110.2930296,
+              25.2828422
+            ],
+            [
+              110.2930342,
+              25.2828762
+            ],
+            [
+              110.293073,
+              25.2828719
+            ],
+            [
+              110.2930748,
+              25.2828851
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "西华门",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/684987708",
+        "floors": 1,
+        "facade_bearing": 278.4,
+        "photo": null,
+        "axis_deg": 8.4,
+        "floors_estimated": true,
+        "position_confidence": "中",
+        "name_confidence": "高",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2927403,
+              25.2833698
+            ],
+            [
+              110.2928642,
+              25.2833549
+            ],
+            [
+              110.2928518,
+              25.2832795
+            ],
+            [
+              110.2928414,
+              25.2832163
+            ],
+            [
+              110.292718,
+              25.2832329
+            ],
+            [
+              110.2927282,
+              25.2832954
+            ],
+            [
+              110.2927403,
+              25.2833698
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "东华路",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/684987709",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "低"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2943246,
+            25.2831097
+          ],
+          [
+            110.2944877,
+            25.2830913
+          ],
+          [
+            110.2958184,
+            25.2829416
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "西华里",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/684987710",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "低"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2927282,
+            25.2832954
+          ],
+          [
+            110.2928518,
+            25.2832795
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "后贡门",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/885083143",
+        "floors": 1,
+        "facade_bearing": 8.1,
+        "photo": null,
+        "axis_deg": 98.1,
+        "floors_estimated": true,
+        "position_confidence": "中",
+        "name_confidence": "高",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.294905,
+              25.2869536
+            ],
+            [
+              110.294895,
+              25.2868907
+            ],
+            [
+              110.2949542,
+              25.2868829
+            ],
+            [
+              110.2950194,
+              25.2868744
+            ],
+            [
+              110.2950295,
+              25.2869374
+            ],
+            [
+              110.2949671,
+              25.2869455
+            ],
+            [
+              110.294905,
+              25.2869536
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "东华门",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1008248057",
+        "floors": 1,
+        "facade_bearing": 97.7,
+        "photo": null,
+        "axis_deg": 7.7,
+        "floors_estimated": true,
+        "position_confidence": "中",
+        "name_confidence": "高",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2959163,
+              25.2828643
+            ],
+            [
+              110.2958089,
+              25.282878
+            ],
+            [
+              110.2958184,
+              25.2829416
+            ],
+            [
+              110.2958267,
+              25.2829974
+            ],
+            [
+              110.2959366,
+              25.2829841
+            ],
+            [
+              110.2959163,
+              25.2828643
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "西华里",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1008248058",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "低"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2958184,
+            25.2829416
+          ],
+          [
+            110.2959273,
+            25.2829273
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "正阳门",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1008248059",
+        "floors": 1,
+        "facade_bearing": 187.9,
+        "photo": "22–23",
+        "imagery_center": [
+          110.29416995,
+          25.28210789
+        ],
+        "center_delta_m": 3.16,
+        "axis_deg": 97.9,
+        "floors_estimated": true,
+        "position_confidence": "高",
+        "name_confidence": "高",
+        "facade_estimated": true,
+        "edge_delta_max_m": 1.5
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2939695,
+              25.2820737
+            ],
+            [
+              110.2941529,
+              25.2820492
+            ],
+            [
+              110.2943455,
+              25.2820229
+            ],
+            [
+              110.2943697,
+              25.2822012
+            ],
+            [
+              110.2941794,
+              25.2822252
+            ],
+            [
+              110.2939956,
+              25.2822484
+            ],
+            [
+              110.2939695,
+              25.2820737
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1008248060",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2941529,
+            25.2820492
+          ],
+          [
+            110.2941794,
+            25.2822252
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "natural",
+        "osm": "https://www.openstreetmap.org/way/1008248061",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2943772,
+              25.2862655
+            ],
+            [
+              110.2942569,
+              25.2862447
+            ],
+            [
+              110.2941943,
+              25.2862338
+            ],
+            [
+              110.2941041,
+              25.2861302
+            ],
+            [
+              110.2941456,
+              25.2860574
+            ],
+            [
+              110.2941736,
+              25.2860043
+            ],
+            [
+              110.2943744,
+              25.2858405
+            ],
+            [
+              110.2944524,
+              25.2857638
+            ],
+            [
+              110.2947475,
+              25.2857416
+            ],
+            [
+              110.2947796,
+              25.2857378
+            ],
+            [
+              110.2950404,
+              25.2857064
+            ],
+            [
+              110.2951123,
+              25.2859052
+            ],
+            [
+              110.2952842,
+              25.2860412
+            ],
+            [
+              110.2953728,
+              25.2860753
+            ],
+            [
+              110.2953717,
+              25.2861253
+            ],
+            [
+              110.2952838,
+              25.2861746
+            ],
+            [
+              110.2952369,
+              25.2861976
+            ],
+            [
+              110.295136,
+              25.2862662
+            ],
+            [
+              110.295044,
+              25.2863208
+            ],
+            [
+              110.2948964,
+              25.2863545
+            ],
+            [
+              110.294817,
+              25.2863528
+            ],
+            [
+              110.2947473,
+              25.2863492
+            ],
+            [
+              110.2946167,
+              25.2863332
+            ],
+            [
+              110.2944925,
+              25.2862886
+            ],
+            [
+              110.2943772,
+              25.2862655
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1008248063",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2949542,
+            25.2868829
+          ],
+          [
+            110.2949671,
+            25.2869455
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "西华里",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1008248064",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "低"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2928518,
+            25.2832795
+          ],
+          [
+            110.2941182,
+            25.2831335
+          ],
+          [
+            110.2943246,
+            25.2831097
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "承运门",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1008248065",
+        "floors": 2,
+        "facade_bearing": 189.8,
+        "photo": "31–35",
+        "axis_deg": 99.8,
+        "floors_estimated": true,
+        "position_confidence": "中",
+        "name_confidence": "高",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2942617,
+              25.2834208
+            ],
+            [
+              110.2942487,
+              25.2833532
+            ],
+            [
+              110.2942431,
+              25.2833242
+            ],
+            [
+              110.294353,
+              25.2833069
+            ],
+            [
+              110.2945028,
+              25.2832833
+            ],
+            [
+              110.2945085,
+              25.2833128
+            ],
+            [
+              110.2945214,
+              25.2833798
+            ],
+            [
+              110.2943708,
+              25.2834036
+            ],
+            [
+              110.2942617,
+              25.2834208
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1008248066",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2946719,
+            25.2850449
+          ],
+          [
+            110.2946602,
+            25.284976
+          ],
+          [
+            110.2945648,
+            25.2844319
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1008248068",
+        "floors": 1,
+        "facade_bearing": 6.4,
+        "photo": null,
+        "axis_deg": 96.4,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.294491,
+              25.2829301
+            ],
+            [
+              110.2944707,
+              25.2827702
+            ],
+            [
+              110.2950942,
+              25.282702
+            ],
+            [
+              110.2951145,
+              25.2828672
+            ],
+            [
+              110.294491,
+              25.2829301
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1008248069",
+        "floors": 1,
+        "facade_bearing": 6.4,
+        "photo": null,
+        "axis_deg": 96.4,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.294469,
+              25.2827044
+            ],
+            [
+              110.2944487,
+              25.2825444
+            ],
+            [
+              110.2950721,
+              25.2824763
+            ],
+            [
+              110.2950924,
+              25.2826414
+            ],
+            [
+              110.294469,
+              25.2827044
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1008248070",
+        "floors": 1,
+        "facade_bearing": 8.2,
+        "photo": null,
+        "axis_deg": 98.2,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2953675,
+              25.2828823
+            ],
+            [
+              110.295353,
+              25.2827695
+            ],
+            [
+              110.2957299,
+              25.2827223
+            ],
+            [
+              110.2957473,
+              25.2828325
+            ],
+            [
+              110.2953675,
+              25.2828823
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1008248071",
+        "floors": 1,
+        "facade_bearing": 188.6,
+        "photo": null,
+        "axis_deg": 98.6,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2953518,
+              25.2826077
+            ],
+            [
+              110.2953318,
+              25.2824881
+            ],
+            [
+              110.2957791,
+              25.2824268
+            ],
+            [
+              110.2957992,
+              25.2825465
+            ],
+            [
+              110.2953518,
+              25.2826077
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1008248072",
+        "floors": 1,
+        "facade_bearing": 189.1,
+        "photo": null,
+        "axis_deg": 99.1,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2952141,
+              25.2824064
+            ],
+            [
+              110.2951784,
+              25.2822051
+            ],
+            [
+              110.2956269,
+              25.2821401
+            ],
+            [
+              110.2956414,
+              25.2822216
+            ],
+            [
+              110.2957329,
+              25.2822083
+            ],
+            [
+              110.2957542,
+              25.282328
+            ],
+            [
+              110.2952141,
+              25.2824064
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1008248073",
+        "floors": 1,
+        "facade_bearing": 189.1,
+        "photo": null,
+        "axis_deg": 99.1,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2948934,
+              25.2822183
+            ],
+            [
+              110.29489,
+              25.2821991
+            ],
+            [
+              110.2947108,
+              25.2822254
+            ],
+            [
+              110.294688,
+              25.2820985
+            ],
+            [
+              110.2948867,
+              25.2820694
+            ],
+            [
+              110.2948908,
+              25.2820921
+            ],
+            [
+              110.2954499,
+              25.2820103
+            ],
+            [
+              110.295472,
+              25.2821336
+            ],
+            [
+              110.2948934,
+              25.2822183
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "leisure",
+        "osm": "https://www.openstreetmap.org/way/1350892047",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2956712,
+              25.2839825
+            ],
+            [
+              110.2960353,
+              25.2839292
+            ],
+            [
+              110.2959963,
+              25.2837111
+            ],
+            [
+              110.2956321,
+              25.2837644
+            ],
+            [
+              110.2956712,
+              25.2839825
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "amenity",
+        "osm": "https://www.openstreetmap.org/way/1350892048",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2939697,
+              25.2836642
+            ],
+            [
+              110.2939148,
+              25.2833576
+            ],
+            [
+              110.2931701,
+              25.2834659
+            ],
+            [
+              110.2932278,
+              25.2837733
+            ],
+            [
+              110.2939697,
+              25.2836642
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471082173",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2940645,
+            25.2839692
+          ],
+          [
+            110.2944562,
+            25.2839185
+          ],
+          [
+            110.2948551,
+            25.2838605
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471082174",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2941182,
+            25.2831335
+          ],
+          [
+            110.2939898,
+            25.2834992
+          ],
+          [
+            110.2939969,
+            25.2835454
+          ],
+          [
+            110.294018,
+            25.2836836
+          ],
+          [
+            110.2940645,
+            25.2839692
+          ],
+          [
+            110.2941576,
+            25.2844826
+          ],
+          [
+            110.2942565,
+            25.2850408
+          ],
+          [
+            110.2943242,
+            25.2854338
+          ],
+          [
+            110.2943547,
+            25.2856107
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471082175",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2944877,
+            25.2830913
+          ],
+          [
+            110.2946881,
+            25.2833011
+          ],
+          [
+            110.2947632,
+            25.2833798
+          ],
+          [
+            110.2948551,
+            25.2838605
+          ],
+          [
+            110.2949798,
+            25.2846849
+          ],
+          [
+            110.2950113,
+            25.284925
+          ],
+          [
+            110.2950276,
+            25.2850069
+          ],
+          [
+            110.2950692,
+            25.2852587
+          ],
+          [
+            110.2951084,
+            25.2855257
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471082176",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2942565,
+            25.2850408
+          ],
+          [
+            110.2946602,
+            25.284976
+          ],
+          [
+            110.2950113,
+            25.284925
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471082177",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2951084,
+            25.2855257
+          ],
+          [
+            110.2949779,
+            25.2855367
+          ],
+          [
+            110.294891,
+            25.2854826
+          ],
+          [
+            110.2944559,
+            25.2855449
+          ],
+          [
+            110.2943547,
+            25.2856107
+          ],
+          [
+            110.2941829,
+            25.2858228
+          ],
+          [
+            110.2938237,
+            25.2860937
+          ],
+          [
+            110.2939029,
+            25.2863845
+          ],
+          [
+            110.2940399,
+            25.2864762
+          ],
+          [
+            110.294285,
+            25.2866128
+          ],
+          [
+            110.2945424,
+            25.2867114
+          ],
+          [
+            110.2949016,
+            25.2866838
+          ],
+          [
+            110.2949542,
+            25.2868829
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471082178",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2951084,
+            25.2855257
+          ],
+          [
+            110.2957068,
+            25.285445
+          ],
+          [
+            110.2962343,
+            25.2853781
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471513676",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2938237,
+            25.2860937
+          ],
+          [
+            110.2937629,
+            25.2856981
+          ],
+          [
+            110.2936446,
+            25.2849447
+          ],
+          [
+            110.2934527,
+            25.2848668
+          ],
+          [
+            110.2933985,
+            25.2845977
+          ],
+          [
+            110.2932438,
+            25.2837934
+          ],
+          [
+            110.294018,
+            25.2836836
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1471513677",
+        "floors": 1,
+        "facade_bearing": 189.1,
+        "photo": null,
+        "axis_deg": 99.1,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2932755,
+              25.2834176
+            ],
+            [
+              110.2932654,
+              25.2833608
+            ],
+            [
+              110.2934542,
+              25.2833333
+            ],
+            [
+              110.2934644,
+              25.2833901
+            ],
+            [
+              110.2932755,
+              25.2834176
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1471513678",
+        "floors": 1,
+        "facade_bearing": 189.3,
+        "photo": null,
+        "axis_deg": 99.3,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2936563,
+              25.2833572
+            ],
+            [
+              110.2936465,
+              25.2833031
+            ],
+            [
+              110.2939223,
+              25.2832622
+            ],
+            [
+              110.2939321,
+              25.2833164
+            ],
+            [
+              110.2936563,
+              25.2833572
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471513679",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2933985,
+            25.2845977
+          ],
+          [
+            110.2941576,
+            25.2844826
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1471513680",
+        "floors": 1,
+        "facade_bearing": 188.0,
+        "photo": null,
+        "axis_deg": 98.0,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.293457,
+              25.2847693
+            ],
+            [
+              110.2934384,
+              25.2846508
+            ],
+            [
+              110.2937284,
+              25.2846136
+            ],
+            [
+              110.293747,
+              25.2847321
+            ],
+            [
+              110.293457,
+              25.2847693
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1471513681",
+        "floors": 1,
+        "facade_bearing": 98.5,
+        "photo": null,
+        "axis_deg": 98.5,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2931187,
+              25.2848459
+            ],
+            [
+              110.2931047,
+              25.2847619
+            ],
+            [
+              110.2933424,
+              25.2847294
+            ],
+            [
+              110.2933565,
+              25.2848135
+            ],
+            [
+              110.2931187,
+              25.2848459
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471513682",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2937629,
+            25.2856981
+          ],
+          [
+            110.2943547,
+            25.2856107
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1471513683",
+        "floors": 1,
+        "facade_bearing": 187.5,
+        "photo": null,
+        "axis_deg": 97.5,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2938264,
+              25.2858362
+            ],
+            [
+              110.293811,
+              25.2857308
+            ],
+            [
+              110.2941499,
+              25.2856904
+            ],
+            [
+              110.2941653,
+              25.2857957
+            ],
+            [
+              110.2938264,
+              25.2858362
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471513684",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2948551,
+            25.2838605
+          ],
+          [
+            110.2952368,
+            25.2838033
+          ],
+          [
+            110.2952461,
+            25.283802
+          ],
+          [
+            110.2952907,
+            25.2840857
+          ],
+          [
+            110.295329,
+            25.2843296
+          ],
+          [
+            110.2953748,
+            25.2846215
+          ],
+          [
+            110.295574,
+            25.2845932
+          ],
+          [
+            110.2956236,
+            25.2849115
+          ],
+          [
+            110.2956631,
+            25.2851649
+          ],
+          [
+            110.2957068,
+            25.285445
+          ],
+          [
+            110.2957768,
+            25.2858784
+          ],
+          [
+            110.295815,
+            25.2861308
+          ],
+          [
+            110.2958688,
+            25.2864719
+          ],
+          [
+            110.2958856,
+            25.2865785
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471513685",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2949016,
+            25.2866838
+          ],
+          [
+            110.2958688,
+            25.2864719
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1471513686",
+        "floors": 1,
+        "facade_bearing": 189.6,
+        "photo": null,
+        "axis_deg": 99.6,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2935569,
+              25.2870789
+            ],
+            [
+              110.2935254,
+              25.2869118
+            ],
+            [
+              110.2940091,
+              25.2868372
+            ],
+            [
+              110.2940406,
+              25.2870043
+            ],
+            [
+              110.2935569,
+              25.2870789
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471515769",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2949798,
+            25.2846849
+          ],
+          [
+            110.2953748,
+            25.2846215
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471515770",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2950692,
+            25.2852587
+          ],
+          [
+            110.2956631,
+            25.2851649
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471515771",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2950276,
+            25.2850069
+          ],
+          [
+            110.2956236,
+            25.2849115
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471515772",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.295574,
+            25.2845932
+          ],
+          [
+            110.295732,
+            25.2845644
+          ],
+          [
+            110.295682,
+            25.2842784
+          ],
+          [
+            110.2956403,
+            25.2840399
+          ],
+          [
+            110.2956573,
+            25.2839884
+          ],
+          [
+            110.2956077,
+            25.2837517
+          ],
+          [
+            110.2952461,
+            25.283802
+          ],
+          [
+            110.2952368,
+            25.2838033
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471515773",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2952907,
+            25.2840857
+          ],
+          [
+            110.2956403,
+            25.2840399
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471515774",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.295329,
+            25.2843296
+          ],
+          [
+            110.295682,
+            25.2842784
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "amenity",
+        "osm": "https://www.openstreetmap.org/way/1471528127",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2934619,
+              25.286869
+            ],
+            [
+              110.2933968,
+              25.2864759
+            ],
+            [
+              110.2939042,
+              25.2864072
+            ],
+            [
+              110.2939693,
+              25.2868003
+            ],
+            [
+              110.2934619,
+              25.286869
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471528129",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2943547,
+            25.2856107
+          ],
+          [
+            110.2944168,
+            25.2856994
+          ],
+          [
+            110.2944437,
+            25.2857209
+          ],
+          [
+            110.2945236,
+            25.2857363
+          ],
+          [
+            110.2950637,
+            25.285675
+          ],
+          [
+            110.2951084,
+            25.2855257
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471528130",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2950637,
+            25.285675
+          ],
+          [
+            110.2950904,
+            25.285794
+          ],
+          [
+            110.29511,
+            25.2858466
+          ],
+          [
+            110.2951318,
+            25.2859051
+          ],
+          [
+            110.2952744,
+            25.2861327
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1471528915",
+        "floors": 1,
+        "facade_bearing": 7.5,
+        "photo": null,
+        "axis_deg": 97.5,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2947619,
+              25.2832262
+            ],
+            [
+              110.2947504,
+              25.2831482
+            ],
+            [
+              110.2952162,
+              25.2830921
+            ],
+            [
+              110.2952277,
+              25.28317
+            ],
+            [
+              110.2947619,
+              25.2832262
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "leisure",
+        "osm": "https://www.openstreetmap.org/way/1471528916",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2953674,
+              25.2837189
+            ],
+            [
+              110.2952897,
+              25.2832577
+            ],
+            [
+              110.2955354,
+              25.2832238
+            ],
+            [
+              110.2956133,
+              25.283685
+            ],
+            [
+              110.2953674,
+              25.2837189
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1471528918",
+        "floors": 1,
+        "facade_bearing": 10.2,
+        "photo": null,
+        "axis_deg": 10.2,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2956625,
+              25.2837369
+            ],
+            [
+              110.2959179,
+              25.283698
+            ],
+            [
+              110.2957938,
+              25.2830727
+            ],
+            [
+              110.2955349,
+              25.2831111
+            ],
+            [
+              110.2955821,
+              25.2833488
+            ],
+            [
+              110.2955692,
+              25.2833672
+            ],
+            [
+              110.2955874,
+              25.2834604
+            ],
+            [
+              110.2956078,
+              25.2834623
+            ],
+            [
+              110.2956625,
+              25.2837369
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1471528919",
+        "floors": 1,
+        "facade_bearing": 189.2,
+        "photo": null,
+        "axis_deg": 9.2,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2958446,
+              25.2833089
+            ],
+            [
+              110.2959555,
+              25.2832927
+            ],
+            [
+              110.2959143,
+              25.2830625
+            ],
+            [
+              110.2958035,
+              25.2830787
+            ],
+            [
+              110.2958446,
+              25.2833089
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471528920",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2957768,
+            25.2858784
+          ],
+          [
+            110.2962818,
+            25.2858107
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1471528921",
+        "floors": 1,
+        "facade_bearing": 188.4,
+        "photo": null,
+        "axis_deg": 98.4,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.29537,
+              25.2859187
+            ],
+            [
+              110.2953601,
+              25.2858583
+            ],
+            [
+              110.2955093,
+              25.2858382
+            ],
+            [
+              110.2955193,
+              25.2858986
+            ],
+            [
+              110.29537,
+              25.2859187
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471528922",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2933985,
+            25.2864535
+          ],
+          [
+            110.2939029,
+            25.2863845
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1471530355",
+        "floors": 1,
+        "facade_bearing": 188.7,
+        "photo": null,
+        "axis_deg": 98.7,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2945164,
+              25.2856647
+            ],
+            [
+              110.2945055,
+              25.2856007
+            ],
+            [
+              110.2948439,
+              25.2855536
+            ],
+            [
+              110.2948548,
+              25.2856176
+            ],
+            [
+              110.2945164,
+              25.2856647
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1471530955",
+        "floors": 1,
+        "facade_bearing": 279.3,
+        "photo": null,
+        "axis_deg": 9.3,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2957537,
+              25.2843428
+            ],
+            [
+              110.2956919,
+              25.283998
+            ],
+            [
+              110.2958514,
+              25.2839746
+            ],
+            [
+              110.2959133,
+              25.2843194
+            ],
+            [
+              110.2957537,
+              25.2843428
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471530958",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2946881,
+            25.2833011
+          ],
+          [
+            110.2952773,
+            25.2832313
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "highway",
+        "osm": "https://www.openstreetmap.org/way/1471531248",
+        "floors": null,
+        "facade_bearing": null,
+        "photo": null,
+        "axis_deg": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "未具名"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2957768,
+            25.2858784
+          ],
+          [
+            110.2955503,
+            25.2858668
+          ],
+          [
+            110.295524,
+            25.2857925
+          ],
+          [
+            110.29511,
+            25.2858466
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "",
+        "kind": "building",
+        "osm": "https://www.openstreetmap.org/way/1471532482",
+        "floors": 1,
+        "facade_bearing": 189.1,
+        "photo": null,
+        "axis_deg": 99.1,
+        "floors_estimated": true,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "facade_estimated": true
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2943956,
+              25.2869629
+            ],
+            [
+              110.2943678,
+              25.2868068
+            ],
+            [
+              110.2946558,
+              25.2867649
+            ],
+            [
+              110.2946836,
+              25.286921
+            ],
+            [
+              110.2943956,
+              25.2869629
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "王城城垣",
+        "kind": "wall",
+        "osm": "https://www.openstreetmap.org/way/258909996",
+        "axis_deg": null,
+        "floors": null,
+        "floors_estimated": false,
+        "position_confidence": "低",
+        "name_confidence": "低"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            110.2957488,
+            25.2818358
+          ],
+          [
+            110.2959163,
+            25.2828643
+          ],
+          [
+            110.2959273,
+            25.2829273
+          ],
+          [
+            110.2959366,
+            25.2829841
+          ],
+          [
+            110.2965496,
+            25.2867335
+          ],
+          [
+            110.2950295,
+            25.2869374
+          ],
+          [
+            110.2949671,
+            25.2869455
+          ],
+          [
+            110.294905,
+            25.2869536
+          ],
+          [
+            110.29336,
+            25.2871598
+          ],
+          [
+            110.2927403,
+            25.2833698
+          ],
+          [
+            110.2927282,
+            25.2832954
+          ],
+          [
+            110.292718,
+            25.2832329
+          ],
+          [
+            110.2925592,
+            25.2822622
+          ],
+          [
+            110.2939695,
+            25.2820737
+          ],
+          [
+            110.2941529,
+            25.2820492
+          ],
+          [
+            110.2943455,
+            25.2820229
+          ],
+          [
+            110.2957488,
+            25.2818358
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "月牙池",
+        "kind": "pond",
+        "source": "Esri World Imagery；湖心亭北侧可见水面，树冠下岸线估计",
+        "position_confidence": "低"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.29469634,
+              25.28657081
+            ],
+            [
+              110.2948194,
+              25.28660789
+            ],
+            [
+              110.29503132,
+              25.28654608
+            ],
+            [
+              110.2953116,
+              25.28652136
+            ],
+            [
+              110.2955372,
+              25.28642246
+            ],
+            [
+              110.29560556,
+              25.28634828
+            ],
+            [
+              110.29550302,
+              25.28631738
+            ],
+            [
+              110.29534579,
+              25.28637301
+            ],
+            [
+              110.29525691,
+              25.28631738
+            ],
+            [
+              110.29516804,
+              25.28634828
+            ],
+            [
+              110.29507917,
+              25.28642864
+            ],
+            [
+              110.29486041,
+              25.286441
+            ],
+            [
+              110.29477154,
+              25.28647191
+            ],
+            [
+              110.29469634,
+              25.28657081
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "夫妻树",
+        "kind": "natural",
+        "osm": "https://www.openstreetmap.org/node/14088892740",
+        "position_confidence": "中",
+        "name_confidence": "高"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.294389,
+          25.2846439
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "贡院",
+        "kind": "poi",
+        "source": "百度地图 POI + 桂林景区游线",
+        "bd09mc": [
+          12279314.67,
+          2893012.04
+        ],
+        "position_confidence": "低",
+        "wgs84_before_registration": [
+          110.29472528226613,
+          25.28685446466248
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.29468558,
+          25.28682306
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "太平岩",
+        "kind": "poi",
+        "source": "独秀峰西麓记载；峰体西向崖脚网格；百度景点 POI 另存",
+        "bd09mc": [
+          12279301.41,
+          2892900.85
+        ],
+        "position_confidence": "低",
+        "wgs84_before_registration": [
+          110.29460654013015,
+          25.285944652423574
+        ],
+        "registered_baidu_poi": [
+          110.29456684,
+          25.28591325
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.29411085,
+          25.28613782
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "读书岩",
+        "kind": "poi",
+        "source": "百度地图 POI + 桂林景区游线",
+        "bd09mc": [
+          12279341.06,
+          2892903.02
+        ],
+        "position_confidence": "低",
+        "wgs84_before_registration": [
+          110.29496087750975,
+          25.28596707873748
+        ]
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.29492118,
+          25.28593568
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "building",
+        "name": "",
+        "osm": "https://www.openstreetmap.org/way/1531543882",
+        "floors": 1,
+        "floors_estimated": true,
+        "facade_estimated": true,
+        "photo": null,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "axis_deg": 155.2,
+        "facade_bearing": 245.2
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2944437,
+              25.2862366
+            ],
+            [
+              110.2944711,
+              25.2861827
+            ],
+            [
+              110.2945281,
+              25.2862064
+            ],
+            [
+              110.2945007,
+              25.2862603
+            ],
+            [
+              110.2944437,
+              25.2862366
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "building",
+        "name": "",
+        "osm": "https://www.openstreetmap.org/way/1531543883",
+        "floors": 1,
+        "floors_estimated": true,
+        "facade_estimated": true,
+        "photo": null,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "axis_deg": 155.2,
+        "facade_bearing": 245.2
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2946797,
+              25.2862966
+            ],
+            [
+              110.2947071,
+              25.2862427
+            ],
+            [
+              110.2947642,
+              25.2862664
+            ],
+            [
+              110.2947368,
+              25.2863203
+            ],
+            [
+              110.2946797,
+              25.2862966
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "building",
+        "name": "Guanyin Hall",
+        "osm": "https://www.openstreetmap.org/way/1531543884",
+        "floors": 1,
+        "floors_estimated": true,
+        "facade_estimated": true,
+        "photo": null,
+        "position_confidence": "低",
+        "name_confidence": "低",
+        "axis_deg": 155.2,
+        "facade_bearing": 245.2
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2945557,
+              25.2862669
+            ],
+            [
+              110.2945831,
+              25.286213
+            ],
+            [
+              110.2946401,
+              25.2862367
+            ],
+            [
+              110.2946127,
+              25.2862906
+            ],
+            [
+              110.2945557,
+              25.2862669
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "building",
+        "name": "孔庙",
+        "osm": "https://www.openstreetmap.org/way/1531544950",
+        "floors": 1,
+        "floors_estimated": true,
+        "facade_estimated": true,
+        "photo": null,
+        "position_confidence": "低",
+        "name_confidence": "低",
+        "axis_deg": 100.2,
+        "facade_bearing": 190.2
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2941243,
+              25.2870014
+            ],
+            [
+              110.2943672,
+              25.2869618
+            ],
+            [
+              110.2943356,
+              25.2868028
+            ],
+            [
+              110.2940926,
+              25.2868424
+            ],
+            [
+              110.2941243,
+              25.2870014
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "building",
+        "name": "",
+        "osm": "https://www.openstreetmap.org/way/1548992185",
+        "floors": 1,
+        "floors_estimated": true,
+        "facade_estimated": true,
+        "photo": null,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "axis_deg": 9.4,
+        "facade_bearing": 99.4
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2927989,
+              25.283086
+            ],
+            [
+              110.2927535,
+              25.282836
+            ],
+            [
+              110.2928475,
+              25.282822
+            ],
+            [
+              110.2928929,
+              25.283072
+            ],
+            [
+              110.2927989,
+              25.283086
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "building",
+        "name": "",
+        "osm": "https://www.openstreetmap.org/way/1548992186",
+        "floors": 1,
+        "floors_estimated": true,
+        "facade_estimated": true,
+        "photo": null,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "axis_deg": 9.4,
+        "facade_bearing": 99.4
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2927361,
+              25.2827707
+            ],
+            [
+              110.2926907,
+              25.2825207
+            ],
+            [
+              110.2927847,
+              25.2825067
+            ],
+            [
+              110.2928301,
+              25.2827567
+            ],
+            [
+              110.2927361,
+              25.2827707
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "building",
+        "name": "",
+        "osm": "https://www.openstreetmap.org/way/1548992187",
+        "floors": 1,
+        "floors_estimated": true,
+        "facade_estimated": true,
+        "photo": null,
+        "position_confidence": "低",
+        "name_confidence": "未具名",
+        "axis_deg": 9.5,
+        "facade_bearing": 99.5
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              110.2926993,
+              25.282494
+            ],
+            [
+              110.2926714,
+              25.282343
+            ],
+            [
+              110.2927483,
+              25.2823314
+            ],
+            [
+              110.2927762,
+              25.2824824
+            ],
+            [
+              110.2926993,
+              25.282494
+            ]
+          ]
+        ]
+      }
+    }
+  ],
+  "registration": {
+    "reference": "IDOK-50 Esri/OSM",
+    "control_osm": "way/1008248059",
+    "control_lon_lat": [
+      110.2941688,
+      25.2821368
+    ],
+    "after_gcj02_inverse_delta_lon_lat": [
+      -3.97e-05,
+      -3.14e-05
+    ]
+  }
+}
