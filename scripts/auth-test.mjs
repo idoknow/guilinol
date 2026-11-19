@@ -24,8 +24,8 @@ try {
     if(child.exitCode!==null||attempt===199)throw Error('Wrangler failed: '+logs)
     await delay(150)
   }
-  async function code(purpose){for(let attempt=0;attempt<50;attempt++){
-    const match=logs.match(new RegExp(`DEV_EMAIL ${email} ${purpose} (\\d{6})`));if(match)return match[1];await delay(100)
+  async function code(purpose,index=0){for(let attempt=0;attempt<50;attempt++){
+    const match=Array.from(logs.matchAll(new RegExp(`DEV_EMAIL ${email} ${purpose} (\\d{6})`,'g')))[index];if(match)return match[1];await delay(100)
   }throw Error('Missing local email')}
   if(ui) {
     browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
@@ -46,14 +46,19 @@ try {
       return result
     }
     const register={email,password,nickname},login={email,password}
-    await api('auth/register',register,403,'origin',{headers:{Origin:'https://example.test'}});await api('auth/register',{},400,'invalid_input');await api('auth/register',register)
+    const firstPassword='first-registration-password'
+    await api('auth/register',register,403,'origin',{headers:{Origin:'https://example.test'}});await api('auth/register',{},400,'invalid_input');await api('auth/register',{...register,password:firstPassword})
+    sql('UPDATE mail_events SET sent=sent-61');await api('auth/register',register)
     await api('auth/resend',{email,purpose:'verify'},429,'rate_limited');await api('auth/login',login,403,'unverified')
-    const verification={email,code:await code('verify')};await api('auth/verify',verification);await api('auth/verify',verification,400,'invalid_code');assert.equal((await api('me')).verified,true)
+    const verification={email,code:await code('verify',1)}
+    await api('auth/verify',verification,400,'invalid_code');await api('auth/verify',{...verification,password:firstPassword},400,'invalid_code');await api('me',null,401,'unauthorized')
+    await api('auth/verify',{...verification,password});await api('auth/verify',{...verification,password},400,'invalid_code');assert.equal((await api('me')).verified,true)
+    console.log('Verification requires the latest registration password: missing and stale passwords rejected; current password accepted')
     assert.equal((await api('me',{nickname:'江岸' },200,null,{method:'PATCH'})).nickname,'江岸');const sessionRows=JSON.parse(sql('SELECT digest FROM sessions'))[0].results;assert.equal(sessionRows.length,1);assert.notEqual(sessionRows[0].digest,cookie.split('=')[1]);assert.notEqual(JSON.parse(sql('SELECT digest FROM users'))[0].results[0].digest,password)
     await api('auth/logout',{});await api('me',null,401,'unauthorized');await api('auth/login',login)
     for(let attempt=1;attempt<=5;attempt++)await api('auth/login',{email,password:'incorrect'},attempt===5?429:401,attempt===5?'locked':'credentials');await api('auth/login',login,429,'locked')
     sql('UPDATE mail_events SET sent=sent-61');await api('auth/resend',{email,purpose:'reset'});const reset={email,code:await code('reset'),password:'new-password'};await api('auth/reset',reset);await api('me',null,401,'unauthorized');await api('auth/reset',reset,400,'invalid_code');await api('auth/login',login,401,'credentials');await api('auth/login',reset)
-    for(let index=0;index<8;index++)await api('auth/resend',{email:`other${index}@example.test`,purpose:'reset'});await api('auth/resend',{email:'capped@example.test',purpose:'reset'},429,'rate_limited')
+    for(let index=0;index<7;index++)await api('auth/resend',{email:`other${index}@example.test`,purpose:'reset'});await api('auth/resend',{email:'capped@example.test',purpose:'reset'},429,'rate_limited')
   }
   console.log(ui?'UI registration, login and mobile screenshots passed':'API lifecycle, storage, lockout, cooldown, IP limit and Origin passed')
 }finally{

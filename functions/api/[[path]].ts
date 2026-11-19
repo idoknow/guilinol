@@ -89,9 +89,17 @@ async function handle(request:Request,env:Env) {
   if(typeof body.code!=='string'||!/^\d{6}$/.test(body.code)) invalid()
   const bad=()=>new Problem(400,'invalid_code','验证码无效或已过期')
   const record=await stmt(`UPDATE email_codes SET attempts=attempts+1 WHERE email=? AND purpose=? AND expires>? AND attempts<5 RETURNING digest`,email,purpose,now()).first<{digest:string}>()
-  if(!record||!user||!equal(record.digest,await hash(`${email}:${purpose}:${body.code}`))) throw bad()
+  if(!record||!user) throw bad()
+  if(!reset) {
+    const candidate=body.password
+    if(typeof candidate!=='string'||candidate.length<8||candidate.length>256||
+      !equal(user.digest,await passwordHash(candidate,user.salt))) throw bad()
+  }
+  if(!equal(record.digest,await hash(`${email}:${purpose}:${body.code}`))) throw bad()
   const salt=random(16)
-  const consume=stmt('DELETE FROM email_codes WHERE email=? AND purpose=? AND digest=? AND expires>?',email,purpose,record.digest,now())
+  const deleteCode='DELETE FROM email_codes WHERE email=? AND purpose=? AND digest=? AND expires>?'
+  const consume=reset?stmt(deleteCode,email,purpose,record.digest,now()):stmt(`${deleteCode} AND EXISTS
+    (SELECT 1 FROM users WHERE id=? AND verified=0 AND salt=? AND digest=?)`,email,purpose,record.digest,now(),user.id,user.salt,user.digest)
   const [used]=await db.batch(reset?[consume,
     stmt('UPDATE users SET salt=?,digest=?,failures=0,locked_until=0 WHERE id=? AND changes()=1',salt,await passwordHash(pass,salt),user.id),
     stmt('DELETE FROM sessions WHERE user_id=? AND changes()=1',user.id)]:[consume,
@@ -102,6 +110,7 @@ async function handle(request:Request,env:Env) {
 }
 export const onRequest:PagesFunction<Env>=async ({request,env})=>{
   try { return await handle(request,env) } catch(error) {
+    if(!(error instanceof Problem)) console.error(error)
     const problem=error instanceof Problem?error:new Problem(500,'internal','服务暂时不可用')
     return json({error:{code:problem.code,message:problem.message}},problem.status)
   }

@@ -29,7 +29,9 @@ export function accountPanel() {
     if(busy)return;busy=true;message.textContent='处理中…'
     try{await run()}catch(error){message.textContent=error instanceof Error?error.message:'请求失败，请重试'}finally{busy=false}
   }
-  function render(next:Screen,note='') {
+  let verificationPassword=''
+  function render(next:Screen,note='',pass='') {
+    verificationPassword=next==='verify'&&dialog.open?pass:''
     screen=next;fields.replaceChildren();nav.replaceChildren();message.textContent=note
     dialog.querySelector('h2')!.textContent=titles[next]
     form.querySelector('button')!.textContent=next==='forgot'?'发送重置验证码':next==='profile'?'保存昵称':titles[next]
@@ -47,13 +49,15 @@ export function accountPanel() {
     if(screen==='profile'){setUser(await api('me','PATCH',data));render('profile','昵称已保存');return}
     if(screen==='forgot'){await api('auth/resend','POST',{email,purpose:'reset'});render('reset','如邮箱已注册，请查收验证码');return}
     const previous=screen
+    if(previous==='verify') data.password=verificationPassword
     let result
-    try {result=await api(`auth/${screen}`,'POST',data)} catch(error){if((error as {code?:string}).code==='unverified'){render('verify','请验证邮箱后登录');return}throw error}
-    if(previous==='register')render('verify','请查收邮箱中的六位验证码，10 分钟内有效')
+    try {result=await api(`auth/${screen}`,'POST',data)} catch(error){if((error as {code?:string}).code==='unverified'){render('verify','请验证邮箱后登录',data.password);return}throw error}
+    if(previous==='register')render('verify','请查收邮箱中的六位验证码，10 分钟内有效',data.password)
     else if(previous==='reset')render('login','密码已重置，请重新登录')
     else {setUser(result);render('profile',previous==='verify'?'注册成功，已登录':'已登录')}
   })}
   dialog.querySelector('header button')!.addEventListener('click',()=>dialog.close())
+  dialog.addEventListener('close',()=>{verificationPassword='';form.reset()})
   for(const type of ['keydown','keyup'])dialog.addEventListener(type,event=>event.stopPropagation())
   const ready=api('me').then(setUser).catch(()=>{})
   entry.onclick=async()=>{await ready;render(user?'profile':'login');dialog.showModal()}
