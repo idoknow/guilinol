@@ -376,7 +376,10 @@ try {
       return !stats.pending && manifest.chunks.every(
         t => Math.hypot(t.x + 128 - camera.position.x, t.z + 128 - camera.position.z) > stream.radius || stream.loaded.has(t),
       )
-    }, null, {timeout: 3500}).catch(() => {})
+      && manifest.landmarks.every(lm =>
+        Math.hypot(camera.position.x - lm.position[0], camera.position.y - lm.position[1], camera.position.z - lm.position[2]) - lm.sphere[3] > 350
+        || stream.landmarks.has(lm))
+    }, null, {timeout: 60000})
     await page.waitForTimeout(60)
     await page.evaluate(() => window.viewer.freeze())
     try { await page.screenshot({path: filePath}) }
