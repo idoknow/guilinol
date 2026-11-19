@@ -30,13 +30,21 @@ try {
   if(ui) {
     browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
     await mkdir('captures/auth',{recursive:true})
-    const page=await browser.newPage({viewport:{width:1100,height:740}})
+    const page=await browser.newPage({viewport:{width:feedbackUI?960:1100,height:feedbackUI?620:740}})
+    if(feedbackUI){
+      await page.request.post(origin+'/api/auth/register',{headers:{Origin:origin},data:{email,password,nickname}})
+      await page.request.post(origin+'/api/auth/verify',{headers:{Origin:origin},data:{email,password,code:await code('verify')}})
+      await page.request.post(origin+'/api/auth/logout',{headers:{Origin:origin}})
+      await page.goto(origin+'/?verify');await page.locator('.account-entry').click();await page.evaluate(()=>window.viewer.freeze())
+      const account=page.getByRole('dialog');await account.getByLabel('邮箱').fill(email);await account.getByLabel('密码').fill(password);await account.getByRole('button',{name:'登录',exact:true}).click();await account.getByText('已登录',{exact:true}).waitFor();await account.getByRole('button',{name:'关闭'}).click()
+      await (await import('./feedback-test.mjs')).uiTest(page,origin)
+    }else{
     await page.goto(origin+'/?verify');await page.locator('.account-entry').click();if(feedbackUI)await page.evaluate(()=>window.viewer.freeze())
     const dialog=page.getByRole('dialog'),click=name=>dialog.getByRole('button',{name,exact:true}).click(),fill=(name,value)=>dialog.getByLabel(name).fill(value)
     await page.screenshot({path:'captures/auth/login.png'});await click('注册账号');await fill('邮箱',email);await fill('密码',password);await fill('昵称',nickname);await click('注册账号');await fill('六位验证码',await code('verify'));await click('验证邮箱')
     await dialog.getByText('注册成功，已登录').waitFor();await page.screenshot({path:'captures/auth/registered.png'});await click('退出登录');await fill('密码',password);await click('登录');await dialog.getByText('已登录',{exact:true}).waitFor();await click('关闭');assert.equal(await page.locator('.account-entry').textContent(),nickname)
-    if(feedbackUI)await (await import('./feedback-test.mjs')).uiTest(page,origin)
     await page.close();if(!feedbackUI){const mobile=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});await mobile.goto(origin+'/?verify');await mobile.locator('.account-entry').tap();await mobile.getByRole('dialog').waitFor();await mobile.screenshot({path:'captures/auth/mobile.png'})}
+    }
   }else{
     let cookie=''
     async function api(path,data,status=200,code,options={}){

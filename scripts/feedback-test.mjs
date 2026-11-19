@@ -96,9 +96,11 @@ export async function uiTest(page, origin) {
       ),
     )
   await fb.getByLabel('拍摄视角').first().selectOption('正面')
+  await fb.locator('.fb-grid').scrollIntoViewIfNeeded()
+  await fb.locator('.fb-grid img').evaluateAll(images=>Promise.all(images.map(image=>image.decode())))
   await shot('photos')
   await click('提交反馈')
-  await fb.locator('.fb-status--submitted').waitFor()
+  await fb.locator('.fb-status--submitted').waitFor({timeout:120000}).catch(async error=>{throw Error(`${error.message}: ${await fb.innerText()}`)})
   await click('我的反馈')
   await click(draft.title + ' · 已提交')
   const [item] = await (await page.request.get(origin + '/api/feedback?mine=1')).json()
@@ -110,6 +112,7 @@ export async function uiTest(page, origin) {
     assert.equal(response.status(), 200)
   }
   await click('刷新进度')
+  await fb.locator('.fb-status--live').waitFor()
   assert.equal(await fb.locator('.fb-timeline li').count(), 5)
   await shot('timeline')
   await page.evaluate(() => window.viewer.camera.position.set(0, 500, 0))

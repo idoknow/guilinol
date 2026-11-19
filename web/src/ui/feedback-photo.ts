@@ -1,8 +1,10 @@
 import { parse } from 'exifr'
 import { views } from '../../../lib/feedback-contract'
 
-async function prepare(file: File) {
-  const tags = await parse(file, { gps: true }).catch(() => null)
+async function prepare(file: File, report:(stage:string)=>void) {
+  report('正在读取拍摄信息')
+  const tags = await parse(await file.arrayBuffer(), { gps: true }).catch(() => null)
+  report('正在解码')
   let blob: Blob = file
   let bitmap: ImageBitmap
   try {
@@ -19,6 +21,7 @@ async function prepare(file: File) {
   canvas.height = Math.max(1, Math.round(bitmap.height * scale))
   canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
   bitmap.close()
+  report('正在压缩')
   const jpeg = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob((value) => (value ? resolve(value) : reject(Error('压缩失败'))), 'image/jpeg', 0.84),
   )
@@ -84,7 +87,8 @@ export function photoPicker(container: HTMLElement, used: number[], warn: (messa
           if (entry.done) return
           note.textContent = '正在处理'
           try {
-            const { jpeg, meta } = await prepare(file)
+            const { jpeg, meta } = await prepare(file,stage=>{note.textContent=stage})
+            note.textContent='正在上传'
             await new Promise<void>((resolve, reject) => {
               const xhr = new XMLHttpRequest()
               xhr.open('PUT', `/api/feedback/${id}/photos/${slot}`)
