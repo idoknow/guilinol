@@ -22,6 +22,7 @@ from atlas import write_atlas
 from vehicles import plan_vehicles, write_vehicles
 from clearance import landmark_triangles
 from bridgeheads import raise_approaches
+from landmarks.rong_ground import grade_landings
 from shoreline import correct_water, contour_ronghu
 from landmark_layout import Layout
 
@@ -89,6 +90,7 @@ def build(bbox, output, palette):
     correct_water(surface, terrain, original, bounds, stencil)
     terrain[wet]=original[wet]=np.minimum(terrain[wet],surface[wet]-20)
     contour_ronghu(surface, terrain, original, bounds)
+    rong_pavement = grade_landings(terrain,original,wet,left,top,GRID,layout.entries)
     interchange=None
     bank_pavement=None
     west_portal=None
@@ -151,7 +153,8 @@ def build(bbox, output, palette):
         if entry['id'] in ('jiefang_bridge','ronghu') and bounds.covers(Point(x,z)) and sample(x,z)[1]!=DRY:
             height=previous_bed[round((z-top)/GRID),round((x-left)/GRID)]/10
         landmarks.append(dict(position=[x,height,z],**entry))
-    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,bank_pavement)
+    modeled_paving = unary_union([*rong_pavement, bank_pavement if bank_pavement is not None else Polygon()])
+    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,modeled_paving)
     print('Lengths (m):',lengths)
     def asset(name):
         return {'file':name,'bytes':(output/name).stat().st_size}
