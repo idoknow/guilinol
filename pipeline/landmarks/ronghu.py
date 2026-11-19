@@ -26,6 +26,7 @@ Colors: roof #393943, column #9a3832, library wall #adaaa6, column #a7a4a1.
 import math
 import sys
 from rong_bridges import nine_bends, ancient_bridge
+from rong_street import scooter
 from pathlib import Path
 
 from c_kit import (
@@ -135,6 +136,13 @@ def island(b):
 def library(b):
     wall, lit = b.parts['atlas'], b.parts['lit']
     x, y, z = -22.0, 1.75, -36.0
+    box(wall,(-66,3.9,-61),(9,8.0,13),'yellow')
+    hip_roof(wall,(-66,-61),8.0,9.2,13.4,2.1,.6,.22,'graytile','wood')
+    if b.collide:
+        solid(b.hit,(-66,3.9,-61),(9,8,13),'yellow')
+    for index in range(9 if b.detail else 3):
+        scooter(wall,-73+index*.36,-.72+index*.09,-58-index*.94,'steel' if index%2 else 'cream')
+    banyan(wall,(-71,-.8,-56),12,10,123,b.detail)
     for direction in (-1,1):
         wing=x+direction*19
         box(wall,(wing,y+5.4,z-6),(18,10.8,12),'cream',2.1)
