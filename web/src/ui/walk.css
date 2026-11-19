@@ -13,7 +13,6 @@ body[data-aboard] .joystick.running::after{border-color:rgba(169,80,60,0)}
 @media (pointer:coarse){
   .vehicle-action{bottom:calc(170px + env(safe-area-inset-bottom));max-width:calc(100vw - 168px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .toast{max-width:calc(100vw - 32px);font-size:13.5px;padding:8px 16px}
-  body .btn-about.account-entry{left:calc(12px + env(safe-area-inset-left));right:auto;top:calc(112px + env(safe-area-inset-top));bottom:auto}
 }
 @media (pointer:coarse) and (max-width:520px){
   html,body{overflow:hidden;max-width:100vw}
