@@ -24,8 +24,9 @@ def clock(model):
 
 
 def boulevard(model):
-    model.pose=(0,0,0,.16);clock(model)
-    for block in range(-3,4):
+    model.pose=(-11.5,0,71,.16);clock(model)
+    model.pose=(0,0,0,.16)
+    for block in range(4):
         center=block*25
         model.box(0,0,center,18,.14,25,'pave',True)
         for stripe in (-5.6,0,5.6):
