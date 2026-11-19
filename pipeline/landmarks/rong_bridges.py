@@ -3,6 +3,7 @@ import math
 import numpy as np
 
 from c_kit import box, cylinder, tube, yaw_box, ramp
+from rong_solids import oval, banyan
 
 
 NINE_BENDS = [(75.2,38.2),(76.9,45.3),(88.7,53.5),(103.1,49.9),(109.4,63.1),
@@ -29,7 +30,7 @@ def crossing(builder,path,widths,heights,arch_segment=None):
         arched = index == arch_segment
         for panel in range(count):
             def section(fraction):
-                rise = math.sin(math.pi*fraction)*.85 if arched else 0
+                rise = math.sin(math.pi*fraction)*2.15 if arched else 0
                 height = heights[index]*(1-fraction)+heights[index+1]*fraction+rise
                 return [np.array([pos[0],height,pos[1]]) for pos in
                         (left*(1-fraction)+end_left*fraction,right*(1-fraction)+end_right*fraction)]
@@ -37,6 +38,16 @@ def crossing(builder,path,widths,heights,arch_segment=None):
             far_left,far_right = section((panel+1)/count)
             surface = [near_left,near_right,far_right,far_left]
             stone.face(surface,(0,1,0),'granite',1.4)
+            if arched:
+                def underside(fraction):
+                    return -4.9+3.72*math.sqrt(max(0,1-((fraction-.5)/.39)**2))
+                soffit=[point.copy() for point in surface]
+                for corner,point in enumerate(soffit):
+                    point[1]=underside((panel+int(corner>=2))/count)
+                stone.face(soffit,(0,-1,0),'ashlar',1.1)
+                for first,last in ((0,3),(1,2)):
+                    outward=surface[first]-surface[1-first]
+                    stone.face([soffit[first],soffit[last],surface[last],surface[first]],outward,'white',None)
             if builder.collide:
                 builder.hit.face(surface,(0,1,0),'granite',None)
             for start,end,side in ((near_left,far_left,-1),(near_right,far_right,1)):
@@ -94,6 +105,17 @@ def ancient_bridge(builder):
             yaw_box(stone,point(middle,top+.45),(.76,.16,end-start+.02),yaw,'foliage')
     for sign in (-1,1):
         yaw_box(stone,point(sign*19,-3.22),(9,.45,4.4),yaw,'granite')
-    for index in range(12 if builder.detail else 5):
-        center=point(-19+(index%3)*1.7,1.1+abs(index%5-2)*.23,(index-5)*.92)
-        cylinder(builder.parts['lit'],center,.23,.45,('vermilion','yellow','glaze')[index%3],8)
+    for offset in (-7,7):
+        banyan(stone,point(-20,-3.2,offset),9,5,32+offset,builder.detail)
+    colors=('lantern_red','lantern_gold','lantern_cyan','lantern_pink','lantern_orange')
+    for strand in range(4):
+        previous=None
+        count=15 if builder.detail else 7
+        for index in range(count):
+            fraction=index/(count-1)
+            knot=point(-23+strand*1.65,3.8-1.15*math.sin(math.pi*fraction),-7+14*fraction)
+            if previous is not None: tube(stone,previous,knot,.025,'wood',4)
+            center=knot-[0,.32,0]
+            tube(stone,knot,center,.026,'wood',4)
+            oval(builder.parts['lit'],center,(.24,.24,.24),colors[(index+strand*2)%len(colors)],8 if builder.detail else 5)
+            previous=knot

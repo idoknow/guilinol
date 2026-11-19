@@ -27,6 +27,9 @@ import math
 import sys
 from rong_bridges import nine_bends, ancient_bridge
 from rong_street import scooter
+from rong_solids import oval, torus, banyan as solid_tree
+from c_kit import RECTS
+from PIL import ImageDraw
 from pathlib import Path
 
 from c_kit import (
@@ -79,20 +82,32 @@ def island(b):
     if b.collide:
         extrude(b.hit,bank,-.18,.24,'ashlar')
     box(wall,(133,.29,142),(36,.1,3.4),'granite')
-    ring(wall,(123,2.5,136),2.3,1.58,'white',sides=24)
+    torus(wall,(123,2.5,136),1.94,.35,.39,'white')
     for offset in (-.7,0,.7):
-        ring(wall,(123+offset,2.5,136),.85,.63,'white')
-    arch_wall(wall,(130,.24,132),12,3.2,.48,2.2,2.75,'rubble')
-    for east in (126,134):
-        grille(wall,east,2,132.27,1.7,1.5,'lattice',4)
+        torus(wall,(123+offset,2.5,136),.72,.12,.15,'white')
+    arch_wall(wall,(130,.24,132),4.2,3.2,.48,2.2,2.75,'brick')
+    for east in (125.8,134.2):
+        box(wall,(east,.82,132),(4.2,1.16,.48),'brick')
+        box(wall,(east,3.13,132),(4.2,.64,.48),'brick')
+        for side in (-1,1):
+            box(wall,(east+side*1.65,2.09,132),(.92,1.42,.48),'brick')
+        for offset in (-.9,-.45,0,.45,.9):
+            box(wall,(east+offset,2.09,132),(.09,1.42,.16),'ashlar')
+        for height in (1.76,2.4):
+            box(wall,(east,height,132),(2.5,.1,.18),'ashlar')
     for index in range(10 if b.detail else 5):
         east,south=119+3.3*index,142+(-1)**index*3.3
-        tube(wall,(east,.2,south),(east+.6,2.6+(index%3)*.45,south+.25),.72,'rubble',5)
-        ring(wall,(east+.82,1.45,south),1.05,.46,'rubble',sides=8)
-    for index in range(20 if b.detail else 8):
-        angle=index*2.4
-        east,south=142+4*math.sin(angle),134+3*math.cos(angle)
-        tube(wall,(east,.24,south),(east+.4,5+index%3,south-.5),.08,'foliage',5)
+        torus(wall,(east,1.5,south),.86,.44,.72,'rubble',.18)
+        oval(wall,(east+.72,1.85,south-.22),(.61,1.42,.68),'rubble',8)
+        oval(wall,(east-.45,.52,south+.31),(1.05,.47,.93),'rubble',8)
+        oval(wall,(east+1.15,.57,south),(1.24,.61,.92),'foliage',8)
+    for clump in range(5):
+        for stem in range(8 if b.detail else 4):
+            angle=stem*2.4+clump
+            east,south=140+clump*1.5+math.sin(angle)*.6,133+clump%2+math.cos(angle)*.55
+            tip=(east+.6*math.sin(angle),4.7+stem%3,south+.6*math.cos(angle))
+            tube(wall,(east,.24,south),tip,.065,'foliage',5)
+            oval(wall,tip,(.74,.34,.58),'foliage',6)
     for index in range(5):
         east,south=130+index*2.4,153+index%2
         cylinder(wall,(east,.25,south),.12,.8,'steel',5)
@@ -158,12 +173,16 @@ def library(b):
         box(wall,(wing,y+3.45,z+.5),(18.5,.28,2.5),'cream')
         box(wall,(x+direction*9,y+.32,z+5.4),(5.5,.64,2.1),'granite')
         box(wall,(x+direction*9,y+.75,z+5.4),(5.2,.32,1.9),'foliage')
-    banyan(wall,(x-14,y,z+9),15,13,54,b.detail)
+    solid_tree(wall,(x-21,y,z+8),14,12,54,b.detail)
     box(wall,(x+17,y+1.1,z+9),(8.4,2.2,.45),'white')
     for index in range(7):
         east=x+14+index*.95
-        cylinder(wall,(east,y+1.45,z+9.27),.22,.39,'cream',7)
-        tube(wall,(east-.18,y+.55,z+9.26),(east,y+1.48,z+9.26),.26,'cream',6)
+        front=z+9.29
+        oval(wall,(east,y+1.67,front),(.16,.22,.14),'granite',8)
+        oval(wall,(east,y+1.22,front),(.27,.37,.17),'cream',8)
+        for sign in (-1,1):
+            tube(wall,(east+.16*sign,y+1.42,front),(east+.36*sign,y+1.05+index%2*.18,front),.085,'granite',6)
+            tube(wall,(east+.1*sign,y+1,front),(east+.2*sign,y+.32,front),.1,'cream',6)
     # South front faces the lake (+Z). Body is 20 m wide, two storeys plus pediment.
     box(wall, (x, y + 4.3, z - 3.2), (20, 8.6, 10), 'cream', 2.2)
     stairs(wall, (x, y, z + 2.6), (x, y + 0.9, z + 1.6), 8.5, 5 if b.detail else 2, 'granite')
@@ -295,11 +314,14 @@ def shore(b):
     for index in range(10):
         east=-82+index*5
         level=-.7+index*.09
-        box(wall,(east,level,-16),(5.1,.27,5.8),'granite')
-        box(wall,(east,level+.15,-16),(5.05,.05,.85),'glaze')
-        box(wall,(east,level+.23,-16),(.4,.2,.64),'ashlar')
-        if index%3==0:
-            banyan(wall,(east,level,-20),11,8,90+index,b.detail)
+        for side in (-1,1):
+            box(wall,(east,level,-16+side*1.79),(5,.4,2.18),'granite')
+            box(wall,(east,level+.16,-16+side*.75),(5,.22,.15),'white')
+        box(wall,(east,level+.03,-16),(5,.08,1.4),'rill_water')
+        for offset in (-1.3,1.3):
+            box(wall,(east+offset,level+.17,-16),(.63,.32,.6),'ashlar')
+        if index in (0,3):
+            solid_tree(wall,(east,level,-21),9,5,90+index,b.detail)
     for index in range(6):
         angle=index*math.tau/6
         cylinder(wall,(-46+2.25*math.cos(angle),0,-10+2.25*math.sin(angle)),.19,3,'vermilion',8)
@@ -309,11 +331,9 @@ def shore(b):
     railing(wall, (-36, 7.2), (-2.2, 7.2), 0, 0.95, 'granite', post, stone=True)
     railing(wall, (2.2, 7.2), (72, 7.2), 0, 0.95, 'granite', post, stone=True)
     # North of the pavilion, so a camera standing beside the pavilion is not inside a crown.
-    banyan(wall, (-16, 0, -8), 14, 11, 41, b.detail)
     banyan(wall, (20, 0, -7), 13, 10, 42, b.detail)
     if b.detail:
         banyan(wall, (48, 0, -4), 12, 9, 43, True)
-        banyan(wall, (-34, 0, -6), 11, 8, 44, True)
 
 
 def build(b: Builder):
@@ -331,6 +351,11 @@ def build(b: Builder):
 def main():
     folder = Path(sys.argv[1])
     image = ensure_textures(folder)
+    draw=ImageDraw.Draw(image)
+    for index,(name,color) in enumerate([('lantern_red','#df4233'),('lantern_gold','#ebbd34'),('lantern_cyan','#53b7cf'),('lantern_pink','#eb81a9'),('lantern_orange','#f68526'),('rill_water','#83acbc')]):
+        left=768+index*40
+        RECTS[name]=(left,640,36,36)
+        draw.rectangle((left,640,left+36,676),fill=color)
     hi, lo = Builder(0, True), Builder(1, False)
     build(hi)
     build(lo)
