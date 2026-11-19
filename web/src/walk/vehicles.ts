@@ -12,7 +12,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
   function store(mesh:T.Mesh){const key=`${Math.floor(mesh.position.x/cellSize)},${Math.floor(mesh.position.z/cellSize)}`
     let cell=cells.get(key);if(!cell){cell=new T.Group();cells.set(key,cell)}cell.add(mesh)}
   for(const [x,y,z,angle,paint] of data.bikes){const mesh=vehicleModel('bike',paint);mesh.position.set(x,y,z);mesh.rotation.y=angle;store(mesh)}
-  const vessels=data.routes.map(route=>{const mesh=vehicleModel(route.kind);mesh.position.fromArray(route.path[0]);group.add(mesh);return mesh})
+  const vessels=data.routes.map(route=>{const pink=route.kind==='boat'&&[route.start,route.end].includes('桂湖');const mesh=vehicleModel(route.kind,pink?1:0);mesh.position.fromArray(route.path[0]);group.add(mesh);return mesh})
   const piers=new Map<string,T.Mesh>(),pierShape=new T.BoxGeometry(1,1,1),pierMaterial=new T.MeshStandardMaterial({color:0x816a50})
   for(const leg of data.routes){if(piers.has(leg.start))continue
     const [x,,z]=data.docks[leg.start],[waterX,waterY,waterZ]=leg.path[0],dx=waterX-x,dz=waterZ-z,length=Math.hypot(dx,dz)

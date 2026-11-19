@@ -23,6 +23,13 @@ export function vehicleModel(kind:string,paint=0){
     }else if(kind==='raft'){
       for(let pole=-3;pole<=3;pole++)part(new T.CylinderGeometry(.1,.12,4.3,8).rotateX(Math.PI/2),0xae905b,pole*.19,.1,0)
       box(1.1,.26,.46,0,.33,0,0x72573e)
+    }else if(kind==='boat' && paint===1){
+      box(2.2,.34,5.8,0,.16,0,0xf2efe6)
+      box(1.96,.49,4.95,0,.58,.04,0x72868b)
+      for(const side of [-1,1])for(const station of [-2,-1,0,1,2])box(.06,.49,.07,side*.99,.58,station,0xf2efe6)
+      box(2.2,.12,5.3,0,.87,0,0xf5f1e9)
+      for(const side of [-1,1])for(const station of [-2,0,2])box(.06,.80,.06,side*.94,1.33,station,0xffeee6)
+      box(2.23,.11,4.8,0,1.78,0,0xd799ab)
     }else{
       box(2.2,.38,5.8,0,.13,0,0xe9e6dd);box(1.95,.12,5.4,0,.37,0,0x95724e)
       box(1.4,.28,.42,0,.58,0,0x72573e)

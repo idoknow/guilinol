@@ -41,6 +41,14 @@ def plan_vehicles(bounds, surface, roads, buildings, sample):
         road = tags.get('highway')
         if road == 'pedestrian' and tags.get('area') == 'yes':
             extras.append(area(el))
+        if el['id']==702246385:
+            bridge=area(el)
+            center=np.asarray(bridge.centroid.coords[0])
+            axis=np.array([math.cos(math.radians(14.5)),math.sin(math.radians(14.5))])
+            lateral=np.array([-axis[1],axis[0]])
+            for side in (-1,1):
+                middle=center+side*9.6*lateral
+                extras.append(LineString([middle-75*axis,middle+75*axis]).buffer(1.9,cap_style='flat'))
         if road not in ('trunk', 'primary', 'secondary', 'tertiary') or tags.get('bridge') or len(points(el)) < 2:
             continue
         line = LineString(points(el))

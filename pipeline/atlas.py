@@ -60,6 +60,9 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
     schools = {item['osm']:item for item in json.loads(Path(__file__).with_name('schools-g2.json').read_text())}
     schools.update({'node/2597936160': {'name':'少年宫（地块待核）'},
                     'node/3170011400': {'name':'回民小学（地块待核）'}})
+    catalog = json.loads(Path(__file__).with_name('schools-g1.json').read_text())
+    school_names = {item['osm']:item['name'] for item in catalog}
+    school_names.update({'way/253811717':'桂林市奎光学校','node/2597936167':'桂林小学（待核）','node/6342889660':'凌风高中（待核）'})
     school_centers, public_streets = {}, []
 
     def place(name, kind, point):
@@ -76,6 +79,8 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
             shape = (Point(ll2xz(element['lat'],element['lon'])) if element['type']=='node' else area(element)).intersection(bounds)
             if not shape.is_empty: school_centers[key] = shape.centroid
         coords = points(element)
+        if key in school_names:
+            school_centers[key] = (Point(ll2xz(element['lat'],element['lon'])) if element['type']=='node' else area(element).representative_point())
         highway = tags.get('highway','').removesuffix('_link')
         if highway in CLASSES and len(coords) >= 2:
             clipped = LineString(coords).intersection(bounds)
@@ -91,7 +96,7 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
                 road = dict(n=name, c=CLASSES[highway], w=width if math.isfinite(width) and width > 0 else default, p=path)
                 if tags.get('bridge','no') != 'no': road['b'] = 1
                 roads.append(road)
-                if name and highway in ('residential','living_street','tertiary','secondary','pedestrian') and tags.get('access') not in ('private','no'):
+                if name and highway in ('residential','living_street','tertiary','secondary','pedestrian','primary','unclassified') and tags.get('access') not in ('private','no'):
                     public_streets.append((name,line))
                 if name and (name not in longest or line.length > longest[name].length): longest[name] = line
         kind = kind_of(tags)
@@ -111,10 +116,11 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
         place(name,kind,point)
     for name,line in longest.items():
         place(name,'road',line.interpolate(.5,normalized=True))
+    place('桂林中学解西校区', 'school', Point(-1244, -242))
     for key,center in school_centers.items():
         segments = [line for name,line in public_streets if key != 'way/675588260' or name == '漓滨路']
         if segments:
-            place(schools[key]['name'],'school',nearest_points(center, min(segments,key=center.distance))[1])
+            place(school_names[key] if key in school_names else schools[key]['name'],'school',nearest_points(center, min(segments,key=center.distance))[1])
     place('桂林医科大学（东城校区）', 'school', Point(678, -1701))
     place('桂林理工大学附属小学', 'school', Point(933, -399))
     place('桂林市田家炳中学', 'school', Point(1032, -965))

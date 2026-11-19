@@ -8,11 +8,11 @@ from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw
-from shapely import STRtree, intersects_xy
+from shapely import STRtree, intersects_xy, unary_union
 from shapely.geometry import box, Point
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem
-from features import building_mesh, buildings, ground_features, polygons
+from features import building_mesh, buildings, game_court, ground_features, polygons
 from karst import generate
 from bridges import bridge_tiles
 from scatter import CONFIG, scatter
@@ -52,9 +52,16 @@ def build(bbox, output, palette):
         row = np.clip(round((south-top)/GRID),0,depth//GRID)
         col = np.clip(round((east-left)/GRID),0,width//GRID)
         return original[row,col]/10
-    layers = ground_features(bounds)
+    layout = Layout()
+    layers = ground_features(bounds,layout.school_grounds)
     surface = np.full_like(terrain, DRY)
     texture = Image.new('RGB',(width,depth),palette['ground'])
+    for region in layout.school_grounds:
+        for part in polygons(region.intersection(bounds)):
+            for surface_area, color in ((part, palette['green']), (part.buffer(-3), '#bdbcb5')):
+                for paved in polygons(surface_area):
+                    mask, corner = stencil(paved,left,top,1)
+                    texture.paste(color,corner,mask)
     for layer, features in layers.items():
         for poly in features:
             mask, corner = stencil(poly,left,top,1)
@@ -68,7 +75,6 @@ def build(bbox, output, palette):
                     patch[wet] = round(np.median(terrain[row:row+patch.shape[0],col:col+patch.shape[1]][wet]))
     wet = surface != DRY
     previous_bed = np.where(wet,np.minimum(terrain,surface-20),terrain)
-    layout = Layout()
     output.mkdir(parents=True, exist_ok=True)
     original = previous_bed.copy()
     mountain_trees = []
@@ -91,11 +97,19 @@ def build(bbox, output, palette):
     if raised:
         footprints, heights = buildings(bounds, elevation, STRtree(peak_shapes),layout)
     index = STRtree(footprints)
-    trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees,layout.tree_exclude)
+    for campus in layout.allow_unmapped_court:
+        if not bounds.covers(campus) or any(campus.covers(field.representative_point())
+                for layer in ('schoolTrack','schoolCourt') for field in layers[layer]):
+            continue
+        court = game_court(campus,[footprints[key] for key in index.query(campus)])
+        if court is not None:
+            mask,corner = stencil(court,left,top,1)
+            texture.paste(palette['schoolCourt'],corner,mask)
+    trees, roads, banks, tree_stats = scatter(bounds,footprints,layers['water'],peak_shapes,elevation,mountain_trees,unary_union([layout.tree_exclude,*(court.buffer(1.5) for court in layers['schoolTrack']+layers['schoolCourt'])]))
     for road in roads:
         for part in polygons(road.line.buffer(road.width/2,quad_segs=2).intersection(bounds)):
             mask,corner = stencil(part,left,top,1)
-            texture.paste(palette['road'],corner,mask)
+            texture.paste('#484b4d' if road.name=='翊武路' else palette['road'],corner,mask)
             layers['road'].append(part)
     report = []
     for road in roads:
@@ -123,7 +137,7 @@ def build(bbox, output, palette):
         return {'file':name,'bytes':(output/name).stat().st_size}
     np.where(wet,surface,terrain)[::8,::8].astype('<i2').tofile(output/'overview.i16')
     np.where(wet,surface,original)[::8,::8].astype('<i2').tofile(output/'underlay.i16')
-    texture.resize((width//4,depth//4), Image.Resampling.BOX).quantize(32).save(output/'overview.png')
+    texture.resize((width//4,depth//4), Image.Resampling.BOX).quantize(32).save(output/'overview.png', optimize=True)
     chunks = []
     for south in range(0,depth,CHUNK):
         for east in range(0,width,CHUNK):
@@ -132,8 +146,8 @@ def build(bbox, output, palette):
             parts = ((poly,heights[key]) for key in sorted(index.query(tile))
                      for poly in polygons(footprints[key].intersection(tile)) if poly.area >= .01)
             vertices, normals, indices, rings = building_mesh(parts, origin)
-            deck,thin = decks(tile,origin)
-            collision = json.dumps([rings,streets(tile,origin),thin],separators=(',',':')).encode()
+            deck,thin,asphalt = decks(tile,origin)
+            collision = json.dumps([rings,streets(tile,origin),thin,asphalt],separators=(',',':')).encode()
             png = io.BytesIO()
             texture.crop((east,south,east+CHUNK,south+CHUNK)).save(png,format='PNG')
             image = png.getvalue()

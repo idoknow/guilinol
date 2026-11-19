@@ -40,7 +40,7 @@ float winMask; float winHash;`)
     .replace('#include <color_fragment>', `#include <color_fragment>
 winMask = 0.; winHash = 0.;
 if (vRoof < .5) {
-  bool old = vKind > .5 && vKind < 1.5, glazed = vKind > 1.5;
+  bool old = vKind > .5 && vKind < 1.5, glazed = vKind > 1.5 && vKind < 2.5, school = vKind > 2.5;
   float bay = old ? 2.8 : glazed ? 2.4 : 3.6;
   float f = vFloor, fl = fract(f), fi = floor(f), u = vFacade / bay, bx = fract(u), bi = floor(u);
   float h = facadeHash(vec3(bi, fi, vCell.x * 7. + vCell.y * 131.));
@@ -58,6 +58,10 @@ if (vRoof < .5) {
   c = mix(c, wall * uLine, 1. - step(.045, fl));                       // slab line at each storey
   vec3 avg = mix(wall, glass, cover) * mix(1., uLine, .045);
   if (f < 0.) { c = wall * .74; avg = c; }                              // plinth below the footprint base
+  else if (school) {
+    c = mix(c, uGlass, box1(fl,.12,.19));
+    c = mix(c, wall, box1(fl,.2,.46)*max(step(.94,fract(u*4.)),box1(fl,.42,.45)));
+  }
   else if (fi < .5 && !glazed) {                                        // ground-floor shops (R9)
     float front = box1(fl, .08, .64) * box1(bx, .06, .94);
     vec3 sign = uSigns[int(min(3., floor(h * 4.)))];

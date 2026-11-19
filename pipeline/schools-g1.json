@@ -1,0 +1,9 @@
+[
+  {"id":"guilin_thirteen","wallStreet":"四会路","name":"桂林市第十三中学","osm":"way/669069474","worldGround":true,"scale":1.36,"band":"#9f5961","blocks":[],"heritage":false},
+  {"id":"lequn_primary","wallStreet":"","name":"乐群小学","osm":"way/684946203","worldGround":true,"scale":1.32,"band":"#648091","blocks":[],"heritage":false},
+  {"id":"baoxian_school","wallStreet":"中山北路","name":"宝贤中学","osm":"way/669065609","worldGround":true,"scale":1.7,"band":"#9a5a53","blocks":[],"heritage":false},
+  {"id":"zhonghua_primary","wallStreet":"","name":"桂林市中华小学","osm":"way/1531318258","worldGround":true,"scale":1.23,"band":"#667c96","blocks":[],"heritage":false},
+  {"id":"guilin_fifth","wallStreet":"","name":"桂林市第五中学","osm":"way/683286832","worldGround":true,"scale":2.1,"band":"#955b54","blocks":[],"heritage":false},
+  {"id":"lequn_medical","name":"桂林医科大学（乐群校区）","osm":"way/627527309","worldGround":true,"scale":2.1,"band":"#708699","blocks":[],"heritage":false},
+  {"id":"wangcheng_teaching","name":"广西师范大学（王城校区）","osm":"way/885083147","worldGround":true,"scale":1,"band":"#9b5b52","blocks":[[0.0,0.0,52,3],[7.2,-48.0,52,3],[-8.2,46.1,52,3]],"heritage":true}
+]

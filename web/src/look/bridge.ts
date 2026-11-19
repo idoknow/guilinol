@@ -8,7 +8,8 @@ const top = new THREE.Color(), side = new THREE.Color()
 export const bridgeMaterial = new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,side:THREE.DoubleSide})
 nightBridge(bridgeMaterial)
 
-export function bridgeGeometry(deck:Float32Array,thin:Set<number>) {
+const asphaltColor=new THREE.Color('#42454a')
+export function bridgeGeometry(deck:Float32Array,thin:Set<number>,asphalt:number[]) {
   top.set(look.bridgeTop); side.set(look.bridgeSide)
   const key = (at:number)=>`${Math.round(deck[at]*20)},${Math.round(deck[at+1]*20)},${Math.round(deck[at+2]*20)}`
   const edges = new Map<string,[number,number,number]>()
@@ -21,6 +22,10 @@ export function bridgeGeometry(deck:Float32Array,thin:Set<number>) {
   const positions = new Float32Array(deck.length+open.length*18), colors = new Float32Array(positions.length), edge = new Float32Array(positions.length/3)
   positions.set(deck)
   for(let at=0;at<deck.length;at+=3) top.toArray(colors,at)
+  for(const triangle of asphalt) for(let corner=0;corner<3;corner++) {
+    const vertex=triangle*3+corner
+    asphaltColor.toArray(colors,vertex*3);edge[vertex]=-1
+  }
   let out = deck.length
   for(const [a,b] of open) {
     const depth = thin.has(Math.floor(a/9))?.6:look.bridgeDepth

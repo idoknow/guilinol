@@ -34,6 +34,14 @@ for (const name of ['榕湖小学','民主小学','少年宫','回民小学']) {
     assert.ok(!manifest.landmarks.some(entry=>entry.name.includes(name)))
   }
 }
+const jiexi = atlas.search('桂林中学解西')[0]
+assert.equal(jiexi.k, 'school')
+assert.equal(atlas.roadAt(jiexi.x, jiexi.z)?.name, '解放西路')
+for (const name of ['桂林市奎光学校','桂林市第十三中学','乐群小学','宝贤中学','桂林市中华小学','桂林市第五中学','桂林医科大学（乐群校区）','广西师范大学（王城校区）','桂林小学（待核）','凌风高中（待核）']) {
+  const results = atlas.search(name).filter(place=>place.n===name && place.k==='school')
+  assert.equal(results.length,1,name)
+  assert.ok(atlas.roadAt(results[0].x,results[0].z)?.name,name)
+}
 for(const [query,name,road] of [
   ['桂林医科大学','桂林医科大学（东城校区）','环城北二路'],
   ['理工大附小','桂林理工大学附属小学','建干路'],

@@ -90,14 +90,17 @@ def bridge_tiles(bounds, sample, routes, raised=()):
     def encode(tile, origin):
         triangles = []
         thin=[]
+        asphalt=[]
         for index in sorted(tree.query(tile)):
             for poly in polygons(spans[index].intersection(tile)):
                 ring = list(orient(poly,sign=-1).exterior.coords)[:-1]
                 for at in range(1,len(ring)-1):
                     if thin_spans[index]: thin.append(len(triangles)//3)
+                    if owners[index] in (121981963,1023638023,259011247,259011248):
+                        asphalt.append(len(triangles)//3)
                     for east,south in (ring[0],ring[at],ring[at+1]):
                         height = profiles[index] @ [east,south,1]
                         triangles.append([round((east-origin[0])*100),round(height*10),round((south-origin[1])*100)])
                     emitted.append((owners[index],np.array(triangles[-3:])/[100,10,100]+[origin[0],0,origin[1]],.6 if thin_spans[index] else 1.2))
-        return np.asarray(triangles,dtype='<i2').tobytes(),thin
+        return np.asarray(triangles,dtype='<i2').tobytes(),thin,asphalt
     return encode, emitted
