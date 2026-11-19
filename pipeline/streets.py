@@ -88,8 +88,10 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         surf_poly = line.buffer(width/2,quad_segs=2)
         if kind == 'pedestrian' and not rep_excl.is_empty:
             surf_poly = surf_poly.difference(rep_excl)
+        # Stone pedestrian approaches around Gunanmen and the north bank of Ronghu.
+        paving = sidewalks if road.way in (221349750, 684511179, 221882718) else surfaces
         if not surf_poly.is_empty:
-            surfaces.append(surf_poly)
+            paving.append(surf_poly)
         for side,extra in ((-1,road.left),(1,road.right)):
             if extra:
                 sw_p = line.buffer(side*(width/2+extra),single_sided=True,quad_segs=2)

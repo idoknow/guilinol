@@ -19,7 +19,9 @@ import math
 import random
 import sys
 from PIL import Image, ImageDraw
-from c_kit import RECTS, ATLAS
+from c_kit import RECTS, ATLAS, _font
+from rong_paving import pave, slab_texture
+from rong_ground import GATE_PLAZA
 from rong_street import shops, signs, approach
 from rong_solids import loft, oval, banyan as solid_tree, align_front
 from pathlib import Path
@@ -47,12 +49,12 @@ def stone_cells(image):
         brush = ImageDraw.Draw(tile)
         row = 0
         while row < 128:
-            height = rng.randint(10, 15)
+            height = rng.randint(5, 9)
             edge = -rng.randint(0, 38)
             while edge < 320:
-                width = rng.randint(20, 49)
+                width = rng.randint(10, 25)
                 tone = rng.randint(120, 168) - index * 47
-                brush.polygon([(edge+2,row+1),(edge+width-2,row),(edge+width,row+height-3),(edge+width-4,row+height-1),(edge,row+height-2)], fill=(tone,tone+1,tone-2))
+                brush.polygon([(edge+1,row+1),(edge+width-2,row),(edge+width-1,row+height-2),(edge+width-4,row+height-1),(edge,row+height-2)], fill=(tone,tone+1,tone-2))
                 edge += width
             row += height
         if index:
@@ -101,37 +103,71 @@ def courtyard(builder, deck):
     for offset in (-4.5, -1.5, 1.5, 4.5):
         cylinder(wall, (offset, deck + 2.48, 7.6), .24, .45, 'vermilion', 8)
         cylinder(wall, (offset, deck + 2.34, 7.6), .045, .14, 'yellow', 5)
-    box(wall, (-15, 1.15, 9), (12, 2.3, 1.15), 'ashlar')
-    box(wall,(0,deck/2,-4.5),(22,deck,3.4),'ashlar')
-    _battered(wall,(-11,-6.8),(11,-6.8),(11,-6.21),(-11,-6.21),0,deck,'ivywall')
-    railing(wall,(-10.7,-6.05),(10.7,-6.05),deck,.95,'white',1.2,stone=True)
-    box(wall,(-2,.55,-7.9),(20,1.1,1.2),'foliage')
-    curve=[(3+index*1.6,-9.8+.04*(index-4)**2) for index in range(10)]
-    for start,end in zip(curve,curve[1:]):
-        segment_wall(wall,start,end,0,1.8,.42,'vermilion')
-        segment_wall(wall,start,end,1.8,2.02,.64,'glaze')
+    # South curtain runs from the west enclosure to the stair, below the west
+    # hall. IMG_1313 shows the uninterrupted stone face to the left of the arch.
+    curtain = [(-30,8.6),(-10.2,8.6),(-10.2,9.6),(-30,9.6)]
+    extrude(wall,curtain,0,4.65,'coursed',None)
+    box(wall,(-20.1,4.74,9.1),(19.9,.18,1.14),'ashlar')
+    if builder.collide:
+        extrude(builder.hit,curtain,0,4.83,'ashlar')
+    # The rear face of the bastion closes the platform. IMG_1315/16 show
+    # open space east of it; the former 22 m backing box extended past the side.
+    if builder.collide:
+        solid(builder.hit, (-31, 1.45, 3.5), (.52, 2.9, 21), 'ashlar')
     for row in range(7):
         front=-10-row*2
         for east in range(-19,19,2):
             corners=[(east,front),(east+2,front),(east+2,front-2),(east,front-2)]
             wall.face([(xx,.54+max(0,-zz-10)*.092,zz) for xx,zz in corners],(0,1,0),'granite',None)
-    box(wall, (14.2,1.5,4.34),(2.2,3,.22),'wood')
-    for south in (2.75,5.25):
-        wall.face([(11.9,3.28,south),(16.5,3.28,south),(16.5,4.25,4),(11.9,4.25,4)],(0,1,south-4),'glaze',None)
-    box(wall,(14.2,3.24,4),(4.65,.22,2.65),'vermilion')
-    box(wall,(14.2,4.28,4),(4.7,.22,.25),'glaze')
-    for east in (13,15.4):
-        box(wall,(east,1.5,4.56),(.2,3.05,.18),'wood')
-    for east,height in ((16.4,1.45),(17.6,.95)):
-        box(wall,(east,height/2,4.85),(.78,height,.32),'granite')
-        box(wall,(east,height*.7,5.03),(.54,.38,.04),'blacktile')
+    # The red enclosure faces the pedestrian lane west of the yellow hall.
+    for start, end in ((-7, 5.5), (8.5, 14)):
+        segment_wall(wall, (-31, start), (-31, end), 0, 2.9, .52, 'vermilion')
+        segment_wall(wall, (-31, start), (-31, end), 2.9, 3.15, .78, 'glaze')
+    box(wall, (-31, 1.55, 7), (.32, 3.1, 3), 'door')
+    hip_roof(wall, (-31, 7), 3.1, 1.7, 3.8, .72, .22, .12, 'graytile', 'wood')
+    stairs(wall, (-33, 0, 7), (-31.2, .45, 7), 3, 3, 'ashlar')
+    for south in (4.5, 9.5):
+        box(wall, (-31.8, .8, south), (.35, 1.6, .94), 'granite')
+
 
 
 def build(b: Builder):
+    pave(b, GATE_PLAZA, .13)
     shops(b)
     approach(b)
-    with align_front(b, (0, 0), -26.8, shift=(.95,-15.8)):
-        gate(b)
+    # The eastern hall sits on way/684946200, the western hall on way/521248472.
+    # Keep the plaza banyan on the west side of pedestrian way/684511179.
+    ancient_banyan(b, -28, 3)
+    # Trail map at the south edge of the gate plaza, facing its pedestrian path.
+    with align_front(b, (-6, 12), 164):
+        mesh = b.parts['atlas']
+        for x in (-7.62, -4.38):
+            box(mesh, (x, 1.28, 12), (.16, 2.56, .22), 'wood')
+        box(mesh, (-6, 1.55, 12), (3.42, 1.96, .19), 'wood')
+        board(mesh, -6, 1.55, 12.11, 3.12, 1.68, 'park_map')
+        if b.collide:
+            solid(b.hit, (-6, 1.55, 12), (3.42, 1.96, .19), 'wood')
+    with align_front(b, (0, 0), -26.8, shift=(15, -7.2)):
+        west_hall(b)
+        # The arch is set back from the terrace lip between the round bastions.
+        with align_front(b, (0,0), 0, shift=(-1.45,-1.35)):
+            gate(b)
+
+
+def west_hall(b):
+    wall, deck = b.parts['atlas'], 6.7
+    # The west hall occupies way/521248472. IMG_1304 and IMG_1313 show both
+    # yellow halls above the same stone terrace, with the western roof lower.
+    west = [(-22.92,-2.27), (-9.6,-2.31), (-9.64,7.88), (-22.95,7.9)]
+    extrude(wall, west, 0, deck, 'coursed', None)
+    if b.collide:
+        extrude(b.hit, west, 0, deck, 'ashlar')
+    box(wall, (-16.3,deck+1.2,2.8), (12.5,2.4,8.2), 'yellow')
+    hip_roof(wall, (-16.3,2.8), deck+2.4, 12.6,8.3,1.85,.65,.38,'graytile','wood')
+    if b.detail:
+        for east in (-20.5,-17.7,-14.9,-12.1):
+            for south in (-1.4,7.0):
+                grille(wall,east,deck+1.2,south,1.4,1.6,'lattice',3)
 
 
 def gate(b: Builder):
@@ -162,18 +198,6 @@ def gate(b: Builder):
     for i in range(len(foot) - 1):
         _battered(wall, foot[i], foot[i + 1], head[i + 1], head[i], 0, deck)
     extrude(wall, [(-7.0, -2.2), (7.0, -2.2), (7.0, 7.4), (-7.0, 7.4)], deck - 0.24, deck, 'ashlar', 2.4)
-    # West wing: two-storey yellow building with a gray roof, as on the left of the photo.
-    box(wall, (-15.2, 3.5, 3.2), (8.4, 7.0, 7.6), 'yellow', 1.8)
-    hip_roof(wall, (-15.2, 3.2), 7.05, 8.6, 7.8, 2.1, 0.7, 0.55, 'graytile', 'vermilion')
-    if detail:
-        for dx, yy, hh in ((-1.6, 2.1, 2.1), (1.6, 2.1, 2.1), (-1.6, 5.0, 1.35), (1.6, 5.0, 1.35)):
-            grille(wall, -15.2 + dx, yy, 7.1, 1.35, hh, 'lattice', 3)
-        arch_wall(wall, (-15.2, 0, 6.4), 2.4, 3.4, 0.5, 1.5, 2.6, 'yellow', 8)
-        for i in range(12):
-            box(wall, (-18.6 + i * 0.62, 7.35, 6.6), (0.1, 0.18, 1.4), 'graytile', 0.3)
-    # Low east courtyard wall, yellow with a tile coping.
-    box(wall, (14.2, 1.55, 4.0), (7.5, 3.1, 0.55), 'vermilion', 1.5)
-    box(wall, (14.2, 3.2, 4.0), (8.0, 0.28, 0.9), 'glaze', 0.6)
     # Gatehouse: yellow hall, vermilion colonnade, gray xieshan, stone rail on the terrace.
     box(wall, (0, deck + 1.55, 3.15), (11.8, 3.1, 4.25), 'yellow', 1.6)
     box(wall, (-6.05, deck + 1.55, 4.5), (0.42, 3.1, 4.6), 'yellow', 1.4)
@@ -202,13 +226,6 @@ def gate(b: Builder):
     # West stair, about 30 degrees. It lands on the west edge of the terrace.
     stairs(wall, (-12.2, 0, 16.5), (-7.2, deck, 5.2), 2.6, 22 if detail else 8, 'ashlar')
     railing(wall, (-13.4, 16.5), (-8.4, 5.2), 0, 0.9, 'ashlar', post, stone=True)
-    # Plaza paving sits a few centimetres above the flattened ground.
-    for east in range(-20,18,2):
-        for south in range(11,29,2):
-            wall.face([(east,.22,south),(east+2,.22,south),(east+2,.22,south+2),(east,.22,south+2)],(0,1,0),'granite',None)
-    # Banyans stand off the south axis so a front camera is not inside the crown.
-    ancient_banyan(b, -22, 20)
-    solid_tree(wall, (20, 0, 22), 12, 8.5, 8, detail)
     if not b.collide:
         return
     for side in (-1,1):
@@ -221,6 +238,18 @@ def main():
     image = ensure_textures(folder)
     signs(image)
     stone_cells(image)
+    slab_texture(image,896,896)
+    RECTS['park_map'] = (640, 896, 256, 128)
+    panel = Image.new('RGB', (256,128), '#efe8d4')
+    draw = ImageDraw.Draw(panel)
+    draw.polygon([(9,74),(40,54),(77,66),(100,89),(147,81),(170,105),
+                  (153,118),(94,111),(53,88)], fill='#89bbb8')
+    draw.ellipse((82,81,112,97), fill='#96a66b')
+    draw.line([(32,49),(56,57),(76,63),(93,88)], fill='#b49972', width=3)
+    draw.text((60,4),'榕湖游览图',font=_font(16),fill='#584537')
+    for index, label in enumerate(('古南门','九曲桥','湖心岛')):
+        draw.text((187,36+index*22),label,font=_font(11),fill='#514c41')
+    image.paste(panel,(640,896))
     hi, lo = Builder(0, True), Builder(1, False)
     build(hi)
     build(lo)

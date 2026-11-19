@@ -28,7 +28,9 @@ ALIASES = {'象鼻山': ['象山', '水月洞'], '日塔': ['日月双塔'], '�
            '桂林市田家炳中学': ['田家炳中学', '桂林四中', '桂林市第四中学'],
            '桂林市辰山小学': ['辰山小学'],
            '漓江小学': ['桂林市漓江小学', '七星区漓江小学', '桂林市七星区漓江小学'],
-           '龙隐小学': ['桂林市龙隐小学', '七星区龙隐小学']}
+           '龙隐小学': ['桂林市龙隐小学', '七星区龙隐小学'],
+           '桂林剧院': ['漓江歌剧院', '桂林大剧院'],
+           '桂林图书市场': ['滨江文化市场', '图书市场']}
 
 
 def flat(curve):
@@ -85,8 +87,11 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
         if key in g4:
             campuses[key] = area(element)
         if key in schools:
-            shape = (Point(ll2xz(element['lat'],element['lon'])) if element['type']=='node' else area(element)).intersection(bounds)
-            if not shape.is_empty: school_centers[key] = shape.centroid
+            if key == 'way/675588260':
+                school_centers[key] = Point(ll2xz(25.279323, 110.295764))
+            else:
+                shape = (Point(ll2xz(element['lat'],element['lon'])) if element['type']=='node' else area(element)).intersection(bounds)
+                if not shape.is_empty: school_centers[key] = shape.centroid
         coords = points(element)
         if key in school_names:
             school_centers[key] = (Point(ll2xz(element['lat'],element['lon'])) if element['type']=='node' else area(element).representative_point())
@@ -135,6 +140,7 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
         segments = [line for _,_,line in public_streets if line.disjoint(campus.buffer(1))]
         closest = min(segments, key=reference.distance)
         place(g4[key], 'school', nearest_points(reference, closest)[1])
+    school_centers.setdefault('way/1531318258', Point(ll2xz(25.28352138, 110.29722322)))
     for key,center in school_centers.items():
         street = schools.get(key, {}).get('street', '漓滨路' if key == 'way/675588260' else '')
         segments = [line for name,hw,line in public_streets if (name == street if street else (hw != 'trunk' if key in school_names else hw not in ('primary','trunk')))]
@@ -146,6 +152,8 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
     place('桂林市辰山小学', 'school', Point(1110, -2413))
     place('漓江小学', 'school', Point(1111, 102))
     place('龙隐小学', 'school', Point(835, 1106))
+    place('桂林剧院', 'scenic', Point(-294, 80))
+    place('桂林图书市场', 'scenic', Point(-403, 91))
 
     data = dict(extent=extent,roads=roads,places=places)
     for layer in ('water','green'):

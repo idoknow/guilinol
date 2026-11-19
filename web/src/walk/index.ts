@@ -192,7 +192,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(!wasBike&&nextAction&&action!==nextAction){action?.fadeOut(.2);nextAction.reset().fadeIn(.2).play();action=nextAction}
     mixer.update(dt);follow()
   }
-  function photoSupport(x:number,z:number,bridgeRadius:number){
+  function photoSupport(x:number,z:number,bridgeRadius?:number){
     const tile=sim.tileAt(x,z), data=tile&&stream.loaded.get(tile)
     if(!tile||!data)throw Error(`Missing detail at ${x},${z}`)
     sim.sync(x,z)
@@ -201,8 +201,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     function deckAt(east:number,south:number){
       const deck=sim.surface(east,south,'deck')
       if(deck)return deck
-      // walk.tick also supports landmark treads over water (e.g. the Nine-Bend Bridge).
-      if(Number.isFinite(waterY)){
+      // Guanyi's pedestrian promenade is a landmark tread over a dry bank tile.
+      if(bridgeRadius!==undefined || Number.isFinite(waterY)){
         const tread=sim.surface(east,south,'landmark')
         if(tread && tread.slope<=cfg.slope && tread.y>waterY)return tread
       }
@@ -212,7 +212,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(deck)return {kind:'deck',y:Math.max(deck.y,waterY),sampleDistance:0}
     // Known on-bridge photo, but the recorded point lies beside the narrow span.
     // Borrow only elevation inside the EXIF uncertainty circle. Keep the original X/Z.
-    if(bridgeRadius>0 && Number.isFinite(waterY)){
+    if(bridgeRadius!==undefined && bridgeRadius>0 && Number.isFinite(waterY)){
       let nearest:null|{kind:string,y:number,sampleDistance:number}=null
       const steps=Math.ceil(bridgeRadius/.5)
       for(let i=-steps;i<=steps;i++)for(let j=-steps;j<=steps;j++){
