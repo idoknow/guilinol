@@ -34,7 +34,8 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
   if (!users) {
     const status = params.get('status'),
       user = params.get('user')
-    if (status) {
+    if(status==='pending')filters.push("f.status IN ('submitted','need_info')")
+    else if (status) {
       if (!Object.hasOwn(labels, status)) invalid()
       filters.push('f.status=?')
       args.push(status)
@@ -49,7 +50,7 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
     (SELECT count(*) FROM feedback WHERE user_id=u.id) feedback_count,
     (SELECT max(submitted_at) FROM feedback WHERE user_id=u.id) last_submitted_at FROM users u`
     : `f.id,f.user_id,f.title,f.kind,f.status,u.email,u.nickname,f.lat,f.lon,f.multica_issue,f.pr_url,f.submitted_at,f.updated_at,
-    (SELECT count(*) FROM feedback_photos WHERE feedback_id=f.id AND ready=1) photo_count FROM feedback f JOIN users u ON u.id=f.user_id`
+    (SELECT count(*) FROM feedback_messages WHERE feedback_id=f.id AND author_kind='user' AND id>f.admin_read_id) unread,(SELECT count(*) FROM feedback_photos WHERE feedback_id=f.id AND ready=1) photo_count FROM feedback f JOIN users u ON u.id=f.user_id`
   const { results } = await db
     .prepare(
       `SELECT ${alias}.rowid AS page_key,${select} ${filters.length ? 'WHERE ' + filters.join(' AND ') : ''} ORDER BY ${alias}.rowid DESC LIMIT 51`,

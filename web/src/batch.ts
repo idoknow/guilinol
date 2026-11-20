@@ -133,6 +133,7 @@ class StaticLayerBatch {
 }
 
 export class ChunkBatcher {
+  feedbackMeshes(){return [this.buildings.mesh,this.bridges.mesh]}
   private items = new Map<Tile,TileBatchInput>()
   private dirty = false
   private lastFocus = new THREE.Vector3(Infinity,Infinity,Infinity)

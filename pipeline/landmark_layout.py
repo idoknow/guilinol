@@ -20,7 +20,7 @@ def polygon(coords):
     return Polygon([ll2xz(lat,lon) for lon,lat in coords])
 
 
-def _model_structure_footprint(glb_path: Path, px: float, pz: float, rot_deg: float) -> Polygon:
+def _model_structure_footprint(glb_path: Path, px: float, pz: float, rot_deg: float, *, collision_only=False) -> Polygon:
     gltfpack = os.getenv('GLTFPACK') or 'gltfpack'
     rot = math.radians(rot_deg)
     cs, sn = math.cos(rot), math.sin(rot)
@@ -33,13 +33,16 @@ def _model_structure_footprint(glb_path: Path, px: float, pz: float, rot_deg: fl
         for node in sc.graph.nodes_geometry:
             cur = node
             skip = False
+            collision = False
             while cur and cur != sc.graph.base_frame:
                 nm = str(cur).lower()
-                if nm in ('lod1', 'lod2') or nm.startswith('collision'):
+                if nm.startswith('collision'):
+                    collision = True
+                if nm in ('lod1', 'lod2'):
                     skip = True
                     break
                 cur = edges.get(cur)
-            if skip:
+            if skip or collision != collision_only:
                 continue
             mat, gname = sc.graph[node]
             g = sc.geometry[gname].copy()
@@ -61,6 +64,7 @@ class Layout:
         self.flatten = []
         self.school_grounds = []
         self.allow_unmapped_court = []
+        self.street_foundations = []
         tree_free = []
         areas = []
         compound_areas = []
@@ -115,6 +119,9 @@ class Layout:
             if entry['model'] in peak_models:
                 continue
             if model.exists():
+                if entry.get('cutStreetFoundations'):
+                    foot = _model_structure_footprint(model, x, z, entry.get('rotation', 0), collision_only=True)
+                    self.street_foundations.append(foot)
                 metadata = json.loads(model.with_suffix('.json').read_text())
                 *center, radius = metadata['sphere']
                 rounded = [round(value, 3) for value in center]

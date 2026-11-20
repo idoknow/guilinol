@@ -62,6 +62,13 @@ def historic_bays(model,length,height,levels):
 def envelope(model, feature):
     attributes = feature['properties']
     corners = np.array([point(coords) for coords in feature['geometry']['coordinates'][0][:-1]])
+    if attributes['name']=='R2':
+        # IMG_1398 and the Esri roof both show a clipped NE corner with a screen.
+        ne = int(np.argmax(corners[:,0]))
+        corner = corners[ne]
+        cuts = [corner+4.5*(v-corner)/np.linalg.norm(v-corner)
+                for v in (corners[ne-1],corners[(ne+1)%len(corners)])]
+        corners = np.vstack([corners[:ne],cuts,corners[ne+1:]])
     holes=[[point(coords) for coords in ring] for ring in feature['geometry']['coordinates'][1:]]
     polygon = orient(Polygon(corners,holes),sign=-1)
     corners = np.asarray(polygon.exterior.coords)[:-1]
@@ -78,6 +85,10 @@ def envelope(model, feature):
     modern=name in ('R67','R2')
     shopfront=name in ('D-west','N011')
     model.mesh(vertices, volume.faces[:, ::-1], 'stone' if name=='N011' else 'white' if modern or name=='R17' else 'brick', True)
+    if name=='R2':
+        # The ground-floor shopfronts follow the original street wall beneath the screen.
+        shop_corner = trimesh.creation.extrude_polygon(Polygon([cuts[0],corner,cuts[1]]),3.45,engine='earcut')
+        model.mesh(shop_corner.vertices[:,[0,2,1]],shop_corner.faces[:,::-1],'white',True)
     historic=attributes.get('historic',True)
     for start, end in zip(corners, np.roll(corners, -1, axis=0)):
         delta = end-start
@@ -136,6 +147,11 @@ def envelope(model, feature):
                     along=((bay+.5)/count-.5)*length
                     model.box(along,.02,.38,.28,height-.34,.34,'stone')
                     model.box(along,2.52,.16,length/count-.30,.46,.31,'sign')
+            if name=='R2' and outward[0]>.3 and outward[1]<-.3:
+                # The dark full-height advertising panel faces the walking street (Rock 09).
+                model.box(0,4.3,.24,length*.94,height-8.0,.26,'sign')
+                model.box(0,height-.10,0,length,1.78,.30,'granite')
+                letters(model,'港舍',(0,height+.18,.16),length*.76,1.35,'white')
             bays=max(1,round(length/2.4))
             for bay in range(bays):
                 along=((bay+.5)/bays-.5)*length

@@ -1,12 +1,15 @@
 import type { Host } from '../play/host'
 import type { mapView } from '../play/map'
-import { kinds, labels } from '../../../lib/feedback-contract'
+import { kinds, labels, type FeedbackView } from '../../../lib/feedback-contract'
 import { ll2xz, xz2ll } from '../../../lib/projection'
 import { photoPicker } from './feedback-photo'
 import './feedback.css'
 
 type MapApi = ReturnType<typeof mapView>
 interface Item {
+  messages:{id:number;author_kind:string;author_name:string;body:string;created_at:number}[]
+  view: FeedbackView | null
+  has_view_shot: boolean
   id: string
   title: string
   status: string
@@ -38,13 +41,23 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, text = '', className 
 }
 const ROUTE = '【沿路拍摄】'
 const when = (seconds: number) =>
-  new Date(seconds * 1000).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  new Date(seconds * 1000).toLocaleString('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 function pill(status: string) {
   return el('span', labels[status] ?? status, `fb-pill fb-status--${status}`)
 }
 
 /** Location picker drawn with the game's own map painter: drag to pan, wheel/pinch to zoom, tap to drop the pin. */
-function locationPicker(host: Host, map: MapApi, start: { x: number; z: number }, onPick: (x: number, z: number) => void) {
+function locationPicker(
+  host: Host,
+  map: MapApi,
+  start: { x: number; z: number },
+  onPick: (x: number, z: number) => void,
+) {
   const wrap = el('div', '', 'fb-map'),
     canvas = el('canvas'),
     tools = el('div', '', 'fb-map-tools'),
@@ -143,7 +156,10 @@ function locationPicker(host: Host, map: MapApi, start: { x: number; z: number }
     wrap.classList.remove('fb-map--drag')
     if (moved < 6 && pointers.size === 0) {
       const r = canvas.getBoundingClientRect()
-      pin = { x: view.x + (e.clientX - r.left - r.width / 2) / view.scale, z: view.z + (e.clientY - r.top - r.height / 2) / view.scale }
+      pin = {
+        x: view.x + (e.clientX - r.left - r.width / 2) / view.scale,
+        z: view.z + (e.clientY - r.top - r.height / 2) / view.scale,
+      }
       onPick(pin.x, pin.z)
       redraw()
     }
@@ -182,11 +198,20 @@ function locationPicker(host: Host, map: MapApi, start: { x: number; z: number }
   })
   const resize = new ResizeObserver(redraw)
   resize.observe(canvas)
-  return { node: wrap, dispose: () => resize.disconnect() }
+  return {
+    node: wrap,
+    setPin(x: number, z: number) {
+      view.x = pin.x = x
+      view.z = pin.z = z
+      onPick(x, z)
+      redraw()
+    },
+    dispose: () => resize.disconnect(),
+  }
 }
 
-export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi | undefined>) {
-  if (document.querySelector('.fb-panel')) return
+export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi | undefined>,initialId?:string) {
+  if (document.querySelector('.fb-panel,.fb-aim-bar')) return
   const dialog = el('dialog', '', 'about-panel fb-panel')
   dialog.setAttribute('aria-label', '反馈')
   const header = el('header'),
@@ -200,6 +225,12 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
   header.append(title, tabs, close)
   dialog.append(header, body, note)
   document.body.append(dialog)
+  let captured: Awaited<ReturnType<Host['captureView']>> | undefined
+  try {
+    if(!initialId)captured = await host.captureView()
+  } catch (error) {
+    note.textContent = String(error)
+  }
   dialog.showModal()
   requestAnimationFrame(() => dialog.classList.add('fb-open'))
   close.onclick = () => dialog.close()
@@ -218,7 +249,9 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
   }
   for (const event of ['keydown', 'keyup']) dialog.addEventListener(event, (event) => event.stopPropagation())
   dialog.addEventListener('paste', (event) => {
-    const files = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/'))
+    const files = Array.from(event.clipboardData?.files ?? []).filter((file) =>
+      file.type.startsWith('image/'),
+    )
     if (!files.length || !onPaste) return
     event.preventDefault()
     onPaste(files)
@@ -297,8 +330,17 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     const head = el('div', '', 'fb-detail-head')
     head.append(el('h3', item.title), pill(item.status))
     body.append(head)
+    if (item.has_view_shot) {
+      const image = el('img', '', 'fb-view-shot')
+      image.alt = '反馈时看到的画面'
+      image.src = `/api/feedback/${id}/view-shot`
+      body.append(image)
+    }
     const [route, text] = item.body.startsWith(ROUTE)
-      ? [item.body.slice(ROUTE.length).split('\n\n')[0], item.body.slice(ROUTE.length).split('\n\n').slice(1).join('\n\n')]
+      ? [
+          item.body.slice(ROUTE.length).split('\n\n')[0],
+          item.body.slice(ROUTE.length).split('\n\n').slice(1).join('\n\n'),
+        ]
       : ['', item.body]
     const facts = el('dl', '', 'fb-facts')
     const fact = (k: string, v: string) => v && facts.append(el('dt', k), el('dd', v))
@@ -323,9 +365,11 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       }
       body.append(gallery)
     }
-    body.append(el('h4', '进度', 'fb-section-title'))
+    body.append(el('h4', '进度与对话', 'fb-section-title'))
     const timeline = el('ol', '', 'fb-timeline')
-    for (const event of [...item.events].reverse()) {
+    const paintChat=(record:Item)=>{timeline.replaceChildren();head.replaceChildren(el('h3',record.title),pill(record.status))
+    for (const event of [...record.events,...record.messages].sort((left,right)=>left.created_at-right.created_at)) {
+      if('author_kind' in event){const msg=el('li','',`fb-msg fb-msg--${event.author_kind}`),meta=el('span','','fb-msg-meta');meta.append(el('b',event.author_kind==='user'?'我':event.author_name),el('time',when(event.created_at)));msg.append(meta,el('p',event.body,'fb-msg-body'));timeline.append(msg);continue}
       const line = el('li', '', `fb-status--${event.status}`)
       line.append(el('b', labels[event.status] ?? event.status), el('time', when(event.created_at)))
       if (event.message && event.message !== labels[event.status]) line.append(el('p', event.message))
@@ -338,15 +382,26 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       }
       timeline.append(line)
     }
-    if (!item.events.length) timeline.append(el('li', '还没有进度记录', 'fb-status--draft'))
+    if (!record.events.length) timeline.append(el('li', '还没有进度记录', 'fb-status--draft'))};paintChat(item);timeline.classList.add('fb-chat')
     body.append(timeline)
     const actions = el('div', '', 'fb-actions')
     body.append(actions)
-    if (item.status === 'live')
+    if(!['draft','live','rejected','duplicate'].includes(item.status)){
+      const input=el('textarea'),photo=el('input'),compose=el('div','','fb-compose'),attach=el('label','','fb-compose-attach'),tools=el('div','','fb-compose-tools');input.maxLength=1000;input.rows=2;input.placeholder='回复协调人，或补充说明…';input.setAttribute('aria-label','回复内容');photo.type='file';photo.accept='image/jpeg,image/png,image/webp';photo.setAttribute('aria-label','回复照片');attach.append(photo,el('span','附照片'));photo.onchange=()=>{attach.querySelector('span')!.textContent=photo.files?.[0]?'已选 1 张':'附照片'};tools.append(attach);compose.append(input,tools);body.insertBefore(compose,actions)
+      button(tools,'发送回复',async()=>{let message=input.value.trim();if(!message)throw Error('请输入回复');const attachment=photo.files?.[0];if(attachment){const fresh=await api<Item>('feedback/'+id),slot=Math.max(0,...fresh.photos.map(p=>p.n))+1;if(slot>20)throw Error('照片数量已达上限');message+=`（照片 #${slot}）`;if([...message].length>1000)throw Error('回复过长');const upload=await fetch(`/api/feedback/${id}/photos/${slot}`,{method:'PUT',body:attachment});if(!upload.ok)throw Error('照片上传失败')}await api(`feedback/${id}/messages`,{body:message});await detail(id)})
+    }
+    const refresh=async()=>{if(document.hidden||!timeline.isConnected)return;try{const latest=await api<Item>('feedback/'+id);if(timeline.isConnected)paintChat(latest)}catch{}}
+    const timer=setInterval(refresh,15000);document.addEventListener('visibilitychange',refresh);const previous=dispose;dispose=()=>{clearInterval(timer);document.removeEventListener('visibilitychange',refresh);previous()}
+    if (item.view || item.status === 'live')
       button(
         actions,
         '飞过去看看',
         async () => {
+          if (item.view) {
+            await host.setView(item.view)
+            dialog.close()
+            return
+          }
           const { x, z } = ll2xz(item.lat, item.lon)
           host.fly()
           host.camera.position.set(x, Math.max(host.camera.position.y, 350), z)
@@ -376,8 +431,8 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     const form = el('form', '', 'fb-form')
     body.append(form)
     let id = item?.id
-    const walker = host.walker(),
-      position = walker?.active ? walker.position : host.camera.position
+    let selection = item ? undefined : captured
+    const position = selection?.view.target ?? selection?.view ?? host.camera.position
     let location = item ? { lat: item.lat, lon: item.lon } : xz2ll(position.x, position.z)
     const section = (n: string, heading: string) => {
       const box = el('section', '', 'fb-step')
@@ -400,8 +455,74 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       route = el('textarea'),
       mode = { route: false }
     let routeField: HTMLElement | undefined
+    let pin: (x: number, z: number) => void = () => {}
+    const preview = (where: HTMLElement) => {
+      const box = el('div', '', 'fb-view'),
+        figure = el('figure', '', 'fb-view-frame'),
+        image = el('img', '', 'fb-view-shot'),
+        cross = el('span', '＋', 'fb-view-cross'),
+        info = el('p'),
+        aim = el('button', '重新取景', 'fb-btn')
+      aim.type = 'button'
+      image.alt = '反馈时看到的画面'
+      figure.append(image, cross)
+      box.append(el('h4', '你看到的画面'), figure, info, aim)
+      where.append(box)
+      let url = ''
+      const paint = () => {
+        if (url) URL.revokeObjectURL(url)
+        const view = selection?.view ?? item?.view
+        if (selection) {
+          url = URL.createObjectURL(selection.shot)
+          image.src = url
+        } else if (item?.has_view_shot) image.src = `/api/feedback/${item.id}/view-shot`
+        figure.hidden = !image.src
+        cross.hidden = !view?.target
+        info.textContent = view
+          ? `${view.lat.toFixed(5)}, ${view.lon.toFixed(5)} · 朝向 ${view.heading.toFixed(1)}° · ${host.manifest.landmarks?.find((entry) => entry.id === view.landmark_id)?.name ?? view.landmark_id ?? '未命中地标'}`
+          : '未取得截图，请重新取景'
+      }
+      paint()
+      const prev = dispose
+      dispose = () => {
+        URL.revokeObjectURL(url)
+        prev()
+      }
+      aim.onclick = () => {
+        dialog.remove()
+        dialog.removeAttribute('open')
+        const bar = el('aside', '', 'fb-aim-bar'),
+          take = el('button', '截取'),
+          cancel = el('button', '取消')
+        bar.append('移动到要反馈的位置，对准物体后点“截取”', take, cancel)
+        document.body.append(bar)
+        const restore = () => {
+          bar.remove()
+          document.exitPointerLock?.()
+          document.body.append(dialog)
+          dialog.showModal()
+          aim.focus()
+        }
+        cancel.onclick = restore
+        take.onclick = async () => {
+          take.disabled = cancel.disabled = true
+          try {
+            selection = await host.captureView()
+            const pos = selection.view.target ?? selection.view
+            pin(pos.x, pos.z)
+            paint()
+          } catch (error) {
+            note.textContent = String(error)
+          } finally {
+            restore()
+          }
+        }
+      }
+    }
+    if (item) preview(section('', '游戏视角'))
     if (!item) {
       const where = section('1', '在哪里')
+      preview(where)
       const rule = el('div', '', 'fb-rule')
       rule.innerHTML =
         '<b>每次只反馈一个地点。</b>如果是沿一条路连续拍的多张照片，请选「沿路拍摄」，写清从哪里走到哪里、朝哪个方向走，照片按行走顺序添加。'
@@ -431,7 +552,8 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
         b.setAttribute('aria-checked', String(mode.route === value))
         b.onclick = () => {
           mode.route = value
-          for (const other of Array.from(modes.children)) other.setAttribute('aria-checked', String(other === b))
+          for (const other of Array.from(modes.children))
+            other.setAttribute('aria-checked', String(other === b))
           routeField!.hidden = !value
           route.required = value
           const p = ll2xz(location.lat, location.lon)
@@ -444,14 +566,17 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       route.placeholder = '例：从十字街沿解放东路向东走到解放桥西桥头，照片按行走顺序排列'
       routeField = field(where, '行走路径和方向', route, '写清起点、终点和行走方向；起点就是地图上的定位针')
       routeField.hidden = true
+      pin = describe
       describe(position.x, position.z)
       void ensureMap().then((api) => {
         if (!api || !slot.isConnected) {
-          if (slot.isConnected) slot.replaceChildren(el('p', '地图暂时不可用，将使用你当前所在的位置', 'fb-map-hint'))
+          if (slot.isConnected)
+            slot.replaceChildren(el('p', '地图暂时不可用，将使用你当前所在的位置', 'fb-map-hint'))
           return
         }
         mapApi = api
         const picker = locationPicker(host, api, ll2xz(location.lat, location.lon), describe)
+        pin = picker.setPin
         slot.replaceWith(picker.node)
         const prev = dispose
         dispose = () => {
@@ -532,15 +657,28 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
         send.textContent = '正在上传…'
         try {
           if (!id) {
+            if (!selection) throw Error('请先截取游戏画面')
             id = (
               await api<{ id: string }>('feedback', {
                 ...location,
+                view: selection.view,
+                heading: selection.view.heading,
+                landmark_id: selection.view.landmark_id,
                 kind: (kind.querySelector('input:checked') as HTMLInputElement | null)?.value ?? kinds[0],
                 title: name.value.trim(),
                 body: text,
               })
             ).id
-            for (const box of Array.from(form.querySelectorAll<HTMLElement>('.fb-step'))) box.inert = box !== shots
+            for (const box of Array.from(form.querySelectorAll<HTMLElement>('.fb-step')))
+              box.inert = box !== shots
+          }
+          if (selection) {
+            const response = await fetch(`/api/feedback/${id}/view-shot`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'image/jpeg', 'X-Feedback-View': JSON.stringify(selection.view) },
+              body: selection.shot,
+            })
+            if (!response.ok) throw Error((await response.json()).error.message)
           }
           await picker.upload(id)
           await api(`feedback/${id}/${supplement ? 'supplement' : 'submit'}`, { body: text })
@@ -559,7 +697,10 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       tabs.replaceChildren()
       const empty = el('div', '', 'fb-empty')
       empty.append(
-        el('p', '发现哪里建得不像、位置不对或者缺了建筑？登录后上传照片，AI 会按照片重新建模，你可以在这里跟踪进度。'),
+        el(
+          'p',
+          '发现哪里建得不像、位置不对或者缺了建筑？登录后上传照片，AI 会按照片重新建模，你可以在这里跟踪进度。',
+        ),
       )
       button(
         empty,
@@ -574,6 +715,6 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       return
     }
     if (!me.ok) throw Error('账号暂时不可用')
-    await form()
+    if(initialId)await detail(initialId);else await form()
   })
 }

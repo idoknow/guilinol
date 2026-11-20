@@ -115,3 +115,11 @@ bridge 请求均用 Bearer token。回写字段 `status,message,multica_issue,pr
 ## 不做（这一期）
 
 - 第三方登录、手机号；公开反馈广场/点赞；管理后台（用 D1 控制台 + bridge 代替）；建模结果的自动合并（仍由 sg claude 验收）。
+## 游戏视角（0004）
+新版审批和对话（迁移 `0005_feedback_chat.sql`）：提交即建协调 issue，但只能沟通。关联 issue 不等于批准。管理员从 `submitted` 或 `need_info` 发起 AI 制作后，bridge 发出开工通知并推进到 `queued`。旧 `queued` 不回填、不重新发通知。用户、管理员的回复按消息 ID 转发；协调人用 `feedback-reply` 回复。`feedback-status need_info` 同时写入对话。详情同步显示状态和消息。
+
+邮件提醒由同一个 bridge 定时任务调用 `POST /api/bridge/mail` 消费 D1 通知队列；停用 bridge 也会暂停发信。每条反馈合并十分钟内的提醒，个人可在账号面板关闭，或使用邮件中的签名链接退订。`EMAIL_DEV_LOG=1` 使用本地记录而不发真实邮件。
+
+新草稿的 `view` 使用 `lib/feedback-contract.ts` 中的 `FeedbackView`。朝向、俯仰、FOV 都是角度；世界坐标为实际相机位置（米），不记录步行角色位置。`target` 是中心射线命中点，无命中为 `null`。
+
+提交前须同时上传用户照片、`PUT /api/feedback/:id/view-shot`（JPEG，≤2 MiB）。补充资料可不改视角；若重新取景，同时用 `X-Feedback-View` 传新的 JSON，上传量与照片合计。详情返回 `view` 和 `has_view_shot`；同路径 GET 需与原照片相同的权限。旧记录无视角时仍可查看。深链接 `/?view=<base64url(JSON)>` 复现镜头而不恢复角色，不包含私有照片或用户信息。

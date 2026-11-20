@@ -38,6 +38,7 @@ export function flight(camera:THREE.PerspectiveCamera, canvas:HTMLCanvasElement,
   for(const name of ['pointerup','pointercancel','lostpointercapture'])
     canvas.addEventListener(name,event=>touches.delete((event as PointerEvent).pointerId))
   return (dt:number)=>{
+    if(!enabled()||!['KeyW','KeyS','KeyA','KeyD','KeyE','KeyQ'].some(key=>keys.has(key)))return
     const speed = (keys.has('ShiftLeft')?380:120)*Math.min(.1,dt)
     const axis = (plus:string,minus:string)=>Number(keys.has(plus))-Number(keys.has(minus))
     move(axis('KeyW','KeyS')*speed,axis('KeyD','KeyA')*speed)

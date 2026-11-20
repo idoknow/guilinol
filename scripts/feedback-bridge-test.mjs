@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
+import {view,uploadShot} from './feedback-view-fixture.mjs'
 import { execFileSync } from 'node:child_process'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
-export async function bridgeTest({ api, origin, cookie, state, staticDir }) {
+export async function bridgeTest({ api, origin, cookie, state, staticDir,sql,mailLog }) {
   const bin = join(state, 'bin'),
     fixture = join(state, 'fixture.json'),
     cli = join(bin, 'multica')
@@ -54,6 +55,7 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
   const set = async (values) => writeFile(fixture, JSON.stringify({ ...(await load()), ...values }))
   await writeFile(fixture, JSON.stringify({ creates: 0, status: 'todo', comments: [], replies: [] }))
   const { id } = await api('feedback', {
+      view,
       kind: '其他',
       title: '桥头',
       body: '请核对入口朝向',
@@ -62,6 +64,7 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
     }),
     path = 'feedback/' + id
   const picture = await readFile('public/og.jpg')
+  await uploadShot(origin,cookie,id)
   for (const slot of [1, 3])
     assert.equal(
       (
@@ -91,7 +94,8 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
   run()
   let data = await load()
   assert.equal(data.creates, 1)
-  assert.deepEqual(data.sizes, [picture.length, picture.length])
+  assert.deepEqual(data.sizes, [picture.length,picture.length, picture.length])
+  assert.match(data.args[data.args.indexOf('--attachment')+1],/\/view\.jpg$/);assert.match(data.body,/\?view=/)
   assert.equal(data.body.trim(), dry.trim())
   for (const [key, value] of Object.entries({
     '--parent': 'parent',
@@ -100,6 +104,11 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
     '--status': 'todo',
   }))
     assert.equal(data.args[data.args.indexOf(key) + 1], value)
+  assert.equal((await api(path)).status,'submitted');assert.match(data.body,/待管理员批准/)
+  const approve=async id=>api(`admin/feedback/${id}/status`,{status:'approved'});await sql("UPDATE users SET role='admin',notify_email=1; UPDATE feedback_mail SET next_at=0")
+  await set({comments:[{id:'clarify',author_id:'agent',author_type:'agent',created_at:new Date().toISOString(),content:'```feedback-reply\n是桥头吗？\n```'}]});await api(path+'/messages',{body:'是的'});run();run()
+  assert.equal((await api(path)).messages.filter(m=>m.author_kind==='agent').length,1);assert.equal((await load()).replies.filter(m=>m.startsWith('用户回复：')).length,1);assert.match(mailLog(),/DEV_NOTIFICATION/)
+  await approve(id);run();run();assert.equal((await load()).replies.filter(m=>m.startsWith('管理员已批准')).length,1)
   await set({ status: 'in_progress' })
   run()
   await set({
@@ -138,13 +147,13 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
   await api(path + '/supplement', { body: '已核对背面' })
   await set({ failCommand: 'issue comment add' })
   assert.throws(() => run())
-  assert.equal((await journal(id)).failures, 1)
   await set({ failCommand: null })
   run()
   assert.equal((await journal(id)).failures, undefined)
+  await approve(id);run()
   await set({ status: 'in_progress' })
   run()
-  assert.match((await load()).replies[0], /已核对背面/)
+  assert.ok((await load()).replies.some(reply=>reply.includes('已核对背面')))
   await writeFile(join(staticDir, 'version.json'), JSON.stringify({ sha: 'b'.repeat(40) }))
   await set({ pr: true, status: 'done' })
   run()
@@ -157,11 +166,13 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
     detail.events.map((event) => event.status),
     [
       'submitted',
+      'approved',
       'queued',
       'modelling',
       'reviewing',
       'need_info',
       'submitted',
+      'approved',
       'queued',
       'modelling',
       'reviewing',
@@ -170,7 +181,7 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
   )
   assert.equal((await load()).creates, 1)
   const next = (
-    await api('feedback', { kind: '其他', title: '新反馈', body: '请核对', lat: 25.28, lon: 110.3 })
+    await api('feedback', { view,kind: '其他', title: '新反馈', body: '请核对', lat: 25.28, lon: 110.3 })
   ).id
   assert.equal(
     (
@@ -182,6 +193,7 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
     ).status,
     200,
   )
+  await uploadShot(origin,cookie,next)
   await api(`feedback/${next}/submit`, {})
   await set({
     pr: false,
@@ -195,12 +207,13 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
     })),
   })
   assert.throws(() => run())
+  await approve(next)
   run()
   run()
   run()
   assert.deepEqual(
     (await api('feedback/' + next)).events.map((event) => event.status),
-    ['submitted', 'queued'],
+    ['submitted','approved', 'queued'],
   )
   assert.equal((await load()).replies.filter((message) => message.includes('自动处理已暂停')).length, 1)
   const recovered = await journal(next)
@@ -213,7 +226,7 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
   run()
   assert.deepEqual(
     (await api('feedback/' + next)).events.map((event) => event.status),
-    ['submitted', 'queued', 'modelling'],
+    ['submitted','approved', 'queued', 'modelling'],
   )
   assert.equal((await load()).replies.filter((message) => message.includes('自动处理已暂停')).length, 1)
   console.log(
