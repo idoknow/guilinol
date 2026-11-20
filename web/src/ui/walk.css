@@ -16,16 +16,28 @@
 body[data-aboard][data-ride="bike"] .walk-ui :is(.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck){display:grid}
 body[data-aboard] :is(.btn-jump,.btn-run){display:none}
 body[data-aboard] .joystick.running::after{border-color:rgba(169,80,60,0)}
-.ride-hud{position:fixed;left:50%;bottom:calc(124px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4;display:none;align-items:center;gap:8px;padding:5px 12px;border-radius:18px;background:rgba(28,44,42,.56);color:#f4efe2;border:1px solid rgba(244,239,226,.34);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-size:12.5px;letter-spacing:.06em;white-space:nowrap;user-select:none;-webkit-user-select:none}
+.ride-hud{position:fixed;left:50%;bottom:calc(124px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4;display:none;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px 7px;max-width:calc(100vw - 24px);padding:5px 11px;border-radius:18px;background:rgba(28,44,42,.58);color:#f4efe2;border:1px solid rgba(244,239,226,.34);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-size:12px;letter-spacing:.05em;white-space:nowrap;user-select:none;-webkit-user-select:none}
 body[data-aboard][data-ride="bike"] .ride-hud,body[data-aboard][data-ride="bicycle"] .ride-hud{display:flex}
 body[data-photo="on"] .ride-hud{display:none!important}
-.ride-gear{font:700 12px/1 ui-monospace,monospace;letter-spacing:0;background:rgba(169,80,60,.82);color:#f4efe2;padding:4px 7px;border-radius:9px}
-.ride-speed{font:600 13px/1 ui-monospace,monospace;letter-spacing:0;min-width:5.2em;text-align:center}
-.ride-state{font-size:11.5px;padding:2px 7px;border-radius:9px;background:rgba(244,239,226,.14);color:#f4efe2}
-.ride-state[data-warn="1"]{background:rgba(196,68,52,.85);color:#fff}
-.ride-mod{font:inherit;font-size:11.5px;color:#f4efe2;background:rgba(244,239,226,.12);border:1px solid rgba(244,239,226,.28);border-radius:10px;padding:2px 8px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ride-type{font-size:11px;font-weight:600;padding:2px 6px;border-radius:8px;background:rgba(244,239,226,.16);color:#f4efe2;border:1px solid rgba(244,239,226,.28)}
+.ride-type[data-kind="shared"]{background:rgba(56,146,118,.84);border-color:rgba(155,235,208,.65);color:#f2fbf7}
+.ride-gear{font:700 12px/1 ui-monospace,monospace;letter-spacing:0;background:rgba(169,80,60,.84);color:#f4efe2;padding:4px 7px;border-radius:9px}
+.ride-speed{font:600 12.5px/1 ui-monospace,monospace;letter-spacing:0;min-width:4.8em;text-align:center}
+.ride-bat{display:inline-flex;align-items:center;gap:6px}
+.ride-bat-bar{position:relative;width:34px;height:9px;border-radius:3px;padding:1px;box-sizing:border-box;background:rgba(14,22,20,.55);border:1px solid rgba(244,239,226,.45);overflow:visible}
+.ride-bat-bar::after{content:"";position:absolute;right:-3px;top:2px;width:2px;height:3px;border-radius:0 1px 1px 0;background:rgba(244,239,226,.45)}
+.ride-bat-bar i{display:block;height:100%;width:100%;border-radius:1.5px;background:#64c9a6;transition:width .2s,background-color .2s}
+.ride-bat[data-level="low"] .ride-bat-bar i{background:#e69b3a}
+.ride-bat[data-level="crit"] .ride-bat-bar i{background:#e24e42}
+.ride-bat-pct{font:600 11.5px/1 ui-monospace,monospace;letter-spacing:0}
+.ride-bat[data-level="low"] .ride-bat-pct{color:#f5bf6b}
+.ride-bat[data-level="crit"] .ride-bat-pct{color:#ff8f85}
+.ride-state{font-size:11px;padding:2px 7px;border-radius:9px;background:rgba(244,239,226,.14);color:#f4efe2}
+.ride-state[data-warn="1"]{background:rgba(196,68,52,.88);color:#fff}
+.ride-mod{font:inherit;font-size:11px;color:#f4efe2;background:rgba(244,239,226,.12);border:1px solid rgba(244,239,226,.28);border-radius:10px;padding:2px 7px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .ride-mod:hover{background:rgba(244,239,226,.22)}
-body[data-ride="bicycle"] .ride-mod{display:none}
+body[data-ride="bicycle"] :is(.ride-mod,.ride-bat){display:none}
+body[data-ride-type="shared"] .ride-mod{display:none}
 .toast{z-index:6;box-sizing:border-box;width:max-content;max-width:min(520px,calc(100vw - 32px));text-align:center;line-height:1.45;border:1px solid rgba(244,239,226,.34)}
 @media (hover:hover) and (pointer:fine){
   .vehicle-action{box-shadow:0 4px 16px rgba(18,30,28,.28),0 0 0 1px rgba(214,120,92,.35)}
