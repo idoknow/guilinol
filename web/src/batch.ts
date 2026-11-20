@@ -164,14 +164,13 @@ const STREET_ATTRS:AttrDef[] = [
 // A bucket owns the merged geometry of a small group of tiles. Adding or dropping one tile only
 // rebuilds its own bucket, so the cost stops scaling with how far the player has already walked.
 // ?nobatch=1 collapses this to a single bucket for ablation runs.
-// 3 tiles per side keeps the usual 480 m view inside two or three buckets, so the extra draw
-// calls stay in single digits while a rebuild still only touches ~9 tiles instead of every tile
-// the player has ever visited. ?nobatch=1 collapses it to one bucket for ablation runs.
-const BUCKET_TILES = 3
-const BUCKET_SPAN = 256 * BUCKET_TILES
+// Default 3 tiles per side keeps the usual 480 m view inside two or three buckets, so the extra
+// draw calls stay in single digits while a rebuild still only touches ~9 tiles instead of every
+// tile the player has ever visited. ?buckets=N retunes the split, ?nobatch=1 collapses it to one
+// bucket, so the draw-call / rebuild trade-off can be measured instead of guessed.
 
 function bucketKey(tile:Tile) {
-  const span = flags.noBatch ? Number.POSITIVE_INFINITY : BUCKET_SPAN
+  const span = flags.noBatch ? Number.POSITIVE_INFINITY : 256 * flags.bucketTiles
   return `${Math.floor(tile.x/span)}:${Math.floor(tile.z/span)}`
 }
 
@@ -246,6 +245,7 @@ export class ChunkBatcher {
   private furniture:THREE.InstancedMesh|null = null
   private parked:THREE.InstancedMesh|null = null
   private lastFurnitureMask = ''
+  private furnitureStale = false
   private lastFurniturePos = new THREE.Vector3(Infinity,Infinity,Infinity)
 
   constructor(private scene:THREE.Scene) {}
@@ -273,6 +273,9 @@ export class ChunkBatcher {
     if(bucket.items.size) { bucket.dirty = true; return }
     bucket.dispose()
     this.buckets.delete(key)
+    // The emptied bucket's street furniture lives in the shared instance meshes, so the selection
+    // has to be redone even if the camera never moves again.
+    this.furnitureStale = true
   }
 
   private anyDirty() {
@@ -300,7 +303,7 @@ export class ChunkBatcher {
       camera.position.distanceToSquared(this.lastPos)>=4 ||
       this.lastQuat.angleTo(camera.quaternion)>=.012 ||
       !(mirrorLevel===this.lastMirror || (Number.isFinite(mirrorLevel) && Number.isFinite(this.lastMirror) && Math.abs(mirrorLevel-this.lastMirror)<.5))
-    if(!moved && !this.anyDirty()) return
+    if(!moved && !this.anyDirty() && !this.furnitureStale) return
 
     this.rebuildDirty()
     this.lastFocus.copy(focus); this.lastPos.copy(camera.position); this.lastQuat.copy(camera.quaternion); this.lastMirror = mirrorLevel
@@ -345,7 +348,8 @@ export class ChunkBatcher {
 
     for(const bucket of this.buckets.values()) bucket.cull(visibleChunks,farBuildings,visibleStreets)
 
-    if(furnMask!==this.lastFurnitureMask || camera.position.distanceToSquared(this.lastFurniturePos)>=4) {
+    if(this.furnitureStale || furnMask!==this.lastFurnitureMask || camera.position.distanceToSquared(this.lastFurniturePos)>=4) {
+      this.furnitureStale = false
       this.lastFurnitureMask = furnMask
       this.lastFurniturePos.copy(camera.position)
       const near=(matrices:Float32Array,index:number,radius=30)=>{
