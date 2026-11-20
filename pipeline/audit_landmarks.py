@@ -228,6 +228,15 @@ def main():
             row['status']='missing-instance';continue
         if key in ('dongxixiang','zhengyang') and notes=='deferred to IDOK-44':
             row['status']='deferred';continue
+        if key=='zhengyang_clock':
+            survey=json.loads((ROOT/'docs/layout/zhengyang.geojson').read_text())
+            lon,lat=next(f['geometry']['coordinates'] for f in survey['features'] if f['id']=='clock-osm')
+            reference=Point((lon-LON0)*MLON,(LAT0-lat)*MLAT)
+            base=footprint(ROOT/'public'/spec['model'],entry,elevation=1)
+            distance=base.centroid.distance(reference) if not base.is_empty else math.inf
+            row.update(reference='node/6326899999',measurement='four pier centres at 1 m',
+                       centroidM=round(distance,3),status='pass' if distance<=4 else 'fail')
+            continue
         if key=='wangcheng_market':
             # Alley/plaza aggregate with no single footprint; positions are checked by the
             # IDOK-50 evidence-layout audit (docs/layout/dongxi-audit.md, scripts/dongxi/lane-audit.py).
