@@ -71,9 +71,10 @@ export function deriveRangeMetrics(config: Pick<RenderRangeConfig, 'preset' | 'r
   )
   const landmarkConcurrency = r >= 768 ? 3 : 2
 
+  // Match forest range closer to loaded terrain on low presets so distant crowns do not float over coarse overview.
   const treeFar = Math.round(
     r <= RENDER_RADIUS_DEFAULT
-      ? THREE.MathUtils.lerp(720, 1500, (r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
+      ? THREE.MathUtils.lerp(360, 1500, (r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
       : THREE.MathUtils.lerp(1500, 1600, (r - RENDER_RADIUS_DEFAULT) / (RENDER_RADIUS_MAX - RENDER_RADIUS_DEFAULT)),
   )
   const treeLoadRadius = treeFar + 184
@@ -92,22 +93,22 @@ export function deriveRangeMetrics(config: Pick<RenderRangeConfig, 'preset' | 'r
       : Number(THREE.MathUtils.lerp(1.0, 1.35, (r - RENDER_RADIUS_DEFAULT) / (RENDER_RADIUS_MAX - RENDER_RADIUS_DEFAULT)).toFixed(3))
   const fogBlueFrom = Math.round(
     r <= RENDER_RADIUS_DEFAULT
-      ? THREE.MathUtils.lerp(280, look.fogBlueFrom, (r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
+      ? THREE.MathUtils.lerp(220, look.fogBlueFrom, (r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
       : THREE.MathUtils.lerp(look.fogBlueFrom, 850, (r - RENDER_RADIUS_DEFAULT) / (RENDER_RADIUS_MAX - RENDER_RADIUS_DEFAULT)),
   )
   const fogBlueTo = Math.round(
     r <= RENDER_RADIUS_DEFAULT
-      ? THREE.MathUtils.lerp(1850, look.fogBlueTo, (r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
+      ? THREE.MathUtils.lerp(1150, look.fogBlueTo, (r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
       : THREE.MathUtils.lerp(look.fogBlueTo, 4600, (r - RENDER_RADIUS_DEFAULT) / (RENDER_RADIUS_MAX - RENDER_RADIUS_DEFAULT)),
   )
   const fogHorizonFrom = Math.round(
     r <= RENDER_RADIUS_DEFAULT
-      ? THREE.MathUtils.lerp(2300, look.fogHorizonFrom, (r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
+      ? THREE.MathUtils.lerp(1500, look.fogHorizonFrom, (r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
       : THREE.MathUtils.lerp(look.fogHorizonFrom, 5600, (r - RENDER_RADIUS_DEFAULT) / (RENDER_RADIUS_MAX - RENDER_RADIUS_DEFAULT)),
   )
   const fogHorizonTo = Math.round(
     r <= RENDER_RADIUS_DEFAULT
-      ? THREE.MathUtils.lerp(4200, look.fogHorizonTo, (r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
+      ? THREE.MathUtils.lerp(3000, look.fogHorizonTo, (r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
       : THREE.MathUtils.lerp(look.fogHorizonTo, 8800, (r - RENDER_RADIUS_DEFAULT) / (RENDER_RADIUS_MAX - RENDER_RADIUS_DEFAULT)),
   )
   const cullHorizon = Math.max(fogHorizonTo, landmarkLoadRadius + 240, treeLoadRadius + 240, Math.round(2200 + t * 6600))

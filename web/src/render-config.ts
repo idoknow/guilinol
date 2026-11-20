@@ -15,16 +15,6 @@ export interface RenderRangeConfig {
   source: RenderConfigSource
 }
 
-export interface RenderScope {
-  chunkRadius: number
-  unloadMargin: number
-  landmarkLoadRadius: number
-  landmarkUnloadRadius: number
-  forestLoadRadius: number
-  forestUnloadRadius: number
-  fogScale: number
-}
-
 export const RENDER_RADIUS_MIN = 192
 export const RENDER_RADIUS_MAX = 1600
 export const RENDER_RADIUS_STEP = 32
@@ -182,38 +172,4 @@ export function resetRenderConfig(): RenderRangeConfig {
     // Ignore storage errors in restricted environments.
   }
   return {preset: 'balanced', radius: RENDER_RADIUS_DEFAULT, source: 'default'}
-}
-
-export function deriveRenderScope(radius: number): RenderScope {
-  const r = clampRenderRadius(radius)
-  const t = (r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_MAX - RENDER_RADIUS_MIN)
-  return {
-    chunkRadius: r,
-    unloadMargin: Math.round(Math.min(240, Math.max(120, r * 0.36))),
-    landmarkLoadRadius: Math.round(
-      r <= RENDER_RADIUS_DEFAULT
-        ? 540 + (900 - 540) * ((r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
-        : 900 + (1650 - 900) * ((r - RENDER_RADIUS_DEFAULT) / (RENDER_RADIUS_MAX - RENDER_RADIUS_DEFAULT)),
-    ),
-    landmarkUnloadRadius: Math.round(
-      (r <= RENDER_RADIUS_DEFAULT
-        ? 540 + (900 - 540) * ((r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
-        : 900 + (1650 - 900) * ((r - RENDER_RADIUS_DEFAULT) / (RENDER_RADIUS_MAX - RENDER_RADIUS_DEFAULT))) + 160,
-    ),
-    forestLoadRadius: Math.round(
-      (r <= RENDER_RADIUS_DEFAULT
-        ? 720 + (1500 - 720) * ((r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
-        : 1500 + (1600 - 1500) * ((r - RENDER_RADIUS_DEFAULT) / (RENDER_RADIUS_MAX - RENDER_RADIUS_DEFAULT))) + 184,
-    ),
-    forestUnloadRadius: Math.round(
-      (r <= RENDER_RADIUS_DEFAULT
-        ? 720 + (1500 - 720) * ((r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
-        : 1500 + (1600 - 1500) * ((r - RENDER_RADIUS_DEFAULT) / (RENDER_RADIUS_MAX - RENDER_RADIUS_DEFAULT))) + 264,
-    ),
-    fogScale: Number(
-      (r <= RENDER_RADIUS_DEFAULT
-        ? 0.62 + (1.0 - 0.62) * ((r - RENDER_RADIUS_MIN) / (RENDER_RADIUS_DEFAULT - RENDER_RADIUS_MIN))
-        : 1.0 + (1.35 - 1.0) * t).toFixed(3),
-    ),
-  }
 }

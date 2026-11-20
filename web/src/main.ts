@@ -142,7 +142,7 @@ async function start() {
   showMode()
   const renderUi = renderRangeControl({
     initial:rangeStore.getConfig(),
-    onPreview:(next:RenderRangeConfig)=>{stream.setRenderRange(next,{persist:false})},
+    onPreview:(next:RenderRangeConfig)=>{stream.setRenderRange(next,{persist:false,source:next.source})},
     onCommit:(next:RenderRangeConfig)=>{stream.setRenderRange(next.radius,{persist:true});return rangeStore.getConfig()},
     onReset:()=>stream.resetRenderRange(),
     getStats:(rangeRadius)=>{

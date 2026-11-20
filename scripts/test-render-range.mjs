@@ -8,7 +8,6 @@ import {
   RENDER_RADIUS_MIN,
   RENDER_STORAGE_KEY,
   clampRenderRadius,
-  deriveRenderScope,
   loadRenderConfig,
   parseRenderQuery,
   presetForRadius,
@@ -30,13 +29,6 @@ assert.deepEqual(parseRenderQuery(new URLSearchParams('radius=640&range=fast')),
 assert.equal(parseRenderQuery(new URLSearchParams('radius=abc&range=unknown')), null)
 assert.deepEqual(loadRenderConfig(new URLSearchParams('range=far')), {preset: 'far', radius: 960, source: 'url'})
 assert.deepEqual(loadRenderConfig(new URLSearchParams('')), {preset: 'balanced', radius: 480, source: 'default'})
-
-const scopeFast = deriveRenderScope(256)
-const scopeFar = deriveRenderScope(960)
-assert(scopeFast.chunkRadius < scopeFar.chunkRadius)
-assert(scopeFast.landmarkLoadRadius < scopeFar.landmarkLoadRadius)
-assert(scopeFast.forestLoadRadius < scopeFar.forestLoadRadius)
-assert(scopeFast.fogScale < scopeFar.fogScale)
 console.log('render-config unit tests OK')
 
 const outDir = process.env.RENDER_SHOT_DIR
@@ -76,8 +68,9 @@ function checkRectsScript() {
         if (ox * oy > 0) overlaps.push({a: a.sel, b: b.sel, area: +(ox * oy).toFixed(1)})
       }
     }
+    const missing = boxes.filter(b => b.missing).map(b => b.sel)
     const outOfBounds = visible.filter(b => b.sel.startsWith('.render-') && (b.left < -0.5 || b.top < -0.5 || b.right > width + 0.5 || b.bottom > height + 0.5))
-    return {overlaps, outOfBounds}
+    return {overlaps, outOfBounds, missing}
   }
 }
 
@@ -90,6 +83,32 @@ try {
   })
   const errors = []
 
+  // Verify default flight landing at 480m without ?mode=walk or ?radius
+  const flightCtx = await browser.newContext({viewport: {width: 1280, height: 720}})
+  const fp = await flightCtx.newPage()
+  fp.on('pageerror', e => errors.push('flight: ' + e.message))
+  await fp.route('**/favicon.ico', r => r.fulfill({status: 204}))
+  await fp.goto(`${baseUrl}/?verify&flow=0`)
+  await fp.waitForFunction(() => window.viewer?.renderRange?.radius === 480 && document.querySelector('.render-entry') && window.viewer.stats.loaded >= 10, null, {timeout: 90000})
+  const metricsCheck = await fp.evaluate(() => {
+    const f = window.viewer.deriveRangeMetrics(256)
+    const b = window.viewer.deriveRangeMetrics(480)
+    const r = window.viewer.deriveRangeMetrics(960)
+    return {
+      ordered: f.radius < b.radius && b.radius < r.radius
+        && f.landmarkLoadRadius < b.landmarkLoadRadius && b.landmarkLoadRadius < r.landmarkLoadRadius
+        && f.treeLoadRadius < b.treeLoadRadius && b.treeLoadRadius < r.treeLoadRadius
+        && f.fogLengthScale < b.fogLengthScale && b.fogLengthScale < r.fogLengthScale,
+      balancedOk: b.landmarkLoadRadius === 900 && b.treeFar === 1500 && b.fogLengthScale === 1,
+    }
+  })
+  assert(metricsCheck.ordered && metricsCheck.balancedOk, `metrics check failed: ${JSON.stringify(metricsCheck)}`)
+  const flightClosed = await fp.evaluate(checkRectsScript(), {width: 1280, height: 720, selectors: ['output', '.sky-ui', '.account-entry', '.render-entry', '.dock', '.btn-about', 'footer', '.hint']})
+  assert.deepEqual(flightClosed.missing, [])
+  assert.deepEqual(flightClosed.overlaps, [])
+  assert.deepEqual(flightClosed.outOfBounds, [])
+  await flightCtx.close()
+
   const deskCtx = await browser.newContext({viewport: {width: 1280, height: 720}})
   const page = await deskCtx.newPage()
   page.on('pageerror', e => errors.push('desk: ' + e.message))
@@ -100,15 +119,23 @@ try {
 
   const deskSelectors = ['output', '.sky-ui', '.account-entry', '.render-entry', '.dock', '.btn-about', 'footer', '.hint']
   const deskClosed = await page.evaluate(checkRectsScript(), {width: 1280, height: 720, selectors: deskSelectors})
+  assert.deepEqual(deskClosed.missing, [])
   assert.deepEqual(deskClosed.overlaps, [])
   assert.deepEqual(deskClosed.outOfBounds, [])
 
   await page.click('.render-entry')
   await page.waitForSelector('.render-pop:not([hidden])')
   const deskOpen = await page.evaluate(checkRectsScript(), {width: 1280, height: 720, selectors: [...deskSelectors, '.render-pop']})
+  assert.deepEqual(deskOpen.missing, [])
   assert.deepEqual(deskOpen.overlaps, [])
   assert.deepEqual(deskOpen.outOfBounds, [])
   if (outDir) await page.screenshot({path: `${outDir}/desktop-open.png`})
+
+  // Outside click closes the panel
+  await page.mouse.click(640, 360)
+  await page.waitForFunction(() => document.querySelector('.render-pop')?.hasAttribute('hidden'))
+  await page.click('.render-entry')
+  await page.waitForSelector('.render-pop:not([hidden])')
 
   const initialLoaded = await page.evaluate(() => window.viewer.stats.loaded)
   await page.click('.render-presets button[data-preset="far"]')
@@ -121,13 +148,18 @@ try {
   const fastLoaded = await page.evaluate(() => window.viewer.stats.loaded)
   assert(fastLoaded <= 12 && fastLoaded < farLoaded)
 
+  // Slider input previews radius without persisting to localStorage until change
   await page.evaluate(() => {
     const slider = document.querySelector('.render-pop input[type="range"]')
     slider.value = '640'
     slider.dispatchEvent(new Event('input', {bubbles: true}))
-    slider.dispatchEvent(new Event('change', {bubbles: true}))
   })
   await page.waitForFunction(() => window.viewer.stream.radius === 640)
+  assert.equal(JSON.parse(await page.evaluate(k => localStorage.getItem(k), RENDER_STORAGE_KEY)).radius, 256)
+  await page.evaluate(() => {
+    const slider = document.querySelector('.render-pop input[type="range"]')
+    slider.dispatchEvent(new Event('change', {bubbles: true}))
+  })
   assert.deepEqual(JSON.parse(await page.evaluate(k => localStorage.getItem(k), RENDER_STORAGE_KEY)), {preset: 'custom', radius: 640})
 
   await page.goto(`${baseUrl}/?verify&mode=walk&flow=0`)
@@ -156,8 +188,8 @@ try {
   await page.waitForFunction(() => document.body.dataset.photo !== 'on')
   await deskCtx.close()
 
-  const mobSelectors = ['output', '.sky-ui', '.account-entry', '.render-entry', '.dock', '.btn-about', 'footer', '.walk-ui .joystick', '.walk-ui .btn-run', '.walk-ui .btn-jump', '.walk-ui .btn-view']
-  for (const [label, vp] of [['390x844', {width: 390, height: 844}], ['844x390', {width: 844, height: 390}]]) {
+  const mobSelectors = ['output', '.sky-ui', '.account-entry', '.render-entry', '.dock', '.btn-about', 'footer', '.walk-ui .joystick', '.walk-ui .btn-jump', '.walk-ui .btn-view']
+  for (const [label, vp] of [['390x844', {width: 390, height: 844}], ['844x390', {width: 844, height: 390}], ['640x360', {width: 640, height: 360}]]) {
     const ctx = await browser.newContext({viewport: vp, deviceScaleFactor: 1, isMobile: true, hasTouch: true})
     const mp = await ctx.newPage()
     mp.on('pageerror', e => errors.push(`${label}: ${e.message}`))
@@ -167,11 +199,13 @@ try {
     await mp.evaluate(async () => { for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame) })
 
     const closed = await mp.evaluate(checkRectsScript(), {...vp, selectors: mobSelectors})
+    assert.deepEqual(closed.missing, [], `${label} closed missing`)
     assert.deepEqual(closed.overlaps, [], `${label} closed overlap`)
     assert.deepEqual(closed.outOfBounds, [], `${label} closed outOfBounds`)
     await mp.locator('.render-entry').tap()
     await mp.waitForSelector('.render-pop:not([hidden])')
     const open = await mp.evaluate(checkRectsScript(), {...vp, selectors: [...mobSelectors, '.render-pop']})
+    assert.deepEqual(open.missing, [], `${label} open missing`)
     assert.deepEqual(open.overlaps, [], `${label} open overlap`)
     assert.deepEqual(open.outOfBounds, [], `${label} open outOfBounds`)
     if (outDir) await mp.screenshot({path: `${outDir}/mobile-${label}-open.png`})

@@ -69,7 +69,7 @@ export function renderRangeControl(options: RenderRangeControlOptions): RenderRa
         <strong class="render-val"></strong>
       </span>
       <input type="range" min="${RENDER_RADIUS_MIN}" max="${RENDER_RADIUS_MAX}" step="${RENDER_RADIUS_STEP}" />
-      <span class="render-ticks"><span>${RENDER_RADIUS_MIN}m</span><span>480m</span><span>${RENDER_RADIUS_MAX}m</span></span>
+      <span class="render-ticks"><span>${RENDER_RADIUS_MIN}m</span><span>${Math.round((RENDER_RADIUS_MIN + RENDER_RADIUS_MAX) / 2)}m</span><span>${RENDER_RADIUS_MAX}m</span></span>
     </label>
     <div class="render-foot">
       <span class="render-stats"></span>
@@ -130,14 +130,13 @@ export function renderRangeControl(options: RenderRangeControlOptions): RenderRa
       const preset = RENDER_PRESETS.find(item => item.id === button.dataset.preset)
       if (!preset) return
       current = options.onCommit({preset: preset.id, radius: preset.radius, source: 'storage'})
-      options.onPreview(current)
       syncUi()
     }
   }
 
   slider.addEventListener('input', () => {
     const radius = snapRenderRadius(Number(slider.value))
-    current = options.onCommit({preset: presetForRadius(radius), radius, source: 'storage'})
+    current = {preset: presetForRadius(radius), radius, source: current.source}
     options.onPreview(current)
     syncUi()
   })
@@ -145,13 +144,11 @@ export function renderRangeControl(options: RenderRangeControlOptions): RenderRa
   slider.addEventListener('change', () => {
     const radius = snapRenderRadius(Number(slider.value))
     current = options.onCommit({preset: presetForRadius(radius), radius, source: 'storage'})
-    options.onPreview(current)
     syncUi()
   })
 
   resetBtn.onclick = () => {
     current = options.onReset()
-    options.onPreview(current)
     syncUi()
   }
 
@@ -171,7 +168,14 @@ export function renderRangeControl(options: RenderRangeControlOptions): RenderRa
   const onWindowKey = (event: KeyboardEvent) => {
     if (event.code === 'Escape' && !panel.hidden) close()
   }
+  const onOutsidePointer = (event: PointerEvent) => {
+    if (panel.hidden) return
+    const target = event.target as Node | null
+    if (target && (panel.contains(target) || entry.contains(target))) return
+    close()
+  }
   window.addEventListener('keydown', onWindowKey)
+  document.addEventListener('pointerdown', onOutsidePointer)
 
   document.body.append(entry, panel)
   syncUi()
@@ -189,6 +193,7 @@ export function renderRangeControl(options: RenderRangeControlOptions): RenderRa
     close,
     dispose: () => {
       window.removeEventListener('keydown', onWindowKey)
+      document.removeEventListener('pointerdown', onOutsidePointer)
       entry.remove()
       panel.remove()
     },

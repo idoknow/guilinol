@@ -7,6 +7,7 @@ import {currentMirrorLevel, isWaterInView} from './look/water'
 import {
   RENDER_RADIUS_DEFAULT,
   RenderRangeStore,
+  type RenderConfigSource,
   type RenderRangeConfig,
   type RenderRangeListener,
   type RenderRangeMetrics,
@@ -63,11 +64,11 @@ export class Stream {
   get metrics():RenderRangeMetrics{return this.rangeStore.getMetrics()}
   getConfig():RenderRangeConfig{return this.rangeStore.getConfig()}
 
-  setRadius(radius:number, options?:{persist?:boolean}){
+  setRadius(radius:number, options?:{persist?:boolean; source?:RenderConfigSource}){
     return this.rangeStore.set(radius,options)
   }
 
-  setRenderRange(next:Partial<RenderRangeConfig>|number|string, options?:{persist?:boolean}){
+  setRenderRange(next:Partial<RenderRangeConfig>|number|string, options?:{persist?:boolean; source?:RenderConfigSource}){
     return this.rangeStore.set(next,options)
   }
 

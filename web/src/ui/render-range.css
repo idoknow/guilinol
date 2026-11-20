@@ -121,6 +121,7 @@
   display: grid;
   gap: 1px;
   text-align: center;
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   transition: background .15s, border-color .15s;
 }
@@ -174,6 +175,7 @@
   margin: 2px 0;
   accent-color: #d0694c;
   cursor: pointer;
+  touch-action: pan-x;
 }
 
 .render-ticks {
@@ -212,6 +214,7 @@
   border-radius: 10px;
   padding: 3px 8px;
   cursor: pointer;
+  touch-action: manipulation;
 }
 
 .render-reset:hover {
@@ -251,7 +254,7 @@ body[data-photo="on"] :is(.render-entry, .render-pop) {
   .render-pop {
     top: calc(74px + env(safe-area-inset-top));
     left: calc(156px + env(safe-area-inset-left));
-    width: min(260px, calc(100vw - 380px));
+    width: min(260px, calc(100vw - 360px));
     max-height: calc(100vh - 96px);
     overflow: auto;
   }
