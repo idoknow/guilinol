@@ -10,15 +10,15 @@ export interface Landmark {
 }
 export type LoadedLandmarks = Map<Landmark,THREE.Group>
 
-function batchShopBays(root:THREE.Group){
+function batchRepeatedMeshes(root:THREE.Group){
   root.updateMatrixWorld(true)
-  for(const name of ['lod0','lod1']){
+  for(const name of ['lod0','lod1','lod2']){
     const layer=root.getObjectByName(name)
     if(!layer)continue
     const batches=new Map<string,THREE.Mesh[]>()
-    for(const bay of layer.children.filter(node=>node.name.startsWith(name+'_bay'))){
+    for(const bay of layer.children){
       bay.traverse(node=>{
-        if(!(node instanceof THREE.Mesh)||Array.isArray(node.material))return
+        if(!(node instanceof THREE.Mesh)||node.children.length||node instanceof THREE.InstancedMesh||node.matrixWorld.determinant()<=0||Array.isArray(node.material)||node.material.transparent)return
         const key=node.geometry.uuid+node.material.uuid
         const group=batches.get(key)??[];group.push(node);batches.set(key,group)
       })
@@ -55,7 +55,7 @@ export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,en
       }else if(distance<=900&&!pending.has(entry)&&(priority||pending.size<2)&&performance.now()>=(retry.get(entry)??0)){
         pending.add(entry)
         loaderReady.then(loader=>loader.loadAsync('./'+entry.file)).then(({scene:group})=>{
-          if(entry.id==='wangcheng_market')batchShopBays(group)
+          batchRepeatedMeshes(group)
           group.position.fromArray(entry.position);group.rotation.y=THREE.MathUtils.degToRad(entry.rotation)
           group.traverse(node=>{
             if(/^collision/i.test(node.name))node.visible=false

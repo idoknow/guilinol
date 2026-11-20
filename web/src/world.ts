@@ -13,7 +13,7 @@ export interface Tile extends Asset {x:number; z:number}
 export interface Manifest {
   landmarks?:import('./landmarks').Landmark[]
   version:number; extent:[number,number,number,number]; grid:number; chunkSize:number; chunks:Tile[];
-  peaks:Peaks; atlas:Asset; vehicles?:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset}
+  peaks:Peaks; atlas:Asset; vehicles?:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset; water?:Asset}
 }
 export let bytes = 0
 export async function fetchAsset(file:string, signal?:AbortSignal) {
@@ -51,11 +51,12 @@ function ground(width:number, depth:number, step:number, height:(col:number,row:
 export function startOverview(manifest:Manifest) {
   const {underlay,texture,step} = manifest.overview
   const [left,top,width,depth] = manifest.extent
-  const dispatched = Promise.all([fetchAsset(underlay.file),fetchAsset(texture.file)]).then(([values,image])=>{
+  const dispatched = Promise.all([fetchAsset(underlay.file),fetchAsset(texture.file),
+    manifest.overview.water?fetchAsset(manifest.overview.water.file):null]).then(([values,image,water])=>{
     const blob = new Blob([image],{type:'image/png'})
     const bitmaps = Promise.all([
       createImageBitmap(blob,{imageOrientation:'flipY'}),
-      createImageBitmap(blob),
+      water?new Uint8Array(water):createImageBitmap(blob),
     ])
     return {values,bitmaps}
   })

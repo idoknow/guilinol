@@ -23,10 +23,10 @@ function paint(parts:Part[]) {
     g.computeBoundingBox()
     const {min, max} = g.boundingBox!, pos = g.getAttribute('position'), rgb = new Float32Array(pos.count * 3)
     lo.setHex(dark ?? color); hi.setHex(lit ?? color)
+    const mid = new THREE.Color(color)
     for (let i = 0; i < pos.count; i += 3) {
       // One colour per face (flat look): shade by the face's mean height inside its part.
       const y = (pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2)) / 3, t = (y - min.y) / Math.max(.01, max.y - min.y)
-      const mid = new THREE.Color(color)
       if (t < .5) tmp.copy(lo).lerp(mid, t * 2); else tmp.copy(mid).lerp(hi, (t - .5) * 2)
       for (let k = 0; k < 3; k++) tmp.toArray(rgb, (i + k) * 3)
     }
@@ -118,6 +118,7 @@ function shrub() { // 灌木团: peak scrub and park undergrowth, two low lumps
 
 const material = new THREE.MeshStandardMaterial({vertexColors:true, flatShading:true, roughness:1, metalness:0, side:THREE.DoubleSide})
 const builders = [camphor, banyan, osmanthus, palm, conifer, shrub]
+export const speciesCount = builders.length
 export function treeGeometry(species:number) {
   const {near, far} = builders[species] ? builders[species]() : camphor()
   return {near:paint(near), far:paint(far), material}

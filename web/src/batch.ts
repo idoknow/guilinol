@@ -25,6 +25,7 @@ export interface TileBatchInput {
 
 interface IndexedSlice {
   tile:Tile
+  farCount:number
   indices:Uint32Array
 }
 
@@ -101,7 +102,7 @@ class StaticLayerBatch {
         idx = new Uint32Array(vCount)
         for(let i=0;i<vCount;i++) idx[i] = vStart+i
       }
-      slices.push({tile, indices:idx})
+      slices.push({tile, indices:idx,farCount:geom.userData.farIndexCount??idx.length})
       vStart += vCount
     }
     this.slices = slices
@@ -112,17 +113,18 @@ class StaticLayerBatch {
     this.geom.setDrawRange(0,0)
   }
 
-  cull(visibleTiles:Set<Tile>) {
+  cull(visibleTiles:Set<Tile>, farTiles?:Set<Tile>) {
     if(!this.slices.length||!this.idxAttr) { this.mesh.visible = false; return }
     let mask = ''
-    for(let i=0;i<this.slices.length;i++) mask += visibleTiles.has(this.slices[i].tile) ? '1' : '0'
+    for(let i=0;i<this.slices.length;i++) mask += visibleTiles.has(this.slices[i].tile) ? (farTiles?.has(this.slices[i].tile)?'2':'1') : '0'
     if(mask===this.lastMask) return
     this.lastMask = mask
     let cursor = 0
     for(const slice of this.slices) {
       if(!visibleTiles.has(slice.tile)) continue
-      this.idxArray.set(slice.indices,cursor)
-      cursor += slice.indices.length
+      const indices=farTiles?.has(slice.tile)?slice.indices.subarray(0,slice.farCount):slice.indices
+      this.idxArray.set(indices,cursor)
+      cursor += indices.length
     }
     this.idxAttr.clearUpdateRanges()
     if(cursor>0) this.idxAttr.addUpdateRange(0,cursor)
@@ -236,6 +238,7 @@ export class ChunkBatcher {
     const mirrorOn = Number.isFinite(mirrorLevel) && camera.position.y>=mirrorLevel+.2 && camera.position.y<=4000
 
     const visibleChunks = new Set<Tile>()
+    const farBuildings = new Set<Tile>()
     const visibleStreets = new Set<Tile>()
     let furnMask = ''
 
@@ -253,6 +256,7 @@ export class ChunkBatcher {
       }
       if(vis) {
         visibleChunks.add(tile)
+        if(this.pt.set(cx,cy,cz).distanceTo(camera.position)-radius>280)farBuildings.add(tile)
         const nearStreet = Math.hypot(
           Math.max(0,Math.abs(focus.x-cx)-128),
           Math.max(0,Math.abs(focus.z-cz)-128),
@@ -267,7 +271,7 @@ export class ChunkBatcher {
       furnMask += '0'
     }
 
-    this.buildings.cull(visibleChunks)
+    this.buildings.cull(visibleChunks,farBuildings)
     this.water.cull(visibleChunks)
     this.bridges.cull(visibleChunks)
     this.streets.cull(visibleStreets)
