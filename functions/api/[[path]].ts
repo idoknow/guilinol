@@ -64,7 +64,7 @@ async function handle(request:Request,env:Env) {
         DO UPDATE SET nickname=excluded.nickname,salt=excluded.salt,digest=excluded.digest WHERE users.verified=0`,
         crypto.randomUUID(),email,name,salt,await passwordHash(pass,salt)))
     }
-    writes.push(stmt('INSERT OR REPLACE INTO email_codes VALUES(?,?,?,?,0)',email,purpose,await hash(`${email}:${purpose}:${code}`),now()+600))
+    writes.push(stmt('INSERT INTO email_codes VALUES(?,?,?,?,0) ON CONFLICT(email,purpose) DO UPDATE SET digest=excluded.digest,expires=excluded.expires,attempts=0',email,purpose,await hash(`${email}:${purpose}:${code}`),now()+600))
     await db.batch(writes); await deliver(env,email,purpose,code)
     return json({ok:true})
   }
