@@ -246,14 +246,14 @@ async function detail(id: string) {
   const events = el('ol')
   events.className = 'adm-timeline'
   for (const event of [...item.events,...item.messages].sort((left,right)=>left.created_at-right.created_at)) {
-    if(event.author_kind){events.append(el('li',`${date(event.created_at)} · ${event.author_name}：${event.body}`));continue}
+    if(event.author_kind){const msg=el('li');msg.className=`adm-msg adm-msg--${event.author_kind}`;const meta=el('span');meta.className='adm-msg-meta';meta.append(el('b',event.author_name),' ',el('time',date(event.created_at)));const text=el('p',event.body);text.className='adm-msg-body';msg.append(meta,text);events.append(msg);continue}
     const entry = el('li', `${date(event.created_at)} · ${labels[event.status]} · ${event.message} `)
     if (event.screenshot_url) entry.append(external('查看截图', event.screenshot_url))
     events.append(entry)
   }
   main.append(events)
-  if(!['draft','live','rejected','duplicate'].includes(item.status)){const input=el('textarea'),send=el('button','管理员回复');input.maxLength=1000;input.setAttribute('aria-label','管理员回复内容');main.append(input,send);send.onclick=async()=>{try{await api(path+'/messages',{body:input.value});location.reload()}catch(error){failure(error)}}}
-  if(['submitted','need_info'].includes(item.status)){const start=el('button','发起 AI 制作');main.append(start);start.onclick=async()=>{try{await api(path+'/status',{status:'approved'});location.reload()}catch(error){failure(error)}}}
+  if(!['draft','live','rejected','duplicate'].includes(item.status)){const input=el('textarea'),send=el('button','以管理员身份回复'),box=el('div');box.className='adm-compose';input.maxLength=1000;input.rows=3;input.placeholder='回复提交人（会同时发邮件提醒）';input.setAttribute('aria-label','管理员回复内容');box.append(input,send);main.append(box);send.onclick=async()=>{try{await api(path+'/messages',{body:input.value});location.reload()}catch(error){failure(error)}}}
+  if(['submitted','need_info'].includes(item.status)){const start=el('button','发起 AI 制作'),gate=el('div');start.className='adm-primary';gate.className='adm-gate';gate.append(el('p','确认信息足够后发起制作，协调人会收到开工通知。'),start);main.append(gate);start.onclick=async()=>{try{await api(path+'/status',{status:'approved'});location.reload()}catch(error){failure(error)}}}
   if (!edges[item.status]) return
   const form = el('form'),
     select = el('select'),

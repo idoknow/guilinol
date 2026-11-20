@@ -189,7 +189,7 @@ export async function uiTest(page, origin,sql) {
   await fb.locator('.fb-card').first().click()
   const [item] = await (await page.request.get(origin + '/api/feedback?mine=1')).json()
   const reply=await page.request.post(`${origin}/api/bridge/feedback/${item.id}/messages`,{headers:bridge,data:{source:'mock-1',body:'模型入口朝哪个方向？'}});assert.equal(reply.status(),200)
-  await click('刷新进度');await fb.getByText(/模型入口朝哪个方向/).waitFor();await fb.getByLabel('回复内容').fill('朝东');await click('发送回复');await fb.getByText(/提交人：朝东/).waitFor()
+  await click('刷新进度');await fb.getByText(/模型入口朝哪个方向/).waitFor();await fb.getByLabel('回复内容').fill('朝东');await click('发送回复');await fb.locator('.fb-msg--user .fb-msg-body',{hasText:'朝东'}).waitFor()
   await sql("UPDATE users SET role='admin' WHERE email='walker@example.test'")
   const adminPage=await page.context().newPage()
   const adminMessage='已确认入口朝东，准备发起制作。'
@@ -201,9 +201,9 @@ export async function uiTest(page, origin,sql) {
       await adminPage.getByRole('heading',{name:'时间线',exact:true}).evaluate(node=>node.scrollIntoView({block:'start'}))
       await adminPage.screenshot({path:`captures/feedback/${name}.png`})
     }
-    await timeline.getByText(/提交人：朝东/).waitFor()
+    await timeline.locator('.adm-msg--user',{hasText:'朝东'}).waitFor()
     await adminPage.getByLabel('管理员回复内容').fill(adminMessage)
-    await adminPage.getByRole('button',{name:'管理员回复',exact:true}).click()
+    await adminPage.getByRole('button',{name:'以管理员身份回复',exact:true}).click()
     await timeline.getByText(adminMessage,{exact:false}).waitFor()
     await capture('admin-before-approval')
     await approve.click()
