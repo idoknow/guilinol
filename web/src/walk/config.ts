@@ -1,3 +1,24 @@
+export {
+  EBIKE_COMPLIANT_CAP_KMH,
+  EBIKE_DEFAULT_GEAR,
+  EBIKE_SHARED_MAX_KMH,
+  EBIKE_STANDARD_MAX_KMH,
+  EBIKE_UPGRADE_MAX_KMH,
+  ebikeBatteryConfig,
+  ebikeTierConfigs,
+  resolveEbikeKind,
+  resolveEbikeProfile,
+  resolveEbikeTier,
+  type EbikeBatteryStatus,
+  type EbikeGearProfile,
+  type EbikeTier,
+  type EbikeUpgradeMods,
+  type EbikeVehicleType,
+  type NormalizedEbikeUpgrades,
+  type ResolvedEbikeProfile,
+} from './tuning'
+import {EBIKE_COMPLIANT_CAP_KMH} from './tuning'
+
 export const walkConfig = {
   height:1.7, radius:.29, walk:4, run:9, jump:1.2, gravity:-20, fallGravity:-28,
   accel:50, decel:135, grip:220, airAccel:18, pivotBoost:2.2, turnRate:20, coyote:.1, jumpBuffer:.12,
@@ -8,15 +29,15 @@ export const walkConfig = {
   gate:{x:-588,z:-212,yaw:Math.PI},
 }
 
-/** E-bike longitudinal dynamics, cornering lean, and transition parameters (25 km/h cap). */
+/** E-bike baseline longitudinal dynamics, cornering lean, and transition parameters (default mount resets to 25 km/h D2). */
 export const bikeConfig = {
-  maxSpeed:25/3.6, reverseMax:-1.8, accel:4.2, torqueDecay:.65, torquePow:.65,
-  brake:7.5, revHold:.22, revAccel:2.4, rollDrag:.42, aeroDrag:.09,
-  pivotTurn:.9, peakTurn:1.65, topTurn:1.12, steerDamp:10,
-  leanMax:.26, leanDamp:7.5, pitchMax:.18, pitchDamp:8,
-  mountDuration:.22, dismountDuration:.16,
-  stickDeadFwd:.1, stickDeadTurn:.12, slideDamp:1.8,
-  uphillDrag:0, uphillCapScale:0, offRoadCap:4.2, step:.42, maxSlope:Math.PI/4,
+  maxSpeed: EBIKE_COMPLIANT_CAP_KMH / 3.6, reverseMax: -1.8, accel: 4.2, torqueDecay: .65, torquePow: .65,
+  brake: 7.5, revHold: .22, revAccel: 2.4, rollDrag: .42, aeroDrag: .09,
+  pivotTurn: .9, peakTurn: 1.65, topTurn: 1.12, steerDamp: 10,
+  leanMax: .26, tuckLeanMax: .42, leanDamp: 7.5, pitchMax: .18, pitchDamp: 8,
+  mountDuration: .22, dismountDuration: .16,
+  stickDeadFwd: .1, stickDeadTurn: .12, slideDamp: 1.8,
+  uphillDrag: 0, uphillCapScale: 0, offRoadCap: 4.2, step: .42, maxSlope: Math.PI / 4,
 }
 
 /** Pedal bicycle dynamics (~5.0 m/s = 18 km/h cap, gentler human launch, noticeable uphill gravity drag). */
@@ -24,7 +45,7 @@ export const bicycleConfig: typeof bikeConfig = {
   maxSpeed:18/3.6, reverseMax:-1.3, accel:2.35, torqueDecay:.45, torquePow:.85,
   brake:6.8, revHold:.22, revAccel:1.9, rollDrag:.36, aeroDrag:.08,
   pivotTurn:.95, peakTurn:1.72, topTurn:1.18, steerDamp:10,
-  leanMax:.24, leanDamp:7.5, pitchMax:.18, pitchDamp:8,
+  leanMax:.24, tuckLeanMax:.24, leanDamp:7.5, pitchMax:.18, pitchDamp:8,
   mountDuration:.22, dismountDuration:.16,
   stickDeadFwd:.1, stickDeadTurn:.12, slideDamp:1.8,
   uphillDrag:13.5, uphillCapScale:3.2, offRoadCap:3.4, step:.42, maxSlope:Math.PI/4,

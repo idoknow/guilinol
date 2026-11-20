@@ -2,9 +2,66 @@ import R from '@dimforge/rapier3d-compat'
 import * as T from 'three'
 import type {Stream} from '../stream'
 import type {Tile} from '../world'
-import {bicycleConfig, bikeConfig as bcfg, walkConfig as wcfg} from './config'
+import {
+  bicycleConfig,
+  bikeConfig as bcfg,
+  ebikeBatteryConfig,
+  EBIKE_COMPLIANT_CAP_KMH,
+  EBIKE_DEFAULT_GEAR,
+  resolveEbikeKind,
+  resolveEbikeProfile,
+  walkConfig as wcfg,
+  type EbikeBatteryStatus,
+  type EbikeTier,
+  type EbikeUpgradeMods,
+  type EbikeVehicleType,
+  type NormalizedEbikeUpgrades,
+  type ResolvedEbikeProfile,
+} from './config'
 
 export type RideKind = 'bike' | 'bicycle'
+export interface EbikeStepControl {
+  wheelie?: boolean | number
+  tuck?: boolean
+}
+export interface EbikeMountOptions {
+  vehicleType?: EbikeVehicleType
+  tier?: EbikeTier
+  batteryPct?: number
+  mods?: EbikeUpgradeMods | null
+  keepGear?: boolean
+  drainEnabled?: boolean
+}
+export interface EbikeDynamicTelemetry {
+  vehicleType: EbikeVehicleType
+  isShared: boolean
+  tier: EbikeTier
+  tierLabel: string
+  badge: string
+  gear: number
+  gearLabel: string
+  speed: number
+  kmh: number
+  maxKmh: number
+  targetKmh: number
+  tierMaxKmh: number
+  compliantCapKmh: number
+  battery: number
+  batteryPct: number
+  batteryStatus: EbikeBatteryStatus
+  lowBattery: boolean
+  criticalBattery: boolean
+  batteryDepleted: boolean
+  lowBatteryCapKmh: number | null
+  drainPerSec: number
+  lean: number
+  leanLimit: number
+  wheelie: number
+  tucking: boolean
+  braking: boolean
+  upgrades: NormalizedEbikeUpgrades
+  upgraded: boolean
+}
 type Kind = 'ground'|'overview'|'road'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
 type SurfaceHit = {y:number; slope:number} | null
 
@@ -77,10 +134,47 @@ function shortestAngle(from: number, to: number) {
   return Math.atan2(Math.sin(to - from), Math.cos(to - from))
 }
 
-function turnRate(speed: number, spec = bcfg) {
-  const s = T.MathUtils.clamp(Math.abs(speed) / spec.maxSpeed, 0, 1)
+function turnRate(speed: number, spec = bcfg, maxSpeed = spec.maxSpeed) {
+  const s = T.MathUtils.clamp(Math.abs(speed) / Math.max(.5, maxSpeed), 0, 1)
   if (s <= .4) return T.MathUtils.lerp(spec.pivotTurn, spec.peakTurn, smoothstep(s / .4))
   return T.MathUtils.lerp(spec.peakTurn, spec.topTurn, smoothstep((s - .4) / .6))
+}
+
+function batteryStatusOf(pct: number): EbikeBatteryStatus {
+  if (pct <= 0) return 'empty'
+  if (pct <= ebikeBatteryConfig.criticalThresholdPct) return 'critical'
+  if (pct <= ebikeBatteryConfig.lowThresholdPct) return 'low'
+  return 'normal'
+}
+
+function computeBatteryLimits(pct: number): {
+  status: EbikeBatteryStatus
+  lowBattery: boolean
+  capKmh: number | null
+  accelMul: number
+} {
+  const status = batteryStatusOf(pct)
+  if (status === 'normal') return {status, lowBattery: false, capKmh: null, accelMul: 1}
+  if (status === 'empty') {
+    return {status, lowBattery: true, capKmh: ebikeBatteryConfig.emptyCapKmh, accelMul: ebikeBatteryConfig.emptyAccelMul}
+  }
+  if (status === 'critical') {
+    const t = T.MathUtils.clamp(pct / Math.max(1e-3, ebikeBatteryConfig.criticalThresholdPct), 0, 1)
+    return {
+      status,
+      lowBattery: true,
+      capKmh: +T.MathUtils.lerp(ebikeBatteryConfig.emptyCapKmh, ebikeBatteryConfig.criticalCapKmh, t).toFixed(2),
+      accelMul: ebikeBatteryConfig.emptyAccelMul,
+    }
+  }
+  const span = Math.max(1e-3, ebikeBatteryConfig.lowThresholdPct - ebikeBatteryConfig.criticalThresholdPct)
+  const t = T.MathUtils.clamp((pct - ebikeBatteryConfig.criticalThresholdPct) / span, 0, 1)
+  return {
+    status,
+    lowBattery: true,
+    capKmh: +T.MathUtils.lerp(ebikeBatteryConfig.criticalCapKmh, ebikeBatteryConfig.lowCapKmh, t).toFixed(2),
+    accelMul: ebikeBatteryConfig.lowAccelMul,
+  }
 }
 
 /** Shows non-intrusive toast when mounting/dismounting a bike is blocked by walls or narrow obstacles. */
@@ -169,35 +263,183 @@ export function probeLocalMount(ctx: DismountContext, px: number, py: number, pz
   return {ok: false, reason: 'narrow'}
 }
 
-/** Manages e-bike and pedal-bicycle acceleration, uphill drag, coasting, steering, and lean/pitch. */
+function isVerifySilentMode(): boolean {
+  if (typeof location === 'undefined') return false
+  const p = new URLSearchParams(location.search)
+  return p.has('verify') && p.get('stunt') !== '1'
+}
+
+/** Manages e-bike and pedal-bicycle tiers, gears, uphill drag, coasting, steering, battery drain, and low-battery limp caps. */
 export function createBikeControl() {
   let speed = 0, heading = 0, lean = 0, pitch = 0, steerInput = 0, revHold = 0
   let onPavement = false, kind: RideKind = 'bike'
+  let vehicleType: EbikeVehicleType = 'normal'
+  let mods: EbikeUpgradeMods | null = null
+  let profile: ResolvedEbikeProfile = resolveEbikeProfile(vehicleType)
+  let gear = EBIKE_DEFAULT_GEAR
+  let batteryPct = 100
+  let lastBatteryStatus: EbikeBatteryStatus = 'normal'
+  let drainEnabledOverride: boolean | undefined
+  let drainPerSec = 0
+  let wheelieLoad = 0
+  let tucking = false
+  let braking = false
 
   function spec() {
     return kind === 'bicycle' ? bicycleConfig : bcfg
   }
 
+  function currentGearSpec() {
+    return profile.gears[T.MathUtils.clamp(gear - 1, 0, profile.gears.length - 1)]
+  }
+
+  function effectiveMaxKmh(): {targetKmh: number; lowBatteryCapKmh: number | null; accelBatteryMul: number; status: EbikeBatteryStatus; lowBattery: boolean; criticalBattery: boolean} {
+    if (kind === 'bicycle') {
+      return {targetKmh: bicycleConfig.maxSpeed * 3.6, lowBatteryCapKmh: null, accelBatteryMul: 1, status: 'normal', lowBattery: false, criticalBattery: false}
+    }
+    const g = currentGearSpec()
+    const bat = computeBatteryLimits(batteryPct)
+    return {
+      targetKmh: bat.capKmh !== null ? Math.min(g.maxKmh, bat.capKmh) : g.maxKmh,
+      lowBatteryCapKmh: bat.capKmh,
+      accelBatteryMul: bat.accelMul,
+      status: bat.status,
+      lowBattery: bat.lowBattery,
+      criticalBattery: batteryPct <= ebikeBatteryConfig.criticalThresholdPct,
+    }
+  }
+
+  function maybeNotifyBattery(nextStatus: EbikeBatteryStatus) {
+    const rank: Record<EbikeBatteryStatus, number> = {normal: 0, low: 1, critical: 2, empty: 3}
+    if (rank[nextStatus] <= rank[lastBatteryStatus]) {
+      lastBatteryStatus = nextStatus
+      return
+    }
+    lastBatteryStatus = nextStatus
+    if (typeof window === 'undefined' || isVerifySilentMode()) return
+    const text = nextStatus === 'empty'
+      ? `${profile.tierLabel}电量耗尽，已切至 ${ebikeBatteryConfig.emptyCapKmh} km/h 应急助力`
+      : nextStatus === 'critical'
+        ? `${profile.tierLabel}严重亏电，已限速 ${ebikeBatteryConfig.criticalCapKmh} km/h`
+        : `${profile.tierLabel}电量偏低，开启低电降速保护`
+    window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text, ms: 2600}}))
+  }
+
   function reset() {
     speed = lean = pitch = steerInput = revHold = 0
+    drainPerSec = wheelieLoad = 0
+    tucking = braking = false
     onPavement = false
     kind = 'bike'
+    vehicleType = 'normal'
+    mods = null
+    profile = resolveEbikeProfile('normal')
+    gear = EBIKE_DEFAULT_GEAR
+    batteryPct = 100
+    lastBatteryStatus = 'normal'
+    drainEnabledOverride = undefined
+  }
+
+  function setGear(nextGear: number) {
+    if (kind !== 'bike') return 1
+    gear = T.MathUtils.clamp(Math.round(nextGear), 1, profile.gears.length)
+    return gear
+  }
+
+  function setVehicleType(nextType: EbikeVehicleType | string) {
+    vehicleType = resolveEbikeKind(0, nextType)
+    if (vehicleType === 'shared') mods = null
+    profile = resolveEbikeProfile(vehicleType, mods)
+    return profile
+  }
+
+  function setUpgrades(nextMods: EbikeUpgradeMods | null) {
+    mods = vehicleType === 'shared' ? null : (nextMods ? {...nextMods} : null)
+    profile = resolveEbikeProfile(vehicleType, mods)
+    return profile
+  }
+
+  function setBattery(pct: number) {
+    batteryPct = T.MathUtils.clamp(Number.isFinite(pct) ? pct : 100, 0, 100)
+    lastBatteryStatus = batteryStatusOf(batteryPct)
+    return batteryPct
+  }
+
+  function telemetry(): EbikeDynamicTelemetry {
+    const g = currentGearSpec()
+    const lim = effectiveMaxKmh()
+    const batRounded = +batteryPct.toFixed(1)
+    return {
+      vehicleType,
+      isShared: vehicleType === 'shared',
+      tier: vehicleType,
+      tierLabel: profile.tierLabel,
+      badge: profile.badge,
+      gear,
+      gearLabel: kind === 'bicycle' ? '单车' : g.label,
+      speed,
+      kmh: Math.round(Math.abs(speed) * 3.6),
+      maxKmh: lim.targetKmh,
+      targetKmh: lim.targetKmh,
+      tierMaxKmh: profile.tierMaxKmh,
+      compliantCapKmh: profile.compliantCapKmh,
+      battery: batRounded,
+      batteryPct: batRounded,
+      batteryStatus: lim.status,
+      lowBattery: lim.lowBattery,
+      criticalBattery: lim.criticalBattery,
+      batteryDepleted: batteryPct <= 0,
+      lowBatteryCapKmh: lim.lowBatteryCapKmh,
+      drainPerSec: +drainPerSec.toFixed(3),
+      lean,
+      leanLimit: tucking ? bcfg.tuckLeanMax : bcfg.leanMax,
+      wheelie: wheelieLoad,
+      tucking,
+      braking,
+      upgrades: profile.upgrades,
+      upgraded: profile.upgraded,
+    }
   }
 
   return {
     get kind() { return kind },
+    get vehicleType() { return vehicleType },
+    get tier() { return vehicleType },
+    get isShared() { return vehicleType === 'shared' },
+    get gear() { return gear },
+    get profile() { return profile },
+    get mods() { return mods },
+    get batteryPct() { return batteryPct },
+    get batteryStatus() { return batteryStatusOf(batteryPct) },
+    get lowBattery() { return batteryStatusOf(batteryPct) !== 'normal' },
+    get criticalBattery() { return batteryPct <= ebikeBatteryConfig.criticalThresholdPct },
+    get drainPerSec() { return drainPerSec },
     get speed() { return speed },
     get heading() { return heading },
     get lean() { return lean },
     get pitch() { return pitch },
     get steerInput() { return steerInput },
-    mount(yaw: number, initialPitch = 0, rideKind: RideKind = 'bike') {
+    get telemetry() { return telemetry },
+    mount(yaw: number, initialPitch = 0, rideKind: RideKind = 'bike', options?: EbikeMountOptions) {
       heading = yaw
       reset()
       kind = rideKind
       pitch = initialPitch
+      vehicleType = resolveEbikeKind(0, options?.vehicleType ?? options?.tier ?? 'normal')
+      mods = vehicleType === 'shared' ? null : (options?.mods ? {...options.mods} : null)
+      profile = resolveEbikeProfile(vehicleType, mods)
+      gear = options?.keepGear ? T.MathUtils.clamp(gear, 1, profile.gears.length) : EBIKE_DEFAULT_GEAR
+      batteryPct = T.MathUtils.clamp(options?.batteryPct ?? 100, 0, 100)
+      lastBatteryStatus = batteryStatusOf(batteryPct)
+      drainEnabledOverride = options?.drainEnabled
     },
-    stop() { speed = 0 },
+    setGear,
+    shiftGear(delta: number) { return setGear(gear + delta) },
+    resetGearToCompliant() { return setGear(EBIKE_DEFAULT_GEAR) },
+    setVehicleType,
+    setUpgrades,
+    setBattery,
+    stop() { speed = 0; drainPerSec = 0 },
     reset,
     dampSpeed(step: number) {
       speed *= Math.max(0, 1 - spec().slideDamp * step)
@@ -208,32 +450,51 @@ export function createBikeControl() {
       if (abs > limit) speed = Math.sign(speed) * Math.max(limit, abs - 6.5 * step)
       return speed
     },
-    steer(forward: number, right: number, dt: number, mounted = true) {
+    steer(forward: number, right: number, dt: number, mounted = true, control?: EbikeStepControl) {
       const s = spec()
       const cdt = Math.min(.12, Math.max(0, dt))
       if (!mounted) {
         revHold = 0
+        drainPerSec = 0
+        braking = false
         steerInput = T.MathUtils.damp(steerInput, 0, s.steerDamp, cdt)
         lean = T.MathUtils.damp(lean, 0, s.leanDamp, cdt)
         return speed
       }
+
+      const prevSpeed = speed
       const uFwd = deadzone(T.MathUtils.clamp(forward, -1, 1), s.stickDeadFwd)
       const uTurn = deadzone(T.MathUtils.clamp(right, -1, 1), s.stickDeadTurn)
       steerInput = T.MathUtils.damp(steerInput, uTurn, s.steerDamp, cdt)
+      tucking = kind === 'bike' && !!control?.tuck && Math.abs(steerInput) > .12 && Math.abs(speed) > 2
+      wheelieLoad = kind === 'bike'
+        ? (typeof control?.wheelie === 'number' ? T.MathUtils.clamp(control.wheelie, 0, 1) : control?.wheelie ? .85 : 0)
+        : 0
+
       const uphillSin = s.uphillDrag > 0 ? Math.max(0, Math.sin(pitch) - .012) : 0
-      const effMax = uphillSin > 0 ? Math.max(2.1, s.maxSpeed * (1 - s.uphillCapScale * uphillSin)) : s.maxSpeed
+      const climbSin = Math.max(0, Math.sin(pitch) - .01)
+      const gSpec = kind === 'bike' ? currentGearSpec() : null
+      const batLim = effectiveMaxKmh()
+      const capMs = batLim.targetKmh / 3.6
+      const effMax = uphillSin > 0 ? Math.max(2.1, capMs * (1 - s.uphillCapScale * uphillSin)) : capMs
+      const gearAccelScale = kind === 'bike'
+        ? (gSpec!.accelScale * profile.accelMul * batLim.accelBatteryMul)
+        : 1
+
+      braking = (uFwd < -.05 && speed > .05) || (uFwd > .05 && speed < -.05)
 
       if (uFwd > .05) {
         revHold = 0
         if (speed < 0) speed = Math.min(0, speed + s.brake * uFwd * cdt)
         else {
-          const ratio = Math.max(0, speed) / s.maxSpeed
-          const rawDrive = s.accel * (1 - s.torqueDecay * Math.pow(ratio, s.torquePow)) * uFwd
+          const ratio = Math.max(0, speed) / Math.max(1, effMax)
+          const rawDrive = s.accel * gearAccelScale * (1 - s.torqueDecay * Math.pow(ratio, s.torquePow)) * uFwd
           const slopeLoss = uphillSin > 0 ? Math.min(rawDrive * .68, s.uphillDrag * uphillSin) : 0
           const nextSpd = speed + (rawDrive - slopeLoss) * cdt
+          const capDrop = batLim.lowBatteryCapKmh !== null || capMs < speed ? 3.2 : 0
           speed = nextSpd <= effMax
             ? nextSpd
-            : Math.max(effMax, speed - (s.rollDrag + s.uphillDrag * uphillSin) * cdt)
+            : Math.max(effMax, speed - (s.rollDrag + s.uphillDrag * uphillSin + capDrop) * cdt)
         }
       } else if (uFwd < -.05) {
         if (speed > .05) {
@@ -253,14 +514,39 @@ export function createBikeControl() {
         else if (speed < 0) speed = Math.min(0, speed + (s.rollDrag * 1.8 - s.aeroDrag * speed) * cdt)
       }
 
-      const omega = turnRate(speed, s)
+      const omega = turnRate(speed, s, capMs)
       const dirSign = speed < -.05 ? -1 : 1
       heading -= steerInput * omega * dirSign * cdt
 
+      const maxLean = tucking ? s.tuckLeanMax : s.leanMax
       const targetLean = speed > .4
-        ? T.MathUtils.clamp(-steerInput * (speed / s.maxSpeed) * (omega / s.peakTurn) * s.leanMax, -s.leanMax, s.leanMax)
+        ? T.MathUtils.clamp(-steerInput * (speed / Math.max(1, capMs)) * (omega / s.peakTurn) * maxLean, -maxLean, maxLean)
         : 0
       lean = T.MathUtils.damp(lean, targetLean, s.leanDamp, cdt)
+
+      const shouldDrain = drainEnabledOverride ?? !isVerifySilentMode()
+      if (kind === 'bike' && cdt > 0 && shouldDrain) {
+        const driveFactor = uFwd > .05 ? uFwd : (uFwd < -.05 && prevSpeed <= .05) ? Math.abs(uFwd) * .55 : 0
+        const posAccel = Math.max(0, (speed - prevSpeed) / cdt - ebikeBatteryConfig.accelNoiseThreshold)
+        const speedRatio = (Math.abs(speed) * 3.6) / EBIKE_COMPLIANT_CAP_KMH
+        const leanNorm = Math.min(1.5, Math.abs(lean) / Math.max(.1, s.leanMax))
+        const activeLoad = driveFactor > 0
+          ? (ebikeBatteryConfig.cruiseDrainPerSec * gSpec!.drainScale
+            + ebikeBatteryConfig.speedAeroDrainPerSec * speedRatio * speedRatio
+            + ebikeBatteryConfig.accelDrainPerAccel * posAccel
+            + ebikeBatteryConfig.wheelieDrainPerSec * wheelieLoad
+            + ebikeBatteryConfig.cornerLeanDrainPerSec * leanNorm
+            + (tucking ? ebikeBatteryConfig.tuckDrainPerSec : 0)
+            + ebikeBatteryConfig.climbDrainPerSlope * climbSin) * driveFactor * profile.drainMul
+          : 0
+        const regen = braking && prevSpeed > 3 ? ebikeBatteryConfig.regenOnBrakePerSec : 0
+        drainPerSec = Math.max(0, (ebikeBatteryConfig.idleDrainPerSec + activeLoad - regen) / Math.max(.25, profile.capacityScale))
+        batteryPct = Math.max(0, batteryPct - drainPerSec * cdt)
+        maybeNotifyBattery(batteryStatusOf(batteryPct))
+      } else {
+        drainPerSec = 0
+      }
+
       return speed
     },
     setPitch(frontY: number | undefined, backY: number | undefined, dt: number) {
