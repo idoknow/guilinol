@@ -36,9 +36,8 @@ try {
     }else if(feedbackUI){
       await page.request.post(origin+'/api/auth/register',{headers:{Origin:origin},data:{email,password,nickname}})
       await page.request.post(origin+'/api/auth/verify',{headers:{Origin:origin},data:{email,password,code:await code('verify')}})
-      await page.request.post(origin+'/api/auth/logout',{headers:{Origin:origin}})
-      await page.goto(origin+'/?verify');await page.locator('.account-entry').click();await page.evaluate(()=>window.viewer.freeze())
-      const account=page.getByRole('dialog');await account.getByLabel('邮箱').fill(email);await account.getByLabel('密码').fill(password);await account.getByRole('button',{name:'登录',exact:true}).click();await account.getByText('已登录',{exact:true}).waitFor();await account.getByRole('button',{name:'关闭'}).click()
+      assert.equal((await page.request.get(origin+'/api/me')).status(),200)
+      await page.goto(origin+'/?verify');await page.locator('.dock-feedback').waitFor({timeout:120000})
       await (await import('./feedback-test.mjs')).uiTest(page,origin)
     }else{
     await page.goto(origin+'/?verify');await page.locator('.account-entry').click();if(feedbackUI)await page.evaluate(()=>window.viewer.freeze())

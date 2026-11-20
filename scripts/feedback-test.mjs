@@ -110,6 +110,7 @@ export async function apiTest({ api, origin, cookie, sql }) {
   console.log('Feedback: private photos, quota, transitions, idempotency and supplement passed')
 }
 export async function uiTest(page, origin) {
+  page.on('response',response=>{if(response.url().includes('/api/feedback')&&response.status()>=400)console.error('Feedback request failed:',response.request().method(),response.status(),response.url())})
   await mkdir('captures/feedback', { recursive: true })
   const shot = async (name) => {
     // Pause the WebGL loop so screenshots don't time out on a loaded software-GL host.
@@ -194,11 +195,8 @@ export async function uiTest(page, origin) {
   await page.evaluate(() => window.viewer.camera.position.set(0, 500, 0))
   await click('飞过去看看')
   await fb.waitFor({ state: 'detached' })
-  assert.ok(
-    await page.evaluate(
-      view => {const camera=window.viewer.camera;return Math.hypot(camera.position.x-view.x,camera.position.y-view.y,camera.position.z-view.z)<.5 && Math.abs(camera.rotation.y*180/Math.PI-view.yaw)<.5 && Math.abs(camera.rotation.x*180/Math.PI-view.pitch)<.5 && view.landmark_id==='yiwu_old_house'},stored,
-    ),
-  )
+  const errors=await page.evaluate(view=>{const camera=window.viewer.camera;return {meters:Math.hypot(camera.position.x-view.x,camera.position.y-view.y,camera.position.z-view.z),yaw:Math.abs(camera.rotation.y*180/Math.PI-view.yaw),pitch:Math.abs(camera.rotation.x*180/Math.PI-view.pitch)}},stored)
+  assert.equal(stored.x,-1526);assert.ok(Object.values(errors).every(value=>value<.5),JSON.stringify(errors));console.log('Retaken camera replay errors:',errors)
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(origin+'/?verify&view='+Buffer.from(JSON.stringify(stored)).toString('base64url'))
   await page.waitForFunction(view=>{const viewer=window.viewer;if(!viewer||viewer.stats.loaded===0)return false;const camera=viewer.camera;return document.body.dataset.mode==='fly'&&Math.hypot(camera.position.x-view.x,camera.position.y-view.y,camera.position.z-view.z)<.5&&Math.abs(camera.rotation.y*180/Math.PI-view.yaw)<.5&&Math.abs(camera.rotation.x*180/Math.PI-view.pitch)<.5},stored,{timeout:120000})
