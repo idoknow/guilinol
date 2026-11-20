@@ -109,14 +109,21 @@ try {
     w.tick = () => {}
   })
 
-  // 1. HUD baseline + gear switching + steady top speed per gear
+  // 1. HUD baseline + normal/shared badge & battery + gear switching
+  await page.evaluate(() => window.viewer.walk.ebike.setVehicleType('normal'))
+  await stepTicks(page, 1, 0.05)
   const hudInit = await page.evaluate(() => ({
     visible: getComputedStyle(document.querySelector('.ride-hud')).display !== 'none',
+    type: document.querySelector('.ride-type')?.textContent,
     gear: document.querySelector('.ride-gear')?.textContent,
     speed: document.querySelector('.ride-speed')?.textContent,
+    bat: document.querySelector('.ride-bat-pct')?.textContent,
     mod: document.querySelector('.ride-mod')?.textContent,
   }))
-  assert(hudInit.visible && hudInit.gear === 'D2' && hudInit.mod === '素车', `Bad init HUD: ${JSON.stringify(hudInit)}`)
+  assert(
+    hudInit.visible && hudInit.type === '电摩' && hudInit.gear === 'D2' && hudInit.bat === '100%' && hudInit.mod === '素车',
+    `Bad init HUD: ${JSON.stringify(hudInit)}`,
+  )
 
   // Move smoothly onto clear Jiefang East Road (-511,-70) before running speed/coast/stunt checks
   await steerTowardPoint(page, -511, -70, false, 60)
@@ -286,7 +293,7 @@ try {
   await page.keyboard.up('KeyA')
   await page.keyboard.up('KeyW')
 
-  // 7. Mod cycle KeyG + HUD click + clean dismount KeyF
+  // 7. Mod cycle KeyG + HUD click + battery/shared distinction + compliant D2 reset on remount + clean dismount KeyF
   await page.keyboard.press('KeyG')
   await stepTicks(page, 1, 0.05)
   const modAfterG = await page.locator('.ride-mod').textContent()
@@ -296,11 +303,37 @@ try {
   assert(modAfterG !== modAfterClick, `Mod cycle failed: ${modAfterG} -> ${modAfterClick}`)
   await page.screenshot({path: `${SHOTS_DIR}/mod-neon.png`})
 
+  // Battery HUD critical state + shared vehicle mode hiding mod slots
+  await page.evaluate(() => window.viewer.walk.ebike.setBattery(10))
+  await stepTicks(page, 1, 0.05)
+  const lowBatState = await page.locator('.ride-state').textContent()
+  assert(lowBatState?.includes('极低电'), `Expected critical battery warning at 10%, got ${lowBatState}`)
+  await page.evaluate(() => window.viewer.walk.ebike.setBattery(100))
+  await page.evaluate(() => window.viewer.walk.ebike.setVehicleType('shared'))
+  await stepTicks(page, 1, 0.05)
+  const sharedHud = await page.evaluate(() => ({
+    type: document.querySelector('.ride-type')?.textContent,
+    modHidden: getComputedStyle(document.querySelector('.ride-mod')).display === 'none',
+  }))
+  assert(sharedHud.type === '共享' && sharedHud.modHidden, `Shared HUD check failed: ${JSON.stringify(sharedHud)}`)
+  await page.evaluate(() => window.viewer.walk.ebike.setVehicleType('normal'))
+  await page.keyboard.press('Digit4')
+  await stepTicks(page, 1, 0.05)
+  assert((await page.locator('.ride-gear').textContent()) === 'S', 'Expected gear S before dismount')
+
   await page.keyboard.press('KeyF')
   const dismountSnap = await stepTicks(page, 12, 0.05)
   const hudHiddenAfterDismount = await page.evaluate(() => getComputedStyle(document.querySelector('.ride-hud')).display === 'none')
   assert(dismountSnap.vehicle === 'foot' && hudHiddenAfterDismount, `Dismount failed: vehicle=${dismountSnap.vehicle}, hudHidden=${hudHiddenAfterDismount}`)
   assert(!dismountSnap.probe.inHouse && !dismountSnap.probe.wet, 'Dismount landed inside house or water')
+
+  // Remount verifies compliant D2 (<=25 km/h) reset
+  await page.keyboard.press('KeyF')
+  await stepTicks(page, 18, 0.05)
+  const remountGear = await page.locator('.ride-gear').textContent()
+  assert(remountGear === 'D2', `Expected compliant D2 reset on remount, got ${remountGear}`)
+  await page.keyboard.press('KeyF')
+  await stepTicks(page, 12, 0.05)
 
   const physicsChecks = {
     gearTopSpeedScaling: gearResults.S.peakKmh > gearResults.D3.peakKmh && gearResults.D3.peakKmh > gearResults.D2.peakKmh && gearResults.D2.peakKmh > gearResults.D1.peakKmh,
