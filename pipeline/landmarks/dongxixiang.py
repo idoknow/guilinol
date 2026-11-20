@@ -31,24 +31,29 @@ def frontage(model):
     origin = np.array(ll2xz(*reversed(landmarks['dongxixiang']['anchor'])))
     replaced = Polygon([np.array(ll2xz(*reversed(point)))-origin for point in landmarks['wangcheng_market']['replace']['polygon']])
     path=[(21.67,-121.76),(13.12,-58.68),(0,0),(37.8,7.3),(47.2,9.8)]
-    for first,last in zip(path,path[1:]):
+    for segment,(first,last) in enumerate(zip(path,path[1:])):
         dx,dz=np.subtract(last,first);length=math.hypot(dx,dz);angle=math.atan2(-dx,dz)
-        count=max(1,round(length/10));width=length/count
+        count=max(1,round(length/10));pitch=length/count
         for bay in range(count):
-            frac=(bay+.5)/count;model.pose=(first[0]+dx*frac,0,first[1]+dz*frac,angle)
+            entry_clearance=4.9 if segment==0 and bay==0 else 0
+            width=pitch-entry_clearance
+            frac=(bay+.5)/count+entry_clearance/(2*length)
+            model.pose=(first[0]+dx*frac,0,first[1]+dz*frac,angle)
             model.box(0,0,0,4.5,.17,width+.12,'pave',True)
             for side in (-1,1):
                 east=side*6.4; high=6.1+(bay%3==1)*2.9
                 corners=[(model.pose[0]+xx*math.cos(angle)-zz*math.sin(angle),model.pose[2]+xx*math.sin(angle)+zz*math.cos(angle)) for xx in (east-3.9,east+3.9) for zz in (-width/2,width/2)]
                 if replaced.intersection(Polygon(corners).convex_hull).area>.01:continue
-                model.box(east,3,0,6.5,high-3,width-.16,'brick',True)
-                model.box(side*6.97,0,0,5.36,3,width-.16,'brick',True)
-                model.roof(east,high,0,7.8,width,1.8)
+                setback=(3.7-.13*bay) if segment==0 and side==-1 else 0
+                east-=side*setback/2
+                model.box(east,3,0,6.5-setback,high-3,width-.16,'brick',True)
+                model.box(side*(6.97-setback/2),0,0,5.36-setback,3,width-.16,'brick',True)
+                model.roof(east,high,0,7.8-setback,width,1.8)
                 model.box(side*2.9,3.15,0,1.7,.35,width,'wood')
                 if not model.detail:continue
                 for end in (-1,1):
-                    model.box(east,high,end*(width/2-.16),6.8,.75,.3,'brick')
-                    for lift in range(3):model.box(east,high+.7+lift*.43,end*(width/2-.16),6-lift*1.6,.47,.32,'brick')
+                    model.box(east,high,end*(width/2-.16),6.8-setback,.75,.3,'brick')
+                    for lift in range(3):model.box(east,high+.7+lift*.43,end*(width/2-.16),(6-lift*1.6)*(1-setback/6.8),.47,.32,'brick')
                 for cell in range(3):
                     zz=(cell-1)*width/3
                     model.box(side*3.66,0,zz-width/6+.19,1.22,3,.31,'brick',True)
@@ -68,7 +73,8 @@ def frontage(model):
                         model.box(side*3.1,6.75,zz,.24,1.6,2.25,'glass')
                         for bar in (-.8,0,.8):model.box(side*2.93,6.75,zz+bar,.12,1.6,.12,'wood')
                 for zz in (-.85,0,.85):lantern(model,side*2.18,zz)
-    model.pose=(21.67,0,-123,.14)
+    entry_angle=math.atan2(path[0][0]-path[1][0],path[1][1]-path[0][1])
+    model.pose=(path[0][0]-3.7*math.sin(entry_angle),0,path[0][1]+3.7*math.cos(entry_angle),entry_angle)
     for east in (-5.25,-2.35,2.35,5.25):
         top=6.25 if abs(east)<3 else 4.97
         model.box(east,0,0,.65,top,.72,'white',True);model.box(east,0,0,1.1,.5,1.2,'granite',True)

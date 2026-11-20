@@ -11,9 +11,10 @@ from common import CHUNK, ll2xz, load_osm
 from features import points, polygons, rongyin_photo, rongyin_sidewalk
 from scatter import CONFIG, walk_line
 from sections import section_layers, clipped, speed_paint, yiwu_frontage, RULES
+from dongxi_streets import street_surface
 
 
-def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None,gate_plaza=None):
+def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None,gate_plaza=None,walkable_by_way=None):
     if bands is None:
         bands = section_layers(roads)
     surfaces, sidewalks, stripes, medians, gaps = [],[],[],[],[]
@@ -103,7 +104,9 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         if not line.intersects(bounds):
             continue
         lengths['road']+=line.intersection(bounds).length
-        surf_poly = road.pavement
+        surf_poly = street_surface(road)
+        if kind == 'pedestrian' and walkable_by_way and road.way in walkable_by_way:
+            surf_poly = surf_poly.difference(walkable_by_way[road.way])
         if kind == 'pedestrian' and not rep_excl.is_empty:
             surf_poly = surf_poly.difference(rep_excl)
         # Stone pedestrian approaches around Gunanmen and the north bank of Ronghu.

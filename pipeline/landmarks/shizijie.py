@@ -25,6 +25,9 @@ import numpy as np
 
 from c_kit import landmark_surface
 from nikoniko import Builder, export_landmark
+from shizijie_layout import KIOSK_CENTER, islands
+from shapely.affinity import scale
+from shapely.geometry import box
 
 
 NW_NANFANG = [
@@ -190,35 +193,24 @@ def build_shizijie(m: Builder):
     # 1. Four corner channelizing refuge islands + sidewalks + guardrails
     # (Center of intersection around (0, 0) is completely clear asphalt.)
     # ------------------------------------------------------------------
-    islands = [
-        # NW refuge island (between Jiefang W & Zhongshan N)
-        [(-25.5, -18.5), (-14.5, -34.0), (-29.5, -30.5)],
-        # NE refuge island (between Zhongshan N & Jiefang E, with police booth)
-        [(23.5, -8.5), (42.5, -4.5), (34.0, -24.5)],
-        # SE refuge island (between Jiefang E & Zhongshan S)
-        [(8.5, 22.5), (27.5, 16.5), (18.5, 38.0)],
-        # SW refuge apron tip (leading toward Weixiaotang corner)
-        [(-34.5, -3.5), (-21.0, 16.5), (-37.5, 11.5)],
-    ]
     m.follow_grade = True
-    for tri in islands:
-        m.prism(tri, -.04, .19, 'pave', collide=True, cap_mat='pave')
-        cx = sum(p[0] for p in tri) / 3.0
-        cz = sum(p[1] for p in tri) / 3.0
-        shrunk = [(cx + (p[0] - cx) * 0.58, cz + (p[1] - cz) * 0.58) for p in tri]
-        m.prism(shrunk, 0.15, 0.52, 'beige', collide=True, cap_mat='hedge')
-        inner_red = [(cx + (p[0] - cx) * 0.36, cz + (p[1] - cz) * 0.36) for p in tri]
-        m.prism(inner_red, 0.67, 0.14, 'red', collide=False, cap_mat='red')
+    for corner, island in enumerate(islands()):
+        for ratio, base, height, wall, cap, solid in (
+            (1, -.04, .19, 'pave', 'pave', True),
+            (.58, .15, .52, 'beige', 'hedge', True),
+            (.36, .67, .14, 'red', 'red', False),
+        ):
+            shape = island.intersection(scale(island, ratio, ratio, origin='centroid'))
+            if corner == 1 and ratio < 1:
+                shape = shape.intersection(box(*island.bounds[:2], 24.5, island.bounds[3]))
+            for part in getattr(shape, 'geoms', [shape]):
+                m.prism(list(part.exterior.coords), base, height, wall, collide=solid, cap_mat=cap)
 
     # Decorative median & bike-lane guardrails on all 4 arterial legs
-    _guardrail_run(m, (6.5, -21.5), (16.5, -54.0))
-    _guardrail_run(m, (-8.5, 22.5), (-19.5, 56.0))
-    _guardrail_run(m, (-26.0, -5.5), (-106.0, -21.5))
-    _guardrail_run(m, (24.0, 5.5), (62.0, 14.5))
-    # Continuous clipped green median hedge along West Jiefang Rd + low north sidewalk shrub & wrought-iron rail (IMG_1385, 1386!)
-    m.poly_wall_strip([(-38.0, -7.9), (-106.0, -21.5)], -.08, .73, 1.35, 'hedge', collide=True, cap_mat='hedge')
-    m.poly_wall_strip([(-48.0, -25.2), (-104.0, -35.8)], -.12, .54, .78, 'hedge', collide=True, cap_mat='hedge')
-    m.poly_wall_strip([(-48.0, -24.8), (-104.0, -35.4)], .38, .22, .06, 'dark', collide=False, cap_mat='dark')
+    _guardrail_run(m, (6.4, -21.53), (15.76, -51.94))
+    _guardrail_run(m, (7.8, 31.1), (14.0, 27.3))
+    _guardrail_run(m, (-32.0, 19.9), (-29.8, 23.8))
+    _guardrail_run(m, (24.3, -12.0), (28.9, -5.1))
 
     # Colored red/yellow non-motorized waiting pavements & zebra crosswalks on 4 approaches
     _colored_crosswalk_approach(m, 9.8, -32.0, yaw=math.atan2(-10.0, 32.0) + math.pi, road_w=23.0)
@@ -227,16 +219,16 @@ def build_shizijie(m: Builder):
     _colored_crosswalk_approach(m, 36.0, 8.2, yaw=math.atan2(36.0, 8.2), road_w=22.0)
 
     # Four cantilevered traffic signal gantries + blue direction signs
-    _signal_gantry(m, 22.0, -26.5, yaw=math.atan2(-10.0, 32.0) + math.pi, span=8.8, sign_mode=0)
-    _signal_gantry(m, -24.5, 28.0, yaw=math.atan2(-10.0, 32.0), span=8.8, sign_mode=1)
-    _signal_gantry(m, -33.5, -19.5, yaw=math.atan2(-38.0, -7.8), span=8.2, sign_mode=2)
-    _signal_gantry(m, 31.5, 19.5, yaw=math.atan2(36.0, 8.2), span=8.2, sign_mode=3)
+    _signal_gantry(m, 26.5, -27.5, yaw=math.atan2(-10.0, 32.0) + math.pi, span=8.8, sign_mode=0)
+    _signal_gantry(m, -29.5, 24, yaw=math.atan2(-10.0, 32.0), span=8.8, sign_mode=1)
+    _signal_gantry(m, -32.5, -23.5, yaw=math.atan2(-38.0, -7.8), span=8.2, sign_mode=2)
+    _signal_gantry(m, 33.5, 28, yaw=math.atan2(36.0, 8.2), span=8.2, sign_mode=3)
 
     # Roadside large municipal blue direction sign on south approach east sidewalk (bing_10.jpg right)
-    _roadside_direction_sign(m, 1.2, 46.0, yaw=math.atan2(-17.3, 46.5), sign_key='road_szj_ns')
+    _roadside_direction_sign(m, 4.7, 46.5, yaw=math.atan2(-17.3, 46.5), sign_key='road_szj_ns')
 
     # NE Corner '桂林交警' blue-and-white police kiosk
-    m.pose = (32.5, 0.15, -13.5, -0.55)
+    m.pose = (KIOSK_CENTER[0], 0.15, KIOSK_CENTER[1], -0.55)
     m.box(0, 0.0, 0, 3.4, 2.85, 2.8, 'white', collide=True)
     m.box(0, 0.95, 1.42, 2.6, 1.25, 0.08, 'glass')
     m.box(0, 0.0, 1.41, 2.8, 0.88, 0.08, 'red')
@@ -313,9 +305,9 @@ def build_shizijie(m: Builder):
     # Sidewalk camphor street trees & multi-globe lamps around the 3 corners + south median shrubs
     # North sidewalk along Nanfang Mansion frames IMG_1385 (-77.65, -34.27) & IMG_1386 (-63.05, -36.17)!
     for tx, tz, th, tsp in (
-        (-92.0, -29.2, 10.5, 4.4),
-        (-79.6, -28.8, 12.2, 4.5),  # left trunk framing IMG_1385 (~26% frame width)!
-        (-76.1, -28.2, 12.4, 4.6),  # right trunk framing IMG_1385 (~62% frame width)!
+        (-91.29, -33.17, 10.5, 4.4),
+        (-79.21, -30.99, 12.2, 4.5),  # left trunk framing IMG_1385 (~26% frame width)!
+        (-75.07, -29.78, 12.4, 4.6),  # right trunk framing IMG_1385 (~62% frame width)!
         (-66.5, -31.8, 10.8, 4.4),  # canopy framing IMG_1386!
         (-59.5, -32.8, 10.4, 4.2),
         (-48.5, -30.8, 8.8, 3.6),
@@ -331,11 +323,11 @@ def build_shizijie(m: Builder):
             m.cluster_lamp(lx, 0.08, lz, height=7.0, globes=5, collide=True)
         # Flowering crape-myrtle median strip on south approach (bing_10.jpg foreground)
         for t in np.linspace(0.08, 0.92, 6):
-            sx = -8.5 + (-19.5 - (-8.5)) * t
-            sz = 22.5 + (56.0 - 22.5) * t
+            sx = 11.8 + 4.0 * t
+            sz = 26.5 - 1.5 * t
             m.cylinder_y(sx, 0.10, 0.72, sz, 0.85, 'hedge', sections=7)
             m.cylinder_y(sx, 0.82, 0.55, sz, 0.72, 'red', sections=7)
 
 
 if __name__ == '__main__':
-    export_landmark('shizijie', build_shizijie)
+    export_landmark('shizijie', build_shizijie, reuse_atlas=True)

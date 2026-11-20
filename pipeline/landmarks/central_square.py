@@ -319,9 +319,9 @@ def build_central_square(m: Builder):
     # ------------------------------------------------------------------
     hcx, hcz = _ax_pt(-54.0, -76.0)
     m.pose = (hcx, 0.0, hcz, AXIS_YAW + math.pi / 2.0)
-    m.box(0, -2.0, 0, 56.0, 22.8, 16.5, 'wood', collide=True, footing=True)
+    m.box(0, -2.0, 3.5, 56.0, 22.8, 9.5, 'wood', collide=True, footing=True)
     m.box(0, 4.5, 8.35, 52.0, 14.8, 0.28, 'glass')
-    m.box(0, 20.8, 0, 57.2, 1.8, 17.4, 'roof')
+    m.box(0, 20.8, 3.5, 57.2, 1.8, 10.4, 'roof')
     if m.detail:
         for px in np.linspace(-24.0, 24.0, 9):
             m.box(px, 0.0, 8.45, 0.75, 20.8, 0.45, 'dark')
@@ -337,4 +337,4 @@ def build_central_square(m: Builder):
 
 
 if __name__ == '__main__':
-    export_landmark('central_square', build_central_square)
+    export_landmark('central_square', build_central_square, reuse_atlas=True)

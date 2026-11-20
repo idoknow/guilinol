@@ -2,6 +2,7 @@
 
 import argparse
 from collections import defaultdict
+from functools import lru_cache
 import gzip
 import json
 import math
@@ -9,14 +10,12 @@ import os
 from pathlib import Path
 import re
 import struct
-import subprocess
-import tempfile
 
 import numpy as np
-from shapely import STRtree, contains_xy, union_all
+from shapely import STRtree, build_area, contains_xy, union_all
 from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import nearest_points, polygonize, unary_union
-import trimesh
+from landmark_solids import load_landmark_meshes, structural_footprint, slice_tris_at_y, solid_projection
 
 from landmarks.jiefang_layout import SPAN_WAYS, world_road_sections
 from common import CHUNK, GRID, OUT, load_osm, xz2ll
@@ -35,33 +34,6 @@ def read_tile_metres(root: Path) -> dict[str, float]:
             k, v = pair.split(':', 1)
             out[k.strip()] = float(v.strip())
     return out
-
-
-def slice_tris_at_y(tris: np.ndarray, y_plane: float):
-    segs = []
-    for tri in tris:
-        ys = tri[:, 1] - y_plane
-        if (ys > 0).all() or (ys < 0).all():
-            continue
-        pts = []
-        for i in range(3):
-            j = (i + 1) % 3
-            y1, y2 = ys[i], ys[j]
-            if (y1 <= 0 < y2) or (y2 <= 0 < y1):
-                t = -y1 / (y2 - y1)
-                p = tri[i] + t * (tri[j] - tri[i])
-                pts.append((float(p[0]), float(p[2])))
-            elif abs(y1) < 1e-6:
-                pts.append((float(tri[i][0]), float(tri[i][2])))
-        if len(pts) >= 2 and (pts[0][0] - pts[1][0]) ** 2 + (pts[0][1] - pts[1][1]) ** 2 > 1e-8:
-            segs.append(LineString([pts[0], pts[1]]))
-    if not segs:
-        return Polygon()
-    merged = unary_union(segs)
-    polys = list(polygonize(merged))
-    if polys:
-        return unary_union(polys).buffer(0)
-    return merged.buffer(0.05)
 
 
 def uv_stretch_ratio(p0: np.ndarray, p1: np.ndarray, p2: np.ndarray,
@@ -109,56 +81,6 @@ def make_issue(subtype: str, x: float, z: float, value: float, detail: str = '',
         rec['detail'] = detail
     rec.update(extra)
     return rec
-
-
-def load_landmark_meshes(root: Path, manifest: dict):
-    gltfpack = os.getenv('GLTFPACK') or 'gltfpack'
-    out = {}
-    for lm in manifest.get('landmarks', []):
-        glb = root / 'public' / lm['file']
-        if not glb.exists():
-            continue
-        px, py, pz = lm['position']
-        rot = math.radians(lm.get('rotation', 0.0))
-        cs, sn = math.cos(rot), math.sin(rot)
-        T = np.array([[cs, 0, sn, px], [0, 1, 0, py], [-sn, 0, cs, pz], [0, 0, 0, 1]], dtype=float)
-        with tempfile.NamedTemporaryFile(suffix='.glb') as tmp:
-            subprocess.run([gltfpack, '-i', str(glb), '-o', tmp.name, '-kn'], check=True, capture_output=True)
-            sc = trimesh.load_scene(tmp.name)
-            edges = {child: parent for parent, child, _ in sc.graph.to_edgelist()}
-            coll_tris, vis_tris = [], []
-            coll_normals, vis_normals = [], []
-            for node in sc.graph.nodes_geometry:
-                cur = node
-                in_coll, in_lod12 = False, False
-                while cur and cur != sc.graph.base_frame:
-                    nm = str(cur).lower()
-                    if nm.startswith('collision'):
-                        in_coll = True
-                    if nm in ('lod1', 'lod2'):
-                        in_lod12 = True
-                    cur = edges.get(cur)
-                if in_lod12:
-                    continue
-                mat, gname = sc.graph[node]
-                g = sc.geometry[gname].copy()
-                g.apply_transform(T @ mat)
-                tris = g.vertices[g.faces]
-                norms = g.face_normals
-                if in_coll:
-                    coll_tris.append(tris)
-                    coll_normals.append(norms)
-                else:
-                    vis_tris.append(tris)
-                    vis_normals.append(norms)
-            out[lm['id']] = {
-                'entry': lm,
-                'coll_tris': np.concatenate(coll_tris, axis=0) if coll_tris else np.zeros((0, 3, 3)),
-                'coll_normals': np.concatenate(coll_normals, axis=0) if coll_normals else np.zeros((0, 3)),
-                'vis_tris': np.concatenate(vis_tris, axis=0) if vis_tris else np.zeros((0, 3, 3)),
-                'vis_normals': np.concatenate(vis_normals, axis=0) if vis_normals else np.zeros((0, 3)),
-            }
-    return out
 
 
 def apply_landmark_exceptions(rules, *categories):
@@ -969,32 +891,24 @@ def run_audit(world_dir: Path, root: Path) -> dict:
 
     # 4e. Landmark-Landmark and Landmark-ProceduralBuilding overlaps (> 0.5 m²)
     u_proc = unary_union(proc_bldg_polys) if proc_bldg_polys else Polygon()
-    lm_struct_polys = {}
-    for lid, ldata in landmarks.items():
-        vtris = ldata['vis_tris']
-        py = ldata['entry']['position'][1]
-        if not len(vtris):
-            lm_struct_polys[lid] = Polygon()
-            continue
-        above = vtris[vtris[:, :, 1].max(axis=1) > py + 0.6]
-        tpolys = [Polygon(t[:, [0, 2]]) for t in above if Polygon(t[:, [0, 2]]).is_valid and Polygon(t[:, [0, 2]]).area > 1e-3]
-        lm_struct_polys[lid] = union_all(tpolys, grid_size=.01).buffer(0) if tpolys else Polygon()
-
-    lids = list(lm_struct_polys.keys())
+    from landmarks.world_surface import Surface
+    surface = Surface(root/'public/world')
+    @lru_cache(maxsize=262144)
+    def ground(east,south):
+        return surface.sample(east,south)[0]
+    solids = {lid: structural_footprint(data,ground,lm_block_footprints.get(lid,Polygon()))
+              for lid,data in landmarks.items()}
+    lids = list(solids)
     for i, lid_a in enumerate(lids):
-        pa = lm_struct_polys[lid_a]
-        if pa.is_empty:
-            continue
-        inter_p = pa.intersection(u_proc)
+        inter_p = solids[lid_a].intersection(u_proc)
         if inter_p.area > 0.5:
             rp = inter_p.representative_point()
             other_issues.append(make_issue('landmarkOverlap', rp.x, rp.y, inter_p.area,
                                            f'Landmark {lid_a} overlaps procedural buildings by {inter_p.area:.1f} m²', landmark=lid_a))
         for lid_b in lids[i + 1:]:
-            pb = lm_struct_polys[lid_b]
-            if pb.is_empty:
+            if solids[lid_a].is_empty or solids[lid_b].is_empty:
                 continue
-            inter_ll = pa.intersection(pb)
+            inter_ll = solids[lid_a].intersection(solids[lid_b])
             if inter_ll.area > 0.5:
                 rp = inter_ll.representative_point()
                 other_issues.append(make_issue('landmarkOverlap', rp.x, rp.y, inter_ll.area,

@@ -30,6 +30,7 @@ import sys
 
 import numpy as np
 from shapely import STRtree
+from shapely.affinity import translate
 from shapely.geometry import LineString, Point, box
 from shapely.ops import unary_union
 
@@ -39,6 +40,7 @@ from features import points  # noqa: E402
 from road_profile import RULES, pair_carriageways, profile  # noqa: E402
 
 from c_kit import landmark_surface
+from shizijie_layout import surfaces
 from nikoniko import Builder, export_landmark  # noqa: E402
 
 
@@ -384,9 +386,11 @@ def build_zhongshan_road(m: Builder):
         bus_pullin_zones.append(pt.buffer(11.5))
 
     divider_mask = unary_union([junc_mask, *bus_pullin_zones])
+    road_surface, sidewalk = surfaces('zhongshan_road', 260)
+    paved = translate(road_surface.union(sidewalk), AX, AZ)
 
     # Central green median along exact midpoint between east & west paired carriageways
-    median_raw = east_road.line.offset_curve(-(east_road.width / 2.0 + 0.40)).intersection(corridor_clip).difference(junc_mask)
+    median_raw = east_road.line.offset_curve(-(east_road.width / 2.0 + 0.40)).intersection(corridor_clip).difference(junc_mask).difference(paved.buffer(.85))
     for seg in _iter_lines(median_raw):
         _median_curve(m, seg)
 
@@ -394,7 +398,7 @@ def build_zhongshan_road(m: Builder):
     # offset = road.width * ((road.lanes - 1) / road.lanes - 0.5)
     for road in [east_road, *west_roads]:
         divider_offset = road.width * ((road.lanes - 1) / float(road.lanes) - 0.5)
-        div_raw = road.line.offset_curve(divider_offset).intersection(corridor_clip).difference(divider_mask)
+        div_raw = road.line.offset_curve(divider_offset).intersection(corridor_clip).difference(divider_mask).difference(paved.buffer(.50))
         for seg in _iter_lines(div_raw):
             _planter_divider_curve(m, seg)
 
@@ -431,4 +435,4 @@ def build_zhongshan_road(m: Builder):
 
 
 if __name__ == '__main__':
-    export_landmark('zhongshan_road', build_zhongshan_road)
+    export_landmark('zhongshan_road', build_zhongshan_road, reuse_atlas=True)

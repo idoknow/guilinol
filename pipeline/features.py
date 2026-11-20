@@ -146,13 +146,13 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
     sw_tree = STRtree(list(polygons(sidewalk_mask))) if sidewalk_mask and not sidewalk_mask.is_empty else None
     kinds = Counter()
     removed_road, clipped_road, clipped_sw = 0, 0, 0
-    def clipped_footprints(raw_poly, carries_landmark_roof=False):
+    def clipped_footprints(raw_poly):
         nonlocal removed_road, clipped_road, clipped_sw
         orig_area = raw_poly.area
         if orig_area < 4.0:
             return []
         cand_polys = [raw_poly]
-        if not carries_landmark_roof and not model_excl.is_empty and raw_poly.intersects(model_excl):
+        if not model_excl.is_empty and raw_poly.intersects(model_excl):
             diff_m = make_valid(raw_poly.difference(model_excl))
             if diff_m.is_empty or (orig_area - diff_m.area) / orig_area > 0.40:
                 return []
@@ -197,8 +197,7 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
         palace.append(poly)
         if ident in custom:
             continue
-        # The GL04 walls of these annexes carry the roofs in wangcheng_teaching.glb.
-        for footprint in clipped_footprints(poly, carries_landmark_roof=ident in (679734418,679734455,679734456)):
+        for footprint in clipped_footprints(poly):
             center = footprint.representative_point()
             base = elevation(center.x, center.y)
             floors = int(props['floors'])

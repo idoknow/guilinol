@@ -90,7 +90,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         const vertices=new Float32Array(pos.count*3),point=new THREE.Vector3()
         for(let index=0;index<pos.count;index++)point.fromBufferAttribute(pos,index).applyMatrix4(node.matrixWorld).toArray(vertices,3*index)
         const triCount=rawIdx?rawIdx.length/3:pos.count/3,filtered:number[]=[],slabCap=root.position.y+.22
-        const keepLowSlab=/bridge|huaqiao|ronghu|mulong/.test(entry.id)
+        const keepLowSlab=parent.name==='collision_stairs'||/bridge|huaqiao|ronghu|mulong/.test(entry.id)
         for(let t=0;t<triCount;t++){
           const i0=rawIdx?rawIdx[t*3]:t*3,i1=rawIdx?rawIdx[t*3+1]:t*3+1,i2=rawIdx?rawIdx[t*3+2]:t*3+2
           const y0=vertices[i0*3+1],y1=vertices[i1*3+1],y2=vertices[i2*3+1],hi=Math.max(y0,y1,y2)

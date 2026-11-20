@@ -1,5 +1,9 @@
 import unittest
 
+import trimesh
+from shapely.geometry import Polygon
+from audit import structural_footprint
+
 from shapely.affinity import rotate, translate
 from shapely.geometry import LineString, box
 
@@ -9,6 +13,29 @@ from common import xz2ll
 
 
 class LandmarkMetricsTest(unittest.TestCase):
+    def test_visible_courtyard_is_not_a_solid_floor(self):
+        ring = box(0,0,8,8).difference(box(1,1,7,7))
+        walls = trimesh.creation.extrude_polygon(ring,3,engine='earcut')
+        walls.apply_transform(trimesh.transformations.rotation_matrix(-1.5707963267948966,[1,0,0]))
+        solid = structural_footprint(dict(vis_tris=walls.triangles,vis_normals=walls.face_normals,
+                                          coll_tris=[]),lambda east,south:0, Polygon())
+        self.assertAlmostEqual(solid.area,ring.area)
+
+    def test_solid_overlap_excludes_crowns_and_paving_but_keeps_visible_walls(self):
+        def cuboid(center, size):
+            return trimesh.creation.box(size).apply_translation(center)
+        wall = cuboid([0, 12, 0], [4, 4, 2])
+        crown = cuboid([0, 17, 0], [12, 3, 10])
+        paving = cuboid([0, 10.1, 0], [15, .2, 15])
+        post = cuboid([5, 11, 0], [1, 2, 1])
+        visible = trimesh.util.concatenate([wall,crown,paving])
+        data = dict(vis_tris=visible.triangles, vis_normals=visible.face_normals,
+                    coll_tris=trimesh.util.concatenate([post,paving]).triangles)
+        solid = structural_footprint(data, lambda east,south:10, Polygon())
+        self.assertAlmostEqual(solid.intersection(box(-2,-1,2,1)).area,8)
+        self.assertAlmostEqual(solid.intersection(box(4,-1,6,1)).area,1)
+        self.assertAlmostEqual(solid.area,9)
+
     def test_schematic_boundary_requires_both_distance_and_parallelism(self):
         def geometry(coords):
             return [dict(zip(('lat','lon'),xz2ll(*point))) for point in coords]

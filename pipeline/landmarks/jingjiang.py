@@ -193,7 +193,8 @@ class Model:
             spring=height*.32
             for angle1,angle2 in zip(np.linspace(0,math.pi,13)[:-1],np.linspace(0,math.pi,13)[1:]):
                 a,b=center+radius*math.cos(angle1),center+radius*math.cos(angle2)
-                low,high=spring+radius*math.sin(angle1),spring+radius*math.sin(angle2)
+                rise=min(radius,height-spring-.45)
+                low,high=spring+rise*math.sin(angle1),spring+rise*math.sin(angle2)
                 verts=[(px,py,z+side*depth/2) for side in (-1,1) for px,py in ((a,low),(b,high),(b,height),(a,height))]
                 self.mesh(verts,[[0,1,2],[0,2,3],[4,6,5],[4,7,6],[0,4,5],[0,5,1],[3,2,6],[3,6,7]],color,True)
             cursor=center+radius
@@ -245,6 +246,8 @@ def generate(name,build,colors=None):
             if lod==0:
                 for triangles in template.solid:model.solid.append(triangles@matrix[:3,:3].T+matrix[:3,3])
         if lod==0 and model.solid:scene.add_geometry(packed(model.solid),node_name='collision_surface')
+        if lod==0 and getattr(model,'stair_collision',None):
+            scene.add_geometry(packed(model.stair_collision),node_name='collision_stairs')
     scene.export(Path(sys.argv[1])/f'{name}.glb')
 
 
@@ -295,10 +298,20 @@ def gate_furniture(m,plan_surface):
     m.beam([-2.8,0,-153.8],[-2.8,2.9,-153.8],.045,'wood',6)
     rim=[[-2.8+1.95*math.cos(i*math.pi/4),2.55,-153.8+1.95*math.sin(i*math.pi/4)] for i in range(8)]
     m.mesh([[-2.8,3.08,-153.8],*rim],[[0,i+1,(i+1)%8+1] for i in range(8)],'yellow')
-    for n in range(8):
-        m.foundation(plan_surface,-8,.15,-38-n*.94,.82,1.9,.9,'yellow')
-        for y in (.28,1.15):
-            m.box(-7.59,y,-38-n*.94,.04,.73,.79,'white')
+    dx,dy,dz,angle=m.pose
+    cosine,sine=math.cos(angle),math.sin(angle)
+    for index in range(8):
+        center=-38-index*.94
+        corners=[(-8.41,center-.45),(-7.59,center-.45),(-7.59,center+.45),(-8.41,center+.45)]
+        base=[[x,plan_surface.ground(dx+cosine*x-sine*z,dz+sine*x+cosine*z)-dy-.04,z] for x,z in corners]
+        for height,display in ((.28,False),(1.01,True),(1.15,False),(1.88,True),(2.05,False)):
+            upper=[[x,height,z] for x,z in corners]
+            for edge in range(4):
+                end=(edge+1)%4
+                m.mesh([base[edge],upper[edge],upper[end],base[end]],[[0,1,2],[0,2,3]],
+                       'white' if display and edge==1 else 'yellow',True)
+            base=upper
+        m.mesh(base,[[0,2,1],[0,3,2]],'yellow',True)
 
 
 def palace(m):
@@ -397,8 +410,9 @@ def palace(m):
         banyan(m,side*23,-136,37+side)
         for i,z in enumerate((-173,-214,-236)):
             banyan(m,side*25,z,i+43+side)
-        m.pose=(0,plan.ground(142,-121+side*10),0,0)
-        banyan(m,142,-121+side*10,56+side)
+        verge_z = -121+side*14
+        m.pose=(0,plan.ground(142,verge_z),0,0)
+        banyan(m,142,verge_z,56+side)
         m.pose=(0,0,0,0)
     m.box(0,-.45,-123,71,.59,48,'pave',True)
     for side in (-1,1):
@@ -438,7 +452,10 @@ def palace(m):
     m.box(0,6.2,-22.55,6.1,1.4,.25,'granite')
     letters(m,'三元及第',(0,6.42,-22.7),5.15,.86,'wood',facing=-1)
     if m.detail:
-        for step in range(33):m.box(-24-step*.5,0,-3, .52,(33-step)*.197,3,'stone',True)
+        landing = plan.ground(-40.25,-3)
+        for step in range(33):
+            tread = landing + (6.5-landing)*(33-step)/33
+            m.foundation(plan.surface,-24-step*.5,0,-3,.52,tread,3,'stone')
 
 
 if __name__=='__main__': generate('jingjiang', palace)

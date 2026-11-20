@@ -84,8 +84,16 @@ def libin_levels(points):
 def widths(way):
     if way in RAMPS:
         opposite=LineString(OSM[RAMPS[RAMPS.index(way)^1]])
-        inside=np.array([min(4,opposite.distance(Point(p))/2-.08) for p in section(way)[0]])
-        return -inside,8-inside,2.5
+        axis, normals, _, _ = section(way)
+        inside=np.array([min(4,opposite.distance(Point(p))/2-.08) for p in axis])
+        outside = 8-inside
+        sidewalk = 2.5
+        if way == 258909976:
+            promenade = LineString(OSM[1008909370])
+            curb = axis + normals*outside[:,None]
+            clearance = np.array([promenade.distance(Point(point)) for point in curb])
+            sidewalk = np.clip(clearance-1., 0., sidewalk)
+        return -inside,outside,sidewalk
     if way in UPPER_ROADS:
         blend=np.clip((section(way)[0][:,0]+265)/23,0,1)
         native=4.7 if way==UPPER_ROADS[0] else 4.9
@@ -156,7 +164,7 @@ def grade_banks(terrain,original,wet,left,top,step,anchor,angle,datum,finish=Fal
     for way in RAMPS+UPPER_ROADS+LOWER_ROADS+SIDE_ROAD+FOOTWAYS:
         xy,_,_,y=section(way,native_grade=True)
         l,r,w=widths(way)
-        radius=7.2 if way in LOWER_ROADS else max(np.max(-l),np.max(r)+w)
+        radius=7.2 if way in LOWER_ROADS else max(np.max(-l),np.max(r+w))
         for a,b,h0,h1 in zip(xy,xy[1:],y,y[1:]):
             dx,dz=b-a
             t=np.clip(((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz),0,1)

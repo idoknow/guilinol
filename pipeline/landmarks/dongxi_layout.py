@@ -11,6 +11,7 @@ from shapely.geometry import LineString, Polygon, Point, box
 from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
 from shop_lettering import letters
+from dongxi_owners import EXTERNAL_ROOFS, EXTERNAL_SIGNS
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'pipeline'))
@@ -131,7 +132,7 @@ def envelope(model, feature):
                 model.box((index+.5)*pitch-length/2,3.25,depth/2,pitch+.02,.42,depth,'white')
             model.box(0,.06,1.45,length,.12,2.9,'pave')
             for along in np.arange(-length/2+3,length/2-1,7.2):
-                model.beam([along,0 if name=='R10' else .18,3.1],[along,3.7,3.1],.16,'wood',8,True)
+                model.beam([along,0,3.1],[along,3.7,3.1],.16,'wood',8,True)
                 crown=trimesh.creation.icosphere(subdivisions=1)
                 model.mesh(crown.vertices*[1.4,1.35,1.3]+[along,4.6,3.1],crown.faces,'leaf')
         if name=='N011' and center[0]+ORIGIN[0]>-627 and -174<center[1]+ORIGIN[1]<-130 and outward[0]>.35 and length>3:
@@ -258,7 +259,7 @@ def registered_market(model):
     model.grade=grade
     for feature in LAYOUT+INFILL:
         attrs = feature['properties']
-        if attrs['kind']=='roof' and attrs['render']:
+        if attrs['kind']=='roof' and attrs['render'] and attrs['name'] not in EXTERNAL_ROOFS:
             envelope(model, feature)
         elif attrs['kind']=='covered_passage':
             model.grade_reference=attrs['ground_m']-157.7
@@ -267,6 +268,8 @@ def registered_market(model):
             model.pose=(0,attrs['ground_m']-157.7+attrs['eave_m']-.24,0,0)
             model.mesh(deck.vertices[:,[0,2,1]],deck.faces[:,::-1],'tile',True)
         elif attrs['kind']=='storefront':
+            if attrs['name'] in EXTERNAL_SIGNS:
+                continue
             model.grade_reference=attrs['ground_m']-157.7
             east,south = point(feature['geometry']['coordinates'])
             normal = math.radians(attrs['bearing'])

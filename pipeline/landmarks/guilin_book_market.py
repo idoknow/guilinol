@@ -456,15 +456,19 @@ def _build_book_market_and_binjiang(b: SceneBuilder):
 
     # --- D. STEPPED 6-STOREY GREY-WHITE RESIDENTIAL WING BEHIND LEFT GATE PYLON (`h = 19.4 m`, photos 52-54!) ---
     # Sits right between Binjiang Mansion (7F, 22.8 m) and No. 9 Gate Left Pylon (9.4 m), set back to `z_front = -3.8 m`!
-    b.box(10.80, 0.0, -8.20, 9.80, 19.00, 8.80, 'white_wall', cap_region='gray_tile', tile=2.8, collide=True)
+    wing = [(5.90, -12.60), (15.70, -12.60), (15.70, -11.20), (13.20, -11.20),
+            (13.20, -8.85), (10.00, -8.85), (10.00, -3.80), (5.90, -3.80)]
+    b.prism(wing, 0.0, 19.00, 'white_wall', cap_region='gray_tile', tile=2.8, collide=True)
     # Pitched dark-grey tiled overhanging roof cornice (`top = 19.45 m`)
-    b.box(10.80, 19.00, -8.10, 10.60, 0.45, 9.60, 'gray_tile', tile=2.0)
+    cornice = [(5.55, -12.95), (16.05, -12.95), (16.05, -10.85), (13.55, -10.85),
+               (13.55, -8.50), (10.35, -8.50), (10.35, -3.45), (5.55, -3.45)]
+    b.prism(cornice, 19.00, 0.45, 'gray_tile', tile=2.0)
     if b.detail:
         for fl in range(2, 6):
             wy = fl * 3.05 + 1.20
             b.box(8.80, wy, -3.55, 2.40, 1.65, 0.52, 'cage_grille', tile=1.5)
             b.box(8.80, wy + 1.65, -3.50, 2.60, 0.10, 0.65, 'gray_tile', tile=1.2)
-            b.box(12.20, wy + 0.20, -3.60, 0.82, 0.54, 0.38, 'pale_stone', tile=1.0)
+            b.box(6.65, wy + 0.20, -3.60, 0.82, 0.54, 0.38, 'pale_stone', tile=1.0)
 
     # --- E. GAP RIGHT OF GATE: 2-STOREY WHITE ANNEX (`h = 7.2 m`) + 1F BOOTH + 6F BACKGROUND BLOCK (`#53` & `#55`!) ---
     # Right pylon of No. 9 Gate is around `x = +28.8 m` in `bm_origin` frame (`world -410.8, 60.3`).

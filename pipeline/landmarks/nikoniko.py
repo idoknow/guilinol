@@ -793,8 +793,14 @@ class Builder:
                 self.cylinder_y(lx, ly, 0.34, lz, 0.16, 'red_lit', sections=6)
 
 
-def export_landmark(name, build_fn):
-    textures = ensure_b_textures()
+def export_landmark(name, build_fn, *, reuse_atlas=False):
+    if reuse_atlas:
+        folder = Path(__file__).resolve().parents[2] / 'public/textures/landmarks/B'
+        textures = {key: Image.open(folder / filename) for key, filename in (
+            ('surfaces', 'surfaces.png'), ('glass', 'curtain_glass.png'),
+            ('pave', 'plaza_pave.png'), ('signs', 'signs.png'))}
+    else:
+        textures = ensure_b_textures()
     scene = trimesh.Scene()
 
     mat_surfaces = trimesh.visual.material.PBRMaterial(

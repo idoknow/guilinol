@@ -61,6 +61,7 @@ export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,en
     scene.remove(root);for(const asset of assets)asset.dispose()
   }
   return (eye:THREE.Vector3, priority?:Landmark)=>{
+    const candidates:{entry:Landmark,range:number}[]=[]
     for(const entry of priority?[priority]:entries){
       const distance=Math.hypot(eye.x-entry.position[0],eye.y-entry.position[1],eye.z-entry.position[2])-entry.sphere[3]
       const root=loaded.get(entry)
@@ -73,22 +74,26 @@ export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,en
         if(entry.lods.length){for(const name of entry.lods){const node=root.getObjectByName(name);if(node)node.visible=name===level}}
         else root.visible=distance<=650
       }else if(distance<=900&&!pending.has(entry)&&(priority||pending.size<2)&&performance.now()>=(retry.get(entry)??0)){
-        pending.add(entry)
-        loaderReady.then(loader=>loader.loadAsync('./'+entry.file)).then(({scene:group,parser})=>{
-          group.position.fromArray(entry.position);group.rotation.y=THREE.MathUtils.degToRad(entry.rotation)
-          group.traverse(node=>{
-            if(/^collision/i.test(node.name))node.visible=false
-            if(node instanceof THREE.Mesh) for(const material of [node.material].flat()) nightLit(material)
-          })
-          const coverage={value:1}
-          fades.set(group,coverage)
-          for(const asset of parser.associations.keys()){
-            if(asset instanceof THREE.Material)fadeMaterial(asset,coverage)
-          }
-          batchRepeatedMeshes(group)
-          scene.add(group);group.updateMatrixWorld(true);loaded.set(entry,group)
-        }).catch(error=>{console.warn(entry.id,error);retry.set(entry,performance.now()+30000)}).finally(()=>pending.delete(entry))
+        candidates.push({entry,range:Math.hypot(eye.x-entry.position[0],eye.z-entry.position[2])})
       }
+    }
+    candidates.sort((first,second)=>first.range-second.range)
+    for(const {entry} of candidates.slice(0,priority?1:Math.max(0,2-pending.size))){
+      pending.add(entry)
+      loaderReady.then(loader=>loader.loadAsync('./'+entry.file)).then(({scene:group,parser})=>{
+        group.position.fromArray(entry.position);group.rotation.y=THREE.MathUtils.degToRad(entry.rotation)
+        group.traverse(node=>{
+          if(/^collision/i.test(node.name))node.visible=false
+          if(node instanceof THREE.Mesh) for(const material of [node.material].flat()) nightLit(material)
+        })
+        const coverage={value:1}
+        fades.set(group,coverage)
+        for(const asset of parser.associations.keys()){
+          if(asset instanceof THREE.Material)fadeMaterial(asset,coverage)
+        }
+        batchRepeatedMeshes(group)
+        scene.add(group);group.updateMatrixWorld(true);loaded.set(entry,group)
+      }).catch(error=>{console.warn(entry.id,error);retry.set(entry,performance.now()+30000)}).finally(()=>pending.delete(entry))
     }
   }
 }

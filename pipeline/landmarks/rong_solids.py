@@ -174,6 +174,8 @@ def banyan(mesh, origin, height, crown, seed, detail, lobed=True, grade=None, jo
         else:
             ctr = (east - .06 * crown, level + height * .84, south + .04 * crown)
             radii = (crown * .38, height * .19, crown * .36)
+        if grade and not lobed and index < 6:
+            tube(mesh, (east,level+height*.35,south), ctr, .17*girth, 'bark', 6)
         _organic_blob(mesh, ctr, radii, 'foliage', seed * 13 + index * 19 + 7, detail)
 
     if grade:

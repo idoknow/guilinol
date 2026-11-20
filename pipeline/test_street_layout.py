@@ -9,6 +9,7 @@ from shapely.geometry import LineString, Polygon, box
 
 from common import LAT0,LON0
 from road_profile import profile
+from dongxi_streets import street_surface
 from streets import chunks
 
 
@@ -22,6 +23,17 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual((road.width,road.lanes,road.left,road.right),(20,0,0,0))
         road=profile(self.line,{'highway':'primary','width':'14 m','lanes':'4','sidewalk':'left'},self.facades)
         self.assertEqual((road.width,road.lanes,road.right,road.divided),(14,4,0,True))
+
+    def test_dongxi_inferred_surface_keeps_axis_and_opposite_edge(self):
+        wall = box(-5,3,5,15)
+        with patch('dongxi_streets.frontage_limits',return_value={'R41':wall}):
+            inferred=profile(self.line,{'highway':'pedestrian'},self.facades,1554170682)
+            surface=street_surface(inferred)
+            self.assertTrue(surface.covers(self.line))
+            self.assertTrue(surface.covers(box(-4,-9,4,-3)))
+            self.assertEqual(surface.intersection(wall).area,0)
+            surveyed=profile(self.line,{'highway':'pedestrian','width':'20'},self.facades,1554170682)
+            self.assertGreater(street_surface(surveyed).intersection(wall).area,0)
 
     def test_yiwu_has_no_inferred_median(self):
         tags={'highway':'secondary','lanes':'4'}

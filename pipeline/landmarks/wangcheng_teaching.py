@@ -3,7 +3,9 @@ import math
 import sys
 from pathlib import Path
 import numpy as np
-from shapely.geometry import Polygon
+import trimesh
+from shapely.affinity import translate
+from shapely.geometry import Point, Polygon
 from jingjiang import generate
 from c_kit import landmark_surface
 
@@ -11,7 +13,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from common import ll2xz,load_osm
 
 
-def seated_roof(model, y, width, depth, rise, surface, on_chunk=False):
+def seated_roof(model, y, width, depth, rise, surface, wall=None):
     """A closed soffit and bearing timbers beneath the curved tile eaves."""
     x0, y0, z0, angle = model.pose
     def world_point(x,z):
@@ -21,14 +23,14 @@ def seated_roof(model, y, width, depth, rise, surface, on_chunk=False):
     seats = []
     for x in np.linspace(-width*.43,width*.43,max(2,round(width/6))):
         for z in (-depth*.34,depth*.34):
-            if on_chunk and not all(
-                    (h := surface.roof(*world_point(x+dx,z+dz))) is not None and abs(h-y0)<.02
+            if wall is not None and not all(
+                    wall.covers(Point(world_point(x+dx,z+dz)))
                     for dx in (-.28,.28) for dz in (-.28,.28)):
                 continue
             seats.append((x,z))
     if len(seats)<2:
         raise ValueError(f'Missing roof bearings at {model.pose}')
-    if on_chunk:
+    if wall is not None:
         # The eastern wall backs onto bedrock which rises through part of its
         # GL04 outline. Seat each timber on the exposed surface there.
         wall_top = y
@@ -80,21 +82,25 @@ def teaching(model):
         center=np.array(rectangle.centroid.coords[0])-anchor
         angle=math.atan2(axis[1],axis[0])
         if way['id'] in (679734418,679734455,679734456):
-            # The chunk renderer supplies the walls and their exact collision outlines.
-            sample=np.array(outline.representative_point().coords[0])-anchor
-            roof=surface.roof(*sample)
-            if roof is None:
-                raise ValueError(f'Missing GL04 wall for teaching annex {way["id"]}')
+            wall=translate(outline,-anchor[0],-anchor[1])
+            floors=3 if way['id']==679734456 else 1
+            roof=surface.ground(*wall.representative_point().coords[0])+3.2*floors
+            prism=trimesh.creation.extrude_polygon(wall,1,engine='earcut')
+            vertices=prism.vertices[:,[0,2,1]].copy()
+            for vertex in vertices:
+                vertex[1]=roof if vertex[1]>0 else min(roof-.04,surface.ground(*vertex[::2])-.04)
+            model.pose=(0,0,0,0)
+            model.mesh(vertices,prism.faces[:,::-1],'white',True)
             model.pose=(center[0],roof,center[1],angle)
             if way['id']==679734456:
-                seated_roof(model,0,width+1,depth+1,3.3,surface,True)
+                seated_roof(model,0,width+1,depth+1,3.3,surface,wall)
             else:
                 # Twin transverse wings flank a narrower longitudinal range.
-                seated_roof(model,0,width-15,13.4,2.9,surface,True)
+                seated_roof(model,0,width-15,13.4,2.9,surface,wall)
                 for side in (-1,1):
                     wing=center+side*(width/2-4.45)*axis/width
                     model.pose=(wing[0],roof,wing[1],angle+math.pi/2)
-                    seated_roof(model,0,depth+.8,9.6,2.9,surface,True)
+                    seated_roof(model,0,depth+.8,9.6,2.9,surface,wall)
             continue
         grade=max(surface.ground(*(np.array(point)-anchor)) for point in rectangle.exterior.coords)
         model.pose=(center[0],grade,center[1],angle)

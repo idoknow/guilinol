@@ -16,6 +16,8 @@ root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root/'pipeline'))
 from common import ll2xz
 from landmarks.world_surface import LandmarkSurface, Surface
+from landmarks.dongxi_owners import EXTERNAL_ROOFS, EXTERNAL_SIGNS
+from audit import load_landmark_meshes
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('glb', help='uncompressed generator output, before meshopt quantization')
@@ -45,6 +47,10 @@ slabs = [Polygon(triangle[:,[0,2]]) for triangle in triangles]
 index=STRtree(slabs)
 expected_roofs=[]
 actual_roofs=[]
+manifest=json.loads((root/'public/world/manifest.json').read_text())
+owner_ids={owner for owner, height in EXTERNAL_ROOFS.values()}
+manifest['landmarks']=[entry for entry in manifest['landmarks'] if entry['id'] in owner_ids]
+external=load_landmark_meshes(root,manifest)
 for item in features:
     props = item['properties']
     if props['kind']!='roof':continue
@@ -52,7 +58,28 @@ for item in features:
     rings = [[ll2xz(*reversed(corner))-origin for corner in ring] for ring in item['geometry']['coordinates']]
     expected = Polygon(rings[0],rings[1:])
     floor=props['ground_m']-157.7
-    actual = union_all([slabs[key] for key in index.query(expected.buffer(.02)) if slabs[key].area>.001 and expected.buffer(.02).covers(slabs[key])]);expected_roofs.append(expected);actual_roofs.append(actual)
+    actual = union_all([slabs[key] for key in index.query(expected.buffer(.02)) if slabs[key].area>.001 and expected.buffer(.02).covers(slabs[key])])
+    if props['name'] in EXTERNAL_ROOFS:
+        if actual.area > .5: raise ValueError('Duplicate market floor: '+props['name'])
+        owner, height = EXTERNAL_ROOFS[props['name']]
+        data = external[owner]
+        if owner == 'zhuangyuan_gallery' and height is None:
+            triangles = data['vis_tris']
+            entry = data['entry']
+            angle = math.radians(entry['rotation'])
+            cosine, sine = math.cos(angle), math.sin(angle)
+            relative = triangles - entry['position']
+            gallery = relative[:,:,::2] @ np.array([[cosine,sine],[-sine,cosine]])
+            roof = triangles[(abs(gallery[:,:,0]).max(axis=1)<22) & (abs(gallery[:,:,1]).max(axis=1)<3.5)
+                             & (relative[:,:,1].min(axis=1)>3.15)]
+        else:
+            triangles = data['coll_tris']
+            roof = triangles[(abs(triangles[:,:,1] - data['entry']['position'][1] - height)<.035).all(axis=1)]
+        caps = [Polygon(triangle[:,[0,2]]-origin) for triangle in roof]
+        actual = union_all([cap for cap in caps if cap.area>.001 and cap.intersects(expected)])
+        if actual.is_empty or actual.boundary.hausdorff_distance(expected.boundary)>1.5:
+            raise ValueError(f'{owner}: missing or misaligned structural roof for {props["name"]}')
+    expected_roofs.append(expected);actual_roofs.append(actual)
     if actual.is_empty:raise ValueError('Missing floor: '+props['name'])
     distance = actual.centroid.distance(expected.centroid)
     rotation = abs((axis(actual)-axis(expected)+90)%180-90)
@@ -75,12 +102,38 @@ for item in features:
     if props['roof']=='王城商厦':
         ref=max(ref,surface.ground(*(center-origin)))
     base=ref+2.4+(props['floor']-1)*3.45
+    sign_owner=EXTERNAL_SIGNS.get(props['name'])
+    if sign_owner:
+        assert EXTERNAL_ROOFS[props['roof']][0]==sign_owner
+        owner=external[sign_owner]
+        entry=owner['entry'];angle=math.radians(entry['rotation'])
+        basis=np.array([[math.cos(angle),math.sin(angle)],[-math.sin(angle),math.cos(angle)]])
+        local=owner['vis_tris'].reshape(-1,3)-entry['position']
+        local[:,::2]=local[:,::2]@basis
+        local_center=(center-np.array(entry['position'])[::2])@basis
+        assert abs(local_center[1]-1.89)<.3
+        tree=cKDTree(local)
+        for end in (-.5,.5):
+            for level in (2.43,3.18):
+                assert tree.query([local_center[0]+end*width,level,1.97])[0]<.025,props['name']
+        spans=local.reshape(-1,3,3)
+        rear=tree.query([local_center[0]-width/2,3.18,1.81])[0]
+        assert rear<.025, 'Sign backing does not reach the beam'
+        lettering=spans[(abs(spans[:,:,0]-local_center[0])<width*.48).all(axis=1)
+                        & ((spans[:,:,1]>2.51)&(spans[:,:,1]<3.07)).all(axis=1)
+                        & (abs(spans[:,:,2]-1.971)<.014).all(axis=1)]
+        assert len(lettering)>len(props['name'])*2, 'Missing gallery lettering'
+        beam=spans[(abs(spans[:,:,2]-1.845)<.015).all(axis=1)]
+        profile=union_all([Polygon(face[:,:2]) for face in beam])
+        assert profile.intersection(LineString([(local_center[0]-width/2,3.05),(local_center[0]+width/2,3.05)])).length>width-.03
     for fraction in [-.5,.5]:
         corner=center-origin+.24*normal+tangent*width*fraction
         for height in (base,base+.75):
             height+=np.clip(1-(height-ref)/3.2,0,1)*(surface.ground(*corner)-.035-ref)
             distance,_=joinery.query((corner[0],height,corner[1]))
-            if distance>.002:raise ValueError('Missing exported sign corner: '+props['name'])
+            if sign_owner and distance<=.002:raise ValueError('Duplicate market sign: '+props['name'])
+            if not sign_owner and distance>.002:raise ValueError('Missing exported sign corner: '+props['name'])
+    if sign_owner:continue
     offset=max(wall.distance(Point(center+.25*normal+tangent*width*fraction)) for fraction in [-.5,0,.5]);top=props['ground_m']-host['properties']['ground_m']+(props['floor']-1)*3.45+3.15
     if offset>.3001 or top>host['properties']['eave_m']:floating.append((props['name'],offset,top))
 print(f'Unsupported signs: {len(floating)}/{checked}',floating);assert not floating
