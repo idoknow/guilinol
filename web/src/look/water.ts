@@ -121,8 +121,7 @@ const srgbLut = Float32Array.from({length:256},(_,i)=>{
 
 // Far water under the overview terrain: water pixels of overview.png (4 m/px) decide which 32 m cells
 // hold water; the underlay grid equals the water level there. Cells under a loaded chunk are hidden.
-export async function farWater(manifest:{extent:[number,number,number,number],chunkSize:number,overview:{step:number}}, bitmap:ImageBitmap, underlay:Int16Array) {
-  const [left,top,width,depth] = manifest.extent, step = manifest.overview.step, cols = width/step, rows = depth/step
+function bitmapWater(bitmap:ImageBitmap,width:number) {
   const canvas = new OffscreenCanvas(bitmap.width,bitmap.height), ctx = canvas.getContext('2d',{willReadFrequently:true})!
   ctx.drawImage(bitmap,0,0); bitmap.close()
   const pixels = ctx.getImageData(0,0,canvas.width,canvas.height).data, px = canvas.width/width
@@ -132,6 +131,15 @@ export async function farWater(manifest:{extent:[number,number,number,number],ch
     const i = ((z*px|0)<ch ? (z*px|0) : ch-1)*cw + ((x*px|0)<cw ? (x*px|0) : cw-1) << 2
     return Math.abs(srgbLut[pixels[i]]-tr)+Math.abs(srgbLut[pixels[i+1]]-tg)+Math.abs(srgbLut[pixels[i+2]]-tb)<.06
   }
+  return (x:number,z:number)=>wet(x+2,z+2)||wet(x+6,z+6)
+}
+
+export async function farWater(manifest:{extent:[number,number,number,number],chunkSize:number,overview:{step:number}}, water:ImageBitmap|Uint8Array, underlay:Int16Array) {
+  const [left,top,width,depth] = manifest.extent, step = manifest.overview.step, cols = width/step, rows = depth/step
+  const wet = water instanceof Uint8Array ? (x:number,z:number)=>{
+    const bit=(z/8)*(width/8)+x/8
+    return (water[bit>>3] & (1<<(bit%8)))!==0
+  } : bitmapWater(water,width)
   const per = manifest.chunkSize/step, positions:number[] = [], ranges = new Map<string,[number,number,FarWaterPatch|null]>()
   const nextFar:FarWaterPatch[] = []
   for(let tz=0;tz<rows;tz+=per) for(let tx=0;tx<cols;tx+=per) {
@@ -143,7 +151,7 @@ export async function farWater(manifest:{extent:[number,number,number,number],ch
       let startX=tx*step,level=NaN
       for(let x1=tx*step;x1<=endX;x1+=8){
         let next=NaN
-        if(x1<endX&&(wet(x1+2,z0+2)||wet(x1+6,z0+6))){
+        if(x1<endX&&wet(x1,z0)){
           const cell=row*(cols+1)+Math.floor(x1/step),below=cell+cols+1
           next=Math.min(underlay[cell],underlay[cell+1],underlay[below],underlay[below+1])/10
         }
@@ -182,6 +190,8 @@ const mirrorCamera = new THREE.PerspectiveCamera(), clip = new THREE.Plane(), q 
 const size = new THREE.Vector2(), target = new THREE.Vector3(), forward = new THREE.Vector3()
 const mainFrustum = new THREE.Frustum(), mainProj = new THREE.Matrix4()
 let level = 148
+const lastView=new THREE.Matrix4(), lastProjection=new THREE.Matrix4()
+let lastReflection=-Infinity, lastLevel=NaN
 export function isWaterInView(camera:THREE.PerspectiveCamera) {
   camera.updateMatrixWorld()
   mainFrustum.setFromProjectionMatrix(mainProj.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
@@ -198,7 +208,7 @@ export function currentMirrorLevel(camera:THREE.PerspectiveCamera) {
   return level
 }
 // skip: the first frame is budgeted (≤2 s), so the mirror starts one frame later with a sky-tint fallback.
-export function renderMirror(renderer:THREE.WebGLRenderer, scene:THREE.Scene, camera:THREE.PerspectiveCamera, skip=false) {
+export function renderMirror(renderer:THREE.WebGLRenderer, scene:THREE.Scene, camera:THREE.PerspectiveCamera, skip=false, allowReuse=false) {
   body.value.copy(env.water).convertLinearToSRGB()
   sunLight.value.copy(atmo.uSunColor.value).convertLinearToSRGB()
   if(env.night>.5) sunLight.value.setRGB(.5,.55,.65).multiplyScalar(env.night*.6)
@@ -208,8 +218,16 @@ export function renderMirror(renderer:THREE.WebGLRenderer, scene:THREE.Scene, ca
   waterMaterial.uniforms.uMirrorReady.value = 1
   renderer.getDrawingBufferSize(size)
   const w = Math.max(1,Math.round(size.x*.5)), h = Math.max(1,Math.round(size.y*.5))
-  if(mirrorTarget.width!==w||mirrorTarget.height!==h) mirrorTarget.setSize(w,h)
   camera.updateMatrixWorld()
+  const resized=mirrorTarget.width!==w||mirrorTarget.height!==h
+  const now=performance.now()
+  // With a stationary flight camera, only slow cloud/light changes enter the
+  // reflection. Ripples still animate every frame on the live water surface.
+  if(allowReuse && !resized && now-lastReflection<60 && level===lastLevel &&
+     camera.matrixWorld.equals(lastView) && camera.projectionMatrix.equals(lastProjection))return
+  if(resized)mirrorTarget.setSize(w,h)
+  lastReflection=now;lastLevel=level
+  lastView.copy(camera.matrixWorld);lastProjection.copy(camera.projectionMatrix)
   mirrorCamera.position.set(camera.position.x,2*level-camera.position.y,camera.position.z)
   camera.getWorldDirection(forward)
   target.copy(camera.position).add(forward); target.y = 2*level-target.y
