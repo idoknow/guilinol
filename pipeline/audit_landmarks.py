@@ -407,7 +407,8 @@ def main():
         if key not in BRIDGES and not tags.get('building'):continue
         # The east footing of Wangcheng Mall reaches +3.81 m on the finished slope.
         # Slice the continuous ground-floor walls two metres above that corner.
-        elevation=None if key in BRIDGES or key=='zhuangyuan_gallery' else {'central_square':8,'ronghu':4,'nikoniko':10,'wangcheng_mall':6,'gunanmen':6.6,'xiaoyao_tower':9}.get(key,2)
+        # At Gunanmen compare the western hall walls above the shared terrace to its OSM building.
+        elevation=None if key in BRIDGES or key=='zhuangyuan_gallery' else {'central_square':8,'ronghu':4,'nikoniko':10,'wangcheng_mall':6,'gunanmen':8.2,'xiaoyao_tower':9}.get(key,2)
         component_box=((-22,3,-3),(22,7,3)) if key=='zhuangyuan_gallery' else None
         shape=footprint(ROOT/'public'/spec['model'],entry,window,elevation,component_box)
         row['measurement']='visible deck projection' if elevation is None else f'wall section at local y={elevation} m'

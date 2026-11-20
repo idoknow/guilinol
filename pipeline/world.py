@@ -25,7 +25,7 @@ from streets import chunks as street_chunks
 from atlas import write_atlas
 from vehicles import plan_vehicles, write_vehicles
 from clearance import landmark_triangles
-from landmarks.rong_ground import grade_landings
+from landmarks.rong_ground import GATE_PLAZA, grade_landings
 from shoreline import correct_water, contour_ronghu
 from landmark_layout import Layout
 from shapely.geometry import LineString, Point, Polygon as ShapelyPolygon
@@ -275,7 +275,9 @@ def build(bbox, output, palette):
     vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange)
     decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal)
     modeled_paving = unary_union([*layout.street_foundations, *rong_pavement, modeled_paving if modeled_paving is not None else ShapelyPolygon()])
-    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving)
+    gate_plaza = next((ShapelyPolygon(np.asarray(GATE_PLAZA)+[x,z]) for x,z,entry in layout.entries
+                       if entry['id']=='gunanmen'),None)
+    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving,gate_plaza=gate_plaza)
     (output/'marking-audit.json').write_text(json.dumps(lengths.pop('markingOverlap')))
     print('Lengths (m):',lengths)
     def asset(name):

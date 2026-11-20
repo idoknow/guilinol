@@ -3,7 +3,7 @@ import math
 import shapely
 from PIL import ImageDraw
 
-from c_kit import RECTS, _font, box, solid, tube, railing, extrude, landmark_surface
+from c_kit import RECTS, _font, box, solid, tube, extrude, landmark_surface
 from rong_solids import banyan, align_front
 
 
@@ -222,8 +222,3 @@ def approach(builder):
         tube(mesh,(east,ground(east,-31)-.04,-31),(east,1.1,-31),.09,'yellow',6)
         for sign in (-1,1):
             tube(mesh,(16+index,1.1,-31),(16+index+sign*3.4,1.32,-34.4),.085,'yellow',4)
-    start=len(mesh.pos)
-    railing(mesh,(12,-23),(9,-16),.25,.95,'white',1.6,stone=True)
-    for i in range(start,len(mesh.pos)):
-        x,y,z=mesh.pos[i]
-        mesh.pos[i]=(x,ground(x,z)+y-.28,z)
