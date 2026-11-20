@@ -273,6 +273,8 @@ def library(b):
     for east in (x-25,x-23,x-21):
         oval(wall,(east,grade(east,z+7.2)+.79,z+7.2),(1.12,.84,.75),'limestone',7)
     box(wall,(x+17,y+1.1,z+9),(8.4,2.2,.45),'white')
+    # Continuous stone sill under the relief figures, keyed into the wall.
+    box(wall,(x+17,y+.18,z+9.23),(8.4,.36,.32),'granite')
     for index in range(7):
         east=x+14+index*.95
         front=z+9.225
@@ -468,6 +470,7 @@ def shore(b):
             east = -16 + index * 4
             for side in (-1, 1):
                 box(wall, (east, level, -17.5+side*1.24), (4.02,.48,.36), 'granite')
+            box(wall,(east,.065,-17.5),(4,.27,2.20),'ashlar')
             box(wall, (east,level+.08,-17.5), (4,.1,2.2), 'rill_water')
             box(wall, (east-1.8,level+.17,-17.5), (.36,.3,2.25), 'ashlar')
     for i in range(rill_start,len(wall.pos)):

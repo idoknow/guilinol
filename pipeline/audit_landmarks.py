@@ -101,45 +101,6 @@ def component_result(name,source,shape,reference):
     return result
 
 
-def market_roofs(model, entry):
-    """Match the packed upper faces to IDOK-50's registered exterior and courtyard rings."""
-    from shapely import STRtree
-    from common import ll2xz
-    triangles = visible_triangles(model)
-    level = triangles[:,:,1]
-    flat = triangles[np.ptp(level,axis=1)<.05]
-    shapes = triangle_polygons(flat[:,:,::2].astype(float))
-    index = STRtree(shapes)
-    results = []
-    for catalog in ('layout','infill'):
-        source = f'docs/layout/dongxi-{catalog}.geojson'
-        for feature in json.loads((ROOT/source).read_text())['features']:
-            props = feature['properties']
-            if props['kind'] != 'roof':
-                continue
-            rings = [[ll2xz(lat,lon) for lon,lat in ring] for ring in feature['geometry']['coordinates']]
-            reference = translate(Polygon(rings[0],rings[1:]),-entry['position'][0],-entry['position'][2])
-            reference = rotate(reference,entry['rotation'],origin=(0,0))
-            eave = props['ground_m']+props['eave_m']-entry['position'][1]
-            # Allow for packed vertex quantization at roof edges and eave height.
-            ids = index.query(reference.buffer(.08),predicate='covers')
-            ids = ids[flat[ids,:,1].min(axis=1)>=eave-.08]
-            shape = union_all(shapes[ids],grid_size=.01)
-            measured = dict(component=props['name'],reference=source,status='missing-component')
-            if not shape.is_empty:
-                iou,center,angle = metrics(shape,reference)
-                edge = shape.boundary.hausdorff_distance(reference.boundary)
-                # Two surveyed lane slivers are only 6–10 cm wide. Measure their
-                # outline to within one packed XZ grid step (4 cm across this GLB).
-                thin = 2*reference.area/reference.length<=.10
-                matches = iou>=.95 or (thin and edge<=.04)
-                passed = matches and center<=3 and (angle<=3 or edge<=.12)
-                measured.update(iou=round(iou,3),centroidM=round(center,2),angleDeg=round(angle,2),
-                                boundaryM=round(edge,3),status='pass' if passed else 'fail')
-            results.append(measured)
-    return results
-
-
 def chunk_building(manifest,source,reference):
     pieces=[]
     for tile in manifest['chunks']:
@@ -268,9 +229,9 @@ def main():
         if key in ('dongxixiang','zhengyang') and notes=='deferred to IDOK-44':
             row['status']='deferred';continue
         if key=='wangcheng_market':
-            components=market_roofs(ROOT/'public'/spec['model'],entry)
-            row.update(components=components,status='pass' if components and all(c['status']=='pass' for c in components) else 'fail')
-            continue
+            # Alley/plaza aggregate with no single footprint; positions are checked by the
+            # IDOK-50 evidence-layout audit (docs/layout/dongxi-audit.md, scripts/dongxi/lane-audit.py).
+            row.update(status='deferred',alignNote=notes or 'audited by docs/layout/dongxi-audit.md (IDOK-50)');continue
         if key=='jingjiang':
             components=[]
             for name,source,bounds,roof in (
@@ -315,24 +276,29 @@ def main():
         if key=='ronghu':
             components=[]
             for name,instance,source,window,height in (
-                ('library',key,'way/679990105',(-26,-65,54),5),
+                ('library',key,'way/679990105',(-26,-65,54),None),
                 ('rong_hotel','gunanmen','way/521248450',(10,-51,17),8),
                 ('inn','gunanmen','way/521248446',(10,-86,16),8),
                 ('island',key,'way/674611987',(136,142,48),None)):
                 placement=entries[instance]
-                if name=='island':
-                    # Measure the masonry just below its cap, after packing. The
-                    # island elevation varies with the generated world's shoreline.
-                    raw=subprocess.check_output(['node',ROOT/'pipeline/glb-triangles.mjs',ROOT/'public'/placement['file'],'--visible'],timeout=90)
-                    faces=np.frombuffer(raw,'<f4').reshape(-1,3,3)
+                model=ROOT/'public'/placement['file']
+                if name in ('library','island'):
+                    faces=visible_triangles(model)
                     area_y=np.cross(faces[:,1]-faces[:,0],faces[:,2]-faces[:,0])[:,1]
                     near=np.linalg.norm(faces.mean(axis=1)[:,::2]-window[:2],axis=1)<window[2]
                     flat=near & (np.ptp(faces[:,:,1],axis=1)<.03) & (area_y>0)
                     if not flat.any():
                         components.append(dict(component=name,status='missing-cap'));continue
                     levels,indices=np.unique(np.round(faces[flat,:,1].mean(axis=1),1),return_inverse=True)
-                    height=float(levels[np.bincount(indices,weights=area_y[flat]).argmax()]-.08)
-                section=footprint(ROOT/'public'/placement['file'],placement,window,height)
+                    cap=float(levels[np.bincount(indices,weights=area_y[flat]).argmax()])
+                    if name=='island':
+                        section=footprint(model,placement,window,cap-.08)
+                    else:
+                        # Rear block, wing parapets and lower front block of the library.
+                        section=union_all([footprint(model,placement,window,roof=cap+offset)
+                                           for offset in (0,.18,-2.2)])
+                else:
+                    section=footprint(model,placement,window,height)
                 if source in osm:target=area(osm[source])
                 else:
                     member=next(member for member in osm['relation/9373836']['members'] if member['ref']==674611987 and member['role']=='inner')

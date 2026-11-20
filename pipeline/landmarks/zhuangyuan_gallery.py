@@ -39,7 +39,7 @@ def gallery(m):
     apartments(m,-1.4,15.1,49,7)
     apartments(m,-3.6,-15.0,40,6)
     length = 42.3
-    m.box(0, -.2, 0, length, .33, 3.85, 'pave', True)
+    m.foundation(landmark_surface('zhuangyuan_gallery'),0,-.2,0,length,.33,3.85,'pave')
     for x in np.linspace(-20.7, 20.7, 12):
         for side in (-1, 1):
             z = side * 1.73

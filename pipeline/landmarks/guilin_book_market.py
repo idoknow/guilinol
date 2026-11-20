@@ -665,7 +665,7 @@ def _build_yunman_and_south_ramp(b: SceneBuilder):
     # 2b. Continuous stone-brick & tactile-strip pedestrian terrace (`z_ramp in [-28.0, -15.0]`, strictly outside `258909978` outer wall!)
     b.draped_patch(
         ANCHOR_WORLD, -19.0, 13.5, -28.0, -15.0, 'ramp_paver', curb_region='granite',
-        lift=0.16, skirt=0.75, step=2.2, curb_edges=('+z', '+x', '-x'), curb_h=0.05, curb_w=0.22, collide=False,
+        lift=0.10, skirt=0.75, step=1.1, curb_edges=('+z', '+x', '-x'), curb_h=0.05, curb_w=0.22, collide=False,
     )
 
     # 2c. Continuous Bright-White Painted-Metal Guilin Mountain-Motif Guardrail (`山形白护栏`, photo #50, at `z_ramp = -15.35`!)
@@ -677,13 +677,13 @@ def _build_yunman_and_south_ramp(b: SceneBuilder):
             xm = 0.5 * (xa + xb)
             lpa = b.xf((xa, 0.0, z_rail))
             lpb = b.xf((xb, 0.0, z_rail))
-            ya = libin_terrain_y(ORIGIN_X + lpa[0], ORIGIN_Z + lpa[2]) + 0.17 - ORIGIN_Y
-            yb = libin_terrain_y(ORIGIN_X + lpb[0], ORIGIN_Z + lpb[2]) + 0.17 - ORIGIN_Y
+            ya = libin_terrain_y(ORIGIN_X + lpa[0], ORIGIN_Z + lpa[2]) + 0.10 - ORIGIN_Y
+            yb = libin_terrain_y(ORIGIN_X + lpb[0], ORIGIN_Z + lpb[2]) + 0.10 - ORIGIN_Y
             ym = 0.5 * (ya + yb)
             bay_len = xb - xa
 
             b.box(xa, ya, z_rail, 0.09, 1.02, 0.09, 'rail_white', tile=0.5, collide=True)
-            for r_off, r_h in ((0.92, 0.075), (0.18, 0.065)):
+            for r_off, r_h in ((0.92, 0.075), (0.12, 0.065)):
                 b.face([(xa, ya + r_off, z_rail + 0.035), (xb, yb + r_off, z_rail + 0.035),
                         (xb, yb + r_off + r_h, z_rail + 0.035), (xa, ya + r_off + r_h, z_rail + 0.035)],
                        (0, 0, 1), 'rail_white', tile=1.0)
@@ -707,7 +707,7 @@ def _build_yunman_and_south_ramp(b: SceneBuilder):
 
         # Traffic sign pole next to tree pit (photo #50!)
         lps = b.xf((-6.2, 0.0, -16.1))
-        ys_p = libin_terrain_y(ORIGIN_X + lps[0], ORIGIN_Z + lps[2]) + 0.17 - ORIGIN_Y
+        ys_p = libin_terrain_y(ORIGIN_X + lps[0], ORIGIN_Z + lps[2]) + 0.10 - ORIGIN_Y
         b.cylinder_y(-6.2, ys_p, 2.85, -16.1, 0.045, 'rail_white', sections=6)
         b.disc_z(-6.2, ys_p + 2.55, -16.1, 0.34, 0.05, 'granite', sections=12)
 

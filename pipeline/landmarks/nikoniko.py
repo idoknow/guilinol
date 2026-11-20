@@ -938,7 +938,7 @@ def _facade_run(m: Builder, p0, p1, ground_h=4.8, upper_h=18.2, bays=8, brand_se
         m.box(lx, ground_h + 0.5, 0.44, 0.24, upper_h - 0.5, 0.22, 'alum')
         if i < bays:
             cx = lx + bay_w / 2.0
-            m.box(cx, 0.15, -0.05, bay_w - 0.82, 3.35, 0.24, 'glass')
+            m.box(cx, 0.15, -0.05, bay_w - 0.82, 3.35, 0.24, 'glass', footing=True)
             m.box(cx, 3.52, 0.30, bay_w - 0.76, 0.92, 0.26, 'dark')
             m.sign_quad(cx, 3.55, 0.45, bay_w - 0.82, 0.86, f'shop_{(i + brand_seed) % 8}')
             for fl in range(1, 5):
@@ -1015,8 +1015,8 @@ def build_nikoniko(m: Builder):
     # Walkable recessed corner entrance lobby floor + rear glass doors
     m.pose = (corner_cx + 4.2, 0.0, corner_cz - 3.8, corner_yaw)
     for step in range(2):
-        m.box(0, step * 0.11, 8.2 - step * 1.1, 13.5, 0.12, 1.2, 'pave', collide=True)
-    m.box(0, 0.2, 2.2, 12.6, 5.8, 0.5, 'glass', collide=True)
+        m.box(0, step * 0.11, 8.2 - step * 1.1, 13.5, 0.12, 1.2, 'pave', collide=True, footing=True)
+    m.box(0, 0.2, 2.2, 12.6, 5.8, 0.5, 'glass', collide=True, footing=True)
     for side in (-1, 1):
         m.cylinder_y(side * 5.2, 0.0, 6.8, 7.2, 0.68, 'alum', sections=12 if m.detail else 6, collide=True)
         if m.detail:
@@ -1067,9 +1067,9 @@ def build_nikoniko(m: Builder):
         # Three steel-and-blue-glass underground pedestrian passage canopies on NE forecourt
         for ux, uz, uyaw in ((52.5, -20.5, corner_yaw - 0.55), (46.8, -26.8, corner_yaw), (37.2, -33.2, corner_yaw + 0.55)):
             m.pose = (ux, 0.0, uz, uyaw)
-            m.box(-1.65, 0.0, 0.0, 0.32, 1.05, 5.2, 'dark', collide=True)
-            m.box(1.65, 0.0, 0.0, 0.32, 1.05, 5.2, 'dark', collide=True)
-            m.box(0.0, 0.0, -2.45, 3.62, 1.05, 0.32, 'dark', collide=True)
+            m.box(-1.65, 0.0, 0.0, 0.32, 1.05, 5.2, 'dark', collide=True, footing=True)
+            m.box(1.65, 0.0, 0.0, 0.32, 1.05, 5.2, 'dark', collide=True, footing=True)
+            m.box(0.0, 0.0, -2.45, 3.62, 1.05, 0.32, 'dark', collide=True, footing=True)
             roof_v = [
                 (-1.85, 2.55, 2.65), (1.85, 2.55, 2.65),
                 (1.85, 1.25, -2.65), (-1.85, 1.25, -2.65),
@@ -1080,7 +1080,7 @@ def build_nikoniko(m: Builder):
         m.pose = (0.0, 0.0, 0.0, 0.0)
 
         for lx, lz in ((56.8, 12.0), (52.0, 34.0), (14.0, -39.5), (-14.0, -44.5)):
-            m.cluster_lamp(lx, 0.08, lz, height=6.8, globes=5, collide=True)
+            m.cluster_lamp(lx, m.surface.ground(lx,lz)+.04, lz, height=6.8, globes=5, collide=True)
 
 
 if __name__ == '__main__':

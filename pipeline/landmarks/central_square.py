@@ -273,6 +273,9 @@ def build_central_square(m: Builder):
     dome_v[:, 1] = np.maximum(0.0, dome_v[:, 1] * 0.85) + 0.15
     dome_v[:, 0] += dx_dome
     dome_v[:, 2] += dz_dome
+    for vertex in dome_v:
+        if vertex[1] <= .15:
+            vertex[1] = m.feet_at_grade([vertex])[0]-.035
     m.mesh(dome_v, ico.faces, 'glass', collide=True)
     m.cylinder_y(dx_dome, 0.06, 0.45, dz_dome, 4.4, 'dark', sections=12, collide=True)
 

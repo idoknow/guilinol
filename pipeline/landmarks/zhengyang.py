@@ -48,6 +48,7 @@ def boulevard(model):
             for offset in np.linspace(-10,10,5 if model.detail else 2):
                 model.box(side*8.7,.12,center+offset,.6,3.3,.62,'granite',True)
                 if model.detail:
+                    model.box(side*10.68,0,center+offset,.23,.32,3.35,'granite')
                     for floor in (.3,3.9,7.2):model.box(side*10.68,floor,center+offset,.18,2.25,3.3,'glass')
                     model.box(side*10.48,.08,center+offset,.16,2.55,1.16,'wood');model.box(side*10.36,.52,center+offset,.12,1.8,.91,'glass')
                     model.box(side*10.42,2.56,center+offset,.24,.65,3.85,['red','earth','tile'][block%3])

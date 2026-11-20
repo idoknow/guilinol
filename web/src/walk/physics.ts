@@ -30,6 +30,17 @@ function fineField(data:Awaited<ReturnType<typeof import('../world').detail>>){
     return Math.max(visible,(data.water[at]===-32768?data.terrain[at]:data.water[at])/10)
   })
 }
+function weldedDeck(raw:Float32Array, corners:number[]){
+  const verts:number[]=[],indices=new Uint32Array(corners.length),seen=new Map<string,number>()
+  for(const [at,corner] of corners.entries()){
+    const i=3*corner
+    const key=`${Math.round(raw[i]*100)},${Math.round(raw[i+1]*100)},${Math.round(raw[i+2]*100)}`
+    let idx=seen.get(key)
+    if(idx===undefined){idx=verts.length/3;seen.set(key,idx);verts.push(raw[i],raw[i+1],raw[i+2])}
+    indices[at]=idx
+  }
+  return R.ColliderDesc.trimesh(Float32Array.from(verts),indices,R.TriMeshFlags.FIX_INTERNAL_EDGES)
+}
 function houses(rings:Outline[]){
   const verts:number[]=[], indices:number[]=[]
   for(const [bottom,top,loops] of rings){
@@ -75,9 +86,18 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         if(!(node instanceof THREE.Mesh))return
         let parent:THREE.Object3D|null=node;while(parent&&parent!==root&&!/^collision/i.test(parent.name))parent=parent.parent
         if(!parent||parent===root)return
-        const pos=node.geometry.getAttribute('position'),vertices=new Float32Array(pos.count*3),point=new THREE.Vector3()
+        const pos=node.geometry.getAttribute('position'),rawIdx=node.geometry.index?node.geometry.index.array:null
+        const vertices=new Float32Array(pos.count*3),point=new THREE.Vector3()
         for(let index=0;index<pos.count;index++)point.fromBufferAttribute(pos,index).applyMatrix4(node.matrixWorld).toArray(vertices,3*index)
-        colliders.push(add(R.ColliderDesc.trimesh(vertices,node.geometry.index?Uint32Array.from(node.geometry.index.array):Uint32Array.from({length:pos.count},(_,index)=>index)),'landmark'))
+        const triCount=rawIdx?rawIdx.length/3:pos.count/3,filtered:number[]=[],slabCap=root.position.y+.22
+        const keepLowSlab=/bridge|huaqiao|ronghu|mulong/.test(entry.id)
+        for(let t=0;t<triCount;t++){
+          const i0=rawIdx?rawIdx[t*3]:t*3,i1=rawIdx?rawIdx[t*3+1]:t*3+1,i2=rawIdx?rawIdx[t*3+2]:t*3+2
+          const y0=vertices[i0*3+1],y1=vertices[i1*3+1],y2=vertices[i2*3+1],hi=Math.max(y0,y1,y2)
+          if(!keepLowSlab&&hi<=slabCap)continue
+          filtered.push(i0,i1,i2)
+        }
+        if(filtered.length)colliders.push(add(R.ColliderDesc.trimesh(vertices,Uint32Array.from(filtered)),'landmark'))
       })
       landmarks.set(root,colliders);changed=true
     }
@@ -97,7 +117,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       const rings=data?.rings??[]
       if(data){const {sidewalk,banks}=data.streets
         if(sidewalk.length)colliders.push(add(R.ColliderDesc.trimesh(sidewalk,Uint32Array.from({length:sidewalk.length/3},(_,i)=>i)).setTranslation(tile.x,0,tile.z),'sidewalk'))
-        for(const [ax,az,bx,bz,top,bottom] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=(top-bottom)/10+1.25
+        for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=((top+endTop)/2-bottom)/10+1.25
           colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
       if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
       if(data?.deck.length){
@@ -109,7 +129,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         }
         for(const [thin,faces] of indices.entries()){
           if(!faces.length)continue
-          const collider=add(R.ColliderDesc.trimesh(data.deck,Uint32Array.from(faces),R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(tile.x,0,tile.z),'deck')
+          const collider=add(weldedDeck(data.deck,faces).setTranslation(tile.x,0,tile.z),'deck')
           colliders.push(collider)
           if(thin)thinDecks.add(collider.handle)
         }

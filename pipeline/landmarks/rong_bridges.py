@@ -85,6 +85,7 @@ def nine_bends(builder):
     # Landward end of way/684946201, meeting the first deck of way/221475379.
     stone = builder.parts['atlas']
     pave(builder,BANK,lambda x,z: ground(x,z)+.05)
+    bank_start=len(stone.pos)
     for start,end in zip(BANK_EDGE,BANK_EDGE[1:]):
         segment_wall(stone,start,end,BANK_Y-1.15,BANK_Y,.3,'ashlar')
     for i,(x,z) in enumerate(((79,39.6),(82,38.6),(85,37.8),(90,33.3),(94,30))):
@@ -94,6 +95,10 @@ def nine_bends(builder):
                     (x-.15,BANK_Y-.3,z+.9,reach+.4,1.35),
                     (x+.18,BANK_Y+.12,z+.7,reach,.95),
                     (x+.38,BANK_Y+.3+i%3*.16,z+.5,reach*.52,.55)],'rubble',9)
+    for i in range(bank_start,len(stone.pos)):
+        x,y,z=stone.pos[i]
+        bottom=y<BANK_Y-1
+        stone.pos[i]=(x,ground(x,z)+(-.06 if bottom else y-BANK_Y+.40),z)
     ramp(stone,(75.1,ground(75.1,34.4)+.05,34.4),(75.2,near,38.2),2.8)
     if builder.collide:
         ramp(builder.hit,(75.1,ground(75.1,34.4)+.05,34.4),(75.2,near,38.2),2.8)

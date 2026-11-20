@@ -22,8 +22,8 @@ def office(model):
         model.box(-21.76,bottom-.59,1.8,.5,.54,1.06,'granite')
         for slat in range(4):model.box(-22.02,bottom-.54+.11*slat,1.8,.04,.045,.79,'sign')
     for station in range(-20,22,3):model.foundation(surface,station,0,-3.74,.13,3.32,.10,'tile')
-    for lateral in (-2.2,0,2.2):model.box(-21.54,0,lateral,.10,3.32,.13,'tile')
-    model.box(-20.95,0,-3.52,1.18,3.32,.52,'tile')
+    for lateral in (-2.2,0,2.2):model.foundation(surface,-21.54,0,lateral,.10,3.32,.13,'tile')
+    model.foundation(surface,-20.95,0,-3.52,1.18,3.32,.52,'tile')
     for x in (-21.4,-18.4):
         model.box(x,3.05,-4.08,.09,.08,.94,'red')
     for z in (-3.65,-1.65):

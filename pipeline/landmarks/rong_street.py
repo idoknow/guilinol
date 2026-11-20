@@ -210,6 +210,12 @@ def approach(builder):
     for index in range(6):
         box(mesh,(15+index*.95,ground(15+index*.95,-24)+.035,-24),(.5,.07,4.3),'white')
     for index in range(5):
+        east=16+index
+        tube(mesh,(east,ground(east,-31)-.04,-31),(east,1.1,-31),.09,'yellow',6)
         for sign in (-1,1):
             tube(mesh,(16+index,1.1,-31),(16+index+sign*3.4,1.32,-34.4),.085,'yellow',4)
+    start=len(mesh.pos)
     railing(mesh,(12,-23),(9,-16),.25,.95,'white',1.6,stone=True)
+    for i in range(start,len(mesh.pos)):
+        x,y,z=mesh.pos[i]
+        mesh.pos[i]=(x,ground(x,z)+y-.28,z)

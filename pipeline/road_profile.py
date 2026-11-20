@@ -54,19 +54,20 @@ def facade_gap(line, index):
 
 def profile(line, tags, index,way=0):
     kind = tags['highway']
+    is_link = kind.endswith('_link')
     pedestrian = kind == 'pedestrian'
-    one_way = tags.get('oneway', 'yes' if tags.get('junction') == 'roundabout' else 'no') in ('yes','1','true','-1')
+    one_way = is_link or tags.get('oneway', 'yes' if tags.get('junction') == 'roundabout' else 'no') in ('yes','1','true','-1')
     lane = RULES['laneWidth']
     tag_width = re.fullmatch(r'(\d+(?:\.\d+)?)\s*(?:m)?', tags.get('width','').strip())
     width = float(tag_width[1]) if tag_width else None
     count = tags.get('lanes','')
     lanes = int(count) if count.isdecimal() and 0 < int(count) <= 16 else None
-    sidewalk = tags.get('sidewalk','both')
+    sidewalk = tags.get('sidewalk', 'none' if is_link else 'both')
     def edge(side):
         default = 'yes' if sidewalk in ('both', side, 'yes') else 'no'
         return RULES['sidewalkWidth'] if not pedestrian and tags.get('sidewalk:'+side, default) == 'yes' else 0
     left, right = edge('left'), edge('right')
-    samples = facade_gap(line, index) if not width and (pedestrian or not lanes) else ()
+    samples = facade_gap(line, index) if not width and not is_link and (pedestrian or not lanes) else ()
     gap = median(sample[2] for sample in samples) if samples else None
     if width:
         source = 'width'
@@ -74,6 +75,8 @@ def profile(line, tags, index,way=0):
         width, source = lanes * lane, 'lanes'
     elif gap is not None:
         width, source = max(2, gap - left - right), 'frontage'
+        if pedestrian:
+            width = min(width, RULES.get('maxPedestrianWidth', 22))
     else:
         width, source = RULES['defaultWidth'][kind], 'class'
     if pedestrian:
@@ -83,7 +86,7 @@ def profile(line, tags, index,way=0):
         if source == 'frontage':
             width = min(width, lanes * lane)
     inferred_divider = way != 221349755 and not one_way and lanes >= 4 and kind in ('trunk','primary','secondary')
-    divided = not pedestrian and tags.get('divider', 'yes' if inferred_divider else 'no') not in ('no','none','line')
+    divided = not pedestrian and not is_link and tags.get('divider', 'yes' if inferred_divider else 'no') not in ('no','none','line')
     return Road(line, width, kind, tags.get('name',''), lanes, left, right, divided, gap, source, one_way,way,samples)
 
 

@@ -103,10 +103,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(verify)spawns.push({reason,from:[x,z],to:found?[found.x,found.z]:null,distance:found?Math.hypot(found.x-x,found.z-z):null,rule:found?.rule??'none'})
     if(!found)return false
     sim.body.setTranslation(found,true);sim.body.setNextKinematicTranslation(found);sim.world.step();safe.set(found.x,found.y,found.z);velocity=0;grounded=false;return true}
+  let destination:THREE.Vector3|null=null
   async function enter(x:number,z:number,heading:number,reason:string,override=false){
-    focus.set(x,0,z);const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
+    const target=new THREE.Vector3(x,0,z);destination=target
+    const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
     const deadline=performance.now()+15000
-    while(needed.some(tile=>!stream.loaded.has(tile))&&performance.now()<deadline){stream.tick(focus);await new Promise(resolve=>setTimeout(resolve,12))}
+    while(needed.some(tile=>!stream.loaded.has(tile))&&performance.now()<deadline){if(destination!==target)return false;stream.tick(target);await new Promise(resolve=>setTimeout(resolve,12))}
     // Register nearby collision surfaces before placing the capsule. The palace
     // forecourt is a 17 cm slab above GL04, and can stream in under a new walker.
     const supports=(manifest.landmarks??[]).filter(entry=>{
@@ -117,16 +119,19 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       return Math.hypot(ex-x,ez-z)<=r+cfg.search
     })
     while(supports.some(entry=>!stream.landmarks.has(entry))&&performance.now()<deadline){
+      if(destination!==target)return false
       for(const entry of supports)if(!stream.landmarks.has(entry)){
-        focus.y=entry.position[1];stream.updateLandmarks?.(focus,entry)
+        target.y=entry.position[1];stream.updateLandmarks?.(target,entry)
       }
       await new Promise(resolve=>setTimeout(resolve,12))
     }
-    if(supports.some(entry=>!stream.landmarks.has(entry)))return false
+    if(destination!==target)return false
+    destination=null
+    if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))return false
     sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;yaw=heading;figure.rotation.y=yaw+avatar.yaw;input.show(true);accumulator=0;camera.near=.08;camera.updateProjectionMatrix();follow();return true
   }
-  function leave(){active=false;rides?.show(false);wasBoat=wasBike=false;figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function leave(){destination=null;active=false;rides?.show(false);wasBoat=wasBike=false;figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function follow(){const pos=sim.body.translation();figure.position.set(pos.x,pos.y-cfg.height/2,pos.z)
     if(rides?.boat){figure.position.copy(rides.boat.position);figure.position.y+=rides.boat.name==='raft'?-.44:-.18;figure.rotation.y=rides.heading}
     rides?.park(figure.position)
@@ -176,12 +181,15 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;blockedWater=true}
         }
       }
-      if(rides?.bike){let obstacle=false
+      if(rides?.bike){let obstacle='';const footY=next.y-cfg.height/2
         if(Math.hypot(move.x,move.z)<speed*step*.35)for(let at=0;at<sim.controller.numComputedCollisions();at++){
-          const contact=sim.controller.computedCollision(at)
-          if(contact&&contact.normal1.y<Math.cos(cfg.slope)){obstacle=true;break}
+          const contact=sim.controller.computedCollision(at),ckind=contact?.collider&&sim.kinds.get(contact.collider.handle)
+          if(contact&&contact.normal1.y<Math.cos(cfg.slope)){
+            if((ckind==='deck'||ckind==='ground'||ckind==='sidewalk')&&contact.witness1.y<=footY+cfg.step+.05)continue
+            obstacle=ckind==='building'?'building':'collision';break
+          }
         }
-        const reason=sim.insideHouse(next.x+delta.x*.72,next.z+delta.y*.72)?'building':!rides.pavement(next.x,next.z)?'off-road':obstacle?'collision':''
+        const reason=sim.insideHouse(next.x+delta.x*.72,next.z+delta.y*.72)?'building':!rides.pavement(next.x,next.z)?'off-road':obstacle
         if(reason){bikeObstacle=reason;next.x=pos.x;next.z=pos.z;rides.stop();speed=0}}
       traveled+=Math.hypot(next.x-pos.x,next.z-pos.z);sim.body.setNextKinematicTranslation(next);sim.world.step();if(grounded&&!blockedWater)safe.set(next.x,next.y,next.z)
     }
@@ -228,7 +236,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     throw Error(`Missing support at ${x},${z}`)
   }
-  return {photoSupport,enter,leave,tick,spawns,probe,boatClearance,get obstacle(){return bikeObstacle},get vehicle(){return rides?.bike?'bike':rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  return {photoSupport,enter,leave,tick,get destination(){return destination},spawns,probe,boatClearance,get obstacle(){return bikeObstacle},get vehicle(){return rides?.bike?'bike':rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on)rides?.stop()},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow()},showFigure(on:boolean){figure.visible=on&&active},
     get position(){const pos=rides?.boat?.position??sim.body.translation();return focus.set(pos.x,pos.y,pos.z)}}
 }
