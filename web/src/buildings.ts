@@ -36,7 +36,7 @@ export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:
         if(!kind&&!(x===ex&&(x===0||x===256))&&!(z===ez&&(z===0||z===256)))face([[x,level,z],[x,level+.9,z],[ex,level+.9,ez],[ex,level,ez]],true)
       }
     }
-    if(!anchor.length||kind===3)continue
+    if(!anchor.length||kind>=3)continue
     const [cx,cz]=anchor.map(v=>v/100)
     if(!kind){for(let box=0;box<seed%3;box++){
       const x=cx+box*2-1,z=cz-1,h=level+1.7

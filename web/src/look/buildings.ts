@@ -40,7 +40,7 @@ float winMask; float winHash;`)
     .replace('#include <color_fragment>', `#include <color_fragment>
 winMask = 0.; winHash = 0.;
 if (vRoof < .5) {
-  bool old = vKind > .5 && vKind < 1.5, glazed = vKind > 1.5 && vKind < 2.5, school = vKind > 2.5;
+  bool old = vKind > .5 && vKind < 1.5, glazed = vKind > 1.5 && vKind < 2.5, school = vKind > 2.5 && vKind < 3.5;
   float bay = old ? 2.8 : glazed ? 2.4 : 3.6;
   float f = vFloor, fl = fract(f), fi = floor(f), u = vFacade / bay, bx = fract(u), bi = floor(u);
   float h = facadeHash(vec3(bi, fi, vCell.x * 7. + vCell.y * 131.));
@@ -58,6 +58,15 @@ if (vRoof < .5) {
   c = mix(c, wall * uLine, 1. - step(.045, fl));                       // slab line at each storey
   vec3 avg = mix(wall, glass, cover) * mix(1., uLine, .045);
   if (f < 0.) { c = wall * .74; avg = c; }                              // plinth below the footprint base
+  else if (vKind > 3.5) {
+    // Pale masonry piers and full-height turquoise glazing beside the end bays.
+    float strip = box1(fract(vFacade / 34.), .055, .14);
+    win = max(strip, box1(fl, .31, .85) * box1(bx, .15, .85));
+    glass = mix(glass, vec3(.23, .51, .52), strip);
+    c = mix(wall, glass, win);
+    c = mix(c, wall * 1.17, max(box1(bx, .92, .99), box1(fl, .92, .98)) * (1. - strip));
+    cover = .42; avg = mix(wall, glass, cover);
+  }
   else if (school) {
     c = mix(c, uGlass, box1(fl,.12,.19));
     c = mix(c, wall, box1(fl,.2,.46)*max(step(.94,fract(u*4.)),box1(fl,.42,.45)));
