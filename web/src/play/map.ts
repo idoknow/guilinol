@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type {Host} from './host'
 import type {Atlas, Place} from '../map/atlas'
-import {spots, type Spot} from './spots'
+import {spots, waterDocks, type Spot, type WaterDock} from './spots'
 
 // 地图 (M4): one canvas painter shared by the minimap and the full map. North up, world z grows south.
 // Look follows docs/style.md: rice-paper ground, jade water, pale-green parks, karst peaks as ink mounds,
@@ -41,7 +41,7 @@ function bounds(rings:number[][]):[number,number,number,number] {
 }
 
 export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HTMLElement; stamps:Set<string>;
-  goPoint(x:number,z:number,name:string):void; goSpot(spot:Spot):void}) {
+  goPoint(x:number,z:number,name:string):void; goSpot(spot:Spot):void; goDock(dock:WaterDock):void}) {
   // --- Prepare paths once (world units), bucketed into 256 m cells for culling.
   const polys = (list:number[][][])=>list.map(rings=>{const path = new Path2D(); for(const p of rings) ring(path,p,true); return {path,box:bounds(rings)}})
   const water = index(polys(atlas.water)), green = index(polys(atlas.green))
@@ -157,13 +157,14 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
 
   // --- Full map
   const sheet = document.createElement('section'); sheet.className = 'atlas'; sheet.hidden = true
-  sheet.innerHTML = `<canvas></canvas><div class="atlas-search"><input type="search" placeholder="搜地名、路名、山名" aria-label="搜索地点" enterkeyhint="search"><ol></ol></div>
+  sheet.innerHTML = `<canvas></canvas><div class="atlas-search"><input type="search" placeholder="搜地名、路名、码头、山名" aria-label="搜索地点" enterkeyhint="search"><div class="atlas-docks">${waterDocks.map(d=>`<button type="button" data-dock="${d.id}">${d.name} · ${d.badge}</button>`).join('')}</div><ol></ol></div>
     <button class="atlas-close" aria-label="关闭地图">×</button><button class="atlas-here" aria-label="回到我的位置">◎</button>
     <div class="atlas-pop" hidden></div><p class="atlas-legend">朱印＝观景点 · 实心为已到访 · 点地图任意处可传送</p>`
   document.body.append(sheet)
   const canvas = sheet.querySelector('canvas')!, input = sheet.querySelector('input')!, results = sheet.querySelector('ol')!, pop = sheet.querySelector<HTMLElement>('.atlas-pop')!
+  for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('.atlas-docks button'))) b.onclick = ()=>{const d = waterDocks.find(x=>x.id===b.dataset.dock); if(d){close(); ui.goDock(d)}}
   const view = {x:0,z:0,scale:.5}
-  let pin:{x:number,z:number,name:string,spot?:Spot}|null = null
+  let pin:{x:number,z:number,name:string,spot?:Spot,dock?:WaterDock}|null = null
   function redraw() {
     if(sheet.hidden) return
     const w = sheet.clientWidth, h = sheet.clientHeight, dpr = Math.min(2,devicePixelRatio)
@@ -189,23 +190,24 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   function setPin(next:typeof pin) {
     pin = next; pop.hidden = !pin
     if(pin) {
-      const sub = pin.spot?pin.spot.sub:atlas.roadAt(pin.x,pin.z,40)?.name ?? ''
+      const sub = pin.spot?pin.spot.sub:pin.dock?pin.dock.sub:atlas.roadAt(pin.x,pin.z,40)?.name ?? ''
       pop.innerHTML = `<b>${pin.name}</b>${sub&&sub!==pin.name?`<span>${sub}</span>`:''}<button>前往</button>`
-      pop.querySelector('button')!.onclick = ()=>{const target = pin!; close(); if(target.spot) ui.goSpot(target.spot); else ui.goPoint(target.x,target.z,target.name)}
+      pop.querySelector('button')!.onclick = ()=>{const target = pin!; close(); if(target.spot) ui.goSpot(target.spot); else if(target.dock) ui.goDock(target.dock); else ui.goPoint(target.x,target.z,target.name)}
     }
     redraw()
   }
   function focus(x:number,z:number,scale=Math.max(view.scale,1.1)){view.x = x; view.z = z; view.scale = scale; clampView()}
   input.oninput = ()=>{
     const q = input.value.trim()
-    const hits:{name:string,sub:string,x:number,z:number,spot?:Spot}[] = q?[
+    const hits:{name:string,sub:string,x:number,z:number,spot?:Spot,dock?:WaterDock}[] = q?[
+      ...waterDocks.filter(d=>d.name.includes(q)||d.sub.includes(q)||d.keywords.includes(q)).map(d=>({name:d.name,sub:'水边开船 · '+d.badge,x:d.x,z:d.z,dock:d})),
       ...spots.filter(s=>s.name.includes(q)||s.sub.includes(q)).map(s=>({name:s.name,sub:'观景点 · '+s.sub,x:s.x,z:s.z,spot:s})),
       ...atlas.search(q,8).map((p:Place)=>({name:p.n,sub:{peak:'山',scenic:'景点',gate:'城门',bridge:'桥',water:'水面',park:'公园',museum:'博物馆',memorial:'纪念地',road:'道路',school:'学校'}[p.k],x:p.x,z:p.z}))]:[]
     const seen = new Set<string>()
     results.innerHTML = ''
     for(const hit of hits) { if(seen.has(hit.name)||seen.size>=8) continue; seen.add(hit.name)
       const li = document.createElement('li'); li.innerHTML = `<b>${hit.name}</b><span>${hit.sub}</span>`
-      li.onclick = ()=>{focus(hit.x,hit.z); setPin({x:hit.x,z:hit.z,name:hit.name,spot:hit.spot}); results.innerHTML = ''; input.blur()}
+      li.onclick = ()=>{focus(hit.x,hit.z); setPin({x:hit.x,z:hit.z,name:hit.name,spot:hit.spot,dock:hit.dock}); results.innerHTML = ''; input.blur()}
       results.append(li)}
     if(q&&!seen.size) results.innerHTML = '<li class="none">没有找到</li>'
   }

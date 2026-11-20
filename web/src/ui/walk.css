@@ -1,0 +1,30 @@
+.walk-ui{position:fixed;inset:0;z-index:2;pointer-events:none}
+.walk-ui>*{pointer-events:auto}
+.walk-ui .joystick{left:calc(18px + env(safe-area-inset-left));bottom:calc(28px + env(safe-area-inset-bottom));width:112px;height:112px}
+.walk-ui .joystick-knob{width:46px;height:46px}
+.walk-ui .btn-run,.walk-ui .btn-jump,.walk-ui .btn-view{position:fixed;border-radius:50%;display:grid;place-items:center;padding:0;box-sizing:border-box}
+.walk-ui .btn-jump{right:calc(18px + env(safe-area-inset-right));bottom:calc(30px + env(safe-area-inset-bottom));width:68px;height:68px;font-size:21px}
+.walk-ui .btn-run{right:calc(98px + env(safe-area-inset-right));bottom:calc(26px + env(safe-area-inset-bottom));width:56px;height:56px;font-size:17px;letter-spacing:.04em}
+.walk-ui .btn-run.on{background:rgba(169,80,60,.68);border-color:rgba(244,239,226,.72);box-shadow:0 0 0 2px rgba(214,120,92,.32)}
+.walk-ui .btn-view{right:calc(22px + env(safe-area-inset-right));bottom:calc(112px + env(safe-area-inset-bottom));width:48px;height:48px;font-size:12px;letter-spacing:.04em}
+body[data-aboard] :is(.btn-jump,.btn-run){display:none}
+body[data-aboard] .joystick.running::after{border-color:rgba(169,80,60,0)}
+.toast{z-index:6;box-sizing:border-box;width:max-content;max-width:min(520px,calc(100vw - 32px));text-align:center;line-height:1.45;border:1px solid rgba(244,239,226,.34)}
+@media (hover:hover) and (pointer:fine){
+  .vehicle-action{box-shadow:0 4px 16px rgba(18,30,28,.28),0 0 0 1px rgba(214,120,92,.35)}
+  .vehicle-action::before{content:attr(aria-keyshortcuts);display:inline-grid;place-items:center;min-width:1.45em;height:1.45em;margin-right:.55em;padding:0 .24em;border-radius:5px;border:1px solid rgba(244,239,226,.72);background:linear-gradient(180deg,rgba(244,239,226,.26),rgba(244,239,226,.12));box-shadow:0 2px 0 rgba(244,239,226,.38),inset 0 1px 0 rgba(255,255,255,.28);font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:0;vertical-align:1px}
+}
+@media (pointer:coarse){
+  .vehicle-action{bottom:calc(170px + env(safe-area-inset-bottom));max-width:calc(100vw - 168px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .toast{max-width:calc(100vw - 32px);font-size:13.5px;padding:8px 16px}
+}
+@media (pointer:coarse) and (max-width:520px){
+  html,body{overflow:hidden;max-width:100vw}
+  .toast{top:calc(336px + env(safe-area-inset-top))}
+  output{max-width:calc(100vw - 156px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  footer{max-width:calc(100vw - 16px);font-size:8px;overflow:hidden;text-overflow:ellipsis}
+  .sky-ui{max-width:calc(100vw - 156px);flex-wrap:wrap;row-gap:2px;padding:4px 8px}
+  .sky-ui .sky-time{min-width:6.6em}
+  .sky-ui button{width:26px;height:25px}
+  .dock .minimap{width:108px;height:108px}
+}

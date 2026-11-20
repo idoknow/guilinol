@@ -3,12 +3,15 @@ import * as THREE from 'three'
 import type {PeakColliderData, PeaksGroup} from '../peaks'
 import type {Stream} from '../stream'
 import {fetchAsset,type Manifest,type Tile} from '../world'
+import {look} from '../look/config'
 import {walkConfig as cfg} from './config'
+import {probeCarDismount, probeCarMount} from './car'
+import {probeLocalDismount, probeLocalMount} from './ride'
 
 type Outline = import('../buildings').Building
-type Kind = 'ground'|'overview'|'deck'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
+type Kind = 'ground'|'overview'|'road'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
 type Region = {fine:boolean,colliders:R.Collider[],rings:Outline[]}
-const identity = {x:0,y:0,z:0,w:1}, down = {x:0,y:-1,z:0}
+const identity = {x:0,y:0,z:0,w:1}, down = {x:0,y:-1,z:0}, up = {x:0,y:1,z:0}
 const candidates = [{dx:0,dz:0}]
 for(let dx=-cfg.search;dx<=cfg.search;dx+=2) for(let dz=-cfg.search;dz<=cfg.search;dz+=2)
   if((dx||dz)&&Math.hypot(dx,dz)<=cfg.search)candidates.push({dx,dz})
@@ -30,16 +33,88 @@ function fineField(data:Awaited<ReturnType<typeof import('../world').detail>>){
     return Math.max(visible,(data.water[at]===-32768?data.terrain[at]:data.water[at])/10)
   })
 }
-function weldedDeck(raw:Float32Array, corners:number[]){
-  const verts:number[]=[],indices=new Uint32Array(corners.length),seen=new Map<string,number>()
-  for(const [at,corner] of corners.entries()){
+function weldedIndexed(vertices:Float32Array, rawIndices:number[]){
+  const verts:number[]=[],idxList:number[]=[],seen=new Map<string,number>()
+  const addVertex=(corner:number)=>{
+    const i=3*corner
+    const key=`${Math.round(vertices[i]*100)},${Math.round(vertices[i+1]*100)},${Math.round(vertices[i+2]*100)}`
+    let idx=seen.get(key)
+    if(idx===undefined){idx=verts.length/3;seen.set(key,idx);verts.push(vertices[i],vertices[i+1],vertices[i+2])}
+    return idx
+  }
+  for(let t=0;t+2<rawIndices.length;t+=3){
+    const a=addVertex(rawIndices[t]),b=addVertex(rawIndices[t+1]),c=addVertex(rawIndices[t+2])
+    if(a!==b&&b!==c&&c!==a)idxList.push(a,b,c)
+  }
+  return idxList.length?R.ColliderDesc.trimesh(Float32Array.from(verts),Uint32Array.from(idxList),R.TriMeshFlags.FIX_INTERNAL_EDGES):null
+}
+function weldedSurface(raw:Float32Array, corners:number[]|null, data:Awaited<ReturnType<typeof import('../world').detail>>, maxGap:number, minRun:number, maxRun:number, runScale:number){
+  const verts:number[]=[],idxList:number[]=[],seen=new Map<string,number>()
+  const addVertex=(corner:number)=>{
     const i=3*corner
     const key=`${Math.round(raw[i]*100)},${Math.round(raw[i+1]*100)},${Math.round(raw[i+2]*100)}`
     let idx=seen.get(key)
     if(idx===undefined){idx=verts.length/3;seen.set(key,idx);verts.push(raw[i],raw[i+1],raw[i+2])}
-    indices[at]=idx
+    return idx
   }
-  return R.ColliderDesc.trimesh(Float32Array.from(verts),indices,R.TriMeshFlags.FIX_INTERNAL_EDGES)
+  if(corners){
+    for(let t=0;t+2<corners.length;t+=3){
+      const a=addVertex(corners[t]),b=addVertex(corners[t+1]),c=addVertex(corners[t+2])
+      if(a!==b&&b!==c&&c!==a)idxList.push(a,b,c)
+    }
+  }else{
+    for(let t=0;t+2<raw.length/3;t+=3){
+      const a=addVertex(t),b=addVertex(t+1),c=addVertex(t+2)
+      if(a!==b&&b!==c&&c!==a)idxList.push(a,b,c)
+    }
+  }
+  if(!idxList.length)return null
+  // Smooth low dry abutment/road-shoulder edges onto terrain so pedestrians and vehicles glide up without snagging.
+  const edgeCount=new Map<string,number>(), edgeTri=new Map<string,[number,number,number]>()
+  const addEdge=(u:number,v:number,w:number)=>{
+    const k=u<v?`${u}:${v}`:`${v}:${u}`
+    edgeCount.set(k,(edgeCount.get(k)??0)+1)
+    edgeTri.set(k,[u,v,w])
+  }
+  for(let t=0;t<idxList.length;t+=3){
+    const a=idxList[t],b=idxList[t+1],c=idxList[t+2]
+    addEdge(a,b,c);addEdge(b,c,a);addEdge(c,a,b)
+  }
+  const pos=data.groundMesh.geometry.getAttribute('position')
+  const stride=data.groundMesh.geometry.parameters.widthSegments+1, step=256/(stride-1)
+  const groundAt=(lx:number,lz:number)=>{
+    const c=Math.min(stride-2,Math.max(0,Math.floor(lx/step))), r=Math.min(stride-2,Math.max(0,Math.floor(lz/step)))
+    const u=lx/step-c, v=lz/step-r, at=r*stride+c
+    const a=pos.getY(at), b=pos.getY(at+1), cc=pos.getY(at+stride), d=pos.getY(at+stride+1)
+    const vis=u+v<=1?a+(b-a)*u+(cc-a)*v:d+(cc-d)*(1-u)+(b-d)*(1-v)
+    const gi=Math.min(64,Math.max(0,Math.round(lz/4)))*65+Math.min(64,Math.max(0,Math.round(lx/4)))
+    return Math.max(vis,(data.water[gi]===-32768?data.terrain[gi]:data.water[gi])/10)
+  }
+  const dryAt=(lx:number,lz:number)=>data.water[Math.min(64,Math.max(0,Math.round(lz/4)))*65+Math.min(64,Math.max(0,Math.round(lx/4)))]===-32768
+  for(const [k,cnt] of edgeCount){
+    if(cnt!==1)continue
+    const [u,v,w]=edgeTri.get(k)!
+    const ax=verts[u*3],ay=verts[u*3+1],az=verts[u*3+2]
+    const bx=verts[v*3],by=verts[v*3+1],bz=verts[v*3+2]
+    if((ax<.15&&bx<.15)||(ax>255.85&&bx>255.85)||(az<.15&&bz<.15)||(az>255.85&&bz>255.85))continue
+    const ex=bx-ax, ez=bz-az, elen=Math.hypot(ex,ez); if(elen<.2)continue
+    const mx=(ax+bx)*.5, mz=(az+bz)*.5
+    let nx=-ez/elen, nz=ex/elen
+    if((verts[w*3]-mx)*nx+(verts[w*3+2]-mz)*nz>0){nx=-nx;nz=-nz}
+    const gA=groundAt(ax,az), gB=groundAt(bx,bz), gap=Math.max(ay-gA,by-gB)
+    if(gap<=.04||gap>maxGap)continue
+    const run=Math.min(maxRun,Math.max(minRun,gap*runScale))
+    const a2x=ax+nx*run, a2z=az+nz*run, b2x=bx+nx*run, b2z=bz+nz*run
+    if(a2x<.1||a2x>255.9||b2x<.1||b2x>255.9||a2z<.1||a2z>255.9||b2z<.1||b2z>255.9)continue
+    if(!dryAt(ax,az)||!dryAt(bx,bz)||!dryAt(mx,mz)||!dryAt(a2x,a2z)||!dryAt(b2x,b2z)||!dryAt(mx+nx*run,mz+nz*run))continue
+    const gA2=groundAt(a2x,a2z), gB2=groundAt(b2x,b2z)
+    if(Math.max(ay-gA2,by-gB2)>maxGap)continue
+    const u2=verts.length/3; verts.push(a2x,Math.min(ay-.02,gA2-.04),a2z)
+    const v2=verts.length/3; verts.push(b2x,Math.min(by-.02,gB2-.04),b2z)
+    if((bz-az)*(a2x-ax)-(bx-ax)*(a2z-az)>=0)idxList.push(u,v,v2,u,v2,u2)
+    else idxList.push(u,v2,v,u,u2,v2)
+  }
+  return R.ColliderDesc.trimesh(Float32Array.from(verts),Uint32Array.from(idxList),R.TriMeshFlags.FIX_INTERNAL_EDGES)
 }
 function houses(rings:Outline[]){
   const verts:number[]=[], indices:number[]=[]
@@ -60,9 +135,9 @@ function houses(rings:Outline[]){
 export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksGroup,rapierInit?:Promise<void>){
   const [,buffer]=await Promise.all([rapierInit??R.init(),fetchAsset(manifest.overview.heights.file)])
   const overview=new Int16Array(buffer), [left,top,width]=manifest.extent
-  const world=new R.World({x:0,y:cfg.gravity,z:0}), controller=world.createCharacterController(.025)
+  const world=new R.World({x:0,y:cfg.gravity,z:0}), controller=world.createCharacterController(cfg.skin)
   controller.setMaxSlopeClimbAngle(cfg.slope);controller.setMinSlopeSlideAngle(cfg.slope)
-  controller.enableAutostep(cfg.step,.18,false);controller.enableSnapToGround(cfg.snap)
+  controller.enableAutostep(cfg.step,cfg.stepWidth,false);controller.enableSnapToGround(cfg.snap)
   const shape=new R.Capsule(cfg.height/2-cfg.radius,cfg.radius)
   const body=world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(0,-500,0))
   const capsule=world.createCollider(new R.ColliderDesc(shape),body)
@@ -89,15 +164,26 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         const pos=node.geometry.getAttribute('position'),rawIdx=node.geometry.index?node.geometry.index.array:null
         const vertices=new Float32Array(pos.count*3),point=new THREE.Vector3()
         for(let index=0;index<pos.count;index++)point.fromBufferAttribute(pos,index).applyMatrix4(node.matrixWorld).toArray(vertices,3*index)
-        const triCount=rawIdx?rawIdx.length/3:pos.count/3,filtered:number[]=[],slabCap=root.position.y+.22
+        const triCount=rawIdx?rawIdx.length/3:pos.count/3,filtered:number[]=[],lowSlabs:number[]=[],slabCap=root.position.y+.22
         const keepLowSlab=/bridge|huaqiao|ronghu|mulong/.test(entry.id)
         for(let t=0;t<triCount;t++){
           const i0=rawIdx?rawIdx[t*3]:t*3,i1=rawIdx?rawIdx[t*3+1]:t*3+1,i2=rawIdx?rawIdx[t*3+2]:t*3+2
-          const y0=vertices[i0*3+1],y1=vertices[i1*3+1],y2=vertices[i2*3+1],hi=Math.max(y0,y1,y2)
-          if(!keepLowSlab&&hi<=slabCap)continue
+          const x0=vertices[i0*3],y0=vertices[i0*3+1],z0=vertices[i0*3+2]
+          const x1=vertices[i1*3],y1=vertices[i1*3+1],z1=vertices[i1*3+2]
+          const x2=vertices[i2*3],y2=vertices[i2*3+1],z2=vertices[i2*3+2]
+          const hi=Math.max(y0,y1,y2)
+          if(!keepLowSlab&&hi<=slabCap){
+            const e1x=x1-x0,e1y=y1-y0,e1z=z1-z0,e2x=x2-x0,e2y=y2-y0,e2z=z2-z0
+            const nx=e1y*e2z-e1z*e2y,ny=e1z*e2x-e1x*e2z,nz=e1x*e2y-e1y*e2x,len=Math.hypot(nx,ny,nz)
+            if(len>1e-6&&ny/len>=.7)lowSlabs.push(i0,i1,i2)
+            continue
+          }
           filtered.push(i0,i1,i2)
         }
-        if(filtered.length)colliders.push(add(R.ColliderDesc.trimesh(vertices,Uint32Array.from(filtered)),'landmark'))
+        const solidDesc=filtered.length?weldedIndexed(vertices,filtered):null
+        if(solidDesc)colliders.push(add(solidDesc,'landmark'))
+        const slabDesc=lowSlabs.length?weldedIndexed(vertices,lowSlabs):null
+        if(slabDesc)colliders.push(add(slabDesc,'sidewalk'))
       })
       landmarks.set(root,colliders);changed=true
     }
@@ -115,8 +201,11 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       const ground=data?fineField(data):field(8,(col,row)=>overview[start+row*stride+col]/10)
       const colliders=[add(ground.setTranslation(tile.x+128,0,tile.z+128),data?'ground':'overview')]
       const rings=data?.rings??[]
-      if(data){const {sidewalk,banks}=data.streets
-        if(sidewalk.length)colliders.push(add(R.ColliderDesc.trimesh(sidewalk,Uint32Array.from({length:sidewalk.length/3},(_,i)=>i)).setTranslation(tile.x,0,tile.z),'sidewalk'))
+      if(data){const {sidewalk,road,banks}=data.streets
+        const swDesc=sidewalk.length?weldedSurface(sidewalk,null,data,.65,.38,1.4,2.4):null
+        if(swDesc)colliders.push(add(swDesc.setTranslation(tile.x,0,tile.z),'sidewalk'))
+        const rdDesc=road.length?weldedSurface(road,null,data,.65,.8,1.8,4):null
+        if(rdDesc)colliders.push(add(rdDesc.setTranslation(tile.x,0,tile.z),'road'))
         for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=((top+endTop)/2-bottom)/10+1.25
           colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
       if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
@@ -129,7 +218,9 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         }
         for(const [thin,faces] of indices.entries()){
           if(!faces.length)continue
-          const collider=add(weldedDeck(data.deck,faces).setTranslation(tile.x,0,tile.z),'deck')
+          const desc=weldedSurface(data.deck,faces,data,.80,1.2,2.8,5)
+          if(!desc)continue
+          const collider=add(desc.setTranslation(tile.x,0,tile.z),'deck')
           colliders.push(collider)
           if(thin)thinDecks.add(collider.handle)
         }
@@ -169,26 +260,96 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   }
   const tiles=new Map(manifest.chunks.map(tile=>[`${tile.x},${tile.z}`,tile]))
   const tileAt=(east:number,south:number)=>tiles.get(`${Math.floor(east/256)*256},${Math.floor(south/256)*256}`)
+  const surfaceRay=new R.Ray({x:0,y:0,z:0},down)
+  const upRay=new R.Ray({x:0,y:0,z:0},up)
+  const segmentRay=new R.Ray({x:0,y:0,z:0},{x:1,y:0,z:0})
+  const hullBoxes=new Map<string,R.Cuboid>()
+  const deckFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='deck'||k==='deckThin'}
+  const spanFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'}
+  const wallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='building'}
+  const hullFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='rail'||k==='building'}
+  const carWallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='building'||k==='rail'||k==='peak'||k==='tree'}
+  const landmarkFilter=(coll:R.Collider)=>kinds.get(coll.handle)==='landmark'
+  const walkableFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='deck'||k==='deckThin'||k==='sidewalk'||k==='road'||k==='ground'||k==='overview'||k==='landmark'}
   function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
-    const hit=world.castRayAndGetNormal(new R.Ray({x:east,y:origin,z:south},down),reach,false,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)
-    const thin=!!hit&&thinDecks.has(hit.collider.handle)
+    surfaceRay.origin.x=east;surfaceRay.origin.y=origin;surfaceRay.origin.z=south
+    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)
+    const thin=!!hit&&(thinDecks.has(hit.collider.handle)||kinds.get(hit.collider.handle)==='deckThin')
     return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}:null
+  }
+  function groundSurface(east:number,south:number,footY:number){
+    const origin=footY+.18
+    surfaceRay.origin.x=east;surfaceRay.origin.y=origin;surfaceRay.origin.z=south
+    const hit=world.castRayAndGetNormal(surfaceRay,.5,false,undefined,undefined,capsule,undefined,walkableFilter)
+    if(!hit)return null
+    const slope=Math.acos(Math.min(1,Math.abs(hit.normal.y)))
+    if(slope>cfg.slope+.18)return null
+    return {y:origin-hit.timeOfImpact,slope,kind:kinds.get(hit.collider.handle)!}
+  }
+  function waterCeiling(east:number,south:number,waterY:number){
+    let bottom=Infinity
+    if(hasDeck(east,south)){
+      upRay.origin.x=east;upRay.origin.y=waterY-.8;upRay.origin.z=south
+      const deckHit=world.castRayAndGetNormal(upRay,16,false,undefined,undefined,capsule,undefined,deckFilter)
+      if(deckHit){const thick=(thinDecks.has(deckHit.collider.handle)||kinds.get(deckHit.collider.handle)==='deckThin')?.6:look.bridgeDepth
+        bottom=Math.min(bottom,waterY-.8+deckHit.timeOfImpact-thick)}
+    }
+    upRay.origin.x=east;upRay.origin.y=waterY+.15;upRay.origin.z=south
+    const spanHit=world.castRayAndGetNormal(upRay,15,false,undefined,undefined,capsule,undefined,spanFilter)
+    if(spanHit)bottom=Math.min(bottom,waterY+.15+spanHit.timeOfImpact)
+    return bottom
+  }
+  function waterOverlap(x:number,y:number,z:number,heading:number,halfW:number,halfH:number,halfL:number){
+    const key=`${halfW.toFixed(3)},${halfH.toFixed(3)},${halfL.toFixed(3)}`
+    let box=hullBoxes.get(key)
+    if(!box){box=new R.Cuboid(halfW,halfH,halfL);hullBoxes.set(key,box)}
+    const half=heading*.5
+    return !!world.intersectionWithShape({x,y,z},{x:0,y:Math.sin(half),z:0,w:Math.cos(half)},box,undefined,undefined,capsule,undefined,hullFilter)
+  }
+  function pathBlocked(x0:number,z0:number,x1:number,z1:number,y:number){
+    const dx=x1-x0,dz=z1-z0,len=Math.hypot(dx,dz)
+    if(len<1e-3)return false
+    segmentRay.origin.x=x0;segmentRay.origin.y=y;segmentRay.origin.z=z0
+    segmentRay.dir.x=dx/len;segmentRay.dir.y=0;segmentRay.dir.z=dz/len
+    return !!world.castRay(segmentRay,len,true,undefined,undefined,capsule,undefined,wallFilter)
+  }
+  function freeCapsule(x:number,y:number,z:number){
+    return !world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule)
   }
   function wet(east:number,south:number){const tile=tileAt(east,south),data=tile&&stream.loaded.get(tile);if(!tile||!data)return true
     const at=Math.round((south-tile.z)/4)*65+Math.round((east-tile.x)/4)
     return data.water[at]!==-32768&&data.water[at]-data.terrain[at]>5
   }
-  function insideHouse(east:number,south:number){const tile=tileAt(east,south);if(!tile)return false
+  const solidLandmarks=(manifest.landmarks??[]).flatMap(entry=>(entry.solid??[]).map(([bottom,top,loop])=>{
+    let minX=Infinity,maxX=-Infinity,minZ=Infinity,maxZ=-Infinity
+    for(const [lx,lz] of loop){if(lx<minX)minX=lx;if(lx>maxX)maxX=lx;if(lz<minZ)minZ=lz;if(lz>maxZ)maxZ=lz}
+    return {bottom,top,loop,minX,maxX,minZ,maxZ}
+  }))
+  function insideHouse(east:number,south:number,y?:number){const tile=tileAt(east,south);if(!tile)return false
     const px=(east-tile.x)*100,pz=(south-tile.z)*100
-    return regions.get(tile)?.rings.some(([, ,loops])=>{let inside=false
+    const inRing=regions.get(tile)?.rings.some(([bottom,top,loops])=>{
+      if(y!==undefined&&(y<bottom/10||y>top/10))return false
+      let inside=false
       for(const loop of loops)for(let at=0,prev=loop.length-1;at<loop.length;prev=at++){
         const [ax,az]=loop[at],[bx,bz]=loop[prev];if((az>pz)!==(bz>pz)&&px<(bx-ax)*(pz-az)/(bz-az)+ax)inside=!inside
       }return inside})??false
+    if(inRing)return true
+    for(const solid of solidLandmarks){
+      if(east<solid.minX||east>solid.maxX||south<solid.minZ||south>solid.maxZ)continue
+      if(y!==undefined&&(y<solid.bottom||y>solid.top))continue
+      let inside=false
+      const loop=solid.loop
+      for(let at=0,prev=loop.length-1;at<loop.length;prev=at++){
+        const [ax,az]=loop[at],[bx,bz]=loop[prev];if((az>south)!==(bz>south)&&east<(bx-ax)*(south-az)/(bz-az)+ax)inside=!inside
+      }
+      if(inside)return true
+    }
+    return false
   }
   function findWalkableSpawn(east:number,south:number,override=false){
     for(const {dx,dz} of override?[candidates[0]]:candidates){const x=east+dx,z=south+dz,tile=tileAt(x,z)
       if(!tile||!stream.loaded.has(tile)||insideHouse(x,z))continue
-      const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
+      const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'road')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
       const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05)continue
       const tread=surface(x,z,'landmark',support.y+cfg.step+.02,cfg.step+.04)
       const floor=tread&&tread.slope<=cfg.slope?Math.max(tread.y,support.y):support.y
@@ -197,7 +358,47 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return {x,y,z,rule:(dx||dz?'search-':'')+(deck?'bridge':'land')}
     }return null
   }
-  function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,coll=>kinds.get(coll.handle)===kind)}
+  function hasDeck(east:number,south:number){const tile=tileAt(east,south);return !!(tile&&stream.loaded.get(tile)?.deck.length)}
+  function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)}
   function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear()}
-  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,surface,wet,insideHouse,findWalkableSpawn}
+  function findLocalDismount(cx:number,cz:number,heading:number,bikeY:number){
+    return probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,bikeY)
+  }
+  function findLocalMount(px:number,py:number,pz:number,bx:number,by:number,bz:number){
+    return probeLocalMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},px,py,pz,bx,by,bz)
+  }
+  function findCarDismount(cx:number,cz:number,heading:number,carY:number){
+    return probeCarDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,carY)
+  }
+  function findCarMount(px:number,py:number,pz:number,cx:number,cy:number,cz:number){
+    return probeCarMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},px,py,pz,cx,cy,cz)
+  }
+  function carOverlap(x:number,footY:number,z:number,heading:number,dirSign:-1|0|1=0){
+    const fx=-Math.sin(heading),fz=-Math.cos(heading),rx=Math.cos(heading),rz=-Math.sin(heading)
+    const halfL=dirSign===0?2.12:1.62,shift=dirSign*.52
+    const key=`car:${halfL.toFixed(2)}`
+    let box=hullBoxes.get(key)
+    if(!box){box=new R.Cuboid(.86,.48,halfL);hullBoxes.set(key,box)}
+    const half=heading*.5
+    if(world.intersectionWithShape({x:x+fx*shift,y:footY+.82,z:z+fz*shift},{x:0,y:Math.sin(half),z:0,w:Math.cos(half)},box,undefined,undefined,capsule,undefined,carWallFilter))return true
+    const dirs:[number,number,number][]=[]
+    if(dirSign>=0)dirs.push([fx,fz,2.18],[fx*2.14-rx*.84,fz*2.14-rz*.84,1],[fx*2.14+rx*.84,fz*2.14+rz*.84,1])
+    if(dirSign<=0)dirs.push([-fx,-fz,2.18],[-fx*2.14-rx*.84,-fz*2.14-rz*.84,1],[-fx*2.14+rx*.84,-fz*2.14+rz*.84,1])
+    for(const oy of [.65,1.15]){
+      segmentRay.origin.x=x;segmentRay.origin.y=footY+oy;segmentRay.origin.z=z
+      for(const [dx,dz,scale] of dirs){
+        const len=scale===1?Math.hypot(dx,dz):scale
+        segmentRay.dir.x=dx/(scale===1?len:1);segmentRay.dir.y=0;segmentRay.dir.z=dz/(scale===1?len:1)
+        if(world.castRay(segmentRay,len,true,undefined,undefined,capsule,undefined,landmarkFilter))return true
+      }
+    }
+    return false
+  }
+  function isBlockedAt(x:number,y:number,z:number){
+    return !!world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule,undefined,coll=>{
+      const k=kinds.get(coll.handle)
+      return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
+    })
+  }
+  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,pathBlocked,freeCapsule,wet,insideHouse,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
 }

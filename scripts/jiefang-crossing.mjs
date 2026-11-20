@@ -26,11 +26,11 @@ try {
         if(performance.now()>deadline)throw Error('Bridge collision mesh did not load')
         await new Promise(resolve=>requestAnimationFrame(resolve))
       }
-      if(!await walk.enter(...window.toWorld([-118,-30]),0,'lower bike stand'))throw Error('Lower approach spawn failed')
+      if(!await walk.enter(...window.toWorld([-117.5,-25.0]),0,'lower bike stand'))throw Error('Lower approach spawn failed')
     })
     if(mode==='ride'){
       await page.evaluate(()=>{
-        const walk=window.viewer.walk,[x,z]=window.toWorld([-118,-31])
+        const walk=window.viewer.walk,[x,z]=window.toWorld([-117.5,-26.0])
         for(let i=0;i<80;i++){
           const p=walk.position,dx=x-p.x,dz=z-p.z
           if(Math.hypot(dx,dz)<1.8)break
@@ -38,8 +38,8 @@ try {
         }
         walk.drive(0,0)
       })
-      await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent.includes('骑行'))
-      await page.keyboard.press('e')
+      await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent.includes('骑电动车'))
+      await page.keyboard.press('f')
       assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'bike')
     }
     const result=await page.evaluate(([mode,ways])=>{
