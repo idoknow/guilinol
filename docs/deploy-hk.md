@@ -11,6 +11,8 @@
 
 ## 切流与回滚（sg claude）
 
+默认部署不含反馈桥，sg timer 保持原状。下面的桥迁移步骤和桥验收项仅在 Rock 确认迁桥后适用；在此之前不要创建 Secret、应用 `deploy/k8s/bridge`、停用 timer 或迁移其状态。
+
 切流时先 `systemctl --user disable --now glol-feedback-bridge.timer`，等待 `glol-feedback-bridge.service` 正常退出。将旧 `BRIDGE_STATE` 的持久日志（`*.json`，含已派单关联和去重标记，不含 lock、run-* 和原照片）通过私有通道复制到 `idoknow/glol-feedback-bridge` PVC 的根目录（容器内 `/state`），校验文件数与摘要。旧状态目录保留不删。目标验收完成后由 sg claude 执行 `kubectl -n idoknow patch cronjob glol-feedback-bridge --type=merge -p '{"spec":{"suspend":false}}'`。同时把部署清单中的暂停状态改为正式值，否则下次部署会再次暂停。观察首个 Job 正常退出，确认只存在一个派单方。回滚时顺序反过来：暂停集群 CronJob、等待在途 Job 结束、回同步最新日志，再恢复 sg timer；不要两端同时运行。
 
 1. 停止源站写入，暂停反馈桥写入；同时限制目标端写入直至同步与验证结束。记录切换时间和旧的代理 CNAME。
