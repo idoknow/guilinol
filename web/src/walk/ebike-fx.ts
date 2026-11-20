@@ -1,8 +1,23 @@
 import * as T from 'three'
-import type {EbikeModConfig, EbikeModPreset, EbikeVisualRig} from './vehicle-model'
+import type {EbikeModConfig, EbikeModPreset, EbikeVehicleKind, EbikeVisualRig} from './vehicle-model'
 
 export type EbikeCrashPhase = 'none' | 'crashed' | 'recovering'
 export type EbikeCrashReason = '' | 'impact' | 'lowside' | 'loopout'
+export type EbikeVehicleType = EbikeVehicleKind
+
+export interface EbikeVehicleProfile {
+  type: EbikeVehicleType
+  label: string
+  badge: string
+  maxKmh: number
+  gearCaps: readonly [number, number, number, number]
+  drainBase: number
+}
+
+export const EBIKE_VEHICLE_PROFILES: Record<EbikeVehicleType, EbikeVehicleProfile> = {
+  normal: {type: 'normal', label: '普通电动车', badge: '电摩', maxKmh: 50, gearCaps: [18, 25, 38, 50], drainBase: .24},
+  shared: {type: 'shared', label: '共享电动车', badge: '共享', maxKmh: 40, gearCaps: [18, 25, 32, 40], drainBase: .34},
+}
 
 export interface EbikeGearSpec {
   id: number
@@ -14,9 +29,9 @@ export interface EbikeGearSpec {
 
 export const EBIKE_GEARS: readonly EbikeGearSpec[] = [
   {id: 1, label: 'D1', hint: '缓行', targetKmh: 18, wheelieEase: .45},
-  {id: 2, label: 'D2', hint: '均衡', targetKmh: 25, wheelieEase: .75},
-  {id: 3, label: 'D3', hint: '畅行', targetKmh: 38, wheelieEase: 1.05},
-  {id: 4, label: 'S', hint: '鬼火', targetKmh: 52, wheelieEase: 1.35},
+  {id: 2, label: 'D2', hint: '合规', targetKmh: 25, wheelieEase: .75},
+  {id: 3, label: 'D3', hint: '提速', targetKmh: 38, wheelieEase: 1.05},
+  {id: 4, label: 'S', hint: '运动', targetKmh: 50, wheelieEase: 1.35},
 ]
 
 export interface EbikeRideControlInput {
@@ -34,8 +49,14 @@ export interface EbikeRideControlInput {
  * back to lightweight presentation-side estimation so riders still get live lean, wheelie, gear & crash FX.
  */
 export interface ExternalEbikeTelemetry {
+  vehicleType?: EbikeVehicleType
+  isShared?: boolean
   gear?: number
   gearLabel?: string
+  maxKmh?: number
+  battery?: number
+  lowBattery?: boolean
+  criticalBattery?: boolean
   wheelie?: number
   lean?: number
   leanLimit?: number
@@ -49,10 +70,18 @@ export interface ExternalEbikeTelemetry {
 }
 
 export interface EbikeTelemetrySnapshot {
+  vehicleType: EbikeVehicleType
+  vehicleLabel: string
+  vehicleBadge: string
   gear: number
   gearLabel: string
+  maxKmh: number
   speed: number
   kmh: number
+  battery: number
+  lowBattery: boolean
+  criticalBattery: boolean
+  batteryDepleted: boolean
   lean: number
   leanLimit: number
   wheelie: number
@@ -101,7 +130,9 @@ export interface SafeMoveProbe {
 }
 
 export function createEbikeFxController() {
+  let vehicleType: EbikeVehicleType = 'normal'
   let gear = 2
+  let battery = 100
   let modPreset: EbikeModPreset = 'stock'
   let customMods: Partial<EbikeModConfig> | null = null
   let wheelie = 0
@@ -121,6 +152,7 @@ export function createEbikeFxController() {
   let bikeSlideX = 0
   let bikeSlideZ = 0
   let lastNotifiedCrash: EbikeCrashPhase = 'none'
+  let lowBatteryWarned = false
 
   const RECOVER_DURATION = .72
   const LEAN_LIMIT = .56
@@ -143,6 +175,32 @@ export function createEbikeFxController() {
     riderEjectX = riderEjectZ = 0
     bikeSlideX = bikeSlideZ = 0
     lastNotifiedCrash = 'none'
+  }
+
+  /** Resets to <=25 km/h compliant gear (D2) on every mount while keeping vehicle type and remaining battery. */
+  function resetForMount(type: EbikeVehicleType = 'normal', initialBattery = 100) {
+    vehicleType = type
+    gear = 2
+    battery = T.MathUtils.clamp(initialBattery, 0, 100)
+    lowBatteryWarned = battery <= 20
+    if (type === 'shared') {
+      modPreset = 'stock'
+      customMods = null
+    }
+    resetPoseOnly()
+  }
+
+  function setVehicleType(type: EbikeVehicleType) {
+    vehicleType = type
+    if (type === 'shared') {
+      modPreset = 'stock'
+      customMods = null
+    }
+  }
+
+  function setBattery(pct: number) {
+    battery = T.MathUtils.clamp(pct, 0, 100)
+    lowBatteryWarned = battery <= 20
   }
 
   function triggerCrash(reason: Exclude<EbikeCrashReason, ''>, side: -1 | 1, heading: number, entrySpeed: number) {
@@ -180,6 +238,7 @@ export function createEbikeFxController() {
   }
 
   function cycleModPreset(): EbikeModPreset {
+    if (vehicleType === 'shared') return 'stock'
     const idx = MOD_ORDER.indexOf(modPreset)
     modPreset = MOD_ORDER[(idx + 1) % MOD_ORDER.length]
     customMods = null
@@ -187,6 +246,11 @@ export function createEbikeFxController() {
   }
 
   function setModPreset(preset: EbikeModPreset, overrides?: Partial<EbikeModConfig>) {
+    if (vehicleType === 'shared') {
+      modPreset = 'stock'
+      customMods = null
+      return
+    }
     modPreset = preset
     customMods = overrides ?? null
   }
@@ -208,6 +272,9 @@ export function createEbikeFxController() {
   ): EbikeTelemetrySnapshot {
     const cdt = Math.min(.1, Math.max(0, dt))
 
+    if (external?.vehicleType !== undefined) setVehicleType(external.vehicleType)
+    else if (external?.isShared !== undefined) setVehicleType(external.isShared ? 'shared' : 'normal')
+
     if (input.cycleMod) cycleModPreset()
 
     if (external?.gear !== undefined) {
@@ -218,6 +285,24 @@ export function createEbikeFxController() {
     }
 
     const gearSpec = currentGearSpec()
+    const profile = EBIKE_VEHICLE_PROFILES[vehicleType]
+
+    if (external?.battery !== undefined) {
+      battery = T.MathUtils.clamp(external.battery, 0, 100)
+    } else if (base.allowAutoCrash && cdt > 0 && crashPhase === 'none') {
+      const spdNorm = T.MathUtils.clamp(Math.abs(base.speed) / (profile.maxKmh / 3.6), 0, 1.4)
+      const gearMult = [.55, .9, 1.35, 1.85][gear - 1] ?? 1
+      const wheelieExtra = wheelie > .1 ? .35 : 0
+      if (spdNorm > .04) {
+        battery = Math.max(0, battery - profile.drainBase * gearMult * (spdNorm + wheelieExtra) * cdt)
+      }
+    }
+    if (battery <= 20 && !lowBatteryWarned) {
+      lowBatteryWarned = true
+      window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: '电量低于 20%，请注意及时减挡省电', ms: 2400}}))
+    } else if (battery > 24) {
+      lowBatteryWarned = false
+    }
 
     if (external?.crashPhase !== undefined) {
       crashPhase = external.crashPhase
@@ -308,12 +393,25 @@ export function createEbikeFxController() {
 
     const finalWheelie = external?.wheelie ?? wheelie
     const finalLean = external?.lean ?? T.MathUtils.clamp(base.lean + leanExtra, -.68, .68)
+    const lowBattery = external?.lowBattery ?? battery <= 20
+    const criticalBattery = external?.criticalBattery ?? battery <= 10
+    const batteryDepleted = battery <= .5
+    const gearCap = profile.gearCaps[gear - 1] ?? profile.maxKmh
+    const effMaxKmh = external?.maxKmh ?? (batteryDepleted ? 0 : criticalBattery ? Math.min(gearCap, 20) : gearCap)
 
     return {
+      vehicleType,
+      vehicleLabel: profile.label,
+      vehicleBadge: profile.badge,
       gear,
       gearLabel: external?.gearLabel ?? gearSpec.label,
+      maxKmh: effMaxKmh,
       speed: base.speed,
       kmh: Math.round(Math.abs(base.speed) * 3.6),
+      battery: Math.round(battery * 10) / 10,
+      lowBattery,
+      criticalBattery,
+      batteryDepleted,
       lean: finalLean,
       leanLimit: external?.leanLimit ?? LEAN_LIMIT,
       wheelie: finalWheelie,
@@ -371,13 +469,18 @@ export function createEbikeFxController() {
   }
 
   return {
+    get vehicleType() { return vehicleType },
     get gear() { return gear },
+    get battery() { return battery },
     get modPreset() { return modPreset },
     get customMods() { return customMods },
     get crashPhase() { return crashPhase },
     get crashElapsed() { return crashElapsed },
     get longAccel() { return longAccel },
     reset: resetPoseOnly,
+    resetForMount,
+    setVehicleType,
+    setBattery,
     triggerCrash,
     startRecover,
     cycleModPreset,

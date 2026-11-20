@@ -20,6 +20,7 @@ import {
   type EbikeCrashReason,
   type EbikeRideControlInput,
   type EbikeTelemetrySnapshot,
+  type EbikeVehicleType,
   type ExternalEbikeTelemetry,
   type RiderJointName,
   type RiderJoints,
@@ -439,7 +440,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         releaseDynamicBike()
         ridePose.updateRiding(figure.position,rides.heading,rides.lean,rides.pitch,rides.speed,rides.steerInput,dt,rides.rideKind??'bike',rides.bike)
         input.syncRideHud({
-          gear:1,gearLabel:'单车',speed:rides.speed,kmh:Math.round(Math.abs(rides.speed)*3.6),
+          vehicleType:'normal',vehicleLabel:'单车',vehicleBadge:'单车',
+          gear:1,gearLabel:'人力',maxKmh:18,speed:rides.speed,kmh:Math.round(Math.abs(rides.speed)*3.6),
+          battery:100,lowBattery:false,criticalBattery:false,batteryDepleted:false,
           lean:rides.lean,leanLimit:.45,wheelie:0,steerInput:rides.steerInput,
           tucking:false,braking:false,crashPhase:'none',crashReason:'',crashSide:1,crashElapsed:0,recoverProgress:0,modPreset:'stock',
         },'bicycle')
@@ -561,11 +564,16 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           const r=riderJoints[name]?.rotation
           ebikeMountStartRot.set(name,r?[r.x,r.y,r.z]:[0,0,0])
         }
-        ebikeFx.reset()
+        const ridesMeta=rides as typeof rides&{vehicleType?:EbikeVehicleType;isShared?:boolean}
+        const vType:EbikeVehicleType=ridesMeta.vehicleType??(ridesMeta.isShared||rides.bike.userData.shared?'shared':'normal')
+        const savedBat=(rides.bike.userData.battery as number|undefined)??100
+        ebikeFx.resetForMount(vType,savedBat)
         mountedStaticBike=rides.bike
         mountedStaticBike.visible=false
         ebikeRig.root.visible=true
-        ebikeRig.applyMods(ebikeFx.customMods??ebikeFx.modPreset,(mountedStaticBike.userData.paint as number|undefined)??0)
+        const paint=(mountedStaticBike.userData.paint as number|undefined)??0
+        ebikeRig.setVehicleType(vType,paint)
+        ebikeRig.applyMods(ebikeFx.customMods??ebikeFx.modPreset,paint)
       }
       sim.controller.enableAutostep(bikeConfig.step,cfg.stepWidth,false)
       sim.controller.setMaxSlopeClimbAngle(bikeConfig.maxSlope)
@@ -748,6 +756,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         supportY:(ox,oz,ry)=>supportAt(p.x+ox,p.z+oz,ry)?.y??ry,
       })
       if(rideCtrl.cycleMod)ebikeRig.applyMods(ebikeFx.customMods??ebikeFx.modPreset,(mountedStaticBike?.userData.paint as number|undefined)??0)
+      if(mountedStaticBike)mountedStaticBike.userData.battery=ebikeState.battery
     }
     const actualSpeed=simSteps>0?traveled/(simSteps*step):Math.hypot(vx,vz)
     let turnDiff=0
@@ -825,6 +834,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       triggerCrash(reason:Exclude<EbikeCrashReason,''>='lowside',side:-1|1=1){if(rides?.bike&&rides.rideKind==='bike')ebikeFx.triggerCrash(reason,side,rides.heading,Math.max(4.5,Math.abs(rides.speed)))},
       recover(){return ebikeFx.startRecover()},
       setMod(preset:EbikeModPreset){ebikeFx.setModPreset(preset);ebikeRig.applyMods(preset,(mountedStaticBike?.userData.paint as number|undefined)??0)},
+      setVehicleType(type:EbikeVehicleType){ebikeFx.setVehicleType(type);ebikeRig.setVehicleType(type,(mountedStaticBike?.userData.paint as number|undefined)??0)},
+      setBattery(pct:number){ebikeFx.setBattery(pct);if(mountedStaticBike)mountedStaticBike.userData.battery=pct},
     },
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}

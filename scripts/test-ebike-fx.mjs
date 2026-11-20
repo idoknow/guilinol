@@ -71,17 +71,70 @@ try {
   await page.keyboard.press('f')
   await page.waitForFunction(() => window.viewer.walk.vehicle === 'bike' && document.body.dataset.ride === 'bike')
 
-  // Gear shifts & Ghostfire mod toggle
+  // Default compliant gear on mount (D2 <= 25 km/h), normal bike type & full battery
+  assert.equal(await page.textContent('.ride-type'), '电摩')
+  assert.equal(await page.textContent('.ride-gear'), 'D2')
+  assert.equal(await page.textContent('.ride-bat-pct'), '100%')
+  assert.equal(await page.evaluate(() => window.viewer.walk.probe().ebike.maxKmh), 25)
+
+  // Gear shifts & Ghostfire mod toggle (normal bike S unlocks 50 km/h)
   await page.keyboard.press('e')
   await page.evaluate(() => window.viewer.walk.tick(1 / 60))
   assert.equal(await page.textContent('.ride-gear'), 'D3')
   await page.keyboard.press('e')
   await page.evaluate(() => window.viewer.walk.tick(1 / 60))
   assert.equal(await page.textContent('.ride-gear'), 'S')
+  assert.equal(await page.evaluate(() => window.viewer.walk.probe().ebike.maxKmh), 50)
   await page.keyboard.press('q')
   await page.evaluate(() => window.viewer.walk.tick(1 / 60))
   assert.equal(await page.textContent('.ride-gear'), 'D3')
 
+  // Switch to shared e-bike -> capped at 40 km/h on S, badge = 共享, hides .ride-mod
+  await page.evaluate(() => {
+    window.viewer.walk.ebike.setVehicleType('shared')
+    window.viewer.walk.tick(1 / 60)
+  })
+  assert.equal(await page.textContent('.ride-type'), '共享')
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.ride-mod')).display), 'none')
+  await page.keyboard.press('e')
+  await page.evaluate(() => window.viewer.walk.tick(1 / 60))
+  assert.equal(await page.textContent('.ride-gear'), 'S')
+  assert.equal(await page.evaluate(() => window.viewer.walk.probe().ebike.maxKmh), 40)
+
+  // Low battery & critical battery warning HUD
+  await page.evaluate(() => {
+    window.viewer.walk.ebike.setBattery(18)
+    window.viewer.walk.tick(1 / 60)
+  })
+  assert.equal(await page.evaluate(() => document.querySelector('.ride-bat').dataset.level), 'low')
+  assert.equal(await page.textContent('.ride-bat-pct'), '18%')
+  assert.equal(await page.textContent('.ride-state'), '低电预警')
+
+  await page.evaluate(() => {
+    window.viewer.walk.ebike.setBattery(8)
+    window.viewer.walk.tick(1 / 60)
+  })
+  assert.equal(await page.evaluate(() => document.querySelector('.ride-bat').dataset.level), 'crit')
+  assert.equal(await page.evaluate(() => window.viewer.walk.probe().ebike.maxKmh), 20)
+  assert.equal(await page.textContent('.ride-state'), '极低电 · 限速 20')
+
+  await page.evaluate(() => {
+    window.viewer.walk.ebike.setVehicleType('shared')
+    window.viewer.walk.ebike.setBattery(15)
+    window.viewer.walk.tick(1 / 60)
+  })
+  assert.equal(await page.textContent('.ride-type'), '共享')
+  assert.equal(await page.textContent('.ride-bat-pct'), '15%')
+  if (outDir) await page.screenshot({path: `${outDir}/desktop-shared-lowbat.png`})
+
+  // Restore to normal e-bike at full battery, toggle Ghostfire & drop back to D3
+  await page.evaluate(() => {
+    window.viewer.walk.ebike.setVehicleType('normal')
+    window.viewer.walk.ebike.setBattery(100)
+    window.viewer.walk.tick(1 / 60)
+  })
+  await page.keyboard.press('q')
+  await page.evaluate(() => window.viewer.walk.tick(1 / 60))
   await page.keyboard.press('g')
   await page.evaluate(() => window.viewer.walk.tick(1 / 60))
   assert.equal(await page.textContent('.ride-mod'), '鬼火')
@@ -171,11 +224,25 @@ try {
     })
   }
 
-  // Dismount restores foot state & clears ride HUD
+  // Dismount restores foot state & clears ride HUD, and remounting resets gear to compliant D2 (<=25) while keeping battery
+  await page.evaluate(() => {
+    window.viewer.walk.ebike.setBattery(77)
+    window.viewer.walk.tick(1 / 60)
+  })
   await page.keyboard.press('f')
   await page.waitForFunction(() => window.viewer.walk.vehicle === 'foot')
   assert.equal(await page.evaluate(() => document.body.dataset.ride ?? ''), '')
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.ride-hud')).display), 'none')
+  await page.evaluate(() => window.viewer.walk.tick(1 / 60))
+  await page.waitForFunction(() => document.querySelector('.vehicle-action')?.textContent === '骑电动车')
+  await page.keyboard.press('f')
+  await page.waitForFunction(() => window.viewer.walk.vehicle === 'bike')
+  await page.evaluate(() => window.viewer.walk.tick(1 / 60))
+  assert.equal(await page.textContent('.ride-gear'), 'D2')
+  assert.equal(await page.evaluate(() => window.viewer.walk.probe().ebike.maxKmh), 25)
+  assert.equal(await page.textContent('.ride-bat-pct'), '77%')
+  await page.keyboard.press('f')
+  await page.waitForFunction(() => window.viewer.walk.vehicle === 'foot')
   console.log('Desktop e-bike FX & crash/recover OK', {
     wheelie: +wheelieRes.pWheelie.ebike.wheelie.toFixed(3),
     lean: +wheelieRes.pLean.ebike.lean.toFixed(3),
@@ -242,7 +309,21 @@ try {
     await mp.evaluate(() => {
       document.querySelector('.walk-ui .btn-wheelie').dispatchEvent(new PointerEvent('pointerup', {pointerId: 32, pointerType: 'touch', bubbles: true}))
       document.querySelector('.walk-ui .joystick').dispatchEvent(new PointerEvent('pointerup', {pointerId: 31, pointerType: 'touch', bubbles: true}))
+      window.viewer.walk.ebike.setVehicleType('shared')
+      window.viewer.walk.ebike.setBattery(9)
+      window.viewer.walk.tick(1 / 60)
     })
+    const lowBatHud = await mp.evaluate(checkRectsScript(), {
+      ...vp,
+      selectors: [
+        'output', '.sky-ui', '.dock', '.btn-about', 'footer', '.vehicle-action',
+        '.walk-ui .joystick', '.walk-ui .btn-view',
+        '.walk-ui .btn-wheelie', '.walk-ui .btn-gear-up', '.walk-ui .btn-gear-down', '.walk-ui .btn-tuck',
+        '.ride-hud',
+      ],
+    })
+    assert.deepEqual(lowBatHud.overlaps, [], `${label} shared+lowBat HUD overlap: ${JSON.stringify(lowBatHud.overlaps)}`)
+    assert.deepEqual(lowBatHud.outOfBounds, [], `${label} shared+lowBat HUD outOfBounds: ${JSON.stringify(lowBatHud.outOfBounds)}`)
     console.log(`Mobile ${label} e-bike HUD & touch OK`)
     await ctx.close()
   }

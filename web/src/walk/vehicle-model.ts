@@ -27,9 +27,11 @@ function getBicycleCrank(){
   return crankGeom
 }
 
-export function vehicleModel(kind:string,paint=0){
-  const key=kind+paint
-  if(kind==='car'){
+export function vehicleModel(kind:string,paint=0,options?:{shared?:boolean}){
+  const isSharedBike=kind==='shared_bike'||(kind==='bike'&&!!options?.shared)
+  const effectiveKind=isSharedBike?'shared_bike':kind
+  const key=effectiveKind+paint
+  if(effectiveKind==='car'){
     if(!cache.has(key))cache.set(key,buildCarGeometry(paint))
     const mesh=new T.Mesh(cache.get(key),material);mesh.name=kind;return mesh
   }
@@ -43,14 +45,26 @@ export function vehicleModel(kind:string,paint=0){
       qTmp.setFromUnitVectors(upAxis,dirVec.set(dx/len,dy/len,dz/len));g.applyQuaternion(qTmp)
       part(g,color,(x1+x2)/2,(y1+y2)/2,(z1+z2)/2)
     }
-    if(kind==='bike'){
+    if(effectiveKind==='bike'){
       const color=[0xf3f1e9,0x99c9de,0xe4afbb,0x383c40][paint%4]
       for(const z of [-.53,.53])part(new T.CylinderGeometry(.24,.24,.12,10).rotateZ(Math.PI/2),0x303234,0,.24,z)
       box(.38,.24,1,0,.37,0,color);box(.36,.32,.38,0,.58,.3,color);box(.4,.11,.48,0,.8,.27,0x443e3b)
       box(.18,.56,.14,0,.79,-.45,color);box(.68,.065,.09,0,1.04,-.43,0x474b4b)
       for(const side of [-1,1]){box(.025,.19,.025,side*.29,1.14,-.46,0x535858);box(.13,.08,.04,side*.29,1.25,-.46,0xa8b9bf)}
       for(const side of [-1,1]){box(.03,.2,.28,side*.18,.92,-.65,0x858883);box(.38,.2,.025,0,.92,-.65+side*.14,0x858883)}
-    }else if(kind==='bicycle'){
+    }else if(effectiveKind==='shared_bike'){
+      const mint=0x72d5b0,trim=0xeef2ee,batteryGreen=0x2d7f63,scanOrange=0xd9683b
+      for(const z of [-.53,.53])part(new T.CylinderGeometry(.24,.24,.12,10).rotateZ(Math.PI/2),0x303234,0,.24,z)
+      box(.38,.24,1,0,.37,0,mint);box(.35,.22,.40,0,.49,-.05,trim);box(.39,.14,.32,0,.38,.02,batteryGreen)
+      box(.36,.32,.38,0,.58,.3,mint);box(.40,.11,.46,0,.8,.26,0x333638)
+      box(.18,.56,.14,0,.79,-.45,mint);box(.66,.065,.09,0,1.04,-.43,0x474b4b)
+      // Shared scan lock tail plate
+      box(.20,.14,.05,0,.67,.51,scanOrange);box(.11,.08,.02,0,.67,.54,0xf5f2ea)
+      for(const side of [-1,1]){box(.025,.18,.025,side*.28,1.13,-.46,0x535858);box(.12,.07,.04,side*.28,1.23,-.46,0xa8b9bf)}
+      // Distinct front wire basket for shared e-bike
+      box(.36,.03,.24,0,.82,-.62,0x5c6266)
+      for(const side of [-1,1]){box(.025,.18,.24,side*.17,.92,-.62,0x6e757a);box(.36,.18,.025,0,.92,-.62+side*.11,0x6e757a)}
+    }else if(effectiveKind==='bicycle'){
       // Guilin muted city palette (sage, terracotta, linen ivory, karst slate) — no commercial bike-share brand colors or logos.
       const frameColor=[0x5b8a72,0xc96f53,0xd8cfc0,0x5c6e7e][paint%4]
       const alloy=0xb8bec2,dark=0x2b2e30,saddle=0x423832,basket=0x6f7577,rattan=0xa68963
@@ -135,8 +149,8 @@ export function vehicleModel(kind:string,paint=0){
     }
     cache.set(key,mergeGeometries(parts));for(const part of parts)part.dispose()
   }
-  const mesh=new T.Mesh(cache.get(key),material);mesh.name=kind;mesh.userData.paint=paint
-  if(kind==='bicycle'){
+  const mesh=new T.Mesh(cache.get(key),material);mesh.name=kind==='shared_bike'?'bike':kind;mesh.userData.paint=paint;mesh.userData.shared=isSharedBike;mesh.userData.vehicleType=isSharedBike?'shared':kind==='bike'?'normal':kind
+  if(effectiveKind==='bicycle'){
     const crank=new T.Mesh(getBicycleCrank(),material)
     crank.name='Crank';crank.position.set(0,.29,.05)
     mesh.add(crank)
@@ -442,6 +456,7 @@ function buildCarGeometry(paint=0):T.BufferGeometry{
 }
 
 export type EbikeModPreset = 'stock' | 'ghostfire' | 'neon'
+export type EbikeVehicleKind = 'normal' | 'shared'
 
 export interface EbikeModConfig {
   preset: EbikeModPreset
@@ -454,6 +469,8 @@ export interface EbikeModConfig {
   tailWing: boolean
   exhaust: boolean
 }
+
+export const EBIKE_SHARED_COLOR = 0x72d5b0
 
 export const EBIKE_MOD_PRESETS: Record<EbikeModPreset, EbikeModConfig> = {
   stock: {
@@ -509,6 +526,8 @@ export interface EbikeVisualRig {
     tailWing: T.Group
     exhaust: T.Group
   }
+  get vehicleType(): EbikeVehicleKind
+  setVehicleType: (type: EbikeVehicleKind, basePaint?: number) => void
   applyMods: (next: EbikeModPreset | Partial<EbikeModConfig>, basePaint?: number) => void
   update: (state: {
     pos: T.Vector3
@@ -549,7 +568,7 @@ function buildWheelGroup(tireMat: T.Material, rimMat: T.Material) {
  * - Front fork + handlebar steer with rider hand/steer sync; wheels spin with speed
  * - Exposes 6 named visual mod slots (shell, headlight, underglow, shock, tailWing, exhaust)
  */
-export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConfig>): EbikeVisualRig {
+export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConfig>, initialType: EbikeVehicleKind = 'normal'): EbikeVisualRig {
   const disposables: (T.BufferGeometry | T.Material)[] = []
   const trackG = <G extends T.BufferGeometry>(g: G) => { disposables.push(g); return g }
   const trackM = <M extends T.Material>(m: M) => { disposables.push(m); return m }
@@ -568,6 +587,10 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   const glowFloorMat = trackM(new T.MeshBasicMaterial({color: 0xc84bff, transparent: true, opacity: .24, depthWrite: false, side: T.DoubleSide}))
   const goldMat = trackM(new T.MeshStandardMaterial({color: 0xe3b23c, flatShading: true, roughness: .35, metalness: .55}))
   const accentMat = trackM(new T.MeshStandardMaterial({color: 0x9934d4, flatShading: true, roughness: .45}))
+  const basketMat = trackM(new T.MeshStandardMaterial({color: 0x6b7277, flatShading: true, roughness: .75}))
+  const scanMat = trackM(new T.MeshStandardMaterial({color: 0xd9683b, flatShading: true, roughness: .6}))
+  const sharedBatteryMat = trackM(new T.MeshStandardMaterial({color: 0x2d7f63, flatShading: true, roughness: .6}))
+  const qrMat = trackM(new T.MeshBasicMaterial({color: 0xf5f2ea}))
 
   const root = new T.Group()
   root.name = 'dynamic-ebike'
@@ -677,32 +700,65 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   seatAnchor.position.set(0, 0, .23 - REAR_Z)
   wheeliePivot.add(seatAnchor)
 
+  // Shared e-bike distinguishing parts: front wire basket (steers with handlebar) + rear scan lock/battery trim.
+  const sharedFrontBasket = new T.Group()
+  sharedFrontBasket.name = 'shared-front-basket'
+  sharedFrontBasket.add(makeSolidPart(trackG(new T.BoxGeometry(.34, .03, .22)), basketMat, 0, .82, -.19))
+  for (const side of [-1, 1]) {
+    sharedFrontBasket.add(
+      makeSolidPart(trackG(new T.BoxGeometry(.024, .17, .22)), basketMat, side * .16, .91, -.19),
+      makeSolidPart(trackG(new T.BoxGeometry(.34, .17, .024)), basketMat, 0, .91, -.19 + side * .10),
+    )
+  }
+  frontAssembly.add(sharedFrontBasket)
+
+  const sharedTailGroup = new T.Group()
+  sharedTailGroup.name = 'shared-tail-lock'
+  sharedTailGroup.add(
+    makeSolidPart(trackG(new T.BoxGeometry(.20, .13, .05)), scanMat, 0, .68, .51 - REAR_Z),
+    makeSolidPart(trackG(new T.BoxGeometry(.10, .07, .02)), qrMat, 0, .68, .54 - REAR_Z),
+    makeSolidPart(trackG(new T.BoxGeometry(.395, .12, .32)), sharedBatteryMat, 0, .38, .02 - REAR_Z),
+  )
+  chassis.add(sharedTailGroup)
+
   let wheelSpin = 0
   let currentPaint = paint
+  let currentType: EbikeVehicleKind = initialType
+  let lastMods: EbikeModPreset | Partial<EbikeModConfig> = initialMods ?? 'stock'
 
   function applyMods(next: EbikeModPreset | Partial<EbikeModConfig>, basePaint = currentPaint) {
     currentPaint = basePaint
+    lastMods = next
     const presetKey: EbikeModPreset = typeof next === 'string' ? next : (next.preset ?? 'stock')
     const baseCfg = EBIKE_MOD_PRESETS[presetKey] ?? EBIKE_MOD_PRESETS.stock
     const cfg: EbikeModConfig = typeof next === 'string' ? baseCfg : {...baseCfg, ...next, preset: presetKey}
 
+    const shared = currentType === 'shared'
+    sharedFrontBasket.visible = shared
+    sharedTailGroup.visible = shared
+
     const stockHex = EBIKE_STOCK_PAINTS[((basePaint % 4) + 4) % 4]
-    bodyMat.color.setHex(cfg.paintColor ?? stockHex)
+    bodyMat.color.setHex(shared ? EBIKE_SHARED_COLOR : (cfg.paintColor ?? stockHex))
     glowMat.color.setHex(cfg.underglowColor)
     glowFloorMat.color.setHex(cfg.underglowColor)
     angelMat.color.setHex(cfg.angelEyeColor)
     accentMat.color.setHex(cfg.angelEyeColor)
 
-    underglowSlot.visible = cfg.underglow
-    angelRing.visible = cfg.angelEye
-    tailWingSlot.visible = cfg.tailWing
-    exhaustSlot.visible = cfg.exhaust
+    underglowSlot.visible = !shared && cfg.underglow
+    angelRing.visible = !shared && cfg.angelEye
+    tailWingSlot.visible = !shared && cfg.tailWing
+    exhaustSlot.visible = !shared && cfg.exhaust
     for (const child of shockSlot.children) {
-      if (child.name === 'mod-gold-canister') child.visible = cfg.goldShock
+      if (child.name === 'mod-gold-canister') child.visible = !shared && cfg.goldShock
     }
   }
 
-  applyMods(initialMods ?? 'stock', paint)
+  function setVehicleType(type: EbikeVehicleKind, basePaint = currentPaint) {
+    currentType = type
+    applyMods(lastMods, basePaint)
+  }
+
+  applyMods(lastMods, paint)
 
   return {
     root,
@@ -721,6 +777,8 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
       tailWing: tailWingSlot,
       exhaust: exhaustSlot,
     },
+    get vehicleType() { return currentType },
+    setVehicleType,
     applyMods,
     update(state) {
       root.position.copy(state.pos)

@@ -23,10 +23,14 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
 
   const rideHud=document.createElement('div')
   rideHud.className='ride-hud'
-  rideHud.innerHTML='<span class="ride-gear">D2</span><span class="ride-speed">0 km/h</span><span class="ride-state" hidden></span><button class="ride-mod" type="button" aria-label="切换电动车改装">素车</button>'
+  rideHud.innerHTML='<span class="ride-type" data-kind="normal">电摩</span><span class="ride-gear">D2</span><span class="ride-speed">0 km/h</span><span class="ride-bat" data-level="ok"><span class="ride-bat-bar"><i></i></span><span class="ride-bat-pct">100%</span></span><span class="ride-state" hidden></span><button class="ride-mod" type="button" aria-label="切换电动车改装">素车</button>'
   document.body.append(rideHud)
+  const typeEl=rideHud.querySelector<HTMLElement>('.ride-type')!
   const gearEl=rideHud.querySelector<HTMLElement>('.ride-gear')!
   const speedEl=rideHud.querySelector<HTMLElement>('.ride-speed')!
+  const batEl=rideHud.querySelector<HTMLElement>('.ride-bat')!
+  const batFillEl=rideHud.querySelector<HTMLElement>('.ride-bat-bar i')!
+  const batPctEl=rideHud.querySelector<HTMLElement>('.ride-bat-pct')!
   const stateEl=rideHud.querySelector<HTMLElement>('.ride-state')!
   const modBtn=rideHud.querySelector<HTMLButtonElement>('.ride-mod')!
 
@@ -205,11 +209,24 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     syncRideHud(state:EbikeTelemetrySnapshot|null,rideKind:'bike'|'bicycle'|'car'|'boat'|null){
       if(rideKind)document.body.dataset.ride=rideKind
       else delete document.body.dataset.ride
+      if(state&&rideKind==='bike')document.body.dataset.rideType=state.vehicleType
+      else delete document.body.dataset.rideType
       if(!state||(rideKind!=='bike'&&rideKind!=='bicycle')){
         stateEl.hidden=true
         return
       }
-      gearEl.textContent=rideKind==='bicycle'?'单车':state.gearLabel
+      if(rideKind==='bicycle'){
+        typeEl.dataset.kind='bicycle';typeEl.textContent='单车'
+        gearEl.textContent='人力';gearEl.removeAttribute('title')
+      }else{
+        typeEl.dataset.kind=state.vehicleType;typeEl.textContent=state.vehicleBadge
+        gearEl.textContent=state.gearLabel
+        gearEl.title=`${state.vehicleLabel} · 本挡限速 ${state.maxKmh} km/h`
+        const pct=Math.max(0,Math.min(100,Math.round(state.battery)))
+        batEl.dataset.level=state.criticalBattery?'crit':state.lowBattery?'low':'ok'
+        batFillEl.style.width=`${pct}%`
+        batPctEl.textContent=`${pct}%`
+      }
       speedEl.textContent=`${state.kmh} km/h`
       modBtn.textContent=MOD_LABELS[state.modPreset]
       const leanDeg=Math.round(Math.abs(state.lean)*180/Math.PI)
@@ -225,12 +242,21 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
       }else{
         btnWheelie.textContent='翘头'
         btnWheelie.classList.toggle('on',wheelieTouch||keys.has('Space'))
-        if(wheelieDeg>=4){
+        if(rideKind==='bike'&&state.batteryDepleted){
+          stateEl.hidden=false;stateEl.dataset.warn='1'
+          stateEl.textContent='电量耗尽'
+        }else if(rideKind==='bike'&&state.criticalBattery){
+          stateEl.hidden=false;stateEl.dataset.warn='1'
+          stateEl.textContent=`极低电 · 限速 ${state.maxKmh}`
+        }else if(wheelieDeg>=4){
           stateEl.hidden=false;stateEl.dataset.warn=wheelieDeg>=38?'1':'0'
           stateEl.textContent=`翘头 ${wheelieDeg}°`
         }else if(leanDeg>=8){
           stateEl.hidden=false;stateEl.dataset.warn=Math.abs(state.lean)>=state.leanLimit*.86?'1':'0'
           stateEl.textContent=`压弯 ${leanDeg}°`
+        }else if(rideKind==='bike'&&state.lowBattery){
+          stateEl.hidden=false;stateEl.dataset.warn='1'
+          stateEl.textContent='低电预警'
         }else{
           stateEl.hidden=true;stateEl.dataset.warn='0'
         }
