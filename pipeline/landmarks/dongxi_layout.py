@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import trimesh
+from shapely import STRtree
 from shapely.geometry import LineString, Polygon, Point, box
 from shapely.geometry.polygon import orient
 from shapely.ops import unary_union
@@ -13,7 +14,9 @@ from shop_lettering import letters
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'pipeline'))
-from common import ll2xz
+from common import ll2xz, load_osm
+from features import points
+from road_profile import pair_carriageways, profile
 
 LAYOUT = json.loads((ROOT / 'docs/layout/dongxi-layout.geojson').read_text())['features']
 INFILL = json.loads((ROOT / 'docs/layout/dongxi-infill.geojson').read_text())['features']
@@ -201,6 +204,10 @@ def envelope(model, feature):
 
 def registered_market(model):
     boundary = Polygon([point(coords) for coords in MARKET['replace']['polygon']])
+    carriageways = [profile(LineString(np.asarray(points(way))-ORIGIN), way['tags'], STRtree([]), way['id'])
+                    for way in load_osm() if way['type']=='way' and way['id'] in (258909993,259020569)]
+    if len(carriageways)!=2:raise ValueError('Missing Jiefang East carriageway')
+    boundary=boundary.difference(unary_union([road.pavement for road in pair_carriageways(carriageways)]))
     terrain=np.load(ROOT/'docs/layout/dongxi-ground.npz');grid=terrain['heights']/10
     model.tile_parts['ruinGlass']=[]
     left,top=terrain['lower']-ORIGIN
@@ -212,10 +219,10 @@ def registered_market(model):
         if not boundary.intersects(cell):continue
         part=boundary.intersection(cell)
         if part.geom_type!='Polygon' or part.area<.01:continue
-        vertices,faces=trimesh.creation.triangulate_polygon(part,engine='earcut');u,v=((vertices-[x,z])/4).T
-        heights=(1-v)*((1-u)*grid[row,col]+u*grid[row,col+1])+v*((1-u)*grid[row+1,col]+u*grid[row+1,col+1])
+        vertices,faces=trimesh.creation.triangulate_polygon(part,engine='earcut')
+        heights=np.array([grade(east,south) for east,south in vertices])
         plaza=-514<x+ORIGIN[0]<-496 and -186<z+ORIGIN[1]<-174
-        model.mesh(np.column_stack((vertices[:,0],heights-157.7+.12,vertices[:,1])),faces[:,::-1],'ruinGlass' if plaza else 'pave')
+        model.mesh(np.column_stack((vertices[:,0],heights+.12,vertices[:,1])),faces[:,::-1],'ruinGlass' if plaza else 'pave')
     model.grade=grade
     for feature in LAYOUT+INFILL:
         attrs = feature['properties']

@@ -87,11 +87,11 @@ def seated_roof(model,height,width,depth,rise):
 
 
 def market(model):
-    for first,last,width,level in [((-106,15),(-26,28),17,.09),((-28,22),(6,25),22,.10),
+    for first,last,width,level in [((-28,22),(6,25),22,.10),
         ((-6,24),(5,-15),10,.13),((0,28),(54,39),9,.12),((54,39),(63,-4),10,.14),
         ((63,-4),(3,-13),10,.15),((5,-14),(13,-62),32,.16),((58,18.5),(7,3.8),9,.17)]:slab(model,first,last,width,level)
     for east,south in [(-92,31),(-72,34),(-52,37),(-35,39)]:
-        model.pose=(east,0,south,0);model.beam([0,.1,0],[0,4.2,0],.22,'wood',8,True)
+        model.pose=(east,0,south,0);model.beam([0,0,0],[0,4.2,0],.22,'wood',8,True)
         crown=trimesh.creation.icosphere(subdivisions=1);model.mesh(crown.vertices*[2.3,2.15,2.55]+[0,5.2,0],crown.faces,'leaf')
     slab(model,(56,39),(85,50.5),8,.14)
     registered_market(model)
