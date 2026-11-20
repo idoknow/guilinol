@@ -119,15 +119,15 @@ def make_theater_atlas():
         dr.line((0, gy, 511, gy), fill=(214, 220, 226), width=1)
 
     # 5. Deep grey-blue parabolic arch glass curtain wall (`arch_glass`) (512, 256, 256, 256)
-    # Exact deep grey-blue glazing matching Rock photo #48, Baike East & Sina North views!
+    # Deep cool navy-slate glazing so even under warm afternoon sun (16:41) arches read crisp dark grey-blue, never beige!
     rects['arch_glass'] = (512, 256, 256, 256)
-    dr.rectangle((512, 256, 767, 511), fill=(28, 46, 68))
+    dr.rectangle((512, 256, 767, 511), fill=(18, 34, 56))
     for gy in range(256, 512, 42):
-        dr.rectangle((512, gy, 767, gy + 6), fill=(20, 34, 52))
+        dr.rectangle((512, gy, 767, gy + 6), fill=(12, 24, 42))
     for gx in range(524, 768, 20):
-        dr.line((gx, 256, gx, 511), fill=(88, 114, 140), width=2)
+        dr.line((gx, 256, gx, 511), fill=(72, 100, 128), width=2)
     for gy in range(276, 512, 21):
-        dr.line((512, gy, 767, gy), fill=(72, 96, 122), width=1)
+        dr.line((512, gy, 767, gy), fill=(56, 82, 110), width=1)
 
     # 6. Concert Hall ("Flower Bud") louvered clerestory & perforated white facade (`bud_facade`) (768, 192, 256, 192)
     rects['bud_facade'] = (768, 192, 256, 192)
@@ -187,6 +187,7 @@ def make_theater_atlas():
         ('grass_island',  (384, 768, 128, 128), (118, 146, 102)),
         ('amber_flood',   (512, 768, 128, 128), (236, 198, 132)),
         ('bark',          (640, 768, 128, 128), ( 92,  80,  68)),
+        ('soffit_rib',    (768, 768, 256, 128), (112, 130, 150)),
     ]
     for key, (x, y, w, h), rgb in swatches:
         rects[key] = (x, y, w, h)
@@ -196,6 +197,10 @@ def make_theater_atlas():
                 dr.line((rx, y, rx, y + h - 1), fill=(58, 64, 70), width=2)
         elif key == 'oculus_glass':
             dr.ellipse((x + 14, y + 14, x + w - 15, y + h - 15), outline=(218, 230, 242), width=5)
+        elif key == 'soffit_rib':
+            for rx in range(x, x + w, 16):
+                dr.rectangle((rx, y, rx + 5, y + h - 1), fill=(78, 96, 116))
+                dr.rectangle((rx + 11, y, rx + 15, y + h - 1), fill=(186, 202, 218))
 
     return im, rects
 
@@ -566,53 +571,80 @@ def build_guilin_theater(b: SceneBuilder):
         b.face([lip0, lip1, top1, top0], (out_dir[0], 0.3, out_dir[2]), 'rib_white', tile=3.0, lit=False)
 
     # =========================================================================
-    # 6. FOUR RECESSED FULL-HEIGHT DARK-BLUE GLASS ARCHES ("EYES") & 8 RAKED WHITE MEGA-COLUMNS!
+    # 6. FOUR RECESSED FULL-HEIGHT DARK-BLUE GLASS ARCHES ("EYES"), WING GLAZING & COOL RIBBED SOFFITS!
     # =========================================================================
-    # Recessed at s = 0.68 so each upward-flaring petal tip frames a deep, unmistakable parabolic
-    # arch opening filled with deep grey-blue glass (`arch_glass`).
-    # In the central arch bays (`pm > 0.55`), `lit=True` uses the EXACT SAME `arch_glass` dark-blue
-    # texture (`baseColorTexture` = deep grey-blue in daytime!) while glowing warm amber at night (`uNight=1`)!
-    s_wall_idx = max(2, int(round(ns * 0.68)))
+    # Placed at `s = 0.84` so dark grey-blue glazing (`arch_glass`) sits cleanly under ALL 4 upward-flaring
+    # wings (including the swept-up Left Wing on the riverfront!) AND inside all 4 parabolic arches,
+    # eliminating any exposed beige interior/underside surfaces!
+    s_wall_idx = max(2, int(round(ns * 0.83)))
+
+    # Cool ribbed metallic overhang soffit (`soffit_rib`) closing the underside between `s_wall_idx` and `ns`
+    # so wing undersides & arch ceilings read crisp cool ribbed silver-grey rather than warm beige!
+    for i in range(s_wall_idx, ns):
+        s0, s1 = ss[i], ss[i + 1]
+        for j in range(nt):
+            u00 = pts_grid[i, j] - np.array([0.0, 0.28, 0.0])
+            u10 = pts_grid[i + 1, j] - np.array([0.0, 0.28, 0.0])
+            u11 = pts_grid[i + 1, j + 1] - np.array([0.0, 0.28, 0.0])
+            u01 = pts_grid[i, j + 1] - np.array([0.0, 0.28, 0.0])
+            su0 = (j % 4) / 4.0
+            su1 = su0 + 0.25
+            b.face(
+                [u00, u01, u11, u10],
+                (0.0, -0.9, 0.0),
+                'soffit_rib',
+                uvs=[(su0, (s0 - 0.80) / 0.20), (su1, (s0 - 0.80) / 0.20), (su1, (s1 - 0.80) / 0.20), (su0, (s1 - 0.80) / 0.20)],
+                lit=False,
+            )
+
+    # Dark stone plinth ring at y = 6.50..9.10 m under `s_wall_idx` so outer wing glazing joins Tier 2/3 podium seamlessly!
+    wall_base_ring = [(CROWN_X + (pts_grid[s_wall_idx, j, 0] - CROWN_X) * 0.90,
+                       CROWN_Z + (pts_grid[s_wall_idx, j, 2] - CROWN_Z) * 0.90) for j in range(nt)]
+    _grounded_ribbon_wall(
+        b, wall_base_ring, 9.10, 'arch_glass', cap_region='dark_stone', tile=4.2,
+        collide=False, y_bot_fn=lambda x, z: 6.50
+    )
+
     for j in range(nt):
         r0 = pts_grid[s_wall_idx, j]
         r1 = pts_grid[s_wall_idx, j + 1]
-        y_top0 = max(9.6, r0[1] - 0.10)
-        y_top1 = max(9.6, r1[1] - 0.10)
-        bx0 = CROWN_X + (r0[0] - CROWN_X) * 0.92
-        bz0 = CROWN_Z + (r0[2] - CROWN_Z) * 0.92
-        bx1 = CROWN_X + (r1[0] - CROWN_X) * 0.92
-        bz1 = CROWN_Z + (r1[2] - CROWN_Z) * 0.92
+        y_top0 = max(9.3, r0[1] - 0.22)
+        y_top1 = max(9.3, r1[1] - 0.22)
+        bx0 = CROWN_X + (r0[0] - CROWN_X) * 0.90
+        bz0 = CROWN_Z + (r0[2] - CROWN_Z) * 0.90
+        bx1 = CROWN_X + (r1[0] - CROWN_X) * 0.90
+        bz1 = CROWN_Z + (r1[2] - CROWN_Z) * 0.90
         tx0, tz0 = r0[0], r0[2]
         tx1, tz1 = r1[0], r1[2]
-        out_n = (0.5 * (tx0 + tx1) - CROWN_X, 0.06, 0.5 * (tz0 + tz1) - CROWN_Z)
+        # Slightly downward/skyward-tilted normal prevents warm low-angle sunset specular washout into beige!
+        out_n = (0.5 * (tx0 + tx1) - CROWN_X, -8.0, 0.5 * (tz0 + tz1) - CROWN_Z)
         pm = 0.5 * (p_grid[s_wall_idx, j] + p_grid[s_wall_idx, j + 1])
-        is_arch_eye_glow = pm > 0.54
+        is_arch_eye_glow = (pm > 0.62)
         b.face(
-            [(bx0, 8.90, bz0), (bx1, 8.90, bz1), (tx1, y_top1, tz1), (tx0, y_top0, tz0)],
+            [(bx0, 8.95, bz0), (bx1, 8.95, bz1), (tx1, y_top1, tz1), (tx0, y_top0, tz0)],
             out_n, 'arch_glass', tile=4.4, lit=is_arch_eye_glow
         )
 
         # 8 sculpted white structural raked mega-columns flanking the 4 grand parabolic arches!
         if b.detail:
-            if 0.36 <= pm <= 0.50:
+            if 0.36 <= pm <= 0.48:
                 dx0, dz0 = tx0 - CROWN_X, tz0 - CROWN_Z
                 ln0 = max(1e-6, math.hypot(dx0, dz0))
                 ux, uz = dx0 / ln0, dz0 / ln0
                 px_n, pz_n = -uz, ux
-                p_bot_l = (bx0 - px_n * 0.85 + ux * 1.1, 6.40, bz0 - pz_n * 0.85 + uz * 1.1)
-                p_bot_r = (bx0 + px_n * 0.85 + ux * 1.1, 6.40, bz0 + pz_n * 0.85 + uz * 1.1)
-                p_top_l = (tx0 - px_n * 0.52 + ux * 0.55, y_top0, tz0 - pz_n * 0.52 + uz * 0.55)
-                p_top_r = (tx0 + px_n * 0.52 + ux * 0.55, y_top0, tz0 + pz_n * 0.52 + uz * 0.55)
+                p_bot_l = (bx0 - px_n * 0.85 + ux * 0.9, 6.50, bz0 - pz_n * 0.85 + uz * 0.9)
+                p_bot_r = (bx0 + px_n * 0.85 + ux * 0.9, 6.50, bz0 + pz_n * 0.85 + uz * 0.9)
+                p_top_l = (tx0 - px_n * 0.52 + ux * 0.45, y_top0, tz0 - pz_n * 0.52 + uz * 0.45)
+                p_top_r = (tx0 + px_n * 0.52 + ux * 0.45, y_top0, tz0 + pz_n * 0.52 + uz * 0.45)
                 b.face([p_bot_l, p_bot_r, p_top_r, p_top_l], (ux, 0.1, uz), 'podium_wall', tile=3.0)
-                b.face([(bx0, 6.40, bz0), p_bot_l, p_top_l, (tx0, y_top0, tz0)], (-px_n, 0.0, -pz_n), 'podium_wall', tile=3.0)
-                b.face([p_bot_r, (bx0, 6.40, bz0), (tx0, y_top0, tz0), p_top_r], (px_n, 0.0, pz_n), 'podium_wall', tile=3.0)
-            elif pm > 0.52 and j % 3 == 0:
-                # Subtle dark-silver curtain wall vertical mullion fins inside the 4 glass arches
+                b.face([(bx0, 6.50, bz0), p_bot_l, p_top_l, (tx0, y_top0, tz0)], (-px_n, 0.0, -pz_n), 'podium_wall', tile=3.0)
+                b.face([p_bot_r, (bx0, 6.50, bz0), (tx0, y_top0, tz0), p_top_r], (px_n, 0.0, pz_n), 'podium_wall', tile=3.0)
+            elif pm > 0.50 and j % 3 == 0:
                 dx0, dz0 = tx0 - CROWN_X, tz0 - CROWN_Z
                 ln0 = max(1e-6, math.hypot(dx0, dz0))
                 ux, uz = dx0 / ln0, dz0 / ln0
                 b.face(
-                    [(bx0, 8.90, bz0), (bx0 + ux * 0.18, 8.90, bz0 + uz * 0.18),
+                    [(bx0, 8.95, bz0), (bx0 + ux * 0.18, 8.95, bz0 + uz * 0.18),
                      (tx0 + ux * 0.18, y_top0, tz0 + uz * 0.18), (tx0, y_top0, tz0)],
                     (-uz, 0.0, ux), 'dark_stone', tile=2.0
                 )
@@ -719,7 +751,7 @@ def export_theater(out_glb: Path):
         if m_atlas is not None:
             scene.add_geometry(m_atlas, node_name=f'{lod_name}_atlas', parent_node_name=lod_name)
         m_lit = bucket_to_trimesh(
-            b.lit, image, 'guilin_theater_lit', (0.28, 0.21, 0.12), 0.10, 0.45, double_sided=True
+            b.lit, image, 'guilin_theater_lit', (0.20, 0.16, 0.10), 0.10, 0.52, double_sided=True
         )
         if m_lit is not None:
             # Detach emissiveTexture so emissiveFactor alone drives warm amber glow at night (`uNight=1`),
