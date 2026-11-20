@@ -5,6 +5,8 @@ import {chromium} from 'playwright'
 const output = process.argv[2] ?? 'captures/jiefang'
 await mkdir(output, {recursive:true})
 const views = [
+  ['south-seam', [-142,2.55,128], [-156,4.1,183],14],
+  ['north-seam', [-124,2.55,-128], [-124.5,4.1,-183],14],
   ['35', [-135,2.75,-103], [-178,4,-99],19.1],
   ['36', [-152, 2.75, -108], [-112, 4, -68], 19.1],
   ['38', [-118,2.7,-46], [-163,14,-136],19.1],

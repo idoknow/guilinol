@@ -9,13 +9,14 @@ import subprocess
 from statistics import median
 
 import numpy as np
+from scipy.spatial import cKDTree
 from scipy.ndimage import distance_transform_edt, gaussian_filter, maximum_filter
 from scipy.sparse import coo_matrix
 from shapely import STRtree, intersects_xy
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
-from landmarks.jiefang_layout import NATIVE_APPROACH, LOWER, bank_blend, LOWER_ROADS, SPAN_WAYS, deck_level, world_road_sections
+from landmarks.jiefang_layout import NATIVE_APPROACH, LOWER_ROADS, SPAN_WAYS, deck_level, world_road_sections
 from common import CHUNK, GRID, load_osm
 from features import points, rongyin_sidewalk
 from road_profile import RULES
@@ -1079,9 +1080,53 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
         # Finish the two extended seams locally, after the citywide fit and
         # terrain imprint. A control-cell apron keeps the cubic spline level
         # across both carriageway edges before it rejoins the native approach.
-        east,south=GX-jb_pos[0],GZ-jb_pos[2]
-        x=east*np.cos(angle)+south*np.sin(angle)
-        z=-east*np.sin(angle)+south*np.cos(angle)
-        blend=bank_blend(x,z,padding=STEP)*np.clip((abs(z)-NATIVE_APPROACH+12)/12,0,1)
-        ctrl=ctrl+blend*(jb_pos[1]+LOWER-.045-ctrl)
+        for way,line,_,levels,_,_ in world_road_sections(anchor,angle):
+            if way not in LOWER_ROADS or way not in osm_ways or not line.intersects(bounds_poly):
+                continue
+            end=0 if way==LOWER_ROADS[0] else -1
+            seam=np.array(line.coords[end])
+            outward=seam-line.coords[1 if end==0 else -2]
+            outward/=np.linalg.norm(outward)
+            # Use the native centerline beyond the seam, including its bends.
+            native=LineString(osm_ways[way][0])
+            start=native.project(Point(seam))
+            sign=1 if native.project(Point(seam+outward))>start else -1
+            run=90.
+            def native_height(distance):
+                x,z=native.interpolate(start+sign*distance).coords[0]
+                return eval_bspline_grid(ctrl,left,top,np.array([x]),np.array([z]))[0]
+            far=native_height(run)
+            slope=(native_height(run+2)-native_height(run-2))/4
+            base=jb_pos[1]+levels[end]-.045
+            stations=np.arange(-32,run+33,2)
+            axis=np.array([native.interpolate(start+sign*t).coords[0] for t in stations])
+            tree=cKDTree(axis)
+            def profile(xs,zs):
+                points=np.column_stack((xs.ravel(),zs.ravel()))
+                _,idx=tree.query(points)
+                idx=np.clip(idx,1,len(axis)-2)
+                tangent=axis[idx+1]-axis[idx-1]
+                tangent/=np.linalg.norm(tangent,axis=1)[:,None]
+                delta=points-axis[idx]
+                t=(stations[idx]+np.sum(delta*tangent,axis=1)).reshape(xs.shape)
+                side=abs(delta[:,0]*tangent[:,1]-delta[:,1]*tangent[:,0]).reshape(xs.shape)
+                u=np.clip(t/run,0,1)
+                # Cubic Hermite profile: level at the seam, native height and grade at run.
+                h=base+(far-base)*u*u*(3-2*u)+run*slope*u*u*(u-1)
+                h+=slope*np.maximum(0,t-run)
+                weight=np.clip((t+28)/16,0,1)*np.clip((run+20-t)/20,0,1)
+                return h,weight,side
+            h,w,d=profile(GX,GZ)
+            blend=w*np.clip((30-d)/10,0,1)
+            ctrl=ctrl+blend*(h-ctrl)
+            # Keep the rendered terrain below the transitioning asphalt.
+            # Patch only the bank corridor so neighboring foundations retain their grade.
+            rr,cc=np.ogrid[:gh4,:gw4]
+            xs,zs=np.broadcast_arrays(left+cc*GRID,top+rr*GRID)
+            window=(abs(xs-seam[0])<135)&(abs(zs-seam[1])<135)
+            h,w,d=profile(xs[window],zs[window])
+            blend=w*np.clip((14-d)/5,0,1)*(~wet[window])
+            for field in (original_dm,terrain_dm):
+                old=field[window]
+                field[window]=np.rint(old+blend*np.minimum(0,10*(h-.28)-old))
     return ctrl, bridge_plans, finalize_bridges
