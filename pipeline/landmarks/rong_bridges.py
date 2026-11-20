@@ -159,16 +159,19 @@ def ancient_bridge(builder):
     if builder.collide:
         yaw_box(builder.hit,point(-18.2,height(-17)+.39),(2.1,.8,2.6),yaw,'ashlar')
         ramp(builder.hit,point(-23,FORECOURT_Y),point(-17,height(-17)),11)
-    for sign in (1,):
-        top = []
-        for station, lateral in ((17,-4.5),(17,4.5),(21.2,4.5),(21.2,-4.5)):
-            x, _, z = point(sign*station,0,lateral)
-            y = grade(sign*17) if station==17 else ground(x,z)
-            top.append(np.array([x,y,z]))
-        stone.face(top,(0,1,0),'granite')
-        if builder.collide: builder.hit.face(top,(0,1,0),'granite')
-        for a,c in zip(top,top[1:]+top[:1]):
-            stone.face([a,c,c-[0,.45,0],a-[0,.45,0]],(a+c)/2-point(sign*19,0),'ashlar')
+    # Tie the full landing into the bank, including the crown between its edges.
+    def landing_vertex(station,lateral):
+        x,_,z = point(station,0,lateral)
+        fraction = (station-17)/4.2
+        return point(station,(1-fraction)*grade(17)+fraction*ground(x,z),lateral)
+    for start,end in ((17,19.1),(19.1,21.2)):
+        for left,right in ((-4.5,-2.25),(-2.25,0),(0,2.25),(2.25,4.5)):
+            top = [landing_vertex(s,l) for s,l in ((start,left),(start,right),(end,right),(end,left))]
+            stone.face(top,(0,1,0),'granite')
+            if builder.collide: builder.hit.face(top,(0,1,0),'granite')
+            for outside,a,c in zip((start==17,right==4.5,end==21.2,left==-4.5),top,top[1:]+top[:1]):
+                if outside:
+                    stone.face([a,c,c-[0,.45,0],a-[0,.45,0]],(a+c)/2-point(19,0),'ashlar')
     colors=('lantern_red','lantern_gold','lantern_cyan','lantern_pink','lantern_orange')
     for strand in range(4):
         previous=None

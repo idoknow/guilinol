@@ -612,7 +612,9 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
             owner_lm = next((e['id'] for e in landmarks_cfg if isinstance(e.get('replace'), list) and f'way/{wid}' in e['replace']), None)
             if wid in SPAN_WAYS:
                 owner_lm = 'jiefang_bridge'
-            if owner_lm:
+            # Ronghu decks are fitted to the final banks during landmark packing.
+            # Pinning the banks to yesterday's deck would feed that fit back into itself.
+            if owner_lm and owner_lm != 'ronghu':
                 for end_idx, into_d in ((0, min(0.5, line.length * 0.2)), (-1, max(0.0, line.length - min(0.5, line.length * 0.2)))):
                     end_pt = pts[end_idx]
                     cland = connected_land_ways(wid, end_pt)
@@ -865,7 +867,9 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
         xs4 = left + np.arange(gw4, dtype=np.float64) * GRID
         zs4 = top + np.arange(gh4, dtype=np.float64) * GRID
         X4, Z4 = np.meshgrid(xs4, zs4)
-        lm_keep = getattr(layout, 'exclude', rep_excl)
+        # Grading precedes landmark packing. Use the surveyed replacement polygons
+        # so grade-following paving cannot change its own ground on the next build.
+        lm_keep = layout.replace_exclude
         # A full ground-mesh cell beyond the photographed sidewalk keeps its
         # triangulated surface level with the junction even at the facade edge.
         corner_bed = rongyin_sidewalk().buffer(8)

@@ -140,9 +140,9 @@ def _fire_station(m: Builder, cx, cz, yaw):
     m.box(0, -1.5, 0, 15.6, 9.9, 10.5, 'alum', collide=True, footing=True)
     m.box(0, 4.22, 5.30, 15.8, 1.26, 0.22, 'dark')
     m.sign_quad(0, 4.24, 5.44, 15.6, 1.22, 'fire_fascia')
-    m.box(-4.8, 0.1, 5.26, 4.4, 4.05, 0.12, 'terra')
+    m.box(-4.8, 0.1, 5.26, 4.4, 4.05, 0.12, 'terra', footing=True)
     m.box(5.2, 2.35, 5.26, 3.8, 1.80, 0.12, 'red')
-    m.box(0.3, 0.1, 3.2, 4.8, 4.0, 3.8, 'dark')
+    m.box(0.3, 0.1, 3.2, 4.8, 4.0, 3.8, 'dark', footing=True)
     m.box(-2.35, 0.95, 5.36, 0.46, 2.65, 0.10, 'yellow_pave')
     if m.detail:
         for wx in (-4.6, 0.2, 4.4):
