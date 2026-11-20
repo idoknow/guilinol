@@ -48,6 +48,62 @@ function weldedIndexed(vertices:Float32Array, rawIndices:number[]){
   }
   return idxList.length?R.ColliderDesc.trimesh(Float32Array.from(verts),Uint32Array.from(idxList),R.TriMeshFlags.FIX_INTERNAL_EDGES):null
 }
+function filterBridgeOverRoad(road: Float32Array, deck: Float32Array) {
+  if (!road.length || !deck.length) return road
+  const pad = cfg.radius + .06, cell = 8, dim = 32
+  const buckets = new Map<number, number[]>()
+  const dBounds: number[] = []
+  for (let i = 0, tri = 0; i + 8 < deck.length; i += 9, tri++) {
+    const minX = Math.min(deck[i], deck[i + 3], deck[i + 6]) - pad
+    const maxX = Math.max(deck[i], deck[i + 3], deck[i + 6]) + pad
+    const minZ = Math.min(deck[i + 2], deck[i + 5], deck[i + 8]) - pad
+    const maxZ = Math.max(deck[i + 2], deck[i + 5], deck[i + 8]) + pad
+    const minY = Math.min(deck[i + 1], deck[i + 4], deck[i + 7])
+    const maxY = Math.max(deck[i + 1], deck[i + 4], deck[i + 7])
+    dBounds.push(minX, maxX, minZ, maxZ, minY, maxY)
+    const cx0 = Math.max(0, Math.min(dim - 1, Math.floor(minX / cell)))
+    const cx1 = Math.max(0, Math.min(dim - 1, Math.floor(maxX / cell)))
+    const cz0 = Math.max(0, Math.min(dim - 1, Math.floor(minZ / cell)))
+    const cz1 = Math.max(0, Math.min(dim - 1, Math.floor(maxZ / cell)))
+    for (let cz = cz0; cz <= cz1; cz++) for (let cx = cx0; cx <= cx1; cx++) {
+      const k = cz * dim + cx
+      let arr = buckets.get(k)
+      if (!arr) { arr = []; buckets.set(k, arr) }
+      arr.push(tri)
+    }
+  }
+  const kept: number[] = []
+  for (let i = 0; i + 8 < road.length; i += 9) {
+    const minX = Math.min(road[i], road[i + 3], road[i + 6])
+    const maxX = Math.max(road[i], road[i + 3], road[i + 6])
+    const minZ = Math.min(road[i + 2], road[i + 5], road[i + 8])
+    const maxZ = Math.max(road[i + 2], road[i + 5], road[i + 8])
+    const minY = Math.min(road[i + 1], road[i + 4], road[i + 7])
+    const midY = (road[i + 1] + road[i + 4] + road[i + 7]) / 3
+    const cx0 = Math.max(0, Math.min(dim - 1, Math.floor(minX / cell)))
+    const cx1 = Math.max(0, Math.min(dim - 1, Math.floor(maxX / cell)))
+    const cz0 = Math.max(0, Math.min(dim - 1, Math.floor(minZ / cell)))
+    const cz1 = Math.max(0, Math.min(dim - 1, Math.floor(maxZ / cell)))
+    let blockedByBridge = false
+    outer: for (let cz = cz0; cz <= cz1; cz++) for (let cx = cx0; cx <= cx1; cx++) {
+      const list = buckets.get(cz * dim + cx)
+      if (!list) continue
+      for (const tri of list) {
+        const b = tri * 6
+        if (maxX >= dBounds[b] && minX <= dBounds[b + 1] && maxZ >= dBounds[b + 2] && minZ <= dBounds[b + 3]
+          && midY > dBounds[b + 5] + .08 && minY < dBounds[b + 4] + 2.5) {
+          blockedByBridge = true
+          break outer
+        }
+      }
+    }
+    if (!blockedByBridge) {
+      for (let j = 0; j < 9; j++) kept.push(road[i + j])
+    }
+  }
+  return kept.length === road.length ? road : Float32Array.from(kept)
+}
+
 function weldedSurface(raw:Float32Array, corners:number[]|null, data:Awaited<ReturnType<typeof import('../world').detail>>, maxGap:number, minRun:number, maxRun:number, runScale:number){
   const verts:number[]=[],idxList:number[]=[],seen=new Map<string,number>()
   const addVertex=(corner:number)=>{
@@ -205,7 +261,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       if(data){const {sidewalk,road,banks}=data.streets
         const swDesc=sidewalk.length?weldedSurface(sidewalk,null,data,.65,.38,1.4,2.4):null
         if(swDesc)colliders.push(add(swDesc.setTranslation(tile.x,0,tile.z),'sidewalk'))
-        const rdDesc=road.length?weldedSurface(road,null,data,.65,.8,1.8,4):null
+        const filteredRoad=filterBridgeOverRoad(road,data.deck)
+        const rdDesc=filteredRoad.length?weldedSurface(filteredRoad,null,data,.65,.8,1.8,4):null
         if(rdDesc)colliders.push(add(rdDesc.setTranslation(tile.x,0,tile.z),'road'))
         for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=((top+endTop)/2-bottom)/10+1.25
           colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
