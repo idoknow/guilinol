@@ -38,6 +38,9 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
 // Max active batches <= 4 + 4 + 4 = 12 (<= baseline 12).
 const TOTAL_SLOTS=TREE_SPECIES_COUNT+8
 const MAX_NEAR_BATCHES=4
+// Keep the approved street view's species priority even though the detailed
+// mesh now stops sooner. Otherwise a rare foreground tree can lose its slot.
+const SPECIES_PRIORITY_RADIUS=140
 
 export class Forest{
   loaded=new Map<Tile,Tree[]>()
@@ -46,6 +49,7 @@ export class Forest{
   private assets:{geometry:THREE.BufferGeometry;material:THREE.Material}[]|null=null
   private batches:(THREE.InstancedMesh|undefined)[]=Array.from({length:TOTAL_SLOTS},()=>undefined)
   private groups:Tree[][]=Array.from({length:TOTAL_SLOTS},()=>[])
+  private speciesFrequency=new Uint32Array(TREE_SPECIES_COUNT)
   private nearOrder:number[]=Array.from({length:TREE_SPECIES_COUNT},(_,i)=>i)
   private dirty=true
   private anchor=new THREE.Vector3(Infinity,0,0)
@@ -79,6 +83,7 @@ export class Forest{
     const cam=this.camera.position
     const groups=this.groups
     for(let i=0;i<TOTAL_SLOTS;i++)groups[i].length=0
+    this.speciesFrequency.fill(0)
     const nearSq=look.trees.lodNear**2, midSq=look.trees.lodMid**2
     for(const trees of this.loaded.values())for(const tree of trees){
       const d=(tree.x-cam.x)**2+(tree.y-cam.y)**2+(tree.z-cam.z)**2
@@ -87,13 +92,15 @@ export class Forest{
       if((tree.x-cam.x)**2+(tree.z-cam.z)**2<(highCanopy?2.2:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue
       this.point.set(tree.x,tree.y+4,tree.z)
       if(!this.frustum.planes.every(plane=>plane.distanceToPoint(this.point)>-40))continue
+      if(d < SPECIES_PRIORITY_RADIUS**2) this.speciesFrequency[tree.kind]++
       const slot=d<nearSq?tree.kind:d<midSq?TREE_SPECIES_COUNT+tree.proxyGroup:TREE_SPECIES_COUNT+4+tree.proxyGroup
       groups[slot].push(tree)
     }
-    this.nearOrder.sort((a,b)=>groups[b].length-groups[a].length)
-    for(let rank=MAX_NEAR_BATCHES;rank<TREE_SPECIES_COUNT;rank++){
-      const k=this.nearOrder[rank], overflow=groups[k]
-      if(!overflow.length)break
+    this.nearOrder.sort((a,b)=>this.speciesFrequency[b]-this.speciesFrequency[a])
+    let activeNear=0
+    for(const k of this.nearOrder){
+      const overflow=groups[k]
+      if(!overflow.length || ++activeNear<=MAX_NEAR_BATCHES)continue
       for(let j=0;j<overflow.length;j++)groups[TREE_SPECIES_COUNT+overflow[j].proxyGroup].push(overflow[j])
       overflow.length=0
     }
