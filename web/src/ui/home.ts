@@ -29,7 +29,7 @@ export function home(play:()=>void):Home {
       <span class="home-seal" aria-hidden="true">桂</span>
       <h1>网上桂林</h1>
       <p class="home-tag">一座按真实地图搭起来的 3D 桂林。<br>飞上天看山水，落地逛街巷，走到哪儿算哪儿。</p>
-      <p class="home-meta"><span>打开网页就能玩</span><span>电脑 · 手机都行</span><span>不用下载</span></p>
+      <p class="home-meta"><span>登录就能玩</span><span>电脑 · 手机都行</span><span>不用下载</span></p>
     </div>
     <div class="home-modes" role="list">
       <button type="button" class="home-mode home-mode--tour" role="listitem" data-umami-event="home-tour">
@@ -62,7 +62,6 @@ export function home(play:()=>void):Home {
   onUser(user=>{account.innerHTML = user?`<i class="home-avatar"></i><span></span>`:'<span>登录 / 注册</span>'
     if(user){account.querySelector('i')!.textContent = initial(user.nickname); account.querySelector('span')!.textContent = user.nickname}})
   account.innerHTML = '<span>登录 / 注册</span>'
-  addEventListener('account:play',()=>{if(shown)play()})
 
   // Backdrop: cross-fade with a slow push-in. Later slides load only after the first one is on screen.
   const images = Array.from(root.querySelectorAll<HTMLImageElement>('.home-bg img')), caption = root.querySelector('.home-caption')!
