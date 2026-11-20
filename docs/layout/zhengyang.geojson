@@ -1419,13 +1419,15 @@
       "properties": {
         "kind": "candidate_building",
         "source": "doi:10.5281/zenodo.8174931",
-        "levels": null,
+        "levels": 8,
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定",
+        "status": "八层体量已核",
         "esri_review": "与港舍屋顶的大堂一侧重合，北缘较露台内缩约6米",
-        "footprint_axis_deg": 103.2
+        "footprint_axis_deg": 103.2,
+        "name": "港舍屋顶观景酒店",
+        "model_ref": "wangcheng_market/R2"
       }
     },
     {
@@ -2250,13 +2252,14 @@
         "kind": "building_roof",
         "name": "港舍屋顶观景酒店",
         "source": "Esri 屋顶点取；百度解放东路15号及大堂 POI；Rock 09 西侧转角",
-        "status": "屋顶可辨，地面轮廓待定",
-        "levels": null,
+        "status": "八层体量已核",
+        "levels": 8,
         "roof": "屋顶露台",
         "arcade": null,
         "retail": null,
         "floor_evidence": "桂林晚报 2025-05-30：3至8楼为客房；实拍09可见玻璃幕墙和屋顶露台",
-        "footprint_axis_deg": 104.4
+        "footprint_axis_deg": 104.4,
+        "model_ref": "wangcheng_market/R2"
       }
     },
     {
@@ -2374,7 +2377,7 @@
       "properties": {
         "kind": "camera",
         "source": "walk-shizijie-wangcheng/09_IMG_1398.jpg",
-        "heading": 165,
+        "heading": 176.3,
         "hAccuracy": 4.7
       }
     },
@@ -2389,9 +2392,10 @@
         ]
       },
       "properties": {
-        "kind": "clock_candidate",
+        "kind": "poi",
         "source": "百度地图 正阳钟塔",
-        "status": "待定"
+        "status": "核名",
+        "geometric_control": false
       }
     },
     {
@@ -2405,9 +2409,17 @@
         ]
       },
       "properties": {
-        "kind": "clock_candidate",
+        "kind": "clock",
         "source": "Esri World Imagery；环形铺装与塔身交叠区域，人工点取",
-        "status": "待定"
+        "status": "定位采用",
+        "height_m": 17.5,
+        "clock_face_center_m": 11.5,
+        "base_section_m": [
+          4.5,
+          4.5
+        ],
+        "axis_deg": 9.6,
+        "dimensions_source": "总高据桂林摄影旅游，基柱轴距与钟面高度为89738/89739照片比例，轴线沿步行街"
       }
     },
     {
@@ -2421,10 +2433,11 @@
         ]
       },
       "properties": {
-        "kind": "clock_candidate",
+        "kind": "clock_check",
         "source": "OSM node/6326899999",
         "tower:type": "bell_tower",
-        "status": "待定"
+        "status": "独立几何复核",
+        "residual_m": 3.16
       }
     },
     {

@@ -226,7 +226,19 @@ def main():
             if peak:entry={'position':peak['center'],'rotation':0}
         if not entry:
             row['status']='missing-instance';continue
-        if key in ('dongxixiang','zhengyang') and notes=='deferred to IDOK-44':
+        if key=='zhengyang':
+            from landmarks.world_surface import LandmarkSurface, Surface
+            model=ROOT/'public'/spec['model']
+            surface=LandmarkSurface(Surface(),key)
+            vertices=np.unique(visible_triangles(model).reshape(-1,3),axis=0)
+            clearance=max(abs(y-surface.ground(x,z)) for x,y,z in vertices)
+            street=LineString(points(osm['way/221821082']))
+            offset=footprint(model,entry).centroid.distance(street)
+            row.update(reference='way/221821082',measurement='north entrance paving only',
+                       centreToStreetM=round(offset,3),maxTerrainOffsetM=round(float(clearance),3),
+                       status='pass' if offset<=1 and clearance<=.3 else 'fail')
+            continue
+        if key=='dongxixiang' and notes=='deferred to IDOK-44':
             row['status']='deferred';continue
         if key=='zhengyang_clock':
             survey=json.loads((ROOT/'docs/layout/zhengyang.geojson').read_text())
