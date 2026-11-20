@@ -455,8 +455,15 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         shapes[1] = shapes[1].union(walk.difference(tactile))
         # The gate square shares the surrounding stone sidewalk mesh, height
         # field and 2 m paver texture. Union before triangulation to remove seams.
+        curb_cuts = []
         if gate_plaza is not None and tile.intersects(gate_plaza):
             shapes[1] = shapes[1].union(tile.intersection(gate_plaza))
+            # Lower the approach at the motor and cycle pavement edges.
+            for adjacent in (shapes[0],cycle):
+                contact = gate_plaza.boundary.intersection(adjacent.buffer(.01))
+                for line in getattr(contact,'geoms',[contact]):
+                    if line.geom_type=='LineString' and line.length>.05:
+                        curb_cuts.append(np.rint((np.asarray(line.coords)-origin)*100).astype(int).tolist())
         items=[]
         for kind,shape in [*enumerate(shapes[:3]), (4,verge), (5,cycle.difference(verge)), (6,tactile)]:
             for poly in polygons(shape):
@@ -480,5 +487,8 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         if decor.get(origin):
             out.extend([None, [], [], []][len(out)-5:])
             out.append(decor[origin])
+        if curb_cuts:
+            out.extend([None, [], [], [], []][len(out)-5:])
+            out.append(curb_cuts)
         return out
     return encode,lengths

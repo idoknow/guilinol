@@ -3,7 +3,7 @@ import {look} from './look/config'
 type Pair=[number,number]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const parkingYellow=new THREE.Color(0xe7b62e)
@@ -19,10 +19,24 @@ function evalRoadCtrl([baseMm,deltas]:RoadCtrl,lx:number,lz:number){
   return (baseMm+sum)/1000
 }
 
-function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[]]:Streets,ground:(x:number,z:number)=>number){
+function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[]]:Streets,ground:(x:number,z:number)=>number){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],mats:number[]=[],cols:number[]=[]
   const baseLevel=(x:number,z:number)=>{const g=ground(x,z);return roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g}
-  const vector=(pt:THREE.Vector2,offset:number)=>new THREE.Vector3(pt.x,baseLevel(pt.x,pt.y)+offset,pt.y)
+  const curbSegments=curbCuts.flatMap(line=>line.slice(1).map(([x,z],i)=>
+    new THREE.Line3(new THREE.Vector3(line[i][0]/100,0,line[i][1]/100),new THREE.Vector3(x/100,0,z/100)))).filter(segment=>segment.distanceSq()>0)
+  const testPoint=new THREE.Vector3(), closest=new THREE.Vector3()
+  function vector(pt:THREE.Vector2,offset:number){
+    if(offset===.195 && curbSegments.length){
+      testPoint.set(pt.x,0,pt.y)
+      let distance=2
+      for(const segment of curbSegments){
+        segment.closestPointToPoint(testPoint,true,closest)
+        distance=Math.min(distance,testPoint.distanceTo(closest))
+      }
+      offset=.045+.15*distance/2
+    }
+    return new THREE.Vector3(pt.x,baseLevel(pt.x,pt.y)+offset,pt.y)
+  }
   const surfaceKinds:number[]=[],alongVals:number[]=[]
   function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1=0,u2=0,u3=0,vertical=false){
     let p1=first,p2=second,p3=third,a1=u1,a2=u2,a3=u3
