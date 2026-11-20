@@ -27,7 +27,7 @@ import math
 import random
 import sys
 from rong_paving import pave, slab_texture
-from rong_ground import ISLAND_COURT
+from rong_ground import ISLAND_COURT, RILL_COURT_EDGE, rill_north_path
 from rong_bridges import nine_bends, ancient_bridge
 from rong_street import scooter
 from rong_solids import loft, oval, torus, banyan as solid_tree
@@ -430,9 +430,6 @@ def shore(b):
     # IMG_1334–36 look along the strip between ways 684511179 and 686230933.
     with align_front(b, (0, -17.5), -18, shift=(0,1.25)):
         # Mapped path centre lines in the channel frame, sampled from the November snapshot.
-        def north_path(x):
-            return -26.936 + (x+62.146)*2.066/104.458
-
         def south_path(x):
             pts = [(-39.955,-18.544),(-12.9,-16.778),(12.635,-14.901),(40.322,-11.318)]
             for (a,za),(c,zc) in zip(pts,pts[1:]):
@@ -440,19 +437,22 @@ def shore(b):
                     return za + (zc-za)*(x-a)/(c-a)
 
         def channel(x):
-            if x > 14:
-                return -17.5 - .96*(x-14)/2.42
-            return -17.5 - 1.85*max(0,1-abs(x-3)/11)
+            # Near coping measured at 70–80% image height in 1335 and 1336.
+            controls = [(-18,-17.9),(-11,-18.15),(-8,-18.23),(3,-20.32),
+                        (4,-20.29),(14,-17.5),(16.42,-18.46)]
+            for (a,za),(c,zc) in zip(controls,controls[1:]):
+                if x <= c:
+                    return za+(zc-za)*(x-a)/(c-a)
 
         def banks(x):
-            return north_path(x)-1.4, south_path(x)+1.7
+            return rill_north_path(x)-1.4, south_path(x)+1.7
 
         def paving_level(x,z):
             return 1.19 + (x+18)*.006
 
         # 0.94 m clear water with two 0.25 m stone lips. Carry both paving strips
         # over the path centres so the side visible in IMG_1336 has no grass seam.
-        stations = [-18,-14,-10,-8,-6,-2,2,3,6,10,14,16.42]
+        stations = [-18,-14,-11,-8,-6,-2,2,3,4,6,10,14,16.42]
         for left,right in zip(stations,stations[1:]):
             level = 1.08 + (left+18)*.006
             za,zb = channel(left),channel(right)
@@ -491,14 +491,13 @@ def shore(b):
 
         # IMG_1336 shows a paved forecourt on the pavilion side of 686230933.
         # Tie the path to the plinth, inland of water relation 9373836.
-        edge = [(-18,-10.6),(-7,-6.2),(3,-4.7),(9,-6.8),(16,-10.3),(25,-11.0)]
-        for (a,za),(c,zc) in zip(edge,edge[1:]):
+        for (a,za),(c,zc) in zip(RILL_COURT_EDGE,RILL_COURT_EDGE[1:]):
             outer_a,outer_c = banks(a)[1],banks(c)[1]
             def forecourt_level(x,z):
                 t = (x-a)/(c-a)
                 inner = outer_a+(outer_c-outer_a)*t
                 far = za+(zc-za)*t
-                return paving_level(x,z) + (.30-paving_level(x,z))*(z-inner)/(far-inner)
+                return paving_level(x,z) + (1.07-paving_level(x,z))*(z-inner)/(far-inner)
             pave(b,[(a,outer_a),(c,outer_c),(c,zc),(a,za)],forecourt_level)
     pavilion(b, 24, .35, -6, span=4.4)
     post = 0.95 if b.detail else 8
