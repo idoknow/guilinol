@@ -15,6 +15,7 @@ const steps = [
   'verify:ride',
   'verify:tour',
   'audit:landmarks',
+  'audit:seams',
   'photo-match',
 ]
 const extraArgs = { 'audit:landmarks': ['--', '--strict'], 'photo-match': ['--', '--all'] }

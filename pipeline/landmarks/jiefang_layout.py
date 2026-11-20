@@ -19,6 +19,13 @@ NATIVE_APPROACH=120
 BANK_LIMIT=140
 
 
+def dash_intervals(first, last, period=7., painted=2.8):
+    for start in np.arange(np.floor(first/period)*period,last,period):
+        left, right = max(first,start), min(last,start+painted)
+        if right-left>1e-6:
+            yield left,right
+
+
 def site_limit(way):
     return BANK_LIMIT if way in LOWER_ROADS else NATIVE_APPROACH
 
@@ -111,7 +118,19 @@ def widths(way):
 SPAN_WAYS = {49322149, 258899702, 1531308751, 1531308752}
 
 def deck_level(local_x):
-    return 5.62 - local_x * 1.3 / 281
+    original = 5.62 - local_x * 1.3 / 281
+    inner = 134.6286
+    head = 151.2322 - 145.6
+    distance = np.maximum(0., inner-local_x)
+    approach = head + .05*np.where(distance<2, distance**2/4, distance-1)
+    start, end = 16., 111.
+    length = end-start
+    fraction = np.clip((local_x-start)/length, 0, 1)
+    left = 5.62-start*1.3/281
+    right = head+.05*(inner-end-1)
+    curve = (left+(right-left)*(3-2*fraction)*fraction**2
+             - length*fraction*(1-fraction)*((1-fraction)*1.3/281-fraction*.05))
+    return np.where(local_x<start,original,np.where(local_x<end,curve,approach))
 
 
 def world_road_sections(anchor, angle, native_grade=False):

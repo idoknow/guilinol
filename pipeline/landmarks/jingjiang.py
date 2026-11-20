@@ -316,10 +316,13 @@ def gate_furniture(m,plan_surface):
 
 def palace(m):
     from wangcheng_plan import PalacePlan, enclosure, inner_court
+    from plaza_seam import civic_plaza
     plan = PalacePlan()
+    m.surface = plan.surface
+    def paving(center_z,width,depth):
+        civic_plaza(m,[(side*width/2,center_z+end*depth/2) for side,end in [(-1,-1),(1,-1),(1,1),(-1,1)]])
     enclosure(m, plan)
-    # Carry the forecourt through both arches up to the axial path at z=-11.5.
-    m.box(0,-.65,10.5,47,.82,44,'pave',True)
+    paving(10.5,47,44)
     m.arcade(0,-11,40,23,6.8,[-11,0],[2.0,3.75],'stone')
     m.box(0,6.8,-11,40,2.25,23,'brick',True)
     if m.detail:
@@ -414,13 +417,13 @@ def palace(m):
         m.pose=(0,plan.ground(142,verge_z),0,0)
         banyan(m,142,verge_z,56+side)
         m.pose=(0,0,0,0)
-    m.box(0,-.45,-123,71,.59,48,'pave',True)
+    paving(-123,71,48)
     for side in (-1,1):
         lo,hi=side*18-16,side*18+16
         sand=np.array([[173,146,107,255]]*4,dtype=np.uint8)
-        m.mesh([[lo,.16,-216.5],[lo,.16,-163.5],[hi,.16,-163.5],[hi,.16,-216.5]],
+        m.mesh([[x,plan.ground(x,z)+.035,z] for x,z in [(lo,-216.5),(lo,-163.5),(hi,-163.5),(hi,-216.5)]],
                [[0,1,2],[0,2,3]],sand,True)
-    m.box(0,-.36,-192,4,.54,78,'pave',True)
+    paving(-192,4,78)
     for i,x in enumerate((-18,-8,9,19)):
         # Front garden screening the lower part of the hall in Rock 34–35.
         crown=trimesh.creation.icosphere(subdivisions=int(m.detail))
@@ -447,7 +450,7 @@ def palace(m):
             for index in range(64):
                 end=(index+2)%64;m.mesh([rear[index],rear[end],ring[end],ring[index]],[[0,1,2],[0,2,3]],'gold')
     m.pose=(0,0,0,0)
-    m.box(0,0,-79,12,.12,135,'pave',True)
+    paving(-79,12,135)
     inner_court(m, plan)
     m.box(0,6.2,-22.55,6.1,1.4,.25,'granite')
     letters(m,'三元及第',(0,6.42,-22.7),5.15,.86,'wood',facing=-1)

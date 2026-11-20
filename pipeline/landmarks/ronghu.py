@@ -660,6 +660,8 @@ def shore(b):
 
 
 def build(b: Builder):
+    from rong_revetment import revetment
+    revetment(b)
     nine_bends(b)
     ancient_bridge(b)
     glass_bridge(b)

@@ -17,6 +17,7 @@
     "landmarks": "uv run --locked python pipeline/pack_landmarks.py",
     "world": "uv run --locked python pipeline/world.py",
     "audit:grounding": "uv run --locked python pipeline/audit_grounding.py",
+    "audit:seams": "uv run --locked python pipeline/audit_seams.py",
     "audit:landmarks": "uv run --locked python pipeline/audit_landmarks.py",
     "audit:grounding:market": "uv run --locked python scripts/dongxi/grounding.py",
     "credits": "node scripts/photo-credits.mjs",

@@ -3,7 +3,8 @@ import {look} from './look/config'
 type Pair=[number,number]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?]
+type Lower=[number,Pair[],[number,number,number,number][]]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,Lower?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const parkingYellow=new THREE.Color(0xe7b62e)
@@ -19,12 +20,30 @@ function evalRoadCtrl([baseMm,deltas]:RoadCtrl,lx:number,lz:number){
   return (baseMm+sum)/1000
 }
 
-function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[]]:Streets,ground:(x:number,z:number)=>number){
+function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,profile]:Lower){
+  const [start,end,,side]=corners
+  if((x-(start[0]+end[0])/2)*(end[0]-start[0])+(z-(start[1]+end[1])/2)*(end[1]-start[1])>0){
+    let best=Infinity,height=base
+    for(let i=1;i<profile.length;i++){
+      const a=profile[i-1],b=profile[i],dx=b[0]-a[0],dz=b[1]-a[1]
+      const t=THREE.MathUtils.clamp(((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz),0,1)
+      const distance=(x-a[0]-t*dx)**2+(z-a[1]-t*dz)**2
+      if(distance<best){best=distance;height=base+(a[2]+t*(b[2]-a[2])-base)*(a[3]+t*(b[3]-a[3]))}
+    }
+    return height
+  }
+  const outside=(point:Pair)=>{const dx=point[0]-start[0],dz=point[1]-start[1],len=Math.hypot(dx,dz),along=((x-start[0])*dx+(z-start[1])*dz)/len;return Math.max(0,-along,along-len)}
+  const factor=THREE.MathUtils.smoothstep(Math.hypot(outside(end),outside(side)),2,24)
+  return terrain+factor*(base-terrain)
+}
+
+function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower]:Streets,ground:(x:number,z:number)=>number){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],mats:number[]=[],cols:number[]=[]
   const baseLevel=(x:number,z:number)=>{const g=ground(x,z);return roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g}
   const curbSegments=curbCuts.flatMap(line=>line.slice(1).map(([x,z],i)=>
     new THREE.Line3(new THREE.Vector3(line[i][0]/100,0,line[i][1]/100),new THREE.Vector3(x/100,0,z/100)))).filter(segment=>segment.distanceSq()>0)
   const testPoint=new THREE.Vector3(), closest=new THREE.Vector3()
+  let lowerPath=false
   function vector(pt:THREE.Vector2,offset:number){
     if(offset===.195 && curbSegments.length){
       testPoint.set(pt.x,0,pt.y)
@@ -35,7 +54,8 @@ function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRai
       }
       offset=.045+.15*distance/2
     }
-    return new THREE.Vector3(pt.x,baseLevel(pt.x,pt.y)+offset,pt.y)
+    const base=baseLevel(pt.x,pt.y)
+    return new THREE.Vector3(pt.x,(lower&&lowerPath?lowerHeight(pt.x,pt.y,base,ground(pt.x,pt.y),lower):base)+offset,pt.y)
   }
   const surfaceKinds:number[]=[],alongVals:number[]=[]
   function triangle(first:THREE.Vector3,second:THREE.Vector3,third:THREE.Vector3,kind:number,u1=0,u2=0,u3=0,vertical=false){
@@ -55,7 +75,8 @@ function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRai
     const c=colors[kind]
     for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(channel===1)sidewalk.push(pt.x,pt.y,pt.z)}
   }
-  for(const [kind,...rings] of paths){
+  for(const [index,[kind,...rings]] of paths.entries()){
+    lowerPath=!!lower && index>=lower[0]
     const loops=rings.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
     const tris=THREE.ShapeUtils.triangulateShape(loops[0],loops.slice(1)),points=loops.flat()
     const height=[.045,.195,.065,0,.195,.06,.195][kind]

@@ -1,0 +1,23 @@
+{
+  "surfaces": {
+    "shizijie": {"B_plaza_pave": "sidewalk"},
+    "nikoniko": {"B_plaza_pave": "sidewalk"},
+    "dongxixiang": {"pave": "plaza"},
+    "wangcheng_market": {"pave": "plaza"},
+    "central_square": {"B_plaza_pave": "sidewalk"},
+    "jiefang_bridge": {"pave": "sidewalk"},
+    "jingjiang": {"pave": "plaza"},
+    "zhongshan_road": {"B_plaza_pave": "sidewalk"}
+  },
+  "atlas": {
+    "libin_middle": {"material":"libin_middle_atlas","role":"sidewalk","box":[0,0.25,0.25,0.46875]},
+    "ronghu": {"material":"landmark","role":"plaza","box":[0.5,0.75,0.625,0.875]}
+  },
+  "adjacentAtlas": {
+    "libin_middle": {"label":"innerDrive","material":"libin_middle_atlas","role":"road","box":[0.75,0.09375,0.875,0.1875]}
+  },
+  "exceptions": [
+    {"id":"ronghu","material":"landmark","kind":"retainingWall","name":"亲水平台驳岸","worldXZ":[[-1395.78,140.89],[-1387.87,139.13],[-1383.14,139.92]],"designRise":"sidewalk minus lower paving; 5.01 m at (-1392.27,140.08) before IDOK-59"},
+    {"id":"ronghu","material":"landmark","kind":"retainingWall","name":"桥头入口石阶","worldXZ":[[-1424.57,166.06],[-1422.48,167.30]],"designRise":"sidewalk minus lower forecourt paving"}
+  ]
+}
