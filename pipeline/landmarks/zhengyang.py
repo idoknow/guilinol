@@ -1,5 +1,5 @@
-"""North blocks of pedestrian ways 221821082/258909992. Arcade spans ~5 m,
-three ~3.4 m floors; 2018 references for balustrades and four-faced clock.
+"""North blocks of pedestrian ways 221821082/258909992. Frontages are owned by wangcheng_market and wangcheng_mall.
+2018 references show the four-faced clock.
 Clock placement/height approximate. No unverified underground entrance.
 """
 import math
@@ -41,34 +41,6 @@ def boulevard(model):
                 model.mesh(strip,[[0,2,3],[0,3,1]],'tile')
         for side in (-1,1):
             model.box(side*7.6,.14,center,1.3,.04,25,'granite')
-            # The east frontage here belongs to Wangcheng Mall (OSM 264901525)
-            # and the adjoining mapped footprint 675591853. See docs/layout/zhengyang.md.
-            if block == 0 or side == 1:
-                continue
-            model.box(side*14.4,0,center,7.4,10.2,22,'white' if block%2==0 else 'earth',True)
-            for floor in (3.35,6.65):model.box(side*10.1,floor,center,3.5,.32,22.3,'white')
-            for offset in np.linspace(-10,10,5 if model.detail else 2):
-                model.box(side*8.7,.12,center+offset,.6,3.3,.62,'granite',True)
-                if model.detail:
-                    model.box(side*10.68,0,center+offset,.23,.32,3.35,'granite')
-                    for floor in (.3,3.9,7.2):model.box(side*10.68,floor,center+offset,.18,2.25,3.3,'glass')
-                    model.box(side*10.48,.08,center+offset,.16,2.55,1.16,'wood');model.box(side*10.36,.52,center+offset,.12,1.8,.91,'glass')
-                    model.box(side*10.42,2.56,center+offset,.24,.65,3.85,['red','earth','tile'][block%3])
-                    for glyph in (-.9,0,.9):model.box(side*10.25,2.72,center+offset+glyph,.1,.32,.26,'white')
-            if model.detail:
-                for floor in (3.68,6.98):
-                    model.box(side*8.59,floor+.84,center,.26,.19,22,'white')
-                    for offset in np.linspace(-10.6,10.6,15):
-                        zz=center+offset
-                        model.beam([side*8.59,floor,zz],[side*8.59,floor+.68,zz],.10,'white',6)
-                        model.beam([side*8.59,floor+.21,zz],[side*8.59,floor+.44,zz],.17,'white',5)
-                        model.box(side*8.59,floor+.65,zz,.18,.2,.18,'white')
-            if block%2==0:
-                east=side*6;zz=center+8
-                model.beam([east,0,zz],[east,6.5,zz],.23,'wood',7,True)
-                for leaf in range(9 if model.detail else 4):
-                    angle=leaf*2.4;dx,dz=math.cos(angle),math.sin(angle)
-                    model.mesh([(east,6.4,zz),(east+1.6*dx+.5*dz,7.4,zz+1.6*dz-.5*dx),(east+3.4*dx,5.8,zz+3.4*dz),(east+1.6*dx-.5*dz,7.4,zz+1.6*dz+.5*dx)],[[0,1,2],[0,2,3]],'leaf')
 
 
 if __name__=='__main__':generate('zhengyang',boulevard)
