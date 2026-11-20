@@ -52,11 +52,11 @@ def frontage(model):
                 for cell in range(3):
                     zz=(cell-1)*width/3
                     model.box(side*3.66,0,zz-width/6+.19,1.22,3,.31,'brick',True)
-                    model.box(side*4.13,.37,zz,.16,2.0,width/3-.60,'glass')
-                    model.box(side*3.65,.27,zz,1.20,.14,width/3-.30,'wood')
-                    model.box(side*4.01,.38,zz,.10,1.97,.07,'wood')
-                    model.box(side*3.23,2.54,zz,.29,.38,1.22,'sign')
-                    for mark in (-.28,0,.28):model.box(side*3.06,2.63,zz+mark,.07,.15,.11,'gold')
+                    model.box(side*4.23,.37,zz,.16,2.0,width/3-.60,'glass')
+                    model.box(side*3.70,0,zz,1.24,.41,width/3-.30,'wood')
+                    model.box(side*4.13,.38,zz,.10,1.97,.07,'wood')
+                    model.box(side*4.17,2.54,zz,.29,.38,1.22,'sign')
+                    for mark in (-.28,0,.28):model.box(side*4.01,2.63,zz+mark,.07,.15,.11,'gold')
                     model.box(side*3.10,3.8,zz,.22,1.8,width/3-.38,'glass')
                     for bar in range(4):model.box(side*2.94,3.8,zz+(bar-1.5)*.46,.13,1.85,.10,'wood')
                     model.box(side*2.95,4.6,zz,.14,.12,width/3-.3,'wood')

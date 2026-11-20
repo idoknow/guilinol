@@ -1,4 +1,4 @@
-"""Run the IDOK-59 LOD0 contact audit without its citywide deferral."""
+"""Measure LOD0 contacts inside the surveyed Wangcheng market polygon."""
 import json
 import sys
 from pathlib import Path

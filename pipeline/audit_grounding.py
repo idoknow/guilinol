@@ -323,12 +323,6 @@ def run(directory):
         heatmap(directory/(name+'.png'), coords, gap, name, np.radians(entry['rotation']))
         failures = sum(r['status']=='fail' for r in rows)
         item = dict(id=name, aboveBearingBand=aboveBand, components=rows, failures=failures)
-        if name == 'dongxixiang' and failures:
-            item.update(
-                status='deferred',
-                reason=('IDOK-50 owns model; see IDOK-50 grounding note. Remaining contacts '
-                        'are outside the registered market replacement polygon.'),
-                deferredFailures=failures, failures=0)
         report.append(item)
     result = dict(failures=sum(r['failures'] for r in report), landmarks=report,
                   tolerances=dict(bearingBand=BEARING_BAND, land=[-SINK,FLOAT], bridgeEnd=.30),
