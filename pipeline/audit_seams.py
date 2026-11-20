@@ -139,6 +139,9 @@ def main():
                 for way,x,z,found in paint_checks:
                     if not found: rows.append([x,z,'dash:'+str(way),None,[],['missingModelPaint']])
         if 'flatten' in spec: rings.append(('flatten',polygon(spec['flatten']['polygon'])))
+        if name=='gunanmen':
+            from landmarks.rong_ground import GATE_PLAZA
+            rings.append(('streetPlaza',shapely.Polygon(np.asarray(GATE_PLAZA)+np.asarray(entry['position'])[::2])))
         replace = spec.get('replace',[])
         if isinstance(replace,dict): rings.append(('replace',polygon(replace['polygon'])))
         else:

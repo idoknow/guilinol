@@ -7,7 +7,6 @@
   },
   "atlas": {
     "libin_middle": {"material":"libin_middle_atlas","role":"sidewalk","box":[0,0.25,0.25,0.46875]},
-    "gunanmen": {"material":"landmark","role":"plaza","box":[0.875,0.875,1,1]},
     "ronghu": {"material":"landmark","role":"plaza","box":[0.5,0.75,0.625,0.875]}
   },
   "adjacentAtlas": {
