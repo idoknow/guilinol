@@ -83,6 +83,7 @@ def seated_lion(model, x, y0, z, yaw):
 
 def camphor_tree(model, x, y0, z, h=9.8, spread=3.8):
     model.beam([x, y0 - 0.5, z], [x, y0 + h * 0.48, z], 0.26, 'wood', 7, True)
+    model.beam([x,y0+h*.40,z],[x,y0+h*.84,z],.17,'wood',7)
     sphere = trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
     for dx, dy, dz, r in ((-1.0, h * 0.68, 0.3, spread * 0.72), (0.9, h * 0.72, -0.4, spread * 0.68), (0.0, h * 0.86, 0.0, spread * 0.64)):
         model.mesh(sphere.vertices * [r, r * 0.65, r] + [x + dx, y0 + dy, z + dz], sphere.faces, 'leaf')
@@ -136,7 +137,7 @@ def build_kuiguang_lou(model):
     model.box(0, 3.87, gz + 0.35, w - 0.6, 0.88, 0.10, 'red')
     if model.detail:
         for lx in np.linspace(-5.0, 5.0, 7):
-            model.box(lx, 0.5, gz - 0.95, 1.25, 2.85, 0.12, 'red')
+            model.box(lx, 0.22, gz - 0.95, 1.25, 3.13, 0.12, 'red')
             model.box(lx, 4.0, gz - 0.95, 1.25, 2.65, 0.12, 'red')
     # Heritage stone stele & scholar rock in front of SE gable (IMG_1379!)
     model.box(6.8, -0.2, 3.6, 0.65, 1.65, 0.28, 'white')
@@ -147,6 +148,7 @@ def build_kuiguang_lou(model):
 def build_school_gate(model):
     # Street-facing grand school gate centered at (12.8, 25.4), aligned with Jiefang West Rd (+12.4 deg)
     # Strictly exterior architectural gate & facade ONLY (no guard booth, no turnstiles, no retractable barrier!)
+    model.site_datum = -0.58
     gy = -0.58  # exact gate ground 157.82 m - 158.40 m
     yaw = 0.216  # +12.4 deg
     cx, cz = 12.8, 25.4
@@ -169,7 +171,7 @@ def build_school_gate(model):
         model.box(px, 7.70, 1.6, 0.78, 0.92, 0.85, 'granite')
         # Vertical silver-grey school nameplate on front left column ('桂林市桂林中学', IMG_1375!)
         if px < 0:
-            model.box(px, 1.25, 2.08, 0.48, 2.85, 0.06, 'stone')
+            model.box(px, 1.25, 2.04, 0.48, 2.85, 0.14, 'stone')
 
     # Deep coffered hall canopy ceiling with terracotta-pink panels & white grid beams (IMG_1375, 1376, 1377, 1379!)
     # Covers lx in [-8.8, +8.8], lz in [-4.8, +2.2] at y = 5.54..6.35
@@ -195,8 +197,11 @@ def build_school_gate(model):
     model.box(0, 7.68, 1.85, 9.4, 0.22, 1.25, 'white')
 
     # Dark horizontal LED fascia bar under front beam + 4 festive red lanterns (IMG_1373, 1374, 1375, 1376!)
+    for sx in (-4.5,4.5):
+        model.box(sx,5.36,1.15,.12,.54,.16,'stone')
     model.box(0, 4.72, 1.15, 9.8, 0.72, 0.26, 'sign')
     for lx in (-3.6, -1.2, 1.2, 3.6):
+        model.beam([lx,4.55,1.75],[lx,5.9,1.75],.035,'stone')
         cyl = trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
         model.mesh(cyl.vertices * [0.32, 0.26, 0.32] + [lx, 4.55, 1.75], cyl.faces, 'red')
 
@@ -215,12 +220,14 @@ def build_school_gate(model):
     # Pair of carved grey stone lions + flowerbed outside front columns (IMG_1375!)
     seated_lion(model, -6.4, 0.0, 3.65, 0.25)
     seated_lion(model, 6.0, 0.0, 3.65, -0.25)
+    model.site_datum = 0
     model.box(-8.6, 0.0, 3.9, 2.2, 0.55, 1.4, 'leaf')
 
     model.pose = (0, 0, 0, 0)
 
 
 def build_flanking_facades(model):
+    model.site_datum = -0.58
     gy = -0.58
     yaw = 0.216
 
@@ -297,13 +304,14 @@ def build_flanking_facades(model):
         model.mesh(can_q, [[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]], 'granite')
     # Rooftop open pergola louver frame on south face
     for px in (-3.5, 1.0, 5.5, 9.5):
-        model.box(px, 21.8, -1.5, 0.38, 2.3, 0.38, 'stone')
+        model.box(px, 20.92, -1.5, 0.38, 3.18, 0.38, 'stone')
     model.box(3.0, 24.0, -1.5, 14.5, 0.35, 6.2, 'granite')
     for fl in range(5):
         fy = 3.2 + fl * 3.4
         model.box(2.5, fy, 0.10, 16.5, 1.65, 0.12, 'glass')
     model.pose = (0, 0, 0, 0)
 
+    model.site_datum = 0
     # 4. Paved granite tree-lined campus courtyard & avenue seamlessly flush across the 158.4m flattened ground!
     model.box(13.0, -0.34, 2.0, 32.0, 0.39, 72.0, 'pave', True)
     model.pose = (16.2, 0.05, -6.0, 0.10)
@@ -313,6 +321,7 @@ def build_flanking_facades(model):
 
     # Distant 5-storey teaching wing with blue pitched roof at z = -42 (framing distant background of IMG_1378 & 1379!)
     model.box(10.0, -0.6, -42.0, 36.0, 17.5, 10.5, 'white', True)
+    model.box(10,16.82,-36.65,37,.16,.40,'clock')
     pts_br = [(-8.5, 16.9, -36.5), (28.5, 16.9, -36.5), (28.5, 19.6, -42.0), (-8.5, 19.6, -42.0)]
     model.mesh(pts_br, [[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]], 'clock')
     for fl in range(4):
@@ -340,6 +349,7 @@ def build_flanking_facades(model):
 
 
 def school(model):
+    model.fit_to_grade('guilin_middle')
     build_kuiguang_lou(model)
     build_school_gate(model)
     build_flanking_facades(model)

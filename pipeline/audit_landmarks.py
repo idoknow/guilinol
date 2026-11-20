@@ -116,6 +116,8 @@ def chunk_building(manifest,source,reference):
 
 
 def shoreline_axis(shape):
+    if shape.geom_type == "MultiPolygon":
+        shape = max(shape.geoms,key=lambda part:part.area)
     ring=shape.exterior
     samples=np.array([ring.interpolate(fraction,normalized=True).coords[0] for fraction in np.arange(256)/256])
     _,vectors=np.linalg.eigh(np.cov(samples.T))
@@ -208,7 +210,7 @@ def main():
             if not entry:
                 row['status']='missing-instance';continue
             _, source, midpoint, _, road, edge = site
-            shape=footprint(ROOT/'public'/spec['model'],entry,elevation=1)
+            shape=footprint(ROOT/'public'/spec['model'],entry)
             if shape.is_empty:
                 row['status']='empty-geometry';continue
             distance=shape.centroid.distance(midpoint)
@@ -274,12 +276,29 @@ def main():
         if key=='ronghu':
             components=[]
             for name,instance,source,window,height in (
-                ('library',key,'way/679990105',(-26,-65,54),5),
+                ('library',key,'way/679990105',(-26,-65,54),None),
                 ('rong_hotel','gunanmen','way/521248450',(10,-51,17),8),
                 ('inn','gunanmen','way/521248446',(10,-86,16),8),
-                ('island',key,'way/674611987',(136,142,48),-.2)):
+                ('island',key,'way/674611987',(136,142,48),None)):
                 placement=entries[instance]
-                section=footprint(ROOT/'public'/placement['file'],placement,window,height)
+                model=ROOT/'public'/placement['file']
+                if name in ('library','island'):
+                    faces=visible_triangles(model)
+                    area_y=np.cross(faces[:,1]-faces[:,0],faces[:,2]-faces[:,0])[:,1]
+                    near=np.linalg.norm(faces.mean(axis=1)[:,::2]-window[:2],axis=1)<window[2]
+                    flat=near & (np.ptp(faces[:,:,1],axis=1)<.03) & (area_y>0)
+                    if not flat.any():
+                        components.append(dict(component=name,status='missing-cap'));continue
+                    levels,indices=np.unique(np.round(faces[flat,:,1].mean(axis=1),1),return_inverse=True)
+                    cap=float(levels[np.bincount(indices,weights=area_y[flat]).argmax()])
+                    if name=='island':
+                        section=footprint(model,placement,window,cap-.08)
+                    else:
+                        # Rear block, wing parapets and lower front block of the library.
+                        section=union_all([footprint(model,placement,window,roof=cap+offset)
+                                           for offset in (0,.18,-2.2)])
+                else:
+                    section=footprint(model,placement,window,height)
                 if source in osm:target=area(osm[source])
                 else:
                     member=next(member for member in osm['relation/9373836']['members'] if member['ref']==674611987 and member['role']=='inner')
@@ -365,7 +384,9 @@ def main():
         if not element:continue
         tags=element.get('tags',{})
         if key not in BRIDGES and not tags.get('building'):continue
-        elevation=None if key in BRIDGES or key=='zhuangyuan_gallery' else {'central_square':8,'ronghu':4,'nikoniko':10,'gunanmen':6.6,'xiaoyao_tower':9}.get(key,2)
+        # The east footing of Wangcheng Mall reaches +3.81 m on the finished slope.
+        # Slice the continuous ground-floor walls two metres above that corner.
+        elevation=None if key in BRIDGES or key=='zhuangyuan_gallery' else {'central_square':8,'ronghu':4,'nikoniko':10,'wangcheng_mall':6,'gunanmen':6.6,'xiaoyao_tower':9}.get(key,2)
         component_box=((-22,3,-3),(22,7,3)) if key=='zhuangyuan_gallery' else None
         shape=footprint(ROOT/'public'/spec['model'],entry,window,elevation,component_box)
         row['measurement']='visible deck projection' if elevation is None else f'wall section at local y={elevation} m'
@@ -377,7 +398,7 @@ def main():
             if not photos_pass(row['photos']):row['status']='fail'
             continue
         if key=='zhuangyuan_gallery':row['measurement']='gallery roof projection'
-        if key in ('central_square','gunanmen','xiaoyao_tower'):
+        if key in ('central_square','gunanmen','xiaoyao_tower','guilin_theater'):
             parts=list(getattr(shape,'geoms',[shape]));shape=max(parts,key=lambda part:part.intersection(reference).area)
         if shape.is_empty:row['status']='empty-geometry';continue
         iou,center,delta=metrics(shape,reference)
@@ -391,6 +412,11 @@ def main():
     text=json.dumps(report,indent=2,ensure_ascii=False)
     if args.out:args.out.write_text(text+'\n')
     print(text)
+    if args.strict:
+        from audit_grounding import run
+        grounding = run(ROOT/"captures/grounding")
+        if grounding["failures"]:
+            raise SystemExit(f"{grounding['failures']} grounding failures (captures/grounding/grounding.json)")
     if args.strict and any(row['status'] not in ('pass','deferred') for row in report):raise SystemExit(1)
 
 

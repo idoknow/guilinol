@@ -10,6 +10,7 @@ from xiaoyao_tower import generate
 
 
 def office(model):
+    model.fit_to_grade('yiwu_office')
     x0, x1 = -23.3, 23.3
     cx = 0.0
     w, d = 46.6, 10.0

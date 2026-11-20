@@ -67,6 +67,7 @@ def text_mesh(model, text, width, height, color, y_center, z_plane, font_px=28):
 
 def camphor_tree(model, x, y0, z, h=11.0, spread=4.4):
     model.beam([x, y0 - 0.5, z], [x, y0 + h * 0.44, z], 0.28, 'wood', 7, True)
+    model.beam([x,y0+h*.40,z],[x,y0+h*.84,z],.17,'wood',7)
     sphere = trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
     for dx, dy, dz, r in (
         (-1.2, h * 0.64, 0.5, spread * 0.78),
@@ -77,6 +78,7 @@ def camphor_tree(model, x, y0, z, h=11.0, spread=4.4):
 
 
 def school(model):
+    model.fit_to_grade('kuiguang_school')
     # =========================================================================
     # 1. AUDITED STREET-FRONT SOUTH WING (exact OSM way/701820464, y=0..16.5m)
     # =========================================================================
@@ -135,6 +137,7 @@ def school(model):
                 model.box(sx, 0.0, gz, 0.18, 3.65, 0.10, 'tile')
     # Two red lanterns hanging under the front portal soffit + yellow/black road barriers (IMG_1295!)
     for lx in (-2.05, 2.05):
+        model.beam([lx,3.62,4.85],[lx,4.12,4.85],.035,'wood')
         sph = trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
         model.mesh(sph.vertices * [0.42, 0.30, 0.42] + [lx, 3.62, 4.85], sph.faces, 'red')
         # Small stone guardian lions inside piers
@@ -149,7 +152,7 @@ def school(model):
             model.box(wx, fy, 5.84, 2.85, 1.85, 0.16, 'white')
             model.box(wx, fy + 0.15, 5.92, 2.35, 1.45, 0.08, 'glass')
             if model.detail and wx in (-2.6, 2.2):
-                model.box(wx + 1.85, fy + 0.2, 6.05, 0.72, 0.52, 0.38, 'white')
+                model.box(wx + 1.85, fy + 0.2, 5.97, 0.72, 0.52, 0.54, 'white')
 
     # Yellow no-stopping crisscross box markings painted on Rongyin Rd asphalt in front of gate (IMG_1295 bottom!)
     for yz in (9.6, 13.2):
@@ -170,6 +173,7 @@ def school(model):
     # Angle -1.147 rad aligns -lz directly along WNW sightline (-0.912, -0.410) toward Boxue Lou!
     # =========================================================================
     cy = 0.30
+    model.site_datum = cy
     model.pose = (-28.7, cy, 6.73, -1.147)
     # Continuous bluestone walkway extending all the way from inner gate (+22) to Boxue Lou (-126)
     model.box(0, -0.35, -52.0, 11.0, 0.38, 148.0, 'pave', True)
@@ -189,6 +193,9 @@ def school(model):
 
     # Festive overhead triangular bunting flags across campus avenue (IMG_1297, 1298!)
     for fz in (-16.0, -28.0):
+        for post in (-5.5,5.5):
+            model.beam([post,0,fz],[post,3.87,fz],.055,'wood')
+        model.beam([-5.5,3.85,fz],[5.5,3.85,fz],.035,'wood')
         for fx in np.linspace(-5.2, 5.2, 11):
             col = ('red', 'yellow', 'clock', 'green')[int(abs(fx * 3)) % 4]
             pts = [(fx - 0.22, 3.85, fz), (fx + 0.22, 3.85, fz), (fx, 3.45, fz)]
@@ -225,7 +232,7 @@ def school(model):
             model.box(0, fy + 0.98, 6.06, 26.8, 0.12, 0.26, 'clock')
         for col_x in np.linspace(-11.5, 11.5, 7):
             model.box(col_x, fy, 5.95, 0.42, 3.35, 0.35, 'white')
-            model.box(col_x, fy + 1.1, 5.65, 2.8, 1.55, 0.12, 'glass')
+            model.box(col_x, fy + 1.1, 5.71, 2.8, 1.55, 0.24, 'glass')
     # Sawtooth blue-edged roof parapet peaks + rounded left stairwell bay (IMG_1298!)
     for gable_x in (-8.5, -2.8, 2.8, 8.5):
         gp = [

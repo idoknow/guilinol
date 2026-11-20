@@ -71,11 +71,13 @@ for item in features:
     checked+=1;host=hosts[props['roof']];wall=Polygon([ll2xz(*reversed(corner)) for corner in host['geometry']['coordinates'][0]]).boundary
     center=np.array(ll2xz(*reversed(item['geometry']['coordinates'])));bearing=math.radians(props['bearing']);normal=np.array([math.sin(bearing),-math.cos(bearing)]);tangent=np.array([math.cos(bearing),math.sin(bearing)])
     width=min(props['wall_width_m'],8.6 if props['name']=='星巴克' else min(5.5,max(2.6,len(props['name'])*.72)))
-    base=props['ground_m']-157.7+2.4+(props['floor']-1)*3.45
+    ref=props['ground_m']-157.7
+    if props['roof']=='王城商厦':
+        ref=max(ref,surface.ground(*(center-origin)))
+    base=ref+2.4+(props['floor']-1)*3.45
     for fraction in [-.5,.5]:
         corner=center-origin+.24*normal+tangent*width*fraction
         for height in (base,base+.75):
-            ref=props['ground_m']-157.7
             height+=np.clip(1-(height-ref)/3.2,0,1)*(surface.ground(*corner)-.035-ref)
             distance,_=joinery.query((corner[0],height,corner[1]))
             if distance>.002:raise ValueError('Missing exported sign corner: '+props['name'])

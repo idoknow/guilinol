@@ -33,8 +33,10 @@ def historic_bays(model,length,height,levels):
         sill=level*3.45+.32
         for slot in range(bays):
             center=(slot+.5)*pitch-length/2
-            model.box(center,sill,.06,pitch*.70,2.03,.14,'wood')
-            model.box(center,sill+.64,.15,pitch*.60,1.30,.08,'sign')
+            if level == 0:
+                model.box(center,0,.06,pitch*.70+.10,sill+.02,.34,'brick')
+            model.box(center,sill,.025,pitch*.70,2.03,.21,'wood')
+            model.box(center,sill+.64,.12,pitch*.60,1.30,.12,'sign')
             if model.detail:
                 for division in (-.2,0,.2):
                     model.box(center+division*pitch,sill+.64,.21,.085,1.30,.06,'wood')
@@ -60,8 +62,11 @@ def envelope(model, feature):
     holes=[[point(coords) for coords in ring] for ring in feature['geometry']['coordinates'][1:]]
     polygon = orient(Polygon(corners,holes),sign=-1)
     corners = np.asarray(polygon.exterior.coords)[:-1]
+    # Keep at least 0.8 m of the 3.2 m lower facade above the highest sampled footing.
+    ring = LineString([point(c) for c in feature['geometry']['coordinates'][0]])
+    stations = (ring.interpolate(d) for d in np.arange(0,ring.length,2))
+    offset = max(attributes['ground_m']-157.7, max(model.grade(p.x,p.y) for p in stations)-2.4)
     height = attributes['eave_m']
-    offset = attributes['ground_m']-157.7
     model.grade_reference=offset
     model.pose = (0, offset, 0, 0)
     volume = trimesh.creation.extrude_polygon(polygon, height, engine='earcut')
@@ -128,10 +133,14 @@ def envelope(model, feature):
                     along=((bay+.5)/count-.5)*length
                     model.box(along,.02,.38,.28,height-.34,.34,'stone')
                     model.box(along,2.52,.16,length/count-.30,.46,.31,'sign')
+            bays=max(1,round(length/2.4))
+            for bay in range(bays):
+                along=((bay+.5)/bays-.5)*length
+                model.box(along,0,.07,length/bays,.47,.40,'stone')
             for level in range(attributes['levels']):
-                model.box(0,level*3.45+.45,.08,length*(.99 if name=='R2' else .91),2.85 if name=='R2' else 2.05,.17,'glass')
-                for slot in range(max(1,round(length/2.4))):
-                    model.box(((slot+.5)/max(1,round(length/2.4))-.5)*length,level*3.45+.44,.18,.10,2.08,.10,'granite')
+                model.box(0,level*3.45+.45,.035,length*(.99 if name=='R2' else .91),2.85 if name=='R2' else 2.05,.17,'glass')
+                for slot in range(bays):
+                    model.box(((slot+.5)/bays-.5)*length,level*3.45+.44,.12,.10,2.08,.14,'granite')
             continue
         if shopfront:
             bays=max(1,round(length/3.2))
@@ -161,11 +170,14 @@ def envelope(model, feature):
             count = max(1,round(length/3.4))
             for slot in range(count):
                 east = ((slot+.5)/count-.5)*length
-                model.box(east,level*3.45+.42,.04,length/count*.75,1.9,.17,'glass')
+                if level == 0:
+                    model.box(east,0,.06,length/count*.75+.10,.44,.38,'brick')
+                model.box(east,level*3.45+.42,.02,length/count*.75,1.9,.20,'glass')
                 if model.detail:
-                    model.box(east,level*3.45+.42,.14,.095,1.9,.14,'wood')
+                    model.box(east,level*3.45+.42,.09,.095,1.9,.18,'wood')
                     if level==0 and length/count>1.6:
                         model.box(east-length/count*.46,0,.65,.19,3.05,.19,'wood')
+                        model.box(east-length/count*.33,2.91,.38,.10,.13,.84,'wood')
                         model.box(east-length/count*.33,2.65,.76,.27,.37,.27,'red')
         if attributes['screen'] and delta[0]>10:
             model.box(0,5.8,.35,12.8,4.05,.55,'sign')
@@ -222,10 +234,17 @@ def registered_market(model):
             model.pose = (east,0,south,normal-math.pi)
             title = 'STARBUCKS COFFEE' if attrs['name']=='星巴克' else attrs['name']
             width = 8.6 if attrs['name']=='星巴克' else min(5.5,max(2.6,len(title)*.72))
-            base = attrs['ground_m']-157.7+2.4 + (attrs['floor']-1)*3.45
             historic=next(item['properties'].get('historic',False) for item in LAYOUT if item['properties']['name']==attrs['roof'])
             shade = 'sign' if historic else attrs['sign_background']
             width=min(width,attrs['wall_width_m'])
-            model.box(0,base,.18,width,.75,.12,shade)
+            if attrs['roof']=='王城商厦':
+                # The mall shell streams separately. Seat the sign jambs on its final street grade.
+                model.grade_reference=max(model.grade_reference,grade(east,south))
+            base=model.grade_reference+2.4+(attrs['floor']-1)*3.45
+            if attrs['roof']=='王城商厦':
+                for side in (-1,1):
+                    model.box(side*(width/2-.08),model.grade_reference,.06,.14,
+                              base-model.grade_reference+.12,.18,'stone')
+            model.box(0,base,.09,width,.75,.30,shade)
             letters(model,title,(0,base+.11,.25),width*.93,.5,'gold' if historic else ('sign' if shade in ('white','gold') else 'white'))
     model.grade_reference=0

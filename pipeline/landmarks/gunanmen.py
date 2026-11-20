@@ -19,7 +19,7 @@ import math
 import random
 import sys
 from PIL import Image, ImageDraw
-from c_kit import RECTS, ATLAS, _font
+from c_kit import RECTS, ATLAS, _font, landmark_surface
 from rong_paving import pave, slab_texture
 from rong_ground import GATE_PLAZA
 from rong_street import shops, signs, approach
@@ -82,8 +82,8 @@ def ancient_banyan(builder, east, south):
     count = 32 if builder.detail else 16
     for index in range(count):
         ends = [(east+11.6*math.cos(math.tau*t/count),south+10.6*math.sin(math.tau*t/count)) for t in (index,index+1)]
-        segment_wall(wood,*ends,0,.4,.8,'rubble')
-        segment_wall(wood,*ends,.4,.72,.64,'foliage')
+        segment_wall(wood,*ends,-.04,.43,.8,'rubble')
+        segment_wall(wood,*ends,-.04,.72,.64,'foliage')
         railing(iron,*ends,.42,.74,'steel',1.25)
 
 
@@ -116,7 +116,7 @@ def courtyard(builder, deck):
         front=-10-row*2
         for east in range(-19,19,2):
             corners=[(east,front),(east+2,front),(east+2,front-2),(east,front-2)]
-            wall.face([(xx,.54+max(0,-zz-10)*.092,zz) for xx,zz in corners],(0,1,0),'granite',None)
+            wall.face([(xx,.035,zz) for xx,zz in corners],(0,1,0),'granite',None)
     # North-facing gate and the west return of the garden enclosure (IMG_1306).
     segment_wall(wall,(-31,-2.5),(-31,14),0,2.8,.60,'gate_plaster')
     segment_wall(wall,(-31,-2.5),(-31,14),2.8,3.07,.82,'graytile')
@@ -134,6 +134,7 @@ def courtyard(builder, deck):
         box(wall,(post,1.76,-2.87),(.20,3.52,.32),'wood')
     box(wall,(-28.5,3.36,-2.53),(3.98,.40,.78),'gate_plaster')
     box(wall,(-28.5,3.13,-2.87),(2.30,.22,.32),'wood')
+    box(wall,(-28.5,3.52,-2.5),(4.52,.24,1.68),'wood')
     garden_gate_roof(wall,(-28.5,-2.5),3.59,4.52,1.68,.48)
     stairs(wall,(-28.5,.13,-6.2),(-28.5,.68,-2.7),3.35,4,'ashlar')
     if builder.collide:
@@ -143,12 +144,13 @@ def courtyard(builder, deck):
 
 
 
-
-
 def build(b: Builder):
-    pave(b, GATE_PLAZA, .13)
+    pave(b, GATE_PLAZA, lambda x,z: landmark_surface('gunanmen').ground(x,z)+.04)
     shops(b)
     approach(b)
+    meshes = [*b.parts.values(), b.hit]
+    starts = [len(mesh.pos) for mesh in meshes]
+    ground = landmark_surface('gunanmen').ground
     # The eastern hall sits on way/684946200, the western hall on way/521248472.
     # Keep the plaza banyan on the west side of pedestrian way/684511179.
     ancient_banyan(b, -28, 3)
@@ -166,6 +168,17 @@ def build(b: Builder):
         # The arch is set back from the terrace lip between the round bastions.
         with align_front(b, (0,0), 0, shift=(-1.45,-1.35)):
             gate(b)
+    # Sample feet after rotating into landmark space. Keep the terrace and
+    # gatehouse level, tapering the change up the battered masonry walls.
+    terrace_datum = ground(15,-7.2)
+    for mesh, start in zip(meshes, starts):
+        for i in range(start, len(mesh.pos)):
+            x, y, z = mesh.pos[i]
+            blend = max(0, 1 - max(0, y) / 6.7)
+            datum = terrace_datum
+            if blend:
+                datum += blend * (ground(x, z) - terrace_datum)
+            mesh.pos[i] = (x, y + datum, z)
 
 
 def west_hall(b):
@@ -177,11 +190,12 @@ def west_hall(b):
     if b.collide:
         extrude(b.hit, west, 0, deck, 'ashlar')
     box(wall, (-16.3,deck+1.2,2.8), (12.5,2.4,8.2), 'yellow')
+    box(wall,(-16.3,deck+2.4,2.8),(13.8,.26,9.45),'wood')
     hip_roof(wall, (-16.3,2.8), deck+2.4, 12.6,8.3,1.85,.65,.38,'graytile','wood')
     if b.detail:
         for east in (-20.5,-17.7,-14.9,-12.1):
-            for south in (-1.4,7.0):
-                grille(wall,east,deck+1.2,south,1.4,1.6,'lattice',3)
+            for south in (-1.30,6.90):
+                grille(wall,east,deck+1.2,south,1.4,1.6,'lattice',3,depth=.13)
 
 
 def gate(b: Builder):
@@ -218,7 +232,7 @@ def gate(b: Builder):
     box(wall, (6.05, deck + 1.55, 4.5), (0.42, 3.1, 4.6), 'yellow', 1.4)
     if detail:
         for x in (-3.6, -1.2, 1.2, 3.6):
-            grille(wall, x, deck + 1.9, 2.5, 1.2, 1.7, 'lattice', 3)
+            grille(wall, x, deck + 1.9, 5.285, 1.2, 1.7, 'lattice', 3)
     columns = 6 if detail else 4
     for i in range(columns):
         x = -4.4 + 8.8 * i / (columns - 1)
@@ -230,7 +244,7 @@ def gate(b: Builder):
     yaw_box(wall, (-0.78, 1.85, 8.7), (1.45, 3.5, 0.08), 0.55, 'door', None)
     yaw_box(wall, (0.78, 1.85, 8.7), (1.45, 3.5, 0.08), math.pi - 0.55, 'door', None)
     # 4.8 m plaque. At 10 m and a 60° view it covers ~27° , enough for the three characters.
-    wall.face([(east,level,10.75-.19*level) for east,level in ((-2.4,4.84),(2.4,4.84),(2.4,6.26),(-2.4,6.26))],(0,.19,1),'sign_gate',uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
+    wall.face([(east,level,10.71-.19*level) for east,level in ((-2.4,4.84),(2.4,4.84),(2.4,6.26),(-2.4,6.26))],(0,.19,1),'sign_gate',uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
     post = 0.7 if detail else 4.5
     railing(wall, (-6.4, 7.6), (-1.6, 7.6), deck, 0.95, 'ashlar', post, stone=True)
     railing(wall, (1.6, 7.6), (6.4, 7.6), deck, 0.95, 'ashlar', post, stone=True)

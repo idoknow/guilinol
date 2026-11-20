@@ -22,6 +22,8 @@ import numpy as np
 
 # World midpoint (-977.10, 630.90) from Overture footprints in guilinol XZ:
 # Sun Pagoda (-963.12, 617.57), Moon Pagoda (-991.08, 644.22).
+from c_kit import landmark_surface
+
 SUN_OFFSET = (13.98, 0.0, -13.33)
 MOON_OFFSET = (-13.98, 0.0, 13.33)
 
@@ -378,7 +380,7 @@ def build_sun_pagoda():
 
         if idx == 2:
             for ca in (0.0, math.pi):
-                add_tris(b, 'goldBronze', radial_panel(r_wall + 0.25, ca, y_cur + th * 0.62, 1.65, 0.68, 0.14))
+                add_tris(b, 'goldBronze', radial_panel(r_wall * .91, ca, y_cur + th * 0.62, 1.65, 0.68, 0.18))
 
         add_eave_roof(
             b, r_wall=r_wall, r_eave=r_eave, y_base=y_next - 0.25, roof_h=1.25 - 0.25 * t,
@@ -516,14 +518,16 @@ def build_lakeside_railings():
                  island_pts[(i + 1) % len(island_pts)][0] * island_pts[i][1]) for i in range(len(island_pts)))
     if area2 < 0:
         island_pts.reverse()
-    bot_ring = [(x, -1.60, z) for x, z in island_pts]
-    top_ring = [(x, 0.55, z) for x, z in island_pts]
+    ground = landmark_surface('shanhu_pagodas').ground
+    bot_ring = [(x, ground(x,z)-.12, z) for x, z in island_pts]
+    terrace = max(ground(x,z) for x,z in island_pts)+.12
+    top_ring = [(x, terrace, z) for x, z in island_pts]
     add_tris(b, 'stoneDeck', loft([bot_ring, top_ring], cap_bottom=True, cap_top=True))
 
     # Perimeter carved stone balustrade along the lakeside water edge,
     # leaving a walkway gap on the south-east shore neck (between idx 7 and 9).
-    add_carved_stone_balustrade_chain(b, island_pts[9:] + island_pts[:8], y_deck=0.55, closed=False, post_spacing=2.8)
-    return make_mesh('LakesideRailingsMesh', b)
+    add_carved_stone_balustrade_chain(b, island_pts[9:] + island_pts[:8], y_deck=terrace, closed=False, post_spacing=2.8)
+    return b, terrace, island_pts, loft([bot_ring,top_ring])
 
 
 def shift(buckets, dx, dy, dz):
@@ -541,22 +545,33 @@ def merge(*parts):
     return out
 
 
-def build_trees():
+def build_trees(terrace, outline):
     """Willows and metasequoia along the moon-pagoda shore. Heights vs a 1.7 m visitor."""
     b = {}
     spots = [(-28.0, 18.0, 7.2, 'willow'), (-22.0, 28.5, 6.4, 'willow'), (-31.5, 8.5, 8.0, 'willow'),
              (-16.0, 34.0, 11.0, 'sequoia'), (-26.0, 36.5, 12.5, 'sequoia'), (8.0, -28.0, 6.8, 'willow')]
-    for x, z, height, kind in spots:
-        add_tris(b, 'bark', cylinder_at(x, z, 0.18, 0.1, 0.5, 0.5 + height * 0.45, 5))
-        if kind == 'sequoia':
-            add_tris(b, 'leaf', frustum(1.35, 0.08, 0.5 + height * 0.28, 0.5 + height, 6))
-            add_tris(b, 'leaf', frustum(0.85, 0.04, 0.5 + height * 0.55, 0.5 + height * 0.95, 6))
+    from shapely.geometry import Point, Polygon
+    ground = landmark_surface('shanhu_pagodas').ground
+    island = Polygon(outline)
+    for x,z,height,kind in spots:
+        foot = terrace if island.covers(Point(x,z)) else ground(x,z)
+        tree = {}
+        add_tris(tree,'bark',frustum(.18,.10,-.06,height*.45,6))
+        if kind=='sequoia':
+            add_tris(tree,'leaf',frustum(1.35,.08,height*.28,height,6))
+            add_tris(tree,'leaf',frustum(.85,.04,height*.55,height*.95,6))
         else:
             for k in range(5):
-                ang = k * math.pi * 2 / 5
-                add_tris(b, 'leaf', cylinder_at(x + math.cos(ang) * 0.2, z + math.sin(ang) * 0.2,
-                                                0.06, 0.04, 0.5 + height * 0.4, 0.2, 4))
-                add_tris(b, 'leaf', frustum(0.9, 0.15, 0.55 + height * 0.15, 0.5 + height * 0.55, 5, ang))
+                ang = k*math.tau/5
+                dx,dz = .55*math.cos(ang),.55*math.sin(ang)
+                add_tris(tree,'bark',segment_bar(0,0,dx,dz,height*.40-.05,height*.40+.08,.07,cap=True))
+                add_tris(tree,'leaf',cylinder_at(dx,dz,.07,.035,height*.40,.87,5,cap_bottom=True))
+                add_tris(tree,'leaf',cylinder_at(dx,dz,.9,.15,height*.30,height*.65,6))
+        if not island.covers(Point(x,z)):
+            tree['bark'] = [tuple((px,ground(x+px,z+pz)-foot-.045 if py<0 else py,pz)
+                                  for px,py,pz in tri) for tri in tree['bark']]
+        for key,tris in shift(tree,x,foot,z).items():
+            add_tris(b,key,tris)
     return b
 
 
@@ -565,19 +580,27 @@ def build_tunnel():
     b = {}
     sun = np.array(SUN_OFFSET)
     moon = np.array(MOON_OFFSET)
-    direction = moon - sun
-    direction = direction / np.linalg.norm(direction)
-    for origin, reach in ((sun, 9.2), (moon, 8.4)):
-        center = origin + direction * reach
-        yaw = math.atan2(direction[2], direction[0])
-        add_tris(b, 'stoneRail', box_at(center[0], -0.4, center[2], 3.4, 3.1, 1.1, yaw))
-        # Door void is the missing centre: two jambs and a lintel instead of a solid box.
-        add_tris(b, 'stoneDeck', box_at(center[0] - math.sin(yaw) * 1.15, -0.2, center[2] + math.cos(yaw) * 1.15, 0.45, 2.5, 1.15, yaw))
-        add_tris(b, 'stoneDeck', box_at(center[0] + math.sin(yaw) * 1.15, -0.2, center[2] - math.cos(yaw) * 1.15, 0.45, 2.5, 1.15, yaw))
-        add_tris(b, 'granite' if False else 'stoneRail', box_at(center[0], 2.15, center[2], 3.5, 0.45, 1.2, yaw))
+    ground = landmark_surface('shanhu_pagodas').ground
+    for origin, destination, reach in ((sun,moon,9.2),(moon,sun,8.4)):
+        direction = destination-origin
+        direction = direction/np.linalg.norm(direction)
+        center = origin + direction*reach
+        normal = np.array([-direction[2],0,direction[0]])
+        yaw = math.atan2(normal[2],normal[0])
+        def footing(location,width,depth,top):
+            tris = box_at(location[0],0,location[2],width,1,depth,yaw)
+            for tri in tris:
+                add_tris(b,'stoneDeck',[tuple((x,top if y else ground(x,z)-.06,z) for x,y,z in tri)])
+        corners = box_at(center[0],0,center[2],3.5,.1,1.2,yaw)
+        sill = max(ground(x,z) for tri in corners for x,_,z in tri)
+        for side in (-1,1):
+            footing(center+side*1.35*normal,.52,1.15,sill+2.5)
+        add_tris(b,'stoneRail',box_at(center[0],sill+2.45,center[2],3.5,.45,1.2,yaw))
         for step in range(3):
-            add_tris(b, 'stoneDeck', box_at(center[0] - direction[0] * (1.2 + step * 0.55), -0.2,
-                                            center[2] - direction[2] * (1.2 + step * 0.55), 2.2, 0.22 + step * 0.08, 0.5, yaw))
+            station = center-direction*(1.2+step*.55)
+            top = max(ground(x,z) for tri in box_at(station[0],0,station[2],2.2,.1,.58,yaw)
+                      for x,_,z in tri)+.12
+            footing(station,2.2,.58,top)
     return b
 
 
@@ -585,17 +608,21 @@ def build_glb():
     from d_export import export_buckets
     from pathlib import Path
     import sys
+    ground = landmark_surface('shanhu_pagodas').ground
+    sun = (SUN_OFFSET[0], ground(SUN_OFFSET[0],SUN_OFFSET[2])+1.48, SUN_OFFSET[2])
+    bank, terrace, outline, terrace_collision = build_lakeside_railings()
+    moon = (MOON_OFFSET[0], terrace-.45, MOON_OFFSET[2])
     buckets = merge(
-        shift(build_sun_pagoda(), *SUN_OFFSET),
-        shift(build_moon_pagoda(), *MOON_OFFSET),
-        build_lakeside_railings(),
-        build_trees(),
+        shift(build_sun_pagoda(), *sun),
+        shift(build_moon_pagoda(), *moon),
+        bank,
+        build_trees(terrace,outline),
         build_tunnel(),
     )
     collision = []
-    collision += box_at(SUN_OFFSET[0], -1.2, SUN_OFFSET[2], 10, 28, 10)
-    collision += box_at(MOON_OFFSET[0], 0.4, MOON_OFFSET[2], 9, 24, 9)
-    collision += box_at(MOON_OFFSET[0], -1.4, MOON_OFFSET[2] + 4, 22, 1.9, 26)
+    collision += box_at(sun[0], sun[1]-1.2, SUN_OFFSET[2], 10, 28, 10)
+    collision += box_at(moon[0], moon[1]+.4, MOON_OFFSET[2], 9, 24, 9)
+    collision += terrace_collision
     out = Path(sys.argv[1]) / 'shanhu_pagodas.glb'
     export_buckets(out, buckets, collision)
 

@@ -109,18 +109,25 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
     const deadline=performance.now()+15000
     while(needed.some(tile=>!stream.loaded.has(tile))&&performance.now()<deadline){if(destination!==target)return false;stream.tick(target);await new Promise(resolve=>setTimeout(resolve,12))}
-    const bridge=manifest.landmarks?.find(entry=>entry.id==='jiefang_bridge'&&Math.hypot(entry.position[0]-x,entry.position[2]-z)<=entry.sphere[3]+cfg.search)
-    if(bridge){
-      target.y=bridge.position[1]
-      while(!stream.landmarks.has(bridge)&&performance.now()<deadline){
-        if(destination!==target)return false
-        stream.updateLandmarks?.(target,bridge)
-        await new Promise(resolve=>setTimeout(resolve,12))
+    // Register nearby collision surfaces before placing the capsule. The palace
+    // forecourt is a 17 cm slab above GL04, and can stream in under a new walker.
+    const supports=(manifest.landmarks??[]).filter(entry=>{
+      if(entry.collision==='none')return false
+      const [cx,,cz,r]=entry.sphere, a=entry.rotation*Math.PI/180
+      const ex=entry.position[0]+cx*Math.cos(a)+cz*Math.sin(a)
+      const ez=entry.position[2]-cx*Math.sin(a)+cz*Math.cos(a)
+      return Math.hypot(ex-x,ez-z)<=r+cfg.search
+    })
+    while(supports.some(entry=>!stream.landmarks.has(entry))&&performance.now()<deadline){
+      if(destination!==target)return false
+      for(const entry of supports)if(!stream.landmarks.has(entry)){
+        target.y=entry.position[1];stream.updateLandmarks?.(target,entry)
       }
+      await new Promise(resolve=>setTimeout(resolve,12))
     }
     if(destination!==target)return false
     destination=null
-    if(bridge&&!stream.landmarks.has(bridge))return false
+    if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))return false
     sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;yaw=heading;figure.rotation.y=yaw+avatar.yaw;input.show(true);accumulator=0;camera.near=.08;camera.updateProjectionMatrix();follow();return true
   }

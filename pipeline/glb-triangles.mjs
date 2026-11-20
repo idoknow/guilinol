@@ -13,9 +13,10 @@ const header=Buffer.from(bytes.subarray(0,20));header.writeUInt32LE(bytes.length
 const glb=Buffer.concat([header,text,Buffer.alloc(padded-text.length,32),bytes.subarray(20+length)])
 const {scene}=await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(glb.buffer.slice(glb.byteOffset,glb.byteOffset+glb.length),'')
 scene.updateMatrixWorld(true)
-const coords=[],vertex=new Vector3()
+const coords=[],vertex=new Vector3(),meshName=process.argv[4]
 scene.traverse(node=>{
   if(!node.isMesh)return
+  if(meshName && node.name!==meshName && node.parent?.name!==meshName)return
   let high=false
   for(let parent=node;parent;parent=parent.parent)high ||= parent.name.startsWith('lod0')
   if(!high && (process.argv[3]!=='--visible' || scene.getObjectByName('lod0')))return

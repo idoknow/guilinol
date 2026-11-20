@@ -5,6 +5,7 @@ Clock placement/height approximate. No unverified underground entrance.
 import math
 import numpy as np
 from jingjiang import generate
+from c_kit import landmark_surface
 
 
 def clock(model):
@@ -24,17 +25,19 @@ def clock(model):
 
 
 def boulevard(model):
+    model.ground_offset = landmark_surface('zhengyang').ground
     model.pose=(-11.5,0,71,.16);clock(model)
     model.pose=(0,0,0,.16)
     for block in range(4):
         center=block*25
-        model.box(0,0,center,18,.14,25,'pave',True)
+        for station in np.linspace(center-12.5,center+12.5,17)[:-1]:
+            model.box(0,0,station+25/32,18,.14,25/16,'pave',True)
         for stripe in (-5.6,0,5.6):
             for zz in np.linspace(center-12.5,center+12.5,17)[:-1]:
                 strip=[]
                 for station in (zz,zz+25/16):
                     offset=stripe+.82*math.sin(station*math.pi/9)
-                    strip.extend([(offset-.27,.155,station),(offset+.27,.155,station)])
+                    strip.extend([(offset-.27,.146,station),(offset+.27,.146,station)])
                 model.mesh(strip,[[0,2,3],[0,3,1]],'tile')
         for side in (-1,1):
             model.box(side*7.6,.14,center,1.3,.04,25,'granite')
@@ -45,8 +48,9 @@ def boulevard(model):
             for offset in np.linspace(-10,10,5 if model.detail else 2):
                 model.box(side*8.7,.12,center+offset,.6,3.3,.62,'granite',True)
                 if model.detail:
-                    for floor in (.3,3.9,7.2):model.box(side*10.64,floor,center+offset,.18,2.25,3.3,'glass')
-                    model.box(side*10.48,.18,center+offset,.16,2.45,1.16,'wood');model.box(side*10.36,.52,center+offset,.12,1.8,.91,'glass')
+                    model.box(side*10.68,0,center+offset,.23,.32,3.35,'granite')
+                    for floor in (.3,3.9,7.2):model.box(side*10.68,floor,center+offset,.18,2.25,3.3,'glass')
+                    model.box(side*10.48,.08,center+offset,.16,2.55,1.16,'wood');model.box(side*10.36,.52,center+offset,.12,1.8,.91,'glass')
                     model.box(side*10.42,2.56,center+offset,.24,.65,3.85,['red','earth','tile'][block%3])
                     for glyph in (-.9,0,.9):model.box(side*10.25,2.72,center+offset+glyph,.1,.32,.26,'white')
             if model.detail:

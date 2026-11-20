@@ -2,8 +2,8 @@ import numpy as np
 from collections import defaultdict, deque
 from PIL import Image, ImageDraw
 from scipy.ndimage import label, maximum_filter, minimum_filter, binary_dilation, find_objects
-from shapely.geometry import LineString
-from shapely import distance, points as grid_points
+from shapely.geometry import LineString, Polygon
+from shapely import distance, points as grid_points, intersects_xy
 
 from common import GRID, load_osm
 from features import area, polygons, points
@@ -34,6 +34,46 @@ def contour_ronghu(surface, terrain, original, bounds):
     bed = surface[rows,cols] - np.maximum(1, np.rint(offsets[near]*8))
     for field in (original, terrain):
         field[rows,cols] = bed
+
+
+    # The landscaped island has a low masonry edge (Rock IMG_1323). Clip its
+    # DEM crown to the underside of the terrace; leave the surrounding lake bed intact.
+    member = next((m for e in load_osm() if e['type']=='relation' and e['id']==9373836
+                   for m in e['members'] if m['role']=='inner' and m['ref']==674611987), None)
+    if member:
+        island = Polygon(points(member)).intersection(bounds)
+        if not island.is_empty:
+            x0,z0,x1,z1 = island.bounds
+            cols = np.arange(max(0,int((x0-west)//GRID)-1),min(surface.shape[1],int((x1-west)//GRID)+3))
+            rows = np.arange(max(0,int((z0-north)//GRID)-1),min(surface.shape[0],int((z1-north)//GRID)+3))
+            patch = np.ix_(rows,cols)
+            inside = intersects_xy(island,west+GRID*cols,north+GRID*rows[:,None])
+            bank_cells = inside & ~wet[patch]
+            edge = wet[patch] & binary_dilation(inside)
+            if bank_cells.any() and edge.any():
+                level = np.median(surface[patch][edge])
+                for field in (original,terrain):
+                    window = field[patch]
+                    window[bank_cells] = np.minimum(window[bank_cells],level+7)
+                    field[patch] = window
+
+    # Low landings at the Glass Bridge (Rock IMG_1328). Grade back into
+    # the existing banks on each side, retaining the water mask and lake bed.
+    bridge = next((w for w in load_osm() if w['type']=='way' and w['id']==836701791), None)
+    if bridge:
+        for end in (points(bridge)[0], points(bridge)[-1]):
+            x,z=end
+            cols=np.flatnonzero(abs(west+GRID*np.arange(surface.shape[1])-x)<25)
+            rows=np.flatnonzero(abs(north+GRID*np.arange(surface.shape[0])-z)<25)
+            if not len(rows) or not len(cols): continue
+            dist=np.hypot(west+GRID*cols-x,north+GRID*rows[:,None]-z)
+            patch=np.ix_(rows,cols)
+            water=surface[patch]
+            near=water[(water!=-32768)&(dist<15)]
+            if not len(near): continue
+            limit=np.median(near)+8+np.maximum(dist-8,0)*3
+            for field in (original,terrain):
+                field[patch]=np.where(water==-32768,np.minimum(field[patch],np.rint(limit)),field[patch])
 
 
 def correct_water(surface, terrain, original, bounds, stencil):
