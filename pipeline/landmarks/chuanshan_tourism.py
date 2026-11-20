@@ -16,7 +16,7 @@ import math
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import split
 
-from school_kit import SchoolBuilder, export_school_glb, mrr_stats
+from school_kit import SchoolBuilder, export_school_glb, mrr_stats, hole_free as _hole_free, stadium_polygon as _stadium, terrain_track
 
 PALETTE = {
     'wall_main':   '#eeede8',
@@ -144,59 +144,6 @@ def _pieces(ring, court):
     return [[(round(x, 2), round(z, 2)) for x, z in list(q.exterior.coords)[:-1]] for q in out if q.area > 20]
 
 
-def _stadium(cx, cz, r, h=42.0):
-    """Stadium outline (long axis along +z) as a shapely polygon."""
-    return (Point(cx, cz - h).buffer(r, 24).union(Point(cx, cz + h).buffer(r, 24))
-            .union(Polygon([(cx - r, cz - h), (cx + r, cz - h), (cx + r, cz + h), (cx - r, cz + h)])))
-
-
-def _track(b, cx, cz):
-    """400 m track (`relation/9035639`) + turf pitch (`way/378650266`), every surface
-    terrain-following so the flatten taper at the south bend never leaves it floating."""
-    outer, red, inner = _stadium(cx, cz, 46.85), _stadium(cx, cz, 46.5), _stadium(cx, cz, 38.0)
-    for q in _hole_free(outer.difference(red)):
-        b.ground_slab(q, region='white', lift=0.035, edge_drop=0.04)
-    for q in _hole_free(red.difference(inner)):
-        b.ground_slab(q, region='track_red', lift=0.045, edge_drop=0.04)
-    n = 10
-    x0, x1 = cx - 38.0, cx + 38.0
-    z0, z1 = cz - 80.0, cz + 80.0
-    for i in range(n):
-        za, zb = z0 + (z1 - z0) * i / n, z0 + (z1 - z0) * (i + 1) / n
-        strip = inner.intersection(Polygon([(x0, za), (x1, za), (x1, zb), (x0, zb)]))
-        for q in _hole_free(strip):
-            b.ground_slab(q, region='turf_a' if i % 2 == 0 else 'turf_b', lift=0.06, edge_drop=0.05)
-    if b.detail:
-        hw, hl, lw = 34.0, 52.0, 0.14
-        lines = [Polygon([(cx - hw, cz + sz * hl - lw), (cx + hw, cz + sz * hl - lw), (cx + hw, cz + sz * hl + lw), (cx - hw, cz + sz * hl + lw)]) for sz in (-1, 1)]
-        lines += [Polygon([(cx + sx * hw - lw, cz - hl), (cx + sx * hw + lw, cz - hl), (cx + sx * hw + lw, cz + hl), (cx + sx * hw - lw, cz + hl)]) for sx in (-1, 1)]
-        lines.append(Polygon([(cx - hw, cz - lw), (cx + hw, cz - lw), (cx + hw, cz + lw), (cx - hw, cz + lw)]))
-        for sz in (-1, 1):
-            zb = cz + sz * hl
-            zi = zb - sz * 16.5
-            lines.append(Polygon([(cx - 20.0, min(zb, zi)), (cx - 19.86, min(zb, zi)), (cx - 19.86, max(zb, zi)), (cx - 20.0, max(zb, zi))]))
-            lines.append(Polygon([(cx + 19.86, min(zb, zi)), (cx + 20.0, min(zb, zi)), (cx + 20.0, max(zb, zi)), (cx + 19.86, max(zb, zi))]))
-            lines.append(Polygon([(cx - 20.0, zi - lw), (cx + 20.0, zi - lw), (cx + 20.0, zi + lw), (cx - 20.0, zi + lw)]))
-        for q in lines:
-            b.ground_slab([(round(x, 2), round(z, 2)) for x, z in list(q.exterior.coords)[:-1]], region='white', lift=0.075, edge_drop=0.0)
-
-
-def _hole_free(poly):
-    """Split (multi)polygons with holes into hole-free rings for `ground_slab`."""
-    todo = [poly] if poly.geom_type == 'Polygon' else list(poly.geoms)
-    out = []
-    while todo:
-        p = todo.pop()
-        if p.geom_type != 'Polygon' or p.area < 4.0:
-            continue
-        if p.interiors:
-            cx = Polygon(p.interiors[0]).centroid.x
-            todo.extend(split(p, LineString([(cx, -1e4), (cx, 1e4)])).geoms)
-        else:
-            out.append([(round(x, 2), round(z, 2)) for x, z in list(p.simplify(0.3).exterior.coords)[:-1]])
-    return out
-
-
 def _gate(b: SchoolBuilder):
     p0, p1 = GATE_EDGE
     mx, mz = (p0[0] + p1[0]) * 0.5 + (p1[0] - p0[0]) * 0.088, (p0[1] + p1[1]) * 0.5 + (p1[1] - p0[1]) * 0.088
@@ -245,7 +192,7 @@ def build_chuanshan(b: SchoolBuilder):
 
     # 400 m track + turf pitch (`relation/9035639`, `way/378650266`).
     pcx, pcz, _, _, _ = mrr_stats(R['way/378650266'][:-1])
-    _track(b, pcx, pcz + 0.4)
+    terrain_track(b, pcx, pcz + 0.4, r=46.5, h=42.0, r_in=38.0)
     # Court column west of the track (`way/1474590953`), terrain-following blue base.
     b.ground_slab(R['way/1474590953'][:-1], region='court_b', lift=0.03, edge_drop=0.04)
     for k in ('way/1474590954', 'way/1474590955', 'way/1474590956', 'way/1474590962', 'way/1474590963'):

@@ -1407,6 +1407,68 @@ class SchoolBuilder:
         self.pose = old
 
 
+# ---------------- Terrain-following sports surfaces (IDOK-83) ----------------
+
+from shapely.geometry import LineString as _LineString, Point as _Point
+from shapely.ops import split as _split
+
+
+def stadium_polygon(cx, cz, r, h=42.0):
+    """Stadium outline (long axis along +z) as a shapely polygon."""
+    return (_Point(cx, cz - h).buffer(r, 24).union(_Point(cx, cz + h).buffer(r, 24))
+            .union(Polygon([(cx - r, cz - h), (cx + r, cz - h), (cx + r, cz + h), (cx - r, cz + h)])))
+
+
+def terrain_track(b, cx, cz, r=46.5, h=42.0, r_in=38.0, clip=None):
+    """400 m track (`relation/9035639`) + turf pitch (`way/378650266`), every surface
+    terrain-following so the flatten taper at the south bend never leaves it floating."""
+    outer, red, inner = stadium_polygon(cx, cz, r + 0.35, h), stadium_polygon(cx, cz, r, h), stadium_polygon(cx, cz, r_in, h)
+    if clip is not None:  # e.g. the world edge cuts the far bend
+        outer, red, inner = outer.intersection(clip), red.intersection(clip), inner.intersection(clip)
+    for q in hole_free(outer.difference(red)):
+        b.ground_slab(q, region='white', lift=0.035, edge_drop=0.04)
+    for q in hole_free(red.difference(inner)):
+        b.ground_slab(q, region='track_red', lift=0.045, edge_drop=0.04)
+    n = 10
+    x0, x1 = cx - r_in, cx + r_in
+    z0, z1 = cz - h - r_in, cz + h + r_in
+    for i in range(n):
+        za, zb = z0 + (z1 - z0) * i / n, z0 + (z1 - z0) * (i + 1) / n
+        strip = inner.intersection(Polygon([(x0, za), (x1, za), (x1, zb), (x0, zb)]))
+        for q in hole_free(strip):
+            b.ground_slab(q, region='turf_a' if i % 2 == 0 else 'turf_b', lift=0.06, edge_drop=0.05)
+    if b.detail:
+        hw, hl, lw = min(34.0, r_in - 3.0), min(52.0, h + r_in - 10.0), 0.14
+        lines = [Polygon([(cx - hw, cz + sz * hl - lw), (cx + hw, cz + sz * hl - lw), (cx + hw, cz + sz * hl + lw), (cx - hw, cz + sz * hl + lw)]) for sz in (-1, 1)]
+        lines += [Polygon([(cx + sx * hw - lw, cz - hl), (cx + sx * hw + lw, cz - hl), (cx + sx * hw + lw, cz + hl), (cx + sx * hw - lw, cz + hl)]) for sx in (-1, 1)]
+        lines.append(Polygon([(cx - hw, cz - lw), (cx + hw, cz - lw), (cx + hw, cz + lw), (cx - hw, cz + lw)]))
+        for sz in (-1, 1):
+            zb = cz + sz * hl
+            zi = zb - sz * 16.5
+            lines.append(Polygon([(cx - 20.0, min(zb, zi)), (cx - 19.86, min(zb, zi)), (cx - 19.86, max(zb, zi)), (cx - 20.0, max(zb, zi))]))
+            lines.append(Polygon([(cx + 19.86, min(zb, zi)), (cx + 20.0, min(zb, zi)), (cx + 20.0, max(zb, zi)), (cx + 19.86, max(zb, zi))]))
+            lines.append(Polygon([(cx - 20.0, zi - lw), (cx + 20.0, zi - lw), (cx + 20.0, zi + lw), (cx - 20.0, zi + lw)]))
+        for q in lines:
+            b.ground_slab([(round(x, 2), round(z, 2)) for x, z in list(q.exterior.coords)[:-1]], region='white', lift=0.075, edge_drop=0.0)
+
+
+def hole_free(poly):
+    """Split (multi)polygons with holes into hole-free rings for `ground_slab`."""
+    todo = [poly] if poly.geom_type == 'Polygon' else list(poly.geoms)
+    out = []
+    while todo:
+        p = todo.pop()
+        if p.geom_type != 'Polygon' or p.area < 4.0:
+            continue
+        if p.interiors:
+            cx = Polygon(p.interiors[0]).centroid.x
+            todo.extend(_split(p, _LineString([(cx, -1e4), (cx, 1e4)])).geoms)
+        else:
+            out.append([(round(x, 2), round(z, 2)) for x, z in list(p.simplify(0.3).exterior.coords)[:-1]])
+    return out
+
+
+
 # ---------------- GLB Packing with True Shared Mesh Instancing ----------------
 
 def _pack_part_into_gltf(part: MeshPart, material_index: int, blobs: bytearray, buffer_views: list, accessors: list):
