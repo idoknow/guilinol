@@ -149,7 +149,8 @@
         "overture_id": "f7b6eace-debc-40fe-a2c7-4f70b0e7ce16",
         "overture_source": "OpenStreetMap",
         "footprint_iou": 1.0,
-        "level_source": "Rock 06/09；IDOK-51 dongxi-layout"
+        "level_source": "Rock 06/09；IDOK-51 dongxi-layout",
+        "esri_review": "主屋顶及内院可辨，北侧及西侧屋顶线相对轮廓内缩"
       }
     },
     {
@@ -277,7 +278,8 @@
         "status": "待定",
         "overture_id": "fb2a54fb-44e0-47f5-aa9f-89b8421f4df5",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "屋顶阵列可见，西侧超出本图范围"
       }
     },
     {
@@ -393,7 +395,8 @@
         "status": "待定",
         "overture_id": "8c18f097-7f44-4c13-84af-4565d3f6baa7",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "两条浅色长屋面与院落轮廓相符"
       }
     },
     {
@@ -437,7 +440,8 @@
         "status": "待定",
         "overture_id": "ec0403f5-f671-4381-8b2c-ccbe1577d300",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "中央条纹屋面可辨，四边待定"
       }
     },
     {
@@ -497,7 +501,8 @@
         "status": "待定",
         "overture_id": "3822e653-760a-4f18-aea3-51a39a0ecfe7",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "南段有缺角，北侧连续屋面"
       }
     },
     {
@@ -573,7 +578,8 @@
         "status": "待定",
         "overture_id": "48e96695-5a4e-4117-b572-eb2d55ea2af5",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "折线穿过浅色场地，不能确认为屋顶"
       }
     },
     {
@@ -621,7 +627,8 @@
         "status": "待定",
         "overture_id": "5eeed446-8b3d-471f-afff-4cb802b194a6",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "可辨矩形屋面和南侧端部"
       }
     },
     {
@@ -665,7 +672,8 @@
         "status": "待定",
         "overture_id": "c4462106-7bfe-4f5e-b9ee-5896deca7721",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "树影遮挡"
       }
     },
     {
@@ -709,7 +717,8 @@
         "status": "待定",
         "overture_id": "8c5cad64-f56a-4575-8619-0201b5ac70e9",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "树影遮挡"
       }
     },
     {
@@ -753,7 +762,8 @@
         "status": "待定",
         "overture_id": "c7f7728b-eb60-487e-9536-a9b460ccb135",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "屋顶外缘较弱"
       }
     },
     {
@@ -805,7 +815,8 @@
         "status": "待定",
         "overture_id": "895304c2-e9c9-4368-a92b-4294eefe41a6",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "浅色屋面相对轮廓偏移"
       }
     },
     {
@@ -857,7 +868,8 @@
         "status": "待定",
         "overture_id": "2664b957-8faa-4018-a484-e918fb9f7eab",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "南北条状屋面及转折可辨"
       }
     },
     {
@@ -933,7 +945,8 @@
         "status": "待定",
         "overture_id": "16b51b40-035e-45fa-95a9-8b886b6e2689",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "体育馆主屋面，和外圈建筑属于同一场馆"
       }
     },
     {
@@ -1033,7 +1046,8 @@
         "status": "待定",
         "overture_id": "16b51b40-035e-45fa-95a9-8b886b6e2689",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 0.631
+        "footprint_iou": 0.631,
+        "esri_review": "包围主屋面及侧翼的外轮廓，不能将两面分别拉伸为完整楼体"
       }
     },
     {
@@ -1077,7 +1091,8 @@
         "status": "待定",
         "overture_id": "35863642-1681-4692-ac96-7cc599192fc2",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "树冠覆盖，外缘待定"
       }
     },
     {
@@ -1121,7 +1136,8 @@
         "status": "待定",
         "overture_id": "ceb5466d-eeed-4491-9bed-43562304b027",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "树冠覆盖，外缘待定"
       }
     },
     {
@@ -1193,7 +1209,8 @@
         "status": "待定",
         "overture_id": "c9423775-bfbb-4b7a-95a2-6a6b6282f593",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "可见内院，部分边缘被树冠遮挡"
       }
     },
     {
@@ -1253,7 +1270,8 @@
         "status": "待定",
         "overture_id": "8632b401-9ba5-4b65-bb34-869536d50eef",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "南北向相连屋面，分栋界线待定"
       }
     },
     {
@@ -1345,7 +1363,8 @@
         "status": "待定",
         "overture_id": "2c136332-fd97-4972-bf49-95fccf6bc7b7",
         "overture_source": "OpenStreetMap",
-        "footprint_iou": 1.0
+        "footprint_iou": 1.0,
+        "esri_review": "浅色带退台屋面，北侧轮廓吻合，东侧有偏移"
       }
     },
     {
@@ -1385,7 +1404,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "与港舍屋顶的大堂一侧重合，北缘较露台内缩约6米"
       }
     },
     {
@@ -1433,7 +1453,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "红色屋面主体可辨，东南附属部分边缘待定"
       }
     },
     {
@@ -1473,7 +1494,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘"
       }
     },
     {
@@ -1513,7 +1535,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "蓝白相间屋面，局部外缘可辨"
       }
     },
     {
@@ -1553,7 +1576,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘"
       }
     },
     {
@@ -1593,7 +1617,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘"
       }
     },
     {
@@ -1633,7 +1658,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘"
       }
     },
     {
@@ -1673,7 +1699,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘"
       }
     },
     {
@@ -1713,7 +1740,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘"
       }
     },
     {
@@ -1753,7 +1781,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘"
       }
     },
     {
@@ -1793,7 +1822,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "东西向白色长屋面仅占候选面的部分面积"
       }
     },
     {
@@ -1841,7 +1871,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "连续东西向屋面，独立分栋待定"
       }
     },
     {
@@ -1881,7 +1912,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "东西向屋面与边缘相邻树冠"
       }
     },
     {
@@ -1921,7 +1953,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘"
       }
     },
     {
@@ -1961,7 +1994,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘"
       }
     },
     {
@@ -2001,7 +2035,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘"
       }
     },
     {
@@ -2041,7 +2076,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "轮廓小或遮挡，无法从本图独立确认外缘"
       }
     },
     {
@@ -2103,7 +2139,8 @@
         "roof": null,
         "arcade": null,
         "retail": null,
-        "status": "待定"
+        "status": "待定",
+        "esri_review": "可辨围合内院及东侧附楼"
       }
     },
     {
