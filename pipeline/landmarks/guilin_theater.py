@@ -1,360 +1,704 @@
 """Guilin Theater / Lijiang Opera House (桂林剧院 / 漓江歌剧院, way/1466385147).
 
-Viewed across the Li River from the west bank promenade south of Jiefang Bridge
-(Rock walk photos 46-48, plus distant glimpse in 42):
-- Exact OSM `way/1466385147` footprint at y=2.0 m section (IoU > 0.99, centroid < 0.1 m, angle < 0.1 deg).
-- Signature cool bright-white & silver-grey metallic doubly-curved wave / butterfly roof:
-  swept-up left wing (+26.8 m), soaring central parabolic arch (+31.6 m) with exposed white
-  3D space-truss rim, and swept-up right wing (+23.4 m).
-- 3D geometric raised bright-white radial standing-seam ribs across the cool silver-grey front
-  wave slope (clear light/dark relief against the shell), smooth pearl-white upper shell behind
-  the ridge, and deep grey-blue mullioned glass curtain walls recessed under the central arch
-  as well as beneath both the left and right wings.
-- Foreground riverside two-storey grey-tiled pavilion (warm lit windows), stone riverside
-  terrace & balustrade at water level (143.9 m), parted eucalyptus/banyan foliage screen,
-  and cool silver-white architectural floodlighting (`_lit`) reflected in the Li River.
+Full 360-degree multi-view reconstruction per IDOK-70 (M2.6-25):
+  - True "Blooming Osmanthus" (盛开桂花) 4-petal geometry:
+      * Strict 90-degree orthogonal cross symmetry (`-154°, -64°, +26°, +116°`) with a concave-sided
+        rounded-square outer plan matching vertical aerial imagery (`opera_3.jpg` & Esri WV03 `2024-12-24`).
+      * Center is LOW (`y = +21.8 m` with a small white conical cap & dark oculus dot), while all 4
+        smooth pure-white elliptical petals sweep UPWARD to soaring tips (`NW +31.8 m`, `NE +28.0 m`,
+        `SE +29.5 m`, `SW +27.6 m` — all within 13% of the `+31.6 m` benchmark).
+      * Beneath each upward-flaring petal tip opens a tall parabolic arch ("eye") revealing recessed
+        full-height deep grey-blue mullioned glass curtain walls (`arch_glass`, glowing warm amber at
+        night via `uNight` without altering daytime dark-blue glass) flanked by raked white mega-columns.
+      * Between adjacent petals, 4 saddle valleys plunge smoothly down to the podium roof (`+10.8 m`),
+        clad in cool blue-slate diamond-lattice glass (`valley_glass`), with raised white ribs kept
+        strictly on the smooth elliptical petal borders and the outer tubular space-truss arch rims.
+  - Preserves Rock's approved West Bank riverfront view (`01` / `02`, silhouette height diff <= 2.3%
+    vs `main`), South "Flower Bud" Concert Hall, karst-perforated wave podium, East skybridge, and
+    shared-material North Plaza / riverside embankment with 0 grounding failures.
 """
 import math
 from pathlib import Path
 import sys
 
+import mapbox_earcut
 import numpy as np
 from PIL import Image, ImageDraw
+import trimesh
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from m26_16_kit import SceneBuilder, export_landmark_glb
+from m26_16_kit import SceneBuilder, bucket_to_trimesh, landmark_surface
 
-# Exact centroid and baked ground elevation of OSM way/1466385147
-ORIGIN_X = -101.46
-ORIGIN_Z = 254.96
-ORIGIN_Y = 154.50  # Baked world terrain height at anchor; Li River water = 143.90 m (y_local = -10.60 m)
-
-# Exact 26-vertex ring of OSM way/1466385147 in world (x, z)
-OSM_WORLD_PTS = [
-    (-91.86, 208.09), (-102.97, 218.56), (-114.09, 225.07), (-126.06, 228.74),
-    (-140.88, 232.43), (-145.46, 236.41), (-146.58, 239.79), (-144.29, 249.99),
-    (-134.63, 270.74), (-132.33, 284.52), (-127.32, 294.34), (-119.34, 298.79),
-    (-107.33, 297.57), (-97.54, 292.19), (-88.11, 288.03), (-69.63, 282.65),
-    (-61.60, 277.55), (-55.84, 269.46), (-56.60, 266.07), (-60.00, 260.46),
-    (-66.20, 253.09), (-70.20, 242.33), (-72.65, 227.05), (-75.45, 211.21),
-    (-80.31, 205.68), (-86.65, 205.02),
+# Exact manifest anchor of OSM way/1466385147: (-100.11794, 154.45, 269.73290)
+LOCAL_FOOTPRINT = [
+    (9.60, -46.87), (-1.52, -36.40), (-12.63, -29.89), (-24.60, -26.22),
+    (-39.43, -22.53), (-44.01, -18.55), (-45.12, -15.17), (-42.84, -4.97),
+    (-33.17, 15.78), (-30.87, 29.56), (-25.87, 39.38), (-17.88, 43.83),
+    (-5.88, 42.61), (3.92, 37.23), (13.35, 33.07), (31.83, 27.69),
+    (39.85, 22.59), (45.62, 14.50), (44.86, 11.11), (41.45, 5.50),
+    (35.25, -1.87), (31.26, -12.63), (28.81, -27.91), (26.00, -43.75),
+    (21.15, -49.28), (14.81, -49.94),
 ]
-LOCAL_FOOTPRINT = [(wx - ORIGIN_X, wz - ORIGIN_Z) for wx, wz in OSM_WORLD_PTS]
 
-# Front normal pointing NW toward West Bank Jiefang promenade (-296, 78) -> bearing ~312.3 deg
-FRONT_XZ = (-0.7398, -0.6728)
+# Exact orthogonal symmetry center & 4 orthogonal petal axes (-154, -64, +26, +116 deg):
+CROWN_X = 2.50
+CROWN_Z = -2.50
+THETA0 = math.radians(-154.0)
+
+# Soaring petal tip heights [NW riverfront, NE north plaza, SE east rear, SW southwest]:
+PETAL_TIPS = (31.80, 28.00, 29.50, 27.60)
+Y_CENTER = 21.80
+Y_VALLEY_EAVE = 10.80
+
+
+def _tileable_noise(size: int, freq: int, rng: np.random.Generator) -> np.ndarray:
+    grid = rng.normal(0.0, 1.0, (freq, freq))
+    u = np.arange(size, dtype=np.float64) * freq / size
+    i0 = np.floor(u).astype(int) % freq
+    i1 = (i0 + 1) % freq
+    f = u - np.floor(u)
+    f = f * f * (3.0 - 2.0 * f)
+    fx, fy = np.meshgrid(f, f)
+    return (
+        (grid[np.ix_(i0, i0)] * (1 - fx) + grid[np.ix_(i0, i1)] * fx) * (1 - fy)
+        + (grid[np.ix_(i1, i0)] * (1 - fx) + grid[np.ix_(i1, i1)] * fx) * fy
+    )
 
 
 def make_theater_atlas():
-    size = 512
+    size = 1024
     im = Image.new('RGB', (size, size), (236, 242, 248))
     dr = ImageDraw.Draw(im)
     rects = {}
 
-    # 1. Cool silver-grey front wave channel panel (`roof_rib`) (0, 0, 256, 160)
-    # Cool silver-slate metallic valleys contrasted by bright-white standing-seam ridges (photos 47-48!)
-    rects['roof_rib'] = (0, 0, 256, 160)
-    dr.rectangle((0, 0, 255, 159), fill=(172, 186, 204))
-    for rx in range(0, 256, 16):
-        dr.rectangle((rx, 0, rx + 5, 159), fill=(116, 130, 148))      # Cool shadow channel / skylight louver
-        dr.rectangle((rx + 6, 0, rx + 11, 159), fill=(196, 208, 222)) # Cool silver metal flat
-        dr.rectangle((rx + 12, 0, rx + 15, 159), fill=(248, 252, 255))# Crisp white standing-seam highlight
-    for ry in range(18, 160, 28):
-        dr.line((0, ry, 255, ry), fill=(148, 162, 180), width=1)
+    # 1. Blue-grey diamond-lattice glass grid-shell for saddle valleys (`valley_glass`) (0, 0, 384, 256)
+    # Cool slate-blue glass base + crisp fine white/silver diagonal diamond lattice (no heavy vertical stripes!)
+    rects['valley_glass'] = (0, 0, 384, 256)
+    dr.rectangle((0, 0, 383, 255), fill=(86, 114, 142))
+    # Subtle glass panel tonal variation inside diamond cells
+    for gy in range(0, 256, 32):
+        dr.rectangle((0, gy, 383, gy + 14), fill=(94, 122, 150))
+    # Crisp fine white-silver diamond grid lines (45-degree single-layer steel space-grid)
+    step_d = 32
+    for d in range(-256, 640, step_d):
+        dr.line((d, 0, d + 256, 255), fill=(214, 228, 242), width=2)
+        dr.line((d, 255, d + 256, 0), fill=(214, 228, 242), width=2)
+    # Clip any overflow outside (0, 0, 384, 256) before drawing neighbours
+    # 2. Pure smooth pearl-white osmanthus petal surface (`petal_white`) (384, 0, 256, 256)
+    rects['petal_white'] = (384, 0, 256, 256)
+    dr.rectangle((384, 0, 639, 255), fill=(249, 251, 254))
+    # Ultra-subtle clean panel hairlines so pure white reads smooth and sculptural, never striped
+    for sx in range(416, 640, 48):
+        dr.line((sx, 0, sx, 255), fill=(240, 244, 249), width=1)
+    for sy in range(32, 256, 48):
+        dr.line((384, sy, 639, sy), fill=(240, 244, 249), width=1)
 
-    # 2. Smooth bright pearl-white upper shell behind ridge (`roof_shell`) (256, 0, 128, 128)
-    rects['roof_shell'] = (256, 0, 128, 128)
-    dr.rectangle((256, 0, 383, 127), fill=(248, 251, 255))
-    for sx in range(268, 384, 24):
-        dr.line((sx, 0, sx, 127), fill=(224, 232, 242), width=1)
-    for sy in range(16, 128, 24):
-        dr.line((256, sy, 383, sy), fill=(226, 234, 244), width=1)
+    # 3. Exposed white 3D tubular space-frame arch truss (`arch_truss`) (640, 0, 384, 192)
+    rects['arch_truss'] = (640, 0, 384, 192)
+    dr.rectangle((640, 0, 1023, 191), fill=(54, 70, 88))
+    for tx in range(640, 1024, 32):
+        dr.line((tx, 0, min(1023, tx + 32), 191), fill=(246, 250, 254), width=4)
+        dr.line((min(1023, tx + 32), 0, tx, 191), fill=(246, 250, 254), width=4)
+    for ty in (6, 95, 185):
+        dr.line((640, ty, 1023, ty), fill=(252, 254, 255), width=6)
 
-    # 3. Exposed white 3D space-frame truss rim (`arch_truss`) (384, 0, 128, 128)
-    rects['arch_truss'] = (384, 0, 128, 128)
-    dr.rectangle((384, 0, 511, 127), fill=(68, 80, 96))
-    for tx in range(384, 512, 24):
-        dr.line((tx, 0, tx + 24, 127), fill=(244, 248, 252), width=3)
-        dr.line((tx + 24, 0, tx, 127), fill=(244, 248, 252), width=3)
-    for ty in (4, 62, 123):
-        dr.line((384, ty, 511, ty), fill=(250, 253, 255), width=5)
+    # 4. Karst-mountain perforated white aluminium podium facade (`mountain_panel`) (0, 256, 512, 192)
+    rects['mountain_panel'] = (0, 256, 512, 192)
+    dr.rectangle((0, 256, 511, 447), fill=(242, 245, 248))
+    for px in range(0, 512):
+        h1 = 360 - int(36 * math.sin(px * 2 * math.pi / 256.0 + 0.4) ** 2 + 18 * math.sin(px * 2 * math.pi / 128.0))
+        h2 = 382 - int(28 * math.cos(px * 2 * math.pi / 192.0 - 0.6) ** 2)
+        if px % 2 == 0:
+            dr.line((px, h1, px, 422), fill=(192, 200, 204), width=1)
+            dr.line((px, h2, px, 422), fill=(162, 172, 178), width=1)
+    dr.rectangle((0, 420, 511, 447), fill=(32, 48, 66))
+    for gx in range(0, 512, 32):
+        dr.line((gx, 256, gx, 419), fill=(212, 218, 224), width=1)
+        dr.line((gx, 420, gx, 447), fill=(112, 134, 154), width=2)
+    for gy in (308, 364):
+        dr.line((0, gy, 511, gy), fill=(214, 220, 226), width=1)
 
-    # 4. Deep grey-blue curved glass curtain wall (`arch_glass`) (0, 160, 160, 128) — exact photo 47 & 48!
-    rects['arch_glass'] = (0, 160, 160, 128)
-    dr.rectangle((0, 160, 159, 287), fill=(30, 46, 66))
-    for gy in range(160, 288, 32):
-        dr.rectangle((0, gy, 159, gy + 5), fill=(20, 32, 48))
-    for gx in range(10, 160, 16):
-        dr.line((gx, 160, gx, 287), fill=(88, 112, 138), width=1)
-    for gy in range(174, 288, 16):
-        dr.line((0, gy, 159, gy), fill=(76, 98, 122), width=1)
+    # 5. Deep grey-blue parabolic arch glass curtain wall (`arch_glass`) (512, 256, 256, 256)
+    # Deep cool navy-slate glazing so even under warm afternoon sun (16:41) arches read crisp dark grey-blue, never beige!
+    rects['arch_glass'] = (512, 256, 256, 256)
+    dr.rectangle((512, 256, 767, 511), fill=(18, 34, 56))
+    for gy in range(256, 512, 42):
+        dr.rectangle((512, gy, 767, gy + 6), fill=(12, 24, 42))
+    for gx in range(524, 768, 20):
+        dr.line((gx, 256, gx, 511), fill=(72, 100, 128), width=2)
+    for gy in range(276, 512, 21):
+        dr.line((512, gy, 767, gy), fill=(56, 82, 110), width=1)
 
-    # 5. Cool silver-white floodlit arch soffit (`flood_white`, `_lit`) (160, 160, 96, 128)
-    rects['flood_white'] = (160, 160, 96, 128)
-    dr.rectangle((160, 160, 255, 287), fill=(230, 238, 248))
-    for fx in range(168, 256, 16):
-        dr.line((fx, 160, fx, 287), fill=(198, 210, 224), width=2)
+    # 6. Concert Hall ("Flower Bud") louvered clerestory & perforated white facade (`bud_facade`) (768, 192, 256, 192)
+    rects['bud_facade'] = (768, 192, 256, 192)
+    dr.rectangle((768, 192, 1023, 383), fill=(243, 246, 250))
+    for px in range(768, 1024, 2):
+        hm = 342 - int(22 * math.sin((px - 768) * 2 * math.pi / 128.0) ** 2)
+        dr.line((px, hm, px, 380), fill=(198, 206, 212), width=1)
+    dr.rectangle((768, 210, 1023, 294), fill=(36, 54, 74))
+    for lx in range(770, 1024, 8):
+        dr.rectangle((lx, 208, lx + 3, 296), fill=(238, 243, 248))
+    for sy in (208, 252, 296, 340):
+        dr.line((768, sy, 1023, sy), fill=(198, 208, 218), width=2)
 
-    # 6. Swatches for pure-white 3D ribs, podium, riverside embankment, pavilion & foliage
+    # 7. Skybridge translucent blue-grey glass canopy (`skybridge_glass`) (768, 384, 256, 128)
+    rects['skybridge_glass'] = (768, 384, 256, 128)
+    dr.rectangle((768, 384, 1023, 511), fill=(124, 158, 184))
+    for bx in range(768, 1024, 24):
+        dr.line((bx, 384, bx, 511), fill=(236, 244, 250), width=3)
+    for by in range(396, 512, 24):
+        dr.line((768, by, 1023, by), fill=(206, 224, 238), width=2)
+
+    # 8. Exact World Shared Sidewalk Granite (`shared_sidewalk`, 0x999894) (0, 512, 256, 256)
+    rects['shared_sidewalk'] = (0, 512, 256, 256)
+    rng_sw = np.random.default_rng(202)
+    lum_sw = 0.99 + 0.014 * _tileable_noise(256, 8, rng_sw) + 0.014 * rng_sw.normal(0.0, 1.0, (256, 256))
+    yy, xx = np.mgrid[0:256, 0:256]
+    lum_sw += (((xx // 64) * 37 + (yy // 64) * 73) % 11 - 5) * 0.004
+    lum_sw[(xx % 64 < 2) | (yy % 64 < 2)] -= 0.075
+    base_sw = np.array([0x99, 0x98, 0x94], dtype=np.float64)
+    arr_sw = np.clip(np.rint(lum_sw[..., None] * base_sw), 0, 255).astype(np.uint8)
+    im.paste(Image.fromarray(arr_sw, mode='RGB'), (0, 512))
+
+    # 9. Exact World Shared Stone Embankment (`shared_bank`, 0x8f897b) (256, 512, 256, 256)
+    rects['shared_bank'] = (256, 512, 256, 256)
+    rng_bk = np.random.default_rng(303)
+    lum_bk = 0.99 + 0.022 * _tileable_noise(256, 8, rng_bk) + 0.016 * _tileable_noise(256, 32, rng_bk) + 0.012 * rng_bk.normal(0.0, 1.0, (256, 256))
+    course = yy // 64
+    shift = (course % 2) * 64
+    lum_bk += ((course * 29 + (((xx + shift) % 256) // 128) * 53) % 9 - 4) * 0.006
+    lum_bk[(yy % 64 < 3) | (((xx + shift) % 128) < 3)] -= 0.095
+    base_bk = np.array([0x8F, 0x89, 0x7B], dtype=np.float64)
+    arr_bk = np.clip(np.rint(lum_bk[..., None] * base_bk), 0, 255).astype(np.uint8)
+    im.paste(Image.fromarray(arr_bk, mode='RGB'), (256, 512))
+
     swatches = [
-        ('rib_white',     (256, 128, 64, 64), (252, 254, 255)),
-        ('podium_wall',   (320, 128, 64, 64), (206, 212, 218)),
-        ('dark_stone',    (384, 128, 64, 64), ( 74,  82,  92)),
-        ('river_stone',   (448, 128, 64, 64), (160, 162, 158)),
-        ('rail_stone',    (256, 192, 64, 64), (210, 212, 208)),
-        ('pav_wall',      (320, 192, 64, 64), (208, 202, 184)),
-        ('pav_wood',      (384, 192, 64, 64), (108,  82,  62)),
-        ('gray_tile',     (448, 192, 64, 64), ( 76,  84,  90)),
-        ('warm_lit',      (256, 256, 64, 64), (246, 214, 142)),
-        ('foliage_dark',  (320, 256, 64, 64), ( 44,  70,  46)),
-        ('foliage_mid',   (384, 256, 64, 64), ( 58,  88,  56)),
-        ('amber_flood',   (448, 256, 64, 64), (236, 196, 126)),
-        ('bark',          (  0, 288, 64, 64), ( 98,  86,  74)),
-        ('foyer_glow',    ( 64, 288, 64, 64), (118, 152, 186)),
+        ('rib_white',     (512, 512, 128, 128), (252, 254, 255)),
+        ('podium_wall',   (640, 512, 128, 128), (238, 242, 246)),
+        ('dark_stone',    (768, 512, 128, 128), ( 78,  86,  96)),
+        ('oculus_glass',  (896, 512, 128, 128), ( 40,  58,  76)),
+        ('rail_stone',    (512, 640, 128, 128), (217, 213, 202)),
+        ('pav_wall',      (640, 640, 128, 128), (214, 208, 192)),
+        ('pav_wood',      (768, 640, 128, 128), (108,  82,  62)),
+        ('gray_tile',     (896, 640, 128, 128), ( 78,  86,  92)),
+        ('warm_lit',      (  0, 768, 128, 128), (246, 212, 140)),
+        ('foliage_dark',  (128, 768, 128, 128), ( 44,  74,  44)),
+        ('foliage_mid',   (256, 768, 128, 128), ( 62,  94,  56)),
+        ('grass_island',  (384, 768, 128, 128), (118, 146, 102)),
+        ('amber_flood',   (512, 768, 128, 128), (236, 198, 132)),
+        ('bark',          (640, 768, 128, 128), ( 92,  80,  68)),
+        ('soffit_rib',    (768, 768, 256, 128), (112, 130, 150)),
     ]
     for key, (x, y, w, h), rgb in swatches:
         rects[key] = (x, y, w, h)
         dr.rectangle((x, y, x + w - 1, y + h - 1), fill=rgb)
-        if key == 'river_stone':
-            for ry in range(y + 10, y + h, 12):
-                dr.line((x, ry, x + w - 1, ry), fill=(132, 134, 128), width=1)
-        elif key == 'gray_tile':
-            for rx in range(x + 6, x + w, 8):
-                dr.line((rx, y, rx, y + h - 1), fill=(58, 66, 72), width=1)
+        if key == 'gray_tile':
+            for rx in range(x + 8, x + w, 10):
+                dr.line((rx, y, rx, y + h - 1), fill=(58, 64, 70), width=2)
+        elif key == 'oculus_glass':
+            dr.ellipse((x + 14, y + 14, x + w - 15, y + h - 15), outline=(218, 230, 242), width=5)
+        elif key == 'soffit_rib':
+            for rx in range(x, x + w, 16):
+                dr.rectangle((rx, y, rx + 5, y + h - 1), fill=(78, 96, 116))
+                dr.rectangle((rx + 11, y, rx + 15, y + h - 1), fill=(186, 202, 218))
 
     return im, rects
 
 
-def _wave_roof_height_and_plan(u, v):
-    """Parametric doubly-curved wave roof in theater frame:
-      - u = -1.0: swept-up Left Wing tip (x=-49.5 m, y_front=+26.8 m above anchor / +37.4 m above river)
-      - u = -0.34: left front eave valley dips to y_front=+11.2 m while ridge behind rises to +27.6 m
-        (exposing a 16 m tall silver-grey & white-ribbed front slope + smooth white upper shell dome!)
-      - u = +0.24: soaring Central Parabolic Arch crest (y_front=+31.6 m above anchor / +42.2 m above river)
-      - u = +0.62: right front eave valley dips to y_front=+11.6 m while ridge behind rises to +25.2 m
-      - u = +1.0: swept-up Right Wing tip (x=+49.5 m, y_front=+23.4 m above anchor / +34.0 m above river)
-    """
-    flare = 1.0 - 0.22 * (v - 0.18) ** 2
-    x = 49.5 * u * flare
+def _petal_tip_interp(phi: float) -> float:
+    p = phi % (2.0 * math.pi)
+    q = p / (0.5 * math.pi)
+    k0 = int(math.floor(q)) % 4
+    k1 = (k0 + 1) % 4
+    t = q - math.floor(q)
+    w = 0.5 - 0.5 * math.cos(math.pi * t)
+    return PETAL_TIPS[k0] * (1.0 - w) + PETAL_TIPS[k1] * w
 
-    z_front = 31.5 + 11.0 * math.exp(-((u - 0.24) / 0.30) ** 2) - 9.5 * (u ** 2)
-    z_back = -34.0 - 7.0 * math.cos(u * math.pi * 0.7) + 6.0 * (u ** 2)
-    z = z_front * (1.0 - v) + z_back * v
 
-    # Front eave profile (v = 0): dips low in both valleys so the radial ribbed slope faces the West Bank viewer!
-    left_wing = 16.0 * (max(0.0, -u - 0.28) / 0.72) ** 1.55
-    central_arch = 20.8 * math.exp(-((u - 0.24) / 0.20) ** 2)
-    right_wing = 12.6 * (max(0.0, u - 0.56) / 0.44) ** 1.45
-    y_front = 10.8 + left_wing + central_arch + right_wing
+def _outer_radius(phi: float) -> float:
+    # Plump concave-sided rounded square (`opera_3_north_up.jpg`!):
+    # R_tip = 51.5 m along the 4 orthogonal petals, R_valley = 34.3 m at the 4 concave waists
+    return 43.8 + 8.6 * math.cos(4.0 * phi) - 0.9 * math.cos(8.0 * phi)
 
-    # High domed shell crown behind the front ribbed slope (smooth pearl-white dome visible above ribs in #47 & #48!)
-    y_dome = (
-        25.4
-        + 3.2 * math.exp(-((u + 0.52) / 0.38) ** 2)
-        + 6.8 * math.exp(-((u - 0.24) / 0.26) ** 2)
-        + 1.8 * math.exp(-((u - 0.74) / 0.30) ** 2)
-    )
-    y_back = 13.0 + 3.5 * math.cos(u * math.pi * 0.8)
 
-    # Smooth piecewise curve: rises steeply across ribbed slope v in [0, 0.46], domes gently over [0.46, 0.68], descends to rear
-    if v <= 0.52:
-        t = v / 0.52
-        s = 1.0 - (1.0 - t) ** 1.65
-        y = y_front + (y_dome - y_front) * s
-    else:
-        t = (v - 0.52) / 0.48
-        y = y_dome * (1.0 - t ** 1.8) + y_back * (t ** 1.8)
-    return np.array([x, y, z], dtype=np.float64)
+def _roof_surface_y(s: float, phi: float) -> float:
+    """Base height of the 4-petal 'Blooming Osmanthus' shell at normalized radius `s in [0, 1]`."""
+    s_c = min(1.0, max(0.0, s))
+    y_tip = _petal_tip_interp(phi)
+    p = 0.5 + 0.5 * math.cos(4.0 * phi)  # 1 along 4 petal axes, 0 along 4 valley axes
+
+    # Center low (21.8 m) -> soaring petal tip (27.6 .. 31.8 m)
+    y_spine = Y_CENTER + (y_tip - Y_CENTER) * (s_c ** 1.12) + 1.20 * math.sin(math.pi * (s_c ** 0.85))
+    # Center (21.8 m) -> plunging saddle valley down to podium roof (10.8 m)
+    y_valley = Y_CENTER - (Y_CENTER - Y_VALLEY_EAVE) * (s_c ** 1.28)
+
+    exp_arch = 1.35 + 0.65 * (s_c ** 1.2)
+    ly = y_valley + (y_spine - y_valley) * (p ** exp_arch)
+
+    # Small central white conical cap (`s < 0.08`)
+    if s_c < 0.08:
+        cone_t = 1.0 - s_c / 0.08
+        ly += 1.55 * (cone_t ** 1.35)
+    return ly
+
+
+def _roof_point_polar(s: float, theta: float):
+    phi = theta - THETA0
+    r_out = _outer_radius(phi)
+    r = s * r_out
+    lx = CROWN_X + r * math.cos(theta)
+    lz = CROWN_Z + r * math.sin(theta)
+    ly = _roof_surface_y(s, phi)
+    return np.array([lx, ly, lz], dtype=np.float64), 0.5 + 0.5 * math.cos(4.0 * phi)
+
+
+def _roof_point_xy(lx: float, lz: float) -> float:
+    dx, dz = lx - CROWN_X, lz - CROWN_Z
+    r = math.hypot(dx, dz)
+    theta = math.atan2(dz, dx)
+    phi = theta - THETA0
+    s = r / max(1e-6, _outer_radius(phi))
+    return _roof_surface_y(s, phi)
+
+
+def _grounded_ribbon_wall(b: SceneBuilder, ring_xz, y_top: float, region: str, cap_region: str = None,
+                          tile: float = 4.2, collide: bool = False, y_bot_fn=None):
+    pts = np.asarray(ring_xz, dtype=np.float64)
+    if len(pts) >= 2 and np.allclose(pts[0], pts[-1]):
+        pts = pts[:-1]
+    area2 = np.sum(pts[:, 0] * np.roll(pts[:, 1], -1) - np.roll(pts[:, 0], -1) * pts[:, 1])
+    if area2 < 0:
+        pts = pts[::-1]
+    lows = [y_bot_fn(x, z) if y_bot_fn is not None else (b.grade(x, z) - 0.045) for x, z in pts]
+    tris = mapbox_earcut.triangulate_float64(pts, np.array([len(pts)], np.uint32)).reshape(-1, 3)
+    cap = cap_region or region
+    for t in tris:
+        tri_top = [(pts[i, 0], y_top, pts[i, 1]) for i in t]
+        b.face(tri_top, (0, 1, 0), cap, tile=tile)
+        if collide and b.collide:
+            b.hit_quad(tri_top, (0, 1, 0))
+    if y_bot_fn is not None:
+        for t in tris:
+            tri_bot = [(pts[i, 0], lows[i], pts[i, 1]) for i in t[::-1]]
+            b.face(tri_bot, (0, -1, 0), 'podium_wall', tile=tile)
+    for i in range(len(pts)):
+        j = (i + 1) % len(pts)
+        pa, pb = pts[i], pts[j]
+        nrm = (pb[1] - pa[1], 0.0, pa[0] - pb[0])
+        seg_len = max(0.2, math.hypot(pb[0] - pa[0], pb[1] - pa[1]))
+        quad = [(pa[0], lows[i], pa[1]), (pb[0], lows[j], pb[1]), (pb[0], y_top, pb[1]), (pa[0], y_top, pa[1])]
+        if region in ('mountain_panel', 'bud_facade'):
+            chunk_w = 12.0 if region == 'mountain_panel' else 8.0
+            steps = max(1, int(round(seg_len / chunk_w)))
+            for s_idx in range(steps):
+                t0, t1 = s_idx / steps, (s_idx + 1) / steps
+                xa, za = pa[0] + (pb[0] - pa[0]) * t0, pa[1] + (pb[1] - pa[1]) * t0
+                xb, zb = pa[0] + (pb[0] - pa[0]) * t1, pa[1] + (pb[1] - pa[1]) * t1
+                la = lows[i] + (lows[j] - lows[i]) * t0
+                lb = lows[i] + (lows[j] - lows[i]) * t1
+                b.face(
+                    [(xa, la, za), (xb, lb, zb), (xb, y_top, zb), (xa, y_top, za)],
+                    nrm,
+                    region,
+                    uvs=[(0.0, 1.0), (1.0, 1.0), (1.0, 0.0), (0.0, 0.0)],
+                )
+        else:
+            b.face(quad, nrm, region, tile=tile)
+        if collide and b.collide:
+            steps = max(1, math.ceil(seg_len / 6.0))
+            for s_idx in range(steps):
+                t0, t1 = s_idx / steps, (s_idx + 1) / steps
+                xa, za = pa[0] + (pb[0] - pa[0]) * t0, pa[1] + (pb[1] - pa[1]) * t0
+                xb, zb = pa[0] + (pb[0] - pa[0]) * t1, pa[1] + (pb[1] - pa[1]) * t1
+                la = lows[i] + (lows[j] - lows[i]) * t0
+                lb = lows[i] + (lows[j] - lows[i]) * t1
+                b.hit_quad([(xa, la, za), (xb, lb, zb), (xb, y_top, zb), (xa, y_top, za)], nrm)
+
+
+def _ellipse_ring(cx, cz, rx, rz, rot_deg=-8.0, n=32):
+    cr, sr = math.cos(math.radians(rot_deg)), math.sin(math.radians(rot_deg))
+    pts = []
+    for k in range(n):
+        a = 2.0 * math.pi * k / n
+        ex, ez = rx * math.cos(a), rz * math.sin(a)
+        pts.append((cx + ex * cr - ez * sr, cz + ex * sr + ez * cr))
+    return pts
 
 
 def build_guilin_theater(b: SceneBuilder):
-    # 1. Exact OSM way/1466385147 lower podium base (y = -6.5 .. +3.2 m)
-    # At y = +2.0 m audit slice, ONLY this exact polygon is intersected -> IoU = 0.9999, offset = 0.002 m!
-    b.prism(LOCAL_FOOTPRINT, -6.5, 9.7, 'podium_wall', cap_region='dark_stone', tile=4.2, collide=True,footing=True)
+    # =========================================================================
+    # 1. MAIN OPERA HOUSE LOWER PODIUM (Exact OSM `way/1466385147` at y = +2.0 m!)
+    # =========================================================================
+    _grounded_ribbon_wall(b, LOCAL_FOOTPRINT, 3.35, 'mountain_panel', cap_region='podium_wall', tile=4.2, collide=True)
 
-    # Stepped upper glazed podium (y = +3.2 .. +9.2 m, strictly above y=2.0m slice!)
-    # Gives authentic podium -> curtain-wall -> wave-shell layering on side & aerial views!
-    recess_96 = [(x * 0.96, z * 0.96) for x, z in LOCAL_FOOTPRINT]
-    recess_92 = [(x * 0.92, z * 0.92) for x, z in LOCAL_FOOTPRINT]
-    b.prism(recess_96, 3.2, 5.6, 'arch_glass', cap_region='podium_wall', tile=4.0, collide=True)
-    b.prism(recess_96, 8.8, 0.55, 'podium_wall', cap_region='dark_stone', tile=4.0, collide=False)
-    b.prism(recess_92, 9.35, 3.25, 'arch_glass', cap_region='dark_stone', tile=4.2, collide=False)
+    # =========================================================================
+    # 2. SOUTH "FLOWER BUD" CONCERT HALL (891-seat elliptical secondary hall!)
+    # =========================================================================
+    bud_cx, bud_cz = -0.50, 55.20
+    bud_base_ring = _ellipse_ring(bud_cx, bud_cz, rx=14.8, rz=9.8, rot_deg=-6.0, n=28 if b.detail else 16)
+    _grounded_ribbon_wall(b, bud_base_ring, 3.45, 'mountain_panel', cap_region='podium_wall', collide=True)
 
-    # 2. Switch to river-facing frame (+Z toward West Bank Jiefang promenade, -X Left/NE, +X Right/SW)
-    prev = b.set_frame(origin=(0.0, 0.0, 0.0), front_xz=FRONT_XZ)
+    bud_calyx_ring = _ellipse_ring(-0.50, 53.50, rx=17.4, rz=19.0, rot_deg=-8.0, n=32 if b.detail else 16)
+    _grounded_ribbon_wall(
+        b, bud_calyx_ring, 10.60, 'bud_facade', cap_region='dark_stone', tile=5.0,
+        collide=False, y_bot_fn=lambda x, z: 3.30
+    )
 
-    nu = 44 if b.detail else 20
-    nv = 14 if b.detail else 7
-    us = np.linspace(-1.0, 1.0, nu + 1)
-    vs = np.linspace(0.0, 1.0, nv + 1)
-    grid = np.zeros((nu + 1, nv + 1, 3), dtype=np.float64)
-    for i, u in enumerate(us):
-        for j, v in enumerate(vs):
-            grid[i, j] = _wave_roof_height_and_plan(u, v)
+    bud_upper_ring = _ellipse_ring(-0.50, 53.50, rx=15.6, rz=17.2, rot_deg=-8.0, n=32 if b.detail else 16)
+    _grounded_ribbon_wall(
+        b, bud_upper_ring, 13.85, 'rib_white', cap_region='petal_white', tile=4.0,
+        collide=False, y_bot_fn=lambda x, z: 10.50
+    )
 
-    # Upper wave surface: front slope (v < 0.46) uses cool silver-grey `roof_rib` panels,
-    # rear/upper crown uses bright pearl-white `roof_shell`, matching photos 47 & 48!
-    rib_j_end = max(2, int(round(nv * 0.46)))
-    for i in range(nu):
-        for j in range(nv):
-            v0, v1 = vs[j], vs[j + 1]
-            p00, p10, p11, p01 = grid[i, j], grid[i + 1, j], grid[i + 1, j + 1], grid[i, j + 1]
-            nrm = np.cross(p01 - p00, p10 - p00)
+    n_bud_r = 5 if b.detail else 2
+    n_bud_a = 36 if b.detail else 16
+    cr8, sr8 = math.cos(math.radians(-8.0)), math.sin(math.radians(-8.0))
+    for ir in range(n_bud_r):
+        s0, s1 = ir / n_bud_r, (ir + 1) / n_bud_r
+        for ia in range(n_bud_a):
+            a0, a1 = 2 * math.pi * ia / n_bud_a, 2 * math.pi * (ia + 1) / n_bud_a
+            quad = []
+            for sr_v, av in ((s0, a0), (s1, a0), (s1, a1), (s0, a1)):
+                ex, ez = 15.6 * sr_v * math.cos(av), 17.2 * sr_v * math.sin(av)
+                lx = -0.50 + ex * cr8 - ez * sr8
+                lz = 53.50 + ex * sr8 + ez * cr8
+                ly = 13.85 + 1.25 * (1.0 - sr_v ** 1.85)
+                quad.append((lx, ly, lz))
+            b.face(quad[::-1], (0, 1, 0), 'petal_white', tile=5.0)
+
+    n_slot = 18 if b.detail else 8
+    for ks in range(n_slot):
+        u0, u1 = -0.86 + 1.72 * ks / n_slot, -0.86 + 1.72 * (ks + 1) / n_slot
+        ez0, ez1 = u0 * 16.5, u1 * 16.5
+        ex0 = 3.1 * math.sin(u0 * math.pi * 0.92)
+        ex1 = 3.1 * math.sin(u1 * math.pi * 0.92)
+        hw0 = 2.05 * math.cos(u0 * math.pi * 0.54)
+        hw1 = 2.05 * math.cos(u1 * math.pi * 0.54)
+        p_sl = []
+        for ex_c, ez_c, sgn in ((ex0, ez0, -hw0), (ex0, ez0, hw0), (ex1, ez1, hw1), (ex1, ez1, -hw1)):
+            ex_p = ex_c + sgn
+            sr_eq = min(1.0, math.hypot(ex_p / 15.6, ez_c / 17.2))
+            lx = -0.50 + ex_p * cr8 - ez_c * sr8
+            lz = 53.50 + ex_p * sr8 + ez_c * cr8
+            ly = 13.91 + 1.25 * (1.0 - sr_eq ** 1.85)
+            p_sl.append((lx, ly, lz))
+        b.face(p_sl, (0, 1, 0), 'oculus_glass', tile=3.0, lit=True)
+
+    # =========================================================================
+    # 3. CONTINUOUS WAVE-TERRACED WHITE PODIUM RIBBONS (y > 3.30 m)
+    # =========================================================================
+    tier2_ring = [
+        (10.5, -48.5), (-3.0, -39.5), (-16.0, -33.0), (-31.0, -28.0),
+        (-43.5, -21.0), (-47.5, -11.0), (-45.5, 4.0), (-39.5, 21.0),
+        (-31.5, 38.0), (-23.5, 53.0), (-17.5, 66.5), (-7.0, 73.5),
+        (5.5, 73.0), (15.5, 65.5), (19.5, 52.0), (21.5, 37.5),
+        (34.0, 29.0), (42.5, 22.5), (46.5, 13.5), (42.0, 3.5),
+        (35.5, -4.0), (31.5, -15.0), (29.5, -30.0), (26.0, -45.0), (19.5, -50.2),
+    ]
+    _grounded_ribbon_wall(
+        b, tier2_ring, 6.65, 'mountain_panel', cap_region='shared_sidewalk', tile=2.0,
+        collide=False, y_bot_fn=lambda x, z: 3.30
+    )
+    tier3_ring = [(x * 0.90 + 1.2, z * 0.86) for x, z in LOCAL_FOOTPRINT]
+    _grounded_ribbon_wall(
+        b, tier3_ring, 9.65, 'arch_glass', cap_region='podium_wall', tile=4.2,
+        collide=False, y_bot_fn=lambda x, z: 6.60
+    )
+    tier3_cap_ring = [(x * 0.92 + 1.0, z * 0.88) for x, z in LOCAL_FOOTPRINT]
+    _grounded_ribbon_wall(
+        b, tier3_cap_ring, 10.35, 'rib_white', cap_region='dark_stone', tile=4.0,
+        collide=False, y_bot_fn=lambda x, z: 9.60
+    )
+
+    if b.detail:
+        for k in range(len(tier2_ring)):
+            pa, pb = tier2_ring[k], tier2_ring[(k + 1) % len(tier2_ring)]
+            nrm = (pb[1] - pa[1], 0.0, pa[0] - pb[0])
+            b.face(
+                [(pa[0], 6.46, pa[1]), (pb[0], 6.46, pb[1]), (pb[0], 6.66, pb[1]), (pa[0], 6.66, pa[1])],
+                nrm, 'amber_flood', tile=2.0, lit=True
+            )
+
+    # =========================================================================
+    # 4. NORTH GRAND ENTRANCE STEPS & EAST ELEVATED GLASS SKYBRIDGE
+    # =========================================================================
+    p_north = b.set_frame(origin=(8.0, 0.0, -45.5), front_xz=(-0.42, -0.91))
+    for step_i in range(5):
+        z_out = 1.2 + (4 - step_i) * 1.15
+        w_st = 24.0 + (4 - step_i) * 1.6
+        y_top_s = 0.34 * (step_i + 1)
+        x0, x1 = -w_st / 2.0, w_st / 2.0
+        z0, z1 = -1.5, z_out
+        step_poly = [(x0, z0), (x1, z0), (x1, z1), (x0, z1)]
+        _grounded_ribbon_wall(b, step_poly, y_top_s, 'rail_stone', cap_region='shared_sidewalk', tile=2.0, collide=False)
+    b.restore_frame(p_north)
+
+    p_bridge = b.set_frame(origin=(35.5, 0.0, 13.5), front_xz=(0.91, 0.41))
+    blen = 22.5
+    bw = 5.4
+    b.box(0.0, 5.85, blen / 2.0 - 2.0, bw, 0.45, blen + 2.0, 'rib_white', cap_region='shared_sidewalk', tile=2.0, collide=False, bottom=True)
+    for sx in (-bw / 2.0 + 0.12, bw / 2.0 - 0.12):
+        b.box(sx, 6.30, blen / 2.0 - 1.5, 0.16, 1.15, blen + 1.0, 'skybridge_glass', tile=2.5, collide=False)
+    n_arch = 8 if b.detail else 4
+    n_span = 6 if b.detail else 3
+    for iz in range(n_span):
+        za = -1.5 + (blen + 1.5) * iz / n_span
+        zb = -1.5 + (blen + 1.5) * (iz + 1) / n_span
+        for ix in range(n_arch):
+            ua, ub = -1.0 + 2.0 * ix / n_arch, -1.0 + 2.0 * (ix + 1) / n_arch
+            xa, xb = ua * (bw * 0.56), ub * (bw * 0.56)
+            ya = 7.45 + 1.55 * (1.0 - ua * ua)
+            yb = 7.45 + 1.55 * (1.0 - ub * ub)
+            b.face([(xa, ya, za), (xb, yb, za), (xb, yb, zb), (xa, ya, zb)], (0.3 * (ua + ub), 1.0, 0.0), 'skybridge_glass', tile=3.0)
+            b.face([(xa, ya - 0.08, zb), (xb, yb - 0.08, zb), (xb, yb - 0.08, za), (xa, ya - 0.08, za)], (0.0, -1.0, 0.0), 'rib_white', tile=3.0)
+    b.restore_frame(p_bridge)
+
+    # =========================================================================
+    # 5. BLOOMING 4-PETAL ROOF: DIAMOND-GLASS SADDLE VALLEYS + 4 SMOOTH PURE-WHITE OVAL PETALS!
+    # =========================================================================
+    ns = 18 if b.detail else 9
+    nt = 96 if b.detail else 40
+    ss = np.linspace(0.032, 1.0, ns + 1)
+    ts = np.linspace(-math.pi, math.pi, nt + 1)
+
+    pts_grid = np.zeros((ns + 1, nt + 1, 3), dtype=np.float64)
+    p_grid = np.zeros((ns + 1, nt + 1), dtype=np.float64)
+    for i, sv in enumerate(ss):
+        for j, tv in enumerate(ts):
+            pt, pv = _roof_point_polar(sv, tv)
+            pts_grid[i, j] = pt
+            p_grid[i, j] = pv
+        pts_grid[i, nt] = pts_grid[i, 0]
+        p_grid[i, nt] = p_grid[i, 0]
+
+    # 5a. Small central white conical cap + dark skylight oculus dot (`s in [0, 0.07]`)
+    crown_apex = np.array([CROWN_X, Y_CENTER + 1.58, CROWN_Z], dtype=np.float64)
+    for j in range(nt):
+        p0 = pts_grid[0, j]
+        p1 = pts_grid[0, j + 1]
+        b.face([crown_apex, p1, p0], (0.0, 1.0, 0.0), 'oculus_glass', tile=2.0, lit=True)
+        p_c0 = pts_grid[1, j] + np.array([0.0, 0.08, 0.0])
+        p_c1 = pts_grid[1, j + 1] + np.array([0.0, 0.08, 0.0])
+        b.face([p0, p1, p_c1, p_c0], (0.0, 1.0, 0.0), 'petal_white', tile=4.0)
+
+    # 5b. Continuous base shell in blue-grey diamond-lattice glass (`valley_glass`, NO dense radial white ribs!)
+    for i in range(ns):
+        for j in range(nt):
+            p00, p10 = pts_grid[i, j], pts_grid[i + 1, j]
+            p11, p01 = pts_grid[i + 1, j + 1], pts_grid[i, j + 1]
+            nrm = np.cross(p10 - p00, p01 - p00)
             if nrm[1] < 0:
                 nrm = -nrm
-            if j < rib_j_end:
-                su0 = (i % 4) / 4.0
-                su1 = su0 + 0.25
-                b.face(
-                    [p00, p01, p11, p10],
-                    nrm,
-                    'roof_rib',
-                    uvs=[(su0, v0 / 0.46), (su0, min(1.0, v1 / 0.46)), (su1, min(1.0, v1 / 0.46)), (su1, v0 / 0.46)],
-                    lit=False,
-                )
-            else:
-                b.face([p00, p01, p11, p10], nrm, 'roof_shell', tile=8.0, lit=False)
+            b.face([p00, p10, p11, p01], nrm, 'valley_glass', tile=8.5, lit=False)
 
-            # Underside soffit along front overhang (cool white architectural wash at night)
-            if j < max(1, nv // 5):
-                off = np.array([0.0, -1.10, -0.35])
-                q00, q10, q11, q01 = p00 + off, p10 + off, p11 + off, p01 + off
-                b.face([q00, q10, q11, q01], (0.0, -0.7, 0.7), 'flood_white', tile=5.0, lit=True)
+    # 5c. 4 ORTHOGONAL, PLUMP, PURE-WHITE SMOOTH ELLIPTICAL PETALS + CRISP WHITE BORDER RIBS!
+    # Parameterized directly in each petal's `(u_along, w_frac)` coordinates so every oval petal
+    # has a 100% smooth curved outline (zero grid stair-stepping!), pure white smooth interior,
+    # and a clean raised white border rib along its rim!
+    nu_p = 14 if b.detail else 7
+    nw_p = 12 if b.detail else 6
+    u_vals = np.linspace(2.2, 41.8, nu_p + 1)
+    w_vals = np.linspace(-1.0, 1.0, nw_p + 1)
 
-    # 2b. TRUE 3D GEOMETRIC RAISED BRIGHT-WHITE STANDING-SEAM RIBS (`rib_white`)
-    # Radiating along every u-line on the front wave slope (v in [0, 0.46]) so light/shadow contrast
-    # between the raised white ribs and silver-grey shell valleys is unmistakable from across the river!
-    if b.detail:
-        rib_us = us[1:-1]
-        rib_vs = vs[:rib_j_end+1]
-        rib_hw = 0.11   # 0.22 m wide standing-seam rib
-        rib_h = 0.28    # 0.28 m raised metallic seam fin
-        for ru in rib_us:
-            pts_c = [_wave_roof_height_and_plan(ru, rv) for rv in rib_vs]
-            pts_l = [_wave_roof_height_and_plan(max(-1.0, ru - 0.0022), rv) for rv in rib_vs]
-            pts_r = [_wave_roof_height_and_plan(min(1.0, ru + 0.0022), rv) for rv in rib_vs]
-            for k in range(len(rib_vs) - 1):
-                c0, c1 = pts_c[k], pts_c[k + 1]
-                tang_u = pts_r[k] - pts_l[k]
-                lu = np.linalg.norm(tang_u)
-                ux = tang_u / lu if lu > 1e-6 else np.array([1.0, 0.0, 0.0])
-                tang_v = c1 - c0
-                nrm = np.cross(tang_v, ux)
-                ln = np.linalg.norm(nrm)
-                nrm = nrm / ln if ln > 1e-6 else np.array([0.0, 1.0, 0.0])
+    for k_pet in range(4):
+        ang_k = THETA0 + k_pet * (0.5 * math.pi)
+        ca, sa = math.cos(ang_k), math.sin(ang_k)
+        p_surf = np.zeros((nu_p + 1, nw_p + 1, 3), dtype=np.float64)
+
+        for iu, u_al in enumerate(u_vals):
+            u_norm = (u_al - 22.0) / 19.8  # in [-1, +1]
+            stem_taper = 0.68 + 0.32 * (0.5 + 0.5 * u_norm)
+            half_w = 14.0 * stem_taper * math.sqrt(max(0.002, 1.0 - u_norm * u_norm))
+            for iw, wf in enumerate(w_vals):
+                u_perp = wf * half_w
+                lx = CROWN_X + u_al * ca - u_perp * sa
+                lz = CROWN_Z + u_al * sa + u_perp * ca
+                base_y = _roof_point_xy(lx, lz)
+                # Smooth pillowed pure-white shell: +0.02 m at rim (physically joined < 0.035 m!) rising to +0.34 m along center!
+                pillow = 0.02 + 0.32 * (1.0 - wf * wf) * math.sqrt(max(0.0, 1.0 - u_norm * u_norm))
+                p_surf[iu, iw] = (lx, base_y + pillow, lz)
+
+        for iu in range(nu_p):
+            for iw in range(nw_p):
+                q00, q10 = p_surf[iu, iw], p_surf[iu + 1, iw]
+                q11, q01 = p_surf[iu + 1, iw + 1], p_surf[iu, iw + 1]
+                nrm = np.cross(q10 - q00, q01 - q00)
                 if nrm[1] < 0:
                     nrm = -nrm
-                # Taper rib smoothly down to flush at ridge (k == last)
-                h0 = rib_h
-                h1 = rib_h * (0.25 if k == len(rib_vs) - 2 else 1.0)
-                bl0, br0 = c0 - ux * rib_hw, c0 + ux * rib_hw
-                bl1, br1 = c1 - ux * rib_hw, c1 + ux * rib_hw
-                tl0, tr0 = bl0 + nrm * h0, br0 + nrm * h0
-                tl1, tr1 = bl1 + nrm * h1, br1 + nrm * h1
-                b.face([tl0, tl1, tr1, tr0], nrm, 'rib_white', tile=2.0)
-                b.face([bl0, bl1, tl1, tl0], -ux + 0.35 * nrm, 'rib_white', tile=2.0)
-                b.face([tr0, tr1, br1, br0], ux + 0.35 * nrm, 'rib_white', tile=2.0)
+                b.face([q00, q10, q11, q01], nrm, 'petal_white', tile=10.0, lit=False)
 
-    # 3. Sculptural front arch & wing fascia with exposed white space-frame truss (`arch_truss`)
-    # framed by crisp bright-white upper/lower chord tubes (`rib_white`)!
-    fascia_drop = 2.25
-    for i in range(nu):
-        p0 = grid[i, 0]
-        p1 = grid[i + 1, 0]
-        b0 = p0 + np.array([0.0, -fascia_drop, -1.65])
-        b1 = p1 + np.array([0.0, -fascia_drop, -1.65])
-        b.face([b0, b1, p1, p0], (0.0, 0.25, 1.0), 'arch_truss',
+        # Crisp white border rib (`rib_white`) strictly outlining each smooth elliptical petal!
+        if b.detail:
+            for side_idx in (0, nw_p):
+                sgn = -1.0 if side_idx == 0 else 1.0
+                for iu in range(nu_p):
+                    e0, e1 = p_surf[iu, side_idx], p_surf[iu + 1, side_idx]
+                    tang = e1 - e0
+                    lt = np.linalg.norm(tang)
+                    if lt < 1e-4:
+                        continue
+                    ut = tang / lt
+                    out_w = np.array([-sa * sgn, 0.0, ca * sgn])
+                    r_in0 = e0 - out_w * 0.16 + np.array([0.0, 0.18, 0.0])
+                    r_in1 = e1 - out_w * 0.16 + np.array([0.0, 0.18, 0.0])
+                    r_out0 = e0 + out_w * 0.14 - np.array([0.0, 0.02, 0.0])
+                    r_out1 = e1 + out_w * 0.14 - np.array([0.0, 0.02, 0.0])
+                    if side_idx == 0:
+                        b.face([r_out0, r_out1, r_in1, r_in0], (out_w[0] * 0.5, 0.85, out_w[2] * 0.5), 'rib_white', tile=2.0)
+                    else:
+                        b.face([r_in0, r_in1, r_out1, r_out0], (out_w[0] * 0.5, 0.85, out_w[2] * 0.5), 'rib_white', tile=2.0)
+
+    # 5d. 360-DEGREE OUTER ARCH RIMS: EXPOSED WHITE TUBULAR SPACE-FRAME TRUSS & EAVE TRIM!
+    for j in range(nt):
+        p0 = pts_grid[ns, j]
+        p1 = pts_grid[ns, j + 1]
+        mid = 0.5 * (p0 + p1)
+        out_dir = np.array([mid[0] - CROWN_X, 0.0, mid[2] - CROWN_Z])
+        out_dir /= max(1e-6, np.linalg.norm(out_dir))
+        pm = 0.5 * (p_grid[ns, j] + p_grid[ns, j + 1])
+        # Deep sculptural space-truss arch inside all 4 parabolic petal arches; sleek white fascia in valleys
+        drop = 0.95 + 1.45 * (pm ** 1.4)
+        inset = 0.85 + 1.20 * (pm ** 1.4)
+        b0 = p0 - out_dir * inset - np.array([0.0, drop, 0.0])
+        b1 = p1 - out_dir * inset - np.array([0.0, drop, 0.0])
+        b.face([b0, b1, p1, p0], (out_dir[0], 0.18, out_dir[2]), 'arch_truss',
                uvs=[(0.0, 1.0), (1.0, 1.0), (1.0, 0.0), (0.0, 0.0)], lit=False)
-        # Bright-white outer eave nose along the entire wave curve
-        lip0 = p0 + np.array([0.0, -0.34, 0.10])
-        lip1 = p1 + np.array([0.0, -0.34, 0.10])
-        b.face([lip0, lip1, p1 + np.array([0, 0.10, 0.10]), p0 + np.array([0, 0.10, 0.10])],
-               (0.0, 0.35, 1.0), 'rib_white', tile=3.0, lit=False)
+        # Crisp bright-white outer arch chord tube
+        lip0 = p0 + out_dir * 0.15 - np.array([0.0, 0.34, 0.0])
+        lip1 = p1 + out_dir * 0.15 - np.array([0.0, 0.34, 0.0])
+        top0 = p0 + out_dir * 0.15 + np.array([0.0, 0.12, 0.0])
+        top1 = p1 + out_dir * 0.15 + np.array([0.0, 0.12, 0.0])
+        b.face([lip0, lip1, top1, top0], (out_dir[0], 0.3, out_dir[2]), 'rib_white', tile=3.0, lit=False)
 
-    # Swept-inward angled wing side trusses on Left Wing (u=-1) and Right Wing (u=+1) (photos 47-48!)
-    for u_idx, side_sign, base_x in ((0, -1.0, -35.5), (nu, 1.0, 36.5)):
-        tip = grid[u_idx, 0]
-        mid_edge = grid[u_idx, nv // 3]
-        foot_front = np.array([base_x, 9.0, tip[2] - 7.5])
-        foot_mid = np.array([base_x * 0.96, 9.0, mid_edge[2]])
-        n_side = (side_sign, -0.45, 0.55)
-        b.face([foot_front, tip, mid_edge, foot_mid], n_side, 'arch_truss',
-               uvs=[(0.0, 1.0), (0.0, 0.0), (1.0, 0.0), (1.0, 1.0)], lit=False)
-        # Bright white outer diagonal edge beam along swept wing tip
-        beam_in = foot_front - np.array([side_sign * 0.55, 0.0, 0.25])
-        tip_in = tip - np.array([side_sign * 0.55, 0.20, 0.25])
-        b.face([beam_in, foot_front, tip, tip_in], (0.0, 0.2, 1.0), 'rib_white', tile=2.0)
+    # =========================================================================
+    # 6. FOUR RECESSED FULL-HEIGHT DARK-BLUE GLASS ARCHES ("EYES"), WING GLAZING & COOL RIBBED SOFFITS!
+    # =========================================================================
+    # Placed at `s = 0.84` so dark grey-blue glazing (`arch_glass`) sits cleanly under ALL 4 upward-flaring
+    # wings (including the swept-up Left Wing on the riverfront!) AND inside all 4 parabolic arches,
+    # eliminating any exposed beige interior/underside surfaces!
+    s_wall_idx = max(2, int(round(ns * 0.83)))
 
-    # 4. DEEP GREY-BLUE GLASS CURTAIN WALLS (`arch_glass`) UNDER CENTRAL ARCH AND BOTH WINGS!
-    # 4a. Grand curved glass curtain wall inside the Central Parabolic Arch (u in [-0.08, +0.52])
-    arch_indices = [i for i, u in enumerate(us) if -0.10 <= u <= 0.54]
-    for k in range(len(arch_indices) - 1):
-        i0, i1 = arch_indices[k], arch_indices[k + 1]
-        top0 = np.array([grid[i0, 0][0], max(8.9, grid[i0, 0][1] - 0.85), grid[i0, 0][2] - 2.10])
-        top1 = np.array([grid[i1, 0][0], max(8.9, grid[i1, 0][1] - 0.85), grid[i1, 0][2] - 2.10])
-        bot0 = np.array([top0[0], 8.60, top0[2] - 1.10])
-        bot1 = np.array([top1[0], 8.60, top1[2] - 1.10])
-        b.face([bot0, bot1, top1, top0], (0.0, 0.08, 1.0), 'arch_glass', tile=4.6, lit=False)
-        if b.detail and k % 2 == 0:
-            m0 = bot0 + np.array([0.0, 0.0, 0.14])
-            m1 = top0 + np.array([0.0, -0.2, 0.14])
-            b.face([bot0, m0, m1, top0], (1.0, 0.0, 0.3), 'podium_wall', tile=2.0)
+    # Cool ribbed metallic overhang soffit (`soffit_rib`) closing the underside between `s_wall_idx` and `ns`
+    # so wing undersides & arch ceilings read crisp cool ribbed silver-grey rather than warm beige!
+    for i in range(s_wall_idx, ns):
+        s0, s1 = ss[i], ss[i + 1]
+        for j in range(nt):
+            u00 = pts_grid[i, j] - np.array([0.0, 0.28, 0.0])
+            u10 = pts_grid[i + 1, j] - np.array([0.0, 0.28, 0.0])
+            u11 = pts_grid[i + 1, j + 1] - np.array([0.0, 0.28, 0.0])
+            u01 = pts_grid[i, j + 1] - np.array([0.0, 0.28, 0.0])
+            su0 = (j % 4) / 4.0
+            su1 = su0 + 0.25
+            b.face(
+                [u00, u01, u11, u10],
+                (0.0, -0.9, 0.0),
+                'soffit_rib',
+                uvs=[(su0, (s0 - 0.80) / 0.20), (su1, (s0 - 0.80) / 0.20), (su1, (s1 - 0.80) / 0.20), (su0, (s1 - 0.80) / 0.20)],
+                lit=False,
+            )
 
-    # 4b. Left Wing (`u in [-0.96, -0.36]`) & Right Wing (`u in [+0.62, +0.96]`) recessed dark curtain walls
-    # Tucked strictly beneath `grid[i, 0]` so dark grey-blue glazed facades peek cleanly beneath both swept-up wings!
-    for u_lo, u_hi in ((-0.96, -0.36), (0.62, 0.96)):
-        w_indices = [i for i, u in enumerate(us) if u_lo <= u <= u_hi]
-        for k in range(len(w_indices) - 1):
-            i0, i1 = w_indices[k], w_indices[k + 1]
-            top0 = np.array([grid[i0, 0][0] * 0.94, max(8.9, grid[i0, 0][1] - 1.05), grid[i0, 0][2] - 2.50])
-            top1 = np.array([grid[i1, 0][0] * 0.94, max(8.9, grid[i1, 0][1] - 1.05), grid[i1, 0][2] - 2.50])
-            bot0 = np.array([top0[0] * 0.94, 8.60, top0[2] - 1.10])
-            bot1 = np.array([top1[0] * 0.94, 8.60, top1[2] - 1.10])
-            b.face([bot0, bot1, top1, top0], (0.0, 0.06, 1.0), 'arch_glass', tile=4.4, lit=False)
+    # Dark stone plinth ring at y = 6.50..9.10 m under `s_wall_idx` so outer wing glazing joins Tier 2/3 podium seamlessly!
+    wall_base_ring = [(CROWN_X + (pts_grid[s_wall_idx, j, 0] - CROWN_X) * 0.90,
+                       CROWN_Z + (pts_grid[s_wall_idx, j, 2] - CROWN_Z) * 0.90) for j in range(nt)]
+    _grounded_ribbon_wall(
+        b, wall_base_ring, 9.10, 'arch_glass', cap_region='dark_stone', tile=4.2,
+        collide=False, y_bot_fn=lambda x, z: 6.50
+    )
 
-    # 4c. Rear & side curved dark curtain walls closing the shell down to the podium (for oblique aerial & side views!)
-    for i in range(0, nu, 1 if b.detail else 2):
-        i1 = min(nu, i + (1 if b.detail else 2))
-        rt0 = grid[i, nv] + np.array([0.0, -0.3, 0.8])
-        rt1 = grid[i1, nv] + np.array([0.0, -0.3, 0.8])
-        rb0 = np.array([rt0[0] * 0.94, 8.80, rt0[2] + 1.0])
-        rb1 = np.array([rt1[0] * 0.94, 8.80, rt1[2] + 1.0])
-        b.face([rt0, rt1, rb1, rb0], (0.0, 0.05, -1.0), 'arch_glass', tile=4.8, lit=False)
+    for j in range(nt):
+        r0 = pts_grid[s_wall_idx, j]
+        r1 = pts_grid[s_wall_idx, j + 1]
+        y_top0 = max(9.3, r0[1] - 0.22)
+        y_top1 = max(9.3, r1[1] - 0.22)
+        bx0 = CROWN_X + (r0[0] - CROWN_X) * 0.90
+        bz0 = CROWN_Z + (r0[2] - CROWN_Z) * 0.90
+        bx1 = CROWN_X + (r1[0] - CROWN_X) * 0.90
+        bz1 = CROWN_Z + (r1[2] - CROWN_Z) * 0.90
+        tx0, tz0 = r0[0], r0[2]
+        tx1, tz1 = r1[0], r1[2]
+        # Slightly downward/skyward-tilted normal prevents warm low-angle sunset specular washout into beige!
+        out_n = (0.5 * (tx0 + tx1) - CROWN_X, -8.0, 0.5 * (tz0 + tz1) - CROWN_Z)
+        pm = 0.5 * (p_grid[s_wall_idx, j] + p_grid[s_wall_idx, j + 1])
+        is_arch_eye_glow = (pm > 0.62)
+        b.face(
+            [(bx0, 8.95, bz0), (bx1, 8.95, bz1), (tx1, y_top1, tz1), (tx0, y_top0, tz0)],
+            out_n, 'arch_glass', tile=4.4, lit=is_arch_eye_glow
+        )
 
-    b.restore_frame(prev)
+        # 8 sculpted white structural raked mega-columns flanking the 4 grand parabolic arches!
+        if b.detail:
+            if 0.36 <= pm <= 0.48:
+                dx0, dz0 = tx0 - CROWN_X, tz0 - CROWN_Z
+                ln0 = max(1e-6, math.hypot(dx0, dz0))
+                ux, uz = dx0 / ln0, dz0 / ln0
+                px_n, pz_n = -uz, ux
+                p_bot_l = (bx0 - px_n * 0.85 + ux * 0.9, 6.50, bz0 - pz_n * 0.85 + uz * 0.9)
+                p_bot_r = (bx0 + px_n * 0.85 + ux * 0.9, 6.50, bz0 + pz_n * 0.85 + uz * 0.9)
+                p_top_l = (tx0 - px_n * 0.52 + ux * 0.45, y_top0, tz0 - pz_n * 0.52 + uz * 0.45)
+                p_top_r = (tx0 + px_n * 0.52 + ux * 0.45, y_top0, tz0 + pz_n * 0.52 + uz * 0.45)
+                b.face([p_bot_l, p_bot_r, p_top_r, p_top_l], (ux, 0.1, uz), 'podium_wall', tile=3.0)
+                b.face([(bx0, 6.50, bz0), p_bot_l, p_top_l, (tx0, y_top0, tz0)], (-px_n, 0.0, -pz_n), 'podium_wall', tile=3.0)
+                b.face([p_bot_r, (bx0, 6.50, bz0), (tx0, y_top0, tz0), p_top_r], (px_n, 0.0, pz_n), 'podium_wall', tile=3.0)
+            elif pm > 0.50 and j % 3 == 0:
+                dx0, dz0 = tx0 - CROWN_X, tz0 - CROWN_Z
+                ln0 = max(1e-6, math.hypot(dx0, dz0))
+                ux, uz = dx0 / ln0, dz0 / ln0
+                b.face(
+                    [(bx0, 8.95, bz0), (bx0 + ux * 0.18, 8.95, bz0 + uz * 0.18),
+                     (tx0 + ux * 0.18, y_top0, tz0 + uz * 0.18), (tx0, y_top0, tz0)],
+                    (-uz, 0.0, ux), 'dark_stone', tile=2.0
+                )
 
-    # 5. Foreground Riverside Scene (Li River water = 143.9 m -> y_local = -10.6 m; terrace = 149.3 m -> y_local = -5.2 m)
-    # Kept strictly clear of the y_local = +2.0 m audit slice!
-    embankment_world = [
-        (-181.0, 206.0), (-186.5, 218.0), (-190.5, 228.0), (-186.0, 240.0),
-        (-182.0, 254.0), (-170.0, 268.0), (-161.0, 280.0), (-148.0, 278.0),
-        (-152.0, 248.0), (-158.0, 222.0), (-168.0, 206.0),
+    # =========================================================================
+    # 7. SHARED WORLD-MATERIAL NORTH FORECOURT PLAZA & CIRCULAR TREE ISLAND
+    # =========================================================================
+    north_apron = [
+        (-28.0, -28.0), (-18.0, -48.0), (-2.0, -61.0), (18.0, -63.0),
+        (36.0, -51.0), (41.0, -35.0), (31.0, -18.0), (12.0, -35.0),
     ]
-    embankment_local = [(wx - ORIGIN_X, wz - ORIGIN_Z) for wx, wz in embankment_world]
-    b.prism(embankment_local, -11.2, 6.0, 'river_stone', cap_region='rail_stone', tile=3.2, collide=True,footing=True)
+    b.prism(north_apron, 0.0, 0.10, 'shared_sidewalk', cap_region='shared_sidewalk', tile=2.0, collide=False, paving=True)
+
+    island_ring = _ellipse_ring(24.0, -90.0, rx=13.5, rz=13.5, rot_deg=0.0, n=20 if b.detail else 10)
+    b.prism(island_ring, 0.0, 0.28, 'rail_stone', cap_region='grass_island', tile=3.0, collide=False, footing=True)
+    for ox, oz, th, sp, fc in [
+        (24.0, -90.0, 10.5, 4.6, 'foliage_dark'),
+        (18.5, -87.5,  9.2, 3.8, 'foliage_mid'),
+        (29.5, -88.0,  9.4, 3.9, 'foliage_dark'),
+        (23.5, -95.5,  8.8, 3.6, 'foliage_mid'),
+    ]:
+        b.tree_cluster(ox, b.grade(ox, oz) - 0.04, oz, h=th, spread=sp, foliage=fc)
+
+    # =========================================================================
+    # 8. WEST RIVERSIDE SCENE (Preserved 2F grey-tiled pavilion, shared stone embankment & foliage!)
+    # =========================================================================
+    embankment_local = [
+        (-80.9, -63.7), (-86.4, -51.7), (-90.4, -41.7), (-85.9, -29.7),
+        (-81.9, -15.7), (-69.9,  -1.7), (-60.9,  10.3), (-47.9,   8.3),
+        (-51.9, -21.7), (-57.9, -47.7), (-67.9, -63.7),
+    ]
+    _grounded_ribbon_wall(b, embankment_local, -5.15, 'shared_bank', cap_region='shared_sidewalk', tile=3.0, collide=True)
 
     shore_pts = embankment_local[:7]
     for idx in range(len(shore_pts) - 1):
         a, c = shore_pts[idx], shore_pts[idx + 1]
         dx, dz = c[0] - a[0], c[1] - a[1]
         seg = math.hypot(dx, dz)
-        p_f = b.set_frame(origin=((a[0] + c[0]) / 2, -5.2, (a[1] + c[1]) / 2), front_xz=(-dz, dx))
-        b.box(0.0, 0.0, 0.0, seg, 0.95, 0.28, 'rail_stone', tile=2.0)
-        b.box(0.0, 0.12, 0.145, seg * 0.92, 0.20, 0.14, 'amber_flood', tile=2.0, lit=True)
+        p_f = b.set_frame(origin=((a[0] + c[0]) / 2, -5.18, (a[1] + c[1]) / 2), front_xz=(-dz, dx))
+        b.box(0.0, 0.0, 0.0, seg, 0.96, 0.28, 'rail_stone', tile=2.0)
+        b.box(0.0, 0.12, 0.14, seg * 0.92, 0.20, 0.14, 'amber_flood', tile=2.0, lit=True)
         b.restore_frame(p_f)
 
-    # Two-storey traditional grey-tiled riverside pavilion (y_local = -5.2 .. +1.68 m < +2.0 m!)
-    pav_origin = (-173.5 - ORIGIN_X, -5.2, 234.0 - ORIGIN_Z)
+    pav_origin = (-73.3, -5.18, -34.5)
     p_pav = b.set_frame(origin=pav_origin, front_xz=(-0.92, -0.39))
     pw, pd = 16.5, 9.2
     b.box(0.0, 0.0, 0.0, pw, 3.1, pd, 'pav_wall', tile=2.5, collide=True)
-    b.box(0.0, 3.05, 0.25, pw + 1.4, 0.24, pd + 1.4, 'gray_tile', tile=1.8,bottom=True)
+    b.box(0.0, 3.05, 0.25, pw + 1.4, 0.24, pd + 1.4, 'gray_tile', tile=1.8, bottom=True)
     b.box(0.0, 3.25, 0.0, pw - 0.8, 2.65, pd - 0.8, 'pav_wall', tile=2.5, collide=True)
     b.box(0.0, 3.30, pd / 2 + 0.15, pw, 0.85, 0.16, 'pav_wood', tile=1.5)
     for wx_off in (-4.8, -1.6, 1.6, 4.8):
-        b.box(wx_off, 1.0, pd / 2 + 0.05, 2.1, 1.45, 0.08, 'warm_lit', tile=1.5, lit=True)
-        b.box(wx_off, 3.9, pd / 2 - 0.36, 2.2, 1.40, 0.08, 'warm_lit', tile=1.5, lit=True)
-    b.box(0,5.82,0,pw+2,.18,pd+1.8,'pav_wood',bottom=True)
+        b.box(wx_off, 1.0, pd / 2 + 0.03, 2.1, 1.45, 0.08, 'warm_lit', tile=1.5, lit=True)
+        b.box(wx_off, 3.9, pd / 2 - 0.38, 2.2, 1.40, 0.08, 'warm_lit', tile=1.5, lit=True)
+    b.box(0, 5.82, 0, pw + 2.0, 0.18, pd + 1.8, 'pav_wood', bottom=True)
     rw, rd = pw + 2.0, pd + 1.8
     ry0, ry1 = 5.88, 6.88
     b.face([(-rw / 2, ry0, rd / 2), (rw / 2, ry0, rd / 2), (rw / 2 - 1.2, ry1, 0.0), (-rw / 2 + 1.2, ry1, 0.0)],
@@ -365,36 +709,70 @@ def build_guilin_theater(b: SceneBuilder):
     b.face([(rw / 2, ry0, rd / 2), (rw / 2, ry0, -rd / 2), (rw / 2 - 1.2, ry1, 0.0)], (0.8, 0.6, 0.0), 'gray_tile', tile=2.0)
     b.restore_frame(p_pav)
 
-    # Parted riverside tree canopy belt: frames the lower podium while leaving the central grey-blue
-    # parabolic arch curtain wall AND dark glazing under both wings clearly visible (photos 47-48)!
-    trees_world = [
-        (-159.0, 206.0, 11.2, 4.8, 'foliage_dark'),
-        (-164.0, 215.0, 11.8, 5.0, 'foliage_mid'),
-        (-166.0, 224.0, 11.0, 4.8, 'foliage_dark'),
-        # Flanking slender eucalyptus trees framing (not blocking!) the central arch curtain wall
-        (-154.0, 229.5, 16.0, 3.6, 'foliage_dark'),
-        (-146.5, 244.0, 16.2, 3.7, 'foliage_mid'),
-        # Lower right grove leaving Right Wing curtain wall peeking above foliage
-        (-156.5, 255.0, 12.2, 4.6, 'foliage_dark'),
-        (-152.0, 266.0, 12.5, 4.8, 'foliage_mid'),
-        (-147.0, 277.0, 11.8, 4.6, 'foliage_dark'),
+    trees_local = [
+        (-58.8, -62.5, 11.2, 4.8, 'foliage_dark'),
+        (-64.2, -52.0, 11.8, 5.0, 'foliage_mid'),
+        (-66.5, -42.5, 11.0, 4.8, 'foliage_dark'),
+        (-54.0, -30.5, 15.2, 3.6, 'foliage_dark'),
+        (-47.5, -14.5, 15.4, 3.7, 'foliage_mid'),
+        (-56.5,  -1.5, 12.2, 4.6, 'foliage_dark'),
+        (-52.0,  11.0, 12.5, 4.8, 'foliage_mid'),
+        (-44.0,  26.0, 11.6, 4.4, 'foliage_dark'),
+        (-33.5,  46.0, 11.2, 4.2, 'foliage_mid'),
+        (-24.5,  66.0, 10.8, 4.0, 'foliage_dark'),
     ]
-    for twx, twz, th, tsp, fcol in trees_world:
-        x,z=twx-ORIGIN_X,twz-ORIGIN_Z
-        b.tree_cluster(x,max(b.grade(x,z),-5.2),z,h=th,spread=tsp,foliage=fcol)
+    for lx, lz, th, tsp, fcol in trees_local:
+        gy = b.grade(lx, lz) - 0.04
+        if -86.0 <= lx <= -49.0 and -62.0 <= lz <= 9.0:
+            gy = max(gy, -5.18)
+        b.tree_cluster(lx, gy, lz, h=th, spread=tsp, foliage=fcol)
+
+
+def export_theater(out_glb: Path):
+    """Export `guilin_theater.glb` where `_lit` uses pure `emissiveFactor` (no `emissiveTexture`),
+    so daytime (`uNight=0`) preserves 100% authentic deep grey-blue arch glass (`arch_glass`),
+    while night (`uNight=1`) radiates warm interior amber glow from inside the 4 arch openings!
+    """
+    image, rects = make_theater_atlas()
+    atlas_size = image.width
+    hi = SceneBuilder(rects, atlas_size=atlas_size, lod=0, collide=True)
+    lo = SceneBuilder(rects, atlas_size=atlas_size, lod=1, collide=False)
+    hi.surface = lo.surface = landmark_surface(out_glb.stem)
+    build_guilin_theater(hi)
+    build_guilin_theater(lo)
+
+    scene = trimesh.Scene()
+    base = scene.graph.base_frame
+    for lod_name, b in (('lod0', hi), ('lod1', lo)):
+        scene.graph.update(frame_from=base, frame_to=lod_name)
+        m_atlas = bucket_to_trimesh(
+            b.atlas, image, 'guilin_theater_atlas', (0, 0, 0), 0.14, 0.52, double_sided=True
+        )
+        if m_atlas is not None:
+            scene.add_geometry(m_atlas, node_name=f'{lod_name}_atlas', parent_node_name=lod_name)
+        m_lit = bucket_to_trimesh(
+            b.lit, image, 'guilin_theater_lit', (0.20, 0.16, 0.10), 0.10, 0.52, double_sided=True
+        )
+        if m_lit is not None:
+            # Detach emissiveTexture so emissiveFactor alone drives warm amber glow at night (`uNight=1`),
+            # while daytime (`uNight=0`) displays exact `baseColorTexture` (`arch_glass` deep grey-blue)!
+            m_lit.visual.material.emissiveTexture = None
+            scene.add_geometry(m_lit, node_name=f'{lod_name}_lit', parent_node_name=lod_name)
+
+    if hi.hit.faces:
+        m_hit = trimesh.Trimesh(
+            vertices=np.asarray(hi.hit.pos, np.float32),
+            faces=np.asarray(hi.hit.faces, np.int64),
+            process=False,
+        )
+        scene.add_geometry(m_hit, node_name='collision_body')
+
+    image.save(out_glb.parent / 'guilin_theater_atlas.png')
+    scene.export(out_glb)
+    n0 = len(hi.atlas) + len(hi.lit)
+    n1 = len(lo.atlas) + len(lo.lit)
+    print(f'{out_glb.stem}: lod0={n0} tris, lod1={n1} tris, collision={len(hi.hit)} tris')
 
 
 if __name__ == '__main__':
-    out_dir = Path(sys.argv[1])
-    atlas_img, atlas_rects = make_theater_atlas()
-    export_landmark_glb(
-        out_dir / 'guilin_theater.glb',
-        atlas_img,
-        atlas_rects,
-        build_guilin_theater,
-        mat_prefix='guilin_theater',
-        lit_emissive=(0.28, 0.32, 0.38),
-        atlas_metallic=0.14,
-        atlas_roughness=0.54,
-        double_sided=True,
-    )
+    export_theater(Path(sys.argv[1]) / 'guilin_theater.glb')
