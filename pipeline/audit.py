@@ -399,7 +399,9 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                     lm_walk_polys.append(p2.buffer(0))
     lm_walk_tris_arr = np.asarray(lm_walk_tris) if lm_walk_tris else np.zeros((0, 3, 3))
     lm_walk_tree = STRtree(lm_walk_polys) if lm_walk_polys else None
-    u_lm_walk = unary_union(lm_walk_polys) if lm_walk_polys else Polygon()
+    # Projected edges of adjacent packed triangles can differ below GL04 precision.
+    # Snap the coverage union to a millimetre; height queries still use the original triangles.
+    u_lm_walk = union_all(lm_walk_polys, grid_size=.001) if lm_walk_polys else Polygon()
 
     def lm_walk_y_at(x: float, z: float, ref_y: float | None = None) -> float | None:
         if not lm_walk_tree:
