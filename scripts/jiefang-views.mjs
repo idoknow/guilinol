@@ -5,20 +5,23 @@ import {chromium} from 'playwright'
 const output = process.argv[2] ?? 'captures/jiefang'
 await mkdir(output, {recursive:true})
 const views = [
+  ['south-seam', [-142,2.55,128], [-156,4.1,183],14],
+  ['north-seam', [-124,2.55,-128], [-124.5,4.1,-183],14],
   ['35', [-135,2.75,-103], [-178,4,-99],19.1],
-  ['36', [-132,2.75,-98], [-80,4,-44],19.1],
+  ['36', [-152, 2.75, -108], [-112, 4, -68], 19.1],
   ['38', [-118,2.7,-46], [-163,14,-136],19.1],
   ['39', [-124,2.7,-99], [-161,9,-115],19.1],
-  ['40', [-113,2.73,24], [-115,3.7,59],19.1],
+  ['40', [-117.2, 2.78, -88], [-121.6, 4.9, -73], 19.1],
   ['44', [-122,2.7,40], [-128,5,0],19.1],
-  ['45', [-92,3.3,50], [-99,4.9,76],19.1],
+  ['45', [-119, 2.77, 40], [-124, 5.6, 51], 19.1],
+  ['overview', [-257,143,0], [-125,1,0],17.4],
   ['interchange', [-51,106,67], [-166,2,0],14],
   ['plan', [-162,260,0], [-162,1,0],14],
-  ['37', [-126,2.85,36.8], [-109.5,4.6,36.8], 19.1],
-  ['41', [-96,3.4,-66.4], [-6,4.8,0], 19.1],
-  ['42', [-115.8,2.83,21.8], [-110.3,5.5,31.5], 19.1],
-  ['43', [-116.2,2.48,-3], [-109.4,3.95,36.8], 19.1],
-  ['49', [-96,3.4,66.4], [-6,4.8,0], 19.1],
+  ['37', [-138, 2.75, -64], [-114.25, 4.5, -64], 19.1],
+  ['41', [-113.2, 2.75, -90.1], [-93.85, 5.69, -55.09], 19.1],
+  ['42', [-116.5, 2.78, -91], [-116.1, 5.3, -75], 19.1],
+  ['43', [-117, 2.48, -3], [-120.5, 3.8, 50.85], 19.1],
+  ['49', [-128.0, 2.75, 92.7], [-101.21, 3.1, 62.99], 19.1],
   ['58', [10,7.45,-18], [-125,6.65,-18], 20.3],
   ['60', [98,7.15,-20], [-145,30,-714], 20.3],
   ['elevation', [0,3,85], [0,3,0], 19.1],
@@ -31,9 +34,9 @@ try {
   const page = await browser.newPage({viewport:{width:960,height:600}})
   for (const [name,eye,target,hour] of views) {
     if(process.argv.length>3 && !process.argv.slice(3).includes(name))continue
-    const portrait=['35','38','40','42','43','44','45','58'].includes(name)
-    await page.setViewportSize(['interchange','plan'].includes(name)?{width:1440,height:950}:name==='elevation'?{width:1280,height:280}:portrait?{width:570,height:760}:{width:960,height:720})
-    await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&radius=768&weather=${['60','interchange','plan'].includes(name)?'clear':'mist'}&time=${hour}`)
+    const portrait=['35','38','42','43','44','58'].includes(name)
+    await page.setViewportSize(['interchange','plan','overview'].includes(name)?{width:1440,height:950}:name==='elevation'?{width:1280,height:280}:portrait?{width:570,height:760}:{width:960,height:720})
+    await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&radius=768&weather=${['60','interchange','plan','overview'].includes(name)?'clear':'mist'}&time=${hour}`)
     await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
     await page.addStyleTag({content:'body > :not(canvas) { visibility:hidden!important }'})
     await page.evaluate(([eye,target,name])=>{

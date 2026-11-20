@@ -9,7 +9,7 @@ from shapely.geometry import LineString, box
 
 from common import ll2xz, load_osm
 from features import points
-from landmarks.jiefang_layout import OSM, RAMPS, UPPER_ROADS, LOWER_ROADS, FOOTWAYS, SIDE_ROAD, section, widths, libin_levels
+from landmarks.jiefang_layout import site_limit, OSM, RAMPS, UPPER_ROADS, LOWER_ROADS, FOOTWAYS, SIDE_ROAD, section, widths, libin_levels
 
 root=Path(__file__).resolve().parent.parent
 landmark=next(x for x in json.loads((root/'pipeline/landmarks.json').read_text()) if x['id']=='jiefang_bridge')
@@ -23,7 +23,8 @@ for el in load_osm():
             assert el['tags']['highway']=='primary_link' and el['tags']['oneway']=='yes',el['id']
         coords=(np.array(points(el))-origin)@inverse
         if el['id'] in (258909993,259020569,1531308428,1531308427,675174045,1382486210,1382486212):
-            coords=np.asarray(LineString(coords).intersection(box(-265,-120,-65,120)).coords)
+            limit=site_limit(el["id"])
+            coords=np.asarray(LineString(coords).intersection(box(-265,-limit,-65,limit)).coords)
         assert np.max(np.linalg.norm(OSM[el['id']]-coords,axis=1))<.001,el['id']
         sources[el['id']]=LineString(coords)
 assert sources.keys()==OSM.keys()

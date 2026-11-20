@@ -72,7 +72,7 @@ try {
       }
       // Follow OSM directions on all four links, including the westbound merge.
       const riding=mode==='ride'
-      const bank=ways[1531308428]
+      const bank=[...ways[1531308427].slice(0,-1),...ways[1531308428]]
       function binjiang(z,part) {
         for(let i=1;i<bank.length;i++){
           const [x0,z0]=bank[i-1],[x1,z1]=bank[i]
@@ -81,6 +81,15 @@ try {
           return
         }
         throw Error('Station outside Binjiang Road')
+      }
+      function crossBankSeam(side) {
+        const part=side>0?'south road seam':'north road seam'
+        const end=side>0?bank[0]:bank.at(-1)
+        const next=side>0?bank[1]:bank.at(-2)
+        const slope=(end[0]-next[0])/(end[1]-next[1])
+        for(const distance of [100,120,135,139])binjiang(side*distance,part)
+        reach(end[0]+side*5*slope+(riding?0:5.2),end[1]+side*5,part)
+        for(const distance of [139,135,120,100,94])binjiang(side*distance,part)
       }
       function link(id) {
         const line=ways[id]
@@ -112,6 +121,7 @@ try {
         }
       }
       for(const z of [-27,0,29,42,85,94])binjiang(z,z<=29?'underpass':'south bank')
+      crossBankSeam(1)
       link(258909977)
       const lane=riding?6:17.5
       reach(-143,lane,'upper entry')
@@ -121,6 +131,7 @@ try {
       reach(-184,-lane,'west approach')
       link(258909975)
       binjiang(-94,'north landing')
+      crossBankSeam(-1)
       link(258909976)
       // Follow the widening sidewalk through the transition to the native street.
       for(const [x,z] of [[-239,-17],[-253,-15],[-265,-12.7],[-272,-12.7],[-272,11.8],[-265,11.8],[-253,14],[-239,17]])

@@ -1,7 +1,7 @@
 """West-bank carriageways and pedestrian surfaces built from the OSM survey."""
 import numpy as np
 from shapely.geometry import LineString, Point
-from jiefang_layout import OSM, RAMPS, UPPER_ROADS, LOWER_ROADS, SIDE_ROAD, FOOTWAYS, LOWER, UPPER, section, widths, libin_levels
+from jiefang_layout import BANK_LIMIT, OSM, RAMPS, UPPER_ROADS, LOWER_ROADS, SIDE_ROAD, FOOTWAYS, LOWER, UPPER, section, widths, libin_levels
 
 
 def vertex(p,h):
@@ -30,6 +30,9 @@ def street(model,way):
         xy[np.argmax(xy[:,0]),0]=-139.9
     # Flush sidewalk ends avoid a kerb across any turning movement.
     curb=.12*np.clip(np.minimum(along,along[-1]-along)/5,0,1)
+    if way in LOWER_ROADS:
+        # The two OSM ways meet within the continuous sidewalk.
+        curb=.12*np.clip((BANK_LIMIT-abs(xy[:,1]))/5,0,1)
     if way in UPPER_ROADS+LOWER_ROADS:
         upper=way in UPPER_ROADS
         axis=0 if upper else 1
@@ -65,12 +68,12 @@ def street(model,way):
             dx,dz=n[i]*.075
             stripe=np.array([dx,0,dz])
             surface(model,[pa-stripe,pb-stripe],[pa+stripe,pb+stripe],'white' if way not in LOWER_ROADS else 'yellow',False)
-    if way==1531308428:
+    if way in LOWER_ROADS:
         # Low stone parapet and white handrail, with openings at the stair
         # landings and at the plaza crossing shown in photos 37 and 43.
         for i,(a,b) in enumerate(zip(outer,outer[1:])):
             z=xy[i:i+2,1].mean()
-            if abs(z)>45 or min(abs(z-v) for v in (-27,27,37,42))<3.5:continue
+            if min(abs(z-v) for v in (-94,-45,-27,27,42,45,91,100))<5:continue
             surface(model,[a,b],[a+[0,.50,0],b+[0,.50,0]],'stone',False)
             model.beam(a+[0,.86,0],b+[0,.86,0],.065,'white',6)
             model.box(a[0],a[1]+.49,a[2],.10,.4,.10,'white')
