@@ -191,9 +191,14 @@ def west_bank(model):
             half=spacing+1.15
             center=-side*middle
             model.pose=(0,0,0,0)
-            landing(center-half,center+half,.45)
-            for end in (-1,1):
-                edge=center+end*half
+            lo,hi=center-half,center+half
+            # Trim the bridge-facing lip to keep all three treads outside the
+            # surveyed stair-exit pavement, including at the south sidewalk bend.
+            if middle==34.5:
+                if center<0: hi-=.22
+                else: lo+=.22
+            landing(lo,hi,.45)
+            for end,edge in ((-1,lo),(1,hi)):
                 for step in (2,1):
                     tip=edge+end*.36
                     landing(min(edge,tip),max(edge,tip),.15*step)
