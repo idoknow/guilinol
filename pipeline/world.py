@@ -275,8 +275,15 @@ def build(bbox, output, palette):
         lm_y = lm_elevation(x, z, entry)
         item = dict(position=[x, lm_y, z], **entry)
         if entry['id'] == 'guilin_theater':
-            from landmarks.guilin_theater import OSM_WORLD_PTS
-            item['solid'] = [[round(lm_y - 6.5, 2), round(lm_y + 12.6, 2), [[round(px, 2), round(pz, 2)] for px, pz in OSM_WORLD_PTS]]]
+            from landmarks.guilin_theater import LOCAL_FOOTPRINT, _ellipse_ring
+            rad = math.radians(entry.get('rotation', 0))
+            cos_r, sin_r = math.cos(rad), math.sin(rad)
+            bud_ring = _ellipse_ring(-0.50, 55.20, 14.8, 9.8, -6.0, 28)
+            item['solid'] = [
+                [round(lm_y - 6.5, 2), round(lm_y + 12.6, 2),
+                 [[round(x + lx * cos_r + lz * sin_r, 2), round(z - lx * sin_r + lz * cos_r, 2)] for lx, lz in ring]]
+                for ring in (LOCAL_FOOTPRINT, bud_ring)
+            ]
         landmarks.append(item)
     landmark_faces = list(landmark_triangles(landmarks))
     vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange)
