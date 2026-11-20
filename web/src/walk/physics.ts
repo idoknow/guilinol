@@ -149,9 +149,10 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const landmarks=new Map<THREE.Group,R.Collider[]>()
   function sync(east:number,south:number){
     let changed=false
+    const collisionRadius=Math.min(cfg.collisionRadius,Math.max(192,stream.radius))
     const nearLandmarks=new Set<THREE.Group>()
     for(const [entry,root] of stream.landmarks){
-      if(entry.collision==='none'||Math.hypot(east-root.position.x,south-root.position.z)>cfg.collisionRadius+entry.sphere[3])continue
+      if(entry.collision==='none'||Math.hypot(east-root.position.x,south-root.position.z)>collisionRadius+entry.sphere[3])continue
       nearLandmarks.add(root);if(landmarks.has(root))continue
       const colliders:R.Collider[]=[]
       if(entry.collision==='box'){
@@ -190,7 +191,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     for(const [root,colliders] of landmarks)if(!nearLandmarks.has(root)){colliders.forEach(remove);landmarks.delete(root);changed=true}
     for(const [tree,collider] of trunks)if(Math.hypot(east-tree.x,south-tree.z)>48){remove(collider);trunks.delete(tree);changed=true}
     for(const tile of manifest.chunks){
-      const near=Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))<=cfg.collisionRadius
+      const near=Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))<=collisionRadius
       const data=stream.loaded.get(tile), region=regions.get(tile)
       const trees=stream.forest.loaded.get(tile)
       if(trees&&Math.max(Math.abs(east-tile.x-128),Math.abs(south-tile.z-128))<168)for(const tree of trees){

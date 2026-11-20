@@ -1,0 +1,276 @@
+/* 渲染范围轻量化配置入口与实时预览面板 · 青绿山水玻璃语言 */
+.render-entry {
+  position: fixed;
+  left: calc(10px + env(safe-area-inset-left));
+  top: calc(108px + env(safe-area-inset-top));
+  z-index: 5;
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: .1em;
+  color: #f4efe2;
+  background: rgba(28, 44, 42, .42);
+  border: 1px solid rgba(244, 239, 226, .38);
+  border-radius: 14px;
+  padding: 4px 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .15s, border-color .15s, transform .15s;
+}
+
+.render-entry:hover {
+  background: rgba(28, 44, 42, .64);
+}
+
+.render-entry:active {
+  background: rgba(169, 80, 60, .62);
+  transform: scale(.95);
+}
+
+.render-entry[aria-expanded="true"] {
+  background: rgba(169, 80, 60, .62);
+  border-color: rgba(244, 239, 226, .72);
+}
+
+.render-pop {
+  position: fixed;
+  left: calc(10px + env(safe-area-inset-left));
+  top: calc(140px + env(safe-area-inset-top));
+  z-index: 6;
+  width: 256px;
+  box-sizing: border-box;
+  padding: 12px 13px;
+  border-radius: 16px;
+  background: rgba(28, 44, 42, .76);
+  color: #f4efe2;
+  border: 1px solid rgba(244, 239, 226, .3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 14px 36px rgba(12, 20, 20, .3);
+  display: grid;
+  gap: 10px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.render-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.render-head h3 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: .14em;
+}
+
+.render-badge {
+  margin-right: auto;
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(244, 239, 226, .12);
+  color: rgba(244, 239, 226, .84);
+}
+
+.render-badge[data-source="url"] {
+  background: rgba(169, 80, 60, .55);
+  color: #f4efe2;
+}
+
+.render-close {
+  font: inherit;
+  color: #f4efe2;
+  background: rgba(244, 239, 226, .08);
+  border: 1px solid rgba(244, 239, 226, .24);
+  border-radius: 10px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  line-height: 1;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.render-close:hover {
+  background: rgba(244, 239, 226, .18);
+}
+
+.render-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.render-presets button {
+  font: inherit;
+  color: #f4efe2;
+  background: rgba(244, 239, 226, .08);
+  border: 1px solid rgba(244, 239, 226, .22);
+  border-radius: 11px;
+  padding: 6px 4px;
+  cursor: pointer;
+  display: grid;
+  gap: 1px;
+  text-align: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .15s, border-color .15s;
+}
+
+.render-presets button:hover {
+  background: rgba(244, 239, 226, .16);
+}
+
+.render-presets button b {
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: .1em;
+}
+
+.render-presets button span {
+  font: 10.5px/1.2 ui-monospace, monospace;
+  opacity: .76;
+  letter-spacing: 0;
+}
+
+.render-presets button.on {
+  background: rgba(169, 80, 60, .78);
+  border-color: rgba(244, 239, 226, .65);
+}
+
+.render-slider {
+  display: grid;
+  gap: 5px;
+}
+
+.render-slider-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 12px;
+  letter-spacing: .06em;
+}
+
+.render-slider-row span {
+  opacity: .84;
+}
+
+.render-slider-row strong {
+  font: 600 12.5px/1 ui-monospace, monospace;
+  letter-spacing: 0;
+  color: #f4efe2;
+}
+
+.render-slider input[type="range"] {
+  width: 100%;
+  margin: 2px 0;
+  accent-color: #d0694c;
+  cursor: pointer;
+  touch-action: pan-x;
+}
+
+.render-ticks {
+  display: flex;
+  justify-content: space-between;
+  font: 10px/1 ui-monospace, monospace;
+  opacity: .64;
+}
+
+.render-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(244, 239, 226, .16);
+  font-size: 11px;
+}
+
+.render-stats {
+  color: rgba(244, 239, 226, .84);
+  letter-spacing: .03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.render-reset {
+  flex: none;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: #f4efe2;
+  background: rgba(244, 239, 226, .08);
+  border: 1px solid rgba(244, 239, 226, .24);
+  border-radius: 10px;
+  padding: 3px 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.render-reset:hover {
+  background: rgba(244, 239, 226, .18);
+}
+
+body[data-photo="on"] :is(.render-entry, .render-pop) {
+  display: none !important;
+}
+
+@media (pointer: coarse) {
+  .render-entry {
+    left: calc(12px + env(safe-area-inset-left));
+    top: calc(150px + env(safe-area-inset-top));
+    padding: 5px 12px;
+  }
+
+  .render-pop {
+    left: calc(12px + env(safe-area-inset-left));
+    top: calc(184px + env(safe-area-inset-top));
+    width: min(220px, calc(100vw - 168px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    padding: 10px 11px;
+    gap: 8px;
+  }
+
+  .render-presets {
+    gap: 4px;
+  }
+}
+
+@media (pointer: coarse) and (max-height: 500px) and (min-width: 521px) {
+  .render-entry {
+    top: calc(74px + env(safe-area-inset-top));
+    left: calc(12px + env(safe-area-inset-left));
+  }
+
+  .render-pop {
+    top: calc(74px + env(safe-area-inset-top));
+    left: calc(156px + env(safe-area-inset-left));
+    width: min(260px, calc(100vw - 360px));
+    max-height: calc(100vh - 96px);
+    overflow: auto;
+  }
+}
+
+@media (pointer: coarse) and (max-height: 500px) and (max-width: 520px) {
+  .render-entry {
+    top: calc(114px + env(safe-area-inset-top));
+    left: calc(76px + env(safe-area-inset-left));
+  }
+
+  .render-pop {
+    top: calc(150px + env(safe-area-inset-top));
+    left: calc(12px + env(safe-area-inset-left));
+    width: min(264px, calc(100vw - 24px));
+    max-height: calc(100vh - 162px);
+    overflow: auto;
+  }
+}

@@ -68,15 +68,15 @@ export function landmarkCulling(){
   const margin=8
   const anchor=new THREE.Vector3(Infinity,0,0), rotation=new THREE.Quaternion()
   const projection=new THREE.Matrix4(), reflect=new THREE.Matrix4().makeScale(1,-1,1)
-  let lastMirror=NaN
+  let lastMirror=NaN, lastHorizon=NaN
   const layers:Draw[][]=[]
   return {
-    update(roots:Iterable<THREE.Group>,camera:THREE.PerspectiveCamera,mirror:number){
+    update(roots:Iterable<THREE.Group>,camera:THREE.PerspectiveCamera,mirror:number,cullHorizon=look.fogHorizonTo){
       camera.updateMatrixWorld()
       const moved=anchor.distanceToSquared(camera.position)>=margin*margin ||
-        !rotation.equals(camera.quaternion) || !projection.equals(camera.projectionMatrix) || mirror!==lastMirror
+        !rotation.equals(camera.quaternion) || !projection.equals(camera.projectionMatrix) || mirror!==lastMirror || cullHorizon!==lastHorizon
       if(moved){
-        anchor.copy(camera.position);rotation.copy(camera.quaternion);projection.copy(camera.projectionMatrix);lastMirror=mirror
+        anchor.copy(camera.position);rotation.copy(camera.quaternion);projection.copy(camera.projectionMatrix);lastMirror=mirror;lastHorizon=cullHorizon
         matrix.multiplyMatrices(projection,camera.matrixWorldInverse)
         frustum.setFromProjectionMatrix(matrix)
         for(const plane of frustum.planes)plane.constant+=margin
@@ -87,7 +87,7 @@ export function landmarkCulling(){
         }
       }
       const classify=(box:THREE.Box3)=>{
-        if(box.distanceToPoint(anchor)>look.fogHorizonTo+margin)return 0
+        if(box.distanceToPoint(anchor)>cullHorizon+margin)return 0
         return Number(frustum.intersectsBox(box))+
           (Number.isFinite(mirror)&&box.max.y>=mirror&&reflection.intersectsBox(box)?2:0)
       }

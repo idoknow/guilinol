@@ -311,7 +311,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let destination:THREE.Vector3|null=null
   async function enter(x:number,z:number,heading:number,reason:string,override=false){
     const target=new THREE.Vector3(x,0,z);destination=target
+    stream.prioritize(x,z)
     const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
+    // Register nearby collision surfaces before placing the capsule. The palace
+    // forecourt is a 17 cm slab above GL04, and can stream in under a new walker.
     const supports=(manifest.landmarks??[]).filter(entry=>{
       if(entry.collision==='none')return false
       const [cx,,cz,r]=entry.sphere, a=entry.rotation*Math.PI/180

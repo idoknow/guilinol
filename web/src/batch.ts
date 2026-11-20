@@ -236,6 +236,9 @@ export class ChunkBatcher {
   private lastPos = new THREE.Vector3(Infinity,Infinity,Infinity)
   private lastQuat = new THREE.Quaternion()
   private lastMirror = NaN
+  private lastHorizon = NaN
+  private lastBuildingLod = NaN
+  private lastStreetRadius = NaN
   private frustum = new THREE.Frustum()
   private projScreen = new THREE.Matrix4()
   private pt = new THREE.Vector3()
@@ -292,7 +295,10 @@ export class ChunkBatcher {
     return rebuilt
   }
 
-  update(focus:THREE.Vector3, camera:THREE.PerspectiveCamera, mirrorLevel=148) {
+  update(focus:THREE.Vector3, camera:THREE.PerspectiveCamera, mirrorLevel=148, range?:{cullHorizon?:number; buildingFarLod?:number; streetRadius?:number}) {
+    const cullHorizon = range?.cullHorizon ?? look.fogHorizonTo
+    const buildingFarLod = range?.buildingFarLod ?? 280
+    const streetRadius = range?.streetRadius ?? 300
     if(!this.items.size) {
       this.rebuildDirty()
       if(this.furniture) this.furniture.visible = false
@@ -302,11 +308,15 @@ export class ChunkBatcher {
     const moved = focus.distanceToSquared(this.lastFocus)>=4 ||
       camera.position.distanceToSquared(this.lastPos)>=4 ||
       this.lastQuat.angleTo(camera.quaternion)>=.012 ||
+      cullHorizon!==this.lastHorizon ||
+      buildingFarLod!==this.lastBuildingLod ||
+      streetRadius!==this.lastStreetRadius ||
       !(mirrorLevel===this.lastMirror || (Number.isFinite(mirrorLevel) && Number.isFinite(this.lastMirror) && Math.abs(mirrorLevel-this.lastMirror)<.5))
     if(!moved && !this.anyDirty() && !this.furnitureStale) return
 
     this.rebuildDirty()
     this.lastFocus.copy(focus); this.lastPos.copy(camera.position); this.lastQuat.copy(camera.quaternion); this.lastMirror = mirrorLevel
+    this.lastHorizon = cullHorizon; this.lastBuildingLod = buildingFarLod; this.lastStreetRadius = streetRadius
     camera.updateMatrixWorld()
     this.frustum.setFromProjectionMatrix(this.projScreen.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
     const mirrorOn = Number.isFinite(mirrorLevel) && camera.position.y>=mirrorLevel+.2 && camera.position.y<=4000
@@ -323,7 +333,7 @@ export class ChunkBatcher {
       // Bounding sphere of a 256×256 tile prism: sqrt(128^2 + 128^2 + halfH^2).
       const radius = Math.hypot(181.02,halfH)
       this.pt.set(cx,cy,cz)
-      if(this.pt.distanceTo(camera.position)-radius>look.fogHorizonTo){furnMask+='0';continue}
+      if(this.pt.distanceTo(camera.position)-radius>cullHorizon){furnMask+='0';continue}
       let vis = inFrustum(this.frustum,this.pt,radius)
       if(!vis && mirrorOn && cy+radius>=mirrorLevel) {
         this.pt.set(cx,2*mirrorLevel-cy,cz)
@@ -331,12 +341,12 @@ export class ChunkBatcher {
       }
       if(vis) {
         visibleChunks.add(tile)
-        if(this.pt.set(cx,cy,cz).distanceTo(camera.position)-radius>280)farBuildings.add(tile)
+        if(this.pt.set(cx,cy,cz).distanceTo(camera.position)-radius>buildingFarLod)farBuildings.add(tile)
         const nearStreet = Math.hypot(
           Math.max(0,Math.abs(focus.x-cx)-128),
           Math.max(0,Math.abs(focus.z-cz)-128),
           focus.y-item.midY,
-        )<=300
+        )<=streetRadius
         if(nearStreet) {
           visibleStreets.add(tile)
           furnMask += '1'
