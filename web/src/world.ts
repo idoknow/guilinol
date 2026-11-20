@@ -13,7 +13,7 @@ export interface Tile extends Asset {x:number; z:number}
 export interface Manifest {
   landmarks?:import('./landmarks').Landmark[]
   version:number; extent:[number,number,number,number]; grid:number; chunkSize:number; chunks:Tile[];
-  peaks:Peaks; atlas:Asset; vehicles?:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset; water?:Asset}
+  peaks:Peaks; atlas:Asset; vehicles?:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset; waterMask?:string}
 }
 export let bytes = 0
 export async function fetchAsset(file:string, signal?:AbortSignal) {
@@ -48,15 +48,20 @@ function ground(width:number, depth:number, step:number, height:(col:number,row:
   return geometry
 }
 
+async function inflateMask(encoded:string) {
+  const bytes=Uint8Array.from(atob(encoded),char=>char.charCodeAt(0))
+  const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))
+  return new Uint8Array(await new Response(stream).arrayBuffer())
+}
+
 export function startOverview(manifest:Manifest) {
-  const {underlay,texture,step} = manifest.overview
+  const {underlay,texture,step,waterMask} = manifest.overview
   const [left,top,width,depth] = manifest.extent
-  const dispatched = Promise.all([fetchAsset(underlay.file),fetchAsset(texture.file),
-    manifest.overview.water?fetchAsset(manifest.overview.water.file):null]).then(([values,image,water])=>{
+  const dispatched = Promise.all([fetchAsset(underlay.file),fetchAsset(texture.file)]).then(([values,image])=>{
     const blob = new Blob([image],{type:'image/png'})
     const bitmaps = Promise.all([
       createImageBitmap(blob,{imageOrientation:'flipY'}),
-      water?new Uint8Array(water):createImageBitmap(blob),
+      waterMask?inflateMask(waterMask):createImageBitmap(blob),
     ])
     return {values,bitmaps}
   })

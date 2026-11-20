@@ -13,6 +13,10 @@ export function glHookScript() {
     // HALF_FLOAT = 0x140B, FLOAT = 0x1406, RGBA16F = 0x881A, RGBA32F = 0x8814
     if (internalFormat === 0x8814 || type === 0x1406) return 16
     if (internalFormat === 0x881a || type === 0x140b) return 8
+    // KTX2 transcodes used by the viewer (4x4 blocks). Other texture formats
+    // retain the RGBA8 estimate; driver alignment is outside WebGL accounting.
+    if ([33776,33777,35916,35917,36196,37492,37493].includes(internalFormat)) return .5
+    if ([33778,33779,35918,35919,37496,37497,36492,36493,37808,37840].includes(internalFormat)) return 1
     return 4
   }
 
@@ -218,7 +222,8 @@ export function glHookScript() {
         buffers: buffers.size,
         textures: textures.size,
         bufferMB: +(bufferBytes / 1048576).toFixed(2),
-        textureMB: +(textureBytes / 1048576).toFixed(2),
+        textureOnlyMB: +(textureBytes / 1048576).toFixed(2),
+        textureMB: +((textureBytes + renderbufferBytes) / 1048576).toFixed(2),
         vramMB: +(totalBytes / 1048576).toFixed(2),
         totalBytes,
       }

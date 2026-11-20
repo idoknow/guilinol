@@ -1,4 +1,7 @@
 """Bake the two diagonal samples used by the overview water mesh (8 m cells)."""
+import base64
+import gzip
+
 import numpy as np
 from PIL import ImageColor
 
@@ -11,4 +14,5 @@ def water_mask(image, color):
     def matches(samples):
         return np.abs(lut[samples]-target).sum(axis=2) < .06
     wet = matches(rgb[::2,::2]) | matches(rgb[1::2,1::2])
-    return np.packbits(wet, bitorder='little').tobytes()
+    packed = np.packbits(wet, bitorder='little').tobytes()
+    return base64.b64encode(gzip.compress(packed, mtime=0)).decode('ascii')

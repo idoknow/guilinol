@@ -1,6 +1,5 @@
 import * as THREE from 'three'
 import {bytes, fetchAsset, startOverview, type Manifest} from './world'
-import {landmarkCulling} from './landmark-culling'
 import {Stream} from './stream'
 import {flight} from './flight'
 import {look} from './look/config'
@@ -130,14 +129,14 @@ async function start() {
       }
       return {clearance,lookingAt,landmark,wallDistance:hits[0]?.distance}
     }}})
-  const cullLandmarks=landmarkCulling()
+  let cullLandmarks:ReturnType<typeof import('./landmarks').landmarkCulling>|undefined
   function draw(){
     const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
-    cullLandmarks.update(stream.landmarks.values(),camera,mirror)
+    cullLandmarks?.update(stream.landmarks.values(),camera,mirror)
     peaks.update(camera,mirror)
-    if(Number.isFinite(mirror))cullLandmarks.pass(true)
+    if(Number.isFinite(mirror))cullLandmarks?.pass(true)
     renderMirror(renderer,scene,camera,!Number.isFinite(mirror),!walker?.active&&!cinema&&!stream.pending.size&&clock.weather==='clear')
-    cullLandmarks.pass(false)
+    cullLandmarks?.pass(false)
     renderer.render(scene,camera)
   }
   const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
@@ -151,7 +150,7 @@ async function start() {
       void import('./play').then(mod=>{tour=mod.play(host)})
       setTimeout(()=>void import('./ui/about').then(mod=>mod.aboutPanel()),500)
     }
-    if(frame===2&&manifest.landmarks?.length)void import('./landmarks').then(module=>{stream.updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks)})
+    if(frame===2&&manifest.landmarks?.length)void import('./landmarks').then(module=>{cullLandmarks=module.landmarkCulling();stream.updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks)})
     if(frame===2){
       peaks.loadModels(renderer)
       void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))

@@ -18,10 +18,13 @@ function prepare(mesh:THREE.Mesh, unique:boolean):Draw {
     draw.main=mask&1?Infinity:0
     draw.mirror=mask&2?Infinity:0
   }}
-  const index=geometry.index
-  if(instanced||!unique||!index||index.count<12000)return draw
+  const source=geometry.index
+  if(instanced||!unique||!source||source.count<12000||geometry.groups.length)return draw
 
-  const original=index.array.slice(), positions=geometry.getAttribute('position')
+  // glTF primitives with different vertex attributes may share an index accessor.
+  const index=source.clone()
+  geometry.setIndex(index)
+  const original=source.array, positions=geometry.getAttribute('position')
   const point=new THREE.Vector3(), boxes:THREE.Box3[]=[]
   const stride=3*256
   for(let start=0;start<original.length;start+=stride){

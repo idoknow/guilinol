@@ -1,9 +1,12 @@
 import {resolve} from 'node:path'
 import {preview} from 'vite'
 import {chromium} from 'playwright'
+import {browserOptions} from './qa-browser.mjs'
 
 const roots=process.argv.slice(2)
 if(roots.length!==2) throw Error('Usage: node scripts/first-frame-comparison.mjs <main-dist> <branch-dist>')
+const profile=process.env.PERF_PROFILE
+const mobile=profile==='mobile'
 const servers=[]
 let browser
 try {
@@ -11,8 +14,9 @@ try {
   const samples=[[],[]]
   for(let run=0;run<14;run++) {
     const index=run%2
-    browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
-    const page=await browser.newPage({viewport:{width:960,height:540}})
+    browser=await chromium.launch(browserOptions(profile==='desktop'||mobile))
+    const page=await browser.newPage({viewport:mobile?{width:390,height:844}:{width:960,height:540},isMobile:mobile,hasTouch:mobile})
+    if(mobile)await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate',{rate:4})
     const requests=[]
     page.on('request',request=>requests.push(request))
     await page.goto(`http://127.0.0.1:${servers[index].httpServer.address().port}/?verify`)

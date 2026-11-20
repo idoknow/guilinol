@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import {treeGeometry, speciesCount} from './look/trees'
+import {treeGeometry, speciesCount, treeFar} from './look/trees'
 import {look} from './look/config'
 import {fetchAsset,type Tile} from './world'
 
@@ -57,15 +57,18 @@ export class Forest{
       readTrees(tile,control.signal).then(trees=>{if(!control.signal.aborted){this.loaded.set(tile,trees);this.dirty=true}})
         .catch(err=>{if(!control.signal.aborted){console.error(err);this.retry.set(tile,performance.now()+10000)}}).finally(()=>this.pending.delete(tile))
     }
-    if(!this.loaded.size)return
+    if(!this.loaded.size){
+      for(const mesh of this.batches)if(mesh){mesh.visible=false;mesh.count=0}
+      return
+    }
     if(!this.dirty&&this.camera.position.distanceToSquared(this.anchor)<4&&this.rotation.angleTo(this.camera.quaternion)<.016)return
     this.anchor.copy(this.camera.position);this.dirty=false
     this.rotation.copy(this.camera.quaternion);this.camera.updateMatrixWorld();this.frustum.setFromProjectionMatrix(this.matrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse))
     const cam=this.camera.position
     const groups=this.groups
     for(let i=0;i<speciesCount*2;i++)groups[i].length=0
-    for(const trees of this.loaded.values())for(const tree of trees){const d=(tree.x-position.x)**2+(tree.y-position.y)**2+(tree.z-position.z)**2
-      if(d>=1500**2)continue
+    for(const trees of this.loaded.values())for(const tree of trees){const d=(tree.x-cam.x)**2+(tree.y-cam.y)**2+(tree.z-cam.z)**2
+      if(d>=treeFar**2)continue
       // Never let a crown swallow the follow camera: drop trees whose canopy the camera is inside.
       const underCamphor=tree.kind===0&&cam.y-tree.y<3.2*tree.scale
       if((tree.x-cam.x)**2+(tree.z-cam.z)**2<(underCamphor?2.5:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue

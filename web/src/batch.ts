@@ -249,6 +249,7 @@ export class ChunkBatcher {
       // Bounding sphere of a 256×256 tile prism: sqrt(128^2 + 128^2 + halfH^2).
       const radius = Math.hypot(181.02,halfH)
       this.pt.set(cx,cy,cz)
+      if(this.pt.distanceTo(camera.position)-radius>look.fogHorizonTo){furnMask+='0';continue}
       let vis = inFrustum(this.frustum,this.pt,radius)
       if(!vis && mirrorOn && cy+radius>=mirrorLevel) {
         this.pt.set(cx,2*mirrorLevel-cy,cz)

@@ -3,7 +3,6 @@ import gzip
 import json
 import math
 import struct
-from functools import lru_cache
 
 import numpy as np
 from trimesh.transformations import quaternion_matrix
@@ -16,19 +15,35 @@ class GroundFloor:
         manifest = world / 'manifest.json'
         data = json.loads(manifest.read_bytes()) if manifest.exists() else {}
         self.entries = {e['id']: e for e in data.get('landmarks', [])}
-        self.tiles = {(t['x'], t['z']): t['file'] for t in data.get('chunks', [])}
+        tiles = data.get('chunks', [])
+        if tiles:
+            self.west, self.north, width, depth = data['extent']
+            # Include the ninth support sample on both edges of each 32 m cell.
+            # This bounds wet 4 m terrain, dry 8 m terrain, seam interpolation
+            # and the 32 m overview even where their triangles differ.
+            self.minimum = np.full((depth//32+2,width//32+2), -np.inf)
+            for tile in tiles:
+                grid, wet = self.underlay(world / tile['file'])
+                cells = np.lib.stride_tricks.sliding_window_view(grid,(9,9))[::8,::8]
+                col = (tile['x']-self.west)//32+1
+                row = (tile['z']-self.north)//32+1
+                # Preserve submerged caps. Pier footings and hull draft are
+                # geometric contacts even where the water obscures their bases.
+                water_cells = np.lib.stride_tricks.sliding_window_view(wet,(9,9))[::8,::8]
+                dry = (water_cells == -32768).all(axis=(2,3))
+                self.minimum[row:row+8,col:col+8] = np.where(dry,cells.min(axis=(2,3))/10,-np.inf)
 
-    @lru_cache(None)
-    def tile_minimum(self, tile):
-        if tile not in self.tiles:
-            return -math.inf
-        raw = gzip.decompress((self.world / self.tiles[tile]).read_bytes())
+    @staticmethod
+    def underlay(path):
+        raw = gzip.decompress(path.read_bytes())
         vertices, indices, collision, png, tris = struct.unpack_from('<5I', raw, 4)
         tail = 24 + 16900 + vertices*9 + indices*4 + collision + png + tris*18
         offset = tail if len(raw) == tail + 8450 else 24
-        return np.frombuffer(raw, '<i2', count=4225, offset=offset).min() / 10
+        def grid(at):
+            return np.frombuffer(raw, '<i2', count=4225, offset=at).reshape(65,65)
+        return grid(offset),grid(24+8450)
 
-    def local_floor(self, key, points):
+    def local_floor(self, key, points, faces):
         entry = self.entries.get(key)
         if not entry:
             return -math.inf
@@ -37,9 +52,14 @@ class GroundFloor:
         c, s = math.cos(angle), math.sin(angle)
         east = x + points[:, 0]*c + points[:, 2]*s
         south = z - points[:, 0]*s + points[:, 2]*c
-        def tiles(axis):
-            return range(math.floor(axis.min()/256)*256, math.floor(axis.max()/256)*256+1, 256)
-        return min(self.tile_minimum((a,b)) for a in tiles(east) for b in tiles(south)) - y
+        def limits(axis, start, size):
+            cells = np.clip(np.floor((axis-start)/32).astype(int)+1,0,size-1)[faces]
+            return cells.min(axis=1),cells.max(axis=1)
+        x0,x1 = limits(east,self.west,self.minimum.shape[1])
+        z0,z1 = limits(south,self.north,self.minimum.shape[0])
+        floor = np.minimum.reduce([self.minimum[row,col] for row in (z0,z1) for col in (x0,x1)])
+        # Large polygons can cross an unsampled interior cell.
+        return np.where((x1-x0<=1)&(z1-z0<=1),floor-y,-np.inf)
 
 
 def internal_contacts(ids, faces, pos, pairs):
@@ -127,7 +147,7 @@ def prune(path, key, ground):
             if len(nodes)==1:
                 matrix = nodes[0][1]
                 points = pos @ matrix[:3,:3].T + matrix[:3,3]
-                floor = ground.local_floor(key,points)
+                floor = ground.local_floor(key,points,faces)
                 tris = points[faces]
                 normals = np.cross(tris[:,1]-tris[:,0],tris[:,2]-tris[:,0])
                 hidden |= (tris[:,:,1].max(axis=1)<=floor+1e-6) & (normals[:,1]<0)

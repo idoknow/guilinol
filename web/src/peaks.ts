@@ -162,7 +162,9 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
       for(let i=0;i<data.peaks.length;i++) {
         const p = data.peaks[i]
         const [px,py,pz] = p.center
-        const dist = Math.hypot(cxCam-px,cyCam-py,czCam-pz)*invZoom
+        const meters = Math.hypot(cxCam-px,cyCam-py,czCam-pz)
+        if(meters-p.radius>look.fogHorizonTo)continue
+        const dist = meters*invZoom
         const limit = farState[i] ? 760 : 800
         const isFar = dist>=limit
         farState[i] = isFar ? 1 : 0

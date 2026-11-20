@@ -4,6 +4,8 @@ import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js'
 import {nightLit} from './look/night'
 import {sharedKtx2Loader} from './look/tiles'
 
+export {landmarkCulling} from './landmark-culling'
+
 export interface Landmark {
   id:string; name?:string; file:string; position:[number,number,number]; rotation:number; collision:'mesh'|'box'|'none'; lods:string[]
   sphere:[number,number,number,number]; bytes:number
@@ -16,13 +18,12 @@ function batchRepeatedMeshes(root:THREE.Group){
     const layer=root.getObjectByName(name)
     if(!layer)continue
     const batches=new Map<string,THREE.Mesh[]>()
-    for(const bay of layer.children){
-      bay.traverse(node=>{
-        if(!(node instanceof THREE.Mesh)||node.children.length||node instanceof THREE.InstancedMesh||node.matrixWorld.determinant()<=0||Array.isArray(node.material)||node.material.transparent)return
-        const key=node.geometry.uuid+node.material.uuid
-        const group=batches.get(key)??[];group.push(node);batches.set(key,group)
-      })
-    }
+    layer.traverseVisible(node=>{
+      if(!(node instanceof THREE.Mesh)||node===layer||node.children.length||node instanceof THREE.InstancedMesh)return
+      if(node.matrixWorld.determinant()<=0||Array.isArray(node.material)||node.material.transparent)return
+      const key=node.geometry.uuid+node.material.uuid
+      const group=batches.get(key)??[];group.push(node);batches.set(key,group)
+    })
     const inverse=layer.matrixWorld.clone().invert()
     for(const meshes of batches.values()){
       if(meshes.length<2)continue
@@ -55,12 +56,12 @@ export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,en
       }else if(distance<=900&&!pending.has(entry)&&(priority||pending.size<2)&&performance.now()>=(retry.get(entry)??0)){
         pending.add(entry)
         loaderReady.then(loader=>loader.loadAsync('./'+entry.file)).then(({scene:group})=>{
-          batchRepeatedMeshes(group)
           group.position.fromArray(entry.position);group.rotation.y=THREE.MathUtils.degToRad(entry.rotation)
           group.traverse(node=>{
             if(/^collision/i.test(node.name))node.visible=false
             if(node instanceof THREE.Mesh) for(const material of [node.material].flat()) nightLit(material)
           })
+          batchRepeatedMeshes(group)
           scene.add(group);group.updateMatrixWorld(true);loaded.set(entry,group)
         }).catch(error=>{console.warn(entry.id,error);retry.set(entry,performance.now()+30000)}).finally(()=>pending.delete(entry))
       }
