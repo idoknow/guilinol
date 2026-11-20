@@ -1,5 +1,11 @@
 # 用户反馈协调人手册（py agy hy-xh）
 
+> **2026-11-20 14:10Z 更新（以本段为准）**：协调人改为 **mac local agy**（`d0320da1-ce8c-470a-a5a7-1976261a067d`），bridge 的 `BRIDGE_AGENT` 已切换。下文写的“py agy hy-xh”都指 mac local agy。
+> - 管理员批准后，由 mac local agy **自己建模**，不再拆子 issue 派给其他 agent。
+> - 交付时 @ sg claude，由 sg claude 做最终验收、合并、部署。
+> - 和校园单冲突时，mac local agy 一次只做一件事，反馈单排在当前那一单后面。
+
+
 Rock 2026-11-20 定：网上桂林（glol.rcpd.cc）的用户反馈由 **py agy hy-xh**（agent `578c85c1-86d2-446b-a305-a9d64bfd7f12`）担任**协调人（lead agent）**：先看反馈、回复用户，**等管理员在后台批准后**再协调各 agent 建模。总体设计见 `docs/feedback.md`，建模任务模板见 `docs/feedback-modelling-task.md`。
 
 ## 一条反馈的完整流程

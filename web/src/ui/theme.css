@@ -1,0 +1,84 @@
+/* 网上桂林 UI 体系「山水印」 — the one place colours, shapes and motion are defined.
+   Three materials, each with one job:
+   · 青玉玻璃 (jade glass)  — controls that float over the scene: HUD buttons, dark dialogs.
+   · 宣纸     (rice paper)  — things you read: spot cards, 景册, the map, the title-screen cards.
+   · 朱砂印   (vermilion)   — the single most important action on screen, and stamps. Never decoration.
+   Shapes: controls are pills, dialogs are 18 px cards, paper is 6 px sheets. Type is one serif.
+   Every component file (hud.css, play.css, feedback.css, account.css, home.css) reads these tokens;
+   do not introduce new colours elsewhere — add a token here and document it in docs/ui.md. */
+:root{
+  --ui-serif:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong",serif;
+  /* 青玉 */
+  --ui-ink-900:#14211e;--ui-ink-800:#1c2c2a;--ui-jade-700:#2f4a45;--ui-jade-500:#4f7f7a;--ui-jade-300:#8fc1b5;
+  --ui-glass:rgba(24,40,37,.5);--ui-glass-strong:rgba(24,40,37,.74);--ui-glass-solid:rgba(22,36,33,.9);
+  --ui-glass-line:rgba(244,239,226,.3);--ui-glass-line-soft:rgba(244,239,226,.16);
+  /* 宣纸 */
+  --ui-paper:#f4efe2;--ui-paper-2:#e9e1cf;--ui-paper-3:#efe8d8;--ui-paper-dim:rgba(244,239,226,.7);
+  --ui-ink:#2a302c;--ui-ink-soft:#5d655f;--ui-paper-line:rgba(60,60,50,.14);
+  /* 朱砂 */
+  --ui-seal:#a9503c;--ui-seal-hi:#bd5e48;--ui-seal-light:#d0694c;--ui-seal-wash:rgba(169,80,60,.12);
+  /* 状态 */
+  --ui-ok:#8fc1b5;--ui-warn:#e2b878;--ui-error:#f0b9a6;--ui-disabled:rgba(244,239,226,.38);
+  /* 形状 */
+  --ui-r-pill:999px;--ui-r-lg:18px;--ui-r-md:12px;--ui-r-sm:8px;--ui-r-paper:6px;
+  --ui-h:38px;--ui-h-lg:48px;
+  --ui-blur:blur(8px) saturate(1.15);
+  --ui-shadow-1:0 4px 14px rgba(12,20,20,.22);--ui-shadow-2:0 18px 50px rgba(12,20,20,.32);
+  --ui-ease:cubic-bezier(.2,.8,.2,1);--ui-fast:.15s;--ui-slow:.32s;
+  --ui-track:.1em;
+  /* legacy aliases (play.css / feedback.css were written against these names) */
+  --glass:var(--ui-glass);--glass-strong:var(--ui-glass-strong);--paper:var(--ui-paper);--paper-deep:var(--ui-paper-2);
+  --ink:var(--ui-ink);--ink-soft:var(--ui-ink-soft);--seal:var(--ui-seal);--seal-light:var(--ui-seal-light);--line:var(--ui-glass-line);--serif:var(--ui-serif)}
+@media (pointer:coarse){:root{--ui-h:42px}}
+[hidden]{display:none!important}
+body{font-family:var(--ui-serif)}
+
+/* --- 按钮 ------------------------------------------------------------------------------------- */
+.ui-btn{display:inline-flex;align-items:center;justify-content:center;gap:.45em;box-sizing:border-box;min-height:var(--ui-h);padding:0 18px;
+  font:500 14px/1 var(--ui-serif);letter-spacing:var(--ui-track);text-decoration:none;white-space:nowrap;cursor:pointer;
+  color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line);border-radius:var(--ui-r-pill);
+  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;
+  transition:background var(--ui-fast),border-color var(--ui-fast),transform var(--ui-fast),box-shadow var(--ui-fast),color var(--ui-fast)}
+.ui-btn:hover{background:var(--ui-glass-strong)}
+.ui-btn:active{transform:scale(.96)}
+.ui-btn:focus-visible,.ui-icon-btn:focus-visible,.ui-tab:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
+.ui-btn--seal{background:var(--ui-seal);border-color:var(--ui-seal);box-shadow:0 6px 18px rgba(169,80,60,.32)}
+.ui-btn--seal:hover{background:var(--ui-seal-hi);border-color:var(--ui-seal-hi)}
+.ui-btn--paper{background:var(--ui-paper);border-color:var(--ui-paper);color:var(--ui-ink)}
+.ui-btn--paper:hover{background:#fffaf0}
+.ui-btn--ghost{background:none;border-color:transparent;color:var(--ui-paper-dim);backdrop-filter:none;-webkit-backdrop-filter:none}
+.ui-btn--ghost:hover{background:rgba(244,239,226,.08);color:var(--ui-paper)}
+.ui-btn--lg{min-height:var(--ui-h-lg);padding:0 28px;font-size:17px;letter-spacing:.2em}
+.ui-btn--block{display:flex;width:100%}
+.ui-btn[disabled],.ui-btn[aria-disabled=true]{cursor:default;color:var(--ui-disabled);background:rgba(24,40,37,.32);border-color:var(--ui-glass-line-soft);box-shadow:none;transform:none}
+.ui-icon-btn{display:inline-grid;place-items:center;flex:none;width:34px;height:34px;padding:0;border-radius:50%;cursor:pointer;font:400 20px/1 var(--ui-serif);
+  color:var(--ui-paper-dim);background:rgba(244,239,226,.08);border:1px solid var(--ui-glass-line-soft);transition:background var(--ui-fast),color var(--ui-fast)}
+.ui-icon-btn:hover{background:rgba(244,239,226,.16);color:var(--ui-paper)}
+
+/* --- 面板：深青玻璃对话框（关于 / 账号 / 反馈 / 玩法） --------------------------------------- */
+.ui-panel,.about-panel{box-sizing:border-box;color:var(--ui-paper);background:var(--ui-glass-solid);border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-lg);
+  box-shadow:var(--ui-shadow-2);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);font-family:var(--ui-serif)}
+dialog.ui-panel,dialog.about-panel{padding:0;margin:auto}
+dialog.ui-panel::backdrop,dialog.about-panel::backdrop{background:rgba(12,20,20,.5);backdrop-filter:blur(4px)}
+.about-panel>header,.ui-panel>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px 12px;border-bottom:1px solid var(--ui-glass-line-soft)}
+.about-panel h2,.ui-panel h2{margin:0;font-size:18px;font-weight:600;letter-spacing:.2em}
+/* every dialog's close is the same round ×; the text stays for screen readers and tests */
+.about-panel>header .about-close,.ui-panel>header .about-close{position:relative;flex:none;width:34px;height:34px;min-height:0;padding:0;border-radius:50%;font-size:0;cursor:pointer;
+  color:var(--ui-paper-dim);background:rgba(244,239,226,.08);border:1px solid var(--ui-glass-line-soft);transition:background var(--ui-fast),color var(--ui-fast)}
+.about-panel>header .about-close::before,.ui-panel>header .about-close::before{content:"×" / "";font:400 21px/32px var(--ui-serif);position:absolute;inset:0;text-align:center}
+.about-panel>header .about-close:hover,.ui-panel>header .about-close:hover{background:rgba(244,239,226,.16);color:var(--ui-paper)}
+
+/* --- 表单 ------------------------------------------------------------------------------------- */
+.ui-field{display:grid;gap:6px;font-size:13px;letter-spacing:.06em;color:var(--ui-paper-dim)}
+.ui-input,.ui-field input:not([type=checkbox]):not([type=radio]){box-sizing:border-box;width:100%;min-height:44px;padding:10px 12px;font:16px var(--ui-serif);color:var(--ui-ink-800);
+  background:var(--ui-paper);border:1px solid transparent;border-radius:var(--ui-r-sm);transition:border-color var(--ui-fast),box-shadow var(--ui-fast)}
+.ui-input:focus,.ui-field input:focus{outline:none;border-color:var(--ui-jade-300);box-shadow:0 0 0 3px rgba(143,193,181,.28)}
+.ui-field ::placeholder{color:#8a8f86}
+
+/* --- 标签与印 --------------------------------------------------------------------------------- */
+.ui-tag{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:var(--ui-r-pill);font:500 11.5px/1.2 var(--ui-serif);letter-spacing:.1em;
+  color:var(--ui-paper);background:rgba(244,239,226,.14);border:1px solid var(--ui-glass-line-soft)}
+.ui-tag--seal{background:var(--ui-seal);border-color:var(--ui-seal)}
+.ui-seal{display:inline-grid;place-items:center;flex:none;width:1.9em;height:1.9em;border-radius:5px;font:700 1em/1 var(--ui-serif);color:var(--ui-paper);background:var(--ui-seal);
+  box-shadow:inset 0 0 0 2px var(--ui-seal),inset 0 0 0 3.5px rgba(244,239,226,.82);transform:rotate(-4deg)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}

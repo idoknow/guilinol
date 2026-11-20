@@ -31,9 +31,14 @@ def shops(builder):
         box(mesh, (63,5.9,-115.85), (12.4,.85,.36), 'wood')
         for east in (58,61.3,64.7,68):
             box(glass,(east,4.5,-115.9),(2.8,2.6,.24),'glass')
-        for level in (7.4,10.6,13.8,16):
+        # IMG_1302: stacked glazed corner balconies flank the plain central wall.
+        for level in (7.4,10.6,13.8,16.3):
             for east in (57.6,68.4):
-                box(glass,(east,level,-115.87),(2.9,1.85,.25),'glass')
+                box(mesh,(east,level-1.06,-115.44),(3.66,.22,1.12),'cream')
+                box(glass,(east,level,-115.42),(3.38,1.91,1.02),'glass')
+                for dx in (-1.67,0,1.67):
+                    box(mesh,(east+dx,level,-114.88),(.10,1.97,.10),'cream')
+                box(mesh,(east,level-.45,-114.88),(3.45,.10,.10),'brick')
         if builder.collide:
             solid(builder.hit,(63,10.1,-117.8),(14.4,14.2,3.6),'cream')
     # The small street-facing volume on way/521248452 stands in front of the hotel.
@@ -209,7 +214,7 @@ def approach(builder):
         base = ground(east+5,south)+.12
         start=len(mesh.pos)
         box(mesh,(east+5,base,south),(2.3,.24,2.3),'granite')
-        banyan(mesh,(east+5,base+.12,south),9+index%3,4.9,77+index,builder.detail,lobed=False,grade=ground)
+        banyan(mesh,(east+5,base+.12,south),9+index%3,4.9,77+index,builder.detail,lobed=False,grade=ground,join_forks=True)
         for i in range(start,len(mesh.pos)):
             px,py,pz=mesh.pos[i]
             outside=max(abs(px-east-5),abs(pz-south))>1.15

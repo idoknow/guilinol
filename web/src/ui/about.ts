@@ -1,4 +1,5 @@
 import {photoCredits} from './photo-credits'
+import {SOURCE_URL} from './source'
 
 const dataLines = [
   '© OpenStreetMap contributors（ODbL）',
@@ -6,62 +7,40 @@ const dataLines = [
   'Mapzen Terrarium 高程瓦片',
 ]
 
-export function aboutPanel() {
-  void import('./account').then(module=>module.accountPanel())
-  const btn = document.createElement('button')
-  btn.className = 'btn-about'
-  btn.type = 'button'
-  btn.textContent = '关于'
-  btn.setAttribute('aria-haspopup', 'dialog')
+let mask:HTMLDivElement|undefined
 
-  const mask = document.createElement('div')
-  mask.className = 'about-mask'
-  mask.hidden = true
-  mask.innerHTML = `<div class="about-panel" role="dialog" aria-modal="true" aria-labelledby="about-title">
-    <header><h2 id="about-title">关于网上桂林</h2><button type="button" class="about-close" aria-label="关闭">关闭</button></header>
-    <div class="about-body"></div>
-  </div>`
-  const body = mask.querySelector('.about-body')!
-  const close = () => { mask.hidden = true; btn.setAttribute('aria-expanded', 'false') }
-  const open = () => { mask.hidden = false; btn.setAttribute('aria-expanded', 'true') }
-
-  body.innerHTML = ''
-  body.append(
-    section('简介', '<p>真实地理布局的桂林第三人称 3D 城市漫游。飞、走，看山水与街区。</p>'),
-    section('操作', controlsHtml()),
-    section('数据署名', `<ul>${dataLines.map(line => `<li>${line}</li>`).join('')}</ul>`),
-    section('参考照片', photoHtml()),
-    section('角色', '<p>城市漫游者模型与动画为原创，以 CC0 1.0 提供。</p>'),
-    section('版本', `<p>v${escape(__APP_VERSION__)} · 构建 ${escape(formatBuild(__BUILD_TIME__))}</p>`),
-  )
-
-  btn.onclick = () => (mask.hidden ? open() : close())
-  mask.querySelector('.about-close')!.addEventListener('click', close)
-  mask.addEventListener('click', event => { if (event.target === mask) close() })
-  window.addEventListener('keydown', event => { if (event.code === 'Escape' && !mask.hidden) close() })
-  document.body.append(btn, mask)
-  btn.setAttribute('aria-expanded', 'false')
+/** 关于：作品介绍、开源地址、数据与照片署名、版本。由主界面打开。 */
+export function openAbout() {
+  if (!mask) {
+    mask = document.createElement('div')
+    mask.className = 'about-mask'
+    mask.hidden = true
+    mask.innerHTML = `<div class="about-panel" role="dialog" aria-modal="true" aria-labelledby="about-title">
+      <header><h2 id="about-title">关于网上桂林</h2><button type="button" class="about-close" aria-label="关闭">关闭</button></header>
+      <div class="about-body"></div>
+    </div>`
+    const close = () => { mask!.hidden = true }
+    mask.querySelector('.about-body')!.append(
+      section('这是什么', '<p>一款免费的 3D 漫游游戏。整座桂林城按真实地图搭建：山在哪、江怎么弯、街道怎么走，都和现实一一对应。你可以飞上天看两江四湖，也可以落地沿着街巷慢慢逛。</p>'),
+      section('开源', `<p>游戏完全免费，代码公开在 GitHub，欢迎任何人查看、提建议或参与制作：<br><a href="${SOURCE_URL}" target="_blank" rel="noopener">${SOURCE_URL.replace('https://', '')}</a></p>`),
+      section('地图数据', `<ul>${dataLines.map(line => `<li>${line}</li>`).join('')}</ul>`),
+      section('参考照片', photoHtml()),
+      section('角色', '<p>城市漫游者模型与动画为原创，以 CC0 1.0 提供。</p>'),
+      section('版本', `<p>v${escape(__APP_VERSION__)} · 构建 ${escape(formatBuild(__BUILD_TIME__))}</p>`),
+    )
+    mask.querySelector('.about-close')!.addEventListener('click', close)
+    mask.addEventListener('click', event => { if (event.target === mask) close() })
+    window.addEventListener('keydown', event => { if (event.code === 'Escape' && !mask!.hidden) close() })
+    document.body.append(mask)
+  }
+  mask.hidden = false
+  mask.querySelector<HTMLButtonElement>('.about-close')!.focus()
 }
 
 function section(title: string, html: string) {
   const el = document.createElement('section')
   el.innerHTML = `<h3>${title}</h3>${html}`
   return el
-}
-
-function controlsHtml() {
-  return `<div class="about-cols">
-    <div><h4>桌面</h4><ul>
-      <li>飞行：WASD 移动，Q/E 升降，Shift 加速</li>
-      <li>步行：WASD 走，Shift 跑，空格跳</li>
-      <li>拖动转视角，滚轮远近，V 切换飞行/步行</li>
-    </ul></div>
-    <div><h4>手机</h4><ul>
-      <li>飞行：单指转向，双指拖移</li>
-      <li>步行：左摇杆移动，右半屏转向</li>
-      <li>右上「落地步行 / 起飞」切换模式</li>
-    </ul></div>
-  </div>`
 }
 
 function photoHtml() {

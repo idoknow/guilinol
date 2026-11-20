@@ -6,6 +6,7 @@ import {streetFurnitureGeo, streetFurnitureMat, streetSurfaceMat} from './street
 import type {Tile} from './world'
 import {vehicleModel} from './walk/vehicle-model'
 import {look} from './look/config'
+import {flags} from './debug'
 
 export interface TileBatchInput {
   tile:Tile
@@ -134,80 +135,75 @@ class StaticLayerBatch {
   }
 }
 
-export class ChunkBatcher {
-  feedbackMeshes(){return [this.buildings.mesh,this.bridges.mesh]}
-  private items = new Map<Tile,TileBatchInput>()
-  private dirty = false
-  private lastFocus = new THREE.Vector3(Infinity,Infinity,Infinity)
-  private lastPos = new THREE.Vector3(Infinity,Infinity,Infinity)
-  private lastQuat = new THREE.Quaternion()
-  private lastMirror = NaN
-  private frustum = new THREE.Frustum()
-  private projScreen = new THREE.Matrix4()
-  private pt = new THREE.Vector3()
+type AttrDef = {name:string;size:number;ctor:'f32'|'u8'}
 
-  private buildings = new StaticLayerBatch(buildingMaterial,[
-    {name:'position',size:3,ctor:'f32'},
-    {name:'normal',size:3,ctor:'f32'},
-    {name:'color',size:3,ctor:'f32'},
-    {name:'aFloor',size:1,ctor:'f32'},
-    {name:'aFacade',size:1,ctor:'f32'},
-    {name:'aKind',size:1,ctor:'u8'},
-    {name:'aRoof',size:1,ctor:'u8'},
-  ])
-  private water = new StaticLayerBatch(waterMaterial,[
-    {name:'position',size:3,ctor:'f32'},
-  ],WATER_LAYER)
-  private bridges = new StaticLayerBatch(bridgeMaterial,[
-    {name:'position',size:3,ctor:'f32'},
-    {name:'normal',size:3,ctor:'f32'},
-    {name:'color',size:3,ctor:'f32'},
-    {name:'aEdge',size:1,ctor:'f32'},
-  ])
-  private streets = new StaticLayerBatch(streetSurfaceMat,[
-    {name:'aSurface',size:1,ctor:'u8'},
-    {name:'aAlong',size:1,ctor:'f32'},
-    {name:'position',size:3,ctor:'f32'},
-    {name:'normal',size:3,ctor:'f32'},
-    {name:'color',size:3,ctor:'f32'},
-  ])
+const BUILDING_ATTRS:AttrDef[] = [
+  {name:'position',size:3,ctor:'f32'},
+  {name:'normal',size:3,ctor:'f32'},
+  {name:'color',size:3,ctor:'f32'},
+  {name:'aFloor',size:1,ctor:'f32'},
+  {name:'aFacade',size:1,ctor:'f32'},
+  {name:'aKind',size:1,ctor:'u8'},
+  {name:'aRoof',size:1,ctor:'u8'},
+]
+const WATER_ATTRS:AttrDef[] = [{name:'position',size:3,ctor:'f32'}]
+const BRIDGE_ATTRS:AttrDef[] = [
+  {name:'position',size:3,ctor:'f32'},
+  {name:'normal',size:3,ctor:'f32'},
+  {name:'color',size:3,ctor:'f32'},
+  {name:'aEdge',size:1,ctor:'f32'},
+]
+const STREET_ATTRS:AttrDef[] = [
+  {name:'aSurface',size:1,ctor:'u8'},
+  {name:'aAlong',size:1,ctor:'f32'},
+  {name:'position',size:3,ctor:'f32'},
+  {name:'normal',size:3,ctor:'f32'},
+  {name:'color',size:3,ctor:'f32'},
+]
 
-  private furniture:THREE.InstancedMesh|null = null
-  private parked:THREE.InstancedMesh|null = null
-  private lastFurnitureMask = ''
-  private lastFurniturePos = new THREE.Vector3(Infinity,Infinity,Infinity)
+// A bucket owns the merged geometry of a small group of tiles. Adding or dropping one tile only
+// rebuilds its own bucket, so the cost stops scaling with how far the player has already walked.
+// ?nobatch=1 collapses this to a single bucket for ablation runs.
+// Default 3 tiles per side keeps the usual 480 m view inside two or three buckets, so the extra
+// draw calls stay in single digits while a rebuild still only touches ~9 tiles instead of every
+// tile the player has ever visited. ?buckets=N retunes the split, ?nobatch=1 collapses it to one
+// bucket, so the draw-call / rebuild trade-off can be measured instead of guessed.
+
+function bucketKey(tile:Tile) {
+  const span = flags.noBatch ? Number.POSITIVE_INFINITY : 256 * flags.bucketTiles
+  return `${Math.floor(tile.x/span)}:${Math.floor(tile.z/span)}`
+}
+
+class Bucket {
+  readonly buildings:StaticLayerBatch
+  readonly water:StaticLayerBatch
+  readonly bridges:StaticLayerBatch
+  readonly streets:StaticLayerBatch
+  readonly items = new Map<Tile,TileBatchInput>()
+  dirty = false
 
   constructor(private scene:THREE.Scene) {
+    this.buildings = new StaticLayerBatch(buildingMaterial,BUILDING_ATTRS)
+    this.water = new StaticLayerBatch(waterMaterial,WATER_ATTRS,WATER_LAYER)
+    this.bridges = new StaticLayerBatch(bridgeMaterial,BRIDGE_ATTRS)
+    this.streets = new StaticLayerBatch(streetSurfaceMat,STREET_ATTRS)
     scene.add(this.buildings.mesh,this.water.mesh,this.bridges.mesh,this.streets.mesh)
   }
 
-  add(input:TileBatchInput) {
-    const {tile} = input
-    if(input.walls) shiftPositions(input.walls,tile.x,tile.z)
-    if(input.bridge) shiftPositions(input.bridge,tile.x,tile.z)
-    if(input.streetSurface) shiftPositions(input.streetSurface,tile.x,tile.z)
-    for(const mats of [input.furnitureMatrices,input.parked])for(let i=0;i<mats.length;i+=16) { mats[i+12]+=tile.x; mats[i+14]+=tile.z }
-    this.items.set(tile,input)
-    this.dirty = true
-  }
+  staticMeshes(){return [this.buildings.mesh,this.bridges.mesh]}
 
-  remove(tile:Tile) {
-    if(this.items.delete(tile)) this.dirty = true
-  }
-
-  private rebuildStatic() {
+  rebuild() {
     this.dirty = false
     const wallList:{tile:Tile; geom:THREE.BufferGeometry}[] = []
     const waterList:{tile:Tile; geom:THREE.BufferGeometry}[] = []
     const bridgeList:{tile:Tile; geom:THREE.BufferGeometry}[] = []
     const streetList:{tile:Tile; geom:THREE.BufferGeometry}[] = []
-
     for(const [tile, item] of this.items) {
       if(item.walls) wallList.push({tile, geom:item.walls})
       if(item.pond?.length) {
-        const g = new THREE.BufferGeometry()
-        g.setAttribute('position',new THREE.BufferAttribute(item.pond,3))
-        waterList.push({tile, geom:g})
+        const geometry = new THREE.BufferGeometry()
+        geometry.setAttribute('position',new THREE.BufferAttribute(item.pond,3))
+        waterList.push({tile, geom:geometry})
       }
       if(item.bridge) bridgeList.push({tile, geom:item.bridge})
       if(item.streetSurface) streetList.push({tile, geom:item.streetSurface})
@@ -216,12 +212,89 @@ export class ChunkBatcher {
     this.water.rebuild(waterList)
     this.bridges.rebuild(bridgeList)
     this.streets.rebuild(streetList)
-    this.lastFurnitureMask = ''
+  }
+
+  cull(visible:Set<Tile>, far:Set<Tile>, visibleStreets:Set<Tile>) {
+    this.buildings.cull(visible,far)
+    this.water.cull(visible)
+    this.bridges.cull(visible)
+    this.streets.cull(visibleStreets)
+  }
+
+  dispose() {
+    for(const mesh of [this.buildings.mesh,this.water.mesh,this.bridges.mesh,this.streets.mesh]) {
+      this.scene.remove(mesh)
+      mesh.geometry.dispose()
+    }
+  }
+}
+
+export class ChunkBatcher {
+  feedbackMeshes(){return [...this.buckets.values()].flatMap(bucket=>bucket.staticMeshes())}
+  private items = new Map<Tile,TileBatchInput>()
+  private lastFocus = new THREE.Vector3(Infinity,Infinity,Infinity)
+  private lastPos = new THREE.Vector3(Infinity,Infinity,Infinity)
+  private lastQuat = new THREE.Quaternion()
+  private lastMirror = NaN
+  private frustum = new THREE.Frustum()
+  private projScreen = new THREE.Matrix4()
+  private pt = new THREE.Vector3()
+
+  private buckets = new Map<string,Bucket>()
+
+  private furniture:THREE.InstancedMesh|null = null
+  private parked:THREE.InstancedMesh|null = null
+  private lastFurnitureMask = ''
+  private furnitureStale = false
+  private lastFurniturePos = new THREE.Vector3(Infinity,Infinity,Infinity)
+
+  constructor(private scene:THREE.Scene) {}
+
+  add(input:TileBatchInput) {
+    const {tile} = input
+    if(input.walls) shiftPositions(input.walls,tile.x,tile.z)
+    if(input.bridge) shiftPositions(input.bridge,tile.x,tile.z)
+    if(input.streetSurface) shiftPositions(input.streetSurface,tile.x,tile.z)
+    for(const mats of [input.furnitureMatrices,input.parked])for(let i=0;i<mats.length;i+=16) { mats[i+12]+=tile.x; mats[i+14]+=tile.z }
+    this.items.set(tile,input)
+    const key = bucketKey(tile)
+    let bucket = this.buckets.get(key)
+    if(!bucket) { bucket = new Bucket(this.scene); this.buckets.set(key,bucket) }
+    bucket.items.set(tile,input)
+    bucket.dirty = true
+  }
+
+  remove(tile:Tile) {
+    if(!this.items.delete(tile)) return
+    const key = bucketKey(tile)
+    const bucket = this.buckets.get(key)
+    if(!bucket) return
+    bucket.items.delete(tile)
+    if(bucket.items.size) { bucket.dirty = true; return }
+    bucket.dispose()
+    this.buckets.delete(key)
+    // The emptied bucket's street furniture lives in the shared instance meshes, so the selection
+    // has to be redone even if the camera never moves again.
+    this.furnitureStale = true
+  }
+
+  private anyDirty() {
+    for(const bucket of this.buckets.values()) if(bucket.dirty) return true
+    return false
+  }
+
+  private rebuildDirty() {
+    let rebuilt = false
+    for(const bucket of this.buckets.values()) if(bucket.dirty) { bucket.rebuild(); rebuilt = true }
+    // Only a geometry rebuild invalidates the furniture selection; a pure camera turn must not
+    // re-run the selection loop and re-upload the instance buffers.
+    if(rebuilt) this.lastFurnitureMask = ''
+    return rebuilt
   }
 
   update(focus:THREE.Vector3, camera:THREE.PerspectiveCamera, mirrorLevel=148) {
     if(!this.items.size) {
-      if(this.dirty) this.rebuildStatic()
+      this.rebuildDirty()
       if(this.furniture) this.furniture.visible = false
       if(this.parked) this.parked.visible=false
       return
@@ -230,9 +303,9 @@ export class ChunkBatcher {
       camera.position.distanceToSquared(this.lastPos)>=4 ||
       this.lastQuat.angleTo(camera.quaternion)>=.012 ||
       !(mirrorLevel===this.lastMirror || (Number.isFinite(mirrorLevel) && Number.isFinite(this.lastMirror) && Math.abs(mirrorLevel-this.lastMirror)<.5))
-    if(!this.dirty && !moved) return
+    if(!moved && !this.anyDirty() && !this.furnitureStale) return
 
-    if(this.dirty) this.rebuildStatic()
+    this.rebuildDirty()
     this.lastFocus.copy(focus); this.lastPos.copy(camera.position); this.lastQuat.copy(camera.quaternion); this.lastMirror = mirrorLevel
     camera.updateMatrixWorld()
     this.frustum.setFromProjectionMatrix(this.projScreen.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
@@ -273,12 +346,10 @@ export class ChunkBatcher {
       furnMask += '0'
     }
 
-    this.buildings.cull(visibleChunks,farBuildings)
-    this.water.cull(visibleChunks)
-    this.bridges.cull(visibleChunks)
-    this.streets.cull(visibleStreets)
+    for(const bucket of this.buckets.values()) bucket.cull(visibleChunks,farBuildings,visibleStreets)
 
-    if(furnMask!==this.lastFurnitureMask || camera.position.distanceToSquared(this.lastFurniturePos)>=4) {
+    if(this.furnitureStale || furnMask!==this.lastFurnitureMask || camera.position.distanceToSquared(this.lastFurniturePos)>=4) {
+      this.furnitureStale = false
       this.lastFurnitureMask = furnMask
       this.lastFurniturePos.copy(camera.position)
       const near=(matrices:Float32Array,index:number,radius=30)=>{

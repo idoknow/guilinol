@@ -1,5 +1,6 @@
 /* 反馈面板 · 青绿山水：深青玻璃底、宣纸色文字、朱砂只用于定位针和主按钮。 */
-dialog.fb-panel{--paper:#f4efe2;--paper-dim:rgba(244,239,226,.68);--line:rgba(244,239,226,.18);--jade:#8fc1b5;--seal:#a9503c;--seal-hi:#bd5e48;
+/* colours come from theme.css (山水印); these locals only alias them */
+dialog.fb-panel{--paper:var(--ui-paper);--paper-dim:var(--ui-paper-dim);--line:var(--ui-glass-line-soft);--jade:var(--ui-jade-300);--seal:var(--ui-seal);--seal-hi:var(--ui-seal-hi);
   padding:0;margin:auto;width:min(40rem,calc(100% - 20px));max-height:min(88dvh,860px);display:flex;flex-direction:column;overflow:hidden;
   opacity:0;transform:translateY(10px) scale(.985);transition:opacity .22s ease,transform .26s cubic-bezier(.2,.8,.2,1)}
 dialog.fb-panel.fb-open{opacity:1;transform:none}
@@ -29,7 +30,7 @@ dialog.fb-panel::backdrop{background:rgba(16,24,24,.42);backdrop-filter:blur(3px
 .fb-field{display:grid;gap:6px;font-size:13px;color:var(--paper-dim)}
 .fb-field small{font-size:12px;opacity:.85}
 .fb-field[hidden]{display:none}
-.fb-panel input:not([type=radio]):not([type=file]),.fb-panel textarea,.fb-panel select{box-sizing:border-box;width:100%;font:inherit;font-size:16px;color:#1c2c2a;background:#f4efe2;border:1px solid transparent;border-radius:10px;padding:9px 11px;transition:border-color .15s,box-shadow .15s}
+.fb-panel input:not([type=radio]):not([type=file]),.fb-panel textarea,.fb-panel select{box-sizing:border-box;width:100%;font:inherit;font-size:16px;color:#1c2c2a;background:#f4efe2;border:1px solid transparent;border-radius:var(--ui-r-sm);padding:9px 11px;transition:border-color .15s,box-shadow .15s}
 .fb-panel textarea{resize:vertical;min-height:2.6em;line-height:1.55}
 .fb-panel input:focus,.fb-panel textarea:focus,.fb-panel select:focus{outline:none;border-color:var(--jade);box-shadow:0 0 0 3px rgba(143,193,181,.28)}
 .fb-panel ::placeholder{color:#8a8f86}
@@ -93,7 +94,7 @@ a.fb-photo{color:inherit}
 .fb-submit{position:sticky;bottom:-16px;margin:0 -16px -16px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(rgba(28,44,42,0),rgba(28,44,42,.96) 30%);}
 .fb-count{font-size:13px;color:var(--jade)}
 .fb-count--empty{color:var(--paper-dim)}
-.fb-btn{font:inherit;font-size:14px;letter-spacing:.1em;color:var(--paper);background:rgba(244,239,226,.08);border:1px solid rgba(244,239,226,.28);border-radius:12px;padding:8px 16px;cursor:pointer;transition:background .15s,transform .1s}
+.fb-btn{font:inherit;font-size:14px;letter-spacing:.1em;color:var(--paper);background:rgba(244,239,226,.08);border:1px solid var(--ui-glass-line);border-radius:var(--ui-r-pill);padding:8px 16px;cursor:pointer;transition:background .15s,transform .1s}
 .fb-btn:hover{background:rgba(244,239,226,.16)}
 .fb-btn:active{transform:translateY(1px)}
 .fb-btn--primary{background:var(--seal);border-color:var(--seal);padding:10px 22px}

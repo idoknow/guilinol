@@ -35,7 +35,9 @@
     "audit": "node scripts/audit.mjs",
     "qa": "node scripts/qa.mjs",
     "photo-match": "node scripts/photo-match.mjs",
-    "verify:tour": "node scripts/tour.mjs"
+    "verify:tour": "node scripts/tour.mjs",
+    "check:flags": "node scripts/check-flags.mjs",
+    "check:batcher": "node scripts/check-batcher.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.21.0",

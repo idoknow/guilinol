@@ -11,5 +11,6 @@ export function sectionCamera(key, location) {
   const [east, south] = offsets[key]
   const metres = Math.hypot(east, south)
   if (!(metres <= location.hAccuracy)) throw Error(`${key}: offset exceeds GPS accuracy`)
-  return {...location, x: location.x + east, z: location.z + south, offsetLabel: `${metres.toFixed(2)} m (E ${east}, S ${south})`}
+  // Section references have their own offsets from EXIF and their own heading.
+  return {...location, pose: undefined, x: location.x + east, z: location.z + south, offsetLabel: `${metres.toFixed(2)} m (E ${east}, S ${south})`}
 }

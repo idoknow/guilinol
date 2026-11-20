@@ -9,7 +9,7 @@ import {atmo, env} from './time'
 export function installAtmosphere() {
   const chunk = THREE.ShaderChunk
   chunk.fog_pars_vertex = `#ifdef USE_FOG\nvarying float vFogDepth;\nvarying vec3 vFogWorld;\n#endif`
-  chunk.fog_vertex = `#ifdef USE_FOG\nvFogDepth = - mvPosition.z;\n#ifdef USE_INSTANCING\nvFogWorld = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;\n#else\nvFogWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;\n#endif\n#endif`
+  chunk.fog_vertex = `#ifdef USE_FOG\nvFogDepth = - mvPosition.z;\nmat4 fogModel = modelMatrix;\n#ifdef USE_BATCHING\nfogModel = fogModel * batchingMatrix;\n#endif\n#ifdef USE_INSTANCING\nfogModel = fogModel * instanceMatrix;\n#endif\nvFogWorld = (fogModel * vec4(transformed, 1.0)).xyz;\n#endif`
   chunk.fog_pars_fragment = `#ifdef USE_FOG
     uniform vec3 fogColor; varying float vFogDepth; varying vec3 vFogWorld;
     uniform vec3 uHazeNear; uniform vec3 uHazeFar; uniform vec3 uHorizon; uniform vec4 uFog;
