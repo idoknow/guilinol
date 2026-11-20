@@ -352,7 +352,7 @@ function solvePedalIK(phase: number): [number, number] {
 export function createRiderPose(figure: T.Group) {
   const joints = Object.fromEntries(JOINT_NAMES.map(name => [name, figure.getObjectByName(name)])) as Record<JointName, T.Object3D | undefined>
   const startPos = new T.Vector3(), startRot = new Map<JointName, [number, number, number]>()
-  const dismountFrom = new T.Vector3()
+  const dismountFrom = new T.Vector3(), dismountStartRot = new Map<JointName, [number, number, number]>()
   let startYaw = 0, dismountFromYaw = 0, mountElapsed = bcfg.mountDuration, dismountElapsed = bcfg.dismountDuration, camArmOffset = 0
   let footWeight = 1, pedalPhase = 0
 
@@ -435,7 +435,10 @@ export function createRiderPose(figure: T.Group) {
       dismountElapsed = 0
       mountElapsed = bcfg.mountDuration
       figure.rotation.x = figure.rotation.z = 0
-      clearJoints()
+      for (const name of JOINT_NAMES) {
+        const r = joints[name]?.rotation
+        dismountStartRot.set(name, r ? [r.x, r.y, r.z] : [0, 0, 0])
+      }
     },
     reset() {
       mountElapsed = bcfg.mountDuration
@@ -468,18 +471,27 @@ export function createRiderPose(figure: T.Group) {
       const seatX = bikePos.x + Math.sin(heading) * seatOffset
       const seatZ = bikePos.z + Math.cos(heading) * seatOffset
       const seatY = bikePos.y + seatLift
+      const swing = t < 1 ? Math.sin(t * Math.PI) : 0
       if (t < 1) {
         figure.position.set(
           T.MathUtils.lerp(startPos.x, seatX, t),
-          T.MathUtils.lerp(startPos.y, seatY, t),
+          T.MathUtils.lerp(startPos.y, seatY, t) + swing * .18,
           T.MathUtils.lerp(startPos.z, seatZ, t),
         )
-        figure.rotation.set(0, startYaw + shortestAngle(startYaw, heading) * t, 0, 'YXZ')
+        figure.rotation.set(0, startYaw + shortestAngle(startYaw, heading) * t, -swing * .10, 'YXZ')
       } else {
         figure.position.set(seatX, seatY, seatZ)
         figure.rotation.set(pitch * .45, heading, lean * .9, 'YXZ')
       }
       applySeatedPose(speed, steerInput, t, dt, kind)
+      if (swing > 1e-4) {
+        if (joints.ThighR) {
+          joints.ThighR.rotation.x += swing * .35
+          joints.ThighR.rotation.z -= swing * .55
+        }
+        if (joints.ShinR) joints.ShinR.rotation.x -= swing * .30
+        if (joints.Torso) joints.Torso.rotation.x -= swing * .14
+      }
     },
     applyDismount(currentFootPos: T.Vector3, targetYaw: number, dt: number) {
       if (dismountElapsed >= bcfg.dismountDuration) return
@@ -488,6 +500,16 @@ export function createRiderPose(figure: T.Group) {
       figure.position.lerpVectors(dismountFrom, currentFootPos, t)
       figure.position.y += Math.sin(t * Math.PI) * .12
       figure.rotation.y = dismountFromYaw + shortestAngle(dismountFromYaw, targetYaw) * t
+      if (t >= 1) {
+        clearJoints()
+      } else {
+        for (const name of JOINT_NAMES) {
+          const joint = joints[name]
+          if (!joint) continue
+          const from = dismountStartRot.get(name) ?? [0, 0, 0]
+          joint.rotation.set(from[0] * (1 - t), from[1] * (1 - t), from[2] * (1 - t))
+        }
+      }
     },
     clearJoints,
   }

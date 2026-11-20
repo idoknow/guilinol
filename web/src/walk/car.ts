@@ -322,9 +322,32 @@ export function createCarControl() {
   }
 }
 
-/** Smooth 0.24s door-entry transition, hidden in-cabin seated state, 0.20s step-out, and +4.2m camera arm. */
+/** Smooth 0.28s door-entry duck-in transition, hidden in-cabin seated state, 0.20s step-out stand-up, and +4.2m camera arm. */
 export function createDriverPose(figure: T.Group) {
   const startPos = new T.Vector3(), dismountFrom = new T.Vector3()
+  const joints = {
+    Torso: figure.getObjectByName('Torso'),
+    Head: figure.getObjectByName('Head'),
+    ThighL: figure.getObjectByName('ThighL'),
+    ThighR: figure.getObjectByName('ThighR'),
+    ShinL: figure.getObjectByName('ShinL'),
+    ShinR: figure.getObjectByName('ShinR'),
+    ArmL: figure.getObjectByName('ArmL'),
+    ArmR: figure.getObjectByName('ArmR'),
+  }
+  const clearJoints = () => {
+    for (const j of Object.values(joints)) j?.rotation.set(0, 0, 0)
+  }
+  const applyDuck = (weight: number) => {
+    if (joints.Torso) joints.Torso.rotation.set(-0.34 * weight, 0, 0)
+    if (joints.Head) joints.Head.rotation.set(0.18 * weight, 0, 0)
+    if (joints.ThighL) joints.ThighL.rotation.set(0.62 * weight, 0, 0)
+    if (joints.ThighR) joints.ThighR.rotation.set(0.55 * weight, 0, 0)
+    if (joints.ShinL) joints.ShinL.rotation.set(-0.72 * weight, 0, 0)
+    if (joints.ShinR) joints.ShinR.rotation.set(-0.65 * weight, 0, 0)
+    if (joints.ArmL) joints.ArmL.rotation.set(0.42 * weight, 0, 0)
+    if (joints.ArmR) joints.ArmR.rotation.set(0.42 * weight, 0, 0)
+  }
   let startYaw = 0, dismountFromYaw = 0
   let mountElapsed = ccfg.mountDuration, dismountElapsed = ccfg.dismountDuration, camArmOffset = 0
 
@@ -345,6 +368,7 @@ export function createDriverPose(figure: T.Group) {
       mountElapsed = ccfg.mountDuration
       figure.visible = active
       figure.rotation.x = figure.rotation.z = 0
+      applyDuck(0.85)
     },
     reset(active = false) {
       mountElapsed = ccfg.mountDuration
@@ -352,6 +376,7 @@ export function createDriverPose(figure: T.Group) {
       camArmOffset = 0
       figure.visible = active
       figure.rotation.x = figure.rotation.z = 0
+      clearJoints()
     },
     advanceMount(dt: number) {
       if (mountElapsed < ccfg.mountDuration) mountElapsed = Math.min(ccfg.mountDuration, mountElapsed + Math.max(0, dt))
@@ -363,20 +388,36 @@ export function createDriverPose(figure: T.Group) {
       return camArmOffset
     },
     updateDriving(carPos: T.Vector3, heading: number, active: boolean) {
-      const t = smoothstep(mountElapsed / ccfg.mountDuration)
+      const rawT = T.MathUtils.clamp(mountElapsed / ccfg.mountDuration, 0, 1)
+      const t = smoothstep(rawT)
       const rx = Math.cos(heading), rz = -Math.sin(heading)
       const fx = -Math.sin(heading), fz = -Math.cos(heading)
-      const doorX = carPos.x - rx * .55 + fx * .12
-      const doorZ = carPos.z - rz * .55 + fz * .12
-      if (t < 1) {
+      const doorOuterX = carPos.x - rx * .92 + fx * .12
+      const doorOuterZ = carPos.z - rz * .92 + fz * .12
+      const cabinX = carPos.x - rx * .36 + fx * .10
+      const cabinZ = carPos.z - rz * .36 + fz * .10
+      if (rawT < 1) {
         figure.visible = active
-        figure.position.set(
-          T.MathUtils.lerp(startPos.x, doorX, t),
-          T.MathUtils.lerp(startPos.y, carPos.y, t),
-          T.MathUtils.lerp(startPos.z, doorZ, t),
-        )
+        if (rawT < .52) {
+          const p = smoothstep(rawT / .52)
+          figure.position.set(
+            T.MathUtils.lerp(startPos.x, doorOuterX, p),
+            T.MathUtils.lerp(startPos.y, carPos.y, p) + Math.sin(p * Math.PI) * .06,
+            T.MathUtils.lerp(startPos.z, doorOuterZ, p),
+          )
+          applyDuck(p * .28)
+        } else {
+          const p = smoothstep((rawT - .52) / .48)
+          figure.position.set(
+            T.MathUtils.lerp(doorOuterX, cabinX, p),
+            carPos.y - p * .14,
+            T.MathUtils.lerp(doorOuterZ, cabinZ, p),
+          )
+          applyDuck(.28 + p * .72)
+        }
         figure.rotation.set(0, startYaw + shortestAngle(startYaw, heading) * t, 0, 'YXZ')
       } else {
+        clearJoints()
         figure.visible = false
         figure.position.copy(carPos)
         figure.rotation.set(0, heading, 0, 'YXZ')
@@ -387,8 +428,10 @@ export function createDriverPose(figure: T.Group) {
       if (dt > 0) dismountElapsed = Math.min(ccfg.dismountDuration, dismountElapsed + Math.min(.12, dt))
       const t = smoothstep(dismountElapsed / ccfg.dismountDuration)
       figure.position.lerpVectors(dismountFrom, currentFootPos, t)
-      figure.position.y += Math.sin(t * Math.PI) * .08
+      figure.position.y += Math.sin(t * Math.PI) * .08 - (1 - t) * .10
       figure.rotation.y = dismountFromYaw + shortestAngle(dismountFromYaw, targetYaw) * t
+      if (t >= 1) clearJoints()
+      else applyDuck((1 - t) * .85)
     },
   }
 }

@@ -389,6 +389,26 @@ def plan_cars(bounds, surface, buildings, sample, existing_bikes=(), docks=None,
                 cars.extend(group)
             dist += rng.uniform(145.0, 220.0)
 
+    # Guaranteed starter roadside sedan just south of Zhengyang gate on Jiefang East Rd (-572, -92).
+    if all(math.hypot(-572.0 - c[0], -92.0 - c[2]) > 50.0 for c in cars):
+        sx, sz, s_heading, s_paint = -572.0, -92.0, -1.86, 1
+        sfx, sfz = -math.sin(s_heading), -math.cos(s_heading)
+        srx, srz = math.cos(s_heading), -math.sin(s_heading)
+        sg, sw = sample(sx, sz)
+        s_obb = rotate(box(sx - 1.32, sz - 2.62, sx + 1.32, sz + 2.62), -math.degrees(s_heading), origin=(sx, sz))
+        s_wheels_ok = (
+            sw == -32768
+            and on_motor(sx, sz)
+            and not facades.query(s_obb, predicate='intersects').size
+            and all(
+                sample(sx + ox * srx + oz * sfx, sz + oz * sfz + ox * srz)[1] == -32768
+                and on_motor(sx + ox * srx + oz * sfx, sz + oz * sfz + ox * srz)
+                for ox in (-0.80, 0.80) for oz in (-1.35, 1.35)
+            )
+        )
+        if s_wheels_ok:
+            cars.append([round(sx, 1), round(sg, 2), round(sz, 1), round(s_heading, 3), s_paint])
+
     return dict(
         cars=cars,
         motorGrid=[left, top, cols, rows, MOTOR_STEP],

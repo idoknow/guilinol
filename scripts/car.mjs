@@ -313,15 +313,18 @@ try {
   await interactExact('下车')
   assert.equal(await page.evaluate(() => window.viewer.walk.vehicle), 'foot')
 
+  // Starter roadside car check: guaranteed near Zhengyang south exit on Jiefang East Rd (-572, -92).
+  assert(data.cars.some(c => Math.hypot(c[0] - -572, c[2] - -92) < 6), 'missing starter sedan near (-572, -92)')
   // Case C: Yiren Rd -> Zhengyang Pedestrian Street exclusion & boundary/wall stop + reverse escape + door dismount.
   const zyNearCar = [...data.cars].sort((a, b) => Math.hypot(a[0] - -685, a[2] - 188) - Math.hypot(b[0] - -685, b[2] - 188))[0]
   await settleAt(zyNearCar[0], zyNearCar[2], zyNearCar[3])
   await interactExact('开车')
   const pullOut = await steerCarTo([-700.0, 183.5], 900, 4.0)
   assert(pullOut.traveled > 45 && pullOut.targetDist <= 4.5, `failed to merge onto Yiren Rd centerline: ${JSON.stringify(pullOut)}`)
-  const pedBlock = await steerCarTo([-640.0, 202.0], 900, 2.0)
+  // Aim south of relocated zhengyang_clock (-655.2, 195.5) into Zhengyang Pedestrian Street so pure motorMask 'off-road' blocks entry.
+  const pedBlock = await steerCarTo([-656.0, 214.0], 900, 2.0)
   console.log('Zhengyang pedestrian block:', pedBlock)
-  assert(pedBlock.traveled > 25 && pedBlock.targetDist > 16 && pedBlock.obstacle === 'off-road' && !motorAt(-640.0, 202.0) && motorAt(pedBlock.end[0], pedBlock.end[2]), `car must not enter Zhengyang Pedestrian Street: ${JSON.stringify(pedBlock)}`)
+  assert(pedBlock.traveled > 25 && pedBlock.targetDist > 10 && pedBlock.obstacle === 'off-road' && !motorAt(-640.0, 202.0) && !motorAt(-656.0, 214.0) && motorAt(pedBlock.end[0], pedBlock.end[2]), `car must not enter Zhengyang Pedestrian Street: ${JSON.stringify(pedBlock)}`)
 
   // Steer into nearby building wall, verify clean stop + reverse escape + door dismount.
   const wallCheck = await page.evaluate(() => {

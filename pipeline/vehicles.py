@@ -74,13 +74,27 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
     bikes, bicycles = [], []
     for idx, group in enumerate(groups):
         (bicycles if idx % 3 == 2 else bikes).extend(group)
+    # Guaranteed starter e-bike & pedal bicycle in the open plaza ahead of default walk spawn (-588, -212),
+    # clear of the south wall and west aisle and angled east-southeast toward the exit corridor.
+    for target_list, (sx, sz, s_yaw, s_paint) in (
+        (bikes, (-584.5, -204.5, -1.64, 0)),
+        (bicycles, (-591.5, -204.5, -1.64, 2)),
+    ):
+        pt = Point(sx, sz)
+        if bounds.contains(pt):
+            sg, sw = sample(sx, sz)
+            if sw == -32768 and not obstacles.query(pt.buffer(0.8), predicate='intersects').size:
+                entry = [round(sx, 1), round(sg, 1), round(sz, 1), round(s_yaw, 3), s_paint]
+                target_list.append(entry)
+                placed.append(entry)
+                extras.append(pt.buffer(12.0))
     if interchange is not None:
         origin,angle,bank_pavement=interchange
         transform=np.array([[math.cos(angle),math.sin(angle)],[-math.sin(angle),math.cos(angle)]])
         axis=np.array([[-140,0],[140,0]])@transform+origin
         extras.extend((LineString(axis).buffer(21.5,cap_style='flat'),bank_pavement))
-        # Lower bike stand beside the northern landing, approached on foot.
-        x,z=np.array([-118,-31])@transform+origin
+        # Lower bike stand beside the northern landing, clear of the +0.45 m west-bank portal steps.
+        x,z=np.array([-117.5,-26.0])@transform+origin
         bikes.append([round(x,2),sample(x,z)[0]+.2,round(z,2),round(angle,3),1])
     pavement = union_all(roads+extras).buffer(3)
     mask = intersects_xy(pavement,xs[None,:],zs[:,None])

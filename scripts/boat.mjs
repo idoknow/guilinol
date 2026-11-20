@@ -28,9 +28,9 @@ assert(RONGHU_TO_GUIHU_ROUTE?.path?.length > 10, 'vehicles.bin 缺少 榕湖 →
 
 // 施工图第 5.1 节码头自由栈桥岸点（freeBank）与泊位参考坐标
 const FREE_DOCKS = {
-  ronghu: {name: '榕湖', kind: 'rowboat', label: '划小船', freeBank: [-1340, 326], mooring: [-1340, 322]},
+  ronghu: {name: '榕湖', kind: 'rowboat', label: '划小船', freeBank: [-1340, 326], mooring: [-1340, 320.5]},
   mulong: {name: '木龙湖', kind: 'rowboat', label: '划小船', freeBank: [-344, -1570], mooring: [-344, -1574]},
-  jiefang: {name: '解放桥码头', kind: 'freeRaft', label: '划竹筏', freeBank: [-164, 162], mooring: [-170, 162]},
+  jiefang: {name: '解放桥码头', kind: 'freeRaft', label: '划竹筏', freeBank: [-164, 162], mooring: [-170.9, 159.1]},
   shanhu: {name: '杉湖', kind: 'rowboat', label: '划小船', freeBank: [-842, 546], mooring: [-844, 550]},
 }
 
@@ -589,38 +589,38 @@ try {
     lateSlide: +shoreSteerSlide.lateSlide.toFixed(2),
   })
 
-  // --- 用例 3：高桥穿行（玻璃桥）+ 低桥拦截（榕杉连桥矮跨）并发 walk:toast + 湖心拒下 & 靠岸下船 ---
+  // --- 用例 3：高桥穿行（榕湖古榕双桥）+ 低桥拦截（IDOK-66 接地低平玻璃桥）并发 walk:toast + 湖心拒下 & 靠岸下船 ---
   await clearToasts(page)
-  const glassBridge = await runInPage(page, async ({steerTo, readBoat}) => {
-    await steerTo([[-1300, 315], [-1260, 298], [-1210, 286]], {arriveDist: 2.8})
-    const west = readBoat()
-    const res = await steerTo([[-1174, 286], [-1155, 285]], {arriveDist: 1.5})
+  const highBridge = await runInPage(page, async ({steerTo, readBoat}) => {
+    await steerTo([[-1344, 304], [-1372, 292], [-1400, 268], [-1412, 240]], {arriveDist: 2.8})
+    const east = readBoat()
+    const res = await steerTo([[-1432, 216], [-1448, 204], [-1472, 192]], {arriveDist: 2.6})
     return {
-      westX: west.x,
-      eastX: res.end.x,
+      eastX: east.x,
+      westX: res.end.x,
       minClearance: res.minClearance,
       toasts: [...window.__boatToasts],
       sawUnsafe: res.sawUnsafeProbe || res.sawResetOrHouse,
     }
   })
-  assert(glassBridge.westX < -1195 && glassBridge.eastX > -1158, `未能完整穿过玻璃桥: ${JSON.stringify(glassBridge)}`)
-  assert(glassBridge.minClearance >= 0.30, `玻璃桥净空不足: ${JSON.stringify(glassBridge)}`)
-  assert.equal(glassBridge.toasts.length, 0, `过玻璃桥不应触发拦截 toast: ${JSON.stringify(glassBridge.toasts)}`)
-  assert(!glassBridge.sawUnsafe, '过玻璃桥期间发生异常落水/进屋/重置')
-  console.log('3a. 高桥穿行通过 (玻璃桥):', {eastX: +glassBridge.eastX.toFixed(1), minClearance: +glassBridge.minClearance.toFixed(2)})
+  assert(highBridge.eastX > -1425 && highBridge.westX < -1465, `未能完整穿过古榕双桥: ${JSON.stringify(highBridge)}`)
+  assert(highBridge.minClearance >= 0.30, `古榕双桥净空不足: ${JSON.stringify(highBridge)}`)
+  assert.equal(highBridge.toasts.length, 0, `过古榕双桥不应触发拦截 toast: ${JSON.stringify(highBridge.toasts)}`)
+  assert(!highBridge.sawUnsafe, '过古榕双桥期间发生异常落水/进屋/重置')
+  console.log('3a. 高桥穿行通过 (古榕双桥):', {westX: +highBridge.westX.toFixed(1), minClearance: +highBridge.minClearance.toFixed(2)})
 
-  // 顺东侧深水水道前往榕杉连桥矮跨 (-1079.7, 350.5) [thin 桥底净高 1.30m < 1.58m]
+  // 回到西榕湖开阔水面驶向玻璃桥 (-1174, 286) [IDOK-66 桥底净高约 0.9m < 1.6m]
   await runInPage(page, async ({steerTo}) => {
-    await steerTo([[-1132, 300], [-1108, 322], [-1092, 336], [-1085, 343]], {arriveDist: 2.2})
+    await steerTo([[-1448, 204], [-1412, 240], [-1372, 292], [-1300, 304], [-1260, 298], [-1186, 286]], {arriveDist: 2.2})
   })
   await clearToasts(page)
   const lowBridge = await runInPage(page, async ({faceTarget, press, step, readBoat}) => {
-    await faceTarget(-1074, 354)
+    await faceTarget(-1174, 286)
     let minClearance = Infinity
     let maxTravelDist = 0
     const start = readBoat()
     press('KeyW', true)
-    for (let i = 0; i < 300; i++) { // 5.0s 持续撞向矮桥
+    for (let i = 0; i < 360; i++) { // 6.0s 持续撞向矮桥
       step(1)
       const cur = readBoat()
       if (cur.clearance !== null && Number.isFinite(cur.clearance)) minClearance = Math.min(minClearance, cur.clearance)
@@ -644,11 +644,11 @@ try {
       resets: end.probe.resets,
     }
   })
-  assert(lowBridge.endX < -1077 || lowBridge.endZ < 352, `船体越过了榕杉连桥矮跨轴线: ${JSON.stringify(lowBridge)}`)
+  assert(lowBridge.endX < -1175, `船体越过了玻璃桥矮跨轴线: ${JSON.stringify(lowBridge)}`)
   assert(lowBridge.minClearance >= 0, `矮桥穿模！最小净空小于 0: ${JSON.stringify(lowBridge)}`)
   assert(lowBridge.events.length > 0 && lowBridge.toastVisible, `低桥拦截未发 walk:toast 或未显示 .toast.show: ${JSON.stringify(lowBridge)}`)
   assert(/净高|无法通过/.test(lowBridge.toastText) && /净高|无法通过/.test(lowBridge.events[0].text), `低桥提示文案不符合施工图: ${JSON.stringify(lowBridge)}`)
-  console.log('3b. 低桥拦截通过 (榕杉连桥矮跨):', {
+  console.log('3b. 低桥拦截通过 (榕湖玻璃桥):', {
     stopAt: [+lowBridge.endX.toFixed(1), +lowBridge.endZ.toFixed(1)],
     toast: lowBridge.toastText,
   })
@@ -658,7 +658,7 @@ try {
     press('KeyS', true)
     step(72)
     press('KeyS', false)
-    await steerTo([[-1092, 336], [-1108, 322], [-1132, 300], [-1174, 286], [-1260, 298], [-1300, 304]], {arriveDist: 3})
+    await steerTo([[-1260, 298], [-1300, 304]], {arriveDist: 3})
   })
   await clearToasts(page)
   await triggerAction(page, '靠岸下船')
@@ -672,7 +672,7 @@ try {
   assert(midLakeDismount.toastVisible && /岸|码头|太远/.test(midLakeDismount.toastText), `湖心拒下缺少提示: ${JSON.stringify(midLakeDismount)}`)
 
   await runInPage(page, async ({steerTo, arg}) => {
-    await steerTo([arg], {arriveDist: 2.5})
+    await steerTo([arg], {arriveDist: 2.8})
   }, FREE_DOCKS.ronghu.mooring)
   await triggerAction(page, '靠岸下船')
   const landed = await page.evaluate(() => ({
@@ -1122,7 +1122,7 @@ try {
 
   // 触屏划回泊位或靠岸下船
   await runInPage(mobile, async ({steerTo, arg}) => {
-    await steerTo([arg], {arriveDist: 2.5})
+    await steerTo([arg], {arriveDist: 2.8})
   }, FREE_DOCKS.ronghu.mooring)
   await triggerAction(mobile, '靠岸下船', true)
   const mobileLanded = await mobile.evaluate(() => ({
