@@ -25,8 +25,8 @@ export async function sessionHash(request:Request) {
 export async function limit(db:D1Database,key:string,max:number,seconds:number) {
   const time=now()
   const result=await db.prepare(`INSERT INTO rate_limits VALUES(?,?,1) ON CONFLICT(key) DO UPDATE SET
-    hits=CASE WHEN until<=? THEN 1 ELSE hits+1 END, until=CASE WHEN until<=? THEN excluded.until ELSE until END
-    WHERE until<=? OR hits<?`).bind(key,time+seconds,time,time,time,max).run()
+    hits=CASE WHEN rate_limits.until<=? THEN 1 ELSE rate_limits.hits+1 END, until=CASE WHEN rate_limits.until<=? THEN excluded.until ELSE rate_limits.until END
+    WHERE rate_limits.until<=? OR rate_limits.hits<?`).bind(key,time+seconds,time,time,time,max).run()
   if (!result.meta.changes) limited()
 }
 export async function reserveMail(db:D1Database,email:string,ip:string) {

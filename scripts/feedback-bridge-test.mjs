@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {view,uploadShot} from './feedback-view-fixture.mjs'
-import { execFileSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -45,12 +46,11 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
     MULTICA_CLI_PATH: cli,
     BRIDGE_STATE: join(state, 'journal'),
   }
-  const run = (...flags) =>
-    execFileSync(process.execPath, ['scripts/feedback-bridge.mjs', ...flags], {
+  const run = async (...flags) =>
+    (await promisify(execFile)(process.execPath, ['scripts/feedback-bridge.mjs', ...flags], {
       env,
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
+    })).stdout
   const load = async () => JSON.parse(await readFile(fixture))
   const set = async (values) => writeFile(fixture, JSON.stringify({ ...(await load()), ...values }))
   await writeFile(fixture, JSON.stringify({ creates: 0, status: 'todo', comments: [], replies: [] }))
@@ -77,21 +77,21 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
       200,
     )
   await api(path + '/submit', {})
-  const dry = run('--dry-run')
+  const dry = await run('--dry-run')
   assert.match(dry, /桥头/)
   console.log('DRY RUN BEGIN\n' + dry + 'DRY RUN END')
   assert.equal((await load()).creates, 0)
-  assert.throws(() => run())
+  await assert.rejects(run())
   const journalPath = (feedbackId) => join(env.BRIDGE_STATE, feedbackId + '.json')
   const journal = async (feedbackId) => JSON.parse(await readFile(journalPath(feedbackId)))
   await set({ failCommand: 'issue children' })
-  assert.throws(() => run())
-  assert.throws(() => run())
+  await assert.rejects(run())
+  await assert.rejects(run())
   assert.equal((await journal(id)).failures, 1)
   await set({ failCommand: null })
-  run()
+  await run()
   assert.equal((await journal(id)).failures, undefined)
-  run()
+  await run()
   let data = await load()
   assert.equal(data.creates, 1)
   assert.deepEqual(data.sizes, [picture.length,picture.length, picture.length])
@@ -106,11 +106,11 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
     assert.equal(data.args[data.args.indexOf(key) + 1], value)
   assert.equal((await api(path)).status,'submitted');assert.match(data.body,/待管理员批准/)
   const approve=async id=>api(`admin/feedback/${id}/status`,{status:'approved'});await sql("UPDATE users SET role='admin',notify_email=1; UPDATE feedback_mail SET next_at=0")
-  await set({comments:[{id:'clarify',author_id:'agent',author_type:'agent',created_at:new Date().toISOString(),content:'```feedback-reply\n是桥头吗？\n```'}]});await api(path+'/messages',{body:'是的'});run();run()
+  await set({comments:[{id:'clarify',author_id:'agent',author_type:'agent',created_at:new Date().toISOString(),content:'```feedback-reply\n是桥头吗？\n```'}]});await api(path+'/messages',{body:'是的'});await run();await run()
   assert.equal((await api(path)).messages.filter(m=>m.author_kind==='agent').length,1);assert.equal((await load()).replies.filter(m=>m.startsWith('用户回复：')).length,1);assert.match(mailLog(),/DEV_NOTIFICATION/)
-  await approve(id);run();run();assert.equal((await load()).replies.filter(m=>m.startsWith('管理员已批准')).length,1)
+  await approve(id);await run();await run();assert.equal((await load()).replies.filter(m=>m.startsWith('管理员已批准')).length,1)
   await set({ status: 'in_progress' })
-  run()
+  await run()
   await set({
     status: 'in_review',
     comments: [
@@ -123,8 +123,8 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
       },
     ],
   })
-  run()
-  run()
+  await run()
+  await run()
   const shot = (await api(path)).events.at(-1).screenshot_url
   assert.match(shot, /^\/api\/feedback\/comparisons\/[a-f0-9]{64}$/)
   assert.equal((await fetch(origin + shot)).headers.get('content-type'), 'image/png')
@@ -139,28 +139,28 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
       },
     ],
   })
-  run()
-  run()
+  await run()
+  await run()
   let detail = await api(path)
   assert.equal(detail.events.at(-1).message, '请补充背面照片。')
   assert.equal(detail.multica_issue, 'model-1')
   await api(path + '/supplement', { body: '已核对背面' })
   await set({ failCommand: 'issue comment add' })
-  assert.throws(() => run())
+  await assert.rejects(run())
   await set({ failCommand: null })
-  run()
+  await run()
   assert.equal((await journal(id)).failures, undefined)
-  await approve(id);run()
+  await approve(id);await run()
   await set({ status: 'in_progress' })
-  run()
+  await run()
   assert.ok((await load()).replies.some(reply=>reply.includes('已核对背面')))
   await writeFile(join(staticDir, 'version.json'), JSON.stringify({ sha: 'b'.repeat(40) }))
   await set({ pr: true, status: 'done' })
-  run()
+  await run()
   assert.equal((await api(path)).status, 'reviewing')
   await writeFile(join(staticDir, 'version.json'), JSON.stringify({ sha: 'a'.repeat(40) }))
-  run()
-  run()
+  await run()
+  await run()
   detail = await api(path)
   assert.deepEqual(
     detail.events.map((event) => event.status),
@@ -206,11 +206,11 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
       completed_at: new Date(time).toISOString(),
     })),
   })
-  assert.throws(() => run())
+  await assert.rejects(run())
   await approve(next)
-  run()
-  run()
-  run()
+  await run()
+  await run()
+  await run()
   assert.deepEqual(
     (await api('feedback/' + next)).events.map((event) => event.status),
     ['submitted','approved', 'queued'],
@@ -222,8 +222,8 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
   delete recovered.alerted
   recovered.runsAfter = Date.now()
   await writeFile(journalPath(next), JSON.stringify(recovered))
-  run()
-  run()
+  await run()
+  await run()
   assert.deepEqual(
     (await api('feedback/' + next)).events.map((event) => event.status),
     ['submitted','approved', 'queued', 'modelling'],

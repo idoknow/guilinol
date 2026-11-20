@@ -1,4 +1,6 @@
-## sg 主机上安装（仅由验收人执行）
+## 旧版 sg timer（仅作切换前与回滚参考）
+
+正式部署改用 `idoknow/glol-feedback-bridge` CronJob，参见 `docs/deploy-hk.md`。不要同时启用以下 timer 与集群 CronJob。
 
 使用专用的私有工作目录 `~/guilinol`，或修改 service 的 WorkingDirectory。需要 Linux util-linux `flock`、Node 22、已登录相应 workspace 的 Multica daemon CLI、对私库有只读访问权的 `gh`。确保 user service 的 PATH 可找到它们（必要时在 env 写入完整 PATH）。不要使用短期任务 checkout。
 

@@ -7,19 +7,20 @@ import {join} from 'node:path'
 import {createServer} from 'node:net'
 import {setTimeout as delay} from 'node:timers/promises'
 import {chromium} from 'playwright'
+import {fixture} from './selfhost-test.mjs'
+import {preview} from 'vite'
 
 const adminUI=process.argv.includes('--admin-ui'),feedbackUI=process.argv.includes('--feedback-ui'),ui=adminUI||feedbackUI||process.argv.includes('--ui'), email='walker@example.test', password='local-test-password', nickname='漓江访客'
-const state=await mkdtemp(join(tmpdir(),'glol-auth-')), wrangler='node_modules/.bin/wrangler'
-const local=['--local','--persist-to',state]
-async function sql(command){const response=once(child,'message');child.send(command);const [result]=await response;if(result.error)throw Error(result.error);return result.rows}
-let child,browser,logs='',closed
+const state=await mkdtemp(join(tmpdir(),'glol-auth-'))
+let child,browser,logs='',closed,storage,site
+async function sql(command){return storage.sql(command)}
 try {
-  execFileSync(wrangler,['d1','migrations','apply','glol',...local],{stdio:['ignore','pipe','inherit']})
+  storage=await fixture()
   const probe=createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');const port=probe.address().port;await new Promise(resolve=>probe.close(resolve))
-  const origin=`http://127.0.0.1:${port}`
   const staticDir=ui?'dist':join(state,'empty-site');if(!ui)await mkdir(staticDir)
-  execFileSync(wrangler,['pages','functions','build','--outdir',join(state,'pages')],{stdio:['ignore','pipe','inherit']})
-  child=spawn(process.execPath,['scripts/pages-test-server.mjs',state,staticDir,String(port)],{stdio:['ignore','pipe','pipe','ipc'],detached:true});closed=once(child,'exit')
+  site=await preview({configFile:false,build:{outDir:staticDir},preview:{host:'127.0.0.1',port:0,proxy:{'/api':`http://127.0.0.1:${port}`}}})
+  const origin=`http://127.0.0.1:${site.httpServer.address().port}`
+  child=spawn(process.execPath,['--import','tsx','server/index.mjs'],{env:{...process.env,...storage.env,PORT:String(port),PUBLIC_ORIGIN:origin,BRIDGE_TOKEN:'local-test',EMAIL_DEV_LOG:'1'},stdio:['ignore','pipe','pipe'],detached:true});closed=once(child,'exit')
   for(const stream of [child.stdout,child.stderr])stream.on('data',chunk=>logs+=chunk)
   for(let attempt=0;attempt<200;attempt++) {
     if(await fetch(origin+'/api/me').then(response=>response.status===401).catch(()=>false))break
@@ -78,5 +79,5 @@ try {
 }catch(error){
   console.error(logs.slice(-6000).replace(/(DEV_EMAIL \S+ \S+) \d{6}/g,'$1 [redacted]'));throw error
 }finally{
-  await browser?.close();if(child&&child.exitCode===null&&child.signalCode===null){process.kill(-child.pid,'SIGTERM');await closed}await rm(state,{recursive:true,force:true})
+  await browser?.close();if(child&&child.exitCode===null&&child.signalCode===null){process.kill(-child.pid,'SIGTERM');await closed}await site?.close();await storage?.close();await rm(state,{recursive:true,force:true})
 }
