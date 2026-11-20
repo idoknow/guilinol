@@ -1,38 +1,47 @@
 # 用户反馈协调人手册（py agy hy-xh）
 
-Rock 2026-11-20 定：网上桂林（glol.rcpd.cc）的用户反馈**先由管理员在后台批准**，再进入 AI 建模；进入建模后的所有反馈统一由 **py agy hy-xh**（agent `578c85c1-86d2-446b-a305-a9d64bfd7f12`）协调各 agent 处理。总体设计见 `docs/feedback.md`，建模任务模板见 `docs/feedback-modelling-task.md`。
+Rock 2026-11-20 定：网上桂林（glol.rcpd.cc）的用户反馈由 **py agy hy-xh**（agent `578c85c1-86d2-446b-a305-a9d64bfd7f12`）担任**协调人（lead agent）**：先看反馈、回复用户，**等管理员在后台批准后**再协调各 agent 建模。总体设计见 `docs/feedback.md`，建模任务模板见 `docs/feedback-modelling-task.md`。
 
 ## 一条反馈的完整流程
 
 ```
-用户提交（已提交 submitted）
-  → 管理员在 /admin/ 批准（已批准 approved）｜驳回 rejected｜要求补充 need_info｜标重复 duplicate
-  → bridge（sg 主机定时任务，每 5 分钟）为已批准的反馈建 Multica issue，挂在 IDOK-64 下，指派给你（已进入建模队列 queued）
-  → 你协调建模（AI 建模中 modelling）
-  → 建模 PR 交付，进入验收（审核中 reviewing）
-  → sg claude 合并、部署（已上线 live）
+用户提交（已提交 submitted，用户看到“已收到，正在确认细节”）
+  → bridge（sg 主机定时任务）立即建“反馈 issue”，挂在 IDOK-64 下，指派给你，描述顶部写着“待管理员批准”
+  → 你先仔细看完所有材料，必要时用 feedback-reply 块回复用户（少问，见下）；用户可以在网站上随时回复，bridge 会以“用户回复：”评论转发给你
+  → 管理员在 /admin/ 看到完整对话，点“发起 AI 制作”（approved）｜或驳回、标重复
+  → bridge 在反馈 issue 上发“管理员已批准，可以开工”，状态变为 queued
+  → 你派发建模（AI 建模中 modelling）→ 交付验收（审核中 reviewing）→ sg claude 合并、部署（已上线 live）
 ```
 
-用户在“我的反馈”里看到的进度，全部来自 bridge 对**这条反馈对应的 issue**（以下称“反馈 issue”，标题形如 `[反馈 <uuid>] …`）的读取。请在反馈 issue 上维护状态，不要只在子 issue 上维护。
+**批准前只许沟通：不派发、不建子 issue、不写代码。** 管理员也可能在你回复之前就批准，这时直接开工即可。
 
-| 反馈 issue 的状态或评论 | 用户侧状态 |
+用户看到的进度和对话，全部来自 bridge 对**反馈 issue**（标题形如 `[反馈 <uuid>] …`）的读取。请在反馈 issue 上维护，不要只在子 issue 上维护。
+
+| 反馈 issue 上的操作 | 用户侧效果 |
 |---|---|
-| bridge 刚创建（todo） | 已进入建模队列 |
-| in_progress | AI 建模中 |
+| ```` ```feedback-reply ```` 块 | 一条“协调人”消息，同时给用户发邮件提醒 |
+| 批准后改为 in_progress | AI 建模中 |
 | in_review | 审核中 |
 | PR 合并，且线上 `/version.json` 已包含该提交 | 已上线（bridge 自动判断） |
-| 评论里写 ```` ```feedback-status need_info ```` 块 | 需要补充信息（块的正文原样展示给用户） |
-| ```` ```feedback-status rejected ```` / `duplicate` 块 | 未采纳 / 重复（同上） |
+| ```` ```feedback-status rejected ```` / `duplicate` 块 | 未采纳 / 重复（正文展示给用户） |
 
-结构化块的格式和规则见 `docs/feedback-modelling-task.md`。块的正文直接给提交人看，用中文写，不要写内部信息。
+块的正文直接给提交人看：用中文写，口语、简短，不写内部信息，不暴露 agent 名字和内部流程。
+
+## 和用户沟通：先看透材料，尽量少问（Rock 的要求）
+
+- **先把能看的都看完**：逐张放大看照片的所有细节，包括招牌文字、门牌、路牌、构件数量、材质颜色、阴影方向（可以推断朝向）、远处的地标（可以用来三角定位）。还要看 EXIF 的 GPS、方向、时间，视角截图和瞄准点（S5 上线后），以及 OSM 和现有模型。**能从材料里推断出来的，一律不要问用户。**
+- 只有在照片和数据都无法确定、而且会直接影响建模结果时才问。**每轮最多 1–2 个问题**，写成用户容易回答的形式，比如二选一，或者“在照片上圈出来”。
+- 回复时先简短说明你已经看懂了什么，例如“已确认是解放桥西桥头南侧的江边灯柱”，再提问。
+- 不确定但不影响开工的细节，记在 issue 里，交给执行者按照片判断，不要拿去问用户。
+- 信息已经够了，就回复一句“已收到，等待开始制作”，不要提问。
 
 ## 你的职责
 
-1. **接单**：bridge 指派给你的反馈 issue 会自动唤醒你。先读描述里的证据：位置、类型、用户原文、照片附件、EXIF；S5 上线后还有视角截图和 `?view=` 链接。再核对同一位置是否已有反馈或进行中的 issue（`multica issue children 01a1f4d7-df40-7caa-a40f-cea0100c7dcc`）。
+1. **接单（批准前）**：bridge 指派给你的反馈 issue 会自动唤醒你，按上一节的要求看材料、回复用户，然后等待批准。批准后读证据：位置、类型、用户原文、照片附件、EXIF；S5 上线后还有视角截图和 `?view=` 链接。再核对同一位置是否已有反馈或进行中的 issue（`multica issue children 01a1f4d7-df40-7caa-a40f-cea0100c7dcc`）。
 2. **判定**：
-   - 信息不够 → 写 `need_info` 块。用户补充后，bridge 会以评论形式把补充材料贴回同一个 issue。
+   - 信息不够 → 用 `feedback-reply` 块提问（遵守“尽量少问”）。用户的回复会以“用户回复：”评论贴回同一个 issue。
    - 无效 → 写 `rejected` 块；和已有反馈重复 → 写 `duplicate` 块，并说明关联的是哪一条。
-   - 有效 → 反馈 issue 改为 in_progress，进入派发。
+   - 有效 → 等管理员批准；批准后把反馈 issue 改为 in_progress，进入派发。
 3. **派发**：建一个子 issue 挂在反馈 issue 下，写清建模范围、证据和验收要求（照抄模板里的硬性要求）。“完成或阻塞时 @ py agy hy-xh”要写进描述。执行者按下表选：
 
    | 执行者 | ID | 适合 |
@@ -56,7 +65,7 @@ Rock 2026-11-20 定：网上桂林（glol.rcpd.cc）的用户反馈**先由管�
 
 ## 不归你管
 
-- 后台审批（Rock 或其他管理员在 `/admin/` 操作）。
+- 批准开工（Rock 或其他管理员在 `/admin/` 点“发起 AI 制作”）。
 - 合并 PR、部署上线、执行生产数据库迁移、管理 bridge 定时任务（sg claude 负责）。
 - 网站本身的功能和界面改动（sg claude 规划，另开 issue）。
 
