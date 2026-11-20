@@ -33,24 +33,38 @@ def crossing(builder,path,widths,heights,arch_segment=None):
         arched = index == arch_segment
         for panel in range(count):
             def section(fraction):
-                rise = math.sin(math.pi*fraction)*2.15 if arched else 0
+                rise = 2.15*min(fraction/.48, (1-fraction)/.26, 1) if arched else 0
                 height = heights[index]*(1-fraction)+heights[index+1]*fraction+rise
                 return [np.array([pos[0],height,pos[1]]) for pos in
                         (left*(1-fraction)+end_left*fraction,right*(1-fraction)+end_right*fraction)]
             near_left,near_right = section(panel/count)
             far_left,far_right = section((panel+1)/count)
             surface = [near_left,near_right,far_right,far_left]
-            stone.face(surface,(0,1,0),'granite',1.4)
             if arched:
-                def underside(fraction):
-                    return -4.9+3.72*math.sqrt(max(0,1-((fraction-.5)/.39)**2))
+                # Level stone treads over a continuous walkable ramp.
+                steps = 4 if builder.detail else 2
+                for tread in range(steps):
+                    a0,a1 = section((panel+tread/steps)/count)
+                    b0,b1 = section((panel+(tread+1)/steps)/count)
+                    y = max(a0[1],b0[1])
+                    lip = [np.array([pt[0],y+.02,pt[2]]) for pt in (a0,a1,b1,b0)]
+                    stone.face(lip,(0,1,0),'granite',1.4)
+                    stone.face([a0,a1,lip[1],lip[0]],a0-b0,'ashlar')
+                    stone.face([b1,b0,lip[3],lip[2]],b0-a0,'ashlar')
+
+                def underside(point,fraction):
+                    arch = math.sqrt(max(0,1-((fraction-.5)/.39)**2))
+                    bed = ground(point[0],point[2])-.06
+                    return bed+(point[1]-.50-bed)*arch
                 soffit=[point.copy() for point in surface]
                 for corner,point in enumerate(soffit):
-                    point[1]=underside((panel+int(corner>=2))/count)
+                    point[1]=underside(point,(panel+int(corner>=2))/count)
                 stone.face(soffit,(0,-1,0),'ashlar',1.1)
                 for first,last in ((0,3),(1,2)):
                     outward=surface[first]-surface[1-first]
                     stone.face([soffit[first],soffit[last],surface[last],surface[first]],outward,'white',None)
+            else:
+                stone.face(surface,(0,1,0),'granite',1.4)
             if builder.collide:
                 builder.hit.face(surface,(0,1,0),'granite',None)
             for start,end,side in ((near_left,far_left,-1),(near_right,far_right,1)):
@@ -102,7 +116,7 @@ def nine_bends(builder):
     ramp(stone,(75.1,ground(75.1,34.4)+.05,34.4),(75.2,near,38.2),2.8)
     if builder.collide:
         ramp(builder.hit,(75.1,ground(75.1,34.4)+.05,34.4),(75.2,near,38.2),2.8)
-    crossing(builder,NINE_BENDS,[2.8,2.8,2.8,2.8,4.2,4.2,2.8,2.8,2.8,2.8],
+    crossing(builder,NINE_BENDS,[2.8,2.8,2.8,2.8,2.9,2.9,2.8,2.8,2.8,2.8],
              near+(far-near)*lengths/lengths[-1],5)
 
 

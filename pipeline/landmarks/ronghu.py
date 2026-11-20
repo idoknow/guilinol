@@ -16,19 +16,21 @@ Colors: roof #393943, column #9a3832, library wall #adaaa6, column #a7a4a1.
 import math
 import random
 import sys
-from rong_paving import slab_texture
+from rong_paving import pave, slab_texture
+from rong_ground import ISLAND_COURT, RILL_COURT_EDGE, rill_north_path
 from rong_bridges import nine_bends, ancient_bridge
 from rong_surface import ground, water, bank_top, bank_strip, shoreline_z, island_top
 from rong_street import scooter
-from rong_solids import oval, torus, banyan as solid_tree
+from rong_solids import loft, oval, torus, banyan as solid_tree
 from rong_solids import banyan, align_front
-from c_kit import RECTS
+from c_kit import RECTS, _font
 from PIL import ImageDraw
+from shapely.geometry import LineString
 from pathlib import Path
 
 from c_kit import (
     Builder, arch_wall, box, cylinder, ensure_textures, export_landmark, solid,
-    extrude, grille, hip_roof, railing, ramp, stairs, star, tri_count, tube, ring,
+    extrude, garden_gate_roof, grille, hip_roof, segment_wall, railing, ramp, stairs, star, tri_count, tube, ring,
 )
 
 
@@ -48,7 +50,11 @@ def pavilion(b, x, z, span=5.4, column_h=2.75, roof='blacktile'):
     y = ground(x,z+half+2.4)
     bank_strip(wall, pad, lambda px,pz: deck, 'ashlar')
     start=len(wall.pos)
-    stairs(wall, (x, y, z+half+2.4), (x, deck, z+half-.2), 1.8, 5 if b.detail else 3, 'granite')
+    count = 5 if b.detail else 3
+    for step in range(count):
+        level = y+(deck-y)*(step+1)/count
+        south = z+half+2.4-2.6*(step+.5)/count
+        box(wall,(x,(level+y)/2,south),(1.8,level-y,2.6/count+.02),'granite')
     for i in range(start,len(wall.pos)):
         px,py,pz=wall.pos[i]
         if abs(py-y)<.01:
@@ -110,20 +116,65 @@ def island(b):
         for south in (138.6,153.1):
             box(wall,(east,.38,south),(2.02,.32,3.5),'foliage',None)
             oval(wall,(east,.65,south),(.97,.48,.85),'foliage',7)
+    pave(b, ISLAND_COURT, .35)
     # IMG_1324 sees this pierced limestone at the island landing, north of the wall.
-    torus(wall,(116,1.93,126),1.43,.39,.48,'limestone', .14, stretch=1.14)
+    torus(wall,(119,1.93,125),1.43,.39,.48,'limestone', .14, stretch=1.14)
+    # The narrow weathered crown rises above the circular opening.
+    for offset,level,radius in ((-.22,3.87,.54),(.13,4.61,.42),(-.12,5.15,.3)):
+        torus(wall,(119+offset,level,125),radius,.22,.36,'limestone',.18,stretch=1.2)
     for offset in (-.7,0,.7):
-        oval(wall,(116+offset,.5,126),(.85,.45,.6),'limestone',8)
-    arch_wall(wall,(130,.24,132),4.2,3.2,.48,2.2,2.75,'garden_brick',tile=None)
-    for east in (125.8,134.2):
-        box(wall,(east,.82,132),(4.2,1.16,.48),'garden_brick',None)
-        box(wall,(east,3.13,132),(4.2,.64,.48),'garden_brick',None)
+        oval(wall,(119+offset,.5,125),(.85,.45,.6),'limestone',8)
+    with align_front(b, (130,132), 24, shift=(-20,1)):
+        arch_wall(wall,(130,.24,132),4.2,3.2,.48,2.2,2.75,'garden_brick',tile=None)
         for side in (-1,1):
-            box(wall,(east+side*1.65,2.09,132),(.92,1.42,.48),'garden_brick',None)
-        for offset in (-.9,-.45,0,.45,.9):
-            box(wall,(east+offset,2.09,132),(.09,1.42,.16),'ashlar')
-        for height in (1.76,2.4):
-            box(wall,(east,height,132),(2.5,.1,.18),'ashlar')
+            # Leave sky above the curved gable. The pierced brick screen joins
+            # it at its low outer end instead of hiding it in a rectangular wall.
+            shoulder = [(2.1,3.34),(2.30,3.13),(2.47,2.68),(2.55,2.14),
+                        (2.70,1.82),(3.02,1.55),(3.35,1.45),(3.67,1.46)]
+            for (dx,h),(ex,k) in zip(shoulder,shoulder[1:]):
+                a,c = 130+side*dx,130+side*ex
+                for face in (131.76,132.24):
+                    wall.face([(a,.24,face),(c,.24,face),(c,k,face),(a,h,face)],
+                              (0,0,face-132),'garden_brick',None)
+                wall.face([(a,h,131.76),(c,k,131.76),(c,k,132.24),(a,h,132.24)],
+                          (0,1,0),'limestone')
+            east = 130+side*4.95
+            box(wall,(east,.83,132),(2.58,1.18,.48),'garden_brick')
+            box(wall,(east,2.59,132),(2.58,.34,.48),'garden_brick')
+            for bar in (-1.14,-.58,0,.58,1.14):
+                box(wall,(east+bar,1.92,132),(.13,1.08,.25),'ashlar')
+            box(wall,(east,2.0,132),(2.58,.12,.25),'ashlar')
+        # Projecting lime-plaster reveal; the circular head joins the side mouldings.
+        for side in (-1,1):
+            box(wall,(130+side*1.18,1.12,131.71),(.26,1.76,.23),'white')
+            for j in range(12):
+                a,c = j*math.pi/9,(j+1)*math.pi/9
+                def toe(t):
+                    return (130+side*(1.19+.16*math.cos(t)),.66+.18*math.sin(t),131.60)
+                tube(wall,toe(a),toe(c),.07,'white',6)
+            plaque_x = 130+side*1.67
+            wall.face([(plaque_x+.23,.47,131.64),(plaque_x-.23,.47,131.64),
+                       (plaque_x-.23,2.86,131.64),(plaque_x+.23,2.86,131.64)],
+                      (0,0,-1),'couplet_left' if side<0 else 'couplet_right',
+                      uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
+            # Paired scrolls terminate the stepped brick side walls.
+            for k in range(24):
+                t0,t1 = k/24,(k+1)/24
+                def curl(t):
+                    angle = t*math.pi*2.3
+                    radius = .13+.52*t
+                    return (130+side*(2.83+radius*math.cos(angle)),
+                            1.46+radius*math.sin(angle)+1.04*t*t,131.67)
+                tube(wall,curl(t0),curl(t1),.16,'limestone',8)
+        for k in range(24):
+            a,c = k*math.pi/24,(k+1)*math.pi/24
+            def rim(angle,r):
+                return (130+r*math.cos(angle),1.89+r*math.sin(angle),131.61)
+            wall.face([rim(a,1.06),rim(a,1.32),rim(c,1.32),rim(c,1.06)],
+                      (0,0,-1),'white',None)
+        garden_gate_roof(wall,(130,132),3.44,4.42,1.26,.36)
+        if b.collide:
+            arch_wall(b.hit,(130,.24,132),4.2,3.2,.48,2.2,2.75,'ashlar')
     for index,(east,south) in enumerate(((133,149),(135,150),(138,137),(141,138),(144,139),(147,150))):
         for step in range(2+index%2):
             torus(wall,(east+.28*math.sin(index+step),1+step*.98,south+.13*step),
@@ -270,8 +321,13 @@ def library(b):
         east = x - 30 + index * 1.65
         box(wall, (east,grade(east,z+6)+.19,z+6), (1.68,.42,2.4), 'granite')
         oval(wall, (east,grade(east,z+6)+.55,z+6), (1.02,.6,.95), 'foliage', 8)
-    for east in (x-25,x-23,x-21):
-        oval(wall,(east,grade(east,z+7.2)+.79,z+7.2),(1.12,.84,.75),'limestone',7)
+    # A continuous low planting bed runs from the monument to the banyan.
+    bed_start = len(wall.pos)
+    box(wall,(x-20,.30,z+7.1),(16,.66,2.25),'granite')
+    for index in range(13):
+        east = x-27.3 + 1.23*index
+        oval(wall,(east,.78,z+7.1),(.84,.46,.91),'foliage',8)
+    wall.pos[bed_start:] = [(px,py+grade(px,pz),pz) for px,py,pz in wall.pos[bed_start:]]
     box(wall,(x+17,y+1.1,z+9),(8.4,2.2,.45),'white')
     # Continuous stone sill under the relief figures, keyed into the wall.
     box(wall,(x+17,y+.18,z+9.23),(8.4,.36,.32),'granite')
@@ -283,6 +339,26 @@ def library(b):
         for sign in (-1,1):
             tube(wall,(east+.16*sign,y+1.42,front),(east+.36*sign,y+1.05+index%2*.18,front),.085,'granite',6)
             tube(wall,(east+.1*sign,y+1,front),(east+.2*sign,y+.32,front),.1,'cream',6)
+    # IMG_1341: long robe, right hand at chin, carved against a stepped stone screen.
+    sx, sz = x-27.8, z+7.3
+    statue_meshes = [(m,len(m.pos)) for m in (wall,b.hit)]
+    with align_front(b,(sx,sz),-45):
+        box(wall,(sx,.57,sz),(3.6,1.14,1.1),'granite')
+        box(wall,(sx,1.82,sz-.28),(3.28,1.48,.36),'limestone')
+        box(wall,(sx,1.16,sz),(3.65,.16,1.16),'white')
+        loft(wall,[(sx,1.23,sz+.12,.43,.22),(sx+.06,2.08,sz+.14,.31,.20),
+                   (sx+.03,2.59,sz+.14,.44,.24),(sx,2.68,sz+.15,.16,.13)],'limestone')
+        oval(wall,(sx,2.87,sz+.14),(.18,.24,.16),'limestone')
+        oval(wall,(sx,2.85,sz+.29),(.045,.07,.05),'limestone')
+        for elbow,hand in (((-.42,2.28),(-.05,2.68)),((.46,2.27),(.19,2.03))):
+            ex,ey=elbow
+            hx,hy=hand
+            tube(wall,(sx+ex*.7,2.54,sz+.18),(sx+ex,ey,sz+.31),.105,'limestone',8)
+            tube(wall,(sx+ex,ey,sz+.31),(sx+hx,hy,sz+.38),.085,'limestone',8)
+        if b.collide:
+            box(b.hit,(sx,1.38,sz),(3.6,2.76,1.1),'ashlar')
+    for mesh,start in statue_meshes:
+        mesh.pos[start:] = [(px,py+grade(sx,sz),pz) for px,py,pz in mesh.pos[start:]]
     # South front faces the lake (+Z). Body is 20 m wide, two storeys plus pediment.
     box(wall, (x, y + 4.3, z - 3.2), (20, 8.6, 10), 'cream', 2.2)
     stairs(wall, (x, y, z + 7.2), (x, y + 0.9, z + 2.4), 14.8, 7 if b.detail else 4, 'paver')
@@ -448,6 +524,14 @@ def glass_bridge(builder):
 
 def shore(b):
     wall = b.parts['atlas']
+    # way/155148513 leads to the portal at the east end of way/221882720.
+    path = [(-71.6,-49.5),(-74.3,-43.1),(-86,-33.4),(-116.3,-24.1)]
+    pave(b, list(LineString(path).buffer(2.25,cap_style='flat',join_style='mitre').exterior.coords)[:-1], lambda x,z: ground(x,z)+.05)
+    for height, width, depth in ((6.85,8.65,2.38),(7.20,8.95,2.6),(7.5,9.36,2.9)):
+        box(wall,(-116,height,-24),(depth,.38,width),'limestone')
+    for side in (-1,1):
+        for course in range(6):
+            box(wall,(-116,1.75+course*.78,-24+side*3.4),(2.42,.11,1.99),'limestone')
     for south in (-27.4,-20.6):
         corners=[(-116+dx,south+dz) for dx,dz in ((-1.4,-1.18),(1.4,-1.18),(1.4,1.18),(-1.4,1.18))]
         plinth=max(ground(px,pz) for px,pz in corners)+.18
@@ -463,19 +547,73 @@ def shore(b):
         for radius,side in ((2.48,-1),(4.32,1)):
             wall.face(arc(-117.15,radius)+arc(-114.85,radius)[::-1],(0,side*math.sin(angles[0]),side*math.cos(angles[0])),'white')
     # IMG_1334–36 look along the strip between ways 684511179 and 686230933.
-    rill_start=len(wall.pos)
-    with align_front(b, (0, -17.5), -21):
-        for index in range(10):
-            level=.18
-            east = -16 + index * 4
-            for side in (-1, 1):
-                box(wall, (east, level, -17.5+side*1.24), (4.02,.48,.36), 'granite')
-            box(wall,(east,.065,-17.5),(4,.27,2.20),'ashlar')
-            box(wall, (east,level+.08,-17.5), (4,.1,2.2), 'rill_water')
-            box(wall, (east-1.8,level+.17,-17.5), (.36,.3,2.25), 'ashlar')
-    for i in range(rill_start,len(wall.pos)):
-        px,py,pz=wall.pos[i]
-        wall.pos[i]=(px,py+ground(px,pz),pz)
+    rill_meshes = [(mesh,len(mesh.pos)) for mesh in (wall,b.hit)]
+    with align_front(b, (0, -17.5), -18, shift=(0,1.25)):
+        # Mapped path centre lines in the channel frame, sampled from the November snapshot.
+        def south_path(x):
+            pts = [(-39.955,-18.544),(-12.9,-16.778),(12.635,-14.901),(40.322,-11.318)]
+            for (a,za),(c,zc) in zip(pts,pts[1:]):
+                if x <= c:
+                    return za + (zc-za)*(x-a)/(c-a)
+
+        def channel(x):
+            # Near coping measured at 70–80% image height in 1335 and 1336.
+            controls = [(-18,-17.9),(-11,-18.15),(-8,-18.23),(3,-20.32),
+                        (4,-20.29),(14,-17.5),(16.42,-18.46)]
+            for (a,za),(c,zc) in zip(controls,controls[1:]):
+                if x <= c:
+                    return za+(zc-za)*(x-a)/(c-a)
+
+        def banks(x):
+            return rill_north_path(x)-1.4, south_path(x)+1.7
+
+        paving_level = .07
+
+        # 0.94 m clear water with two 0.25 m stone lips. Carry both paving strips
+        # over the path centres so the side visible in IMG_1336 has no grass seam.
+        stations = [-18,-14,-11,-8,-6,-2,2,3,4,6,10,14,16.42]
+        for left,right in zip(stations,stations[1:]):
+            za,zb = channel(left),channel(right)
+            for i,side in enumerate((-1,1)):
+                ca,cb = za+side*.72,zb+side*.72
+                pave(b,[(left,ca),(right,cb),(right,banks(right)[i]),(left,banks(left)[i])],paving_level)
+                segment_wall(wall,(left,za+side*.595),(right,zb+side*.595),
+                             -.12,.22,.25,'granite')
+            water = [(left,za-.47),(right,zb-.47),(right,zb+.47),(left,za+.47)]
+            wall.face([(x,.08,z) for x,z in water],(0,1,0),'rill_water',None)
+        for i in range(28):
+            x = -17.6 + 1.2*i
+            box(wall,(x,.20,channel(x)),(.50,.34,.50),'granite')
+            if b.collide:
+                box(b.hit,(x,.20,channel(x)),(.50,.34,.50),'ashlar')
+        # Eight-sided terminal basin, 2.25 m across flats plus the perimeter coping.
+        left,right = 16.42,18.67
+        mid,z = (left+right)/2,-18.46
+        pool = [(left,z-.47),(mid-.47,z-1.125),(mid+.47,z-1.125),(right,z-.47),
+                (right,z+.47),(mid+.47,z+1.125),(mid-.47,z+1.125),(left,z+.47)]
+        extrude(wall,pool,-.04,.08,'rill_water',None)
+        for a,c in zip(pool,pool[1:]):
+            segment_wall(wall,a,c,-.12,.22,.25,'granite')
+        for edge,side in ((pool[:4],0),(pool[4:][::-1],1)):
+            for a,c in zip(edge,edge[1:]):
+                pave(b,[a,c,(c[0],banks(c[0])[side]),(a[0],banks(a[0])[side])],paving_level)
+        pave(b,[(right,banks(right)[0]),(25,banks(25)[0]),
+                (25,banks(25)[1]),(right,banks(right)[1])],paving_level)
+        box(wall,(mid,.22,z),(1.00,.44,1.00),'ashlar')
+        for side in (-1,1):
+            box(wall,(mid+side*.34,.51,z),(.36,.14,1.04),'granite')
+            box(wall,(mid,.51,z+side*.34),(.32,.14,.36),'granite')
+        if b.collide:
+            box(b.hit,(mid,.29,z),(1.04,.58,1.04),'ashlar')
+
+        # IMG_1336 shows a paved forecourt on the pavilion side of 686230933.
+        # Tie the path to the plinth, inland of water relation 9373836.
+        for (a,za),(c,zc) in zip(RILL_COURT_EDGE,RILL_COURT_EDGE[1:]):
+            outer_a,outer_c = banks(a)[1],banks(c)[1]
+            pave(b,[(a,outer_a),(c,outer_c),(c,zc),(a,za)],paving_level)
+    for mesh,start in rill_meshes:
+        mesh.pos[start:] = [(x,y+ground(x,z),z) for x,y,z in mesh.pos[start:]]
+    pavilion(b,24,-6,span=4.4)
     px, pz = -46, shoreline_z(-46)-2
     outline = [(px+3*math.cos(i*math.tau/6), pz+3*math.sin(i*math.tau/6)) for i in range(6)]
     level = max(bank_top(x,z) for x,z in outline)
@@ -578,10 +716,18 @@ def main():
                 draw.line((left,top+row*8,left+45,top+row*8),fill='#5b5d5c')
                 for offset in range(row%2*8,46,16):
                     draw.line((left+offset,top+row*8,left+offset,min(top+61,top+row*8+8)),fill='#5b5d5c')
-    for index,(name,color) in enumerate([('lantern_red','#df4233'),('lantern_gold','#ebbd34'),('lantern_cyan','#53b7cf'),('lantern_pink','#eb81a9'),('lantern_orange','#f68526'),('rill_water','#83acbc')]):
+    for index,(name,color) in enumerate([('lantern_red','#df4233'),('lantern_gold','#ebbd34'),('lantern_cyan','#53b7cf'),('lantern_pink','#eb81a9'),('lantern_orange','#f68526'),('rill_water','#425d52')]):
         left=768+index*40
         RECTS[name]=(left,640,36,36)
         draw.rectangle((left,640,left+36,676),fill=color)
+    # Only transcribe the legible characters on the photographed black boards.
+    for col,(region,letters) in enumerate((('couplet_left','七星玉　缀晚景'),
+                                           ('couplet_right','一泓碧水留明月'))):
+        left,top = col*48,768
+        RECTS[region] = (left,top,46,126)
+        draw.rectangle((left,top,left+45,top+125),fill='#172026')
+        for row,char in enumerate(letters):
+            draw.text((left+23,top+10+row*17),char,anchor='mm',font=_font(16),fill='#d5dbcf')
     hi, lo = Builder(0, True), Builder(1, False)
     build(hi)
     build(lo)

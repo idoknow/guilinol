@@ -1,36 +1,24 @@
 from functools import cache
 import math
 import shapely
-from PIL import Image, ImageDraw
+from PIL import ImageDraw
 
-from c_kit import RECTS, _font, box, solid, stairs, ring, tube, railing, extrude
+from c_kit import RECTS, _font, box, solid, tube, railing, extrude, landmark_surface
 from rong_solids import banyan, align_front
 
 
 def signs(image):
     draw = ImageDraw.Draw(image)
     draw.rectangle((384,640,511,767),fill='#81493c')
-    for name,rect,text,size in [('inn',(768,640,64,128),'涵栅雅居',23),('rong',(832,640,192,96),'RONG HOTEL',23)]:
-        RECTS[name]=rect
-        left,top,width,height=rect
-        draw.rectangle((left,top,left+width-1,top+height-1),fill='#322a28')
-        if name=='inn':
-            for index,char in enumerate(text):
-                draw.text((left+width/2,top+(index+.5)*height/4),char,anchor='mm',font=_font(size),fill='white')
-        else:
-            draw.text((left+width/2,top+height/2),text,font=_font(size),anchor='mm',fill='white')
-    RECTS['inn_board'] = (768,736,128,32)
-    draw.rectangle((768,736,895,767),fill='#273748')
-    draw.text((832,752),'涵栅雅居',anchor='mm',font=_font(19),fill='white')
-    sign=Image.new('RGB',(128,512),'#171819')
-    brush=ImageDraw.Draw(sign)
-    for index,char in enumerate('涵栅雅居'):
-        brush.text((64,64+128*index),char,font=_font(107),anchor='mm',fill='#fffaf0')
-    RECTS['inn']=RECTS['sign_school']
-    image.paste(sign.transpose(Image.Transpose.ROTATE_90),(512,768))
-
-
-from c_kit import landmark_surface
+    RECTS['rong'] = (832,640,192,96)
+    draw.rectangle((832,640,1023,735),fill='#322a28')
+    draw.text((928,688),'RONG HOTEL',font=_font(23),anchor='mm',fill='white')
+    # Reserve a full plaque panel for the two lines on the projecting sign.
+    RECTS['inn_board'] = (512,768,320,128)
+    draw.rectangle((512,768,831,895),fill='#161f24')
+    draw.rectangle((516,772,827,891),outline='#e9ebdf',width=2)
+    for row,label in enumerate(('涵栅雅居','民宿酒店')):
+        draw.text((672,800+row*57),label,anchor='mm',font=_font(50),fill='#fffaf0')
 
 
 def shops(builder):
@@ -64,6 +52,9 @@ def shops(builder):
                 mesh.pos[i]=(px,landmark_surface('gunanmen').ground(px,pz)-.04,pz)
     for east,south,width,length,floors,kind in [(10,-51,17,24,4,'rong'),(10,-86,26.3,8.5,3,'inn'),(32,-115,15,19,3,'hall')]:
         base = landmark_surface('gunanmen').ground(east,south)
+        if kind == 'inn':
+            angle = math.radians(-21.92)
+            base = landmark_surface('gunanmen').ground(east+width/2*math.cos(angle),south-width/2*math.sin(angle))
         meshes = [*builder.parts.values(),builder.hit]
         starts = [len(mesh.pos) for mesh in meshes]
         with align_front(builder, (east, south), -21.92):
@@ -113,12 +104,6 @@ def shop(builder, east, base, south, width, length, floors, kind):
         else:
             box(stone,center,size,'rubble' if kind=='hall' else 'brick')
             if builder.collide:solid(builder.hit,center,size,'brick')
-        if kind == 'rong':
-            # The south return of way/521248450 faces the approach in IMG_1307.
-            for floor in range(floors):
-                for dx in (1.8, 5, 8):
-                    box(glass, (east+dx, base+1.7+floor*3.25, south+13.7),
-                        (2.45, 1.7, .16), 'glass')
         face=east+width/2
         if kind=='hall':
             box(glass,(face+.15,base+5,south),(.3,9.8,6.2),'glass',None)
@@ -132,33 +117,55 @@ def shop(builder, east, base, south, width, length, floors, kind):
                 box(stone,(face+5-4.5*(step+.5)/7,base+tread/2,south),
                     (4.5/7+.02,tread,8.8),'granite')
             return
+        def grade(x,z):
+            angle = math.radians(-21.92)
+            dx,dz = x-east,z-south
+            return landmark_surface('gunanmen').ground(east+dx*math.cos(angle)+dz*math.sin(angle),
+                                                      south-dx*math.sin(angle)+dz*math.cos(angle))+.04
+        def window(x,level,z,size):
+            # Along the uphill return only the portion above the sidewalk is exposed.
+            bottom = max(level-size[1]/2,grade(x,z))
+            top = level+size[1]/2
+            if top>bottom+.05:
+                box(glass,(x,(top+bottom)/2,z),(size[0],top-bottom,size[2]),'glass',None)
         for row in range(floors):
             for side in (-1,1):
                 for bay in (-.28,0,.28):
-                    box(glass,(east+bay*width,base+1.66+row*3.25,south+side*(length/2+.06)),(width*.21,1.53,.12),'glass',None)
+                    window(east+bay*width,base+1.66+row*3.25,south+side*(length/2+.06),(width*.21,1.53,.12))
                 box(stone,(east,base+(row+1)*3.25,south+side*length/2),(width+.24,.16,.42),'brick')
             for bay in (-.32,0,.32):
-                box(glass,(east-width/2-.06,base+1.66+row*3.25,south+bay*length),(.12,1.53,length*.23),'glass',None)
+                window(east-width/2-.06,base+1.66+row*3.25,south+bay*length,(.12,1.53,length*.23))
             for col in (-1,1):
                 level=base+1.66+row*3.25
                 offset=south+col*length*.245
                 box(stone,(face+.08,level,offset),(.18,1.8,length*.44),'wood')
                 box(glass,(face+.2,level,offset),(.09,1.53,length*.42),'glass',None)
         if kind == 'inn':
+            # Sample the sidewalk in landmark space after rotating the shop footprint.
+            for col in range(5):
+                a = face + col*1.8
+                for row in range(8):
+                    c = south-5.6 + row*2
+                    corners = [(a,c),(a+1.8,c),(a+1.8,c+2),(a,c+2)]
+                    vertices = [(x,grade(x,z),z) for x,z in corners]
+                    stone.face(vertices,(0,1,0),'plaza_stone')
+                    if builder.collide:
+                        builder.hit.face(vertices,(0,1,0),'ashlar')
+            for stall in range(5 if builder.detail else 3):
+                z = south-length*.4+1.28*stall
+                scooter(stone,face+1.25,grade,z,('steel','cream','vermilion')[stall%3])
             corner = south+length/2
-            box(stone,(face+.9,base+3.5,corner),(1.8,.82,.13),'wood')
+            start,end = face+.28,face+2.08
+            for level in (base+2.31,base+3.10):
+                box(stone,(face+.42,level,corner),(.84,.075,.09),'steel')
+            box(stone,((start+end)/2,base+2.69,corner),(end-start,.90,.14),'steel')
             for side in (-1,1):
-                z = corner + side*.073
-                stone.face([(face,y,z) for y in (base+3.1,base+3.9)]
-                           + [(face+1.8,y,z) for y in (base+3.9,base+3.1)],
-                           (0,0,side),'inn_board',uvs=[(.01,.99),(.01,.01),(.99,.01),(.99,.99)])
-        span,high=(9,1.15) if kind=='rong' else (1.55,5.8)
-        offset=south+length*.36 if kind=='inn' else south
-        level=base+3.2
-        coords=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)]
-        if kind=='inn': coords=[(v,1-u) for u,v in coords]
-        box(stone,(face+.04,level,offset),(.5,high,span),'wood')
-        stone.face([(face+.3,level-high/2,offset+span/2),(face+.3,level-high/2,offset-span/2),(face+.3,level+high/2,offset-span/2),(face+.3,level+high/2,offset+span/2)],(1,0,0),kind,uvs=coords)
+                z = corner + side*.084
+                left,right = (start,end) if side==1 else (end,start)
+                stone.face([(left,base+2.26,z),(right,base+2.26,z),
+                            (right,base+3.12,z),(left,base+3.12,z)],
+                           (0,0,side),'inn_board',uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
+            return
 
 
 @cache
@@ -210,8 +217,6 @@ def approach(builder):
                 mesh.pos[i]=(px,ground(px,pz)-.04,pz)
         for offset in range(7 if builder.detail else 3):
             scooter(mesh,east+5,ground,south+2+offset*.77,('steel','vermilion','cream')[offset%3])
-    for index in range(6):
-        box(mesh,(15+index*.95,ground(15+index*.95,-24)+.035,-24),(.5,.07,4.3),'white')
     for index in range(5):
         east=16+index
         tube(mesh,(east,ground(east,-31)-.04,-31),(east,1.1,-31),.09,'yellow',6)
