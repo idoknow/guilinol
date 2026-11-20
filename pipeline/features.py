@@ -240,6 +240,9 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
                             kind = 1
                         elif floors<=rules['glazedMaxFloors'] and seed%100<rules['glazedPercent'] and campuses.query(center,predicate='intersects').size:
                             kind = 2
+                        # IMG_1365: estimate six floors from the exposed upper bays and tree line.
+                        if row['id'] == '7c3acb0b-2be4-48f6-8efd-c9ecb5cc6f29':
+                            floors, kind = 6, 4
                         rectangle=[]
                         if kind in (1,2):
                             rect=sub.minimum_rotated_rectangle

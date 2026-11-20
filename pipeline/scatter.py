@@ -99,7 +99,7 @@ def _bank_profile(name: str, water_kind: str) -> str:
     return 'lake' if water_kind == 'lake' else 'mixed'
 
 
-def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, precomputed=None, extra_blocked=(), structure_exclude=None):
+def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, precomputed=None, extra_blocked=(), structure_exclude=None, verge_obstacles=None):
     rng = random.Random(110300)
     if precomputed is not None:
         elements, roads, intersections, banks, waterways, _ped_areas = precomputed
@@ -333,4 +333,33 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
 
     for pos, normal in mountain_trees:
         tree(Point(pos[0], pos[2]), 'peak', 'mountain', pos[1], normal)
+    # Surveyed strips opposite IMG_1384/1386 and along the market at IMG_1393.
+    # Some verge centres fall in landmark replacement or tree-clearing polygons.
+    # Keep the actual structures, tactile paving and the usual road clearance.
+    if verge_obstacles is not None:
+        # A half-pitch shift fits one pit before the taper meets the junction.
+        # Values are distances along the outer edge guide, in metres.
+        restored = {221821072: (465, 545, None), 727682110: (13, 15, 0), 258909993: (345, 393, None)}
+        for road in roads:
+            if road.way not in restored or not road.right:
+                continue
+            start, end, phase = restored[road.way]
+            guide = road.side_line(1)
+            inset = (road.width + road.dimensions['verge']) / 2
+            for pt in walk_line(guide, street['spacing'], inset, phase=phase):
+                station = guide.project(pt)
+                if not start <= station <= end:
+                    continue
+                pit = pt.buffer(.52)
+                if (blocked.query(pit, predicate='intersects').size or
+                    verge_obstacles.query(pit, predicate='intersects').size or
+                    junctions.query(pt, predicate='dwithin', distance=4 if road.widening else street['junction']).size):
+                    continue
+                kind = rng.choices(SPECIES_IDS, _road_weights(road))[0]
+                if tree(pt, 'mixed', 'street', force_kind=kind, force_scale=_street_scale(kind, False, True, rng),
+                        planting_mask=Polygon()):
+                    tangent = np.subtract(guide.interpolate(station+.2).coords[0], guide.interpolate(station-.2).coords[0])
+                    angle = math.atan2(tangent[1], tangent[0])
+                    origin = tuple(math.floor(value / CHUNK) * CHUNK for value in pt.coords[0])
+                    beds[origin].append([round((pt.x-origin[0])*10), round((pt.y-origin[1])*10), round(angle*100), 1])
     return tiles, roads, banks, stats, beds

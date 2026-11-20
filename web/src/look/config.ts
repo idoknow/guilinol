@@ -44,9 +44,9 @@ export const look = {
     willow: 0x638e3c, willowLit: 0x94ba54,
   },
   // M2.5 buildings (look/buildings.ts), indexed by GL04 kind: 0 white-tile flat, 1 old grey-tile pitched,
-  // 2 green-glazed hip (R2), 3 landmark placeholder (王城 yellow/red, R16).
+  // 2 green-glazed hip (R2), 3 campus masonry, 4 sand-coloured Jiefang frontage.
   buildings: {
-    walls: [0xe6e3da, 0xd9d4c8, 0xe9e4d6, 0xc9a46a], roofs: [0xa3a19a, 0x55595b, 0x3c7a55, 0x5d6062],
+    walls: [0xe6e3da, 0xd9d4c8, 0xe9e4d6, 0xc9a46a, 0xe3c8aa], roofs: [0xa3a19a, 0x55595b, 0x3c7a55, 0x5d6062, 0xc5bba6],
     glass: 0x4d5b62, glassLit: 0x8d9ea3, timber: 0x6e5444, shop: 0x4a4744, floorLine: .84,
     signs: [0x9a5246, 0xb39452, 0x52708a, 0x5f7d56], windowWarm: 0xffc979,
   },

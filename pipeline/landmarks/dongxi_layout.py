@@ -98,6 +98,22 @@ def envelope(model, feature):
         angle = math.atan2(delta[1],delta[0])
         model.pose = (center[0], offset, center[1], angle)
         outward=np.array([-delta[1],delta[0]])/length
+        # The two cut faces bound the 3.4 m service alley in IMG_1391.
+        # Its party walls have high windows, exposed pipes and a shop at the mouth.
+        alley_bearing = math.radians(41.8)
+        if name in ('R10', 'R10-west') and abs(delta @ [math.sin(alley_bearing), -math.cos(alley_bearing)]) > .999 * length:
+            model.box(0,height-.2,.08,length,.24,.38,'granite')
+            for along in (-length*.29,length*.25):
+                model.box(along,5.1,.04,1.2,1.0,.13,'glass')
+                model.box(along-.82,-.05,.09,.10,7.2,.12,'granite')
+            if name=='R10':
+                end_bay=length/2-1.65
+                model.box(end_bay,.15,.06,2.8,2.45,.16,'glass')
+                model.box(end_bay,2.6,.18,3.15,.55,.35,'gold')
+                letters(model,'桂林特产',(end_bay,2.67,.37),2.75,.37,'red')
+                for along in (-2.4,1.2):
+                    model.beam([along,6.7,.05],[along+.9,6.5,3.4],.038,'sign')
+            continue
         if name=='D-west' and outward[0]<-.8:
             model.box(0,height,.03,length,.55,.5,'white')
             for tier in range(3):
@@ -115,7 +131,7 @@ def envelope(model, feature):
                 model.box((index+.5)*pitch-length/2,3.25,depth/2,pitch+.02,.42,depth,'white')
             model.box(0,.06,1.45,length,.12,2.9,'pave')
             for along in np.arange(-length/2+3,length/2-1,7.2):
-                model.beam([along,.18,3.1],[along,3.7,3.1],.16,'wood',8,True)
+                model.beam([along,0 if name=='R10' else .18,3.1],[along,3.7,3.1],.16,'wood',8,True)
                 crown=trimesh.creation.icosphere(subdivisions=1)
                 model.mesh(crown.vertices*[1.4,1.35,1.3]+[along,4.6,3.1],crown.faces,'leaf')
         if name=='N011' and center[0]+ORIGIN[0]>-627 and -174<center[1]+ORIGIN[1]<-130 and outward[0]>.35 and length>3:
