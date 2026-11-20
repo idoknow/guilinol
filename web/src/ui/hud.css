@@ -73,9 +73,13 @@ body[data-aboard] .btn-jump{display:none}
 .boot-bar{height:3px;background:rgba(42,61,60,.16);border-radius:2px;overflow:hidden}.boot-bar i{display:block;height:100%;width:8%;background:var(--ui-seal);border-radius:2px;transition:width .25s}
 
 @media (pointer:coarse){
+  output{left:calc(12px + env(safe-area-inset-left));top:calc(123px + env(safe-area-inset-top));bottom:auto;max-width:244px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .sky-ui{top:calc(58px + env(safe-area-inset-top));font-size:12px}.sky-ui button{width:30px;height:28px}
   .hint{display:none}
   footer{left:50%;right:auto;transform:translateX(-50%);bottom:calc(6px + env(safe-area-inset-bottom));font-size:9px;opacity:.6;white-space:nowrap}
   .btn-menu{padding:0 12px}.btn-menu span{display:none}
   .about-cols{grid-template-columns:1fr}}
+@media (pointer:coarse) and (max-height:500px){
+  output{top:calc(140px + env(safe-area-inset-top));max-width:126px;box-sizing:border-box}
+}
 @media (max-width:520px){.about-cols{grid-template-columns:1fr}.account-entry{max-width:7.5em}}

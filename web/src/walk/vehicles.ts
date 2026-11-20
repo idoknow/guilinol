@@ -148,7 +148,8 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     else if(nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)){freeBoats!.mount(nearFree.slot,nearFree.atBank);syncHud()}
     else if(nearRoute>=0){route=nearRoute;segment=1;disembark=false}
   }
-  button.onclick=interact;window.addEventListener('keydown',event=>{if(event.code==='KeyF'&&!event.repeat&&!(event.target as Element)?.closest?.('input,textarea,select,[contenteditable]'))interact()})
+  const blockHotkey=()=>document.body.hasAttribute('data-home')||document.body.dataset.photo==='on'||!!document.querySelector('dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show')
+  button.onclick=interact;window.addEventListener('keydown',event=>{if(event.code==='KeyF'&&!event.repeat&&!blockHotkey()&&!(event.target as Element)?.closest?.('input,textarea,select,[contenteditable]'))interact()})
   function nearby(x:number,z:number,footY?:number){nearBike=null;nearRoute=-1;nearRouteDist=Infinity;let best=4.6
     let bestHint:{x:number;y:number;z:number;dist:number;reach:number;radius:number}|null=null
     const nextCells=new Set<T.Group>()

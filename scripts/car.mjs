@@ -401,7 +401,7 @@ try {
     const btnText = document.querySelector('.vehicle-action')?.textContent
     const jumpHidden = getComputedStyle(document.querySelector('.walk-ui .btn-jump')).display === 'none'
     const runHidden = getComputedStyle(document.querySelector('.walk-ui .btn-run')).display === 'none'
-    const sels = ['.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.btn-about']
+    const sels = ['.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.hud-me']
     const boxes = sels.map(sel => {
       const el = document.querySelector(sel)
       if (!el) return null

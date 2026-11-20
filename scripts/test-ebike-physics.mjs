@@ -292,6 +292,14 @@ try {
   }
   await page.keyboard.up('KeyA')
   await page.keyboard.up('KeyW')
+  if (impactCrash) {
+    await page.keyboard.press('Space')
+    await stepTicks(page, 24, 0.05)
+  }
+  await page.keyboard.down('KeyS')
+  await stepTicks(page, 28, 0.05)
+  await page.keyboard.up('KeyS')
+  await stepTicks(page, 6, 0.05)
 
   // 7. Mod cycle KeyG + HUD click + battery/shared distinction + compliant D2 reset on remount + clean dismount KeyF
   await page.keyboard.press('KeyG')

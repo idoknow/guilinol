@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {mkdir} from 'node:fs/promises'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
+import {browserOptions} from './qa-browser.mjs'
 
 const outDir = process.env.EBIKE_SHOT_DIR
 if (outDir) await mkdir(outDir, {recursive: true})
@@ -44,12 +45,7 @@ function checkRectsScript() {
 }
 
 try {
-  browser = await chromium.launch({
-    executablePath: process.env.CHROMIUM,
-    args: process.platform === 'darwin'
-      ? ['--enable-gpu', '--use-angle=metal']
-      : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
-  })
+  browser = await chromium.launch(browserOptions())
   const errors = []
 
   // --- A. Desktop 1280x720: stance, wheelie, lean, crash/recover, mod slots, HUD ---
@@ -70,6 +66,10 @@ try {
   await page.waitForFunction(() => document.querySelector('.vehicle-action')?.textContent === '骑电动车')
   await page.keyboard.press('f')
   await page.waitForFunction(() => window.viewer.walk.vehicle === 'bike' && document.body.dataset.ride === 'bike')
+  await page.evaluate(() => {
+    window.viewer.walk.ebike.setVehicleType('normal')
+    window.viewer.walk.tick(1 / 60)
+  })
 
   // Default compliant gear on mount (D2 <= 25 km/h), normal bike type & full battery
   assert.equal(await page.textContent('.ride-type'), '电摩')
@@ -115,8 +115,16 @@ try {
     window.viewer.walk.tick(1 / 60)
   })
   assert.equal(await page.evaluate(() => document.querySelector('.ride-bat').dataset.level), 'crit')
-  assert.equal(await page.evaluate(() => window.viewer.walk.probe().ebike.maxKmh), 20)
-  assert.equal(await page.textContent('.ride-state'), '极低电 · 限速 20')
+  const critMax = await page.evaluate(() => window.viewer.walk.probe().ebike.maxKmh)
+  assert(critMax >= 10 && critMax <= 16, `expected critical battery cap in 10..16, got ${critMax}`)
+  assert.equal(await page.textContent('.ride-state'), `极低电 · 限速 ${Math.round(critMax)}`)
+
+  await page.evaluate(() => {
+    window.viewer.walk.ebike.setBattery(0)
+    window.viewer.walk.tick(1 / 60)
+  })
+  assert.equal(await page.evaluate(() => window.viewer.walk.probe().ebike.maxKmh), 10)
+  assert.equal(await page.textContent('.ride-state'), '电量耗尽 · 限速 10')
 
   await page.evaluate(() => {
     window.viewer.walk.ebike.setVehicleType('shared')
@@ -186,7 +194,7 @@ try {
   // Desktop HUD check while riding
   const deskHud = await page.evaluate(checkRectsScript(), {
     width: 1280, height: 720,
-    selectors: ['output', '.sky-ui', '.dock', '.btn-about', 'footer', '.hint', '.vehicle-action', '.ride-hud'],
+    selectors: ['output', '.hud-me', '.sky-ui', '.render-entry', '.dock', 'footer', '.hint', '.vehicle-action', '.ride-hud'],
   })
   assert.deepEqual(deskHud.overlaps, [], `desktop ride HUD overlap: ${JSON.stringify(deskHud.overlaps)}`)
   assert.deepEqual(deskHud.outOfBounds, [], `desktop ride HUD outOfBounds: ${JSON.stringify(deskHud.outOfBounds)}`)
@@ -274,7 +282,7 @@ try {
     const hudCheck = await mp.evaluate(checkRectsScript(), {
       ...vp,
       selectors: [
-        'output', '.sky-ui', '.dock', '.btn-about', 'footer', '.vehicle-action',
+        'output', '.hud-me', '.sky-ui', '.render-entry', '.dock', 'footer', '.vehicle-action',
         '.walk-ui .joystick', '.walk-ui .btn-view',
         '.walk-ui .btn-wheelie', '.walk-ui .btn-gear-up', '.walk-ui .btn-gear-down', '.walk-ui .btn-tuck',
         '.ride-hud',
@@ -316,7 +324,7 @@ try {
     const lowBatHud = await mp.evaluate(checkRectsScript(), {
       ...vp,
       selectors: [
-        'output', '.sky-ui', '.dock', '.btn-about', 'footer', '.vehicle-action',
+        'output', '.hud-me', '.sky-ui', '.render-entry', '.dock', 'footer', '.vehicle-action',
         '.walk-ui .joystick', '.walk-ui .btn-view',
         '.walk-ui .btn-wheelie', '.walk-ui .btn-gear-up', '.walk-ui .btn-gear-down', '.walk-ui .btn-tuck',
         '.ride-hud',

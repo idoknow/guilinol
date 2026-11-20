@@ -112,7 +112,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     .observe(document.body,{attributes:true,attributeFilter:['data-aboard']})
 
   window.addEventListener('keydown',event=>{
-    if(!active()||(event.target as Element)?.closest?.('input,textarea,select,[contenteditable]'))return
+    if(!active()||document.body.hasAttribute('data-home')||document.body.dataset.photo==='on'||document.querySelector('dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show')||(event.target as Element)?.closest?.('input,textarea,select,[contenteditable]'))return
     keys.add(event.code)
     const ridingBike=document.body.dataset.ride==='bike'
     if(!event.repeat&&event.code==='Space'){
@@ -221,7 +221,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
       }else{
         typeEl.dataset.kind=state.vehicleType;typeEl.textContent=state.vehicleBadge
         gearEl.textContent=state.gearLabel
-        gearEl.title=`${state.vehicleLabel} · 本挡限速 ${state.maxKmh} km/h`
+        gearEl.title=`${state.vehicleLabel} · 本挡限速 ${Math.round(state.maxKmh)} km/h`
         const pct=Math.max(0,Math.min(100,Math.round(state.battery)))
         batEl.dataset.level=state.criticalBattery?'crit':state.lowBattery?'low':'ok'
         batFillEl.style.width=`${pct}%`
@@ -244,10 +244,10 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
         btnWheelie.classList.toggle('on',wheelieTouch||keys.has('Space'))
         if(rideKind==='bike'&&state.batteryDepleted){
           stateEl.hidden=false;stateEl.dataset.warn='1'
-          stateEl.textContent='电量耗尽'
+          stateEl.textContent=state.maxKmh>0?`电量耗尽 · 限速 ${Math.round(state.maxKmh)}`:'电量耗尽'
         }else if(rideKind==='bike'&&state.criticalBattery){
           stateEl.hidden=false;stateEl.dataset.warn='1'
-          stateEl.textContent=`极低电 · 限速 ${state.maxKmh}`
+          stateEl.textContent=`极低电 · 限速 ${Math.round(state.maxKmh)}`
         }else if(wheelieDeg>=4){
           stateEl.hidden=false;stateEl.dataset.warn=wheelieDeg>=38?'1':'0'
           stateEl.textContent=`翘头 ${wheelieDeg}°`

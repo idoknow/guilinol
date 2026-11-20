@@ -18,6 +18,7 @@ body[data-aboard] :is(.btn-jump,.btn-run){display:none}
 body[data-aboard] .joystick.running::after{border-color:rgba(169,80,60,0)}
 .ride-hud{position:fixed;left:50%;bottom:calc(124px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4;display:none;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px 7px;max-width:calc(100vw - 24px);padding:5px 11px;border-radius:18px;background:rgba(28,44,42,.58);color:#f4efe2;border:1px solid rgba(244,239,226,.34);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-size:12px;letter-spacing:.05em;white-space:nowrap;user-select:none;-webkit-user-select:none}
 body[data-aboard][data-ride="bike"] .ride-hud,body[data-aboard][data-ride="bicycle"] .ride-hud{display:flex}
+body[data-home] .ride-hud{visibility:hidden}
 body[data-photo="on"] .ride-hud{display:none!important}
 .ride-type{font-size:11px;font-weight:600;padding:2px 6px;border-radius:8px;background:rgba(244,239,226,.16);color:#f4efe2;border:1px solid rgba(244,239,226,.28)}
 .ride-type[data-kind="shared"]{background:rgba(56,146,118,.84);border-color:rgba(155,235,208,.65);color:#f2fbf7}
@@ -38,7 +39,9 @@ body[data-photo="on"] .ride-hud{display:none!important}
 .ride-mod:hover{background:rgba(244,239,226,.22)}
 body[data-ride="bicycle"] :is(.ride-mod,.ride-bat){display:none}
 body[data-ride-type="shared"] .ride-mod{display:none}
-.toast{z-index:6;box-sizing:border-box;width:max-content;max-width:min(520px,calc(100vw - 32px));text-align:center;line-height:1.45;border:1px solid rgba(244,239,226,.34)}
+.vehicle-action[data-ebike-tier="shared"]{border-color:rgba(114,213,176,.85)}
+body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
+.toast{z-index:30;box-sizing:border-box;width:max-content;max-width:min(520px,calc(100vw - 32px));text-align:center;line-height:1.45;border:1px solid rgba(244,239,226,.34)}
 @media (hover:hover) and (pointer:fine){
   .vehicle-action{box-shadow:0 4px 16px rgba(18,30,28,.28),0 0 0 1px rgba(214,120,92,.35)}
   .vehicle-action::before{content:attr(aria-keyshortcuts);display:inline-grid;place-items:center;min-width:1.45em;height:1.45em;margin-right:.55em;padding:0 .24em;border-radius:5px;border:1px solid rgba(244,239,226,.72);background:linear-gradient(180deg,rgba(244,239,226,.26),rgba(244,239,226,.12));box-shadow:0 2px 0 rgba(244,239,226,.38),inset 0 1px 0 rgba(255,255,255,.28);font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:0;vertical-align:1px}
@@ -47,14 +50,15 @@ body[data-ride-type="shared"] .ride-mod{display:none}
   .vehicle-action{bottom:calc(170px + env(safe-area-inset-bottom));max-width:calc(100vw - 168px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .toast{max-width:calc(100vw - 32px);font-size:13.5px;padding:8px 16px}
   .ride-hud{bottom:calc(216px + env(safe-area-inset-bottom));padding:4px 10px;gap:6px;font-size:12px}
+  output{top:auto;bottom:calc(292px + env(safe-area-inset-bottom));left:calc(12px + env(safe-area-inset-left));max-width:calc(100vw - 24px);box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
 @media (pointer:coarse) and (max-height:500px){
-  .ride-hud{bottom:calc(32px + env(safe-area-inset-bottom));top:auto}
+  .ride-hud{bottom:calc(32px + env(safe-area-inset-bottom));top:auto;max-width:calc(100vw - 328px - env(safe-area-inset-left) - env(safe-area-inset-right))}
+  output{top:calc(142px + env(safe-area-inset-top));bottom:auto;left:calc(12px + env(safe-area-inset-left));max-width:124px}
 }
 @media (pointer:coarse) and (max-width:520px){
   html,body{overflow:hidden;max-width:100vw}
   .toast{top:calc(336px + env(safe-area-inset-top))}
-  output{max-width:calc(100vw - 156px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   footer{max-width:calc(100vw - 16px);font-size:8px;overflow:hidden;text-overflow:ellipsis}
   .sky-ui{max-width:calc(100vw - 156px);flex-wrap:wrap;row-gap:2px;padding:4px 8px}
   .sky-ui .sky-time{min-width:6.6em}

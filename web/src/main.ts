@@ -132,7 +132,10 @@ async function start() {
       }
     }finally{switching=false}
   }
-  window.addEventListener('keydown',event=>{if(event.code==='KeyV'&&!event.repeat)void toggle().then(showMode)})
+  window.addEventListener('keydown',event=>{
+    if(document.body.hasAttribute('data-home')||document.body.dataset.photo==='on'||(event.target as Element)?.closest?.('input,textarea,select,[contenteditable]'))return
+    if(event.code==='KeyV'&&!event.repeat)void toggle().then(showMode)
+  })
   const touch=matchMedia('(pointer:coarse)').matches,hint=document.querySelector<HTMLElement>('.hint')!,toast=document.querySelector<HTMLElement>('.toast')!
   const modeButton=document.createElement('button');modeButton.className='btn-mode'
   modeButton.addEventListener('pointerenter',()=>void prefetchWalk())

@@ -57,6 +57,7 @@ export interface ExternalEbikeTelemetry {
   battery?: number
   lowBattery?: boolean
   criticalBattery?: boolean
+  batteryDepleted?: boolean
   wheelie?: number
   lean?: number
   leanLimit?: number
@@ -297,11 +298,13 @@ export function createEbikeFxController() {
         battery = Math.max(0, battery - profile.drainBase * gearMult * (spdNorm + wheelieExtra) * cdt)
       }
     }
-    if (battery <= 20 && !lowBatteryWarned) {
-      lowBatteryWarned = true
-      window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: '电量低于 20%，请注意及时减挡省电', ms: 2400}}))
-    } else if (battery > 24) {
-      lowBatteryWarned = false
+    if (external?.battery === undefined) {
+      if (battery <= 20 && !lowBatteryWarned) {
+        lowBatteryWarned = true
+        window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: '电量低于 20%，请注意及时减挡省电', ms: 2400}}))
+      } else if (battery > 24) {
+        lowBatteryWarned = false
+      }
     }
 
     if (external?.crashPhase !== undefined) {
@@ -340,10 +343,11 @@ export function createEbikeFxController() {
           : 0
         leanExtra = T.MathUtils.damp(leanExtra, tuckBoost, 8, cdt)
 
-        const totalLean = T.MathUtils.clamp(base.lean + leanExtra, -.68, .68)
+        const totalLean = T.MathUtils.clamp((external?.lean ?? base.lean) + leanExtra, -.68, .68)
         if (base.allowAutoCrash) {
           const speedDrop = cdt > 1e-4 ? (prevSpeed - base.speed) / cdt : 0
-          if (base.obstacle && prevSpeed > 5.0 && base.speed < .6 && speedDrop > 20) {
+          // Keep 25 km/h (6.94 m/s) compliant bumps safe; high-speed wall hits above ~27 km/h trigger impact crash.
+          if (base.obstacle && prevSpeed > 7.4 && base.speed < .6 && speedDrop > 20) {
             triggerCrash('impact', base.steerInput >= 0 ? 1 : -1, base.heading, prevSpeed)
           } else if (input.tuck && Math.abs(totalLean) > LEAN_LIMIT && base.speed > 4.6) {
             triggerCrash('lowside', totalLean > 0 ? -1 : 1, base.heading, base.speed)
@@ -392,12 +396,12 @@ export function createEbikeFxController() {
     }
 
     const finalWheelie = external?.wheelie ?? wheelie
-    const finalLean = external?.lean ?? T.MathUtils.clamp(base.lean + leanExtra, -.68, .68)
+    const finalLean = T.MathUtils.clamp((external?.lean ?? base.lean) + leanExtra, -.68, .68)
     const lowBattery = external?.lowBattery ?? battery <= 20
     const criticalBattery = external?.criticalBattery ?? battery <= 10
-    const batteryDepleted = battery <= .5
+    const batteryDepleted = external?.batteryDepleted ?? battery <= .05
     const gearCap = profile.gearCaps[gear - 1] ?? profile.maxKmh
-    const effMaxKmh = external?.maxKmh ?? (batteryDepleted ? 0 : criticalBattery ? Math.min(gearCap, 20) : gearCap)
+    const effMaxKmh = external?.maxKmh ?? (batteryDepleted ? 10 : criticalBattery ? Math.min(gearCap, 16) : gearCap)
 
     return {
       vehicleType,

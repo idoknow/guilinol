@@ -574,7 +574,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         }
         const vType:EbikeVehicleType=rides.vehicleType??(rides.isShared||rides.bike.userData.shared?'shared':'normal')
         const savedBat=(rides.bike.userData.battery as number|undefined)??rides.ebikeBattery??100
+        const savedMod:EbikeModPreset=vType==='shared'?'stock':((rides.bike.userData.modPreset as EbikeModPreset|undefined)??'stock')
         ebikeFx.resetForMount(vType,savedBat)
+        ebikeFx.setModPreset(savedMod)
         rides.setEbikeUpgrades(ebikeModUpgrades(vType,ebikeFx.modPreset))
         mountedStaticBike=rides.bike
         mountedStaticBike.visible=false
@@ -762,6 +764,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         const nextPreset=ebikeFx.cycleModPreset()
         rides.setEbikeUpgrades(ebikeModUpgrades(ebikeFx.vehicleType,nextPreset))
         ebikeRig.applyMods(ebikeFx.customMods??nextPreset,(mountedStaticBike?.userData.paint as number|undefined)??0)
+        if(mountedStaticBike)mountedStaticBike.userData.modPreset=nextPreset
       }
       const rawTel=rides.ebikeTelemetry
       const extTel:ExternalEbikeTelemetry|undefined=rawTel?{
@@ -773,6 +776,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         battery:rawTel.batteryPct,
         lowBattery:rawTel.lowBattery,
         criticalBattery:rawTel.criticalBattery,
+        batteryDepleted:rawTel.batteryDepleted,
         lean:rawTel.lean,
         leanLimit:rawTel.leanLimit,
         tucking:rawTel.tucking,
@@ -872,8 +876,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       get state(){return ebikeState},
       triggerCrash(reason:Exclude<EbikeCrashReason,''>='lowside',side:-1|1=1){if(rides?.bike&&rides.rideKind==='bike')ebikeFx.triggerCrash(reason,side,rides.heading,Math.max(4.5,Math.abs(rides.speed)))},
       recover(){return ebikeFx.startRecover()},
-      setMod(preset:EbikeModPreset){ebikeFx.setModPreset(preset);rides?.setEbikeUpgrades(ebikeModUpgrades(ebikeFx.vehicleType,ebikeFx.modPreset));ebikeRig.applyMods(ebikeFx.modPreset,(mountedStaticBike?.userData.paint as number|undefined)??0)},
-      setVehicleType(type:EbikeVehicleType){rides?.setEbikeVehicleType(type);if(type==='shared')rides?.setEbikeUpgrades(null);ebikeFx.setVehicleType(type);ebikeRig.setVehicleType(type,(mountedStaticBike?.userData.paint as number|undefined)??0)},
+      setMod(preset:EbikeModPreset){ebikeFx.setModPreset(preset);rides?.setEbikeUpgrades(ebikeModUpgrades(ebikeFx.vehicleType,ebikeFx.modPreset));ebikeRig.applyMods(ebikeFx.modPreset,(mountedStaticBike?.userData.paint as number|undefined)??0);if(mountedStaticBike)mountedStaticBike.userData.modPreset=ebikeFx.modPreset},
+      setVehicleType(type:EbikeVehicleType){rides?.setEbikeVehicleType(type);ebikeFx.setVehicleType(type);rides?.setEbikeUpgrades(ebikeModUpgrades(type,ebikeFx.modPreset));const paint=(mountedStaticBike?.userData.paint as number|undefined)??0;ebikeRig.setVehicleType(type,paint);ebikeRig.applyMods(ebikeFx.customMods??ebikeFx.modPreset,paint);if(mountedStaticBike)mountedStaticBike.userData.modPreset=ebikeFx.modPreset},
       setBattery(pct:number){const clamped=rides?.rideKind==='bike'?rides.setEbikeBattery(pct):pct;ebikeFx.setBattery(clamped);if(mountedStaticBike)mountedStaticBike.userData.battery=clamped},
     },
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},

@@ -113,7 +113,8 @@ function guide() {
           <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 前后左右</li>
           <li>按住鼠标拖动 转视角 · 滚轮 拉远拉近</li>
           <li><kbd>Q</kbd>/<kbd>E</kbd> 飞高飞低 · <kbd>Shift</kbd> 加速 / 跑</li>
-          <li><kbd>空格</kbd> 跳 · <kbd>V</kbd> 起飞或落地 · <kbd>E</kbd> 上下车船</li>
+          <li><kbd>空格</kbd> 跳 · <kbd>V</kbd> 起飞或落地 · <kbd>F</kbd> 上下车船</li>
+          <li><kbd>1</kbd>-<kbd>4</kbd> / <kbd>Q</kbd><kbd>E</kbd> 电动车换挡 · <kbd>空格</kbd> 翘头或扶车</li>
           <li><kbd>M</kbd> 地图 · <kbd>J</kbd> 景册 · <kbd>P</kbd> 拍照</li>
         </ul></section>
         <section><h3>手机</h3><ul>

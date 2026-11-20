@@ -80,7 +80,7 @@ try{
         const btn=document.querySelector('.vehicle-action')
         const before=btn?getComputedStyle(btn,'::before').content:''
         const shortcut=btn?.getAttribute('aria-keyshortcuts'),text=btn?.textContent
-        const sels=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.btn-about']
+        const sels=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
         const boxes=sels.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
           return st.display==='none'||st.visibility==='hidden'||el.hasAttribute('hidden')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
         const overlaps=[]
@@ -115,7 +115,7 @@ try{
         const jumpHidden=getComputedStyle(document.querySelector('.walk-ui .btn-jump')).display==='none'
         const runHidden=getComputedStyle(document.querySelector('.walk-ui .btn-run')).display==='none'
         const aboard=document.body.hasAttribute('data-aboard')
-        const sels=['.walk-ui .joystick','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.btn-about']
+        const sels=['.walk-ui .joystick','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
         const boxes=sels.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
           return st.display==='none'||st.visibility==='hidden'||el.hasAttribute('hidden')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
         const overlaps=[]

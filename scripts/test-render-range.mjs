@@ -103,7 +103,7 @@ try {
     }
   })
   assert(metricsCheck.ordered && metricsCheck.balancedOk, `metrics check failed: ${JSON.stringify(metricsCheck)}`)
-  const flightClosed = await fp.evaluate(checkRectsScript(), {width: 1280, height: 720, selectors: ['output', '.sky-ui', '.account-entry', '.render-entry', '.dock', '.btn-about', 'footer', '.hint']})
+  const flightClosed = await fp.evaluate(checkRectsScript(), {width: 1280, height: 720, selectors: ['output', '.sky-ui', '.hud-me', '.btn-menu', '.account-entry', '.render-entry', '.dock', 'footer', '.hint']})
   assert.deepEqual(flightClosed.missing, [])
   assert.deepEqual(flightClosed.overlaps, [])
   assert.deepEqual(flightClosed.outOfBounds, [])
@@ -117,7 +117,7 @@ try {
   await page.waitForFunction(() => window.viewer?.walk?.active && document.querySelector('.account-entry') && document.querySelector('.render-entry') && window.viewer?.tour?.map, null, {timeout: 90000})
   await page.waitForFunction(() => window.viewer.stats.pending === 0 && window.viewer.stats.loaded >= 10, null, {timeout: 60000})
 
-  const deskSelectors = ['output', '.sky-ui', '.account-entry', '.render-entry', '.dock', '.btn-about', 'footer', '.hint']
+  const deskSelectors = ['output', '.sky-ui', '.hud-me', '.btn-menu', '.account-entry', '.render-entry', '.dock', 'footer', '.hint']
   const deskClosed = await page.evaluate(checkRectsScript(), {width: 1280, height: 720, selectors: deskSelectors})
   assert.deepEqual(deskClosed.missing, [])
   assert.deepEqual(deskClosed.overlaps, [])
@@ -131,9 +131,10 @@ try {
   assert.deepEqual(deskOpen.outOfBounds, [])
   if (outDir) await page.screenshot({path: `${outDir}/desktop-open.png`})
 
-  // Outside click closes the panel
-  await page.mouse.click(640, 360)
+  // Escape closes render panel without opening home pause menu
+  await page.keyboard.press('Escape')
   await page.waitForFunction(() => document.querySelector('.render-pop')?.hasAttribute('hidden'))
+  assert.equal(await page.evaluate(() => document.body.hasAttribute('data-home')), false, 'Escape on render-pop must not open home menu')
   await page.click('.render-entry')
   await page.waitForSelector('.render-pop:not([hidden])')
 
@@ -188,14 +189,14 @@ try {
   await page.waitForFunction(() => document.body.dataset.photo !== 'on')
   await deskCtx.close()
 
-  const mobSelectors = ['output', '.sky-ui', '.account-entry', '.render-entry', '.dock', '.btn-about', 'footer', '.walk-ui .joystick', '.walk-ui .btn-jump', '.walk-ui .btn-view']
+  const mobSelectors = ['output', '.sky-ui', '.hud-me', '.btn-menu', '.account-entry', '.render-entry', '.dock', 'footer', '.walk-ui .joystick', '.walk-ui .btn-jump', '.walk-ui .btn-view']
   for (const [label, vp] of [['390x844', {width: 390, height: 844}], ['844x390', {width: 844, height: 390}], ['640x360', {width: 640, height: 360}]]) {
     const ctx = await browser.newContext({viewport: vp, deviceScaleFactor: 1, isMobile: true, hasTouch: true})
     const mp = await ctx.newPage()
     mp.on('pageerror', e => errors.push(`${label}: ${e.message}`))
     await mp.route('**/favicon.ico', r => r.fulfill({status: 204}))
     await mp.goto(`${baseUrl}/?verify&mode=walk&flow=0&time=10.5`)
-    await mp.waitForFunction(() => window.viewer?.walk?.active && window.viewer?.tour?.map && document.querySelector('.account-entry') && document.querySelector('.render-entry') && document.querySelector('.btn-about'), null, {timeout: 90000})
+    await mp.waitForFunction(() => window.viewer?.walk?.active && window.viewer?.tour?.map && document.querySelector('.account-entry') && document.querySelector('.render-entry') && document.querySelector('.btn-menu'), null, {timeout: 90000})
     await mp.evaluate(async () => { for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame) })
 
     const closed = await mp.evaluate(checkRectsScript(), {...vp, selectors: mobSelectors})

@@ -221,7 +221,8 @@
   background: rgba(244, 239, 226, .18);
 }
 
-body[data-photo="on"] :is(.render-entry, .render-pop) {
+body[data-photo="on"] :is(.render-entry, .render-pop),
+body[data-home] :is(.render-entry, .render-pop) {
   display: none !important;
 }
 
@@ -247,15 +248,15 @@ body[data-photo="on"] :is(.render-entry, .render-pop) {
 
 @media (pointer: coarse) and (max-height: 500px) and (min-width: 521px) {
   .render-entry {
-    top: calc(74px + env(safe-area-inset-top));
+    top: calc(104px + env(safe-area-inset-top));
     left: calc(12px + env(safe-area-inset-left));
   }
 
   .render-pop {
-    top: calc(74px + env(safe-area-inset-top));
-    left: calc(156px + env(safe-area-inset-left));
-    width: min(260px, calc(100vw - 360px));
-    max-height: calc(100vh - 96px);
+    top: calc(104px + env(safe-area-inset-top));
+    left: calc(144px + env(safe-area-inset-left));
+    width: min(260px, calc(100vw - 340px));
+    max-height: calc(100vh - 118px);
     overflow: auto;
   }
 }

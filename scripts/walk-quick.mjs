@@ -363,7 +363,7 @@ try {
   await mobile.evaluate(async()=>{for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
 
   const hud=await mobile.evaluate(()=>{
-    const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-jump','.walk-ui .btn-view','.dock','.sky-ui','output','.btn-about']
+    const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-jump','.walk-ui .btn-view','.dock','.sky-ui','output','.hud-me']
     const boxes=selectors.map(sel=>{
       const el=document.querySelector(sel)
       if(!el)return {sel,missing:true}
@@ -384,7 +384,7 @@ try {
     return {boxes,overlaps,outOfBounds}
   })
   assert(hud.boxes.every(b=>!b.missing&&!b.hidden),`missing HUD: ${JSON.stringify(hud.boxes)}`)
-  assert(hud.boxes.filter(b=>b.sel.startsWith('.walk-ui .btn-')).every(b=>b.bg.includes('28, 44, 42')&&b.font.includes('Noto Serif SC')),`HUD style mismatch: ${JSON.stringify(hud.boxes)}`)
+  assert(hud.boxes.filter(b=>b.sel.startsWith('.walk-ui .btn-')).every(b=>(b.bg.includes('24, 40, 37')||b.bg.includes('28, 44, 42'))&&b.font.includes('Noto Serif SC')),`HUD style mismatch: ${JSON.stringify(hud.boxes)}`)
   assert.deepEqual(hud.overlaps,[],`HUD overlap: ${JSON.stringify(hud)}`)
   assert.deepEqual(hud.outOfBounds,[],`HUD out of bounds: ${JSON.stringify(hud)}`)
 
@@ -437,7 +437,7 @@ try {
       const close=document.querySelector('.spot-card.show .card-close')
       if(close)close.click()
       await new Promise(r=>setTimeout(r,280))
-      const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.btn-about']
+      const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
       const boxes=selectors.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
         return st.display==='none'||st.visibility==='hidden'||el.hasAttribute('hidden')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
       const overlaps=[]

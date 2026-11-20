@@ -1005,7 +1005,7 @@ try {
 
   await enterSpot(mobile, ...FREE_DOCKS.ronghu.freeBank, 0, 'mobile-ronghu-bank')
   await closeSpotCard(mobile)
-  await mobile.waitForSelector('.btn-about.account-entry', {state: 'attached', timeout: 10000})
+  await mobile.waitForSelector('.hud-me .account-entry', {state: 'attached', timeout: 10000})
   await mobile.waitForFunction(
     t => document.querySelector('.vehicle-action')?.textContent?.includes(t),
     FREE_DOCKS.ronghu.label,
@@ -1015,8 +1015,8 @@ try {
   async function measureHud(targetPage, selectors) {
     return targetPage.evaluate(sels => {
       const boxes = sels.flatMap(sel => {
-        const els = sel === '.btn-about'
-          ? [...document.querySelectorAll(sel)]
+        const els = sel === '.hud-me'
+          ? [...document.querySelectorAll('.hud-me > *')]
           : [...document.querySelectorAll(sel)].slice(0, 1)
         return els.map((el, idx) => {
           const st = getComputedStyle(el)
@@ -1052,10 +1052,10 @@ try {
 
   const preHud = await measureHud(mobile, [
     '.walk-ui .joystick', '.walk-ui .btn-run', '.walk-ui .btn-jump',
-    '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.btn-about',
+    '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.hud-me',
   ])
   assert(preHud.boxes.some(b => b.sel === '.vehicle-action'), '手机端自由栈桥旁未显示 .vehicle-action')
-  assert(preHud.boxes.filter(b => b.sel.startsWith('.btn-about')).length >= 2, `手机端 .btn-about 未完整覆盖两个按钮: ${JSON.stringify(preHud.boxes)}`)
+  assert(preHud.boxes.filter(b => b.sel.startsWith('.hud-me')).length >= 2, `手机端 .hud-me 未完整覆盖两个按钮: ${JSON.stringify(preHud.boxes)}`)
   assert.deepEqual(preHud.overlaps, [], `手机端上船前按钮重叠: ${JSON.stringify(preHud)}`)
   assert.deepEqual(preHud.outOfBounds, [], `手机端上船前按钮出界: ${JSON.stringify(preHud)}`)
 
@@ -1063,7 +1063,7 @@ try {
   await triggerAction(mobile, FREE_DOCKS.ronghu.label, true)
   const aboardHud = await measureHud(mobile, [
     '.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action',
-    '.dock', '.sky-ui', 'output', '.btn-about',
+    '.dock', '.sky-ui', 'output', '.hud-me',
   ])
   const aboardState = await mobile.evaluate(() => ({
     vehicle: window.viewer.walk.vehicle,
@@ -1114,7 +1114,7 @@ try {
   await mobile.waitForSelector('.toast.show', {state: 'visible', timeout: 5000})
   const toastHud = await measureHud(mobile, [
     '.toast.show', '.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action',
-    '.dock', '.sky-ui', 'output', '.btn-about',
+    '.dock', '.sky-ui', 'output', '.hud-me',
   ])
   assert(toastHud.boxes.some(b => b.sel === '.toast.show'), `手机端未测到激活态 .toast.show: ${JSON.stringify(toastHud)}`)
   assert.deepEqual(toastHud.overlaps, [], `手机 390×844 .toast.show 与 HUD 控件重叠: ${JSON.stringify(toastHud)}`)
