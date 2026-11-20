@@ -121,11 +121,16 @@ const material = new THREE.MeshStandardMaterial({vertexColors:true, flatShading:
 // A screen-door fade writes normal opaque depth while thinning the last band
 // of crowns. The forest stops submitting trees at the outer edge of the band.
 export const treeFar = 1500
+export const treeFarUniform = {value: treeFar}
+export function setTreeFar(distance:number) { treeFarUniform.value = distance }
 material.onBeforeCompile = shader=>{
   shareAtmosphere(shader)
-  shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
+  shader.uniforms.uTreeFar = treeFarUniform
+  shader.fragmentShader=shader.fragmentShader
+    .replace('#include <common>','#include <common>\nuniform float uTreeFar;')
+    .replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
 #ifdef USE_FOG
-  float fade = smoothstep(${treeFar-120}., ${treeFar}., distance(vFogWorld,cameraPosition));
+  float fade = smoothstep(max(60., uTreeFar-120.), uTreeFar, distance(vFogWorld,cameraPosition));
   if(fade > fract(52.9829189 * fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))))) discard;
 #endif`)
 }

@@ -12,7 +12,7 @@ export function installAtmosphere() {
   chunk.fog_vertex = `#ifdef USE_FOG\nvFogDepth = - mvPosition.z;\n#ifdef USE_INSTANCING\nvFogWorld = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;\n#else\nvFogWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;\n#endif\n#endif`
   chunk.fog_pars_fragment = `#ifdef USE_FOG
     uniform vec3 fogColor; varying float vFogDepth; varying vec3 vFogWorld;
-    uniform vec3 uHazeNear; uniform vec3 uHazeFar; uniform vec3 uHorizon; uniform vec4 uFog;
+    uniform vec3 uHazeNear; uniform vec3 uHazeFar; uniform vec3 uHorizon; uniform vec4 uFog; uniform vec4 uFogBands;
     float fogLayer(float y) { return exp(-max(y - uFog.z, 0.0) / uFog.w); }
   #endif`
   chunk.fog_fragment = `#ifdef USE_FOG
@@ -23,8 +23,8 @@ export function installAtmosphere() {
     float fogLow = 0.5 * (vFogWorld.y + cameraPosition.y) - uFog.z;
     float fogDensity2 = (1.0 + uFog.y * fogValley) * exp(-max(fogLow, 0.0) / ${look.airScaleHeight.toFixed(1)});
     float fogFactor = 1.0 - exp(-fogDist * fogDensity2 / uFog.x);
-    vec3 fogTint = mix(uHazeNear, uHazeFar, smoothstep(${look.fogBlueFrom.toFixed(1)}, ${look.fogBlueTo.toFixed(1)}, fogDist));
-    float fogEdge = smoothstep(${look.fogHorizonFrom.toFixed(1)}, ${look.fogHorizonTo.toFixed(1)}, fogDist);
+    vec3 fogTint = mix(uHazeNear, uHazeFar, smoothstep(uFogBands.x, uFogBands.y, fogDist));
+    float fogEdge = smoothstep(uFogBands.z, uFogBands.w, fogDist);
     fogTint = mix(fogTint, uHorizon, fogEdge);
     gl_FragColor.rgb = mix(gl_FragColor.rgb, fogTint, max(fogFactor, fogEdge));
   #endif`

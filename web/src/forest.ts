@@ -1,9 +1,21 @@
 import * as THREE from 'three'
-import {treeGeometry, speciesCount, treeFar} from './look/trees'
+import {treeGeometry, speciesCount, treeFar, setTreeFar} from './look/trees'
 import {look} from './look/config'
 import {fetchAsset,type Tile} from './world'
 
 export type Tree={x:number,y:number,z:number,kind:number,scale:number,seed:number,matrix:THREE.Matrix4,tint:THREE.Color}
+export interface ForestRange {
+  treeFar:number
+  treeLoadRadius:number
+  treeUnloadRadius:number
+  treeNearLod:number
+}
+const defaultRange:ForestRange={
+  treeFar,
+  treeLoadRadius:1682,
+  treeUnloadRadius:1750,
+  treeNearLod:240,
+}
 const lean=new THREE.Quaternion()
 export async function readTrees(tile:Tile,signal:AbortSignal){
   const raw=await fetchAsset(tile.file.replace('.glc','.trees'),signal)
@@ -38,15 +50,31 @@ export class Forest{
   private frustum=new THREE.Frustum()
   private matrix=new THREE.Matrix4()
   private point=new THREE.Vector3()
-  constructor(private scene:THREE.Scene,private tiles:Tile[],private camera:THREE.PerspectiveCamera){}
-  tick(position:THREE.Vector3){
+  private range:ForestRange={...defaultRange}
+  constructor(private scene:THREE.Scene,private tiles:Tile[],private camera:THREE.PerspectiveCamera,initialRange?:ForestRange){
+    if(initialRange)this.setRange(initialRange)
+  }
+  setRange(next:ForestRange){
+    if(
+      this.range.treeFar===next.treeFar &&
+      this.range.treeLoadRadius===next.treeLoadRadius &&
+      this.range.treeUnloadRadius===next.treeUnloadRadius &&
+      this.range.treeNearLod===next.treeNearLod
+    ) return
+    this.range={...next}
+    setTreeFar(next.treeFar)
+    this.dirty=true
+  }
+  tick(position:THREE.Vector3, deferOuter=false){
     const distance=(tile:Tile)=>Math.hypot(tile.x+128-position.x,tile.z+128-position.z)
     for(const tile of this.tiles){
-      if(distance(tile)>1750){if(this.loaded.delete(tile))this.dirty=true;this.pending.get(tile)?.abort()}
+      if(distance(tile)>this.range.treeUnloadRadius){if(this.loaded.delete(tile))this.dirty=true;this.pending.get(tile)?.abort()}
     }
+    const maxPending=deferOuter?1:3
+    const loadLimit=deferOuter?Math.min(this.range.treeLoadRadius,280):this.range.treeLoadRadius
     const now=performance.now()
-    while(this.pending.size<3){
-      let best=1682,next:Tile|undefined
+    while(this.pending.size<maxPending){
+      let best=loadLimit,next:Tile|undefined
       for(const tile of this.tiles){
         if(this.loaded.has(tile)||this.pending.has(tile)||(this.retry.get(tile)??0)>=now)continue
         const dist=distance(tile)
@@ -64,16 +92,16 @@ export class Forest{
     if(!this.dirty&&this.camera.position.distanceToSquared(this.anchor)<4&&this.rotation.angleTo(this.camera.quaternion)<.016)return
     this.anchor.copy(this.camera.position);this.dirty=false
     this.rotation.copy(this.camera.quaternion);this.camera.updateMatrixWorld();this.frustum.setFromProjectionMatrix(this.matrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse))
-    const cam=this.camera.position
+    const cam=this.camera.position, farSq=this.range.treeFar**2, nearBase=this.range.treeNearLod
     const groups=this.groups
     for(let i=0;i<speciesCount*2;i++)groups[i].length=0
     for(const trees of this.loaded.values())for(const tree of trees){const d=(tree.x-cam.x)**2+(tree.y-cam.y)**2+(tree.z-cam.z)**2
-      if(d>=treeFar**2)continue
+      if(d>=farSq)continue
       // Never let a crown swallow the follow camera: drop trees whose canopy the camera is inside.
       const underCamphor=tree.kind===0&&cam.y-tree.y<3.2*tree.scale
       if((tree.x-cam.x)**2+(tree.z-cam.z)**2<(underCamphor?2.5:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue
       this.point.set(tree.x,tree.y+4,tree.z)
-      if(this.frustum.planes.every(plane=>plane.distanceToPoint(this.point)>-40))groups[(tree.kind<speciesCount?tree.kind:0)+(d<(240+tree.seed*.3)**2?0:speciesCount)].push(tree)}
+      if(this.frustum.planes.every(plane=>plane.distanceToPoint(this.point)>-40))groups[(tree.kind<speciesCount?tree.kind:0)+(d<(nearBase+tree.seed*.3)**2?0:speciesCount)].push(tree)}
     this.assets??=Array.from({length:speciesCount},(_,i)=>treeGeometry(i))
     const assets=this.assets
     for(let i=0;i<speciesCount*2;i++){
