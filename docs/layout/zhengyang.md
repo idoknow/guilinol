@@ -37,3 +37,5 @@ GeoJSON 收录与两段街道中心线 22 m 缓冲区相交的 OSM 建筑 19 个
 旧 GLB 的钟塔中心由地标 anchor 加局部偏移 (−11.5, 71.0) m 得 (110.2938048,25.2801319)，距 Esri 候选点约 212 m、距百度候选点约 220 m。已复看 Esri Wayback 2017-01-11、2019-12-12、2022-12-14、2026-11-18 四版，早期图层分辨率和树影不足以辨认四个柱脚；不同发布版本也不能作为独立 POI 或实测点。[Esri Wayback](https://livingatlas.arcgis.com/wayback/)
 
 南端的曲水流觞石雕、马君武铜像及北口可见的设施以空几何入表，保留可核对的存在证据。OSM 中的咖啡馆 outdoor_seating 标签只表示商家提供户外座位，不能用来定位公共座椅。[桂林摄影旅游](https://www.glvisit.com/scenery_view.asp?id=62) · [南口实地游记](https://gs.ctrip.com/html5/you/comment/28/108721-sight.html)
+
+西侧港舍的既有模型归属可精确到 dongxi-layout.geojson 的 R2，对应 Overture 6c8b3dce。R2 标为低置信估计三层、檐高 10.35 m，和酒店客房已用到八楼的记录冲突。R19、R61 也在该地标内。单纯移动正阳路 GLB 无法修正 R2 的层数。
