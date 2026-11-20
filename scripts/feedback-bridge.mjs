@@ -89,13 +89,16 @@ function evidence(detail) {
     heading,
     landmark_id,
     nearby,
+    view:detail.view??null,
     photos,
     supplements: events
       .filter((item) => item.status === 'submitted')
       .slice(1)
       .map((item) => item.message),
   }
-  return template.replace('{{EVIDENCE}}', () =>
+  const token=detail.view?Buffer.from(JSON.stringify(detail.view)).toString('base64url'):null
+  const replay=token?`\n\n游戏视角：https://glol.rcpd.cc/?view=${token}\n\n本地 Playwright 复现（baseURL 指向本地预览）：\n\n\`\`\`js\nawait page.goto('/?verify&view=${token}');\nawait page.waitForFunction(() => window.viewer?.stats.loaded > 0 && !window.viewer.stream.pending.size);\nawait page.screenshot({path:'before.png'});\n\`\`\`\n`:''
+  return replay+template.replace('{{EVIDENCE}}', () =>
     JSON.stringify(data, null, 2)
       .replaceAll('mention:', 'mention：')
       .split('\n')
@@ -105,6 +108,7 @@ function evidence(detail) {
 }
 async function files(detail) {
   const args = []
+  if(detail.has_view_shot){const file=join(work,'view.jpg');await writeFile(file,Buffer.from(await (await request(`/api/feedback/${detail.id}/view-shot`)).arrayBuffer()));args.push('--attachment',file)}
   for (const photo of detail.photos) {
     const ext = { 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/png': 'png', 'image/heic': 'heic' }[
       photo.mime

@@ -1,6 +1,6 @@
 import { type Env, Problem, equal, hash, invalid, limited, now, sessionHash, unauthorized } from './auth'
 import { ll2xz } from './projection'
-import { edges, kinds, labels, views } from './feedback-contract'
+import { edges, kinds, labels, views, validView } from './feedback-contract'
 import { adminList } from './admin'
 
 const json = (value: unknown) => Response.json(value, { headers: { 'Cache-Control': 'private, no-store' } })
@@ -116,12 +116,13 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (
       Math.abs(point.x) > 3072.000001 ||
       Math.abs(point.z) > 3328.000001 ||
-      !kinds.includes(String(data.kind))
+      !kinds.includes(String(data.kind)) ||
+      !validView(data.view)
     )
       invalid()
     const id = crypto.randomUUID()
     const created = await stmt(
-      `INSERT INTO feedback(id,user_id,kind,title,body,lat,lon,heading,landmark_id) SELECT ?,?,?,?,?,?,?,?,?
+      `INSERT INTO feedback(id,user_id,kind,title,body,lat,lon,heading,landmark_id,view_json) SELECT ?,?,?,?,?,?,?,?,?,?
        WHERE (SELECT count(*) FROM feedback WHERE user_id=? AND status='draft')<3`,
       id,
       user,
@@ -132,13 +133,14 @@ export async function feedback(request: Request, env: Env, path: string) {
       lon,
       data.heading == null ? null : number(data.heading, 0, 360),
       text(data.landmark_id, 120),
+      JSON.stringify(data.view),
       user,
     ).run()
     if (!created.meta.changes) throw new Problem(429, 'draft_limit', '最多保留 3 条草稿，请先提交或删除草稿')
     return json({ id })
   }
   const match =
-    /^(bridge\/|admin\/)?feedback\/([\w-]+)(?:\/(submit|supplement|status|photos\/(?:[1-9]|1\d|20)))?$/.exec(
+    /^(bridge\/|admin\/)?feedback\/([\w-]+)(?:\/(submit|supplement|status|view-shot|photos\/(?:[1-9]|1\d|20)))?$/.exec(
       path,
     )
   if (!match || (!admin && bridge !== (match[3] === 'status'))) missing()
@@ -149,20 +151,98 @@ export async function feedback(request: Request, env: Env, path: string) {
         : 'SELECT * FROM feedback WHERE id=?') + ' AND (user_id=? OR ?=1)',
       id,
       user,
-      Number(machine || admin || (isAdmin && method === 'GET' && action?.startsWith('photos/')) || false),
-    ).first<{ status: string; multica_issue: string | null }>()
+      Number(
+        machine ||
+          admin ||
+          (isAdmin && method === 'GET' && (action === 'view-shot' || action?.startsWith('photos/'))) ||
+          false,
+      ),
+    ).first<{ status: string; multica_issue: string | null; view_json: string | null; shot_state: number }>()
   if (!row) missing()
+  const shotKey = `fb/${id}/view.jpg`
+  if (action === 'view-shot') {
+    if (method === 'GET') {
+      if (row.shot_state !== 1) missing()
+      const object = await env.FEEDBACK.get(shotKey)
+      if (!object) missing()
+      return new Response(object.body, {
+        headers: {
+          'Content-Type': 'image/jpeg',
+          'Cache-Control': 'private, no-store',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      })
+    }
+    if (method !== 'PUT') missing()
+    if (!['draft', 'need_info'].includes(row.status)) conflict()
+    const size = Number(request.headers.get('content-length'))
+    if (
+      request.headers.get('content-type') !== 'image/jpeg' ||
+      !Number.isInteger(size) ||
+      size < 4 ||
+      size > 2097152
+    )
+      invalid()
+    const bytes = new Uint8Array(await request.arrayBuffer())
+    if (bytes.length !== size || bytes[0] !== 255 || bytes[1] !== 216 || bytes[2] !== 255) invalid()
+    const header = request.headers.get('X-Feedback-View')
+    if (header !== null) {
+      try {
+        if (!validView(JSON.parse(header))) invalid()
+      } catch {
+        invalid()
+      }
+    }
+    const [, lock, usage] = await env.DB.batch([
+      stmt('DELETE FROM feedback_upload_usage WHERE uploaded_at<=unixepoch()-86400'),
+      stmt(
+        'UPDATE feedback SET shot_state=2 WHERE id=? AND status=? AND shot_state!=2 AND (SELECT coalesce(sum(bytes),0) FROM feedback_upload_usage WHERE user_id=?)+?<=314572800',
+        id,
+        row.status,
+        user,
+        size,
+      ),
+      stmt('INSERT INTO feedback_upload_usage SELECT ?,unixepoch(),? WHERE changes()=1', user, size),
+    ])
+    if (!lock.meta.changes || !usage.meta.changes) {
+      if (
+        Number(
+          await stmt(
+            'SELECT coalesce(sum(bytes),0) total FROM feedback_upload_usage WHERE user_id=?',
+            user,
+          ).first('total'),
+        ) +
+          size >
+        314572800
+      )
+        throw new Problem(429, 'upload_limit', '24 小时上传额度已用完')
+      conflict()
+    }
+    try {
+      await env.FEEDBACK.put(shotKey, bytes)
+    } catch (error) {
+      await stmt('UPDATE feedback SET shot_state=? WHERE id=?', row.shot_state, id).run()
+      throw error
+    }
+    await stmt(
+      'UPDATE feedback SET shot_state=1,view_json=coalesce(?,view_json) WHERE id=?',
+      header,
+      id,
+    ).run()
+    return json({ ok: true })
+  }
   if (!action && method === 'DELETE') {
-    if (row.status !== 'draft') conflict()
+    if (row.status !== 'draft' || row.shot_state === 2) conflict()
     const [photos, removed] = await env.DB.batch<{ r2_key: string }>([
       stmt(
-        `DELETE FROM feedback_photos WHERE feedback_id=? AND EXISTS(SELECT 1 FROM feedback WHERE id=? AND status='draft') RETURNING r2_key`,
+        `DELETE FROM feedback_photos WHERE feedback_id=? AND EXISTS(SELECT 1 FROM feedback WHERE id=? AND status='draft' AND shot_state!=2) RETURNING r2_key`,
         id,
         id,
       ),
-      stmt(`DELETE FROM feedback WHERE id=? AND status='draft'`, id),
+      stmt(`DELETE FROM feedback WHERE id=? AND status='draft' AND shot_state!=2`, id),
     ])
     if (!removed.meta.changes) conflict()
+    await env.FEEDBACK.delete(shotKey)
     if (photos.results.length) await env.FEEDBACK.delete(photos.results.map((photo) => String(photo.r2_key)))
     return json({ ok: true })
   }
@@ -174,6 +254,10 @@ export async function feedback(request: Request, env: Env, path: string) {
   if (!action && method === 'GET')
     return json({
       ...row,
+      view_json: undefined,
+      shot_state: undefined,
+      view: row.view_json ? JSON.parse(row.view_json) : null,
+      has_view_shot: row.shot_state === 1,
       ...(admin
         ? {
             issue_url: row.multica_issue
@@ -308,11 +392,12 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (row.status !== 'draft') conflict()
     target = 'submitted'
     message = '已提交，等待处理'
-    guard = ` AND EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1) AND (SELECT count(*) FROM feedback f WHERE f.user_id=feedback.user_id AND f.submitted_at>unixepoch()-86400)<5`
+    guard = ` AND view_json IS NOT NULL AND shot_state=1 AND EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1) AND (SELECT count(*) FROM feedback f WHERE f.user_id=feedback.user_id AND f.submitted_at>unixepoch()-86400)<5`
   } else if (action === 'supplement') {
     if (row.status !== 'need_info') conflict()
     target = 'submitted'
     message = text((await fields(request)).body, 2000, true)!
+    guard = ' AND shot_state!=2'
   } else if (bridge || admin) {
     const data = await fields(request)
     target = String(data.status)

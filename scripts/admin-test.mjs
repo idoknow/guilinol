@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
+import {view,uploadShot} from './feedback-view-fixture.mjs'
 import { mkdir, readFile } from 'node:fs/promises'
 
-export async function apiTest({ api, sql, id, second, photo }) {
+export async function apiTest({ api, sql, id, second, photo,origin,cookie }) {
   const admin = (path, data = null, status = 200, headers = {}) =>
     api('admin/' + path, data, status, null, { headers: { ...second, ...headers } })
   const detail = 'feedback/' + id,
@@ -30,9 +31,10 @@ export async function apiTest({ api, sql, id, second, photo }) {
   await photo(id, 1, 200, second, 'GET')
   await photo(id, 1, 404, second, 'DELETE')
   const manual = (
-    await api('feedback', { kind: '其他', title: '状态测试', body: '请核对', lat: 25.28, lon: 110.3 })
+    await api('feedback', { view,kind: '其他', title: '状态测试', body: '请核对', lat: 25.28, lon: 110.3 })
   ).id
   await photo(manual, 1, 200)
+  await uploadShot(origin,cookie,manual)
   await api(`feedback/${manual}/submit`, {})
   const change = `feedback/${manual}/status`
   await admin(change, transition, 409)
@@ -77,6 +79,7 @@ export async function browserTest({ page, origin, email, password, nickname, cod
   await page.getByText('无权限').waitFor()
   const title = '象鼻山入口朝向',
     item = await post('feedback', {
+      view,
       title,
       kind: '位置或朝向不对',
       body: '入口朝向滨江路，附入口正面照片。',
@@ -92,6 +95,7 @@ export async function browserTest({ page, origin, email, password, nickname, cod
     data: await readFile('public/og.jpg'),
   })
   assert.equal(upload.status(), 200)
+  assert.equal((await request.put(`${origin}/api/feedback/${item.id}/view-shot`,{headers:{...headers,'Content-Type':'image/jpeg'},data:await readFile('public/og.jpg')})).status(),200)
   await post(`feedback/${item.id}/submit`, {})
   sql(`UPDATE users SET role='admin' WHERE email='${email}'`)
   await page.reload()

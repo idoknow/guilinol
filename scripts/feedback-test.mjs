@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
+import {view,uploadShot} from './feedback-view-fixture.mjs'
 import { mkdir, readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 const bridge = { Authorization: 'Bearer local-test' },
-  draft = { kind: '其他', title: '象鼻山入口', body: '请核对入口的朝向', lat: 25.28, lon: 110.3 }
+  draft = { view,kind: '其他', title: '象鼻山入口', body: '请核对入口的朝向', lat: 25.28, lon: 110.3 }
 export async function apiTest({ api, origin, cookie, sql }) {
   const other = '1'.repeat(64),
     digest = createHash('sha256').update(other).digest('hex')
@@ -32,6 +33,7 @@ export async function apiTest({ api, origin, cookie, sql }) {
       headers: bridge,
     })
   await api('feedback', { ...draft, lat: 0 }, 400)
+  for(const invalid of [undefined,{...view,other:true},{...view,x:4000},{...view,pitch:100},{...view,target:{...view,distance:2}}])await api('feedback',{...draft,view:invalid},400)
   await api('bridge/pending', null, 401, null, { headers: { Authorization: 'Bearer bad' } })
   const id = await create(),
     path = 'feedback/' + id
@@ -54,12 +56,17 @@ export async function apiTest({ api, origin, cookie, sql }) {
     [1, 2, 3],
   )
   await photo(id, 4, 404, {}, 'GET')
+  await api(path+'/submit',{},409)
+  await uploadShot(origin,cookie,id)
+  assert.equal((await fetch(`${origin}/api/${path}/view-shot`,{headers:second})).status,404)
+  assert.deepEqual((await api(path)).view,view)
   sql(
     `INSERT INTO feedback_upload_usage SELECT user_id,unixepoch(),314572800-${picture.length}-(SELECT sum(bytes) FROM feedback_upload_usage) FROM feedback WHERE id='${id}'`,
   )
   await photo(id, 4, 200)
   await photo(id, 4, 200, {}, 'DELETE')
   await photo(id, 3, 429)
+  await uploadShot(origin,cookie,id,429)
   sql('UPDATE feedback_upload_usage SET uploaded_at=unixepoch()-86400')
   await photo(id, 3, 200)
   await photo(id, 1, 404, second, 'GET')
@@ -93,9 +100,10 @@ export async function apiTest({ api, origin, cookie, sql }) {
     ['submitted', 'queued', 'reviewing', 'modelling', 'need_info', 'submitted', 'queued', 'live'],
   )
   assert.equal(detail.photos.length, 4)
-  await (await import('./admin-test.mjs')).apiTest({api,sql,id,second,photo})
+  await (await import('./admin-test.mjs')).apiTest({api,sql,id,second,photo,origin,cookie})
   for (let count = 1; count <= 5; count++) {
     const next = await create()
+    await uploadShot(origin,cookie,next)
     await photo(next, 1, 200)
     await api(`feedback/${next}/submit`, {}, count === 5 ? 429 : 200)
   }
@@ -106,19 +114,22 @@ export async function uiTest(page, origin) {
   const shot = async (name) => {
     // Pause the WebGL loop so screenshots don't time out on a loaded software-GL host.
     await page.evaluate(() => window.viewer.freeze?.())
-    try {
-      await page.screenshot({ path: `captures/feedback/${name}.png`, timeout: 120000 })
-    } finally {
-      await page.evaluate(() => window.viewer.resume?.())
-    }
+    await page.screenshot({ path: `captures/feedback/${name}.png`, timeout: 120000 })
   }
   const fb = page.locator('.fb-panel')
   const click = (name) => fb.getByRole('button', { name, exact: true }).click()
-  await page.evaluate(() => window.viewer.camera.position.set(-685, 420, 1182))
+  await page.evaluate(()=>{const viewer=window.viewer;viewer.camera.position.set(-1530,168,-82);viewer.camera.lookAt(-1530,161,-116);viewer.resume()})
+  await page.waitForFunction(()=>[...window.viewer.stream.landmarks.keys()].some(entry=>entry.id==='yiwu_old_house'),null,{timeout:120000})
   await page.locator('.dock-feedback').click()
   await fb.locator('.fb-map canvas').waitFor({ timeout: 60000 })
   await page.waitForTimeout(400)
-  await fb.getByRole('radio', { name: '沿路拍摄' }).click()
+  await fb.locator('.fb-view').getByText(/翊武路青砖老楼/).waitFor()
+  await fb.locator('.fb-view-shot').evaluate(image=>image.decode())
+  await shot('view-step')
+  await click('重新取景');await shot('aim-bar');await page.evaluate(()=>{const camera=window.viewer.camera;camera.position.x+=4;camera.lookAt(-1530,161,-116)})
+  await page.getByRole('button',{name:'截取',exact:true}).click()
+  const routeMode=fb.getByRole('radio',{name:'沿路拍摄'})
+  await routeMode.evaluate(node=>node.scrollIntoView({block:'center',behavior:'instant'}));await routeMode.click()
   await fb.getByLabel('行走路径和方向').fill('从十字街沿解放东路向东走到解放桥西桥头')
   // The pin starts at the walker; zoom in once and check the painter drew map pixels (not a blank canvas).
   await fb.getByRole('button', { name: '放大' }).click()
@@ -178,15 +189,20 @@ export async function uiTest(page, origin) {
   await fb.locator('.fb-pill.fb-status--live').waitFor()
   assert.equal(await fb.locator('.fb-timeline li').count(), 5)
   await shot('timeline')
+  await fb.locator('.fb-view-shot').evaluate(image=>image.decode());await fb.locator('.fb-view-shot').scrollIntoViewIfNeeded();await shot('view-detail')
+  const stored=(await (await page.request.get(`${origin}/api/feedback/${item.id}`)).json()).view
   await page.evaluate(() => window.viewer.camera.position.set(0, 500, 0))
   await click('飞过去看看')
   await fb.waitFor({ state: 'detached' })
   assert.ok(
     await page.evaluate(
-      () => Math.hypot(window.viewer.camera.position.x + 685, window.viewer.camera.position.z - 1182) < 0.5,
+      view => {const camera=window.viewer.camera;return Math.hypot(camera.position.x-view.x,camera.position.y-view.y,camera.position.z-view.z)<.5 && Math.abs(camera.rotation.y*180/Math.PI-view.yaw)<.5 && Math.abs(camera.rotation.x*180/Math.PI-view.pitch)<.5 && view.landmark_id==='yiwu_old_house'},stored,
     ),
   )
   await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(origin+'/?verify&view='+Buffer.from(JSON.stringify(stored)).toString('base64url'))
+  await page.waitForFunction(view=>{const viewer=window.viewer;if(!viewer||viewer.stats.loaded===0)return false;const camera=viewer.camera;return document.body.dataset.mode==='fly'&&Math.hypot(camera.position.x-view.x,camera.position.y-view.y,camera.position.z-view.z)<.5&&Math.abs(camera.rotation.y*180/Math.PI-view.yaw)<.5&&Math.abs(camera.rotation.x*180/Math.PI-view.pitch)<.5},stored,{timeout:120000})
+  await page.evaluate(()=>window.viewer.freeze())
   await page.locator('.dock-feedback').click()
   await fb.getByLabel('标题').waitFor()
   await fb.locator('.fb-map canvas').waitFor()

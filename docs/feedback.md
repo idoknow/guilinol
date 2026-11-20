@@ -115,3 +115,8 @@ bridge 请求均用 Bearer token。回写字段 `status,message,multica_issue,pr
 ## 不做（这一期）
 
 - 第三方登录、手机号；公开反馈广场/点赞；管理后台（用 D1 控制台 + bridge 代替）；建模结果的自动合并（仍由 sg claude 验收）。
+## 游戏视角（0004）
+
+新草稿的 `view` 使用 `lib/feedback-contract.ts` 中的 `FeedbackView`。朝向、俯仰、FOV 都是角度；世界坐标为实际相机位置（米），不记录步行角色位置。`target` 是中心射线命中点，无命中为 `null`。
+
+提交前须同时上传用户照片、`PUT /api/feedback/:id/view-shot`（JPEG，≤2 MiB）。补充资料可不改视角；若重新取景，同时用 `X-Feedback-View` 传新的 JSON，上传量与照片合计。详情返回 `view` 和 `has_view_shot`；同路径 GET 需与原照片相同的权限。旧记录无视角时仍可查看。深链接 `/?view=<base64url(JSON)>` 复现镜头而不恢复角色，不包含私有照片或用户信息。

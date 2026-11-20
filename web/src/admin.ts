@@ -1,4 +1,4 @@
-import { edges, labels } from '../../lib/feedback-contract'
+import { edges, labels, viewToken } from '../../lib/feedback-contract'
 import './admin.css'
 
 const main = document.querySelector('main')!,
@@ -216,6 +216,8 @@ async function detail(id: string) {
   )
   if (item.issue_url) main.append(external('Multica issue', item.issue_url), ' ')
   if (item.pr_url) main.append(external('查看 PR', item.pr_url))
+  if(item.view){main.append(el('h3','游戏视角'),el('pre',JSON.stringify(item.view,null,2)),link('在游戏中打开此视角','/?view='+viewToken(item.view)))}
+  if(item.has_view_shot){const image=el('img');image.alt='反馈视角截图';image.src=`/api/feedback/${encodeURIComponent(id)}/view-shot`;main.append(image)}
   main.append(el('h3', '照片'))
   const photos = el('div')
   photos.className = 'adm-photos'

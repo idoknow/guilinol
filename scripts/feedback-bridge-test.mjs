@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import {view,uploadShot} from './feedback-view-fixture.mjs'
 import { execFileSync } from 'node:child_process'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -54,6 +55,7 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
   const set = async (values) => writeFile(fixture, JSON.stringify({ ...(await load()), ...values }))
   await writeFile(fixture, JSON.stringify({ creates: 0, status: 'todo', comments: [], replies: [] }))
   const { id } = await api('feedback', {
+      view,
       kind: '其他',
       title: '桥头',
       body: '请核对入口朝向',
@@ -62,6 +64,7 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
     }),
     path = 'feedback/' + id
   const picture = await readFile('public/og.jpg')
+  await uploadShot(origin,cookie,id)
   for (const slot of [1, 3])
     assert.equal(
       (
@@ -91,7 +94,8 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
   run()
   let data = await load()
   assert.equal(data.creates, 1)
-  assert.deepEqual(data.sizes, [picture.length, picture.length])
+  assert.deepEqual(data.sizes, [picture.length,picture.length, picture.length])
+  assert.match(data.args[data.args.indexOf('--attachment')+1],/\/view\.jpg$/);assert.match(data.body,/\?view=/)
   assert.equal(data.body.trim(), dry.trim())
   for (const [key, value] of Object.entries({
     '--parent': 'parent',
@@ -170,7 +174,7 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
   )
   assert.equal((await load()).creates, 1)
   const next = (
-    await api('feedback', { kind: '其他', title: '新反馈', body: '请核对', lat: 25.28, lon: 110.3 })
+    await api('feedback', { view,kind: '其他', title: '新反馈', body: '请核对', lat: 25.28, lon: 110.3 })
   ).id
   assert.equal(
     (
@@ -182,6 +186,7 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
     ).status,
     200,
   )
+  await uploadShot(origin,cookie,next)
   await api(`feedback/${next}/submit`, {})
   await set({
     pr: false,

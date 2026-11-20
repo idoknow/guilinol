@@ -145,3 +145,7 @@ a.fb-photo{color:inherit}
   .fb-grid{grid-template-columns:repeat(3,1fr)}
 }
 @media (prefers-reduced-motion:reduce){dialog.fb-panel,.fb-photo{transition:none;animation:none}}
+.fb-view-shot{display:block;max-width:100%;max-height:28vh}
+.fb-view-frame{position:relative;width:fit-content;margin:0}
+.fb-view-cross{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
+.fb-aim-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);z-index:100}
