@@ -10,3 +10,13 @@ Measurements use the recorded camera position in metres, true-north heading and 
 | 1408 | Camera heading 184.3° places the R17 CCB sign at 9.6% of the image width. In plan, the centre ray now reaches N022 at 13.9 m. The line to the CCB sign enters N022 after 8.8 m and traverses 41.3 m of its registered footprint. | The camera direction is corrected. Bringing the southeast row forward would increase the obstruction; the optical match is not evidence to relocate a second storefront or extrude more mass. |
 
 The documented trial translations (east, south) are 1403 (+4.60, 0.00) m, 1406 (+2.70,+3.80) m towards the OSM pedestrian junction, and 1407 (−0.18,+0.73) m to the service axis. They do not modify the catalog.
+
+## Six-photo review disposition
+
+| Image | Decision | What changed or still needs a photograph |
+|---|---|---|
+| 1390 / 1391 | Paving fix retained | Remove market paving that floated over the Jiefang East carriageways in these views. |
+| 1403 | `pending-reshoot` — scene unchanged | The advert is not enough to locate the storefront. Photograph the street axis, beer-fish advert and an identifiable shop or corner together to distinguish a separate board from a sign on the mall. |
+| 1406 | `pending-reshoot` — scene unchanged | Roof cover does not locate the gateway connections. Photograph both ends and the building corners they meet (IDOK-58). |
+| 1407 | Alley fix retained | Narrow the alley only where the roof mask supports infill; leave 4.6 m clear. |
+| 1408 | Heading fix retained; passage `pending-reshoot` | Keep 184.3° at the recorded position. The sign bearing does not establish an opening: leave the frontage unchanged until a ground-level view shows the route between the square and R17 (IDOK-58). |
