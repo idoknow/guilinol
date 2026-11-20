@@ -2,10 +2,13 @@
 Covers IMG_1344, IMG_1347, IMG_1350, IMG_1351..1353 sightlines, Guihu iron fence & street corner sign.
 """
 import math
+from pathlib import Path
+import sys
 import numpy as np
-import trimesh
 from PIL import Image, ImageDraw, ImageFont
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from trees import emit_landmark_tree
 from xiaoyao_tower import generate
 
 
@@ -24,30 +27,42 @@ def _cjk_font(size):
 
 
 def canopy(model, station, side, high_crown=False):
-    lateral = side * (6.8 if side > 0 else 6.4)
-    trunk_top = 6.8 if high_crown else 5.2
-    crown_y = 8.4 if high_crown else 6.3
-    model.beam([station, -0.4, lateral], [station, trunk_top, lateral], 0.26, 'wood', 8, True)
-    sphere = trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
-    for reach in (-2.0, 1.7):
-        tip = [station + reach, crown_y, lateral - side * 2.0]
-        model.beam([station, trunk_top - 1.4, lateral], tip, 0.18, 'wood')
-        model.mesh(sphere.vertices * [3.8, 2.3, 3.6] + tip, sphere.faces, 'leaf')
+    near_office = side > 0 and -60 <= station <= -10
+    lateral = 5.85 if near_office else side * (6.5 if side > 0 else 6.4)
+    # Orient +X leaning/arching limbs across Yiwu Rd (-z when side > 0, +z when side < 0)
+    yaw = (math.pi / 2 if side > 0 else -math.pi / 2) + ((int(abs(station)) % 5) - 2) * 0.14
+    species = 'osmanthus' if near_office else ('camphor' if int(abs(station)) % 3 == 0 else 'bischofia')
+    emit_landmark_tree(
+        model,
+        species,
+        station,
+        0.05,
+        lateral,
+        scale=0.80 if near_office else (0.92 if high_crown else 0.96),
+        y_scale=0.98 if near_office else (1.18 if high_crown else 0.96),
+        yaw=yaw,
+        variant_idx=int(abs(station)) % 3,
+        wood_mat='wood',
+        leaf_mat='leaf',
+        collide_trunk=True,
+    )
 
 
 def palm(model, station, lateral=-11.2, height=10.2):
-    lean = 0.45 if station % 2 == 0 else -0.35
-    top = np.array([station + lean, height, lateral])
-    model.beam([station, -0.4, lateral], top.tolist(), 0.20, 'granite', 8)
-    for angle in np.linspace(0, 2 * math.pi, 11 if model.detail else 6, endpoint=False):
-        radial = np.array([math.cos(angle), 0, math.sin(angle)])
-        cross = np.array([-radial[2], 0, radial[0]])
-        crest = top + 1.45 * radial + [0, 0.95, 0]
-        model.mesh(
-            [top, crest + cross * 0.48, crest, crest - cross * 0.48, top + 2.55 * radial - [0, 0.35, 0]],
-            [[0, 1, 2], [0, 2, 3], [1, 4, 2], [2, 4, 3]],
-            'green',
-        )
+    emit_landmark_tree(
+        model,
+        'palm',
+        station,
+        0.0,
+        lateral,
+        scale=0.92,
+        y_scale=height / 10.2,
+        yaw=station * 0.4,
+        variant_idx=int(abs(station)) % 3,
+        wood_mat='granite',
+        leaf_mat='green',
+        collide_trunk=False,
+    )
 
 
 def scooter(model, station, paint, lateral=-6.65):
@@ -166,16 +181,14 @@ def street(model):
 
     # Street trees carefully placed to frame rather than block key facades (1344, 1347, 1350, 1351..1353)
     west_stations = (-58, -42, -15, 2, 18, 36, 48, 86)
-    east_stations = (-54, -38, -20, -4, 12, 44, 64, 82)
+    east_stations = (-48, -34, -20, -4, 12, 44, 64, 82)
     for st in west_stations:
         canopy(model, st, -1, high_crown=(st >= 48))
     for st in east_stations:
         canopy(model, st, +1, high_crown=(st >= 44))
     # High overarching camphor boughs in front of yiwu_old_house (trunks across street, high leafy canopy)
     for st in (58, 72):
-        sphere = trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
-        model.beam([st,0,-6.4],[st,9.2,-5.5],.22,'wood',8,True)
-        model.mesh(sphere.vertices * [4.5, 2.2, 4.2] + [st, 9.2, -5.5], sphere.faces, 'leaf')
+        emit_landmark_tree(model, 'camphor', st, 0.05, -6.2, scale=0.95, y_scale=1.24, yaw=-math.pi / 2, variant_idx=st % 3, wood_mat='wood', leaf_mat='leaf', collide_trunk=True)
 
     # Roadside scooters (including foreground row near 1350)
     for base_st, lat in ((-50, -6.6), (4, -6.6), (21.5, -2.2)):

@@ -1,37 +1,51 @@
 import * as THREE from 'three'
-import {treeGeometry, speciesCount, treeFar} from './look/trees'
+import {applyTreeVariant, sharedProxyAssets, TREE_SPECIES_COUNT, treeGeometry} from './look/trees'
 import {look} from './look/config'
 import {fetchAsset,type Tile} from './world'
 
-export type Tree={x:number,y:number,z:number,kind:number,scale:number,seed:number,matrix:THREE.Matrix4,tint:THREE.Color}
-const lean=new THREE.Quaternion()
+export type Tree={
+  x:number; y:number; z:number; kind:number; scale:number; seed:number
+  matrix:THREE.Matrix4; midMatrix:THREE.Matrix4; farMatrix:THREE.Matrix4
+  tint:THREE.Color; proxyTint:THREE.Color; midGroup:0|1
+}
+const lean=new THREE.Quaternion(), slopeQ=new THREE.Quaternion()
 export async function readTrees(tile:Tile,signal:AbortSignal){
   const raw=await fetchAsset(tile.file.replace('.glc','.trees'),signal)
   const data=new DataView(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
   if(data.byteLength%12)throw Error('Invalid vegetation payload')
-  const trees:Tree[]=[],up=new THREE.Vector3(0,1,0),object=new THREE.Object3D(),nVec=new THREE.Vector3()
+  const trees:Tree[]=[],up=new THREE.Vector3(0,1,0),nVec=new THREE.Vector3()
   for(let i=0;i<data.byteLength;i+=12){
     const x=tile.x+data.getUint16(i,true)/100,z=tile.z+data.getUint16(i+2,true)/100,y=data.getInt16(i+4,true)/10
-    const kind=data.getUint8(i+6),scale=data.getUint8(i+7)/100,seed=data.getUint8(i+9)
+    const rawKind=data.getUint8(i+6),kind=rawKind<TREE_SPECIES_COUNT?rawKind:0
+    const scale=data.getUint8(i+7)/100,yaw=data.getUint8(i+8)*Math.PI/128,seed=data.getUint8(i+9)
     const nx=data.getInt8(i+10)/127,nz=data.getInt8(i+11)/127
-    object.position.set(x,y,z);object.scale.setScalar(scale)
     lean.setFromUnitVectors(up,nVec.set(nx,Math.sqrt(Math.max(0,1-nx*nx-nz*nz)),nz).normalize())
     // Trees grow towards the sky: keep at most look.treeLean of the slope normal.
-    const angle=2*Math.acos(Math.min(1,Math.abs(lean.w)));object.quaternion.identity().slerp(lean,angle>look.treeLean?look.treeLean/angle:1)
-    object.rotateY(data.getUint8(i+8)*Math.PI/128);object.updateMatrix()
-    const j=look.trees.treeJitter,h=((seed*37)%256)/255-.5,v=((seed*101)%256)/255-.5
-    const tint=new THREE.Color(1+v*j*2+h*j,1+v*j*2,1+v*j*2-h*j*1.5)
-    trees.push({x,y,z,kind,scale,seed,matrix:object.matrix.clone(),tint})
-  }return trees
+    const angle=2*Math.acos(Math.min(1,Math.abs(lean.w)))
+    slopeQ.identity().slerp(lean,angle>look.treeLean?look.treeLean/angle:1)
+    const matrix=new THREE.Matrix4(),midMatrix=new THREE.Matrix4(),farMatrix=new THREE.Matrix4()
+    const tint=new THREE.Color(),proxyTint=new THREE.Color()
+    const midGroup=applyTreeVariant(kind,seed,scale,yaw,slopeQ,x,y,z,matrix,midMatrix,farMatrix,tint,proxyTint)
+    trees.push({x,y,z,kind,scale,seed,matrix,midMatrix,farMatrix,tint,proxyTint,midGroup})
+  }
+  return trees
 }
+
+// Batch slots:
+//   0 .. TREE_SPECIES_COUNT-1 : LOD0 near (species-exact detailed mesh, d < lodNear; capped to MAX_NEAR_BATCHES)
+//   TREE_SPECIES_COUNT + 0..1 : LOD1 mid  (2 shared 3D crown archetypes, lodNear <= d < lodMid)
+//   TREE_SPECIES_COUNT + 2    : LOD2 far  (1 shared crossed silhouette card, lodMid <= d < 1500)
+const TOTAL_SLOTS=TREE_SPECIES_COUNT+3
+const MAX_NEAR_BATCHES=6
 
 export class Forest{
   loaded=new Map<Tile,Tree[]>()
   pending=new Map<Tile,AbortController>()
   private retry=new Map<Tile,number>()
-  private assets:ReturnType<typeof treeGeometry>[]|null=null
-  private batches:(THREE.InstancedMesh|undefined)[]=[]
-  private groups:Tree[][]=Array.from({length:speciesCount*2},()=>[])
+  private nearAssets:ReturnType<typeof treeGeometry>[]|null=null
+  private batches:(THREE.InstancedMesh|undefined)[]=Array.from({length:TOTAL_SLOTS},()=>undefined)
+  private groups:Tree[][]=Array.from({length:TOTAL_SLOTS},()=>[])
+  private nearOrder:number[]=Array.from({length:TREE_SPECIES_COUNT},(_,i)=>i)
   private dirty=true
   private anchor=new THREE.Vector3(Infinity,0,0)
   private rotation=new THREE.Quaternion()
@@ -57,39 +71,59 @@ export class Forest{
       readTrees(tile,control.signal).then(trees=>{if(!control.signal.aborted){this.loaded.set(tile,trees);this.dirty=true}})
         .catch(err=>{if(!control.signal.aborted){console.error(err);this.retry.set(tile,performance.now()+10000)}}).finally(()=>this.pending.delete(tile))
     }
-    if(!this.loaded.size){
-      for(const mesh of this.batches)if(mesh){mesh.visible=false;mesh.count=0}
-      return
-    }
+    if(!this.loaded.size)return
     if(!this.dirty&&this.camera.position.distanceToSquared(this.anchor)<4&&this.rotation.angleTo(this.camera.quaternion)<.016)return
     this.anchor.copy(this.camera.position);this.dirty=false
     this.rotation.copy(this.camera.quaternion);this.camera.updateMatrixWorld();this.frustum.setFromProjectionMatrix(this.matrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse))
     const cam=this.camera.position
     const groups=this.groups
-    for(let i=0;i<speciesCount*2;i++)groups[i].length=0
-    for(const trees of this.loaded.values())for(const tree of trees){const d=(tree.x-cam.x)**2+(tree.y-cam.y)**2+(tree.z-cam.z)**2
-      if(d>=treeFar**2)continue
-      // Never let a crown swallow the follow camera: drop trees whose canopy the camera is inside.
-      const underCamphor=tree.kind===0&&cam.y-tree.y<3.2*tree.scale
-      if((tree.x-cam.x)**2+(tree.z-cam.z)**2<(underCamphor?2.5:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue
+    for(let i=0;i<TOTAL_SLOTS;i++)groups[i].length=0
+    const nearSq=look.trees.lodNear**2, midSq=look.trees.lodMid**2
+    for(const trees of this.loaded.values())for(const tree of trees){
+      const d=(tree.x-position.x)**2+(tree.y-position.y)**2+(tree.z-position.z)**2
+      if(d>=1500**2)continue
+      const highCanopy=(tree.kind===0||tree.kind===1||tree.kind===6||tree.kind===7||tree.kind===9)&&cam.y-tree.y<2.9*tree.scale
+      if((tree.x-cam.x)**2+(tree.z-cam.z)**2<(highCanopy?2.2:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue
       this.point.set(tree.x,tree.y+4,tree.z)
-      if(this.frustum.planes.every(plane=>plane.distanceToPoint(this.point)>-40))groups[(tree.kind<speciesCount?tree.kind:0)+(d<(240+tree.seed*.3)**2?0:speciesCount)].push(tree)}
-    this.assets??=Array.from({length:speciesCount},(_,i)=>treeGeometry(i))
-    const assets=this.assets
-    for(let i=0;i<speciesCount*2;i++){
-      const group=groups[i];let mesh=this.batches[i];const asset=assets[i%speciesCount]
+      if(!this.frustum.planes.every(plane=>plane.distanceToPoint(this.point)>-40))continue
+      const slot=d<nearSq?tree.kind:d<midSq?TREE_SPECIES_COUNT+tree.midGroup:TREE_SPECIES_COUNT+2
+      groups[slot].push(tree)
+    }
+    // Guarantee total tree draw calls <= 9 (MAX_NEAR_BATCHES + 2 mid + 1 far), strictly below baseline 12:
+    // keep the 6 most populous near species on LOD0 and fold any rare 7th+ species seamlessly into LOD1 mid.
+    this.nearOrder.sort((a,b)=>groups[b].length-groups[a].length)
+    for(let rank=MAX_NEAR_BATCHES;rank<TREE_SPECIES_COUNT;rank++){
+      const k=this.nearOrder[rank], overflow=groups[k]
+      if(!overflow.length)break
+      for(let j=0;j<overflow.length;j++)groups[TREE_SPECIES_COUNT+overflow[j].midGroup].push(overflow[j])
+      overflow.length=0
+    }
+    this.nearAssets??=Array.from({length:TREE_SPECIES_COUNT},(_,i)=>treeGeometry(i))
+    const nearAssets=this.nearAssets, shared=sharedProxyAssets()
+    for(let i=0;i<TOTAL_SLOTS;i++){
+      const group=groups[i];let mesh=this.batches[i]
       if(group.length&&(!mesh||mesh.instanceMatrix.count<group.length)){
         if(mesh){this.scene.remove(mesh);mesh.dispose()}
-        const cap=2**Math.ceil(Math.log2(group.length))
-        mesh=new THREE.InstancedMesh(i<speciesCount?asset.near:asset.far,asset.material,cap)
+        const cap=Math.max(16,2**Math.ceil(Math.log2(group.length)))
+        const geom=i<TREE_SPECIES_COUNT?nearAssets[i].near:i<TREE_SPECIES_COUNT+2?shared.mid[i-TREE_SPECIES_COUNT]:shared.far
+        const mat=i<TREE_SPECIES_COUNT?nearAssets[i].material:shared.material
+        mesh=new THREE.InstancedMesh(geom,mat,cap)
         mesh.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(cap*3),3)
+        mesh.raycast=()=>{}
         this.scene.add(mesh);this.batches[i]=mesh;mesh.frustumCulled=false
       }
       if(mesh){
         mesh.count=group.length;mesh.visible=!!group.length
         if(group.length){
           const mArr=mesh.instanceMatrix.array as Float32Array,cArr=mesh.instanceColor!.array as Float32Array
-          for(let j=0;j<group.length;j++){const tree=group[j];mArr.set(tree.matrix.elements,j*16);const c=tree.tint;cArr[j*3]=c.r;cArr[j*3+1]=c.g;cArr[j*3+2]=c.b}
+          const mode=i<TREE_SPECIES_COUNT?0:i<TREE_SPECIES_COUNT+2?1:2
+          for(let j=0;j<group.length;j++){
+            const tree=group[j]
+            const mat=mode===0?tree.matrix:mode===1?tree.midMatrix:tree.farMatrix
+            const c=mode===0?tree.tint:tree.proxyTint
+            mArr.set(mat.elements,j*16)
+            cArr[j*3]=c.r;cArr[j*3+1]=c.g;cArr[j*3+2]=c.b
+          }
           mesh.instanceMatrix.clearUpdateRanges();mesh.instanceMatrix.addUpdateRange(0,group.length*16);mesh.instanceMatrix.needsUpdate=true
           mesh.instanceColor!.clearUpdateRanges();mesh.instanceColor!.addUpdateRange(0,group.length*3);mesh.instanceColor!.needsUpdate=true
         }

@@ -29,13 +29,19 @@ export const look = {
   // M2.5 trees (docs/reference.md): crowns #2f5a2c–#4c7a3a, sunlit #6f9445, under-canopy #1f3a22.
   // Each species shades canopyDark → base → lit with height; instances get ±treeJitter hue/value from their seed.
   trees: {
-    trunk: 0x4a3f33, canopyDark: 0x1a3320, treeJitter: .09,
-    camphor: 0x3d6a33, camphorLit: 0x648a40,
-    banyan: 0x2e5a2c, banyanLit: 0x4c7a3a,
-    osmanthus: 0x2a5229, osmanthusLit: 0x416e35,
-    palm: 0x557d36, palmLit: 0x7a9a4a, palmDark: 0x33532a, palmTrunk: 0x857b6b,
-    conifer: 0x264a2d, coniferLit: 0x3f6840,
+    trunk: 0x4d4236, canopyDark: 0x1a3320, treeJitter: .09,
+    lodNear: 82, lodMid: 340,
+    camphor: 0x3b6832, camphorLit: 0x648c40,
+    banyan: 0x2d592b, banyanLit: 0x4d7c3a,
+    osmanthus: 0x2b5429, osmanthusLit: 0x487538,
+    palm: 0x527b35, palmLit: 0x799b4a, palmDark: 0x2e4e27, palmTrunk: 0x857c6d,
+    conifer: 0x2d5232, coniferLit: 0x58753b,
     shrub: 0x375f30, shrubLit: 0x56803c,
+    virens: 0x3f6e35, virensLit: 0x6d9644,
+    bischofia: 0x386430, bischofiaLit: 0x658c3e,
+    elaeocarpus: 0x2f5c2e, elaeocarpusLit: 0x537d3a,
+    ginkgo: 0x9aa838, ginkgoLit: 0xd4be46,
+    willow: 0x567d38, willowLit: 0x82a64d,
   },
   // M2.5 buildings (look/buildings.ts), indexed by GL04 kind: 0 white-tile flat, 1 old grey-tile pitched,
   // 2 green-glazed hip (R2), 3 landmark placeholder (王城 yellow/red, R16).
