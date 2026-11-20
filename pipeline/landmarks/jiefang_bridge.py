@@ -7,7 +7,8 @@ import math
 import numpy as np
 import trimesh
 from jiefang_materials import generate_bridge
-from jiefang_roads import interchange
+from jiefang_layout import LOWER, deck_level, section, widths
+from jiefang_roads import interchange, surface, vertex
 
 
 def arch(model, center, radius, width, spring, rise, top, blocks=False):
@@ -79,31 +80,22 @@ def lantern(model,x,y,z,size):
             model.mesh(face,[[0,1,2],[0,2,3]],'wood')
 
 
-def pillar(model,tone,flat=False):
-    for width,depth,y in ((3.5,2.7,-.18),(3.15,2.4,.02),(2.82,2.12,.22)):
-        model.box(0,y,0,width,.2,depth,'stone',True)
-    model.box(0,.42,0,2.44,1.72,1.76,'stone',True)
-    model.box(0,2.08,0,2.48,.16,1.78,'granite')
-    # Four tinted faces enclose the hanging lamps above a continuous plinth.
-    model.box(0,2.24,0,2.24,5.15,1.44,'glazing',True)
-    if flat:
-        model.box(0,7.39,0,2.48,.25,1.70,'granite')
-        model.box(0,7.64,0,2.39,.10,1.61,tone)
-    for x in (-1.12,1.12):
-        model.box(x,.42,0,.48,.48,1.85,'granite',True)
+def pillar(model,tone):
+    # Separate glazed legs leave the tactile strip and the lower opening clear.
+    for x in (-1.34,1.34):
+        model.box(x,0,0,.58,.44,1.7,'stone',True)
+        model.box(x,.44,0,.43,6.95,1.46,'glazing',True)
         for z in (-.72,.72):
-            model.box(x,.88,z,.22,6.52,.2,'white',True)
-            model.box(x+np.sign(x)*.10,.88,z+np.sign(z)*.105,.16,6.54,.16,tone)
-            if flat:continue
+            model.box(x,0,z,.20,7.39,.20,'white',True)
+            model.box(x+np.sign(x)*.10,.45,z+np.sign(z)*.10,.13,6.94,.12,tone)
             model.beam([x,7.39,z],[0,8.56,z],.13,'white',6)
-            model.beam([x,7.39,z+np.sign(z)*.15],[0,8.56,z+np.sign(z)*.15],.105,tone,6)
-    if not flat:
-        for x in (-1.12,1.12):
-            slope=[(x,7.39,-.72),(0,8.56,-.72),(0,8.56,.72),(x,7.39,.72)]
-            model.mesh(slope,[[0,1,2],[0,2,3]],'glazing')
-        model.beam([0,8.56,-.75],[0,8.56,.75],.08,tone,6)
-        for z in (-.72,.72):
-            model.mesh([(-1.12,7.39,z),(1.12,7.39,z),(0,8.56,z)],[[0,1,2]],'glazing')
+            model.beam([x,7.39,z+np.sign(z)*.12],[0,8.56,z+np.sign(z)*.12],.10,tone,6)
+        roof=[(x,7.39,-.72),(0,8.56,-.72),(0,8.56,.72),(x,7.39,.72)]
+        model.mesh(roof,[[0,1,2],[0,2,3]],'glazing')
+    model.beam([0,8.56,-.75],[0,8.56,.75],.08,tone,6)
+    for z in (-.72,.72):
+        model.mesh([(-1.34,7.39,z),(1.34,7.39,z),(0,8.56,z)],[[0,1,2]],'glazing')
+    model.box(0,6.08,0,2.68,1.31,1.44,'glazing')
     for z in (-.71,.71):
         diamond=[(0,7.28,z),(.58,6.73,z),(0,6.16,z),(-.58,6.73,z),(0,7.28,z)]
         for a,b in zip(diamond,diamond[1:]):model.beam(a,b,.047,'granite',5)
@@ -163,24 +155,62 @@ def lamp_post(model,x,side):
 
 
 def west_bank(model):
-    # Photo-matched platforms beside the OSM river-bank paths.
-    for side, tone in ((-1,'violet'),(1,'jade')):
-        # The lower intersection looks across the carriageway at three towers.
-        if side==1:
-            model.box(-110.8,-5.83,36.8,7.8,.82,21,'stone',True)
-            model.box(-110.8,-5.01,36.8,7.8,.10,21,'pave',True)
-            model.box(-107,-4.91,38.55,.36,.57,17.5,'stone',True)
-            model.beam([-107,-4,29.8],[-107,-4,47.3],.085,'white',8,True)
-            for z in (30.4,36.8,43.2):
-                model.pose=(-109.5,-4.90,z,{30.4:-.67,36.8:0,43.2:.99}[z])
-                pillar(model,'violet',flat=z==36.8)
-        # Bank lookouts project toward the water; the end tower frames the span.
+    way=1531308428
+    xy,n,chain,_=section(way)
+    _,kerb,width=widths(way)
+    sidewalk=xy+n*(kerb+width/2)
+    bridge_station=np.interp(0,xy[::-1,1],chain[::-1])
+
+    def sidewalk_pose(distance,height):
+        station=bridge_station+distance
+        i=np.searchsorted(chain,station)-1
+        fraction=(station-chain[i])/(chain[i+1]-chain[i])
+        tangent=sidewalk[i+1]-sidewalk[i]
+        x,z=sidewalk[i]+fraction*tangent
+        return x,LOWER+.12+height-deck_level(x),z,math.atan2(tangent[0],-tangent[1])
+
+    def landing(start,end,height):
+        # Include every OSM bend so the kerb and parapet stay outside the steps.
+        lo,hi=bridge_station+start,bridge_station+end
+        stations=np.r_[lo,chain[(lo<chain)&(chain<hi)],hi]
+        def edge(offset,level):
+            points=sidewalk+n*offset
+            xs,zs=(np.interp(stations,chain,axis) for axis in points.T)
+            return np.array([vertex((x,z),LOWER+level) for x,z in zip(xs,zs)])
+        left,right=edge(-1.73,.12+height),edge(1.73,.12+height)
+        surface(model,left,right,'stone')
+        for rim in (left,right,[left[0],right[0]],[left[-1],right[-1]]):
+            rim=np.asarray(rim)
+            surface(model,rim,rim-[0,height+.14,0],'stone')
+        surface(model,edge(-.17,.13+height),edge(.17,.13+height),'yellow',False)
+
+    for side,tone in ((-1,'violet'),(1,'jade')):
+        # Station increases northwards. Each landing serves three portals,
+        # with three risers at each end and space between landings for crossings.
+        for middle,spacing in ((34.5,4.25),(70,6.5)):
+            half=spacing+1.15
+            center=-side*middle
+            model.pose=(0,0,0,0)
+            landing(center-half,center+half,.45)
+            for end in (-1,1):
+                edge=center+end*half
+                for step in (2,1):
+                    tip=edge+end*.36
+                    landing(min(edge,tip),max(edge,tip),.15*step)
+                    edge=tip
+            for offset in (-spacing,0,spacing):
+                model.pose=sidewalk_pose(center+offset,.45)
+                pillar(model,tone)
+        # Lower viewing terraces have unobstructed views of the span.
         model.pose=(0,0,0,0)
         model.box(-97,-5.5,side*61,25,.98,14,'stone',True)
         model.box(-97,-4.52,side*61,25,.16,14,'pave',True)
         # A sloping footway joins the lower landing to the viewing terrace.
-        corners=[(-118,-5.11,side*41),(-114,-5.11,side*41),
-                 (-102,-4.36,side*57),(-107,-4.36,side*57)]
+        corners=[]
+        for station in (-side*45-1.5,-side*45+1.5):
+            x,h,z,angle=sidewalk_pose(station,0)
+            corners.append((x+1.7*math.cos(angle),h,z+1.7*math.sin(angle)))
+        corners.extend([(-102,-4.36,side*57),(-107,-4.36,side*57)][::side])
         model.mesh(corners,[[0,1,2],[0,2,3],[2,1,0],[3,2,0]],'pave',True)
         for z in (side*54.2,side*67.8):
             model.box(-94,-4.36,z,19,.54,.36,'stone',True)
@@ -191,25 +221,20 @@ def west_bank(model):
         model.beam([-84.7,-3.46,side*54],[-84.7,-3.46,side*68],.09,'white',8,True)
         for z in (54,57.5,61,64.5,68):
             model.beam([-84.7,-3.84,side*z],[-84.7,-3.46,side*z],.06,'white')
-        model.pose=(-90.7,-4.36,side*57.1,math.pi*.14*side)
-        pillar(model,'aqua' if side==1 else 'jade')
         model.pose=(0,0,0,0)
         model.beam([-143,.04,side*12],[-143,5.2,side*12],.14,'granite')
         model.box(-143,4.3,side*12,.48,1.23,.4,'sign')
         model.box(-143.26,5.12,side*12,.08,.25,.25,'red')
-    model.pose=(0,-1.5,0,0)
-    # Two-way lower road, alongside the 5 m pedestrian landing.
-    # A paved crossing, with signals on the approach and an unobstructed view
-    # of the three river-side lantern towers from the opposite kerb.
-    for x in np.arange(-125,-118.4,1):
-        model.box(x,-3.73,36,.48,.035,3.4,'white')
-    model.beam([-113.9,-3.8,38.35],[-113.9,1.7,38.35],.14,'granite')
-    model.beam([-113.9,1.65,38.35],[-113.9,1.65,39.05],.1,'granite')
-    model.box(-113.9,.55,39.05,.42,1.25,.42,'sign')
-    model.box(-114.14,1.4,39.05,.09,.28,.28,'knot')
-    pendant(model,-114.35,-3.72,29.4)
-    for z in (-36,-24,24):
-        pendant(model,-118.3,-3.92,z)
+        # The crossing and its signal occupy the opening between the two triples.
+        model.pose=sidewalk_pose(-side*45,0)
+        for offset in np.arange(-3,4):
+            model.box(-kerb-width/2+offset,-.095,0,.48,.025,3.4,'white')
+        model.beam([-1.45,0,2.25],[-1.45,5.4,2.25],.14,'granite')
+        model.box(-1.45,4.15,2.25,.42,1.25,.42,'sign')
+        model.box(-1.69,5,2.25,.09,.28,.28,'knot')
+        for distance in (24,48):
+            model.pose=sidewalk_pose(-side*distance,0)
+            pendant(model,-1.45,0,0)
     model.pose=(0,0,0,0)
 
 

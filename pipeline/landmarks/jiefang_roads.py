@@ -70,7 +70,7 @@ def street(model,way):
         # landings and at the plaza crossing shown in photos 37 and 43.
         for i,(a,b) in enumerate(zip(outer,outer[1:])):
             z=xy[i:i+2,1].mean()
-            if abs(z)>45 or min(abs(z-v) for v in (-27,27,37,42))<3.5:continue
+            if abs(z)>45 or min(abs(z-v) for v in (-45,-27,27,42,45))<3.5:continue
             surface(model,[a,b],[a+[0,.50,0],b+[0,.50,0]],'stone',False)
             model.beam(a+[0,.86,0],b+[0,.86,0],.065,'white',6)
             model.box(a[0],a[1]+.49,a[2],.10,.4,.10,'white')
