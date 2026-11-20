@@ -271,8 +271,11 @@ function isWallBlocker(kind: Kind | undefined) {
 function localSupport(ctx: DismountContext, x: number, z: number, refY: number) {
   const deck = ctx.surface(x, z, 'deck', refY + .35, 1.4)
   const validDeck = deck && deck.y <= refY + .35 ? deck : null
-  const support = validDeck ?? ctx.surface(x, z, 'sidewalk') ?? ctx.surface(x, z, 'road') ?? ctx.surface(x, z, 'ground')
-  if (!support || support.slope > wcfg.slope || (!validDeck && ctx.wet(x, z))) return null
+  const lm = ctx.surface(x, z, 'landmark', refY + .35, 1.4)
+  const validLm = lm && lm.slope <= wcfg.slope && lm.y <= refY + .35 ? lm : null
+  const bridgeDeck = validDeck && validLm ? (validLm.y > validDeck.y ? validLm : validDeck) : (validDeck ?? validLm)
+  const support = bridgeDeck ?? ctx.surface(x, z, 'sidewalk') ?? ctx.surface(x, z, 'road') ?? ctx.surface(x, z, 'ground')
+  if (!support || support.slope > wcfg.slope || (!bridgeDeck && ctx.wet(x, z))) return null
   const peak = ctx.surface(x, z, 'peak')
   if (peak && peak.y > support.y + .05) return null
   return support

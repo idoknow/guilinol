@@ -52,7 +52,9 @@ export interface ExternalEbikeTelemetry {
   vehicleType?: EbikeVehicleType
   isShared?: boolean
   gear?: number
+  gearCount?: number
   gearLabel?: string
+  gearHint?: string
   maxKmh?: number
   battery?: number
   lowBattery?: boolean
@@ -61,6 +63,7 @@ export interface ExternalEbikeTelemetry {
   wheelie?: number
   lean?: number
   leanLimit?: number
+  crashRisk?: number
   tucking?: boolean
   braking?: boolean
   crashPhase?: EbikeCrashPhase
@@ -75,7 +78,9 @@ export interface EbikeTelemetrySnapshot {
   vehicleLabel: string
   vehicleBadge: string
   gear: number
+  gearCount?: number
   gearLabel: string
+  gearHint?: string
   maxKmh: number
   speed: number
   kmh: number
@@ -85,6 +90,7 @@ export interface EbikeTelemetrySnapshot {
   batteryDepleted: boolean
   lean: number
   leanLimit: number
+  crashRisk?: number
   wheelie: number
   steerInput: number
   tucking: boolean
@@ -222,10 +228,10 @@ export function createEbikeFxController() {
     window.dispatchEvent(new CustomEvent('walk:toast', {
       detail: {
         text: reason === 'lowside'
-          ? '压弯过低打滑摔车 · 按空格或点「扶车」起身'
+          ? '压弯过低打滑摔车！按空格或方向键人先爬起，再去扶车'
           : reason === 'loopout'
-            ? '翘头翻车 · 按空格或点「扶车」起身'
-            : '猛烈撞击倒车 · 按空格或点「扶车」起身',
+            ? '翘头翻车！按空格或方向键人先爬起，再去扶车'
+            : '猛烈撞击倒车！按空格或方向键人先爬起，再去扶车',
         ms: 2600,
       },
     }))
@@ -408,7 +414,9 @@ export function createEbikeFxController() {
       vehicleLabel: profile.label,
       vehicleBadge: profile.badge,
       gear,
+      gearCount: external?.gearCount ?? EBIKE_GEARS.length,
       gearLabel: external?.gearLabel ?? gearSpec.label,
+      gearHint: external?.gearHint ?? gearSpec.hint,
       maxKmh: effMaxKmh,
       speed: base.speed,
       kmh: Math.round(Math.abs(base.speed) * 3.6),
@@ -418,6 +426,7 @@ export function createEbikeFxController() {
       batteryDepleted,
       lean: finalLean,
       leanLimit: external?.leanLimit ?? LEAN_LIMIT,
+      crashRisk: external?.crashRisk,
       wheelie: finalWheelie,
       steerInput: base.steerInput,
       tucking: external?.tucking ?? (input.tuck && Math.abs(finalLean) > .08),

@@ -82,7 +82,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
   function syncHud(){
     const preferFree=!!nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)
     const freePrompt=nearFree.slot?(nearFree.slot.kind==='freeRaft'?'划竹筏 · ':'划小船 · ')+nearFree.slot.name:''
-    const ridePrompt=nearBike?(nearBike.name==='car'?'开车':nearBike.name==='bicycle'?'骑单车':'骑电动车'):''
+    const ridePrompt=nearBike?(nearBike.name==='car'?'开车':nearBike.userData.downed?(nearBike.name==='bicycle'?'扶起单车':'扶起电动车'):(nearBike.name==='bicycle'?'骑单车':'骑电动车')):''
     const label=car?'下车':bike?'下车':freeBoats?.active?'靠岸下船':route>=0?(disembark?'下一站下船':'下站下船'):ridePrompt||(preferFree?freePrompt:nearRoute>=0?'上船 · '+data.routes[nearRoute].start:'')
     document.body.toggleAttribute('data-aboard',!!car||!!bike||route>=0||!!freeBoats?.active)
     if(bike&&bikeCtrl.kind==='bike'){
@@ -156,7 +156,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     for(let col=Math.floor((x-110)/cellSize);col<=Math.floor((x+110)/cellSize);col++)for(let row=Math.floor((z-110)/cellSize);row<=Math.floor((z+110)/cellSize);row++){
       const cell=cells.get(`${col},${row}`);if(!cell)continue;nextCells.add(cell);if(!visibleCells.has(cell)){visibleCells.add(cell);group.add(cell)}
       for(const child of cell.children){
-        const mesh=child as T.Mesh,distance=Math.hypot(mesh.position.x-x,mesh.position.z-z),isCar=mesh.name==='car',reach=isCar?4.6:4.2
+        const mesh=child as T.Mesh,distance=Math.hypot(mesh.position.x-x,mesh.position.z-z),isCar=mesh.name==='car',reach=mesh.userData.downed?4.4:isCar?4.6:4.2
         mesh.visible=distance<110
         const vertOk=footY===undefined||Math.abs(mesh.position.y-footY)<=1.5
         if(distance<reach&&distance<best&&vertOk){nearBike=mesh;best=distance}
@@ -205,7 +205,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     if(disembark||next<0){if(land(x,z))reset();return}
     if(next>=0){mesh.position.fromArray(leg.path[0]);route=next;segment=1}
   }
-  return {nearby,advance,get car(){return car},get bike(){return bike},get rideKind():RideKind|null{return bike?bikeCtrl.kind:null},get vehicleType():EbikeVehicleType|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.vehicleType:null},get isShared(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.isShared:false},get ebikeTier():EbikeTier|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.tier:null},get ebikeGear(){return bike?bikeCtrl.gear:2},get ebikeBattery(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.batteryPct:100},get ebikeTelemetry():EbikeDynamicTelemetry|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.telemetry():null},get boat(){return freeBoats?.boat??(route>=0?vessels[route]:null)},get freeBoat(){return freeBoats?.boat??null},get freeKind(){return freeBoats?.boatKind??null},get boatSeatOffset(){return freeBoats?.active?freeBoats.seatOffset:(route>=0&&vessels[route].name==='raft'?-.44:-.18)},get heading(){return car?carCtrl.heading:bike?bikeCtrl.heading:freeBoats?.active?freeBoats.heading:heading},get speed(){return car?carCtrl.speed:bike?bikeCtrl.speed:freeBoats?.active?freeBoats.speed:0},
+  return {nearby,advance,get car(){return car},get bike(){return bike},get rideKind():RideKind|null{return bike?bikeCtrl.kind:null},get vehicleType():EbikeVehicleType|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.vehicleType:null},get isShared(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.isShared:false},get ebikeTier():EbikeTier|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.tier:null},get ebikeGear(){return bike?bikeCtrl.gear:2},get ebikeBattery(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.batteryPct:100},get ebikeTelemetry():EbikeDynamicTelemetry|null{return bike?bikeCtrl.telemetry():null},get boat(){return freeBoats?.boat??(route>=0?vessels[route]:null)},get freeBoat(){return freeBoats?.boat??null},get freeKind(){return freeBoats?.boatKind??null},get boatSeatOffset(){return freeBoats?.active?freeBoats.seatOffset:(route>=0&&vessels[route].name==='raft'?-.44:-.18)},get heading(){return car?carCtrl.heading:bike?bikeCtrl.heading:freeBoats?.active?freeBoats.heading:heading},get speed(){return car?carCtrl.speed:bike?bikeCtrl.speed:freeBoats?.active?freeBoats.speed:0},
     get lean(){return bikeCtrl.lean},get pitch(){return car?carCtrl.pitch:bikeCtrl.pitch},get steerInput(){return car?carCtrl.steerInput:bikeCtrl.steerInput},
     get bikePitch(){return lastBike?.rotation.x??0},get bikeY(){return lastBike?.position.y??0},
     get carPitch(){return lastCar?.rotation.x??0},get carY(){return lastCar?.position.y??0},
@@ -215,9 +215,10 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     capSpeed(step:number,limit:number){return bikeCtrl.capSpeed(step,limit)},
     setPitch(frontY:number|undefined,backY:number|undefined,dt:number){bikeCtrl.setPitch(frontY,backY,dt)},
     setCarPitch(frontY:number|undefined,backY:number|undefined,dt:number){carCtrl.setPitch(frontY,backY,dt)},
-    setEbikeGear(gear:number){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.setGear(gear):2},
-    shiftEbikeGear(delta:number){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.shiftGear(delta):2},
-    resetEbikeGearOnRecover(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.resetGearToCompliant():2},
+    setEbikeGear(gear:number){return bike?bikeCtrl.setGear(gear):2},
+    shiftEbikeGear(delta:number){return bike?bikeCtrl.shiftGear(delta):2},
+    resetEbikeGearOnRecover(){return bike?bikeCtrl.resetGearToCompliant():2},
+    setAutoCrash(on:boolean|undefined){bikeCtrl.setAutoCrash(on)},
     setEbikeVehicleType(nextType:EbikeVehicleType){
       if(!bike||bikeCtrl.kind!=='bike')return null
       const profile=bikeCtrl.setVehicleType(nextType)

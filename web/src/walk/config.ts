@@ -42,7 +42,7 @@ export const bikeConfig = {
   leanMax: .44, tuckLeanMax: .56, leanDamp: 8.5, pitchMax: .22, pitchDamp: 8.5,
   mountDuration: .22, dismountDuration: .16,
   stickDeadFwd: .1, stickDeadTurn: .12, slideDamp: 1.9,
-  uphillDrag: 5.5, uphillCapScale: 1.1, offRoadCap: 4.5, step: .42, maxSlope: Math.PI / 4,
+  uphillDrag: 5.5, uphillCapScale: 1.1, offRoadCap: 4.2, step: .42, maxSlope: Math.PI / 4,
   crash: {
     lowsideLeanRad: .34,
     wetGripPenaltyRad: .11,
@@ -73,7 +73,7 @@ export const bicycleConfig: typeof bikeConfig = {
   leanMax: .42, tuckLeanMax: .52, leanDamp: 9.0, pitchMax: .20, pitchDamp: 8.5,
   mountDuration: .22, dismountDuration: .16,
   stickDeadFwd: .1, stickDeadTurn: .12, slideDamp: 1.85,
-  uphillDrag: 13.5, uphillCapScale: 2.8, offRoadCap: 3.6, step: .42, maxSlope: Math.PI / 4,
+  uphillDrag: 17.5, uphillCapScale: 3.9, offRoadCap: 3.6, step: .42, maxSlope: Math.PI / 4,
   crash: {
     lowsideLeanRad: .31,
     wetGripPenaltyRad: .10,

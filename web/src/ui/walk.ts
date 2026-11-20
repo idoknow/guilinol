@@ -23,16 +23,18 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
 
   const rideHud=document.createElement('div')
   rideHud.className='ride-hud'
-  rideHud.innerHTML='<span class="ride-type" data-kind="normal">电摩</span><span class="ride-gear">D2</span><span class="ride-speed">0 km/h</span><span class="ride-bat" data-level="ok"><span class="ride-bat-bar"><i></i></span><span class="ride-bat-pct">100%</span></span><span class="ride-state" hidden></span><button class="ride-mod" type="button" aria-label="切换电动车改装">素车</button>'
+  rideHud.innerHTML='<span class="ride-type" data-kind="normal">电摩</span><span class="ride-gear">D2</span><span class="ride-gears" role="group" aria-label="挡位切换"><button class="ride-gear-btn" type="button" data-gear="1">D1</button><button class="ride-gear-btn on" type="button" data-gear="2">D2</button><button class="ride-gear-btn" type="button" data-gear="3">D3</button><button class="ride-gear-btn" type="button" data-gear="4">S</button></span><span class="ride-speed">0 km/h</span><span class="ride-bat" data-level="ok"><span class="ride-bat-bar"><i></i></span><span class="ride-bat-pct">100%</span></span><button class="ride-state" type="button" hidden></button><button class="ride-mod" type="button" aria-label="切换电动车改装">素车</button><span class="ride-keys">1-4/Q·E换挡 · Space翘头</span>'
   document.body.append(rideHud)
   const typeEl=rideHud.querySelector<HTMLElement>('.ride-type')!
   const gearEl=rideHud.querySelector<HTMLElement>('.ride-gear')!
+  const gearButtons=Array.from(rideHud.querySelectorAll<HTMLButtonElement>('.ride-gear-btn'))
   const speedEl=rideHud.querySelector<HTMLElement>('.ride-speed')!
   const batEl=rideHud.querySelector<HTMLElement>('.ride-bat')!
   const batFillEl=rideHud.querySelector<HTMLElement>('.ride-bat-bar i')!
   const batPctEl=rideHud.querySelector<HTMLElement>('.ride-bat-pct')!
-  const stateEl=rideHud.querySelector<HTMLElement>('.ride-state')!
+  const stateEl=rideHud.querySelector<HTMLButtonElement>('.ride-state')!
   const modBtn=rideHud.querySelector<HTMLButtonElement>('.ride-mod')!
+  const keysEl=rideHud.querySelector<HTMLElement>('.ride-keys')!
 
   const joystick=panel.querySelector<HTMLElement>('.joystick')!, knob=panel.querySelector<HTMLElement>('.joystick-knob')!
   const btnRun=panel.querySelector<HTMLButtonElement>('.btn-run')!, btnJump=panel.querySelector<HTMLButtonElement>('.btn-jump')!, btnView=panel.querySelector<HTMLButtonElement>('.btn-view')!
@@ -104,6 +106,12 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   btnTuck.onpointerup=endTuck;btnTuck.onpointercancel=endTuck;btnTuck.onlostpointercapture=endTuck
   modBtn.onpointerdown=event=>{event.stopPropagation()}
   modBtn.onclick=event=>{event.stopPropagation();cycleModPulse=true}
+  for(const btn of gearButtons){
+    btn.onpointerdown=event=>{event.stopPropagation()}
+    btn.onclick=event=>{event.stopPropagation();const g=Number(btn.dataset.gear);if(g>=1)gearSelect=g}
+  }
+  stateEl.onpointerdown=event=>{event.stopPropagation()}
+  stateEl.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash==='1')recoverPulse=true}
   btnRun.onpointerdown=event=>{event.preventDefault();event.stopPropagation();runPointer=event.pointerId;safeCapture(btnRun,event.pointerId);runHold=true;runDownAt=performance.now();syncRun()}
   const endRun=(toggle:boolean,pointerId?:number)=>{if(!runHold||(pointerId!==undefined&&pointerId!==runPointer))return;if(toggle&&performance.now()-runDownAt<220)runLock=!runLock;runHold=false;runPointer=-1;syncRun()}
   btnRun.onpointerup=event=>endRun(true,event.pointerId)
@@ -114,17 +122,17 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   window.addEventListener('keydown',event=>{
     if(!active()||document.body.hasAttribute('data-home')||document.body.dataset.photo==='on'||document.querySelector('dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show')||(event.target as Element)?.closest?.('input,textarea,select,[contenteditable]'))return
     keys.add(event.code)
-    const ridingBike=document.body.dataset.ride==='bike'
+    const ridingTwoWheel=document.body.dataset.ride==='bike'||document.body.dataset.ride==='bicycle'
     if(!event.repeat&&event.code==='Space'){
-      if(ridingBike)recoverPulse=true
+      if(ridingTwoWheel)recoverPulse=true
       else jump=true
       event.preventDefault()
     }
     if(!event.repeat&&event.code==='KeyC')view()
-    if(ridingBike&&!event.repeat){
+    if(ridingTwoWheel&&!event.repeat){
       if(event.code==='KeyE')gearDelta+=1
       else if(event.code==='KeyQ')gearDelta-=1
-      else if(event.code==='KeyG')cycleModPulse=true
+      else if(event.code==='KeyG'&&document.body.dataset.ride==='bike')cycleModPulse=true
       else if(event.code==='Digit1'||event.code==='Digit2'||event.code==='Digit3'||event.code==='Digit4')gearSelect=Number(event.code.slice(-1))
     }
   })
@@ -213,32 +221,52 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
       else delete document.body.dataset.rideType
       if(!state||(rideKind!=='bike'&&rideKind!=='bicycle')){
         stateEl.hidden=true
+        delete document.body.dataset.rideCrash
         return
       }
+      const bikeGearLabels=['D1','D2','D3','S']
+      const bicycleGearLabels=['1挡','2挡','3挡']
+      const gearLabels=rideKind==='bicycle'?bicycleGearLabels:bikeGearLabels
       if(rideKind==='bicycle'){
         typeEl.dataset.kind='bicycle';typeEl.textContent='单车'
-        gearEl.textContent='人力';gearEl.removeAttribute('title')
+        gearEl.textContent=state.gearLabel||'2挡'
+        gearEl.title=`单车 · 本挡限速 ${Math.round(state.maxKmh)} km/h（1-3 / Q·E 换挡）`
+        keysEl.textContent='1-3/Q·E换挡 · Space翘头'
       }else{
         typeEl.dataset.kind=state.vehicleType;typeEl.textContent=state.vehicleBadge
         gearEl.textContent=state.gearLabel
-        gearEl.title=`${state.vehicleLabel} · 本挡限速 ${Math.round(state.maxKmh)} km/h`
+        gearEl.title=`${state.vehicleLabel} · 本挡限速 ${Math.round(state.maxKmh)} km/h（1-4 / Q·E 换挡）`
+        keysEl.textContent='1-4/Q·E换挡 · Space翘头'
         const pct=Math.max(0,Math.min(100,Math.round(state.battery)))
         batEl.dataset.level=state.criticalBattery?'crit':state.lowBattery?'low':'ok'
         batFillEl.style.width=`${pct}%`
         batPctEl.textContent=`${pct}%`
       }
+      for(let i=0;i<gearButtons.length;i++){
+        const btn=gearButtons[i]
+        const label=gearLabels[i]
+        btn.hidden=!label
+        if(label){
+          btn.textContent=label
+          const activeGear=state.gear===i+1
+          btn.classList.toggle('on',activeGear)
+          btn.setAttribute('aria-pressed',String(activeGear))
+        }
+      }
       speedEl.textContent=`${state.kmh} km/h`
       modBtn.textContent=MOD_LABELS[state.modPreset]
       const leanDeg=Math.round(Math.abs(state.lean)*180/Math.PI)
       const wheelieDeg=Math.round(Math.max(0,state.wheelie)*180/Math.PI)
-      if(state.crashPhase==='crashed'){
+      const crashed=state.crashPhase==='crashed'
+      document.body.dataset.rideCrash=crashed?'1':'0'
+      if(crashed){
         stateEl.hidden=false;stateEl.dataset.warn='1'
-        stateEl.textContent='摔车 · 空格扶起'
-        btnWheelie.textContent='扶车';btnWheelie.classList.add('on')
+        stateEl.textContent='摔车 · 空格先爬起'
+        btnWheelie.textContent='爬起';btnWheelie.classList.add('on')
       }else if(state.crashPhase==='recovering'){
         stateEl.hidden=false;stateEl.dataset.warn='0'
-        stateEl.textContent='扶车中…'
-        btnWheelie.textContent='扶车'
+        stateEl.textContent='爬起中…'
+        btnWheelie.textContent='翘头'
       }else{
         btnWheelie.textContent='翘头'
         btnWheelie.classList.toggle('on',wheelieTouch||keys.has('Space'))
@@ -249,11 +277,12 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
           stateEl.hidden=false;stateEl.dataset.warn='1'
           stateEl.textContent=`极低电 · 限速 ${Math.round(state.maxKmh)}`
         }else if(wheelieDeg>=4){
-          stateEl.hidden=false;stateEl.dataset.warn=wheelieDeg>=38?'1':'0'
-          stateEl.textContent=`翘头 ${wheelieDeg}°`
+          stateEl.hidden=false;stateEl.dataset.warn=wheelieDeg>=26?'1':'0'
+          stateEl.textContent=wheelieDeg>=26?`翘头 ${wheelieDeg}° 易翻`:`翘头 ${wheelieDeg}°`
         }else if(leanDeg>=8){
-          stateEl.hidden=false;stateEl.dataset.warn=Math.abs(state.lean)>=state.leanLimit*.86?'1':'0'
-          stateEl.textContent=`压弯 ${leanDeg}°`
+          const risky=Math.abs(state.lean)>=state.leanLimit*.82||(state.crashRisk??0)>=.72
+          stateEl.hidden=false;stateEl.dataset.warn=risky?'1':'0'
+          stateEl.textContent=risky?`压弯 ${leanDeg}° 易摔`:`压弯 ${leanDeg}°`
         }else if(rideKind==='bike'&&state.lowBattery){
           stateEl.hidden=false;stateEl.dataset.warn='1'
           stateEl.textContent='低电预警'
