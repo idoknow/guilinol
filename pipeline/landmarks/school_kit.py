@@ -1080,15 +1080,15 @@ class SchoolBuilder:
                         )
                 elif roof == 'flat_pergola' and elen >= 6.0:
                     perg_y = top_y + parapet_h + 1.50
-                    self.box(0.0, perg_y, 0.15, elen + 0.45, 0.26, 0.32, 'white')
+                    self.box(0.0, perg_y, 0.15, elen + 0.45, 0.26, 0.32, 'white', bottom=True)
                     n_cols = max(2, round(elen / 4.2))
                     for ci in range(n_cols + 1):
-                        self.box(-elen * 0.5 + ci * (elen / n_cols), top_y + parapet_h, 0.05, 0.30, 1.50, 0.30, 'white')
+                        self.box(-elen * 0.5 + ci * (elen / n_cols), top_y + parapet_h - 0.02, 0.05, 0.30, 1.54, 0.30, 'white')
                     if self.detail:
                         n_slats = max(4, int(elen / 1.25))
                         for si in range(n_slats):
                             sx_l = -elen * 0.46 + si * (elen * 0.92 / max(1, n_slats - 1))
-                            self.box(sx_l, perg_y + 0.04, -0.75, 0.11, 0.14, 1.95, 'white')
+                            self.box(sx_l, perg_y + 0.04, -0.75, 0.11, 0.14, 1.95, 'white', bottom=True)
                 self.pose = (0.0, 0.0, 0.0, 0.0)
         elif roof == 'hip':
             rcx, rcz, rw, rd, rang = mrr_stats(pts)
@@ -1296,9 +1296,10 @@ class SchoolBuilder:
         self.pose = old
 
     def basketball_court(self, cx: float, cz: float, yaw: float = 0.0, w: float = 28.0, d: float = 15.0,
-                         surface: str = 'court_a', apron: str | None = 'track_red', key_reg: str = 'track_red'):
+                         surface: str = 'court_a', apron: str | None = 'track_red', key_reg: str = 'track_red',
+                         lift: float = 0.0):
         old = self.pose
-        y0 = self.ground(cx, cz) + 0.025
+        y0 = self.ground(cx, cz) + 0.025 + lift
         self.pose = (cx, 0.0, cz, yaw)
         cur_y = y0
         if apron:
