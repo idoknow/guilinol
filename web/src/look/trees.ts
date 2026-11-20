@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import {look} from './config'
 import {shareAtmosphere} from './atmosphere'
+import {RENDER_RADIUS_DEFAULT, deriveRangeMetrics} from '../render-range'
 
 // M2.5 tree look (docs/reference.md R2/R4/R8/R11): deep broadleaf canopy that the city sits in.
 // Species order follows pipeline/vegetation.json: camphor, banyan, osmanthus, palm, conifer, shrub.
@@ -120,7 +121,7 @@ function shrub() { // 灌木团: peak scrub and park undergrowth, two low lumps
 const material = new THREE.MeshStandardMaterial({vertexColors:true, flatShading:true, roughness:1, metalness:0, side:THREE.DoubleSide})
 // A screen-door fade writes normal opaque depth while thinning the last band
 // of crowns. The forest stops submitting trees at the outer edge of the band.
-export const treeFar = 1500
+export const treeFar = deriveRangeMetrics(RENDER_RADIUS_DEFAULT).treeFar
 export const treeFarUniform = {value: treeFar}
 export function setTreeFar(distance:number) { treeFarUniform.value = distance }
 material.onBeforeCompile = shader=>{
