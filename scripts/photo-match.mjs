@@ -110,7 +110,14 @@ try {
     if (pose && (
       ![pose.dx, pose.dz, pose.dyaw].every(Number.isFinite) ||
       typeof pose.basis !== 'string' || !pose.basis.trim() ||
-      Math.hypot(dx, dz) > location.hAccuracy || Math.abs(dyaw) > 25 ||
+      // Default limits: shift within GPS accuracy, turn within ±25°. A compass disturbed by steel
+      // (gates, bridges) can be off by far more; then `override.anchors` must name neighbouring
+      // photos (or landmarks) that pin the direction independently, and the shift may reach 15 m.
+      (pose.override
+        ? !(Array.isArray(pose.override.anchors) && pose.override.anchors.length &&
+            pose.override.anchors.every((a) => typeof a === 'string' && a.trim()) &&
+            Math.hypot(dx, dz) <= Math.max(location.hAccuracy, 15) && Math.abs(dyaw) <= 180)
+        : Math.hypot(dx, dz) > location.hAccuracy || Math.abs(dyaw) > 25) ||
       (pose.unusable && (dx !== 0 || dz !== 0 || dyaw !== 0))
     )) throw Error('Invalid calibration for ' + key)
     const x = location.x + dx
@@ -169,7 +176,7 @@ try {
       ? `（距机位 ${support.sampleDistance.toFixed(1)} m 处桥面估高）`
       : ''
     const basis = pose?.basis.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
-    const calibration = pose ? ` · Δ东/南 (${dx}, ${dz}) m · Δ朝向 ${dyaw}° · ${pose.unusable ? 'GPS 不可用：' : ''}${basis}` : ''
+    const calibration = pose ? ` · Δ东/南 (${dx}, ${dz}) m · Δ朝向 ${dyaw}° · ${pose.unusable ? 'GPS 不可用：' : ''}${pose.override ? '超限修正（参照 ' + pose.override.anchors.join('、') + '）：' : ''}${basis}` : ''
     cards.push(`<figure>
       <figcaption>${key} · ${support.kind} ${support.y.toFixed(2)} m${estimate} · 机位 ${eyeY.toFixed(2)} m · 原始 x/z (${location.x}, ${location.z}) m · EXIF ${location.heading}° ${location.headingRef} · 真北 ${heading.toFixed(1)}°${calibration} · 渲染 ${renderHeading.toFixed(1)}° · ${location.focal35} mm · GPS ±${location.hAccuracy} m · <a href="${overlay}">50% 叠加</a></figcaption>
       <a href="${key}"><img loading="lazy" src="${key}" alt="${key} 实拍和游戏对比" width="${viewport.width * 2}" height="${viewport.height}"></a>
