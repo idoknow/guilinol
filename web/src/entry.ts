@@ -1,0 +1,44 @@
+import './ui/theme.css'
+import './ui/hud.css'
+import {home} from './ui/home'
+import {accountEntry} from './ui/account'
+
+// Page entry. A plain visit lands on the title screen (ui/home.ts) and the 3D city (main.ts, three.js + world data)
+// only boots on 开始游览. Deep links — shares, feedback views, test harnesses — skip the title screen and boot directly.
+const params = new URLSearchParams(location.search)
+if (params.has('verify') || params.has('debug')) document.body.dataset.debug = ''
+const deepLink = ['verify', 'spawn', 'view', 'mode', 'cam', 'feedback', 'play'].some(key => params.has(key))
+
+let engine: Promise<typeof import('./main')> | undefined
+const loadEngine = () => engine ??= import('./main')
+let started = false
+
+const title = home(() => void enter())
+async function enter() {
+  title.close()
+  const main = await loadEngine()
+  if (started) { main.setPaused(false); return }
+  started = true
+  hud(main)
+  void main.boot()
+}
+
+function hud(main: typeof import('./main')) {
+  const box = document.createElement('div'); box.className = 'hud-me'
+  const menu = document.createElement('button'); menu.type = 'button'; menu.className = 'btn-menu'
+  menu.innerHTML = '<span>菜单</span>'; menu.setAttribute('aria-label', '主菜单'); menu.title = '主菜单（Esc）'
+  menu.onclick = () => { main.setPaused(true); title.open(true) }
+  box.append(menu); accountEntry(box); document.body.append(box)
+  addEventListener('keydown', event => {
+    if (event.code !== 'Escape' || title.shown || document.querySelector('dialog[open],.about-mask:not([hidden]),.atlas:not([hidden]),.book:not([hidden]),.spot-card:not([hidden]),.photo-bar:not([hidden])')) return
+    menu.click()
+  })
+}
+
+if (deepLink) void enter()
+else {
+  title.open(false)
+  // Warm the engine module while the player reads the menu; the world data is already preloaded by index.html.
+  const warm = () => void loadEngine()
+  if ('requestIdleCallback' in window) requestIdleCallback(warm, {timeout: 2500}); else setTimeout(warm, 1200)
+}
