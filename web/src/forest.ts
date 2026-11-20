@@ -1,11 +1,11 @@
 import * as THREE from 'three'
-import {applyTreeVariant, sharedProxyAssets, TREE_SPECIES_COUNT, treeGeometry} from './look/trees'
+import {applyTreeVariant, sharedProxyAssets, TREE_SPECIES_COUNT, treeFar, treeNearAsset} from './look/trees'
 import {look} from './look/config'
 import {fetchAsset,type Tile} from './world'
 
 export type Tree={
   x:number; y:number; z:number; kind:number; scale:number; seed:number
-  matrix:THREE.Matrix4; midMatrix:THREE.Matrix4; farMatrix:THREE.Matrix4
+  matrix:THREE.Matrix4; midMatrix:THREE.Matrix4
   tint:THREE.Color; proxyTint:THREE.Color; proxyGroup:0|1|2|3
 }
 const lean=new THREE.Quaternion(), slopeQ=new THREE.Quaternion()
@@ -23,10 +23,10 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
     // Trees grow towards the sky: keep at most look.treeLean of the slope normal.
     const angle=2*Math.acos(Math.min(1,Math.abs(lean.w)))
     slopeQ.identity().slerp(lean,angle>look.treeLean?look.treeLean/angle:1)
-    const matrix=new THREE.Matrix4(),midMatrix=new THREE.Matrix4(),farMatrix=new THREE.Matrix4()
+    const matrix=new THREE.Matrix4(),midMatrix=new THREE.Matrix4()
     const tint=new THREE.Color(),proxyTint=new THREE.Color()
-    const proxyGroup=applyTreeVariant(kind,seed,scale,yaw,slopeQ,x,y,z,matrix,midMatrix,farMatrix,tint,proxyTint)
-    trees.push({x,y,z,kind,scale,seed,matrix,midMatrix,farMatrix,tint,proxyTint,proxyGroup})
+    const proxyGroup=applyTreeVariant(kind,seed,scale,yaw,slopeQ,x,y,z,matrix,midMatrix,tint,proxyTint)
+    trees.push({x,y,z,kind,scale,seed,matrix,midMatrix,tint,proxyTint,proxyGroup})
   }
   return trees
 }
@@ -43,7 +43,7 @@ export class Forest{
   loaded=new Map<Tile,Tree[]>()
   pending=new Map<Tile,AbortController>()
   private retry=new Map<Tile,number>()
-  private nearAssets:ReturnType<typeof treeGeometry>[]|null=null
+  private assets:{geometry:THREE.BufferGeometry;material:THREE.Material}[]|null=null
   private batches:(THREE.InstancedMesh|undefined)[]=Array.from({length:TOTAL_SLOTS},()=>undefined)
   private groups:Tree[][]=Array.from({length:TOTAL_SLOTS},()=>[])
   private nearOrder:number[]=Array.from({length:TREE_SPECIES_COUNT},(_,i)=>i)
@@ -81,8 +81,8 @@ export class Forest{
     for(let i=0;i<TOTAL_SLOTS;i++)groups[i].length=0
     const nearSq=look.trees.lodNear**2, midSq=look.trees.lodMid**2
     for(const trees of this.loaded.values())for(const tree of trees){
-      const d=(tree.x-position.x)**2+(tree.y-position.y)**2+(tree.z-position.z)**2
-      if(d>=1500**2)continue
+      const d=(tree.x-cam.x)**2+(tree.y-cam.y)**2+(tree.z-cam.z)**2
+      if(d>=treeFar**2)continue
       const highCanopy=(tree.kind===0||tree.kind===1||tree.kind===6||tree.kind===7||tree.kind===9)&&cam.y-tree.y<2.9*tree.scale
       if((tree.x-cam.x)**2+(tree.z-cam.z)**2<(highCanopy?2.2:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue
       this.point.set(tree.x,tree.y+4,tree.z)
@@ -97,16 +97,21 @@ export class Forest{
       for(let j=0;j<overflow.length;j++)groups[TREE_SPECIES_COUNT+overflow[j].proxyGroup].push(overflow[j])
       overflow.length=0
     }
-    this.nearAssets??=Array.from({length:TREE_SPECIES_COUNT},(_,i)=>treeGeometry(i))
-    const nearAssets=this.nearAssets, shared=sharedProxyAssets()
+    if(!this.assets){
+      const shared=sharedProxyAssets()
+      this.assets=[
+        ...Array.from({length:TREE_SPECIES_COUNT},(_,kind)=>treeNearAsset(kind)),
+        ...shared.mid.map(geometry=>({geometry,material:shared.material})),
+        ...shared.far,
+      ]
+    }
     for(let i=0;i<TOTAL_SLOTS;i++){
       const group=groups[i];let mesh=this.batches[i]
       if(group.length&&(!mesh||mesh.instanceMatrix.count<group.length)){
         if(mesh){this.scene.remove(mesh);mesh.dispose()}
         const cap=Math.max(16,2**Math.ceil(Math.log2(group.length)))
-        const geom=i<TREE_SPECIES_COUNT?nearAssets[i].near:i<TREE_SPECIES_COUNT+4?shared.mid[i-TREE_SPECIES_COUNT]:shared.far[i-TREE_SPECIES_COUNT-4]
-        const mat=i<TREE_SPECIES_COUNT?nearAssets[i].material:shared.material
-        mesh=new THREE.InstancedMesh(geom,mat,cap)
+        const {geometry,material}=this.assets[i]
+        mesh=new THREE.InstancedMesh(geometry,material,cap)
         mesh.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(cap*3),3)
         mesh.raycast=()=>{}
         this.scene.add(mesh);this.batches[i]=mesh;mesh.frustumCulled=false
@@ -115,11 +120,11 @@ export class Forest{
         mesh.count=group.length;mesh.visible=!!group.length
         if(group.length){
           const mArr=mesh.instanceMatrix.array as Float32Array,cArr=mesh.instanceColor!.array as Float32Array
-          const mode=i<TREE_SPECIES_COUNT?0:i<TREE_SPECIES_COUNT+4?1:2
+          const near=i<TREE_SPECIES_COUNT
           for(let j=0;j<group.length;j++){
             const tree=group[j]
-            const mat=mode===0?tree.matrix:mode===1?tree.midMatrix:tree.farMatrix
-            const c=mode===0?tree.tint:tree.proxyTint
+            const mat=near?tree.matrix:tree.midMatrix
+            const c=near?tree.tint:tree.proxyTint
             mArr.set(mat.elements,j*16)
             cArr[j*3]=c.r;cArr[j*3+1]=c.g;cArr[j*3+2]=c.b
           }

@@ -30,7 +30,7 @@ export const look = {
   // Each species shades canopyDark → base → lit with height; instances get ±treeJitter hue/value from their seed.
   trees: {
     trunk: 0x4a3f34, canopyDark: 0x19331d, treeJitter: .08,
-    lodNear: 140, lodMid: 340,
+    lodNear: 64, lodMid: 340,
     camphor: 0x35642f, camphorLit: 0x729b42,
     banyan: 0x2c582a, banyanLit: 0x527f3b,
     osmanthus: 0x2a5428, osmanthusLit: 0x4e7a39,

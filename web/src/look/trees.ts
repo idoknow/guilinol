@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import {treeCards} from './tree-cards'
+import {shareAtmosphere} from './atmosphere'
 import treeSpecs from '../../../pipeline/tree-specs.json'
 import {look} from './config'
 
@@ -277,11 +279,27 @@ function buildGeometry(parts:PartSpec[], neutralWhite = false) {
 
 const material = new THREE.MeshStandardMaterial({vertexColors:true, flatShading:true, roughness:1, metalness:0, side:THREE.DoubleSide})
 
+// A screen-door fade writes normal opaque depth while thinning the last band
+// of crowns. The forest stops submitting trees at the outer edge of the band.
+export const treeFar = 1500
+material.onBeforeCompile = shader=>{
+  shareAtmosphere(shader)
+  shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
+#ifdef USE_FOG
+  float fade = smoothstep(${treeFar-120}., ${treeFar}., distance(vFogWorld,cameraPosition));
+  if(fade > fract(52.9829189 * fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))))) discard;
+#endif`)
+}
+
 export const builders = specs.map(spec => () => ({
   near: buildGeometry(spec.near),
   mid: buildGeometry(spec.mid),
   far: buildGeometry(spec.far),
 }))
+
+export function treeNearAsset(species:number) {
+  return {geometry:buildGeometry(specs[species].near),material}
+}
 
 export function treeGeometry(species:number) {
   const builder = builders[species] ?? builders[0]
@@ -308,13 +326,12 @@ function measureBounds(parts:PartSpec[]):[number, number] {
 }
 
 const REF_MID = ARCHETYPE_SPECIES.map(idx => measureBounds(specs[idx].mid))
-const REF_FAR = ARCHETYPE_SPECIES.map(idx => measureBounds(specs[idx].far))
 
-const PROXY_META:{group:0|1|2|3; midScale:Vec3; farScale:Vec3; proxyTint:THREE.Color}[] = specs.map((spec, idx) => {
+
+const PROXY_META:{group:0|1|2|3; midScale:Vec3; proxyTint:THREE.Color}[] = specs.map((spec, idx) => {
   const group:0|1|2|3 = idx === 3 ? 3 : idx === 4 ? 2 : (idx === 2 || idx === 8 || idx === 9) ? 1 : 0
   const [w, h] = measureBounds(spec.near)
   const [rmW, rmH] = REF_MID[group]
-  const [rfW, rfH] = REF_FAR[group]
   const leafPart = spec.near.find(p => p.op !== 'tube' && p.op !== 'bundles') ?? spec.near[0]
   const spCol = new THREE.Color(leafPart.c)
   const proxyTint = idx === 3 ? new THREE.Color(1, 1, 1) : new THREE.Color(
@@ -325,28 +342,18 @@ const PROXY_META:{group:0|1|2|3; midScale:Vec3; farScale:Vec3; proxyTint:THREE.C
   return {
     group,
     midScale: [w / rmW, h / rmH, w / rmW],
-    farScale: [w / rfW, h / rfH, w / rfW],
     proxyTint,
   }
 })
 
-let cachedShared:{mid:[THREE.BufferGeometry, THREE.BufferGeometry, THREE.BufferGeometry, THREE.BufferGeometry]; far:[THREE.BufferGeometry, THREE.BufferGeometry, THREE.BufferGeometry, THREE.BufferGeometry]; material:THREE.Material}|null = null
+function makeSharedProxies() {
+  const mid = ARCHETYPE_SPECIES.map(idx => buildGeometry(specs[idx].mid, idx !== 3))
+  return {mid, far:mid.map(mesh => treeCards(mesh, material)), material}
+}
+
+let cachedShared:ReturnType<typeof makeSharedProxies> | undefined
 export function sharedProxyAssets() {
-  return cachedShared ??= {
-    mid: [
-      buildGeometry(specs[ARCHETYPE_SPECIES[0]].mid, true),
-      buildGeometry(specs[ARCHETYPE_SPECIES[1]].mid, true),
-      buildGeometry(specs[ARCHETYPE_SPECIES[2]].mid, true),
-      buildGeometry(specs[ARCHETYPE_SPECIES[3]].mid, false),
-    ],
-    far: [
-      buildGeometry(specs[ARCHETYPE_SPECIES[0]].far, true),
-      buildGeometry(specs[ARCHETYPE_SPECIES[1]].far, true),
-      buildGeometry(specs[ARCHETYPE_SPECIES[2]].far, true),
-      buildGeometry(specs[ARCHETYPE_SPECIES[3]].far, false),
-    ],
-    material,
-  }
+  return cachedShared ??= makeSharedProxies()
 }
 
 export function applyTreeVariant(
@@ -358,7 +365,6 @@ export function applyTreeVariant(
   x:number, y:number, z:number,
   outNearMat:THREE.Matrix4,
   outMidMat:THREE.Matrix4,
-  outFarMat:THREE.Matrix4,
   outNearTint:THREE.Color,
   outProxyTint:THREE.Color,
 ):0|1|2|3 {
@@ -388,10 +394,6 @@ export function applyTreeVariant(
   obj.scale.set(sx * meta.midScale[0], sy * meta.midScale[1], sz * meta.midScale[2])
   obj.updateMatrix()
   outMidMat.copy(obj.matrix)
-
-  obj.scale.set(sx * meta.farScale[0], sy * meta.farScale[1], sz * meta.farScale[2])
-  obj.updateMatrix()
-  outFarMat.copy(obj.matrix)
 
   return meta.group
 }
