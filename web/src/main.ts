@@ -15,6 +15,7 @@ import {skyClock} from './ui/sky'
 import type {Host} from './play/host'
 import {bootDismiss, bootLoaded, bootProgress} from './ui/boot'
 import {loadTiles} from './look/tiles'
+import {flags} from './debug'
 
 installAtmosphere()
 async function start() {
@@ -136,7 +137,10 @@ async function start() {
     cullLandmarks?.update(stream.landmarks.values(),camera,mirror)
     peaks.update(camera,mirror)
     if(Number.isFinite(mirror))cullLandmarks?.pass(true)
-    renderMirror(renderer,scene,camera,!Number.isFinite(mirror),!walker?.active&&!cinema&&!stream.pending.size&&clock.weather==='clear')
+    // Reuse the last reflection while tiles are still streaming: pending work is exactly when the
+    // mirror costs the most, and a frame-old reflection is invisible under the ripple distortion.
+    const mirrorOff = flags.noMirror || !Number.isFinite(mirror)
+    renderMirror(renderer,scene,camera,mirrorOff,!walker?.active&&!cinema&&clock.weather==='clear')
     cullLandmarks?.pass(false)
     renderer.render(scene,camera)
   }
