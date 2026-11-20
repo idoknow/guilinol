@@ -10,7 +10,7 @@ trap 'rm -rf "$anonymous"' EXIT
 for image in api web; do
   ref="ghcr.io/idoknow/glol-$image:$tag"
   for attempt in {1..30}; do
-    docker --config "$anonymous" manifest inspect "$ref" >/dev/null && break
+    docker --config "$anonymous" pull "$ref" >/dev/null && break
     if [[ $attempt == 30 ]]; then echo "Not publicly available: $ref" >&2; exit 1; fi
     sleep 10
   done
