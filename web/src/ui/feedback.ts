@@ -7,6 +7,7 @@ import './feedback.css'
 
 type MapApi = ReturnType<typeof mapView>
 interface Item {
+  messages:{id:number;author_kind:string;author_name:string;body:string;created_at:number}[]
   view: FeedbackView | null
   has_view_shot: boolean
   id: string
@@ -209,7 +210,7 @@ function locationPicker(
   }
 }
 
-export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi | undefined>) {
+export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi | undefined>,initialId?:string) {
   if (document.querySelector('.fb-panel,.fb-aim-bar')) return
   const dialog = el('dialog', '', 'about-panel fb-panel')
   dialog.setAttribute('aria-label', '反馈')
@@ -226,7 +227,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
   document.body.append(dialog)
   let captured: Awaited<ReturnType<Host['captureView']>> | undefined
   try {
-    captured = await host.captureView()
+    if(!initialId)captured = await host.captureView()
   } catch (error) {
     note.textContent = String(error)
   }
@@ -366,7 +367,9 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     }
     body.append(el('h4', '进度', 'fb-section-title'))
     const timeline = el('ol', '', 'fb-timeline')
-    for (const event of [...item.events].reverse()) {
+    const paintChat=(record:Item)=>{timeline.replaceChildren();head.replaceChildren(el('h3',record.title),pill(record.status))
+    for (const event of [...record.events,...record.messages].sort((left,right)=>left.created_at-right.created_at)) {
+      if('author_kind' in event){timeline.append(el('li',`${when(event.created_at)} · ${event.author_name}：${event.body}`,`fb-msg--${event.author_kind}`));continue}
       const line = el('li', '', `fb-status--${event.status}`)
       line.append(el('b', labels[event.status] ?? event.status), el('time', when(event.created_at)))
       if (event.message && event.message !== labels[event.status]) line.append(el('p', event.message))
@@ -379,10 +382,16 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       }
       timeline.append(line)
     }
-    if (!item.events.length) timeline.append(el('li', '还没有进度记录', 'fb-status--draft'))
+    if (!record.events.length) timeline.append(el('li', '还没有进度记录', 'fb-status--draft'))};paintChat(item);timeline.classList.add('fb-chat')
     body.append(timeline)
     const actions = el('div', '', 'fb-actions')
     body.append(actions)
+    if(!['draft','live','rejected','duplicate'].includes(item.status)){
+      const input=el('textarea'),photo=el('input');input.maxLength=1000;input.setAttribute('aria-label','回复内容');photo.type='file';photo.accept='image/jpeg,image/png,image/webp';photo.setAttribute('aria-label','回复照片');actions.append(input,photo)
+      button(actions,'发送回复',async()=>{let message=input.value.trim();if(!message)throw Error('请输入回复');const attachment=photo.files?.[0];if(attachment){const fresh=await api<Item>('feedback/'+id),slot=Math.max(0,...fresh.photos.map(p=>p.n))+1;if(slot>20)throw Error('照片数量已达上限');message+=`（照片 #${slot}）`;if([...message].length>1000)throw Error('回复过长');const upload=await fetch(`/api/feedback/${id}/photos/${slot}`,{method:'PUT',body:attachment});if(!upload.ok)throw Error('照片上传失败')}await api(`feedback/${id}/messages`,{body:message});await detail(id)})
+    }
+    const refresh=async()=>{if(document.hidden||!timeline.isConnected)return;try{const latest=await api<Item>('feedback/'+id);if(timeline.isConnected)paintChat(latest)}catch{}}
+    const timer=setInterval(refresh,15000);document.addEventListener('visibilitychange',refresh);const previous=dispose;dispose=()=>{clearInterval(timer);document.removeEventListener('visibilitychange',refresh);previous()}
     if (item.view || item.status === 'live')
       button(
         actions,
@@ -706,6 +715,6 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       return
     }
     if (!me.ok) throw Error('账号暂时不可用')
-    await form()
+    if(initialId)await detail(initialId);else await form()
   })
 }

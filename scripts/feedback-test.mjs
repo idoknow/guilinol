@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import {view,uploadShot} from './feedback-view-fixture.mjs'
 import { mkdir, readFile } from 'node:fs/promises'
-import { createHash } from 'node:crypto'
+import { createHash,createHmac } from 'node:crypto'
 const bridge = { Authorization: 'Bearer local-test' },
   draft = { view,kind: '其他', title: '象鼻山入口', body: '请核对入口的朝向', lat: 25.28, lon: 110.3 }
 export async function apiTest({ api, origin, cookie, sql }) {
@@ -82,6 +82,14 @@ export async function apiTest({ api, origin, cookie, sql }) {
   assert.equal((await api('bridge/pending', null, 200, null, { headers: bridge }))[0].id, id)
   assert.deepEqual(Buffer.from(await (await photo(id, 1, 200, bridge, 'GET')).arrayBuffer()), picture)
   await move(id, 'live', 409)
+  await move(id,'approved',409);await move(id,'queued',409);await api('admin/'+path+'/status',{status:'approved'},403)
+  await api(path+'/messages',{body:'不应越权'},404,null,{headers:second});await api(path+'/messages',{body:'x'.repeat(1001)},400)
+  const adminHeaders={headers:second};sql("UPDATE users SET role='admin' WHERE id='other'");const approve=()=>api('admin/'+path+'/status',{status:'approved'},200,null,adminHeaders)
+  await api('admin/'+path+'/messages',{body:'管理员回复'},200,null,adminHeaders)
+  for(let index=0;index<19;index++)await api(path+'/messages',{body:'用户回复'});await api(path+'/messages',{body:'超过每小时额度'},429)
+  sql('UPDATE feedback_messages SET created_at=created_at-3601');await approve()
+  assert.equal((await api('me',{notify_email:false},200,null,{method:'PATCH'})).notify_email,false);await api('me',{notify_email:true},200,null,{method:'PATCH'})
+  const who=(await api('me')).id,sig=createHmac('sha256','local-test').update('feedback-unsubscribe:'+who).digest('hex');assert.equal((await fetch(`${origin}/api/unsubscribe?user=${who}&sig=bogus`)).status,400);assert.equal((await fetch(`${origin}/api/unsubscribe?user=${who}&sig=${sig}`)).status,200);assert.equal((await api('me')).notify_email,false)
   await move(id, 'queued')
   await move(id, 'reviewing')
   await move(id, 'reviewing')
@@ -90,6 +98,7 @@ export async function apiTest({ api, origin, cookie, sql }) {
   await move(id, 'need_info')
   await photo(id, 4, 200)
   await api(path + '/supplement', { body: '补充入口侧视图' })
+  await approve();sql("UPDATE users SET role='user' WHERE id='other'")
   await move(id, 'queued')
   await move(id, 'live')
   await move(id, 'live', 409)
@@ -97,7 +106,7 @@ export async function apiTest({ api, origin, cookie, sql }) {
   detail = await api(path)
   assert.deepEqual(
     detail.events.map((event) => event.status),
-    ['submitted', 'queued', 'reviewing', 'modelling', 'need_info', 'submitted', 'queued', 'live'],
+    ['submitted','approved', 'queued', 'reviewing', 'modelling', 'need_info', 'submitted','approved', 'queued', 'live'],
   )
   assert.equal(detail.photos.length, 4)
   await (await import('./admin-test.mjs')).apiTest({api,sql,id,second,photo,origin,cookie})
@@ -109,7 +118,7 @@ export async function apiTest({ api, origin, cookie, sql }) {
   }
   console.log('Feedback: private photos, quota, transitions, idempotency and supplement passed')
 }
-export async function uiTest(page, origin) {
+export async function uiTest(page, origin,sql) {
   page.on('response',response=>{if(response.url().includes('/api/feedback')&&response.status()>=400)console.error('Feedback request failed:',response.request().method(),response.status(),response.url())})
   await mkdir('captures/feedback', { recursive: true })
   const shot = async (name) => {
@@ -179,6 +188,10 @@ export async function uiTest(page, origin) {
   await shot('list')
   await fb.locator('.fb-card').first().click()
   const [item] = await (await page.request.get(origin + '/api/feedback?mine=1')).json()
+  const reply=await page.request.post(`${origin}/api/bridge/feedback/${item.id}/messages`,{headers:bridge,data:{source:'mock-1',body:'模型入口朝哪个方向？'}});assert.equal(reply.status(),200)
+  await click('刷新进度');await fb.getByText(/模型入口朝哪个方向/).waitFor();await fb.getByLabel('回复内容').fill('朝东');await click('发送回复');await fb.getByText(/提交人：朝东/).waitFor()
+  sql("UPDATE users SET role='admin' WHERE email='walker@example.test'");const adminPage=await page.context().newPage();try{await adminPage.goto(origin+'/admin/?id='+item.id);await adminPage.getByText(/提交人：朝东/).waitFor();await adminPage.screenshot({path:'captures/feedback/admin-chat.png'});await adminPage.getByRole('button',{name:'发起 AI 制作'}).click();await adminPage.waitForFunction(()=>document.querySelector('.adm-meta')?.textContent.includes('已开始 AI 制作'))}finally{await adminPage.close()}
+  await click('刷新进度');await fb.locator('.fb-pill.fb-status--approved').waitFor();await shot('approved-chat')
   for (const status of ['queued', 'modelling', 'reviewing', 'live']) {
     const response = await page.request.post(`${origin}/api/bridge/feedback/${item.id}/status`, {
       headers: bridge,
@@ -188,7 +201,7 @@ export async function uiTest(page, origin) {
   }
   await click('刷新进度')
   await fb.locator('.fb-pill.fb-status--live').waitFor()
-  assert.equal(await fb.locator('.fb-timeline li').count(), 5)
+  assert.equal(await fb.locator('.fb-timeline li').count(), 8)
   await shot('timeline')
   await fb.locator('.fb-view-shot').evaluate(image=>image.decode());await fb.locator('.fb-view-shot').scrollIntoViewIfNeeded();await shot('view-detail')
   const stored=(await (await page.request.get(`${origin}/api/feedback/${item.id}`)).json()).view

@@ -30,7 +30,7 @@ try {
   if(ui) {
     browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
     await mkdir('captures/auth',{recursive:true})
-    const page=await browser.newPage({viewport:{width:feedbackUI?960:1100,height:feedbackUI?620:740}})
+    const context=await browser.newContext({viewport:{width:feedbackUI?960:1100,height:feedbackUI?620:740}}),page=await context.newPage()
     if(adminUI){
       await (await import('./admin-test.mjs')).browserTest({page,origin,email,password,nickname,code,sql})
     }else if(feedbackUI){
@@ -38,7 +38,7 @@ try {
       await page.request.post(origin+'/api/auth/verify',{headers:{Origin:origin},data:{email,password,code:await code('verify')}})
       assert.equal((await page.request.get(origin+'/api/me')).status(),200)
       await page.goto(origin+'/?verify');await page.locator('.dock-feedback').waitFor({timeout:120000})
-      await (await import('./feedback-test.mjs')).uiTest(page,origin)
+      await (await import('./feedback-test.mjs')).uiTest(page,origin,sql)
     }else{
     await page.goto(origin+'/?verify');await page.locator('.account-entry').click();if(feedbackUI)await page.evaluate(()=>window.viewer.freeze())
     const dialog=page.getByRole('dialog'),click=name=>dialog.getByRole('button',{name,exact:true}).click(),fill=(name,value)=>dialog.getByLabel(name).fill(value)
@@ -66,7 +66,7 @@ try {
     console.log('Verification requires the latest registration password: missing and stale passwords rejected; current password accepted')
     assert.equal((await api('me',{nickname:'江岸' },200,null,{method:'PATCH'})).nickname,'江岸');const sessionRows=JSON.parse(sql('SELECT digest FROM sessions'))[0].results;assert.equal(sessionRows.length,1);assert.notEqual(sessionRows[0].digest,cookie.split('=')[1]);assert.notEqual(JSON.parse(sql('SELECT digest FROM users'))[0].results[0].digest,password)
     await api('auth/logout',{});await api('me',null,401,'unauthorized');await api('auth/login',login)
-    if(process.argv.includes('--bridge')) await (await import('./feedback-bridge-test.mjs')).bridgeTest({api,origin,cookie,state,staticDir})
+    if(process.argv.includes('--bridge')) await (await import('./feedback-bridge-test.mjs')).bridgeTest({api,origin,cookie,state,staticDir,sql,mailLog:()=>logs})
     else await (await import('./feedback-test.mjs')).apiTest({api,origin,cookie,sql})
     for(let attempt=1;attempt<=5;attempt++)await api('auth/login',{email,password:'incorrect'},attempt===5?429:401,attempt===5?'locked':'credentials');await api('auth/login',login,429,'locked')
     sql('UPDATE mail_events SET sent=sent-61');await api('auth/resend',{email,purpose:'reset'});const reset={email,code:await code('reset'),password:'new-password'};await api('auth/reset',reset);await api('me',null,401,'unauthorized');await api('auth/reset',reset,400,'invalid_code');await api('auth/login',login,401,'credentials');await api('auth/login',reset)

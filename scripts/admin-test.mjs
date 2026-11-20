@@ -37,14 +37,14 @@ export async function apiTest({ api, sql, id, second, photo,origin,cookie }) {
   await uploadShot(origin,cookie,manual)
   await api(`feedback/${manual}/submit`, {})
   const change = `feedback/${manual}/status`
-  await admin(change, transition, 409)
+  await admin(change, {status:'rejected'}, 400)
   await admin(change, { status: 'queued' }, 403, { Origin: 'https://example.test' })
-  await admin(change, { status: 'queued' })
+  await admin(change, { status: 'approved' });await api('bridge/'+change,{status:'queued'},200,null,{headers:{Authorization:'Bearer local-test'}})
   await admin(change, transition)
   const events = (await admin('feedback/' + manual)).events
   assert.deepEqual(
     events.map((row) => row.status),
-    ['submitted', 'queued', 'rejected'],
+    ['submitted','approved', 'queued', 'rejected'],
   )
   assert.equal(events.at(-1).message, transition.message)
   sql(

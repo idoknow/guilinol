@@ -81,6 +81,7 @@ type User = {
   last_submitted_at: number | null
 }
 type Feedback = {
+  unread:number
   id: string
   title: string
   kind: string
@@ -111,7 +112,7 @@ function filters(users: boolean) {
   if (!users) {
     const status = el('select')
     status.name = 'status'
-    status.append(option('', '所有状态'), ...Object.entries(labels).map(([key, label]) => option(key, label)))
+    status.append(option('pending','待批准'),option('', '所有状态'), ...Object.entries(labels).map(([key, label]) => option(key, label)))
     status.value = params.get('status') || ''
     const label = el('label', ' 状态 ')
     label.append(status)
@@ -128,6 +129,7 @@ function filters(users: boolean) {
   main.append(form)
 }
 async function list(users: boolean) {
+  if(!users&&!params.has('status'))params.set('status','pending')
   if (users) {
     const stats = await api('admin/stats')
     main.append(el('h2', '统计'))
@@ -172,7 +174,7 @@ async function list(users: boolean) {
     table(
       ['标题', '类型', '状态', '提交人', '经纬度', '照片', '提交时间', '更新时间'],
       page.items.map((item: Feedback) => [
-        link(item.title, '?id=' + encodeURIComponent(item.id)),
+        link(item.title+(item.unread?`（${item.unread} 条未读）`:''), '?id=' + encodeURIComponent(item.id)),
         item.kind,
         pill(item.status),
         `${item.nickname} (${item.email})`,
@@ -243,12 +245,15 @@ async function detail(id: string) {
   main.append(el('h3', '时间线'))
   const events = el('ol')
   events.className = 'adm-timeline'
-  for (const event of item.events) {
+  for (const event of [...item.events,...item.messages].sort((left,right)=>left.created_at-right.created_at)) {
+    if(event.author_kind){events.append(el('li',`${date(event.created_at)} · ${event.author_name}：${event.body}`));continue}
     const entry = el('li', `${date(event.created_at)} · ${labels[event.status]} · ${event.message} `)
     if (event.screenshot_url) entry.append(external('查看截图', event.screenshot_url))
     events.append(entry)
   }
   main.append(events)
+  if(!['draft','live','rejected','duplicate'].includes(item.status)){const input=el('textarea'),send=el('button','管理员回复');input.maxLength=1000;input.setAttribute('aria-label','管理员回复内容');main.append(input,send);send.onclick=async()=>{try{await api(path+'/messages',{body:input.value});location.reload()}catch(error){failure(error)}}}
+  if(['submitted','need_info'].includes(item.status)){const start=el('button','发起 AI 制作');main.append(start);start.onclick=async()=>{try{await api(path+'/status',{status:'approved'});location.reload()}catch(error){failure(error)}}}
   if (!edges[item.status]) return
   const form = el('form'),
     select = el('select'),
@@ -258,7 +263,7 @@ async function detail(id: string) {
     button = el('button', '保存状态')
   message.required = true
   message.maxLength = 2000
-  for (const key of edges[item.status]) select.append(option(key, labels[key]))
+  for (const key of edges[item.status].filter(key=>!['approved','queued'].includes(key))) select.append(option(key, labels[key]));if(!select.length)return
   statusLabel.append(select)
   messageLabel.append(message)
   form.className = 'adm-status-form'

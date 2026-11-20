@@ -4,7 +4,8 @@ export const kinds = ['缺失建筑', '位置或朝向不对', '外观不像', '
 export const views = ['正面', '左侧', '右侧', '背面', '远景', '细节', '内部']
 export const labels: Record<string, string> = {
   draft: '草稿',
-  submitted: '已提交',
+  submitted: '已收到，正在确认细节',
+  approved: '已开始 AI 制作',
   queued: '已进入建模队列',
   modelling: 'AI 建模中',
   reviewing: '审核中',
@@ -14,11 +15,12 @@ export const labels: Record<string, string> = {
   duplicate: '与已有反馈重复',
 }
 export const edges: Record<string, string[]> = {
-  submitted: ['queued'],
+  submitted: ['approved','need_info','rejected','duplicate'],
+  approved: ['queued'],
   queued: ['modelling', 'reviewing', 'live', 'need_info', 'rejected', 'duplicate'],
   modelling: ['reviewing', 'live', 'need_info', 'rejected', 'duplicate'],
   reviewing: ['modelling', 'live', 'need_info', 'rejected', 'duplicate'],
-  need_info: ['rejected', 'duplicate'],
+  need_info: ['approved','rejected', 'duplicate'],
 }
 
 type Point = { x: number; y: number; z: number; lat: number; lon: number }

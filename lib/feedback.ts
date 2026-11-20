@@ -2,6 +2,7 @@ import { type Env, Problem, equal, hash, invalid, limited, now, sessionHash, una
 import { ll2xz } from './projection'
 import { edges, kinds, labels, views, validView } from './feedback-contract'
 import { adminList } from './admin'
+import {flushMail} from './feedback-mail'
 
 const json = (value: unknown) => Response.json(value, { headers: { 'Cache-Control': 'private, no-store' } })
 function missing(): never {
@@ -86,7 +87,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (
       admin &&
       !(method === 'GET' && /^admin\/feedback\/[\w-]+$/.test(path)) &&
-      !(method === 'POST' && /^admin\/feedback\/[\w-]+\/status$/.test(path))
+      !(method === 'POST' && /^admin\/feedback\/[\w-]+\/(status|messages)$/.test(path))
     )
       missing()
   }
@@ -94,10 +95,11 @@ export async function feedback(request: Request, env: Env, path: string) {
     return json(
       (
         await stmt(
-          "SELECT * FROM feedback WHERE status='submitted' OR (multica_issue IS NOT NULL AND status NOT IN ('draft','live','rejected','duplicate')) ORDER BY updated_at,id",
+          "SELECT * FROM feedback WHERE status IN ('submitted','approved','need_info') OR (multica_issue IS NOT NULL AND status NOT IN ('draft','live','rejected','duplicate')) ORDER BY updated_at,id",
         ).all()
       ).results,
     )
+  if(path==='bridge/mail'&&method==='POST'){await flushMail(env);return json({ok:true})}
   if (path === 'feedback' && !machine) {
     if (method === 'GET')
       return json(
@@ -140,10 +142,10 @@ export async function feedback(request: Request, env: Env, path: string) {
     return json({ id })
   }
   const match =
-    /^(bridge\/|admin\/)?feedback\/([\w-]+)(?:\/(submit|supplement|status|view-shot|photos\/(?:[1-9]|1\d|20)))?$/.exec(
+    /^(bridge\/|admin\/)?feedback\/([\w-]+)(?:\/(submit|supplement|status|messages|relayed|bind|view-shot|photos\/(?:[1-9]|1\d|20)))?$/.exec(
       path,
     )
-  if (!match || (!admin && bridge !== (match[3] === 'status'))) missing()
+  if (!match || (bridge&&!['status','messages','relayed','bind'].includes(match[3])) || (!bridge&&!admin&&['status','relayed','bind'].includes(match[3]))) missing()
   const [, , id, action] = match,
     row = await stmt(
       (admin
@@ -159,6 +161,20 @@ export async function feedback(request: Request, env: Env, path: string) {
       ),
     ).first<{ status: string; multica_issue: string | null; view_json: string | null; shot_state: number }>()
   if (!row) missing()
+  if(method==='POST'&&bridge&&action==='bind'){
+    const issue=text((await fields(request)).issue,128,true)!
+    if(!(await stmt('UPDATE feedback SET multica_issue=? WHERE id=? AND (multica_issue IS NULL OR multica_issue=?)',issue,id,issue).run()).meta.changes)conflict()
+    return json({ok:true})
+  }
+  if(method==='POST'&&bridge&&action==='relayed'){
+    await stmt('UPDATE feedback_messages SET relayed_at=coalesce(relayed_at,unixepoch()) WHERE feedback_id=? AND id=?',id,number((await fields(request)).id,1,Number.MAX_SAFE_INTEGER)).run();return json({ok:true})
+  }
+  if(method==='POST'&&action==='messages'){
+    if(['live','rejected','duplicate','draft'].includes(row.status))conflict()
+    const data=await fields(request),body=text(data.body,1000,true)!,kind=bridge?'agent':admin?'admin':'user',source=bridge?text(data.source,200,true):null
+    const result=await stmt(`INSERT INTO feedback_messages(feedback_id,author_kind,author_name,body,source,relayed_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM feedback WHERE id=? AND status NOT IN ('draft','live','rejected','duplicate')) AND (?='agent' OR (SELECT count(*) FROM feedback_messages WHERE feedback_id=? AND author_kind!='agent' AND created_at>unixepoch()-3600)<20) ON CONFLICT(feedback_id,source) DO NOTHING`,id,kind,bridge?'协调人':admin?'管理员':'提交人',body,source,bridge?now():null,id,kind,id).run()
+    if(!result.meta.changes&&!bridge)limited();return json({ok:true})
+  }
   const shotKey = `fb/${id}/view.jpg`
   if (action === 'view-shot') {
     if (method === 'GET') {
@@ -251,9 +267,12 @@ export async function feedback(request: Request, env: Env, path: string) {
       'SELECT n,bytes,mime,view_label,exif_lat,exif_lon,exif_dir,exif_time FROM feedback_photos WHERE feedback_id=? AND ready=1 ORDER BY n',
       id,
     ).all()
-  if (!action && method === 'GET')
+  if (!action && method === 'GET'){
+    const messages=(await stmt('SELECT id,author_kind,author_name,body,created_at,relayed_at FROM feedback_messages WHERE feedback_id=? ORDER BY created_at,id',id).all()).results
+    if(admin&&messages.length)await stmt('UPDATE feedback SET admin_read_id=max(admin_read_id,?) WHERE id=?',Number(messages.at(-1)?.id),id).run()
     return json({
       ...row,
+      messages,
       view_json: undefined,
       shot_state: undefined,
       view: row.view_json ? JSON.parse(row.view_json) : null,
@@ -268,6 +287,7 @@ export async function feedback(request: Request, env: Env, path: string) {
       photos: (await photos()).results,
       events: (await stmt('SELECT * FROM feedback_events WHERE feedback_id=? ORDER BY id', id).all()).results,
     })
+  }
   if (action?.startsWith('photos/')) {
     const slot = Number(action.slice(7))
     if (method === 'GET') {
@@ -288,7 +308,7 @@ export async function feedback(request: Request, env: Env, path: string) {
         },
       })
     }
-    if (!['draft', 'need_info'].includes(row.status)) conflict()
+    if (!['draft', 'need_info'].includes(row.status) && (method!=='PUT'||['live','rejected','duplicate'].includes(row.status)||await stmt('SELECT 1 FROM feedback_photos WHERE feedback_id=? AND n=?',id,slot).first())) conflict()
     if (method === 'DELETE') {
       const photo = await stmt(
         `DELETE FROM feedback_photos WHERE feedback_id=? AND n=? AND EXISTS(SELECT 1 FROM feedback WHERE id=? AND status=?) RETURNING r2_key`,
@@ -337,7 +357,7 @@ export async function feedback(request: Request, env: Env, path: string) {
        AND (SELECT coalesce(sum(bytes),0) FROM feedback_upload_usage WHERE user_id=?) + ? <= 314572800
        ON CONFLICT(feedback_id,n) DO UPDATE SET r2_key=excluded.r2_key,bytes=excluded.bytes,mime=excluded.mime,
        view_label=excluded.view_label,exif_lat=excluded.exif_lat,exif_lon=excluded.exif_lon,exif_dir=excluded.exif_dir,
-       exif_time=excluded.exif_time,uploaded_at=excluded.uploaded_at,ready=0`,
+       exif_time=excluded.exif_time,uploaded_at=excluded.uploaded_at,ready=0 WHERE (SELECT status FROM feedback WHERE id=excluded.feedback_id) IN ('draft','need_info')`,
         id,
         slot,
         key,
@@ -396,12 +416,13 @@ export async function feedback(request: Request, env: Env, path: string) {
   } else if (action === 'supplement') {
     if (row.status !== 'need_info') conflict()
     target = 'submitted'
-    message = text((await fields(request)).body, 2000, true)!
-    guard = ' AND shot_state!=2'
+    message = text((await fields(request)).body, 1000, true)!
+    guard = " AND shot_state!=2 AND (SELECT count(*) FROM feedback_messages WHERE feedback_id=feedback.id AND author_kind!='agent' AND created_at>unixepoch()-3600)<20"
   } else if (bridge || admin) {
     const data = await fields(request)
     target = String(data.status)
     if (!edges[row.status]) conflict()
+    if((target==='approved'&&!admin)||(target==='queued'&&!bridge))conflict()
     if (bridge && target === row.status) return json({ ok: true })
     if (!edges[row.status].includes(target)) conflict()
     message =
@@ -432,6 +453,7 @@ export async function feedback(request: Request, env: Env, path: string) {
       message,
       screenshot,
     ),
+    ...(action==='supplement'?[stmt("INSERT INTO feedback_messages(feedback_id,author_kind,author_name,body) SELECT ?,'user','提交人',? WHERE changes()=1",id,message)]:[]),
   ])
   if (!changed.meta.changes) {
     if (

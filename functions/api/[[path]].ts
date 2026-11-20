@@ -1,8 +1,9 @@
 import {type Env,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCode,now,passwordHash,random,reserveMail,sessionHash,unauthorized} from '../../lib/auth'
 
 import {feedback} from '../../lib/feedback'
-type User={id:string;email:string;nickname:string;verified:number;role:string;salt:string;digest:string;locked_until:number}
-const profile=(user:User)=>({id:user.id,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role})
+import {unsubscribe} from '../../lib/feedback-mail'
+type User={id:string;email:string;nickname:string;verified:number;role:string;salt:string;digest:string;locked_until:number;notify_email:number}
+const profile=(user:User)=>({id:user.id,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email})
 const json=(data:unknown,status=200,session?:string)=>Response.json(data,{status,headers:{'Cache-Control':'no-store',...(session?{'Set-Cookie':session}:{})}})
 function nickname(value:unknown) {
   if(typeof value!=='string'||!value.trim()||value.trim().length>32) invalid()
@@ -17,6 +18,7 @@ const methods:Record<string,string[]>={me:['GET','PATCH'],...Object.fromEntries(
 async function handle(request:Request,env:Env) {
   const url=new URL(request.url), path=url.pathname.slice(5), method=request.method, db=env.DB
   const stmt=(sql:string,...args:(string|number)[])=>db.prepare(sql).bind(...args)
+  if(method==='GET'&&path==='unsubscribe')return unsubscribe(env,url)
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(!Object.hasOwn(methods,path)) throw new Problem(404,'not_found','接口不存在')
   if(!methods[path].includes(method)) throw new Problem(405,'method','不支持的请求方式')
@@ -37,7 +39,8 @@ async function handle(request:Request,env:Env) {
     if(!user) unauthorized()
     const writes=[stmt('UPDATE sessions SET expires=? WHERE digest=? AND expires>?',now()+lifetime,digest,now())]
     if(method==='PATCH') {
-      user.nickname=nickname(body.nickname)
+      if('notify_email' in body){if(typeof body.notify_email!=='boolean')invalid();user.notify_email=Number(body.notify_email);writes.push(stmt('UPDATE users SET notify_email=? WHERE id=?',user.notify_email,user.id))}
+      if('nickname' in body)user.nickname=nickname(body.nickname)
       writes.push(stmt('UPDATE users SET nickname=? WHERE id=? AND EXISTS (SELECT 1 FROM sessions WHERE digest=?)',user.nickname,user.id,digest))
     }
     if(!(await db.batch(writes))[0].meta.changes) unauthorized()
