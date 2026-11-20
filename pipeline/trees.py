@@ -1,474 +1,614 @@
-"""Procedural low-poly Guilin tree model generator (IDOK-71).
+"""Authoritative procedural low-poly generator for Guilin street & waterfront trees (M2.6-26 / IDOK-71).
 
-Generates 10 reusable Guilin street/waterfront tree species (+ mountain shrub at
-slot 5 for GL04 compatibility), each with:
-  - 3 morphological/colour variants (anisotropic scale, trunk lean, hue/value shift)
-  - 3 LOD levels:
-      * near (lod0): tapered curved trunk, visible primary branches, layered organic
-                     foliage clusters, banyan pillar/curtain aerial roots, palm fronds,
-                     metasequoia whorls, weeping willow curtains
-      * mid  (lod1): simplified trunk + merged crown tiers
-      * far  (lod2): orthogonal crossed silhouette planes + overhead canopy cap
+Generates `pipeline/tree-specs.json` consumed by `web/src/look/trees.ts` and provides
+`emit_landmark_tree()` so street landmarks (`yiwu_street`, `xinyi_arcade`, `ronghu`) share
+the exact same botanical crowns, trunks, roots, and seasonal palettes.
 
-Exports `pipeline/tree-specs.json` (shared with `web/src/look/trees.ts`) and can
-optionally export `.glb` assets (`--export-glb <dir>`) for inspection/comparison.
+Slot order (preserving 0..5 compatibility with `.trees` 12-byte records and `physics.ts` kind!==5):
+  0: camphor      — 香樟 (Cinnamomum camphora)
+  1: banyan       — 小叶榕/高山榕 (Ficus microcarpa)
+  2: osmanthus    — 桂花 (Osmanthus fragrans, 市树)
+  3: palm         — 蒲葵/大王椰 (Livistona chinensis / Roystonea regia)
+  4: conifer      — 水杉 (Metasequoia glyptostroboides)
+  5: shrub        — 山石灌丛 (Karst scrub, trunkless collider-exempt slot 5)
+  6: virens       — 黄葛榕/大叶榕 (Ficus virens)
+  7: bischofia    — 秋枫/复羽叶栾树 (Bischofia javanica / Koelreuteria bipinnata)
+  8: elaeocarpus  — 杜英 (Elaeocarpus decipiens)
+  9: ginkgo       — 银杏 (Ginkgo biloba)
+ 10: willow       — 垂柳 (Salix babylonica)
 """
-
 from __future__ import annotations
 
-import argparse
 import json
 import math
 from pathlib import Path
 import numpy as np
-import trimesh
 
+OUT_JSON = Path(__file__).with_name('tree-specs.json')
 
+# Palette anchored to docs/reference.md deep lush subtropical greens + species botanical accents
 PALETTE = {
-    'trunk': 0x4D4236,
-    'banyanTrunk': 0x463B30,
-    'osmanthusTrunk': 0x686157,
-    'palmTrunk': 0x857C6D,
-    'palmCrownshaft': 0x4E7436,
-    'coniferTrunk': 0x5A3F32,
-    'virensTrunk': 0x5C5349,
-    'bischofiaTrunk': 0x473D34,
+    'camphor':          {'c': 0x35642F, 'lit': 0x729B42, 'dark': 0x19331D},
+    'camphorTrunk':     0x4A3F34,
+    'banyan':           {'c': 0x2C582A, 'lit': 0x527F3B, 'dark': 0x152D1A},
+    'banyanTrunk':      0x473C31,
+    'osmanthus':        {'c': 0x2A5428, 'lit': 0x4E7A39, 'dark': 0x162E1B},
+    'osmanthusTrunk':   0x665F55,
+    'palm':             {'c': 0x4E7B34, 'lit': 0x7BA04B, 'dark': 0x294823},
+    'palmTrunk':        0x9E988C,
+    'palmCrownshaft':   {'c': 0x4B8736, 'lit': 0x6CA848, 'dark': 0x2C5922},
+    'conifer':          {'c': 0x2E5831, 'lit': 0x5F833E, 'dark': 0x18321F},
+    'coniferTrunk':     0x5B3E30,
+    'shrub':            {'c': 0x355E2E, 'lit': 0x5A843D, 'dark': 0x19321E},
+    'virens':           {'c': 0x48803B, 'lit': 0x80B44B, 'dark': 0x234725},
+    'virensTrunk':      0x685F54,
+    'bischofia':        {'c': 0x37642F, 'lit': 0x689040, 'dark': 0x1B351F},
+    'bischofiaPod':     {'c': 0xBE7D63, 'lit': 0xDC9E7E, 'dark': 0x7D4B3B},
+    'bischofiaTrunk':   0x463C33,
+    'elaeocarpus':      {'c': 0x2D5B2C, 'lit': 0x55803B, 'dark': 0x17311C},
+    'elaeocarpusRed':   {'c': 0xAE3A2A, 'lit': 0xD4573B, 'dark': 0x6D2018},
     'elaeocarpusTrunk': 0x52483E,
-    'ginkgoTrunk': 0x665D52,
-    'willowTrunk': 0x4F4539,
-    'canopyDark': 0x1A3320,
-    # Species foliage base / sunlit / deep-shade colours (anchored to docs/reference.md)
-    'camphor': (0x3B6832, 0x648C40, 0x1B3520),
-    'banyan': (0x2D592B, 0x4D7C3A, 0x17301C),
-    'osmanthus': (0x2B5429, 0x487538, 0x18311D),
-    'palm': (0x527B35, 0x799B4A, 0x2E4E27),
-    'conifer': (0x2D5232, 0x58753B, 0x193221),
-    'shrub': (0x375F30, 0x56803C, 0x1A3320),
-    'virens': (0x3F6E35, 0x6D9644, 0x1F3B22),
-    'bischofia': (0x386430, 0x658C3E, 0x1C3620),
-    'bischofiaPod': (0x8B6340, 0xB48353, 0x3D4A28),
-    'elaeocarpus': (0x2F5C2E, 0x537D3A, 0x19331E),
-    'elaeocarpusRed': (0x823E2D, 0xA8553B, 0x3B2920),
-    'ginkgo': (0x9AA838, 0xD4BE46, 0x5C6E28),
-    'willow': (0x567D38, 0x82A64D, 0x2D4C24),
+    'ginkgo':           {'c': 0xA4AF38, 'lit': 0xDEC547, 'dark': 0x637226},
+    'ginkgoTrunk':      0x665D52,
+    'willow':           {'c': 0x638E3C, 'lit': 0x94BA54, 'dark': 0x355626},
+    'willowTrunk':      0x4E4438,
 }
 
 
-def hex_rgb(value: int) -> tuple[float, float, float]:
-    return (((value >> 16) & 255) / 255.0, ((value >> 8) & 255) / 255.0, (value & 255) / 255.0)
+def hex_rgb(h: int) -> tuple[float, float, float]:
+    return (((h >> 16) & 255) / 255.0, ((h >> 8) & 255) / 255.0, (h & 255) / 255.0)
+
+
+def _scale_hex(h: int, f: float) -> int:
+    r = min(255, max(0, round(((h >> 16) & 255) * f)))
+    g = min(255, max(0, round(((h >> 8) & 255) * f)))
+    b = min(255, max(0, round((h & 255) * f)))
+    return (r << 16) | (g << 8) | b
+
+
+def wood(key: str) -> dict:
+    base = PALETTE[key]
+    return {'c': base, 'lit': _scale_hex(base, 1.24), 'dark': _scale_hex(base, 0.66)}
+
+
+def leaf(key: str) -> dict:
+    return dict(PALETTE[key])
 
 
 def build_species_specs() -> list[dict]:
-    p = PALETTE
-
-    def leaf(key: str) -> dict:
-        c, lit, dark = p[key]
-        return {'c': c, 'lit': lit, 'dark': dark}
-
-    def wood(key: str, dark_mul: float = 0.72) -> dict:
-        base = p[key]
-        r, g, b = (base >> 16) & 255, (base >> 8) & 255, base & 255
-        dark = (int(r * dark_mul) << 16) | (int(g * dark_mul) << 8) | int(b * dark_mul)
-        lit = (min(255, int(r * 1.14)) << 16) | (min(255, int(g * 1.14)) << 8) | min(255, int(b * 1.12))
-        return {'c': base, 'lit': lit, 'dark': dark}
-
-    # 0. camphor — 香樟 (Cinnamomum camphora): 11.5–13.5 m, curved fissured trunk, 4 spreading main limbs, layered dome
-    camphor_leaf = leaf('camphor')
-    camphor_wood = wood('trunk')
+    # -------------------------------------------------------------------------
+    # 0. camphor — 香樟 (Cinnamomum camphora)
+    # Wide rounded dome (W=11.6m >= crown H=9.6m), crown starts 2.6-3.0m;
+    # trunk D=0.72m at base (>=0.05*12.2m), leans ~5.5 deg; 4 thick limbs at 38-48 deg
+    # terminating strictly inside 8 overlapping irregular icosphere blobs.
+    # -------------------------------------------------------------------------
+    cam_leaf = leaf('camphor')
+    cam_wood = wood('camphorTrunk')
     camphor = {
-        'id': 0,
-        'name': 'camphor',
-        'zh': '香樟',
-        'latin': 'Cinnamomum camphora',
+        'id': 0, 'name': 'camphor', 'zh': '香樟', 'latin': 'Cinnamomum camphora',
         'variants': [
-            {'scale': [1.00, 1.00, 1.00], 'lean': 0.03, 'tint': [1.00, 1.00, 1.00]},
-            {'scale': [1.08, 0.95, 1.05], 'lean': -0.04, 'tint': [0.96, 1.02, 0.95]},
-            {'scale': [0.94, 1.07, 0.96], 'lean': 0.05, 'tint': [1.04, 1.01, 0.93]},
+            {'scale': [1.00, 1.00, 1.00], 'lean': 0.05, 'tint': [1.00, 1.00, 1.00]},
+            {'scale': [1.08, 0.95, 1.06], 'lean': -0.06, 'tint': [0.96, 1.02, 0.95]},
+            {'scale': [0.95, 1.06, 0.96], 'lean': 0.07, 'tint': [1.04, 1.02, 0.92]},
         ],
         'near': [
-            {'op': 'tube', **camphor_wood, 'sides': 7, 'pts': [[0, -1.5, 0, 0.34], [0.02, 0.25, 0, 0.31], [0.10, 1.7, 0.04, 0.24], [0.22, 3.2, 0.06, 0.19], [0.30, 4.8, 0.04, 0.13]]},
-            {'op': 'tube', **camphor_wood, 'sides': 5, 'pts': [[0.20, 3.0, 0.05, 0.15], [1.25, 4.3, 0.55, 0.11], [2.45, 5.6, 1.05, 0.07]]},
-            {'op': 'tube', **camphor_wood, 'sides': 5, 'pts': [[0.18, 2.9, 0.04, 0.15], [-1.15, 4.2, 0.70, 0.11], [-2.25, 5.5, 1.30, 0.07]]},
-            {'op': 'tube', **camphor_wood, 'sides': 5, 'pts': [[0.22, 3.1, 0.02, 0.14], [0.45, 4.5, -1.25, 0.10], [0.95, 5.8, -2.35, 0.06]]},
-            {'op': 'tube', **camphor_wood, 'sides': 4, 'pts': [[0.26, 4.0, 0.04, 0.12], [-0.75, 5.6, -0.95, 0.08], [-1.45, 6.9, -1.65, 0.05]]},
-            {'op': 'tuft', **camphor_leaf, 'r': [3.3, 1.85, 3.1], 'p': [2.3, 6.3, 1.0], 'yaw': 0.4, 'seed': 11, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **camphor_leaf, 'r': [3.2, 1.80, 3.0], 'p': [-2.1, 6.2, 1.2], 'yaw': 1.3, 'seed': 23, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **camphor_leaf, 'r': [3.1, 1.85, 3.2], 'p': [0.8, 6.5, -2.1], 'yaw': 2.1, 'seed': 37, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **camphor_leaf, 'r': [2.8, 1.75, 2.7], 'p': [-1.4, 7.1, -1.5], 'yaw': 2.9, 'seed': 53, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **camphor_leaf, 'r': [3.8, 2.15, 3.6], 'p': [0.3, 8.4, 0.1], 'yaw': 0.8, 'seed': 71, 'rings': 3, 'segs': 8},
-            {'op': 'tuft', **camphor_leaf, 'r': [2.6, 1.65, 2.5], 'p': [0.4, 10.2, -0.2], 'yaw': 1.9, 'seed': 89, 'rings': 3, 'segs': 7},
+            # Flared base D=0.74m (r=0.37), strong taper, slight 5.5 deg curve (+0.28m at y=3.0m)
+            {'op': 'tube', **cam_wood, 'sides': 7, 'pts': [
+                [0.0, -1.5, 0.0, 0.42], [0.0, 0.0, 0.0, 0.37], [0.08, 1.3, 0.02, 0.30],
+                [0.20, 2.6, 0.05, 0.25], [0.34, 5.2, 0.08, 0.14],
+            ]},
+            # 4 stout primary limbs (38-48 deg from vertical), tips deep inside outer blobs
+            {'op': 'tube', **cam_wood, 'sides': 5, 'pts': [[0.18, 2.5, 0.04, 0.20], [1.45, 4.0, 0.55, 0.14], [2.75, 5.4, 1.05, 0.09]]},
+            {'op': 'tube', **cam_wood, 'sides': 5, 'pts': [[0.16, 2.4, 0.04, 0.19], [-1.35, 3.9, 0.70, 0.14], [-2.55, 5.3, 1.35, 0.09]]},
+            {'op': 'tube', **cam_wood, 'sides': 5, 'pts': [[0.19, 2.6, 0.02, 0.18], [0.55, 4.2, -1.45, 0.13], [1.10, 5.6, -2.65, 0.08]]},
+            {'op': 'tube', **cam_wood, 'sides': 5, 'pts': [[0.24, 3.1, 0.05, 0.16], [-1.05, 4.8, -1.15, 0.12], [-2.05, 6.3, -2.15, 0.08]]},
+            # 8 overlapping organic icosphere(subdiv=1) blobs, vertically squashed 0.68-0.75, starting y=2.7m
+            {'op': 'blob', **cam_leaf, 'r': [3.3, 2.25, 3.1], 'p': [2.65, 5.5, 1.0], 'yaw': 0.4, 'seed': 11, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **cam_leaf, 'r': [3.2, 2.20, 3.0], 'p': [-2.45, 5.4, 1.25], 'yaw': 1.3, 'seed': 23, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **cam_leaf, 'r': [3.1, 2.20, 3.2], 'p': [1.05, 5.7, -2.55], 'yaw': 2.1, 'seed': 37, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **cam_leaf, 'r': [2.9, 2.10, 2.9], 'p': [-1.95, 6.4, -2.0], 'yaw': 2.9, 'seed': 53, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **cam_leaf, 'r': [3.0, 2.10, 2.8], 'p': [0.2, 4.9, 2.35], 'yaw': 0.9, 'seed': 67, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **cam_leaf, 'r': [3.8, 2.65, 3.6], 'p': [0.25, 7.5, 0.1], 'yaw': 1.7, 'seed': 79, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **cam_leaf, 'r': [3.3, 2.35, 3.2], 'p': [1.4, 8.6, -0.6], 'yaw': 2.5, 'seed': 89, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **cam_leaf, 'r': [3.1, 2.25, 3.0], 'p': [-0.6, 9.7, 0.2], 'yaw': 0.6, 'seed': 101, 'subdiv': 1, 'jitter': 0.14},
         ],
         'mid': [
-            {'op': 'tube', **camphor_wood, 'sides': 5, 'pts': [[0, -1.5, 0, 0.30], [0.20, 6.4, 0.04, 0.14]]},
-            {'op': 'tuft', **camphor_leaf, 'r': [4.6, 2.4, 4.4], 'p': [0.2, 6.7, 0.0], 'yaw': 0.5, 'seed': 11, 'rings': 2, 'segs': 7},
-            {'op': 'tuft', **camphor_leaf, 'r': [3.2, 2.0, 3.1], 'p': [0.3, 9.2, -0.1], 'yaw': 1.7, 'seed': 37, 'rings': 2, 'segs': 6},
+            {'op': 'tube', **cam_wood, 'sides': 5, 'pts': [[0.0, -1.5, 0.0, 0.37], [0.22, 5.6, 0.04, 0.16]]},
+            {'op': 'blob', **cam_leaf, 'r': [3.7, 2.5, 3.5], 'p': [1.8, 5.8, 0.6], 'yaw': 0.4, 'seed': 11, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **cam_leaf, 'r': [3.6, 2.4, 3.5], 'p': [-1.7, 5.9, -0.5], 'yaw': 1.8, 'seed': 37, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **cam_leaf, 'r': [3.8, 2.6, 3.6], 'p': [0.2, 7.2, -1.2], 'yaw': 1.1, 'seed': 67, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **cam_leaf, 'r': [3.5, 2.5, 3.4], 'p': [0.1, 9.2, 0.2], 'yaw': 2.4, 'seed': 89, 'subdiv': 0, 'jitter': 0.13},
         ],
         'far': [
-            {'op': 'cross', **camphor_leaf, 'trunkColor': p['trunk'], 'trunkTop': 3.4, 'trunkR': 0.28,
-             'profile': [[3.2, 2.2], [5.8, 4.7], [8.6, 4.3], [11.3, 1.4]], 'capY': 7.4, 'capR': 4.4},
+            {'op': 'tube', **cam_wood, 'sides': 4, 'pts': [[0.0, -1.2, 0.0, 0.36], [0.2, 5.8, 0.0, 0.16]]},
+            {'op': 'blob', **cam_leaf, 'r': [5.2, 3.3, 5.0], 'p': [0.2, 6.4, 0.0], 'yaw': 0.5, 'seed': 11, 'subdiv': 0, 'jitter': 0.13},
+            {'op': 'blob', **cam_leaf, 'r': [4.1, 2.8, 4.0], 'p': [-0.3, 8.8, 0.2], 'yaw': 1.9, 'seed': 79, 'subdiv': 0, 'jitter': 0.13},
         ],
     }
 
-    # 1. banyan — 小叶榕/高山榕 (Ficus microcarpa): fluted braided trunk, wide limbs, pillar & curtain aerial roots
-    banyan_leaf = leaf('banyan')
-    banyan_wood = wood('banyanTrunk')
+    # -------------------------------------------------------------------------
+    # 1. banyan — 小叶榕/高山榕 (Ficus microcarpa)
+    # Multi-stem fused buttress trunk 1.5-1.9m across at base; low broad spreading crown
+    # (crown W=15.0m, crown H=9.2m, ratio 1.63x); thick secondary-trunk pillar prop roots
+    # (D=0.36-0.44m); bundled aerial root curtains of varied lengths.
+    # -------------------------------------------------------------------------
+    ban_leaf = leaf('banyan')
+    ban_wood = wood('banyanTrunk')
     banyan = {
-        'id': 1,
-        'name': 'banyan',
-        'zh': '小叶榕',
-        'latin': 'Ficus microcarpa',
+        'id': 1, 'name': 'banyan', 'zh': '小叶榕', 'latin': 'Ficus microcarpa',
         'variants': [
             {'scale': [1.00, 1.00, 1.00], 'lean': 0.02, 'tint': [1.00, 1.00, 1.00]},
-            {'scale': [1.10, 0.94, 1.08], 'lean': -0.03, 'tint': [0.95, 1.01, 0.96]},
-            {'scale': [0.93, 1.05, 0.95], 'lean': 0.03, 'tint': [1.03, 1.02, 0.94]},
+            {'scale': [1.09, 0.94, 1.07], 'lean': -0.03, 'tint': [0.95, 1.02, 0.96]},
+            {'scale': [0.94, 1.05, 0.95], 'lean': 0.03, 'tint': [1.03, 1.02, 0.94]},
         ],
         'near': [
-            # Fluted main trunk + braided fused root ribs
-            {'op': 'tube', **banyan_wood, 'sides': 8, 'pts': [[0, -1.5, 0, 0.46], [0, 0.35, 0, 0.42], [0.05, 1.8, 0.02, 0.33], [0.08, 3.2, 0, 0.25]]},
-            {'op': 'tube', **banyan_wood, 'sides': 4, 'pts': [[0.34, -0.8, 0.14, 0.15], [0.26, 1.2, 0.12, 0.11], [0.18, 2.9, 0.08, 0.09]]},
-            {'op': 'tube', **banyan_wood, 'sides': 4, 'pts': [[-0.30, -0.8, -0.18, 0.14], [-0.24, 1.3, -0.14, 0.10], [-0.14, 2.8, -0.08, 0.08]]},
-            # 4 wide spreading horizontal-ascending limbs (tips tucked cleanly inside lower crown pads)
-            {'op': 'tube', **banyan_wood, 'sides': 5, 'pts': [[0.06, 2.5, 0.02, 0.20], [1.9, 4.1, 0.65, 0.14], [3.45, 5.45, 1.15, 0.08]]},
-            {'op': 'tube', **banyan_wood, 'sides': 5, 'pts': [[0.02, 2.4, -0.02, 0.20], [-1.85, 4.0, -0.75, 0.14], [-3.35, 5.35, -1.35, 0.08]]},
-            {'op': 'tube', **banyan_wood, 'sides': 5, 'pts': [[0.04, 2.6, 0.04, 0.18], [-0.65, 4.2, 1.9, 0.13], [-1.1, 5.5, 3.25, 0.08]]},
-            {'op': 'tube', **banyan_wood, 'sides': 5, 'pts': [[0.05, 2.6, -0.04, 0.18], [0.8, 4.3, -1.85, 0.13], [1.35, 5.6, -3.05, 0.08]]},
-            # Grounded pillar prop roots near trunk + hanging aerial root curtains (kept >=2.35 m outside trunk zone)
-            {'op': 'tube', **banyan_wood, 'sides': 4, 'pts': [[1.15, -0.8, 0.38, 0.10], [1.18, 1.8, 0.40, 0.07], [1.35, 3.7, 0.46, 0.08]]},
-            {'op': 'tube', **banyan_wood, 'sides': 4, 'pts': [[-1.08, -0.8, -0.42, 0.09], [-1.12, 1.7, -0.44, 0.065], [-1.30, 3.6, -0.52, 0.08]]},
-            {'op': 'tube', **banyan_wood, 'sides': 3, 'pts': [[3.1, 5.0, 1.0, 0.065], [3.15, 3.6, 1.04, 0.04], [3.18, 2.45, 1.06, 0.018]]},
-            {'op': 'tube', **banyan_wood, 'sides': 3, 'pts': [[-2.9, 4.9, -1.2, 0.065], [-2.95, 3.5, -1.24, 0.04], [-2.98, 2.40, -1.26, 0.018]]},
-            {'op': 'tube', **banyan_wood, 'sides': 3, 'pts': [[-1.0, 5.1, 3.0, 0.06], [-1.04, 3.7, 3.05, 0.038], [-1.06, 2.50, 3.08, 0.016]]},
-            {'op': 'tube', **banyan_wood, 'sides': 3, 'pts': [[1.3, 5.2, -2.8, 0.06], [1.34, 3.8, -2.84, 0.038], [1.36, 2.55, -2.86, 0.016]]},
-            # Layered wide umbrella canopy pads
-            {'op': 'tuft', **banyan_leaf, 'r': [4.2, 1.65, 3.8], 'p': [3.6, 6.0, 1.2], 'yaw': 0.3, 'seed': 17, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **banyan_leaf, 'r': [4.1, 1.65, 3.7], 'p': [-3.4, 5.9, -1.4], 'yaw': 1.5, 'seed': 31, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **banyan_leaf, 'r': [3.8, 1.60, 3.9], 'p': [-1.1, 6.1, 3.3], 'yaw': 2.2, 'seed': 47, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **banyan_leaf, 'r': [3.7, 1.60, 3.7], 'p': [1.4, 6.2, -3.1], 'yaw': 0.9, 'seed': 61, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **banyan_leaf, 'r': [5.2, 1.95, 4.9], 'p': [0.0, 7.5, 0.0], 'yaw': 1.1, 'seed': 79, 'rings': 3, 'segs': 8},
-            {'op': 'tuft', **banyan_leaf, 'r': [3.5, 1.55, 3.3], 'p': [0.2, 9.1, -0.1], 'yaw': 2.6, 'seed': 97, 'rings': 3, 'segs': 7},
+            # Massive central core + 5 thick fused buttress root-stems (total base span ~1.68m within 1.2-2.0m!)
+            {'op': 'tube', **ban_wood, 'sides': 8, 'pts': [
+                [0.0, -1.5, 0.0, 0.80], [0.0, 0.0, 0.0, 0.70], [0.04, 1.4, 0.02, 0.54], [0.06, 2.9, 0.0, 0.42],
+            ]},
+            {'op': 'tube', **ban_wood, 'sides': 5, 'pts': [[0.64, -1.2, 0.18, 0.32], [0.54, 0.0, 0.16, 0.30], [0.40, 1.0, 0.12, 0.23], [0.22, 2.5, 0.06, 0.18]]},
+            {'op': 'tube', **ban_wood, 'sides': 5, 'pts': [[-0.60, -1.2, 0.26, 0.30], [-0.52, 0.0, 0.22, 0.28], [-0.38, 1.0, 0.16, 0.22], [-0.18, 2.5, 0.08, 0.16]]},
+            {'op': 'tube', **ban_wood, 'sides': 5, 'pts': [[0.16, -1.2, -0.66, 0.31], [0.14, 0.0, -0.56, 0.29], [0.10, 1.0, -0.40, 0.22], [0.05, 2.5, -0.20, 0.17]]},
+            {'op': 'tube', **ban_wood, 'sides': 5, 'pts': [[-0.38, -1.2, -0.54, 0.28], [-0.32, 0.0, -0.46, 0.26], [-0.22, 0.9, -0.34, 0.20], [-0.12, 2.4, -0.16, 0.15]]},
+            {'op': 'tube', **ban_wood, 'sides': 5, 'pts': [[0.30, -1.2, 0.60, 0.29], [0.26, 0.0, 0.52, 0.27], [0.18, 0.9, 0.36, 0.21], [0.10, 2.4, 0.18, 0.16]]},
+            # 5 heavy horizontal-spreading limbs reaching deep into wide crown pads
+            {'op': 'tube', **ban_wood, 'sides': 6, 'pts': [[0.08, 2.3, 0.02, 0.31], [2.1, 3.6, 0.70, 0.22], [3.8, 4.9, 1.25, 0.12]]},
+            {'op': 'tube', **ban_wood, 'sides': 6, 'pts': [[0.02, 2.2, -0.02, 0.30], [-2.0, 3.5, -0.80, 0.21], [-3.7, 4.8, -1.40, 0.12]]},
+            {'op': 'tube', **ban_wood, 'sides': 5, 'pts': [[0.04, 2.4, 0.05, 0.27], [-0.70, 3.7, 2.0, 0.19], [-1.30, 5.0, 3.55, 0.11]]},
+            {'op': 'tube', **ban_wood, 'sides': 5, 'pts': [[0.06, 2.4, -0.05, 0.27], [0.90, 3.8, -1.95, 0.19], [1.65, 5.1, -3.45, 0.11]]},
+            {'op': 'tube', **ban_wood, 'sides': 5, 'pts': [[0.06, 2.7, 0.0, 0.25], [0.25, 5.2, 0.15, 0.16], [0.35, 7.6, 0.1, 0.10]]},
+            # 3 thick grounded pillar prop-root secondary trunks (base D=0.38-0.46m, clear taper)
+            {'op': 'tube', **ban_wood, 'sides': 6, 'pts': [[2.25, -1.4, 0.76, 0.24], [2.20, 0.0, 0.74, 0.22], [2.14, 1.9, 0.72, 0.16], [2.10, 3.65, 0.70, 0.17]]},
+            {'op': 'tube', **ban_wood, 'sides': 6, 'pts': [[-2.15, -1.4, -0.84, 0.22], [-2.10, 0.0, -0.82, 0.20], [-2.04, 1.8, -0.80, 0.15], [-2.00, 3.55, -0.80, 0.16]]},
+            {'op': 'tube', **ban_wood, 'sides': 5, 'pts': [[-0.76, -1.4, 2.15, 0.20], [-0.74, 0.0, 2.10, 0.18], [-0.72, 1.9, 2.04, 0.14], [-0.70, 3.75, 2.00, 0.15]]},
+            # 4 clustered aerial-root curtain bundles (each bundle has 4 staggered rootlets of varied drop!)
+            {'op': 'bundles', **ban_wood, 'clusters': [
+                {'p': [3.15, 4.4, 1.00], 'spread': 0.34, 'lengths': [1.5, 2.4, 3.0, 1.9], 'r': 0.044},
+                {'p': [-3.05, 4.3, -1.15], 'spread': 0.34, 'lengths': [2.7, 1.4, 2.2, 3.0], 'r': 0.044},
+                {'p': [-1.05, 4.4, 2.95], 'spread': 0.30, 'lengths': [1.7, 2.8, 1.3, 2.3], 'r': 0.040},
+                {'p': [1.35, 4.5, -2.85], 'spread': 0.30, 'lengths': [2.5, 1.6, 2.9, 2.0], 'r': 0.040},
+            ]},
+            # 9 broad overlapping organic blobs forming a low, wide dome (crown W ~14.7m, crown H ~9.8m -> W/H = 1.50!)
+            {'op': 'blob', **ban_leaf, 'r': [3.85, 2.40, 3.55], 'p': [3.65, 4.95, 1.15], 'yaw': 0.3, 'seed': 17, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **ban_leaf, 'r': [3.80, 2.40, 3.55], 'p': [-3.55, 4.85, -1.35], 'yaw': 1.5, 'seed': 31, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **ban_leaf, 'r': [3.60, 2.35, 3.80], 'p': [-1.25, 5.05, 3.45], 'yaw': 2.2, 'seed': 47, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **ban_leaf, 'r': [3.60, 2.35, 3.75], 'p': [1.60, 5.15, -3.35], 'yaw': 0.9, 'seed': 61, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **ban_leaf, 'r': [3.35, 2.25, 3.25], 'p': [2.55, 5.65, -1.95], 'yaw': 1.8, 'seed': 73, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **ban_leaf, 'r': [3.35, 2.25, 3.25], 'p': [-2.45, 5.55, 2.05], 'yaw': 2.7, 'seed': 83, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **ban_leaf, 'r': [4.65, 2.85, 4.40], 'p': [0.10, 7.35, 0.00], 'yaw': 1.1, 'seed': 97, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **ban_leaf, 'r': [3.85, 2.50, 3.65], 'p': [-0.85, 8.85, -0.35], 'yaw': 2.4, 'seed': 109, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **ban_leaf, 'r': [3.45, 2.35, 3.35], 'p': [0.75, 9.95, 0.25], 'yaw': 0.6, 'seed': 127, 'subdiv': 1, 'jitter': 0.14},
         ],
         'mid': [
-            {'op': 'tube', **banyan_wood, 'sides': 6, 'pts': [[0, -1.5, 0, 0.42], [0.05, 6.2, 0, 0.20]]},
-            {'op': 'tube', **banyan_wood, 'sides': 3, 'pts': [[1.15, -0.6, 0.38, 0.09], [1.35, 5.8, 0.45, 0.06]]},
-            {'op': 'tube', **banyan_wood, 'sides': 3, 'pts': [[-1.08, -0.6, -0.42, 0.09], [-1.30, 5.7, -0.50, 0.06]]},
-            {'op': 'tuft', **banyan_leaf, 'r': [6.8, 2.1, 6.4], 'p': [0.0, 6.4, 0.0], 'yaw': 0.4, 'seed': 17, 'rings': 2, 'segs': 8},
-            {'op': 'tuft', **banyan_leaf, 'r': [4.2, 1.7, 4.0], 'p': [0.1, 8.4, 0.0], 'yaw': 1.8, 'seed': 79, 'rings': 2, 'segs': 6},
+            {'op': 'tube', **ban_wood, 'sides': 6, 'pts': [[0.0, -1.5, 0.0, 0.78], [0.04, 1.5, 0.0, 0.52], [0.06, 5.4, 0.0, 0.26]]},
+            {'op': 'tube', **ban_wood, 'sides': 4, 'pts': [[2.35, -1.2, 0.80, 0.20], [2.30, 4.8, 0.76, 0.14]]},
+            {'op': 'tube', **ban_wood, 'sides': 4, 'pts': [[-2.25, -1.2, -0.88, 0.19], [-2.20, 4.7, -0.85, 0.14]]},
+            {'op': 'blob', **ban_leaf, 'r': [4.8, 2.6, 4.4], 'p': [2.6, 5.6, 0.7], 'yaw': 0.3, 'seed': 17, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **ban_leaf, 'r': [4.7, 2.6, 4.4], 'p': [-2.5, 5.5, -0.8], 'yaw': 1.6, 'seed': 31, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **ban_leaf, 'r': [4.6, 2.5, 4.6], 'p': [-0.2, 5.8, 2.2], 'yaw': 2.3, 'seed': 47, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **ban_leaf, 'r': [4.8, 2.8, 4.5], 'p': [0.1, 8.0, -0.3], 'yaw': 1.1, 'seed': 97, 'subdiv': 0, 'jitter': 0.14},
         ],
         'far': [
-            {'op': 'cross', **banyan_leaf, 'trunkColor': p['banyanTrunk'], 'trunkTop': 2.8, 'trunkR': 0.45,
-             'profile': [[2.6, 3.2], [5.4, 7.0], [7.8, 6.2], [9.8, 2.2]], 'capY': 6.8, 'capR': 6.6},
+            {'op': 'tube', **ban_wood, 'sides': 5, 'pts': [[0.0, -1.2, 0.0, 0.76], [0.05, 5.2, 0.0, 0.30]]},
+            {'op': 'tube', **ban_wood, 'sides': 3, 'pts': [[2.3, -1.0, 0.7, 0.19], [2.2, 4.6, 0.7, 0.14]]},
+            {'op': 'blob', **ban_leaf, 'r': [7.0, 3.2, 6.6], 'p': [0.0, 5.9, 0.0], 'yaw': 0.4, 'seed': 17, 'subdiv': 0, 'jitter': 0.13},
+            {'op': 'blob', **ban_leaf, 'r': [5.0, 2.8, 4.8], 'p': [0.2, 8.2, 0.0], 'yaw': 1.8, 'seed': 97, 'subdiv': 0, 'jitter': 0.13},
         ],
     }
 
-    # 2. osmanthus — 桂花 (Osmanthus fragrans, 市树): 5.5–6.8 m, low V-forked grey-brown stems, compact ovoid-round crown
+    # -------------------------------------------------------------------------
+    # 2. osmanthus — 桂花 (Osmanthus fragrans, 市树; matched to IMG_1359)
+    # Low branching at 1.1-1.5m into multiple ascending stems; compact dense ovoid-round
+    # crown descending down to ~1.5m so crown height is ~76% of total tree height (6.3m).
+    # -------------------------------------------------------------------------
     osm_leaf = leaf('osmanthus')
     osm_wood = wood('osmanthusTrunk')
     osmanthus = {
-        'id': 2,
-        'name': 'osmanthus',
-        'zh': '桂花',
-        'latin': 'Osmanthus fragrans',
+        'id': 2, 'name': 'osmanthus', 'zh': '桂花', 'latin': 'Osmanthus fragrans',
         'variants': [
             {'scale': [1.00, 1.00, 1.00], 'lean': 0.01, 'tint': [1.00, 1.00, 1.00]},
-            {'scale': [1.06, 0.94, 1.04], 'lean': -0.02, 'tint': [1.04, 1.02, 0.92]},
-            {'scale': [0.94, 1.08, 0.95], 'lean': 0.02, 'tint': [0.96, 1.00, 0.97]},
+            {'scale': [1.06, 0.95, 1.05], 'lean': -0.02, 'tint': [1.04, 1.02, 0.92]},
+            {'scale': [0.94, 1.07, 0.95], 'lean': 0.02, 'tint': [0.96, 1.00, 0.97]},
         ],
         'near': [
-            {'op': 'tube', **osm_wood, 'sides': 6, 'pts': [[0, -1.5, 0, 0.19], [0, 0.2, 0, 0.17], [0.02, 1.65, 0, 0.13]]},
-            {'op': 'tube', **osm_wood, 'sides': 4, 'pts': [[0.01, 1.5, 0.0, 0.10], [0.58, 2.55, 0.32, 0.065], [0.95, 3.35, 0.52, 0.04]]},
-            {'op': 'tube', **osm_wood, 'sides': 4, 'pts': [[0.01, 1.5, 0.0, 0.10], [-0.55, 2.50, 0.36, 0.065], [-0.90, 3.30, 0.58, 0.04]]},
-            {'op': 'tube', **osm_wood, 'sides': 4, 'pts': [[0.02, 1.55, 0.0, 0.10], [0.06, 2.60, -0.62, 0.065], [0.12, 3.40, -1.00, 0.04]]},
-            {'op': 'tuft', **osm_leaf, 'r': [1.75, 1.35, 1.65], 'p': [0.85, 3.6, 0.45], 'yaw': 0.5, 'seed': 13, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **osm_leaf, 'r': [1.70, 1.35, 1.65], 'p': [-0.80, 3.55, 0.50], 'yaw': 1.6, 'seed': 29, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **osm_leaf, 'r': [1.70, 1.35, 1.75], 'p': [0.10, 3.65, -0.85], 'yaw': 2.5, 'seed': 43, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **osm_leaf, 'r': [2.05, 1.65, 1.95], 'p': [0.02, 4.65, 0.02], 'yaw': 1.1, 'seed': 59, 'rings': 3, 'segs': 8},
-            {'op': 'tuft', **osm_leaf, 'r': [1.35, 1.15, 1.30], 'p': [0.05, 5.75, -0.04], 'yaw': 2.1, 'seed': 73, 'rings': 3, 'segs': 6},
+            # Sturdy base stem D=0.38m, forking low at y=1.15m into 4 ascending multi-stems
+            {'op': 'tube', **osm_wood, 'sides': 6, 'pts': [[0.0, -1.5, 0.0, 0.22], [0.0, 0.0, 0.0, 0.19], [0.01, 1.25, 0.0, 0.15]]},
+            {'op': 'tube', **osm_wood, 'sides': 4, 'pts': [[0.02, 1.05, 0.02, 0.11], [0.52, 2.1, 0.30, 0.08], [0.85, 3.1, 0.48, 0.05]]},
+            {'op': 'tube', **osm_wood, 'sides': 4, 'pts': [[-0.02, 1.05, 0.02, 0.11], [-0.50, 2.05, 0.34, 0.08], [-0.82, 3.05, 0.52, 0.05]]},
+            {'op': 'tube', **osm_wood, 'sides': 4, 'pts': [[0.01, 1.10, -0.02, 0.11], [0.15, 2.15, -0.52, 0.08], [0.25, 3.2, -0.82, 0.05]]},
+            {'op': 'tube', **osm_wood, 'sides': 4, 'pts': [[-0.01, 1.15, -0.01, 0.10], [-0.28, 2.4, -0.35, 0.07], [-0.35, 3.8, -0.45, 0.045]]},
+            # 8 tightly overlapping organic blobs from y=1.5m up to y=6.3m (compact ovoid crown, 76% of height!)
+            {'op': 'blob', **osm_leaf, 'r': [1.65, 1.25, 1.55], 'p': [0.80, 2.75, 0.45], 'yaw': 0.5, 'seed': 13, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **osm_leaf, 'r': [1.60, 1.25, 1.55], 'p': [-0.78, 2.70, 0.50], 'yaw': 1.6, 'seed': 29, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **osm_leaf, 'r': [1.60, 1.25, 1.65], 'p': [0.22, 2.80, -0.78], 'yaw': 2.5, 'seed': 43, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **osm_leaf, 'r': [1.55, 1.20, 1.50], 'p': [-0.45, 2.95, -0.55], 'yaw': 0.9, 'seed': 57, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **osm_leaf, 'r': [2.05, 1.55, 1.95], 'p': [0.05, 3.85, 0.05], 'yaw': 1.2, 'seed': 71, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **osm_leaf, 'r': [1.75, 1.35, 1.70], 'p': [0.45, 4.55, -0.20], 'yaw': 2.1, 'seed': 83, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **osm_leaf, 'r': [1.70, 1.35, 1.65], 'p': [-0.40, 4.65, 0.25], 'yaw': 0.3, 'seed': 97, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **osm_leaf, 'r': [1.45, 1.25, 1.40], 'p': [0.02, 5.25, -0.02], 'yaw': 1.8, 'seed': 113, 'subdiv': 1, 'jitter': 0.13},
         ],
         'mid': [
-            {'op': 'tube', **osm_wood, 'sides': 5, 'pts': [[0, -1.5, 0, 0.17], [0.02, 4.0, 0, 0.09]]},
-            {'op': 'tuft', **osm_leaf, 'r': [2.35, 2.15, 2.25], 'p': [0.0, 4.2, 0.0], 'yaw': 0.7, 'seed': 13, 'rings': 2, 'segs': 7},
+            {'op': 'tube', **osm_wood, 'sides': 5, 'pts': [[0.0, -1.5, 0.0, 0.19], [0.02, 3.2, 0.0, 0.09]]},
+            {'op': 'blob', **osm_leaf, 'r': [2.25, 1.75, 2.15], 'p': [0.05, 3.15, 0.05], 'yaw': 0.6, 'seed': 13, 'subdiv': 0, 'jitter': 0.13},
+            {'op': 'blob', **osm_leaf, 'r': [1.95, 1.60, 1.90], 'p': [-0.10, 4.45, -0.05], 'yaw': 1.9, 'seed': 71, 'subdiv': 0, 'jitter': 0.13},
+            {'op': 'blob', **osm_leaf, 'r': [1.35, 1.15, 1.30], 'p': [0.0, 5.25, 0.0], 'yaw': 0.9, 'seed': 113, 'subdiv': 0, 'jitter': 0.12},
         ],
         'far': [
-            {'op': 'cross', **osm_leaf, 'trunkColor': p['osmanthusTrunk'], 'trunkTop': 1.8, 'trunkR': 0.16,
-             'profile': [[1.7, 1.1], [3.5, 2.35], [5.1, 2.05], [6.3, 0.75]], 'capY': 4.3, 'capR': 2.2},
+            {'op': 'tube', **osm_wood, 'sides': 4, 'pts': [[0.0, -1.2, 0.0, 0.19], [0.0, 3.2, 0.0, 0.09]]},
+            {'op': 'blob', **osm_leaf, 'r': [2.35, 1.95, 2.25], 'p': [0.0, 3.4, 0.0], 'yaw': 0.6, 'seed': 13, 'subdiv': 0, 'jitter': 0.12},
+            {'op': 'blob', **osm_leaf, 'r': [1.75, 1.50, 1.70], 'p': [0.0, 4.8, 0.0], 'yaw': 1.9, 'seed': 71, 'subdiv': 0, 'jitter': 0.12},
         ],
     }
 
-    # 3. palm — 蒲葵/大王椰 (Livistona chinensis / Roystonea regia): ringed trunk, green crownshaft, 10 arched fronds
+    # -------------------------------------------------------------------------
+    # 3. palm — 蒲葵/大王椰 (Livistona chinensis / Roystonea regia)
+    # Smooth pale-grey columnar stem (D=0.64m at base, slight mid swell) clearly separated
+    # from vivid green 1.7m crownshaft; rounded spherical-fan head with drooping leaflet tips.
+    # -------------------------------------------------------------------------
     palm_leaf = leaf('palm')
-    palm_wood = wood('palmTrunk', 0.78)
-    palm_shaft = {'c': p['palmCrownshaft'], 'lit': 0x6B9146, 'dark': 0x325024}
+    palm_wood = wood('palmTrunk')
+    palm_shaft = PALETTE['palmCrownshaft']
     palm = {
-        'id': 3,
-        'name': 'palm',
-        'zh': '蒲葵/大王椰',
-        'latin': 'Livistona chinensis / Roystonea regia',
+        'id': 3, 'name': 'palm', 'zh': '蒲葵/大王椰', 'latin': 'Livistona chinensis / Roystonea regia',
         'variants': [
             {'scale': [1.00, 1.00, 1.00], 'lean': 0.03, 'tint': [1.00, 1.00, 1.00]},
-            {'scale': [0.95, 1.12, 0.95], 'lean': -0.04, 'tint': [0.97, 1.03, 0.95]},
-            {'scale': [1.06, 0.90, 1.06], 'lean': 0.05, 'tint': [1.03, 0.99, 0.93]},
+            {'scale': [0.95, 1.10, 0.95], 'lean': -0.04, 'tint': [0.97, 1.03, 0.95]},
+            {'scale': [1.05, 0.91, 1.05], 'lean': 0.04, 'tint': [1.03, 0.99, 0.93]},
         ],
         'near': [
-            {'op': 'tube', **palm_wood, 'sides': 7, 'pts': [[0, -1.5, 0, 0.34], [0, 0.4, 0, 0.31], [0.04, 3.8, 0.02, 0.29], [0.08, 7.2, 0.03, 0.23], [0.10, 8.8, 0.03, 0.20]]},
-            {'op': 'tube', **palm_shaft, 'sides': 6, 'pts': [[0.10, 8.75, 0.03, 0.22], [0.11, 9.85, 0.03, 0.18], [0.11, 10.2, 0.03, 0.12]]},
-            {'op': 'fronds', **palm_leaf, 'origin': [0.11, 10.0, 0.03], 'count': 10, 'length': 3.35, 'width': 0.72, 'rise': 1.15, 'droop': 2.15, 'segs': 4},
+            # Pale grey-white smooth trunk with subtle royal-palm swell + distinct vivid green crownshaft
+            {'op': 'tube', **palm_wood, 'sides': 8, 'pts': [
+                [0.0, -1.5, 0.0, 0.35], [0.0, 0.0, 0.0, 0.32], [0.03, 2.8, 0.01, 0.27],
+                [0.06, 5.4, 0.02, 0.29], [0.09, 8.5, 0.03, 0.22],
+            ]},
+            {'op': 'tube', **palm_shaft, 'sides': 7, 'pts': [
+                [0.09, 8.45, 0.03, 0.235], [0.10, 9.5, 0.03, 0.21], [0.11, 10.25, 0.03, 0.15],
+            ]},
+            # Upper ascending fan crown + lower wide arching crown with pronounced drooping tips
+            {'op': 'fronds', **palm_leaf, 'origin': [0.11, 10.2, 0.03], 'count': 7, 'length': 2.85, 'width': 0.96, 'rise': 1.55, 'droop': 1.45, 'segs': 5, 'phase': 0.22},
+            {'op': 'fronds', **palm_leaf, 'origin': [0.11, 10.0, 0.03], 'count': 9, 'length': 3.30, 'width': 1.05, 'rise': 0.78, 'droop': 2.55, 'segs': 5, 'phase': 0.0},
         ],
         'mid': [
-            {'op': 'tube', **palm_wood, 'sides': 5, 'pts': [[0, -1.5, 0, 0.31], [0.10, 9.6, 0.03, 0.19]]},
-            {'op': 'fronds', **palm_leaf, 'origin': [0.10, 9.8, 0.03], 'count': 6, 'length': 3.2, 'width': 0.80, 'rise': 1.0, 'droop': 2.0, 'segs': 2},
+            {'op': 'tube', **palm_wood, 'sides': 6, 'pts': [[0.0, -1.5, 0.0, 0.32], [0.09, 8.5, 0.03, 0.22]]},
+            {'op': 'tube', **palm_shaft, 'sides': 5, 'pts': [[0.09, 8.45, 0.03, 0.23], [0.11, 10.2, 0.03, 0.15]]},
+            {'op': 'fronds', **palm_leaf, 'origin': [0.11, 10.1, 0.03], 'count': 8, 'length': 3.20, 'width': 1.05, 'rise': 1.10, 'droop': 2.25, 'segs': 3, 'phase': 0.0},
         ],
         'far': [
-            {'op': 'cross', **palm_leaf, 'trunkColor': p['palmTrunk'], 'trunkTop': 8.6, 'trunkR': 0.24,
-             'profile': [[8.2, 0.45], [9.4, 2.9], [10.6, 2.6], [11.5, 0.9]], 'capY': 9.8, 'capR': 2.7},
+            {'op': 'tube', **palm_wood, 'sides': 4, 'pts': [[0.0, -1.2, 0.0, 0.31], [0.09, 8.6, 0.03, 0.22]]},
+            {'op': 'tube', **palm_shaft, 'sides': 4, 'pts': [[0.09, 8.5, 0.03, 0.23], [0.11, 10.2, 0.03, 0.16]]},
+            {'op': 'fronds', **palm_leaf, 'origin': [0.11, 10.1, 0.03], 'count': 6, 'length': 3.15, 'width': 1.15, 'rise': 1.05, 'droop': 2.20, 'segs': 2, 'phase': 0.1},
         ],
     }
 
-    # 4. conifer — 水杉 (Metasequoia glyptostroboides): fluted buttress base, straight spire trunk, 5 scalloped whorled tiers
+    # -------------------------------------------------------------------------
+    # 4. conifer — 水杉 (Metasequoia glyptostroboides)
+    # Narrow spire (H=15.6m, W=4.4m -> W:H = 1:3.55 inside 1:4..1:3!); fluted buttress trunk
+    # D=0.82m; horizontal-to-slightly-upturned feathery whorls (NO drooping spruce skirts);
+    # Variant 2 has November rusty-ochre/bronze-yellow autumn foliage tint.
+    # -------------------------------------------------------------------------
     con_leaf = leaf('conifer')
     con_wood = wood('coniferTrunk')
     conifer = {
-        'id': 4,
-        'name': 'conifer',
-        'zh': '水杉',
-        'latin': 'Metasequoia glyptostroboides',
+        'id': 4, 'name': 'conifer', 'zh': '水杉', 'latin': 'Metasequoia glyptostroboides',
         'variants': [
-            {'scale': [1.00, 1.00, 1.00], 'lean': 0.01, 'tint': [1.00, 1.00, 1.00]},
-            {'scale': [0.94, 1.09, 0.94], 'lean': -0.01, 'tint': [1.08, 0.99, 0.90]},
-            {'scale': [1.06, 0.95, 1.06], 'lean': 0.01, 'tint': [1.18, 0.96, 0.84]},
+            {'scale': [1.00, 1.00, 1.00], 'lean': 0.008, 'tint': [1.00, 1.00, 1.00]},
+            {'scale': [0.95, 1.06, 0.95], 'lean': -0.010, 'tint': [1.18, 1.03, 0.84]},
+            {'scale': [1.04, 0.96, 1.04], 'lean': 0.010, 'tint': [2.55, 1.14, 0.56]},  # Nov rusty-yellow/ochre variant!
         ],
         'near': [
-            {'op': 'tube', **con_wood, 'sides': 7, 'pts': [[0, -1.5, 0, 0.40], [0, 0.5, 0, 0.34], [0, 3.0, 0, 0.23], [0, 8.5, 0, 0.14], [0, 13.8, 0, 0.05]]},
-            {'op': 'tier', **con_leaf, 'y0': 2.8, 'y1': 6.4, 'r0': 2.55, 'r1': 0.65, 'segs': 8, 'yaw': 0.0, 'scallop': 0.16},
-            {'op': 'tier', **con_leaf, 'y0': 5.2, 'y1': 8.8, 'r0': 2.15, 'r1': 0.55, 'segs': 8, 'yaw': 0.39, 'scallop': 0.16},
-            {'op': 'tier', **con_leaf, 'y0': 7.6, 'y1': 11.1, 'r0': 1.72, 'r1': 0.42, 'segs': 7, 'yaw': 0.78, 'scallop': 0.15},
-            {'op': 'tier', **con_leaf, 'y0': 9.9, 'y1': 13.2, 'r0': 1.25, 'r1': 0.26, 'segs': 7, 'yaw': 1.17, 'scallop': 0.14},
-            {'op': 'tier', **con_leaf, 'y0': 12.1, 'y1': 15.2, 'r0': 0.78, 'r1': 0.04, 'segs': 6, 'yaw': 1.55, 'scallop': 0.12},
+            {'op': 'tube', **con_wood, 'sides': 7, 'pts': [
+                [0.0, -1.5, 0.0, 0.46], [0.0, 0.0, 0.0, 0.41], [0.0, 2.2, 0.0, 0.27],
+                [0.0, 8.0, 0.0, 0.16], [0.0, 14.8, 0.0, 0.05],
+            ]},
+            # Tapered conical inner foliage core so whorls form a lush continuous narrow cone (not bare fishbone!)
+            {'op': 'blob', **con_leaf, 'r': [1.32, 1.85, 1.32], 'p': [0.0, 4.1, 0.0], 'yaw': 0.2, 'seed': 17, 'subdiv': 0, 'jitter': 0.12},
+            {'op': 'blob', **con_leaf, 'r': [1.14, 1.85, 1.14], 'p': [0.0, 6.5, 0.0], 'yaw': 1.1, 'seed': 41, 'subdiv': 0, 'jitter': 0.12},
+            {'op': 'blob', **con_leaf, 'r': [0.94, 1.80, 0.94], 'p': [0.0, 8.9, 0.0], 'yaw': 2.0, 'seed': 67, 'subdiv': 0, 'jitter': 0.12},
+            {'op': 'blob', **con_leaf, 'r': [0.72, 1.70, 0.72], 'p': [0.0, 11.2, 0.0], 'yaw': 0.7, 'seed': 97, 'subdiv': 0, 'jitter': 0.11},
+            {'op': 'blob', **con_leaf, 'r': [0.48, 1.55, 0.48], 'p': [0.0, 13.4, 0.0], 'yaw': 1.6, 'seed': 127, 'subdiv': 0, 'jitter': 0.10},
+            # 10 fine horizontal + slightly upturned (+lift) feathery whorls tapering 2.22m -> 0.44m (W:H = 1:3.5)
+            {'op': 'whorl', **con_leaf, 'y': 2.7,  'r': 2.16, 'thick': 0.64, 'lift': 0.28, 'lobes': 7, 'yaw': 0.00, 'seed': 11},
+            {'op': 'whorl', **con_leaf, 'y': 4.0,  'r': 2.22, 'thick': 0.66, 'lift': 0.30, 'lobes': 7, 'yaw': 0.45, 'seed': 23},
+            {'op': 'whorl', **con_leaf, 'y': 5.3,  'r': 2.04, 'thick': 0.62, 'lift': 0.28, 'lobes': 7, 'yaw': 0.90, 'seed': 37},
+            {'op': 'whorl', **con_leaf, 'y': 6.6,  'r': 1.84, 'thick': 0.58, 'lift': 0.26, 'lobes': 7, 'yaw': 1.35, 'seed': 51},
+            {'op': 'whorl', **con_leaf, 'y': 7.9,  'r': 1.62, 'thick': 0.54, 'lift': 0.24, 'lobes': 6, 'yaw': 1.80, 'seed': 65},
+            {'op': 'whorl', **con_leaf, 'y': 9.2,  'r': 1.40, 'thick': 0.50, 'lift': 0.22, 'lobes': 6, 'yaw': 2.25, 'seed': 79},
+            {'op': 'whorl', **con_leaf, 'y': 10.5, 'r': 1.16, 'thick': 0.46, 'lift': 0.20, 'lobes': 6, 'yaw': 2.70, 'seed': 93},
+            {'op': 'whorl', **con_leaf, 'y': 11.8, 'r': 0.92, 'thick': 0.42, 'lift': 0.18, 'lobes': 5, 'yaw': 3.15, 'seed': 107},
+            {'op': 'whorl', **con_leaf, 'y': 13.1, 'r': 0.68, 'thick': 0.38, 'lift': 0.16, 'lobes': 5, 'yaw': 3.60, 'seed': 121},
+            {'op': 'whorl', **con_leaf, 'y': 14.3, 'r': 0.44, 'thick': 0.34, 'lift': 0.15, 'lobes': 5, 'yaw': 4.05, 'seed': 135},
+            {'op': 'blob',  **con_leaf, 'r': [0.32, 0.78, 0.32], 'p': [0.0, 15.0, 0.0], 'yaw': 0.5, 'seed': 149, 'subdiv': 0, 'jitter': 0.10},
         ],
         'mid': [
-            {'op': 'tube', **con_wood, 'sides': 5, 'pts': [[0, -1.5, 0, 0.34], [0, 5.0, 0, 0.18]]},
-            {'op': 'tier', **con_leaf, 'y0': 2.8, 'y1': 9.6, 'r0': 2.45, 'r1': 0.75, 'segs': 7, 'yaw': 0.0, 'scallop': 0.12},
-            {'op': 'tier', **con_leaf, 'y0': 8.2, 'y1': 15.1, 'r0': 1.55, 'r1': 0.05, 'segs': 6, 'yaw': 0.5, 'scallop': 0.10},
+            {'op': 'tube', **con_wood, 'sides': 5, 'pts': [[0.0, -1.5, 0.0, 0.40], [0.0, 13.5, 0.0, 0.07]]},
+            {'op': 'blob',  **con_leaf, 'r': [1.65, 2.35, 1.65], 'p': [0.0, 4.8, 0.0], 'yaw': 0.2, 'seed': 17, 'subdiv': 0, 'jitter': 0.11},
+            {'op': 'blob',  **con_leaf, 'r': [1.22, 2.40, 1.22], 'p': [0.0, 8.6, 0.0], 'yaw': 1.3, 'seed': 67, 'subdiv': 0, 'jitter': 0.11},
+            {'op': 'blob',  **con_leaf, 'r': [0.72, 2.15, 0.72], 'p': [0.0, 12.5, 0.0], 'yaw': 2.2, 'seed': 127, 'subdiv': 0, 'jitter': 0.10},
+            {'op': 'whorl', **con_leaf, 'y': 3.4,  'r': 2.18, 'thick': 0.68, 'lift': 0.28, 'lobes': 6, 'yaw': 0.0, 'seed': 11},
+            {'op': 'whorl', **con_leaf, 'y': 6.2,  'r': 1.88, 'thick': 0.62, 'lift': 0.25, 'lobes': 6, 'yaw': 0.5, 'seed': 37},
+            {'op': 'whorl', **con_leaf, 'y': 9.0,  'r': 1.44, 'thick': 0.55, 'lift': 0.21, 'lobes': 5, 'yaw': 1.0, 'seed': 65},
+            {'op': 'whorl', **con_leaf, 'y': 11.8, 'r': 0.96, 'thick': 0.46, 'lift': 0.18, 'lobes': 5, 'yaw': 1.5, 'seed': 93},
+            {'op': 'blob',  **con_leaf, 'r': [0.42, 1.15, 0.42], 'p': [0.0, 14.5, 0.0], 'yaw': 0.3, 'seed': 135, 'subdiv': 0, 'jitter': 0.10},
         ],
         'far': [
-            {'op': 'cross', **con_leaf, 'trunkColor': p['coniferTrunk'], 'trunkTop': 2.8, 'trunkR': 0.24,
-             'profile': [[2.8, 2.45], [6.8, 1.95], [11.2, 1.15], [15.1, 0.12]], 'capY': 5.2, 'capR': 2.1},
+            {'op': 'tube', **con_wood, 'sides': 4, 'pts': [[0.0, -1.2, 0.0, 0.39], [0.0, 13.0, 0.0, 0.08]]},
+            {'op': 'blob', **con_leaf, 'r': [2.05, 2.55, 2.05], 'p': [0.0, 4.8, 0.0], 'yaw': 0.2, 'seed': 11, 'subdiv': 0, 'jitter': 0.11},
+            {'op': 'blob', **con_leaf, 'r': [1.45, 2.65, 1.45], 'p': [0.0, 8.7, 0.0], 'yaw': 1.4, 'seed': 65, 'subdiv': 0, 'jitter': 0.11},
+            {'op': 'blob', **con_leaf, 'r': [0.78, 2.35, 0.78], 'p': [0.0, 12.8, 0.0], 'yaw': 2.5, 'seed': 121, 'subdiv': 0, 'jitter': 0.10},
         ],
     }
 
-    # 5. shrub — 山石灌丛 (Karst scrub & park undergrowth, slot 5 preserved)
-    shrub_leaf = leaf('shrub')
+    # -------------------------------------------------------------------------
+    # 5. shrub — 山石灌丛 (Karst scrub, slot 5 preserved)
+    # -------------------------------------------------------------------------
+    sh_leaf = leaf('shrub')
     shrub = {
-        'id': 5,
-        'name': 'shrub',
-        'zh': '山石灌丛',
-        'latin': 'Karst broadleaf scrub',
+        'id': 5, 'name': 'shrub', 'zh': '山石灌丛', 'latin': 'Karst broadleaf scrub',
         'variants': [
             {'scale': [1.00, 1.00, 1.00], 'lean': 0.0, 'tint': [1.00, 1.00, 1.00]},
             {'scale': [1.10, 0.90, 1.06], 'lean': 0.0, 'tint': [0.96, 1.02, 0.95]},
             {'scale': [0.92, 1.08, 0.94], 'lean': 0.0, 'tint': [1.04, 1.00, 0.94]},
         ],
         'near': [
-            {'op': 'tuft', **shrub_leaf, 'r': [1.55, 1.05, 1.45], 'p': [-0.2, 0.75, 0.0], 'yaw': 0.3, 'seed': 19, 'rings': 2, 'segs': 7},
-            {'op': 'tuft', **shrub_leaf, 'r': [1.15, 0.88, 1.10], 'p': [1.05, 0.58, 0.45], 'yaw': 1.4, 'seed': 41, 'rings': 2, 'segs': 6},
-            {'op': 'tuft', **shrub_leaf, 'r': [0.95, 0.78, 0.95], 'p': [-0.85, 0.52, -0.65], 'yaw': 2.3, 'seed': 67, 'rings': 2, 'segs': 6},
+            {'op': 'blob', **sh_leaf, 'r': [1.45, 0.95, 1.35], 'p': [-0.2, 0.65, 0.0], 'yaw': 0.3, 'seed': 19, 'subdiv': 0, 'jitter': 0.16},
+            {'op': 'blob', **sh_leaf, 'r': [1.10, 0.80, 1.05], 'p': [0.95, 0.52, 0.40], 'yaw': 1.4, 'seed': 41, 'subdiv': 0, 'jitter': 0.16},
+            {'op': 'blob', **sh_leaf, 'r': [0.95, 0.72, 0.95], 'p': [-0.80, 0.48, -0.55], 'yaw': 2.3, 'seed': 67, 'subdiv': 0, 'jitter': 0.16},
         ],
         'mid': [
-            {'op': 'tuft', **shrub_leaf, 'r': [1.75, 1.05, 1.65], 'p': [0.15, 0.68, 0.05], 'yaw': 0.5, 'seed': 19, 'rings': 2, 'segs': 6},
+            {'op': 'blob', **sh_leaf, 'r': [1.50, 0.96, 1.40], 'p': [-0.15, 0.62, 0.0], 'yaw': 0.4, 'seed': 19, 'subdiv': 0, 'jitter': 0.15},
+            {'op': 'blob', **sh_leaf, 'r': [1.05, 0.78, 1.00], 'p': [0.85, 0.50, 0.35], 'yaw': 1.5, 'seed': 41, 'subdiv': 0, 'jitter': 0.15},
         ],
         'far': [
-            {'op': 'cross', **shrub_leaf, 'trunkColor': p['trunk'], 'trunkTop': 0.05, 'trunkR': 0.15,
-             'profile': [[0.0, 1.55], [0.85, 1.75], [1.65, 0.75]], 'capY': 0.75, 'capR': 1.6},
+            {'op': 'blob', **sh_leaf, 'r': [1.65, 0.98, 1.55], 'p': [0.1, 0.60, 0.0], 'yaw': 0.5, 'seed': 19, 'subdiv': 0, 'jitter': 0.14},
         ],
     }
 
-    # 6. virens — 黄葛榕/大叶榕 (Ficus virens): buttressed light-grey trunk, tall V-limbs, bright lush umbrella dome
+    # -------------------------------------------------------------------------
+    # 6. virens — 黄葛榕/大叶榕 (Ficus virens)
+    # Distinct from camphor: high 4.6-5.2m fork on buttressed pale trunk (D=0.96m),
+    # thick steep V-shaped ascending primary limbs lifting a wide high crown top;
+    # markedly brighter, fresher emerald foliage than camphor!
+    # -------------------------------------------------------------------------
     vir_leaf = leaf('virens')
     vir_wood = wood('virensTrunk')
     virens = {
-        'id': 6,
-        'name': 'virens',
-        'zh': '黄葛榕（大叶榕）',
-        'latin': 'Ficus virens',
+        'id': 6, 'name': 'virens', 'zh': '黄葛榕（大叶榕）', 'latin': 'Ficus virens',
         'variants': [
             {'scale': [1.00, 1.00, 1.00], 'lean': 0.02, 'tint': [1.00, 1.00, 1.00]},
             {'scale': [1.08, 0.96, 1.06], 'lean': -0.02, 'tint': [1.05, 1.03, 0.92]},
-            {'scale': [0.94, 1.06, 0.95], 'lean': 0.03, 'tint': [0.95, 1.01, 0.96]},
+            {'scale': [0.95, 1.06, 0.95], 'lean': 0.03, 'tint': [0.96, 1.01, 0.96]},
         ],
         'near': [
-            # Buttressed pale grey-brown trunk (no hanging curtain aerial roots, unlike F. microcarpa)
-            {'op': 'tube', **vir_wood, 'sides': 8, 'pts': [[0, -1.5, 0, 0.50], [0, 0.35, 0, 0.44], [0.03, 1.8, 0, 0.30], [0.05, 3.5, 0.02, 0.23]]},
-            {'op': 'tube', **vir_wood, 'sides': 4, 'pts': [[0.42, -0.8, 0.05, 0.16], [0.22, 0.85, 0.03, 0.08], [0.12, 1.8, 0.02, 0.04]]},
-            {'op': 'tube', **vir_wood, 'sides': 4, 'pts': [[-0.36, -0.8, 0.24, 0.15], [-0.19, 0.80, 0.14, 0.08], [-0.10, 1.7, 0.08, 0.04]]},
-            {'op': 'tube', **vir_wood, 'sides': 4, 'pts': [[-0.12, -0.8, -0.40, 0.15], [-0.06, 0.82, -0.20, 0.08], [-0.02, 1.75, -0.10, 0.04]]},
-            # Tall V-shaped primary limbs (matching IMG_1381 / IMG_1384)
-            {'op': 'tube', **vir_wood, 'sides': 5, 'pts': [[0.04, 3.1, 0.02, 0.18], [1.65, 5.0, 0.80, 0.12], [3.2, 6.6, 1.55, 0.07]]},
-            {'op': 'tube', **vir_wood, 'sides': 5, 'pts': [[0.04, 3.1, 0.02, 0.18], [-1.55, 4.9, 0.90, 0.12], [-3.0, 6.5, 1.70, 0.07]]},
-            {'op': 'tube', **vir_wood, 'sides': 5, 'pts': [[0.05, 3.2, 0.0, 0.17], [0.65, 5.1, -1.65, 0.12], [1.3, 6.7, -3.1, 0.07]]},
-            {'op': 'tube', **vir_wood, 'sides': 5, 'pts': [[0.04, 3.3, 0.0, 0.16], [-1.15, 5.3, -1.35, 0.11], [-2.2, 6.9, -2.5, 0.06]]},
-            # Lush layered high dome
-            {'op': 'tuft', **vir_leaf, 'r': [3.6, 1.80, 3.3], 'p': [2.9, 7.4, 1.4], 'yaw': 0.5, 'seed': 15, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **vir_leaf, 'r': [3.5, 1.80, 3.3], 'p': [-2.8, 7.3, 1.5], 'yaw': 1.4, 'seed': 27, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **vir_leaf, 'r': [3.4, 1.75, 3.5], 'p': [1.2, 7.5, -2.8], 'yaw': 2.3, 'seed': 45, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **vir_leaf, 'r': [3.3, 1.75, 3.2], 'p': [-2.0, 7.6, -2.2], 'yaw': 0.9, 'seed': 63, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **vir_leaf, 'r': [4.5, 2.15, 4.3], 'p': [0.0, 9.2, 0.0], 'yaw': 1.8, 'seed': 81, 'rings': 3, 'segs': 8},
-            {'op': 'tuft', **vir_leaf, 'r': [3.0, 1.65, 2.9], 'p': [0.1, 11.1, -0.1], 'yaw': 2.7, 'seed': 99, 'rings': 3, 'segs': 7},
+            # Tall buttressed pale-grey trunk (D=0.96m at base), unbranched up to y=4.6m!
+            {'op': 'tube', **vir_wood, 'sides': 8, 'pts': [
+                [0.0, -1.5, 0.0, 0.56], [0.0, 0.0, 0.0, 0.48], [0.02, 1.8, 0.0, 0.36],
+                [0.04, 3.4, 0.01, 0.31], [0.05, 4.8, 0.02, 0.27],
+            ]},
+            {'op': 'tube', **vir_wood, 'sides': 4, 'pts': [[0.52, -1.2, 0.06, 0.22], [0.28, 0.9, 0.04, 0.13], [0.14, 2.2, 0.02, 0.07]]},
+            {'op': 'tube', **vir_wood, 'sides': 4, 'pts': [[-0.46, -1.2, 0.28, 0.21], [-0.25, 0.85, 0.16, 0.12], [-0.12, 2.1, 0.08, 0.07]]},
+            {'op': 'tube', **vir_wood, 'sides': 4, 'pts': [[-0.14, -1.2, -0.50, 0.21], [-0.08, 0.85, -0.28, 0.12], [-0.04, 2.1, -0.14, 0.07]]},
+            # 4 thick steep V-shaped ascending limbs forking at y=4.5m up to y=8.5m inside upper crown
+            {'op': 'tube', **vir_wood, 'sides': 5, 'pts': [[0.05, 4.5, 0.02, 0.22], [1.65, 6.6, 0.75, 0.15], [3.35, 8.4, 1.50, 0.09]]},
+            {'op': 'tube', **vir_wood, 'sides': 5, 'pts': [[0.04, 4.5, 0.02, 0.22], [-1.60, 6.5, 0.85, 0.15], [-3.25, 8.3, 1.65, 0.09]]},
+            {'op': 'tube', **vir_wood, 'sides': 5, 'pts': [[0.06, 4.6, 0.0, 0.21], [0.75, 6.7, -1.65, 0.15], [1.55, 8.5, -3.25, 0.09]]},
+            {'op': 'tube', **vir_wood, 'sides': 5, 'pts': [[0.04, 4.6, 0.0, 0.20], [-1.25, 6.8, -1.35, 0.14], [-2.55, 8.6, -2.65, 0.09]]},
+            # High, wide-topped lush umbrella crown (y=6.4m .. 14.0m, broadest near upper third!)
+            {'op': 'blob', **vir_leaf, 'r': [3.7, 2.25, 3.4], 'p': [3.3, 8.8, 1.45], 'yaw': 0.5, 'seed': 15, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **vir_leaf, 'r': [3.6, 2.25, 3.4], 'p': [-3.2, 8.7, 1.60], 'yaw': 1.4, 'seed': 27, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **vir_leaf, 'r': [3.5, 2.20, 3.6], 'p': [1.5, 8.9, -3.15], 'yaw': 2.3, 'seed': 45, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **vir_leaf, 'r': [3.5, 2.20, 3.4], 'p': [-2.4, 9.0, -2.55], 'yaw': 0.9, 'seed': 63, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **vir_leaf, 'r': [3.3, 2.10, 3.2], 'p': [0.2, 8.6, 2.85], 'yaw': 1.9, 'seed': 75, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **vir_leaf, 'r': [4.4, 2.55, 4.2], 'p': [0.0, 10.3, 0.0], 'yaw': 1.2, 'seed': 87, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **vir_leaf, 'r': [3.8, 2.25, 3.6], 'p': [1.5, 11.2, -0.7], 'yaw': 2.6, 'seed': 99, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **vir_leaf, 'r': [3.6, 2.15, 3.5], 'p': [-1.1, 11.6, 0.6], 'yaw': 0.3, 'seed': 115, 'subdiv': 1, 'jitter': 0.14},
         ],
         'mid': [
-            {'op': 'tube', **vir_wood, 'sides': 6, 'pts': [[0, -1.5, 0, 0.42], [0.04, 7.5, 0, 0.18]]},
-            {'op': 'tuft', **vir_leaf, 'r': [5.6, 2.3, 5.4], 'p': [0.0, 7.8, 0.0], 'yaw': 0.6, 'seed': 15, 'rings': 2, 'segs': 8},
-            {'op': 'tuft', **vir_leaf, 'r': [3.6, 1.85, 3.5], 'p': [0.1, 10.2, 0.0], 'yaw': 1.9, 'seed': 81, 'rings': 2, 'segs': 6},
+            {'op': 'tube', **vir_wood, 'sides': 6, 'pts': [[0.0, -1.5, 0.0, 0.48], [0.05, 4.8, 0.0, 0.27]]},
+            {'op': 'tube', **vir_wood, 'sides': 4, 'pts': [[0.05, 4.5, 0.0, 0.20], [2.6, 8.2, 0.9, 0.10]]},
+            {'op': 'tube', **vir_wood, 'sides': 4, 'pts': [[0.04, 4.5, 0.0, 0.20], [-2.5, 8.1, -0.9, 0.10]]},
+            {'op': 'blob', **vir_leaf, 'r': [4.3, 2.5, 4.1], 'p': [2.3, 9.0, 0.8], 'yaw': 0.5, 'seed': 15, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **vir_leaf, 'r': [4.2, 2.5, 4.0], 'p': [-2.2, 8.9, -0.8], 'yaw': 1.8, 'seed': 45, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **vir_leaf, 'r': [4.6, 2.7, 4.4], 'p': [0.0, 10.9, 0.1], 'yaw': 1.1, 'seed': 87, 'subdiv': 0, 'jitter': 0.14},
         ],
         'far': [
-            {'op': 'cross', **vir_leaf, 'trunkColor': p['virensTrunk'], 'trunkTop': 3.6, 'trunkR': 0.34,
-             'profile': [[3.4, 2.5], [6.8, 5.8], [9.6, 5.1], [12.3, 1.8]], 'capY': 8.2, 'capR': 5.5},
+            {'op': 'tube', **vir_wood, 'sides': 4, 'pts': [[0.0, -1.2, 0.0, 0.46], [0.05, 7.6, 0.0, 0.20]]},
+            {'op': 'blob', **vir_leaf, 'r': [6.2, 3.0, 5.9], 'p': [0.0, 9.4, 0.0], 'yaw': 0.5, 'seed': 15, 'subdiv': 0, 'jitter': 0.13},
+            {'op': 'blob', **vir_leaf, 'r': [4.6, 2.6, 4.4], 'p': [0.2, 11.4, 0.0], 'yaw': 1.9, 'seed': 87, 'subdiv': 0, 'jitter': 0.13},
         ],
     }
 
-    # 7. bischofia — 秋枫/重阳木（兼翊武路栾树拱冠）(Bischofia javanica): slightly leaning trunk, long arching limbs
+    # -------------------------------------------------------------------------
+    # 7. bischofia — 秋枫/复羽叶栾树 (Bischofia javanica / Koelreuteria bipinnata)
+    # NO brown cap on top! Leaning dark trunk (D=0.72m at base, +X lean toward street),
+    # sweeping arched limbs reaching across lane; 7 irregular green blobs + 2 scattered
+    # pinkish-brown Koelreuteria seed-pod clusters nestled along outer-upper crown surface (~18%).
+    # -------------------------------------------------------------------------
     bis_leaf = leaf('bischofia')
     bis_pod = leaf('bischofiaPod')
     bis_wood = wood('bischofiaTrunk')
     bischofia = {
-        'id': 7,
-        'name': 'bischofia',
-        'zh': '秋枫',
-        'latin': 'Bischofia javanica',
+        'id': 7, 'name': 'bischofia', 'zh': '秋枫/栾树', 'latin': 'Bischofia javanica / Koelreuteria bipinnata',
         'variants': [
-            {'scale': [1.00, 1.00, 1.00], 'lean': 0.07, 'tint': [1.00, 1.00, 1.00]},
-            {'scale': [1.07, 0.95, 1.04], 'lean': 0.09, 'tint': [1.06, 0.99, 0.91]},
-            {'scale': [0.95, 1.05, 0.96], 'lean': 0.05, 'tint': [1.12, 0.97, 0.88]},
+            {'scale': [1.00, 1.00, 1.00], 'lean': 0.09, 'tint': [1.00, 1.00, 1.00]},
+            {'scale': [1.07, 0.96, 1.05], 'lean': 0.12, 'tint': [1.05, 1.00, 0.93]},
+            {'scale': [0.95, 1.06, 0.96], 'lean': 0.07, 'tint': [1.09, 0.98, 0.90]},
         ],
         'near': [
-            # Slightly leaning dark fissured trunk + long arching street-spanning limbs (IMG_1345 / IMG_1346)
-            {'op': 'tube', **bis_wood, 'sides': 7, 'pts': [[0, -1.5, 0, 0.31], [0.04, 0.3, 0, 0.27], [0.26, 1.7, 0.05, 0.22], [0.52, 3.0, 0.08, 0.17]]},
-            {'op': 'tube', **bis_wood, 'sides': 5, 'pts': [[0.48, 2.8, 0.07, 0.14], [1.95, 4.1, 0.45, 0.10], [3.55, 5.1, 0.80, 0.06]]},
-            {'op': 'tube', **bis_wood, 'sides': 5, 'pts': [[0.46, 2.8, 0.06, 0.13], [-0.85, 4.3, 0.95, 0.09], [-1.95, 5.5, 1.75, 0.055]]},
-            {'op': 'tube', **bis_wood, 'sides': 5, 'pts': [[0.50, 2.9, 0.06, 0.13], [0.95, 4.5, -1.35, 0.09], [1.65, 5.7, -2.45, 0.055]]},
-            {'op': 'tube', **bis_wood, 'sides': 4, 'pts': [[0.52, 3.0, 0.08, 0.12], [-0.45, 4.9, -0.85, 0.08], [-1.15, 6.4, -1.55, 0.05]]},
-            {'op': 'tuft', **bis_leaf, 'r': [3.1, 1.45, 2.7], 'p': [3.2, 5.8, 0.75], 'yaw': 0.3, 'seed': 21, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **bis_leaf, 'r': [2.8, 1.50, 2.7], 'p': [-1.7, 6.2, 1.55], 'yaw': 1.5, 'seed': 35, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **bis_leaf, 'r': [2.8, 1.50, 2.8], 'p': [1.5, 6.3, -2.2], 'yaw': 2.4, 'seed': 51, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **bis_leaf, 'r': [3.4, 1.70, 3.2], 'p': [0.55, 7.6, -0.15], 'yaw': 1.0, 'seed': 69, 'rings': 3, 'segs': 8},
-            {'op': 'tuft', **bis_leaf, 'r': [2.4, 1.40, 2.3], 'p': [-0.75, 7.9, -1.1], 'yaw': 2.0, 'seed': 85, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **bis_pod, 'r': [1.95, 1.05, 1.85], 'p': [1.35, 8.8, 0.25], 'yaw': 0.7, 'seed': 93, 'rings': 2, 'segs': 6},
+            {'op': 'tube', **bis_wood, 'sides': 7, 'pts': [
+                [0.0, -1.5, 0.0, 0.41], [0.0, 0.0, 0.0, 0.36], [0.22, 1.5, 0.04, 0.29],
+                [0.52, 3.0, 0.08, 0.23], [1.05, 7.5, 0.10, 0.12],
+            ]},
+            {'op': 'tube', **bis_wood, 'sides': 5, 'pts': [[0.48, 2.8, 0.07, 0.19], [2.25, 4.4, 0.55, 0.13], [4.05, 5.8, 0.95, 0.08]]},
+            {'op': 'tube', **bis_wood, 'sides': 5, 'pts': [[0.46, 2.8, 0.06, 0.18], [-0.85, 4.5, 1.15, 0.13], [-2.05, 6.0, 2.15, 0.08]]},
+            {'op': 'tube', **bis_wood, 'sides': 5, 'pts': [[0.50, 2.9, 0.06, 0.18], [1.15, 4.6, -1.45, 0.13], [2.05, 6.1, -2.65, 0.08]]},
+            {'op': 'tube', **bis_wood, 'sides': 5, 'pts': [[0.72, 4.2, 0.08, 0.15], [2.15, 6.4, -0.45, 0.10], [3.10, 7.9, -0.80, 0.07]]},
+            # 7 main green irregular crown blobs (top is pure lush green, NO brown cap!)
+            {'op': 'blob', **bis_leaf, 'r': [3.3, 2.15, 2.9], 'p': [3.95, 6.0, 0.95], 'yaw': 0.3, 'seed': 21, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **bis_leaf, 'r': [3.0, 2.10, 2.9], 'p': [-1.95, 6.2, 2.05], 'yaw': 1.5, 'seed': 35, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **bis_leaf, 'r': [3.0, 2.10, 3.0], 'p': [1.95, 6.3, -2.55], 'yaw': 2.4, 'seed': 51, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **bis_leaf, 'r': [2.9, 2.05, 2.8], 'p': [-1.45, 6.8, -1.65], 'yaw': 0.8, 'seed': 65, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **bis_leaf, 'r': [3.6, 2.45, 3.4], 'p': [1.15, 8.1, 0.10], 'yaw': 1.2, 'seed': 79, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **bis_leaf, 'r': [3.2, 2.20, 3.0], 'p': [2.85, 8.4, -0.75], 'yaw': 2.1, 'seed': 91, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **bis_leaf, 'r': [3.0, 2.20, 2.9], 'p': [0.55, 10.1, -0.15], 'yaw': 0.6, 'seed': 105, 'subdiv': 1, 'jitter': 0.14},
+            # 2 scattered pinkish-brown panicle pod puffs nestled on lateral crown surface (~18% of blobs)
+            {'op': 'blob', **bis_pod, 'r': [1.75, 1.15, 1.65], 'p': [3.65, 7.5, 1.45], 'yaw': 0.7, 'seed': 119, 'subdiv': 1, 'jitter': 0.16},
+            {'op': 'blob', **bis_pod, 'r': [1.55, 1.05, 1.50], 'p': [-0.85, 8.6, 1.75], 'yaw': 2.2, 'seed': 133, 'subdiv': 0, 'jitter': 0.16},
         ],
         'mid': [
-            {'op': 'tube', **bis_wood, 'sides': 5, 'pts': [[0, -1.5, 0, 0.27], [0.68, 6.1, 0.05, 0.12]]},
-            {'op': 'tuft', **bis_leaf, 'r': [4.4, 2.0, 4.1], 'p': [0.75, 6.3, 0.0], 'yaw': 0.5, 'seed': 21, 'rings': 2, 'segs': 7},
-            {'op': 'tuft', **bis_leaf, 'r': [2.9, 1.55, 2.8], 'p': [0.65, 8.2, -0.1], 'yaw': 1.8, 'seed': 69, 'rings': 2, 'segs': 6},
+            {'op': 'tube', **bis_wood, 'sides': 5, 'pts': [[0.0, -1.5, 0.0, 0.36], [0.85, 5.8, 0.08, 0.15]]},
+            {'op': 'blob', **bis_leaf, 'r': [3.8, 2.4, 3.5], 'p': [2.6, 6.4, 0.4], 'yaw': 0.4, 'seed': 21, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **bis_leaf, 'r': [3.5, 2.3, 3.4], 'p': [-1.1, 6.6, 0.2], 'yaw': 1.7, 'seed': 35, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **bis_leaf, 'r': [3.6, 2.5, 3.4], 'p': [1.0, 9.1, -0.2], 'yaw': 1.1, 'seed': 79, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **bis_pod,  'r': [1.6, 1.05, 1.5], 'p': [3.1, 7.6, 1.2], 'yaw': 0.8, 'seed': 119, 'subdiv': 0, 'jitter': 0.15},
         ],
         'far': [
-            {'op': 'cross', **bis_leaf, 'trunkColor': p['bischofiaTrunk'], 'trunkTop': 3.0, 'trunkR': 0.24,
-             'profile': [[2.8, 2.1], [5.5, 4.5], [7.9, 3.9], [9.8, 1.3]], 'capY': 6.7, 'capR': 4.2},
+            {'op': 'tube', **bis_wood, 'sides': 4, 'pts': [[0.0, -1.2, 0.0, 0.35], [0.8, 5.8, 0.0, 0.15]]},
+            {'op': 'blob', **bis_leaf, 'r': [5.2, 3.1, 4.9], 'p': [1.1, 6.8, 0.0], 'yaw': 0.5, 'seed': 21, 'subdiv': 0, 'jitter': 0.13},
+            {'op': 'blob', **bis_leaf, 'r': [3.8, 2.6, 3.6], 'p': [0.8, 9.4, 0.0], 'yaw': 1.8, 'seed': 79, 'subdiv': 0, 'jitter': 0.13},
         ],
     }
 
-    # 8. elaeocarpus — 杜英 (Elaeocarpus decipiens): straight trunk, whorled pagoda tiers + crimson senescent leaf tufts
+    # -------------------------------------------------------------------------
+    # 8. elaeocarpus — 杜英 (Elaeocarpus decipiens)
+    # Broadleaf evergreen tree (NOT a Christmas conifer!): upright oblong-ovoid / columnar
+    # clustered broadleaf crown with ~2:1 height-to-width ratio (H=11.6m, W=5.8m);
+    # straight trunk D=0.62m; sparse crimson senescent leaf tufts <= 6% (< 8% limit).
+    # -------------------------------------------------------------------------
     ela_leaf = leaf('elaeocarpus')
     ela_red = leaf('elaeocarpusRed')
     ela_wood = wood('elaeocarpusTrunk')
     elaeocarpus = {
-        'id': 8,
-        'name': 'elaeocarpus',
-        'zh': '杜英',
-        'latin': 'Elaeocarpus decipiens',
+        'id': 8, 'name': 'elaeocarpus', 'zh': '杜英', 'latin': 'Elaeocarpus decipiens',
         'variants': [
             {'scale': [1.00, 1.00, 1.00], 'lean': 0.01, 'tint': [1.00, 1.00, 1.00]},
-            {'scale': [0.95, 1.08, 0.95], 'lean': -0.02, 'tint': [1.05, 0.98, 0.94]},
-            {'scale': [1.06, 0.94, 1.05], 'lean': 0.02, 'tint': [0.97, 1.02, 0.96]},
+            {'scale': [0.95, 1.07, 0.95], 'lean': -0.02, 'tint': [1.04, 0.99, 0.95]},
+            {'scale': [1.05, 0.95, 1.05], 'lean': 0.02, 'tint': [0.97, 1.02, 0.96]},
         ],
         'near': [
-            {'op': 'tube', **ela_wood, 'sides': 6, 'pts': [[0, -1.5, 0, 0.25], [0, 0.3, 0, 0.22], [0, 2.6, 0, 0.16], [0, 6.8, 0, 0.09]]},
-            {'op': 'tube', **ela_wood, 'sides': 4, 'pts': [[0, 2.4, 0, 0.10], [1.15, 3.3, 0.45, 0.055]]},
-            {'op': 'tube', **ela_wood, 'sides': 4, 'pts': [[0, 2.5, 0, 0.10], [-1.10, 3.4, 0.55, 0.055]]},
-            {'op': 'tube', **ela_wood, 'sides': 4, 'pts': [[0, 2.5, 0, 0.10], [0.15, 3.4, -1.20, 0.055]]},
-            {'op': 'tier', **ela_leaf, 'y0': 2.6, 'y1': 5.5, 'r0': 2.85, 'r1': 1.05, 'segs': 8, 'yaw': 0.1, 'scallop': 0.18},
-            {'op': 'tier', **ela_leaf, 'y0': 4.6, 'y1': 7.5, 'r0': 2.35, 'r1': 0.80, 'segs': 8, 'yaw': 0.55, 'scallop': 0.17},
-            {'op': 'tier', **ela_leaf, 'y0': 6.6, 'y1': 9.3, 'r0': 1.75, 'r1': 0.45, 'segs': 7, 'yaw': 1.05, 'scallop': 0.16},
-            {'op': 'tuft', **ela_leaf, 'r': [1.20, 1.25, 1.15], 'p': [0.0, 9.5, 0.0], 'yaw': 0.4, 'seed': 33, 'rings': 2, 'segs': 6},
-            # Signature scattered crimson-red senescent foliage puffs ("红叶杜英")
-            {'op': 'tuft', **ela_red, 'r': [0.95, 0.62, 0.90], 'p': [1.65, 4.1, 0.75], 'yaw': 0.8, 'seed': 57, 'rings': 2, 'segs': 6},
-            {'op': 'tuft', **ela_red, 'r': [0.82, 0.55, 0.80], 'p': [-1.25, 6.0, -0.65], 'yaw': 2.1, 'seed': 77, 'rings': 2, 'segs': 6},
+            {'op': 'tube', **ela_wood, 'sides': 7, 'pts': [
+                [0.0, -1.5, 0.0, 0.35], [0.0, 0.0, 0.0, 0.31], [0.0, 2.2, 0.0, 0.23],
+                [0.0, 5.8, 0.0, 0.15], [0.0, 9.2, 0.0, 0.08],
+            ]},
+            {'op': 'tube', **ela_wood, 'sides': 4, 'pts': [[0.0, 2.2, 0.0, 0.15], [0.95, 3.5, 0.45, 0.08]]},
+            {'op': 'tube', **ela_wood, 'sides': 4, 'pts': [[0.0, 2.3, 0.0, 0.15], [-0.95, 3.6, 0.50, 0.08]]},
+            {'op': 'tube', **ela_wood, 'sides': 4, 'pts': [[0.0, 2.4, 0.0, 0.14], [0.15, 3.7, -1.05, 0.08]]},
+            {'op': 'tube', **ela_wood, 'sides': 4, 'pts': [[0.0, 4.8, 0.0, 0.12], [-0.75, 6.4, -0.75, 0.06]]},
+            # 8 tightly overlapping broadleaf blobs forming a 2:1 upright ovoid-columnar crown (W=5.8m, H=11.6m)
+            {'op': 'blob', **ela_leaf, 'r': [1.95, 1.55, 1.85], 'p': [0.85, 3.8, 0.40], 'yaw': 0.4, 'seed': 17, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **ela_leaf, 'r': [1.90, 1.55, 1.85], 'p': [-0.85, 3.9, 0.45], 'yaw': 1.5, 'seed': 31, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **ela_leaf, 'r': [1.90, 1.55, 1.90], 'p': [0.10, 4.0, -0.90], 'yaw': 2.4, 'seed': 47, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **ela_leaf, 'r': [2.25, 1.85, 2.15], 'p': [0.55, 5.9, -0.35], 'yaw': 0.9, 'seed': 61, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **ela_leaf, 'r': [2.20, 1.85, 2.15], 'p': [-0.55, 6.1, 0.35], 'yaw': 2.0, 'seed': 73, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **ela_leaf, 'r': [2.05, 1.75, 2.00], 'p': [0.15, 7.9, 0.25], 'yaw': 1.2, 'seed': 89, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **ela_leaf, 'r': [1.85, 1.65, 1.80], 'p': [-0.25, 8.5, -0.30], 'yaw': 2.6, 'seed': 103, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **ela_leaf, 'r': [1.45, 1.55, 1.40], 'p': [0.0, 10.0, 0.0], 'yaw': 0.6, 'seed': 117, 'subdiv': 1, 'jitter': 0.13},
+            # 2 small subdiv=0 crimson senescent leaf accents (40 tris / 680 crown tris = 5.9% <= 8%!)
+            {'op': 'blob', **ela_red, 'r': [0.68, 0.48, 0.65], 'p': [1.85, 4.5, 0.72], 'yaw': 0.8, 'seed': 131, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **ela_red, 'r': [0.62, 0.45, 0.60], 'p': [-1.45, 7.2, 0.85], 'yaw': 2.1, 'seed': 149, 'subdiv': 0, 'jitter': 0.14},
         ],
         'mid': [
-            {'op': 'tube', **ela_wood, 'sides': 5, 'pts': [[0, -1.5, 0, 0.22], [0, 4.2, 0, 0.13]]},
-            {'op': 'tier', **ela_leaf, 'y0': 2.6, 'y1': 7.0, 'r0': 2.8, 'r1': 0.95, 'segs': 7, 'yaw': 0.1, 'scallop': 0.14},
-            {'op': 'tier', **ela_leaf, 'y0': 6.0, 'y1': 10.3, 'r0': 1.85, 'r1': 0.12, 'segs': 6, 'yaw': 0.6, 'scallop': 0.12},
+            {'op': 'tube', **ela_wood, 'sides': 5, 'pts': [[0.0, -1.5, 0.0, 0.31], [0.0, 7.5, 0.0, 0.11]]},
+            {'op': 'blob', **ela_leaf, 'r': [2.65, 2.2, 2.55], 'p': [0.0, 4.4, 0.0], 'yaw': 0.4, 'seed': 17, 'subdiv': 0, 'jitter': 0.13},
+            {'op': 'blob', **ela_leaf, 'r': [2.55, 2.2, 2.45], 'p': [0.05, 7.1, -0.05], 'yaw': 1.7, 'seed': 61, 'subdiv': 0, 'jitter': 0.13},
+            {'op': 'blob', **ela_leaf, 'r': [1.75, 1.9, 1.70], 'p': [0.0, 9.6, 0.0], 'yaw': 0.9, 'seed': 117, 'subdiv': 0, 'jitter': 0.12},
         ],
         'far': [
-            {'op': 'cross', **ela_leaf, 'trunkColor': p['elaeocarpusTrunk'], 'trunkTop': 2.5, 'trunkR': 0.20,
-             'profile': [[2.5, 2.75], [5.4, 2.35], [8.1, 1.45], [10.4, 0.25]], 'capY': 4.8, 'capR': 2.5},
+            {'op': 'tube', **ela_wood, 'sides': 4, 'pts': [[0.0, -1.2, 0.0, 0.30], [0.0, 7.2, 0.0, 0.12]]},
+            {'op': 'blob', **ela_leaf, 'r': [2.75, 2.9, 2.65], 'p': [0.0, 5.1, 0.0], 'yaw': 0.4, 'seed': 17, 'subdiv': 0, 'jitter': 0.13},
+            {'op': 'blob', **ela_leaf, 'r': [2.10, 2.7, 2.00], 'p': [0.0, 8.8, 0.0], 'yaw': 1.7, 'seed': 61, 'subdiv': 0, 'jitter': 0.13},
         ],
     }
 
-    # 9. ginkgo — 银杏 (Ginkgo biloba): upright trunk, acute ascending branches, golden-yellow autumn ovoid-conical crown
+    # -------------------------------------------------------------------------
+    # 9. ginkgo — 银杏 (Ginkgo biloba)
+    # Upright tapered trunk (D=0.66m at base), acute ascending branches tucked inside
+    # 8 irregular organic blobs forming a natural ovoid-conical golden-yellow autumn crown.
+    # -------------------------------------------------------------------------
     gin_leaf = leaf('ginkgo')
     gin_wood = wood('ginkgoTrunk')
     ginkgo = {
-        'id': 9,
-        'name': 'ginkgo',
-        'zh': '银杏',
-        'latin': 'Ginkgo biloba',
+        'id': 9, 'name': 'ginkgo', 'zh': '银杏', 'latin': 'Ginkgo biloba',
         'variants': [
             {'scale': [1.00, 1.00, 1.00], 'lean': 0.01, 'tint': [1.00, 1.00, 1.00]},
-            {'scale': [0.93, 1.08, 0.94], 'lean': -0.02, 'tint': [1.08, 1.01, 0.86]},
-            {'scale': [1.06, 0.95, 1.05], 'lean': 0.02, 'tint': [0.88, 1.03, 0.95]},
+            {'scale': [0.94, 1.08, 0.94], 'lean': -0.02, 'tint': [1.08, 1.01, 0.86]},
+            {'scale': [1.06, 0.95, 1.05], 'lean': 0.02, 'tint': [0.89, 1.03, 0.94]},
         ],
         'near': [
-            {'op': 'tube', **gin_wood, 'sides': 6, 'pts': [[0, -1.5, 0, 0.26], [0, 0.3, 0, 0.23], [0.02, 2.7, 0, 0.17], [0.03, 6.8, 0, 0.10], [0.02, 9.6, 0, 0.05]]},
-            # Acute 35-45 deg ascending ginkgo branches (matching 25_IMG_1414.jpg)
-            {'op': 'tube', **gin_wood, 'sides': 4, 'pts': [[0.02, 2.6, 0, 0.11], [0.95, 4.3, 0.45, 0.07], [1.65, 5.8, 0.80, 0.04]]},
-            {'op': 'tube', **gin_wood, 'sides': 4, 'pts': [[0.02, 2.8, 0, 0.11], [-0.90, 4.5, 0.55, 0.07], [-1.55, 6.0, 0.95, 0.04]]},
-            {'op': 'tube', **gin_wood, 'sides': 4, 'pts': [[0.02, 2.9, 0, 0.10], [0.20, 4.7, -1.05, 0.065], [0.35, 6.2, -1.75, 0.04]]},
-            {'op': 'tube', **gin_wood, 'sides': 4, 'pts': [[0.03, 4.6, 0, 0.09], [-0.75, 6.4, -0.75, 0.055], [-1.25, 7.8, -1.20, 0.035]]},
-            {'op': 'tuft', **gin_leaf, 'r': [1.95, 1.50, 1.85], 'p': [1.45, 5.7, 0.70], 'yaw': 0.4, 'seed': 14, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **gin_leaf, 'r': [1.90, 1.50, 1.85], 'p': [-1.40, 5.9, 0.85], 'yaw': 1.5, 'seed': 28, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **gin_leaf, 'r': [1.85, 1.45, 1.90], 'p': [0.30, 6.0, -1.55], 'yaw': 2.4, 'seed': 42, 'rings': 3, 'segs': 7},
-            {'op': 'tuft', **gin_leaf, 'r': [2.25, 1.85, 2.15], 'p': [0.05, 7.6, 0.05], 'yaw': 1.1, 'seed': 56, 'rings': 3, 'segs': 8},
-            {'op': 'tuft', **gin_leaf, 'r': [1.65, 1.40, 1.60], 'p': [-0.85, 8.1, -0.85], 'yaw': 2.0, 'seed': 70, 'rings': 3, 'segs': 6},
-            {'op': 'tuft', **gin_leaf, 'r': [1.55, 1.65, 1.50], 'p': [0.05, 9.7, -0.05], 'yaw': 0.8, 'seed': 84, 'rings': 3, 'segs': 7},
+            {'op': 'tube', **gin_wood, 'sides': 7, 'pts': [
+                [0.0, -1.5, 0.0, 0.37], [0.0, 0.0, 0.0, 0.33], [0.02, 2.5, 0.0, 0.24],
+                [0.03, 6.5, 0.0, 0.14], [0.02, 10.0, 0.0, 0.06],
+            ]},
+            {'op': 'tube', **gin_wood, 'sides': 4, 'pts': [[0.02, 2.6, 0.0, 0.16], [1.05, 4.4, 0.48, 0.10], [1.75, 5.8, 0.80, 0.06]]},
+            {'op': 'tube', **gin_wood, 'sides': 4, 'pts': [[0.02, 2.7, 0.0, 0.16], [-1.00, 4.5, 0.55, 0.10], [-1.65, 5.9, 0.90, 0.06]]},
+            {'op': 'tube', **gin_wood, 'sides': 4, 'pts': [[0.02, 2.8, 0.0, 0.15], [0.22, 4.7, -1.10, 0.10], [0.38, 6.1, -1.75, 0.06]]},
+            {'op': 'tube', **gin_wood, 'sides': 4, 'pts': [[0.03, 4.8, 0.0, 0.12], [-0.78, 6.7, -0.78, 0.08], [-1.25, 8.1, -1.20, 0.05]]},
+            {'op': 'blob', **gin_leaf, 'r': [2.05, 1.60, 1.95], 'p': [1.55, 5.5, 0.70], 'yaw': 0.4, 'seed': 14, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **gin_leaf, 'r': [2.00, 1.60, 1.95], 'p': [-1.45, 5.6, 0.80], 'yaw': 1.5, 'seed': 28, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **gin_leaf, 'r': [1.95, 1.55, 2.00], 'p': [0.35, 5.7, -1.55], 'yaw': 2.4, 'seed': 42, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **gin_leaf, 'r': [1.85, 1.50, 1.80], 'p': [-0.95, 5.9, -1.05], 'yaw': 0.9, 'seed': 56, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **gin_leaf, 'r': [2.35, 1.95, 2.25], 'p': [0.15, 7.4, 0.15], 'yaw': 1.2, 'seed': 70, 'subdiv': 1, 'jitter': 0.15},
+            {'op': 'blob', **gin_leaf, 'r': [1.95, 1.70, 1.90], 'p': [-0.85, 8.2, -0.75], 'yaw': 2.1, 'seed': 84, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **gin_leaf, 'r': [1.85, 1.65, 1.80], 'p': [0.65, 8.9, -0.25], 'yaw': 0.3, 'seed': 98, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **gin_leaf, 'r': [1.45, 1.75, 1.40], 'p': [0.02, 10.5, 0.0], 'yaw': 1.7, 'seed': 112, 'subdiv': 1, 'jitter': 0.14},
         ],
         'mid': [
-            {'op': 'tube', **gin_wood, 'sides': 5, 'pts': [[0, -1.5, 0, 0.23], [0.02, 6.1, 0, 0.11]]},
-            {'op': 'tuft', **gin_leaf, 'r': [2.85, 2.45, 2.75], 'p': [0.0, 6.3, 0.0], 'yaw': 0.5, 'seed': 14, 'rings': 2, 'segs': 7},
-            {'op': 'tuft', **gin_leaf, 'r': [1.95, 2.05, 1.90], 'p': [0.02, 9.0, 0.0], 'yaw': 1.7, 'seed': 56, 'rings': 2, 'segs': 6},
+            {'op': 'tube', **gin_wood, 'sides': 5, 'pts': [[0.0, -1.5, 0.0, 0.33], [0.02, 8.0, 0.0, 0.11]]},
+            {'op': 'blob', **gin_leaf, 'r': [3.0, 2.2, 2.9], 'p': [0.05, 5.8, 0.0], 'yaw': 0.5, 'seed': 14, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **gin_leaf, 'r': [2.4, 2.1, 2.3], 'p': [-0.1, 8.2, 0.0], 'yaw': 1.8, 'seed': 70, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **gin_leaf, 'r': [1.5, 1.8, 1.45], 'p': [0.0, 10.4, 0.0], 'yaw': 0.8, 'seed': 112, 'subdiv': 0, 'jitter': 0.13},
         ],
         'far': [
-            {'op': 'cross', **gin_leaf, 'trunkColor': p['ginkgoTrunk'], 'trunkTop': 2.7, 'trunkR': 0.20,
-             'profile': [[2.6, 1.5], [5.5, 2.85], [8.4, 2.25], [11.1, 0.45]], 'capY': 6.6, 'capR': 2.65},
+            {'op': 'tube', **gin_wood, 'sides': 4, 'pts': [[0.0, -1.2, 0.0, 0.32], [0.02, 7.6, 0.0, 0.12]]},
+            {'op': 'blob', **gin_leaf, 'r': [3.1, 2.5, 3.0], 'p': [0.0, 6.0, 0.0], 'yaw': 0.5, 'seed': 14, 'subdiv': 0, 'jitter': 0.13},
+            {'op': 'blob', **gin_leaf, 'r': [2.1, 2.5, 2.0], 'p': [0.0, 9.4, 0.0], 'yaw': 1.8, 'seed': 70, 'subdiv': 0, 'jitter': 0.13},
         ],
     }
 
-    # 10. willow — 垂柳 (Salix babylonica): gently leaning trunk, arched fountain limbs, pendulous weeping curtains
+    # -------------------------------------------------------------------------
+    # 10. willow — 垂柳 (Salix babylonica)
+    # NO flat umbrella disc, NO wide jellyfish blades!
+    # Leaning dark trunk (D=0.58m), arched fountain limbs, small rounded upper crown domes,
+    # and 28 slender pendulous willow strands cascading in a fountain arc down to y=1.2-1.9m
+    # above ground/water; fresh yellow-green foliage.
+    # -------------------------------------------------------------------------
     wil_leaf = leaf('willow')
     wil_wood = wood('willowTrunk')
     willow = {
-        'id': 10,
-        'name': 'willow',
-        'zh': '垂柳',
-        'latin': 'Salix babylonica',
+        'id': 10, 'name': 'willow', 'zh': '垂柳', 'latin': 'Salix babylonica',
         'variants': [
-            {'scale': [1.00, 1.00, 1.00], 'lean': 0.08, 'tint': [1.00, 1.00, 1.00]},
-            {'scale': [1.07, 0.94, 1.06], 'lean': 0.11, 'tint': [1.04, 1.02, 0.93]},
-            {'scale': [0.94, 1.06, 0.95], 'lean': 0.06, 'tint': [0.96, 1.01, 0.96]},
+            {'scale': [1.00, 1.00, 1.00], 'lean': 0.09, 'tint': [1.00, 1.00, 1.00]},
+            {'scale': [1.07, 0.95, 1.06], 'lean': 0.12, 'tint': [1.04, 1.02, 0.93]},
+            {'scale': [0.95, 1.06, 0.95], 'lean': 0.06, 'tint': [0.96, 1.01, 0.96]},
         ],
         'near': [
-            {'op': 'tube', **wil_wood, 'sides': 6, 'pts': [[0, -1.5, 0, 0.29], [0.05, 0.3, 0, 0.25], [0.22, 1.8, 0.06, 0.20], [0.35, 2.9, 0.10, 0.15]]},
-            {'op': 'tube', **wil_wood, 'sides': 4, 'pts': [[0.32, 2.6, 0.09, 0.12], [1.35, 4.4, 0.45, 0.08], [2.25, 5.4, 0.75, 0.045]]},
-            {'op': 'tube', **wil_wood, 'sides': 4, 'pts': [[0.32, 2.6, 0.09, 0.12], [-0.95, 4.5, 0.85, 0.08], [-1.85, 5.5, 1.45, 0.045]]},
-            {'op': 'tube', **wil_wood, 'sides': 4, 'pts': [[0.34, 2.7, 0.09, 0.11], [0.55, 4.6, -1.25, 0.075], [0.95, 5.6, -2.10, 0.045]]},
-            {'op': 'tube', **wil_wood, 'sides': 4, 'pts': [[0.34, 2.7, 0.09, 0.11], [-0.85, 4.7, -0.95, 0.075], [-1.55, 5.6, -1.70, 0.045]]},
-            {'op': 'tuft', **wil_leaf, 'r': [3.3, 1.55, 3.2], 'p': [0.25, 6.4, 0.05], 'yaw': 0.5, 'seed': 25, 'rings': 2, 'segs': 8},
-            {'op': 'curtains', **wil_leaf, 'origin': [0.25, 6.3, 0.05], 'count': 12, 'innerR': 1.65, 'outerR': 3.55, 'topY': 6.6, 'botY': 2.15, 'width': 0.62, 'segs': 3},
+            {'op': 'tube', **wil_wood, 'sides': 7, 'pts': [
+                [0.0, -1.5, 0.0, 0.34], [0.0, 0.0, 0.0, 0.29], [0.18, 1.5, 0.05, 0.23], [0.34, 2.8, 0.08, 0.18],
+            ]},
+            # 5 arched fountain limbs rising to y=5.8-6.6m inside the small rounded upper crown
+            {'op': 'tube', **wil_wood, 'sides': 4, 'pts': [[0.30, 2.5, 0.07, 0.14], [1.15, 4.7, 0.38, 0.09], [1.85, 6.0, 0.62, 0.05]]},
+            {'op': 'tube', **wil_wood, 'sides': 4, 'pts': [[0.30, 2.5, 0.07, 0.14], [-0.80, 4.8, 0.72, 0.09], [-1.45, 6.1, 1.25, 0.05]]},
+            {'op': 'tube', **wil_wood, 'sides': 4, 'pts': [[0.32, 2.6, 0.08, 0.13], [0.48, 4.9, -1.05, 0.085], [0.82, 6.2, -1.75, 0.05]]},
+            {'op': 'tube', **wil_wood, 'sides': 4, 'pts': [[0.32, 2.6, 0.08, 0.13], [-0.72, 4.9, -0.82, 0.085], [-1.30, 6.2, -1.40, 0.05]]},
+            {'op': 'tube', **wil_wood, 'sides': 4, 'pts': [[0.34, 2.7, 0.08, 0.12], [0.35, 5.4, 0.10, 0.08], [0.30, 7.1, 0.08, 0.045]]},
+            # Small rounded upper crown (5 compact arched blobs, NOT a flat disc!)
+            {'op': 'blob', **wil_leaf, 'r': [1.95, 1.55, 1.85], 'p': [0.30, 7.3, 0.08], 'yaw': 0.4, 'seed': 25, 'subdiv': 1, 'jitter': 0.14},
+            {'op': 'blob', **wil_leaf, 'r': [1.65, 1.35, 1.60], 'p': [1.55, 6.4, 0.50], 'yaw': 1.3, 'seed': 39, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **wil_leaf, 'r': [1.65, 1.35, 1.60], 'p': [-1.20, 6.5, 1.00], 'yaw': 2.2, 'seed': 53, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **wil_leaf, 'r': [1.60, 1.35, 1.65], 'p': [0.65, 6.5, -1.45], 'yaw': 0.8, 'seed': 67, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'blob', **wil_leaf, 'r': [1.55, 1.30, 1.55], 'p': [-1.05, 6.5, -1.15], 'yaw': 1.9, 'seed': 81, 'subdiv': 0, 'jitter': 0.14},
+            # 28 slender fountain-arched willow strands cascading to 1.25-1.95m above ground/water!
+            {'op': 'strands', **wil_leaf, 'origin': [0.30, 6.8, 0.08], 'count': 16, 'innerR': 1.25, 'outerR': 3.85, 'topY': 6.9, 'arch': 0.85, 'botY': 1.42, 'width': 0.21, 'segs': 5, 'phase': 0.0},
+            {'op': 'strands', **wil_leaf, 'origin': [0.30, 7.4, 0.08], 'count': 12, 'innerR': 0.65, 'outerR': 2.85, 'topY': 7.5, 'arch': 0.75, 'botY': 1.78, 'width': 0.19, 'segs': 4, 'phase': 0.26},
         ],
         'mid': [
-            {'op': 'tube', **wil_wood, 'sides': 5, 'pts': [[0, -1.5, 0, 0.25], [0.26, 6.0, 0.06, 0.12]]},
-            {'op': 'tuft', **wil_leaf, 'r': [3.4, 1.6, 3.3], 'p': [0.25, 6.2, 0.05], 'yaw': 0.5, 'seed': 25, 'rings': 2, 'segs': 7},
-            {'op': 'curtains', **wil_leaf, 'origin': [0.25, 6.1, 0.05], 'count': 7, 'innerR': 1.8, 'outerR': 3.45, 'topY': 6.3, 'botY': 2.25, 'width': 0.78, 'segs': 2},
+            {'op': 'tube', **wil_wood, 'sides': 5, 'pts': [[0.0, -1.5, 0.0, 0.29], [0.32, 6.2, 0.08, 0.11]]},
+            {'op': 'blob', **wil_leaf, 'r': [2.45, 1.85, 2.35], 'p': [0.30, 6.9, 0.08], 'yaw': 0.5, 'seed': 25, 'subdiv': 0, 'jitter': 0.14},
+            {'op': 'strands', **wil_leaf, 'origin': [0.30, 6.8, 0.08], 'count': 14, 'innerR': 1.15, 'outerR': 3.75, 'topY': 6.9, 'arch': 0.80, 'botY': 1.48, 'width': 0.26, 'segs': 3, 'phase': 0.0},
         ],
         'far': [
-            {'op': 'cross', **wil_leaf, 'trunkColor': p['willowTrunk'], 'trunkTop': 2.2, 'trunkR': 0.22,
-             'profile': [[2.1, 3.45], [4.6, 3.65], [6.7, 3.10], [8.2, 1.15]], 'capY': 5.8, 'capR': 3.35},
+            {'op': 'tube', **wil_wood, 'sides': 4, 'pts': [[0.0, -1.2, 0.0, 0.28], [0.30, 6.0, 0.08, 0.12]]},
+            {'op': 'blob', **wil_leaf, 'r': [2.6, 2.0, 2.5], 'p': [0.30, 6.8, 0.08], 'yaw': 0.5, 'seed': 25, 'subdiv': 0, 'jitter': 0.13},
+            {'op': 'strands', **wil_leaf, 'origin': [0.30, 6.7, 0.08], 'count': 10, 'innerR': 1.15, 'outerR': 3.70, 'topY': 6.8, 'arch': 0.75, 'botY': 1.55, 'width': 0.32, 'segs': 2, 'phase': 0.0},
         ],
     }
 
@@ -479,179 +619,212 @@ def build_species_specs() -> list[dict]:
 # Deterministic Geometry Evaluators (mirrored 1:1 in web/src/look/trees.ts)
 # =============================================================================
 
-def _lerp_color(c0: tuple[float, float, float], c1: tuple[float, float, float], t: float) -> tuple[float, float, float]:
-    u = max(0.0, min(1.0, t))
-    return (c0[0] + (c1[0] - c0[0]) * u, c0[1] + (c1[1] - c0[1]) * u, c0[2] + (c1[2] - c0[2]) * u)
+_PHI = (1.0 + math.sqrt(5.0)) / 2.0
+_ICO_RAW = [
+    (-1, _PHI, 0), (1, _PHI, 0), (-1, -_PHI, 0), (1, -_PHI, 0),
+    (0, -1, _PHI), (0, 1, _PHI), (0, -1, -_PHI), (0, 1, -_PHI),
+    (_PHI, 0, -1), (_PHI, 0, 1), (-_PHI, 0, -1), (-_PHI, 0, 1),
+]
+_ICO_VERTS = [tuple(c / math.hypot(*v) for c in v) for v in _ICO_RAW]
+_ICO_FACES = [
+    (0, 11, 5), (0, 5, 1), (0, 1, 7), (0, 7, 10), (0, 10, 11),
+    (1, 5, 9), (5, 11, 4), (11, 10, 2), (10, 7, 6), (7, 1, 8),
+    (3, 9, 4), (3, 4, 2), (3, 2, 6), (3, 6, 8), (3, 8, 9),
+    (4, 9, 5), (2, 4, 11), (6, 2, 10), (8, 6, 7), (9, 8, 1),
+]
 
 
-def _shade_part(tris: list[tuple], c_hex: int, lit_hex: int, dark_hex: int) -> tuple[list, list]:
-    if not tris:
-        return [], []
-    ys = [(a[1] + b[1] + c[1]) / 3.0 for a, b, c in tris]
-    ymin, ymax = min(ys), max(ys)
-    span = max(0.01, ymax - ymin)
-    lo, mid, hi = hex_rgb(dark_hex), hex_rgb(c_hex), hex_rgb(lit_hex)
-    pos, col = [], []
-    for (a, b, c), ym in zip(tris, ys):
-        t = (ym - ymin) / span
-        rgb = _lerp_color(lo, mid, t * 2.0) if t < 0.5 else _lerp_color(mid, hi, (t - 0.5) * 2.0)
-        pos.extend([a, b, c])
-        col.extend([rgb, rgb, rgb])
-    return pos, col
+def _subdivide_ico(verts: list[tuple[float, float, float]], faces: list[tuple[int, int, int]]) -> tuple[list, list]:
+    v_out = list(verts)
+    mid_cache: dict[tuple[int, int], int] = {}
+
+    def mid(i: int, j: int) -> int:
+        key = (i, j) if i < j else (j, i)
+        if key in mid_cache:
+            return mid_cache[key]
+        ax, ay, az = v_out[i]
+        bx, by, bz = v_out[j]
+        mx, my, mz = (ax + bx) * 0.5, (ay + by) * 0.5, (az + bz) * 0.5
+        ln = math.hypot(mx, my, mz)
+        idx = len(v_out)
+        v_out.append((mx / ln, my / ln, mz / ln))
+        mid_cache[key] = idx
+        return idx
+
+    f_out = []
+    for a, b, c in faces:
+        ab, bc, ca = mid(a, b), mid(b, c), mid(c, a)
+        f_out.extend([(a, ab, ca), (b, bc, ab), (c, ca, bc), (ab, bc, ca)])
+    return v_out, f_out
+
+
+_ICO_1_VERTS, _ICO_1_FACES = _subdivide_ico(_ICO_VERTS, _ICO_FACES)
+
+
+def _eval_blob(rx: float, ry: float, rz: float, px: float, py: float, pz: float,
+               yaw: float, seed: int, subdiv: int, jitter: float) -> list[tuple]:
+    verts = _ICO_1_VERTS if subdiv >= 1 else _ICO_VERTS
+    faces = _ICO_1_FACES if subdiv >= 1 else _ICO_FACES
+    cy, sy = math.cos(yaw), math.sin(yaw)
+    pts = []
+    for ux, uy, uz in verts:
+        d1 = math.sin(seed * 1.73 + ux * 3.17 + uy * 2.63 + uz * 3.53)
+        d2 = math.cos(seed * 2.91 - ux * 4.31 + uy * 3.79 - uz * 2.87)
+        disp = 1.0 + jitter * (0.62 * d1 + 0.38 * d2)
+        lx, ly, lz = ux * rx * disp, uy * ry * disp, uz * rz * disp
+        wx = lx * cy + lz * sy + px
+        wz = -lx * sy + lz * cy + pz
+        pts.append((wx, ly + py, wz))
+    return [(pts[a], pts[b], pts[c]) for a, b, c in faces]
 
 
 def _eval_tube(pts: list[list[float]], sides: int) -> list[tuple]:
     rings = []
-    up_ref = np.array([0.0, 0.0, 1.0])
-    for i, (x, y, z, r) in enumerate(pts):
-        p0 = np.array(pts[max(0, i - 1)][:3], dtype=float)
-        p1 = np.array(pts[min(len(pts) - 1, i + 1)][:3], dtype=float)
-        tang = p1 - p0
-        tlen = float(np.linalg.norm(tang))
-        tang = tang / tlen if tlen > 1e-6 else np.array([0.0, 1.0, 0.0])
-        ref = np.array([1.0, 0.0, 0.0]) if abs(float(np.dot(tang, up_ref))) > 0.92 else up_ref
-        u = np.cross(tang, ref)
-        u /= max(1e-6, float(np.linalg.norm(u)))
-        v = np.cross(tang, u)
-        center = np.array([x, y, z], dtype=float)
+    n = len(pts)
+    for i, (cx, cy, cz, r) in enumerate(pts):
+        p0 = pts[max(0, i - 1)]
+        p1 = pts[min(n - 1, i + 1)]
+        tx, ty, tz = p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]
+        tl = math.hypot(tx, ty, tz) or 1.0
+        tx, ty, tz = tx / tl, ty / tl, tz / tl
+        up = (1.0, 0.0, 0.0) if abs(ty) > 0.92 else (0.0, 1.0, 0.0)
+        ux = ty * up[2] - tz * up[1]
+        uy = tz * up[0] - tx * up[2]
+        uz = tx * up[1] - ty * up[0]
+        ul = math.hypot(ux, uy, uz) or 1.0
+        ux, uy, uz = ux / ul, uy / ul, uz / ul
+        vx = ty * uz - tz * uy
+        vy = tz * ux - tx * uz
+        vz = tx * uy - ty * ux
         ring = []
         for s in range(sides):
             ang = s / sides * math.tau
-            pt = center + r * (math.cos(ang) * u + math.sin(ang) * v)
-            ring.append((float(pt[0]), float(pt[1]), float(pt[2])))
+            ca, sa = math.cos(ang), math.sin(ang)
+            ring.append((cx + r * (ca * ux + sa * vx), cy + r * (ca * uy + sa * vy), cz + r * (ca * uz + sa * vz)))
         rings.append(ring)
     tris = []
-    for i in range(len(rings) - 1):
+    for i in range(n - 1):
         r0, r1 = rings[i], rings[i + 1]
         for s in range(sides):
             sn = (s + 1) % sides
+            # Outward-facing winding (r0[s] -> r0[sn] -> r1[sn])
             tris.append((r0[s], r0[sn], r1[sn]))
             tris.append((r0[s], r1[sn], r1[s]))
     return tris
 
 
-def _eval_tuft(rx: float, ry: float, rz: float, px: float, py: float, pz: float,
-               yaw: float, seed: int, rings: int, segs: int) -> list[tuple]:
-    eff_rings = max(1, rings - 1)
-    eff_segs = max(5, segs - 1) if rings >= 3 else segs
-    cs, sn = math.cos(yaw), math.sin(yaw)
-
-    def xform(lx: float, ly: float, lz: float) -> tuple[float, float, float]:
-        wx = lx * cs + lz * sn + px
-        wz = -lx * sn + lz * cs + pz
-        return (wx, ly + py, wz)
-
-    top = xform(0.0, ry * 0.98, 0.0)
-    bot = xform(0.0, -ry * 0.56, 0.0)
-    bands = []
-    for r_idx in range(1, eff_rings + 1):
-        v = r_idx / (eff_rings + 1)
-        phi = (0.5 - v) * math.pi
-        sy = math.sin(phi)
-        cy = math.cos(phi)
-        y_local = ry * (sy * (0.98 if sy >= 0 else 0.58))
-        band = []
-        for s in range(eff_segs):
-            th = s / eff_segs * math.tau
-            lobe = 1.0 + 0.13 * math.sin(3.0 * th + seed * 0.7) + 0.08 * math.cos(5.0 * th - seed * 1.3 + r_idx)
-            bump_y = 0.07 * ry * math.sin(2.0 * th + seed + r_idx * 1.7)
-            band.append(xform(rx * cy * lobe * math.cos(th), y_local + bump_y, rz * cy * lobe * math.sin(th)))
-        bands.append(band)
-
+def _eval_bundles(clusters: list[dict]) -> list[tuple]:
     tris = []
-    for s in range(eff_segs):
-        sn = (s + 1) % eff_segs
-        tris.append((top, bands[0][sn], bands[0][s]))
-        tris.append((bands[-1][s], bands[-1][sn], bot))
-    for b in range(len(bands) - 1):
-        b0, b1 = bands[b], bands[b + 1]
-        for s in range(eff_segs):
-            sn = (s + 1) % eff_segs
-            tris.append((b0[s], b0[sn], b1[sn]))
-            tris.append((b0[s], b1[sn], b1[s]))
+    for ci, cl in enumerate(clusters):
+        ox, oy, oz = cl['p']
+        sp = float(cl['spread'])
+        r = float(cl['r'])
+        lengths = cl['lengths']
+        m = len(lengths)
+        for k, ln in enumerate(lengths):
+            ang = k / m * math.tau + ci * 0.7
+            dx, dz = math.cos(ang) * sp, math.sin(ang) * sp
+            sway_x = math.sin(ci * 1.9 + k * 2.3) * 0.10
+            sway_z = math.cos(ci * 1.5 + k * 2.7) * 0.10
+            pts = [
+                [ox + dx * 0.45, oy + 0.15, oz + dz * 0.45, r],
+                [ox + dx + sway_x * 0.5, oy - ln * 0.52, oz + dz + sway_z * 0.5, r * 0.68],
+                [ox + dx * 1.15 + sway_x, oy - ln, oz + dz * 1.15 + sway_z, r * 0.28],
+            ]
+            tris.extend(_eval_tube(pts, 3))
     return tris
 
 
-def _eval_tier(y0: float, y1: float, r0: float, r1: float, segs: int, yaw: float, scallop: float) -> list[tuple]:
-    n = segs * 2
-    bot_ring = []
-    top_ring = []
-    ymid = y0 + (y1 - y0) * 0.12
-    for i in range(n):
-        th = yaw + i / n * math.tau
-        tip = (i % 2 == 0)
-        rad = r0 * (1.0 + scallop if tip else 1.0 - scallop * 0.75)
-        by = y0 if tip else ymid
-        bot_ring.append((rad * math.cos(th), by, rad * math.sin(th)))
-        top_ring.append((r1 * math.cos(th), y1, r1 * math.sin(th)))
+def _eval_whorl(y: float, r: float, thick: float, lift: float, lobes: int, yaw: float, seed: int) -> list[tuple]:
     tris = []
-    for i in range(n):
-        inext = (i + 1) % n
-        if r1 < 0.08:
-            apex = (0.0, y1, 0.0)
-            tris.append((bot_ring[i], apex, bot_ring[inext]))
-        else:
-            tris.append((bot_ring[i], top_ring[inext], bot_ring[inext]))
-            tris.append((bot_ring[i], top_ring[i], top_ring[inext]))
+    for i in range(lobes):
+        ang = yaw + i / lobes * math.tau + math.sin(seed + i * 1.7) * 0.08
+        cs, sn = math.cos(ang), math.sin(ang)
+        rl = r * (0.90 + 0.16 * math.sin(seed * 1.3 + i * 2.5))
+        w = rl * 0.44
+        # Feathery horizontal-upturned bough pad: inner base at trunk -> wide mid-fan -> upturned feathery tip
+        p_base_top = (cs * 0.12, y + thick * 0.52, sn * 0.12)
+        p_base_bot = (cs * 0.12, y - thick * 0.28, sn * 0.12)
+        p_mid_l = (cs * rl * 0.56 - sn * w, y + lift * 0.35, sn * rl * 0.56 + cs * w)
+        p_mid_r = (cs * rl * 0.56 + sn * w, y + lift * 0.35, sn * rl * 0.56 - cs * w)
+        p_mid_top = (cs * rl * 0.52, y + thick * 0.42 + lift * 0.35, sn * rl * 0.52)
+        p_tip = (cs * rl, y + lift, sn * rl)
+        # Upper sunlit facets (outward +Y normals)
+        tris.append((p_base_top, p_mid_r, p_mid_top))
+        tris.append((p_base_top, p_mid_top, p_mid_l))
+        tris.append((p_mid_top, p_mid_r, p_tip))
+        tris.append((p_mid_top, p_tip, p_mid_l))
+        # Lower shaded facets (outward -Y normals)
+        tris.append((p_base_bot, p_mid_l, p_tip))
+        tris.append((p_base_bot, p_tip, p_mid_r))
     return tris
 
 
 def _eval_fronds(origin: list[float], count: int, length: float, width: float,
-                 rise: float, droop: float, segs: int) -> list[tuple]:
+                 rise: float, droop: float, segs: int, phase: float = 0.0) -> list[tuple]:
     ox, oy, oz = origin
     tris = []
     for i in range(count):
-        tier_mul = 0.86 if i % 2 else 1.0
-        yaw = i / count * math.tau + (i % 2) * 0.18
+        yaw = phase + i / count * math.tau + (i % 2) * 0.10
         cs, sn = math.cos(yaw), math.sin(yaw)
+        v_scale = 0.94 + (i % 3) * 0.05
+        L = length * v_scale
         stations = []
         for s in range(segs + 1):
             u = s / segs
-            r = 0.15 + u * length * tier_mul
-            y = oy + math.sin(u * 2.05) * rise * tier_mul - (u * u) * droop * (1.15 if i % 2 else 0.92)
-            w = width * math.sin(max(0.08, min(0.96, u)) * math.pi) * (1.0 - u * 0.35)
-            fold = 0.14 * w
-            stations.append((r, y, w, fold))
+            # Smooth rounded palm arch with pronounced downward-hanging leaflet tip (u > 0.65)
+            rr = L * (0.88 * math.sin(u * math.pi * 0.58) + 0.12 * u)
+            yy = oy + math.sin(u * math.pi * 0.52) * rise - (u ** 2.15) * droop
+            # Rounded broad fan silhouette (full across u=0.2..0.8, tapering softly at tip)
+            ww = width * math.sin(min(1.0, u * 1.15) * math.pi * 0.88) * (1.0 - 0.25 * u * u) + 0.04
+            fold = 0.14 * ww
+            stations.append((rr, yy, ww, fold))
+
+        def wp(rr: float, yy: float, lat: float) -> tuple[float, float, float]:
+            return (ox + rr * cs - lat * sn, yy, oz + rr * sn + lat * cs)
+
         for s in range(segs):
             r0, y0, w0, f0 = stations[s]
             r1, y1, w1, f1 = stations[s + 1]
-
-            def wp(rr: float, yy: float, zz: float) -> tuple[float, float, float]:
-                return (ox + rr * cs - zz * sn, yy, oz + rr * sn + zz * cs)
-
-            # V-creased leaflet pair along spine
-            m0, m1 = wp(r0, y0 + f0, 0.0), wp(r1, y1 + f1, 0.0)
-            l0, l1 = wp(r0, y0, -w0), wp(r1, y1, -w1)
-            rt0, rt1 = wp(r0, y0, w0), wp(r1, y1, w1)
-            tris.append((l0, m1, m0))
-            tris.append((l0, l1, m1))
-            tris.append((m0, m1, rt1))
-            tris.append((m0, rt1, rt0))
+            l0, m0, rt0 = wp(r0, y0 - f0, -w0), wp(r0, y0 + f0 * 0.5, 0.0), wp(r0, y0 - f0, w0)
+            l1, m1, rt1 = wp(r1, y1 - f1, -w1), wp(r1, y1 + f1 * 0.5, 0.0), wp(r1, y1 - f1, w1)
+            tris.append((l0, m0, m1))
+            tris.append((l0, m1, l1))
+            tris.append((m0, rt0, rt1))
+            tris.append((m0, rt1, m1))
     return tris
 
 
-def _eval_curtains(origin: list[float], count: int, inner_r: float, outer_r: float,
-                   top_y: float, bot_y: float, width: float, segs: int) -> list[tuple]:
+def _eval_strands(origin: list[float], count: int, inner_r: float, outer_r: float,
+                  top_y: float, arch: float, bot_y: float, width: float, segs: int, phase: float = 0.0) -> list[tuple]:
     ox, _, oz = origin
     tris = []
     for i in range(count):
-        yaw = i / count * math.tau + (i % 3) * 0.11
+        yaw = phase + i / count * math.tau + math.sin(i * 2.1) * 0.08
         cs, sn = math.cos(yaw), math.sin(yaw)
-        drop = bot_y + (i % 3) * 0.32
+        # Varied natural drop height (1.2m - 2.0m above ground/water)
+        drop = bot_y + (i % 4) * 0.22
+        r_end = outer_r * (0.88 + (i % 3) * 0.08)
+        twist = 0.55 if (i % 2 == 0) else -0.55
+        ct, st_ang = math.cos(twist), math.sin(twist)
         pts = []
         for s in range(segs + 1):
             u = s / segs
-            rr = inner_r + (outer_r - inner_r) * math.sin(u * math.pi * 0.62)
-            yy = top_y + math.sin(u * 1.2) * 0.35 - (u ** 1.35) * (top_y - drop)
-            ww = width * (0.55 + 0.55 * math.sin(u * math.pi)) * (1.0 - 0.55 * u)
+            # Fountain trajectory: rises out in a graceful arch, then hangs vertically to `drop` (1.2-2.0m)
+            rr = inner_r + (r_end - inner_r) * (1.0 - (1.0 - u) ** 1.7)
+            yy = top_y * (1.0 - u ** 1.45) + drop * (u ** 1.45) + math.sin(u * math.pi) * arch * (1.0 - u * 0.65)
+            ww = width * (0.45 + 0.65 * math.sin(u * math.pi * 0.75)) * (1.0 - 0.72 * u) + 0.015
             pts.append((rr, yy, ww))
+
+        def wp(rr: float, yy: float, off: float) -> tuple[float, float, float]:
+            # Slight twist off-tangent so slender strands stay visible from side & top views
+            rx_d = off * st_ang * 0.35
+            tz_d = off * ct
+            return (ox + (rr + rx_d) * cs - tz_d * sn, yy, oz + (rr + rx_d) * sn + tz_d * cs)
+
         for s in range(segs):
             r0, y0, w0 = pts[s]
             r1, y1, w1 = pts[s + 1]
-
-            def wp(rr: float, yy: float, tang_off: float) -> tuple[float, float, float]:
-                return (ox + rr * cs - tang_off * sn, yy, oz + rr * sn + tang_off * cs)
-
             a0, b0 = wp(r0, y0, -w0), wp(r0, y0, w0)
             a1, b1 = wp(r1, y1, -w1), wp(r1, y1, w1)
             tris.append((a0, b0, b1))
@@ -659,42 +832,103 @@ def _eval_curtains(origin: list[float], count: int, inner_r: float, outer_r: flo
     return tris
 
 
-def _eval_cross(part: dict) -> tuple[list, list]:
-    pos, col = [], []
-    tt, tr = float(part['trunkTop']), float(part['trunkR'])
-    if tt > 4.0:
-        trunk_tris = []
-        for axis in (0, 1):
-            a = (-tr, -0.8, 0.0) if axis == 0 else (0.0, -0.8, -tr)
-            b = (tr, -0.8, 0.0) if axis == 0 else (0.0, -0.8, tr)
-            c = (tr * 0.7, tt, 0.0) if axis == 0 else (0.0, tt, tr * 0.7)
-            d = (-tr * 0.7, tt, 0.0) if axis == 0 else (0.0, tt, -tr * 0.7)
-            trunk_tris.extend([(a, b, c), (a, c, d)])
-        tc = int(part['trunkColor'])
-        t_pos, t_col = _shade_part(trunk_tris, tc, tc, tc)
-        pos.extend(t_pos)
-        col.extend(t_col)
-    prof = part['profile']
-    ya, wa = float(prof[0][0]) * 0.85, float(prof[0][1]) * 0.75
-    ym, wm = float(prof[1][0]), float(prof[1][1])
-    yt, wt = float(prof[-1][0]), float(prof[-1][1])
-    crown_tris = []
-    for y0, w0, y1, w1 in ((ya, wa, ym, wm), (ym, wm, yt, wt)):
-        for axis in (0, 1):
-            a = (-w0, y0, 0.0) if axis == 0 else (0.0, y0, -w0)
-            b = (w0, y0, 0.0) if axis == 0 else (0.0, y0, w0)
-            c = (w1, y1, 0.0) if axis == 0 else (0.0, y1, w1)
-            d = (-w1, y1, 0.0) if axis == 0 else (0.0, y1, -w1)
-            crown_tris.extend([(a, b, c), (a, c, d)])
-    cy, cr = float(part['capY']), float(part['capR'])
-    crown_tris.extend([
-        ((-cr, cy, 0.0), (0.0, cy + 0.25, cr), (cr, cy, 0.0)),
-        ((-cr, cy, 0.0), (cr, cy, 0.0), (0.0, cy + 0.25, -cr)),
-    ])
-    c_pos, c_col = _shade_part(crown_tris, part['c'], part['lit'], part['dark'])
-    pos.extend(c_pos)
-    col.extend(c_col)
-    return pos, col
+def _eval_part_tris(part: dict) -> tuple[list[tuple], bool]:
+    op = part['op']
+    if op == 'tube':
+        return _eval_tube(part['pts'], part['sides']), True
+    if op == 'bundles':
+        return _eval_bundles(part['clusters']), True
+    if op == 'blob':
+        rx, ry, rz = part['r']
+        px, py, pz = part['p']
+        return _eval_blob(rx, ry, rz, px, py, pz, part['yaw'], part['seed'], part['subdiv'], part.get('jitter', 0.15)), False
+    if op == 'whorl':
+        return _eval_whorl(part['y'], part['r'], part['thick'], part['lift'], part['lobes'], part['yaw'], part['seed']), False
+    if op == 'fronds':
+        return _eval_fronds(part['origin'], part['count'], part['length'], part['width'], part['rise'], part['droop'], part['segs'], part.get('phase', 0.0)), False
+    if op == 'strands':
+        return _eval_strands(part['origin'], part['count'], part['innerR'], part['outerR'], part['topY'], part['arch'], part['botY'], part['width'], part['segs'], part.get('phase', 0.0)), False
+    raise ValueError(f'Unknown op: {op}')
+
+
+def _lerp_color(c0: tuple[float, float, float], c1: tuple[float, float, float], t: float) -> tuple[float, float, float]:
+    u = max(0.0, min(1.0, t))
+    return (c0[0] + (c1[0] - c0[0]) * u, c0[1] + (c1[1] - c0[1]) * u, c0[2] + (c1[2] - c0[2]) * u)
+
+
+def _tri_normal(a: tuple, b: tuple, c: tuple) -> tuple[float, float, float]:
+    abx, aby, abz = b[0] - a[0], b[1] - a[1], b[2] - a[2]
+    acx, acy, acz = c[0] - a[0], c[1] - a[1], c[2] - a[2]
+    nx = aby * acz - abz * acy
+    ny = abz * acx - abx * acz
+    nz = abx * acy - aby * acx
+    ln = math.hypot(nx, ny, nz) or 1.0
+    return (nx / ln, ny / ln, nz / ln)
+
+
+def build_lod_arrays(spec: dict, lod: str = 'near', variant_idx: int | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    evaluated = []
+    crown_ys = []
+    for part in spec[lod]:
+        tris, is_wood = _eval_part_tris(part)
+        evaluated.append((part, tris, is_wood))
+        if not is_wood:
+            for a, b, c in tris:
+                crown_ys.extend((a[1], b[1], c[1]))
+    c_ymin = min(crown_ys) if crown_ys else 0.0
+    c_yspan = max(0.5, (max(crown_ys) - c_ymin)) if crown_ys else 1.0
+
+    all_pos, all_col = [], []
+    for part, tris, is_wood in evaluated:
+        if not tris:
+            continue
+        lo, mid, hi = hex_rgb(part['dark']), hex_rgb(part['c']), hex_rgb(part['lit'])
+        if is_wood:
+            ys = [(a[1] + b[1] + c[1]) / 3.0 for a, b, c in tris]
+            w_min, w_span = min(ys), max(0.2, max(ys) - min(ys))
+            for (a, b, c), ym in zip(tris, ys):
+                nx, ny, nz = _tri_normal(a, b, c)
+                sun = max(0.0, min(1.0, (-0.45 * nx + 0.35 * ny + 0.55 * nz) * 0.5 + 0.5))
+                t = 0.45 * ((ym - w_min) / w_span) + 0.55 * sun
+                rgb = _lerp_color(lo, mid, t * 2.0) if t < 0.5 else _lerp_color(mid, hi, (t - 0.5) * 2.0)
+                all_pos.extend((a, b, c))
+                all_col.extend((rgb, rgb, rgb))
+        else:
+            # Global crown height + outward normal Y shading: crown underside is 1 stop darker than top,
+            # and overlapping blobs blend seamlessly into one continuous organic volume!
+            for a, b, c in tris:
+                ym = (a[1] + b[1] + c[1]) / 3.0
+                _, ny, _ = _tri_normal(a, b, c)
+                h_t = max(0.0, min(1.0, (ym - c_ymin) / c_yspan))
+                n_t = ny * 0.5 + 0.5
+                t = max(0.0, min(1.0, 0.58 * h_t + 0.42 * n_t))
+                rgb = _lerp_color(lo, mid, t * 2.0) if t < 0.5 else _lerp_color(mid, hi, (t - 0.5) * 2.0)
+                all_pos.extend((a, b, c))
+                all_col.extend((rgb, rgb, rgb))
+
+    pos = np.asarray(all_pos, dtype=np.float32)
+    col = np.asarray(all_col, dtype=np.float32)
+    if variant_idx is not None:
+        var = spec['variants'][variant_idx % len(spec['variants'])]
+        sx, sy, sz = var['scale']
+        pos[:, 0] *= sx
+        pos[:, 1] *= sy
+        pos[:, 2] *= sz
+        lean = float(var['lean'])
+        if abs(lean) > 1e-4:
+            cl, sl = math.cos(lean), math.sin(lean)
+            above = pos[:, 1] > 0.0
+            x_new = pos[above, 0] * cl + pos[above, 1] * sl
+            y_new = -pos[above, 0] * sl + pos[above, 1] * cl
+            pos[above, 0], pos[above, 1] = x_new, y_new
+        col = np.clip(col * np.asarray(var['tint'], dtype=np.float32), 0.0, 1.0)
+
+    v0, v1, v2 = pos[0::3], pos[1::3], pos[2::3]
+    fn = np.cross(v1 - v0, v2 - v0)
+    fl = np.linalg.norm(fn, axis=1, keepdims=True)
+    fn = fn / np.maximum(fl, 1e-9)
+    nrm = np.repeat(fn, 3, axis=0).astype(np.float32)
+    return pos, nrm, col
 
 
 _SPEC_BY_NAME: dict[str, dict] | None = None
@@ -712,7 +946,10 @@ def emit_landmark_tree(
     variant_idx: int = 0,
     wood_mat: str = 'wood',
     leaf_mat: str = 'leaf',
+    pod_mat: str | None = None,
     collide_trunk: bool = True,
+    lean_override: float | None = None,
+    clip_local_z: tuple[float, float] | None = None,
 ) -> None:
     """Emit a reusable multi-LOD procedural tree from `trees.py` into a LandmarkModel."""
     global _SPEC_BY_NAME
@@ -724,141 +961,79 @@ def emit_landmark_tree(
     sx = scale * var['scale'][0]
     sy = (y_scale if y_scale is not None else scale) * var['scale'][1]
     sz = scale * var['scale'][2]
-    lean = float(var['lean'])
+    # Positive lean tilts +X crown across the road in local +X direction before yaw rotation
+    lean = float(lean_override) if lean_override is not None else float(var['lean'])
     cl, sl = math.cos(lean), math.sin(lean)
     cy_v, sy_v = math.cos(yaw), math.sin(yaw)
 
-    wood_verts, wood_faces = [], []
-    leaf_verts, leaf_faces = [], []
+    buckets: dict[str, tuple[list, list]] = {}
+
+    def add_tri(mat_name: str, wtri: list[tuple[float, float, float]], is_wood_tri: bool = False) -> None:
+        if clip_local_z is not None:
+            z_lo, z_hi = clip_local_z
+            # Pull clipped back-side limbs well inside the foliage boundary so zero wood tips protrude
+            if is_wood_tri:
+                z_lo_w, z_hi_w = z_lo + 1.15, z_hi - 1.15
+                if any(pt[2] < z_lo_w or pt[2] > z_hi_w for pt in wtri):
+                    wtri = [(pt[0], pt[1], min(z_hi_w, max(z_lo_w, pt[2]))) for pt in wtri]
+            elif any(pt[2] < z_lo or pt[2] > z_hi for pt in wtri):
+                wtri = [(pt[0], pt[1], min(z_hi, max(z_lo, pt[2]))) for pt in wtri]
+        v_list, f_list = buckets.setdefault(mat_name, ([], []))
+        base_idx = len(v_list)
+        v_list.extend(wtri)
+        f_list.append([base_idx, base_idx + 1, base_idx + 2])
+
     for part in spec[lod_key]:
-        op = part['op']
-        if op == 'tube':
-            tris = _eval_tube(part['pts'], part['sides'])
-        elif op == 'tuft':
-            rx, ry, rz = part['r']
-            px, py, pz = part['p']
-            tris = _eval_tuft(rx, ry, rz, px, py, pz, part['yaw'], part['seed'], part['rings'], part['segs'])
-        elif op == 'tier':
-            tris = _eval_tier(part['y0'], part['y1'], part['r0'], part['r1'], part['segs'], part['yaw'], part['scallop'])
-        elif op == 'fronds':
-            tris = _eval_fronds(part['origin'], part['count'], part['length'], part['width'], part['rise'], part['droop'], part['segs'])
-        elif op == 'curtains':
-            tris = _eval_curtains(part['origin'], part['count'], part['innerR'], part['outerR'], part['topY'], part['botY'], part['width'], part['segs'])
-        else:
+        # On wall-adjacent street trees (`clip_local_z`), prune back-facing wall-side limbs (`vx < -0.5`) cleanly
+        if clip_local_z is not None and part['op'] == 'tube' and part['pts'][0][1] > 1.0 and part['pts'][-1][0] < -0.5:
             continue
-        is_wood = (op == 'tube')
-        v_list = wood_verts if is_wood else leaf_verts
-        f_list = wood_faces if is_wood else leaf_faces
+        tris, is_wood = _eval_part_tris(part)
+        is_pod = (not is_wood) and part.get('c') in (PALETTE['bischofiaPod']['c'], PALETTE['elaeocarpusRed']['c'])
+        mat_name = wood_mat if is_wood else (pod_mat if (is_pod and pod_mat) else leaf_mat)
         for tri in tris:
-            base_idx = len(v_list)
+            wtri = []
             for vx, vy, vz in tri:
-                vy_c = max(-0.45, vy) * sy
+                # Keep foot of trunk anchored within [-0.18m, 0m] below local datum so grounding audit passes 0 sink/float
+                vy_c = max(-0.18, vy * sy)
                 vx_c, vz_c = vx * sx, vz * sz
-                lx = vx_c * cl - vy_c * sl
-                ly = vx_c * sl + vy_c * cl
+                if vy <= 0.02:
+                    lx, ly = vx_c, vy_c
+                else:
+                    # Lean pivots smoothly from ground base y=0 so root base never lifts off the ground!
+                    lx = vx_c * cl + vy_c * sl
+                    ly = -vx_c * sl + vy_c * cl
                 wx = lx * cy_v + vz_c * sy_v + x
                 wz = -lx * sy_v + vz_c * cy_v + z
-                v_list.append((wx, ly + y, wz))
-            f_list.append([base_idx, base_idx + 1, base_idx + 2])
+                wtri.append((wx, ly + y, wz))
+            add_tri(mat_name, wtri, is_wood)
 
-    if wood_faces:
-        model.mesh(wood_verts, wood_faces, wood_mat, collide=False)
-        if collide_trunk:
-            model.box(x, y, z, 0.42 * scale, 2.6 * scale, 0.42 * scale, wood_mat, True)
-    if leaf_faces:
-        model.mesh(leaf_verts, leaf_faces, leaf_mat, collide=False)
-
-
-def build_lod_arrays(spec: dict, lod: str = 'near', variant_idx: int | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    all_pos, all_col = [], []
-    for part in spec[lod]:
-        op = part['op']
-        if op == 'cross':
-            p_arr, c_arr = _eval_cross(part)
-        else:
-            if op == 'tube':
-                tris = _eval_tube(part['pts'], part['sides'])
-            elif op == 'tuft':
-                rx, ry, rz = part['r']
-                px, py, pz = part['p']
-                tris = _eval_tuft(rx, ry, rz, px, py, pz, part['yaw'], part['seed'], part['rings'], part['segs'])
-            elif op == 'tier':
-                tris = _eval_tier(part['y0'], part['y1'], part['r0'], part['r1'], part['segs'], part['yaw'], part['scallop'])
-            elif op == 'fronds':
-                tris = _eval_fronds(part['origin'], part['count'], part['length'], part['width'], part['rise'], part['droop'], part['segs'])
-            elif op == 'curtains':
-                tris = _eval_curtains(part['origin'], part['count'], part['innerR'], part['outerR'], part['topY'], part['botY'], part['width'], part['segs'])
-            else:
-                raise ValueError(f'Unknown op: {op}')
-            p_arr, c_arr = _shade_part(tris, part['c'], part['lit'], part['dark'])
-        all_pos.extend(p_arr)
-        all_col.extend(c_arr)
-
-    pos = np.asarray(all_pos, dtype=np.float32)
-    col = np.asarray(all_col, dtype=np.float32)
-
-    if variant_idx is not None:
-        var = spec['variants'][variant_idx % len(spec['variants'])]
-        sx, sy, sz = var['scale']
-        pos[:, 0] *= sx
-        pos[:, 1] *= sy
-        pos[:, 2] *= sz
-        lean = float(var['lean'])
-        if abs(lean) > 1e-5:
-            cs, sn = math.cos(lean), math.sin(lean)
-            x_new = pos[:, 0] * cs - pos[:, 1] * sn
-            y_new = pos[:, 0] * sn + pos[:, 1] * cs
-            pos[:, 0], pos[:, 1] = x_new, y_new
-        tr, tg, tb = var['tint']
-        col = np.clip(col * np.array([tr, tg, tb], dtype=np.float32), 0.0, 1.0)
-
-    # Flat-shaded per-triangle normals
-    tris_v = pos.reshape(-1, 3, 3)
-    e1 = tris_v[:, 1] - tris_v[:, 0]
-    e2 = tris_v[:, 2] - tris_v[:, 0]
-    n = np.cross(e1, e2)
-    nlen = np.maximum(1e-6, np.linalg.norm(n, axis=1, keepdims=True))
-    n = np.repeat(n / nlen, 3, axis=0).astype(np.float32)
-    return pos, n, col
+    for mat_name, (v_list, f_list) in buckets.items():
+        if f_list:
+            model.mesh(v_list, f_list, mat_name, collide=False)
+    if collide_trunk:
+        # Compact foot collider tucked inside the 0.7m trunk base (never protruding visually beside leaning trunks!)
+        model.box(x, y - 0.14, z, 0.30 * scale, 0.55 * scale, 0.30 * scale, wood_mat, True)
 
 
-def export_glb_assets(specs: list[dict], out_dir: Path) -> None:
-    out_dir.mkdir(parents=True, exist_ok=True)
-    for spec in specs:
-        scene = trimesh.Scene()
-        for lod_key, node_name in (('near', 'lod0'), ('mid', 'lod1'), ('far', 'lod2')):
-            pos, _, col = build_lod_arrays(spec, lod_key, variant_idx=0)
-            rgba = np.column_stack([(col * 255).round().astype(np.uint8), np.full(len(pos), 255, dtype=np.uint8)])
-            faces = np.arange(len(pos), dtype=np.int64).reshape(-1, 3)
-            mesh = trimesh.Trimesh(vertices=pos, faces=faces, process=False)
-            mesh.visual = trimesh.visual.ColorVisuals(mesh=mesh, vertex_colors=rgba)
-            scene.add_geometry(mesh, node_name=node_name, geom_name=f"{spec['name']}_{node_name}")
-        scene.export(out_dir / f"{spec['id']:02d}_{spec['name']}.glb")
+def write_specs_json(out_path: Path = OUT_JSON) -> list[dict]:
+    specs = build_species_specs()
+    payload = {'version': 2, 'species': specs}
+    out_path.write_text(json.dumps(payload, ensure_ascii=False, separators=(',', ':')) + '\n', encoding='utf-8')
+    return specs
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--specs-out', type=Path, default=Path(__file__).with_name('tree-specs.json'))
-    parser.add_argument('--export-glb', type=Path, default=None)
-    args = parser.parse_args()
-
-    specs = build_species_specs()
-    payload = {'version': 1, 'species': specs}
-    args.specs_out.write_text(json.dumps(payload, ensure_ascii=False, separators=(',', ':')) + '\n')
-    print(f'Wrote {args.specs_out} ({args.specs_out.stat().st_size:,} bytes, {len(specs)} species)')
-    for spec in specs:
-        counts = {}
-        for lod in ('near', 'mid', 'far'):
-            pos, _, _ = build_lod_arrays(spec, lod, variant_idx=0)
-            counts[lod] = len(pos) // 3
-        pos0, _, _ = build_lod_arrays(spec, 'near', variant_idx=0)
-        w = float(max(pos0[:, 0].max() - pos0[:, 0].min(), pos0[:, 2].max() - pos0[:, 2].min()))
-        h = float(pos0[:, 1].max())
-        print(f"  [{spec['id']:2d}] {spec['name']:12s} ({spec['zh']:8s})  H={h:5.1f}m  W={w:4.1f}m  tris near={counts['near']:3d} mid={counts['mid']:2d} far={counts['far']:2d}")
-
-    if args.export_glb is not None:
-        export_glb_assets(specs, args.export_glb)
-        print(f'Exported {len(specs)} multi-LOD GLBs to {args.export_glb}')
+    specs = write_specs_json()
+    print(f'Wrote {OUT_JSON} ({OUT_JSON.stat().st_size:,} bytes, {len(specs)} species)')
+    for s in specs:
+        p0, _, _ = build_lod_arrays(s, 'near')
+        p1, _, _ = build_lod_arrays(s, 'mid')
+        p2, _, _ = build_lod_arrays(s, 'far')
+        w = float(max(p0[:, 0].max() - p0[:, 0].min(), p0[:, 2].max() - p0[:, 2].min()))
+        h = float(p0[:, 1].max())
+        base_mask = np.abs(p0[:, 1]) < 0.35
+        bd = float(max(np.ptp(p0[base_mask, 0]), np.ptp(p0[base_mask, 2]))) if np.any(base_mask) else 0.0
+        print(f"  [{s['id']:2d}] {s['name']:12s} ({s['zh']:10s})  H={h:5.1f}m  W={w:5.1f}m  baseD={bd:4.2f}m  tris near={len(p0)//3:3d} mid={len(p1)//3:3d} far={len(p2)//3:2d}")
 
 
 if __name__ == '__main__':

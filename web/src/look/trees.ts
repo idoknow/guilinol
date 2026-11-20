@@ -2,71 +2,96 @@ import * as THREE from 'three'
 import treeSpecs from '../../../pipeline/tree-specs.json'
 import {look} from './config'
 
-// M2.6-26 Guilin street & waterfront tree models (docs/trees.md, pipeline/trees.py).
-// Species order preserves GL04 0..5 and appends 6..10 at the tail:
-//   0 camphor, 1 banyan, 2 osmanthus, 3 palm, 4 conifer, 5 shrub,
-//   6 virens, 7 bischofia, 8 elaeocarpus, 9 ginkgo, 10 willow.
-// `treeGeometry(kind)` returns `{near, mid, far, material}` (compatible with IDOK-72's
-// `{near, far, material}` single-BufferGeometry + instanceColor contract).
-
 type Vec3 = [number, number, number]
+type VariantSpec = {scale:Vec3; lean:number; tint:Vec3}
 type PartSpec = Record<string, any>
-type VariantSpec = {scale:Vec3, lean:number, tint:Vec3}
-type SpeciesSpec = {
-  id:number; name:string; zh:string; latin:string
-  variants:VariantSpec[]
-  near:PartSpec[]; mid:PartSpec[]; far:PartSpec[]
-}
+type SpeciesSpec = {id:number; name:string; zh:string; latin:string; variants:VariantSpec[]; near:PartSpec[]; mid:PartSpec[]; far:PartSpec[]}
 
 const specs = (treeSpecs as unknown as {species:SpeciesSpec[]}).species
 export const TREE_SPECIES_COUNT = specs.length
 
-const cLo = new THREE.Color(), cMid = new THREE.Color(), cHi = new THREE.Color(), cTmp = new THREE.Color()
-const uVec = new THREE.Vector3(), vVec = new THREE.Vector3(), tVec = new THREE.Vector3(), refVec = new THREE.Vector3()
+const tmpC0 = new THREE.Color(), tmpC1 = new THREE.Color(), tmpC2 = new THREE.Color(), tmpOut = new THREE.Color()
+const tmpObj = new THREE.Object3D()
 
-function shadedTriangles(tris:Vec3[][], cHex:number, litHex:number, darkHex:number, outPos:number[], outCol:number[]) {
-  if (!tris.length) return
-  let yMin = Infinity, yMax = -Infinity
-  const ys = new Float32Array(tris.length)
-  for (let i = 0; i < tris.length; i++) {
-    const ym = (tris[i][0][1] + tris[i][1][1] + tris[i][2][1]) / 3
-    ys[i] = ym
-    if (ym < yMin) yMin = ym
-    if (ym > yMax) yMax = ym
+// Standard outward-facing unit icosahedron + 1-level geodesic subdivision (42 verts, 80 tris)
+const PHI = (1 + Math.sqrt(5)) / 2
+const ICO_RAW:Vec3[] = [
+  [-1, PHI, 0], [1, PHI, 0], [-1, -PHI, 0], [1, -PHI, 0],
+  [0, -1, PHI], [0, 1, PHI], [0, -1, -PHI], [0, 1, -PHI],
+  [PHI, 0, -1], [PHI, 0, 1], [-PHI, 0, -1], [-PHI, 0, 1],
+]
+const ICO_VERTS:Vec3[] = ICO_RAW.map(([x, y, z]) => {
+  const ln = Math.hypot(x, y, z)
+  return [x / ln, y / ln, z / ln]
+})
+const ICO_FACES:[number, number, number][] = [
+  [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+  [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+  [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+  [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+]
+
+function subdivideIco(verts:Vec3[], faces:[number, number, number][]) {
+  const vOut:Vec3[] = verts.slice()
+  const cache = new Map<string, number>()
+  const mid = (i:number, j:number) => {
+    const key = i < j ? `${i}_${j}` : `${j}_${i}`
+    const hit = cache.get(key)
+    if (hit !== undefined) return hit
+    const [ax, ay, az] = vOut[i], [bx, by, bz] = vOut[j]
+    const mx = (ax + bx) * 0.5, my = (ay + by) * 0.5, mz = (az + bz) * 0.5
+    const ln = Math.hypot(mx, my, mz)
+    const idx = vOut.length
+    vOut.push([mx / ln, my / ln, mz / ln])
+    cache.set(key, idx)
+    return idx
   }
-  const span = Math.max(0.01, yMax - yMin)
-  cLo.setHex(darkHex); cMid.setHex(cHex); cHi.setHex(litHex)
-  for (let i = 0; i < tris.length; i++) {
-    const t = Math.max(0, Math.min(1, (ys[i] - yMin) / span))
-    if (t < 0.5) cTmp.copy(cLo).lerp(cMid, t * 2)
-    else cTmp.copy(cMid).lerp(cHi, (t - 0.5) * 2)
-    const tri = tris[i]
-    for (let k = 0; k < 3; k++) {
-      outPos.push(tri[k][0], tri[k][1], tri[k][2])
-      outCol.push(cTmp.r, cTmp.g, cTmp.b)
-    }
+  const fOut:[number, number, number][] = []
+  for (const [a, b, c] of faces) {
+    const ab = mid(a, b), bc = mid(b, c), ca = mid(c, a)
+    fOut.push([a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca])
   }
+  return {verts:vOut, faces:fOut}
+}
+
+const ICO_1 = subdivideIco(ICO_VERTS, ICO_FACES)
+
+function evalBlob([rx, ry, rz]:Vec3, [px, py, pz]:Vec3, yaw:number, seed:number, subdiv:number, jitter = 0.15):Vec3[][] {
+  const verts = subdiv >= 1 ? ICO_1.verts : ICO_VERTS
+  const faces = subdiv >= 1 ? ICO_1.faces : ICO_FACES
+  const cy = Math.cos(yaw), sy = Math.sin(yaw)
+  const pts:Vec3[] = verts.map(([ux, uy, uz]) => {
+    const d1 = Math.sin(seed * 1.73 + ux * 3.17 + uy * 2.63 + uz * 3.53)
+    const d2 = Math.cos(seed * 2.91 - ux * 4.31 + uy * 3.79 - uz * 2.87)
+    const disp = 1 + jitter * (0.62 * d1 + 0.38 * d2)
+    const lx = ux * rx * disp, ly = uy * ry * disp, lz = uz * rz * disp
+    return [lx * cy + lz * sy + px, ly + py, -lx * sy + lz * cy + pz]
+  })
+  return faces.map(([a, b, c]) => [pts[a], pts[b], pts[c]])
 }
 
 function evalTube(pts:number[][], sides:number):Vec3[][] {
-  const rings:Vec3[][] = []
-  for (let i = 0; i < pts.length; i++) {
-    const [x, y, z, r] = pts[i]
-    const p0 = pts[Math.max(0, i - 1)], p1 = pts[Math.min(pts.length - 1, i + 1)]
-    tVec.set(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2])
-    if (tVec.lengthSq() > 1e-12) tVec.normalize(); else tVec.set(0, 1, 0)
-    refVec.set(Math.abs(tVec.z) > 0.92 ? 1 : 0, 0, Math.abs(tVec.z) > 0.92 ? 0 : 1)
-    uVec.crossVectors(tVec, refVec).normalize()
-    vVec.crossVectors(tVec, uVec)
+  const rings:Vec3[][] = [], n = pts.length
+  for (let i = 0; i < n; i++) {
+    const [cx, cy, cz, r] = pts[i]
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[Math.min(n - 1, i + 1)]
+    let tx = p1[0] - p0[0], ty = p1[1] - p0[1], tz = p1[2] - p0[2]
+    const tl = Math.hypot(tx, ty, tz) || 1
+    tx /= tl; ty /= tl; tz /= tl
+    const upX = Math.abs(ty) > 0.92 ? 1 : 0, upY = Math.abs(ty) > 0.92 ? 0 : 1
+    let ux = -tz * upY, uy = tz * upX, uz = tx * upY - ty * upX
+    const ul = Math.hypot(ux, uy, uz) || 1
+    ux /= ul; uy /= ul; uz /= ul
+    const vx = ty * uz - tz * uy, vy = tz * ux - tx * uz, vz = tx * uy - ty * ux
     const ring:Vec3[] = []
     for (let s = 0; s < sides; s++) {
-      const a = (s / sides) * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a)
-      ring.push([x + r * (ca * uVec.x + sa * vVec.x), y + r * (ca * uVec.y + sa * vVec.y), z + r * (ca * uVec.z + sa * vVec.z)])
+      const ang = (s / sides) * Math.PI * 2, ca = Math.cos(ang), sa = Math.sin(ang)
+      ring.push([cx + r * (ca * ux + sa * vx), cy + r * (ca * uy + sa * vy), cz + r * (ca * uz + sa * vz)])
     }
     rings.push(ring)
   }
   const tris:Vec3[][] = []
-  for (let i = 0; i < rings.length - 1; i++) {
+  for (let i = 0; i < n - 1; i++) {
     const r0 = rings[i], r1 = rings[i + 1]
     for (let s = 0; s < sides; s++) {
       const sn = (s + 1) % sides
@@ -76,96 +101,90 @@ function evalTube(pts:number[][], sides:number):Vec3[][] {
   return tris
 }
 
-function evalTuft([rx, ry, rz]:Vec3, [px, py, pz]:Vec3, yaw:number, seed:number, rings:number, segs:number):Vec3[][] {
-  const effRings = Math.max(1, rings - 1)
-  const effSegs = rings >= 3 ? Math.max(5, segs - 1) : segs
-  const cs = Math.cos(yaw), sn = Math.sin(yaw)
-  const xf = (lx:number, ly:number, lz:number):Vec3 => [lx * cs + lz * sn + px, ly + py, -lx * sn + lz * cs + pz]
-  const top = xf(0, ry * 0.98, 0), bot = xf(0, -ry * 0.56, 0)
-  const bands:Vec3[][] = []
-  for (let rIdx = 1; rIdx <= effRings; rIdx++) {
-    const v = rIdx / (effRings + 1), phi = (0.5 - v) * Math.PI
-    const sy = Math.sin(phi), cy = Math.cos(phi)
-    const yLocal = ry * sy * (sy >= 0 ? 0.98 : 0.58)
-    const band:Vec3[] = []
-    for (let s = 0; s < effSegs; s++) {
-      const th = (s / effSegs) * Math.PI * 2
-      const lobe = 1 + 0.13 * Math.sin(3 * th + seed * 0.7) + 0.08 * Math.cos(5 * th - seed * 1.3 + rIdx)
-      const bumpY = 0.07 * ry * Math.sin(2 * th + seed + rIdx * 1.7)
-      band.push(xf(rx * cy * lobe * Math.cos(th), yLocal + bumpY, rz * cy * lobe * Math.sin(th)))
-    }
-    bands.push(band)
-  }
+function evalBundles(clusters:any[]):Vec3[][] {
   const tris:Vec3[][] = []
-  for (let s = 0; s < effSegs; s++) {
-    const sNext = (s + 1) % effSegs
-    tris.push([top, bands[0][sNext], bands[0][s]], [bands[bands.length - 1][s], bands[bands.length - 1][sNext], bot])
-  }
-  for (let b = 0; b < bands.length - 1; b++) {
-    const b0 = bands[b], b1 = bands[b + 1]
-    for (let s = 0; s < effSegs; s++) {
-      const sNext = (s + 1) % effSegs
-      tris.push([b0[s], b0[sNext], b1[sNext]], [b0[s], b1[sNext], b1[s]])
+  for (let ci = 0; ci < clusters.length; ci++) {
+    const cl = clusters[ci]
+    const [ox, oy, oz] = cl.p as Vec3
+    const sp = cl.spread as number, r = cl.r as number, lengths = cl.lengths as number[]
+    for (let k = 0; k < lengths.length; k++) {
+      const ln = lengths[k]
+      const ang = (k / lengths.length) * Math.PI * 2 + ci * 0.7
+      const dx = Math.cos(ang) * sp, dz = Math.sin(ang) * sp
+      const sx = Math.sin(ci * 1.9 + k * 2.3) * 0.10, sz = Math.cos(ci * 1.5 + k * 2.7) * 0.10
+      tris.push(...evalTube([
+        [ox + dx * 0.45, oy + 0.15, oz + dz * 0.45, r],
+        [ox + dx + sx * 0.5, oy - ln * 0.52, oz + dz + sz * 0.5, r * 0.68],
+        [ox + dx * 1.15 + sx, oy - ln, oz + dz * 1.15 + sz, r * 0.28],
+      ], 3))
     }
   }
   return tris
 }
 
-function evalTier(y0:number, y1:number, r0:number, r1:number, segs:number, yaw:number, scallop:number):Vec3[][] {
-  const n = segs * 2, yMid = y0 + (y1 - y0) * 0.12
-  const botRing:Vec3[] = [], topRing:Vec3[] = []
-  for (let i = 0; i < n; i++) {
-    const th = yaw + (i / n) * Math.PI * 2, tip = i % 2 === 0
-    const rad = r0 * (tip ? 1 + scallop : 1 - scallop * 0.75)
-    botRing.push([rad * Math.cos(th), tip ? y0 : yMid, rad * Math.sin(th)])
-    topRing.push([r1 * Math.cos(th), y1, r1 * Math.sin(th)])
-  }
+function evalWhorl(y:number, r:number, thick:number, lift:number, lobes:number, yaw:number, seed:number):Vec3[][] {
   const tris:Vec3[][] = []
-  for (let i = 0; i < n; i++) {
-    const next = (i + 1) % n
-    if (r1 < 0.08) tris.push([botRing[i], [0, y1, 0], botRing[next]])
-    else tris.push([botRing[i], topRing[next], botRing[next]], [botRing[i], topRing[i], topRing[next]])
+  for (let i = 0; i < lobes; i++) {
+    const ang = yaw + (i / lobes) * Math.PI * 2 + Math.sin(seed + i * 1.7) * 0.08
+    const cs = Math.cos(ang), sn = Math.sin(ang)
+    const rl = r * (0.90 + 0.16 * Math.sin(seed * 1.3 + i * 2.5))
+    const w = rl * 0.44
+    const pBaseTop:Vec3 = [cs * 0.12, y + thick * 0.52, sn * 0.12]
+    const pBaseBot:Vec3 = [cs * 0.12, y - thick * 0.28, sn * 0.12]
+    const pMidL:Vec3 = [cs * rl * 0.56 - sn * w, y + lift * 0.35, sn * rl * 0.56 + cs * w]
+    const pMidR:Vec3 = [cs * rl * 0.56 + sn * w, y + lift * 0.35, sn * rl * 0.56 - cs * w]
+    const pMidTop:Vec3 = [cs * rl * 0.52, y + thick * 0.42 + lift * 0.35, sn * rl * 0.52]
+    const pTip:Vec3 = [cs * rl, y + lift, sn * rl]
+    tris.push(
+      [pBaseTop, pMidR, pMidTop], [pBaseTop, pMidTop, pMidL],
+      [pMidTop, pMidR, pTip], [pMidTop, pTip, pMidL],
+      [pBaseBot, pMidL, pTip], [pBaseBot, pTip, pMidR],
+    )
   }
   return tris
 }
 
-function evalFronds([ox, oy, oz]:Vec3, count:number, length:number, width:number, rise:number, droop:number, segs:number):Vec3[][] {
+function evalFronds([ox, oy, oz]:Vec3, count:number, length:number, width:number, rise:number, droop:number, segs:number, phase = 0):Vec3[][] {
   const tris:Vec3[][] = []
   for (let i = 0; i < count; i++) {
-    const tierMul = i % 2 ? 0.86 : 1, yaw = (i / count) * Math.PI * 2 + (i % 2) * 0.18
-    const cs = Math.cos(yaw), sn = Math.sin(yaw)
-    const wp = (rr:number, yy:number, zz:number):Vec3 => [ox + rr * cs - zz * sn, yy, oz + rr * sn + zz * cs]
+    const yaw = phase + (i / count) * Math.PI * 2 + (i % 2) * 0.10, cs = Math.cos(yaw), sn = Math.sin(yaw)
+    const L = length * (0.94 + (i % 3) * 0.05)
+    const wp = (rr:number, yy:number, lat:number):Vec3 => [ox + rr * cs - lat * sn, yy, oz + rr * sn + lat * cs]
     const st:[number, number, number, number][] = []
     for (let s = 0; s <= segs; s++) {
       const u = s / segs
-      const r = 0.15 + u * length * tierMul
-      const y = oy + Math.sin(u * 2.05) * rise * tierMul - u * u * droop * (i % 2 ? 1.15 : 0.92)
-      const w = width * Math.sin(Math.max(0.08, Math.min(0.96, u)) * Math.PI) * (1 - u * 0.35)
-      st.push([r, y, w, 0.14 * w])
+      const rr = L * (0.88 * Math.sin(u * Math.PI * 0.58) + 0.12 * u)
+      const yy = oy + Math.sin(u * Math.PI * 0.52) * rise - Math.pow(u, 2.15) * droop
+      const ww = width * Math.sin(Math.min(1, u * 1.15) * Math.PI * 0.88) * (1 - 0.25 * u * u) + 0.04
+      st.push([rr, yy, ww, 0.14 * ww])
     }
     for (let s = 0; s < segs; s++) {
       const [r0, y0, w0, f0] = st[s], [r1, y1, w1, f1] = st[s + 1]
-      const m0 = wp(r0, y0 + f0, 0), m1 = wp(r1, y1 + f1, 0)
-      const l0 = wp(r0, y0, -w0), l1 = wp(r1, y1, -w1)
-      const rt0 = wp(r0, y0, w0), rt1 = wp(r1, y1, w1)
-      tris.push([l0, m1, m0], [l0, l1, m1], [m0, m1, rt1], [m0, rt1, rt0])
+      const l0 = wp(r0, y0 - f0, -w0), m0 = wp(r0, y0 + f0 * 0.5, 0), rt0 = wp(r0, y0 - f0, w0)
+      const l1 = wp(r1, y1 - f1, -w1), m1 = wp(r1, y1 + f1 * 0.5, 0), rt1 = wp(r1, y1 - f1, w1)
+      tris.push([l0, m0, m1], [l0, m1, l1], [m0, rt0, rt1], [m0, rt1, m1])
     }
   }
   return tris
 }
 
-function evalCurtains([ox, , oz]:Vec3, count:number, innerR:number, outerR:number, topY:number, botY:number, width:number, segs:number):Vec3[][] {
+function evalStrands([ox, , oz]:Vec3, count:number, innerR:number, outerR:number, topY:number, arch:number, botY:number, width:number, segs:number, phase = 0):Vec3[][] {
   const tris:Vec3[][] = []
   for (let i = 0; i < count; i++) {
-    const yaw = (i / count) * Math.PI * 2 + (i % 3) * 0.11, cs = Math.cos(yaw), sn = Math.sin(yaw)
-    const drop = botY + (i % 3) * 0.32
-    const wp = (rr:number, yy:number, off:number):Vec3 => [ox + rr * cs - off * sn, yy, oz + rr * sn + off * cs]
+    const yaw = phase + (i / count) * Math.PI * 2 + Math.sin(i * 2.1) * 0.08, cs = Math.cos(yaw), sn = Math.sin(yaw)
+    const drop = botY + (i % 4) * 0.22
+    const rEnd = outerR * (0.88 + (i % 3) * 0.08)
+    const twist = (i % 2 === 0) ? 0.55 : -0.55, ct = Math.cos(twist), stAng = Math.sin(twist)
+    const wp = (rr:number, yy:number, off:number):Vec3 => {
+      const rxD = off * stAng * 0.35, tzD = off * ct
+      return [ox + (rr + rxD) * cs - tzD * sn, yy, oz + (rr + rxD) * sn + tzD * cs]
+    }
     const st:[number, number, number][] = []
     for (let s = 0; s <= segs; s++) {
       const u = s / segs
-      const rr = innerR + (outerR - innerR) * Math.sin(u * Math.PI * 0.62)
-      const yy = topY + Math.sin(u * 1.2) * 0.35 - Math.pow(u, 1.35) * (topY - drop)
-      const ww = width * (0.55 + 0.55 * Math.sin(u * Math.PI)) * (1 - 0.55 * u)
+      const rr = innerR + (rEnd - innerR) * (1 - Math.pow(1 - u, 1.7))
+      const yy = topY * (1 - Math.pow(u, 1.45)) + drop * Math.pow(u, 1.45) + Math.sin(u * Math.PI) * arch * (1 - u * 0.65)
+      const ww = width * (0.45 + 0.65 * Math.sin(u * Math.PI * 0.75)) * (1 - 0.72 * u) + 0.015
       st.push([rr, yy, ww])
     }
     for (let s = 0; s < segs; s++) {
@@ -177,55 +196,77 @@ function evalCurtains([ox, , oz]:Vec3, count:number, innerR:number, outerR:numbe
   return tris
 }
 
-function evalCross(part:PartSpec, outPos:number[], outCol:number[]) {
-  const tt = part.trunkTop as number, tr = part.trunkR as number
-  if (tt > 4.0) {
-    const trunkTris:Vec3[][] = []
-    for (let axis = 0; axis < 2; axis++) {
-      const a:Vec3 = axis === 0 ? [-tr, -0.8, 0] : [0, -0.8, -tr]
-      const b:Vec3 = axis === 0 ? [tr, -0.8, 0] : [0, -0.8, tr]
-      const c:Vec3 = axis === 0 ? [tr * 0.7, tt, 0] : [0, tt, tr * 0.7]
-      const d:Vec3 = axis === 0 ? [-tr * 0.7, tt, 0] : [0, tt, -tr * 0.7]
-      trunkTris.push([a, b, c], [a, c, d])
-    }
-    const tc = part.trunkColor as number
-    shadedTriangles(trunkTris, tc, tc, tc, outPos, outCol)
-  }
-  const prof = part.profile as number[][], crownTris:Vec3[][] = []
-  const ya = prof[0][0] * 0.85, wa = prof[0][1] * 0.75
-  const ym = prof[1][0], wm = prof[1][1]
-  const yt = prof[prof.length - 1][0], wt = prof[prof.length - 1][1]
-  for (const [y0, w0, y1, w1] of [[ya, wa, ym, wm], [ym, wm, yt, wt]]) {
-    for (let axis = 0; axis < 2; axis++) {
-      const a:Vec3 = axis === 0 ? [-w0, y0, 0] : [0, y0, -w0]
-      const b:Vec3 = axis === 0 ? [w0, y0, 0] : [0, y0, w0]
-      const c:Vec3 = axis === 0 ? [w1, y1, 0] : [0, y1, w1]
-      const d:Vec3 = axis === 0 ? [-w1, y1, 0] : [0, y1, -w1]
-      crownTris.push([a, b, c], [a, c, d])
-    }
-  }
-  const cy = part.capY as number, cr = part.capR as number
-  crownTris.push([[-cr, cy, 0], [0, cy + 0.25, cr], [cr, cy, 0]], [[-cr, cy, 0], [cr, cy, 0], [0, cy + 0.25, -cr]])
-  shadedTriangles(crownTris, part.c, part.lit, part.dark, outPos, outCol)
+function triNormal(a:Vec3, b:Vec3, c:Vec3):Vec3 {
+  const abx = b[0] - a[0], aby = b[1] - a[1], abz = b[2] - a[2]
+  const acx = c[0] - a[0], acy = c[1] - a[1], acz = c[2] - a[2]
+  const nx = aby * acz - abz * acy, ny = abz * acx - abx * acz, nz = abx * acy - aby * acx
+  const ln = Math.hypot(nx, ny, nz) || 1
+  return [nx / ln, ny / ln, nz / ln]
+}
+
+function evalPart(part:PartSpec):{tris:Vec3[][]; isWood:boolean} {
+  const op = part.op as string
+  if (op === 'tube') return {tris:evalTube(part.pts, part.sides), isWood:true}
+  if (op === 'bundles') return {tris:evalBundles(part.clusters), isWood:true}
+  if (op === 'blob') return {tris:evalBlob(part.r, part.p, part.yaw, part.seed, part.subdiv, part.jitter ?? 0.15), isWood:false}
+  if (op === 'whorl') return {tris:evalWhorl(part.y, part.r, part.thick, part.lift, part.lobes, part.yaw, part.seed), isWood:false}
+  if (op === 'fronds') return {tris:evalFronds(part.origin, part.count, part.length, part.width, part.rise, part.droop, part.segs, part.phase ?? 0), isWood:false}
+  if (op === 'strands') return {tris:evalStrands(part.origin, part.count, part.innerR, part.outerR, part.topY, part.arch, part.botY, part.width, part.segs, part.phase ?? 0), isWood:false}
+  return {tris:[], isWood:false}
 }
 
 function buildGeometry(parts:PartSpec[], neutralWhite = false) {
-  const pos:number[] = [], col:number[] = []
-  for (const part of parts) {
-    const c = neutralWhite && part.op !== 'tube' ? 0x6b8f55 : part.c
-    const lit = neutralWhite && part.op !== 'tube' ? 0xa3c96e : part.lit
-    const dark = neutralWhite && part.op !== 'tube' ? 0x2d4d31 : part.dark
-    if (part.op === 'cross') {
-      evalCross(neutralWhite ? {...part, c, lit, dark} : part, pos, col)
-      continue
+  const evaluated = parts.map(part => ({part, ...evalPart(part)}))
+  let cYmin = Infinity, cYmax = -Infinity
+  for (const item of evaluated) {
+    if (item.isWood) continue
+    for (const [a, b, c] of item.tris) {
+      cYmin = Math.min(cYmin, a[1], b[1], c[1])
+      cYmax = Math.max(cYmax, a[1], b[1], c[1])
     }
-    let tris:Vec3[][] = []
-    if (part.op === 'tube') tris = evalTube(part.pts, part.sides)
-    else if (part.op === 'tuft') tris = evalTuft(part.r, part.p, part.yaw, part.seed, part.rings, part.segs)
-    else if (part.op === 'tier') tris = evalTier(part.y0, part.y1, part.r0, part.r1, part.segs, part.yaw, part.scallop)
-    else if (part.op === 'fronds') tris = evalFronds(part.origin, part.count, part.length, part.width, part.rise, part.droop, part.segs)
-    else if (part.op === 'curtains') tris = evalCurtains(part.origin, part.count, part.innerR, part.outerR, part.topY, part.botY, part.width, part.segs)
-    shadedTriangles(tris, c, lit, dark, pos, col)
+  }
+  if (!Number.isFinite(cYmin)) { cYmin = 0; cYmax = 1 }
+  const cSpan = Math.max(0.5, cYmax - cYmin)
+
+  const pos:number[] = [], col:number[] = []
+  for (const {part, tris, isWood} of evaluated) {
+    if (!tris.length) continue
+    const cHex = neutralWhite && !isWood ? 0x6b8f55 : (part.c as number)
+    const litHex = neutralWhite && !isWood ? 0xa3c96e : (part.lit as number)
+    const darkHex = neutralWhite && !isWood ? 0x2d4d31 : (part.dark as number)
+    tmpC0.setHex(darkHex); tmpC1.setHex(cHex); tmpC2.setHex(litHex)
+
+    if (isWood) {
+      let wMin = Infinity, wMax = -Infinity
+      for (const [a, b, c] of tris) {
+        const ym = (a[1] + b[1] + c[1]) / 3
+        if (ym < wMin) wMin = ym
+        if (ym > wMax) wMax = ym
+      }
+      const wSpan = Math.max(0.2, wMax - wMin)
+      for (const [a, b, c] of tris) {
+        const ym = (a[1] + b[1] + c[1]) / 3
+        const [nx, ny, nz] = triNormal(a, b, c)
+        const sun = Math.max(0, Math.min(1, (-0.45 * nx + 0.35 * ny + 0.55 * nz) * 0.5 + 0.5))
+        const t = 0.45 * ((ym - wMin) / wSpan) + 0.55 * sun
+        if (t < 0.5) tmpOut.copy(tmpC0).lerp(tmpC1, t * 2)
+        else tmpOut.copy(tmpC1).lerp(tmpC2, (t - 0.5) * 2)
+        pos.push(...a, ...b, ...c)
+        col.push(tmpOut.r, tmpOut.g, tmpOut.b, tmpOut.r, tmpOut.g, tmpOut.b, tmpOut.r, tmpOut.g, tmpOut.b)
+      }
+    } else {
+      for (const [a, b, c] of tris) {
+        const ym = (a[1] + b[1] + c[1]) / 3
+        const [, ny] = triNormal(a, b, c)
+        const hT = Math.max(0, Math.min(1, (ym - cYmin) / cSpan))
+        const nT = ny * 0.5 + 0.5
+        const t = Math.max(0, Math.min(1, 0.58 * hT + 0.42 * nT))
+        if (t < 0.5) tmpOut.copy(tmpC0).lerp(tmpC1, t * 2)
+        else tmpOut.copy(tmpC1).lerp(tmpC2, (t - 0.5) * 2)
+        pos.push(...a, ...b, ...c)
+        col.push(tmpOut.r, tmpOut.g, tmpOut.b, tmpOut.r, tmpOut.g, tmpOut.b, tmpOut.r, tmpOut.g, tmpOut.b)
+      }
+    }
   }
   const g = new THREE.BufferGeometry()
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
@@ -248,40 +289,62 @@ export function treeGeometry(species:number) {
   return {near, mid, far, material}
 }
 
-// Shared LOD1 (2 morphological archetypes: broadleaf crown vs spire/columnar) & LOD2 (1 universal crossed silhouette)
-// so 11 species × 3 LODs never exceed baseline draw calls on any WebGL2 device.
+// 4 organic 3D proxy archetypes for LOD1 & LOD2:
+//   0: wide dome broadleaf (camphor/banyan/virens/bischofia/willow/shrub)
+//   1: upright ovoid/columnar broadleaf (osmanthus/elaeocarpus/ginkgo)
+//   2: narrow conical spire (conifer)
+//   3: tall-stemmed fan/royal palm (palm)
 const NEUTRAL_BASE = new THREE.Color(0x6b8f55)
-const PROXY_META:{midGroup:0|1; midScale:Vec3; farScale:Vec3; proxyTint:THREE.Color}[] = specs.map((spec, idx) => {
-  const midGroup:0|1 = (idx === 4 || idx === 8 || idx === 3) ? 1 : 0
-  const refMid:[number, number] = midGroup === 1 ? [4.9, 15.1] : [9.2, 11.2]
-  const nearGeom = buildGeometry(spec.near)
-  nearGeom.computeBoundingBox()
-  const bb = nearGeom.boundingBox!
-  const w = Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z), h = Math.max(1.2, bb.max.y)
-  nearGeom.dispose()
-  const leafPart = spec.near.find(p => p.op !== 'tube') ?? spec.near[0]
+const ARCHETYPE_SPECIES:[number, number, number, number] = [0, 8, 4, 3]
+
+function measureBounds(parts:PartSpec[]):[number, number] {
+  const g = buildGeometry(parts)
+  g.computeBoundingBox()
+  const bb = g.boundingBox!
+  const w = Math.max(0.5, bb.max.x - bb.min.x, bb.max.z - bb.min.z)
+  const h = Math.max(1.0, bb.max.y)
+  g.dispose()
+  return [w, h]
+}
+
+const REF_MID = ARCHETYPE_SPECIES.map(idx => measureBounds(specs[idx].mid))
+const REF_FAR = ARCHETYPE_SPECIES.map(idx => measureBounds(specs[idx].far))
+
+const PROXY_META:{group:0|1|2|3; midScale:Vec3; farScale:Vec3; proxyTint:THREE.Color}[] = specs.map((spec, idx) => {
+  const group:0|1|2|3 = idx === 3 ? 3 : idx === 4 ? 2 : (idx === 2 || idx === 8 || idx === 9) ? 1 : 0
+  const [w, h] = measureBounds(spec.near)
+  const [rmW, rmH] = REF_MID[group]
+  const [rfW, rfH] = REF_FAR[group]
+  const leafPart = spec.near.find(p => p.op !== 'tube' && p.op !== 'bundles') ?? spec.near[0]
   const spCol = new THREE.Color(leafPart.c)
-  const proxyTint = new THREE.Color(
+  const proxyTint = idx === 3 ? new THREE.Color(1, 1, 1) : new THREE.Color(
     spCol.r / Math.max(0.05, NEUTRAL_BASE.r),
     spCol.g / Math.max(0.05, NEUTRAL_BASE.g),
     spCol.b / Math.max(0.05, NEUTRAL_BASE.b),
   )
   return {
-    midGroup,
-    midScale: [w / refMid[0], h / refMid[1], w / refMid[0]],
-    farScale: [w / 9.4, h / 11.3, w / 9.4],
+    group,
+    midScale: [w / rmW, h / rmH, w / rmW],
+    farScale: [w / rfW, h / rfH, w / rfW],
     proxyTint,
   }
 })
 
-let cachedShared:{mid:[THREE.BufferGeometry, THREE.BufferGeometry]; far:THREE.BufferGeometry; material:THREE.Material}|null = null
+let cachedShared:{mid:[THREE.BufferGeometry, THREE.BufferGeometry, THREE.BufferGeometry, THREE.BufferGeometry]; far:[THREE.BufferGeometry, THREE.BufferGeometry, THREE.BufferGeometry, THREE.BufferGeometry]; material:THREE.Material}|null = null
 export function sharedProxyAssets() {
   return cachedShared ??= {
     mid: [
-      buildGeometry(specs[0].mid, true),
-      buildGeometry(specs[4].mid, true),
+      buildGeometry(specs[ARCHETYPE_SPECIES[0]].mid, true),
+      buildGeometry(specs[ARCHETYPE_SPECIES[1]].mid, true),
+      buildGeometry(specs[ARCHETYPE_SPECIES[2]].mid, true),
+      buildGeometry(specs[ARCHETYPE_SPECIES[3]].mid, false),
     ],
-    far: buildGeometry(specs[0].far, true),
+    far: [
+      buildGeometry(specs[ARCHETYPE_SPECIES[0]].far, true),
+      buildGeometry(specs[ARCHETYPE_SPECIES[1]].far, true),
+      buildGeometry(specs[ARCHETYPE_SPECIES[2]].far, true),
+      buildGeometry(specs[ARCHETYPE_SPECIES[3]].far, false),
+    ],
     material,
   }
 }
@@ -298,7 +361,7 @@ export function applyTreeVariant(
   outFarMat:THREE.Matrix4,
   outNearTint:THREE.Color,
   outProxyTint:THREE.Color,
-):0|1 {
+):0|1|2|3 {
   const sp = specs[species] ?? specs[0]
   const meta = PROXY_META[species] ?? PROXY_META[0]
   const variant = sp.variants[seed % sp.variants.length]
@@ -316,7 +379,7 @@ export function applyTreeVariant(
   obj.position.set(x, y, z)
   obj.quaternion.copy(slopeQuat)
   obj.rotateY(yawRad)
-  if (Math.abs(variant.lean) > 1e-4) obj.rotateZ(variant.lean)
+  if (Math.abs(variant.lean) > 1e-4) obj.rotateZ(-variant.lean)
   const sx = baseScale * variant.scale[0], sy = baseScale * variant.scale[1], sz = baseScale * variant.scale[2]
   obj.scale.set(sx, sy, sz)
   obj.updateMatrix()
@@ -326,13 +389,9 @@ export function applyTreeVariant(
   obj.updateMatrix()
   outMidMat.copy(obj.matrix)
 
-  // Far crossed silhouette stays upright for clean distant skyline reading
-  obj.quaternion.copy(slopeQuat)
-  obj.rotateY(yawRad)
   obj.scale.set(sx * meta.farScale[0], sy * meta.farScale[1], sz * meta.farScale[2])
   obj.updateMatrix()
   outFarMat.copy(obj.matrix)
 
-  return meta.midGroup
+  return meta.group
 }
-const tmpObj = new THREE.Object3D()

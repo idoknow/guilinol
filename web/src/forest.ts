@@ -6,7 +6,7 @@ import {fetchAsset,type Tile} from './world'
 export type Tree={
   x:number; y:number; z:number; kind:number; scale:number; seed:number
   matrix:THREE.Matrix4; midMatrix:THREE.Matrix4; farMatrix:THREE.Matrix4
-  tint:THREE.Color; proxyTint:THREE.Color; midGroup:0|1
+  tint:THREE.Color; proxyTint:THREE.Color; proxyGroup:0|1|2|3
 }
 const lean=new THREE.Quaternion(), slopeQ=new THREE.Quaternion()
 export async function readTrees(tile:Tile,signal:AbortSignal){
@@ -25,18 +25,19 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
     slopeQ.identity().slerp(lean,angle>look.treeLean?look.treeLean/angle:1)
     const matrix=new THREE.Matrix4(),midMatrix=new THREE.Matrix4(),farMatrix=new THREE.Matrix4()
     const tint=new THREE.Color(),proxyTint=new THREE.Color()
-    const midGroup=applyTreeVariant(kind,seed,scale,yaw,slopeQ,x,y,z,matrix,midMatrix,farMatrix,tint,proxyTint)
-    trees.push({x,y,z,kind,scale,seed,matrix,midMatrix,farMatrix,tint,proxyTint,midGroup})
+    const proxyGroup=applyTreeVariant(kind,seed,scale,yaw,slopeQ,x,y,z,matrix,midMatrix,farMatrix,tint,proxyTint)
+    trees.push({x,y,z,kind,scale,seed,matrix,midMatrix,farMatrix,tint,proxyTint,proxyGroup})
   }
   return trees
 }
 
 // Batch slots:
-//   0 .. TREE_SPECIES_COUNT-1 : LOD0 near (species-exact detailed mesh, d < lodNear; capped to MAX_NEAR_BATCHES)
-//   TREE_SPECIES_COUNT + 0..1 : LOD1 mid  (2 shared 3D crown archetypes, lodNear <= d < lodMid)
-//   TREE_SPECIES_COUNT + 2    : LOD2 far  (1 shared crossed silhouette card, lodMid <= d < 1500)
-const TOTAL_SLOTS=TREE_SPECIES_COUNT+3
-const MAX_NEAR_BATCHES=6
+//   0 .. TREE_SPECIES_COUNT-1   : LOD0 near (species-exact detailed mesh, d < lodNear; capped to MAX_NEAR_BATCHES=4)
+//   TREE_SPECIES_COUNT + 0..3   : LOD1 mid  (4 organic 3D crown archetypes, lodNear <= d < lodMid)
+//   TREE_SPECIES_COUNT + 4..7   : LOD2 far  (4 organic low-poly 3D silhouette archetypes, lodMid <= d < 1500)
+// Max active batches <= 4 + 4 + 4 = 12 (<= baseline 12).
+const TOTAL_SLOTS=TREE_SPECIES_COUNT+8
+const MAX_NEAR_BATCHES=4
 
 export class Forest{
   loaded=new Map<Tile,Tree[]>()
@@ -86,16 +87,14 @@ export class Forest{
       if((tree.x-cam.x)**2+(tree.z-cam.z)**2<(highCanopy?2.2:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue
       this.point.set(tree.x,tree.y+4,tree.z)
       if(!this.frustum.planes.every(plane=>plane.distanceToPoint(this.point)>-40))continue
-      const slot=d<nearSq?tree.kind:d<midSq?TREE_SPECIES_COUNT+tree.midGroup:TREE_SPECIES_COUNT+2
+      const slot=d<nearSq?tree.kind:d<midSq?TREE_SPECIES_COUNT+tree.proxyGroup:TREE_SPECIES_COUNT+4+tree.proxyGroup
       groups[slot].push(tree)
     }
-    // Guarantee total tree draw calls <= 9 (MAX_NEAR_BATCHES + 2 mid + 1 far), strictly below baseline 12:
-    // keep the 6 most populous near species on LOD0 and fold any rare 7th+ species seamlessly into LOD1 mid.
     this.nearOrder.sort((a,b)=>groups[b].length-groups[a].length)
     for(let rank=MAX_NEAR_BATCHES;rank<TREE_SPECIES_COUNT;rank++){
       const k=this.nearOrder[rank], overflow=groups[k]
       if(!overflow.length)break
-      for(let j=0;j<overflow.length;j++)groups[TREE_SPECIES_COUNT+overflow[j].midGroup].push(overflow[j])
+      for(let j=0;j<overflow.length;j++)groups[TREE_SPECIES_COUNT+overflow[j].proxyGroup].push(overflow[j])
       overflow.length=0
     }
     this.nearAssets??=Array.from({length:TREE_SPECIES_COUNT},(_,i)=>treeGeometry(i))
@@ -105,7 +104,7 @@ export class Forest{
       if(group.length&&(!mesh||mesh.instanceMatrix.count<group.length)){
         if(mesh){this.scene.remove(mesh);mesh.dispose()}
         const cap=Math.max(16,2**Math.ceil(Math.log2(group.length)))
-        const geom=i<TREE_SPECIES_COUNT?nearAssets[i].near:i<TREE_SPECIES_COUNT+2?shared.mid[i-TREE_SPECIES_COUNT]:shared.far
+        const geom=i<TREE_SPECIES_COUNT?nearAssets[i].near:i<TREE_SPECIES_COUNT+4?shared.mid[i-TREE_SPECIES_COUNT]:shared.far[i-TREE_SPECIES_COUNT-4]
         const mat=i<TREE_SPECIES_COUNT?nearAssets[i].material:shared.material
         mesh=new THREE.InstancedMesh(geom,mat,cap)
         mesh.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(cap*3),3)
@@ -116,7 +115,7 @@ export class Forest{
         mesh.count=group.length;mesh.visible=!!group.length
         if(group.length){
           const mArr=mesh.instanceMatrix.array as Float32Array,cArr=mesh.instanceColor!.array as Float32Array
-          const mode=i<TREE_SPECIES_COUNT?0:i<TREE_SPECIES_COUNT+2?1:2
+          const mode=i<TREE_SPECIES_COUNT?0:i<TREE_SPECIES_COUNT+4?1:2
           for(let j=0;j<group.length;j++){
             const tree=group[j]
             const mat=mode===0?tree.matrix:mode===1?tree.midMatrix:tree.farMatrix

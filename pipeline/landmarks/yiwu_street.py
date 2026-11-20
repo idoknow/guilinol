@@ -27,24 +27,32 @@ def _cjk_font(size):
 
 
 def canopy(model, station, side, high_crown=False):
-    near_office = side > 0 and -60 <= station <= -10
-    lateral = 5.85 if near_office else side * (6.5 if side > 0 else 6.4)
-    # Orient +X leaning/arching limbs across Yiwu Rd (-z when side > 0, +z when side < 0)
-    yaw = (math.pi / 2 if side > 0 else -math.pi / 2) + ((int(abs(station)) % 5) - 2) * 0.14
-    species = 'osmanthus' if near_office else ('camphor' if int(abs(station)) % 3 == 0 else 'bischofia')
+    near_office = side > 0 and -62 <= station <= -6
+    lateral = 5.95 if near_office else (-6.05 if side < 0 else 6.35)
+    # Orient +X leaning/arching crown across Yiwu Rd (-z when side > 0, +z when side < 0)
+    yaw = (math.pi / 2 if side > 0 else -math.pi / 2) + ((int(abs(station)) % 5) - 2) * 0.08
+    # Alternate camphor and bischofia/koelreuteria along the street (foreground -56.5 is a grand leaning camphor!)
+    species = 'camphor' if (station == -56.5 or int(abs(station)) % 2 == 0) else 'bischofia'
+    # Tall 13.5-15.6 m street trees leaning 10.5-14.3 deg (0.185-0.25 rad) across the 2-lane carriageway!
+    lean_rad = 0.23 if station == -56.5 else (0.185 + (int(abs(station) * 3) % 4) * 0.020)
+    base_sc = 1.15 if station == -56.5 else (1.06 + (int(abs(station)) % 3) * 0.04)
+    y_sc = 1.22 if high_crown else (1.14 + (int(abs(station)) % 3) * 0.04)
     emit_landmark_tree(
         model,
         species,
         station,
-        0.05,
+        0.06,
         lateral,
-        scale=0.80 if near_office else (0.92 if high_crown else 0.96),
-        y_scale=0.98 if near_office else (1.18 if high_crown else 0.96),
+        scale=base_sc,
+        y_scale=y_sc,
         yaw=yaw,
         variant_idx=int(abs(station)) % 3,
         wood_mat='wood',
         leaf_mat='leaf',
+        pod_mat='earth',
         collide_trunk=True,
+        lean_override=lean_rad,
+        clip_local_z=(-16.0, 8.20) if near_office else None,
     )
 
 
@@ -179,16 +187,16 @@ def street(model):
         if p_st in (-36.5, 4.0, 34.0):
             model.box(p_st, -0.2, -10.8, 4.8, 0.95, 1.8, 'leaf')
 
-    # Street trees carefully placed to frame rather than block key facades (1344, 1347, 1350, 1351..1353)
-    west_stations = (-58, -42, -15, 2, 18, 36, 48, 86)
-    east_stations = (-48, -34, -20, -4, 12, 44, 64, 82)
+    # Dense overarching street-tree rows closing >=60% over the 2-lane carriageway (IMG_1345) while framing facades
+    west_stations = (-56.5, -46.5, -36.5, -26.5, -16.0, -4.5, 7.5, 19.5, 36.0, 48.0, 85.0)
+    east_stations = (-52.0, -41.5, -31.0, -20.5, -9.5, 2.5, 13.5, 44.0, 64.0, 82.0)
     for st in west_stations:
         canopy(model, st, -1, high_crown=(st >= 48))
     for st in east_stations:
         canopy(model, st, +1, high_crown=(st >= 44))
     # High overarching camphor boughs in front of yiwu_old_house (trunks across street, high leafy canopy)
     for st in (58, 72):
-        emit_landmark_tree(model, 'camphor', st, 0.05, -6.2, scale=0.95, y_scale=1.24, yaw=-math.pi / 2, variant_idx=st % 3, wood_mat='wood', leaf_mat='leaf', collide_trunk=True)
+        emit_landmark_tree(model, 'camphor', st, 0.06, -6.1, scale=1.06, y_scale=1.22, yaw=-math.pi / 2, variant_idx=st % 3, wood_mat='wood', leaf_mat='leaf', collide_trunk=True, lean_override=0.20)
 
     # Roadside scooters (including foreground row near 1350)
     for base_st, lat in ((-50, -6.6), (4, -6.6), (21.5, -2.2)):
@@ -209,6 +217,6 @@ if __name__ == '__main__':
             tile='#262a2d',
             glass='#19589c',
             green='#3e6c54',
-            leaf='#3c5e36',
+            leaf='#396031',
         ),
     )

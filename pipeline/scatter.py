@@ -265,9 +265,29 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
             angle = math.atan2(ahead.y - center.y, ahead.x - center.x)
             inset = ry_road.width / 2 + 2.85
             point = Point(center.x - inset * math.sin(angle), center.y + inset * math.cos(angle))
-            if tree(point, 'ronghu', 'street', force_kind=1, force_scale=125, yaw=-angle, separation=3, planting_mask=Polygon()):
+            if tree(point, 'ronghu', 'street', force_kind=1, force_scale=130, yaw=-angle, separation=3, planting_mask=Polygon()):
                 origin = tuple(math.floor(value / CHUNK) * CHUNK for value in point.coords[0])
                 beds[origin].append([round((point.x - origin[0]) * 10), round((point.y - origin[1]) * 10), round(angle * 100), 0])
+
+    # Flanking rows of large camphor trees along both sides of the Ronghu North rill promenade (IMG_1334-1336)
+    rh_node = next((ll2xz(e['lat'], e['lon']) for e in elements if e['type'] == 'node' and e['id'] == 6320266329), None)
+    if rh_node is not None:
+        rx0, rz0 = rh_node
+        ang18 = math.radians(18.0)
+        c18, s18 = math.cos(ang18), math.sin(ang18)
+
+        def rill_world_pt( u_x: float, u_z: float) -> Point:
+            lx = u_x * c18 - (u_z + 17.5) * s18
+            lz = -16.25 + u_x * s18 + (u_z + 17.5) * c18
+            return Point(rx0 + lx, rz0 + lz)
+
+        # South (lakeside) camphor row & North (promenade outer edge) camphor row flanking the stone rill
+        for ux, uz, sc, yw in (
+            (3.5,  -15.6, 122, -1.35), (-5.5, -14.8, 118, -1.45), (-14.5, -14.4, 124, -1.30), (-24.0, -14.8, 116, -1.40),
+            (13.0, -25.8, 124,  1.65), (4.0,  -26.2, 118,  1.55), (-5.0,  -26.5, 126,  1.70), (-14.0, -26.8, 120,  1.60),
+            (-23.0,-27.2, 122,  1.65), (-32.0,-27.6, 118,  1.55),
+        ):
+            tree(rill_world_pt(ux, uz), 'ronghu', 'street', force_kind=0, force_scale=sc, yaw=yw, separation=4.2)
 
     # Waterfront banyans, weeping willows, and dawn redwoods along lakeshores & rivers
     shore = unary_union(wet).boundary
