@@ -26,9 +26,10 @@ jobs:
       - name: Assemble web distribution with verified published world tiles
         if: matrix.image == 'web'
         run: |
-          mkdir -p public/world
+          snapshot=$(docker create ghcr.io/idoknow/glol-web@sha256:41637bb89cce04b56d9a1028ac9ee9178a6f24d2bf0054dd4a5d5726076a7a8b)
+          docker cp "$snapshot:/usr/share/nginx/html/world" public/
+          docker rm "$snapshot"
           cd public
-          awk '{print $2}' ../deploy/world.sha256 | xargs -P 8 -I '{}' curl --fail --silent --show-error --retry 3 --create-dirs -o '{}' 'https://glol.rcpd.cc/{}'
           sha256sum --check --quiet ../deploy/world.sha256
           cd ..
           npm ci
