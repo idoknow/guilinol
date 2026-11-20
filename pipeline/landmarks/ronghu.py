@@ -396,23 +396,32 @@ def shore(b):
     with align_front(b, (0, -17.5), -18, shift=(0,1.25)):
         # Finished-ground samples along the pedestrian strip; keep lips above paving.
         levels = [1.05,1.08,1.10,1.13,1.15,1.18,1.20,1.23]
+        # The two mapped paths diverge here. IMG_1335 puts the middle bays
+        # nearer the north path; the two end shots pin the original endpoints.
+        def centerline(x):
+            return -17.5 - 1.85*max(0,1-abs(x-3)/11)
+
         for index, level in enumerate(levels):
             east = -16 + index * 4
+            left, right = east-2, east+2
+            za, zb = centerline(left), centerline(right)
             for side in (-1, 1):
-                # Lay stone from the lip to the parallel paths in IMG_1334–36.
                 for row in range(3):
-                    near = -17.5 + side*(1.42+row*1.25)
+                    near = side*(1.42+row*1.25)
                     far = near + side*1.25
-                    for left in (east-2,east):
-                        corners = [(left,near),(left+2,near),(left+2,far),(left,far)]
-                        points = [(x,level+.11,z) for x,z in corners]
+                    for start in (left,east):
+                        corners = [(start,near),(start+2,near),(start+2,far),(start,far)]
+                        points = [(x,level+.11,centerline(x)+z) for x,z in corners]
                         wall.face(points,(0,1,0),'plaza_stone',None)
                         if b.collide:
                             b.hit.face(points,(0,1,0),'ashlar',None)
-                box(wall, (east, level, -17.5+side*1.24), (4.02,.48,.36), 'granite')
-            box(wall, (east,level+.08,-17.5), (4,.1,2.2), 'rill_water')
-            box(wall, (east-1.8,level+.39,-17.5), (.62,.36,.62), 'granite')
-            box(wall, (east-1.8,level+.17,-17.5), (.36,.3,2.25), 'ashlar')
+                segment_wall(wall,(left,za+side*1.24),(right,zb+side*1.24),
+                             level-.24,level+.24,.36,'granite')
+            pool = [(left,za-1.1),(right,zb-1.1),(right,zb+1.1),(left,za+1.1)]
+            wall.face([(x,level+.13,z) for x,z in pool],(0,1,0),'rill_water',None)
+            cross_z = centerline(east-1.8)
+            box(wall,(east-1.8,level+.39,cross_z),(.62,.36,.62),'granite')
+            box(wall,(east-1.8,level+.17,cross_z),(.36,.3,2.25),'ashlar')
         # The east end flares around a raised square outlet (IMG_1334).
         # The inlet is open on its west side. Pave only outside its coping.
         pool = [(14,-18.6),(16,-20.6),(18.6,-20.6),(20.4,-19),
@@ -425,8 +434,8 @@ def shore(b):
                      [pool[3],pool[4],(23,-17.2),(23,-19)]):
             pave(b,bank,1.37)
         for mesh in ([wall,b.hit] if b.collide else [wall]):
-            box(mesh,(17.45,1.56,-19.0),(1.02,.48,1.04),'ashlar')
-            box(mesh,(17.45,1.86,-19.0),(1.16,.14,1.18),'granite')
+            box(mesh,(17.45,1.56,-18.46),(1.02,.48,1.04),'ashlar')
+            box(mesh,(17.45,1.86,-18.46),(1.16,.14,1.18),'granite')
     pavilion(b, 24, .35, -6, span=4.4)
     post = 0.95 if b.detail else 8
     # North bank between the pavilion and 古南门, with a gap in front of the steps.
