@@ -18,6 +18,9 @@ import {loadTiles} from './look/tiles'
 import {flags} from './debug'
 
 installAtmosphere()
+// The title screen (ui/home.ts) pauses the scene while it covers it: no simulation, no draws.
+let paused=false
+export function setPaused(on:boolean){paused=on}
 async function start() {
   bootProgress('载入地形', 12)
   const manifest:Manifest = JSON.parse(new TextDecoder().decode(await fetchAsset('manifest.json')))
@@ -94,7 +97,7 @@ async function start() {
   modeButton.addEventListener('touchstart',()=>void prefetchWalk(),{passive:true})
   function showMode(){const walking=!!walker?.active;document.body.dataset.mode=walking?'walk':'fly'
     modeButton.textContent=walking?'起飞':'落地步行';modeButton.setAttribute('aria-label',walking?'切换到飞行':'切换到步行')
-    hint.textContent=walking?'WASD 走 · Shift 跑 · 空格 跳 · 拖动转视角 · 滚轮远近 · V 起飞 · J 景册 · P 拍照':'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · J 景册 · P 拍照'}
+    hint.textContent=walking?'WASD 走 · Shift 跑 · 空格 跳 · 拖动转视角 · 滚轮远近 · V 起飞 · M 地图 · J 景册 · P 拍照 · Esc 菜单':'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · M 地图 · J 景册 · P 拍照 · Esc 菜单'}
   let toastTimer=0
   window.addEventListener('walk:spawn-failed',()=>{toast.textContent='这里没有可以落脚的地方，飞近岸边或街道再试';toast.classList.add('show')
     clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>toast.classList.remove('show'),3200)})
@@ -151,12 +154,12 @@ async function start() {
     fly(){if(walker?.active)walker.leave();showMode()},get cinema(){return cinema},set cinema(on){cinema=on}}
   let tour:Awaited<ReturnType<typeof import('./play').play>>|undefined
   function animate(now:number){
+    if(paused&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now
     if(walker?.active)walker.tick(elapsed/1000);else if(!switching)controls(elapsed/1000)
     if(frame===1) {
       first=performance.now();stats.firstMs=first;stats.firstWorldBytes=bytes;bootProgress('载入街区', 100);bootDismiss()
       void import('./play').then(mod=>{tour=mod.play(host)})
-      setTimeout(()=>void import('./ui/about').then(mod=>mod.aboutPanel()),500)
     }
     if(frame===2&&manifest.landmarks?.length)void import('./landmarks').then(module=>{cullLandmarks=module.landmarkCulling();stream.updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks)})
     if(frame===2){
@@ -190,4 +193,4 @@ async function start() {
   if(token){try{if(token.length>4096)throw Error();await host.setView(JSON.parse(atob(token.replace(/-/g,'+').replace(/_/g,'/'))))}catch{console.warn('Invalid feedback view')}}
   else if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }
-start().catch(error=>{document.querySelector('output')!.value=`无法加载：${error.message}`;bootProgress(`无法加载：${error.message}`,0);console.error(error)})
+export const boot=()=>start().catch(error=>{document.querySelector('output')!.value=`无法加载：${error.message}`;bootProgress(`无法加载：${error.message}`,0);console.error(error)})

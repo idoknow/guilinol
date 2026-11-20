@@ -1,20 +1,14 @@
-/* M4 sightseeing HUD. Same language as the M2/M3 HUD: dark jade glass for controls on the scene,
-   rice paper (#f4efe2) for things you read, vermilion seal (#a9503c) for the one thing that matters. */
-[hidden]{display:none!important}
-:root{--glass:rgba(28,44,42,.42);--glass-strong:rgba(28,44,42,.66);--paper:#f4efe2;--paper-deep:#e9e1cf;--ink:#2a302c;--ink-soft:#5d655f;
-  --seal:#a9503c;--seal-light:#d0694c;--line:rgba(244,239,226,.38);--serif:"Noto Serif SC","Source Han Serif SC","Songti SC",serif}
+/* M4 sightseeing HUD on the 山水印 tokens (web/src/ui/theme.css): jade glass for controls on the scene,
+   rice paper for things you read, vermilion seal for the one thing that matters. Glass button material lives in hud.css. */
 
 /* Dock: top-right column — mode, 景册, 拍照 (the map joins it once the atlas lands). */
 .dock{position:fixed;right:calc(12px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));display:flex;flex-direction:column;align-items:flex-end;gap:8px;z-index:5}
 .dock-mini{display:flex;flex-direction:column;align-items:center;gap:6px}
 .dock-buttons{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
-.dock-buttons>button{font-family:var(--serif);color:var(--paper);background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  border-radius:18px;padding:7px 14px;font-size:14px;letter-spacing:.1em;cursor:pointer;display:flex;align-items:center;gap:6px;
-  -webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;transition:background .15s,transform .15s}
-.dock-buttons>button:hover{background:var(--glass-strong)}.dock-buttons>button:active{background:rgba(169,80,60,.62);transform:scale(.95)}
-.dock small{font:11px/1 ui-monospace,monospace;letter-spacing:0;background:var(--seal);border-radius:8px;padding:3px 5px}
-.dock .btn-mode{position:static}
-body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-card,.book,.summit-pill,.minimap,.road-name){display:none!important}
+.dock-buttons>button{box-sizing:border-box;height:var(--ui-h);border-radius:var(--ui-r-pill);padding:0 16px;font-size:14px;letter-spacing:var(--ui-track);display:flex;align-items:center;gap:6px}
+.dock small{font:600 11px/1 var(--ui-serif);letter-spacing:0;background:var(--seal);border-radius:var(--ui-r-pill);padding:3px 7px}
+.dock .btn-mode{position:static;height:var(--ui-h);padding:0 16px}
+body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-card,.book,.summit-pill,.minimap,.road-name,.hud-me){display:none!important}
 
 /* Minimap: a paper disc with a thin jade rim; north tick on top. */
 .minimap{position:relative;width:132px;height:132px;padding:0;border-radius:50%;overflow:hidden;cursor:pointer;background:#efe8d8;
@@ -24,6 +18,8 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
   background:rgba(239,232,216,.9);border-radius:6px;padding:2px 3px}
 .road-name{font:13px/1 var(--serif);letter-spacing:.12em;color:var(--paper);background:var(--glass);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   padding:5px 10px;border-radius:12px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.road-name:empty{display:none}
 
 /* Full map */
 .atlas{position:fixed;inset:0;z-index:12;background:#efe8d8;opacity:0;transition:opacity .22s}
@@ -45,7 +41,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 .atlas-pop{position:absolute;left:0;top:0;display:flex;align-items:center;gap:8px;white-space:nowrap;padding:6px 6px 6px 14px;border-radius:20px;
   background:var(--ink);color:var(--paper);font:14px var(--serif);box-shadow:0 8px 22px rgba(20,30,28,.3);pointer-events:auto}
 .atlas-pop span{font-size:12px;opacity:.7}
-.atlas-pop button{font:13px var(--serif);letter-spacing:.15em;border:0;border-radius:14px;padding:6px 12px;background:var(--seal);color:var(--paper);cursor:pointer}
+.atlas-pop button{font:13px var(--serif);letter-spacing:.15em;border:0;border-radius:var(--ui-r-pill);padding:6px 12px;background:var(--seal);color:var(--paper);cursor:pointer}
 .atlas-legend{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);margin:0;font:12px var(--serif);color:var(--ink-soft);
   background:rgba(252,250,243,.85);padding:4px 12px;border-radius:12px;white-space:nowrap;pointer-events:none}
 
@@ -71,7 +67,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 .spot-card button,.book button{font-family:var(--serif);cursor:pointer;-webkit-tap-highlight-color:transparent}
 .card-best button{border:1px solid rgba(169,80,60,.5);color:var(--seal);background:none;border-radius:14px;padding:4px 10px;font-size:12px}
 .card-actions{display:flex;gap:8px}
-.card-actions button{flex:1;border:0;border-radius:4px;padding:9px 0;font-size:14px;letter-spacing:.2em;background:var(--paper-deep);color:var(--ink);transition:background .15s}
+.card-actions button{flex:1;border:0;border-radius:var(--ui-r-pill);padding:9px 0;font-size:14px;letter-spacing:.2em;background:var(--paper-deep);color:var(--ink);transition:background .15s}
 .card-actions button:first-child{background:var(--seal);color:var(--paper)}
 .card-actions button:hover{filter:brightness(1.05)}
 .card-close{position:absolute;right:8px;top:6px;width:32px;height:32px;border:0;background:none;color:var(--ink-soft);font-size:22px;line-height:1;cursor:pointer}
@@ -100,7 +96,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 /* Summit pill */
 .summit-pill{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:10px;
   padding:5px 6px 5px 16px;border-radius:20px;background:var(--glass);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:var(--paper);font:15px var(--serif);letter-spacing:.2em}
-.summit-pill button{font:13px var(--serif);letter-spacing:.15em;border:0;border-radius:15px;padding:6px 12px;background:var(--seal);color:var(--paper);cursor:pointer}
+.summit-pill button{font:13px var(--serif);letter-spacing:.15em;border:0;border-radius:var(--ui-r-pill);padding:6px 12px;background:var(--seal);color:var(--paper);cursor:pointer}
 
 /* Photo mode */
 .photo-bar{position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:8;box-sizing:border-box;
@@ -126,7 +122,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 @keyframes drop{0%{transform:translate(30vw,30vh) rotate(8deg) scale(1.6);opacity:0}100%{transform:rotate(-2deg);opacity:1}}
 .photo-shot img{display:block;width:100%;border-radius:2px}
 .photo-shot figcaption{display:flex;gap:6px;align-items:center;padding:6px 0;font:13px var(--serif)}
-.photo-shot a,.photo-shot button{flex:1;text-align:center;text-decoration:none;color:var(--paper);background:var(--seal);border:0;border-radius:3px;padding:6px 0;font:13px var(--serif);letter-spacing:.15em;cursor:pointer}
+.photo-shot a,.photo-shot button{flex:1;text-align:center;text-decoration:none;color:var(--paper);background:var(--seal);border:0;border-radius:var(--ui-r-pill);padding:6px 0;font:13px var(--serif);letter-spacing:.15em;cursor:pointer}
 .photo-shot .shot-close{flex:none;width:30px;background:none;color:var(--ink-soft);font-size:18px;letter-spacing:0}
 
 /* Phones */
