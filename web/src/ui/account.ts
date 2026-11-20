@@ -1,7 +1,7 @@
 import './account.css'
 
 // 账号：登录 / 注册（填写 → 邮箱验证 → 完成）/ 忘记密码 / 我的账号。
-// Logging in is optional — it only unlocks feedback and reply e-mails — so every screen says so and offers a way back to play.
+// Playing requires an account (IDOK-99): the title screen asks for a login before the city boots, see requireUser().
 type Screen='login'|'register'|'verify'|'forgot'|'reset'|'profile'
 export type User={email:string,nickname:string,notify_email:boolean}
 const titles:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'忘记密码',reset:'重置密码',profile:'我的账号'}
@@ -22,8 +22,15 @@ export function onUser(listen:(user:User|null)=>void){listeners.add(listen);void
 export const initial=(name:string)=>[...name.trim()][0]??'客'
 
 let dialog:HTMLDialogElement|undefined,render:((screen:Screen,note?:string,pass?:string)=>void)|undefined
+let gate:((user:User|null)=>void)|undefined
 export async function openAccount(){
   build();await ready;render!(user?'profile':'login');dialog!.showModal()
+}
+/** Resolve with the signed-in user, opening the login dialog first if needed; null if the player closes it without signing in. */
+export async function requireUser():Promise<User|null>{
+  await ready;if(user)return user
+  build();gate?.(null)
+  return new Promise(resolve=>{gate=resolve;render!('login');dialog!.showModal()})
 }
 
 /** The in-game chip (top left): avatar initial + nickname, or 登录 for guests. */
@@ -45,7 +52,7 @@ function build(){
     <ol class="acc-steps" aria-label="注册进度"><li>填写信息</li><li>验证邮箱</li><li>完成</li></ol>
     <form class="acc-body" novalidate><p class="acc-lead"></p><div class="acc-who"></div><div class="fields"></div><p class="acc-msg" role="status"></p>
       <button class="ui-btn ui-btn--seal ui-btn--block acc-submit" type="submit"></button><nav class="acc-links"></nav></form>
-    <p class="acc-guest">不登录也能玩 · <button type="button" class="acc-play">继续游玩</button></p>`
+    <p class="acc-guest">还没有账号？ <button type="button" class="acc-join">注册一个</button>，一分钟就好</p>`
   const form=d.querySelector('form')!,fields=form.querySelector('.fields')!,nav=form.querySelector('nav')!,message=form.querySelector<HTMLElement>('.acc-msg')!,
     lead=form.querySelector('.acc-lead')!,who=form.querySelector<HTMLElement>('.acc-who')!,submitButton=form.querySelector<HTMLButtonElement>('.acc-submit')!,
     tabs=Array.from(d.querySelectorAll<HTMLButtonElement>('[role=tab]')),steps=Array.from(d.querySelectorAll('.acc-steps li'))
@@ -81,7 +88,7 @@ function build(){
     for(const tab of tabs)tab.setAttribute('aria-selected',String(tab.dataset.to===next))
     const step=next==='register'?0:next==='verify'?1:-1
     steps.forEach((li,i)=>{li.classList.toggle('on',i===step);li.classList.toggle('done',i<step)})
-    lead.textContent={login:'登录后可以提交反馈，并在有回复时收到邮件提醒。',register:'只需要邮箱和一个昵称，一分钟就好。',
+    lead.textContent={login:'登录后即可进入游玩。提交的反馈有回复时，也会发邮件告诉你。',register:'只需要邮箱和一个昵称，一分钟就好。',
       verify:`六位验证码已发到 ${email||'你的邮箱'}，10 分钟内有效。没收到可以看看垃圾邮件。`,forgot:'输入注册时用的邮箱，我们会发一个六位验证码给你。',
       reset:'输入邮箱里的验证码，再设一个新密码。',profile:''}[next]
     if(next==='profile'&&user){const badge=document.createElement('span'),info=document.createElement('div')
@@ -115,11 +122,12 @@ function build(){
     try {result=await api(`auth/${screen}`,'POST',data)} catch(error){if((error as {code?:string}).code==='unverified'){render!('verify','请先验证邮箱再登录',data.password);return}throw error}
     if(previous==='register')render!('verify','',data.password)
     else if(previous==='reset')render!('login','密码已重置，请重新登录')
-    else {setUser(result);render!('profile',previous==='verify'?'注册成功，已登录':'已登录')}
+    else {setUser(result);if(gate){const resolve=gate;gate=undefined;d.close();resolve(result);return}
+      render!('profile',previous==='verify'?'注册成功，已登录':'已登录')}
   })}
   d.querySelector('header button')!.addEventListener('click',()=>d.close())
-  d.querySelector('.acc-play')!.addEventListener('click',()=>{d.close();dispatchEvent(new Event('account:play'))})
-  d.addEventListener('close',()=>{verificationPassword='';form.reset()})
+  d.querySelector('.acc-join')!.addEventListener('click',()=>{if(!busy)render!('register')})
+  d.addEventListener('close',()=>{verificationPassword='';form.reset();const resolve=gate;gate=undefined;resolve?.(user)})
   d.addEventListener('click',event=>{if(event.target===d)d.close()})
   for(const type of ['keydown','keyup'])d.addEventListener(type,event=>event.stopPropagation())
   document.body.append(d)
