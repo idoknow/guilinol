@@ -1,30 +1,46 @@
-import {S3Client,ListObjectsV2Command,HeadObjectCommand,GetObjectCommand,PutObjectCommand} from '@aws-sdk/client-s3'
+import {createHash} from 'node:crypto'
+import {readFile,realpath} from 'node:fs/promises'
+import {resolve,sep} from 'node:path'
+import {S3Client,ListObjectsV2Command,GetObjectCommand,PutObjectCommand,HeadBucketCommand,CreateBucketCommand} from '@aws-sdk/client-s3'
 
-const Bucket='glol-feedback'
-const source=new S3Client({region:'auto',endpoint:`https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,credentials:{accessKeyId:process.env.R2_ACCESS_KEY_ID,secretAccessKey:process.env.R2_SECRET_ACCESS_KEY}})
-const destination=new S3Client({region:'us-east-1',endpoint:process.env.S3_ENDPOINT,forcePathStyle:true})
-if(!process.env.S3_ENDPOINT || !process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY || !/^[a-f0-9]{32}$/.test(process.env.CLOUDFLARE_ACCOUNT_ID)) throw Error('Missing scoped R2 source or MinIO target')
-async function inventory(client) {
-  const objects=new Map(); let ContinuationToken
-  do {
+const Bucket='glol-feedback', base=resolve(process.argv[2],'r2'),root=await realpath(resolve(base,'objects'))
+const manifest=JSON.parse(await readFile(resolve(base,'manifest.json'),'utf8'))
+const objects=new Map(manifest.objects.map(item=>[item.key,item]))
+const bytes=[...objects.values()].reduce((sum,item)=>sum+item.size,0)
+if(manifest.bucket!==Bucket || objects.size!==manifest.objects.length || objects.size!==manifest.count || bytes!==manifest.bytes) throw Error('Invalid snapshot inventory')
+const digest=data=>createHash('sha256').update(data).digest('hex')
+async function load(item){
+  const path=await realpath(resolve(root,item.key))
+  if(!path.startsWith(root+sep)) throw Error('Object outside export')
+  const data=await readFile(path)
+  if(data.length!==item.size || digest(data)!==item.sha256) throw Error('Source digest mismatch')
+  return data
+}
+for(const item of objects.values()) await load(item)
+if(process.argv.includes('--check-only')){ console.log({objects:objects.size,bytes}); process.exit(0) }
+if(!process.env.S3_ENDPOINT || !['127.0.0.1','localhost'].includes(new URL(process.env.S3_ENDPOINT).hostname)) throw Error('Expected loopback tunnel to glol-minio')
+const client=new S3Client({region:'us-east-1',endpoint:process.env.S3_ENDPOINT,forcePathStyle:true})
+try{await client.send(new HeadBucketCommand({Bucket}))}catch(error){if(error.$metadata?.httpStatusCode!==404)throw error;await client.send(new CreateBucketCommand({Bucket}))}
+async function inventory(){
+  const result=new Map(); let ContinuationToken
+  do{
     const page=await client.send(new ListObjectsV2Command({Bucket,ContinuationToken}))
-    for(const item of page.Contents||[]) objects.set(item.Key,item)
+    for(const item of page.Contents||[])result.set(item.Key,item.Size)
     ContinuationToken=page.NextContinuationToken
-  } while(ContinuationToken)
-  return objects
+  }while(ContinuationToken)
+  return result
 }
-const objects=await inventory(source),existing=await inventory(destination)
-for(const key of existing.keys()) if(!objects.has(key)) throw Error('Target has extra objects; reconcile before retrying. No objects deleted.')
-let copied=0
-for(const [Key,item] of objects) {
-  if(existing.get(Key)?.Size===item.Size) {
-    const head=await destination.send(new HeadObjectCommand({Bucket,Key}))
-    if(head.Metadata?.['source-etag']===item.ETag.replaceAll('"',''))continue
-  }
-  const data=await source.send(new GetObjectCommand({Bucket,Key,IfMatch:item.ETag}))
-  await destination.send(new PutObjectCommand({Bucket,Key,Body:data.Body,ContentLength:item.Size,ContentType:data.ContentType,Metadata:{...data.Metadata,'source-etag':item.ETag.replaceAll('"','')}}));copied++
+async function matches(Key,item){
+  const response=await client.send(new GetObjectCommand({Bucket,Key}))
+  return digest(await response.Body.transformToByteArray())===item.sha256 && response.ContentType===item.contentType
 }
-const check=await inventory(destination),fresh=await inventory(source)
-const bytes=map=>[...map.values()].reduce((sum,item)=>sum+item.Size,0)
-if(check.size!==fresh.size || [...fresh].some(([key,item])=>objects.get(key)?.ETag!==item.ETag || check.get(key)?.Size!==item.Size)) throw Error('Source changed or target inventory differs; repeat before cutover')
-console.log({copied,source:{objects:fresh.size,bytes:bytes(fresh)},target:{objects:check.size,bytes:bytes(check)}})
+const before=await inventory(); let copied=0
+for(const key of before.keys())if(!objects.has(key))throw Error('Extra target object; no objects removed')
+for(const [Key,item] of objects){
+  if(before.get(Key)===item.size && await matches(Key,item))continue
+  await client.send(new PutObjectCommand({Bucket,Key,Body:await load(item),ContentType:item.contentType}));copied++
+  if(!await matches(Key,item))throw Error('Target readback mismatch')
+}
+const after=await inventory()
+if(after.size!==objects.size || [...objects].some(([key,item])=>after.get(key)!==item.size))throw Error('Target inventory mismatch')
+console.log({objects:after.size,bytes,copied})

@@ -1,0 +1,49 @@
+name: Publish glol images
+on:
+  push:
+    branches: [agent/sg-codex/a89323fc0d6c]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [api, web]
+    env:
+      IMAGE: ghcr.io/idoknow/glol-${{ matrix.image }}:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        if: matrix.image == 'web'
+        with:
+          node-version: 22
+      - name: Assemble web distribution with verified published world tiles
+        if: matrix.image == 'web'
+        run: |
+          mkdir -p public/world
+          cd public
+          awk '{print $2}' ../deploy/world.sha256 | xargs -P 8 -I '{}' curl --fail --silent --show-error --retry 3 --create-dirs -o '{}' 'https://glol.rcpd.cc/{}'
+          sha256sum --check --quiet ../deploy/world.sha256
+          cd ..
+          npm ci
+          npx --no-install playwright install --with-deps chromium
+          npm run build
+      - name: Build image
+        run: docker build -f deploy/${{ matrix.image }}.Dockerfile -t "$IMAGE" .
+      - name: Log in to GHCR
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Push built image
+        run: |
+          for attempt in 1 2 3 4; do
+            docker push "$IMAGE" && exit 0
+            sleep $((attempt * 3))
+          done
+          exit 1

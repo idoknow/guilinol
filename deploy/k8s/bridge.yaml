@@ -28,7 +28,6 @@ spec:
           nodeSelector: {kubernetes.io/hostname: cn-hk-fxy-01}
           dnsPolicy: None
           dnsConfig: {nameservers: [10.42.10.1]}
-          imagePullSecrets: [{name: glol-registry}]
           securityContext: {runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000}
           containers:
           - name: glol-feedback-bridge

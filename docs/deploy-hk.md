@@ -3,10 +3,10 @@
 目标只限香港节点 `cn-hk-fxy-01`、`idoknow/glol-*`。保留原 Pages/D1/R2 作为回滚源。部署前后分别在 hk01 执行 `kubectl top node cn-hk-fxy-01`。容器内存 limits：nginx 64 Mi、API 384 Mi、PG 384 Mi、MinIO 512 Mi，常驻共 1344 Mi；反馈桥运行时再加 192 Mi，总上限 1536 Mi。使用 Recreate 和 CronJob Forbid 避免滚动或定时任务重叠。local-path PVC 不是跨节点备份。
 
 1. 准备与发布版本匹配的 `public/world/`，确保清单引用的文件齐全。sg 保持工作树干净，安装 Docker、Node 22、kubectl，SSH 到 hk01 无需 sudo。`test:api`、`test:bridge`、`verify:auth`、`verify:feedback`、`verify:admin` 使用临时 Docker PG 和 MinIO，不复用线上数据库。浏览器验证需要先构建 `dist`。
-2. 在 `idoknow` 安全预置 `glol-registry`（仅能拉取 glol 私有包）和 `glol-env`。后者含 `POSTGRES_PASSWORD`（随机十六进制）、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`（glol 专用 MinIO）、原有 `RESEND_API_KEY` 和 `BRIDGE_TOKEN`。不复制共享 Docker 登录文件、不通过 issue 或 Git 传值。Ingress 须覆盖客户端自报的 `X-Real-IP`，并传递受信任的客户端地址，以保持原 IP 限流行为。
-3. `npm run deploy:hk`；等待三个 Deployment 就绪、`Certificate/glol-tls` Ready。部署脚本只处理源站，不切流。不要在运行中的生产站执行快照替换。
-4. 为 D1 注入获准导出 glol 的 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`，在可接受的时间窗口运行 `CONFIRM_REPLACE_HK_GLOL=yes bash deploy/import-hk.sh`。Wrangler 提示导出期间可能短暂无法查询。仅在被忽略的私有临时目录生成导出，退出即清理。目标快照事务替换 11 张应用表（含无主键的用量表），保留外键，禁用会产生重复副作用的用户触发器，逐表对数，并复位序列。CF 内部表不导入。
-5. 向 `idoknow/glol-minio` 建立只绑定回环地址的 kubectl port-forward（从 sg 使用 SSH 转发到 hk01 回环地址）。设置本地 `S3_ENDPOINT`、目标 MinIO `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`、源 `R2_ACCESS_KEY_ID`/`R2_SECRET_ACCESS_KEY`（仅 `glol-feedback` list/get）和 `CLOUDFLARE_ACCOUNT_ID`。执行 `node deploy/sync-objects.mjs`，保留对象数和总字节数。不按 key 逐一打印；增量仅覆盖新增/变更，若目标有额外对象会中止而非静默删除。验收测试写入的目标照片须与同步分开，演练后清理自建测试数据再同步。
+2. 在 `idoknow` 安全预置 `glol-env`。后者含 `POSTGRES_PASSWORD`（随机十六进制）、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`（glol 专用 MinIO）、原有 `RESEND_API_KEY` 和 `BRIDGE_TOKEN`。不复制共享 Docker 登录文件、不通过 issue 或 Git 传值。Ingress 须覆盖客户端自报的 `X-Real-IP`，并传递受信任的客户端地址，以保持原 IP 限流行为。 镜像按 SHA 匿名拉取。
+3. Actions 在 PR 分支 push 或手动触发时构建并推送 web 和 api 的 commit SHA；构建时从当前线上站读取按 `deploy/world.sha256` 固定的公开 world 资源。确认两包 Public 后运行 `npm run deploy:hk`；脚本只等待镜像并应用源站，不推镜像、不切流。桥保持暂停，启用前须另行备齐同 SHA 桥镜像和专用 Secret。
+4. sg claude 在停写窗口重新导出，传入只读快照目录。`CONFIRM_REPLACE_HK_GLOL=yes bash deploy/import-hk.sh /absolute/export` 将 `d1-glol.sql` 流式事务替换到指定 glol 库，逐表校验；不申请 Cloudflare 令牌，不复制导出文件。
+5. 从 sg 通过仅绑定回环的 SSH 隧道连接 hk01 的 glol-minio，设置 `S3_ENDPOINT` 和 glol 专用 AWS 凭据。运行 `node deploy/sync-objects.mjs /absolute/export`；从 `r2/manifest.json` 和 `r2/objects` 校验 SHA-256，增量写入后回读校验，遇到多余对象停止。`--check-only` 只查源文件。
 6. 使用 `curl --resolve glol.rcpd.cc:443:38.39.30.208 https://glol.rcpd.cc/`，不使用 `-k`。相同 Host 核验 `/world/manifest.json`、至少一个清单分块、`/api/me` 未登录 401、静态缓存头。浏览器定向同一 IP 验证注册、邮箱验证码、登录、私有图片上传与回读、反馈提交及管理员界面。不要用生产用户凭据做冒烟测试。分别检查三个 Deployment 的 Pod 内存和节点使用量，只记录数字。
 
 ## 切流与回滚（sg claude）

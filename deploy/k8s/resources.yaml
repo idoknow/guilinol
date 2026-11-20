@@ -84,8 +84,6 @@ spec:
       dnsConfig:
         nameservers:
         - 10.42.10.1
-      imagePullSecrets:
-      - name: glol-registry
       containers:
       - name: glol-postgres
         image: postgres:16-alpine
@@ -146,8 +144,6 @@ spec:
       dnsConfig:
         nameservers:
         - 10.42.10.1
-      imagePullSecrets:
-      - name: glol-registry
       containers:
       - name: glol-minio
         image: cgr.dev/chainguard/minio@sha256:0f9fda72fbc6bd3560ea903aec2ceefa20f6ba82628d67656f37fb370c39ae9c
@@ -212,8 +208,6 @@ spec:
       dnsConfig:
         nameservers:
         - 10.42.10.1
-      imagePullSecrets:
-      - name: glol-registry
       containers:
       - name: glol-nginx
         image: ghcr.io/idoknow/glol-web:RELEASE
