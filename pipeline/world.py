@@ -204,7 +204,7 @@ def build(bbox, output, palette):
         vessel_routes=candidate_routes, previous_bed=previous_bed,
     )
     if interchange is not None:
-        grade_banks(terrain, original, wet, left, top, GRID, (x_jb, z_jb), angle, datum)
+        grade_banks(terrain, original, wet, left, top, GRID, (x_jb, z_jb), angle, datum, finish=True)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 

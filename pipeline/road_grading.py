@@ -15,7 +15,7 @@ from shapely import STRtree, intersects_xy
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
-from landmarks.jiefang_layout import site_limit, LOWER_ROADS, SPAN_WAYS, deck_level, world_road_sections
+from landmarks.jiefang_layout import NATIVE_APPROACH, LOWER, bank_blend, LOWER_ROADS, SPAN_WAYS, deck_level, world_road_sections
 from common import CHUNK, GRID, load_osm
 from features import points, rongyin_sidewalk
 from road_profile import RULES
@@ -549,7 +549,7 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
     if jb_pos is not None:
         anchor = np.asarray(jb_pos)[[0, 2]]
         angle = -np.deg2rad(lm_meshes['jiefang_bridge']['entry']['rotation'])
-        for way, line, _, levels, edge_l, edge_r in world_road_sections(anchor, angle):
+        for way, line, _, levels, edge_l, edge_r in world_road_sections(anchor, angle, native_grade=True):
             if way not in osm_ways or not line.intersects(bounds_poly):
                 continue
             # Pin the full carriageway at each junction with the native road.
@@ -562,7 +562,7 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
                 # let the spline transition into its existing longitudinal grade.
                 pt = np.array(line.coords[i])
                 local = (pt - anchor) @ np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
-                if min(abs(local[0] + 265), abs(abs(local[1]) - site_limit(way))) < .01:
+                if min(abs(local[0] + 265), abs(abs(local[1]) - NATIVE_APPROACH)) < .01:
                     outward = pt - line.coords[1 if i == 0 else -2]
                     outward /= np.linalg.norm(outward)
                     native = LineString(osm_ways[way][0])
@@ -1075,4 +1075,13 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
                     h_adj += delta*np.maximum(0.,1.-distance/run)
             bridge_plans[wid] = (line, b_width, s_b, h_adj)
 
+    if jb_pos is not None:
+        # Finish the two extended seams locally, after the citywide fit and
+        # terrain imprint. A control-cell apron keeps the cubic spline level
+        # across both carriageway edges before it rejoins the native approach.
+        east,south=GX-jb_pos[0],GZ-jb_pos[2]
+        x=east*np.cos(angle)+south*np.sin(angle)
+        z=-east*np.sin(angle)+south*np.cos(angle)
+        blend=bank_blend(x,z,padding=STEP)*np.clip((abs(z)-NATIVE_APPROACH+12)/12,0,1)
+        ctrl=ctrl+blend*(jb_pos[1]+LOWER-.045-ctrl)
     return ctrl, bridge_plans, finalize_bridges

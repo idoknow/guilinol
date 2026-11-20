@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 import numpy as np
-from shapely.geometry import LineString, Point, Polygon
+from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import unary_union
 
 OSM = {int(key):np.array(points) for key,points in
@@ -15,11 +15,12 @@ SIDE_ROAD=(675174045,)
 FOOTWAYS=(1382486207,1382486209,1382486210,1382486211,1382486212,1382487357)
 UPPER=6.26
 LOWER=.96
+NATIVE_APPROACH=120
 BANK_LIMIT=140
 
 
 def site_limit(way):
-    return BANK_LIMIT if way in LOWER_ROADS else 120
+    return BANK_LIMIT if way in LOWER_ROADS else NATIVE_APPROACH
 
 
 def promenade_offset(z):
@@ -29,9 +30,13 @@ def promenade_offset(z):
                      [5.4,10.4,10.1,9.05,8.75,5.4,5.4,7.46,8.14,7.9,7.5,5.4])
 
 
-def section(way):
+def section(way, native_grade=False):
     """OSM stations, right-hand miter, chainage and deck level in travel order."""
     xy=OSM[way]
+    if native_grade and way in LOWER_ROADS:
+        # Keep the existing Binjiang approach controls in the citywide fit.
+        # The widened pavement and its new end joints are graded locally.
+        xy=np.asarray(LineString(xy).intersection(box(-265,-NATIVE_APPROACH,-65,NATIVE_APPROACH)).coords).round(3)
     if way in RAMPS+UPPER_ROADS+LOWER_ROADS+SIDE_ROAD:
         xy=np.asarray(LineString(xy).segmentize(6).coords)
     delta=np.diff(xy,axis=0)
@@ -41,7 +46,7 @@ def section(way):
     mid=normals[:-1]+normals[1:]
     mid/=np.sum(mid*normals[:-1],axis=1)[:,None]
     edges=np.vstack([normals[0],mid,normals[-1]])
-    if way in LOWER_ROADS:
+    if way in LOWER_ROADS and not native_grade:
         # Both ways must use the same miter at the shared OSM node,
         # including the outer edge of the widened pavement.
         south,north=(OSM[w] for w in LOWER_ROADS)
@@ -101,11 +106,11 @@ def deck_level(local_x):
     return 5.62 - local_x * 1.3 / 281
 
 
-def world_road_sections(anchor, angle):
+def world_road_sections(anchor, angle, native_grade=False):
     """Modeled road stations and carriageway edges in world coordinates."""
     transform = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
     for way in RAMPS + UPPER_ROADS + LOWER_ROADS + SIDE_ROAD:
-        xy, normals, station, levels = section(way)
+        xy, normals, station, levels = section(way,native_grade)
         left, right, _ = widths(way)
         edge = lambda offset: (xy + normals * np.broadcast_to(offset, len(xy))[:, None]) @ transform + anchor
         yield way, LineString(xy @ transform + anchor), station, levels, edge(left), edge(right)
@@ -122,7 +127,20 @@ def bank_paving(anchor,angle):
     return unary_union(paths)
 
 
-def grade_banks(terrain,original,wet,left,top,step,anchor,angle,datum):
+def bank_blend(x,z,padding=0):
+    """Blend the promenade grade back to native ground across and along the road."""
+    axis=np.vstack((OSM[LOWER_ROADS[0]][:-1],OSM[LOWER_ROADS[1]]))[::-1]
+    center=np.interp(z,axis[:,1],axis[:,0])
+    for p,q,overrun in ((axis[0],axis[1],np.minimum(0,z+BANK_LIMIT)),
+                        (axis[-1],axis[-2],np.maximum(0,z-BANK_LIMIT))):
+        center+=overrun*(p[0]-q[0])/(p[1]-q[1])
+    d=x-center
+    across=np.clip((d+12+padding)/6,0,1)*np.clip((promenade_offset(z)+10+padding-d)/6,0,1)
+    along=np.clip((BANK_LIMIT+34-abs(z))/26,0,1)
+    return across*along**2*(3-2*along)
+
+
+def grade_banks(terrain,original,wet,left,top,step,anchor,angle,datum,finish=False):
     bx,bz=anchor
     rows=slice(max(0,int((bz-330-top)//step)),min(terrain.shape[0],int((bz+330-top)//step)+1))
     cols=slice(max(0,int((bx-330-left)//step)),min(terrain.shape[1],int((bx+330-left)//step)+1))
@@ -136,13 +154,12 @@ def grade_banks(terrain,original,wet,left,top,step,anchor,angle,datum):
     shore=(x>-114)&(x<-56)&(abs(z)<76)
     limit[shore]=(datum+LOWER-.17-np.maximum(0,x+90)*.10+np.maximum(0,abs(z)-68)*.3)[shore]
     for way in RAMPS+UPPER_ROADS+LOWER_ROADS+SIDE_ROAD+FOOTWAYS:
-        xy,_,_,y=section(way)
+        xy,_,_,y=section(way,native_grade=True)
         l,r,w=widths(way)
-        radius_at=np.broadcast_to(r+w if way in LOWER_ROADS else max(np.max(-l),np.max(r)+w),len(xy))
-        for i,(a,b,h0,h1) in enumerate(zip(xy,xy[1:],y,y[1:])):
+        radius=7.2 if way in LOWER_ROADS else max(np.max(-l),np.max(r)+w)
+        for a,b,h0,h1 in zip(xy,xy[1:],y,y[1:]):
             dx,dz=b-a
             t=np.clip(((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz),0,1)
-            radius=radius_at[i]+t*(radius_at[i+1]-radius_at[i])
             dist=np.hypot(x-a[0]-t*dx,z-a[1]-t*dz)
             level=datum+h0+t*(h1-h0)-.20+np.maximum(0,dist-radius-2)*.40
             limit=np.where(dist<radius+18,np.minimum(limit,level),limit)
@@ -158,10 +175,10 @@ def grade_banks(terrain,original,wet,left,top,step,anchor,angle,datum):
         patch[fill_mask]=np.maximum(patch[fill_mask],np.rint(10*approach_fill[fill_mask]))
     # Blend the ends of the modeled road into the heightfield outside the site.
     for way in UPPER_ROADS+LOWER_ROADS+SIDE_ROAD:
-        xy,_,_,levels=section(way)
+        xy,_,_,levels=section(way,native_grade=True)
         for end,neighbor in ((0,1),(-1,-2)):
             p=xy[end]
-            if abs(p[0]+265)>.01 and abs(abs(p[1])-site_limit(way))>.01:continue
+            if abs(p[0]+265)>.01 and abs(abs(p[1])-NATIVE_APPROACH)>.01:continue
             direction=p-xy[neighbor];direction/=np.linalg.norm(direction)
             dx,dz=x-p[0],z-p[1]
             station=dx*direction[0]+dz*direction[1]
@@ -172,3 +189,11 @@ def grade_banks(terrain,original,wet,left,top,step,anchor,angle,datum):
             for field in (original,terrain):
                 patch=field[rows,cols]
                 patch[mask]=np.rint(mix[mask]*10*level+(1-mix[mask])*patch[mask])
+    if finish:
+        # Excavate only the modeled road and its riverside shoulder. The
+        # native grade around adjacent building foundations remains in place.
+        blend=bank_blend(x,z)*(~wet[rows,cols])
+        bed=10*(datum+LOWER-.18)
+        for field in (original,terrain):
+            patch=field[rows,cols]
+            patch[:]=np.rint(patch+blend*np.minimum(0,bed-patch))
