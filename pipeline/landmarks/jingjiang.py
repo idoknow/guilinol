@@ -305,7 +305,8 @@ def palace(m):
     from wangcheng_plan import PalacePlan, enclosure, inner_court
     plan = PalacePlan()
     enclosure(m, plan)
-    m.box(0,-.65,16,47,.82,33,'pave',True)
+    # Carry the forecourt through both arches up to the axial path at z=-11.5.
+    m.box(0,-.65,10.5,47,.82,44,'pave',True)
     m.arcade(0,-11,40,23,6.8,[-11,0],[2.0,3.75],'stone')
     m.box(0,6.8,-11,40,2.25,23,'brick',True)
     if m.detail:
