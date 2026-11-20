@@ -33,7 +33,7 @@ export function vehicleModel(kind:string,paint=0,options?:{shared?:boolean}){
   const key=effectiveKind+paint
   if(effectiveKind==='car'){
     if(!cache.has(key))cache.set(key,buildCarGeometry(paint))
-    const mesh=new T.Mesh(cache.get(key),material);mesh.name=kind;return mesh
+    const mesh=new T.Mesh(cache.get(key),material);mesh.name=kind;mesh.userData.paint=paint;return mesh
   }
   if(!cache.has(key)){
     const parts:T.BufferGeometry[]=[]
@@ -161,7 +161,61 @@ export function vehicleModel(kind:string,paint=0,options?:{shared?:boolean}){
 // Four understated Guilin street sedan finishes: pearl ivory, Lijiang slate blue, karst silver, osmanthus burgundy.
 const CAR_PAINTS=[0xf0ede6,0x365b77,0x8c949c,0x8f3330] as const
 
-function buildCarGeometry(paint=0):T.BufferGeometry{
+const CAR_WHEEL_PALETTE={
+  underbody:0x191b1d,chrome:0xc5cdd3,alloy:0xcfd5da,alloyInner:0x7c838a,tireRubber:0x26292c,brakeBright:0xe8483e,
+}
+
+function appendCarWheelParts(
+  emit:(raw:T.BufferGeometry,color:number,x?:number,y?:number,z?:number)=>void,
+  box:(w:number,h:number,d:number,x:number,y:number,z:number,color:number)=>void,
+  side:-1|1,wx:number,wy:number,wz:number,includeCaliper:boolean,
+){
+  const {underbody,chrome,alloy,alloyInner,tireRubber,brakeBright}=CAR_WHEEL_PALETTE
+  const tireTorus=new T.TorusGeometry(.232,.074,4,10);tireTorus.rotateY(Math.PI/2)
+  emit(tireTorus,tireRubber,wx,wy,wz)
+  const tread=new T.CylinderGeometry(.244,.244,.195,10,1,true);tread.rotateZ(Math.PI/2)
+  emit(tread,tireRubber,wx,wy,wz)
+  const rimLip=new T.TorusGeometry(.184,.015,3,8);rimLip.rotateY(Math.PI/2)
+  emit(rimLip,alloy,wx+side*.086,wy,wz)
+  const barrel=new T.CylinderGeometry(.182,.182,.15,8,1,true);barrel.rotateZ(Math.PI/2)
+  emit(barrel,underbody,wx,wy,wz)
+  const rotor=new T.CylinderGeometry(.140,.140,.022,7);rotor.rotateZ(Math.PI/2)
+  emit(rotor,alloyInner,wx+side*.046,wy,wz)
+  if(includeCaliper)box(.045,.092,.062,wx+side*.052,wy+.02,wz-.09,brakeBright)
+  for(let s=0;s<5;s++){
+    const ang=(s*Math.PI*2)/5+.18,rMid=.10
+    const spoke=new T.BoxGeometry(.026,.158,.034);spoke.rotateX(ang)
+    emit(spoke,alloy,wx+side*.088,wy+Math.cos(ang)*rMid,wz+Math.sin(ang)*rMid)
+  }
+  const hub=new T.CylinderGeometry(.044,.048,.030,6);hub.rotateZ(Math.PI/2)
+  emit(hub,chrome,wx+side*.092,wy,wz)
+}
+
+function buildCarWheelGeometry(side:-1|1):T.BufferGeometry{
+  const key=`car_wheel_${side}`
+  const existing=cache.get(key)
+  if(existing)return existing
+  const parts:T.BufferGeometry[]=[]
+  const emit=(raw:T.BufferGeometry,color:number,x=0,y=0,z=0)=>{
+    const g=raw.index?raw.toNonIndexed():raw
+    if(g!==raw)raw.dispose()
+    if(x||y||z)g.translate(x,y,z)
+    g.deleteAttribute('uv')
+    const count=g.attributes.position.count,c=new T.Color(color),colors=new Float32Array(count*3)
+    for(let i=0;i<count;i++){colors[i*3]=c.r;colors[i*3+1]=c.g;colors[i*3+2]=c.b}
+    g.setAttribute('color',new T.BufferAttribute(colors,3))
+    parts.push(g)
+  }
+  const box=(w:number,h:number,d:number,x:number,y:number,z:number,color:number)=>emit(new T.BoxGeometry(w,h,d),color,x,y,z)
+  appendCarWheelParts(emit,box,side,0,0,0,false)
+  const merged=mergeGeometries(parts,false)
+  for(const p of parts)p.dispose()
+  merged.computeVertexNormals()
+  cache.set(key,merged)
+  return merged
+}
+
+function buildCarGeometry(paint=0,includeWheels=true):T.BufferGeometry{
   const bodyHex=CAR_PAINTS[((paint%4)+4)%4]
   const bodyCol=new T.Color(bodyHex)
   const shadeHex=bodyCol.clone().multiplyScalar(.88).getHex()
@@ -427,26 +481,10 @@ function buildCarGeometry(paint=0):T.BufferGeometry{
   }
 
   // 5-spoke alloy wheels with rounded tires, rim lips, brake discs, and calipers
-  for(const side of [-1,1])for(const wz of [-1.34,1.31]){
-    const wx=side*.795,wy=.306
-    const tireTorus=new T.TorusGeometry(.232,.074,4,10);tireTorus.rotateY(Math.PI/2)
-    emit(tireTorus,tireRubber,wx,wy,wz)
-    const tread=new T.CylinderGeometry(.244,.244,.195,10,1,true);tread.rotateZ(Math.PI/2)
-    emit(tread,tireRubber,wx,wy,wz)
-    const rimLip=new T.TorusGeometry(.184,.015,3,8);rimLip.rotateY(Math.PI/2)
-    emit(rimLip,alloy,wx+side*.086,wy,wz)
-    const barrel=new T.CylinderGeometry(.182,.182,.15,8,1,true);barrel.rotateZ(Math.PI/2)
-    emit(barrel,underbody,wx,wy,wz)
-    const rotor=new T.CylinderGeometry(.140,.140,.022,7);rotor.rotateZ(Math.PI/2)
-    emit(rotor,alloyInner,wx+side*.046,wy,wz)
-    box(.045,.092,.062,wx+side*.052,wy+.02,wz-.09,brakeBright)
-    for(let s=0;s<5;s++){
-      const ang=(s*Math.PI*2)/5+.18,rMid=.10
-      const spoke=new T.BoxGeometry(.026,.158,.034);spoke.rotateX(ang)
-      emit(spoke,alloy,wx+side*.088,wy+Math.cos(ang)*rMid,wz+Math.sin(ang)*rMid)
+  if(includeWheels){
+    for(const side of [-1,1] as const)for(const wz of [-1.34,1.31]){
+      appendCarWheelParts(emit,box,side,side*.795,.306,wz,true)
     }
-    const hub=new T.CylinderGeometry(.044,.048,.030,6);hub.rotateZ(Math.PI/2)
-    emit(hub,chrome,wx+side*.092,wy,wz)
   }
 
   const merged=mergeGeometries(parts,false)
@@ -509,7 +547,22 @@ export const EBIKE_MOD_PRESETS: Record<EbikeModPreset, EbikeModConfig> = {
 
 const EBIKE_STOCK_PAINTS = [0xf3f1e9, 0x99c9de, 0xe4afbb, 0x383c40] as const
 
-export interface EbikeVisualRig {
+export interface TwoWheelRigState {
+  pos: T.Vector3
+  heading: number
+  groundPitch: number
+  lean: number
+  wheelie: number
+  steerInput: number
+  speed: number
+  pedalPhase?: number
+  braking?: boolean
+  crashRoll?: number
+  crashLift?: number
+  dt: number
+}
+
+export interface TwoWheelVisualRig {
   root: T.Group
   crashPivot: T.Group
   leanPivot: T.Group
@@ -518,6 +571,12 @@ export interface EbikeVisualRig {
   frontWheel: T.Group
   rearWheel: T.Group
   seatAnchor: T.Object3D
+  crank?: T.Group
+  update: (state: TwoWheelRigState) => void
+  dispose: () => void
+}
+
+export interface EbikeVisualRig extends TwoWheelVisualRig {
   modSlots: {
     shell: T.Group
     headlight: T.Group
@@ -529,19 +588,28 @@ export interface EbikeVisualRig {
   get vehicleType(): EbikeVehicleKind
   setVehicleType: (type: EbikeVehicleKind, basePaint?: number) => void
   applyMods: (next: EbikeModPreset | Partial<EbikeModConfig>, basePaint?: number) => void
+}
+
+export interface BicycleVisualRig extends TwoWheelVisualRig {
+  setPaint: (paint: number) => void
+}
+
+export interface CarVisualRig {
+  root: T.Group
+  suspensionPivot: T.Group
+  setPaint: (paint: number) => void
+  triggerImpact: (strength: number) => void
   update: (state: {
     pos: T.Vector3
     heading: number
     groundPitch: number
-    lean: number
-    wheelie: number
-    steerInput: number
     speed: number
-    braking?: boolean
-    crashRoll?: number
-    crashLift?: number
+    steerInput: number
+    braking: boolean
+    reversing: boolean
     dt: number
   }) => void
+  probe: () => { roll: number; pitch: number; heave: number; steerAngle: number; wheelSpin: number; braking: boolean; reversing: boolean }
   dispose: () => void
 }
 
@@ -785,7 +853,7 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
       root.rotation.set(state.groundPitch, state.heading, 0, 'YXZ')
       const crashRoll = state.crashRoll ?? 0
       crashPivot.rotation.set(0, 0, crashRoll)
-      crashPivot.position.set(0, state.crashLift ?? 0, 0)
+      crashPivot.position.set(0, state.crashLift ?? Math.abs(Math.sin(crashRoll)) * .19, 0)
       leanPivot.rotation.set(0, 0, state.lean)
       wheeliePivot.rotation.set(state.wheelie, 0, 0)
       frontAssembly.rotation.y = -state.steerInput * .42
@@ -800,6 +868,304 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
     },
     dispose() {
       for (const item of disposables) item.dispose()
+      root.removeFromParent()
+    },
+  }
+}
+
+const BICYCLE_PAINTS = [0x5b8a72, 0xc96f53, 0xd8cfc0, 0x5c6e7e] as const
+
+function buildSpokedBicycleWheel(tireMat: T.Material, rimMat: T.Material, trackG: <G extends T.BufferGeometry>(g: G) => G) {
+  const g = new T.Group()
+  g.add(
+    makeSolidPart(trackG(new T.TorusGeometry(.304, .026, 7, 18).rotateY(Math.PI / 2)), tireMat),
+    makeSolidPart(trackG(new T.TorusGeometry(.272, .011, 6, 18).rotateY(Math.PI / 2)), rimMat),
+    makeSolidPart(trackG(new T.CylinderGeometry(.024, .024, .072, 8).rotateZ(Math.PI / 2)), rimMat),
+  )
+  for (let s = 0; s < 4; s++) {
+    g.add(makeSolidPart(trackG(new T.CylinderGeometry(.005, .005, .53, 4).rotateX(s * Math.PI / 4)), rimMat))
+  }
+  return g
+}
+
+function makeTube(r: number, x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, mat: T.Material, trackG: <G extends T.BufferGeometry>(g: G) => G, segs = 6) {
+  const dx = x2 - x1, dy = y2 - y1, dz = z2 - z1, len = Math.hypot(dx, dy, dz)
+  const g = trackG(new T.CylinderGeometry(r, r, Math.max(1e-3, len), segs))
+  qTmp.setFromUnitVectors(upAxis, dirVec.set(dx / Math.max(1e-4, len), dy / Math.max(1e-4, len), dz / Math.max(1e-4, len)))
+  g.applyQuaternion(qTmp)
+  return makeSolidPart(g, mat, (x1 + x2) * .5, (y1 + y2) * .5, (z1 + z2) * .5)
+}
+
+/**
+ * Articulated dynamic pedal bicycle rig matching static Guilin bicycle proportions:
+ * - Wheelie pivots cleanly on rear tire contact patch (0, 0, +0.54)
+ * - Front fork, wheel, swept handlebar, bell & rattan basket steer together
+ * - Spinning spoked wheels and crank assembly driven by pedaling phase
+ * - Crash roll & lift pivot rests frame on asphalt when downed
+ */
+export function createDynamicBicycle(paint = 0): BicycleVisualRig {
+  const disposables: (T.BufferGeometry | T.Material)[] = []
+  const trackG = <G extends T.BufferGeometry>(g: G) => { disposables.push(g); return g }
+  const trackM = <M extends T.Material>(m: M) => { disposables.push(m); return m }
+
+  const frameMat = trackM(new T.MeshStandardMaterial({color: BICYCLE_PAINTS[((paint % 4) + 4) % 4], flatShading: true, roughness: .55}))
+  const alloyMat = trackM(new T.MeshStandardMaterial({color: 0xb8bec2, flatShading: true, roughness: .4, metalness: .45}))
+  const darkMat = trackM(new T.MeshStandardMaterial({color: 0x2b2e30, flatShading: true, roughness: .85}))
+  const saddleMat = trackM(new T.MeshStandardMaterial({color: 0x423832, flatShading: true, roughness: .9}))
+  const basketMat = trackM(new T.MeshStandardMaterial({color: 0x6f7577, flatShading: true, roughness: .75}))
+  const rattanMat = trackM(new T.MeshStandardMaterial({color: 0xa68963, flatShading: true, roughness: .85}))
+  const bellMat = trackM(new T.MeshStandardMaterial({color: 0xd4b46a, flatShading: true, roughness: .35, metalness: .6}))
+  const chainMat = trackM(new T.MeshStandardMaterial({color: 0x525659, flatShading: true, roughness: .7}))
+
+  const root = new T.Group()
+  root.name = 'dynamic-bicycle'
+  const crashPivot = new T.Group()
+  const leanPivot = new T.Group()
+  const wheeliePivot = new T.Group()
+  const REAR_Z = .54
+  wheeliePivot.position.set(0, 0, REAR_Z)
+  root.add(crashPivot)
+  crashPivot.add(leanPivot)
+  leanPivot.add(wheeliePivot)
+
+  const chassis = new T.Group()
+  wheeliePivot.add(chassis)
+
+  const rearWheel = buildSpokedBicycleWheel(darkMat, alloyMat, trackG)
+  rearWheel.position.set(0, .33, 0)
+  chassis.add(rearWheel)
+
+  const fender = makeSolidPart(trackG(new T.TorusGeometry(.336, .016, 5, 12, Math.PI * .78).rotateY(Math.PI / 2).rotateX(-.22)), frameMat, 0, .33, 0)
+  const bbShell = makeSolidPart(trackG(new T.CylinderGeometry(.032, .032, .09, 8).rotateZ(Math.PI / 2)), alloyMat, 0, .29, .05 - REAR_Z)
+  const seatTube = makeTube(.017, 0, .29, .05 - REAR_Z, 0, .72, .19 - REAR_Z, frameMat, trackG, 7)
+  const seatPost = makeTube(.013, 0, .72, .19 - REAR_Z, 0, .82, .22 - REAR_Z, alloyMat, trackG, 6)
+  const downTube = makeTube(.019, 0, .64, -.43 - REAR_Z, 0, .29, .05 - REAR_Z, frameMat, trackG, 7)
+  const topTube = makeTube(.016, 0, .74, -.41 - REAR_Z, 0, .58, .14 - REAR_Z, frameMat, trackG, 7)
+  const saddle = makeSolidPart(trackG(new T.BoxGeometry(.15, .048, .25)), saddleMat, 0, .835, .22 - REAR_Z)
+  const saddleNose = makeSolidPart(trackG(new T.BoxGeometry(.075, .038, .10)), saddleMat, 0, .832, .10 - REAR_Z)
+  const chainring = makeSolidPart(trackG(new T.CylinderGeometry(.082, .082, .012, 12).rotateZ(Math.PI / 2)), chainMat, .048, .29, .05 - REAR_Z)
+  const chainLine = makeTube(.008, .048, .36, .05 - REAR_Z, .048, .35, 0, chainMat, trackG, 4)
+  chassis.add(fender, bbShell, seatTube, seatPost, downTube, topTube, saddle, saddleNose, chainring, chainLine)
+
+  for (const side of [-1, 1]) {
+    chassis.add(
+      makeTube(.011, side * .036, .29, .05 - REAR_Z, side * .044, .33, 0, frameMat, trackG, 5),
+      makeTube(.011, side * .032, .67, .17 - REAR_Z, side * .044, .33, 0, frameMat, trackG, 5),
+    )
+  }
+
+  const crank = new T.Group()
+  crank.name = 'Crank'
+  crank.position.set(0, .29, .05 - REAR_Z)
+  const crankMesh = new T.Mesh(getBicycleCrank(), trackM(new T.MeshStandardMaterial({vertexColors: true, flatShading: true})))
+  crank.add(crankMesh)
+  chassis.add(crank)
+
+  // Head tube / front steering assembly at z = -0.42 -> relative to REAR_Z = -0.96
+  const frontAssembly = new T.Group()
+  frontAssembly.position.set(0, 0, -.42 - REAR_Z)
+  wheeliePivot.add(frontAssembly)
+
+  const frontWheel = buildSpokedBicycleWheel(darkMat, alloyMat, trackG)
+  frontWheel.position.set(0, .33, -.12)
+  frontAssembly.add(frontWheel)
+
+  frontAssembly.add(
+    makeTube(.020, 0, .61, -.02, 0, .79, .02, frameMat, trackG, 7),
+    makeSolidPart(trackG(new T.BoxGeometry(.095, .026, .034)), frameMat, 0, .61, -.02),
+    makeTube(.014, 0, .79, .02, 0, .97, .04, alloyMat, trackG, 6),
+    makeTube(.014, 0, .97, .04, 0, .98, 0, alloyMat, trackG, 6),
+    makeTube(.013, -.16, .98, 0, .16, .98, 0, alloyMat, trackG, 6),
+    makeSolidPart(trackG(new T.CylinderGeometry(.022, .022, .018, 8)), bellMat, .13, 1.005, 0),
+    makeSolidPart(trackG(new T.BoxGeometry(.08, .022, .10)), alloyMat, 0, .75, -.05),
+    makeSolidPart(trackG(new T.BoxGeometry(.26, .018, .19)), rattanMat, 0, .74, -.14),
+  )
+  for (const side of [-1, 1]) {
+    frontAssembly.add(
+      makeTube(.013, side * .038, .61, -.02, side * .044, .33, -.12, frameMat, trackG, 6),
+      makeTube(.013, side * .16, .98, 0, side * .28, .99, .07, alloyMat, trackG, 6),
+      makeTube(.019, side * .20, .984, .025, side * .29, .992, .075, saddleMat, trackG, 6),
+    )
+  }
+  for (const ry of [.83, .92]) {
+    const spread = ry > .88 ? 1 : .93
+    for (const side of [-1, 1]) {
+      frontAssembly.add(
+        makeSolidPart(trackG(new T.BoxGeometry(.014, .014, .22 * spread)), basketMat, side * .15 * spread, ry, -.14),
+        makeSolidPart(trackG(new T.BoxGeometry(.30 * spread, .014, .014)), basketMat, 0, ry, -.14 + side * .11 * spread),
+      )
+    }
+  }
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    frontAssembly.add(makeTube(.008, sx * .13, .74, -.14 + sz * .095, sx * .15, .92, -.14 + sz * .11, basketMat, trackG, 4))
+  }
+
+  const seatAnchor = new T.Object3D()
+  seatAnchor.name = 'rider-seat-anchor'
+  seatAnchor.position.set(0, 0, .22 - REAR_Z)
+  wheeliePivot.add(seatAnchor)
+
+  let wheelSpin = 0
+
+  return {
+    root,
+    crashPivot,
+    leanPivot,
+    wheeliePivot,
+    frontAssembly,
+    frontWheel,
+    rearWheel,
+    seatAnchor,
+    crank,
+    setPaint(nextPaint: number) {
+      frameMat.color.setHex(BICYCLE_PAINTS[((nextPaint % 4) + 4) % 4])
+    },
+    update(state) {
+      root.position.copy(state.pos)
+      root.rotation.set(state.groundPitch, state.heading, 0, 'YXZ')
+      const crashRoll = state.crashRoll ?? 0
+      crashPivot.rotation.set(0, 0, crashRoll)
+      crashPivot.position.set(0, state.crashLift ?? Math.abs(Math.sin(crashRoll)) * .19, 0)
+      leanPivot.rotation.set(0, 0, state.lean)
+      wheeliePivot.rotation.set(state.wheelie, 0, 0)
+      frontAssembly.rotation.y = -state.steerInput * .42
+
+      const spinDelta = (state.speed * state.dt) / .33
+      wheelSpin -= spinDelta
+      rearWheel.rotation.x = wheelSpin
+      frontWheel.rotation.x -= state.wheelie > .08 ? spinDelta * .35 : spinDelta
+      if (state.pedalPhase !== undefined) crank.rotation.x = -state.pedalPhase
+    },
+    dispose() {
+      for (const item of disposables) item.dispose()
+      root.removeFromParent()
+    },
+  }
+}
+
+/**
+ * GTA-style dynamic sedan rig with independent 4-wheel spin, Ackermann front steering,
+ * outward lateral suspension roll, brake nose-dive / launch squat, jounce spring & live lamps.
+ */
+export function createDynamicCar(paint = 0): CarVisualRig {
+  const disposables: (T.BufferGeometry | T.Material)[] = []
+  const trackG = <G extends T.BufferGeometry>(g: G) => { disposables.push(g); return g }
+  const trackM = <M extends T.Material>(m: M) => { disposables.push(m); return m }
+
+  const bodyMat = trackM(new T.MeshStandardMaterial({vertexColors: true, flatShading: true}))
+  const wheelMat = trackM(new T.MeshStandardMaterial({vertexColors: true, flatShading: true}))
+  const caliperMat = trackM(new T.MeshStandardMaterial({color: CAR_WHEEL_PALETTE.brakeBright, flatShading: true}))
+  const brakeLampMat = trackM(new T.MeshBasicMaterial({color: 0x7a1714}))
+  const reverseLampMat = trackM(new T.MeshBasicMaterial({color: 0x3b4046}))
+
+  const bodyCache = new Map<number, T.BufferGeometry>()
+  const getBodyGeom = (p: number) => {
+    const idx = ((p % 4) + 4) % 4
+    let g = bodyCache.get(idx)
+    if (!g) {
+      g = buildCarGeometry(idx, false)
+      bodyCache.set(idx, g)
+    }
+    return g
+  }
+
+  const root = new T.Group()
+  root.name = 'dynamic-car'
+  const suspensionPivot = new T.Group()
+  const CG_Y = .45
+  suspensionPivot.position.set(0, CG_Y, 0)
+  root.add(suspensionPivot)
+
+  const bodyMesh = new T.Mesh(getBodyGeom(paint), bodyMat)
+  bodyMesh.position.set(0, -CG_Y, 0)
+  suspensionPivot.add(bodyMesh)
+
+  for (const side of [-1, 1]) {
+    const yaw = -side * .20
+    const br = makeSolidPart(trackG(new T.BoxGeometry(.345, .048, .022)), brakeLampMat, side * .61, .85 - CG_Y, 2.222)
+    br.rotation.set(-.06, yaw, 0)
+    const rev = makeSolidPart(trackG(new T.BoxGeometry(.245, .034, .022)), reverseLampMat, side * .57, .775 - CG_Y, 2.222)
+    rev.rotation.set(-.06, yaw, 0)
+    suspensionPivot.add(br, rev)
+  }
+
+  const wheelL = buildCarWheelGeometry(-1)
+  const wheelR = buildCarWheelGeometry(1)
+  const calGeom = trackG(new T.BoxGeometry(.045, .092, .062))
+
+  function mountWheel(side: -1 | 1, wz: number, steerable: boolean) {
+    const steerGroup = new T.Group()
+    steerGroup.position.set(side * .795, .306, wz)
+    const spinMesh = new T.Mesh(side < 0 ? wheelL : wheelR, wheelMat)
+    const caliper = makeSolidPart(calGeom, caliperMat, side * .052, .02, -.09)
+    steerGroup.add(spinMesh, caliper)
+    root.add(steerGroup)
+    return {steerGroup, spinMesh, steerable}
+  }
+
+  const fl = mountWheel(-1, -1.34, true)
+  const fr = mountWheel(1, -1.34, true)
+  const rl = mountWheel(-1, 1.31, false)
+  const rr = mountWheel(1, 1.31, false)
+
+  let roll = 0, pitch = 0, heave = 0, heaveVel = 0, prevSpeed = 0, wheelSpin = 0, steerAngle = 0
+  let lastBraking = false, lastReversing = false
+
+  return {
+    root,
+    suspensionPivot,
+    setPaint(nextPaint: number) {
+      bodyMesh.geometry = getBodyGeom(nextPaint)
+      roll = pitch = heave = heaveVel = prevSpeed = 0
+    },
+    triggerImpact(strength: number) {
+      const s = T.MathUtils.clamp(strength, .1, 2.5)
+      heaveVel -= .32 * s
+      pitch -= .045 * s
+    },
+    update(state) {
+      const cdt = Math.min(.1, Math.max(1e-4, state.dt))
+      root.position.copy(state.pos)
+      root.rotation.set(state.groundPitch, state.heading, 0, 'YXZ')
+
+      const accel = T.MathUtils.clamp((state.speed - prevSpeed) / cdt, -18, 18)
+      prevSpeed = state.speed
+      // Under cornering, car body rolls outward; under braking nose dives (-pitch); under throttle tail squats (+pitch).
+      const latFactor = T.MathUtils.clamp(state.speed * state.steerInput * .14, -1.2, 1.2)
+      const targetRoll = T.MathUtils.clamp(-latFactor * .058, -.078, .078)
+      const targetPitch = T.MathUtils.clamp(accel * .0048, -.048, .048)
+
+      roll = T.MathUtils.damp(roll, targetRoll, 9, cdt)
+      pitch = T.MathUtils.damp(pitch, targetPitch, 11, cdt)
+      // Spring-damper heave bounce (omega=15 rad/s, damp=12)
+      heaveVel += (-225 * heave - 16 * heaveVel) * cdt
+      heave = T.MathUtils.clamp(heave + heaveVel * cdt, -.07, .07)
+
+      suspensionPivot.position.set(0, CG_Y + heave, 0)
+      suspensionPivot.rotation.set(pitch, 0, roll, 'YXZ')
+
+      steerAngle = T.MathUtils.damp(steerAngle, -state.steerInput * .44, 14, cdt)
+      fl.steerGroup.rotation.y = steerAngle > 0 ? steerAngle * 1.07 : steerAngle * .93
+      fr.steerGroup.rotation.y = steerAngle < 0 ? steerAngle * 1.07 : steerAngle * .93
+
+      const spinDelta = (state.speed * cdt) / .306
+      wheelSpin -= spinDelta
+      fl.spinMesh.rotation.x = wheelSpin
+      fr.spinMesh.rotation.x = wheelSpin
+      rl.spinMesh.rotation.x = wheelSpin
+      rr.spinMesh.rotation.x = wheelSpin
+
+      lastBraking = state.braking
+      lastReversing = state.reversing
+      brakeLampMat.color.setHex(state.braking ? 0xff3b30 : 0x7a1714)
+      reverseLampMat.color.setHex(state.reversing ? 0xf8fafc : 0x3b4046)
+    },
+    probe() {
+      return {roll, pitch, heave, steerAngle, wheelSpin, braking: lastBraking, reversing: lastReversing}
+    },
+    dispose() {
+      for (const item of disposables) item.dispose()
+      for (const g of bodyCache.values()) g.dispose()
       root.removeFromParent()
     },
   }
