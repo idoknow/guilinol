@@ -7,8 +7,25 @@
 .walk-ui .btn-run{right:calc(98px + env(safe-area-inset-right));bottom:calc(26px + env(safe-area-inset-bottom));width:56px;height:56px;font-size:17px;letter-spacing:.04em}
 .walk-ui .btn-run.on{background:rgba(169,80,60,.68);border-color:rgba(244,239,226,.72);box-shadow:0 0 0 2px rgba(214,120,92,.32)}
 .walk-ui .btn-view{right:calc(22px + env(safe-area-inset-right));bottom:calc(112px + env(safe-area-inset-bottom));width:48px;height:48px;font-size:12px;letter-spacing:.04em}
+.walk-ui .btn-wheelie,.walk-ui .btn-gear-up,.walk-ui .btn-gear-down,.walk-ui .btn-tuck{position:fixed;border-radius:50%;display:none;place-items:center;padding:0;box-sizing:border-box}
+.walk-ui .btn-wheelie{right:calc(18px + env(safe-area-inset-right));bottom:calc(30px + env(safe-area-inset-bottom));width:66px;height:66px;font-size:15px;letter-spacing:.06em;border-color:rgba(214,120,92,.78)}
+.walk-ui .btn-gear-up{right:calc(96px + env(safe-area-inset-right));bottom:calc(84px + env(safe-area-inset-bottom));width:46px;height:46px;font-size:13px;letter-spacing:.02em}
+.walk-ui .btn-gear-down{right:calc(96px + env(safe-area-inset-right));bottom:calc(28px + env(safe-area-inset-bottom));width:46px;height:46px;font-size:13px;letter-spacing:.02em}
+.walk-ui .btn-tuck{right:calc(150px + env(safe-area-inset-right));bottom:calc(34px + env(safe-area-inset-bottom));width:44px;height:44px;font-size:12px;letter-spacing:.02em}
+.walk-ui :is(.btn-wheelie,.btn-tuck).on{background:rgba(169,80,60,.74);border-color:rgba(244,239,226,.78);box-shadow:0 0 0 2px rgba(214,120,92,.34)}
+body[data-aboard][data-ride="bike"] .walk-ui :is(.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck){display:grid}
 body[data-aboard] :is(.btn-jump,.btn-run){display:none}
 body[data-aboard] .joystick.running::after{border-color:rgba(169,80,60,0)}
+.ride-hud{position:fixed;left:50%;bottom:calc(124px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4;display:none;align-items:center;gap:8px;padding:5px 12px;border-radius:18px;background:rgba(28,44,42,.56);color:#f4efe2;border:1px solid rgba(244,239,226,.34);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-size:12.5px;letter-spacing:.06em;white-space:nowrap;user-select:none;-webkit-user-select:none}
+body[data-aboard][data-ride="bike"] .ride-hud,body[data-aboard][data-ride="bicycle"] .ride-hud{display:flex}
+body[data-photo="on"] .ride-hud{display:none!important}
+.ride-gear{font:700 12px/1 ui-monospace,monospace;letter-spacing:0;background:rgba(169,80,60,.82);color:#f4efe2;padding:4px 7px;border-radius:9px}
+.ride-speed{font:600 13px/1 ui-monospace,monospace;letter-spacing:0;min-width:5.2em;text-align:center}
+.ride-state{font-size:11.5px;padding:2px 7px;border-radius:9px;background:rgba(244,239,226,.14);color:#f4efe2}
+.ride-state[data-warn="1"]{background:rgba(196,68,52,.85);color:#fff}
+.ride-mod{font:inherit;font-size:11.5px;color:#f4efe2;background:rgba(244,239,226,.12);border:1px solid rgba(244,239,226,.28);border-radius:10px;padding:2px 8px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ride-mod:hover{background:rgba(244,239,226,.22)}
+body[data-ride="bicycle"] .ride-mod{display:none}
 .toast{z-index:6;box-sizing:border-box;width:max-content;max-width:min(520px,calc(100vw - 32px));text-align:center;line-height:1.45;border:1px solid rgba(244,239,226,.34)}
 @media (hover:hover) and (pointer:fine){
   .vehicle-action{box-shadow:0 4px 16px rgba(18,30,28,.28),0 0 0 1px rgba(214,120,92,.35)}
@@ -17,6 +34,10 @@ body[data-aboard] .joystick.running::after{border-color:rgba(169,80,60,0)}
 @media (pointer:coarse){
   .vehicle-action{bottom:calc(170px + env(safe-area-inset-bottom));max-width:calc(100vw - 168px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .toast{max-width:calc(100vw - 32px);font-size:13.5px;padding:8px 16px}
+  .ride-hud{bottom:calc(216px + env(safe-area-inset-bottom));padding:4px 10px;gap:6px;font-size:12px}
+}
+@media (pointer:coarse) and (max-height:500px){
+  .ride-hud{bottom:calc(32px + env(safe-area-inset-bottom));top:auto}
 }
 @media (pointer:coarse) and (max-width:520px){
   html,body{overflow:hidden;max-width:100vw}
