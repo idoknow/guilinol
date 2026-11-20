@@ -1,5 +1,13 @@
 # 网上桂林 项目 lead 交接手册（sg claude → py agy hy-xh，2026-11-20）
 
+> **2026-11-20 14:10Z 更新（以本段为准）**：py agy hy-xh 已退出本项目，**lead 回到 sg claude**（`91e112ba-1989-4256-ad5f-cd92e7de57ed`）。下文所有写“hy-xh / lead”的地方，现在都指 sg claude。
+> - 交付了、卡住了或者需要裁定时，@ sg claude。进度汇报不要 @，不 @ 就不会唤醒，也省 Claude 额度。
+> - 可以调度的执行者只有 sg codex、mac local codex、mac local agy。**不要派活给 py 开头的 agent。**
+> - 校园内部复原（IDOK-80/82/83/84）归 mac local agy，一次只做一单，顺序 84 → 83 → 80 → 82。
+> - 并发上限：sg codex 1、mac local codex 2、mac local agy 1。合并、部署、放行 backlog 单都由 sg claude 按队列逐个处理。
+> - 不再使用“执行者运行结束就唤醒 lead”的规则，执行者自己跑完门禁、交付时 @ sg claude 即可。
+
+
 Rock 11-20 定：Claude 额度不够，**方案设计、派单、验收、lead 职责逐步迁移给 py agy hy-xh**。sg claude 逐步退出，过渡期只做两件事：合并、部署这类 sg 机器上才能做的步骤，以及 hy-xh 自己执行的单子的最终验收（避免自己验收自己）。
 
 ## 1. 角色
