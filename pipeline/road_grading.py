@@ -5,12 +5,12 @@ import json
 import math
 from pathlib import Path
 import re
+import subprocess
 from statistics import median
 
 import numpy as np
 from scipy.ndimage import distance_transform_edt, gaussian_filter, maximum_filter
 from scipy.sparse import coo_matrix
-from scipy.sparse.linalg import lsqr
 from shapely import STRtree, intersects_xy
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
@@ -107,6 +107,21 @@ def _add_diff_rows(rows_l, cols_l, vals_l, rhs_l, row_cursor: int,
                 vals_l.append(sign * weights * wv[dr] * wu[dc])
     rhs_l.append(weights * diff_targets)
     return row_cursor + n
+
+
+def solve_road_spline(A, b_rhs, initial):
+    # Canonicalize the survey constraints before the solve: GEOS/libm last bits
+    # otherwise propagate through thousands of Lanczos iterations.
+    A.sort_indices()
+    x0 = np.round(initial.ravel(), 8)
+    A.data = np.round(A.data, 8)
+    A.eliminate_zeros()
+    payload = b''.join((np.asarray(A.shape, '<u4').tobytes(),
+                        A.indptr.astype('<u4').tobytes(), A.indices.astype('<u4').tobytes(),
+                        A.data.astype('<f8').tobytes(), np.round(b_rhs, 8).astype('<f8').tobytes(),
+                        x0.astype('<f8').tobytes()))
+    packed = subprocess.check_output(['node', Path(__file__).with_name('road-lsqr.mjs')], input=payload)
+    return np.frombuffer(packed, '<f8').reshape(initial.shape)
 
 
 def build_ground_mesh_lookup(original_dm: np.ndarray, surface_dm: np.ndarray,
@@ -853,9 +868,7 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
         shape=(cursor, gh * gw),
     ).tocsr()
     b_rhs = np.concatenate(rhs_l)
-    x0 = smooth_bg_ctrl.ravel().copy()
-    delta_sol = lsqr(A, b_rhs - A @ x0, atol=1e-7, btol=1e-7, iter_lim=2200)[0]
-    ctrl = (x0 + delta_sol).reshape(gh, gw)
+    ctrl = solve_road_spline(A, b_rhs, smooth_bg_ctrl)
 
     # Imprint S(x, z) onto DRY cells of original_dm & terrain_dm:
     # - Inside actual road footprint (excluding landmark bounds): lift or press smoothly to road bed.
