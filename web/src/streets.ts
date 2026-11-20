@@ -53,7 +53,7 @@ function evalRoadCtrl([baseMm,deltas]:RoadCtrl,lx:number,lz:number){
 }
 
 export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[]]:Streets,ground:(x:number,z:number)=>number){
-  const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],mats:number[]=[],cols:number[]=[]
+  const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const baseLevel=(x:number,z:number)=>{const g=ground(x,z);return roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g}
   const vector=(pt:THREE.Vector2,offset:number)=>new THREE.Vector3(pt.x,baseLevel(pt.x,pt.y)+offset,pt.y)
   const surfaceKinds:number[]=[],alongVals:number[]=[]
@@ -72,7 +72,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     const textureChannel=kind===6?6:channel
     surfaceKinds.push(textureChannel,textureChannel,textureChannel);alongVals.push(a1,a2,a3)
     const c=colors[kind]
-    for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(channel===1)sidewalk.push(pt.x,pt.y,pt.z)}
+    for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(channel===1&&!vertical)sidewalk.push(pt.x,pt.y,pt.z);else if(channel===0&&!vertical)road.push(pt.x,pt.y,pt.z)}
   }
   for(const [kind,...rings] of paths){
     const loops=rings.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
@@ -211,6 +211,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     railLodCount,
     parked:Float32Array.from(parked),
     sidewalk:Float32Array.from(sidewalk),
+    road:Float32Array.from(road),
     surface,
     furnitureMatrices:Float32Array.from(mats),
     furnitureColors:Float32Array.from(cols),

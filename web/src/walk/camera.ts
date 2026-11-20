@@ -81,7 +81,7 @@ export function createCameraRig(sim:Physics) {
 
     const camDeck = anyDeck?sim.surface(camera.position.x,camera.position.z,'deck',footY+18,20):null
     const underDeck = !!camDeck && footY<camDeck.y-.55
-    const floor = (!underDeck?camDeck:null)??sim.surface(camera.position.x,camera.position.z,'sidewalk')??sim.surface(camera.position.x,camera.position.z,'ground')
+    const floor = (!underDeck?camDeck:null)??sim.surface(camera.position.x,camera.position.z,'sidewalk')??sim.surface(camera.position.x,camera.position.z,'road')??sim.surface(camera.position.x,camera.position.z,'ground')
     if(floor) {
       const minY = floor.y+cfg.camRadius
       if(camera.position.y<minY) { camera.position.y = Number.isFinite(endCeil)?Math.min(minY,endCeil):minY; clampedY = true }
@@ -99,7 +99,7 @@ export function createCameraRig(sim:Physics) {
           if(Number.isFinite(reCeil) && camera.position.y>reCeil) camera.position.y = reCeil
           const reDeck = anyDeck?sim.surface(camera.position.x,camera.position.z,'deck',footY+18,20):null
           const reUnder = !!reDeck && footY<reDeck.y-.55
-          const reFloor = (!reUnder?reDeck:null)??sim.surface(camera.position.x,camera.position.z,'sidewalk')??sim.surface(camera.position.x,camera.position.z,'ground')
+          const reFloor = (!reUnder?reDeck:null)??sim.surface(camera.position.x,camera.position.z,'sidewalk')??sim.surface(camera.position.x,camera.position.z,'road')??sim.surface(camera.position.x,camera.position.z,'ground')
           if(reFloor) {
             const reMinY = reFloor.y+cfg.camRadius
             if(camera.position.y<reMinY) camera.position.y = Number.isFinite(reCeil)?Math.min(reMinY,reCeil):reMinY

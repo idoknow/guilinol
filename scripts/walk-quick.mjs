@@ -37,19 +37,93 @@ try {
         walk.leave();if(!await walk.enter(tree.x-2,tree.z,0,'tree'))throw Error('No tree approach')
       }
       const spawn=walk.probe();if(target==='shore')direction=[-740-spawn.x,868-spawn.z]
-      walk.drive(...direction);let hit=false
+      walk.drive(...direction);let hit=false,maxSink=-Infinity
       for(let step=0;step<seconds*10;step++){
         walk.tick(.1);const probe=walk.probe()
         if(probe.resets||probe.inHouse||probe.inPeak||probe.renderClearance<-.15)throw Error(JSON.stringify(probe))
+        if(probe.grounded&&Number.isFinite(probe.footSink))maxSink=Math.max(maxSink,probe.footSink)
+        if(probe.grounded&&probe.footSink>.03)throw Error(`foot sank (${probe.footSink.toFixed(3)}m): `+JSON.stringify(probe))
         hit ||= target==='gate'?spawn.z-probe.z>39:target==='shore'?probe.blockedWater&&!probe.wet:target==='deck'?probe.wet&&probe.deck!==undefined&&probe.foot>=probe.deck-.35&&!probe.blockedWater:probe.hits.includes(target)
         if(hit)break
       }
-      walk.drive(0,0);return {hit,last:walk.probe()}
-    },{origin,direction,seconds,target});assert(result.hit,`${target}: ${JSON.stringify(result)}`);console.log(target,'OK')
+      walk.drive(0,0);return {hit,maxSink,last:walk.probe()}
+    },{origin,direction,seconds,target});assert(result.hit,`${target}: ${JSON.stringify(result)}`);console.log(target,'OK',result.maxSink>-Infinity?`maxSink=${result.maxSink.toFixed(4)}m`:'')
   }
 
   await page.waitForFunction(()=>[...window.viewer.stream.landmarks.keys()].some(entry=>entry.id==='jingjiang'))
   assert(await page.evaluate(()=>document.querySelector('.walk-ui')?.hidden===true),'desktop should hide mobile walk-ui')
+
+  // Foot grounding & low-step/curb/slab direct autostep check (no jump, no floor sink).
+  const grounding=await page.evaluate(async()=>{
+    const {walk}=window.viewer
+    // 1) Default spawn on Jingjiang stone plaza slab (+0.17m above terrain) through full idle breathing cycle.
+    let idleMaxSink=-Infinity, idleMinSink=Infinity, spawnSurfaceY=0, spawnSoleY=0
+    for(let i=0;i<180;i++){
+      walk.tick(1/60)
+      const p=walk.probe()
+      if(i===10){spawnSurfaceY=p.surfaceY??0;spawnSoleY=p.soleY??0}
+      if(p.grounded){idleMaxSink=Math.max(idleMaxSink,p.footSink);idleMinSink=Math.min(idleMinSink,p.footSink)}
+    }
+    // 2) Walk directly onto Jingjiang stone plaza from outside (-588, -193 -> north) without jumping.
+    walk.leave()
+    if(!await walk.enter(-588,-193,0,'slab-step'))throw Error('Spawn failed: slab-step')
+    const slabStart=walk.probe()
+    walk.drive(0,-1,false)
+    let slabMaxSink=-Infinity, slabGroundedFrames=0
+    for(let i=0;i<120;i++){
+      walk.tick(1/60)
+      const p=walk.probe()
+      if(p.grounded){slabGroundedFrames++;slabMaxSink=Math.max(slabMaxSink,p.footSink)}
+    }
+    walk.drive(0,0,false)
+    const slabEnd=walk.probe()
+
+    // 3) Walk directly from asphalt road onto raised sidewalk curb at Shizijie (-840, -275 -> +X) without jumping.
+    walk.leave()
+    if(!await walk.enter(-840,-275,0,'curb-step'))throw Error('Spawn failed: curb-step')
+    for(let i=0;i<6;i++)walk.tick(1/60)
+    const curbStart=walk.probe()
+    walk.drive(1,0,false)
+    let curbHitSidewalk=false, curbMaxSink=-Infinity, curbMaxY=-Infinity
+    for(let i=0;i<90;i++){
+      walk.tick(1/60)
+      const p=walk.probe()
+      if(p.hits.includes('sidewalk')||p.surfaceKind==='sidewalk')curbHitSidewalk=true
+      if(p.grounded){curbMaxSink=Math.max(curbMaxSink,p.footSink);curbMaxY=Math.max(curbMaxY,p.surfaceY??-Infinity)}
+    }
+    walk.drive(0,0,false)
+    const curbEnd=walk.probe()
+
+    // 4) Diagonal curb walk at Ronghu North (-872, 920 -> SW) must climb smoothly without wedging airborne.
+    walk.leave()
+    if(!await walk.enter(-872,920,0,'diag-curb'))throw Error('Spawn failed: diag-curb')
+    for(let i=0;i<6;i++)walk.tick(1/60)
+    const diagStart=walk.probe(), diagLen=Math.hypot(-.5,.85)
+    walk.drive(-.5/diagLen,.85/diagLen,false)
+    let diagAirborne=0, diagMaxSink=-Infinity, diagHitSidewalk=false
+    for(let i=0;i<120;i++){
+      walk.tick(1/60)
+      const p=walk.probe()
+      if(p.hits.includes('sidewalk')||p.surfaceKind==='sidewalk')diagHitSidewalk=true
+      if(p.grounded)diagMaxSink=Math.max(diagMaxSink,p.footSink)
+      else diagAirborne++
+    }
+    walk.drive(0,0,false)
+    const diagEnd=walk.probe()
+    return {
+      spawnSurfaceY,spawnSoleY,idleMaxSink,idleMinSink,
+      slabDist:slabStart.z-slabEnd.z,slabClimb:slabEnd.soleY-slabStart.soleY,slabMaxSink,slabGroundedFrames,slabEndSurface:slabEnd.surfaceY,
+      curbStartKind:curbStart.surfaceKind,curbStartY:curbStart.surfaceY,curbEndKind:curbEnd.surfaceKind,curbEndY:curbEnd.surfaceY,
+      curbDist:curbEnd.x-curbStart.x,curbHitSidewalk,curbMaxSink,curbMaxY,
+      diagDist:Math.hypot(diagEnd.x-diagStart.x,diagEnd.z-diagStart.z),diagAirborne,diagMaxSink,diagHitSidewalk,
+    }
+  })
+  assert(grounding.spawnSurfaceY>157.82&&grounding.idleMaxSink<=.015&&grounding.idleMinSink>=-.05,`idle/plaza grounding bad: ${JSON.stringify(grounding)}`)
+  assert(grounding.slabDist>6&&grounding.slabEndSurface>157.82&&grounding.slabMaxSink<=.02&&grounding.slabGroundedFrames>100,`plaza slab step-up bad: ${JSON.stringify(grounding)}`)
+  assert(grounding.curbDist>3&&grounding.curbHitSidewalk&&grounding.curbMaxSink<=.02&&grounding.curbMaxY>(grounding.curbStartY??0)+.08,`curb step-up bad: ${JSON.stringify(grounding)}`)
+  assert(grounding.diagDist>6&&grounding.diagHitSidewalk&&grounding.diagAirborne<=4&&grounding.diagMaxSink<=.02,`diagonal curb step-up bad: ${JSON.stringify(grounding)}`)
+  console.log('grounding & low-step OK',JSON.stringify({spawnY:+grounding.spawnSurfaceY.toFixed(3),idleSink:+grounding.idleMaxSink.toFixed(4),slabDist:+grounding.slabDist.toFixed(2),curbDist:+grounding.curbDist.toFixed(2),curbRise:+(grounding.curbMaxY-grounding.curbStartY).toFixed(3),diagAir:grounding.diagAirborne}))
+
   await fixture([-588,-212],[.145,-.989],7,'gate')
 
   // M6-1: gate tunnel / archway camera check (landmark arch) + LOS guard.

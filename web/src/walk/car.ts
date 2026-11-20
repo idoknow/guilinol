@@ -3,7 +3,7 @@ import * as T from 'three'
 import {carConfig as ccfg, walkConfig as wcfg} from './config'
 import type {DismountContext, MountCheckResult} from './ride'
 
-type Kind = 'ground'|'overview'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
+type Kind = 'ground'|'overview'|'road'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
 
 export interface CarMoveContext {
   pos: {x:number; y:number; z:number}
@@ -74,7 +74,7 @@ function localSupport(ctx: DismountContext, x: number, z: number, refY: number) 
   const lm = ctx.surface(x, z, 'landmark', refY + .55, 1.8)
   const validLm = lm && lm.y <= refY + .55 && lm.slope <= wcfg.slope ? lm : null
   const bridgeHit = validDeck && validLm ? (validLm.y > validDeck.y ? validLm : validDeck) : (validDeck ?? validLm)
-  const support = bridgeHit ?? ctx.surface(x, z, 'sidewalk') ?? ctx.surface(x, z, 'ground')
+  const support = bridgeHit ?? ctx.surface(x, z, 'road') ?? ctx.surface(x, z, 'sidewalk') ?? ctx.surface(x, z, 'ground')
   if (!support || support.slope > wcfg.slope || (!bridgeHit && ctx.wet(x, z))) return null
   const peak = ctx.surface(x, z, 'peak')
   if (peak && peak.y > support.y + .05) return null

@@ -5,7 +5,7 @@ import type {Tile} from '../world'
 import {bicycleConfig, bikeConfig as bcfg, walkConfig as wcfg} from './config'
 
 export type RideKind = 'bike' | 'bicycle'
-type Kind = 'ground'|'overview'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
+type Kind = 'ground'|'overview'|'road'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
 type SurfaceHit = {y:number; slope:number} | null
 
 export interface DismountContext {
@@ -95,7 +95,7 @@ function isWallBlocker(kind: Kind | undefined) {
 function localSupport(ctx: DismountContext, x: number, z: number, refY: number) {
   const deck = ctx.surface(x, z, 'deck', refY + .35, 1.4)
   const validDeck = deck && deck.y <= refY + .35 ? deck : null
-  const support = validDeck ?? ctx.surface(x, z, 'sidewalk') ?? ctx.surface(x, z, 'ground')
+  const support = validDeck ?? ctx.surface(x, z, 'sidewalk') ?? ctx.surface(x, z, 'road') ?? ctx.surface(x, z, 'ground')
   if (!support || support.slope > wcfg.slope || (!validDeck && ctx.wet(x, z))) return null
   const peak = ctx.surface(x, z, 'peak')
   if (peak && peak.y > support.y + .05) return null
