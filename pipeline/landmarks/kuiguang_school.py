@@ -97,7 +97,8 @@ def school(model):
     # =========================================================================
     gate_yaw = math.atan2(-0.917, 0.399)  # -66.5 deg
     gcx, gcz = -9.6, 31.2
-    model.pose = (gcx, 0.0, gcz, gate_yaw)
+    setback = 2.7
+    model.pose = (gcx + setback * math.sin(gate_yaw), 0.0, gcz - setback * math.cos(gate_yaw), gate_yaw)
 
     # Keep a 12 cm gap from w7018_ring at y=6m (lx >= -10.2 begins north of w7018's z=19.86 edge!)
     # Upper coral-pink residential storeys spanning over the portal (lx in [-10.0, +13.5], y = 5.2..16.6, d = 11.6)
@@ -128,7 +129,7 @@ def school(model):
     for beam_z in (-4.2, -1.4, 1.4, 4.2):
         model.box(0.0, 3.88, beam_z, 7.6, 0.16, 0.26, 'stone')
     # Dark bluestone slab floor extending through tunnel & out to Rongyin Rd kerb
-    model.box(1.5, -0.42, 2.2, 24.5, 0.46, 17.5, 'pave', True)
+    model.box(1.5, -0.42, 0.2, 24.5, 0.46, 13.5, 'pave', True)
     # Glazed showcase walls lining left & right tunnel interior + open iron gate leaves (IMG_1296!)
     for sx in (-3.68, 3.68):
         model.box(sx, 0.25, -0.5, 0.14, 3.35, 9.2, 'glass', True)
@@ -155,6 +156,7 @@ def school(model):
                 model.box(wx + 1.85, fy + 0.2, 5.97, 0.72, 0.52, 0.54, 'white')
 
     # Yellow no-stopping crisscross box markings painted on Rongyin Rd asphalt in front of gate (IMG_1295 bottom!)
+    model.pose = (gcx, 0.0, gcz, gate_yaw)
     for yz in (9.6, 13.2):
         model.box(0.0, -0.02, yz, 14.0, 0.04, 0.18, 'yellow')
     for diag in range(-5, 6, 3):
@@ -204,7 +206,7 @@ def school(model):
 
     # Street trees at Rongyin Rd gate + continuous twin rows of avenue camphor trees along both hedges!
     ca, sa = math.cos(-1.147), math.sin(-1.147)
-    for tx, tz, th, tsp in ((-5.5, 36.5, 9.5, 4.2), (-13.5, 22.0, 9.2, 3.8)):
+    for tx, tz, th, tsp in ((-8.0, 35.4, 9.5, 4.2), (-13.5, 22.0, 9.2, 3.8)):
         camphor_tree(model, tx, 0.0, tz, h=th, spread=tsp)
     for idx, az_loc in enumerate(np.linspace(-3.5, -92.0, 8)):
         for side_x, h_add in ((8.1, 1.2), (-8.2, 0.4)):

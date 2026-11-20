@@ -22,12 +22,17 @@ from bridges import bridge_tiles
 from road_grading import build_ground_mesh_lookup, eval_bspline_grid, solve_road_and_bridge_elevations
 from scatter import CONFIG, extract_road_network, scatter
 from streets import chunks as street_chunks
+from dongxi_streets import street_surface
 from atlas import write_atlas
 from vehicles import plan_vehicles, write_vehicles
 from clearance import landmark_triangles
 from landmarks.rong_ground import GATE_PLAZA, grade_landings
+from landmarks import xiaoyao_access
 from shoreline import correct_water, contour_ronghu
 from landmark_layout import Layout
+from landmark_solids import load_landmark_meshes, structural_footprint, slice_tris_at_y
+from landmarks.world_surface import PeakSurface
+from functools import lru_cache
 from shapely.geometry import LineString, Point, Polygon as ShapelyPolygon
 from shapely.ops import unary_union
 
@@ -156,7 +161,9 @@ def build(bbox, output, palette):
     road_net = extract_road_network(raw_foots)
     _, roads, _, banks, _, ped_areas = road_net
     grade_roads = roads
-    roads = [road.aligned_section() for road in roads]
+    elevated_walks = {way['id'] for way in road_net[0] if way['type']=='way' and way['id']==1008909371
+                      and way.get('tags',{}).get('layer')=='1'}
+    roads = [road.aligned_section() for road in roads if road.way not in elevated_walks]
     road_net = (road_net[0], roads, *road_net[2:])
     bridge_polys = []
     bus_pads = []
@@ -177,7 +184,7 @@ def build(bbox, output, palette):
     for road in roads:
         if not road.line.intersects(bounds):
             continue
-        sp = road.pavement
+        sp = street_surface(road)
         if road.kind == 'pedestrian' and not comp_excl.is_empty:
             sp = sp.difference(comp_excl)
         if not sp.is_empty:
@@ -216,6 +223,33 @@ def build(bbox, output, palette):
             return max(rc, gm) + 0.195
         return gm
 
+    peak_centers = {p['name']: p['center'] for p in peaks['entries']}
+    peak_lm_names = {'fubo': '伏波山', 'diecai': '明月峰', 'duxiu': '独秀峰'}
+    def lm_elevation(x, z, entry):
+        if entry['id'] in peak_lm_names and peak_lm_names[entry['id']] in peak_centers:
+            px_c, _, pz_c = peak_centers[peak_lm_names[entry['id']]]
+            return sample(px_c, pz_c)[0]
+        terr_y, surf_y = sample(x, z)
+        if surf_y != DRY:
+            if entry['id'] in ('jiefang_bridge', 'ronghu') and bounds.covers(Point(x, z)):
+                return float(previous_bed[round((z - top) / GRID), round((x - left) / GRID)]) / 10.0
+            if entry['id'] == 'shanhu_pagodas':
+                return float(surf_y) / 10.0
+            return terr_y
+        gm_y = ground_mesh_at(x, z)
+        fl = entry.get('flatten')
+        if isinstance(fl, dict) and 'elevation' in fl and entry['id'] in ('zhengyang', 'dongxixiang', 'jingjiang'):
+            return round(max(gm_y, float(fl['elevation'])), 2)
+        return round(gm_y, 2)
+    landmarks = [dict(position=[x, lm_elevation(x, z, entry), z], **entry) for x, z, entry in layout.entries]
+    structural_entries = [entry for entry in landmarks if entry['id'] in (*peak_lm_names, 'guilin_theater')]
+    peak_surface = PeakSurface(output, peaks, left, top, CHUNK)
+    @lru_cache(maxsize=262144)
+    def structural_ground(east,south):
+        return peak_surface.height(east,south,ground_mesh_at(east,south))
+    structures = load_landmark_meshes(Path(__file__).resolve().parents[1], {'landmarks': structural_entries})
+    layout.model_footprints = unary_union([layout.model_footprints, *(
+        structural_footprint(data,structural_ground,ShapelyPolygon()) for data in structures.values())])
     footprints, heights = buildings(bounds, ground_mesh_at, peak_tree, layout, carriageway_mask, sidewalk_mask)
     index = STRtree(footprints)
     shop_rows = shopfronts(footprints, heights, roads)
@@ -232,7 +266,7 @@ def build(bbox, output, palette):
     trees, roads, banks, tree_stats, beds = scatter(bounds, footprints, layers['water'], peak_shapes, tree_support_at, mountain_trees, unary_union([layout.tree_exclude, bank_pavement.buffer(2)]) if bank_pavement is not None else layout.tree_exclude, precomputed=road_net, extra_blocked=[*(court.buffer(1.5) for court in layers["schoolTrack"] + layers["schoolCourt"]), *bridge_polys, *road_surfs, *cycle_clearance], structure_exclude=layout.exclude.buffer(.52),
         verge_obstacles=STRtree([layout.model_footprints, *bands[3].geometries]))
     for road in roads:
-        for part in polygons(road.pavement.intersection(bounds)):
+        for part in polygons(street_surface(road).intersection(bounds)):
             mask,corner = stencil(part,left,top,1)
             texture.paste('#484b4d' if road.name=='翊武路' else palette['road'],corner,mask)
             layers['road'].append(part)
@@ -253,32 +287,29 @@ def build(bbox, output, palette):
             length=round(road.line.length),x=anchor.x,z=anchor.y,yaw=math.atan2(anchor.x-ahead.x,anchor.y-ahead.y)))
     (output/'street-report.json').write_text(json.dumps(report,ensure_ascii=False))
     print('Vegetation:',dict(sorted(tree_stats.items())))
-    peak_centers = {p['name']: p['center'] for p in peaks['entries']}
-    peak_lm_names = {'fubo': '伏波山', 'diecai': '明月峰', 'duxiu': '独秀峰'}
-    def lm_elevation(x, z, entry):
-        if entry['id'] in peak_lm_names and peak_lm_names[entry['id']] in peak_centers:
-            px_c, _, pz_c = peak_centers[peak_lm_names[entry['id']]]
-            return sample(px_c, pz_c)[0]
-        terr_y, surf_y = sample(x, z)
-        if surf_y != DRY:
-            if entry['id'] in ('jiefang_bridge', 'ronghu') and bounds.covers(Point(x, z)):
-                return float(previous_bed[round((z - top) / GRID), round((x - left) / GRID)]) / 10.0
-            if entry['id'] == 'shanhu_pagodas':
-                return float(surf_y) / 10.0
-            return terr_y
-        gm_y = ground_mesh_at(x, z)
-        fl = entry.get('flatten')
-        if isinstance(fl, dict) and 'elevation' in fl and entry['id'] in ('zhengyang', 'dongxixiang', 'jingjiang'):
-            return round(max(gm_y, float(fl['elevation'])), 2)
-        return round(gm_y, 2)
-    landmarks = [dict(position=[x, lm_elevation(x, z, entry), z], **entry) for x, z, entry in layout.entries]
     landmark_faces = list(landmark_triangles(landmarks))
     vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange)
     decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal)
     modeled_paving = unary_union([*layout.street_foundations, *rong_pavement, modeled_paving if modeled_paving is not None else ShapelyPolygon()])
     gate_plaza = next((ShapelyPolygon(np.asarray(GATE_PLAZA)+[x,z]) for x,z,entry in layout.entries
                        if entry['id']=='gunanmen'),None)
-    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving,gate_plaza=gate_plaza)
+    if gate_plaza is not None:
+        gate_entry = next(entry for entry in landmarks if entry['id']=='gunanmen')
+        gate = load_landmark_meshes(Path(__file__).resolve().parents[1], {'landmarks':[gate_entry]})['gunanmen']
+        walls = gate['coll_tris'][abs(gate['coll_normals'][:,1])<.72].copy()
+        for triangle in walls:
+            east,south = triangle[:,::2].mean(axis=0)
+            triangle[:,1] -= sample(east,south)[0]
+        masonry = unary_union([slice_tris_at_y(walls,level) for level in (.6,1.2)])
+        gate_plaza = gate_plaza.difference(masonry.buffer(.06))
+    walkable_by_way = next((xiaoyao_access.walkable_surfaces(east,south,entry['rotation'])
+                            for east,south,entry in layout.entries if entry['id']=='xiaoyao_tower'), {})
+    for east,south,entry in layout.entries:
+        if entry['id']=='zhuangyuan_gallery':
+            slab = xiaoyao_access.gallery_floor(east,south,entry['rotation'])
+            for way in xiaoyao_access.GALLERY_PAVING_WAYS:
+                walkable_by_way[way] = walkable_by_way.get(way,ShapelyPolygon()).union(slab)
+    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving,walkable_by_way=walkable_by_way,gate_plaza=gate_plaza)
     (output/'marking-audit.json').write_text(json.dumps(lengths.pop('markingOverlap')))
     print('Lengths (m):',lengths)
     def asset(name):

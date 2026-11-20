@@ -13,25 +13,15 @@ WORLD = Path(__file__).resolve().parents[2] / 'public/world'
 DRY = -32768
 
 
-class Surface:
-    def __init__(self, directory=WORLD):
-        self.directory = Path(directory)
-        manifest = json.loads((self.directory / 'manifest.json').read_text())
-        self.left, self.top, self.width, self.depth = manifest['extent']
-        self.size = manifest['chunkSize']
-        self.grid = manifest['grid']
-        self.files = {(c['x'], c['z']): c['file'] for c in manifest['chunks']}
-        self.entries = {p['id']: p for p in manifest['landmarks']}
-
+class PeakSurface:
+    def __init__(self, directory, peaks, left, top, size):
+        self.left, self.top, self.size = left, top, size
         self.peak_tiles = {}
-        packed = gzip.decompress((self.directory / manifest['peaks']['file']).read_bytes())
+        packed = gzip.decompress((directory / peaks['file']).read_bytes())
         if packed[:4] != b'PK02':
             raise ValueError('Invalid packed mountain header')
-        for peak in manifest['peaks']['entries']:
-            if model := peak.get('model'):
-                x, y, z = peak['center']
-                self.entries[Path(model).stem] = dict(file=model, position=[x, peak.get('baseHeight', y), z], rotation=0)
-            elif peak['lods']:
+        for peak in peaks['entries']:
+            if not peak.get('model') and peak['lods']:
                 lod = peak['lods'][0]
                 vertices = np.frombuffer(packed,'<i2',lod['vertices']*3,lod['offset']).reshape(-1,3)/100 + peak['center']
                 faces = np.frombuffer(packed,'<u2',lod['indices'],lod['indexOffset']).reshape(-1,3)
@@ -44,6 +34,33 @@ class Surface:
                 for row in range(lo[1],hi[1]+1):
                     for col in range(lo[0],hi[0]+1):
                         self.peak_tiles.setdefault((col,row),[]).append((tree,tris[:,0],normal))
+
+    def height(self,x,z,y):
+        key = (math.floor((x-self.left)/self.size),math.floor((z-self.top)/self.size))
+        for tree,points,normal in self.peak_tiles.get(key,()):
+            faces = tree.query(shapely.Point(x,z),predicate='intersects')
+            if len(faces):
+                a, n = points[faces], normal[faces]
+                heights = a[:,1]-((x-a[:,0])*n[:,0]+(z-a[:,2])*n[:,2])/n[:,1]
+                y=max(y,float(heights.max()))
+        return y
+
+
+class Surface:
+    def __init__(self, directory=WORLD):
+        self.directory = Path(directory)
+        manifest = json.loads((self.directory / 'manifest.json').read_text())
+        self.left, self.top, self.width, self.depth = manifest['extent']
+        self.size = manifest['chunkSize']
+        self.grid = manifest['grid']
+        self.files = {(c['x'], c['z']): c['file'] for c in manifest['chunks']}
+        self.entries = {p['id']: p for p in manifest['landmarks']}
+
+        self.peaks = PeakSurface(self.directory, manifest['peaks'], self.left, self.top, self.size)
+        for peak in manifest['peaks']['entries']:
+            if model := peak.get('model'):
+                x, y, z = peak['center']
+                self.entries[Path(model).stem] = dict(file=model, position=[x, peak.get('baseHeight', y), z], rotation=0)
 
     @lru_cache(maxsize=96)
     def tile(self, origin):
@@ -101,13 +118,7 @@ class Surface:
         i, j, u, v = cell(step)
         (a, b), (c, d) = ground[j:j+2, i:i+2]
         y = a+(b-a)*u+(c-a)*v if u+v <= 1 else d+(c-d)*(1-u)+(b-d)*(1-v)
-        key = ((ox-self.left)//self.size,(oz-self.top)//self.size)
-        for tree,points,normal in self.peak_tiles.get(key,()):
-            faces = tree.query(shapely.Point(x,z),predicate='intersects')
-            if len(faces):
-                a, n = points[faces], normal[faces]
-                heights = a[:,1]-((x-a[:,0])*n[:,0]+(z-a[:,2])*n[:,2])/n[:,1]
-                y=max(y,float(heights.max()))
+        y = self.peaks.height(x,z,y)
         i, j, _, _ = cell(self.grid)
         level = water[j:j+2, i:i+2].max()
         return float(y), None if level == DRY else float(level)/10

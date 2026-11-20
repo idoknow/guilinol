@@ -21,6 +21,7 @@ try{
   for(const mobile of [false,true]){
     const page=await browser.newPage({viewport:mobile?{width:420,height:740}:{width:800,height:450},hasTouch:mobile,isMobile:mobile})
     page.on('pageerror',error=>errors.push(error.message))
+    if(process.env.TRACE_BRIDGE)page.on('console',message=>{if(message.text().startsWith('bridge-trace'))console.log(mobile?'mobile':'desktop',message.text())})
     await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?mode=walk&verify&radius=480`)
     await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
     await recordFrames(page)
@@ -45,6 +46,13 @@ try{
       for(const key of [...keys])press(key,false)
       const end=walker.position.clone();return {distance:end.distanceTo(start),targetDistance:Math.hypot(end.x-target[0],end.z-target[1]),end:end.toArray(),obstacle:walker.obstacle,speed:walker.speed}
     },{target,wall})}
+    if(!mobile){
+      for(const target of [[-552,-95],[-579,-101.5],[-590.4,-104.3],[-606,-108.1]]){
+        const result=await steer(target)
+        assert(result.targetDistance<3,`Jiefang eastbound lane, target ${target}: ${JSON.stringify(result)}`)
+      }
+      await interact('下车');await fixture(bike[0],bike[2]);await interact('骑行')
+    }
     const ride=await rideToCrossroads(page,atlas);console.log('ride',ride);assert(ride.main>=500&&ride.crossed&&ride.targetDistance<=10)
     await shot(mobile?'bike-mobile':'bike-desktop');if(!mobile)console.log('median frame ms',{foot,bike:await timings()})
     await interact('下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')

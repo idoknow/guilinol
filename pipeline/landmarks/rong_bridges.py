@@ -127,50 +127,58 @@ def ancient_bridge(builder):
     def point(distance,level,offset=0):
         east,south = bridge_xz(distance,offset)
         return np.array([east,level,south])
-    north, south = [bank_top(*point(d,0)[::2]) for d in (-17,17)]
-    toe = ground(*bridge_xz(-23, 0)) + .05
+    north, south = [bank_top(*point(d,0)[::2])+.16 for d in (-17,17)]
+    toe = ground(*bridge_xz(-17, 0)) + .05
     north = max(north, toe + .48)
     def grade(distance):
         return north+(south-north)*min(1,max(0,(distance+17)/34))
     def height(distance):
-        return grade(distance)+6.6*max(0,1-(abs(distance)/17)**1.55)
+        if distance < -14:
+            return toe+(north-toe)*max(0,(distance+17)/3)
+        span = 14 if distance < 0 else 15.4
+        return grade(distance)+6.6*max(0,1-(abs(distance)/span)**1.55)
     def soffit(distance,edge):
         return ground(*point(distance,0,edge)[::2])-.09+math.sqrt(max(0,7.45**2-distance**2))
-    count = 64 if builder.detail else 24
+    count = 136
     for index in range(count):
         start,end = -17+34*index/count,-17+34*(index+1)/count
         middle = (start+end)/2
         top = height(middle)
-        for offset in (-2.65,2.65):
-            yaw_box(stone,point(middle,top-.14,offset),(4.0,.28,end-start+.02),yaw,'granite')
+        landing = abs(middle)>13.25
+        for offset in (() if middle < -14 else (0,) if landing else (-2.65,2.65)):
+            width = 9.3 if landing else 4.0
+            yaw_box(stone,point(middle,top-.14,offset),(width,.28,end-start+.02),yaw,'granite')
             edge_station = start if middle < 0 else end
             yaw_box(stone,point(edge_station,top-.015,offset),(4.04,.055,.075),yaw,'limestone')
-        yaw_box(stone,point(middle,top+.10),(1.4,.46,end-start+.025),yaw,'ashlar')
-        yaw_box(stone,point(middle,top+.43),(1.26,.36,end-start+.03),yaw,'foliage')
-        if index % (3 if builder.detail else 2) == 0:
+        if not landing:
+            yaw_box(stone,point(middle,top+.10),(1.4,.46,end-start+.025),yaw,'ashlar')
+            yaw_box(stone,point(middle,top+.43),(1.26,.36,end-start+.03),yaw,'foliage')
+        if not landing and index % (6 if builder.detail else 12) == 0:
             oval(stone,point(middle,top+.62),(.66,.26,.78),'foliage',7)
-        if builder.collide:
-            for offset in (-2.65,2.65):
-                ramp(builder.hit,point(start,height(start),offset),point(end,height(end),offset),4.0)
-            yaw_box(builder.hit,point(middle,top+.21),(1.4,.68,end-start+.03),yaw,'ashlar')
+        if builder.collide and middle >= -14:
+            for offset in ((0,) if landing else (-2.65,2.65)):
+                ramp(builder.hit,point(start,height(start),offset),point(end,height(end),offset),9.3 if landing else 4.0)
+            if not landing:
+                yaw_box(builder.hit,point(middle,top+.21),(1.4,.68,end-start+.03),yaw,'ashlar')
         stone.face([point(d,soffit(d,e),e) for d,e in ((start,-4.65),(end,-4.65),(end,4.65),(start,4.65))],(0,-1,0),'ashlar')
         for sign in (-1,1):
-            tube(stone,point(start,height(start)+.48,sign*.78),
-                 point(end,height(end)+.48,sign*.78),.11,'white',5)
+            if not landing:
+                tube(stone,point(start,height(start)+.48,sign*.78),
+                     point(end,height(end)+.48,sign*.78),.11,'white',5)
             edge=sign*4.65
             inside_start,inside_end=soffit(start,edge),soffit(end,edge)
             stone.face([point(start,inside_start,edge),point(end,inside_end,edge),point(end,top,edge),point(start,top,edge)],(sign*side[0],0,sign*side[1]),'white')
             tube(stone,point(start,height(start)+.92,edge),point(end,height(end)+.92,edge),.12,'white',5)
-            if index%2==0:
+            if index%4==0:
                 box(stone,point(start,height(start)+.48,edge),(.27,.96,.27),'white')
     pave(builder,FORECOURT,lambda x,z: ground(x,z)+.05)
-    riser = (height(-17)-toe)/3
+    riser = (north-toe)/3
     for step in range(3):
-        start = -23+step*2
+        start = -17+step
         level = toe + riser*(step+1)
         half_width = (13-step)/2
         corners = [(start,-half_width),(start,half_width),
-                   (start+2,half_width),(start+2,-half_width)]
+                   (start+1,half_width),(start+1,-half_width)]
         upper = [point(d,level,w) for d,w in corners]
         lower = [point(d,ground(*bridge_xz(d,w))-.06,w) for d,w in corners]
         stone.face(upper,(0,1,0),'granite')
@@ -180,12 +188,13 @@ def ancient_bridge(builder):
             stone.face([lower[i],lower[j],upper[j],upper[i]],outward,'ashlar')
         if builder.collide:
             ramp(builder.hit,point(start,level-riser),
-                 point(start+2,level),half_width*2)
-    yaw_box(stone,point(-18.2,height(-17)+.23),(2.1,.52,2.6),yaw,'ashlar')
+                 point(start+1,level),half_width*2)
+    planter = ground(*bridge_xz(-18.7,0))+.05
+    yaw_box(stone,point(-18.7,planter+.23),(2.1,.52,2.6),yaw,'ashlar')
     for offset in (-.55,0,.55):
-        oval(stone,point(-18.2,height(-17)+.77,offset),(.52,.55,1.22),'foliage',9)
+        oval(stone,point(-18.7,planter+.77,offset),(.52,.55,1.22),'foliage',9)
     if builder.collide:
-        yaw_box(builder.hit,point(-18.2,height(-17)+.39),(2.1,.8,2.6),yaw,'ashlar')
+        yaw_box(builder.hit,point(-18.7,planter+.39),(2.1,.8,2.6),yaw,'ashlar')
     # Tie the full landing into the bank, including the crown between its edges.
     def landing_vertex(station,lateral):
         x,_,z = point(station,0,lateral)

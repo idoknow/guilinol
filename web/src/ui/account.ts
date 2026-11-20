@@ -8,7 +8,7 @@ const titles:Record<Screen,string>={login:'登录',register:'注册账号',verif
 const submits:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'发送重置验证码',reset:'重置密码',profile:'保存设置'}
 async function api(path:string,method='GET',data?:object) {
   const response=await fetch(`/api/${path}`,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
-  const result=await response.json().catch(()=>({error:{message:'网络不太顺畅，请稍后再试'}}))
+  const result=await response.json().catch(()=>{throw new Error('网络不太顺畅，请稍后再试')})
   if(!response.ok) throw Object.assign(new Error(result.error?.message??'请求失败，请重试'),{code:result.error?.code})
   return result
 }

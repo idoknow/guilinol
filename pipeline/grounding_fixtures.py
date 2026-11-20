@@ -26,7 +26,7 @@ ENDS = {
                      + [('promenade',-54.92,z) for z in (-19.3,-17.8,16.1)]
                      + [('promenade',52.92,z) for z in (-16.1,16.1)],
     'lize_bridge': [('approach',x,z) for x in (-74.42,74.42) for z in (-9.6,9.6)],
-    'huaqiao': [('stairs',x,0) for x in (-101.96,47.36)],
+    'huaqiao': [('west landing',-105.20,south) for south in (1.67,4.67,7.67)] + [('east stairs',47.36,0)],
     'jiefang_bridge': [('west approach',-264.92,2.1),('east landing',140.42,2.1),
                        ('upper road joint',-140.42,2.1)]
 }

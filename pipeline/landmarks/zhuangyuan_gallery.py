@@ -5,6 +5,8 @@ import numpy as np
 
 from xiaoyao_roof import tiled_roof
 from xiaoyao_tower import generate
+from xiaoyao_access import GALLERY_LENGTH, GALLERY_WIDTH
+from shop_lettering import letters
 
 
 from c_kit import landmark_surface
@@ -38,8 +40,8 @@ def apartments(m, x, z, length, floors):
 def gallery(m):
     apartments(m,-1.4,15.1,49,7)
     apartments(m,-3.6,-15.0,40,6)
-    length = 42.3
-    m.foundation(landmark_surface('zhuangyuan_gallery'),0,-.2,0,length,.33,3.85,'pave')
+    length = GALLERY_LENGTH
+    m.foundation(landmark_surface('zhuangyuan_gallery'),0,-.2,0,length,.33,GALLERY_WIDTH,'pave')
     for x in np.linspace(-20.7, 20.7, 12):
         for side in (-1, 1):
             z = side * 1.73
@@ -52,6 +54,8 @@ def gallery(m):
         m.box(0, 2.94, side*1.72, length, .28, .25, 'wood')
         m.box(0, .13, side*1.77, length-.3, .47, .26, 'wood', True)
         m.box(0, .6, side*1.72, length-.3, .13, .46, 'wood')
+    m.box(-10.925,2.43,1.89,2.88,.75,.16,'sign')
+    letters(m,'玩艺旅拍',(-10.925,2.54,1.971),2.88*.93,.5,'white')
     # A continuous gable ridge runs parallel to the passage.
     for side in (-1, 1):
         vertices = [[x,h,z*side] for x in (-18.95,18.95)
@@ -86,7 +90,7 @@ def gallery(m):
         m.box(end*20.70,3.06,0,.24,.23,3.85,'red')
     # The photograph back toward the gallery looks across a low planted bed.
     m.box(25,-.16,-.9,9,.29,7.1,'pave',True)
-    m.pose=(1.8,0,-2.8,0)
+    m.pose=(1.8,0,-16.2,0)
     x = 25
     for sign in (-1,1):
         z=sign*4.05

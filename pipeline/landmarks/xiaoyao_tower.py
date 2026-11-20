@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 from shop_lettering import letters
 from xiaoyao_roof import tiled_roof
 from jingjiang import Model, SWATCHES, atlas
+from xiaoyao_access import CENTER, FOOT, WIDTH
 
 
 class LandmarkModel(Model):
@@ -148,15 +149,20 @@ def tower(model):
     from c_kit import landmark_surface
     surface = landmark_surface('xiaoyao_tower')
     court, platform = 8.4, 9.84
-    model.foundation(surface,0,-.36,-8,34,court+.36,48,'stone')
-    model.box(0,court-.16,-8,34,.16,48,'pave',True)
-    # From the gallery pavilion, ascend east to the open northern court.
-    # Two flights turn south at a level landing outside the west curtain.
-    steps(model,0,2.8,-27.08,-21,.38,0,16,4.2)
-    model.box(-19,0,-21,4,2.8,4.2,'stone',True)
-    steps(model,2.8,court,-19,-18.9,0,.38,32,4)
-    model.box(-19,0,-5.24,4,court,3,'stone',True)
-    model.box(0,court-.55,-8,34.16,.24,48.16,'granite')
+    stair_center, stair_width = CENTER, WIDTH
+    near, far = stair_center-stair_width/2, stair_center+stair_width/2
+    for left,right,back,front in [(-17,17,-32,near),(-17,17,far,16),(0,17,near,far)]:
+        center_x,center_z = (left+right)/2,(back+front)/2
+        width,depth = right-left,front-back
+        model.foundation(surface,center_x,-.36,center_z,width,court+.36,depth,'stone')
+        model.box(center_x,court-.16,center_z,width,.16,depth,'pave',True)
+        model.box(center_x,court-.55,center_z,width+.16,.24,depth+.16,'granite')
+    count = 48
+    tread = -FOOT/count
+    for index in range(count):
+        center_x = FOOT+(index+.5)*tread
+        height = court*(index+1)/count
+        model.foundation(surface,center_x,-.36,stair_center,tread,height+.36,stair_width,'pave')
     # Riverside stair follows the eastern face, ending on an upper landing.
     steps(model,0,court,18.68,15.08,0,-.42,48,3.36)
     model.foundation(surface,18.68,-.25,-7.06,3.36,court+.25,4,'stone')
@@ -232,7 +238,7 @@ def tower(model):
 
 
 
-def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None, terrain_offset=None):
+def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None, terrain_offset=None, lateral_offset=None):
     image = atlas(colors,smooth)
     if flood_roof:
         carve_medallion(image)
@@ -249,6 +255,8 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
         scene.graph.update(frame_to=group)
         def add(parts, uvs, texture, name):
             vertices = np.concatenate(parts).reshape(-1,3)
+            if lateral_offset is not None:
+                vertices[:,2] += lateral_offset(vertices[:,0])
             if lift is not None:
                 vertices[:,1]+=lift(vertices[:,0])
             if terrain_offset is not None:

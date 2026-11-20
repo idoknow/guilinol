@@ -8,13 +8,16 @@ import math
 from pathlib import Path
 
 import numpy as np
+import trimesh
+from shapely.affinity import rotate, translate
+from shapely.geometry import Polygon, box
 
 from jingjiang import generate
 from c_kit import landmark_surface
 from wangcheng_plan import ROOT, ll2xz
 
 
-def rock_shelter(model, inscription,surface):
+def rock_shelter(model, inscription,surface, neighbour=None):
     samples=41 if model.detail else 15
     widths=np.linspace(-8.6,8.6,samples)
     profile=[(-3.8,1.5,18),(-2.15,1.45,24),(-1.52,2.0,38),(-1.35,2.9,56),
@@ -51,7 +54,17 @@ def rock_shelter(model, inscription,surface):
     from shop_lettering import letters
     model.box(0,.25,3.49,3.4,.85,1.44,'stone')
     letters(model,inscription,(0,.35,4.22),3.2,.65,'red')
-    model.foundation(surface,0,-4.45,7.15,11,.53,4.8,'pave')
+    if neighbour is None:
+        model.foundation(surface,0,-4.45,7.15,11,.53,4.8,'pave')
+    else:
+        boundary=rotate(translate(neighbour,-surface.x-ox,-surface.z-oz),-angle,origin=(0,0),use_radians=True)
+        landing=box(-5.5,4.75,5.5,9.55).difference(boundary.buffer(.18,join_style='mitre'))
+        prism=trimesh.creation.extrude_polygon(landing,1,engine='earcut')
+        points=prism.vertices[:,[0,2,1]].copy()
+        for point in points:
+            east,level,south=point
+            point[1]=-3.92 if level else surface.ground(ox+c*east-s*south,oz+s*east+c*south)-model.pose[1]-.04
+        model.mesh(points,prism.faces[:,::-1],'pave',True)
     for step in range(4):model.foundation(surface,0,-4.3,4.75-step*.44,8.8,.52+step*.14,.46,'granite')
     model.foundation(surface,0,-4.2,2.38,9,.84,2.28,'pave')
     for east in np.linspace(-4.4,4.4,17):model.box(east,-3.36,3.15,.065,1.35,.07,'tile',True)
@@ -113,7 +126,9 @@ def summit(model):
     rock_shelter(model,'太平岩',surface)  # Taiping Cave, west foot at the stair entrance.
     southeast = rings[1,cliff_column('读书岩')]
     model.pose = (*southeast, -math.pi/4)
-    rock_shelter(model,'颜公读书岩',surface)  # Dushu Cave and cliff inscriptions, southeast foot.
+    dorm=next(feature for feature in pois if feature['properties'].get('osm','').endswith('/679734456'))
+    boundary=Polygon([ll2xz(lat,lon) for lon,lat in dorm['geometry']['coordinates'][0]])
+    rock_shelter(model,'颜公读书岩',surface,boundary)
     model.pose=(*tip,0)
     def ring(radius,height):return [(radius*math.cos(n*math.pi/4),height,radius*math.sin(n*math.pi/4)) for n in range(8)]
     model.beam([0,-2.8,0],[0,.48,0],5.2,'stone',8,True)

@@ -318,10 +318,14 @@ def library(b):
         dx,dz=east-x,south-z
         return ground(x+dx*math.cos(building_angle)+dz*math.sin(building_angle),z-dx*math.sin(building_angle)+dz*math.cos(building_angle))
     annex = grade(-66,-61)
+    footings = [(mesh,len(mesh.pos)) for mesh in (wall,b.hit)]
     box(wall,(-66,annex+4,-61),(9,8.0,13),'yellow')
     hip_roof(wall,(-66,-61),annex+8.0,9.2,13.4,2.1,.6,.22,'graytile','wood')
     if b.collide:
         solid(b.hit,(-66,annex+4,-61),(9,8,13),'yellow')
+    for mesh,first in footings:
+        mesh.pos[first:] = [(px,grade(px,pz)-.04 if abs(py-annex)<.005 else py,pz)
+                            for px,py,pz in mesh.pos[first:]]
     for index in range(9 if b.detail else 3):
         scooter(wall,-73+index*.36,grade,-58-index*.94,'steel' if index%2 else 'cream')
     banyan(wall,(-71,grade(-71,-56),-56),12,10,123,b.detail)
@@ -527,25 +531,6 @@ def glass_bridge(builder):
     near, far = max(ground(x,145.5) for x in (301.8,306.2))+.10, max(ground(x,174.5) for x in (301.8,306.2))+.10
     for mesh,start in starts:
         mesh.pos[start:] = [(x,ground(x,z)-.05 if abs(y-.20)<.01 else y-.76+near+(far-near)*(z-145.5)/29,z) for x,y,z in mesh.pos[start:]]
-    east,south=470,196.5
-    tower_meshes = [(m,len(m.pos)) for m in (stone,builder.hit)]
-    tower_ground = ground(east,south)-1.8
-    box(stone,(east,tower_ground+14.8,south),(23,26,15),'bank_blue',None)
-    box(stone,(east,tower_ground+27.5,south),(23.4,1.3,15.4),'white',None)
-    for offset in range(-6,7,2):
-        box(stone,(east-11.56,tower_ground+14.6,south+offset),(.15,24.8,.13),'steel')
-    for level in range(9):
-        box(stone,(east,tower_ground+2+3.1*level,south),(23.3,.18,15.3),'steel')
-    for offset in range(-10,11,4):
-        box(stone,(east+offset,tower_ground+14.8,south-7.55),(.13,26,.18),'white')
-    if builder.collide:
-        solid(builder.hit,(east,tower_ground+14.8,south),(23,26,15),'glass')
-
-    for mesh,start in tower_meshes:
-        for i in range(start,len(mesh.pos)):
-            px,py,pz = mesh.pos[i]
-            if py < tower_ground+2.6:
-                mesh.pos[i] = (px,ground(px,pz)+py-tower_ground-1.84,pz)
 
 
 def shore(b):

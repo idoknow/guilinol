@@ -44,12 +44,15 @@ def shops(builder):
     # The small street-facing volume on way/521248452 stands in front of the hotel.
     with align_front(builder, (-4.5, -43.6), -20):
         mesh = builder.parts['atlas']
-        box(mesh, (-4.5, 6.1, -43.6), (7.25, 9.6, 6.65), 'brick')
+        back,front = -46.925,-41.55
+        center = (-4.5,6.1,(back+front)/2)
+        size = (7.25,9.6,front-back)
+        box(mesh, center, size, 'brick')
         for level in (2.7, 6.1, 9.15):
             for east in (-6.25, -2.75):
-                box(builder.parts['lit'], (east, level, -40.2), (2.65, 1.82, .14), 'glass')
+                box(builder.parts['lit'], (east, level, front+.075), (2.65, 1.82, .14), 'glass')
         if builder.collide:
-            solid(builder.hit, (-4.5, 6.1, -43.6), (7.25, 9.6, 6.65), 'brick')
+            solid(builder.hit, center, size, 'brick')
     for mesh,start in extras:
         for i in range(start,len(mesh.pos)):
             px,py,pz=mesh.pos[i]

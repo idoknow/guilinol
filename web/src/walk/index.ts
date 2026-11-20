@@ -104,6 +104,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(!found)return false
     sim.body.setTranslation(found,true);sim.body.setNextKinematicTranslation(found);sim.world.step();safe.set(found.x,found.y,found.z);velocity=0;grounded=false;return true}
   let destination:THREE.Vector3|null=null
+  const bridge=manifest.landmarks?.find(entry=>entry.id==='jiefang_bridge'),bridgeEye=new THREE.Vector3()
+  const bridgeCenter=bridge&&new THREE.Vector3(...bridge.sphere.slice(0,3)).applyAxisAngle(new THREE.Vector3(0,1,0),THREE.MathUtils.degToRad(bridge.rotation)).add(new THREE.Vector3(...bridge.position))
+  const bridgeDistance=(x:number,z:number)=>bridge&&bridgeCenter?Math.hypot(x-bridgeCenter.x,z-bridgeCenter.z)-bridge.sphere[3]:Infinity
   async function enter(x:number,z:number,heading:number,reason:string,override=false){
     const target=new THREE.Vector3(x,0,z);destination=target
     const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
@@ -169,6 +172,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const pos=sim.body.translation();velocity+=cfg.gravity*step
       sim.controller.computeColliderMovement(sim.capsule,{x:delta.x*speed*step,y:velocity*step,z:delta.y*speed*step})
       const move=sim.controller.computedMovement(),next={x:pos.x+move.x,y:pos.y+move.y,z:pos.z+move.z}
+      if(bridge&&!stream.landmarks.has(bridge)){
+        const distance=bridgeDistance(pos.x,pos.z)
+        if(distance<cfg.collisionRadius){
+          stream.updateLandmarks?.(bridgeEye.set(pos.x,pos.y,pos.z),bridge)
+          const ahead=bridgeDistance(next.x,next.z)
+          if(ahead<=0&&ahead<distance){next.x=pos.x;next.z=pos.z}
+        }
+      }
       grounded=sim.controller.computedGrounded();if(grounded&&velocity<0)velocity=0
       if(verify)for(let at=0;at<sim.controller.numComputedCollisions();at++){const coll=sim.controller.computedCollision(at)?.collider;if(coll)lastHits.push(sim.kinds.get(coll.handle)??'')}
       const ground=sim.surface(next.x,next.z,'ground')

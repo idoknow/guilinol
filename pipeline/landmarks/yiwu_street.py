@@ -29,6 +29,9 @@ def _cjk_font(size):
 def canopy(model, station, side, high_crown=False):
     near_office = side > 0 and -62 <= station <= -6
     lateral = 5.95 if near_office else (-6.05 if side < 0 else 6.35)
+    verge_stations = ((-42,-7.35),(-15,-7.65),(2,-7.85)) if side<0 else ((-38,10.05),(-20,9.9),(-4,9.75),(12,8.7))
+    if verge_stations[0][0]-5 <= station <= verge_stations[-1][0]+5:
+        lateral = float(np.interp(station,*zip(*verge_stations)))
     # Orient +X leaning/arching crown across Yiwu Rd (-z when side > 0, +z when side < 0)
     yaw = (math.pi / 2 if side > 0 else -math.pi / 2) + ((int(abs(station)) % 5) - 2) * 0.08
     # Alternate camphor and bischofia/koelreuteria along the street (foreground -56.5 is a grand leaning camphor!)
@@ -196,7 +199,7 @@ def street(model):
         canopy(model, st, +1, high_crown=(st >= 44))
     # High overarching camphor boughs in front of yiwu_old_house (trunks across street, high leafy canopy)
     for st in (58, 72):
-        emit_landmark_tree(model, 'camphor', st, 0.06, -6.1, scale=1.06, y_scale=1.22, yaw=-math.pi / 2, variant_idx=st % 3, wood_mat='wood', leaf_mat='leaf', collide_trunk=True, lean_override=0.20)
+        emit_landmark_tree(model, 'camphor', st, 0.06, 8.1, scale=1.06, y_scale=1.22, yaw=math.pi / 2, variant_idx=st % 3, wood_mat='wood', leaf_mat='leaf', collide_trunk=True, lean_override=0.20)
 
     # Roadside scooters (including foreground row near 1350)
     for base_st, lat in ((-50, -6.6), (4, -6.6), (21.5, -2.2)):
