@@ -177,7 +177,7 @@ def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie'):
     from plaza_seam import civic_plaza
     outline = m._transform([[-1.25,0,-5.6],[1.25,0,-5.6],[1.25,0,5.6],[-1.25,0,5.6]])[:,::2]
     m.pose = (0,0,0,0)
-    civic_plaza(m,outline)
+    civic_plaza(m,outline,refine_outer=True)
     m.pose = (x,y0,z,yaw)
     for sz in (-4.6, -1.5, 1.5, 4.6):
         base=m.feet_at_grade([[-.82,0,sz]])[0]-.035

@@ -18,8 +18,13 @@ def lower_paths(roads, slab):
     spans = [(shapely.LineString(points(osm[key])),level(osm[key]['tags']),set(osm[key]['nodes']))
              for key in SPAN_WAYS if key in osm and level(osm[key]['tags'])>=1]
     forms = {}; portal_zone = slab.buffer(24)
+    corners = np.asarray(slab.exterior.coords)[:4]
+    along = corners[1]-corners[0]; across = corners[3]-corners[0]
+    axes = np.stack([along/np.linalg.norm(along), across/np.linalg.norm(across)])
+    lower_terrace = shapely.Polygon(np.array([[-114.7,26.3],[-106.9,26.3],[-106.9,47.3],[-114.7,47.3]])@axes+corners.mean(axis=0))
     def add(kind,shape):
         clipped = shape.intersection(zone)
+        if kind in (1,4,6): clipped = clipped.difference(lower_terrace)
         if clipped.area: forms.setdefault(kind,[]).append(clipped)
     for road in roads:
         if not road.line.intersects(slab) or road.way not in osm: continue

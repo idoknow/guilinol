@@ -11,7 +11,7 @@ from features import polygons
 from seam_streets import Streets
 
 
-def civic_plaza(builder, ring, frontage=None):
+def civic_plaza(builder, ring, frontage=None, refine_outer=False):
     surface = builder.surface
     rotation = np.array([[surface.cos,-surface.sin],[surface.sin,surface.cos]])
     streets = Streets(surface.surface)
@@ -27,6 +27,7 @@ def civic_plaza(builder, ring, frontage=None):
             tree,_,_ = streets.tile((col*size,row*size))
             masks.extend(tree.geometries[tree.query(plaza,predicate='intersects')])
     streets_mask = shapely.union_all(shapely.make_valid(masks))
+    street_boundary = streets_mask.boundary
     if frontage is not None:
         plaza = original.union(frontage.intersection(streets_mask.buffer(4)))
     footprint = plaza.difference(streets_mask)
@@ -66,13 +67,16 @@ def civic_plaza(builder, ring, frontage=None):
         for row in range(math.floor(north/4),math.ceil(south/4)):
             cell = shapely.box(col*4,row*4,(col+1)*4,(row+1)*4)
             for part in polygons(footprint.intersection(cell)):
-                if frontage is not None:
+                if frontage is not None or (refine_outer and boundary.intersects(part)):
                     def refine(ring):
                         result = []
                         for start,end in zip(ring.coords, list(ring.coords)[1:]):
                             result.append(start)
                             edge = shapely.LineString([start,end])
-                            if edge.length>.5 and streets_mask.boundary.distance(edge.interpolate(.5,normalized=True))<.03:
+                            midpoint = edge.interpolate(.5,normalized=True)
+                            road_edge = street_boundary is not None and street_boundary.distance(midpoint)<.03
+                            outside_edge = boundary.distance(midpoint)<.002
+                            if edge.length>.5 and (road_edge or outside_edge):
                                 first,last = vertices[vertex(*start)][1],vertices[vertex(*end)][1]
                                 if abs(first-last)>.05:
                                     result.extend(edge.interpolate(step*.45).coords[0] for step in range(1,math.ceil(edge.length/.45)))

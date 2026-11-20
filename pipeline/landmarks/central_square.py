@@ -326,9 +326,12 @@ def build_central_square(m: Builder):
     # ------------------------------------------------------------------
     hcx, hcz = _ax_pt(-54.0, -76.0)
     m.pose = (hcx, 0.0, hcz, AXIS_YAW + math.pi / 2.0)
-    m.box(0, -2.0, 0, 56.0, 22.8, 16.5, 'wood', collide=True, footing=True)
+    hall_front, hall_rear = 8.25, -2.25
+    hall_center = (hall_front + hall_rear) / 2
+    hall_depth = hall_front - hall_rear
+    m.box(0, -2.0, hall_center, 56.0, 22.8, hall_depth, 'wood', collide=True, footing=True)
     m.box(0, 4.5, 8.35, 52.0, 14.8, 0.28, 'glass')
-    m.box(0, 20.8, 0, 57.2, 1.8, 17.4, 'roof')
+    m.box(0, 20.8, hall_center, 57.2, 1.8, hall_depth + .9, 'roof')
     if m.detail:
         for px in np.linspace(-24.0, 24.0, 9):
             m.box(px, 0.0, 8.45, 0.75, 20.8, 0.45, 'dark')
