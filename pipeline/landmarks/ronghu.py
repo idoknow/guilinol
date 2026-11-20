@@ -342,7 +342,7 @@ def library(b):
         box(wall,(x+direction*9,y+.75,z+5.4),(5.2,.32,1.9),'foliage')
         for plant in range(9 if b.detail else 4):
             oval(wall,(x+direction*9+2*math.cos(plant*2.4),y+1,z+5.4+.55*math.sin(plant*2.4)),(.4,.25,.37),'foliage',6)
-    solid_tree(wall,(x-21,grade(x-21,z+5),z+5),12.8,8.6,54,b.detail,lobed=False,grade=grade)
+    solid_tree(wall,(x-21,grade(x-21,z+5),z+5),12.8,9.6,54,b.detail,lobed=True,grade=grade)
     for index in range(12):
         east = x - 30 + index * 1.65
         box(wall, (east,grade(east,z+6)+.19,z+6), (1.68,.42,2.4), 'granite')
@@ -668,8 +668,8 @@ def shore(b):
                     wall.pos[at] = (px,ground(px,pz)-.08,pz)
         for a,c in zip(points,points[1:]):
             tube(wall,a,c,.14,'granite',4)
-    # North of the pavilion, so a camera standing beside the pavilion is not inside a crown.
-    banyan(wall, (20, ground(20,-7), -7), 13, 10, 42, b.detail,grade=ground)
+    # Foreground left-side lakeside tree in the garden bed north-west of Xizhou Pavilion (IMG_1334 left frame, clear of rill paving!).
+    banyan(wall, (10.2, ground(10.2, -5.2), -5.2), 13.4, 10.6, 42, b.detail, lobed=False, grade=ground)
     if b.detail:
         banyan(wall, (48, ground(48,-4), -4), 12, 9, 43, True,grade=ground)
 

@@ -214,7 +214,7 @@ def approach(builder):
         base = ground(east+5,south)+.12
         start=len(mesh.pos)
         box(mesh,(east+5,base,south),(2.3,.24,2.3),'granite')
-        banyan(mesh,(east+5,base+.12,south),9+index%3,4.9,77+index,builder.detail,lobed=False,grade=ground)
+        banyan(mesh,(east+5,base+.12,south),9+index%3,4.9,77+index,builder.detail,lobed=False,grade=ground,join_forks=True)
         for i in range(start,len(mesh.pos)):
             px,py,pz=mesh.pos[i]
             outside=max(abs(px-east-5),abs(pz-south))>1.15

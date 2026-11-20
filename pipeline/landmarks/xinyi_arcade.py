@@ -2,8 +2,11 @@
 Anchored at Overture c82cbe63-0533-4b26-895c-6378ffcca723 centroid (-1735.23, -390.82), rot=0.
 """
 import math
+from pathlib import Path
+import sys
 import numpy as np
-import trimesh
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from trees import emit_landmark_tree
 from xiaoyao_tower import generate
 
 
@@ -78,14 +81,21 @@ def planter_tree(model, x, z):
     # Square granite tree planter kerb (prominent in IMG_1359 & IMG_1360!)
     model.box(x, gy - 0.3, z, 1.85, 0.64 + h_lift, 1.85, 'stone', True)
     model.box(x, gy + 0.34 + h_lift, z, 1.55, 0.06, 1.55, 'tile')
-    model.beam([x, gy + 0.2, z], [x, gy + 3.8 + h_lift, z], 0.16, 'wood', 7, True)
-    sphere = trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
-    for dx, dy, dz, sx, sy, sz in (
-        (-0.8, 4.9, 0.2, 2.5, 1.9, 2.5),
-        (0.7, 5.2, -0.4, 2.3, 1.8, 2.3),
-        (0.0, 6.1, 0.0, 2.2, 1.7, 2.2),
-    ):
-        model.mesh(sphere.vertices * [sx, sy, sz] + [x + dx, gy + dy, z + dz], sphere.faces, 'leaf')
+    # Sweet Osmanthus (桂花, city tree) in raised granite planter matching IMG_1359 & IMG_1360
+    emit_landmark_tree(
+        model,
+        'osmanthus',
+        x,
+        gy + 0.32 + h_lift,
+        z,
+        scale=1.02,
+        y_scale=1.04,
+        yaw=z * 0.55,
+        variant_idx=int(abs(z)) % 3,
+        wood_mat='wood',
+        leaf_mat='leaf',
+        collide_trunk=True,
+    )
 
 
 def arcade(model):
