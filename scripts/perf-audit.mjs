@@ -26,6 +26,7 @@ function summarize(samples){
 }
 
 const out = process.argv[2] ?? 'captures/perf-audit'
+const routes = process.env.PERF_ROUTE_ONLY === '1' ? ['flight'] : ['flight','shizijie','zhengyang','palace','gunanmen','jiefang_bridge']
 const frames = 120
 await mkdir(out, {recursive:true})
 const server = await preview({build:{outDir:process.env.AUDIT_DIST ?? '../dist'},root:'web', configFile:'web/vite.config.ts', preview:{host:'127.0.0.1',port:0}})
@@ -35,7 +36,7 @@ try {
   for (const mobile of [false,true]) {
     const rows = []
     const profile = mobile ? 'mobile' : 'desktop'
-    for (const id of ['flight','shizijie','zhengyang','palace','gunanmen','jiefang_bridge']) {
+    for (const id of routes) {
       const context = await browser.newContext({viewport:mobile ? {width:390,height:844} : {width:960,height:540},isMobile:mobile,hasTouch:mobile})
       try {
         await context.addInitScript(glHookScript)

@@ -62,22 +62,31 @@ function prepare(mesh:THREE.Mesh, unique:boolean):Draw {
 export function landmarkCulling(){
   const prepared=new WeakMap<THREE.Object3D,Draw[]>(), active=new WeakSet<THREE.Object3D>()
   const frustum=new THREE.Frustum(), reflection=new THREE.Frustum(), matrix=new THREE.Matrix4()
-  const previous=new THREE.Matrix4(), reflect=new THREE.Matrix4().makeScale(1,-1,1)
+  // For translations up to this distance, the expanded planes still enclose
+  // the current view (also after reflecting across a fixed water plane).
+  const margin=8
+  const anchor=new THREE.Vector3(Infinity,0,0), rotation=new THREE.Quaternion()
+  const projection=new THREE.Matrix4(), reflect=new THREE.Matrix4().makeScale(1,-1,1)
   let lastMirror=NaN
   const layers:Draw[][]=[]
   return {
     update(roots:Iterable<THREE.Group>,camera:THREE.PerspectiveCamera,mirror:number){
       camera.updateMatrixWorld()
-      matrix.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse)
-      const moved=!previous.equals(matrix)||mirror!==lastMirror
-      previous.copy(matrix);lastMirror=mirror
-      frustum.setFromProjectionMatrix(matrix)
-      if(Number.isFinite(mirror)){
-        reflect.elements[13]=2*mirror
-        reflection.setFromProjectionMatrix(matrix.multiply(reflect))
+      const moved=anchor.distanceToSquared(camera.position)>=margin*margin ||
+        !rotation.equals(camera.quaternion) || !projection.equals(camera.projectionMatrix) || mirror!==lastMirror
+      if(moved){
+        anchor.copy(camera.position);rotation.copy(camera.quaternion);projection.copy(camera.projectionMatrix);lastMirror=mirror
+        matrix.multiplyMatrices(projection,camera.matrixWorldInverse)
+        frustum.setFromProjectionMatrix(matrix)
+        for(const plane of frustum.planes)plane.constant+=margin
+        if(Number.isFinite(mirror)){
+          reflect.elements[13]=2*mirror
+          reflection.setFromProjectionMatrix(matrix.multiply(reflect))
+          for(const plane of reflection.planes)plane.constant+=margin
+        }
       }
       const classify=(box:THREE.Box3)=>{
-        if(box.distanceToPoint(camera.position)>look.fogHorizonTo)return 0
+        if(box.distanceToPoint(anchor)>look.fogHorizonTo+margin)return 0
         return Number(frustum.intersectsBox(box))+
           (Number.isFinite(mirror)&&box.max.y>=mirror&&reflection.intersectsBox(box)?2:0)
       }
