@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import {treeGeometry} from './look/trees'
+import {treeGeometry, speciesCount, treeFar} from './look/trees'
 import {look} from './look/config'
 import {fetchAsset,type Tile} from './world'
 
@@ -31,7 +31,7 @@ export class Forest{
   private retry=new Map<Tile,number>()
   private assets:ReturnType<typeof treeGeometry>[]|null=null
   private batches:(THREE.InstancedMesh|undefined)[]=[]
-  private groups:Tree[][]=Array.from({length:12},()=>[])
+  private groups:Tree[][]=Array.from({length:speciesCount*2},()=>[])
   private dirty=true
   private anchor=new THREE.Vector3(Infinity,0,0)
   private rotation=new THREE.Quaternion()
@@ -57,28 +57,31 @@ export class Forest{
       readTrees(tile,control.signal).then(trees=>{if(!control.signal.aborted){this.loaded.set(tile,trees);this.dirty=true}})
         .catch(err=>{if(!control.signal.aborted){console.error(err);this.retry.set(tile,performance.now()+10000)}}).finally(()=>this.pending.delete(tile))
     }
-    if(!this.loaded.size)return
+    if(!this.loaded.size){
+      for(const mesh of this.batches)if(mesh){mesh.visible=false;mesh.count=0}
+      return
+    }
     if(!this.dirty&&this.camera.position.distanceToSquared(this.anchor)<4&&this.rotation.angleTo(this.camera.quaternion)<.016)return
     this.anchor.copy(this.camera.position);this.dirty=false
     this.rotation.copy(this.camera.quaternion);this.camera.updateMatrixWorld();this.frustum.setFromProjectionMatrix(this.matrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse))
     const cam=this.camera.position
     const groups=this.groups
-    for(let i=0;i<12;i++)groups[i].length=0
-    for(const trees of this.loaded.values())for(const tree of trees){const d=(tree.x-position.x)**2+(tree.y-position.y)**2+(tree.z-position.z)**2
-      if(d>=1500**2)continue
+    for(let i=0;i<speciesCount*2;i++)groups[i].length=0
+    for(const trees of this.loaded.values())for(const tree of trees){const d=(tree.x-cam.x)**2+(tree.y-cam.y)**2+(tree.z-cam.z)**2
+      if(d>=treeFar**2)continue
       // Never let a crown swallow the follow camera: drop trees whose canopy the camera is inside.
       const underCamphor=tree.kind===0&&cam.y-tree.y<3.2*tree.scale
       if((tree.x-cam.x)**2+(tree.z-cam.z)**2<(underCamphor?2.5:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue
       this.point.set(tree.x,tree.y+4,tree.z)
-      if(this.frustum.planes.every(plane=>plane.distanceToPoint(this.point)>-40))groups[tree.kind+(d<600**2?0:6)].push(tree)}
-    this.assets??=Array.from({length:6},(_,i)=>treeGeometry(i))
+      if(this.frustum.planes.every(plane=>plane.distanceToPoint(this.point)>-40))groups[(tree.kind<speciesCount?tree.kind:0)+(d<(240+tree.seed*.3)**2?0:speciesCount)].push(tree)}
+    this.assets??=Array.from({length:speciesCount},(_,i)=>treeGeometry(i))
     const assets=this.assets
-    for(let i=0;i<12;i++){
-      const group=groups[i];let mesh=this.batches[i];const asset=assets[i%6]
+    for(let i=0;i<speciesCount*2;i++){
+      const group=groups[i];let mesh=this.batches[i];const asset=assets[i%speciesCount]
       if(group.length&&(!mesh||mesh.instanceMatrix.count<group.length)){
         if(mesh){this.scene.remove(mesh);mesh.dispose()}
         const cap=2**Math.ceil(Math.log2(group.length))
-        mesh=new THREE.InstancedMesh(i<6?asset.near:asset.far,asset.material,cap)
+        mesh=new THREE.InstancedMesh(i<speciesCount?asset.near:asset.far,asset.material,cap)
         mesh.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(cap*3),3)
         this.scene.add(mesh);this.batches[i]=mesh;mesh.frustumCulled=false
       }

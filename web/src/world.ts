@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import {buildingGeometry,type Building} from './buildings'
-import {streetGeometry,type Streets} from './streets'
+import {loadStreetGeometry} from './street-loader'
+import type {Streets} from './street-worker'
 import {bridgeGeometry} from './look/bridge'
 import {look} from './look/config'
 import {nightGround} from './look/night'
@@ -13,7 +14,7 @@ export interface Tile extends Asset {x:number; z:number}
 export interface Manifest {
   landmarks?:import('./landmarks').Landmark[]
   version:number; extent:[number,number,number,number]; grid:number; chunkSize:number; chunks:Tile[];
-  peaks:Peaks; atlas:Asset; vehicles?:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset}
+  peaks:Peaks; atlas:Asset; vehicles?:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset; waterMask?:string}
 }
 export let bytes = 0
 export async function fetchAsset(file:string, signal?:AbortSignal) {
@@ -48,14 +49,20 @@ function ground(width:number, depth:number, step:number, height:(col:number,row:
   return geometry
 }
 
+async function inflateMask(encoded:string) {
+  const bytes=Uint8Array.from(atob(encoded),char=>char.charCodeAt(0))
+  const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))
+  return new Uint8Array(await new Response(stream).arrayBuffer())
+}
+
 export function startOverview(manifest:Manifest) {
-  const {underlay,texture,step} = manifest.overview
+  const {underlay,texture,step,waterMask} = manifest.overview
   const [left,top,width,depth] = manifest.extent
   const dispatched = Promise.all([fetchAsset(underlay.file),fetchAsset(texture.file)]).then(([values,image])=>{
     const blob = new Blob([image],{type:'image/png'})
     const bitmaps = Promise.all([
       createImageBitmap(blob,{imageOrientation:'flipY'}),
-      createImageBitmap(blob),
+      waterMask?inflateMask(waterMask):createImageBitmap(blob),
     ])
     return {values,bitmaps}
   })
@@ -107,7 +114,6 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   if(extra!==0 && extra!==8450) throw Error('Invalid GL04 sections')
   const deck = Float32Array.from(new Int16Array(buffer.slice(end,tail)),value=>value/100)
   const underlay = extra ? new Int16Array(buffer.slice(tail)) : terrain
-  const material = await surfaceMaterial(buffer.slice(offset,end))
   const sample = (col:number,row:number)=>{
     const index = row*65+col
     return underlay[index]/10
@@ -127,18 +133,16 @@ export async function detail(tile:Tile, signal:AbortSignal) {
     return y
   })
   for(const [,topLevel] of rings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
+  const heights = geometry.getAttribute('position')
+  const streets = await loadStreetGeometry(paths,step,heights)
+  signal.throwIfAborted()
+  const material = await surfaceMaterial(buffer.slice(offset,end))
   const group = new THREE.Group()
   group.position.set(tile.x,0,tile.z)
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
   const pond = chunkWater(water,tile.x,tile.z)
   const walls = vertices ? buildingGeometry(positions,normals,indices,rings) : null
-  const heights = geometry.getAttribute('position')
-  const streets = streetGeometry(paths,(x,z)=>{
-    const col=Math.min(segments-1,Math.max(0,Math.floor(x/step))),row=Math.min(segments-1,Math.max(0,Math.floor(z/step))),at=row*stride+col
-    const u=x/step-col,v=z/step-row,a=heights.getY(at),b=heights.getY(at+1),c=heights.getY(at+stride),d=heights.getY(at+stride+1)
-    return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
-  })
   const bridge = deck.length ? bridgeGeometry(deck,thin,asphalt) : null
   const batch:TileBatchInput = {
     tile, minY, maxY, midY:heights.getY(segments/2*(stride+1)),
@@ -153,7 +157,7 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   return {
     group,groundMesh,terrain,water,rings,deck,thin,streets,batch,
     dispose(){
-      pond?.dispose(); streets.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
+      pond?.dispose(); streets.surface?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
       material.map!.image.close(); material.map!.dispose(); material.dispose()
     },
   }
