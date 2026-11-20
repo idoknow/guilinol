@@ -681,6 +681,23 @@ def _hex_roof(mesh, center, y, radius, rise, lift, tile_region, fascia_region):
     box(mesh, (x, y + rise + 0.28, z), (0.28, 0.5, 0.28), tile_region, 0.3)
 
 
+def garden_gate_roof(mesh, center, eave, width, depth, rise):
+    """Shallow two-slope tile cap for a courtyard doorway, with 0.22 m ridge finials."""
+    x,z = center
+    ridge = eave + rise
+    for side in (-1,1):
+        edge = z + side*depth/2
+        mesh.face([(x-width/2,eave,edge),(x+width/2,eave,edge),
+                   (x+width/2,ridge,z),(x-width/2,ridge,z)],(0,1,side),'graytile',.65)
+        box(mesh,(x,eave-.06,edge),(width,.12,.12),'graytile')
+    for side in (-1,1):
+        end = x + side*width/2
+        mesh.face([(end,eave,z-depth/2),(end,eave,z+depth/2),(end,ridge,z)],
+                  (side,0,0),'graytile')
+        tube(mesh,(end-side*.10,ridge+.05,z),(end+side*.07,ridge+.18,z),.04,'graytile',6)
+    box(mesh,(x,ridge+.045,z),(width,.09,.16),'graytile')
+
+
 def hip_roof(mesh, center, y, width, depth, rise, overhang, lift, tile_region, soffit_region, tiers=1, sides=4, ceiling=False):
     xieshan(
         mesh, center, y, width, depth, rise, overhang, lift, tile_region, soffit_region,

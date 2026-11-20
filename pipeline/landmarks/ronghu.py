@@ -32,14 +32,14 @@ from rong_bridges import nine_bends, ancient_bridge
 from rong_street import scooter
 from rong_solids import loft, oval, torus, banyan as solid_tree
 from rong_solids import banyan, align_front
-from c_kit import RECTS
+from c_kit import RECTS, _font
 from PIL import ImageDraw
 from shapely.geometry import LineString
 from pathlib import Path
 
 from c_kit import (
     Builder, arch_wall, box, cylinder, ensure_textures, export_landmark, solid,
-    extrude, grille, hip_roof, segment_wall, railing, ramp, stairs, star, tri_count, tube, ring,
+    extrude, garden_gate_roof, grille, hip_roof, segment_wall, railing, ramp, stairs, star, tri_count, tube, ring,
 )
 
 
@@ -97,20 +97,55 @@ def island(b):
         torus(wall,(119+offset,level,125),radius,.22,.36,'limestone',.18,stretch=1.2)
     for offset in (-.7,0,.7):
         oval(wall,(119+offset,.5,125),(.85,.45,.6),'limestone',8)
-    with align_front(b, (130,132), 48, shift=(-20,1)):
+    with align_front(b, (130,132), 24, shift=(-20,1)):
         arch_wall(wall,(130,.24,132),4.2,3.2,.48,2.2,2.75,'garden_brick',tile=None)
-        for east in (125.8,134.2):
-            box(wall,(east,.82,132),(4.2,1.16,.48),'garden_brick',None)
-            box(wall,(east,3.13,132),(4.2,.64,.48),'garden_brick',None)
-            for side in (-1,1):
-                box(wall,(east+side*1.65,2.09,132),(.92,1.42,.48),'garden_brick',None)
-            for offset in (-.9,-.45,0,.45,.9):
-                box(wall,(east+offset,2.09,132),(.09,1.42,.16),'ashlar')
-            for height in (1.76,2.4):
-                box(wall,(east,height,132),(2.5,.1,.18),'ashlar')
-        for jamb in (128.5,131.5):
-            box(wall,(jamb,1.72,131.72),(.38,2.48,.09),'blacktile')
-        hip_roof(wall,(130,132),3.42,4.28,1.2,.54,.25,.14,'graytile','wood')
+        for side in (-1,1):
+            # Leave sky above the curved gable. The pierced brick screen joins
+            # it at its low outer end instead of hiding it in a rectangular wall.
+            shoulder = [(2.1,3.34),(2.30,3.13),(2.47,2.68),(2.55,2.14),
+                        (2.70,1.82),(3.02,1.55),(3.35,1.45),(3.67,1.46)]
+            for (dx,h),(ex,k) in zip(shoulder,shoulder[1:]):
+                a,c = 130+side*dx,130+side*ex
+                for face in (131.76,132.24):
+                    wall.face([(a,.24,face),(c,.24,face),(c,k,face),(a,h,face)],
+                              (0,0,face-132),'garden_brick',None)
+                wall.face([(a,h,131.76),(c,k,131.76),(c,k,132.24),(a,h,132.24)],
+                          (0,1,0),'limestone')
+            east = 130+side*4.95
+            box(wall,(east,.83,132),(2.58,1.18,.48),'garden_brick')
+            box(wall,(east,2.59,132),(2.58,.34,.48),'garden_brick')
+            for bar in (-1.14,-.58,0,.58,1.14):
+                box(wall,(east+bar,1.92,132),(.13,1.08,.25),'ashlar')
+            box(wall,(east,2.0,132),(2.58,.12,.25),'ashlar')
+        # Projecting lime-plaster reveal; the circular head joins the side mouldings.
+        for side in (-1,1):
+            box(wall,(130+side*1.18,1.12,131.71),(.26,1.76,.23),'white')
+            for j in range(12):
+                a,c = j*math.pi/9,(j+1)*math.pi/9
+                def toe(t):
+                    return (130+side*(1.19+.16*math.cos(t)),.66+.18*math.sin(t),131.60)
+                tube(wall,toe(a),toe(c),.07,'white',6)
+            plaque_x = 130+side*1.67
+            wall.face([(plaque_x+.23,.47,131.64),(plaque_x-.23,.47,131.64),
+                       (plaque_x-.23,2.86,131.64),(plaque_x+.23,2.86,131.64)],
+                      (0,0,-1),'couplet_left' if side<0 else 'couplet_right',
+                      uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
+            # Paired scrolls terminate the stepped brick side walls.
+            for k in range(24):
+                t0,t1 = k/24,(k+1)/24
+                def curl(t):
+                    angle = t*math.pi*2.3
+                    radius = .13+.52*t
+                    return (130+side*(2.83+radius*math.cos(angle)),
+                            1.46+radius*math.sin(angle)+1.04*t*t,131.67)
+                tube(wall,curl(t0),curl(t1),.16,'limestone',8)
+        for k in range(24):
+            a,c = k*math.pi/24,(k+1)*math.pi/24
+            def rim(angle,r):
+                return (130+r*math.cos(angle),1.89+r*math.sin(angle),131.61)
+            wall.face([rim(a,1.06),rim(a,1.32),rim(c,1.32),rim(c,1.06)],
+                      (0,0,-1),'white',None)
+        garden_gate_roof(wall,(130,132),3.44,4.42,1.26,.36)
         if b.collide:
             arch_wall(b.hit,(130,.24,132),4.2,3.2,.48,2.2,2.75,'ashlar')
     for index,(east,south) in enumerate(((133,149),(135,150),(138,137),(141,138),(144,139),(147,150))):
@@ -394,48 +429,77 @@ def shore(b):
             wall.face(arc(-117.15,radius)+arc(-114.85,radius)[::-1],(0,side*math.sin(angles[0]),side*math.cos(angles[0])),'white')
     # IMG_1334–36 look along the strip between ways 684511179 and 686230933.
     with align_front(b, (0, -17.5), -18, shift=(0,1.25)):
-        # Finished-ground samples along the pedestrian strip; keep lips above paving.
-        levels = [1.05,1.08,1.10,1.13,1.15,1.18,1.20,1.23]
-        # The two mapped paths diverge here. IMG_1335 puts the middle bays
-        # nearer the north path; the two end shots pin the original endpoints.
-        def centerline(x):
+        # Mapped path centre lines in the channel frame, sampled from the November snapshot.
+        def north_path(x):
+            return -26.936 + (x+62.146)*2.066/104.458
+
+        def south_path(x):
+            pts = [(-39.955,-18.544),(-12.9,-16.778),(12.635,-14.901),(40.322,-11.318)]
+            for (a,za),(c,zc) in zip(pts,pts[1:]):
+                if x <= c:
+                    return za + (zc-za)*(x-a)/(c-a)
+
+        def channel(x):
+            if x > 14:
+                return -17.5 - .96*(x-14)/2.42
             return -17.5 - 1.85*max(0,1-abs(x-3)/11)
 
-        for index, level in enumerate(levels):
-            east = -16 + index * 4
-            left, right = east-2, east+2
-            za, zb = centerline(left), centerline(right)
-            for side in (-1, 1):
-                for row in range(3):
-                    near = side*(1.42+row*1.25)
-                    far = near + side*1.25
-                    for start in (left,east):
-                        corners = [(start,near),(start+2,near),(start+2,far),(start,far)]
-                        points = [(x,level+.11,centerline(x)+z) for x,z in corners]
-                        wall.face(points,(0,1,0),'plaza_stone',None)
-                        if b.collide:
-                            b.hit.face(points,(0,1,0),'ashlar',None)
-                segment_wall(wall,(left,za+side*1.24),(right,zb+side*1.24),
-                             level-.24,level+.24,.36,'granite')
-            pool = [(left,za-1.1),(right,zb-1.1),(right,zb+1.1),(left,za+1.1)]
-            wall.face([(x,level+.13,z) for x,z in pool],(0,1,0),'rill_water',None)
-            cross_z = centerline(east-1.8)
-            box(wall,(east-1.8,level+.39,cross_z),(.62,.36,.62),'granite')
-            box(wall,(east-1.8,level+.17,cross_z),(.36,.3,2.25),'ashlar')
-        # The east end flares around a raised square outlet (IMG_1334).
-        # The inlet is open on its west side. Pave only outside its coping.
-        pool = [(14,-18.6),(16,-20.6),(18.6,-20.6),(20.4,-19),
-                (20.4,-17.2),(18.8,-16),(16,-16),(14,-16.4)]
-        extrude(wall,pool,1.21,1.36,'rill_water',None)
+        def banks(x):
+            return north_path(x)-1.4, south_path(x)+1.7
+
+        def paving_level(x,z):
+            return 1.19 + (x+18)*.006
+
+        # 0.94 m clear water with two 0.25 m stone lips. Carry both paving strips
+        # over the path centres so the side visible in IMG_1336 has no grass seam.
+        stations = [-18,-14,-10,-8,-6,-2,2,3,6,10,14,16.42]
+        for left,right in zip(stations,stations[1:]):
+            level = 1.08 + (left+18)*.006
+            za,zb = channel(left),channel(right)
+            for i,side in enumerate((-1,1)):
+                ca,cb = za+side*.72,zb+side*.72
+                pave(b,[(left,ca),(right,cb),(right,banks(right)[i]),(left,banks(left)[i])],paving_level)
+                segment_wall(wall,(left,za+side*.595),(right,zb+side*.595),
+                             level-.12,level+.22,.25,'granite')
+            water = [(left,za-.47),(right,zb-.47),(right,zb+.47),(left,za+.47)]
+            wall.face([(x,level+.08,z) for x,z in water],(0,1,0),'rill_water',None)
+        for i in range(28):
+            x = -17.6 + 1.2*i
+            y = 1.08 + (x+18)*.006
+            box(wall,(x,y+.20,channel(x)),(.50,.34,.50),'granite')
+            if b.collide:
+                box(b.hit,(x,y+.20,channel(x)),(.50,.34,.50),'ashlar')
+        # Eight-sided terminal basin, 2.25 m across flats plus the perimeter coping.
+        left,right = 16.42,18.67
+        mid,z = (left+right)/2,-18.46
+        pool = [(left,z-.47),(mid-.47,z-1.125),(mid+.47,z-1.125),(right,z-.47),
+                (right,z+.47),(mid+.47,z+1.125),(mid-.47,z+1.125),(left,z+.47)]
+        extrude(wall,pool,1.24,1.36,'rill_water',None)
         for a,c in zip(pool,pool[1:]):
-            segment_wall(wall,a,c,1.2,1.55,.30,'granite')
-        for bank in ([pool[0],pool[1],pool[2],pool[3],(23,-19),(23,-23),(14,-23)],
-                     [pool[4],pool[5],pool[6],pool[7],(14,-12.3),(23,-12.3),(23,-17.2)],
-                     [pool[3],pool[4],(23,-17.2),(23,-19)]):
-            pave(b,bank,1.37)
-        for mesh in ([wall,b.hit] if b.collide else [wall]):
-            box(mesh,(17.45,1.56,-18.46),(1.02,.48,1.04),'ashlar')
-            box(mesh,(17.45,1.86,-18.46),(1.16,.14,1.18),'granite')
+            segment_wall(wall,a,c,1.20,1.54,.25,'granite')
+        for edge,side in ((pool[:4],0),(pool[4:][::-1],1)):
+            for a,c in zip(edge,edge[1:]):
+                pave(b,[a,c,(c[0],banks(c[0])[side]),(a[0],banks(a[0])[side])],1.39)
+        pave(b,[(right,banks(right)[0]),(25,banks(25)[0]),
+                (25,banks(25)[1]),(right,banks(right)[1])],1.39)
+        box(wall,(mid,1.53,z),(1.00,.44,1.00),'ashlar')
+        for side in (-1,1):
+            box(wall,(mid+side*.34,1.82,z),(.36,.14,1.04),'granite')
+            box(wall,(mid,1.82,z+side*.34),(.32,.14,.36),'granite')
+        if b.collide:
+            box(b.hit,(mid,1.60,z),(1.04,.58,1.04),'ashlar')
+
+        # IMG_1336 shows a paved forecourt on the pavilion side of 686230933.
+        # Tie the path to the plinth, inland of water relation 9373836.
+        edge = [(-18,-10.6),(-7,-6.2),(3,-4.7),(9,-6.8),(16,-10.3),(25,-11.0)]
+        for (a,za),(c,zc) in zip(edge,edge[1:]):
+            outer_a,outer_c = banks(a)[1],banks(c)[1]
+            def forecourt_level(x,z):
+                t = (x-a)/(c-a)
+                inner = outer_a+(outer_c-outer_a)*t
+                far = za+(zc-za)*t
+                return paving_level(x,z) + (.30-paving_level(x,z))*(z-inner)/(far-inner)
+            pave(b,[(a,outer_a),(c,outer_c),(c,zc),(a,za)],forecourt_level)
     pavilion(b, 24, .35, -6, span=4.4)
     post = 0.95 if b.detail else 8
     # North bank between the pavilion and 古南门, with a gap in front of the steps.
@@ -499,10 +563,18 @@ def main():
                 draw.line((left,top+row*8,left+45,top+row*8),fill='#5b5d5c')
                 for offset in range(row%2*8,46,16):
                     draw.line((left+offset,top+row*8,left+offset,min(top+61,top+row*8+8)),fill='#5b5d5c')
-    for index,(name,color) in enumerate([('lantern_red','#df4233'),('lantern_gold','#ebbd34'),('lantern_cyan','#53b7cf'),('lantern_pink','#eb81a9'),('lantern_orange','#f68526'),('rill_water','#83acbc')]):
+    for index,(name,color) in enumerate([('lantern_red','#df4233'),('lantern_gold','#ebbd34'),('lantern_cyan','#53b7cf'),('lantern_pink','#eb81a9'),('lantern_orange','#f68526'),('rill_water','#425d52')]):
         left=768+index*40
         RECTS[name]=(left,640,36,36)
         draw.rectangle((left,640,left+36,676),fill=color)
+    # Only transcribe the legible characters on the photographed black boards.
+    for col,(region,letters) in enumerate((('couplet_left','七星玉　缀晚景'),
+                                           ('couplet_right','一泓碧水留明月'))):
+        left,top = col*48,768
+        RECTS[region] = (left,top,46,126)
+        draw.rectangle((left,top,left+45,top+125),fill='#172026')
+        for row,char in enumerate(letters):
+            draw.text((left+23,top+10+row*17),char,anchor='mm',font=_font(16),fill='#d5dbcf')
     hi, lo = Builder(0, True), Builder(1, False)
     build(hi)
     build(lo)

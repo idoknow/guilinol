@@ -1,4 +1,4 @@
-from PIL import Image, ImageDraw
+from PIL import ImageDraw
 
 from c_kit import RECTS, _font, box, solid, stairs, ring, tube, railing, extrude
 from rong_solids import banyan, align_front
@@ -7,26 +7,15 @@ from rong_solids import banyan, align_front
 def signs(image):
     draw = ImageDraw.Draw(image)
     draw.rectangle((384,640,511,767),fill='#81493c')
-    for name,rect,text,size in [('inn',(768,640,64,128),'涵栅雅居',23),('rong',(832,640,192,96),'RONG HOTEL',23)]:
-        RECTS[name]=rect
-        left,top,width,height=rect
-        draw.rectangle((left,top,left+width-1,top+height-1),fill='#322a28')
-        if name=='inn':
-            for index,char in enumerate(text):
-                draw.text((left+width/2,top+(index+.5)*height/4),char,anchor='mm',font=_font(size),fill='white')
-        else:
-            draw.text((left+width/2,top+height/2),text,font=_font(size),anchor='mm',fill='white')
-    RECTS['inn_board'] = (768,736,128,32)
-    draw.rectangle((768,736,895,767),fill='#273748')
-    draw.rectangle((770,737,893,766),outline='#b9c3bf')
+    RECTS['rong'] = (832,640,192,96)
+    draw.rectangle((832,640,1023,735),fill='#322a28')
+    draw.text((928,688),'RONG HOTEL',font=_font(23),anchor='mm',fill='white')
+    # Reserve a full plaque panel for the two lines on the projecting sign.
+    RECTS['inn_board'] = (512,768,320,128)
+    draw.rectangle((512,768,831,895),fill='#161f24')
+    draw.rectangle((516,772,827,891),outline='#e9ebdf',width=2)
     for row,label in enumerate(('涵栅雅居','民宿酒店')):
-        draw.text((832,744+row*14),label,anchor='mm',font=_font(14),fill='white')
-    sign=Image.new('RGB',(128,512),'#171819')
-    brush=ImageDraw.Draw(sign)
-    for index,char in enumerate('涵栅雅居'):
-        brush.text((64,64+128*index),char,font=_font(107),anchor='mm',fill='#fffaf0')
-    RECTS['inn']=RECTS['sign_school']
-    image.paste(sign.transpose(Image.Transpose.ROTATE_90),(512,768))
+        draw.text((672,800+row*57),label,anchor='mm',font=_font(50),fill='#fffaf0')
 
 
 def shops(builder):
@@ -52,7 +41,7 @@ def shops(builder):
                 box(builder.parts['lit'], (east, level, -40.2), (2.65, 1.82, .14), 'glass')
         if builder.collide:
             solid(builder.hit, (-4.5, 6.1, -43.6), (7.25, 9.6, 6.65), 'brick')
-    for east,base,south,width,length,floors,kind in [(10,1.7,-51,17,24,4,'rong'),(10,4,-86,26.3,8.5,3,'inn'),(32,3.8,-115,15,19,3,'hall')]:
+    for east,base,south,width,length,floors,kind in [(10,1.7,-51,17,24,4,'rong'),(10,1.08,-86,26.3,8.5,3,'inn'),(32,3.8,-115,15,19,3,'hall')]:
         with align_front(builder, (east, south), -21.92):
             shop(builder, east, base, south, width, length, floors, kind)
 
@@ -99,22 +88,38 @@ def shop(builder, east, base, south, width, length, floors, kind):
                 box(stone,(face+.08,level,offset),(.18,1.8,length*.44),'wood')
                 box(glass,(face+.2,level,offset),(.09,1.53,length*.42),'glass',None)
         if kind == 'inn':
+            # The sidewalk descends south with Rongyin Road. The east doorway
+            # opens at this grade, about 3 m below the old constant shop datum.
+            def grade(z):
+                return 1.38 - .041*(z-south)
+            for col in range(5):
+                a = face + col*1.8
+                for row in range(8):
+                    c = south-5.6 + row*2
+                    corners = [(a,c),(a+1.8,c),(a+1.8,c+2),(a,c+2)]
+                    vertices = [(x,grade(z),z) for x,z in corners]
+                    stone.face(vertices,(0,1,0),'plaza_stone')
+                    if builder.collide:
+                        builder.hit.face(vertices,(0,1,0),'ashlar')
             for stall in range(5 if builder.detail else 3):
-                scooter(stone,face+1.25,base,south-length*.4+1.28*stall,
-                        ('steel','cream','vermilion')[stall%3])
+                z = south-length*.4+1.28*stall
+                scooter(stone,face+1.25,grade(z),z,('steel','cream','vermilion')[stall%3])
             corner = south+length/2
-            box(stone,(face+.9,base+3.5,corner),(1.8,.82,.13),'wood')
+            start,end = face+.28,face+2.08
+            for level in (base+2.31,base+3.10):
+                box(stone,(face+.42,level,corner),(.84,.075,.09),'steel')
+            box(stone,((start+end)/2,base+2.69,corner),(end-start,.90,.14),'steel')
             for side in (-1,1):
-                z = corner + side*.073
-                stone.face([(face,y,z) for y in (base+3.1,base+3.9)]
-                           + [(face+1.8,y,z) for y in (base+3.9,base+3.1)],
-                           (0,0,side),'inn_board',uvs=[(.01,.99),(.01,.01),(.99,.01),(.99,.99)])
-        span,high=(9,1.15) if kind=='rong' else (1.55,5.8)
-        offset=south+length*.36 if kind=='inn' else south
-        level=base+3.2
-        coords=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)]
-        if kind=='inn': coords=[(v,1-u) for u,v in coords]
-        stone.face([(face+.3,level-high/2,offset+span/2),(face+.3,level-high/2,offset-span/2),(face+.3,level+high/2,offset-span/2),(face+.3,level+high/2,offset+span/2)],(1,0,0),kind,uvs=coords)
+                z = corner + side*.084
+                left,right = (start,end) if side==1 else (end,start)
+                stone.face([(left,base+2.26,z),(right,base+2.26,z),
+                            (right,base+3.12,z),(left,base+3.12,z)],
+                           (0,0,side),'inn_board',uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
+            return
+        offset,level = south,base+3.2
+        stone.face([(face+.3,level-.575,offset+4.5),(face+.3,level-.575,offset-4.5),
+                    (face+.3,level+.575,offset-4.5),(face+.3,level+.575,offset+4.5)],
+                   (1,0,0),'rong',uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
 
 
 def scooter(mesh,east,base,south,color):

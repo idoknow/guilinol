@@ -28,7 +28,7 @@ from pathlib import Path
 
 from c_kit import (
     Builder, arch_wall, box, cylinder, ensure_textures, export_landmark, solid,
-    extrude, grille, hip_roof, railing, ramp, stairs, tri_count, ramp, yaw_box, segment_wall, tube, _canopy,
+    extrude, grille, garden_gate_roof, hip_roof, railing, ramp, stairs, tri_count, yaw_box, segment_wall, tube, _canopy,
 )
 
 
@@ -118,21 +118,23 @@ def courtyard(builder, deck):
             corners=[(east,front),(east+2,front),(east+2,front-2),(east,front-2)]
             wall.face([(xx,.54+max(0,-zz-10)*.092,zz) for xx,zz in corners],(0,1,0),'granite',None)
     # North-facing gate and the west return of the garden enclosure (IMG_1306).
-    segment_wall(wall,(-31,-2.5),(-31,14),0,2.8,.55,'brick')
+    segment_wall(wall,(-31,-2.5),(-31,14),0,2.8,.60,'gate_plaster')
     segment_wall(wall,(-31,-2.5),(-31,14),2.8,3.07,.82,'graytile')
     if builder.collide:
-        segment_wall(builder.hit,(-31,-2.5),(-31,14),0,3.07,.55,'ashlar')
-    for left,right in ((-31,-30),(-27,-23)):
-        segment_wall(wall,(left,-2.5),(right,-2.5),0,2.6,.55,'brick')
-        segment_wall(wall,(left,-2.5),(right,-2.5),2.6,2.9,.78,'graytile')
+        segment_wall(builder.hit,(-31,-2.5),(-31,14),0,3.07,.60,'ashlar')
+    # Masonry jambs bond into the two returns; the woodwork lines the opening.
+    for left,right in ((-33.2,-29.58),(-27.42,-22.3)):
+        segment_wall(wall,(left,-2.5),(right,-2.5),0,2.92,.60,'gate_plaster')
+        segment_wall(wall,(left,-2.5),(right,-2.5),2.92,3.13,.80,'graytile')
         if builder.collide:
-            segment_wall(builder.hit,(left,-2.5),(right,-2.5),0,2.9,.55,'ashlar')
-    for post in (-30,-27):
-        box(wall,(post,1.78,-2.5),(.60,3.56,1.16),'wood')
-        if builder.collide:
-            box(builder.hit,(post,1.78,-2.5),(.60,3.56,1.16),'ashlar')
-    box(wall,(-28.5,3.32,-2.5),(3.7,.48,1.24),'wood')
-    hip_roof(wall,(-28.5,-2.5),3.55,4.3,2.24,1.05,.58,.18,'graytile','wood')
+            segment_wall(builder.hit,(left,-2.5),(right,-2.5),0,3.13,.60,'ashlar')
+    for jamb in (-30.04,-26.96):
+        box(wall,(jamb,1.78,-2.5),(.92,3.56,.76),'gate_plaster')
+    for post in (-29.52,-27.48):
+        box(wall,(post,1.76,-2.87),(.20,3.52,.32),'wood')
+    box(wall,(-28.5,3.36,-2.53),(3.98,.40,.78),'gate_plaster')
+    box(wall,(-28.5,3.13,-2.87),(2.30,.22,.32),'wood')
+    garden_gate_roof(wall,(-28.5,-2.5),3.59,4.52,1.68,.48)
     stairs(wall,(-28.5,.13,-6.2),(-28.5,.68,-2.7),3.35,4,'ashlar')
     if builder.collide:
         ramp(builder.hit,(-28.5,.13,-6.2),(-28.5,.68,-2.7),3.35)
@@ -250,6 +252,14 @@ def main():
     image = ensure_textures(folder)
     signs(image)
     stone_cells(image)
+    RECTS['gate_plaster'] = (768,640,62,126)
+    patch = ImageDraw.Draw(image)
+    patch.rectangle((768,640,829,765),fill='#b57563')
+    noise = random.Random(1306)
+    for _ in range(1900):
+        shade = noise.randint(-10,9)
+        patch.point((noise.randrange(768,830),noise.randrange(640,766)),
+                    fill=tuple(value+shade for value in (181,117,99)))
     slab_texture(image,896,896)
     RECTS['park_map'] = (640, 896, 256, 128)
     panel = Image.new('RGB', (256,128), '#efe8d4')

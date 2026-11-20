@@ -33,7 +33,7 @@ def pave(builder, ring, level):
             if part.area < .001:
                 continue
             coords = list(part.exterior.coords)[:-1]
-            vertices = [(a,level,b) for a,b in coords]
+            vertices = [(a,level(a,b) if callable(level) else level,b) for a,b in coords]
             uv = [(.005+.99*(a-x)/size,.005+.99*(b-z)/size) for a,b in coords]
             mesh.face(vertices,(0,1,0),'plaza_stone',uvs=uv)
             if builder.collide:
