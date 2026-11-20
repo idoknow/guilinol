@@ -16,6 +16,7 @@ from common import GRID, ll2xz, load_osm
 from features import area, points
 from navigation import return_trips
 from clearance import audit_routes, navigable_edges
+from cars import plan_cars
 
 
 def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), interchange=None):
@@ -25,7 +26,7 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
     xs = left + np.arange(cols)*GRID
     zs = top + np.arange(rows)*GRID
     obstacles = STRtree(buildings)
-    bikes, anchors, extras = [], {}, []
+    placed, groups, anchors, extras = [], [], {}, []
     lakes = {'桂湖', '木龙湖', '杉湖', '榕湖'}
     for el in load_osm():
         tags = el.get('tags', {})
@@ -66,9 +67,13 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
                 ground, water = sample(east, south)
                 if bounds.contains(Point(east,south)) and water == -32768 and not obstacles.query(Point(east,south).buffer(1),predicate='intersects').size:
                     group.append([round(east,1),round(ground,1),round(south,1),round(math.atan2(-normal[0],-normal[1]),3),rng.randrange(4)])
-            if len(group)>=3 and all(math.hypot(group[0][0]-bike[0],group[0][2]-bike[2])>145 for bike in bikes):
-                bikes.extend(group)
+            if len(group)>=3 and all(math.hypot(group[0][0]-bike[0],group[0][2]-bike[2])>145 for bike in placed):
+                placed.extend(group)
+                groups.append(group)
             distance += rng.uniform(150,250)
+    bikes, bicycles = [], []
+    for idx, group in enumerate(groups):
+        (bicycles if idx % 3 == 2 else bikes).extend(group)
     if interchange is not None:
         origin,angle,bank_pavement=interchange
         transform=np.array([[math.cos(angle),math.sin(angle)],[-math.sin(angle),math.cos(angle)]])
@@ -125,7 +130,7 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
                     if node==nodes[start]:break
                     node=prev[node]
                 routes.append(dict(kind=kind,start=start,end=end,path=path[::-1]))
-    return dict(bikes=bikes,docks=docks,routes=routes,grid=[left,top,cols,rows,GRID],mask=base64.b64encode(np.packbits(mask).tobytes()).decode())
+    return dict(bikes=bikes,bicycles=bicycles,docks=docks,routes=routes,grid=[left,top,cols,rows,GRID],mask=base64.b64encode(np.packbits(mask).tobytes()).decode(),**plan_cars(bounds,surface,buildings,sample,placed,docks,interchange=interchange))
 
 
 def write_vehicles(output,data,triangles):

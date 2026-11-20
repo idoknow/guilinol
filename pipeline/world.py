@@ -270,7 +270,14 @@ def build(bbox, output, palette):
         if isinstance(fl, dict) and 'elevation' in fl and entry['id'] in ('zhengyang', 'dongxixiang', 'jingjiang'):
             return round(max(gm_y, float(fl['elevation'])), 2)
         return round(gm_y, 2)
-    landmarks = [dict(position=[x, lm_elevation(x, z, entry), z], **entry) for x, z, entry in layout.entries]
+    landmarks = []
+    for x, z, entry in layout.entries:
+        lm_y = lm_elevation(x, z, entry)
+        item = dict(position=[x, lm_y, z], **entry)
+        if entry['id'] == 'guilin_theater':
+            from landmarks.guilin_theater import OSM_WORLD_PTS
+            item['solid'] = [[round(lm_y - 6.5, 2), round(lm_y + 12.6, 2), [[round(px, 2), round(pz, 2)] for px, pz in OSM_WORLD_PTS]]]
+        landmarks.append(item)
     landmark_faces = list(landmark_triangles(landmarks))
     vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange)
     decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal)

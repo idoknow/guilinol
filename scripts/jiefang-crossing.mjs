@@ -38,8 +38,8 @@ try {
         }
         walk.drive(0,0)
       })
-      await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent.includes('骑行'))
-      await page.keyboard.press('e')
+      await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent.includes('骑电动车'))
+      await page.keyboard.press('f')
       assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'bike')
     }
     const result=await page.evaluate(([mode,ways])=>{

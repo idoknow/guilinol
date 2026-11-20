@@ -22,6 +22,7 @@ function prepare(mesh:THREE.Mesh, unique:boolean):Draw {
   if(instanced||!unique||!source||source.count<12000||geometry.groups.length)return draw
 
   // glTF primitives with different vertex attributes may share an index accessor.
+  geometry.userData.fullIndex=source.array
   const index=source.clone()
   geometry.setIndex(index)
   const original=source.array, positions=geometry.getAttribute('position')
