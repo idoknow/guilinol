@@ -15,6 +15,18 @@ SIDE_ROAD=(675174045,)
 FOOTWAYS=(1382486207,1382486209,1382486210,1382486211,1382486212,1382487357)
 UPPER=6.26
 LOWER=.96
+BANK_LIMIT=140
+
+
+def site_limit(way):
+    return BANK_LIMIT if way in LOWER_ROADS else 120
+
+
+def promenade_offset(z):
+    # Offset of the tactile strip from Binjiang's axis. The four gate groups
+    # sit on the wider riverside pavement, which tapers at both native seams.
+    return np.interp(z, [-BANK_LIMIT,-133,-108,-75,-53,-41,36,49,72,104,129,BANK_LIMIT],
+                     [5.4,10.4,10.1,9.05,8.75,5.4,5.4,7.46,8.14,7.9,7.5,5.4])
 
 
 def section(way):
@@ -29,6 +41,14 @@ def section(way):
     mid=normals[:-1]+normals[1:]
     mid/=np.sum(mid*normals[:-1],axis=1)[:,None]
     edges=np.vstack([normals[0],mid,normals[-1]])
+    if way in LOWER_ROADS:
+        # Both ways must use the same miter at the shared OSM node,
+        # including the outer edge of the widened pavement.
+        south,north=(OSM[w] for w in LOWER_ROADS)
+        legs=np.array([south[-1]-south[-2],north[1]-north[0]])
+        legs/=np.linalg.norm(legs,axis=1)[:,None]
+        joint=legs[:,::-1]*[-1,1]
+        edges[-1 if way==LOWER_ROADS[0] else 0]=joint.sum(axis=0)/(1+joint[0]@joint[1])
     along=np.r_[0,np.cumsum(lengths)]
     # Short level landings merge into the receiving carriageways.
     top_first=way in (RAMPS[0],RAMPS[3])
@@ -67,7 +87,11 @@ def widths(way):
         return -native-(6-native)*blend,native+(9.85-native)*blend,3.
     if way in SIDE_ROAD:return -3.,3.,0.
     # Binjiang's OSM way runs north: its river-side pavement is on the right.
-    if way in LOWER_ROADS:return -3.6,3.6,3.6
+    if way in LOWER_ROADS:
+        z=section(way)[0][:,1]
+        offset=promenade_offset(z)
+        rail_margin=1.8+.55*np.clip((offset-5.4)/2,0,1)
+        return -3.6,3.6,offset+rail_margin-3.6
     return -1.35,1.35,0.
 
 # River span carriageways and cycleways connect to the modeled west approaches.
@@ -114,10 +138,11 @@ def grade_banks(terrain,original,wet,left,top,step,anchor,angle,datum):
     for way in RAMPS+UPPER_ROADS+LOWER_ROADS+SIDE_ROAD+FOOTWAYS:
         xy,_,_,y=section(way)
         l,r,w=widths(way)
-        radius=max(np.max(-l),np.max(r)+w)
-        for a,b,h0,h1 in zip(xy,xy[1:],y,y[1:]):
+        radius_at=np.broadcast_to(r+w if way in LOWER_ROADS else max(np.max(-l),np.max(r)+w),len(xy))
+        for i,(a,b,h0,h1) in enumerate(zip(xy,xy[1:],y,y[1:])):
             dx,dz=b-a
             t=np.clip(((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz),0,1)
+            radius=radius_at[i]+t*(radius_at[i+1]-radius_at[i])
             dist=np.hypot(x-a[0]-t*dx,z-a[1]-t*dz)
             level=datum+h0+t*(h1-h0)-.20+np.maximum(0,dist-radius-2)*.40
             limit=np.where(dist<radius+18,np.minimum(limit,level),limit)
@@ -136,7 +161,7 @@ def grade_banks(terrain,original,wet,left,top,step,anchor,angle,datum):
         xy,_,_,levels=section(way)
         for end,neighbor in ((0,1),(-1,-2)):
             p=xy[end]
-            if abs(p[0]+265)>.01 and abs(abs(p[1])-120)>.01:continue
+            if abs(p[0]+265)>.01 and abs(abs(p[1])-site_limit(way))>.01:continue
             direction=p-xy[neighbor];direction/=np.linalg.norm(direction)
             dx,dz=x-p[0],z-p[1]
             station=dx*direction[0]+dz*direction[1]

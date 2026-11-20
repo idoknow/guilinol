@@ -7,7 +7,7 @@ import math
 import numpy as np
 import trimesh
 from jiefang_materials import generate_bridge
-from jiefang_layout import LOWER, deck_level, section, widths
+from jiefang_layout import LOWER, deck_level, section, LOWER_ROADS, promenade_offset
 from jiefang_roads import interchange, surface, vertex
 
 
@@ -155,11 +155,15 @@ def lamp_post(model,x,side):
 
 
 def west_bank(model):
-    way=1531308428
-    xy,n,chain,_=section(way)
-    _,kerb,width=widths(way)
-    sidewalk=xy+n*(kerb+width/2)
-    bridge_station=np.interp(0,xy[::-1,1],chain[::-1])
+    south,north=(section(way) for way in LOWER_ROADS)
+    xy=np.vstack((south[0][:-1],north[0]))
+    n=np.vstack((south[1][:-1],north[1]))
+    strip_offset=promenade_offset(xy[:,1])
+    sidewalk=xy+n*strip_offset[:,None]
+    chain=np.r_[0,np.cumsum(np.linalg.norm(np.diff(sidewalk,axis=0),axis=1))]
+    def station_at(z):
+        return np.interp(z,sidewalk[::-1,1],chain[::-1])
+    bridge_station=station_at(0)
 
     def sidewalk_pose(distance,height):
         station=bridge_station+distance
@@ -167,7 +171,9 @@ def west_bank(model):
         fraction=(station-chain[i])/(chain[i+1]-chain[i])
         tangent=sidewalk[i+1]-sidewalk[i]
         x,z=sidewalk[i]+fraction*tangent
-        return x,LOWER+.12+height-deck_level(x),z,math.atan2(tangent[0],-tangent[1])
+        # Use the shore normal even where the tactile strip shifts sideways.
+        normal=n[i]+fraction*(n[i+1]-n[i])
+        return x,LOWER+.12+height-deck_level(x),z,math.atan2(normal[1],normal[0])
 
     def landing(start,end,height):
         # Include every OSM bend so the kerb and parapet stay outside the steps.
@@ -177,7 +183,7 @@ def west_bank(model):
             points=sidewalk+n*offset
             xs,zs=(np.interp(stations,chain,axis) for axis in points.T)
             return np.array([vertex((x,z),LOWER+level) for x,z in zip(xs,zs)])
-        left,right=edge(-1.73,.12+height),edge(1.73,.12+height)
+        left,right=edge(-1.88,.12+height),edge(1.88,.12+height)
         surface(model,left,right,'stone')
         for rim in (left,right,[left[0],right[0]],[left[-1],right[-1]]):
             rim=np.asarray(rim)
@@ -187,16 +193,11 @@ def west_bank(model):
     for side,tone in ((-1,'violet'),(1,'jade')):
         # Station increases northwards. Each landing serves three portals,
         # with three risers at each end and space between landings for crossings.
-        for middle,spacing in ((34.5,4.25),(70,6.5)):
-            half=spacing+1.15
-            center=-side*middle
+        spacing=10.95
+        for z in ((-64.10,-118.50) if side<0 else (61.65,115.74)):
+            center=station_at(z)-bridge_station
             model.pose=(0,0,0,0)
-            lo,hi=center-half,center+half
-            # Trim the bridge-facing lip to keep all three treads outside the
-            # surveyed stair-exit pavement, including at the south sidewalk bend.
-            if middle==34.5:
-                if center<0: hi-=.22
-                else: lo+=.22
+            lo,hi=center-spacing-1.15,center+spacing+1.15
             landing(lo,hi,.45)
             for end,edge in ((-1,lo),(1,hi)):
                 for step in (2,1):
@@ -231,9 +232,11 @@ def west_bank(model):
         model.box(-143,4.3,side*12,.48,1.23,.4,'sign')
         model.box(-143.26,5.12,side*12,.08,.25,.25,'red')
         # The crossing and its signal occupy the opening between the two triples.
-        model.pose=sidewalk_pose(-side*45,0)
-        for offset in np.arange(-3,4):
-            model.box(-kerb-width/2+offset,-.095,0,.48,.025,3.4,'white')
+        crossing=station_at(-93.8 if side<0 else 91.0)
+        model.pose=sidewalk_pose(crossing-bridge_station,0)
+        road_offset=np.interp(crossing,chain,strip_offset)
+        for stripe in np.arange(-3,4):
+            model.box(-road_offset+stripe,-.095,0,.48,.025,3.4,'white')
         model.beam([-1.45,0,2.25],[-1.45,5.4,2.25],.14,'granite')
         model.box(-1.45,4.15,2.25,.42,1.25,.42,'sign')
         model.box(-1.69,5,2.25,.09,.28,.28,'knot')

@@ -15,7 +15,7 @@ from shapely import STRtree, intersects_xy
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
-from landmarks.jiefang_layout import LOWER_ROADS, SPAN_WAYS, deck_level, world_road_sections
+from landmarks.jiefang_layout import site_limit, LOWER_ROADS, SPAN_WAYS, deck_level, world_road_sections
 from common import CHUNK, GRID, load_osm
 from features import points, rongyin_sidewalk
 from road_profile import RULES
@@ -562,7 +562,7 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
                 # let the spline transition into its existing longitudinal grade.
                 pt = np.array(line.coords[i])
                 local = (pt - anchor) @ np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
-                if min(abs(local[0] + 265), abs(abs(local[1]) - 120)) < .01:
+                if min(abs(local[0] + 265), abs(abs(local[1]) - site_limit(way))) < .01:
                     outward = pt - line.coords[1 if i == 0 else -2]
                     outward /= np.linalg.norm(outward)
                     native = LineString(osm_ways[way][0])
