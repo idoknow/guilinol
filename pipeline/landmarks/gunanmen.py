@@ -6,12 +6,12 @@ from PIL import Image, ImageDraw
 from c_kit import RECTS, ATLAS, _font, landmark_surface
 from rong_paving import slab_texture
 from rong_street import shops, signs, approach
-from rong_solids import loft, oval, banyan as solid_tree, align_front
+from rong_solids import oval, banyan as solid_tree, align_front
 from pathlib import Path
 
 from c_kit import (
     Builder, arch_wall, box, cylinder, ensure_textures, export_landmark, solid,
-    grille, garden_gate_roof, hip_roof, railing, ramp, tri_count, segment_wall,
+    grille, garden_gate_roof, hip_roof, railing, ramp, tri_count, segment_wall, tube, extrude,
 )
 
 
@@ -49,6 +49,29 @@ def stone_cells(image):
         image.paste(tile,(left,top))
 
 
+    # Large irregular blocks across the lake facade. Paint fine joints at
+    # triple resolution before filtering into the existing atlas cell.
+    stone = Image.new('RGB',(960,384),'#77766e')
+    brush = ImageDraw.Draw(stone)
+    row = 0
+    while row<384:
+        height=rng.randrange(15,26)
+        x=-rng.randrange(38)
+        while x<960:
+            width=rng.randrange(15,34)
+            tone=rng.randrange(113,174)
+            brush.polygon([(x+2,row+1),(x+width-3,row+1),
+                           (x+width-1,row+height-3),(x+width-5,row+height-1),
+                           (x+2,row+height-2)],fill=(tone,tone-1,tone-7))
+            for _ in range(width*height//8):
+                px,py=x+rng.randrange(2,width-2),row+rng.randrange(2,height-2)
+                grain=tone+rng.randrange(-30,20)
+                brush.ellipse((px,py,px+2,py+2),fill=(grain,grain-1,grain-6))
+            x+=width
+        row+=height
+    image.paste(stone.resize((320,128),Image.Resampling.LANCZOS),(0,896))
+
+
 def ancient_banyan(builder, east, south):
     wood = builder.parts['atlas']
     iron = builder.parts['steel']
@@ -63,22 +86,6 @@ def ancient_banyan(builder, east, south):
 
 def courtyard(builder, deck):
     wall = builder.parts['atlas']
-    for center in (-6.5, 6.5):
-        count = 28 if builder.detail else 16
-        for index in range(count):
-            angles=[step*math.tau/count for step in (index,index+1)]
-            foot=[(center+3.75*math.cos(angle),7.9+3.45*math.sin(angle)) for angle in angles]
-            head=[(center+2.35*math.cos(angle),7.9+2.1*math.sin(angle)) for angle in angles]
-            points=[(east,level,south) for (east,south),level in zip([*foot,*reversed(head)],(0,0,deck,deck))]
-            if builder.collide:
-                builder.hit.face(points,(math.cos(sum(angles)/2),0,math.sin(sum(angles)/2)),'ashlar')
-            start=.005+.99*index/count; end=.005+.99*(index+1)/count
-            wall.face(points,(math.cos(sum(angles)/2),0,math.sin(sum(angles)/2)),'coursed',uvs=[(start,.99),(end,.99),(end,.01),(start,.01)])
-        cap = [(center+2.35*math.cos(step*math.tau/count),deck-.015,
-                7.9+2.1*math.sin(step*math.tau/count)) for step in range(count)]
-        wall.face(cap,(0,1,0),'granite')
-        if builder.collide:
-            builder.hit.face(cap,(0,1,0),'ashlar')
     solid_tree(wall, (7.2, deck, 6.7), 5.6, 3.2, 82, builder.detail,lobed=False)
     for offset in (-4.5, -1.5, 1.5, 4.5):
         cylinder(wall, (offset, deck + 2.66, 7.6), .24, .45, 'vermilion', 8)
@@ -171,6 +178,92 @@ def west_hall(b):
                 grille(wall,x,deck+1.55,z,1.4,2.15,'lattice',3,depth=.13)
 
 
+def south_stair(b, deck):
+    wall = b.parts['atlas']
+    start, end, z, width = -21.4, -6.0, 10.7, 2.9
+    count = 40 if b.detail else 20
+    first = len(wall.pos)
+    for i in range(count):
+        x = start + (end-start)*(i+.5)/count
+        height = deck*(i+1)/count
+        box(wall,(x,height/2,z),((end-start)/count,height,width),'coursed',None)
+    # The upper landing returns north onto the terrace through a break in its rail.
+    for mesh in ([wall,b.hit] if b.collide else [wall]):
+        box(mesh,(end+1.3,deck/2,10.40),(2.6,deck,3.5),'coursed',None)
+    left,top,w,h = RECTS['coursed']
+    for i in range(first,len(wall.pos)):
+        x,y,zp = wall.pos[i]
+        if abs(wall.nrm[i][2])>.9:
+            wall.uv[i]=((left+1+(w-2)*(x-start)/33)/ATLAS,
+                        1-(top+1+(h-2)*(1-y/deck))/ATLAS)
+    if b.collide:
+        ramp(b.hit,(start,0,z),(end,deck,z),width)
+    outside = z+width/2-.13
+    for i in range(11):
+        x = start + (end-start)*i/10
+        y = deck*i/10
+        box(wall,(x,y+.45,outside),(.24,.90,.24),'ashlar',None)
+    for rise in (.36,.86):
+        tube(wall,(start,rise,outside),(end,deck+rise,outside),.10,'ashlar',8)
+    railing(wall,(end,outside),(end+2.45,outside),deck,.89,'ashlar',1.2,stone=True)
+    railing(wall,(end+2.45,outside),(end+2.45,8.6),deck,.89,'ashlar',1.2,stone=True)
+    # IMG_1313: the green coping obscures the bottom half of the flight.
+    for mesh in ([wall,b.hit] if b.collide else [wall]):
+        box(mesh,(-17,1.65,12.55),(15.6,3.3,.46),'courtstone',None)
+    box(wall,(-17,3.35,12.55),(15.8,.16,.76),'glaze',None)
+    if b.detail:
+        for i in range(65):
+            x=-24.85+i*.245
+            for sign in (-1,1):
+                tube(wall,(x,3.52,12.55),(x,3.39,12.55+sign*.39),.057,'glaze',6)
+    tube(wall,(-24.9,3.47,12.55),(-9.1,3.47,12.55),.12,'glaze',8)
+
+
+def north_planter(b, north):
+    wall = b.parts['atlas']
+    center = north-2.1
+    # Capsule-shaped plan with a long straight crown and two semicircular ends.
+    def ring(radius):
+        outline = []
+        for x,angle in ((-21.6,math.pi/2),(-2.95,-math.pi/2)):
+            for i in range(13):
+                theta = angle+math.pi*i/12
+                outline.append((x+radius*math.cos(theta),center+radius*math.sin(theta)))
+            # Subdivide the straight shoulder at the same leaf-texture scale as the ends.
+            first = outline[-1]
+            other = -2.95 if x==-21.6 else -21.6
+            outline.extend((first[0]+(other-first[0])*j/24,first[1]) for j in range(1,24))
+        return outline
+    extrude(wall,ring(1.32)[::-1],0,.50,'granite',None)
+    extrude(wall,ring(1.20)[::-1],.50,.93,'groundcover',None)
+    if b.collide:
+        extrude(b.hit,ring(1.30)[::-1],0,1.20,'granite',None)
+    # Shrub crown rises from its broad shoulders to a narrow rounded top.
+    def crown_point(x,z,y):
+        ripple=.035*math.sin(1.7*x)+.024*math.cos(3*x+2*z)
+        return (x,y+ripple,z)
+    profiles = [(.88,1.00),(1.15,1.08),(1.38,.93),(1.54,.65),(1.61,.18)]
+    for (y0,r0),(y1,r1) in zip(profiles,profiles[1:]):
+        lower,upper = ring(r0),ring(r1)
+        for i,a in enumerate(lower):
+            j=(i+1)%len(lower)
+            c=lower[j]
+            wall.face([crown_point(*a,y0),crown_point(*c,y0),crown_point(*upper[j],y1),
+                       crown_point(*upper[i],y1)],(c[1]-a[1],.1,a[0]-c[0]),'hedge',None)
+    # Close the narrow crest in short strips, following the clipped foliage.
+    crown=ring(.18)
+    for i in range(12):
+        for idx in (i,36+i):
+            a,c=crown[idx],crown[idx+1]
+            x=-21.6 if idx<12 else -2.95
+            wall.face([crown_point(*a,1.61),crown_point(*c,1.61),crown_point(x,center,1.63)],(0,1,0),'hedge')
+    for i in range(24):
+        a,c=crown[12+i],crown[13+i]
+        wall.face([crown_point(*a,1.61),crown_point(*c,1.61),
+                   crown_point(c[0],center+.18,1.61),crown_point(a[0],center+.18,1.61)],
+                  (0,1,0),'hedge')
+
+
 def gate(b: Builder):
     wall = b.parts['atlas']
     detail = b.detail
@@ -178,15 +271,36 @@ def gate(b: Builder):
     courtyard(b, deck)
     # The northern portal narrows at the plaza. Both openings lead into
     # the same vaulted passage. Duplicate the profile in the collision mesh.
-    north, south, west, east = -4.2, 8.7, -23.0, 8.4
+    north, south, west, east = -4.2, 11.85, -23.0, 8.4
+    stair_back = 8.7
+    portal_half = 3.4
     wall_start = len(wall.pos)
+    radius = 3.6
+    tangent = east-radius
+    curve = [(tangent+radius*math.sin(math.pi*i/24),
+              south-radius+radius*math.cos(math.pi*i/24)) for i in range(13)]
     for mesh in ([wall, b.hit] if b.collide else [wall]):
+        start = len(mesh.pos)
         for low, high, opening, crown in ((north, north+.8, 2.6, 3.4),
                                           (north+.8, south, 3.6, 4.6)):
-            arch_wall(mesh, (0, 0, (low+high)/2), 16.8, deck, high-low,
+            arch_wall(mesh, (0, 0, (low+high)/2), 2*portal_half, deck, high-low,
                       opening, crown, 'coursed', 12 if detail else 6, tile=None)
-        box(mesh, ((west-east)/2, deck/2, (north+south)/2),
-            (-east-west, deck, south-north), 'coursed', None)
+        box(mesh, ((west-portal_half)/2,deck/2,(north+stair_back)/2),
+            (-portal_half-west,deck,stair_back-north),'coursed',None)
+        # Slice the east return into strips so the stone UVs and the top
+        # remain continuous around the single quarter-round corner.
+        for (x0,z0),(x1,z1) in zip([(portal_half,south),*curve],curve):
+            extrude(mesh,[(x0,z0),(x1,z1),(x1,north),(x0,north)],0,deck,'coursed',None)
+        left,top,w,h = RECTS['coursed']
+        for i in range(start,len(mesh.pos)):
+            x,y,z = mesh.pos[i]
+            if mesh is wall and (z>=south-radius-.01 or x>=east-.01) and abs(mesh.nrm[i][1])<.01:
+                run = x-west+max(0,south-z)
+                mesh.uv[i]=((left+1+(w-2)*run/(east-west+south-north))/ATLAS,
+                            1-(top+1+(h-2)*(1-y/deck))/ATLAS)
+            # Batter the southern face 0.75 m over its height, leaving the
+            # northern facade fixed. The arch and its jambs follow that plane.
+            mesh.pos[i]=(x,y,z+.75*(1-y/deck)*(z-north)/(south-north))
     # Project the north-facing stone courses through the arch spandrel.
     # Faces in the vault retain the clean masonry texture.
     left, top, width, height = RECTS['ivywall']
@@ -196,12 +310,8 @@ def gate(b: Builder):
             u = (x-west)/(east-west)
             wall.uv[i] = ((left+1+(width-2)*u)/ATLAS,
                           1-(top+1+(height-2)*(1-y/deck))/ATLAS)
-    # The low clipped hedge fronts the western half. The passage remains open.
-    box(wall, (-13,.22,north-1.1), (17,.44,1.8), 'coursed', None)
-    loft(wall,[(-13,.43,north-1.1,8.3,.85),(-13,1.20,north-1.1,8.6,1.02),
-               (-13,1.47,north-1.1,8.1,.86)],'hedge',28 if detail else 14)
-    if b.collide:
-        box(b.hit,(-13,.6,north-1.1),(16,1.2,1.5),'ashlar')
+    north_planter(b,north)
+    south_stair(b,deck)
     # Gatehouse: yellow hall, vermilion colonnade, gray xieshan, stone rail on the terrace.
     box(wall, (0, deck + 1.55, 1.65), (11.8, 3.1, 7.25), 'yellow', 1.6)
     box(wall, (-6.05, deck + 1.55, 4.5), (0.42, 3.1, 4.6), 'yellow', 1.4)
@@ -219,14 +329,20 @@ def gate(b: Builder):
     # Open door leaves rest against the interior returns of the southern portal.
     for side in (-1, 1):
         box(wall, (side*1.72,1.72,south-.9), (.12,3.44,1.65), 'door', None)
-    board(wall, 0, 5.55, south+.02, 4.8, 1.32, 'sign_gate')
+    # Follow the wall batter at both edges of the lintel plaque.
+    wall.face([(x,y,south+.75*(1-y/deck)+.025) for x,y in
+               [(-1.65,4.84),(1.65,4.84),(1.65,5.91),(-1.65,5.91)]],
+              (0,.11,1),'sign_gate',uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
     if detail:
         for x in (-4.5,-1.5,1.5,4.5):
             grille(wall,x,deck+1.45,-1.99,1.18,2.20,'lattice',3,depth=.11)
     spacing = 1.45 if detail else 2.9
-    corners = [(west+.3,north+.25),(east-.3,north+.25),
-               (east-.3,south-.25),(west+.3,south-.25)]
-    for a,c in zip(corners,corners[1:]+corners[:1]):
+    perimeter = [(-6.0,stair_back-.25),(west+.3,stair_back-.25),(west+.3,north+.25),
+                 (east-.3,north+.25)]
+    perimeter += [(tangent+(radius-.3)*math.sin(math.pi*i/6),
+                   south-radius+(radius-.3)*math.cos(math.pi*i/6)) for i in range(3,-1,-1)]
+    perimeter.append((-3.4,south-.3))
+    for a,c in zip(perimeter,perimeter[1:]):
         railing(wall,a,c,deck,.88,'white',spacing,stone=True)
 
 
@@ -244,12 +360,22 @@ def main():
         shade = noise.randint(-10,9)
         patch.point((noise.randrange(768,830),noise.randrange(640,766)),
                     fill=tuple(value+shade for value in (181,117,99)))
-    RECTS['hedge'] = (832,736,192,32)
-    patch.rectangle((832,736,1023,767),fill='#46512b')
-    for _ in range(2300):
-        x,z = noise.randrange(833,1022),noise.randrange(737,766)
-        tone = noise.randrange(-16,28)
-        patch.point((x,z),fill=(72+tone,83+tone,37+tone))
+    RECTS['courtstone'] = (896,768,128,128)
+    patch.rectangle((896,768,1023,895),fill='#b4b1a4')
+    for row in range(18):
+        for col in range(-1,19):
+            x,y=896+col*8+(row%2)*4,768+row*7
+            shade=noise.randrange(156,188)
+            if x+6>=896 and x<=1023:
+                patch.rectangle((max(896,x),y,min(1023,x+6),min(895,y+5)),
+                                fill=(shade,shade-2,shade-10))
+    for name,top,base in [('hedge',768,(164,195,55)),('groundcover',832,(82,116,48))]:
+        RECTS[name] = (834,top+2,60,60)
+        patch.rectangle((832,top,895,top+63),fill=base)
+        for _ in range(2300):
+            x,z = noise.randrange(833,893),noise.randrange(top+1,top+61)
+            tone = noise.randrange(-31,31)
+            patch.ellipse((x,z,x+2,z+2),fill=tuple(value+tone for value in base))
     RECTS['park_map'] = (640, 896, 256, 128)
     panel = Image.new('RGB', (256,128), '#efe8d4')
     draw = ImageDraw.Draw(panel)

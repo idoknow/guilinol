@@ -38,7 +38,13 @@ try {
         if(probe.resets||probe.inHouse||probe.inPeak||probe.renderClearance<-.15)throw Error(JSON.stringify(probe))
         if(target==='gunanmen'){
           if(Math.abs(probe.foot-spawn.foot)>.6)throw Error('Walker left the gate passage')
-          hit = probe.z-spawn.z>18.5
+          hit = probe.z-spawn.z>21.5
+        }else if(target==='gunanmen-stairs'){
+          // Cross the landing, turn north through the rail opening and finish
+          // on the main deck, clear of both the stair ramp and its landing.
+          const along=(probe.x-spawn.x)*.893+(probe.z-spawn.z)*.451
+          if(along>=18.25)walk.drive(.451,-.893)
+          hit=Math.hypot(probe.x+1404.62,probe.z-116.54)<.65 && Math.abs(probe.foot-160.20)<.25
         }else hit ||= target==='gate'?spawn.z-probe.z>39:target==='shore'?probe.blockedWater&&!probe.wet:target==='deck'?probe.wet&&probe.deck!==undefined&&probe.foot>=probe.deck-.35&&!probe.blockedWater:probe.hits.includes(target)
         if(hit)break
       }
@@ -58,5 +64,6 @@ try {
   await fixture([-740,868],[0,0],6,'shore')
   // Start 4.8 m outside the northern opening, finish beyond the lake-side portal.
   await fixture([-1392.99,103.71],[-.451,.893],7,'gunanmen')
+  await fixture([-1422.40,110.92],[.893,.451],9,'gunanmen-stairs')
   assert.deepEqual(errors,[]);console.log('seconds',(performance.now()-start)/1000);assert(performance.now()-start<180000)
 }finally{await browser?.close();await server.close()}
