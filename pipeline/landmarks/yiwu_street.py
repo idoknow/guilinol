@@ -51,11 +51,28 @@ def palm(model, station, lateral=-11.2, height=10.2):
 
 
 def scooter(model, station, paint, lateral=-6.65):
-    for position in (lateral - 0.48, lateral + 0.48):
-        model.beam([station - 0.09, 0.28, position], [station + 0.09, 0.28, position], 0.21, 'tile', 8)
-    model.box(station, 0.32, lateral, 0.36, 0.24, 1.12, paint)
-    model.box(station, 0.56, lateral - 0.24, 0.38, 0.18, 0.58, 'sign')
-    model.box(station, 0.50, lateral + 0.48, 0.34, 0.46, 0.15, paint)
+    # Sweep the joined wheel, floorboard and seat profiles at their actual widths.
+    # Interior faces at the wheel/frame joint would split the bearing surface.
+    import shapely
+    from shapely.geometry import Point, box
+    rims = [Point(z,.28).buffer(.21,quad_segs=2) for z in (-.48,.48)]
+    body = box(-.56,.32,.56,.56).union(box(.405,.50,.555,.96))
+    seat = box(-.53,.56,.05,.74)
+    layers = [(0,.09,shapely.union_all([*rims,body,seat])),
+              (.09,.18,body.union(seat)),(.18,.19,seat)]
+    for index,(inner,outer,profile) in enumerate(layers):
+        following = layers[index+1][2] if index+1<len(layers) else None
+        cap = profile if following is None else profile.difference(following)
+        for sign in (-1,1):
+            for tri in shapely.constrained_delaunay_triangles(cap).geoms:
+                coords=list(tri.exterior.coords)[:3]
+                middle=tri.centroid
+                color='sign' if seat.covers(middle) else paint if body.covers(middle) else 'tile'
+                model.mesh([(station+sign*outer,y,lateral+z) for z,y in coords],[[0,1,2]],color)
+            for (z,y),(zz,yy) in zip(profile.exterior.coords,list(profile.exterior.coords)[1:]):
+                color='sign' if min(y,yy)>=.56 and max(z,zz)<.06 else paint if max(y,yy)>=.32 else 'tile'
+                model.mesh([(station+sign*x,h,lateral+d) for x,h,d in
+                            ((inner,y,z),(outer,y,z),(outer,yy,zz),(inner,yy,zz))],[[0,1,2],[0,2,3]],color)
 
 
 def directions_and_corner(model):
@@ -101,6 +118,7 @@ def directions_and_corner(model):
 
 
 def street(model):
+    model.fit_to_grade('yiwu_street')
     # West lakeside stone sidewalk & granite-pillared spearhead iron fence (IMG_1347)
     for station in range(-65, 86, 5):
         # Low natural kerb height (+0.13 m above carriageway, skirt down to -0.35 m)
@@ -156,6 +174,7 @@ def street(model):
     # High overarching camphor boughs in front of yiwu_old_house (trunks across street, high leafy canopy)
     for st in (58, 72):
         sphere = trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
+        model.beam([st,0,-6.4],[st,9.2,-5.5],.22,'wood',8,True)
         model.mesh(sphere.vertices * [4.5, 2.2, 4.2] + [st, 9.2, -5.5], sphere.faces, 'leaf')
 
     # Roadside scooters (including foreground row near 1350)
@@ -167,8 +186,6 @@ def street(model):
 
 
 if __name__ == '__main__':
-    stations = np.arange(-70, 101, 10)
-    heights = [158, 157.9, 158, 157.9, 157.7, 157.3, 157.3, 157, 156.9, 156.9, 157.2, 157.4, 157.6, 157.4, 157.1, 156.8, 156.7, 156.7]
     generate(
         'yiwu_street',
         street,
@@ -181,5 +198,4 @@ if __name__ == '__main__':
             green='#3e6c54',
             leaf='#3c5e36',
         ),
-        lift=lambda east: np.interp(east, stations, heights) - 157,
     )

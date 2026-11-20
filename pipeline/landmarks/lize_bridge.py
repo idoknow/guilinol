@@ -4,6 +4,11 @@ IMG_1354: keep both east-portal suspension tower columns unobstructed; low palm 
 import math
 import numpy as np
 from xiaoyao_tower import generate
+from c_kit import landmark_surface
+
+
+def deck_grade(station):
+    return 8.55 + np.minimum(.05*station, 2-.045*(station-40))
 
 
 def cable_height(station):
@@ -15,9 +20,11 @@ def cable_height(station):
 
 def towers(model, lateral):
     for station in (-40, 40):
-        for bottom, width, height in [(-4, 2.1, 6), (2, 1.5, 15), (17, 1.8, 0.4), (17.4, 1.5, 0.9)]:
+        foot = landmark_surface('lize_bridge').ground(station,lateral)-deck_grade(station)-.12
+        for bottom, width, height in [(foot, 2.1, 2-foot), (2, 1.5, 15), (17, 1.8, 0.4), (17.4, 1.5, 0.9)]:
             model.box(station, bottom, lateral, width, height, width, 'red', True)
         vertices = [(station + dx, 18.3, lateral + dz) for dx, dz in [(-0.95, -0.95), (0.95, -0.95), (0.95, 0.95), (-0.95, 0.95)]]
+        model.mesh(vertices, [[0,1,2],[0,2,3]], 'red')
         vertices.append((station, 19.8, lateral))
         model.mesh(vertices, [[0, 4, 1], [1, 4, 2], [2, 4, 3], [3, 4, 0]], 'red')
         model.box(station + 0.765, 2, lateral, 0.035, 15, 0.16, 'lamp')
@@ -33,13 +40,17 @@ def towers(model, lateral):
 
 
 def promenade(model, side):
-    for direction, outer_height in [(-1, 150.1), (1, 154.7)]:
-        inner = direction * 61.5
-        outer = direction * 74.5
-        height = outer_height - 146.6 - (8.55 + min(0.05 * outer, 2 - 0.045 * (outer - 40)))
-        corners = [(station, y, side * 9.6 + offset) for station, y in [(inner, 0.15), (outer, height)] for offset in (-1.9, 1.9)]
-        faces = [[0, 2, 3], [0, 3, 1]] if direction < 0 else [[0, 3, 2], [0, 1, 3]]
-        model.mesh(corners, faces, 'pave', True)
+    for direction in (-1,1):
+        inner=direction*61.5
+        outer=direction*74.5
+        corners=[]
+        for station in (inner,outer):
+            for offset in (-1.9,1.9):
+                z = side*9.6+offset
+                y = .15 if station==inner else landmark_surface('lize_bridge').ground(station,z)-deck_grade(station)
+                corners.append((station,y,z))
+        faces=[[0,2,3],[0,3,1]] if direction<0 else [[0,3,2],[0,1,3]]
+        model.mesh(corners,faces,'pave',True)
     for start, end in [(-61.5, 40), (40, 61.5)]:
         center, length = (start + end) / 2, end - start
         model.box(center, -0.48, side * 9.6, length, 0.63, 3.8, 'pave', True)
@@ -74,6 +85,7 @@ def bridge(model):
         model.box(side * 60.0 + 0.23, 4.98, side * 8.55, 0.04, 0.21, 0.21, 'red')
 
     # IMG_1354 foreground left: low manicured shrub bed + compact palm inside left FOV edge
+    model.ground_offset = lambda x,z: landmark_surface('lize_bridge').ground(x,z)-deck_grade(x)+1.56
     model.box(69.5, -1.6, 12.6, 8.5, 1.25, 2.2, 'leaf')
     palm_base = np.array([69.2, -0.5, 12.8])
     model.beam(palm_base.tolist(), (palm_base + [0, 2.6, 0]).tolist(), 0.22, 'wood', 7)
@@ -95,5 +107,5 @@ if __name__ == '__main__':
         bridge,
         smooth=('red',),
         colors=dict(red='#d4733a', green='#bc5140', yellow='#d79547', earth='#a76358', granite='#828484', leaf='#3b5b35'),
-        lift=lambda east: 8.55 + np.minimum(0.05 * east, 2 - 0.045 * (east - 40)),
+        lift=deck_grade,
     )

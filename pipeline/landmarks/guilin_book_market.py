@@ -540,7 +540,7 @@ def _build_universal_hotel(b: SceneBuilder):
     cornice_top = 27.85   # Cantilevered 8F illuminated roof cornice
 
     # 1. Exact OSM `way/675919397` 1F base extrusion (extended down to y=-4.60 m for IDOK-48 graded NE terrain; IoU=0.999 at y=+2.0m!)
-    b.prism(HOTEL_PTS, -4.60, y0 + 3.15 - (-4.60), 'dark_metal', cap_region='white_wall', tile=3.2, collide=True)
+    b.prism(HOTEL_PTS, -4.60, y0 + 3.15 - (-4.60), 'dark_metal', cap_region='white_wall', tile=3.2, collide=True,footing=True)
     # Split L-compound above y = 3.15 m to match real-world heights in photos #52, #53 & #55:
     # - SW annex wing behind school gate rises to 2 storeys (`h = 7.20 m` white stucco, leaving open sky above '公為下天'!)
     hotel_west_annex = [(-14.46, -59.25), (-19.73, -41.64), (1.60, -35.35), (5.36, -53.41)]
@@ -586,7 +586,7 @@ def _build_universal_hotel(b: SceneBuilder):
             if b.detail:
                 # Prominent 0.26 m wide 3D vertical warm-gold uplight channel strip (`lit=True`, photo 55!)
                 ux_strip = -seg / 2.0 + k * pitch
-                b.box(ux_strip, podium_top + 0.05, 0.20, 0.26, tower_top - podium_top - 0.10, 0.24, 'warm_glow', lit=True)
+                b.box(ux_strip, podium_top + 0.05, 0.20, 0.26, tower_top - podium_top - 0.10, 0.5, 'warm_glow', lit=True)
             for fl in range(6):
                 fy = podium_top + fl * 3.30
                 warm_rm = b.detail and ((e_idx == 1 and fl in (1, 4)) or (e_idx == 0 and k == n_bays - 1 and fl == 3))
@@ -595,7 +595,7 @@ def _build_universal_hotel(b: SceneBuilder):
                 else:
                     b.box(bx, fy + 0.8, 0.35, pitch * 0.8, 1.8, 0.65, 'hotel_glass', tile=2.0)
         if b.detail:
-            b.box(seg / 2.0 - 0.12, podium_top + 0.05, 0.20, 0.26, tower_top - podium_top - 0.10, 0.24, 'warm_glow', lit=True)
+            b.box(seg / 2.0 - 0.12, podium_top + 0.05, 0.20, 0.26, tower_top - podium_top - 0.10, 0.5, 'warm_glow', lit=True)
 
         b.restore_frame(p_f)
 
@@ -607,18 +607,19 @@ def _build_universal_hotel(b: SceneBuilder):
     seg_i = math.hypot(dx_i, dz_i)  # 9.32 m
     iz_f = b.set_frame(origin=((a_iz[0] + c_iz[0]) / 2.0, y0, (a_iz[1] + c_iz[1]) / 2.0), front_xz=(-dz_i, dx_i))
     # Deep dark-bronze modern canopy (`y = 2.95 .. 4.02 m`, strictly > y=2.0m!)
-    b.box(0.30, 2.95, 1.05, seg_i + 1.40, 1.05, 2.10, 'dark_metal', tile=2.0, collide=False)
+    b.box(0.30, 2.95, 1.05, seg_i + 1.40, 1.05, 2.10, 'dark_metal', tile=2.0, collide=False,bottom=True)
     # Bright glowing '鳥炭 · 六本' sign across the front fascia!
     b.sign_quad(0.60, 3.48, 2.13, 7.80, 0.96, 'sign_toritan', normal=(0, 0, 1), lit=True)
     # Warm glowing Japanese wood-lattice storefront & row of 5 hanging orange paper lanterns (`#55`!)
     b.box(0.60, 0.25, 0.22, 7.40, 2.65, 0.18, 'shop_interior', tile=1.8, lit=True)
     if b.detail:
         for lx_i in np.linspace(-2.2, 2.6, 5):
+            b.cylinder_y(float(lx_i),2.78,.20,1.55,.045,'dark_metal',sections=6)
             b.cylinder_y(float(lx_i), 2.38, 0.42, 1.55, 0.18, 'lantern_orange', sections=8, lit=True)
     # Dark vertical parking pylon sign 'P 环球国际酒店' on left side by alley mouth (`#55`!)
     lp_hp = b.xf((-4.60, 0.0, 2.55))
     py_hp = libin_street_base_y(ORIGIN_X + lp_hp[0], ORIGIN_Z + lp_hp[2]) + 0.18 - ORIGIN_Y - y0
-    b.box(-4.60, py_hp - 0.15, 2.55, 0.62, 2.40, 0.24, 'dark_metal', tile=1.0, collide=True)
+    b.box(-4.60, b.grade(-4.6,2.55)-.04, 2.55, 0.62, 2.40, 0.24, 'dark_metal', tile=1.0, collide=True)
     b.sign_quad(-4.60, py_hp + 1.13, 2.69, 0.56, 2.05, 'sign_hotel_p', normal=(0, 0, 1), lit=True)
     # Stepped granite entrance stairs beneath Toritan storefront down to graded NE sidewalk
     b.box(0.60, -2.80, 0.68, 8.20, 3.05, 1.15, 'granite', tile=1.8, collide=True)
@@ -640,12 +641,12 @@ def _build_yunman_and_south_ramp(b: SceneBuilder):
     y0 = -0.05  # Preserves ~153.25 m datum above ORIGIN_Y=153.30 m
 
     # 1. Exact Overture `c1096f2a` 5-storey commercial/hotel block (base extended to y=-5.20 m for graded NE ramp cut; IoU=1.000 at y=+2.0m!)
-    b.prism(YUNMAN_PTS, -5.20, y0 + 3.30 - (-5.20), 'dark_metal', cap_region='Yunman_wall', tile=3.2, collide=True)
+    b.prism(YUNMAN_PTS, -5.20, y0 + 3.30 - (-5.20), 'dark_metal', cap_region='Yunman_wall', tile=3.2, collide=True,footing=True)
     b.prism(YUNMAN_PTS, y0 + 3.30, 14.20, 'Yunman_wall', cap_region='granite', tile=3.6, collide=True)
     ym_f = b.set_frame(origin=(17.35, y0, 5.12), front_xz=(-19.73, -10.75))
     b.box(3.5, 4.10, 0.14, 13.8, 3.20, 0.20, 'hotel_glass', tile=2.2)
     b.box(4.8, 4.20, 0.22, 3.60, 2.90, 0.12, 'shop_interior', tile=1.8, lit=True)
-    b.box(3.5, 2.85, 0.78, 14.2, 0.92, 1.45, 'dark_metal', tile=2.0)
+    b.box(3.5, 2.85, 0.59, 14.2, 0.92, 1.86, 'dark_metal', tile=2.0)
     b.sign_quad(3.5, 3.32, 1.54, 11.8, 0.88, 'sign_yunman', normal=(0, 0, 1), lit=True)
     b.box(3.5, 0.20, 0.14, 12.6, 2.55, 0.14, 'shop_interior', tile=2.0, lit=True)
     b.restore_frame(ym_f)
@@ -664,7 +665,7 @@ def _build_yunman_and_south_ramp(b: SceneBuilder):
     # 2b. Continuous stone-brick & tactile-strip pedestrian terrace (`z_ramp in [-28.0, -15.0]`, strictly outside `258909978` outer wall!)
     b.draped_patch(
         ANCHOR_WORLD, -19.0, 13.5, -28.0, -15.0, 'ramp_paver', curb_region='granite',
-        lift=0.16, skirt=0.75, step=2.2, curb_edges=('+z', '+x', '-x'), curb_h=0.05, curb_w=0.22, collide=False,
+        lift=0.10, skirt=0.75, step=1.1, curb_edges=('+z', '+x', '-x'), curb_h=0.05, curb_w=0.22, collide=False,
     )
 
     # 2c. Continuous Bright-White Painted-Metal Guilin Mountain-Motif Guardrail (`山形白护栏`, photo #50, at `z_ramp = -15.35`!)
@@ -676,13 +677,13 @@ def _build_yunman_and_south_ramp(b: SceneBuilder):
             xm = 0.5 * (xa + xb)
             lpa = b.xf((xa, 0.0, z_rail))
             lpb = b.xf((xb, 0.0, z_rail))
-            ya = libin_terrain_y(ORIGIN_X + lpa[0], ORIGIN_Z + lpa[2]) + 0.17 - ORIGIN_Y
-            yb = libin_terrain_y(ORIGIN_X + lpb[0], ORIGIN_Z + lpb[2]) + 0.17 - ORIGIN_Y
+            ya = libin_terrain_y(ORIGIN_X + lpa[0], ORIGIN_Z + lpa[2]) + 0.10 - ORIGIN_Y
+            yb = libin_terrain_y(ORIGIN_X + lpb[0], ORIGIN_Z + lpb[2]) + 0.10 - ORIGIN_Y
             ym = 0.5 * (ya + yb)
             bay_len = xb - xa
 
             b.box(xa, ya, z_rail, 0.09, 1.02, 0.09, 'rail_white', tile=0.5, collide=True)
-            for r_off, r_h in ((0.92, 0.075), (0.18, 0.065)):
+            for r_off, r_h in ((0.92, 0.075), (0.12, 0.065)):
                 b.face([(xa, ya + r_off, z_rail + 0.035), (xb, yb + r_off, z_rail + 0.035),
                         (xb, yb + r_off + r_h, z_rail + 0.035), (xa, ya + r_off + r_h, z_rail + 0.035)],
                        (0, 0, 1), 'rail_white', tile=1.0)
@@ -706,7 +707,7 @@ def _build_yunman_and_south_ramp(b: SceneBuilder):
 
         # Traffic sign pole next to tree pit (photo #50!)
         lps = b.xf((-6.2, 0.0, -16.1))
-        ys_p = libin_terrain_y(ORIGIN_X + lps[0], ORIGIN_Z + lps[2]) + 0.17 - ORIGIN_Y
+        ys_p = libin_terrain_y(ORIGIN_X + lps[0], ORIGIN_Z + lps[2]) + 0.10 - ORIGIN_Y
         b.cylinder_y(-6.2, ys_p, 2.85, -16.1, 0.045, 'rail_white', sections=6)
         b.disc_z(-6.2, ys_p + 2.55, -16.1, 0.34, 0.05, 'granite', sections=12)
 
@@ -721,11 +722,11 @@ def _build_yunman_and_south_ramp(b: SceneBuilder):
 
     # 3. Traditional warm-lit square street lanterns on East granite plaza outside `SIDE_ROAD` (photos 51, 52, 55!)
     for lwx, lwz in ((-388.8, 68.0), (-394.6, 80.2)):
-        ly = libin_street_base_y(lwx, lwz) + 0.18 - ORIGIN_Y
+        ly = b.grade(lwx-ORIGIN_X,lwz-ORIGIN_Z)-.02
         lx, lz = lwx - ORIGIN_X, lwz - ORIGIN_Z
         b.cylinder_y(lx, ly, 4.35, lz, 0.08, 'pale_stone', sections=6)
-        b.box(lx, ly + 4.35, lz, 0.54, 0.72, 0.54, 'warm_glow', cap_region='dark_metal', lit=True)
-        b.box(lx, ly + 5.07, lz, 0.70, 0.14, 0.70, 'dark_metal', tile=0.8)
+        b.box(lx, ly + 4.35, lz, 0.54, 0.72, 0.54, 'warm_glow', cap_region='dark_metal', lit=True,bottom=True)
+        b.box(lx, ly + 5.07, lz, 0.70, 0.14, 0.70, 'dark_metal', tile=0.8,bottom=True)
 
 
 def build_guilin_book_market(b: SceneBuilder):

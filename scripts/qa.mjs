@@ -14,10 +14,10 @@ const steps = [
   'verify:walk:full',
   'verify:ride',
   'verify:tour',
-  'audit',
+  'audit:landmarks',
   'photo-match',
 ]
-const extraArgs = { audit: ['--', '--strict'], 'photo-match': ['--', '--all'] }
+const extraArgs = { 'audit:landmarks': ['--', '--strict'], 'photo-match': ['--', '--all'] }
 const env = { ...process.env, WALK_MAIN_ONLY: '0', QA_METRICS: '1' }
 const { scripts } = JSON.parse(await readFile('package.json'))
 const revision = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim()

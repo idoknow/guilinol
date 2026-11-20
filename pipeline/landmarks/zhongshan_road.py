@@ -38,6 +38,7 @@ from common import ll2xz, load_osm  # noqa: E402
 from features import points  # noqa: E402
 from road_profile import RULES, pair_carriageways, profile  # noqa: E402
 
+from c_kit import landmark_surface
 from nikoniko import Builder, export_landmark  # noqa: E402
 
 
@@ -86,15 +87,6 @@ EAST_YANGQIAO_675586420 = [
     (-14.86, 257.54), (-47.91, 221.97), (-48.81, 219.14), (-48.44, 216.04),
     (-46.64, 212.92),
 ]
-
-
-def _local_ground_y(z):
-    """Smooth transition from Shizijie 151.5 m (y=-2.3) north of z=-58 to 153.8 m (y=0)."""
-    if z >= -54.0:
-        return 0.0
-    if z <= -70.0:
-        return -2.3
-    return -2.3 * (-54.0 - z) / 16.0
 
 
 def _iter_lines(geom):
@@ -164,11 +156,11 @@ def _street_facade(m: Builder, p0, p1, nx_sign, y0, ground_h, total_h, wall_mat,
     fl_h = (total_h - ground_h - 1.05) / floors
     for i in range(bays + 1):
         lx = -length / 2.0 + i * bay_w
-        m.box(lx, -1.8, 0.20, 0.58, total_h + 1.8, 0.58, wall_mat, collide=True)
+        m.box(lx, -1.8, 0.20, 0.58, total_h + 1.8, 0.58, wall_mat, collide=True, footing=True)
         if i < bays:
             cx = lx + bay_w / 2.0
-            m.box(cx, 0.12, -0.04, bay_w - 0.68, 3.05, 0.20, 'glass')
-            m.box(cx, 0.12, 0.08, 0.14, 2.95, 0.14, 'dark')
+            m.box(cx, 0.12, -0.04, bay_w - 0.68, 3.05, 0.20, 'glass', footing=True)
+            m.box(cx, 0.12, 0.08, 0.14, 2.95, 0.14, 'dark', footing=True)
             if canopy:
                 m.box(cx, 3.08, 0.78, bay_w - 0.36, 0.15, 1.45, 'alum')
             m.box(cx, 3.32, 0.28, bay_w - 0.58, 0.88, 0.24, 'dark')
@@ -182,7 +174,7 @@ def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie'):
     """Guilin Zhongshan Road modern transit bus shelter + CJK station totem."""
     # Local +X of pose points toward carriageway; local +Z runs along sidewalk.
     m.pose = (x, y0, z, yaw)
-    m.box(0, -0.4, 0, 2.5, 0.48, 11.2, 'pave', collide=True)
+    m.box(0, -0.4, 0, 2.5, 0.48, 11.2, 'pave', collide=True, footing=True)
     for sz in (-4.6, -1.5, 1.5, 4.6):
         m.beam([-0.82, 0.08, sz], [-0.82, 2.95, sz], 0.08, 'bronze', sections=6, collide=True)
     m.box(0.05, 2.95, 0, 2.65, 0.16, 11.2, 'alum')
@@ -190,6 +182,8 @@ def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie'):
 
     # Back route-map & transit lightboxes facing +X toward waiting passengers
     for sz, col in ((-3.1, 'blue'), (0.0, 'white'), (3.1, 'red')):
+        for sign in (-1,1):
+            m.box(-.82,.08,sz+sign*.92,.14,2.34,.13,'bronze')
         m.box(-0.78, 0.52, sz, 0.18, 1.85, 2.38, 'dark', collide=True)
         if m.detail:
             m.box(-0.67, 0.65, sz, 0.04, 1.58, 2.16, col)
@@ -218,10 +212,10 @@ def _median_curve(m: Builder, world_line: LineString):
             continue
         yaw = math.atan2(dx, dz)
         mx, mz = (p0[0] + p1[0]) / 2.0, (p0[1] + p1[1]) / 2.0
-        y0 = _local_ground_y(mz)
-        m.pose = (mx, y0, mz, yaw)
+        m.follow_grade = True
+        m.pose = (mx, 0, mz, yaw)
         # 1.48 m wide median curb stays strictly inside the paired-carriageway gap
-        m.box(0, -0.5, 0, 1.48, 0.72, seg_len + 0.15, 'beige', collide=True)
+        m.box(0, -0.04, 0, 1.48, 0.26, seg_len + 0.15, 'beige', collide=True)
         m.box(0, 0.22, 0, 1.16, 0.56, max(0.5, seg_len - 0.3), 'hedge')
         m.box(0, 0.78, 0, 0.06, 0.36, max(0.5, seg_len - 0.5), 'alum')
         if m.detail:
@@ -231,13 +225,14 @@ def _median_curve(m: Builder, world_line: LineString):
                 m.cylinder_y(0, 0.76, 0.65, sz, 0.68, 'leaf' if k % 2 == 0 else 'hedge', sections=8)
                 if (i + k) % 2 == 1:
                     m.cylinder_y(0, 1.40, 0.34, sz, 0.48, 'red', sections=7)
+        m.follow_grade = False
         m.pose = (0.0, 0.0, 0.0, 0.0)
 
     n_lamps = max(1, int(world_line.length // 28.0))
     for k in range(n_lamps):
         pt = world_line.interpolate(world_line.length * (k + 0.5) / n_lamps)
         lx, lz = pt.x - AX, pt.y - AZ
-        m.cluster_lamp(lx, _local_ground_y(lz) + 0.20, lz, height=7.4, globes=5, collide=True)
+        m.cluster_lamp(lx, m.surface.ground(lx,lz) + 0.20, lz, height=7.4, globes=5, collide=True)
 
 
 def _planter_divider_curve(m: Builder, world_line: LineString):
@@ -255,8 +250,8 @@ def _planter_divider_curve(m: Builder, world_line: LineString):
             continue
         yaw = math.atan2(dx, dz)
         mx, mz = (p0[0] + p1[0]) / 2.0, (p0[1] + p1[1]) / 2.0
-        y0 = _local_ground_y(mz)
-        m.pose = (mx, y0, mz, yaw)
+        m.follow_grade = True
+        m.pose = (mx, 0, mz, yaw)
         # Continuous redwood slat planter wall covering the outer lane stripe (0.64 m wide)
         m.box(0, -0.05, 0, 0.64, 0.67, seg_len, 'wood', collide=True)
         m.box(0, 0.62, 0, 0.70, 0.06, seg_len + 0.06, 'dark')
@@ -270,22 +265,24 @@ def _planter_divider_curve(m: Builder, world_line: LineString):
             m.box(0, 0.64, sz, 0.66, 0.20, 1.24, 'wood')
             m.box(0, 0.84, sz, 0.72, 0.05, 1.30, 'dark')
             m.cylinder_y(0, 0.86, 0.58, sz, 0.44, 'leaf' if k % 2 == 0 else 'hedge', sections=7)
+        m.follow_grade = False
         m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
 def build_zhongshan_road(m: Builder):
+    m.surface = landmark_surface('zhongshan_road')
     # ------------------------------------------------------------------
     # 1. West Frontage 1: Commercial Complex way/675593163 (6F / 20.6 m)
     # ------------------------------------------------------------------
     y_wn = -1.2
-    m.prism(WEST_NORTH_675593163, y_wn - 2.0, 6.5, 'dark', collide=True, cap_mat='alum')
+    m.prism(WEST_NORTH_675593163, y_wn - 2.0, 6.5, 'dark', collide=True, cap_mat='alum', footing=True)
     m.prism(WEST_NORTH_675593163, y_wn + 4.5, 16.1, 'white', collide=True, cap_mat='roof')
     _street_facade(m, (-0.73, -91.13), (24.48, -157.39), 1, y_wn, 4.5, 20.6, 'white', 0, 9)
 
     # ------------------------------------------------------------------
     # 2. West Frontage 2: Bagui Mansion (八桂大厦, way/264328067)
     # ------------------------------------------------------------------
-    m.prism(WEST_BAGUI_264328067, -2.5, 7.3, 'dark', collide=True, cap_mat='beige')
+    m.prism(WEST_BAGUI_264328067, -2.5, 7.3, 'dark', collide=True, cap_mat='beige', footing=True)
     m.prism(WEST_BAGUI_264328067, 4.8, 18.4, 'beige', collide=True, cap_mat='roof')
     _street_facade(m, (-48.51, 94.53), (-1.31, -52.66), 1, 0.0, 4.8, 23.2, 'beige', 2, 18)
 
@@ -308,10 +305,10 @@ def build_zhongshan_road(m: Builder):
     # ------------------------------------------------------------------
     # 3. West Frontage 3: Yangqiao White-Tiled Block & '金马大厦' Shaft
     # ------------------------------------------------------------------
-    m.prism(WEST_JINMA_OV, -2.5, 7.0, 'dark', collide=True, cap_mat='white')
+    m.prism(WEST_JINMA_OV, -2.5, 7.0, 'dark', collide=True, cap_mat='white', footing=True)
     m.prism(WEST_JINMA_OV, 4.5, 22.7, 'white', collide=True, cap_mat='roof')
     annex = [(-93.23,170.59),(-87.41,157.37),(-96.83,153.17),(-102.55,166.72)]
-    m.prism(annex, -2.5, 10.5, 'white', collide=True, cap_mat='roof')
+    m.prism(annex, -2.5, 10.5, 'white', collide=True, cap_mat='roof', footing=True)
     _street_facade(m, (-84.53, 195.61), (-48.10, 101.30), 1, 0.0, 4.5, 27.2, 'white', 4, 12)
     m.pose = (-64.6, 0.0, 144.0, math.atan2(0.933, 0.360))
     m.box(-2.0, 5.0, 0.85, 3.8, 23.2, 0.85, 'dark')
@@ -323,26 +320,26 @@ def build_zhongshan_road(m: Builder):
     # ------------------------------------------------------------------
     # 4. East Frontages 1..4 (Shizijie S to Central Square NW)
     # ------------------------------------------------------------------
-    m.prism(EAST_679990110, -4.5, 6.6, 'dark', collide=True, cap_mat='beige')
+    m.prism(EAST_679990110, -4.5, 6.6, 'dark', collide=True, cap_mat='beige', footing=True)
     m.prism(EAST_679990110, 2.1, 13.2, 'white', collide=True, cap_mat='roof')
     _street_facade(m, (76.25, -176.64), (65.27, -140.18), 1, -2.3, 4.4, 17.6, 'white', 1, 5)
 
-    m.prism(EAST_679990111, -3.0, 7.4, 'dark', collide=True, cap_mat='white')
+    m.prism(EAST_679990111, -3.0, 7.4, 'dark', collide=True, cap_mat='white', footing=True)
     m.prism(EAST_679990111, 4.4, 14.0, 'white', collide=True, cap_mat='roof')
     _street_facade(m, (64.44, -137.42), (52.37, -97.14), 1, 0.0, 4.4, 18.4, 'white', 3, 6)
 
-    m.prism(EAST_264904810, -2.5, 7.3, 'dark', collide=True, cap_mat='beige')
+    m.prism(EAST_264904810, -2.5, 7.3, 'dark', collide=True, cap_mat='beige', footing=True)
     m.prism(EAST_264904810, 4.8, 16.8, 'beige', collide=True, cap_mat='roof')
     _street_facade(m, (52.07, -80.70), (37.86, -36.80), 1, 0.0, 4.8, 21.6, 'beige', 5, 6)
 
-    m.prism(EAST_675591854, -2.5, 6.7, 'dark', collide=True, cap_mat='white')
+    m.prism(EAST_675591854, -2.5, 6.7, 'dark', collide=True, cap_mat='white', footing=True)
     m.prism(EAST_675591854, 4.2, 11.0, 'white', collide=True, cap_mat='roof')
     _street_facade(m, (36.14, -30.97), (28.70, -9.00), 1, 0.0, 4.2, 15.2, 'white', 7, 4)
 
     # ------------------------------------------------------------------
     # 5. East Frontage 5: Yangqiao East Molded Podium & Hotel Tower (way/675586420)
     # ------------------------------------------------------------------
-    m.prism(EAST_YANGQIAO_675586420, -2.5, 14.7, 'alum', collide=True, cap_mat='roof')
+    m.prism(EAST_YANGQIAO_675586420, -2.5, 14.7, 'alum', collide=True, cap_mat='roof', footing=True)
     _street_facade(m, (-23.12, 171.54), (-46.64, 212.92), 1, 0.0, 4.5, 12.2, 'alum', 6, 6)
     m.pose = (-14.0, 0.0, 214.0, math.atan2(-0.92, 0.38))
     m.box(0, 12.2, 0, 32.0, 12.6, 22.0, 'beige', collide=True)
@@ -383,7 +380,7 @@ def build_zhongshan_road(m: Builder):
         # Local +X = (cos(yaw), -sin(yaw)) == normalized (inward_x, inward_z) -> yaw = atan2(-inward_z, inward_x)
         shelter_yaw = math.atan2(-inward_z, inward_x)
         lx, lz = pt.x - AX, pt.y - AZ
-        _bus_shelter(m, lx, _local_ground_y(lz), lz, shelter_yaw, station_key=station_key)
+        _bus_shelter(m, lx, m.surface.ground(lx,lz), lz, shelter_yaw, station_key=station_key)
         bus_pullin_zones.append(pt.buffer(11.5))
 
     divider_mask = unary_union([junc_mask, *bus_pullin_zones])
@@ -411,7 +408,7 @@ def build_zhongshan_road(m: Builder):
                     pt = seg.interpolate(seg.length * (k + 0.5) / n_trees)
                     tx, tz = pt.x - AX, pt.y - AZ
                     m.street_tree(
-                        tx, _local_ground_y(tz), tz,
+                        tx, m.surface.ground(tx,tz), tz,
                         height=8.8, spread=3.5, kind='camphor',
                         lanterns=(idx_counter % 2 == 0), collide=True,
                     )
@@ -425,7 +422,7 @@ def build_zhongshan_road(m: Builder):
     # Gantry faces south (+Z) toward northbound/approaching traffic
     g_yaw = math.atan2(g_b.x - g_a.x, g_b.y - g_a.y)
     gx, gz = g_pt.x - AX, g_pt.y - AZ
-    m.pose = (gx, _local_ground_y(gz), gz, g_yaw)
+    m.pose = (gx, m.surface.ground(gx,gz), gz, g_yaw)
     m.cylinder_y(0, 0.0, 6.8, 0, 0.22, 'alum', sections=8 if m.detail else 5, collide=True)
     m.beam([0, 6.2, 0], [8.8, 6.2, 0], 0.09, 'alum', sections=6)
     m.box(4.6, 5.05, 0.12, 3.7, 2.15, 0.08, 'alum')

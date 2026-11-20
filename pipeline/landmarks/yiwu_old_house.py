@@ -61,6 +61,7 @@ def pilaster(model, x, z, w, d):
 
 
 def house(model):
+    model.fit_to_grade('yiwu_old_house')
     # Exact OSM way/702352880 footprint: 26.0 x 14.76 m centered at (0, 0)
     w, d, total_h = 26.0, 14.76, 11.85
     hz = d / 2.0  # 7.38

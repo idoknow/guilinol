@@ -6,6 +6,7 @@ import numpy as np
 import trimesh
 from PIL import Image, ImageDraw, ImageFont
 from xiaoyao_tower import generate
+from c_kit import landmark_surface
 
 
 def _cjk_font(size):
@@ -25,7 +26,7 @@ def _cjk_font(size):
 def monument(model, station, lateral):
     # Tall neoclassical Corinthian four-column bridgehead pylon (~8.8 m tall, IMG_1361 & IMG_1362)
     for bottom, width, height in [
-        (-0.8, 2.55, 1.15),
+        (0.10, 2.55, 0.25),
         (0.35, 2.25, 0.30),
         (0.65, 1.95, 1.55),
         (2.20, 2.15, 0.26),
@@ -72,7 +73,7 @@ def monument(model, station, lateral):
 def promenade(model, side):
     for station in range(-54, 53, 2):
         for row in range(4):
-            model.box(station, -0.5, side * (13 + row * 2), 2, 0.66, 2, 'pave' if (station // 2 + row) % 2 else 'granite', True)
+            model.box(station, -.06, side * (13 + row * 2 + (.2 if row == 3 else 0)), 2, .22, 2.4 if row == 3 else 2, 'pave' if (station // 2 + row) % 2 else 'granite', True)
         model.box(station, 0.16, side * 20, 2, 1.0, 0.30, 'white', True)
         model.box(station, 1.16, side * 20, 2, 0.18, 0.42, 'stone')
         if station % 4 == 0:
@@ -135,13 +136,15 @@ def west_split_island(model):
     island_len = 20.5
     for idx, (sx, hw) in enumerate(((-9.4, 0.9), (-6.0, 1.65), (0.0, 2.05), (6.5, 1.85), (9.6, 1.15))):
         seg_l = 3.6 if idx in (0, 4) else 5.8
-        model.box(sx, -0.6, 0, seg_l, 0.92, hw * 2, 'granite', True)
+        model.box(sx, -.08, 0, seg_l, .40, hw * 2, 'granite', True)
         model.box(sx, 0.32, 0, seg_l - 0.32, 0.42, hw * 2 - 0.36, 'green')
 
     # Rounded clipped shrubs inside the median island (IMG_1361 foreground!)
     sphere = trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
     for sx, sr, sh in ((-7.2, 1.15, 0.95), (-3.6, 1.65, 1.35), (1.2, 1.50, 1.20), (5.6, 1.45, 1.15)):
-        model.mesh(sphere.vertices * [sr * 1.25, sh, sr] + [sx, 0.82, 0], sphere.faces, 'leaf')
+        crown = sphere.vertices * [sr * 1.25, sh, sr] + [sx, 0.82, 0]
+        crown[:,1] = np.maximum(crown[:,1],.65)
+        model.mesh(crown, sphere.faces, 'leaf')
 
     # White traffic guardrail along the left carriageway edge (IMG_1361 left!)
     for gx in np.arange(-9.0, 8.5, 2.2):
@@ -156,12 +159,13 @@ def west_split_island(model):
         model.box(-9.66, sy - 0.03, -0.35, 0.06, 0.60, 0.60, 'white')
 
     # Overhead aluminum gantry mast + large municipal blue direction board ('解放西路 / 乐群路 / 三多路', IMG_1361!)
-    model.beam([-3.2, -0.3, 0.85], [-3.2, 5.55, 0.85], 0.14, 'granite', 8, True)
+    model.beam([-3.2, -0.18, 0.85], [-3.2, 5.55, 0.85], 0.14, 'granite', 8, True)
     model.beam([-3.2, 5.30, 0.85], [-3.2, 5.30, -4.6], 0.09, 'granite', 6)
     # Large blue road direction board centered above right branch approach, facing incoming (-x)
     bx, by, bz = -1.6, 3.65, 2.15
+    model.beam([-3.2,5.28,.85],[bx,5.05,bz],.09,'granite')
     model.box(bx + 0.02, by - 0.05, bz, 0.08, 1.66, 3.16, 'white')
-    model.box(bx, by, bz, 0.10, 1.56, 3.06, 'clock')
+    model.box(bx-.022, by, bz, 0.144, 1.56, 3.06, 'clock')
     model.pose = (
         cx + bx * math.cos(-yaw) - bz * math.sin(-yaw),
         by + 1.08,
@@ -179,7 +183,7 @@ def west_split_island(model):
 
     # Vertical blue '观漪桥' bridge nameplate on right approach kerb (z > island, IMG_1361 center-right!)
     model.pose = (-55.5, 0, -3.8, -yaw)
-    model.beam([0, -0.4, 0], [0, 3.55, 0], 0.07, 'granite', 6)
+    model.beam([0, -.08, 0], [0, 3.55, 0], 0.07, 'granite', 6)
     model.box(-0.06, 1.85, 0, 0.08, 1.38, 0.58, 'white')
     model.box(-0.08, 1.90, 0, 0.10, 1.28, 0.50, 'clock')
     model.pose = (0, 0, 0, 0)
@@ -191,8 +195,16 @@ def bridge(model):
         promenade(model, side_z)
         for side_x in (-1, 1):
             monument(model, side_x * 50, side_z * 17.3)
+    model.ground_offset = lambda x,z: surface.ground(x,z) - approach_height(x,z)
     west_split_island(model)
 
+
+surface = landmark_surface('guanyi_bridge')
+def approach_height(x,z):
+    if x < -55 or x > 53:
+        return surface.ground(x,z)-.16
+    return np.interp(x,[-55,-30,0,30,53],
+                     [surface.ground(-55,z)-.16,6,7.35,8.5,surface.ground(53,z)-.16])
 
 if __name__ == '__main__':
     generate(
@@ -209,5 +221,5 @@ if __name__ == '__main__':
             leaf='#2f502b',
         ),
         smooth=('clock',),
-        lift=lambda station: np.interp(station, [-75, -51, -30, 0, 30, 51], [151.6, 152.7, 153.5, 154.85, 156.0, 155.2]) - 147.5,
+        terrain_offset=approach_height,
     )

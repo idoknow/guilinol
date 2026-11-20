@@ -6,6 +6,12 @@ of the atlas; packed UVs flip v, because three.js reads glTF v from the bottom.
 """
 import math
 from pathlib import Path
+from functools import cache
+
+if __package__:
+    from .world_surface import LandmarkSurface, Surface
+else:
+    from world_surface import LandmarkSurface, Surface
 
 import mapbox_earcut
 import numpy as np
@@ -15,6 +21,11 @@ from PIL import Image, ImageDraw, ImageFont
 ATLAS = 1024
 ROOT = Path(__file__).resolve().parents[2]
 TEX_DIR = ROOT / 'public' / 'textures' / 'landmarks' / 'c'
+
+@cache
+def landmark_surface(landmark):
+    return LandmarkSurface(Surface(), landmark)
+
 
 # Pixel rects (x, y, w, h), y from the top of the atlas.
 RECTS = {
@@ -498,6 +509,7 @@ def segment_wall(mesh, a, b, y0, y1, thick, region):
               (side[0], 0, side[1]), region, 1.3)
     mesh.face([(inner1[0], y0, inner1[1]), (inner0[0], y0, inner0[1]), (inner0[0], y1, inner0[1]), (inner1[0], y1, inner1[1])],
               (-side[0], 0, -side[1]), region, 1.3)
+    mesh.face([(p[0],y0,p[1]) for p in (inner0,inner1,outer1,outer0)], (0,-1,0),region,1.3)
     mesh.face([(outer0[0], y1, outer0[1]), (outer1[0], y1, outer1[1]), (inner1[0], y1, inner1[1]), (inner0[0], y1, inner0[1])],
               (0, 1, 0), region, 1.3)
 
@@ -558,8 +570,8 @@ def _chiwen(mesh, origin, direction, region):
     ox, oy, oz = origin
     dx, dz = direction
     box(mesh, (ox + dx * 0.2, oy + 0.55, oz + dz * 0.2), (0.46, 1.05, 0.34), region, 0.35)
-    box(mesh, (ox + dx * 0.62, oy + 1.2, oz + dz * 0.62), (0.34, 0.7, 0.26), region, 0.3)
-    box(mesh, (ox + dx * 0.98, oy + 1.65, oz + dz * 0.98), (0.24, 0.4, 0.2), region, 0.25)
+    box(mesh, (ox + dx * 0.52, oy + 1.2, oz + dz * 0.52), (0.34, 0.7, 0.26), region, 0.3)
+    box(mesh, (ox + dx * 0.75, oy + 1.65, oz + dz * 0.75), (0.24, 0.4, 0.2), region, 0.25)
 
 
 def xieshan(mesh, center, y, width, depth, rise, overhang, lift, tile_region, fascia_region, tiers=1, gable_region='wood', sides=4, ceiling=False):
@@ -678,7 +690,7 @@ def _hex_roof(mesh, center, y, radius, rise, lift, tile_region, fascia_region):
             climb = np.linalg.norm(apex - (p + q) / 2)
             mesh.face([p, q, apex], q + p - 2 * np.array([x, y, z]), tile_region,
                       uvs=[(0, 0), (max(span / 0.46, 0.4), 0), (max(span / 0.92, 0.2), max(climb / 0.32, 0.4))])
-    box(mesh, (x, y + rise + 0.28, z), (0.28, 0.5, 0.28), tile_region, 0.3)
+    box(mesh, (x, y + rise + 0.16, z), (0.28, 0.74, 0.28), tile_region, 0.3)
 
 
 def hip_roof(mesh, center, y, width, depth, rise, overhang, lift, tile_region, soffit_region, tiers=1, sides=4, ceiling=False):

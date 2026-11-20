@@ -149,14 +149,17 @@ def solid_perforated_brick_wall(model, p0, p1, y0):
 
 def camphor_tree(model, x, y0, z, h=9.2, spread=3.8):
     model.beam([x, y0 - 0.5, z], [x, y0 + h * 0.46, z], 0.26, 'wood', 7, True)
+    model.beam([x,y0+h*.40,z],[x,y0+h*.84,z],.17,'wood',7)
     sphere = trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
     for dx, dy, dz, r in ((-1.1, h * 0.68, 0.4, spread * 0.72), (1.0, h * 0.72, -0.5, spread * 0.68), (0.0, h * 0.85, 0.0, spread * 0.65)):
         model.mesh(sphere.vertices * [r, r * 0.62, r] + [x + dx, y0 + dy, z + dz], sphere.faces, 'leaf')
 
 
 def hall(model):
+    model.fit_to_grade('guangxi_arts')
     # Ground at anchor is 157.3 m; surrounding sidewalks are +0.1..+0.5 m
     gy = 0.20
+    model.site_datum = gy
 
     # =========================================================================
     # 1. MAIN AUDITORIUM — Exact OSM way/682942533 footprint (IoU >= 0.96, centroidM <= 0.3m)
@@ -184,6 +187,7 @@ def hall(model):
 
     # Clerestory monitor stage tower with 3 small white-framed square windows (IMG_1370, 1371)
     model.box(1.5, gy + 8.6, -9.5, 12.8, 3.2, 12.5, 'brick', True)
+    model.box(1.5,gy+11.75,-9.5,13.6,.16,13.3,'red')
     model.roof(1.5, gy + 11.8, -9.5, 13.6, 13.3, 1.6)
     for sx in (-2.8, -1.2, 0.4):
         model.box(sx, gy + 9.8, -15.82, 0.85, 0.85, 0.14, 'white')
@@ -234,7 +238,8 @@ def hall(model):
         model.box(east, gy - 0.4, south, 0.72, 4.35, 0.72, 'red', True)
     # Deep-red side link beam connecting portico west columns back to north wall (seen in IMG_1369 left!)
     model.box(-4.15, gy + 3.82, -19.35, 0.85, 0.95, 2.35, 'red')
-    drum(model, pcx, pcz, 6.15, gy + 3.95, gy + 5.05, 'white')
+    # Back the full inscription with the curved fascia, including its lower strokes.
+    drum(model, pcx, pcz, 6.22, gy + 3.62, gy + 5.05, 'white')
     drum(model, pcx, pcz, 5.95, gy + 3.82, gy + 3.96, 'white')
     drum(model, pcx, pcz, 5.15, gy + 5.05, gy + 7.45, 'brick')
     drum(model, pcx, pcz, 5.40, gy + 7.45, gy + 7.68, 'red')
@@ -290,6 +295,7 @@ def hall(model):
     annex_ang = math.atan2(4.10, 31.21)
     prism(model, west_annex, -1.0, 7.9, 'brick', 'tile', True)
     model.pose = (-36.70, gy + 0.20, -9.37, annex_ang)
+    model.box(0,6.48,0,32.6,.34,11.6,'brick')
     model.roof(0, 6.70, 0, 32.6, 11.6, 1.95)
     model.box(0, 6.48, 0, 32.5, 0.24, 11.5, 'white')
     for gz in (-2.3, 1.4):
@@ -327,9 +333,10 @@ def hall(model):
     apt_l_len = math.hypot(apt_l_dx, apt_l_dz)
     apt_l_ang = math.atan2(-apt_l_dz, apt_l_dx)
     model.pose = (-100.77, 0.9, 22.66, -apt_l_ang)
+    model.box(0,22.05,0,30.4,.30,11.4,'earth')
     model.roof(0, 22.2, 0, 30.4, 11.4, 2.45)
     # Rooftop dormer penthouse & glazed east corner sun-room bay (prominent in IMG_1366 left block!)
-    model.box(6.5, 22.4, -2.2, 4.8, 2.6, 4.2, 'gold')
+    model.box(6.5, 22.1, -2.2, 4.8, 2.9, 4.2, 'gold')
     model.box(6.5, 25.0, -2.2, 5.2, 0.25, 4.6, 'white')
     for fl in range(6):
         fy = 4.2 + fl * 2.95
@@ -347,19 +354,31 @@ def hall(model):
     apt_r_ang = -math.atan2(5.0, 32.3)  # negative sign so +lx runs W->E (+32.3, +5.0) and +lz faces SSE toward IMG_1366 camera!
     model.pose = (-110.0, 1.0, -15.5, apt_r_ang)
     # Prominent overhanging white corner roof slab & vertical teal-glass stairwell strip on left corner (IMG_1366 right block!)
-    model.box(13.8, 24.4, 0.0, 7.6, 0.58, 9.4, 'white')
+    model.box(13.8, 24.24, 0.0, 7.6, 0.74, 9.4, 'white')
     model.box(0.0, 23.9, 0.0, 33.8, 0.42, 8.8, 'white')
     # Teal-glass stairwell vertical strip on the east-south corner (left edge of right block in IMG_1366!)
     model.box(15.2, 4.5, 2.2, 2.5, 19.2, 3.6, 'clock')
+    # Behind each surveyed window frame, take its concealed mounting rail
+    # back to the Overture wall while preserving the photographed outer face.
+    from shapely.geometry import LineString, Point
+    cx,_,cz,angle = model.pose
+    ca,sa = math.cos(angle),math.sin(angle)
+    wall = LineString([((x-cx)*ca+(z-cz)*sa,-(x-cx)*sa+(z-cz)*ca)
+                       for x,z in apt_right_tall+[apt_right_tall[0]]])
+    def frame_anchor(x,y,z):
+        foot = wall.interpolate(wall.project(Point(x,z)))
+        model.beam([foot.x,y,foot.y],[x,y,z],.055,'stone',6)
     for fl in range(6):
         fy = 4.6 + fl * 3.15
         for bx in np.linspace(-13.0, 11.2, 6):
             for sz in (-3.88, 3.88):
+                frame_anchor(bx,fy+.85,sz)
                 model.box(bx, fy, sz, 2.8, 1.95, 0.16, 'white')
                 model.box(bx, fy + 0.15, sz + (0.08 if sz > 0 else -0.08), 2.3, 1.50, 0.08, 'glass')
         # Windows on the east gable face (+lx = +16.3, directly facing IMG_1366!)
         for gz in (-2.0, 1.8):
             if gz < 0:
+                frame_anchor(16.32,fy+.85,gz)
                 model.box(16.32, fy, gz, 0.16, 1.95, 2.4, 'white')
                 model.box(16.40, fy + 0.15, gz, 0.08, 1.50, 1.95, 'glass')
     model.pose = (0, 0, 0, 0)
@@ -369,7 +388,7 @@ def hall(model):
         camphor_tree(model, tx, 0.4, tz, h=6.4, spread=4.4)
     # Foreground hedge & municipal blue road direction sign at bottom-left of IMG_1366!
     model.box(-71.0, 0.2, -16.0, 1.2, 0.65, 22.0, 'leaf')
-    model.box(-67.5, 0.5, -11.2, 0.10, 3.0, 0.10, 'granite')
+    model.box(-67.5, 0.12, -11.2, 0.10, 3.38, 0.10, 'granite')
     model.box(-67.4, 2.1, -11.2, 0.10, 1.20, 2.10, 'clock')
 
 

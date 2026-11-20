@@ -612,7 +612,9 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
             owner_lm = next((e['id'] for e in landmarks_cfg if isinstance(e.get('replace'), list) and f'way/{wid}' in e['replace']), None)
             if wid in SPAN_WAYS:
                 owner_lm = 'jiefang_bridge'
-            if owner_lm:
+            # Ronghu decks are fitted to the final banks during landmark packing.
+            # Pinning the banks to yesterday's deck would feed that fit back into itself.
+            if owner_lm and owner_lm != 'ronghu':
                 for end_idx, into_d in ((0, min(0.5, line.length * 0.2)), (-1, max(0.0, line.length - min(0.5, line.length * 0.2)))):
                     end_pt = pts[end_idx]
                     cland = connected_land_ways(wid, end_pt)
@@ -865,7 +867,9 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
         xs4 = left + np.arange(gw4, dtype=np.float64) * GRID
         zs4 = top + np.arange(gh4, dtype=np.float64) * GRID
         X4, Z4 = np.meshgrid(xs4, zs4)
-        lm_keep = getattr(layout, 'exclude', rep_excl)
+        # Grading precedes landmark packing. Use the surveyed replacement polygons
+        # so grade-following paving cannot change its own ground on the next build.
+        lm_keep = layout.replace_exclude
         # A full ground-mesh cell beyond the photographed sidewalk keeps its
         # triangulated surface level with the junction even at the facade edge.
         corner_bed = rongyin_sidewalk().buffer(8)
@@ -1047,6 +1051,15 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
                 if extra_arch > 0.0:
                     extra_arch = min(extra_arch, min(1.80, 0.00050 * (L ** 2)))
                     h_adj = h_adj + extra_arch * 4.0 * u_b * (1.0 - u_b)
+            if wid == 191185431:
+                # Both ends meet interior nodes of unpaved OSM paths (191185441,
+                # 191185429). Those paths walk on GL04, not the smoothed road grid.
+                # Blend the landings into the existing span, retaining its navigation arch.
+                run = min(12., L / 3)
+                for station, endpoint in ((0,pts[0]),(-1,pts[-1])):
+                    distance = s_b if station == 0 else L-s_b
+                    delta = ground_mesh_at(*endpoint)+.045-h_adj[station]
+                    h_adj += delta*np.maximum(0.,1.-distance/run)
             bridge_plans[wid] = (line, b_width, s_b, h_adj)
 
     return ctrl, bridge_plans, finalize_bridges

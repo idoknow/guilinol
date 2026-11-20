@@ -67,6 +67,7 @@ class Model:
         self.pose=(0,0,0,0)
         self.templates={}
         self.placements=[]
+        self.ground_offset=None
 
     def mesh(self, vertices, faces, color, collide=False):
         triangles=np.asarray(vertices,dtype=float)[faces]
@@ -76,6 +77,10 @@ class Model:
         triangles[:,:,0]=local[:,:,0]*cosine-local[:,:,2]*sine+dx
         triangles[:,:,2]=local[:,:,0]*sine+local[:,:,2]*cosine+dz
         triangles[:,:,1]+=dy
+        if self.ground_offset:
+            points,indices=np.unique(triangles[:,:,[0,2]].reshape(-1,2),axis=0,return_inverse=True)
+            offsets=np.array([self.ground_offset(x,z) for x,z in points])
+            triangles[:,:,1]+=offsets[indices].reshape(triangles.shape[:2])
         if getattr(self,'grade',None) is not None:
             reference=self.grade_reference
             flat=triangles.reshape(-1,3)
@@ -97,6 +102,18 @@ class Model:
         coords=(coords-coords.min(axis=1,keepdims=True))/np.maximum(coords.max(axis=1,keepdims=True)-coords.min(axis=1,keepdims=True),1e-6)
         cell=list(SWATCHES).index(color)
         self.uv.append((coords*.94+.03+[cell%4,3-cell//4])/4)
+
+    def foundation(self, surface, x, y, z, w, h, d, color):
+        """Adjust the four lower corners in posed landmark coordinates."""
+        cube = trimesh.creation.box([w,h,d])
+        vertices = cube.vertices + [x,y+h/2,z]
+        dx,dy,dz,angle = self.pose
+        c, s = np.cos(angle), np.sin(angle)
+        for point in vertices:
+            if point[1] < y+h/2:
+                px,_,pz = point
+                point[1] = surface.ground(dx+c*px-s*pz,dz+s*px+c*pz)-dy-.04
+        self.mesh(vertices,cube.faces,color,True)
 
     def box(self,x,y,z,w,h,d,color,collide=False):
         cube=trimesh.creation.box([w,h,d]); self.mesh(cube.vertices+[x,y+h/2,z],cube.faces,color,collide)
@@ -162,12 +179,17 @@ class Model:
                     self.beam(surface(end,a,side),surface(end,b,side),.13,'white' if gable else material)
         self.beam([x-ridge-.22,y+rise,z],[x+ridge+.22,y+rise,z],.20,'white' if gable else material,8)
 
-    def arcade(self,x,z,width,depth,height,openings,radius,color):
+    def arcade(self,x,z,width,depth,height,openings,radius,color,surface=None):
+        def pier(cx,w):
+            if surface:
+                self.foundation(surface,cx,0,z,w,height,depth,color)
+            else:
+                self.box(cx,0,z,w,height,depth,color,True)
         cursor=x-width/2
         for center,rad in zip(openings,np.broadcast_to(radius,(len(openings),))):
             radius=rad
             left=center-radius
-            self.box((cursor+left)/2,0,z,left-cursor,height,depth,color,True)
+            pier((cursor+left)/2,left-cursor)
             spring=height*.32
             for angle1,angle2 in zip(np.linspace(0,math.pi,13)[:-1],np.linspace(0,math.pi,13)[1:]):
                 a,b=center+radius*math.cos(angle1),center+radius*math.cos(angle2)
@@ -175,7 +197,7 @@ class Model:
                 verts=[(px,py,z+side*depth/2) for side in (-1,1) for px,py in ((a,low),(b,high),(b,height),(a,height))]
                 self.mesh(verts,[[0,1,2],[0,2,3],[4,6,5],[4,7,6],[0,4,5],[0,5,1],[3,2,6],[3,6,7]],color,True)
             cursor=center+radius
-        self.box((cursor+x+width/2)/2,0,z,x+width/2-cursor,height,depth,color,True)
+        pier((cursor+x+width/2)/2,x+width/2-cursor)
 
 
 def generate(name,build,colors=None):
@@ -251,14 +273,15 @@ def banyan(m,x,z,index):
     m.mesh(crown.vertices*[6,3.8,6]+[x,9.2,z],crown.faces,'leaf')
 
 
-def gate_furniture(m):
+def gate_furniture(m,plan_surface):
     for side in (-1,1):
         x=side*9.5
-        m.box(x,.1,-137.2,2.45,.95,2.45,'red',True)
+        m.foundation(plan_surface,x,.1,-137.2,2.45,.95,2.45,'red')
         for offset in (-1.08,1.08):
             for dz in (-1.08,1.08):
                 m.box(x+offset,.95,-137.2+dz,.16,1.85,.16,'red',True)
         m.box(x,1.05,-137.2,2.5,.12,2.5,'wood')
+        m.box(x,2.76,-137.2,3.25,.24,3.2,'wood')
         m.tiled_roof(x,2.8,-137.2,3.25,3.2,1.05)
         # The information boards are set back on either side of the kiosks.
         x=side*13.1
@@ -273,9 +296,9 @@ def gate_furniture(m):
     rim=[[-2.8+1.95*math.cos(i*math.pi/4),2.55,-153.8+1.95*math.sin(i*math.pi/4)] for i in range(8)]
     m.mesh([[-2.8,3.08,-153.8],*rim],[[0,i+1,(i+1)%8+1] for i in range(8)],'yellow')
     for n in range(8):
-        m.box(-8,.15,-38-n*.94,.82,1.9,.9,'yellow',True)
+        m.foundation(plan_surface,-8,.15,-38-n*.94,.82,1.9,.9,'yellow')
         for y in (.28,1.15):
-            m.box(-7.55,y,-38-n*.94,.05,.73,.79,'white')
+            m.box(-7.59,y,-38-n*.94,.04,.73,.79,'white')
 
 
 def palace(m):
@@ -298,7 +321,7 @@ def palace(m):
     for center,radius in ((-11,2),(0,3.75)):
         for angle in (np.arange(18)*math.pi/18 if m.detail else []):
             following=angle+math.pi/18
-            verts=[[center+rad*math.cos(theta),2.176+rad*math.sin(theta),.66] for theta,rad in ((angle,radius),(angle,radius+.46),(following,radius+.46),(following,radius))];m.mesh(verts,[[0,1,2],[0,2,3]],'granite' if round(angle*18/math.pi)%2 else 'white')
+            verts=[[center+rad*math.cos(theta),2.176+rad*math.sin(theta),.515] for theta,rad in ((angle,radius),(angle,radius+.46),(following,radius+.46),(following,radius))];m.mesh(verts,[[0,1,2],[0,2,3]],'granite' if round(angle*18/math.pi)%2 else 'white')
     # Rock 22: paired guardian lions flank the large southern arch.
     lion = trimesh.creation.icosphere(subdivisions=int(m.detail))
     for east in (-5.0,5.0):
@@ -330,7 +353,7 @@ def palace(m):
         arch=[(2.85*math.cos(t),2.02+2.85*math.sin(t)) for t in (a,b)]
         soffit=[(x,y,z) for z in (-154.92,-142.48) for x,y in arch]
         m.mesh(soffit,[[0,1,3],[0,3,2]],'white',True)
-    m.beam([0,4.78,-151.9],[0,4.47,-151.9],.035,'wood')
+    m.beam([0,4.95,-151.9],[0,4.47,-151.9],.035,'wood')
     m.beam([0,4.46,-151.9],[0,4.17,-151.9],.20,'wood',8)
     for side in (-1,1):
         m.box(side*6.8,0,-147,1.4,5.8,10,'yellow',True)
@@ -351,6 +374,8 @@ def palace(m):
                 for n in range(7):
                     m.box(side*4.6,1.9+n*.37,-141.14,.22,.07,.05,'gold')
         lantern=trimesh.creation.icosphere(subdivisions=int(m.detail))
+        m.beam([side*2.45,6.58,-141.85],[side*2.45,6.58,-140.95],.065,'wood')
+        m.beam([side*2.45,5.8,-140.95],[side*2.45,6.58,-140.95],.04,'wood')
         m.mesh(lantern.vertices*[.47,.38,.47]+[side*2.45,5.5,-140.95],lantern.faces,'red')
     m.box(0,5.35,-147,10.7,3.05,10,'yellow',True)
     m.tiled_roof(0,8.4,-147,13.0,12,3.7)
@@ -363,7 +388,7 @@ def palace(m):
         for east in (side*5.25,side*12.75):
             m.beam([east,.86,-132.7],[east,1.77,-135.15],.13,'white');m.box(east,0,-133,.33,.94,.33,'white')
         m.box(side*10.5,0,-147,6,3.15,10,'yellow',True);m.tiled_roof(side*10.5,3.15,-147,7.1,11.5,2.3)
-    gate_furniture(m)
+    gate_furniture(m,plan.surface)
     m.pose=(0,0,0,0)
     for side in (-1,1):
         for i,z in enumerate((-30,-54,-78,-101,-123)):
@@ -371,7 +396,9 @@ def palace(m):
         banyan(m,side*23,-136,37+side)
         for i,z in enumerate((-173,-214,-236)):
             banyan(m,side*25,z,i+43+side)
+        m.pose=(0,plan.ground(142,-121+side*10),0,0)
         banyan(m,142,-121+side*10,56+side)
+        m.pose=(0,0,0,0)
     m.box(0,-.45,-123,71,.59,48,'pave',True)
     for side in (-1,1):
         lo,hi=side*18-16,side*18+16

@@ -73,6 +73,7 @@ def east_wall_x(z):
 
 def planter_tree(model, x, z):
     gy = ground_offset(z)
+    model.site_datum = gy
     h_lift = 0.14 if z <= -9.0 else 0.0
     # Square granite tree planter kerb (prominent in IMG_1359 & IMG_1360!)
     model.box(x, gy - 0.3, z, 1.85, 0.64 + h_lift, 1.85, 'stone', True)
@@ -88,11 +89,14 @@ def planter_tree(model, x, z):
 
 
 def arcade(model):
+    model.fit_to_grade('xinyi_arcade')
     # 1. East-side & West-side audited Overture building masses
     for ring, dy, h, col in EAST_BLOCKS + WEST_BLOCKS:
+        model.site_datum = dy
         prism(model, ring, dy - 1.8, h + 1.8, col, True)
 
     # Windows on street-facing east end of 26d958b7 ((-33.48, 4.81) -> (-31.46, -5.48)) for IMG_1359 top-left!
+    model.site_datum = -0.2
     west_yaw = -math.atan2(2.02, 10.29)
     model.pose = (-32.47, -0.2, -0.33, west_yaw)
     model.box(0.08, 0.0, 0.0, 0.16, 3.6, 10.1, 'clock')
@@ -101,7 +105,10 @@ def arcade(model):
         for fl in range(4):
             fy = 4.6 + fl * 3.1
             for fz in (-3.2, 0.0, 3.2):
-                model.box(0.05, fy, fz, 0.08, 1.35, 1.15, 'glass')
+                # Rear pins meet the oblique Overture wall behind the glass.
+                wall_x = fz*math.tan(2*west_yaw)
+                model.beam([wall_x,fy+.6,fz],[.05,fy+.6,fz],.055,'granite')
+                model.box(.05, fy, fz, .08, 1.35, 1.15, 'glass')
     model.pose = (0, 0, 0, 0)
 
     # 2. Continuous cantilevered 2nd-floor soffit ceiling & shop awnings along east sidewalk (below y=5.7m)
@@ -119,6 +126,7 @@ def arcade(model):
             seg_len = math.hypot(dx_seg, 6.0) + 0.45
 
         gy = ground_offset(seg_z)
+        model.site_datum = gy
         model.pose = (wall_x, gy, seg_z, yaw)
 
         # Sidewalk paving & yellow tactile strip under arcade
@@ -133,12 +141,12 @@ def arcade(model):
         # Ground-floor blue roller shutters & pharmacy green frames
         is_pharmacy = -6.5 <= seg_z <= 3.5
         frame_col = 'green' if is_pharmacy else 'clock'
-        model.box(0.05, 0.35, 0, 0.28, 3.25, seg_len - 0.1, frame_col, True)
+        model.box(0.05, 0.0, 0, 0.28, 3.60, seg_len - 0.1, frame_col, True)
         for sub_z in (-1.45, 1.45):
-            model.box(-0.08, 0.42, sub_z, 0.14, 2.75, 2.35, 'sign' if is_pharmacy else 'clock')
+            model.box(-0.06, 0.07, sub_z, 0.18, 3.10, 2.35, 'sign' if is_pharmacy else 'clock')
             if model.detail:
                 for sl in np.arange(0.6, 3.0, 0.28):
-                    model.box(-0.16, sl, sub_z, 0.04, 0.04, 2.28, 'granite')
+                    model.box(-0.15, sl, sub_z, 0.08, 0.04, 2.28, 'granite')
 
         if seg_z > -9.0:
             # IMG_1359 segment (unchanged)

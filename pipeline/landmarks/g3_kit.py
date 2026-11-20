@@ -343,7 +343,7 @@ class Builder:
         if collide:
             self.solid_box(x, y0, z, w, h, d)
 
-    def cylinder_y(self, x, y0, h, z, r, region, sections=10, cap=True, collide=False):
+    def cylinder_y(self, x, y0, h, z, r, region, sections=10, cap=True, collide=False, bottom=False):
         y1 = y0 + h
         ring = [(x + r * math.cos(2 * math.pi * i / sections), z + r * math.sin(2 * math.pi * i / sections))
                 for i in range(sections)]
@@ -353,6 +353,8 @@ class Builder:
             x1, z1 = ring[j]
             self.face([(x0, y0, z0), (x1, y0, z1), (x1, y1, z1), (x0, y1, z0)],
                       ((x0 + x1) / 2 - x, 0, (z0 + z1) / 2 - z), region, tile=2.0)
+        if bottom:
+            self.face([(px,y0,pz) for px,pz in ring], (0,-1,0),region,tile=2.0)
         if cap:
             self.face([(px, y1, pz) for px, pz in ring[::-1]], (0, 1, 0), region, tile=2.0)
         if collide:
@@ -416,7 +418,7 @@ class Builder:
             self.box(0, y + 0.12, 0, w - 1.2, 0.42, min(1.0, d * 0.4), 'hedge', tile=1.5)
         self.pose = prev
 
-    def prism(self, poly_xz, y0, h, region, cap_region=None, tile=2.4, collide=False, holes=()):
+    def prism(self, poly_xz, y0, h, region, cap_region=None, tile=2.4, collide=False, holes=(), footing=False):
         pts = np.asarray(poly_xz, dtype=np.float64)
         if len(pts) >= 2 and np.allclose(pts[0], pts[-1]):
             pts = pts[:-1]
@@ -437,10 +439,15 @@ class Builder:
             self.face(quad_tri, (0, 1, 0), cap_region or region, tile=tile)
             if collide and self.collide:
                 self.hit.add_poly([self._xf(p) for p in quad_tri], self._xf_dir((0, 1, 0)), None)
+        def bottom(point):
+            if not footing:
+                return y0
+            x,y,z = self._xf((point[0],0,point[1]))
+            return self.surface.ground(x,z)-y-.04
         if h > 0.02:
             for a,b in (pair for ring in rings for pair in zip(ring,np.roll(ring,-1,axis=0))):
                 nrm = (b[1] - a[1], 0.0, a[0] - b[0])
-                quad = [(a[0], y0, a[1]), (b[0], y0, b[1]), (b[0], y1, b[1]), (a[0], y1, a[1])]
+                quad = [(a[0], bottom(a), a[1]), (b[0], bottom(b), b[1]), (b[0], y1, b[1]), (a[0], y1, a[1])]
                 self.face(quad, nrm, region, tile=tile)
                 if collide and self.collide and h >= 0.35:
                     seg_len = math.hypot(b[0] - a[0], b[1] - a[1])
@@ -470,8 +477,10 @@ class Builder:
             pts = pts[::-1]
 
         total_h = floors * floor_h
-        self.prism(pts, y0 - 0.35, 0.90, plinth, cap_region=plinth, tile=2.0, collide=False, holes=holes)
-        self.prism(pts, y0 + 0.55, total_h - 0.55, wall, cap_region=roof_tile if roof_kind == 'flat' else wall, tile=2.4, collide=True, holes=holes)
+        corners = [self._xf((x, 0, z)) for x, z in pts]
+        sill = max(y0+.55, max(self.surface.ground(x,z)-y for x,y,z in corners)+.10)
+        self.prism(pts, y0-.35, sill-y0+.35, plinth, cap_region=plinth, tile=2.0, holes=holes, footing=True)
+        self.prism(pts, sill, y0+total_h-sill, wall, cap_region=roof_tile if roof_kind == 'flat' else wall, tile=2.4, collide=True, holes=holes)
         # Parapet band at top
         self.prism(pts, y0 + total_h, 0.48, accent, cap_region=roof_tile if roof_kind == 'flat' else accent, tile=2.0, collide=False, holes=holes)
 
@@ -503,8 +512,8 @@ class Builder:
                     (p_start[0], wy1, p_start[1]),
                 ], (nx, 0.0, nz), 'glass', tile=2.2, lit=True)
                 if self.detail and sill_bands:
-                    sx0, sz0 = a[0] + ux * (inset * 0.6) + nx * 0.14, a[1] + uz * (inset * 0.6) + nz * 0.14
-                    sx1, sz1 = b[0] - ux * (inset * 0.6) + nx * 0.14, b[1] - uz * (inset * 0.6) + nz * 0.14
+                    sx0, sz0 = a[0] + ux * (inset * 0.6) + nx * 0.018, a[1] + uz * (inset * 0.6) + nz * 0.018
+                    sx1, sz1 = b[0] - ux * (inset * 0.6) + nx * 0.018, b[1] - uz * (inset * 0.6) + nz * 0.018
                     self.face([
                         (sx0, wy0 - 0.14, sz0), (sx1, wy0 - 0.14, sz1),
                         (sx1, wy0, sz1), (sx0, wy0, sz0),
@@ -657,22 +666,37 @@ class Builder:
             yaw = math.atan2(-dx, -dz) + math.pi / 2
             prev = self.pose
             self.pose = (float((a[0] + b[0]) / 2), 0.0, float((a[1] + b[1]) / 2), yaw)
-            self.box(0, 0.0, 0, ln, 0.68, 0.32, base_mat, tile=1.8, collide=True)
+            parts = [self.atlas,self.lit,self.hit]
+            starts = [len(part.pos) for part in parts]
+            # Sample long runs in short panels so the stone cap follows the
+            # same grade as the pickets between the two road survey vertices.
+            spans = max(1, math.ceil(ln / 1.5))
+            step_len = ln/spans
+            centers = [(i+.5)*step_len-ln/2 for i in range(spans)]
+            for px in centers:
+                self.box(px, 0, 0, step_len, .68, .32, base_mat, tile=1.8, collide=True)
             if self.detail:
                 n_bays = max(1, int(ln / 4.5))
                 step = ln / n_bays
                 for bi in range(n_bays + 1):
                     px = -ln / 2 + bi * step
                     self.box(px, 0.68, 0, 0.38, h - 0.68, 0.38, wall_mat, tile=1.5)
-                    self.box(px, h, 0, 0.48, 0.12, 0.46, cap_mat, tile=1.0)
-                self.box(0, h - 0.16, 0, ln, 0.06, 0.07, 'dark_stone', tile=1.0)
-                self.box(0, 0.82, 0, ln, 0.05, 0.07, 'dark_stone', tile=1.0)
+                    self.box(px, h, 0, 0.48, 0.12, 0.46, cap_mat, tile=1.0, bottom=True)
+                for px in centers:
+                    self.box(px, h-.16, 0, step_len, .06, .07, 'dark_stone', tile=1.0)
+                    self.box(px, .82, 0, step_len, .05, .07, 'dark_stone', tile=1.0)
                 for rx in np.arange(-ln / 2 + 0.4, ln / 2 - 0.3, 0.55):
                     self.box(float(rx), 0.70, 0, 0.035, h - 0.86, 0.045, 'dark_stone', tile=0.8)
             else:
-                self.box(0, 0.68, 0, ln, h - 0.68, 0.26, wall_mat, tile=2.2)
+                for px in centers:
+                    self.box(px, .68, 0, step_len, h-.68, .26, wall_mat, tile=2.2)
             if self.collide:
-                self.solid_box(0, 0.0, 0, ln, h, 0.36)
+                for px in centers:
+                    self.solid_box(px, 0, 0, step_len, h, .36)
+            for part,start in zip(parts,starts):
+                for k in range(start,len(part.pos)):
+                    x,y,z = part.pos[k]
+                    part.pos[k]=(x,y+self.surface.ground(x,z),z)
             self.pose = prev
 
     def track_field(self, cx, cz, yaw, straight_len, inner_r, track_w=5.2, stand_side=0, y0=0.05):
@@ -770,7 +794,7 @@ class Builder:
             for step in range(4):
                 self.box(sx + stand_side * step * 0.85, 0.0, 0, 0.9, 0.45 * (step + 1), sw, 'granite', tile=2.0, collide=(step == 3))
             self.box(sx + stand_side * 1.6, 1.8, 0, 3.8, 2.8, min(12.0, sw * 0.5), 'white', tile=2.0)
-            self.box(sx + stand_side * 1.2, 4.5, 0, 5.2, 0.28, min(13.2, sw * 0.55), 'terracotta', tile=2.0)
+            self.box(sx + stand_side * 1.2, 4.5, 0, 5.2, 0.28, min(13.2, sw * 0.55), 'terracotta', tile=2.0,bottom=True)
 
         self.pose = prev
 
@@ -824,7 +848,7 @@ class Builder:
     def campus_tree(self, x, z, h=8.0, spread=3.2, seed=1, kind='camphor', y0=0.0, planter=True):
         tx, ty, tz = self._xf((x, y0, z))
         prev = self.pose
-        self.pose = (tx, ty, tz, 0.0)
+        self.pose = (tx, ty+self.surface.ground(tx,tz), tz, 0.0)
         if planter:
             self.box(0, 0.02, 0, 1.85, 0.16, 1.85, 'granite', tile=1.2)
             self.box(0, 0.18, 0, 1.48, 0.04, 1.48, 'lawn', tile=1.2)
@@ -879,6 +903,8 @@ def export_school(path, build_fn, signs=()):
     image, rects = make_school_atlas(signs)
     hi = Builder(rects, lod=0, collide=True)
     lo = Builder(rects, lod=1, collide=False)
+    from c_kit import landmark_surface
+    hi.surface = lo.surface = landmark_surface(Path(path).stem)
     build_fn(hi)
     build_fn(lo)
 

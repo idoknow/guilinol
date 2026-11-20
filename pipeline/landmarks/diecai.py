@@ -7,19 +7,30 @@ import numpy as np
 import sys
 from pathlib import Path
 from fubo import mountain,pavilion
+from c_kit import landmark_surface
 from xiaoyao_tower import generate
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from wind_cave import PORTALS, RING, trail
 
 
 def build(model):
-    rings,tip=mountain('明月峰');point=trail(rings,tip)
+    rings,tip=mountain('明月峰')
+    route = trail(rings,tip)
+    surface = landmark_surface('diecai')
+    def point(progress):
+        p = route(progress)
+        if progress < .20:
+            p[1] = max(p[1],surface.ground(p[0],p[2])+.08)
+        return p
     steps=470 if model.detail else 52
     for index in range(steps):
         start=point(index/steps);end=point((index+1)/steps);delta=end-start
         angle=math.atan2(delta[2],delta[0]);model.pose=(*((start+end)/2),angle)
         length=np.hypot(delta[0],delta[2])+.18
-        model.box(0,-1.85,0,length,1.98,2.85,'stone')
+        if index/steps < .05:
+            model.foundation(surface,0,-1.85,0,length,1.98,2.85,'stone')
+        else:
+            model.box(0,-1.85,0,length,1.98,2.85,'stone')
         if model.detail:
             model.box(0,.11,0,length,.1,2.75,'pave')
             sections=[]
@@ -55,8 +66,10 @@ def build(model):
         previous=section
     start=point(.015);direction=point(.016)-start
     model.pose=(*start,math.atan2(direction[2],direction[0])-math.pi/2)
-    model.arcade(0,0,9,1.5,4.4,[0],2,'brick');model.swept_roof(0,4.4,0,10.4,3.4,1.4)
-    model.pose=(*tip,0);pavilion(model,6.25,3.8)
+    for side in (-1,1):
+        model.foundation(surface,side*3.25,-.3,0,2.5,.55,1.5,'stone')
+    model.arcade(0,0,9,1.5,4.4,[0],2,'brick');model.box(0,4.28,0,10.4,.23,3.4,'wood');model.swept_roof(0,4.4,0,10.4,3.4,1.4)
+    model.pose=(*tip,0);pavilion(model,6.25,3.8,landmark_surface('diecai'))
     model.box(0,3.1,2.55,2.1,.55,.14,'sign')
 
 

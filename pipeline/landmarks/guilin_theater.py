@@ -170,7 +170,7 @@ def _wave_roof_height_and_plan(u, v):
 def build_guilin_theater(b: SceneBuilder):
     # 1. Exact OSM way/1466385147 lower podium base (y = -6.5 .. +3.2 m)
     # At y = +2.0 m audit slice, ONLY this exact polygon is intersected -> IoU = 0.9999, offset = 0.002 m!
-    b.prism(LOCAL_FOOTPRINT, -6.5, 9.7, 'podium_wall', cap_region='dark_stone', tile=4.2, collide=True)
+    b.prism(LOCAL_FOOTPRINT, -6.5, 9.7, 'podium_wall', cap_region='dark_stone', tile=4.2, collide=True,footing=True)
 
     # Stepped upper glazed podium (y = +3.2 .. +9.2 m, strictly above y=2.0m slice!)
     # Gives authentic podium -> curtain-wall -> wave-shell layering on side & aerial views!
@@ -225,8 +225,8 @@ def build_guilin_theater(b: SceneBuilder):
     # Radiating along every u-line on the front wave slope (v in [0, 0.46]) so light/shadow contrast
     # between the raised white ribs and silver-grey shell valleys is unmistakable from across the river!
     if b.detail:
-        rib_us = np.linspace(-0.985, 0.985, 52)
-        rib_vs = np.linspace(0.0, 0.46, 8)
+        rib_us = us[1:-1]
+        rib_vs = vs[:rib_j_end+1]
         rib_hw = 0.11   # 0.22 m wide standing-seam rib
         rib_h = 0.28    # 0.28 m raised metallic seam fin
         for ru in rib_us:
@@ -331,7 +331,7 @@ def build_guilin_theater(b: SceneBuilder):
         (-152.0, 248.0), (-158.0, 222.0), (-168.0, 206.0),
     ]
     embankment_local = [(wx - ORIGIN_X, wz - ORIGIN_Z) for wx, wz in embankment_world]
-    b.prism(embankment_local, -11.2, 6.0, 'river_stone', cap_region='rail_stone', tile=3.2, collide=True)
+    b.prism(embankment_local, -11.2, 6.0, 'river_stone', cap_region='rail_stone', tile=3.2, collide=True,footing=True)
 
     shore_pts = embankment_local[:7]
     for idx in range(len(shore_pts) - 1):
@@ -340,7 +340,7 @@ def build_guilin_theater(b: SceneBuilder):
         seg = math.hypot(dx, dz)
         p_f = b.set_frame(origin=((a[0] + c[0]) / 2, -5.2, (a[1] + c[1]) / 2), front_xz=(-dz, dx))
         b.box(0.0, 0.0, 0.0, seg, 0.95, 0.28, 'rail_stone', tile=2.0)
-        b.box(0.0, -0.45, 0.18, seg * 0.92, 0.20, 0.14, 'amber_flood', tile=2.0, lit=True)
+        b.box(0.0, 0.12, 0.145, seg * 0.92, 0.20, 0.14, 'amber_flood', tile=2.0, lit=True)
         b.restore_frame(p_f)
 
     # Two-storey traditional grey-tiled riverside pavilion (y_local = -5.2 .. +1.68 m < +2.0 m!)
@@ -348,12 +348,13 @@ def build_guilin_theater(b: SceneBuilder):
     p_pav = b.set_frame(origin=pav_origin, front_xz=(-0.92, -0.39))
     pw, pd = 16.5, 9.2
     b.box(0.0, 0.0, 0.0, pw, 3.1, pd, 'pav_wall', tile=2.5, collide=True)
-    b.box(0.0, 3.05, 0.25, pw + 1.4, 0.24, pd + 1.4, 'gray_tile', tile=1.8)
+    b.box(0.0, 3.05, 0.25, pw + 1.4, 0.24, pd + 1.4, 'gray_tile', tile=1.8,bottom=True)
     b.box(0.0, 3.25, 0.0, pw - 0.8, 2.65, pd - 0.8, 'pav_wall', tile=2.5, collide=True)
     b.box(0.0, 3.30, pd / 2 + 0.15, pw, 0.85, 0.16, 'pav_wood', tile=1.5)
     for wx_off in (-4.8, -1.6, 1.6, 4.8):
         b.box(wx_off, 1.0, pd / 2 + 0.05, 2.1, 1.45, 0.08, 'warm_lit', tile=1.5, lit=True)
         b.box(wx_off, 3.9, pd / 2 - 0.36, 2.2, 1.40, 0.08, 'warm_lit', tile=1.5, lit=True)
+    b.box(0,5.82,0,pw+2,.18,pd+1.8,'pav_wood',bottom=True)
     rw, rd = pw + 2.0, pd + 1.8
     ry0, ry1 = 5.88, 6.88
     b.face([(-rw / 2, ry0, rd / 2), (rw / 2, ry0, rd / 2), (rw / 2 - 1.2, ry1, 0.0), (-rw / 2 + 1.2, ry1, 0.0)],
@@ -379,7 +380,8 @@ def build_guilin_theater(b: SceneBuilder):
         (-147.0, 277.0, 11.8, 4.6, 'foliage_dark'),
     ]
     for twx, twz, th, tsp, fcol in trees_world:
-        b.tree_cluster(twx - ORIGIN_X, 0.8, twz - ORIGIN_Z, h=th, spread=tsp, foliage=fcol, trunk=False)
+        x,z=twx-ORIGIN_X,twz-ORIGIN_Z
+        b.tree_cluster(x,max(b.grade(x,z),-5.2),z,h=th,spread=tsp,foliage=fcol)
 
 
 if __name__ == '__main__':

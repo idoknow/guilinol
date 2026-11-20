@@ -20,7 +20,11 @@ ENDS = {
         + [('glass',304,z) for z in (145.55,174.45)]
         + [('nine-bends-north',75.22,38.28),('nine-bends-island',109.91,123.34)]
         + [('ancient',31.4-.51*d,82.1+.86*d) for d in (-21.10,21.10)],
-    'guanyi_bridge': [('promenade',x,z) for x in (-54.92,52.92) for z in (-16.1,16.1)],
+    # The west splitter island covers the centre of the south-side landing.
+    # Check the pedestrian passage on its outside at both edges of a 1.5 m lane.
+    'guanyi_bridge': [('paving below splitter',-54.92,-16.1)]
+                     + [('promenade',-54.92,z) for z in (-19.3,-17.8,16.1)]
+                     + [('promenade',52.92,z) for z in (-16.1,16.1)],
     'lize_bridge': [('approach',x,z) for x in (-74.42,74.42) for z in (-9.6,9.6)],
     'huaqiao': [('stairs',x,0) for x in (-101.96,47.36)],
     'jiefang_bridge': [('west approach',-264.92,2.1),('east landing',140.42,2.1),
