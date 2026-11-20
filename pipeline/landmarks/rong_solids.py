@@ -109,7 +109,7 @@ def _organic_blob(mesh, center, radii, region, seed, detail):
         mesh.face([p0, p1, p2], (nx / ln, ny / ln, nz / ln), region, None)
 
 
-def banyan(mesh, origin, height, crown, seed, detail, lobed=True, grade=None):
+def banyan(mesh, origin, height, crown, seed, detail, lobed=True, grade=None, join_forks=False):
     east, level, south = origin
     start = len(mesh.pos)
     scale = height / 14
@@ -140,6 +140,11 @@ def banyan(mesh, origin, height, crown, seed, detail, lobed=True, grade=None):
         tip = (east + crown * .56 * cosine, level + height * .64, south + crown * .56 * sine)
         tube(mesh, (east, level + height * .29, south), fork, .42 * girth, 'bark', 7)
         tube(mesh, fork, tip, .24 * girth, 'bark', 6)
+        if join_forks:
+            # The thinner limb meets the side of the thicker limb at an angle.
+            # Cover the open ring ends with a bark knuckle at the crotch.
+            radius = .46*girth
+            oval(mesh, fork, (radius, radius, radius), 'bark', 7)
         if detail and lobed:
             # Grounded thick secondary-trunk prop roots on two major limbs + bundled aerial root curtains
             if index in (1, 4):
