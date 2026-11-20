@@ -155,7 +155,7 @@
   },
   "09": {
     "original": 176.3,
-    "heading": 165,
+    "heading": 176.3,
     "quadrants": [
       353.8,
       83.8,
@@ -164,11 +164,11 @@
     ],
     "lines": 49,
     "support": 0.2,
-    "basis": "06→09 商厦静态特征 +28.1°",
-    "delta": -11.3,
+    "basis": "IDOK-68 复核：独立裙楼与主楼退台，采用原始真北 EXIF，位置与焦距不变",
+    "delta": 0,
     "adopted": true,
     "prior": 176.3,
-    "residual": -11.3,
+    "residual": 0,
     "orientation": "竖",
     "confidence": "中"
   },
