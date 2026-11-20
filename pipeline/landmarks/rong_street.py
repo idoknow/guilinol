@@ -71,7 +71,7 @@ def shops(builder):
         for mesh,start in zip(meshes,starts):
             for i in range(start,len(mesh.pos)):
                 x,y,z = mesh.pos[i]
-                if abs(y-base)<.008:
+                if abs(y-base)<.008 or (kind=='hall' and 0 < y-base < .12):
                     mesh.pos[i] = (x,landmark_surface('gunanmen').ground(x,z)-.04,z)
 
 
@@ -127,7 +127,10 @@ def shop(builder, east, base, south, width, length, floors, kind):
             for offset in (-3.5,3.5):
                 box(stone,(face+1.2,base+2,south+offset),(2.5,3.8,.31),'vermilion')
             box(stone,(face+1.2,base+4,south),(2.6,.38,7.5),'vermilion')
-            stairs(stone,(face+5,base,south),(face+.5,base+1.15,south),8.8,7,'granite')
+            for step in range(7):
+                tread = 1.15*(step+1)/7
+                box(stone,(face+5-4.5*(step+.5)/7,base+tread/2,south),
+                    (4.5/7+.02,tread,8.8),'granite')
             return
         for row in range(floors):
             for side in (-1,1):

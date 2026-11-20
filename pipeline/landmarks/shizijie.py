@@ -213,8 +213,12 @@ def build_shizijie(m: Builder):
     # Decorative median & bike-lane guardrails on all 4 arterial legs
     _guardrail_run(m, (6.5, -21.5), (16.5, -54.0))
     _guardrail_run(m, (-8.5, 22.5), (-19.5, 56.0))
-    _guardrail_run(m, (-26.0, -5.5), (-62.0, -12.5))
+    _guardrail_run(m, (-26.0, -5.5), (-106.0, -21.5))
     _guardrail_run(m, (24.0, 5.5), (62.0, 14.5))
+    # Continuous clipped green median hedge along West Jiefang Rd + low north sidewalk shrub & wrought-iron rail (IMG_1385, 1386!)
+    m.poly_wall_strip([(-38.0, -7.9), (-106.0, -21.5)], -.08, .73, 1.35, 'hedge', collide=True, cap_mat='hedge')
+    m.poly_wall_strip([(-48.0, -25.2), (-104.0, -35.8)], -.12, .54, .78, 'hedge', collide=True, cap_mat='hedge')
+    m.poly_wall_strip([(-48.0, -24.8), (-104.0, -35.4)], .38, .22, .06, 'dark', collide=False, cap_mat='dark')
 
     # Colored red/yellow non-motorized waiting pavements & zebra crosswalks on 4 approaches
     _colored_crosswalk_approach(m, 9.8, -32.0, yaw=math.atan2(-10.0, 32.0) + math.pi, road_w=23.0)
@@ -258,7 +262,7 @@ def build_shizijie(m: Builder):
     m.cylinder_y(-24.5, 4.8, 22.4, -46.0, 9.6, 'glass', sections=16 if m.detail else 8, collide=True)
     m.cylinder_y(-24.5, 27.2, 2.2, -46.0, 8.8, 'white', sections=16 if m.detail else 8)
     m.pose = (-24.5, 27.5, -46.0, math.atan2(1.0, 1.1))
-    m.box(0, 0, 8.43, 6.6, 1.65, 1.28, 'dark')
+    m.box(0, 0, 8.46, 6.6, 1.65, 1.34, 'dark')
     m.sign_quad(0, 0.05, 9.10, 6.4, 1.55, 'nanfang_roof')
     m.pose = (0.0, 0.0, 0.0, 0.0)
     _commercial_strip(m, (-84.57, -42.86), (-44.98, -33.52), 1, 4.8, 25.2, 'white', 0, 7)
@@ -307,9 +311,22 @@ def build_shizijie(m: Builder):
     _commercial_strip(m, (76.25, 1.14), (130.47, 13.93), 1, 4.2, 14.8, 'white', 1, 9)
 
     # Sidewalk camphor street trees & multi-globe lamps around the 3 corners + south median shrubs
+    # North sidewalk along Nanfang Mansion frames IMG_1385 (-77.65, -34.27) & IMG_1386 (-63.05, -36.17)!
+    for tx, tz, th, tsp in (
+        (-92.0, -29.2, 10.5, 4.4),
+        (-79.6, -28.8, 12.2, 4.5),  # left trunk framing IMG_1385 (~26% frame width)!
+        (-76.1, -28.2, 12.4, 4.6),  # right trunk framing IMG_1385 (~62% frame width)!
+        (-66.5, -31.8, 10.8, 4.4),  # canopy framing IMG_1386!
+        (-59.5, -32.8, 10.4, 4.2),
+        (-48.5, -30.8, 8.8, 3.6),
+        (50.5, -18.0, 8.2, 3.3),
+        (88.0, 6.5, 8.2, 3.3),
+        (108.0, 11.2, 8.2, 3.3),
+        (24.0, 56.5, 8.2, 3.3),
+        (4.5, 74.0, 8.2, 3.3),
+    ):
+        m.street_tree(tx, 0.08, tz, height=th, spread=tsp, kind='camphor', lanterns=(tx > -55), collide=True)
     if m.detail:
-        for tx, tz in ((-54.0, -30.5), (-68.0, -34.0), (50.5, -18.0), (88.0, 6.5), (108.0, 11.2), (24.0, 56.5), (4.5, 74.0)):
-            m.street_tree(tx, 0.08, tz, height=8.2, spread=3.3, kind='camphor', lanterns=True, collide=True)
         for lx, lz in ((-38.0, -29.0), (45.0, -32.0), (68.0, 2.5), (14.5, 55.0)):
             m.cluster_lamp(lx, 0.08, lz, height=7.0, globes=5, collide=True)
         # Flowering crape-myrtle median strip on south approach (bing_10.jpg foreground)

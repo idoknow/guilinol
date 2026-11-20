@@ -260,6 +260,17 @@ def measurements(model, surface, sample_region=None, wall_corners=None):
                 # Upward, nearly horizontal faces at the landing; road markings add only centimetres.
                 walkable=(normal[ids,1] > .85*np.linalg.norm(normal[ids],axis=1))
                 deck=hits[walkable]
+                if label=='paving below splitter':
+                    # The median covers this station. Measure the packed pavement
+                    # beneath it as well as the adjacent unobstructed lane.
+                    data=subprocess.check_output(['node',ROOT/'pipeline/glb-triangles.mjs',model,
+                                                  '--visible','lod0_pave'],timeout=90)
+                    paving=np.frombuffer(data,'<f4').reshape(-1,3,3)
+                    paving=paving[shapely.intersects_xy(shapely.polygons(paving[:,:,::2]),x,z)]
+                    n=np.cross(paving[:,1]-paving[:,0],paving[:,2]-paving[:,0])
+                    up=n[:,1]>.85*np.linalg.norm(n,axis=1)
+                    a,n=paving[up,0],n[up]
+                    deck=a[:,1]-((x-a[:,0])*n[:,0]+(z-a[:,2])*n[:,2])/n[:,1]
                 height=float(max(deck)) if len(deck) else None
                 error=None if height is None else height-reference
                 passed=error is not None and abs(error)<=.3

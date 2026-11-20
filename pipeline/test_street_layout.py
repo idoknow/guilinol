@@ -28,6 +28,12 @@ class LayoutTests(unittest.TestCase):
         self.assertFalse(profile(self.line,tags,self.facades,221349755).divided)
         self.assertTrue(profile(self.line,tags,self.facades,1).divided)
 
+    def test_yiwu_photo_section(self):
+        tags = {'highway':'secondary','name':'翊武路'}
+        road = profile(self.line,tags,self.facades,221349755)
+        self.assertEqual((road.section,road.lanes,road.width,road.divided),('local',2,6.5,False))
+        self.assertEqual(profile(self.line,tags,self.facades,1).section,'collector')
+
     def test_signals(self):
         tags={'highway':'primary','width':'14','lanes':'4'}
         roads=[profile(line,tags,self.facades) for line in (self.line,LineString([(0,-40),(0,0),(0,40)]))]

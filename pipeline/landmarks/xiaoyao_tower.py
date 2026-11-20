@@ -4,6 +4,7 @@ footprint and the NNE axis (~17 degrees east of north). The floor and sill
 heights are estimates, not survey data. Roof slate, dark red timber and
 pale grey paving follow the daylight 2025 views in landmark-refs.json.
 """
+from functools import cache
 from pathlib import Path
 import sys
 
@@ -23,7 +24,30 @@ class LandmarkModel(Model):
         self.lit_tiles=[]
         self.flood_roof=flood_roof
 
+    def fit_to_grade(self, name, datum=0.0):
+        """Fit the buried skirt and lower storey to GL04, preserving roof elevations."""
+        from c_kit import landmark_surface
+        self.site_ground = cache(landmark_surface(name).ground)
+        self.site_datum = datum
+
+    def foundation_vertices(self, vertices):
+        vertices = np.array(vertices, dtype=float, copy=True)
+        dx,dy,dz,angle = self.pose
+        x,y,z = vertices.T
+        east = dx+x*np.cos(angle)-z*np.sin(angle)
+        south = dz+x*np.sin(angle)+z*np.cos(angle)
+        above = y+dy-self.site_datum
+        for i in np.flatnonzero(above < 3.2):
+            ground = self.site_ground(round(east[i],5),round(south[i],5))
+            # Limit the embedded skirt while keeping the ordering of nested plinths.
+            skirt = max(-.12, above[i])
+            blend = 1 - np.clip(above[i]/3.2,0,1)
+            y[i] += blend*(ground-self.site_datum) + skirt-above[i]
+        return vertices
+
     def mesh(self, vertices, faces, color, collide=False):
+        if hasattr(self, 'site_ground'):
+            vertices = self.foundation_vertices(vertices)
         if isinstance(color,str) and color=='lamp':
             super().mesh(vertices,faces,'wood' if self.flood_roof else 'gold',collide)
             self.lamps.append((self.visible.pop(),self.uv.pop()))

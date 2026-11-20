@@ -5,6 +5,7 @@ import json
 import math
 import struct
 from pathlib import Path
+from sections import section_layers, shopfronts, RULES
 
 import numpy as np
 from PIL import Image, ImageDraw
@@ -123,6 +124,9 @@ def build(bbox, output, palette):
     raw_foots = raw_overture_footprints(bounds)
     road_net = extract_road_network(raw_foots)
     _, roads, _, banks, _, ped_areas = road_net
+    grade_roads = roads
+    roads = [road.aligned_section() for road in roads]
+    road_net = (road_net[0], roads, *road_net[2:])
     bridge_polys = []
     bus_pads = []
     for el in load_osm():
@@ -142,14 +146,16 @@ def build(bbox, output, palette):
     for road in roads:
         if not road.line.intersects(bounds):
             continue
-        sp = road.line.buffer(road.width/2, quad_segs=2)
+        sp = road.pavement
         if road.kind == 'pedestrian' and not comp_excl.is_empty:
             sp = sp.difference(comp_excl)
         if not sp.is_empty:
             road_surfs.append(sp)
         for side, extra in ((-1, road.left), (1, road.right)):
             if extra:
-                sw_p = road.line.buffer(side*(road.width/2+extra), single_sided=True, quad_segs=2)
+                if str(road.way) in RULES['frontageSections']:
+                    extra = sum(road.dimensions[key] for key in ('verge','cycle','curb','walk'))
+                sw_p = road.side_line(side).buffer(side*(road.width/2+extra), single_sided=True, quad_segs=2)
                 if not comp_excl.is_empty:
                     sw_p = sw_p.difference(comp_excl)
                 if not sw_p.is_empty:
@@ -163,7 +169,7 @@ def build(bbox, output, palette):
 
     road_ctrl, bridge_plans, finalize_bridges = solve_road_and_bridge_elevations(
         original, terrain, surface, left, top, width, depth,
-        roads, ped_areas, layout, Path(__file__).resolve().parents[1],
+        grade_roads, ped_areas, layout, Path(__file__).resolve().parents[1],
         vessel_routes=candidate_routes, previous_bed=previous_bed,
     )
     if interchange is not None:
@@ -181,6 +187,7 @@ def build(bbox, output, palette):
 
     footprints, heights = buildings(bounds, ground_mesh_at, peak_tree, layout, carriageway_mask, sidewalk_mask)
     index = STRtree(footprints)
+    shop_rows = shopfronts(footprints, heights, roads)
     for campus in layout.allow_unmapped_court:
         if not bounds.covers(campus) or any(campus.covers(field.representative_point())
                 for layer in ('schoolTrack','schoolCourt') for field in layers[layer]):
@@ -189,9 +196,11 @@ def build(bbox, output, palette):
         if court is not None:
             mask,corner = stencil(court,left,top,1)
             texture.paste(palette['schoolCourt'],corner,mask)
-    trees, roads, banks, tree_stats = scatter(bounds, footprints, layers['water'], peak_shapes, tree_support_at, mountain_trees, unary_union([layout.tree_exclude, bank_pavement.buffer(2)]) if bank_pavement is not None else layout.tree_exclude, precomputed=road_net, extra_blocked=[*(court.buffer(1.5) for court in layers["schoolTrack"] + layers["schoolCourt"]), *bridge_polys, *road_surfs])
+    bands = section_layers(roads)
+    cycle_clearance = [band.buffer(.08) for band in bands[2].geometries]
+    trees, roads, banks, tree_stats, beds = scatter(bounds, footprints, layers['water'], peak_shapes, tree_support_at, mountain_trees, unary_union([layout.tree_exclude, bank_pavement.buffer(2)]) if bank_pavement is not None else layout.tree_exclude, precomputed=road_net, extra_blocked=[*(court.buffer(1.5) for court in layers["schoolTrack"] + layers["schoolCourt"]), *bridge_polys, *road_surfs, *cycle_clearance], structure_exclude=layout.exclude.buffer(.52))
     for road in roads:
-        for part in polygons(road.line.buffer(road.width/2,quad_segs=2).intersection(bounds)):
+        for part in polygons(road.pavement.intersection(bounds)):
             mask,corner = stencil(part,left,top,1)
             texture.paste('#484b4d' if road.name=='翊武路' else palette['road'],corner,mask)
             layers['road'].append(part)
@@ -235,7 +244,7 @@ def build(bbox, output, palette):
     vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange)
     decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal)
     modeled_paving = unary_union([*rong_pavement, modeled_paving if modeled_paving is not None else ShapelyPolygon()])
-    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,modeled_paving=modeled_paving)
+    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving)
     (output/'marking-audit.json').write_text(json.dumps(lengths.pop('markingOverlap')))
     print('Lengths (m):',lengths)
     def asset(name):
@@ -254,21 +263,27 @@ def build(bbox, output, palette):
             vertices, normals, indices, rings = building_mesh(parts, origin)
             deck, thin, asphalt = decks(tile, origin)
             st_data = streets(tile, origin)
+            for slot, rows in ((7,beds),(8,shop_rows)):
+                if rows.get(origin):
+                    while len(st_data)<=slot:
+                        st_data.append(None if len(st_data)==5 else [])
+                    st_data[slot]=rows[origin]
             collision = json.dumps([rings, st_data, thin, asphalt], separators=(',', ':')).encode()
             tbuf = trees[origin]
             if tbuf:
-                sw_tile_polys, rd_tile_polys = [], []
+                sw_tile_polys, rd_tile_polys, cycle_tile_polys = [], [], []
                 for s_item in st_data[0]:
                     skind, ext, *holes = s_item
-                    if skind not in (0, 1) or len(ext) < 3:
+                    if skind not in (0, 1, 4, 5, 6) or len(ext) < 3:
                         continue
                     ext_w = [(origin[0] + p[0] / 100.0, origin[1] + p[1] / 100.0) for p in ext]
                     holes_w = [[(origin[0] + p[0] / 100.0, origin[1] + p[1] / 100.0) for p in h] for h in holes if len(h) >= 3]
                     sp = ShapelyPolygon(ext_w, holes_w).buffer(0)
                     if not sp.is_empty:
-                        (sw_tile_polys if skind == 1 else rd_tile_polys).append(sp)
+                        (cycle_tile_polys if skind == 5 else rd_tile_polys if skind == 0 else sw_tile_polys).append(sp)
                 u_sw_tile = unary_union(sw_tile_polys) if sw_tile_polys else ShapelyPolygon()
                 u_rd_tile = unary_union(rd_tile_polys) if rd_tile_polys else ShapelyPolygon()
+                u_cycle_tile = unary_union(cycle_tile_polys) if cycle_tile_polys else ShapelyPolygon()
                 n_trees = len(tbuf) // 12
                 tx_arr = np.empty(n_trees, dtype=np.float64)
                 tz_arr = np.empty(n_trees, dtype=np.float64)
@@ -284,7 +299,7 @@ def build(bbox, output, palette):
                         continue
                     gm_w = ground_mesh_at(wx, wz)
                     rb_w = max(float(rc_vals[ti]), gm_w)
-                    sup_w = (rb_w + 0.195) if u_sw_tile.covers(pt_w) else (rb_w + 0.045) if u_rd_tile.covers(pt_w) else gm_w
+                    sup_w = (rb_w + 0.195) if u_sw_tile.covers(pt_w) else (rb_w + 0.045) if u_rd_tile.covers(pt_w) else (rb_w + 0.060) if u_cycle_tile.covers(pt_w) else gm_w
                     struct.pack_into('<h', tbuf, ti * 12 + 4, round(10.0 * sup_w))
             png = io.BytesIO()
             texture.crop((east,south,east+CHUNK,south+CHUNK)).save(png,format='PNG')
