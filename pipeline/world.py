@@ -1,5 +1,6 @@
 import argparse
 import gzip
+import hashlib
 import io
 import json
 import math
@@ -41,6 +42,33 @@ def stencil(poly, west, north, step):
     for ring, fill in [(poly.exterior, 255), *((hole, 0) for hole in poly.interiors)]:
         draw.polygon([((east-west)/step-col, (south-north)/step-row) for east,south in ring.coords], fill)
     return mask, (col,row)
+
+
+def terrain_stencil(poly, west, north, col, row, shape):
+    """Rasterize the legacy snapped footprint with explicit half-pixel ties.
+
+    Each scanline covers the columns nearest its intersections with each ring.
+    Computing these from integer endpoints avoids native float scan conversion.
+    """
+    mask = np.zeros(shape, dtype=bool)
+    for ring, fill in [(poly.exterior, True), *((hole, False) for hole in poly.interiors)]:
+        vertices = [(math.floor((x-west)/GRID)-col, math.floor((z-north)/GRID)-row)
+                    for x,z in ring.coords]
+        crossings = [[] for _ in range(shape[0])]
+        for (x0,y0),(x1,y1) in zip(vertices, vertices[1:]):
+            if y0 == y1:
+                mask[y0,min(x0,x1):max(x0,x1)+1] = fill
+                continue
+            if y1 < y0:
+                x0,y0,x1,y1 = x1,y1,x0,y0
+            mask[y1,x1] = fill
+            for y in range(y0,y1):
+                crossings[y].append(x0 + (y-y0)*(x1-x0)/(y1-y0))
+        for y, xs in enumerate(crossings):
+            xs.sort()
+            for a,b in zip(xs[::2],xs[1::2]):
+                mask[y,math.floor(a+.5):math.ceil(b-.5)+1] = fill
+    return mask
 
 
 def build(bbox, output, palette):
@@ -86,10 +114,12 @@ def build(bbox, output, palette):
     peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet,mountain_trees,CONFIG['peakAreaPerTree'])
     for region,level in layout.flatten:
         for part in polygons(region.intersection(bounds)):
-            mask,(col,row) = stencil(part,left,top,GRID)
-            for field in (terrain,original):
-                patch = field[row:row+mask.height,col:col+mask.width]
-                patch[np.asarray(mask,dtype=bool)[:patch.shape[0],:patch.shape[1]]] = round(level*10)
+            col, row = math.floor((part.bounds[0]-left)/GRID), math.floor((part.bounds[1]-top)/GRID)
+            end_col = math.ceil((part.bounds[2]-left)/GRID)
+            end_row = math.ceil((part.bounds[3]-top)/GRID)
+            window = np.s_[row:end_row+1, col:end_col+1]
+            mask = terrain_stencil(part, left, top, col, row, terrain[window].shape)
+            terrain[window][mask] = original[window][mask] = round(level*10)
     correct_water(surface, terrain, original, bounds, stencil)
     wet = surface != DRY
     terrain[wet] = original[wet] = np.minimum(terrain[wet], surface[wet] - 20)
@@ -318,6 +348,13 @@ def build(bbox, output, palette):
     write_vehicles(output,vehicles,triangles)
     manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=extent,chunkSize=CHUNK,peaks=peaks,atlas=asset('atlas.bin'),
                     vehicles=asset('vehicles.bin'),grid=GRID,overview=dict(step=32, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png')),chunks=chunks)
+    # Hash the full-resolution GL04 fields in wire order, independent of gzip,
+    # texture encoders, or whether a chunk elides its redundant underlay.
+    digest = hashlib.sha256()
+    for field in (terrain, surface, original):
+        digest.update(field.astype('<i2', copy=False).tobytes())
+    manifest['terrainSha256'] = digest.hexdigest()
+    print('Terrain SHA-256:', digest.hexdigest())
     manifest['landmarks'] = landmarks
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
