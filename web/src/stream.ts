@@ -37,7 +37,7 @@ export class Stream {
     if(!nearest) return
     const tile = nearest, controller = new AbortController()
     this.pending.set(tile,controller)
-    detail(tile,controller.signal).then(item=>{
+    detail(tile,controller.signal,this.manifest.campusExteriors).then(item=>{
       if(controller.signal.aborted) {item.dispose();return}
       this.scene.add(item.group); this.batches.add(item.batch); this.base.toggle(tile,false); this.loaded.set(tile,item); this.visited.add(tile); this.failures.delete(tile)
     }).catch(error=>{

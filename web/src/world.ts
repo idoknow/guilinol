@@ -11,6 +11,7 @@ import type {Peaks} from './peaks'
 interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number}
 export interface Manifest {
+  campusExteriors?:import('./campus-exteriors').CampusExterior[]
   landmarks?:import('./landmarks').Landmark[]
   version:number; extent:[number,number,number,number]; grid:number; chunkSize:number; chunks:Tile[];
   peaks:Peaks; atlas:Asset; vehicles?:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset}
@@ -88,7 +89,7 @@ export async function overview(manifest:Manifest) {
   return startOverview(manifest).finish
 }
 
-export async function detail(tile:Tile, signal:AbortSignal) {
+export async function detail(tile:Tile, signal:AbortSignal, campuses:NonNullable<Manifest['campusExteriors']>=[]) {
   const compressed = await fetchAsset(tile.file,signal)
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
   signal.throwIfAborted()
@@ -132,7 +133,7 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
   const pond = chunkWater(water,tile.x,tile.z)
-  const walls = vertices ? buildingGeometry(positions,normals,indices,rings) : null
+  const walls = vertices ? buildingGeometry(positions,normals,indices,rings,tile,campuses) : null
   const heights = geometry.getAttribute('position')
   const streets = streetGeometry(paths,(x,z)=>{
     const col=Math.min(segments-1,Math.max(0,Math.floor(x/step))),row=Math.min(segments-1,Math.max(0,Math.floor(z/step))),at=row*stride+col

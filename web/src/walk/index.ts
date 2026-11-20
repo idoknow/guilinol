@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {campusAt} from '../campus-exteriors'
 import R from '@dimforge/rapier3d-compat'
 import {GLTFLoader, type GLTF} from 'three/addons/loaders/GLTFLoader.js'
 import type {PeaksGroup} from '../peaks'
@@ -99,7 +100,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     void import('./vehicles').then(module=>module.vehicles(scene,file,(x,z)=>{sim.sync(x,z);return place(x,z,'dismount')})).then(loaded=>{rides=loaded;rides.show(active)})
       .catch(error=>console.warn('Vehicles unavailable:',error)).finally(()=>{loading=false})}
   let wasBoat=false,wasBike=false,bikeObstacle=''
-  function place(x:number,z:number,reason:string,override=false){const found=sim.findWalkableSpawn(x,z,override)
+  function place(x:number,z:number,reason:string,override=false){
+    const candidate=campusAt(manifest.campusExteriors??[],x,z)?null:sim.findWalkableSpawn(x,z,override)
+    const found=candidate&&!campusAt(manifest.campusExteriors??[],candidate.x,candidate.z)?candidate:null
     if(verify)spawns.push({reason,from:[x,z],to:found?[found.x,found.z]:null,distance:found?Math.hypot(found.x-x,found.z-z):null,rule:found?.rule??'none'})
     if(!found)return false
     sim.body.setTranslation(found,true);sim.body.setNextKinematicTranslation(found);sim.world.step();safe.set(found.x,found.y,found.z);velocity=0;grounded=false;return true}
@@ -169,6 +172,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const pos=sim.body.translation();velocity+=cfg.gravity*step
       sim.controller.computeColliderMovement(sim.capsule,{x:delta.x*speed*step,y:velocity*step,z:delta.y*speed*step})
       const move=sim.controller.computedMovement(),next={x:pos.x+move.x,y:pos.y+move.y,z:pos.z+move.z}
+      if(campusAt(manifest.campusExteriors??[],next.x,next.z)){next.x=pos.x;next.z=pos.z}
       grounded=sim.controller.computedGrounded();if(grounded&&velocity<0)velocity=0
       if(verify)for(let at=0;at<sim.controller.numComputedCollisions();at++){const coll=sim.controller.computedCollision(at)?.collider;if(coll)lastHits.push(sim.kinds.get(coll.handle)??'')}
       const ground=sim.surface(next.x,next.z,'ground')
