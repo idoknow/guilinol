@@ -4,12 +4,26 @@ import {fetchAsset} from '../world'
 import {createFreeBoats,type MooringSlot} from './boat'
 import type {createPhysics} from './physics'
 import {createCarControl} from './car'
-import {createBikeControl,type RideKind} from './ride'
+import {
+  resolveEbikeKind,
+  type EbikeTier,
+  type EbikeUpgradeMods,
+  type EbikeVehicleType,
+  type ResolvedEbikeProfile,
+} from './tuning'
+import {
+  createBikeControl,
+  type EbikeDynamicTelemetry,
+  type EbikeStepControl,
+  type RideKind,
+} from './ride'
 import {vehicleModel} from './vehicle-model'
 
 type Position=[number,number,number]
 type Route={kind:string,start:string,end:string,path:Position[]}
 type BoardPos={x:number,y:number,z:number,bikeY:number}
+type BikeInstanceState={vehicleType:EbikeVehicleType; batteryPct:number; mods:EbikeUpgradeMods|null}
+const bikeCoordKey=(x:number,z:number)=>`${Math.round(x*10)},${Math.round(z*10)}`
 type Physics=Awaited<ReturnType<typeof createPhysics>>
 export type FreeDismountTarget={x:number,y:number,z:number,rule:string,heading:number}
 export interface VehiclesEnv {
@@ -17,15 +31,36 @@ export interface VehiclesEnv {
   stream: Stream
   landFree: (spot:FreeDismountTarget)=>boolean
 }
-interface Data {bikes:[number,number,number,number,number][];bicycles?:[number,number,number,number,number][];cars?:[number,number,number,number,number][];docks:Record<string,Position>;routes:Route[];grid:number[];mask:string;motorGrid?:number[];motorMask?:string}
+interface Data {bikes:[number,number,number,number,number][];sharedBikes?:[number,number,number,number,number][];bicycles?:[number,number,number,number,number][];cars?:[number,number,number,number,number][];docks:Record<string,Position>;routes:Route[];grid:number[];mask:string;motorGrid?:number[];motorMask?:string}
 export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number,bikeHeading?:number,bikeY?:number,kind?:'car')=>boolean,board?:(bx:number,by:number,bz:number,kind?:'car')=>BoardPos|null,env?:VehiclesEnv){
   const buffer=await fetchAsset(file), data:Data=JSON.parse(await new Response(new Blob([buffer]).stream().pipeThrough(new DecompressionStream('gzip'))).text())
   const mask=atob(data.mask),[left,top,width,height,step]=data.grid,group=new T.Group();scene.add(group)
   const mMask=data.motorMask?atob(data.motorMask):mask,[mLeft,mTop,mWidth,mHeight,mStep]=data.motorGrid??data.grid
   const cells=new Map<string,T.Group>(),visibleCells=new Set<T.Group>(),cellSize=128
+  const bikeStates=new WeakMap<T.Object3D,BikeInstanceState>()
+  const bikeCoordStates=new Map<string,BikeInstanceState>()
+  const makeVehicleMesh=vehicleModel as (kind:string,paint?:number,options?:{shared?:boolean})=>T.Mesh
   function store(mesh:T.Mesh){const key=`${Math.floor(mesh.position.x/cellSize)},${Math.floor(mesh.position.z/cellSize)}`
     let cell=cells.get(key);if(!cell){cell=new T.Group();cells.set(key,cell)}cell.add(mesh)}
-  for(const [x,y,z,angle,paint] of data.bikes){const mesh=vehicleModel('bike',paint);mesh.position.set(x,y,z);mesh.rotation.y=angle;store(mesh)}
+  function addBike(x:number,y:number,z:number,angle:number,paint:number,explicitType?:EbikeVehicleType){
+    const vehicleType=resolveEbikeKind(paint,explicitType)
+    const isShared=vehicleType==='shared'
+    const mesh=makeVehicleMesh('bike',paint,isShared?{shared:true}:undefined)
+    mesh.position.set(x,y,z);mesh.rotation.y=angle
+    mesh.userData.paint=paint
+    mesh.userData.shared=isShared
+    mesh.userData.vehicleType=vehicleType
+    mesh.userData.ebikeTier=vehicleType
+    mesh.userData.battery=100
+    const coordKey=bikeCoordKey(x,z)
+    mesh.userData.coordKey=coordKey
+    const state:BikeInstanceState={vehicleType,batteryPct:100,mods:null}
+    bikeStates.set(mesh,state)
+    bikeCoordStates.set(coordKey,state)
+    store(mesh)
+  }
+  for(const [x,y,z,angle,paint] of data.bikes)addBike(x,y,z,angle,paint)
+  for(const [x,y,z,angle,paint] of data.sharedBikes??[])addBike(x,y,z,angle,paint,'shared')
   for(const [x,y,z,angle,paint] of data.bicycles??[]){const mesh=vehicleModel('bicycle',paint);mesh.position.set(x,y,z);mesh.rotation.y=angle;store(mesh)}
   for(const [x,y,z,angle,paint] of data.cars??[]){const mesh=vehicleModel('car',paint);mesh.position.set(x,y,z);mesh.rotation.y=angle;store(mesh)}
   const vessels=data.routes.map(route=>{const pink=route.kind==='boat'&&[route.start,route.end].includes('桂湖');const mesh=vehicleModel(route.kind,pink?1:0);mesh.position.fromArray(route.path[0]);group.add(mesh);return mesh})
@@ -49,9 +84,38 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     const freePrompt=nearFree.slot?(nearFree.slot.kind==='freeRaft'?'划竹筏 · ':'划小船 · ')+nearFree.slot.name:''
     const ridePrompt=nearBike?(nearBike.name==='car'?'开车':nearBike.name==='bicycle'?'骑单车':'骑电动车'):''
     const label=car?'下车':bike?'下车':freeBoats?.active?'靠岸下船':route>=0?(disembark?'下一站下船':'下站下船'):ridePrompt||(preferFree?freePrompt:nearRoute>=0?'上船 · '+data.routes[nearRoute].start:'')
-    document.body.toggleAttribute('data-aboard',!!car||!!bike||route>=0||!!freeBoats?.active);button.hidden=!label;if(button.textContent!==label)button.textContent=label
+    document.body.toggleAttribute('data-aboard',!!car||!!bike||route>=0||!!freeBoats?.active)
+    if(bike&&bikeCtrl.kind==='bike'){
+      document.body.dataset.ebikeTier=bikeCtrl.vehicleType
+      document.body.dataset.rideType=bikeCtrl.vehicleType
+    }else{
+      delete document.body.dataset.ebikeTier
+      if(bike?.name!=='bicycle')delete document.body.dataset.rideType
+    }
+    if(nearBike?.name==='bike')button.dataset.ebikeTier=(nearBike.userData.vehicleType as EbikeVehicleType|undefined)??resolveEbikeKind((nearBike.userData.paint as number|undefined)??0)
+    else delete button.dataset.ebikeTier
+    button.hidden=!label;if(button.textContent!==label)button.textContent=label
   }
-  function reset(){if(route>=0)vessels[route].position.fromArray(data.routes[route].path[0]);freeBoats?.reset();if(car){car.rotation.set(carCtrl.pitch,carCtrl.heading,0,'YXZ');store(car);if(active&&car.parent&&!visibleCells.has(car.parent as T.Group)){visibleCells.add(car.parent as T.Group);group.add(car.parent)}}if(bike){bike.rotation.set(bikeCtrl.pitch,bikeCtrl.heading,0,'YXZ');store(bike);if(active&&bike.parent&&!visibleCells.has(bike.parent as T.Group)){visibleCells.add(bike.parent as T.Group);group.add(bike.parent)}}car=null;bike=null;route=-1;nearFree={slot:null,distance:Infinity,atBank:false};disembark=false;segment=1;bikeCtrl.reset();carCtrl.reset()}
+  function saveBikeInstanceState(mesh:T.Mesh){
+    if(mesh.name!=='bike')return
+    const prev=bikeStates.get(mesh)
+    const state:BikeInstanceState={
+      vehicleType:bikeCtrl.vehicleType,
+      batteryPct:bikeCtrl.batteryPct,
+      mods:bikeCtrl.vehicleType==='normal'?(bikeCtrl.mods??prev?.mods??null):null,
+    }
+    bikeStates.set(mesh,state)
+    mesh.userData.vehicleType=state.vehicleType
+    mesh.userData.ebikeTier=state.vehicleType
+    mesh.userData.shared=state.vehicleType==='shared'
+    mesh.userData.battery=state.batteryPct
+    const oldKey=mesh.userData.coordKey as string|undefined
+    const newKey=bikeCoordKey(mesh.position.x,mesh.position.z)
+    if(oldKey&&oldKey!==newKey)bikeCoordStates.delete(oldKey)
+    mesh.userData.coordKey=newKey
+    bikeCoordStates.set(newKey,state)
+  }
+  function reset(){if(route>=0)vessels[route].position.fromArray(data.routes[route].path[0]);freeBoats?.reset();if(car){car.rotation.set(carCtrl.pitch,carCtrl.heading,0,'YXZ');store(car);if(active&&car.parent&&!visibleCells.has(car.parent as T.Group)){visibleCells.add(car.parent as T.Group);group.add(car.parent)}}if(bike){saveBikeInstanceState(bike);bike.rotation.set(bikeCtrl.pitch,bikeCtrl.heading,0,'YXZ');store(bike);if(active&&bike.parent&&!visibleCells.has(bike.parent as T.Group)){visibleCells.add(bike.parent as T.Group);group.add(bike.parent)}}car=null;bike=null;route=-1;nearFree={slot:null,distance:Infinity,atBank:false};disembark=false;segment=1;delete document.body.dataset.ebikeTier;delete document.body.dataset.rideType;bikeCtrl.reset();carCtrl.reset()}
   function interact(){if(!active)return
     if(car){if(land(car.position.x,car.position.z,carCtrl.heading,car.position.y,'car'))reset()}
     else if(bike){if(land(bike.position.x,bike.position.z,bikeCtrl.heading,bike.position.y))reset()}
@@ -64,11 +128,22 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
       car=lastCar=nearBike;group.add(car);carCtrl.mount(car.rotation.y,car.rotation.x);syncHud()
     }
     else if(nearBike){
+      const prevKey=(nearBike.userData.coordKey as string|undefined)??bikeCoordKey(nearBike.position.x,nearBike.position.z)
       const safePos=board?board(nearBike.position.x,nearBike.position.y,nearBike.position.z):{x:nearBike.position.x,y:nearBike.position.y,z:nearBike.position.z,bikeY:nearBike.position.y}
       if(!safePos)return
       nearBike.position.set(safePos.x,safePos.bikeY,safePos.z)
       const rideKind:RideKind=nearBike.name==='bicycle'?'bicycle':'bike'
-      bike=lastBike=nearBike;group.add(bike);bikeCtrl.mount(bike.rotation.y,bike.rotation.x,rideKind)
+      const saved=bikeStates.get(nearBike)??bikeCoordStates.get(prevKey)
+      const vehicleType=saved?.vehicleType??resolveEbikeKind((nearBike.userData.paint as number|undefined)??0,nearBike.userData.vehicleType??nearBike.userData.ebikeTier)
+      const savedBat=saved?.batteryPct??(nearBike.userData.battery as number|undefined)??100
+      bike=lastBike=nearBike;group.add(bike)
+      bikeCtrl.mount(bike.rotation.y,bike.rotation.x,rideKind,{
+        vehicleType,
+        batteryPct:savedBat,
+        mods:vehicleType==='normal'?(saved?.mods??null):null,
+      })
+      saveBikeInstanceState(bike)
+      syncHud()
     }
     else if(nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)){freeBoats!.mount(nearFree.slot,nearFree.atBank);syncHud()}
     else if(nearRoute>=0){route=nearRoute;segment=1;disembark=false}
@@ -129,19 +204,47 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     if(disembark||next<0){if(land(x,z))reset();return}
     if(next>=0){mesh.position.fromArray(leg.path[0]);route=next;segment=1}
   }
-  return {nearby,advance,get car(){return car},get bike(){return bike},get rideKind():RideKind|null{return bike?bikeCtrl.kind:null},get boat(){return freeBoats?.boat??(route>=0?vessels[route]:null)},get freeBoat(){return freeBoats?.boat??null},get freeKind(){return freeBoats?.boatKind??null},get boatSeatOffset(){return freeBoats?.active?freeBoats.seatOffset:(route>=0&&vessels[route].name==='raft'?-.44:-.18)},get heading(){return car?carCtrl.heading:bike?bikeCtrl.heading:freeBoats?.active?freeBoats.heading:heading},get speed(){return car?carCtrl.speed:bike?bikeCtrl.speed:freeBoats?.active?freeBoats.speed:0},
+  return {nearby,advance,get car(){return car},get bike(){return bike},get rideKind():RideKind|null{return bike?bikeCtrl.kind:null},get vehicleType():EbikeVehicleType|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.vehicleType:null},get isShared(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.isShared:false},get ebikeTier():EbikeTier|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.tier:null},get ebikeGear(){return bike?bikeCtrl.gear:2},get ebikeBattery(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.batteryPct:100},get ebikeTelemetry():EbikeDynamicTelemetry|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.telemetry():null},get boat(){return freeBoats?.boat??(route>=0?vessels[route]:null)},get freeBoat(){return freeBoats?.boat??null},get freeKind(){return freeBoats?.boatKind??null},get boatSeatOffset(){return freeBoats?.active?freeBoats.seatOffset:(route>=0&&vessels[route].name==='raft'?-.44:-.18)},get heading(){return car?carCtrl.heading:bike?bikeCtrl.heading:freeBoats?.active?freeBoats.heading:heading},get speed(){return car?carCtrl.speed:bike?bikeCtrl.speed:freeBoats?.active?freeBoats.speed:0},
     get lean(){return bikeCtrl.lean},get pitch(){return car?carCtrl.pitch:bikeCtrl.pitch},get steerInput(){return car?carCtrl.steerInput:bikeCtrl.steerInput},
     get bikePitch(){return lastBike?.rotation.x??0},get bikeY(){return lastBike?.position.y??0},
     get carPitch(){return lastCar?.rotation.x??0},get carY(){return lastCar?.position.y??0},
-    show(on:boolean){reset();interactRing.visible=false;document.body.removeAttribute('data-aboard');active=group.visible=on;button.hidden=true;if(!on){button.textContent='';lastBike=null;lastCar=null}},stop(){carCtrl.stop();bikeCtrl.stop();freeBoats?.stop()},
+    show(on:boolean){reset();interactRing.visible=false;document.body.removeAttribute('data-aboard');delete document.body.dataset.ebikeTier;delete document.body.dataset.rideType;delete button.dataset.ebikeTier;active=group.visible=on;button.hidden=true;if(!on){button.textContent='';lastBike=null;lastCar=null}},stop(){carCtrl.stop();bikeCtrl.stop();freeBoats?.stop()},
     dampSpeed(step:number){return bikeCtrl.dampSpeed(step)},
     dampCarSpeed(step:number){return carCtrl.dampSpeed(step)},
     capSpeed(step:number,limit:number){return bikeCtrl.capSpeed(step,limit)},
     setPitch(frontY:number|undefined,backY:number|undefined,dt:number){bikeCtrl.setPitch(frontY,backY,dt)},
     setCarPitch(frontY:number|undefined,backY:number|undefined,dt:number){carCtrl.setPitch(frontY,backY,dt)},
+    setEbikeGear(gear:number){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.setGear(gear):2},
+    shiftEbikeGear(delta:number){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.shiftGear(delta):2},
+    resetEbikeGearOnRecover(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.resetGearToCompliant():2},
+    setEbikeVehicleType(nextType:EbikeVehicleType){
+      if(!bike||bikeCtrl.kind!=='bike')return null
+      const profile=bikeCtrl.setVehicleType(nextType)
+      saveBikeInstanceState(bike)
+      syncHud()
+      return profile
+    },
+    setEbikeUpgrades(mods:EbikeUpgradeMods|null):ResolvedEbikeProfile|null{
+      if(!bike||bikeCtrl.kind!=='bike')return null
+      const next=bikeCtrl.setUpgrades(mods)
+      saveBikeInstanceState(bike)
+      return next
+    },
+    setEbikeBattery(pct:number){
+      if(!bike||bikeCtrl.kind!=='bike')return 100
+      const next=bikeCtrl.setBattery(pct)
+      saveBikeInstanceState(bike)
+      return next
+    },
+    rechargeEbike(pct=100){
+      if(!bike||bikeCtrl.kind!=='bike')return 100
+      const next=bikeCtrl.setBattery(pct)
+      saveBikeInstanceState(bike)
+      return next
+    },
     resolveMove(ctx:Parameters<typeof bikeCtrl.resolveMove>[0]){return bikeCtrl.resolveMove(ctx)},
     resolveCarMove(ctx:Parameters<typeof carCtrl.resolveMove>[0]){return carCtrl.resolveMove(ctx)},
-    steer(forward:number,right:number,dt:number,mounted=true){return bikeCtrl.steer(forward,right,dt,mounted)},
+    steer(forward:number,right:number,dt:number,mounted=true,control?:EbikeStepControl){const spd=bikeCtrl.steer(forward,right,dt,mounted,control);if(bike&&bikeCtrl.kind==='bike')bike.userData.battery=bikeCtrl.batteryPct;return spd},
     steerCar(forward:number,right:number,dt:number,mounted=true){return carCtrl.steer(forward,right,dt,mounted)},
     steerBoat(forward:number,right:number,dt:number){freeBoats?.steer(forward,right,dt)},
     poseBoat(figure:T.Group,forward:number,right:number,dt:number){freeBoats?.pose(figure,forward,right,dt)},
@@ -152,6 +255,17 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     parked(kind?:RideKind|'car'):Position[]{
       const out:Position[]=[]
       for(const cell of cells.values())for(const child of cell.children)if(!kind||child.name===kind)out.push([child.position.x,child.position.y,child.position.z])
+      return out
+    },
+    parkedBikes(){
+      const out:{x:number;y:number;z:number;paint:number;vehicleType:EbikeVehicleType;tier:EbikeTier;batteryPct:number}[]=[]
+      for(const cell of cells.values())for(const child of cell.children){
+        if(child.name!=='bike')continue
+        const paint=(child.userData.paint as number|undefined)??0
+        const saved=bikeStates.get(child)??bikeCoordStates.get(bikeCoordKey(child.position.x,child.position.z))
+        const vehicleType=saved?.vehicleType??resolveEbikeKind(paint,child.userData.vehicleType??child.userData.ebikeTier)
+        out.push({x:child.position.x,y:child.position.y,z:child.position.z,paint,vehicleType,tier:vehicleType,batteryPct:saved?.batteryPct??100})
+      }
       return out
     },
     park(pos:T.Vector3){if(car){car.position.copy(pos);car.rotation.set(carCtrl.pitch,carCtrl.heading,carCtrl.roll,'YXZ')}if(bike){bike.position.copy(pos);bike.rotation.set(bikeCtrl.pitch,bikeCtrl.heading,bikeCtrl.lean,'YXZ')}},
