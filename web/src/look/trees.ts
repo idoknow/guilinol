@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import {look} from './config'
+import {shareAtmosphere} from './atmosphere'
 
 // M2.5 tree look (docs/reference.md R2/R4/R8/R11): deep broadleaf canopy that the city sits in.
 // Species order follows pipeline/vegetation.json: camphor, banyan, osmanthus, palm, conifer, shrub.
@@ -23,10 +24,10 @@ function paint(parts:Part[]) {
     g.computeBoundingBox()
     const {min, max} = g.boundingBox!, pos = g.getAttribute('position'), rgb = new Float32Array(pos.count * 3)
     lo.setHex(dark ?? color); hi.setHex(lit ?? color)
+    const mid = new THREE.Color(color)
     for (let i = 0; i < pos.count; i += 3) {
       // One colour per face (flat look): shade by the face's mean height inside its part.
       const y = (pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2)) / 3, t = (y - min.y) / Math.max(.01, max.y - min.y)
-      const mid = new THREE.Color(color)
       if (t < .5) tmp.copy(lo).lerp(mid, t * 2); else tmp.copy(mid).lerp(hi, (t - .5) * 2)
       for (let k = 0; k < 3; k++) tmp.toArray(rgb, (i + k) * 3)
     }
@@ -117,7 +118,19 @@ function shrub() { // 灌木团: peak scrub and park undergrowth, two low lumps
 }
 
 const material = new THREE.MeshStandardMaterial({vertexColors:true, flatShading:true, roughness:1, metalness:0, side:THREE.DoubleSide})
+// A screen-door fade writes normal opaque depth while thinning the last band
+// of crowns. The forest stops submitting trees at the outer edge of the band.
+export const treeFar = 1500
+material.onBeforeCompile = shader=>{
+  shareAtmosphere(shader)
+  shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
+#ifdef USE_FOG
+  float fade = smoothstep(${treeFar-120}., ${treeFar}., distance(vFogWorld,cameraPosition));
+  if(fade > fract(52.9829189 * fract(dot(gl_FragCoord.xy,vec2(.06711056,.00583715))))) discard;
+#endif`)
+}
 const builders = [camphor, banyan, osmanthus, palm, conifer, shrub]
+export const speciesCount = builders.length
 export function treeGeometry(species:number) {
   const {near, far} = builders[species] ? builders[species]() : camphor()
   return {near:paint(near), far:paint(far), material}

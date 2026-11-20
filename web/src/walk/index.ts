@@ -142,25 +142,20 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   scene.add(figure);figure.visible=false;figure.scale.setScalar(avatar.scale)
   const soleOffset=footMetrics.soleOffset*avatar.scale, footTmp=new THREE.Vector3()
   const lmFloorCache=new WeakMap<THREE.Group,{grid:Map<string,number[]>;large:number[]}>()
-  const _va=new THREE.Vector3(), _vb=new THREE.Vector3(), _vc=new THREE.Vector3()
+  const _va=new THREE.Vector3(), _vb=new THREE.Vector3(), _vc=new THREE.Vector3(), _im=new THREE.Matrix4(), _inst=new THREE.Matrix4()
   function getLandmarkFloorGrid(root:THREE.Group){
     let cache=lmFloorCache.get(root)
     if(!cache){
       const grid=new Map<string,number[]>(), large:number[]=[]
       root.updateMatrixWorld(true)
       const target=root.getObjectByName('lod0')??root
-      target.traverse(node=>{
-        if(!(node instanceof THREE.Mesh)||node instanceof THREE.InstancedMesh)return
-        let p:THREE.Object3D|null=node
-        while(p&&p!==root){if(/^collision/i.test(p.name))return;p=p.parent}
-        if(/^collision/i.test(node.name))return
-        const pos=node.geometry.getAttribute('position'); if(!pos)return
-        const idx=node.geometry.index?.array, triCount=idx?idx.length/3:pos.count/3
+      const addMeshTris=(pos:THREE.BufferAttribute|THREE.InterleavedBufferAttribute,idx:THREE.TypedArray|undefined,mat:THREE.Matrix4)=>{
+        const triCount=idx?idx.length/3:pos.count/3
         for(let t=0;t<triCount;t++){
           const i0=idx?idx[t*3]:t*3, i1=idx?idx[t*3+1]:t*3+1, i2=idx?idx[t*3+2]:t*3+2
-          _va.fromBufferAttribute(pos,i0).applyMatrix4(node.matrixWorld)
-          _vb.fromBufferAttribute(pos,i1).applyMatrix4(node.matrixWorld)
-          _vc.fromBufferAttribute(pos,i2).applyMatrix4(node.matrixWorld)
+          _va.fromBufferAttribute(pos,i0).applyMatrix4(mat)
+          _vb.fromBufferAttribute(pos,i1).applyMatrix4(mat)
+          _vc.fromBufferAttribute(pos,i2).applyMatrix4(mat)
           const e1x=_vb.x-_va.x, e1y=_vb.y-_va.y, e1z=_vb.z-_va.z
           const e2x=_vc.x-_va.x, e2y=_vc.y-_va.y, e2z=_vc.z-_va.z
           const nx=e1y*e2z-e1z*e2y, ny=e1z*e2x-e1x*e2z, nz=e1x*e2y-e1y*e2x
@@ -179,6 +174,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
             bucket.push(_va.x,_va.y,_va.z,_vb.x,_vb.y,_vb.z,_vc.x,_vc.y,_vc.z)
           }
         }
+      }
+      target.traverse(node=>{
+        if(!(node instanceof THREE.Mesh))return
+        let p:THREE.Object3D|null=node
+        while(p&&p!==root){if(/^collision/i.test(p.name))return;p=p.parent}
+        if(/^collision/i.test(node.name))return
+        const pos=node.geometry.getAttribute('position'); if(!pos)return
+        const idx=(node.geometry.userData.fullIndex as THREE.TypedArray|undefined)??node.geometry.index?.array
+        if(node instanceof THREE.InstancedMesh){
+          for(let i=0;i<node.count;i++){node.getMatrixAt(i,_inst);_im.multiplyMatrices(node.matrixWorld,_inst);addMeshTris(pos,idx,_im)}
+        }else addMeshTris(pos,idx,node.matrixWorld)
       })
       cache={grid,large}
       lmFloorCache.set(root,cache)

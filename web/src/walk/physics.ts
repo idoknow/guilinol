@@ -164,7 +164,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         const pos=node.geometry.getAttribute('position'),rawIdx=node.geometry.index?node.geometry.index.array:null
         const vertices=new Float32Array(pos.count*3),point=new THREE.Vector3()
         for(let index=0;index<pos.count;index++)point.fromBufferAttribute(pos,index).applyMatrix4(node.matrixWorld).toArray(vertices,3*index)
-        const triCount=rawIdx?rawIdx.length/3:pos.count/3,filtered:number[]=[],lowSlabs:number[]=[],slabCap=root.position.y+.22,slabFloor=root.position.y-.35
+        const triCount=rawIdx?rawIdx.length/3:pos.count/3,filtered:number[]=[],lowSlabs:number[]=[],slabCap=root.position.y+.22
         const keepLowSlab=/bridge|huaqiao|ronghu|mulong/.test(entry.id)
         for(let t=0;t<triCount;t++){
           const i0=rawIdx?rawIdx[t*3]:t*3,i1=rawIdx?rawIdx[t*3+1]:t*3+1,i2=rawIdx?rawIdx[t*3+2]:t*3+2
@@ -175,7 +175,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
           if(!keepLowSlab&&hi<=slabCap){
             const e1x=x1-x0,e1y=y1-y0,e1z=z1-z0,e2x=x2-x0,e2y=y2-y0,e2z=z2-z0
             const nx=e1y*e2z-e1z*e2y,ny=e1z*e2x-e1x*e2z,nz=e1x*e2y-e1y*e2x,len=Math.hypot(nx,ny,nz)
-            if(len>1e-6&&ny/len>=.7&&hi>=slabFloor)lowSlabs.push(i0,i1,i2)
+            if(len>1e-6&&ny/len>=.7)lowSlabs.push(i0,i1,i2)
             continue
           }
           filtered.push(i0,i1,i2)

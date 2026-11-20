@@ -6,6 +6,7 @@ import json
 import math
 import struct
 from pathlib import Path
+from overview_water import water_mask
 from sections import section_layers, shopfronts, RULES
 
 import numpy as np
@@ -288,7 +289,9 @@ def build(bbox, output, palette):
         return {'file':name,'bytes':(output/name).stat().st_size}
     np.where(wet,surface,terrain)[::8,::8].astype('<i2').tofile(output/'overview.i16')
     np.where(wet,surface,original)[::8,::8].astype('<i2').tofile(output/'underlay.i16')
-    texture.resize((width//4,depth//4), Image.Resampling.BOX).quantize(32).save(output/'overview.png', optimize=True)
+    overview_image = texture.resize((width//4,depth//4), Image.Resampling.BOX).quantize(32)
+    overview_image.save(output/'overview.png', optimize=True)
+    water_bits = water_mask(overview_image, palette['water'])
     u_peaks_buf = unary_union(peak_shapes).buffer(1.0) if peak_shapes else ShapelyPolygon()
     chunks = []
     for south in range(0,depth,CHUNK):
@@ -354,7 +357,7 @@ def build(bbox, output, palette):
     triangles.extend(landmark_faces)
     write_vehicles(output,vehicles,triangles)
     manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=extent,chunkSize=CHUNK,peaks=peaks,atlas=asset('atlas.bin'),
-                    vehicles=asset('vehicles.bin'),grid=GRID,overview=dict(step=32, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png')),chunks=chunks)
+                    vehicles=asset('vehicles.bin'),grid=GRID,overview=dict(step=32, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png'),waterMask=water_bits),chunks=chunks)
     # Hash the full-resolution GL04 fields in wire order, independent of gzip,
     # texture encoders, or whether a chunk elides its redundant underlay.
     digest = hashlib.sha256()

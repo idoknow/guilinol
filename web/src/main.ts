@@ -28,7 +28,7 @@ async function start() {
   const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
   renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure
   document.body.prepend(renderer.domElement)
-  const camera = new THREE.PerspectiveCamera(55,1,1,12000)
+  const camera = new THREE.PerspectiveCamera(55,1,1,look.fogHorizonTo)
   const scene = new THREE.Scene()
   scene.fog = new THREE.Fog(look.hazeNear,0,1)
   const dome = sky(), drops = rain(); scene.add(dome,drops)
@@ -134,9 +134,15 @@ async function start() {
       }
       return {clearance,lookingAt,landmark,wallDistance:hits[0]?.distance}
     }}})
+  let cullLandmarks:ReturnType<typeof import('./landmarks').landmarkCulling>|undefined
   function draw(){
     const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
-    peaks.update(camera,mirror); renderMirror(renderer,scene,camera,!Number.isFinite(mirror)); renderer.render(scene,camera)
+    cullLandmarks?.update(stream.landmarks.values(),camera,mirror)
+    peaks.update(camera,mirror)
+    if(Number.isFinite(mirror))cullLandmarks?.pass(true)
+    renderMirror(renderer,scene,camera,!Number.isFinite(mirror),!walker?.active&&!cinema&&!stream.pending.size&&clock.weather==='clear')
+    cullLandmarks?.pass(false)
+    renderer.render(scene,camera)
   }
   const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
     captureView:async()=>(await import('./play/feedback-view')).capture(host),
@@ -151,7 +157,7 @@ async function start() {
       void import('./play').then(mod=>{tour=mod.play(host)})
       setTimeout(()=>void import('./ui/about').then(mod=>mod.aboutPanel()),500)
     }
-    if(frame===2&&manifest.landmarks?.length)void import('./landmarks').then(module=>{stream.updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks)})
+    if(frame===2&&manifest.landmarks?.length)void import('./landmarks').then(module=>{cullLandmarks=module.landmarkCulling();stream.updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks)})
     if(frame===2){
       peaks.loadModels(renderer)
       void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))
