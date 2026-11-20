@@ -99,3 +99,34 @@ def ronghu_footings(vertices, surface):
                 for dz in (-.13,.13):
                     foot('north shore rail post',x+dx,north_bank(x)+dz,.075)
     return rows
+
+
+def gunanmen_hall_bearings(triangles):
+    """Measure opposing packed faces at four stations under each hall."""
+    import math
+    import numpy as np
+    import shapely
+
+    flat = triangles[:,:,::2]
+    normals = np.cross(triangles[:,1]-triangles[:,0], triangles[:,2]-triangles[:,0])
+    horizontal = abs(normals[:,1]) > .99*np.linalg.norm(normals,axis=1)
+    c, s = math.cos(math.radians(-26.8)), math.sin(math.radians(-26.8))
+    rows = []
+    for label, xs, zs in [('western hall',(-22,-11),(-.9,6.4)),
+                          ('gatehouse',(-6.3,3.5),(.2,3.5))]:
+        for u in xs:
+            for v in zs:
+                x,z = 15+c*u+s*v, -7.2-s*u+c*v
+                ids = np.flatnonzero(horizontal & (flat.min(axis=1)<=[x,z]).all(axis=1)
+                                     & (flat.max(axis=1)>=[x,z]).all(axis=1))
+                ids = ids[shapely.intersects_xy(shapely.polygons(flat[ids]),x,z)]
+                heights = triangles[ids,:,1].mean(axis=1)
+                supports = heights[(normals[ids,1]>0) & (heights>5) & (heights<8)]
+                floors = heights[(normals[ids,1]<0) & (heights>5)]
+                support = float(max(supports)) if len(supports) else None
+                floor = float(min(floors)) if len(floors) else None
+                gap = None if floor is None or support is None else floor-support
+                rows.append(dict(rule='terrace bearing',fixture=label,local=[x,floor,z],
+                                 support=support,gap=gap,status='pass' if gap is not None
+                                 and -.30<=gap<=.15 else 'fail'))
+    return rows

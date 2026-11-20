@@ -36,7 +36,10 @@ try {
       for(let step=0;step<seconds*10;step++){
         walk.tick(.1);const probe=walk.probe()
         if(probe.resets||probe.inHouse||probe.inPeak||probe.renderClearance<-.15)throw Error(JSON.stringify(probe))
-        hit ||= target==='gate'?spawn.z-probe.z>39:target==='shore'?probe.blockedWater&&!probe.wet:target==='deck'?probe.wet&&probe.deck!==undefined&&probe.foot>=probe.deck-.35&&!probe.blockedWater:probe.hits.includes(target)
+        if(target==='gunanmen'){
+          if(Math.abs(probe.foot-spawn.foot)>.6)throw Error('Walker left the gate passage')
+          hit = probe.z-spawn.z>18.5
+        }else hit ||= target==='gate'?spawn.z-probe.z>39:target==='shore'?probe.blockedWater&&!probe.wet:target==='deck'?probe.wet&&probe.deck!==undefined&&probe.foot>=probe.deck-.35&&!probe.blockedWater:probe.hits.includes(target)
         if(hit)break
       }
       walk.drive(0,0);return {hit,last:walk.probe()}
@@ -53,5 +56,7 @@ try {
   releaseBridge()
   await fixture([-309,-1],[.95,.32],18,'deck')
   await fixture([-740,868],[0,0],6,'shore')
+  // Start 4.8 m outside the northern opening, finish beyond the lake-side portal.
+  await fixture([-1392.99,103.71],[-.451,.893],7,'gunanmen')
   assert.deepEqual(errors,[]);console.log('seconds',(performance.now()-start)/1000);assert(performance.now()-start<180000)
 }finally{await browser?.close();await server.close()}

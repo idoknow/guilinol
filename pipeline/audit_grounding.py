@@ -12,7 +12,7 @@ import shapely
 import trimesh
 
 from grounding_contacts import crossing_joints
-from grounding_fixtures import CRAFT, ENDS, PIERS, ronghu_footings
+from grounding_fixtures import CRAFT, ENDS, PIERS, gunanmen_hall_bearings, ronghu_footings
 from landmarks.world_surface import LandmarkSurface, Surface, WORLD
 
 ROOT = WORLD.parent.parent
@@ -291,6 +291,8 @@ def measurements(model, surface, sample_region=None, wall_corners=None):
                         and -.30<=error<=.015 and reached>=water)
             rows.append(dict(rule=role,fixture=label,local=[x,height,z],ground=ground,water=water,
                              support=reference,gap=error,status='pass' if passed else 'fail'))
+    if surface.name=='gunanmen':
+        rows.extend(gunanmen_hall_bearings(triangles))
     if surface.name=='ronghu':
         rows.extend(ronghu_footings(vertices,surface))
     station_rows=[r for r in rows if 'fixture' in r]

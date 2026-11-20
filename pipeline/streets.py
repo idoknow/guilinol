@@ -13,7 +13,7 @@ from scatter import CONFIG, walk_line
 from sections import section_layers, clipped, speed_paint, yiwu_frontage, RULES
 
 
-def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None):
+def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None,gate_plaza=None):
     if bands is None:
         bands = section_layers(roads)
     surfaces, sidewalks, stripes, medians, gaps = [],[],[],[],[]
@@ -453,6 +453,10 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         walk = walk.difference(cycle).difference(verge)
         tactile = tactile.intersection(walk)
         shapes[1] = shapes[1].union(walk.difference(tactile))
+        # The gate square shares the surrounding stone sidewalk mesh, height
+        # field and 2 m paver texture. Union before triangulation to remove seams.
+        if gate_plaza is not None and tile.intersects(gate_plaza):
+            shapes[1] = shapes[1].union(tile.intersection(gate_plaza))
         items=[]
         for kind,shape in [*enumerate(shapes[:3]), (4,verge), (5,cycle.difference(verge)), (6,tactile)]:
             for poly in polygons(shape):
