@@ -3,8 +3,6 @@
   {"id": "dongxixiang+jingjiang", "subtype": "landmarkOverlap", "maxArea": 507, "maxCount": 1, "reason": "IDOK-51 王城与东西巷重叠，交回 IDOK-51 / IDOK-50 修模"},
   {"id": "guilin_book_market+jiefang_bridge", "subtype": "landmarkOverlap", "maxArea": 32, "maxCount": 1, "reason": "IDOK-49 合入后新增的地标模型问题，交回 IDOK-61 修模"},
   {"id": "guilin_book_market+libin_middle", "subtype": "landmarkOverlap", "maxArea": 60, "maxCount": 1, "reason": "IDOK-49 合入后新增的地标模型问题，交回 IDOK-61 修模"},
-  {"id": "guilin_technical", "subtype": "invisibleColliderOnRoad", "maxArea": 8, "maxCount": 1, "reason": "地标模型问题，另案修复"},
-  {"id": "guilin_technical", "subtype": "landmarkOnSidewalk", "maxArea": 10, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "guilin_thirteen", "subtype": "landmarkOnSidewalk", "maxArea": 13, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "gunanmen", "subtype": "invisibleColliderOnRoad", "maxArea": 10, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "gunanmen", "subtype": "landmarkOnCarriageway", "maxArea": 62, "maxCount": 1, "reason": "地标模型问题，另案修复"},
