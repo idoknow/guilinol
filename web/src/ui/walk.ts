@@ -1,5 +1,8 @@
 import './walk.css'
 import {walkConfig as cfg} from '../walk/config'
+import type {EbikeRideControlInput, EbikeTelemetrySnapshot} from '../walk/ebike-fx'
+
+const MOD_LABELS = {stock: '素车', ghostfire: '鬼火', neon: '霓虹'} as const
 
 function safeCapture(el:Element, pointerId:number) {
   try { el.setPointerCapture(pointerId) } catch {}
@@ -12,10 +15,34 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     +'<button class="btn-run" type="button" aria-label="奔跑" aria-pressed="false">跑</button>'
     +'<button class="btn-jump" type="button" aria-label="跳">跃</button>'
     +'<button class="btn-view" type="button" aria-label="切换视距">远近</button>'
+    +'<button class="btn-wheelie" type="button" aria-label="翘头或扶车">翘头</button>'
+    +'<button class="btn-gear-up" type="button" aria-label="升挡">+挡</button>'
+    +'<button class="btn-gear-down" type="button" aria-label="降挡">-挡</button>'
+    +'<button class="btn-tuck" type="button" aria-label="深压弯" aria-pressed="false">压弯</button>'
   document.body.append(panel);panel.hidden=true
+
+  const rideHud=document.createElement('div')
+  rideHud.className='ride-hud'
+  rideHud.innerHTML='<span class="ride-type" data-kind="normal">电摩</span><span class="ride-gear">D2</span><span class="ride-speed">0 km/h</span><span class="ride-bat" data-level="ok"><span class="ride-bat-bar"><i></i></span><span class="ride-bat-pct">100%</span></span><span class="ride-state" hidden></span><button class="ride-mod" type="button" aria-label="切换电动车改装">素车</button>'
+  document.body.append(rideHud)
+  const typeEl=rideHud.querySelector<HTMLElement>('.ride-type')!
+  const gearEl=rideHud.querySelector<HTMLElement>('.ride-gear')!
+  const speedEl=rideHud.querySelector<HTMLElement>('.ride-speed')!
+  const batEl=rideHud.querySelector<HTMLElement>('.ride-bat')!
+  const batFillEl=rideHud.querySelector<HTMLElement>('.ride-bat-bar i')!
+  const batPctEl=rideHud.querySelector<HTMLElement>('.ride-bat-pct')!
+  const stateEl=rideHud.querySelector<HTMLElement>('.ride-state')!
+  const modBtn=rideHud.querySelector<HTMLButtonElement>('.ride-mod')!
+
   const joystick=panel.querySelector<HTMLElement>('.joystick')!, knob=panel.querySelector<HTMLElement>('.joystick-knob')!
   const btnRun=panel.querySelector<HTMLButtonElement>('.btn-run')!, btnJump=panel.querySelector<HTMLButtonElement>('.btn-jump')!, btnView=panel.querySelector<HTMLButtonElement>('.btn-view')!
+  const btnWheelie=panel.querySelector<HTMLButtonElement>('.btn-wheelie')!
+  const btnGearUp=panel.querySelector<HTMLButtonElement>('.btn-gear-up')!
+  const btnGearDown=panel.querySelector<HTMLButtonElement>('.btn-gear-down')!
+  const btnTuck=panel.querySelector<HTMLButtonElement>('.btn-tuck')!
   let jump=false, runHold=false, runLock=false, runDownAt=0, stickPointer=-1, runPointer=-1
+  let wheelieTouch=false, wheeliePointer=-1, tuckTouch=false, tuckPointer=-1
+  let gearDelta=0, gearSelect:number|null=null, recoverPulse=false, cycleModPulse=false
   const touches=new Map<number,{x:number,y:number}>()
   let mouseDown=false, lastMouse={x:0,y:0}, pinchDist=0
 
@@ -44,11 +71,39 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   joystick.onpointercancel=endStick
   joystick.onlostpointercapture=endStick
   window.addEventListener('pointermove',event=>{if(event.pointerId===stickPointer)drag(event)})
-  window.addEventListener('pointerup',event=>{endStick(event);if(event.pointerId===runPointer)endRun(true,event.pointerId)})
-  window.addEventListener('pointercancel',event=>{endStick(event);if(event.pointerId===runPointer)endRun(false,event.pointerId)})
+  window.addEventListener('pointerup',event=>{
+    endStick(event)
+    if(event.pointerId===runPointer)endRun(true,event.pointerId)
+    if(event.pointerId===wheeliePointer){wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')}
+    if(event.pointerId===tuckPointer){tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')}
+  })
+  window.addEventListener('pointercancel',event=>{
+    endStick(event)
+    if(event.pointerId===runPointer)endRun(false,event.pointerId)
+    if(event.pointerId===wheeliePointer){wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')}
+    if(event.pointerId===tuckPointer){tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')}
+  })
 
   btnJump.onpointerdown=event=>{event.preventDefault();event.stopPropagation();jump=true}
   btnView.onpointerdown=event=>{event.preventDefault();event.stopPropagation();view()}
+  btnGearUp.onpointerdown=event=>{event.preventDefault();event.stopPropagation();gearDelta+=1}
+  btnGearDown.onpointerdown=event=>{event.preventDefault();event.stopPropagation();gearDelta-=1}
+  btnWheelie.onpointerdown=event=>{
+    event.preventDefault();event.stopPropagation()
+    wheeliePointer=event.pointerId;safeCapture(btnWheelie,event.pointerId)
+    wheelieTouch=true;recoverPulse=true;btnWheelie.classList.add('on')
+  }
+  const endWheelie=(event:PointerEvent)=>{if(event.pointerId===wheeliePointer){wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')}}
+  btnWheelie.onpointerup=endWheelie;btnWheelie.onpointercancel=endWheelie;btnWheelie.onlostpointercapture=endWheelie
+  btnTuck.onpointerdown=event=>{
+    event.preventDefault();event.stopPropagation()
+    tuckPointer=event.pointerId;safeCapture(btnTuck,event.pointerId)
+    tuckTouch=true;btnTuck.classList.add('on');btnTuck.setAttribute('aria-pressed','true')
+  }
+  const endTuck=(event:PointerEvent)=>{if(event.pointerId===tuckPointer){tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')}}
+  btnTuck.onpointerup=endTuck;btnTuck.onpointercancel=endTuck;btnTuck.onlostpointercapture=endTuck
+  modBtn.onpointerdown=event=>{event.stopPropagation()}
+  modBtn.onclick=event=>{event.stopPropagation();cycleModPulse=true}
   btnRun.onpointerdown=event=>{event.preventDefault();event.stopPropagation();runPointer=event.pointerId;safeCapture(btnRun,event.pointerId);runHold=true;runDownAt=performance.now();syncRun()}
   const endRun=(toggle:boolean,pointerId?:number)=>{if(!runHold||(pointerId!==undefined&&pointerId!==runPointer))return;if(toggle&&performance.now()-runDownAt<220)runLock=!runLock;runHold=false;runPointer=-1;syncRun()}
   btnRun.onpointerup=event=>endRun(true,event.pointerId)
@@ -57,13 +112,24 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     .observe(document.body,{attributes:true,attributeFilter:['data-aboard']})
 
   window.addEventListener('keydown',event=>{
-    if(!active()||(event.target as HTMLElement)?.tagName==='INPUT')return
+    if(!active()||(event.target as Element)?.closest?.('input,textarea,select,[contenteditable]'))return
     keys.add(event.code)
-    if(!event.repeat&&event.code==='Space'){jump=true;event.preventDefault()}
+    const ridingBike=document.body.dataset.ride==='bike'
+    if(!event.repeat&&event.code==='Space'){
+      if(ridingBike)recoverPulse=true
+      else jump=true
+      event.preventDefault()
+    }
     if(!event.repeat&&event.code==='KeyC')view()
+    if(ridingBike&&!event.repeat){
+      if(event.code==='KeyE')gearDelta+=1
+      else if(event.code==='KeyQ')gearDelta-=1
+      else if(event.code==='KeyG')cycleModPulse=true
+      else if(event.code==='Digit1'||event.code==='Digit2'||event.code==='Digit3'||event.code==='Digit4')gearSelect=Number(event.code.slice(-1))
+    }
   })
   window.addEventListener('keyup',event=>keys.delete(event.code))
-  window.addEventListener('blur',()=>{keys.clear();jump=false;runHold=false;touches.clear();mouseDown=false;resetStick()})
+  window.addEventListener('blur',()=>{keys.clear();jump=false;runHold=false;wheelieTouch=false;tuckTouch=false;touches.clear();mouseDown=false;resetStick()})
 
   function touchDistance(){
     const [a,b]=[...touches.values()]
@@ -127,6 +193,74 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
       const run=keys.has('ShiftLeft')||keys.has('ShiftRight')||runHold||runLock||stick.mag>.9
       const jumped=jump;jump=false
       return {right,forward,run,jump:jumped}
+    },
+    readRideControls():EbikeRideControlInput{
+      const out:EbikeRideControlInput={
+        gearDelta,
+        gearSelect,
+        wheelie:keys.has('Space')||wheelieTouch,
+        tuck:keys.has('ShiftLeft')||keys.has('ShiftRight')||tuckTouch,
+        recover:recoverPulse,
+        cycleMod:cycleModPulse,
+      }
+      gearDelta=0;gearSelect=null;recoverPulse=false;cycleModPulse=false
+      return out
+    },
+    syncRideHud(state:EbikeTelemetrySnapshot|null,rideKind:'bike'|'bicycle'|'car'|'boat'|null){
+      if(rideKind)document.body.dataset.ride=rideKind
+      else delete document.body.dataset.ride
+      if(state&&rideKind==='bike')document.body.dataset.rideType=state.vehicleType
+      else delete document.body.dataset.rideType
+      if(!state||(rideKind!=='bike'&&rideKind!=='bicycle')){
+        stateEl.hidden=true
+        return
+      }
+      if(rideKind==='bicycle'){
+        typeEl.dataset.kind='bicycle';typeEl.textContent='单车'
+        gearEl.textContent='人力';gearEl.removeAttribute('title')
+      }else{
+        typeEl.dataset.kind=state.vehicleType;typeEl.textContent=state.vehicleBadge
+        gearEl.textContent=state.gearLabel
+        gearEl.title=`${state.vehicleLabel} · 本挡限速 ${state.maxKmh} km/h`
+        const pct=Math.max(0,Math.min(100,Math.round(state.battery)))
+        batEl.dataset.level=state.criticalBattery?'crit':state.lowBattery?'low':'ok'
+        batFillEl.style.width=`${pct}%`
+        batPctEl.textContent=`${pct}%`
+      }
+      speedEl.textContent=`${state.kmh} km/h`
+      modBtn.textContent=MOD_LABELS[state.modPreset]
+      const leanDeg=Math.round(Math.abs(state.lean)*180/Math.PI)
+      const wheelieDeg=Math.round(Math.max(0,state.wheelie)*180/Math.PI)
+      if(state.crashPhase==='crashed'){
+        stateEl.hidden=false;stateEl.dataset.warn='1'
+        stateEl.textContent='摔车 · 空格扶起'
+        btnWheelie.textContent='扶车';btnWheelie.classList.add('on')
+      }else if(state.crashPhase==='recovering'){
+        stateEl.hidden=false;stateEl.dataset.warn='0'
+        stateEl.textContent='扶车中…'
+        btnWheelie.textContent='扶车'
+      }else{
+        btnWheelie.textContent='翘头'
+        btnWheelie.classList.toggle('on',wheelieTouch||keys.has('Space'))
+        if(rideKind==='bike'&&state.batteryDepleted){
+          stateEl.hidden=false;stateEl.dataset.warn='1'
+          stateEl.textContent='电量耗尽'
+        }else if(rideKind==='bike'&&state.criticalBattery){
+          stateEl.hidden=false;stateEl.dataset.warn='1'
+          stateEl.textContent=`极低电 · 限速 ${state.maxKmh}`
+        }else if(wheelieDeg>=4){
+          stateEl.hidden=false;stateEl.dataset.warn=wheelieDeg>=38?'1':'0'
+          stateEl.textContent=`翘头 ${wheelieDeg}°`
+        }else if(leanDeg>=8){
+          stateEl.hidden=false;stateEl.dataset.warn=Math.abs(state.lean)>=state.leanLimit*.86?'1':'0'
+          stateEl.textContent=`压弯 ${leanDeg}°`
+        }else if(rideKind==='bike'&&state.lowBattery){
+          stateEl.hidden=false;stateEl.dataset.warn='1'
+          stateEl.textContent='低电预警'
+        }else{
+          stateEl.hidden=true;stateEl.dataset.warn='0'
+        }
+      }
     },
   }
 }
