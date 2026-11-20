@@ -41,10 +41,19 @@ const hash = (x: number, z: number) => {
   const v = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453
   return v - Math.floor(v)
 }
+// Neighbouring vertices and both LODs sample the same integer noise lattice.
+// Cache exact double-precision values for the common range during this worker's lifetime.
+const lattice = new Float64Array(256*256).fill(NaN)
+function latticeHash(x:number,z:number) {
+  if(x < -128 || x >= 128 || z < -128 || z >= 128)return hash(x,z)
+  const i=(z+128)*256+x+128, value=lattice[i]
+  if(Number.isFinite(value))return value
+  return lattice[i]=hash(x,z)
+}
 const noise = (x: number, z: number, cell: number) => {
   const gx = x / cell, gz = z / cell, ix = Math.floor(gx), iz = Math.floor(gz), fx = gx - ix, fz = gz - iz
   const u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz)
-  const a = hash(ix, iz), b = hash(ix + 1, iz), c = hash(ix, iz + 1), d = hash(ix + 1, iz + 1)
+  const a = latticeHash(ix, iz), b = latticeHash(ix + 1, iz), c = latticeHash(ix, iz + 1), d = latticeHash(ix + 1, iz + 1)
   const ab = a + (b - a) * u, cd = c + (d - c) * u
   return ab + (cd - ab) * v
 }
