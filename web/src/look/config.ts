@@ -46,7 +46,11 @@ export const look = {
   },
   // M2.5 streets (streets.ts): GL04 path kinds 0 carriageway, 1 sidewalk+kerb, 2 lane markings, 3 stone embankment.
   streets: {
-    surfaces: [0x6a6b6b, 0xb7b3a8, 0xe6e2d4, 0x8f897b],
+    hedge: 0x486544, iron: 0x42624e,
+    directionSign: 0x3279a7,
+    sharedBike: 0x72d5b0,
+    awnings: [0x557650,0x506f94,0x9c4a46,0x878981], shutter:0x858b88,
+    surfaces: [0x6a6b6b, 0x999894, 0xe6e2d4, 0x8f897b, 0x737962, 0x626365, 0xa18b55],
     railing: 0xd9d5ca, lampPole: 0x3e4743, lampHead: 0xe7dcbc,
   },
   // Max lean of slope-planted trees towards the surface normal (radians); trees grow up, not out.

@@ -67,7 +67,8 @@ export class Forest{
     for(const trees of this.loaded.values())for(const tree of trees){const d=(tree.x-position.x)**2+(tree.y-position.y)**2+(tree.z-position.z)**2
       if(d>=1500**2)continue
       // Never let a crown swallow the follow camera: drop trees whose canopy the camera is inside.
-      if((tree.x-cam.x)**2+(tree.z-cam.z)**2<look.treeCameraClear**2&&cam.y-tree.y<14*tree.scale)continue
+      const underCamphor=tree.kind===0&&cam.y-tree.y<3.2*tree.scale
+      if((tree.x-cam.x)**2+(tree.z-cam.z)**2<(underCamphor?2.5:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue
       this.point.set(tree.x,tree.y+4,tree.z)
       if(this.frustum.planes.every(plane=>plane.distanceToPoint(this.point)>-40))groups[tree.kind+(d<600**2?0:6)].push(tree)}
     this.assets??=Array.from({length:6},(_,i)=>treeGeometry(i))

@@ -107,7 +107,7 @@ def rongyin_frontage():
 def rongyin_sidewalk():
     edge, along, inward = rongyin_frontage()
     return Polygon([edge + a * along - b * inward for a, b in
-                    [(-8, 0), (8, 0), (8, 18), (-8, 18)]])
+                    [(-8, 0), (8, 0), (8, 10), (-8, 10)]])
 
 
 def overture_geometry(row):

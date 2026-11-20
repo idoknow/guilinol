@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 from shapely import STRtree
-from shapely.geometry import Point, LineString
+from shapely.geometry import Point, LineString, Polygon
 from shapely.ops import unary_union
 
 from common import CHUNK, ll2xz, load_osm
@@ -17,9 +17,9 @@ from road_profile import pair_carriageways, profile, RULES
 CONFIG = json.loads(Path(__file__).with_name('vegetation.json').read_text())
 
 
-def walk_line(line, spacing, offset=0, jitter=0, rng=None):
+def walk_line(line, spacing, offset=0, jitter=0, rng=None, phase=None):
     length = line.length
-    for along in np.arange(spacing / 2, length, spacing):
+    for along in np.arange(spacing / 2 if phase is None else phase, length, spacing):
         along += rng.uniform(-jitter, jitter) if jitter else 0
         before = line.interpolate(max(0, along-.25))
         after = line.interpolate(min(length, along+.25))
@@ -57,7 +57,7 @@ def extract_road_network(frontage_footprints):
     return elements, roads, intersections, banks, waterways, ped_areas
 
 
-def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, precomputed=None, extra_blocked=()):
+def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, precomputed=None, extra_blocked=(), structure_exclude=None):
     rng = random.Random(110300)
     if precomputed is not None:
         elements, roads, intersections, banks, waterways, _ped_areas = precomputed
@@ -70,9 +70,10 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
     tiles, occupancy, stats = defaultdict(bytearray), defaultdict(list), Counter()
     spacing = CONFIG['minSeparation']
 
-    def tree(pt, profile, source, height=None, normal=(0,1,0), separation=spacing, force_kind=None, force_scale=None):
+    def tree(pt, profile, source, height=None, normal=(0,1,0), separation=spacing, force_kind=None, force_scale=None, yaw=None, planting_mask=None):
         east,south = pt.x,pt.y
-        if not bounds.contains(pt) or exclude.covers(pt) or road_only.query(pt, predicate='intersects').size:
+        mask = exclude if planting_mask is None else planting_mask
+        if not bounds.contains(pt) or mask.covers(pt) or road_only.query(pt, predicate='intersects').size:
             return False
         if height is None and blocked.query(pt,predicate='intersects').size:
             return False
@@ -90,7 +91,7 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
         final_y = ground_y if height is None else (max(height, ground_y) if height < ground_y - 0.35 else height)
         tiles[left,top].extend(struct.pack('<HHhBBBBbb',min(CHUNK*100-1,max(0,round((east-left)*100))),min(CHUNK*100-1,max(0,round((south-top)*100))),
             round(10*final_y),kind,scale,
-            rng.randrange(256),rng.randrange(256),round(normal[0]*127),round(normal[2]*127)))
+            rng.randrange(256) if yaw is None else round(yaw*128/math.pi)%256,rng.randrange(256),round(normal[0]*127),round(normal[2]*127)))
         stats[source]+=1
         stats[CONFIG['species'][kind]]+=1
         return True
@@ -131,14 +132,44 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
             for pt in walk_line(LineString(points(elem)),CONFIG['treeRowSpacing']):
                 tree(pt,'mixed','osmRow')
     street = CONFIG['street']
+    beds = defaultdict(list)
     for road in roads:
         line,width,name = road.line,road.width,road.name
         if not bounds.intersects(line):
             continue
-        for side in [-1,1]:
-            for pt in walk_line(line,street['spacing'],side*(width/2+street['offset']),street['jitter'],rng):
-                if not junctions.query(pt,predicate='dwithin',distance=street['junction']).size:
-                    tree(pt,'river' if '滨江' in name else 'lake' if '榕' in name else 'mixed','street')
+        section = road.dimensions
+        for side, available in ((-1,road.left),(1,road.right)):
+            if section and not available:
+                continue
+            arterial = road.kind in ('trunk','primary')
+            offset = (section['verge']/2 if arterial else section['verge']+section['cycle']+section['curb']+.58) if section else street['offset']
+            if section:
+                offset = section.get('treeInset',offset)
+            line = road.side_line(side)
+            for pt in walk_line(line,street['spacing'],side*(width/2+offset),0 if section else street['jitter'],rng,phase=0 if section and 'treeInset' in section else None):
+                fitted_verge = road.widening and road.widening[0]==side and road.line.project(pt)<RULES['outerWidening'][str(road.way)]['stationMetres'][-1]
+                if not junctions.query(pt,predicate='dwithin',distance=4 if fitted_verge else street['junction']).size:
+                    if not section:
+                        tree(pt,'river' if '滨江' in name else 'lake' if '榕' in name else 'mixed','street')
+                    elif not blocked.query(pt.buffer(.52), predicate='intersects').size:
+                        origin = tuple(math.floor(value/CHUNK)*CHUNK for value in pt.coords[0])
+                        along = line.project(pt)
+                        before, after = line.interpolate(max(0,along-.2)), line.interpolate(min(line.length,along+.2))
+                        angle = math.atan2(after.y-before.y,after.x-before.x)
+                        canopy = 'treeInset' in section
+                        if not tree(pt,'mixed','street',force_kind=1 if canopy else 0 if arterial else rng.randrange(2),force_scale=125 if canopy else 100 if arterial else 120,yaw=-angle-side*math.pi/2 if arterial else None,planting_mask=structure_exclude if fitted_verge else None):
+                            continue
+                        beds[origin].append([round((pt.x-origin[0])*10),round((pt.y-origin[1])*10),round(angle*100),int(arterial)])
+    if ry_road is not None and ry_road.line.length>280:
+        for station in (265,273,281):
+            center = ry_road.line.interpolate(station)
+            ahead = ry_road.line.interpolate(station+.1)
+            angle = math.atan2(ahead.y-center.y,ahead.x-center.x)
+            inset = ry_road.width/2+2.85
+            point = Point(center.x-inset*math.sin(angle),center.y+inset*math.cos(angle))
+            if tree(point,'lake','street',force_kind=1,force_scale=125,yaw=-angle,separation=3,planting_mask=Polygon()):
+                origin = tuple(math.floor(value/CHUNK)*CHUNK for value in point.coords[0])
+                beds[origin].append([round((point.x-origin[0])*10),round((point.y-origin[1])*10),round(angle*100),0])
     shore = unary_union(wet).boundary
     for poly,name,water in banks:
         for pt in walk_line(poly.exterior,CONFIG['bank']['spacing']):
@@ -173,4 +204,4 @@ def scatter(bounds, footprints, wet, peaks, elevation, mountain_trees, exclude, 
                     tree(pt,'mixed','waterway')
     for pos,normal in mountain_trees:
         tree(Point(pos[0],pos[2]),'peak','mountain',pos[1],normal)
-    return tiles, roads, banks, stats
+    return tiles, roads, banks, stats, beds

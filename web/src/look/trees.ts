@@ -40,10 +40,10 @@ const t = look.trees
 function camphor() { // 香樟: broad rounded crown of three lumps on a short trunk, ~11 m tall
   const leaf = {color:t.camphor, lit:t.camphorLit, dark:t.canopyDark}
   return {
-    near: [{geometry:trunk(5, .42, .26), color:t.trunk},
-      {...leaf, geometry:lump(4.2, .72, 0, 7.4, 0)}, {...leaf, geometry:lump(3.1, .75, 2.6, 6.3, 1.1, 1)},
-      {...leaf, geometry:lump(2.9, .8, -2.2, 6.6, -1.6, 2)}, {...leaf, geometry:lump(2.5, .8, .3, 9.3, -.4, .5)}],
-    far: [{...leaf, geometry:lump(5, .72, 0, 7.2, 0)}],
+    near: [{geometry:trunk(5, .245, .20, 8), color:t.trunk},
+      {...leaf, geometry:lump(4.6, .72, 1.5, 7.4, 0)}, {...leaf, geometry:lump(3.0, .75, 3.4, 6.3, 1.1, 1)},
+      {...leaf, geometry:lump(3.0, .8, -.5, 6.6, -1.6, 2)}, {...leaf, geometry:lump(2.5, .8, 1.8, 9.3, -.4, .5)}],
+    far: [{...leaf, geometry:lump(5, .72, 1.5, 7.2, 0)}],
   }
 }
 function rootStrand(x:number, z:number, topY:number, botY:number, rTop:number) {
@@ -52,9 +52,7 @@ function rootStrand(x:number, z:number, topY:number, botY:number, rTop:number) {
 function banyan() { // 榕树: very wide, low dome; fluted root columns by trunk + hanging canopy aerial-root curtains (near = 116 <= 120 faces)
   const leaf = {color:t.banyan, lit:t.banyanLit, dark:t.canopyDark}
   return {
-    near: [{geometry:trunk(4.5, .92, .56, 6), color:t.trunk},
-      {geometry:trunk(4.7, .17, .12, 3).translate(.88, 0, .42), color:t.trunk},
-      {geometry:trunk(4.6, .16, .11, 3).translate(-.82, 0, -.52), color:t.trunk},
+    near: [{geometry:trunk(4.5, .245, .20, 8), color:t.trunk},
       {geometry:rootStrand(1.05, -.38, 4.9, .45, .11), color:t.trunk},
       {geometry:rootStrand(-.45, 1.02, 5.0, .55, .10), color:t.trunk},
       {geometry:rootStrand(2.2, 1.7, 5.7, 2.35, .10), color:t.trunk},

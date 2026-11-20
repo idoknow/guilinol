@@ -5,6 +5,7 @@ import { basename, dirname, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
 import { preview } from 'vite'
+import {sectionCamera} from './section-camera.mjs'
 
 const refs = resolve('docs/refs/rock'),
   out = resolve('captures/photo-match')
@@ -13,6 +14,7 @@ const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
     all: { type: 'boolean' },
+    'section-views': { type: 'boolean' },
     height: { type: 'string', default: '1.5' },
     'yaw-offset': { type: 'string', default: '0' },
   },
@@ -102,7 +104,7 @@ try {
       return { width: Math.round(img.width * scale), height: Math.round(img.height * scale) }
     }, data)
     await page.setViewportSize(viewport)
-    const location = locations[key]
+    const location = values['section-views'] ? sectionCamera(key, locations[key]) : locations[key]
     // WMM2025, Guilin (25.2825 N, 110.2942 E), 2026-11-19, 154 m ASL.
     // IMG_1425 and IMG_1426 are the two magnetic headings in this collection.
     const pose = location.pose
@@ -146,7 +148,10 @@ try {
     // The loaders publish data between frames. Let the render loop apply LOD and tree batches.
     await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
     calls.push(await page.evaluate(() => window.viewer.stats.calls))
-    const shot = await page.screenshot({ type: 'png' })
+    await page.evaluate(() => window.viewer.freeze())
+    let shot
+    try { shot = await page.screenshot({ type: 'png', timeout: settleMs }) }
+    finally { await page.evaluate(() => window.viewer.resume()) }
     const images = await compose.evaluate(
       async ({ src, width, height }) => {
         const game = new Image()
@@ -172,13 +177,14 @@ try {
     await mkdir(dirname(join(out, key)), { recursive: true })
     for (const [i, path] of [key, overlay].entries())
       await writeFile(join(out, path), Buffer.from(images[i], 'base64'))
+    const offsetText = location.offsetLabel ? ` · 机位偏移 ${location.offsetLabel}` : ''
     const estimate = support.sampleDistance
       ? `（距机位 ${support.sampleDistance.toFixed(1)} m 处桥面估高）`
       : ''
     const basis = pose?.basis.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
     const calibration = pose ? ` · Δ东/南 (${dx}, ${dz}) m · Δ朝向 ${dyaw}° · ${pose.unusable ? 'GPS 不可用：' : ''}${pose.override ? '超限修正（参照 ' + pose.override.anchors.join('、') + '）：' : ''}${basis}` : ''
     cards.push(`<figure>
-      <figcaption>${key} · ${support.kind} ${support.y.toFixed(2)} m${estimate} · 机位 ${eyeY.toFixed(2)} m · 原始 x/z (${location.x}, ${location.z}) m · EXIF ${location.heading}° ${location.headingRef} · 真北 ${heading.toFixed(1)}°${calibration} · 渲染 ${renderHeading.toFixed(1)}° · ${location.focal35} mm · GPS ±${location.hAccuracy} m · <a href="${overlay}">50% 叠加</a></figcaption>
+      <figcaption>${key} · ${support.kind} ${support.y.toFixed(2)} m${estimate} · 机位 ${eyeY.toFixed(2)} m · 原始 x/z (${locations[key].x}, ${locations[key].z}) m · EXIF ${location.heading}° ${location.headingRef} · 真北 ${heading.toFixed(1)}°${calibration} · 渲染 ${renderHeading.toFixed(1)}° · ${location.focal35} mm · GPS ±${location.hAccuracy} m${offsetText} · <a href="${overlay}">50% 叠加</a></figcaption>
       <a href="${key}"><img loading="lazy" src="${key}" alt="${key} 实拍和游戏对比" width="${viewport.width * 2}" height="${viewport.height}"></a>
     </figure>`)
   }

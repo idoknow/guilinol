@@ -4,6 +4,8 @@ import {bridgeMaterial} from './look/bridge'
 import {WATER_LAYER, waterMaterial} from './look/water'
 import {streetFurnitureGeo, streetFurnitureMat, streetSurfaceMat} from './streets'
 import type {Tile} from './world'
+import {vehicleModel} from './walk/vehicle-model'
+import {look} from './look/config'
 
 export interface TileBatchInput {
   tile:Tile
@@ -16,6 +18,9 @@ export interface TileBatchInput {
   streetSurface:THREE.BufferGeometry|null
   furnitureMatrices:Float32Array
   furnitureColors:Float32Array
+  detailCount:number
+  railLodCount:number
+  parked:Float32Array
 }
 
 interface IndexedSlice {
@@ -165,7 +170,9 @@ export class ChunkBatcher {
   ])
 
   private furniture:THREE.InstancedMesh|null = null
+  private parked:THREE.InstancedMesh|null = null
   private lastFurnitureMask = ''
+  private lastFurniturePos = new THREE.Vector3(Infinity,Infinity,Infinity)
 
   constructor(private scene:THREE.Scene) {
     scene.add(this.buildings.mesh,this.water.mesh,this.bridges.mesh,this.streets.mesh)
@@ -176,8 +183,7 @@ export class ChunkBatcher {
     if(input.walls) shiftPositions(input.walls,tile.x,tile.z)
     if(input.bridge) shiftPositions(input.bridge,tile.x,tile.z)
     if(input.streetSurface) shiftPositions(input.streetSurface,tile.x,tile.z)
-    const mats = input.furnitureMatrices
-    for(let i=0;i<mats.length;i+=16) { mats[i+12]+=tile.x; mats[i+14]+=tile.z }
+    for(const mats of [input.furnitureMatrices,input.parked])for(let i=0;i<mats.length;i+=16) { mats[i+12]+=tile.x; mats[i+14]+=tile.z }
     this.items.set(tile,input)
     this.dirty = true
   }
@@ -214,6 +220,7 @@ export class ChunkBatcher {
     if(!this.items.size) {
       if(this.dirty) this.rebuildStatic()
       if(this.furniture) this.furniture.visible = false
+      if(this.parked) this.parked.visible=false
       return
     }
     const moved = focus.distanceToSquared(this.lastFocus)>=4 ||
@@ -265,10 +272,43 @@ export class ChunkBatcher {
     this.bridges.cull(visibleChunks)
     this.streets.cull(visibleStreets)
 
-    if(furnMask!==this.lastFurnitureMask) {
+    if(furnMask!==this.lastFurnitureMask || camera.position.distanceToSquared(this.lastFurniturePos)>=4) {
       this.lastFurnitureMask = furnMask
-      let boxCount = 0
-      for(const tile of visibleStreets) boxCount += (this.items.get(tile)?.furnitureMatrices.length ?? 0)/16
+      this.lastFurniturePos.copy(camera.position)
+      const near=(matrices:Float32Array,index:number,radius=30)=>{
+        const offset=index*16,position=camera.position
+        return (matrices[offset+12]-position.x)**2+(matrices[offset+13]-position.y)**2+(matrices[offset+14]-position.z)**2<=radius**2
+      }
+      const selections=Array.from(visibleStreets,tile=>{
+        const item=this.items.get(tile)!, bikes:number[]=[],boxes:number[]=[]
+        const position=camera.position
+        const tileDistance=Math.max(tile.x-position.x,position.x-tile.x-256,tile.z-position.z,position.z-tile.z-256)
+        if(tileDistance<=122){
+          for(let index=0;index<item.railLodCount;index++)if(near(item.furnitureMatrices,index,120))boxes.push(index)
+        }
+        if(tileDistance<=32){
+          for(let index=0;index<item.parked.length/16;index++)if(near(item.parked,index))bikes.push(index)
+          for(let index=item.railLodCount;index<item.detailCount;index++)if(near(item.furnitureMatrices,index))boxes.push(index)
+        }
+        return {item,bikes,boxes}
+      })
+      const count=selections.reduce((total,{bikes})=>total+bikes.length,0)
+      if(count && (!this.parked || this.parked.instanceMatrix.count<count)){
+        if(this.parked){this.scene.remove(this.parked);this.parked.dispose()}
+        const bike=vehicleModel('bike',1)
+        this.parked=new THREE.InstancedMesh(bike.geometry,bike.material,2**Math.ceil(Math.log2(count)))
+        this.parked.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(this.parked.instanceMatrix.count*3),3)
+        const shared=new THREE.Color(look.streets.sharedBike),privateBike=new THREE.Color(0xffffff)
+        for(let index=0;index<this.parked.instanceMatrix.count;index++)this.parked.setColorAt(index,Math.floor(index/3)%3===0?shared:privateBike)
+        this.parked.frustumCulled=false;this.scene.add(this.parked)
+      }
+      if(this.parked){
+        this.parked.visible=!!count;this.parked.count=count;let offset=0
+        for(const {item,bikes} of selections)for(const index of bikes){this.parked.instanceMatrix.array.set(item.parked.subarray(index*16,index*16+16),offset);offset+=16}
+        this.parked.instanceMatrix.clearUpdateRanges();this.parked.instanceMatrix.addUpdateRange(0,offset)
+        this.parked.instanceMatrix.needsUpdate=true
+      }
+      const boxCount=selections.reduce((total,{item,boxes})=>total+item.furnitureMatrices.length/16-item.detailCount+boxes.length,0)
       if(!boxCount) {
         if(this.furniture) this.furniture.visible = false
         return
@@ -284,11 +324,14 @@ export class ChunkBatcher {
       const matArr = this.furniture.instanceMatrix.array as Float32Array
       const colArr = this.furniture.instanceColor!.array as Float32Array
       let mCursor = 0, cCursor = 0
-      for(const tile of visibleStreets) {
-        const item = this.items.get(tile)!
-        if(!item.furnitureMatrices.length) continue
-        matArr.set(item.furnitureMatrices,mCursor); mCursor += item.furnitureMatrices.length
-        colArr.set(item.furnitureColors,cCursor); cCursor += item.furnitureColors.length
+      for(const {item,boxes} of selections) {
+        for(const index of boxes){
+          matArr.set(item.furnitureMatrices.subarray(index*16,index*16+16),mCursor);mCursor+=16
+          colArr.set(item.furnitureColors.subarray(index*3,index*3+3),cCursor);cCursor+=3
+        }
+        const matrices=item.furnitureMatrices.subarray(item.detailCount*16),colors=item.furnitureColors.subarray(item.detailCount*3)
+        matArr.set(matrices,mCursor);mCursor+=matrices.length
+        colArr.set(colors,cCursor);cCursor+=colors.length
       }
       this.furniture.count = boxCount
       this.furniture.visible = true

@@ -144,8 +144,11 @@ export async function detail(tile:Tile, signal:AbortSignal) {
     tile, minY, maxY, midY:heights.getY(segments/2*(stride+1)),
     walls, pond:pond?.positions ?? null, bridge,
     streetSurface:streets.surface,
+    detailCount:streets.detailCount,
+    railLodCount:streets.railLodCount,
     furnitureMatrices:streets.furnitureMatrices,
     furnitureColors:streets.furnitureColors,
+    parked:streets.parked,
   }
   return {
     group,groundMesh,terrain,water,rings,deck,thin,streets,batch,
