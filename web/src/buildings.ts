@@ -1,14 +1,16 @@
 import * as THREE from 'three'
 import {buildingColor} from './look/buildings'
+import {campusAt,type CampusExterior} from './campus-exteriors'
 
 type Pair=[number,number]
 type Vertex=[number,number,number]
 export type Building=[number,number,Pair[][],number,number,number,number[],Pair[],number]
 
-export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:Uint32Array,parts:Building[]){
+export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:Uint32Array,parts:Building[],tile:{x:number,z:number},campuses:CampusExterior[]){
   const xyz=Array.from(positions,(v,i)=>v/(i%3===1?10:100)),normal=Array.from(normals,v=>v/127),faces=Array.from(indices)
   const count=xyz.length/3,kinds=new Array<number>(count),floor=new Array<number>(count),facade=new Array<number>(count),roofs=new Array<number>(count)
   let cursor=0
+  const tints:{start:number,end:number,color:THREE.Color}[]=[]
   for(const [base,top,loops,kind,floors,seed,anchor,rectangle,complex] of parts){
     const level=top/10
     function tag(index:number,isRoof:number,f:number,u:number){kinds[index]=kind;floor[index]=f;facade[index]=u;roofs[index]=isRoof}
@@ -19,6 +21,7 @@ export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:
       for(let i=1;i+1<corners.length;i++)faces.push(start,start+i,start+i+1)
     }
     for(const loop of loops)for(let i=0;i<loop.length;i++)tag(cursor++,1,floors,0)
+    const firstWall=cursor
     for(const loop of loops){let u=0
       for(let i=0;i<loop.length;i++){
         const [x,z]=loop[i].map(v=>v/100),[ex,ez]=loop[(i+1)%loop.length].map(v=>v/100),len=Math.hypot(ex-x,ez-z)
@@ -26,6 +29,11 @@ export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:
         for(const end of [false,false,true,true]){const index=cursor++;tag(index,0,(xyz[3*index+1]-base/10)/3.1,end?u+len:u)}u+=len
         if(!kind&&!(x===ex&&(x===0||x===256))&&!(z===ez&&(z===0||z===256)))face([[x,level,z],[x,level+.9,z],[ex,level+.9,ez],[ex,level,ez]])
       }
+    }
+    if(kind===3 && loops[0]?.length){
+      const outer=loops[0], center=outer.reduce(([east,south],[x,z])=>[east+x,south+z],[0,0])
+      const color=campusAt(campuses,tile.x+center[0]/(100*outer.length),tile.z+center[1]/(100*outer.length))?.wall
+      if(color!=null)tints.push({start:firstWall,end:cursor,color:new THREE.Color(color)})
     }
     if(!anchor.length||kind===3)continue
     const [cx,cz]=anchor.map(v=>v/100)
@@ -46,6 +54,7 @@ export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:
   }
   const geom=new THREE.BufferGeometry(),colors:number[]=new Array(kinds.length*3)
   kinds.forEach((kind,i)=>buildingColor(kind,!!roofs[i],normal[3*i+1],colors,i*3))
+  for(const {start,end,color} of tints)for(let index=start;index<end;index++)color.toArray(colors,index*3)
   for(const [name,values,size] of [['position',xyz,3],['normal',normal,3],['color',colors,3],['aFloor',floor,1],['aFacade',facade,1]] as const)
     geom.setAttribute(name,new THREE.Float32BufferAttribute(values,size))
   geom.setAttribute('aKind',new THREE.Uint8BufferAttribute(kinds,1));geom.setAttribute('aRoof',new THREE.Uint8BufferAttribute(roofs,1));geom.setIndex(faces);return geom

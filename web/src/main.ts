@@ -167,7 +167,7 @@ async function start() {
     tour?.tick(elapsed/1000)
     draw()
     frame++; sum+=elapsed;samples++
-    Object.assign(stats,{ms:elapsed,calls:renderer.info.render.calls,frame,loaded:stream.loaded.size,pending:stream.pending.size,
+    Object.assign(stats,{ms:elapsed,calls:renderer.info.render.calls,triangles:renderer.info.render.triangles,frame,loaded:stream.loaded.size,pending:stream.pending.size,
       visited:stream.visited.size,failures:stream.failures.size})
     if(sum>=400||frame===1) {
       output.value=`${Math.round(samples*1000/(sum||16.7))} FPS · ${stats.calls} calls · ${stats.loaded} 块 · ${bytes.toLocaleString()} B`

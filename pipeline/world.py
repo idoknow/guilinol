@@ -22,6 +22,7 @@ from road_grading import build_ground_mesh_lookup, eval_bspline_grid, solve_road
 from scatter import CONFIG, extract_road_network, scatter
 from streets import chunks as street_chunks
 from atlas import write_atlas
+from campus_exteriors import exterior_regions
 from vehicles import plan_vehicles, write_vehicles
 from clearance import landmark_triangles
 from landmarks.rong_ground import grade_landings
@@ -356,6 +357,7 @@ def build(bbox, output, palette):
     manifest['terrainSha256'] = digest.hexdigest()
     print('Terrain SHA-256:', digest.hexdigest())
     manifest['landmarks'] = landmarks
+    manifest['campusExteriors'] = exterior_regions()
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
