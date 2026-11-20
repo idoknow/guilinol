@@ -272,14 +272,21 @@ spec:
         - name: PUBLIC_ORIGIN
           value: https://glol.rcpd.cc
 ---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: glol-tls
+  namespace: idoknow
+spec:
+  secretName: glol-tls
+  issuerRef: {kind: Issuer, name: letsencrypt-idoknow}
+  dnsNames: [glol.rcpd.cc]
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: glol-web
   namespace: idoknow
-  annotations:
-    cert-manager.io/issuer: letsencrypt-idoknow
-    nginx.ingress.kubernetes.io/proxy-body-size: 16m
 spec:
   ingressClassName: hongkong
   tls:
