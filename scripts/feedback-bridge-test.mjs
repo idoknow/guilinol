@@ -105,7 +105,7 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
   }))
     assert.equal(data.args[data.args.indexOf(key) + 1], value)
   assert.equal((await api(path)).status,'submitted');assert.match(data.body,/待管理员批准/)
-  const approve=async id=>api(`admin/feedback/${id}/status`,{status:'approved'});sql("UPDATE users SET role='admin',notify_email=1; UPDATE feedback_mail SET next_at=0")
+  const approve=async id=>api(`admin/feedback/${id}/status`,{status:'approved'});await sql("UPDATE users SET role='admin',notify_email=1; UPDATE feedback_mail SET next_at=0")
   await set({comments:[{id:'clarify',author_id:'agent',author_type:'agent',created_at:new Date().toISOString(),content:'```feedback-reply\n是桥头吗？\n```'}]});await api(path+'/messages',{body:'是的'});run();run()
   assert.equal((await api(path)).messages.filter(m=>m.author_kind==='agent').length,1);assert.equal((await load()).replies.filter(m=>m.startsWith('用户回复：')).length,1);assert.match(mailLog(),/DEV_NOTIFICATION/)
   await approve(id);run();run();assert.equal((await load()).replies.filter(m=>m.startsWith('管理员已批准')).length,1)

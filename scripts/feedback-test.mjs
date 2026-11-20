@@ -7,7 +7,7 @@ const bridge = { Authorization: 'Bearer local-test' },
 export async function apiTest({ api, origin, cookie, sql }) {
   const other = '1'.repeat(64),
     digest = createHash('sha256').update(other).digest('hex')
-  sql(
+  await sql(
     `INSERT INTO users(id,email,nickname,salt,digest,verified) VALUES('other','other@example.test','other','','',1); INSERT INTO sessions VALUES('${digest}','other',unixepoch()+3600)`,
   )
   const second = { Cookie: `glol_session=${other}` },
@@ -44,7 +44,7 @@ export async function apiTest({ api, origin, cookie, sql }) {
   await photo(discard, 1, 200)
   for (const unused of [discard, extra])
     await api('feedback/' + unused, null, 200, null, { method: 'DELETE' })
-  sql(
+  await sql(
     `INSERT INTO feedback_photos(feedback_id,n,r2_key,bytes,mime) VALUES('${id}',1,'fb/interrupted.png',4096,'image/png')`,
   )
   for (const n of [1, 2, 3]) await photo(id, n, 200)
@@ -60,14 +60,14 @@ export async function apiTest({ api, origin, cookie, sql }) {
   await uploadShot(origin,cookie,id)
   assert.equal((await fetch(`${origin}/api/${path}/view-shot`,{headers:second})).status,404)
   assert.deepEqual((await api(path)).view,view)
-  sql(
+  await sql(
     `INSERT INTO feedback_upload_usage SELECT user_id,unixepoch(),314572800-${picture.length}-(SELECT sum(bytes) FROM feedback_upload_usage) FROM feedback WHERE id='${id}'`,
   )
   await photo(id, 4, 200)
   await photo(id, 4, 200, {}, 'DELETE')
   await photo(id, 3, 429)
   await uploadShot(origin,cookie,id,429)
-  sql('UPDATE feedback_upload_usage SET uploaded_at=unixepoch()-86400')
+  await sql('UPDATE feedback_upload_usage SET uploaded_at=unixepoch()-86400')
   await photo(id, 3, 200)
   await photo(id, 1, 404, second, 'GET')
   await photo(id, 4, 404, second)
@@ -84,10 +84,10 @@ export async function apiTest({ api, origin, cookie, sql }) {
   await move(id, 'live', 409)
   await move(id,'approved',409);await move(id,'queued',409);await api('admin/'+path+'/status',{status:'approved'},403)
   await api(path+'/messages',{body:'不应越权'},404,null,{headers:second});await api(path+'/messages',{body:'x'.repeat(1001)},400)
-  const adminHeaders={headers:second};sql("UPDATE users SET role='admin' WHERE id='other'");const approve=()=>api('admin/'+path+'/status',{status:'approved'},200,null,adminHeaders)
+  const adminHeaders={headers:second};await sql("UPDATE users SET role='admin' WHERE id='other'");const approve=()=>api('admin/'+path+'/status',{status:'approved'},200,null,adminHeaders)
   await api('admin/'+path+'/messages',{body:'管理员回复'},200,null,adminHeaders)
   for(let index=0;index<19;index++)await api(path+'/messages',{body:'用户回复'});await api(path+'/messages',{body:'超过每小时额度'},429)
-  sql('UPDATE feedback_messages SET created_at=created_at-3601');await approve()
+  await sql('UPDATE feedback_messages SET created_at=created_at-3601');await approve()
   assert.equal((await api('me',{notify_email:false},200,null,{method:'PATCH'})).notify_email,false);await api('me',{notify_email:true},200,null,{method:'PATCH'})
   const who=(await api('me')).id,sig=createHmac('sha256','local-test').update('feedback-unsubscribe:'+who).digest('hex');assert.equal((await fetch(`${origin}/api/unsubscribe?user=${who}&sig=bogus`)).status,400);assert.equal((await fetch(`${origin}/api/unsubscribe?user=${who}&sig=${sig}`)).status,200);assert.equal((await api('me')).notify_email,false)
   await move(id, 'queued')
@@ -98,7 +98,7 @@ export async function apiTest({ api, origin, cookie, sql }) {
   await move(id, 'need_info')
   await photo(id, 4, 200)
   await api(path + '/supplement', { body: '补充入口侧视图' })
-  await approve();sql("UPDATE users SET role='user' WHERE id='other'")
+  await approve();await sql("UPDATE users SET role='user' WHERE id='other'")
   await move(id, 'queued')
   await move(id, 'live')
   await move(id, 'live', 409)
@@ -214,6 +214,8 @@ export async function uiTest(page, origin,sql) {
   await page.goto(origin+'/?verify&view='+Buffer.from(JSON.stringify(stored)).toString('base64url'))
   await page.waitForFunction(view=>{const viewer=window.viewer;if(!viewer||viewer.stats.loaded===0)return false;const camera=viewer.camera;return document.body.dataset.mode==='fly'&&Math.hypot(camera.position.x-view.x,camera.position.y-view.y,camera.position.z-view.z)<.5&&Math.abs(camera.rotation.y*180/Math.PI-view.yaw)<.5&&Math.abs(camera.rotation.x*180/Math.PI-view.pitch)<.5},stored,{timeout:120000})
   await page.evaluate(()=>window.viewer.freeze())
+  const replay=await page.evaluate(view=>{const camera=window.viewer.camera;return {meters:Math.hypot(camera.position.x-view.x,camera.position.y-view.y,camera.position.z-view.z),yaw:Math.abs(camera.rotation.y*180/Math.PI-view.yaw),pitch:Math.abs(camera.rotation.x*180/Math.PI-view.pitch)}},stored)
+  assert.ok(Object.values(replay).every(value=>value<.5),JSON.stringify(replay));console.log('Deep link camera replay errors:',replay);await shot('deep-link-replay')
   await page.locator('.dock-feedback').click()
   await fb.getByLabel('标题').waitFor()
   await fb.locator('.fb-map canvas').waitFor()

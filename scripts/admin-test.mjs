@@ -17,7 +17,7 @@ export async function apiTest({ api, sql, id, second, photo,origin,cookie }) {
     await admin(path, data, 401, { Cookie: '' })
     await admin(path, data, 403)
   }
-  sql(`UPDATE users SET role='admin' WHERE id='other';`)
+  await sql(`UPDATE users SET role='admin' WHERE id='other';`)
   assert.equal((await admin('stats')).verified, 2)
   const users = await admin('users?q=WALKER')
   assert.equal(users.items.length, 1)
@@ -47,7 +47,7 @@ export async function apiTest({ api, sql, id, second, photo,origin,cookie }) {
     ['submitted','approved', 'queued', 'rejected'],
   )
   assert.equal(events.at(-1).message, transition.message)
-  sql(
+  await sql(
     `UPDATE feedback SET submitted_at=unixepoch()-86401 WHERE id='${manual}'; WITH RECURSIVE numbers(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM numbers WHERE n<51) INSERT INTO users(id,email,nickname,salt,digest) SELECT 'seed'||n,'seed'||n||'@example.test','分页','','' FROM numbers;`,
   )
   const first = await admin('users?q=seed'),
@@ -56,7 +56,7 @@ export async function apiTest({ api, sql, id, second, photo,origin,cookie }) {
   assert.equal(last.items.length, 1)
   assert.equal(last.next_cursor, null)
   assert.equal(new Set([...first.items, ...last.items].map((row) => row.id)).size, 51)
-  sql("UPDATE users SET role='user' WHERE id='other'")
+  await sql("UPDATE users SET role='user' WHERE id='other'")
   await admin('stats', null, 403)
   await photo(id, 1, 404, second, 'GET')
 }
@@ -97,7 +97,7 @@ export async function browserTest({ page, origin, email, password, nickname, cod
   assert.equal(upload.status(), 200)
   assert.equal((await request.put(`${origin}/api/feedback/${item.id}/view-shot`,{headers:{...headers,'Content-Type':'image/jpeg'},data:await readFile('public/og.jpg')})).status(),200)
   await post(`feedback/${item.id}/submit`, {})
-  sql(`UPDATE users SET role='admin' WHERE email='${email}'`)
+  await sql(`UPDATE users SET role='admin' WHERE email='${email}'`)
   await page.reload()
   await page.getByRole('cell', { name: email }).waitFor()
   await shot('users')
