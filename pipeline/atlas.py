@@ -150,7 +150,9 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
     place('桂林理工大学附属小学', 'school', Point(933, -399))
     place('桂林市田家炳中学', 'school', Point(1032, -965))
     place('桂林市辰山小学', 'school', Point(1110, -2413))
-    place('漓江小学', 'school', Point(1111, 102))
+    fangxiang = [line for name, _, line in public_streets if name == '芳香路']
+    street_hint = Point(1111, 102)
+    place('漓江小学', 'school', nearest_points(street_hint, min(fangxiang, key=street_hint.distance))[1])
     place('龙隐小学', 'school', Point(835, 1106))
     place('桂林剧院', 'scenic', Point(-294, 80))
     place('桂林图书市场', 'scenic', Point(-403, 91))

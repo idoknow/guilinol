@@ -54,6 +54,7 @@ for(const [query,name,road] of [
   assert.equal(hit?.n,name)
   assert.equal(hit?.k,'school')
   if(road) assert.equal(atlas.roadAt(hit.x,hit.z,30)?.name,road)
+  if(name==='漓江小学') assert.equal(atlas.roadAt(hit.x,hit.z,2)?.name,road)
 }
 const yixian = atlas.search('桂林市逸仙中学')[0]
 assert.equal(yixian.k,'school')
