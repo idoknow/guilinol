@@ -100,7 +100,7 @@ export function landmarkStream(
     })
   }
   function entryCutoffs(entry:Landmark,metrics:RenderRangeMetrics,guardDist:number){
-    const load=Math.max(guardDist,entry.lods.includes('lod2')?metrics.landmarkLoadRadius:metrics.landmarkLod1+32)
+    const load=Math.max(guardDist,metrics.landmarkLoadRadius)
     const fadeCutoff=Math.max(guardDist,entry.lods.includes('lod2')?metrics.landmarkLoadRadius:metrics.landmarkLod1)
     const unload=Math.max(guardDist+80,load+160)
     return {load,fadeCutoff,unload}
