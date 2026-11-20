@@ -70,6 +70,22 @@ def widths(way):
     if way in LOWER_ROADS:return -3.6,3.6,3.6
     return -1.35,1.35,0.
 
+# River span carriageways and cycleways connect to the modeled west approaches.
+SPAN_WAYS = {49322149, 258899702, 1531308751, 1531308752}
+
+def deck_level(local_x):
+    return 5.62 - local_x * 1.3 / 281
+
+
+def world_road_sections(anchor, angle):
+    """Modeled road stations and carriageway edges in world coordinates."""
+    transform = np.array([[np.cos(angle), np.sin(angle)], [-np.sin(angle), np.cos(angle)]])
+    for way in RAMPS + UPPER_ROADS + LOWER_ROADS + SIDE_ROAD:
+        xy, normals, station, levels = section(way)
+        left, right, _ = widths(way)
+        edge = lambda offset: (xy + normals * np.broadcast_to(offset, len(xy))[:, None]) @ transform + anchor
+        yield way, LineString(xy @ transform + anchor), station, levels, edge(left), edge(right)
+
 
 def bank_paving(anchor,angle):
     transform=np.array([[np.cos(angle),np.sin(angle)],[-np.sin(angle),np.cos(angle)]])

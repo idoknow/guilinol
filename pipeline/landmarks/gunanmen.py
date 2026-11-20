@@ -19,7 +19,7 @@ import math
 import random
 import sys
 from PIL import Image, ImageDraw
-from c_kit import RECTS, ATLAS, _font
+from c_kit import RECTS, ATLAS, _font, landmark_surface
 from rong_paving import pave, slab_texture
 from rong_ground import GATE_PLAZA
 from rong_street import shops, signs, approach
@@ -28,7 +28,7 @@ from pathlib import Path
 
 from c_kit import (
     Builder, arch_wall, box, cylinder, ensure_textures, export_landmark, solid,
-    extrude, grille, hip_roof, railing, ramp, stairs, tri_count, yaw_box, segment_wall, tube, _canopy,
+    extrude, grille, garden_gate_roof, hip_roof, railing, ramp, stairs, tri_count, yaw_box, segment_wall, tube, _canopy,
 )
 
 
@@ -82,8 +82,8 @@ def ancient_banyan(builder, east, south):
     count = 32 if builder.detail else 16
     for index in range(count):
         ends = [(east+11.6*math.cos(math.tau*t/count),south+10.6*math.sin(math.tau*t/count)) for t in (index,index+1)]
-        segment_wall(wood,*ends,0,.4,.8,'rubble')
-        segment_wall(wood,*ends,.4,.72,.64,'foliage')
+        segment_wall(wood,*ends,-.04,.43,.8,'rubble')
+        segment_wall(wood,*ends,-.04,.72,.64,'foliage')
         railing(iron,*ends,.42,.74,'steel',1.25)
 
 
@@ -112,29 +112,45 @@ def courtyard(builder, deck):
         extrude(builder.hit,curtain,0,4.83,'ashlar')
     # The rear face of the bastion closes the platform. IMG_1315/16 show
     # open space east of it; the former 22 m backing box extended past the side.
-    if builder.collide:
-        solid(builder.hit, (-31, 1.45, 3.5), (.52, 2.9, 21), 'ashlar')
     for row in range(7):
         front=-10-row*2
         for east in range(-19,19,2):
             corners=[(east,front),(east+2,front),(east+2,front-2),(east,front-2)]
-            wall.face([(xx,.54+max(0,-zz-10)*.092,zz) for xx,zz in corners],(0,1,0),'granite',None)
-    # The red enclosure faces the pedestrian lane west of the yellow hall.
-    for start, end in ((-7, 5.5), (8.5, 14)):
-        segment_wall(wall, (-31, start), (-31, end), 0, 2.9, .52, 'vermilion')
-        segment_wall(wall, (-31, start), (-31, end), 2.9, 3.15, .78, 'glaze')
-    box(wall, (-31, 1.55, 7), (.32, 3.1, 3), 'door')
-    hip_roof(wall, (-31, 7), 3.1, 1.7, 3.8, .72, .22, .12, 'graytile', 'wood')
-    stairs(wall, (-33, 0, 7), (-31.2, .45, 7), 3, 3, 'ashlar')
-    for south in (4.5, 9.5):
-        box(wall, (-31.8, .8, south), (.35, 1.6, .94), 'granite')
+            wall.face([(xx,.035,zz) for xx,zz in corners],(0,1,0),'granite',None)
+    # North-facing gate and the west return of the garden enclosure (IMG_1306).
+    segment_wall(wall,(-31,-2.5),(-31,14),0,2.8,.60,'gate_plaster')
+    segment_wall(wall,(-31,-2.5),(-31,14),2.8,3.07,.82,'graytile')
+    if builder.collide:
+        segment_wall(builder.hit,(-31,-2.5),(-31,14),0,3.07,.60,'ashlar')
+    # Masonry jambs bond into the two returns; the woodwork lines the opening.
+    for left,right in ((-33.2,-29.58),(-27.42,-22.3)):
+        segment_wall(wall,(left,-2.5),(right,-2.5),0,2.92,.60,'gate_plaster')
+        segment_wall(wall,(left,-2.5),(right,-2.5),2.92,3.13,.80,'graytile')
+        if builder.collide:
+            segment_wall(builder.hit,(left,-2.5),(right,-2.5),0,3.13,.60,'ashlar')
+    for jamb in (-30.04,-26.96):
+        box(wall,(jamb,1.78,-2.5),(.92,3.56,.76),'gate_plaster')
+    for post in (-29.52,-27.48):
+        box(wall,(post,1.76,-2.87),(.20,3.52,.32),'wood')
+    box(wall,(-28.5,3.36,-2.53),(3.98,.40,.78),'gate_plaster')
+    box(wall,(-28.5,3.13,-2.87),(2.30,.22,.32),'wood')
+    box(wall,(-28.5,3.52,-2.5),(4.52,.24,1.68),'wood')
+    garden_gate_roof(wall,(-28.5,-2.5),3.59,4.52,1.68,.48)
+    stairs(wall,(-28.5,.13,-6.2),(-28.5,.68,-2.7),3.35,4,'ashlar')
+    if builder.collide:
+        ramp(builder.hit,(-28.5,.13,-6.2),(-28.5,.68,-2.7),3.35)
+    for index in range(6):
+        oval(wall,(-25+index*1.65,1.12,-3.25),(1.25,.72,.85),'foliage',9)
 
 
 
 def build(b: Builder):
-    pave(b, GATE_PLAZA, .13)
+    pave(b, GATE_PLAZA, lambda x,z: landmark_surface('gunanmen').ground(x,z)+.04)
     shops(b)
     approach(b)
+    meshes = [*b.parts.values(), b.hit]
+    starts = [len(mesh.pos) for mesh in meshes]
+    ground = landmark_surface('gunanmen').ground
     # The eastern hall sits on way/684946200, the western hall on way/521248472.
     # Keep the plaza banyan on the west side of pedestrian way/684511179.
     ancient_banyan(b, -28, 3)
@@ -152,6 +168,17 @@ def build(b: Builder):
         # The arch is set back from the terrace lip between the round bastions.
         with align_front(b, (0,0), 0, shift=(-1.45,-1.35)):
             gate(b)
+    # Sample feet after rotating into landmark space. Keep the terrace and
+    # gatehouse level, tapering the change up the battered masonry walls.
+    terrace_datum = ground(15,-7.2)
+    for mesh, start in zip(meshes, starts):
+        for i in range(start, len(mesh.pos)):
+            x, y, z = mesh.pos[i]
+            blend = max(0, 1 - max(0, y) / 6.7)
+            datum = terrace_datum
+            if blend:
+                datum += blend * (ground(x, z) - terrace_datum)
+            mesh.pos[i] = (x, y + datum, z)
 
 
 def west_hall(b):
@@ -163,11 +190,12 @@ def west_hall(b):
     if b.collide:
         extrude(b.hit, west, 0, deck, 'ashlar')
     box(wall, (-16.3,deck+1.2,2.8), (12.5,2.4,8.2), 'yellow')
+    box(wall,(-16.3,deck+2.4,2.8),(13.8,.26,9.45),'wood')
     hip_roof(wall, (-16.3,2.8), deck+2.4, 12.6,8.3,1.85,.65,.38,'graytile','wood')
     if b.detail:
         for east in (-20.5,-17.7,-14.9,-12.1):
-            for south in (-1.4,7.0):
-                grille(wall,east,deck+1.2,south,1.4,1.6,'lattice',3)
+            for south in (-1.30,6.90):
+                grille(wall,east,deck+1.2,south,1.4,1.6,'lattice',3,depth=.13)
 
 
 def gate(b: Builder):
@@ -204,7 +232,7 @@ def gate(b: Builder):
     box(wall, (6.05, deck + 1.55, 4.5), (0.42, 3.1, 4.6), 'yellow', 1.4)
     if detail:
         for x in (-3.6, -1.2, 1.2, 3.6):
-            grille(wall, x, deck + 1.9, 2.5, 1.2, 1.7, 'lattice', 3)
+            grille(wall, x, deck + 1.9, 5.285, 1.2, 1.7, 'lattice', 3)
     columns = 6 if detail else 4
     for i in range(columns):
         x = -4.4 + 8.8 * i / (columns - 1)
@@ -216,7 +244,7 @@ def gate(b: Builder):
     yaw_box(wall, (-0.78, 1.85, 8.7), (1.45, 3.5, 0.08), 0.55, 'door', None)
     yaw_box(wall, (0.78, 1.85, 8.7), (1.45, 3.5, 0.08), math.pi - 0.55, 'door', None)
     # 4.8 m plaque. At 10 m and a 60° view it covers ~27° , enough for the three characters.
-    wall.face([(east,level,10.75-.19*level) for east,level in ((-2.4,4.84),(2.4,4.84),(2.4,6.26),(-2.4,6.26))],(0,.19,1),'sign_gate',uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
+    wall.face([(east,level,10.71-.19*level) for east,level in ((-2.4,4.84),(2.4,4.84),(2.4,6.26),(-2.4,6.26))],(0,.19,1),'sign_gate',uvs=[(.01,.99),(.99,.99),(.99,.01),(.01,.01)])
     post = 0.7 if detail else 4.5
     railing(wall, (-6.4, 7.6), (-1.6, 7.6), deck, 0.95, 'ashlar', post, stone=True)
     railing(wall, (1.6, 7.6), (6.4, 7.6), deck, 0.95, 'ashlar', post, stone=True)
@@ -238,6 +266,14 @@ def main():
     image = ensure_textures(folder)
     signs(image)
     stone_cells(image)
+    RECTS['gate_plaster'] = (768,640,62,126)
+    patch = ImageDraw.Draw(image)
+    patch.rectangle((768,640,829,765),fill='#b57563')
+    noise = random.Random(1306)
+    for _ in range(1900):
+        shade = noise.randint(-10,9)
+        patch.point((noise.randrange(768,830),noise.randrange(640,766)),
+                    fill=tuple(value+shade for value in (181,117,99)))
     slab_texture(image,896,896)
     RECTS['park_map'] = (640, 896, 256, 128)
     panel = Image.new('RGB', (256,128), '#efe8d4')

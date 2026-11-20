@@ -10,6 +10,8 @@ export interface Walker {
 }
 export interface Clock {hour:number; weather:Weather; flowing:boolean; goal:number|null; set(hour:number,weather?:Weather):void}
 export interface Host {
+  captureView():Promise<{view:import('../../../lib/feedback-contract').FeedbackView;shot:Blob}>
+  setView(view:unknown):Promise<void>
   scene:THREE.Scene; camera:THREE.PerspectiveCamera; renderer:THREE.WebGLRenderer
   manifest:Manifest; stream:Stream; peaks:THREE.Group; clock:Clock
   walker():Walker|undefined

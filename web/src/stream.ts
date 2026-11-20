@@ -5,6 +5,7 @@ import {currentMirrorLevel, isWaterInView} from './look/water'
 import {detail, type Manifest, type Tile, overview} from './world'
 
 export class Stream {
+  overviewMesh(){return this.base.mesh}
   landmarks:import('./landmarks').LoadedLandmarks=new Map()
   updateLandmarks?:ReturnType<typeof import('./landmarks').landmarkStream>
   loaded = new Map<Tile,Awaited<ReturnType<typeof detail>>>()

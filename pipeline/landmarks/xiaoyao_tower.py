@@ -4,6 +4,7 @@ footprint and the NNE axis (~17 degrees east of north). The floor and sill
 heights are estimates, not survey data. Roof slate, dark red timber and
 pale grey paving follow the daylight 2025 views in landmark-refs.json.
 """
+from functools import cache
 from pathlib import Path
 import sys
 
@@ -23,7 +24,30 @@ class LandmarkModel(Model):
         self.lit_tiles=[]
         self.flood_roof=flood_roof
 
+    def fit_to_grade(self, name, datum=0.0):
+        """Fit the buried skirt and lower storey to GL04, preserving roof elevations."""
+        from c_kit import landmark_surface
+        self.site_ground = cache(landmark_surface(name).ground)
+        self.site_datum = datum
+
+    def foundation_vertices(self, vertices):
+        vertices = np.array(vertices, dtype=float, copy=True)
+        dx,dy,dz,angle = self.pose
+        x,y,z = vertices.T
+        east = dx+x*np.cos(angle)-z*np.sin(angle)
+        south = dz+x*np.sin(angle)+z*np.cos(angle)
+        above = y+dy-self.site_datum
+        for i in np.flatnonzero(above < 3.2):
+            ground = self.site_ground(round(east[i],5),round(south[i],5))
+            # Limit the embedded skirt while keeping the ordering of nested plinths.
+            skirt = max(-.12, above[i])
+            blend = 1 - np.clip(above[i]/3.2,0,1)
+            y[i] += blend*(ground-self.site_datum) + skirt-above[i]
+        return vertices
+
     def mesh(self, vertices, faces, color, collide=False):
+        if hasattr(self, 'site_ground'):
+            vertices = self.foundation_vertices(vertices)
         if isinstance(color,str) and color=='lamp':
             super().mesh(vertices,faces,'wood' if self.flood_roof else 'gold',collide)
             self.lamps.append((self.visible.pop(),self.uv.pop()))
@@ -121,8 +145,10 @@ def white_rail(m, x, z, dx, dz, bays, base):
 
 
 def tower(model):
+    from c_kit import landmark_surface
+    surface = landmark_surface('xiaoyao_tower')
     court, platform = 8.4, 9.84
-    model.box(0,-.36,-8,34,court+.36,48,'stone',True)
+    model.foundation(surface,0,-.36,-8,34,court+.36,48,'stone')
     model.box(0,court-.16,-8,34,.16,48,'pave',True)
     # From the gallery pavilion, ascend east to the open northern court.
     # Two flights turn south at a level landing outside the west curtain.
@@ -133,7 +159,7 @@ def tower(model):
     model.box(0,court-.55,-8,34.16,.24,48.16,'granite')
     # Riverside stair follows the eastern face, ending on an upper landing.
     steps(model,0,court,18.68,15.08,0,-.42,48,3.36)
-    model.box(18.68,-.25,-7.06,3.36,court+.25,4,'stone',True)
+    model.foundation(surface,18.68,-.25,-7.06,3.36,court+.25,4,'stone')
     for z in np.arange(-30,15,2.15):
         if -10 < z < -5:
             continue
@@ -184,6 +210,8 @@ def tower(model):
         model.pose=(0,0,side*9.36,np.pi/2)
         tiled_roof(model,0,platform+5.17,0,5.45,8.3,2.45,.85,.84,gable_material='earth',frame_gable=True)
         model.pose=(0,0,0,0 if side>0 else np.pi)
+        for post in (-1.9,1.9):
+            model.box(post,platform+4.92,11.45,.16,.65,.66,'wood')
         model.box(0,platform+4.0,11.72,4.6,1.05,.22,'wood')
         model.box(0,platform+4.06,11.84,4.34,.92,.04,'sign')
         letters(model,'逍遙樓',(0,platform+4.15,11.88),3.10,.72,'gold')
@@ -194,15 +222,17 @@ def tower(model):
     facade(model,upper,7.9,4.85,True)
     tiled_roof(model,0,upper+4.85,0,21.5,20.2,2.65,1.60,lit_edge=True)
     model.box(0,upper+7.12,0,12,1.05,11,'wood')
+    model.box(0,upper+8.02,0,18.4,.36,17.5,'wood')
     tiled_roof(model,0,upper+8.17,0,18.4,17.5,3.7,1.50,.76,lit_edge=True,gable_material='earth',frame_gable=True)
     if model.detail:
         for side in (-1,1):
             for x in (-6,-3,3,6):
+                model.beam([x,platform+4.17,side*8.9],[x,platform+5.32,side*8.9],.05,'wood')
                 model.beam([x,platform+3.65,side*8.9],[x,platform+4.25,side*8.9],.28,'red',10)
 
 
 
-def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None):
+def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None, terrain_offset=None):
     image = atlas(colors,smooth)
     if flood_roof:
         carve_medallion(image)
@@ -221,6 +251,9 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
             vertices = np.concatenate(parts).reshape(-1,3)
             if lift is not None:
                 vertices[:,1]+=lift(vertices[:,0])
+            if terrain_offset is not None:
+                points, inverse = np.unique(vertices[:,::2],axis=0,return_inverse=True)
+                vertices[:,1] += np.array([terrain_offset(x,z) for x,z in points])[inverse]
             mesh = trimesh.Trimesh(vertices, np.arange(len(vertices)).reshape(-1,3), process=False)
             if texture is not None:
                 material = trimesh.visual.material.PBRMaterial(name=name,baseColorTexture=texture,roughnessFactor=1,metallicFactor=0,doubleSided=True)

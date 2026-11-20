@@ -45,9 +45,13 @@ export function newCode() {
 export async function deliver(env:Env,email:string,purpose:string,code:string) {
   if (env.EMAIL_DEV_LOG==='1') { console.log(`DEV_EMAIL ${email} ${purpose} ${code}`); return }
   const subject=purpose==='verify'?'验证邮箱':'重置密码'
+  await sendMail(env,email,subject,`${subject}的验证码：${code}，10 分钟内有效。如果不是本人操作，请忽略。`)
+}
+export async function sendMail(env:Env,email:string,subject:string,message:string){
+  if(env.EMAIL_DEV_LOG==='1'){console.log(`DEV_NOTIFICATION ${subject}`);return}
   if (!env.RESEND_API_KEY || !(await fetch('https://api.resend.com/emails',{method:'POST',
     headers:{Authorization:`Bearer ${env.RESEND_API_KEY}`,'Content-Type':'application/json'},
     body:JSON.stringify({from:'网上桂林 <noreply@mail.idoknow.top>',to:[email],subject:`网上桂林 · ${subject}`,
-      text:`${subject}的验证码：${code}，10 分钟内有效。如果不是本人操作，请忽略。`})})).ok)
+      text:message})})).ok)
     throw new Problem(503,'mail_unavailable','邮件暂时未能发送，请稍后重试')
 }

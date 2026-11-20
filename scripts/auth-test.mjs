@@ -10,14 +10,16 @@ import {chromium} from 'playwright'
 
 const adminUI=process.argv.includes('--admin-ui'),feedbackUI=process.argv.includes('--feedback-ui'),ui=adminUI||feedbackUI||process.argv.includes('--ui'), email='walker@example.test', password='local-test-password', nickname='漓江访客'
 const state=await mkdtemp(join(tmpdir(),'glol-auth-')), wrangler='node_modules/.bin/wrangler'
-const local=['--local','--persist-to',state],sql=command=>execFileSync(wrangler,['d1','execute','glol',...local,'--command',command,'--json'],{encoding:'utf8'})
+const local=['--local','--persist-to',state]
+async function sql(command){const response=once(child,'message');child.send(command);const [result]=await response;if(result.error)throw Error(result.error);return result.rows}
 let child,browser,logs='',closed
 try {
   execFileSync(wrangler,['d1','migrations','apply','glol',...local],{stdio:['ignore','pipe','inherit']})
   const probe=createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');const port=probe.address().port;await new Promise(resolve=>probe.close(resolve))
   const origin=`http://127.0.0.1:${port}`
   const staticDir=ui?'dist':join(state,'empty-site');if(!ui)await mkdir(staticDir)
-  child=spawn(wrangler,['pages','dev',staticDir,'--ip','127.0.0.1','--port',String(port),'--inspector-port','0','--persist-to',state,'--binding','EMAIL_DEV_LOG=1','--binding','BRIDGE_TOKEN=local-test'],{stdio:['ignore','pipe','pipe'],detached:true});closed=once(child,'exit')
+  execFileSync(wrangler,['pages','functions','build','--outdir',join(state,'pages')],{stdio:['ignore','pipe','inherit']})
+  child=spawn(process.execPath,['scripts/pages-test-server.mjs',state,staticDir,String(port)],{stdio:['ignore','pipe','pipe','ipc'],detached:true});closed=once(child,'exit')
   for(const stream of [child.stdout,child.stderr])stream.on('data',chunk=>logs+=chunk)
   for(let attempt=0;attempt<200;attempt++) {
     if(await fetch(origin+'/api/me').then(response=>response.status===401).catch(()=>false))break
@@ -30,16 +32,15 @@ try {
   if(ui) {
     browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
     await mkdir('captures/auth',{recursive:true})
-    const page=await browser.newPage({viewport:{width:feedbackUI?960:1100,height:feedbackUI?620:740}})
+    const context=await browser.newContext({viewport:{width:feedbackUI?960:1100,height:feedbackUI?620:740}}),page=await context.newPage()
     if(adminUI){
       await (await import('./admin-test.mjs')).browserTest({page,origin,email,password,nickname,code,sql})
     }else if(feedbackUI){
       await page.request.post(origin+'/api/auth/register',{headers:{Origin:origin},data:{email,password,nickname}})
       await page.request.post(origin+'/api/auth/verify',{headers:{Origin:origin},data:{email,password,code:await code('verify')}})
-      await page.request.post(origin+'/api/auth/logout',{headers:{Origin:origin}})
-      await page.goto(origin+'/?verify');await page.locator('.account-entry').click();await page.evaluate(()=>window.viewer.freeze())
-      const account=page.getByRole('dialog');await account.getByLabel('邮箱').fill(email);await account.getByLabel('密码').fill(password);await account.getByRole('button',{name:'登录',exact:true}).click();await account.getByText('已登录',{exact:true}).waitFor();await account.getByRole('button',{name:'关闭'}).click()
-      await (await import('./feedback-test.mjs')).uiTest(page,origin)
+      assert.equal((await page.request.get(origin+'/api/me')).status(),200)
+      await page.goto(origin+'/?verify');await page.locator('.dock-feedback').waitFor({timeout:120000})
+      await (await import('./feedback-test.mjs')).uiTest(page,origin,sql)
     }else{
     await page.goto(origin+'/?verify');await page.locator('.account-entry').click();if(feedbackUI)await page.evaluate(()=>window.viewer.freeze())
     const dialog=page.getByRole('dialog'),click=name=>dialog.getByRole('button',{name,exact:true}).click(),fill=(name,value)=>dialog.getByLabel(name).fill(value)
@@ -59,21 +60,23 @@ try {
     const register={email,password,nickname},login={email,password}
     const firstPassword='first-registration-password'
     await api('auth/register',register,403,'origin',{headers:{Origin:'https://example.test'}});await api('auth/register',{},400,'invalid_input');await api('auth/register',{...register,password:firstPassword})
-    sql('UPDATE mail_events SET sent=sent-61');await api('auth/register',register)
+    await sql('UPDATE mail_events SET sent=sent-61');await api('auth/register',register)
     await api('auth/resend',{email,purpose:'verify'},429,'rate_limited');await api('auth/login',login,403,'unverified')
     const verification={email,code:await code('verify',1)}
     await api('auth/verify',verification,400,'invalid_code');await api('auth/verify',{...verification,password:firstPassword},400,'invalid_code');await api('me',null,401,'unauthorized')
     await api('auth/verify',{...verification,password});await api('auth/verify',{...verification,password},400,'invalid_code');assert.equal((await api('me')).verified,true)
     console.log('Verification requires the latest registration password: missing and stale passwords rejected; current password accepted')
-    assert.equal((await api('me',{nickname:'江岸' },200,null,{method:'PATCH'})).nickname,'江岸');const sessionRows=JSON.parse(sql('SELECT digest FROM sessions'))[0].results;assert.equal(sessionRows.length,1);assert.notEqual(sessionRows[0].digest,cookie.split('=')[1]);assert.notEqual(JSON.parse(sql('SELECT digest FROM users'))[0].results[0].digest,password)
+    assert.equal((await api('me',{nickname:'江岸' },200,null,{method:'PATCH'})).nickname,'江岸');const sessionRows=(await sql('SELECT digest FROM sessions'))[0].results;assert.equal(sessionRows.length,1);assert.notEqual(sessionRows[0].digest,cookie.split('=')[1]);assert.notEqual((await sql('SELECT digest FROM users'))[0].results[0].digest,password)
     await api('auth/logout',{});await api('me',null,401,'unauthorized');await api('auth/login',login)
-    if(process.argv.includes('--bridge')) await (await import('./feedback-bridge-test.mjs')).bridgeTest({api,origin,cookie,state,staticDir})
+    if(process.argv.includes('--bridge')) await (await import('./feedback-bridge-test.mjs')).bridgeTest({api,origin,cookie,state,staticDir,sql,mailLog:()=>logs})
     else await (await import('./feedback-test.mjs')).apiTest({api,origin,cookie,sql})
     for(let attempt=1;attempt<=5;attempt++)await api('auth/login',{email,password:'incorrect'},attempt===5?429:401,attempt===5?'locked':'credentials');await api('auth/login',login,429,'locked')
-    sql('UPDATE mail_events SET sent=sent-61');await api('auth/resend',{email,purpose:'reset'});const reset={email,code:await code('reset'),password:'new-password'};await api('auth/reset',reset);await api('me',null,401,'unauthorized');await api('auth/reset',reset,400,'invalid_code');await api('auth/login',login,401,'credentials');await api('auth/login',reset)
+    await sql('UPDATE mail_events SET sent=sent-61');await api('auth/resend',{email,purpose:'reset'});const reset={email,code:await code('reset'),password:'new-password'};await api('auth/reset',reset);await api('me',null,401,'unauthorized');await api('auth/reset',reset,400,'invalid_code');await api('auth/login',login,401,'credentials');await api('auth/login',reset)
     for(let index=0;index<7;index++)await api('auth/resend',{email:`other${index}@example.test`,purpose:'reset'});await api('auth/resend',{email:'capped@example.test',purpose:'reset'},429,'rate_limited')
   }
   console.log(adminUI?'Admin access, lists, photo viewer, status timeline and three screenshots passed':ui?'UI registration, login and mobile screenshots passed':'API lifecycle, storage, lockout, cooldown, IP limit and Origin passed')
+}catch(error){
+  console.error(logs.slice(-6000).replace(/(DEV_EMAIL \S+ \S+) \d{6}/g,'$1 [redacted]'));throw error
 }finally{
   await browser?.close();if(child&&child.exitCode===null&&child.signalCode===null){process.kill(-child.pid,'SIGTERM');await closed}await rm(state,{recursive:true,force:true})
 }

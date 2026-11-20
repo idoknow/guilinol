@@ -23,6 +23,7 @@ and NE traffic police booth ('桂林交警').
 import math
 import numpy as np
 
+from c_kit import landmark_surface
 from nikoniko import Builder, export_landmark
 
 
@@ -76,10 +77,10 @@ def _commercial_strip(m: Builder, p0, p1, outward_sign, podium_h, total_h, wall_
     fl_h = (total_h - podium_h - 1.1) / floors
     for i in range(bays + 1):
         lx = -length / 2.0 + i * bay_w
-        m.box(lx, -1.2, 0.22, 0.62, total_h + 1.2, 0.62, wall_mat, collide=True)
+        m.box(lx, -1.2, 0.22, 0.62, total_h + 1.2, 0.62, wall_mat, collide=True, footing=True)
         if i < bays:
             cx = lx + bay_w / 2.0
-            m.box(cx, 0.15, -0.05, bay_w - 0.72, 3.15, 0.22, 'glass')
+            m.box(cx, 0.11, -0.05, bay_w - 0.72, 3.15, 0.22, 'glass')
             m.box(cx, 3.15, 0.65, bay_w - 0.45, 0.18, 1.25, 'alum')
             m.box(cx, 3.45, 0.28, bay_w - 0.68, 0.92, 0.26, 'dark')
             m.sign_quad(cx, 3.48, 0.43, bay_w - 0.74, 0.86, f'shop_{(i + shop_seed) % 8}')
@@ -142,14 +143,14 @@ def _guardrail_run(m: Builder, p0, p1):
     m.box(0, 0.05, 0, 0.12, 0.93, length, 'alum', collide=True)
     if m.detail:
         m.box(0, 0.92, 0, 0.09, 0.07, length, 'alum')
-        m.box(0, 0.22, 0, 0.08, 0.05, length, 'alum')
+        m.box(0, .05, 0, .15, .22, length, 'alum')
         for i in range(segs + 1):
             lz = -length / 2.0 + i * (length / segs)
             m.box(0, 0.0, lz, 0.18, 1.02, 0.12, 'dark')
             if i < segs:
                 cz = lz + 0.5 * (length / segs)
-                m.box(0, 0.38, cz, 0.14, 0.42, 0.42, 'white')
-                m.box(0, 0.46, cz, 0.16, 0.24, 0.24, 'dark')
+                m.box(.063, .38, cz, .04, .42, .42, 'white')
+                m.box(.087, .46, cz, .025, .24, .24, 'dark')
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
@@ -184,6 +185,7 @@ def _colored_crosswalk_approach(m: Builder, cx, cz, yaw, road_w=24.0, zebra_len=
 
 
 def build_shizijie(m: Builder):
+    m.surface = landmark_surface('shizijie')
     # ------------------------------------------------------------------
     # 1. Four corner channelizing refuge islands + sidewalks + guardrails
     # (Center of intersection around (0, 0) is completely clear asphalt.)
@@ -198,8 +200,9 @@ def build_shizijie(m: Builder):
         # SW refuge apron tip (leading toward Weixiaotang corner)
         [(-34.5, -3.5), (-21.0, 16.5), (-37.5, 11.5)],
     ]
+    m.follow_grade = True
     for tri in islands:
-        m.prism(tri, -1.2, 1.35, 'pave', collide=True, cap_mat='pave')
+        m.prism(tri, -.04, .19, 'pave', collide=True, cap_mat='pave')
         cx = sum(p[0] for p in tri) / 3.0
         cz = sum(p[1] for p in tri) / 3.0
         shrunk = [(cx + (p[0] - cx) * 0.58, cz + (p[1] - cz) * 0.58) for p in tri]
@@ -210,8 +213,12 @@ def build_shizijie(m: Builder):
     # Decorative median & bike-lane guardrails on all 4 arterial legs
     _guardrail_run(m, (6.5, -21.5), (16.5, -54.0))
     _guardrail_run(m, (-8.5, 22.5), (-19.5, 56.0))
-    _guardrail_run(m, (-26.0, -5.5), (-62.0, -12.5))
+    _guardrail_run(m, (-26.0, -5.5), (-106.0, -21.5))
     _guardrail_run(m, (24.0, 5.5), (62.0, 14.5))
+    # Continuous clipped green median hedge along West Jiefang Rd + low north sidewalk shrub & wrought-iron rail (IMG_1385, 1386!)
+    m.poly_wall_strip([(-38.0, -7.9), (-106.0, -21.5)], -.08, .73, 1.35, 'hedge', collide=True, cap_mat='hedge')
+    m.poly_wall_strip([(-48.0, -25.2), (-104.0, -35.8)], -.12, .54, .78, 'hedge', collide=True, cap_mat='hedge')
+    m.poly_wall_strip([(-48.0, -24.8), (-104.0, -35.4)], .38, .22, .06, 'dark', collide=False, cap_mat='dark')
 
     # Colored red/yellow non-motorized waiting pavements & zebra crosswalks on 4 approaches
     _colored_crosswalk_approach(m, 9.8, -32.0, yaw=math.atan2(-10.0, 32.0) + math.pi, road_w=23.0)
@@ -248,13 +255,14 @@ def build_shizijie(m: Builder):
         (-87.0, -40.5), (-42.0, -30.5), (-22.0, -41.5), (-8.5, -49.5),
         (5.0, -100.5), (-50.5, -117.5),
     ]
-    m.prism(nw_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave')
-    m.prism(NW_NANFANG, -2.0, 6.8, 'dark', collide=True, cap_mat='alum')
+    m.follow_grade = False
+    m.prism(nw_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave', paving=True)
+    m.prism(NW_NANFANG, -2.0, 6.8, 'dark', collide=True, cap_mat='alum', footing=True)
     m.prism(NW_NANFANG, 4.8, 20.4, 'white', collide=True, cap_mat='roof')
     m.cylinder_y(-24.5, 4.8, 22.4, -46.0, 9.6, 'glass', sections=16 if m.detail else 8, collide=True)
     m.cylinder_y(-24.5, 27.2, 2.2, -46.0, 8.8, 'white', sections=16 if m.detail else 8)
     m.pose = (-24.5, 27.5, -46.0, math.atan2(1.0, 1.1))
-    m.box(0, 0, 8.95, 6.6, 1.65, 0.24, 'dark')
+    m.box(0, 0, 8.46, 6.6, 1.65, 1.34, 'dark')
     m.sign_quad(0, 0.05, 9.10, 6.4, 1.55, 'nanfang_roof')
     m.pose = (0.0, 0.0, 0.0, 0.0)
     _commercial_strip(m, (-84.57, -42.86), (-44.98, -33.52), 1, 4.8, 25.2, 'white', 0, 7)
@@ -267,8 +275,8 @@ def build_shizijie(m: Builder):
         (4.0, 92.5), (67.5, 108.5), (85.5, 52.5), (48.0, 42.5),
         (32.0, 61.5), (10.5, 62.0),
     ]
-    m.prism(se_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave')
-    m.prism(SE_WENHUA, -2.0, 6.6, 'dark', collide=True, cap_mat='beige')
+    m.prism(se_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave', paving=True)
+    m.prism(SE_WENHUA, -2.0, 6.6, 'dark', collide=True, cap_mat='beige', footing=True)
     m.prism(SE_WENHUA, 4.6, 18.0, 'beige', collide=True, cap_mat='roof')
     m.cylinder_y(34.5, 4.6, 19.2, 60.5, 10.2, 'glass', sections=16 if m.detail else 8, collide=True)
     m.cylinder_y(34.5, 23.8, 1.6, 60.5, 10.6, 'beige', sections=16 if m.detail else 8)
@@ -287,8 +295,8 @@ def build_shizijie(m: Builder):
         (46.0, -45.5), (53.5, -23.0), (63.5, -7.5), (135.5, 16.5),
         (137.0, -2.5), (94.5, -78.5), (59.5, -87.0),
     ]
-    m.prism(ne_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave')
-    m.prism(NE_CORNER, -2.0, 6.4, 'dark', collide=True, cap_mat='alum')
+    m.prism(ne_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave', paving=True)
+    m.prism(NE_CORNER, -2.0, 6.4, 'dark', collide=True, cap_mat='alum', footing=True)
     m.prism(NE_CORNER, 4.4, 17.0, 'white', collide=True, cap_mat='roof')
     m.pose = (60.5, 0.0, -24.5, math.atan2(-1.0, 0.85))
     m.box(0, 21.4, 0, 14.0, 3.2, 12.0, 'alum')
@@ -298,14 +306,27 @@ def build_shizijie(m: Builder):
     _commercial_strip(m, (49.35, -43.56), (65.01, -10.57), 1, 4.4, 21.4, 'white', 4, 6)
     _commercial_strip(m, (61.23, -84.32), (49.35, -43.56), 1, 4.4, 21.4, 'white', 6, 7)
 
-    m.prism(NE_ANNEX, -2.0, 4.5, 'dark', collide=True, cap_mat='beige')
+    m.prism(NE_ANNEX, -2.0, 4.5, 'dark', collide=True, cap_mat='beige', footing=True)
     m.prism(NE_ANNEX, 2.5, 12.3, 'white', collide=True, cap_mat='roof')
     _commercial_strip(m, (76.25, 1.14), (130.47, 13.93), 1, 4.2, 14.8, 'white', 1, 9)
 
     # Sidewalk camphor street trees & multi-globe lamps around the 3 corners + south median shrubs
+    # North sidewalk along Nanfang Mansion frames IMG_1385 (-77.65, -34.27) & IMG_1386 (-63.05, -36.17)!
+    for tx, tz, th, tsp in (
+        (-92.0, -29.2, 10.5, 4.4),
+        (-79.6, -28.8, 12.2, 4.5),  # left trunk framing IMG_1385 (~26% frame width)!
+        (-76.1, -28.2, 12.4, 4.6),  # right trunk framing IMG_1385 (~62% frame width)!
+        (-66.5, -31.8, 10.8, 4.4),  # canopy framing IMG_1386!
+        (-59.5, -32.8, 10.4, 4.2),
+        (-48.5, -30.8, 8.8, 3.6),
+        (50.5, -18.0, 8.2, 3.3),
+        (88.0, 6.5, 8.2, 3.3),
+        (108.0, 11.2, 8.2, 3.3),
+        (24.0, 56.5, 8.2, 3.3),
+        (4.5, 74.0, 8.2, 3.3),
+    ):
+        m.street_tree(tx, 0.08, tz, height=th, spread=tsp, kind='camphor', lanterns=(tx > -55), collide=True)
     if m.detail:
-        for tx, tz in ((-54.0, -30.5), (-68.0, -34.0), (50.5, -18.0), (88.0, 6.5), (108.0, 11.2), (24.0, 56.5), (4.5, 74.0)):
-            m.street_tree(tx, 0.08, tz, height=8.2, spread=3.3, kind='camphor', lanterns=True, collide=True)
         for lx, lz in ((-38.0, -29.0), (45.0, -32.0), (68.0, 2.5), (14.5, 55.0)):
             m.cluster_lamp(lx, 0.08, lz, height=7.0, globes=5, collide=True)
         # Flowering crape-myrtle median strip on south approach (bing_10.jpg foreground)

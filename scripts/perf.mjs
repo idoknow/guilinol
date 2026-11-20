@@ -280,6 +280,7 @@ try {
 
   const viewpoints = {}
   for (const cam of CAMERAS) {
+    if(process.env.PERF_CAMERA && process.env.PERF_CAMERA!==cam.id)continue
     await page.goto(`${baseUrl}/?${cam.query}`)
     await page.waitForFunction(mode => {
       const viewer = window.viewer

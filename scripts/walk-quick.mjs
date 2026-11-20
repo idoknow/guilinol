@@ -25,6 +25,13 @@ try {
     const result=await page.evaluate(async({origin,direction,seconds,target})=>{
       const {walk,stream}=window.viewer;walk.leave()
       if(!await walk.enter(...origin,0,'quick'))throw Error('Spawn failed: '+target)
+      if(target==='deck'){
+        const deadline=performance.now()+45000
+        while(![...stream.landmarks.keys()].some(entry=>entry.id==='jiefang_bridge')){
+          if(performance.now()>deadline)throw Error('Bridge approach collider not loaded')
+          await new Promise(requestAnimationFrame)
+        }
+      }
       if(target==='tree'){
         const tree=[...stream.forest.loaded.values()].flat().filter(tree=>tree.kind!==5).sort((one,two)=>Math.hypot(one.x-origin[0],one.z-origin[1])-Math.hypot(two.x-origin[0],two.z-origin[1]))[0]
         walk.leave();if(!await walk.enter(tree.x-2,tree.z,0,'tree'))throw Error('No tree approach')

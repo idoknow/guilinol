@@ -103,6 +103,7 @@ async function start() {
   modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton);void touch
   showMode()
   if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,
+    setView:(view:unknown)=>host.setView(view),
     async photoSupport(x:number,z:number,bridgeRadius?:number){return (await loadWalker()).photoSupport(x,z,bridgeRadius)},
     peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},
     setPreset(name:string){setPreset(camera,name);camera.updateMatrixWorld();return stats.frame},
@@ -118,21 +119,28 @@ async function start() {
       const clearance = ray.intersectObjects(scene.children)[0]?.distance
       ray.setFromCamera(new THREE.Vector2(0,0),camera)
       const hits = ray.intersectObjects(scene.children)
+      const roots=new Map([...stream.landmarks].map(([entry,root])=>[root as THREE.Object3D,entry]))
       let lookingAt:string|undefined
-      for(const hit of hits){
-        for(let obj:THREE.Object3D|null=hit.object;obj;obj=obj.parent) if(obj.name){lookingAt=obj.name;break}
-        if(lookingAt) break
+      let landmark:string|undefined
+      for(let obj:THREE.Object3D|null=hits[0]?.object??null;obj;obj=obj.parent){
+        if(obj.name && !lookingAt) lookingAt=obj.name
+        const entry=roots.get(obj)
+        if(!entry) continue
+        landmark=entry.id
+        // A modeled cave or pavilion and the PK02 mesh share the peak's map location.
+        const peak=manifest.peaks.entries.find(p=>Math.hypot(p.center[0]-entry.position[0],p.center[2]-entry.position[2])<.1)
+        lookingAt=peak?.name??entry.name??entry.id
+        break
       }
-    const roots=new Map([...stream.landmarks].map(([entry,root])=>[root as THREE.Object3D,entry.id]))
-    let landmark:string|undefined
-    for(let obj:THREE.Object3D|null=hits[0]?.object??null;obj;obj=obj.parent){landmark=roots.get(obj);if(landmark)break}
-    return {clearance,lookingAt,landmark,wallDistance:hits[0]?.distance}
+      return {clearance,lookingAt,landmark,wallDistance:hits[0]?.distance}
     }}})
   function draw(){
     const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
     peaks.update(camera,mirror); renderMirror(renderer,scene,camera,!Number.isFinite(mirror)); renderer.render(scene,camera)
   }
   const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
+    captureView:async()=>(await import('./play/feedback-view')).capture(host),
+    setView:async(view)=>(await import('./play/feedback-view')).setView(host,view),
     fly(){if(walker?.active)walker.leave();showMode()},get cinema(){return cinema},set cinema(on){cinema=on}}
   let tour:Awaited<ReturnType<typeof import('./play').play>>|undefined
   function animate(now:number){
@@ -149,8 +157,9 @@ async function start() {
       void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))
     }
     if(first&&!switching) {
-      stream.updateLandmarks?.(walker?.active?walker.position:camera.position)
-      stream.tick(walker?.active?walker.position:camera.position)
+      const target=walker?.destination??(walker?.active?walker.position:camera.position)
+      stream.updateLandmarks?.(target)
+      stream.tick(target)
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
     }
     clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/1200))
@@ -170,6 +179,8 @@ async function start() {
     }
   }
   renderer.setAnimationLoop(animate)
-  if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
+  const token=params.get('view')
+  if(token){try{if(token.length>4096)throw Error();await host.setView(JSON.parse(atob(token.replace(/-/g,'+').replace(/_/g,'/'))))}catch{console.warn('Invalid feedback view')}}
+  else if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }
 start().catch(error=>{document.querySelector('output')!.value=`无法加载：${error.message}`;bootProgress(`无法加载：${error.message}`,0);console.error(error)})

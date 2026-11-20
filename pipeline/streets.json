@@ -1,6 +1,20 @@
 {
   "sampleStep": 20, "probeLength": 45, "laneWidth": 3.25,
-  "sidewalkWidth": 2.5,
-  "defaultWidth": {"trunk":18,"primary":14,"secondary":12,"tertiary":10,"residential":6,"pedestrian":6},
-  "maxLanes": {"trunk":8,"primary":8,"secondary":6,"tertiary":4,"residential":2}
+  "sidewalkWidth": 2.5, "maxPedestrianWidth": 22,
+  "sectionClasses": {"trunk":"arterial","primary":"arterial","secondary":"collector","tertiary":"collector","residential":"local"},
+  "photoOverrides": {"221349755":{"photos":[1345,1346],"lanes":2,"divider":"no","section":"local","walk":4.0,"treeInset":1.15}},
+  "outerWidening": {"727682110":{"photos":[1382,1385],"side":1,"stationMetres":[0,22,169,215],"extraMetres":[0,9.25,9.25,0]},"221349761":{"photos":[1299],"side":1,"stationMetres":[131,149,160,174],"extraMetres":[0,4.8,4.8,0]}},
+  "sectionAlignment": {"221349755":{"photos":[1346],"stationMetres":[68,83,112,147],"offsetMetres":[0,1.35,1.35,0]}},
+  "frontageSections": {"221349761":{"photos":[1299,1301],"cycle":1.8,"walk":3.2},"727682110":{"photos":[1381,1384]}},
+  "plantedMedian": {"221821072":{"photos":[1365],"stationMetres":[75,185]}},
+  "sections": {
+    "arterial": {"verge":2.2,"cycle":3,"curb":0.2,"walk":3.4},
+    "collector": {"verge":0.22,"cycle":2.25,"curb":0.18,"walk":2.7},
+    "local": {"verge":0,"cycle":0,"curb":0.15,"walk":2.1}
+  },
+  "tactileWidth":0.35,
+  "shops":{"bay":5,"setback":14},
+  "fixtures":{"railSpan":3,"parkingInterval":22,"localParkingInterval":9,"signInterval":130,"speedInterval":160},
+  "defaultWidth": {"trunk":18,"primary":14,"secondary":12,"tertiary":10,"residential":6,"pedestrian":6,"trunk_link":7,"primary_link":6.5,"secondary_link":6,"tertiary_link":5.5},
+  "maxLanes": {"trunk":8,"primary":8,"secondary":6,"tertiary":4,"residential":2,"trunk_link":2,"primary_link":2,"secondary_link":2,"tertiary_link":1}
 }

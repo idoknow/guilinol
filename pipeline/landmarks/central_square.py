@@ -28,6 +28,7 @@ import math
 import numpy as np
 import trimesh
 
+from c_kit import landmark_surface
 from nikoniko import Builder, export_landmark
 
 
@@ -136,12 +137,12 @@ def _karst_stele(m: Builder, cx, cz, yaw):
 def _fire_station(m: Builder, cx, cz, yaw):
     """2-storey Guilin Central Square Fire Rescue Station (2026 Commons 00..02-2026.jpg)."""
     m.pose = (cx, 0.0, cz, yaw)
-    m.box(0, -1.5, 0, 15.6, 9.9, 10.5, 'alum', collide=True)
+    m.box(0, -1.5, 0, 15.6, 9.9, 10.5, 'alum', collide=True, footing=True)
     m.box(0, 4.22, 5.30, 15.8, 1.26, 0.22, 'dark')
     m.sign_quad(0, 4.24, 5.44, 15.6, 1.22, 'fire_fascia')
-    m.box(-4.8, 0.1, 5.26, 4.4, 4.05, 0.12, 'terra')
+    m.box(-4.8, 0.1, 5.26, 4.4, 4.05, 0.12, 'terra', footing=True)
     m.box(5.2, 2.35, 5.26, 3.8, 1.80, 0.12, 'red')
-    m.box(0.3, 0.1, 3.2, 4.8, 4.0, 3.8, 'dark')
+    m.box(0.3, 0.1, 3.2, 4.8, 4.0, 3.8, 'dark', footing=True)
     m.box(-2.35, 0.95, 5.36, 0.46, 2.65, 0.10, 'yellow_pave')
     if m.detail:
         for wx in (-4.6, 0.2, 4.4):
@@ -157,6 +158,7 @@ def _fire_station(m: Builder, cx, cz, yaw):
 
 
 def build_central_square(m: Builder):
+    m.surface = landmark_surface('central_square')
     # ------------------------------------------------------------------
     # 1. Master Granite Civic Plaza Deck
     # ------------------------------------------------------------------
@@ -166,7 +168,7 @@ def build_central_square(m: Builder):
         _ax_pt(92.0, 68.0),
         _ax_pt(-118.0, 68.0),
     ]
-    m.prism(plaza_ring, -2.2, 2.26, 'pave', collide=True, cap_mat='pave')
+    m.prism(plaza_ring, -2.2, 2.26, 'pave', collide=True, cap_mat='pave', paving=True)
 
     # ------------------------------------------------------------------
     # 2. Circular Musical Fountain Assembly Plaza (center at along=+22, across=0)
@@ -271,6 +273,9 @@ def build_central_square(m: Builder):
     dome_v[:, 1] = np.maximum(0.0, dome_v[:, 1] * 0.85) + 0.15
     dome_v[:, 0] += dx_dome
     dome_v[:, 2] += dz_dome
+    for vertex in dome_v:
+        if vertex[1] <= .15:
+            vertex[1] = m.feet_at_grade([vertex])[0]-.035
     m.mesh(dome_v, ico.faces, 'glass', collide=True)
     m.cylinder_y(dx_dome, 0.06, 0.45, dz_dome, 4.4, 'dark', sections=12, collide=True)
 
@@ -283,7 +288,7 @@ def build_central_square(m: Builder):
     # ------------------------------------------------------------------
     # 5. Guilin Gymnasium (桂林市体育馆, exact OSM way/675177179)
     # ------------------------------------------------------------------
-    m.prism(GYM_675177179, -2.2, 6.2, 'beige', collide=True, cap_mat='alum')
+    m.prism(GYM_675177179, -2.2, 6.2, 'beige', collide=True, cap_mat='alum', footing=True)
     m.prism(GYM_675177179, 4.0, 14.6, 'alum', collide=True, cap_mat='roof')
     gcx, gcz = _ax_pt(96.5, 16.5)
     m.pose = (gcx, 0.0, gcz, AXIS_YAW)
@@ -294,18 +299,19 @@ def build_central_square(m: Builder):
     m.mesh(crown_v, [[0, 4, 5], [0, 5, 1], [1, 5, 2], [2, 5, 4], [2, 4, 3], [3, 4, 0]], 'roof')
 
     for st in range(7):
-        m.box(0, st * 0.17, 29.8 - st * 0.65, 24.0, 0.18, 0.72, 'pave', collide=True)
+        m.box(0, 0, 29.8 - st * 0.65, 24.0, st * 0.17 + 0.18, 0.72, 'pave', collide=True, footing=True)
     for side in (-1, 1):
         m.box(side * 13.8, 0.0, 26.5, 6.4, 20.2, 6.2, 'alum', collide=True)
         m.box(side * 13.8, 1.2, 29.7, 4.2, 3.6, 0.25, 'dark')
 
     # Giant dark glossy SMD LED screen + red slogan frieze + rooftop gold '体育馆'
+    m.box(0, .2, 24.9, 22, 20.55, 1.7, 'alum', collide=True, footing=True)
     m.box(0, 4.8, 25.8, 19.6, 9.4, 0.85, 'dark')
     m.sign_quad(0, 5.25, 26.28, 18.4, 8.4, 'led_screen')
     m.box(0, 15.15, 25.6, 20.5, 1.45, 0.35, 'alum')
     m.sign_quad(0, 15.22, 25.82, 19.2, 1.30, 'gym_slogan')
-    m.box(0, 18.6, 24.8, 9.8, 2.15, 0.28, 'dark')
-    m.sign_quad(0, 18.66, 24.98, 9.5, 2.02, 'gym_title')
+    m.box(0, 18.6, 25.7, 9.8, 2.15, 0.28, 'dark')
+    m.sign_quad(0, 18.66, 25.88, 9.5, 2.02, 'gym_title')
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
     # ------------------------------------------------------------------
@@ -313,7 +319,7 @@ def build_central_square(m: Builder):
     # ------------------------------------------------------------------
     hcx, hcz = _ax_pt(-54.0, -76.0)
     m.pose = (hcx, 0.0, hcz, AXIS_YAW + math.pi / 2.0)
-    m.box(0, -2.0, 0, 56.0, 22.8, 16.5, 'wood', collide=True)
+    m.box(0, -2.0, 0, 56.0, 22.8, 16.5, 'wood', collide=True, footing=True)
     m.box(0, 4.5, 8.35, 52.0, 14.8, 0.28, 'glass')
     m.box(0, 20.8, 0, 57.2, 1.8, 17.4, 'roof')
     if m.detail:
@@ -322,9 +328,9 @@ def build_central_square(m: Builder):
         m.box(4.0, 22.6, 8.0, 14.0, 1.6, 0.24, 'hedge')
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
-    m.prism(NE_HALL_1493030771, -2.0, 15.8, 'white', collide=True, cap_mat='roof')
+    m.prism(NE_HALL_1493030771, -2.0, 15.8, 'white', collide=True, cap_mat='roof', footing=True)
     m.prism(NE_HALL_1493030771, 13.8, 1.9, 'terra', collide=False, cap_mat='roof')
-    m.prism(SE_ANNEX_675106655, -2.0, 16.4, 'white', collide=True, cap_mat='roof')
+    m.prism(SE_ANNEX_675106655, -2.0, 16.4, 'white', collide=True, cap_mat='roof', footing=True)
 
     fsx, fsz = _ax_pt(52.0, -68.0)
     _fire_station(m, fsx, fsz, AXIS_YAW + math.pi)

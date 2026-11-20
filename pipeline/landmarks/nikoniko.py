@@ -503,6 +503,7 @@ class Builder:
 
     def __init__(self, detail=True):
         self.detail = detail
+        self.follow_grade = False
         self.visible = []
         self.uv = []
         self.tiled = {k: [] for k in self.TILED_SCALES}
@@ -525,6 +526,10 @@ class Builder:
             out[..., 0] += dx
             out[..., 2] += dz
         out[..., 1] += dy
+        if self.follow_grade:
+            unique, indices = np.unique(out[...,[0,2]].reshape(-1,2),axis=0,return_inverse=True)
+            offsets = np.array([self.surface.ground(x,z) for x,z in unique])
+            out[...,1] += offsets[indices].reshape(out.shape[:-1])
         return out
 
     def sign_quad(self, x, y0, z, w, h, sign_key, double_sided=False):
@@ -642,9 +647,18 @@ class Builder:
             self.visible.append(tris)
             self.uv.append(mapped_uv)
 
-    def box(self, x, y, z, w, h, d, mat, collide=False, uv_scale=None):
+    def feet_at_grade(self, vertices):
+        """Return local Y of the final surface at each posed XZ coordinate."""
+        return np.array([self.surface.ground(x,z)-self.pose[1]
+                         for x, _, z in self._transform(vertices)])
+
+    def box(self, x, y, z, w, h, d, mat, collide=False, uv_scale=None, footing=False):
         cube = trimesh.creation.box([w, h, d])
-        self.mesh(cube.vertices + [x, y + h / 2.0, z], cube.faces, mat, collide, uv_scale)
+        vertices = cube.vertices + [x, y + h / 2.0, z]
+        if footing:
+            bottom = vertices[:,1] < y + h/2
+            vertices[bottom,1] = self.feet_at_grade(vertices[bottom]) - .04
+        self.mesh(vertices, cube.faces, mat, collide, uv_scale)
 
     def beam(self, start, end, r, mat, sections=8, collide=False):
         seg = np.asarray([start, end], dtype=float)
@@ -660,7 +674,7 @@ class Builder:
         verts += [x, y0 + h / 2.0, z]
         self.mesh(verts, cyl.faces, mat, collide, uv_scale)
 
-    def prism(self, poly_xz, y0, h, mat, collide=False, cap_mat=None, uv_scale=None, wall_mask=None):
+    def prism(self, poly_xz, y0, h, mat, collide=False, cap_mat=None, uv_scale=None, wall_mask=None, footing=False, paving=False):
         """Extrude a 2D polygon [(x, z), ...] vertically from y0 to y0 + h."""
         pts = np.asarray(poly_xz, dtype=float)
         if np.allclose(pts[0], pts[-1]):
@@ -675,6 +689,11 @@ class Builder:
                 wall_mask = list(reversed(wall_mask))
         tris_2d = mapbox_earcut.triangulate_float64(pts, np.array([n], dtype=np.uint32)).reshape(-1, 3)
         top_verts = np.column_stack([pts[:, 0], np.full(n, y0 + h), pts[:, 1]])
+        bottom = np.full(n, y0, dtype=float)
+        if footing or paving:
+            bottom = self.feet_at_grade(top_verts) - .04
+        if paving:
+            top_verts[:,1] = bottom + .10
         self.mesh(top_verts, tris_2d[:, ::-1], cap_mat or mat, collide, uv_scale)
         for i in range(n):
             if wall_mask is not None and not wall_mask[i]:
@@ -683,10 +702,10 @@ class Builder:
             x0, z0 = pts[i]
             x1, z1 = pts[j]
             quad_v = [
-                (x0, y0, z0),
-                (x1, y0, z1),
-                (x1, y0 + h, z1),
-                (x0, y0 + h, z0),
+                (x0, bottom[i], z0),
+                (x1, bottom[j], z1),
+                top_verts[j],
+                top_verts[i],
             ]
             self.mesh(quad_v, [[0, 2, 1], [0, 3, 2]], mat, collide, uv_scale)
 
@@ -711,7 +730,7 @@ class Builder:
     def cluster_lamp(self, x, y0, z, height=7.2, globes=5, collide=False):
         """Guilin municipal multi-globe decorative streetlamp (玉兰/五头球灯)."""
         self.box(x, y0, z, 0.52, 0.55, 0.52, 'dark', collide=collide)
-        self.beam([x, y0 + 0.55, z], [x, y0 + height - 0.5, z], 0.11, 'bronze', sections=6, collide=collide)
+        self.beam([x, y0 + 0.55, z], [x, y0 + height - 0.12, z], 0.11, 'bronze', sections=6, collide=collide)
         if not self.detail:
             self.box(x, y0 + height - 0.5, z, 0.9, 0.65, 0.9, 'white_lit')
             return
@@ -738,7 +757,7 @@ class Builder:
                 dx, dz = math.cos(ang), math.sin(ang)
                 px, pz = -dz * 0.45, dx * 0.45
                 verts = [
-                    (x, top + 0.15, z),
+                    (x, top - 0.04, z),
                     (x + dx * spread * 0.52 + px, top + 0.85, z + dz * spread * 0.52 + pz),
                     (x + dx * spread, top - 0.65, z + dz * spread),
                     (x + dx * spread * 0.52 - px, top + 0.85, z + dz * spread * 0.52 - pz),
@@ -769,6 +788,8 @@ class Builder:
                 lx = x + math.cos(ang) * spread * 0.52
                 lz = z + math.sin(ang) * spread * 0.52
                 ly = y0 + trunk_h + 0.15
+                self.beam([x,y0+trunk_h-.35,z],[lx,ly+.68,lz],.08,'wood',sections=5)
+                self.beam([lx,ly+.68,lz],[lx,ly+.31,lz],.035,'bronze',sections=4)
                 self.cylinder_y(lx, ly, 0.34, lz, 0.16, 'red_lit', sections=6)
 
 
@@ -913,11 +934,11 @@ def _facade_run(m: Builder, p0, p1, ground_h=4.8, upper_h=18.2, bays=8, brand_se
 
     for i in range(bays + 1):
         lx = -length / 2.0 + i * bay_w
-        m.box(lx, -1.5, 0.25, 0.72, ground_h + 1.5, 0.85, 'dark', collide=True)
+        m.box(lx, -1.5, 0.25, 0.72, ground_h + 1.5, 0.85, 'dark', collide=True, footing=True)
         m.box(lx, ground_h + 0.5, 0.44, 0.24, upper_h - 0.5, 0.22, 'alum')
         if i < bays:
             cx = lx + bay_w / 2.0
-            m.box(cx, 0.15, -0.05, bay_w - 0.82, 3.35, 0.24, 'glass')
+            m.box(cx, 0.15, -0.05, bay_w - 0.82, 3.35, 0.24, 'glass', footing=True)
             m.box(cx, 3.52, 0.30, bay_w - 0.76, 0.92, 0.26, 'dark')
             m.sign_quad(cx, 3.55, 0.45, bay_w - 0.82, 0.86, f'shop_{(i + brand_seed) % 8}')
             for fl in range(1, 5):
@@ -928,7 +949,7 @@ def _facade_run(m: Builder, p0, p1, ground_h=4.8, upper_h=18.2, bays=8, brand_se
 def _buttress_pylon(m: Builder, cx, cz, yaw):
     """Flanking chamfered silver-grey aluminum stair/elevator pylon (27.0 m)."""
     m.pose = (cx, 0.0, cz, yaw)
-    m.box(0, -2.0, 0, 10.6, 28.6, 9.2, 'alum', collide=True)
+    m.box(0, -2.0, 0, 10.6, 28.6, 9.2, 'alum', collide=True, footing=True)
     m.box(0, 26.6, 0, 9.2, 0.85, 8.0, 'alum')
     if m.detail:
         m.box(0, 2.2, 4.48, 3.8, 22.8, 0.35, 'glass')
@@ -943,110 +964,122 @@ def _buttress_pylon(m: Builder, cx, cz, yaw):
 
 
 def build_nikoniko(m: Builder):
+    from c_kit import landmark_surface
+    m.surface = landmark_surface('nikoniko')
     # 1. Granite sidewalk & corner forecourt plaza (flush at ground y=0, skirt to -2.0 m)
+    # Tightly hugs OSM way/253743030 north setback so Jiefang West Rd carriageway keeps full width!
     apron = [
-        (-46.5, -49.5),
-        (-58.5, 9.5),
-        (-56.0, 21.5),
-        (-1.5, 35.5),
-        (14.0, 49.0),
-        (42.5, 56.5),
-        (59.8, -1.5),
-        (57.2, -18.5),
-        (48.5, -29.5),
-        (33.5, -38.0),
-        (-18.0, -47.0),
+        (-45.5, -48.0),
+        (-57.5, 9.5),
+        (-55.5, 21.5),
+        (-1.5, 35.0),
+        (14.0, 48.5),
+        (41.5, 55.5),
+        (57.8, -1.5),
+        (54.2, -16.5),
+        (45.5, -25.2),
+        (31.2, -36.2),
+        (-18.0, -45.2),
     ]
-    m.prism(apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave')
+    m.prism(apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave', paving=True)
 
     # 2. Main 6-storey retail body extruded from exact OSM footprint
     n_edges = len(FOOTPRINT)
     ground_mask = [i not in (9, 10, 11, 12) for i in range(n_edges)]
-    m.prism(FOOTPRINT, -2.0, 6.8, 'dark', collide=True, cap_mat='alum', wall_mask=ground_mask)
-    m.prism(FOOTPRINT, 4.8, 18.2, 'alum', collide=True, cap_mat='roof')
+    m.prism(FOOTPRINT, -2.0, 6.8, 'dark', collide=True, cap_mat='alum', wall_mask=ground_mask, footing=True)
+    m.prism(FOOTPRINT, 4.8, 18.2, 'white', collide=True, cap_mat='roof')
 
     m.pose = (-8.0, 0.0, -4.0, 0.22)
     m.box(0, 23.0, 0, 34.0, 3.2, 24.0, 'alum')
     m.box(0, 26.2, 0, 22.0, 1.4, 14.0, 'roof')
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
-    # 3. East Wing (along Zhongshan Middle Rd) & North Wing (along Jiefang West Rd) curtain walls
+    # 3. East Wing (along Zhongshan Middle Rd) & exact 2-segment North Wing (along Jiefang West Rd, IMG_1385/1386!)
     _facade_run(m, (38.80, 52.82), (53.67, -2.19), ground_h=4.8, upper_h=18.2, bays=9, brand_seed=1)
     _facade_run(m, (53.67, -2.19), (50.70, -14.83), ground_h=4.8, upper_h=18.2, bays=2, brand_seed=0)
-    _facade_run(m, (27.48, -26.63), (-40.41, -46.09), ground_h=4.8, upper_h=18.2, bays=11, brand_seed=3)
+    _facade_run(m, (29.09, -33.31), (-17.98, -41.96), ground_h=4.8, upper_h=18.2, bays=8, brand_seed=3)
+    _facade_run(m, (-17.98, -41.96), (-40.41, -46.09), ground_h=4.8, upper_h=18.2, bays=4, brand_seed=5)
     _facade_run(m, (-44.00, -43.57), (-55.60, 8.50), ground_h=4.8, upper_h=18.2, bays=7, brand_seed=2)
     _facade_run(m, (13.38, 46.01), (38.80, 52.82), ground_h=4.8, upper_h=18.2, bays=4, brand_seed=0)
+
+    # North facade warm pink/coral commercial ad billboard panels visible through trees (IMG_1385, IMG_1386!)
+    for bx, bz in ((22.5, -32.8), (-4.0, -39.8)):
+        m.pose = (bx, 0.0, bz, math.atan2(0.18, -0.98))
+        m.box(0, 8.5, 0.65, 11.5, 11.2, 0.22, 'terra')
+        m.box(0, 8.1, 0.60, 12.1, 12.0, 0.14, 'white')
+        m.pose = (0.0, 0.0, 0.0, 0.0)
 
     # Cantilevered semi-cylindrical glass bay on upper-west end of North Wing (00-2019.jpg right)
     m.cylinder_y(-33.5, 13.8, 7.6, -45.6, 2.6, 'glass', sections=12 if m.detail else 6)
     m.cylinder_y(-33.5, 13.4, 0.4, -45.6, 2.75, 'alum', sections=12 if m.detail else 6)
     m.cylinder_y(-33.5, 21.4, 0.45, -45.6, 2.75, 'alum', sections=12 if m.detail else 6)
 
-    # 4. NE Corner Rotunda Glass Tower + Flanking Aluminum Buttress Pylons + Rooftop Sign Drum
-    corner_cx, corner_cz = 40.5, -15.5
+    # 4. NE Corner Rotunda Glass Tower + Flanking Pylons strictly within OSM way/253743030 setback (IMG_1386!)
+    corner_cx, corner_cz = 41.5, -12.5
     corner_yaw = math.atan2(1.0, -0.88)
 
-    _buttress_pylon(m, 49.2, -9.2, corner_yaw - 0.34)
-    _buttress_pylon(m, 33.0, -25.0, corner_yaw + 0.34)
+    _buttress_pylon(m, 48.8, -6.8, corner_yaw - 0.34)
+    _buttress_pylon(m, 31.8, -20.2, corner_yaw + 0.34)
 
     # Walkable recessed corner entrance lobby floor + rear glass doors
-    m.pose = (corner_cx + 4.2, 0.0, corner_cz - 3.8, corner_yaw)
+    m.pose = (corner_cx + 2.6, 0.0, corner_cz - 2.4, corner_yaw)
     for step in range(2):
-        m.box(0, step * 0.11, 8.2 - step * 1.1, 13.5, 0.12, 1.2, 'pave', collide=True)
-    m.box(0, 0.2, 2.2, 12.6, 5.8, 0.5, 'glass', collide=True)
+        m.box(0, step * 0.11, 6.2 - step * 0.9, 11.2, 0.12, 1.0, 'pave', collide=True, footing=True)
+    m.box(0, 0.2, 1.8, 10.6, 5.8, 0.5, 'glass', collide=True, footing=True)
     for side in (-1, 1):
-        m.cylinder_y(side * 5.2, 0.0, 6.8, 7.2, 0.68, 'alum', sections=12 if m.detail else 6, collide=True)
+        m.cylinder_y(side * 4.4, 0.0, 6.8, 5.4, 0.58, 'alum', sections=12 if m.detail else 6, collide=True)
         if m.detail:
-            m.box(side * 5.2, 1.8, 7.92, 0.88, 4.3, 0.08, 'red')
-            m.box(side * 5.2, 1.72, 7.94, 0.94, 0.12, 0.10, 'yellow_pave')
-            m.box(side * 5.2, 6.08, 7.94, 0.94, 0.12, 0.10, 'yellow_pave')
+            m.box(side * 4.4, 1.8, 6.02, 0.78, 4.3, 0.08, 'red')
+            m.box(side * 4.4, 1.72, 6.04, 0.84, 0.12, 0.10, 'yellow_pave')
+            m.box(side * 4.4, 6.08, 6.04, 0.84, 0.12, 0.10, 'yellow_pave')
 
-    # Semi-circular fan-ribbed glass arch canopy over main corner entrance (00-2019.jpg)
-    arch_r = 4.65
+    # Semi-circular fan-ribbed glass arch canopy over main corner entrance (IMG_1386 lower-left!)
+    arch_r = 4.35
     arch_y0 = 3.65
     arch_segs = 12 if m.detail else 6
     for idx in range(arch_segs):
         a0 = math.pi * idx / arch_segs
         a1 = math.pi * (idx + 1) / arch_segs
-        x0, y0 = arch_r * math.cos(a0), arch_y0 + arch_r * math.sin(a0) * 0.78
-        x1, y1 = arch_r * math.cos(a1), arch_y0 + arch_r * math.sin(a1) * 0.78
-        quad = [(x0, y0, 6.6), (x1, y1, 6.6), (x1, y1, 9.2), (x0, y0, 9.2)]
+        x0, y0 = arch_r * math.cos(a0), arch_y0 + arch_r * math.sin(a0) * 0.82
+        x1, y1 = arch_r * math.cos(a1), arch_y0 + arch_r * math.sin(a1) * 0.82
+        quad = [(x0, y0, 4.8), (x1, y1, 4.8), (x1, y1, 7.1), (x0, y0, 7.1)]
         m.mesh(quad, [[0, 1, 2], [0, 2, 3]], 'alum')
-        fan = [(0.0, arch_y0, 9.05), (x0, y0, 9.05), (x1, y1, 9.05)]
+        fan = [(0.0, arch_y0, 6.95), (x0, y0, 6.95), (x1, y1, 6.95)]
         m.mesh(fan, [[0, 1, 2]], 'glass')
         if m.detail:
-            m.beam([0.0, arch_y0, 9.12], [x0, y0, 9.12], 0.045, 'white', sections=4)
+            m.beam([0.0, arch_y0, 7.02], [x0, y0, 7.02], 0.045, 'white', sections=4)
     # Entrance canopy header ('桂林微笑堂商厦 / GUILIN WEIXIAOTANG PLAZA')
-    m.box(0, arch_y0 - 0.88, 8.92, 9.4, 0.96, 0.48, 'alum')
-    m.sign_quad(0, arch_y0 - 0.84, 9.19, 8.4, 0.88, 'niko_arch')
+    m.box(0, arch_y0 - 0.88, 6.82, 8.8, 0.96, 0.48, 'alum')
+    m.sign_quad(0, arch_y0 - 0.84, 7.09, 8.0, 0.88, 'niko_arch')
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
-    # Main corner curved blue-teal glass drum (y=6.6..26.0 m) + stepped upper cylinder (y=26.0..30.2 m)
-    m.cylinder_y(corner_cx, 6.6, 19.4, corner_cz, 14.8, 'glass', sections=24 if m.detail else 10, collide=True)
-    m.cylinder_y(corner_cx, 25.8, 0.55, corner_cz, 15.1, 'alum', sections=24 if m.detail else 10)
-    m.cylinder_y(corner_cx, 26.3, 3.9, corner_cz, 12.8, 'glass', sections=20 if m.detail else 10)
-    m.cylinder_y(corner_cx, 30.1, 0.45, corner_cz, 13.0, 'alum', sections=20 if m.detail else 10)
+    # Main corner curved blue-teal glass drum (radius 10.4 m matching OSM corner!) + stepped upper cylinder
+    m.cylinder_y(corner_cx, 6.6, 19.4, corner_cz, 10.4, 'glass', sections=24 if m.detail else 10, collide=True)
+    m.cylinder_y(corner_cx, 25.8, 0.55, corner_cz, 10.65, 'alum', sections=24 if m.detail else 10)
+    m.cylinder_y(corner_cx, 26.3, 3.9, corner_cz, 9.1, 'glass', sections=20 if m.detail else 10)
+    m.cylinder_y(corner_cx, 30.1, 0.45, corner_cz, 9.3, 'alum', sections=20 if m.detail else 10)
 
-    # Giant dark glossy SMD LED billboard screen on floors 2..4 (00-2019.jpg)
+    # Giant dark glossy SMD LED billboard screen on floors 2..4 (facing NE intersection)
     m.pose = (corner_cx, 0.0, corner_cz, corner_yaw)
-    m.box(0, 9.4, 14.55, 13.8, 8.8, 0.65, 'dark')
-    m.sign_quad(0, 9.82, 14.92, 13.0, 7.96, 'led_screen')
+    m.box(0, 9.4, 10.25, 10.2, 8.4, 0.55, 'dark')
+    m.sign_quad(0, 9.82, 10.56, 9.6, 7.6, 'led_screen')
 
-    # White cylindrical rooftop crown signboard drum (y=30.5..35.0 m) with real CJK & English lettering
+    # White cylindrical rooftop crown signboard drum (y=30.5..35.0 m)
     m.pose = (0.0, 0.0, 0.0, 0.0)
-    m.cylinder_y(corner_cx, 30.5, 4.45, corner_cz, 11.2, 'white', sections=24 if m.detail else 10)
-    m.cylinder_y(corner_cx, 34.85, 0.22, corner_cz, 11.35, 'alum', sections=24 if m.detail else 10)
+    m.cylinder_y(corner_cx, 30.5, 4.45, corner_cz, 8.2, 'white', sections=24 if m.detail else 10)
+    m.cylinder_y(corner_cx, 34.85, 0.22, corner_cz, 8.35, 'alum', sections=24 if m.detail else 10)
+    m.cylinder_y(corner_cx, 30.93, .12, corner_cz, 8.34, 'white', sections=48)
     m.sign_arc(
-        corner_cx, corner_cz, 11.30, 30.95, 3.55, corner_yaw,
+        corner_cx, corner_cz, 8.30, 30.95, 3.55, corner_yaw,
         span_rad=1.54, sign_key='niko_crown', segs=18 if m.detail else 8,
     )
     if m.detail:
-        # Three steel-and-blue-glass underground pedestrian passage canopies on NE forecourt
-        for ux, uz, uyaw in ((52.5, -20.5, corner_yaw - 0.55), (46.8, -26.8, corner_yaw), (37.2, -33.2, corner_yaw + 0.55)):
+        # Two steel-and-blue-glass underground pedestrian passage canopies on NE forecourt
+        for ux, uz, uyaw in ((52.5, -18.5, corner_yaw - 0.45), (46.2, -23.8, corner_yaw)):
             m.pose = (ux, 0.0, uz, uyaw)
-            m.box(-1.65, 0.0, 0.0, 0.32, 1.05, 5.2, 'dark', collide=True)
-            m.box(1.65, 0.0, 0.0, 0.32, 1.05, 5.2, 'dark', collide=True)
-            m.box(0.0, 0.0, -2.45, 3.62, 1.05, 0.32, 'dark', collide=True)
+            m.box(-1.65, 0.0, 0.0, 0.32, 1.05, 5.2, 'dark', collide=True, footing=True)
+            m.box(1.65, 0.0, 0.0, 0.32, 1.05, 5.2, 'dark', collide=True, footing=True)
+            m.box(0.0, 0.0, -2.45, 3.62, 1.05, 0.32, 'dark', collide=True, footing=True)
             roof_v = [
                 (-1.85, 2.55, 2.65), (1.85, 2.55, 2.65),
                 (1.85, 1.25, -2.65), (-1.85, 1.25, -2.65),
@@ -1056,8 +1089,21 @@ def build_nikoniko(m: Builder):
             m.beam([1.7, 1.05, 2.4], [1.7, 2.5, 2.4], 0.07, 'alum', sections=5)
         m.pose = (0.0, 0.0, 0.0, 0.0)
 
-        for lx, lz in ((56.8, 12.0), (52.0, 34.0), (14.0, -39.5), (-14.0, -44.5)):
-            m.cluster_lamp(lx, 0.08, lz, height=6.8, globes=5, collide=True)
+        for lx, lz in ((56.8, 12.0), (52.0, 34.0), (14.0, -37.2), (-14.0, -42.5)):
+            m.cluster_lamp(lx, m.surface.ground(lx,lz)+.04, lz, height=6.8, globes=5, collide=True)
+
+    # Continuous camphor street tree row along Weixiaotang's north sidewalk (IMG_1385 & IMG_1386!)
+    for tx, tz, th, tsp in (
+        (31.5, -26.8, 10.2, 4.2),
+        (23.5, -31.8, 10.6, 4.4),
+        (14.5, -34.8, 9.8, 4.0),
+        (5.5, -36.5, 10.4, 4.3),
+        (-4.5, -38.4, 9.6, 4.0),
+        (-14.5, -40.2, 10.2, 4.2),
+        (-25.5, -42.2, 9.8, 4.0),
+        (-36.5, -44.2, 9.5, 3.8),
+    ):
+        m.street_tree(tx, m.surface.ground(tx,tz)+.02, tz, height=th, spread=tsp, kind='camphor', lanterns=False, collide=True)
 
 
 if __name__ == '__main__':

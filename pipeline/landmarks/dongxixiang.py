@@ -2,7 +2,11 @@
 estimated against doors in the 2019 series. Bend modules follow way nodes.
 """
 import math
+import json
+from pathlib import Path
+import sys
 import numpy as np
+from shapely.geometry import Point, Polygon
 from jingjiang import generate
 
 
@@ -20,6 +24,12 @@ def lantern(model,east,south):
 
 
 def frontage(model):
+    pipeline = Path(__file__).resolve().parents[1]
+    sys.path.insert(0,str(pipeline))
+    from common import ll2xz
+    landmarks = {entry['id']:entry for entry in json.loads((pipeline/'landmarks.json').read_text())}
+    origin = np.array(ll2xz(*reversed(landmarks['dongxixiang']['anchor'])))
+    replaced = Polygon([np.array(ll2xz(*reversed(point)))-origin for point in landmarks['wangcheng_market']['replace']['polygon']])
     path=[(21.67,-121.76),(13.12,-58.68),(0,0),(37.8,7.3),(47.2,9.8)]
     for first,last in zip(path,path[1:]):
         dx,dz=np.subtract(last,first);length=math.hypot(dx,dz);angle=math.atan2(-dx,dz)
@@ -29,6 +39,8 @@ def frontage(model):
             model.box(0,0,0,4.5,.17,width+.12,'pave',True)
             for side in (-1,1):
                 east=side*6.4; high=6.1+(bay%3==1)*2.9
+                corners=[(model.pose[0]+xx*math.cos(angle)-zz*math.sin(angle),model.pose[2]+xx*math.sin(angle)+zz*math.cos(angle)) for xx in (east-3.9,east+3.9) for zz in (-width/2,width/2)]
+                if replaced.intersection(Polygon(corners).convex_hull).area>.01:continue
                 model.box(east,3,0,6.5,high-3,width-.16,'brick',True)
                 model.box(side*6.97,0,0,5.36,3,width-.16,'brick',True)
                 model.roof(east,high,0,7.8,width,1.8)
@@ -40,11 +52,11 @@ def frontage(model):
                 for cell in range(3):
                     zz=(cell-1)*width/3
                     model.box(side*3.66,0,zz-width/6+.19,1.22,3,.31,'brick',True)
-                    model.box(side*4.13,.37,zz,.16,2.0,width/3-.60,'glass')
-                    model.box(side*3.65,.27,zz,1.20,.14,width/3-.30,'wood')
-                    model.box(side*4.01,.38,zz,.10,1.97,.07,'wood')
-                    model.box(side*3.23,2.54,zz,.29,.38,1.22,'sign')
-                    for mark in (-.28,0,.28):model.box(side*3.06,2.63,zz+mark,.07,.15,.11,'gold')
+                    model.box(side*4.23,.37,zz,.16,2.0,width/3-.60,'glass')
+                    model.box(side*3.70,0,zz,1.24,.41,width/3-.30,'wood')
+                    model.box(side*4.13,.38,zz,.10,1.97,.07,'wood')
+                    model.box(side*4.17,2.54,zz,.29,.38,1.22,'sign')
+                    for mark in (-.28,0,.28):model.box(side*4.01,2.63,zz+mark,.07,.15,.11,'gold')
                     model.box(side*3.10,3.8,zz,.22,1.8,width/3-.38,'glass')
                     for bar in range(4):model.box(side*2.94,3.8,zz+(bar-1.5)*.46,.13,1.85,.10,'wood')
                     model.box(side*2.95,4.6,zz,.14,.12,width/3-.3,'wood')

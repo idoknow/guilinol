@@ -175,23 +175,35 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(verify)spawns.push({reason,from:[x,z],to:found?[found.x,found.z]:null,distance:found?Math.hypot(found.x-x,found.z-z):null,rule:found?.rule??'none'})
     if(!found)return false
     sim.body.setTranslation(found,true);sim.body.setNextKinematicTranslation(found);sim.world.step();safe.set(found.x,found.y,found.z);resetMotion();return true}
+  let destination:THREE.Vector3|null=null
   async function enter(x:number,z:number,heading:number,reason:string,override=false){
-    posOut.set(x,0,z);const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
-    const covering=manifest.landmarks?.filter(entry=>entry.collision!=='none'&&Math.hypot(entry.position[0]-x,entry.position[2]-z)<=entry.sphere[3]+cfg.search)??[]
-    const strictBridge=covering.some(entry=>entry.id==='jiefang_bridge')
+    const target=new THREE.Vector3(x,0,z);destination=target
+    const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
+    const supports=(manifest.landmarks??[]).filter(entry=>{
+      if(entry.collision==='none')return false
+      const [cx,,cz,r]=entry.sphere, a=entry.rotation*Math.PI/180
+      const ex=entry.position[0]+cx*Math.cos(a)+cz*Math.sin(a)
+      const ez=entry.position[2]-cx*Math.sin(a)+cz*Math.cos(a)
+      return Math.hypot(ex-x,ez-z)<=r+cfg.search
+    })
     const deadline=performance.now()+15000
-    while((needed.some(tile=>!stream.loaded.has(tile))||covering.some(entry=>!stream.landmarks.has(entry)))&&performance.now()<deadline){
-      posOut.set(x,0,z);stream.tick(posOut)
-      for(const entry of covering)if(!stream.landmarks.has(entry)){posOut.set(x,entry.position[1],z);stream.updateLandmarks?.(posOut,entry)}
+    while((needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))&&performance.now()<deadline){
+      if(destination!==target)return false
+      target.y=0;stream.tick(target)
+      for(const entry of supports)if(!stream.landmarks.has(entry)){
+        target.y=entry.position[1];stream.updateLandmarks?.(target,entry)
+      }
       await new Promise(resolve=>setTimeout(resolve,12))
     }
-    if(strictBridge&&covering.some(entry=>entry.id==='jiefang_bridge'&&!stream.landmarks.has(entry)))return false
+    if(destination!==target)return false
+    destination=null
+    if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))return false
     sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true);return true
   }
-  function leave(){active=false;rides?.clearBoatPose(figure);rides?.show(false);if(wasCar){sim.controller.enableAutostep(cfg.step,.18,false);sim.controller.setMaxSlopeClimbAngle(cfg.slope)}wasBoat=wasBike=wasCar=false;bikeObstacle='';ridePose.reset();driverPose.reset(false);resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function leave(){destination=null;active=false;rides?.clearBoatPose(figure);rides?.show(false);if(wasCar){sim.controller.enableAutostep(cfg.step,.18,false);sim.controller.setMaxSlopeClimbAngle(cfg.slope)}wasBoat=wasBike=wasCar=false;bikeObstacle='';ridePose.reset();driverPose.reset(false);resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function follow(dt=0,snap=false){const pos=sim.body.translation();figure.position.set(pos.x,pos.y-cfg.height/2,pos.z)
     if(rides?.boat){figure.position.copy(rides.boat.position);figure.position.y+=rides.boatSeatOffset;figure.rotation.y=rides.heading}
     if(rides?.car){
@@ -509,7 +521,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     throw Error(`Missing support at ${x},${z}`)
   }
-  return {photoSupport,enter,leave,tick,spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  return {photoSupport,enter,leave,tick,get destination(){return destination},spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}
 }

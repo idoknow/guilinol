@@ -33,6 +33,17 @@ function fineField(data:Awaited<ReturnType<typeof import('../world').detail>>){
     return Math.max(visible,(data.water[at]===-32768?data.terrain[at]:data.water[at])/10)
   })
 }
+function weldedDeck(raw:Float32Array, corners:number[]){
+  const verts:number[]=[],indices=new Uint32Array(corners.length),seen=new Map<string,number>()
+  for(const [at,corner] of corners.entries()){
+    const i=3*corner
+    const key=`${Math.round(raw[i]*100)},${Math.round(raw[i+1]*100)},${Math.round(raw[i+2]*100)}`
+    let idx=seen.get(key)
+    if(idx===undefined){idx=verts.length/3;seen.set(key,idx);verts.push(raw[i],raw[i+1],raw[i+2])}
+    indices[at]=idx
+  }
+  return R.ColliderDesc.trimesh(Float32Array.from(verts),indices,R.TriMeshFlags.FIX_INTERNAL_EDGES)
+}
 function houses(rings:Outline[]){
   const verts:number[]=[], indices:number[]=[]
   for(const [bottom,top,loops] of rings){
@@ -60,7 +71,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const capsule=world.createCollider(new R.ColliderDesc(shape),body)
   const regions=new Map<Tile,Region>(), mountains=new Map<PeakColliderData,R.Collider>(), modelMountains=new Map<THREE.Object3D,R.Collider[]>(), kinds=new Map<number,Kind>()
   function add(desc:R.ColliderDesc,kind:Kind){const coll=world.createCollider(desc);kinds.set(coll.handle,kind);return coll}
-  function remove(coll:R.Collider){kinds.delete(coll.handle);world.removeCollider(coll,false)}
+  const thinDecks=new Set<number>()
+  function remove(coll:R.Collider){thinDecks.delete(coll.handle);kinds.delete(coll.handle);world.removeCollider(coll,false)}
   const trunks=new Map<import('../forest').Tree,R.Collider>()
   const landmarks=new Map<THREE.Group,R.Collider[]>()
   function sync(east:number,south:number){
@@ -77,9 +89,18 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         if(!(node instanceof THREE.Mesh))return
         let parent:THREE.Object3D|null=node;while(parent&&parent!==root&&!/^collision/i.test(parent.name))parent=parent.parent
         if(!parent||parent===root)return
-        const pos=node.geometry.getAttribute('position'),vertices=new Float32Array(pos.count*3),point=new THREE.Vector3()
+        const pos=node.geometry.getAttribute('position'),rawIdx=node.geometry.index?node.geometry.index.array:null
+        const vertices=new Float32Array(pos.count*3),point=new THREE.Vector3()
         for(let index=0;index<pos.count;index++)point.fromBufferAttribute(pos,index).applyMatrix4(node.matrixWorld).toArray(vertices,3*index)
-        colliders.push(add(R.ColliderDesc.trimesh(vertices,node.geometry.index?Uint32Array.from(node.geometry.index.array):Uint32Array.from({length:pos.count},(_,index)=>index)),'landmark'))
+        const triCount=rawIdx?rawIdx.length/3:pos.count/3,filtered:number[]=[],slabCap=root.position.y+.22
+        const keepLowSlab=/bridge|huaqiao|ronghu|mulong/.test(entry.id)
+        for(let t=0;t<triCount;t++){
+          const i0=rawIdx?rawIdx[t*3]:t*3,i1=rawIdx?rawIdx[t*3+1]:t*3+1,i2=rawIdx?rawIdx[t*3+2]:t*3+2
+          const y0=vertices[i0*3+1],y1=vertices[i1*3+1],y2=vertices[i2*3+1],hi=Math.max(y0,y1,y2)
+          if(!keepLowSlab&&hi<=slabCap)continue
+          filtered.push(i0,i1,i2)
+        }
+        if(filtered.length)colliders.push(add(R.ColliderDesc.trimesh(vertices,Uint32Array.from(filtered)),'landmark'))
       })
       landmarks.set(root,colliders);changed=true
     }
@@ -99,19 +120,23 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       const rings=data?.rings??[]
       if(data){const {sidewalk,banks}=data.streets
         if(sidewalk.length)colliders.push(add(R.ColliderDesc.trimesh(sidewalk,Uint32Array.from({length:sidewalk.length/3},(_,i)=>i)).setTranslation(tile.x,0,tile.z),'sidewalk'))
-        for(const [ax,az,bx,bz,top,bottom] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=(top-bottom)/10+1.25
+        for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=((top+endTop)/2-bottom)/10+1.25
           colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
       if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
-      if(data?.deck.length){const count=data.deck.length/3
-        if(!data.thin.size){
-          colliders.push(add(R.ColliderDesc.trimesh(data.deck,Uint32Array.from({length:count},(_,at)=>at),R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(tile.x,0,tile.z),'deck'))
-        }else{
-          const thick:number[]=[], thin:number[]=[]
-          for(let tri=0;tri<count/3;tri++){const dst=data.thin.has(tri)?thin:thick, base=tri*9
-            for(let k=0;k<9;k++)dst.push(data.deck[base+k])}
-          if(thick.length)colliders.push(add(R.ColliderDesc.trimesh(Float32Array.from(thick),Uint32Array.from({length:thick.length/3},(_,at)=>at),R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(tile.x,0,tile.z),'deck'))
-          if(thin.length)colliders.push(add(R.ColliderDesc.trimesh(Float32Array.from(thin),Uint32Array.from({length:thin.length/3},(_,at)=>at),R.TriMeshFlags.FIX_INTERNAL_EDGES).setTranslation(tile.x,0,tile.z),'deckThin'))
-        }}
+      if(data?.deck.length){
+        // Keep the rendered slab thickness on the collider. Rapier feature IDs
+        // on a trimesh ray hit need not index the original GL04 triangles.
+        const indices:[number[],number[]]=[[],[]]
+        for(let face=0;face<data.deck.length/9;face++){
+          indices[data.thin.has(face)?1:0].push(face*3,face*3+1,face*3+2)
+        }
+        for(const [thin,faces] of indices.entries()){
+          if(!faces.length)continue
+          const collider=add(weldedDeck(data.deck,faces).setTranslation(tile.x,0,tile.z),'deck')
+          colliders.push(collider)
+          if(thin)thinDecks.add(collider.handle)
+        }
+      }
       regions.set(tile,{colliders,rings,fine:!!data});changed=true
     }
     for(const peak of peaks.colliders){
@@ -160,7 +185,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
     surfaceRay.origin.x=east;surfaceRay.origin.y=origin;surfaceRay.origin.z=south
     const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)
-    const thin=!!hit&&kinds.get(hit.collider.handle)==='deckThin'
+    const thin=!!hit&&(thinDecks.has(hit.collider.handle)||kinds.get(hit.collider.handle)==='deckThin')
     return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}:null
   }
   function waterCeiling(east:number,south:number,waterY:number){
@@ -168,7 +193,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     if(hasDeck(east,south)){
       upRay.origin.x=east;upRay.origin.y=waterY-.8;upRay.origin.z=south
       const deckHit=world.castRayAndGetNormal(upRay,16,false,undefined,undefined,capsule,undefined,deckFilter)
-      if(deckHit){const thick=kinds.get(deckHit.collider.handle)==='deckThin'?.6:look.bridgeDepth
+      if(deckHit){const thick=(thinDecks.has(deckHit.collider.handle)||kinds.get(deckHit.collider.handle)==='deckThin')?.6:look.bridgeDepth
         bottom=Math.min(bottom,waterY-.8+deckHit.timeOfImpact-thick)}
     }
     upRay.origin.x=east;upRay.origin.y=waterY+.15;upRay.origin.z=south
@@ -228,7 +253,9 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       if(!tile||!stream.loaded.has(tile)||insideHouse(x,z))continue
       const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
       const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05)continue
-      const y=support.y+cfg.height/2+.055
+      const tread=surface(x,z,'landmark',support.y+cfg.step+.02,cfg.step+.04)
+      const floor=tread&&tread.slope<=cfg.slope?Math.max(tread.y,support.y):support.y
+      const y=floor+cfg.height/2+.055
       if(world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule))continue
       return {x,y,z,rule:(dx||dz?'search-':'')+(deck?'bridge':'land')}
     }return null

@@ -1,0 +1,2 @@
+ALTER TABLE feedback ADD COLUMN view_json TEXT;
+ALTER TABLE feedback ADD COLUMN shot_state INTEGER NOT NULL DEFAULT 0;

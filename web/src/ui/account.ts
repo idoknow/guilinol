@@ -14,7 +14,7 @@ export function accountPanel() {
   dialog.className='about-panel account';dialog.setAttribute('aria-labelledby','account-title')
   dialog.innerHTML='<header><h2 id="account-title"></h2><button class="about-close" type="button">关闭</button></header><form class="about-body"><div class="fields"></div><button class="about-close" type="submit"></button><nav></nav><p class="message" role="status"></p></form>'
   const form=dialog.querySelector('form')!,fields=form.querySelector('.fields')!,nav=form.querySelector('nav')!,message=form.querySelector('.message')!
-  let screen:Screen='login',email='',user:{email:string,nickname:string}|null=null,busy=false
+  let screen:Screen='login',email='',user:{email:string,nickname:string,notify_email:boolean}|null=null,busy=false
   const setUser=(value:typeof user)=>{user=value;entry.textContent=user?.nickname??'登录'}
   function field(name:string,label:string,type:string,auto:string,value='') {
     const wrapper=document.createElement('label'),input=document.createElement('input')
@@ -39,6 +39,7 @@ export function accountPanel() {
     if(next==='verify'||next==='reset')field('code','六位验证码','text','one-time-code')
     if(next==='register'||next==='login'||next==='reset')field('password',next==='login'?'密码':'密码（至少 8 位）','password',next==='login'?'current-password':'new-password')
     if(next==='register'||next==='profile')field('nickname','昵称','text','nickname',user?.nickname)
+    if(next==='profile'){const label=document.createElement('label'),toggle=document.createElement('input');toggle.type='checkbox';toggle.name='notify_email';toggle.checked=!!user?.notify_email;label.append(toggle,'反馈邮件提醒');fields.append(label)}
     if(next==='login'){action('注册账号',()=>render('register'));action('忘记密码',()=>render('forgot'))}
     else if(next==='profile')action('退出登录',()=>submit(async()=>{await api('auth/logout','POST');setUser(null);render('login','已退出登录')}))
     else action('返回登录',()=>render('login'))
@@ -46,7 +47,7 @@ export function accountPanel() {
   }
   form.onsubmit=event=>{event.preventDefault();void submit(async()=>{
     const data:Record<string,string>={};new FormData(form).forEach((value,key)=>{data[key]=String(value)});if(data.email)email=data.email
-    if(screen==='profile'){setUser(await api('me','PATCH',data));render('profile','昵称已保存');return}
+    if(screen==='profile'){setUser(await api('me','PATCH',{...data,notify_email:!!data.notify_email}));render('profile','账号设置已保存');return}
     if(screen==='forgot'){const res=await api('auth/resend','POST',{email,purpose:'reset'});render('reset',res.devCode?`本地测试验证码：${res.devCode}（10 分钟内有效）`:'如邮箱已注册，请查收验证码');return}
     const previous=screen
     if(previous==='verify') data.password=verificationPassword

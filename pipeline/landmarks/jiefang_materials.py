@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 
 import numpy as np
+from jiefang_layout import deck_level
 import trimesh
 from PIL import Image, ImageDraw
 from jingjiang import Model, SWATCHES, atlas
@@ -59,7 +60,7 @@ def generate_bridge(build):
         build(model)
         def emit(parts,uvs,name):
             vertices=np.concatenate(parts).reshape(-1,3)
-            vertices[:,1]+=5.62-vertices[:,0]*1.3/281
+            vertices[:,1]+=deck_level(vertices[:,0])
             mesh=trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
             if uvs is not None:
                 mesh.visual=trimesh.visual.TextureVisuals(uv=np.concatenate(uvs).reshape(-1,2),material=finishes[name])
