@@ -4,10 +4,28 @@
 
 1. 准备与发布版本匹配的 `public/world/`，确保清单引用的文件齐全。sg 保持工作树干净，安装 Docker、Node 22、kubectl，SSH 到 hk01 无需 sudo。`test:api`、`test:bridge`、`verify:auth`、`verify:feedback`、`verify:admin` 使用临时 Docker PG 和 MinIO，不复用线上数据库。浏览器验证需要先构建 `dist`。
 2. 在 `idoknow` 安全预置 `glol-env`。后者含 `POSTGRES_PASSWORD`（随机十六进制）、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`（glol 专用 MinIO）、原有 `RESEND_API_KEY` 和 `BRIDGE_TOKEN`。不复制共享 Docker 登录文件、不通过 issue 或 Git 传值。Ingress 须覆盖客户端自报的 `X-Real-IP`，并传递受信任的客户端地址，以保持原 IP 限流行为。 镜像按 SHA 匿名拉取。
-3. Actions 在 PR 分支 push 或手动触发时构建并推送 web 和 api 的 commit SHA；从固定 digest 的 glol-web 快照取 world 资源，按 `deploy/world.sha256` 校验。确认两包 Public 后运行 `npm run deploy:hk`；脚本只等待镜像并应用源站，不推镜像、不切流，不部署桥。
+3. Actions 在 main、本 PR 分支 push 或手动触发时构建并推送 web 和 api 的 commit SHA。web 从本仓库 Release 下载 world，解包前按 `deploy/world.sha256` 校验。确认两包 Public 后运行 `npm run deploy:hk`；脚本只等待镜像并应用源站，不推镜像、不切流，不部署桥。
 4. sg claude 在停写窗口重新导出，传入只读快照目录。`CONFIRM_REPLACE_HK_GLOL=yes bash deploy/import-hk.sh /absolute/export` 将 `d1-glol.sql` 流式事务替换到指定 glol 库，逐表校验；不申请 Cloudflare 令牌，不复制导出文件。
 5. 从 sg 通过仅绑定回环的 SSH 隧道连接 hk01 的 glol-minio，设置 `S3_ENDPOINT` 和 glol 专用 AWS 凭据。运行 `node deploy/sync-objects.mjs /absolute/export`；从 `r2/manifest.json` 和 `r2/objects` 校验 SHA-256，增量写入后回读校验，遇到多余对象停止。`--check-only` 只查源文件。
 6. 使用 `curl --resolve glol.rcpd.cc:443:38.39.30.208 https://glol.rcpd.cc/`，不使用 `-k`。相同 Host 核验 `/world/manifest.json`、至少一个清单分块、`/api/me` 未登录 401、静态缓存头。浏览器定向同一 IP 验证注册、邮箱验证码、登录、私有图片上传与回读、反馈提交及管理员界面。不要用生产用户凭据做冒烟测试。分别检查三个 Deployment 的 Pod 内存和节点使用量，只记录数字。
+
+## 更新 world
+
+在 sg 使用 GNU tar。生成并核对 `public/world` 后，只打包这个公开目录，不包含原始输入、用户数据或凭据。从仓库根目录执行：
+
+```bash
+set -euo pipefail
+test -s public/world/manifest.json
+tmp=$(mktemp -d)
+tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C public -cf - world | gzip -n > "$tmp/world.tar.gz"
+(cd "$tmp" && sha256sum world.tar.gz) > "$tmp/world.sha256"
+tag="world-$(cut -c1-12 "$tmp/world.sha256")"
+gh release create "$tag" --repo idoknow/guilinol --target "$(git rev-parse HEAD)" --title "$tag" --notes 'Generated public world assets' --latest=false
+gh release upload "$tag" "$tmp/world.tar.gz" --repo idoknow/guilinol
+cp "$tmp/world.sha256" deploy/world.sha256
+```
+
+生成资源的提交应已推送。已有相同 tag 时下载并核对完整摘要，复用匹配附件，不覆盖。把 `deploy/world.sha256` 的变更提交审查；合入 main 后由 Actions 发布镜像。回滚 world 时恢复先前的摘要即可。
 
 ## 切流与回滚（sg claude）
 

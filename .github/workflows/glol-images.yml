@@ -1,7 +1,7 @@
 name: Publish glol images
 on:
   push:
-    branches: [agent/sg-codex/a89323fc0d6c]
+    branches: [main, agent/sg-codex/a89323fc0d6c]
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,18 +25,22 @@ jobs:
           node-version: 22
       - name: Assemble web distribution with verified published world tiles
         if: matrix.image == 'web'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          snapshot=$(docker create ghcr.io/idoknow/glol-web@sha256:41637bb89cce04b56d9a1028ac9ee9178a6f24d2bf0054dd4a5d5726076a7a8b)
-          docker cp "$snapshot:/usr/share/nginx/html/world" public/
-          docker rm "$snapshot"
-          cd public
-          sha256sum --check --quiet ../deploy/world.sha256
-          cd ..
+          tag="world-$(cut -c1-12 deploy/world.sha256)"
+          gh release download "$tag" --repo idoknow/guilinol --pattern world.tar.gz
+          sha256sum --check deploy/world.sha256
+          tar -xzf world.tar.gz -C public
+          test -s public/world/manifest.json
           npm ci
           npx --no-install playwright install --with-deps chromium
           npm run build
       - name: Build image
         run: docker build -f deploy/${{ matrix.image }}.Dockerfile -t "$IMAGE" .
+      - name: Test trusted proxy handling
+        if: matrix.image == 'web'
+        run: bash deploy/test-client-ip.sh "$IMAGE"
       - name: Log in to GHCR
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
