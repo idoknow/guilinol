@@ -16,7 +16,6 @@
   {"id": "lequn_medical", "subtype": "invisibleColliderOnRoad", "maxArea": 11, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "lequn_medical", "subtype": "landmarkOnSidewalk", "maxArea": 16, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "nikoniko", "subtype": "landmarkOnSidewalk", "maxArea": 2, "maxCount": 1, "reason": "地标模型问题，另案修复"},
-  {"id": "ningyuan_primary", "subtype": "landmarkOnSidewalk", "maxArea": 50, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "peizhi_special", "subtype": "landmarkOnSidewalk", "maxArea": 15, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "ronghu", "subtype": "invisibleColliderOnRoad", "maxArea": 37, "maxCount": 1, "reason": "地标模型问题，另案修复"},
   {"id": "ronghu", "subtype": "landmarkOnCarriageway", "maxArea": 159, "maxCount": 1, "reason": "地标模型问题，另案修复"},

@@ -33,7 +33,8 @@
     "id": "ningyuan_primary",
     "name": "桂林市宁远小学",
     "osm": "way/1001796192",
-    "facade": "photo-informed"
+    "facade": "photo-informed",
+    "street": "安新北路"
   },
   {
     "id": "peizhi_special",
