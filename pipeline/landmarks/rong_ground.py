@@ -4,7 +4,11 @@ from shapely import distance, points
 from shapely.geometry import Polygon
 
 # Outer side of the pedestrian loop on ways 221349750 and 684511179.
-GATE_PLAZA = [(-26,-9),(-8,-17),(20,-13),(36,-11),(25,16),(11,20),(-28,7)]
+GATE_PLAZA = [(-26,-9),(-12.3,-32.3),(6,-23),(12.8,-36.5),
+              (26.4,-31.1),(21,-16.5),(36,-11),(25,16),(11,20),(-28,7)]
+# Stone landing immediately inside the mapped island ring at the bridge end.
+ISLAND_COURT = [(110.34,118.02),(121.57,120.07),(129.25,120.5),
+                (132,134),(119,139),(102,133)]
 # South edge follows outer member 674611984 of water relation 9373836.
 BANK_EDGE = [(69.3,43.3),(86.7,37.7),(95.6,29.5),(103.3,28.7)]
 BANK = [*BANK_EDGE,(102,19),(90,17),(81,19),(71,24)]
@@ -28,7 +32,7 @@ def grade_landings(terrain, original, wet, west, north, grid, entries):
         if entry['id'] == 'gunanmen':
             patches = [(GATE_PLAZA,153.77)]
         elif entry['id'] == 'ronghu':
-            patches = [(BANK,153.1+BANK_Y), (FORECOURT,153.1+FORECOURT_Y)]
+            patches = [(BANK,153.1+BANK_Y), (FORECOURT,153.1+FORECOURT_Y), (ISLAND_COURT,152.14)]
         else:
             continue
         for ring, top in patches:
@@ -44,5 +48,9 @@ def grade_landings(terrain, original, wet, west, north, grid, entries):
             xx,zz = np.meshgrid(west+cols*grid,north+rows*grid)
             influence = np.clip(1-distance(points(xx,zz),shape)/(2*grid),0,1) * ~wet[ix]
             for field in (terrain,original):
-                field[ix] = np.rint(field[ix]*(1-influence) + (top-.08)*10*influence)
+                target = (top-.08)*10
+                if ring is ISLAND_COURT:
+                    # Cut high terrain under the slabs while preserving the sloping shore.
+                    target = np.minimum(field[ix],target)
+                field[ix] = np.rint(field[ix]*(1-influence) + target*influence)
     return paved

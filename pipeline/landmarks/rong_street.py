@@ -18,7 +18,9 @@ def signs(image):
             draw.text((left+width/2,top+height/2),text,font=_font(size),anchor='mm',fill='white')
     RECTS['inn_board'] = (768,736,128,32)
     draw.rectangle((768,736,895,767),fill='#273748')
-    draw.text((832,752),'涵栅雅居',anchor='mm',font=_font(19),fill='white')
+    draw.rectangle((770,737,893,766),outline='#b9c3bf')
+    for row,label in enumerate(('涵栅雅居','民宿酒店')):
+        draw.text((832,744+row*14),label,anchor='mm',font=_font(14),fill='white')
     sign=Image.new('RGB',(128,512),'#171819')
     brush=ImageDraw.Draw(sign)
     for index,char in enumerate('涵栅雅居'):
@@ -97,6 +99,9 @@ def shop(builder, east, base, south, width, length, floors, kind):
                 box(stone,(face+.08,level,offset),(.18,1.8,length*.44),'wood')
                 box(glass,(face+.2,level,offset),(.09,1.53,length*.42),'glass',None)
         if kind == 'inn':
+            for stall in range(5 if builder.detail else 3):
+                scooter(stone,face+1.25,base,south-length*.4+1.28*stall,
+                        ('steel','cream','vermilion')[stall%3])
             corner = south+length/2
             box(stone,(face+.9,base+3.5,corner),(1.8,.82,.13),'wood')
             for side in (-1,1):
@@ -130,8 +135,6 @@ def approach(builder):
         banyan(mesh,(east+5,base+.12,south),9+index%3,4.9,77+index,builder.detail,lobed=False)
         for offset in range(7 if builder.detail else 3):
             scooter(mesh,east+5,base,south+2+offset*.77,('steel','vermilion','cream')[offset%3])
-    for index in range(6):
-        box(mesh,(15+index*.95,.85,-24),(.5,.07,4.3),'white')
     for index in range(5):
         for sign in (-1,1):
             tube(mesh,(16+index,1.1,-31),(16+index+sign*3.4,1.32,-34.4),.085,'yellow',4)

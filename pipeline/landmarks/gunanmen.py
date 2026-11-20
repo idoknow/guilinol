@@ -28,7 +28,7 @@ from pathlib import Path
 
 from c_kit import (
     Builder, arch_wall, box, cylinder, ensure_textures, export_landmark, solid,
-    extrude, grille, hip_roof, railing, ramp, stairs, tri_count, yaw_box, segment_wall, tube, _canopy,
+    extrude, grille, hip_roof, railing, ramp, stairs, tri_count, ramp, yaw_box, segment_wall, tube, _canopy,
 )
 
 
@@ -112,22 +112,34 @@ def courtyard(builder, deck):
         extrude(builder.hit,curtain,0,4.83,'ashlar')
     # The rear face of the bastion closes the platform. IMG_1315/16 show
     # open space east of it; the former 22 m backing box extended past the side.
-    if builder.collide:
-        solid(builder.hit, (-31, 1.45, 3.5), (.52, 2.9, 21), 'ashlar')
     for row in range(7):
         front=-10-row*2
         for east in range(-19,19,2):
             corners=[(east,front),(east+2,front),(east+2,front-2),(east,front-2)]
             wall.face([(xx,.54+max(0,-zz-10)*.092,zz) for xx,zz in corners],(0,1,0),'granite',None)
-    # The red enclosure faces the pedestrian lane west of the yellow hall.
-    for start, end in ((-7, 5.5), (8.5, 14)):
-        segment_wall(wall, (-31, start), (-31, end), 0, 2.9, .52, 'vermilion')
-        segment_wall(wall, (-31, start), (-31, end), 2.9, 3.15, .78, 'glaze')
-    box(wall, (-31, 1.55, 7), (.32, 3.1, 3), 'door')
-    hip_roof(wall, (-31, 7), 3.1, 1.7, 3.8, .72, .22, .12, 'graytile', 'wood')
-    stairs(wall, (-33, 0, 7), (-31.2, .45, 7), 3, 3, 'ashlar')
-    for south in (4.5, 9.5):
-        box(wall, (-31.8, .8, south), (.35, 1.6, .94), 'granite')
+    # North-facing gate and the west return of the garden enclosure (IMG_1306).
+    segment_wall(wall,(-31,-2.5),(-31,14),0,2.8,.55,'brick')
+    segment_wall(wall,(-31,-2.5),(-31,14),2.8,3.07,.82,'graytile')
+    if builder.collide:
+        segment_wall(builder.hit,(-31,-2.5),(-31,14),0,3.07,.55,'ashlar')
+    for left,right in ((-31,-30),(-27,-23)):
+        segment_wall(wall,(left,-2.5),(right,-2.5),0,2.6,.55,'brick')
+        segment_wall(wall,(left,-2.5),(right,-2.5),2.6,2.9,.78,'graytile')
+        if builder.collide:
+            segment_wall(builder.hit,(left,-2.5),(right,-2.5),0,2.9,.55,'ashlar')
+    for post in (-30,-27):
+        box(wall,(post,1.78,-2.5),(.60,3.56,1.16),'wood')
+        if builder.collide:
+            box(builder.hit,(post,1.78,-2.5),(.60,3.56,1.16),'ashlar')
+    box(wall,(-28.5,3.32,-2.5),(3.7,.48,1.24),'wood')
+    hip_roof(wall,(-28.5,-2.5),3.55,4.3,2.24,1.05,.58,.18,'graytile','wood')
+    stairs(wall,(-28.5,.13,-6.2),(-28.5,.68,-2.7),3.35,4,'ashlar')
+    if builder.collide:
+        ramp(builder.hit,(-28.5,.13,-6.2),(-28.5,.68,-2.7),3.35)
+    for index in range(6):
+        oval(wall,(-25+index*1.65,1.12,-3.25),(1.25,.72,.85),'foliage',9)
+
+
 
 
 
