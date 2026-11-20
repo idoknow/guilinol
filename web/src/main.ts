@@ -65,7 +65,8 @@ async function start() {
   const stream = new Stream(scene,manifest,base,THREE.MathUtils.clamp(Number.isFinite(radius)?radius:480,192,1600),camera)
   const output = document.querySelector('output')!
   let previous=0, first=0, frame=0, sum=0, samples=0
-  const stats = {firstMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0}
+  const stats = {firstMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
+    geometries:0,textures:0}
   type Walker=Awaited<ReturnType<typeof import('./walk').walk>>
   async function loadWalker():Promise<Walker>{return walker??=await (await prefetchWalk()).walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))}
   async function walkTo(x:number,z:number,yaw:number,reason:string){
@@ -177,7 +178,7 @@ async function start() {
     tour?.tick(elapsed/1000)
     draw()
     frame++; sum+=elapsed;samples++
-    Object.assign(stats,{ms:elapsed,calls:renderer.info.render.calls,frame,loaded:stream.loaded.size,pending:stream.pending.size,
+    Object.assign(stats,{ms:elapsed,calls:renderer.info.render.calls,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,frame,loaded:stream.loaded.size,pending:stream.pending.size,
       visited:stream.visited.size,failures:stream.failures.size})
     if(sum>=400||frame===1) {
       output.value=`${Math.round(samples*1000/(sum||16.7))} FPS · ${stats.calls} calls · ${stats.loaded} 块 · ${bytes.toLocaleString()} B`
