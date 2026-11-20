@@ -1,9 +1,11 @@
 export {
+  BICYCLE_DEFAULT_GEAR,
   EBIKE_COMPLIANT_CAP_KMH,
   EBIKE_DEFAULT_GEAR,
   EBIKE_SHARED_MAX_KMH,
   EBIKE_STANDARD_MAX_KMH,
   EBIKE_UPGRADE_MAX_KMH,
+  bicycleGearConfigs,
   ebikeBatteryConfig,
   ebikeTierConfigs,
   resolveEbikeKind,
@@ -19,6 +21,9 @@ export {
 } from './tuning'
 import {EBIKE_COMPLIANT_CAP_KMH} from './tuning'
 
+export type TwoWheelCrashReason = '' | 'impact' | 'lowside' | 'loopout'
+export type TwoWheelCrashPhase = 'none' | 'sliding' | 'downed' | 'rider_rising' | 'bike_down' | 'picking_up'
+
 export const walkConfig = {
   height:1.7, radius:.29, walk:4, run:9, jump:1.2, gravity:-20, fallGravity:-28,
   accel:50, decel:135, grip:220, airAccel:18, pivotBoost:2.2, turnRate:20, coyote:.1, jumpBuffer:.12,
@@ -29,26 +34,80 @@ export const walkConfig = {
   gate:{x:-588,z:-212,yaw:Math.PI},
 }
 
-/** E-bike baseline longitudinal dynamics, cornering lean, and transition parameters (default mount resets to 25 km/h D2). */
+/** E-bike longitudinal dynamics, coasting inertia, high-sensitivity lean/wheelie, and easy crash tuning. */
 export const bikeConfig = {
-  maxSpeed: EBIKE_COMPLIANT_CAP_KMH / 3.6, reverseMax: -1.8, accel: 4.2, torqueDecay: .65, torquePow: .65,
-  brake: 7.5, revHold: .22, revAccel: 2.4, rollDrag: .42, aeroDrag: .09,
-  pivotTurn: .9, peakTurn: 1.65, topTurn: 1.12, steerDamp: 10,
-  leanMax: .26, tuckLeanMax: .42, leanDamp: 7.5, pitchMax: .18, pitchDamp: 8,
+  maxSpeed: EBIKE_COMPLIANT_CAP_KMH / 3.6, reverseMax: -1.9, accel: 4.6, torqueDecay: .58, torquePow: .72,
+  brake: 9.2, revHold: .20, revAccel: 2.5, rollDrag: .22, aeroDrag: .0048,
+  pivotTurn: .98, peakTurn: 1.72, topTurn: 1.18, steerDamp: 11.5,
+  leanMax: .44, tuckLeanMax: .56, leanDamp: 8.5, pitchMax: .22, pitchDamp: 8.5,
   mountDuration: .22, dismountDuration: .16,
-  stickDeadFwd: .1, stickDeadTurn: .12, slideDamp: 1.8,
-  uphillDrag: 0, uphillCapScale: 0, offRoadCap: 4.2, step: .42, maxSlope: Math.PI / 4,
+  stickDeadFwd: .1, stickDeadTurn: .12, slideDamp: 1.9,
+  uphillDrag: 5.5, uphillCapScale: 1.1, offRoadCap: 4.5, step: .42, maxSlope: Math.PI / 4,
+  crash: {
+    lowsideLeanRad: .34,
+    wetGripPenaltyRad: .11,
+    offRoadGripPenaltyRad: .11,
+    brakeInLeanPenaltyRad: .08,
+    highSpeedPenaltyStartMs: 8.2,
+    highSpeedPenaltyRad: .06,
+    sharpSteerSpeedMs: 5.8,
+    sharpSteerInput: .78,
+    sharpSteerWindowSec: .36,
+    wheelieTargetRad: .50,
+    wheelieRaiseRate: 4.4,
+    wheelieFallRate: 6.2,
+    wheelieCrashRad: .56,
+    wheelieMinSpeedMs: 1.1,
+    impactCrashMs: 3.2,
+    angledImpactCrashMs: 2.0,
+    angledImpactLeanRad: .14,
+    offRoadShockMs: 8.2,
+  },
 }
 
-/** Pedal bicycle dynamics (~5.0 m/s = 18 km/h cap, gentler human launch, noticeable uphill gravity drag). */
+/** Pedal bicycle dynamics: 3 tactile gears, agile steering, realistic coasting inertia, and easy two-wheel spills. */
 export const bicycleConfig: typeof bikeConfig = {
-  maxSpeed:18/3.6, reverseMax:-1.3, accel:2.35, torqueDecay:.45, torquePow:.85,
-  brake:6.8, revHold:.22, revAccel:1.9, rollDrag:.36, aeroDrag:.08,
-  pivotTurn:.95, peakTurn:1.72, topTurn:1.18, steerDamp:10,
-  leanMax:.24, tuckLeanMax:.24, leanDamp:7.5, pitchMax:.18, pitchDamp:8,
-  mountDuration:.22, dismountDuration:.16,
-  stickDeadFwd:.1, stickDeadTurn:.12, slideDamp:1.8,
-  uphillDrag:13.5, uphillCapScale:3.2, offRoadCap:3.4, step:.42, maxSlope:Math.PI/4,
+  maxSpeed: 21 / 3.6, reverseMax: -1.4, accel: 2.9, torqueDecay: .48, torquePow: .82,
+  brake: 7.8, revHold: .20, revAccel: 2.0, rollDrag: .17, aeroDrag: .0056,
+  pivotTurn: 1.05, peakTurn: 1.82, topTurn: 1.24, steerDamp: 12.0,
+  leanMax: .42, tuckLeanMax: .52, leanDamp: 9.0, pitchMax: .20, pitchDamp: 8.5,
+  mountDuration: .22, dismountDuration: .16,
+  stickDeadFwd: .1, stickDeadTurn: .12, slideDamp: 1.85,
+  uphillDrag: 13.5, uphillCapScale: 2.8, offRoadCap: 3.6, step: .42, maxSlope: Math.PI / 4,
+  crash: {
+    lowsideLeanRad: .31,
+    wetGripPenaltyRad: .10,
+    offRoadGripPenaltyRad: .10,
+    brakeInLeanPenaltyRad: .07,
+    highSpeedPenaltyStartMs: 6.0,
+    highSpeedPenaltyRad: .05,
+    sharpSteerSpeedMs: 4.8,
+    sharpSteerInput: .76,
+    sharpSteerWindowSec: .34,
+    wheelieTargetRad: .46,
+    wheelieRaiseRate: 4.6,
+    wheelieFallRate: 6.6,
+    wheelieCrashRad: .52,
+    wheelieMinSpeedMs: .9,
+    impactCrashMs: 2.8,
+    angledImpactCrashMs: 1.8,
+    angledImpactLeanRad: .12,
+    offRoadShockMs: 6.2,
+  },
+}
+
+/** Two-wheel crash slide, rider-gets-up-first, and approach-to-pickup state machine timings/distances. */
+export const twoWheelCrashFlowConfig = {
+  slideFriction: 5.4,
+  riderSlideMul: 1.18,
+  riderFriction: 4.8,
+  minSlideSec: .42,
+  bikeLayRollRad: 1.42,
+  riderRiseSec: .58,
+  pickupSec: .65,
+  pickupRadius: 2.4,
+  approachRadius: 4.5,
+  autoRiseDelaySec: 1.4,
 }
 
 /** Passenger car dynamics (40 km/h cap, Ackermann steering R_min ~ 4.85m, delayed -12 km/h reverse). */
