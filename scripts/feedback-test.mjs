@@ -190,7 +190,7 @@ export async function uiTest(page, origin,sql) {
   const [item] = await (await page.request.get(origin + '/api/feedback?mine=1')).json()
   const reply=await page.request.post(`${origin}/api/bridge/feedback/${item.id}/messages`,{headers:bridge,data:{source:'mock-1',body:'模型入口朝哪个方向？'}});assert.equal(reply.status(),200)
   await click('刷新进度');await fb.getByText(/模型入口朝哪个方向/).waitFor();await fb.getByLabel('回复内容').fill('朝东');await click('发送回复');await fb.getByText(/提交人：朝东/).waitFor()
-  sql("UPDATE users SET role='admin' WHERE email='walker@example.test'");const adminPage=await page.context().newPage();try{await adminPage.goto(origin+'/admin/?id='+item.id);await adminPage.getByText(/提交人：朝东/).waitFor();await adminPage.screenshot({path:'captures/feedback/admin-chat.png'});await adminPage.getByRole('button',{name:'发起 AI 制作'}).click();await adminPage.waitForFunction(()=>document.querySelector('.adm-meta')?.textContent.includes('已开始 AI 制作'))}finally{await adminPage.close()}
+  await sql("UPDATE users SET role='admin' WHERE email='walker@example.test'");const adminPage=await page.context().newPage();try{await adminPage.goto(origin+'/admin/?id='+item.id);await adminPage.getByText(/提交人：朝东/).waitFor();await adminPage.screenshot({path:'captures/feedback/admin-chat.png'});await adminPage.getByRole('button',{name:'发起 AI 制作'}).click();await adminPage.waitForFunction(()=>document.querySelector('.adm-meta')?.textContent.includes('已开始 AI 制作'))}finally{await adminPage.close()}
   await click('刷新进度');await fb.locator('.fb-pill.fb-status--approved').waitFor();await shot('approved-chat')
   for (const status of ['queued', 'modelling', 'reviewing', 'live']) {
     const response = await page.request.post(`${origin}/api/bridge/feedback/${item.id}/status`, {
