@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 host=rock@cn-hk-fxy-01.rockchin.top
 k() { ssh -T -o BatchMode=yes "$host" kubectl -n idoknow "$@"; }
 tag=$(git rev-parse HEAD)
-for secret in glol-env glol-registry; do k get secret "$secret" -o name >/dev/null; done
+for secret in glol-env glol-registry glol-feedback-bridge; do k get secret "$secret" -o name >/dev/null; done
 test -s public/world/manifest.json
 npm ci && npm run build
 for image in api web; do
@@ -12,6 +12,8 @@ for image in api web; do
   docker build -f "deploy/$image.Dockerfile" -t "$ref" .
   docker push "$ref"
 done
+bash deploy/feedback-bridge/build.sh
+docker push "ghcr.io/idoknow/glol-feedback-bridge:$tag"
 kubectl kustomize deploy/k8s | sed "s/:RELEASE$/:$tag/g" | k apply -f -
 for name in postgres minio web; do k rollout status "deployment/glol-$name" --timeout=300s; done
 schema=$(printf "select count(*) from information_schema.tables where table_schema='public' and table_name='users';" | k exec -i deploy/glol-postgres -- psql -XAt -U postgres -d glol)

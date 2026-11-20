@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: glol-feedback-bridge, namespace: idoknow}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources: {requests: {storage: 1Gi}}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: glol-feedback-bridge, namespace: idoknow}
+spec:
+  schedule: '*/5 * * * *'
+  concurrencyPolicy: Forbid
+  suspend: true
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        metadata:
+          labels: {app.kubernetes.io/name: glol-feedback-bridge}
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          nodeSelector: {kubernetes.io/hostname: cn-hk-fxy-01}
+          dnsPolicy: None
+          dnsConfig: {nameservers: [10.42.10.1]}
+          imagePullSecrets: [{name: glol-registry}]
+          securityContext: {runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000}
+          containers:
+          - name: glol-feedback-bridge
+            image: ghcr.io/idoknow/glol-feedback-bridge:RELEASE
+            resources:
+              requests: {memory: 48Mi, cpu: 20m}
+              limits: {memory: 192Mi, cpu: '1'}
+            securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+            volumeMounts:
+            - {name: state, mountPath: /state}
+            - {name: credentials, mountPath: /run/glol, readOnly: true}
+          volumes:
+          - name: state
+            persistentVolumeClaim: {claimName: glol-feedback-bridge}
+          - name: credentials
+            secret: {secretName: glol-feedback-bridge, defaultMode: 0440}

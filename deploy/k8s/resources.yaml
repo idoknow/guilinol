@@ -105,6 +105,8 @@ spec:
         env:
         - name: POSTGRES_DB
           value: glol
+        - name: POSTGRES_USER
+          value: postgres
         - name: PGDATA
           value: /var/lib/postgresql/data/pgdata
         - name: POSTGRES_PASSWORD
