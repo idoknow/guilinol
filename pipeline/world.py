@@ -212,6 +212,20 @@ def build(bbox, output, palette):
         for field in (terrain,original):
             grade_east(east_road,field,left,top,GRID,10,wet)
         grade_landing(east_road,(terrain,original),left,top,GRID,wet,(x_jb,z_jb),angle,datum)
+    for east,south,entry in layout.entries:
+        if entry['id']!='zhengyang': continue
+        cosine,sine=np.cos(.16),np.sin(.16)
+        for row in range(max(0,int((south-top-36)//GRID)),min(len(original),int((south-top+10)//GRID)+1)):
+            for col in range(max(0,int((east-left-28)//GRID)),min(original.shape[1],int((east-left+28)//GRID)+1)):
+                if wet[row,col]: continue
+                wx,wz=left+col*GRID,top+row*GRID
+                across=(wx-east)*cosine+(wz-south)*sine
+                station=-(wx-east)*sine+(wz-south)*cosine
+                weight=np.clip((22-abs(across))/6,0,1)*np.clip((16-abs(station+12.5))/6,0,1)
+                if weight:
+                    target=float(eval_bspline_grid(road_ctrl,left,top,np.array(wx),np.array(wz))) * 10
+                    for field in (terrain,original):
+                        field[row,col]+=round(weight*max(0,target-field[row,col]))
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 

@@ -36,9 +36,9 @@ def boulevard(model):
                     offset=stripe+.82*math.sin(station*math.pi/9)
                     strip.extend([(offset-.27,.146,station),(offset+.27,.146,station)])
                 model.mesh(strip,[[0,2,3],[0,3,1]],'tile')
-        model.ground_offset = frame.ground
         for side in (-1,1):
-            model.box(side*7.6,.14,center,1.3,.04,25,'granite')
+            for station in np.linspace(center-12.5,center+12.5,17)[:-1]:
+                model.box(side*7.6,.14,station+25/32,1.3,.04,25/16,'granite')
 
 
 if __name__=='__main__':generate('zhengyang',boulevard)

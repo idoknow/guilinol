@@ -46,8 +46,8 @@ def grade_landing(line,fields,left,top,step,wet,anchor,angle,datum):
         for col in range(int((center[0]-left-34)//step),int((center[0]-left+34)//step)+1):
             if not (0<=row<wet.shape[0] and 0<=col<wet.shape[1]) or wet[row,col]:continue
             point=np.array([left+col*step,top+row*step]);along,across=(point-anchor)@axes.T
-            if not 140.5<=along<156 or abs(across)>=20:continue
-            distance=line.distance(Point(point)); weight=np.clip((distance-8)/4,0,1)*np.clip((20-abs(across))/5,0,1)
+            if not 136<=along<156 or abs(across)>=20:continue
+            distance=line.distance(Point(point)); weight=np.clip(distance-9.55,0,1)*np.clip((along-136)/2,0,1)*np.clip((20-abs(across))/5,0,1)
             run=np.clip(along-140.5,0,15); drop=.05*(run**2/4 if run<2 else run-1 if run<=13 else 13-(15-run)**2/4)
             target=10*(datum+5.6322-drop-.055)
             for field in fields:

@@ -407,7 +407,7 @@ def palace(m):
     for side in (-1,1):
         lo,hi=side*18-16,side*18+16
         sand=np.array([[173,146,107,255]]*4,dtype=np.uint8)
-        m.mesh([[lo,.16,-216.5],[lo,.16,-163.5],[hi,.16,-163.5],[hi,.16,-216.5]],
+        m.mesh([[x,plan.ground(x,z)+.035,z] for x,z in [(lo,-216.5),(lo,-163.5),(hi,-163.5),(hi,-216.5)]],
                [[0,1,2],[0,2,3]],sand,True)
     paving(-192,4,78)
     for i,x in enumerate((-18,-8,9,19)):
