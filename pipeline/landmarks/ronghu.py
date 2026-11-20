@@ -99,6 +99,31 @@ def island_paving(mesh, outline, top):
                     mesh.face([(pts[i,0],top,pts[i,1]) for i in face],(0,1,0),'paver',uvs=uv)
 
 
+def rock_path(b):
+    # IMG_1326 looks southeast between a low split boulder and a pierced outcrop.
+    # Lay staggered granite slabs along the narrow approach to the bamboo garden.
+    wall = b.parts['atlas']
+    with align_front(b, (138,124), 42):
+        for row in range(16):
+            for col in range(3):
+                z = 124 + row * 1.2 + .6*(col%2)
+                box(wall,(138+(col-1)*.56,.28,z),(.55,.08,1.18),'granite',None)
+        for index,(side,run,height) in enumerate(((1,3,1.2),(-1,6,1.7),(1,7,2.4),
+                                                  (-1,9,1.5),(1,12,.9),(-1,14,2.1))):
+            x,z = 138+side*(2.0+.35*(index%2)),124+run
+            oval(wall,(x,.48,z),(1.13,.42,.82),'limestone',9)
+            if index in (0,2,5):
+                torus(wall,(x+.18,.60+height*.32,z),height*.34,.26,.51,
+                      'limestone',.28,stretch=1.35,phase=index)
+            else:
+                loft(wall,[(x,.26,z,1.16,.73),(x-.16,.59,z,1.02,.84),
+                           (x+.09,.8+height*.24,z+.07,.66,.53),
+                           (x-.19,.86+height*.30,z,.31,.42)],'limestone',7)
+            oval(wall,(x-.46,.64,z+.36),(.51,.42,.49),'rubble',7)
+            if b.collide:
+                cylinder(b.hit,(x,.24,z),.89,.72,'ashlar',7)
+
+
 def island(b):
     """Double-eave hexagonal pavilion and a glazed corridor, from the 2017 night photograph."""
     wall, lit = b.parts['atlas'], b.parts['lit']
@@ -117,6 +142,7 @@ def island(b):
             box(wall,(east,.38,south),(2.02,.32,3.5),'foliage',None)
             oval(wall,(east,.65,south),(.97,.48,.85),'foliage',7)
     pave(b, ISLAND_COURT, .35)
+    rock_path(b)
     # IMG_1324 sees this pierced limestone at the island landing, north of the wall.
     torus(wall,(119,1.93,125),1.43,.39,.48,'limestone', .14, stretch=1.14)
     # The narrow weathered crown rises above the circular opening.

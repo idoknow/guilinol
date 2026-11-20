@@ -91,10 +91,41 @@ def courtyard(builder, deck):
         cylinder(wall, (offset, deck + 2.66, 7.6), .24, .45, 'vermilion', 8)
         cylinder(wall, (offset, deck + 2.52, 7.6), .045, .14, 'yellow', 5)
     # North-facing gate and the west return of the garden enclosure (IMG_1306).
-    segment_wall(wall,(-31,-2.5),(-31,14),0,2.8,.60,'gate_plaster')
-    segment_wall(wall,(-31,-2.5),(-31,14),2.8,3.07,.82,'graytile')
-    if builder.collide:
-        segment_wall(builder.hit,(-31,-2.5),(-31,14),0,3.07,.60,'ashlar')
+    # The 1308 and 1309 sightlines meet the west return at z=0.33 and 8.06.
+    # The north entrance in 1306 is open; the west entrance has closed doors.
+    for start,end,finish in ((-2.5,6.7,'gate_plaster'),(9.4,14,'coursed')):
+        segment_wall(wall,(-31,start),(-31,end),0,2.8,.60,finish)
+        segment_wall(wall,(-31,start),(-31,end),2.8,3.07,.82,'graytile')
+        if builder.collide:
+            segment_wall(builder.hit,(-31,start),(-31,end),0,3.07,.60,'ashlar')
+    with align_front(builder,(0,0),90,shift=(-31,8.05)):
+        for side in (-1,1):
+            box(wall,(side*1.23,1.70,0),(.48,3.40,.79),'wood')
+            x = side*.50
+            box(wall,(x,1.79,0),(.99,2.40,.20),'wood',None)
+            for plank in range(1,5):
+                box(wall,(x-.5+plank*.20,1.79,-.115),(.018,2.40,.03),'wood')
+            box(wall,(x,.68,-.14),(.99,.12,.08),'yellow')
+            oval(wall,(side*.18,1.85,-.17),(.08,.09,.05),'yellow',8)
+            oval(wall,(side*.88,2.99,-.33),(.12,.18,.12),'vermilion',8)
+            box(wall,(side*1.28,.49,-.94),(.32,.98,1.68),'ashlar')
+        box(wall,(0,3.27,0),(3.52,.47,.91),'wood')
+        box(wall,(0,3.49,0),(3.92,.28,1.76),'wood')
+        garden_gate_roof(wall,(0,0),3.63,3.92,1.76,.40)
+        for i in range(4):
+            h = (i+1)*.15
+            box(wall,(0,h/2,-1.8+(i+.5)*.45),(2.32,h,.46),'ashlar')
+        # From the west, the stele is to the right (south) of the doorway.
+        for y,w,h,d in ((.20,1.54,.40,.95),(.55,1.36,.30,.80),
+                        (1.16,1.21,.96,.51),(1.71,1.40,.14,.72)):
+            box(wall,(-2.46,y,-.68),(w,h,d),'coursed',None)
+        box(wall,(2.34,.145,-.57),(1.46,.29,.56),'coursed',None)
+        for x in (2.02,2.66):
+            box(wall,(x,.90,-.58),(.59,1.27,.28),'ivywall',None)
+        if builder.collide:
+            solid(builder.hit,(0,1.7,0),(2.86,3.40,.66),'wood')
+            ramp(builder.hit,(0,0,-1.8),(0,.6,0),2.32)
+            solid(builder.hit,(-2.46,.84,-.68),(1.4,1.68,.75),'ashlar')
     # Masonry jambs bond into the two returns; the woodwork lines the opening.
     for left,right in ((-33.2,-29.58),(-27.42,-22.3)):
         segment_wall(wall,(left,-2.5),(right,-2.5),0,2.92,.60,'gate_plaster')

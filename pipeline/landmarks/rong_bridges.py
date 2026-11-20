@@ -4,7 +4,7 @@ import numpy as np
 
 from c_kit import box, cylinder, tube, yaw_box, ramp, segment_wall
 from rong_paving import pave
-from rong_ground import BANK, BANK_EDGE, BANK_Y, FORECOURT, FORECOURT_Y, BRIDGE_AXIS, BRIDGE_SIDE, bridge_xz
+from rong_ground import BANK, BANK_EDGE, BANK_Y, FORECOURT, BRIDGE_AXIS, BRIDGE_SIDE, bridge_xz
 from rong_solids import oval, loft
 from rong_surface import ground, bank_top, island_top
 
@@ -128,6 +128,8 @@ def ancient_bridge(builder):
         east,south = bridge_xz(distance,offset)
         return np.array([east,level,south])
     north, south = [bank_top(*point(d,0)[::2]) for d in (-17,17)]
+    toe = ground(*bridge_xz(-23, 0)) + .05
+    north = max(north, toe + .48)
     def grade(distance):
         return north+(south-north)*min(1,max(0,(distance+17)/34))
     def height(distance):
@@ -162,17 +164,28 @@ def ancient_bridge(builder):
             if index%2==0:
                 box(stone,point(start,height(start)+.48,edge),(.27,.96,.27),'white')
     pave(builder,FORECOURT,lambda x,z: ground(x,z)+.05)
+    riser = (height(-17)-toe)/3
     for step in range(3):
         start = -23+step*2
-        level = FORECOURT_Y + (height(-17)-FORECOURT_Y)*(step+1)/3
-        yaw_box(stone,point(start+1,(level+FORECOURT_Y)/2),
-                (13.0-step,level-FORECOURT_Y,2.03),yaw,'granite')
+        level = toe + riser*(step+1)
+        half_width = (13-step)/2
+        corners = [(start,-half_width),(start,half_width),
+                   (start+2,half_width),(start+2,-half_width)]
+        upper = [point(d,level,w) for d,w in corners]
+        lower = [point(d,ground(*bridge_xz(d,w))-.06,w) for d,w in corners]
+        stone.face(upper,(0,1,0),'granite')
+        for i in range(4):
+            j = (i+1)%4
+            outward = (upper[i]+upper[j])/2 - point(start+1,level)
+            stone.face([lower[i],lower[j],upper[j],upper[i]],outward,'ashlar')
+        if builder.collide:
+            ramp(builder.hit,point(start,level-riser),
+                 point(start+2,level),half_width*2)
     yaw_box(stone,point(-18.2,height(-17)+.23),(2.1,.52,2.6),yaw,'ashlar')
     for offset in (-.55,0,.55):
         oval(stone,point(-18.2,height(-17)+.77,offset),(.52,.55,1.22),'foliage',9)
     if builder.collide:
         yaw_box(builder.hit,point(-18.2,height(-17)+.39),(2.1,.8,2.6),yaw,'ashlar')
-        ramp(builder.hit,point(-23,FORECOURT_Y),point(-17,height(-17)),11)
     # Tie the full landing into the bank, including the crown between its edges.
     def landing_vertex(station,lateral):
         x,_,z = point(station,0,lateral)
@@ -192,7 +205,7 @@ def ancient_bridge(builder):
         count=15 if builder.detail else 7
         for index in range(count):
             fraction=index/(count-1)
-            knot=point(-23+strand*1.65,3.8-1.15*math.sin(math.pi*fraction),-7+14*fraction)
+            knot=point(-23+strand*1.65,toe+4.5-1.15*math.sin(math.pi*fraction),-7+14*fraction)
             if index in (0,count-1):
                 x,y,z=knot
                 bed=ground(x,z)-.05

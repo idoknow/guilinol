@@ -36,7 +36,8 @@ def bridge_xz(station, offset):
 
 # North landing of mapped pedestrian bridge way/684946199.
 FORECOURT = [bridge_xz(d, w) for d,w in ((-44,-11),(-44,10),(-17,10),(-17,-11))]
-FORECOURT_Y = -3.62
+# Absolute elevation of the north approach on the mapped pedestrian way.
+FORECOURT_ELEVATION = 152.70
 
 
 def grade_landings(terrain, original, wet, west, north, grid, entries):
@@ -45,7 +46,7 @@ def grade_landings(terrain, original, wet, west, north, grid, entries):
         if entry['id'] == 'gunanmen':
             patches = [(GATE_PLAZA,153.77)]
         elif entry['id'] == 'ronghu':
-            patches = [(BANK,153.1+BANK_Y), (FORECOURT,153.1+FORECOURT_Y), (ISLAND_COURT,152.14), (RILL_PAVING,152.78)]
+            patches = [(BANK,153.1+BANK_Y), (FORECOURT,FORECOURT_ELEVATION), (ISLAND_COURT,152.14), (RILL_PAVING,152.78)]
         else:
             continue
         for ring, top in patches:
