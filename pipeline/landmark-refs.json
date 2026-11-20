@@ -1,7 +1,12 @@
 [
  {"id":"chuanshan_tourism","name":"桂林市旅游职业中等专业学校（穿山校区）","osm":["way/647468198"],"group":"G4","viewOnly":true,"refs":[{"title":"Guilin Vocational Secondary School of Tourism, Chuanshan campus","year":2024,"page":"https://commons.wikimedia.org/wiki/File:Guilin_Vocational_Secondary_School_of_Tourism,_Chuanshan_campus_(20240217164236).jpg","viewOnly":true}]},
  {"id":"guilin_technical","name":"桂林技师学院","osm":["way/646911647"],"group":"G4","viewOnly":true,"refs":[{"title":"学院正门（桂林技师学院官网校园风光）","page":"https://gljsxy.com/info/image-6.html","viewOnly":true}]},
- {"id":"guilin_thirteen","name":"桂林市第十三中学","osm":["way/669069474"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},
+ {"id":"guilin_thirteen","name":"桂林市第十三中学","osm":["way/669069474"],"group":"G1","viewOnly":true,"refs":[
+  {"title":"维基共享资源 File:桂林市第十三中学01.JPG（东侧临四会路立面）","page":"https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E5%B8%82%E7%AC%AC%E5%8D%81%E4%B8%89%E4%B8%AD%E5%AD%A601.JPG","viewOnly":true},
+  {"title":"桂林市第十三中学第54届秋季田径运动会开幕（操场跑道与西南外廊楼）","year":2026,"page":"http://news.gltvs.com/202609/202609301406405c3a07295d3448ed.shtml","viewOnly":true},
+  {"title":"桂林市第十三中学：阳光体育赋能青春成长（校内主席台及后景建筑，视频封面图）","year":2025,"page":"http://v.gltvs.com/202609/202609301406405c3a07295d3448ed.shtml","thumb":"http://video.gltvs.com/uploadvideo/2025/10/桂林市第十三中学：阳光体育赋能青春成长五育融合培育时代新人.jpg","viewOnly":true},
+  {"title":"搜狐校园实景报道 1087662854（西南4F外廊楼及绿蓝塑胶篮球场）","page":"https://www.sohu.com/a/1087662854_121124570","viewOnly":true},
+  {"title":"桂林市第十三中学正门文化墙、玻璃幕墙与东立面顶牌实拍（搜狗检索头条图文）","page":"https://pic.sogou.com/pics?query=%E6%A1%82%E6%9E%97%E5%B8%82%E7%AC%AC%E5%8D%81%E4%B8%89%E4%B8%AD%E5%AD%A6+%E5%9B%9B%E4%BC%9A%E8%B7%AF+%E6%A0%A1%E9%97%A8","viewOnly":true}]},
  {"id":"lequn_primary","name":"乐群小学","osm":["way/684946203"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},
  {"id":"baoxian_school","name":"宝贤中学","osm":["way/669065609"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},
  {"id":"zhonghua_primary","name":"桂林市中华小学","osm":["way/1531318258"],"group":"G1","viewOnly":true,"facade":"schematic","refs":[]},

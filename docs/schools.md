@@ -44,15 +44,14 @@ Rock 第八批 `IMG_1373–1375` 校正临街门楼：平白门楣和红字下�
 
 ## 桂林市第十三中学
 
-底图缺楼处留空，不再补建。
+已完成校内布局精模还原（见 [证据文档](layout/schools/guilin_thirteen.md)）：
+- 参考 Esri World Imagery (2024-12-24)、Bing Aerial、Google Sat、OSM `way/669069474`、`way/691138804/805`、`overture_buildings.csv`（`066329fa`、`6719a1e1`、`06dcb0bc`）及 8 张公开实景照（维基共享资源、搜狐、桂视网、头条、桂林生活网，仅浏览确认、`viewOnly: true`），全部交叉核验。
+- 按实际外观建 B1（SW 4F 外廊楼）、B1w/B1e 端翼、B2-Main（四会路侧 4-5F 灰蓝斜檐综合楼及楼顶「十三中」桁架牌）、B2-Glass（2F 玻璃幕墙转角楼段）、B3/B4/B5 及 S1 红色塑胶跑道操场、双篮球场与北东辅场、NW 主席台旗杆、封闭四会路主校门与「桂林市第十三中學」文化墙、全线贴地围墙及 15 株 IDOK-71 实景树冠。
+- 不含岗亭、门卫室、闸机或监控设备；未对校内任何建筑标示用途或班级名称；校门保持闭合且设为 `collision: "mesh"` 禁止穿行；地图检索锚点落于校外四会路。
 
-补查词：「桂林市第十三中学 校园文化」。本次网页检索未取得可核验校名的临街配图，新增可用 0 张。
+地标包：`guilin_thirteen.glb`（3 级 LOD + 窗户/栏杆/篮球架/树木实例化）。
 
-`facade: "schematic"`。未确认临街图片；不从同名的外地十三中移用校舍外观。保留世界分块建筑，并补充未匹配的公开轮廓；OSM 校园地址为四会路，仅在该街一侧放围墙名牌，不建门。
-
-地标包：`guilin_thirteen.glb`。校园分块建筑另计。
-
-![示意立面](schools/guilin_thirteen-front.jpg) ![示意布局](schools/guilin_thirteen-overview.jpg)
+![立面正门](schools/guilin_thirteen-front.jpg) ![布局俯视](schools/guilin_thirteen-overview.jpg)
 
 ## 乐群小学
 
