@@ -89,13 +89,16 @@ function evidence(detail) {
     heading,
     landmark_id,
     nearby,
+    view:detail.view??null,
     photos,
     supplements: events
       .filter((item) => item.status === 'submitted')
       .slice(1)
       .map((item) => item.message),
   }
-  return template.replace('{{EVIDENCE}}', () =>
+  const token=detail.view?Buffer.from(JSON.stringify(detail.view)).toString('base64url'):null
+  const replay=token?`\n\n游戏视角：https://glol.rcpd.cc/?view=${token}\n\n本地 Playwright 复现（baseURL 指向本地预览）：\n\n\`\`\`js\nawait page.goto('/?verify&view=${token}');\nawait page.waitForFunction(() => window.viewer?.stats.loaded > 0 && !window.viewer.stream.pending.size);\nawait page.screenshot({path:'before.png'});\n\`\`\`\n`:''
+  return '**待管理员批准，批准前只沟通、不派发、不建模**。先阅读 docs/feedback-coordinator.md；以下建模步骤仅在收到管理员开工通知后执行。\n\n'+replay+template.replace('{{EVIDENCE}}', () =>
     JSON.stringify(data, null, 2)
       .replaceAll('mention:', 'mention：')
       .split('\n')
@@ -105,6 +108,7 @@ function evidence(detail) {
 }
 async function files(detail) {
   const args = []
+  if(detail.has_view_shot){const file=join(work,'view.jpg');await writeFile(file,Buffer.from(await (await request(`/api/feedback/${detail.id}/view-shot`)).arrayBuffer()));args.push('--attachment',file)}
   for (const photo of detail.photos) {
     const ext = { 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/png': 'png', 'image/heic': 'heic' }[
       photo.mime
@@ -168,23 +172,15 @@ async function queue(row, journal, save) {
       )
     ).id
     if (!issue) throw Error('No created issue ID')
-  } else if (row.multica_issue) {
-    const event = detail.events.at(-1),
-      marker = `材料补充 ${row.id}/${event.id}`
-    if (!comments(issue).some((comment) => comment.content.startsWith(marker + '\n'))) {
-      await writeFile(
-        file,
-        `${marker}\n[@建模 agent](mention://agent/${env.BRIDGE_AGENT}) 请按补充证据继续。\n${body}`,
-      )
-      await dispatch('issue', 'comment', 'add', issue, '--content-file', file, ...(await files(detail)))
-    }
-    journal.since = event.created_at
-    journal.previousDecision = journal.lastDecision
   }
   journal.issue = issue
   delete journal.failures
   await save()
-  await post(row.id, 'queued', { multica_issue: issue })
+  await command(row.id,'bind',{issue});row.multica_issue=issue
+}
+async function command(id,action,data){
+  const response=await request(`/api/bridge/feedback/${id}/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+  if(!response.ok)throw Error(`Conflict ${action}`)
 }
 async function deployed(url) {
   const match = /^https:\/\/github\.com\/idoknow\/guilinol\/pull\/(\d+)$/.exec(url)
@@ -224,26 +220,44 @@ async function screenshot(comment) {
 async function sync(row, journal, save) {
   const issue = row.multica_issue,
     current = cli('issue', 'get', issue)
-  const trusted = comments(issue).filter(
+  const history=comments(issue),detail=await (await request(`/api/feedback/${row.id}`)).json()
+  async function relay(marker,body,attachments=[]){
+    if(dry||history.some(comment=>comment.content.includes(marker)))return
+    const file=join(work,'relay.md');await writeFile(file,body+'\n\n'+marker+`\n[@协调人](mention://agent/${env.BRIDGE_AGENT})`)
+    cli('issue','comment','add',issue,'--content-file',file,...attachments)
+  }
+  for(const msg of detail.messages.filter(msg=>msg.author_kind!=='agent'&&!msg.relayed_at)){
+    const body=msg.body.replaceAll('mention:','mention：').split('\n').map(line=>'    '+line).join('\n')
+    await relay(`<!-- fb-message:${row.id}:${msg.id} -->`,(msg.author_kind==='user'?'用户回复：':'管理员回复：')+'\n'+body,await files(detail));if(!dry)await command(row.id,'relayed',{id:msg.id})
+  }
+  const trusted = history.filter(
     (c) =>
       !c.content.startsWith('材料补充 ') &&
+      !/^(用户回复：|管理员回复：|管理员已批准，可以开工)/.test(c.content) &&
       (c.author_type === 'member' || [env.BRIDGE_AGENT, reviewer].includes(c.author_id)) &&
       Date.parse(c.created_at) / 1000 >= (journal.since || 0) &&
       c.id !== journal.previousDecision,
   )
+  for(const comment of trusted.slice().reverse()){
+    for(const [index,match] of [...comment.content.matchAll(/^```feedback-reply\r?\n([\s\S]+?)\r?\n```\s*$/gm)].entries())if(!dry)await command(row.id,'messages',{source:`${comment.id}:${index}`,body:match[1].trim()})
+  }
+  if(row.status==='approved'){
+    await relay(`<!-- fb-start:${row.id}:${detail.events.at(-1).id} -->`,'管理员已批准，可以开工');await post(row.id,'queued');return
+  }
   const decision = trusted
-    .map((c) =>
+    .filter(c=>c.id!==journal.lastDecision).map((c) =>
       /^```feedback-status (need_info|rejected|duplicate)\r?\n([\s\S]+?)\r?\n```\s*$/m.exec(c.content),
     )
     .find(Boolean)
   if (decision) {
+    const source=trusted.find(comment=>comment.content.includes(decision[0])).id
+    if(source===journal.lastDecision)return
     if (decision[1] === 'need_info') {
-      journal.lastDecision = trusted.find((comment) => comment.content.includes(decision[0])).id
-      await save()
+      if(!dry)await command(row.id,'messages',{source:`${source}:status`,body:decision[2].trim()})
     }
-    return post(row.id, decision[1], { message: decision[2].trim() })
+    await post(row.id, decision[1], { message: decision[2].trim() });journal.lastDecision=source;await save();return
   }
-  if (row.status === 'need_info') return
+  if (['submitted','need_info'].includes(row.status)) return
   const prs = cli('issue', 'pull-requests', issue).pull_requests.filter((pr) =>
     /^https:\/\/github\.com\/idoknow\/guilinol\/pull\/\d+$/.test(pr.html_url),
   )
@@ -289,8 +303,8 @@ async function processRow(row) {
     }
   }
   if (!(journal.failures >= 2)) {
-    if (row.status === 'submitted') await queue(row, journal, save)
-    else await sync(row, journal, save)
+    if (!row.multica_issue)await queue(row,journal,save)
+    if(row.multica_issue)await sync(row,journal,save)
   }
   if (journal.failures >= 2 && !journal.alerted && !dry) {
     const file = join(work, 'alert.md'),
@@ -318,6 +332,7 @@ try {
       process.exitCode = 1
     }
   }
+  if(!dry)await request('/api/bridge/mail',{method:'POST'})
 } finally {
   await rm(work, { recursive: true, force: true })
   await lock.close()

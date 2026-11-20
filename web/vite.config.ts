@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version as string
+const buildSha=()=>execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()
 
 function rapierExternalWasm(): Plugin {
   const inlineBase64 = /oC\.toByteArray\("AGFzbQE[A-Za-z0-9+/=]+"\)(?:\.buffer)?/
@@ -25,8 +26,10 @@ function rapierExternalWasm(): Plugin {
 
 export default defineConfig({
   publicDir: '../public',
-  plugins: [rapierExternalWasm(), {name:'deploy-version', generateBundle(){
-    const sha = execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()
+  plugins: [rapierExternalWasm(), {name:'deploy-version',configureServer(server){
+    server.middlewares.use('/version.json',(_request,response)=>{response.setHeader('Content-Type','application/json');response.end(JSON.stringify({sha:buildSha()}))})
+  }, generateBundle(){
+    const sha = buildSha()
     this.emitFile({type:'asset',fileName:'version.json',source:JSON.stringify({sha})})
   }}],
   optimizeDeps: {exclude: ['@dimforge/rapier3d-compat']},

@@ -99,6 +99,7 @@ async function start() {
   modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton);void touch
   showMode()
   if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,
+    setView:(view:unknown)=>host.setView(view),
     async photoSupport(x:number,z:number,bridgeRadius?:number){return (await loadWalker()).photoSupport(x,z,bridgeRadius)},
     peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},
     setPreset(name:string){setPreset(camera,name);camera.updateMatrixWorld();return stats.frame},
@@ -134,6 +135,8 @@ async function start() {
     peaks.update(camera,mirror); renderMirror(renderer,scene,camera,!Number.isFinite(mirror)); renderer.render(scene,camera)
   }
   const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
+    captureView:async()=>(await import('./play/feedback-view')).capture(host),
+    setView:async(view)=>(await import('./play/feedback-view')).setView(host,view),
     fly(){if(walker?.active)walker.leave();showMode()},get cinema(){return cinema},set cinema(on){cinema=on}}
   let tour:Awaited<ReturnType<typeof import('./play').play>>|undefined
   function animate(now:number){
@@ -172,6 +175,8 @@ async function start() {
     }
   }
   renderer.setAnimationLoop(animate)
-  if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
+  const token=params.get('view')
+  if(token){try{if(token.length>4096)throw Error();await host.setView(JSON.parse(atob(token.replace(/-/g,'+').replace(/_/g,'/'))))}catch{console.warn('Invalid feedback view')}}
+  else if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }
 start().catch(error=>{document.querySelector('output')!.value=`无法加载：${error.message}`;bootProgress(`无法加载：${error.message}`,0);console.error(error)})
