@@ -164,7 +164,10 @@ const STREET_ATTRS:AttrDef[] = [
 // A bucket owns the merged geometry of a small group of tiles. Adding or dropping one tile only
 // rebuilds its own bucket, so the cost stops scaling with how far the player has already walked.
 // ?nobatch=1 collapses this to a single bucket for ablation runs.
-const BUCKET_TILES = 2
+// 3 tiles per side keeps the usual 480 m view inside two or three buckets, so the extra draw
+// calls stay in single digits while a rebuild still only touches ~9 tiles instead of every tile
+// the player has ever visited. ?nobatch=1 collapses it to one bucket for ablation runs.
+const BUCKET_TILES = 3
 const BUCKET_SPAN = 256 * BUCKET_TILES
 
 function bucketKey(tile:Tile) {
@@ -278,8 +281,12 @@ export class ChunkBatcher {
   }
 
   private rebuildDirty() {
-    for(const bucket of this.buckets.values()) if(bucket.dirty) bucket.rebuild()
-    this.lastFurnitureMask = ''
+    let rebuilt = false
+    for(const bucket of this.buckets.values()) if(bucket.dirty) { bucket.rebuild(); rebuilt = true }
+    // Only a geometry rebuild invalidates the furniture selection; a pure camera turn must not
+    // re-run the selection loop and re-upload the instance buffers.
+    if(rebuilt) this.lastFurnitureMask = ''
+    return rebuilt
   }
 
   update(focus:THREE.Vector3, camera:THREE.PerspectiveCamera, mirrorLevel=148) {
