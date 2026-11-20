@@ -1156,6 +1156,20 @@ class SchoolBuilder:
                     continue
                 yaw = math.atan2(-dz, dx)
                 bays = max(1, round(length / 3.4))
+                # Steep, non-planar ground (terrace edges): split bays until the straight
+                # sloped base stays within the grounding band between its end piers.
+                while length / bays > 0.9:
+                    worst = 0.0
+                    for bi in range(bays):
+                        q0 = (ax + dx * (bi / bays), az + dz * (bi / bays))
+                        q1 = (ax + dx * ((bi + 1) / bays), az + dz * ((bi + 1) / bays))
+                        for t in (0.25, 0.5, 0.75):
+                            gq = self.ground(q0[0] + (q1[0] - q0[0]) * t, q0[1] + (q1[1] - q0[1]) * t)
+                            lin = self.ground(*q0) * (1 - t) + self.ground(*q1) * t
+                            worst = max(worst, abs(gq - lin))
+                    if worst <= 0.08:
+                        break
+                    bays *= 2
                 step = length / bays
                 for bi in range(bays):
                     px0, pz0 = ax + dx * (bi / bays), az + dz * (bi / bays)
