@@ -1,0 +1,11 @@
+{"cameras":{
+  "rock-east-approx":{"landmark":"shizijie","eye":[-891,153.2,-165],"target":[-849,152.2,-151],"viewport":{"width":402,"height":874}},
+  "shizijie-crossing":{"landmark":"shizijie","eye":[-890,156,-146],"target":[-876,151.6,-171]},
+  "central-square":{"landmark":"central_square","eye":[-962,157.2,125],"target":[-943,154,118]},
+  "zhengyang-north":{"landmark":"zhengyang","eye":[-611,160,-110],"target":[-612,156,-88]},
+  "zhengyang-south":{"landmark":"zhengyang","eye":[-628,158.4,13],"target":[-624,155.9,-7]},
+  "wangcheng-gate":{"landmark":"jingjiang","eye":[-591,161,-188],"target":[-589,158,-222]},
+  "gunanmen":{"landmark":"gunanmen","eye":[-1411,156,142],"target":[-1411,153.8,120]},
+  "bridge-west":{"landmark":"jiefang_bridge","eye":[-321,156,-25],"target":[-295,152,0]},
+  "bridge-east":{"landmark":"jiefang_bridge","eye":[-14,154,109],"target":[-39,151,85]}
+}}

@@ -556,6 +556,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         if len(coords) < 2:
             continue
         full_line = LineString(coords)
+        if el['id']==682893309: east_axis=full_line
         if not bounds.intersects(full_line):
             continue
         is_bridge = tags.get('bridge', 'no') != 'no'
@@ -613,6 +614,10 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             interchange[way] = line, stations, datum + levels, pavement, left_edge, right_edge
 
     def road_surface_y(x: float, z: float, is_bridge: bool, way_id: int) -> float:
+        if way_id==682893309 and 'jiefang_bridge' in landmarks:
+            from east_grading import STATIONS, LEVELS, cut_weight
+            station=east_axis.project(Point(x,z)); weight=cut_weight(station)
+            return (1-weight)*road_base_y(x,z)+weight*(np.interp(station,STATIONS,LEVELS)+.025)+.045
         if way_id in interchange:
             line, stations, levels, pavement, _, _ = interchange[way_id]
             point = Point(x, z)

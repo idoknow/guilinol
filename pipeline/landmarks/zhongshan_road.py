@@ -174,7 +174,11 @@ def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie'):
     """Guilin Zhongshan Road modern transit bus shelter + CJK station totem."""
     # Local +X of pose points toward carriageway; local +Z runs along sidewalk.
     m.pose = (x, y0, z, yaw)
-    m.box(0, -0.4, 0, 2.5, 0.48, 11.2, 'pave', collide=True, footing=True)
+    from plaza_seam import civic_plaza
+    outline = m._transform([[-1.25,0,-5.6],[1.25,0,-5.6],[1.25,0,5.6],[-1.25,0,5.6]])[:,::2]
+    m.pose = (0,0,0,0)
+    civic_plaza(m,outline)
+    m.pose = (x,y0,z,yaw)
     for sz in (-4.6, -1.5, 1.5, 4.6):
         m.beam([-0.82, 0.08, sz], [-0.82, 2.95, sz], 0.08, 'bronze', sections=6, collide=True)
     m.box(0.05, 2.95, 0, 2.65, 0.16, 11.2, 'alum')

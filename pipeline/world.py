@@ -131,6 +131,7 @@ def build(bbox, output, palette):
     bank_pavement=None
     west_portal=None
     modeled_paving=None
+    deck_mask=None
     for x,z,entry in layout.entries:
         if entry['id']=='jiefang_bridge' and bounds.covers(Point(x,z)):
             x_jb, z_jb = x, z
@@ -143,7 +144,8 @@ def build(bbox, output, palette):
             # Wide native Binjiang sidewalks extend past the modeled lower road.
             # Clip their overhang across the upper slab, including the portal.
             slab = np.array([[-140.5,-21.5],[140.5,-21.5],[140.5,21.5],[-140.5,21.5]])
-            modeled_paving = bank_pavement.union(ShapelyPolygon(slab @ axes + [x,z]))
+            deck_mask = ShapelyPolygon(slab @ axes + [x,z])
+            modeled_paving = bank_pavement.union(deck_mask)
             interchange=((x,z),angle,bank_pavement)
             grade_banks(terrain,original,wet,left,top,GRID,(x,z),angle,datum)
 
@@ -205,6 +207,11 @@ def build(bbox, output, palette):
     )
     if interchange is not None:
         grade_banks(terrain, original, wet, left, top, GRID, (x_jb, z_jb), angle, datum)
+        from east_grading import grade_east, grade_landing
+        east_road = next(road.line for road in roads if road.way == 682893309)
+        for field in (terrain,original):
+            grade_east(east_road,field,left,top,GRID,10,wet)
+        grade_landing(east_road,(terrain,original),left,top,GRID,wet,(x_jb,z_jb),angle,datum)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 
@@ -277,7 +284,7 @@ def build(bbox, output, palette):
     modeled_paving = unary_union([*layout.street_foundations, *rong_pavement, modeled_paving if modeled_paving is not None else ShapelyPolygon()])
     gate_plaza = next((ShapelyPolygon(np.asarray(GATE_PLAZA)+[x,z]) for x,z,entry in layout.entries
                        if entry['id']=='gunanmen'),None)
-    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving,gate_plaza=gate_plaza)
+    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving,gate_plaza=gate_plaza,deck_mask=deck_mask)
     (output/'marking-audit.json').write_text(json.dumps(lengths.pop('markingOverlap')))
     print('Lengths (m):',lengths)
     def asset(name):

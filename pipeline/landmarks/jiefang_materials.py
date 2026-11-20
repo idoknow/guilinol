@@ -21,8 +21,15 @@ class BridgeModel(Model):
         self.lights=[]
         self.glass=[]
         self.concrete=[]
+        self.road_parts={'road_paint':[], 'curb_face':[], 'rail_cap':[]}
 
     def mesh(self, vertices, faces, color, collide=False):
+        if color in ('paint_white','paint_yellow','curb_granite','rail_white'):
+            role,swatch=color.split('_')
+            super().mesh(vertices,faces,swatch,collide)
+            part = {'paint':'road_paint','curb':'curb_face','rail':'rail_cap'}[role]
+            self.road_parts[part].append((self.visible.pop(),self.uv.pop()))
+            return
         if color=='concrete':
             # Preserve metre-based UVs for the curved formwork panels.
             super().mesh(vertices,faces,'stone',collide)
@@ -59,15 +66,32 @@ def generate_bridge(build):
         model=BridgeModel(lod==0)
         build(model)
         def emit(parts,uvs,name):
-            vertices=np.concatenate(parts).reshape(-1,3)
+            triangles=np.concatenate(parts).reshape(-1,3,3)
+            if uvs is not None:
+                triangles=np.concatenate([triangles,np.concatenate(uvs).reshape(-1,3,2)],axis=2)
+            for station in np.r_[np.arange(16,134,4),134.6286]:
+                coord=triangles[:,:,0]
+                crosses=(coord.min(axis=1)<station-1e-7)&(coord.max(axis=1)>station+1e-7)
+                if not crosses.any(): continue
+                cut=[]
+                for face in triangles[crosses]:
+                    low=face[:,0]<station
+                    solo=int(np.flatnonzero(low if low.sum()==1 else ~low)[0])
+                    first,second,third=np.roll(face,-solo,axis=0)
+                    def intersection(other):
+                        return first+(other-first)*((station-first[0])/(other[0]-first[0]))
+                    near,far=intersection(second),intersection(third)
+                    cut.extend(((first,near,far),(near,second,third),(near,third,far)))
+                triangles=np.concatenate([triangles[~crosses],cut])
+            vertices=triangles[:,:,:3].reshape(-1,3).copy()
             vertices[:,1]+=deck_level(vertices[:,0])
             mesh=trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
             if uvs is not None:
-                mesh.visual=trimesh.visual.TextureVisuals(uv=np.concatenate(uvs).reshape(-1,2),material=finishes[name])
+                mesh.visual=trimesh.visual.TextureVisuals(uv=triangles[:,:,3:].reshape(-1,2),material=finishes['finish' if name in model.road_parts else name])
             scene.add_geometry(mesh,node_name=group+'_'+name if uvs is not None else 'collision_surface',
                                parent_node_name=group if uvs is not None else scene.graph.base_frame)
         emit(model.visible,model.uv,'finish')
-        for name,parts in [('lights',model.lights),('glass',model.glass),('concrete',model.concrete),*model.tile_parts.items()]:
+        for name,parts in [('lights',model.lights),('glass',model.glass),('concrete',model.concrete),*model.tile_parts.items(),*model.road_parts.items()]:
             if parts:
                 triangles,uvs=zip(*parts)
                 emit(triangles,uvs,name)
