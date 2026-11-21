@@ -39,6 +39,7 @@ import {
   type PlayerMode,
 } from '../game'
 import {
+  KICKSTAND_REST_ROLL_RAD,
   computeParkedRoll,
   computePickupRoll,
   createInitialTwoWheelOpState,
@@ -51,7 +52,9 @@ import {
   createDynamicBicycle,
   createDynamicCar,
   createDynamicEbike,
+  vehicleModel,
   type EbikeModPreset,
+  type StaticBikeVisualOptions,
   type TwoWheelVisualRig,
 } from './vehicle-model'
 import {
@@ -410,6 +413,35 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   shopHintGroup.visible=false
   scene.add(shopHintGroup)
 
+  // IDOK-127: Front-of-shop 3-tier exhibition bikes reusing vehicleModel() on Shizijie raised plinths (0 dynamic lights).
+  const SHOWROOM_SIGNATURES:Record<PersonalEbikeModelId,StaticBikeVisualOptions>={
+    lijiang_light:{paintColor:0x6e9eb5,windshield:'clear',topbox:'none',headlightTier:0},
+    city_range:{paintColor:0x266c7a,windshield:'clear',topbox:'delivery',angelEye:true,angelEyeColor:0x58f7ff,goldShock:true,headlightTier:1},
+    xiangshan_gt:{paintColor:0x5c2e8a,windshield:'tinted',topbox:'none',underglow:true,underglowColor:0x20d6c1,angelEye:true,angelEyeColor:0xffc53d,goldShock:true,tailWing:true,exhaust:true,headlightTier:2},
+  }
+  const ebikeShowroomGroup=new THREE.Group()
+  ebikeShowroomGroup.name='shizijie-ebike-showroom'
+  const showroomBikes=listShops().flatMap(shop=>(shop.displayStands??[]).map((stand,idx)=>{
+    const visual=SHOWROOM_SIGNATURES[stand.modelId]
+    const mesh=vehicleModel('bike',idx,{visual})
+    mesh.name=`showroom-${stand.modelId}`
+    mesh.position.set(stand.pos[0],stand.pos[1]+stand.plinthHeight,stand.pos[2])
+    mesh.rotation.set(0,stand.yaw,KICKSTAND_REST_ROLL_RAD,'YXZ')
+    mesh.userData.showroomStand=stand.id
+    mesh.userData.modelId=stand.modelId
+    mesh.userData.paintColor=visual.paintColor
+    ebikeShowroomGroup.add(mesh)
+    return {shop,stand,mesh,snapped:false}
+  }))
+  ebikeShowroomGroup.visible=false
+  scene.add(ebikeShowroomGroup)
+
+  // Live 360° showcase e-bike rig positioned at `stagePos` (d=+4.2m) only while e-bike shop/garage overlay is open.
+  const shopEbikeShowcaseRig=createDynamicEbike(0,undefined,'normal')
+  shopEbikeShowcaseRig.root.name='shop-ebike-showcase'
+  shopEbikeShowcaseRig.root.visible=false
+  scene.add(shopEbikeShowcaseRig.root)
+
   interface SavedStreetPose {
     yaw:number
     pitch:number
@@ -422,6 +454,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
   interface ActiveShopCamera {
     stagePos:THREE.Vector3
+    subjectYaw:number
     orbitYaw:number
     orbitPitch:number
     orbitRadius:number
@@ -534,8 +567,26 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     openSafeWardrobe()
   })
 
+  function syncShopShowcaseBike(){
+    if(!shopCam||!shopEbikeShowcaseRig.root.visible)return
+    shopEbikeShowcaseRig.update({
+      pos:shopCam.stagePos,
+      heading:shopCam.subjectYaw,
+      groundPitch:0,
+      lean:0,
+      wheelie:0,
+      steerInput:0,
+      speed:0,
+      kickstandDown:true,
+      headlight:env.night>.35?'low':'off',
+      night:env.night,
+      dt:0,
+    })
+  }
+
   function updateShopShowcaseCamera(){
     if(!shopCam)return
+    syncShopShowcaseBike()
     const focusY=shopCam.stagePos.y+shopCam.targetHeightOffset
     shopLookTarget.set(shopCam.stagePos.x,focusY,shopCam.stagePos.z)
     const cosP=Math.cos(shopCam.orbitPitch)
@@ -571,11 +622,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         }
         mixer.update(0)
       }
+      const isEbikeShowcase=shop?.kind==='ebike'||overlayMode==='garage'||overlayMode==='service'
       if(shop){
         const sx=shop.cameraRig.stagePos[0], sz=shop.cameraRig.stagePos[2]
         const sy=supportAt(sx,sz,shop.cameraRig.stagePos[1])?.y??figure.position.y
         shopCam={
           stagePos:new THREE.Vector3(sx,sy,sz),
+          subjectYaw:shop.facingYaw,
           orbitYaw:shop.cameraRig.stageYaw,
           orbitPitch:shop.cameraRig.pitchRad,
           orbitRadius:shop.cameraRig.orbitRadius,
@@ -585,16 +638,22 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           fovDeg:shop.cameraRig.fovDeg,
         }
         if(shop.kind==='clothing'){
+          shopEbikeShowcaseRig.root.visible=false
           figure.position.set(sx,sy+soleOffset,sz)
           figure.rotation.y=shop.cameraRig.stageYaw+avatar.yaw
           figure.visible=true
+        }else if(isEbikeShowcase){
+          figure.visible=false
+          shopEbikeShowcaseRig.root.visible=true
         }
         camera.fov=shopCam.fovDeg
         camera.updateProjectionMatrix()
         updateShopShowcaseCamera()
       }else if(overlayMode==='wardrobe'){
+        shopEbikeShowcaseRig.root.visible=false
         shopCam={
           stagePos:figure.position.clone(),
+          subjectYaw:figure.rotation.y,
           orbitYaw:figure.rotation.y+Math.PI+0.16,
           orbitPitch:.12,
           orbitRadius:2.55,
@@ -609,18 +668,31 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }else{
         shopCam={
           stagePos:figure.position.clone(),
+          subjectYaw:yaw+Math.PI*.75,
           orbitYaw:yaw+Math.PI,
-          orbitPitch:.16,
-          orbitRadius:3.1,
+          orbitPitch:.18,
+          orbitRadius:isEbikeShowcase?2.9:3.1,
           minRadius:2.0,
           maxRadius:4.6,
-          targetHeightOffset:1.05,
+          targetHeightOffset:isEbikeShowcase?.72:1.05,
           fovDeg:44,
+        }
+        if(isEbikeShowcase){
+          figure.visible=false
+          shopEbikeShowcaseRig.root.visible=true
+        }else{
+          shopEbikeShowcaseRig.root.visible=false
         }
         camera.fov=shopCam.fovDeg
         camera.updateProjectionMatrix()
         updateShopShowcaseCamera()
       }
+    },
+    onPreviewEbike(preview){
+      const paintIdx=preview.modelId==='lijiang_light'?0:preview.modelId==='city_range'?2:3
+      shopEbikeShowcaseRig.setVehicleType('normal',paintIdx)
+      shopEbikeShowcaseRig.applyMods(preview.visual,paintIdx)
+      syncShopShowcaseBike()
     },
     onOrbitDrag(dx,dy){
       if(!shopCam)return
@@ -663,6 +735,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const restored=savedStreetPose
       savedStreetPose=null
       shopCam=null
+      shopEbikeShowcaseRig.root.visible=false
+      figure.visible=active
       if(restored){
         camera.fov=restored.fov
         camera.updateProjectionMatrix()
@@ -779,6 +853,26 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
 
   function updateShopHintRings(x:number,z:number,footY:number){
+    let anyShowroomVisible=false
+    for(const item of showroomBikes){
+      const d=Math.hypot(item.stand.pos[0]-x,item.stand.pos[2]-z)
+      const show=active&&d<115
+      item.mesh.visible=show
+      if(show){
+        anyShowroomVisible=true
+        if(!item.snapped){
+          const lmHit=sim.surface(item.stand.pos[0],item.stand.pos[2],'landmark',item.stand.pos[1]+1.2,2.4)
+          if(lmHit){
+            item.mesh.position.y=lmHit.y
+            item.snapped=true
+          }else{
+            const baseY=supportAt(item.stand.pos[0],item.stand.pos[2],footY)?.y??item.stand.pos[1]
+            item.mesh.position.y=baseY+item.stand.plinthHeight
+          }
+        }
+      }
+    }
+    ebikeShowroomGroup.visible=anyShowroomVisible
     const onFoot=active&&!rides?.car&&!rides?.bike&&!rides?.boat&&!shopOverlay.isOpen()
     shopHintGroup.visible=onFoot
     if(!onFoot)return
@@ -1091,7 +1185,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true);return true
   }
-  function leave(){if(shopOverlay.isOpen())shopOverlay.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function leave(){if(shopOverlay.isOpen())shopOverlay.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number){
     const dryBridge=!!sim.surface(x,z,'deck',refY+.4,1.5)||!!sim.surface(x,z,'landmark',refY+.4,1.5)
     return !sim.insideHouse(x,z)&&(!sim.wet(x,z)||dryBridge)&&!sim.isBlockedAt(x,refY,z)
@@ -2309,6 +2403,16 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       isOpen:()=>shopOverlay.isOpen(),
       triggerInteract:()=>interactArbiter.trigger(),
       getInteractDecision:()=>interactArbiter.getLastDecision(),
+      getShowroomStands:()=>showroomBikes.map(item=>({
+        id:item.stand.id,
+        modelId:item.stand.modelId,
+        visible:item.mesh.visible,
+        snapped:item.snapped,
+        pos:item.mesh.position.toArray(),
+        yaw:item.mesh.rotation.y,
+        paintColor:item.mesh.userData.paintColor as number|undefined,
+      })),
+      showcaseVisible:()=>shopEbikeShowcaseRig.root.visible,
     },
     outfit:{
       getSnapshot:()=>outfitController.getSnapshot(),

@@ -6,6 +6,7 @@ import {photoMode} from './photo'
 import {mapView} from './map'
 import {isGlobalHotkeyBlocked, shouldPhotoYieldKeyPFromDom} from '../walk/input-guard'
 import {SPOT_BOUNTY_YUAN, claimSpotBounty, hasClaimedSpotBounty, recordSpotFound} from '../game/commerce'
+import {type ShopTriggerDef} from '../game/shops'
 import {getState, onState} from '../game/state'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
@@ -88,6 +89,14 @@ export function play(host:Host) {
       if(await host.walkTo(dock.x,dock.z,yaw,'dock:'+dock.id)) {
         host.walker()?.face(yaw,.14)}})
   }
+  async function goShop(shop:ShopTriggerDef) {
+    closeAll()
+    // Face directly toward the storefront sign and display showcase upon arrival.
+    const yaw = Math.atan2(Math.sin(shop.facingYaw + Math.PI), Math.cos(shop.facingYaw + Math.PI))
+    await travel(shop.displayName,async()=>{leaveSummit(false)
+      if(await host.walkTo(shop.triggerPos[0],shop.triggerPos[2],yaw,'shop:'+shop.shopId)) {
+        host.walker()?.face(yaw,.10)}})
+  }
   // Stamp + card. Walking into the ring does it; so does travelling there (the spawn search may land a few metres off).
   function awardSpot(spot:Spot) {
     const bounty = claimSpotBounty(spot.id)
@@ -118,7 +127,7 @@ export function play(host:Host) {
   // Atlas loads only after the scene has been running a couple of seconds, never inside the first-frame budget.
   let mapLoading:Promise<ReturnType<typeof mapView>|undefined>|undefined
   const ensureMap = ()=>mapLoading ??= import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
-    atlas = loaded; return map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s),goDock:d=>void goDock(d)})
+    atlas = loaded; return map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s),goDock:d=>void goDock(d),goShop:sh=>void goShop(sh)})
   }).catch(error=>{console.warn('atlas',error); mapLoading = undefined; return undefined})
   const loadMap = ()=>void ensureMap()
   let mapRequested = !(host.manifest as {atlas?:unknown}).atlas
