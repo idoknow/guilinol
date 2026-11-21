@@ -4,7 +4,7 @@ import numpy as np
 import trimesh
 from jingjiang import Model,generate
 from shop_lettering import letters
-from dongxi_layout import registered_market
+from dongxi_layout import registered_market, SCREEN_PALETTE
 
 
 def row(model, first, last, count, side, depth=6, arcade=False, gap=3.45,tall=False):
@@ -130,4 +130,4 @@ def market(model):
 
 if __name__=='__main__':
     generate('wangcheng_market',market,dict(brick='#7a7d7b',white='#e8e4da',tile='#3b3e42',
-             wood='#5a3a22',sign='#282420',pave='#8f8f88'))
+             wood='#5a3a22',sign='#282420',pave='#8f8f88',**SCREEN_PALETTE))
