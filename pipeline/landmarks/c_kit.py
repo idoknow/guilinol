@@ -376,7 +376,7 @@ def solid(mesh, center, size, region='granite', cell=1.8):
     quads(2, cz - sz / 2, 0, cx + sx / 2, cx - sx / 2, 1, cy - sy / 2, cy + sy / 2, (0, 0, -1))
 
 
-def box(mesh, center, size, region, tile=1.6, stretch=False):
+def box(mesh, center, size, region, tile=1.6, stretch=False, top_mesh=None):
     cx, cy, cz = center
     hx, hy, hz = size[0] / 2, size[1] / 2, size[2] / 2
     x0, x1, y0, y1, z0, z1 = cx - hx, cx + hx, cy - hy, cy + hy, cz - hz, cz + hz
@@ -390,10 +390,11 @@ def box(mesh, center, size, region, tile=1.6, stretch=False):
     ]
     scale = None if stretch else tile
     for pts, outward in faces:
-        mesh.face(pts, outward, region, scale)
+        target = top_mesh if outward[1] > 0 and top_mesh is not None else mesh
+        target.face(pts, outward, region, scale)
 
 
-def yaw_box(mesh, center, size, yaw, region, tile=1.6):
+def yaw_box(mesh, center, size, yaw, region, tile=1.6, top_mesh=None):
     cx, cy, cz = center
     hx, hy, hz = (np.array(size) / 2).tolist()
     c, s = math.cos(yaw), math.sin(yaw)
@@ -411,7 +412,8 @@ def yaw_box(mesh, center, size, yaw, region, tile=1.6):
         (4, 7, 3, 0, (-c, 0, s)),
     ]
     for a, b, c0, d, outward in quads:
-        mesh.face([corners[a], corners[b], corners[c0], corners[d]], outward, region, tile)
+        target = top_mesh if outward[1] > 0 and top_mesh is not None else mesh
+        target.face([corners[a], corners[b], corners[c0], corners[d]], outward, region, tile)
 
 
 def cylinder(mesh, base, radius, height, region, sides=8, tile=1.2):
@@ -741,7 +743,7 @@ def railing(mesh, a, b, y, height, region, post=0.8, stone=False):
     yaw_box(mesh, (mid[0], y + 0.28, mid[1]), (length, 0.08, 0.08), yaw, region, 0.8)
 
 
-def stairs(mesh, a, b, width, count, region):
+def stairs(mesh, a, b, width, count, region, landing=None):
     a, b = np.asarray(a, np.float64), np.asarray(b, np.float64)
     for i in range(count):
         p0 = a + (b - a) * (i / count)
@@ -750,10 +752,10 @@ def stairs(mesh, a, b, width, count, region):
         mid[1] = p1[1] - (p1[1] - p0[1]) / 2
         step = p1 - p0
         yaw = math.atan2(step[0], step[2])
-        yaw_box(mesh, mid, (width, p1[1] - p0[1], np.linalg.norm(step[[0, 2]]) + 0.02), yaw, region, 0.6)
+        yaw_box(mesh, mid, (width, p1[1] - p0[1], np.linalg.norm(step[[0, 2]]) + 0.02), yaw, region, 0.6, top_mesh=landing if i == count-1 else None)
 
 
-def ramp(mesh, a, b, width, thickness=0.28):
+def ramp(mesh, a, b, width, thickness=0.28, top_mesh=None):
     a, b = np.asarray(a, np.float64), np.asarray(b, np.float64)
     direction = b - a
     flat = direction.copy()
@@ -768,7 +770,8 @@ def ramp(mesh, a, b, width, thickness=0.28):
     if normal[1] < 0:
         normal = -normal
     c0, c1, c2, c3 = a + side, a - side, b - side, b + side
-    mesh.face([c0, c1, c2, c3], (0, 1, 0), 'granite', 1.0)
+    target = mesh if top_mesh is None else top_mesh
+    target.face([c0, c1, c2, c3], (0, 1, 0), 'granite', 1.0)
     mesh.face([c0 - normal, c3 - normal, c2 - normal, c1 - normal], (0, -1, 0), 'granite', 1.0)
 
 
@@ -871,7 +874,7 @@ class Builder:
     def __init__(self, lod, collide=False):
         self.lod = lod
         self.collide = collide
-        self.parts = {'atlas': Mesh(), 'lit': Mesh(), 'steel': Mesh()}
+        self.parts = {key: Mesh() for key in SPECS}
         self.hit = Mesh()
         for part in self.parts.values():
             part.detail = self.lod == 0
@@ -909,6 +912,7 @@ SPECS = {
     'atlas': ('landmark', (0, 0, 0), 0.0, 0.88),
     'lit': ('window_lit', (0.45, 0.28, 0.12), 0.0, 0.42),
     'steel': ('steel', (0, 0, 0), 0.7, 0.38),
+    'sidewalk': ('sidewalk', (0, 0, 0), 0, 0.88),
 }
 
 
@@ -919,7 +923,8 @@ def export_landmark(path, image, builders):
     for name, builder in builders:
         scene.graph.update(frame_from=base, frame_to=name)
         for key, (mat_name, emissive, metallic, roughness) in SPECS.items():
-            geometry = _trimesh_of(builder.parts[key], image, mat_name, emissive, metallic, roughness)
+            texture = Image.new("RGB", (1, 1), "#aaa9a6") if key == "sidewalk" else image
+            geometry = _trimesh_of(builder.parts[key], texture, mat_name, emissive, metallic, roughness)
             if geometry is not None:
                 scene.add_geometry(geometry, node_name=f'{name}_{key}', parent_node_name=name)
     hit = _trimesh_of(builders[0][1].hit, image, 'collision_mat', (0, 0, 0), 0, 1)

@@ -12,6 +12,8 @@ export interface Clock {hour:number; weather:Weather; flowing:boolean; goal:numb
 export interface Host {
   captureView():Promise<{view:import('../../../lib/feedback-contract').FeedbackView;shot:Blob}>
   setView(view:unknown):Promise<void>
+  /** Camera pose + target as a FeedbackView, without the screenshot (IDOK-105 saver). */
+  lastView():Promise<import('../../../lib/feedback-contract').FeedbackView>
   scene:THREE.Scene; camera:THREE.PerspectiveCamera; renderer:THREE.WebGLRenderer
   manifest:Manifest; stream:Stream; peaks:THREE.Group; clock:Clock
   walker():Walker|undefined

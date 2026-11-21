@@ -19,11 +19,10 @@ NATIVE_APPROACH=120
 BANK_LIMIT=140
 
 
-def dash_intervals(first, last, period=7., painted=2.8):
-    for start in np.arange(np.floor(first/period)*period,last,period):
-        left, right = max(first,start), min(last,start+painted)
-        if right-left>1e-6:
-            yield left,right
+def lane_dividers(way, left, right):
+    # Eastbound Jiefang East is tagged lanes=3 at the native west joint.
+    lanes = 3 if way==259020569 else 2
+    return [left+(right-left)*i/lanes for i in range(1,lanes)]
 
 
 def site_limit(way):

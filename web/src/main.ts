@@ -6,7 +6,9 @@ import {flight} from './flight'
 import {look} from './look/config'
 import {installAtmosphere, outerGround, sky} from './look/atmosphere'
 import {startPeaks} from './peaks'
-import {presets,setPreset} from './presets'
+import {presets,setPreset,pickSpawn,spawnPool} from './presets'
+import {isDeepLink} from './deeplink'
+import {readLastView, saveLastView, consumeRestore, applyLastView} from './lastview'
 import {walkConfig} from './walk/config'
 import {atmo, env, evaluate, setFogMetrics} from './look/time'
 import {currentMirrorLevel, isWaterInView, renderMirror, WATER_LAYER} from './look/water'
@@ -19,6 +21,7 @@ import {loadTiles} from './look/tiles'
 import {flags} from './debug'
 import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRangeConfig} from './render-range'
 import {renderRangeControl} from './ui/render-range'
+import type {FeedbackView} from '../../lib/feedback-contract'
 
 installAtmosphere()
 // The title screen (ui/home.ts) pauses the scene while it covers it: no simulation, no draws.
@@ -52,7 +55,19 @@ async function start() {
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const [left,top,width,depth] = manifest.extent
   scene.add(outerGround(manifest.extent))
-  camera.position.set(left+width*.55,420,top+depth*.62)
+  // IDOK-105: choose the opening camera pose. The camera is NOT touched here — `flight()` below sets
+  // `rotation.order = 'YXZ'` and lookAt()/rotation.set() must run after it, or three.js recomputes the
+  // quaternion with the wrong order and every slot gains a roll.
+  const openParams = new URLSearchParams(location.search)
+  // `?slot=X` pins a specific pool frame (deterministic, for captures and shared links). It is also
+  // a deep link, so it skips the title screen, but it must bypass the "deep link → fixed camera"
+  // fallback below. Every other deep link keeps the deterministic camera the harnesses measure.
+  const forcedSlot = openParams.get('slot')
+  // `restoring` is a FeedbackView only when the player picked "回到上次离开的地方" AND a usable view
+  // is stored; a stale/cleared record must fall back to pickSpawn(), not the fixed camera.
+  const opening = forcedSlot !== null
+    ? spawnPool.find(slot => slot.id === forcedSlot) ?? spawnPool[0]
+    : isDeepLink(openParams) ? null : consumeRestore() ? readLastView() ?? pickSpawn() : pickSpawn()
   let walker:Awaited<ReturnType<typeof import('./walk').walk>>|undefined, switching=false
   let cinema=false
   let walkModPromise:Promise<typeof import('./walk')>|undefined
@@ -62,7 +77,15 @@ async function start() {
   }
   if(params.get('mode')==='walk'||params.has('spawn')) void prefetchWalk()
   const controls = flight(camera,renderer.domElement,manifest.extent,()=>!walker?.active&&!switching&&!cinema)
-  camera.lookAt(left+width*.47,150,top+depth*.45)
+  // Apply the opening pose here, after flight() has set rotation.order='YXZ'. lookAt()/rotation.set()
+  // before that line would be recomputed in the wrong Euler order and leave a permanent roll.
+  if(opening) {
+    if('eye' in opening) { camera.position.set(...opening.eye); camera.lookAt(...opening.look) }
+    else applyLastView(camera, opening)
+  } else {
+    camera.position.set(left+width*.55,420,top+depth*.62)
+    camera.lookAt(left+width*.47,150,top+depth*.45)
+  }
   function resize() {
     renderer.setPixelRatio(Math.min(devicePixelRatio,1.5)); renderer.setSize(innerWidth,innerHeight)
     camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix()
@@ -218,7 +241,12 @@ async function start() {
         break
       }
       return {clearance,lookingAt,landmark,wallDistance:hits[0]?.distance}
-    }}})
+    },
+    // IDOK-105 test hooks (verify mode only).
+    spawnPool,
+    saveLastViewNow:()=>host.lastView().then(saveLastView),
+    readLastViewNow:()=>readLastView(),
+    applyLastViewNow:(view:FeedbackView)=>applyLastView(camera,view)}})
   function draw(){
     const metrics=stream.metrics
     const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
@@ -234,6 +262,7 @@ async function start() {
   }
   const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
     captureView:async()=>(await import('./play/feedback-view')).capture(host),
+    lastView:async()=>(await import('./play/feedback-view')).currentView(host,false),
     setView:async(view)=>(await import('./play/feedback-view')).setView(host,view),
     fly(){if(walker?.active)walker.leave();showMode()},get cinema(){return cinema},set cinema(on){cinema=on}}
   let tour:Awaited<ReturnType<typeof import('./play').play>>|undefined
@@ -266,6 +295,7 @@ async function start() {
     renderer.toneMappingExposure = env.exposure; windowLight.value = env.night
     dome.update(); drops.update()
     tour?.tick(elapsed/1000)
+    persistView?.()
     draw()
     sampleFrame(elapsed)
     if(!frame)record('firstFrame',{ms:performance.now()})
@@ -285,6 +315,19 @@ async function start() {
     }
   }
   renderer.setAnimationLoop(animate)
+  // IDOK-105: keep the last view fresh so "回到上次离开的地方" can restore it. Deep-linked
+  // sessions (`?verify`, `?slot`, shares…) never write it — tests and shared links must not pollute.
+  const persistView = isDeepLink(openParams) ? null : (() => {
+    let lastWrite = 0
+    const write = (force = false) => {
+      if (!force && Date.now() - lastWrite < 15000) return
+      lastWrite = Date.now()
+      void host.lastView().then(saveLastView).catch(() => {})
+    }
+    addEventListener('pagehide', () => write(true))
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') write(true) })
+    return write
+  })()
   const token=params.get('view')
   if(token){try{if(token.length>4096)throw Error();await host.setView(JSON.parse(atob(token.replace(/-/g,'+').replace(/_/g,'/'))))}catch{console.warn('Invalid feedback view')}}
   else if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}

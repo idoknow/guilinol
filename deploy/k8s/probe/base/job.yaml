@@ -18,10 +18,10 @@ spec:
           restartPolicy: Never
           tolerations:
           - {key: migration.rockchin.top/hold, operator: Exists}
-          - {key: langbot-cloud-excluded, operator: Exists}
+          - {key: workload.rockchin.top/langbot-cloud-excluded, operator: Exists}
           containers:
           - name: curl
-            image: docker.m.daocloud.io/curlimages/curl:8.12.1
+            image: ghcr.nju.edu.cn/idoknow/glol-probe:RELEASE
             command: ["/bin/sh", "/probe/run.sh"]
             env:
             - name: PROBE_SESSION

@@ -6,7 +6,7 @@ import shapely
 from audit_seams import probes, declared_mesh, seam_segments, designed_rise
 from seam_layers import bridge_layer
 from seam_crossings import crossings
-from landmarks.jiefang_layout import deck_level, dash_intervals
+from landmarks.jiefang_layout import deck_level, lane_dividers
 from seam_bridge import CurbFaces, native_contact, protected_edge
 
 
@@ -47,15 +47,22 @@ class SeamTests(unittest.TestCase):
         world = Surface(ROOT/'public/world')
         entry = world.entries['zhengyang']
         streets = Streets(world)
-        _, heights = projected_faces(entry,'pave',ROOT/'public')
+        faces, heights = projected_faces(entry,'pave',ROOT/'public')
+        footprint=shapely.union_all(faces,grid_size=.001)
         cosine,sine = np.cos(.16),np.sin(.16)
         transform = np.array([[cosine,sine],[-sine,cosine]])
         origin = np.array(entry['position'])[::2]
-        for end,sign in [(-12.5,-1),(87.5,1)]:
+        for sign in (-1,1):
             for across in np.arange(-8.5,9,.5):
+                # The north edge follows the GL04 road cut across the entrance.
+                transect=shapely.LineString(np.array([[across,-15],[across,90]])@transform+origin)
+                stations=((shapely.get_coordinates(footprint.intersection(transect))-origin)@transform.T)[:,1]
+                end=min(stations) if sign<0 else max(stations)
                 inside = origin+np.array([across,end-sign*.04])@transform
                 outside = origin+np.array([across,end+sign*.04])@transform
-                self.assertLessEqual(abs(max(heights(shapely.Point(inside)))-streets.at(*outside)[0]),.05)
+                elevation,kinds=streets.at(*outside)
+                if sign<0:self.assertIn(0,kinds)
+                self.assertLessEqual(abs(max(heights(shapely.Point(inside)))-elevation),.05)
 
     def test_balustrade_requires_full_span_and_deck_height(self):
         interval = shapely.LineString([(0,0),(2,0)])
@@ -76,9 +83,72 @@ class SeamTests(unittest.TestCase):
         street.at.side_effect = lambda x,z: (10 if z<.1 else 8,set())
         self.assertFalse(native_contact(interval,normal,lambda point:10,street,10))
 
-    def test_dash_crosses_station_vertex(self):
-        self.assertEqual(list(dash_intervals(6,8)),[(7,8)])
-        self.assertEqual(list(dash_intervals(8,12)),[(8,9.8)])
+    def test_native_three_lane_dividers(self):
+        np.testing.assert_allclose(lane_dividers(259020569,-4.9,4.9),[-4.9/3,4.9/3])
+        self.assertEqual(lane_dividers(258909993,-4.7,4.7),[0])
+
+    def test_release_atlas_quantization(self):
+        from seam_inventory import atlas_mask
+        uv=np.array([[[.87497,.875],[1.0000001,.875],[1.,1.]],
+                     [[.4,.9],[1.,.875],[1.,1.]]])
+        np.testing.assert_array_equal(atlas_mask(uv,[.875,.875,1.,1.]),[True,False])
+
+    def test_native_pavement_handoff_preserves_uv_and_elevated_deck(self):
+        from unittest.mock import Mock
+        from landmarks.native_paving import NativePaving
+        world=Mock(size=256,files={(0,0):'tile'})
+        world.sample.return_value=(0,None)
+        paving=NativePaving(world,dict(position=[0,0,0],rotation=0))
+        paving.streets.tile=Mock(return_value=(shapely.STRtree([shapely.box(0,0,2,8)]),[1],None))
+        paving.streets.at=Mock(return_value=(0,{1}))
+        triangle=np.array([[0.,0,0],[0,0,4],[4,0,0]])
+        vertices,uv=paving.clip(triangle,triangle[:,::2])
+        self.assertAlmostEqual(shapely.polygons(vertices.reshape(-1,3,3)[:,:,::2])[0].area,2.)
+        np.testing.assert_allclose(vertices[:,::2],uv)
+        deck=triangle+[0,4,0]
+        np.testing.assert_array_equal(paving.clip(deck,triangle[:,::2])[0],deck)
+
+    def test_unbound_surface_near_street(self):
+        from unittest.mock import Mock
+        from seam_inventory import street_contacts
+        streets=Mock()
+        streets.world.size=256
+        streets.world.files={(0,0):'tile'}
+        streets.tile.return_value=(shapely.STRtree([shapely.box(0,0,8,8)]),[1],None)
+        streets.at.return_value=(.1,{1})
+        tris=np.array([[[9.,.1,2],[9.,.1,3],[10.,.1,2]]])
+        triangles=np.concatenate([tris,tris+[0,4,0],tris+[2,0,0]])
+        normals=np.cross(triangles[:,1]-triangles[:,0],triangles[:,2]-triangles[:,0])
+        kinds=street_contacts(shapely.polygons(triangles[:,:,::2]),triangles,normals,streets)
+        np.testing.assert_array_equal(kinds,[1,-1,-1])
+
+    def test_raised_connected_ramp_and_unconnected_step(self):
+        from unittest.mock import Mock
+        from seam_inventory import street_contacts, surface_components
+        lower = np.array([[1., .16, 1.], [1., .16, 2.], [2., .16, 1.]])
+        ramp = np.array([lower[1], [2., .26, 2.], lower[2]])
+        triangles = np.array([lower, ramp, lower+[0., .13, 0.]])
+        component = surface_components(triangles)
+        self.assertEqual(component[0], component[1])
+        self.assertNotEqual(component[0], component[2])
+        streets = Mock()
+        streets.world.size, streets.world.files = 256, {(0, 0): 'tile'}
+        streets.tile.return_value = shapely.STRtree([shapely.box(0, 0, 4, 4)]), [1], None
+        streets.at.return_value = 0., {1}
+        normals = np.cross(triangles[:,1]-triangles[:,0], triangles[:,2]-triangles[:,0])
+        contacts = street_contacts(shapely.polygons(triangles[:,:,::2]), triangles, normals,
+                                   streets, component == component[0])
+        np.testing.assert_array_equal(contacts, [1, 1, -1])
+
+    def test_overhang_only_excludes_fully_covered_triangle(self):
+        from seam_inventory import ModelCover
+        floor = np.array([[0., 0., 0.], [0., 0., 2.], [2., 0., 0.]])
+        roof = floor + [0., 2., 0.]
+        model = ModelCover(np.array([floor, roof]))
+        self.assertTrue(model.hides(shapely.Polygon(floor[:, ::2]), floor))
+        exposed = floor + [.5, 0., 0.]
+        self.assertFalse(model.hides(shapely.Polygon(exposed[:, ::2]), exposed))
+        self.assertFalse(model.hides(shapely.Polygon(roof[:, ::2]), roof))
 
     def test_sloping_curb_requires_vertical_face_at_sample_level(self):
         curb = CurbFaces(np.array([[[0.,0,0],[2,1,0],[2,1.12,0]],[[0.,0,0],[2,1.12,0],[0,.12,0]]]))

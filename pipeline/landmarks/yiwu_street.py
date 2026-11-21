@@ -149,7 +149,7 @@ def street(model):
     for station in range(-65, 86, 5):
         # Low natural kerb height (+0.13 m above carriageway, skirt down to -0.35 m)
         model.box(station, -0.35, -7.45, 5.0, 0.48, 4.1, 'pave', True)
-        model.box(station, 0.135, -5.48, 5.0, 0.02, 0.18, 'granite')
+        model.box(station, 0.135, -5.48, 5.0, 0.02, 0.18, 'curb')
         model.box(station, 0.138, -8.05, 5.0, 0.015, 0.30, 'yellow')
         # Gap in lakeside fence across yiwu_old_house frontage (station 49..80)
         for left, right in ((station - 2.5, min(station + 2.5, 49.0)), (max(station - 2.5, 80.5), station + 2.5)):

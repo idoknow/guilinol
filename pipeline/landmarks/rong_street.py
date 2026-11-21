@@ -123,7 +123,8 @@ def shop(builder, east, base, south, width, length, floors, kind):
             for step in range(7):
                 tread = 1.15*(step+1)/7
                 box(stone,(face+5-4.5*(step+.5)/7,base+tread/2,south),
-                    (4.5/7+.02,tread,8.8),'granite')
+                    (4.5/7+.02,tread,8.8),'granite',
+                    top_mesh=builder.parts['sidewalk'] if step < 2 else None)
             return
         def grade(x,z):
             angle = math.radians(-21.92)

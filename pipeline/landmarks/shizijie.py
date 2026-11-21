@@ -158,36 +158,6 @@ def _guardrail_run(m: Builder, p0, p1):
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
-def _colored_crosswalk_approach(m: Builder, cx, cz, yaw, road_w=24.0, zebra_len=4.2):
-    """Zebra crosswalk + red bike crossing band + red/yellow waiting boxes."""
-    m.pose = (cx, 0.0, cz, yaw)
-    # Parallel red non-motorized crossing band alongside zebra stripes (itc_3.jpg & itc_5.jpg)
-    m.box(0.0, 0.024, -zebra_len / 2.0 - 0.85, road_w + 6.4, 0.024, 1.55, 'red_pave')
-    if m.detail:
-        n_stripes = int((road_w - 2.0) // 1.15)
-        for i in range(n_stripes):
-            sx = -road_w / 2.0 + 1.4 + i * 1.15
-            m.box(sx, 0.025, 0.0, 0.52, 0.026, zebra_len, 'white')
-
-        # Stop line behind crosswalk (+z in approach local coords)
-        m.box(0.0, 0.025, zebra_len / 2.0 + 1.4, road_w - 1.6, 0.024, 0.38, 'white')
-
-    # Terracotta-red & ochre-yellow non-motorized waiting boxes on approach flanks
-    for side in (-1, 1):
-        bx = side * (road_w / 2.0 + 2.4)
-        m.box(bx, 0.028, -0.2, 4.2, 0.028, 5.4, 'yellow_pave')
-        m.box(bx, 0.028, 6.4, 3.9, 0.028, 8.0, 'red_pave')
-        if m.detail:
-            m.box(bx, 0.057, 5.9, 0.26, 0.012, 2.2, 'white')
-            arrow = [
-                (bx, 0.069, 4.2),
-                (bx - 0.48, 0.069, 5.0),
-                (bx + 0.48, 0.069, 5.0),
-            ]
-            m.mesh(arrow, [[0, 1, 2]], 'white')
-    m.pose = (0.0, 0.0, 0.0, 0.0)
-
-
 def build_shizijie(m: Builder):
     m.surface = landmark_surface('shizijie')
     # ------------------------------------------------------------------
@@ -212,12 +182,6 @@ def build_shizijie(m: Builder):
     _guardrail_run(m, (7.8, 31.1), (14.0, 27.3))
     _guardrail_run(m, (-32.0, 19.9), (-29.8, 23.8))
     _guardrail_run(m, (24.3, -12.0), (28.9, -5.1))
-
-    # Colored red/yellow non-motorized waiting pavements & zebra crosswalks on 4 approaches
-    _colored_crosswalk_approach(m, 9.8, -32.0, yaw=math.atan2(-10.0, 32.0) + math.pi, road_w=23.0)
-    _colored_crosswalk_approach(m, -11.5, 34.0, yaw=math.atan2(-10.0, 32.0), road_w=23.0)
-    _colored_crosswalk_approach(m, -38.0, -7.8, yaw=math.atan2(-38.0, -7.8), road_w=22.0)
-    _colored_crosswalk_approach(m, 36.0, 8.2, yaw=math.atan2(36.0, 8.2), road_w=22.0)
 
     # Four cantilevered traffic signal gantries + blue direction signs
     _signal_gantry(m, 26.5, -27.5, yaw=math.atan2(-10.0, 32.0) + math.pi, span=8.8, sign_mode=0)

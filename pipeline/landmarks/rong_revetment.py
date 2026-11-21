@@ -68,6 +68,6 @@ def revetment(builder):
         if high <= low:
             raise ValueError('Upper sidewalk no longer above lower landing')
         bottom, crest = (lower[0],low,lower[1]), (upper[0],high,upper[1])
-        stairs(mesh, bottom, crest, 2.4, max(1,round((high-low)/.15)), 'granite')
+        stairs(mesh, bottom, crest, 2.4, max(1,round((high-low)/.15)), 'granite', landing=builder.parts['sidewalk'])
         if builder.collide:
             ramp(builder.hit, bottom, crest, 2.4)

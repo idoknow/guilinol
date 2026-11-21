@@ -316,7 +316,7 @@ def build_flanking_facades(model):
     model.box(13.0, -0.34, 2.0, 32.0, 0.39, 72.0, 'pave', True)
     model.pose = (16.2, 0.05, -6.0, 0.10)
     for kerb_x in (-6.8, 6.8):
-        model.box(kerb_x, 0.0, 0.0, 0.24, 0.06, 44.0, 'granite')
+        model.box(kerb_x, 0.0, 0.0, 0.24, 0.06, 44.0, 'curb')
     model.pose = (0, 0, 0, 0)
 
     # Distant 5-storey teaching wing with blue pitched roof at z = -42 (framing distant background of IMG_1378 & 1379!)

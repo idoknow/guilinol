@@ -73,7 +73,7 @@ def monument(model, station, lateral):
 def promenade(model, side):
     for station in range(-54, 53, 2):
         for row in range(4):
-            model.box(station, -.06, side * (13 + row * 2 + (.2 if row == 3 else 0)), 2, .22, 2.4 if row == 3 else 2, 'pave' if (station // 2 + row) % 2 else 'granite', True)
+            model.box(station, -.06, side * (13 + row * 2 + (.2 if row == 3 else 0)), 2, .22, 2.4 if row == 3 else 2, 'pave', True)
         model.box(station, 0.16, side * 20, 2, 1.0, 0.30, 'white', True)
         model.box(station, 1.16, side * 20, 2, 0.18, 0.42, 'stone')
         if station % 4 == 0:
@@ -136,7 +136,7 @@ def west_split_island(model):
     island_len = 20.5
     for idx, (sx, hw) in enumerate(((-9.4, 0.9), (-6.0, 1.65), (0.0, 2.05), (6.5, 1.85), (9.6, 1.15))):
         seg_l = 3.6 if idx in (0, 4) else 5.8
-        model.box(sx, -.08, 0, seg_l, .40, hw * 2, 'granite', True)
+        model.box(sx, -.08, 0, seg_l, .40, hw * 2, 'curb', True)
         model.box(sx, 0.32, 0, seg_l - 0.32, 0.42, hw * 2 - 0.36, 'green')
 
     # Rounded clipped shrubs inside the median island (IMG_1361 foreground!)

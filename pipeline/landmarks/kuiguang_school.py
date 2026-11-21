@@ -155,19 +155,6 @@ def school(model):
             if model.detail and wx in (-2.6, 2.2):
                 model.box(wx + 1.85, fy + 0.2, 5.97, 0.72, 0.52, 0.54, 'white')
 
-    # Yellow no-stopping crisscross box markings painted on Rongyin Rd asphalt in front of gate (IMG_1295 bottom!)
-    model.pose = (gcx, 0.0, gcz, gate_yaw)
-    for yz in (9.6, 13.2):
-        model.box(0.0, -0.02, yz, 14.0, 0.04, 0.18, 'yellow')
-    for diag in range(-5, 6, 3):
-        for sgn in (-1, 1):
-            p = [
-                (diag - sgn * 1.8, 0.02, 9.6),
-                (diag - sgn * 1.62, 0.02, 9.6),
-                (diag + sgn * 1.8, 0.02, 13.2),
-                (diag + sgn * 1.62, 0.02, 13.2),
-            ]
-            model.mesh(p, [[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]], 'yellow')
     model.pose = (0, 0, 0, 0)
 
     # =========================================================================
@@ -180,7 +167,7 @@ def school(model):
     # Continuous bluestone walkway extending all the way from inner gate (+22) to Boxue Lou (-126)
     model.box(0, -0.35, -52.0, 11.0, 0.38, 148.0, 'pave', True)
     for kerb_x in (-5.62, 5.62):
-        model.box(kerb_x, 0.03, -46.0, 0.24, 0.09, 124.0, 'granite')
+        model.box(kerb_x, 0.03, -46.0, 0.24, 0.09, 124.0, 'curb')
 
     # Right-hand (+lx) short red-brick pitched-eave corner end at entrance (occupying only ~8% right edge in IMG_1297!)
     model.box(5.85, -0.3, -0.2, 2.2, 2.85, 5.2, 'brick', True)

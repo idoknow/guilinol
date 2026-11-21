@@ -4,7 +4,7 @@ import math
 import numpy as np
 import shapely
 
-from landmarks.jiefang_layout import LOWER_ROADS, RAMPS, UPPER_ROADS, section
+from landmarks.jiefang_layout import LOWER_ROADS, RAMPS, UPPER_ROADS, lane_dividers, section, widths
 
 
 def native_contact(interval, outward, model_height, streets, reference):
@@ -104,14 +104,15 @@ def check_paint(entry, heights):
     rotation = np.array([[math.cos(angle),-math.sin(angle)],[math.sin(angle),math.cos(angle)]])
     origin = np.array(entry['position'])
     for way in RAMPS+UPPER_ROADS+LOWER_ROADS:
-        coords,_,stations,levels = section(way)
+        coords,normals,stations,levels = section(way)
         if way in UPPER_ROADS:
             coords = coords.copy()
             coords[np.argmax(coords[:,0]),0] = -139.9
-        for station in np.arange(.25,stations[-1],.5):
-            if station%7>=2.8: continue
-            local = np.array([np.interp(station,stations,column) for column in coords.T])
-            world = local@rotation + origin[::2]
-            expected = origin[1]+np.interp(station,stations,levels)+.015
-            found = any(abs(height-expected)<.05 for height in heights(shapely.Point(world)))
-            yield [way,*world.round(3),found]
+        for offset in lane_dividers(way,*widths(way)[:2]):
+            line=coords+normals*np.broadcast_to(offset,len(coords))[:,None]
+            for station in np.arange(.25,stations[-1],.5):
+                local = np.array([np.interp(station,stations,column) for column in line.T])
+                world = local@rotation + origin[::2]
+                expected = origin[1]+np.interp(station,stations,levels)+.035
+                found = any(abs(height-expected)<.05 for height in heights(shapely.Point(world)))
+                yield [way,*world.round(3),found]
