@@ -43,7 +43,7 @@
   "guilin_book_market-road-seam":{"landmark":"guilin_book_market","eye":[-418.0,174.5,106.52],"target":[-405,153.5,84]},
   "guilin_theater-road-seam":{"landmark":"guilin_theater","eye":[-66.67,171.6,187.59],"target":[-76.09,151.6,210.75]},
   "ronghu-steel-footbridge":{"landmark":"ronghu","eye":[-2067.97,167.49,229.33],"target":[-2081.97,150.49,209.33]},
-  "ronghu-yingbin-approach":{"landmark":"ronghu","eye":[-1549.87,168.29,55.13],"target":[-1567.87,151.29,67.13]},
-  "gunanmen-hall-steps":{"landmark":"gunanmen","eye":[-1348.36,172.3,17.8],"target":[-1368.36,155.3,9.8]},
+  "ronghu-yingbin-approach":{"landmark":"ronghu","eye":[-1577.37,169.29,83.58],"target":[-1567.87,151.29,67.13]},
+  "gunanmen-hall-steps":{"landmark":"gunanmen","eye":[-1351.91,173.3,19.3],"target":[-1368.36,155.3,9.8]},
   "guanyi-west-median":{"landmark":"guanyi_bridge","eye":[-1569.26,167.9,-427.42],"target":[-1558.67,150.9,-408.19]}
 }}
