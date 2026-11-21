@@ -78,18 +78,16 @@ PERIM = [
     (-10.01, -22.7), (-30.88, -30.99), (-25.54, -44.22), (-115.0, -79.76)
 ]
 
-# Exact building rings
+# Exact building rings (Note: way/683033674 and way/683033676 belong to adjacent guangxi_arts landmark)
 RING_B1 = [(-168.34, -28.89), (-157.16, -53.72), (-146.29, -48.89), (-157.48, -24.06)]
 RING_B2 = [(-89.89, 17.0), (-92.91, 25.14), (-125.98, 13.01), (-122.96, 4.87)]
 RING_B3 = [(-88.9, -37.47), (-58.88, -26.02), (-61.78, -18.51), (-91.8, -29.96)]
 RING_B4 = [(-142.66, -59.56), (-145.43, -51.98), (-109.08, -37.2), (-106.31, -44.76)]
-RING_B5 = [(-115.29, -72.53), (-87.29, -62.87), (-90.79, -52.85), (-118.79, -62.51)]
-RING_B6 = [(-58.37, -52.87), (-60.46, -46.89), (-89.32, -56.85), (-87.23, -62.84)]
-RING_B7 = [(-55.42, -51.82), (-30.01, -43.05), (-32.14, -37.0), (-57.53, -45.77)]
+RING_B5 = [(-55.42, -51.82), (-30.01, -43.05), (-32.14, -37.0), (-57.53, -45.77)]
 
 # Frontage building way/701820464: safely trimmed on east edge by 0.8m to prevent sidewalk collision
-RING_B8 = [(-1.2, -17.21), (-14.6, 13.82), (-0.46, 19.86), (11.5, -13.2), (6.17, -19.27), (4.27, -14.88)]
-RING_B9 = [(-51.51, -34.82), (-12.87, -21.52), (-19.35, -2.98), (-57.99, -16.28)]
+RING_B6 = [(-1.2, -17.21), (-14.6, 13.82), (-0.46, 19.86), (11.5, -13.2), (6.17, -19.27), (4.27, -14.88)]
+RING_B7 = [(-51.51, -34.82), (-12.87, -21.52), (-19.35, -2.98), (-57.99, -16.28)]
 
 # Sports Courts (OSM way/683033679..682)
 COURTS = [
@@ -162,34 +160,10 @@ def build_kuiguang(b: SchoolBuilder):
         parapet_reg='wall_accent',
     )
 
-    # B5 (way/683033674, 4F)
+    # B5 (way/683033675, 3F)
     b.footprint_building(
         RING_B5,
-        bid='B5_east1',
-        source_id='way/683033674',
-        floors=4,
-        floor_h=3.35,
-        roof='flat_rail',
-        wall_reg='wall_main',
-        base_reg='wall_base',
-    )
-
-    # B6 (way/683033676, 4F)
-    b.footprint_building(
-        RING_B6,
-        bid='B6_east2',
-        source_id='way/683033676',
-        floors=4,
-        floor_h=3.35,
-        roof='flat_rail',
-        wall_reg='wall_main',
-        base_reg='wall_base',
-    )
-
-    # B7 (way/683033675, 3F)
-    b.footprint_building(
-        RING_B7,
-        bid='B7_aux',
+        bid='B5_aux',
         source_id='way/683033675',
         floors=3,
         floor_h=3.35,
@@ -198,10 +172,10 @@ def build_kuiguang(b: SchoolBuilder):
         base_reg='wall_base',
     )
 
-    # B8 (way/701820464, 5F, coral-pink facade, Rock IMG_1295)
+    # B6 (way/701820464, 5F, coral-pink facade, Rock IMG_1295)
     b.footprint_building(
-        RING_B8,
-        bid='B8_front',
+        RING_B6,
+        bid='B6_front',
         source_id='way/701820464',
         floors=5,
         floor_h=3.45,
@@ -211,10 +185,10 @@ def build_kuiguang(b: SchoolBuilder):
         parapet_reg='wall_accent',
     )
 
-    # B9 (way/683033677, 2F)
+    # B7 (way/683033677, 2F)
     b.footprint_building(
-        RING_B9,
-        bid='B9_annex',
+        RING_B7,
+        bid='B7_annex',
         source_id='way/683033677',
         floors=2,
         floor_h=3.35,
@@ -280,8 +254,8 @@ def build_kuiguang(b: SchoolBuilder):
     b.retractable_gate(gate_w, gate_h=2.0, y0=gy, iron_grille=True)
     b.pose = old_p
 
-    # Perimeter fence along boundary
-    b.perimeter_fence(PERIM, gate_edge=9, gate_t0=0.0, gate_t1=1.0)
+    # Perimeter fence along boundary (skip edges 0, 13, 14 shared with guangxi_arts buildings)
+    b.perimeter_fence(PERIM, gate_edge=9, gate_t0=0.0, gate_t1=1.0, skip_edges={0, 13, 14})
 
 
 if __name__ == '__main__':
