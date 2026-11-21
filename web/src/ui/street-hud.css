@@ -1,0 +1,127 @@
+/* 第二期「桂林街头」HUD skin (docs/style.md 第二期 · HUD). Active when body[data-hud=street].
+   Materials: 沥青 (asphalt) panels for things you operate, bare outlined type for numbers you glance at,
+   路名牌蓝 for street names. Accents: 桂花金 = money, 漓江青 = route / mission, 警红 + 警蓝 = police only.
+   One sans family, heavy weight; digits tabular. No serif, no rice paper, no seals in the game HUD. */
+:root{
+  --st-sans:"PingFang SC","HarmonyOS Sans SC","Noto Sans CJK SC","Source Han Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  --st-num:"Bahnschrift","DIN Alternate","Roboto Condensed","Arial Narrow",var(--st-sans);
+  --st-asphalt:rgba(14,17,21,.74);--st-asphalt-solid:#121519;--st-line:rgba(255,255,255,.16);
+  --st-white:#f6f4ef;--st-dim:rgba(246,244,239,.66);
+  --st-gold:#ffc53d;--st-jade:#20d6c1;--st-red:#ff3d4f;--st-blue:#2f7dff;--st-sign:#1d4f9e;
+  --st-shadow:0 2px 0 rgba(0,0,0,.55),0 0 10px rgba(0,0,0,.45);
+}
+body[data-hud=street]{font-family:var(--st-sans)}
+body[data-hud=street] :is(.sky-ui,.dock-buttons,.btn-mode,.hint,output){display:none!important}
+body[data-hud=street] footer{font:10px/1.4 var(--st-sans);background:none;opacity:.5;text-shadow:var(--st-shadow);left:auto;right:12px;bottom:6px}
+.st-hud{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:6;color:var(--st-white);font-family:var(--st-sans);user-select:none;-webkit-user-select:none}
+.st-hud button{pointer-events:auto;font-family:inherit}
+.st-hud kbd{display:inline-grid;place-items:center;min-width:1.7em;height:1.7em;padding:0 .35em;box-sizing:border-box;border-radius:5px;
+  font:700 11px/1 var(--st-num);color:var(--st-asphalt-solid);background:var(--st-white);box-shadow:0 2px 0 rgba(0,0,0,.4)}
+
+/* 左上：菜单 / 账号 → 沥青小方块 */
+body[data-hud=street] :is(.btn-menu,.account-entry){font-family:var(--st-sans);font-weight:600;letter-spacing:.04em;background:var(--st-asphalt);
+  border:1px solid var(--st-line);border-radius:10px;height:36px}
+body[data-hud=street] .account-entry::before{background:var(--st-jade);color:var(--st-asphalt-solid)}
+
+/* 右上：钱 + 追捕灯 */
+.st-cash{position:absolute;right:calc(22px + env(safe-area-inset-right));top:calc(14px + env(safe-area-inset-top));display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.st-money{font:700 36px/1 var(--st-num);font-variant-numeric:tabular-nums;letter-spacing:.01em;color:var(--st-gold);
+  -webkit-text-stroke:1.5px rgba(10,10,10,.85);paint-order:stroke fill;text-shadow:var(--st-shadow)}
+.st-wanted{display:flex;gap:5px}
+.st-wanted i{width:24px;height:11px;border-radius:3px;background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28),0 1px 0 rgba(0,0,0,.5)}
+.st-wanted i.on:nth-child(odd){background:var(--st-red);box-shadow:0 0 10px var(--st-red),inset 0 0 0 1px rgba(255,255,255,.5);animation:st-siren .9s steps(1) infinite}
+.st-wanted i.on:nth-child(even){background:var(--st-blue);box-shadow:0 0 10px var(--st-blue),inset 0 0 0 1px rgba(255,255,255,.5);animation:st-siren .9s steps(1) infinite .45s}
+.st-wanted[data-level="0"]{opacity:.55}
+@keyframes st-siren{50%{filter:brightness(.55)}}
+.st-phone-btn{position:absolute;right:calc(22px + env(safe-area-inset-right));top:calc(84px + env(safe-area-inset-top));display:flex;align-items:center;gap:7px;height:34px;padding:0 8px 0 10px;
+  border-radius:10px;border:1px solid var(--st-line);background:var(--st-asphalt);color:var(--st-white);font-size:13px;font-weight:600;cursor:pointer;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.st-phone-btn i{width:11px;height:17px;border:2px solid currentColor;border-radius:3px;box-sizing:border-box;position:relative}
+.st-phone-btn i::after{content:"";position:absolute;left:50%;bottom:1px;width:3px;height:1.5px;margin-left:-1.5px;background:currentColor}
+
+/* 左下：小地图（play/map.ts 画的同一张图，换街头色板）+ 路名牌 */
+body[data-hud=street] .minimap{position:fixed;left:calc(22px + env(safe-area-inset-left));bottom:calc(24px + env(safe-area-inset-bottom));width:192px;height:192px;
+  background:#1b1f25;border:4px solid rgba(246,244,239,.92);box-shadow:0 0 0 1px rgba(0,0,0,.6),0 8px 24px rgba(0,0,0,.45)}
+body[data-hud=street] .minimap::after{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 18px rgba(0,0,0,.55);pointer-events:none}
+body[data-hud=street] .minimap i{top:3px;font:800 10px/1 var(--st-sans);color:var(--st-asphalt-solid);background:var(--st-white);border-radius:4px;padding:2px 4px}
+body[data-hud=street] .road-name{position:fixed;left:calc(226px + env(safe-area-inset-left));bottom:calc(30px + env(safe-area-inset-bottom));max-width:240px;
+  font:700 15px/1 var(--st-sans);letter-spacing:.14em;color:#fff;background:var(--st-sign);backdrop-filter:none;border-radius:4px;padding:8px 12px 8px 14px;
+  box-shadow:inset 0 0 0 2px var(--st-sign),inset 0 0 0 3.5px rgba(255,255,255,.9),0 3px 10px rgba(0,0,0,.4)}
+.st-clock{position:absolute;left:calc(226px + env(safe-area-inset-left));bottom:calc(72px + env(safe-area-inset-bottom));font:700 14px/1 var(--st-num);letter-spacing:.06em;
+  text-shadow:var(--st-shadow)}
+
+/* 底部居中：任务条 + 字幕 */
+.st-mission{position:absolute;left:50%;bottom:calc(30px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(640px,max(420px,calc(100vw - 560px)),calc(100vw - 24px));
+  display:flex;flex-direction:column;align-items:center;gap:8px}
+.st-mission header{display:flex;align-items:center;gap:10px;padding:6px 8px 6px 6px;border-radius:10px;background:var(--st-asphalt);border:1px solid var(--st-line);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.st-line{font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--st-asphalt-solid);background:var(--st-jade);border-radius:6px;padding:5px 8px}
+.st-step{font-size:15px;font-weight:700;letter-spacing:.04em}
+.st-timer{font:700 17px/1 var(--st-num);font-variant-numeric:tabular-nums;color:var(--st-white);padding-left:10px;border-left:1px solid var(--st-line)}
+.st-timer.low{color:var(--st-red)}
+.st-meter{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;text-shadow:var(--st-shadow)}
+.st-meter i{width:150px;height:7px;border-radius:4px;background:rgba(255,255,255,.2);box-shadow:0 1px 0 rgba(0,0,0,.5);overflow:hidden}
+.st-meter em{display:block;height:100%;background:linear-gradient(90deg,#ffb547,#ffd77a);border-radius:4px}
+.st-sub{margin:0;font-size:17px;font-weight:600;line-height:1.45;text-align:center;letter-spacing:.03em;text-shadow:var(--st-shadow)}
+.st-sub b{color:var(--st-gold);margin-right:.5em}
+
+/* 右下：速度表 */
+.st-speed{position:absolute;right:calc(26px + env(safe-area-inset-right));bottom:calc(26px + env(safe-area-inset-bottom));display:grid;grid-template-columns:auto auto;align-items:end;
+  column-gap:6px;row-gap:4px;text-shadow:var(--st-shadow)}
+.st-speed b{grid-row:span 2;font:700 64px/.8 var(--st-num);font-variant-numeric:tabular-nums;-webkit-text-stroke:1.5px rgba(10,10,10,.8);paint-order:stroke fill}
+.st-speed small{font:700 13px/1 var(--st-num);color:var(--st-dim)}
+.st-gear{font:800 15px/1 var(--st-num);color:var(--st-jade)}
+.st-gear:empty{display:none}
+.st-ride{grid-column:1 / -1;justify-self:end;font-style:normal;font-size:12px;font-weight:700;letter-spacing:.1em;color:var(--st-dim)}
+.st-damage{grid-column:1 / -1;width:100%;height:4px;border-radius:2px;background:rgba(255,255,255,.18);overflow:hidden}
+.st-damage s{display:block;height:100%;background:var(--st-white);text-decoration:none}
+
+/* 交互提示、安静区 */
+.st-prompt{position:absolute;left:50%;top:62%;transform:translateX(-50%);display:flex;align-items:center;gap:9px;padding:7px 14px 7px 8px;border-radius:10px;
+  background:var(--st-asphalt);border:1px solid var(--st-line);font-size:15px;font-weight:700}
+.st-prompt kbd{font-size:13px;height:1.9em;min-width:1.9em;background:var(--st-gold)}
+.st-quiet{position:absolute;left:50%;top:calc(16px + env(safe-area-inset-top));transform:translateX(-50%);font-size:13px;font-weight:700;letter-spacing:.06em;
+  padding:6px 12px;border-radius:8px;background:rgba(32,214,193,.18);border:1px solid rgba(32,214,193,.5)}
+
+/* 手机 = 菜单 */
+.st-phone{position:absolute;right:calc(36px + env(safe-area-inset-right));top:50%;transform:translateY(-50%) rotate(-2deg);pointer-events:auto;
+  width:300px;height:610px;padding:12px;box-sizing:border-box;border-radius:44px;background:#0b0d10;box-shadow:inset 0 0 0 2px #3a3f47,0 30px 60px rgba(0,0,0,.55)}
+.st-phone-body{height:100%;border-radius:34px;overflow:hidden;display:flex;flex-direction:column;gap:14px;padding:16px 16px 14px;box-sizing:border-box;
+  background:radial-gradient(120% 70% at 20% 0%,#2a3d5c 0%,transparent 60%),radial-gradient(90% 60% at 100% 100%,#4a1f45 0%,transparent 70%),#14161c}
+.st-phone header{display:flex;justify-content:space-between;font:700 12px/1 var(--st-num);color:var(--st-dim)}
+.st-phone-cash{display:flex;flex-direction:column;gap:4px;padding:4px 2px}
+.st-phone-cash small{font-size:11px;color:var(--st-dim);letter-spacing:.1em}
+.st-phone-cash b{font:700 30px/1 var(--st-num);color:var(--st-gold)}
+.st-apps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:16px 8px}
+.st-apps button{width:100%;display:flex;flex-direction:column;align-items:center;gap:7px;background:none;border:0;color:var(--st-white);font-size:12px;font-weight:600;cursor:pointer}
+.st-apps i{width:58px;height:58px;border-radius:17px;display:grid;place-items:center;font-style:normal;font-size:24px;font-weight:800;color:#101216;
+  background:linear-gradient(155deg,color-mix(in srgb,var(--tint) 100%,#fff 25%),var(--tint));box-shadow:0 6px 14px rgba(0,0,0,.35),inset 0 -2px 0 rgba(0,0,0,.18)}
+.st-radio{margin-top:auto;display:flex;gap:10px;align-items:center;padding:10px;border-radius:16px;background:rgba(255,255,255,.07)}
+.st-radio i{flex:none;width:40px;height:40px;border-radius:10px;background:conic-gradient(from 200deg,#ff5d8f,#ffc53d,#20d6c1,#ff5d8f)}
+.st-radio p{margin:0;display:flex;flex-direction:column;gap:3px;min-width:0}
+.st-radio b{font-size:13px}.st-radio span{font-size:11px;color:var(--st-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-phone footer{text-align:center;font-size:11px;color:var(--st-dim)}
+
+/* 手机端：摇杆、按钮换沥青；地图挪到左上菜单下面 */
+body[data-hud=street] .joystick{background:radial-gradient(circle,rgba(14,17,21,.2) 0 55%,rgba(14,17,21,.5) 56% 100%);border:2px solid rgba(246,244,239,.4)}
+body[data-hud=street] .joystick.running::after{border-color:rgba(32,214,193,.85)}
+body[data-hud=street] .joystick-knob{background:var(--st-white)}
+body[data-hud=street] :is(.btn-jump,.btn-view){font-family:var(--st-sans);font-weight:800;background:var(--st-asphalt);border:2px solid rgba(246,244,239,.4)}
+body[data-hud=street] .btn-jump{font-size:0}body[data-hud=street] .btn-jump::after{content:"跳";font-size:22px}
+body[data-hud=street] .btn-view{font-size:0}body[data-hud=street] .btn-view::after{content:"视角";font-size:13px}
+@media (pointer:coarse),(max-width:560px){
+  .st-cash{right:calc(12px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));gap:5px}
+  .st-money{font-size:28px}.st-wanted i{width:18px;height:9px}.st-wanted{gap:4px}
+  .st-phone-btn{right:calc(12px + env(safe-area-inset-right));top:calc(66px + env(safe-area-inset-top));height:32px}
+  .st-phone-btn kbd{display:none}
+  body[data-hud=street] .minimap{left:calc(12px + env(safe-area-inset-left));top:calc(58px + env(safe-area-inset-top));bottom:auto;width:112px;height:112px;border-width:3px}
+  body[data-hud=street] .road-name{left:calc(12px + env(safe-area-inset-left));top:calc(180px + env(safe-area-inset-top));bottom:auto;font-size:12px;padding:6px 10px;max-width:150px}
+  .st-clock{display:none}
+  .st-mission{width:calc(100vw - 24px);min-width:0;bottom:calc(178px + env(safe-area-inset-bottom))}
+  .st-step{font-size:13px}.st-sub{font-size:14px}.st-meter i{width:120px}
+  .st-speed{right:calc(14px + env(safe-area-inset-right));top:calc(112px + env(safe-area-inset-top));bottom:auto}
+  .st-speed b{font-size:44px}
+  .st-prompt{top:auto;bottom:calc(270px + env(safe-area-inset-bottom))}
+  .st-phone{left:50%;right:auto;top:50%;transform:translate(-50%,-50%);width:min(300px,86vw);height:min(600px,80vh)}
+  body[data-hud=street] footer{display:none}
+}
