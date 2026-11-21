@@ -1,3 +1,4 @@
+import {record} from './telemetry'
 import * as THREE from 'three'
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js'
@@ -110,6 +111,7 @@ export function landmarkStream(
     if(loaded.has(entry)||pending.has(entry))return
     pending.add(entry)
     if(isPriority)priorityPending.add(entry)
+    if(retry.has(entry))record('retry',{category:'landmark'})
     loaderReady.then(loader=>loader.loadAsync('./'+entry.file)).then(({scene:group,parser})=>{
       group.position.fromArray(entry.position);group.rotation.y=THREE.MathUtils.degToRad(entry.rotation)
       const surfaces:Record<string,string>=(seamConfig.surfaces as Record<string,Record<string,string>>)[entry.id]??{}
@@ -152,8 +154,8 @@ export function landmarkStream(
         if(asset instanceof THREE.Material)fadeMaterial(asset,coverage)
       }
       batchRepeatedMeshes(group)
-      scene.add(group);group.updateMatrixWorld(true);loaded.set(entry,group)
-    }).catch(error=>{console.warn(entry.id,error);retry.set(entry,performance.now()+30000)}).finally(()=>{
+      scene.add(group);group.updateMatrixWorld(true);loaded.set(entry,group);retry.delete(entry)
+    }).catch(error=>{record('failure',{category:'landmark'});console.warn(entry.id,error);retry.set(entry,performance.now()+30000)}).finally(()=>{
       pending.delete(entry);priorityPending.delete(entry)
     })
   }

@@ -1,4 +1,4 @@
-import {record} from './telemetry'
+import {fault,record} from './telemetry'
 import * as THREE from 'three'
 import {ChunkBatcher} from './batch'
 import {Forest} from './forest'
@@ -120,6 +120,7 @@ export class Stream {
 
   private enqueue(tile:Tile, inner:boolean){
     const controller = new AbortController()
+    if(this.failures.has(tile))record('retry',{category:'chunk'})
     this.pending.set(tile,controller)
     if(inner) this.innerPending.add(tile)
     const start=performance.now()
@@ -129,7 +130,7 @@ export class Stream {
       this.loaded.set(tile,item);this.visited.add(tile);this.failures.delete(tile)
       record('chunk',{ms:performance.now()-start,grid:Math.floor(tile.x/250)+','+Math.floor(tile.z/250)})
     }).catch(error=>{
-      if(!controller.signal.aborted){console.error(tile.file,error);this.failures.set(tile,performance.now()+10000)}
+      if(!controller.signal.aborted){record('failure',{category:'chunk'});fault('chunk','',0,error);console.error(tile.file,error);this.failures.set(tile,performance.now()+10000)}
     }).finally(()=>{
       this.pending.delete(tile)
       this.innerPending.delete(tile)

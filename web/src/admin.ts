@@ -1,4 +1,4 @@
-import { edges, labels, viewToken } from '../../lib/feedback-contract'
+import { labels, viewToken } from '../../lib/feedback-contract'
 import './admin.css'
 
 const main = document.querySelector('main')!,
@@ -109,6 +109,7 @@ function filters(users: boolean) {
   query.value = params.get('q') || ''
   queryLabel.append(query)
   form.append(queryLabel)
+  if(users){const role=el('select');role.name='role';role.append(option('','所有角色'),option('admin','管理员'),option('user','用户'));role.value=params.get('role')??'';form.append(role)}
   if (!users) {
     const status = el('select')
     status.name = 'status'
@@ -164,7 +165,10 @@ async function list(users: boolean) {
         user.email,
         user.nickname,
         user.verified ? '已验证' : '未验证',
-        user.role,
+        (()=>{const button=el('button',user.role==='admin'?'取消管理员':'设为管理员')
+          button.disabled=!user.verified
+          button.onclick=async()=>{try{await api('admin/users/'+encodeURIComponent(user.id)+'/role',{role:user.role==='admin'?'user':'admin'});location.reload()}catch(error){failure(error)}}
+          const cell=el('span',user.role+' ');cell.append(button);return cell})(),
         date(user.created_at),
         link(String(user.feedback_count), `?view=feedback&user=${encodeURIComponent(user.id)}`),
         date(user.last_submitted_at),
@@ -253,8 +257,9 @@ async function detail(id: string) {
   }
   main.append(events)
   if(!['draft','live','rejected','duplicate'].includes(item.status)){const input=el('textarea'),send=el('button','以管理员身份回复'),box=el('div');box.className='adm-compose';input.maxLength=1000;input.rows=3;input.placeholder='回复提交人（会同时发邮件提醒）';input.setAttribute('aria-label','管理员回复内容');box.append(input,send);main.append(box);send.onclick=async()=>{try{await api(path+'/messages',{body:input.value});location.reload()}catch(error){failure(error)}}}
-  if(['submitted','need_info'].includes(item.status)){const start=el('button','发起 AI 制作'),gate=el('div');start.className='adm-primary';gate.className='adm-gate';gate.append(el('p','确认信息足够后发起制作，协调人会收到开工通知。'),start);main.append(gate);start.onclick=async()=>{try{await api(path+'/status',{status:'approved'});location.reload()}catch(error){failure(error)}}}
-  if (!edges[item.status]) return
+  if(item.allowed_transitions.some((t:{status:string})=>t.status==='approved')){const start=el('button','发起 AI 制作'),gate=el('div');start.className='adm-primary';gate.className='adm-gate';gate.append(el('p','确认信息足够后发起制作，协调人会收到开工通知。'),start);main.append(gate);start.onclick=async()=>{try{await api(path+'/status',{status:'approved'});location.reload()}catch(error){failure(error)}}}
+  const transitions=item.allowed_transitions.filter((t:{status:string})=>t.status!=='approved') as {status:string;label:string;needs_message:boolean}[]
+  if (!transitions.length) return
   const form = el('form'),
     select = el('select'),
     statusLabel = el('label', '新状态 '),
@@ -263,7 +268,9 @@ async function detail(id: string) {
     button = el('button', '保存状态')
   message.required = true
   message.maxLength = 2000
-  for (const key of edges[item.status].filter(key=>!['approved','queued'].includes(key))) select.append(option(key, labels[key]));if(!select.length)return
+  for (const t of transitions) select.append(option(t.status,t.label))
+  select.onchange=()=>{message.required=transitions[select.selectedIndex].needs_message}
+  message.required=transitions[0].needs_message
   statusLabel.append(select)
   messageLabel.append(message)
   form.className = 'adm-status-form'
@@ -287,7 +294,11 @@ async function start() {
   nav.append(' · ',link('性能遥测','?view=perf'),' · ', link('统计与用户', '?view=users'), ' · ', link('反馈列表', '?view=feedback'))
   main.replaceChildren()
   const id = params.get('id')
-  if(params.get('view')==='perf') main.append(el('pre',JSON.stringify(await api('admin/perf?group=device'),null,2)))
+  const views={overview:'概览',timeseries:'时间序列',breakdown:'维度',funnel:'漏斗',errors:'错误',live:'实时',audit:'审计'}
+  for(const [key,label] of Object.entries(views))nav.append(' · ',link(label,'?view='+key))
+  const view=params.get('view')??''
+  if(Object.hasOwn(views,view))main.append(el('pre',JSON.stringify(await api('admin/'+view+'?'+params),null,2)))
+  else if(params.get('view')==='perf') main.append(el('pre',JSON.stringify(await api('admin/perf?group=device'),null,2)))
   else if (id) await detail(id)
   else await list(params.get('view') !== 'feedback')
 }

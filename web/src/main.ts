@@ -37,7 +37,11 @@ async function start() {
   setFogMetrics(initialMetrics)
 
   bootProgress('载入地形', 12)
-  const manifestBytes = await fetchAsset('manifest.json')
+  const manifestBytes = await fetchAsset('manifest.json').catch(()=>{
+    record('failure',{category:'manifest'})
+    record('retry',{category:'manifest'})
+    return fetchAsset('manifest.json').catch(error=>{record('failure',{category:'manifest'});throw error})
+  })
   identifyWorld(manifestBytes)
   const manifest:Manifest = JSON.parse(new TextDecoder().decode(manifestBytes))
   if(manifest.version!==4 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
@@ -144,7 +148,14 @@ async function start() {
     if(switching)return false
     switching=true
     const start=performance.now()
-    try{primeLanding(x,z);await loadWalker();if(walker!.active)walker!.leave();return await walker!.enter(x,z,yaw,reason)}finally{operation('teleport',start);switching=false;showMode()}
+    let completed=false
+    try{
+      primeLanding(x,z)
+      const player=await loadWalker()
+      if(player.active)player.leave()
+      completed=await player.enter(x,z,yaw,reason)
+      return completed
+    }finally{operation('teleport',start,completed);switching=false;showMode()}
   }
   async function toggle(initial=false){
     if(switching)return
@@ -270,8 +281,11 @@ async function start() {
     setView:async(view)=>(await import('./play/feedback-view')).setView(host,view),
     fly(){if(walker?.active)walker.leave();showMode()},get cinema(){return cinema},set cinema(on){cinema=on}}
   let tour:Awaited<ReturnType<typeof import('./play').play>>|undefined
-  const sampleFrame=instrument(renderer,()=>({mode:tour?.map?.active?'map':paused?'menu':walker?.active?(walker.vehicle==='foot'?'walk':'drive'):'fly',
-    x:camera.position.x,z:camera.position.z,chunks:stream.loaded.size}))
+  const sampleFrame=instrument(renderer,()=>{
+    const mode=tour?.map?.active?'map':paused?'menu':walker?.active?(walker.vehicle==='foot'?'walk':'drive'):'fly'
+    const position=walker && (mode==='walk'||mode==='drive')?walker.position:camera.position
+    return {mode,x:position.x,z:position.z,chunks:stream.loaded.size}
+  })
   let playable=false
   function animate(now:number){
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
