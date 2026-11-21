@@ -68,14 +68,16 @@ function facts(part,type,metric){
 export async function sessionTotals(pool,part){
   const {sql,args}=facts(part,'sessions')
   args.push(part.end)
-  const {rows}=await pool.query(`WITH facts AS (${sql}), visits AS (
-    SELECT session,vid,bool_or(is_new) AS is_new,bool_or(is_returning) AS is_returning,bool_or(failed) AS failed,
-      max(duration) AS duration,sum(lost) AS lost,max(seen) AS seen FROM facts GROUP BY session,vid)
-    SELECT count(distinct session) AS sessions,count(distinct vid) AS visitors,count(distinct vid) filter(where is_new) AS "newVisitors",
-      count(distinct vid) filter(where is_returning)::float/nullif(count(distinct vid),0) AS "returnRate",
-      count(distinct session) filter(where failed)::float/nullif(count(distinct session),0) AS "errorRate",
-      coalesce(sum(lost),0) AS "contextLost",count(distinct session) filter(where seen>=$${args.length}::timestamptz-interval '5 minutes') AS online,
-      avg(duration) AS "durationAvg",percentile_cont(.5) within group(order by duration) AS "durationP50" FROM visits`,args)
+  const {rows}=await pool.query(`WITH facts AS MATERIALIZED (${sql}), visits AS (
+    SELECT session,bool_or(failed) AS failed,max(duration) AS duration,sum(lost) AS lost,max(seen) AS seen
+    FROM facts GROUP BY session), visitors AS (
+    SELECT vid::uuid,bool_or(is_new) AS is_new,bool_or(is_returning) AS is_returning
+    FROM facts WHERE vid IS NOT NULL GROUP BY vid::uuid)
+    SELECT * FROM (SELECT count(*) AS sessions,avg(failed::int)::float AS "errorRate",coalesce(sum(lost),0) AS "contextLost",
+      count(*) filter(where seen>=$${args.length}::timestamptz-interval '5 minutes') AS online,
+      avg(duration) AS "durationAvg",percentile_cont(.5) within group(order by duration) AS "durationP50" FROM visits) s
+    CROSS JOIN (SELECT count(*) AS visitors,count(*) filter(where is_new) AS "newVisitors",
+      avg(coalesce(is_returning,false)::int)::float AS "returnRate" FROM visitors) v`,args)
   return rows[0]
 }
 

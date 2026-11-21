@@ -79,4 +79,4 @@ overview 和 timeseries 的 KPI 为 online、visitors、newVisitors、returnRate
 
 加载失败和重试计数可在 timeseries 用 failure.chunk、failure.landmark、failure.manifest、retry.chunk、retry.landmark、retry.manifest 查询。会话各累计字段的性能分布可用 session.<字段>.p50 或 .p95。WebGL 能力字段在浏览器上下文内。确认开始 AI 制作仍写 approved，桥接脚本中继后写 queued。
 
-服务端自动回填已结束 UTC 日的 perf_session_day、perf_value_day；同一日的标记与摘要在一个事务中提交。概览、按设备/地区拆分及按日的 fps、playable、chunk 使用会话去重和按数值计数的分布做精确线性分位插值。半天区间、未完成回填的天以及其他维度查询原始事件。90 天的对照区间可能早于原始数据保留期。查看 500 万行 HTTP 验收的实测响应、时延和 PostgreSQL EXPLAIN 可运行 `node --import tsx scripts/analytics-bench.mjs plans.json`，需要与 verify:telemetry 相同的临时 PostgreSQL 环境。
+003 迁移会从既有服务端分钟记录的 routes 自动计算请求总数和 5xx 总数。服务端自动回填已结束 UTC 日的 perf_session_day、perf_value_day；同一日的标记与摘要在一个事务中提交。概览、按设备/地区拆分及按日的 fps、playable、chunk 使用会话去重和按数值计数的分布做精确线性分位插值。半天区间、未完成回填的天以及其他维度查询原始事件。90 天的对照区间可能早于原始数据保留期。查看 500 万行 HTTP 验收的实测响应、时延和 PostgreSQL EXPLAIN 可运行 `node --import tsx scripts/analytics-bench.mjs plans.json`，需要与 verify:telemetry 相同的临时 PostgreSQL 环境。

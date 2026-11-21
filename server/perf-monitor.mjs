@@ -61,7 +61,7 @@ export function monitor(pool){
       const [load,memoryCurrent,cpuStat,web]=await Promise.all([read('/proc/loadavg'),read('/sys/fs/cgroup/memory.current'),read('/sys/fs/cgroup/cpu.stat'),nginx()])
       Object.assign(sample,{load:load?.trim().split(/\s+/).slice(0,3).map(Number),cgroupMemory:memoryCurrent?Number(memoryCurrent):null,
         cgroupCpuUsec:cpuStat?Number(/^usage_usec (\d+)/m.exec(cpuStat)?.[1]):null,nginx:web})
-      await pool.query("INSERT INTO perf_server VALUES(date_trunc('minute',$1::timestamptz),$2)",[stamp,sample])
+      await pool.query("INSERT INTO perf_server(minute,sample) VALUES(date_trunc('minute',$1::timestamptz),$2)",[stamp,sample])
       const today=new Date(stamp.getTime()-300000).toISOString().slice(0,10)
       if(today!==day){await summarizeDays(pool);await rollup(pool);day=today}
     }catch(error){console.error('telemetry minute write failed',error.code??error.name)}finally{busy=false}

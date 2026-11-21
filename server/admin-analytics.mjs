@@ -44,7 +44,7 @@ export async function analytics(pool,path,params){
     const people=await rows(`WITH latest AS (SELECT DISTINCT ON(session) mode,region FROM perf_event
       WHERE received>=now()-interval '5 minutes' AND kind<>'probe' ORDER BY session,received DESC,batch_position DESC)
       SELECT mode,region,grouping(mode,region) AS level,count(*) AS n FROM latest GROUP BY GROUPING SETS ((),(mode),(region))`,[])
-    const server=await rows(`SELECT minute,sample,(SELECT coalesce(sum((r->>'count')::int),0) FROM jsonb_array_elements(sample->'routes') r WHERE (r->>'status')::int>=500) AS errors5xx FROM perf_server WHERE minute>=date_trunc('minute',now())-interval '1 minute' ORDER BY minute DESC LIMIT 1`,[])
+    const server=await rows(`SELECT minute,sample,errors5xx FROM perf_server WHERE minute>=date_trunc('minute',now())-interval '1 minute' ORDER BY minute DESC LIMIT 1`,[])
     return json({online:people.find(r=>r.level===3).n,modes:people.filter(r=>r.level===1),regions:people.filter(r=>r.level===2),server:server[0]??null})
   }
   if(path==='admin/errors')return json(await rows(`SELECT fields->>'errorKind' AS kind,fields->>'signature' AS signature,build,
@@ -120,8 +120,8 @@ export async function analytics(pool,path,params){
   }
   for(const key of names.filter(k=>Object.hasOwn(global,k))){
     const [table,col]=global[key],server=key==='api5xxRate',stamp=server?col:`to_timestamp(${col})`
-    const expr=server?`sum(CASE WHEN (r->>'status')::int>=500 THEN (r->>'count')::int ELSE 0 END)::float/nullif(sum((r->>'count')::int),0)`:'count(*)'
-    const data=await rows(`SELECT ${time(stamp)} t,${expr} value,${server?"sum((r->>'count')::bigint)::bigint":'count(*)'} samples FROM ${table} ${server?"CROSS JOIN LATERAL jsonb_array_elements(sample->'routes') r":''}
+    const expr=server?`sum(errors5xx)::float/nullif(sum(requests),0)`:'count(*)'
+    const data=await rows(`SELECT ${time(stamp)} t,${expr} value,${server?'sum(requests)::bigint':'count(*)'} samples FROM ${table}
       WHERE ${stamp}>=$1 AND ${stamp}<$2 GROUP BY 1 ORDER BY 1`,values)
     result.push(...data.map(row=>({...row,key,...(group?{group:'unknown'}:{})})))
   }
