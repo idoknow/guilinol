@@ -4,7 +4,7 @@ import shapely
 
 from common import load_osm
 from features import points
-from landmarks.jiefang_layout import SPAN_WAYS
+from landmarks.jiefang_layout import LOWER_ROADS, SPAN_WAYS, widths
 from sections import section_layers
 
 
@@ -32,8 +32,11 @@ def lower_paths(roads, slab):
         if not any(level(way['tags'])<upper and road.line.crosses(axis) and nodes.isdisjoint(way['nodes']) for axis,upper,nodes in spans): continue
         zone = road.line.buffer(road.width/2+max(road.left,road.right)+2) if road.way==682893309 else portal_zone
         add(0,road.pavement)
+        modeled = widths(road.way)[:2] if road.way in LOWER_ROADS else None
         for lane in range(1,road.lanes):
-            add(2,road.line.offset_curve(road.width*(lane/road.lanes-.5)).buffer(.09,quad_segs=1))
+            offset = road.width*(lane/road.lanes-.5)
+            if modeled and modeled[0] <= offset <= modeled[1]: continue
+            add(2,road.line.offset_curve(offset).buffer(.09,quad_segs=1))
         if road.section:
             for kind,tree in zip((1,4,5,6),section_layers([road])):
                 add(kind,shapely.union_all(tree.geometries))

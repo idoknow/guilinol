@@ -17,7 +17,7 @@ from shapely.geometry import box, Point
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem, load_osm
 from features import building_mesh, buildings, game_court, ground_features, points, polygons, raw_overture_footprints, rongyin_sidewalk
 from karst import generate
-from landmarks.jiefang_layout import bank_paving, grade_banks
+from landmarks.jiefang_layout import bank_paving, grade_banks, grade_binjiang_streets
 from bridges import bridge_tiles
 from road_grading import build_ground_mesh_lookup, eval_bspline_grid, solve_road_and_bridge_elevations
 from scatter import CONFIG, extract_road_network, scatter
@@ -214,6 +214,7 @@ def build(bbox, output, palette):
     )
     if interchange is not None:
         grade_banks(terrain, original, wet, left, top, GRID, (x_jb, z_jb), angle, datum, finish=True)
+        grade_binjiang_streets(road_ctrl,left,top,8,(x_jb,z_jb),angle,datum)
         from east_grading import grade_east, grade_landing
         east_road = next(road.line for road in roads if road.way == 682893309)
         for field in (terrain,original):

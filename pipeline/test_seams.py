@@ -11,6 +11,19 @@ from seam_bridge import CurbFaces, native_contact, protected_edge
 
 
 class SeamTests(unittest.TestCase):
+    def test_binjiang_lower_street_and_shoulder_follow_terrain(self):
+        from audit_seams import ROOT, Surface, Streets
+        world = Surface(ROOT/'public/world')
+        streets = Streets(world)
+        for east,south,kind in [(-295.76,39.43,0),(-292,37.91,0),(-288.75,43.07,1),(-290.03,47.24,1)]:
+            with self.subTest(east=east,south=south):
+                street,kinds = streets.at(east,south)
+                self.assertIn(kind,kinds)
+                from seam_streets import OFFSETS
+                self.assertLessEqual(abs(street-world.sample(east,south)[0]-OFFSETS[kind]),.05)
+        foreground,_ = streets.at(-277.62,-64.23)
+        self.assertGreater(world.entries['jiefang_bridge']['position'][1]+2.75-foreground,1.5)
+
     def test_plaza_driveway_edge(self):
         from audit_seams import ROOT, Surface, Streets, projected_faces
         world = Surface(ROOT/'public/world')
