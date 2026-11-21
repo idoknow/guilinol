@@ -16,6 +16,7 @@ from common import GRID, ll2xz, load_osm
 from features import area, points
 from navigation import return_trips
 from clearance import audit_routes, navigable_edges
+from cars import plan_cars
 
 
 def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), interchange=None):
@@ -25,7 +26,7 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
     xs = left + np.arange(cols)*GRID
     zs = top + np.arange(rows)*GRID
     obstacles = STRtree(buildings)
-    bikes, anchors, extras = [], {}, []
+    placed, groups, anchors, extras = [], [], {}, []
     lakes = {'桂湖', '木龙湖', '杉湖', '榕湖'}
     for el in load_osm():
         tags = el.get('tags', {})
@@ -66,16 +67,34 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
                 ground, water = sample(east, south)
                 if bounds.contains(Point(east,south)) and water == -32768 and not obstacles.query(Point(east,south).buffer(1),predicate='intersects').size:
                     group.append([round(east,1),round(ground,1),round(south,1),round(math.atan2(-normal[0],-normal[1]),3),rng.randrange(4)])
-            if len(group)>=3 and all(math.hypot(group[0][0]-bike[0],group[0][2]-bike[2])>145 for bike in bikes):
-                bikes.extend(group)
+            if len(group)>=3 and all(math.hypot(group[0][0]-bike[0],group[0][2]-bike[2])>145 for bike in placed):
+                placed.extend(group)
+                groups.append(group)
             distance += rng.uniform(150,250)
+    bikes, bicycles = [], []
+    for idx, group in enumerate(groups):
+        (bicycles if idx % 3 == 2 else bikes).extend(group)
+    # Guaranteed starter e-bike & pedal bicycle in the open plaza ahead of default walk spawn (-588, -212),
+    # clear of the south wall and west aisle and angled east-southeast toward the exit corridor.
+    for target_list, (sx, sz, s_yaw, s_paint) in (
+        (bikes, (-584.5, -204.5, -1.64, 0)),
+        (bicycles, (-591.5, -204.5, -1.64, 2)),
+    ):
+        pt = Point(sx, sz)
+        if bounds.contains(pt):
+            sg, sw = sample(sx, sz)
+            if sw == -32768 and not obstacles.query(pt.buffer(0.8), predicate='intersects').size:
+                entry = [round(sx, 1), round(sg, 1), round(sz, 1), round(s_yaw, 3), s_paint]
+                target_list.append(entry)
+                placed.append(entry)
+                extras.append(pt.buffer(12.0))
     if interchange is not None:
         origin,angle,bank_pavement=interchange
         transform=np.array([[math.cos(angle),math.sin(angle)],[-math.sin(angle),math.cos(angle)]])
         axis=np.array([[-140,0],[140,0]])@transform+origin
         extras.extend((LineString(axis).buffer(21.5,cap_style='flat'),bank_pavement))
-        # Lower bike stand beside the northern landing, approached on foot.
-        x,z=np.array([-118,-31])@transform+origin
+        # Lower bike stand beside the northern landing, clear of the +0.45 m west-bank portal steps.
+        x,z=np.array([-117.5,-26.0])@transform+origin
         bikes.append([round(x,2),sample(x,z)[0]+.2,round(z,2),round(angle,3),1])
     pavement = union_all(roads+extras).buffer(3)
     mask = intersects_xy(pavement,xs[None,:],zs[:,None])
@@ -125,7 +144,7 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
                     if node==nodes[start]:break
                     node=prev[node]
                 routes.append(dict(kind=kind,start=start,end=end,path=path[::-1]))
-    return dict(bikes=bikes,docks=docks,routes=routes,grid=[left,top,cols,rows,GRID],mask=base64.b64encode(np.packbits(mask).tobytes()).decode())
+    return dict(bikes=bikes,bicycles=bicycles,docks=docks,routes=routes,grid=[left,top,cols,rows,GRID],mask=base64.b64encode(np.packbits(mask).tobytes()).decode(),**plan_cars(bounds,surface,buildings,sample,placed,docks,interchange=interchange))
 
 
 def write_vehicles(output,data,triangles):

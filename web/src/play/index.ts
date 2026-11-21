@@ -1,9 +1,10 @@
 import * as THREE from 'three'
 import './play.css'
-import {spots, yawToward, type Spot} from './spots'
+import {spots, waterDocks, yawToward, type Spot, type WaterDock} from './spots'
 import type {Host} from './host'
 import {photoMode} from './photo'
 import {mapView} from './map'
+import {isGlobalHotkeyBlocked, shouldPhotoYieldKeyPFromDom} from '../walk/input-guard'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
 const ease = (t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2
@@ -77,6 +78,13 @@ export function play(host:Host) {
       if(await host.walkTo(spot.x,spot.z,yawToward(spot.x,spot.z,spot.at),'spot:'+spot.id)) {
         host.walker()?.face(yawToward(spot.x,spot.z,spot.at),.16); arrive(marks.find(m=>m.spot===spot)!)}})
   }
+  async function goDock(dock:WaterDock) {
+    closeAll()
+    const yaw = yawToward(dock.x,dock.z,dock.at)
+    await travel(dock.name,async()=>{leaveSummit(false)
+      if(await host.walkTo(dock.x,dock.z,yaw,'dock:'+dock.id)) {
+        host.walker()?.face(yaw,.14)}})
+  }
   // Stamp + card. Walking into the ring does it; so does travelling there (the spawn search may land a few metres off).
   function arrive(m:typeof marks[number]) {
     m.armed = false; const fresh = !stamps.has(m.spot.id)
@@ -99,7 +107,7 @@ export function play(host:Host) {
   // Atlas loads only after the scene has been running a couple of seconds, never inside the first-frame budget.
   let mapLoading:Promise<ReturnType<typeof mapView>|undefined>|undefined
   const ensureMap = ()=>mapLoading ??= import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
-    atlas = loaded; return map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s)})
+    atlas = loaded; return map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s),goDock:d=>void goDock(d)})
   }).catch(error=>{console.warn('atlas',error); mapLoading = undefined; return undefined})
   const loadMap = ()=>void ensureMap()
   let mapRequested = !(host.manifest as {atlas?:unknown}).atlas
@@ -163,10 +171,12 @@ export function play(host:Host) {
     closeCard()
     sheet.innerHTML = `<header><h2>景册</h2><p>已盖 <b>${stamps.size}</b> / ${spots.length} 枚印 · 走到地上的朱红圆圈处即可盖印</p><button class="card-close" aria-label="关闭">×</button></header>
       <ol>${spots.map(s=>`<li class="${stamps.has(s.id)?'done':''}"><div class="card-seal${stamps.has(s.id)?' done':''}">${s.seal}</div>
-        <div><h3>${s.name}</h3><p>${s.sub}</p></div><button data-id="${s.id}">前往</button></li>`).join('')}</ol>`
+        <div><h3>${s.name}</h3><p>${s.sub}</p></div><button data-id="${s.id}">前往</button></li>`).join('')}</ol>
+      <div class="book-docks"><span>水边开船直达</span><div>${waterDocks.map(d=>`<button data-dock="${d.id}">${d.name} · ${d.badge}</button>`).join('')}</div></div>`
     sheet.hidden = false; requestAnimationFrame(()=>sheet.classList.add('show'))
     sheet.querySelector<HTMLButtonElement>('.card-close')!.onclick = closeBook
     for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-id]'))) b.onclick = ()=>void goTo(spots.find(s=>s.id===b.dataset.id)!)
+    for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-dock]'))) b.onclick = ()=>void goDock(waterDocks.find(d=>d.id===b.dataset.dock)!)
   }
   function closeBook(){sheet.classList.remove('show'); setTimeout(()=>{if(!sheet.classList.contains('show')) sheet.hidden = true},260)}
   function closeAll(){closeCard(); closeBook()}
@@ -175,10 +185,14 @@ export function play(host:Host) {
   const photo = photoMode(host,()=>nearestName())
   shutter.onclick = ()=>photo.open()
   window.addEventListener('keydown',event=>{
-    if(event.repeat||(event.target as HTMLElement)?.tagName==='INPUT') return
-    if(event.code==='KeyJ') sheet.hidden?openBook():closeBook()
-    if(event.code==='KeyP') photo.active?photo.close():photo.open()
-    if(event.code==='Escape') {if(photo.active) photo.close(); else if(!map?.active) closeAll()}
+    if(event.repeat) return
+    if(event.code==='Escape') {if(photo.active) photo.close(); else if(!map?.active) closeAll(); return}
+    if(isGlobalHotkeyBlocked(event.target,{allowPhoto:photo.active})) return
+    if(event.code==='KeyJ'&&!photo.active) sheet.hidden?openBook():closeBook()
+    if(event.code==='KeyP'){
+      if(shouldPhotoYieldKeyPFromDom(event,photo.active)) return
+      photo.active?photo.close():photo.open()
+    }
   })
 
   function nearestName() {

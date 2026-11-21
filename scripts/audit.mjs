@@ -91,6 +91,7 @@ try {
     else if (msg.type() === 'warning') consoleWarnings.push(msg.text())
   })
   await page.route('**/favicon.ico', route => route.fulfill({status: 204}))
+  await page.route('**/api/t', route => route.fulfill({status: 204}))
 
   await page.goto(`http://127.0.0.1:${port}/?verify&mode=walk&radius=320&time=13.5`)
   await page.waitForFunction(() => window.viewer?.walk?.active, null, {timeout: 60000})
