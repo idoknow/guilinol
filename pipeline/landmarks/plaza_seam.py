@@ -11,11 +11,28 @@ from features import polygons
 from seam_streets import Streets
 
 
+def walkway_rect(pose, width, depth):
+    east, _, south, angle = pose
+    rect = shapely.box(-width/2, -depth/2, width/2, depth/2)
+    return shapely.affinity.translate(shapely.affinity.rotate(rect,angle,origin=(0,0),use_radians=True),east,south)
+
+
+def drape_walkways(model, rectangles):
+    pose, grade = model.pose, model.grade
+    model.pose, model.grade = (0,0,0,0), None
+    try:
+        for part in polygons(shapely.union_all(rectangles)):
+            civic_plaza(model, part)
+    finally:
+        model.pose, model.grade = pose, grade
+
+
 def civic_plaza(builder, ring, frontage=None, refine_outer=False):
     surface = builder.surface
     rotation = np.array([[surface.cos,-surface.sin],[surface.sin,surface.cos]])
     streets = Streets(surface.surface)
-    origin = np.array([surface.x,surface.z]); plaza = shapely.Polygon(np.array(ring)@rotation+origin)
+    origin = np.array([surface.x,surface.z])
+    plaza = shapely.transform(shapely.Polygon(ring),lambda coords:coords@rotation+origin)
     if frontage is not None:
         original = plaza
         plaza = plaza.union(frontage)

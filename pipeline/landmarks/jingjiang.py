@@ -229,7 +229,8 @@ def generate(name,build,colors=None):
         if name in ('wangcheng_market','dongxixiang'):
             from functools import lru_cache
             from world_surface import LandmarkSurface,Surface
-            model.grade=lru_cache(maxsize=262144)(LandmarkSurface(Surface(),name).ground)
+            model.surface=LandmarkSurface(Surface(),name)
+            model.grade=lru_cache(maxsize=262144)(model.surface.ground)
             model.grade_reference=0
         build(model)
         layer=f'lod{lod}';scene.graph.update(frame_to=layer)

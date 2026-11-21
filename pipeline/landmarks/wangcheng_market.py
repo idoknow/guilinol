@@ -47,10 +47,11 @@ def shop(model,height,arcade):
         model.box(0,4.3,side*(gap-.98),pitch,.14,.18,'wood')
 
 
-def slab(model,first,last,width,level):
+def slab(first,last,width):
+    from plaza_seam import walkway_rect
     dx,dz=last[0]-first[0],last[1]-first[1]
-    model.pose=((first[0]+last[0])/2,0,(first[1]+last[1])/2,math.atan2(dz,dx))
-    model.box(0,level-.1,0,math.hypot(dx,dz)+1,.1,width,'pave')
+    pose=((first[0]+last[0])/2,0,(first[1]+last[1])/2,math.atan2(dz,dx))
+    return walkway_rect(pose,math.hypot(dx,dz)+1,width)
 
 
 def screen_house(model):
@@ -87,13 +88,13 @@ def seated_roof(model,height,width,depth,rise):
 
 
 def market(model):
-    for first,last,width,level in [((-28,22),(6,25),22,.10),
-        ((-6,24),(5,-15),10,.13),((0,28),(54,39),9,.12),((54,39),(63,-4),10,.14),
-        ((63,-4),(3,-13),10,.15),((5,-14),(13,-62),32,.16),((58,18.5),(7,3.8),9,.17)]:slab(model,first,last,width,level)
+    from plaza_seam import drape_walkways
+    drape_walkways(model,[slab(*section) for section in [((-28,22),(6,25),22),
+        ((-6,24),(5,-15),10),((0,28),(54,39),9),((54,39),(63,-4),10),
+        ((63,-4),(3,-13),10),((5,-14),(13,-62),32),((58,18.5),(7,3.8),9),((56,39),(85,50.5),8)]])
     for east,south in [(-92,19.5),(-72,24.5),(-52,29.25),(-35,33.25)]:
         model.pose=(east,0,south,0);model.beam([0,0,0],[0,4.2,0],.22,'wood',8,True)
         crown=trimesh.creation.icosphere(subdivisions=1);model.mesh(crown.vertices*[2.3,2.15,2.55]+[0,5.2,0],crown.faces,'leaf')
-    slab(model,(56,39),(85,50.5),8,.14)
     registered_market(model)
     model.pose=(-4.7,0,17,.14)
     for east,top in [(-6.5,5.15),(-3.4,6.6),(3.4,6.6),(6.5,5.15)]:
