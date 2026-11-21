@@ -50,7 +50,10 @@ function hud(main: typeof import('./main')) {
     const source = params.has('hudDemo') ? hudModule.demoSource(params.get('hudDemo')) : hudModule.gameStateHudSource()
     hudModule.mountStreetHud(source, {
       phone: params.has('phone'),
-      onApp: id => { if (id === 'jobs') window.dispatchEvent(new CustomEvent('game:open-missions')) },
+      onApp: id => {
+        if (id === 'jobs') window.dispatchEvent(new CustomEvent('game:open-missions'))
+        else if (id === 'garage') window.dispatchEvent(new CustomEvent('game:open-garage'))
+      },
     })
   })
   addEventListener('keydown', event => {

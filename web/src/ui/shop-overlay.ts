@@ -43,6 +43,7 @@ export interface ShopOverlayHooks {
   onPreviewOutfit?: (equipped: EquippedOutfit) => void
   onPreviewRollback?: (equipped: EquippedOutfit) => void
   onStartTestRide?: (shopId: string, modelId: PersonalEbikeModelId) => void
+  onSummonVehicle?: (vehicleId?: string) => void
 }
 
 interface RenderCard {
@@ -470,8 +471,18 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
       return
     }
 
-    // Secondary action: free test ride in e-bike shop
-    if (activeCard.testRideModelId && currentShop && hooks.onStartTestRide) {
+    // Secondary action: summon owned personal e-bike (garage or owned model), or free test ride in e-bike shop
+    if (activeCard.itemType === 'ebike_model' && activeCard.owned && activeCard.targetVehicleId && hooks.onSummonVehicle) {
+      secondaryBtn.hidden = false
+      secondaryBtn.textContent = '召唤提车'
+      secondaryBtn.disabled = busyPurchasing
+      secondaryBtn.onclick = () => {
+        const targetId = activeCard.targetVehicleId!
+        selectActivePersonalVehicle(targetId)
+        close('user')
+        hooks.onSummonVehicle?.(targetId)
+      }
+    } else if (activeCard.testRideModelId && currentShop && hooks.onStartTestRide) {
       secondaryBtn.hidden = false
       secondaryBtn.textContent = '免费试驾'
       secondaryBtn.disabled = busyPurchasing
