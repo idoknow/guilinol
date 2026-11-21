@@ -95,10 +95,11 @@ export function play(host:Host) {
   // Teleport to an arbitrary map point. Peaks, lakes and parks resolve to the nearest road vertex first,
   // because their centres are rarely walkable.
   async function goPoint(x:number,z:number,name:string) {
+    if(map&&!map.contains(x,z))return
     closeAll()
     let tx = x, tz = z
     if(atlas&&!atlas.roadAt(x,z,30)) {let best = 320
-      for(const r of atlas.roads) if(r.c<=2) for(let i=0;i<r.p.length;i+=2){const d = Math.hypot(r.p[i]-x,r.p[i+1]-z); if(d<best){best = d; tx = r.p[i]; tz = r.p[i+1]}}}
+      for(const r of atlas.roads) if(r.c<=2) for(let i=0;i<r.p.length;i+=2){const d = Math.hypot(r.p[i]-x,r.p[i+1]-z); if(d<best&&(!map||map.contains(r.p[i],r.p[i+1]))){best = d; tx = r.p[i]; tz = r.p[i+1]}}}
     const yaw = Math.atan2(-(x-tx),-(z-tz))
     await travel(name,async()=>{leaveSummit(); await host.walkTo(tx,tz,tx===x&&tz===z?(host.walker()?.yaw??0):yaw,'map')})
   }

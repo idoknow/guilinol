@@ -24,6 +24,7 @@ from scatter import CONFIG, extract_road_network, scatter
 from streets import chunks as street_chunks
 from dongxi_streets import street_surface
 from atlas import write_atlas
+from overview_map import write_overview_map
 from vehicles import plan_vehicles, write_vehicles
 from clearance import landmark_triangles
 from landmarks.rong_ground import GATE_PLAZA, grade_landings
@@ -417,6 +418,7 @@ def build(bbox, output, palette):
             chunks.append(dict(x=origin[0],z=origin[1],**asset(name)))
     extent = [left,top,width,depth]
     write_atlas(output,extent,bounds,layers,footprints,peaks)
+    write_overview_map(output,bbox)
     triangles.extend(landmark_faces)
     write_vehicles(output,vehicles,triangles)
     manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=extent,chunkSize=CHUNK,peaks=peaks,atlas=asset('atlas.bin'),

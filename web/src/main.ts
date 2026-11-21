@@ -233,7 +233,7 @@ async function start() {
     fly(){if(walker?.active)walker.leave();showMode()},get cinema(){return cinema},set cinema(on){cinema=on}}
   let tour:Awaited<ReturnType<typeof import('./play').play>>|undefined
   function animate(now:number){
-    if(paused&&frame>2){previous=0;return}
+    if((paused||tour?.map?.active)&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now
     if(walker?.active)walker.tick(elapsed/1000);else if(!switching)controls(elapsed/1000)
     if(frame===1) {
