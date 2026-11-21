@@ -5901,11 +5901,10 @@
   },
   {
     "id": "tianjiabing",
-    "alignNote": "示意，非真实入口",
     "name": "桂林市田家炳中学",
     "anchor": "way/658142453",
     "model": "landmarks/tianjiabing.glb",
-    "collision": "none",
+    "collision": "mesh",
     "treeClearingsMeters": [
       [
         [
@@ -5983,8 +5982,14 @@
       ],
       "elevation": 155.0
     },
-    "schematicCampus": "way/658142453",
-    "schoolGround": true
+    "schoolGround": true,
+    "rotation": 0,
+    "replace": [
+      "way/658142453"
+    ],
+    "auditBuildings": {
+      "425575f2-0f24-4edb-b0c5-a1cb17789f38": null
+    }
   },
   {
     "id": "chenshan_primary",
