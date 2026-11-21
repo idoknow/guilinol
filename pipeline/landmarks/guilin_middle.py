@@ -48,7 +48,7 @@ PALETTE = {
 }
 
 SIGNS = {
-    'school_name': '桂林市桂林中学',
+    'school_name': '桂林中学',
     'school_en':   'Guilin Middle School',
     'gate_bg':     '#efeae0',
     'gate_fg':     '#a8322c',
