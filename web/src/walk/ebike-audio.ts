@@ -23,6 +23,7 @@ export interface EbikeAudioCounts {
   leanWarn: number
   crashImpact: number
   pickup: number
+  shopBuy: number
 }
 
 export interface EbikeAudioSnapshot {
@@ -50,6 +51,7 @@ export interface EbikeAudioEngine {
   playTurnRelay: (tickOn: boolean) => void
   playCrashImpact: (speedMs?: number) => void
   playPickupComplete: () => void
+  playShopBuySuccess: () => void
   updateContinuous: (params: {
     active: boolean
     rideKind: RideSoundKind
@@ -134,6 +136,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     leanWarn: 0,
     crashImpact: 0,
     pickup: 0,
+    shopBuy: 0,
   }
 
   function ensureContext(): AudioContext | null {
@@ -469,6 +472,14 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     toneBurst(587.33, 880, 0.09, 0.07, 'sine', 0.04)
   }
 
+  function playShopBuySuccess() {
+    counts.shopBuy++
+    // Boutique checkout chime: crisp major triad arpeggio + warm register sparkle
+    toneBurst(523.25, 523.25, 0.08, 0.10, 'triangle', 0, 2800)
+    toneBurst(659.25, 659.25, 0.09, 0.10, 'triangle', 0.065, 3200)
+    toneBurst(783.99, 1046.5, 0.16, 0.11, 'sine', 0.13, 4200)
+  }
+
   function updateContinuous(params: {
     active: boolean
     rideKind: RideSoundKind
@@ -613,6 +624,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     playTurnRelay,
     playCrashImpact,
     playPickupComplete,
+    playShopBuySuccess,
     updateContinuous,
     stopContinuous,
     probe,

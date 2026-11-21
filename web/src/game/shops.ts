@@ -84,27 +84,28 @@ const DEFAULT_SHOPS: readonly ShopTriggerDef[] = [
     displayName: '漓尚服饰 · 微笑堂店',
     brandName: '漓尚服饰',
     landmarkId: 'nikoniko',
-    // nikoniko world origin (-974.91, 151.5, -121.59) + local (+55.2, 0, -6.0) on open east-wing granite apron,
-    // >12m away from NE canopies (52.5,-18.5)/(46.2,-23.8) and >22m away from north camphor trees.
-    triggerPos: [-919.71, 151.5, -127.59],
+    // nikoniko anchor (-974.905, 151.5, -121.586) + EastWing_Main bay 5+6 wall center (48.713, 16.147).
+    // triggerPos (+1.95 m) & stagePos (+2.15 m) sit squarely on +0.247 m Zhongshan M. Rd sidewalk inside apron:
+    // ~1.0 m inside sidewalk curb, >5.7 m from carriageway, >=7.5 m from Lamp_N, >=17 m from Pylon_E.
+    triggerPos: [-924.31, 151.75, -104.93],
     triggerRadius: 3.2,
     hintRadius: 18,
-    facingYaw: -1.52,
+    facingYaw: -1.8348,
     cameraRig: {
-      stagePos: [-920.91, 151.5, -127.59],
-      stageYaw: -1.52,
-      orbitRadius: 3.3,
-      minRadius: 2.1,
-      maxRadius: 4.8,
-      pitchRad: 0.16,
+      stagePos: [-924.12, 151.75, -104.88],
+      stageYaw: 1.3068,
+      orbitRadius: 2.4,
+      minRadius: 1.8,
+      maxRadius: 3.6,
+      pitchRad: 0.14,
       targetHeightOffset: 1.05,
       fovDeg: 44,
     },
     quietCheck: true,
     mapMarker: {
-      label: '漓尚服饰',
+      label: '微笑堂服装店',
       badge: '服饰',
-      keywords: '微笑堂服装店漓尚服饰买衣服换装衣橱',
+      keywords: '微笑堂服装店漓尚服饰买衣服换装衣橱nikoniko',
     },
   },
   {

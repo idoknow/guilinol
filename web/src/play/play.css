@@ -47,6 +47,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
   background:var(--ink);color:var(--paper);font:14px var(--serif);box-shadow:0 8px 22px rgba(20,30,28,.3);pointer-events:auto}
 .atlas-pop span{font-size:12px;opacity:.7}
 .atlas-pop button{font:13px var(--serif);letter-spacing:.15em;border:0;border-radius:var(--ui-r-pill);padding:6px 12px;background:var(--seal);color:var(--paper);cursor:pointer}
+.atlas-pop .atlas-nav-btn{background:rgba(245,166,35,.18);color:#ffd166;border:1px solid rgba(245,166,35,.45);letter-spacing:.08em}
 .atlas-legend{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);margin:0;font:12px var(--serif);color:var(--ink-soft);
   background:rgba(252,250,243,.85);padding:4px 12px;border-radius:12px;white-space:nowrap;pointer-events:none}
 
