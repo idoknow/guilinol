@@ -151,10 +151,11 @@ try {
     })
     assert.deepEqual(streetOverlap.overlaps, [], `[${vp.name}] street HUD overlap: ${JSON.stringify(streetOverlap)}`)
 
-    // 2. Open shop and check geometry, zero overlaps, zero overflow, touch target sizes
-    await page.evaluate(shopId => {
+    // 2. Open phone first (on desktop) then open shop to assert .st-phone auto-collapses cleanly on shop:open
+    await page.evaluate(({shopId, testPhone}) => {
+      if (testPhone) window.__shopHarness.hud.togglePhone(true)
       window.__shopHarness.overlay.openShop(shopId)
-    }, vp.shopId)
+    }, {shopId: vp.shopId, testPhone: vp.name.startsWith('desktop')})
 
     const geom = await page.evaluate(({W, H, minTouch}) => {
       const stage = document.querySelector('.shop-stage').getBoundingClientRect()
@@ -219,10 +220,14 @@ try {
 
     // 3. On desktop, also run live interactive E2E flow (hotkey block + preview rollback + atomic purchase + reload persist)
     if (vp.name.startsWith('desktop')) {
-      // Press W inside shop -> must be blocked by input-guard
+      // Press W inside shop -> must be blocked by input-guard; also verify .st-phone auto-collapses when shop opens
       await page.keyboard.press('KeyW')
-      const blocked = await page.evaluate(() => window.__shopHarness.logs.hotkeyBlocked)
-      assert.equal(blocked, true, 'KeyW must be blocked while shop is open')
+      const blocked = await page.evaluate(() => ({
+        wBlocked: window.__shopHarness.logs.hotkeyBlocked,
+        phoneClosed: !document.body.hasAttribute('data-phone'),
+      }))
+      assert.equal(blocked.wBlocked, true, 'KeyW must be blocked while shop is open')
+      assert.equal(blocked.phoneClosed, true, 'st-phone must auto-collapse on shop:open')
 
       // Select unowned T1 hoodie -> preview fires; press Esc -> rollback fires and real state unchanged
       await page.click('.shop-card[data-item-key="outfit_preset:outfit_guilin_hoodie"]')

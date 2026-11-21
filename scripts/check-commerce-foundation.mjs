@@ -479,17 +479,22 @@ try {
     assert.equal(game.validateCloudPayload(merged).ok, true)
   })
 
-  // --- 4. Shop Registry & 24 Campus Quiet Zones ---
-  test('quiet zones cover all 24 campuses (incl. libin_middle, guilin_middle, glmu_dongcheng) + 5m buffer; shops strictly outside', () => {
-    assert.equal(game.QUIET_ZONES.length, 24)
+  // --- 4. Shop Registry & 25 Campus Quiet Zones ---
+  test('quiet zones cover all 25 campuses (incl. libin_middle, guilin_middle, glmu_dongcheng, wangcheng_teaching) + 5m buffer; shops & duxiu public plaza outside', () => {
+    assert.equal(game.QUIET_ZONES.length, 25)
     const ids = new Set(game.QUIET_ZONES.map(z => z.id))
     assert(ids.has('libin_middle'), 'libin_middle must be in QUIET_ZONES')
     assert(ids.has('guilin_middle'), 'guilin_middle must be in QUIET_ZONES')
     assert(ids.has('glmu_dongcheng'), 'glmu_dongcheng must be in QUIET_ZONES')
+    assert(ids.has('wangcheng_teaching'), 'wangcheng_teaching inner courtyard must be in QUIET_ZONES')
 
-    // Inside libin_middle and guilin_middle
+    // Inside libin_middle, guilin_middle, and wangcheng_teaching inner courtyard
     assert.equal(game.isPointInQuietZone(-540, 80), true)
     assert.equal(game.isPointInQuietZone(-1260, -350), true)
+    assert.equal(game.isPointInQuietZone(-661.6, -604.6), true)
+    // Duxiu Peak public trail (-525, -595) and Zhengyang Gate public plaza remain open
+    assert.equal(game.isPointInQuietZone(-525, -595), false)
+    assert.equal(game.isPointInQuietZone(-565, -455), false)
 
     // Registered shops have locked canonical names & pass quietCheck
     const apparel = game.getShop('shop_nikoniko_apparel')
