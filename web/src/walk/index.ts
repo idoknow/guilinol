@@ -433,6 +433,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let savedStreetPose:SavedStreetPose|null=null
   let shopCam:ActiveShopCamera|null=null
   const shopLookTarget=new THREE.Vector3()
+  let rides:Awaited<ReturnType<typeof vehicles>>|null=null,loading=false
   let testRideBrakeTimer=0
   let testRideOobSince=0
 
@@ -979,7 +980,6 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const safe=new THREE.Vector3(),posOut=new THREE.Vector3(),wish=new THREE.Vector2();const spawns:object[]=[]
   let external:{x:number,z:number,run:boolean}|null=null,blockedWater=false,held=false
   const still={right:0,forward:0,run:false,crouch:false,jump:false}
-  let rides:Awaited<ReturnType<typeof vehicles>>|null=null,loading=false
   function setSnap(on:boolean){if(snapEnabled===on)return;snapEnabled=on;if(on)sim.controller.enableSnapToGround(cfg.snap);else sim.controller.disableSnapToGround()}
   function resetMotion(){vx=vz=velocity=coyoteTimer=jumpTimer=bankLean=strideLean=prevSpeed=jumpStageTimer=0;grounded=false;wasGroundedFoot=true;crouching=false;wasLandmarkHit=false;jumpStage='none';setSnap(true);figure.rotation.x=figure.rotation.z=0;if(traveller)traveller.rotation.set(0,0,0)}
   function supportAt(x:number,z:number,refY:number){
