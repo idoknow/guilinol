@@ -299,6 +299,8 @@ def registered_market(model, slabs):
             model.grade_reference=attrs['ground_m']-157.7
             east,south = point(feature['geometry']['coordinates'])
             normal = math.radians(attrs['bearing'])
+            if attrs['roof']=='R10' and math.cos(normal)<-.8:
+                south-=1.85
             model.pose = (east,0,south,normal-math.pi)
             title = 'STARBUCKS COFFEE' if attrs['name']=='星巴克' else attrs['name']
             width = 8.6 if attrs['name']=='星巴克' else min(5.5,max(2.6,len(title)*.72))
