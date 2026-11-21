@@ -27,7 +27,7 @@ export const look = {
   // 石桥 decks (GL03): warm limestone top, shaded fascia hanging bridgeDepth metres below the deck.
   bridgeTop: 0xc4bca8, bridgeSide: 0x938d7e, bridgeDepth: vesselBounds.bridgeDepth,
   // M3 water: jade body under the mirror; night lights.
-  waterBody: 0x4f8580, waterBaked: 0x6c9c97, waterBank: 0x8a876f, windowLight: 0xffc27a, roadLight: 0xffb55e, bridgeLamp: 0xffd08a,
+  waterBody: 0x4f8580, waterBaked: 0x6c9c97, waterBank: 0x8a876f, windowLight: 0xffc27a, roadLight: 0xffe2bc, bridgeLamp: 0xffd08a,
   peakUplightWarm: 0xffd9a0, peakUplightJade: 0x9fd8c0,
   wall: 0xe9e5da, roof: 0x646b6d, roughness: 1, metalness: 0,
   // M2.5 trees (docs/reference.md): crowns #2f5a2c–#4c7a3a, sunlit #6f9445, under-canopy #1f3a22.
