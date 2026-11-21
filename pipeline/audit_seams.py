@@ -15,6 +15,7 @@ from common import RAW, load_osm
 from features import area, overture_geometry, polygons
 from landmark_layout import polygon
 from landmarks.world_surface import Surface
+from seam_inventory import inventory
 from seam_streets import Streets
 from seam_crossings import crossings, nearby_features
 
@@ -100,7 +101,10 @@ def main():
     parser.add_argument('--out',type=Path,default=Path('captures/seams'))
     parser.add_argument('--public',type=Path,default=ROOT/'public')
     parser.add_argument('--ids',nargs='+'); parser.add_argument('--report-only',action='store_true')
-    args = parser.parse_args(); args.out.mkdir(exist_ok=True,parents=True)
+    parser.add_argument('--strict',action='store_true',help='Fail on any flagged seam (default)')
+    args = parser.parse_args()
+    if args.strict and args.report_only: parser.error('--strict and --report-only are mutually exclusive')
+    args.out.mkdir(exist_ok=True,parents=True)
     specs = json.loads((ROOT/'pipeline/landmarks.json').read_text())
     if args.ids:
         unknown = set(args.ids)-{entry['id'] for entry in specs}
@@ -115,7 +119,7 @@ def main():
     report = {'revision':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
               'columns':['x','z','boundary','heightDeltaM','streetKinds','flags'],
               'exceptions':config['exceptions'],'landmarks':{}}
-    overview = []; total = 0
+    overview = []; total = 0; unbound = 0
     for spec in specs:
         name = spec['id']; rings = []; rows = []; meshes = {}; edges = defaultdict(list); separated = []
         entry = world.entries.get(name)
@@ -155,15 +159,14 @@ def main():
             plaque = shapely.box(-3,-.12,3,.12)
             rotated = shapely.affinity.rotate(plaque,-entry['rotation'],origin=(0,0))
             rings.append(('plaqueFootprint',shapely.affinity.translate(rotated,entry['position'][0],entry['position'][2])))
-        if atlas: roles[atlas['material']] = atlas['role']
         for material in roles:
-            shape, meshes[material] = declared_mesh(world.entries[name],material,args.public,atlas['box'] if atlas and material==atlas['material'] else None)
+            shape, meshes[material] = declared_mesh(world.entries[name],material,args.public)
             rings.append((material,shape))
-        adjacency = config.get('adjacentAtlas',{}).get(name)
-        if adjacency:
-            label = adjacency['label']
-            shape,meshes[label] = declared_mesh(entry,adjacency['material'],args.public,adjacency['box'])
-            roles[label] = adjacency['role']
+        atlas_rules = atlas if isinstance(atlas,list) else [atlas] if atlas else []
+        for rule in atlas_rules:
+            label = rule.get('label',rule['material'] if len(atlas_rules)==1 else rule['material']+':'+rule['role'])
+            shape,meshes[label] = declared_mesh(entry,rule['material'],args.public,rule['box'])
+            roles[label] = rule['role']
             rings.append((label,shape))
         for label,region in rings:
             region = shapely.make_valid(region)
@@ -202,7 +205,7 @@ def main():
                                 if right is not None: outside = max(outside,right)
                         if mesh:
                             inside = mesh(shapely.Point(point))
-                            if adjacency or 'edgeStone' in roles:
+                            if len(atlas_rules)>1 or 'edgeStone' in roles:
                                 for other,neighbor in meshes.items():
                                     if other!=label:
                                         peer = neighbor(shapely.Point(sides[1]))
@@ -246,9 +249,14 @@ def main():
                             elif not (curb and abs(delta-.15)<.015): flags.append('height')
                         rows.append([*point.round(3),label,None if delta is None else round(delta,4),sorted(outgoing),flags])
                         if flags: edges[layer].append(interval)
+        inventory_rows = inventory(dict(entry,id=name),args.public,config,streets) if entry else []
+        for item in inventory_rows:
+            if item['status']=='unbound':
+                unbound += item['faces']
+                rows.append([*item['worldXZ'],item['material'],None,[],['unboundStreetSurface']])
         count = sum(bool(row[-1]) for row in rows); total += count
         segments = seam_segments(edges)
-        report['landmarks'][name] = {'samples':len(rows),'flagged':count,'declaredMaterials':list(meshes),'points':rows,
+        report['landmarks'][name] = {'streetSurfaceInventory':inventory_rows,'samples':len(rows),'flagged':count,'declaredMaterials':list(meshes),'points':rows,
                                      'segments':segments,'lengthM':round(sum(item['lengthM'] for item in segments),3),'unpairedLayers':separated,'designedRises':approved,'streetCrossings':crossing_report}
         overview.extend(rows); heatmap(args.out/(name+'.png'),rows,name)
         if name=='jiefang_bridge':
@@ -256,11 +264,12 @@ def main():
             report['landmarks'][name]['wallSectionChecks'] = structural_walls
             report['landmarks'][name].update(modelRolesAvailable=curb_faces is not None,modelCurbPairs=curb_pairs,modelPaintChecks=paint_checks,unpairedCrossings=layer_crossings,nativeContactPairs=native_pairs)
     heatmap(args.out/'overview.png',overview,'Landmark seams'); report['flagged']=total
+    report['unboundStreetSurface']=unbound
     report['segmentCount']=sum(len(entry['segments']) for entry in report['landmarks'].values())
     report['lengthM']=round(sum(entry['lengthM'] for entry in report['landmarks'].values()),3)
     report['unpairedCount']=sum(len(entry['unpairedLayers'])+len(entry.get('unpairedCrossings',[])) for entry in report['landmarks'].values())
     (args.out/'seams.json').write_text(json.dumps(report,separators=(',',':'),allow_nan=False)+'\n')
-    print(f'{len(specs)} landmarks; {len(overview)} boundary samples; {total} flagged')
+    print(f'{len(specs)} landmarks; {len(overview)} boundary samples; {total} flagged; {unbound} unbound candidate triangles')
     return int(bool(total or report['unpairedCount']) and not args.report_only)
 
 

@@ -21,6 +21,7 @@ from xiaoyao_access import CENTER, FOOT, WIDTH
 class LandmarkModel(Model):
     def __init__(self, detail, flood_roof=False):
         super().__init__(detail)
+        self.curbs=[]
         self.lamps=[]
         self.lit_tiles=[]
         self.flood_roof=flood_roof
@@ -49,7 +50,10 @@ class LandmarkModel(Model):
     def mesh(self, vertices, faces, color, collide=False):
         if hasattr(self, 'site_ground'):
             vertices = self.foundation_vertices(vertices)
-        if isinstance(color,str) and color=='lamp':
+        if isinstance(color,str) and color=='curb':
+            super().mesh(vertices,faces,'granite',collide)
+            self.curbs.append((self.visible.pop(),self.uv.pop()))
+        elif isinstance(color,str) and color=='lamp':
             super().mesh(vertices,faces,'wood' if self.flood_roof else 'gold',collide)
             self.lamps.append((self.visible.pop(),self.uv.pop()))
         elif isinstance(color,str) and color in ('tile','roof_soffit'):
@@ -239,6 +243,15 @@ def tower(model):
 
 
 def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None, terrain_offset=None, lateral_offset=None):
+    import json
+    from c_kit import landmark_surface
+    from native_paving import NativePaving
+    config=Path(__file__).resolve().parents[1]/'seam-surfaces.json'
+    street_roles=json.loads(config.read_text())['surfaces'].get(name,{})
+    pavement=None
+    if street_roles:
+        frame=landmark_surface(name)
+        pavement=NativePaving(frame.surface,frame.surface.entries[name])
     image = atlas(colors,smooth)
     if flood_roof:
         carve_medallion(image)
@@ -262,12 +275,16 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
             if terrain_offset is not None:
                 points, inverse = np.unique(vertices[:,::2],axis=0,return_inverse=True)
                 vertices[:,1] += np.array([terrain_offset(x,z) for x,z in points])[inverse]
+            coords=np.concatenate(uvs).reshape(-1,2) if texture is not None else None
+            if coords is not None and street_roles.get(name) in ('sidewalk','curb'):
+                vertices,coords=pavement.clip(vertices,coords)
+                if not len(vertices):return
             mesh = trimesh.Trimesh(vertices, np.arange(len(vertices)).reshape(-1,3), process=False)
             if texture is not None:
                 material = trimesh.visual.material.PBRMaterial(name=name,baseColorTexture=texture,roughnessFactor=1,metallicFactor=0,doubleSided=True)
                 if name.endswith('_lit'):
                     material.emissiveFactor=[.58,.24,.055] if name=='roof_lit' else [.85,.57,.24]
-                mesh.visual = trimesh.visual.TextureVisuals(uv=np.concatenate(uvs).reshape(-1,2),material=material)
+                mesh.visual = trimesh.visual.TextureVisuals(uv=coords,material=material)
             scene.add_geometry(mesh,node_name=group+'_'+name if texture else 'collision_surface',parent_node_name=group if texture else scene.graph.base_frame)
         if model.visible:
             add(model.visible,model.uv,image,'joinery')
@@ -279,6 +296,9 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
             scene.add_geometry(rock,node_name=group+'_limestone',parent_node_name=group)
         if model.lit_tiles:
             faces,uvs=zip(*model.lit_tiles);add(faces,uvs,image,'roof_lit')
+        if model.curbs:
+            faces,uvs=zip(*model.curbs)
+            add(faces,uvs,Image.new('RGB',(1,1),'#aaa9a6'),'curb')
         if model.lamps:
             faces,uvs=zip(*model.lamps);add(faces,uvs,image,'lamp_lit')
         for key, parts in model.tile_parts.items():

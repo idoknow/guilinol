@@ -1,7 +1,7 @@
 """West-bank carriageways and pedestrian surfaces built from the OSM survey."""
 import numpy as np
 from shapely.geometry import LineString, Point
-from jiefang_layout import BANK_LIMIT, OSM, RAMPS, UPPER_ROADS, LOWER_ROADS, SIDE_ROAD, FOOTWAYS, LOWER, UPPER, section, widths, libin_levels, dash_intervals
+from jiefang_layout import BANK_LIMIT, OSM, RAMPS, UPPER_ROADS, LOWER_ROADS, SIDE_ROAD, FOOTWAYS, LOWER, UPPER, section, widths, libin_levels, lane_dividers
 
 
 def vertex(p,h):
@@ -22,7 +22,7 @@ def street(model,way):
         return np.array([vertex(p,h) for p,h in zip(points,levels+up)])
     if way in FOOTWAYS+SIDE_ROAD:
         raise_by=.12 if way in FOOTWAYS else 0
-        surface(model,edge(l,raise_by),edge(r,raise_by),'pave' if way in FOOTWAYS else 'tile')
+        surface(model,edge(l,raise_by),edge(r,raise_by),'pave' if way in FOOTWAYS else 'road')
         return
     # Extend the upper sidewalk across the bridge expansion joint.
     if way in UPPER_ROADS:
@@ -55,23 +55,16 @@ def street(model,way):
     if way in RAMPS:
         from jiefang_edges import join_bank
         join_bank(outer,n,w,along)
-    surface(model,left,right,'tile')
+    surface(model,left,right,'road')
     surface(model,right,edge(r,curb),'curb_granite')
     sidewalk=edge(r,curb)
     for i in range(len(xy)-1):
         apron=max(curb[i:i+2])<.01
-        surface(model,sidewalk[i:i+2],outer[i:i+2],'tile' if apron else 'pave')
+        surface(model,sidewalk[i:i+2],outer[i:i+2],'road' if apron else 'pave')
     for top in (left,outer):
         surface(model,top,top-[0,2.5,0],'stone',False)
-    for i,(a,b) in enumerate(zip(edge(0,.015),edge(0,.015)[1:])):
-        length=along[i+1]-along[i]
-        for start,end in dash_intervals(along[i],along[i+1]):
-            u=(start-along[i])/length;v=(end-along[i])/length
-            pa=a+(b-a)*u;pb=a+(b-a)*v
-            def stripe(fraction):
-                normal=(1-fraction)*n[i]+fraction*n[i+1]
-                return np.array([normal[0],0,normal[1]])*.075
-            surface(model,[pa-stripe(u),pb-stripe(v)],[pa+stripe(u),pb+stripe(v)],'paint_white' if way not in LOWER_ROADS else 'paint_yellow',False)
+    for divider in lane_dividers(way,l,r):
+        surface(model,edge(divider-.09,.035),edge(divider+.09,.035),'paint_white',False)
     if way==1531308428:
         # Low stone parapet and white handrail, with openings at the stair
         # landings and at the plaza crossing shown in photos 37 and 43.

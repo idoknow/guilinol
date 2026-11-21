@@ -209,8 +209,9 @@ def generate(name,build,colors=None):
     def packed(parts):
         vertices=np.concatenate(parts).reshape(-1,3);return trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
     def emit(model,layer,parent):
-        mesh=packed(model.visible);mesh.visual=trimesh.visual.TextureVisuals(uv=np.concatenate(model.uv).reshape(-1,2),material=mat)
-        scene.add_geometry(mesh,geom_name=layer+'_joinery',node_name=layer+'_joinery',parent_node_name=parent)
+        if model.visible:
+            mesh=packed(model.visible);mesh.visual=trimesh.visual.TextureVisuals(uv=np.concatenate(model.uv).reshape(-1,2),material=mat)
+            scene.add_geometry(mesh,geom_name=layer+'_joinery',node_name=layer+'_joinery',parent_node_name=parent)
         if model.pigmented:
             rock=packed([triangles for triangles,colors in model.pigmented]);rock.visual.vertex_colors=np.concatenate([colors for triangles,colors in model.pigmented]).reshape(-1,4)
             scene.add_geometry(rock,node_name=layer+'_rock',parent_node_name=parent)

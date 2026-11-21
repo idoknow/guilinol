@@ -160,6 +160,7 @@ class SceneBuilder:
         self.detail = (lod == 0)
         self.collide = collide
         self.atlas = MeshBucket(rects, atlas_size)
+        self.street_parts = {role:MeshBucket(rects,atlas_size) for role in ("road","curb","sidewalk")}
         self.lit = MeshBucket(rects, atlas_size)
         self.hit = MeshBucket(rects, atlas_size)
         self.origin = np.zeros(3, dtype=np.float64)
@@ -192,8 +193,8 @@ class SceneBuilder:
     def xf_dir(self, d):
         return d[0] * self.ex + d[1] * self.ey + d[2] * self.ez
 
-    def face(self, pts, normal, region, tile=2.5, uvs=None, lit=False):
-        target = self.lit if lit else self.atlas
+    def face(self, pts, normal, region, tile=2.5, uvs=None, lit=False, street_role=None):
+        target = self.street_parts[street_role] if street_role else self.lit if lit else self.atlas
         target.add_poly([self.xf(p) for p in pts], self.xf_dir(normal), region, tile=tile, uvs=uvs)
 
     def hit_quad(self, pts, normal):
@@ -276,6 +277,8 @@ class SceneBuilder:
                 wy = hfn(ax + lp[0], az + lp[2]) + lift
                 pts[i, j] = (xv, wy - ay - self.origin[1], zv)
 
+        role = {'road_asphalt':'road','pave_dark':'road','plaza_granite':'sidewalk',
+                'plaza_tile':'sidewalk','ramp_paver':'sidewalk','granite':'sidewalk'}.get(region)
         for i in range(nx):
             su0 = (i % 2) * 0.5
             su1 = su0 + 0.5
@@ -287,6 +290,7 @@ class SceneBuilder:
                     [p01, p11, p10, p00],
                     (0, 1, 0),
                     region,
+                    street_role=role,
                     uvs=[(su0, sv1), (su1, sv1), (su1, sv0), (su0, sv0)],
                 )
                 if collide and self.collide:
@@ -301,14 +305,14 @@ class SceneBuilder:
                     [(a[0], self.grade(a[0],a[2])-.04, a[2]), (b[0], self.grade(b[0],b[2])-.04, b[2]), (b[0], b[1] + curb_h, b[2]), (a[0], a[1] + curb_h, a[2])],
                     (0, 0, 1),
                     cr,
-                    tile=tile,
+                    tile=tile, street_role="curb",
                 )
                 if curb_h > 0.005:
                     self.face(
                         [(a[0], a[1] + curb_h, a[2]), (b[0], b[1] + curb_h, b[2]), (b[0], b[1] + curb_h, b[2] - curb_w), (a[0], a[1] + curb_h, a[2] - curb_w)],
                         (0, 1, 0),
                         cr,
-                        tile=tile,
+                        tile=tile, street_role="curb",
                     )
         if '-z' in curb_edges:
             for i in range(nx):
@@ -317,7 +321,7 @@ class SceneBuilder:
                     [(a[0], self.grade(a[0],a[2])-.04, a[2]), (b[0], self.grade(b[0],b[2])-.04, b[2]), (b[0], b[1] + curb_h, b[2]), (a[0], a[1] + curb_h, a[2])],
                     (0, 0, -1),
                     cr,
-                    tile=tile,
+                    tile=tile, street_role="curb",
                 )
         if '+x' in curb_edges:
             for j in range(nz):
@@ -326,7 +330,7 @@ class SceneBuilder:
                     [(a[0], self.grade(a[0],a[2])-.04, a[2]), (b[0], self.grade(b[0],b[2])-.04, b[2]), (b[0], b[1] + curb_h, b[2]), (a[0], a[1] + curb_h, a[2])],
                     (1, 0, 0),
                     cr,
-                    tile=tile,
+                    tile=tile, street_role="curb",
                 )
         if '-x' in curb_edges:
             for j in range(nz):
@@ -335,7 +339,7 @@ class SceneBuilder:
                     [(a[0], self.grade(a[0],a[2])-.04, a[2]), (b[0], self.grade(b[0],b[2])-.04, b[2]), (b[0], b[1] + curb_h, b[2]), (a[0], a[1] + curb_h, a[2])],
                     (-1, 0, 0),
                     cr,
-                    tile=tile,
+                    tile=tile, street_role="curb",
                 )
 
     def sign_quad(self, x, yc, z, w, h, region, normal=(0, 0, 1), lit=False):
@@ -518,6 +522,11 @@ def export_landmark_glb(
         )
         if m_atlas is not None:
             scene.add_geometry(m_atlas, node_name=f'{lod_name}_atlas', parent_node_name=lod_name)
+        for role, part in b.street_parts.items():
+            mesh=bucket_to_trimesh(part,None,role,roughness=1,double_sided=True)
+            if mesh is not None:
+                mesh.visual.material.baseColorFactor={'road':[70,70,70,255],'curb':[170,170,170,255],'sidewalk':[160,160,160,255]}[role]
+                scene.add_geometry(mesh,node_name=f'{lod_name}_{role}',parent_node_name=lod_name)
         m_lit = bucket_to_trimesh(b.lit, image, f'{mat_prefix}_lit', lit_emissive, 0.08, 0.42, double_sided=double_sided)
         if m_lit is not None:
             scene.add_geometry(m_lit, node_name=f'{lod_name}_lit', parent_node_name=lod_name)
@@ -532,7 +541,7 @@ def export_landmark_glb(
 
     image.save(out_glb.parent / f'{mat_prefix}_atlas.png')
     scene.export(out_glb)
-    n0 = len(hi.atlas) + len(hi.lit)
-    n1 = len(lo.atlas) + len(lo.lit)
+    n0 = len(hi.atlas) + len(hi.lit) + sum(map(len,hi.street_parts.values()))
+    n1 = len(lo.atlas) + len(lo.lit) + sum(map(len,lo.street_parts.values()))
     print(f'{out_glb.stem}: lod0={n0} tris, lod1={n1} tris, collision={len(hi.hit)} tris')
     return n0, n1, len(hi.hit)

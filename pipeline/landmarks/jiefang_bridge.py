@@ -256,20 +256,20 @@ def bridge(model):
     # The west portal has a curved soffit and a thinner slab above the crown.
     for left,right,depth in ((-140.5,-136,1.22),(-136,-103,.36),(-103,140.5,1.22)):
         model.box((left+right)/2,-depth,0,right-left,depth,width,'stone',True)
-    model.box(0,-.03,0,length,.08,32.2,'tile')
+    model.box(0,-.03,0,length,.08,32.2,'road')
     for side in (-1,1):
         walk_inner = 16.175
         walk_outer = width/2
         model.box(0,0,side*(walk_inner+walk_outer)/2,length,.18,walk_outer-walk_inner,'pave',True)
         model.box(0,.05,side*16.16,length,.15,.3,'curb_granite',True)
-        model.box(0,.055,side*12,length,.018,.15,'paint_white')
-        model.box(0,.055,side*.18,length,.015,.13,'paint_yellow')
+        model.box(0,.055,side*12,length,.018,.18,'paint_white')
+        model.box(0,.055,side*.18,length,.015,.18,'paint_yellow')
         model.box(0,.182,side*16.93,length,.018,.46,'granite')
         if model.detail:
             for offset in (-.13,0,.13):
                 model.box(0,.20,side*16.93+offset,length,.014,.036,'white')
             for lane in (3.7,7.4):
-                for east in np.arange(-135,138,9):model.box(east,.055,side*lane,3,.02,.13,'paint_white')
+                model.box(0,.055,side*lane,length,.02,.18,'paint_white')
         for east in np.arange(-126,127,21 if model.detail else 42):
             lamp_post(model,east,side)
     springings=(-92,-46,0,46,92,140.5)
