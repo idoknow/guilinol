@@ -118,7 +118,9 @@ const DEFAULT_SHOPS: readonly ShopTriggerDef[] = [
     // outward normal n = (-0.2296, +0.9733), tangent u = (+0.9733, +0.2296), cleanly between camphor trees
     // Tree_M (88.0, 6.5) and Tree_E (108.0, 11.2). Runtime Y resolves dynamically via ground/supportAt.
     triggerPos: [-780.05, 151.99, -160.08], // u=0.0, d=+2.8m
-    triggerRadius: 3.4,
+    // Keep triggerRadius (2.2 m) cleanly clear of deliveryBay (2.83 m away) so standing beside a newly delivered
+    // personal e-bike mounts it ('骑我的电摩') instead of accidentally re-opening the shop.
+    triggerRadius: 2.2,
     hintRadius: 18,
     facingYaw: 2.91, // Three.js -Z facing +n (south-southwest toward Jiefang East Rd)
     cameraRig: {

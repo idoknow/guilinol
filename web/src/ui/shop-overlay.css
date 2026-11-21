@@ -31,6 +31,8 @@ body[data-shop-open="1"] :is(
   .st-hud,
   .minimap,
   .road-name,
+  .toast,
+  footer,
   output
 ) {
   display: none !important;
