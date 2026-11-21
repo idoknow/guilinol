@@ -24,15 +24,15 @@ def _build_street_gate(b: Builder):
     Vertical plaque pillar, closed gate, and perimeter wall."""
     prev = b.pose
     b.pose = (-5.5, 0.0, 12.5, YAW)
-    gz_line = 16.2
-    b.box(0.0, 0.02, gz_line, 34.0, 0.04, 5.2, 'pave_plaza', tile=2.5)
+    gz_line = 11.5
+    b.box(0.0, 0.02, gz_line, 24.0, 0.04, 3.8, 'pave_plaza', tile=2.5)
 
     # Blue-and-white campus boundary wall on left
-    for k in range(4):
-        cx = -17.5 + k * 3.8
+    for k in range(2):
+        cx = -9.9 + k * 3.8
         b.box(cx, 0.0, gz_line, 3.75, 2.35, 0.38, 'white', cap_region='blue_facade', tile=1.8, collide=(k == 0))
         b.box(cx, 0.65, gz_line + 0.21, 2.9, 1.15, 0.06, 'blue_facade', tile=1.4)
-    b.solid_box(-11.8, 0.0, gz_line, 15.2, 2.35, 0.42)
+    b.solid_box(-8.0, 0.0, gz_line, 7.6, 2.35, 0.42)
 
     # Cream-stone vertical-plaque gate pillar at x = -3.6
     b.box(-3.6, 0.0, gz_line, 1.45, 4.45, 1.45, 'cream', cap_region='white', tile=1.6, collide=True)

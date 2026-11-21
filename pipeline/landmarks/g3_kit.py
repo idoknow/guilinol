@@ -392,7 +392,11 @@ class Builder:
             pts = pts[::-1]
         tris = mapbox_earcut.triangulate_float64(pts, np.array([len(pts)], np.uint32)).reshape(-1, 3)
         for t in tris:
-            self.face([(pts[i, 0], y, pts[i, 1]) for i in t], (0, 1, 0), region, tile=4.0)
+            verts = []
+            for i in t:
+                gy = self.surface.ground(pts[i, 0], pts[i, 1]) if self.surface else 0.0
+                verts.append((pts[i, 0], y + gy, pts[i, 1]))
+            self.face(verts, (0, 1, 0), region, tile=4.0)
 
     def walkway(self, p0, p1, width=4.6, y=0.045, region='pave_plaza', curb=False):
         dx, dz = p1[0] - p0[0], p1[1] - p0[1]
@@ -504,6 +508,8 @@ class Builder:
             p_end = (b[0] - ux * inset + nx * 0.06, b[1] - uz * inset + nz * 0.06)
             for fl in range(floors):
                 wy0 = y0 + fl * floor_h + 1.12
+                if wy0 < sill:
+                    continue
                 wy1 = wy0 + 1.48
                 self.face([
                     (p_start[0], wy0, p_start[1]),

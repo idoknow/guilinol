@@ -48,7 +48,7 @@ def _build_yellow_pillar_gate(b: Builder):
     for px, pw, ph in ((-3.6, 1.25, 3.15), (2.8, 1.35, 3.15), (5.6, 0.95, 2.75)):
         b.box(px, 0.0, 0.0, pw + 0.16, 0.42, 1.26, 'granite', tile=1.4)
         b.box(px, 0.42, 0.0, pw, ph - 0.42, 1.10, 'yellow_wall', tile=1.6, collide=True)
-        b.box(px, ph, 0.0, pw + 0.22, 0.18, 1.28, 'terracotta', tile=1.2)
+        b.box(px, ph, 0.0, pw + 0.22, 0.18, 1.28, 'terracotta', tile=1.2, bottom=True)
 
     # Vertical plaque on right main yellow pillar
     b.sign_board(2.65, 1.82, 0.58, 0.56, 2.15, 'cs_vert', backing='steel', depth=0.05)
@@ -104,7 +104,7 @@ def build_chenshan(b: Builder):
     b.flagpole_plinth(-6.0, 16.0, math.pi, poles=1, height=11.2)
 
     # 4. Campus Trees in Stone Planters
-    for idx, (tx, tz) in enumerate([(-48, 18), (-18, 18), (22, 10), (48, -32), (-38, 90), (14, 90)]):
+    for idx, (tx, tz) in enumerate([(-48, 18), (-18, 18), (22, 10), (22, -15), (-38, 90), (14, 90)]):
         b.campus_tree(tx, tz, h=7.8 + (idx % 2) * 0.8, spread=3.0, seed=idx + 51, planter=True)
 
 

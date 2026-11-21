@@ -46,13 +46,13 @@ def _build_qixing_gate(b: Builder):
     # Tall beige ceramic-tile left main pillar (x = -4.6) + vertical gold school name
     b.box(-4.6, 0.0, 0.0, 2.05, 0.45, 1.55, 'granite', tile=1.4)
     b.box(-4.6, 0.45, 0.0, 1.88, 4.35, 1.38, 'cream', tile=1.5, collide=True)
-    b.box(-4.6, 4.80, 0.0, 2.30, 0.28, 1.78, 'white', tile=1.4)
+    b.box(-4.6, 4.80, 0.0, 2.30, 0.28, 1.78, 'white', tile=1.4, bottom=True)
     b.pitched_roof(-4.6, 5.08, 0.0, 2.45, 1.85, 0.82, overhang=0.45, tile_region='green_glaze', fascia_region='white')
     b.sign_board(-4.6, 2.65, 0.72, 0.68, 3.15, 'ly_vert', backing=None, depth=0)
 
     # Pedestrian side archway [-3.6 .. -1.3] (closed gate)
     b.box(-1.05, 0.0, 0.0, 0.82, 3.35, 1.10, 'cream', tile=1.5, collide=True)
-    b.box(-2.45, 3.05, 0.0, 3.35, 0.36, 1.22, 'cream', cap_region='white', tile=1.5)
+    b.box(-2.45, 3.05, 0.0, 3.35, 0.36, 1.22, 'cream', cap_region='white', tile=1.5, bottom=True)
     b.pitched_roof(-2.45, 3.41, 0.0, 3.55, 1.35, 0.65, overhang=0.38, tile_region='green_glaze', fascia_region='white')
     b.box(-2.45, 0.0, 0.0, 2.0, 2.8, 0.16, 'steel', tile=1.0, collide=True)
 

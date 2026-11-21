@@ -14,7 +14,7 @@ if(materialFilter||inventory)for(const mesh of model.meshes)for(const primitive 
 }
 for(const key of ['textures','images','materials'])delete model[key]
 for(const mesh of model.meshes)for(const primitive of mesh.primitives)delete primitive.material
-for(const key of ['extensionsUsed','extensionsRequired'])model[key]=model[key].filter(name=>name!=='KHR_texture_basisu')
+for(const key of ['extensionsUsed','extensionsRequired'])if(model[key])model[key]=model[key].filter(name=>name!=='KHR_texture_basisu')
 const text=Buffer.from(JSON.stringify(model)),padded=Math.ceil(text.length/4)*4
 const header=Buffer.from(bytes.subarray(0,20));header.writeUInt32LE(bytes.length-length+padded,8);header.writeUInt32LE(padded,12)
 const glb=Buffer.concat([header,text,Buffer.alloc(padded-text.length,32),bytes.subarray(20+length)])

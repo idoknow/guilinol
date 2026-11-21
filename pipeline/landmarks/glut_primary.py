@@ -34,11 +34,11 @@ def _build_jiangan_gate(b: Builder):
     # Main pillars supporting flat canopy
     for px, pw in ((-5.2, 1.15), (2.8, 1.15), (5.8, 0.90)):
         b.box(px, 0.0, 0.0, pw + 0.18, 0.50, 1.35, 'dark_stone', tile=1.4)
-        b.box(px, 0.50, 0.0, pw, 3.85, 1.15, 'white', tile=1.8, collide=True)
+        b.box(px, 0.50, 0.0, pw, 3.80, 1.15, 'white', tile=1.8, collide=True)
     # Thick flat-roofed white canopy overhang
     b.box(0.3, 4.30, 0.15, 13.6, 1.26, 3.6, 'white', cap_region='silver_roof', tile=2.0, bottom=True)
-    b.box(0.3, 5.56, 0.15, 13.9, 0.14, 3.8, 'granite', tile=1.6)
-    b.sign_board(-1.0, 4.94, 1.98, 10.2, 1.02, 'glut_gate', backing=None, depth=0)
+    b.box(0.3, 5.56, 0.15, 13.9, 0.14, 3.8, 'granite', tile=1.6, bottom=True)
+    b.sign_board(-1.0, 4.98, 1.98, 10.2, 0.98, 'glut_gate', backing=None, depth=0)
     # Closed stainless-steel retractable gate across opening
     b.retractable_gate(-4.55, 2.15, 0.0, h=1.32)
     b.box(4.35, 0.0, 0.0, 1.9, 1.32, 0.16, 'steel', tile=1.0, collide=True)
