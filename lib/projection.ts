@@ -10,3 +10,7 @@ export function ll2xz(lat: number, lon: number) {
 export function xz2ll(x: number, z: number) {
   return {lat: latitudeOrigin - z / metresLatitude, lon: longitudeOrigin + x / metresLongitude}
 }
+
+export function playableBounds([south,west,north,east]: [number,number,number,number]) {
+  return {min:ll2xz(north,west),max:ll2xz(south,east)}
+}

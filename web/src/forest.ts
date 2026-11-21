@@ -1,3 +1,4 @@
+import {TileGrid, streamBudget} from './tile-grid'
 import * as THREE from 'three'
 import {applyTreeVariant, setTreeFar, sharedProxyAssets, TREE_SPECIES_COUNT, treeFar, treeNearAsset} from './look/trees'
 import {look} from './look/config'
@@ -70,7 +71,7 @@ export class Forest{
   private matrix=new THREE.Matrix4()
   private point=new THREE.Vector3()
   private range:ForestRange={...defaultRange}
-  constructor(private scene:THREE.Scene,private tiles:Tile[],private camera:THREE.PerspectiveCamera,initialRange?:ForestRange){
+  constructor(private scene:THREE.Scene,private grid:TileGrid,private camera:THREE.PerspectiveCamera,initialRange?:ForestRange){
     if(initialRange)this.setRange(initialRange)
   }
   setRange(next:ForestRange){
@@ -84,26 +85,32 @@ export class Forest{
     setTreeFar(next.treeFar)
     this.dirty=true
   }
+  private queue:Tile[]=[]
+  private requestLimit=1
+  private pump(){
+    while(this.pending.size<this.requestLimit && this.queue.length){
+      const tile=this.queue.pop()!, control=new AbortController()
+      this.pending.set(tile,control)
+      readTrees(tile,control.signal).then(trees=>{
+        if(!control.signal.aborted){this.loaded.set(tile,trees);this.dirty=true}
+      }).catch(err=>{
+        if(!control.signal.aborted){console.error(err);this.retry.set(tile,performance.now()+10000)}
+      }).finally(()=>{this.pending.delete(tile);this.pump()})
+    }
+  }
   tick(position:THREE.Vector3, deferOuter=false){
     const distance=(tile:Tile)=>Math.hypot(tile.x+128-position.x,tile.z+128-position.z)
-    for(const tile of this.tiles){
-      if(distance(tile)>this.range.treeUnloadRadius){if(this.loaded.delete(tile))this.dirty=true;this.pending.get(tile)?.abort()}
+    for(const tile of this.loaded.keys()){
+      if(distance(tile)>this.range.treeUnloadRadius){this.loaded.delete(tile);this.dirty=true}
     }
-    const maxPending=deferOuter?1:3
-    const loadLimit=deferOuter?Math.min(this.range.treeLoadRadius,280):this.range.treeLoadRadius
+    for(const [tile,control] of this.pending)if(distance(tile)>this.range.treeUnloadRadius)control.abort()
+    const limit=deferOuter?Math.min(this.range.treeLoadRadius,280):this.range.treeLoadRadius
+    this.requestLimit=deferOuter?1:streamBudget.treeRequests
     const now=performance.now()
-    while(this.pending.size<maxPending){
-      let best=loadLimit,next:Tile|undefined
-      for(const tile of this.tiles){
-        if(this.loaded.has(tile)||this.pending.has(tile)||(this.retry.get(tile)??0)>=now)continue
-        const dist=distance(tile)
-        if(dist<best){best=dist;next=tile}
-      }
-      if(!next)break
-      const tile=next,control=new AbortController();this.pending.set(tile,control)
-      readTrees(tile,control.signal).then(trees=>{if(!control.signal.aborted){this.loaded.set(tile,trees);this.dirty=true}})
-        .catch(err=>{if(!control.signal.aborted){console.error(err);this.retry.set(tile,performance.now()+10000)}}).finally(()=>this.pending.delete(tile))
-    }
+    this.queue=Array.from(this.grid.near(position.x,position.z,limit))
+      .filter(tile=>distance(tile)<=limit&&!this.loaded.has(tile)&&!this.pending.has(tile)&&(this.retry.get(tile)??0)<=now)
+      .sort((a,b)=>distance(b)-distance(a))
+    this.pump()
     if(!this.loaded.size)return
     if(!this.dirty&&this.camera.position.distanceToSquared(this.anchor)<4&&this.rotation.angleTo(this.camera.quaternion)<.016)return
     this.anchor.copy(this.camera.position);this.dirty=false

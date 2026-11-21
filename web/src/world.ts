@@ -13,10 +13,11 @@ import type {Peaks} from './peaks'
 interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number}
 export interface Manifest {
-  bbox:[number,number,number,number]; builtArea?:{type:'Polygon';coordinates:[number,number][][]}
+  builtArea?:{type:'Polygon';coordinates:[number,number][][]}
+  distantBuildings?:Asset
   landmarks?:import('./landmarks').Landmark[]
-  version:number; extent:[number,number,number,number]; grid:number; chunkSize:number; chunks:Tile[];
-  peaks:Peaks; atlas:Asset; vehicles?:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset; waterMask?:string}
+  version:number; bbox:[number,number,number,number]; extent:[number,number,number,number]; grid:number; chunkSize:number; chunks:Tile[];
+  peaks:Peaks; atlas:Asset; vehicles?:Asset; overview:{step:number; heights:Asset; underlay:Asset; packedUnderlay?:Asset; texture:Asset; waterMask?:string}
 }
 export let bytes = 0
 export async function fetchAsset(file:string, signal?:AbortSignal) {
@@ -52,6 +53,62 @@ function ground(width:number, depth:number, step:number, height:(col:number,row:
   return geometry
 }
 
+// All overview tiles share vertices, material and one draw. Only coarse cells
+// touching a fine tile need the intermediate vertices along their common edge.
+function terrainPattern(side:number,stride:number,coarse:boolean,edges:number){
+  const out:number[]=[]
+  const v=(x:number,z:number)=>x+z*stride
+  const n=coarse?4:1
+  for(let z=0;z<side;z+=n)for(let x=0;x<side;x+=n){
+    const a=v(x,z), b=v(x,z+n), c=v(x+n,z+n), d=v(x+n,z)
+    const ring=[a]
+    if(x===0 && edges&1)for(let i=1;i<n;i++)ring.push(v(x,z+i))
+    ring.push(b)
+    if(z+n===side && edges&2)for(let i=1;i<n;i++)ring.push(v(x+i,z+n))
+    ring.push(c)
+    if(x+n===side && edges&4)for(let i=1;i<n;i++)ring.push(v(x+n,z+n-i))
+    ring.push(d)
+    if(z===0 && edges&8)for(let i=1;i<n;i++)ring.push(v(x+n-i,z))
+    if(ring.length===4)out.push(a,b,d,b,c,d)
+    else for(let i=0;i<ring.length;i++)out.push(v(x+n/2,z+n/2),ring[i],ring[(i+1)%ring.length])
+  }
+  return out
+}
+
+// Carry the last measured elevation and colour into the surrounding ground
+// plane. The apron is visual only and does not extend travel or physics bounds.
+function perimeterApron(width:number,depth:number,step:number,samples:Int16Array,image:ImageBitmap) {
+  const canvas = new OffscreenCanvas(image.width,image.height)
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(image,0,0)
+  const pixels = ctx.getImageData(0,0,image.width,image.height).data
+  const points:[number,number][] = []
+  for(let x=0;x<width;x+=step)points.push([x,0])
+  for(let z=0;z<depth;z+=step)points.push([width,z])
+  for(let x=width;x>0;x-=step)points.push([x,depth])
+  for(let z=depth;z>0;z-=step)points.push([0,z])
+  const positions:number[]=[],colors:number[]=[],indices:number[]=[]
+  const outer=new THREE.Color(look.outerGround),inner=new THREE.Color()
+  for(const [i,[x,z]] of points.entries()) {
+    const dx=x===0?-1:x===width?1:0, dz=z===0?-1:z===depth?1:0
+    const px=Math.min(image.width-1,Math.floor(x/width*image.width))
+    const py=Math.max(0,image.height-1-Math.floor(z/depth*image.height))
+    const at=4*(py*image.width+px)
+    inner.setRGB(pixels[at]/255,pixels[at+1]/255,pixels[at+2]/255,THREE.SRGBColorSpace)
+    positions.push(x,samples[z/step*(width/step+1)+x/step]/10,z,
+                   x+512*dx,look.outerGroundY+.01,z+512*dz)
+    colors.push(inner.r,inner.g,inner.b,outer.r,outer.g,outer.b)
+    const a=i*2,b=(i+1)%points.length*2
+    indices.push(a,b,b+1,a,b+1,a+1)
+  }
+  const geometry=new THREE.BufferGeometry()
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3))
+  geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  return new THREE.Mesh(geometry,new THREE.MeshLambertMaterial({vertexColors:true}))
+}
+
 async function inflateMask(encoded:string) {
   const bytes=Uint8Array.from(atob(encoded),char=>char.charCodeAt(0))
   const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))
@@ -59,9 +116,12 @@ async function inflateMask(encoded:string) {
 }
 
 export function startOverview(manifest:Manifest) {
-  const {underlay,texture,step,waterMask} = manifest.overview
+  const {underlay,packedUnderlay,texture,step,waterMask} = manifest.overview
   const [left,top,width,depth] = manifest.extent
-  const dispatched = Promise.all([fetchAsset(underlay.file),fetchAsset(texture.file)]).then(([values,image])=>{
+  const elevations = packedUnderlay
+    ? fetchAsset(packedUnderlay.file).then(data=>new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
+    : fetchAsset(underlay.file)
+  const dispatched = Promise.all([elevations,fetchAsset(texture.file)]).then(([values,image])=>{
     const blob = new Blob([image],{type:'image/png'})
     const bitmaps = Promise.all([
       createImageBitmap(blob,{imageOrientation:'flipY'}),
@@ -72,24 +132,70 @@ export function startOverview(manifest:Manifest) {
   const finish = dispatched.then(async ({values,bitmaps})=>{
     const [flipped,upright] = await bitmaps
     const samples = new Int16Array(values), cols = width/step
-    const geometry = ground(width,depth,step,(col,row)=>samples[row*(cols+1)+col]/10)
-    const mesh = new THREE.Mesh(geometry,bitmapMaterial(flipped))
-    const lake = await farWater(manifest,upright,samples)
+    const mesh = new THREE.Group()
     mesh.position.set(left,0,top)
-    const indices = geometry.index!, original = indices.array.slice(), side = manifest.chunkSize/step
-    function toggle(tile:Tile, show:boolean) {
-      const first = ((tile.z-top)/step*cols+(tile.x-left)/step)*6
-      for(let row=0;row<side;row++) {
-        const from = first+row*cols*6, to = from+side*6
-        if(show) indices.array.set(original.subarray(from,to),from)
-        else indices.array.fill(0,from,to)
-        indices.addUpdateRange(from,to-from)
+    const material = bitmapMaterial(flipped)
+    const size=manifest.chunkSize, side=size/step, stride=cols+1
+    const terrain=new THREE.BufferGeometry()
+    const positions=new Float32Array(samples.length*3), normals=new Float32Array(samples.length*3)
+    const uv=new Float32Array(samples.length*2)
+    const rows=depth/step
+    for(let z=0;z<=rows;z++)for(let x=0;x<=cols;x++){
+      const i=z*stride+x
+      positions[3*i]=x*step;positions[3*i+1]=samples[i]/10;positions[3*i+2]=z*step
+      const dx=(samples[i+(x>0?-1:0)]-samples[i+(x<cols?1:0)])/(10*step*(x>0&&x<cols?2:1))
+      const dz=(samples[i-(z>0?stride:0)]-samples[i+(z<rows?stride:0)])/(10*step*(z>0&&z<rows?2:1))
+      const n=1/Math.sqrt(dx*dx+1+dz*dz)
+      normals[3*i]=dx*n;normals[3*i+1]=n;normals[3*i+2]=dz*n
+      uv[2*i]=x/cols;uv[2*i+1]=1-z/rows
+    }
+    terrain.setAttribute('position',new THREE.BufferAttribute(positions,3))
+    terrain.setAttribute('normal',new THREE.BufferAttribute(normals,3))
+    terrain.setAttribute('uv',new THREE.BufferAttribute(uv,2))
+    terrain.setIndex(new THREE.BufferAttribute(new Uint32Array(cols*rows*6),1))
+    const terrainMesh=new THREE.Mesh(terrain,material)
+    mesh.add(terrainMesh)
+    const index=terrain.index!
+    index.setUsage(THREE.DynamicDrawUsage)
+    const fine=terrainPattern(side,stride,false,0)
+    const coarse=Array.from({length:16},(_,mask)=>terrainPattern(side,stride,true,mask))
+    const covered=new Set<Tile>()
+    let anchorX=Infinity, anchorZ=Infinity, lastFar=0, dirty=true
+    function update(camera:THREE.PerspectiveCamera){
+      lake.update(camera)
+      const {position,far}=camera
+      const ax=Math.floor(position.x/size), az=Math.floor(position.z/size)
+      if(!dirty && ax===anchorX && az===anchorZ && far===lastFar)return
+      anchorX=ax;anchorZ=az;lastFar=far;dirty=false
+      // The entire fine-detail streaming radius fits inside this square.
+      const fineRadius=7
+      const high=(x:number,z:number)=>Math.max(Math.abs(x-ax),Math.abs(z-az))<=fineRadius
+      let cursor=0
+      for(const tile of manifest.chunks){
+        if(covered.has(tile))continue
+        const x=tile.x/size,z=tile.z/size
+        if(Math.hypot(x-ax,z-az)*size>far+2*size)continue
+        const mask=Number(high(x-1,z))+2*Number(high(x,z+1))+4*Number(high(x+1,z))+8*Number(high(x,z-1))
+        const pattern=high(x,z)?fine:coarse[mask]
+        const offset=(tile.z-top)/step*stride+(tile.x-left)/step
+        for(const i of pattern)index.array[cursor++]=offset+i
       }
-      indices.needsUpdate = true
+      index.clearUpdateRanges()
+      if(cursor)index.addUpdateRange(0,cursor)
+      index.needsUpdate=true
+      terrain.setDrawRange(0,cursor)
+    }
+    if(manifest.chunks.length>512)mesh.add(perimeterApron(width,depth,step,samples,flipped))
+    const lake = await farWater(manifest,upright,samples)
+    mesh.add(lake.mesh)
+    lake.mesh.position.set(0,0,0)
+    function toggle(tile:Tile, show:boolean) {
+      if(show)covered.delete(tile)
+      else covered.add(tile)
+      dirty=true
       lake.toggle(tile,show)
     }
-    mesh.add(lake.mesh); lake.mesh.position.set(0,0,0)
-    return {mesh,toggle,water:lake.mesh}
+    return {mesh,toggle,update,water:lake.mesh}
   })
   return {dispatched,finish}
 }
@@ -98,9 +204,10 @@ export async function overview(manifest:Manifest) {
   return startOverview(manifest).finish
 }
 
-export async function detail(tile:Tile, signal:AbortSignal) {
+export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>) {
   const compressed = await fetchAsset(tile.file,signal)
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
+  if(parseSlot) await parseSlot()
   signal.throwIfAborted()
   const view = new DataView(buffer)
   if(view.getUint32(0)!==0x474c3034) throw Error('Invalid GL04 tile')
@@ -140,6 +247,7 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   const streets = await loadStreetGeometry(paths,step,heights)
   signal.throwIfAborted()
   const material = await surfaceMaterial(buffer.slice(offset,end))
+  if(parseSlot)await parseSlot()
   const group = new THREE.Group()
   group.position.set(tile.x,0,tile.z)
   const groundMesh = new THREE.Mesh(geometry,material)

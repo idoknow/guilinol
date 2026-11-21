@@ -35,7 +35,7 @@ export type FeedbackView = Point & {
   landmark_id: string | null
   build: string
 }
-export function validView(value: unknown): value is FeedbackView {
+export function validView(value: unknown, area: 'feedback' | 'saved' = 'feedback'): value is FeedbackView {
   const keys = (obj: unknown, list: string): obj is Record<string, unknown> =>
     !!obj &&
     typeof obj === 'object' &&
@@ -45,8 +45,9 @@ export function validView(value: unknown): value is FeedbackView {
     typeof num === 'number' && Number.isFinite(num) && num >= min && num <= max
   const point = (obj: Record<string, unknown>) => {
     if (
-      !range(obj.x, -3072, 3072) ||
-      !range(obj.z, -3328, 3328) ||
+      typeof obj.x !== 'number' || !Number.isFinite(obj.x) ||
+      typeof obj.z !== 'number' || !Number.isFinite(obj.z) ||
+      (area === 'feedback' && (Math.abs(obj.x)>3072 || Math.abs(obj.z)>3328)) ||
       !range(obj.y, -500, 6000) ||
       !range(obj.lat, -90, 90) ||
       !range(obj.lon, -180, 180)

@@ -14,7 +14,7 @@ export interface BatchedPeakMeta {
   vStart0: number
   vCount0: number
   idx0: Uint32Array
-  idx1: Uint16Array
+  idx1: Uint16Array | Uint32Array
 }
 
 export interface PeakWorkerOutput {
@@ -79,11 +79,14 @@ self.onmessage = async (event: MessageEvent<PeakWorkerInput>) => {
   const height0 = new Uint8Array(total0)
   const pick0 = new Uint16Array(total0)
 
-  const pos1 = new Float32Array(total1 * 3)
-  const norm1 = new Int8Array(total1 * 3)
-  const col1 = new Float32Array(total1 * 3)
-  const height1 = new Uint8Array(total1)
-  const pick1 = new Uint16Array(total1)
+  // The city-wide bootstrap package uses the same coarse mesh for both
+  // levels until its detail sector arrives. Shade and transfer it once.
+  const sharedLevel = procedural.every(({lods})=>lods[0].offset===lods[1].offset && lods[0].vertices===lods[1].vertices)
+  const pos1 = sharedLevel ? pos0 : new Float32Array(total1 * 3)
+  const norm1 = sharedLevel ? norm0 : new Int8Array(total1 * 3)
+  const col1 = sharedLevel ? col0 : new Float32Array(total1 * 3)
+  const height1 = sharedLevel ? height0 : new Uint8Array(total1)
+  const pick1 = sharedLevel ? pick0 : new Uint16Array(total1)
 
   const sharedIdx = new Map<number, Uint16Array>()
   const getShared = (indexOffset: number, indices: number) => {
@@ -194,7 +197,7 @@ self.onmessage = async (event: MessageEvent<PeakWorkerInput>) => {
     const lod0 = entry.lods[0], lod1 = entry.lods[1]
     const riverCliff=entry.name==='伏波山'
     const radius = fillLevel(lod0, cx, cy, cz, pickVal, pos0, norm0, col0, height0, pick0, cursor0, true,riverCliff)
-    fillLevel(lod1, cx, cy, cz, pickVal, pos1, norm1, col1, height1, pick1, cursor1, false,riverCliff)
+    if(!sharedLevel)fillLevel(lod1, cx, cy, cz, pickVal, pos1, norm1, col1, height1, pick1, cursor1, false,riverCliff)
 
     const template0 = getShared(lod0.indexOffset, lod0.indices)
     if (!localIdx0.length) localIdx0 = Uint32Array.from(template0)
@@ -202,7 +205,7 @@ self.onmessage = async (event: MessageEvent<PeakWorkerInput>) => {
     for (let i = 0; i < template0.length; i++) idx0[i] = template0[i] + cursor0
 
     const template1 = getShared(lod1.indexOffset, lod1.indices)
-    const idx1 = new Uint16Array(template1.length)
+    const idx1 = total1 > 65535 ? new Uint32Array(template1.length) : new Uint16Array(template1.length)
     for (let i = 0; i < template1.length; i++) idx1[i] = template1[i] + cursor1
 
     peaks.push({
@@ -226,5 +229,5 @@ self.onmessage = async (event: MessageEvent<PeakWorkerInput>) => {
     ...peaks.flatMap(p => [p.idx0.buffer, p.idx1.buffer]),
   ]
   const out: PeakWorkerOutput = {pos0, norm0, col0, height0, pick0, pos1, norm1, col1, height1, pick1, localIdx0, peaks}
-  ;(self as unknown as Worker).postMessage(out, transfer)
+  ;(self as unknown as Worker).postMessage(out, [...new Set(transfer)])
 }

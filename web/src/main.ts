@@ -1,3 +1,4 @@
+import {playableBounds} from '../../lib/projection'
 import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
 import {bytes, fetchAsset, startOverview, type Manifest} from './world'
@@ -85,6 +86,9 @@ async function start() {
   const opening = forcedSlot !== null
     ? spawnPool.find(slot => slot.id === forcedSlot) ?? spawnPool[0]
     : isDeepLink(openParams) ? null : consumeRestore() ? readLastView() ?? pickSpawn() : pickSpawn()
+  const hasDowntown = left<=-2304 && top<=-2560 && left+width>=1280 && top+depth>=3328
+  const framing = hasDowntown ? [-2304,-2560,3584,5888] : manifest.extent
+  const [viewX,viewZ,viewWidth,viewDepth] = framing
   let walker:Awaited<ReturnType<typeof import('./walk').walk>>|undefined, switching=false
   let cinema=false
   let walkModPromise:Promise<typeof import('./walk')>|undefined
@@ -96,12 +100,21 @@ async function start() {
   const controls = flight(camera,renderer.domElement,manifest.extent,()=>!walker?.active&&!switching&&!cinema)
   // Apply the opening pose here, after flight() has set rotation.order='YXZ'. lookAt()/rotation.set()
   // before that line would be recomputed in the wrong Euler order and leave a permanent roll.
+  const {min,max} = playableBounds(manifest.bbox)
+  function clampOpening() {
+    camera.position.x = THREE.MathUtils.clamp(camera.position.x,min.x,max.x)
+    camera.position.z = THREE.MathUtils.clamp(camera.position.z,min.z,max.z)
+  }
+  function restoreOpening(view:FeedbackView) {
+    applyLastView(camera,view)
+    clampOpening()
+  }
   if(opening) {
-    if('eye' in opening) { camera.position.set(...opening.eye); camera.lookAt(...opening.look) }
-    else applyLastView(camera, opening)
+    if('eye' in opening) { camera.position.set(...opening.eye); camera.lookAt(...opening.look); clampOpening() }
+    else restoreOpening(opening)
   } else {
-    camera.position.set(left+width*.55,420,top+depth*.62)
-    camera.lookAt(left+width*.47,150,top+depth*.45)
+    camera.position.set(viewX+viewWidth*.55,420,viewZ+viewDepth*.62)
+    camera.lookAt(viewX+viewWidth*.47,150,viewZ+viewDepth*.45)
   }
   function resize() {
     renderer.setPixelRatio(Math.min(devicePixelRatio,1.5)); renderer.setSize(innerWidth,innerHeight)
@@ -113,7 +126,7 @@ async function start() {
   scene.add(base.mesh,peaks)
   bootProgress('载入街区', 78)
   const clock = skyClock(params)
-  setPreset(camera,params.get('cam'))
+  setPreset(camera,params.get('cam'),manifest.bbox)
   const stream = new Stream(scene,manifest,base,rangeStore,camera)
   const output = document.querySelector('output')!
   let previous=0, first=0, frame=0, sum=0, samples=0
@@ -174,11 +187,11 @@ async function start() {
     switching=true
     try{
       const name=params.get('spawn'),preset=initial&&name&&Object.hasOwn(presets,name)?presets[name]:null
-      const original=camera.clone();if(preset)setPreset(original,name)
+      const original=camera.clone();if(preset)setPreset(original,name,manifest.bbox)
       const gate=walkConfig.gate,point=preset?.walk??(initial&&!preset?gate:{x:original.position.x,z:original.position.z,yaw:original.rotation.y})
       primeLanding(point.x,point.z)
       const walking=await loadWalker()
-      if(!await walking.enter(point.x,point.z,point.yaw,initial?name??'default':'flight',!!preset?.walk)&&initial){
+      if(!await walking.enter(point.x,point.z,point.yaw,initial?name??'default':'flight')&&initial){
         primeLanding(gate.x,gate.z)
         await walking.enter(gate.x,gate.z,gate.yaw,'fallback')
       }
@@ -317,7 +330,7 @@ async function start() {
     setView:(view:unknown)=>host.setView(view),
     async photoSupport(x:number,z:number,bridgeRadius?:number){return (await loadWalker()).photoSupport(x,z,bridgeRadius)},
     peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},
-    setPreset(name:string){setPreset(camera,name);camera.updateMatrixWorld();return stats.frame},
+    setPreset(name:string){setPreset(camera,name,manifest.bbox);camera.updateMatrixWorld();return stats.frame},
     freeze(){return new Promise<void>(resolve=>requestAnimationFrame(()=>{
       renderer.setAnimationLoop(null)
       const gl=renderer.getContext()
@@ -349,8 +362,9 @@ async function start() {
     spawnPool,
     saveLastViewNow:()=>host.lastView().then(saveLastView),
     readLastViewNow:()=>readLastView(),
-    applyLastViewNow:(view:FeedbackView)=>applyLastView(camera,view)}})
+    applyLastViewNow:restoreOpening}})
   function draw(){
+    base.update(camera)
     const metrics=stream.metrics
     const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
     cullLandmarks?.update(stream.landmarks.values(),camera,mirror,metrics.cullHorizon)
@@ -365,7 +379,7 @@ async function start() {
   }
   const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
     captureView:async()=>(await import('./play/feedback-view')).capture(host),
-    lastView:async()=>(await import('./play/feedback-view')).currentView(host,false),
+    lastView:async()=>(await import('./play/feedback-view')).currentView(host,'saved'),
     setView:async(view)=>(await import('./play/feedback-view')).setView(host,view),
     fly(){if(walker?.active)walker.leave();showMode()},get cinema(){return cinema},set cinema(on){cinema=on}}
   const sampleFrame=instrument(renderer,()=>{

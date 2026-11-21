@@ -1,0 +1,116 @@
+{
+  "timestamp": "2026-11-21T17:20:09.931Z",
+  "viewport": {
+    "width": 960,
+    "height": 540,
+    "renderer": "SwiftShader"
+  },
+  "sampleFrames": 60,
+  "firstFrame": {
+    "runsMs": [
+      3106.1,
+      3152.8,
+      3156.9,
+      3188.4,
+      3241.5
+    ],
+    "worldBytes": [
+      1265929,
+      1265929,
+      1265929,
+      1265929,
+      1265929
+    ],
+    "meanMs": 3169.1,
+    "maxMs": 3241.5,
+    "minMs": 3106.1
+  },
+  "viewpoints": {
+    "overview": {
+      "label": "overview",
+      "heapPeakBytes": 86459259,
+      "meanMs": 77.91,
+      "medianMs": 73,
+      "p95Ms": 103.3,
+      "calls": 12,
+      "mirrorCalls": 11,
+      "totalCalls": 23,
+      "peakCalls": 1,
+      "triangles": 80408,
+      "totalTriangles": 152164,
+      "loadedChunks": 12,
+      "vramMB": 13.12,
+      "bufferMB": 2.18,
+      "textureMB": 10.94
+    },
+    "lijiang": {
+      "label": "lijiang",
+      "heapPeakBytes": 255716597,
+      "meanMs": 274.01,
+      "medianMs": 272.3,
+      "p95Ms": 301.5,
+      "calls": 39,
+      "mirrorCalls": 36,
+      "totalCalls": 75,
+      "peakCalls": 3,
+      "triangles": 402029,
+      "totalTriangles": 789760,
+      "loadedChunks": 11,
+      "vramMB": 67.39,
+      "bufferMB": 52.13,
+      "textureMB": 15.25
+    },
+    "palace": {
+      "label": "palace",
+      "heapPeakBytes": 386237418,
+      "meanMs": 345.54,
+      "medianMs": 343.1,
+      "p95Ms": 377.6,
+      "calls": 45,
+      "mirrorCalls": 40,
+      "totalCalls": 85,
+      "peakCalls": 3,
+      "triangles": 456558,
+      "totalTriangles": 903062,
+      "loadedChunks": 12,
+      "vramMB": 74.86,
+      "bufferMB": 59.98,
+      "textureMB": 14.88
+    },
+    "south": {
+      "label": "south",
+      "heapPeakBytes": 154449155,
+      "meanMs": 264.32,
+      "medianMs": 241,
+      "p95Ms": 385.4,
+      "calls": 36,
+      "mirrorCalls": 33,
+      "totalCalls": 69,
+      "peakCalls": 2,
+      "triangles": 268176,
+      "totalTriangles": 520692,
+      "loadedChunks": 10,
+      "vramMB": 30.09,
+      "bufferMB": 16.4,
+      "textureMB": 13.69
+    },
+    "walk-palace": {
+      "label": "步行王城",
+      "heapPeakBytes": 315415129,
+      "meanMs": 346.56,
+      "medianMs": 345.8,
+      "p95Ms": 357.6,
+      "calls": 79,
+      "mirrorCalls": 75,
+      "totalCalls": 154,
+      "peakCalls": 3,
+      "triangles": 696856,
+      "totalTriangles": 1402776,
+      "loadedChunks": 12,
+      "vramMB": 113.95,
+      "bufferMB": 79.28,
+      "textureMB": 34.67
+    }
+  },
+  "errors": []
+}

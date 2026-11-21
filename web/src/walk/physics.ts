@@ -1,3 +1,4 @@
+import {playableBounds} from '../../../lib/projection'
 import R from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import type {PeakColliderData, PeaksGroup} from '../peaks'
@@ -285,6 +286,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       }
       regions.set(tile,{colliders,rings,fine:!!data});changed=true
     }
+    for(const [peak,collider] of mountains)if(!peaks.colliders.includes(peak)){remove(collider);mountains.delete(peak);changed=true}
     for(const peak of peaks.colliders){
       const near=Math.hypot(east-peak.center[0],south-peak.center[2])<=cfg.peakRadius
       if(!near&&mountains.has(peak)){remove(mountains.get(peak)!);mountains.delete(peak);changed=true}
@@ -404,9 +406,13 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     }
     return false
   }
+  const {min,max} = playableBounds(manifest.bbox)
+  function withinBounds(x:number,z:number){
+    return x>=min.x && x<=max.x && z>=min.z && z<=max.z
+  }
   function findWalkableSpawn(east:number,south:number,override=false){
     for(const {dx,dz} of override?[candidates[0]]:candidates){const x=east+dx,z=south+dz,tile=tileAt(x,z)
-      if(!tile||!stream.loaded.has(tile)||insideHouse(x,z))continue
+      if(!withinBounds(x,z)||!tile||!stream.loaded.has(tile)||insideHouse(x,z))continue
       const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'road')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
       const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05)continue
       const tread=surface(x,z,'landmark',support.y+cfg.step+.02,cfg.step+.04)
@@ -458,5 +464,5 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,pathBlocked,freeCapsule,wet,insideHouse,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
+  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
 }

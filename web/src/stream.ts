@@ -1,6 +1,7 @@
 import {fault,record} from './telemetry'
 import * as THREE from 'three'
 import {ChunkBatcher} from './batch'
+import {DistantBuildings} from './distant-buildings'
 import {Forest} from './forest'
 import {setTreeFar} from './look/trees'
 import {setFogMetrics} from './look/time'
@@ -15,6 +16,7 @@ import {
 } from './render-range'
 import {detail, type Manifest, type Tile, overview} from './world'
 
+import {TileGrid, streamBudget, frameSlots} from './tile-grid'
 export function tileCenterDistance(tile:Tile, position:THREE.Vector3){
   return Math.hypot(tile.x+128-position.x,tile.z+128-position.z)
 }
@@ -24,6 +26,10 @@ export function tileEdgeDistance(tile:Tile, x:number, z:number){
 }
 
 export class Stream {
+  private distant?:DistantBuildings
+  private grid: TileGrid
+  private parseSlot = frameSlots(streamBudget.parseMs)
+  private attachSlot = frameSlots(streamBudget.attachMs)
   overviewMesh(){return this.base.mesh}
   landmarks:import('./landmarks').LoadedLandmarks=new Map()
   updateLandmarks?:ReturnType<typeof import('./landmarks').landmarkStream>
@@ -37,18 +43,22 @@ export class Stream {
   private priorityTarget:THREE.Vector3|null = null
   private priorityUntil = 0
   private lastPosition = new THREE.Vector3(Infinity,0,0)
+  private queue:Tile[]=[]
+  private queueIsInner=false
   private innerPending = new Set<Tile>()
 
   constructor(
     private scene:THREE.Scene,
-    private manifest:Manifest,
+    manifest:Manifest,
     private base:Awaited<ReturnType<typeof overview>>,
     rangeOrRadius:number|RenderRangeStore|RenderRangeConfig = RENDER_RADIUS_DEFAULT,
     private camera:THREE.PerspectiveCamera,
   ) {
     this.rangeStore = rangeOrRadius instanceof RenderRangeStore ? rangeOrRadius : new RenderRangeStore(rangeOrRadius)
     const initialMetrics = this.rangeStore.getMetrics()
-    this.forest = new Forest(scene,manifest.chunks,camera,initialMetrics)
+    this.grid = new TileGrid(manifest)
+    if(manifest.distantBuildings)this.distant=new DistantBuildings(scene,manifest.distantBuildings.file,manifest.chunks)
+    this.forest = new Forest(scene,this.grid,camera,initialMetrics)
     this.batches = new ChunkBatcher(scene)
     this.syncMetrics(initialMetrics)
     this.rangeStore.subscribe((_cfg, metrics)=>{
@@ -103,7 +113,7 @@ export class Stream {
   }
 
   private hasUnloadedInner(x:number, z:number, metrics:RenderRangeMetrics, now:number){
-    for(const tile of this.manifest.chunks){
+    for(const tile of this.grid.near(x,z,metrics.spawnRingEdge+128)){
       if(tileEdgeDistance(tile,x,z)<=metrics.spawnRingEdge && !this.loaded.has(tile) && (this.failures.get(tile)??0)<=now) return true
     }
     return false
@@ -124,7 +134,8 @@ export class Stream {
     this.pending.set(tile,controller)
     if(inner) this.innerPending.add(tile)
     const start=performance.now()
-    detail(tile,controller.signal).then(item=>{
+    detail(tile,controller.signal,this.parseSlot).then(async item=>{
+      await this.attachSlot()
       if(controller.signal.aborted){item.dispose();return}
       this.scene.add(item.group);this.batches.add(item.batch);this.base.toggle(tile,false)
       this.loaded.set(tile,item);this.visited.add(tile);this.failures.delete(tile)
@@ -134,10 +145,19 @@ export class Stream {
     }).finally(()=>{
       this.pending.delete(tile)
       this.innerPending.delete(tile)
+      this.fillRequests()
     })
   }
 
+  private fillRequests(){
+    while(this.queue.length && this.pending.size<streamBudget.detailRequests){
+      if(this.queueIsInner && this.innerPending.size>=streamBudget.innerRequests)break
+      this.enqueue(this.queue.pop()!,this.queueIsInner)
+    }
+  }
+
   tick(position:THREE.Vector3) {
+    this.distant?.tick(this.camera,this.loaded)
     this.lastPosition.copy(position)
     const metrics = this.rangeStore.getMetrics()
     const now = performance.now()
@@ -152,7 +172,7 @@ export class Stream {
     const innerEdge = metrics.spawnRingEdge
 
     const innerTiles:Tile[] = []
-    for(const tile of this.manifest.chunks){
+    for(const tile of this.grid.near(focus.x,focus.z,innerEdge+128)){
       if(tileEdgeDistance(tile,focus.x,focus.z)<=innerEdge && !this.loaded.has(tile) && !this.pending.has(tile) && (this.failures.get(tile)??0)<=now){
         innerTiles.push(tile)
       }
@@ -179,30 +199,14 @@ export class Stream {
       if(!keepInner && tileCenterDistance(tile,position)>metrics.unloadRadius) controller.abort()
     }
 
-    if(innerTiles.length){
-      innerTiles.sort((a,b)=>tileEdgeDistance(a,focus.x,focus.z)-tileEdgeDistance(b,focus.x,focus.z))
-      for(const tile of innerTiles){
-        if(this.innerPending.size>=4 || this.pending.size>=6) break
-        this.enqueue(tile,true)
-      }
-      return
+    this.queueIsInner=innerBusy
+    if(innerBusy){
+      this.queue=innerTiles.sort((a,b)=>tileEdgeDistance(b,focus.x,focus.z)-tileEdgeDistance(a,focus.x,focus.z))
+    }else{
+      this.queue=Array.from(this.grid.near(position.x,position.z,metrics.radius))
+        .filter(tile=>!this.loaded.has(tile)&&!this.pending.has(tile)&&(this.failures.get(tile)??0)<=now && tileCenterDistance(tile,position)<=metrics.radius)
+        .sort((a,b)=>tileCenterDistance(b,position)-tileCenterDistance(a,position))
     }
-    if(innerBusy) return
-
-    const outerTiles:{tile:Tile; dist:number}[] = []
-    for(const tile of this.manifest.chunks){
-      if(this.loaded.has(tile)||this.pending.has(tile)||(this.failures.get(tile)??0)>now) continue
-      const dist = tileCenterDistance(tile,position)
-      if(dist<=metrics.radius) outerTiles.push({tile,dist})
-    }
-    if(!outerTiles.length) return
-    outerTiles.sort((a,b)=>a.dist-b.dist)
-    const maxAllowed = outerTiles[0].dist<=metrics.nearLoadRadius ? metrics.nearConcurrency : metrics.outerConcurrency
-    let launched = 0
-    for(const {tile} of outerTiles){
-      if(this.pending.size>=maxAllowed || launched>=2) break
-      this.enqueue(tile,false)
-      launched++
-    }
+    this.fillRequests()
   }
 }

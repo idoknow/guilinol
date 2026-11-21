@@ -1,3 +1,4 @@
+import {telemetryPreview} from './telemetry-preview.mjs'
 import assert from 'node:assert/strict'
 import {mkdir} from 'node:fs/promises'
 import {chromium} from 'playwright'
@@ -6,7 +7,7 @@ import {preview} from 'vite'
 const start=performance.now()
 const outDir=process.env.WALK_CAPTURE_DIR??'captures/walk'
 await mkdir(outDir,{recursive:true})
-const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
+const server=await preview({plugins:[telemetryPreview],root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 const baseUrl=`http://127.0.0.1:${server.httpServer.address().port}`
 let browser
 try {

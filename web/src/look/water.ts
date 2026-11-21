@@ -146,7 +146,9 @@ export async function farWater(manifest:{extent:[number,number,number,number],ch
     const start = positions.length/3
     let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity, minZ=Infinity, maxZ=-Infinity
     const endX=Math.min(cols,tx+per)*step
+    let previous = new Map<string,number>()
     for(let z0=tz*step;z0<Math.min(rows,tz+per)*step;z0+=8){
+      const current = new Map<string,number>()
       const row=Math.floor(z0/step),z1=z0+8
       let startX=tx*step,level=NaN
       for(let x1=tx*step;x1<=endX;x1+=8){
@@ -158,13 +160,22 @@ export async function farWater(manifest:{extent:[number,number,number,number],ch
         if(Object.is(level,next))continue
         const x0=startX;startX=x1
         if(Number.isFinite(level)){
-        if(left+x0<minX) minX=left+x0; if(left+x1>maxX) maxX=left+x1
-        if(level<minY) minY=level; if(level>maxY) maxY=level
-        if(top+z0<minZ) minZ=top+z0; if(top+z1>maxZ) maxZ=top+z1
-        positions.push(x0,level,z0, x0,level,z1, x1,level,z0, x1,level,z0, x0,level,z1, x1,level,z1)
+          minX=Math.min(minX,left+x0);maxX=Math.max(maxX,left+x1)
+          minY=Math.min(minY,level);maxY=Math.max(maxY,level)
+          minZ=Math.min(minZ,top+z0);maxZ=Math.max(maxZ,top+z1)
+          const key=x0+','+x1+','+level
+          const offset=previous.get(key)
+          if(offset===undefined){
+            current.set(key,positions.length)
+            positions.push(x0,level,z0, x0,level,z1, x1,level,z0, x1,level,z0, x0,level,z1, x1,level,z1)
+          }else{
+            current.set(key,offset)
+            positions[offset+5]=positions[offset+14]=positions[offset+17]=z1
+          }
         }
         level=next
       }
+      previous=current
     }
     const count = positions.length/3-start
     const fp:FarWaterPatch|null = count ? {box:new THREE.Box3(new THREE.Vector3(minX,minY-.5,minZ),new THREE.Vector3(maxX,maxY+.5,maxZ)), hidden:false} : null
@@ -172,16 +183,33 @@ export async function farWater(manifest:{extent:[number,number,number,number],ch
     ranges.set(`${left+tx*step},${top+tz*step}`,[start,count,fp])
   }
   farPatches = nextFar
-  const original = Float32Array.from(positions)
-  const mesh = finish(original.slice(),148,left,top)!
-  const attr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute
-  return {mesh,toggle(tile:{x:number,z:number},show:boolean){
-    const range = ranges.get(`${tile.x},${tile.z}`); if(!range||!range[1]) return
-    const [from,count,fp] = range, array = attr.array as Float32Array
-    if(fp) fp.hidden = !show
-    if(show) array.set(original.subarray(from*3,(from+count)*3),from*3); else array.fill(0,from*3,(from+count)*3)
-    attr.addUpdateRange(from*3,count*3); attr.needsUpdate = true
+  const mesh = finish(Float32Array.from(positions),148,left,top)!
+  const indices = new THREE.BufferAttribute(new Uint32Array(positions.length/3),1)
+  indices.setUsage(THREE.DynamicDrawUsage)
+  mesh.geometry.setIndex(indices)
+  const frustum=new THREE.Frustum(), projection=new THREE.Matrix4(), previousView=new THREE.Matrix4()
+  let dirty=true
+  return {mesh,update(camera:THREE.PerspectiveCamera){
+    camera.updateMatrixWorld()
+    projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse)
+    if(!dirty && projection.equals(previousView))return
+    previousView.copy(projection);dirty=false
+    frustum.setFromProjectionMatrix(projection)
+    let cursor=0
+    for(const [start,count,patch] of ranges.values()){
+      if(!patch || patch.hidden || !frustum.intersectsBox(patch.box))continue
+      for(let i=start;i<start+count;i++)indices.array[cursor++]=i
+    }
+    indices.clearUpdateRanges()
+    if(cursor)indices.addUpdateRange(0,cursor)
+    indices.needsUpdate=true
+    mesh.geometry.setDrawRange(0,cursor)
+    mesh.visible=cursor>0
+  },toggle(tile:{x:number,z:number},show:boolean){
+    const patch=ranges.get(`${tile.x},${tile.z}`)?.[2]
+    if(patch){patch.hidden=!show;dirty=true}
   }}
+
 }
 
 // Mirror pass: reflect the camera in the plane y = level of the nearest loaded water, oblique-clip

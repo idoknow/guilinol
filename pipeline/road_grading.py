@@ -11,7 +11,11 @@ from statistics import median
 import numpy as np
 from scipy.spatial import cKDTree
 from scipy.ndimage import distance_transform_edt, gaussian_filter, maximum_filter
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse.linalg import spsolve
+from concurrent.futures import ThreadPoolExecutor
+import hashlib
+import tempfile
 from shapely import STRtree, intersects_xy
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
@@ -110,6 +114,42 @@ def _add_diff_rows(rows_l, cols_l, vals_l, rhs_l, row_cursor: int,
     return row_cursor + n
 
 
+def solve_city_spline(A, rhs, initial):
+    """Overlapping Dirichlet subdomains on the same survey least-squares system."""
+    height,width = initial.shape
+    side,halo = 96,20   # 768 m core and 160 m of surrounding survey constraints
+    tiles = [(r,c) for r in range(0,height,side) for c in range(0,width,side)]
+    transposed = A.T.tocsr()
+    ctrl = initial.copy()
+    for _ in range(4):
+        residual = rhs-A@ctrl.ravel()
+        correction = np.zeros_like(ctrl)
+        def patch(tile):
+            r,c = tile
+            r1,c1 = min(r+side,height),min(c+side,width)
+            top,left = max(0,r-halo),max(0,c-halo)
+            rows = np.arange(top,min(height,r1+halo))
+            cols = np.arange(left,min(width,c1+halo))
+            local = transposed[(rows[:,None]*width+cols).ravel()]
+            used, compact = np.unique(local.indices,return_inverse=True)
+            design = csr_matrix((local.data,compact,local.indptr),shape=(local.shape[0],len(used)))
+            normal = (design@design.T).tocsc()
+            delta = spsolve(normal,design@residual[used],permc_spec='MMD_AT_PLUS_A')
+            core = delta.reshape(len(rows),len(cols))[r-top:r1-top,c-left:c1-left]
+            return r,r1,c,c1,core.copy()
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            for r,r1,c,c1,core in pool.map(patch,tiles):
+                correction[r:r1,c:c1]=core
+        ctrl+=correction
+        shift = np.max(np.abs(correction))
+        if not np.isfinite(shift):
+            raise ValueError('Non-finite city road spline')
+        print(f'Road subdomain correction: {shift:.5f} m',flush=True)
+        if shift<.001:
+            break
+    return ctrl
+
+
 def solve_road_spline(A, b_rhs, initial):
     # Canonicalize the survey constraints before the solve: GEOS/libm last bits
     # otherwise propagate through thousands of Lanczos iterations.
@@ -117,6 +157,20 @@ def solve_road_spline(A, b_rhs, initial):
     x0 = np.round(initial.ravel(), 8)
     A.data = np.round(A.data, 8)
     A.eliminate_zeros()
+    if initial.size>1_000_000:
+        directory = Path(__file__).resolve().parents[1]/'.world-cache'
+        directory.mkdir(exist_ok=True)
+        digest = hashlib.sha256(Path(__file__).read_bytes())
+        for array in (A.indptr,A.indices,A.data,b_rhs,initial):
+            digest.update(np.ascontiguousarray(array).view(np.uint8))
+        path = directory/('spline-'+digest.hexdigest()+'.npy')
+        if path.exists():
+            return np.load(path,allow_pickle=False)
+        result = solve_city_spline(A,np.round(b_rhs,8),x0.reshape(initial.shape))
+        with tempfile.NamedTemporaryFile(dir=directory,delete=False) as out:
+            np.save(out,result)
+        Path(out.name).replace(path)
+        return result
     payload = b''.join((np.asarray(A.shape, '<u4').tobytes(),
                         A.indptr.astype('<u4').tobytes(), A.indices.astype('<u4').tobytes(),
                         A.data.astype('<f8').tobytes(), np.round(b_rhs, 8).astype('<f8').tobytes(),
@@ -869,7 +923,9 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
         shape=(cursor, gh * gw),
     ).tocsr()
     b_rhs = np.concatenate(rhs_l)
+    del rows_l,cols_l,vals_l,rhs_l
     ctrl = solve_road_spline(A, b_rhs, smooth_bg_ctrl)
+    del A,b_rhs
 
     # Imprint S(x, z) onto DRY cells of original_dm & terrain_dm:
     # - Inside actual road footprint (excluding landmark bounds): lift or press smoothly to road bed.
@@ -892,6 +948,26 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
             actual_road_geom = actual_road_geom.difference(lm_keep)
         inside_actual = intersects_xy(actual_road_geom, X4, Z4) if not actual_road_geom.is_empty else np.zeros_like(wet)
         inside_bed = intersects_xy(u_roads.buffer(14.0), X4, Z4)
+        if ctrl.size > 1_000_000:
+            # A lakeside road can be cut below the original DEM while the
+            # baked freeboard keeps its shoulder above the water. Lift the
+            # spline before grading, spreading the rise along both approaches.
+            rr, cc = np.where(inside_bed & (shore_floor_dm != -32768))
+            east, south = xs4[cc], zs4[rr]
+            delta = shore_floor_dm[rr, cc]/10 + .15 - eval_bspline_grid(ctrl,left,top,east,south)
+            outside = (east < -2304) | (east > 1280) | (south < -2560) | (south > 3328)
+            lifts = np.zeros_like(ctrl)
+            for x,z,rise in zip(east[(delta>0)&outside],south[(delta>0)&outside],delta[(delta>0)&outside]):
+                taper = max(100.,rise*100.)
+                radius = 32 + taper
+                cx, cz = (x-left)/STEP+1, (z-top)/STEP+1
+                x0, x1 = max(0,int(cx-radius/STEP)),min(gw,math.ceil(cx+radius/STEP)+1)
+                z0, z1 = max(0,int(cz-radius/STEP)),min(gh,math.ceil(cz+radius/STEP)+1)
+                dz,dx = np.ogrid[z0:z1,x0:x1]
+                t = np.clip((radius-STEP*np.hypot(dx-cx,dz-cz))/taper,0,1)
+                patch = lifts[z0:z1,x0:x1]
+                np.maximum(patch,rise*t*t*(3-2*t),out=patch)
+            ctrl += lifts
         dist_out_m = distance_transform_edt(~inside_bed) * GRID
         apron_mask = (~wet) & (dist_out_m < 8.0)
         ar, ac = np.where(apron_mask)
@@ -1075,6 +1151,23 @@ def solve_road_and_bridge_elevations(original_dm: np.ndarray, terrain_dm: np.nda
                     delta = ground_mesh_at(*endpoint)+.045-h_adj[station]
                     h_adj += delta*np.maximum(0.,1.-distance/run)
             bridge_plans[wid] = (line, b_width, s_b, h_adj)
+
+        # A spur meeting an interior node of a closed elevated road joins
+        # the ring deck at that station, independently of the ground below.
+        ring_nodes = {}
+        for ring_id,(ring,width,stations,levels) in bridge_plans.items():
+            if ring.is_ring:
+                for node in osm_ways[ring_id][0]:
+                    ring_nodes[node] = (width,float(np.interp(ring.project(Point(node)),stations,levels)))
+        for wid,(line,width,stations,levels) in bridge_plans.items():
+            if line.is_ring:
+                continue
+            for node,distances in ((line.coords[0],stations),(line.coords[-1],line.length-stations)):
+                if node in ring_nodes:
+                    ring_width,level = ring_nodes[node]
+                    t = np.clip((distances-ring_width)/min(40.,line.length/2),0,1)
+                    weight = t*t*(3-2*t)
+                    levels[:] = level*(1-weight) + levels*weight
 
     if jb_pos is not None:
         # Finish the two extended seams locally, after the citywide fit and

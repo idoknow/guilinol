@@ -7,7 +7,7 @@ import type {PeakWorkerInput, PeakWorkerOutput} from './peaks-worker'
 
 interface Section {offset:number; vertices:number; indices:number; indexOffset:number}
 export interface Peaks {
-  file:string; entries:{name:string; center:[number,number,number]; baseHeight?:number; lods:Section[]; model?:string}[]
+  file:string; sectorSize?:number; entries:{name:string; center:[number,number,number]; baseHeight?:number; lods:Section[]; model?:string}[]
 }
 export interface PeakColliderData {
   name:string
@@ -34,7 +34,7 @@ function inFrustum(frustum:THREE.Frustum, pt:THREE.Vector3, radius:number) {
   return true
 }
 
-export function startPeaks(asset:Peaks) {
+function loadBatch(asset:Peaks, sector?:'coarse'|'detail') {
   const worker = prewarmedWorker ?? new Worker(new URL('./peaks-worker.ts',import.meta.url),{type:'module'})
   prewarmedWorker = null
   const palette = [
@@ -45,11 +45,28 @@ export function startPeaks(asset:Peaks) {
   let markDispatched!:()=>void
   const dispatched = new Promise<void>(r=>{markDispatched=r})
   const workerDone = fetchAsset(asset.file).then(packed=>{
+    let entries = asset.entries
+    if(sector) {
+      // Each procedural peak has two pairs of uint32 offsets before the gzip member.
+      const header = new DataView(packed)
+      let cursor = 0
+      entries = entries.map(entry=>{
+        if(entry.model)return entry
+        const lods = entry.lods.map(lod=>{
+          const source = sector==='coarse'?entry.lods[1]:lod
+          const indexOffset = header.getUint32(cursor,true), offset = header.getUint32(cursor+4,true)
+          cursor += 8
+          return {...source,indexOffset,offset}
+        })
+        return {...entry,lods}
+      })
+      packed = packed.slice(cursor)
+    }
     const workerPromise = new Promise<PeakWorkerOutput>((resolve,reject)=>{
       worker.onmessage = event=>{worker.terminate();resolve(event.data)}
       worker.onerror = err=>{worker.terminate();reject(err)}
       const msg:PeakWorkerInput = {
-        packed, entries:asset.entries, palette,
+        packed, entries, palette,
         bareFrom:look.peakBareFrom, rockShare:look.peakRockShare, jitter:look.peakJitter,
       }
       worker.postMessage(msg,[packed])
@@ -65,6 +82,84 @@ export function startPeaks(asset:Peaks) {
     return group
   })
   return {dispatched, finish}
+}
+
+export function startPeaks(asset:Peaks) {
+  const size = asset.sectorSize
+  if(!size)return loadBatch(asset)
+  const coarse = loadBatch({...asset,file:'peaks-far.bin'},'coarse')
+  const finish = coarse.finish.then(base=>{
+    const groups = new Map<string,Peaks['entries']>()
+    for(const entry of asset.entries) {
+      if(entry.model)continue
+      const [x,,z] = entry.center
+      const key = Math.floor(x/size)+'_'+Math.floor(z/size)
+      const group = groups.get(key)??[]
+      group.push(entry);groups.set(key,group)
+    }
+    const loaded = new Map<string,PeaksGroup>()
+    const retry = new Map<string,number>()
+    const hidden = new Set<string>()
+    const coarseColliders = base.colliders
+    let pending = false
+    const scene = new THREE.Group()
+    scene.add(base)
+    const group:PeaksGroup = Object.assign(scene,{
+      colliders:coarseColliders, modelPeaks:base.modelPeaks, stats:{...base.stats},
+      loadModels:(renderer:THREE.WebGLRenderer)=>base.loadModels(renderer),
+      update(camera:THREE.PerspectiveCamera,level?:number,range?:Parameters<PeaksGroup['update']>[2]) {
+        const {x,z} = camera.position
+        const near = new Map<string,number>()
+        for(let rz=Math.floor((z-1600)/size);rz<=Math.floor((z+1600)/size);rz++) {
+          for(let cx=Math.floor((x-1600)/size);cx<=Math.floor((x+1600)/size);cx++) {
+            const key = cx+'_'+rz
+            if(groups.has(key))near.set(key,Math.hypot((cx+.5)*size-x,(rz+.5)*size-z))
+          }
+        }
+        let changed = false
+        for(const [key,batch] of loaded) if(!near.has(key)) {
+          group.remove(batch)
+          batch.traverse(node=>{
+            if(node instanceof THREE.Mesh){node.geometry.dispose();node.material.dispose()}
+          })
+          loaded.delete(key);changed=true
+        }
+        if(!pending) {
+          const next = [...near].filter(([key])=>!loaded.has(key)&&(retry.get(key)??0)<=performance.now())
+            .sort((a,b)=>a[1]-b[1])[0]
+          if(next) {
+            const key = next[0]
+            pending=true
+            void loadBatch({entries:groups.get(key)!,file:'peaks-'+key+'.bin'},'detail').finish.then(batch=>{
+              loaded.set(key,batch);group.add(batch);refreshColliders()
+            }).catch(err=>{retry.set(key,performance.now()+10000);console.warn(key,err)})
+              .finally(()=>{pending=false})
+          }
+        }
+        if(changed)refreshColliders()
+        base.update(camera,level,range)
+        Object.assign(group.stats,base.stats)
+        for(const batch of loaded.values()){
+          batch.update(camera,level,range)
+          group.stats.calls+=batch.stats.calls
+          group.stats.lod0Peaks+=batch.stats.lod0Peaks
+          group.stats.lod1Peaks+=batch.stats.lod1Peaks
+        }
+      },
+    })
+    function refreshColliders(){
+      hidden.clear()
+      const detail:PeakColliderData[]=[]
+      for(const batch of loaded.values())for(const collider of batch.colliders){
+        hidden.add(collider.name);detail.push(collider)
+      }
+      base.userData.hidden = hidden
+      base.userData.visibilityChanged = true
+      group.colliders=coarseColliders.filter(c=>!hidden.has(c.name)).concat(detail)
+    }
+    return group
+  })
+  return {dispatched:coarse.dispatched,finish}
 }
 
 export async function loadPeaks(asset:Peaks):Promise<PeaksGroup> {
@@ -100,7 +195,7 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
   geom0.setDrawRange(0,0)
 
   const totalIdx1 = data.peaks.reduce((sum,p)=>sum+p.idx1.length,0)
-  const idxArray1 = new Uint16Array(totalIdx1)
+  const idxArray1 = data.pos1.length/3 > 65535 ? new Uint32Array(totalIdx1) : new Uint16Array(totalIdx1)
   const idxAttr1 = new THREE.BufferAttribute(idxArray1,1)
   idxAttr1.setUsage(THREE.DynamicDrawUsage)
   geom1.setIndex(idxAttr1)
@@ -148,12 +243,13 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
       const cullHorizon = range?.cullHorizon ?? look.fogHorizonTo
       const lodSplit = range?.peakLodSplit ?? 800
       if(
-        camera.position.distanceToSquared(lastPos)<4 &&
+        !group.userData.visibilityChanged && camera.position.distanceToSquared(lastPos)<4 &&
         lastQuat.angleTo(camera.quaternion)<.012 &&
         cullHorizon===lastHorizon &&
         lodSplit===lastLodSplit &&
         (mirrorLevel===lastMirror || (Number.isFinite(mirrorLevel) && Number.isFinite(lastMirror) && Math.abs(mirrorLevel-lastMirror)<.5))
       ) return
+      group.userData.visibilityChanged=false
       lastPos.copy(camera.position); lastQuat.copy(camera.quaternion); lastMirror = mirrorLevel
       lastHorizon = cullHorizon; lastLodSplit = lodSplit
       camera.updateMatrixWorld()
@@ -181,6 +277,7 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
           visible = inFrustum(frustum,pt,p.radius)
         }
         if(!visible) continue
+        if(group.userData.hidden?.has(p.name))continue
         const bit = 1n<<BigInt(i)
         if(isFar) { mask1 |= bit; vis1.push(i) }
         else { mask0 |= bit; vis0.push(i) }
@@ -234,6 +331,7 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
     const ray = raycaster.ray
     for(let i=0;i<data.peaks.length;i++) {
       const p = data.peaks[i]
+      if(group.userData.hidden?.has(p.name))continue
       raySphere.center.set(p.center[0],p.center[1],p.center[2])
       raySphere.radius = p.radius
       if(!ray.intersectsSphere(raySphere)) continue
