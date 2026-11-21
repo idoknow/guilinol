@@ -25,6 +25,10 @@ MARKET = next(entry for entry in json.loads((ROOT / 'pipeline/landmarks.json').r
               if entry['id'] == 'wangcheng_market')
 ORIGIN = np.array(ll2xz(*reversed(MARKET['anchor'])))
 
+SCREEN_FACE = 'earth'
+SCREEN_FRAME = 'yellow'
+SCREEN_PALETTE = {SCREEN_FACE: '#9292a2', SCREEN_FRAME: '#c9c9ca'}
+
 
 def point(coords):
     return np.array(ll2xz(*reversed(coords))) - ORIGIN
@@ -166,7 +170,12 @@ def envelope(model, feature):
                     model.box(along,2.52,.16,length/count-.30,.46,.31,'sign')
             if name=='R2' and outward[0]>.3 and outward[1]<-.3:
                 # The dark full-height advertising panel faces the walking street (Rock 09).
-                model.box(0,4.3,.24,length*.94,height-8.0,.26,'sign')
+                width, panel_height, rim = length*.94, height-8.0, .30
+                model.box(0,4.3+rim,.24,width-2*rim,panel_height-2*rim,.26,SCREEN_FACE)
+                for base in (4.3,4.3+panel_height-rim):
+                    model.box(0,base,.24,width,rim,.26,SCREEN_FRAME)
+                for jamb in (-(width-rim)/2,(width-rim)/2):
+                    model.box(jamb,4.3+rim,.24,rim,panel_height-2*rim,.26,SCREEN_FRAME)
                 model.box(0,height-.10,0,length,1.78,.30,'granite')
                 letters(model,'港舍',(0,height+.18,.16),length*.76,1.35,'white')
             bays=max(1,round(length/2.4))
