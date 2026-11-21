@@ -275,3 +275,15 @@ body[data-home] :is(.render-entry, .render-pop) {
     overflow: auto;
   }
 }
+
+/* IDOK-122 / IDOK-128: prevent .render-entry from overlapping mobile street-hud .minimap (top:58px, h:112px) */
+@media (pointer: coarse), (max-width: 560px) {
+  body[data-hud=street] .render-entry {
+    top: calc(214px + env(safe-area-inset-top));
+    left: calc(12px + env(safe-area-inset-left));
+  }
+  body[data-hud=street] .render-pop {
+    top: calc(248px + env(safe-area-inset-top));
+    left: calc(12px + env(safe-area-inset-left));
+  }
+}

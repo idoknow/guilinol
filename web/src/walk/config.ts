@@ -8,15 +8,18 @@ export {
   bicycleGearConfigs,
   ebikeBatteryConfig,
   ebikeTierConfigs,
+  personalEbikeTuningConfigs,
   resolveEbikeKind,
   resolveEbikeProfile,
   resolveEbikeTier,
+  resolvePersonalEbikeProfile,
   type EbikeBatteryStatus,
   type EbikeGearProfile,
   type EbikeTier,
   type EbikeUpgradeMods,
   type EbikeVehicleType,
   type NormalizedEbikeUpgrades,
+  type PersonalEbikeTierId,
   type ResolvedEbikeProfile,
 } from './tuning'
 import {EBIKE_COMPLIANT_CAP_KMH} from './tuning'

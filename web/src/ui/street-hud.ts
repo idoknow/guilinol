@@ -1,4 +1,5 @@
 import './street-hud.css'
+import {isGlobalHotkeyBlocked} from '../walk/input-guard'
 
 // Phase 2 街头 HUD (docs/style.md 第二期 · HUD). Pure view: it renders whatever state it is given and never
 // touches engine objects. G1+ wires `mountStreetHud` to `onState` from web/src/game/state.ts; until then
@@ -49,9 +50,17 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean}={}) {
   const $ = <T extends HTMLElement>(sel:string)=>root.querySelector<T>(sel)!
   const wanted = $('.st-wanted'); wanted.innerHTML = '<i></i>'.repeat(5)
   const phone = $('.st-phone'), phoneButton = $('.st-phone-btn')
-  const togglePhone = (on = phone.hidden)=>{phone.hidden = !on; document.body.toggleAttribute('data-phone', on)}
+  const togglePhone = (on = phone.hidden)=>{
+    if(on && document.body.dataset.shopOpen === '1') return
+    phone.hidden = !on; document.body.toggleAttribute('data-phone', on)
+  }
   phoneButton.onclick = ()=>togglePhone()
-  addEventListener('keydown', e=>{if(e.code==='Tab'){e.preventDefault(); togglePhone()}})
+  addEventListener('keydown', e=>{
+    if(e.code==='Tab'){
+      if(isGlobalHotkeyBlocked(e.target) && phone.hidden) return
+      e.preventDefault(); togglePhone()
+    }
+  })
   if(opts.phone) togglePhone(true)
 
   function render(s:Readonly<HudState>) {

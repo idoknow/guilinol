@@ -60,7 +60,7 @@ export const look = {
   streets: {
     hedge: 0x486544, iron: 0x42624e,
     directionSign: 0x3279a7,
-    sharedBike: 0x72d5b0,
+    sharedBike: 0x5e7680,
     awnings: [0x2f8a4a,0x2766b0,0xc23b33,0x8b8e90], shutter:0x8d9391,
     // Phase 2: dark asphalt so markings, neon and wet reflections read; cool grey sidewalk.
     surfaces: [0x3f4245, 0x8e8d89, 0xf1eee4, 0x8f897b, 0x737962, 0x4a4c4f, 0xa18b55],

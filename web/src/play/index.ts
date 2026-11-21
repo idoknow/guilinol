@@ -5,6 +5,7 @@ import type {Host} from './host'
 import {photoMode} from './photo'
 import {mapView} from './map'
 import {isGlobalHotkeyBlocked, shouldPhotoYieldKeyPFromDom} from '../walk/input-guard'
+import {registerSpotFound} from '../game/state'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
 const ease = (t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2
@@ -88,7 +89,7 @@ export function play(host:Host) {
   // Stamp + card. Walking into the ring does it; so does travelling there (the spawn search may land a few metres off).
   function arrive(m:typeof marks[number]) {
     m.armed = false; const fresh = !stamps.has(m.spot.id)
-    if(fresh){stamps.add(m.spot.id); save(); restamp(m.spot.id); refreshCount()}
+    if(fresh){stamps.add(m.spot.id); save(); registerSpotFound(m.spot.id); restamp(m.spot.id); refreshCount()}
     showCard(m.spot,fresh)
   }
 

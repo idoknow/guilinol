@@ -22,6 +22,11 @@ import {flags} from './debug'
 import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRangeConfig} from './render-range'
 import {renderRangeControl} from './ui/render-range'
 import type {FeedbackView} from '../../lib/feedback-contract'
+import * as gameState from './game/state'
+import * as gameCommerce from './game/commerce'
+import * as gameCatalog from './game/catalog'
+import * as gameShops from './game/shops'
+import * as gameQuietZones from './game/quiet-zones'
 
 installAtmosphere()
 // The title screen (ui/home.ts) pauses the scene while it covers it: no simulation, no draws.
@@ -214,6 +219,19 @@ async function start() {
     setView:(view:unknown)=>host.setView(view),
     async photoSupport(x:number,z:number,bridgeRadius?:number){return (await loadWalker()).photoSupport(x,z,bridgeRadius)},
     peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},
+    game:{
+      getState:gameState.getState,
+      onState:gameState.onState,
+      onEvent:gameState.onEvent,
+      emit:gameState.emit,
+      exportSave:gameState.exportSaveSnapshot,
+      flushSave:gameState.flushSaveNow,
+      loadSave:gameState.loadSaveFromStorage,
+      commerce:gameCommerce,
+      catalog:gameCatalog,
+      shops:gameShops,
+      quietZones:gameQuietZones,
+    },
     setPreset(name:string){setPreset(camera,name);camera.updateMatrixWorld();return stats.frame},
     freeze(){return new Promise<void>(resolve=>requestAnimationFrame(()=>{
       renderer.setAnimationLoop(null)

@@ -179,12 +179,12 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   btnRun.onpointerup=event=>endRun(true,event.pointerId)
   btnRun.onpointercancel=event=>endRun(false,event.pointerId)
   new MutationObserver(()=>{
-    if(document.body.dataset.photo==='on'){clearTransientInput(true);return}
+    if(document.body.dataset.photo==='on'||document.body.dataset.shopOpen==='1'){clearTransientInput(true);return}
     crouch=false;syncCrouch()
     runHold=false;runLock=false;runPointer=-1
     resetRideTouchControls()
     resetStick()
-  }).observe(document.body,{attributes:true,attributeFilter:['data-aboard','data-photo']})
+  }).observe(document.body,{attributes:true,attributeFilter:['data-aboard','data-photo','data-shop-open']})
 
   window.addEventListener('keydown',event=>{
     if(!active()||isGlobalHotkeyBlocked(event.target))return
@@ -283,6 +283,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     clearRun(){
       runHold=false;runLock=false;runPointer=-1;syncRun()
     },
+    clearTransientInput,
     read(){
       if(document.body.hasAttribute('data-aboard')&&(runHold||runLock)){runHold=false;runLock=false;runPointer=-1;syncRun()}
       if(document.body.hasAttribute('data-aboard')&&crouch){crouch=false;syncCrouch()}

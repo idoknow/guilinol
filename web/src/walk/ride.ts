@@ -14,6 +14,7 @@ import {
   ebikeRealFeaturesConfig,
   resolveEbikeKind,
   resolveEbikeProfile,
+  resolvePersonalEbikeProfile,
   twoWheelCrashFlowConfig,
   walkConfig as wcfg,
   type EbikeBatteryStatus,
@@ -24,6 +25,7 @@ import {
   type EbikeUpgradeMods,
   type EbikeVehicleType,
   type NormalizedEbikeUpgrades,
+  type PersonalEbikeTierId,
   type ResolvedEbikeProfile,
   type TwoWheelCrashPhase,
   type TwoWheelCrashReason,
@@ -49,6 +51,8 @@ export interface EbikeStepControl {
 export interface EbikeMountOptions {
   vehicleType?: EbikeVehicleType
   tier?: EbikeTier
+  modelId?: PersonalEbikeTierId | null
+  durabilityPct?: number
   batteryPct?: number
   mods?: EbikeUpgradeMods | null
   keepGear?: boolean
@@ -415,8 +419,14 @@ export function createBikeControl() {
   let onPavement = false, wetSurface = false, offRoadSurface = false
   let kind: RideKind = 'bike'
   let vehicleType: EbikeVehicleType = 'normal'
+  let modelId: PersonalEbikeTierId | null = null
+  let durabilityPct = 100
   let mods: EbikeUpgradeMods | null = null
-  let profile: ResolvedEbikeProfile = resolveEbikeProfile(vehicleType)
+  const computeActiveProfile = () =>
+    vehicleType === 'normal' && modelId
+      ? resolvePersonalEbikeProfile(modelId, mods, durabilityPct)
+      : resolveEbikeProfile(vehicleType, mods)
+  let profile: ResolvedEbikeProfile = computeActiveProfile()
   let gear = EBIKE_DEFAULT_GEAR
   let batteryPct = 100
   let lastBatteryStatus: EbikeBatteryStatus = 'normal'
@@ -581,8 +591,10 @@ export function createBikeControl() {
     gripLimitRad = spec().crash.mandatoryFallLeanRad
     kind = 'bike'
     vehicleType = 'normal'
+    modelId = null
+    durabilityPct = 100
     mods = null
-    profile = resolveEbikeProfile('normal')
+    profile = computeActiveProfile()
     gear = EBIKE_DEFAULT_GEAR
     batteryPct = 100
     lastBatteryStatus = 'normal'
@@ -611,12 +623,17 @@ export function createBikeControl() {
     clearCrashState()
   }
 
-  function unlockParkIfNeeded(silent = false) {
+  function unlockParkIfNeeded(silent = false, preserveExplicitGear = false) {
     if (!parkLocked && !kickstandDown) return
     parkLocked = false
     kickstandDown = false
     throttleBlockedByPark = false
     brakeUnlockHold = 0
+    // IDOK-124 deterministic gear recovery: unlocking P-gear from standstill clamps high gear (D3/S) -> D2
+    // so pressing E / P / brake never lurches forward in S-gear, while explicit Digit1-4 respects chosen gear.
+    if (kind === 'bike' && !preserveExplicitGear && Math.abs(speed) <= 0.25 && gear > EBIKE_DEFAULT_GEAR) {
+      gear = EBIKE_DEFAULT_GEAR
+    }
     if (!silent && !isVerifySilentMode()) {
       emitToast(kind === 'bike' ? `已解除 P 档 · 进入 ${currentGearSpec().label} 档` : '边撑已收起', 1800)
     }
@@ -772,7 +789,7 @@ export function createBikeControl() {
   function setGear(nextGear: number) {
     const list = activeGears()
     gear = T.MathUtils.clamp(Math.round(nextGear), 1, list.length)
-    if (parkLocked || kickstandDown) unlockParkIfNeeded(true)
+    if (parkLocked || kickstandDown) unlockParkIfNeeded(true, true)
     if (cruiseControl) {
       const maxMs = effectiveMaxKmh().targetKmh / 3.6
       if (maxMs < ebikeRealFeaturesConfig.cruiseMinSpeedKmh / 3.6) cruiseControl = false
@@ -783,24 +800,41 @@ export function createBikeControl() {
 
   function shiftGear(delta: number) {
     if (kind === 'bike' && parkLocked) {
-      // Pressing gear-up (E) from P unlocks cleanly into current compliant gear (D2) instead of skipping to D3.
-      if (delta > 0) unlockParkIfNeeded(false)
-      return gear
+      // IDOK-124 deterministic P-gear recovery: E (+1) unlocks and clamps high gear (D3/S) -> D2;
+      // Q (-1) stays locked in P-gear so accidental downshift never disengages park lock.
+      if (delta > 0) {
+        unlockParkIfNeeded(false, false)
+        return gear
+      }
+      return 0
     }
     return setGear(gear + delta)
   }
 
   function setVehicleType(nextType: EbikeVehicleType | string) {
     vehicleType = resolveEbikeKind(0, nextType)
-    if (vehicleType === 'shared') mods = null
-    profile = resolveEbikeProfile(vehicleType, mods)
+    if (vehicleType === 'shared') {
+      mods = null
+      modelId = null
+    }
+    profile = computeActiveProfile()
+    gear = T.MathUtils.clamp(gear, 1, activeGears().length)
+    return profile
+  }
+
+  function setPersonalModel(nextModelId: PersonalEbikeTierId | null, nextDurabilityPct?: number) {
+    modelId = vehicleType === 'shared' ? null : nextModelId
+    if (nextDurabilityPct !== undefined && Number.isFinite(nextDurabilityPct)) {
+      durabilityPct = T.MathUtils.clamp(nextDurabilityPct, 15, 100)
+    }
+    profile = computeActiveProfile()
     gear = T.MathUtils.clamp(gear, 1, activeGears().length)
     return profile
   }
 
   function setUpgrades(nextMods: EbikeUpgradeMods | null) {
     mods = vehicleType === 'shared' ? null : (nextMods ? {...nextMods} : null)
-    profile = resolveEbikeProfile(vehicleType, mods)
+    profile = computeActiveProfile()
     gear = T.MathUtils.clamp(gear, 1, activeGears().length)
     return profile
   }
@@ -1182,8 +1216,10 @@ export function createBikeControl() {
       kind = rideKind
       pitch = initialPitch
       vehicleType = resolveEbikeKind(0, options?.vehicleType ?? options?.tier ?? 'normal')
+      modelId = vehicleType === 'shared' ? null : (options?.modelId ?? null)
+      durabilityPct = T.MathUtils.clamp(options?.durabilityPct ?? 100, 15, 100)
       mods = vehicleType === 'shared' ? null : (options?.mods ? {...options.mods} : null)
-      profile = resolveEbikeProfile(vehicleType, mods)
+      profile = computeActiveProfile()
       gear = options?.keepGear ? T.MathUtils.clamp(gear, 1, activeGears().length) : defaultGearFor(kind)
       batteryPct = T.MathUtils.clamp(options?.batteryPct ?? 100, 0, 100)
       lastBatteryStatus = batteryStatusOf(batteryPct)
@@ -1198,6 +1234,7 @@ export function createBikeControl() {
     shiftGear,
     resetGearToCompliant() { return setGear(defaultGearFor(kind)) },
     setVehicleType,
+    setPersonalModel,
     setUpgrades,
     setBattery,
     setAutoCrash(on: boolean | undefined) { autoCrashOverride = on },

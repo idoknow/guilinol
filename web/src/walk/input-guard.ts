@@ -8,8 +8,8 @@
  */
 
 const TEXT_INPUT_SELECTOR = 'input,textarea,select,[contenteditable]'
-const MODAL_OVERLAY_SELECTOR = 'dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show'
-const TOUCH_UI_SELECTOR = '.walk-ui,.ride-hud,.vehicle-action,.dock,.sky-ui,.render-entry,.hud-me'
+const MODAL_OVERLAY_SELECTOR = 'dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show,.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show'
+const TOUCH_UI_SELECTOR = '.walk-ui,.ride-hud,.vehicle-action,.dock,.sky-ui,.render-entry,.hud-me,.shop-overlay,.wardrobe-overlay,.garage-overlay,.mission-hud,.commerce-dock'
 
 export function isTextInputTarget(target: EventTarget | null): boolean {
   if (!target || typeof (target as Element).closest !== 'function') return false
@@ -18,6 +18,7 @@ export function isTextInputTarget(target: EventTarget | null): boolean {
 
 export function isModalOrOverlayOpen(doc: Document = document): boolean {
   if (doc.body.hasAttribute('data-home')) return true
+  if (doc.body.dataset.shopOpen === '1') return true
   return !!doc.querySelector(MODAL_OVERLAY_SELECTOR)
 }
 

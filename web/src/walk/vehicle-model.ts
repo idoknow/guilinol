@@ -55,13 +55,14 @@ export function vehicleModel(kind:string,paint=0,options?:{shared?:boolean}){
       for(const side of [-1,1]){box(.025,.19,.025,side*.29,1.14,-.46,0x535858);box(.13,.08,.04,side*.29,1.25,-.46,0xa8b9bf)}
       for(const side of [-1,1]){box(.03,.2,.28,side*.18,.92,-.65,0x858883);box(.38,.2,.025,0,.92,-.65+side*.14,0x858883)}
     }else if(effectiveKind==='shared_bike'){
-      const mint=0x72d5b0,trim=0xeef2ee,batteryGreen=0x2d7f63,scanOrange=0xd9683b
+      // Original Guilin slate/ivory/terracotta shared fleet palette (zero real-world bike-share brand colors or logos).
+      const slate=0x5e7680,trim=0xe8e4da,batterySlate=0x455a63,scanTerracotta=0xb5563d
       for(const z of [-.53,.53])part(new T.CylinderGeometry(.24,.24,.12,10).rotateZ(Math.PI/2),0x303234,0,.24,z)
-      box(.38,.24,1,0,.37,0,mint);box(.35,.22,.40,0,.49,-.05,trim);box(.39,.14,.32,0,.38,.02,batteryGreen)
-      box(.36,.32,.38,0,.58,.3,mint);box(.40,.11,.46,0,.8,.26,0x333638)
-      box(.18,.56,.14,0,.79,-.45,mint);box(.66,.065,.09,0,1.04,-.43,0x474b4b)
+      box(.38,.24,1,0,.37,0,slate);box(.35,.22,.40,0,.49,-.05,trim);box(.39,.14,.32,0,.38,.02,batterySlate)
+      box(.36,.32,.38,0,.58,.3,slate);box(.40,.11,.46,0,.8,.26,0x333638)
+      box(.18,.56,.14,0,.79,-.45,slate);box(.66,.065,.09,0,1.04,-.43,0x474b4b)
       // Shared scan lock tail plate
-      box(.20,.14,.05,0,.67,.51,scanOrange);box(.11,.08,.02,0,.67,.54,0xf5f2ea)
+      box(.20,.14,.05,0,.67,.51,scanTerracotta);box(.11,.08,.02,0,.67,.54,0xf5f2ea)
       for(const side of [-1,1]){box(.025,.18,.025,side*.28,1.13,-.46,0x535858);box(.12,.07,.04,side*.28,1.23,-.46,0xa8b9bf)}
       // Distinct front wire basket for shared e-bike
       box(.36,.03,.24,0,.82,-.62,0x5c6266)
@@ -510,7 +511,7 @@ export interface EbikeModConfig {
   exhaust: boolean
 }
 
-export const EBIKE_SHARED_COLOR = 0x72d5b0
+export const EBIKE_SHARED_COLOR = 0x5e7680
 
 export const EBIKE_MOD_PRESETS: Record<EbikeModPreset, EbikeModConfig> = {
   stock: {
