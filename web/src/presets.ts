@@ -28,7 +28,7 @@ export interface SpawnSlot {id:string; eye:Point; look:Point}
 export const spawnPool:SpawnSlot[] = [
   {id:'N',  eye:[-620,  521.8,-1780], look:[-300, 160,-1300]},
   {id:'NE', eye:[196,   381.7,-1820], look:[-880, 160,-170]},
-  {id:'E',  eye:[1250,  382.8, 150],  look:[700,  160, 350]},
+  {id:'E',  eye:[800,   575.3, 700],  look:[-880, 160,-170]},
   {id:'SE', eye:[700,   397.2, 1420], look:[400,  160, 900]},
   {id:'S',  eye:[-560,  384.2, 1560], look:[-700, 160, 1150]},
   {id:'SW', eye:[-2140, 384,   1840], look:[-1650,160, 900]},

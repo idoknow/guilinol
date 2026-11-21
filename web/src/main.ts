@@ -45,22 +45,19 @@ async function start() {
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const [left,top,width,depth] = manifest.extent
   scene.add(outerGround(manifest.extent))
-  // IDOK-105: an ordinary visit opens on a random slot from `spawnPool` (still flying, no walker),
-  // so the same frame never repeats — unless the player picked "回到上次离开的地方" on the title
-  // screen, which restores the saved camera instead. Any deep link (`?cam=`/`?spawn=`/`?slot=`/`?verify`…)
-  // keeps the deterministic camera below, what the capture and performance harnesses measure.
+  // IDOK-105: choose the opening camera pose. The camera is NOT touched here — `flight()` below sets
+  // `rotation.order = 'YXZ'` and lookAt()/rotation.set() must run after it, or three.js recomputes the
+  // quaternion with the wrong order and every slot gains a roll.
   const openParams = new URLSearchParams(location.search)
   // `?slot=X` pins a specific pool frame (deterministic, for captures and shared links). It is also
   // a deep link, so it skips the title screen, but it must bypass the "deep link → fixed camera"
   // fallback below. Every other deep link keeps the deterministic camera the harnesses measure.
   const forcedSlot = openParams.get('slot')
+  // `restoring` is a FeedbackView only when the player picked "回到上次离开的地方" AND a usable view
+  // is stored; a stale/cleared record must fall back to pickSpawn(), not the fixed camera.
   const opening = forcedSlot !== null
     ? spawnPool.find(slot => slot.id === forcedSlot) ?? spawnPool[0]
-    : isDeepLink(openParams) ? null : consumeRestore() ? readLastView() : pickSpawn()
-  if(opening) {
-    if('eye' in opening) { camera.position.set(...opening.eye); camera.lookAt(...opening.look) }
-    else applyLastView(camera, opening)
-  } else camera.position.set(left+width*.55,420,top+depth*.62)
+    : isDeepLink(openParams) ? null : consumeRestore() ? readLastView() ?? pickSpawn() : pickSpawn()
   let walker:Awaited<ReturnType<typeof import('./walk').walk>>|undefined, switching=false
   let cinema=false
   let walkModPromise:Promise<typeof import('./walk')>|undefined
@@ -69,7 +66,15 @@ async function start() {
     return walkModPromise
   }
   const controls = flight(camera,renderer.domElement,manifest.extent,()=>!walker?.active&&!switching&&!cinema)
-  if(!opening) camera.lookAt(left+width*.47,150,top+depth*.45)
+  // Apply the opening pose here, after flight() has set rotation.order='YXZ'. lookAt()/rotation.set()
+  // before that line would be recomputed in the wrong Euler order and leave a permanent roll.
+  if(opening) {
+    if('eye' in opening) { camera.position.set(...opening.eye); camera.lookAt(...opening.look) }
+    else applyLastView(camera, opening)
+  } else {
+    camera.position.set(left+width*.55,420,top+depth*.62)
+    camera.lookAt(left+width*.47,150,top+depth*.45)
+  }
   function resize() {
     renderer.setPixelRatio(Math.min(devicePixelRatio,1.5)); renderer.setSize(innerWidth,innerHeight)
     camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix()
