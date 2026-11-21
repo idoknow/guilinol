@@ -1,3 +1,4 @@
+import {operation} from '../telemetry'
 import * as THREE from 'three'
 import type {Host} from './host'
 import type {Atlas, Place} from '../map/atlas'
@@ -202,9 +203,10 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       return half*2>=max-min?(min+max)/2:Math.min(max-half,Math.max(min+half,value))}
     view.x=axis(view.x,northwest.x,southeast.x,sheet.clientWidth);view.z=axis(view.z,northwest.z,southeast.z,sheet.clientHeight)}
   function open() {
+    const start=performance.now()
     requestMap('overview.bin')
     const p = here(); view.x = p.x; view.z = p.z; view.scale = innerWidth<700?.45:.6
-    sheet.hidden = false; requestAnimationFrame(()=>{sheet.classList.add('show'); redraw()})
+    sheet.hidden = false; requestAnimationFrame(()=>{sheet.classList.add('show'); redraw();operation('mapOpen',start)})
     if(!matchMedia('(pointer:coarse)').matches) input.focus()
   }
   function close(){sheet.classList.remove('show'); setPin(null); input.value = ''; results.innerHTML = ''; input.blur()

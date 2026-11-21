@@ -82,6 +82,8 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (admin && !isAdmin) throw new Problem(403, 'forbidden', '无权限')
     if (method !== 'GET' && request.headers.get('Origin') !== new URL(request.url).origin)
       throw new Problem(403, 'origin', '请求来源不符')
+    if (admin && method==='GET' && env.perfQuery && ['admin/perf','admin/perf/grid','admin/perf/server'].includes(path))
+      return env.perfQuery(path,new URL(request.url).searchParams)
     if (admin && method === 'GET' && ['admin/stats', 'admin/users', 'admin/feedback'].includes(path))
       return adminList(env.DB, path, new URL(request.url).searchParams)
     if (

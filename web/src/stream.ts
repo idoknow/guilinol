@@ -1,3 +1,4 @@
+import {record} from './telemetry'
 import * as THREE from 'three'
 import {ChunkBatcher} from './batch'
 import {Forest} from './forest'
@@ -37,9 +38,11 @@ export class Stream {
     if(!nearest) return
     const tile = nearest, controller = new AbortController()
     this.pending.set(tile,controller)
+    const start=performance.now()
     detail(tile,controller.signal).then(item=>{
       if(controller.signal.aborted) {item.dispose();return}
       this.scene.add(item.group); this.batches.add(item.batch); this.base.toggle(tile,false); this.loaded.set(tile,item); this.visited.add(tile); this.failures.delete(tile)
+      record('chunk',{ms:performance.now()-start,grid:Math.floor(tile.x/250)+','+Math.floor(tile.z/250)})
     }).catch(error=>{
       if(!controller.signal.aborted) {console.error(tile.file,error); this.failures.set(tile,performance.now()+10000)}
     }).finally(()=>this.pending.delete(tile))
