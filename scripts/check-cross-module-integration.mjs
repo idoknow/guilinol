@@ -173,6 +173,18 @@ try {
     ebike.update({pos, heading: 0, groundPitch: 0, lean: 0, wheelie: 0, steerInput: 0, speed: 2, headlight: 'high', night: 1, batteryDepleted: true, dt: 0.05})
     assert(ebike.beamProbe().intensity < highNight.intensity * 0.5)
 
+    // Batched amber turn signals: 0 idle draw calls, 1 draw call single-side, 2 draw calls hazard, 0 dynamic lights
+    ebike.update({pos, heading: 0, groundPitch: 0, lean: 0, wheelie: 0, steerInput: 0, speed: 4, headlight: 'off', night: 1, leftSignalLit: false, rightSignalLit: false, dt: 0.05})
+    assert.equal(ebike.signalProbe().signalDrawCalls, 0)
+    ebike.update({pos, heading: 0, groundPitch: 0, lean: 0, wheelie: 0, steerInput: 0, speed: 4, headlight: 'off', night: 1, leftSignalLit: true, rightSignalLit: false, dt: 0.05})
+    assert.equal(ebike.signalProbe().leftSignalLit, true)
+    assert.equal(ebike.signalProbe().rightSignalLit, false)
+    assert.equal(ebike.signalProbe().signalDrawCalls, 1)
+    ebike.update({pos, heading: 0, groundPitch: 0, lean: 0, wheelie: 0, steerInput: 0, speed: 0, headlight: 'off', night: 1, leftSignalLit: true, rightSignalLit: true, brakeLight: true, dt: 0.05})
+    assert.equal(ebike.signalProbe().signalDrawCalls, 2)
+    assert.equal(ebike.signalProbe().brakeLight, true)
+    assert.equal(countLights(ebike.root), 0, 'signals must not inject dynamic Three.js lights')
+
     // Car twin-headlamp beams also use strictly <= 2 draw calls (merged twin cone + 1 pool)
     car.update({pos, heading: 0, groundPitch: 0, speed: 10, steerInput: 0, braking: false, reversing: false, headlight: 'off', night: 1, dt: 0.05})
     assert.equal(car.probe().beamDrawCalls, 0)

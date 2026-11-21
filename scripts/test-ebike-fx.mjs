@@ -5,6 +5,7 @@ import {preview} from 'vite'
 import {browserOptions} from './qa-browser.mjs'
 
 const outDir = process.env.EBIKE_SHOT_DIR
+const STRICT_V2 = process.argv.includes('--strict-v2') || process.env.STRICT_TWOWHEEL_V2 === '1'
 if (outDir) await mkdir(outDir, {recursive: true})
 
 const server = await preview({root: 'web', configFile: 'web/vite.config.ts', preview: {host: '127.0.0.1', port: 0}})
@@ -411,8 +412,119 @@ try {
     await ctx.close()
   }
 
+  // --- C. V2 HUD, Night Lighting, Kickstand Rig & Audio FX verification ---
+  // Dedicated 1280x720 night-time context (time=21) so night headlight beam & V2 telemetry are tested cleanly.
+  const v2Ctx = await browser.newContext({viewport: {width: 1280, height: 720}})
+  try {
+    const v2Page = await v2Ctx.newPage()
+    v2Page.on('pageerror', e => errors.push('v2: ' + e.message))
+    await v2Page.route('**/favicon.ico', r => r.fulfill({status: 204}))
+    await v2Page.goto(`${baseUrl}/?verify&mode=walk&flow=0&time=21`)
+    await v2Page.waitForFunction(() => window.viewer?.walk?.active && window.viewer.walk.parked('bike').length > 0, null, {timeout: 90000})
+
+    await v2Page.evaluate(async () => {
+      const {walk} = window.viewer
+      const target = walk.parked('bike').find(b => Math.hypot(b[0] + 539, b[2] + 95) < 12) ?? walk.parked('bike')[0]
+      await window.viewer.walkTo(target[0], target[2], 0, 'ebike-v2-fx')
+      for (let i = 0; i < 6; i++) walk.tick(1 / 60)
+    })
+    await v2Page.waitForFunction(() => document.querySelector('.vehicle-action')?.textContent === '骑电动车')
+    await v2Page.keyboard.press('f')
+    await v2Page.waitForFunction(() => window.viewer.walk.vehicle === 'bike')
+    await v2Page.evaluate(() => window.viewer.walk.tick(1 / 60))
+
+    const v2FxReport = await v2Page.evaluate(() => {
+      const ebikeDomSelectors = [
+        '.ride-park', '.ride-p', '.ride-light', '.ride-lights',
+        '.ride-turn-left', '.ride-turn-right', '.ride-hazard',
+        '.ride-lean-bar', '.ride-risk', '.ride-cruise', '.ride-stand', '.ride-kickstand',
+      ]
+      const visibleControls = ebikeDomSelectors.filter(s => {
+        const el = document.querySelector(s)
+        if (!el) return false
+        const st = getComputedStyle(el)
+        return st.display !== 'none' && st.visibility !== 'hidden' && !el.hasAttribute('hidden')
+      })
+      const floatingControls = visibleControls.filter(s => !document.querySelector(s)?.closest('.ride-hud'))
+      return {visibleControls, floatingControls}
+    })
+
+    const v2HudRects = await v2Page.evaluate(checkRectsScript(), {
+      width: 1280, height: 720,
+      selectors: [
+        'output', '.hud-me', '.sky-ui', '.render-entry', '.dock', 'footer', '.hint', '.vehicle-action', '.ride-hud',
+        ...v2FxReport.floatingControls,
+      ],
+    })
+    assert.deepEqual(v2HudRects.overlaps, [], `V2 desktop HUD overlap: ${JSON.stringify(v2HudRects.overlaps)}`)
+    assert.deepEqual(v2HudRects.outOfBounds, [], `V2 desktop HUD outOfBounds: ${JSON.stringify(v2HudRects.outOfBounds)}`)
+
+    const v2RigAudit = await v2Page.evaluate(() => {
+      const {walk} = window.viewer
+      const p0 = walk.probe()
+      const eb = p0.ebike ?? {}
+      const rig = p0.ebikeRig ?? {}
+      const audioSnap = p0.ebikeAudio ?? walk.ebike?.audioStats ?? null
+      const hasV2Telemetry = (
+        eb.parkLocked !== undefined || eb.parkGear !== undefined || eb.parked !== undefined
+      ) && (
+        eb.headlight !== undefined || eb.headlightMode !== undefined
+      ) && eb.turnSignal !== undefined
+      const hasLightRig = rig.headlight !== undefined || rig.headlightMode !== undefined || rig.headlightIntensity !== undefined || rig.beamActive !== undefined
+      const hasStandRig = rig.kickstandAngle !== undefined || rig.kickstand !== undefined || rig.kickstandDown !== undefined || rig.sideStandAngle !== undefined
+      const hasAudioFx = audioSnap !== null
+      let lightProgressionOk = false
+      const lightFn = walk.ebike?.cycleHeadlight ?? walk.ebike?.cycleLight
+      if (lightFn) {
+        const seq = []
+        for (let i = 0; i < 3; i++) {
+          walk.tick(1 / 60)
+          const r = walk.probe().ebikeRig ?? {}
+          const t = walk.probe().ebike ?? {}
+          seq.push(r.headlightIntensity ?? r.lightIntensity ?? (r.headlightMode ?? r.headlight ?? t.headlightMode ?? t.headlight ?? 0))
+          lightFn()
+        }
+        lightProgressionOk = new Set(seq).size >= 2
+      }
+      let turnRigOk = false
+      if (walk.ebike?.setTurnSignal || walk.ebike?.toggleTurnSignal) {
+        walk.ebike.setTurnSignal ? walk.ebike.setTurnSignal('left') : walk.ebike.toggleTurnSignal('left')
+        for (let i = 0; i < 6; i++) walk.tick(1 / 60)
+        const r = walk.probe().ebikeRig ?? {}
+        const t = walk.probe().ebike ?? {}
+        turnRigOk = Boolean(r.leftSignalLit ?? t.leftSignalLit ?? (t.turnSignal === 'left'))
+      }
+      return {
+        hasV2Telemetry,
+        hasLightRig,
+        hasStandRig,
+        hasAudioFx,
+        lightProgressionOk,
+        turnRigOk,
+        audioCounts: audioSnap?.counts ?? audioSnap ?? null,
+      }
+    })
+    await v2Page.keyboard.press('f')
+    await v2Page.waitForFunction(() => window.viewer.walk.vehicle === 'foot')
+
+    const v2FxChecks = {
+      hudIndicatorsVisible: v2RigAudit.hasV2Telemetry && v2FxReport.visibleControls.length >= 2,
+      nightHeadlightAndTailRig: v2RigAudit.hasLightRig && v2RigAudit.lightProgressionOk,
+      turnSignalRig: v2RigAudit.turnRigOk,
+      kickstandVisualRig: v2RigAudit.hasStandRig,
+      ebikeAudioFxHooks: v2RigAudit.hasAudioFx,
+    }
+    const v2FxPass = Object.values(v2FxChecks).every(Boolean)
+    console.log('EBIKE V2 FX/HUD AUDIT:', JSON.stringify({v2FxReport, v2RigAudit, v2FxChecks, v2FxPass}))
+    if (STRICT_V2) {
+      assert(v2FxPass, `--strict-v2 FX checks failed: ${JSON.stringify(v2FxChecks)}`)
+    }
+  } finally {
+    await v2Ctx.close()
+  }
+
   assert.deepEqual(errors, [], `Page errors: ${errors.join('; ')}`)
-  console.log('ALL EBIKE FX & HUD TESTS PASSED')
+  console.log(STRICT_V2 ? 'ALL V2 EBIKE FX & HUD TESTS PASSED' : 'ALL EBIKE FX & HUD TESTS PASSED')
 } finally {
   await browser?.close()
   await server.close()

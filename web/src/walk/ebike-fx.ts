@@ -1,6 +1,7 @@
 import * as T from 'three'
 import type {EbikeModConfig, EbikeModPreset, EbikeVehicleKind, EbikeVisualRig} from './vehicle-model'
 import type {TwoWheelHeadlightMode} from './ebike-state-coupling'
+import type {EbikeTurnSignal} from './config'
 
 export type EbikeCrashPhase = 'none' | 'crashed' | 'recovering'
 export type EbikeCrashReason = '' | 'impact' | 'lowside' | 'loopout'
@@ -45,6 +46,11 @@ export interface EbikeRideControlInput {
   parkToggle?: boolean
   kickstandToggle?: boolean
   headlightCycle?: boolean
+  turnLeftToggle?: boolean
+  turnRightToggle?: boolean
+  hazardToggle?: boolean
+  horn?: boolean
+  cruiseToggle?: boolean
 }
 
 /**
@@ -67,13 +73,29 @@ export interface ExternalEbikeTelemetry {
   wheelie?: number
   lean?: number
   leanLimit?: number
+  leanRateDegPerSec?: number
+  mandatoryFallLeanRad?: number
+  effectiveFallLeanRad?: number
+  leanDangerRatio?: number
   crashRisk?: number
   tucking?: boolean
   braking?: boolean
   parkLocked?: boolean
   kickstandDown?: boolean
+  throttleBlockedByPark?: boolean
+  parkWarnSeq?: number
   headlight?: TwoWheelHeadlightMode
+  taillight?: boolean
+  brakeLight?: boolean
+  turnSignal?: EbikeTurnSignal
+  leftSignalLit?: boolean
+  rightSignalLit?: boolean
   hazard?: boolean
+  blinkOn?: boolean
+  hornActive?: boolean
+  hornSeq?: number
+  cruiseControl?: boolean
+  cruiseTargetKmh?: number
   crashPhase?: EbikeCrashPhase
   crashReason?: EbikeCrashReason
   crashSide?: -1 | 1
@@ -98,6 +120,10 @@ export interface EbikeTelemetrySnapshot {
   batteryDepleted: boolean
   lean: number
   leanLimit: number
+  leanRateDegPerSec?: number
+  mandatoryFallLeanRad?: number
+  effectiveFallLeanRad?: number
+  leanDangerRatio?: number
   crashRisk?: number
   wheelie: number
   steerInput: number
@@ -105,8 +131,20 @@ export interface EbikeTelemetrySnapshot {
   braking: boolean
   parkLocked?: boolean
   kickstandDown?: boolean
+  throttleBlockedByPark?: boolean
+  parkWarnSeq?: number
   headlight?: TwoWheelHeadlightMode
+  taillight?: boolean
+  brakeLight?: boolean
+  turnSignal?: EbikeTurnSignal
+  leftSignalLit?: boolean
+  rightSignalLit?: boolean
   hazard?: boolean
+  blinkOn?: boolean
+  hornActive?: boolean
+  hornSeq?: number
+  cruiseControl?: boolean
+  cruiseTargetKmh?: number
   crashPhase: EbikeCrashPhase
   crashReason: EbikeCrashReason
   crashSide: -1 | 1
@@ -297,7 +335,7 @@ export function createEbikeFxController() {
     if (input.cycleMod) cycleModPreset()
 
     if (external?.gear !== undefined) {
-      gear = T.MathUtils.clamp(Math.round(external.gear), 1, EBIKE_GEARS.length)
+      if (external.gear >= 1) gear = T.MathUtils.clamp(Math.round(external.gear), 1, EBIKE_GEARS.length)
     } else {
       if (input.gearSelect !== null) gear = T.MathUtils.clamp(input.gearSelect, 1, EBIKE_GEARS.length)
       else if (input.gearDelta !== 0) gear = T.MathUtils.clamp(gear + input.gearDelta, 1, EBIKE_GEARS.length)
@@ -414,18 +452,24 @@ export function createEbikeFxController() {
     }
 
     const finalWheelie = external?.wheelie ?? wheelie
-    const finalLean = T.MathUtils.clamp((external?.lean ?? base.lean) + leanExtra, -.68, .68)
+    // Never superimpose presentation-only leanExtra on top of authoritative ride.ts lean telemetry.
+    const finalLean = external?.lean !== undefined
+      ? T.MathUtils.clamp(external.lean, -.72, .72)
+      : T.MathUtils.clamp(base.lean + leanExtra, -.68, .68)
     const lowBattery = external?.lowBattery ?? battery <= 20
     const criticalBattery = external?.criticalBattery ?? battery <= 10
     const batteryDepleted = external?.batteryDepleted ?? battery <= .05
     const gearCap = profile.gearCaps[gear - 1] ?? profile.maxKmh
     const effMaxKmh = external?.maxKmh ?? (batteryDepleted ? 10 : criticalBattery ? Math.min(gearCap, 16) : gearCap)
+    const parkLocked = external?.parkLocked ?? false
+    const headlight = external?.headlight ?? 'off'
+    const brakingNow = external?.braking ?? base.braking
 
     return {
       vehicleType,
       vehicleLabel: profile.label,
       vehicleBadge: profile.badge,
-      gear,
+      gear: external?.gear ?? gear,
       gearCount: external?.gearCount ?? EBIKE_GEARS.length,
       gearLabel: external?.gearLabel ?? gearSpec.label,
       gearHint: external?.gearHint ?? gearSpec.hint,
@@ -438,15 +482,31 @@ export function createEbikeFxController() {
       batteryDepleted,
       lean: finalLean,
       leanLimit: external?.leanLimit ?? LEAN_LIMIT,
+      leanRateDegPerSec: external?.leanRateDegPerSec,
+      mandatoryFallLeanRad: external?.mandatoryFallLeanRad,
+      effectiveFallLeanRad: external?.effectiveFallLeanRad,
+      leanDangerRatio: external?.leanDangerRatio,
       crashRisk: external?.crashRisk,
       wheelie: finalWheelie,
       steerInput: base.steerInput,
       tucking: external?.tucking ?? (input.tuck && Math.abs(finalLean) > .08),
-      braking: external?.braking ?? base.braking,
-      parkLocked: external?.parkLocked ?? false,
+      braking: brakingNow,
+      parkLocked,
       kickstandDown: external?.kickstandDown ?? false,
-      headlight: external?.headlight ?? 'off',
+      throttleBlockedByPark: external?.throttleBlockedByPark ?? false,
+      parkWarnSeq: external?.parkWarnSeq ?? 0,
+      headlight,
+      taillight: external?.taillight ?? headlight !== 'off',
+      brakeLight: external?.brakeLight ?? (brakingNow || parkLocked),
+      turnSignal: external?.turnSignal ?? 'off',
+      leftSignalLit: external?.leftSignalLit ?? false,
+      rightSignalLit: external?.rightSignalLit ?? false,
       hazard: external?.hazard ?? false,
+      blinkOn: external?.blinkOn ?? false,
+      hornActive: external?.hornActive ?? false,
+      hornSeq: external?.hornSeq ?? 0,
+      cruiseControl: external?.cruiseControl ?? false,
+      cruiseTargetKmh: external?.cruiseTargetKmh ?? 0,
       crashPhase,
       crashReason,
       crashSide,
@@ -567,6 +627,7 @@ export function applyEbikeVisualAndRider(params: {
     steerInput: state.steerInput,
     speed: state.crashPhase === 'none' ? state.speed : 0,
     braking: state.braking,
+    brakeLight: state.brakeLight,
     crashRoll: crash.bikeRoll,
     crashLift: crash.bikeLift,
     kickstandDown: state.crashPhase === 'none' ? !!state.kickstandDown : false,
@@ -575,12 +636,14 @@ export function applyEbikeVisualAndRider(params: {
     crashed: state.crashPhase !== 'none',
     batteryDepleted: state.batteryDepleted,
     hazard: !!state.hazard,
+    leftSignalLit: !!state.leftSignalLit,
+    rightSignalLit: !!state.rightSignalLit,
     dt: cdt,
   })
 
   rig.seatAnchor.getWorldPosition(_seatPos)
   const swing = snapMountBlend < 1 ? Math.sin(snapMountBlend * Math.PI) : 0
-  const idleFoot = smoothstep((.38 - Math.abs(state.speed)) / .38)
+  const idleFoot = state.parkLocked && state.kickstandDown ? 1 : smoothstep((.38 - Math.abs(state.speed)) / .38)
 
   if (state.crashPhase === 'crashed') {
     const rx = basePos.x + crash.riderOffset.x

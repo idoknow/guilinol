@@ -10,13 +10,16 @@ import {
   bicycleGearConfigs,
   bikeConfig as bcfg,
   ebikeBatteryConfig,
+  ebikeRealFeaturesConfig,
   resolveEbikeKind,
   resolveEbikeProfile,
   twoWheelCrashFlowConfig,
   walkConfig as wcfg,
   type EbikeBatteryStatus,
   type EbikeGearProfile,
+  type EbikeHeadlightMode,
   type EbikeTier,
+  type EbikeTurnSignal,
   type EbikeUpgradeMods,
   type EbikeVehicleType,
   type NormalizedEbikeUpgrades,
@@ -32,6 +35,14 @@ export interface EbikeStepControl {
   tuck?: boolean
   gearDelta?: number
   gearSelect?: number | null
+  parkToggle?: boolean
+  kickstandToggle?: boolean
+  headlightCycle?: boolean
+  turnLeftToggle?: boolean
+  turnRightToggle?: boolean
+  hazardToggle?: boolean
+  horn?: boolean
+  cruiseToggle?: boolean
 }
 
 export interface EbikeMountOptions {
@@ -42,6 +53,8 @@ export interface EbikeMountOptions {
   keepGear?: boolean
   drainEnabled?: boolean
   autoCrash?: boolean
+  parkStart?: boolean
+  envHour?: number
 }
 
 export interface TwoWheelSurfaceState {
@@ -122,13 +135,37 @@ export interface EbikeDynamicTelemetry {
   lowBatteryCapKmh: number | null
   drainPerSec: number
   lean: number
+  leanDeg: number
+  leanRateDegPerSec: number
   leanLimit: number
   gripLimitRad: number
+  mandatoryFallLeanRad: number
+  mandatoryFallDeg: number
+  effectiveFallLeanRad: number
+  effectiveFallDeg: number
+  leanDangerRatio: number
   crashRisk: number
   wheelie: number
   wheelieVel: number
   tucking: boolean
   braking: boolean
+  parkLocked: boolean
+  kickstandDown: boolean
+  throttleBlockedByPark: boolean
+  parkWarnSeq: number
+  headlight: EbikeHeadlightMode
+  taillight: boolean
+  brakeLight: boolean
+  turnSignal: EbikeTurnSignal
+  leftSignalLit: boolean
+  rightSignalLit: boolean
+  hazard: boolean
+  blinkOn: boolean
+  blinkPhase: number
+  hornActive: boolean
+  hornSeq: number
+  cruiseControl: boolean
+  cruiseTargetKmh: number
   wetSurface: boolean
   offRoadSurface: boolean
   crashPhase: TwoWheelCrashPhase
@@ -348,6 +385,11 @@ export function probeLocalMount(ctx: DismountContext, px: number, py: number, pz
   return {ok: false, reason: 'narrow'}
 }
 
+function isVerifyMode(): boolean {
+  if (typeof location === 'undefined') return false
+  return new URLSearchParams(location.search).has('verify')
+}
+
 function isVerifySilentMode(): boolean {
   if (typeof location === 'undefined') return false
   const p = new URLSearchParams(location.search)
@@ -385,9 +427,31 @@ export function createBikeControl() {
   let wheelieLoad = 0
   let tucking = false
   let braking = false
-  let sharpSteerHold = 0
-  let gripLimitRad = bcfg.crash.lowsideLeanRad
+  let gripLimitRad = bcfg.crash.mandatoryFallLeanRad
   let crashRisk = 0
+  let leanRateNow = 0
+
+  // Real e-bike operational features: P-gear park lock, kickstand, lights, turn signals, hazard, horn, cruise control
+  let parkLocked = false
+  let kickstandDown = false
+  let brakeUnlockHold = 0
+  let throttleBlockedByPark = false
+  let parkWarnSeq = 0
+  let prevThrottlePressed = false
+  let headlight: EbikeHeadlightMode = 'off'
+  let headlightManual = false
+  let turnSignal: EbikeTurnSignal = 'off'
+  let turnCancelYawAccum = 0
+  let turnStraightHold = 0
+  let hazard = false
+  let blinkPhase = 0
+  let blinkOn = false
+  let hornActive = false
+  let hornTimer = 0
+  let hornSeq = 0
+  let prevHornReq = false
+  let cruiseControl = false
+  let cruiseTargetSpeed = 0
 
   // Crash & rider-first-rise state machine
   let bikePos = {x: 0, y: 0, z: 0}
@@ -501,8 +565,8 @@ export function createBikeControl() {
     riderStandProgress = 0
     pickupProgress = 0
     pickupStartRoll = 0
-    sharpSteerHold = 0
     crashRisk = 0
+    leanRateNow = 0
   }
 
   function reset() {
@@ -510,7 +574,7 @@ export function createBikeControl() {
     drainPerSec = wheelie = wheelieVel = wheelieLoad = 0
     tucking = braking = false
     onPavement = wetSurface = offRoadSurface = false
-    gripLimitRad = spec().crash.lowsideLeanRad
+    gripLimitRad = spec().crash.mandatoryFallLeanRad
     kind = 'bike'
     vehicleType = 'normal'
     mods = null
@@ -521,12 +585,195 @@ export function createBikeControl() {
     drainEnabledOverride = undefined
     autoCrashOverride = undefined
     justRecoveredToRide = false
+    parkLocked = false
+    kickstandDown = false
+    brakeUnlockHold = 0
+    throttleBlockedByPark = false
+    parkWarnSeq = 0
+    prevThrottlePressed = false
+    headlight = 'off'
+    headlightManual = false
+    turnSignal = 'off'
+    turnCancelYawAccum = 0
+    turnStraightHold = 0
+    hazard = false
+    blinkPhase = 0
+    blinkOn = false
+    hornActive = false
+    hornTimer = 0
+    prevHornReq = false
+    cruiseControl = false
+    cruiseTargetSpeed = 0
     clearCrashState()
+  }
+
+  function unlockParkIfNeeded(silent = false) {
+    if (!parkLocked && !kickstandDown) return
+    parkLocked = false
+    kickstandDown = false
+    throttleBlockedByPark = false
+    brakeUnlockHold = 0
+    if (!silent && !isVerifySilentMode()) {
+      emitToast(kind === 'bike' ? `已解除 P 档 · 进入 ${currentGearSpec().label} 档` : '边撑已收起', 1800)
+    }
+  }
+
+  function setPark(next: boolean, silent = false) {
+    if (kind !== 'bike' || crashPhase !== 'none') {
+      if (kind !== 'bike') parkLocked = false
+      return false
+    }
+    if (!next) {
+      unlockParkIfNeeded(silent)
+      return false
+    }
+    if (Math.abs(speed) > ebikeRealFeaturesConfig.parkEngageMaxSpeedMs) {
+      if (!silent && !isVerifySilentMode()) emitToast('车速过快，请先刹停再挂入 P 档', 2000)
+      return parkLocked
+    }
+    parkLocked = true
+    kickstandDown = true
+    speed = 0
+    wheelie = 0
+    wheelieVel = 0
+    cruiseControl = false
+    cruiseTargetSpeed = 0
+    brakeUnlockHold = 0
+    if (!silent && !isVerifySilentMode()) emitToast('已挂入 P 档驻车 · 边撑已放下', 1800)
+    return true
+  }
+
+  function togglePark(silent = false) {
+    return setPark(!parkLocked, silent)
+  }
+
+  function setKickstand(next: boolean, silent = false) {
+    if (crashPhase !== 'none') return false
+    if (kind === 'bike') {
+      return setPark(next, silent)
+    }
+    if (!next) {
+      if (kickstandDown) {
+        kickstandDown = false
+        throttleBlockedByPark = false
+        if (!silent && !isVerifySilentMode()) emitToast('边撑已收起', 1600)
+      }
+      return false
+    }
+    if (Math.abs(speed) > ebikeRealFeaturesConfig.parkEngageMaxSpeedMs) {
+      if (!silent && !isVerifySilentMode()) emitToast('行驶中无法放下边撑，请先刹停', 1800)
+      return kickstandDown
+    }
+    kickstandDown = true
+    speed = 0
+    wheelie = 0
+    wheelieVel = 0
+    if (!silent && !isVerifySilentMode()) emitToast('边撑已放下', 1600)
+    return true
+  }
+
+  function toggleKickstand(silent = false) {
+    return setKickstand(!kickstandDown, silent)
+  }
+
+  function setHeadlight(mode: EbikeHeadlightMode, manual = true) {
+    if (kind === 'bike' && batteryPct <= 0 && mode !== 'off') {
+      headlight = 'off'
+      if (manual && !isVerifySilentMode()) emitToast('电量耗尽，无法开启头灯', 1800)
+      return headlight
+    }
+    headlight = mode
+    if (manual) headlightManual = true
+    return headlight
+  }
+
+  function cycleHeadlight() {
+    const order: readonly EbikeHeadlightMode[] = ['off', 'low', 'high']
+    const next = order[(order.indexOf(headlight) + 1) % order.length]
+    return setHeadlight(next, true)
+  }
+
+  function setEnvironmentHour(hour: number) {
+    if (headlightManual || batteryPct <= 0 || crashPhase !== 'none') return
+    const isNight = hour >= 18.5 || hour < 6.0
+    headlight = isNight ? 'low' : 'off'
+  }
+
+  function setTurnSignal(next: EbikeTurnSignal) {
+    turnSignal = next
+    turnCancelYawAccum = 0
+    turnStraightHold = 0
+    if (next !== 'off') blinkOn = true
+    return turnSignal
+  }
+
+  function toggleTurnSignal(dir: Exclude<EbikeTurnSignal, 'off'>) {
+    return setTurnSignal(turnSignal === dir ? 'off' : dir)
+  }
+
+  function setHazard(on: boolean) {
+    hazard = on
+    if (on) blinkOn = true
+    return hazard
+  }
+
+  function toggleHazard() {
+    return setHazard(!hazard)
+  }
+
+  function setHorn(pressed: boolean) {
+    if (pressed && !prevHornReq) hornSeq++
+    prevHornReq = pressed
+    hornActive = pressed || hornTimer > 0
+    return hornActive
+  }
+
+  function pulseHorn() {
+    hornSeq++
+    hornTimer = ebikeRealFeaturesConfig.hornPulseSec
+    hornActive = true
+    return hornSeq
+  }
+
+  function setCruise(on: boolean, silent = false) {
+    if (!on) {
+      cruiseControl = false
+      cruiseTargetSpeed = 0
+      return false
+    }
+    if (kind !== 'bike') {
+      if (!silent && !isVerifySilentMode()) emitToast('人力单车不支持定速巡航', 1600)
+      return false
+    }
+    if (parkLocked || crashPhase !== 'none' || braking || batteryPct <= 0) {
+      if (!silent && !isVerifySilentMode()) emitToast('驻车/刹车或异常状态无法开启定速', 1800)
+      return false
+    }
+    const minMs = ebikeRealFeaturesConfig.cruiseMinSpeedKmh / 3.6
+    if (speed < minMs) {
+      if (!silent && !isVerifySilentMode()) emitToast(`车速需达 ${ebikeRealFeaturesConfig.cruiseMinSpeedKmh} km/h 以上才可定速`, 1800)
+      return false
+    }
+    const maxMs = effectiveMaxKmh().targetKmh / 3.6
+    cruiseTargetSpeed = T.MathUtils.clamp(speed, minMs, Math.max(minMs, maxMs))
+    cruiseControl = true
+    if (!silent && !isVerifySilentMode()) emitToast(`定速巡航已锁定 ${Math.round(cruiseTargetSpeed * 3.6)} km/h`, 1800)
+    return true
+  }
+
+  function toggleCruise(silent = false) {
+    return setCruise(!cruiseControl, silent)
   }
 
   function setGear(nextGear: number) {
     const list = activeGears()
     gear = T.MathUtils.clamp(Math.round(nextGear), 1, list.length)
+    if (parkLocked || kickstandDown) unlockParkIfNeeded(true)
+    if (cruiseControl) {
+      const maxMs = effectiveMaxKmh().targetKmh / 3.6
+      if (maxMs < ebikeRealFeaturesConfig.cruiseMinSpeedKmh / 3.6) cruiseControl = false
+      else cruiseTargetSpeed = Math.min(cruiseTargetSpeed, maxMs)
+    }
     return gear
   }
 
@@ -548,6 +795,11 @@ export function createBikeControl() {
   function setBattery(pct: number) {
     batteryPct = T.MathUtils.clamp(Number.isFinite(pct) ? pct : 100, 0, 100)
     lastBatteryStatus = batteryStatusOf(batteryPct)
+    if (kind === 'bike' && batteryPct <= 0) {
+      if (headlight !== 'off') headlight = 'off'
+      cruiseControl = false
+      cruiseTargetSpeed = 0
+    }
     return batteryPct
   }
 
@@ -601,8 +853,14 @@ export function createBikeControl() {
     speed = 0
     wheelie = 0
     wheelieVel = 0
-    sharpSteerHold = 0
     braking = false
+    cruiseControl = false
+    cruiseTargetSpeed = 0
+    parkLocked = false
+    kickstandDown = false
+    throttleBlockedByPark = false
+    hazard = kind === 'bike'
+    blinkOn = hazard
 
     const vehicleName = kind === 'bicycle' ? '单车' : '电车'
     const msg = reason === 'lowside'
@@ -655,6 +913,14 @@ export function createBikeControl() {
     const cdt = Math.min(.1, Math.max(0, dt))
     crashElapsed += cdt
     phaseElapsed += cdt
+
+    if (hazard || turnSignal !== 'off') {
+      blinkPhase = (blinkPhase + cdt * ebikeRealFeaturesConfig.blinkFreqHz) % 1
+      blinkOn = blinkPhase < .5
+    } else {
+      blinkPhase = 0
+      blinkOn = false
+    }
 
     const layRoll = -crashSide * twoWheelCrashFlowConfig.bikeLayRollRad
 
@@ -730,6 +996,12 @@ export function createBikeControl() {
         speed = 0
         wheelie = 0
         wheelieVel = 0
+        hazard = false
+        turnSignal = 'off'
+        turnCancelYawAccum = 0
+        turnStraightHold = 0
+        parkLocked = false
+        kickstandDown = false
         clearCrashState()
         setGear(defaultGearFor(kind))
         justRecoveredToRide = true
@@ -770,11 +1042,18 @@ export function createBikeControl() {
   }
 
   function telemetry(): EbikeDynamicTelemetry {
+    const s = spec()
     const list = activeGears()
     const g = currentGearSpec()
     const lim = effectiveMaxKmh()
     const batRounded = +batteryPct.toFixed(1)
     const snap = crashSnapshot()
+    const mandatoryRad = s.crash.mandatoryFallLeanRad
+    const effectiveRad = gripLimitRad
+    const leanDanger = T.MathUtils.clamp(Math.abs(lean) / Math.max(1e-3, effectiveRad), 0, 1)
+    const wheelieDanger = wheelie / Math.max(1e-3, s.crash.wheelieCrashRad)
+    const leftLit = blinkOn && (hazard || turnSignal === 'left')
+    const rightLit = blinkOn && (hazard || turnSignal === 'right')
     return {
       kind,
       vehicleType,
@@ -782,14 +1061,14 @@ export function createBikeControl() {
       tier: vehicleType,
       tierLabel: kind === 'bicycle' ? '人力单车' : profile.tierLabel,
       badge: kind === 'bicycle' ? '单车' : profile.badge,
-      gear,
+      gear: kind === 'bike' && parkLocked ? 0 : gear,
       gearCount: list.length,
-      gearLabel: g.label,
-      gearHint: g.hint,
+      gearLabel: kind === 'bike' && parkLocked ? 'P' : g.label,
+      gearHint: kind === 'bike' && parkLocked ? '驻车锁' : g.hint,
       speed,
       kmh: Math.round(Math.abs(speed) * 3.6),
-      maxKmh: lim.targetKmh,
-      targetKmh: lim.targetKmh,
+      maxKmh: kind === 'bike' && parkLocked ? 0 : lim.targetKmh,
+      targetKmh: kind === 'bike' && parkLocked ? 0 : lim.targetKmh,
       tierMaxKmh: kind === 'bicycle' ? bicycleGearConfigs[bicycleGearConfigs.length - 1].maxKmh : profile.tierMaxKmh,
       compliantCapKmh: profile.compliantCapKmh,
       battery: batRounded,
@@ -801,13 +1080,37 @@ export function createBikeControl() {
       lowBatteryCapKmh: lim.lowBatteryCapKmh,
       drainPerSec: +drainPerSec.toFixed(3),
       lean,
-      leanLimit: gripLimitRad,
-      gripLimitRad,
-      crashRisk,
+      leanDeg: +(Math.abs(lean) * 180 / Math.PI).toFixed(1),
+      leanRateDegPerSec: +(leanRateNow * 180 / Math.PI).toFixed(1),
+      leanLimit: effectiveRad,
+      gripLimitRad: effectiveRad,
+      mandatoryFallLeanRad: mandatoryRad,
+      mandatoryFallDeg: +(mandatoryRad * 180 / Math.PI).toFixed(1),
+      effectiveFallLeanRad: effectiveRad,
+      effectiveFallDeg: +(effectiveRad * 180 / Math.PI).toFixed(1),
+      leanDangerRatio: +leanDanger.toFixed(3),
+      crashRisk: +Math.max(leanDanger, wheelieDanger).toFixed(3),
       wheelie,
       wheelieVel,
       tucking,
       braking,
+      parkLocked,
+      kickstandDown,
+      throttleBlockedByPark,
+      parkWarnSeq,
+      headlight,
+      taillight: headlight !== 'off',
+      brakeLight: braking || parkLocked,
+      turnSignal,
+      leftSignalLit: leftLit,
+      rightSignalLit: rightLit,
+      hazard,
+      blinkOn,
+      blinkPhase,
+      hornActive,
+      hornSeq,
+      cruiseControl,
+      cruiseTargetKmh: cruiseControl ? Math.round(cruiseTargetSpeed * 3.6) : 0,
       wetSurface,
       offRoadSurface,
       crashPhase,
@@ -839,11 +1142,22 @@ export function createBikeControl() {
     get speed() { return speed },
     get heading() { return heading },
     get lean() { return lean },
+    get leanDeg() { return Math.abs(lean) * 180 / Math.PI },
     get pitch() { return pitch },
     get steerInput() { return steerInput },
     get wheelie() { return wheelie },
     get crashRisk() { return crashRisk },
     get gripLimitRad() { return gripLimitRad },
+    get parkLocked() { return parkLocked },
+    get kickstandDown() { return kickstandDown },
+    get headlight() { return headlight },
+    get turnSignal() { return turnSignal },
+    get hazard() { return hazard },
+    get blinkOn() { return blinkOn },
+    get hornActive() { return hornActive },
+    get hornSeq() { return hornSeq },
+    get cruiseControl() { return cruiseControl },
+    get cruiseTargetKmh() { return cruiseControl ? Math.round(cruiseTargetSpeed * 3.6) : 0 },
     get crashPhase() { return crashPhase },
     get isCrashedOrDown() { return crashPhase !== 'none' },
     get bikeDownState() { return crashSnapshot() },
@@ -862,7 +1176,10 @@ export function createBikeControl() {
       lastBatteryStatus = batteryStatusOf(batteryPct)
       drainEnabledOverride = options?.drainEnabled
       autoCrashOverride = options?.autoCrash
-      gripLimitRad = spec().crash.lowsideLeanRad
+      parkLocked = kind === 'bike' ? (options?.parkStart ?? !isVerifyMode()) : false
+      kickstandDown = parkLocked
+      if (options?.envHour !== undefined) setEnvironmentHour(options.envHour)
+      gripLimitRad = spec().crash.mandatoryFallLeanRad
     },
     setGear,
     shiftGear(delta: number) { return setGear(gear + delta) },
@@ -871,6 +1188,21 @@ export function createBikeControl() {
     setUpgrades,
     setBattery,
     setAutoCrash(on: boolean | undefined) { autoCrashOverride = on },
+    setPark,
+    togglePark,
+    setKickstand,
+    toggleKickstand,
+    setHeadlight,
+    cycleHeadlight,
+    setEnvironmentHour,
+    setTurnSignal,
+    toggleTurnSignal,
+    setHazard,
+    toggleHazard,
+    setHorn,
+    pulseHorn,
+    setCruise,
+    toggleCruise,
     setVehicleWorldPos,
     setRiderWorldPos,
     setSurfaceCondition,
@@ -879,7 +1211,7 @@ export function createBikeControl() {
     startPickup,
     recover,
     stepCrash,
-    stop() { speed = 0; drainPerSec = 0; wheelieVel = 0 },
+    stop() { speed = 0; drainPerSec = 0; wheelieVel = 0; cruiseControl = false },
     reset,
     dampSpeed(step: number) {
       speed *= Math.max(0, 1 - spec().slideDamp * step)
@@ -894,27 +1226,54 @@ export function createBikeControl() {
       const s = spec()
       const cdt = Math.min(.12, Math.max(0, dt))
 
+      if (hornTimer > 0) hornTimer = Math.max(0, hornTimer - cdt)
+      if (control?.horn !== undefined) setHorn(control.horn)
+      else hornActive = hornTimer > 0
+
+      if (hazard || turnSignal !== 'off') {
+        blinkPhase = (blinkPhase + cdt * ebikeRealFeaturesConfig.blinkFreqHz) % 1
+        blinkOn = blinkPhase < .5
+      } else {
+        blinkPhase = 0
+        blinkOn = false
+      }
+
       if (crashPhase !== 'none') {
         speed = 0
         drainPerSec = 0
         wheelieVel = 0
+        leanRateNow = 0
+        cruiseControl = false
         return 0
       }
 
+      if (control?.parkToggle) togglePark()
+      if (control?.kickstandToggle) toggleKickstand()
+      if (control?.headlightCycle) cycleHeadlight()
+      if (control?.turnLeftToggle) toggleTurnSignal('left')
+      if (control?.turnRightToggle) toggleTurnSignal('right')
+      if (control?.hazardToggle) toggleHazard()
+      if (control?.cruiseToggle) toggleCruise()
+
       if (control?.gearSelect !== undefined && control.gearSelect !== null) setGear(control.gearSelect)
       else if (control?.gearDelta) setGear(gear + control.gearDelta)
+
+      if (kind === 'bike' && batteryPct <= 0 && headlight !== 'off') headlight = 'off'
 
       if (!mounted) {
         revHold = 0
         drainPerSec = 0
         braking = false
         tucking = false
+        throttleBlockedByPark = false
+        prevThrottlePressed = false
+        cruiseControl = false
         wheelieLoad = 0
         wheelieVel = 0
         wheelie = T.MathUtils.damp(wheelie, 0, 10, cdt)
         steerInput = T.MathUtils.damp(steerInput, 0, s.steerDamp, cdt)
-        lean = T.MathUtils.damp(lean, 0, s.leanDamp, cdt)
-        sharpSteerHold = 0
+        lean = T.MathUtils.damp(lean, 0, s.leanRecoverRate, cdt)
+        leanRateNow = 0
         crashRisk = 0
         return speed
       }
@@ -922,6 +1281,48 @@ export function createBikeControl() {
       const prevSpeed = speed
       const uFwd = deadzone(T.MathUtils.clamp(forward, -1, 1), s.stickDeadFwd)
       const uTurn = deadzone(T.MathUtils.clamp(right, -1, 1), s.stickDeadTurn)
+
+      // P-gear / kickstand safety interlock: touching throttle while parked won't surge forward; squeeze brake S or shift unlocks cleanly.
+      if ((kind === 'bike' && parkLocked) || kickstandDown) {
+        braking = uFwd < -.08
+        if (braking) {
+          brakeUnlockHold += cdt
+          if (brakeUnlockHold >= ebikeRealFeaturesConfig.brakeUnlockHoldSec) unlockParkIfNeeded()
+        } else {
+          brakeUnlockHold = 0
+        }
+        if ((kind === 'bike' && parkLocked) || kickstandDown) {
+          speed = 0
+          drainPerSec = 0
+          wheelie = 0
+          wheelieVel = 0
+          wheelieLoad = 0
+          tucking = false
+          cruiseControl = false
+          steerInput = T.MathUtils.damp(steerInput, 0, s.steerDamp, cdt)
+          lean = T.MathUtils.damp(lean, 0, s.leanRecoverRate, cdt)
+          leanRateNow = 0
+          crashRisk = 0
+          const tryingThrottle = uFwd > .05
+          throttleBlockedByPark = tryingThrottle
+          if (tryingThrottle && !prevThrottlePressed) {
+            parkWarnSeq++
+            if (!isVerifySilentMode()) {
+              emitToast(
+                kind === 'bike'
+                  ? 'P 档防误拧保护中 · 轻捏刹车(S) / 按 P / 按 1-4 解锁出发'
+                  : '边撑已放下 · 按 K 或轻捏刹车(S) 收起边撑',
+                2200,
+              )
+            }
+          }
+          prevThrottlePressed = tryingThrottle
+          return 0
+        }
+      }
+      throttleBlockedByPark = false
+      prevThrottlePressed = false
+
       steerInput = T.MathUtils.damp(steerInput, uTurn, s.steerDamp, cdt)
       tucking = !!control?.tuck && Math.abs(speed) > 1.8
 
@@ -936,7 +1337,7 @@ export function createBikeControl() {
       const capMs = batLim.targetKmh / 3.6
       const uphillFactor = uphillSin > .012 ? Math.max(0, uphillSin - .012) : 0
       const downhillFactor = uphillSin < -.012 ? Math.max(0, -uphillSin - .012) : 0
-      const slopeMul = kind === 'bicycle' ? gSpec.uphillMul : gSpec.uphillMul
+      const slopeMul = gSpec.uphillMul
       const effMax = uphillFactor > 0
         ? Math.max(2.0, capMs * (1 - s.uphillCapScale * .28 * slopeMul * uphillFactor))
         : capMs
@@ -944,14 +1345,20 @@ export function createBikeControl() {
       const torqueMul = kind === 'bike' ? profile.accelMul * batLim.accelBatteryMul : 1
       braking = (uFwd < -.05 && speed > .05) || (uFwd > .05 && speed < -.05)
 
+      if (uFwd < -.05 || (kind === 'bike' && batteryPct <= 0) || capMs < ebikeRealFeaturesConfig.cruiseMinSpeedKmh / 3.6) {
+        if (cruiseControl) cruiseControl = false
+      }
+
+      let driveEffort = 0
       if (uFwd > .05) {
         revHold = 0
         if (speed < 0) {
           speed = Math.min(0, speed + s.brake * uFwd * cdt)
         } else {
+          driveEffort = Math.pow(uFwd, gSpec.throttleExp)
           const ratio = T.MathUtils.clamp(speed / Math.max(.8, effMax), 0, 1.1)
           const blendedGearAccel = T.MathUtils.lerp(gSpec.launchTorque, gSpec.accelScale, smoothstep(Math.min(1, ratio))) * torqueMul
-          const rawDrive = s.accel * blendedGearAccel * (1 - s.torqueDecay * Math.pow(Math.min(1, ratio), s.torquePow)) * uFwd
+          const rawDrive = s.accel * blendedGearAccel * (1 - s.torqueDecay * Math.pow(Math.min(1, ratio), s.torquePow)) * driveEffort
           const slopeDrag = uphillFactor > 0
             ? Math.min(rawDrive * .72, s.uphillDrag * slopeMul * uphillFactor)
             : -9.8 * downhillFactor * .32
@@ -973,6 +1380,20 @@ export function createBikeControl() {
           if (revHold >= s.revHold) speed = T.MathUtils.clamp(speed + s.revAccel * uFwd * cdt, s.reverseMax, 0)
           else speed = 0
         }
+      } else if (cruiseControl && speed >= 0) {
+        // Active cruise control: holds target speed smoothly until brake/park/battery cutout.
+        revHold = 0
+        const cruiseMax = Math.min(cruiseTargetSpeed, effMax)
+        const spdErr = cruiseMax - speed
+        driveEffort = T.MathUtils.clamp(spdErr * .85 + .18, 0, 1)
+        const ratio = T.MathUtils.clamp(speed / Math.max(.8, effMax), 0, 1.1)
+        const blendedGearAccel = T.MathUtils.lerp(gSpec.launchTorque, gSpec.accelScale, smoothstep(Math.min(1, ratio))) * torqueMul
+        const rawDrive = s.accel * blendedGearAccel * (1 - s.torqueDecay * Math.pow(Math.min(1, ratio), s.torquePow)) * driveEffort
+        const slopeDrag = uphillFactor > 0
+          ? Math.min(rawDrive * .72, s.uphillDrag * slopeMul * uphillFactor)
+          : -9.8 * downhillFactor * .32
+        const nextSpd = speed + (rawDrive - slopeDrag) * cdt
+        speed = nextSpd <= cruiseMax ? nextSpd : Math.max(cruiseMax, speed - s.rollDrag * cdt)
       } else {
         // Freewheel / coasting inertia: gentle rolling drag + aerodynamic quadratic drag + slope gravity.
         revHold = 0
@@ -994,50 +1415,74 @@ export function createBikeControl() {
         const speedEase = T.MathUtils.clamp(speed / 3.8, .48, 1.25)
         const liftAccel = s.crash.wheelieRaiseRate * wheelieLoad * torqueBias * speedEase
         wheelieVel = T.MathUtils.damp(wheelieVel, Math.max(0, liftAccel * .32), 6, cdt)
-        wheelie = Math.max(0, wheelie + wheelieVel * cdt)
+        const maxSafeWheelie = canAutoCrash() ? s.crash.wheelieCrashRad + .08 : s.crash.wheelieCrashRad * .86
+        wheelie = T.MathUtils.clamp(wheelie + wheelieVel * cdt, 0, maxSafeWheelie)
       } else {
         wheelieVel = T.MathUtils.damp(wheelieVel, -s.crash.wheelieFallRate * (wheelie > 0 ? .38 : 0), 10, cdt)
         wheelie = Math.max(0, T.MathUtils.damp(wheelie, 0, s.crash.wheelieFallRate, cdt))
       }
 
+      const prevHeading = heading
       const omega = turnRate(speed, s, Math.max(s.maxSpeed, capMs * .85))
       const dirSign = speed < -.05 ? -1 : 1
-      // Wheelie reduces front tire steering bite mildly, and tucking tightens corner carve.
       const frontGripFactor = wheelie > .18 ? T.MathUtils.lerp(1, .52, T.MathUtils.clamp((wheelie - .18) / .35, 0, 1)) : 1
       heading -= steerInput * omega * dirSign * frontGripFactor * cdt
 
-      const maxLean = tucking ? s.tuckLeanMax : s.leanMax
-      const speedNorm = Math.abs(speed) / Math.max(1.2, s.maxSpeed)
-      const targetLean = Math.abs(speed) > .45
-        ? T.MathUtils.clamp(-steerInput * Math.min(1.32, .35 + speedNorm * .78) * maxLean, -maxLean, maxLean)
-        : 0
-      lean = T.MathUtils.damp(lean, targetLean, s.leanDamp, cdt)
-
-      // Dynamic cornering grip threshold (wet, off-road, braking in lean, and high speed lower slip threshold).
-      let limit = s.crash.lowsideLeanRad
-      if (wetSurface) limit -= s.crash.wetGripPenaltyRad
-      if (offRoadSurface) limit -= s.crash.offRoadGripPenaltyRad
-      if (braking && Math.abs(lean) > .14) limit -= s.crash.brakeInLeanPenaltyRad
-      if (Math.abs(speed) > s.crash.highSpeedPenaltyStartMs) limit -= s.crash.highSpeedPenaltyRad
-      gripLimitRad = Math.max(.16, limit)
-
-      if (Math.abs(steerInput) >= s.crash.sharpSteerInput && Math.abs(speed) >= s.crash.sharpSteerSpeedMs) {
-        sharpSteerHold += cdt
-      } else {
-        sharpSteerHold = Math.max(0, sharpSteerHold - cdt * 3)
+      // Turn signal auto-cancels after completing a matching turn and straightening handlebars.
+      if (turnSignal !== 'off' && !hazard) {
+        const dYaw = shortestAngle(prevHeading, heading)
+        const matchingYaw = turnSignal === 'left' ? dYaw : -dYaw
+        if (matchingYaw > 0) turnCancelYawAccum += matchingYaw
+        if (turnCancelYawAccum >= ebikeRealFeaturesConfig.turnAutoCancelYawRad) {
+          if (Math.abs(steerInput) <= ebikeRealFeaturesConfig.turnAutoCancelSteerBand) {
+            turnStraightHold += cdt
+            if (turnStraightHold >= ebikeRealFeaturesConfig.turnAutoCancelStraightHoldSec) {
+              turnSignal = 'off'
+              turnCancelYawAccum = 0
+              turnStraightHold = 0
+            }
+          } else {
+            turnStraightHold = 0
+          }
+        }
       }
+
+      // Speed-responsive lean physics: slow speed -> gentle slow lean change, high speed -> rapid steep lean toward mandatory fall angle.
+      const absSpd = Math.abs(speed)
+      const leanRefSpd = kind === 'bicycle' ? 7.4 : 12.5
+      const speedRatio = T.MathUtils.clamp((absSpd - .5) / leanRefSpd, 0, 1.15)
+      const leanRate = absSpd > .45
+        ? T.MathUtils.lerp(s.leanRateMin, s.leanRateMax, Math.pow(Math.min(1, speedRatio), 1.15))
+        : s.leanRecoverRate
+      const maxLean = tucking ? s.tuckLeanMax : s.leanMax
+      const curveScalar = Math.pow(T.MathUtils.clamp(speedRatio * gSpec.leanScale, 0, 1.12), 1.25)
+      const baseLeanMag = T.MathUtils.lerp(s.leanTargetMinRad, s.leanMax, curveScalar)
+      const leanEnvelope = tucking ? Math.max(baseLeanMag * 1.28, Math.min(s.tuckLeanMax, baseLeanMag + .18)) : baseLeanMag
+      const targetLean = absSpd > .45
+        ? T.MathUtils.clamp(-steerInput * leanEnvelope, -maxLean, maxLean)
+        : 0
+      const activeRate = Math.abs(targetLean) > Math.abs(lean) ? leanRate : Math.max(leanRate, s.leanRecoverRate)
+      const prevLeanVal = lean
+      lean = T.MathUtils.damp(lean, targetLean, activeRate, cdt)
+      leanRateNow = cdt > 1e-5 ? Math.abs(lean - prevLeanVal) / cdt : 0
+
+      // Explicit physical mandatory fall angle (~31 deg dry e-bike / ~27.5 deg bicycle) with fair wet/off-road/brake grip trim.
+      let fallAngle = s.crash.mandatoryFallLeanRad
+      if (wetSurface) fallAngle -= s.crash.wetGripPenaltyRad
+      if (offRoadSurface) fallAngle -= s.crash.offRoadGripPenaltyRad
+      if (braking && Math.abs(lean) > .22) fallAngle -= s.crash.brakeInLeanPenaltyRad
+      gripLimitRad = Math.max(s.crash.minEffectiveFallRad, fallAngle)
 
       const leanRatio = Math.abs(lean) / gripLimitRad
       const wheelieRatio = wheelie / s.crash.wheelieCrashRad
-      const jerkRatio = sharpSteerHold / s.crash.sharpSteerWindowSec
-      crashRisk = T.MathUtils.clamp(Math.max(leanRatio, wheelieRatio, jerkRatio), 0, 1)
+      crashRisk = T.MathUtils.clamp(Math.max(leanRatio, wheelieRatio), 0, 1)
 
       if (canAutoCrash()) {
         if (wheelie >= s.crash.wheelieCrashRad) {
           triggerCrash('loopout', steerInput >= 0 ? 1 : -1)
           return speed
         }
-        if ((Math.abs(lean) >= gripLimitRad && Math.abs(speed) >= 3.2) || jerkRatio >= 1) {
+        if (Math.abs(lean) >= gripLimitRad && absSpd >= 2.2) {
           triggerCrash('lowside', lean > 0 ? -1 : 1)
           return speed
         }
@@ -1045,22 +1490,25 @@ export function createBikeControl() {
 
       const shouldDrain = drainEnabledOverride ?? !isVerifySilentMode()
       if (kind === 'bike' && cdt > 0 && shouldDrain) {
-        const driveFactor = uFwd > .05 ? uFwd : (uFwd < -.05 && prevSpeed <= .05) ? Math.abs(uFwd) * .55 : 0
+        const effectiveFwd = Math.max(uFwd > .05 ? uFwd : 0, driveEffort)
+        const driveFactor = effectiveFwd > .02 ? effectiveFwd : (uFwd < -.05 && prevSpeed <= .05) ? Math.abs(uFwd) * .55 : 0
         const posAccel = Math.max(0, (speed - prevSpeed) / cdt - ebikeBatteryConfig.accelNoiseThreshold)
-        const speedRatio = (Math.abs(speed) * 3.6) / EBIKE_COMPLIANT_CAP_KMH
+        const speedRatioBat = (absSpd * 3.6) / EBIKE_COMPLIANT_CAP_KMH
         const leanNorm = Math.min(1.5, Math.abs(lean) / Math.max(.1, s.leanMax))
         const activeLoad = driveFactor > 0
           ? (ebikeBatteryConfig.cruiseDrainPerSec * gSpec.drainScale
-            + ebikeBatteryConfig.speedAeroDrainPerSec * speedRatio * speedRatio
+            + ebikeBatteryConfig.speedAeroDrainPerSec * speedRatioBat * speedRatioBat
             + ebikeBatteryConfig.accelDrainPerAccel * posAccel
             + ebikeBatteryConfig.wheelieDrainPerSec * wheelieLoad
             + ebikeBatteryConfig.cornerLeanDrainPerSec * leanNorm
             + (tucking ? ebikeBatteryConfig.tuckDrainPerSec : 0)
             + ebikeBatteryConfig.climbDrainPerSlope * Math.max(0, uphillSin)) * driveFactor * profile.drainMul
           : 0
+        const beamLoad = headlight === 'high' ? ebikeRealFeaturesConfig.highBeamDrainPerSec : headlight === 'low' ? ebikeRealFeaturesConfig.lowBeamDrainPerSec : 0
         const regen = braking && prevSpeed > 3 ? ebikeBatteryConfig.regenOnBrakePerSec : 0
-        drainPerSec = Math.max(0, (ebikeBatteryConfig.idleDrainPerSec + activeLoad - regen) / Math.max(.25, profile.capacityScale))
+        drainPerSec = Math.max(0, (ebikeBatteryConfig.idleDrainPerSec + beamLoad + activeLoad - regen) / Math.max(.25, profile.capacityScale))
         batteryPct = Math.max(0, batteryPct - drainPerSec * cdt)
+        if (batteryPct <= 0 && headlight !== 'off') headlight = 'off'
         maybeNotifyBattery(batteryStatusOf(batteryPct))
       } else {
         drainPerSec = 0

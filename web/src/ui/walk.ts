@@ -25,7 +25,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
 
   const rideHud=document.createElement('div')
   rideHud.className='ride-hud'
-  rideHud.innerHTML='<span class="ride-type" data-kind="normal">电摩</span><span class="ride-gear">D2</span><span class="ride-gears" role="group" aria-label="挡位切换"><button class="ride-gear-btn" type="button" data-gear="1">D1</button><button class="ride-gear-btn on" type="button" data-gear="2">D2</button><button class="ride-gear-btn" type="button" data-gear="3">D3</button><button class="ride-gear-btn" type="button" data-gear="4">S</button></span><span class="ride-speed">0 km/h</span><span class="ride-bat" data-level="ok"><span class="ride-bat-bar"><i></i></span><span class="ride-bat-pct">100%</span></span><button class="ride-state" type="button" hidden></button><button class="ride-mod" type="button" aria-label="切换电动车改装">素车</button><span class="ride-keys">1-4/Q·E换挡 · Space翘头</span>'
+  rideHud.innerHTML='<span class="ride-type" data-kind="normal">电摩</span><span class="ride-gear">D2</span><span class="ride-gears" role="group" aria-label="挡位切换"><button class="ride-gear-btn" type="button" data-gear="1">D1</button><button class="ride-gear-btn on" type="button" data-gear="2">D2</button><button class="ride-gear-btn" type="button" data-gear="3">D3</button><button class="ride-gear-btn" type="button" data-gear="4">S</button></span><span class="ride-speed">0 km/h</span><span class="ride-bat" data-level="ok"><span class="ride-bat-bar"><i></i></span><span class="ride-bat-pct">100%</span></span><span class="ride-lean-bar" title="压弯倾角风险"><i></i></span><button class="ride-park" type="button" aria-label="P档驻车" title="P档驻车 / 边撑 (P/K)">P</button><button class="ride-light" type="button" aria-label="切换车灯" title="车灯切换 关/近/远 (L)">关灯</button><button class="ride-turn-left" type="button" aria-label="左转向灯" title="左转向灯 (Z)">◀</button><button class="ride-turn-right" type="button" aria-label="右转向灯" title="右转向灯 (X)">▶</button><button class="ride-hazard" type="button" aria-label="双闪警示灯" title="双闪警示灯 (B)">⚠</button><button class="ride-cruise" type="button" aria-label="定速巡航" title="定速巡航 (U)">定速</button><button class="ride-state" type="button" hidden></button><button class="ride-mod" type="button" aria-label="切换电动车改装">素车</button><span class="ride-keys">1-4/Q·E换挡 · P驻车 · L灯 · Z/X/B转向 · H喇叭 · U定速</span>'
   document.body.append(rideHud)
   const typeEl=rideHud.querySelector<HTMLElement>('.ride-type')!
   const gearEl=rideHud.querySelector<HTMLElement>('.ride-gear')!
@@ -34,6 +34,14 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   const batEl=rideHud.querySelector<HTMLElement>('.ride-bat')!
   const batFillEl=rideHud.querySelector<HTMLElement>('.ride-bat-bar i')!
   const batPctEl=rideHud.querySelector<HTMLElement>('.ride-bat-pct')!
+  const leanBarEl=rideHud.querySelector<HTMLElement>('.ride-lean-bar')!
+  const leanBarFillEl=rideHud.querySelector<HTMLElement>('.ride-lean-bar i')!
+  const parkBtn=rideHud.querySelector<HTMLButtonElement>('.ride-park')!
+  const lightBtn=rideHud.querySelector<HTMLButtonElement>('.ride-light')!
+  const turnLeftBtn=rideHud.querySelector<HTMLButtonElement>('.ride-turn-left')!
+  const turnRightBtn=rideHud.querySelector<HTMLButtonElement>('.ride-turn-right')!
+  const hazardBtn=rideHud.querySelector<HTMLButtonElement>('.ride-hazard')!
+  const cruiseBtn=rideHud.querySelector<HTMLButtonElement>('.ride-cruise')!
   const stateEl=rideHud.querySelector<HTMLButtonElement>('.ride-state')!
   const modBtn=rideHud.querySelector<HTMLButtonElement>('.ride-mod')!
   const keysEl=rideHud.querySelector<HTMLElement>('.ride-keys')!
@@ -48,6 +56,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   let wheelieTouch=false, wheeliePointer=-1, tuckTouch=false, tuckPointer=-1
   let gearDelta=0, gearSelect:number|null=null, recoverPulse=false, cycleModPulse=false
   let parkTogglePulse=false, kickstandTogglePulse=false, headlightCyclePulse=false
+  let turnLeftPulse=false, turnRightPulse=false, hazardPulse=false, cruisePulse=false
   const touches=new Map<number,{x:number,y:number}>()
   let mouseDown=false, lastMouse={x:0,y:0}, pinchDist=0
 
@@ -56,6 +65,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')
     gearDelta=0;gearSelect=null;recoverPulse=false;cycleModPulse=false
     parkTogglePulse=false;kickstandTogglePulse=false;headlightCyclePulse=false
+    turnLeftPulse=false;turnRightPulse=false;hazardPulse=false;cruisePulse=false
   }
   function clearTransientInput(clearKeys=true){
     if(clearKeys)keys.clear()
@@ -125,6 +135,18 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   btnTuck.onpointerup=endTuck;btnTuck.onpointercancel=endTuck;btnTuck.onlostpointercapture=endTuck
   modBtn.onpointerdown=event=>{event.stopPropagation()}
   modBtn.onclick=event=>{event.stopPropagation();cycleModPulse=true}
+  parkBtn.onpointerdown=event=>{event.stopPropagation()}
+  parkBtn.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash!=='1')parkTogglePulse=true}
+  lightBtn.onpointerdown=event=>{event.stopPropagation()}
+  lightBtn.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash!=='1')headlightCyclePulse=true}
+  turnLeftBtn.onpointerdown=event=>{event.stopPropagation()}
+  turnLeftBtn.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash!=='1')turnLeftPulse=true}
+  turnRightBtn.onpointerdown=event=>{event.stopPropagation()}
+  turnRightBtn.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash!=='1')turnRightPulse=true}
+  hazardBtn.onpointerdown=event=>{event.stopPropagation()}
+  hazardBtn.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash!=='1')hazardPulse=true}
+  cruiseBtn.onpointerdown=event=>{event.stopPropagation()}
+  cruiseBtn.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash!=='1')cruisePulse=true}
   for(const btn of gearButtons){
     btn.onpointerdown=event=>{event.stopPropagation()}
     btn.onclick=event=>{event.stopPropagation();const g=Number(btn.dataset.gear);if(g>=1)gearSelect=g}
@@ -164,6 +186,10 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
       }
       else if(event.code==='KeyK'&&ridingTwoWheel&&!crashed)kickstandTogglePulse=true
       else if(event.code==='KeyL'&&(document.body.dataset.ride==='bike'||drivingCar)&&!crashed)headlightCyclePulse=true
+      else if(event.code==='KeyZ'&&document.body.dataset.ride==='bike'&&!crashed)turnLeftPulse=true
+      else if(event.code==='KeyX'&&document.body.dataset.ride==='bike'&&!crashed)turnRightPulse=true
+      else if(event.code==='KeyB'&&document.body.dataset.ride==='bike'&&!crashed)hazardPulse=true
+      else if(event.code==='KeyU'&&document.body.dataset.ride==='bike'&&!crashed)cruisePulse=true
       else if(event.code==='Digit1'||event.code==='Digit2'||event.code==='Digit3'||(ridingTwoWheel&&event.code==='Digit4'))gearSelect=Number(event.code.slice(-1))
     }
   })
@@ -251,9 +277,15 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
         parkToggle:parkTogglePulse,
         kickstandToggle:kickstandTogglePulse,
         headlightCycle:headlightCyclePulse,
+        turnLeftToggle:turnLeftPulse,
+        turnRightToggle:turnRightPulse,
+        hazardToggle:hazardPulse,
+        horn:crashed?false:keys.has('KeyH'),
+        cruiseToggle:cruisePulse,
       }
       gearDelta=0;gearSelect=null;recoverPulse=false;cycleModPulse=false
       parkTogglePulse=false;kickstandTogglePulse=false;headlightCyclePulse=false
+      turnLeftPulse=false;turnRightPulse=false;hazardPulse=false;cruisePulse=false
       return out
     },
     syncRideHud(state:EbikeTelemetrySnapshot|null,rideKind:'bike'|'bicycle'|'car'|'boat'|null){
@@ -281,19 +313,35 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
           ?`${state.vehicleLabel} · P档驻车（按 P/K 或 E 解除）`
           :`${state.vehicleLabel} · 本挡限速 ${Math.round(state.maxKmh)} km/h（1-4 / Q·E 换挡）`
         const lightTag=state.headlight==='high'?'远光':state.headlight==='low'?'近光':'关灯'
-        keysEl.textContent=`1-4/Q·E换挡 · P驻车 · L${lightTag}`
+        keysEl.textContent='1-4/Q·E · P驻车 · L灯 · Z/X/B · H · U定速'
+        parkBtn.classList.toggle('on',!!state.parkLocked)
+        parkBtn.setAttribute('aria-pressed',String(!!state.parkLocked))
+        lightBtn.textContent=lightTag
+        lightBtn.dataset.mode=state.headlight??'off'
+        lightBtn.classList.toggle('on',state.headlight==='low'||state.headlight==='high')
+        turnLeftBtn.classList.toggle('on',!!state.leftSignalLit)
+        turnLeftBtn.classList.toggle('armed',state.turnSignal==='left')
+        turnRightBtn.classList.toggle('on',!!state.rightSignalLit)
+        turnRightBtn.classList.toggle('armed',state.turnSignal==='right')
+        hazardBtn.classList.toggle('on',!!state.hazard&&!!state.blinkOn)
+        hazardBtn.classList.toggle('armed',!!state.hazard)
+        cruiseBtn.classList.toggle('on',!!state.cruiseControl)
+        cruiseBtn.textContent=state.cruiseControl&&state.cruiseTargetKmh?`定速${state.cruiseTargetKmh}`:'定速'
         const pct=Math.max(0,Math.min(100,Math.round(state.battery)))
         batEl.dataset.level=state.criticalBattery?'crit':state.lowBattery?'low':'ok'
         batFillEl.style.width=`${pct}%`
         batPctEl.textContent=`${pct}%`
       }
+      const riskVal=Math.max(0,Math.min(1,state.leanDangerRatio??state.crashRisk??(Math.abs(state.lean)/Math.max(.18,state.leanLimit))))
+      leanBarFillEl.style.width=`${Math.round(riskVal*100)}%`
+      leanBarEl.dataset.level=riskVal>=.82?'crit':riskVal>=.55?'warn':'ok'
       for(let i=0;i<gearButtons.length;i++){
         const btn=gearButtons[i]
         const label=gearLabels[i]
         btn.hidden=!label
         if(label){
           btn.textContent=label
-          const activeGear=state.gear===i+1
+          const activeGear=!state.parkLocked&&state.gear===i+1
           btn.classList.toggle('on',activeGear)
           btn.setAttribute('aria-pressed',String(activeGear))
         }
@@ -342,7 +390,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
         }
       }
     },
-    syncCarHud(state:CarDynamicTelemetry|null){
+    syncCarHud(state:CarDynamicTelemetry|null,headlight:'off'|'low'|'high'='off'){
       if(!state){
         stateEl.hidden=true
         delete document.body.dataset.rideCrash
@@ -352,6 +400,10 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
       delete document.body.dataset.rideType
       delete document.body.dataset.rideCrash
       typeEl.dataset.kind='car';typeEl.textContent='轿车'
+      const hlLabel=headlight==='high'?'远光':headlight==='low'?'近光':'关灯'
+      lightBtn.textContent=hlLabel
+      lightBtn.dataset.mode=headlight
+      lightBtn.classList.toggle('on',headlight!=='off')
       gearEl.textContent=state.gearLabel
       gearEl.title=`自动挡 ${state.gearLabel} · ${state.modeLabel}模式上限 ${state.maxKmh} km/h（1-3 / Q·E 切模式）`
       const modeLabels=['合规40','街道75','运动108']

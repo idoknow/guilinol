@@ -4,7 +4,8 @@ import {fetchAsset} from '../world'
 import {createFreeBoats,type MooringSlot} from './boat'
 import type {createPhysics} from './physics'
 import {createCarControl, type CarDynamicTelemetry, type CarStepControl} from './car'
-import type {CarDriveMode} from './config'
+import type {CarDriveMode, EbikeHeadlightMode, EbikeTurnSignal} from './config'
+import {env as skyEnv} from '../look/time'
 import {
   resolveEbikeKind,
   type EbikeTier,
@@ -201,8 +202,9 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
         vehicleType,
         batteryPct:savedBat,
         mods:vehicleType==='normal'?(saved?.mods??null):null,
+        envHour:skyEnv.hour,
       })
-      saveBikeInstanceState(bike)
+      saveBikeInstanceState(bike,{parkLocked:bikeCtrl.parkLocked,kickstandDown:bikeCtrl.kickstandDown})
       syncHud()
     }
     else if(nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)){freeBoats!.mount(nearFree.slot,nearFree.atBank);syncHud()}
@@ -283,6 +285,21 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     shiftEbikeGear(delta:number){return bike?bikeCtrl.shiftGear(delta):2},
     resetEbikeGearOnRecover(){return bike?bikeCtrl.resetGearToCompliant():2},
     setAutoCrash(on:boolean|undefined){bikeCtrl.setAutoCrash(on)},
+    setEbikePark(on:boolean,silent=false){return bike?bikeCtrl.setPark(on,silent):false},
+    toggleEbikePark(silent=false){return bike?bikeCtrl.togglePark(silent):false},
+    setEbikeKickstand(on:boolean,silent=false){return bike?bikeCtrl.setKickstand(on,silent):false},
+    toggleEbikeKickstand(silent=false){return bike?bikeCtrl.toggleKickstand(silent):false},
+    setEbikeHeadlight(mode:EbikeHeadlightMode,manual=true){return bike?bikeCtrl.setHeadlight(mode,manual):'off'},
+    cycleEbikeHeadlight(){return bike?bikeCtrl.cycleHeadlight():'off'},
+    setEbikeEnvironmentHour(hour:number){if(bike)bikeCtrl.setEnvironmentHour(hour)},
+    setEbikeTurnSignal(dir:EbikeTurnSignal){return bike?bikeCtrl.setTurnSignal(dir):'off'},
+    toggleEbikeTurnSignal(dir:Exclude<EbikeTurnSignal,'off'>){return bike?bikeCtrl.toggleTurnSignal(dir):'off'},
+    setEbikeHazard(on:boolean){return bike?bikeCtrl.setHazard(on):false},
+    toggleEbikeHazard(){return bike?bikeCtrl.toggleHazard():false},
+    setEbikeHorn(pressed:boolean){return bike?bikeCtrl.setHorn(pressed):false},
+    pulseEbikeHorn(){return bike?bikeCtrl.pulseHorn():0},
+    setEbikeCruise(on:boolean,silent=false){return bike?bikeCtrl.setCruise(on,silent):false},
+    toggleEbikeCruise(silent=false){return bike?bikeCtrl.toggleCruise(silent):false},
     dismountDownedBike,
     relocateParkedBike,
     setEbikeVehicleType(nextType:EbikeVehicleType){

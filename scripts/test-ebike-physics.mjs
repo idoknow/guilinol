@@ -7,9 +7,50 @@ import {browserOptions} from './qa-browser.mjs'
 const ROOT = resolve(import.meta.dirname, '..')
 const SHOTS_DIR = '/tmp/hy4-ebike-physics-shots'
 const STRICT_PHYSICS = process.argv.includes('--strict-physics')
+const STRICT_V2 = process.argv.includes('--strict-v2') || process.env.STRICT_TWOWHEEL_V2 === '1'
 
 const assert = (cond, msg) => { if (!cond) throw Error(`Assertion failed: ${msg}`) }
 const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a))
+
+function readV2Telemetry(eb) {
+  if (!eb) return {}
+  const pick = keys => {
+    for (const k of keys) if (eb[k] !== undefined && eb[k] !== null) return eb[k]
+    return undefined
+  }
+  return {
+    fatalLeanRad: pick(['mandatoryFallLeanRad', 'effectiveFallLeanRad', 'fatalLeanRad', 'leanLimit']),
+    leanRateDegPerSec: pick(['leanRateDegPerSec']),
+    leanDangerRatio: pick(['leanDangerRatio', 'leanWarning']),
+    parked: pick(['parkLocked', 'parkGear', 'parked', 'pGear', 'isParked', 'parkLock']),
+    kickstand: pick(['kickstandDown', 'kickstand', 'sideStand', 'sideStandDown']),
+    headlight: pick(['headlight', 'headlightMode', 'lightMode', 'light']),
+    taillight: pick(['taillight', 'tailLight']),
+    brakeLight: pick(['brakeLight', 'brakeLamp', 'tailBrake']),
+    turnSignal: pick(['turnSignal', 'blinker', 'indicator']),
+    leftSignalLit: pick(['leftSignalLit']),
+    rightSignalLit: pick(['rightSignalLit']),
+    hazard: pick(['hazard', 'hazardLights', 'doubleFlash']),
+    cruise: pick(['cruiseControl', 'cruise', 'cruiseActive']),
+    cruiseKmh: pick(['cruiseTargetKmh', 'cruiseKmh']),
+    hornCount: pick(['hornSeq', 'hornCount', 'hornTriggers']),
+    hornActive: pick(['hornActive', 'honking', 'horn']),
+  }
+}
+
+async function releaseParkIfLocked(page) {
+  await page.evaluate(() => {
+    const {walk} = window.viewer
+    const eb = walk.probe()?.ebike
+    if (!eb) return
+    if (eb.parkLocked || eb.parkGear || eb.parked || eb.pGear || eb.isParked || eb.parkLock) {
+      walk.ebike.setPark?.(false) ?? walk.ebike.togglePark?.()
+    }
+    if (eb.kickstand || eb.kickstandDown || eb.sideStand || eb.sideStandDown) {
+      walk.ebike.setKickstand?.(false) ?? walk.ebike.toggleKickstand?.()
+    }
+  })
+}
 
 async function stepTicks(page, count, dt = 0.05) {
   return page.evaluate(({count, dt}) => {
@@ -27,13 +68,24 @@ async function stepTicks(page, count, dt = 0.05) {
   }, {count, dt})
 }
 
-async function steerTowardPoint(page, tx, tz, stopAfter = true, maxSteps = 80) {
+async function steerTowardPoint(page, tx, tz, stopAfter = true, maxSteps = 90) {
   for (let i = 0; i < maxSteps; i++) {
     const snap = await stepTicks(page, 1, 0.05)
     if (snap.probe?.twoWheelFlow === 'crashed') break
     const err = wrapAngle(Math.atan2(-(tx - snap.probe.x), -(tz - snap.probe.z)) - snap.heading)
     const dist = Math.hypot(tx - snap.probe.x, tz - snap.probe.z)
-    if (Math.abs(err) < 0.08 && (!stopAfter || snap.speed < 0.25)) break
+    if (snap.obstacle && Math.abs(snap.speed) < 0.25) {
+      await page.keyboard.up('KeyW')
+      await page.keyboard.down('KeyS')
+      await page.keyboard[err >= 0 ? 'down' : 'up']('KeyD')
+      await page.keyboard[err < 0 ? 'down' : 'up']('KeyA')
+      await stepTicks(page, 16, 0.05)
+      await page.keyboard.up('KeyS')
+      await page.keyboard.up('KeyA')
+      await page.keyboard.up('KeyD')
+      continue
+    }
+    if (!snap.obstacle && Math.abs(err) < 0.08 && (!stopAfter || snap.speed < 0.25)) break
     if (dist < 4 && !stopAfter) break
     const needTurn = Math.abs(err) > 0.25
     await page.keyboard[needTurn && snap.speed > 3.2 ? 'up' : 'down']('KeyW')
@@ -80,6 +132,8 @@ async function mountNearestBike(page) {
     probe: window.viewer.walk.probe(),
   }))
   assert(mounted.vehicle === 'bike', `Expected vehicle=bike after KeyF, got ${mounted.vehicle}`)
+  await releaseParkIfLocked(page)
+  await stepTicks(page, 2, 0.05)
 }
 
 await mkdir(SHOTS_DIR, {recursive: true})
@@ -98,9 +152,16 @@ try {
   page = await context.newPage()
   const errors = []
   page.on('pageerror', err => errors.push(`pageerror: ${err.message}`))
-  page.on('console', msg => { if (msg.type() === 'error') errors.push(`console: ${msg.text()}`) })
+  page.on('console', msg => {
+    if (msg.type() !== 'error') return
+    const txt = msg.text()
+    // Streaming tile aborts during rapid multi-district teleports can close a localhost keep-alive socket.
+    if (/Failed to load resource: net::ERR_(CONNECTION_CLOSED|ABORTED)/.test(txt)) return
+    errors.push(`console: ${txt}`)
+  })
 
   const port = server.httpServer.address().port
+  await page.route('**/favicon.ico', r => r.fulfill({status: 204}))
   await page.goto(`http://127.0.0.1:${port}/?verify&mode=walk&flow=0&time=10`, {waitUntil: 'domcontentloaded'})
   await mountNearestBike(page)
 
@@ -285,32 +346,112 @@ try {
     await stepTicks(page, 12, 0.05)
   }
 
-  // 4. Left & right steering lean + easy sharp-steer lowside auto-crash (NO Shift required!)
-  await page.click('.ride-gear-btn[data-gear="3"]')
-  await stepTicks(page, 1, 0.05)
+  // 4. Speed-scaled lean rate, low-speed controllability, non-tuck corner survival & fatal lean lowside boundary
+  await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(false))
+  const [txLow, tzLow] = await pingPongEndpoint(page)
+  await steerTowardPoint(page, txLow, tzLow, true, 60)
+  await page.click('.ride-gear-btn[data-gear="1"]')
+  await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(true))
   await page.keyboard.down('KeyW')
-  await stepTicks(page, 24, 0.05)
+  await stepTicks(page, 22, 0.05)
+  await page.keyboard.down('KeyA')
+  let lowSpeedLeanAt015 = 0
+  let lowSpeedCrashed = false
+  let maxLowLean = 0
+  for (let i = 0; i < 48; i++) {
+    const snap = await stepTicks(page, 1, 0.05)
+    const lean = Math.abs(snap.probe?.ebikeRig?.lean ?? snap.ebike?.lean ?? 0)
+    if (i === 2) lowSpeedLeanAt015 = lean
+    if (lean > maxLowLean) maxLowLean = lean
+    if (snap.probe?.twoWheelFlow === 'crashed') { lowSpeedCrashed = true; break }
+  }
+  await page.keyboard.up('KeyA')
+  await page.keyboard.up('KeyW')
+  if (lowSpeedCrashed) await finishCrashStandAndPickup(page, '扶起电动车')
+  else await stepTicks(page, 10, 0.05)
+
+  // Non-tuck D2 compliant full-lock turn should survive cleanly without false crash
+  await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(false))
+  const [txMid, tzMid] = await pingPongEndpoint(page)
+  await steerTowardPoint(page, txMid, tzMid, true, 60)
+  await page.click('.ride-gear-btn[data-gear="2"]')
+  await stepTicks(page, 1, 0.05)
+  await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(true))
+  await page.keyboard.down('KeyW')
+  await stepTicks(page, 32, 0.05)
   await page.keyboard.down('KeyA')
   let maxLeftLean = 0
-  let leftLowside = false
+  let midLeanAt015 = 0
+  let d2NonTuckCrashed = false
+  for (let i = 0; i < 40; i++) {
+    const snap = await stepTicks(page, 1, 0.05)
+    const lean = snap.probe?.ebikeRig?.lean ?? snap.ebike?.lean ?? 0
+    if (i === 2) midLeanAt015 = Math.abs(lean)
+    if (Math.abs(lean) > Math.abs(maxLeftLean)) maxLeftLean = lean
+    if (snap.probe?.twoWheelFlow === 'crashed') { d2NonTuckCrashed = true; break }
+  }
+  await page.keyboard.up('KeyA')
+  await page.keyboard.up('KeyW')
+  if (d2NonTuckCrashed) await finishCrashStandAndPickup(page, '扶起电动车')
+
+  // High-speed D3 non-tuck turn check
+  await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(false))
+  const [txD3, tzD3] = await pingPongEndpoint(page)
+  await steerTowardPoint(page, txD3, tzD3, true, 60)
+  await page.click('.ride-gear-btn[data-gear="3"]')
+  await stepTicks(page, 1, 0.05)
+  await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(true))
+  await page.keyboard.down('KeyW')
+  await stepTicks(page, 30, 0.05)
+  await page.keyboard.down('KeyA')
+  let leftLeanAt015 = 0
+  let nonTuckLeftCrashed = false
+  for (let i = 0; i < 36; i++) {
+    const snap = await stepTicks(page, 1, 0.05)
+    const lean = snap.probe?.ebikeRig?.lean ?? snap.ebike?.lean ?? 0
+    if (i === 2) leftLeanAt015 = Math.abs(lean)
+    if (Math.abs(lean) > Math.abs(maxLeftLean)) maxLeftLean = lean
+    if (snap.probe?.twoWheelFlow === 'crashed') { nonTuckLeftCrashed = true; break }
+  }
+  await page.keyboard.up('KeyA')
+  await page.keyboard.up('KeyW')
+  if (nonTuckLeftCrashed) await finishCrashStandAndPickup(page, '扶起电动车')
+
+  // Deep-lean tuck in S gear past fatal lean angle triggers real lowside
+  await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(false))
+  const [txFatal, tzFatal] = await pingPongEndpoint(page)
+  await steerTowardPoint(page, txFatal, tzFatal, true, 60)
+  await page.click('.ride-gear-btn[data-gear="4"]')
+  await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(true))
+  await page.keyboard.down('KeyW')
+  await stepTicks(page, 30, 0.05)
+  await page.keyboard.down('ShiftLeft')
+  await page.keyboard.down('KeyA')
+  let fatalLeftLowside = false
+  let fatalLeftLean = 0
   for (let i = 0; i < 40; i++) {
     const snap = await stepTicks(page, 1, 0.05)
     const lean = snap.probe?.ebikeRig?.lean ?? snap.ebike?.lean ?? 0
     if (Math.abs(lean) > Math.abs(maxLeftLean)) maxLeftLean = lean
     if (snap.probe?.twoWheelFlow === 'crashed' && snap.ebike?.crashReason === 'lowside') {
-      leftLowside = true
+      fatalLeftLowside = true
+      fatalLeftLean = Math.abs(snap.ebike?.lean ?? lean)
       break
     }
   }
   await page.screenshot({path: `${SHOTS_DIR}/lean-left.png`})
   await page.keyboard.up('KeyA')
+  await page.keyboard.up('ShiftLeft')
   await page.keyboard.up('KeyW')
-  if (leftLowside) {
+  if (fatalLeftLowside) {
     await finishCrashStandAndPickup(page, '扶起电动车')
   }
-  await page.click('.ride-gear-btn[data-gear="3"]')
+  const leftLowside = fatalLeftLowside || nonTuckLeftCrashed
+
+  await page.click('.ride-gear-btn[data-gear="4"]')
   await page.keyboard.down('KeyW')
-  await stepTicks(page, 24, 0.05)
+  await stepTicks(page, 30, 0.05)
+  await page.keyboard.down('ShiftLeft')
   await page.keyboard.down('KeyD')
   let maxRightLean = 0
   let rightLowside = false
@@ -324,10 +465,14 @@ try {
     }
   }
   await page.keyboard.up('KeyD')
+  await page.keyboard.up('ShiftLeft')
   await page.keyboard.up('KeyW')
   if (rightLowside) {
     await finishCrashStandAndPickup(page, '扶起电动车')
   }
+  const lowLeanRate = +(lowSpeedLeanAt015 / 0.15).toFixed(2)
+  const midLeanRate = +(midLeanAt015 / 0.15).toFixed(2)
+  const highLeanRate = +(leftLeanAt015 / 0.15).toFixed(2)
   assert(
     Math.abs(maxLeftLean) > 0.12 && Math.abs(maxRightLean) > 0.12 && maxLeftLean * maxRightLean < 0,
     `Left/right lean must oppose & exceed 0.12 rad: left=${maxLeftLean}, right=${maxRightLean}`,
@@ -424,8 +569,7 @@ try {
     await stepTicks(page, 12, 0.05)
   }
 
-  // 8. Real Bicycle test on open Fuxing Road straightaway (585, 1384 -> 592, 1392 -> 710, 1392):
-  // visible 1挡/2挡/3挡 HUD, real gear speed diff, hair-trigger lowside auto-crash, rider rises first -> pickup single bike!
+  // 8. Real Bicycle test on open road: low-speed 1挡 stability + visible 1挡/2挡/3挡 HUD + deep-tuck fatal crash + rider-first pickup
   await page.evaluate(async () => {
     const {walk} = window.viewer
     const bc = [...walk.parked('bicycle')].sort((a, b) => Math.hypot(a[0] - 585, a[2] - 1384) - Math.hypot(b[0] - 585, b[2] - 1384))[0]
@@ -454,11 +598,40 @@ try {
     await page.keyboard.up('KeyW')
     bicycleGearPeaks[lbl] = +(pk * 3.6).toFixed(1)
   }
+
+  // Low-speed 1挡 stability check on open multi-lane center road
   await steerTowardPoint(page, 636, 1398, true, 60)
   await steerTowardPoint(page, 580, 1398, false, 12)
+  await page.click('.ride-gear-btn[data-gear="1"]')
+  await stepTicks(page, 1, 0.05)
+  await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(true))
+  await page.keyboard.down('KeyW')
+  let bicycleLowSpeedCrashed = false
+  for (let i = 0; i < 20; i++) {
+    const s = await stepTicks(page, 1, 0.05)
+    if (s.probe?.twoWheelFlow === 'crashed') { bicycleLowSpeedCrashed = true; break }
+  }
+  if (!bicycleLowSpeedCrashed) {
+    await page.keyboard.down('KeyA')
+    for (let i = 0; i < 40; i++) {
+      const s = await stepTicks(page, 1, 0.05)
+      if (s.probe?.twoWheelFlow === 'crashed') { bicycleLowSpeedCrashed = true; break }
+    }
+    await page.keyboard.up('KeyA')
+  }
+  await page.keyboard.up('KeyW')
+  if (bicycleLowSpeedCrashed) await finishCrashStandAndPickup(page, '扶起单车')
+  await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(false))
+
+  // 3挡 deep-tuck fatal lowside check on open multi-lane center road
+  await steerTowardPoint(page, 636, 1398, true, 60)
+  await steerTowardPoint(page, 580, 1398, false, 12)
+  await page.click('.ride-gear-btn[data-gear="3"]')
+  await stepTicks(page, 1, 0.05)
   await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(true))
   await page.keyboard.down('KeyW')
   await stepTicks(page, 38, 0.05) // accelerate > 5 m/s in 3挡 along open multi-lane center road
+  await page.keyboard.down('ShiftLeft')
   await page.keyboard.down('KeyD')
   let bicycleLowside = false
   for (let i = 0; i < 40; i++) {
@@ -466,6 +639,7 @@ try {
     if (s.probe?.twoWheelFlow === 'crashed') { bicycleLowside = true; break }
   }
   await page.keyboard.up('KeyD')
+  await page.keyboard.up('ShiftLeft')
   await page.keyboard.up('KeyW')
   await stepTicks(page, 6, 0.05)
   await page.screenshot({path: `${SHOTS_DIR}/bicycle-crash.png`})
@@ -474,6 +648,86 @@ try {
   }
   await page.keyboard.press('KeyF')
   await stepTicks(page, 12, 0.05)
+
+  // 9. V2 Real E-bike features probe (P-gear, kickstand, lights, turn signals, hazard, horn, cruise)
+  await page.evaluate(async () => { await window.viewer.walk.enter(-539, -95) })
+  await stepTicks(page, 12, 0.05)
+  await mountNearestBike(page)
+  const v2State0 = await page.evaluate(() => window.viewer.walk.probe()?.ebike)
+  const v2Init = readV2Telemetry(v2State0)
+  const hasV2Proto = v2Init.parked !== undefined && v2Init.headlight !== undefined && v2Init.turnSignal !== undefined
+  const v2Checks = {
+    lowSpeedNoFalseCrash: !lowSpeedCrashed,
+    d2CompliantNoFalseCrash: !d2NonTuckCrashed,
+    bicycleLowSpeedNoFalseCrash: !bicycleLowSpeedCrashed,
+    nonTuckTurnSurvived: !nonTuckLeftCrashed,
+    speedScaledLeanRate: highLeanRate > lowLeanRate * 1.35,
+    fatalLeanLowside: fatalLeftLowside,
+    pGearBlocksThrottle: false,
+    kickstandBlocksThrottle: false,
+    lightAndBrakeCycle: false,
+    turnAndHazard: false,
+    hornAndCruise: false,
+  }
+  if (hasV2Proto) {
+    await page.evaluate(() => window.viewer.walk.ebike.setPark?.(true))
+    await stepTicks(page, 2, 0.05)
+    await page.keyboard.down('KeyW')
+    const pSpd = (await stepTicks(page, 10, 0.05)).speed
+    await page.keyboard.up('KeyW')
+    const pKick = readV2Telemetry(await page.evaluate(() => window.viewer.walk.probe().ebike)).kickstand
+    await page.evaluate(() => window.viewer.walk.ebike.setPark?.(false))
+    await stepTicks(page, 2, 0.05)
+    v2Checks.pGearBlocksThrottle = pSpd === 0
+    v2Checks.kickstandBlocksThrottle = Boolean(pKick) && pSpd === 0
+
+    if (await page.evaluate(() => typeof window.viewer?.walk?.ebike?.setKickstand === 'function')) {
+      await page.evaluate(() => window.viewer.walk.ebike.setKickstand?.(true))
+      await stepTicks(page, 2, 0.05)
+      await page.keyboard.down('KeyW')
+      const ksSpd = (await stepTicks(page, 10, 0.05)).speed
+      await page.keyboard.up('KeyW')
+      await page.evaluate(() => window.viewer.walk.ebike.setKickstand?.(false))
+      v2Checks.kickstandBlocksThrottle = ksSpd === 0
+    }
+
+    const lightSeq = []
+    for (let i = 0; i < 4; i++) {
+      lightSeq.push(readV2Telemetry(await page.evaluate(() => window.viewer.walk.probe().ebike)).headlight)
+      await page.evaluate(() => window.viewer.walk.ebike.cycleHeadlight?.() ?? window.viewer.walk.ebike.cycleLight?.())
+      await stepTicks(page, 1, 0.05)
+    }
+    await page.keyboard.down('KeyW')
+    await stepTicks(page, 16, 0.05)
+    await page.keyboard.up('KeyW')
+    await page.keyboard.down('KeyS')
+    const brkSnap = readV2Telemetry((await stepTicks(page, 2, 0.05)).ebike)
+    await page.keyboard.up('KeyS')
+    v2Checks.lightAndBrakeCycle = new Set(lightSeq.slice(0, 3)).size === 3 && brkSnap.brakeLight === true
+
+    await page.evaluate(() => window.viewer.walk.ebike.setTurnSignal?.('left'))
+    const tsL = readV2Telemetry((await stepTicks(page, 2, 0.05)).ebike).turnSignal
+    await page.evaluate(() => window.viewer.walk.ebike.setHazard?.(true))
+    const hzOn = readV2Telemetry((await stepTicks(page, 2, 0.05)).ebike).hazard === true
+    await page.evaluate(() => { window.viewer.walk.ebike.setHazard?.(false); window.viewer.walk.ebike.setTurnSignal?.('off') })
+    v2Checks.turnAndHazard = tsL === 'left' && hzOn
+
+    const h0 = readV2Telemetry((await stepTicks(page, 1, 0.05)).ebike).hornCount ?? 0
+    await page.evaluate(() => window.viewer.walk.ebike.pulseHorn?.() ?? window.viewer.walk.ebike.honk?.() ?? window.viewer.walk.ebike.triggerHorn?.())
+    const h1 = readV2Telemetry((await stepTicks(page, 1, 0.05)).ebike).hornCount ?? 0
+    await page.keyboard.down('KeyW')
+    await stepTicks(page, 24, 0.05)
+    await page.keyboard.up('KeyW')
+    await page.evaluate(() => window.viewer.walk.ebike.setCruise?.(true))
+    const cSnap = await stepTicks(page, 20, 0.05)
+    const cHeld = readV2Telemetry(cSnap.ebike).cruise === true && cSnap.speed > 4.0
+    await page.keyboard.down('KeyS')
+    const cOff = readV2Telemetry((await stepTicks(page, 2, 0.05)).ebike).cruise === false
+    await page.keyboard.up('KeyS')
+    v2Checks.hornAndCruise = h1 > h0 && cHeld && cOff
+  }
+  await page.keyboard.press('KeyF')
+  await stepTicks(page, 10, 0.05)
 
   const physicsChecks = {
     gearTopSpeedScaling: gearResults.S.peakKmh > gearResults.D3.peakKmh && gearResults.D3.peakKmh > gearResults.D2.peakKmh && gearResults.D2.peakKmh > gearResults.D1.peakKmh,
@@ -485,6 +739,7 @@ try {
     wallImpactAutoCrash: impactCrash,
   }
   const strictPass = Object.values(physicsChecks).every(Boolean)
+  const v2Pass = Object.values(v2Checks).every(Boolean)
   assert(errors.length === 0, `Runtime errors: ${errors.join('; ')}`)
   console.log('EBIKE PHYSICS & HUD ACCEPTANCE REPORT:', JSON.stringify({
     gearResults,
@@ -494,15 +749,24 @@ try {
     wheelieStateText,
     maxLeftLeanRad: Number(maxLeftLean.toFixed(3)),
     maxRightLeanRad: Number(maxRightLean.toFixed(3)),
+    lowLeanRateRadS: lowLeanRate,
+    midLeanRateRadS: midLeanRate,
+    highLeanRateRadS: highLeanRate,
+    fatalLeftLeanRad: Number(fatalLeftLean.toFixed(3)),
     sawObstacle,
     modCycle: [hudInit.mod, modAfterG, modAfterClick],
     physicsChecks,
+    v2Checks,
     strictPass,
+    v2Pass,
   }, null, 2))
   if (STRICT_PHYSICS && !strictPass) {
     throw Error(`--strict-physics failed: ${JSON.stringify(physicsChecks)}`)
   }
-  console.log(STRICT_PHYSICS ? 'STRICT EBIKE PHYSICS PASS' : 'EBIKE STANCE/HUD ACCEPTANCE PASS (physics integration telemetry recorded)')
+  if (STRICT_V2 && !v2Pass) {
+    throw Error(`--strict-v2 failed: ${JSON.stringify(v2Checks)}`)
+  }
+  console.log(STRICT_V2 ? 'STRICT V2 EBIKE PHYSICS PASS' : STRICT_PHYSICS ? 'STRICT EBIKE PHYSICS PASS' : 'EBIKE STANCE/HUD ACCEPTANCE PASS (physics integration telemetry recorded)')
 } finally {
   await page?.evaluate(() => { if (window.__advanceWalk) window.viewer.walk.tick = window.__advanceWalk }).catch(() => {})
   await browser?.close()

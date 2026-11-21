@@ -1,7 +1,7 @@
 import * as T from 'three'
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
 import type {TwoWheelHeadlightMode} from './ebike-state-coupling'
-import {createHeadlightBeamRig, type HeadlightBeamProbe} from './vehicle-lights'
+import {createHeadlightBeamRig, type HeadlightBeamProbe} from './vehicle-lights.ts'
 
 const material=new T.MeshStandardMaterial({vertexColors:true,flatShading:true})
 const cache=new Map<string,T.BufferGeometry>()
@@ -559,6 +559,7 @@ export interface TwoWheelRigState {
   speed: number
   pedalPhase?: number
   braking?: boolean
+  brakeLight?: boolean
   crashRoll?: number
   crashLift?: number
   kickstandDown?: boolean
@@ -567,6 +568,8 @@ export interface TwoWheelRigState {
   crashed?: boolean
   batteryDepleted?: boolean
   hazard?: boolean
+  leftSignalLit?: boolean
+  rightSignalLit?: boolean
   dt: number
 }
 
@@ -596,6 +599,7 @@ export interface EbikeVisualRig extends TwoWheelVisualRig {
   get vehicleType(): EbikeVehicleKind
   get kickstandAngle(): number
   beamProbe: () => HeadlightBeamProbe
+  signalProbe: () => {leftSignalLit: boolean; rightSignalLit: boolean; brakeLight: boolean; signalDrawCalls: number}
   setVehicleType: (type: EbikeVehicleKind, basePaint?: number) => void
   applyMods: (next: EbikeModPreset | Partial<EbikeModConfig>, basePaint?: number) => void
 }
@@ -797,6 +801,25 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   headlightSlot.add(headLens, angelRing, beamRig.group)
   frontAssembly.add(headlightSlot)
 
+  // Batched amber turn-signal lamps (zero dynamic lights, 0 draw calls when off, <=2 draw calls when both flashing).
+  const signalLeftMat = trackM(new T.MeshBasicMaterial({color: 0xffa824}))
+  const signalRightMat = trackM(new T.MeshBasicMaterial({color: 0xffa824}))
+  const makeMergedSignalGeom = (side: -1 | 1) => {
+    const frontPod = new T.BoxGeometry(.06, .04, .05).translate(side * .155, .71, -.43 - REAR_Z - .09)
+    const rearPod = new T.BoxGeometry(.06, .04, .05).translate(side * .15, .63, .51 - REAR_Z)
+    const merged = mergeGeometries([frontPod, rearPod], false)
+    frontPod.dispose()
+    rearPod.dispose()
+    return trackG(merged)
+  }
+  const leftSignalMesh = new T.Mesh(makeMergedSignalGeom(-1), signalLeftMat)
+  leftSignalMesh.name = 'ebike-signal-left'
+  leftSignalMesh.visible = false
+  const rightSignalMesh = new T.Mesh(makeMergedSignalGeom(1), signalRightMat)
+  rightSignalMesh.name = 'ebike-signal-right'
+  rightSignalMesh.visible = false
+  chassis.add(leftSignalMesh, rightSignalMesh)
+
   // Articulated left side kickstand (stowed back while riding/crashed, swings down when parked).
   const kickstandPivot = new T.Group()
   kickstandPivot.name = 'ebike-kickstand'
@@ -837,6 +860,9 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   let wheelSpin = 0
   let kickstandBlend = 0
   let hazardClock = 0
+  let lastLeftSig = false
+  let lastRightSig = false
+  let lastBrakeLamp = false
   let currentPaint = paint
   let currentType: EbikeVehicleKind = initialType
   let lastMods: EbikeModPreset | Partial<EbikeModConfig> = initialMods ?? 'stock'
@@ -895,6 +921,12 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
     get vehicleType() { return currentType },
     get kickstandAngle() { return +(kickstandBlend * .42).toFixed(4) },
     beamProbe: () => beamRig.probe(),
+    signalProbe: () => ({
+      leftSignalLit: lastLeftSig,
+      rightSignalLit: lastRightSig,
+      brakeLight: lastBrakeLamp,
+      signalDrawCalls: (lastLeftSig ? 1 : 0) + (lastRightSig ? 1 : 0),
+    }),
     setVehicleType,
     applyMods,
     update(state) {
@@ -906,9 +938,14 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
       crashPivot.position.set(0, state.crashLift ?? Math.abs(Math.sin(crashRoll)) * .19, 0)
 
       const wantStand = !!state.kickstandDown && !crashed
-      kickstandBlend = state.dt > 0
-        ? T.MathUtils.damp(kickstandBlend, wantStand ? 1 : 0, 12, Math.min(.12, state.dt))
-        : (wantStand ? 1 : 0)
+      if (crashed) {
+        kickstandBlend = 0
+      } else {
+        kickstandBlend = state.dt > 0
+          ? T.MathUtils.damp(kickstandBlend, wantStand ? 1 : 0, 12, Math.min(.12, state.dt))
+          : (wantStand ? 1 : 0)
+        if (!wantStand && kickstandBlend < 1e-3) kickstandBlend = 0
+      }
       kickstandPivot.rotation.set(
         T.MathUtils.lerp(1.42, .22, kickstandBlend),
         0,
@@ -936,14 +973,24 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
         batteryDepleted: !!state.batteryDepleted,
       })
 
-      if (state.hazard) {
+      let leftLit = !!state.leftSignalLit
+      let rightLit = !!state.rightSignalLit
+      if (state.hazard && state.leftSignalLit === undefined && state.rightSignalLit === undefined) {
         hazardClock += Math.max(0, state.dt)
         const pulseOn = Math.sin(hazardClock * Math.PI * 3.6) >= 0
-        tailMat.color.setHex(pulseOn ? 0xff9d2e : 0x7a1a16)
-      } else {
+        leftLit = pulseOn
+        rightLit = pulseOn
+      } else if (!state.hazard) {
         hazardClock = 0
-        tailMat.color.setHex(state.braking || state.speed < -.05 ? 0xff4238 : hlMode !== 'off' ? 0xd03028 : 0x99201c)
       }
+      leftSignalMesh.visible = leftLit
+      rightSignalMesh.visible = rightLit
+      lastLeftSig = leftLit
+      lastRightSig = rightLit
+
+      const brakeOn = !!(state.brakeLight || state.braking || state.speed < -.05)
+      lastBrakeLamp = brakeOn
+      tailMat.color.setHex(brakeOn ? 0xff4238 : hlMode !== 'off' ? 0xd03028 : 0x99201c)
     },
     dispose() {
       beamRig.dispose()

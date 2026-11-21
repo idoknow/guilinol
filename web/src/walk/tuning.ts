@@ -15,6 +15,8 @@ export interface EbikeGearProfile {
   readonly maxKmh: number
   readonly accelScale: number
   readonly launchTorque: number
+  readonly throttleExp: number
+  readonly leanScale: number
   readonly wheelieGain: number
   readonly uphillMul: number
   readonly drainScale: number
@@ -70,9 +72,9 @@ export const EBIKE_SHARED_MAX_KMH = 40
 export const EBIKE_UPGRADE_MAX_KMH = 70
 
 export const bicycleGearConfigs: readonly EbikeGearProfile[] = [
-  {id: 1, label: '1挡', hint: '爬坡', maxKmh: 14, accelScale: 1.38, launchTorque: 1.50, wheelieGain: 1.18, uphillMul: .52, drainScale: 0},
-  {id: 2, label: '2挡', hint: '巡航', maxKmh: 21, accelScale: 1.00, launchTorque: 1.00, wheelieGain: .78,  uphillMul: 1.00, drainScale: 0},
-  {id: 3, label: '3挡', hint: '冲刺', maxKmh: 29, accelScale: .82,  launchTorque: .68,  wheelieGain: .50,  uphillMul: 1.38, drainScale: 0},
+  {id: 1, label: '1挡', hint: '爬坡', maxKmh: 14, accelScale: 1.42, launchTorque: 1.55, throttleExp: 1.05, leanScale: .76, wheelieGain: 1.15, uphillMul: .52, drainScale: 0},
+  {id: 2, label: '2挡', hint: '巡航', maxKmh: 21, accelScale: 1.00, launchTorque: 1.00, throttleExp: 1.00, leanScale: .95, wheelieGain: .76,  uphillMul: 1.00, drainScale: 0},
+  {id: 3, label: '3挡', hint: '冲刺', maxKmh: 29, accelScale: .80,  launchTorque: .64,  throttleExp: .90,  leanScale: 1.18, wheelieGain: .48,  uphillMul: 1.38, drainScale: 0},
 ]
 
 export const ebikeTierConfigs: Record<EbikeVehicleType, {
@@ -90,10 +92,10 @@ export const ebikeTierConfigs: Record<EbikeVehicleType, {
     allowUpgrades: true,
     capacityScale: 1,
     gears: [
-      {id: 1, label: 'D1', hint: '经济', maxKmh: 16, accelScale: .64, launchTorque: .72, wheelieGain: .30, uphillMul: 1.15, drainScale: .52},
-      {id: 2, label: 'D2', hint: '合规', maxKmh: EBIKE_COMPLIANT_CAP_KMH, accelScale: 1.00, launchTorque: 1.00, wheelieGain: .68, uphillMul: 1.00, drainScale: .90},
-      {id: 3, label: 'D3', hint: '提速', maxKmh: 38, accelScale: 1.36, launchTorque: 1.34, wheelieGain: 1.08, uphillMul: .86, drainScale: 1.65},
-      {id: 4, label: 'S',  hint: '运动', maxKmh: EBIKE_STANDARD_MAX_KMH, accelScale: 1.72, launchTorque: 1.68, wheelieGain: 1.45, uphillMul: .72, drainScale: 3.10},
+      {id: 1, label: 'D1', hint: '经济', maxKmh: 16, accelScale: .56, launchTorque: .60, throttleExp: 1.40, leanScale: .72, wheelieGain: .26, uphillMul: 1.15, drainScale: .52},
+      {id: 2, label: 'D2', hint: '合规', maxKmh: EBIKE_COMPLIANT_CAP_KMH, accelScale: .96, launchTorque: .94, throttleExp: 1.12, leanScale: .92, wheelieGain: .64, uphillMul: 1.00, drainScale: .90},
+      {id: 3, label: 'D3', hint: '提速', maxKmh: 38, accelScale: 1.42, launchTorque: 1.38, throttleExp: .94,  leanScale: 1.14, wheelieGain: 1.06, uphillMul: .86, drainScale: 1.65},
+      {id: 4, label: 'S',  hint: '运动', maxKmh: EBIKE_STANDARD_MAX_KMH, accelScale: 1.86, launchTorque: 1.82, throttleExp: .78, leanScale: 1.32, wheelieGain: 1.46, uphillMul: .72, drainScale: 3.10},
     ],
   },
   shared: {
@@ -103,10 +105,10 @@ export const ebikeTierConfigs: Record<EbikeVehicleType, {
     allowUpgrades: false,
     capacityScale: .72,
     gears: [
-      {id: 1, label: 'D1', hint: '缓行', maxKmh: 15, accelScale: .60, launchTorque: .68, wheelieGain: .25, uphillMul: 1.20, drainScale: .58},
-      {id: 2, label: 'D2', hint: '合规', maxKmh: EBIKE_COMPLIANT_CAP_KMH, accelScale: .94, launchTorque: .96, wheelieGain: .60, uphillMul: 1.00, drainScale: .95},
-      {id: 3, label: 'D3', hint: '畅行', maxKmh: 33, accelScale: 1.18, launchTorque: 1.16, wheelieGain: .90, uphillMul: .90, drainScale: 1.65},
-      {id: 4, label: 'S',  hint: '极速', maxKmh: EBIKE_SHARED_MAX_KMH, accelScale: 1.40, launchTorque: 1.35, wheelieGain: 1.15, uphillMul: .80, drainScale: 2.75},
+      {id: 1, label: 'D1', hint: '缓行', maxKmh: 15, accelScale: .54, launchTorque: .58, throttleExp: 1.42, leanScale: .70, wheelieGain: .22, uphillMul: 1.20, drainScale: .58},
+      {id: 2, label: 'D2', hint: '合规', maxKmh: EBIKE_COMPLIANT_CAP_KMH, accelScale: .92, launchTorque: .90, throttleExp: 1.14, leanScale: .90, wheelieGain: .56, uphillMul: 1.00, drainScale: .95},
+      {id: 3, label: 'D3', hint: '畅行', maxKmh: 33, accelScale: 1.22, launchTorque: 1.18, throttleExp: .98,  leanScale: 1.08, wheelieGain: .88, uphillMul: .90, drainScale: 1.65},
+      {id: 4, label: 'S',  hint: '极速', maxKmh: EBIKE_SHARED_MAX_KMH, accelScale: 1.48, launchTorque: 1.42, throttleExp: .86, leanScale: 1.22, wheelieGain: 1.12, uphillMul: .80, drainScale: 2.75},
     ],
   },
 }
