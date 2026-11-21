@@ -78,6 +78,7 @@ function loadBatch(asset:Peaks, sector?:'coarse'|'detail') {
   const modelEntries = asset.entries.filter(e=>e.model)
   const finish = workerDone.then(data=>{
     const group = assemblePeaks(data,[])
+    group.userData.sector = sector
     group.userData.modelEntries = modelEntries
     return group
   })
@@ -266,7 +267,9 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
         const meters = Math.hypot(cxCam-px,cyCam-py,czCam-pz)
         if(meters-p.radius>cullHorizon)continue
         const dist = meters*invZoom
-        const limit = farState[i] ? lodSplit*.95 : lodSplit
+        // Independently streamed sectors and the city-wide coarse batch must
+        // agree on which batch owns each peak at the transition.
+        const limit = !group.userData.sector && farState[i] ? lodSplit*.95 : lodSplit
         const isFar = dist>=limit
         farState[i] = isFar ? 1 : 0
 
@@ -277,9 +280,10 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
           visible = inFrustum(frustum,pt,p.radius)
         }
         if(!visible) continue
-        if(group.userData.hidden?.has(p.name))continue
+        if(isFar && group.userData.sector==='detail')continue
+        if(!isFar && group.userData.hidden?.has(p.name))continue
         const bit = 1n<<BigInt(i)
-        if(isFar) { mask1 |= bit; vis1.push(i) }
+        if(isFar || group.userData.sector==='coarse') { mask1 |= bit; vis1.push(i) }
         else { mask0 |= bit; vis0.push(i) }
       }
 

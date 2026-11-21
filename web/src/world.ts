@@ -160,19 +160,29 @@ export function startOverview(manifest:Manifest) {
     const fine=terrainPattern(side,stride,false,0)
     const coarse=Array.from({length:16},(_,mask)=>terrainPattern(side,stride,true,mask))
     const covered=new Set<Tile>()
-    let anchorX=Infinity, anchorZ=Infinity, lastFar=0, dirty=true
+    // Bound both the measured terrain and its water reflection vertically;
+    // the same index buffer serves the normal and mirrored cameras.
+    let low=Infinity,highY=-Infinity
+    for(const dm of samples){low=Math.min(low,dm/10);highY=Math.max(highY,dm/10)}
+    const floor=2*low-highY,ceiling=2*highY-low
+    const sections=manifest.chunks.map(tile=>({tile,box:new THREE.Box3(
+      new THREE.Vector3(tile.x,floor,tile.z),new THREE.Vector3(tile.x+size,ceiling,tile.z+size))}))
+    const frustum=new THREE.Frustum(), projection=new THREE.Matrix4(), lastView=new THREE.Matrix4()
+    let dirty=true
     function update(camera:THREE.PerspectiveCamera){
       lake.update(camera)
       const {position,far}=camera
       const ax=Math.floor(position.x/size), az=Math.floor(position.z/size)
-      if(!dirty && ax===anchorX && az===anchorZ && far===lastFar)return
-      anchorX=ax;anchorZ=az;lastFar=far;dirty=false
+      projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse)
+      if(!dirty && lastView.equals(projection))return
+      lastView.copy(projection);dirty=false
+      frustum.setFromProjectionMatrix(projection)
       // The entire fine-detail streaming radius fits inside this square.
       const fineRadius=7
       const high=(x:number,z:number)=>Math.max(Math.abs(x-ax),Math.abs(z-az))<=fineRadius
       let cursor=0
-      for(const tile of manifest.chunks){
-        if(covered.has(tile))continue
+      for(const {tile,box} of sections){
+        if(covered.has(tile) || !frustum.intersectsBox(box))continue
         const x=tile.x/size,z=tile.z/size
         if(Math.hypot(x-ax,z-az)*size>far+2*size)continue
         const mask=Number(high(x-1,z))+2*Number(high(x,z+1))+4*Number(high(x+1,z))+8*Number(high(x,z-1))
