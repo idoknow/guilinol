@@ -80,6 +80,7 @@ async function waitForWalkReady(page) {
 
 async function verifyViewportLayout(browser, baseUrl, label, viewport, hasTouch) {
   const ctx = await browser.newContext({viewport, hasTouch, isMobile: hasTouch})
+  await ctx.route('**/api/t', route => route.fulfill({status:204}))
   const page = await ctx.newPage()
   const errors = []
   page.on('pageerror', err => errors.push(`pageerror(${label}): ${err.message}`))
@@ -127,10 +128,11 @@ try {
   // A. Desktop E2E Gameplay Loop, Persistence, Soup/Freeze, Quiet & Spots
   // -------------------------------------------------------------------------
   const ctx = await browser.newContext({viewport: {width: 1280, height: 720}})
+  await ctx.route('**/api/t', route => route.fulfill({status:204}))
   const page = await ctx.newPage()
   page.on('pageerror', err => errors.push(`pageerror: ${err.message}`))
   page.on('console', msg => {
-    if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`)
+    if (msg.type() === 'error') errors.push(`console.error: ${msg.text()} (${msg.location().url})`)
   })
   await page.route('**/favicon.ico', r => r.fulfill({status: 204}))
   await page.goto(`${baseUrl}/?verify&mode=walk&flow=0`)
@@ -267,7 +269,7 @@ try {
   await page.evaluate(async b => {
     await window.viewer.walkTo(b[0] + 1.2, b[2], 0, 'e2e-mount-bike')
   }, parkedBike)
-  await page.waitForTimeout(150)
+  await page.waitForFunction(() => document.querySelector('.vehicle-action')?.dataset.interactAction === 'mount_vehicle', null, {timeout:8000})
   await page.keyboard.press('KeyF')
   await page.waitForFunction(() => window.viewer.walk.vehicle === 'bike', null, {timeout: 8000})
 
