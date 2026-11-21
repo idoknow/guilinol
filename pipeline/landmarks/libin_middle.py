@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mapped_school import build
 from school_kit import export_school_glb
+from school_exteriors import append_exterior
 
 PALETTE = {
     'wall_main':   '#eceae4',
@@ -51,6 +52,8 @@ BOUNDARY = 'way/675588260'
 FRONTAGE = (125, -10, 65)
 LINTEL_HEIGHT = 5.5
 SKIP_EDGES = {0, 2, 3}
+# The Libin Road gatehouse (live before IDOK-84) replaces the generic gate.
+LEGACY_GATE = True
 BUILDINGS = [
     dict(bid='B1', source_id='way/683033662', floors=5, floor_h=3.45, roof='flat_rail', wall_reg='wall_main', base_reg='wall_base', parapet_reg='wall_accent'),
     dict(bid='B2', source_id='way/683033663', floors=4, floor_h=3.45, roof='flat_rail', wall_reg='white', base_reg='wall_base', parapet_reg='wall_accent')
@@ -58,4 +61,12 @@ BUILDINGS = [
 
 
 if __name__ == '__main__':
+    import subprocess
+    out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path('.')
     export_school_glb(SCHOOL, PALETTE, SIGNS, lambda builder: build(builder, sys.modules[__name__]))
+    gate_dir = out / 'street_gate'
+    gate_dir.mkdir(exist_ok=True)
+    # Named after the landmark so the gate drapes on the same flattened ground.
+    subprocess.run([sys.executable, str(Path(__file__).with_name('libin_street_gate.py')), str(gate_dir)], check=True)
+    (gate_dir / 'libin_middle.glb').replace(out / 'exterior.glb')
+    append_exterior(out, SCHOOL)

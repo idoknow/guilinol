@@ -152,15 +152,17 @@ def build(builder, module):
             if occupied.distance(point) > 4:
                 builder.tree(point.x, point.y, species='camphor', scale=0.85)
     x, z, degrees = module.FRONTAGE
-    y = builder.ground(x, z)
-    builder.pose = (x, 0, z, math.radians(degrees))
-    lintel = getattr(module, "LINTEL_HEIGHT", 4.55)
-    for side in (-1, 1):
-        builder.box(side*4.5, y-0.15, 0, 1, lintel+0.8, 1.4, 'granite', collide=True)
-    builder.box(0, y+lintel, 0, 10, 0.85, 1.45, 'wall_accent', collide=True)
-    builder.sign(0, y+lintel+0.43, 0.74, 6.5, 0.7, 'sign_gate', double_sided=True)
-    builder.retractable_gate(8, gate_h=2.2, y0=y, iron_grille=True)
-    builder.pose = (0, 0, 0, 0)
+    # Schools whose detailed, already-live street gate is packed separately keep it instead.
+    if not getattr(module, 'LEGACY_GATE', False):
+        y = builder.ground(x, z)
+        builder.pose = (x, 0, z, math.radians(degrees))
+        lintel = getattr(module, "LINTEL_HEIGHT", 4.55)
+        for side in (-1, 1):
+            builder.box(side*4.5, y-0.15, 0, 1, lintel+0.8, 1.4, 'granite', collide=True)
+        builder.box(0, y+lintel, 0, 10, 0.85, 1.45, 'wall_accent', collide=True)
+        builder.sign(0, y+lintel+0.43, 0.74, 6.5, 0.7, 'sign_gate', double_sided=True)
+        builder.retractable_gate(8, gate_h=2.2, y0=y, iron_grille=True)
+        builder.pose = (0, 0, 0, 0)
     if module.SCHOOL == 'guilin_middle':
         # Let the closed street frontage occupy its own bay.
         edge_ring = builder._clean_ring_ccw(ring)
@@ -168,7 +170,7 @@ def build(builder, module):
         edges = [LineString([a, b]) for a, b in zip(edge_ring, edge_ring[1:] + edge_ring[:1])]
         index = min(range(len(edges)), key=lambda i: edges[i].distance(gate))
         station = edges[index].project(gate, normalized=True)
-        half_span = 5 / edges[index].length
+        half_span = getattr(module, 'GATE_HALF_SPAN', 5) / edges[index].length
         builder.perimeter_fence(ring, index, max(0, station-half_span), min(1, station+half_span))
     else:
         builder.perimeter_fence(ring, gate_edge=-1, skip_edges=module.SKIP_EDGES)

@@ -4,9 +4,11 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import trimesh
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from school_exteriors import append_exterior, prism
+from legacy_gate_parts import closed_grille, seated_lion, text_mesh
 from mapped_school import build
 from school_kit import export_school_glb
 
@@ -52,6 +54,9 @@ SCHOOL = 'guilin_middle'
 BOUNDARY = 'way/253811718'
 FRONTAGE = (15, 25, 0)
 SKIP_EDGES = set()
+# The pillared Jiefang West Road gate (live before IDOK-84) replaces the generic gate.
+LEGACY_GATE = True
+GATE_HALF_SPAN = 9.8
 CUSTOM_BUILDINGS = {'way/690980799', 'f97d45ef-6943-4e73-8c4b-672340a7b8a7'}
 BUILDINGS = [
     dict(bid='B1', source_id='way/690980799', floors=2, floor_h=3.6, roof='hip_gable', wall_reg='pave_dark', base_reg='pave_dark', parapet_reg='cinnabar'),
@@ -105,6 +110,75 @@ def build_kuiguang_lou(model):
             model.box(lx, 4.0, gz - 0.95, 1.25, 2.65, 0.12, 'red')
     model.box(6.8, -0.2, 3.6, 0.65, 1.65, 0.28, 'white')
     model.box(7.8, -0.2, 1.2, 1.45, 1.85, 1.15, 'stone')
+    model.pose = (0, 0, 0, 0)
+
+
+def build_school_gate(model):
+    """Pillared Jiefang West Road gate, kept as it was live before IDOK-84 (IMG_1373-1375).
+
+    Only changes: closed iron gates between the rear columns and side aisles, and the forecourt
+    apron no longer reaches onto the public pavement.
+    """
+    model.site_datum = -0.58
+    gy = -0.58
+    yaw = 0.216
+    cx, cz = 12.8, 25.4
+    model.pose = (cx, gy, cz, yaw)
+
+    model.box(0, -0.45, -3.4, 32.0, 0.48, 10.2, 'pave', True)
+
+    for px in (-5.45, 5.45):
+        for pz in (-3.8, 1.6):
+            segs = 18 if model.detail else 8
+            cyl = trimesh.creation.cylinder(radius=0.44, height=6.45, sections=segs)
+            verts = cyl.vertices[:, [0, 2, 1]].copy()
+            verts += [px, 3.05, pz]
+            model.mesh(verts, cyl.faces, 'granite', True)
+            model.box(px, -0.2, pz, 1.12, 0.36, 1.12, 'tile', True)
+        model.box(px, 6.25, 1.6, 1.35, 1.45, 1.35, 'stone')
+        model.box(px, 7.70, 1.6, 0.78, 0.92, 0.85, 'granite')
+        if px < 0:
+            model.box(px, 1.25, 2.04, 0.48, 2.85, 0.14, 'stone')
+
+    model.box(0, 5.82, -1.3, 17.8, 0.52, 7.2, 'earth', True)
+    for bx in np.linspace(-8.4, 8.4, 7):
+        model.box(bx, 5.54, -1.3, 0.26, 0.30, 7.2, 'white')
+    for bz in np.linspace(-4.6, 2.0, 5):
+        model.box(0, 5.54, bz, 17.8, 0.30, 0.26, 'white')
+
+    model.box(0, 5.85, 1.85, 11.2, 1.95, 1.10, 'white', True)
+    model.box(0, 6.05, 2.40, 8.8, 1.18, 0.12, 'stone')
+    text_mesh(model, '桂 林 中 学', 6.9, 0.88, 'red', 6.64, 2.50, 32)
+    eave_pts = [(-4.55, 7.18, 2.75), (4.55, 7.18, 2.75), (4.55, 7.68, 2.05), (-4.55, 7.68, 2.05)]
+    model.mesh(eave_pts, [[0, 1, 2], [0, 2, 3]], 'green')
+    model.box(0, 7.68, 1.85, 9.4, 0.22, 1.25, 'white')
+
+    for sx in (-4.5, 4.5):
+        model.box(sx, 5.36, 1.15, .12, .54, .16, 'stone')
+    model.box(0, 4.72, 1.15, 9.8, 0.72, 0.26, 'sign')
+    for lx in (-3.6, -1.2, 1.2, 3.6):
+        model.beam([lx, 4.55, 1.75], [lx, 5.9, 1.75], .035, 'stone')
+        sph = trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
+        model.mesh(sph.vertices * [0.32, 0.26, 0.32] + [lx, 4.55, 1.75], sph.faces, 'red')
+
+    model.beam([0, 6.35, -0.3], [0, 11.4, -0.3], 0.07, 'stone', 6)
+    flag_pts = [(0.05, 11.25, -0.3), (1.65, 10.65, 0.0), (1.55, 9.65, -0.05), (0.05, 10.15, -0.3)]
+    model.mesh(flag_pts, [[0, 1, 2], [0, 2, 3], [0, 2, 1], [0, 3, 2]], 'red')
+
+    model.box(-8.4, 4.85, 0.2, 4.6, 1.45, 3.6, 'white', True)
+    model.box(8.4, 4.85, 0.2, 4.6, 1.45, 3.6, 'white', True)
+    model.box(-9.6, -0.3, -2.0, 0.42, 5.2, 6.0, 'white', True)
+    model.box(9.2, -0.3, -2.0, 0.42, 5.2, 6.0, 'white', True)
+
+    closed_grille(model, 0.0, 0.0, -3.8, 10.0, 2.3)
+    closed_grille(model, -7.5, 0.0, -3.8, 3.7, 2.3)
+    closed_grille(model, 7.3, 0.0, -3.8, 3.3, 2.3)
+
+    # Lions and planter exactly where the live model had them (seated_lion resets the pose).
+    seated_lion(model, -6.4, 0.0, 3.65, 0.25)
+    seated_lion(model, 6.0, 0.0, 3.65, -0.25)
+    model.site_datum = 0
+    model.box(-8.6, 0.0, 3.9, 2.2, 0.55, 1.4, 'leaf')
     model.pose = (0, 0, 0, 0)
 
 
@@ -184,6 +258,7 @@ def append_heritage_hall(folder):
     def hall(model):
         model.fit_to_grade(SCHOOL)
         build_kuiguang_lou(model)
+        build_school_gate(model)
         build_flanking_facades(model)
 
     generate('exterior', hall, smooth=('red', 'green', 'clock', 'earth'),

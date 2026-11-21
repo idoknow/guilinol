@@ -2,10 +2,14 @@
 import sys
 from pathlib import Path
 
+import math
+
 import numpy as np
+import trimesh
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from school_exteriors import append_exterior, prism
+from legacy_gate_parts import camphor_tree, closed_grille, text_mesh
 from mapped_school import build
 from school_kit import export_school_glb
 
@@ -53,6 +57,8 @@ SCHOOL = 'kuiguang_school'
 BOUNDARY = 'way/253811717'
 FRONTAGE = (-13, 25, -65)
 SKIP_EDGES = {0, 13, 14}
+# The detailed Rongyin Road gate block (live before IDOK-84) replaces the generic gate.
+LEGACY_GATE = True
 # Boundary trimmed to keep the model off the public street.
 STREET_SETBACK = [
     (-115.0, -79.76), (-123.96, -57.52), (-153.23, -69.17), (-174.46, -16.5),
@@ -72,10 +78,68 @@ BUILDINGS = [
 ]
 
 
+def rongyin_gate(model):
+    """Through-building gate on Rongyin Road, kept as it was live before IDOK-84 (IMG_1295/1296).
+
+    Only change: the passage now ends in a closed iron gate, and the road markings that used to be
+    painted on the public street are left to the city road surface.
+    """
+    gate_yaw = math.atan2(-0.917, 0.399)
+    gcx, gcz = -9.6, 31.2
+    setback = 7.0  # front face kept behind the Rongyin Road sidewalk (IDOK-84 street clearance)
+    model.pose = (gcx + setback * math.sin(gate_yaw), 0.0, gcz - setback * math.cos(gate_yaw), gate_yaw)
+
+    model.box(1.75, 5.25, 0.0, 23.5, 11.35, 11.6, 'earth', True)
+    model.box(-6.85, -0.8, 0.0, 6.3, 6.05, 11.6, 'stone', True)
+    model.box(-6.85, 3.15, 5.92, 6.3, 1.55, 0.24, 'green')
+    model.box(-6.85, 0.35, 5.84, 5.4, 2.65, 0.14, 'glass')
+    model.box(8.60, -0.8, 3.6, 9.8, 6.05, 4.5, 'white', True)
+    for rx in (6.1, 10.9):
+        model.box(rx, 0.15, 5.88, 3.9, 3.35, 0.14, 'clock')
+
+    for px in (-4.1, 4.1):
+        model.box(px, -0.4, 5.85, 0.85, 5.85, 0.75, 'white', True)
+        model.box(px, 0.95, 6.26, 0.44, 2.85, 0.06, 'sign')
+    model.box(0.0, 4.15, 5.88, 9.05, 1.35, 0.78, 'white', True)
+    model.box(0.0, 5.42, 5.95, 9.25, 0.16, 0.92, 'granite')
+    text_mesh(model, '桂林市奎光学校', 6.9, 0.85, 'red', 4.82, 6.32, 30)
+
+    model.box(0.0, 4.02, 0.0, 7.6, 0.22, 11.8, 'white')
+    for beam_z in (-4.2, -1.4, 1.4, 4.2):
+        model.box(0.0, 3.88, beam_z, 7.6, 0.16, 0.26, 'stone')
+    # Passage floor stays inside the building line.
+    model.box(0.0, -0.42, 0.0, 7.4, 0.46, 11.6, 'pave', True)
+    for sx in (-3.68, 3.68):
+        model.box(sx, 0.25, -0.5, 0.14, 3.35, 9.2, 'glass', True)
+        if model.detail:
+            for gz in np.linspace(-4.6, 3.6, 6):
+                model.box(sx, 0.0, gz, 0.18, 3.65, 0.10, 'tile')
+    # Closed iron gate recessed just inside the portal (as in IMG_1295).
+    closed_grille(model, 0.0, 0.0, 3.9, 7.3, 3.7)
+    for lx in (-2.05, 2.05):
+        model.beam([lx, 3.62, 4.85], [lx, 4.12, 4.85], .035, 'wood')
+        sph = trimesh.creation.icosphere(subdivisions=1 if model.detail else 0)
+        model.mesh(sph.vertices * [0.42, 0.30, 0.42] + [lx, 3.62, 4.85], sph.faces, 'red')
+        model.box(lx * 1.62, 0.0, 5.45, 0.45, 1.15, 0.55, 'gold')
+
+    for fl in range(3):
+        fy = 6.05 + fl * 3.35
+        for wx in (-7.2, -2.6, 2.2, 7.2, 11.2):
+            model.box(wx, fy, 5.84, 2.85, 1.85, 0.16, 'white')
+            model.box(wx, fy + 0.15, 5.92, 2.35, 1.45, 0.08, 'glass')
+            if model.detail and wx in (-2.6, 2.2):
+                model.box(wx + 1.85, fy + 0.2, 5.97, 0.72, 0.52, 0.54, 'white')
+    model.pose = (0, 0, 0, 0)
+
+    for tx, tz, th, tsp in ((-8.0, 35.4, 9.5, 4.2), (-13.5, 22.0, 9.2, 3.8)):
+        camphor_tree(model, tx, 0.0, tz, h=th, spread=tsp)
+
+
 def street_buildings(model):
     model.fit_to_grade(SCHOOL)
     w7018_ring = [(-1.20, -17.21), (-14.60, 13.82), (-0.46, 19.86), (14.84, -15.57), (6.17, -19.27), (4.27, -14.88)]
     prism(model, w7018_ring, -1.2, 17.4, 'earth', 'granite', True)
+    rongyin_gate(model)
 
     cy = 0.30
     model.site_datum = cy
