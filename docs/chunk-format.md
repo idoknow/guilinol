@@ -60,3 +60,7 @@
 底图来自 © OpenStreetMap contributors（ODbL），本次 Geofabrik 中国 PBF 的 SHA-256 为 `bd25a37406ad4edd6e9ded6cc15069c931c01ebcf64f034cebae4a4ccbdc08c9`。原始数据不入库。维护者刷新处理后的快照：`uv run --with osmium python pipeline/overview_pbf.py raw/china.osm.pbf`。`npm run world` 离线从 `pipeline/overview-map.gz` 生成完整地图和按当前 bbox 筛选的 `overview-edge.bin`。小地图只在逼近边界时请求边缘包；完整包首次打开大地图时请求，然后两者共享。
 
 开放区域优先取 `manifest.builtArea`（GeoJSON Polygon，WGS84 `[lon,lat]`；可有洞），否则取 `manifest.bbox=[south,west,north,east]`。不要用对齐到分块的 `extent` 代替。地图变焦、遮罩、搜索和传送均不改变世界分块范围。
+
+扩区 manifest 可带 `peaks.sectorSize`。浏览器启动读 `peaks-far.bin` 的全域远景，接近后读 `peaks-{x}_{z}.bin`，x/z 是山体中心世界坐标除以 sectorSize 向下取整的索引。每个文件的头部按清单中的程序峰顺序列出两级 LOD，每级两个小端 uint32（索引偏移、顶点偏移），接着是 gzip PK02，偏移相对于解压数据。远景包两级都引用远景顶点。构建与审计可继续读完整的 `peaks.bin`。可选 `overview.packedUnderlay` 为原 underlay 的 gzip 副本，解析后网格相同。
+
+`distantBuildings` 为可选 gzip 数据，每条记录 7 个小端 int16（中心 x/z 米、底/顶分米、宽/深米、建筑分类）。每个 256 m 块的 48 m 网格各取体积最大的可见建筑片段；浏览器以同一实例批次绘制近景已加载块之外的体块。

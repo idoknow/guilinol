@@ -1,3 +1,4 @@
+import {TileGrid, streamBudget} from './tile-grid'
 import * as THREE from 'three'
 import {applyTreeVariant, setTreeFar, sharedProxyAssets, TREE_SPECIES_COUNT, treeFar, treeNearAsset} from './look/trees'
 import {look} from './look/config'
@@ -5,8 +6,7 @@ import {fetchAsset,type Tile} from './world'
 
 export type Tree={
   x:number; y:number; z:number; kind:number; scale:number; seed:number
-  matrix:THREE.Matrix4; midMatrix:THREE.Matrix4
-  tint:THREE.Color; proxyTint:THREE.Color; proxyGroup:0|1|2|3
+  instances:Float32Array; offset:number; proxyGroup:0|1|2|3
 }
 export interface ForestRange {
   treeFar:number
@@ -26,6 +26,11 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
   const data=new DataView(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
   if(data.byteLength%12)throw Error('Invalid vegetation payload')
   const trees:Tree[]=[],up=new THREE.Vector3(0,1,0),nVec=new THREE.Vector3()
+  // Two matrices and two RGB triples per tree, packed directly at GPU
+  // precision. Physics keeps lightweight tree identities for trunk colliders.
+  const instances=new Float32Array(data.byteLength/12*38)
+  const matrix=new THREE.Matrix4(),midMatrix=new THREE.Matrix4()
+  const tint=new THREE.Color(),proxyTint=new THREE.Color()
   for(let i=0;i<data.byteLength;i+=12){
     const x=tile.x+data.getUint16(i,true)/100,z=tile.z+data.getUint16(i+2,true)/100,y=data.getInt16(i+4,true)/10
     const rawKind=data.getUint8(i+6),kind=rawKind<TREE_SPECIES_COUNT?rawKind:0
@@ -35,10 +40,11 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
     // Trees grow towards the sky: keep at most look.treeLean of the slope normal.
     const angle=2*Math.acos(Math.min(1,Math.abs(lean.w)))
     slopeQ.identity().slerp(lean,angle>look.treeLean?look.treeLean/angle:1)
-    const matrix=new THREE.Matrix4(),midMatrix=new THREE.Matrix4()
-    const tint=new THREE.Color(),proxyTint=new THREE.Color()
     const proxyGroup=applyTreeVariant(kind,seed,scale,yaw,slopeQ,x,y,z,matrix,midMatrix,tint,proxyTint)
-    trees.push({x,y,z,kind,scale,seed,matrix,midMatrix,tint,proxyTint,proxyGroup})
+    const offset=i/12*38
+    matrix.toArray(instances,offset);midMatrix.toArray(instances,offset+16)
+    tint.toArray(instances,offset+32);proxyTint.toArray(instances,offset+35)
+    trees.push({x,y,z,kind,scale,seed,instances,offset,proxyGroup})
   }
   return trees
 }
@@ -70,7 +76,7 @@ export class Forest{
   private matrix=new THREE.Matrix4()
   private point=new THREE.Vector3()
   private range:ForestRange={...defaultRange}
-  constructor(private scene:THREE.Scene,private tiles:Tile[],private camera:THREE.PerspectiveCamera,initialRange?:ForestRange){
+  constructor(private scene:THREE.Scene,private grid:TileGrid,private camera:THREE.PerspectiveCamera,initialRange?:ForestRange){
     if(initialRange)this.setRange(initialRange)
   }
   setRange(next:ForestRange){
@@ -84,26 +90,32 @@ export class Forest{
     setTreeFar(next.treeFar)
     this.dirty=true
   }
+  private queue:Tile[]=[]
+  private requestLimit=1
+  private pump(){
+    while(this.pending.size<this.requestLimit && this.queue.length){
+      const tile=this.queue.pop()!, control=new AbortController()
+      this.pending.set(tile,control)
+      readTrees(tile,control.signal).then(trees=>{
+        if(!control.signal.aborted){this.loaded.set(tile,trees);this.dirty=true}
+      }).catch(err=>{
+        if(!control.signal.aborted){console.error(err);this.retry.set(tile,performance.now()+10000)}
+      }).finally(()=>{this.pending.delete(tile);this.pump()})
+    }
+  }
   tick(position:THREE.Vector3, deferOuter=false){
     const distance=(tile:Tile)=>Math.hypot(tile.x+128-position.x,tile.z+128-position.z)
-    for(const tile of this.tiles){
-      if(distance(tile)>this.range.treeUnloadRadius){if(this.loaded.delete(tile))this.dirty=true;this.pending.get(tile)?.abort()}
+    for(const tile of this.loaded.keys()){
+      if(distance(tile)>this.range.treeUnloadRadius){this.loaded.delete(tile);this.dirty=true}
     }
-    const maxPending=deferOuter?1:3
-    const loadLimit=deferOuter?Math.min(this.range.treeLoadRadius,280):this.range.treeLoadRadius
+    for(const [tile,control] of this.pending)if(distance(tile)>this.range.treeUnloadRadius)control.abort()
+    const limit=deferOuter?Math.min(this.range.treeLoadRadius,280):this.range.treeLoadRadius
+    this.requestLimit=deferOuter?1:streamBudget.treeRequests
     const now=performance.now()
-    while(this.pending.size<maxPending){
-      let best=loadLimit,next:Tile|undefined
-      for(const tile of this.tiles){
-        if(this.loaded.has(tile)||this.pending.has(tile)||(this.retry.get(tile)??0)>=now)continue
-        const dist=distance(tile)
-        if(dist<best){best=dist;next=tile}
-      }
-      if(!next)break
-      const tile=next,control=new AbortController();this.pending.set(tile,control)
-      readTrees(tile,control.signal).then(trees=>{if(!control.signal.aborted){this.loaded.set(tile,trees);this.dirty=true}})
-        .catch(err=>{if(!control.signal.aborted){console.error(err);this.retry.set(tile,performance.now()+10000)}}).finally(()=>this.pending.delete(tile))
-    }
+    this.queue=Array.from(this.grid.near(position.x,position.z,limit))
+      .filter(tile=>distance(tile)<=limit&&!this.loaded.has(tile)&&!this.pending.has(tile)&&(this.retry.get(tile)??0)<=now)
+      .sort((a,b)=>distance(b)-distance(a))
+    this.pump()
     if(!this.loaded.size)return
     if(!this.dirty&&this.camera.position.distanceToSquared(this.anchor)<4&&this.rotation.angleTo(this.camera.quaternion)<.016)return
     this.anchor.copy(this.camera.position);this.dirty=false
@@ -160,10 +172,9 @@ export class Forest{
           const near=i<TREE_SPECIES_COUNT
           for(let j=0;j<group.length;j++){
             const tree=group[j]
-            const mat=near?tree.matrix:tree.midMatrix
-            const c=near?tree.tint:tree.proxyTint
-            mArr.set(mat.elements,j*16)
-            cArr[j*3]=c.r;cArr[j*3+1]=c.g;cArr[j*3+2]=c.b
+            const mat=tree.offset+(near?0:16), color=tree.offset+(near?32:35)
+            for(let k=0;k<16;k++)mArr[j*16+k]=tree.instances[mat+k]
+            for(let k=0;k<3;k++)cArr[j*3+k]=tree.instances[color+k]
           }
           mesh.instanceMatrix.clearUpdateRanges();mesh.instanceMatrix.addUpdateRange(0,group.length*16);mesh.instanceMatrix.needsUpdate=true
           mesh.instanceColor!.clearUpdateRanges();mesh.instanceColor!.addUpdateRange(0,group.length*3);mesh.instanceColor!.needsUpdate=true

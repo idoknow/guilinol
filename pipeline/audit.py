@@ -12,7 +12,7 @@ import re
 import struct
 
 import numpy as np
-from shapely import STRtree, build_area, contains_xy, union_all
+from shapely import box as box_array, prepare, STRtree, build_area, contains_xy, union_all
 from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import nearest_points, polygonize, unary_union
 from landmark_solids import load_landmark_meshes, structural_footprint, slice_tris_at_y, solid_projection
@@ -303,6 +303,9 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     u_sidewalk = unary_union(roads1_polys) if roads1_polys else Polygon()
     u_all_road_surface = unary_union([u_carriageway, u_sidewalk])
 
+    for geom in (u_carriageway,u_sidewalk,u_all_road_surface):
+        prepare(geom)
+
     # Load landmarks
     landmarks = load_landmark_meshes(root, manifest)
 
@@ -367,8 +370,12 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         ring0 = p_pos[:128, [0, 2]]
         peak_polys_list.append(Polygon(ring0).buffer(0))
     all_peak_tris = np.concatenate(peak_tris_list, axis=0) if peak_tris_list else np.zeros((0, 3, 3))
-    peak_tri_boxes = [box(float(t[:, 0].min()), float(t[:, 2].min()), float(t[:, 0].max()), float(t[:, 2].max())) for t in all_peak_tris]
-    peak_tri_tree = STRtree(peak_tri_boxes) if peak_tri_boxes else None
+    if len(all_peak_tris):
+        minima = all_peak_tris.min(axis=1)
+        maxima = all_peak_tris.max(axis=1)
+        peak_tri_tree = STRtree(box_array(minima[:,0],minima[:,2],maxima[:,0],maxima[:,2]))
+    else:
+        peak_tri_tree = None
 
     def nearest_peak_y(x: float, y: float, z: float) -> float | None:
         if not peak_tri_tree:
@@ -397,12 +404,12 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         if poly.is_empty:
             continue
         proc_bldg_polys.append(poly)
-        inter_road = poly.intersection(u_carriageway)
+        inter_road = poly.intersection(u_carriageway) if u_carriageway.intersects(poly) else Polygon()
         if inter_road.area > 0.5:
             rp = inter_road.representative_point()
             bldg_issues.append(make_issue('proceduralOnCarriageway', rp.x, rp.y, inter_road.area,
                                           f'procedural building seed={seed} overlaps carriageway {inter_road.area:.1f} m²'))
-        inter_sw = poly.intersection(u_sidewalk)
+        inter_sw = poly.intersection(u_sidewalk) if u_sidewalk.intersects(poly) else Polygon()
         if inter_sw.area > 0.5:
             rp = inter_sw.representative_point()
             bldg_issues.append(make_issue('proceduralOnSidewalk', rp.x, rp.y, inter_sw.area,
@@ -457,6 +464,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             landmark_polygons.append(Polygon([ll2xz(lat, lon) for lon, lat in rep['polygon']]).buffer(0))
     u_lm_replace_poly = unary_union(landmark_polygons).buffer(1.1) if landmark_polygons else Polygon()
     u_surface_check = unary_union([u_all_road_surface, u_lm_walk])
+    prepare(u_surface_check)
 
     uneven_issues = []
     gap_issues = []
@@ -705,19 +713,18 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                 continue
             step = int(chunk_step[cj, ci])
             segs = 256 // step
-            for row in range(segs):
-                for col in range(segs):
-                    x0_s, z0_s = tx + col * step, tz + row * step
-                    cx, cz = x0_s + step * 0.5, z0_s + step * 0.5
-                    if not u_all_road_surface.contains(Point(cx, cz)):
-                        continue
-                    y00 = road_base_y(x0_s, z0_s)
-                    dz_dx = (road_base_y(x0_s + step, z0_s) - y00) / step
-                    dz_dy = (road_base_y(x0_s, z0_s + step) - y00) / step
-                    cos_slope = 1.0 / math.sqrt(1.0 + dz_dx ** 2 + dz_dy ** 2)
-                    if cos_slope < 0.5:
-                        texture_issues.append(make_issue('uvStretch', cx, cz, 1.0 / cos_slope,
-                                                         f'Steep road slope foreshortens xz UV by {1.0/cos_slope:.2f}x (>2x)'))
+            centers = (np.arange(segs)+.5)*step
+            street_cells = contains_xy(u_all_road_surface,tx+centers,tz+centers[:,None])
+            for row,col in zip(*np.nonzero(street_cells)):
+                x0_s, z0_s = tx + int(col) * step, tz + int(row) * step
+                cx, cz = x0_s + step * .5, z0_s + step * .5
+                y00 = road_base_y(x0_s, z0_s)
+                dz_dx = (road_base_y(x0_s + step, z0_s) - y00) / step
+                dz_dy = (road_base_y(x0_s, z0_s + step) - y00) / step
+                cos_slope = 1.0 / math.sqrt(1.0 + dz_dx ** 2 + dz_dy ** 2)
+                if cos_slope < 0.5:
+                    texture_issues.append(make_issue('uvStretch', cx, cz, 1.0 / cos_slope,
+                                                     f'Steep road slope foreshortens xz UV by {1.0/cos_slope:.2f}x (>2x)'))
 
     texture_issues.sort(key=lambda r: r['value'], reverse=True)
 
@@ -895,7 +902,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                                            f'Landmark {lid} has {ghost.area:.1f} m² invisible collision* on road/sidewalk', landmark=lid))
 
     # 4e. Landmark-Landmark and Landmark-ProceduralBuilding overlaps (> 0.5 m²)
-    u_proc = unary_union(proc_bldg_polys) if proc_bldg_polys else Polygon()
+    proc_index = STRtree(proc_bldg_polys)
     from landmarks.world_surface import Surface
     surface = Surface(root/'public/world')
     @lru_cache(maxsize=262144)
@@ -905,7 +912,8 @@ def run_audit(world_dir: Path, root: Path) -> dict:
               for lid,data in landmarks.items()}
     lids = list(solids)
     for i, lid_a in enumerate(lids):
-        inter_p = solids[lid_a].intersection(u_proc)
+        nearby = proc_index.query(solids[lid_a],predicate="intersects")
+        inter_p = solids[lid_a].intersection(unary_union(proc_index.geometries.take(nearby)))
         if inter_p.area > 0.5:
             rp = inter_p.representative_point()
             other_issues.append(make_issue('landmarkOverlap', rp.x, rp.y, inter_p.area,

@@ -18,6 +18,7 @@
 //     localStorage['glol.spawn'], and two visits in a row differ.
 //  4. ?verify in a fresh context never writes glol.lastView, even past the throttle and after
 //     visibilitychange→hidden / pagehide.
+import { playableBounds } from '../lib/projection.ts'
 import { browserOptions } from './qa-browser.mjs'
 import assert from 'node:assert/strict'
 import { chromium } from 'playwright'
@@ -106,31 +107,35 @@ try {
     await levelContext.close()
 
     // --- 2. restore through the real path ---------------------------------------------------
-    const restoreContext = await browser.newContext({ viewport: { width: 960, height: 540 } })
-    await signIn(restoreContext)
-    const restore = await restoreContext.newPage()
-    const fixture = viewFixture()
-    await restore.goto(origin + '/')
-    await restore.evaluate((view) => {
-      localStorage.removeItem('glol.lastView')
-      localStorage.setItem('glol.lastView', JSON.stringify({ t: Date.now() - 60000, v: view }))
-    }, fixture)
-    await restore.reload()
-    await restore.locator('.home-resume:not([hidden])').waitFor({ timeout: 60000 })
-    const before = await restore.evaluate(() => {
-      const record = JSON.parse(localStorage.getItem('glol.lastView') || 'null')
-      return record?.t ?? 0
-    })
-    // The click must land on a frame newer than `before` (first-frame write is unthrottled).
-    const clickedAt = Date.now()
-    await restore.locator('.home-resume').click()
-    const landed = await awaitedView(restore, Math.max(before, clickedAt - 1000))
-    const distance = Math.hypot(landed.x - fixture.x, landed.y - fixture.y, landed.z - fixture.z)
-    const angleOff = Math.max(Math.abs(landed.yaw - fixture.yaw), Math.abs(landed.pitch - fixture.pitch))
-    assert(distance < 1, `restore drifted ${distance.toFixed(2)} m`)
-    assert(angleOff < 1, `restore angle off by ${angleOff.toFixed(2)}°`)
-    console.log(`restore within ${distance.toFixed(3)} m / ${angleOff.toFixed(3)}°`)
-    await restoreContext.close()
+    const manifest = await (await fetch(origin+'/world/manifest.json')).json()
+    const {min,max} = playableBounds(manifest.bbox)
+    for(const fixture of [viewFixture(),viewFixture({x:min.x-2000,z:max.z+2000})]) {
+      const expected={x:Math.max(min.x,Math.min(max.x,fixture.x)),z:Math.max(min.z,Math.min(max.z,fixture.z))}
+      const restoreContext = await browser.newContext({ viewport: { width: 960, height: 540 } })
+      await signIn(restoreContext)
+      const restore = await restoreContext.newPage()
+      await restore.goto(origin + '/')
+      await restore.evaluate((view) => {
+        localStorage.removeItem('glol.lastView')
+        localStorage.setItem('glol.lastView', JSON.stringify({ t: Date.now() - 60000, v: view }))
+      }, fixture)
+      await restore.reload()
+      await restore.locator('.home-resume:not([hidden])').waitFor({ timeout: 60000 })
+      const before = await restore.evaluate(() => {
+        const record = JSON.parse(localStorage.getItem('glol.lastView') || 'null')
+        return record?.t ?? 0
+      })
+      // The click must land on a frame newer than `before` (first-frame write is unthrottled).
+      const clickedAt = Date.now()
+      await restore.locator('.home-resume').click()
+      const landed = await awaitedView(restore, Math.max(before, clickedAt - 1000))
+      const distance = Math.hypot(landed.x - expected.x, landed.y - fixture.y, landed.z - expected.z)
+      const angleOff = Math.max(Math.abs(landed.yaw - fixture.yaw), Math.abs(landed.pitch - fixture.pitch))
+      assert(distance < 1, `restore drifted ${distance.toFixed(2)} m`)
+      assert(angleOff < 1, `restore angle off by ${angleOff.toFixed(2)}°`)
+      console.log(`restore within ${distance.toFixed(3)} m / ${angleOff.toFixed(3)}°`)
+      await restoreContext.close()
+    }
 
     // --- 3. plain play lands on a pool slot, and changes between visits ---------------------
     const playContext = await browser.newContext({ viewport: { width: 960, height: 540 } })

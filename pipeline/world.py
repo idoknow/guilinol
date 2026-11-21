@@ -1,3 +1,5 @@
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 import argparse
 import gzip
 import hashlib
@@ -17,7 +19,9 @@ from shapely.geometry import box, Point
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem, load_osm
 from features import building_mesh, buildings, game_court, ground_features, points, polygons, raw_overture_footprints, rongyin_sidewalk
+from legacy_core import Downtown, EXTENT as DOWNTOWN
 from karst import generate
+from peak_sectors import write_city_lods
 from landmarks.jiefang_layout import bank_paving, grade_banks, grade_binjiang_streets
 from bridges import bridge_tiles
 from road_grading import build_ground_mesh_lookup, eval_bspline_grid, solve_road_and_bridge_elevations
@@ -79,12 +83,23 @@ def terrain_stencil(poly, west, north, col, row, shape):
     return mask
 
 
-def build(bbox, output, palette):
+def write_chunk(output, name, payload, trees, origin):
+    compressed = gzip.compress(payload, compresslevel=5, mtime=0)
+    (output/name).write_bytes(compressed)
+    (output/name.replace('.glc', '.trees')).write_bytes(gzip.compress(trees, mtime=0))
+    return dict(x=origin[0], z=origin[1], file=name, bytes=len(compressed))
+
+
+def build(bbox, output, palette, workers=4):
+    if workers < 1:
+        raise ValueError('workers must be positive')
     south, west, north, east = bbox
     if not (south < north and west < east):
         raise ValueError('Expected bbox: south west north east')
     start = np.floor(np.array(ll2xz(north, west))/CHUNK).astype(int)*CHUNK
     end = np.ceil(np.array(ll2xz(south, east))/CHUNK).astype(int)*CHUNK
+    west0,north0,w0,h0 = DOWNTOWN
+    downtown = Downtown() if (start[0]<west0 and start[1]<north0 and end[0]>west0+w0 and end[1]>north0+h0) else None
     left, top = map(int,start)
     width, depth = map(int,end-start)
     terrain = np.rint(load_dem(np.arange(left,left+width+1,GRID),np.arange(top,top+depth+1,GRID))*10).astype('<i2')
@@ -255,6 +270,10 @@ def build(bbox, output, palette):
             local = field[window].astype(float)
             smooth = gaussian_filter(local, sigma=span/(3*GRID), mode='nearest')
             field[window] = np.rint(local + blend*(smooth-local))
+    if downtown:
+        downtown.blend(terrain,surface,original,road_ctrl,left,top)
+        wet[:] = surface != DRY
+        downtown.peaks(output,peaks)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 
@@ -299,6 +318,8 @@ def build(bbox, output, palette):
                 for ring in (LOCAL_FOOTPRINT, bud_ring)
             ]
         landmarks.append(item)
+    if downtown:
+        downtown.landmarks(landmarks)
     structural_entries = [entry for entry in landmarks if entry['id'] in (*peak_lm_names, 'guilin_theater')]
     peak_surface = PeakSurface(output, peaks, left, top, CHUNK)
     @lru_cache(maxsize=262144)
@@ -374,68 +395,80 @@ def build(bbox, output, palette):
     np.where(wet,surface,terrain)[::8,::8].astype('<i2').tofile(output/'overview.i16')
     np.where(wet,surface,original)[::8,::8].astype('<i2').tofile(output/'underlay.i16')
     overview_image = texture.resize((width//4,depth//4), Image.Resampling.BOX).quantize(32)
-    overview_image.save(output/'overview.png', optimize=True)
     water_bits = water_mask(overview_image, palette['water'])
+    overview_image.save(output/'overview.png', optimize=True)
     u_peaks_buf = unary_union(peak_shapes).buffer(1.0) if peak_shapes else ShapelyPolygon()
     chunks = []
-    for south in range(0,depth,CHUNK):
-        for east in range(0,width,CHUNK):
-            origin = (left+east,top+south)
-            tile = box(*origin,origin[0]+CHUNK,origin[1]+CHUNK)
-            parts = ((poly,heights[key]) for key in sorted(index.query(tile))
-                     for poly in polygons(footprints[key].intersection(tile)) if poly.area >= .01)
-            vertices, normals, indices, rings = building_mesh(parts, origin)
-            deck, thin, asphalt = decks(tile, origin)
-            st_data = streets(tile, origin)
-            for slot, rows in ((7,beds),(8,shop_rows)):
-                if rows.get(origin):
-                    while len(st_data)<=slot:
-                        st_data.append(None if len(st_data)==5 else [])
-                    st_data[slot]=rows[origin]
-            collision = json.dumps([rings, st_data, thin, asphalt], separators=(',', ':')).encode()
-            tbuf = trees[origin]
-            if tbuf:
-                sw_tile_polys, rd_tile_polys, cycle_tile_polys = [], [], []
-                for s_item in st_data[0]:
-                    skind, ext, *holes = s_item
-                    if skind not in (0, 1, 4, 5, 6) or len(ext) < 3:
-                        continue
-                    ext_w = [(origin[0] + p[0] / 100.0, origin[1] + p[1] / 100.0) for p in ext]
-                    holes_w = [[(origin[0] + p[0] / 100.0, origin[1] + p[1] / 100.0) for p in h] for h in holes if len(h) >= 3]
-                    sp = ShapelyPolygon(ext_w, holes_w).buffer(0)
-                    if not sp.is_empty:
-                        (cycle_tile_polys if skind == 5 else rd_tile_polys if skind == 0 else sw_tile_polys).append(sp)
-                u_sw_tile = unary_union(sw_tile_polys) if sw_tile_polys else ShapelyPolygon()
-                u_rd_tile = unary_union(rd_tile_polys) if rd_tile_polys else ShapelyPolygon()
-                u_cycle_tile = unary_union(cycle_tile_polys) if cycle_tile_polys else ShapelyPolygon()
-                n_trees = len(tbuf) // 12
-                tx_arr = np.empty(n_trees, dtype=np.float64)
-                tz_arr = np.empty(n_trees, dtype=np.float64)
-                for ti in range(n_trees):
-                    lx_cm, lz_cm = struct.unpack_from('<HH', tbuf, ti * 12)
-                    tx_arr[ti] = origin[0] + lx_cm / 100.0
-                    tz_arr[ti] = origin[1] + lz_cm / 100.0
-                rc_vals = eval_bspline_grid(road_ctrl, left, top, tx_arr, tz_arr)
-                for ti in range(n_trees):
-                    wx, wz = float(tx_arr[ti]), float(tz_arr[ti])
-                    pt_w = Point(wx, wz)
-                    if not u_peaks_buf.is_empty and u_peaks_buf.contains(pt_w):
-                        continue
-                    gm_w = ground_mesh_at(wx, wz)
-                    rb_w = max(float(rc_vals[ti]), gm_w)
-                    sup_w = (rb_w + 0.195) if u_sw_tile.covers(pt_w) else (rb_w + 0.045) if u_rd_tile.covers(pt_w) else (rb_w + 0.060) if u_cycle_tile.covers(pt_w) else gm_w
-                    struct.pack_into('<h', tbuf, ti * 12 + 4, round(10.0 * sup_w))
-            png = io.BytesIO()
-            texture.crop((east,south,east+CHUNK,south+CHUNK)).save(png,format='PNG')
-            image = png.getvalue()
-            window = np.s_[south//GRID:south//GRID+65,east//GRID:east//GRID+65]
-            underlay = original[window].tobytes() if np.any(original[window]!=terrain[window]) else b''
-            header = struct.pack('<4s5I',b'GL04',len(vertices)//6,len(indices)//4,len(collision),len(image),len(deck)//18)
-            name = f'{east//CHUNK}_{south//CHUNK}.glc'
-            payload = header+terrain[window].tobytes()+surface[window].tobytes()+vertices+normals+indices+collision+image+deck
-            (output/name).write_bytes(gzip.compress(payload+underlay,compresslevel=5,mtime=0))
-            (output/name.replace('.glc','.trees')).write_bytes(gzip.compress(tbuf,mtime=0))
-            chunks.append(dict(x=origin[0],z=origin[1],**asset(name)))
+    pending = deque()
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for south in range(0,depth,CHUNK):
+            for east in range(0,width,CHUNK):
+                origin = (left+east,top+south)
+                if downtown and downtown.frozen_tile(*origin):
+                    old = downtown.tiles[origin]
+                    name = f'{east//CHUNK}_{south//CHUNK}.glc'
+                    (output/name).write_bytes(downtown.files[old])
+                    (output/name.replace('.glc','.trees')).write_bytes(downtown.files[old.replace('.glc','.trees')])
+                    while pending:
+                        chunks.append(pending.popleft().result())
+                    chunks.append(dict(x=origin[0],z=origin[1],**asset(name)))
+                    continue
+                tile = box(*origin,origin[0]+CHUNK,origin[1]+CHUNK)
+                parts = ((poly,heights[key]) for key in sorted(index.query(tile))
+                         for poly in polygons(footprints[key].intersection(tile)) if poly.area >= .01)
+                vertices, normals, indices, rings = building_mesh(parts, origin)
+                deck, thin, asphalt = decks(tile, origin)
+                st_data = streets(tile, origin)
+                for slot, rows in ((7,beds),(8,shop_rows)):
+                    if rows.get(origin):
+                        while len(st_data)<=slot:
+                            st_data.append(None if len(st_data)==5 else [])
+                        st_data[slot]=rows[origin]
+                collision = json.dumps([rings, st_data, thin, asphalt], separators=(',', ':')).encode()
+                tbuf = trees[origin]
+                if tbuf:
+                    sw_tile_polys, rd_tile_polys, cycle_tile_polys = [], [], []
+                    for s_item in st_data[0]:
+                        skind, ext, *holes = s_item
+                        if skind not in (0, 1, 4, 5, 6) or len(ext) < 3:
+                            continue
+                        ext_w = [(origin[0] + p[0] / 100.0, origin[1] + p[1] / 100.0) for p in ext]
+                        holes_w = [[(origin[0] + p[0] / 100.0, origin[1] + p[1] / 100.0) for p in h] for h in holes if len(h) >= 3]
+                        sp = ShapelyPolygon(ext_w, holes_w).buffer(0)
+                        if not sp.is_empty:
+                            (cycle_tile_polys if skind == 5 else rd_tile_polys if skind == 0 else sw_tile_polys).append(sp)
+                    u_sw_tile = unary_union(sw_tile_polys) if sw_tile_polys else ShapelyPolygon()
+                    u_rd_tile = unary_union(rd_tile_polys) if rd_tile_polys else ShapelyPolygon()
+                    u_cycle_tile = unary_union(cycle_tile_polys) if cycle_tile_polys else ShapelyPolygon()
+                    n_trees = len(tbuf) // 12
+                    tx_arr = np.empty(n_trees, dtype=np.float64)
+                    tz_arr = np.empty(n_trees, dtype=np.float64)
+                    for ti in range(n_trees):
+                        lx_cm, lz_cm = struct.unpack_from('<HH', tbuf, ti * 12)
+                        tx_arr[ti] = origin[0] + lx_cm / 100.0
+                        tz_arr[ti] = origin[1] + lz_cm / 100.0
+                    rc_vals = eval_bspline_grid(road_ctrl, left, top, tx_arr, tz_arr)
+                    for ti in range(n_trees):
+                        wx, wz = float(tx_arr[ti]), float(tz_arr[ti])
+                        pt_w = Point(wx, wz)
+                        if not u_peaks_buf.is_empty and u_peaks_buf.contains(pt_w):
+                            continue
+                        gm_w = ground_mesh_at(wx, wz)
+                        rb_w = max(float(rc_vals[ti]), gm_w)
+                        sup_w = (rb_w + 0.195) if u_sw_tile.covers(pt_w) else (rb_w + 0.045) if u_rd_tile.covers(pt_w) else (rb_w + 0.060) if u_cycle_tile.covers(pt_w) else gm_w
+                        struct.pack_into('<h', tbuf, ti * 12 + 4, round(10.0 * sup_w))
+                png = io.BytesIO()
+                texture.crop((east,south,east+CHUNK,south+CHUNK)).save(png,format='PNG')
+                image = png.getvalue()
+                window = np.s_[south//GRID:south//GRID+65,east//GRID:east//GRID+65]
+                underlay = original[window].tobytes() if np.any(original[window]!=terrain[window]) else b''
+                header = struct.pack('<4s5I',b'GL04',len(vertices)//6,len(indices)//4,len(collision),len(image),len(deck)//18)
+                name = f'{east//CHUNK}_{south//CHUNK}.glc'
+                payload = header+terrain[window].tobytes()+surface[window].tobytes()+vertices+normals+indices+collision+image+deck
+                pending.append(pool.submit(write_chunk, output, name, payload+underlay, bytes(tbuf), origin))
+                if len(pending) >= workers:
+                    chunks.append(pending.popleft().result())
+        chunks.extend(job.result() for job in pending)
     extent = [left,top,width,depth]
     write_atlas(output,extent,bounds,layers,footprints,peaks)
     write_overview_map(output,bbox)
@@ -451,14 +484,16 @@ def build(bbox, output, palette):
     manifest['terrainSha256'] = digest.hexdigest()
     print('Terrain SHA-256:', digest.hexdigest())
     manifest['landmarks'] = landmarks
+    write_city_lods(output, manifest)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--bbox',type=float,nargs=4,default=[25.250,110.278,25.302,110.312])
+    parser.add_argument('--bbox',type=float,nargs=4,default=[25.212,110.243,25.366,110.352])
     parser.add_argument('--output',type=Path,default=Path(OUT))
     parser.add_argument('--palette',type=Path,default=Path(__file__).with_name('palette.json'))
+    parser.add_argument('--workers', type=int, default=4, help='Concurrent chunk compression writers')
     args = parser.parse_args()
-    build(args.bbox,args.output,json.loads(args.palette.read_text()))
+    build(args.bbox,args.output,json.loads(args.palette.read_text()),args.workers)

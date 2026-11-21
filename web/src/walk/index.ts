@@ -1175,6 +1175,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const bridgeCenter=bridge&&new THREE.Vector3(...bridge.sphere.slice(0,3)).applyAxisAngle(new THREE.Vector3(0,1,0),THREE.MathUtils.degToRad(bridge.rotation)).add(new THREE.Vector3(...bridge.position))
   const bridgeDistance=(x:number,z:number)=>bridge&&bridgeCenter?Math.hypot(x-bridgeCenter.x,z-bridgeCenter.z)-bridge.sphere[3]:Infinity
   async function enter(x:number,z:number,heading:number,reason:string,override=false){
+    if(!sim.withinBounds(x,z))return false
     if(shopOverlay.isOpen())shopOverlay.close('teleport')
     const target=new THREE.Vector3(x,0,z);destination=target
     stream.prioritize(x,z)

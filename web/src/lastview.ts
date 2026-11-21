@@ -19,7 +19,7 @@ export function readLastView(store: Store = localStorage): FeedbackView | null {
   if (!record || typeof record !== 'object' || Array.isArray(record)) return null
   if (typeof record.t !== 'number' || !Number.isFinite(record.t)) return null
   if (Date.now() - record.t > MAX_AGE) return null
-  if (!validView(record.v)) return null
+  if (!validView(record.v,'saved')) return null
   return record.v as FeedbackView
 }
 
