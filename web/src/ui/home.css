@@ -40,6 +40,9 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home-mode-text>span{font-size:13.5px;line-height:1.65;letter-spacing:.04em}
 .home-progress{font-size:12px;letter-spacing:.1em;color:var(--ui-seal)}.home-progress:empty{display:none}
 .home-go{grid-area:go;width:100%}
+/* IDOK-105: 占位样式，最终视觉由 sg claude 定稿。作为 .home-go 的次级按钮出现，有记录时才显示。 */
+.home-resume{grid-column:1/-1;width:100%;margin-top:8px;text-align:center;cursor:pointer}
+.home-resume[hidden]{display:none}
 .home-mode--tour{cursor:pointer;color:var(--ui-ink);background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,0) 50%),var(--ui-paper);
   box-shadow:var(--ui-shadow-2),inset 0 0 0 1px rgba(90,80,60,.14);transition:transform .25s var(--ui-ease),box-shadow .25s}
 .home-mode--tour:hover{transform:translateY(-2px);box-shadow:0 24px 60px rgba(12,20,20,.4),inset 0 0 0 1px rgba(90,80,60,.14)}

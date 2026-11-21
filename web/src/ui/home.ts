@@ -2,6 +2,7 @@ import './home.css'
 import {spots} from '../play/spots'
 import {SOURCE_URL} from './source'
 import {initial, onUser, openAccount} from './account'
+import {readLastView, requestRestore} from '../lastview'
 
 // 主界面（title screen）. Shown on every plain visit before the 3D city loads; the menu button in game brings it back.
 // It owns no engine state: it calls `play()` and the entry module decides whether that boots or resumes the city.
@@ -37,6 +38,7 @@ export function home(play:()=>void):Home {
         <span class="home-mode-text"><b>游览模式</b><span>自由飞行、落地步行，走遍 ${spots.length} 处名胜，在景册里集齐印章。</span>
           <small class="home-progress"></small></span>
         <span class="ui-btn ui-btn--seal ui-btn--lg home-go">开始游览</span>
+        <span class="ui-btn ui-btn--ghost ui-btn--lg home-resume" role="button" tabindex="0" data-umami-event="home-resume">回到上次离开的地方</span>
       </button>
       <div class="home-mode home-mode--soon" role="listitem" aria-disabled="true">
         <span class="home-mode-seal" aria-hidden="true">事</span>
@@ -55,6 +57,13 @@ export function home(play:()=>void):Home {
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
   const go = root.querySelector<HTMLElement>('.home-go')!, tour = root.querySelector<HTMLButtonElement>('.home-mode--tour')!
   tour.onclick = ()=>play()
+  // IDOK-105: offer to resume the last view only when one is stored. Placeholder styles — sg claude
+  // owns the final look; `.home-resume` is the styling hook.
+  const resume = root.querySelector<HTMLElement>('.home-resume')!
+  const resumeClick = (event?: Event) => { event?.stopPropagation(); requestRestore(); play() }
+  resume.onclick = resumeClick
+  resume.onkeydown = (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); resumeClick(event) } }
+  const resumeButton = resume
   root.querySelector<HTMLButtonElement>('[data-act=guide]')!.onclick = ()=>guide()
   root.querySelector<HTMLButtonElement>('[data-act=about]')!.onclick = ()=>void import('./about').then(m=>m.openAbout())
   const account = root.querySelector<HTMLButtonElement>('.home-account')!
@@ -83,6 +92,9 @@ export function home(play:()=>void):Home {
     open(resume){
       shown = true; root.hidden = false; root.classList.toggle('resume',resume)
       go.textContent = resume?'继续游览':'开始游览'
+      // IDOK-105: only offer to resume on a fresh entry (not the mid-game "继续游览" menu) and only
+      // when a usable view is stored; sg claude owns the final copy and placement.
+      resumeButton.hidden = resume || !readLastView()
       requestAnimationFrame(()=>{root.classList.add('show'); tour.focus({preventScroll:true})})
       if(!reduce&&!timer) timer = window.setInterval(step,SLIDE_MS)
       document.body.dataset.home = ''

@@ -26,6 +26,7 @@
     "build": "node scripts/photo-credits.mjs && tsc -p web && vite build web --config web/vite.config.ts && node scripts/og.mjs",
     "preview": "vite preview web --config web/vite.config.ts",
     "verify:flight": "node scripts/flight.mjs",
+    "verify:spawn": "node scripts/spawn-pool.mjs --check",
     "verify:atlas": "node --experimental-strip-types scripts/atlas.mjs",
     "verify:walk": "npm run verify:walk:quick",
     "verify:walk:quick": "node scripts/walk-quick.mjs",

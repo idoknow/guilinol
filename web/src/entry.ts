@@ -2,12 +2,14 @@ import './ui/theme.css'
 import './ui/hud.css'
 import {home} from './ui/home'
 import {accountEntry, onUser, requireUser} from './ui/account'
+import {isDeepLink} from './deeplink'
+import {cancelRestore} from './lastview'
 
 // Page entry. A plain visit lands on the title screen (ui/home.ts) and the 3D city (main.ts, three.js + world data)
 // only boots on 开始游览. Deep links — shares, feedback views, test harnesses — skip the title screen and boot directly.
 const params = new URLSearchParams(location.search)
 if (params.has('verify') || params.has('debug')) document.body.dataset.debug = ''
-const deepLink = ['verify', 'spawn', 'view', 'mode', 'cam', 'feedback', 'play'].some(key => params.has(key))
+const deepLink = isDeepLink(params)
 // Playing requires a signed-in account (IDOK-99). Local test harnesses (Playwright on 127.0.0.1 with deep-link params) skip it.
 const harness = deepLink && ['127.0.0.1', 'localhost'].includes(location.hostname)
 
@@ -22,7 +24,7 @@ async function enter() {
   if (!harness) {
     entering = true
     const user = await requireUser().finally(() => { entering = false })
-    if (!user) { if (!title.shown) title.open(started); return }
+    if (!user) { cancelRestore(); if (!title.shown) title.open(started); return }
   }
   title.close()
   const main = await loadEngine()
