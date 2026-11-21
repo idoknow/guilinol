@@ -23,8 +23,8 @@ export interface HudSource { get():Readonly<HudState>; on(fn:(s:Readonly<HudStat
 const VEHICLE: Record<string,string> = {ebike:'电驴', bike:'单车', car:'汽车', boat:'快艇', taxi:'出租车'}
 const APPS = [
   {id:'map', glyph:'图', name:'地图', tint:'#20d6c1'}, {id:'jobs', glyph:'活', name:'接活', tint:'#ffc53d'},
-  {id:'radio', glyph:'台', name:'电台', tint:'#ff5d8f'}, {id:'album', glyph:'拍', name:'拍照点', tint:'#7b8cff'},
-  {id:'garage', glyph:'车', name:'车库', tint:'#ff8a3d'}, {id:'settings', glyph:'设', name:'设置', tint:'#9aa3ad'},
+  {id:'wardrobe', glyph:'衣', name:'衣橱', tint:'#ff5d8f'}, {id:'garage', glyph:'车', name:'车库', tint:'#ff8a3d'},
+  {id:'radio', glyph:'台', name:'电台', tint:'#7b8cff'}, {id:'settings', glyph:'设', name:'设置', tint:'#9aa3ad'},
 ]
 const money = (n:number)=>n.toLocaleString('zh-CN')
 const clockText = (s:number)=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`

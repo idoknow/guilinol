@@ -26,11 +26,17 @@ export interface FootProbe {
   points: THREE.Vector3[]
 }
 
+export interface AvatarAttachments {
+  head?: THREE.Object3D
+  torso?: THREE.Object3D
+}
+
 export interface AvatarRig {
   isSkinned: boolean
   skinnedMesh?: THREE.SkinnedMesh
   traveller?: THREE.Object3D
   joints: AvatarJointMap
+  attachments: AvatarAttachments
   soleOffset: number
   footProbes: FootProbe[]
   clearPose(): void
@@ -168,6 +174,10 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
       skinnedMesh: root.userData.skinned as THREE.SkinnedMesh | undefined,
       traveller: root.getObjectByName('Traveller'),
       joints: legacyJoints,
+      attachments: {
+        head: root.getObjectByName('Head') ?? root.getObjectByName('head') ?? root,
+        torso: root.getObjectByName('Torso') ?? root.getObjectByName('spine_02') ?? root,
+      },
       soleOffset: metrics.soleOffset,
       footProbes: metrics.footProbes,
       clearPose() {
@@ -225,6 +235,7 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
   skeletonRoot.traverse(node => {
     if (node === skeletonRoot && node === root) return
     if (node instanceof THREE.Mesh) return
+    if (node.userData?.isAttachmentAnchor) return
     const worldQ = node.getWorldQuaternion(new THREE.Quaternion()).premultiply(rootWorldInv)
     const entry: BoneRest = {
       bone: node,
@@ -404,11 +415,31 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
     AVATAR_JOINT_NAMES.map(name => [name, makeJointHandle(name)]),
   ) as AvatarJointMap
 
+  // Create axis-aligned attachment anchors under `head` and `spine_02` (compensating native bone roll/tilt to -Z forward).
+  function ensureBoneAttachmentAnchor(boneName: string, fallbackName: string, anchorName: string): THREE.Object3D | undefined {
+    const rest = boneRestMap.get(boneName) ?? boneRestMap.get(fallbackName)
+    if (!rest) return undefined
+    const existing = rest.bone.children.find(c => c.name === anchorName && c.userData?.isAttachmentAnchor)
+    if (existing) return existing
+    const anchor = new THREE.Group()
+    anchor.name = anchorName
+    anchor.userData.isAttachmentAnchor = true
+    anchor.quaternion.copy(rest.worldRestQuat).invert()
+    rest.bone.add(anchor)
+    return anchor
+  }
+
+  const attachments: AvatarAttachments = {
+    head: ensureBoneAttachmentAnchor('head', 'neck_01', 'attach_head'),
+    torso: ensureBoneAttachmentAnchor('spine_02', 'spine_03', 'attach_torso'),
+  }
+
   const rig: AvatarRig = {
     isSkinned: true,
     skinnedMesh,
     traveller,
     joints,
+    attachments,
     soleOffset,
     footProbes,
     clearPose: restoreRestPose,
