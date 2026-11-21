@@ -6,7 +6,7 @@ import type {Manifest} from '../world'
 import type {Stream} from '../stream'
 import {walkInput} from '../ui/walk'
 import {avatar} from '../look/avatar'
-import {bikeConfig, carConfig, walkConfig as cfg, type EbikeUpgradeMods} from './config'
+import {bikeConfig, carConfig, walkConfig as cfg, type CarDriveMode, type EbikeUpgradeMods} from './config'
 import {createPhysics} from './physics'
 import {createCameraRig} from './camera'
 import {look} from '../look/config'
@@ -286,7 +286,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const carRig=createDynamicCar(0)
   carRig.root.visible=false
   scene.add(carRig.root)
-  const stuntMode=typeof location!=='undefined'&&new URLSearchParams(location.search).get('stunt')==='1'
+  scene.add(carRig.smokeGroup)
+  const searchParams=typeof location!=='undefined'?new URLSearchParams(location.search):null
+  const stuntMode=searchParams?.get('stunt')==='1'
+  const gtaCarParam=searchParams?.get('gtacar')==='1'
+  const defaultCarGta=!verify||gtaCarParam
+  let carGtaOverride:boolean|undefined=undefined
+  let carShake=0, carShakePhase=0, carSpeedArm=0
   function ebikeModUpgrades(vType:EbikeVehicleType,preset:EbikeModPreset):EbikeUpgradeMods|null{
     if(vType==='shared'||preset==='stock')return null
     return preset==='ghostfire'?{motorLevel:1,controllerLevel:1,batteryLevel:1}:{motorLevel:2,controllerLevel:2,batteryLevel:2}
@@ -363,7 +369,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function releaseDynamicCar(){
     if(mountedStaticCar){mountedStaticCar.visible=true;mountedStaticCar=null}
     carRig.root.visible=false
-    prevCarSpeed=0;prevCarObstacle='';lastCarBraking=false
+    carRig.clearEffects()
+    prevCarSpeed=0;prevCarObstacle='';lastCarBraking=false;carShake=0;carSpeedArm=0
   }
   function releaseDynamicBike(){
     if(mountedStaticBike){mountedStaticBike.visible=true;mountedStaticBike=null}
@@ -770,18 +777,26 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         rides.setCarPitch(fSup?.y,bSup?.y,dt)
       }
       rides.park(figure.position)
+      const carTel=rides.carTelemetry
       carRig.update({
         pos:figure.position,
         heading:rides.heading,
         groundPitch:rides.pitch,
         speed:rides.speed,
         steerInput:rides.steerInput,
-        braking:lastCarBraking,
-        reversing:rides.speed<-.05,
+        braking:carTel?.braking??lastCarBraking,
+        reversing:carTel?.reversing??rides.speed<-.05,
+        dynRoll:carTel?.dynRoll,
+        dynPitch:carTel?.dynPitch,
+        driftIntensity:carTel?.driftIntensity??0,
+        handbrake:carTel?.handbrake??false,
         dt,
       })
       driverPose.updateDriving(figure.position,rides.heading,active)
-      input.syncRideHud(null,'car')
+      input.syncCarHud(carTel)
+      const targetSpeedArm=carTel?.gtaPhysics?Math.min(carConfig.speedCameraPull,Math.max(0,(Math.hypot(rides.carVelX,rides.carVelZ)-8.5)*.095)):0
+      carSpeedArm=dt>0?THREE.MathUtils.damp(carSpeedArm,targetSpeedArm,4.5,Math.min(.12,dt)):targetSpeedArm
+      if(dt>0&&carShake>0){carShake=Math.max(0,carShake-3.8*Math.min(.12,dt));carShakePhase+=Math.min(.12,dt)*46}
     }else if(rides?.bike){
       releaseDynamicCar()
       const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading),baseY=footY
@@ -993,7 +1008,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         }
       }
     }
-    rig.update(camera,figure.position,yaw,pitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap),dt,snap)
+    const shakeYaw=rides?.car&&carShake>.01?Math.sin(carShakePhase)*carShake*.018:0
+    const shakePitch=rides?.car&&carShake>.01?Math.cos(carShakePhase*1.3)*carShake*.012:0
+    rig.update(camera,figure.position,yaw+shakeYaw,pitch+shakePitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0),dt,snap)
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
   function boatClearance(){
@@ -1037,6 +1054,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         seatWorld:bicycleRig.seatAnchor.getWorldPosition(new THREE.Vector3()).toArray(),
       }:null,
       carRig:carRig.root.visible?carRig.probe():null,
+      carTelemetry:rides?.carTelemetry??null,
       twoWheelFlow:crashSession?'crashed':standUpSession?'standing_up':pickupSession?'picking_up':rides?.bike?'riding':'foot',
       downedCount:downedBikes.size,
       downedBikes:Array.from(downedBikes).map(r=>({kind:r.kind,x:r.x,z:r.z,roll:r.roll,dist:Math.hypot(r.x-pos.x,r.z-pos.z)})),
@@ -1092,7 +1110,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       mixer.stopAllAction();action=undefined;bikeObstacle='';bikeSpeed=0
       mountedStaticCar=rides.car;mountedStaticCar.visible=false
       carRig.setPaint((mountedStaticCar.userData.paint as number|undefined)??0)
-      carRig.root.visible=true;prevCarSpeed=0;prevCarObstacle='';lastCarBraking=false
+      carRig.root.visible=true;prevCarSpeed=0;prevCarObstacle='';lastCarBraking=false;carShake=0;carSpeedArm=0
+      const useCarGta=carGtaOverride??defaultCarGta
+      rides.setCarGtaPhysics(useCarGta)
+      rides.setCarMode(useCarGta?'street':'cruise')
     }
     if(rides?.bike&&!wasBike){
       const bx=rides.bike.position.x,bz=rides.bike.position.z,cur=sim.body.translation()
@@ -1142,6 +1163,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(wasBike&&rides?.bike&&!crashSession){
       if(rideCtrl.gearSelect!==null)rides.setEbikeGear(rideCtrl.gearSelect)
       else if(rideCtrl.gearDelta!==0)rides.shiftEbikeGear(rideCtrl.gearDelta)
+    }else if(wasCar&&rides?.car){
+      if(rideCtrl.gearSelect!==null)rides.setCarModeByIndex(rideCtrl.gearSelect)
+      else if(rideCtrl.gearDelta!==0)rides.shiftCarMode(rideCtrl.gearDelta)
     }
     const aboardGround=wasCar||wasBike
     if(keys.jump&&!aboardGround&&!busyFootAnim)jumpTimer=cfg.jumpBuffer
@@ -1157,11 +1181,29 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(wasCar&&rides?.car){
         const previous=rides.heading
         driverPose.advanceMount(step)
-        bikeSpeed=rides.steerCar(keys.forward,keys.right,step,driverPose.mounted)
+        bikeSpeed=rides.steerCar(keys.forward,keys.right,step,driverPose.mounted,{handbrake:rideCtrl.wheelie})
         wish.set(-Math.sin(rides.heading),-Math.cos(rides.heading))
-        if(driverPose.mounted)yaw+=rides.heading-previous
-        else yaw+=shortestAngle(yaw,rides.heading)*(1-Math.exp(-10*step))
-        vx=wish.x*bikeSpeed;vz=wish.y*bikeSpeed
+        vx=rides.carVelX;vz=rides.carVelZ
+        const carTel=rides.carTelemetry
+        if(driverPose.mounted){
+          if(carTel?.gtaPhysics){
+            const planar=Math.hypot(vx,vz)
+            const dHeading=shortestAngle(previous,rides.heading)
+            // GTA chase camera: trails drifting tail slightly, then smoothly swings back behind velocity vector.
+            yaw+=dHeading*(1-Math.min(.55,rides.carDrift*.68))
+            if(planar>3.5){
+              const travelHeading=Math.atan2(-vx,-vz)
+              const goalYaw=rides.speed>=0
+                ?rides.heading+shortestAngle(rides.heading,travelHeading)*(rides.carDrift>.12?.55:.20)
+                :rides.heading
+              yaw+=shortestAngle(yaw,goalYaw)*(1-Math.exp(-(rides.carDrift>.15?4.6:2.6)*step))
+            }
+          }else{
+            yaw+=rides.heading-previous
+          }
+        }else{
+          yaw+=shortestAngle(yaw,rides.heading)*(1-Math.exp(-10*step))
+        }
       }else if(wasBike&&rides?.bike){
         const previous=rides.heading
         ridePose.advanceMount(step)
@@ -1208,7 +1250,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
 
       const pos=sim.body.translation()
       velocity+=(velocity>0?cfg.gravity:cfg.fallGravity)*step
-      const stepDx=(aboardGround?wish.x*bikeSpeed:vx)*step, stepDz=(aboardGround?wish.y*bikeSpeed:vz)*step
+      const stepDx=(wasCar?vx:aboardGround?wish.x*bikeSpeed:vx)*step, stepDz=(wasCar?vz:aboardGround?wish.y*bikeSpeed:vz)*step
       sim.controller.computeColliderMovement(sim.capsule,{x:stepDx,y:velocity*step,z:stepDz})
       const move=sim.controller.computedMovement(),next={x:pos.x+move.x,y:pos.y+move.y,z:pos.z+move.z}
       const nowGrounded=sim.controller.computedGrounded()
@@ -1256,8 +1298,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           dampCar:s=>rides!.dampCarSpeed(s),
         })
         bikeSpeed=res.speed
-        if(res.blocked){bikeObstacle=res.reason;vx=vz=0}
-        else{vx=wish.x*bikeSpeed;vz=wish.y*bikeSpeed;if(Math.abs(bikeSpeed)>.15)bikeObstacle=''}
+        vx=rides.carVelX;vz=rides.carVelZ
+        const impactPulse=rides.consumeCarImpact()
+        if(impactPulse>0){
+          carRig.triggerImpact(impactPulse)
+          carShake=Math.max(carShake,Math.min(1.35,impactPulse*.85))
+        }
+        if(res.blocked){bikeObstacle=res.reason}
+        else if(Math.hypot(vx,vz)>.15){bikeObstacle=''}
       }
       else if(rides?.bike){
         const res=rides.resolveMove({
@@ -1569,6 +1617,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       setGear(gear:number){return rides?.setEbikeGear(gear)??2},
       shiftGear(delta:number){return rides?.shiftEbikeGear(delta)??2},
       setAutoCrash(on:boolean|undefined){autoCrashOverride=on;rides?.setAutoCrash(on)},
+    },
+    car:{
+      get telemetry(){return rides?.carTelemetry??null},
+      setMode(mode:CarDriveMode){return rides?.setCarMode(mode)??mode},
+      shiftMode(delta:number){return rides?.shiftCarMode(delta)??'street'},
+      setGtaPhysics(on:boolean|undefined){carGtaOverride=on;if(on!==undefined)rides?.setCarGtaPhysics(on)},
     },
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}

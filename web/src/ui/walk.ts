@@ -1,5 +1,6 @@
 import './walk.css'
 import {walkConfig as cfg} from '../walk/config'
+import type {CarDynamicTelemetry} from '../walk/car'
 import type {EbikeRideControlInput, EbikeTelemetrySnapshot} from '../walk/ebike-fx'
 
 const MOD_LABELS = {stock: '素车', ghostfire: '鬼火', neon: '霓虹'} as const
@@ -123,17 +124,18 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     if(!active()||document.body.hasAttribute('data-home')||document.body.dataset.photo==='on'||document.querySelector('dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show')||(event.target as Element)?.closest?.('input,textarea,select,[contenteditable]'))return
     keys.add(event.code)
     const ridingTwoWheel=document.body.dataset.ride==='bike'||document.body.dataset.ride==='bicycle'
+    const drivingCar=document.body.dataset.ride==='car'
     if(!event.repeat&&event.code==='Space'){
       if(ridingTwoWheel)recoverPulse=true
-      else jump=true
+      else if(!drivingCar)jump=true
       event.preventDefault()
     }
     if(!event.repeat&&event.code==='KeyC')view()
-    if(ridingTwoWheel&&!event.repeat){
+    if((ridingTwoWheel||drivingCar)&&!event.repeat){
       if(event.code==='KeyE')gearDelta+=1
       else if(event.code==='KeyQ')gearDelta-=1
       else if(event.code==='KeyG'&&document.body.dataset.ride==='bike')cycleModPulse=true
-      else if(event.code==='Digit1'||event.code==='Digit2'||event.code==='Digit3'||event.code==='Digit4')gearSelect=Number(event.code.slice(-1))
+      else if(event.code==='Digit1'||event.code==='Digit2'||event.code==='Digit3'||(ridingTwoWheel&&event.code==='Digit4'))gearSelect=Number(event.code.slice(-1))
     }
   })
   window.addEventListener('keyup',event=>keys.delete(event.code))
@@ -289,6 +291,55 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
         }else{
           stateEl.hidden=true;stateEl.dataset.warn='0'
         }
+      }
+    },
+    syncCarHud(state:CarDynamicTelemetry|null){
+      if(!state){
+        stateEl.hidden=true
+        delete document.body.dataset.rideCrash
+        return
+      }
+      document.body.dataset.ride='car'
+      delete document.body.dataset.rideType
+      delete document.body.dataset.rideCrash
+      typeEl.dataset.kind='car';typeEl.textContent='轿车'
+      gearEl.textContent=state.gearLabel
+      gearEl.title=`自动挡 ${state.gearLabel} · ${state.modeLabel}模式上限 ${state.maxKmh} km/h（1-3 / Q·E 切模式）`
+      const modeLabels=['合规40','街道75','运动108']
+      for(let i=0;i<gearButtons.length;i++){
+        const btn=gearButtons[i]
+        const label=modeLabels[i]
+        btn.hidden=!label
+        if(label){
+          btn.textContent=label
+          const activeMode=state.modeIndex===i+1
+          btn.classList.toggle('on',activeMode)
+          btn.setAttribute('aria-pressed',String(activeMode))
+        }
+      }
+      speedEl.textContent=`${state.kmh} km/h`
+      const rpmPct=Math.max(5,Math.min(100,Math.round(state.rpmRatio*100)))
+      batEl.dataset.level=state.rpm>=5600?'crit':state.rpm>=4400?'low':'ok'
+      batFillEl.style.width=`${rpmPct}%`
+      batPctEl.textContent=`${(state.rpm/1000).toFixed(1)}k`
+      keysEl.textContent='Space手刹漂移 · 1-3/Q·E切模式'
+      btnWheelie.textContent='手刹'
+      btnWheelie.classList.toggle('on',state.handbrake)
+      const slipDeg=Math.round(Math.abs(state.slipAngle)*180/Math.PI)
+      if(state.impactStrength>.32){
+        stateEl.hidden=false;stateEl.dataset.warn='1'
+        stateEl.textContent='撞击缓冲'
+      }else if(state.driftIntensity>.22){
+        stateEl.hidden=false;stateEl.dataset.warn=state.driftIntensity>.62?'1':'0'
+        stateEl.textContent=state.handbrake?`手刹漂移 ${slipDeg}°`:`侧滑 ${slipDeg}°`
+      }else if(state.handbrake&&state.kmh>3){
+        stateEl.hidden=false;stateEl.dataset.warn='0'
+        stateEl.textContent='手刹拉起'
+      }else if(state.shifting){
+        stateEl.hidden=false;stateEl.dataset.warn='0'
+        stateEl.textContent=`升挡 ${state.gearLabel}`
+      }else{
+        stateEl.hidden=true;stateEl.dataset.warn='0'
       }
     },
   }

@@ -110,14 +110,38 @@ export const twoWheelCrashFlowConfig = {
   autoRiseDelaySec: 1.4,
 }
 
-/** Passenger car dynamics (40 km/h cap, Ackermann steering R_min ~ 4.85m, delayed -12 km/h reverse). */
+export type CarDriveMode = 'cruise' | 'street' | 'sport'
+
+export interface CarDriveModeSpec {
+  id: CarDriveMode
+  label: string
+  shortLabel: string
+  maxKmh: number
+  accelScale: number
+  driftSlipGain: number
+}
+
+export const carDriveModes: Record<CarDriveMode, CarDriveModeSpec> = {
+  cruise: {id: 'cruise', label: '合规', shortLabel: '合规40', maxKmh: 40, accelScale: 1.0, driftSlipGain: .75},
+  street: {id: 'street', label: '街道', shortLabel: '街道75', maxKmh: 75, accelScale: 1.38, driftSlipGain: 1.05},
+  sport: {id: 'sport', label: '运动', shortLabel: '运动108', maxKmh: 108, accelScale: 1.78, driftSlipGain: 1.35},
+}
+
+export const CAR_DRIVE_MODE_ORDER: readonly CarDriveMode[] = ['cruise', 'street', 'sport']
+
+/** GTA-grade passenger car dynamics (5-speed auto, 3 drive modes 40/75/108 km/h, 2D tire slip & handbrake drift, weight transfer, momentum rebound). */
 export const carConfig = {
-  maxSpeed:40/3.6, reverseMax:-12/3.6, accel:5.2, torqueDecay:.58, torquePow:.75,
-  brake:11.5, revHold:.24, revAccel:3.6, rollDrag:.35, aeroDrag:.06,
+  maxSpeed:40/3.6, reverseMax:-14/3.6, accel:5.6, torqueDecay:.52, torquePow:.72,
+  brake:13.2, revHold:.24, revAccel:4.2, rollDrag:.34, aeroDrag:.0048,
   wheelbase:2.65, halfWidth:.91, halfLength:2.24,
-  maxSteerAngle:.50, speedSteer:2.2, steerDamp:8.5,
-  bodyRollMax:.035, rollDamp:8, pitchMax:.22, pitchDamp:9,
+  maxSteerAngle:.50, speedSteer:1.75, steerDamp:9.5,
+  frontGrip:11.8, rearGrip:10.6, handbrakeRearGrip:2.1, handbrakeDrag:5.0,
+  driftYawBoost:1.45, driftCounterAssist:2.4, yawDamp:9.5,
+  bodyRollMax:.105, rollDamp:7.5, pitchMax:.22, pitchDamp:9, dynPitchMax:.072,
+  reboundRestitution:.24, reboundMinSpeed:4.0, reboundDuration:.22,
   maxSlope:.32, slideDamp:2.2,
-  mountDuration:.28, dismountDuration:.20, cameraArmOffset:4.2,
+  mountDuration:.28, dismountDuration:.20, cameraArmOffset:4.2, speedCameraPull:1.75,
   stickDeadFwd:.1, stickDeadTurn:.12, strictMotorway:true,
+  gearUpshiftKmh:[18, 36, 56, 80] as readonly number[],
+  gearTorque:[1.30, 1.14, 1.00, .90, .82] as readonly number[],
 }

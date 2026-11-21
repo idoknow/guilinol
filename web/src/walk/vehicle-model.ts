@@ -596,9 +596,11 @@ export interface BicycleVisualRig extends TwoWheelVisualRig {
 
 export interface CarVisualRig {
   root: T.Group
+  smokeGroup: T.Group
   suspensionPivot: T.Group
   setPaint: (paint: number) => void
   triggerImpact: (strength: number) => void
+  clearEffects: () => void
   update: (state: {
     pos: T.Vector3
     heading: number
@@ -608,8 +610,12 @@ export interface CarVisualRig {
     braking: boolean
     reversing: boolean
     dt: number
+    dynRoll?: number
+    dynPitch?: number
+    driftIntensity?: number
+    handbrake?: boolean
   }) => void
-  probe: () => { roll: number; pitch: number; heave: number; steerAngle: number; wheelSpin: number; braking: boolean; reversing: boolean }
+  probe: () => { roll: number; pitch: number; heave: number; steerAngle: number; wheelSpin: number; rearWheelSpin: number; braking: boolean; reversing: boolean; handbrake: boolean; smokeActive: number }
   dispose: () => void
 }
 
@@ -1108,20 +1114,45 @@ export function createDynamicCar(paint = 0): CarVisualRig {
   const rl = mountWheel(-1, 1.31, false)
   const rr = mountWheel(1, 1.31, false)
 
-  let roll = 0, pitch = 0, heave = 0, heaveVel = 0, prevSpeed = 0, wheelSpin = 0, steerAngle = 0
-  let lastBraking = false, lastReversing = false
+  // Pooled world-space tire smoke puffs for GTA handbrake / high-slip drifts (zero per-frame allocations).
+  const smokeGroup = new T.Group()
+  smokeGroup.name = 'car-drift-smoke'
+  const smokeGeo = trackG(new T.IcosahedronGeometry(.22, 0))
+  const smokePool = Array.from({length: 18}, () => {
+    const mat = trackM(new T.MeshBasicMaterial({color: 0xe6e4dc, transparent: true, opacity: 0, depthWrite: false}))
+    const mesh = new T.Mesh(smokeGeo, mat)
+    mesh.visible = false
+    smokeGroup.add(mesh)
+    return {mesh, mat, life: 0, maxLife: .55, vx: 0, vy: 0, vz: 0}
+  })
+  let smokeCursor = 0, smokeCooldown = 0
+
+  let roll = 0, pitch = 0, heave = 0, heaveVel = 0, prevSpeed = 0, wheelSpin = 0, rearWheelSpin = 0, steerAngle = 0
+  let lastBraking = false, lastReversing = false, lastHandbrake = false, roadPhase = 0
+
+  function clearEffects() {
+    for (const p of smokePool) {
+      p.life = 0
+      p.mesh.visible = false
+      p.mat.opacity = 0
+    }
+  }
 
   return {
     root,
+    smokeGroup,
     suspensionPivot,
     setPaint(nextPaint: number) {
       bodyMesh.geometry = getBodyGeom(nextPaint)
       roll = pitch = heave = heaveVel = prevSpeed = 0
+      clearEffects()
     },
+    clearEffects,
     triggerImpact(strength: number) {
       const s = T.MathUtils.clamp(strength, .1, 2.5)
-      heaveVel -= .32 * s
-      pitch -= .045 * s
+      heaveVel -= .42 * s
+      pitch -= .055 * s
+      roll += (steerAngle >= 0 ? 1 : -1) * .025 * s
     },
     update(state) {
       const cdt = Math.min(.1, Math.max(1e-4, state.dt))
@@ -1130,18 +1161,20 @@ export function createDynamicCar(paint = 0): CarVisualRig {
 
       const accel = T.MathUtils.clamp((state.speed - prevSpeed) / cdt, -18, 18)
       prevSpeed = state.speed
-      // Under cornering, car body rolls outward; under braking nose dives (-pitch); under throttle tail squats (+pitch).
+      // Prefer authoritative 2D car physics weight transfer when supplied, fallback to kinematic estimate.
       const latFactor = T.MathUtils.clamp(state.speed * state.steerInput * .14, -1.2, 1.2)
-      const targetRoll = T.MathUtils.clamp(-latFactor * .058, -.078, .078)
-      const targetPitch = T.MathUtils.clamp(accel * .0048, -.048, .048)
+      const targetRoll = state.dynRoll !== undefined ? state.dynRoll : T.MathUtils.clamp(-latFactor * .058, -.078, .078)
+      const targetPitch = state.dynPitch !== undefined ? state.dynPitch : T.MathUtils.clamp(accel * .0048, -.048, .048)
 
-      roll = T.MathUtils.damp(roll, targetRoll, 9, cdt)
+      roll = T.MathUtils.damp(roll, targetRoll, 9.5, cdt)
       pitch = T.MathUtils.damp(pitch, targetPitch, 11, cdt)
-      // Spring-damper heave bounce (omega=15 rad/s, damp=12)
-      heaveVel += (-225 * heave - 16 * heaveVel) * cdt
-      heave = T.MathUtils.clamp(heave + heaveVel * cdt, -.07, .07)
+      roadPhase += Math.abs(state.speed) * cdt * 2.4
+      const roadRumble = Math.min(1, Math.abs(state.speed) / 22) * Math.sin(roadPhase) * .006
+      // Spring-damper heave bounce (omega=15 rad/s, damp=14)
+      heaveVel += (-225 * heave - 14 * heaveVel) * cdt
+      heave = T.MathUtils.clamp(heave + heaveVel * cdt, -.09, .09)
 
-      suspensionPivot.position.set(0, CG_Y + heave, 0)
+      suspensionPivot.position.set(0, CG_Y + heave + roadRumble, 0)
       suspensionPivot.rotation.set(pitch, 0, roll, 'YXZ')
 
       steerAngle = T.MathUtils.damp(steerAngle, -state.steerInput * .44, 14, cdt)
@@ -1152,20 +1185,74 @@ export function createDynamicCar(paint = 0): CarVisualRig {
       wheelSpin -= spinDelta
       fl.spinMesh.rotation.x = wheelSpin
       fr.spinMesh.rotation.x = wheelSpin
-      rl.spinMesh.rotation.x = wheelSpin
-      rr.spinMesh.rotation.x = wheelSpin
+      // Handbrake locks rear wheels while front wheels keep rolling.
+      if (!state.handbrake) rearWheelSpin -= spinDelta
+      rl.spinMesh.rotation.x = rearWheelSpin
+      rr.spinMesh.rotation.x = rearWheelSpin
+
+      // Subtle independent wheel droop/compression compensation against body roll & pitch.
+      const baseWheelY = .306
+      fl.steerGroup.position.y = baseWheelY + T.MathUtils.clamp(-heave * .25 + roll * .18 - pitch * .22, -.04, .04)
+      fr.steerGroup.position.y = baseWheelY + T.MathUtils.clamp(-heave * .25 - roll * .18 - pitch * .22, -.04, .04)
+      rl.steerGroup.position.y = baseWheelY + T.MathUtils.clamp(-heave * .25 + roll * .18 + pitch * .22, -.04, .04)
+      rr.steerGroup.position.y = baseWheelY + T.MathUtils.clamp(-heave * .25 - roll * .18 + pitch * .22, -.04, .04)
+
+      // Emit world-space rear tire smoke during drift or high-speed handbrake lock.
+      const drift = state.driftIntensity ?? 0
+      const smoking = drift > .20 || (!!state.handbrake && Math.abs(state.speed) > 4.2)
+      smokeCooldown = Math.max(0, smokeCooldown - cdt)
+      if (smoking && smokeCooldown <= 0) {
+        smokeCooldown = Math.max(.028, .075 - drift * .045)
+        const fx = -Math.sin(state.heading), fz = -Math.cos(state.heading)
+        const rx = Math.cos(state.heading), rz = -Math.sin(state.heading)
+        for (const side of [-1, 1]) {
+          const puff = smokePool[smokeCursor++ % smokePool.length]
+          puff.life = puff.maxLife = .42 + drift * .28
+          puff.mesh.position.set(
+            state.pos.x + rx * (side * .78) - fx * 1.34,
+            state.pos.y + .14,
+            state.pos.z + rz * (side * .78) - fz * 1.34,
+          )
+          puff.vx = -fx * .4 + (Math.random() - .5) * .6
+          puff.vy = .55 + drift * .55
+          puff.vz = -fz * .4 + (Math.random() - .5) * .6
+          puff.mesh.scale.setScalar(.55 + drift * .35)
+          puff.mesh.visible = true
+          puff.mat.opacity = Math.min(.52, .22 + drift * .34)
+        }
+      }
+      for (const puff of smokePool) {
+        if (puff.life <= 0) continue
+        puff.life = Math.max(0, puff.life - cdt)
+        const frac = puff.life / puff.maxLife
+        if (frac <= 0) {
+          puff.mesh.visible = false
+          puff.mat.opacity = 0
+        } else {
+          puff.mesh.position.x += puff.vx * cdt
+          puff.mesh.position.y += puff.vy * cdt
+          puff.mesh.position.z += puff.vz * cdt
+          puff.mesh.scale.setScalar(.55 + (1 - frac) * 1.35)
+          puff.mat.opacity = frac * .44
+        }
+      }
 
       lastBraking = state.braking
       lastReversing = state.reversing
-      brakeLampMat.color.setHex(state.braking ? 0xff3b30 : 0x7a1714)
+      lastHandbrake = !!state.handbrake
+      brakeLampMat.color.setHex(state.braking || state.handbrake ? 0xff3b30 : 0x7a1714)
       reverseLampMat.color.setHex(state.reversing ? 0xf8fafc : 0x3b4046)
     },
     probe() {
-      return {roll, pitch, heave, steerAngle, wheelSpin, braking: lastBraking, reversing: lastReversing}
+      let smokeActive = 0
+      for (const p of smokePool) if (p.life > 0) smokeActive++
+      return {roll, pitch, heave, steerAngle, wheelSpin, rearWheelSpin, braking: lastBraking, reversing: lastReversing, handbrake: lastHandbrake, smokeActive}
     },
     dispose() {
+      clearEffects()
       for (const item of disposables) item.dispose()
       for (const g of bodyCache.values()) g.dispose()
+      smokeGroup.removeFromParent()
       root.removeFromParent()
     },
   }

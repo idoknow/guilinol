@@ -142,7 +142,20 @@ async function start() {
   modeButton.addEventListener('touchstart',()=>void prefetchWalk(),{passive:true})
   function showMode(){const walking=!!walker?.active;document.body.dataset.mode=walking?'walk':'fly'
     modeButton.textContent=walking?'起飞':'落地步行';modeButton.setAttribute('aria-label',walking?'切换到飞行':'切换到步行')
-    hint.textContent=walking?'WASD 走 · Shift 跑 · 空格 跳 · 拖动转视角 · 滚轮远近 · V 起飞 · M 地图 · J 景册 · P 拍照 · Esc 菜单':'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · M 地图 · J 景册 · P 拍照 · Esc 菜单'}
+    const ride=document.body.dataset.ride
+    if(walking&&document.body.hasAttribute('data-aboard')&&ride==='car'){
+      hint.textContent='WASD 驾驶 · Space 手刹漂移 · 1-3/Q·E 切模式 · F 下车 · 拖动转视角 · C 视距 · V 起飞'
+    }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='bike'){
+      hint.textContent='WASD 骑行 · 1-4/Q·E 换挡 · Space 翘头/起身 · Shift 压弯 · G 改装 · F 下车 · V 起飞'
+    }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='bicycle'){
+      hint.textContent='WASD 骑行 · 1-3/Q·E 换挡 · Space 翘头/起身 · Shift 压弯 · F 下车 · V 起飞'
+    }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='boat'){
+      hint.textContent='WASD 划船 · F 靠岸下船 · 拖动转视角 · 滚轮远近 · V 起飞'
+    }else{
+      hint.textContent=walking?'WASD 走 · Shift 跑 · 空格 跳 · 拖动转视角 · 滚轮远近 · V 起飞 · M 地图 · J 景册 · P 拍照 · Esc 菜单':'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · M 地图 · J 景册 · P 拍照 · Esc 菜单'
+    }
+  }
+  new MutationObserver(()=>showMode()).observe(document.body,{attributes:true,attributeFilter:['data-aboard','data-ride']})
   let toastTimer=0
   const showToast=(text:string,ms=3200)=>{toast.textContent=text;toast.classList.add('show')
     clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>toast.classList.remove('show'),ms)}

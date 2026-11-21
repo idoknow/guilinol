@@ -3,7 +3,8 @@ import type {Stream} from '../stream'
 import {fetchAsset} from '../world'
 import {createFreeBoats,type MooringSlot} from './boat'
 import type {createPhysics} from './physics'
-import {createCarControl} from './car'
+import {createCarControl, type CarDynamicTelemetry, type CarStepControl} from './car'
+import type {CarDriveMode} from './config'
 import {
   resolveEbikeKind,
   type EbikeTier,
@@ -205,7 +206,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     if(disembark||next<0){if(land(x,z))reset();return}
     if(next>=0){mesh.position.fromArray(leg.path[0]);route=next;segment=1}
   }
-  return {nearby,advance,get car(){return car},get bike(){return bike},get rideKind():RideKind|null{return bike?bikeCtrl.kind:null},get vehicleType():EbikeVehicleType|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.vehicleType:null},get isShared(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.isShared:false},get ebikeTier():EbikeTier|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.tier:null},get ebikeGear(){return bike?bikeCtrl.gear:2},get ebikeBattery(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.batteryPct:100},get ebikeTelemetry():EbikeDynamicTelemetry|null{return bike?bikeCtrl.telemetry():null},get boat(){return freeBoats?.boat??(route>=0?vessels[route]:null)},get freeBoat(){return freeBoats?.boat??null},get freeKind(){return freeBoats?.boatKind??null},get boatSeatOffset(){return freeBoats?.active?freeBoats.seatOffset:(route>=0&&vessels[route].name==='raft'?-.44:-.18)},get heading(){return car?carCtrl.heading:bike?bikeCtrl.heading:freeBoats?.active?freeBoats.heading:heading},get speed(){return car?carCtrl.speed:bike?bikeCtrl.speed:freeBoats?.active?freeBoats.speed:0},
+  return {nearby,advance,get car(){return car},get bike(){return bike},get rideKind():RideKind|null{return bike?bikeCtrl.kind:null},get vehicleType():EbikeVehicleType|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.vehicleType:null},get isShared(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.isShared:false},get ebikeTier():EbikeTier|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.tier:null},get ebikeGear(){return bike?bikeCtrl.gear:2},get ebikeBattery(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.batteryPct:100},get ebikeTelemetry():EbikeDynamicTelemetry|null{return bike?bikeCtrl.telemetry():null},get carTelemetry():CarDynamicTelemetry|null{return car?carCtrl.telemetry():null},get carVelX(){return carCtrl.velX},get carVelZ(){return carCtrl.velZ},get carRoll(){return carCtrl.roll},get carDynPitch(){return carCtrl.dynPitch},get carDrift(){return carCtrl.driftIntensity},get carHandbrake(){return carCtrl.handbrake},get boat(){return freeBoats?.boat??(route>=0?vessels[route]:null)},get freeBoat(){return freeBoats?.boat??null},get freeKind(){return freeBoats?.boatKind??null},get boatSeatOffset(){return freeBoats?.active?freeBoats.seatOffset:(route>=0&&vessels[route].name==='raft'?-.44:-.18)},get heading(){return car?carCtrl.heading:bike?bikeCtrl.heading:freeBoats?.active?freeBoats.heading:heading},get speed(){return car?carCtrl.speed:bike?bikeCtrl.speed:freeBoats?.active?freeBoats.speed:0},
     get lean(){return bikeCtrl.lean},get pitch(){return car?carCtrl.pitch:bikeCtrl.pitch},get steerInput(){return car?carCtrl.steerInput:bikeCtrl.steerInput},
     get bikePitch(){return lastBike?.rotation.x??0},get bikeY(){return lastBike?.position.y??0},
     get carPitch(){return lastCar?.rotation.x??0},get carY(){return lastCar?.position.y??0},
@@ -215,6 +216,11 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     capSpeed(step:number,limit:number){return bikeCtrl.capSpeed(step,limit)},
     setPitch(frontY:number|undefined,backY:number|undefined,dt:number){bikeCtrl.setPitch(frontY,backY,dt)},
     setCarPitch(frontY:number|undefined,backY:number|undefined,dt:number){carCtrl.setPitch(frontY,backY,dt)},
+    setCarMode(mode:CarDriveMode){return carCtrl.setMode(mode)},
+    setCarModeByIndex(idx:number){return carCtrl.setModeByIndex(idx)},
+    shiftCarMode(delta:number){return carCtrl.shiftMode(delta)},
+    setCarGtaPhysics(on:boolean){carCtrl.setGtaPhysics(on)},
+    consumeCarImpact(){return carCtrl.consumeImpactPulse()},
     setEbikeGear(gear:number){return bike?bikeCtrl.setGear(gear):2},
     shiftEbikeGear(delta:number){return bike?bikeCtrl.shiftGear(delta):2},
     resetEbikeGearOnRecover(){return bike?bikeCtrl.resetGearToCompliant():2},
@@ -247,7 +253,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     resolveMove(ctx:Parameters<typeof bikeCtrl.resolveMove>[0]){return bikeCtrl.resolveMove(ctx)},
     resolveCarMove(ctx:Parameters<typeof carCtrl.resolveMove>[0]){return carCtrl.resolveMove(ctx)},
     steer(forward:number,right:number,dt:number,mounted=true,control?:EbikeStepControl){const spd=bikeCtrl.steer(forward,right,dt,mounted,control);if(bike&&bikeCtrl.kind==='bike')bike.userData.battery=bikeCtrl.batteryPct;return spd},
-    steerCar(forward:number,right:number,dt:number,mounted=true){return carCtrl.steer(forward,right,dt,mounted)},
+    steerCar(forward:number,right:number,dt:number,mounted=true,control?:CarStepControl){return carCtrl.steer(forward,right,dt,mounted,control)},
     steerBoat(forward:number,right:number,dt:number){freeBoats?.steer(forward,right,dt)},
     poseBoat(figure:T.Group,forward:number,right:number,dt:number){freeBoats?.pose(figure,forward,right,dt)},
     clearBoatPose(figure:T.Group){freeBoats?.clearPoseJoints(figure)},

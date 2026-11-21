@@ -1,9 +1,48 @@
 import R from '@dimforge/rapier3d-compat'
 import * as T from 'three'
-import {carConfig as ccfg, walkConfig as wcfg} from './config'
+import {
+  CAR_DRIVE_MODE_ORDER,
+  carConfig as ccfg,
+  carDriveModes,
+  walkConfig as wcfg,
+  type CarDriveMode,
+} from './config'
 import type {DismountContext, MountCheckResult} from './ride'
 
 type Kind = 'ground'|'overview'|'road'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
+
+export interface CarStepControl {
+  handbrake?: boolean
+}
+
+export interface CarDynamicTelemetry {
+  mode: CarDriveMode
+  modeIndex: number
+  modeLabel: string
+  maxKmh: number
+  gear: number
+  gearLabel: string
+  rpm: number
+  rpmRatio: number
+  speed: number
+  kmh: number
+  vLong: number
+  vLat: number
+  velX: number
+  velZ: number
+  yawRate: number
+  slipAngle: number
+  driftIntensity: number
+  handbrake: boolean
+  braking: boolean
+  reversing: boolean
+  shifting: boolean
+  dynRoll: number
+  dynPitch: number
+  impactStrength: number
+  damage: number
+  gtaPhysics: boolean
+}
 
 export interface CarMoveContext {
   pos: {x:number; y:number; z:number}
@@ -111,91 +150,336 @@ export function probeCarMount(ctx: DismountContext, px: number, py: number, pz: 
   return {ok: true, x: cx, y: support.y + wcfg.height / 2 + .055, z: cz, bikeY: support.y, shifted: false}
 }
 
-/** Kinematic bicycle-model car controller (40 km/h max, no zero-speed pivot spin, -12 km/h delayed reverse, motorway confinement). */
+/** GTA-grade 2D planar car controller: 5-speed auto transmission, 3 drive modes (40/75/108 km/h), handbrake powerslide drift, dynamic weight transfer, and momentum rebound. */
 export function createCarControl() {
-  let speed = 0, heading = 0, roll = 0, pitch = 0, steerInput = 0, revHold = 0
+  let vx = 0, vz = 0, vLong = 0, vLat = 0, yawRate = 0
+  let heading = 0, roll = 0, pitch = 0, dynPitch = 0, steerInput = 0, revHold = 0
   let onMotor = false, offRoadHold = 0, lastToastAt = -1e9
+  let mode: CarDriveMode = 'street', gtaPhysics = true
+  let gear = 1, rpm = 900, shiftTimer = 0
+  let handbrake = false, braking = false, slipAngle = 0, driftIntensity = 0
+  let impactStrength = 0, damage = 0, reboundTimer = 0, lastImpactPulse = 0
+
+  function modeSpec() {
+    return carDriveModes[mode]
+  }
+
+  function maxSpeedMs() {
+    return modeSpec().maxKmh / 3.6
+  }
+
+  function reverseCapMs() {
+    return gtaPhysics ? ccfg.reverseMax : -12 / 3.6
+  }
+
+  function updateGearAndRpm(cdt: number, throttle: number) {
+    const absKmh = Math.abs(vLong) * 3.6
+    if (vLong < -.12) {
+      gear = -1
+      rpm = T.MathUtils.damp(rpm, 1100 + Math.min(1, absKmh / 16) * 3400, 10, cdt)
+      shiftTimer = Math.max(0, shiftTimer - cdt)
+      return
+    }
+    if (absKmh < .35 && throttle <= .05) {
+      gear = 0
+      rpm = T.MathUtils.damp(rpm, 850, 9, cdt)
+      shiftTimer = Math.max(0, shiftTimer - cdt)
+      return
+    }
+    const thresholds = ccfg.gearUpshiftKmh
+    let targetGear = 1
+    for (let i = 0; i < thresholds.length; i++) {
+      const hyster = gear > i + 1 ? -3.0 : 0
+      if (absKmh >= thresholds[i] + hyster) targetGear = i + 2
+    }
+    const modeMaxGear = mode === 'cruise' ? 3 : mode === 'street' ? 4 : 5
+    targetGear = Math.min(modeMaxGear, Math.max(1, targetGear))
+    if (gear > 0 && targetGear > gear) shiftTimer = .095
+    gear = targetGear
+    shiftTimer = Math.max(0, shiftTimer - cdt)
+
+    const low = gear <= 1 ? 0 : thresholds[gear - 2] * .72
+    const high = gear >= thresholds.length + 1 ? modeSpec().maxKmh : Math.min(modeSpec().maxKmh, thresholds[gear - 1] * 1.08)
+    const span = Math.max(6, high - low)
+    const frac = T.MathUtils.clamp((absKmh - low) / span, 0, 1)
+    const targetRpm = 1150 + frac * 5250 + (handbrake && throttle > .1 ? 850 : 0) - (shiftTimer > 0 ? 700 : 0)
+    rpm = T.MathUtils.damp(rpm, T.MathUtils.clamp(targetRpm, 850, 6800), 12, cdt)
+  }
+
+  function syncWorldVel() {
+    const fx = -Math.sin(heading), fz = -Math.cos(heading)
+    const rx = Math.cos(heading), rz = -Math.sin(heading)
+    vx = fx * vLong + rx * vLat
+    vz = fz * vLong + rz * vLat
+  }
 
   function reset() {
-    speed = roll = pitch = steerInput = revHold = offRoadHold = 0
-    onMotor = false
+    vx = vz = vLong = vLat = yawRate = 0
+    roll = pitch = dynPitch = steerInput = revHold = offRoadHold = 0
+    onMotor = handbrake = braking = false
+    gear = 1; rpm = 900; shiftTimer = 0
+    slipAngle = driftIntensity = impactStrength = reboundTimer = lastImpactPulse = 0
+  }
+
+  function gearLabel() {
+    if (gear < 0) return 'R'
+    if (gear === 0) return 'N'
+    return `D${gear}`
+  }
+
+  function setMode(next: CarDriveMode) {
+    mode = carDriveModes[next] ? next : 'street'
+    return mode
+  }
+
+  function setModeByIndex(index: number) {
+    const clamped = Math.max(0, Math.min(CAR_DRIVE_MODE_ORDER.length - 1, Math.round(index) - 1))
+    mode = CAR_DRIVE_MODE_ORDER[clamped]
+    return mode
+  }
+
+  function shiftMode(delta: number) {
+    const idx = CAR_DRIVE_MODE_ORDER.indexOf(mode)
+    const nextIdx = Math.max(0, Math.min(CAR_DRIVE_MODE_ORDER.length - 1, idx + Math.sign(delta)))
+    mode = CAR_DRIVE_MODE_ORDER[nextIdx]
+    return mode
+  }
+
+  function telemetry(): CarDynamicTelemetry {
+    const spec = modeSpec()
+    return {
+      mode,
+      modeIndex: CAR_DRIVE_MODE_ORDER.indexOf(mode) + 1,
+      modeLabel: spec.label,
+      maxKmh: spec.maxKmh,
+      gear,
+      gearLabel: gearLabel(),
+      rpm: Math.round(rpm),
+      rpmRatio: T.MathUtils.clamp((rpm - 850) / (6800 - 850), 0, 1),
+      speed: vLong,
+      kmh: Math.round(Math.hypot(vx, vz) * 3.6),
+      vLong,
+      vLat,
+      velX: vx,
+      velZ: vz,
+      yawRate,
+      slipAngle,
+      driftIntensity,
+      handbrake,
+      braking,
+      reversing: vLong < -.05,
+      shifting: shiftTimer > 0,
+      dynRoll: roll,
+      dynPitch,
+      impactStrength,
+      damage,
+      gtaPhysics,
+    }
   }
 
   return {
-    get speed() { return speed },
+    get speed() { return vLong },
+    get velX() { return vx },
+    get velZ() { return vz },
+    get vLat() { return vLat },
+    get yawRate() { return yawRate },
     get heading() { return heading },
     get roll() { return roll },
     get pitch() { return pitch },
+    get dynPitch() { return dynPitch },
     get steerInput() { return steerInput },
-    mount(yaw: number, initialPitch = 0) {
+    get handbrake() { return handbrake },
+    get braking() { return braking },
+    get driftIntensity() { return driftIntensity },
+    get slipAngle() { return slipAngle },
+    get impactStrength() { return impactStrength },
+    get mode() { return mode },
+    get gear() { return gear },
+    get rpm() { return rpm },
+    setMode,
+    setModeByIndex,
+    shiftMode,
+    setGtaPhysics(on: boolean) {
+      gtaPhysics = on
+      if (!on) mode = 'cruise'
+    },
+    consumeImpactPulse() {
+      const p = lastImpactPulse
+      lastImpactPulse = 0
+      return p
+    },
+    telemetry,
+    mount(yaw: number, initialPitch = 0, options?: {mode?: CarDriveMode; gtaPhysics?: boolean}) {
       heading = yaw
+      if (options?.gtaPhysics !== undefined) gtaPhysics = options.gtaPhysics
+      if (options?.mode !== undefined) mode = options.mode
       reset()
       pitch = initialPitch
+      damage = 0
     },
-    stop() { speed = 0 },
+    stop() {
+      vx = vz = vLong = vLat = yawRate = 0
+      driftIntensity = slipAngle = 0
+    },
     reset,
     dampSpeed(step: number) {
-      speed *= Math.max(0, 1 - ccfg.slideDamp * step)
-      return speed
+      const k = Math.max(0, 1 - ccfg.slideDamp * step)
+      vLong *= k
+      vLat *= Math.max(0, 1 - ccfg.slideDamp * 1.4 * step)
+      syncWorldVel()
+      return vLong
     },
-    steer(forward: number, right: number, dt: number, mounted = true) {
+    steer(forward: number, right: number, dt: number, mounted = true, control?: CarStepControl) {
       const cdt = Math.min(.12, Math.max(0, dt))
+      impactStrength = Math.max(0, impactStrength - 2.6 * cdt)
+      reboundTimer = Math.max(0, reboundTimer - cdt)
       if (!mounted) {
         revHold = 0
+        handbrake = false
+        braking = false
         steerInput = T.MathUtils.damp(steerInput, 0, ccfg.steerDamp, cdt)
         roll = T.MathUtils.damp(roll, 0, ccfg.rollDamp, cdt)
+        dynPitch = T.MathUtils.damp(dynPitch, 0, 10, cdt)
+        updateGearAndRpm(cdt, 0)
         return 0
       }
+
       const uFwd = deadzone(T.MathUtils.clamp(forward, -1, 1), ccfg.stickDeadFwd)
       const uTurn = deadzone(T.MathUtils.clamp(right, -1, 1), ccfg.stickDeadTurn)
       steerInput = T.MathUtils.damp(steerInput, uTurn, ccfg.steerDamp, cdt)
+      handbrake = !!control?.handbrake
 
+      const fx = -Math.sin(heading), fz = -Math.cos(heading)
+      const rx = Math.cos(heading), rz = -Math.sin(heading)
+      vLong = vx * fx + vz * fz
+      vLat = vx * rx + vz * rz
+
+      const prevVLong = vLong
+      const spec = modeSpec()
+      const capMs = maxSpeedMs()
+      const revCap = reverseCapMs()
       const uphillSin = Math.max(0, Math.sin(pitch) - .015)
-      if (uFwd > .05) {
+      const downhillSin = Math.max(0, -Math.sin(pitch) - .015)
+
+      braking = false
+      if (reboundTimer > 0) {
+        vLong *= Math.max(0, 1 - 5.2 * cdt)
+        vLat *= Math.max(0, 1 - 6.5 * cdt)
+      } else if (uFwd > .05) {
         revHold = 0
-        if (speed < 0) {
-          speed = Math.min(0, speed + ccfg.brake * uFwd * cdt)
+        if (vLong < -.05) {
+          braking = true
+          vLong = Math.min(0, vLong + ccfg.brake * uFwd * cdt)
         } else {
-          const ratio = Math.max(0, speed) / ccfg.maxSpeed
-          const drive = ccfg.accel * (1 - ccfg.torqueDecay * Math.pow(ratio, ccfg.torquePow)) * uFwd
-          const gravLoss = uphillSin > 0 ? Math.min(drive * .45, 5.5 * uphillSin) : 0
-          speed = Math.min(ccfg.maxSpeed, speed + (drive - gravLoss) * cdt)
+          const ratio = T.MathUtils.clamp(Math.max(0, vLong) / capMs, 0, 1.15)
+          const gearMul = gtaPhysics ? (ccfg.gearTorque[Math.max(0, Math.min(4, gear - 1))] ?? 1) : 1
+          const shiftDip = gtaPhysics && shiftTimer > 0 ? .45 : 1
+          const modeAccel = gtaPhysics ? ccfg.accel * spec.accelScale : 5.2
+          const drive = modeAccel * gearMul * shiftDip * (1 - ccfg.torqueDecay * Math.pow(Math.min(1, ratio), ccfg.torquePow)) * uFwd
+          const gravLoss = uphillSin > 0 ? Math.min(drive * .45, 5.5 * uphillSin) : -Math.min(2.2, 4.0 * downhillSin)
+          const hbDrag = handbrake ? ccfg.handbrakeDrag * .65 : 0
+          const nextSpd = vLong + (drive - gravLoss - hbDrag) * cdt
+          vLong = nextSpd <= capMs ? Math.max(0, nextSpd) : T.MathUtils.damp(vLong, capMs, 3.5, cdt)
         }
       } else if (uFwd < -.05) {
-        if (speed > .05) {
+        if (vLong > .05) {
           revHold = 0
-          speed = Math.max(0, speed + ccfg.brake * uFwd * cdt)
-        } else if (speed < -.01) {
+          braking = true
+          vLong = Math.max(0, vLong + ccfg.brake * uFwd * cdt)
+        } else if (vLong < -.01) {
           revHold = ccfg.revHold
-          speed = T.MathUtils.clamp(speed + ccfg.revAccel * uFwd * cdt, ccfg.reverseMax, 0)
+          vLong = T.MathUtils.clamp(vLong + ccfg.revAccel * uFwd * cdt, revCap, 0)
         } else {
           revHold += cdt
           if (revHold >= ccfg.revHold) {
-            speed = T.MathUtils.clamp(speed + ccfg.revAccel * uFwd * cdt, ccfg.reverseMax, 0)
+            vLong = T.MathUtils.clamp(vLong + ccfg.revAccel * uFwd * cdt, revCap, 0)
           } else {
-            speed = 0
+            vLong = 0
           }
         }
       } else {
         revHold = 0
-        if (speed > 0) speed = Math.max(0, speed - (ccfg.rollDrag + ccfg.aeroDrag * speed + (uphillSin > 0 ? 4.5 * uphillSin : 0)) * cdt)
-        else if (speed < 0) speed = Math.min(0, speed + (ccfg.rollDrag * 1.8 - ccfg.aeroDrag * speed) * cdt)
+        const drag = (ccfg.rollDrag + ccfg.aeroDrag * vLong * vLong + (handbrake ? ccfg.handbrakeDrag : 0))
+        if (vLong > 0) vLong = Math.max(0, vLong - (drag + (uphillSin > 0 ? 4.5 * uphillSin : 0)) * cdt)
+        else if (vLong < 0) vLong = Math.min(0, vLong + (drag * 1.6) * cdt)
+      }
+      if (handbrake && Math.abs(vLong) > .25) {
+        braking = true
+        if (uFwd <= .05) {
+          const sign = Math.sign(vLong)
+          vLong = sign * Math.max(0, Math.abs(vLong) - ccfg.handbrakeDrag * .55 * cdt)
+        }
       }
 
-      // Kinematic bicycle steering: zero pivot turn at standstill, R_min = wheelbase / tan(maxSteerAngle) ~ 4.85m.
-      let omega = 0
-      if (Math.abs(speed) > .015) {
-        const spdRatio = Math.min(1, Math.abs(speed) / ccfg.maxSpeed)
-        const effSteer = ccfg.maxSteerAngle / (1 + ccfg.speedSteer * spdRatio * spdRatio)
-        omega = (speed / ccfg.wheelbase) * Math.tan(steerInput * effSteer)
-        heading -= omega * cdt
+      const planarSpd = Math.hypot(vLong, vLat)
+      if (planarSpd <= .015) {
+        vLong = 0; vLat = 0; yawRate = 0; slipAngle = 0; driftIntensity = 0
+      } else {
+        const spdRatio = Math.min(1, Math.abs(vLong) / Math.max(11.11, capMs))
+        const steerScale = gtaPhysics ? ccfg.speedSteer : 2.2
+        const effSteer = ccfg.maxSteerAngle / (1 + steerScale * spdRatio * spdRatio)
+        const ackermannOmega = (vLong / ccfg.wheelbase) * Math.tan(steerInput * effSteer)
+
+        if (!gtaPhysics || (Math.abs(vLong) < 4.5 && !handbrake)) {
+          // Crisp low-speed Ackermann steering: exact turning radius [4.6, 6.2]m & reverse sign.
+          yawRate = ackermannOmega
+          heading -= yawRate * cdt
+          vLat = T.MathUtils.damp(vLat, 0, 14, cdt)
+        } else {
+          // GTA planar yaw + rear tire slip & handbrake powerslide dynamics.
+          const speedGate = T.MathUtils.clamp((Math.abs(vLong) - 3.5) / 9.5, 0, 1)
+          const hbOversteer = handbrake && vLong > 2.2
+            ? steerInput * ccfg.driftYawBoost * spec.driftSlipGain * Math.min(1, vLong / 10.5)
+            : 0
+          const counterRestore = !handbrake && Math.abs(vLat) > .45
+            ? T.MathUtils.clamp((vLat / Math.max(4, Math.abs(vLong))) * ccfg.driftCounterAssist, -1.2, 1.2)
+            : 0
+          const targetYaw = ackermannOmega * (handbrake ? 1.26 : 1.0) + hbOversteer - counterRestore
+          yawRate = T.MathUtils.damp(yawRate, targetYaw, handbrake ? 7.2 : ccfg.yawDamp, cdt)
+          heading -= yawRate * cdt
+
+          // Re-project inertial planar velocity onto rotated car basis, then apply lateral tire grip.
+          const nfx = -Math.sin(heading), nfz = -Math.cos(heading)
+          const nrx = Math.cos(heading), nrz = -Math.sin(heading)
+          // Preserve longitudinal delta while carrying inertia laterally through the turn.
+          const carryX = fx * vLong + rx * vLat
+          const carryZ = fz * vLong + rz * vLat
+          const projLong = carryX * nfx + carryZ * nfz
+          let projLat = carryX * nrx + carryZ * nrz
+
+          // High-speed aggressive steering or handbrake induces controlled tail slip.
+          const slipInject = (handbrake ? 2.85 : .68 * speedGate) * spec.driftSlipGain * Math.max(0, vLong) * yawRate * cdt
+          projLat += slipInject
+
+          const grip = handbrake
+            ? ccfg.handbrakeRearGrip
+            : Math.max(5.0, ccfg.rearGrip - speedGate * 3.2 * (Math.abs(steerInput) > .65 ? 1.15 : .6))
+          const latDamp = Math.exp(-grip * cdt)
+          vLat = T.MathUtils.clamp(projLat * latDamp, -Math.max(4.5, Math.abs(vLong) * .68), Math.max(4.5, Math.abs(vLong) * .68))
+          vLong = T.MathUtils.clamp(projLong, revCap, capMs)
+        }
+        slipAngle = Math.atan2(vLat, Math.max(1.5, Math.abs(vLong)))
+        const rawDrift = gtaPhysics
+          ? T.MathUtils.clamp(((Math.abs(slipAngle) - .10) / .38) * T.MathUtils.clamp((planarSpd - 3.0) / 5.0, 0, 1) + (handbrake && planarSpd > 3.2 && Math.abs(steerInput) > .2 ? .32 : 0), 0, 1)
+          : 0
+        driftIntensity = T.MathUtils.damp(driftIntensity, rawDrift, 9, cdt)
       }
 
-      // Subtle outward centrifugal body roll (opposite to 2-wheel lean).
-      const latAccel = speed * omega
-      const targetRoll = T.MathUtils.clamp((latAccel / 8.5) * ccfg.bodyRollMax, -ccfg.bodyRollMax, ccfg.bodyRollMax)
+      syncWorldVel()
+      updateGearAndRpm(cdt, uFwd)
+
+      // Weight transfer: outward centrifugal roll + brake nose-dive / launch squat pitch.
+      const latAccel = vLong * yawRate + vLat * 1.4
+      const maxRoll = gtaPhysics ? ccfg.bodyRollMax : .035
+      const targetRoll = T.MathUtils.clamp((latAccel / 9.0) * maxRoll, -maxRoll, maxRoll)
       roll = T.MathUtils.damp(roll, targetRoll, ccfg.rollDamp, cdt)
-      return speed
+
+      const longAccel = cdt > 1e-4 ? T.MathUtils.clamp((vLong - prevVLong) / cdt, -16, 16) : 0
+      const targetDynPitch = gtaPhysics
+        ? T.MathUtils.clamp(longAccel * .0054 - (handbrake && vLong > 2 ? .018 : 0), -ccfg.dynPitchMax, ccfg.dynPitchMax * .82)
+        : 0
+      dynPitch = T.MathUtils.damp(dynPitch, targetDynPitch, 10.5, cdt)
+      return vLong
     },
     setPitch(frontY: number | undefined, backY: number | undefined, dt: number) {
       const target = frontY !== undefined && backY !== undefined && Math.abs(frontY - backY) < 1.1
@@ -218,23 +502,43 @@ export function createCarControl() {
         )
       }
 
+      const handleImpact = (reason: 'building' | 'collision') => {
+        const hitSpd = Math.hypot(vx, vz) || Math.abs(ctx.speed)
+        ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z
+        if (hitSpd > 1.8) {
+          const pulse = T.MathUtils.clamp(hitSpd / 11.5, .2, 2.2)
+          impactStrength = Math.max(impactStrength, pulse)
+          lastImpactPulse = Math.max(lastImpactPulse, pulse)
+          if (gtaPhysics && hitSpd > 3.5) {
+            damage = Math.min(1, damage + Math.min(.22, (hitSpd - 3.5) * .018))
+          }
+        }
+        if (gtaPhysics && hitSpd >= ccfg.reboundMinSpeed && reboundTimer <= 0) {
+          // Real momentum rebound instead of instant brick-wall freeze.
+          const bounce = Math.min(3.4, hitSpd * ccfg.reboundRestitution)
+          vLong = -sign * bounce
+          vLat *= -.35
+          yawRate += (Math.abs(vLat) > .3 ? Math.sign(vLat) : (steerInput >= 0 ? 1 : -1)) * Math.min(1.4, hitSpd * .08)
+          reboundTimer = ccfg.reboundDuration
+          syncWorldVel()
+          return {blocked: true, reason, speed: vLong}
+        }
+        ctx.stopCar()
+        return {blocked: true, reason, speed: 0}
+      }
+
       if (Math.abs(ctx.speed) > 1e-4 && leadHouseHit(ctx.next.x, ctx.next.z)) {
-        ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z; ctx.stopCar()
-        return {blocked: true, reason: 'building', speed: 0}
+        return handleImpact('building')
       }
 
       if (Math.abs(ctx.speed) > 1e-4 && ctx.carBlockedAt(ctx.next.x, footY, ctx.next.z, ctx.heading, sign)) {
         const hit = ctx.collisionKind(fwdX * sign, fwdZ * sign) || (leadHouseHit(ctx.next.x + fwdX * sign * .3, ctx.next.z + fwdZ * sign * .3) ? 'building' : 'collision')
-        ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z; ctx.stopCar()
-        return {blocked: true, reason: hit, speed: 0}
+        return handleImpact(hit)
       }
 
       if (Math.hypot(ctx.move.x, ctx.move.z) < Math.abs(ctx.speed) * ctx.step * .35) {
         const hit = ctx.collisionKind(fwdX * sign, fwdZ * sign)
-        if (hit) {
-          ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z; ctx.stopCar()
-          return {blocked: true, reason: hit, speed: 0}
-        }
+        if (hit) return handleImpact(hit)
       }
 
       const motorScore = (cx: number, cz: number) => {
