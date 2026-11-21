@@ -1,3 +1,4 @@
+import {checkOverlaps} from './mobile-hud-baseline.mjs'
 import {enableStickInput} from './joystick-fixture.mjs'
 import assert from 'node:assert/strict'
 import {copyFile, mkdir, readFile} from 'node:fs/promises'
@@ -403,7 +404,7 @@ try {
     const btnText = document.querySelector('.vehicle-action')?.textContent
     const jumpHidden = getComputedStyle(document.querySelector('.walk-ui .btn-jump')).display === 'none'
     const runHidden = !document.querySelector('.walk-ui .btn-run')?.getClientRects().length
-    const sels = ['.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.btn-menu', '.account-entry']
+    const sels = ['.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action', '.hud-dev', '.dock', '.sky-ui', 'output', '.btn-menu', '.account-entry']
     const boxes = sels.map(sel => {
       const el = document.querySelector(sel)
       if (!el) return null
@@ -417,7 +418,7 @@ try {
       const a = boxes[i], b = boxes[j]
       const ox = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left))
       const oy = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top))
-      if (ox * oy > 0) overlaps.push({a: a.sel, b: b.sel, area: +(ox * oy).toFixed(1)})
+      if (ox * oy > 0) overlaps.push({a: a.sel, b: b.sel, area: ox * oy})
     }
     const jr = joy.getBoundingClientRect(), cx = jr.left + jr.width / 2, cy = jr.top + jr.height / 2
     const pos0 = walk.position.clone(), h0 = walk.heading
@@ -430,7 +431,7 @@ try {
   })
   console.log('mobile car check:', mobileCarCheck)
   assert(mobileCarCheck.vehicle === 'car' && mobileCarCheck.btnText === '下车' && mobileCarCheck.jumpHidden && mobileCarCheck.runHidden, `mobile car state bad: ${JSON.stringify(mobileCarCheck)}`)
-  assert.deepEqual(mobileCarCheck.overlaps, [], `mobile car HUD overlap: ${JSON.stringify(mobileCarCheck)}`)
+  checkOverlaps(mobileCarCheck.overlaps)
   assert(mobileCarCheck.dist > 1.2 && mobileCarCheck.spd > 2.5 && mobileCarCheck.dh > .04, `mobile stick car drive failed: ${JSON.stringify(mobileCarCheck)}`)
   await saveShot(mPage, 'car-mobile-driving')
   await mPage.close()

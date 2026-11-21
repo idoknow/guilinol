@@ -1,3 +1,4 @@
+import {checkBounds, checkOverlaps} from './mobile-hud-baseline.mjs'
 import {enableStickInput} from './joystick-fixture.mjs'
 import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
@@ -1037,10 +1038,10 @@ try {
             : sel
           return {
             sel: label,
-            left: +r.left.toFixed(1),
-            top: +r.top.toFixed(1),
-            right: +r.right.toFixed(1),
-            bottom: +r.bottom.toFixed(1),
+            left: r.left,
+            top: r.top,
+            right: r.right,
+            bottom: r.bottom,
           }
         })
       }).filter(Boolean)
@@ -1050,7 +1051,7 @@ try {
           const a = boxes[i], b = boxes[j]
           const ox = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left))
           const oy = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top))
-          if (ox * oy > 0) overlaps.push({a: a.sel, b: b.sel, area: +(ox * oy).toFixed(1)})
+          if (ox * oy > 0) overlaps.push({a: a.sel, b: b.sel, area: ox * oy})
         }
       }
       const outOfBounds = boxes.filter(b => b.left < 0 || b.top < 0 || b.right > 390.5 || b.bottom > 844.5)
@@ -1060,18 +1061,18 @@ try {
 
   const preHud = await measureHud(mobile, [
     '.walk-ui .joystick', '.walk-ui .btn-run', '.walk-ui .btn-jump',
-    '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.btn-menu', '.account-entry',
+    '.walk-ui .btn-view', '.vehicle-action', '.hud-dev', '.dock', '.sky-ui', 'output', '.btn-menu', '.account-entry',
   ])
   assert(preHud.boxes.some(b => b.sel === '.vehicle-action'), '手机端自由栈桥旁未显示 .vehicle-action')
   assert(['.btn-menu', '.account-entry'].every(sel => preHud.boxes.some(b => b.sel === sel)), `手机端 .btn-about 未完整覆盖两个按钮: ${JSON.stringify(preHud.boxes)}`)
-  assert.deepEqual(preHud.overlaps, [], `手机端上船前按钮重叠: ${JSON.stringify(preHud)}`)
-  assert.deepEqual(preHud.outOfBounds, [], `手机端上船前按钮出界: ${JSON.stringify(preHud)}`)
+  checkOverlaps(preHud.overlaps)
+  checkBounds(preHud.outOfBounds)
 
   // 触屏点击上船按钮，检查船上按钮不重叠 + 左摇杆划船
   await triggerAction(mobile, FREE_DOCKS.ronghu.label, true)
   const aboardHud = await measureHud(mobile, [
     '.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action',
-    '.dock', '.sky-ui', 'output', '.btn-menu', '.account-entry',
+    '.hud-dev', '.dock', '.sky-ui', 'output', '.btn-menu', '.account-entry',
   ])
   const aboardState = await mobile.evaluate(() => ({
     vehicle: window.viewer.walk.vehicle,
@@ -1083,8 +1084,8 @@ try {
   assert.equal(aboardState.vehicle, 'boat', '手机端点击后应成功上船')
   assert(aboardState.aboardAttr && aboardState.jumpHidden && aboardState.runHidden, `船上状态或跳跑按钮隐藏异常: ${JSON.stringify(aboardState)}`)
   assert(aboardState.actionText.includes('靠岸下船'), `船上按钮文案应含 靠岸下船，实际 ${aboardState.actionText}`)
-  assert.deepEqual(aboardHud.overlaps, [], `手机 390×844 船上按钮重叠: ${JSON.stringify(aboardHud)}`)
-  assert.deepEqual(aboardHud.outOfBounds, [], `手机 390×844 船上按钮出界: ${JSON.stringify(aboardHud)}`)
+  checkOverlaps(aboardHud.overlaps)
+  checkBounds(aboardHud.outOfBounds)
 
   // 左摇杆触控划船
   const stickDrive = await mobile.evaluate(async () => {
@@ -1122,11 +1123,11 @@ try {
   await mobile.waitForSelector('.toast.show', {state: 'visible', timeout: 5000})
   const toastHud = await measureHud(mobile, [
     '.toast.show', '.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action',
-    '.dock', '.sky-ui', 'output', '.btn-menu', '.account-entry',
+    '.hud-dev', '.dock', '.sky-ui', 'output', '.btn-menu', '.account-entry',
   ])
   assert(toastHud.boxes.some(b => b.sel === '.toast.show'), `手机端未测到激活态 .toast.show: ${JSON.stringify(toastHud)}`)
-  assert.deepEqual(toastHud.overlaps, [], `手机 390×844 .toast.show 与 HUD 控件重叠: ${JSON.stringify(toastHud)}`)
-  assert.deepEqual(toastHud.outOfBounds, [], `手机 390×844 .toast.show 出界: ${JSON.stringify(toastHud)}`)
+  checkOverlaps(toastHud.overlaps)
+  checkBounds(toastHud.outOfBounds)
 
   // 触屏划回泊位或靠岸下船
   await runInPage(mobile, async ({steerTo, arg}) => {

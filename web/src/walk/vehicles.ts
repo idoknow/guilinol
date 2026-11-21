@@ -4,6 +4,7 @@ import type {ParkedBike} from '../batch'
 import {fetchAsset} from '../world'
 import {quietIndex} from '../drive/quiet'
 import {updateTravel} from '../game/state'
+import {positionTravelHint} from '../ui/hud-dev'
 import {createFreeBoats,type MooringSlot} from './boat'
 import type {createPhysics} from './physics'
 import {createCarControl} from './car'
@@ -46,6 +47,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
   const interactRing=new T.Mesh(new T.RingGeometry(.86,1.08,32).rotateX(-Math.PI/2),ringMat)
   interactRing.renderOrder=4;interactRing.visible=false;group.add(interactRing)
   const button=document.createElement('button');button.className='vehicle-action';button.setAttribute('aria-keyshortcuts','F');button.hidden=true;document.body.append(button)
+  positionTravelHint(button,'action')
   const bikeCtrl=createBikeControl(),carCtrl=createCarControl()
   let nearDecor:ParkedBike|null=null,riddenDecor:string|null=null
   let bike:T.Mesh|null=null,lastBike:T.Mesh|null=null,car:T.Mesh|null=null,lastCar:T.Mesh|null=null,route=-1,nearBike:T.Mesh|null=null,nearRoute=-1,nearRouteDist=Infinity,segment=1,disembark=false,active=false,heading=0

@@ -21,7 +21,7 @@ installAtmosphere()
 // The title screen (ui/home.ts) pauses the scene while it covers it: no simulation, no draws.
 let paused=false
 export function setPaused(on:boolean){paused=on}
-import {mountDevHud} from './ui/hud-dev'
+import {mountDevHud,positionTravelHint} from './ui/hud-dev'
 async function start() {
   mountDevHud()
   bootProgress('载入地形', 12)
@@ -101,12 +101,14 @@ async function start() {
     modeButton.textContent=walking?'起飞':'落地步行';modeButton.setAttribute('aria-label',walking?'切换到飞行':'切换到步行')
     hint.textContent=walking?'WASD 走 · Shift 跑 · 空格 跳 · 拖动转视角 · 滚轮远近 · V 起飞 · M 地图 · J 景册 · P 拍照 · Esc 菜单':'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · M 地图 · J 景册 · P 拍照 · Esc 菜单'}
   let toastTimer=0
-  const showToast=(text:string,ms=3200)=>{toast.textContent=text;toast.classList.add('show')
-    clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>toast.classList.remove('show'),ms)}
+  let restoreToast:(()=>void)|undefined
+  const showToast=(text:string,ms=3200,travel=false)=>{restoreToast?.();restoreToast=travel?positionTravelHint(toast,'toast'):undefined
+    toast.textContent=text;toast.classList.add('show')
+    clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>{toast.classList.remove('show');restoreToast?.();restoreToast=undefined},ms)}
   window.addEventListener('walk:spawn-failed',()=>showToast('这里没有可以落脚的地方，飞近岸边或街道再试'))
   window.addEventListener('walk:toast',event=>{const detail=(event as CustomEvent<{text?:string;message?:string;ms?:number}|string>).detail
     const text=typeof detail==='string'?detail:detail?.text??detail?.message
-    if(text)showToast(text,typeof detail==='object'&&detail?.ms?detail.ms:2600)})
+    if(text)showToast(text,typeof detail==='object'&&detail?.ms?detail.ms:2600,true)})
   modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton);void touch
   showMode()
   if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,

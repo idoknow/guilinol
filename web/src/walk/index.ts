@@ -550,7 +550,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const pos=sim.body.translation()
       velocity+=(velocity>0?cfg.gravity:cfg.fallGravity)*step
       const stepDx=(aboardGround?wish.x*bikeSpeed:vx)*step, stepDz=(aboardGround?wish.y*bikeSpeed:vz)*step
-      sim.controller.computeColliderMovement(sim.capsule,{x:stepDx,y:velocity*step,z:stepDz})
+      const footY=pos.y-cfg.height/2
+      const bikeDeck=wasBike?sim.surface(pos.x+stepDx,pos.z+stepDz,'deck',footY+.2,.45):null
+      sim.controller.computeColliderMovement(sim.capsule,{x:stepDx,y:velocity*step,z:stepDz},undefined,undefined,
+        bikeDeck?collider=>sim.kinds.get(collider.handle)!=='road':undefined)
       const move=sim.controller.computedMovement(),next={x:pos.x+move.x,y:pos.y+move.y,z:pos.z+move.z}
       if(bridge&&!stream.landmarks.has(bridge)){
         const distance=bridgeDistance(pos.x,pos.z)
