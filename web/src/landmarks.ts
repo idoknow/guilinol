@@ -15,6 +15,29 @@ export interface Landmark {
 }
 export type LoadedLandmarks = Map<Landmark,THREE.Group>
 
+function atlasStreetMesh(source:THREE.Mesh, indices:number[], role:string){
+  const geometry=new THREE.BufferGeometry()
+  const positions=source.geometry.getAttribute('position'), normals=source.geometry.getAttribute('normal')
+  const vertices=[...new Set(indices)]
+  const remap=new Map(vertices.map((vertex,index)=>[vertex,index]))
+  const xyz=new THREE.Float32BufferAttribute(new Float32Array(vertices.length*3),3)
+  const directions=new THREE.Float32BufferAttribute(new Float32Array(vertices.length*3),3)
+  vertices.forEach((vertex,index)=>{
+    xyz.setXYZ(index,positions.getX(vertex),positions.getY(vertex),positions.getZ(vertex))
+    if(normals)directions.setXYZ(index,normals.getX(vertex),normals.getY(vertex),normals.getZ(vertex))
+  })
+  geometry.setAttribute('position',xyz)
+  if(normals)geometry.setAttribute('normal',directions)
+  geometry.setIndex(indices.map(vertex=>remap.get(vertex)!))
+  bindStreetSurface(geometry,role)
+  if(source instanceof THREE.InstancedMesh){
+    const mesh=new THREE.InstancedMesh(geometry,streetSurfaceMat,source.count)
+    mesh.instanceMatrix.copy(source.instanceMatrix)
+    return mesh
+  }
+  return new THREE.Mesh(geometry,streetSurfaceMat)
+}
+
 function batchRepeatedMeshes(root:THREE.Group){
   root.updateMatrixWorld(true)
   for(const name of ['lod0','lod1','lod2']){
@@ -88,20 +111,29 @@ export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,en
         group.position.fromArray(entry.position);group.rotation.y=THREE.MathUtils.degToRad(entry.rotation)
         const surfaces:Record<string,string>=(seamConfig.surfaces as Record<string,Record<string,string>>)[entry.id]??{}
         const exceptions=seamConfig.exceptions.filter((item:{kind?:string})=>!item.kind||item.kind==='material')
-        const atlas=(seamConfig.atlas as Record<string,{material:string,role:string,box:number[]}>)[entry.id]
+        type AtlasRule={material:string,role:string,box:number[]}
+        const atlas=(seamConfig.atlas as Record<string,AtlasRule|AtlasRule[]>)[entry.id]
+        const regions=atlas?[atlas].flat():[]
         group.userData.replacedAssets=new Set()
         group.traverse(node=>{
           if(/^collision/i.test(node.name))node.visible=false
           if(!(node instanceof THREE.Mesh))return
           const original=node.material,kind=surfaces[original.name]
-          if(atlas&&original.name===atlas.material&&!exceptions.some(item=>item.id===entry.id&&item.material===atlas.material)){
-            const {selected,rest}=atlasTriangles(node.geometry,atlas.box,original.map?.repeat.toArray(),original.map?.offset.toArray())
-            if(selected.length){
-              const geometry=node.geometry.clone();group.userData.replacedAssets.add(node.geometry)
-              geometry.setIndex(rest.concat(selected));geometry.clearGroups()
-              geometry.addGroup(0,rest.length,0);geometry.addGroup(rest.length,selected.length,1)
-              bindStreetSurface(geometry,atlas.role);node.geometry=geometry;node.material=[original,streetSurfaceMat]
-              nightLit(original);return
+          if(original===streetSurfaceMat)return
+          const rules=regions.filter(rule=>rule.material===original.name)
+          if(rules.length&&!exceptions.some(item=>item.id===entry.id&&item.material===original.name)){
+            const source=node.geometry
+            let remainder=source
+            for(const rule of rules){
+              const {selected,rest}=atlasTriangles(remainder,rule.box,original.map?.repeat.toArray(),original.map?.offset.toArray())
+              if(!selected.length)continue
+              if(remainder===source){
+                remainder=source.clone()
+                group.userData.replacedAssets.add(source)
+                node.geometry=remainder
+              }
+              node.add(atlasStreetMesh(node,selected,rule.role))
+              remainder.setIndex(rest)
             }
           }
           if(kind&&!exceptions.some(item=>item.id===entry.id&&item.material===original.name)){

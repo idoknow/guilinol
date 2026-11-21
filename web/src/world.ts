@@ -1,3 +1,4 @@
+import {cacheResponse} from './telemetry'
 import * as THREE from 'three'
 import {buildingGeometry,type Building} from './buildings'
 import {loadStreetGeometry} from './street-loader'
@@ -12,6 +13,7 @@ import type {Peaks} from './peaks'
 interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number}
 export interface Manifest {
+  bbox:[number,number,number,number]; builtArea?:{type:'Polygon';coordinates:[number,number][][]}
   landmarks?:import('./landmarks').Landmark[]
   version:number; extent:[number,number,number,number]; grid:number; chunkSize:number; chunks:Tile[];
   peaks:Peaks; atlas:Asset; vehicles?:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset; waterMask?:string}
@@ -19,6 +21,7 @@ export interface Manifest {
 export let bytes = 0
 export async function fetchAsset(file:string, signal?:AbortSignal) {
   const response = await fetch(`./world/${file}`, {signal})
+  cacheResponse(response)
   if (!response.ok) throw Error(`${file}: HTTP ${response.status}`)
   const data = await response.arrayBuffer()
   bytes += data.byteLength

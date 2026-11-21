@@ -284,10 +284,11 @@ async function detail(id: string) {
 async function start() {
   const profile = await api('me')
   if (profile.role !== 'admin') throw new ApiError(403, '无权限')
-  nav.append(' · ', link('统计与用户', '?view=users'), ' · ', link('反馈列表', '?view=feedback'))
+  nav.append(' · ',link('性能遥测','?view=perf'),' · ', link('统计与用户', '?view=users'), ' · ', link('反馈列表', '?view=feedback'))
   main.replaceChildren()
   const id = params.get('id')
-  if (id) await detail(id)
+  if(params.get('view')==='perf') main.append(el('pre',JSON.stringify(await api('admin/perf?group=device'),null,2)))
+  else if (id) await detail(id)
   else await list(params.get('view') !== 'feedback')
 }
 start().catch(failure)

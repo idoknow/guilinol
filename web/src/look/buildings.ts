@@ -20,7 +20,7 @@ buildingMaterial.onBeforeCompile = shader => {
   Object.assign(shader.uniforms, {
     uGlass: {value: hex(b.glass)}, uGlassLit: {value: hex(b.glassLit)}, uTimber: {value: hex(b.timber)},
     uShop: {value: hex(b.shop)}, uLine: {value: b.floorLine}, uWindowLight: windowLight,
-    uSigns: {value: b.signs.map(hex)}, uWarm: {value: hex(b.windowWarm)},
+    uSigns: {value: b.signs.map(hex)}, uNeon: {value: b.neon.map(hex)}, uShopGlow: {value: hex(b.shopGlow)}, uWarm: {value: hex(b.windowWarm)},
   })
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', `#include <common>
@@ -32,13 +32,13 @@ vec4 bw = modelMatrix * vec4(position, 1.); vCell = floor(bw.xz / 23.);`)
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <common>', `#include <common>
 uniform vec3 uGlass; uniform vec3 uGlassLit; uniform vec3 uTimber; uniform vec3 uShop; uniform vec3 uWarm;
-uniform vec3 uSigns[4]; uniform float uLine; uniform float uWindowLight;
+uniform vec3 uSigns[6]; uniform vec3 uNeon[6]; uniform vec3 uShopGlow; uniform float uLine; uniform float uWindowLight;
 varying float vKind; varying float vFloor; varying float vFacade; varying float vRoof; flat varying vec2 vCell;
 float facadeHash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
 float box1(float x, float a, float b) { return step(a, x) * step(x, b); }
-float winMask; float winHash;`)
+float winMask; float winHash; vec3 neonGlow;`)
     .replace('#include <color_fragment>', `#include <color_fragment>
-winMask = 0.; winHash = 0.;
+winMask = 0.; winHash = 0.; neonGlow = vec3(0.);
 if (vRoof < .5) {
   bool old = vKind > .5 && vKind < 1.5, glazed = vKind > 1.5 && vKind < 2.5, school = vKind > 2.5 && vKind < 3.5;
   float bay = old ? 2.8 : glazed ? 2.4 : 3.6;
@@ -55,6 +55,15 @@ if (vRoof < .5) {
     if (h > .8) glass = mix(wall * .78, glass, box1(fl, .34, .62));
   }
   vec3 c = mix(wall, glass, win);
+  // Phase 2 竖招牌: ~1 in 6 street bays carries a vertical lightbox sign over floors 2–4, split into
+  // stacked character boxes; painted by day, neon at night.
+  float bayHash = facadeHash(vec3(bi, 7., vCell.x * 7. + vCell.y * 131.));
+  if (!glazed && !school && vKind < 3.5 && bayHash > .83 && f > 1.15 && f < 3.9) {
+    float blade = box1(bx, .43, .57) * step(.14, fract(f * 2.));
+    int bladeIdx = int(min(5., floor(fract(bayHash * 13.7) * 6.)));
+    c = mix(c, mix(uSigns[bladeIdx], vec3(1.), .12), blade);
+    neonGlow += uNeon[bladeIdx] * blade * 1.5 + uNeon[bladeIdx] * .05;
+  }
   c = mix(c, wall * uLine, 1. - step(.045, fl));                       // slab line at each storey
   vec3 avg = mix(wall, glass, cover) * mix(1., uLine, .045);
   if (f < 0.) { c = wall * .74; avg = c; }                              // plinth below the footprint base
@@ -73,20 +82,26 @@ if (vRoof < .5) {
   }
   else if (fi < .5 && !glazed) {                                        // ground-floor shops (R9)
     float front = box1(fl, .08, .64) * box1(bx, .06, .94);
-    vec3 sign = uSigns[int(min(3., floor(h * 4.)))];
+    int signIdx = int(min(5., floor(fract(h * 7.31) * 6.)));
+    vec3 sign = uSigns[signIdx];
+    float band = box1(fl, .7, .88) * box1(bx, .03, .97) * step(.3, h);
     c = mix(uShop, mix(uGlassLit, uShop, .4), front);
-    c = mix(c, h > .3 ? mix(sign, wall, .15) : wall * .9, box1(fl, .7, .88) * box1(bx, .03, .97));
+    c = mix(c, h > .3 ? mix(sign, wall, .08) : wall * .9, box1(fl, .7, .88) * box1(bx, .03, .97));
     avg = mix(uShop, sign, .25); win = front;
+    // Night: sign band lights as neon (brighter border tube), shopfront glass glows warm white.
+    float tube = band * max(box1(fl, .7, .72) + box1(fl, .86, .88), box1(bx, .03, .05) + box1(bx, .95, .97));
+    neonGlow += uNeon[signIdx] * (band * 1.1 + tube * 2.2) + uShopGlow * front * .6 + uNeon[signIdx] * .12;
   }
   float fw = max(fwidth(u), fwidth(f));
+  neonGlow *= 1. - .8 * smoothstep(.18, .45, fw);                      // far blocks: soft average glow, no shimmer
   diffuseColor.rgb = mix(c, avg, smoothstep(.18, .45, fw));
   // Lit share: exact window shapes up close, the bay's average glass cover once windows blur.
   winMask = mix(win, cover, smoothstep(.18, .45, fw)); winHash = h;
 }`)
     .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-totalEmissiveRadiance += uWarm * uWindowLight * step(.45, winHash) * winMask;`)
+totalEmissiveRadiance += uWarm * uWindowLight * step(.45, winHash) * winMask + neonGlow * uWindowLight;`)
 }
-buildingMaterial.customProgramCacheKey = () => 'guilinol-facade-1'
+buildingMaterial.customProgramCacheKey = () => 'guilinol-facade-2'
 tileMaterial(buildingMaterial,true)
 
 // Vertex colours for GL04 building meshes: roofs by kind, parapets and roof boxes keep the wall colour.

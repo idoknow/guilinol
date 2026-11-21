@@ -117,8 +117,8 @@ def house(model):
 
     # Narrow street planter kerb & neat green shrubs along front facade (IMG_1351, IMG_1352)
     for seg_x, seg_w in ((-6.8, 10.2), (6.8, 10.2)):
-        model.box(seg_x, -0.15, -(hz + 0.55), seg_w, 0.34, 0.95, 'granite')
-        model.box(seg_x, 0.19, -(hz + 0.52), seg_w - 0.25, 0.08, 0.78, 'earth')
+        model.box(seg_x, -0.15, -(hz + 0.55), seg_w, 0.34, 0.95, 'planter_frame')
+        model.box(seg_x, 0.19, -(hz + 0.52), seg_w - 0.25, 0.08, 0.78, 'planter_soil')
     for sx, sh in ((-11.2, 1.85), (-5.5, 1.15), (5.5, 1.15), (10.5, 1.25)):
         model.box(sx, 0.25, -(hz + 0.55), 0.95, sh, 0.85, 'leaf')
 

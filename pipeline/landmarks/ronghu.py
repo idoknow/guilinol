@@ -481,7 +481,9 @@ def steel_bridge(b):
     x, y, z = -604.1, 0.0, 87.2
     starts = [(m,len(m.pos)) for m in [*b.parts.values(), b.hit]]
     length, width = 44.5, 3.3
-    box(steel, (x, y + 0.12, z), (width, 0.24, length), 'steel', 2)
+    # Keep the fascia, underside and trusses metallic. Only the wearing surface
+    # belongs to the municipal sidewalk material.
+    box(steel, (x, y + .12, z), (width, .24, length), 'steel', 2, top_mesh=b.parts['sidewalk'])
     bays = 14 if b.detail else 4
     for side in (-width / 2, width / 2):
         z0, z1 = z - length / 2, z + length / 2
@@ -695,9 +697,14 @@ def build(b: Builder):
     for start, end in zip(points,points[1:]):
         a = (start[0],ground(start[0],start[1])+.09,start[1])
         c = (end[0],ground(end[0],end[1])+.09,end[1])
-        for mesh in ([b.parts['atlas'],b.hit] if b.collide else [b.parts['atlas']]):
-            first=len(mesh.pos)
-            ramp(mesh,a,c,3.8,.12)
+        targets = [b.parts['atlas'], b.parts['sidewalk']]
+        starts = [len(mesh.pos) for mesh in targets]
+        ramp(targets[0], a, c, 3.8, .12, top_mesh=targets[1])
+        if b.collide:
+            targets.append(b.hit)
+            starts.append(len(b.hit.pos))
+            ramp(b.hit, a, c, 3.8, .12)
+        for mesh, first in zip(targets, starts):
             for i in range(first,len(mesh.pos)):
                 x,y,z=mesh.pos[i]
                 t=((x-a[0])*(c[0]-a[0])+(z-a[2])*(c[2]-a[2]))/((c[0]-a[0])**2+(c[2]-a[2])**2)

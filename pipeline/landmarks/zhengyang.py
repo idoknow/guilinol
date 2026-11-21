@@ -39,7 +39,9 @@ def boulevard(model):
         if not weight: return ground
         offset = end-station+direction*.04
         road,_ = streets.at(frame.x+x-sine*offset,frame.z+z+cosine*offset)
-        return ground + weight*(road-frame.y-.14-ground)
+        # Fit the native grade while keeping the 14 cm slab within 30 cm of terrain.
+        correction=np.clip(road-frame.y-.14-ground,-.29,.155)
+        return ground + weight*correction
     for block in range(4):
         center=block*25
         model.ground_offset = entrance_grade
@@ -48,21 +50,6 @@ def boulevard(model):
                 panel([(-9,station),(9,station),(9,station+25/16),(-9,station+25/16)],.14,'pave',True)
                 continue
             model.box(0,0,station+25/32,18,.14,25/16,'pave',True)
-        for stripe in (-5.6,0,5.6):
-            for zz in np.linspace(center-12.5,center+12.5,17)[:-1]:
-                strip=[]
-                for station in (zz,zz+25/16):
-                    offset=stripe+.82*math.sin(station*math.pi/9)
-                    strip.extend([(offset-.27,.146,station),(offset+.27,.146,station)])
-                if zz<0: panel([(strip[i][0],strip[i][2]) for i in (0,1,3,2)],.146,'tile')
-                else: model.mesh(strip,[[0,2,3],[0,3,1]],'tile')
-        for side in (-1,1):
-            for station in np.linspace(center-12.5,center+12.5,17)[:-1]:
-                if station<0:
-                    left,right=side*7.6-.65,side*7.6+.65
-                    panel([(left,station),(right,station),(right,station+25/16),(left,station+25/16)],.18,'granite')
-                    continue
-                model.box(side*7.6,.14,station+25/32,1.3,.04,25/16,'granite')
 
 
 if __name__=='__main__':generate('zhengyang',boulevard)

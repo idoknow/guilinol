@@ -1,14 +1,23 @@
+import {operation} from '../telemetry'
 import * as THREE from 'three'
 import type {Host} from './host'
 import type {Atlas, Place} from '../map/atlas'
 import {spots, type Spot} from './spots'
+import {builtBoundary,loadRegional,northwest,southeast} from '../map/regional'
 
 // 地图 (M4): one canvas painter shared by the minimap and the full map. North up, world z grows south.
 // Look follows docs/style.md: rice-paper ground, jade water, pale-green parks, karst peaks as ink mounds,
 // vermilion only for the player and the viewpoint seals.
 const C = {paper:'#efe8d8', green:'#d3dcc0', water:'#a6c9c1', waterEdge:'#86ada5', building:'#e0d6c3', buildingEdge:'#cdc1aa',
   road:'#fcfaf3', casing:'#cbbea4', major:'#f8ebcb', majorCasing:'#c4a676', path:'#b7aa90', ink:'#2a302c', inkSoft:'#5d655f',
-  peak:'#7f9a7b', peakDark:'#4f6b55', seal:'#a9503c', sealSoft:'rgba(169,80,60,.55)', paperText:'#f4efe2'}
+  peak:'#7f9a7b', peakDark:'#4f6b55', seal:'#a9503c', sealSoft:'rgba(169,80,60,.55)', paperText:'#f4efe2',
+  halo:'rgba(239,232,216,.92)', roadHalo:'rgba(252,250,243,.95)'}
+// Phase 2 街头 palette (docs/style.md 第二期 · 小地图): night-asphalt ground, grey roads, white arterials, jade water.
+const STREET:typeof C = {paper:'#1b1f25', green:'#1f3329', water:'#17414c', waterEdge:'#245866', building:'#2a2f37', buildingEdge:'#353b45',
+  road:'#7d838c', casing:'#14171b', major:'#e9e6de', majorCasing:'#0d0f12', path:'#4c525b', ink:'#f6f4ef', inkSoft:'#c9ccd2',
+  peak:'#2d4a3a', peakDark:'#203629', seal:'#20d6c1', sealSoft:'rgba(32,214,193,.5)', paperText:'#101216',
+  halo:'rgba(16,18,22,.9)', roadHalo:'rgba(16,18,22,.9)'}
+export function setMapPalette(name:'ink'|'street'){if(name==='street')Object.assign(C,STREET)}
 const SERIF = '"Noto Serif SC","Source Han Serif SC","Songti SC",serif'
 const CELL = 256
 const ROAD_PX:[number,number][] = [[7.5,5.4],[6,4.2],[3.8,2.6],[2,1.2]] // [casing,fill] px at zoom 1 by class
@@ -55,6 +64,15 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   const roads = index(roadItems)
   const peaks = host.manifest.peaks.entries.map(p=>({x:p.center[0],z:p.center[2],h:p.center[1]-((p as {baseHeight?:number}).baseHeight??150),name:/[一-鿿]/.test(p.name)&&!/^\d/.test(p.name)?p.name:''}))
   const placeLabels = atlas.places.filter(p=>p.k!=='road'&&p.k!=='peak'&&p.k!=='water')
+  const built=builtBoundary(host.manifest), style=getComputedStyle(document.documentElement)
+  const mask=new Path2D(built.path); mask.rect(-1e6,-1e6,2e6,2e6)
+  let regional:Awaited<ReturnType<typeof loadRegional>>|undefined, edge:typeof regional
+  const pending=new Set<string>()
+  function requestMap(file:string){
+    if(pending.has(file))return
+    pending.add(file)
+    loadRegional(file).then(map=>{if(file==='overview.bin')regional=map;else edge=map;redraw()}).catch(error=>{console.warn(error); setTimeout(()=>pending.delete(file),10000)})
+  }
 
   function heading() {
     const w = host.walker()
@@ -69,6 +87,13 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const x0 = cx-w/2/scale, x1 = cx+w/2/scale, z0 = cz-h/2/scale, z1 = cz+h/2/scale
     g.setTransform(scale*dpr,0,0,scale*dpr,(w/2-cx*scale)*dpr,(h/2-cz*scale)*dpr)
     const px = (v:number)=>v/scale
+    const far=scale<.09
+    if(mini&&!regional&&!edge&&(!built.contains(x0,z0)||!built.contains(x1,z1)))requestMap('overview-edge.bin')
+    ;(regional??edge)?.paint(g,x0,z0,x1,z1,scale,style)
+    const sx = (x:number)=>w/2+(x-cx)*scale, sz = (z:number)=>h/2+(z-cz)*scale
+    const player = here(), hx = sx(player.x), hy = sz(player.z)
+    if(!far){
+    g.save();g.clip(built.path,'evenodd')
     g.fillStyle = C.green; for(const it of green(x0,z0,x1,z1)) g.fill(it.path,'evenodd')
     g.fillStyle = C.water; g.strokeStyle = C.waterEdge; g.lineWidth = px(1.1)
     for(const it of water(x0,z0,x1,z1)){g.fill(it.path,'evenodd'); g.stroke(it.path)}
@@ -86,7 +111,6 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     g.setLineDash([])
     // Peaks: an ink mound per karst peak, darker ridge on the left; scaled by height.
     g.setTransform(dpr,0,0,dpr,0,0)
-    const sx = (x:number)=>w/2+(x-cx)*scale, sz = (z:number)=>h/2+(z-cz)*scale
     const taken:[number,number,number,number][] = []
     const free = (x:number,y:number,bw:number,bh:number)=>{for(const [a,b,c,d] of taken) if(x<c&&x+bw>a&&y<d&&y+bh>b) return false; taken.push([x,y,x+bw,y+bh]); return true}
     for(const p of peaks) {
@@ -98,10 +122,9 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const text = (s:string,x:number,y:number,size:number,color:string,weight='')=>{
       g.font = `${weight} ${size}px ${SERIF}`; const bw = g.measureText(s).width
       if(!free(x-bw/2-2,y-size/2-2,bw+4,size+4)) return false
-      g.lineWidth = 3.2; g.strokeStyle = 'rgba(239,232,216,.92)'; g.strokeText(s,x,y); g.fillStyle = color; g.fillText(s,x,y); return true}
+      g.lineWidth = 3.2; g.strokeStyle = C.halo; g.strokeText(s,x,y); g.fillStyle = color; g.fillText(s,x,y); return true}
     g.textAlign = 'center'; g.textBaseline = 'middle'
     // Spots and the player go into `taken` first so labels never cover them.
-    const player = here(), hx = sx(player.x), hy = sz(player.z)
     taken.push([hx-12,hy-12,hx+12,hy+12])
     const seals = spots.map(s=>({s,x:sx(s.x),y:sz(s.z)})).filter(o=>o.x>-20&&o.y>-20&&o.x<w+20&&o.y<h+20)
     const sealSize = mini?13:20
@@ -118,7 +141,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       const size = mini?10:r.c<=1?12:11; g.font = `${size}px ${SERIF}`; const bw = g.measureText(r.n).width
       const ax = Math.abs(Math.cos(r.label.angle))*bw+Math.abs(Math.sin(r.label.angle))*size, ay = Math.abs(Math.sin(r.label.angle))*bw+Math.abs(Math.cos(r.label.angle))*size
       if(!free(x-ax/2,y-ay/2,ax,ay)) continue
-      g.save(); g.translate(x,y); g.rotate(r.label.angle); g.lineWidth = 3; g.strokeStyle = 'rgba(252,250,243,.95)'; g.strokeText(r.n,0,0)
+      g.save(); g.translate(x,y); g.rotate(r.label.angle); g.lineWidth = 3; g.strokeStyle = C.roadHalo; g.strokeText(r.n,0,0)
       g.fillStyle = C.inkSoft; g.fillText(r.n,0,0); g.restore()
     }
     for(const o of seals) {
@@ -128,10 +151,16 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       g.beginPath(); g.roundRect(-s/2,-s/2,s,s,s*.16); g.fill(); g.stroke()
       g.fillStyle = done?C.paperText:C.seal; g.font = `600 ${s*.62}px ${SERIF}`; g.fillText(o.s.seal,0,s*.04); g.restore()
     }
+    g.restore()
+    }
+    g.fillStyle=style.getPropertyValue('--region-mask');g.fill(mask,'evenodd')
+    g.strokeStyle=style.getPropertyValue('--region-boundary');g.lineWidth=px(parseFloat(style.getPropertyValue('--region-boundary-width')));g.stroke(built.path)
+    ;(regional??edge)?.labels(g,x0,z0,x1,z1,scale,style,(x,z)=>!far&&built.contains(x,z))
+    g.setTransform(dpr,0,0,dpr,0,0)
     // Player: vermilion arrow with a paper outline, pointing where the camera faces.
     const a = heading()
     g.save(); g.translate(hx,hy); g.rotate(Math.PI-a)
-    g.fillStyle = 'rgba(169,80,60,.16)'; g.beginPath(); g.arc(0,0,mini?11:16,0,Math.PI*2); g.fill()
+    g.fillStyle = C.sealSoft; g.globalAlpha = .35; g.beginPath(); g.arc(0,0,mini?11:16,0,Math.PI*2); g.fill(); g.globalAlpha = 1
     g.beginPath(); g.moveTo(0,-9); g.lineTo(6.5,7); g.lineTo(0,3.5); g.lineTo(-6.5,7); g.closePath()
     g.fillStyle = C.seal; g.strokeStyle = C.paperText; g.lineWidth = 1.8; g.stroke(); g.fill(); g.restore()
   }
@@ -159,7 +188,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   const sheet = document.createElement('section'); sheet.className = 'atlas'; sheet.hidden = true
   sheet.innerHTML = `<canvas></canvas><div class="atlas-search"><input type="search" placeholder="搜地名、路名、山名" aria-label="搜索地点" enterkeyhint="search"><ol></ol></div>
     <button class="atlas-close" aria-label="关闭地图">×</button><button class="atlas-here" aria-label="回到我的位置">◎</button>
-    <div class="atlas-pop" hidden></div><p class="atlas-legend">朱印＝观景点 · 实心为已到访 · 点地图任意处可传送</p>`
+    <div class="atlas-pop" hidden></div><p class="atlas-legend">朱印＝观景点 · 已开放区域可传送 · © OpenStreetMap contributors</p>`
   document.body.append(sheet)
   const canvas = sheet.querySelector('canvas')!, input = sheet.querySelector('input')!, results = sheet.querySelector('ol')!, pop = sheet.querySelector<HTMLElement>('.atlas-pop')!
   const view = {x:0,z:0,scale:.5}
@@ -176,12 +205,15 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       pop.style.transform = `translate(${Math.round(x)}px,${Math.round(y-(pin.spot?18:26))}px) translate(-50%,-100%)`
     }
   }
-  const [left,top,width,depth] = atlas.extent
-  function clampView(){view.scale = Math.min(3,Math.max(.06,view.scale))
-    view.x = Math.min(left+width,Math.max(left,view.x)); view.z = Math.min(top+depth,Math.max(top,view.z))}
+  function clampView(){view.scale = Math.min(3,Math.max(Math.min(sheet.clientWidth/(southeast.x-northwest.x),sheet.clientHeight/(southeast.z-northwest.z))*.9,view.scale))
+    function axis(value:number,min:number,max:number,pixels:number){const half=pixels/(2*view.scale)
+      return half*2>=max-min?(min+max)/2:Math.min(max-half,Math.max(min+half,value))}
+    view.x=axis(view.x,northwest.x,southeast.x,sheet.clientWidth);view.z=axis(view.z,northwest.z,southeast.z,sheet.clientHeight)}
   function open() {
+    const start=performance.now()
+    requestMap('overview.bin')
     const p = here(); view.x = p.x; view.z = p.z; view.scale = innerWidth<700?.45:.6
-    sheet.hidden = false; requestAnimationFrame(()=>{sheet.classList.add('show'); redraw()})
+    sheet.hidden = false; requestAnimationFrame(()=>{sheet.classList.add('show'); redraw();operation('mapOpen',start)})
     if(!matchMedia('(pointer:coarse)').matches) input.focus()
   }
   function close(){sheet.classList.remove('show'); setPin(null); input.value = ''; results.innerHTML = ''; input.blur()
@@ -189,6 +221,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   function setPin(next:typeof pin) {
     pin = next; pop.hidden = !pin
     if(pin) {
+      if(!built.contains(pin.x,pin.z)){pop.textContent='未开放'; redraw(); return}
       const sub = pin.spot?pin.spot.sub:atlas.roadAt(pin.x,pin.z,40)?.name ?? ''
       pop.innerHTML = `<b>${pin.name}</b>${sub&&sub!==pin.name?`<span>${sub}</span>`:''}<button>前往</button>`
       pop.querySelector('button')!.onclick = ()=>{const target = pin!; close(); if(target.spot) ui.goSpot(target.spot); else ui.goPoint(target.x,target.z,target.name)}
@@ -203,7 +236,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       ...atlas.search(q,8).map((p:Place)=>({name:p.n,sub:{peak:'山',scenic:'景点',gate:'城门',bridge:'桥',water:'水面',park:'公园',museum:'博物馆',memorial:'纪念地',road:'道路',school:'学校'}[p.k],x:p.x,z:p.z}))]:[]
     const seen = new Set<string>()
     results.innerHTML = ''
-    for(const hit of hits) { if(seen.has(hit.name)||seen.size>=8) continue; seen.add(hit.name)
+    for(const hit of hits) { if(!built.contains(hit.x,hit.z)||seen.has(hit.name)||seen.size>=8) continue; seen.add(hit.name)
       const li = document.createElement('li'); li.innerHTML = `<b>${hit.name}</b><span>${hit.sub}</span>`
       li.onclick = ()=>{focus(hit.x,hit.z); setPin({x:hit.x,z:hit.z,name:hit.name,spot:hit.spot}); results.innerHTML = ''; input.blur()}
       results.append(li)}
@@ -224,7 +257,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   canvas.onpointerup = e=>{pointers.delete(e.pointerId); pinch = 0
     if(moved<6&&pointers.size===0) {
       const r = canvas.getBoundingClientRect(), x = view.x+(e.clientX-r.left-r.width/2)/view.scale, z = view.z+(e.clientY-r.top-r.height/2)/view.scale
-      const near = spots.find(s=>Math.hypot(s.x-x,s.z-z)*view.scale<16)
+      const near = built.contains(x,z)&&spots.find(s=>built.contains(s.x,s.z)&&Math.hypot(s.x-x,s.z-z)*view.scale<16)
       if(near) setPin({x:near.x,z:near.z,name:near.name,spot:near})
       else setPin({x,z,name:atlas.roadAt(x,z,40)?.name ?? '这里'})
     }}
@@ -238,6 +271,6 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     if(e.code==='Escape'&&!sheet.hidden) close()})
 
   let clock = 0
-  return {paint, extent:atlas.extent, roadAt:atlas.roadAt.bind(atlas), open, close, get active(){return !sheet.hidden}, roadName:()=>lastRoad, search:(q:string)=>{input.value = q; input.oninput?.(new Event('input'))},
+  return {paint, contains:built.contains, extent:atlas.extent, roadAt:atlas.roadAt.bind(atlas), open, close, get active(){return !sheet.hidden}, roadName:()=>lastRoad, search:(q:string)=>{input.value = q; input.oninput?.(new Event('input'))},
     tick(dt:number){clock += dt; if(clock<.2) return; clock = 0; if(document.body.dataset.photo!=='on') drawMini(); if(!sheet.hidden&&!pointers.size) redraw()}}
 }

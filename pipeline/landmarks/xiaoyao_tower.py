@@ -21,6 +21,8 @@ from xiaoyao_access import CENTER, FOOT, WIDTH
 class LandmarkModel(Model):
     def __init__(self, detail, flood_roof=False):
         super().__init__(detail)
+        self.curbs=[]
+        self.planters=[]
         self.lamps=[]
         self.lit_tiles=[]
         self.flood_roof=flood_roof
@@ -49,7 +51,17 @@ class LandmarkModel(Model):
     def mesh(self, vertices, faces, color, collide=False):
         if hasattr(self, 'site_ground'):
             vertices = self.foundation_vertices(vertices)
-        if isinstance(color,str) and color=='lamp':
+        if isinstance(color,str) and color=='curb':
+            super().mesh(vertices,faces,'granite',collide)
+            self.curbs.append((self.visible.pop(),self.uv.pop()))
+        elif isinstance(color, str) and color in ('planter_frame', 'planter_soil'):
+            swatch = 'granite' if color=='planter_frame' else 'earth'
+            super().mesh(vertices, faces, swatch, collide)
+            cell = list(SWATCHES).index(swatch)
+            uv = self.uv.pop()*4 - [cell%4, 3-cell//4]
+            uv[..., 0] = (uv[..., 0] + (swatch=='earth'))/2
+            self.planters.append((self.visible.pop(), uv))
+        elif isinstance(color,str) and color=='lamp':
             super().mesh(vertices,faces,'wood' if self.flood_roof else 'gold',collide)
             self.lamps.append((self.visible.pop(),self.uv.pop()))
         elif isinstance(color,str) and color in ('tile','roof_soffit'):
@@ -154,7 +166,7 @@ def tower(model):
     for left,right,back,front in [(-17,17,-32,near),(-17,17,far,16),(0,17,near,far)]:
         center_x,center_z = (left+right)/2,(back+front)/2
         width,depth = right-left,front-back
-        model.foundation(surface,center_x,-.36,center_z,width,court+.36,depth,'stone')
+        model.foundation(surface,center_x,-.36,center_z,width,court+.36,depth,'stone',covered_top=True)
         model.box(center_x,court-.16,center_z,width,.16,depth,'pave',True)
         model.box(center_x,court-.55,center_z,width+.16,.24,depth+.16,'granite')
     count = 48
@@ -239,6 +251,15 @@ def tower(model):
 
 
 def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=None, smooth=(), flood_roof=False, lettering=None, terrain_offset=None, lateral_offset=None):
+    import json
+    from c_kit import landmark_surface
+    from native_paving import NativePaving
+    config=Path(__file__).resolve().parents[1]/'seam-surfaces.json'
+    street_roles=json.loads(config.read_text())['surfaces'].get(name,{})
+    pavement=None
+    if street_roles:
+        frame=landmark_surface(name)
+        pavement=NativePaving(frame.surface,frame.surface.entries[name])
     image = atlas(colors,smooth)
     if flood_roof:
         carve_medallion(image)
@@ -262,12 +283,16 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
             if terrain_offset is not None:
                 points, inverse = np.unique(vertices[:,::2],axis=0,return_inverse=True)
                 vertices[:,1] += np.array([terrain_offset(x,z) for x,z in points])[inverse]
+            coords=np.concatenate(uvs).reshape(-1,2) if texture is not None else None
+            if coords is not None and street_roles.get(name) in ('sidewalk','curb'):
+                vertices,coords=pavement.clip(vertices,coords)
+                if not len(vertices):return
             mesh = trimesh.Trimesh(vertices, np.arange(len(vertices)).reshape(-1,3), process=False)
             if texture is not None:
                 material = trimesh.visual.material.PBRMaterial(name=name,baseColorTexture=texture,roughnessFactor=1,metallicFactor=0,doubleSided=True)
                 if name.endswith('_lit'):
                     material.emissiveFactor=[.58,.24,.055] if name=='roof_lit' else [.85,.57,.24]
-                mesh.visual = trimesh.visual.TextureVisuals(uv=np.concatenate(uvs).reshape(-1,2),material=material)
+                mesh.visual = trimesh.visual.TextureVisuals(uv=coords,material=material)
             scene.add_geometry(mesh,node_name=group+'_'+name if texture else 'collision_surface',parent_node_name=group if texture else scene.graph.base_frame)
         if model.visible:
             add(model.visible,model.uv,image,'joinery')
@@ -279,6 +304,17 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
             scene.add_geometry(rock,node_name=group+'_limestone',parent_node_name=group)
         if model.lit_tiles:
             faces,uvs=zip(*model.lit_tiles);add(faces,uvs,image,'roof_lit')
+        if model.curbs:
+            faces,uvs=zip(*model.curbs)
+            add(faces,uvs,Image.new('RGB',(1,1),'#aaa9a6'),'curb')
+        if model.planters:
+            faces, uvs = zip(*model.planters)
+            finish = Image.new('RGB', (256, 128))
+            for col, key in enumerate(('granite', 'earth')):
+                cell = list(SWATCHES).index(key)
+                x, y = 128*(cell%4), 128*(cell//4)
+                finish.paste(image.crop((x, y, x+128, y+128)), (col*128, 0))
+            add(faces, uvs, finish, 'planter')
         if model.lamps:
             faces,uvs=zip(*model.lamps);add(faces,uvs,image,'lamp_lit')
         for key, parts in model.tile_parts.items():

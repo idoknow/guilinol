@@ -1,3 +1,4 @@
+import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
 import {bytes, fetchAsset, startOverview, type Manifest} from './world'
 import {Stream} from './stream'
@@ -5,7 +6,9 @@ import {flight} from './flight'
 import {look} from './look/config'
 import {installAtmosphere, outerGround, sky} from './look/atmosphere'
 import {startPeaks} from './peaks'
-import {presets,setPreset} from './presets'
+import {presets,setPreset,pickSpawn,spawnPool} from './presets'
+import {isDeepLink} from './deeplink'
+import {readLastView, saveLastView, consumeRestore, applyLastView} from './lastview'
 import {walkConfig} from './walk/config'
 import {atmo, env, evaluate} from './look/time'
 import {currentMirrorLevel, isWaterInView, renderMirror, WATER_LAYER} from './look/water'
@@ -16,6 +19,7 @@ import type {Host} from './play/host'
 import {bootDismiss, bootLoaded, bootProgress} from './ui/boot'
 import {loadTiles} from './look/tiles'
 import {flags} from './debug'
+import type {FeedbackView} from '../../lib/feedback-contract'
 
 installAtmosphere()
 // The title screen (ui/home.ts) pauses the scene while it covers it: no simulation, no draws.
@@ -23,7 +27,9 @@ let paused=false
 export function setPaused(on:boolean){paused=on}
 async function start() {
   bootProgress('载入地形', 12)
-  const manifest:Manifest = JSON.parse(new TextDecoder().decode(await fetchAsset('manifest.json')))
+  const manifestBytes = await fetchAsset('manifest.json')
+  identifyWorld(manifestBytes)
+  const manifest:Manifest = JSON.parse(new TextDecoder().decode(manifestBytes))
   if(manifest.version!==4 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
   const ovTask = startOverview(manifest), pkTask = startPeaks(manifest.peaks)
   await Promise.all([ovTask.dispatched, pkTask.dispatched])
@@ -42,7 +48,19 @@ async function start() {
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const [left,top,width,depth] = manifest.extent
   scene.add(outerGround(manifest.extent))
-  camera.position.set(left+width*.55,420,top+depth*.62)
+  // IDOK-105: choose the opening camera pose. The camera is NOT touched here — `flight()` below sets
+  // `rotation.order = 'YXZ'` and lookAt()/rotation.set() must run after it, or three.js recomputes the
+  // quaternion with the wrong order and every slot gains a roll.
+  const openParams = new URLSearchParams(location.search)
+  // `?slot=X` pins a specific pool frame (deterministic, for captures and shared links). It is also
+  // a deep link, so it skips the title screen, but it must bypass the "deep link → fixed camera"
+  // fallback below. Every other deep link keeps the deterministic camera the harnesses measure.
+  const forcedSlot = openParams.get('slot')
+  // `restoring` is a FeedbackView only when the player picked "回到上次离开的地方" AND a usable view
+  // is stored; a stale/cleared record must fall back to pickSpawn(), not the fixed camera.
+  const opening = forcedSlot !== null
+    ? spawnPool.find(slot => slot.id === forcedSlot) ?? spawnPool[0]
+    : isDeepLink(openParams) ? null : consumeRestore() ? readLastView() ?? pickSpawn() : pickSpawn()
   let walker:Awaited<ReturnType<typeof import('./walk').walk>>|undefined, switching=false
   let cinema=false
   let walkModPromise:Promise<typeof import('./walk')>|undefined
@@ -51,7 +69,15 @@ async function start() {
     return walkModPromise
   }
   const controls = flight(camera,renderer.domElement,manifest.extent,()=>!walker?.active&&!switching&&!cinema)
-  camera.lookAt(left+width*.47,150,top+depth*.45)
+  // Apply the opening pose here, after flight() has set rotation.order='YXZ'. lookAt()/rotation.set()
+  // before that line would be recomputed in the wrong Euler order and leave a permanent roll.
+  if(opening) {
+    if('eye' in opening) { camera.position.set(...opening.eye); camera.lookAt(...opening.look) }
+    else applyLastView(camera, opening)
+  } else {
+    camera.position.set(left+width*.55,420,top+depth*.62)
+    camera.lookAt(left+width*.47,150,top+depth*.45)
+  }
   function resize() {
     renderer.setPixelRatio(Math.min(devicePixelRatio,1.5)); renderer.setSize(innerWidth,innerHeight)
     camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix()
@@ -75,11 +101,13 @@ async function start() {
   async function walkTo(x:number,z:number,yaw:number,reason:string){
     if(switching)return false
     switching=true
-    try{await loadWalker();if(walker!.active)walker!.leave();return await walker!.enter(x,z,yaw,reason)}finally{switching=false;showMode()}
+    const start=performance.now()
+    try{await loadWalker();if(walker!.active)walker!.leave();return await walker!.enter(x,z,yaw,reason)}finally{operation('teleport',start);switching=false;showMode()}
   }
   async function toggle(initial=false){
     if(switching)return
-    if(walker?.active){walker.leave();return}
+    const start=performance.now()
+    if(walker?.active){walker.leave();operation('switch',start);return}
     switching=true
     try{
       const walking=await loadWalker()
@@ -88,7 +116,7 @@ async function start() {
       const gate=walkConfig.gate,point=preset?.walk??(initial&&!preset?gate:{x:original.position.x,z:original.position.z,yaw:original.rotation.y})
       if(!await walking.enter(point.x,point.z,point.yaw,initial?name??'default':'flight',!!preset?.walk)&&initial)
         await walking.enter(gate.x,gate.z,gate.yaw,'fallback')
-    }finally{switching=false}
+    }finally{operation('switch',start);switching=false}
   }
   window.addEventListener('keydown',event=>{if(event.code==='KeyV'&&!event.repeat)void toggle().then(showMode)})
   const touch=matchMedia('(pointer:coarse)').matches,hint=document.querySelector<HTMLElement>('.hint')!,toast=document.querySelector<HTMLElement>('.toast')!
@@ -134,7 +162,12 @@ async function start() {
         break
       }
       return {clearance,lookingAt,landmark,wallDistance:hits[0]?.distance}
-    }}})
+    },
+    // IDOK-105 test hooks (verify mode only).
+    spawnPool,
+    saveLastViewNow:()=>host.lastView().then(saveLastView),
+    readLastViewNow:()=>readLastView(),
+    applyLastViewNow:(view:FeedbackView)=>applyLastView(camera,view)}})
   let cullLandmarks:ReturnType<typeof import('./landmarks').landmarkCulling>|undefined
   function draw(){
     const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
@@ -150,11 +183,15 @@ async function start() {
   }
   const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
     captureView:async()=>(await import('./play/feedback-view')).capture(host),
+    lastView:async()=>(await import('./play/feedback-view')).currentView(host,false),
     setView:async(view)=>(await import('./play/feedback-view')).setView(host,view),
     fly(){if(walker?.active)walker.leave();showMode()},get cinema(){return cinema},set cinema(on){cinema=on}}
   let tour:Awaited<ReturnType<typeof import('./play').play>>|undefined
+  const sampleFrame=instrument(renderer,()=>({mode:tour?.map?.active?'map':paused?'menu':walker?.active?(walker.vehicle==='foot'?'walk':'drive'):'fly',
+    x:camera.position.x,z:camera.position.z,chunks:stream.loaded.size}))
+  let playable=false
   function animate(now:number){
-    if(paused&&frame>2){previous=0;return}
+    if((paused||tour?.map?.active)&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now
     if(walker?.active)walker.tick(elapsed/1000);else if(!switching)controls(elapsed/1000)
     if(frame===1) {
@@ -179,7 +216,16 @@ async function start() {
     renderer.toneMappingExposure = env.exposure; windowLight.value = env.night
     dome.update(); drops.update()
     tour?.tick(elapsed/1000)
+    persistView?.()
     draw()
+    sampleFrame(elapsed)
+    if(!frame)record('firstFrame',{ms:performance.now()})
+    if(!playable && first && !paused && !switching && !stream.pending.size && stream.loaded.size){
+      const p=walker?.active?walker.position:camera.position
+      if(manifest.chunks.every(t=>Math.hypot(t.x+128-p.x,t.z+128-p.z)>stream.radius||stream.loaded.has(t))){
+        playable=true;record('playable',{ms:performance.now()})
+      }
+    }
     frame++; sum+=elapsed;samples++
     Object.assign(stats,{ms:elapsed,calls:renderer.info.render.calls,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,frame,loaded:stream.loaded.size,pending:stream.pending.size,
       visited:stream.visited.size,failures:stream.failures.size})
@@ -189,6 +235,19 @@ async function start() {
     }
   }
   renderer.setAnimationLoop(animate)
+  // IDOK-105: keep the last view fresh so "回到上次离开的地方" can restore it. Deep-linked
+  // sessions (`?verify`, `?slot`, shares…) never write it — tests and shared links must not pollute.
+  const persistView = isDeepLink(openParams) ? null : (() => {
+    let lastWrite = 0
+    const write = (force = false) => {
+      if (!force && Date.now() - lastWrite < 15000) return
+      lastWrite = Date.now()
+      void host.lastView().then(saveLastView).catch(() => {})
+    }
+    addEventListener('pagehide', () => write(true))
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') write(true) })
+    return write
+  })()
   const token=params.get('view')
   if(token){try{if(token.length>4096)throw Error();await host.setView(JSON.parse(atob(token.replace(/-/g,'+').replace(/_/g,'/'))))}catch{console.warn('Invalid feedback view')}}
   else if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}

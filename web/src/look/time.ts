@@ -20,12 +20,12 @@ const day:Key = {
 const k = (patch:Partial<Key>):Key=>({...day,...patch})
 // hour → mood. 晨雾偏冷青、正午通透、黄昏暖金、夜晚深蓝加暖色灯 (docs/style.md 原则 5).
 const keys:[number,Key][] = [
-  [0, k({sun:[.35,.62,-.45],sunColor:0xa9bde0,sunPower:.55,hemiSky:0x4a5f86,hemiGround:0x1c2228,hemiPower:.95,
-    zenith:0x0a1626,horizon:0x2a3a55,glow:0x3a4c6a,hazeNear:0x283449,hazeFar:0x1f2c42,fogLength:3200,fogBoost:1.6,
-    night:1,exposure:1.3,clouds:.26,cloudLit:0x56637e,cloudShade:0x1e2a3e,water:0x122430})],
-  [4.6, k({sun:[.35,.62,-.45],sunColor:0xa9bde0,sunPower:.55,hemiSky:0x4a5f86,hemiGround:0x1c2228,hemiPower:.95,
-    zenith:0x0a1626,horizon:0x2a3a55,glow:0x3a4c6a,hazeNear:0x283449,hazeFar:0x1f2c42,fogLength:3200,fogBoost:1.6,
-    night:1,exposure:1.3,clouds:.26,cloudLit:0x56637e,cloudShade:0x1e2a3e,water:0x122430})],
+  [0, k({sun:[.35,.62,-.45],sunColor:0x9fb0d0,sunPower:.45,hemiSky:0x4c5270,hemiGround:0x4a3a2c,hemiPower:1.25,
+    zenith:0x0b1222,horizon:0x3a3150,glow:0x4a3f60,hazeNear:0x2a2a40,hazeFar:0x231f38,fogLength:3600,fogBoost:1.4,
+    night:1,exposure:1.45,clouds:.3,cloudLit:0x6a5a78,cloudShade:0x1c1a2c,water:0x101c28})],
+  [4.6, k({sun:[.35,.62,-.45],sunColor:0x9fb0d0,sunPower:.45,hemiSky:0x4c5270,hemiGround:0x4a3a2c,hemiPower:1.25,
+    zenith:0x0b1222,horizon:0x3a3150,glow:0x4a3f60,hazeNear:0x2a2a40,hazeFar:0x231f38,fogLength:3600,fogBoost:1.4,
+    night:1,exposure:1.45,clouds:.3,cloudLit:0x6a5a78,cloudShade:0x1c1a2c,water:0x101c28})],
   [5.6, k({sun:[.95,.04,.1],sunColor:0xb7a6c8,sunPower:.35,hemiSky:0x6c7f97,hemiGround:0x2c3132,hemiPower:.9,
     zenith:0x34506e,horizon:0x9aa6b4,glow:0xd7a99a,hazeNear:0x8593a2,hazeFar:0x5f7186,fogLength:1300,fogBoost:3.2,fogFalloff:45,
     night:.75,exposure:1.15,clouds:.34,cloudLit:0xd2a9a2,cloudShade:0x56637a,water:0x2c4048})],
@@ -44,9 +44,9 @@ const keys:[number,Key][] = [
   [19.1, k({sun:[-.95,-.02,.25],sunColor:0xd88a7c,sunPower:.5,hemiSky:0x5c6a8c,hemiGround:0x2b2a2e,hemiPower:.85,
     zenith:0x22365a,horizon:0xb98f86,glow:0xd8826a,hazeNear:0x6c6a7c,hazeFar:0x45506a,fogLength:2600,fogBoost:1.6,
     night:.85,exposure:1.18,clouds:.36,cloudLit:0xc98a7e,cloudShade:0x3a3f58,water:0x223139})],
-  [20.4, k({sun:[.35,.62,-.45],sunColor:0xa9bde0,sunPower:.55,hemiSky:0x4a5f86,hemiGround:0x1c2228,hemiPower:.95,
-    zenith:0x0a1626,horizon:0x2a3a55,glow:0x3a4c6a,hazeNear:0x283449,hazeFar:0x1f2c42,fogLength:3200,fogBoost:1.6,
-    night:1,exposure:1.3,clouds:.26,cloudLit:0x56637e,cloudShade:0x1e2a3e,water:0x122430})],
+  [20.4, k({sun:[.35,.62,-.45],sunColor:0x9fb0d0,sunPower:.45,hemiSky:0x4c5270,hemiGround:0x4a3a2c,hemiPower:1.25,
+    zenith:0x0b1222,horizon:0x3a3150,glow:0x4a3f60,hazeNear:0x2a2a40,hazeFar:0x231f38,fogLength:3600,fogBoost:1.4,
+    night:1,exposure:1.45,clouds:.3,cloudLit:0x6a5a78,cloudShade:0x1c1a2c,water:0x101c28})],
 ]
 keys.push([24,keys[0][1]])
 
@@ -63,7 +63,7 @@ const color = ()=>new THREE.Color()
 export const atmo = {
   uHazeNear:{value:color()}, uHazeFar:{value:color()}, uHorizon:{value:color()},
   uFog:{value:new THREE.Vector4()}, uNight:{value:0}, uTime:{value:0}, uRain:{value:0},
-  uSun:{value:new THREE.Vector3()}, uSunColor:{value:color()},
+  uSun:{value:new THREE.Vector3()}, uSunColor:{value:color()}, uGrade:{value:new THREE.Vector2(1,1)},
 }
 export const env = {
   hour:13.5, weather:'clear' as Weather, sunDir:new THREE.Vector3(), sunColor:color(), sunPower:0,
@@ -73,6 +73,7 @@ export const env = {
 }
 
 const a = color(), b = color(), grey = color()
+const lerpN = (x:number,y:number,t:number)=>x+(y-x)*t
 function blendColor(target:THREE.Color, from:number, to:number, t:number) {
   a.setHex(from); b.setHex(to); target.copy(a).lerp(b,t)
 }
@@ -116,6 +117,8 @@ export function evaluate(hour:number, weather:Weather, blend=1) {
   atmo.uHorizon.value.copy(env.horizon).convertLinearToSRGB()
   atmo.uFog.value.set(fogLength,fogBoost,look.heightFogBase,fogFalloff)
   atmo.uNight.value = dark; atmo.uRain.value = m.rain
+  // Phase 2 street grade: punchier by day, a touch more saturated at night; rain flattens contrast a little.
+  atmo.uGrade.value.set(lerpN(look.gradeDay[0],look.gradeNight[0],dark),lerpN(look.gradeDay[1],look.gradeNight[1],dark)*(1-.04*m.rain))
   atmo.uSun.value.copy(env.sunDir); atmo.uSunColor.value.copy(env.sunColor).multiplyScalar(env.sunPower*env.sunUp)
 }
 

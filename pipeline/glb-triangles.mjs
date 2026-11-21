@@ -1,5 +1,5 @@
 import {readFileSync} from 'node:fs'
-import {Vector3} from 'three'
+import {Matrix4,Vector3} from 'three'
 import {atlasTriangles} from '../lib/atlas-ground.mjs'
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js'
@@ -7,9 +7,10 @@ import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js'
 const bytes=readFileSync(process.argv[2]),length=bytes.readUInt32LE(12)
 const model=JSON.parse(bytes.subarray(20,20+length).toString())
 const materialFilter=process.argv[5]
-if(materialFilter)for(const mesh of model.meshes)for(const primitive of mesh.primitives){
+const inventory=process.argv[3]==='--inventory'
+if(materialFilter||inventory)for(const mesh of model.meshes)for(const primitive of mesh.primitives){
   const finish=model.materials?.[primitive.material]
-  primitive.extras={...primitive.extras,seamMaterial:finish?.name??'',atlasTransform:finish?.pbrMetallicRoughness?.baseColorTexture?.extensions?.KHR_texture_transform??{}}
+  primitive.extras={...primitive.extras,materialIndex:primitive.material??-1,seamMaterial:finish?.name??'',atlasTransform:finish?.pbrMetallicRoughness?.baseColorTexture?.extensions?.KHR_texture_transform??{}}
 }
 for(const key of ['textures','images','materials'])delete model[key]
 for(const mesh of model.meshes)for(const primitive of mesh.primitives)delete primitive.material
@@ -26,9 +27,27 @@ scene.traverse(node=>{
   if(materialFilter && node.geometry.userData.seamMaterial!==materialFilter)return
   let high=false
   for(let parent=node;parent;parent=parent.parent)high ||= parent.name.startsWith('lod0')
-  if(!high && (process.argv[3]!=='--visible' || scene.getObjectByName('lod0')))return
+  if(!high && ((!inventory && process.argv[3]!=='--visible') || scene.getObjectByName('lod0')))return
   if(!high){for(let parent=node;parent;parent=parent.parent)if(/^collision|^lod[12]/i.test(parent.name))return}
   const geometry=node.geometry,index=geometry.index,position=geometry.getAttribute('position')
+  if(inventory){
+    const uv=geometry.getAttribute('uv'),meta=geometry.userData
+    const {scale=[1,1],offset=[0,0]}=meta.atlasTransform
+    const matrix=new Matrix4()
+    for(let instance=0;instance<(node.isInstancedMesh?node.count:1);instance++){
+      if(node.isInstancedMesh){node.getMatrixAt(instance,matrix);matrix.premultiply(node.matrixWorld)}
+      else matrix.copy(node.matrixWorld)
+      for(let at=0;at<(index?.count??position.count);at+=3){
+        coords.push(meta.materialIndex)
+        for(let corner=0;corner<3;corner++){
+          const i=index?index.getX(at+corner):at+corner
+          coords.push(...vertex.fromBufferAttribute(position,i).applyMatrix4(matrix).toArray(),
+            uv?uv.getX(i)*scale[0]+offset[0]:NaN,uv?uv.getY(i)*scale[1]+offset[1]:NaN)
+        }
+      }
+    }
+    return
+  }
   if(process.argv[6]){
     const {scale,offset}=geometry.userData.atlasTransform
     for(const at of atlasTriangles(geometry,JSON.parse(process.argv[6]),scale,offset).selected)coords.push(...vertex.fromBufferAttribute(position,at).applyMatrix4(node.matrixWorld).toArray())
@@ -36,5 +55,5 @@ scene.traverse(node=>{
   }
   for(let at=0;at<(index?.count??position.count);at++)coords.push(...vertex.fromBufferAttribute(position,index?index.getX(at):at).applyMatrix4(node.matrixWorld).toArray())
 })
-if(!coords.length)throw Error('Missing LOD0 triangles')
+if(!coords.length && !process.argv[6])throw Error('Missing LOD0 triangles')
 process.stdout.write(Buffer.from(new Float32Array(coords).buffer))

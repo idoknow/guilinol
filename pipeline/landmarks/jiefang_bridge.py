@@ -184,7 +184,7 @@ def west_bank(model):
             xs,zs=(np.interp(stations,chain,axis) for axis in points.T)
             return np.array([vertex((x,z),LOWER+level) for x,z in zip(xs,zs)])
         left,right=edge(-1.88,.12+height),edge(1.88,.12+height)
-        surface(model,left,right,'stone')
+        surface(model,left,right,'step_stone')
         for rim in (left,right,[left[0],right[0]],[left[-1],right[-1]]):
             rim=np.asarray(rim)
             surface(model,rim,rim-[0,height+.14,0],'stone')
@@ -236,7 +236,7 @@ def west_bank(model):
         model.pose=sidewalk_pose(crossing-bridge_station,0)
         road_offset=np.interp(crossing,chain,strip_offset)
         for stripe in np.arange(-3,4):
-            model.box(-road_offset+stripe,-.095,0,.48,.025,3.4,'white')
+            model.box(-road_offset+stripe,-.095,0,.48,.025,3.4,'paint_white')
         model.beam([-1.45,0,2.25],[-1.45,5.4,2.25],.14,'granite')
         model.box(-1.45,4.15,2.25,.42,1.25,.42,'sign')
         model.box(-1.69,5,2.25,.09,.28,.28,'knot')
@@ -256,20 +256,27 @@ def bridge(model):
     # The west portal has a curved soffit and a thinner slab above the crown.
     for left,right,depth in ((-140.5,-136,1.22),(-136,-103,.36),(-103,140.5,1.22)):
         model.box((left+right)/2,-depth,0,right-left,depth,width,'stone',True)
-    model.box(0,-.03,0,length,.08,32.2,'tile')
+    model.box(0,-.03,0,length,.08,32.2,'road')
+    def deck_line(z):
+        # Paint is a surface, following the curved deck without box walls or
+        # long triangles crossing every grading station in the bridge export.
+        for a,b in zip(deck_stations,deck_stations[1:]):
+            model.mesh([(a,.085,z-.09),(a,.085,z+.09),(b,.085,z+.09),(b,.085,z-.09)],
+                       [[0,1,2],[0,2,3]],'paint_white')
+    deck_stations=np.r_[-length/2,np.arange(16,134,4),134.6286,length/2]
     for side in (-1,1):
         walk_inner = 16.175
         walk_outer = width/2
         model.box(0,0,side*(walk_inner+walk_outer)/2,length,.18,walk_outer-walk_inner,'pave',True)
         model.box(0,.05,side*16.16,length,.15,.3,'curb_granite',True)
-        model.box(0,.055,side*12,length,.018,.15,'paint_white')
-        model.box(0,.055,side*.18,length,.015,.13,'paint_yellow')
-        model.box(0,.182,side*16.93,length,.018,.46,'granite')
+        deck_line(side*12)
+        deck_line(side*.18)
+        model.box(0,.182,side*16.93,length,.018,.46,'tactile_granite')
         if model.detail:
             for offset in (-.13,0,.13):
-                model.box(0,.20,side*16.93+offset,length,.014,.036,'white')
+                model.box(0,.20,side*16.93+offset,length,.014,.036,'tactile_white')
             for lane in (3.7,7.4):
-                for east in np.arange(-135,138,9):model.box(east,.055,side*lane,3,.02,.13,'paint_white')
+                deck_line(side*lane)
         for east in np.arange(-126,127,21 if model.detail else 42):
             lamp_post(model,east,side)
     springings=(-92,-46,0,46,92,140.5)

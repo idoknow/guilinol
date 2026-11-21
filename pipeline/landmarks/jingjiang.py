@@ -103,7 +103,7 @@ class Model:
         cell=list(SWATCHES).index(color)
         self.uv.append((coords*.94+.03+[cell%4,3-cell//4])/4)
 
-    def foundation(self, surface, x, y, z, w, h, d, color):
+    def foundation(self, surface, x, y, z, w, h, d, color, covered_top=False):
         """Adjust the four lower corners in posed landmark coordinates."""
         cube = trimesh.creation.box([w,h,d])
         vertices = cube.vertices + [x,y+h/2,z]
@@ -113,7 +113,8 @@ class Model:
             if point[1] < y+h/2:
                 px,_,pz = point
                 point[1] = surface.ground(dx+c*px-s*pz,dz+s*px+c*pz)-dy-.04
-        self.mesh(vertices,cube.faces,color,True)
+        faces = cube.faces[cube.face_normals[:,1] < .99] if covered_top else cube.faces
+        self.mesh(vertices,faces,color,True)
 
     def box(self,x,y,z,w,h,d,color,collide=False):
         cube=trimesh.creation.box([w,h,d]); self.mesh(cube.vertices+[x,y+h/2,z],cube.faces,color,collide)
@@ -209,8 +210,9 @@ def generate(name,build,colors=None):
     def packed(parts):
         vertices=np.concatenate(parts).reshape(-1,3);return trimesh.Trimesh(vertices,np.arange(len(vertices)).reshape(-1,3),process=False)
     def emit(model,layer,parent):
-        mesh=packed(model.visible);mesh.visual=trimesh.visual.TextureVisuals(uv=np.concatenate(model.uv).reshape(-1,2),material=mat)
-        scene.add_geometry(mesh,geom_name=layer+'_joinery',node_name=layer+'_joinery',parent_node_name=parent)
+        if model.visible:
+            mesh=packed(model.visible);mesh.visual=trimesh.visual.TextureVisuals(uv=np.concatenate(model.uv).reshape(-1,2),material=mat)
+            scene.add_geometry(mesh,geom_name=layer+'_joinery',node_name=layer+'_joinery',parent_node_name=parent)
         if model.pigmented:
             rock=packed([triangles for triangles,colors in model.pigmented]);rock.visual.vertex_colors=np.concatenate([colors for triangles,colors in model.pigmented]).reshape(-1,4)
             scene.add_geometry(rock,node_name=layer+'_rock',parent_node_name=parent)

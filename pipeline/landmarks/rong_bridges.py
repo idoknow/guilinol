@@ -203,7 +203,7 @@ def ancient_bridge(builder):
     for start,end in ((17,19.1),(19.1,21.2)):
         for left,right in ((-4.5,-2.25),(-2.25,0),(0,2.25),(2.25,4.5)):
             top = [landing_vertex(s,l) for s,l in ((start,left),(start,right),(end,right),(end,left))]
-            stone.face(top,(0,1,0),'granite')
+            builder.parts['sidewalk'].face(top,(0,1,0),'granite')
             if builder.collide: builder.hit.face(top,(0,1,0),'granite')
             for outside,a,c in zip((start==17,right==4.5,end==21.2,left==-4.5),top,top[1:]+top[:1]):
                 if outside:

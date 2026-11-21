@@ -12,9 +12,28 @@ function compile(sql, changes) {
     .replace('u.id user FROM', 'u.id AS "user" FROM')
 }
 
+export function measuredConnections(pool,metrics) {
+  async function connect() {
+    const before=performance.now()
+    const client=await pool.connect()
+    metrics.wait(performance.now()-before)
+    return {
+      async query(sql,args) {
+        const start=performance.now()
+        try{return await client.query(sql,args)}finally{metrics.query(performance.now()-start)}
+      },
+      release:()=>client.release()
+    }
+  }
+  return {connect,async query(sql,args){
+    const client=await connect()
+    try{return await client.query(sql,args)}finally{client.release()}
+  }}
+}
+
 export function database(pool) {
   async function batch(statements) {
-    const client = await pool.connect()
+    const client=await pool.connect()
     try {
       await client.query('BEGIN')
       await client.query('SELECT pg_advisory_xact_lock(907071)')

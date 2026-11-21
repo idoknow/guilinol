@@ -21,6 +21,7 @@ schema=$(printf "select count(*) from information_schema.tables where table_sche
 if [[ $schema == 0 ]]; then
   k exec -i deploy/glol-postgres -- psql -X -v ON_ERROR_STOP=1 -U postgres -d glol <deploy/postgres/001-schema.sql
 fi
+k exec -i deploy/glol-postgres -- psql -X -v ON_ERROR_STOP=1 -U postgres -d glol <deploy/postgres/002-telemetry.sql
 k exec -i deploy/glol-web -c glol-api -- node --input-type=module <<'JS'
 import {S3Client,HeadBucketCommand,CreateBucketCommand} from '@aws-sdk/client-s3'
 const client=new S3Client({region:'us-east-1',endpoint:process.env.S3_ENDPOINT,forcePathStyle:true}),params={Bucket:'glol-feedback'}
