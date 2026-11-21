@@ -158,5 +158,60 @@ def gen_glmu():
     c.save(out_dir / 'glmu_dongcheng-basemap.png')
     print('Generated glmu_dongcheng-basemap.png')
 
+# 2. 桂林理工大学附属小学 (glut_primary)
+def gen_glut():
+    b_pts = get_poly('way/473969804')
+    xs = [p[0] for p in b_pts]
+    zs = [p[1] for p in b_pts]
+    bounds = (min(xs) - 10, min(zs) - 10, max(xs) + 10, max(zs) + 10)
+    c = MapCanvas(bounds, 1200, 900)
+    c.draw_header('桂林理工大学附属小学 — 校园平面布局与OSM基线要素底图', 'OSM校界: way/473969804')
+
+    # Boundary
+    c.draw_poly(b_pts, fill=(42, 48, 60), outline=(239, 68, 68), width=3)
+
+    # Pitches
+    for wid, label, col in [('way/692355778', '体育活动场', (47, 133, 90)), ('way/692355777', '篮球场', (49, 130, 206))]:
+        pts = get_poly(wid)
+        if pts:
+            c.draw_poly(pts, fill=col, outline=(39, 103, 73), width=1)
+            cx = sum(p[0] for p in pts) / len(pts)
+            cz = sum(p[1] for p in pts) / len(pts)
+            c.draw_text(cx, cz, label, col=(255, 255, 255), size=11)
+
+    # Buildings
+    anchor_x, anchor_z = 979.45, -385.83
+    # B1: Overture 253e76b1-cafd-4077-adca-ae60ae8f7c7b
+    b1_local = [(36.47, -36.54), (-9.36, -49.73), (-21.52, -8.0), (24.32, 5.17)]
+    b1_pts = [(anchor_x + x, anchor_z + z) for x, z in b1_local]
+    c.draw_poly(b1_pts, fill=(217, 226, 236), outline=(16, 42, 67), width=1)
+    cx = sum(p[0] for p in b1_pts) / len(b1_pts)
+    cz = sum(p[1] for p in b1_pts) / len(b1_pts)
+    c.draw_text(cx, cz, 'B1 (4F)', col=(16, 42, 67), size=12)
+
+    bldgs = [
+        ('way/473969842', 'B2 (3F)'),
+        ('way/473969841', 'B3 (2F)'),
+        ('way/692355779', 'B4 (1F)'),
+    ]
+    for wid, label in bldgs:
+        pts = get_poly(wid)
+        if pts:
+            c.draw_poly(pts, fill=(217, 226, 236), outline=(16, 42, 67), width=1)
+            cx = sum(p[0] for p in pts) / len(pts)
+            cz = sum(p[1] for p in pts) / len(pts)
+            c.draw_text(cx, cz, label, col=(16, 42, 67), size=11)
+
+    # Gate on Jiangan Rd
+    gx, gz = 948.85, -392.63
+    c.draw_star(gx, gz)
+    c.draw_text(gx - 40, gz - 15, '校门: 建干路大门 (常闭)', col=(236, 201, 75), size=12)
+
+    c.draw_footer('口径 A 安全边界: 0门卫 0闸机 0监控 无室内 常闭校门')
+    c.save(out_dir / 'glut_primary-basemap.png')
+    print('Generated glut_primary-basemap.png')
+
+
 if __name__ == '__main__':
     gen_glmu()
+    gen_glut()
