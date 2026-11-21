@@ -2,7 +2,7 @@
 
 {{EVIDENCE}}
 
-有效：进入 in_progress，按现有地标管线核对 OSM、比例、朝向和遮挡。PR 标题带本 issue key。运行 `npm run audit:landmarks -- --strict`（脚本不可用则明确报告，不能声称通过），交付同角度照片/模型对比和斜视总览图。仅发布已脱敏、有公开授权的对比图；否则只交付私有对比图。交付时置 in_review，评论中 @ sg claude 请求验收，不自行部署。
+有效：进入 in_progress，按现有地标管线核对 OSM、比例、朝向和遮挡。PR 标题带本 issue key。运行 `npm run audit:landmarks -- --strict`（脚本不可用则明确报告，不能声称通过），交付同角度照片/模型对比和斜视总览图。模型里画到的车行道、路缘、人行道、标线必须绑定全城街道共享材质（`pipeline/seam-surfaces.json`），并交付每处模型与道路交接的低空斜视图，模型路面与世界路面不能有颜色、路缘或标线风格差异（IDOK-116）。仅发布已脱敏、有公开授权的对比图；否则只交付私有对比图。交付时置 in_review，评论中 @ sg claude 请求验收，不自行部署。
 
 信息不足、无效或重复：在独立评论中写如下块，首行状态分别用 need_info、rejected、duplicate，正文只写给提交人看的中文；重复须说明关联对象。补充后在本 issue 继续。不要引用旧状态块。
 
