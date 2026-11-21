@@ -6066,11 +6066,10 @@
   },
   {
     "id": "lijiang_primary",
-    "alignNote": "缺少 addr:street，不放牌",
     "name": "漓江小学",
     "anchor": "way/1563350367",
     "model": "landmarks/lijiang_primary.glb",
-    "collision": "none",
+    "collision": "mesh",
     "flatten": {
       "polygon": [
         [
@@ -6092,9 +6091,11 @@
       ],
       "elevation": 152.5
     },
-    "schematicCampus": "way/1563350367",
     "schoolGround": true,
-    "noStreetSign": true
+    "rotation": 0,
+    "replace": [
+      "way/1563350367"
+    ]
   },
   {
     "id": "longyin_primary",

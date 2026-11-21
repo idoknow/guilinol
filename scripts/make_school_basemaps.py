@@ -296,8 +296,38 @@ def gen_chenshan():
     print('Generated chenshan_primary-basemap.png')
 
 
+# 5. 漓江小学 (lijiang_primary)
+def gen_lijiang():
+    b_pts = get_poly('way/1563350367')
+    xs = [p[0] for p in b_pts]
+    zs = [p[1] for p in b_pts]
+    bounds = (min(xs) - 10, min(zs) - 10, max(xs) + 10, max(zs) + 10)
+    c = MapCanvas(bounds, 1200, 900)
+    c.draw_header('漓江小学 — 校园平面布局与OSM基线要素底图', 'OSM校界: way/1563350367')
+
+    # Boundary
+    c.draw_poly(b_pts, fill=(42, 48, 60), outline=(239, 68, 68), width=3)
+
+    # Note: No OSM/Overture buildings or pitches
+    cx = sum(p[0] for p in b_pts) / len(b_pts)
+    cz = sum(p[1] for p in b_pts) / len(b_pts)
+    c.draw_text(cx, cz - 10, '校园绿化与铺装空间', col=(160, 174, 192), size=14)
+    c.draw_text(cx, cz + 15, '(OSM/Overture内无建筑轮廓与场地要素)', col=(120, 134, 152), size=11)
+
+    # Gate on south (Fangxiang Rd)
+    anchor_x, anchor_z = 1125.48, 56.46
+    gx, gz = anchor_x - 5.5, anchor_z + 28.7
+    c.draw_star(gx, gz)
+    c.draw_text(gx - 40, gz - 15, '校门: 芳香路校门 (常闭)', col=(236, 201, 75), size=12)
+
+    c.draw_footer('口径 A 安全边界: 0门卫 0闸机 0监控 无室内 常闭校门 (无OSM楼栋及场地，不虚构补建)')
+    c.save(out_dir / 'lijiang_primary-basemap.png')
+    print('Generated lijiang_primary-basemap.png')
+
+
 if __name__ == '__main__':
     gen_glmu()
     gen_glut()
     gen_tianjiabing()
     gen_chenshan()
+    gen_lijiang()
