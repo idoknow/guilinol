@@ -5993,11 +5993,10 @@
   },
   {
     "id": "chenshan_primary",
-    "alignNote": "缺少 addr:street，不放牌",
     "name": "桂林市辰山小学",
     "anchor": "way/671777304",
     "model": "landmarks/chenshan_primary.glb",
-    "collision": "none",
+    "collision": "mesh",
     "flatten": {
       "polygon": [
         [
@@ -6055,9 +6054,15 @@
       ],
       "elevation": 153.1
     },
-    "schematicCampus": "way/671777304",
     "schoolGround": true,
-    "noStreetSign": true
+    "rotation": 0,
+    "replace": [
+      "way/671777304"
+    ],
+    "auditBuildings": {
+      "way/1475475421": null,
+      "way/1475475422": null
+    }
   },
   {
     "id": "lijiang_primary",

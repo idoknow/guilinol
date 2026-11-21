@@ -260,7 +260,44 @@ def gen_tianjiabing():
     print('Generated tianjiabing-basemap.png')
 
 
+# 4. 桂林市辰山小学 (chenshan_primary)
+def gen_chenshan():
+    b_pts = get_poly('way/671777304')
+    xs = [p[0] for p in b_pts]
+    zs = [p[1] for p in b_pts]
+    bounds = (min(xs) - 10, min(zs) - 10, max(xs) + 10, max(zs) + 10)
+    c = MapCanvas(bounds, 1200, 900)
+    c.draw_header('桂林市辰山小学 — 校园平面布局与OSM基线要素底图', 'OSM校界: way/671777304')
+
+    # Boundary
+    c.draw_poly(b_pts, fill=(42, 48, 60), outline=(239, 68, 68), width=3)
+
+    # Buildings
+    bldgs = [
+        ('way/1475475421', 'B1 (4F/5F)'),
+        ('way/1475475422', 'B2 (2F)'),
+    ]
+    for wid, label in bldgs:
+        pts = get_poly(wid)
+        if pts:
+            c.draw_poly(pts, fill=(217, 226, 236), outline=(16, 42, 67), width=1)
+            cx = sum(p[0] for p in pts) / len(pts)
+            cz = sum(p[1] for p in pts) / len(pts)
+            c.draw_text(cx, cz, label, col=(16, 42, 67), size=12)
+
+    # Gate on NW
+    anchor_x, anchor_z = 1131.63, -2354.08
+    gx, gz = anchor_x - 16.5, anchor_z - 47.5
+    c.draw_star(gx, gz)
+    c.draw_text(gx - 45, gz - 15, '校门: 西北门 (常闭)', col=(236, 201, 75), size=12)
+
+    c.draw_footer('口径 A 安全边界: 0门卫 0闸机 0监控 无室内 常闭校门 (OSM无pitch要素，不画球场)')
+    c.save(out_dir / 'chenshan_primary-basemap.png')
+    print('Generated chenshan_primary-basemap.png')
+
+
 if __name__ == '__main__':
     gen_glmu()
     gen_glut()
     gen_tianjiabing()
+    gen_chenshan()
