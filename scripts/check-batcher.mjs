@@ -116,6 +116,17 @@ check('four meshes left the scene', scene.children.length, sceneChildrenBefore -
 batcher.remove(t768.tile)
 check('no buckets left', batcher.buckets.size, 0)
 
+const bikeTile=()=>({...tile(512,256),parked:Float32Array.from(new THREE.Matrix4().makeTranslation(3,150,4).elements)})
+const initial=bikeTile();batcher.add(initial)
+const candidate=batcher.nearestBike(515,260,150,2)
+check('parked bike world position',[candidate.x,candidate.z],[515,260])
+check('take once',batcher.takeBike(candidate.id),true)
+check('duplicate take',batcher.takeBike(candidate.id),false)
+batcher.remove(initial.tile);batcher.add(bikeTile())
+check('no duplicate after tile reload',batcher.nearestBike(515,260,150,2),null)
+batcher.returnBike(candidate.id)
+check('restored same instance',batcher.nearestBike(515,260,150,2).id,candidate.id)
+
 await rm(dir, {recursive: true, force: true})
 
 if (failures.length) {

@@ -9,7 +9,7 @@ const data=JSON.parse(gunzipSync(await readFile('dist/world/vehicles.bin')))
 const car=data.cars.filter(point=>Math.hypot(point[0]+572,point[2]+92)<50)
   .sort((left,right)=>Math.hypot(left[0]+572,left[2]+92)-Math.hypot(right[0]+572,right[2]+92))[0]
 assert(car,'no car at Wangcheng gate approach')
-const route=[[-511,-70],[-378,-25],[-374,3],[-383,40],[-381,57],[-367,71],[-331,92],[-602,560],[-633,583],[-647,590],[-666,591],[-719,571],[-869,881],[-879,968],[-885,991],[-899,1010],[-924,1019],[-952,1023],[-1033,1024],[-1085,1018],[-1135,1018],[-1148,1053],[-1164,1094]]
+const route=[[-511,-70],[-378,-25],[-374,3],[-383,40],[-381,57],[-367,71],[-331,92],[-602,560],[-633,583],[-647,590],[-666,591],[-719,571],[-869,881],[-879,968],[-885,991],[-899,1010],[-924,1019],[-952,1023],[-1033,1024],[-1085,1018],[-1125,1007],[-1136,1006],[-1138,1020],[-1148,1053],[-1164,1094]]
 const parking=[-1132.4,1072.8] // West access edge of OSM parking way 1430634139.
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 let browser
@@ -45,12 +45,13 @@ try{
             }if(inside)throw Error(`entered ${name}`)}
             if(frame%20===0){stream.tick(walk.position);await new Promise(resolve=>setTimeout(resolve,0))}
           }
-          if(!reached)throw Error(`stalled at ${walk.position.toArray()} heading for ${east},${south}: ${walk.obstacle}`)
+          if(!reached){const {hits,carContact}=walk.probe();throw Error(`stalled at ${walk.position.toArray()} heading for ${east},${south}: ${walk.obstacle} ${JSON.stringify({hits,carContact})}`)}
         }
         for(const code of pressed)key(code,false)
         return {path,elapsedMs:Math.round(performance.now()-start),distance:Math.hypot(walk.position.x-parking[0],walk.position.z-parking[1])}
       },{route,quiet:data.quiet,parking})
       console.log(result);assert(result.distance<=40,'missed parking radius')
+      await page.screenshot({path:'captures/drive/parking.png'})
       await page.keyboard.press('f');await page.waitForFunction(()=>window.viewer.walk.vehicle==='foot')
     }
     await page.close()

@@ -1,5 +1,6 @@
 import * as T from 'three'
 import type {Stream} from '../stream'
+import type {ParkedBike} from '../batch'
 import {fetchAsset} from '../world'
 import {quietIndex} from '../drive/quiet'
 import {updateTravel} from '../game/state'
@@ -46,21 +47,32 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
   interactRing.renderOrder=4;interactRing.visible=false;group.add(interactRing)
   const button=document.createElement('button');button.className='vehicle-action';button.setAttribute('aria-keyshortcuts','F');button.hidden=true;document.body.append(button)
   const bikeCtrl=createBikeControl(),carCtrl=createCarControl()
+  let nearDecor:ParkedBike|null=null,riddenDecor:string|null=null
   let bike:T.Mesh|null=null,lastBike:T.Mesh|null=null,car:T.Mesh|null=null,lastCar:T.Mesh|null=null,route=-1,nearBike:T.Mesh|null=null,nearRoute=-1,nearRouteDist=Infinity,segment=1,disembark=false,active=false,heading=0
   let nearFree:{slot:MooringSlot|null,distance:number,atBank:boolean}={slot:null,distance:Infinity,atBank:false}
   function syncHud(){
     const preferFree=!!nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)
     const freePrompt=nearFree.slot?(nearFree.slot.kind==='freeRaft'?'划竹筏 · ':'划小船 · ')+nearFree.slot.name:''
-    const ridePrompt=nearBike?(nearBike.name==='car'?'开车':nearBike.name==='bicycle'?'骑单车':'骑电动车'):''
+    const ridePrompt=nearDecor?'骑电动车':nearBike?(nearBike.name==='car'?'开车':nearBike.name==='bicycle'?'骑单车':'骑电动车'):''
     const label=car?'下车':bike?'下车':freeBoats?.active?'靠岸下船':route>=0?(disembark?'下一站下船':'下站下船'):ridePrompt||(preferFree?freePrompt:nearRoute>=0?'上船 · '+data.routes[nearRoute].start:'')
     document.body.toggleAttribute('data-aboard',!!car||!!bike||route>=0||!!freeBoats?.active);button.hidden=!label;if(button.textContent!==label)button.textContent=label
   }
-  function reset(){if(route>=0)vessels[route].position.fromArray(data.routes[route].path[0]);freeBoats?.reset();if(car){car.rotation.set(carCtrl.pitch,carCtrl.heading,0,'YXZ');store(car);if(active&&car.parent&&!visibleCells.has(car.parent as T.Group)){visibleCells.add(car.parent as T.Group);group.add(car.parent)}}if(bike){bike.rotation.set(bikeCtrl.pitch,bikeCtrl.heading,0,'YXZ');store(bike);if(active&&bike.parent&&!visibleCells.has(bike.parent as T.Group)){visibleCells.add(bike.parent as T.Group);group.add(bike.parent)}}car=null;bike=null;route=-1;nearFree={slot:null,distance:Infinity,atBank:false};disembark=false;segment=1;bikeCtrl.reset();carCtrl.reset()}
+  function reset(){
+    if(riddenDecor){bike?.removeFromParent();env?.stream.batches.returnBike(riddenDecor);bike=lastBike=null;riddenDecor=null}
+    nearDecor=null;
+    if(route>=0)vessels[route].position.fromArray(data.routes[route].path[0]);freeBoats?.reset();if(car){car.rotation.set(carCtrl.pitch,carCtrl.heading,0,'YXZ');store(car);if(active&&car.parent&&!visibleCells.has(car.parent as T.Group)){visibleCells.add(car.parent as T.Group);group.add(car.parent)}}if(bike){bike.rotation.set(bikeCtrl.pitch,bikeCtrl.heading,0,'YXZ');store(bike);if(active&&bike.parent&&!visibleCells.has(bike.parent as T.Group)){visibleCells.add(bike.parent as T.Group);group.add(bike.parent)}}car=null;bike=null;route=-1;nearFree={slot:null,distance:Infinity,atBank:false};disembark=false;segment=1;bikeCtrl.reset();carCtrl.reset()}
   function interact(){if(!active)return
     if(car){if(land(car.position.x,car.position.z,carCtrl.heading,car.position.y,'car'))reset()}
     else if(bike){if(land(bike.position.x,bike.position.z,bikeCtrl.heading,bike.position.y))reset()}
     else if(freeBoats?.active){const spot=freeBoats.dismount(data.docks,s=>!!env?.landFree(s));if(spot){nearFree={slot:null,distance:Infinity,atBank:false};syncHud();return}}
     else if(route>=0)disembark=true
+    else if(nearDecor&&env&&board){
+      const spot=board(nearDecor.x,nearDecor.y,nearDecor.z)
+      if(!spot||!env.stream.batches.takeBike(nearDecor.id))return
+      bike=lastBike=vehicleModel('bike',1);riddenDecor=nearDecor.id
+      bike.position.set(spot.x,spot.bikeY,spot.z);bike.rotation.y=nearDecor.yaw
+      group.add(bike);bikeCtrl.mount(nearDecor.yaw,0,'bike');nearDecor=null
+    }
     else if(nearBike?.name==='car'){
       const safePos=board?board(nearBike.position.x,nearBike.position.y,nearBike.position.z,'car'):{x:nearBike.position.x,y:nearBike.position.y,z:nearBike.position.z,bikeY:nearBike.position.y}
       if(!safePos)return
@@ -95,6 +107,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
       }
     }
     for(const cell of visibleCells)if(!nextCells.has(cell)){group.remove(cell);visibleCells.delete(cell)}
+    nearDecor=!bike&&!car&&!freeBoats?.active&&route<0?env?.stream.batches.nearestBike(x,z,footY,Math.min(best,4.2))??null:null
     let nearestDock=9
     data.routes.forEach((leg,index)=>{const [dx,,dz]=data.docks[leg.start],distance=Math.hypot(dx-x,dz-z);vessels[index].visible=route===index||(moored[index]&&distance<200);piers.get(leg.start)!.visible=distance<200
       if(distance<nearestDock){nearRoute=index;nearestDock=distance}})

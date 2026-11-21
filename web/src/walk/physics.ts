@@ -205,7 +205,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         const swDesc=sidewalk.length?weldedSurface(sidewalk,null,data,.65,.38,1.4,2.4):null
         if(swDesc)colliders.push(add(swDesc.setTranslation(tile.x,0,tile.z),'sidewalk'))
         const positions=surface?.getAttribute('position'),kinds=surface?.getAttribute('aSurface'),road:number[]=[]
-        if(positions&&kinds)for(let at=0;at<positions.count;at++)if(kinds.getX(at)===0)road.push(positions.getX(at),positions.getY(at),positions.getZ(at))
+        if(positions&&kinds)for(let at=0;at<positions.count;at++)if(kinds.getX(at)===0)road.push(positions.getX(at)-tile.x,positions.getY(at),positions.getZ(at)-tile.z)
         const rdDesc=road.length?weldedSurface(Float32Array.from(road),null,data,.65,.8,1.8,4):null
         if(rdDesc)colliders.push(add(rdDesc.setTranslation(tile.x,0,tile.z),'road'))
         for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=((top+endTop)/2-bottom)/10+1.25
@@ -359,6 +359,11 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function findCarMount(px:number,py:number,pz:number,cx:number,cy:number,cz:number){
     return probeCarMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},px,py,pz,cx,cy,cz)
   }
+  let carContact: {kind:Kind|undefined;center:R.Vector;handle:number;source:string}|null=null
+  function recordContact(collider:R.Collider,source:string){
+    carContact={kind:kinds.get(collider.handle),center:collider.translation(),handle:collider.handle,source}
+    return true
+  }
   function carOverlap(x:number,footY:number,z:number,heading:number,dirSign:-1|0|1=0){
     const fx=-Math.sin(heading),fz=-Math.cos(heading),rx=Math.cos(heading),rz=-Math.sin(heading)
     const halfL=dirSign===0?2.12:1.62,shift=dirSign*.52
@@ -366,7 +371,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     let box=hullBoxes.get(key)
     if(!box){box=new R.Cuboid(.86,.48,halfL);hullBoxes.set(key,box)}
     const half=heading*.5
-    if(world.intersectionWithShape({x:x+fx*shift,y:footY+.82,z:z+fz*shift},{x:0,y:Math.sin(half),z:0,w:Math.cos(half)},box,undefined,undefined,capsule,undefined,carWallFilter))return true
+    const hullHit=world.intersectionWithShape({x:x+fx*shift,y:footY+.82,z:z+fz*shift},{x:0,y:Math.sin(half),z:0,w:Math.cos(half)},box,undefined,undefined,capsule,undefined,carWallFilter)
+    if(hullHit)return recordContact(hullHit,'hull')
     const dirs:[number,number,number][]=[]
     if(dirSign>=0)dirs.push([fx,fz,2.18],[fx*2.14-rx*.84,fz*2.14-rz*.84,1],[fx*2.14+rx*.84,fz*2.14+rz*.84,1])
     if(dirSign<=0)dirs.push([-fx,-fz,2.18],[-fx*2.14-rx*.84,-fz*2.14-rz*.84,1],[-fx*2.14+rx*.84,-fz*2.14+rz*.84,1])
@@ -375,7 +381,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       for(const [dx,dz,scale] of dirs){
         const len=scale===1?Math.hypot(dx,dz):scale
         segmentRay.dir.x=dx/(scale===1?len:1);segmentRay.dir.y=0;segmentRay.dir.z=dz/(scale===1?len:1)
-        if(world.castRay(segmentRay,len,true,undefined,undefined,capsule,undefined,landmarkFilter))return true
+        const rayHit=world.castRay(segmentRay,len,true,undefined,undefined,capsule,undefined,landmarkFilter)
+        if(rayHit)return recordContact(rayHit.collider,'landmark ray')
       }
     }
     return false
@@ -386,5 +393,5 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,pathBlocked,freeCapsule,wet,insideHouse,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
+  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,get carContact(){return carContact},pathBlocked,freeCapsule,wet,insideHouse,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
 }

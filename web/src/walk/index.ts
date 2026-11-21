@@ -431,7 +431,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       planarSpeed:Math.hypot(vx,vz),grounded,verticalVelocity:velocity,facing,figPos:figure.position.toArray(),figYaw:figure.rotation.y,bikePitch:rides?.bikePitch??0,bikeY:rides?.bikeY??0,carPitch:rides?.carPitch??0,carY:rides?.carY??0,
       pedalPhase:ridePose.pedalPhase,thighL:figure.getObjectByName('ThighL')?.rotation.x??0,thighR:figure.getObjectByName('ThighR')?.rotation.x??0,
       camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z,camera.position.y),
-      boat:rides?.boatProbe()??null}}
+      carContact:sim.carContact,boat:rides?.boatProbe()??null}}
   function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);rides?.nearby(start.x,start.z,rides?.boat?start.y:start.y-cfg.height/2)
     if(rides?.freeBoat){
       const read=held?still:input.read(), firstFrame=!wasBoat
