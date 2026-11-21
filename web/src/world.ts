@@ -1,3 +1,4 @@
+import {cacheResponse} from './telemetry'
 import * as THREE from 'three'
 import {buildingGeometry,type Building} from './buildings'
 import {loadStreetGeometry} from './street-loader'
@@ -20,6 +21,7 @@ export interface Manifest {
 export let bytes = 0
 export async function fetchAsset(file:string, signal?:AbortSignal) {
   const response = await fetch(`./world/${file}`, {signal})
+  cacheResponse(response)
   if (!response.ok) throw Error(`${file}: HTTP ${response.status}`)
   const data = await response.arrayBuffer()
   bytes += data.byteLength

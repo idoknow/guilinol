@@ -1,3 +1,4 @@
+import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
 import {bytes, fetchAsset, startOverview, type Manifest} from './world'
 import {Stream} from './stream'
@@ -23,7 +24,9 @@ let paused=false
 export function setPaused(on:boolean){paused=on}
 async function start() {
   bootProgress('载入地形', 12)
-  const manifest:Manifest = JSON.parse(new TextDecoder().decode(await fetchAsset('manifest.json')))
+  const manifestBytes = await fetchAsset('manifest.json')
+  identifyWorld(manifestBytes)
+  const manifest:Manifest = JSON.parse(new TextDecoder().decode(manifestBytes))
   if(manifest.version!==4 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
   const ovTask = startOverview(manifest), pkTask = startPeaks(manifest.peaks)
   await Promise.all([ovTask.dispatched, pkTask.dispatched])
@@ -75,11 +78,13 @@ async function start() {
   async function walkTo(x:number,z:number,yaw:number,reason:string){
     if(switching)return false
     switching=true
-    try{await loadWalker();if(walker!.active)walker!.leave();return await walker!.enter(x,z,yaw,reason)}finally{switching=false;showMode()}
+    const start=performance.now()
+    try{await loadWalker();if(walker!.active)walker!.leave();return await walker!.enter(x,z,yaw,reason)}finally{operation('teleport',start);switching=false;showMode()}
   }
   async function toggle(initial=false){
     if(switching)return
-    if(walker?.active){walker.leave();return}
+    const start=performance.now()
+    if(walker?.active){walker.leave();operation('switch',start);return}
     switching=true
     try{
       const walking=await loadWalker()
@@ -88,7 +93,7 @@ async function start() {
       const gate=walkConfig.gate,point=preset?.walk??(initial&&!preset?gate:{x:original.position.x,z:original.position.z,yaw:original.rotation.y})
       if(!await walking.enter(point.x,point.z,point.yaw,initial?name??'default':'flight',!!preset?.walk)&&initial)
         await walking.enter(gate.x,gate.z,gate.yaw,'fallback')
-    }finally{switching=false}
+    }finally{operation('switch',start);switching=false}
   }
   window.addEventListener('keydown',event=>{if(event.code==='KeyV'&&!event.repeat)void toggle().then(showMode)})
   const touch=matchMedia('(pointer:coarse)').matches,hint=document.querySelector<HTMLElement>('.hint')!,toast=document.querySelector<HTMLElement>('.toast')!
@@ -153,6 +158,9 @@ async function start() {
     setView:async(view)=>(await import('./play/feedback-view')).setView(host,view),
     fly(){if(walker?.active)walker.leave();showMode()},get cinema(){return cinema},set cinema(on){cinema=on}}
   let tour:Awaited<ReturnType<typeof import('./play').play>>|undefined
+  const sampleFrame=instrument(renderer,()=>({mode:tour?.map?.active?'map':paused?'menu':walker?.active?(walker.vehicle==='foot'?'walk':'drive'):'fly',
+    x:camera.position.x,z:camera.position.z,chunks:stream.loaded.size}))
+  let playable=false
   function animate(now:number){
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now
@@ -180,6 +188,14 @@ async function start() {
     dome.update(); drops.update()
     tour?.tick(elapsed/1000)
     draw()
+    sampleFrame(elapsed)
+    if(!frame)record('firstFrame',{ms:performance.now()})
+    if(!playable && first && !paused && !switching && !stream.pending.size && stream.loaded.size){
+      const p=walker?.active?walker.position:camera.position
+      if(manifest.chunks.every(t=>Math.hypot(t.x+128-p.x,t.z+128-p.z)>stream.radius||stream.loaded.has(t))){
+        playable=true;record('playable',{ms:performance.now()})
+      }
+    }
     frame++; sum+=elapsed;samples++
     Object.assign(stats,{ms:elapsed,calls:renderer.info.render.calls,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,frame,loaded:stream.loaded.size,pending:stream.pending.size,
       visited:stream.visited.size,failures:stream.failures.size})
