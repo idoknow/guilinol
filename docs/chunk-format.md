@@ -53,3 +53,10 @@
 近景每环 128 点、12 环。低裙边以上保留 21 条竖棱；清单的 `shoulder`（0.50–0.65）和 `taper`（10–25%）分别是逐峰种子确定的肩高比例和截至肩部的平均半径收缩比例。圆顶从肩部连续收至约 0.15R 的末环后封尖，圆顶高度为 `(1 − shoulder) × 相对高`。远景 32 点、6 环，两级共用偏斜的峰顶和 PK02 属性约定。按清单名称设置 `model`（相对 `world/` 的 GLB 路径）并在发布时提供世界坐标模型，可跳过该山两级程序网格；手工峰的专用碰撞需另供。
 
 在已命名峰削平后，管线在 32 m 陆地格网上检测剩余隆起。局部地面取距中心 320–480 m 环带的第 15 百分位，再经 2 格高斯平滑；水域不作为候选，其高程不参与低地估计（用最近干点延拓）。对高差 ≥25 m 的八邻连通区，按局部极大值的高程降序、同行列稳定排序选峰，距已选峰及已命名峰均须 ≥60 m。目标为该格点的 DEM 高程，清单单独写入 `manifest.peaks.autoCatalog` 所指 JSON，不回写 OSM 清单。自动峰和具名峰同材质、同高度回写和建筑剔除规则。检测后将区域低地基准插值至 4 m，仅平滑压低干地的剩余隆起（3 m 以下不改，3–15 m 渐变，15 m 以上降至基准）；岩体仍由独立网格绘制。
+## 桂林区域地图（OV1，非地形）
+
+`overview.bin` 是 gzip 封装的 UTF-8 JSON，不依赖 HTTP Content-Encoding。`version=1`；`paths` 每项为 `[layer,[ring,...]]`，ring 为交错的整数 `[x,z,...]`（米，与 `ll2xz` 同原点）。道路是折线（`ring` 为 S2201 路线关系或含该 ref 的共线段；其余为 `motorway/trunk/primary/secondary`，含连接线）；`lake/pond` 为多边形，外环在前，后跟洞。`labels` 为 `[district|place|peak,公开名称,x,z]`。范围 25.09–25.39°N、110.09–110.41°E，与 GL04 分块范围独立。
+
+底图来自 © OpenStreetMap contributors（ODbL），本次 Geofabrik 中国 PBF 的 SHA-256 为 `bd25a37406ad4edd6e9ded6cc15069c931c01ebcf64f034cebae4a4ccbdc08c9`。原始数据不入库。维护者刷新处理后的快照：`uv run --with osmium python pipeline/overview_pbf.py raw/china.osm.pbf`。`npm run world` 离线从 `pipeline/overview-map.gz` 生成完整地图和按当前 bbox 筛选的 `overview-edge.bin`。小地图只在逼近边界时请求边缘包；完整包首次打开大地图时请求，然后两者共享。
+
+开放区域优先取 `manifest.builtArea`（GeoJSON Polygon，WGS84 `[lon,lat]`；可有洞），否则取 `manifest.bbox=[south,west,north,east]`。不要用对齐到分块的 `extent` 代替。地图变焦、遮罩、搜索和传送均不改变世界分块范围。
