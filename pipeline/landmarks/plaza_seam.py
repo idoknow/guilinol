@@ -47,8 +47,15 @@ def civic_plaza(builder, ring, frontage=None, refine_outer=False, dressed=False,
     street_boundary = streets_mask.boundary
     if frontage is not None:
         plaza = original.union(frontage.intersection(streets_mask.buffer(4)))
+    if dressed and not streets_mask.is_empty:
+        # Close narrow terrain slivers between the plaza outline and its street lip.
+        closed = plaza.union(streets_mask).buffer(.25).buffer(-.25)
+        plaza = plaza.union(closed.intersection(plaza.buffer(.5)).intersection(streets_mask.buffer(.5)))
     footprint = plaza.difference(streets_mask)
     regions = [('pave',footprint)]
+    if frontage is not None:
+        interior = footprint.buffer(-.30)
+        regions = [('pave',interior),('dark',footprint.difference(interior))]
     if dressed and not streets_mask.is_empty:
         outer = streets_mask.buffer(.20)
         inner = streets_mask.buffer(.50)
