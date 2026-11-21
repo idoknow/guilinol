@@ -424,8 +424,9 @@ try {
 
   // Deep-lean tuck in S gear past fatal lean angle triggers real lowside
   await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(false))
-  await steerTowardPoint(page, -539, -95, false, 120, 8)
-  await steerTowardPoint(page, -511, -70, true, 160, 8)
+  await steerTowardPoint(page, -511, -70, false, 140, 3)
+  await steerTowardPoint(page, -463, -54, false, 120, 3)
+  await steerTowardPoint(page, -378, -25, true, 120, 3)
   await steerTowardPoint(page, -197, 37, true, 35)
   await page.click('.ride-gear-btn[data-gear="4"]')
   await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(true))
@@ -517,8 +518,7 @@ try {
 
   // 6. Mod cycle KeyG + HUD click + battery/shared distinction + compliant D2 reset on remount + clean dismount KeyF
   await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(false))
-  await steerTowardPoint(page, -539, -95, false, 120, 8)
-  await steerTowardPoint(page, -480, -60, true, 120, 4)
+  await steerTowardPoint(page, -463, -54, true, 140, 3)
   await page.keyboard.press('KeyG')
   await stepTicks(page, 1, 0.05)
   const modAfterG = await page.locator('.ride-mod').textContent()
