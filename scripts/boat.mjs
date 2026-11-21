@@ -75,6 +75,7 @@ try {
 
   async function gotoWalk(page, urlQuery = 'mode=walk&verify&flow=0') {
     await page.route('**/favicon.ico', route => route.fulfill({status: 204}))
+    await page.route('**/api/t', route => route.fulfill({status: 204}))
     await page.goto(`${baseUrl}/?${urlQuery}`)
     await page.waitForFunction(() => window.viewer?.walk?.active, null, {timeout: 90000})
     await page.waitForSelector('.vehicle-action', {state: 'attached', timeout: 45000})

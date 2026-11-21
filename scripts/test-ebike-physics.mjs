@@ -68,7 +68,7 @@ async function stepTicks(page, count, dt = 0.05) {
   }, {count, dt})
 }
 
-async function steerTowardPoint(page, tx, tz, stopAfter = true, maxSteps = 90) {
+async function steerTowardPoint(page, tx, tz, stopAfter = true, maxSteps = 90, arrivalDist = 0) {
   for (let i = 0; i < maxSteps; i++) {
     const snap = await stepTicks(page, 1, 0.05)
     if (snap.probe?.twoWheelFlow === 'crashed') break
@@ -86,8 +86,9 @@ async function steerTowardPoint(page, tx, tz, stopAfter = true, maxSteps = 90) {
       await stepTicks(page, 4, 0.05)
       continue
     }
-    if (!snap.obstacle && Math.abs(err) < 0.08 && (!stopAfter || snap.speed < 0.25)) break
-    if (dist < 4 && !stopAfter) break
+    const closeEnough = arrivalDist > 0 ? dist <= arrivalDist : true
+    if (!snap.obstacle && closeEnough && Math.abs(err) < 0.08 && (!stopAfter || snap.speed < 0.25)) break
+    if (dist < Math.max(4, arrivalDist) && !stopAfter) break
     const needTurn = Math.abs(err) > 0.25
     await page.keyboard[needTurn && snap.speed > 3.2 ? 'up' : 'down']('KeyW')
     await page.keyboard[err > 0.05 ? 'down' : 'up']('KeyA')
@@ -164,6 +165,7 @@ try {
 
   const port = server.httpServer.address().port
   await page.route('**/favicon.ico', r => r.fulfill({status: 204}))
+  await page.route('**/api/t', r => r.fulfill({status: 204}))
   await page.goto(`http://127.0.0.1:${port}/?verify&mode=walk&flow=0&time=10`, {waitUntil: 'domcontentloaded'})
   await mountNearestBike(page)
 
@@ -396,11 +398,11 @@ try {
   await page.keyboard.up('KeyW')
   if (d2NonTuckCrashed) await finishCrashStandAndPickup(page, '扶起电动车')
 
-  // High-speed D3 non-tuck turn check (re-center on Jiefang East Rd first so post-D2 turn never clips curbside props)
+  // High-speed D3 non-tuck turn check (re-center along Jiefang East Rd before facing west at (-539,-95) plaza)
   await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(false))
-  await steerTowardPoint(page, -445, -48, false, 90)
-  await steerTowardPoint(page, -539, -95, true, 160)
-  await steerTowardPoint(page, -610, -110, true, 60)
+  await steerTowardPoint(page, -445, -48, false, 140, 12)
+  await steerTowardPoint(page, -539, -95, true, 180, 6)
+  await steerTowardPoint(page, -610, -110, true, 24)
   await page.click('.ride-gear-btn[data-gear="3"]')
   await stepTicks(page, 1, 0.05)
   await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(true))
@@ -422,8 +424,8 @@ try {
 
   // Deep-lean tuck in S gear past fatal lean angle triggers real lowside
   await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(false))
-  await steerTowardPoint(page, -511, -70, true, 120)
-  await steerTowardPoint(page, -197, 37, true, 60)
+  await steerTowardPoint(page, -511, -70, true, 160, 8)
+  await steerTowardPoint(page, -197, 37, true, 35)
   await page.click('.ride-gear-btn[data-gear="4"]')
   await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(true))
   await page.keyboard.down('KeyW')
@@ -451,7 +453,11 @@ try {
   }
   const leftLowside = fatalLeftLowside || nonTuckLeftCrashed
 
+  await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(false))
+  await steerTowardPoint(page, -445, -48, false, 120, 12)
+  await steerTowardPoint(page, -197, 37, true, 35)
   await page.click('.ride-gear-btn[data-gear="4"]')
+  await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(true))
   await page.keyboard.down('KeyW')
   await stepTicks(page, 30, 0.05)
   await page.keyboard.down('ShiftLeft')
