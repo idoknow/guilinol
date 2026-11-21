@@ -12,7 +12,6 @@ way/701820455, way/701820456, way/701820457), and Overture building footprints:
 - B6 (193caf84-2a3c-4949-9cf0-55bed91edc2d): 3F south street-front building (405.6 m²).
 - B7 (c693ee13-ec1b-4e1c-a409-0ef415f03b50): 3F southeast building (161 m²).
 - 3 emerald basketball courts (way/701820455, way/701820456, way/701820457).
-- 150m rubber running track with green soccer turf infield in central courtyard.
 - Flagpole plaza, camphor tree avenues, and perimeter enclosure.
 - South grand entrance gate on Ronghu North Road with closed iron gate.
 - Strictly K-12 compliant (0 guardhouse, 0 turnstiles, 0 CCTV, closed exterior gates).
@@ -192,17 +191,6 @@ def build_ronghu_primary(b: SchoolBuilder):
     # 3 Emerald Basketball Courts
     for cx, cz, yaw in COURTS:
         b.basketball_court(cx=cx, cz=cz, yaw=yaw, w=28.0, d=15.0)
-
-    # 150m Rubber Running Track with Green Soccer Pitch Infield
-    b.running_track(
-        cx=-8.0,
-        cz=10.0,
-        length=54.0,
-        width=34.0,
-        yaw=-0.484,
-        track_reg='track_red',
-        infield_mode='soccer',
-    )
 
     # 4. Central Courtyard Flagpole Plaza
     b.flagpole_plaza(cx=-12.0, cz=24.0, yaw=-0.484, poles=3)
