@@ -23,8 +23,6 @@ import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRange
 import {renderRangeControl} from './ui/render-range'
 import type {FeedbackView} from '../../lib/feedback-contract'
 import {
-  SHARED_EBIKE_FREE_SECONDS,
-  chargeSharedRideFee,
   createGameDebugProbe,
   createMissionBeacon,
   getState,
@@ -239,9 +237,6 @@ async function start() {
     }
   })
   window.addEventListener('game:open-missions', () => missionUi.openBoard())
-  let sharedRideElapsedSec = 0
-  let sharedRideCharged = false
-  let sharedRideNonce = `sr_${Date.now()}`
   const syncMissionLoop = (dt: number) => {
     const walking = !!walker?.active
     const activePos = walking ? walker!.position : camera.position
@@ -254,19 +249,6 @@ async function start() {
           : walker!.vehicle
     const eb = walking ? walker!.ebike?.state : null
     const speedMs = walking ? Math.abs(walker!.speed) : 0
-    if (mode === 'ebike' && eb?.vehicleType === 'shared' && !params.has('verify')) {
-      sharedRideElapsedSec += dt
-      if (sharedRideElapsedSec >= SHARED_EBIKE_FREE_SECONDS && !sharedRideCharged) {
-        sharedRideCharged = true
-        const fee = chargeSharedRideFee(sharedRideNonce)
-        if (fee.fallbackFree) showToast('余额不足 ¥3，可先骑免费单车或步行接单', 2800)
-        else if (fee.charged > 0) showToast(`共享电车试骑已满 120s，扣费 ¥${fee.charged}`, 2200)
-      }
-    } else {
-      sharedRideElapsedSec = 0
-      sharedRideCharged = false
-      sharedRideNonce = `sr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
-    }
     missionRunner.step({
       dt,
       x: activePos.x,

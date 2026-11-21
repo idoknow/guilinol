@@ -19,14 +19,20 @@ import {isGlobalHotkeyBlocked, isModalOrOverlayOpen} from './input-guard'
 import {createInteractArbiter} from './interact-arbiter'
 import {mountShopOverlay, type ShopCloseReason} from '../ui/shop-overlay'
 import {
+  PERSONAL_EBIKE_MODELS,
+  emit as emitGameEvent,
   findNearbyServiceBay,
   findNearbyShopTrigger,
   getQuietZoneAt,
   getShop,
+  getState as getGameState,
   listShops,
+  onEvent as onGameEvent,
   setPrompt,
   updateTravel,
   type ActiveVehicleState,
+  type PersistedEbikeVisual,
+  type PersonalEbikeModelId,
   type PlayerMode,
 } from '../game'
 import {
@@ -419,6 +425,79 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let savedStreetPose:SavedStreetPose|null=null
   let shopCam:ActiveShopCamera|null=null
   const shopLookTarget=new THREE.Vector3()
+  let testRideBrakeTimer=0
+  let testRideOobSince=0
+
+  function finishActiveTestRide(reason:'timeout'|'out_of_bounds'|'user'|'dismount_far'|'mode_switch'|'purchase'){
+    testRideBrakeTimer=0
+    testRideOobSince=0
+    // Clear any active crash/standup/pickup state atomically before reclaiming test-ride bike (IDOK-128 safety).
+    if(crashSession){
+      crashSession=null
+      crashRecoverQueued=false
+      ebikeFx.resetForMount('normal',100)
+    }
+    standUpSession=null
+    pickupSession=null
+    const ended=rides?.endTestRide(reason)??false
+    if(ended){
+      releaseDynamicBike()
+      input.syncRideHud(null,null)
+      applyFootController()
+      wasBike=false
+      if((!verify||stuntMode)&&reason!=='mode_switch'&&reason!=='purchase'){
+        const label=reason==='timeout'?'试驾时间已到，车辆已安全归还车行'
+          :reason==='out_of_bounds'?'超出试驾范围，车辆已安全归还车行'
+            :reason==='dismount_far'?'已离开试驾车，试驾自动结束'
+              :'已结束免费试驾，欢迎回「漓行电驴行」选购'
+        window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:label,ms:2800}}))
+      }
+    }
+  }
+
+  function summonPersonalWithToast(vehicleId?:string){
+    if(!rides)return {ok:false as const,code:'NOT_ON_FOOT' as const}
+    const p=sim.body.translation()
+    const res=rides.summonPersonalBike({x:p.x,y:p.y-cfg.height/2,z:p.z},yaw,vehicleId)
+    if(!verify||stuntMode){
+      const msg=res.ok
+        ?'个人电摩已送达路边（已挂 P 档并支好边撑），按 F 上车'
+        :res.code==='QUIET_ZONE_BLOCKED'
+          ?'校园安静区内禁止召唤个人电摩，请走到校外路边'
+          :res.code==='COOLDOWN'
+            ?`召唤冷却中（剩余 ${Math.ceil((res.cooldownRemainingMs??0)/1000)} 秒）`
+            :res.code==='NO_OWNED_VEHICLE'
+              ?'车库暂空，前往十字街「漓行电驴行」选购个人电摩'
+              :res.code==='NOT_ON_FOOT'
+                ?'请先下车到路边步行状态再召唤个人电摩'
+                :res.code==='IN_TEST_RIDE'
+                  ?'试驾进行中无法召唤个人电摩'
+                  :'当前周围空间不足，挪到开阔路边再试'
+      window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:msg,ms:2500}}))
+    }
+    return res
+  }
+
+  onGameEvent(ev=>{
+    if(ev.type==='shop:buy'&&ev.itemType==='ebike_model'){
+      if(getGameState().garage.activeTestRide)finishActiveTestRide('purchase')
+      const activeId=getGameState().garage.activeVehicleId
+      if(activeId)rides?.spawnPersonalBikeAtBay(ev.shopId,activeId)
+    }else if(ev.type==='garage:mod'||ev.type==='garage:service'){
+      rides?.refreshPersonalBikeVisual(ev.vehicleId)
+      const owned=getGameState().garage.vehicles[ev.vehicleId]
+      if(owned&&mountedStaticBike&&mountedStaticBike.userData.instanceId===ev.vehicleId){
+        ebikeRig.applyMods(owned.visual,(mountedStaticBike.userData.paint as number|undefined)??0)
+      }
+    }
+  })
+
+  window.addEventListener('game:open-garage',()=>{
+    if(active)shopOverlay.openGarage()
+  })
+  window.addEventListener('game:open-wardrobe',()=>{
+    if(active)shopOverlay.openWardrobe()
+  })
 
   function updateShopShowcaseCamera(){
     if(!shopCam)return
@@ -492,6 +571,22 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(!shopCam)return
       shopCam.orbitRadius=THREE.MathUtils.clamp(shopCam.orbitRadius+delta*.003,shopCam.minRadius,shopCam.maxRadius)
       updateShopShowcaseCamera()
+    },
+    onStartTestRide(shopId,modelId){
+      if(!rides)return
+      const res=rides.startTestRide(shopId,modelId)
+      if(res.ok){
+        testRideBrakeTimer=0
+        testRideOobSince=0
+        if(!verify||stuntMode){
+          window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:`免费试驾「${PERSONAL_EBIKE_MODELS[modelId].name}」已发车（限时 90 秒 / 350 米范围）`,ms:2800}}))
+        }
+      }else if(!verify||stuntMode){
+        window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'当前无法开启试驾，请稍后重试',ms:2200}}))
+      }
+    },
+    onSummonVehicle(vehicleId){
+      summonPersonalWithToast(vehicleId)
     },
     onAfterClose(_shopId,reason:ShopCloseReason){
       const restored=savedStreetPose
@@ -588,16 +683,20 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const tel=rides.ebikeTelemetry
       const ownership=(rides.bike.userData.ownership as ActiveVehicleState['ownership']|undefined)??(rides.isShared?'shared':'personal')
       const gearLabel=(tel?.parkLocked?'P':tel?.gearLabel) as ActiveVehicleState['gearLabel']|undefined
+      const instanceId=rides.bikeInstanceId
+      const ownedDur=instanceId?getGameState().garage.vehicles[instanceId]?.durabilityPct:undefined
+      const durabilityPct=ownedDur??rides.bikeDurabilityPct
       vehicleState={
         kind:isBicycle?'bike':'ebike',
-        id:(rides.bike.userData.instanceId as string|undefined)??(rides.isShared?'shared_ebike':'world_ebike'),
+        id:instanceId??(rides.isShared?'shared_ebike':'world_ebike'),
         speedKmh:tel?.kmh??Math.round(Math.abs(rides.speed)*3.6),
         gear:tel?.parkLocked?'N':'D',
-        damage:0,
+        damage:THREE.MathUtils.clamp(1-durabilityPct/100,0,1),
         ownership,
+        modelId:rides.bikeModelId??undefined,
         gearLabel,
         batteryPct:tel?.batteryPct??rides.ebikeBattery,
-        durabilityPct:100,
+        durabilityPct,
         parkLocked:tel?.parkLocked??false,
       }
     }else if(rides?.boat){
@@ -867,7 +966,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const check=sim.findLocalMount(cur.x,cur.y-cfg.height/2,cur.z,bx,by,bz)
       if(!check.ok){notifyDismountBlocked(check.reason==='blocked'?'中间有遮挡，绕过去再骑':'这里太窄了，挪一挪再骑');return null}
       return check
-    },{sim,stream,actionButton,externalArbiter:true,landFree:spot=>{sim.sync(spot.x,spot.z)
+    },{sim,stream,actionButton,externalArbiter:true,isFootAnimBusy:()=>!!(standUpSession||pickupSession||crashSession),supportYAt:(x,z,refY)=>supportAt(x,z,refY)?.y??refY,landFree:spot=>{sim.sync(spot.x,spot.z)
       const prevBoatPos=figure.position.clone(),prevBoatYaw=figure.rotation.y
       if(sim.insideHouse(spot.x,spot.z)||!sim.freeCapsule(spot.x,spot.y,spot.z)||!place(spot.x,spot.z,spot.rule,true,spot))return false
       rides?.clearBoatPose(figure);boatLandFrom.copy(prevBoatPos);boatLandYaw=prevBoatYaw;boatLandElapsed=0;boatBoardElapsed=BOAT_BOARD_DUR
@@ -917,7 +1016,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true);return true
   }
-  function leave(){if(shopOverlay.isOpen())shopOverlay.close('fly');shopHintGroup.visible=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function leave(){if(shopOverlay.isOpen())shopOverlay.close('fly');finishActiveTestRide('mode_switch');shopHintGroup.visible=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number){
     const dryBridge=!!sim.surface(x,z,'deck',refY+.4,1.5)||!!sim.surface(x,z,'landmark',refY+.4,1.5)
     return !sim.insideHouse(x,z)&&(!sim.wet(x,z)||dryBridge)&&!sim.isBlockedAt(x,refY,z)
@@ -959,7 +1058,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       elapsed:0,reason,
     }
     rides.stop()
+    const crashSeverity=THREE.MathUtils.clamp((crashSession.slideSpeed-3.5)/9,0.1,1)
     if(kind==='bike'){
+      rides.applyPersonalCrashDamage(crashSeverity)
+      emitGameEvent({type:'crash',severity:crashSeverity,vehicleId:rides.bikeInstanceId??undefined})
       rides.setEbikePark(false,true)
       rides.setEbikeHazard(true)
     }else{
@@ -1396,6 +1498,37 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       boat:rides?.boatProbe()??null}}
   function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
     if(shopOverlay.isOpen()){updateShopShowcaseCamera();return}
+    // Test-ride 90s timer & 350m / quiet-zone boundary watchdog (with 1.5s gentle decel when >15 km/h)
+    const activeTr=getGameState().garage.activeTestRide
+    if(activeTr){
+      const nowMs=Date.now()
+      const distFromOrigin=Math.hypot(start.x-activeTr.origin[0],start.z-activeTr.origin[1])
+      const inQuiet=Boolean(getQuietZoneAt(start.x,start.z))
+      const isRidingTr=rides?.bikeOwnership==='test_ride'
+      const oob=distFromOrigin>activeTr.maxRadiusM||inQuiet
+      if(oob){
+        if(!testRideOobSince){
+          testRideOobSince=nowMs
+          if(!verify||stuntMode)window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:inQuiet?'前方为校园安静区，5 秒后将自动结束试驾':'超出 350m 试驾范围，请 5 秒内折返',ms:2200}}))
+        }
+      }else{
+        testRideOobSince=0
+      }
+      const timedOut=nowMs>=activeTr.expiresAt
+      const oobExpired=testRideOobSince>0&&nowMs-testRideOobSince>=5000
+      if(!isRidingTr&&distFromOrigin>15&&rides?.bike===null){
+        finishActiveTestRide('dismount_far')
+      }else if(timedOut||oobExpired){
+        const endReason:'timeout'|'out_of_bounds'=timedOut?'timeout':'out_of_bounds'
+        if(isRidingTr&&Math.abs(rides?.speed??0)>15/3.6&&testRideBrakeTimer<1.5){
+          testRideBrakeTimer+=Math.min(.12,dt)
+          const limit=Math.max(0,(15/3.6)*(1-testRideBrakeTimer/1.5))
+          rides?.capSpeed(Math.min(.12,dt),limit)
+        }else{
+          finishActiveTestRide(endReason)
+        }
+      }
+    }
     if(rides?.freeBoat){
       releaseDynamicBike();input.syncRideHud(null,'boat')
       const read=held?still:input.read(), firstFrame=!wasBoat
@@ -1485,14 +1618,18 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(rides.rideKind==='bike'){
         const vType:EbikeVehicleType=rides.vehicleType??(rides.isShared||rides.bike.userData.shared?'shared':'normal')
         const savedBat=(rides.bike.userData.battery as number|undefined)??rides.ebikeBattery??100
-        const savedMod:EbikeModPreset=vType==='shared'?'stock':((rides.bike.userData.modPreset as EbikeModPreset|undefined)??'stock')
+        const visualMods=rides.bike.userData.visualMods as PersistedEbikeVisual|undefined
+        const isPersonalOrTest=rides.bikeOwnership==='personal'||rides.bikeOwnership==='test_ride'
+        const savedMod:EbikeModPreset=vType==='shared'?'stock':(visualMods?.preset??(rides.bike.userData.modPreset as EbikeModPreset|undefined)??'stock')
         ebikeFx.resetForMount(vType,savedBat)
         ebikeFx.setModPreset(savedMod)
-        rides.setEbikeUpgrades(ebikeModUpgrades(vType,ebikeFx.modPreset))
+        if(!isPersonalOrTest){
+          rides.setEbikeUpgrades(ebikeModUpgrades(vType,ebikeFx.modPreset))
+        }
         bicycleRig.root.visible=false
         ebikeRig.root.visible=true
         ebikeRig.setVehicleType(vType,paint)
-        ebikeRig.applyMods(ebikeFx.customMods??ebikeFx.modPreset,paint)
+        ebikeRig.applyMods(visualMods??ebikeFx.customMods??ebikeFx.modPreset,paint)
       }else{
         ebikeRig.root.visible=false
         bicycleRig.root.visible=true
@@ -2096,6 +2233,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       isOpen:()=>shopOverlay.isOpen(),
       triggerInteract:()=>interactArbiter.trigger(),
       getInteractDecision:()=>interactArbiter.getLastDecision(),
+    },
+    garage:{
+      summon:(vehicleId?:string)=>summonPersonalWithToast(vehicleId),
+      spawnAtBay:(shopId:string,vehicleId:string)=>rides?.spawnPersonalBikeAtBay(shopId,vehicleId)??false,
+      refreshVisual:(vehicleId:string)=>rides?.refreshPersonalBikeVisual(vehicleId)??false,
+      startTestRide:(shopId:string,modelId:PersonalEbikeModelId)=>rides?.startTestRide(shopId,modelId)??{ok:false,code:'INVALID_SHOP'},
+      endTestRide:(reason:'timeout'|'out_of_bounds'|'user'|'dismount_far'|'mode_switch'|'purchase'='user')=>{finishActiveTestRide(reason)},
     },
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}

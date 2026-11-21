@@ -6,6 +6,7 @@
 
 export type EbikeVehicleType = 'normal' | 'shared'
 export type EbikeTier = EbikeVehicleType
+export type PersonalEbikeTierId = 'lijiang_light' | 'city_range' | 'xiangshan_gt'
 export type EbikeBatteryStatus = 'normal' | 'low' | 'critical' | 'empty'
 
 export interface EbikeGearProfile {
@@ -205,6 +206,123 @@ export function resolveEbikeProfile(vehicleType: EbikeVehicleType, mods?: EbikeU
     accelMul,
     drainMul: Math.max(.55, drainMul),
     wheelieTorqueMul: 1 + motorLevel * .10 + controllerLevel * .08,
+    gears,
+    upgrades: {
+      motorLevel,
+      controllerLevel,
+      batteryLevel,
+      topKmhBonus,
+      accelMul: posFactor(mods?.accelMul),
+      capacityScale: posFactor(mods?.capacityScale),
+      drainMul: posFactor(mods?.drainMul),
+    },
+    upgraded,
+  }
+}
+
+export interface PersonalEbikeTuningSpec {
+  readonly id: PersonalEbikeTierId
+  readonly tierLabel: string
+  readonly badge: string
+  readonly stockGearsKmh: readonly [number, number, number, number]
+  readonly hardCapKmh: number
+  readonly baseCapacityScale: number
+  readonly baseAccelMul: number
+  readonly baseDrainMul: number
+  readonly maxMotorLevel: 1 | 2 | 3
+  readonly maxControllerLevel: 1 | 2 | 3
+  readonly maxBatteryLevel: 2 | 3
+}
+
+export const personalEbikeTuningConfigs: Record<PersonalEbikeTierId, PersonalEbikeTuningSpec> = {
+  lijiang_light: {
+    id: 'lijiang_light',
+    tierLabel: '漓江小轻骑',
+    badge: '轻骑',
+    stockGearsKmh: [16, 25, 36, 42],
+    hardCapKmh: 50,
+    baseCapacityScale: 1.05,
+    baseAccelMul: 1.0,
+    baseDrainMul: 0.95,
+    maxMotorLevel: 1,
+    maxControllerLevel: 1,
+    maxBatteryLevel: 2,
+  },
+  city_range: {
+    id: 'city_range',
+    tierLabel: '城心续航摩',
+    badge: '续航',
+    stockGearsKmh: [16, 25, 38, 50],
+    hardCapKmh: 60,
+    baseCapacityScale: 1.45,
+    baseAccelMul: 1.1,
+    baseDrainMul: 0.85,
+    maxMotorLevel: 2,
+    maxControllerLevel: 2,
+    maxBatteryLevel: 3,
+  },
+  xiangshan_gt: {
+    id: 'xiangshan_gt',
+    tierLabel: '象山疾风电摩',
+    badge: '旗舰',
+    stockGearsKmh: [18, 25, 42, 55],
+    hardCapKmh: EBIKE_UPGRADE_MAX_KMH,
+    baseCapacityScale: 1.65,
+    baseAccelMul: 1.22,
+    baseDrainMul: 0.95,
+    maxMotorLevel: 3,
+    maxControllerLevel: 3,
+    maxBatteryLevel: 3,
+  },
+}
+
+/**
+ * Resolves a personal 3-tier e-bike profile (`lijiang_light` / `city_range` / `xiangshan_gt`)
+ * into the standard `ResolvedEbikeProfile` consumed by `ride.ts`, clamping every upgrade axis
+ * to the model's ceiling and strictly enforcing `<= EBIKE_UPGRADE_MAX_KMH (70 km/h)`.
+ */
+export function resolvePersonalEbikeProfile(
+  modelId: PersonalEbikeTierId,
+  mods?: EbikeUpgradeMods | null,
+  durabilityPct = 100,
+): ResolvedEbikeProfile {
+  const spec = personalEbikeTuningConfigs[modelId]
+  const baseNormal = ebikeTierConfigs.normal
+  const motorLevel = Math.min(spec.maxMotorLevel, clampLevel(mods?.motorLevel))
+  const controllerLevel = Math.min(spec.maxControllerLevel, clampLevel(mods?.controllerLevel))
+  const batteryLevel = Math.min(spec.maxBatteryLevel, clampLevel(mods?.batteryLevel))
+  const topKmhBonus = Number.isFinite(mods?.topKmhBonus) ? Math.max(0, mods!.topKmhBonus!) : 0
+  const lowConditionMul = durabilityPct < 40 ? 0.9 : 1.0
+  const accelMul = spec.baseAccelMul * posFactor(mods?.accelMul) * (1 + motorLevel * 0.09 + controllerLevel * 0.07) * lowConditionMul
+  const capacityScale = spec.baseCapacityScale * posFactor(mods?.capacityScale) * (1 + batteryLevel * 0.35)
+  const drainMul = Math.max(0.55, spec.baseDrainMul * posFactor(mods?.drainMul) * (1 + motorLevel * 0.08 - batteryLevel * 0.05))
+  const hardCeiling = Math.min(EBIKE_UPGRADE_MAX_KMH, spec.hardCapKmh)
+  const stockS = spec.stockGearsKmh[3]
+  const extraKmh = motorLevel * 4 + controllerLevel * 5 + topKmhBonus
+  const tierMaxKmh = Math.min(hardCeiling, stockS + extraKmh)
+  const d3Extra = Math.max(0, tierMaxKmh - stockS) * 0.45
+  const gears: EbikeGearProfile[] = baseNormal.gears.map((g, idx) => {
+    const stockCap = spec.stockGearsKmh[idx] ?? g.maxKmh
+    if (g.id === 4) return {...g, maxKmh: tierMaxKmh}
+    if (g.id === 3) return {...g, maxKmh: +(Math.min(tierMaxKmh - 2, stockCap + d3Extra)).toFixed(1)}
+    return {...g, maxKmh: stockCap}
+  })
+  const upgraded = motorLevel > 0 || controllerLevel > 0 || batteryLevel > 0 || topKmhBonus > 0
+  return {
+    vehicleType: 'normal',
+    tier: 'normal',
+    isShared: false,
+    tierLabel: spec.tierLabel,
+    badge: spec.badge,
+    stockMaxKmh: stockS,
+    tierMaxKmh,
+    compliantCapKmh: EBIKE_COMPLIANT_CAP_KMH,
+    defaultGear: EBIKE_DEFAULT_GEAR,
+    allowUpgrades: true,
+    capacityScale,
+    accelMul,
+    drainMul,
+    wheelieTorqueMul: (1 + motorLevel * 0.1 + controllerLevel * 0.08) * lowConditionMul,
     gears,
     upgrades: {
       motorLevel,
