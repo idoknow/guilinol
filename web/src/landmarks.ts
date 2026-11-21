@@ -3,6 +3,9 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js'
 import {nightLit} from './look/night'
 import {sharedKtx2Loader} from './look/tiles'
+import {bindStreetSurface,streetSurfaceMat} from './streets'
+import seamConfig from '../../pipeline/seam-surfaces.json'
+import {atlasTriangles} from '../../lib/atlas-ground.mjs'
 
 export {landmarkCulling} from './landmark-culling'
 
@@ -55,8 +58,9 @@ export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,en
   const fades=new WeakMap<THREE.Group,THREE.IUniform<number>>()
   function dispose(root:THREE.Group){
     const assets=new Set<THREE.BufferGeometry|THREE.Material|THREE.Texture>()
+    for(const asset of root.userData.replacedAssets??[])assets.add(asset)
     root.traverse(node=>{if(node instanceof THREE.Mesh){if(node instanceof THREE.InstancedMesh)node.dispose();assets.add(node.geometry)
-      for(const material of [node.material].flat()) {assets.add(material);for(const value of Object.values(material))if(value instanceof THREE.Texture)assets.add(value)}
+      for(const material of [node.material].flat()) {if(material===streetSurfaceMat)continue;assets.add(material);for(const value of Object.values(material))if(value instanceof THREE.Texture)assets.add(value)}
     }})
     scene.remove(root);for(const asset of assets)asset.dispose()
   }
@@ -82,9 +86,30 @@ export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,en
       pending.add(entry)
       loaderReady.then(loader=>loader.loadAsync('./'+entry.file)).then(({scene:group,parser})=>{
         group.position.fromArray(entry.position);group.rotation.y=THREE.MathUtils.degToRad(entry.rotation)
+        const surfaces:Record<string,string>=(seamConfig.surfaces as Record<string,Record<string,string>>)[entry.id]??{}
+        const exceptions=seamConfig.exceptions.filter((item:{kind?:string})=>!item.kind||item.kind==='material')
+        const atlas=(seamConfig.atlas as Record<string,{material:string,role:string,box:number[]}>)[entry.id]
+        group.userData.replacedAssets=new Set()
         group.traverse(node=>{
           if(/^collision/i.test(node.name))node.visible=false
-          if(node instanceof THREE.Mesh) for(const material of [node.material].flat()) nightLit(material)
+          if(!(node instanceof THREE.Mesh))return
+          const original=node.material,kind=surfaces[original.name]
+          if(atlas&&original.name===atlas.material&&!exceptions.some(item=>item.id===entry.id&&item.material===atlas.material)){
+            const {selected,rest}=atlasTriangles(node.geometry,atlas.box,original.map?.repeat.toArray(),original.map?.offset.toArray())
+            if(selected.length){
+              const geometry=node.geometry.clone();group.userData.replacedAssets.add(node.geometry)
+              geometry.setIndex(rest.concat(selected));geometry.clearGroups()
+              geometry.addGroup(0,rest.length,0);geometry.addGroup(rest.length,selected.length,1)
+              bindStreetSurface(geometry,atlas.role);node.geometry=geometry;node.material=[original,streetSurfaceMat]
+              nightLit(original);return
+            }
+          }
+          if(kind&&!exceptions.some(item=>item.id===entry.id&&item.material===original.name)){
+            const retired=group.userData.replacedAssets
+            retired.add(original);retired.add(node.geometry)
+            for(const value of Object.values(original))if(value instanceof THREE.Texture)retired.add(value)
+            node.geometry=node.geometry.clone();bindStreetSurface(node.geometry,kind);node.material=streetSurfaceMat
+          }else for(const material of [original].flat())nightLit(material)
         })
         const coverage={value:1}
         fades.set(group,coverage)

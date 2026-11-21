@@ -26,6 +26,7 @@ import numpy as np
 from c_kit import landmark_surface
 from nikoniko import Builder, export_landmark
 from shizijie_layout import KIOSK_CENTER, islands
+from plaza_seam import civic_plaza
 from shapely.affinity import scale
 from shapely.geometry import box
 
@@ -248,7 +249,7 @@ def build_shizijie(m: Builder):
         (5.0, -100.5), (-50.5, -117.5),
     ]
     m.follow_grade = False
-    m.prism(nw_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave', paving=True)
+    civic_plaza(m, nw_apron)
     m.prism(NW_NANFANG, -2.0, 6.8, 'dark', collide=True, cap_mat='alum', footing=True)
     m.prism(NW_NANFANG, 4.8, 20.4, 'white', collide=True, cap_mat='roof')
     m.cylinder_y(-24.5, 4.8, 22.4, -46.0, 9.6, 'glass', sections=16 if m.detail else 8, collide=True)
@@ -267,7 +268,7 @@ def build_shizijie(m: Builder):
         (4.0, 92.5), (67.5, 108.5), (85.5, 52.5), (48.0, 42.5),
         (32.0, 61.5), (10.5, 62.0),
     ]
-    m.prism(se_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave', paving=True)
+    civic_plaza(m, se_apron)
     m.prism(SE_WENHUA, -2.0, 6.6, 'dark', collide=True, cap_mat='beige', footing=True)
     m.prism(SE_WENHUA, 4.6, 18.0, 'beige', collide=True, cap_mat='roof')
     m.cylinder_y(34.5, 4.6, 19.2, 60.5, 10.2, 'glass', sections=16 if m.detail else 8, collide=True)
@@ -287,7 +288,7 @@ def build_shizijie(m: Builder):
         (46.0, -45.5), (53.5, -23.0), (63.5, -7.5), (135.5, 16.5),
         (137.0, -2.5), (94.5, -78.5), (59.5, -87.0),
     ]
-    m.prism(ne_apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave', paving=True)
+    civic_plaza(m, ne_apron)
     m.prism(NE_CORNER, -2.0, 6.4, 'dark', collide=True, cap_mat='alum', footing=True)
     m.prism(NE_CORNER, 4.4, 17.0, 'white', collide=True, cap_mat='roof')
     m.pose = (60.5, 0.0, -24.5, math.atan2(-1.0, 0.85))

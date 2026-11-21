@@ -987,7 +987,8 @@ def build_nikoniko(m: Builder):
         (31.2, -36.2),
         (-18.0, -45.2),
     ]
-    m.prism(apron, -2.0, 2.08, 'pave', collide=True, cap_mat='pave', paving=True)
+    from plaza_seam import civic_plaza
+    civic_plaza(m, apron)
 
     # 2. Main 6-storey retail body extruded from exact OSM footprint
     n_edges = len(FOOTPRINT)

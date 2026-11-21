@@ -176,25 +176,30 @@ def _bus_shelter(m: Builder, x, y0, z, yaw, station_key='bus_shizijie'):
     """Guilin Zhongshan Road modern transit bus shelter + CJK station totem."""
     # Local +X of pose points toward carriageway; local +Z runs along sidewalk.
     m.pose = (x, y0, z, yaw)
-    m.box(0, -0.4, 0, 2.5, 0.48, 11.2, 'pave', collide=True, footing=True)
+    from plaza_seam import civic_plaza
+    outline = m._transform([[-1.25,0,-5.6],[1.25,0,-5.6],[1.25,0,5.6],[-1.25,0,5.6]])[:,::2]
+    m.pose = (0,0,0,0)
+    civic_plaza(m,outline,refine_outer=True)
+    m.pose = (x,y0,z,yaw)
     for sz in (-4.6, -1.5, 1.5, 4.6):
-        m.beam([-0.82, 0.08, sz], [-0.82, 2.95, sz], 0.08, 'bronze', sections=6, collide=True)
+        base=m.feet_at_grade([[-.82,0,sz]])[0]-.035
+        m.beam([-0.82, base, sz], [-0.82, 2.95, sz], 0.08, 'bronze', sections=6, collide=True)
     m.box(0.05, 2.95, 0, 2.65, 0.16, 11.2, 'alum')
     m.box(0.12, 3.11, 0, 2.45, 0.08, 10.9, 'white')
 
     # Back route-map & transit lightboxes facing +X toward waiting passengers
     for sz, col in ((-3.1, 'blue'), (0.0, 'white'), (3.1, 'red')):
         for sign in (-1,1):
-            m.box(-.82,.08,sz+sign*.92,.14,2.34,.13,'bronze')
+            m.box(-.82,.08,sz+sign*.92,.14,2.34,.13,'bronze',footing=True)
         m.box(-0.78, 0.52, sz, 0.18, 1.85, 2.38, 'dark', collide=True)
         if m.detail:
             m.box(-0.67, 0.65, sz, 0.04, 1.58, 2.16, col)
     m.box(-0.22, 0.48, 0.0, 0.46, 0.08, 4.4, 'alum', collide=True)
     for bz in (-1.8, 0.0, 1.8):
-        m.box(-0.22, 0.08, bz, 0.40, 0.40, 0.12, 'dark')
+        m.box(-0.22, 0.08, bz, 0.40, 0.40, 0.12, 'dark',footing=True)
 
     # Tall double-sided bus-stop totem ('十字街' / '阳桥') facing along sidewalk (+Z / -Z)
-    m.box(0.76, 0.08, 5.25, 0.72, 2.82, 0.16, 'dark', collide=True)
+    m.box(0.76, 0.08, 5.25, 0.72, 2.82, 0.16, 'dark', collide=True,footing=True)
     m.sign_quad(0.76, 1.15, 5.35, 0.66, 1.68, station_key, double_sided=True)
     m.box(0.76, 0.18, 5.25, 0.66, 0.92, 0.18, 'blue')
     m.pose = (0.0, 0.0, 0.0, 0.0)

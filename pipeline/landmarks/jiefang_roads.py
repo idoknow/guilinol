@@ -1,7 +1,7 @@
 """West-bank carriageways and pedestrian surfaces built from the OSM survey."""
 import numpy as np
 from shapely.geometry import LineString, Point
-from jiefang_layout import BANK_LIMIT, OSM, RAMPS, UPPER_ROADS, LOWER_ROADS, SIDE_ROAD, FOOTWAYS, LOWER, UPPER, section, widths, libin_levels
+from jiefang_layout import BANK_LIMIT, OSM, RAMPS, UPPER_ROADS, LOWER_ROADS, SIDE_ROAD, FOOTWAYS, LOWER, UPPER, section, widths, libin_levels, dash_intervals
 
 
 def vertex(p,h):
@@ -52,8 +52,11 @@ def street(model,way):
             curb*=np.clip((distance-4)/3,0,1)
     left,right=edge(l),edge(r)
     outer=edge(r+w,curb)
+    if way in RAMPS:
+        from jiefang_edges import join_bank
+        join_bank(outer,n,w,along)
     surface(model,left,right,'tile')
-    surface(model,right,edge(r,curb),'granite')
+    surface(model,right,edge(r,curb),'curb_granite')
     sidewalk=edge(r,curb)
     for i in range(len(xy)-1):
         apron=max(curb[i:i+2])<.01
@@ -62,13 +65,14 @@ def street(model,way):
         surface(model,top,top-[0,2.5,0],'stone',False)
     for i,(a,b) in enumerate(zip(edge(0,.015),edge(0,.015)[1:])):
         length=along[i+1]-along[i]
-        for start in np.arange(np.ceil((along[i]+.01)/7)*7,along[i+1]-1,7):
-            u=(start-along[i])/length;v=min(1,u+2.8/length)
+        for start,end in dash_intervals(along[i],along[i+1]):
+            u=(start-along[i])/length;v=(end-along[i])/length
             pa=a+(b-a)*u;pb=a+(b-a)*v
-            dx,dz=n[i]*.075
-            stripe=np.array([dx,0,dz])
-            surface(model,[pa-stripe,pb-stripe],[pa+stripe,pb+stripe],'white' if way not in LOWER_ROADS else 'yellow',False)
-    if way in LOWER_ROADS:
+            def stripe(fraction):
+                normal=(1-fraction)*n[i]+fraction*n[i+1]
+                return np.array([normal[0],0,normal[1]])*.075
+            surface(model,[pa-stripe(u),pb-stripe(v)],[pa+stripe(u),pb+stripe(v)],'paint_white' if way not in LOWER_ROADS else 'paint_yellow',False)
+    if way==1531308428:
         # Low stone parapet and white handrail, with openings at the stair
         # landings and at the plaza crossing shown in photos 37 and 43.
         for i,(a,b) in enumerate(zip(outer,outer[1:])):
@@ -87,7 +91,7 @@ def street(model,way):
             elev=y[i]+.035
             slope=(y[i+1]-y[i])/np.linalg.norm(xy[i+1]-xy[i])
             model.mesh([vertex(p,elev+np.dot(p-center,forward)*slope) for p in pts],
-                       [[0,1,6],[2,3,4],[2,4,5]],'white')
+                       [[0,1,6],[2,3,4],[2,4,5]],'paint_white')
         for i,(a,b) in enumerate(zip(outer,outer[1:])):
             if min(curb[i:i+2])<.10:continue
             model.beam(a+[0,1,0],b+[0,1,0],.075,'white',6)

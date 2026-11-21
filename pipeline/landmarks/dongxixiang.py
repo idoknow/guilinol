@@ -24,6 +24,8 @@ def lantern(model,east,south):
 
 
 def frontage(model):
+    from plaza_seam import drape_walkways, walkway_rect
+    rectangles=[]
     pipeline = Path(__file__).resolve().parents[1]
     sys.path.insert(0,str(pipeline))
     from common import ll2xz
@@ -39,7 +41,7 @@ def frontage(model):
             width=pitch-entry_clearance
             frac=(bay+.5)/count+entry_clearance/(2*length)
             model.pose=(first[0]+dx*frac,0,first[1]+dz*frac,angle)
-            model.box(0,0,0,4.5,.17,width+.12,'pave',True)
+            rectangles.append(walkway_rect(model.pose,4.5,width+.12))
             for side in (-1,1):
                 east=side*6.4; high=6.1+(bay%3==1)*2.9
                 corners=[(model.pose[0]+xx*math.cos(angle)-zz*math.sin(angle),model.pose[2]+xx*math.sin(angle)+zz*math.cos(angle)) for xx in (east-3.9,east+3.9) for zz in (-width/2,width/2)]
@@ -74,6 +76,7 @@ def frontage(model):
                         for bar in (-.8,0,.8):model.box(side*2.93,6.75,zz+bar,.12,1.6,.12,'wood')
                 for zz in (-.85,0,.85):lantern(model,side*2.18,zz)
     entry_angle=math.atan2(path[0][0]-path[1][0],path[1][1]-path[0][1])
+    drape_walkways(model,rectangles)
     model.pose=(path[0][0]-3.7*math.sin(entry_angle),0,path[0][1]+3.7*math.cos(entry_angle),entry_angle)
     for east in (-5.25,-2.35,2.35,5.25):
         top=6.25 if abs(east)<3 else 4.97

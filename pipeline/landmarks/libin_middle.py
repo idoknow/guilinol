@@ -27,6 +27,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from m26_16_kit import SceneBuilder, export_landmark_glb, get_font, libin_street_base_y, libin_terrain_y
 
 # Anchor: centroid of OSM way/675588260, flattened to 154.50 m
@@ -250,7 +251,20 @@ def _build_street_gate(b: SceneBuilder):
     prev = b.set_frame(origin=GATE_LOCAL_ORIGIN, front_xz=GATE_FRONT_XZ)
     anchor_world = (ORIGIN_X, ORIGIN_Y, ORIGIN_Z)
 
-    # Terrain-following grey granite forecourt paving (`lift=0.18 m`, seamlessly graded to IDOK-48 Libin Rd!)
+    from c_kit import landmark_surface
+    from seam_streets import Streets
+    streets = Streets(landmark_surface('libin_middle').surface)
+    from shapely.geometry import Point, box
+    edge = box(-11.2,-2.2,12.4,10.2).union(box(-10,-11,10,-2.2)).boundary
+    def entrance_level(wx,wz):
+        position = np.array([wx-GATE_WORLD_X,0,wz-GATE_WORLD_Z])
+        across,front = position@b.ex,position@b.ez
+        distance = edge.distance(Point(across,front))
+        blend = min(1,distance/4)
+        blend *= blend*(3-2*blend)
+        adjacent = streets.at(wx,wz)[0]+.018
+        return adjacent + blend*(libin_street_base_y(wx,wz)+.18-adjacent)
+
     b.draped_patch(
         anchor_world,
         -11.2,
@@ -259,14 +273,14 @@ def _build_street_gate(b: SceneBuilder):
         10.2,
         'plaza_tile',
         curb_region='granite',
-        lift=0.18,
+        lift=0,
         skirt=0.85,
-        step=2.2,
+        step=1.1,
         curb_edges=('+z',),
         curb_h=0.05,
         curb_w=0.24,
         collide=False,
-        height_fn=libin_street_base_y,
+        height_fn=entrance_level,
     )
     # Inner driveway behind closed grille
     b.draped_patch(
@@ -277,9 +291,10 @@ def _build_street_gate(b: SceneBuilder):
         -2.2,
         'pave_dark',
         curb_region='dark_stone',
-        lift=0.18,
+        lift=0,
         skirt=0.35,
-        step=3.0,
+        step=1.1,
+        height_fn=entrance_level,
         collide=False,
     )
 

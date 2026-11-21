@@ -25,11 +25,13 @@ references (Ctrip 108723 aerials & ground views, 2026 Wikimedia Commons CC BY
   Square Fire Rescue Station ('中国消防救援 CHINA FIRE AND RESCUE').
 """
 import math
+from pathlib import Path
 import numpy as np
 import trimesh
 
 from c_kit import landmark_surface
 from nikoniko import Builder, export_landmark
+from plaza_seam import civic_plaza
 
 
 GYM_675177179 = [
@@ -168,7 +170,12 @@ def build_central_square(m: Builder):
         _ax_pt(92.0, 68.0),
         _ax_pt(-118.0, 68.0),
     ]
-    m.prism(plaza_ring, -2.2, 2.26, 'pave', collide=True, cap_mat='pave', paving=True)
+    import json
+    from landmark_layout import polygon
+    catalog = json.loads((Path(__file__).resolve().parents[1]/'landmarks.json').read_text())
+    mask = polygon(next(entry['flatten']['polygon'] for entry in catalog if entry['id']=='central_square'))
+    frontage = mask.difference(mask.buffer(-4))
+    civic_plaza(m, plaza_ring, frontage)
 
     # ------------------------------------------------------------------
     # 2. Circular Musical Fountain Assembly Plaza (center at along=+22, across=0)

@@ -136,6 +136,7 @@ def build(bbox, output, palette):
     bank_pavement=None
     west_portal=None
     modeled_paving=None
+    deck_mask=None
     for x,z,entry in layout.entries:
         if entry['id']=='jiefang_bridge' and bounds.covers(Point(x,z)):
             x_jb, z_jb = x, z
@@ -148,7 +149,8 @@ def build(bbox, output, palette):
             # Wide native Binjiang sidewalks extend past the modeled lower road.
             # Clip their overhang across the upper slab, including the portal.
             slab = np.array([[-140.5,-21.5],[140.5,-21.5],[140.5,21.5],[-140.5,21.5]])
-            modeled_paving = bank_pavement.union(ShapelyPolygon(slab @ axes + [x,z]))
+            deck_mask = ShapelyPolygon(slab @ axes + [x,z])
+            modeled_paving = bank_pavement.union(deck_mask)
             interchange=((x,z),angle,bank_pavement)
             grade_banks(terrain,original,wet,left,top,GRID,(x,z),angle,datum)
 
@@ -212,6 +214,25 @@ def build(bbox, output, palette):
     )
     if interchange is not None:
         grade_banks(terrain, original, wet, left, top, GRID, (x_jb, z_jb), angle, datum, finish=True)
+        from east_grading import grade_east, grade_landing
+        east_road = next(road.line for road in roads if road.way == 682893309)
+        for field in (terrain,original):
+            grade_east(east_road,field,left,top,GRID,10,wet)
+        grade_landing(east_road,(terrain,original),left,top,GRID,wet,(x_jb,z_jb),angle,datum)
+    for east,south,entry in layout.entries:
+        if entry['id']!='zhengyang': continue
+        cosine,sine=np.cos(.16),np.sin(.16)
+        for row in range(max(0,int((south-top-36)//GRID)),min(len(original),int((south-top+10)//GRID)+1)):
+            for col in range(max(0,int((east-left-28)//GRID)),min(original.shape[1],int((east-left+28)//GRID)+1)):
+                if wet[row,col]: continue
+                wx,wz=left+col*GRID,top+row*GRID
+                across=(wx-east)*cosine+(wz-south)*sine
+                station=-(wx-east)*sine+(wz-south)*cosine
+                weight=np.clip((22-abs(across))/6,0,1)*np.clip((16-abs(station+12.5))/6,0,1)
+                if weight:
+                    target=float(eval_bspline_grid(road_ctrl,left,top,np.array(wx),np.array(wz))) * 10
+                    for field in (terrain,original):
+                        field[row,col]+=round(weight*max(0,target-field[row,col]))
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 
@@ -309,7 +330,7 @@ def build(bbox, output, palette):
             slab = xiaoyao_access.gallery_floor(east,south,entry['rotation'])
             for way in xiaoyao_access.GALLERY_PAVING_WAYS:
                 walkable_by_way[way] = walkable_by_way.get(way,ShapelyPolygon()).union(slab)
-    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving,walkable_by_way=walkable_by_way,gate_plaza=gate_plaza)
+    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving,walkable_by_way=walkable_by_way,gate_plaza=gate_plaza,deck_mask=deck_mask)
     (output/'marking-audit.json').write_text(json.dumps(lengths.pop('markingOverlap')))
     print('Lengths (m):',lengths)
     def asset(name):

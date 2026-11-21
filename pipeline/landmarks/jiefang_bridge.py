@@ -122,7 +122,7 @@ def stone_balustrade(model,start,end):
     for side in (-1,1):
         z=side*21.1
         for y,h,d in ((.18,.18,.44),(1.12,.16,.38)):
-            model.box((start+end)/2,y,z,end-start,h,d,'white',True)
+            model.box((start+end)/2,y,z,end-start,h,d,'rail_white' if y>1 else 'white',True)
         for x in np.linspace(start,end,count+1):
             model.box(x,.35,z,.31,.84,.32,'granite',True)
         # Two carved wave bands leave open sky between the stone cap and sill.
@@ -248,23 +248,28 @@ def west_bank(model):
 
 def bridge(model):
     from c_kit import landmark_surface
+    from jiefang_layout import deck_level
     surface = landmark_surface('jiefang_bridge')
+    from jiefang_east import portal_furniture
+    portal_furniture(model,surface)
     length=281; width=43
     # The west portal has a curved soffit and a thinner slab above the crown.
     for left,right,depth in ((-140.5,-136,1.22),(-136,-103,.36),(-103,140.5,1.22)):
         model.box((left+right)/2,-depth,0,right-left,depth,width,'stone',True)
     model.box(0,-.03,0,length,.08,32.2,'tile')
     for side in (-1,1):
-        model.box(0,0,side*18.8,length,.18,5.25,'pave',True)
-        model.box(0,.05,side*16.16,length,.15,.3,'granite',True)
-        model.box(0,.055,side*12,length,.018,.15,'white')
-        model.box(0,.055,side*.18,length,.015,.13,'yellow')
+        walk_inner = 16.175
+        walk_outer = width/2
+        model.box(0,0,side*(walk_inner+walk_outer)/2,length,.18,walk_outer-walk_inner,'pave',True)
+        model.box(0,.05,side*16.16,length,.15,.3,'curb_granite',True)
+        model.box(0,.055,side*12,length,.018,.15,'paint_white')
+        model.box(0,.055,side*.18,length,.015,.13,'paint_yellow')
         model.box(0,.182,side*16.93,length,.018,.46,'granite')
         if model.detail:
             for offset in (-.13,0,.13):
                 model.box(0,.20,side*16.93+offset,length,.014,.036,'white')
             for lane in (3.7,7.4):
-                for east in np.arange(-135,138,9):model.box(east,.055,side*lane,3,.02,.13,'white')
+                for east in np.arange(-135,138,9):model.box(east,.055,side*lane,3,.02,.13,'paint_white')
         for east in np.arange(-126,127,21 if model.detail else 42):
             lamp_post(model,east,side)
     springings=(-92,-46,0,46,92,140.5)
@@ -274,7 +279,7 @@ def bridge(model):
         for side in (-1,1):
             z=side*(width/2-.35)
             bed, water = surface.sample(pier,z)
-            base = bed-(5.62-pier*1.3/281)-.12
+            base = bed-deck_level(pier)-.12
             if base < -5.63:
                 model.beam([pier,base,z],[pier,-5.63,z],1.84,'stone',10)
             model.box(pier,-5.69,z,3.65,.5,3.2,'granite')
@@ -283,8 +288,17 @@ def bridge(model):
         model.box(0,-.28,side*21.4,length,.12,.15,'lamp')
         for east in np.linspace(-136,136,35 if model.detail else 13):
             model.box(east,1.26,side*21.1,.55,.24,.39,'lamp')
-    for start,end in zip(springings,springings[1:]):
+    for start,end in zip(springings,springings[1:-1]):
         river_ribs(model,start,end,width)
+    for start in np.arange(140.5,155.5,1.):
+        def landing(along):
+            distance=along-140.5
+            roll=min(distance,15-distance,2.)
+            drop=(distance-1 if distance>=2 else distance**2/4) if distance<=13 else 13-roll**2/4
+            return .046-.05*drop
+        for left,right,offset in ((-21.5,-16.2,.14),(-16.2,16.2,0),(16.2,21.5,.14)):
+            corners=[(along,landing(along)+offset,side) for along,side in ((start,left),(start,right),(start+1,right),(start+1,left))]
+            model.solid.append(np.asarray(corners)[[[0,1,2],[0,2,3]]])
     for pier in springings[1:-1]:
         for side in (-1,1):
             z=side*21.28

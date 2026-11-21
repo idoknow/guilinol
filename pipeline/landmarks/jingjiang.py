@@ -96,7 +96,7 @@ class Model:
         axes=np.array([[2,1],[0,2],[0,1]])[normal]
         coords=np.take_along_axis(local,axes[:,None,:],axis=2)
         if color in self.tile_parts:
-            scale={'stone':(3.2,1.2),'brick':(1.04,.448),'pave':(3.2,1.6),'ruinGlass':(1.5,1.5)}[color]
+            scale={'stone':(3.2,1.2),'brick':(1.04,.448),'pave':(3.2,1.6),'ruinGlass':(1.5,1.5),'edgeStone':(1.2,.30),'streetLip':(3.2,1.6)}[color]
             self.tile_parts[color].append((triangles,coords/scale));return
         self.visible.append(triangles)
         coords=(coords-coords.min(axis=1,keepdims=True))/np.maximum(coords.max(axis=1,keepdims=True)-coords.min(axis=1,keepdims=True),1e-6)
@@ -221,7 +221,7 @@ def generate(name,build,colors=None):
                 texture=Image.new('RGB',(128,128),'#2c393a')
                 ImageDraw.Draw(texture).rectangle((0,0,127,127),outline='#657072',width=2)
             else:
-                cell=list(SWATCHES).index(key);left=128*(cell%4);top=128*(cell//4)
+                cell=list(SWATCHES).index({'edgeStone':'stone','streetLip':'pave'}.get(key,key));left=128*(cell%4);top=128*(cell//4)
                 texture=image.crop((left,top,left+128,top+128))
             surface=packed([tri for tri,uv in parts]);surface.visual=trimesh.visual.TextureVisuals(uv=np.concatenate([uv for tri,uv in parts]).reshape(-1,2),material=trimesh.visual.material.PBRMaterial(name=key,baseColorTexture=texture,metallicFactor=.35 if reflective else 0,roughnessFactor=.16 if reflective else 1,doubleSided=True));scene.add_geometry(surface,geom_name=layer+'_'+key,node_name=layer+'_'+key,parent_node_name=parent)
     for lod in (0,1):
@@ -229,7 +229,8 @@ def generate(name,build,colors=None):
         if name in ('wangcheng_market','dongxixiang'):
             from functools import lru_cache
             from world_surface import LandmarkSurface,Surface
-            model.grade=lru_cache(maxsize=262144)(LandmarkSurface(Surface(),name).ground)
+            model.surface=LandmarkSurface(Surface(),name)
+            model.grade=lru_cache(maxsize=262144)(model.surface.ground)
             model.grade_reference=0
         build(model)
         layer=f'lod{lod}';scene.graph.update(frame_to=layer)
@@ -316,10 +317,13 @@ def gate_furniture(m,plan_surface):
 
 def palace(m):
     from wangcheng_plan import PalacePlan, enclosure, inner_court
+    from plaza_seam import civic_plaza
     plan = PalacePlan()
+    m.surface = plan.surface
+    def paving(center_z,width,depth):
+        civic_plaza(m,[(side*width/2,center_z+end*depth/2) for side,end in [(-1,-1),(1,-1),(1,1),(-1,1)]])
     enclosure(m, plan)
-    # Carry the forecourt through both arches up to the axial path at z=-11.5.
-    m.box(0,-.65,10.5,47,.82,44,'pave',True)
+    paving(10.5,47,44)
     m.arcade(0,-11,40,23,6.8,[-11,0],[2.0,3.75],'stone')
     m.box(0,6.8,-11,40,2.25,23,'brick',True)
     if m.detail:
@@ -414,13 +418,13 @@ def palace(m):
         m.pose=(0,plan.ground(142,verge_z),0,0)
         banyan(m,142,verge_z,56+side)
         m.pose=(0,0,0,0)
-    m.box(0,-.45,-123,71,.59,48,'pave',True)
+    paving(-123,71,48)
     for side in (-1,1):
         lo,hi=side*18-16,side*18+16
         sand=np.array([[173,146,107,255]]*4,dtype=np.uint8)
-        m.mesh([[lo,.16,-216.5],[lo,.16,-163.5],[hi,.16,-163.5],[hi,.16,-216.5]],
+        m.mesh([[x,plan.ground(x,z)+.035,z] for x,z in [(lo,-216.5),(lo,-163.5),(hi,-163.5),(hi,-216.5)]],
                [[0,1,2],[0,2,3]],sand,True)
-    m.box(0,-.36,-192,4,.54,78,'pave',True)
+    paving(-192,4,78)
     for i,x in enumerate((-18,-8,9,19)):
         # Front garden screening the lower part of the hall in Rock 34–35.
         crown=trimesh.creation.icosphere(subdivisions=int(m.detail))
@@ -447,7 +451,7 @@ def palace(m):
             for index in range(64):
                 end=(index+2)%64;m.mesh([rear[index],rear[end],ring[end],ring[index]],[[0,1,2],[0,2,3]],'gold')
     m.pose=(0,0,0,0)
-    m.box(0,0,-79,12,.12,135,'pave',True)
+    paving(-79,12,135)
     inner_court(m, plan)
     m.box(0,6.2,-22.55,6.1,1.4,.25,'granite')
     letters(m,'三元及第',(0,6.42,-22.7),5.15,.86,'wood',facing=-1)

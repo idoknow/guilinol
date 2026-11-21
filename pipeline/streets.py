@@ -14,7 +14,11 @@ from sections import section_layers, clipped, speed_paint, yiwu_frontage, RULES
 from dongxi_streets import street_surface
 
 
-def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None,gate_plaza=None,walkable_by_way=None):
+def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None,gate_plaza=None,walkable_by_way=None,deck_mask=None):
+    from street_underpass import lower_paths, grade_frame
+    lower = lower_paths(roads,deck_mask)
+    from east_grading import profile
+    east_axis = next((road.line for road in roads if road.way==682893309),None)
     if bands is None:
         bands = section_layers(roads)
     surfaces, sidewalks, stripes, medians, gaps = [],[],[],[],[]
@@ -468,11 +472,17 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                     if line.geom_type=='LineString' and line.length>.05:
                         curb_cuts.append(np.rint((np.asarray(line.coords)-origin)*100).astype(int).tolist())
         items=[]
-        for kind,shape in [*enumerate(shapes[:3]), (4,verge), (5,cycle.difference(verge)), (6,tactile)]:
+        surfaces_here = [*enumerate(shapes[:3]), (4,verge), (5,cycle.difference(verge)), (6,tactile)]
+        under = {kind:shape.intersection(tile) for kind,shape in lower.items() if shape.intersects(tile)}
+        def append(kind,shape):
             for poly in polygons(shape):
                 if poly.area<.005:
                     continue
                 items.append([kind,*[np.rint((np.asarray(r.coords)[:-1]-origin)*100).astype(int).tolist() for r in [poly.exterior,*poly.interiors]]])
+        for kind,shape in surfaces_here:
+            append(kind,shape.difference(under[kind]) if kind in under else shape)
+        first_lower = len(items)
+        for kind,shape in under.items(): append(kind,shape)
         ctrl_patch = None
         fx = fixtures[origin]
         if road_ctrl is not None and world_origin is not None and (items or any(fx) or layers[0].query(tile.buffer(24)).size):
@@ -493,5 +503,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         if curb_cuts:
             out.extend([None, [], [], [], []][len(out)-5:])
             out.append(curb_cuts)
+        if len(items)>first_lower:
+            out.extend([None,[],[],[],[],[]][len(out)-5:]); out.append([first_lower,grade_frame(deck_mask,origin),profile(east_axis,origin) if east_axis is not None else []])
         return out
     return encode,lengths
