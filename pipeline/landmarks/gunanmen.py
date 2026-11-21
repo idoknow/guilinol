@@ -159,7 +159,7 @@ def build(b: Builder):
     ground = landmark_surface('gunanmen').ground
     # The eastern hall sits on way/684946200, the western hall on way/521248472.
     # Keep the plaza banyan on the west side of pedestrian way/684511179.
-    ancient_banyan(b, -28, 3)
+    ancient_banyan(b, -25.4, 5.1)
     # Trail map at the south edge of the gate plaza, facing its pedestrian path.
     with align_front(b, (-6, 12), 164):
         mesh = b.parts['atlas']

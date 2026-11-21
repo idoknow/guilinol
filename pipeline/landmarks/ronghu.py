@@ -108,6 +108,18 @@ def rock_path(b):
             for col in range(3):
                 z = 124 + row * 1.2 + .6*(col%2)
                 box(wall,(138+(col-1)*.56,.28,z),(.55,.08,1.18),'granite',None)
+            for side in (-1,1):
+                station=124+row*1.2+.35*(side+1)
+                edge=138+side*(1.02+.07*math.sin(row*2.2+side))
+                oval(wall,(edge,.33,station),(.19,.15,.51),'rubble',7)
+                if (row+side)%3:
+                    oval(wall,(edge+side*.30,.34,station+.22),(.29,.19,.37),'foliage',8)
+        for side,run,spread in ((-1,.85,.24),(1,1.55,.27),(-1,2.18,.19),
+                                (1,3.4,.28),(-1,4.8,.19),(-1,5.5,.24),(1,7.1,.31),
+                                (-1,9.3,.29),(1,12.4,.23),(-1,13.8,.26),(1,15.5,.18)):
+            center=138+side*(1.36+spread)
+            oval(wall,(center,.31,124+run),(spread,.14,spread*1.3),'foliage',7)
+            oval(wall,(center+side*.22,.29,124+run+.24),(spread*.78,.11,spread),'foliage',7)
         for index,(side,run,height) in enumerate(((1,3,1.2),(-1,6,1.7),(1,7,2.4),
                                                   (-1,9,1.5),(1,12,.9),(-1,14,2.1))):
             x,z = 138+side*(2.0+.35*(index%2)),124+run

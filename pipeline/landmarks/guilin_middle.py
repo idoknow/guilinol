@@ -127,6 +127,11 @@ def build_school_gate(model):
 
     model.box(0, -0.45, -3.4, 32.0, 0.48, 10.2, 'pave', True)
 
+    for jamb in (-3.95,0.0,3.95):
+        model.box(jamb,0,-1.6,.46,3.48,.52,'granite',True)
+        model.box(jamb,-.15,-1.6,.70,.36,.72,'stone',True)
+    model.box(0,3.36,-1.6,8.48,.42,.64,'stone',True)
+
     for px in (-5.45, 5.45):
         for pz in (-3.8, 1.6):
             segs = 18 if model.detail else 8
