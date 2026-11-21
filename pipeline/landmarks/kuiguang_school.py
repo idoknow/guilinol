@@ -197,18 +197,15 @@ def build_kuiguang(b: SchoolBuilder):
         base_reg='wall_base',
     )
 
-    # 3. Sports Courts (4 standard emerald courts)
+    # 3. Sports Facilities: 4 standard emerald basketball courts + 200m running track with turf
     for c_ring in COURTS:
         b.ground_slab(c_ring, region='court_a', lift=0.035, edge_drop=0.02)
         ccx, ccz, cw, cd, cang = mrr_stats(c_ring)
         b.basketball_court(ccx, ccz, yaw=math.radians(cang), w=cw, d=cd,
                            surface='court_a', apron='court_a', key_reg='cinnabar')
 
-    # Volleyball court
-    b.ground_slab(RING_VOLLEY, region='court_b', lift=0.035, edge_drop=0.02)
-
-    # Running Area (OSM way/691002264, exact non-scaled slab, 0 overlap with courts)
-    b.ground_slab(RING_RUNNING, region='track_red', lift=0.035, edge_drop=0.02)
+    # Standard 200m running track with green soccer turf infield (~70m x 40m)
+    b.running_track(-58.0, -12.0, length=70.0, width=40.0, yaw=0.0, track_reg='track_red', infield_mode='turf')
 
     # 4. Campus Avenue, Hedges and Landscaping (Rock IMG_1295..1298)
     b.path_strip((-7.96, 26.78), (-150.0, -36.5), width=5.6, region='pave_road')
@@ -243,15 +240,37 @@ def build_kuiguang(b: SchoolBuilder):
     for tx, tz, sp, sc in avenue_trees:
         b.tree(tx, tz, species=sp, scale=sc, yaw=(tx * 0.43 + tz * 0.19) % math.tau)
 
-    # 5. Entrance Gate & Boundary Fence (Rock IMG_1295/1296)
-    # Closed gate on Longzhu Road through-building portal
+    # 5. Entrance Gate & Through-Building Portal (Rock IMG_1295/1296)
+    # Authentic through-building portal under street building B6 on Longzhu Road
     gx, gz = (-10.11 + -5.81) * 0.5, (32.12 + 21.44) * 0.5
     gy = b.ground(gx, gz)
-    gate_w = 6.8
+    gate_w = 7.2
     gate_yaw = -1.147
     old_p = b.pose
     b.pose = (gx, 0.0, gz, gate_yaw)
-    b.retractable_gate(gate_w, gate_h=2.0, y0=gy, iron_grille=True)
+
+    # Portal ground-floor opening: span width 7.2m, height 3.8m, depth 4.5m
+    # Left and right ground-floor shopfront pillars
+    b.box(-5.4, gy, 0.0, 3.6, 3.8, 4.4, 'cream', cap_region='wall_base')
+    b.box(5.4, gy, 0.0, 3.6, 3.8, 4.4, 'cream', cap_region='wall_base')
+    # Ground-floor shop display glass and signs on flanking wings
+    b.box(-5.4, gy + 1.0, 2.22, 3.2, 2.2, 0.08, 'glass')
+    b.box(5.4, gy + 1.0, 2.22, 3.2, 2.2, 0.08, 'glass')
+
+    # Portal lintel beam and horizontal plaque "桂林市奎光学校" (Rock IMG_1295)
+    b.box(0.0, gy + 3.8, 0.0, 14.4, 0.8, 4.6, 'cream', cap_region='wall_accent')
+    b.sign(0.0, gy + 4.2, 2.32, 6.8, 0.65, 'sign_gate')
+
+    # Continuous upper floors (2F..5F) spanning over the portal
+    b.box(0.0, gy + 4.6, 0.0, 14.4, 12.5, 4.4, 'cream', cap_region='roof_tile')
+    # Window rows on upper floors
+    for fl in range(4):
+        wy = gy + 5.6 + fl * 3.0
+        for wx in (-5.0, -2.5, 0.0, 2.5, 5.0):
+            b.box(wx, wy, 2.22, 1.6, 1.8, 0.08, 'glass')
+
+    # Closed black iron grille gate inside the portal passage
+    b.retractable_gate(gate_w, gate_h=2.2, y0=gy, iron_grille=True)
     b.pose = old_p
 
     # Perimeter fence along boundary (skip edges 0, 13, 14 shared with guangxi_arts buildings)

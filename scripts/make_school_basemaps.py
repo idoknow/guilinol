@@ -106,7 +106,7 @@ def gen_kuiguang():
     # Boundary
     c.draw_poly(b_pts, fill=(42, 48, 60), outline=(239, 68, 68), width=3)
     
-    # Pitches
+    # Pitches (4 standard basketball courts in west area)
     courts = ['way/683033679', 'way/683033680', 'way/683033681', 'way/683033682']
     for i, wid in enumerate(courts):
         pts = get_poly(wid)
@@ -115,28 +115,26 @@ def gen_kuiguang():
         cz = sum(p[1] for p in pts) / len(pts)
         c.draw_text(cx, cz, f'球场{i+1}', col=(255, 255, 255), size=12)
 
-    # Running area
-    r_pts = get_poly('way/691002264')
-    c.draw_poly(r_pts, fill=(197, 48, 48), outline=(155, 44, 44), width=2)
-    rx = sum(p[0] for p in r_pts) / len(r_pts)
-    rz = sum(p[1] for p in r_pts) / len(r_pts)
-    c.draw_text(rx, rz, '活动跑道区 (833 m²)', col=(255, 255, 255), size=13)
+    # 200m Running Track Oval (~70m x 40m) & Turf Infield matching game model
+    # Outer track oval: X [-1395.5, -1325.5], Z [-199.6, -159.6]
+    ox, oz = -1302.50, -167.63
+    tcx, tcz = ox - 58.0, oz - 12.0
+    c.draw.ellipse([c.xz2px(tcx - 35.0, tcz - 20.0), c.xz2px(tcx + 35.0, tcz + 20.0)],
+                   fill=(185, 78, 67), outline=(155, 44, 44), width=2)
+    # Inner soccer turf infield
+    c.draw.ellipse([c.xz2px(tcx - 22.0, tcz - 10.0), c.xz2px(tcx + 22.0, tcz + 10.0)],
+                   fill=(73, 136, 69), outline=(59, 114, 56), width=1)
+    c.draw_text(tcx, tcz, '200m跑道与草坪 (约2,200 m²)', col=(255, 255, 255), size=13)
 
-    # Volleyball
-    v_pts = get_poly('way/691456683')
-    c.draw_poly(v_pts, fill=(49, 130, 206), outline=(43, 108, 176), width=1)
-
-    # Buildings
+    # Buildings (B1..B7)
     bldgs = [
         ('way/683033673', 'B1 (西楼 5F)', (217, 226, 236)),
         ('way/683033672', 'B2 (北楼 4F)', (188, 204, 220)),
         ('way/683033678', 'B3 (南楼 4F)', (188, 204, 220)),
         ('way/692355780', 'B4 (西南楼 4F)', (159, 179, 200)),
-        ('way/683033674', 'B5 (东楼 4F)', (130, 154, 177)),
-        ('way/683033676', 'B6 (东南楼 4F)', (130, 154, 177)),
-        ('way/683033675', 'B7 (附楼 3F)', (98, 125, 152)),
-        ('way/701820464', 'B8 (街面南楼 5F)', (212, 153, 143)),
-        ('way/683033677', 'B9 (街面北楼 2F)', (181, 121, 112)),
+        ('way/683033675', 'B5 (附楼 3F)', (98, 125, 152)),
+        ('way/701820464', 'B6 (街面南楼 5F)', (212, 153, 143)),
+        ('way/683033677', 'B7 (街面北楼 2F)', (181, 121, 112)),
     ]
     for wid, label, col in bldgs:
         pts = get_poly(wid)
@@ -145,12 +143,12 @@ def gen_kuiguang():
         cz = sum(p[1] for p in pts) / len(pts)
         c.draw_text(cx, cz, label.split()[0], col=(16, 42, 67), size=12)
 
-    # Gate (Rock IMG_1295/1296)
-    gx, gz = -1302.5, -133.9
+    # Gate (Rock IMG_1295/1296) - Through-building portal under B6
+    gx, gz = ox - 7.96, oz + 26.78
     c.draw_star(gx, gz)
-    c.draw_text(gx - 25, gz - 15, '校门: 龙珠路门洞内铁栅门 (Rock IMG_1295)', col=(236, 201, 75), size=13)
+    c.draw_text(gx - 35, gz - 16, '校门: 龙珠路穿楼门洞常闭铁门 (Rock IMG_1295)', col=(236, 201, 75), size=13)
 
-    c.draw_footer('安全边界: 0门卫 0闸机 0监控 无室内 常闭大门 | 几何核验: 4块球场与跑道互不重叠 (交集 0 m²)')
+    c.draw_footer('安全边界: 0门卫 0闸机 0监控 无室内 常闭大门 | 几何核验: 4块球场与200m跑道互不重叠 (交集 0 m²)')
     c.save(out_dir / 'kuiguang_school-basemap.png')
     print('Generated kuiguang_school-basemap.png')
 
@@ -187,7 +185,7 @@ def gen_guilin_middle():
         ('way/682942534', 'B1 (北楼 5F)', (217, 226, 236)),
         ('way/682942535', 'B2 (东楼 5F)', (188, 204, 220)),
         ('way/682942536', 'B3 (东南楼 4F)', (159, 179, 200)),
-        ('way/682942537', 'B4 (综合大馆 3F)', (130, 154, 177)),
+        ('way/682942537', 'B4 (西大楼 3F)', (130, 154, 177)),
         ('way/683033683', 'B5 (西南楼 4F)', (98, 125, 152)),
         ('way/690980799', '奎光楼 (1893建 2F)', (212, 153, 143)),
         ('way/690981446', '古石刻碑亭', (181, 121, 112)),
