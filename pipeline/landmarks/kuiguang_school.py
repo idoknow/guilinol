@@ -48,8 +48,15 @@ SIGNS = {
 
 SCHOOL = 'kuiguang_school'
 BOUNDARY = 'way/253811717'
-FRONTAGE = (-10, 25, -65)
+FRONTAGE = (-13, 25, -65)
 SKIP_EDGES = {0, 13, 14}
+# Boundary trimmed to keep the model off the public street.
+STREET_SETBACK = [
+    (-115.0, -79.76), (-123.96, -57.52), (-153.23, -69.17), (-174.46, -16.5),
+    (-123.86, 3.61), (-128.64, 15.48), (-43.39, 49.36), (-37.61, 35.0),
+    (-16.0, 42.5), (-12.1, 31.5), (-8.2, 21.0), (-24.75, 13.92),
+    (-10.01, -22.7), (-30.88, -30.99), (-25.54, -44.22), (-115.0, -79.76)
+]
 BUILDINGS = [
     dict(bid='B1', source_id='way/683033673', floors=5, floor_h=3.55, roof='flat_rail', wall_reg='wall_main', base_reg='wall_base', parapet_reg='wall_accent'),
     dict(bid='B2', source_id='way/683033672', floors=4, floor_h=3.45, roof='flat_rail', wall_reg='white', base_reg='wall_base', parapet_reg='wall_accent'),

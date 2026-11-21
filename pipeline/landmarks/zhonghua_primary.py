@@ -50,6 +50,14 @@ SCHOOL = 'zhonghua_primary'
 BOUNDARY = 'way/1531318258'
 FRONTAGE = (25, 30, -10)
 SKIP_EDGES = set()
+# Boundary trimmed to keep the model off the public street.
+STREET_SETBACK = [
+    (-29.0, 48.19), (-13.2, 53.37), (-4.21, 55.41), (-3.13, 43.88),
+    (9.02, 32.22), (18.2, 34.63), (21.3, 31.01), (31.5, 32.81),
+    (35.5, 9.04), (37.8, -6.87), (28.8, -9.14), (30.9, -28.56),
+    (29.6, -45.29), (-19.18, -52.29), (-28.77, -3.85), (-29.0, -4.33),
+    (-29.0, 7.04), (-29.0, 48.19)
+]
 BUILDINGS = [
     dict(bid='B1', source_id='2048ed26-fa86-4e34-8959-9b0b2e253237', floors=5, floor_h=3.4, roof='flat_rail', wall_reg='wall_main', base_reg='wall_base', parapet_reg='wall_accent'),
     dict(bid='B2', source_id='608f802c-5541-4c52-9c03-5f3f8bcc362a', floors=2, floor_h=3.4, roof='flat_rail', wall_reg='wall_main', base_reg='wall_base', parapet_reg='wall_accent')

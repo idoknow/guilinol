@@ -31,10 +31,16 @@ def layout(module):
         return translate(shape, -origin.x, -origin.y)
 
     boundary = local(area(osm[module.BOUNDARY]))
+    setback = Polygon(module.STREET_SETBACK) if hasattr(module, "STREET_SETBACK") else None
+    if setback is not None:
+        boundary = boundary.intersection(setback).simplify(0.05)
     buildings = []
     for style in module.BUILDINGS:
         key = style['source_id']
         shape = area(osm[key]) if key.startswith('way/') else overture_geometry(overture[key])
+        shape = local(shape)
+        if module.SCHOOL == 'zhonghua_primary':
+            shape = shape.intersection(setback).simplify(0.3)
         # The facade builder accepts a single ring. Open a narrow seam to each
         # courtyard so the roof and ground-floor footprint retain the void.
         if shape.interiors:
@@ -42,7 +48,7 @@ def layout(module):
         for hole in list(shape.interiors):
             seam = shortest_line(shape.exterior, hole).buffer(0.5, cap_style='square')
             shape = shape.difference(seam)
-        buildings.append((local(shape), style))
+        buildings.append((shape, style))
     available = boundary.difference(union_all([shape for shape, _ in buildings]))
     sports = []
     # Paint nested infield courts before their surrounding athletics surface.
@@ -137,4 +143,14 @@ def build(builder, module):
     builder.sign(0, y+lintel+0.43, 0.74, 6.5, 0.7, 'sign_gate', double_sided=True)
     builder.retractable_gate(8, gate_h=2.2, y0=y, iron_grille=True)
     builder.pose = (0, 0, 0, 0)
-    builder.perimeter_fence(ring, gate_edge=-1, skip_edges=module.SKIP_EDGES)
+    if module.SCHOOL == 'guilin_middle':
+        # Let the closed street frontage occupy its own bay.
+        edge_ring = builder._clean_ring_ccw(ring)
+        gate = Point(x, z)
+        edges = [LineString([a, b]) for a, b in zip(edge_ring, edge_ring[1:] + edge_ring[:1])]
+        index = min(range(len(edges)), key=lambda i: edges[i].distance(gate))
+        station = edges[index].project(gate, normalized=True)
+        half_span = 5 / edges[index].length
+        builder.perimeter_fence(ring, index, max(0, station-half_span), min(1, station+half_span))
+    else:
+        builder.perimeter_fence(ring, gate_edge=-1, skip_edges=module.SKIP_EDGES)

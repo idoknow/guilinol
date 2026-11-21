@@ -62,6 +62,8 @@ def render(module):
     rows.extend(f'- {SPORTS[sport]} · `{key}`' for key, sport, _ in sports)
     if not sports:
         rows.append('本地 OSM 快照在校界内未标注 pitch 或 track。')
+    if hasattr(module, 'STREET_SETBACK'):
+        rows.extend(['', '临街几何沿用项目的道路退距，以保留人行道和车道净空。'])
     rows.extend(['', '## 推断', '',
                  '层数、高低关系、屋顶、配色、绿化和临街门型沿用游戏概化风格。场地画线为示意。', '',
                  f'![OSM 与 Overture 概化底图]({module.SCHOOL}-basemap.png)', ''])
