@@ -96,7 +96,7 @@ class Model:
         axes=np.array([[2,1],[0,2],[0,1]])[normal]
         coords=np.take_along_axis(local,axes[:,None,:],axis=2)
         if color in self.tile_parts:
-            scale={'stone':(3.2,1.2),'brick':(1.04,.448),'pave':(3.2,1.6),'ruinGlass':(1.5,1.5)}[color]
+            scale={'stone':(3.2,1.2),'brick':(1.04,.448),'pave':(3.2,1.6),'ruinGlass':(1.5,1.5),'edgeStone':(1.2,.30),'streetLip':(3.2,1.6)}[color]
             self.tile_parts[color].append((triangles,coords/scale));return
         self.visible.append(triangles)
         coords=(coords-coords.min(axis=1,keepdims=True))/np.maximum(coords.max(axis=1,keepdims=True)-coords.min(axis=1,keepdims=True),1e-6)
@@ -221,7 +221,7 @@ def generate(name,build,colors=None):
                 texture=Image.new('RGB',(128,128),'#2c393a')
                 ImageDraw.Draw(texture).rectangle((0,0,127,127),outline='#657072',width=2)
             else:
-                cell=list(SWATCHES).index(key);left=128*(cell%4);top=128*(cell//4)
+                cell=list(SWATCHES).index({'edgeStone':'stone','streetLip':'pave'}.get(key,key));left=128*(cell%4);top=128*(cell//4)
                 texture=image.crop((left,top,left+128,top+128))
             surface=packed([tri for tri,uv in parts]);surface.visual=trimesh.visual.TextureVisuals(uv=np.concatenate([uv for tri,uv in parts]).reshape(-1,2),material=trimesh.visual.material.PBRMaterial(name=key,baseColorTexture=texture,metallicFactor=.35 if reflective else 0,roughnessFactor=.16 if reflective else 1,doubleSided=True));scene.add_geometry(surface,geom_name=layer+'_'+key,node_name=layer+'_'+key,parent_node_name=parent)
     for lod in (0,1):

@@ -17,17 +17,17 @@ def walkway_rect(pose, width, depth):
     return shapely.affinity.translate(shapely.affinity.rotate(rect,angle,origin=(0,0),use_radians=True),east,south)
 
 
-def drape_walkways(model, rectangles):
+def drape_walkways(model, rectangles, glass=None):
     pose, grade = model.pose, model.grade
     model.pose, model.grade = (0,0,0,0), None
     try:
         for part in polygons(shapely.union_all(rectangles)):
-            civic_plaza(model, part)
+            civic_plaza(model, part, dressed=True, glass=glass)
     finally:
         model.pose, model.grade = pose, grade
 
 
-def civic_plaza(builder, ring, frontage=None, refine_outer=False):
+def civic_plaza(builder, ring, frontage=None, refine_outer=False, dressed=False, glass=None):
     surface = builder.surface
     rotation = np.array([[surface.cos,-surface.sin],[surface.sin,surface.cos]])
     streets = Streets(surface.surface)
@@ -48,6 +48,17 @@ def civic_plaza(builder, ring, frontage=None, refine_outer=False):
     if frontage is not None:
         plaza = original.union(frontage.intersection(streets_mask.buffer(4)))
     footprint = plaza.difference(streets_mask)
+    regions = [('pave',footprint)]
+    if dressed and not streets_mask.is_empty:
+        outer = streets_mask.buffer(.20)
+        inner = streets_mask.buffer(.50)
+        regions = [('streetLip',footprint.intersection(outer)),
+                   ('edgeStone',footprint.intersection(inner).difference(outer)),
+                   ('pave',footprint.difference(inner))]
+        builder.tile_parts.update({key:[] for key in ('streetLip','edgeStone') if key not in builder.tile_parts})
+    if glass is not None:
+        glass_world = shapely.transform(glass,lambda coords:coords@rotation+origin)
+        regions = [(key,region.difference(glass_world)) for key,region in regions]+[('ruinGlass',footprint.intersection(glass_world))]
     adjacent_faces = []
     for col in range(math.floor((west-4)/size),math.floor((east+4)/size)+1):
         for row in range(math.floor((north-4)/size),math.floor((south+4)/size)+1):
@@ -59,7 +70,7 @@ def civic_plaza(builder, ring, frontage=None, refine_outer=False):
                     if not inset.is_empty: adjacent_faces.append(inset)
     adjacent = shapely.STRtree(adjacent_faces)
     boundary = footprint.boundary
-    vertices,faces = [],[]; levels = {}
+    vertices=[]; faces={key:[] for key,_ in regions}; levels = {}
     def vertex(x,z):
         key = (round(x,6),round(z,6))
         if key not in levels:
@@ -83,7 +94,7 @@ def civic_plaza(builder, ring, frontage=None, refine_outer=False):
     for col in range(math.floor(west/4),math.ceil(east/4)):
         for row in range(math.floor(north/4),math.ceil(south/4)):
             cell = shapely.box(col*4,row*4,(col+1)*4,(row+1)*4)
-            for part in polygons(footprint.intersection(cell)):
+            for material,part in ((key,part) for key,region in regions for part in polygons(region.intersection(cell))):
                 if frontage is not None or (refine_outer and boundary.intersects(part)):
                     def refine(ring):
                         result = []
@@ -101,5 +112,6 @@ def civic_plaza(builder, ring, frontage=None, refine_outer=False):
                     part = shapely.Polygon(refine(part.exterior),[refine(hole) for hole in part.interiors])
                 for triangle in shapely.constrained_delaunay_triangles(part).geoms:
                     coords = list(shapely.orient_polygons(triangle,exterior_cw=True).exterior.coords)[:3]
-                    faces.append([vertex(*point) for point in coords])
-    if faces: builder.mesh(vertices,faces,'pave',collide=True)
+                    faces[material].append([vertex(*point) for point in coords])
+    for material, triangles in faces.items():
+        if triangles: builder.mesh(vertices,triangles,material,collide=True)

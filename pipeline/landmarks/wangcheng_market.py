@@ -88,14 +88,13 @@ def seated_roof(model,height,width,depth,rise):
 
 
 def market(model):
-    from plaza_seam import drape_walkways
-    drape_walkways(model,[slab(*section) for section in [((-28,22),(6,25),22),
+    slabs=[slab(*section) for section in [((-28,22),(6,25),22),
         ((-6,24),(5,-15),10),((0,28),(54,39),9),((54,39),(63,-4),10),
-        ((63,-4),(3,-13),10),((5,-14),(13,-62),32),((58,18.5),(7,3.8),9),((56,39),(85,50.5),8)]])
+        ((63,-4),(3,-13),10),((5,-14),(13,-62),32),((58,18.5),(7,3.8),9),((56,39),(85,50.5),8)]]
     for east,south in [(-92,19.5),(-72,24.5),(-52,29.25),(-35,33.25)]:
         model.pose=(east,0,south,0);model.beam([0,0,0],[0,4.2,0],.22,'wood',8,True)
         crown=trimesh.creation.icosphere(subdivisions=1);model.mesh(crown.vertices*[2.3,2.15,2.55]+[0,5.2,0],crown.faces,'leaf')
-    registered_market(model)
+    registered_market(model,slabs)
     model.pose=(-4.7,0,17,.14)
     for east,top in [(-6.5,5.15),(-3.4,6.6),(3.4,6.6),(6.5,5.15)]:
         model.box(east,0,0,.66,top,.78,'white',True)

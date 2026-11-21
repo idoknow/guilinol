@@ -52,7 +52,7 @@ def street(model,way):
             curb*=np.clip((distance-4)/3,0,1)
     left,right=edge(l),edge(r)
     outer=edge(r+w,curb)
-    if way in RAMPS+LOWER_ROADS:
+    if way in RAMPS:
         from jiefang_edges import join_bank
         join_bank(outer,n,w,along)
     surface(model,left,right,'tile')

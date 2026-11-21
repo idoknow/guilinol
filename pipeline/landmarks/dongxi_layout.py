@@ -235,7 +235,8 @@ def envelope(model, feature):
             model.mesh(np.column_stack((top[:,0],height+np.asarray(rise),top[:,1])),top_faces[:,::-1],'tile')
 
 
-def registered_market(model):
+def registered_market(model, slabs):
+    from plaza_seam import drape_walkways
     boundary = Polygon([point(coords) for coords in MARKET['replace']['polygon']])
     carriageways = [profile(LineString(np.asarray(points(way))-ORIGIN), way['tags'], STRtree([]), way['id'])
                     for way in load_osm() if way['type']=='way' and way['id'] in (258909993,259020569)]
@@ -245,18 +246,11 @@ def registered_market(model):
     model.tile_parts['ruinGlass']=[]
     left,top=terrain['lower']-ORIGIN
     model.pose=(0,0,0,0)
-    grade=model.grade
-    model.grade=None
+    glass=[]
     for row,col in np.ndindex(grid.shape[0]-1,grid.shape[1]-1):
         x=left+col*4;z=top+row*4;cell=box(x,z,x+4,z+4)
-        if not boundary.intersects(cell):continue
-        part=boundary.intersection(cell)
-        if part.geom_type!='Polygon' or part.area<.01:continue
-        vertices,faces=trimesh.creation.triangulate_polygon(part,engine='earcut')
-        heights=np.array([grade(east,south) for east,south in vertices])
-        plaza=-514<x+ORIGIN[0]<-496 and -186<z+ORIGIN[1]<-174
-        model.mesh(np.column_stack((vertices[:,0],heights+.12,vertices[:,1])),faces[:,::-1],'ruinGlass' if plaza else 'pave')
-    model.grade=grade
+        if -514<x+ORIGIN[0]<-496 and -186<z+ORIGIN[1]<-174:glass.append(cell)
+    drape_walkways(model,[boundary,*slabs],unary_union(glass).intersection(boundary))
     for feature in LAYOUT+INFILL:
         attrs = feature['properties']
         if attrs['kind']=='roof' and attrs['render'] and attrs['name'] not in EXTERNAL_ROOFS:
@@ -281,7 +275,7 @@ def registered_market(model):
             width=min(width,attrs['wall_width_m'])
             if attrs['roof']=='王城商厦':
                 # The mall shell streams separately. Seat the sign jambs on its final street grade.
-                model.grade_reference=max(model.grade_reference,grade(east,south))
+                model.grade_reference=max(model.grade_reference,model.grade(east,south))
             base=model.grade_reference+2.4+(attrs['floor']-1)*3.45
             if attrs['roof']=='王城商厦':
                 for side in (-1,1):

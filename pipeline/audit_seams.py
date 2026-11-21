@@ -190,6 +190,9 @@ def main():
                     for point,normal,interval in probes(ring,True):
                         sides = [point+normal*.02,point-normal*.02]
                         if shape.contains(shapely.Point(sides[1])): sides.reverse()
+                        if any(tuple(int(base+world.size*math.floor((value-base)/world.size)) for value,base in zip(side,(world.left,world.top))) not in world.files for side in sides):
+                            rows.append([*point.round(3),label,None,[],['outsideWorld']]); edges['outsideWorld'].append(interval)
+                            continue
                         inside, incoming = streets.at(*sides[0]); outside,outgoing = streets.at(*sides[1])
                         mesh = meshes.get(label); flags = []; layer = 'ground'
                         if not mesh and name!='jiefang_bridge':
@@ -199,7 +202,7 @@ def main():
                                 if right is not None: outside = max(outside,right)
                         if mesh:
                             inside = mesh(shapely.Point(point))
-                            if adjacency:
+                            if adjacency or 'edgeStone' in roles:
                                 for other,neighbor in meshes.items():
                                     if other!=label:
                                         peer = neighbor(shapely.Point(sides[1]))
