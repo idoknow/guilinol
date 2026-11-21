@@ -23,7 +23,7 @@ try{
     for(const [bank,points] of Object.entries(routes))for(const bike of [false,true]){
       try{
         if(!await page.evaluate(([x,z])=>window.viewer.walkTo(x,z,0,'underpass'),points[0]))throw Error('spawn failed')
-        if(bike){await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent.includes('骑行'));await page.locator('.vehicle-action').click()}
+        if(bike){await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent.includes('骑'));await page.locator('.vehicle-action').click()}
         const result=await page.evaluate(({points,bike,bank})=>{
           const walk=window.viewer.walk,trace=[];let index=1
           const held=new Set();function key(code,on){if(held.has(code)===on)return;window.dispatchEvent(new KeyboardEvent(on?'keydown':'keyup',{code}));if(on)held.add(code);else held.delete(code)}

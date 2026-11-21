@@ -62,8 +62,16 @@ const color = ()=>new THREE.Color()
 // Shared uniforms: patched into every fogged material (atmosphere.ts) plus sky / water / rain.
 export const atmo = {
   uHazeNear:{value:color()}, uHazeFar:{value:color()}, uHorizon:{value:color()},
-  uFog:{value:new THREE.Vector4()}, uNight:{value:0}, uTime:{value:0}, uRain:{value:0},
+  uFog:{value:new THREE.Vector4()}, uFogBands:{value:new THREE.Vector4(look.fogBlueFrom,look.fogBlueTo,look.fogHorizonFrom,look.fogHorizonTo)},
+  uNight:{value:0}, uTime:{value:0}, uRain:{value:0},
   uSun:{value:new THREE.Vector3()}, uSunColor:{value:color()}, uGrade:{value:new THREE.Vector2(1,1)},
+}
+let fogRangeScale = 1
+export function setFogMetrics(metrics:{fogLengthScale:number; fogBlueFrom:number; fogBlueTo:number; fogHorizonFrom:number; fogHorizonTo:number}) {
+  const nextScale = Math.max(.25, metrics.fogLengthScale)
+  if(fogRangeScale!==nextScale && atmo.uFog.value.x>0) atmo.uFog.value.x *= nextScale/fogRangeScale
+  fogRangeScale = nextScale
+  atmo.uFogBands.value.set(metrics.fogBlueFrom,metrics.fogBlueTo,metrics.fogHorizonFrom,metrics.fogHorizonTo)
 }
 export const env = {
   hour:13.5, weather:'clear' as Weather, sunDir:new THREE.Vector3(), sunColor:color(), sunPower:0,
@@ -101,7 +109,7 @@ export function evaluate(hour:number, weather:Weather, blend=1) {
   for(const key of Object.keys(env.mix) as (keyof typeof env.mix)[]) env.mix[key] += (target[key]-env.mix[key])*blend
   env.weather = weather
   const m = env.mix
-  fogLength *= m.fog; fogBoost += m.boost
+  fogLength *= m.fog*fogRangeScale; fogBoost += m.boost
   const dark = env.night
   // Overcast grey follows the hour's brightness: pale pearl by day, slate at night.
   grey.copy(env.horizon).lerp(env.zenith,.5); const level = (grey.r+grey.g+grey.b)/3

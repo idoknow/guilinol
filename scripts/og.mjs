@@ -28,7 +28,7 @@ try {
   await page.waitForTimeout(400)
   // Hide HUD chrome for a clean share card.
   await page.evaluate(() => {
-    for (const sel of ['#boot', 'output', 'footer', '.hint', '.toast', '.sky-ui', '.btn-mode', '.hud-me', '.home', '.about-mask', '.walk-ui', '.dock', '.road-name', '.summit-pill', '.spot-card', '.veil'])
+    for (const sel of ['#boot', 'output', 'footer', '.hint', '.toast', '.sky-ui', '.btn-mode', '.hud-me', '.home', '.about-mask', '.walk-ui', '.dock', '.road-name', '.summit-pill', '.spot-card', '.veil', '.render-entry', '.render-pop', '.ride-hud', '.vehicle-action'])
       document.querySelectorAll(sel).forEach(el => { el.style.display = 'none' })
   })
   await mkdir(dirname(out), {recursive: true})

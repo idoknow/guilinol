@@ -17,10 +17,10 @@ async function api(path:string,method='GET',data?:object) {
 let user:User|null=null
 const listeners=new Set<(user:User|null)=>void>()
 const setUser=(value:User|null)=>{user=value;for(const listen of listeners)listen(user)}
-const ready=api('me').then(setUser).catch(()=>{})
+const ready=api('me').then(r=>setUser(r&&typeof r.nickname==='string'?r:null)).catch(()=>{})
 /** Subscribe to sign-in changes; called immediately with the current value once known. */
 export function onUser(listen:(user:User|null)=>void){listeners.add(listen);void ready.then(()=>listen(user))}
-export const initial=(name:string)=>[...name.trim()][0]??'客'
+export const initial=(name='')=>[...name.trim()][0]??'客'
 
 let dialog:HTMLDialogElement|undefined,render:((screen:Screen,note?:string,pass?:string)=>void)|undefined
 let gate:((user:User|null)=>void)|undefined
