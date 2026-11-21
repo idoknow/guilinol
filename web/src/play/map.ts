@@ -9,7 +9,14 @@ import {builtBoundary,loadRegional,northwest,southeast} from '../map/regional'
 // vermilion only for the player and the viewpoint seals.
 const C = {paper:'#efe8d8', green:'#d3dcc0', water:'#a6c9c1', waterEdge:'#86ada5', building:'#e0d6c3', buildingEdge:'#cdc1aa',
   road:'#fcfaf3', casing:'#cbbea4', major:'#f8ebcb', majorCasing:'#c4a676', path:'#b7aa90', ink:'#2a302c', inkSoft:'#5d655f',
-  peak:'#7f9a7b', peakDark:'#4f6b55', seal:'#a9503c', sealSoft:'rgba(169,80,60,.55)', paperText:'#f4efe2'}
+  peak:'#7f9a7b', peakDark:'#4f6b55', seal:'#a9503c', sealSoft:'rgba(169,80,60,.55)', paperText:'#f4efe2',
+  halo:'rgba(239,232,216,.92)', roadHalo:'rgba(252,250,243,.95)'}
+// Phase 2 街头 palette (docs/style.md 第二期 · 小地图): night-asphalt ground, grey roads, white arterials, jade water.
+const STREET:typeof C = {paper:'#1b1f25', green:'#1f3329', water:'#17414c', waterEdge:'#245866', building:'#2a2f37', buildingEdge:'#353b45',
+  road:'#7d838c', casing:'#14171b', major:'#e9e6de', majorCasing:'#0d0f12', path:'#4c525b', ink:'#f6f4ef', inkSoft:'#c9ccd2',
+  peak:'#2d4a3a', peakDark:'#203629', seal:'#20d6c1', sealSoft:'rgba(32,214,193,.5)', paperText:'#101216',
+  halo:'rgba(16,18,22,.9)', roadHalo:'rgba(16,18,22,.9)'}
+export function setMapPalette(name:'ink'|'street'){if(name==='street')Object.assign(C,STREET)}
 const SERIF = '"Noto Serif SC","Source Han Serif SC","Songti SC",serif'
 const CELL = 256
 const ROAD_PX:[number,number][] = [[7.5,5.4],[6,4.2],[3.8,2.6],[2,1.2]] // [casing,fill] px at zoom 1 by class
@@ -114,7 +121,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const text = (s:string,x:number,y:number,size:number,color:string,weight='')=>{
       g.font = `${weight} ${size}px ${SERIF}`; const bw = g.measureText(s).width
       if(!free(x-bw/2-2,y-size/2-2,bw+4,size+4)) return false
-      g.lineWidth = 3.2; g.strokeStyle = 'rgba(239,232,216,.92)'; g.strokeText(s,x,y); g.fillStyle = color; g.fillText(s,x,y); return true}
+      g.lineWidth = 3.2; g.strokeStyle = C.halo; g.strokeText(s,x,y); g.fillStyle = color; g.fillText(s,x,y); return true}
     g.textAlign = 'center'; g.textBaseline = 'middle'
     // Spots and the player go into `taken` first so labels never cover them.
     taken.push([hx-12,hy-12,hx+12,hy+12])
@@ -133,7 +140,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       const size = mini?10:r.c<=1?12:11; g.font = `${size}px ${SERIF}`; const bw = g.measureText(r.n).width
       const ax = Math.abs(Math.cos(r.label.angle))*bw+Math.abs(Math.sin(r.label.angle))*size, ay = Math.abs(Math.sin(r.label.angle))*bw+Math.abs(Math.cos(r.label.angle))*size
       if(!free(x-ax/2,y-ay/2,ax,ay)) continue
-      g.save(); g.translate(x,y); g.rotate(r.label.angle); g.lineWidth = 3; g.strokeStyle = 'rgba(252,250,243,.95)'; g.strokeText(r.n,0,0)
+      g.save(); g.translate(x,y); g.rotate(r.label.angle); g.lineWidth = 3; g.strokeStyle = C.roadHalo; g.strokeText(r.n,0,0)
       g.fillStyle = C.inkSoft; g.fillText(r.n,0,0); g.restore()
     }
     for(const o of seals) {
@@ -152,7 +159,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     // Player: vermilion arrow with a paper outline, pointing where the camera faces.
     const a = heading()
     g.save(); g.translate(hx,hy); g.rotate(Math.PI-a)
-    g.fillStyle = 'rgba(169,80,60,.16)'; g.beginPath(); g.arc(0,0,mini?11:16,0,Math.PI*2); g.fill()
+    g.fillStyle = C.sealSoft; g.globalAlpha = .35; g.beginPath(); g.arc(0,0,mini?11:16,0,Math.PI*2); g.fill(); g.globalAlpha = 1
     g.beginPath(); g.moveTo(0,-9); g.lineTo(6.5,7); g.lineTo(0,3.5); g.lineTo(-6.5,7); g.closePath()
     g.fillStyle = C.seal; g.strokeStyle = C.paperText; g.lineWidth = 1.8; g.stroke(); g.fill(); g.restore()
   }
