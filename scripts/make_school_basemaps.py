@@ -325,9 +325,77 @@ def gen_lijiang():
     print('Generated lijiang_primary-basemap.png')
 
 
+# 6. 龙隐小学 (longyin_primary)
+def gen_longyin():
+    b_pts = get_poly('way/1027048356')
+    xs = [p[0] for p in b_pts]
+    zs = [p[1] for p in b_pts]
+    bounds = (min(xs) - 15, min(zs) - 15, max(xs) + 15, max(zs) + 15)
+    c = MapCanvas(bounds, 1200, 900)
+    c.draw_header('桂林市龙隐小学 — 校园平面布局与OSM基线要素底图', 'OSM校界: way/1027048356')
+
+    # Boundary
+    c.draw_poly(b_pts, fill=(42, 48, 60), outline=(239, 68, 68), width=3)
+
+    # Pitches
+    track_pts = get_poly('way/1474986237')
+    if track_pts:
+        c.draw_poly(track_pts, fill=(180, 70, 70), outline=(239, 68, 68), width=1)
+        cx = sum(p[0] for p in track_pts) / len(track_pts)
+        cz = sum(p[1] for p in track_pts) / len(track_pts)
+        c.draw_text(cx, cz, '跑道田径场', col=(255, 255, 255), size=12)
+
+    court_pts = get_poly('way/1474986236')
+    if court_pts:
+        c.draw_poly(court_pts, fill=(40, 120, 80), outline=(16, 185, 129), width=1)
+        cx = sum(p[0] for p in court_pts) / len(court_pts)
+        cz = sum(p[1] for p in court_pts) / len(court_pts)
+        c.draw_text(cx, cz, '篮球场', col=(255, 255, 255), size=12)
+
+    # Buildings
+    bldgs = [
+        ('way/1488495381', 'B1 (4F)'),
+        ('way/1488495382', 'B2 (3F)'),
+        ('way/1488495383', 'B3 (4F)'),
+        ('way/1488495384', 'B4 (4F)'),
+        ('way/1488495385', 'B5 (3F)'),
+        ('way/1488495386', 'B6 (4F)'),
+        ('way/1488495387', 'B7 (2F)'),
+        ('way/1488495388', 'B8 (4F)'),
+    ]
+    for wid, label in bldgs:
+        pts = get_poly(wid)
+        if pts:
+            c.draw_poly(pts, fill=(217, 226, 236), outline=(16, 42, 67), width=1)
+            cx = sum(p[0] for p in pts) / len(pts)
+            cz = sum(p[1] for p in pts) / len(pts)
+            c.draw_text(cx, cz, label, col=(16, 42, 67), size=11)
+
+    # Overture buildings
+    anchor_x, anchor_z = 905.52, 1052.41
+    ov_b3f9 = [(-10.59, -22.36), (3.81, -25.91), (1.32, -36.16), (-13.29, -32.6)]
+    ov_cb0f = [(5.81, -28.27), (19.32, -31.15), (16.73, -42.16), (3.33, -39.29)]
+    for rel_pts, label in [(ov_b3f9, 'OV1 (3F)'), (ov_cb0f, 'OV2 (3F)')]:
+        pts = [(anchor_x + x, anchor_z + z) for x, z in rel_pts]
+        c.draw_poly(pts, fill=(200, 215, 230), outline=(16, 42, 67), width=1)
+        cx = sum(p[0] for p in pts) / len(pts)
+        cz = sum(p[1] for p in pts) / len(pts)
+        c.draw_text(cx, cz, label, col=(16, 42, 67), size=10)
+
+    # Gate on west (Qixing Rd)
+    gx, gz = anchor_x - 93.5, anchor_z - 4.5
+    c.draw_star(gx, gz)
+    c.draw_text(gx - 45, gz - 15, '校门: 七星路校门 (常闭)', col=(236, 201, 75), size=12)
+
+    c.draw_footer('口径 A 安全边界: 0门卫 0闸机 0监控 无室内 常闭校门 (严格按OSM/Overture要素与场地)')
+    c.save(out_dir / 'longyin_primary-basemap.png')
+    print('Generated longyin_primary-basemap.png')
+
+
 if __name__ == '__main__':
     gen_glmu()
     gen_glut()
     gen_tianjiabing()
     gen_chenshan()
     gen_lijiang()
+    gen_longyin()

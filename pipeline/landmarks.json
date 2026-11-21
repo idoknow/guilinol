@@ -6099,11 +6099,10 @@
   },
   {
     "id": "longyin_primary",
-    "alignNote": "缺少 addr:street，不放牌",
     "name": "龙隐小学",
     "anchor": "way/1027048356",
     "model": "landmarks/longyin_primary.glb",
-    "collision": "none",
+    "collision": "mesh",
     "flatten": {
       "polygon": [
         [
@@ -6165,9 +6164,39 @@
       ],
       "elevation": 153.2
     },
-    "schematicCampus": "way/1027048356",
     "schoolGround": true,
-    "noStreetSign": true
+    "rotation": 0,
+    "replacePitches": [
+      "way/1474986236",
+      "way/1474986237"
+    ],
+    "replace": [
+      "way/1027048356"
+    ],
+    "replacePolygons": [
+      [
+        [
+          110.30816,
+          25.27042
+        ],
+        [
+          110.30848,
+          25.27042
+        ],
+        [
+          110.30848,
+          25.27012
+        ],
+        [
+          110.30816,
+          25.27012
+        ]
+      ]
+    ],
+    "auditBuildings": {
+      "way/1488495386": null,
+      "way/1488495381": null
+    }
   },
   {
     "id": "guilin_book_market",
