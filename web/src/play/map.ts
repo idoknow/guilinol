@@ -147,6 +147,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     }
     g.fillStyle=style.getPropertyValue('--region-mask');g.fill(mask,'evenodd')
     g.strokeStyle=style.getPropertyValue('--region-boundary');g.lineWidth=px(parseFloat(style.getPropertyValue('--region-boundary-width')));g.stroke(built.path)
+    ;(regional??edge)?.labels(g,x0,z0,x1,z1,scale,style,(x,z)=>!far&&built.contains(x,z))
     g.setTransform(dpr,0,0,dpr,0,0)
     // Player: vermilion arrow with a paper outline, pointing where the camera faces.
     const a = heading()

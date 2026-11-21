@@ -33,17 +33,32 @@ export async function loadRegional(file:string){
       batch.left=Math.min(batch.left,x);batch.right=Math.max(batch.right,x);batch.top=Math.min(batch.top,z);batch.bottom=Math.max(batch.bottom,z)
     } if(layer==='lake'||layer==='pond') batch.path.closePath()}
   }
+  // One label per public name: OSM often carries both a place node and an admin-centre node for a district.
+  const seen = new Set<string>(), labels = data.labels.filter(([kind,name])=>kind==='peak'&&!name||!seen.has(name)&&!!seen.add(name))
+  const css = (style:CSSStyleDeclaration,name:string)=>style.getPropertyValue(name).trim()
   return {paint(g:CanvasRenderingContext2D,left:number,top:number,right:number,bottom:number,scale:number,style:CSSStyleDeclaration){
     const far=scale<.09
     layers.forEach((layer,index)=>{if(far&&!distant.has(layer))return
-      const water=index<2; g.fillStyle=style.getPropertyValue('--region-water'); g.strokeStyle=style.getPropertyValue(layer==='ring'?'--region-ring':'--region-road')
-      g.lineWidth=(layer==='ring'?2:index>=4?1.3:.8)/scale
+      const water=index<2; g.fillStyle=css(style,'--region-water'); g.strokeStyle=css(style,layer==='ring'?'--region-ring':'--region-road')
+      g.lineWidth=(layer==='ring'?parseFloat(css(style,'--region-ring-width')):index>=4?1.3:.8)/scale
       for(const batch of groups[index].values()) if(batch.right>=left&&batch.bottom>=top&&batch.left<=right&&batch.top<=bottom){if(water)g.fill(batch.path);else g.stroke(batch.path)}
     })
-    g.fillStyle=style.getPropertyValue('--region-label'); g.font=`${parseFloat(style.getPropertyValue('--region-font-size'))/scale}px ${style.getPropertyValue('--region-font')}`; g.textAlign='center'
-    for(const [kind,name,x,z] of data.labels){if(x<left||x>right||z<top||z>bottom||(far&&kind!=='district'))continue
-      if(kind==='peak'){g.beginPath();g.moveTo(x-4/scale,z);g.lineTo(x,z-5/scale);g.lineTo(x+4/scale,z);g.strokeStyle=g.fillStyle;g.lineWidth=1/scale;g.stroke()}
-      if(name)g.fillText(name,x,z-6/scale)
+    // Karst peaks as small ink mounds (same vocabulary as the detailed map), drawn under the mask.
+    if(!far){g.fillStyle=css(style,'--region-peak'); g.beginPath()
+      for(const [kind,,x,z] of labels){if(kind!=='peak'||x<left||x>right||z<top||z>bottom)continue
+        const r=4/scale; g.moveTo(x-r,z+r*.35); g.quadraticCurveTo(x-r*.55,z-r*1.5,x,z-r*1.35); g.quadraticCurveTo(x+r*.6,z-r*1.4,x+r,z+r*.35); g.closePath()}
+      g.fill()}
+  },
+  // Names go above the mask with a paper halo so they stay legible; `skip` hides those the detailed map already names.
+  labels(g:CanvasRenderingContext2D,left:number,top:number,right:number,bottom:number,scale:number,style:CSSStyleDeclaration,skip:(x:number,z:number)=>boolean){
+    const far=scale<.09, size=parseFloat(css(style,'--region-font-size'))
+    g.textAlign='center'; g.textBaseline='alphabetic'; g.lineJoin='round'; g.strokeStyle=css(style,'--region-halo'); g.lineWidth=3/scale
+    for(const [kind,name,x,z] of labels){if(!name||x<left||x>right||z<top||z>bottom||(far?kind!=='district':skip(x,z)))continue
+      const district=kind==='district'
+      g.font=`${district?600:400} ${(district?size+2:size)/scale}px ${css(style,'--region-font')}`
+      g.fillStyle=css(style,district?'--region-label':'--region-label-soft')
+      const y=kind==='peak'?z-7/scale:z+4/scale
+      g.strokeText(name,x,y); g.fillText(name,x,y)
     }
   }}
 }
