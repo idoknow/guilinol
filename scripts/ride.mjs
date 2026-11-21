@@ -58,7 +58,7 @@ try{
     await interact('下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
     if(!mobile){
       // Use the next bike in the same row so the line to the wall clears the tree.
-      await fixture(-1610.8,425);await interact('骑电动车');const wall=await steer([-1606.2,418.7],true);console.log('wall',wall);assert(wall.obstacle==='building'&&wall.speed===0&&wall.distance<8);await interact('下车')
+      await fixture(-1610.8,425);await interact('骑单车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'bicycle');const wall=await steer([-1606.2,418.7],true);console.log('wall',wall);assert(wall.obstacle==='building'&&wall.speed===0&&wall.distance<8);await interact('下车')
       const [x,,z]=data.docks['解放桥码头'];await fixture(x,z);await shot('dock');await interact('上船');
       const distance=await page.evaluate((bounds)=>{const walker=window.viewer.walk,start=walker.position.clone();for(let frame=0;frame<3600;frame++){walker.tick(1/60);const probe=walker.boatClearance();if(probe?.kind!=='raft'||probe.clearance<.3||probe.roof-walker.position.y>bounds.roof+1e-6||probe.head-walker.position.y>bounds.head+1e-6)throw Error(`unsafe raft: ${JSON.stringify(probe)}`)}return walker.position.distanceTo(start)},bounds.raft)
       assert(distance>80&&distance<125);await shot('boat');await interact('下站下船')
