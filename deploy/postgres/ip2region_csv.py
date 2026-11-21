@@ -1,34 +1,47 @@
-"""Convert the legacy IPv4 ip2region v2 XDB (country|0|province|city|ISP) for psql."""
+"""Convert ip2region IPv4 text ranges to PostgreSQL CIDRs. Input stays outside git."""
+import argparse
 import csv
 import ipaddress
-import mmap
-import struct
 import sys
 
 
-def convert(data, output):
-    if len(data) < 256 or struct.unpack_from("<H", data)[0] != 2:
-        raise ValueError("Expected a v2 IPv4 XDB")
-    first, last = struct.unpack_from("<II", data, 8)
-    record = struct.Struct("<IIHI")
-    if first < 256 or last < first or last + record.size > len(data) or (last - first) % record.size:
-        raise ValueError("Invalid segment index")
-    writer = csv.writer(output)
-    writer.writerow(["prefix", "country", "region", "city", "isp"])
-    for pos in range(first, last + 1, record.size):
-        low, high, length, offset = record.unpack_from(data, pos)
-        if low > high or offset + length > len(data):
-            raise ValueError("Invalid segment")
-        parts = data[offset:offset + length].decode("utf-8").split("|")
-        if len(parts) != 5:
-            raise ValueError("Expected five legacy region fields")
-        country, _, region, city, isp = (s if s != "0" else "" for s in parts)
-        # Country headers supply ISO codes outside China when the legacy catalog uses local names.
-        code = "CN" if country in {"CN", "中国", "China"} else country if len(country) == 2 and country.isascii() else ""
-        for prefix in ipaddress.summarize_address_range(ipaddress.IPv4Address(low), ipaddress.IPv4Address(high)):
-            writer.writerow([str(prefix), code, region, city, isp])
+def addresses(source):
+    for number, line in enumerate(source, 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        try:
+            start, end, *parts = line.split("|")
+            if len(parts) == 5:
+                country, region, city, isp, iso = parts
+            elif len(parts) == 4:
+                country, region, city, isp = parts
+                iso = ""
+            else:
+                raise ValueError("expected country, province, city, carrier and optional ISO code")
+            code = "CN" if country in {"中国", "China", "CN"} else iso.upper()
+            low, high = [ipaddress.IPv4Address(int(s) if s.isdecimal() else s) for s in (start, end)]
+            if low > high:
+                raise ValueError("reversed address range")
+            yield low, high, tuple("" if s in {"0", "--"} else s for s in (code, region, city, isp))
+        except ValueError as error:
+            raise ValueError(f"invalid IPv4 source at line {number}: {error}") from error
+
+
+def networks(source, samples=()):
+    selected = [ipaddress.IPv4Address(value) for value in samples]
+    for low, high, region in addresses(source):
+        if selected and not any(low <= ip <= high for ip in selected):
+            continue
+        for prefix in ipaddress.summarize_address_range(low, high):
+            yield [str(prefix), *region]
 
 
 if __name__ == "__main__":
-    with open(sys.argv[1], "rb") as source, mmap.mmap(source.fileno(), 0, access=mmap.ACCESS_READ) as data:
-        convert(data, sys.stdout)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("source")
+    args = parser.parse_args()
+    with open(args.source, encoding="utf-8-sig") as source:
+        writer = csv.writer(sys.stdout)
+        writer.writerow(["prefix", "country", "region", "city", "isp"])
+        writer.writerows(networks(source))

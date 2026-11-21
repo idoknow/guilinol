@@ -34,6 +34,11 @@
 
 部署脚本对现有 PostgreSQL 执行幂等迁移 `deploy/postgres/002-telemetry.sql`。nginx 的 stub_status 监听同一 Pod 网络空间的 loopback:8081，API 每分钟采样。无需新增常驻容器。
 
-离线 IP 目录存放在 PostgreSQL。准备已授权的 UTF-8 CSV，列为 prefix（IPv4/IPv6 CIDR）、country（两位国家码）、region（省）、city、isp。若已有经典 IPv4 v2 ip2region XDB（五列地区字段），运行 `python3 deploy/postgres/ip2region_csv.py ip2region.xdb > networks.csv` 可转换为该格式。在目标 glol 数据库上用 psql 的 `-X -v ON_ERROR_STOP=1 -f deploy/postgres/import-perf-network.sql < networks.csv` 导入。替换操作在同一事务内完成。首次导入前，省、市和运营商为空。
+离线 IP 目录存放在 PostgreSQL。准备已授权的 UTF-8 CSV，列为 prefix（IPv4/IPv6 CIDR）、country（两位国家码）、region（省）、city、isp。运行 `python3 deploy/postgres/ip2region_csv.py ipv4_source.txt > networks.csv` 可把 ip2region 的 IPv4 起止地址范围转换为该格式。在目标 glol 数据库上用 psql 的 `-X -v ON_ERROR_STOP=1 -f deploy/postgres/import-perf-network.sql < networks.csv` 导入。替换操作在同一事务内完成。首次导入前，省、市和运营商为空。
 
-本地使用当前 world 发布包构建 dist。运行 `npm test`、`npm run check:api`、`npm run verify:telemetry`。端到端验收启动临时 PG、API、静态站和 Chromium，检查匿名鉴权、三个测试网段的匹配、步行与飞行、批次尺寸和三个管理员查询。仅检查浏览器数据契约可运行 `npm run verify:telemetry -- --browser-only`。
+本地使用当前 world 发布包构建 dist。设置 `IP2REGION_SOURCE` 为实际 IPv4 数据文件的路径。若已设置 `DATABASE_URL`，验收脚本在该连接上创建独立的临时 schema 并在退出时删除；自托管 API 测试还会启动本机的 MinIO（可用 `MINIO_BIN` 指定可执行文件）。未提供连接时使用临时 Docker 服务。运行 `npm test`、`npm run check:api`、`npm run verify:telemetry`。端到端验收启动临时 PG、API、静态站和 Chromium，检查匿名鉴权、三条真实 IPv4 范围的省份和运营商匹配、步行与飞行、批次尺寸和三个管理员查询。仅检查浏览器数据契约可运行 `npm run verify:telemetry -- --browser-only`。
+
+
+## 大陆探针
+
+两份 CronJob 分别调度到广州和上海节点，每 15 分钟访问首页、manifest、五个固定 chunk 和 `GET /api/health`。健康检查仅确认 API 进程可应答。每个请求记录 DNS、TCP、TLS 阶段耗时、从开始到首字节及总耗时（ms），保留 HTTP 状态码，连接失败记为 0。每轮用 Pod UID 作为批次会话标识。探针通过同源接收接口上报 `context.source=probe`、节点名与八条事件，管理员可查询 `metric=probe.total`、`probe.ttfb`、`probe.dns`、`probe.tcp` 或 `probe.tls`，按 `group=node` 或 `group=target` 查看节点和目标的分布。浏览器继续加载现有 Umami，游戏遥测只发往本站。

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {createServer} from 'node:net'
-import {spawn} from 'node:child_process'
+import {spawn,execFileSync} from 'node:child_process'
 import {once} from 'node:events'
 import {readFile} from 'node:fs/promises'
 import {randomBytes,createHash} from 'node:crypto'
@@ -31,10 +31,11 @@ try {
       if(i===100||api.exitCode!==null)throw Error('Local API unavailable')
       await delay(100)
     }
+    assert.equal((await fetch(origin+'/api/health')).status,200)
     assert.equal((await fetch(origin+'/api/admin/perf')).status,401)
-    // Isolated fixture ranges exercise longest-prefix lookup, including more-specific network precedence.
-    await storage.sql("INSERT INTO perf_network VALUES ('202.96.128.0/24','CN','广东','广州','电信'),('202.106.0.0/24','CN','北京','北京','联通'),('211.136.192.0/24','CN','广东','广州','移动'),('202.0.0.0/8','CN',NULL,NULL,NULL)")
-    for(const [ip,region,isp] of [['202.96.128.86','广东','电信'],['202.106.0.20','北京','联通'],['211.136.192.6','广东','移动']]){
+    const ranges=JSON.parse(execFileSync('python3',['scripts/test-perf-region.py'],{encoding:'utf8'}))
+    for(const {ip,prefix,country,region,city,isp} of ranges){
+      await storage.sql('INSERT INTO perf_network VALUES ($1,$2,$3,$4,$5)',[prefix,country,region,city,isp])
       const sid=crypto.randomUUID()
       assert.equal((await fetch(origin+'/api/t',{method:'POST',headers:{'CF-Connecting-IP':ip},body:JSON.stringify({sid,context:{},rows:[{kind:'error',count:1}]})})).status,204)
       const [result]=await storage.sql("SELECT region,isp FROM perf_event WHERE session='"+sid+"'")
@@ -44,7 +45,8 @@ try {
   browser=await chromium.launch(browserOptions())
   const page=await browser.newPage({viewport:{width:800,height:450}})
   const batches=[],foreign=[]
-  page.on('request',r=>{if(/^https?:/.test(r.url())&&new URL(r.url()).origin!==origin)foreign.push(r.url())})
+  page.on('request',r=>{if(/^https?:/.test(r.url())&&![origin,'https://stats.rcpd.cc'].includes(new URL(r.url()).origin))foreign.push(r.url())})
+  await page.route('https://stats.rcpd.cc/**',route=>route.fulfill({status:204}))
   await page.route('**/api/t',async route=>{
     const bytes=route.request().postDataBuffer(), body=JSON.parse(bytes)
     batches.push({body,bytes:bytes.length,gzip:gzipSync(bytes).length})
@@ -99,10 +101,11 @@ try {
     await storage.sql("INSERT INTO users(id,email,nickname,salt,digest,verified,role) VALUES('perf','perf@example.test','test','','',1,'admin'); INSERT INTO sessions VALUES('"+digest+"','perf',unixepoch()+300)")
     const [saved]=await storage.sql("SELECT count(distinct batch) n FROM perf_event WHERE session='"+batches[0].body.sid+"'")
     assert.ok(saved.results[0].n>=6)
+    console.log('PostgreSQL batches',saved.results[0].n)
     for(const path of ['?group=device','/grid','/server']){
       const response=await fetch(origin+'/api/admin/perf'+path,{headers:{Cookie:'glol_session='+token}})
       assert.equal(response.status,200);const {items}=await response.json();assert.ok(items.length,path)
-      if(path[0]==='?')console.log(JSON.stringify({items}))
+      if(path!=='/server')console.log(path,JSON.stringify({items}))
     }
   }
 }finally{
