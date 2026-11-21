@@ -45,7 +45,7 @@ export function mountMissionUi(
   dialog.innerHTML = `
     <div class="mb-head">
       <h2>桂林通 · 接单大厅</h2>
-      <div class="mb-wallet"><span></span><button type="button" class="mb-close" aria-label="关闭">×</button></div>
+      <div class="mb-wallet"><span></span><button type="button" class="mb-wardrobe-btn">衣橱</button><button type="button" class="mb-close" aria-label="关闭">×</button></div>
     </div>
     <div class="mb-body"></div>
   `
@@ -62,8 +62,14 @@ export function mountMissionUi(
   const meterFillEl = meterEl.querySelector<HTMLElement>('em')!
   const subEl = hud.querySelector<HTMLElement>('.st-sub')!
   const walletSpan = dialog.querySelector<HTMLElement>('.mb-wallet span')!
+  const wardrobeBtn = dialog.querySelector<HTMLButtonElement>('.mb-wardrobe-btn')!
   const bodyEl = dialog.querySelector<HTMLElement>('.mb-body')!
   const closeBtn = dialog.querySelector<HTMLButtonElement>('.mb-close')!
+
+  wardrobeBtn.onclick = () => {
+    dialog.close()
+    window.dispatchEvent(new CustomEvent('game:open-wardrobe'))
+  }
 
   abandonBtn.onclick = () => {
     runner.abandon()

@@ -15,6 +15,7 @@ import {createDriverPose} from './car'
 import {createRiderPose,notifyDismountBlocked} from './ride'
 import {createEbikeAudioEngine} from './ebike-audio'
 import {clearAvatarPose, ensureAvatarRig, getAvatarJoint, getAvatarJoints} from './avatar-rig'
+import {createAvatarOutfitController} from './outfits'
 import {isGlobalHotkeyBlocked, isModalOrOverlayOpen} from './input-guard'
 import {createInteractArbiter} from './interact-arbiter'
 import {mountShopOverlay, type ShopCloseReason} from '../ui/shop-overlay'
@@ -28,9 +29,11 @@ import {
   getState as getGameState,
   listShops,
   onEvent as onGameEvent,
+  onState,
   setPrompt,
   updateTravel,
   type ActiveVehicleState,
+  type EquippedOutfit,
   type PersistedEbikeVisual,
   type PersonalEbikeModelId,
   type PlayerMode,
@@ -309,6 +312,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const [sim,model]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady])
   const rig=createCameraRig(sim)
   const figure=model.scene,legacySkinned=mergeAvatar(figure,avatar.color),avatarRig=ensureAvatarRig(figure,avatar.color),skinned=legacySkinned??avatarRig.skinnedMesh,traveller=figure.getObjectByName('Traveller')??avatarRig.traveller,ridePose=createRiderPose(figure),driverPose=createDriverPose(figure)
+  const outfitController=createAvatarOutfitController(figure,avatarRig)
+  {
+    const initialWardrobe=getGameState().wardrobe
+    outfitController.applyEquipped(initialWardrobe.equipped,{ridingEbike:false,autoHelmetOnRide:initialWardrobe.autoHelmetOnRide})
+  }
   const riderJoints=getAvatarJoints(figure) as RiderJoints
   const ebikeRig=createDynamicEbike(0)
   ebikeRig.root.visible=false
@@ -489,14 +497,40 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(owned&&mountedStaticBike&&mountedStaticBike.userData.instanceId===ev.vehicleId){
         ebikeRig.applyMods(owned.visual,(mountedStaticBike.userData.paint as number|undefined)??0)
       }
+    }else if(ev.type==='outfit:equip'||ev.type==='save:loaded'){
+      const w=getGameState().wardrobe
+      outfitController.applyEquipped(w.equipped,{
+        ridingEbike:Boolean(rides?.bike&&rides.rideKind!=='bicycle'),
+        autoHelmetOnRide:w.autoHelmetOnRide,
+      })
     }
   })
+
+  onState((s,changed)=>{
+    if(changed.has('wardrobe')){
+      outfitController.applyEquipped(s.wardrobe.equipped,{
+        ridingEbike:Boolean(rides?.bike&&rides.rideKind!=='bicycle'),
+        autoHelmetOnRide:s.wardrobe.autoHelmetOnRide,
+      })
+    }
+  })
+
+  function openSafeWardrobe(){
+    if(!active)return false
+    if(rides?.car||crashSession||standUpSession||pickupSession){
+      if(!verify||stuntMode){
+        window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:'请先下车或站稳后再打开随身衣橱',ms:2200}}))
+      }
+      return false
+    }
+    return shopOverlay.openWardrobe()
+  }
 
   window.addEventListener('game:open-garage',()=>{
     if(active)shopOverlay.openGarage()
   })
   window.addEventListener('game:open-wardrobe',()=>{
-    if(active)shopOverlay.openWardrobe()
+    openSafeWardrobe()
   })
 
   function updateShopShowcaseCamera(){
@@ -513,7 +547,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
 
   const shopOverlay=mountShopOverlay({
-    onBeforeOpen(shop){
+    onBeforeOpen(shop,overlayMode){
       input.clearTransientInput(true)
       held=true;external=null;rides?.stop();vx=vz=0
       savedStreetPose={
@@ -523,6 +557,18 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         camPos:camera.position.clone(),
         camQuat:camera.quaternion.clone(),
         fov:camera.fov,
+      }
+      if(!rides?.bike&&!rides?.boat&&!rides?.car&&!crashSession&&!standUpSession&&!pickupSession&&(overlayMode==='wardrobe'||shop?.kind==='clothing')){
+        const idleAct=actions.get(avatar.clips.idle)
+        if(idleAct){
+          if(action!==idleAct){
+            action?.fadeOut(0)
+            idleAct.reset().setLoop(THREE.LoopRepeat,Infinity).fadeIn(0).play()
+            action=idleAct
+          }
+          activeClipName=avatar.clips.idle
+        }
+        mixer.update(0)
       }
       if(shop){
         const sx=shop.cameraRig.stagePos[0], sz=shop.cameraRig.stagePos[2]
@@ -541,6 +587,20 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           figure.position.set(sx,sy+soleOffset,sz)
           figure.rotation.y=shop.cameraRig.stageYaw+avatar.yaw
           figure.visible=true
+        }
+        camera.fov=shopCam.fovDeg
+        camera.updateProjectionMatrix()
+        updateShopShowcaseCamera()
+      }else if(overlayMode==='wardrobe'){
+        shopCam={
+          stagePos:figure.position.clone(),
+          orbitYaw:figure.rotation.y+Math.PI+0.16,
+          orbitPitch:.12,
+          orbitRadius:2.55,
+          minRadius:1.75,
+          maxRadius:4.0,
+          targetHeightOffset:.96,
+          fovDeg:40,
         }
         camera.fov=shopCam.fovDeg
         camera.updateProjectionMatrix()
@@ -571,6 +631,16 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(!shopCam)return
       shopCam.orbitRadius=THREE.MathUtils.clamp(shopCam.orbitRadius+delta*.003,shopCam.minRadius,shopCam.maxRadius)
       updateShopShowcaseCamera()
+    },
+    onPreviewOutfit(equipped){
+      outfitController.setPreview(equipped)
+    },
+    onPreviewRollback(equipped){
+      outfitController.clearPreview()
+      outfitController.applyEquipped(equipped,{
+        ridingEbike:Boolean(rides?.bike&&rides.rideKind!=='bicycle'),
+        autoHelmetOnRide:getGameState().wardrobe.autoHelmetOnRide,
+      })
     },
     onStartTestRide(shopId,modelId){
       if(!rides)return
@@ -703,6 +773,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       mode='boat'
       vehicleState={kind:'boat',id:rides.freeKind??'tour_boat',speedKmh:Math.round(Math.abs(rides.speed)*3.6),damage:0}
     }
+    outfitController.setRidingEbike(Boolean(rides?.bike&&rides.rideKind!=='bicycle'))
     updateTravel(mode,vehicleState,{quiet:!!quietZone,name:quietZone?.name})
   }
 
@@ -724,6 +795,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
   window.addEventListener('keydown',event=>{
     if(active)ebikeAudio.unlock()
+    if(active&&!event.repeat&&event.code==='KeyO'&&!isGlobalHotkeyBlocked(event.target)&&!isModalOrOverlayOpen()&&!shopOverlay.isOpen()){
+      openSafeWardrobe()
+      return
+    }
     if(!active||!crashSession||event.repeat)return
     if(isGlobalHotkeyBlocked(event.target))return
     if(event.code==='Space'||event.code==='KeyW'||event.code==='KeyA'||event.code==='KeyS'||event.code==='KeyD')crashRecoverQueued=true
@@ -1016,7 +1091,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true);return true
   }
-  function leave(){if(shopOverlay.isOpen())shopOverlay.close('fly');finishActiveTestRide('mode_switch');shopHintGroup.visible=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function leave(){if(shopOverlay.isOpen())shopOverlay.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number){
     const dryBridge=!!sim.surface(x,z,'deck',refY+.4,1.5)||!!sim.surface(x,z,'landmark',refY+.4,1.5)
     return !sim.insideHouse(x,z)&&(!sim.wet(x,z)||dryBridge)&&!sim.isBlockedAt(x,refY,z)
@@ -1495,6 +1570,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       downedCount:downedBikes.size,
       downedBikes:Array.from(downedBikes).map(r=>({kind:r.kind,x:r.x,z:r.z,roll:r.roll,dist:Math.hypot(r.x-pos.x,r.z-pos.z)})),
       camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z,camera.position.y),
+      outfit:outfitController.getSnapshot(),
       boat:rides?.boatProbe()??null}}
   function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
     if(shopOverlay.isOpen()){updateShopShowcaseCamera();return}
@@ -2227,12 +2303,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     shop:{
       open:(shopId:string,tab?:string)=>shopOverlay.openShop(shopId,tab),
       openService:(shopId:string)=>shopOverlay.openServiceBay(shopId),
-      openWardrobe:()=>shopOverlay.openWardrobe(),
+      openWardrobe:()=>openSafeWardrobe(),
       openGarage:()=>shopOverlay.openGarage(),
       close:(reason?:ShopCloseReason)=>shopOverlay.close(reason),
       isOpen:()=>shopOverlay.isOpen(),
       triggerInteract:()=>interactArbiter.trigger(),
       getInteractDecision:()=>interactArbiter.getLastDecision(),
+    },
+    outfit:{
+      getSnapshot:()=>outfitController.getSnapshot(),
+      setPreview:(equipped:EquippedOutfit|null)=>outfitController.setPreview(equipped),
+      setRidingEbike:(riding:boolean)=>outfitController.setRidingEbike(riding),
     },
     garage:{
       summon:(vehicleId?:string)=>summonPersonalWithToast(vehicleId),

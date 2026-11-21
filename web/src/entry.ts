@@ -52,6 +52,7 @@ function hud(main: typeof import('./main')) {
       phone: params.has('phone'),
       onApp: id => {
         if (id === 'jobs') window.dispatchEvent(new CustomEvent('game:open-missions'))
+        else if (id === 'wardrobe') window.dispatchEvent(new CustomEvent('game:open-wardrobe'))
         else if (id === 'garage') window.dispatchEvent(new CustomEvent('game:open-garage'))
       },
     })

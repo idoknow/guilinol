@@ -9,6 +9,7 @@
 
 import './shop-overlay.css'
 import {
+  DEFAULT_EQUIPPED_OUTFIT,
   EBIKE_SERVICE_CATALOG,
   EBIKE_UPGRADE_CATALOG,
   EBIKE_VISUAL_CATALOG,
@@ -27,6 +28,7 @@ import {
   executePurchase,
   quotePurchasePrice,
   selectActivePersonalVehicle,
+  setAutoHelmetOnRide,
   type CatalogItemType,
 } from '../game/commerce'
 import {getShop, type ShopTriggerDef} from '../game/shops'
@@ -110,6 +112,10 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
         </div>
       </div>
       <div class="shop-tabs" role="tablist"></div>
+      <div class="shop-wardrobe-opts" hidden>
+        <span class="shop-wardrobe-summary"></span>
+        <button type="button" class="shop-helmet-toggle" aria-pressed="true">骑行自动头盔：开</button>
+      </div>
       <div class="shop-status-msg" hidden></div>
       <div class="shop-list" role="listbox"></div>
       <div class="shop-footer">
@@ -127,6 +133,9 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
   const titleEl = root.querySelector<HTMLElement>('.shop-title')!
   const walletValEl = root.querySelector<HTMLElement>('.shop-wallet-val')!
   const tabsEl = root.querySelector<HTMLElement>('.shop-tabs')!
+  const wardrobeOptsEl = root.querySelector<HTMLElement>('.shop-wardrobe-opts')!
+  const wardrobeSummaryEl = root.querySelector<HTMLElement>('.shop-wardrobe-summary')!
+  const helmetToggleBtn = root.querySelector<HTMLButtonElement>('.shop-helmet-toggle')!
   const statusMsgEl = root.querySelector<HTMLElement>('.shop-status-msg')!
   const listEl = root.querySelector<HTMLElement>('.shop-list')!
   const secondaryBtn = root.querySelector<HTMLButtonElement>('.shop-act-secondary')!
@@ -199,7 +208,12 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
 
     if (mode === 'wardrobe' || currentShop?.kind === 'clothing') {
       if (activeTab === 'presets') {
-        const source = mode === 'wardrobe' ? OUTFIT_PRESETS.filter(p => ownedPresets.has(p.id)) : OUTFIT_PRESETS
+        const source =
+          mode === 'wardrobe'
+            ? OUTFIT_PRESETS.filter(
+                p => ownedPresets.has(p.id) || Object.values(p.items).every(id => ownedItems.has(id)),
+              )
+            : OUTFIT_PRESETS
         return source.map(preset => {
           const allOwned = ownedPresets.has(preset.id) || Object.values(preset.items).every(id => ownedItems.has(id))
           const isActive = (Object.entries(preset.items) as [OutfitSlot, string][]).every(
@@ -398,6 +412,27 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
 
     const tabs = tabsForMode()
     if (!tabs.some(t => t.id === activeTab)) activeTab = tabs[0].id
+    const isWardrobe = mode === 'wardrobe'
+    wardrobeOptsEl.hidden = !isWardrobe
+    if (isWardrobe) {
+      const ownedCount = s.wardrobe.ownedItemIds.length
+      wardrobeSummaryEl.textContent = `已解锁 ${ownedCount} 件单品 · 支持 5 槽位自由混搭`
+      const helmetOn = s.wardrobe.autoHelmetOnRide
+      helmetToggleBtn.textContent = `骑行自动头盔：${helmetOn ? '开' : '关'}`
+      helmetToggleBtn.setAttribute('aria-pressed', String(helmetOn))
+      helmetToggleBtn.classList.toggle('on', helmetOn)
+      helmetToggleBtn.onclick = () => {
+        const next = !getState().wardrobe.autoHelmetOnRide
+        setAutoHelmetOnRide(next)
+        setStatus(
+          next ? '已开启骑电驴自动佩戴安全头盔（下车恢复原造型）' : '已关闭骑电驴自动头盔联动',
+          'ok',
+        )
+        render()
+      }
+    } else {
+      helmetToggleBtn.onclick = null
+    }
     tabsEl.innerHTML = ''
     for (const tab of tabs) {
       const btn = document.createElement('button')
@@ -463,16 +498,52 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
     }
 
     const activeCard = cards.find(c => c.key === selectedKey) ?? null
+    const isDefaultOutfit = (Object.keys(DEFAULT_EQUIPPED_OUTFIT) as OutfitSlot[]).every(
+      slot => s.wardrobe.equipped[slot] === DEFAULT_EQUIPPED_OUTFIT[slot],
+    )
     if (!activeCard) {
-      secondaryBtn.hidden = true
+      if (mode === 'wardrobe') {
+        secondaryBtn.hidden = false
+        secondaryBtn.textContent = '恢复默认'
+        secondaryBtn.disabled = busyPurchasing || isDefaultOutfit
+        secondaryBtn.onclick = () => {
+          if (equipOutfitPreset('outfit_default')) {
+            const committed = {...getState().wardrobe.equipped}
+            previewSnapshot = committed
+            previewingLabel = ''
+            previewBannerEl.hidden = true
+            hooks.onPreviewRollback?.(committed)
+            setStatus('已恢复桂林默认初始穿搭', 'ok')
+            render()
+          }
+        }
+      } else {
+        secondaryBtn.hidden = true
+        secondaryBtn.onclick = null
+      }
       primaryBtn.disabled = true
       primaryBtn.className = 'shop-btn shop-btn--primary shop-act-primary'
       primaryBtn.textContent = '暂无可操作项'
       return
     }
 
-    // Secondary action: summon owned personal e-bike (garage or owned model), or free test ride in e-bike shop
-    if (activeCard.itemType === 'ebike_model' && activeCard.owned && activeCard.targetVehicleId && hooks.onSummonVehicle) {
+    // Secondary action: reset to default in wardrobe, summon owned personal e-bike, or free test ride in e-bike shop
+    if (mode === 'wardrobe') {
+      secondaryBtn.hidden = false
+      secondaryBtn.textContent = '恢复默认'
+      secondaryBtn.disabled = busyPurchasing || isDefaultOutfit
+      secondaryBtn.onclick = () => {
+        if (equipOutfitPreset('outfit_default')) {
+          const committed = {...getState().wardrobe.equipped}
+          previewSnapshot = committed
+          previewingLabel = ''
+          previewBannerEl.hidden = true
+          hooks.onPreviewRollback?.(committed)
+          setStatus('已恢复桂林默认初始穿搭', 'ok')
+          render()
+        }
+      }
+    } else if (activeCard.itemType === 'ebike_model' && activeCard.owned && activeCard.targetVehicleId && hooks.onSummonVehicle) {
       secondaryBtn.hidden = false
       secondaryBtn.textContent = '召唤提车'
       secondaryBtn.disabled = busyPurchasing
@@ -514,9 +585,11 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
               ? equipOutfitPreset(activeCard.itemId)
               : equipOutfitItem(activeCard.itemId)
           if (ok) {
-            previewSnapshot = {...getState().wardrobe.equipped}
+            const committed = {...getState().wardrobe.equipped}
+            previewSnapshot = committed
             previewingLabel = ''
             previewBannerEl.hidden = true
+            hooks.onPreviewRollback?.(committed)
             setStatus(`已切换穿搭：${activeCard.name}`, 'ok')
             render()
           }
@@ -563,9 +636,11 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
             idempotencyKey: `${shopId}:${activeCard.itemType}:${activeCard.itemId}:${++clickSessionNonce}`,
           })
           if (res.ok && res.code === 'OK') {
-            previewSnapshot = {...getState().wardrobe.equipped}
+            const committed = {...getState().wardrobe.equipped}
+            previewSnapshot = committed
             previewingLabel = ''
             previewBannerEl.hidden = true
+            hooks.onPreviewRollback?.(committed)
             setStatus(`成交！已扣除 ${fmtMoney(res.charged)}，当前余额 ${fmtMoney(res.balanceAfter)}`, 'ok')
           } else if (res.code === 'ALREADY_OWNED') {
             setStatus('您已拥有该项，已为您切换为可用状态。', 'ok')
