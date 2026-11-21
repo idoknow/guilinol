@@ -299,7 +299,8 @@ def gate_furniture(m,plan_surface):
         m.box(x,0,-148.8,.24,.95,1.3,'granite')
         m.box(x,.95,-148.8,.26,.12,.42,'glass')
     m.beam([-2.8,0,-153.8],[-2.8,2.9,-153.8],.045,'wood',6)
-    rim=[[-2.8+1.95*math.cos(i*math.pi/4),2.55,-153.8+1.95*math.sin(i*math.pi/4)] for i in range(8)]
+    canopy_radius=2.55
+    rim=[[-2.8+canopy_radius*math.cos(i*math.pi/4),2.55,-153.8+canopy_radius*math.sin(i*math.pi/4)] for i in range(8)]
     m.mesh([[-2.8,3.08,-153.8],*rim],[[0,i+1,(i+1)%8+1] for i in range(8)],'yellow')
     dx,dy,dz,angle=m.pose
     cosine,sine=math.cos(angle),math.sin(angle)
