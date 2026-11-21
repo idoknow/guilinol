@@ -132,7 +132,11 @@ export async function vehicles(
   const cellSize = 128
   const bikeStates = new WeakMap<T.Object3D, BikeInstanceState>()
   const bikeCoordStates = new Map<string, BikeInstanceState>()
-  const makeVehicleMesh = vehicleModel as (kind: string, paint?: number, options?: {shared?: boolean}) => T.Mesh
+  const makeVehicleMesh = vehicleModel as (
+    kind: string,
+    paint?: number,
+    options?: {shared?: boolean; visual?: Partial<PersistedEbikeVisual>},
+  ) => T.Mesh
 
   let activePersonalMesh: T.Mesh | null = null
   let activeTestRideMesh: T.Mesh | null = null
@@ -390,7 +394,7 @@ export async function vehicles(
     visual: PersistedEbikeVisual,
   ): T.Mesh {
     const paintIdx = modelId === 'lijiang_light' ? 0 : modelId === 'city_range' ? 2 : 3
-    const mesh = makeVehicleMesh('bike', paintIdx, undefined)
+    const mesh = makeVehicleMesh('bike', paintIdx, {visual})
     mesh.position.set(x, y, z)
     mesh.rotation.set(0, yaw, KICKSTAND_REST_ROLL_RAD, 'YXZ')
     mesh.userData.paint = paintIdx
@@ -913,6 +917,9 @@ export async function vehicles(
       activePersonalMesh.userData.durability = ownedBike.durabilityPct
       activePersonalMesh.userData.modPreset = ownedBike.visual.preset
       activePersonalMesh.userData.visualMods = {...ownedBike.visual}
+      const paintIdx = ownedBike.modelId === 'lijiang_light' ? 0 : ownedBike.modelId === 'city_range' ? 2 : 3
+      const nextGeom = makeVehicleMesh('bike', paintIdx, {visual: ownedBike.visual}).geometry
+      if (activePersonalMesh.geometry !== nextGeom) activePersonalMesh.geometry = nextGeom
     }
     if (bike && bike.userData.instanceId === vehicleId) {
       bikeCtrl.setPersonalModel(ownedBike.modelId as PersonalEbikeTierId, ownedBike.durabilityPct)

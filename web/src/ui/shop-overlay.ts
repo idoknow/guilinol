@@ -20,6 +20,7 @@ import {
   calcFullServiceCost,
   type EquippedOutfit,
   type OutfitSlot,
+  type PersistedEbikeVisual,
   type PersonalEbikeModelId,
 } from '../game/catalog'
 import {
@@ -44,6 +45,7 @@ export interface ShopOverlayHooks {
   onOrbitZoom?: (delta: number) => void
   onPreviewOutfit?: (equipped: EquippedOutfit) => void
   onPreviewRollback?: (equipped: EquippedOutfit) => void
+  onPreviewEbike?: (preview: {modelId: PersonalEbikeModelId; visual: PersistedEbikeVisual}) => void
   onStartTestRide?: (shopId: string, modelId: PersonalEbikeModelId) => void
   onSummonVehicle?: (vehicleId?: string) => void
 }
@@ -269,8 +271,24 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
           testRideModelId: mode === 'shop' ? m.modelId : undefined,
           targetVehicleId: ownedInstance?.id,
           specs: [
-            {label: 'S挡/满改极速', valueText: `${m.stockGearKmh[3]}/${m.hardCapKmh} km/h`, ratio: m.hardCapKmh / 70},
-            {label: '电池续航倍率', valueText: `${m.capacityScale.toFixed(2)}×`, ratio: Math.min(1, m.capacityScale / 1.8)},
+            {label: '极速 (S/满改)', valueText: `${m.stockGearKmh[3]}/${m.hardCapKmh} km/h`, ratio: m.hardCapKmh / 70},
+            {label: '起步扭矩', valueText: `${Math.round(m.accelScale * 100)}%`, ratio: Math.min(1, m.accelScale / 1.3)},
+            {
+              label: '压弯极限',
+              valueText: m.modelId === 'xiangshan_gt' ? '高阶运动倾角' : m.modelId === 'city_range' ? '稳态巡航倾角' : '轻巧通勤倾角',
+              ratio: m.modelId === 'xiangshan_gt' ? 0.96 : m.modelId === 'city_range' ? 0.78 : 0.64,
+            },
+            {label: '电池续航', valueText: `${m.capacityScale.toFixed(2)}× · 耗电${Math.round(m.drainMul * 100)}%`, ratio: Math.min(1, m.capacityScale / 1.75)},
+            {
+              label: '夜灯光束',
+              valueText: (m.defaultVisual.headlightTier ?? 0) >= 1 ? '双透镜远近光' : '省电暖白灯',
+              ratio: m.modelId === 'xiangshan_gt' ? 1 : (m.defaultVisual.headlightTier ?? 0) >= 1 ? 0.76 : 0.45,
+            },
+            {
+              label: '可改槽位',
+              valueText: `${m.allowedVisuals.length}外观 · Lv${m.maxUpgrades.motorLevel}/${m.maxUpgrades.controllerLevel}/${m.maxUpgrades.batteryLevel}`,
+              ratio: Math.min(1, m.allowedVisuals.length / 10),
+            },
           ],
         }
       })
@@ -379,11 +397,33 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
       previewingLabel = card.owned ? '' : `试穿预览：${card.name}（离开自动还原）`
       emit({type: 'shop:preview', shopId, itemType: 'outfit', itemId: card.itemId})
     } else if (card.itemType === 'ebike_model') {
+      const modelId = card.itemId as PersonalEbikeModelId
+      const owned = card.targetVehicleId ? s.garage.vehicles[card.targetVehicleId] : undefined
+      const visual: PersistedEbikeVisual = owned ? {...owned.visual} : {...PERSONAL_EBIKE_MODELS[modelId].defaultVisual}
+      hooks.onPreviewEbike?.({modelId, visual})
       previewingLabel = card.owned ? '' : `展台预览：${card.name}`
       emit({type: 'shop:preview', shopId, itemType: 'ebike', itemId: card.itemId})
     } else if (card.itemType === 'ebike_visual' || card.itemType === 'ebike_upgrade') {
+      const ownedVehicles = Object.values(s.garage.vehicles)
+      const activeVeh = (card.targetVehicleId ? s.garage.vehicles[card.targetVehicleId] : undefined)
+        ?? (s.garage.activeVehicleId ? s.garage.vehicles[s.garage.activeVehicleId] : ownedVehicles[0])
+      const baseModelId: PersonalEbikeModelId = activeVeh?.modelId ?? 'xiangshan_gt'
+      const baseVisual: PersistedEbikeVisual = activeVeh
+        ? {...activeVeh.visual}
+        : {...PERSONAL_EBIKE_MODELS[baseModelId].defaultVisual}
+      if (card.itemType === 'ebike_visual') {
+        const visDef = EBIKE_VISUAL_CATALOG.find(v => v.id === card.itemId)
+        if (visDef) Object.assign(baseVisual, visDef.patch)
+      }
+      hooks.onPreviewEbike?.({modelId: baseModelId, visual: baseVisual})
       previewingLabel = `方案预览：${card.name}`
       emit({type: 'shop:preview', shopId, itemType: 'ebike_mod', itemId: card.itemId})
+    } else if (card.itemType === 'ebike_service') {
+      const ownedVehicles = Object.values(s.garage.vehicles)
+      const activeVeh = (card.targetVehicleId ? s.garage.vehicles[card.targetVehicleId] : undefined)
+        ?? (s.garage.activeVehicleId ? s.garage.vehicles[s.garage.activeVehicleId] : ownedVehicles[0])
+      if (activeVeh) hooks.onPreviewEbike?.({modelId: activeVeh.modelId, visual: {...activeVeh.visual}})
+      previewingLabel = ''
     } else {
       previewingLabel = ''
     }
@@ -438,6 +478,7 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
       const btn = document.createElement('button')
       btn.type = 'button'
       btn.className = `shop-tab${tab.id === activeTab ? ' on' : ''}`
+      btn.dataset.tab = tab.id
       btn.setAttribute('role', 'tab')
       btn.setAttribute('aria-selected', String(tab.id === activeTab))
       btn.textContent = tab.label
@@ -682,6 +723,13 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
       emit({type: 'shop:open', shopId: shop.shopId, kind: shop.kind})
     }
     render()
+    if (shop?.kind === 'ebike' || nextMode === 'garage' || nextMode === 'service') {
+      const s = getState()
+      const owned = s.garage.activeVehicleId ? s.garage.vehicles[s.garage.activeVehicleId] : Object.values(s.garage.vehicles)[0]
+      const initModelId: PersonalEbikeModelId = owned?.modelId ?? 'lijiang_light'
+      const initVisual: PersistedEbikeVisual = owned ? {...owned.visual} : {...PERSONAL_EBIKE_MODELS[initModelId].defaultVisual}
+      hooks.onPreviewEbike?.({modelId: initModelId, visual: initVisual})
+    }
     return true
   }
 
