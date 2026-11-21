@@ -52,7 +52,10 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean}={}) {
   const phone = $('.st-phone'), phoneButton = $('.st-phone-btn')
   const togglePhone = (on = phone.hidden)=>{phone.hidden = !on; document.body.toggleAttribute('data-phone', on)}
   phoneButton.onclick = ()=>togglePhone()
-  addEventListener('keydown', e=>{if(e.code==='Tab'&&!isGlobalHotkeyBlocked(e.target)){e.preventDefault(); togglePhone()}})
+  const onKeyDown = (e:KeyboardEvent)=>{if(e.code==='Tab'&&!isGlobalHotkeyBlocked(e.target)){e.preventDefault(); togglePhone()}}
+  const onGameEvent = (e:Event)=>{const detail=(e as CustomEvent<{type?:string}>).detail; if(detail?.type==='shop:open'&&!phone.hidden) togglePhone(false)}
+  addEventListener('keydown', onKeyDown)
+  addEventListener('game:event', onGameEvent)
   if(opts.phone) togglePhone(true)
 
   function render(s:Readonly<HudState>) {
@@ -85,7 +88,7 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean}={}) {
   }
   render(source.get())
   const off = source.on(render)
-  return {root, togglePhone, dispose(){off(); root.remove(); delete document.body.dataset.hud}}
+  return {root, togglePhone, dispose(){off(); removeEventListener('keydown', onKeyDown); removeEventListener('game:event', onGameEvent); root.remove(); delete document.body.dataset.hud}}
 }
 
 // Demo states for `?hud=street&hudDemo=…` (style sheets and review screenshots only).
