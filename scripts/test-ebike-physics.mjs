@@ -424,31 +424,48 @@ try {
 
   // Deep-lean tuck in S gear past fatal lean angle triggers real lowside
   await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(false))
+  await steerTowardPoint(page, -539, -95, false, 120, 8)
   await steerTowardPoint(page, -511, -70, true, 160, 8)
   await steerTowardPoint(page, -197, 37, true, 35)
   await page.click('.ride-gear-btn[data-gear="4"]')
   await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(true))
   await page.keyboard.down('KeyW')
-  await stepTicks(page, 30, 0.05)
-  await page.keyboard.down('ShiftLeft')
-  await page.keyboard.down('KeyA')
   let fatalLeftLowside = false
+  let leftCrashed = false
   let fatalLeftLean = 0
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 30; i++) {
     const snap = await stepTicks(page, 1, 0.05)
-    const lean = snap.probe?.ebikeRig?.lean ?? snap.ebike?.lean ?? 0
-    if (Math.abs(lean) > Math.abs(maxLeftLean)) maxLeftLean = lean
-    if (snap.probe?.twoWheelFlow === 'crashed' && snap.ebike?.crashReason === 'lowside') {
-      fatalLeftLowside = true
-      fatalLeftLean = Math.abs(snap.ebike?.lean ?? lean)
+    if (snap.probe?.twoWheelFlow === 'crashed') {
+      leftCrashed = true
+      if (snap.ebike?.crashReason === 'lowside') {
+        fatalLeftLowside = true
+        fatalLeftLean = Math.abs(snap.ebike?.lean ?? 0)
+      }
       break
+    }
+  }
+  if (!leftCrashed) {
+    await page.keyboard.down('ShiftLeft')
+    await page.keyboard.down('KeyA')
+    for (let i = 0; i < 40; i++) {
+      const snap = await stepTicks(page, 1, 0.05)
+      const lean = snap.probe?.ebikeRig?.lean ?? snap.ebike?.lean ?? 0
+      if (Math.abs(lean) > Math.abs(maxLeftLean)) maxLeftLean = lean
+      if (snap.probe?.twoWheelFlow === 'crashed') {
+        leftCrashed = true
+        if (snap.ebike?.crashReason === 'lowside') {
+          fatalLeftLowside = true
+          fatalLeftLean = Math.abs(snap.ebike?.lean ?? lean)
+        }
+        break
+      }
     }
   }
   await page.screenshot({path: `${SHOTS_DIR}/lean-left.png`})
   await page.keyboard.up('KeyA')
   await page.keyboard.up('ShiftLeft')
   await page.keyboard.up('KeyW')
-  if (fatalLeftLowside) {
+  if (leftCrashed) {
     await finishCrashStandAndPickup(page, '扶起电动车')
   }
   const leftLowside = fatalLeftLowside || nonTuckLeftCrashed
@@ -500,7 +517,8 @@ try {
 
   // 6. Mod cycle KeyG + HUD click + battery/shared distinction + compliant D2 reset on remount + clean dismount KeyF
   await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(false))
-  await steerTowardPoint(page, -480, -60, true, 90)
+  await steerTowardPoint(page, -539, -95, false, 120, 8)
+  await steerTowardPoint(page, -480, -60, true, 120, 4)
   await page.keyboard.press('KeyG')
   await stepTicks(page, 1, 0.05)
   const modAfterG = await page.locator('.ride-mod').textContent()

@@ -1134,8 +1134,8 @@ try {
   assert.equal(mobileLanded.aboardAttr, false, '下船后应移除 data-aboard')
   console.log('7. 手机 390×844 船上按钮不重叠 + 摇杆划船 + 触屏下船通过')
 
-  await mobileCtx.close()
   assert.deepEqual(errors, [], `存在运行错误: ${JSON.stringify(errors)}`)
+  await mobileCtx.close()
   console.log('ALL verify:boat checks passed!')
 } finally {
   await browser?.close()
