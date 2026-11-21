@@ -14,11 +14,13 @@ import {listShops, type ShopTriggerDef} from '../game/shops'
 const C = {paper:'#efe8d8', green:'#d3dcc0', water:'#a6c9c1', waterEdge:'#86ada5', building:'#e0d6c3', buildingEdge:'#cdc1aa',
   road:'#fcfaf3', casing:'#cbbea4', major:'#f8ebcb', majorCasing:'#c4a676', path:'#b7aa90', ink:'#2a302c', inkSoft:'#5d655f',
   peak:'#7f9a7b', peakDark:'#4f6b55', seal:'#a9503c', sealSoft:'rgba(169,80,60,.55)', paperText:'#f4efe2',
+  shop:'#d9822b', shopText:'#9c4e0e', nav:'#f59e0b',
   halo:'rgba(239,232,216,.92)', roadHalo:'rgba(252,250,243,.95)'}
 // Phase 2 街头 palette (docs/style.md 第二期 · 小地图): night-asphalt ground, grey roads, white arterials, jade water.
 const STREET:typeof C = {paper:'#1b1f25', green:'#1f3329', water:'#17414c', waterEdge:'#245866', building:'#2a2f37', buildingEdge:'#353b45',
   road:'#7d838c', casing:'#14171b', major:'#e9e6de', majorCasing:'#0d0f12', path:'#4c525b', ink:'#f6f4ef', inkSoft:'#c9ccd2',
   peak:'#2d4a3a', peakDark:'#203629', seal:'#20d6c1', sealSoft:'rgba(32,214,193,.5)', paperText:'#101216',
+  shop:'#f5b841', shopText:'#ffd166', nav:'#ffd166',
   halo:'rgba(16,18,22,.9)', roadHalo:'rgba(16,18,22,.9)'}
 export function setMapPalette(name:'ink'|'street'){if(name==='street')Object.assign(C,STREET)}
 const SERIF = '"Noto Serif SC","Source Han Serif SC","Songti SC",serif'
@@ -127,16 +129,16 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       if(!free(x-bw/2-2,y-size/2-2,bw+4,size+4)) return false
       g.lineWidth = 3.2; g.strokeStyle = C.halo; g.strokeText(s,x,y); g.fillStyle = color; g.fillText(s,x,y); return true}
     g.textAlign = 'center'; g.textBaseline = 'middle'
-    // Spots and the player go into `taken` first so labels never cover them.
+    // Spots, shops and the player go into `taken` first so labels never cover them.
     taken.push([hx-12,hy-12,hx+12,hy+12])
     const seals = spots.map(s=>({s,x:sx(s.x),y:sz(s.z)})).filter(o=>o.x>-20&&o.y>-20&&o.x<w+20&&o.y<h+20)
     const sealSize = mini?13:20
     for(const o of seals) taken.push([o.x-sealSize/2,o.y-sealSize/2,o.x+sealSize/2,o.y+sealSize/2])
-    const shopPins = listShops().map(shop=>({shop,x:sx(shop.triggerPos[0]),y:sz(shop.triggerPos[2])})).filter(o=>o.x>-20&&o.y>-20&&o.x<w+20&&o.y<h+20)
+    const shopPins = listShops().map(shop=>({shop,x:sx(shop.triggerPos[0]),y:sz(shop.triggerPos[2])})).filter(o=>o.x>-24&&o.y>-24&&o.x<w+24&&o.y<h+24)
     const shopSize = mini?14:21
-    for(const o of shopPins) taken.push([o.x-shopSize/2,o.y-shopSize/2,o.x+shopSize/2,o.y+shopSize/2])
+    for(const o of shopPins) taken.push([o.x-shopSize/2-2,o.y-shopSize/2-2,o.x+shopSize/2+2,o.y+shopSize/2+2])
     if(!mini) {
-      for(const o of shopPins) text(o.shop.mapMarker.label,o.x,o.y+shopSize*.5+10,12.5,o.shop.kind==='ebike'?'#20d6c1':'#ffc53d','700')
+      for(const o of shopPins) text(o.shop.mapMarker.label,o.x,o.y+shopSize*.5+10,12.5,o.shop.kind==='ebike'?'#20d6c1':C.shopText,'700')
       for(const o of seals) text(o.s.name,o.x,o.y+sealSize*.5+10,13,C.seal,'600')
       for(const p of peaks) if(p.name&&scale>.12) text(p.name,sx(p.x),sz(p.z)+12,12,C.peakDark)
       if(scale>.22) for(const p of placeLabels) {const x = sx(p.x), y = sz(p.z); if(x>0&&y>0&&x<w&&y<h) text(p.n,x,y,11.5,C.inkSoft)}
@@ -174,6 +176,18 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     g.strokeStyle=style.getPropertyValue('--region-boundary');g.lineWidth=px(parseFloat(style.getPropertyValue('--region-boundary-width')));g.stroke(built.path)
     ;(regional??edge)?.labels(g,x0,z0,x1,z1,scale,style,(x,z)=>!far&&built.contains(x,z))
     g.setTransform(dpr,0,0,dpr,0,0)
+    if(navTarget) {
+      const nx = sx(navTarget.x), ny = sz(navTarget.z)
+      g.save()
+      g.strokeStyle = C.nav; g.lineWidth = mini ? 2 : 2.5; g.setLineDash([6,4])
+      g.beginPath(); g.moveTo(hx,hy); g.lineTo(nx,ny); g.stroke()
+      g.setLineDash([])
+      if(nx > -24 && ny > -24 && nx < w + 24 && ny < h + 24) {
+        g.fillStyle = 'rgba(245,158,11,.28)'; g.beginPath(); g.arc(nx,ny,mini?11:16,0,Math.PI*2); g.fill()
+        g.strokeStyle = C.nav; g.lineWidth = 2; g.beginPath(); g.arc(nx,ny,mini?7:11,0,Math.PI*2); g.stroke()
+      }
+      g.restore()
+    }
     const missionTarget = getState().mission?.target
     if(missionTarget) {
       const tx = sx(missionTarget[0]), ty = sz(missionTarget[1])
@@ -227,6 +241,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('.atlas-docks button[data-dock]'))) b.onclick = ()=>{const d = waterDocks.find(x=>x.id===b.dataset.dock); if(d){close(); ui.goDock(d)}}
   const view = {x:0,z:0,scale:.5}
   let pin:{x:number,z:number,name:string,spot?:Spot,dock?:WaterDock,shop?:ShopTriggerDef}|null = null
+  let navTarget:{x:number,z:number,name:string}|null = null
   function redraw() {
     if(sheet.hidden) return
     const w = sheet.clientWidth, h = sheet.clientHeight, dpr = Math.min(2,devicePixelRatio)
@@ -256,9 +271,17 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     pin = next; pop.hidden = !pin
     if(pin) {
       if(!built.contains(pin.x,pin.z)){pop.textContent='未开放'; redraw(); return}
-      const sub = pin.shop?`商圈商铺 · ${pin.shop.mapMarker.badge}`:pin.spot?pin.spot.sub:pin.dock?pin.dock.sub:atlas.roadAt(pin.x,pin.z,40)?.name ?? ''
-      pop.innerHTML = `<b>${pin.name}</b>${sub&&sub!==pin.name?`<span>${sub}</span>`:''}<button>前往</button>`
-      pop.querySelector('button')!.onclick = ()=>{const target = pin!; close(); if(target.shop){if(ui.goShop) ui.goShop(target.shop); else ui.goPoint(target.x,target.z,target.name)} else if(target.spot) ui.goSpot(target.spot); else if(target.dock) ui.goDock(target.dock); else ui.goPoint(target.x,target.z,target.name)}
+      const sub = pin.shop?pin.shop.displayName:pin.spot?pin.spot.sub:pin.dock?pin.dock.sub:atlas.roadAt(pin.x,pin.z,40)?.name ?? ''
+      const isNav = !!navTarget && Math.hypot(navTarget.x-pin.x,navTarget.z-pin.z)<1
+      pop.innerHTML = `<b>${pin.name}</b>${sub&&sub!==pin.name?`<span>${sub}</span>`:''}<button type="button" data-act="go">前往</button><button type="button" class="atlas-nav-btn" data-act="nav">${isNav?'取消导航':'标记导航'}</button>`
+      pop.querySelector<HTMLButtonElement>('[data-act="nav"]')!.onclick = ()=>{
+        const target = pin!
+        navTarget = isNav ? null : {x:target.x,z:target.z,name:target.name}
+        window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:navTarget?`已标记导航：${navTarget.name}`:'已取消导航标记',ms:2200}}))
+        drawMini()
+        setPin(target)
+      }
+      pop.querySelector<HTMLButtonElement>('[data-act="go"]')!.onclick = ()=>{const target = pin!; close(); if(target.shop){if(ui.goShop) ui.goShop(target.shop); else ui.goPoint(target.x,target.z,target.name)} else if(target.spot) ui.goSpot(target.spot); else if(target.dock) ui.goDock(target.dock); else ui.goPoint(target.x,target.z,target.name)}
     }
     redraw()
   }
@@ -266,7 +289,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   input.oninput = ()=>{
     const q = input.value.trim()
     const hits:{name:string,sub:string,x:number,z:number,spot?:Spot,dock?:WaterDock,shop?:ShopTriggerDef}[] = q?[
-      ...listShops().filter(sh=>sh.displayName.includes(q)||sh.brandName.includes(q)||sh.mapMarker.label.includes(q)||sh.mapMarker.keywords.includes(q)).map(sh=>({name:sh.displayName,sub:'商圈商铺 · '+sh.mapMarker.badge,x:sh.triggerPos[0],z:sh.triggerPos[2],shop:sh})),
+      ...listShops().filter(s=>s.displayName.includes(q)||s.brandName.includes(q)||s.mapMarker.label.includes(q)||s.mapMarker.badge.includes(q)||s.mapMarker.keywords.includes(q)).map(s=>({name:s.mapMarker.label,sub:'商铺 · '+s.displayName,x:s.triggerPos[0],z:s.triggerPos[2],shop:s})),
       ...waterDocks.filter(d=>d.name.includes(q)||d.sub.includes(q)||d.keywords.includes(q)).map(d=>({name:d.name,sub:'水边开船 · '+d.badge,x:d.x,z:d.z,dock:d})),
       ...spots.filter(s=>s.name.includes(q)||s.sub.includes(q)).map(s=>({name:s.name,sub:'观景点 · '+s.sub,x:s.x,z:s.z,spot:s})),
       ...atlas.search(q,8).map((p:Place)=>({name:p.n,sub:{peak:'山',scenic:'景点',gate:'城门',bridge:'桥',water:'水面',park:'公园',museum:'博物馆',memorial:'纪念地',road:'道路',school:'学校'}[p.k],x:p.x,z:p.z}))]:[]
@@ -293,8 +316,8 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   canvas.onpointerup = e=>{pointers.delete(e.pointerId); pinch = 0
     if(moved<6&&pointers.size===0) {
       const r = canvas.getBoundingClientRect(), x = view.x+(e.clientX-r.left-r.width/2)/view.scale, z = view.z+(e.clientY-r.top-r.height/2)/view.scale
-      const nearShop = built.contains(x,z)&&listShops().find(sh=>built.contains(sh.triggerPos[0],sh.triggerPos[2])&&Math.hypot(sh.triggerPos[0]-x,sh.triggerPos[2]-z)*view.scale<18)
-      const near = built.contains(x,z)&&spots.find(s=>built.contains(s.x,s.z)&&Math.hypot(s.x-x,s.z-z)*view.scale<16)
+      const nearShop = built.contains(x,z)&&listShops().find(s=>built.contains(s.triggerPos[0],s.triggerPos[2])&&Math.hypot(s.triggerPos[0]-x,s.triggerPos[2]-z)*view.scale<18)
+      const near = !nearShop&&built.contains(x,z)&&spots.find(s=>built.contains(s.x,s.z)&&Math.hypot(s.x-x,s.z-z)*view.scale<16)
       if(nearShop) setPin({x:nearShop.triggerPos[0],z:nearShop.triggerPos[2],name:nearShop.mapMarker.label,shop:nearShop})
       else if(near) setPin({x:near.x,z:near.z,name:near.name,spot:near})
       else setPin({x,z,name:atlas.roadAt(x,z,40)?.name ?? '这里'})
@@ -314,6 +337,6 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   })
 
   let clock = 0
-  return {paint, contains:built.contains, extent:atlas.extent, roadAt:atlas.roadAt.bind(atlas), open, close, get active(){return !sheet.hidden}, roadName:()=>lastRoad, search:(q:string)=>{input.value = q; input.oninput?.(new Event('input'))},
+  return {paint, contains:built.contains, extent:atlas.extent, roadAt:atlas.roadAt.bind(atlas), open, close, get active(){return !sheet.hidden}, get navTarget(){return navTarget}, setNavTarget:(next:typeof navTarget)=>{navTarget=next;drawMini();redraw()}, roadName:()=>lastRoad, search:(q:string)=>{input.value = q; input.oninput?.(new Event('input'))},
     tick(dt:number){clock += dt; if(clock<.2) return; clock = 0; if(document.body.dataset.photo!=='on') drawMini(); if(!sheet.hidden&&!pointers.size) redraw()}}
 }

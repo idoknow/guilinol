@@ -152,17 +152,18 @@ def build_signs_sheet():
     sheet = Image.new('RGB', (SIGN_ATLAS, SIGN_ATLAS), (32, 36, 42))
     draw = ImageDraw.Draw(sheet)
 
-    # 1. Weixiaotang rooftop curved crown banner ('桂林微笑堂商厦 / GUILIN WEIXIAOTANG PLAZA')
+    # 1. Landmark rooftop curved crown banner (original Guilin twin-peak emblem; no corporate conglomerate marks)
     x, y, w, h = SIGN_RECTS['niko_crown']
     draw.rectangle((x, y, x + w - 1, y + h - 1), fill=(242, 239, 232))
     for vx in range(x, x + w, 64):
         draw.line((vx, y, vx, y + h - 1), fill=(214, 212, 206), width=2)
     draw.rectangle((x, y, x + w - 1, y + 8), fill=(184, 190, 196))
     draw.rectangle((x, y + h - 9, x + w - 1, y + h - 1), fill=(176, 182, 188))
-    # Dashang Group green double-loop infinity emblem on left
-    draw.ellipse((x + 36, y + 26, x + 98, y + 92), outline=(44, 122, 66), width=13)
-    draw.ellipse((x + 84, y + 26, x + 146, y + 92), outline=(44, 122, 66), width=13)
-    _draw_centered(draw, (x + 28, y + 98, 126, 44), '大商集团', _font(24, bold=True, sans=True), (36, 42, 48))
+    # Original Guilin twin-peak & sweet-osmanthus emblem on left
+    draw.polygon([(x + 36, y + 86), (x + 68, y + 26), (x + 100, y + 86)], fill=(44, 122, 66))
+    draw.polygon([(x + 82, y + 86), (x + 114, y + 36), (x + 146, y + 86)], fill=(58, 140, 82))
+    draw.ellipse((x + 80, y + 22, x + 102, y + 44), fill=(214, 174, 68))
+    _draw_centered(draw, (x + 28, y + 98, 126, 44), '桂林名品', _font(24, bold=True, sans=True), (36, 42, 48))
     _draw_centered(
         draw, (x + 164, y + 12, 836, 92), '桂 林 微 笑 堂 商 厦',
         _font(76, bold=True), (28, 34, 42), stroke_w=2, stroke_fill=(28, 34, 42),
@@ -172,12 +173,12 @@ def build_signs_sheet():
         _font(31, bold=True, sans=True), (36, 44, 52), stroke_w=1,
     )
 
-    # 2. Weixiaotang ground entrance arch fascia
+    # 2. Ground entrance arch fascia
     x, y, w, h = SIGN_RECTS['niko_arch']
     draw.rectangle((x, y, x + w - 1, y + h - 1), fill=(224, 228, 232))
     draw.rectangle((x + 3, y + 3, x + w - 4, y + h - 4), outline=(146, 154, 162), width=2)
-    draw.ellipse((x + 22, y + 16, x + 52, y + 48), outline=(44, 122, 66), width=6)
-    draw.ellipse((x + 44, y + 16, x + 74, y + 48), outline=(44, 122, 66), width=6)
+    draw.polygon([(x + 24, y + 52), (x + 40, y + 20), (x + 56, y + 52)], fill=(44, 122, 66))
+    draw.polygon([(x + 48, y + 52), (x + 62, y + 26), (x + 76, y + 52)], fill=(58, 140, 82))
     _draw_centered(draw, (x + 82, y + 6, 540, 42), '桂林微笑堂商厦', _font(36, bold=True), (28, 34, 42), stroke_w=1)
     _draw_centered(draw, (x + 82, y + 48, 540, 24), 'GUILIN WEIXIAOTANG PLAZA', _font(18, bold=True, sans=True), (44, 52, 60))
 
@@ -323,14 +324,14 @@ def build_signs_sheet():
     paint_banner('nanfang_roof', (34, 78, 134), (244, 246, 248), (196, 212, 228), '南 方 大 厦', None, 42)
     paint_banner('wenhua_roof', (134, 48, 42), (244, 232, 188), (204, 178, 122), '文 化 大 厦', None, 38)
 
-    # CCB sign ('中国建设银行 China Construction Bank')
+    # Original local Guilin commercial bank fascia (no real bank trademarks)
     x, y, w, h = SIGN_RECTS['ccb_sign']
     draw.rectangle((x, y, x + w - 1, y + h - 1), fill=(240, 242, 244))
     draw.rectangle((x, y + h - 10, x + w - 1, y + h - 1), fill=(24, 82, 156))
-    draw.ellipse((x + 18, y + 14, x + 64, y + 60), fill=(24, 82, 156))
-    draw.rectangle((x + 33, y + 29, x + 49, y + 45), fill=(240, 242, 244))
-    _draw_centered(draw, (x + 74, y + 6, w - 86, 40), '中国建设银行', _font(34, bold=True, sans=True), (28, 34, 42), stroke_w=1)
-    _draw_centered(draw, (x + 74, y + 46, w - 86, 20), 'China Construction Bank', _font(16, bold=True, sans=True), (48, 56, 66))
+    draw.rectangle((x + 20, y + 16, x + 62, y + 58), outline=(24, 82, 156), width=5)
+    draw.polygon([(x + 41, y + 23), (x + 54, y + 37), (x + 41, y + 51), (x + 28, y + 37)], fill=(24, 82, 156))
+    _draw_centered(draw, (x + 74, y + 6, w - 86, 40), '桂城商业银行', _font(34, bold=True, sans=True), (28, 34, 42), stroke_w=1)
+    _draw_centered(draw, (x + 74, y + 46, w - 86, 20), 'GUICHENG COMMERCIAL BANK', _font(15, bold=True, sans=True), (48, 56, 66))
 
     # Fire rescue station fascia ('中国消防救援 / CHINA FIRE AND RESCUE')
     x, y, w, h = SIGN_RECTS['fire_fascia']
@@ -339,20 +340,39 @@ def build_signs_sheet():
     _draw_centered(draw, (x + 10, y + 4, w - 20, 44), '中 国 消 防 救 援', _font(34, bold=True, sans=True), (246, 222, 92), stroke_w=1)
     _draw_centered(draw, (x + 10, y + 54, w - 20, 22), 'CHINA FIRE AND RESCUE', _font(16, bold=True, sans=True), (242, 246, 250))
 
-    # 12. Eight authentic Guilin storefront fascia signs
+    # 12. Eight original local Guilin storefront fascia signs (no real-world brand trademarks)
     shops = [
-        ('shop_0', (36, 40, 46), (242, 224, 172), '周 大 福', 'CHOW TAI FOOK'),
-        ('shop_1', (34, 88, 62), (244, 246, 244), '桂 林 银 行', 'GUILIN BANK'),
-        ('shop_2', (164, 44, 38), (248, 226, 142), '桂林米粉 · 老字号', 'TRADITIONAL NOODLES'),
-        ('shop_3', (32, 82, 138), (246, 248, 250), '大参林药房', 'DASHENLIN PHARMACY'),
-        ('shop_4', (152, 84, 48), (248, 240, 222), '三品王牛肉粉', 'SANPINWANG'),
-        ('shop_5', (30, 34, 40), (236, 240, 244), '华为授权体验店', 'HUAWEI STORE'),
-        ('shop_6', (128, 38, 44), (244, 218, 136), '金顺昌 · 桂林三宝', 'GUILIN SPECIALTIES'),
+        ('shop_0', (36, 40, 46), (242, 224, 172), '漓翠金玉坊', 'LICUI JADE & GOLD'),
+        ('shop_1', (34, 88, 62), (244, 246, 244), '漓 江 商 行', 'LIJIANG CITY BANK'),
+        ('shop_2', (164, 44, 38), (248, 226, 142), '桂林米粉 · 老字号', 'GUILIN NOODLES'),
+        ('shop_3', (32, 82, 138), (246, 248, 250), '叠彩百草堂', 'DIECAI HERB PHARMACY'),
+        ('shop_4', (152, 84, 48), (248, 240, 222), '象鼻山牛肉粉', 'XIANGSHAN NOODLES'),
+        ('shop_5', (30, 34, 40), (236, 240, 244), '独秀智联馆', 'DUXIU SMART TECH'),
+        ('shop_6', (128, 38, 44), (244, 218, 136), '桂香阁 · 桂林三宝', 'GUILIN SPECIALTIES'),
         ('shop_7', (38, 92, 106), (242, 246, 246), '漓 江 书 院', 'LIJIANG BOOKSTORE'),
     ]
     for key, bg, fg, zh, en in shops:
         paint_banner(key, bg, fg, tuple(min(255, c + 36) for c in bg), zh, en, 28)
 
+    return sheet
+
+
+def build_shop_signs_sheet():
+    """Render dedicated independent signage texture for '漓尚服饰' (IDOK-126: zero mall names/trademarks)."""
+    w, h = 1024, 128
+    sheet = Image.new('RGB', (w, h), (26, 30, 36))
+    draw = ImageDraw.Draw(sheet)
+    # Subtle brushed anodized slate texture + champagne-gold architectural frame
+    for vx in range(0, w, 16):
+        tone = 29 if (vx // 16) % 2 == 0 else 25
+        draw.line((vx, 6, vx, h - 7), fill=(tone, tone + 4, tone + 10), width=1)
+    draw.rectangle((4, 4, w - 5, h - 5), outline=(214, 184, 118), width=3)
+    draw.rectangle((11, 11, w - 12, h - 12), outline=(142, 118, 72), width=1)
+    # Strictly prints ONLY '漓尚服饰' in true 1:1 unstretched proportions (1024x128 matches ~9.2x1.0 m sign)
+    _draw_centered(
+        draw, (40, 10, w - 80, h - 20), '漓   尚   服   饰',
+        _font(86, bold=True), (246, 234, 198), stroke_w=2, stroke_fill=(132, 102, 54),
+    )
     return sheet
 
 
@@ -481,12 +501,14 @@ def ensure_b_textures():
         'glass': build_curtain_glass(),
         'pave': build_plaza_pave(),
         'signs': build_signs_sheet(),
+        'shop_signs': build_shop_signs_sheet(),
     }
     filenames = {
         'surfaces': 'surfaces.png',
         'glass': 'curtain_glass.png',
         'pave': 'plaza_pave.png',
         'signs': 'signs.png',
+        'shop_signs': 'nikoniko_shop_signs.png',
     }
     for key, img in textures.items():
         img.save(tex_dir / filenames[key], optimize=True)
@@ -494,7 +516,7 @@ def ensure_b_textures():
 
 
 class Builder:
-    """Low-draw-call geometry accumulator (<= 5 meshes per LOD)."""
+    """Low-draw-call geometry accumulator (<= 7 meshes per LOD)."""
 
     TILED_SCALES = {
         'glass': (5.2, 15.0),
@@ -509,6 +531,12 @@ class Builder:
         self.tiled = {k: [] for k in self.TILED_SCALES}
         self.sign_tris = []
         self.sign_uv = []
+        self.shop_sign_tris = []
+        self.shop_sign_uv = []
+        self.shop_glass_tris = []
+        self.shop_glass_uv = []
+        self.shop_lit_tris = []
+        self.shop_lit_uv = []
         self.lit_tris = []
         self.lit_uv = []
         self.solid = []
@@ -602,6 +630,35 @@ class Builder:
             self.sign_tris.append(quad[idx])
             self.sign_uv.append(uvs[idx])
 
+    def shop_sign_quad(self, x, y0, z, w, h, double_sided=False):
+        """Place the dedicated independent '漓尚服饰' signboard quad facing local +Z."""
+        hw = w / 2.0
+        quad = self._transform([
+            (x - hw, y0, z),
+            (x + hw, y0, z),
+            (x + hw, y0 + h, z),
+            (x - hw, y0 + h, z),
+        ])
+        uvs = np.array([
+            (0.01, 0.02),
+            (0.99, 0.02),
+            (0.99, 0.98),
+            (0.01, 0.98),
+        ], dtype=float)
+        idx = [[0, 1, 2], [0, 2, 3]]
+        self.shop_sign_tris.append(quad[idx])
+        self.shop_sign_uv.append(uvs[idx])
+
+        if double_sided:
+            back = self._transform([
+                (x + hw, y0, z - 0.04),
+                (x - hw, y0, z - 0.04),
+                (x - hw, y0 + h, z - 0.04),
+                (x + hw, y0 + h, z - 0.04),
+            ])
+            self.shop_sign_tris.append(back[idx])
+            self.shop_sign_uv.append(uvs[idx])
+
     def mesh(self, vertices, faces, mat, collide=False, uv_scale=None):
         verts = np.asarray(vertices, dtype=float)
         idx = np.asarray(faces, dtype=np.int64)
@@ -621,14 +678,27 @@ class Builder:
         if mat == 'stone':
             mat = 'beige'
 
+        if mat == 'shop_glass':
+            cmin = coords.min(axis=1, keepdims=True)
+            span = np.maximum(coords.max(axis=1, keepdims=True) - cmin, 1e-6)
+            self.shop_glass_tris.append(tris)
+            self.shop_glass_uv.append((coords - cmin) / span)
+            return
+
         if mat in self.tiled:
             scale = uv_scale or self.TILED_SCALES[mat]
             self.tiled[mat].append((tris, coords / scale))
             return
 
+        is_shop_lit = False
         is_lit = False
         swatch_key = mat
-        if mat.endswith('_lit'):
+        if mat.endswith('_shop_lit'):
+            is_shop_lit = True
+            swatch_key = mat[:-9]
+            if swatch_key not in SWATCHES:
+                swatch_key = 'beige'
+        elif mat.endswith('_lit'):
             is_lit = True
             swatch_key = mat[:-4]
             if swatch_key not in SWATCHES:
@@ -640,7 +710,10 @@ class Builder:
         cell = list(SWATCHES).index(swatch_key)
         mapped_uv = (norm_uv * 0.90 + 0.05 + [cell % 4, 3 - cell // 4]) / 4.0
 
-        if is_lit:
+        if is_shop_lit:
+            self.shop_lit_tris.append(tris)
+            self.shop_lit_uv.append(mapped_uv)
+        elif is_lit:
             self.lit_tris.append(tris)
             self.lit_uv.append(mapped_uv)
         else:
@@ -825,6 +898,30 @@ def export_landmark(name, build_fn, *, reuse_atlas=False):
         metallicFactor=0.05,
         doubleSided=True,
     )
+    mat_shop_lit = trimesh.visual.material.PBRMaterial(
+        name='nikoniko_shop_lit',
+        baseColorTexture=textures['surfaces'],
+        emissiveFactor=[0.56, 0.44, 0.28],
+        roughnessFactor=0.55,
+        metallicFactor=0.04,
+        doubleSided=True,
+    )
+    mat_shop_signs = trimesh.visual.material.PBRMaterial(
+        name='nikoniko_shop_signs',
+        baseColorTexture=textures.get('shop_signs'),
+        roughnessFactor=0.22,
+        metallicFactor=0.20,
+        doubleSided=True,
+    ) if 'shop_signs' in textures else None
+    mat_shop_glass = trimesh.visual.material.PBRMaterial(
+        name='nikoniko_showcase_glass',
+        baseColorFactor=[188, 214, 226, 84],
+        emissiveFactor=[0.02, 0.03, 0.04],
+        alphaMode='BLEND',
+        roughnessFactor=0.10,
+        metallicFactor=0.18,
+        doubleSided=True,
+    )
     tiled_mats = {
         'glass': trimesh.visual.material.PBRMaterial(
             name='B_curtain_glass',
@@ -873,11 +970,29 @@ def export_landmark(name, build_fn, *, reuse_atlas=False):
             mesh.visual = trimesh.visual.TextureVisuals(uv=uv, material=mat_signs)
             scene.add_geometry(mesh, node_name=f'{layer}_signs', parent_node_name=layer)
 
+        if builder.shop_sign_tris and mat_shop_signs is not None:
+            mesh = pack_tris(builder.shop_sign_tris)
+            uv = np.concatenate(builder.shop_sign_uv, axis=0).reshape(-1, 2)
+            mesh.visual = trimesh.visual.TextureVisuals(uv=uv, material=mat_shop_signs)
+            scene.add_geometry(mesh, node_name=f'{layer}_shop_signs', parent_node_name=layer)
+
+        if builder.shop_glass_tris:
+            mesh = pack_tris(builder.shop_glass_tris)
+            uv = np.concatenate(builder.shop_glass_uv, axis=0).reshape(-1, 2)
+            mesh.visual = trimesh.visual.TextureVisuals(uv=uv, material=mat_shop_glass)
+            scene.add_geometry(mesh, node_name=f'{layer}_shop_glass', parent_node_name=layer)
+
         if builder.lit_tris:
             mesh = pack_tris(builder.lit_tris)
             uv = np.concatenate(builder.lit_uv, axis=0).reshape(-1, 2)
             mesh.visual = trimesh.visual.TextureVisuals(uv=uv, material=mat_lit)
             scene.add_geometry(mesh, node_name=f'{layer}_lit', parent_node_name=layer)
+
+        if builder.shop_lit_tris:
+            mesh = pack_tris(builder.shop_lit_tris)
+            uv = np.concatenate(builder.shop_lit_uv, axis=0).reshape(-1, 2)
+            mesh.visual = trimesh.visual.TextureVisuals(uv=uv, material=mat_shop_lit)
+            scene.add_geometry(mesh, node_name=f'{layer}_shop_lit', parent_node_name=layer)
 
         if lod == 0 and builder.solid:
             coll = pack_tris(builder.solid)
@@ -911,8 +1026,8 @@ FOOTPRINT = [
 ]
 
 
-def _facade_run(m: Builder, p0, p1, ground_h=4.8, upper_h=18.2, bays=8, brand_seed=0):
-    """Build detailed ground-floor luxury storefronts + upper blue glass curtain wall."""
+def _facade_run(m: Builder, p0, p1, ground_h=4.8, upper_h=18.2, bays=8, brand_seed=0, skip_bays=(), skip_mid_pillars=()):
+    """Build detailed ground-floor storefronts + upper blue glass curtain wall."""
     dx, dz = p1[0] - p0[0], p1[1] - p0[1]
     length = math.hypot(dx, dz)
     ux, uz = dx / length, dz / length
@@ -940,15 +1055,143 @@ def _facade_run(m: Builder, p0, p1, ground_h=4.8, upper_h=18.2, bays=8, brand_se
 
     for i in range(bays + 1):
         lx = -length / 2.0 + i * bay_w
-        m.box(lx, -1.5, 0.25, 0.72, ground_h + 1.5, 0.85, 'dark', collide=True, footing=True)
+        if i not in skip_mid_pillars:
+            m.box(lx, -1.5, 0.25, 0.72, ground_h + 1.5, 0.85, 'dark', collide=True, footing=True)
         m.box(lx, ground_h + 0.5, 0.44, 0.24, upper_h - 0.5, 0.22, 'alum')
         if i < bays:
             cx = lx + bay_w / 2.0
-            m.box(cx, 0.15, -0.05, bay_w - 0.82, 3.35, 0.24, 'glass', footing=True)
-            m.box(cx, 3.52, 0.30, bay_w - 0.76, 0.92, 0.26, 'dark')
-            m.sign_quad(cx, 3.55, 0.45, bay_w - 0.82, 0.86, f'shop_{(i + brand_seed) % 8}')
+            if i not in skip_bays:
+                m.box(cx, 0.15, -0.05, bay_w - 0.82, 3.35, 0.24, 'glass', footing=True)
+                m.box(cx, 3.52, 0.30, bay_w - 0.76, 0.92, 0.26, 'dark')
+                m.sign_quad(cx, 3.55, 0.45, bay_w - 0.82, 0.86, f'shop_{(i + brand_seed) % 8}')
             for fl in range(1, 5):
                 m.box(cx, ground_h + fl * (upper_h / 5.0), 0.42, bay_w - 0.24, 0.18, 0.16, 'alum')
+    m.pose = (0.0, 0.0, 0.0, 0.0)
+
+
+def _mannequin(m: Builder, x, z, base_y, coat_mat, shirt_mat, pants_mat, skew_x=0.0):
+    """Low-poly 1.65 m display mannequin rooted smoothly onto its plinth (overlap 2 cm)."""
+    # Bronze base disc + chrome support stand overlapping plinth top
+    m.cylinder_y(x, base_y, 0.05, z, 0.22, 'bronze', sections=10)
+    m.cylinder_y(x, base_y + 0.04, 0.52, z, 0.032, 'alum', sections=8)
+    # Tapered legs & shoes grounded cleanly to pedestal
+    for side in (-1, 1):
+        lx = x + side * 0.095
+        lz = z + side * skew_x * 0.03
+        m.box(lx, base_y + 0.04, lz, 0.10, 0.06, 0.16, 'dark')
+        m.cylinder_y(lx, base_y + 0.08, 0.66, lz, 0.055, pants_mat, sections=8)
+    # Hips & tailored boutique coat torso
+    m.box(x, base_y + 0.72, z, 0.30, 0.20, 0.18, pants_mat)
+    m.box(x, base_y + 0.88, z, 0.38, 0.48, 0.21, coat_mat)
+    m.box(x, base_y + 0.92, z + 0.095, 0.13, 0.40, 0.04, shirt_mat)
+    # Posed arms & shoulders
+    for side in (-1, 1):
+        sx = x + side * 0.22
+        m.beam([sx, base_y + 1.31, z], [sx + side * 0.04, base_y + 0.92, z + (0.08 if side < 0 else -0.02)], 0.048, coat_mat, sections=6)
+    # Neck & faceless sculpt head (total 1.65 m from base_y + 0.02 to +1.67 m)
+    m.cylinder_y(x, base_y + 1.35, 0.09, z, 0.048, 'beige', sections=8)
+    m.cylinder_y(x, base_y + 1.43, 0.21, z, 0.086, 'white', sections=10)
+    m.cylinder_y(x, base_y + 1.62, 0.05, z, 0.062, 'white', sections=10)
+
+
+def _build_lishang_storefront(m: Builder, p0, p1, ground_h=4.8, bays=9):
+    """Build open-front '漓尚服饰' flagship clothing store at bay 5 + bay 6 of EastWing_Main."""
+    dx, dz = p1[0] - p0[0], p1[1] - p0[1]
+    length = math.hypot(dx, dz)
+    ux, uz = dx / length, dz / length
+    nx, nz = -uz, ux
+    if nx < 0:
+        nx, nz = -nx, -nz
+    facade_yaw = math.atan2(nx, nz)
+    bay_w = length / bays
+
+    # Re-close bays 0..4 and bays 7..8 ground wall along omitted edge 7 (depth 0.28 inside footprint)
+    def wall_seg(t0, t1):
+        seg_len = (t1 - t0) * length
+        mx = p0[0] + dx * ((t0 + t1) / 2.0) - nx * 0.14
+        mz = p0[1] + dz * ((t0 + t1) / 2.0) - nz * 0.14
+        m.pose = (mx, 0.0, mz, facade_yaw)
+        m.box(0.0, -1.5, 0.0, seg_len + 0.06, ground_h + 1.5, 0.28, 'dark', collide=True, footing=True)
+
+    wall_seg(0.0, 5.0 / bays)
+    wall_seg(7.0 / bays, 1.0)
+
+    # Center local pose at bay 5 + bay 6 wall line (d = 0); +Z points East toward Zhongshan Middle Rd
+    shop_t = 6.0 / bays
+    shop_cx = p0[0] + dx * shop_t
+    shop_cz = p0[1] + dz * shop_t
+    m.pose = (shop_cx, 0.0, shop_cz, facade_yaw)
+
+    # Interior floor slab (clears max nearby B_plaza_pave +0.313 m; footing=True anchors to terrain)
+    floor_top = 0.34
+    m.box(0.0, -0.5, -1.24, 11.96, floor_top + 0.5, 2.82, 'beige', collide=True, footing=True)
+
+    # Recessed solid enclosure walls + warm backlit ceiling cove (sits cleanly behind piers i=5/7)
+    m.box(0.0, 0.32, -2.54, 11.96, 4.18, 0.24, 'beige', collide=True)
+    m.box(-5.86, 0.32, -1.32, 0.22, 4.18, 2.56, 'bronze', collide=True)
+    m.box(5.86, 0.32, -1.32, 0.22, 4.18, 2.56, 'bronze', collide=True)
+    m.box(0.0, 3.85, -1.24, 11.52, 0.65, 2.66, 'white_shop_lit')
+
+    # Fascia header lintel + champagne-bronze slim canopy + independent nikoniko_shop_signs ('漓尚服饰')
+    m.box(0.0, 3.36, 0.45, 11.90, 1.08, 0.90, 'bronze', collide=True)
+    m.box(0.0, 3.24, 0.50, 11.96, 0.13, 1.00, 'bronze')
+    m.box(0.0, 3.21, 0.50, 3.60, 0.04, 0.42, 'white_shop_lit')
+    m.shop_sign_quad(0.0, 3.40, 0.92, 9.20, 1.00)
+
+    # Outer entrance threshold pad inside B_plaza_pave (narrow accent strips < 0.6 m avoid seam flags)
+    m.box(0.0, -0.4, 0.68, 3.80, 0.315 + 0.4, 0.96, 'pave', collide=True, footing=True)
+    m.box(0.0, 0.305, 0.22, 3.20, 0.030, 0.22, 'bronze')
+    m.box(0.0, 0.315, 0.58, 2.80, 0.024, 0.38, 'terra')
+
+    # Showcase sills, bronze mullions & central boutique double glass doors (always present across LODs)
+    m.box(-3.82, 0.32, 0.12, 4.12, 0.30, 0.24, 'bronze', collide=True)
+    m.box(3.82, 0.32, 0.12, 4.12, 0.30, 0.24, 'bronze', collide=True)
+    m.box(-3.82, 0.60, 0.12, 4.02, 2.64, 0.03, 'shop_glass', collide=True)
+    m.box(3.82, 0.60, 0.12, 4.02, 2.64, 0.03, 'shop_glass', collide=True)
+    for mx in (-5.78, -1.78, 1.78, 5.78):
+        m.box(mx, 0.32, 0.14, 0.14, 2.94, 0.26, 'bronze', collide=True)
+
+    # Recessed glass vestibule entrance doors & bronze vertical handles
+    m.box(0.0, 0.32, -0.35, 3.46, 2.94, 0.04, 'shop_glass', collide=True)
+    m.box(0.0, 2.78, -0.35, 3.52, 0.48, 0.12, 'bronze')
+    for hx in (-0.16, 0.16):
+        m.cylinder_y(hx, 0.96, 0.86, -0.31, 0.025, 'yellow_pave', sections=8)
+
+    if not m.detail:
+        m.pose = (0.0, 0.0, 0.0, 0.0)
+        return
+
+    # Side return wall liners & backlit interior gallery wall bays (night warmth via nikoniko_shop_lit)
+    m.box(-5.70, 0.32, -1.32, 0.06, 3.55, 2.30, 'beige_shop_lit')
+    m.box(5.70, 0.32, -1.32, 0.06, 3.55, 2.30, 'beige_shop_lit')
+    for gx in (-3.82, 0.0, 3.82):
+        m.box(gx, 0.86, -2.39, 2.50, 2.70, 0.06, 'beige_shop_lit')
+        m.box(gx - 1.28, 0.86, -2.38, 0.06, 2.70, 0.08, 'white_shop_lit')
+        m.box(gx + 1.28, 0.86, -2.38, 0.06, 2.70, 0.08, 'white_shop_lit')
+
+    # Left & right grounded showcase display plinths + 2 sculpted 1.65 m display mannequins
+    for sx in (-3.82, 3.82):
+        m.box(sx, 0.32, -0.78, 3.00, 0.27, 1.20, 'beige')
+        m.box(sx, 0.58, -0.78, 3.06, 0.05, 1.26, 'white_shop_lit')
+    _mannequin(m, -3.82, -0.76, 0.61, coat_mat='red', shirt_mat='white', pants_mat='dark', skew_x=1.0)
+    _mannequin(m, 3.82, -0.76, 0.61, coat_mat='blue', shirt_mat='beige', pants_mat='dark', skew_x=-1.0)
+
+    # Interior bronze hanging garment racks & folded boutique display shelves (overlaps floor_top = 0.34)
+    garments = ('white', 'blue', 'terra', 'yellow_pave', 'red', 'beige')
+    for r_idx, rx in enumerate((-3.82, 3.82)):
+        m.cylinder_y(rx - 1.12, 0.32, 1.56, -1.78, 0.032, 'bronze', sections=6)
+        m.cylinder_y(rx + 1.12, 0.32, 1.56, -1.78, 0.032, 'bronze', sections=6)
+        m.beam([rx - 1.12, 1.86, -1.78], [rx + 1.12, 1.86, -1.78], 0.030, 'bronze', sections=6)
+        for g_idx in range(6):
+            gx = rx - 0.85 + g_idx * 0.34
+            m.box(gx, 1.06, -1.78, 0.22, 0.78, 0.36, garments[(g_idx + r_idx * 2) % len(garments)])
+
+    for side_x in (-1.68, 1.68):
+        m.box(side_x, 0.32, -1.86, 0.88, 0.76, 0.56, 'wood')
+        m.box(side_x, 1.06, -1.86, 0.92, 0.05, 0.60, 'beige_lit')
+        m.box(side_x - 0.22, 1.10, -1.86, 0.30, 0.14, 0.36, 'white')
+        m.box(side_x + 0.20, 1.10, -1.86, 0.30, 0.18, 0.36, 'terra')
+
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
@@ -991,8 +1234,10 @@ def build_nikoniko(m: Builder):
     civic_plaza(m, apron)
 
     # 2. Main 6-storey retail body extruded from exact OSM footprint
+    # Note: FOOTPRINT has negative signed area so m.prism() reverses pts & wall_mask;
+    # index 8 in un-reversed mask omits edge FOOTPRINT[7]->FOOTPRINT[8] (EastWing_Main).
     n_edges = len(FOOTPRINT)
-    ground_mask = [i not in (9, 10, 11, 12) for i in range(n_edges)]
+    ground_mask = [i not in (8, 9, 10, 11, 12) for i in range(n_edges)]
     m.prism(FOOTPRINT, -2.0, 6.8, 'dark', collide=True, cap_mat='alum', wall_mask=ground_mask, footing=True)
     m.prism(FOOTPRINT, 4.8, 18.2, 'white', collide=True, cap_mat='roof')
 
@@ -1002,7 +1247,8 @@ def build_nikoniko(m: Builder):
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
     # 3. East Wing (along Zhongshan Middle Rd) & exact 2-segment North Wing (along Jiefang West Rd, IMG_1385/1386!)
-    _facade_run(m, (38.80, 52.82), (53.67, -2.19), ground_h=4.8, upper_h=18.2, bays=9, brand_seed=1)
+    _facade_run(m, (38.80, 52.82), (53.67, -2.19), ground_h=4.8, upper_h=18.2, bays=9, brand_seed=1, skip_bays=(5, 6), skip_mid_pillars=(6,))
+    _build_lishang_storefront(m, (38.80, 52.82), (53.67, -2.19), ground_h=4.8, bays=9)
     _facade_run(m, (53.67, -2.19), (50.70, -14.83), ground_h=4.8, upper_h=18.2, bays=2, brand_seed=0)
     _facade_run(m, (29.09, -33.31), (-17.98, -41.96), ground_h=4.8, upper_h=18.2, bays=8, brand_seed=3)
     _facade_run(m, (-17.98, -41.96), (-40.41, -46.09), ground_h=4.8, upper_h=18.2, bays=4, brand_seed=5)

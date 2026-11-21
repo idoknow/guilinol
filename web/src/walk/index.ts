@@ -521,10 +521,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
 
   onGameEvent(ev=>{
-    if(ev.type==='shop:buy'&&ev.itemType==='ebike_model'){
-      if(getGameState().garage.activeTestRide)finishActiveTestRide('purchase')
-      const activeId=getGameState().garage.activeVehicleId
-      if(activeId)rides?.spawnPersonalBikeAtBay(ev.shopId,activeId)
+    if(ev.type==='shop:buy'){
+      ebikeAudio.unlock()
+      ebikeAudio.playShopBuySuccess()
+      if(!verify||stuntMode){
+        window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:`成交通知：已购入，当前余额 ¥${getGameState().money}`,ms:2600}}))
+      }
+      if(ev.itemType==='ebike_model'){
+        if(getGameState().garage.activeTestRide)finishActiveTestRide('purchase')
+        const activeId=getGameState().garage.activeVehicleId
+        if(activeId)rides?.spawnPersonalBikeAtBay(ev.shopId,activeId)
+      }
     }else if(ev.type==='garage:mod'||ev.type==='garage:service'){
       rides?.refreshPersonalBikeVisual(ev.vehicleId)
       const owned=getGameState().garage.vehicles[ev.vehicleId]
@@ -584,17 +591,30 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     })
   }
 
+  const shopRay=new R.Ray({x:0,y:0,z:0},{x:0,y:1,z:0})
+  const shopBall=new R.Ball(.22)
+  const shopCamDir=new THREE.Vector3()
+  const shopCamId={x:0,y:0,z:0,w:1}
+  const shopWallFilter=(coll:R.Collider)=>{const kind=sim.kinds.get(coll.handle);return kind!==undefined&&kind!=='tree'}
   function updateShopShowcaseCamera(){
     if(!shopCam)return
     syncShopShowcaseBike()
     const focusY=shopCam.stagePos.y+shopCam.targetHeightOffset
     shopLookTarget.set(shopCam.stagePos.x,focusY,shopCam.stagePos.z)
     const cosP=Math.cos(shopCam.orbitPitch)
-    camera.position.set(
-      shopLookTarget.x+Math.sin(shopCam.orbitYaw)*cosP*shopCam.orbitRadius,
-      shopLookTarget.y+Math.sin(shopCam.orbitPitch)*shopCam.orbitRadius,
-      shopLookTarget.z+Math.cos(shopCam.orbitYaw)*cosP*shopCam.orbitRadius,
-    )
+    shopCamDir.set(
+      Math.sin(shopCam.orbitYaw)*cosP,
+      Math.sin(shopCam.orbitPitch),
+      Math.cos(shopCam.orbitYaw)*cosP,
+    ).normalize()
+    let dist=shopCam.orbitRadius
+    shopRay.origin={x:shopLookTarget.x,y:shopLookTarget.y,z:shopLookTarget.z}
+    shopRay.dir={x:shopCamDir.x,y:shopCamDir.y,z:shopCamDir.z}
+    const rayHit=sim.world.castRay(shopRay,dist,true,undefined,undefined,sim.capsule,undefined,shopWallFilter)
+    if(rayHit)dist=Math.min(dist,Math.max(.75,rayHit.timeOfImpact-.22))
+    const shapeHit=sim.world.castShape(shopLookTarget,shopCamId,shopCamDir,shopBall,.02,dist,false,undefined,undefined,sim.capsule,undefined,shopWallFilter)
+    if(shapeHit)dist=Math.min(dist,Math.max(.75,shapeHit.time_of_impact-.05))
+    camera.position.copy(shopLookTarget).addScaledVector(shopCamDir,dist)
     camera.lookAt(shopLookTarget)
   }
 
