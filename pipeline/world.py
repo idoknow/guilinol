@@ -311,6 +311,9 @@ def build(bbox, output, palette):
     print('Vegetation:',dict(sorted(tree_stats.items())))
     landmark_faces = list(landmark_triangles(landmarks))
     vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange)
+    from cars import plan_cars
+    vehicles.update(plan_cars(bounds, surface, footprints, sample, vehicles['bikes'], vehicles['docks'], interchange))
+    vehicles['pedalBikeIndices'] = [index for index in range(2,len(vehicles['bikes']),5)]
     decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal)
     modeled_paving = unary_union([*layout.street_foundations, *rong_pavement, modeled_paving if modeled_paving is not None else ShapelyPolygon()])
     gate_plaza = next((ShapelyPolygon(np.asarray(GATE_PLAZA)+[x,z]) for x,z,entry in layout.entries
