@@ -21,7 +21,7 @@ function evalRoadCtrl([baseMm,deltas]:RoadCtrl,lx:number,lz:number){
 }
 
 function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,profile]:Lower){
-  const [start,end,,side]=corners
+  const [start,end]=corners
   if((x-(start[0]+end[0])/2)*(end[0]-start[0])+(z-(start[1]+end[1])/2)*(end[1]-start[1])>0){
     let best=Infinity,height=base
     for(let i=1;i<profile.length;i++){
@@ -32,9 +32,7 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
     }
     return height
   }
-  const outside=(point:Pair)=>{const dx=point[0]-start[0],dz=point[1]-start[1],len=Math.hypot(dx,dz),along=((x-start[0])*dx+(z-start[1])*dz)/len;return Math.max(0,-along,along-len)}
-  const factor=THREE.MathUtils.smoothstep(Math.hypot(outside(end),outside(side)),2,24)
-  return terrain+factor*(base-terrain)
+  return terrain
 }
 
 function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower]:Streets,ground:(x:number,z:number)=>number){

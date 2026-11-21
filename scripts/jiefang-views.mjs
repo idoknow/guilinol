@@ -5,6 +5,13 @@ import {chromium} from 'playwright'
 const output = process.argv[2] ?? 'captures/jiefang'
 await mkdir(output, {recursive:true})
 const views = [
+  ['legacy-36', [-132,2.75,-98], [-80,4,-44],19.1],
+  ['legacy-37', [-126,2.85,36.8], [-109.5,4.6,36.8],19.1],
+  ['legacy-41', [-96,3.4,-66.4], [-6,4.8,0],19.1],
+  ['legacy-43', [-116.2,2.48,-3], [-109.4,3.95,36.8],19.1],
+  ['legacy-49', [-96,3.4,66.4], [-6,4.8,0],19.1],
+  ['west-low', [-155,18,104], [-94,3,-25],19.1],
+  ['east-low', [164,18,-90], [111,3,17],19.1],
   ['south-seam', [-142,2.55,128], [-156,4.1,183],14],
   ['north-seam', [-124,2.55,-128], [-124.5,4.1,-183],14],
   ['35', [-135,2.75,-103], [-178,4,-99],19.1],
@@ -34,7 +41,7 @@ try {
   const page = await browser.newPage({viewport:{width:960,height:600}})
   for (const [name,eye,target,hour] of views) {
     if(process.argv.length>3 && !process.argv.slice(3).includes(name))continue
-    const portrait=['35','38','42','43','44','58'].includes(name)
+    const portrait=['35','38','42','43','44','58','legacy-43'].includes(name)
     await page.setViewportSize(['interchange','plan','overview'].includes(name)?{width:1440,height:950}:name==='elevation'?{width:1280,height:280}:portrait?{width:570,height:760}:{width:960,height:720})
     await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&radius=768&weather=${['60','interchange','plan','overview'].includes(name)?'clear':'mist'}&time=${hour}`)
     await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)

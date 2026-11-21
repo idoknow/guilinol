@@ -51,8 +51,7 @@ class Streets:
             if grid is not None:
                 weight = 1
                 if origin in self.lower and min(hits)>=self.lower[origin][0]:
-                    t = np.clip((self.lower[origin][1].distance(point)-2)/22,0,1)
-                    weight = t*t*(3-2*t)
+                    weight = 0
                     start,end=np.asarray(self.lower[origin][1].exterior.coords)[:2]
                     if (np.array([x,z])-(start+end)/2)@(end-start)>0:
                         axis,profile=self.lower[origin][2:]; weight=1

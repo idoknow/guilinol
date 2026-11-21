@@ -143,10 +143,10 @@ def world_road_sections(anchor, angle, native_grade=False):
         yield way, LineString(xy @ transform + anchor), station, levels, edge(left), edge(right)
 
 
-def bank_paving(anchor,angle):
+def bank_paving(anchor,angle,ways=RAMPS+UPPER_ROADS+LOWER_ROADS+SIDE_ROAD+FOOTWAYS):
     transform=np.array([[np.cos(angle),np.sin(angle)],[-np.sin(angle),np.cos(angle)]])
     paths=[]
-    for way in RAMPS+UPPER_ROADS+LOWER_ROADS+SIDE_ROAD+FOOTWAYS:
+    for way in ways:
         xy,n,_,_=section(way)
         l,r,w=widths(way)
         edge=lambda offset:xy+n*np.broadcast_to(offset,len(xy))[:,None]

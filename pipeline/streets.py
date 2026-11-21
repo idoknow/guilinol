@@ -14,7 +14,7 @@ from sections import section_layers, clipped, speed_paint, yiwu_frontage, RULES
 from dongxi_streets import street_surface
 
 
-def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None,gate_plaza=None,walkable_by_way=None,deck_mask=None):
+def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=None,road_ctrl=None,world_origin=None,ground_mesh_fn=None,footprints=(),bands=None,modeled_paving=None,gate_plaza=None,walkable_by_way=None,deck_mask=None,lower_shoulder=None):
     from street_underpass import lower_paths, grade_frame
     lower = lower_paths(roads,deck_mask)
     from east_grading import profile
@@ -474,6 +474,11 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         items=[]
         surfaces_here = [*enumerate(shapes[:3]), (4,verge), (5,cycle.difference(verge)), (6,tactile)]
         under = {kind:shape.intersection(tile) for kind,shape in lower.items() if shape.intersects(tile)}
+        if lower_shoulder is not None and lower_shoulder.intersects(tile):
+            for kind,shape in surfaces_here:
+                shoulder = shape.intersection(lower_shoulder)
+                if shoulder.area:
+                    under[kind] = shoulder.union(under[kind]) if kind in under else shoulder
         def append(kind,shape):
             for poly in polygons(shape):
                 if poly.area<.005:
