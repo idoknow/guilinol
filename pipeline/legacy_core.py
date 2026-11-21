@@ -14,7 +14,7 @@ import numpy as np
 
 from common import CHUNK, GRID, ll2xz
 
-DIGEST = '34caca91e6cf41a0e9a6e81c2f7b1b54b5d7643b726cfb233f1b27fb053e9eaf'
+DIGEST = 'e054456980c88cef957d6158c7095145f24c0bea0a4fe23a9ae43de7ee037a76'
 RELEASE = 'world-' + DIGEST[:12]
 EXTENT = (-2304, -2560, 3584, 5888)
 

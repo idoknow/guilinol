@@ -27,6 +27,7 @@ export function tileEdgeDistance(tile:Tile, x:number, z:number){
 
 export class Stream {
   private distant?:DistantBuildings
+  private revision=0
   private grid: TileGrid
   private parseSlot = frameSlots(streamBudget.parseMs)
   private attachSlot = frameSlots(streamBudget.attachMs)
@@ -138,7 +139,7 @@ export class Stream {
       await this.attachSlot()
       if(controller.signal.aborted){item.dispose();return}
       this.scene.add(item.group);this.batches.add(item.batch);this.base.toggle(tile,false)
-      this.loaded.set(tile,item);this.visited.add(tile);this.failures.delete(tile)
+      this.revision++;this.loaded.set(tile,item);this.visited.add(tile);this.failures.delete(tile)
       record('chunk',{ms:performance.now()-start,grid:Math.floor(tile.x/250)+','+Math.floor(tile.z/250)})
     }).catch(error=>{
       if(!controller.signal.aborted){record('failure',{category:'chunk'});fault('chunk','',0,error);console.error(tile.file,error);this.failures.set(tile,performance.now()+10000)}
@@ -157,7 +158,7 @@ export class Stream {
   }
 
   tick(position:THREE.Vector3) {
-    this.distant?.tick(this.camera,this.loaded)
+    this.distant?.tick(this.camera,this.loaded,this.revision)
     this.lastPosition.copy(position)
     const metrics = this.rangeStore.getMetrics()
     const now = performance.now()
@@ -184,7 +185,7 @@ export class Stream {
     for(const [tile,item] of this.loaded){
       const keepInner = tileEdgeDistance(tile,focus.x,focus.z)<=innerEdge || tileEdgeDistance(tile,position.x,position.z)<=innerEdge
       if(!keepInner && tileCenterDistance(tile,position)>metrics.unloadRadius){
-        this.batches.remove(tile);this.base.toggle(tile,true);this.scene.remove(item.group);item.dispose();this.loaded.delete(tile)
+        this.batches.remove(tile);this.base.toggle(tile,true);this.scene.remove(item.group);item.dispose();this.loaded.delete(tile);this.revision++
       }
     }
 

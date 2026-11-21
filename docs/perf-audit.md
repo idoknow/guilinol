@@ -150,7 +150,7 @@ Apple M3 Pro、Chromium、Metal。左侧为 624d0c6，右侧为 4c937d0。每档
 
 构建使用 `npm run world -- --workers 4` 并行压缩和写出块，最多保留 4 个待写块，manifest 仍按行列排序。可传 `--workers 1` 做串行对照。DEM 每次插值 128 行。默认框对齐后为 44 × 68 块，共 2992 块。Terrarium z14 需要 x=13209–13214、y=6997–7005 全部 54 张；IDOK-2 的旧包只有中间 16 张。
 
-当 manifest 超过 512 块，总览地形按 2048 m 扇区绘制，远处网格步长从 32 m 增至 128 m，共享原总览材质，按相机视锥裁剪。近景块就绪后，仅隐藏所属扇区内的对应三角形。新增俯视机位用 `?cam=balijie`、`?cam=zengpiyan`、`?cam=guilinta`、`?cam=eastBoundary`；用相同名字传给 `?spawn=` 请求就地落脚。东侧机位在龙门大桥以东，东界为 110.352 E。四处步行机位分别取俯视中心最近的可通行街道。
+总览地形按 256 m 块拼入同一索引缓冲。相机周围使用 32 m 网格，远处步长为 128 m，粗细交界共用边界顶点。近景块就绪后从总览索引移除对应三角形。新增俯视机位用 `?cam=balijie`、`?cam=zengpiyan`、`?cam=guilinta`、`?cam=eastBoundary`；用相同名字传给 `?spawn=` 请求就地落脚。东侧机位在龙门大桥以东，东界为 110.352 E。四处步行机位分别取俯视中心最近的可通行街道。
 
 扩区山峰近景按 2048 m 扇区、1600 m 预取距离调度，一次解码一个扇区；离开后释放 GPU 几何。远景建筑使用一个实例批次，3600 m 内最多 768 个体块。远水合并相邻行中同一水位和跨度的矩形。运行 `npm run perf -- --expansion` 输出俯视与人视截图、帧时间、draw calls 和三角形数；继而运行 `uv run --locked python pipeline/expansion_overlays.py`，使用截图相机矩阵、32 m 高程样本和原始 OSM 几何制作叠图。
 
