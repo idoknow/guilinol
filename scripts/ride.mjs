@@ -28,11 +28,11 @@ try{
     if(!mobile){const boat=await lakeChecks(page,data,output);assert(boat.roof<=bounds.boat.roof+1e-6&&boat.head<=bounds.boat.head+1e-6)}
     async function fixture(x,z){assert(await page.evaluate(([x,z])=>window.viewer.walkTo(x,z,0,'ride-fixture'),[x,z]))}
     const button=page.locator('.vehicle-action')
-    async function interact(label){const close=page.locator('.spot-card.show .card-close');if(await close.isVisible())await close.click();await page.waitForFunction(label=>document.querySelector('.vehicle-action')?.textContent.includes(label),label);if(mobile)await button.tap();else await page.keyboard.press('e')}
+    async function interact(label){const close=page.locator('.spot-card.show .card-close');if(await close.isVisible())await close.click();await page.waitForFunction(label=>document.querySelector('.vehicle-action')?.textContent.includes(label),label);if(mobile)await button.tap();else await page.keyboard.press('f')}
     async function shot(name){await page.screenshot({path:`${output}/${name}.png`})}
     async function timings(){return page.evaluate(async()=>{const samples=[];for(let frame=0;frame<24;frame++){await new Promise(requestAnimationFrame);samples.push(window.viewer.stats.ms)}return samples.sort((a,b)=>a-b)[12]})}
-    const gate=[-588,-212],distance=bike=>Math.hypot(bike[0]-gate[0],bike[2]-gate[1]);const bike=[...data.bikes].sort((first,second)=>distance(first)-distance(second))[0]
-    await fixture(bike[0],bike[2]);const foot=mobile?0:await timings();await interact('骑行')
+    const gate=[-588,-212],distance=bike=>Math.hypot(bike[0]-gate[0],bike[2]-gate[1]);const bike=data.bikes.filter((_,index)=>!data.pedalBikeIndices?.includes(index)).sort((first,second)=>distance(first)-distance(second))[0]
+    await fixture(bike[0],bike[2]);const foot=mobile?0:await timings();await interact('骑电动车')
     assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'bike')
     async function steer(target,wall=false){return page.evaluate(({target,wall})=>{
       const walker=window.viewer.walk,keys=new Set(),start=walker.position.clone()
@@ -51,14 +51,14 @@ try{
         const result=await steer(target)
         assert(result.targetDistance<3,`Jiefang eastbound lane, target ${target}: ${JSON.stringify(result)}`)
       }
-      await interact('下车');await fixture(bike[0],bike[2]);await interact('骑行')
+      await interact('下车');await fixture(bike[0],bike[2]);await interact('骑电动车')
     }
     const ride=await rideToCrossroads(page,atlas);console.log('ride',ride);assert(ride.main>=500&&ride.crossed&&ride.targetDistance<=10)
     await shot(mobile?'bike-mobile':'bike-desktop');if(!mobile)console.log('median frame ms',{foot,bike:await timings()})
     await interact('下车');assert.equal(await page.evaluate(()=>window.viewer.walk.vehicle),'foot')
     if(!mobile){
       // Use the next bike in the same row so the line to the wall clears the tree.
-      await fixture(-1610.8,425);await interact('骑行');const wall=await steer([-1606.2,418.7],true);console.log('wall',wall);assert(wall.obstacle==='building'&&wall.speed===0&&wall.distance<8);await interact('下车')
+      await fixture(-1610.8,425);await interact('骑电动车');const wall=await steer([-1606.2,418.7],true);console.log('wall',wall);assert(wall.obstacle==='building'&&wall.speed===0&&wall.distance<8);await interact('下车')
       const [x,,z]=data.docks['解放桥码头'];await fixture(x,z);await shot('dock');await interact('上船');
       const distance=await page.evaluate((bounds)=>{const walker=window.viewer.walk,start=walker.position.clone();for(let frame=0;frame<3600;frame++){walker.tick(1/60);const probe=walker.boatClearance();if(probe?.kind!=='raft'||probe.clearance<.3||probe.roof-walker.position.y>bounds.roof+1e-6||probe.head-walker.position.y>bounds.head+1e-6)throw Error(`unsafe raft: ${JSON.stringify(probe)}`)}return walker.position.distanceTo(start)},bounds.raft)
       assert(distance>80&&distance<125);await shot('boat');await interact('下站下船')

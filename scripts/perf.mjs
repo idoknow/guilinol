@@ -15,6 +15,10 @@ const SAMPLE_FRAMES = Number(process.env.PERF_FRAMES ?? 60)
 const FIRST_RUNS = Number(process.env.PERF_FIRST_RUNS ?? 5)
 const OUT_FILE = process.env.PERF_OUT ?? 'captures/perf.json'
 
+const mobile = process.env.PERF_MOBILE === '1'
+const viewport = mobile ? {width: 390, height: 844} : {width: 960, height: 540}
+const device = {viewport, isMobile: mobile, hasTouch: mobile}
+
 function round(n, digits = 2) {
   return +n.toFixed(digits)
 }
@@ -32,7 +36,7 @@ try {
       args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
     })
     try {
-      const page = await coldBrowser.newPage({viewport: {width: 960, height: 540}})
+      const page = await coldBrowser.newPage(device)
       await page.goto(`${baseUrl}/?verify&flow=0`)
       await page.waitForFunction(() => window.viewer?.stats.firstMs > 0, null, {timeout: 30000})
       const firstMs = await page.evaluate(() => +window.viewer.stats.firstMs.toFixed(1))
@@ -48,7 +52,7 @@ try {
   })
 
   // 2. Measure the 5 fixed viewpoints.
-  const context = await browser.newContext({viewport: {width: 960, height: 540}})
+  const context = await browser.newContext(device)
   await context.addInitScript(glHookScript)
   const page = await context.newPage()
   const errors = []
@@ -128,7 +132,7 @@ try {
   const sortedFirst = [...firstFrameRuns].sort((a, b) => a - b)
   const summary = {
     timestamp: new Date().toISOString(),
-    viewport: {width: 960, height: 540, renderer: 'SwiftShader'},
+    viewport: {...viewport, renderer: 'SwiftShader'},
     sampleFrames: SAMPLE_FRAMES,
     firstFrame: {
       runsMs: firstFrameRuns,
