@@ -12,10 +12,13 @@ export function installAtmosphere() {
   chunk.fog_vertex = `#ifdef USE_FOG\nvFogDepth = - mvPosition.z;\nmat4 fogModel = modelMatrix;\n#ifdef USE_BATCHING\nfogModel = fogModel * batchingMatrix;\n#endif\n#ifdef USE_INSTANCING\nfogModel = fogModel * instanceMatrix;\n#endif\nvFogWorld = (fogModel * vec4(transformed, 1.0)).xyz;\n#endif`
   chunk.fog_pars_fragment = `#ifdef USE_FOG
     uniform vec3 fogColor; varying float vFogDepth; varying vec3 vFogWorld;
-    uniform vec3 uHazeNear; uniform vec3 uHazeFar; uniform vec3 uHorizon; uniform vec4 uFog;
+    uniform vec3 uHazeNear; uniform vec3 uHazeFar; uniform vec3 uHorizon; uniform vec4 uFog; uniform vec2 uGrade;
     float fogLayer(float y) { return exp(-max(y - uFog.z, 0.0) / uFog.w); }
   #endif`
   chunk.fog_fragment = `#ifdef USE_FOG
+    // Phase 2 street grade (saturation, contrast) in display space, before the air washes it out.
+    { float gradeL = dot(gl_FragColor.rgb, vec3(.2126, .7152, .0722));
+      gl_FragColor.rgb = clamp((mix(vec3(gradeL), gl_FragColor.rgb, uGrade.x) - .5) * uGrade.y + .5, 0., 1.); }
     float fogDist = length(vFogWorld - cameraPosition);
     float fogDy = vFogWorld.y - cameraPosition.y;
     float fogValley = abs(fogDy) < 1.0 ? fogLayer(0.5 * (vFogWorld.y + cameraPosition.y))
