@@ -41,7 +41,7 @@ function hud(main: typeof import('./main')) {
   menu.onclick = () => { main.setPaused(true); title.open(true) }
   box.append(menu); accountEntry(box); document.body.append(box)
   addEventListener('keydown', event => {
-    if (event.code !== 'Escape' || title.shown || document.querySelector('dialog[open],.about-mask:not([hidden]),.atlas:not([hidden]),.book:not([hidden]),.spot-card:not([hidden]),.photo-bar:not([hidden])')) return
+    if (event.code !== 'Escape' || title.shown || document.querySelector('dialog[open],.about-mask:not([hidden]),.atlas:not([hidden]),.book:not([hidden]),.spot-card:not([hidden]),.photo-bar:not([hidden]),.render-pop:not([hidden])')) return
     menu.click()
   })
 }

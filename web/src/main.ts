@@ -7,7 +7,7 @@ import {installAtmosphere, outerGround, sky} from './look/atmosphere'
 import {startPeaks} from './peaks'
 import {presets,setPreset} from './presets'
 import {walkConfig} from './walk/config'
-import {atmo, env, evaluate} from './look/time'
+import {atmo, env, evaluate, setFogMetrics} from './look/time'
 import {currentMirrorLevel, isWaterInView, renderMirror, WATER_LAYER} from './look/water'
 import {rain} from './look/rain'
 import {windowLight} from './look/buildings'
@@ -16,12 +16,19 @@ import type {Host} from './play/host'
 import {bootDismiss, bootLoaded, bootProgress} from './ui/boot'
 import {loadTiles} from './look/tiles'
 import {flags} from './debug'
+import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRangeConfig} from './render-range'
+import {renderRangeControl} from './ui/render-range'
 
 installAtmosphere()
 // The title screen (ui/home.ts) pauses the scene while it covers it: no simulation, no draws.
 let paused=false
 export function setPaused(on:boolean){paused=on}
 async function start() {
+  const params = new URLSearchParams(location.search)
+  const rangeStore = new RenderRangeStore(loadRenderConfig(params))
+  const initialMetrics = rangeStore.getMetrics()
+  setFogMetrics(initialMetrics)
+
   bootProgress('载入地形', 12)
   const manifest:Manifest = JSON.parse(new TextDecoder().decode(await fetchAsset('manifest.json')))
   if(manifest.version!==4 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
@@ -32,7 +39,7 @@ async function start() {
   const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
   renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure
   document.body.prepend(renderer.domElement)
-  const camera = new THREE.PerspectiveCamera(55,1,1,look.fogHorizonTo)
+  const camera = new THREE.PerspectiveCamera(55,1,1,Math.max(look.fogHorizonTo,initialMetrics.fogHorizonTo)+1200)
   const scene = new THREE.Scene()
   scene.fog = new THREE.Fog(look.hazeNear,0,1)
   const dome = sky(), drops = rain(); scene.add(dome,drops)
@@ -50,6 +57,7 @@ async function start() {
     walkModPromise ??= import('./walk').then(mod=>{void mod.preloadWalk();return mod})
     return walkModPromise
   }
+  if(params.get('mode')==='walk'||params.has('spawn')) void prefetchWalk()
   const controls = flight(camera,renderer.domElement,manifest.extent,()=>!walker?.active&&!switching&&!cinema)
   camera.lookAt(left+width*.47,150,top+depth*.45)
   function resize() {
@@ -61,49 +69,120 @@ async function start() {
   const [base,peaks] = await basePromise
   scene.add(base.mesh,peaks)
   bootProgress('载入街区', 78)
-  const params = new URLSearchParams(location.search)
   const clock = skyClock(params)
   setPreset(camera,params.get('cam'))
-  const radius = Number(params.get('radius')??480)
-  const stream = new Stream(scene,manifest,base,THREE.MathUtils.clamp(Number.isFinite(radius)?radius:480,192,1600),camera)
+  const stream = new Stream(scene,manifest,base,rangeStore,camera)
   const output = document.querySelector('output')!
   let previous=0, first=0, frame=0, sum=0, samples=0
   const stats = {firstMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
     geometries:0,textures:0}
+  let cullLandmarks:ReturnType<typeof import('./landmarks').landmarkCulling>|undefined
+  let landmarksPromise:Promise<void>|undefined
+  function ensureLandmarks(){
+    if(!manifest.landmarks?.length) return Promise.resolve()
+    landmarksPromise ??= import('./landmarks').then(module=>{
+      cullLandmarks=module.landmarkCulling()
+      stream.updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks,{
+        getMetrics:()=>stream.metrics,
+        isInnerBusy:()=>stream.isInnerBusy(),
+      })
+    })
+    return landmarksPromise
+  }
+  function primeLanding(x:number, z:number){
+    stream.prioritize(x,z)
+    const target=new THREE.Vector3(x,0,z)
+    stream.tick(target)
+    if(!manifest.landmarks?.length) return
+    const supports=(manifest.landmarks??[]).filter(entry=>{
+      if(entry.collision==='none') return false
+      const [cx,,cz,r]=entry.sphere, a=entry.rotation*Math.PI/180
+      const ex=entry.position[0]+cx*Math.cos(a)+cz*Math.sin(a)
+      const ez=entry.position[2]-cx*Math.sin(a)+cz*Math.cos(a)
+      return Math.hypot(ex-x,ez-z)<=r+walkConfig.search
+    })
+    void ensureLandmarks().then(()=>{
+      for(const entry of supports){
+        target.y=entry.position[1]
+        stream.updateLandmarks?.(target,entry)
+      }
+      stream.updateLandmarks?.(target)
+    })
+  }
   type Walker=Awaited<ReturnType<typeof import('./walk').walk>>
   async function loadWalker():Promise<Walker>{return walker??=await (await prefetchWalk()).walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))}
   async function walkTo(x:number,z:number,yaw:number,reason:string){
     if(switching)return false
     switching=true
-    try{await loadWalker();if(walker!.active)walker!.leave();return await walker!.enter(x,z,yaw,reason)}finally{switching=false;showMode()}
+    try{primeLanding(x,z);await loadWalker();if(walker!.active)walker!.leave();return await walker!.enter(x,z,yaw,reason)}finally{switching=false;showMode()}
   }
   async function toggle(initial=false){
     if(switching)return
     if(walker?.active){walker.leave();return}
     switching=true
     try{
-      const walking=await loadWalker()
       const name=params.get('spawn'),preset=initial&&name&&Object.hasOwn(presets,name)?presets[name]:null
       const original=camera.clone();if(preset)setPreset(original,name)
       const gate=walkConfig.gate,point=preset?.walk??(initial&&!preset?gate:{x:original.position.x,z:original.position.z,yaw:original.rotation.y})
-      if(!await walking.enter(point.x,point.z,point.yaw,initial?name??'default':'flight',!!preset?.walk)&&initial)
+      primeLanding(point.x,point.z)
+      const walking=await loadWalker()
+      if(!await walking.enter(point.x,point.z,point.yaw,initial?name??'default':'flight',!!preset?.walk)&&initial){
+        primeLanding(gate.x,gate.z)
         await walking.enter(gate.x,gate.z,gate.yaw,'fallback')
+      }
     }finally{switching=false}
   }
-  window.addEventListener('keydown',event=>{if(event.code==='KeyV'&&!event.repeat)void toggle().then(showMode)})
+  window.addEventListener('keydown',event=>{
+    if(document.body.hasAttribute('data-home')||document.body.dataset.photo==='on'||(event.target as Element)?.closest?.('input,textarea,select,[contenteditable]'))return
+    if(event.code==='KeyV'&&!event.repeat)void toggle().then(showMode)
+  })
   const touch=matchMedia('(pointer:coarse)').matches,hint=document.querySelector<HTMLElement>('.hint')!,toast=document.querySelector<HTMLElement>('.toast')!
   const modeButton=document.createElement('button');modeButton.className='btn-mode'
   modeButton.addEventListener('pointerenter',()=>void prefetchWalk())
   modeButton.addEventListener('touchstart',()=>void prefetchWalk(),{passive:true})
   function showMode(){const walking=!!walker?.active;document.body.dataset.mode=walking?'walk':'fly'
     modeButton.textContent=walking?'起飞':'落地步行';modeButton.setAttribute('aria-label',walking?'切换到飞行':'切换到步行')
-    hint.textContent=walking?'WASD 走 · Shift 跑 · 空格 跳 · 拖动转视角 · 滚轮远近 · V 起飞 · M 地图 · J 景册 · P 拍照 · Esc 菜单':'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · M 地图 · J 景册 · P 拍照 · Esc 菜单'}
+    const ride=document.body.dataset.ride
+    if(walking&&document.body.hasAttribute('data-aboard')&&ride==='car'){
+      hint.textContent='WASD 驾驶 · Space 手刹漂移 · 1-3/Q·E 切模式 · L 车灯 · F 下车 · C 视距 · V 起飞'
+    }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='bike'){
+      hint.textContent='WASD 骑 · 0/P 驻车 · 1-4/Q·E 挡 · Space 翘头/起 · Shift 压弯 · K 撑 · L 灯 · Z/X/B 转向 · H 喇叭 · U 定速 · G 改 · F 下车 · V 飞'
+    }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='bicycle'){
+      hint.textContent='WASD 骑行 · 1-3/Q·E 换挡 · Space 翘头/起身 · Shift 压弯 · K 边撑 · H 铃铛 · F 下车 · V 起飞'
+    }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='boat'){
+      hint.textContent='WASD 划船 · F 靠岸下船 · 拖动转视角 · 滚轮远近 · V 起飞'
+    }else{
+      hint.textContent=walking?'WASD 走 · Shift 跑 · X 蹲 · 空格 跳 · C 视距 · 滚轮远近 · V 起飞 · M 地图 · J 景册 · P 拍照':'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · M 地图 · J 景册 · P 拍照 · Esc 菜单'
+    }
+  }
+  new MutationObserver(()=>showMode()).observe(document.body,{attributes:true,attributeFilter:['data-aboard','data-ride']})
   let toastTimer=0
-  window.addEventListener('walk:spawn-failed',()=>{toast.textContent='这里没有可以落脚的地方，飞近岸边或街道再试';toast.classList.add('show')
-    clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>toast.classList.remove('show'),3200)})
+  const showToast=(text:string,ms=3200)=>{toast.textContent=text;toast.classList.add('show')
+    clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>toast.classList.remove('show'),ms)}
+  window.addEventListener('walk:spawn-failed',()=>showToast('这里没有可以落脚的地方，飞近岸边或街道再试'))
+  window.addEventListener('walk:toast',event=>{const detail=(event as CustomEvent<{text?:string;message?:string;ms?:number}|string>).detail
+    const text=typeof detail==='string'?detail:detail?.text??detail?.message
+    if(text)showToast(text,typeof detail==='object'&&detail?.ms?detail.ms:2600)})
   modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton);void touch
   showMode()
+  const renderUi = renderRangeControl({
+    initial:rangeStore.getConfig(),
+    onPreview:(next:RenderRangeConfig)=>{stream.setRenderRange(next,{persist:false,source:next.source})},
+    onCommit:(next:RenderRangeConfig)=>{stream.setRenderRange(next.radius,{persist:true});return rangeStore.getConfig()},
+    onReset:()=>stream.resetRenderRange(),
+    getStats:(rangeRadius)=>{
+      const focus = walker?.destination??(walker?.active?walker.position:camera.position)
+      let targetCount = 0
+      for(const tile of manifest.chunks) if(Math.hypot(tile.x+128-focus.x,tile.z+128-focus.z)<=rangeRadius) targetCount++
+      return {target:targetCount,loaded:stream.loaded.size}
+    },
+  })
+  rangeStore.subscribe(nextCfg=>{renderUi.setConfig(nextCfg)})
   if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,
+    get renderRange(){return rangeStore.getConfig()},
+    get rangeMetrics(){return rangeStore.getMetrics()},
+    setRenderRange(next:unknown, persist=false){return stream.setRenderRange(next as number|string,{persist})},
+    deriveRangeMetrics,
     setView:(view:unknown)=>host.setView(view),
     async photoSupport(x:number,z:number,bridgeRadius?:number){return (await loadWalker()).photoSupport(x,z,bridgeRadius)},
     peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},
@@ -135,11 +214,11 @@ async function start() {
       }
       return {clearance,lookingAt,landmark,wallDistance:hits[0]?.distance}
     }}})
-  let cullLandmarks:ReturnType<typeof import('./landmarks').landmarkCulling>|undefined
   function draw(){
+    const metrics=stream.metrics
     const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
-    cullLandmarks?.update(stream.landmarks.values(),camera,mirror)
-    peaks.update(camera,mirror)
+    cullLandmarks?.update(stream.landmarks.values(),camera,mirror,metrics.cullHorizon)
+    peaks.update(camera,mirror,metrics)
     if(Number.isFinite(mirror))cullLandmarks?.pass(true)
     // Reuse the last reflection while tiles are still streaming: pending work is exactly when the
     // mirror costs the most, and a frame-old reflection is invisible under the ripple distortion.
@@ -161,7 +240,7 @@ async function start() {
       first=performance.now();stats.firstMs=first;stats.firstWorldBytes=bytes;bootProgress('载入街区', 100);bootDismiss()
       void import('./play').then(mod=>{tour=mod.play(host)})
     }
-    if(frame===2&&manifest.landmarks?.length)void import('./landmarks').then(module=>{cullLandmarks=module.landmarkCulling();stream.updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks)})
+    if(frame===2) void ensureLandmarks()
     if(frame===2){
       peaks.loadModels(renderer)
       void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))
@@ -185,6 +264,7 @@ async function start() {
       visited:stream.visited.size,failures:stream.failures.size})
     if(sum>=400||frame===1) {
       output.value=`${Math.round(samples*1000/(sum||16.7))} FPS · ${stats.calls} calls · ${stats.loaded} 块 · ${bytes.toLocaleString()} B`
+      renderUi.refreshStats()
       sum=0;samples=0
     }
   }

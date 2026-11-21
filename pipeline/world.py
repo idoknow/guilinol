@@ -263,7 +263,21 @@ def build(bbox, output, palette):
         if isinstance(fl, dict) and 'elevation' in fl and entry['id'] in ('zhengyang', 'dongxixiang', 'jingjiang'):
             return round(max(gm_y, float(fl['elevation'])), 2)
         return round(gm_y, 2)
-    landmarks = [dict(position=[x, lm_elevation(x, z, entry), z], **entry) for x, z, entry in layout.entries]
+    landmarks = []
+    for x, z, entry in layout.entries:
+        lm_y = lm_elevation(x, z, entry)
+        item = dict(position=[x, lm_y, z], **entry)
+        if entry['id'] == 'guilin_theater':
+            from landmarks.guilin_theater import LOCAL_FOOTPRINT, _ellipse_ring
+            rad = math.radians(entry.get('rotation', 0))
+            cos_r, sin_r = math.cos(rad), math.sin(rad)
+            bud_ring = _ellipse_ring(-0.50, 55.20, 14.8, 9.8, -6.0, 28)
+            item['solid'] = [
+                [round(lm_y - 6.5, 2), round(lm_y + 12.6, 2),
+                 [[round(x + lx * cos_r + lz * sin_r, 2), round(z - lx * sin_r + lz * cos_r, 2)] for lx, lz in ring]]
+                for ring in (LOCAL_FOOTPRINT, bud_ring)
+            ]
+        landmarks.append(item)
     structural_entries = [entry for entry in landmarks if entry['id'] in (*peak_lm_names, 'guilin_theater')]
     peak_surface = PeakSurface(output, peaks, left, top, CHUNK)
     @lru_cache(maxsize=262144)

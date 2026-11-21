@@ -44,4 +44,16 @@ export const spots:Spot[] = [
     x:-881, z:-165, at:[-881,-420], best:{label:'华灯初上',hour:19.5}},
 ]
 
+export interface WaterDock {
+  id:string; name:string; badge:string; sub:string; keywords:string
+  x:number; z:number; at:[number,number]
+}
+
+export const waterDocks:WaterDock[] = [
+  {id:'dock-ronghu', name:'榕湖划船坞', badge:'划小船', sub:'榕湖 · 自由划小船 / 画舫游湖',
+    keywords:'榕湖划船开船码头小船游船', x:-1340, z:326, at:[-1340,320.5]},
+  {id:'dock-jiefang', name:'解放桥竹筏码头', badge:'划竹筏', sub:'漓江 · 自由划竹筏 / 漓江漂流',
+    keywords:'解放桥漓江竹筏开船划船码头', x:-164, z:162, at:[-170.9,159.1]},
+]
+
 export const yawToward = (x:number,z:number,[tx,tz]:[number,number])=>Math.atan2(-(tx-x),-(tz-z))

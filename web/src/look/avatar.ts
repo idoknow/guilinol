@@ -1,2 +1,20 @@
-export const avatar = {path:'./avatar/figure.glb',scale:1,yaw:0,color:null as string|null,
-  clips:{idle:'idle',walk:'walk',run:'run',jump:'jump'}}
+export const avatar = {
+  path: './avatar/figure.glb',
+  scale: 0.955,
+  yaw: 0,
+  color: null as string | null,
+  clips: {
+    idle: 'idle',
+    walk: 'walk',
+    run: 'run',
+    sprint: 'sprint',
+    crouchIdle: 'crouch_idle',
+    crouchWalk: 'crouch_walk',
+    jumpStart: 'jump_start',
+    jumpAir: 'jump_air',
+    jumpLand: 'jump_land',
+    drive: 'drive',
+    sit: 'sit',
+    jump: 'jump_air',
+  },
+}

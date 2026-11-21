@@ -171,6 +171,18 @@ def bank_blend(x,z,padding=0):
     return across*along**2*(3-2*along)
 
 
+def motor_carriageways(anchor,angle):
+    """Exact carriageway polygons for the west interchange (strictly excluding sidewalks & footways)."""
+    transform=np.array([[np.cos(angle),np.sin(angle)],[-np.sin(angle),np.cos(angle)]])
+    paths=[]
+    for way in RAMPS+UPPER_ROADS+LOWER_ROADS+SIDE_ROAD:
+        xy,n,_,_=section(way)
+        l,r,_=widths(way)
+        edge=lambda offset:xy+n*np.broadcast_to(offset,len(xy))[:,None]
+        paths.append(Polygon(np.vstack([edge(l),edge(r)[::-1]])@transform+anchor).buffer(0))
+    return unary_union(paths)
+
+
 def grade_banks(terrain,original,wet,left,top,step,anchor,angle,datum,finish=False):
     bx,bz=anchor
     rows=slice(max(0,int((bz-330-top)//step)),min(terrain.shape[0],int((bz+330-top)//step)+1))

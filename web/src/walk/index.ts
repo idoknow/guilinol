@@ -6,9 +6,45 @@ import type {Manifest} from '../world'
 import type {Stream} from '../stream'
 import {walkInput} from '../ui/walk'
 import {avatar} from '../look/avatar'
-import {walkConfig as cfg} from './config'
+import {bikeConfig, carConfig, walkConfig as cfg, type CarDriveMode, type EbikeHeadlightMode, type EbikeTurnSignal, type EbikeUpgradeMods} from './config'
 import {createPhysics} from './physics'
+import {createCameraRig} from './camera'
 import {look} from '../look/config'
+import {env} from '../look/time'
+import {createDriverPose} from './car'
+import {createRiderPose,notifyDismountBlocked} from './ride'
+import {createEbikeAudioEngine} from './ebike-audio'
+import {clearAvatarPose, ensureAvatarRig, getAvatarJoint, getAvatarJoints} from './avatar-rig'
+import {isGlobalHotkeyBlocked} from './input-guard'
+import {
+  computeParkedRoll,
+  computePickupRoll,
+  createInitialTwoWheelOpState,
+  nextHeadlightMode,
+  resolveTwoWheelTransition,
+  type TwoWheelHeadlightMode,
+  type TwoWheelOperationalState,
+} from './ebike-state-coupling'
+import {
+  createDynamicBicycle,
+  createDynamicCar,
+  createDynamicEbike,
+  type EbikeModPreset,
+  type TwoWheelVisualRig,
+} from './vehicle-model'
+import {
+  applyEbikeVisualAndRider,
+  createEbikeFxController,
+  RIDER_JOINT_NAMES,
+  type EbikeCrashPhase,
+  type EbikeCrashReason,
+  type EbikeRideControlInput,
+  type EbikeTelemetrySnapshot,
+  type EbikeVehicleType,
+  type ExternalEbikeTelemetry,
+  type RiderJointName,
+  type RiderJoints,
+} from './ebike-fx'
 import type {vehicles} from './vehicles'
 
 let rapierReady:Promise<void>|undefined
@@ -24,6 +60,22 @@ function mergeAvatar(root:THREE.Group, tintHex:string|null) {
   if(root.userData.merged) return root.userData.skinned as THREE.SkinnedMesh|undefined
   root.userData.merged = true
   root.position.set(0,0,0); root.rotation.set(0,0,0); root.scale.setScalar(1)
+
+  // Single-primitive glTF joint nodes (ThighL/R, ArmL/R) load as Mesh rather than Group; wrap them so joints stay live.
+  const jointMeshes:THREE.Mesh[] = []
+  root.traverse(n=>{
+    if(n instanceof THREE.Mesh && !(n instanceof THREE.SkinnedMesh) && n.name && !n.name.startsWith('mesh_')) jointMeshes.push(n)
+  })
+  for(const m of jointMeshes) {
+    const grp = new THREE.Group()
+    grp.name = m.name
+    grp.position.copy(m.position); grp.quaternion.copy(m.quaternion); grp.scale.copy(m.scale)
+    const prim = new THREE.Mesh(m.geometry, m.material)
+    prim.name = 'mesh_' + m.name
+    grp.add(prim)
+    for(const c of [...m.children]) grp.add(c)
+    m.parent?.add(grp); m.parent?.remove(m)
+  }
   root.updateMatrixWorld(true)
 
   const bones:THREE.Bone[] = []
@@ -34,6 +86,8 @@ function mergeAvatar(root:THREE.Group, tintHex:string|null) {
   const oldMeshes:THREE.Mesh[] = []
   const v = new THREE.Vector3(), n = new THREE.Vector3(), col = new THREE.Color()
   const override = tintHex ? new THREE.Color(tintHex) : null
+  let bindMinY = Infinity
+  const shinVerts = new Map<THREE.Object3D, THREE.Vector3[]>()
 
   root.traverse(node=>{
     if(!(node instanceof THREE.Mesh) || (node instanceof THREE.SkinnedMesh)) return
@@ -50,8 +104,14 @@ function mergeAvatar(root:THREE.Group, tintHex:string|null) {
     const pos = g.getAttribute('position'), norm = g.getAttribute('normal')
     const mat = node.material as THREE.MeshStandardMaterial
     col.copy(override ?? mat.color)
+    const isShin = joint.name === 'ShinL' || joint.name === 'ShinR'
+    const invJoint = isShin ? joint.matrixWorld.clone().invert() : null
+    const localPts = isShin ? (shinVerts.get(joint) ?? []) : null
+    if(isShin && localPts && !shinVerts.has(joint)) shinVerts.set(joint, localPts)
     for(let i=0;i<pos.count;i++) {
       v.fromBufferAttribute(pos,i).applyMatrix4(node.matrixWorld)
+      if(v.y < bindMinY) bindMinY = v.y
+      if(localPts && invJoint) localPts.push(v.clone().applyMatrix4(invJoint))
       posList.push(v.x,v.y,v.z)
       if(norm) n.fromBufferAttribute(norm,i).transformDirection(node.matrixWorld)
       else n.set(0,1,0)
@@ -62,7 +122,28 @@ function mergeAvatar(root:THREE.Group, tintHex:string|null) {
     }
     if(g!==node.geometry) g.dispose()
   })
-  if(!oldMeshes.length) return undefined
+  const footProbes: {joint:THREE.Object3D; points:THREE.Vector3[]}[] = []
+  for(const [joint, pts] of shinVerts) {
+    let minY = Infinity
+    for(const p of pts) if(p.y < minY) minY = p.y
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
+    for(const p of pts) if(p.y <= minY + .02) {
+      if(p.x < minX) minX = p.x; if(p.x > maxX) maxX = p.x
+      if(p.z < minZ) minZ = p.z; if(p.z > maxZ) maxZ = p.z
+    }
+    if(Number.isFinite(minX)) {
+      footProbes.push({joint, points:[
+        new THREE.Vector3(minX, minY, minZ), new THREE.Vector3(maxX, minY, minZ),
+        new THREE.Vector3(minX, minY, maxZ), new THREE.Vector3(maxX, minY, maxZ),
+      ]})
+    }
+  }
+  if(!oldMeshes.length) {
+    const box = new THREE.Box3().setFromObject(root, true)
+    root.userData.footMetrics = {soleOffset: Number.isFinite(box.min.y) ? Math.max(0, -box.min.y) : 0, footProbes}
+    return undefined
+  }
+  root.userData.footMetrics = {soleOffset: Number.isFinite(bindMinY) ? Math.max(0, -bindMinY) : 0, footProbes}
   for(const m of oldMeshes) { m.parent?.remove(m); m.geometry.dispose() }
 
   const geom = new THREE.BufferGeometry()
@@ -80,38 +161,463 @@ function mergeAvatar(root:THREE.Group, tintHex:string|null) {
   return skinned
 }
 
+function shortestAngle(from:number, to:number) {
+  return Math.atan2(Math.sin(to-from),Math.cos(to-from))
+}
+
+function solveBicyclePedalIK(phase:number):[number,number]{
+  const dy=(.33+.15*Math.cos(phase))-.88
+  const dz=(.05-.15*Math.sin(phase))-.23
+  const d=THREE.MathUtils.clamp(Math.hypot(dy,dz),.24,.88)
+  const alpha=Math.atan2(-dz,-dy)
+  const L1=.45, L2=.45
+  const cosKnee=THREE.MathUtils.clamp((L1*L1+L2*L2-d*d)/(2*L1*L2),-1,1)
+  const beta=Math.acos(THREE.MathUtils.clamp((L1*L1+d*d-L2*L2)/(2*L1*d),-1,1))
+  return [alpha+beta,-(Math.PI-Math.acos(cosKnee))]
+}
+
+type DownedBikeEntry={
+  mesh:THREE.Mesh
+  kind:'bike'|'bicycle'
+  x:number
+  y:number
+  z:number
+  yaw:number
+  side:-1|1
+  roll:number
+  lift:number
+  vehicleType:EbikeVehicleType
+  battery:number
+  modPreset:EbikeModPreset
+  paint:number
+  hazardOverlay?:THREE.Group
+}
+
+function setRiderJoints(joints:RiderJoints,targets:Partial<Record<RiderJointName,[number,number,number]>>,blend=1){
+  for(const name of RIDER_JOINT_NAMES){
+    const j=joints[name], tgt=targets[name]
+    if(!j||!tgt)continue
+    if(blend>=1)j.rotation.set(tgt[0],tgt[1],tgt[2])
+    else j.rotation.set(tgt[0]*blend,tgt[1]*blend,tgt[2]*blend)
+  }
+}
+
+function applySprawledCrashPose(
+  figure:THREE.Group,joints:RiderJoints,fallT:number,side:-1|1,
+  rx:number,ry:number,rz:number,heading:number,seatPos:THREE.Vector3,
+){
+  figure.position.set(
+    THREE.MathUtils.lerp(seatPos.x,rx,fallT),
+    THREE.MathUtils.lerp(seatPos.y,ry+.24*fallT,fallT),
+    THREE.MathUtils.lerp(seatPos.z,rz,fallT),
+  )
+  figure.rotation.set(1.36*fallT,heading+side*.45*fallT,side*.28*fallT,'YXZ')
+  setRiderJoints(joints,{
+    Hips:[0,0,0],
+    Torso:[.18*fallT,side*.20*fallT,0],
+    Head:[-.44*fallT,-side*.30*fallT,0],
+    ArmL:[1.38*fallT,.32*fallT,-.46*fallT],
+    ArmR:[1.38*fallT,-.32*fallT,.46*fallT],
+    ForearmL:[1.12*fallT,0,0],
+    ForearmR:[1.12*fallT,0,0],
+    ThighL:[.68*fallT,0,-.22*fallT],
+    ThighR:[.90*fallT,0,.22*fallT],
+    ShinL:[-.98*fallT,0,0],
+    ShinR:[-1.20*fallT,0,0],
+  })
+}
+
+function applyStandUpAnimation(
+  figure:THREE.Group,joints:RiderJoints,progress:number,side:-1|1,
+  x:number,groundY:number,z:number,startYaw:number,targetYaw:number,
+){
+  const u=THREE.MathUtils.clamp(progress,0,1)
+  const pushT=THREE.MathUtils.smoothstep(u,0,.38)
+  const riseT=THREE.MathUtils.smoothstep(u,.32,.78)
+  const settleT=THREE.MathUtils.smoothstep(u,.74,1)
+  const bodyPitch=THREE.MathUtils.lerp(THREE.MathUtils.lerp(1.36,.52,pushT),0,riseT)
+  const bodyRoll=THREE.MathUtils.lerp(side*.28,0,riseT)+Math.sin(riseT*Math.PI)*(-side*.09)
+  const crouchDrop=Math.sin(riseT*Math.PI)*.10
+  figure.position.set(x,groundY+THREE.MathUtils.lerp(.24,0,riseT)-crouchDrop,z)
+  figure.rotation.set(bodyPitch,startYaw+shortestAngle(startYaw,targetYaw)*riseT,bodyRoll,'YXZ')
+  const dustSweep=Math.sin(settleT*Math.PI)
+  const kneelBlend=(1-settleT)*Math.sin(THREE.MathUtils.clamp((u-.12)/.66,0,1)*Math.PI)
+  setRiderJoints(joints,{
+    Hips:[0,0,0],
+    Torso:[THREE.MathUtils.lerp(.18,-.34,pushT)*(1-riseT)-.10*kneelBlend,dustSweep*.10,0],
+    Head:[THREE.MathUtils.lerp(-.44,.16,pushT)*(1-settleT),0,0],
+    ArmL:[THREE.MathUtils.lerp(1.38,.78,pushT)*(1-riseT)+dustSweep*.45,0,-.12*(1-riseT)],
+    ArmR:[THREE.MathUtils.lerp(1.38,.78,pushT)*(1-riseT)+dustSweep*.45,0,.12*(1-riseT)],
+    ForearmL:[THREE.MathUtils.lerp(1.12,.52,pushT)*(1-riseT)+dustSweep*.40,0,0],
+    ForearmR:[THREE.MathUtils.lerp(1.12,.52,pushT)*(1-riseT)+dustSweep*.40,0,0],
+    ThighL:[THREE.MathUtils.lerp(.68,.95,pushT)*(1-riseT)+.42*kneelBlend,0,-.10*(1-riseT)],
+    ThighR:[THREE.MathUtils.lerp(.90,.55,pushT)*(1-riseT)+.22*kneelBlend,0,.10*(1-riseT)],
+    ShinL:[THREE.MathUtils.lerp(-.98,-1.35,pushT)*(1-riseT)-.55*kneelBlend,0,0],
+    ShinR:[THREE.MathUtils.lerp(-1.20,-.65,pushT)*(1-riseT)-.30*kneelBlend,0,0],
+  })
+}
+
+function applyPickupBikeAnimation(
+  figure:THREE.Group,joints:RiderJoints,progress:number,
+  pos:{x:number;y:number;z:number},yaw:number,rec:DownedBikeEntry,
+){
+  const u=THREE.MathUtils.clamp(progress,0,1)
+  const crouch=THREE.MathUtils.smoothstep(u,0,.38)*(1-THREE.MathUtils.smoothstep(u,.48,1))
+  const liftT=THREE.MathUtils.smoothstep(u,.30,.92)
+  rec.mesh.position.set(rec.x,rec.y+rec.lift*(1-liftT),rec.z)
+  rec.mesh.rotation.set(0,rec.yaw,computePickupRoll(rec.roll,u,rec.kind==='bike'),'YXZ')
+  figure.position.set(pos.x,pos.y-crouch*.08,pos.z)
+  figure.rotation.set(crouch*.18,yaw,0,'YXZ')
+  const pull=Math.sin(THREE.MathUtils.clamp((u-.22)/.72,0,1)*Math.PI)
+  setRiderJoints(joints,{
+    Hips:[0,0,0],
+    Torso:[-.46*crouch-.16*pull,0,0],
+    Head:[.18*crouch,0,0],
+    ArmL:[1.12*crouch+.62*pull,0,-.12*crouch],
+    ArmR:[1.12*crouch+.62*pull,0,.12*crouch],
+    ForearmL:[.34*crouch+.48*pull,0,0],
+    ForearmR:[.34*crouch+.48*pull,0,0],
+    ThighL:[.58*crouch+.18*pull,0,-.06*crouch],
+    ThighR:[.58*crouch+.18*pull,0,.06*crouch],
+    ShinL:[-.88*crouch-.26*pull,0,0],
+    ShinR:[-.88*crouch-.26*pull,0,0],
+  })
+}
+
 export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canvas:HTMLCanvasElement,manifest:Manifest,stream:Stream,peaks:PeaksGroup,verify:boolean){
   rapierReady ??= R.init()
   avatarReady ??= new GLTFLoader().loadAsync(avatar.path)
   const [sim,model]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady])
-  const figure=model.scene,skinned=mergeAvatar(figure,avatar.color);scene.add(figure);figure.visible=false;figure.scale.setScalar(avatar.scale)
+  const rig=createCameraRig(sim)
+  const figure=model.scene,legacySkinned=mergeAvatar(figure,avatar.color),avatarRig=ensureAvatarRig(figure,avatar.color),skinned=legacySkinned??avatarRig.skinnedMesh,traveller=figure.getObjectByName('Traveller')??avatarRig.traveller,ridePose=createRiderPose(figure),driverPose=createDriverPose(figure)
+  const riderJoints=getAvatarJoints(figure) as RiderJoints
+  const ebikeRig=createDynamicEbike(0)
+  ebikeRig.root.visible=false
+  scene.add(ebikeRig.root)
+  const bicycleRig=createDynamicBicycle(0)
+  bicycleRig.root.visible=false
+  scene.add(bicycleRig.root)
+  const carRig=createDynamicCar(0)
+  carRig.root.visible=false
+  scene.add(carRig.root)
+  scene.add(carRig.smokeGroup)
+  const searchParams=typeof location!=='undefined'?new URLSearchParams(location.search):null
+  const stuntMode=searchParams?.get('stunt')==='1'
+  const gtaCarParam=searchParams?.get('gtacar')==='1'
+  const defaultCarGta=!verify||gtaCarParam
+  let carGtaOverride:boolean|undefined=undefined
+  let carShake=0, carShakePhase=0, carSpeedArm=0
+  function ebikeModUpgrades(vType:EbikeVehicleType,preset:EbikeModPreset):EbikeUpgradeMods|null{
+    if(vType==='shared'||preset==='stock')return null
+    return preset==='ghostfire'?{motorLevel:1,controllerLevel:1,batteryLevel:1}:{motorLevel:2,controllerLevel:2,batteryLevel:2}
+  }
+  const ebikeFx=createEbikeFxController()
+  const ebikeAudio=createEbikeAudioEngine()
+  const ZERO_RIDE_INPUT:EbikeRideControlInput={gearDelta:0,gearSelect:null,wheelie:false,tuck:false,recover:false,cycleMod:false,parkToggle:false,kickstandToggle:false,headlightCycle:false,turnLeftToggle:false,turnRightToggle:false,hazardToggle:false,horn:false,hornPulse:false,cruiseToggle:false}
+  const ebikeMountStartPos=new THREE.Vector3(), ebikeMountStartRot=new Map<RiderJointName,[number,number,number]>()
+  let ebikeMountStartYaw=0, ebikeMountElapsed=bikeConfig.mountDuration
+  let mountedStaticBike:THREE.Object3D|null=null
+  let mountedStaticCar:THREE.Object3D|null=null
+  let ebikeState:EbikeTelemetrySnapshot|null=null
+  let autoCrashOverride:boolean|undefined=undefined
+  const downedBikes=new Set<DownedBikeEntry>()
+  const _seatTmp=new THREE.Vector3(), _rigPosTmp=new THREE.Vector3()
+  let prevAudioPark=false, prevAudioGear=2, prevAudioLight:EbikeHeadlightMode='off', prevAudioBlink=false, prevAudioHorn=false
+  type CrashSession={
+    mesh:THREE.Mesh
+    kind:'bike'|'bicycle'
+    vehicleType:EbikeVehicleType
+    paint:number
+    modPreset:EbikeModPreset
+    battery:number
+    side:-1|1
+    heading:number
+    bikeOriginX:number
+    bikeOriginZ:number
+    bikeSlideX:number
+    bikeSlideZ:number
+    riderOffsetX:number
+    riderOffsetZ:number
+    slideSpeed:number
+    elapsed:number
+    reason:Exclude<EbikeCrashReason,''>
+  }
+  type StandUpSession={elapsed:number;duration:number;side:-1|1;x:number;y:number;z:number;startYaw:number;targetYaw:number}
+  type PickupSession={rec:DownedBikeEntry;elapsed:number;duration:number;startYaw:number}
+  let crashSession:CrashSession|null=null
+  let standUpSession:StandUpSession|null=null
+  let pickupSession:PickupSession|null=null
+  let crashRecoverQueued=false
+  let twoWheelOp:TwoWheelOperationalState=createInitialTwoWheelOpState()
+  let carHeadlight:TwoWheelHeadlightMode='off'
+  let carHeadlightManual=false
+  window.addEventListener('keydown',event=>{
+    if(active)ebikeAudio.unlock()
+    if(!active||!crashSession||event.repeat)return
+    if(isGlobalHotkeyBlocked(event.target))return
+    if(event.code==='Space'||event.code==='KeyW'||event.code==='KeyA'||event.code==='KeyS'||event.code==='KeyD')crashRecoverQueued=true
+  })
+  let prevTwoWheelSpeed=0
+  let bicyclePedalPhase=0, bicycleFootWeight=1
+  let prevCarSpeed=0, prevCarObstacle='', lastCarBraking=false
+  let actionButtonEl:HTMLButtonElement|null=null
+  const downedHazardGeo=new THREE.BoxGeometry(.08,.055,.07)
+  const downedHazardMat=new THREE.MeshBasicMaterial({color:0xffa824})
+  function attachDownedHazard(mesh:THREE.Mesh){
+    const g=new THREE.Group()
+    g.name='downed-hazard-flashers'
+    for(const sx of [-.17,.17]){
+      const front=new THREE.Mesh(downedHazardGeo,downedHazardMat)
+      front.position.set(sx,.72,-.54)
+      const rear=new THREE.Mesh(downedHazardGeo,downedHazardMat)
+      rear.position.set(sx,.64,.52)
+      g.add(front,rear)
+    }
+    mesh.add(g)
+    return g
+  }
+  function removeDownedHazard(rec:DownedBikeEntry){
+    if(rec.hazardOverlay){rec.hazardOverlay.removeFromParent();rec.hazardOverlay=undefined}
+  }
+  function findDownedNear(x:number,z:number,radius=.95):DownedBikeEntry|null{
+    let best:DownedBikeEntry|null=null, bestD=radius
+    for(const rec of downedBikes){
+      const d=Math.hypot(rec.x-x,rec.z-z)
+      if(d<bestD){bestD=d;best=rec}
+    }
+    return best
+  }
+  function syncAllDownedPoses(){
+    const flashOn=((performance.now()*.0018)%1)<.5
+    for(const rec of downedBikes){
+      if(rec.hazardOverlay)rec.hazardOverlay.visible=flashOn
+      if(pickupSession?.rec===rec)continue
+      rec.mesh.visible=true
+      rec.mesh.position.set(rec.x,rec.y+rec.lift,rec.z)
+      rec.mesh.rotation.set(0,rec.yaw,rec.roll,'YXZ')
+    }
+  }
+  function clearAllDowned(){
+    for(const rec of downedBikes){
+      removeDownedHazard(rec)
+      rec.mesh.userData.downed=false
+      rec.mesh.position.set(rec.x,rec.y,rec.z)
+      rec.mesh.rotation.set(0,rec.yaw,0,'YXZ')
+    }
+    downedBikes.clear()
+  }
+  function releaseDynamicCar(){
+    if(mountedStaticCar){mountedStaticCar.visible=true;mountedStaticCar=null}
+    carRig.root.visible=false
+    carRig.clearEffects()
+    prevCarSpeed=0;prevCarObstacle='';lastCarBraking=false;carShake=0;carSpeedArm=0
+  }
+  function releaseDynamicBike(){
+    if(mountedStaticBike){mountedStaticBike.visible=true;mountedStaticBike=null}
+    ebikeRig.root.visible=false
+    bicycleRig.root.visible=false
+    ebikeFx.reset()
+    ebikeAudio.stopContinuous()
+    ebikeState=null
+    prevTwoWheelSpeed=0
+    bicyclePedalPhase=0;bicycleFootWeight=1
+    prevAudioPark=false;prevAudioGear=2;prevAudioLight='off';prevAudioBlink=false;prevAudioHorn=false
+  }
+  const footMetrics={soleOffset:avatarRig.soleOffset,footProbes:avatarRig.footProbes}
+  scene.add(figure);figure.visible=false;figure.scale.setScalar(avatar.scale)
+  const soleOffset=footMetrics.soleOffset*avatar.scale, footTmp=new THREE.Vector3()
+  const lmFloorCache=new WeakMap<THREE.Group,{grid:Map<string,number[]>;large:number[]}>()
+  const _va=new THREE.Vector3(), _vb=new THREE.Vector3(), _vc=new THREE.Vector3(), _im=new THREE.Matrix4(), _inst=new THREE.Matrix4()
+  function getLandmarkFloorGrid(root:THREE.Group){
+    let cache=lmFloorCache.get(root)
+    if(!cache){
+      const grid=new Map<string,number[]>(), large:number[]=[]
+      root.updateMatrixWorld(true)
+      const target=root.getObjectByName('lod0')??root
+      const addMeshTris=(pos:THREE.BufferAttribute|THREE.InterleavedBufferAttribute,idx:THREE.TypedArray|undefined,mat:THREE.Matrix4)=>{
+        const triCount=idx?idx.length/3:pos.count/3
+        for(let t=0;t<triCount;t++){
+          const i0=idx?idx[t*3]:t*3, i1=idx?idx[t*3+1]:t*3+1, i2=idx?idx[t*3+2]:t*3+2
+          _va.fromBufferAttribute(pos,i0).applyMatrix4(mat)
+          _vb.fromBufferAttribute(pos,i1).applyMatrix4(mat)
+          _vc.fromBufferAttribute(pos,i2).applyMatrix4(mat)
+          const e1x=_vb.x-_va.x, e1y=_vb.y-_va.y, e1z=_vb.z-_va.z
+          const e2x=_vc.x-_va.x, e2y=_vc.y-_va.y, e2z=_vc.z-_va.z
+          const nx=e1y*e2z-e1z*e2y, ny=e1z*e2x-e1x*e2z, nz=e1x*e2y-e1y*e2x
+          const len=Math.hypot(nx,ny,nz)
+          if(len<1e-6||Math.abs(ny)/len<.7)continue
+          const gx0=Math.floor(Math.min(_va.x,_vb.x,_vc.x)/4), gx1=Math.floor(Math.max(_va.x,_vb.x,_vc.x)/4)
+          const gz0=Math.floor(Math.min(_va.z,_vb.z,_vc.z)/4), gz1=Math.floor(Math.max(_va.z,_vb.z,_vc.z)/4)
+          if((gx1-gx0+1)*(gz1-gz0+1)>16){
+            large.push(_va.x,_va.y,_va.z,_vb.x,_vb.y,_vb.z,_vc.x,_vc.y,_vc.z)
+            continue
+          }
+          for(let gx=gx0;gx<=gx1;gx++)for(let gz=gz0;gz<=gz1;gz++){
+            const k=`${gx},${gz}`
+            let bucket=grid.get(k)
+            if(!bucket){bucket=[];grid.set(k,bucket)}
+            bucket.push(_va.x,_va.y,_va.z,_vb.x,_vb.y,_vb.z,_vc.x,_vc.y,_vc.z)
+          }
+        }
+      }
+      target.traverse(node=>{
+        if(!(node instanceof THREE.Mesh))return
+        let p:THREE.Object3D|null=node
+        while(p&&p!==root){if(/^collision/i.test(p.name))return;p=p.parent}
+        if(/^collision/i.test(node.name))return
+        const pos=node.geometry.getAttribute('position'); if(!pos)return
+        const idx=(node.geometry.userData.fullIndex as THREE.TypedArray|undefined)??node.geometry.index?.array
+        if(node instanceof THREE.InstancedMesh){
+          for(let i=0;i<node.count;i++){node.getMatrixAt(i,_inst);_im.multiplyMatrices(node.matrixWorld,_inst);addMeshTris(pos,idx,_im)}
+        }else addMeshTris(pos,idx,node.matrixWorld)
+      })
+      cache={grid,large}
+      lmFloorCache.set(root,cache)
+    }
+    return cache
+  }
+  function sampleFloorTris(tris:number[],x:number,z:number,baseY:number,best:number){
+    for(let i=0;i<tris.length;i+=9){
+      const ax=tris[i],ay=tris[i+1],az=tris[i+2],bx=tris[i+3],by=tris[i+4],bz=tris[i+5],cx2=tris[i+6],cy=tris[i+7],cz2=tris[i+8]
+      const det=(bx-ax)*(cz2-az)-(cx2-ax)*(bz-az)
+      if(Math.abs(det)<1e-6)continue
+      const w1=((x-ax)*(cz2-az)-(cx2-ax)*(z-az))/det, w2=((bx-ax)*(z-az)-(x-ax)*(bz-az))/det
+      if(w1<-1e-3||w2<-1e-3||w1+w2>1+1e-3)continue
+      const y=ay+w1*(by-ay)+w2*(cy-ay)
+      if(y>best&&y<=baseY+.15)best=y
+    }
+    return best
+  }
+  function visualFloorAt(x:number,z:number,baseY:number){
+    let best=baseY
+    const cellKey=`${Math.floor(x/4)},${Math.floor(z/4)}`
+    for(const [entry,root] of stream.landmarks){
+      if(!root.visible)continue
+      const [cx,,cz,r]=entry.sphere, a=entry.rotation*Math.PI/180
+      const ex=entry.position[0]+cx*Math.cos(a)+cz*Math.sin(a)
+      const ez=entry.position[2]-cx*Math.sin(a)+cz*Math.cos(a)
+      if(Math.hypot(ex-x,ez-z)>r+2)continue
+      const {grid,large}=getLandmarkFloorGrid(root)
+      const tris=grid.get(cellKey)
+      if(tris)best=sampleFloorTris(tris,x,z,baseY,best)
+      if(large.length)best=sampleFloorTris(large,x,z,baseY,best)
+    }
+    return best
+  }
+  function liveSoleLocalY(){
+    if(!footMetrics.footProbes.length)return -soleOffset
+    let minY=Infinity
+    for(const entry of footMetrics.footProbes){
+      for(const pt of entry.points){
+        footTmp.copy(pt)
+        let cur:THREE.Object3D|null=entry.joint
+        while(cur&&cur!==figure){cur.updateMatrix();footTmp.applyMatrix4(cur.matrix);cur=cur.parent}
+        const y=footTmp.y*figure.scale.y
+        if(y<minY)minY=y
+      }
+    }
+    return Number.isFinite(minY)?minY:-soleOffset
+  }
+  function applyFootController(){
+    sim.controller.enableAutostep(cfg.step,cfg.stepWidth,false)
+    sim.controller.setMaxSlopeClimbAngle(cfg.slope)
+    sim.controller.setMinSlopeSlideAngle(cfg.slope)
+  }
   const mixer=new THREE.AnimationMixer(figure),actions=new Map(model.animations.map(clip=>[clip.name,mixer.clipAction(clip)]))
-  let action:THREE.AnimationAction|undefined,active=false,yaw=0,pitch=cfg.pitch,arm=cfg.far,velocity=0,grounded=false,accumulator=0
-  let resets=0,steps=0,physicsMs=0,elapsed=0,lastHits:string[]=[]
+  let action:THREE.AnimationAction|undefined,activeClipName='idle',active=false,yaw=0,pitch=cfg.pitch,arm=cfg.far,facing=0,bankLean=0,strideLean=0,prevSpeed=0
+  let vx=0,vz=0,velocity=0,grounded=false,wasGroundedFoot=true,crouching=false,jumpStage:'none'|'start'|'air'|'land'='none',jumpStageTimer=0,snapEnabled=true,coyoteTimer=0,jumpTimer=0,accumulator=0
+  let resets=0,steps=0,physicsMs=0,elapsed=0,lastHits:string[]=[],wasLandmarkHit=false
   const input=walkInput(canvas,()=>active,(dx,dy)=>{yaw-=dx*cfg.sensitivity;pitch=THREE.MathUtils.clamp(pitch+dy*cfg.sensitivity,-.8,1.3)},
-    delta=>{arm=THREE.MathUtils.clamp(arm+delta*.013,cfg.zoomMin,cfg.zoomMax)},()=>{arm=arm>(cfg.far+cfg.near)/2?cfg.near:cfg.far})
-  const safe=new THREE.Vector3(),focus=new THREE.Vector3(),direction=new THREE.Vector3();const spawns:object[]=[]
+    delta=>{arm=THREE.MathUtils.clamp(arm+delta*.013,cfg.zoomMin,cfg.zoomMax);if(active)follow(0,true)},
+    ()=>{arm=arm>(cfg.far+cfg.near)/2?cfg.near:cfg.far;if(active)follow(0,true)})
+  const safe=new THREE.Vector3(),posOut=new THREE.Vector3(),wish=new THREE.Vector2();const spawns:object[]=[]
   let external:{x:number,z:number,run:boolean}|null=null,blockedWater=false,held=false
-  const still={right:0,forward:0,run:false,jump:false}
+  const still={right:0,forward:0,run:false,crouch:false,jump:false}
   let rides:Awaited<ReturnType<typeof vehicles>>|null=null,loading=false
+  function setSnap(on:boolean){if(snapEnabled===on)return;snapEnabled=on;if(on)sim.controller.enableSnapToGround(cfg.snap);else sim.controller.disableSnapToGround()}
+  function resetMotion(){vx=vz=velocity=coyoteTimer=jumpTimer=bankLean=strideLean=prevSpeed=jumpStageTimer=0;grounded=false;wasGroundedFoot=true;crouching=false;wasLandmarkHit=false;jumpStage='none';setSnap(true);figure.rotation.x=figure.rotation.z=0;if(traveller)traveller.rotation.set(0,0,0)}
+  function supportAt(x:number,z:number,refY:number){
+    const deck=sim.surface(x,z,'deck',refY+.35,1.4)
+    const validDeck=deck&&deck.y<=refY+.35?deck:null
+    return validDeck??sim.surface(x,z,'sidewalk')??sim.surface(x,z,'road')??sim.surface(x,z,'ground')
+  }
+  function carSupportAt(x:number,z:number,refY:number){
+    const deck=sim.surface(x,z,'deck',refY+.55,1.8)
+    const validDeck=deck&&deck.y<=refY+.55?deck:null
+    const lm=sim.surface(x,z,'landmark',refY+.55,1.8)
+    const validLm=lm&&lm.y<=refY+.55&&lm.slope<=cfg.slope?lm:null
+    const bridgeHit=validDeck&&validLm?(validLm.y>validDeck.y?validLm:validDeck):(validDeck??validLm)
+    return bridgeHit??sim.surface(x,z,'road')??sim.surface(x,z,'ground')??sim.surface(x,z,'sidewalk')
+  }
   function loadRides(){if(loading||rides||!active||!manifest.vehicles)return;loading=true
     const file=manifest.vehicles.file
-    void import('./vehicles').then(module=>module.vehicles(scene,file,(x,z)=>{sim.sync(x,z);return place(x,z,'dismount')})).then(loaded=>{rides=loaded;rides.show(active)})
+    void import('./vehicles').then(module=>module.vehicles(scene,file,(x,z,bikeHeading,bikeY,kind)=>{sim.sync(x,z)
+      if(bikeHeading===undefined)return place(x,z,'dismount')
+      if(kind==='car'){
+        const carY=bikeY??safe.y-cfg.height/2
+        const found=sim.findCarDismount(x,z,bikeHeading,carY)
+        if(!found){notifyDismountBlocked();return false}
+        const prevCarPos=new THREE.Vector3(x,carY,z)
+        if(!place(x,z,'dismount',true,found))return false
+        releaseDynamicCar()
+        facing=bikeHeading+avatar.yaw
+        driverPose.startDismount(prevCarPos,bikeHeading,active);input.clearRun();return true
+      }
+      if(crashSession){
+        if(crashSession.elapsed>=.28)beginStandUpFromCrash()
+        else crashRecoverQueued=true
+        return false
+      }
+      const found=sim.findLocalDismount(x,z,bikeHeading,bikeY??safe.y-cfg.height/2)
+      if(!found){notifyDismountBlocked();return false}
+      const prevFoot=figure.position.clone(),prevYaw=figure.rotation.y
+      if(!place(x,z,'dismount',true,found))return false
+      twoWheelOp=resolveTwoWheelTransition(twoWheelOp,{type:'dismount',kind:rides?.rideKind==='bicycle'?'bicycle':'bike'}).state
+      releaseDynamicBike();input.syncRideHud(null,null)
+      facing=bikeHeading+avatar.yaw
+      ridePose.startDismount(prevFoot,prevYaw);input.clearRun();return true
+    },(bx,by,bz,kind)=>{sim.sync(bx,bz)
+      const cur=sim.body.translation()
+      if(kind==='car'){
+        const check=sim.findCarMount(cur.x,cur.y-cfg.height/2,cur.z,bx,by,bz)
+        if(!check.ok){notifyDismountBlocked(check.reason==='blocked'?'中间有遮挡，绕过去再上车':'这里太窄了，换个角度上车');return null}
+        return check
+      }
+      if(standUpSession||pickupSession)return null
+      const downed=findDownedNear(bx,bz,.95)
+      if(downed){
+        twoWheelOp=resolveTwoWheelTransition(twoWheelOp,{type:'pickup_start',kind:downed.kind}).state
+        pickupSession={rec:downed,elapsed:0,duration:.56,startYaw:facing}
+        action?.fadeOut(.08);action=undefined
+        if(traveller)traveller.rotation.set(0,0,0)
+        return null
+      }
+      const check=sim.findLocalMount(cur.x,cur.y-cfg.height/2,cur.z,bx,by,bz)
+      if(!check.ok){notifyDismountBlocked(check.reason==='blocked'?'中间有遮挡，绕过去再骑':'这里太窄了，挪一挪再骑');return null}
+      return check
+    },{sim,stream,landFree:spot=>{sim.sync(spot.x,spot.z)
+      const prevBoatPos=figure.position.clone(),prevBoatYaw=figure.rotation.y
+      if(sim.insideHouse(spot.x,spot.z)||!sim.freeCapsule(spot.x,spot.y,spot.z)||!place(spot.x,spot.z,spot.rule,true,spot))return false
+      rides?.clearBoatPose(figure);boatLandFrom.copy(prevBoatPos);boatLandYaw=prevBoatYaw;boatLandElapsed=0;boatBoardElapsed=BOAT_BOARD_DUR
+      facing=spot.heading+avatar.yaw;figure.rotation.y=facing;wasBoat=false;input.clearRun();follow(0,false);return true}})).then(loaded=>{rides=loaded;rides.show(active)
+      if(active){const p=sim.body.translation();sim.sync(p.x,p.z);loaded.nearby(p.x,p.z,p.y-cfg.height/2)}})
       .catch(error=>console.warn('Vehicles unavailable:',error)).finally(()=>{loading=false})}
-  let wasBoat=false,wasBike=false,bikeObstacle=''
-  function place(x:number,z:number,reason:string,override=false){const found=sim.findWalkableSpawn(x,z,override)
+  const BOAT_BOARD_DUR=.24, BOAT_LAND_DUR=.20
+  const boatBoardFrom=new THREE.Vector3(), boatLandFrom=new THREE.Vector3()
+  let boatBoardElapsed=BOAT_BOARD_DUR, boatBoardYaw=0, boatLandElapsed=BOAT_LAND_DUR, boatLandYaw=0
+  let wasBoat=false,wasBike=false,wasCar=false,bikeObstacle=''
+  function place(x:number,z:number,reason:string,override=false,prefound?:ReturnType<typeof sim.findWalkableSpawn>){const found=prefound??sim.findWalkableSpawn(x,z,override)
     if(verify)spawns.push({reason,from:[x,z],to:found?[found.x,found.z]:null,distance:found?Math.hypot(found.x-x,found.z-z):null,rule:found?.rule??'none'})
     if(!found)return false
-    sim.body.setTranslation(found,true);sim.body.setNextKinematicTranslation(found);sim.world.step();safe.set(found.x,found.y,found.z);velocity=0;grounded=false;return true}
+    sim.body.setTranslation(found,true);sim.body.setNextKinematicTranslation(found);sim.world.step();safe.set(found.x,found.y,found.z);resetMotion();return true}
   let destination:THREE.Vector3|null=null
   const bridge=manifest.landmarks?.find(entry=>entry.id==='jiefang_bridge'),bridgeEye=new THREE.Vector3()
   const bridgeCenter=bridge&&new THREE.Vector3(...bridge.sphere.slice(0,3)).applyAxisAngle(new THREE.Vector3(0,1,0),THREE.MathUtils.degToRad(bridge.rotation)).add(new THREE.Vector3(...bridge.position))
   const bridgeDistance=(x:number,z:number)=>bridge&&bridgeCenter?Math.hypot(x-bridgeCenter.x,z-bridgeCenter.z)-bridge.sphere[3]:Infinity
   async function enter(x:number,z:number,heading:number,reason:string,override=false){
     const target=new THREE.Vector3(x,0,z);destination=target
+    stream.prioritize(x,z)
     const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
-    const deadline=performance.now()+15000
-    while(needed.some(tile=>!stream.loaded.has(tile))&&performance.now()<deadline){if(destination!==target)return false;stream.tick(target);await new Promise(resolve=>setTimeout(resolve,12))}
     // Register nearby collision surfaces before placing the capsule. The palace
     // forecourt is a 17 cm slab above GL04, and can stream in under a new walker.
     const supports=(manifest.landmarks??[]).filter(entry=>{
@@ -121,8 +627,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const ez=entry.position[2]-cx*Math.sin(a)+cz*Math.cos(a)
       return Math.hypot(ex-x,ez-z)<=r+cfg.search
     })
-    while(supports.some(entry=>!stream.landmarks.has(entry))&&performance.now()<deadline){
+    const deadline=performance.now()+15000
+    while((needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))&&performance.now()<deadline){
       if(destination!==target)return false
+      target.y=0;stream.tick(target)
       for(const entry of supports)if(!stream.landmarks.has(entry)){
         target.y=entry.position[1];stream.updateLandmarks?.(target,entry)
       }
@@ -132,45 +640,727 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     destination=null
     if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))return false
     sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
-    active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;yaw=heading;figure.rotation.y=yaw+avatar.yaw;input.show(true);accumulator=0;camera.near=.08;camera.updateProjectionMatrix();follow();return true
+    active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true
+    yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
+    camera.near=.08;camera.updateProjectionMatrix();follow(0,true);return true
   }
-  function leave(){destination=null;active=false;rides?.show(false);wasBoat=wasBike=false;figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
-  function follow(){const pos=sim.body.translation();figure.position.set(pos.x,pos.y-cfg.height/2,pos.z)
-    if(rides?.boat){figure.position.copy(rides.boat.position);figure.position.y+=rides.boat.name==='raft'?-.44:-.18;figure.rotation.y=rides.heading}
-    rides?.park(figure.position)
-    if(rides?.bike){figure.rotation.y=rides.heading;figure.position.z+=Math.cos(rides.heading)*.23;figure.position.x+=Math.sin(rides.heading)*.23}
-    focus.copy(figure.position);focus.y+=1.4;direction.set(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch))
-    const distance=arm+(rides?.bike?2.8:0),hit=sim.world.castRay(new R.Ray(focus,direction),distance,true,undefined,undefined,sim.capsule)
-    camera.position.copy(focus).addScaledVector(direction,Math.max(.02,(hit?.timeOfImpact??distance)-.18));camera.lookAt(focus)
+  function leave(){destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function canPlaceCrashOffset(x:number,z:number,refY:number){
+    const dryBridge=!!sim.surface(x,z,'deck',refY+.4,1.5)||!!sim.surface(x,z,'landmark',refY+.4,1.5)
+    return !sim.insideHouse(x,z)&&(!sim.wet(x,z)||dryBridge)&&!sim.isBlockedAt(x,refY,z)
+  }
+  function triggerTwoWheelCrash(reason:Exclude<EbikeCrashReason,''>,side:-1|1){
+    if(crashSession||!rides?.bike)return
+    const kind=rides.rideKind==='bicycle'?'bicycle':'bike'
+    const p=sim.body.translation(), refY=p.y-cfg.height/2
+    const sideX=Math.cos(rides.heading)*side, sideZ=-Math.sin(rides.heading)*side
+    const paint=(rides.bike.userData.paint as number|undefined)??0
+    const vehicleType:EbikeVehicleType=kind==='bike'?(rides.vehicleType??(rides.isShared||rides.bike.userData.shared?'shared':'normal')):'normal'
+    const battery=kind==='bike'?(rides.ebikeBattery??ebikeFx.battery):100
+    const modPreset=kind==='bike'?ebikeFx.modPreset:'stock'
+    const fx=-Math.sin(rides.heading), fz=-Math.cos(rides.heading)
+    const candidates:[number,number][]=reason==='loopout'
+      ?[
+        [-fx*.95-sideX*.45,-fz*.95-sideZ*.45],[-sideX*.85,-sideZ*.85],[sideX*.85,sideZ*.85],
+        [-fx*.95,-fz*.95],[-fx*1.2-sideX*.6,-fz*1.2-sideZ*.6],[fx*.95,fz*.95],
+      ]
+      :[
+        [-sideX*.85+fx*.18,-sideZ*.85+fz*.18],[-sideX*.65,-sideZ*.65],[-sideX*1.15,-sideZ*1.15],
+        [sideX*.85,sideZ*.85],[-fx*.95-sideX*.45,-fz*.95-sideZ*.45],[-fx*.95,-fz*.95],[fx*.95,fz*.95],
+      ]
+    for(const rad of [.9,1.3]){
+      for(let a=0;a<8;a++){const ang=a*Math.PI/4;candidates.push([Math.cos(ang)*rad,Math.sin(ang)*rad])}
+    }
+    let rx=0, rz=0
+    for(const [cx,cz] of candidates){
+      if(canPlaceCrashOffset(p.x+cx,p.z+cz,refY)){rx=cx;rz=cz;break}
+    }
+    crashSession={
+      mesh:rides.bike as THREE.Mesh,
+      kind,vehicleType,paint,modPreset,battery,side,
+      heading:rides.heading,
+      bikeOriginX:p.x,bikeOriginZ:p.z,
+      bikeSlideX:0,bikeSlideZ:0,
+      riderOffsetX:rx,riderOffsetZ:rz,
+      slideSpeed:THREE.MathUtils.clamp(Math.max(4.0,Math.abs(prevTwoWheelSpeed||rides.speed)),4.0,12.5),
+      elapsed:0,reason,
+    }
+    rides.stop()
+    if(kind==='bike'){
+      rides.setEbikePark(false,true)
+      rides.setEbikeHazard(true)
+    }else{
+      rides.setEbikeKickstand(false,true)
+    }
+    twoWheelOp=resolveTwoWheelTransition(twoWheelOp,{type:'crash',kind}).state
+    ebikeAudio.stopContinuous()
+    ebikeAudio.playCrashImpact(crashSession.slideSpeed)
+    crashRecoverQueued=false
+    if(kind==='bike'&&ebikeFx.crashPhase==='none'){
+      ebikeFx.triggerCrash(reason,side,rides.heading,crashSession.slideSpeed)
+    }else if(!verify||stuntMode){
+      window.dispatchEvent(new CustomEvent('walk:toast',{detail:{
+        text:reason==='lowside'?'压弯过急打滑摔车！按空格或方向键先起身，再去扶车'
+          :reason==='loopout'?'翘头过猛翻车！按空格或方向键先起身，再去扶车'
+            :'撞击摔车倒地！按空格或方向键先起身，再去扶车',
+        ms:2600,
+      }}))
+    }
+  }
+  function resolveSafeRiderSpot(rx:number,rz:number,bx:number,bz:number,refY:number,yawTarget:number){
+    const trySpot=(tx:number,tz:number)=>{
+      const sup=supportAt(tx,tz,refY)
+      const rawSy=sup?sup.y:refY
+      const sy=Math.abs(rawSy-refY)<=1.2?rawSy:refY
+      const cy=sy+cfg.height/2+.055
+      if(sim.insideHouse(tx,tz))return null
+      if(sim.wet(tx,tz)&&!sim.surface(tx,tz,'deck',refY+.6,1.8)&&!sim.surface(tx,tz,'landmark',refY+.6,1.8))return null
+      if(!sim.freeCapsule(tx,cy,tz))return null
+      return {x:tx,y:cy,z:tz,heading:yawTarget,rule:'crash-rider'}
+    }
+    const direct=trySpot(rx,rz)
+    if(direct)return direct
+    for(const rad of [.45,.9,1.35]){
+      for(let a=0;a<8;a++){
+        const ang=a*Math.PI/4
+        const alt=trySpot(rx+Math.cos(ang)*rad,rz+Math.sin(ang)*rad)
+        if(alt)return alt
+      }
+    }
+    const local=sim.findLocalDismount(bx,bz,crashSession?.heading??0,refY)
+    if(local)return {...local,heading:yawTarget}
+    const cy=refY+cfg.height/2+.055
+    return {x:safe.x,y:safe.y||cy,z:safe.z,heading:yawTarget,rule:'crash-safe'}
+  }
+  function beginStandUpFromCrash(){
+    if(!crashSession||!rides?.bike)return false
+    const c=crashSession
+    const p=sim.body.translation(), refY=p.y-cfg.height/2
+    const bx=c.bikeOriginX+c.bikeSlideX, bz=c.bikeOriginZ+c.bikeSlideZ
+    const rawBy=supportAt(bx,bz,refY)?.y??refY
+    const by=Math.abs(rawBy-refY)<=1.2?rawBy:refY
+    const rx=c.bikeOriginX+c.riderOffsetX, rz=c.bikeOriginZ+c.riderOffsetZ
+    const riderYaw=c.heading+c.side*.45
+    const lookToBikeYaw=Math.atan2(rx-bx,rz-bz)+avatar.yaw
+    const spot=resolveSafeRiderSpot(rx,rz,bx,bz,by,lookToBikeYaw)
+    if(!place(spot.x,spot.z,'crash-standup',true,spot))return false
+    const entry:DownedBikeEntry={
+      mesh:c.mesh,
+      kind:c.kind,
+      x:bx,y:by,z:bz,
+      yaw:c.heading+c.side*.18,
+      side:c.side,
+      roll:-c.side*1.43,
+      lift:.19,
+      vehicleType:c.vehicleType,
+      battery:c.battery,
+      modPreset:c.modPreset,
+      paint:c.paint,
+      hazardOverlay:c.kind==='bike'&&c.battery>0?attachDownedHazard(c.mesh):undefined,
+    }
+    if(c.kind==='bike')rides.resetEbikeGearOnRecover()
+    rides.dismountDownedBike(bx,by,bz,entry.yaw,entry.roll,entry.lift)
+    entry.mesh.userData.downedSide=c.side
+    downedBikes.add(entry)
+    twoWheelOp=resolveTwoWheelTransition(twoWheelOp,{type:'standup',kind:c.kind}).state
+    releaseDynamicBike()
+    input.syncRideHud(null,null)
+    facing=spot.heading
+    input.clearRun()
+    crashSession=null
+    standUpSession={
+      elapsed:0,duration:.68,side:c.side,
+      x:spot.x,y:spot.y-cfg.height/2,z:spot.z,
+      startYaw:riderYaw,targetYaw:lookToBikeYaw,
+    }
+    action?.fadeOut(.08);action=undefined
+    if(traveller)traveller.rotation.set(0,0,0)
+    if(!verify||stuntMode){
+      window.dispatchEvent(new CustomEvent('walk:toast',{detail:{
+        text:`先爬起身站稳，再走近按 F 扶起${c.kind==='bicycle'?'单车':'电动车'}`,
+        ms:2200,
+      }}))
+    }
+    return true
+  }
+  function follow(dt=0,snap=false){const pos=sim.body.translation(),footY=pos.y-cfg.height/2
+    figure.position.set(pos.x,footY,pos.z)
+    if(downedBikes.size>0)syncAllDownedPoses()
+    if(rides?.boat){
+      const seatX=rides.boat.position.x, seatY=rides.boat.position.y+rides.boatSeatOffset, seatZ=rides.boat.position.z
+      if(rides.freeBoat&&boatBoardElapsed<BOAT_BOARD_DUR){
+        if(dt>0)boatBoardElapsed=Math.min(BOAT_BOARD_DUR,boatBoardElapsed+Math.min(.12,dt))
+        const u=Math.min(1,boatBoardElapsed/BOAT_BOARD_DUR), t=u*u*(3-2*u)
+        figure.position.set(
+          THREE.MathUtils.lerp(boatBoardFrom.x,seatX,t),
+          Math.min(seatY+.06,THREE.MathUtils.lerp(boatBoardFrom.y,seatY,t)+Math.sin(t*Math.PI)*.08),
+          THREE.MathUtils.lerp(boatBoardFrom.z,seatZ,t),
+        )
+        figure.rotation.y=boatBoardYaw+shortestAngle(boatBoardYaw,rides.heading)*t
+      }else{
+        figure.position.set(seatX,seatY,seatZ);figure.rotation.y=rides.heading
+      }
+    }
+    if(rides?.car){
+      releaseDynamicBike()
+      if(mountedStaticCar!==rides.car){
+        if(mountedStaticCar)mountedStaticCar.visible=true
+        mountedStaticCar=rides.car
+        carRig.setPaint((mountedStaticCar.userData.paint as number|undefined)??0)
+      }
+      mountedStaticCar.visible=false
+      carRig.root.visible=true
+      const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading),baseY=footY
+      const cSup=carSupportAt(pos.x,pos.z,baseY)
+      const groundY=cSup&&baseY-cSup.y<=.16&&baseY>=cSup.y-.08?cSup.y:baseY-.03
+      figure.position.y=groundY
+      if(dt>0){
+        const halfWb=carConfig.wheelbase*.5
+        const fSup=carSupportAt(pos.x+fx*halfWb,pos.z+fz*halfWb,groundY)
+        const bSup=carSupportAt(pos.x-fx*halfWb,pos.z-fz*halfWb,groundY)
+        rides.setCarPitch(fSup?.y,bSup?.y,dt)
+      }
+      rides.park(figure.position)
+      const carTel=rides.carTelemetry
+      carRig.update({
+        pos:figure.position,
+        heading:rides.heading,
+        groundPitch:rides.pitch,
+        speed:rides.speed,
+        steerInput:rides.steerInput,
+        braking:carTel?.braking??lastCarBraking,
+        reversing:carTel?.reversing??rides.speed<-.05,
+        dynRoll:carTel?.dynRoll,
+        dynPitch:carTel?.dynPitch,
+        driftIntensity:carTel?.driftIntensity??0,
+        handbrake:carTel?.handbrake??false,
+        headlight:carHeadlight,
+        night:env.night,
+        dt,
+      })
+      driverPose.updateDriving(figure.position,rides.heading,active)
+      input.syncCarHud(carTel,carHeadlight)
+      const targetSpeedArm=carTel?.gtaPhysics?Math.min(carConfig.speedCameraPull,Math.max(0,(Math.hypot(rides.carVelX,rides.carVelZ)-8.5)*.095)):0
+      carSpeedArm=dt>0?THREE.MathUtils.damp(carSpeedArm,targetSpeedArm,4.5,Math.min(.12,dt)):targetSpeedArm
+      if(dt>0&&carShake>0){carShake=Math.max(0,carShake-3.8*Math.min(.12,dt));carShakePhase+=Math.min(.12,dt)*46}
+    }else if(rides?.bike){
+      releaseDynamicCar()
+      const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading),baseY=footY
+      const cSup=supportAt(pos.x,pos.z,baseY)
+      const groundY=cSup&&baseY-cSup.y<=.12&&baseY>=cSup.y-.05?cSup.y:baseY-.03
+      figure.position.y=groundY
+      if(dt>0){
+        const fSup=supportAt(pos.x+fx*.55,pos.z+fz*.55,groundY)
+        const bSup=supportAt(pos.x-fx*.55,pos.z-fz*.55,groundY)
+        rides.setPitch(fSup?.y,bSup?.y,dt)
+      }
+      rides.park(figure.position)
+      if(mountedStaticBike!==rides.bike){
+        if(mountedStaticBike)mountedStaticBike.visible=true
+        mountedStaticBike=rides.bike
+        if(rides.rideKind==='bicycle')bicycleRig.setPaint((mountedStaticBike.userData.paint as number|undefined)??0)
+      }
+      mountedStaticBike.visible=false
+      if(crashSession){
+        const c=crashSession
+        const cdt=Math.min(.12,Math.max(0,dt))
+        const u=THREE.MathUtils.clamp(c.elapsed/.28,0,1), fallT=u*u*(3-2*u)
+        const bounce=c.elapsed>.22&&c.elapsed<.45?Math.sin(((c.elapsed-.22)/.23)*Math.PI)*.08:0
+        const bikeRoll=-c.side*1.43*fallT+c.side*bounce
+        const bikeLift=.19*fallT
+        const bx=c.bikeOriginX+c.bikeSlideX, bz=c.bikeOriginZ+c.bikeSlideZ
+        const by=supportAt(bx,bz,figure.position.y)?.y??figure.position.y
+        const rigObj:TwoWheelVisualRig=c.kind==='bicycle'?bicycleRig:ebikeRig
+        ebikeRig.root.visible=c.kind==='bike'
+        bicycleRig.root.visible=c.kind==='bicycle'
+        rigObj.update({
+          pos:_rigPosTmp.set(bx,by,bz),
+          heading:c.heading+c.side*.18*fallT,
+          groundPitch:rides.pitch*(1-fallT),
+          lean:0,wheelie:0,steerInput:0,speed:0,braking:false,
+          crashRoll:bikeRoll,crashLift:bikeLift,
+          kickstandDown:false,
+          headlight:c.kind==='bike'?twoWheelOp.headlight:'off',
+          night:env.night,
+          crashed:true,
+          hazard:twoWheelOp.hazard,
+          dt:cdt,
+        })
+        rigObj.seatAnchor.getWorldPosition(_seatTmp)
+        const rx=c.bikeOriginX+c.riderOffsetX, rz=c.bikeOriginZ+c.riderOffsetZ
+        const ry=supportAt(rx,rz,by)?.y??by
+        applySprawledCrashPose(figure,riderJoints,fallT,c.side,rx,ry,rz,c.heading,_seatTmp)
+        if(c.kind==='bike'){
+          const base=ebikeState??ebikeFx.step(0,{speed:0,heading:c.heading,lean:0,steerInput:0,braking:false,obstacle:'',allowAutoCrash:false},ZERO_RIDE_INPUT)
+          const dispSpd=c.slideSpeed<.15?0:c.slideSpeed
+          ebikeState={...base,speed:dispSpd,kmh:Math.round(dispSpd*3.6),crashPhase:'crashed',crashReason:c.reason,crashSide:c.side,crashElapsed:c.elapsed}
+          input.syncRideHud(ebikeState,'bike')
+        }else{
+          const bcTel=rides.ebikeTelemetry
+          const dispSpd=c.slideSpeed<.15?0:c.slideSpeed
+          ebikeState={
+            vehicleType:'normal',vehicleLabel:'单车',vehicleBadge:'单车',
+            gear:bcTel?.gear??rides.ebikeGear,gearCount:bcTel?.gearCount??3,gearLabel:bcTel?.gearLabel??'2挡',gearHint:bcTel?.gearHint??'巡航',maxKmh:bcTel?.maxKmh??21,speed:dispSpd,kmh:Math.round(dispSpd*3.6),
+            battery:100,lowBattery:false,criticalBattery:false,batteryDepleted:false,
+            lean:0,leanLimit:bcTel?.leanLimit??.31,crashRisk:0,wheelie:0,steerInput:0,
+            tucking:false,braking:false,crashPhase:'crashed',crashReason:c.reason,crashSide:c.side,crashElapsed:c.elapsed,recoverProgress:0,modPreset:'stock',
+          }
+          input.syncRideHud(ebikeState,'bicycle')
+        }
+        actionButtonEl ??= document.querySelector<HTMLButtonElement>('.vehicle-action')
+        if(actionButtonEl)actionButtonEl.hidden=true
+      }else if(rides.rideKind==='bike'){
+        bicycleRig.root.visible=false
+        ebikeRig.root.visible=true
+        ebikeState ??= ebikeFx.step(0,{speed:rides.speed,heading:rides.heading,lean:rides.lean,steerInput:rides.steerInput,braking:false,obstacle:'',allowAutoCrash:false},ZERO_RIDE_INPUT)
+        if(dt>0&&ebikeMountElapsed<bikeConfig.mountDuration)ebikeMountElapsed=Math.min(bikeConfig.mountDuration,ebikeMountElapsed+Math.min(.12,dt))
+        const u=THREE.MathUtils.clamp(ebikeMountElapsed/bikeConfig.mountDuration,0,1), mountBlend=u*u*(3-2*u)
+        applyEbikeVisualAndRider({
+          figure,
+          joints:riderJoints,
+          rig:ebikeRig,
+          basePos:figure.position,
+          heading:rides.heading,
+          groundPitch:rides.pitch,
+          snapMountBlend:mountBlend,
+          mountStartPos:ebikeMountStartPos,
+          mountStartYaw:ebikeMountStartYaw,
+          mountStartRot:ebikeMountStartRot,
+          fx:ebikeFx,
+          state:ebikeState,
+          dt,
+          night:env.night,
+          supportY:(sx,sz,refY)=>supportAt(sx,sz,refY)?.y??refY,
+        })
+        input.syncRideHud(ebikeState,'bike')
+      }else{
+        ebikeRig.root.visible=false
+        bicycleRig.root.visible=true
+        const cdt=Math.min(.12,Math.max(0,dt))
+        if(cdt>0){
+          bicyclePedalPhase=(bicyclePedalPhase+(rides.speed/.33)*cdt*.48)%(Math.PI*2)
+          if(bicyclePedalPhase<0)bicyclePedalPhase+=Math.PI*2
+        }
+        const bcTel=rides.ebikeTelemetry
+        const totalLean=THREE.MathUtils.clamp(bcTel?.lean??rides.lean,-.62,.62)
+        const totalWheelie=bcTel?.wheelie??0
+        bicycleRig.update({
+          pos:figure.position,
+          heading:rides.heading,
+          groundPitch:rides.pitch,
+          lean:totalLean,
+          wheelie:totalWheelie,
+          steerInput:rides.steerInput,
+          speed:rides.speed,
+          pedalPhase:bicyclePedalPhase,
+          kickstandDown:!!bcTel?.kickstandDown,
+          dt:cdt,
+        })
+        bicycleRig.seatAnchor.getWorldPosition(_seatTmp)
+        if(dt>0&&ebikeMountElapsed<bikeConfig.mountDuration)ebikeMountElapsed=Math.min(bikeConfig.mountDuration,ebikeMountElapsed+Math.min(.12,dt))
+        const mu=THREE.MathUtils.clamp(ebikeMountElapsed/bikeConfig.mountDuration,0,1), mountBlend=mu*mu*(3-2*mu)
+        const swing=mountBlend<1?Math.sin(mountBlend*Math.PI):0
+        if(mountBlend<1){
+          figure.position.set(
+            THREE.MathUtils.lerp(ebikeMountStartPos.x,_seatTmp.x,mountBlend),
+            THREE.MathUtils.lerp(ebikeMountStartPos.y,_seatTmp.y,mountBlend)+swing*.18,
+            THREE.MathUtils.lerp(ebikeMountStartPos.z,_seatTmp.z,mountBlend),
+          )
+          figure.rotation.set(0,ebikeMountStartYaw+shortestAngle(ebikeMountStartYaw,rides.heading)*mountBlend,-swing*.10,'YXZ')
+        }else{
+          figure.position.copy(_seatTmp)
+          figure.rotation.set(rides.pitch*.45+totalWheelie*.78,rides.heading,totalLean*.92,'YXZ')
+        }
+        const idleRaw=(.35-Math.abs(rides.speed))/.35
+        const idleT=bcTel?.kickstandDown?1:THREE.MathUtils.clamp(idleRaw,0,1)
+        bicycleFootWeight=THREE.MathUtils.damp(bicycleFootWeight,idleT*idleT*(3-2*idleT),10,cdt)
+        const [tlPedal,slPedal]=solveBicyclePedalIK(bicyclePedalPhase)
+        const [trPedal,srPedal]=solveBicyclePedalIK(bicyclePedalPhase+Math.PI)
+        const wheelieFactor=THREE.MathUtils.clamp(totalWheelie/.62,0,1.25)
+        const leanRatio=THREE.MathUtils.clamp(totalLean/.56,-1.2,1.2)
+        const cadenceSway=(1-bicycleFootWeight)*Math.sin(bicyclePedalPhase)*.035*THREE.MathUtils.clamp(Math.abs(rides.speed)/2.5,0,1)
+        const kneeFlareL=leanRatio>.25?-(leanRatio-.25)*.34*(1-bicycleFootWeight):0
+        const kneeFlareR=leanRatio<-.25?(-leanRatio-.25)*.34*(1-bicycleFootWeight):0
+        const spdRatio=Math.max(0,rides.speed)/5.0
+        const bTargets:Record<RiderJointName,[number,number,number]>={
+          Hips:[0,0,0],
+          Torso:[-.14-spdRatio*.08+wheelieFactor*.22,cadenceSway*.5-rides.steerInput*.06,cadenceSway+leanRatio*.22],
+          Head:[.05-wheelieFactor*.26,-rides.steerInput*.20,-leanRatio*.48],
+          ArmL:[.86+rides.steerInput*.14+wheelieFactor*.18,-rides.steerInput*.12,-.03],
+          ArmR:[.86-rides.steerInput*.14+wheelieFactor*.18,-rides.steerInput*.12,.03],
+          ForearmL:[.32+wheelieFactor*.32,0,0],
+          ForearmR:[.32+wheelieFactor*.32,0,0],
+          ThighL:[THREE.MathUtils.lerp(tlPedal,.52,bicycleFootWeight)-wheelieFactor*.12,0,THREE.MathUtils.lerp(kneeFlareL,-.20,bicycleFootWeight)],
+          ThighR:[trPedal-wheelieFactor*.12,0,kneeFlareR],
+          ShinL:[THREE.MathUtils.lerp(slPedal,-.50,bicycleFootWeight)+wheelieFactor*.10,0,0],
+          ShinR:[srPedal+wheelieFactor*.10,0,0],
+        }
+        for(const name of RIDER_JOINT_NAMES){
+          const j=riderJoints[name]; if(!j)continue
+          const [tx,ty,tz]=bTargets[name]
+          if(mountBlend<1){
+            const from=ebikeMountStartRot.get(name)??[0,0,0]
+            j.rotation.set(THREE.MathUtils.lerp(from[0],tx,mountBlend),THREE.MathUtils.lerp(from[1],ty,mountBlend),THREE.MathUtils.lerp(from[2],tz,mountBlend))
+          }else j.rotation.set(tx,ty,tz)
+        }
+        if(swing>1e-4){
+          if(riderJoints.ThighR){riderJoints.ThighR.rotation.x+=swing*.35;riderJoints.ThighR.rotation.z-=swing*.55}
+          if(riderJoints.ShinR)riderJoints.ShinR.rotation.x-=swing*.30
+          if(riderJoints.Torso)riderJoints.Torso.rotation.x-=swing*.14
+        }
+        ebikeState={
+          vehicleType:'normal',vehicleLabel:'单车',vehicleBadge:'单车',
+          gear:bcTel?.gear??rides.ebikeGear,gearCount:bcTel?.gearCount??3,gearLabel:bcTel?.gearLabel??'2挡',gearHint:bcTel?.gearHint??'巡航',
+          maxKmh:bcTel?.maxKmh??21,speed:rides.speed,kmh:Math.round(Math.abs(rides.speed)*3.6),
+          battery:100,lowBattery:false,criticalBattery:false,batteryDepleted:false,
+          lean:totalLean,leanLimit:bcTel?.leanLimit??.48,leanRateDegPerSec:bcTel?.leanRateDegPerSec,
+          mandatoryFallLeanRad:bcTel?.mandatoryFallLeanRad,effectiveFallLeanRad:bcTel?.effectiveFallLeanRad,
+          leanDangerRatio:bcTel?.leanDangerRatio,crashRisk:bcTel?.crashRisk??0,
+          wheelie:totalWheelie,steerInput:rides.steerInput,
+          tucking:bcTel?.tucking??false,braking:bcTel?.braking??false,
+          parkLocked:false,kickstandDown:bcTel?.kickstandDown??false,headlight:'off',hazard:false,turnSignal:'off',
+          crashPhase:'none',crashReason:'',crashSide:1,crashElapsed:0,recoverProgress:0,modPreset:'stock',
+        }
+        input.syncRideHud(ebikeState,'bicycle')
+      }
+    }else if(!rides?.boat){
+      releaseDynamicCar()
+      releaseDynamicBike()
+      input.syncRideHud(null,null)
+      if(standUpSession){
+        const gy=supportAt(standUpSession.x,standUpSession.z,standUpSession.y)?.y??standUpSession.y
+        applyStandUpAnimation(figure,riderJoints,standUpSession.elapsed/standUpSession.duration,standUpSession.side,standUpSession.x,gy,standUpSession.z,standUpSession.startYaw,standUpSession.targetYaw)
+        actionButtonEl ??= document.querySelector<HTMLButtonElement>('.vehicle-action')
+        if(actionButtonEl)actionButtonEl.hidden=true
+      }else if(pickupSession){
+        const gy=supportAt(pos.x,pos.z,footY)?.y??footY
+        applyPickupBikeAnimation(figure,riderJoints,pickupSession.elapsed/pickupSession.duration,{x:pos.x,y:gy,z:pos.z},facing,pickupSession.rec)
+        actionButtonEl ??= document.querySelector<HTMLButtonElement>('.vehicle-action')
+        if(actionButtonEl){
+          actionButtonEl.hidden=false
+          actionButtonEl.textContent=pickupSession.rec.kind==='bicycle'?'正在扶起单车':'正在扶起电动车'
+        }
+      }else{
+        const liveMinY=liveSoleLocalY()
+        const animLift=Math.max(soleOffset,-liveMinY)
+        const surf=(grounded||Math.abs(velocity)<.05)?sim.groundSurface(pos.x,pos.z,footY):null
+        const rawBase=surf&&Math.abs(surf.y-(footY-cfg.skin))<=.14?surf.y:footY-cfg.skin
+        const baseY=(grounded||Math.abs(velocity)<.05)?visualFloorAt(pos.x,pos.z,rawBase):rawBase
+        figure.position.y=baseY+(grounded||Math.abs(velocity)<.05?animLift:soleOffset)
+        rides?.park(figure.position)
+        const dismountDone=ridePose.applyDismount(figure.position,facing,dt)||driverPose.applyDismount(figure.position,facing,dt)
+        if(dismountDone&&action)mixer.update(0)
+        if(!rides?.boat&&boatLandElapsed<BOAT_LAND_DUR){
+          if(dt>0)boatLandElapsed=Math.min(BOAT_LAND_DUR,boatLandElapsed+Math.min(.12,dt))
+          const u=Math.min(1,boatLandElapsed/BOAT_LAND_DUR), t=u*u*(3-2*u)
+          figure.position.lerpVectors(boatLandFrom,figure.position,t)
+          figure.position.y+=Math.sin(t*Math.PI)*.10
+          figure.rotation.y=boatLandYaw+shortestAngle(boatLandYaw,facing)*t
+        }
+      }
+    }
+    const shakeYaw=rides?.car&&carShake>.01?Math.sin(carShakePhase)*carShake*.018:0
+    const shakePitch=rides?.car&&carShake>.01?Math.cos(carShakePhase*1.3)*carShake*.012:0
+    rig.update(camera,figure.position,yaw+shakeYaw,pitch+shakePitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0),dt,snap)
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
-  function boatClearance(){const boat=rides?.boat;if(!boat)return null
+  function boatClearance(){
+    const freeClear=rides?.boatClearance(figure,skinned);if(freeClear)return freeClear
+    const boat=rides?.boat;if(!boat)return null
     figure.updateMatrixWorld(true);skinned?.skeleton.update()
     const roof=new THREE.Box3().setFromObject(boat,true).max.y,head=new THREE.Box3().setFromObject(figure,true).max.y
     let underside=Infinity
     for(const along of [-2.3,-1,0,1,2.3])for(const across of [-1,0,1]){const point=boat.localToWorld(new THREE.Vector3(across,0,along)),deck=sim.surface(point.x,point.z,'deck');if(deck)underside=Math.min(underside,deck.y-(deck.thin?.6:look.bridgeDepth))}
     return {kind:boat.name,head,roof,underside,clearance:underside-Math.max(head,roof)}}
-  function sit(){mixer.stopAllAction();action=undefined;for(const side of ['L','R'])for(const [part,value] of Object.entries({Thigh:1.25,Shin:-1.4,Arm:.9,Forearm:.35})){
-    const joint=figure.getObjectByName(part+side);if(joint)joint.rotation.x=value}}
+  function sit(){mixer.stopAllAction();action=undefined;bankLean=strideLean=0;wasBike=false;if(traveller)traveller.rotation.set(0,0,0);ridePose.reset()
+    for(const side of ['L','R'] as const)for(const [part,value] of Object.entries({Thigh:1.25,Shin:-1.4,Arm:.9,Forearm:.35})){
+      const joint=riderJoints[(part+side) as keyof RiderJoints];if(joint)joint.rotation.x=value}}
   function probe(){const pos=sim.body.translation(),foot=pos.y-cfg.height/2,peak=sim.surface(pos.x,pos.z,'peak')
     const tile=sim.tileAt(pos.x,pos.z),mesh=tile&&stream.loaded.get(tile)?.groundMesh
     terrainRay.ray.origin.set(pos.x,4000,pos.z);mesh?.updateWorldMatrix(true,false)
     const renderY=mesh?terrainRay.intersectObject(mesh,false)[0]?.point.y:undefined
-    return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
-      inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits}}
-  function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);rides?.nearby(start.x,start.z)
-    if(rides?.boat){if(!held)rides.advance(Math.min(.25,dt));if(!wasBoat){yaw=rides.heading+.95;sit()}wasBoat=!!rides.boat;follow();return}wasBoat=false
-    const read=input.read(),keys=held?still:read,delta=new THREE.Vector2(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))
-    if(external)delta.set(external.x,external.z);delta.divideScalar(Math.max(1,delta.length()))
-    let speed=external?.run??keys.run?cfg.run:cfg.walk;const step=1/60;let traveled=0;lastHits=[];blockedWater=false
-    if(rides?.bike){const previous=rides.heading;speed=rides.steer(keys.forward,keys.right,Math.min(.12,dt));delta.set(-Math.sin(rides.heading),-Math.cos(rides.heading));yaw=wasBike?yaw+rides.heading-previous:rides.heading
-      if(!wasBike)sit()}
+    const surf=sim.groundSurface(pos.x,pos.z,foot), soleY=figure.position.y+liveSoleLocalY()
+    const surfaceY=surf?visualFloorAt(pos.x,pos.z,surf.y):undefined, footSink=surfaceY!==undefined?surfaceY-soleY:0
+    return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),soleY,surfaceY,surfaceKind:surf?.kind,footSink,inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
+      inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits,
+      planarSpeed:Math.hypot(vx,vz),grounded,verticalVelocity:velocity,crouching,animClip:activeClipName,facing,figPos:figure.position.toArray(),figYaw:figure.rotation.y,bikePitch:rides?.bikePitch??0,bikeY:rides?.bikeY??0,carPitch:rides?.carPitch??0,carY:rides?.carY??0,
+      pedalPhase:rides?.rideKind==='bicycle'?bicyclePedalPhase:ridePose.pedalPhase,thighL:getAvatarJoint(figure,'ThighL')?.rotation.x??0,thighR:getAvatarJoint(figure,'ThighR')?.rotation.x??0,
+      ebike:ebikeState,
+      ebikeAudio:ebikeAudio.probe(),
+      ebikeRig:ebikeRig.root.visible?{
+        wheelie:ebikeRig.wheeliePivot.rotation.x,
+        lean:ebikeRig.leanPivot.rotation.z,
+        crashRoll:ebikeRig.crashPivot.rotation.z,
+        steer:ebikeRig.frontAssembly.rotation.y,
+        frontWheelSpin:ebikeRig.frontWheel.rotation.x,
+        rearWheelSpin:ebikeRig.rearWheel.rotation.x,
+        kickstandAngle:ebikeRig.kickstandAngle,
+        headlight:ebikeRig.beamProbe().mode,
+        headlightIntensity:ebikeRig.beamProbe().intensity,
+        beamActive:ebikeRig.beamProbe().beamActive,
+        beamDrawCalls:ebikeRig.beamProbe().drawCalls,
+        leftSignalLit:ebikeRig.signalProbe().leftSignalLit,
+        rightSignalLit:ebikeRig.signalProbe().rightSignalLit,
+        brakeLight:ebikeRig.signalProbe().brakeLight,
+        signalDrawCalls:ebikeRig.signalProbe().signalDrawCalls,
+        seatWorld:ebikeRig.seatAnchor.getWorldPosition(new THREE.Vector3()).toArray(),
+      }:null,
+      bicycleRig:bicycleRig.root.visible?{
+        wheelie:bicycleRig.wheeliePivot.rotation.x,
+        lean:bicycleRig.leanPivot.rotation.z,
+        crashRoll:bicycleRig.crashPivot.rotation.z,
+        steer:bicycleRig.frontAssembly.rotation.y,
+        frontWheelSpin:bicycleRig.frontWheel.rotation.x,
+        rearWheelSpin:bicycleRig.rearWheel.rotation.x,
+        seatWorld:bicycleRig.seatAnchor.getWorldPosition(new THREE.Vector3()).toArray(),
+      }:null,
+      carRig:carRig.root.visible?carRig.probe():null,
+      carTelemetry:rides?.carTelemetry??null,
+      twoWheelFlow:crashSession?'crashed':standUpSession?'standing_up':pickupSession?'picking_up':rides?.bike?'riding':'foot',
+      downedCount:downedBikes.size,
+      downedBikes:Array.from(downedBikes).map(r=>({kind:r.kind,x:r.x,z:r.z,roll:r.roll,dist:Math.hypot(r.x-pos.x,r.z-pos.z)})),
+      camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z,camera.position.y),
+      boat:rides?.boatProbe()??null}}
+  function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);rides?.nearby(start.x,start.z,rides?.boat?start.y:start.y-cfg.height/2)
+    if(rides?.freeBoat){
+      releaseDynamicBike();input.syncRideHud(null,'boat')
+      const read=held?still:input.read(), firstFrame=!wasBoat
+      if(firstFrame){boatBoardFrom.copy(figure.position);boatBoardYaw=figure.rotation.y;boatBoardElapsed=0;boatLandElapsed=BOAT_LAND_DUR
+        mixer.stopAllAction();action=undefined;bankLean=strideLean=0
+        if(wasCar||wasBike)applyFootController()
+        wasBike=wasCar=false;if(traveller)traveller.rotation.set(0,0,0);ridePose.reset();driverPose.reset(active);input.clearRun()}
+      const prevHeading=rides.heading
+      if(!held)rides.steerBoat(read.forward,read.right,Math.min(.12,dt))
+      if(boatBoardElapsed<BOAT_BOARD_DUR)yaw+=shortestAngle(yaw,rides.heading)*(1-Math.exp(-12*Math.min(.12,Math.max(1/60,dt))))
+      else yaw+=rides.heading-prevHeading
+      rides.poseBoat(figure,read.forward,read.right,Math.min(.12,dt))
+      const bpos=rides.freeBoat.position, bp=rides.boatProbe(), wy=bp?bp.y:bpos.y
+      sim.body.setTranslation({x:bpos.x,y:wy+cfg.height/2,z:bpos.z},true)
+      sim.body.setNextKinematicTranslation({x:bpos.x,y:wy+cfg.height/2,z:bpos.z})
+      wasBoat=true;follow(dt,false);return
+    }
+    if(rides?.boat){releaseDynamicBike();input.syncRideHud(null,'boat');if(!held)rides.advance(Math.min(.25,dt));if(!wasBoat){if(wasCar||wasBike){applyFootController();wasCar=wasBike=false;driverPose.reset(active)}yaw=rides.heading+.95;sit()}wasBoat=!!rides.boat;follow(dt);return}wasBoat=false
+    const read=input.read(),keys=held?still:read
+    const rideCtrl=held?ZERO_RIDE_INPUT:input.readRideControls()
+    const busyFootAnim=!!(standUpSession||pickupSession)
+    wish.set(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))
+    if(external)wish.set(external.x,external.z)
+    if(busyFootAnim)wish.set(0,0)
+    const rawLen=wish.length(), inputMag=busyFootAnim?0:Math.min(1,rawLen)
+    if(rawLen>1e-5)wish.divideScalar(rawLen);else wish.set(0,0)
+    const maxSpeed=(external?external.run:keys.run)?cfg.run:(keys.crouch&&grounded)?cfg.crouch:cfg.walk
+    crouching=!rides?.car&&!rides?.bike&&!rides?.boat&&!busyFootAnim&&grounded&&!!keys.crouch&&!keys.run&&!external?.run
+    const step=1/60;let traveled=0,simSteps=0;lastHits=[];blockedWater=false
+    let bikeSpeed=(rides?.car||rides?.bike)?rides.speed:0
+    if((wasCar&&!rides?.car)||(wasBike&&!rides?.bike)){
+      applyFootController()
+      if(wasCar&&!rides?.car){releaseDynamicCar();figure.visible=active}
+      if(wasBike&&!rides?.bike){releaseDynamicBike();input.syncRideHud(null,rides?.car?'car':null)}
+    }
+    if(rides?.car&&!wasCar){
+      const cx=rides.car.position.x,cz=rides.car.position.z,cur=sim.body.translation()
+      sim.sync(cx,cz)
+      const sup=carSupportAt(cx,cz,rides.car.position.y)
+      const cy=sup?sup.y:rides.car.position.y
+      driverPose.startMount({x:cur.x,y:cur.y-cfg.height/2,z:cur.z},figure.rotation.y)
+      sim.controller.enableAutostep(.10,.12,false)
+      sim.controller.setMaxSlopeClimbAngle(carConfig.maxSlope)
+      sim.controller.setMinSlopeSlideAngle(carConfig.maxSlope)
+      const dest={x:cx,y:cy+cfg.height/2+.055,z:cz}
+      sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest);sim.world.step()
+      safe.set(dest.x,dest.y,dest.z);resetMotion();input.clearRun()
+      mixer.stopAllAction();action=undefined;bikeObstacle='';bikeSpeed=0
+      mountedStaticCar=rides.car;mountedStaticCar.visible=false
+      carRig.setPaint((mountedStaticCar.userData.paint as number|undefined)??0)
+      carRig.root.visible=true;prevCarSpeed=0;prevCarObstacle='';lastCarBraking=false;carShake=0;carSpeedArm=0
+      const useCarGta=carGtaOverride??defaultCarGta
+      rides.setCarGtaPhysics(useCarGta)
+      rides.setCarMode(useCarGta?'street':'cruise')
+      carHeadlightManual=false
+      carHeadlight=env.night>=.45?'low':'off'
+    }
+    if(rides?.bike&&!wasBike){
+      const bx=rides.bike.position.x,bz=rides.bike.position.z,cur=sim.body.translation()
+      sim.sync(bx,bz)
+      const sup=supportAt(bx,bz,rides.bike.position.y)
+      const by=sup?sup.y:rides.bike.position.y
+      ridePose.startMount({x:cur.x,y:cur.y-cfg.height/2,z:cur.z},figure.rotation.y)
+      ebikeMountStartPos.set(cur.x,cur.y-cfg.height/2,cur.z)
+      ebikeMountStartYaw=figure.rotation.y
+      ebikeMountElapsed=0
+      for(const name of RIDER_JOINT_NAMES){
+        const r=riderJoints[name]?.rotation
+        ebikeMountStartRot.set(name,r?[r.x,r.y,r.z]:[0,0,0])
+      }
+      mountedStaticBike=rides.bike
+      mountedStaticBike.visible=false
+      const paint=(mountedStaticBike.userData.paint as number|undefined)??0
+      const rKind=rides.rideKind==='bicycle'?'bicycle':'bike'
+      rides.setEbikeEnvironmentHour(env.hour)
+      const initTel=rides.ebikeTelemetry
+      twoWheelOp=resolveTwoWheelTransition(twoWheelOp,{type:'mount',kind:rKind,verifyMode:verify,nightLevel:env.night,parkStart:initTel?.parkLocked}).state
+      if(initTel){
+        twoWheelOp={...twoWheelOp,parkLocked:initTel.parkLocked,kickstandDown:initTel.kickstandDown,headlight:initTel.headlight,hazard:initTel.hazard}
+        prevAudioPark=initTel.parkLocked
+        prevAudioGear=initTel.gear
+        prevAudioLight=initTel.headlight
+        prevAudioBlink=initTel.blinkOn
+        prevAudioHorn=initTel.hornActive
+      }
+      ebikeAudio.playPowerOn(rKind)
+      if(rides.rideKind==='bike'){
+        const vType:EbikeVehicleType=rides.vehicleType??(rides.isShared||rides.bike.userData.shared?'shared':'normal')
+        const savedBat=(rides.bike.userData.battery as number|undefined)??rides.ebikeBattery??100
+        const savedMod:EbikeModPreset=vType==='shared'?'stock':((rides.bike.userData.modPreset as EbikeModPreset|undefined)??'stock')
+        ebikeFx.resetForMount(vType,savedBat)
+        ebikeFx.setModPreset(savedMod)
+        rides.setEbikeUpgrades(ebikeModUpgrades(vType,ebikeFx.modPreset))
+        bicycleRig.root.visible=false
+        ebikeRig.root.visible=true
+        ebikeRig.setVehicleType(vType,paint)
+        ebikeRig.applyMods(ebikeFx.customMods??ebikeFx.modPreset,paint)
+      }else{
+        ebikeRig.root.visible=false
+        bicycleRig.root.visible=true
+        bicycleRig.setPaint(paint)
+      }
+      crashSession=null;prevTwoWheelSpeed=0
+      bicyclePedalPhase=0;bicycleFootWeight=1
+      rides.setAutoCrash(autoCrashOverride??(!verify||stuntMode))
+      sim.controller.enableAutostep(bikeConfig.step,cfg.stepWidth,false)
+      sim.controller.setMaxSlopeClimbAngle(bikeConfig.maxSlope)
+      sim.controller.setMinSlopeSlideAngle(bikeConfig.maxSlope)
+      const dest={x:bx,y:by+cfg.height/2+.055,z:bz}
+      sim.body.setTranslation(dest,true);sim.body.setNextKinematicTranslation(dest);sim.world.step()
+      safe.set(dest.x,dest.y,dest.z);resetMotion();input.clearRun()
+      mixer.stopAllAction();action=undefined;bikeObstacle='';bikeSpeed=0
+    }
+    wasCar=!!rides?.car
     wasBike=!!rides?.bike
-    if(keys.jump&&grounded&&!wasBike)velocity=Math.sqrt(-2*cfg.gravity*cfg.jump)
+    if(wasBike&&rides?.bike&&!crashSession){
+      rides.setEbikeEnvironmentHour(env.hour)
+      // Consume one-shot pulse inputs ONCE per rendered frame (never inside multi-substep physics loop).
+      if(rideCtrl.parkToggle)rides.toggleEbikePark()
+      if(rideCtrl.kickstandToggle)rides.toggleEbikeKickstand()
+      if(rideCtrl.headlightCycle){
+        const nextHl=rides.cycleEbikeHeadlight()
+        if(!verify||stuntMode){
+          const hlText=nextHl==='high'?'远光灯已开启':nextHl==='low'?'近光灯已开启':'车灯已关闭'
+          window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:hlText,ms:1600}}))
+        }
+      }
+      if(rideCtrl.turnLeftToggle)rides.toggleEbikeTurnSignal('left')
+      if(rideCtrl.turnRightToggle)rides.toggleEbikeTurnSignal('right')
+      if(rideCtrl.hazardToggle)rides.toggleEbikeHazard()
+      if(rideCtrl.hornPulse)rides.pulseEbikeHorn()
+      if(rideCtrl.cruiseToggle)rides.toggleEbikeCruise()
+      if(rideCtrl.gearSelect!==null)rides.setEbikeGear(rideCtrl.gearSelect)
+      else if(rideCtrl.gearDelta!==0)rides.shiftEbikeGear(rideCtrl.gearDelta)
+    }else if(wasCar&&rides?.car){
+      if(!carHeadlightManual){
+        carHeadlight=env.night>=.45?'low':'off'
+      }
+      if(rideCtrl.headlightCycle){
+        carHeadlight=nextHeadlightMode(carHeadlight)
+        carHeadlightManual=true
+        if(!verify||stuntMode){
+          const hlText=carHeadlight==='high'?'轿车远光灯已开启':carHeadlight==='low'?'轿车近光灯已开启':'轿车大灯已关闭'
+          window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:hlText,ms:1600}}))
+        }
+      }
+      if(rideCtrl.gearSelect!==null)rides.setCarModeByIndex(rideCtrl.gearSelect)
+      else if(rideCtrl.gearDelta!==0)rides.shiftCarMode(rideCtrl.gearDelta)
+    }
+    const aboardGround=wasCar||wasBike
+    if(keys.jump&&!aboardGround&&!busyFootAnim)jumpTimer=cfg.jumpBuffer
     accumulator+=Math.min(.12,dt)
-    while(accumulator>=step){accumulator-=step;steps++;elapsed+=step
-      const pos=sim.body.translation();velocity+=cfg.gravity*step
-      sim.controller.computeColliderMovement(sim.capsule,{x:delta.x*speed*step,y:velocity*step,z:delta.y*speed*step})
+    while(accumulator>=step-1e-7){accumulator=Math.max(0,accumulator-step);steps++;simSteps++;elapsed+=step
+      if(grounded)coyoteTimer=cfg.coyote;else coyoteTimer=Math.max(0,coyoteTimer-step)
+      if(!aboardGround&&!busyFootAnim&&jumpTimer>0&&coyoteTimer>0){
+        velocity=Math.sqrt(-2*cfg.gravity*cfg.jump)
+        grounded=false;coyoteTimer=0;jumpTimer=0;crouching=false;jumpStage='start';jumpStageTimer=0;setSnap(false)
+      }else jumpTimer=Math.max(0,jumpTimer-step)
+      if(velocity<=0)setSnap(true)
+
+      if(wasCar&&rides?.car){
+        const previous=rides.heading
+        driverPose.advanceMount(step)
+        bikeSpeed=rides.steerCar(keys.forward,keys.right,step,driverPose.mounted,{handbrake:rideCtrl.wheelie})
+        wish.set(-Math.sin(rides.heading),-Math.cos(rides.heading))
+        vx=rides.carVelX;vz=rides.carVelZ
+        const carTel=rides.carTelemetry
+        if(driverPose.mounted){
+          if(carTel?.gtaPhysics){
+            const planar=Math.hypot(vx,vz)
+            const dHeading=shortestAngle(previous,rides.heading)
+            // GTA chase camera: trails drifting tail slightly, then smoothly swings back behind velocity vector.
+            yaw+=dHeading*(1-Math.min(.55,rides.carDrift*.68))
+            if(planar>3.5){
+              const travelHeading=Math.atan2(-vx,-vz)
+              const goalYaw=rides.speed>=0
+                ?rides.heading+shortestAngle(rides.heading,travelHeading)*(rides.carDrift>.12?.55:.20)
+                :rides.heading
+              yaw+=shortestAngle(yaw,goalYaw)*(1-Math.exp(-(rides.carDrift>.15?4.6:2.6)*step))
+            }
+          }else{
+            yaw+=rides.heading-previous
+          }
+        }else{
+          yaw+=shortestAngle(yaw,rides.heading)*(1-Math.exp(-10*step))
+        }
+      }else if(wasBike&&rides?.bike){
+        const previous=rides.heading
+        ridePose.advanceMount(step)
+        // Only lock steering input while actively crashed; ride.ts natively handles P-gear/kickstand interlock and brake-hold unlock!
+        const crashLocked=!!crashSession||(rides.rideKind==='bike'&&ebikeFx.crashPhase!=='none')
+        if(crashLocked)rides.stop()
+        const stepCtrl=!crashLocked&&(rides.rideKind==='bike'||rides.rideKind==='bicycle')
+          ?{wheelie:rideCtrl.wheelie?1:0,tuck:rideCtrl.tuck,horn:rideCtrl.horn}
+          :undefined
+        bikeSpeed=rides.steer(crashLocked?0:keys.forward,crashLocked?0:keys.right,step,ridePose.mounted&&!crashLocked,stepCtrl)
+        wish.set(-Math.sin(rides.heading),-Math.cos(rides.heading))
+        if(ridePose.mounted&&!crashLocked)yaw+=rides.heading-previous
+        else if(!crashLocked)yaw+=shortestAngle(yaw,rides.heading)*(1-Math.exp(-10*step))
+        vx=wish.x*bikeSpeed;vz=wish.y*bikeSpeed
+      }else if(!aboardGround){
+        if(busyFootAnim){vx=vz=0}
+        else{
+        const tgtSpd=maxSpeed*inputMag
+        if(!grounded){
+          const targetVx=wish.x*tgtSpd, targetVz=wish.y*tgtSpd
+          const dvx=targetVx-vx, dvz=targetVz-vz, diff=Math.hypot(dvx,dvz)
+          if(diff>1e-5){
+            const maxDelta=(inputMag>1e-3?cfg.airAccel:2.5)*step
+            if(diff<=maxDelta){vx=targetVx;vz=targetVz}else{vx+=dvx/diff*maxDelta;vz+=dvz/diff*maxDelta}
+          }
+        }else if(inputMag<=1e-3){
+          const curSpd=Math.hypot(vx,vz), drop=cfg.decel*step
+          if(curSpd<=drop||curSpd<.08){vx=vz=0}else{const scale=(curSpd-drop)/curSpd;vx*=scale;vz*=scale}
+        }else{
+          let along=vx*wish.x+vz*wish.y
+          let latX=vx-along*wish.x, latZ=vz-along*wish.y
+          const latLen=Math.hypot(latX,latZ), latDrop=cfg.grip*step
+          if(latLen<=latDrop){latX=latZ=0}else{const scale=(latLen-latDrop)/latLen;latX*=scale;latZ*=scale}
+          if(along<0){
+            along=Math.min(tgtSpd,along+cfg.decel*cfg.pivotBoost*step)
+          }else if(along<tgtSpd){
+            along=Math.min(tgtSpd,along+cfg.accel*step)
+          }else if(along>tgtSpd){
+            along=Math.max(tgtSpd,along-cfg.decel*step)
+          }
+          vx=wish.x*along+latX; vz=wish.y*along+latZ
+        }
+        }
+      }
+
+      const pos=sim.body.translation()
+      velocity+=(velocity>0?cfg.gravity:cfg.fallGravity)*step
+      const stepDx=(wasCar?vx:aboardGround?wish.x*bikeSpeed:vx)*step, stepDz=(wasCar?vz:aboardGround?wish.y*bikeSpeed:vz)*step
+      const foot=pos.y-cfg.height/2
+      const surfLm=!wasCar&&sim.surface(pos.x,pos.z,'landmark',foot+.25,.7)
+      const flushRoad=!wasCar&&!surfLm&&sim.surface(pos.x,pos.z,'road',foot+.25,.45)
+      const onLandmark=!wasCar&&(!!surfLm||(wasLandmarkHit&&(!flushRoad||Math.abs(flushRoad.y-foot)>.28)))
+      sim.controller.computeColliderMovement(sim.capsule,{x:stepDx,y:velocity*step,z:stepDz},undefined,undefined,onLandmark?coll=>sim.kinds.get(coll.handle)!=='road':undefined)
       const move=sim.controller.computedMovement(),next={x:pos.x+move.x,y:pos.y+move.y,z:pos.z+move.z}
       if(bridge&&!stream.landmarks.has(bridge)){
         const distance=bridgeDistance(pos.x,pos.z)
@@ -180,8 +1370,20 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           if(ahead<=0&&ahead<distance){next.x=pos.x;next.z=pos.z}
         }
       }
-      grounded=sim.controller.computedGrounded();if(grounded&&velocity<0)velocity=0
-      if(verify)for(let at=0;at<sim.controller.numComputedCollisions();at++){const coll=sim.controller.computedCollision(at)?.collider;if(coll)lastHits.push(sim.kinds.get(coll.handle)??'')}
+      const nowGrounded=sim.controller.computedGrounded()
+      if(velocity<=0){
+        if(nowGrounded){grounded=true;velocity=0}
+        else if(move.y>velocity*step*.25&&Math.abs(move.y)<.005){
+          const ledge=sim.groundSurface(next.x,next.z,next.y-cfg.height/2)
+          if(ledge&&(next.y-cfg.height/2)-ledge.y<=.14){grounded=true;velocity=0}
+          else{grounded=false;velocity=Math.max(velocity,-2)}
+        }else grounded=false
+      }else if(move.y<velocity*step*.25)velocity=0
+      let touchedLandmark=false
+      for(let at=0;at<sim.controller.numComputedCollisions();at++){const coll=sim.controller.computedCollision(at)?.collider;if(coll){const k=sim.kinds.get(coll.handle);if(k==='landmark')touchedLandmark=true;if(verify)lastHits.push(k==='deckThin'?'deck':k??'')}}
+      wasLandmarkHit=touchedLandmark
+      const nextTile=sim.tileAt(next.x,next.z)
+      if(nextTile&&!stream.loaded.has(nextTile)){next.x=pos.x;next.z=pos.z;vx=vz=0;rides?.stop();bikeSpeed=0}
       const ground=sim.surface(next.x,next.z,'ground')
       if(!ground||next.y-cfg.height/2<ground.y-3){if(place(safe.x,safe.z,'rescue'))resets++;break}
       if(sim.wet(next.x,next.z)){
@@ -189,26 +1391,343 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         if(!deck||foot<deck.y-.35){
           const tread=sim.surface(next.x,next.z,'landmark',foot+.6,1.4),tile=sim.tileAt(next.x,next.z),water=tile&&stream.loaded.get(tile)?.water
           const level=tile&&water?water[Math.round((next.z-tile.z)/4)*65+Math.round((next.x-tile.x)/4)]/10:Infinity
-          if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;blockedWater=true}
+          if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;vx=vz=0;blockedWater=true;rides?.stop();bikeSpeed=0}
         }
       }
-      if(rides?.bike){let obstacle='';const footY=next.y-cfg.height/2
-        if(Math.hypot(move.x,move.z)<speed*step*.35)for(let at=0;at<sim.controller.numComputedCollisions();at++){
-          const contact=sim.controller.computedCollision(at),ckind=contact?.collider&&sim.kinds.get(contact.collider.handle)
-          if(contact&&contact.normal1.y<Math.cos(cfg.slope)){
-            if((ckind==='deck'||ckind==='ground'||ckind==='sidewalk')&&contact.witness1.y<=footY+cfg.step+.05)continue
-            obstacle=ckind==='building'?'building':'collision';break
+      if(rides?.car){
+        const res=rides.resolveCarMove({
+          pos,next,move,heading:rides.heading,speed:bikeSpeed,step,
+          motorPavement:rides.motorPavement,insideHouse:sim.insideHouse,
+          carBlockedAt:(x,footY,z,hdg,sgn)=>sim.carOverlap(x,footY,z,hdg,sgn),
+          collisionKind:(dirX,dirZ)=>{
+            let hit:''|'collision'|'building'=''
+            const footY=next.y-cfg.height/2
+            for(let at=0;at<sim.controller.numComputedCollisions();at++){
+              const contact=sim.controller.computedCollision(at)
+              if(!contact||contact.normal1.y>=Math.cos(carConfig.maxSlope))continue
+              if(contact.normal1.x*dirX+contact.normal1.z*dirZ>=-.2)continue
+              const kind=contact.collider?sim.kinds.get(contact.collider.handle):undefined
+              if((kind==='deck'||kind==='deckThin'||kind==='ground'||kind==='sidewalk'||kind==='road')&&contact.witness1.y<=footY+.15)continue
+              if(kind==='building')return 'building'
+              hit='collision'
+            }
+            return hit
+          },
+          stopCar:()=>rides!.stop(),
+          dampCar:s=>rides!.dampCarSpeed(s),
+        })
+        bikeSpeed=res.speed
+        vx=rides.carVelX;vz=rides.carVelZ
+        const impactPulse=rides.consumeCarImpact()
+        if(impactPulse>0){
+          carRig.triggerImpact(impactPulse)
+          carShake=Math.max(carShake,Math.min(1.35,impactPulse*.85))
+        }
+        if(res.blocked){bikeObstacle=res.reason}
+        else if(Math.hypot(vx,vz)>.15){bikeObstacle=''}
+      }
+      else if(rides?.bike){
+        const res=rides.resolveMove({
+          pos,next,move,heading:rides.heading,speed:bikeSpeed,step,
+          pavement:rides.pavement,insideHouse:sim.insideHouse,
+          blockedAt:(x,y,z)=>sim.isBlockedAt(x,y,z),
+          wetSurface:sim.wet(next.x,next.z),
+          collisionKind:(dirX,dirZ)=>{
+            let hit:''|'collision'|'building'=''
+            const footY=next.y-cfg.height/2
+            for(let at=0;at<sim.controller.numComputedCollisions();at++){
+              const contact=sim.controller.computedCollision(at)
+              if(!contact||contact.normal1.y>=Math.cos(bikeConfig.maxSlope))continue
+              if(contact.normal1.x*dirX+contact.normal1.z*dirZ>=-.2)continue
+              const kind=contact.collider?sim.kinds.get(contact.collider.handle):undefined
+              if(kind==='sidewalk'||kind==='road')continue
+              if((kind==='deck'||kind==='deckThin'||kind==='ground'||kind==='landmark')&&contact.witness1.y<=footY+bikeConfig.step+.05)continue
+              if(kind==='building')return 'building'
+              hit='collision'
+            }
+            return hit
+          },
+          stopBike:()=>rides!.stop(),
+          dampBike:s=>rides!.dampSpeed(s),
+          capOffRoad:(s,lim)=>rides!.capSpeed(s,lim),
+        })
+        bikeSpeed=res.speed
+        if(res.blocked){bikeObstacle=res.reason;vx=vz=0}
+        else{vx=wish.x*bikeSpeed;vz=wish.y*bikeSpeed;if(Math.abs(bikeSpeed)>.15)bikeObstacle=''}
+      }
+      else{
+        for(let at=0;at<sim.controller.numComputedCollisions();at++){
+          const contact=sim.controller.computedCollision(at)
+          if(!contact||contact.normal1.y>=Math.cos(cfg.slope))continue
+          const nx=contact.normal1.x, nz=contact.normal1.z, len=Math.hypot(nx,nz)
+          if(len<1e-4)continue
+          const ux=nx/len, uz=nz/len, dot=vx*ux+vz*uz
+          if(dot<0){
+            const stepInto=stepDx*ux+stepDz*uz, moveInto=move.x*ux+move.z*uz
+            if(moveInto>stepInto*.5){vx-=dot*ux;vz-=dot*uz}
           }
         }
-        const reason=sim.insideHouse(next.x+delta.x*.72,next.z+delta.y*.72)?'building':!rides.pavement(next.x,next.z)?'off-road':obstacle
-        if(reason){bikeObstacle=reason;next.x=pos.x;next.z=pos.z;rides.stop();speed=0}}
+      }
       traveled+=Math.hypot(next.x-pos.x,next.z-pos.z);sim.body.setNextKinematicTranslation(next);sim.world.step();if(grounded&&!blockedWater)safe.set(next.x,next.y,next.z)
     }
     physicsMs+=performance.now()-before
-    if(traveled>.001)figure.rotation.y=Math.atan2(-delta.x,-delta.y)+avatar.yaw
-    const nextAction=actions.get(avatar.clips[!grounded?'jump':traveled<.001?'idle':speed===cfg.run?'run':'walk'])
-    if(!wasBike&&nextAction&&action!==nextAction){action?.fadeOut(.2);nextAction.reset().fadeIn(.2).play();action=nextAction}
-    mixer.update(dt);follow()
+    const clampedFrameDt=Math.min(.12,Math.max(0,dt))
+    if(standUpSession){
+      standUpSession.elapsed+=clampedFrameDt
+      if(standUpSession.elapsed>=standUpSession.duration){
+        facing=standUpSession.targetYaw
+        standUpSession=null
+        figure.rotation.x=figure.rotation.z=0
+        clearAvatarPose(figure)
+      }
+    }else if(pickupSession){
+      pickupSession.elapsed+=clampedFrameDt
+      const p=sim.body.translation()
+      const goalYaw=Math.atan2(p.x-pickupSession.rec.x,p.z-pickupSession.rec.z)+avatar.yaw
+      facing+=shortestAngle(facing,goalYaw)*Math.min(1,12*clampedFrameDt)
+      if(pickupSession.elapsed>=pickupSession.duration){
+        const rec=pickupSession.rec
+        const curFootY=p.y-cfg.height/2
+        let rx=rec.x, ry=rec.y, rz=rec.z
+        if(!sim.findLocalMount(p.x,curFootY,p.z,rx,ry,rz).ok){
+          const pullCandidates:[number,number][]=[
+            [THREE.MathUtils.lerp(rec.x,p.x,.45),THREE.MathUtils.lerp(rec.z,p.z,.45)],
+            [THREE.MathUtils.lerp(rec.x,p.x,.90),THREE.MathUtils.lerp(rec.z,p.z,.90)],
+          ]
+          for(const rad of [.6,1.0,1.45]){
+            for(let a=0;a<8;a++){const ang=a*Math.PI/4;pullCandidates.push([rec.x+Math.cos(ang)*rad,rec.z+Math.sin(ang)*rad])}
+          }
+          for(const [cx,cz] of pullCandidates){
+            const rawCy=supportAt(cx,cz,curFootY)?.y??curFootY
+            const cy=Math.abs(rawCy-curFootY)<=1.2?rawCy:curFootY
+            if(sim.findLocalMount(p.x,curFootY,p.z,cx,cy,cz).ok){rx=cx;ry=cy;rz=cz;break}
+          }
+        }
+        const completed=resolveTwoWheelTransition(twoWheelOp,{type:'pickup_complete',kind:rec.kind}).state
+        twoWheelOp=completed
+        removeDownedHazard(rec)
+        ebikeAudio.playPickupComplete()
+        const restRoll=computeParkedRoll(false,0,rec.kind==='bike'&&completed.kickstandDown)
+        if(rides){
+          rides.relocateParkedBike(rec.mesh,rx,ry,rz,rec.yaw,restRoll,{parkLocked:completed.parkLocked,kickstandDown:completed.kickstandDown})
+        }else{
+          rec.mesh.userData.downed=false
+          rec.mesh.position.set(rx,ry,rz)
+          rec.mesh.rotation.set(0,rec.yaw,restRoll,'YXZ')
+        }
+        downedBikes.delete(rec)
+        pickupSession=null
+        figure.rotation.x=figure.rotation.z=0
+        clearAvatarPose(figure)
+        if(!verify||stuntMode){
+          window.dispatchEvent(new CustomEvent('walk:toast',{detail:{
+            text:`${rec.kind==='bicycle'?'单车':'电动车'}已扶正立好边撑，按 F 上车`,
+            ms:2000,
+          }}))
+        }
+      }
+    }
+    if(wasCar&&rides?.car){
+      const curSpd=rides.speed
+      lastCarBraking=(keys.forward<-.05&&curSpd>.25)||(Math.abs(curSpd)<Math.abs(prevCarSpeed)-.04&&curSpd>.35)
+      if(bikeObstacle&&bikeObstacle!==prevCarObstacle&&Math.abs(prevCarSpeed)>2.0){
+        carRig.triggerImpact(Math.min(2.2,Math.abs(prevCarSpeed)*.18+.35))
+      }
+      prevCarSpeed=curSpd
+      prevCarObstacle=bikeObstacle
+    }
+    if(wasBike&&rides?.bike){
+      const p=sim.body.translation()
+      const refY=p.y-cfg.height/2
+      const allowAutoCrash=autoCrashOverride??(!verify||stuntMode)
+      if(crashSession){
+        rides.stop()
+        crashSession.elapsed+=clampedFrameDt
+        if(crashSession.slideSpeed>.05&&clampedFrameDt>0){
+          const fwdX=-Math.sin(crashSession.heading), fwdZ=-Math.cos(crashSession.heading)
+          const sideX=Math.cos(crashSession.heading)*crashSession.side, sideZ=-Math.sin(crashSession.heading)*crashSession.side
+          const bStep=crashSession.slideSpeed*.34*clampedFrameDt
+          const rStep=crashSession.slideSpeed*.76*clampedFrameDt
+          const nextBx=crashSession.bikeSlideX+fwdX*bStep+sideX*bStep*.42
+          const nextBz=crashSession.bikeSlideZ+fwdZ*bStep+sideZ*bStep*.42
+          let moved=false
+          if(canPlaceCrashOffset(crashSession.bikeOriginX+nextBx,crashSession.bikeOriginZ+nextBz,refY)){
+            crashSession.bikeSlideX=nextBx;crashSession.bikeSlideZ=nextBz;moved=true
+          }
+          const nextRx=crashSession.riderOffsetX+fwdX*rStep-sideX*rStep*.62
+          const nextRz=crashSession.riderOffsetZ+fwdZ*rStep-sideZ*rStep*.62
+          if(canPlaceCrashOffset(crashSession.bikeOriginX+nextRx,crashSession.bikeOriginZ+nextRz,refY)){
+            crashSession.riderOffsetX=nextRx;crashSession.riderOffsetZ=nextRz;moved=true
+          }
+          crashSession.slideSpeed=moved?Math.max(0,crashSession.slideSpeed-8.5*clampedFrameDt):0
+          if(crashSession.slideSpeed<.15)crashSession.slideSpeed=0
+        }
+        if(rideCtrl.recover||keys.jump)crashRecoverQueued=true
+        const wantStandUp=crashSession.elapsed>=.28&&(crashRecoverQueued||Math.abs(keys.forward)>.2||Math.abs(keys.right)>.2)
+        if(wantStandUp){crashRecoverQueued=false;beginStandUpFromCrash()}
+      }else if(rides.rideKind==='bike'){
+        if(rideCtrl.cycleMod){
+          const nextPreset=ebikeFx.cycleModPreset()
+          rides.setEbikeUpgrades(ebikeModUpgrades(ebikeFx.vehicleType,nextPreset))
+          ebikeRig.applyMods(ebikeFx.customMods??nextPreset,(mountedStaticBike?.userData.paint as number|undefined)??0)
+          if(mountedStaticBike)mountedStaticBike.userData.modPreset=nextPreset
+        }
+        const rawTel=rides.ebikeTelemetry
+        if(rawTel){
+          twoWheelOp={...twoWheelOp,parkLocked:rawTel.parkLocked,kickstandDown:rawTel.kickstandDown,headlight:rawTel.headlight,hazard:rawTel.hazard}
+          if(rawTel.parkLocked!==prevAudioPark){ebikeAudio.playParkToggle(rawTel.parkLocked);prevAudioPark=rawTel.parkLocked}
+          if(!rawTel.parkLocked&&rawTel.gear!==prevAudioGear){ebikeAudio.playGearShift(rawTel.gear,'bike');prevAudioGear=rawTel.gear}
+          if(rawTel.headlight!==prevAudioLight){ebikeAudio.playLightSwitch(rawTel.headlight);prevAudioLight=rawTel.headlight}
+          const blinkerActive=rawTel.hazard||rawTel.turnSignal!=='off'
+          if(blinkerActive&&rawTel.blinkOn!==prevAudioBlink)ebikeAudio.playTurnRelay(rawTel.blinkOn)
+          prevAudioBlink=blinkerActive?rawTel.blinkOn:false
+          if(rawTel.hornActive!==prevAudioHorn){ebikeAudio.setHorn(rawTel.hornActive,'bike');prevAudioHorn=rawTel.hornActive}
+          ebikeAudio.updateContinuous({
+            active:true,rideKind:'bike',speed:rawTel.speed,throttle:keys.forward,
+            braking:rawTel.braking,parked:rawTel.parkLocked||rawTel.kickstandDown,
+            leanRisk:rawTel.leanDangerRatio,dt:clampedFrameDt,
+          })
+        }
+        const extTel:ExternalEbikeTelemetry|undefined=rawTel?{
+          vehicleType:rawTel.vehicleType,
+          isShared:rawTel.isShared,
+          gear:rawTel.gear,
+          gearCount:rawTel.gearCount,
+          gearLabel:rawTel.gearLabel,
+          gearHint:rawTel.gearHint,
+          maxKmh:rawTel.maxKmh,
+          battery:rawTel.batteryPct,
+          lowBattery:rawTel.lowBattery,
+          criticalBattery:rawTel.criticalBattery,
+          batteryDepleted:rawTel.batteryDepleted,
+          wheelie:rawTel.wheelie,
+          lean:rawTel.lean,
+          leanLimit:rawTel.leanLimit,
+          leanRateDegPerSec:rawTel.leanRateDegPerSec,
+          mandatoryFallLeanRad:rawTel.mandatoryFallLeanRad,
+          effectiveFallLeanRad:rawTel.effectiveFallLeanRad,
+          leanDangerRatio:rawTel.leanDangerRatio,
+          crashRisk:rawTel.crashRisk,
+          tucking:rawTel.tucking,
+          braking:rawTel.braking,
+          parkLocked:rawTel.parkLocked,
+          kickstandDown:rawTel.kickstandDown,
+          throttleBlockedByPark:rawTel.throttleBlockedByPark,
+          parkWarnSeq:rawTel.parkWarnSeq,
+          headlight:rawTel.headlight,
+          taillight:rawTel.taillight,
+          brakeLight:rawTel.brakeLight,
+          turnSignal:rawTel.turnSignal,
+          leftSignalLit:rawTel.leftSignalLit,
+          rightSignalLit:rawTel.rightSignalLit,
+          hazard:rawTel.hazard,
+          blinkOn:rawTel.blinkOn,
+          hornActive:rawTel.hornActive,
+          hornSeq:rawTel.hornSeq,
+          cruiseControl:rawTel.cruiseControl,
+          cruiseTargetKmh:rawTel.cruiseTargetKmh,
+        }:undefined
+        ebikeState=ebikeFx.step(dt,{
+          speed:rides.speed,
+          heading:rides.heading,
+          lean:rides.lean,
+          steerInput:rides.steerInput,
+          braking:keys.forward<-.05&&rides.speed>.2,
+          obstacle:bikeObstacle,
+          allowAutoCrash:false,
+        },rideCtrl.cycleMod?{...rideCtrl,cycleMod:false}:rideCtrl,extTel,{
+          canPlace:(ox,oz)=>!sim.insideHouse(p.x+ox,p.z+oz)&&!sim.wet(p.x+ox,p.z+oz)&&!sim.isBlockedAt(p.x+ox,refY,p.z+oz),
+          supportY:(ox,oz,ry)=>supportAt(p.x+ox,p.z+oz,ry)?.y??ry,
+        })
+        if(mountedStaticBike)mountedStaticBike.userData.battery=ebikeState.battery
+        if(rawTel&&rawTel.crashPhase!=='none'){
+          triggerTwoWheelCrash(rawTel.crashReason||'lowside',rawTel.crashSide??(rides.lean>=0?1:-1))
+        }
+        prevTwoWheelSpeed=Math.abs(rides.speed)
+      }else{
+        const rawTel=rides.ebikeTelemetry
+        if(rawTel){
+          twoWheelOp={...twoWheelOp,parkLocked:false,kickstandDown:rawTel.kickstandDown,headlight:'off',hazard:false}
+          if(rawTel.gear!==prevAudioGear){ebikeAudio.playGearShift(rawTel.gear,'bicycle');prevAudioGear=rawTel.gear}
+          if(rawTel.hornActive!==prevAudioHorn){ebikeAudio.setHorn(rawTel.hornActive,'bicycle');prevAudioHorn=rawTel.hornActive}
+          ebikeAudio.updateContinuous({
+            active:true,rideKind:'bicycle',speed:rawTel.speed,throttle:keys.forward,
+            braking:rawTel.braking,parked:rawTel.kickstandDown,
+            leanRisk:rawTel.leanDangerRatio,dt:clampedFrameDt,
+          })
+          if(rawTel.crashPhase!=='none'){
+            triggerTwoWheelCrash(rawTel.crashReason||'lowside',rawTel.crashSide??(rides.lean>=0?1:-1))
+          }
+        }
+        prevTwoWheelSpeed=Math.abs(rides.speed)
+      }
+    }
+    const actualSpeed=simSteps>0?traveled/(simSteps*step):Math.hypot(vx,vz)
+    let turnDiff=0
+    if(!aboardGround&&!standUpSession&&!pickupSession){
+      const velLen=Math.hypot(vx,vz)
+      const dirX=velLen>.08?vx/velLen:inputMag>.05?wish.x:0, dirZ=velLen>.08?vz/velLen:inputMag>.05?wish.y:0
+      if(dirX||dirZ){
+        const goal=Math.atan2(-dirX,-dirZ)+avatar.yaw
+        turnDiff=shortestAngle(facing,goal)
+        facing+=turnDiff*Math.min(1,cfg.turnRate*Math.min(.12,dt))
+      }
+      figure.rotation.y=facing
+      if(traveller){
+        const clampedDt=Math.min(.12,Math.max(1e-4,dt))
+        const accelPulse=(actualSpeed-prevSpeed)/clampedDt
+        prevSpeed=actualSpeed
+        const goalBank=grounded?THREE.MathUtils.clamp(-turnDiff*(actualSpeed/cfg.run)*.22,-.14,.14):0
+        const goalStride=grounded?THREE.MathUtils.clamp(-accelPulse*.0018,-.06,.05):0
+        bankLean=THREE.MathUtils.damp(bankLean,goalBank,12,clampedDt)
+        strideLean=THREE.MathUtils.damp(strideLean,goalStride,14,clampedDt)
+        traveller.rotation.z=bankLean
+        traveller.rotation.x=strideLean
+      }
+      const moving=actualSpeed>.14||inputMag>.06
+      const running=actualSpeed>5.8||(inputMag>.4&&maxSpeed===cfg.run&&actualSpeed>3.2)
+      const sprinting=actualSpeed>7.4||(running&&inputMag>.8&&actualSpeed>6.8)
+      if(!wasGroundedFoot&&grounded){
+        jumpStage=moving?'none':'land'
+        jumpStageTimer=0
+      }
+      wasGroundedFoot=grounded
+
+      let clipKey:keyof typeof avatar.clips='idle'
+      if(!grounded){
+        jumpStageTimer+=clampedFrameDt
+        if(jumpStage==='start'&&jumpStageTimer<.16&&velocity>1.2)clipKey='jumpStart'
+        else{jumpStage='air';clipKey='jumpAir'}
+      }else if(jumpStage==='land'){
+        jumpStageTimer+=clampedFrameDt
+        if(!moving&&jumpStageTimer<.22)clipKey='jumpLand'
+        else{jumpStage='none'}
+      }
+      if(grounded&&jumpStage!=='land'){
+        clipKey=crouching?(!moving?'crouchIdle':'crouchWalk'):!moving?'idle':sprinting?'sprint':running?'run':'walk'
+      }
+      const resolvedName=(actions.has(avatar.clips[clipKey])?avatar.clips[clipKey]:undefined)
+        ??(!grounded?avatar.clips.jump:crouching?avatar.clips.walk:moving&&sprinting?avatar.clips.run:avatar.clips[clipKey])
+        ??avatar.clips.idle
+      activeClipName=resolvedName
+      const nextAction=actions.get(resolvedName)
+      if(nextAction){
+        const isOneShot=clipKey==='jumpStart'||clipKey==='jumpLand'
+        if(action!==nextAction){
+          action?.fadeOut(isOneShot?.06:.12)
+          nextAction.setLoop(isOneShot?THREE.LoopOnce:THREE.LoopRepeat,isOneShot?1:Infinity)
+          nextAction.clampWhenFinished=isOneShot
+          nextAction.reset().fadeIn(isOneShot?.06:.12).play()
+          action=nextAction
+        }
+        nextAction.timeScale=clipKey==='crouchWalk'?THREE.MathUtils.clamp(actualSpeed/cfg.crouch,.55,1.35)
+          :clipKey==='walk'?THREE.MathUtils.clamp(actualSpeed/cfg.walk,.55,1.35)
+          :clipKey==='run'?THREE.MathUtils.clamp(actualSpeed/6.4,.65,1.3)
+          :clipKey==='sprint'?THREE.MathUtils.clamp(actualSpeed/cfg.run,.72,1.25):1
+      }
+    }
+    if(!standUpSession&&!pickupSession)mixer.update(dt)
+    follow(dt)
   }
   function photoSupport(x:number,z:number,bridgeRadius?:number){
     const tile=sim.tileAt(x,z), data=tile&&stream.loaded.get(tile)
@@ -241,13 +1760,58 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }
       if(nearest)return nearest
     }
-    for(const kind of ['sidewalk','ground'] as const){
+    for(const kind of ['sidewalk','road','ground'] as const){
       const hit=sim.surface(x,z,kind)
       if(hit)return {kind,y:Math.max(hit.y,waterY),sampleDistance:0}
     }
     throw Error(`Missing support at ${x},${z}`)
   }
-  return {photoSupport,enter,leave,tick,get destination(){return destination},spawns,probe,boatClearance,get obstacle(){return bikeObstacle},get vehicle(){return rides?.bike?'bike':rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
-    get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on)rides?.stop()},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow()},showFigure(on:boolean){figure.visible=on&&active},
-    get position(){const pos=rides?.boat?.position??sim.body.translation();return focus.set(pos.x,pos.y,pos.z)}}
+  return {photoSupport,enter,leave,tick,get destination(){return destination},spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+    ebike:{
+      get state(){return ebikeState},
+      triggerCrash(reason:Exclude<EbikeCrashReason,''>='lowside',side:-1|1=1){if(rides?.bike)triggerTwoWheelCrash(reason,side)},
+      recover(){return crashSession?beginStandUpFromCrash():false},
+      pickupNearest(){
+        if(rides?.bike||rides?.car||rides?.boat||standUpSession||pickupSession)return false
+        const p=sim.body.translation(), rec=findDownedNear(p.x,p.z,4.5)
+        if(!rec)return false
+        twoWheelOp=resolveTwoWheelTransition(twoWheelOp,{type:'pickup_start',kind:rec.kind}).state
+        pickupSession={rec,elapsed:0,duration:.56,startYaw:facing}
+        action?.fadeOut(.08);action=undefined
+        if(traveller)traveller.rotation.set(0,0,0)
+        return true
+      },
+      setMod(preset:EbikeModPreset){ebikeFx.setModPreset(preset);rides?.setEbikeUpgrades(ebikeModUpgrades(ebikeFx.vehicleType,ebikeFx.modPreset));ebikeRig.applyMods(ebikeFx.modPreset,(mountedStaticBike?.userData.paint as number|undefined)??0);if(mountedStaticBike)mountedStaticBike.userData.modPreset=ebikeFx.modPreset},
+      setVehicleType(type:EbikeVehicleType){rides?.setEbikeVehicleType(type);ebikeFx.setVehicleType(type);rides?.setEbikeUpgrades(ebikeModUpgrades(type,ebikeFx.modPreset));const paint=(mountedStaticBike?.userData.paint as number|undefined)??0;ebikeRig.setVehicleType(type,paint);ebikeRig.applyMods(ebikeFx.customMods??ebikeFx.modPreset,paint);if(mountedStaticBike)mountedStaticBike.userData.modPreset=ebikeFx.modPreset},
+      setBattery(pct:number){const clamped=rides?.rideKind==='bike'?rides.setEbikeBattery(pct):pct;ebikeFx.setBattery(clamped);if(mountedStaticBike)mountedStaticBike.userData.battery=clamped},
+      setGear(gear:number){return rides?.setEbikeGear(gear)??2},
+      shiftGear(delta:number){return rides?.shiftEbikeGear(delta)??2},
+      setAutoCrash(on:boolean|undefined){autoCrashOverride=on;rides?.setAutoCrash(on)},
+      togglePark(silent=false){if(crashSession)return false;return rides?.toggleEbikePark(silent)??false},
+      setPark(on:boolean,silent=false){if(crashSession)return false;return rides?.setEbikePark(on,silent)??false},
+      toggleKickstand(silent=false){if(crashSession)return false;return rides?.toggleEbikeKickstand(silent)??false},
+      setKickstand(on:boolean,silent=false){if(crashSession)return false;return rides?.setEbikeKickstand(on,silent)??false},
+      cycleLight(){if(crashSession)return 'off' as EbikeHeadlightMode;return rides?.cycleEbikeHeadlight()??'off'},
+      cycleHeadlight(){if(crashSession)return 'off' as EbikeHeadlightMode;return rides?.cycleEbikeHeadlight()??'off'},
+      setHeadlight(mode:TwoWheelHeadlightMode){if(crashSession)return 'off' as EbikeHeadlightMode;return rides?.setEbikeHeadlight(mode,true)??'off'},
+      setTurnSignal(dir:EbikeTurnSignal){return rides?.setEbikeTurnSignal(dir)??'off'},
+      toggleTurnSignal(dir:Exclude<EbikeTurnSignal,'off'>){return rides?.toggleEbikeTurnSignal(dir)??'off'},
+      setHazard(on:boolean){return rides?.setEbikeHazard(on)??false},
+      toggleHazard(){return rides?.toggleEbikeHazard()??false},
+      setHorn(pressed:boolean){return rides?.setEbikeHorn(pressed)??false},
+      pulseHorn(){return rides?.pulseEbikeHorn()??0},
+      setCruise(on:boolean,silent=false){return rides?.setEbikeCruise(on,silent)??false},
+      toggleCruise(silent=false){return rides?.toggleEbikeCruise(silent)??false},
+      get audioStats(){return ebikeAudio.probe()},
+    },
+    car:{
+      get telemetry(){return rides?.carTelemetry??null},
+      setMode(mode:CarDriveMode){return rides?.setCarMode(mode)??mode},
+      shiftMode(delta:number){return rides?.shiftCarMode(delta)??'street'},
+      setGtaPhysics(on:boolean|undefined){carGtaOverride=on;if(on!==undefined)rides?.setCarGtaPhysics(on)},
+      cycleLight(){carHeadlight=nextHeadlightMode(carHeadlight);carHeadlightManual=true;return carHeadlight},
+      setHeadlight(mode:TwoWheelHeadlightMode){carHeadlight=mode;carHeadlightManual=true;return carHeadlight},
+    },
+    get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
+    get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}
 }

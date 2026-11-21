@@ -20,7 +20,7 @@ export interface PeaksGroup extends THREE.Group {
   modelPeaks:THREE.Object3D[]
   stats:{calls:number; lod0Peaks:number; lod1Peaks:number}
   loadModels(renderer:THREE.WebGLRenderer):void
-  update(camera:THREE.PerspectiveCamera, mirrorLevel?:number):void
+  update(camera:THREE.PerspectiveCamera, mirrorLevel?:number, range?:{cullHorizon?:number; peakLodSplit?:number}):void
 }
 
 // Spin up the worker immediately on module evaluation so it warms while manifest.json fetches.
@@ -122,12 +122,12 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
   mesh0.raycast = ()=>{}
   mesh1.raycast = ()=>{}
 
-  // Initial hysteresis state matches THREE.LOD: level 1 starts visible, so switching into LOD 0 uses 800*(1-0.05)=760 m.
+  // Initial hysteresis state matches THREE.LOD: level 1 starts visible, so switching into LOD 0 uses 0.95*split.
   const farState = new Uint8Array(data.peaks.length).fill(1)
   let prevMask0 = -1n, prevMask1 = -1n
   const lastPos = new THREE.Vector3(Infinity,Infinity,Infinity)
   const lastQuat = new THREE.Quaternion()
-  let lastMirror = NaN
+  let lastMirror = NaN, lastHorizon = NaN, lastLodSplit = NaN
   const frustum = new THREE.Frustum()
   const projScreen = new THREE.Matrix4()
   const pt = new THREE.Vector3()
@@ -144,13 +144,18 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
     colliders,
     modelPeaks:models,
     stats,
-    update(camera:THREE.PerspectiveCamera, mirrorLevel=148) {
+    update(camera:THREE.PerspectiveCamera, mirrorLevel=148, range?:{cullHorizon?:number; peakLodSplit?:number}) {
+      const cullHorizon = range?.cullHorizon ?? look.fogHorizonTo
+      const lodSplit = range?.peakLodSplit ?? 800
       if(
         camera.position.distanceToSquared(lastPos)<4 &&
         lastQuat.angleTo(camera.quaternion)<.012 &&
+        cullHorizon===lastHorizon &&
+        lodSplit===lastLodSplit &&
         (mirrorLevel===lastMirror || (Number.isFinite(mirrorLevel) && Number.isFinite(lastMirror) && Math.abs(mirrorLevel-lastMirror)<.5))
       ) return
       lastPos.copy(camera.position); lastQuat.copy(camera.quaternion); lastMirror = mirrorLevel
+      lastHorizon = cullHorizon; lastLodSplit = lodSplit
       camera.updateMatrixWorld()
       frustum.setFromProjectionMatrix(projScreen.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
       const cxCam = camera.position.x, cyCam = camera.position.y, czCam = camera.position.z
@@ -163,9 +168,9 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
         const p = data.peaks[i]
         const [px,py,pz] = p.center
         const meters = Math.hypot(cxCam-px,cyCam-py,czCam-pz)
-        if(meters-p.radius>look.fogHorizonTo)continue
+        if(meters-p.radius>cullHorizon)continue
         const dist = meters*invZoom
-        const limit = farState[i] ? 760 : 800
+        const limit = farState[i] ? lodSplit*.95 : lodSplit
         const isFar = dist>=limit
         farState[i] = isFar ? 1 : 0
 
