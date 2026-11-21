@@ -104,12 +104,12 @@ varying vec2 vUv;
 varying float vFacing;
 void main() {
   float dist = 1.0 - vUv.y;
-  float nearSoft = smoothstep(0.0, 0.08, dist);
-  float axial = pow(max(0.0, 1.0 - dist), 1.85);
-  float edge = pow(clamp(vFacing, 0.0, 1.0), 1.65);
+  float nearSoft = smoothstep(0.0, 0.16, dist);
+  float axial = pow(max(0.0, 1.0 - dist), 1.45);
+  float edge = pow(clamp(vFacing, 0.0, 1.0), 1.35);
   float alpha = nearSoft * axial * edge * uIntensity;
   if (alpha < 0.002) discard;
-  gl_FragColor = vec4(uColor * alpha, alpha);
+  gl_FragColor = vec4(uColor * alpha, min(0.65, alpha));
 }
 `
 
@@ -126,17 +126,20 @@ uniform vec3 uColor;
 uniform float uIntensity;
 varying vec2 vUv;
 void main() {
-  // vUv.y = 0 at tire/bumper front, vUv.y = 1 at far tip; vUv.x = 0.5 centerline.
+  // vUv.y = 0 ahead of front tire, vUv.y = 1 at far tip; vUv.x = 0.5 centerline.
   float z = clamp(vUv.y, 0.0, 1.0);
-  float halfSpread = mix(0.16, 0.48, pow(z, 0.72));
+  float halfSpread = mix(0.14, 0.50, pow(z, 0.58));
   float xNorm = abs(vUv.x - 0.5) / max(0.01, halfSpread);
-  float radial = 1.0 - smoothstep(0.28, 1.0, xNorm);
-  float core = 1.0 - smoothstep(0.0, 0.52, xNorm);
-  float enterSoft = smoothstep(0.0, 0.10, z);
-  float farFade = pow(max(0.0, 1.0 - z), 1.45);
-  float alpha = enterSoft * farFade * (radial * 0.65 + core * 0.35) * uIntensity;
-  if (alpha < 0.002) discard;
-  gl_FragColor = vec4(uColor * alpha, alpha);
+  float radial = 1.0 - smoothstep(0.22, 1.0, xNorm);
+  float core = 1.0 - smoothstep(0.0, 0.56, xNorm);
+  float enterSoft = smoothstep(0.0, 0.14, z);
+  float midBody = 1.0 - smoothstep(0.42, 1.0, z) * 0.62;
+  float farFade = pow(max(0.0, 1.0 - z), 1.05);
+  float lum = enterSoft * midBody * farFade * (radial * 0.64 + core * 0.44) * uIntensity;
+  if (lum < 0.002) discard;
+  // Softly compress highlights so asphalt texture stays legible rather than clipping to solid white.
+  float mapped = lum / (1.0 + lum * 0.52);
+  gl_FragColor = vec4(uColor * mapped, min(0.78, mapped));
 }
 `
 
@@ -177,8 +180,8 @@ export function createHeadlightBeamRig(kind: VehicleLightKind): HeadlightBeamRig
     depthWrite: false,
     blending: T.AdditiveBlending,
     polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4,
     fog: false,
   })
 
@@ -187,14 +190,16 @@ export function createHeadlightBeamRig(kind: VehicleLightKind): HeadlightBeamRig
   coneMesh.visible = false
   coneMesh.frustumCulled = false
   coneMesh.renderOrder = 5
+  coneMesh.position.set(0, 0, -.12)
 
   const poolMesh = new T.Mesh(getPoolGeometry(), poolMat)
   poolMesh.name = `${kind}-beam-pool`
   poolMesh.visible = false
   poolMesh.frustumCulled = false
   poolMesh.renderOrder = 4
-  // Place road pool just above asphalt relative to lamp mounting height.
-  poolMesh.position.set(0, isCar ? -.60 : -.70, -.25)
+  // Project light pool ahead of front tire and clear of subtle pavement crown/slopes.
+  poolMesh.position.set(0, isCar ? -.36 : -.42, isCar ? -.45 : -.55)
+  poolMesh.rotation.x = .024
 
   group.add(coneMesh, poolMesh)
 
@@ -225,17 +230,17 @@ export function createHeadlightBeamRig(kind: VehicleLightKind): HeadlightBeamRig
       const batScale = state.batteryDepleted ? .42 : 1
       const crashScale = state.crashed ? .28 : 1
 
-      // Keep daytime beams subtle (never wash out daylight) and scale smoothly into rich night shafts.
+      // Subtle in daylight, atmospheric forward shaft & clear low-vs-high road pool at night.
       const baseStrength = high
-        ? T.MathUtils.lerp(.12, .44, nightMix)
-        : T.MathUtils.lerp(.07, .28, nightMix)
+        ? T.MathUtils.lerp(.12, .56, nightMix)
+        : T.MathUtils.lerp(.07, .34, nightMix)
       const coneAlpha = baseStrength * batScale * crashScale
 
-      const reach = (isCar ? (high ? 23 : 13.5) : (high ? 15.5 : 8.8)) * (state.crashed ? .32 : 1)
-      const spread = isCar ? (high ? 1.85 : 1.35) : (high ? 1.55 : 1.10)
-      coneMesh.scale.set(spread, spread * .58, reach)
-      coneMesh.rotation.x = high ? -.03 : -.085
-      coneUniforms.uColor.value.setHex(high ? 0xf6fbff : 0xfff1d0)
+      const reach = (isCar ? (high ? 30 : 17) : (high ? 24 : 13.5)) * (state.crashed ? .32 : 1)
+      const spread = isCar ? (high ? 2.4 : 1.65) : (high ? 2.25 : 1.50)
+      coneMesh.scale.set(spread, spread * .52, reach)
+      coneMesh.rotation.x = high ? -.002 : -.034
+      coneUniforms.uColor.value.setHex(high ? 0xedf6ff : 0xffebc0)
       coneUniforms.uIntensity.value = coneAlpha
       coneMesh.visible = coneAlpha > .005
       lastConeVisible = coneMesh.visible
@@ -244,11 +249,12 @@ export function createHeadlightBeamRig(kind: VehicleLightKind): HeadlightBeamRig
       const wheelieFade = 1 - smoothstep01(((state.wheelie ?? 0) - .10) / .24)
       const poolStrength = state.crashed
         ? 0
-        : (high ? T.MathUtils.lerp(.06, .34, nightMix) : T.MathUtils.lerp(.04, .24, nightMix)) * batScale * wheelieFade
-      const poolWidth = isCar ? (high ? 7.4 : 5.4) : (high ? 4.4 : 3.2)
-      const poolLength = isCar ? (high ? 22 : 13) : (high ? 15 : 8.5)
+        : (high ? T.MathUtils.lerp(.10, 1.15, nightMix) : T.MathUtils.lerp(.06, .78, nightMix)) * batScale * wheelieFade
+      const poolWidth = isCar ? (high ? 10.6 : 7.4) : (high ? 7.6 : 5.2)
+      const poolLength = isCar ? (high ? 34 : 19) : (high ? 25 : 14.5)
       poolMesh.scale.set(poolWidth, 1, poolLength)
-      poolUniforms.uColor.value.setHex(high ? 0xf4f9ff : 0xffeed0)
+      poolMesh.rotation.x = high ? .042 : .024
+      poolUniforms.uColor.value.setHex(high ? 0xeef7ff : 0xffe8b2)
       poolUniforms.uIntensity.value = poolStrength
       poolMesh.visible = poolStrength > .005
       lastPoolVisible = poolMesh.visible

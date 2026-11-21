@@ -146,9 +146,9 @@ async function start() {
     if(walking&&document.body.hasAttribute('data-aboard')&&ride==='car'){
       hint.textContent='WASD 驾驶 · Space 手刹漂移 · 1-3/Q·E 切模式 · L 车灯 · F 下车 · C 视距 · V 起飞'
     }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='bike'){
-      hint.textContent='WASD 骑行 · 1-4/Q·E 换挡 · Space 翘头/起身 · Shift 压弯 · P 驻车 · K 边撑 · L 车灯 · G 改装 · F 下车 · V 起飞'
+      hint.textContent='WASD 骑 · 0/P 驻车 · 1-4/Q·E 挡 · Space 翘头/起 · Shift 压弯 · K 撑 · L 灯 · Z/X/B 转向 · H 喇叭 · U 定速 · G 改 · F 下车 · V 飞'
     }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='bicycle'){
-      hint.textContent='WASD 骑行 · 1-3/Q·E 换挡 · Space 翘头/起身 · Shift 压弯 · F 下车 · V 起飞'
+      hint.textContent='WASD 骑行 · 1-3/Q·E 换挡 · Space 翘头/起身 · Shift 压弯 · K 边撑 · H 铃铛 · F 下车 · V 起飞'
     }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='boat'){
       hint.textContent='WASD 划船 · F 靠岸下船 · 拖动转视角 · 滚轮远近 · V 起飞'
     }else{

@@ -87,7 +87,8 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     const preferFree=!!nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)
     const freePrompt=nearFree.slot?(nearFree.slot.kind==='freeRaft'?'划竹筏 · ':'划小船 · ')+nearFree.slot.name:''
     const ridePrompt=nearBike?(nearBike.name==='car'?'开车':nearBike.userData.downed?(nearBike.name==='bicycle'?'扶起单车':'扶起电动车'):(nearBike.name==='bicycle'?'骑单车':'骑电动车')):''
-    const label=car?'下车':bike?'下车':freeBoats?.active?'靠岸下船':route>=0?(disembark?'下一站下船':'下站下船'):ridePrompt||(preferFree?freePrompt:nearRoute>=0?'上船 · '+data.routes[nearRoute].start:'')
+    const crashedRide=document.body.dataset.rideCrash==='1'
+    const label=car?'下车':bike?(crashedRide?'':'下车'):freeBoats?.active?'靠岸下船':route>=0?(disembark?'下一站下船':'下站下船'):ridePrompt||(preferFree?freePrompt:nearRoute>=0?'上船 · '+data.routes[nearRoute].start:'')
     document.body.toggleAttribute('data-aboard',!!car||!!bike||route>=0||!!freeBoats?.active)
     if(bike&&bikeCtrl.kind==='bike'){
       document.body.dataset.ebikeTier=bikeCtrl.vehicleType

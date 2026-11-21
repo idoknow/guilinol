@@ -41,10 +41,10 @@ export const bikeConfig = {
   maxSpeed: EBIKE_COMPLIANT_CAP_KMH / 3.6, reverseMax: -1.9, accel: 4.8, torqueDecay: .56, torquePow: .74,
   brake: 9.6, revHold: .20, revAccel: 2.5, rollDrag: .21, aeroDrag: .0048,
   pivotTurn: .98, peakTurn: 1.70, topTurn: 1.14, steerDamp: 10.5,
-  // Normal steering stays below mandatoryFallLeanRad (0.54) so high-speed non-tuck turns never false-crash;
-  // deep tuck (Shift) or wet/off-road/braking grip reduction crosses the fatal lean boundary cleanly.
-  leanMax: .50, tuckLeanMax: .68, leanDamp: 6.2,
-  leanRateMin: 2.5, leanRateMax: 10.8, leanRecoverRate: 8.4, leanTargetMinRad: .16,
+  // Normal steering stays comfortably below wet/off-road/braking fatal limits so non-tuck cornering
+  // never false-crashes on a light brake tap or wet patch; deep tuck (Shift) crosses the fatal angle cleanly.
+  leanMax: .43, tuckLeanMax: .68, leanDamp: 6.2,
+  leanRateMin: 2.3, leanRateMax: 11.4, leanRecoverRate: 8.6, leanTargetMinRad: .14,
   pitchMax: .22, pitchDamp: 8.5,
   mountDuration: .22, dismountDuration: .16,
   stickDeadFwd: .1, stickDeadTurn: .12, slideDamp: 1.9,
@@ -52,8 +52,8 @@ export const bikeConfig = {
   crash: {
     // Explicit physical mandatory fall angle (~31 deg dry) replacing unpredictable jerk timers.
     mandatoryFallLeanRad: .54,
-    wetGripPenaltyRad: .10,
-    offRoadGripPenaltyRad: .08,
+    wetGripPenaltyRad: .08,
+    offRoadGripPenaltyRad: .07,
     brakeInLeanPenaltyRad: .06,
     minEffectiveFallRad: .36,
     wheelieTargetRad: .56,
@@ -73,16 +73,16 @@ export const bicycleConfig: typeof bikeConfig = {
   maxSpeed: 21 / 3.6, reverseMax: -1.4, accel: 2.9, torqueDecay: .48, torquePow: .82,
   brake: 8.0, revHold: .20, revAccel: 2.0, rollDrag: .17, aeroDrag: .0056,
   pivotTurn: 1.05, peakTurn: 1.80, topTurn: 1.20, steerDamp: 11.0,
-  leanMax: .45, tuckLeanMax: .60, leanDamp: 6.6,
-  leanRateMin: 2.8, leanRateMax: 12.2, leanRecoverRate: 9.0, leanTargetMinRad: .14,
+  leanMax: .40, tuckLeanMax: .60, leanDamp: 6.6,
+  leanRateMin: 2.6, leanRateMax: 12.4, leanRecoverRate: 9.0, leanTargetMinRad: .13,
   pitchMax: .20, pitchDamp: 8.5,
   mountDuration: .22, dismountDuration: .16,
   stickDeadFwd: .1, stickDeadTurn: .12, slideDamp: 1.85,
   uphillDrag: 21.0, uphillCapScale: 4.5, offRoadCap: 3.6, step: .42, maxSlope: Math.PI / 4,
   crash: {
     mandatoryFallLeanRad: .48,
-    wetGripPenaltyRad: .09,
-    offRoadGripPenaltyRad: .08,
+    wetGripPenaltyRad: .07,
+    offRoadGripPenaltyRad: .06,
     brakeInLeanPenaltyRad: .05,
     minEffectiveFallRad: .32,
     wheelieTargetRad: .50,

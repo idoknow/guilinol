@@ -216,7 +216,19 @@ try {
   const carveS = measureCornerWindow(eb, {gear: 4, accelTicks: 80, holdTicks: 60, steerAmt: 0.75, tuck: false})
   const highSTuck = measureCornerWindow(eb, {gear: 4, accelTicks: 80, holdTicks: 50, steerAmt: 1, tuck: true})
   const d2WetNormal = measureCornerWindow(eb, {gear: 2, accelTicks: 50, holdTicks: 50, steerAmt: 0.75, wet: true, tuck: false})
+  const d3WetNormal = measureCornerWindow(eb, {gear: 3, accelTicks: 70, holdTicks: 50, steerAmt: 1, wet: true, tuck: false})
+  const d3OffRoadNormal = measureCornerWindow(eb, {gear: 3, accelTicks: 70, holdTicks: 50, steerAmt: 1, offRoad: true, tuck: false})
   const d2WetTuck = measureCornerWindow(eb, {gear: 3, accelTicks: 60, holdTicks: 50, steerAmt: 1, wet: true, tuck: true})
+  // Regression: S-gear full-lock non-tuck turn + light brake tap (0.15s) must never instant-lowside
+  eb.mount(0, 0, 'bike', {vehicleType: 'normal', autoCrash: true, drainEnabled: false, parkStart: false})
+  ensureDrivable(eb)
+  eb.setGear(4)
+  for (let i = 0; i < 80; i++) eb.steer(1, 0, 0.05, true)
+  for (let i = 0; i < 25; i++) eb.steer(1, 1, 0.05, true)
+  for (let i = 0; i < 3; i++) eb.steer(-1, 1, 0.05, true)
+  const sBrakeTapCrashed = eb.crashPhase !== 'none'
+  const sBrakeTapLean = +Math.abs(eb.lean).toFixed(4)
+  const sBrakeTapLimit = +eb.gripLimitRad.toFixed(4)
   const pedLow = measureCornerWindow(ped, {kind: 'bicycle', gear: 1, accelTicks: 28, holdTicks: 60, steerAmt: 1})
   const pedMid = measureCornerWindow(ped, {kind: 'bicycle', gear: 2, accelTicks: 55, holdTicks: 50, steerAmt: 1, tuck: false})
   const pedHighNoTuck = measureCornerWindow(ped, {kind: 'bicycle', gear: 3, accelTicks: 75, holdTicks: 50, steerAmt: 1, tuck: false})
@@ -247,6 +259,11 @@ try {
     'high-speed D3/S non-tuck full-lock turn >= 2.5s stays controllable without false crash (leanMax < mandatoryFallLeanRad)',
     !midD3.crashed && midD3.survivedSec >= 2.5 && !highS.crashed && highS.survivedSec >= 2.5 && highS.maxLean < highS.gripLimitRad,
     `D3=${JSON.stringify(midD3)} S=${JSON.stringify(highS)}`,
+  )
+  checkV2(
+    'S-gear non-tuck corner light brake tap & D3 wet/off-road full-lock never instant-crash',
+    !sBrakeTapCrashed && !d3WetNormal.crashed && !d3OffRoadNormal.crashed,
+    `sBrakeTap=${sBrakeTapCrashed}(lean=${sBrakeTapLean}<${sBrakeTapLimit}), d3Wet=${d3WetNormal.crashed}, d3Off=${d3OffRoadNormal.crashed}`,
   )
   checkV2(
     'wet moderate carve without crossing fatal angle stays upright; wet high-speed deep tuck triggers lowside',
@@ -399,15 +416,19 @@ try {
     for (let i = 0; i < 24 && eb.speed > 0.05; i++) eb.steer(-1, 0, 0.05, true)
     eb.setPark?.(true, true)
     const stationaryPark = readExtendedState(eb)
+    eb.shiftGear?.(1)
+    const unlockedByShiftUp = readExtendedState(eb)
+    eb.setPark?.(true, true)
     eb.setGear(2)
     const unlockedByGear = readExtendedState(eb)
     checkV2(
-      'P-gear unlocks via brake/gear, retracts kickstand, and refuses lock at riding speed',
+      'P-gear unlocks via brake/gear/shift-up (no skip past D2), retracts kickstand, and refuses lock at riding speed',
       unlockedByBrake.parked === false && unlockedByBrake.kickstand === false &&
       spdDuringMove > 2.0 && highSpdParkLocked === false &&
       stationaryPark.parked === true && stationaryPark.kickstand === true && stationaryPark.brakeLight === true &&
+      unlockedByShiftUp.parked === false && unlockedByShiftUp.raw.gearLabel === 'D2' &&
       unlockedByGear.parked === false && unlockedByGear.raw.gearLabel === 'D2',
-      `brakeUnlock=${unlockedByBrake.parked}, highSpdLock=${highSpdParkLocked}, statPark=${stationaryPark.parked}, gearUnlock=${unlockedByGear.parked}`,
+      `brakeUnlock=${unlockedByBrake.parked}, highSpdLock=${highSpdParkLocked}, statPark=${stationaryPark.parked}, shiftUp=${unlockedByShiftUp.raw.gearLabel}, gearUnlock=${unlockedByGear.parked}`,
     )
 
     // 5c. Bicycle never gets P-gear locked

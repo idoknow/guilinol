@@ -355,6 +355,14 @@ try {
     })
     assert.deepEqual(hudCheck.overlaps, [], `${label} ride HUD overlap: ${JSON.stringify(hudCheck.overlaps)}`)
     assert.deepEqual(hudCheck.outOfBounds, [], `${label} ride HUD outOfBounds: ${JSON.stringify(hudCheck.outOfBounds)}`)
+    const mobileCtrlVis = await mp.evaluate(() => ['.ride-gears', '.ride-park', '.ride-light', '.ride-turn-left', '.ride-turn-right', '.ride-hazard', '.ride-horn', '.ride-cruise', '.ride-lean-bar'].filter(sel => {
+      const el = document.querySelector(sel)
+      if (!el) return true
+      const st = getComputedStyle(el)
+      const r = el.getBoundingClientRect()
+      return st.display === 'none' || st.visibility === 'hidden' || r.width === 0 || r.height === 0
+    }))
+    assert.deepEqual(mobileCtrlVis, [], `${label} mobile ride HUD controls must stay visible: ${JSON.stringify(mobileCtrlVis)}`)
     const hiddenCheck = await mp.evaluate(() => ({
       jumpHidden: getComputedStyle(document.querySelector('.walk-ui .btn-jump')).display === 'none',
       runHidden: getComputedStyle(document.querySelector('.walk-ui .btn-run')).display === 'none',
@@ -436,7 +444,7 @@ try {
     const v2FxReport = await v2Page.evaluate(() => {
       const ebikeDomSelectors = [
         '.ride-park', '.ride-p', '.ride-light', '.ride-lights',
-        '.ride-turn-left', '.ride-turn-right', '.ride-hazard',
+        '.ride-turn-left', '.ride-turn-right', '.ride-hazard', '.ride-horn',
         '.ride-lean-bar', '.ride-risk', '.ride-cruise', '.ride-stand', '.ride-kickstand',
       ]
       const visibleControls = ebikeDomSelectors.filter(s => {

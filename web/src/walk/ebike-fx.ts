@@ -50,6 +50,7 @@ export interface EbikeRideControlInput {
   turnRightToggle?: boolean
   hazardToggle?: boolean
   horn?: boolean
+  hornPulse?: boolean
   cruiseToggle?: boolean
 }
 

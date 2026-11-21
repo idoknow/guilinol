@@ -25,7 +25,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
 
   const rideHud=document.createElement('div')
   rideHud.className='ride-hud'
-  rideHud.innerHTML='<span class="ride-type" data-kind="normal">电摩</span><span class="ride-gear">D2</span><span class="ride-gears" role="group" aria-label="挡位切换"><button class="ride-gear-btn" type="button" data-gear="1">D1</button><button class="ride-gear-btn on" type="button" data-gear="2">D2</button><button class="ride-gear-btn" type="button" data-gear="3">D3</button><button class="ride-gear-btn" type="button" data-gear="4">S</button></span><span class="ride-speed">0 km/h</span><span class="ride-bat" data-level="ok"><span class="ride-bat-bar"><i></i></span><span class="ride-bat-pct">100%</span></span><span class="ride-lean-bar" title="压弯倾角风险"><i></i></span><button class="ride-park" type="button" aria-label="P档驻车" title="P档驻车 / 边撑 (P/K)">P</button><button class="ride-light" type="button" aria-label="切换车灯" title="车灯切换 关/近/远 (L)">关灯</button><button class="ride-turn-left" type="button" aria-label="左转向灯" title="左转向灯 (Z)">◀</button><button class="ride-turn-right" type="button" aria-label="右转向灯" title="右转向灯 (X)">▶</button><button class="ride-hazard" type="button" aria-label="双闪警示灯" title="双闪警示灯 (B)">⚠</button><button class="ride-cruise" type="button" aria-label="定速巡航" title="定速巡航 (U)">定速</button><button class="ride-state" type="button" hidden></button><button class="ride-mod" type="button" aria-label="切换电动车改装">素车</button><span class="ride-keys">1-4/Q·E换挡 · P驻车 · L灯 · Z/X/B转向 · H喇叭 · U定速</span>'
+  rideHud.innerHTML='<span class="ride-type" data-kind="normal">电摩</span><span class="ride-gear">D2</span><span class="ride-gears" role="group" aria-label="挡位切换"><button class="ride-gear-btn" type="button" data-gear="1">D1</button><button class="ride-gear-btn on" type="button" data-gear="2">D2</button><button class="ride-gear-btn" type="button" data-gear="3">D3</button><button class="ride-gear-btn" type="button" data-gear="4">S</button></span><span class="ride-speed">0 km/h</span><span class="ride-bat" data-level="ok"><span class="ride-bat-bar"><i></i></span><span class="ride-bat-pct">100%</span></span><span class="ride-lean-bar" title="压弯倾角风险"><i></i></span><button class="ride-park" type="button" aria-label="P档驻车" title="P档驻车 / 边撑 (0/P/K)">P</button><button class="ride-light" type="button" aria-label="切换车灯" title="车灯切换 关/近/远 (L)">关灯</button><button class="ride-turn-left" type="button" aria-label="左转向灯" title="左转向灯 (Z)">◀</button><button class="ride-turn-right" type="button" aria-label="右转向灯" title="右转向灯 (X)">▶</button><button class="ride-hazard" type="button" aria-label="双闪警示灯" title="双闪警示灯 (B)">⚠</button><button class="ride-horn" type="button" aria-label="喇叭鸣笛" title="喇叭鸣笛 (H)">喇叭</button><button class="ride-cruise" type="button" aria-label="定速巡航" title="定速巡航 (U)">定速</button><button class="ride-state" type="button" hidden></button><button class="ride-mod" type="button" aria-label="切换电动车改装">素车</button><span class="ride-keys">0/P驻车 · K撑 · L灯 · Z/X/B · H喇叭 · U定速 · G改 · Shift压弯</span>'
   document.body.append(rideHud)
   const typeEl=rideHud.querySelector<HTMLElement>('.ride-type')!
   const gearEl=rideHud.querySelector<HTMLElement>('.ride-gear')!
@@ -41,6 +41,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   const turnLeftBtn=rideHud.querySelector<HTMLButtonElement>('.ride-turn-left')!
   const turnRightBtn=rideHud.querySelector<HTMLButtonElement>('.ride-turn-right')!
   const hazardBtn=rideHud.querySelector<HTMLButtonElement>('.ride-hazard')!
+  const hornBtn=rideHud.querySelector<HTMLButtonElement>('.ride-horn')!
   const cruiseBtn=rideHud.querySelector<HTMLButtonElement>('.ride-cruise')!
   const stateEl=rideHud.querySelector<HTMLButtonElement>('.ride-state')!
   const modBtn=rideHud.querySelector<HTMLButtonElement>('.ride-mod')!
@@ -54,6 +55,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   const btnTuck=panel.querySelector<HTMLButtonElement>('.btn-tuck')!
   let jump=false, runHold=false, runLock=false, runDownAt=0, stickPointer=-1, runPointer=-1
   let wheelieTouch=false, wheeliePointer=-1, tuckTouch=false, tuckPointer=-1
+  let hornTouch=false, hornPointer=-1, hornPulse=false
   let gearDelta=0, gearSelect:number|null=null, recoverPulse=false, cycleModPulse=false
   let parkTogglePulse=false, kickstandTogglePulse=false, headlightCyclePulse=false
   let turnLeftPulse=false, turnRightPulse=false, hazardPulse=false, cruisePulse=false
@@ -63,6 +65,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   function resetRideTouchControls(){
     wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')
     tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')
+    hornTouch=false;hornPointer=-1;hornPulse=false;hornBtn.classList.remove('on')
     gearDelta=0;gearSelect=null;recoverPulse=false;cycleModPulse=false
     parkTogglePulse=false;kickstandTogglePulse=false;headlightCyclePulse=false
     turnLeftPulse=false;turnRightPulse=false;hazardPulse=false;cruisePulse=false
@@ -105,12 +108,14 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     if(event.pointerId===runPointer)endRun(true,event.pointerId)
     if(event.pointerId===wheeliePointer){wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')}
     if(event.pointerId===tuckPointer){tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')}
+    if(event.pointerId===hornPointer){hornTouch=false;hornPointer=-1;hornBtn.classList.remove('on')}
   })
   window.addEventListener('pointercancel',event=>{
     endStick(event)
     if(event.pointerId===runPointer)endRun(false,event.pointerId)
     if(event.pointerId===wheeliePointer){wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')}
     if(event.pointerId===tuckPointer){tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')}
+    if(event.pointerId===hornPointer){hornTouch=false;hornPointer=-1;hornBtn.classList.remove('on')}
   })
 
   btnJump.onpointerdown=event=>{event.preventDefault();event.stopPropagation();jump=true}
@@ -145,6 +150,15 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   turnRightBtn.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash!=='1')turnRightPulse=true}
   hazardBtn.onpointerdown=event=>{event.stopPropagation()}
   hazardBtn.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash!=='1')hazardPulse=true}
+  hornBtn.onpointerdown=event=>{
+    event.stopPropagation()
+    if(document.body.dataset.rideCrash==='1')return
+    hornPointer=event.pointerId;safeCapture(hornBtn,event.pointerId)
+    hornTouch=true;hornPulse=true;hornBtn.classList.add('on')
+  }
+  const endHorn=(event:PointerEvent)=>{if(event.pointerId===hornPointer){hornTouch=false;hornPointer=-1;hornBtn.classList.remove('on')}}
+  hornBtn.onpointerup=endHorn;hornBtn.onpointercancel=endHorn;hornBtn.onlostpointercapture=endHorn
+  hornBtn.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash!=='1')hornPulse=true}
   cruiseBtn.onpointerdown=event=>{event.stopPropagation()}
   cruiseBtn.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash!=='1')cruisePulse=true}
   for(const btn of gearButtons){
@@ -184,6 +198,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
         parkTogglePulse=true
         event.preventDefault()
       }
+      else if(event.code==='Digit0'&&document.body.dataset.ride==='bike'&&!crashed&&!parkBtn.classList.contains('on'))parkTogglePulse=true
       else if(event.code==='KeyK'&&ridingTwoWheel&&!crashed)kickstandTogglePulse=true
       else if(event.code==='KeyL'&&(document.body.dataset.ride==='bike'||drivingCar)&&!crashed)headlightCyclePulse=true
       else if(event.code==='KeyZ'&&document.body.dataset.ride==='bike'&&!crashed)turnLeftPulse=true
@@ -280,12 +295,13 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
         turnLeftToggle:turnLeftPulse,
         turnRightToggle:turnRightPulse,
         hazardToggle:hazardPulse,
-        horn:crashed?false:keys.has('KeyH'),
+        horn:crashed?false:(keys.has('KeyH')||hornTouch),
+        hornPulse:crashed?false:hornPulse,
         cruiseToggle:cruisePulse,
       }
       gearDelta=0;gearSelect=null;recoverPulse=false;cycleModPulse=false
       parkTogglePulse=false;kickstandTogglePulse=false;headlightCyclePulse=false
-      turnLeftPulse=false;turnRightPulse=false;hazardPulse=false;cruisePulse=false
+      turnLeftPulse=false;turnRightPulse=false;hazardPulse=false;hornPulse=false;cruisePulse=false
       return out
     },
     syncRideHud(state:EbikeTelemetrySnapshot|null,rideKind:'bike'|'bicycle'|'car'|'boat'|null){
@@ -305,15 +321,17 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
         typeEl.dataset.kind='bicycle';typeEl.textContent='单车'
         gearEl.textContent=state.gearLabel||'2挡'
         gearEl.title=`单车 · 本挡限速 ${Math.round(state.maxKmh)} km/h（1-3 / Q·E 换挡）`
-        keysEl.textContent='1-3/Q·E换挡 · Space翘头'
+        keysEl.textContent='1-3/Q·E · K撑 · H铃铛 · Shift压弯 · Space翘头'
+        hornBtn.textContent='铃铛'
+        hornBtn.classList.toggle('on',!!state.hornActive)
       }else{
         typeEl.dataset.kind=state.vehicleType;typeEl.textContent=state.vehicleBadge
         gearEl.textContent=state.parkLocked?'P':state.gearLabel
         gearEl.title=state.parkLocked
-          ?`${state.vehicleLabel} · P档驻车（按 P/K 或 E 解除）`
+          ?`${state.vehicleLabel} · P档驻车（按 0/P/K 或 E 解除）`
           :`${state.vehicleLabel} · 本挡限速 ${Math.round(state.maxKmh)} km/h（1-4 / Q·E 换挡）`
         const lightTag=state.headlight==='high'?'远光':state.headlight==='low'?'近光':'关灯'
-        keysEl.textContent='1-4/Q·E · P驻车 · L灯 · Z/X/B · H · U定速'
+        keysEl.textContent='0/P驻车 · K撑 · L灯 · Z/X/B · H喇叭 · U定速 · G改 · Shift压弯'
         parkBtn.classList.toggle('on',!!state.parkLocked)
         parkBtn.setAttribute('aria-pressed',String(!!state.parkLocked))
         lightBtn.textContent=lightTag
@@ -325,6 +343,8 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
         turnRightBtn.classList.toggle('armed',state.turnSignal==='right')
         hazardBtn.classList.toggle('on',!!state.hazard&&!!state.blinkOn)
         hazardBtn.classList.toggle('armed',!!state.hazard)
+        hornBtn.textContent='喇叭'
+        hornBtn.classList.toggle('on',!!state.hornActive)
         cruiseBtn.classList.toggle('on',!!state.cruiseControl)
         cruiseBtn.textContent=state.cruiseControl&&state.cruiseTargetKmh?`定速${state.cruiseTargetKmh}`:'定速'
         const pct=Math.max(0,Math.min(100,Math.round(state.battery)))

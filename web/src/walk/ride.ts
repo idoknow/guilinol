@@ -427,6 +427,7 @@ export function createBikeControl() {
   let wheelieLoad = 0
   let tucking = false
   let braking = false
+  let brakeInLeanHold = 0
   let gripLimitRad = bcfg.crash.mandatoryFallLeanRad
   let crashRisk = 0
   let leanRateNow = 0
@@ -567,12 +568,14 @@ export function createBikeControl() {
     pickupStartRoll = 0
     crashRisk = 0
     leanRateNow = 0
+    brakeInLeanHold = 0
   }
 
   function reset() {
     speed = lean = pitch = steerInput = revHold = 0
     drainPerSec = wheelie = wheelieVel = wheelieLoad = 0
     tucking = braking = false
+    brakeInLeanHold = 0
     onPavement = wetSurface = offRoadSurface = false
     gripLimitRad = spec().crash.mandatoryFallLeanRad
     kind = 'bike'
@@ -775,6 +778,15 @@ export function createBikeControl() {
       else cruiseTargetSpeed = Math.min(cruiseTargetSpeed, maxMs)
     }
     return gear
+  }
+
+  function shiftGear(delta: number) {
+    if (kind === 'bike' && parkLocked) {
+      // Pressing gear-up (E) from P unlocks cleanly into current compliant gear (D2) instead of skipping to D3.
+      if (delta > 0) unlockParkIfNeeded(false)
+      return gear
+    }
+    return setGear(gear + delta)
   }
 
   function setVehicleType(nextType: EbikeVehicleType | string) {
@@ -1182,7 +1194,7 @@ export function createBikeControl() {
       gripLimitRad = spec().crash.mandatoryFallLeanRad
     },
     setGear,
-    shiftGear(delta: number) { return setGear(gear + delta) },
+    shiftGear,
     resetGearToCompliant() { return setGear(defaultGearFor(kind)) },
     setVehicleType,
     setUpgrades,
@@ -1256,7 +1268,7 @@ export function createBikeControl() {
       if (control?.cruiseToggle) toggleCruise()
 
       if (control?.gearSelect !== undefined && control.gearSelect !== null) setGear(control.gearSelect)
-      else if (control?.gearDelta) setGear(gear + control.gearDelta)
+      else if (control?.gearDelta) shiftGear(control.gearDelta)
 
       if (kind === 'bike' && batteryPct <= 0 && headlight !== 'off') headlight = 'off'
 
@@ -1466,11 +1478,16 @@ export function createBikeControl() {
       lean = T.MathUtils.damp(lean, targetLean, activeRate, cdt)
       leanRateNow = cdt > 1e-5 ? Math.abs(lean - prevLeanVal) / cdt : 0
 
-      // Explicit physical mandatory fall angle (~31 deg dry e-bike / ~27.5 deg bicycle) with fair wet/off-road/brake grip trim.
+      // Explicit physical mandatory fall angle (~31 deg dry e-bike / ~27.5 deg bicycle) with fair wet/off-road/progressive-brake grip trim.
+      if (braking && Math.abs(lean) > .24 && absSpd > 2.0) {
+        brakeInLeanHold = Math.min(1, brakeInLeanHold + cdt / .45)
+      } else {
+        brakeInLeanHold = Math.max(0, brakeInLeanHold - cdt * 3.5)
+      }
       let fallAngle = s.crash.mandatoryFallLeanRad
       if (wetSurface) fallAngle -= s.crash.wetGripPenaltyRad
       if (offRoadSurface) fallAngle -= s.crash.offRoadGripPenaltyRad
-      if (braking && Math.abs(lean) > .22) fallAngle -= s.crash.brakeInLeanPenaltyRad
+      if (brakeInLeanHold > .01) fallAngle -= s.crash.brakeInLeanPenaltyRad * brakeInLeanHold
       gripLimitRad = Math.max(s.crash.minEffectiveFallRad, fallAngle)
 
       const leanRatio = Math.abs(lean) / gripLimitRad

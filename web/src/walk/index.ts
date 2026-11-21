@@ -189,6 +189,7 @@ type DownedBikeEntry={
   battery:number
   modPreset:EbikeModPreset
   paint:number
+  hazardOverlay?:THREE.Group
 }
 
 function setRiderJoints(joints:RiderJoints,targets:Partial<Record<RiderJointName,[number,number,number]>>,blend=1){
@@ -311,7 +312,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
   const ebikeFx=createEbikeFxController()
   const ebikeAudio=createEbikeAudioEngine()
-  const ZERO_RIDE_INPUT:EbikeRideControlInput={gearDelta:0,gearSelect:null,wheelie:false,tuck:false,recover:false,cycleMod:false,parkToggle:false,kickstandToggle:false,headlightCycle:false,turnLeftToggle:false,turnRightToggle:false,hazardToggle:false,horn:false,cruiseToggle:false}
+  const ZERO_RIDE_INPUT:EbikeRideControlInput={gearDelta:0,gearSelect:null,wheelie:false,tuck:false,recover:false,cycleMod:false,parkToggle:false,kickstandToggle:false,headlightCycle:false,turnLeftToggle:false,turnRightToggle:false,hazardToggle:false,horn:false,hornPulse:false,cruiseToggle:false}
   const ebikeMountStartPos=new THREE.Vector3(), ebikeMountStartRot=new Map<RiderJointName,[number,number,number]>()
   let ebikeMountStartYaw=0, ebikeMountElapsed=bikeConfig.mountDuration
   let mountedStaticBike:THREE.Object3D|null=null
@@ -351,7 +352,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let carHeadlightManual=false
   window.addEventListener('keydown',event=>{
     if(active)ebikeAudio.unlock()
-    if(!active||!crashSession||crashSession.elapsed<.25||event.repeat)return
+    if(!active||!crashSession||event.repeat)return
     if(isGlobalHotkeyBlocked(event.target))return
     if(event.code==='Space'||event.code==='KeyW'||event.code==='KeyA'||event.code==='KeyS'||event.code==='KeyD')crashRecoverQueued=true
   })
@@ -359,6 +360,24 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let bicyclePedalPhase=0, bicycleFootWeight=1
   let prevCarSpeed=0, prevCarObstacle='', lastCarBraking=false
   let actionButtonEl:HTMLButtonElement|null=null
+  const downedHazardGeo=new THREE.BoxGeometry(.08,.055,.07)
+  const downedHazardMat=new THREE.MeshBasicMaterial({color:0xffa824})
+  function attachDownedHazard(mesh:THREE.Mesh){
+    const g=new THREE.Group()
+    g.name='downed-hazard-flashers'
+    for(const sx of [-.17,.17]){
+      const front=new THREE.Mesh(downedHazardGeo,downedHazardMat)
+      front.position.set(sx,.72,-.54)
+      const rear=new THREE.Mesh(downedHazardGeo,downedHazardMat)
+      rear.position.set(sx,.64,.52)
+      g.add(front,rear)
+    }
+    mesh.add(g)
+    return g
+  }
+  function removeDownedHazard(rec:DownedBikeEntry){
+    if(rec.hazardOverlay){rec.hazardOverlay.removeFromParent();rec.hazardOverlay=undefined}
+  }
   function findDownedNear(x:number,z:number,radius=.95):DownedBikeEntry|null{
     let best:DownedBikeEntry|null=null, bestD=radius
     for(const rec of downedBikes){
@@ -368,7 +387,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return best
   }
   function syncAllDownedPoses(){
+    const flashOn=((performance.now()*.0018)%1)<.5
     for(const rec of downedBikes){
+      if(rec.hazardOverlay)rec.hazardOverlay.visible=flashOn
       if(pickupSession?.rec===rec)continue
       rec.mesh.visible=true
       rec.mesh.position.set(rec.x,rec.y+rec.lift,rec.z)
@@ -377,6 +398,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
   function clearAllDowned(){
     for(const rec of downedBikes){
+      removeDownedHazard(rec)
       rec.mesh.userData.downed=false
       rec.mesh.position.set(rec.x,rec.y,rec.z)
       rec.mesh.rotation.set(0,rec.yaw,0,'YXZ')
@@ -541,7 +563,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         driverPose.startDismount(prevCarPos,bikeHeading,active);input.clearRun();return true
       }
       if(crashSession){
-        if(crashSession.elapsed>=.25)beginStandUpFromCrash()
+        if(crashSession.elapsed>=.28)beginStandUpFromCrash()
+        else crashRecoverQueued=true
         return false
       }
       const found=sim.findLocalDismount(x,z,bikeHeading,bikeY??safe.y-cfg.height/2)
@@ -729,6 +752,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       battery:c.battery,
       modPreset:c.modPreset,
       paint:c.paint,
+      hazardOverlay:c.kind==='bike'&&c.battery>0?attachDownedHazard(c.mesh):undefined,
     }
     if(c.kind==='bike')rides.resetEbikeGearOnRecover()
     rides.dismountDownedBike(bx,by,bz,entry.yaw,entry.roll,entry.lift)
@@ -864,19 +888,23 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         applySprawledCrashPose(figure,riderJoints,fallT,c.side,rx,ry,rz,c.heading,_seatTmp)
         if(c.kind==='bike'){
           const base=ebikeState??ebikeFx.step(0,{speed:0,heading:c.heading,lean:0,steerInput:0,braking:false,obstacle:'',allowAutoCrash:false},ZERO_RIDE_INPUT)
-          ebikeState={...base,speed:c.slideSpeed,kmh:Math.round(c.slideSpeed*3.6),crashPhase:'crashed',crashReason:c.reason,crashSide:c.side,crashElapsed:c.elapsed}
+          const dispSpd=c.slideSpeed<.15?0:c.slideSpeed
+          ebikeState={...base,speed:dispSpd,kmh:Math.round(dispSpd*3.6),crashPhase:'crashed',crashReason:c.reason,crashSide:c.side,crashElapsed:c.elapsed}
           input.syncRideHud(ebikeState,'bike')
         }else{
           const bcTel=rides.ebikeTelemetry
+          const dispSpd=c.slideSpeed<.15?0:c.slideSpeed
           ebikeState={
             vehicleType:'normal',vehicleLabel:'单车',vehicleBadge:'单车',
-            gear:bcTel?.gear??rides.ebikeGear,gearCount:bcTel?.gearCount??3,gearLabel:bcTel?.gearLabel??'2挡',gearHint:bcTel?.gearHint??'巡航',maxKmh:bcTel?.maxKmh??21,speed:c.slideSpeed,kmh:Math.round(c.slideSpeed*3.6),
+            gear:bcTel?.gear??rides.ebikeGear,gearCount:bcTel?.gearCount??3,gearLabel:bcTel?.gearLabel??'2挡',gearHint:bcTel?.gearHint??'巡航',maxKmh:bcTel?.maxKmh??21,speed:dispSpd,kmh:Math.round(dispSpd*3.6),
             battery:100,lowBattery:false,criticalBattery:false,batteryDepleted:false,
             lean:0,leanLimit:bcTel?.leanLimit??.31,crashRisk:0,wheelie:0,steerInput:0,
             tucking:false,braking:false,crashPhase:'crashed',crashReason:c.reason,crashSide:c.side,crashElapsed:c.elapsed,recoverProgress:0,modPreset:'stock',
           }
           input.syncRideHud(ebikeState,'bicycle')
         }
+        actionButtonEl ??= document.querySelector<HTMLButtonElement>('.vehicle-action')
+        if(actionButtonEl)actionButtonEl.hidden=true
       }else if(rides.rideKind==='bike'){
         bicycleRig.root.visible=false
         ebikeRig.root.visible=true
@@ -1219,6 +1247,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(rideCtrl.turnLeftToggle)rides.toggleEbikeTurnSignal('left')
       if(rideCtrl.turnRightToggle)rides.toggleEbikeTurnSignal('right')
       if(rideCtrl.hazardToggle)rides.toggleEbikeHazard()
+      if(rideCtrl.hornPulse)rides.pulseEbikeHorn()
       if(rideCtrl.cruiseToggle)rides.toggleEbikeCruise()
       if(rideCtrl.gearSelect!==null)rides.setEbikeGear(rideCtrl.gearSelect)
       else if(rideCtrl.gearDelta!==0)rides.shiftEbikeGear(rideCtrl.gearDelta)
@@ -1456,6 +1485,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         }
         const completed=resolveTwoWheelTransition(twoWheelOp,{type:'pickup_complete',kind:rec.kind}).state
         twoWheelOp=completed
+        removeDownedHazard(rec)
         ebikeAudio.playPickupComplete()
         const restRoll=computeParkedRoll(false,0,rec.kind==='bike'&&completed.kickstandDown)
         if(rides){
@@ -1499,17 +1529,20 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           const rStep=crashSession.slideSpeed*.76*clampedFrameDt
           const nextBx=crashSession.bikeSlideX+fwdX*bStep+sideX*bStep*.42
           const nextBz=crashSession.bikeSlideZ+fwdZ*bStep+sideZ*bStep*.42
+          let moved=false
           if(canPlaceCrashOffset(crashSession.bikeOriginX+nextBx,crashSession.bikeOriginZ+nextBz,refY)){
-            crashSession.bikeSlideX=nextBx;crashSession.bikeSlideZ=nextBz
+            crashSession.bikeSlideX=nextBx;crashSession.bikeSlideZ=nextBz;moved=true
           }
           const nextRx=crashSession.riderOffsetX+fwdX*rStep-sideX*rStep*.62
           const nextRz=crashSession.riderOffsetZ+fwdZ*rStep-sideZ*rStep*.62
           if(canPlaceCrashOffset(crashSession.bikeOriginX+nextRx,crashSession.bikeOriginZ+nextRz,refY)){
-            crashSession.riderOffsetX=nextRx;crashSession.riderOffsetZ=nextRz
+            crashSession.riderOffsetX=nextRx;crashSession.riderOffsetZ=nextRz;moved=true
           }
-          crashSession.slideSpeed=Math.max(0,crashSession.slideSpeed-6.8*clampedFrameDt)
+          crashSession.slideSpeed=moved?Math.max(0,crashSession.slideSpeed-8.5*clampedFrameDt):0
+          if(crashSession.slideSpeed<.15)crashSession.slideSpeed=0
         }
-        const wantStandUp=crashSession.elapsed>=.28&&(crashRecoverQueued||rideCtrl.recover||keys.jump||Math.abs(keys.forward)>.2||Math.abs(keys.right)>.2)
+        if(rideCtrl.recover||keys.jump)crashRecoverQueued=true
+        const wantStandUp=crashSession.elapsed>=.28&&(crashRecoverQueued||Math.abs(keys.forward)>.2||Math.abs(keys.right)>.2)
         if(wantStandUp){crashRecoverQueued=false;beginStandUpFromCrash()}
       }else if(rides.rideKind==='bike'){
         if(rideCtrl.cycleMod){
