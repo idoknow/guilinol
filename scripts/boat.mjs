@@ -1,3 +1,4 @@
+import {enableStickInput} from './joystick-fixture.mjs'
 import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
 import {gunzipSync} from 'node:zlib'
@@ -64,10 +65,15 @@ try {
       window.__boatToasts = []
       window.addEventListener('walk:toast', ev => {
         const detail = ev.detail || {}
-        window.__boatToasts.push({
+        const record = {
           text: String(detail.text ?? ''),
           ms: detail.ms ?? null,
           at: performance.now(),
+        }
+        window.__boatToasts.push(record)
+        queueMicrotask(() => {
+          const toast = document.querySelector('.toast.show')
+          record.visible = !!toast && toast.textContent === record.text
         })
       })
     })
@@ -288,6 +294,7 @@ try {
   page.on('console', msg => {
     if (msg.type() === 'error') errors.push(`desktop console: ${msg.location().url}: ${msg.text()}`)
   })
+  await enableStickInput(page, false)
   await attachHelpers(page)
   await gotoWalk(page)
 
@@ -562,8 +569,8 @@ try {
     let allSafe = true
     try {
       // 模拟摇杆前推同时向岸侧微偏 ~18% (inRight ≈ 0.08 > 0.05)，验证不会因一刀切阈值禁用顺岸滑行而卡死
-      joy.dispatchEvent(new PointerEvent('pointerdown', {pointerId: 42, pointerType: 'touch', clientX: cx, clientY: cy, bubbles: true}))
-      joy.dispatchEvent(new PointerEvent('pointermove', {pointerId: 42, pointerType: 'touch', clientX: cx + half * 0.18, clientY: cy - half * 0.95, bubbles: true}))
+      await window.testStick('down', cx, cy)
+      await window.testStick('move', cx + half * 0.18, cy - half * 0.95)
       for (let i = 0; i < 240; i++) {
         step(1)
         if (i === 120) mid = readBoat()
@@ -571,7 +578,7 @@ try {
         if (cur.probe.wet === false || cur.probe.resets > 0 || cur.probe.inHouse) allSafe = false
       }
     } finally {
-      joy.dispatchEvent(new PointerEvent('pointerup', {pointerId: 42, pointerType: 'touch', clientX: cx, clientY: cy, bubbles: true}))
+      await window.testStick('up')
       panel.hidden = wasHidden
     }
     const end = readBoat()
@@ -669,7 +676,7 @@ try {
     events: [...window.__boatToasts],
   }))
   assert.equal(midLakeDismount.vehicle, 'boat', `湖心深水不应允许下船: ${JSON.stringify(midLakeDismount)}`)
-  assert(midLakeDismount.toastVisible && /岸|码头|太远/.test(midLakeDismount.toastText), `湖心拒下缺少提示: ${JSON.stringify(midLakeDismount)}`)
+  assert(midLakeDismount.events.some(event => event.visible && /岸|码头|太远/.test(event.text)), `湖心拒下缺少提示: ${JSON.stringify(midLakeDismount)}`)
 
   await runInPage(page, async ({steerTo, arg}) => {
     await steerTo([arg], {arriveDist: 2.8})
@@ -1000,12 +1007,13 @@ try {
   mobile.on('console', msg => {
     if (msg.type() === 'error') errors.push(`mobile console: ${msg.location().url}: ${msg.text()}`)
   })
+  await enableStickInput(mobile, true)
   await attachHelpers(mobile)
   await gotoWalk(mobile)
 
   await enterSpot(mobile, ...FREE_DOCKS.ronghu.freeBank, 0, 'mobile-ronghu-bank')
   await closeSpotCard(mobile)
-  await mobile.waitForSelector('.btn-about.account-entry', {state: 'attached', timeout: 10000})
+  await mobile.waitForSelector('.account-entry', {state: 'attached', timeout: 10000})
   await mobile.waitForFunction(
     t => document.querySelector('.vehicle-action')?.textContent?.includes(t),
     FREE_DOCKS.ronghu.label,
@@ -1052,10 +1060,10 @@ try {
 
   const preHud = await measureHud(mobile, [
     '.walk-ui .joystick', '.walk-ui .btn-run', '.walk-ui .btn-jump',
-    '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.btn-about',
+    '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.btn-menu', '.account-entry',
   ])
   assert(preHud.boxes.some(b => b.sel === '.vehicle-action'), '手机端自由栈桥旁未显示 .vehicle-action')
-  assert(preHud.boxes.filter(b => b.sel.startsWith('.btn-about')).length >= 2, `手机端 .btn-about 未完整覆盖两个按钮: ${JSON.stringify(preHud.boxes)}`)
+  assert(['.btn-menu', '.account-entry'].every(sel => preHud.boxes.some(b => b.sel === sel)), `手机端 .btn-about 未完整覆盖两个按钮: ${JSON.stringify(preHud.boxes)}`)
   assert.deepEqual(preHud.overlaps, [], `手机端上船前按钮重叠: ${JSON.stringify(preHud)}`)
   assert.deepEqual(preHud.outOfBounds, [], `手机端上船前按钮出界: ${JSON.stringify(preHud)}`)
 
@@ -1063,13 +1071,13 @@ try {
   await triggerAction(mobile, FREE_DOCKS.ronghu.label, true)
   const aboardHud = await measureHud(mobile, [
     '.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action',
-    '.dock', '.sky-ui', 'output', '.btn-about',
+    '.dock', '.sky-ui', 'output', '.btn-menu', '.account-entry',
   ])
   const aboardState = await mobile.evaluate(() => ({
     vehicle: window.viewer.walk.vehicle,
     aboardAttr: document.body.hasAttribute('data-aboard'),
     jumpHidden: getComputedStyle(document.querySelector('.walk-ui .btn-jump')).display === 'none',
-    runHidden: getComputedStyle(document.querySelector('.walk-ui .btn-run')).display === 'none',
+    runHidden: !document.querySelector('.walk-ui .btn-run')?.getClientRects().length,
     actionText: document.querySelector('.vehicle-action')?.textContent ?? '',
   }))
   assert.equal(aboardState.vehicle, 'boat', '手机端点击后应成功上船')
@@ -1079,7 +1087,7 @@ try {
   assert.deepEqual(aboardHud.outOfBounds, [], `手机 390×844 船上按钮出界: ${JSON.stringify(aboardHud)}`)
 
   // 左摇杆触控划船
-  const stickDrive = await mobile.evaluate(() => {
+  const stickDrive = await mobile.evaluate(async () => {
     const {walk} = window.viewer
     const advance = walk.tick
     walk.tick = () => {}
@@ -1089,8 +1097,8 @@ try {
     const p0 = walk.position.clone()
     const h0 = walk.heading
     try {
-      joy.dispatchEvent(new PointerEvent('pointerdown', {pointerId: 31, pointerType: 'touch', clientX: cx, clientY: cy, bubbles: true}))
-      joy.dispatchEvent(new PointerEvent('pointermove', {pointerId: 31, pointerType: 'touch', clientX: cx + jr.width * 0.2, clientY: cy - jr.height * 0.5, bubbles: true}))
+      await window.testStick('down', cx, cy)
+      await window.testStick('move', cx + jr.width * 0.2, cy - jr.height * 0.5)
       for (let i = 0; i < 60; i++) advance(1 / 60)
       const ringColor = getComputedStyle(joy, '::after').borderColor
       const dist = walk.position.distanceTo(p0)
@@ -1098,7 +1106,7 @@ try {
       const dh = Math.abs(Math.atan2(Math.sin(walk.heading - h0), Math.cos(walk.heading - h0)))
       return {ringColor, dist, spd, dh}
     } finally {
-      joy.dispatchEvent(new PointerEvent('pointerup', {pointerId: 31, pointerType: 'touch', bubbles: true}))
+      await window.testStick('up')
       walk.tick = advance
     }
   })
@@ -1114,7 +1122,7 @@ try {
   await mobile.waitForSelector('.toast.show', {state: 'visible', timeout: 5000})
   const toastHud = await measureHud(mobile, [
     '.toast.show', '.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action',
-    '.dock', '.sky-ui', 'output', '.btn-about',
+    '.dock', '.sky-ui', 'output', '.btn-menu', '.account-entry',
   ])
   assert(toastHud.boxes.some(b => b.sel === '.toast.show'), `手机端未测到激活态 .toast.show: ${JSON.stringify(toastHud)}`)
   assert.deepEqual(toastHud.overlaps, [], `手机 390×844 .toast.show 与 HUD 控件重叠: ${JSON.stringify(toastHud)}`)

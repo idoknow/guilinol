@@ -1,3 +1,4 @@
+import {enableStickInput} from './joystick-fixture.mjs'
 import assert from 'node:assert/strict'
 import {copyFile, mkdir, readFile} from 'node:fs/promises'
 import {gunzipSync} from 'node:zlib'
@@ -374,6 +375,7 @@ try {
   const mCar = paintSamples[0]
   const mDoorX = mCar[0] - Math.cos(mCar[3]) * 1.38, mDoorZ = mCar[2] + Math.sin(mCar[3]) * 1.38
   const mPage = await browser.newPage({viewport: {width: 390, height: 844}, hasTouch: true, isMobile: true})
+  await enableStickInput(mPage, true)
   mPage.on('pageerror', err => errors.push(err.message))
   await mPage.goto(`http://127.0.0.1:${server.httpServer.address().port}/?mode=walk&verify&radius=480&hour=9.5`)
   await mPage.waitForFunction(() => window.viewer?.walk?.active, null, {timeout: 90000})
@@ -394,14 +396,14 @@ try {
   await saveShot(mPage, 'car-mobile-pre-mount')
 
   await mPage.locator('.vehicle-action').tap()
-  const mobileCarCheck = await mPage.evaluate(() => {
+  const mobileCarCheck = await mPage.evaluate(async () => {
     const {walk} = window.viewer
     const joy = document.querySelector('.walk-ui .joystick')
     for (let i = 0; i < 6; i++) walk.tick(.06)
     const btnText = document.querySelector('.vehicle-action')?.textContent
     const jumpHidden = getComputedStyle(document.querySelector('.walk-ui .btn-jump')).display === 'none'
-    const runHidden = getComputedStyle(document.querySelector('.walk-ui .btn-run')).display === 'none'
-    const sels = ['.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.btn-about']
+    const runHidden = !document.querySelector('.walk-ui .btn-run')?.getClientRects().length
+    const sels = ['.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action', '.dock', '.sky-ui', 'output', '.btn-menu', '.account-entry']
     const boxes = sels.map(sel => {
       const el = document.querySelector(sel)
       if (!el) return null
@@ -419,11 +421,11 @@ try {
     }
     const jr = joy.getBoundingClientRect(), cx = jr.left + jr.width / 2, cy = jr.top + jr.height / 2
     const pos0 = walk.position.clone(), h0 = walk.heading
-    joy.dispatchEvent(new PointerEvent('pointerdown', {pointerId: 31, pointerType: 'touch', clientX: cx, clientY: cy, bubbles: true}))
-    joy.dispatchEvent(new PointerEvent('pointermove', {pointerId: 31, pointerType: 'touch', clientX: cx + jr.width * .25, clientY: cy - jr.height * .55, bubbles: true}))
+    await window.testStick('down', cx, cy)
+    await window.testStick('move', cx + jr.width * .25, cy - jr.height * .55)
     for (let i = 0; i < 50; i++) walk.tick(1 / 60)
     const dist = walk.position.distanceTo(pos0), spd = walk.speed, dh = Math.abs(walk.heading - h0)
-    joy.dispatchEvent(new PointerEvent('pointerup', {pointerId: 31, pointerType: 'touch', bubbles: true}))
+    await window.testStick('up')
     return {vehicle: walk.vehicle, btnText, jumpHidden, runHidden, overlaps, dist, spd, dh}
   })
   console.log('mobile car check:', mobileCarCheck)

@@ -24,7 +24,7 @@ try{
     await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent==='开车')
     await page.keyboard.press('f')
     await page.waitForFunction(()=>window.viewer.walk.vehicle==='car')
-    await page.screenshot({path:`captures/drive/${width}x${height}.png`})
+    await page.screenshot({path:`captures/drive/${width}x${height}.png`,timeout:120000})
     if(width===1440){
       const result=await page.evaluate(async ({route,quiet,parking})=>{
         const {walk,stream}=window.viewer,pressed=new Set(),path=[],start=performance.now()
@@ -51,7 +51,7 @@ try{
         return {path,elapsedMs:Math.round(performance.now()-start),distance:Math.hypot(walk.position.x-parking[0],walk.position.z-parking[1])}
       },{route,quiet:data.quiet,parking})
       console.log(result);assert(result.distance<=40,'missed parking radius')
-      await page.screenshot({path:'captures/drive/parking.png'})
+      await page.screenshot({path:'captures/drive/parking.png',timeout:120000})
       await page.keyboard.press('f');await page.waitForFunction(()=>window.viewer.walk.vehicle==='foot')
     }
     await page.close()
