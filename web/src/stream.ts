@@ -152,6 +152,7 @@ export class Stream {
 
   private fillRequests(){
     while(this.queue.length && this.pending.size<streamBudget.detailRequests){
+      if(this.loaded.size+this.pending.size>=streamBudget.residentTiles)break
       if(this.queueIsInner && this.innerPending.size>=streamBudget.innerRequests)break
       this.enqueue(this.queue.pop()!,this.queueIsInner)
     }

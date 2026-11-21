@@ -30,7 +30,7 @@ export class TileGrid {
 }
 
 export const streamBudget = {
-  detailRequests: 8, innerRequests: 6, treeRequests: 6,
+  residentTiles: 180, detailRequests: 8, innerRequests: 6, treeRequests: 6,
   parseMs: 5, attachMs: 4,
 }
 
