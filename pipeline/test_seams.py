@@ -19,7 +19,10 @@ class SeamTests(unittest.TestCase):
             with self.subTest(east=east,south=south):
                 street,kinds = streets.at(east,south)
                 self.assertIn(kind,kinds)
-                self.assertLessEqual(abs(street-world.sample(east,south)[0]),.20)
+                from seam_streets import OFFSETS
+                self.assertLessEqual(abs(street-world.sample(east,south)[0]-OFFSETS[kind]),.05)
+        foreground,_ = streets.at(-277.62,-64.23)
+        self.assertGreater(world.entries['jiefang_bridge']['position'][1]+2.75-foreground,1.5)
 
     def test_plaza_driveway_edge(self):
         from audit_seams import ROOT, Surface, Streets, projected_faces

@@ -143,10 +143,10 @@ def world_road_sections(anchor, angle, native_grade=False):
         yield way, LineString(xy @ transform + anchor), station, levels, edge(left), edge(right)
 
 
-def bank_paving(anchor,angle,ways=RAMPS+UPPER_ROADS+LOWER_ROADS+SIDE_ROAD+FOOTWAYS):
+def bank_paving(anchor,angle):
     transform=np.array([[np.cos(angle),np.sin(angle)],[-np.sin(angle),np.cos(angle)]])
     paths=[]
-    for way in ways:
+    for way in RAMPS+UPPER_ROADS+LOWER_ROADS+SIDE_ROAD+FOOTWAYS:
         xy,n,_,_=section(way)
         l,r,w=widths(way)
         edge=lambda offset:xy+n*np.broadcast_to(offset,len(xy))[:,None]
@@ -154,14 +154,18 @@ def bank_paving(anchor,angle,ways=RAMPS+UPPER_ROADS+LOWER_ROADS+SIDE_ROAD+FOOTWA
     return unary_union(paths)
 
 
-def bank_blend(x,z,padding=0):
-    """Blend the promenade grade back to native ground across and along the road."""
+def bank_offset(x,z):
     axis=np.vstack((OSM[LOWER_ROADS[0]][:-1],OSM[LOWER_ROADS[1]]))[::-1]
     center=np.interp(z,axis[:,1],axis[:,0])
     for p,q,overrun in ((axis[0],axis[1],np.minimum(0,z+BANK_LIMIT)),
                         (axis[-1],axis[-2],np.maximum(0,z-BANK_LIMIT))):
         center+=overrun*(p[0]-q[0])/(p[1]-q[1])
-    d=x-center
+    return x-center
+
+
+def bank_blend(x,z,padding=0):
+    """Blend the promenade grade back to native ground across and along the road."""
+    d=bank_offset(x,z)
     across=np.clip((d+12+padding)/6,0,1)*np.clip((promenade_offset(z)+10+padding-d)/6,0,1)
     along=np.clip((BANK_LIMIT+34-abs(z))/26,0,1)
     return across*along**2*(3-2*along)
@@ -224,3 +228,24 @@ def grade_banks(terrain,original,wet,left,top,step,anchor,angle,datum,finish=Fal
         for field in (original,terrain):
             patch=field[rows,cols]
             patch[:]=np.rint(patch+blend*np.minimum(0,bed-patch))
+            weight=lower_junction_weight(x,z)*(~wet[rows,cols])
+            patch[:]=np.rint(patch+weight*(10*lower_subgrade(x,z,datum)-patch))
+
+
+def lower_junction_weight(x,z):
+    taper=np.clip((101-abs(z))/23,0,1)
+    return bank_blend(x,z,14)*taper*taper*(3-2*taper)
+
+
+def lower_subgrade(x,z,datum):
+    return datum+LOWER-.07+.003*np.clip(bank_offset(x,z),0,18)
+
+
+def grade_binjiang_streets(control,left,top,step,anchor,angle,datum):
+    rows,cols=np.ogrid[:control.shape[0],:control.shape[1]]
+    east=left+(cols-1)*step-anchor[0]
+    south=top+(rows-1)*step-anchor[1]
+    x=east*np.cos(angle)+south*np.sin(angle)
+    z=-east*np.sin(angle)+south*np.cos(angle)
+    weight=lower_junction_weight(x,z)
+    control+=weight*np.minimum(0,lower_subgrade(x,z,datum)-control)

@@ -17,7 +17,7 @@ from shapely.geometry import box, Point
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem, load_osm
 from features import building_mesh, buildings, game_court, ground_features, points, polygons, raw_overture_footprints, rongyin_sidewalk
 from karst import generate
-from landmarks.jiefang_layout import LOWER_ROADS, bank_paving, grade_banks
+from landmarks.jiefang_layout import bank_paving, grade_banks, grade_binjiang_streets
 from bridges import bridge_tiles
 from road_grading import build_ground_mesh_lookup, eval_bspline_grid, solve_road_and_bridge_elevations
 from scatter import CONFIG, extract_road_network, scatter
@@ -137,14 +137,12 @@ def build(bbox, output, palette):
     west_portal=None
     modeled_paving=None
     deck_mask=None
-    lower_shoulder=None
     for x,z,entry in layout.entries:
         if entry['id']=='jiefang_bridge' and bounds.covers(Point(x,z)):
             x_jb, z_jb = x, z
             datum=previous_bed[round((z-top)/GRID),round((x-left)/GRID)]/10
             angle=-np.deg2rad(entry['rotation'])
             bank_pavement=bank_paving((x,z),angle)
-            lower_shoulder=bank_paving((x,z),angle,LOWER_ROADS).buffer(7)
             axes=np.array([[np.cos(angle),np.sin(angle)],[-np.sin(angle),np.cos(angle)]])
             corners=np.array([[-136,-21.5],[-103,-21.5],[-103,21.5],[-136,21.5]])
             west_portal=ShapelyPolygon(corners@axes+[x,z])
@@ -216,6 +214,7 @@ def build(bbox, output, palette):
     )
     if interchange is not None:
         grade_banks(terrain, original, wet, left, top, GRID, (x_jb, z_jb), angle, datum, finish=True)
+        grade_binjiang_streets(road_ctrl,left,top,8,(x_jb,z_jb),angle,datum)
         from east_grading import grade_east, grade_landing
         east_road = next(road.line for road in roads if road.way == 682893309)
         for field in (terrain,original):
@@ -332,7 +331,7 @@ def build(bbox, output, palette):
             slab = xiaoyao_access.gallery_floor(east,south,entry['rotation'])
             for way in xiaoyao_access.GALLERY_PAVING_WAYS:
                 walkable_by_way[way] = walkable_by_way.get(way,ShapelyPolygon()).union(slab)
-    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving,walkable_by_way=walkable_by_way,gate_plaza=gate_plaza,deck_mask=deck_mask,lower_shoulder=lower_shoulder)
+    streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving,walkable_by_way=walkable_by_way,gate_plaza=gate_plaza,deck_mask=deck_mask)
     (output/'marking-audit.json').write_text(json.dumps(lengths.pop('markingOverlap')))
     print('Lengths (m):',lengths)
     def asset(name):
