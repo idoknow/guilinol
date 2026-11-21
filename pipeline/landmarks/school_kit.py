@@ -704,6 +704,7 @@ class SchoolBuilder:
         self.surface = _bootstrap_surface(school_id)
         self.atlas = MeshPart()
         self.lit = MeshPart()
+        self.paving = MeshPart()
         self.hit_v: list[tuple[float, float, float]] = []
         self.hit_f: list[tuple[int, int, int]] = []
         self.pose = (0.0, 0.0, 0.0, 0.0)
@@ -1132,10 +1133,20 @@ class SchoolBuilder:
     def perimeter_fence(self, ring_xz: list[tuple[float, float]], gate_edge: int,
                         gate_t0: float = 0.35, gate_t1: float = 0.65,
                         wall_h: float = 2.25, base_reg: str = 'wall_accent', post_reg: str = 'white',
-                        skip_edges: set[int] | None = None):
+                        skip_edges: set[int] | None = None, drop_steep_bays: bool = False):
         pts = self._clean_ring_ccw(ring_xz)
         n = len(pts)
         base_h = 0.85
+
+        def pier_ok(x, z, g):
+            if not drop_steep_bays:
+                return True
+            for ox, oz in ((0.3, 0.0), (-0.3, 0.0), (0.0, 0.3), (0.0, -0.3)):
+                d = self.ground(x + ox, z + oz) - g
+                if d < -0.19 or d > 0.24:
+                    return False
+            return True
+
         for idx in range(n):
             if skip_edges and idx in skip_edges:
                 continue
@@ -1176,13 +1187,25 @@ class SchoolBuilder:
                     px1, pz1 = ax + dx * ((bi + 1) / bays), az + dz * ((bi + 1) / bays)
                     mx, mz = (px0 + px1) * 0.5, (pz0 + pz1) * 0.5
                     g0, g1, gm = self.ground(px0, pz0), self.ground(px1, pz1), self.ground(mx, mz)
-                    if self.lod < 2:
+                    visible = True
+                    if drop_steep_bays:
+                        # Embankment under the fence line: a bay whose base cannot sit inside the
+                        # grounding band across its width is left out visually (collision stays).
+                        nx, nz = -dz / length * 0.3, dx / length * 0.3
+                        for (qx, qz, gq) in ((px0, pz0, g0), (mx, mz, (g0 + g1) * 0.5), (px1, pz1, g1)):
+                            for sg in (-1.0, 1.0):
+                                d = self.ground(qx + nx * sg, qz + nz * sg) - gq
+                                if d < -0.19 or d > 0.24:
+                                    visible = False
+                    visible = visible and pier_ok(px0, pz0, g0) and pier_ok(px1, pz1, g1)
+                    if self.lod < 2 and visible:
                         # Instanced narrow pier at start of bay (follows terrain within +-0.2m!)
                         self.add_instance(
                             f'fence_pier_{base_reg}_{post_reg}_{self.lod}',
                             lambda br=base_reg, pr=post_reg, l=self.lod: make_fence_pier_template(wall_h, br, pr, lod=l),
                             px0, g0, pz0, yaw=yaw, use_pose=False,
                         )
+                    if self.lod < 2 and visible:
                         # Slope-following continuous masonry base wall & top rail between g0 and g1
                         self._sloped_beam((px0, pz0), g0 - 0.04, g0 + base_h, (px1, pz1), g1 - 0.04, g1 + base_h,
                                           0.32, base_reg, 'white')
@@ -1209,7 +1232,7 @@ class SchoolBuilder:
                         self.pose = old
                 # End cap pier
                 gy_end = self.ground(bx, bz)
-                if self.lod < 2:
+                if self.lod < 2 and pier_ok(bx, bz, gy_end):
                     self.add_instance(
                         f'fence_pier_{base_reg}_{post_reg}_{self.lod}',
                         lambda br=base_reg, pr=post_reg, l=self.lod: make_fence_pier_template(wall_h, br, pr, lod=l),
@@ -1311,7 +1334,7 @@ class SchoolBuilder:
 
     def basketball_court(self, cx: float, cz: float, yaw: float = 0.0, w: float = 28.0, d: float = 15.0,
                          surface: str = 'court_a', apron: str | None = 'track_red', key_reg: str = 'track_red',
-                         lift: float = 0.0):
+                         lift: float = 0.0, hoops: bool = True):
         old = self.pose
         y0 = self.ground(cx, cz) + 0.025 + lift
         self.pose = (cx, 0.0, cz, yaw)
@@ -1328,9 +1351,9 @@ class SchoolBuilder:
             self.box(-w * 0.5, line_y, 0.0, lw, 0.02, d, 'white')
             self.box(w * 0.5, line_y, 0.0, lw, 0.02, d, 'white')
             self.box(0.0, line_y, 0.0, lw, 0.02, d, 'white')
-            for sgn in (-1.0, 1.0):
+            for sgn in (-1.0, 1.0) if hoops else ():
                 self.box(sgn * (w * 0.5 - 2.65), line_y, 0.0, 5.3, 0.02, 4.6, key_reg, cap_region=key_reg)
-        if self.lod < 2:
+        if self.lod < 2 and hoops:
             for sgn in (-1.0, 1.0):
                 px_h = sgn * (w * 0.5 + 0.65)
                 hyaw = math.pi if sgn > 0 else 0.0
@@ -1563,6 +1586,10 @@ def export_school_glb(school_id: str, palette: dict, signs: dict, build_fn, seed
         {'name': 'collision_mat', 'pbrMetallicRoughness': {'baseColorFactor': [0.5, 0.5, 0.5, 1.0], 'roughnessFactor': 1.0}},
     ]
 
+    if any(b.paving.f for b in builders):
+        materials.append({'name': 'campus_paving', 'pbrMetallicRoughness': {
+            'baseColorFactor': [0.67, 0.65, 0.60, 1.0], 'metallicFactor': 0, 'roughnessFactor': 1}})
+
     meshes = []
     nodes = []
     root_nodes = []
@@ -1577,6 +1604,8 @@ def export_school_glb(school_id: str, palette: dict, signs: dict, build_fn, seed
         p_lit = _pack_part_into_gltf(b.lit, 1, blobs, buffer_views, accessors)
         if p_lit:
             prims.append(p_lit)
+        if b.paving.f:
+            prims.append(_pack_part_into_gltf(b.paving, 3, blobs, buffer_views, accessors))
         if prims:
             m_idx = len(meshes)
             meshes.append({'name': f'{lod_name}_mesh', 'primitives': prims})

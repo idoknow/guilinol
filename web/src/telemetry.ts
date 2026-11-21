@@ -1,3 +1,4 @@
+import {sessionMetrics, visitor, vitals} from './session-metrics'
 import type {WebGLRenderer} from 'three'
 
 const enabled = typeof crypto.randomUUID==='function' && Math.random() < Number(import.meta.env.VITE_TELEMETRY_SAMPLE_RATE ?? 1)
@@ -8,13 +9,28 @@ const queue: Fields[] = []
 const percentile = (sorted: number[], p: number) => sorted[Math.max(0, Math.ceil(sorted.length * p) - 1)] ?? 0
 type State = {mode:string;x:number;z:number;chunks:number}
 let currentState:(()=>State)|undefined
+const session=enabled?sessionMetrics(()=>currentState?.()):undefined
+export function fault(errorKind:string,filename='',line=0,reason?:unknown) {
+  if(!enabled)return
+  if(!filename && reason instanceof Error && typeof reason.stack==='string'){
+    // Examine stack frames locally. Only the basename hash leaves the browser.
+    const frame=reason.stack.split('\n').slice(1).join('\n').match(/(?:https?:\/\/[^\s)]+\/)([^/\s)]+?):(\d+):\d+(?:\)|$)/m)
+    if(frame){filename=frame[1];line=Number(frame[2])}
+  }
+  const file=filename.split(/[?#]/)[0].split('/').pop()??''
+  let hash=2166136261
+  for(const c of file+':'+line) hash=Math.imul(hash^c.charCodeAt(0),16777619)
+  record('error',{count:1,errorKind,signature:(hash>>>0).toString(16).padStart(8,'0')})
+}
 export function record(kind: string, fields: Fields) {
   if (!enabled || queue.length>=512)return
   const s=currentState?.()
   const grid=s?Math.floor(s.x/250)+','+Math.floor(s.z/250):''
   queue.push({kind,mode:s?.mode??'menu',grid,...fields})
 }
-export function operation(kind: string, start: number) {
+export function operation(kind: string, start: number, completed=true) {
+  if(kind==='teleport'&&completed)session?.teleport()
+  if(kind==='mapOpen')session?.mapOpen()
   record(kind, {ms: Math.round(performance.now() - start)})
 }
 
@@ -88,11 +104,14 @@ if (enabled) {
   },0)
   if (document.readyState==='complete') navigation()
   else addEventListener('load',navigation,{once:true})
-  addEventListener('error',()=>record('error',{count:1}))
-  addEventListener('unhandledrejection',()=>record('error',{count:1}))
+  Object.assign(context,visitor())
+  const getVitals=vitals()
+  const checkpoint=()=>{record('session',session!.snapshot());const values=getVitals();if(Object.keys(values).length)record('vitals',values);report()}
+  addEventListener('error',e=>fault('error',e.filename,e.lineno))
+  addEventListener('unhandledrejection',e=>fault('rejection','',0,e.reason))
   setInterval(report,30000)
-  addEventListener('pagehide',report)
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)report()})
+  addEventListener('pagehide',checkpoint)
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)checkpoint();else session?.sample()})
 }
 export function identifyWorld(bytes:ArrayBuffer) {
   if (enabled) void crypto.subtle.digest('SHA-256',bytes).then(hash=>{
@@ -103,8 +122,10 @@ export function instrument(renderer: WebGLRenderer, state:()=>State) {
   if (!enabled) return ()=>{}
   currentState=state
   const gl=renderer.getContext(), ext=gl.getExtension('WEBGL_debug_renderer_info')
+  context.maxTextureSize=gl.getParameter(gl.MAX_TEXTURE_SIZE)
+  context.webgl2=Number(renderer.capabilities.isWebGL2)
   if(ext) context.gpu=String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)).replace(/[^\p{L}\p{N} (),.:_+/@\[\]-]/gu,' ').slice(0,160)
-  renderer.domElement.addEventListener('webglcontextlost',()=>record('contextLost',{count:1}))
+  renderer.domElement.addEventListener('webglcontextlost',()=>{record('contextLost',{count:1});fault('webgl')})
   let frames:number[]=[]
   setInterval(()=>{
     const s=state()

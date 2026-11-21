@@ -98,3 +98,10 @@ dialog.ui-panel::backdrop,dialog.about-panel::backdrop{background:rgba(12,20,20,
   --region-font: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
   --region-font-size: 12px;
 }
+:root {
+  /* 管理后台（IDOK-129）：宣纸上的数据卡片。卡片比纸底亮一档，图表六色取自青玉、朱砂、赭石、黛蓝。 */
+  --ui-paper-hi: #fbf8f0;
+  --ui-good: #3f7a6c;
+  --ui-bad: #b0472f;
+  --adm-c1: #4f7f7a; --adm-c2: #c0634a; --adm-c3: #c49a4a; --adm-c4: #2f4a45; --adm-c5: #7d8fae; --adm-c6: #9aa36f;
+}

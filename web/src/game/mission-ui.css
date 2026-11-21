@@ -1,0 +1,404 @@
+/* Stage 1B Mission HUD & Picker UI (docs/style.md Phase 2 桂林街头 palette; zero-overlap on desktop/390x844/844x390) */
+.gl-mission-entry {
+  position: fixed;
+  left: 50%;
+  top: calc(12px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 17px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(14, 17, 21, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #f6f4ef;
+  font-family: "PingFang SC", "Noto Sans CJK SC", "Source Han Sans SC", system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.gl-mission-entry:hover {
+  background: rgba(14, 17, 21, 0.92);
+  border-color: rgba(255, 197, 61, 0.65);
+}
+.gl-mission-entry b {
+  color: #ffc53d;
+  font-variant-numeric: tabular-nums;
+}
+.gl-mission-entry i {
+  font-style: normal;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #20d6c1;
+  color: #101216;
+}
+.gl-mission-entry.quiet i {
+  background: rgba(255, 61, 79, 0.9);
+  color: #fff;
+}
+
+.gl-mission-hud {
+  position: fixed;
+  left: 50%;
+  top: calc(52px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  z-index: 5;
+  width: min(460px, calc(100vw - 360px));
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #f6f4ef;
+  font-family: "PingFang SC", "Noto Sans CJK SC", "Source Han Sans SC", system-ui, sans-serif;
+}
+.gl-mission-hud[hidden],
+body[data-home] .gl-mission-entry,
+body[data-home] .gl-mission-hud,
+body[data-photo="on"] .gl-mission-entry,
+body[data-photo="on"] .gl-mission-hud,
+body[data-shop-open] .gl-mission-entry,
+body[data-shop-open] .gl-mission-hud,
+body[data-hud="street"] .gl-mission-entry,
+body[data-hud="street"] .gl-mission-hud {
+  display: none !important;
+}
+
+.gl-mission-hud .st-mission {
+  position: static;
+  transform: none;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.gl-mission-hud .st-mission header {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(14, 17, 21, 0.80);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.gl-mission-hud .st-line {
+  font-size: 11px;
+  font-weight: 800;
+  color: #101216;
+  background: #20d6c1;
+  border-radius: 6px;
+  padding: 3px 7px;
+}
+.gl-mission-hud .st-step {
+  font-size: 13px;
+  font-weight: 700;
+}
+.gl-mission-hud .st-timer {
+  font-weight: 800;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: #ffc53d;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+}
+.gl-mission-hud .st-timer.low {
+  color: #ff3d4f;
+}
+.gl-mission-hud .st-timer.frozen {
+  color: #20d6c1;
+}
+.gl-mission-abandon {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 61, 79, 0.22);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.gl-mission-abandon:hover {
+  background: rgba(255, 61, 79, 0.72);
+}
+.gl-mission-hud .st-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(14, 17, 21, 0.76);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+  font-weight: 700;
+}
+.gl-mission-hud .st-meter i {
+  width: 120px;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+.gl-mission-hud .st-meter em {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #ffc53d, #20d6c1);
+  border-radius: 4px;
+}
+.gl-mission-hud .st-sub {
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(14, 17, 21, 0.68);
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: center;
+}
+.gl-mission-hud .st-sub b {
+  color: #ffc53d;
+  margin-right: 6px;
+}
+
+/* Mission Board Dialog */
+dialog.mission-board {
+  width: min(560px, calc(100vw - 24px));
+  max-height: min(82vh, 660px);
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  background: rgba(14, 17, 21, 0.94);
+  color: #f6f4ef;
+  font-family: "PingFang SC", "Noto Sans CJK SC", "Source Han Sans SC", system-ui, sans-serif;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+}
+dialog.mission-board::backdrop {
+  background: rgba(8, 10, 14, 0.56);
+  backdrop-filter: blur(4px);
+}
+.mb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.mb-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+.mb-wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffc53d;
+  font-variant-numeric: tabular-nums;
+}
+.mb-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f6f4ef;
+  font-size: 18px;
+  cursor: pointer;
+}
+.mb-wardrobe-btn {
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(32, 214, 193, 0.55);
+  background: rgba(32, 214, 193, 0.16);
+  color: #20d6c1;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.mb-wardrobe-btn:hover {
+  background: rgba(32, 214, 193, 0.28);
+}
+.mb-body {
+  padding: 12px 16px 16px;
+  overflow-y: auto;
+  max-height: calc(min(82vh, 660px) - 62px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mb-quiet-banner {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 61, 79, 0.16);
+  border: 1px solid rgba(255, 61, 79, 0.5);
+  color: #ffd3d7;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.mb-spots-tip {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(32, 214, 193, 0.12);
+  border: 1px solid rgba(32, 214, 193, 0.34);
+  font-size: 12px;
+  color: #c8f7ef;
+}
+.mb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+}
+.mb-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mb-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 800;
+}
+.mb-tag {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(32, 214, 193, 0.22);
+  color: #20d6c1;
+}
+.mb-tag.errand {
+  background: rgba(255, 197, 61, 0.22);
+  color: #ffc53d;
+}
+.mb-reward {
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffc53d;
+  font-variant-numeric: tabular-nums;
+}
+.mb-desc {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(246, 244, 239, 0.78);
+  line-height: 1.45;
+}
+.mb-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+.mb-meta {
+  font-size: 11.5px;
+  color: rgba(246, 244, 239, 0.65);
+}
+.mb-btn {
+  min-height: 34px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffc53d;
+  color: #101216;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.mb-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.mb-btn.abandon {
+  background: rgba(255, 61, 79, 0.88);
+  color: #fff;
+}
+
+/* Portrait phone (390x844) & narrow viewports: park on middle-left below .render-entry and above .joystick */
+@media (max-width: 560px) {
+  .gl-mission-entry {
+    left: calc(12px + env(safe-area-inset-left));
+    top: calc(188px + env(safe-area-inset-top));
+    transform: none;
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+    max-width: calc(100vw - 144px);
+  }
+  .gl-mission-hud {
+    left: calc(12px + env(safe-area-inset-left));
+    top: calc(226px + env(safe-area-inset-top));
+    transform: none;
+    width: min(238px, calc(100vw - 142px));
+    align-items: flex-start;
+  }
+  .gl-mission-hud .st-mission {
+    align-items: flex-start;
+  }
+  .gl-mission-hud .st-mission header {
+    justify-content: flex-start;
+    padding: 5px 8px;
+    gap: 6px;
+  }
+  .gl-mission-hud .st-step {
+    font-size: 12px;
+  }
+  .gl-mission-hud .st-meter i {
+    width: 86px;
+  }
+  .gl-mission-hud .st-sub {
+    display: none;
+  }
+}
+
+/* Landscape phone (844x390, 640x360): park in the clear channel between .sky-ui (<=400px) and .dock (right ~113px) */
+@media (pointer: coarse) and (max-height: 500px) {
+  .gl-mission-entry {
+    left: auto;
+    right: calc(122px + env(safe-area-inset-right));
+    top: calc(10px + env(safe-area-inset-top));
+    transform: none;
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+  .gl-mission-hud {
+    left: auto;
+    right: calc(122px + env(safe-area-inset-right));
+    top: calc(46px + env(safe-area-inset-top));
+    transform: none;
+    width: min(296px, calc(100vw - 534px));
+    align-items: flex-end;
+  }
+  .gl-mission-hud .st-mission {
+    align-items: flex-end;
+  }
+  .gl-mission-hud .st-mission header {
+    justify-content: flex-end;
+  }
+  .gl-mission-hud .st-sub {
+    display: none;
+  }
+}

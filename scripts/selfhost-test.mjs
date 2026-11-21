@@ -71,7 +71,8 @@ export async function fixture({postgresOnly=false}={}) {
       if(attempt>=100||minio?.exitCode!=null)throw Error('Test services not ready')
       await delay(300)
     }
-    await pool.query(await readFile('deploy/postgres/001-schema.sql','utf8'))
+    for(const migration of ['001-schema','002-telemetry','003-admin'])
+      await pool.query(await readFile('deploy/postgres/'+migration+'.sql','utf8'))
     if(!postgresOnly){
       const s3=new S3Client({endpoint:S3_ENDPOINT,region:'us-east-1',forcePathStyle:true,credentials})
       try{await s3.send(new CreateBucketCommand({Bucket:'glol-feedback'}))}finally{s3.destroy()}

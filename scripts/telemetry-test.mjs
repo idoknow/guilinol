@@ -72,3 +72,12 @@ test('curl probe posts timings for eight fixed paths, including a failed target'
     assert.equal(payload.rows.find(row=>row.target==='chunk3').status,503)
   }finally{await new Promise(resolve=>server.close(resolve))}
 })
+
+test('anonymous session context and event schemas',()=>{
+  const context={vid:randomUUID(),firstDay:'2026-11-22',language:'zh',referrer:'search',maxTextureSize:8192,webgl2:1}
+  const rows=[{kind:'vitals',cls:0},{kind:'session',total:42,walkMeters:10,walkSeconds:4},{kind:'error',count:1,errorKind:'error',signature:'deadbeef'},
+    {kind:'retry',category:'landmark'},{kind:'failure',category:'chunk'},{kind:'funnel',step:'feedbackSuccess'}]
+  assert.ok(validate({...batch(),context,rows}))
+  for(const row of [{kind:'error',count:1,signature:'main.js:42'},{kind:'funnel',step:'admin@example.test'}])
+    assert.equal(validate({...batch(),context,rows:[row]}),false)
+})

@@ -1,0 +1,37 @@
+{
+  "id": "errand-02",
+  "line": "errand",
+  "title": "微笑堂→十字街车行送配件",
+  "summary": "把定制后视镜配件盒从微笑堂东口穿过十字街送达「漓行电驴行 · 十字街总店」。",
+  "recommendedVehicle": "any",
+  "giver": [-912, -162],
+  "steps": [
+    {
+      "kind": "pickup",
+      "at": [-905, -145],
+      "radius": 8,
+      "timer": 90,
+      "text": "在微笑堂东侧路边取上电摩配件盒",
+      "npc": {
+        "who": "配件小哥",
+        "text": "“往东过十字街就是解放东路拐角「漓行电驴行」，帮我捎过去！”"
+      }
+    },
+    {
+      "kind": "deliver",
+      "at": [-792, -156],
+      "radius": 10,
+      "timer": 120,
+      "text": "送达 漓行电驴行 · 十字街总店",
+      "npc": {
+        "who": "车行老板",
+        "text": "“谢啦！入门「漓江小轻骑」只要 ¥1,800，店门口就能试驾。”"
+      }
+    }
+  ],
+  "reward": 220,
+  "repeatReward": 100,
+  "minReward": 220,
+  "repeatMinReward": 100,
+  "failOn": ["timeout"]
+}

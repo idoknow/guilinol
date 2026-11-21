@@ -42,3 +42,41 @@
 ## 大陆探针
 
 两份 CronJob 分别调度到广州和上海节点，每 15 分钟访问首页、manifest、五个固定 chunk 和 `GET /api/health`。健康检查仅确认 API 进程可应答。每个请求记录 DNS、TCP、TLS 阶段耗时、从开始到首字节及总耗时（ms），保留 HTTP 状态码，连接失败记为 0。每轮用 Pod UID 作为批次会话标识。探针通过同源接收接口上报 `context.source=probe`、节点名与八条事件，管理员可查询 `metric=probe.total`、`probe.ttfb`、`probe.dns`、`probe.tcp` 或 `probe.tls`，按 `group=node` 或 `group=target` 查看节点和目标的分布。浏览器继续加载现有 Umami，游戏遥测只发往本站。
+
+## 会话、可靠性与漏斗
+
+匿名浏览器上下文增加随机 UUID `vid`、首次访问 UTC 日期 `firstDay`、本次打开是否复用已存访客 ID 的 `returnVisit`（0/1）、主语言 `language`、来源类别 `referrer`（direct/search/social/internal/other）、`maxTextureSize` 和 0/1 的 `webgl2`。访客 ID 存在 localStorage 中，清除存储后生成新 ID。拒绝存储时仍采集会话。服务端按接收时间分桶。
+
+| rows[].kind | 字段及口径 |
+| --- | --- |
+| session | 切后台和 pagehide 时的累计快照。total、visible 和 walkSeconds/driveSeconds/flySeconds/mapSeconds/menuSeconds 单位为秒。对应的 *Meters 为每秒采样位置的水平移动距离。teleports、mapOpens、grids 分别为传送、打开地图和不同网格数。计算时长取每个会话在区间内最后一份快照。 |
+| vitals | lcp、fcp、inp 单位 ms，cls 无单位。隐藏时输出浏览器支持且已观测的指标。INP 取已观测交互最大耗时的第 98 百分位，CLS 取最大布局偏移窗口。 |
+| failure / retry | 每次失败或重试一条，category 为 chunk/landmark/manifest。主动取消加载不计失败。 |
+| error | count、errorKind（error/rejection/webgl/chunk）及 8 位十六进制 signature。签名只使用文件名和行号。没有来源位置时，同种错误合并为一组。 |
+| funnel | step 为 loginOpen/loginSuccess/feedbackOpen/feedbackSuccess。首次可操作复用 playable 事件。 |
+
+## 新版管理接口
+
+路径前缀为 `/api/admin/`，GET 使用管理员会话，POST 同时需要同源 Origin。未登录返回 401，普通用户返回 403；错误体为 `{"error":{"code":"…","message":"…"}}`。统计接口的 from、to 沿用上文的半开区间。服务端时间为 ISO 时间字符串，账户和审计的 created_at 为 Unix 秒。
+
+| 路径 | 参数 | 成功响应 |
+| --- | --- | --- |
+| overview | from,to | 每个 KPI 为一个键，对应 {current,previous}；previous 为前一等长区间。计数缺省 0，无样本的分位数或比率为 null。 |
+| timeseries | from,to,metric,bucket,group | [{t,value,samples}]，t 为 UTC 桶起点，无样本桶省略。bucket 取 5m/1h/1d，默认 1h。group 为 device/region，设置后每行多一个 group，按区间样本量保留前六组。注册、反馈和服务端指标缺少设备和地区信息，分组查询时归入 unknown。 |
+| breakdown | from,to,dim,metric | [{label,samples,sessions,p50,p95}]。dim 为 region/city/isp/device/os/browser/gpu/build/language/referrer/mode，缺省 device。metric 使用性能指标及分位后缀，缺省 fps.p50。两个分位数均返回。 |
+| funnel | from,to | [{step,sessions}]，固定五步，按触发过该步的会话独立去重，包含零计数。 |
+| errors | from,to | [{kind,signature,build,count,sessions,first,last}]，按次数降序取前 50 个签名与版本组合。旧的无签名事件只计入错误率。 |
+| live | 无 | {online,modes,regions,server}。最近五分钟按每个会话最后的状态归类；modes/regions 含 mode、region、level 和人数 n。server 为 {minute,sample,errors5xx} 或 null，sample 字段同 perf/server。 |
+| users | role,q,cursor | role 可传 admin 或 user。返回 {items,next_cursor}。 |
+| POST users/:id/role | JSON {role} | {id,role}。仅可修改已验证邮箱，unverified/self_demotion/last_admin 返回 409。唯一管理员降级优先返回 last_admin。 |
+| audit | cursor,target_type,target_id | {items,next_cursor}，每页 50 条，按 id 降序。每项含 id、actor_id、action、target_type、target_id、detail、created_at。action 为 role/status/start_ai/reply，detail 分别含 role、from/to、from/to、空对象。 |
+| feedback/:id | 无 | 管理详情增加 allowed_transitions，每项为 {status,label,needs_message}。need_info/rejected/duplicate 要求说明；批准后由桥接进程入队。非法转换返回 409。 |
+| stats | 无 | {total,verified,new_24h,feedback,pending}。feedback 为所有状态的计数，pending 为 submitted 加有未读用户消息的 need_info。 |
+
+overview 和 timeseries 的 KPI 为 online、visitors、newVisitors、returnRate、sessions、durationAvg、durationP50、playableP50、playableP95、fpsP50、chunkP95、errorRate、contextLost、api5xxRate、registrations、feedback。online 为区间末五分钟内出现的会话数；无结束快照的会话参与会话计数。首次生成 ID 的会话计入新访客，回访率取区间内复用已存 ID 的去重访客数除以访客数；同日再次打开也算回访。旧版缺少 returnVisit 时按 UTC 日期判断。errorRate 按会话，api5xxRate 按请求，比例均为 0–1。timeseries 也支持上述 perf 表中所有 metric 及 lcp/cls/inp/fcp，追加 .p50 或 .p95 后缀，例如 api.login.p95。
+
+按序执行 002 和幂等的 003-admin.sql。旧事件仍可用于已有指标；历史缺失的访客、会话快照、错误签名和管理员动作均无法追溯。审计从迁移开始记录，与实际写操作在同一事务提交。
+
+加载失败和重试计数可在 timeseries 用 failure.chunk、failure.landmark、failure.manifest、retry.chunk、retry.landmark、retry.manifest 查询。会话各累计字段的性能分布可用 session.<字段>.p50 或 .p95。WebGL 能力字段在浏览器上下文内。确认开始 AI 制作仍写 approved，桥接脚本中继后写 queued。
+
+003 迁移会从既有服务端分钟记录的 routes 自动计算请求总数和 5xx 总数。服务端自动回填已结束 UTC 日的 perf_session_day、perf_value_day；同一日的标记与摘要在一个事务中提交。概览、按设备/地区拆分及按日的 fps、playable、chunk 使用会话去重和按数值计数的分布做精确线性分位插值。半天区间、未完成回填的天以及其他维度查询原始事件。90 天的对照区间可能早于原始数据保留期。查看 500 万行 HTTP 验收的实测响应、时延和 PostgreSQL EXPLAIN 可运行 `node --import tsx scripts/analytics-bench.mjs plans.json`，需要与 verify:telemetry 相同的临时 PostgreSQL 环境。

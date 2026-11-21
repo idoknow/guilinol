@@ -29,6 +29,17 @@ export interface ShopCameraRig {
   fovDeg: number
 }
 
+export interface ShopDisplayStand {
+  readonly id: string
+  readonly modelId: 'lijiang_light' | 'city_range' | 'xiangshan_gt'
+  /** World showcase plinth center [x, y, z]; runtime Y snaps dynamically to loaded landmark plinth top. */
+  readonly pos: [number, number, number]
+  /** Subject facing yaw (Three.js -Z forward convention). */
+  readonly yaw: number
+  /** Plinth elevation above local apron surface (meters). */
+  readonly plinthHeight: number
+}
+
 export interface ShopTriggerDef {
   shopId: string
   kind: ShopKind
@@ -40,6 +51,7 @@ export interface ShopTriggerDef {
   hintRadius: number
   facingYaw: number
   cameraRig: ShopCameraRig
+  displayStands?: readonly ShopDisplayStand[]
   deliveryBay?: {x: number; y: number; z: number; yaw: number}
   testRideSpawn?: {x: number; y: number; z: number; yaw: number}
   serviceBay?: {x: number; y: number; z: number; radius: number}
@@ -72,27 +84,28 @@ const DEFAULT_SHOPS: readonly ShopTriggerDef[] = [
     displayName: '漓尚服饰 · 微笑堂店',
     brandName: '漓尚服饰',
     landmarkId: 'nikoniko',
-    // nikoniko world origin (-974.91, 151.5, -121.59) + local (+55.2, 0, -6.0) on open east-wing granite apron,
-    // >12m away from NE canopies (52.5,-18.5)/(46.2,-23.8) and >22m away from north camphor trees.
-    triggerPos: [-919.71, 151.5, -127.59],
+    // nikoniko anchor (-974.905, 151.5, -121.586) + EastWing_Main bay 5+6 wall center (48.713, 16.147).
+    // triggerPos (+1.95 m) & stagePos (+2.15 m) sit squarely on +0.247 m Zhongshan M. Rd sidewalk inside apron:
+    // ~1.0 m inside sidewalk curb, >5.7 m from carriageway, >=7.5 m from Lamp_N, >=17 m from Pylon_E.
+    triggerPos: [-924.31, 151.75, -104.93],
     triggerRadius: 3.2,
     hintRadius: 18,
-    facingYaw: -1.52,
+    facingYaw: -1.8348,
     cameraRig: {
-      stagePos: [-920.91, 151.5, -127.59],
-      stageYaw: -1.52,
-      orbitRadius: 3.3,
-      minRadius: 2.1,
-      maxRadius: 4.8,
-      pitchRad: 0.16,
+      stagePos: [-924.12, 151.75, -104.88],
+      stageYaw: 1.3068,
+      orbitRadius: 2.4,
+      minRadius: 1.8,
+      maxRadius: 3.6,
+      pitchRad: 0.14,
       targetHeightOffset: 1.05,
       fovDeg: 44,
     },
     quietCheck: true,
     mapMarker: {
-      label: '漓尚服饰',
+      label: '微笑堂服装店',
       badge: '服饰',
-      keywords: '微笑堂服装店漓尚服饰买衣服换装衣橱',
+      keywords: '微笑堂服装店漓尚服饰买衣服换装衣橱nikoniko',
     },
   },
   {
@@ -101,25 +114,39 @@ const DEFAULT_SHOPS: readonly ShopTriggerDef[] = [
     displayName: '漓行电驴行 · 十字街总店',
     brandName: '漓行电驴行',
     landmarkId: 'shizijie',
-    // shizijie world origin (-879.75, 151.5, -169.63) + NE_ANNEX midpoint local (97.6, 0, 10.6),
-    // cleanly centered ~10m between camphor trees at local (88.0, 6.5) and (108.0, 11.2).
-    triggerPos: [-782.15, 151.5, -159.03],
-    triggerRadius: 3.4,
+    // Post-#90 shizijie anchor (-879.750, 151.300, -169.626), NE_ANNEX bays 3+4 wall center local (100.35, 6.82):
+    // outward normal n = (-0.2296, +0.9733), tangent u = (+0.9733, +0.2296), cleanly between camphor trees
+    // Tree_M (88.0, 6.5) and Tree_E (108.0, 11.2). Runtime Y resolves dynamically via ground/supportAt.
+    triggerPos: [-780.05, 151.99, -160.08], // u=0.0, d=+2.8m
+    // Keep triggerRadius (2.2 m) cleanly clear of deliveryBay (2.83 m away) so standing beside a newly delivered
+    // personal e-bike mounts it ('骑我的电摩') instead of accidentally re-opening the shop.
+    triggerRadius: 2.2,
     hintRadius: 18,
-    facingYaw: 2.91,
+    facingYaw: 2.91, // Three.js -Z facing +n (south-southwest toward Jiefang East Rd)
     cameraRig: {
-      stagePos: [-782.5, 151.5, -160.2],
-      stageYaw: 2.91,
-      orbitRadius: 3.8,
-      minRadius: 2.4,
-      maxRadius: 5.6,
-      pitchRad: 0.2,
+      // Forward on open sidewalk at d=+4.2m so full 360° orbit never clips NE_ANNEX wall/piers.
+      stagePos: [-780.37, 151.99, -158.71],
+      // Camera azimuth on street side (-0.92 rad -> classic 3/4 front-side showcase framing with storefront behind).
+      stageYaw: -0.92,
+      orbitRadius: 3.35,
+      minRadius: 2.2,
+      maxRadius: 4.5,
+      pitchRad: 0.16,
       targetHeightOffset: 0.72,
-      fovDeg: 45,
+      fovDeg: 42,
     },
-    deliveryBay: {x: -787.2, y: 151.5, z: -157.8, yaw: -1.34},
-    testRideSpawn: {x: -776.5, y: 151.5, z: -156.2, yaw: -1.34},
-    serviceBay: {x: -797.5, y: 151.5, z: -163.2, radius: 3.2},
+    // Three raised granite exhibition plinths on expanded ne_apron (u = -3.0 / 0.0 / +3.0, d = +1.75m, 3/4 dealership display stance)
+    displayStands: [
+      {id: 'stand_lijiang_light', modelId: 'lijiang_light', pos: [-782.72, 151.99, -161.79], yaw: 2.18, plinthHeight: 0.16},
+      {id: 'stand_city_range', modelId: 'city_range', pos: [-779.80, 151.99, -161.10], yaw: 2.38, plinthHeight: 0.16},
+      {id: 'stand_xiangshan_gt', modelId: 'xiangshan_gt', pos: [-776.88, 151.99, -160.41], yaw: 3.64, plinthHeight: 0.16},
+    ],
+    // u=+1.5, d=+5.2m on open sidewalk next to non-motorized lane; -Z yaw=+1.3391 faces west along Jiefang East Rd
+    deliveryBay: {x: -779.14, y: 151.99, z: -157.40, yaw: 1.3391},
+    // u=0.0, d=+12.4m on Jiefang East Rd carriageway (vehicles.bin pavement=True), -Z yaw=+1.3391 faces west
+    testRideSpawn: {x: -782.25, y: 151.84, z: -150.73, yaw: 1.3391},
+    // u=-6.2, d=+3.2m directly in front of dual-gun fast charger at (u=-6.2, d=+1.70), non-overlapping with triggerPos
+    serviceBay: {x: -786.17, y: 151.87, z: -161.11, radius: 2.6},
     quietCheck: true,
     mapMarker: {
       label: '漓行电驴行',
@@ -156,6 +183,7 @@ export function registerShop(def: ShopTriggerDef): ShopTriggerDef {
       ...def.cameraRig,
       stagePos: [...def.cameraRig.stagePos] as [number, number, number],
     },
+    ...(def.displayStands ? {displayStands: def.displayStands.map(st => ({...st, pos: [...st.pos] as [number, number, number]}))} : {}),
     ...(def.deliveryBay ? {deliveryBay: {...def.deliveryBay}} : {}),
     ...(def.testRideSpawn ? {testRideSpawn: {...def.testRideSpawn}} : {}),
     ...(def.serviceBay ? {serviceBay: {...def.serviceBay}} : {}),

@@ -2,7 +2,7 @@ import './walk.css'
 import {walkConfig as cfg} from '../walk/config'
 import type {CarDynamicTelemetry} from '../walk/car'
 import type {EbikeRideControlInput, EbikeTelemetrySnapshot} from '../walk/ebike-fx'
-import {isGlobalHotkeyBlocked, isTouchInControlZone} from '../walk/input-guard'
+import {isGlobalHotkeyBlocked, isModalOrOverlayOpen, isTouchInControlZone} from '../walk/input-guard'
 
 const MOD_LABELS = {stock: '素车', ghostfire: '鬼火', neon: '霓虹'} as const
 
@@ -285,6 +285,10 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
       runHold=false;runLock=false;runPointer=-1;syncRun()
     },
     read(){
+      if(isModalOrOverlayOpen()){
+        if(keys.size||jump||crouch||runHold||runLock||stick.mag>0)clearTransientInput(true)
+        return {right:0,forward:0,run:false,crouch:false,jump:false}
+      }
       if(document.body.hasAttribute('data-aboard')&&(runHold||runLock)){runHold=false;runLock=false;runPointer=-1;syncRun()}
       if(document.body.hasAttribute('data-aboard')&&crouch){crouch=false;syncCrouch()}
       const right=Math.max(-1,Math.min(1,+keys.has('KeyD')-+keys.has('KeyA')+stick.x))
@@ -295,6 +299,14 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
       return {right,forward,run,crouch,jump:jumped}
     },
     readRideControls():EbikeRideControlInput{
+      if(isModalOrOverlayOpen()){
+        if(keys.size||wheelieTouch||tuckTouch||hornTouch||gearDelta||gearSelect!==null)clearTransientInput(true)
+        return {
+          gearDelta:0,gearSelect:null,wheelie:false,tuck:false,recover:false,cycleMod:false,
+          parkToggle:false,kickstandToggle:false,headlightCycle:false,turnLeftToggle:false,
+          turnRightToggle:false,hazardToggle:false,horn:false,hornPulse:false,cruiseToggle:false,
+        }
+      }
       const crashed=document.body.dataset.rideCrash==='1'
       const out:EbikeRideControlInput={
         gearDelta,

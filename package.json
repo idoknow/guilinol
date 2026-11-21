@@ -40,9 +40,12 @@
     "qa": "node scripts/qa.mjs",
     "photo-match": "node scripts/photo-match.mjs",
     "verify:tour": "node scripts/tour.mjs",
+    "test:missions": "tsx scripts/test-missions-economy.ts",
+    "verify:missions": "node scripts/verify-missions.mjs",
     "check:flags": "node scripts/check-flags.mjs",
     "check:batcher": "node scripts/check-batcher.mjs",
     "check:commerce": "node scripts/check-commerce-foundation.mjs",
+    "verify:commerce": "node scripts/test-guilin-commerce-loop.mjs",
     "deploy:hk": "bash deploy/deploy-hk.sh",
     "verify:telemetry": "node scripts/verify-telemetry.mjs",
     "test": "python3 scripts/test-perf-region.py && node --test scripts/telemetry-test.mjs && npm run test:api"

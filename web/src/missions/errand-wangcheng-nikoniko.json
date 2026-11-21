@@ -1,0 +1,37 @@
+{
+  "id": "errand-01",
+  "line": "errand",
+  "title": "王城→微笑堂取样衣袋",
+  "summary": "从正阳门广场取样衣袋送往「漓尚服饰 · 微笑堂店」，认识城心服装店与试穿买衣。",
+  "recommendedVehicle": "any",
+  "giver": [-588, -212],
+  "steps": [
+    {
+      "kind": "pickup",
+      "at": [-578, -206],
+      "radius": 8,
+      "timer": 120,
+      "text": "在正阳门外广场裁缝摊取走样衣袋",
+      "npc": {
+        "who": "阿珍姐",
+        "text": "“这批桂花纹样衣刚烫好，麻烦帮我送到十字街西边的「漓尚服饰 · 微笑堂店」！”"
+      }
+    },
+    {
+      "kind": "deliver",
+      "at": [-912, -162],
+      "radius": 10,
+      "timer": 150,
+      "text": "送达 漓尚服饰 · 微笑堂店（东北入口）",
+      "npc": {
+        "who": "漓尚店员",
+        "text": "“样衣齐整！T1 街潮入门套 ¥480，跑一单外卖就能凑够啦。”"
+      }
+    }
+  ],
+  "reward": 180,
+  "repeatReward": 80,
+  "minReward": 180,
+  "repeatMinReward": 80,
+  "failOn": ["timeout"]
+}

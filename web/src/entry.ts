@@ -43,10 +43,19 @@ function hud(main: typeof import('./main')) {
   menu.innerHTML = '<span>菜单</span>'; menu.setAttribute('aria-label', '主菜单'); menu.title = '主菜单（Esc）'
   menu.onclick = () => { main.setPaused(true); title.open(true) }
   box.append(menu); accountEntry(box); document.body.append(box)
-  // Phase 2 street HUD preview (IDOK-109): demo state until web/src/game/state.ts lands in G1.
+  // Phase 2 street HUD (IDOK-109 / IDOK-123): live game state by default, demoSource when ?hudDemo= is passed.
   const street = params.get('hud') === 'street'
   if (street) void Promise.all([import('./ui/street-hud'), import('./play/map')]).then(([hudModule, map]) => {
-    map.setMapPalette('street'); hudModule.mountStreetHud(hudModule.demoSource(params.get('hudDemo')), {phone: params.has('phone')})
+    map.setMapPalette('street')
+    const source = params.has('hudDemo') ? hudModule.demoSource(params.get('hudDemo')) : hudModule.gameStateHudSource()
+    hudModule.mountStreetHud(source, {
+      phone: params.has('phone'),
+      onApp: id => {
+        if (id === 'jobs') window.dispatchEvent(new CustomEvent('game:open-missions'))
+        else if (id === 'wardrobe') window.dispatchEvent(new CustomEvent('game:open-wardrobe'))
+        else if (id === 'garage') window.dispatchEvent(new CustomEvent('game:open-garage'))
+      },
+    })
   })
   addEventListener('keydown', event => {
     if (event.code !== 'Escape' || title.shown || document.querySelector('dialog[open],.about-mask:not([hidden]),.atlas:not([hidden]),.book:not([hidden]),.spot-card:not([hidden]),.photo-bar:not([hidden]),.render-pop:not([hidden]),.shop-overlay.show,.wardrobe-overlay.show,.garage-overlay.show')) return

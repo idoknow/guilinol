@@ -23,7 +23,14 @@ export function buildingGeometry(positions:Int16Array,normals:Int8Array,indices:
     for(const loop of loops){let u=0
       for(let i=0;i<loop.length;i++){
         const [x,z]=loop[i].map(v=>v/100),[ex,ez]=loop[(i+1)%loop.length].map(v=>v/100),len=Math.hypot(ex-x,ez-z)
-        if(!len)continue
+        // GL04 omits walls shorter than 5 mm before centimetre quantization.
+        // A rounded zero-length edge can still have an encoded quad, and a
+        // rounded 1 cm edge may have none. Match the packed wall endpoints.
+        const at=cursor*3
+        if(cursor+3>=count || normals[at+1]!==0 ||
+           positions[at]!==loop[i][0] || positions[at+2]!==loop[i][1] ||
+           positions[at+6]!==loop[(i+1)%loop.length][0] ||
+           positions[at+8]!==loop[(i+1)%loop.length][1])continue
         for(const end of [false,false,true,true]){
           const index=cursor++, height=xyz[3*index+1]-base/10
           tag(index,0,height/3.1,end?u+len:u)

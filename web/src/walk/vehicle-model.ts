@@ -29,10 +29,28 @@ function getBicycleCrank(){
   return crankGeom
 }
 
-export function vehicleModel(kind:string,paint=0,options?:{shared?:boolean}){
+export interface StaticBikeVisualOptions {
+  paintColor?: number
+  underglow?: boolean
+  underglowColor?: number
+  angelEye?: boolean
+  angelEyeColor?: number
+  goldShock?: boolean
+  tailWing?: boolean
+  exhaust?: boolean
+  windshield?: 'none' | 'clear' | 'tinted'
+  topbox?: 'none' | 'commuter' | 'delivery'
+  headlightTier?: 0 | 1 | 2
+}
+
+export function vehicleModel(kind:string,paint=0,options?:{shared?:boolean;visual?:StaticBikeVisualOptions}){
   const isSharedBike=kind==='shared_bike'||(kind==='bike'&&!!options?.shared)
   const effectiveKind=isSharedBike?'shared_bike':kind
-  const key=effectiveKind+paint
+  const vis=effectiveKind==='bike'?options?.visual:undefined
+  const visKey=vis
+    ? `:${vis.paintColor??''}:${vis.windshield??'none'}:${vis.topbox??'none'}:${vis.goldShock?1:0}:${vis.tailWing?1:0}:${vis.exhaust?1:0}:${vis.angelEye?(vis.angelEyeColor??1):0}:${vis.underglow?(vis.underglowColor??1):0}:${vis.headlightTier??0}`
+    : ''
+  const key=effectiveKind+paint+visKey
   if(effectiveKind==='car'){
     if(!cache.has(key))cache.set(key,buildCarGeometry(paint))
     const mesh=new T.Mesh(cache.get(key),material);mesh.name=kind;mesh.userData.paint=paint;return mesh
@@ -48,20 +66,66 @@ export function vehicleModel(kind:string,paint=0,options?:{shared?:boolean}){
       part(g,color,(x1+x2)/2,(y1+y2)/2,(z1+z2)/2)
     }
     if(effectiveKind==='bike'){
-      const color=[0xf3f1e9,0x99c9de,0xe4afbb,0x383c40][paint%4]
+      const color=vis?.paintColor??[0xf3f1e9,0x99c9de,0xe4afbb,0x383c40][((paint%4)+4)%4]
       for(const z of [-.53,.53])part(new T.CylinderGeometry(.24,.24,.12,10).rotateZ(Math.PI/2),0x303234,0,.24,z)
       box(.38,.24,1,0,.37,0,color);box(.36,.32,.38,0,.58,.3,color);box(.4,.11,.48,0,.8,.27,0x443e3b)
       box(.18,.56,.14,0,.79,-.45,color);box(.68,.065,.09,0,1.04,-.43,0x474b4b)
       for(const side of [-1,1]){box(.025,.19,.025,side*.29,1.14,-.46,0x535858);box(.13,.08,.04,side*.29,1.25,-.46,0xa8b9bf)}
-      for(const side of [-1,1]){box(.03,.2,.28,side*.18,.92,-.65,0x858883);box(.38,.2,.025,0,.92,-.65+side*.14,0x858883)}
+      if(!vis){
+        for(const side of [-1,1]){box(.03,.2,.28,side*.18,.92,-.65,0x858883);box(.38,.2,.025,0,.92,-.65+side*.14,0x858883)}
+      }else{
+        // Headlight lens & optional dual-lens matrix bezel (zero dynamic lights)
+        const hlTier=vis.headlightTier??0
+        box(hlTier>=2?.22:hlTier===1?.19:.16,.09,.04,0,.74,-.53,hlTier>=1?0xfff6dc:0xe5e6dc)
+        if(hlTier>=1)for(const side of [-1,1])box(.045,.045,.03,side*.065,.74,-.55,0x6ce8ff)
+        if(vis.angelEye)part(new T.TorusGeometry(.065,.014,6,12),vis.angelEyeColor??0x6ce8ff,0,.74,-.555)
+        // Windshield (clear or sport tinted)
+        if(vis.windshield==='clear'||vis.windshield==='tinted'){
+          const wsColor=vis.windshield==='tinted'?0x1c2530:0xb8d8e6
+          const wsH=vis.windshield==='tinted'?.26:.34
+          part(new T.BoxGeometry(.38,wsH,.03).rotateX(-.24),wsColor,0,1.07+wsH*.36,-.49)
+          for(const side of [-1,1])box(.022,.16,.022,side*.14,1.08,-.46,0x3f454c)
+        }
+        // Rear topbox (commuter hardcase or insulated osmanthus-gold delivery box)
+        if(vis.topbox==='commuter'){
+          box(.34,.04,.30,0,.77,.62,0x3a3f44)
+          box(.38,.26,.34,0,.92,.64,0x2a3138)
+          box(.39,.05,.35,0,1.02,.64,color)
+        }else if(vis.topbox==='delivery'){
+          box(.42,.04,.38,0,.77,.64,0x363b40)
+          box(.46,.42,.42,0,1.00,.66,0xd99b2a)
+          box(.47,.06,.43,0,1.16,.66,0x1b2229)
+          box(.28,.08,.02,0,1.02,.88,0x20d6c1)
+        }
+        // Gold nitrogen shocks
+        if(vis.goldShock){
+          for(const side of [-1,1])part(new T.CylinderGeometry(.034,.034,.18,8).rotateX(-.32),0xe3b23c,side*.16,.52,.45)
+        }
+        // Tail wing spoiler
+        if(vis.tailWing){
+          part(new T.BoxGeometry(.52,.04,.14).rotateX(-.18),vis.angelEyeColor??0xffc53d,0,.92,.56)
+          for(const side of [-1,1])box(.035,.13,.16,side*.22,.85,.51,color)
+        }
+        // Dual sport exhaust
+        if(vis.exhaust){
+          part(new T.CylinderGeometry(.045,.036,.52,8).rotateX(Math.PI/2+.16),0xb6bec4,.22,.30,.28)
+          part(new T.CylinderGeometry(.05,.045,.10,8).rotateX(Math.PI/2+.16),0x2b2e32,.22,.35,.56)
+        }
+        // Chassis neon underglow rail strip
+        if(vis.underglow){
+          const uCol=vis.underglowColor??0x20d6c1
+          for(const side of [-1,1])box(.03,.026,.64,side*.19,.24,-.04,uCol)
+        }
+      }
     }else if(effectiveKind==='shared_bike'){
-      const mint=0x72d5b0,trim=0xeef2ee,batteryGreen=0x2d7f63,scanOrange=0xd9683b
+      // Original Guilin slate/ivory/terracotta shared fleet palette (zero real-world bike-share brand colors or logos).
+      const slate=0x5e7680,trim=0xe8e4da,batterySlate=0x455a63,scanTerracotta=0xb5563d
       for(const z of [-.53,.53])part(new T.CylinderGeometry(.24,.24,.12,10).rotateZ(Math.PI/2),0x303234,0,.24,z)
-      box(.38,.24,1,0,.37,0,mint);box(.35,.22,.40,0,.49,-.05,trim);box(.39,.14,.32,0,.38,.02,batteryGreen)
-      box(.36,.32,.38,0,.58,.3,mint);box(.40,.11,.46,0,.8,.26,0x333638)
-      box(.18,.56,.14,0,.79,-.45,mint);box(.66,.065,.09,0,1.04,-.43,0x474b4b)
+      box(.38,.24,1,0,.37,0,slate);box(.35,.22,.40,0,.49,-.05,trim);box(.39,.14,.32,0,.38,.02,batterySlate)
+      box(.36,.32,.38,0,.58,.3,slate);box(.40,.11,.46,0,.8,.26,0x333638)
+      box(.18,.56,.14,0,.79,-.45,slate);box(.66,.065,.09,0,1.04,-.43,0x474b4b)
       // Shared scan lock tail plate
-      box(.20,.14,.05,0,.67,.51,scanOrange);box(.11,.08,.02,0,.67,.54,0xf5f2ea)
+      box(.20,.14,.05,0,.67,.51,scanTerracotta);box(.11,.08,.02,0,.67,.54,0xf5f2ea)
       for(const side of [-1,1]){box(.025,.18,.025,side*.28,1.13,-.46,0x535858);box(.12,.07,.04,side*.28,1.23,-.46,0xa8b9bf)}
       // Distinct front wire basket for shared e-bike
       box(.36,.03,.24,0,.82,-.62,0x5c6266)
@@ -508,9 +572,12 @@ export interface EbikeModConfig {
   goldShock: boolean
   tailWing: boolean
   exhaust: boolean
+  windshield?: 'none' | 'clear' | 'tinted'
+  topbox?: 'none' | 'commuter' | 'delivery'
+  headlightTier?: 0 | 1 | 2
 }
 
-export const EBIKE_SHARED_COLOR = 0x72d5b0
+export const EBIKE_SHARED_COLOR = 0x5e7680
 
 export const EBIKE_MOD_PRESETS: Record<EbikeModPreset, EbikeModConfig> = {
   stock: {
@@ -693,9 +760,13 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   const goldMat = trackM(new T.MeshStandardMaterial({color: 0xe3b23c, flatShading: true, roughness: .35, metalness: .55}))
   const accentMat = trackM(new T.MeshStandardMaterial({color: 0x9934d4, flatShading: true, roughness: .45}))
   const basketMat = trackM(new T.MeshStandardMaterial({color: 0x6b7277, flatShading: true, roughness: .75}))
-  const scanMat = trackM(new T.MeshStandardMaterial({color: 0xd9683b, flatShading: true, roughness: .6}))
-  const sharedBatteryMat = trackM(new T.MeshStandardMaterial({color: 0x2d7f63, flatShading: true, roughness: .6}))
+  const scanMat = trackM(new T.MeshStandardMaterial({color: 0xb5563d, flatShading: true, roughness: .6}))
+  const sharedBatteryMat = trackM(new T.MeshStandardMaterial({color: 0x455a63, flatShading: true, roughness: .6}))
   const qrMat = trackM(new T.MeshBasicMaterial({color: 0xf5f2ea}))
+  const clearShieldMat = trackM(new T.MeshStandardMaterial({color: 0xc2e0ec, transparent: true, opacity: .48, roughness: .15, metalness: .15}))
+  const tintedShieldMat = trackM(new T.MeshStandardMaterial({color: 0x16202a, transparent: true, opacity: .78, roughness: .22, metalness: .3}))
+  const deliveryBoxMat = trackM(new T.MeshStandardMaterial({color: 0xd99b2a, flatShading: true, roughness: .55}))
+  const deliveryStripeMat = trackM(new T.MeshBasicMaterial({color: 0x20d6c1}))
 
   const root = new T.Group()
   root.name = 'dynamic-ebike'
@@ -760,6 +831,24 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   exhaustSlot.add(pipe, tip)
   chassis.add(exhaustSlot)
 
+  // Rear topbox slot (commuter hardcase vs insulated delivery soup box)
+  const topboxCommuterSlot = new T.Group(); topboxCommuterSlot.name = 'mod-topbox-commuter'
+  topboxCommuterSlot.add(
+    makeSolidPart(trackG(new T.BoxGeometry(.34, .04, .30)), darkMat, 0, .77, .62 - REAR_Z),
+    makeSolidPart(trackG(new T.BoxGeometry(.38, .26, .34)), darkMat, 0, .92, .64 - REAR_Z),
+    makeSolidPart(trackG(new T.BoxGeometry(.39, .05, .35)), bodyMat, 0, 1.02, .64 - REAR_Z),
+  )
+  topboxCommuterSlot.visible = false
+  const topboxDeliverySlot = new T.Group(); topboxDeliverySlot.name = 'mod-topbox-delivery'
+  topboxDeliverySlot.add(
+    makeSolidPart(trackG(new T.BoxGeometry(.42, .04, .38)), darkMat, 0, .77, .64 - REAR_Z),
+    makeSolidPart(trackG(new T.BoxGeometry(.46, .42, .42)), deliveryBoxMat, 0, 1.00, .66 - REAR_Z),
+    makeSolidPart(trackG(new T.BoxGeometry(.47, .06, .43)), darkMat, 0, 1.16, .66 - REAR_Z),
+    makeSolidPart(trackG(new T.BoxGeometry(.28, .08, .02)), deliveryStripeMat, 0, 1.02, .88 - REAR_Z),
+  )
+  topboxDeliverySlot.visible = false
+  chassis.add(topboxCommuterSlot, topboxDeliverySlot)
+
   // Underglow slot (attached to leanPivot so ground glow follows lean height cleanly)
   const underglowSlot = new T.Group(); underglowSlot.name = 'mod-underglow'
   for (const side of [-1, 1]) {
@@ -794,12 +883,38 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
 
   const headlightSlot = new T.Group(); headlightSlot.name = 'mod-headlight'
   const headLens = makeSolidPart(trackG(new T.BoxGeometry(.16, .09, .04)), headMat, 0, .74, -.10)
+  const dualLensBezel = new T.Group(); dualLensBezel.name = 'mod-headlight-dual'
+  for (const side of [-1, 1]) {
+    dualLensBezel.add(makeSolidPart(trackG(new T.BoxGeometry(.055, .055, .035)), headMat, side * .075, .74, -.115))
+  }
+  dualLensBezel.visible = false
   const angelRing = makeSolidPart(trackG(new T.TorusGeometry(.065, .014, 6, 12)), angelMat, 0, .74, -.12)
   angelRing.name = 'mod-angel-ring'
   const beamRig = createHeadlightBeamRig('bike')
   beamRig.group.position.set(0, .74, -.13)
-  headlightSlot.add(headLens, angelRing, beamRig.group)
+  headlightSlot.add(headLens, dualLensBezel, angelRing, beamRig.group)
   frontAssembly.add(headlightSlot)
+
+  // Front windshield slot (clear commuter screen vs short sport tinted screen)
+  const windshieldClearSlot = new T.Group(); windshieldClearSlot.name = 'mod-windshield-clear'
+  const clearPane = makeSolidPart(trackG(new T.BoxGeometry(.38, .34, .028)), clearShieldMat, 0, 1.20, -.06)
+  clearPane.rotation.x = -.22
+  windshieldClearSlot.add(
+    clearPane,
+    makeSolidPart(trackG(new T.BoxGeometry(.022, .16, .022)), darkMat, -.14, 1.09, -.03),
+    makeSolidPart(trackG(new T.BoxGeometry(.022, .16, .022)), darkMat, .14, 1.09, -.03),
+  )
+  windshieldClearSlot.visible = false
+  const windshieldTintedSlot = new T.Group(); windshieldTintedSlot.name = 'mod-windshield-tinted'
+  const tintedPane = makeSolidPart(trackG(new T.BoxGeometry(.38, .25, .028)), tintedShieldMat, 0, 1.16, -.06)
+  tintedPane.rotation.x = -.30
+  windshieldTintedSlot.add(
+    tintedPane,
+    makeSolidPart(trackG(new T.BoxGeometry(.022, .14, .022)), darkMat, -.14, 1.08, -.03),
+    makeSolidPart(trackG(new T.BoxGeometry(.022, .14, .022)), darkMat, .14, 1.08, -.03),
+  )
+  windshieldTintedSlot.visible = false
+  frontAssembly.add(windshieldClearSlot, windshieldTintedSlot)
 
   // Batched amber turn-signal lamps (zero dynamic lights, 0 draw calls when off, <=2 draw calls when both flashing).
   const signalLeftMat = trackM(new T.MeshBasicMaterial({color: 0xffa824}))
@@ -889,6 +1004,11 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
     angelRing.visible = !shared && cfg.angelEye
     tailWingSlot.visible = !shared && cfg.tailWing
     exhaustSlot.visible = !shared && cfg.exhaust
+    windshieldClearSlot.visible = !shared && cfg.windshield === 'clear'
+    windshieldTintedSlot.visible = !shared && cfg.windshield === 'tinted'
+    topboxCommuterSlot.visible = !shared && cfg.topbox === 'commuter'
+    topboxDeliverySlot.visible = !shared && cfg.topbox === 'delivery'
+    dualLensBezel.visible = !shared && (cfg.headlightTier ?? 0) >= 1
     for (const child of shockSlot.children) {
       if (child.name === 'mod-gold-canister') child.visible = !shared && cfg.goldShock
     }

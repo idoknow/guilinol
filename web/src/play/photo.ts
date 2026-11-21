@@ -14,7 +14,7 @@ const filters:[string,string][] = [
 const skies:[string,Weather][] = [['晴','clear'],['雾','mist'],['雨','rain']]
 const lenses:[string,number][] = [['广角',72],['标准',55],['人像',34],['长焦',18]]
 
-export function photoMode(host:Host, place:()=>string) {
+export function photoMode(host:Host, place:()=>string, onCapture?:()=>void) {
   const bar = document.createElement('section'); bar.className = 'photo-bar'; bar.hidden = true
   const exit = document.createElement('button'); exit.className = 'photo-exit'; exit.setAttribute('aria-label','退出拍照'); exit.textContent = '×'; exit.hidden = true
   bar.innerHTML = `<div class="photo-row"><label class="photo-hour"><span></span><input type="range" min="0" max="23.9" step=".1" aria-label="时辰"></label>
@@ -90,6 +90,7 @@ export function photoMode(host:Host, place:()=>string) {
     r.setPixelRatio(ratio); r.setSize(innerWidth,innerHeight,false); host.draw()
     if(state.sign) signature(g,c.width,c.height)
     flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go')
+    onCapture?.()
     c.toBlob(blob=>{if(!blob) return; if(url) URL.revokeObjectURL(url); url = URL.createObjectURL(blob)
       const where = place()||'桂林', stamp = new Date(), name = `网上桂林-${where}-${String(stamp.getMonth()+1).padStart(2,'0')}${String(stamp.getDate()).padStart(2,'0')}-${String(stamp.getHours()).padStart(2,'0')}${String(stamp.getMinutes()).padStart(2,'0')}${String(stamp.getSeconds()).padStart(2,'0')}.jpg`
       const file = new File([blob],name,{type:'image/jpeg'})

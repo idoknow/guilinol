@@ -58,6 +58,13 @@ export interface ActiveMissionState {
   // Compatible with web/src/ui/street-hud.ts HudState.mission
   meter?: {label: string; value: number}
   line?: {who: string; text: string}
+  // Stage 1B mission runner progress metadata
+  status?: 'available' | 'active' | 'step_progress' | 'completed' | 'failed' | 'abandoned'
+  stepIndex?: number
+  stepCount?: number
+  rewardPreview?: number
+  canAbandon?: boolean
+  frozen?: boolean
 }
 
 export interface OwnedPersonalEbike {
@@ -132,7 +139,10 @@ export interface GameState {
 export type GameEvent =
   // ---- docs/plan-2.md baseline events ----
   | {type: 'mission:start'; id: string; title: string}
+  | {type: 'mission:step'; id: string; stepIndex: number; text: string}
   | {type: 'mission:done'; id: string; reward: number; firstClear?: boolean}
+  | {type: 'mission:fail'; id: string; reason: string}
+  | {type: 'mission:abandon'; id: string}
   | {type: 'fine'; amount: number; reason: string}
   | {type: 'crash'; severity: number; vehicleId?: string}
   // ---- Stage 1 incremental events ----
@@ -290,6 +300,7 @@ export function setMission(mission: ActiveMissionState | null): void {
   state = {...state, mission: mission ? {...mission} : null}
   notifyState(new Set<keyof GameState>(['mission']))
 }
+export const setMissionState = setMission
 
 export function setWanted(wanted: 0 | 1 | 2 | 3 | 4 | 5): void {
   if (state.wanted === wanted) return
@@ -306,6 +317,7 @@ export function setActiveShop(shop: ActiveShopState | null): void {
   state = {...state, activeShop: shop ? {...shop} : null}
   notifyState(new Set<keyof GameState>(['activeShop']))
 }
+export const setActiveShopState = setActiveShop
 
 export function setPrompt(prompt: InteractionPromptState | null): void {
   if (samePrompt(state.prompt, prompt)) return

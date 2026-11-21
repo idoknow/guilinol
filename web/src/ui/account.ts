@@ -1,3 +1,4 @@
+import {record} from '../telemetry'
 import './account.css'
 
 // 账号：登录 / 注册（填写 → 邮箱验证 → 完成）/ 忘记密码 / 我的账号。
@@ -24,13 +25,13 @@ export const initial=(name='')=>[...name.trim()][0]??'客'
 let dialog:HTMLDialogElement|undefined,render:((screen:Screen,note?:string,pass?:string)=>void)|undefined
 let gate:((user:User|null)=>void)|undefined
 export async function openAccount(){
-  build();await ready;render!(user?'profile':'login');dialog!.showModal()
+  build();await ready;render!(user?'profile':'login');dialog!.showModal();if(!user)record('funnel',{step:'loginOpen'})
 }
 /** Resolve with the signed-in user, opening the login dialog first if needed; null if the player closes it without signing in. */
 export async function requireUser():Promise<User|null>{
   await ready;if(user)return user
   build();gate?.(null)
-  return new Promise(resolve=>{gate=resolve;render!('login');dialog!.showModal()})
+  return new Promise(resolve=>{gate=resolve;render!('login');dialog!.showModal();if(!user)record('funnel',{step:'loginOpen'})})
 }
 
 /** The in-game chip (top left): avatar initial + nickname, or 登录 for guests. */
@@ -119,7 +120,7 @@ function build(){
     const previous=screen
     if(previous==='verify') data.password=verificationPassword
     let result
-    try {result=await api(`auth/${screen}`,'POST',data)} catch(error){if((error as {code?:string}).code==='unverified'){render!('verify','请先验证邮箱再登录',data.password);return}throw error}
+    try {result=await api(`auth/${screen}`,'POST',data);if(screen==='login')record('funnel',{step:'loginSuccess'})} catch(error){if((error as {code?:string}).code==='unverified'){render!('verify','请先验证邮箱再登录',data.password);return}throw error}
     if(previous==='register')render!('verify','',data.password)
     else if(previous==='reset')render!('login','密码已重置，请重新登录')
     else {setUser(result);if(gate){const resolve=gate;gate=undefined;d.close();resolve(result);return}

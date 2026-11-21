@@ -1,10 +1,15 @@
 import { type Env, Problem, equal, hash, invalid, limited, now, sessionHash, unauthorized } from './auth'
 import { ll2xz } from './projection'
 import { edges, kinds, labels, views, validView } from './feedback-contract'
-import { adminList } from './admin'
+import { adminList, audit, setRole } from './admin'
 import {flushMail} from './feedback-mail'
 
 const json = (value: unknown) => Response.json(value, { headers: { 'Cache-Control': 'private, no-store' } })
+function transitions(current: string, bridge: boolean) {
+  return (edges[current]??[]).filter(status=>status!==(bridge?'approved':'queued')).map(status=>({
+    status,label:labels[status],needs_message:['need_info','rejected','duplicate'].includes(status),
+  }))
+}
 function missing(): never {
   throw new Problem(404, 'not_found', '未找到记录')
 }
@@ -82,9 +87,11 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (admin && !isAdmin) throw new Problem(403, 'forbidden', '无权限')
     if (method !== 'GET' && request.headers.get('Origin') !== new URL(request.url).origin)
       throw new Problem(403, 'origin', '请求来源不符')
-    if (admin && method==='GET' && env.perfQuery && ['admin/perf','admin/perf/grid','admin/perf/server'].includes(path))
+    const roleTarget=/^admin\/users\/([\w-]+)\/role$/.exec(path)
+    if (roleTarget && method==='POST') return setRole(env.DB,user,roleTarget[1],(await fields(request)).role)
+    if (admin && method==='GET' && env.perfQuery && ['admin/perf','admin/perf/grid','admin/perf/server','admin/overview','admin/timeseries','admin/breakdown','admin/funnel','admin/errors','admin/live'].includes(path))
       return env.perfQuery(path,new URL(request.url).searchParams)
-    if (admin && method === 'GET' && ['admin/stats', 'admin/users', 'admin/feedback'].includes(path))
+    if (admin && method === 'GET' && ['admin/stats', 'admin/audit','admin/users', 'admin/feedback'].includes(path))
       return adminList(env.DB, path, new URL(request.url).searchParams)
     if (
       admin &&
@@ -174,7 +181,7 @@ export async function feedback(request: Request, env: Env, path: string) {
   if(method==='POST'&&action==='messages'){
     if(['live','rejected','duplicate','draft'].includes(row.status))conflict()
     const data=await fields(request),body=text(data.body,1000,true)!,kind=bridge?'agent':admin?'admin':'user',source=bridge?text(data.source,200,true):null
-    const result=await stmt(`INSERT INTO feedback_messages(feedback_id,author_kind,author_name,body,source,relayed_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM feedback WHERE id=? AND status NOT IN ('draft','live','rejected','duplicate')) AND (?='agent' OR (SELECT count(*) FROM feedback_messages WHERE feedback_id=? AND author_kind!='agent' AND created_at>unixepoch()-3600)<20) ON CONFLICT(feedback_id,source) DO NOTHING`,id,kind,bridge?'协调人':admin?'管理员':'提交人',body,source,bridge?now():null,id,kind,id).run()
+    const [result]=await env.DB.batch([stmt(`INSERT INTO feedback_messages(feedback_id,author_kind,author_name,body,source,relayed_at) SELECT ?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM feedback WHERE id=? AND status NOT IN ('draft','live','rejected','duplicate')) AND (?='agent' OR (SELECT count(*) FROM feedback_messages WHERE feedback_id=? AND author_kind!='agent' AND created_at>unixepoch()-3600)<20) ON CONFLICT(feedback_id,source) DO NOTHING`,id,kind,bridge?'协调人':admin?'管理员':'提交人',body,source,bridge?now():null,id,kind,id),...(admin?[audit(env.DB,user,'reply','feedback',id,{})]:[])])
     if(!result.meta.changes&&!bridge)limited();return json({ok:true})
   }
   const shotKey = `fb/${id}/view.jpg`
@@ -281,6 +288,7 @@ export async function feedback(request: Request, env: Env, path: string) {
       has_view_shot: row.shot_state === 1,
       ...(admin
         ? {
+            allowed_transitions: transitions(row.status,false),
             issue_url: row.multica_issue
               ? `https://multica.ai/idoknow/issues/${encodeURIComponent(row.multica_issue)}`
               : null,
@@ -423,12 +431,10 @@ export async function feedback(request: Request, env: Env, path: string) {
   } else if (bridge || admin) {
     const data = await fields(request)
     target = String(data.status)
-    if (!edges[row.status]) conflict()
-    if((target==='approved'&&!admin)||(target==='queued'&&!bridge))conflict()
-    if (bridge && target === row.status) return json({ ok: true })
-    if (!edges[row.status].includes(target)) conflict()
-    message =
-      text(data.message, 2000, ['need_info', 'rejected', 'duplicate'].includes(target)) || labels[target]
+    if (bridge && target === row.status && target!=='approved' && edges[target]) return json({ ok: true })
+    const change=transitions(row.status,bridge).find(item=>item.status===target)
+    if (!change) conflict()
+    message=text(data.message,2000,change.needs_message)||change.label
     if (bridge) {
       screenshot =
         typeof data.screenshot_url === 'string' &&
@@ -455,6 +461,7 @@ export async function feedback(request: Request, env: Env, path: string) {
       message,
       screenshot,
     ),
+    ...(admin?[audit(env.DB,user,target==='approved'?'start_ai':'status','feedback',id,{from:row.status,to:target})]:[]),
     ...(action==='supplement'?[stmt("INSERT INTO feedback_messages(feedback_id,author_kind,author_name,body) SELECT ?,'user','提交人',? WHERE changes()=1",id,message)]:[]),
   ])
   if (!changed.meta.changes) {
