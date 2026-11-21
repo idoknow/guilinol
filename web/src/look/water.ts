@@ -219,7 +219,8 @@ const size = new THREE.Vector2(), target = new THREE.Vector3(), forward = new TH
 const mainFrustum = new THREE.Frustum(), mainProj = new THREE.Matrix4()
 let level = 148
 const lastView=new THREE.Matrix4(), lastProjection=new THREE.Matrix4()
-let lastReflection=-Infinity, lastLevel=NaN
+let lastReflection=-Infinity, lastLevel=NaN, lastWaterFrame=0
+const lastSun=new THREE.Vector3()
 export function isWaterInView(camera:THREE.PerspectiveCamera) {
   camera.updateMatrixWorld()
   mainFrustum.setFromProjectionMatrix(mainProj.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
@@ -249,11 +250,16 @@ export function renderMirror(renderer:THREE.WebGLRenderer, scene:THREE.Scene, ca
   camera.updateMatrixWorld()
   const resized=mirrorTarget.width!==w||mirrorTarget.height!==h
   const now=performance.now()
-  // With a stationary flight camera, only slow cloud/light changes enter the
-  // reflection. Ripples still animate every frame on the live water surface.
-  if(allowReuse && !resized && now-lastReflection<60 && level===lastLevel &&
+  // Keep the clear-sky reflection for roughly two frames at low FPS.
+  // Camera, lighting or water-level changes refresh immediately; waves
+  // continue to sample the reflection with live distortion on every frame.
+  const reuseMs=Math.min(2500,Math.max(60,2*(now-lastWaterFrame)))
+  lastWaterFrame=now
+  if(allowReuse && !resized && now-lastReflection<reuseMs && level===lastLevel &&
+     lastSun.distanceToSquared(env.sunDir)<.00001 &&
      camera.matrixWorld.equals(lastView) && camera.projectionMatrix.equals(lastProjection))return
   if(resized)mirrorTarget.setSize(w,h)
+  lastSun.copy(env.sunDir)
   lastReflection=now;lastLevel=level
   lastView.copy(camera.matrixWorld);lastProjection.copy(camera.projectionMatrix)
   mirrorCamera.position.set(camera.position.x,2*level-camera.position.y,camera.position.z)
