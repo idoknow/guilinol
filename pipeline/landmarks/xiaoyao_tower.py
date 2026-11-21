@@ -22,6 +22,7 @@ class LandmarkModel(Model):
     def __init__(self, detail, flood_roof=False):
         super().__init__(detail)
         self.curbs=[]
+        self.planters=[]
         self.lamps=[]
         self.lit_tiles=[]
         self.flood_roof=flood_roof
@@ -53,6 +54,13 @@ class LandmarkModel(Model):
         if isinstance(color,str) and color=='curb':
             super().mesh(vertices,faces,'granite',collide)
             self.curbs.append((self.visible.pop(),self.uv.pop()))
+        elif isinstance(color, str) and color in ('planter_frame', 'planter_soil'):
+            swatch = 'granite' if color=='planter_frame' else 'earth'
+            super().mesh(vertices, faces, swatch, collide)
+            cell = list(SWATCHES).index(swatch)
+            uv = self.uv.pop()*4 - [cell%4, 3-cell//4]
+            uv[..., 0] = (uv[..., 0] + (swatch=='earth'))/2
+            self.planters.append((self.visible.pop(), uv))
         elif isinstance(color,str) and color=='lamp':
             super().mesh(vertices,faces,'wood' if self.flood_roof else 'gold',collide)
             self.lamps.append((self.visible.pop(),self.uv.pop()))
@@ -158,7 +166,7 @@ def tower(model):
     for left,right,back,front in [(-17,17,-32,near),(-17,17,far,16),(0,17,near,far)]:
         center_x,center_z = (left+right)/2,(back+front)/2
         width,depth = right-left,front-back
-        model.foundation(surface,center_x,-.36,center_z,width,court+.36,depth,'stone')
+        model.foundation(surface,center_x,-.36,center_z,width,court+.36,depth,'stone',covered_top=True)
         model.box(center_x,court-.16,center_z,width,.16,depth,'pave',True)
         model.box(center_x,court-.55,center_z,width+.16,.24,depth+.16,'granite')
     count = 48
@@ -299,6 +307,14 @@ def generate(name='xiaoyao_tower', build=tower, folder='E', lift=None, colors=No
         if model.curbs:
             faces,uvs=zip(*model.curbs)
             add(faces,uvs,Image.new('RGB',(1,1),'#aaa9a6'),'curb')
+        if model.planters:
+            faces, uvs = zip(*model.planters)
+            finish = Image.new('RGB', (256, 128))
+            for col, key in enumerate(('granite', 'earth')):
+                cell = list(SWATCHES).index(key)
+                x, y = 128*(cell%4), 128*(cell//4)
+                finish.paste(image.crop((x, y, x+128, y+128)), (col*128, 0))
+            add(faces, uvs, finish, 'planter')
         if model.lamps:
             faces,uvs=zip(*model.lamps);add(faces,uvs,image,'lamp_lit')
         for key, parts in model.tile_parts.items():

@@ -122,6 +122,34 @@ class SeamTests(unittest.TestCase):
         kinds=street_contacts(shapely.polygons(triangles[:,:,::2]),triangles,normals,streets)
         np.testing.assert_array_equal(kinds,[1,-1,-1])
 
+    def test_raised_connected_ramp_and_unconnected_step(self):
+        from unittest.mock import Mock
+        from seam_inventory import street_contacts, surface_components
+        lower = np.array([[1., .16, 1.], [1., .16, 2.], [2., .16, 1.]])
+        ramp = np.array([lower[1], [2., .26, 2.], lower[2]])
+        triangles = np.array([lower, ramp, lower+[0., .13, 0.]])
+        component = surface_components(triangles)
+        self.assertEqual(component[0], component[1])
+        self.assertNotEqual(component[0], component[2])
+        streets = Mock()
+        streets.world.size, streets.world.files = 256, {(0, 0): 'tile'}
+        streets.tile.return_value = shapely.STRtree([shapely.box(0, 0, 4, 4)]), [1], None
+        streets.at.return_value = 0., {1}
+        normals = np.cross(triangles[:,1]-triangles[:,0], triangles[:,2]-triangles[:,0])
+        contacts = street_contacts(shapely.polygons(triangles[:,:,::2]), triangles, normals,
+                                   streets, component == component[0])
+        np.testing.assert_array_equal(contacts, [1, 1, -1])
+
+    def test_overhang_only_excludes_fully_covered_triangle(self):
+        from seam_inventory import ModelCover
+        floor = np.array([[0., 0., 0.], [0., 0., 2.], [2., 0., 0.]])
+        roof = floor + [0., 2., 0.]
+        model = ModelCover(np.array([floor, roof]))
+        self.assertTrue(model.hides(shapely.Polygon(floor[:, ::2]), floor))
+        exposed = floor + [.5, 0., 0.]
+        self.assertFalse(model.hides(shapely.Polygon(exposed[:, ::2]), exposed))
+        self.assertFalse(model.hides(shapely.Polygon(roof[:, ::2]), roof))
+
     def test_sloping_curb_requires_vertical_face_at_sample_level(self):
         curb = CurbFaces(np.array([[[0.,0,0],[2,1,0],[2,1.12,0]],[[0.,0,0],[2,1.12,0],[0,.12,0]]]))
         self.assertTrue(curb.pairs((1,0),.5,.62))

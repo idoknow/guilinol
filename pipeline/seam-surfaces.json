@@ -1,5 +1,7 @@
 {
   "surfaces": {
+    "gunanmen": {"sidewalk":"sidewalk"},
+    "ronghu": {"sidewalk":"sidewalk"},
     "guilin_book_market": {"road":"road","sidewalk":"sidewalk","curb":"curb"},
     "libin_middle": {"road":"road","sidewalk":"sidewalk","curb":"curb"},
     "shizijie": {"B_plaza_pave": "sidewalk"},
@@ -12,7 +14,7 @@
     "guangxi_arts": {"pave": "sidewalk"},
     "xiaoyao_tower": {"pave": "sidewalk"},
     "zhuangyuan_gallery": {"pave": "sidewalk"},
-    "guanyi_bridge": {"pave": "sidewalk"},
+    "guanyi_bridge": {"pave": "sidewalk", "curb": "curb"},
     "yiwu_street": {"pave": "sidewalk", "curb":"curb"},
     "lize_bridge": {"pave": "sidewalk"},
     "jiefang_bridge": {"pave": "sidewalk", "road": "road", "road_paint": "marking", "curb_face": "curb"},
@@ -45,6 +47,13 @@
     "jingjiang":["pave"], "zhongshan_road":["B_plaza_pave"],
     "libin_middle":["sidewalk","road"], "ronghu":["landmark"]
   },
+  "notStreet": [
+    {"id":"jiefang_bridge","material":"handrail","part":"jiefang_roads.street / stairs","reason":"引道和踏步侧高 1 m 的金属扶手"},
+    {"id":"jiefang_bridge","material":"step_stone","part":"west_bank.landing","reason":"滨江门户高出步道 0.15、0.30、0.45 m 的台阶及柱台"},
+    {"id":"jiefang_bridge","material":"tactile","part":"bridge","reason":"桥上共享人行道上的 0.46 m 宽盲道及防滑凸条"},
+    {"id":"ronghu","material":"steel","part":"steel_bridge","reason":"钢人行桥桥腹、桁架及护栏，桥面顶面已独立为 sidewalk"},
+    {"id":"yiwu_old_house","material":"planter","part":"house","reason":"沿建筑立面布置的花池框及土床"}
+  ],
   "exceptions": [
     {"id": "wangcheng_market", "material": "pave", "kind": "material", "name": "市场内部青石板"},
     {"id": "wangcheng_market", "material": "ruinGlass", "kind": "material", "name": "入口遗址玻璃"},

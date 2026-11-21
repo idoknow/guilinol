@@ -21,9 +21,23 @@ class BridgeModel(Model):
         self.lights=[]
         self.glass=[]
         self.concrete=[]
-        self.road_parts={'road':[], 'road_paint':[], 'curb_face':[], 'rail_cap':[]}
+        self.road_parts={'road':[], 'road_paint':[], 'curb_face':[], 'rail_cap':[], 'step_stone':[], 'tactile':[], 'handrail':[]}
 
     def mesh(self, vertices, faces, color, collide=False):
+        if color=='step_stone':
+            super().mesh(vertices, faces, 'stone', collide)
+            self.road_parts[color].append(self.tile_parts['stone'].pop())
+            return
+        if color=='handrail_white':
+            super().mesh(vertices, faces, 'white', collide)
+            cell = list(SWATCHES).index('white')
+            uv = self.uv.pop()*4 - [cell%4, 3-cell//4]
+            self.road_parts['handrail'].append((self.visible.pop(), uv))
+            return
+        if color.startswith('tactile_'):
+            super().mesh(vertices, faces, color.split('_')[1], collide)
+            self.road_parts['tactile'].append((self.visible.pop(), self.uv.pop()))
+            return
         if color == 'road':
             super().mesh(vertices,faces,'tile',collide)
             self.road_parts['road'].append((self.visible.pop(),self.uv.pop()))
@@ -66,6 +80,11 @@ def generate_bridge(build):
     for key in ('stone','pave'):
         cell=list(SWATCHES).index(key);x,y=128*(cell%4),128*(cell//4)
         finishes[key]=finish(key,image.crop((x,y,x+128,y+128)))
+    finishes['step_stone'] = finish('step_stone', finishes['stone'].baseColorTexture)
+    finishes['tactile'] = finish('tactile', image)
+    cell = list(SWATCHES).index('white')
+    x,y = 128*(cell%4),128*(cell//4)
+    finishes['handrail'] = finish('handrail', image.crop((x,y,x+128,y+128)))
     for lod in (0,1):
         group=f'lod{lod}'
         scene.graph.update(frame_to=group)

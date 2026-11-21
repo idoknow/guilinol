@@ -184,7 +184,7 @@ def west_bank(model):
             xs,zs=(np.interp(stations,chain,axis) for axis in points.T)
             return np.array([vertex((x,z),LOWER+level) for x,z in zip(xs,zs)])
         left,right=edge(-1.88,.12+height),edge(1.88,.12+height)
-        surface(model,left,right,'stone')
+        surface(model,left,right,'step_stone')
         for rim in (left,right,[left[0],right[0]],[left[-1],right[-1]]):
             rim=np.asarray(rim)
             surface(model,rim,rim-[0,height+.14,0],'stone')
@@ -236,7 +236,7 @@ def west_bank(model):
         model.pose=sidewalk_pose(crossing-bridge_station,0)
         road_offset=np.interp(crossing,chain,strip_offset)
         for stripe in np.arange(-3,4):
-            model.box(-road_offset+stripe,-.095,0,.48,.025,3.4,'white')
+            model.box(-road_offset+stripe,-.095,0,.48,.025,3.4,'paint_white')
         model.beam([-1.45,0,2.25],[-1.45,5.4,2.25],.14,'granite')
         model.box(-1.45,4.15,2.25,.42,1.25,.42,'sign')
         model.box(-1.69,5,2.25,.09,.28,.28,'knot')
@@ -271,10 +271,10 @@ def bridge(model):
         model.box(0,.05,side*16.16,length,.15,.3,'curb_granite',True)
         deck_line(side*12)
         deck_line(side*.18)
-        model.box(0,.182,side*16.93,length,.018,.46,'granite')
+        model.box(0,.182,side*16.93,length,.018,.46,'tactile_granite')
         if model.detail:
             for offset in (-.13,0,.13):
-                model.box(0,.20,side*16.93+offset,length,.014,.036,'white')
+                model.box(0,.20,side*16.93+offset,length,.014,.036,'tactile_white')
             for lane in (3.7,7.4):
                 deck_line(side*lane)
         for east in np.arange(-126,127,21 if model.detail else 42):

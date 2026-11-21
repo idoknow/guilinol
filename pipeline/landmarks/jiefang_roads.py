@@ -87,7 +87,7 @@ def street(model,way):
                        [[0,1,6],[2,3,4],[2,4,5]],'paint_white')
         for i,(a,b) in enumerate(zip(outer,outer[1:])):
             if min(curb[i:i+2])<.10:continue
-            model.beam(a+[0,1,0],b+[0,1,0],.075,'white',6)
+            model.beam(a+[0,1,0],b+[0,1,0],.075,'handrail_white',6)
             for t in np.arange(0,1,3.5/max(1,along[i+1]-along[i])):
                 p=a+(b-a)*t
                 model.box(p[0],p[1],p[2],.12,1.0,.12,'granite')
@@ -109,7 +109,7 @@ def stairs(model,way):
             surface(model,[left[1],right[1]],[left[1]-[0,.19,0],right[1]-[0,.19,0]],'granite',False)
         for sign in (-1,1):
             p=vertex(a+n[i]*sign*1.4,y[i]);q=vertex(b+n[i+1]*sign*1.4,y[i+1])
-            model.beam(p+[0,1,0],q+[0,1,0],.075,'white',6)
+            model.beam(p+[0,1,0],q+[0,1,0],.075,'handrail_white',6)
             model.box(p[0],p[1],p[2],.1,1,.1,'white')
 
 
