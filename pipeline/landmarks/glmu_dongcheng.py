@@ -113,18 +113,19 @@ def _build_main_gate(b: Builder):
     From street NE looking SW: left (-X) has white cantilevered V-canopy portal,
     right (+X) has long dark-red granite '桂林医科大学' monument wall & low hedge."""
     prev = b.pose
-    b.pose = (-27.5, 0.0, -291.5, 3.0 * math.pi / 4.0)
+    gate_gy = b.surface.ground(-27.5, -291.5) if b.surface else 0.0
+    b.pose = (-27.5, gate_gy, -291.5, 3.0 * math.pi / 4.0)
     # Entrance apron
-    b.box(0.0, 0.02, 0.0, 34.0, 0.04, 14.0, 'pave_plaza', tile=3.0)
+    b.box(0.0, -0.15, 0.0, 34.0, 0.19, 14.0, 'pave_plaza', tile=3.0, bottom=True)
     # Left (-X): white cantilevered modern canopy & twin piers (no guardhouse/turnstiles)
-    b.box(-10.8, 0.0, -0.5, 2.2, 5.4, 2.4, 'white', tile=2.0, collide=True)
-    b.box(-2.2, 0.0, -0.5, 1.4, 4.8, 1.8, 'white', tile=2.0, collide=True)
-    b.box(-6.4, 0.0, -0.5, 7.15, 1.6, 0.16, 'steel', tile=1.4, collide=True)
+    b.box(-10.8, -0.20, -0.5, 2.2, 5.6, 2.4, 'white', tile=2.0, collide=True, bottom=True)
+    b.box(-2.2, -0.20, -0.5, 1.4, 5.0, 1.8, 'white', tile=2.0, collide=True, bottom=True)
+    b.box(-6.4, -0.15, -0.5, 7.15, 1.75, 0.16, 'steel', tile=1.4, collide=True, bottom=True)
     # Upward-tilted white cantilevered V-wing canopy on left
     b.box(-8.2, 4.8, 0.2, 11.6, 0.52, 4.6, 'white', cap_region='silver_roof', tile=2.0)
     b.box(-12.6, 5.1, 0.5, 4.8, 0.45, 4.8, 'silver_roof', tile=2.0)
     # Right (+X): long crimson granite monument wall ('桂林医科大学 / GUILIN MEDICAL UNIVERSITY')
-    b.box(7.8, 0.0, 0.4, 15.6, 0.58, 2.2, 'dark_stone', tile=1.8, collide=True)
+    b.box(7.8, -0.20, 0.4, 15.6, 0.78, 2.2, 'dark_stone', tile=1.8, collide=True, bottom=True)
     b.box(7.8, 0.58, 0.4, 14.8, 2.35, 1.15, 'brick_red', tile=2.0, collide=True)
     b.box(7.8, 2.93, 0.4, 15.2, 0.18, 1.35, 'granite', tile=1.6,bottom=True)
     b.sign_board(7.8, 1.78, 1.02, 12.6, 1.62, 'glmu_gate', backing=None, depth=0)
@@ -145,7 +146,7 @@ def _build_library_portal(b: Builder):
             for frac in (0.0, 0.33, 0.67):
                 px = p0[0] + (p1[0] - p0[0]) * frac
                 pz = p0[1] + (p1[1] - p0[1]) * frac
-                b.box(px - 0.25, 0.0, pz + 0.25, 0.55, 22.2, 0.55, 'white', tile=2.0)
+                b.box(px - 0.25, -0.20, pz + 0.25, 0.55, 22.4, 0.55, 'white', tile=2.0, bottom=True)
         # Top white cornice ribbon along concave arc
         for i in range(len(inner_arc) - 1):
             p0, p1 = inner_arc[i], inner_arc[i + 1]
@@ -157,8 +158,9 @@ def _build_library_portal(b: Builder):
 
     # Central 7-storey white portal tower at middle of SW concave arc, facing SW (yaw = -0.76 rad)
     prev = b.pose
-    b.pose = (10.5, 0.0, -193.5, -0.76)
-    b.box(0, 0.0, 1.6, 13.8, 25.8, 5.2, 'white', cap_region='silver_roof', tile=2.2, collide=True)
+    portal_gy = b.surface.ground(10.5, -193.5) if b.surface else 0.0
+    b.pose = (10.5, portal_gy, -193.5, -0.76)
+    b.box(0, -0.20, 1.6, 13.8, 26.0, 5.2, 'white', cap_region='silver_roof', tile=2.2, collide=True, bottom=True)
     # Recessed full-height blue-teal glass curtain wall inside white frame
     b.box(0, 4.4, 4.28, 8.6, 17.6, 0.16, 'glass', tile=2.2, lit=True)
     # Sculptural curved roof wave crown above '图书馆'

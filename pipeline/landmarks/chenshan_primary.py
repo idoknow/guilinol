@@ -41,12 +41,13 @@ def _build_yellow_pillar_gate(b: Builder):
     Warm yellow wall pillars, vertical plaque '桂林市辰山小学' on right pillar,
     closed red iron grille double gate across opening."""
     prev = b.pose
-    b.pose = (-16.5, 0.0, -47.5, -2.39)
-    b.box(0.5, 0.02, 0.0, 14.5, 0.04, 5.0, 'pave_plaza', tile=2.5)
+    gate_gy = b.surface.ground(-16.5, -47.5) if b.surface else 0.0
+    b.pose = (-16.5, gate_gy, -47.5, -2.39)
+    b.box(0.5, -0.15, 0.0, 14.5, 0.19, 5.0, 'pave_plaza', tile=2.5, bottom=True)
 
-    # Warm yellow gate pillars
+    # Warm yellow gate pillars (submerged base)
     for px, pw, ph in ((-3.6, 1.25, 3.15), (2.8, 1.35, 3.15), (5.6, 0.95, 2.75)):
-        b.box(px, 0.0, 0.0, pw + 0.16, 0.42, 1.26, 'granite', tile=1.4)
+        b.box(px, -0.20, 0.0, pw + 0.16, 0.62, 1.26, 'granite', tile=1.4, bottom=True)
         b.box(px, 0.42, 0.0, pw, ph - 0.42, 1.10, 'yellow_wall', tile=1.6, collide=True)
         b.box(px, ph, 0.0, pw + 0.22, 0.18, 1.28, 'terracotta', tile=1.2, bottom=True)
 
@@ -60,21 +61,24 @@ def _build_yellow_pillar_gate(b: Builder):
     for ry in (0.18, 1.15, 2.42, 2.72):
         b.box(xc, ry, 0.0, gw, 0.06, 0.08, 'brick_red', tile=0.8)
     for sx in (span_x0 + 0.04, xc - 0.04, xc + 0.04, span_x1 - 0.04):
-        b.box(sx, 0.08, 0.0, 0.07, 2.70, 0.09, 'brick_red', tile=0.8)
+        b.box(sx, -0.15, 0.0, 0.07, 2.85, 0.09, 'brick_red', tile=0.8, bottom=True)
     if b.detail:
         for bx in [span_x0 + 0.26 + k * 0.24 for k in range(int((gw - 0.4) / 0.24))]:
             b.box(bx, 0.18, 0.0, 0.035, 2.55, 0.045, 'brick_red', tile=0.8)
     b.solid_box(xc, 0.0, 0.0, gw, 2.75, 0.28)
     # Closed pedestrian opening
-    b.box(4.2, 0.0, 0.0, 1.8, 2.70, 0.14, 'brick_red', tile=0.8, collide=True)
+    b.box(4.2, -0.15, 0.0, 1.8, 2.85, 0.14, 'brick_red', tile=0.8, collide=True, bottom=True)
     b.pose = prev
 
 
 def build_chenshan(b: Builder):
-    # 1. Campus-wide grey hard paving + greenbelts
-    b.pave_polygon(PAVE_PTS, y=0.03, region='pave')
+    # 1. Campus-wide grey hard paving + greenbelts & courtyards (zero bare dirt)
+    b.pave_polygon(PAVE_PTS, y=0.035, region='pave')
     b.lawn_patch(-42.0, 62.0, 0.0, 8.0, 28.0, curb=True)
     b.lawn_patch(52.0, -64.0, -0.62, 18.0, 8.0, curb=True)
+    b.lawn_patch(14.0, -20.0, 0.0, 22.0, 14.0, curb=True)
+    b.lawn_patch(46.0, -18.0, 0.0, 20.0, 16.0, curb=True)
+    b.lawn_patch(-12.0, 58.0, 0.0, 16.0, 16.0, curb=True)
 
     # 2. NW Yellow-Pillar Gate + Perimeter Fence
     _build_yellow_pillar_gate(b)

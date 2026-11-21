@@ -70,8 +70,9 @@ def _build_pingfeng_gate_and_main(b: Builder):
     b.pose = prev
 
     # 2. Curved Crimson Gate Wall + Closed Retractable Gate facing SSW along Pingfeng Rd
-    b.pose = (14.5, 0.0, 83.5, -0.46)
-    b.box(2.0, 0.02, 0.0, 36.0, 0.04, 8.0, 'pave_plaza', tile=3.0)
+    gate_gy = b.surface.ground(14.5, 83.5) if b.surface else 0.0
+    b.pose = (14.5, gate_gy, 83.5, -0.46)
+    b.box(2.0, -0.15, 0.0, 36.0, 0.19, 8.0, 'pave_plaza', tile=3.0, bottom=True)
     arc_segs = 8
     for i in range(arc_segs):
         t0, t1 = i / arc_segs, (i + 1) / arc_segs
@@ -79,22 +80,22 @@ def _build_pingfeng_gate_and_main(b: Builder):
         za = -2.2 * math.sin(t0 * math.pi * 0.75)
         zb = -2.2 * math.sin(t1 * math.pi * 0.75)
         ha = 2.45 + 1.15 * (t0 ** 1.6)
-        b.box((xa + xb) / 2, 0.0, (za + zb) / 2, abs(xb - xa) + 0.22, ha, 0.72, 'brick_red', cap_region='white', tile=1.8, collide=True)
+        b.box((xa + xb) / 2, -0.20, (za + zb) / 2, abs(xb - xa) + 0.22, ha + 0.20, 0.72, 'brick_red', cap_region='white', tile=1.8, collide=True, bottom=True)
     # Stepped red gatehead pylon at right end of curved red wall
-    b.box(-2.5, 0.0, -1.5, 1.8, 4.8, 1.6, 'brick_red', cap_region='white', tile=1.8, collide=True)
+    b.box(-2.5, -0.20, -1.5, 1.8, 5.0, 1.6, 'brick_red', cap_region='white', tile=1.8, collide=True, bottom=True)
     b.cylinder_y(-2.5, 4.8, 5.2, -1.5, 0.08, 'steel', sections=6)
     # Gold '桂林市田家炳中学' sign on the curved red wall face
     b.sign_board(-9.5, 1.72, -1.12, 9.6, 1.15, 'tjb_gate', backing=None, depth=0)
 
     # Closed stainless-steel retractable gate across opening
     b.retractable_gate(-1.4, 6.6, -1.2, h=1.35)
-    b.box(7.0, 0.0, -1.2, 0.85, 2.55, 0.90, 'brick_red', cap_region='white', tile=1.6, collide=True)
-    b.box(8.6, 0.0, -1.2, 2.4, 1.35, 0.16, 'steel', tile=1.0, collide=True)
-    b.box(10.2, 0.0, -1.2, 0.85, 2.55, 0.90, 'brick_red', cap_region='white', tile=1.6, collide=True)
+    b.box(7.0, -0.20, -1.2, 0.85, 2.75, 0.90, 'brick_red', cap_region='white', tile=1.6, collide=True, bottom=True)
+    b.box(8.6, -0.15, -1.2, 2.4, 1.50, 0.16, 'steel', tile=1.0, collide=True, bottom=True)
+    b.box(10.2, -0.20, -1.2, 0.85, 2.75, 0.90, 'brick_red', cap_region='white', tile=1.6, collide=True, bottom=True)
     for k in range(8):
         wx = 11.4 + k * 1.45
-        b.box(wx, 0.0, -1.2, 1.42, 2.35, 0.42, 'cream' if k % 2 == 0 else 'brick_red', tile=1.5, collide=(k == 0))
-    b.solid_box(16.5, 0.0, -1.2, 11.8, 2.35, 0.45)
+        b.box(wx, -0.20, -1.2, 1.42, 2.55, 0.42, 'cream' if k % 2 == 0 else 'brick_red', tile=1.5, collide=(k == 0), bottom=True)
+    b.solid_box(16.5, -0.20, -1.2, 11.8, 2.55, 0.45)
     b.pose = prev
 
 

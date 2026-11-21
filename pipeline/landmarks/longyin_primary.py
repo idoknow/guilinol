@@ -108,8 +108,8 @@ def build_longyin(b: Builder):
     b.footprint_building(OV_B3F9, floors=3, floor_h=3.40, wall='cream', accent='ochre', roof_kind='flat', roof_tile='gray_tile')
     b.footprint_building(OV_CB0F, floors=3, floor_h=3.40, wall='cream', accent='ochre', roof_kind='flat', roof_tile='gray_tile')
 
-    # 4. Exact OSM Pitches (way/1474986237 track + way/1474986236 court)
-    b.track_field(53.3, 13.9, 0.01, straight_len=24.0, inner_r=10.2, track_w=4.6, stand_side=0, y0=0.05)
+    # 4. Exact OSM Pitches (way/1474986237 soccer + way/1474986236 basketball court)
+    b.soccer_pitch(53.3, 13.9, 0.01, w=20.0, d=34.0, y0=0.05)
     b.basketball_court(53.3, -24.5, 0.01, surface='court_green', apron='track_red', y0=0.05, scale=0.82)
     b.flagpole_plinth(38.0, 2.0, math.pi / 2, poles=1, height=11.0)
 

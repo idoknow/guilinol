@@ -29,11 +29,12 @@ def _build_jiangan_gate(b: Builder):
     wide flat white canopy, thick white fascia with raised characters,
     and closed retractable gate across vehicle and pedestrian bays (ref #01, #03)."""
     prev = b.pose
-    b.pose = (-30.6, 0.0, -6.8, -1.85)
-    b.box(0.0, 0.02, 0.0, 16.0, 0.04, 5.2, 'pave_plaza', tile=2.5)
+    gate_gy = b.surface.ground(-30.6, -6.8) if b.surface else 0.0
+    b.pose = (-30.6, gate_gy, -6.8, -1.85)
+    b.box(0.0, -0.15, 0.0, 16.0, 0.20, 5.2, 'pave_plaza', tile=2.5, bottom=True)
     # Main pillars supporting flat canopy
     for px, pw in ((-5.2, 1.15), (2.8, 1.15), (5.8, 0.90)):
-        b.box(px, 0.0, 0.0, pw + 0.18, 0.50, 1.35, 'dark_stone', tile=1.4)
+        b.box(px, -0.20, 0.0, pw + 0.18, 0.70, 1.35, 'dark_stone', tile=1.4, bottom=True)
         b.box(px, 0.50, 0.0, pw, 3.80, 1.15, 'white', tile=1.8, collide=True)
     # Thick flat-roofed white canopy overhang
     b.box(0.3, 4.30, 0.15, 13.6, 1.26, 3.6, 'white', cap_region='silver_roof', tile=2.0, bottom=True)
@@ -41,37 +42,17 @@ def _build_jiangan_gate(b: Builder):
     b.sign_board(-1.0, 4.98, 1.98, 10.2, 0.98, 'glut_gate', backing=None, depth=0)
     # Closed stainless-steel retractable gate across opening
     b.retractable_gate(-4.55, 2.15, 0.0, h=1.32)
-    b.box(4.35, 0.0, 0.0, 1.9, 1.32, 0.16, 'steel', tile=1.0, collide=True)
+    b.box(4.35, -0.15, 0.0, 1.9, 1.47, 0.16, 'steel', tile=1.0, collide=True, bottom=True)
     # Flanking warm-ochre & cream stone nameplate planter wall on left
-    b.box(-8.4, 0.0, 0.4, 4.6, 2.05, 0.65, 'ochre', cap_region='cream', tile=1.8, collide=True)
+    b.box(-8.4, -0.20, 0.4, 4.6, 2.25, 0.65, 'ochre', cap_region='cream', tile=1.8, collide=True, bottom=True)
     b.sign_board(-8.4, 1.18, 0.76, 3.6, 0.92, 'glut_plaque', backing='cream', depth=0.06)
     b.lawn_patch(-8.4, 1.45, 0.0, 4.2, 1.0, y=0.04, curb=True, shrubs=True)
     b.pose = prev
 
 
 def _build_main_courtyard_block(b: Builder):
-    """4-storey warm cream-yellow U/quadrangle main teaching block on exact Overture 253e76b1-caf
-    polygon (centroid (7.48, -22.28), yaw 16.06 deg, ref #02)."""
-    p_ne, p_nw, p_sw, p_se = OV_MAIN_253E
-    def lerp2(a, c, t):
-        return (a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t)
-
-    nw_i = lerp2(p_nw, p_sw, 0.26)
-    ne_i = lerp2(p_ne, p_se, 0.26)
-    sw_i = lerp2(p_nw, p_sw, 0.74)
-    se_i = lerp2(p_ne, p_se, 0.74)
-    b.footprint_building([p_nw, p_ne, ne_i, nw_i], floors=4, floor_h=3.55, wall='cream', accent='ochre', roof_kind='flat', roof_tile='gray_tile')
-    b.footprint_building([sw_i, se_i, p_se, p_sw], floors=4, floor_h=3.55, wall='cream', accent='ochre', roof_kind='flat', roof_tile='gray_tile')
-    w_in_n = lerp2(nw_i, ne_i, 0.22)
-    w_in_s = lerp2(sw_i, se_i, 0.22)
-    e_in_n = lerp2(nw_i, ne_i, 0.78)
-    e_in_s = lerp2(sw_i, se_i, 0.78)
-    b.footprint_building([nw_i, w_in_n, w_in_s, sw_i], floors=4, floor_h=3.55, wall='cream', accent='ochre', roof_kind='flat', roof_tile='gray_tile')
-    b.footprint_building([e_in_n, ne_i, se_i, e_in_s], floors=4, floor_h=3.55, wall='cream', accent='ochre', roof_kind='flat', roof_tile='gray_tile')
-    if b.detail:
-        for k in range(1, 8):
-            px, pz = lerp2(p_sw, p_se, k / 8.0)
-            b.cylinder_y(px - 0.3, 0.0, 3.6, pz + 0.5, 0.28, 'white', sections=8)
+    """4-storey solid main teaching block on exact Overture 253e76b1-caf polygon (no fictional inner courtyard)."""
+    b.footprint_building(OV_MAIN_253E, floors=4, floor_h=3.55, wall='cream', accent='ochre', roof_kind='flat', roof_tile='gray_tile')
 
 
 def build_glut_primary(b: Builder):
@@ -93,14 +74,9 @@ def build_glut_primary(b: Builder):
     b.footprint_building(OSM_SW_473969841, floors=2, floor_h=3.40, wall='cream', accent='ochre', roof_kind='flat', roof_tile='gray_tile')
     b.footprint_building(OSM_NW_692355779, floors=1, floor_h=3.30, wall='cream', accent='gray_tile', roof_kind='flat', roof_tile='gray_tile')
 
-    # 4. Exact OSM pitches (way/692355777 basketball + way/692355778 sports area)
-    b.pose = (6.2, 0.04, 14.8, -0.35)
-    b.box(-4.5, 0.0, 0.0, 42.0, 0.03, 21.0, 'track_red', tile=4.0)
-    for si in range(6):
-        xa = -23.0 + si * 3.4
-        b.box(xa + 1.7, 0.032, 0.0, 3.4, 0.015, 16.8, 'turf_light' if si % 2 == 0 else 'turf_green', tile=4.0)
-    b.pose = (0.0, 0.0, 0.0, 0.0)
-    b.basketball_court(13.49, 17.45, -0.35 + math.pi / 2, surface='court_green', apron='track_red', y0=0.055, scale=0.66)
+    # 4. Exact OSM pitches (way/692355777 basketball + way/692355778 volleyball)
+    b.basketball_court(13.49, 17.45, -0.35 + math.pi / 2, surface='court_green', apron='pave', y0=0.055, scale=0.72)
+    b.volleyball_court(1.07, 12.43, -0.35 + math.pi / 2, w=18.0, d=9.0, surface='court_blue', apron='court_green', y0=0.055)
     b.flagpole_plinth(-16.5, 14.5, 1.22, poles=1, height=10.8)
 
     # 5. Trees in stone planters

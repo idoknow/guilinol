@@ -380,23 +380,74 @@ class Builder:
             out = mid - (a + b) / 2
             self.face([rings[0][i], rings[0][j], rings[1][j], rings[1][i]], out, region, tile=0.8)
 
-    def pave_polygon(self, poly_xz, y=0.03, region='pave'):
-        """Fill an arbitrary 2D polygon on the ground with clean paving (eliminating bare dirt)."""
+    def pave_polygon(self, poly_xz, y=0.035, region='pave'):
+        """Fill an arbitrary 2D polygon on the ground with clean paving following terrain elevation."""
+        from scipy.spatial import Delaunay
+        import shapely
+        from shapely.geometry import Polygon
+
         pts = np.asarray(poly_xz, dtype=np.float64)
         if len(pts) >= 2 and np.allclose(pts[0], pts[-1]):
             pts = pts[:-1]
-        if len(pts) < 3:
+        n = len(pts)
+        if n < 3:
             return
-        area2 = np.sum(pts[:, 0] * np.roll(pts[:, 1], -1) - np.roll(pts[:, 0], -1) * pts[:, 1])
-        if area2 < 0:
-            pts = pts[::-1]
-        tris = mapbox_earcut.triangulate_float64(pts, np.array([len(pts)], np.uint32)).reshape(-1, 3)
-        for t in tris:
-            verts = []
-            for i in t:
-                gy = self.surface.ground(pts[i, 0], pts[i, 1]) if self.surface else 0.0
-                verts.append((pts[i, 0], y + gy, pts[i, 1]))
-            self.face(verts, (0, 1, 0), region, tile=4.0)
+        poly = Polygon(pts)
+        minx, minz, maxx, maxz = poly.bounds
+        # Subdivide boundary edges every <= 8 m and add interior 6 m Steiner points
+        ring_dense = []
+        for i in range(n):
+            x0, z0 = pts[i]
+            x1, z1 = pts[(i + 1) % n]
+            segs = max(1, int(math.ceil(math.hypot(x1 - x0, z1 - z0) / 8.0)))
+            for s in range(segs):
+                t = s / segs
+                ring_dense.append((x0 + (x1 - x0) * t, z0 + (z1 - z0) * t))
+        all_pts = list(ring_dense)
+        step = 6.0
+        gx = minx + step * 0.5
+        cand = []
+        while gx < maxx - 0.5:
+            gz = minz + step * 0.5
+            while gz < maxz - 0.5:
+                cand.append((gx, gz))
+                gz += step
+            gx += step
+        if cand:
+            c_arr = np.asarray(cand, dtype=np.float64)
+            inner_poly = poly.buffer(-0.5)
+            if not inner_poly.is_empty:
+                keep = shapely.contains_xy(inner_poly, c_arr[:, 0], c_arr[:, 1])
+                all_pts.extend(map(tuple, c_arr[keep]))
+
+        pts_arr = np.asarray(all_pts, dtype=np.float64)
+        tri_simplices = Delaunay(pts_arr).simplices
+        centroids = pts_arr[tri_simplices].mean(axis=1)
+        inside = shapely.contains_xy(poly, centroids[:, 0], centroids[:, 1])
+        tris = tri_simplices[inside]
+
+        for i0, i1, i2 in tris:
+            p0, p1, p2 = pts_arr[i0], pts_arr[i1], pts_arr[i2]
+            gy0 = self.surface.ground(p0[0], p0[1]) if self.surface else 0.0
+            gy1 = self.surface.ground(p1[0], p1[1]) if self.surface else 0.0
+            gy2 = self.surface.ground(p2[0], p2[1]) if self.surface else 0.0
+            v0 = (p0[0], y + gy0, p0[1])
+            v1 = (p1[0], y + gy1, p1[1])
+            v2 = (p2[0], y + gy2, p2[1])
+            cy = (v1[2] - v0[2]) * (v2[0] - v0[0]) - (v1[0] - v0[0]) * (v2[2] - v0[2])
+            self.face([v0, v1, v2] if cy >= 0 else [v0, v2, v1], (0, 1, 0), region, tile=4.0)
+
+        # Skirt along dense boundary to prevent gaps
+        dn = len(ring_dense)
+        edge_drop = 0.14
+        for i in range(dn):
+            x0, z0 = ring_dense[i]
+            x1, z1 = ring_dense[(i + 1) % dn]
+            g0 = self.surface.ground(x0, z0) if self.surface else 0.0
+            g1 = self.surface.ground(x1, z1) if self.surface else 0.0
+            self.face([(x0, g0 - edge_drop, z0), (x1, g1 - edge_drop, z1),
+                       (x1, g1 + y, z1), (x0, g0 + y, z0)],
+                      (0, 0, 0), region, tile=2.0)
 
     def walkway(self, p0, p1, width=4.6, y=0.045, region='pave_plaza', curb=False):
         dx, dz = p1[0] - p0[0], p1[1] - p0[1]
@@ -680,7 +731,7 @@ class Builder:
             step_len = ln/spans
             centers = [(i+.5)*step_len-ln/2 for i in range(spans)]
             for px in centers:
-                self.box(px, 0, 0, step_len, .68, .32, base_mat, tile=1.8, collide=True)
+                self.box(px, -0.20, 0, step_len, .68 + 0.20, .32, base_mat, tile=1.8, collide=True, bottom=True)
             if self.detail:
                 n_bays = max(1, int(ln / 4.5))
                 step = ln / n_bays
@@ -698,7 +749,7 @@ class Builder:
                     self.box(px, .68, 0, step_len, h-.68, .26, wall_mat, tile=2.2)
             if self.collide:
                 for px in centers:
-                    self.solid_box(px, 0, 0, step_len, h, .36)
+                    self.solid_box(px, -0.20, 0, step_len, h + 0.20, .36)
             for part,start in zip(parts,starts):
                 for k in range(start,len(part.pos)):
                     x,y,z = part.pos[k]
@@ -802,6 +853,60 @@ class Builder:
             self.box(sx + stand_side * 1.6, 1.8, 0, 3.8, 2.8, min(12.0, sw * 0.5), 'white', tile=2.0)
             self.box(sx + stand_side * 1.2, 4.5, 0, 5.2, 0.28, min(13.2, sw * 0.55), 'terracotta', tile=2.0,bottom=True)
 
+        self.pose = prev
+
+    def soccer_pitch(self, cx, cz, yaw, w=20.0, d=34.0, y0=0.05):
+        """Standard rectangular soccer pitch with green turf and crisp white lines (NO running track)."""
+        prev = self.pose
+        self.pose = (cx, y0, cz, yaw)
+        hw, hd = w / 2.0, d / 2.0
+        n_stripes = 8
+        step = d / n_stripes
+        for si in range(n_stripes):
+            za = -hd + si * step
+            zb = -hd + (si + 1) * step
+            mat = 'turf_light' if si % 2 == 0 else 'turf_green'
+            self.face([(-hw, 0.025, zb), (hw, 0.025, zb), (hw, 0.025, za), (-hw, 0.025, za)],
+                      (0, 1, 0), mat, tile=6.0)
+        lw = 0.10
+        self.box(0, 0.03, -hd + lw / 2, w, 0.015, lw, 'line_white', tile=1.0)
+        self.box(0, 0.03, hd - lw / 2, w, 0.015, lw, 'line_white', tile=1.0)
+        self.box(-hw + lw / 2, 0.03, 0, lw, 0.015, d, 'line_white', tile=1.0)
+        self.box(hw - lw / 2, 0.03, 0, lw, 0.015, d, 'line_white', tile=1.0)
+        self.box(0, 0.03, 0, w, 0.015, lw, 'line_white', tile=1.0)
+        c_r = min(4.0, w * 0.22)
+        n_c = 16
+        for i in range(n_c):
+            a0, a1 = 2 * math.pi * i / n_c, 2 * math.pi * (i + 1) / n_c
+            self.face([
+                ((c_r - 0.05) * math.cos(a0), 0.035, (c_r - 0.05) * math.sin(a0)),
+                ((c_r + 0.05) * math.cos(a0), 0.035, (c_r + 0.05) * math.sin(a0)),
+                ((c_r + 0.05) * math.cos(a1), 0.035, (c_r + 0.05) * math.sin(a1)),
+                ((c_r - 0.05) * math.cos(a1), 0.035, (c_r - 0.05) * math.sin(a1)),
+            ], (0, 1, 0), 'line_white', tile=1.0)
+        gw, gh = min(5.0, w * 0.3), 2.2
+        for sz in (-hd, hd):
+            self.tube((-gw / 2, 0.03, sz), (-gw / 2, gh, sz), 0.05, 'white', 4)
+            self.tube((gw / 2, 0.03, sz), (gw / 2, gh, sz), 0.05, 'white', 4)
+            self.tube((-gw / 2, gh, sz), (gw / 2, gh, sz), 0.05, 'white', 4)
+        self.pose = prev
+
+    def volleyball_court(self, cx, cz, yaw, w=18.0, d=9.0, surface='court_blue', apron='court_green', y0=0.05):
+        """Standard volleyball court with colored surface, apron, lines and net."""
+        prev = self.pose
+        self.pose = (cx, y0, cz, yaw)
+        self.box(0, 0.02, 0, w + 4.0, 0.02, d + 4.0, apron, tile=4.0)
+        self.box(0, 0.025, 0, w, 0.02, d, surface, tile=4.0)
+        lw = 0.08
+        self.box(0, 0.032, -d / 2 + lw / 2, w, 0.015, lw, 'line_white', tile=1.0)
+        self.box(0, 0.032, d / 2 - lw / 2, w, 0.015, lw, 'line_white', tile=1.0)
+        self.box(-w / 2 + lw / 2, 0.032, 0, lw, 0.015, d, 'line_white', tile=1.0)
+        self.box(w / 2 - lw / 2, 0.032, 0, lw, 0.015, d, 'line_white', tile=1.0)
+        self.box(0, 0.032, 0, lw, 0.015, d, 'line_white', tile=1.0)
+        # Net
+        self.box(0, 1.25, 0, 0.04, 1.0, d + 0.8, 'white', tile=1.0)
+        for sz in (-d / 2 - 0.4, d / 2 + 0.4):
+            self.cylinder_y(0, 0.0, 2.45, sz, 0.06, 'steel', sections=6)
         self.pose = prev
 
     def basketball_court(self, cx, cz, yaw, surface='court_green', apron='track_red', y0=0.05, scale=1.0):

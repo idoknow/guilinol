@@ -171,7 +171,7 @@ def gen_glut():
     c.draw_poly(b_pts, fill=(42, 48, 60), outline=(239, 68, 68), width=3)
 
     # Pitches
-    for wid, label, col in [('way/692355778', '体育活动场', (47, 133, 90)), ('way/692355777', '篮球场', (49, 130, 206))]:
+    for wid, label, col in [('way/692355778', '排球场', (47, 133, 90)), ('way/692355777', '篮球场', (49, 130, 206))]:
         pts = get_poly(wid)
         if pts:
             c.draw_poly(pts, fill=col, outline=(39, 103, 73), width=1)
@@ -201,11 +201,6 @@ def gen_glut():
             cx = sum(p[0] for p in pts) / len(pts)
             cz = sum(p[1] for p in pts) / len(pts)
             c.draw_text(cx, cz, label, col=(16, 42, 67), size=11)
-
-    # Gate on Jiangan Rd
-    gx, gz = 948.85, -392.63
-    c.draw_star(gx, gz)
-    c.draw_text(gx - 40, gz - 15, '校门: 建干路大门 (常闭)', col=(236, 201, 75), size=12)
 
     c.draw_footer('口径 A 安全边界: 0门卫 0闸机 0监控 无室内 常闭校门')
     c.save(out_dir / 'glut_primary-basemap.png')
@@ -250,11 +245,6 @@ def gen_tianjiabing():
         cz = sum(p[1] for p in pts) / len(pts)
         c.draw_text(cx, cz, label, col=(16, 42, 67), size=10)
 
-    # Gate on Pingfeng Rd
-    gx, gz = anchor_x + 14.5, anchor_z + 83.5
-    c.draw_star(gx, gz)
-    c.draw_text(gx - 45, gz - 15, '校门: 屏风路大门 (常闭)', col=(236, 201, 75), size=12)
-
     c.draw_footer('口径 A 安全边界: 0门卫 0闸机 0监控 无室内 常闭校门 (OSM无pitch要素，不画球场)')
     c.save(out_dir / 'tianjiabing-basemap.png')
     print('Generated tianjiabing-basemap.png')
@@ -285,12 +275,6 @@ def gen_chenshan():
             cz = sum(p[1] for p in pts) / len(pts)
             c.draw_text(cx, cz, label, col=(16, 42, 67), size=12)
 
-    # Gate on NW
-    anchor_x, anchor_z = 1131.63, -2354.08
-    gx, gz = anchor_x - 16.5, anchor_z - 47.5
-    c.draw_star(gx, gz)
-    c.draw_text(gx - 45, gz - 15, '校门: 西北门 (常闭)', col=(236, 201, 75), size=12)
-
     c.draw_footer('口径 A 安全边界: 0门卫 0闸机 0监控 无室内 常闭校门 (OSM无pitch要素，不画球场)')
     c.save(out_dir / 'chenshan_primary-basemap.png')
     print('Generated chenshan_primary-basemap.png')
@@ -314,12 +298,6 @@ def gen_lijiang():
     c.draw_text(cx, cz - 10, '校园绿化与铺装空间', col=(160, 174, 192), size=14)
     c.draw_text(cx, cz + 15, '(OSM/Overture内无建筑轮廓与场地要素)', col=(120, 134, 152), size=11)
 
-    # Gate on south (Fangxiang Rd)
-    anchor_x, anchor_z = 1125.48, 56.46
-    gx, gz = anchor_x - 5.5, anchor_z + 28.7
-    c.draw_star(gx, gz)
-    c.draw_text(gx - 40, gz - 15, '校门: 芳香路校门 (常闭)', col=(236, 201, 75), size=12)
-
     c.draw_footer('口径 A 安全边界: 0门卫 0闸机 0监控 无室内 常闭校门 (无OSM楼栋及场地，不虚构补建)')
     c.save(out_dir / 'lijiang_primary-basemap.png')
     print('Generated lijiang_primary-basemap.png')
@@ -340,10 +318,10 @@ def gen_longyin():
     # Pitches
     track_pts = get_poly('way/1474986237')
     if track_pts:
-        c.draw_poly(track_pts, fill=(180, 70, 70), outline=(239, 68, 68), width=1)
+        c.draw_poly(track_pts, fill=(40, 120, 80), outline=(16, 185, 129), width=1)
         cx = sum(p[0] for p in track_pts) / len(track_pts)
         cz = sum(p[1] for p in track_pts) / len(track_pts)
-        c.draw_text(cx, cz, '跑道田径场', col=(255, 255, 255), size=12)
+        c.draw_text(cx, cz, '足球场 (sport=soccer)', col=(255, 255, 255), size=11)
 
     court_pts = get_poly('way/1474986236')
     if court_pts:
@@ -381,11 +359,6 @@ def gen_longyin():
         cx = sum(p[0] for p in pts) / len(pts)
         cz = sum(p[1] for p in pts) / len(pts)
         c.draw_text(cx, cz, label, col=(16, 42, 67), size=10)
-
-    # Gate on west (Qixing Rd)
-    gx, gz = anchor_x - 93.5, anchor_z - 4.5
-    c.draw_star(gx, gz)
-    c.draw_text(gx - 45, gz - 15, '校门: 七星路校门 (常闭)', col=(236, 201, 75), size=12)
 
     c.draw_footer('口径 A 安全边界: 0门卫 0闸机 0监控 无室内 常闭校门 (严格按OSM/Overture要素与场地)')
     c.save(out_dir / 'longyin_primary-basemap.png')
