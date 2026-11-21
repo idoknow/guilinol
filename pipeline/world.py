@@ -244,6 +244,8 @@ def build(bbox, output, palette):
         xx, zz = np.meshgrid(left+cols*GRID, top+rows*GRID)
         edge_distance = distance(shapely_points(xx, zz), region.boundary)
         blend = np.clip((span-edge_distance)/(span/2), 0, 1)
+        # Keep adjacent parcels at survey grade, including their foundation bearings.
+        blend[~intersects_xy(region, xx, zz)] = 0
         window = np.ix_(rows, cols)
         local_roads = carriageway_mask.intersection(neighborhood)
         sidewalks = sidewalk_mask.intersection(neighborhood)
