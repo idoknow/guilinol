@@ -22,12 +22,15 @@ import {flags} from './debug'
 import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRangeConfig} from './render-range'
 import {renderRangeControl} from './ui/render-range'
 import type {FeedbackView} from '../../lib/feedback-contract'
+import {createGameDebugProbe, initGame} from './game'
+import {isGlobalHotkeyBlocked} from './walk/input-guard'
 
 installAtmosphere()
 // The title screen (ui/home.ts) pauses the scene while it covers it: no simulation, no draws.
 let paused=false
 export function setPaused(on:boolean){paused=on}
 async function start() {
+  initGame()
   const params = new URLSearchParams(location.search)
   const rangeStore = new RenderRangeStore(loadRenderConfig(params))
   const initialMetrics = rangeStore.getMetrics()
@@ -161,7 +164,7 @@ async function start() {
     }finally{operation('switch',start);switching=false}
   }
   window.addEventListener('keydown',event=>{
-    if(document.body.hasAttribute('data-home')||document.body.dataset.photo==='on'||(event.target as Element)?.closest?.('input,textarea,select,[contenteditable]'))return
+    if(isGlobalHotkeyBlocked(event.target))return
     if(event.code==='KeyV'&&!event.repeat)void toggle().then(showMode)
   })
   const touch=matchMedia('(pointer:coarse)').matches,hint=document.querySelector<HTMLElement>('.hint')!,toast=document.querySelector<HTMLElement>('.toast')!
@@ -206,7 +209,8 @@ async function start() {
     },
   })
   rangeStore.subscribe(nextCfg=>{renderUi.setConfig(nextCfg)})
-  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,
+  const gameProbe = createGameDebugProbe()
+  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,game:gameProbe,
     get renderRange(){return rangeStore.getConfig()},
     get rangeMetrics(){return rangeStore.getMetrics()},
     setRenderRange(next:unknown, persist=false){return stream.setRenderRange(next as number|string,{persist})},

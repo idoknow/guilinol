@@ -1,0 +1,289 @@
+/**
+ * Unified `[F]` interaction arbiter (`web/src/walk/interact-arbiter.ts`).
+ *
+ * Replaces private `KeyF` listeners in `vehicles.ts` with a single deterministic 7-level priority short-circuit
+ * (docs/commerce-shops-spec.md §2.2):
+ *   0 (Blocked)       : text input focused / data-home / photo mode / shop·wardrobe·garage·modal open -> hide & block
+ *   1 (Locked)        : crash / standUp / pickup animation active -> block shop & mount (show pickup progress label)
+ *   2 (Aboard)        : riding ebike/bike, driving car, or boating -> ONLY dismount / disembark (if in shop radius, soft hint only)
+ *   3 (Foot·Pickup)   : on foot near downed two-wheeler (< 4.4m, |dy| <= 1.5m) -> pickup fallen bike
+ *   4 (Foot·Shop/Bay) : on foot inside shop trigger (!quiet) or serviceBay -> open shop / service bay (suppresses 4.2m mount!)
+ *   5 (Foot·Vehicle)  : on foot near vehicle (< 4.2m / car < 4.6m; personal bike +0.6m priority bias) -> mount
+ *   6 (Foot·Water)    : on foot near free boat dock or tour pier -> board boat
+ */
+
+import {isGlobalHotkeyBlocked} from './input-guard'
+
+export type InteractionActionKind =
+  | 'none'
+  | 'pickup_busy'
+  | 'dismount'
+  | 'pickup_downed'
+  | 'open_shop'
+  | 'open_service'
+  | 'mount_vehicle'
+  | 'board_boat'
+
+export interface VehicleCandidateSnapshot {
+  kind: 'car' | 'bike' | 'bicycle'
+  downed: boolean
+  distance: number
+  ownership?: 'shared' | 'personal' | 'test_ride'
+  ebikeTier?: 'shared' | 'normal'
+}
+
+export interface BoatCandidateSnapshot {
+  kind: 'free_boat' | 'tour_boat'
+  label: string
+  distance: number
+}
+
+export interface ShopCandidateSnapshot {
+  shopId: string
+  brandName: string
+  displayName: string
+  distance: number
+}
+
+export interface ServiceBayCandidateSnapshot {
+  shopId: string
+  displayName: string
+  distance: number
+}
+
+export interface InteractionContext {
+  active: boolean
+  modalOrOverlayBlocked: boolean
+  crashed: boolean
+  standingUp: boolean
+  pickingUpKind: 'bike' | 'bicycle' | null
+  aboardKind: 'car' | 'bike' | 'bicycle' | 'free_boat' | 'tour_boat' | null
+  tourDisembarkQueued?: boolean
+  inQuietZone: boolean
+  nearDownedVehicle: VehicleCandidateSnapshot | null
+  nearShop: ShopCandidateSnapshot | null
+  nearServiceBay: ServiceBayCandidateSnapshot | null
+  nearVehicle: VehicleCandidateSnapshot | null
+  nearBoat: BoatCandidateSnapshot | null
+}
+
+export interface InteractionDecision {
+  priority: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
+  action: InteractionActionKind
+  label: string
+  disabled: boolean
+  shopId?: string
+  softHint?: string
+  ebikeTier?: 'shared' | 'normal'
+  ownership?: 'shared' | 'personal' | 'test_ride'
+}
+
+/** Pure deterministic 7-level `[F]` priority resolver (zero DOM/Three.js coupling; fully unit-testable). */
+export function resolveInteraction(ctx: InteractionContext): InteractionDecision {
+  // Priority 0: Modal / home / photo / shop overlay / inactive walk mode -> hard block
+  if (!ctx.active || ctx.modalOrOverlayBlocked) {
+    return {priority: 0, action: 'none', label: '', disabled: true}
+  }
+
+  // Priority 1: Crash / stand-up / pickup lock
+  if (ctx.pickingUpKind) {
+    return {
+      priority: 1,
+      action: 'pickup_busy',
+      label: ctx.pickingUpKind === 'bicycle' ? '正在扶起单车' : '正在扶起电动车',
+      disabled: true,
+    }
+  }
+  if (ctx.standingUp || ctx.crashed) {
+    return {priority: 1, action: 'none', label: '', disabled: true}
+  }
+
+  // Priority 2: Aboard any vehicle/boat -> ONLY dismount/disembark; riding in shop radius shows soft hint only
+  if (ctx.aboardKind) {
+    const label =
+      ctx.aboardKind === 'free_boat'
+        ? '靠岸下船'
+        : ctx.aboardKind === 'tour_boat'
+          ? (ctx.tourDisembarkQueued ? '下一站下船' : '下站下船')
+          : '下车'
+    const softHint =
+      (ctx.aboardKind === 'bike' || ctx.aboardKind === 'bicycle' || ctx.aboardKind === 'car') &&
+      !ctx.inQuietZone &&
+      (ctx.nearShop || ctx.nearServiceBay)
+        ? '先按 F 下车再进店'
+        : undefined
+    return {
+      priority: 2,
+      action: 'dismount',
+      label,
+      disabled: false,
+      ...(softHint ? {softHint} : {}),
+    }
+  }
+
+  // Priority 3: On foot near downed two-wheeler -> pickup first so shop entrance never soft-locks
+  if (ctx.nearDownedVehicle) {
+    return {
+      priority: 3,
+      action: 'pickup_downed',
+      label: ctx.nearDownedVehicle.kind === 'bicycle' ? '扶起单车' : '扶起电动车',
+      disabled: false,
+    }
+  }
+
+  // Priority 4: On foot in shop trigger or service bay (outside quiet zone) -> suppresses vehicle mount within 4.2m
+  if (!ctx.inQuietZone && ctx.nearShop) {
+    return {
+      priority: 4,
+      action: 'open_shop',
+      label: `进店 · ${ctx.nearShop.brandName}`,
+      disabled: false,
+      shopId: ctx.nearShop.shopId,
+    }
+  }
+  if (!ctx.inQuietZone && ctx.nearServiceBay) {
+    return {
+      priority: 4,
+      action: 'open_service',
+      label: '充电/保养',
+      disabled: false,
+      shopId: ctx.nearServiceBay.shopId,
+    }
+  }
+
+  // Priority 5: On foot near mountable vehicle
+  if (ctx.nearVehicle) {
+    const v = ctx.nearVehicle
+    // Keep exact legacy label `'骑电动车'` / `'骑单车'` / `'开车'` for non-personal roadside vehicles so existing
+    // Playwright harnesses (`ride.mjs`, `car.mjs`, `jiefang-crossing.mjs`) stay 100% green, while personal rides
+    // display `'骑我的电摩'`.
+    const label =
+      v.kind === 'car'
+        ? '开车'
+        : v.kind === 'bicycle'
+          ? '骑单车'
+          : v.ownership === 'personal'
+            ? '骑我的电摩'
+            : '骑电动车'
+    return {
+      priority: 5,
+      action: 'mount_vehicle',
+      label,
+      disabled: false,
+      ...(v.ebikeTier ? {ebikeTier: v.ebikeTier} : {}),
+      ...(v.ownership ? {ownership: v.ownership} : {}),
+    }
+  }
+
+  // Priority 6: On foot near water dock / mooring
+  if (ctx.nearBoat) {
+    return {
+      priority: 6,
+      action: 'board_boat',
+      label: ctx.nearBoat.label,
+      disabled: false,
+    }
+  }
+
+  return {priority: 7, action: 'none', label: '', disabled: true}
+}
+
+export interface InteractArbiterCallbacks {
+  getContext: () => InteractionContext
+  onOpenShop: (shopId: string) => void
+  onOpenService: (shopId: string) => void
+  onVehicleOrBoatInteract: () => void
+  onSoftHint?: (text: string) => void
+  onDecisionChange?: (decision: InteractionDecision) => void
+}
+
+export interface InteractArbiterHandle {
+  sync: (buttonEl: HTMLButtonElement | null) => InteractionDecision
+  trigger: () => InteractionDecision
+  getLastDecision: () => InteractionDecision
+  dispose: () => void
+}
+
+/**
+ * Single runtime `[F]` keyboard & `.vehicle-action` click coordinator.
+ */
+export function createInteractArbiter(callbacks: InteractArbiterCallbacks): InteractArbiterHandle {
+  let lastDecision: InteractionDecision = {priority: 0, action: 'none', label: '', disabled: true}
+  let lastSoftHintAt = 0
+  let lastSoftHintText = ''
+
+  function applyButton(buttonEl: HTMLButtonElement | null, decision: InteractionDecision): void {
+    if (!buttonEl) return
+    if (decision.ebikeTier) buttonEl.dataset.ebikeTier = decision.ebikeTier
+    else delete buttonEl.dataset.ebikeTier
+    if (decision.ownership) buttonEl.dataset.ownership = decision.ownership
+    else delete buttonEl.dataset.ownership
+    buttonEl.dataset.interactAction = decision.action
+    buttonEl.hidden = !decision.label
+    if (buttonEl.textContent !== decision.label) buttonEl.textContent = decision.label
+  }
+
+  function sync(buttonEl: HTMLButtonElement | null): InteractionDecision {
+    const decision = resolveInteraction(callbacks.getContext())
+    applyButton(buttonEl, decision)
+    if (decision.softHint) {
+      const now = performance.now()
+      if (decision.softHint !== lastSoftHintText || now - lastSoftHintAt > 4500) {
+        lastSoftHintText = decision.softHint
+        lastSoftHintAt = now
+        callbacks.onSoftHint?.(decision.softHint)
+      }
+    } else {
+      lastSoftHintText = ''
+    }
+    if (
+      decision.action !== lastDecision.action ||
+      decision.label !== lastDecision.label ||
+      decision.shopId !== lastDecision.shopId
+    ) {
+      lastDecision = decision
+      callbacks.onDecisionChange?.(decision)
+    } else {
+      lastDecision = decision
+    }
+    return decision
+  }
+
+  function trigger(): InteractionDecision {
+    const decision = resolveInteraction(callbacks.getContext())
+    lastDecision = decision
+    if (decision.disabled || decision.action === 'none' || decision.action === 'pickup_busy') {
+      return decision
+    }
+    if (decision.action === 'open_shop' && decision.shopId) {
+      callbacks.onOpenShop(decision.shopId)
+      return decision
+    }
+    if (decision.action === 'open_service' && decision.shopId) {
+      callbacks.onOpenService(decision.shopId)
+      return decision
+    }
+    callbacks.onVehicleOrBoatInteract()
+    return decision
+  }
+
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.code !== 'KeyF' || event.repeat) return
+    if (isGlobalHotkeyBlocked(event.target)) return
+    const decision = trigger()
+    if (decision.action !== 'none') {
+      event.preventDefault()
+    }
+  }
+
+  window.addEventListener('keydown', onKeyDown)
+
+  return {
+    sync,
+    trigger,
+    getLastDecision: () => lastDecision,
+    dispose: () => {
+      window.removeEventListener('keydown', onKeyDown)
+    },
+  }
+}

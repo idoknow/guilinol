@@ -222,8 +222,30 @@
 }
 
 body[data-photo="on"] :is(.render-entry, .render-pop),
-body[data-home] :is(.render-entry, .render-pop) {
+body[data-home] :is(.render-entry, .render-pop),
+body[data-shop-open="1"] :is(.render-entry, .render-pop) {
   display: none !important;
+}
+
+/* Phase 2 street HUD: keep .render-entry cleanly clear of mobile .minimap (top:58px..170px) & .road-name (top:180px..206px). */
+body[data-hud="street"] .render-entry {
+  top: calc(58px + env(safe-area-inset-top));
+}
+
+body[data-hud="street"] .render-pop {
+  top: calc(92px + env(safe-area-inset-top));
+}
+
+@media (pointer: coarse), (max-width: 560px) {
+  body[data-hud="street"] .render-entry {
+    left: calc(12px + env(safe-area-inset-left));
+    top: calc(214px + env(safe-area-inset-top));
+  }
+
+  body[data-hud="street"] .render-pop {
+    left: calc(12px + env(safe-area-inset-left));
+    top: calc(248px + env(safe-area-inset-top));
+  }
 }
 
 @media (pointer: coarse) {

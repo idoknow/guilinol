@@ -42,6 +42,7 @@
     "verify:tour": "node scripts/tour.mjs",
     "check:flags": "node scripts/check-flags.mjs",
     "check:batcher": "node scripts/check-batcher.mjs",
+    "check:commerce": "node scripts/check-commerce-foundation.mjs",
     "deploy:hk": "bash deploy/deploy-hk.sh",
     "verify:telemetry": "node scripts/verify-telemetry.mjs",
     "test": "python3 scripts/test-perf-region.py && node --test scripts/telemetry-test.mjs && npm run test:api"

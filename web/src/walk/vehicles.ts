@@ -20,8 +20,8 @@ import {
   type RideKind,
 } from './ride'
 import {vehicleModel} from './vehicle-model'
-import {isGlobalHotkeyBlocked} from './input-guard'
 import {KICKSTAND_REST_ROLL_RAD} from './ebike-state-coupling'
+import type {BoatCandidateSnapshot, VehicleCandidateSnapshot} from './interact-arbiter'
 
 type Position=[number,number,number]
 type Route={kind:string,start:string,end:string,path:Position[]}
@@ -34,6 +34,15 @@ export interface VehiclesEnv {
   sim: Physics
   stream: Stream
   landFree: (spot:FreeDismountTarget)=>boolean
+  actionButton?: HTMLButtonElement
+  externalArbiter?: boolean
+}
+export interface VehicleInteractSnapshot {
+  aboardKind: 'car' | 'bike' | 'bicycle' | 'free_boat' | 'tour_boat' | null
+  tourDisembarkQueued: boolean
+  nearDownedVehicle: VehicleCandidateSnapshot | null
+  nearVehicle: VehicleCandidateSnapshot | null
+  nearBoat: BoatCandidateSnapshot | null
 }
 interface Data {bikes:[number,number,number,number,number][];sharedBikes?:[number,number,number,number,number][];bicycles?:[number,number,number,number,number][];cars?:[number,number,number,number,number][];docks:Record<string,Position>;routes:Route[];grid:number[];mask:string;motorGrid?:number[];motorMask?:string}
 export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number,bikeHeading?:number,bikeY?:number,kind?:'car')=>boolean,board?:(bx:number,by:number,bz:number,kind?:'car')=>BoardPos|null,env?:VehiclesEnv){
@@ -79,16 +88,12 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
   const ringMat=new T.MeshBasicMaterial({color:0xd86b4a,transparent:true,opacity:.45,depthWrite:false,side:T.DoubleSide,fog:false})
   const interactRing=new T.Mesh(new T.RingGeometry(.86,1.08,32).rotateX(-Math.PI/2),ringMat)
   interactRing.renderOrder=4;interactRing.visible=false;group.add(interactRing)
-  const button=document.createElement('button');button.className='vehicle-action';button.setAttribute('aria-keyshortcuts','F');button.hidden=true;document.body.append(button)
+  const button=env?.actionButton??document.querySelector<HTMLButtonElement>('.vehicle-action')??(()=>{const b=document.createElement('button');b.className='vehicle-action';b.setAttribute('aria-keyshortcuts','F');b.hidden=true;document.body.append(b);return b})()
+  let externalArbiter=!!env?.externalArbiter
   const bikeCtrl=createBikeControl(),carCtrl=createCarControl()
-  let bike:T.Mesh|null=null,lastBike:T.Mesh|null=null,car:T.Mesh|null=null,lastCar:T.Mesh|null=null,route=-1,nearBike:T.Mesh|null=null,nearRoute=-1,nearRouteDist=Infinity,segment=1,disembark=false,active=false,heading=0
+  let bike:T.Mesh|null=null,lastBike:T.Mesh|null=null,car:T.Mesh|null=null,lastCar:T.Mesh|null=null,route=-1,nearBike:T.Mesh|null=null,nearBikeDist=Infinity,nearDownedBike:T.Mesh|null=null,nearDownedDist=Infinity,nearRoute=-1,nearRouteDist=Infinity,segment=1,disembark=false,active=false,heading=0
   let nearFree:{slot:MooringSlot|null,distance:number,atBank:boolean}={slot:null,distance:Infinity,atBank:false}
   function syncHud(){
-    const preferFree=!!nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)
-    const freePrompt=nearFree.slot?(nearFree.slot.kind==='freeRaft'?'划竹筏 · ':'划小船 · ')+nearFree.slot.name:''
-    const ridePrompt=nearBike?(nearBike.name==='car'?'开车':nearBike.userData.downed?(nearBike.name==='bicycle'?'扶起单车':'扶起电动车'):(nearBike.name==='bicycle'?'骑单车':'骑电动车')):''
-    const crashedRide=document.body.dataset.rideCrash==='1'
-    const label=car?'下车':bike?(crashedRide?'':'下车'):freeBoats?.active?'靠岸下船':route>=0?(disembark?'下一站下船':'下站下船'):ridePrompt||(preferFree?freePrompt:nearRoute>=0?'上船 · '+data.routes[nearRoute].start:'')
     document.body.toggleAttribute('data-aboard',!!car||!!bike||route>=0||!!freeBoats?.active)
     if(bike&&bikeCtrl.kind==='bike'){
       document.body.dataset.ebikeTier=bikeCtrl.vehicleType
@@ -97,7 +102,14 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
       delete document.body.dataset.ebikeTier
       if(bike?.name!=='bicycle')delete document.body.dataset.rideType
     }
-    if(nearBike?.name==='bike')button.dataset.ebikeTier=(nearBike.userData.vehicleType as EbikeVehicleType|undefined)??resolveEbikeKind((nearBike.userData.paint as number|undefined)??0)
+    if(externalArbiter)return
+    const preferFree=!!nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)
+    const freePrompt=nearFree.slot?(nearFree.slot.kind==='freeRaft'?'划竹筏 · ':'划小船 · ')+nearFree.slot.name:''
+    const activeTarget=nearDownedBike??nearBike
+    const ridePrompt=activeTarget?(activeTarget.name==='car'?'开车':activeTarget.userData.downed?(activeTarget.name==='bicycle'?'扶起单车':'扶起电动车'):(activeTarget.name==='bicycle'?'骑单车':activeTarget.userData.ownership==='personal'?'骑我的电摩':'骑电动车')):''
+    const crashedRide=document.body.dataset.rideCrash==='1'
+    const label=car?'下车':bike?(crashedRide?'':'下车'):freeBoats?.active?'靠岸下船':route>=0?(disembark?'下一站下船':'下站下船'):ridePrompt||(preferFree?freePrompt:nearRoute>=0?'上船 · '+data.routes[nearRoute].start:'')
+    if(activeTarget?.name==='bike')button.dataset.ebikeTier=(activeTarget.userData.vehicleType as EbikeVehicleType|undefined)??resolveEbikeKind((activeTarget.userData.paint as number|undefined)??0)
     else delete button.dataset.ebikeTier
     button.hidden=!label;if(button.textContent!==label)button.textContent=label
   }
@@ -183,6 +195,11 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     else if(bike){if(land(bike.position.x,bike.position.z,bikeCtrl.heading,bike.position.y))reset()}
     else if(freeBoats?.active){const spot=freeBoats.dismount(data.docks,s=>!!env?.landFree(s));if(spot){nearFree={slot:null,distance:Infinity,atBank:false};syncHud();return}}
     else if(route>=0)disembark=true
+    else if(nearDownedBike){
+      const target=nearDownedBike
+      const safePos=board?board(target.position.x,target.position.y,target.position.z):{x:target.position.x,y:target.position.y,z:target.position.z,bikeY:target.position.y}
+      if(!safePos)return
+    }
     else if(nearBike?.name==='car'){
       const safePos=board?board(nearBike.position.x,nearBike.position.y,nearBike.position.z,'car'):{x:nearBike.position.x,y:nearBike.position.y,z:nearBike.position.z,bikeY:nearBike.position.y}
       if(!safePos)return
@@ -211,17 +228,45 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     else if(nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)){freeBoats!.mount(nearFree.slot,nearFree.atBank);syncHud()}
     else if(nearRoute>=0){route=nearRoute;segment=1;disembark=false}
   }
-  button.onclick=interact;window.addEventListener('keydown',event=>{if(event.code==='KeyF'&&!event.repeat&&!isGlobalHotkeyBlocked(event.target))interact()})
-  function nearby(x:number,z:number,footY?:number){nearBike=null;nearRoute=-1;nearRouteDist=Infinity;let best=4.6
+  if(!externalArbiter)button.onclick=interact
+  function getInteractSnapshot():VehicleInteractSnapshot{
+    const aboardKind=car?'car':bike?(bikeCtrl.kind==='bicycle'?'bicycle':'bike'):freeBoats?.active?'free_boat':route>=0?'tour_boat':null
+    const toVehicleSnap=(mesh:T.Mesh|null,distance:number):VehicleCandidateSnapshot|null=>{
+      if(!mesh)return null
+      const kind:VehicleCandidateSnapshot['kind']=mesh.name==='car'?'car':mesh.name==='bicycle'?'bicycle':'bike'
+      const tier=kind==='bike'?((mesh.userData.vehicleType as EbikeVehicleType|undefined)??resolveEbikeKind((mesh.userData.paint as number|undefined)??0)):undefined
+      const ownership=(mesh.userData.ownership as VehicleCandidateSnapshot['ownership']|undefined)??(tier==='shared'?'shared':undefined)
+      return {kind,downed:!!mesh.userData.downed,distance,...(tier?{ebikeTier:tier}:{}),...(ownership?{ownership}:{})}
+    }
+    const preferFree=!!nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)
+    const nearBoat:BoatCandidateSnapshot|null=preferFree&&nearFree.slot
+      ?{kind:'free_boat',label:(nearFree.slot.kind==='freeRaft'?'划竹筏 · ':'划小船 · ')+nearFree.slot.name,distance:nearFree.distance}
+      :nearRoute>=0
+        ?{kind:'tour_boat',label:'上船 · '+data.routes[nearRoute].start,distance:nearRouteDist}
+        :null
+    return {
+      aboardKind,
+      tourDisembarkQueued:disembark,
+      nearDownedVehicle:toVehicleSnap(nearDownedBike,nearDownedDist),
+      nearVehicle:toVehicleSnap(nearBike,nearBikeDist),
+      nearBoat,
+    }
+  }
+  function nearby(x:number,z:number,footY?:number){nearBike=null;nearBikeDist=Infinity;nearDownedBike=null;nearDownedDist=Infinity;nearRoute=-1;nearRouteDist=Infinity;let bestScore=4.6
     let bestHint:{x:number;y:number;z:number;dist:number;reach:number;radius:number}|null=null
     const nextCells=new Set<T.Group>()
     for(let col=Math.floor((x-110)/cellSize);col<=Math.floor((x+110)/cellSize);col++)for(let row=Math.floor((z-110)/cellSize);row<=Math.floor((z+110)/cellSize);row++){
       const cell=cells.get(`${col},${row}`);if(!cell)continue;nextCells.add(cell);if(!visibleCells.has(cell)){visibleCells.add(cell);group.add(cell)}
       for(const child of cell.children){
-        const mesh=child as T.Mesh,distance=Math.hypot(mesh.position.x-x,mesh.position.z-z),isCar=mesh.name==='car',reach=mesh.userData.downed?4.4:isCar?4.6:4.2
+        const mesh=child as T.Mesh,distance=Math.hypot(mesh.position.x-x,mesh.position.z-z),isCar=mesh.name==='car',downed=!!mesh.userData.downed,reach=downed?4.4:isCar?4.6:4.2
         mesh.visible=distance<110
         const vertOk=footY===undefined||Math.abs(mesh.position.y-footY)<=1.5
-        if(distance<reach&&distance<best&&vertOk){nearBike=mesh;best=distance}
+        if(downed&&distance<reach&&distance<nearDownedDist&&vertOk){nearDownedBike=mesh;nearDownedDist=distance}
+        else if(!downed&&distance<reach&&vertOk){
+          // Personal owned e-bikes receive a 0.6 m priority bias when parked beside shared bikes (spec §2.2).
+          const score=mesh.userData.ownership==='personal'?Math.max(0,distance-0.6):distance
+          if(score<bestScore){nearBike=mesh;nearBikeDist=distance;bestScore=score}
+        }
         const hintCap=isCar?28:24
         if(distance<hintCap&&vertOk&&(!bestHint||distance<bestHint.dist)){
           bestHint={x:mesh.position.x,y:mesh.position.y,z:mesh.position.z,dist:distance,reach,radius:isCar?2.35:1.15}
@@ -267,7 +312,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     if(disembark||next<0){if(land(x,z))reset();return}
     if(next>=0){mesh.position.fromArray(leg.path[0]);route=next;segment=1}
   }
-  return {nearby,advance,get car(){return car},get bike(){return bike},get rideKind():RideKind|null{return bike?bikeCtrl.kind:null},get vehicleType():EbikeVehicleType|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.vehicleType:null},get isShared(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.isShared:false},get ebikeTier():EbikeTier|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.tier:null},get ebikeGear(){return bike?bikeCtrl.gear:2},get ebikeBattery(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.batteryPct:100},get ebikeTelemetry():EbikeDynamicTelemetry|null{return bike?bikeCtrl.telemetry():null},get carTelemetry():CarDynamicTelemetry|null{return car?carCtrl.telemetry():null},get carVelX(){return carCtrl.velX},get carVelZ(){return carCtrl.velZ},get carRoll(){return carCtrl.roll},get carDynPitch(){return carCtrl.dynPitch},get carDrift(){return carCtrl.driftIntensity},get carHandbrake(){return carCtrl.handbrake},get boat(){return freeBoats?.boat??(route>=0?vessels[route]:null)},get freeBoat(){return freeBoats?.boat??null},get freeKind(){return freeBoats?.boatKind??null},get boatSeatOffset(){return freeBoats?.active?freeBoats.seatOffset:(route>=0&&vessels[route].name==='raft'?-.44:-.18)},get heading(){return car?carCtrl.heading:bike?bikeCtrl.heading:freeBoats?.active?freeBoats.heading:heading},get speed(){return car?carCtrl.speed:bike?bikeCtrl.speed:freeBoats?.active?freeBoats.speed:0},
+  return {nearby,advance,interact,getInteractSnapshot,actionButton:button,setExternalArbiter(on:boolean){externalArbiter=on;if(!on)button.onclick=interact},get car(){return car},get bike(){return bike},get rideKind():RideKind|null{return bike?bikeCtrl.kind:null},get vehicleType():EbikeVehicleType|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.vehicleType:null},get isShared(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.isShared:false},get ebikeTier():EbikeTier|null{return bike&&bikeCtrl.kind==='bike'?bikeCtrl.tier:null},get ebikeGear(){return bike?bikeCtrl.gear:2},get ebikeBattery(){return bike&&bikeCtrl.kind==='bike'?bikeCtrl.batteryPct:100},get ebikeTelemetry():EbikeDynamicTelemetry|null{return bike?bikeCtrl.telemetry():null},get carTelemetry():CarDynamicTelemetry|null{return car?carCtrl.telemetry():null},get carVelX(){return carCtrl.velX},get carVelZ(){return carCtrl.velZ},get carRoll(){return carCtrl.roll},get carDynPitch(){return carCtrl.dynPitch},get carDrift(){return carCtrl.driftIntensity},get carHandbrake(){return carCtrl.handbrake},get boat(){return freeBoats?.boat??(route>=0?vessels[route]:null)},get freeBoat(){return freeBoats?.boat??null},get freeKind(){return freeBoats?.boatKind??null},get boatSeatOffset(){return freeBoats?.active?freeBoats.seatOffset:(route>=0&&vessels[route].name==='raft'?-.44:-.18)},get heading(){return car?carCtrl.heading:bike?bikeCtrl.heading:freeBoats?.active?freeBoats.heading:heading},get speed(){return car?carCtrl.speed:bike?bikeCtrl.speed:freeBoats?.active?freeBoats.speed:0},
     get lean(){return bikeCtrl.lean},get pitch(){return car?carCtrl.pitch:bikeCtrl.pitch},get steerInput(){return car?carCtrl.steerInput:bikeCtrl.steerInput},
     get bikePitch(){return lastBike?.rotation.x??0},get bikeY(){return lastBike?.position.y??0},
     get carPitch(){return lastCar?.rotation.x??0},get carY(){return lastCar?.position.y??0},
