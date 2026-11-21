@@ -2,7 +2,7 @@ import './home.css'
 import {spots} from '../play/spots'
 import {SOURCE_URL} from './source'
 import {initial, onUser, openAccount} from './account'
-import {readLastView, requestRestore} from '../lastview'
+import {lastViewSavedAt, requestRestore} from '../lastview'
 
 // 主界面（title screen）. Shown on every plain visit before the 3D city loads; the menu button in game brings it back.
 // It owns no engine state: it calls `play()` and the entry module decides whether that boots or resumes the city.
@@ -38,8 +38,12 @@ export function home(play:()=>void):Home {
         <span class="home-mode-text"><b>游览模式</b><span>自由飞行、落地步行，走遍 ${spots.length} 处名胜，在景册里集齐印章。</span>
           <small class="home-progress"></small></span>
         <span class="ui-btn ui-btn--seal ui-btn--lg home-go">开始游览</span>
-        <span class="ui-btn ui-btn--ghost ui-btn--lg home-resume" role="button" tabindex="0" data-umami-event="home-resume">回到上次离开的地方</span>
       </button>
+      <div class="home-resume-row" role="listitem" hidden>
+        <button type="button" class="home-resume" data-umami-event="home-resume">
+          <i aria-hidden="true"></i><span>回到上次离开的地方</span><small class="home-resume-ago"></small>
+        </button>
+      </div>
       <div class="home-mode home-mode--soon" role="listitem" aria-disabled="true">
         <span class="home-mode-seal" aria-hidden="true">事</span>
         <span class="home-mode-text"><b>故事模式 <em class="ui-tag">即将推出</em></b><span>跟着一段桂林故事，走进老城的街巷与山水。</span></span>
@@ -57,13 +61,10 @@ export function home(play:()=>void):Home {
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
   const go = root.querySelector<HTMLElement>('.home-go')!, tour = root.querySelector<HTMLButtonElement>('.home-mode--tour')!
   tour.onclick = ()=>play()
-  // IDOK-105: offer to resume the last view only when one is stored. Placeholder styles — sg claude
-  // owns the final look; `.home-resume` is the styling hook.
-  const resume = root.querySelector<HTMLElement>('.home-resume')!
-  const resumeClick = (event?: Event) => { event?.stopPropagation(); requestRestore(); play() }
-  resume.onclick = resumeClick
-  resume.onkeydown = (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); resumeClick(event) } }
-  const resumeButton = resume
+  // IDOK-105: a slim strip under the tour card, shown only when a usable last view is stored.
+  // 开始游览 still opens on a random frame; this is the opt-in way back.
+  const resumeRow = root.querySelector<HTMLElement>('.home-resume-row')!, resumeAgo = root.querySelector('.home-resume-ago')!
+  root.querySelector<HTMLButtonElement>('.home-resume')!.onclick = ()=>{requestRestore(); play()}
   root.querySelector<HTMLButtonElement>('[data-act=guide]')!.onclick = ()=>guide()
   root.querySelector<HTMLButtonElement>('[data-act=about]')!.onclick = ()=>void import('./about').then(m=>m.openAbout())
   const account = root.querySelector<HTMLButtonElement>('.home-account')!
@@ -92,9 +93,9 @@ export function home(play:()=>void):Home {
     open(resume){
       shown = true; root.hidden = false; root.classList.toggle('resume',resume)
       go.textContent = resume?'继续游览':'开始游览'
-      // IDOK-105: only offer to resume on a fresh entry (not the mid-game "继续游览" menu) and only
-      // when a usable view is stored; sg claude owns the final copy and placement.
-      resumeButton.hidden = resume || !readLastView()
+      // IDOK-105: only on a fresh entry (not the mid-game 继续游览 menu) and only with a usable record.
+      const saved = resume ? null : lastViewSavedAt()
+      resumeRow.hidden = saved===null; if(saved!==null) resumeAgo.textContent = ago(saved)
       requestAnimationFrame(()=>{root.classList.add('show'); tour.focus({preventScroll:true})})
       if(!reduce&&!timer) timer = window.setInterval(step,SLIDE_MS)
       document.body.dataset.home = ''
@@ -105,6 +106,11 @@ export function home(play:()=>void):Home {
     },
   }
   return api
+}
+
+function ago(t:number){
+  const min = Math.max(0,(Date.now()-t)/60000)
+  return min<2?'刚刚':min<60?`${Math.round(min)} 分钟前`:min<60*24?`${Math.round(min/60)} 小时前`:`${Math.round(min/1440)} 天前`
 }
 
 let guideMask:HTMLDivElement|undefined

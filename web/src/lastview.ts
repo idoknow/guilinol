@@ -23,6 +23,12 @@ export function readLastView(store: Store = localStorage): FeedbackView | null {
   return record.v as FeedbackView
 }
 
+// Save time of a usable stored view (ms since epoch), or null — the title screen shows how long ago it was.
+export function lastViewSavedAt(store: Store = localStorage): number | null {
+  if (!readLastView(store)) return null
+  try { return (JSON.parse(store.getItem(LAST_VIEW_KEY)!) as { t: number }).t } catch { return null }
+}
+
 export function saveLastView(view: FeedbackView, store: Store = localStorage): void {
   try { store.setItem(LAST_VIEW_KEY, JSON.stringify({ v: view, t: Date.now() })) } catch { /* private mode */ }
 }

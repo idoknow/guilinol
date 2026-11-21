@@ -40,9 +40,19 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home-mode-text>span{font-size:13.5px;line-height:1.65;letter-spacing:.04em}
 .home-progress{font-size:12px;letter-spacing:.1em;color:var(--ui-seal)}.home-progress:empty{display:none}
 .home-go{grid-area:go;width:100%}
-/* IDOK-105: 占位样式，最终视觉由 sg claude 定稿。作为 .home-go 的次级按钮出现，有记录时才显示。 */
-.home-resume{grid-column:1/-1;width:100%;margin-top:8px;text-align:center;cursor:pointer}
-.home-resume[hidden]{display:none}
+/* IDOK-105 续游条：游览卡下方一条青玉玻璃窄条，像压在宣纸下的书签；只有存过位置才出现。 */
+.home-resume-row{margin-top:-4px}.home-resume-row[hidden]{display:none}
+.home-resume{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:11px 18px 11px 14px;border-radius:12px;cursor:pointer;
+  font:500 14.5px/1.3 var(--ui-serif);letter-spacing:.12em;color:var(--ui-paper);text-align:left;
+  background:var(--ui-glass-strong);border:1px solid var(--ui-glass-line-soft);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);
+  transition:background var(--ui-fast),border-color var(--ui-fast),transform .25s var(--ui-ease)}
+.home-resume:hover{background:var(--ui-glass-solid);border-color:var(--ui-glass-line);transform:translateX(3px)}
+.home-resume:active{transform:scale(.985)}
+.home-resume:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
+.home-resume i{flex:none;width:26px;height:26px;border-radius:50%;background:var(--ui-jade-500) center/14px no-repeat;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23f4efe2' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8a5 5 0 1 0 1.6-3.7'/%3E%3Cpath d='M3 2.5V5h2.5'/%3E%3C/svg%3E")}
+.home-resume span{flex:1;min-width:0}
+.home-resume small{flex:none;font-size:12px;letter-spacing:.08em;color:var(--ui-paper-dim)}
 .home-mode--tour{cursor:pointer;color:var(--ui-ink);background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,0) 50%),var(--ui-paper);
   box-shadow:var(--ui-shadow-2),inset 0 0 0 1px rgba(90,80,60,.14);transition:transform .25s var(--ui-ease),box-shadow .25s}
 .home-mode--tour:hover{transform:translateY(-2px);box-shadow:0 24px 60px rgba(12,20,20,.4),inset 0 0 0 1px rgba(90,80,60,.14)}
