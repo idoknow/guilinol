@@ -40,6 +40,8 @@
     "qa": "node scripts/qa.mjs",
     "photo-match": "node scripts/photo-match.mjs",
     "verify:tour": "node scripts/tour.mjs",
+    "test:missions": "tsx scripts/test-missions-economy.ts",
+    "verify:missions": "node scripts/verify-missions.mjs",
     "check:flags": "node scripts/check-flags.mjs",
     "check:batcher": "node scripts/check-batcher.mjs",
     "check:commerce": "node scripts/check-commerce-foundation.mjs",

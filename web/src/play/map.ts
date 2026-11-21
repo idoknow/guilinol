@@ -5,6 +5,7 @@ import type {Atlas, Place} from '../map/atlas'
 import {spots, waterDocks, type Spot, type WaterDock} from './spots'
 import {isGlobalHotkeyBlocked} from '../walk/input-guard'
 import {builtBoundary,loadRegional,northwest,southeast} from '../map/regional'
+import {getState} from '../game/state'
 
 // 地图 (M4): one canvas painter shared by the minimap and the full map. North up, world z grows south.
 // Look follows docs/style.md: rice-paper ground, jade water, pale-green parks, karst peaks as ink mounds,
@@ -158,6 +159,20 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     g.strokeStyle=style.getPropertyValue('--region-boundary');g.lineWidth=px(parseFloat(style.getPropertyValue('--region-boundary-width')));g.stroke(built.path)
     ;(regional??edge)?.labels(g,x0,z0,x1,z1,scale,style,(x,z)=>!far&&built.contains(x,z))
     g.setTransform(dpr,0,0,dpr,0,0)
+    const missionTarget = getState().mission?.target
+    if(missionTarget) {
+      const tx = sx(missionTarget[0]), ty = sz(missionTarget[1])
+      g.save()
+      g.strokeStyle = '#20d6c1'; g.lineWidth = mini ? 2 : 2.5; g.setLineDash([5,4])
+      g.beginPath(); g.moveTo(hx,hy); g.lineTo(tx,ty); g.stroke()
+      g.setLineDash([])
+      if(tx > -24 && ty > -24 && tx < w + 24 && ty < h + 24) {
+        g.fillStyle = 'rgba(32,214,193,.28)'; g.beginPath(); g.arc(tx,ty,mini?10:15,0,Math.PI*2); g.fill()
+        g.fillStyle = '#ffc53d'; g.strokeStyle = '#101216'; g.lineWidth = 2
+        g.beginPath(); g.arc(tx,ty,mini?5:7,0,Math.PI*2); g.fill(); g.stroke()
+      }
+      g.restore()
+    }
     // Player: vermilion arrow with a paper outline, pointing where the camera faces.
     const a = heading()
     g.save(); g.translate(hx,hy); g.rotate(Math.PI-a)

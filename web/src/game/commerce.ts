@@ -138,7 +138,12 @@ function findIdempotentTx(save: Readonly<LocalSaveV1>, idempotencyKey: string): 
 
 function isSharedVehicleId(vehicleId?: string): boolean {
   if (!vehicleId) return false
-  return vehicleId === 'shared' || vehicleId.startsWith('shared:') || vehicleId.startsWith('test-ride:')
+  return (
+    vehicleId === 'shared' ||
+    vehicleId.startsWith('shared:') ||
+    vehicleId.startsWith('shared_') ||
+    vehicleId.startsWith('test-ride:')
+  )
 }
 
 /**
@@ -706,4 +711,109 @@ export function recordSpotFound(spotId: string): boolean {
   syncLegacyStamps(nextSave.spotsFound)
   _commitPersistedSlice({spotsFound: nextSave.spotsFound})
   return true
+}
+
+// ---- Stage 1B mission payout, spot bounty & shared e-bike fare helpers (IDOK-123) ----
+
+export const SPOT_BOUNTY_YUAN = 120
+export const SHARED_EBIKE_FEE_YUAN = 3
+export const SHARED_EBIKE_FREE_SECONDS = 120
+
+export interface MissionPayoutShape {
+  id: string
+  line: 'noodle' | 'errand' | 'taxi' | 'race'
+  reward: number
+  fullSoupBonus?: number
+  repeatReward?: number
+  repeatFullSoupBonus?: number
+  minReward?: number
+  repeatMinReward?: number
+}
+
+export function hasClaimedSpotBounty(spotId: string): boolean {
+  return getActiveSaveSnapshot().economy.claimedSpotBounties.includes(spotId)
+}
+
+export function hasClaimedMissionFirstClear(missionId: string): boolean {
+  return getActiveSaveSnapshot().economy.claimedMissionFirstClear.includes(missionId)
+}
+
+export function claimSpotBounty(spotId: string, idempotencyKey = `spot_bounty:${spotId}`): RewardResult {
+  const snap = getActiveSaveSnapshot()
+  if (snap.economy.claimedSpotBounties.includes(spotId)) {
+    return {ok: false, code: 'ALREADY_CLAIMED', credited: 0, balanceAfter: snap.money}
+  }
+  return creditReward({
+    source: 'spot_bounty',
+    refId: spotId,
+    amount: SPOT_BOUNTY_YUAN,
+    firstClearOnly: true,
+    idempotencyKey,
+  })
+}
+
+export function computeMissionPayout(mission: MissionPayoutShape, soupRatio: number, isFirstClear: boolean): number {
+  if (mission.line !== 'noodle') {
+    if (isFirstClear) return mission.reward
+    return mission.repeatReward ?? Math.round(mission.reward * 0.45)
+  }
+  const clampedSoup = Math.max(0, Math.min(1, soupRatio))
+  const spilledPct = Math.max(0, 1 - clampedSoup) * 100
+  const base = isFirstClear ? mission.reward : (mission.repeatReward ?? Math.round(mission.reward * 0.55))
+  const fullBonus = isFirstClear
+    ? (mission.fullSoupBonus ?? 0)
+    : (mission.repeatFullSoupBonus ?? Math.round((mission.fullSoupBonus ?? 0) * 0.65))
+  const floor = isFirstClear
+    ? (mission.minReward ?? Math.round(base * 0.5))
+    : (mission.repeatMinReward ?? Math.round(base * 0.5))
+  const spillSteps = Math.floor(spilledPct / 10)
+  const penalty = spillSteps * 20
+  const bonus = clampedSoup >= 0.90 ? fullBonus : 0
+  return Math.max(floor, base + bonus - penalty)
+}
+
+export function settleMissionReward(params: {
+  mission: MissionPayoutShape
+  soupRatio: number
+  attemptNonce: string
+}): RewardResult & {isFirstClear: boolean} {
+  const {mission, soupRatio, attemptNonce} = params
+  const isFirstClear = !hasClaimedMissionFirstClear(mission.id)
+  const payout = computeMissionPayout(mission, soupRatio, isFirstClear)
+  const source: RewardRequest['source'] = isFirstClear
+    ? 'mission_first_clear'
+    : mission.line === 'noodle'
+      ? 'mission_delivery'
+      : 'mission_errand'
+  const res = creditReward({
+    source,
+    refId: mission.id,
+    amount: payout,
+    firstClearOnly: isFirstClear,
+    idempotencyKey: `mission:${mission.id}:${attemptNonce}`,
+  })
+  return {...res, isFirstClear}
+}
+
+export function chargeSharedRideFee(sessionKey: string): {charged: number; balanceAfter: number; fallbackFree: boolean} {
+  const snap = getActiveSaveSnapshot()
+  const key = `shared_ride:${sessionKey}`
+  if (findIdempotentTx(snap, key)) {
+    return {charged: 0, balanceAfter: snap.money, fallbackFree: false}
+  }
+  if (snap.money < SHARED_EBIKE_FEE_YUAN) {
+    return {charged: 0, balanceAfter: snap.money, fallbackFree: true}
+  }
+  const res = applyFine({amount: SHARED_EBIKE_FEE_YUAN, reason: 'shared_ebike_ride', idempotencyKey: key})
+  if (!res.ok) {
+    return {charged: 0, balanceAfter: snap.money, fallbackFree: true}
+  }
+  return {charged: res.charged, balanceAfter: res.balanceAfter, fallbackFree: false}
+}
+
+export function getActiveDeliverySoupSpillMultiplier(): number {
+  const s = getState()
+  if (s.mode !== 'ebike' || s.vehicle?.ownership !== 'personal' || !s.vehicle.modelId) return 1
+  const bonus = PERSONAL_EBIKE_MODELS[s.vehicle.modelId]?.deliverySoupBonus ?? 0
+  return Math.max(0.25, Math.min(1, 1 - bonus))
 }

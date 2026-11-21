@@ -1,5 +1,6 @@
 import './street-hud.css'
 import {isGlobalHotkeyBlocked} from '../walk/input-guard'
+import {getState, onState} from '../game/state'
 
 // Phase 2 街头 HUD (docs/style.md 第二期 · HUD). Pure view: it renders whatever state it is given and never
 // touches engine objects. G1+ wires `mountStreetHud` to `onState` from web/src/game/state.ts; until then
@@ -28,7 +29,7 @@ const APPS = [
 const money = (n:number)=>n.toLocaleString('zh-CN')
 const clockText = (s:number)=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`
 
-export function mountStreetHud(source:HudSource, opts:{phone?:boolean}={}) {
+export function mountStreetHud(source:HudSource, opts:{phone?:boolean; onApp?:(id:string)=>void}={}) {
   document.body.dataset.hud = 'street'
   const root = document.createElement('div'); root.className = 'st-hud'
   root.innerHTML = `
@@ -52,6 +53,9 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean}={}) {
   const phone = $('.st-phone'), phoneButton = $('.st-phone-btn')
   const togglePhone = (on = phone.hidden)=>{phone.hidden = !on; document.body.toggleAttribute('data-phone', on)}
   phoneButton.onclick = ()=>togglePhone()
+  for(const btn of Array.from(root.querySelectorAll<HTMLButtonElement>('.st-apps button[data-app]'))) {
+    btn.onclick = ()=>{togglePhone(false); opts.onApp?.(btn.dataset.app!)}
+  }
   const onKeyDown = (e:KeyboardEvent)=>{if(e.code==='Tab'&&!isGlobalHotkeyBlocked(e.target)){e.preventDefault(); togglePhone()}}
   const onGameEvent = (e:Event)=>{const detail=(e as CustomEvent<{type?:string}>).detail; if(detail?.type==='shop:open'&&!phone.hidden) togglePhone(false)}
   addEventListener('keydown', onKeyDown)
@@ -89,6 +93,25 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean}={}) {
   render(source.get())
   const off = source.on(render)
   return {root, togglePhone, dispose(){off(); removeEventListener('keydown', onKeyDown); removeEventListener('game:event', onGameEvent); root.remove(); delete document.body.dataset.hud}}
+}
+
+export function gameStateHudSource():HudSource {
+  const toHud = ():Readonly<HudState>=>{
+    const s = getState()
+    return {
+      mode: s.mode,
+      vehicle: s.vehicle ? {kind:s.vehicle.kind, speedKmh:s.vehicle.speedKmh, gear:s.vehicle.gear, damage:s.vehicle.damage} : null,
+      money: s.money,
+      wanted: s.wanted,
+      mission: s.mission ? {id:s.mission.id, title:s.mission.title, step:s.mission.step, timer:s.mission.timer, meter:s.mission.meter, line:s.mission.line} : null,
+      zone: s.zone,
+      prompt: s.prompt ? {key:s.prompt.key, text:s.prompt.text} : null,
+    }
+  }
+  return {
+    get: toHud,
+    on: fn=>onState(()=>fn(toHud())),
+  }
 }
 
 // Demo states for `?hud=street&hudDemo=…` (style sheets and review screenshots only).

@@ -1,0 +1,50 @@
+{
+  "id": "noodle-02",
+  "line": "noodle",
+  "title": "米粉外卖 · 正阳口→中心广场/杉湖",
+  "summary": "从正阳路口粉摊出发，经中心广场东侧送至杉湖北路观景口，中程骑行控速稳汤拿满奖。",
+  "recommendedVehicle": "ebike",
+  "giver": [-608, -108],
+  "steps": [
+    {
+      "kind": "pickup",
+      "at": [-608, -108],
+      "radius": 9,
+      "timer": 60,
+      "text": "在正阳路口老粉摊取餐打包",
+      "npc": {
+        "who": "摊主阿叔",
+        "text": "“往南过中心广场再去杉湖北路，转弯前先收油滑行，汤就不容易晃洒！”"
+      }
+    },
+    {
+      "kind": "goto",
+      "at": [-749, 232],
+      "radius": 14,
+      "timer": 120,
+      "text": "途经 中心广场东侧路口",
+      "npc": {
+        "who": "骑手导航",
+        "text": "“已过中心广场，继续向西南进入杉湖北路！”"
+      }
+    },
+    {
+      "kind": "deliver",
+      "at": [-885, 497],
+      "radius": 12,
+      "timer": 120,
+      "text": "送达 杉湖北路双塔观景口",
+      "npc": {
+        "who": "食客阿婷",
+        "text": "“汤面一点没洒，双塔边吃桂林米粉太惬意了！”"
+      }
+    }
+  ],
+  "reward": 320,
+  "fullSoupBonus": 80,
+  "repeatReward": 180,
+  "repeatFullSoupBonus": 50,
+  "minReward": 160,
+  "repeatMinReward": 90,
+  "failOn": ["timeout", "spill"]
+}

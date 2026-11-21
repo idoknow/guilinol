@@ -1,0 +1,50 @@
+{
+  "id": "noodle-03",
+  "line": "noodle",
+  "title": "米粉外卖 · 十字街→象鼻山北门",
+  "summary": "从十字街老粉铺出发，经杉湖北路南下直抵象鼻山北门滨江路入口，全程严格避开沿江校园安静区。",
+  "recommendedVehicle": "ebike",
+  "giver": [-881, -165],
+  "steps": [
+    {
+      "kind": "pickup",
+      "at": [-881, -165],
+      "radius": 9,
+      "timer": 60,
+      "text": "在十字街老粉铺取全家福汤粉",
+      "npc": {
+        "who": "粉店老板",
+        "text": "“象鼻山北门大单！先沿中山中路南下过杉湖，再走滨江路直达，路上注意控速！”"
+      }
+    },
+    {
+      "kind": "goto",
+      "at": [-885, 497],
+      "radius": 16,
+      "timer": 140,
+      "text": "途经 杉湖北路（日月双塔北岸）",
+      "npc": {
+        "who": "骑手导航",
+        "text": "“过杉湖继续南行至象鼻山北门，避开西侧民主小学安静区！”"
+      }
+    },
+    {
+      "kind": "deliver",
+      "at": [-798, 876],
+      "radius": 14,
+      "timer": 140,
+      "text": "送达 象鼻山北门滨江路入口",
+      "npc": {
+        "who": "景区导览员",
+        "text": "“准时稳妥送到！大单赏金已到账，快去微笑堂或十字街车行看看吧。”"
+      }
+    }
+  ],
+  "reward": 420,
+  "fullSoupBonus": 100,
+  "repeatReward": 240,
+  "repeatFullSoupBonus": 60,
+  "minReward": 210,
+  "repeatMinReward": 120,
+  "failOn": ["timeout", "spill"]
+}
