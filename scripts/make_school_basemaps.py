@@ -64,6 +64,10 @@ def render(module):
         rows.append('本地 OSM 快照在校界内未标注 pitch 或 track。')
     if hasattr(module, 'STREET_SETBACK'):
         rows.extend(['', '临街几何沿用项目的道路退距，以保留人行道和车道净空。'])
+    if module.SCHOOL == 'guilin_middle':
+        rows.extend(['', 'B1 奎光楼及部分临街立面沿用主分支的建筑模型。'])
+    elif module.SCHOOL == 'kuiguang_school':
+        rows.extend(['', 'B1、B6 及低矮红砖翼墙沿用主分支的建筑模型。'])
     rows.extend(['', '## 推断', '',
                  '层数、高低关系、屋顶、配色、绿化和临街门型沿用游戏概化风格。场地画线为示意。', '',
                  f'![OSM 与 Overture 概化底图]({module.SCHOOL}-basemap.png)', ''])

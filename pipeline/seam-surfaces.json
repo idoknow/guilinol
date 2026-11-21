@@ -1,5 +1,11 @@
 {
   "surfaces": {
+    "kuiguang_school": {"campus_paving":"plaza"},
+    "guilin_middle": {"campus_paving":"plaza"},
+    "libin_middle": {"campus_paving":"plaza"},
+    "ronghu_primary": {"campus_paving":"plaza"},
+    "minzhu_primary": {"campus_paving":"plaza"},
+    "zhonghua_primary": {"campus_paving":"plaza"},
     "shizijie": {"B_plaza_pave": "sidewalk"},
     "nikoniko": {"B_plaza_pave": "sidewalk"},
     "dongxixiang": {"pave": "plaza"},
@@ -10,12 +16,9 @@
     "zhongshan_road": {"B_plaza_pave": "sidewalk"}
   },
   "atlas": {
-    "libin_middle": {"material":"libin_middle_atlas","role":"sidewalk","box":[0,0.25,0.25,0.46875]},
     "ronghu": {"material":"landmark","role":"plaza","box":[0.5,0.75,0.625,0.875]}
   },
-  "adjacentAtlas": {
-    "libin_middle": {"label":"innerDrive","material":"libin_middle_atlas","role":"road","box":[0.75,0.09375,0.875,0.1875]}
-  },
+  "adjacentAtlas": {},
   "exceptions": [
     {"id":"wangcheng_market","material":"pave","kind":"material","name":"市场内部青石板"},
     {"id":"wangcheng_market","material":"ruinGlass","kind":"material","name":"入口遗址玻璃"},

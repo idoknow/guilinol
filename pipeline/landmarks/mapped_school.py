@@ -86,7 +86,24 @@ def markings(shape, sport):
         yield Point(x, z).buffer(radius).boundary.buffer(0.09).intersection(inset)
 
 
-def paint(builder, shape, region, lift):
+def courtyard(boundary, site):
+    # Public road polygons already carry their grades, curbs, paint and textures.
+    from seam_streets import Streets
+    streets = Streets(site.surface)
+    bounds = translate(boundary, site.x, site.z)
+    parts = []
+    for origin in site.surface.files:
+        ox, oz = origin
+        size = site.surface.size
+        if not box(ox, oz, ox+size, oz+size).intersects(bounds):
+            continue
+        tree, _, _ = streets.tile(origin)
+        parts.extend(tree.geometries.take(tree.query(bounds, predicate='intersects')))
+    street = translate(union_all(parts), -site.x, -site.z)
+    return boundary.difference(street.buffer(0.15))
+
+
+def paint(builder, shape, region, lift, mesh=None):
     # Clip to the GL04 terrain grid, including its NE-SW diagonal. A long
     # triangle across multiple cells can otherwise dip below the game terrain.
     surface = builder.surface
@@ -110,15 +127,16 @@ def paint(builder, shape, region, lift):
                         if tri.exterior.is_ccw:
                             ring.reverse()
                         vertices = [(u, builder.ground(u, v) + lift, v) for u, v in ring]
-                        builder.atlas.add_tri(*vertices, region)
+                        (mesh or builder.atlas).add_tri(*vertices, region)
 
 
 def build(builder, module):
     boundary, buildings, sports = layout(module)
     ring = list(boundary.exterior.coords)
-    paint(builder, boundary, "pave_grey", 0.035)
+    paint(builder, courtyard(boundary, builder.surface), "pave_grey", 0.009, builder.paving)
     for shape, style in buildings:
-        builder.footprint_building(list(shape.exterior.coords), **style)
+        if style['source_id'] not in getattr(module, 'CUSTOM_BUILDINGS', ()):
+            builder.footprint_building(list(shape.exterior.coords), **style)
     for _, sport, shape in sports:
         region = {'running': 'track_red', 'athletics': 'track_red', 'soccer': 'turf_a'}.get(sport, 'court_a')
         paint(builder, shape, region, 0.075)

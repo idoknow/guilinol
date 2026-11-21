@@ -11,7 +11,8 @@ from sections import section_layers, shopfronts, RULES
 
 import numpy as np
 from PIL import Image, ImageDraw
-from shapely import STRtree, intersects_xy, unary_union
+from scipy.ndimage import gaussian_filter
+from shapely import STRtree, distance, intersects_xy, points as shapely_points, unary_union
 from shapely.geometry import box, Point
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem, load_osm
@@ -234,6 +235,23 @@ def build(bbox, output, palette):
                     target=float(eval_bspline_grid(road_ctrl,left,top,np.array(wx),np.array(wz))) * 10
                     for field in (terrain,original):
                         field[row,col]+=round(weight*max(0,target-field[row,col]))
+    # Smooth steep compound edges locally after the city road elevations are solved.
+    for region, span in layout.flatten_transitions:
+        neighborhood = region.buffer(span * 2)
+        x0, z0, x1, z1 = neighborhood.bounds
+        cols = np.arange(max(0, math.floor((x0-left)/GRID)), min(width//GRID, math.ceil((x1-left)/GRID))+1)
+        rows = np.arange(max(0, math.floor((z0-top)/GRID)), min(depth//GRID, math.ceil((z1-top)/GRID))+1)
+        xx, zz = np.meshgrid(left+cols*GRID, top+rows*GRID)
+        edge_distance = distance(shapely_points(xx, zz), region.boundary)
+        blend = np.clip((span-edge_distance)/(span/2), 0, 1)
+        window = np.ix_(rows, cols)
+        local_roads = carriageway_mask.intersection(neighborhood)
+        sidewalks = sidewalk_mask.intersection(neighborhood)
+        blend[wet[window] | intersects_xy(local_roads.union(sidewalks), xx, zz)] = 0
+        for field in (original, terrain):
+            local = field[window].astype(float)
+            smooth = gaussian_filter(local, sigma=span/(3*GRID), mode='nearest')
+            field[window] = np.rint(local + blend*(smooth-local))
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 

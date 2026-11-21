@@ -704,6 +704,7 @@ class SchoolBuilder:
         self.surface = _bootstrap_surface(school_id)
         self.atlas = MeshPart()
         self.lit = MeshPart()
+        self.paving = MeshPart()
         self.hit_v: list[tuple[float, float, float]] = []
         self.hit_f: list[tuple[int, int, int]] = []
         self.pose = (0.0, 0.0, 0.0, 0.0)
@@ -1563,6 +1564,10 @@ def export_school_glb(school_id: str, palette: dict, signs: dict, build_fn, seed
         {'name': 'collision_mat', 'pbrMetallicRoughness': {'baseColorFactor': [0.5, 0.5, 0.5, 1.0], 'roughnessFactor': 1.0}},
     ]
 
+    if any(b.paving.f for b in builders):
+        materials.append({'name': 'campus_paving', 'pbrMetallicRoughness': {
+            'baseColorFactor': [0.67, 0.65, 0.60, 1.0], 'metallicFactor': 0, 'roughnessFactor': 1}})
+
     meshes = []
     nodes = []
     root_nodes = []
@@ -1577,6 +1582,8 @@ def export_school_glb(school_id: str, palette: dict, signs: dict, build_fn, seed
         p_lit = _pack_part_into_gltf(b.lit, 1, blobs, buffer_views, accessors)
         if p_lit:
             prims.append(p_lit)
+        if b.paving.f:
+            prims.append(_pack_part_into_gltf(b.paving, 3, blobs, buffer_views, accessors))
         if prims:
             m_idx = len(meshes)
             meshes.append({'name': f'{lod_name}_mesh', 'primitives': prims})
