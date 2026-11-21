@@ -12,9 +12,21 @@ function valid(fields,context) {
     contextKeys.has(k)===context && (numeric.includes(k)?Number.isFinite(v)&&v>=0&&v<=1e15:
       Object.hasOwn(labels,k)&&typeof v==='string'&&labels[k].test(v)))
 }
+const eventFields = {
+  navigation:['dns','tcp','tls','ttfb','dcl','load'],resource:['category','count','bytes','cache','p50','p95','cfCache'],
+  window:['fps','frameP95','longFrames','calls','triangles','geometries','textures','chunks','heap'],
+  api:['ms','api'],error:['count'],contextLost:['count']
+}
+for(const kind of ['firstFrame','playable','chunk','teleport','switch','mapOpen'])eventFields[kind]=['ms']
+function validRow(row) {
+  if(!valid(row,false)||!Object.hasOwn(eventFields,row.kind))return false
+  const fields=eventFields[row.kind]
+  return Object.hasOwn(row,fields[0]) && Object.keys(row).every(k=>['kind','mode','grid'].includes(k)||fields.includes(k))
+    && (row.cache===undefined || row.cache<=1)
+}
 export function validate({sid,context,rows}) {
   return typeof sid==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(sid)
-    &&valid(context,true)&&Array.isArray(rows)&&rows.length>0&&rows.length<=100&&rows.every(r=>valid(r,false)&&r.kind)
+    &&valid(context,true)&&Array.isArray(rows)&&rows.length>0&&rows.length<=100&&rows.every(validRow)
 }
 const salt=randomBytes(32), limits=new Map()
 let expires=0
