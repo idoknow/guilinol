@@ -144,9 +144,9 @@ async function start() {
     modeButton.textContent=walking?'起飞':'落地步行';modeButton.setAttribute('aria-label',walking?'切换到飞行':'切换到步行')
     const ride=document.body.dataset.ride
     if(walking&&document.body.hasAttribute('data-aboard')&&ride==='car'){
-      hint.textContent='WASD 驾驶 · Space 手刹漂移 · 1-3/Q·E 切模式 · F 下车 · 拖动转视角 · C 视距 · V 起飞'
+      hint.textContent='WASD 驾驶 · Space 手刹漂移 · 1-3/Q·E 切模式 · L 车灯 · F 下车 · C 视距 · V 起飞'
     }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='bike'){
-      hint.textContent='WASD 骑行 · 1-4/Q·E 换挡 · Space 翘头/起身 · Shift 压弯 · G 改装 · F 下车 · V 起飞'
+      hint.textContent='WASD 骑行 · 1-4/Q·E 换挡 · Space 翘头/起身 · Shift 压弯 · P 驻车 · K 边撑 · L 车灯 · G 改装 · F 下车 · V 起飞'
     }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='bicycle'){
       hint.textContent='WASD 骑行 · 1-3/Q·E 换挡 · Space 翘头/起身 · Shift 压弯 · F 下车 · V 起飞'
     }else if(walking&&document.body.hasAttribute('data-aboard')&&ride==='boat'){

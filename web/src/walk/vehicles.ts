@@ -19,11 +19,13 @@ import {
   type RideKind,
 } from './ride'
 import {vehicleModel} from './vehicle-model'
+import {isGlobalHotkeyBlocked} from './input-guard'
+import {KICKSTAND_REST_ROLL_RAD} from './ebike-state-coupling'
 
 type Position=[number,number,number]
 type Route={kind:string,start:string,end:string,path:Position[]}
 type BoardPos={x:number,y:number,z:number,bikeY:number}
-type BikeInstanceState={vehicleType:EbikeVehicleType; batteryPct:number; mods:EbikeUpgradeMods|null}
+type BikeInstanceState={vehicleType:EbikeVehicleType; batteryPct:number; mods:EbikeUpgradeMods|null; parkLocked?:boolean; kickstandDown?:boolean}
 const bikeCoordKey=(x:number,z:number)=>`${Math.round(x*10)},${Math.round(z*10)}`
 type Physics=Awaited<ReturnType<typeof createPhysics>>
 export type FreeDismountTarget={x:number,y:number,z:number,rule:string,heading:number}
@@ -97,26 +99,83 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     else delete button.dataset.ebikeTier
     button.hidden=!label;if(button.textContent!==label)button.textContent=label
   }
-  function saveBikeInstanceState(mesh:T.Mesh){
+  function saveBikeInstanceState(mesh:T.Mesh, parkOverride?:{parkLocked:boolean;kickstandDown:boolean}){
     if(mesh.name!=='bike')return
     const prev=bikeStates.get(mesh)
+    const parkLocked=parkOverride?.parkLocked??prev?.parkLocked??true
+    const kickstandDown=parkOverride?.kickstandDown??prev?.kickstandDown??true
     const state:BikeInstanceState={
       vehicleType:bikeCtrl.vehicleType,
       batteryPct:bikeCtrl.batteryPct,
       mods:bikeCtrl.vehicleType==='normal'?(bikeCtrl.mods??prev?.mods??null):null,
+      parkLocked,
+      kickstandDown,
     }
     bikeStates.set(mesh,state)
     mesh.userData.vehicleType=state.vehicleType
     mesh.userData.ebikeTier=state.vehicleType
     mesh.userData.shared=state.vehicleType==='shared'
     mesh.userData.battery=state.batteryPct
+    mesh.userData.parkLocked=parkLocked
+    mesh.userData.kickstandDown=kickstandDown
     const oldKey=mesh.userData.coordKey as string|undefined
     const newKey=bikeCoordKey(mesh.position.x,mesh.position.z)
     if(oldKey&&oldKey!==newKey)bikeCoordStates.delete(oldKey)
     mesh.userData.coordKey=newKey
     bikeCoordStates.set(newKey,state)
   }
-  function reset(){if(route>=0)vessels[route].position.fromArray(data.routes[route].path[0]);freeBoats?.reset();if(car){car.rotation.set(carCtrl.pitch,carCtrl.heading,0,'YXZ');store(car);if(active&&car.parent&&!visibleCells.has(car.parent as T.Group)){visibleCells.add(car.parent as T.Group);group.add(car.parent)}}if(bike){saveBikeInstanceState(bike);bike.rotation.set(bikeCtrl.pitch,bikeCtrl.heading,0,'YXZ');store(bike);if(active&&bike.parent&&!visibleCells.has(bike.parent as T.Group)){visibleCells.add(bike.parent as T.Group);group.add(bike.parent)}}car=null;bike=null;route=-1;nearFree={slot:null,distance:Infinity,atBank:false};disembark=false;segment=1;delete document.body.dataset.ebikeTier;delete document.body.dataset.rideType;bikeCtrl.reset();carCtrl.reset()}
+  function attachMeshToCell(mesh:T.Mesh){
+    store(mesh)
+    if(active&&mesh.parent&&!visibleCells.has(mesh.parent as T.Group)){
+      visibleCells.add(mesh.parent as T.Group)
+      group.add(mesh.parent)
+    }
+  }
+  function reset(){if(route>=0)vessels[route].position.fromArray(data.routes[route].path[0]);freeBoats?.reset();if(car){car.rotation.set(carCtrl.pitch,carCtrl.heading,0,'YXZ');attachMeshToCell(car)}if(bike){const isEbike=bikeCtrl.kind==='bike';saveBikeInstanceState(bike,{parkLocked:isEbike,kickstandDown:true});bike.rotation.set(bikeCtrl.pitch,bikeCtrl.heading,isEbike?KICKSTAND_REST_ROLL_RAD:0,'YXZ');attachMeshToCell(bike)}car=null;bike=null;route=-1;nearFree={slot:null,distance:Infinity,atBank:false};disembark=false;segment=1;delete document.body.dataset.ebikeTier;delete document.body.dataset.rideType;bikeCtrl.reset();carCtrl.reset()}
+  function dismountDownedBike(x:number,y:number,z:number,yaw:number,roll:number,lift:number){
+    if(!bike)return false
+    const mesh=bike
+    mesh.position.set(x,y+lift,z)
+    mesh.rotation.set(0,yaw,roll,'YXZ')
+    mesh.visible=true
+    mesh.userData.downed=true
+    saveBikeInstanceState(mesh,{parkLocked:false,kickstandDown:false})
+    attachMeshToCell(mesh)
+    bike=null
+    delete document.body.dataset.ebikeTier
+    delete document.body.dataset.rideType
+    bikeCtrl.reset()
+    syncHud()
+    return true
+  }
+  function relocateParkedBike(mesh:T.Mesh,x:number,y:number,z:number,yaw:number,roll=0,parkState?:{parkLocked:boolean;kickstandDown:boolean}){
+    mesh.position.set(x,y,z)
+    mesh.rotation.set(0,yaw,roll,'YXZ')
+    mesh.userData.downed=false
+    if(mesh.name==='bike'){
+      const prev=bikeStates.get(mesh)
+      const nextState:BikeInstanceState={
+        vehicleType:prev?.vehicleType??resolveEbikeKind((mesh.userData.paint as number|undefined)??0,mesh.userData.vehicleType??mesh.userData.ebikeTier),
+        batteryPct:prev?.batteryPct??(mesh.userData.battery as number|undefined)??100,
+        mods:prev?.mods??null,
+        parkLocked:parkState?.parkLocked??prev?.parkLocked??true,
+        kickstandDown:parkState?.kickstandDown??prev?.kickstandDown??true,
+      }
+      bikeStates.set(mesh,nextState)
+      mesh.userData.parkLocked=nextState.parkLocked
+      mesh.userData.kickstandDown=nextState.kickstandDown
+      const oldKey=mesh.userData.coordKey as string|undefined
+      const newKey=bikeCoordKey(x,z)
+      if(oldKey&&oldKey!==newKey)bikeCoordStates.delete(oldKey)
+      mesh.userData.coordKey=newKey
+      bikeCoordStates.set(newKey,nextState)
+    }else if(parkState){
+      mesh.userData.parkLocked=parkState.parkLocked
+      mesh.userData.kickstandDown=parkState.kickstandDown
+    }
+    attachMeshToCell(mesh)
+    syncHud()
+  }
   function interact(){if(!active)return
     if(car){if(land(car.position.x,car.position.z,carCtrl.heading,car.position.y,'car'))reset()}
     else if(bike){if(land(bike.position.x,bike.position.z,bikeCtrl.heading,bike.position.y))reset()}
@@ -149,8 +208,7 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     else if(nearFree.slot&&(nearRoute<0||nearFree.distance+1<nearRouteDist)){freeBoats!.mount(nearFree.slot,nearFree.atBank);syncHud()}
     else if(nearRoute>=0){route=nearRoute;segment=1;disembark=false}
   }
-  const blockHotkey=()=>document.body.hasAttribute('data-home')||document.body.dataset.photo==='on'||!!document.querySelector('dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show')
-  button.onclick=interact;window.addEventListener('keydown',event=>{if(event.code==='KeyF'&&!event.repeat&&!blockHotkey()&&!(event.target as Element)?.closest?.('input,textarea,select,[contenteditable]'))interact()})
+  button.onclick=interact;window.addEventListener('keydown',event=>{if(event.code==='KeyF'&&!event.repeat&&!isGlobalHotkeyBlocked(event.target))interact()})
   function nearby(x:number,z:number,footY?:number){nearBike=null;nearRoute=-1;nearRouteDist=Infinity;let best=4.6
     let bestHint:{x:number;y:number;z:number;dist:number;reach:number;radius:number}|null=null
     const nextCells=new Set<T.Group>()
@@ -225,6 +283,8 @@ export async function vehicles(scene:T.Scene,file:string,land:(x:number,z:number
     shiftEbikeGear(delta:number){return bike?bikeCtrl.shiftGear(delta):2},
     resetEbikeGearOnRecover(){return bike?bikeCtrl.resetGearToCompliant():2},
     setAutoCrash(on:boolean|undefined){bikeCtrl.setAutoCrash(on)},
+    dismountDownedBike,
+    relocateParkedBike,
     setEbikeVehicleType(nextType:EbikeVehicleType){
       if(!bike||bikeCtrl.kind!=='bike')return null
       const profile=bikeCtrl.setVehicleType(nextType)

@@ -1,5 +1,7 @@
 import * as T from 'three'
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
+import type {TwoWheelHeadlightMode} from './ebike-state-coupling'
+import {createHeadlightBeamRig, type HeadlightBeamProbe} from './vehicle-lights'
 
 const material=new T.MeshStandardMaterial({vertexColors:true,flatShading:true})
 const cache=new Map<string,T.BufferGeometry>()
@@ -559,6 +561,12 @@ export interface TwoWheelRigState {
   braking?: boolean
   crashRoll?: number
   crashLift?: number
+  kickstandDown?: boolean
+  headlight?: TwoWheelHeadlightMode
+  night?: number
+  crashed?: boolean
+  batteryDepleted?: boolean
+  hazard?: boolean
   dt: number
 }
 
@@ -586,6 +594,8 @@ export interface EbikeVisualRig extends TwoWheelVisualRig {
     exhaust: T.Group
   }
   get vehicleType(): EbikeVehicleKind
+  get kickstandAngle(): number
+  beamProbe: () => HeadlightBeamProbe
   setVehicleType: (type: EbikeVehicleKind, basePaint?: number) => void
   applyMods: (next: EbikeModPreset | Partial<EbikeModConfig>, basePaint?: number) => void
 }
@@ -614,8 +624,25 @@ export interface CarVisualRig {
     dynPitch?: number
     driftIntensity?: number
     handbrake?: boolean
+    headlight?: TwoWheelHeadlightMode
+    night?: number
   }) => void
-  probe: () => { roll: number; pitch: number; heave: number; steerAngle: number; wheelSpin: number; rearWheelSpin: number; braking: boolean; reversing: boolean; handbrake: boolean; smokeActive: number }
+  probe: () => {
+    roll: number
+    pitch: number
+    heave: number
+    steerAngle: number
+    wheelSpin: number
+    rearWheelSpin: number
+    braking: boolean
+    reversing: boolean
+    handbrake: boolean
+    smokeActive: number
+    headlight: TwoWheelHeadlightMode
+    headlightIntensity: number
+    beamActive: boolean
+    beamDrawCalls: number
+  }
   dispose: () => void
 }
 
@@ -765,8 +792,20 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   const headLens = makeSolidPart(trackG(new T.BoxGeometry(.16, .09, .04)), headMat, 0, .74, -.10)
   const angelRing = makeSolidPart(trackG(new T.TorusGeometry(.065, .014, 6, 12)), angelMat, 0, .74, -.12)
   angelRing.name = 'mod-angel-ring'
-  headlightSlot.add(headLens, angelRing)
+  const beamRig = createHeadlightBeamRig('bike')
+  beamRig.group.position.set(0, .74, -.13)
+  headlightSlot.add(headLens, angelRing, beamRig.group)
   frontAssembly.add(headlightSlot)
+
+  // Articulated left side kickstand (stowed back while riding/crashed, swings down when parked).
+  const kickstandPivot = new T.Group()
+  kickstandPivot.name = 'ebike-kickstand'
+  kickstandPivot.position.set(-.15, .25, .14 - REAR_Z)
+  const standLeg = makeSolidPart(trackG(new T.BoxGeometry(.026, .27, .026)), darkMat, 0, -.135, 0)
+  const standFoot = makeSolidPart(trackG(new T.BoxGeometry(.056, .016, .056)), alloyMat, 0, -.27, 0)
+  kickstandPivot.add(standLeg, standFoot)
+  kickstandPivot.rotation.set(1.42, 0, 0)
+  chassis.add(kickstandPivot)
 
   // Rider seat anchor aligned to vehicle-space (0, 0, +0.23) -> wheeliePivot (0, 0, -0.30)
   const seatAnchor = new T.Object3D()
@@ -796,6 +835,8 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   chassis.add(sharedTailGroup)
 
   let wheelSpin = 0
+  let kickstandBlend = 0
+  let hazardClock = 0
   let currentPaint = paint
   let currentType: EbikeVehicleKind = initialType
   let lastMods: EbikeModPreset | Partial<EbikeModConfig> = initialMods ?? 'stock'
@@ -852,15 +893,30 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
       exhaust: exhaustSlot,
     },
     get vehicleType() { return currentType },
+    get kickstandAngle() { return +(kickstandBlend * .42).toFixed(4) },
+    beamProbe: () => beamRig.probe(),
     setVehicleType,
     applyMods,
     update(state) {
       root.position.copy(state.pos)
       root.rotation.set(state.groundPitch, state.heading, 0, 'YXZ')
       const crashRoll = state.crashRoll ?? 0
+      const crashed = !!state.crashed || Math.abs(crashRoll) > .5
       crashPivot.rotation.set(0, 0, crashRoll)
       crashPivot.position.set(0, state.crashLift ?? Math.abs(Math.sin(crashRoll)) * .19, 0)
-      leanPivot.rotation.set(0, 0, state.lean)
+
+      const wantStand = !!state.kickstandDown && !crashed
+      kickstandBlend = state.dt > 0
+        ? T.MathUtils.damp(kickstandBlend, wantStand ? 1 : 0, 12, Math.min(.12, state.dt))
+        : (wantStand ? 1 : 0)
+      kickstandPivot.rotation.set(
+        T.MathUtils.lerp(1.42, .22, kickstandBlend),
+        0,
+        T.MathUtils.lerp(0, .42, kickstandBlend),
+      )
+
+      const standTilt = !crashed && Math.abs(state.lean) < .01 ? -kickstandBlend * .105 : 0
+      leanPivot.rotation.set(0, 0, state.lean + standTilt)
       wheeliePivot.rotation.set(state.wheelie, 0, 0)
       frontAssembly.rotation.y = -state.steerInput * .42
 
@@ -870,9 +926,27 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
       // When wheelieing in air, front wheel coasts slightly slower.
       frontWheel.rotation.x -= state.wheelie > .08 ? spinDelta * .35 : spinDelta
 
-      tailMat.color.setHex(state.braking || state.speed < -.05 ? 0xff4238 : 0x99201c)
+      const hlMode: TwoWheelHeadlightMode = state.headlight ?? 'off'
+      headMat.color.setHex(hlMode === 'high' ? 0xffffff : hlMode === 'low' ? 0xfff5d4 : 0xc6c9be)
+      beamRig.update({
+        mode: hlMode,
+        night: state.night ?? 0,
+        wheelie: state.wheelie,
+        crashed,
+        batteryDepleted: !!state.batteryDepleted,
+      })
+
+      if (state.hazard) {
+        hazardClock += Math.max(0, state.dt)
+        const pulseOn = Math.sin(hazardClock * Math.PI * 3.6) >= 0
+        tailMat.color.setHex(pulseOn ? 0xff9d2e : 0x7a1a16)
+      } else {
+        hazardClock = 0
+        tailMat.color.setHex(state.braking || state.speed < -.05 ? 0xff4238 : hlMode !== 'off' ? 0xd03028 : 0x99201c)
+      }
     },
     dispose() {
+      beamRig.dispose()
       for (const item of disposables) item.dispose()
       root.removeFromParent()
     },
@@ -1063,6 +1137,7 @@ export function createDynamicCar(paint = 0): CarVisualRig {
   const caliperMat = trackM(new T.MeshStandardMaterial({color: CAR_WHEEL_PALETTE.brakeBright, flatShading: true}))
   const brakeLampMat = trackM(new T.MeshBasicMaterial({color: 0x7a1714}))
   const reverseLampMat = trackM(new T.MeshBasicMaterial({color: 0x3b4046}))
+  const headLampMat = trackM(new T.MeshBasicMaterial({color: 0xd6d4c8}))
 
   const bodyCache = new Map<number, T.BufferGeometry>()
   const getBodyGeom = (p: number) => {
@@ -1092,8 +1167,14 @@ export function createDynamicCar(paint = 0): CarVisualRig {
     br.rotation.set(-.06, yaw, 0)
     const rev = makeSolidPart(trackG(new T.BoxGeometry(.245, .034, .022)), reverseLampMat, side * .57, .775 - CG_Y, 2.222)
     rev.rotation.set(-.06, yaw, 0)
-    suspensionPivot.add(br, rev)
+    const hl = makeSolidPart(trackG(new T.BoxGeometry(.22, .072, .024)), headLampMat, side * .62, .645 - CG_Y, -2.232)
+    hl.rotation.set(.08, side * .22, 0)
+    suspensionPivot.add(br, rev, hl)
   }
+
+  const carBeamRig = createHeadlightBeamRig('car')
+  carBeamRig.group.position.set(0, .64 - CG_Y, -2.24)
+  suspensionPivot.add(carBeamRig.group)
 
   const wheelL = buildCarWheelGeometry(-1)
   const wheelR = buildCarWheelGeometry(1)
@@ -1240,16 +1321,28 @@ export function createDynamicCar(paint = 0): CarVisualRig {
       lastBraking = state.braking
       lastReversing = state.reversing
       lastHandbrake = !!state.handbrake
-      brakeLampMat.color.setHex(state.braking || state.handbrake ? 0xff3b30 : 0x7a1714)
+      const hlMode: TwoWheelHeadlightMode = state.headlight ?? 'off'
+      headLampMat.color.setHex(hlMode === 'high' ? 0xffffff : hlMode === 'low' ? 0xfff4d6 : 0xd6d4c8)
+      carBeamRig.update({mode: hlMode, night: state.night ?? 0})
+      brakeLampMat.color.setHex(state.braking || state.handbrake ? 0xff3b30 : hlMode !== 'off' ? 0xba2822 : 0x7a1714)
       reverseLampMat.color.setHex(state.reversing ? 0xf8fafc : 0x3b4046)
     },
     probe() {
       let smokeActive = 0
       for (const p of smokePool) if (p.life > 0) smokeActive++
-      return {roll, pitch, heave, steerAngle, wheelSpin, rearWheelSpin, braking: lastBraking, reversing: lastReversing, handbrake: lastHandbrake, smokeActive}
+      const bp = carBeamRig.probe()
+      return {
+        roll, pitch, heave, steerAngle, wheelSpin, rearWheelSpin,
+        braking: lastBraking, reversing: lastReversing, handbrake: lastHandbrake, smokeActive,
+        headlight: bp.mode,
+        headlightIntensity: bp.intensity,
+        beamActive: bp.beamActive,
+        beamDrawCalls: bp.drawCalls,
+      }
     },
     dispose() {
       clearEffects()
+      carBeamRig.dispose()
       for (const item of disposables) item.dispose()
       for (const g of bodyCache.values()) g.dispose()
       smokeGroup.removeFromParent()

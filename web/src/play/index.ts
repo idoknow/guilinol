@@ -4,6 +4,7 @@ import {spots, waterDocks, yawToward, type Spot, type WaterDock} from './spots'
 import type {Host} from './host'
 import {photoMode} from './photo'
 import {mapView} from './map'
+import {isGlobalHotkeyBlocked, shouldPhotoYieldKeyPFromDom} from '../walk/input-guard'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
 const ease = (t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2
@@ -183,10 +184,14 @@ export function play(host:Host) {
   const photo = photoMode(host,()=>nearestName())
   shutter.onclick = ()=>photo.open()
   window.addEventListener('keydown',event=>{
-    if(event.repeat||(event.target as HTMLElement)?.tagName==='INPUT') return
-    if(event.code==='KeyJ') sheet.hidden?openBook():closeBook()
-    if(event.code==='KeyP') photo.active?photo.close():photo.open()
-    if(event.code==='Escape') {if(photo.active) photo.close(); else if(!map?.active) closeAll()}
+    if(event.repeat) return
+    if(event.code==='Escape') {if(photo.active) photo.close(); else if(!map?.active) closeAll(); return}
+    if(isGlobalHotkeyBlocked(event.target,{allowPhoto:photo.active})) return
+    if(event.code==='KeyJ'&&!photo.active) sheet.hidden?openBook():closeBook()
+    if(event.code==='KeyP'){
+      if(shouldPhotoYieldKeyPFromDom(event,photo.active)) return
+      photo.active?photo.close():photo.open()
+    }
   })
 
   function nearestName() {

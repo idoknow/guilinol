@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import type {Host} from './host'
 import type {Atlas, Place} from '../map/atlas'
 import {spots, waterDocks, type Spot, type WaterDock} from './spots'
+import {isGlobalHotkeyBlocked} from '../walk/input-guard'
 
 // 地图 (M4): one canvas painter shared by the minimap and the full map. North up, world z grows south.
 // Look follows docs/style.md: rice-paper ground, jade water, pale-green parks, karst peaks as ink mounds,
@@ -236,8 +237,13 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     view.x = before.x-ox/view.scale; view.z = before.z-oy/view.scale; clampView(); redraw()}
   addEventListener('resize',redraw)
   mini.onclick = mapButton.onclick = ()=>sheet.hidden?open():close()
-  addEventListener('keydown',e=>{if(e.code==='KeyM'&&!e.repeat&&(e.target as HTMLElement)?.tagName!=='INPUT') sheet.hidden?open():close()
-    if(e.code==='Escape'&&!sheet.hidden) close()})
+  addEventListener('keydown',e=>{
+    if(e.code==='Escape'&&!sheet.hidden){close();return}
+    if(e.code==='KeyM'&&!e.repeat){
+      if(!sheet.hidden){close();return}
+      if(!isGlobalHotkeyBlocked(e.target)) open()
+    }
+  })
 
   let clock = 0
   return {paint, extent:atlas.extent, roadAt:atlas.roadAt.bind(atlas), open, close, get active(){return !sheet.hidden}, roadName:()=>lastRoad, search:(q:string)=>{input.value = q; input.oninput?.(new Event('input'))},

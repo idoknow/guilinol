@@ -2,6 +2,7 @@ import './walk.css'
 import {walkConfig as cfg} from '../walk/config'
 import type {CarDynamicTelemetry} from '../walk/car'
 import type {EbikeRideControlInput, EbikeTelemetrySnapshot} from '../walk/ebike-fx'
+import {isGlobalHotkeyBlocked, isTouchInControlZone} from '../walk/input-guard'
 
 const MOD_LABELS = {stock: '素车', ghostfire: '鬼火', neon: '霓虹'} as const
 
@@ -46,8 +47,23 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   let jump=false, runHold=false, runLock=false, runDownAt=0, stickPointer=-1, runPointer=-1
   let wheelieTouch=false, wheeliePointer=-1, tuckTouch=false, tuckPointer=-1
   let gearDelta=0, gearSelect:number|null=null, recoverPulse=false, cycleModPulse=false
+  let parkTogglePulse=false, kickstandTogglePulse=false, headlightCyclePulse=false
   const touches=new Map<number,{x:number,y:number}>()
   let mouseDown=false, lastMouse={x:0,y:0}, pinchDist=0
+
+  function resetRideTouchControls(){
+    wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')
+    tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')
+    gearDelta=0;gearSelect=null;recoverPulse=false;cycleModPulse=false
+    parkTogglePulse=false;kickstandTogglePulse=false;headlightCyclePulse=false
+  }
+  function clearTransientInput(clearKeys=true){
+    if(clearKeys)keys.clear()
+    jump=false;runHold=false;runLock=false;runPointer=-1
+    resetRideTouchControls()
+    touches.clear();mouseDown=false;pinchDist=0
+    resetStick()
+  }
 
   function syncRun(){
     const running=runHold||runLock||stick.mag>.9
@@ -94,7 +110,9 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   btnWheelie.onpointerdown=event=>{
     event.preventDefault();event.stopPropagation()
     wheeliePointer=event.pointerId;safeCapture(btnWheelie,event.pointerId)
-    wheelieTouch=true;recoverPulse=true;btnWheelie.classList.add('on')
+    wheelieTouch=true
+    if(document.body.dataset.rideCrash==='1')recoverPulse=true
+    btnWheelie.classList.add('on')
   }
   const endWheelie=(event:PointerEvent)=>{if(event.pointerId===wheeliePointer){wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')}}
   btnWheelie.onpointerup=endWheelie;btnWheelie.onpointercancel=endWheelie;btnWheelie.onlostpointercapture=endWheelie
@@ -117,14 +135,19 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   const endRun=(toggle:boolean,pointerId?:number)=>{if(!runHold||(pointerId!==undefined&&pointerId!==runPointer))return;if(toggle&&performance.now()-runDownAt<220)runLock=!runLock;runHold=false;runPointer=-1;syncRun()}
   btnRun.onpointerup=event=>endRun(true,event.pointerId)
   btnRun.onpointercancel=event=>endRun(false,event.pointerId)
-  new MutationObserver(()=>{if(document.body.hasAttribute('data-aboard')){runHold=false;runLock=false;runPointer=-1;resetStick()}})
-    .observe(document.body,{attributes:true,attributeFilter:['data-aboard']})
+  new MutationObserver(()=>{
+    if(document.body.dataset.photo==='on'){clearTransientInput(true);return}
+    runHold=false;runLock=false;runPointer=-1
+    resetRideTouchControls()
+    resetStick()
+  }).observe(document.body,{attributes:true,attributeFilter:['data-aboard','data-photo']})
 
   window.addEventListener('keydown',event=>{
-    if(!active()||document.body.hasAttribute('data-home')||document.body.dataset.photo==='on'||document.querySelector('dialog[open],.about-mask:not([hidden]),.atlas.show,.book.show')||(event.target as Element)?.closest?.('input,textarea,select,[contenteditable]'))return
+    if(!active()||isGlobalHotkeyBlocked(event.target))return
     keys.add(event.code)
     const ridingTwoWheel=document.body.dataset.ride==='bike'||document.body.dataset.ride==='bicycle'
     const drivingCar=document.body.dataset.ride==='car'
+    const crashed=document.body.dataset.rideCrash==='1'
     if(!event.repeat&&event.code==='Space'){
       if(ridingTwoWheel)recoverPulse=true
       else if(!drivingCar)jump=true
@@ -135,11 +158,19 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
       if(event.code==='KeyE')gearDelta+=1
       else if(event.code==='KeyQ')gearDelta-=1
       else if(event.code==='KeyG'&&document.body.dataset.ride==='bike')cycleModPulse=true
+      else if(event.code==='KeyP'&&document.body.dataset.ride==='bike'&&!crashed&&!event.shiftKey&&!event.altKey&&!event.ctrlKey&&!event.metaKey){
+        parkTogglePulse=true
+        event.preventDefault()
+      }
+      else if(event.code==='KeyK'&&ridingTwoWheel&&!crashed)kickstandTogglePulse=true
+      else if(event.code==='KeyL'&&(document.body.dataset.ride==='bike'||drivingCar)&&!crashed)headlightCyclePulse=true
       else if(event.code==='Digit1'||event.code==='Digit2'||event.code==='Digit3'||(ridingTwoWheel&&event.code==='Digit4'))gearSelect=Number(event.code.slice(-1))
     }
   })
-  window.addEventListener('keyup',event=>keys.delete(event.code))
-  window.addEventListener('blur',()=>{keys.clear();jump=false;runHold=false;wheelieTouch=false;tuckTouch=false;touches.clear();mouseDown=false;resetStick()})
+  // Capture-phase keyup ensures modal dialogs calling stopPropagation() never leave stuck movement/ride keys.
+  window.addEventListener('keyup',event=>keys.delete(event.code),{capture:true})
+  window.addEventListener('blur',()=>clearTransientInput(true))
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTransientInput(true)})
 
   function touchDistance(){
     const [a,b]=[...touches.values()]
@@ -150,7 +181,11 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     if(event.pointerType==='mouse'){
       mouseDown=true;lastMouse={x:event.clientX,y:event.clientY};safeCapture(canvas,event.pointerId)
     }else{
-      if(!panel.hidden && document.body.dataset.photo!=='on' && event.clientX<innerWidth*.45 && event.clientY>innerHeight*.55)return
+      if(isTouchInControlZone({
+        clientX:event.clientX,clientY:event.clientY,innerWidth,innerHeight,
+        panelVisible:!panel.hidden,photoOn:document.body.dataset.photo==='on',
+        aboard:document.body.hasAttribute('data-aboard'),target:event.target,
+      }))return
       touches.set(event.pointerId,{x:event.clientX,y:event.clientY})
       safeCapture(canvas,event.pointerId)
       if(touches.size===2)pinchDist=touchDistance()
@@ -191,7 +226,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   return {
     show(on:boolean){
       panel.hidden=!on||!matchMedia('(pointer:coarse)').matches
-      keys.clear();jump=false;runHold=false;runLock=false;touches.clear();mouseDown=false;resetStick()
+      clearTransientInput(true)
     },
     clearRun(){
       runHold=false;runLock=false;runPointer=-1;syncRun()
@@ -205,15 +240,20 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
       return {right,forward,run,jump:jumped}
     },
     readRideControls():EbikeRideControlInput{
+      const crashed=document.body.dataset.rideCrash==='1'
       const out:EbikeRideControlInput={
         gearDelta,
         gearSelect,
-        wheelie:keys.has('Space')||wheelieTouch,
-        tuck:keys.has('ShiftLeft')||keys.has('ShiftRight')||tuckTouch,
+        wheelie:crashed?false:(keys.has('Space')||wheelieTouch),
+        tuck:crashed?false:(keys.has('ShiftLeft')||keys.has('ShiftRight')||tuckTouch),
         recover:recoverPulse,
         cycleMod:cycleModPulse,
+        parkToggle:parkTogglePulse,
+        kickstandToggle:kickstandTogglePulse,
+        headlightCycle:headlightCyclePulse,
       }
       gearDelta=0;gearSelect=null;recoverPulse=false;cycleModPulse=false
+      parkTogglePulse=false;kickstandTogglePulse=false;headlightCyclePulse=false
       return out
     },
     syncRideHud(state:EbikeTelemetrySnapshot|null,rideKind:'bike'|'bicycle'|'car'|'boat'|null){
@@ -236,9 +276,12 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
         keysEl.textContent='1-3/Q·E换挡 · Space翘头'
       }else{
         typeEl.dataset.kind=state.vehicleType;typeEl.textContent=state.vehicleBadge
-        gearEl.textContent=state.gearLabel
-        gearEl.title=`${state.vehicleLabel} · 本挡限速 ${Math.round(state.maxKmh)} km/h（1-4 / Q·E 换挡）`
-        keysEl.textContent='1-4/Q·E换挡 · Space翘头'
+        gearEl.textContent=state.parkLocked?'P':state.gearLabel
+        gearEl.title=state.parkLocked
+          ?`${state.vehicleLabel} · P档驻车（按 P/K 或 E 解除）`
+          :`${state.vehicleLabel} · 本挡限速 ${Math.round(state.maxKmh)} km/h（1-4 / Q·E 换挡）`
+        const lightTag=state.headlight==='high'?'远光':state.headlight==='low'?'近光':'关灯'
+        keysEl.textContent=`1-4/Q·E换挡 · P驻车 · L${lightTag}`
         const pct=Math.max(0,Math.min(100,Math.round(state.battery)))
         batEl.dataset.level=state.criticalBattery?'crit':state.lowBattery?'low':'ok'
         batFillEl.style.width=`${pct}%`
@@ -272,7 +315,13 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
       }else{
         btnWheelie.textContent='翘头'
         btnWheelie.classList.toggle('on',wheelieTouch||keys.has('Space'))
-        if(rideKind==='bike'&&state.batteryDepleted){
+        if(rideKind==='bike'&&state.parkLocked){
+          stateEl.hidden=false;stateEl.dataset.warn='0'
+          stateEl.textContent=state.kickstandDown?'P档 · 边撑已放':'P档驻车'
+        }else if(state.kickstandDown){
+          stateEl.hidden=false;stateEl.dataset.warn='0'
+          stateEl.textContent='边撑放下 · 按K收起'
+        }else if(rideKind==='bike'&&state.batteryDepleted){
           stateEl.hidden=false;stateEl.dataset.warn='1'
           stateEl.textContent=state.maxKmh>0?`电量耗尽 · 限速 ${Math.round(state.maxKmh)}`:'电量耗尽'
         }else if(rideKind==='bike'&&state.criticalBattery){

@@ -1,5 +1,6 @@
 import * as T from 'three'
 import type {EbikeModConfig, EbikeModPreset, EbikeVehicleKind, EbikeVisualRig} from './vehicle-model'
+import type {TwoWheelHeadlightMode} from './ebike-state-coupling'
 
 export type EbikeCrashPhase = 'none' | 'crashed' | 'recovering'
 export type EbikeCrashReason = '' | 'impact' | 'lowside' | 'loopout'
@@ -41,6 +42,9 @@ export interface EbikeRideControlInput {
   tuck: boolean
   recover: boolean
   cycleMod: boolean
+  parkToggle?: boolean
+  kickstandToggle?: boolean
+  headlightCycle?: boolean
 }
 
 /**
@@ -66,6 +70,10 @@ export interface ExternalEbikeTelemetry {
   crashRisk?: number
   tucking?: boolean
   braking?: boolean
+  parkLocked?: boolean
+  kickstandDown?: boolean
+  headlight?: TwoWheelHeadlightMode
+  hazard?: boolean
   crashPhase?: EbikeCrashPhase
   crashReason?: EbikeCrashReason
   crashSide?: -1 | 1
@@ -95,6 +103,10 @@ export interface EbikeTelemetrySnapshot {
   steerInput: number
   tucking: boolean
   braking: boolean
+  parkLocked?: boolean
+  kickstandDown?: boolean
+  headlight?: TwoWheelHeadlightMode
+  hazard?: boolean
   crashPhase: EbikeCrashPhase
   crashReason: EbikeCrashReason
   crashSide: -1 | 1
@@ -431,6 +443,10 @@ export function createEbikeFxController() {
       steerInput: base.steerInput,
       tucking: external?.tucking ?? (input.tuck && Math.abs(finalLean) > .08),
       braking: external?.braking ?? base.braking,
+      parkLocked: external?.parkLocked ?? false,
+      kickstandDown: external?.kickstandDown ?? false,
+      headlight: external?.headlight ?? 'off',
+      hazard: external?.hazard ?? false,
       crashPhase,
       crashReason,
       crashSide,
@@ -527,12 +543,13 @@ export function applyEbikeVisualAndRider(params: {
   fx: ReturnType<typeof createEbikeFxController>
   state: EbikeTelemetrySnapshot
   dt: number
+  night?: number
   supportY?: (x: number, z: number, refY: number) => number
 }) {
   const {
     figure, joints, rig, basePos, heading, groundPitch,
     snapMountBlend, mountStartPos, mountStartYaw, mountStartRot,
-    fx, state, dt, supportY,
+    fx, state, dt, night = 0, supportY,
   } = params
   const cdt = Math.min(.12, Math.max(0, dt))
   const crash = fx.getCrashVisualOffsets()
@@ -552,6 +569,12 @@ export function applyEbikeVisualAndRider(params: {
     braking: state.braking,
     crashRoll: crash.bikeRoll,
     crashLift: crash.bikeLift,
+    kickstandDown: state.crashPhase === 'none' ? !!state.kickstandDown : false,
+    headlight: state.headlight ?? 'off',
+    night,
+    crashed: state.crashPhase !== 'none',
+    batteryDepleted: state.batteryDepleted,
+    hazard: !!state.hazard,
     dt: cdt,
   })
 
