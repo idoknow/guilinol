@@ -3,6 +3,8 @@ import {metrics} from './telemetry.mjs'
 
 const dimensions={region:'region',city:'city',isp:'isp',device:'device',gpu:'gpu',build:'build',mode:'mode'}
 for(const name of ['os','browser','language','referrer'])dimensions[name]=`context->>'${name}'`
+// Mainland synthetic probes (deploy/k8s/probe): which node ran it and which URL it fetched.
+dimensions.node="context->>'node'";dimensions.target="fields->>'target'"
 const visit="context->>'vid'"
 const countSession='count(distinct session)'
 const kpis={
@@ -11,6 +13,8 @@ const kpis={
   errorRate:`count(distinct session) filter(where kind='error')::float/nullif(${countSession},0)`,
   contextLost:"coalesce(sum((fields->>'count')::float) filter(where kind='contextLost'),0)",
   online:`${countSession} filter(where received>=bucket_end-interval '5 minutes')`,
+  // Share of probe fetches that failed or timed out (curl status 0, or HTTP >= 400).
+  probeFail:"avg(CASE WHEN (fields->>'status')::int BETWEEN 200 AND 399 THEN 0 ELSE 1 END) filter(where kind='probe')",
 }
 const percentile=(q,expr)=>`percentile_cont(${q}) within group(order by ${expr})`
 const duration="(fields->>'total')::float"
@@ -29,7 +33,9 @@ function measurement(name){
   const match=/^(.*)\.(p50|p95)$/.exec(Object.hasOwn(aliases,name)?aliases[name]:Object.hasOwn(metrics,name)?name+'.p50':name)
   if(!match||!Object.hasOwn(metrics,match[1]))return
   const [kind,key,api]=metrics[match[1]]
-  return {base:match[1],expr:`(fields->>'${key}')::float`,where:`kind='${kind}'`+(api?` AND fields->>'api'='${api}'`:''),q:match[2]==='p50'?.5:.95}
+  // Failed probe fetches report zero timings; keep them out of latency percentiles (see probeFail).
+  const ok=kind==='probe'?" AND (fields->>'status')::int BETWEEN 200 AND 399":''
+  return {base:match[1],expr:`(fields->>'${key}')::float`,where:`kind='${kind}'`+(api?` AND fields->>'api'='${api}'`:'')+ok,q:match[2]==='p50'?.5:.95}
 }
 const steps=['playable','loginOpen','loginSuccess','feedbackOpen','feedbackSuccess']
 const invalid=()=>Response.json({error:{code:'invalid',message:'无效查询参数'}},{status:400})
@@ -71,8 +77,8 @@ export async function analytics(pool,path,params){
   }
 
   const overview=path==='admin/overview',group=params.get('group'),bucket=params.get('bucket')??'1h'
-  if(!Object.hasOwn(interval,bucket)||group&&!['device','region'].includes(group))return invalid()
-  const names=overview?[...Object.keys(kpis),...Object.keys(aliases),...Object.keys(global)]:[name]
+  if(!Object.hasOwn(interval,bucket)||group&&!['device','region','node'].includes(group))return invalid()
+  const names=overview?[...Object.keys(kpis).filter(k=>k!=='probeFail'),...Object.keys(aliases),...Object.keys(global)]:[name]
   if(!overview&&!m&&!Object.hasOwn(kpis,name)&&!Object.hasOwn(reliability,name)&&!Object.hasOwn(global,name))return invalid()
   const values=overview?[new Date(start-(end-start)),args[1],args[0]]:args
   const time=col=>overview?`CASE WHEN ${col}<$3 THEN $1::timestamptz ELSE $3::timestamptz END`:`date_bin(interval '${interval[bucket]}',${col},'2000-01-01 UTC')`
@@ -110,9 +116,9 @@ export async function analytics(pool,path,params){
       const metric=measurement(key)
       return (metric?percentile(metric.q,metric.expr)+` filter(where ${metric.where})`:(kpis[key]??reliability[key]))+` AS "v${i}"`
     })
-    const predicate=!overview&&m?' AND '+m.where+' AND '+m.expr+' IS NOT NULL':!overview&&name.startsWith('duration')?" AND kind='session'":" AND kind<>'probe'"
+    const predicate=!overview&&m?' AND '+m.where+' AND '+m.expr+' IS NOT NULL':!overview&&name.startsWith('duration')?" AND kind='session'":!overview&&name==='probeFail'?" AND kind='probe'":" AND kind<>'probe'"
     const data=await rows(`WITH events AS (SELECT received,fields,session,kind,context,${time('received')} AS t,
-      ${group?`coalesce(${group},'unknown')`:'NULL::text'} AS label FROM perf_event WHERE ${range}${predicate}),
+      ${group?`coalesce(${dimensions[group]},'unknown')`:'NULL::text'} AS label FROM perf_event WHERE ${range}${predicate}),
       ranked AS (SELECT *,${overview?'CASE WHEN t=$1 THEN $3::timestamptz ELSE $2::timestamptz END':`least(t+interval '${interval[bucket]}',$2::timestamptz)`} AS bucket_end${rankings} FROM events),
       series AS (SELECT t,label,${fields.join(',')},count(*) AS samples FROM ranked GROUP BY t,label)
       SELECT * FROM series ${group?'WHERE label IN (SELECT label FROM series GROUP BY label ORDER BY sum(samples) DESC,label LIMIT 6)':''} ORDER BY t,label`,values)

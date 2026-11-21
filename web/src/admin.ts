@@ -236,6 +236,8 @@ const dimValue: Record<string, Record<string, string>> = {
   device: { mobile: '手机', desktop: '电脑' },
   referrer: { direct: '直接访问', search: '搜索引擎', social: '社交平台', internal: '站内', other: '其他' },
   mode: { walk: '步行', drive: '驾驶', fly: '飞行', map: '地图', menu: '菜单' },
+  node: { 'cn-gz-tencent-02': '广州', 'cn-sh-tencent-01': '上海' },
+  target: { home: '首页', manifest: '世界清单', chunk1: '地形瓦片 1', chunk2: '地形瓦片 2', chunk3: '地形瓦片 3', chunk4: '地形瓦片 4', chunk5: '地形瓦片 5', health: '接口健康检查' },
 }
 const label = (dim: string, value: unknown) =>
   value == null || value === '' || value === 'unknown' ? '未知' : dimValue[dim]?.[String(value)] ?? String(value)
@@ -260,6 +262,7 @@ const views: View[] = [
   { key: 'overview', label: '总览', icon: '◎', group: '数据', ranged: true },
   { key: 'trends', label: '趋势', icon: '〰', group: '数据', ranged: true },
   { key: 'breakdown', label: '分布', icon: '▤', group: '数据', ranged: true },
+  { key: 'network', label: '地区与网络', icon: '◈', group: '数据', ranged: true },
   { key: 'errors', label: '错误', icon: '⚠', group: '数据', ranged: true },
   { key: 'live', label: '实时', icon: '●', group: '数据' },
   { key: 'server', label: '服务端', icon: '▣', group: '数据', ranged: true },
@@ -572,6 +575,109 @@ function toSeries(rows: Point[], dim?: string): Series[] {
   return [...groups.values()]
 }
 
+/* ───────────── network: probe phases + exploration heat ───────────── */
+const phaseNames = ['DNS 解析', 'TCP 建连', 'TLS 握手', '等待首字节', '下载']
+const phaseColors = ['var(--adm-c5)', 'var(--adm-c6)', 'var(--adm-c3)', 'var(--adm-c2)', 'var(--adm-c1)']
+type HeatCell = { gx: number; gz: number; visits: number; fps: number | null; chunk: number | null }
+const heatMetrics: Record<string, { label: string; hint: string; value: (c: HeatCell) => number | null; fmt: Fmt; better: Better }> = {
+  visits: { label: '访问量', hint: '去过这一格的会话数，看玩家往哪里走', value: (c) => c.visits, fmt: fmt.int, better: 'up' },
+  fps: { label: '帧率', hint: '这一格帧率中位数，红色表示卡顿，看哪里渲染吃紧', value: (c) => c.fps, fmt: fmt.fps, better: 'up' },
+  chunk: { label: '瓦片加载', hint: '这一格瓦片加载 p95，红色表示加载慢，看哪里流式加载跟不上', value: (c) => c.chunk, fmt: fmt.ms, better: 'down' },
+}
+const GRID = 250
+/** Paper → jade for amounts; seal → ochre → jade for good/bad. t in [0,1], 1 = more / better. */
+function heatColor(t: number, diverging: boolean) {
+  const stops = diverging
+    ? [[169, 80, 60], [196, 154, 74], [79, 127, 122]]
+    : [[232, 222, 196], [143, 193, 181], [47, 74, 69]]
+  const x = Math.min(1, Math.max(0, t)) * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(x)), f = x - i
+  const c = stops[i].map((v, k) => Math.round(v + (stops[i + 1][k] - v) * f))
+  return `rgb(${c.join(',')})`
+}
+type Place = { name: string; x: number; z: number }
+function nearest(places: Place[], x: number, z: number) {
+  let best: Place | null = null, dist = 600
+  for (const p of places) {
+    const d = Math.hypot(p.x - x, p.z - z)
+    if (d < dist) (best = p), (dist = d)
+  }
+  return best?.name ?? null
+}
+function heatmap(rows: any[], key: string, extent?: number[], places: Place[] = []) {
+  const metric = heatMetrics[key]
+  const cells: HeatCell[] = rows.flatMap((row) => {
+    const [gx, gz] = String(row.grid ?? '').split(',').map(Number)
+    return Number.isFinite(gx) && Number.isFinite(gz)
+      ? [{ gx, gz, visits: num(row.visits) ?? 0, fps: num(row.fps_p50), chunk: num(row.chunk_p95) }] : []
+  })
+  const values = cells.map(metric.value).filter((v): v is number => v != null).sort((a, b) => a - b)
+  const wrap = h('div', { class: 'adm-heat' })
+  if (!values.length) return emptyState(`这段时间没有「${metric.label}」数据`)
+  // Fixed, readable domains: fps 20–60; chunk 0–p90 (min 1 s); visits sqrt scale to max.
+  const lo = key === 'fps' ? 20 : 0
+  const hi = key === 'fps' ? 60 : key === 'chunk' ? Math.max(1000, values[Math.floor(values.length * 0.9)]) : values[values.length - 1]
+  const scale = (v: number) => {
+    const t = key === 'visits' ? Math.sqrt(v) / Math.sqrt(Math.max(1, hi)) : (v - lo) / Math.max(1, hi - lo)
+    return metric.better === 'down' ? 1 - t : t
+  }
+  const [ex, ez, ew, ed] = extent?.length === 4 ? extent : [0, 0, 0, 0]
+  const xs = cells.map((c) => c.gx * GRID), zs = cells.map((c) => c.gz * GRID)
+  const x0 = Math.min(ex || Infinity, ...xs), z0 = Math.min(ez || Infinity, ...zs)
+  const x1 = Math.max(ex + ew, ...xs.map((x) => x + GRID)), z1 = Math.max(ez + ed, ...zs.map((z) => z + GRID))
+  const svg = s('svg', { viewBox: `${x0} ${z0} ${x1 - x0} ${z1 - z0}`, class: 'adm-heat-map', role: 'img', 'aria-label': `探索热力：${metric.label}` })
+  if (ew && ed) svg.append(s('image', { href: '/world/overview.png', x: ex, y: ez, width: ew, height: ed, preserveAspectRatio: 'none', class: 'adm-heat-base' }))
+  const tip = h('div', { class: 'adm-tip', hidden: true })
+  const layer = s('g', { class: 'adm-heat-cells' })
+  for (const cell of cells) {
+    const v = metric.value(cell)
+    if (v == null) continue
+    const rect = s('rect', { x: cell.gx * GRID + 6, y: cell.gz * GRID + 6, width: GRID - 12, height: GRID - 12, rx: 22, style: `fill:${heatColor(scale(v), key !== 'visits')}` })
+    rect.addEventListener('pointerenter', () => {
+      tip.hidden = false
+      tip.replaceChildren(
+        h('b', null, `${metric.label} ${metric.fmt(v)}`),
+        h('span', null, `访问 ${fmt.int(cell.visits)} 会话`),
+        h('span', null, `帧率 p50 ${fmt.fps(cell.fps)}`),
+        h('span', null, `瓦片 p95 ${fmt.ms(cell.chunk)}`),
+        h('span', null, h('small', null, `格子 ${cell.gx}, ${cell.gz}（东 ${cell.gx * GRID} m · 南 ${cell.gz * GRID} m）`)))
+    })
+    rect.addEventListener('pointermove', (event) => {
+      const box = (svg.parentElement ?? wrap).getBoundingClientRect()
+      tip.style.left = `${Math.min(Math.max(event.clientX - box.left, 90), box.width - 90)}px`
+      tip.style.top = `${event.clientY - box.top + 18}px`
+    })
+    rect.addEventListener('pointerleave', () => (tip.hidden = true))
+    layer.append(rect)
+  }
+  svg.append(layer)
+  const ramp = Array.from({ length: 9 }, (_, i) => heatColor(i / 8, key !== 'visits')).join(',')
+  const [low, high] = metric.better === 'down' ? [metric.fmt(hi), metric.fmt(lo)] : [metric.fmt(lo), metric.fmt(hi)]
+  const covered = cells.filter((c) => metric.value(c) != null).length
+  // Side list: the cells that matter most for this metric, named by the nearest landmark.
+  const ranked = cells.filter((c) => metric.value(c) != null)
+  const top = (key === 'fps' ? [...ranked].sort((a, b) => (a.fps ?? 0) - (b.fps ?? 0)) : key === 'chunk' ? [...ranked].sort((a, b) => (b.chunk ?? 0) - (a.chunk ?? 0)) : [...ranked].sort((a, b) => b.visits - a.visits)).filter((cell, i, all) => {
+      // One row per place: keep the most significant cell near each landmark.
+      const name = nearest(places, cell.gx * GRID + GRID / 2, cell.gz * GRID + GRID / 2)
+      return !name || all.findIndex((other) => nearest(places, other.gx * GRID + GRID / 2, other.gz * GRID + GRID / 2) === name) === i
+    }).slice(0, 10)
+  const side = h('div', { class: 'adm-heat-side' },
+    h('p', { class: 'adm-heat-side-title' }, key === 'visits' ? '去的人最多' : key === 'fps' ? '最卡的地方' : '加载最慢的地方'),
+    h('ol', null, top.map((cell) => {
+      const cx = cell.gx * GRID + GRID / 2, cz = cell.gz * GRID + GRID / 2
+      const name = nearest(places, cx, cz)
+      return h('li', null,
+        h('i', { style: `background:${heatColor(scale(metric.value(cell)!), key !== 'visits')}` }),
+        h('span', null, name ? `${name}附近` : `格子 ${cell.gx}, ${cell.gz}`, h('small', null, `${fmt.int(cell.visits)} 会话`)),
+        h('b', null, metric.fmt(metric.value(cell))))
+    })),
+    h('p', { class: 'adm-sub' }, '名称取 600 m 内最近的地标；没有地标的格子显示网格坐标。'))
+  wrap.append(h('div', { class: 'adm-heat-stage' }, svg, tip), side,
+    h('div', { class: 'adm-heat-legend' },
+      h('span', null, key === 'visits' ? '少' : '差'), h('i', { style: `background:linear-gradient(90deg,${ramp})` }), h('span', null, key === 'visits' ? '多' : '好'),
+      h('small', null, `${low} — ${high} · ${covered} 个格子 · 上北下南`)))
+  return wrap
+}
+
 /* ───────────── shell ───────────── */
 function denied(status: number) {
   generation++
@@ -772,6 +878,122 @@ const pages: Record<string, (view: View) => void> = {
             h('td', { class: 'num' }, f(num(row.p50))),
             h('td', { class: `num ${flagged ? 'is-bad' : ''}` }, f(p95)))
         }))))
+    }, skeleton(8))
+  },
+
+  network() {
+    const r = rangeWindow()
+    const gap = Math.max(bucketMs[r.bucket] ?? 3600e3, 15 * 60e3)
+    const kpis = h('div'), trend = h('div'), phases = h('div'), targets = h('div'), fails = h('div'),
+      regions = h('div'), isps = h('div'), heat = h('div')
+    const heatKey = Object.hasOwn(heatMetrics, params.get('heat') ?? '') ? params.get('heat')! : 'visits'
+    main.append(
+      h('p', { class: 'adm-note' }, '大陆探针每 15 分钟从广州、上海的腾讯云节点抓取首页、世界清单、5 个地形瓦片和接口，代表「没有缓存的新访客」。真实玩家的数据按 IP 归属地统计。'),
+      kpis,
+      h('div', { class: 'adm-cols' },
+        card('大陆探针 · 首字节时间', trend, { className: 'adm-span-2', sub: '各节点所有目标的中位数；越低越好' }),
+        card('一次请求的时间花在哪', phases, { sub: '各阶段中位数，按节点' })),
+      h('div', { class: 'adm-cols' },
+        card('各资源耗时', targets, { className: 'adm-span-2', sub: '总耗时 = 从发起请求到下载完毕' }),
+        card('失败与超时', fails, { sub: '连接超时 5 秒或 HTTP 错误的占比' })),
+      h('div', { class: 'adm-grid-2' },
+        card('真实玩家 · 可玩用时按省份', regions, {
+          sub: '中位数，从打开页面到可以操作',
+          actions: navLink('更多维度 →', { view: 'breakdown', dim: 'region', metric: 'playable.p50' }, { class: 'adm-link' }, true),
+        }),
+        card('真实玩家 · 可玩用时按运营商', isps, { sub: '中位数' })),
+      card('探索热力 · 250 m 网格', heat, {
+        sub: heatMetrics[heatKey].hint,
+        actions: segmented(heatKey, Object.entries(heatMetrics).map(([k, v]) => [k, v.label]), (value) => go({ heat: value }, true, true), '热力指标'),
+      }))
+
+    const breakdown = (metric: string, dim: string) => api<any[]>('admin/breakdown?' + rangeQuery({ dim, metric })).then((rows) => list(rows))
+    const series = (metric: string) =>
+      api<Point[]>('admin/timeseries?' + rangeQuery({ metric, bucket: r.bucket, group: 'node' })).then((rows) => list(rows))
+
+    async(kpis, () => Promise.all([breakdown('probe.ttfb.p50', 'node'), breakdown('probe.total.p95', 'node'), series('probeFail')]), ([ttfb, total, fail]) => {
+      if (!ttfb.length && !fail.length) return emptyState('这段时间没有探针数据', '探针每 15 分钟运行一次')
+      const failRate = (node: string) => {
+        const rows = fail.filter((row) => row.group === node)
+        const n = rows.reduce((sum, row) => sum + (num(row.samples) ?? 0), 0)
+        return n ? rows.reduce((sum, row) => sum + (num(row.value) ?? 0) * (num(row.samples) ?? 0), 0) / n : null
+      }
+      const nodes = [...new Set([...ttfb.map((row) => row.label), ...fail.map((row) => row.group)])].filter(Boolean).sort()
+      return h('div', { class: 'adm-kpis adm-kpis--server' }, nodes.flatMap((node) => {
+        const rate = failRate(node)
+        return [
+          serverStat(`${label('node', node)} · 首字节 p50`, fmt.ms(num(ttfb.find((row) => row.label === node)?.p50))),
+          serverStat(`${label('node', node)} · 总耗时 p95`, fmt.ms(num(total.find((row) => row.label === node)?.p95))),
+          serverStat(`${label('node', node)} · 失败率`, fmt.pct(rate), rate != null && rate > 0.05 ? '高于 5%，大陆访问不稳定' : undefined),
+        ]
+      }))
+    }, skeleton(2))
+
+    async(trend, () => series('probe.ttfb.p50'), (rows) => {
+      const lines = toSeries(rows, 'node')
+      return lines.length ? lineChart(lines, fmt.ms, { bucket: r.bucket, gap }) : emptyState('这段时间没有探针数据')
+    }, skeleton(5))
+
+    async(phases, () => Promise.all(['dns', 'tcp', 'tls', 'ttfb', 'total'].map((k) => breakdown(`probe.${k}.p50`, 'node'))), ([dns, tcp, tls, ttfb, total]) => {
+      const nodes = [...new Set(total.map((row) => row.label))].sort()
+      if (!nodes.length) return emptyState('这段时间没有探针数据')
+      const at = (rows: any[], node: string) => num(rows.find((row) => row.label === node)?.p50) ?? 0
+      const parts = nodes.map((node) => {
+        const d = at(dns, node), c = at(tcp, node), t = at(tls, node), first = at(ttfb, node), all = at(total, node)
+        return { node, all, segs: [d, c, t, Math.max(0, first - d - c - t), Math.max(0, all - first)] }
+      })
+      const max = Math.max(...parts.map((p) => p.segs.reduce((a, b) => a + b, 0)), 1)
+      return h('div', { class: 'adm-phases' },
+        parts.map((p) =>
+          h('div', { class: 'adm-phase-row' },
+            h('div', { class: 'adm-phase-head' }, h('b', null, label('node', p.node)), h('span', null, fmt.ms(p.segs.reduce((a, b) => a + b, 0)))),
+            h('div', { class: 'adm-phase-bar' },
+              p.segs.map((v, i) => v > 0 && h('i', { style: `width:${((v / max) * 100).toFixed(2)}%;background:${phaseColors[i]}`, title: `${phaseNames[i]} ${fmt.ms(v)}` }))))),
+        h('div', { class: 'adm-legend' }, phaseNames.map((name, i) => h('span', null, h('i', { style: `background:${phaseColors[i]}` }), name))))
+    }, skeleton(4))
+
+    async(targets, () => Promise.all([breakdown('probe.ttfb.p50', 'target'), breakdown('probe.total.p50', 'target')]), ([ttfb, total]) => {
+      if (!total.length) return emptyState('这段时间没有探针数据')
+      const order = Object.keys(dimValue.target)
+      const rows = [...total].sort((a, b) => order.indexOf(a.label) - order.indexOf(b.label))
+      const worst = Math.max(...rows.map((row) => num(row.p95) ?? 0))
+      return h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table' },
+        h('thead', null, h('tr', null, ['资源', '样本', '首字节 p50', '总耗时 p50', '总耗时 p95'].map((t, i) => h('th', { class: i ? 'num' : '' }, t)))),
+        h('tbody', null, rows.map((row) => {
+          const p95 = num(row.p95)
+          return h('tr', null,
+            h('td', null, label('target', row.label)),
+            h('td', { class: 'num' }, fmt.int(num(row.samples))),
+            h('td', { class: 'num' }, fmt.ms(num(ttfb.find((one) => one.label === row.label)?.p50))),
+            h('td', { class: 'num' }, fmt.ms(num(row.p50))),
+            h('td', { class: `num ${p95 != null && p95 >= 3000 && p95 === worst ? 'is-bad' : ''}` }, fmt.ms(p95)))
+        }))))
+    }, skeleton(6))
+
+    async(fails, () => series('probeFail'), (rows) => {
+      const lines = toSeries(rows, 'node')
+      return lines.length ? lineChart(lines, fmt.pct, { bucket: r.bucket, gap, height: 180 }) : emptyState('这段时间没有探针数据')
+    }, skeleton(4))
+
+    const playable = (slot: HTMLElement, dim: string) =>
+      async(slot, () => breakdown('playable.p50', dim), (rows) => {
+        const items = rows.filter((row) => num(row.p50) != null).slice(0, 10)
+        if (!items.length) return emptyState('这段时间还没有真实玩家数据')
+        return bars(items.map((row) => ({ label: label(dim, row.label), value: num(row.p50)!, note: `${fmt.int(num(row.sessions) ?? num(row.samples))} 会话` })), fmt.ms)
+      }, skeleton(5))
+    playable(regions, 'region')
+    playable(isps, 'isp')
+
+    async(heat, () => Promise.all([
+      api<any[]>('admin/perf/grid?' + rangeQuery()).then((rows) => list(rows)),
+      fetch('/world/manifest.json', { cache: 'no-store' }).then((res) => (res.ok ? res.json() : null)).catch(() => null),
+    ]), ([cells, manifest]) => {
+      if (!cells.length) return emptyState('这段时间没有带位置的玩家数据')
+      const places: Place[] = [
+        ...(manifest?.landmarks ?? []).map((l: any) => ({ name: l.name, x: l.position?.[0], z: l.position?.[2] })),
+        ...(manifest?.peaks?.entries ?? []).map((p: any) => ({ name: p.name, x: p.center?.[0], z: p.center?.[2] })),
+      ].filter((p) => p.name && !/^auto-/.test(p.name) && Number.isFinite(p.x) && Number.isFinite(p.z))
+      return heatmap(cells, heatKey, manifest?.extent, places)
     }, skeleton(8))
   },
 
