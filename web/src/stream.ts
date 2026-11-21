@@ -28,7 +28,7 @@ export function tileEdgeDistance(tile:Tile, x:number, z:number){
 export class Stream {
   private distant?:DistantBuildings
   private revision=0
-  private grid: TileGrid
+  readonly grid: TileGrid
   private parseSlot = frameSlots(streamBudget.parseMs)
   private attachSlot = frameSlots(streamBudget.attachMs)
   overviewMesh(){return this.base.mesh}

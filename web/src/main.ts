@@ -126,7 +126,7 @@ async function start() {
   scene.add(base.mesh,peaks)
   bootProgress('载入街区', 78)
   const clock = skyClock(params)
-  setPreset(camera,params.get('cam'),manifest.bbox)
+  setPreset(camera,params.get('cam')??params.get('spawn'),manifest.bbox)
   const stream = new Stream(scene,manifest,base,rangeStore,camera)
   const output = document.querySelector('output')!
   let previous=0, first=0, frame=0, sum=0, samples=0

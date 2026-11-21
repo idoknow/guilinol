@@ -247,13 +247,18 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     }
     for(const [root,colliders] of landmarks)if(!nearLandmarks.has(root)){colliders.forEach(remove);landmarks.delete(root);changed=true}
     for(const [tree,collider] of trunks)if(Math.hypot(east-tree.x,south-tree.z)>48){remove(collider);trunks.delete(tree);changed=true}
-    for(const tile of manifest.chunks){
-      const near=Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))<=collisionRadius
+    const inRange=(tile:Tile)=>Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))<=collisionRadius
+    for(const [tile,region] of regions){
+      if(inRange(tile))continue
+      region.colliders.forEach(remove);regions.delete(tile);changed=true
+    }
+    for(const tile of stream.grid.near(east,south,collisionRadius+128)){
+      const near=inRange(tile)
       const data=stream.loaded.get(tile), region=regions.get(tile)
       const trees=stream.forest.loaded.get(tile)
       if(trees&&Math.max(Math.abs(east-tile.x-128),Math.abs(south-tile.z-128))<168)for(const tree of trees){
         if(tree.kind!==5&&!trunks.has(tree)&&Math.hypot(east-tree.x,south-tree.z)<40){trunks.set(tree,add(R.ColliderDesc.cylinder(1.8,.42*tree.scale).setTranslation(tree.x,tree.y+1.8,tree.z),'tree'));changed=true}}
-      if(region&&(!near||region.fine!==!!data)){region.colliders.forEach(remove);regions.delete(tile);changed=true}
+      if(region&&region.fine!==!!data){region.colliders.forEach(remove);regions.delete(tile);changed=true}
       if(!near||regions.has(tile))continue
       const stride=width/32+1,start=(tile.z-top)/32*stride+(tile.x-left)/32
       const ground=data?fineField(data):field(8,(col,row)=>overview[start+row*stride+col]/10)

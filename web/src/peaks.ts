@@ -111,10 +111,15 @@ export function startPeaks(asset:Peaks) {
       update(camera:THREE.PerspectiveCamera,level?:number,range?:Parameters<PeaksGroup['update']>[2]) {
         const {x,z} = camera.position
         const near = new Map<string,number>()
-        for(let rz=Math.floor((z-1600)/size);rz<=Math.floor((z+1600)/size);rz++) {
-          for(let cx=Math.floor((x-1600)/size);cx<=Math.floor((x+1600)/size);cx++) {
+        const demand=Math.max(800,(range?.peakLodSplit??800)*camera.zoom+256)
+        for(let rz=Math.floor((z-demand)/size);rz<=Math.floor((z+demand)/size);rz++) {
+          for(let cx=Math.floor((x-demand)/size);cx<=Math.floor((x+demand)/size);cx++) {
             const key = cx+'_'+rz
-            if(groups.has(key))near.set(key,Math.hypot((cx+.5)*size-x,(rz+.5)*size-z))
+            const entries=groups.get(key)
+            if(!entries)continue
+            let nearest=Infinity
+            for(const {center:[px,,pz]} of entries)nearest=Math.min(nearest,Math.hypot(px-x,pz-z))
+            if(nearest<=demand)near.set(key,nearest)
           }
         }
         let changed = false
