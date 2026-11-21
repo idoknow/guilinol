@@ -42,6 +42,7 @@ try {
   // 1. Measure 5 consecutive cold-process first frames (matches verify:flight cold launch).
   const firstFrameRuns = []
   const firstWorldBytes = []
+  const firstWorldRequests = []
   for (let i = 0; i < FIRST_RUNS; i++) {
     const coldBrowser = await chromium.launch({
       executablePath: process.env.CHROMIUM,
@@ -54,7 +55,14 @@ try {
       await page.waitForFunction(() => window.viewer?.stats.firstMs > 0, null, {timeout: 30000})
       const firstMs = await page.evaluate(() => +window.viewer.stats.firstMs.toFixed(1))
       firstFrameRuns.push(firstMs)
-      firstWorldBytes.push(await page.evaluate(() => window.viewer.stats.firstWorldBytes))
+      const requests=await page.evaluate(()=>{
+        const root=new URL('./world/',document.baseURI).href
+        return performance.getEntriesByType('resource')
+          .filter(entry=>entry.name.startsWith(root)&&entry.startTime<=window.viewer.stats.firstMs)
+          .map(entry=>({file:entry.name.slice(root.length),bytes:entry.encodedBodySize}))
+      })
+      firstWorldRequests.push(requests)
+      firstWorldBytes.push(requests.reduce((total,request)=>total+request.bytes,0))
     } finally {
       await coldBrowser.close()
     }
@@ -86,7 +94,7 @@ try {
       viewport: {width: 960, height: 540, renderer: 'SwiftShader'},
       cpuRate, sampleFrames: SAMPLE_FRAMES,
       firstFrame: {
-        runsMs: firstFrameRuns, worldBytes: firstWorldBytes,
+        runsMs: firstFrameRuns, worldBytes: firstWorldBytes, requests:firstWorldRequests,
         meanMs: count ? round(firstFrameRuns.reduce((a,b)=>a+b,0)/count,1) : null,
         maxMs: count ? Math.max(...firstFrameRuns) : null,
         minMs: count ? Math.min(...firstFrameRuns) : null,

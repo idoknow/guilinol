@@ -23,11 +23,6 @@ export interface PeaksGroup extends THREE.Group {
   update(camera:THREE.PerspectiveCamera, mirrorLevel?:number, range?:{cullHorizon?:number; peakLodSplit?:number}):void
 }
 
-// Spin up the worker immediately on module evaluation so it warms while manifest.json fetches.
-let prewarmedWorker:Worker|null = typeof Worker!=='undefined'
-  ? new Worker(new URL('./peaks-worker.ts',import.meta.url),{type:'module'})
-  : null
-
 function inFrustum(frustum:THREE.Frustum, pt:THREE.Vector3, radius:number) {
   const planes = frustum.planes
   for(let i=0;i<6;i++) if(planes[i].distanceToPoint(pt)<-radius) return false
@@ -35,8 +30,7 @@ function inFrustum(frustum:THREE.Frustum, pt:THREE.Vector3, radius:number) {
 }
 
 function loadBatch(asset:Peaks, sector?:'coarse'|'detail') {
-  const worker = prewarmedWorker ?? new Worker(new URL('./peaks-worker.ts',import.meta.url),{type:'module'})
-  prewarmedWorker = null
+  const worker = new Worker(new URL('./peaks-worker.ts',import.meta.url),{type:'module'})
   const palette = [
     look.peakFoot,look.peakGreen,look.peakGreenDark,look.peakGreenLight,
     look.peakRock,look.peakRockDark,look.peakRockOchre,

@@ -29,18 +29,18 @@ export async function fetchAsset(file:string, signal?:AbortSignal) {
   return data
 }
 
-function bitmapMaterial(bitmap:ImageBitmap) {
+function bitmapMaterial(bitmap:ImageBitmap,bakedWater=false) {
   const map = new THREE.Texture(bitmap)
   map.colorSpace = THREE.SRGBColorSpace
   map.needsUpdate = true
   const material = new THREE.MeshStandardMaterial({map, roughness:look.roughness, metalness:look.metalness})
-  nightGround(material)
+  nightGround(material,bakedWater)
   return material
 }
 
-async function surfaceMaterial(data:ArrayBuffer) {
+async function surfaceMaterial(data:ArrayBuffer,bakedWater=false) {
   const bitmap = await createImageBitmap(new Blob([data],{type:'image/png'}),{imageOrientation:'flipY'})
-  return bitmapMaterial(bitmap)
+  return bitmapMaterial(bitmap,bakedWater)
 }
 
 function ground(width:number, depth:number, step:number, height:(col:number,row:number)=>number) {
@@ -51,6 +51,44 @@ function ground(width:number, depth:number, step:number, height:(col:number,row:
     positions.setY(row*(width/step+1)+col,height(col,row))
   geometry.computeVertexNormals()
   return geometry
+}
+
+// GLF1 is independent of the chunk table and the peak-sector catalogue.
+export async function openingTerrain(){
+  const data=await fetchAsset('opening.bin')
+  const view=new DataView(data)
+  if(view.getUint32(0)!==0x474c4631)throw Error('Invalid opening terrain')
+  const bbox=Array.from({length:4},(_,i)=>view.getFloat64(4+i*8,true)) as Manifest['bbox']
+  const extent=Array.from({length:4},(_,i)=>view.getInt32(36+i*4,true)) as Manifest['extent']
+  const [left,top,width,depth]=extent, step=view.getUint32(52,true)
+  const cols=width/step+1, rows=depth/step+1
+  const heights=new Int16Array(data,56,cols*rows)
+  const material=await surfaceMaterial(data.slice(56+heights.byteLength),true)
+  const mesh=new THREE.Mesh(ground(width,depth,step,(x,z)=>heights[z*cols+x]/10),material)
+  mesh.position.set(left,0,top)
+  return {bbox,extent,mesh,dispose(){
+    mesh.removeFromParent()
+    mesh.geometry.dispose()
+    material.map?.source.data.close()
+    material.map?.dispose()
+    material.dispose()
+  }}
+}
+
+export function measureFirstWorldBytes(firstMs:number, publish:(bytes:number)=>void){
+  const root=new URL('./world/',document.baseURI).href
+  let total=0
+  function add(entries:PerformanceEntry[]){
+    for(const resource of entries as PerformanceResourceTiming[]){
+      if(resource.name.startsWith(root) && resource.startTime<=firstMs)total+=resource.encodedBodySize
+    }
+    publish(total)
+  }
+  // Loads already in flight at the boundary can publish their resource
+  // timing after the first frame. Include them once their size is known.
+  const observer=new PerformanceObserver(list=>add(list.getEntries()))
+  observer.observe({entryTypes:['resource']})
+  add(performance.getEntriesByType('resource'))
 }
 
 // All overview tiles share vertices, material and one draw. Only coarse cells

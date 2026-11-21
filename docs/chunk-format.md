@@ -2,6 +2,8 @@
 
 静态入口 `world/manifest.json`，version = 4。`bbox` 为请求的南、西、北、东 WGS84 度数；`origin` 为纬经度。沿用 `pipeline/common.py`：原点 (25.280, 110.300)，x 东、z 南，y 为绝对高程，米。`extent` 是向外对齐到 256 m 的 `[minX,minZ,width,depth]`；块列表按 z、x 递增，条目含左上角世界坐标 `x,z`、相对 manifest 的 `file`、落盘 `bytes`。
 
+扩区发布包另有 `world/opening.bin`，供浏览器在完整清单到达前显示所选机位。56 字节文件头依次为 ASCII `GLF1`、4 个 float64 的 bbox、4 个 int32 的 extent，以及 1 个 uint32 的采样间距（米），数值均为小端。随后是按 z、x 顺序排列的 int16 分米高程，两端都包含边界样点，余下为烘焙地表 PNG。当前采样间距 64 m。已有扩区 world 可运行 `uv run --locked python pipeline/peak_sectors.py public/world` 补建此文件，再构建前端以生成对应的预加载链接。
+
 `overview.heights` 是小端 int16 分米显示高程（湿点为水面），网格间隔 `overview.step` = 32 m；从西北到东南逐行，每行 `width/32+1` 个值，共 `depth/32+1` 行。`overview.texture` 为整图 PNG，北朝上。两者不在块内。
 
 每块一个 `.glc`，磁盘内容是一个 gzip 流（静态服务不要额外标记 `Content-Encoding: gzip` 来解开内部流）。解压后各段紧邻、没有对齐填充，所有多字节数值小端：
@@ -61,6 +63,6 @@
 
 开放区域优先取 `manifest.builtArea`（GeoJSON Polygon，WGS84 `[lon,lat]`；可有洞），否则取 `manifest.bbox=[south,west,north,east]`。不要用对齐到分块的 `extent` 代替。地图变焦、遮罩、搜索和传送均不改变世界分块范围。
 
-扩区 manifest 可带 `peaks.sectorSize`。浏览器启动读 `peaks-far.bin` 的全域远景，接近后读 `peaks-{x}_{z}.bin`，x/z 是山体中心世界坐标除以 sectorSize 向下取整的索引。每个文件的头部按清单中的程序峰顺序列出两级 LOD，每级两个小端 uint32（索引偏移、顶点偏移），接着是 gzip PK02，偏移相对于解压数据。远景包两级都引用远景顶点。构建与审计可继续读完整的 `peaks.bin`。可选 `overview.packedUnderlay` 为原 underlay 的 gzip 副本，解析后网格相同。
+扩区 manifest 可带 `peaks.sectorSize`。首帧地形显示后，浏览器读 `peaks-far.bin` 的全域远景，接近后读 `peaks-{x}_{z}.bin`，x/z 是山体中心世界坐标除以 sectorSize 向下取整的索引。每个文件的头部按清单中的程序峰顺序列出两级 LOD，每级两个小端 uint32（索引偏移、顶点偏移），接着是 gzip PK02，偏移相对于解压数据。远景包两级都引用远景顶点。构建与审计可继续读完整的 `peaks.bin`。可选 `overview.packedUnderlay` 为原 underlay 的 gzip 副本，解析后网格相同。
 
 `distantBuildings` 为可选 gzip 数据，每条记录 7 个小端 int16（中心 x/z 米、底/顶分米、宽/深米、建筑分类）。每个 256 m 块的 48 m 网格各取体积最大的可见建筑片段；浏览器以同一实例批次绘制近景已加载块之外的体块。

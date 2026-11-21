@@ -187,3 +187,19 @@ Apple M3 Pro，Chromium / SwiftShader，960 × 540，CDP CPU 节流 4×。每次
 原始采样和截图在 `docs/verification/idok-114/`。SG 对照使用发布包 `world-4052da78a7e5`，最新 main 使用 `world-e054456980c8`。
 
 13 个机位全部在 120 s 内就绪，最慢为王城人视（25.455 s）。漓江主画面从 SG 上轮的 61 次 draw calls 降到本轮 41 次，两份基线均为 39 次。王城主画面 47 次，基线 45 次。峰值 JS 堆出现在王城人视，相对本次 rebase 的 main 为 1.217 倍；相对历史 SG 对照为 1.479 倍，超过 1.30。
+
+#### SG 首帧复测
+
+Mac M3 Pro，Chromium / SwiftShader，960 × 540，固定 N 机位，CPU 1×，本地 Vite preview。以 SG 指定的 `11c3ea2` 和 `world-e054456980c8` 作 main 对照。每轮先 main 后 PR，各启动 4 个独立 Chromium 进程，连续交替 3 轮。两边使用同一采集脚本。首帧时刻均在首次场景绘制后的下一次动画回调读取。
+
+| 轮次 | main 首帧 (ms) | PR 首帧 (ms) |
+|---|---|---|
+| 1 | 2985.8 / 3008 / 3002 / 3011.5 | 2868.5 / 2508.1 / 2530.3 / 2576.1 |
+| 2 | 3018.7 / 3008.6 / 3000.7 / 2998.7 | 2880.3 / 2504.2 / 2505.3 / 2505.2 |
+| 3 | 3010.6 / 3073.3 / 3001.6 / 3014.4 | 2874.2 / 2505 / 2552.3 / 2864.1 |
+
+12 次冷启动的中位数从 **3,008.30 ms** 降至 **2,541.30 ms**（**0.845×**，上限 1.10×），均值从 3,011.16 ms 降至 2,639.47 ms（0.877×）。
+
+浏览器 Resource Timing 逐请求统计首帧时刻前已发起的同源 world 请求，按 encodedBodySize 计数，在途响应完成后补计。main 为 1,208,948 B（含 manifest 16,675 B），PR 为 240,818 B（opening.bin）。PR 的完整 manifest 在首帧后请求。阻塞该请求时，N 机位的真实地形、河流和道路已显示；放行后继续加载 2992 块的目录和近景。模拟首帧包缺失时，旧加载路径也成功进入场景，页面字节计数与浏览器记录一致。
+
+复测命令为 `PERF_CAMERA=none PERF_FIRST_RUNS=4 npm run perf`。已有扩区构建可先运行 `uv run --locked python pipeline/peak_sectors.py public/world` 和 `npm run build`。

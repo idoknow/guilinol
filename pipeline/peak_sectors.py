@@ -63,6 +63,20 @@ def write_distant_buildings(output, chunks):
     return dict(file=name,bytes=(output/name).stat().st_size)
 
 
+def write_opening(output, manifest):
+    """Self-contained first terrain LOD: bounds, 64 m relief and baked colour."""
+    import numpy as np
+    view = manifest['overview']
+    left, top, width, depth = manifest['extent']
+    step = view['step']
+    grid = np.fromfile(output/view['heights']['file'], dtype='<i2').reshape(depth//step+1, width//step+1)
+    header = struct.pack('<4s4d4iI', b'GLF1', *manifest['bbox'], left, top, width, depth, 2*step)
+    with (output/'opening.bin').open('wb') as out:
+        out.write(header)
+        out.write(grid[::2, ::2].tobytes())
+        out.write((output/view['texture']['file']).read_bytes())
+
+
 def write_city_lods(output, manifest):
     from PIL import Image
     if len(manifest['chunks'])<=512:
@@ -79,3 +93,14 @@ def write_city_lods(output, manifest):
         reduced = image.convert('RGB').resize((width//16,depth//16), Image.Resampling.BOX).quantize(32)
     reduced.save(texture,optimize=True)
     manifest['overview']['texture']['bytes'] = texture.stat().st_size
+    write_opening(output, manifest)
+
+
+if __name__ == '__main__':
+    import argparse
+    import json
+
+    parser = argparse.ArgumentParser(description='Build only the opening terrain from a finished world.')
+    parser.add_argument('world', type=Path)
+    directory = parser.parse_args().world
+    write_opening(directory, json.loads((directory/'manifest.json').read_bytes()))
