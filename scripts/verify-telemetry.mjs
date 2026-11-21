@@ -69,12 +69,16 @@ try {
     document.querySelector('canvas').dispatchEvent(new Event('webglcontextlost'))
   })
   // Exercise lifecycle delivery between normal 30-second batches.
-  for(let i=0;i<6;i++)await page.evaluate(async()=>{
-    await fetch('/api/me')
-    await new Promise(requestAnimationFrame)
-    window.dispatchEvent(new PageTransitionEvent('pagehide'))
-  })
-  await page.waitForTimeout(500)
+  for(let i=0;i<6;i++){
+    const delivered=page.waitForResponse(r=>r.url()===origin+'/api/t',{timeout:10000})
+    await page.evaluate(async()=>{
+      const response=await fetch('/api/me')
+      await response.arrayBuffer()
+      window.dispatchEvent(new ErrorEvent('error'))
+      window.dispatchEvent(new PageTransitionEvent('pagehide'))
+    })
+    assert.equal((await delivered).status(),204)
+  }
   assert.deepEqual(foreign,[])
   assert.ok(batches.length>=6)
   for(const {body,gzip} of batches){assert.ok(validate(body),JSON.stringify(body.context));assert.ok(gzip<=4096)}
