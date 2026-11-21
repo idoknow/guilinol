@@ -4,20 +4,26 @@
 //   node scripts/spawn-pool.mjs --check    → the four assertions below (no images)
 //   node scripts/spawn-pool.mjs N NE S     → shoot a subset
 //
-// --check runs against vite preview, stubbing /api/me per test so a real sign-in happens without a
-// backend. Assertions:
-//  1. every slot is level — camera right-vector |right.y| < 0.001. This catches a lookAt()/rotation
-//     set before flight() assigns rotation.order='YXZ', which leaves a permanent roll.
-//  2. restore path goes through the real chain (stored view → plain `/` → `.home-resume` click →
-//     consumeRestore → main.ts) and lands within 1 m / 1°.
-//  3. plain 「开始游览」 lands on a spawnPool slot, and two visits in a row differ.
-//  4. `?verify` in a fresh context never writes glol.lastView, even past the 15 s throttle and after
+// ---check runs against vite preview with /api/me stubbed, so a real sign-in happens without a
+// backend. The plain-visit cases read localStorage['glol.lastView'] rather than window.viewer:
+// window.viewer only exists under ?verify (main.ts), and a verify session deliberately never
+// writes the record, so it can never observe a restored camera. persistView writes on the FIRST
+// frame (lastWrite starts at 0, so the 15 s throttle does not apply), and that write is exactly
+// the pose the player got. Assertions:
+//  1. every slot is level — camera right-vector |right.y| < 0.001 under ?verify. Catches a lookAt()
+//     before flight() assigns rotation.order='YXZ', which leaves a permanent roll.
+//  2. restore: stored view → plain `/` → click .home-resume → the record written after the click
+//     matches the stored view within 1 m / 1°.
+//  3. plain 「开始游览」 lands on a spawnPool slot (via the first recorded pose), matches
+//     localStorage['glol.spawn'], and two visits in a row differ.
+//  4. ?verify in a fresh context never writes glol.lastView, even past the throttle and after
 //     visibilitychange→hidden / pagehide.
 import { browserOptions } from './qa-browser.mjs'
 import assert from 'node:assert/strict'
 import { chromium } from 'playwright'
 import { mkdir } from 'node:fs/promises'
 import { preview } from 'vite'
+import { readFile } from 'node:fs/promises'
 
 const check = process.argv.includes('--check')
 const picked = process.argv.slice(2).filter((arg) => arg !== '--check')
@@ -26,6 +32,19 @@ const server = await preview({ root: 'web', configFile: 'web/vite.config.ts', pr
 const origin = `http://127.0.0.1:${server.httpServer.address().port}`
 const out = 'captures/spawn'
 await mkdir(out, { recursive: true })
+
+// Read spawnPool straight from presets.ts so the expectation can never drift from the source.
+const spawnPool = await (async () => {
+  const source = await readFile('web/src/presets.ts', 'utf8')
+  const body = source.slice(source.indexOf('export const spawnPool'))
+  const slots = []
+  for (const match of body.matchAll(/\{id:'([^']+)',\s*eye:\[([^\]]+)\]/g)) {
+    slots.push({ id: match[1], eye: match[2].split(',').map((v) => Number(v.trim())) })
+    if (slots.length && body.indexOf(']', body.indexOf(match[0])) < 0) break
+  }
+  return slots
+})()
+assert(spawnPool.length >= 2, `could not parse spawnPool from presets.ts (got ${spawnPool.length})`)
 
 // Signed-in member without a backend: account.ts only needs /api/me to answer.
 const ACCOUNT = { email: 'walker@example.test', nickname: '漓江访客', notify_email: false }
@@ -47,6 +66,23 @@ const viewFixture = ({ x = 120, y = 380, z = -1400, yaw = -40, pitch = -25, fov 
   }
 }
 
+// Wait for a glol.lastView record written after `since`, then return its view.
+const awaitedView = (page, since) =>
+  page
+    .waitForFunction(
+      (since) => {
+        try {
+          const record = JSON.parse(localStorage.getItem('glol.lastView') || 'null')
+          return !!record && record.t > since
+        } catch {
+          return false
+        }
+      },
+      since,
+      { timeout: 120000 },
+    )
+    .then(() => page.evaluate(() => JSON.parse(localStorage.getItem('glol.lastView')).v))
+
 let browser
 try {
   browser = await chromium.launch(browserOptions())
@@ -54,25 +90,19 @@ try {
   if (check) {
     // --- 1. every slot is level -------------------------------------------------------------
     const levelContext = await browser.newContext({ viewport: { width: 960, height: 540 } })
-    const slotIds = await (async () => {
+    for (const slot of spawnPool) {
       const page = await levelContext.newPage()
-      await page.goto(origin + '/?verify&slot=NE&flow=0')
-      await page.waitForFunction(() => window.viewer?.stats.firstMs > 0)
-      return page.evaluate(() => window.viewer.spawnPool.map((slot) => slot.id))
-    })()
-    for (const id of slotIds) {
-      const page = await levelContext.newPage()
-      await page.goto(`${origin}/?verify&slot=${id}&flow=0`)
+      await page.goto(`${origin}/?verify&slot=${slot.id}&flow=0`)
       await page.waitForFunction(() => window.viewer?.stats.firstMs > 0)
       const rightY = await page.evaluate(() => {
         const { camera } = window.viewer
         camera.updateMatrixWorld()
         return camera.matrixWorld.elements[1] // column 0 (right vector), y component
       })
-      assert(Math.abs(rightY) < 0.001, `slot ${id} is rolled: right.y=${rightY.toFixed(4)}`)
+      assert(Math.abs(rightY) < 0.001, `slot ${slot.id} is rolled: right.y=${rightY.toFixed(4)}`)
       await page.close()
     }
-    console.log(`all ${slotIds.length} slots level (|right.y| < 0.001)`)
+    console.log(`all ${spawnPool.length} slots level (|right.y| < 0.001)`)
     await levelContext.close()
 
     // --- 2. restore through the real path ---------------------------------------------------
@@ -82,17 +112,19 @@ try {
     const fixture = viewFixture()
     await restore.goto(origin + '/')
     await restore.evaluate((view) => {
-      localStorage.setItem('glol.lastView', JSON.stringify({ t: Date.now(), v: view }))
+      localStorage.removeItem('glol.lastView')
+      localStorage.setItem('glol.lastView', JSON.stringify({ t: Date.now() - 60000, v: view }))
     }, fixture)
     await restore.reload()
     await restore.locator('.home-resume:not([hidden])').waitFor({ timeout: 60000 })
-    await restore.locator('.home-resume').click()
-    await restore.waitForFunction(() => window.viewer?.stats.firstMs > 0, null, { timeout: 120000 })
-    const landed = await restore.evaluate(() => {
-      const { camera } = window.viewer
-      const deg = (rad) => (rad * 180) / Math.PI
-      return { x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: deg(camera.rotation.y), pitch: deg(camera.rotation.x) }
+    const before = await restore.evaluate(() => {
+      const record = JSON.parse(localStorage.getItem('glol.lastView') || 'null')
+      return record?.t ?? 0
     })
+    // The click must land on a frame newer than `before` (first-frame write is unthrottled).
+    const clickedAt = Date.now()
+    await restore.locator('.home-resume').click()
+    const landed = await awaitedView(restore, Math.max(before, clickedAt - 1000))
     const distance = Math.hypot(landed.x - fixture.x, landed.y - fixture.y, landed.z - fixture.z)
     const angleOff = Math.max(Math.abs(landed.yaw - fixture.yaw), Math.abs(landed.pitch - fixture.pitch))
     assert(distance < 1, `restore drifted ${distance.toFixed(2)} m`)
@@ -107,21 +139,22 @@ try {
     const landings = []
     for (let visit = 0; visit < 2; visit++) {
       await play.goto(origin + '/')
-      await play.getByRole('button', { name: /开始游览|继续游览/ }).first().click()
-      await play.waitForFunction(() => window.viewer?.stats.firstMs > 0, null, { timeout: 120000 })
-      landings.push(
-        await play.evaluate(() => {
-          const { camera } = window.viewer
-          let best = null
-          for (const slot of window.viewer.spawnPool) {
-            const d = Math.hypot(slot.eye[0] - camera.position.x, slot.eye[1] - camera.position.y, slot.eye[2] - camera.position.z)
-            if (!best || d < best.d) best = { id: slot.id, d }
-          }
-          return best
-        }),
-      )
+      await play.evaluate(() => localStorage.removeItem('glol.lastView'))
+      const since = Date.now() - 1000
+      // The tour card is the <button>; 「开始游览」 is a span inside it, so target the card itself.
+      await play.locator('.home-mode--tour').click()
+      const view = await awaitedView(play, since)
+      const stored = await play.evaluate(() => localStorage.getItem('glol.spawn'))
+      let best = null
+      for (const slot of spawnPool) {
+        const d = Math.hypot(slot.eye[0] - view.x, slot.eye[1] - view.y, slot.eye[2] - view.z)
+        if (!best || d < best.d) best = { id: slot.id, d }
+      }
+      landings.push({ ...best, record: stored })
     }
     assert(landings[0].d < 1 && landings[1].d < 1, `plain play did not land on a pool slot: ${JSON.stringify(landings)}`)
+    assert.equal(landings[0].record, landings[0].id, `glol.spawn (${landings[0].record}) disagrees with the landed slot (${landings[0].id})`)
+    assert.equal(landings[1].record, landings[1].id, `glol.spawn (${landings[1].record}) disagrees with the landed slot (${landings[1].id})`)
     assert.notEqual(landings[0].id, landings[1].id, `two visits landed on the same slot (${landings[0].id})`)
     console.log(`consecutive visits landed on ${landings[0].id} then ${landings[1].id}`)
     await playContext.close()
@@ -146,15 +179,9 @@ try {
     console.log('spawn-pool checks passed')
   } else {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } })
-    const slotIds = await (async () => {
-      const page = await context.newPage()
-      await page.goto(origin + '/?verify&slot=NE&flow=0')
-      await page.waitForFunction(() => window.viewer?.stats.firstMs > 0)
-      return page.evaluate(() => window.viewer.spawnPool.map((slot) => slot.id))
-    })()
-    const ids = picked.length ? picked : slotIds
+    const ids = picked.length ? picked : spawnPool.map((slot) => slot.id)
     for (const id of ids) {
-      if (!slotIds.includes(id)) throw Error(`unknown slot ${id}`)
+      if (!spawnPool.some((slot) => slot.id === id)) throw Error(`unknown slot ${id}`)
       const page = await context.newPage()
       const errors = []
       page.on('pageerror', (e) => errors.push(e.message))
