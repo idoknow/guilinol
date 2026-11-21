@@ -23,7 +23,12 @@ export {
   type PersonalEbikeTuningSpec,
   type ResolvedEbikeProfile,
 } from './tuning'
-import {EBIKE_COMPLIANT_CAP_KMH} from './tuning'
+import vehicles from '../drive/vehicles.json' with {type:'json'}
+import camera from '../drive/camera.json' with {type:'json'}
+
+function dynamics<T extends {maxKmh:number;reverseKmh:number}>(spec:T){
+  return {...spec,maxSpeed:spec.maxKmh/3.6,reverseMax:-spec.reverseKmh/3.6}
+}
 
 export type TwoWheelCrashReason = '' | 'impact' | 'lowside' | 'loopout'
 export type TwoWheelCrashPhase = 'none' | 'sliding' | 'downed' | 'rider_rising' | 'bike_down' | 'picking_up'
@@ -41,65 +46,10 @@ export const walkConfig = {
 }
 
 /** E-bike longitudinal dynamics, speed-scaled lean responsiveness, explicit mandatory fall angle, and real P/lights/cruise tuning. */
-export const bikeConfig = {
-  maxSpeed: EBIKE_COMPLIANT_CAP_KMH / 3.6, reverseMax: -1.9, accel: 4.8, torqueDecay: .56, torquePow: .74,
-  brake: 9.6, revHold: .20, revAccel: 2.5, rollDrag: .21, aeroDrag: .0048,
-  pivotTurn: .98, peakTurn: 1.70, topTurn: 1.14, steerDamp: 10.5,
-  // Normal steering stays comfortably below wet/off-road/braking fatal limits so non-tuck cornering
-  // never false-crashes on a light brake tap or wet patch; deep tuck (Shift) crosses the fatal angle cleanly.
-  leanMax: .43, tuckLeanMax: .68, leanDamp: 6.2,
-  leanRateMin: 2.3, leanRateMax: 11.4, leanRecoverRate: 8.6, leanTargetMinRad: .14,
-  pitchMax: .22, pitchDamp: 8.5,
-  mountDuration: .22, dismountDuration: .16,
-  stickDeadFwd: .1, stickDeadTurn: .12, slideDamp: 1.9,
-  uphillDrag: 5.5, uphillCapScale: 1.1, offRoadCap: 4.2, step: .42, maxSlope: Math.PI / 4,
-  crash: {
-    // Explicit physical mandatory fall angle (~31 deg dry) replacing unpredictable jerk timers.
-    mandatoryFallLeanRad: .54,
-    wetGripPenaltyRad: .08,
-    offRoadGripPenaltyRad: .07,
-    brakeInLeanPenaltyRad: .06,
-    minEffectiveFallRad: .36,
-    wheelieTargetRad: .56,
-    wheelieRaiseRate: 3.4,
-    wheelieFallRate: 6.4,
-    wheelieCrashRad: .68,
-    wheelieMinSpeedMs: 1.2,
-    impactCrashMs: 4.0,
-    angledImpactCrashMs: 2.8,
-    angledImpactLeanRad: .24,
-    offRoadShockMs: 9.8,
-  },
-}
+export const bikeConfig = dynamics(vehicles.ebike)
 
 /** Pedal bicycle dynamics: 3 tactile gears, calm low-speed control, speed-coupled lean rate, and clear fall angle (~27.5 deg). */
-export const bicycleConfig: typeof bikeConfig = {
-  maxSpeed: 21 / 3.6, reverseMax: -1.4, accel: 2.9, torqueDecay: .48, torquePow: .82,
-  brake: 8.0, revHold: .20, revAccel: 2.0, rollDrag: .17, aeroDrag: .0056,
-  pivotTurn: 1.05, peakTurn: 1.80, topTurn: 1.20, steerDamp: 11.0,
-  leanMax: .40, tuckLeanMax: .60, leanDamp: 6.6,
-  leanRateMin: 2.6, leanRateMax: 12.4, leanRecoverRate: 9.0, leanTargetMinRad: .13,
-  pitchMax: .20, pitchDamp: 8.5,
-  mountDuration: .22, dismountDuration: .16,
-  stickDeadFwd: .1, stickDeadTurn: .12, slideDamp: 1.85,
-  uphillDrag: 21.0, uphillCapScale: 4.5, offRoadCap: 3.6, step: .42, maxSlope: Math.PI / 4,
-  crash: {
-    mandatoryFallLeanRad: .48,
-    wetGripPenaltyRad: .07,
-    offRoadGripPenaltyRad: .06,
-    brakeInLeanPenaltyRad: .05,
-    minEffectiveFallRad: .32,
-    wheelieTargetRad: .50,
-    wheelieRaiseRate: 3.6,
-    wheelieFallRate: 6.8,
-    wheelieCrashRad: .62,
-    wheelieMinSpeedMs: 1.0,
-    impactCrashMs: 3.6,
-    angledImpactCrashMs: 2.4,
-    angledImpactLeanRad: .22,
-    offRoadShockMs: 7.4,
-  },
-}
+export const bicycleConfig = dynamics(vehicles.bike)
 
 /** Real electric two-wheeler feature constants: P-gear lockouts, blinker auto-cancel, hazard blink cadence, cruise control. */
 export const ebikeRealFeaturesConfig = {
@@ -149,18 +99,4 @@ export const carDriveModes: Record<CarDriveMode, CarDriveModeSpec> = {
 export const CAR_DRIVE_MODE_ORDER: readonly CarDriveMode[] = ['cruise', 'street', 'sport']
 
 /** GTA-grade passenger car dynamics (5-speed auto, 3 drive modes 40/75/108 km/h, 2D tire slip & handbrake drift, weight transfer, momentum rebound). */
-export const carConfig = {
-  maxSpeed:40/3.6, reverseMax:-14/3.6, accel:5.6, torqueDecay:.52, torquePow:.72,
-  brake:13.2, revHold:.24, revAccel:4.2, rollDrag:.34, aeroDrag:.0048,
-  wheelbase:2.65, halfWidth:.91, halfLength:2.24,
-  maxSteerAngle:.50, speedSteer:1.75, steerDamp:9.5,
-  frontGrip:11.8, rearGrip:10.6, handbrakeRearGrip:2.1, handbrakeDrag:5.0,
-  driftYawBoost:1.45, driftCounterAssist:2.4, yawDamp:9.5,
-  bodyRollMax:.105, rollDamp:7.5, pitchMax:.22, pitchDamp:9, dynPitchMax:.072,
-  reboundRestitution:.24, reboundMinSpeed:4.0, reboundDuration:.22,
-  maxSlope:.32, slideDamp:2.2,
-  mountDuration:.28, dismountDuration:.20, cameraArmOffset:4.2, speedCameraPull:1.75,
-  stickDeadFwd:.1, stickDeadTurn:.12, strictMotorway:true,
-  gearUpshiftKmh:[18, 36, 56, 80] as readonly number[],
-  gearTorque:[1.30, 1.14, 1.00, .90, .82] as readonly number[],
-}
+export const carConfig = {...dynamics(vehicles.sedan),maxSteerAngle:vehicles.sedan.steerRad,cameraArmOffset:camera.distance-walkConfig.near,speedCameraPull:camera.pullbackAtMaxSpeed}

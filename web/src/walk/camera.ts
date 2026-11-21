@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import {look} from '../look/config'
 import {walkConfig as cfg} from './config'
 import type {createPhysics} from './physics'
+import driveCamera from '../drive/camera.json' with {type:'json'}
 
 type Physics = Awaited<ReturnType<typeof createPhysics>>
 const identity = {x:0,y:0,z:0,w:1}
@@ -30,9 +31,12 @@ export function createCameraRig(sim:Physics) {
     return safe
   }
 
-  function update(camera:THREE.PerspectiveCamera, figurePos:THREE.Vector3, yaw:number, pitch:number, desiredDist:number, dt:number, snap=false) {
+  let priorFov:number|undefined
+  function update(camera:THREE.PerspectiveCamera, figurePos:THREE.Vector3, yaw:number, pitch:number, desiredDist:number, dt:number, snap=false,driving=false) {
+    if(driving && priorFov===undefined){priorFov=camera.fov;camera.fov=driveCamera.fov;camera.updateProjectionMatrix()}
+    else if(!driving && priorFov!==undefined){camera.fov=priorFov;priorFov=undefined;camera.updateProjectionMatrix()}
     const footY = figurePos.y
-    let focusY = footY+1.4
+    let focusY = footY+(driving?driveCamera.height:1.4)
     const hasStartDeck = sim.hasDeck(figurePos.x,figurePos.z)
     const headCeil = hasStartDeck?ceilingAt(figurePos.x,figurePos.z,footY):Infinity
     if(Number.isFinite(headCeil)) focusY = Math.max(footY+.85,Math.min(focusY,headCeil-.04))

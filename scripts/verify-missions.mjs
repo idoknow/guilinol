@@ -172,6 +172,10 @@ try {
   )
 
   // 3. Accept errand-01 from board UI, verify 3D beacon & complete both steps -> ¥380
+  const atGiver = await page.evaluate(() => window.viewer.game.getState())
+  assert.equal(atGiver.mode, 'foot')
+  assert.equal(atGiver.zone.quiet, false)
+  assert.equal(atGiver.zone.carFree, true)
   await page.click('dialog.mission-board button[data-start="errand-01"]')
   await page.waitForFunction(() => {
     const s = window.viewer.game.getState()
@@ -191,10 +195,12 @@ try {
   await page.waitForFunction(() => window.viewer.game.getState().mission === null, null, {timeout: 15000})
 
   const afterErrand = await page.evaluate(() => ({
+    mode: window.viewer.game.getState().mode,
     money: window.viewer.game.getState().money,
     missionsDone: window.viewer.game.getState().missionsDone,
     beacon: window.viewer.game.missions.beaconVisible(),
   }))
+  assert.equal(afterErrand.mode, 'foot')
   assert.equal(afterErrand.money, 380)
   assert.ok(afterErrand.missionsDone.includes('errand-01'))
   assert.equal(afterErrand.beacon, false, 'beacon must hide after mission completion')

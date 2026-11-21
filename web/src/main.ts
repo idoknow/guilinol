@@ -39,7 +39,10 @@ installAtmosphere()
 // The title screen (ui/home.ts) pauses the scene while it covers it: no simulation, no draws.
 let paused=false
 export function setPaused(on:boolean){paused=on}
+import {mountDevHud} from './ui/hud-dev'
+
 async function start() {
+  mountDevHud()
   initGame()
   const params = new URLSearchParams(location.search)
   const rangeStore = new RenderRangeStore(loadRenderConfig(params))

@@ -1,5 +1,7 @@
 import * as T from 'three'
 import type {Stream} from '../stream'
+import type {ParkedBike} from '../batch'
+import {vehicleForbiddenAt} from '../game/car-free'
 import {fetchAsset} from '../world'
 import {createFreeBoats, type MooringSlot} from './boat'
 import type {createPhysics} from './physics'
@@ -268,6 +270,8 @@ export async function vehicles(
   let route = -1
   let nearBike: T.Mesh | null = null
   let nearBikeDist = Infinity
+  let nearDecor: ParkedBike | null = null
+  let decorDistance = Infinity
   let nearDownedBike: T.Mesh | null = null
   let nearDownedDist = Infinity
   let nearRoute = -1
@@ -468,7 +472,11 @@ export async function vehicles(
       const isEbike = bikeCtrl.kind === 'bike'
       saveBikeInstanceState(bike, {parkLocked: isEbike, kickstandDown: true})
       bike.rotation.set(bikeCtrl.pitch, bikeCtrl.heading, isEbike ? KICKSTAND_REST_ROLL_RAD : 0, 'YXZ')
-      attachMeshToCell(bike)
+      if (bike.userData.decorId) {
+        env?.stream.batches.returnBike(bike.userData.decorId)
+        detachMeshFromCells(bike)
+        lastBike = null
+      } else attachMeshToCell(bike)
     }
     car = null
     bike = null
@@ -551,7 +559,7 @@ export async function vehicles(
       !forceBoard && board
         ? board(targetMesh.position.x, targetMesh.position.y, targetMesh.position.z)
         : {x: targetMesh.position.x, y: targetMesh.position.y, z: targetMesh.position.z, bikeY: targetMesh.position.y}
-    if (!safePos) return false
+    if (!safePos || vehicleForbiddenAt(safePos.x,safePos.z)) return false
     targetMesh.position.set(safePos.x, safePos.bikeY, safePos.z)
     const rideKind: RideKind = targetMesh.name === 'bicycle' ? 'bicycle' : 'bike'
     const saved = bikeStates.get(targetMesh) ?? bikeCoordStates.get(prevKey)
@@ -610,11 +618,21 @@ export async function vehicles(
         ? board(target.position.x, target.position.y, target.position.z)
         : {x: target.position.x, y: target.position.y, z: target.position.z, bikeY: target.position.y}
       if (!safePos) return
+    } else if (nearDecor && env) {
+      const candidate = nearDecor
+      if (!env.stream.batches.takeBike(candidate.id)) return
+      const mesh = makeVehicleMesh('bike',1)
+      mesh.position.set(candidate.x,candidate.y,candidate.z)
+      mesh.rotation.y = candidate.yaw
+      mesh.userData.decorId = candidate.id
+      mesh.userData.paint = 1
+      if (!mountBikeMesh(mesh)) env.stream.batches.returnBike(candidate.id)
+      nearDecor = null
     } else if (nearBike?.name === 'car') {
       const safePos = board
         ? board(nearBike.position.x, nearBike.position.y, nearBike.position.z, 'car')
         : {x: nearBike.position.x, y: nearBike.position.y, z: nearBike.position.z, bikeY: nearBike.position.y}
-      if (!safePos) return
+      if (!safePos || vehicleForbiddenAt(safePos.x,safePos.z)) return
       nearBike.position.set(safePos.x, safePos.bikeY, safePos.z)
       car = lastCar = nearBike
       group.add(car)
@@ -666,7 +684,7 @@ export async function vehicles(
       aboardKind,
       tourDisembarkQueued: disembark,
       nearDownedVehicle: toVehicleSnap(nearDownedBike, nearDownedDist),
-      nearVehicle: toVehicleSnap(nearBike, nearBikeDist),
+      nearVehicle: nearDecor ? {kind:'bike',downed:false,distance:decorDistance,ownership:'shared'} : toVehicleSnap(nearBike, nearBikeDist),
       nearBoat,
     }
   }
@@ -723,6 +741,8 @@ export async function vehicles(
         visibleCells.delete(cell)
       }
     }
+    nearDecor = active && !car && !bike && route < 0 && !freeBoats?.active ? env?.stream.batches.nearestBike(x,z,footY,Math.min(bestScore,4.2)) ?? null : null
+    if (nearDecor) decorDistance = Math.hypot(nearDecor.x-x,nearDecor.z-z)
     let nearestDock = 9
     data.routes.forEach((leg, index) => {
       const [dx, , dz] = data.docks[leg.start]
