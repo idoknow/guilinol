@@ -4,6 +4,7 @@ import type {Stream} from '../stream'
 import {walkConfig as cfg} from './config'
 import type {createPhysics} from './physics'
 import {vehicleModel} from './vehicle-model'
+import {clearAvatarPose, getAvatarJoints} from './avatar-rig'
 
 type Physics = Awaited<ReturnType<typeof createPhysics>>
 type Position = [number, number, number]
@@ -946,6 +947,7 @@ export function createFreeBoats(env: BoatEnv) {
     const inRight = deadzone(THREE.MathUtils.clamp(right, -1, 1), 0.10)
     const effort = Math.min(1, Math.hypot(inFwd, inRight))
 
+    const joints = getAvatarJoints(figure)
     if (slot.kind === 'rowboat') {
       if (effort > 0.05) strokePhase += Math.min(0.12, dt) * 4.4
       const leftDrive = THREE.MathUtils.clamp(inFwd + inRight * 0.8, -1, 1)
@@ -953,38 +955,33 @@ export function createFreeBoats(env: BoatEnv) {
       const swing = Math.sin(strokePhase), bend = Math.cos(strokePhase)
       for (const side of ['L', 'R'] as const) {
         const drive = side === 'L' ? leftDrive : rightDrive
-        const thigh = figure.getObjectByName('Thigh' + side)
-        const shin = figure.getObjectByName('Shin' + side)
-        const arm = figure.getObjectByName('Arm' + side)
-        const forearm = figure.getObjectByName('Forearm' + side)
+        const thigh = joints[`Thigh${side}`]
+        const shin = joints[`Shin${side}`]
+        const arm = joints[`Arm${side}`]
+        const forearm = joints[`Forearm${side}`]
         if (thigh) thigh.rotation.x = 1.45
         if (shin) shin.rotation.x = -0.35
         if (arm) arm.rotation.x = 0.72 + swing * 0.38 * drive
         if (forearm) forearm.rotation.x = 0.35 + bend * 0.22 * Math.abs(drive)
       }
-      const torso = figure.getObjectByName('Torso')
-      if (torso) torso.rotation.x = 0.06 + Math.max(0, swing) * 0.08 * effort
+      if (joints.Torso) joints.Torso.rotation.x = 0.06 + Math.max(0, swing) * 0.08 * effort
     } else {
       for (const side of ['L', 'R'] as const) {
-        const thigh = figure.getObjectByName('Thigh' + side)
-        const shin = figure.getObjectByName('Shin' + side)
-        const arm = figure.getObjectByName('Arm' + side)
-        const forearm = figure.getObjectByName('Forearm' + side)
+        const thigh = joints[`Thigh${side}`]
+        const shin = joints[`Shin${side}`]
+        const arm = joints[`Arm${side}`]
+        const forearm = joints[`Forearm${side}`]
         if (thigh) thigh.rotation.x = 1.25
         if (shin) shin.rotation.x = -1.40
         if (arm) arm.rotation.x = 0.90
         if (forearm) forearm.rotation.x = 0.35
       }
-      const torso = figure.getObjectByName('Torso')
-      if (torso) torso.rotation.x = 0
+      if (joints.Torso) joints.Torso.rotation.x = 0
     }
   }
 
   function clearPoseJoints(figure: THREE.Group) {
-    for (const name of JOINT_RESET_NAMES) {
-      const joint = figure.getObjectByName(name)
-      if (joint) joint.rotation.set(0, 0, 0)
-    }
+    clearAvatarPose(figure)
   }
 
   function clearance(figure: THREE.Group, skinned?: THREE.SkinnedMesh) {

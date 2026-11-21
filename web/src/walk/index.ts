@@ -1359,7 +1359,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const foot=pos.y-cfg.height/2
       const surfLm=!wasCar&&sim.surface(pos.x,pos.z,'landmark',foot+.25,.7)
       const flushRoad=!wasCar&&!surfLm&&sim.surface(pos.x,pos.z,'road',foot+.25,.45)
-      const onLandmark=!wasCar&&(!!surfLm||(wasLandmarkHit&&(!flushRoad||Math.abs(flushRoad.y-foot)>.28)))
+      const overheadRoad=!wasCar&&!surfLm&&!flushRoad&&sim.surface(pos.x,pos.z,'road',foot+2.2,1.4)
+      const onLandmark=!wasCar&&(!!surfLm||(wasLandmarkHit&&(!flushRoad||Math.abs(flushRoad.y-foot)>.28))||(!!overheadRoad&&overheadRoad.y>foot+.8))
       sim.controller.computeColliderMovement(sim.capsule,{x:stepDx,y:velocity*step,z:stepDz},undefined,undefined,onLandmark?coll=>sim.kinds.get(coll.handle)!=='road':undefined)
       const move=sim.controller.computedMovement(),next={x:pos.x+move.x,y:pos.y+move.y,z:pos.z+move.z}
       if(bridge&&!stream.landmarks.has(bridge)){
