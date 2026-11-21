@@ -19,6 +19,10 @@ serve({port:Number(process.env.PORT || 3000),fetch: async request => {
   const start=performance.now()
   let status=500
   try {
+    if(url.pathname==='/api/health'){
+      status=request.method==='GET'?200:405
+      return Response.json({ok:status===200},{status,headers:{'Cache-Control':'no-store'}})
+    }
     const response=url.pathname==='/api/t'?await receive(request,connections,origin):await onRequest({env,request:new Request(origin+url.pathname+url.search,request)})
     status=response.status
     return response

@@ -1,18 +1,19 @@
 import {randomUUID, createHmac, randomBytes} from 'node:crypto'
 import {isIP} from 'node:net'
 
-const numeric = 'cores memory width height dpr rtt downlink ms dns tcp tls ttfb dcl load count bytes cache p50 p95 fps frameP95 longFrames calls triangles geometries textures chunks heap'.split(' ')
-const labels = {cfCache:/^(|HIT|MISS|BYPASS|EXPIRED|STALE|UPDATING|REVALIDATED|DYNAMIC)$/,device:/^(desktop|mobile)$/,os:/^(Android|iPhone|iPad|Windows|Mac OS X|Linux|other)$/i,browser:/^(Edg|Firefox|Chrome|Safari|other)$/,
+const numeric = 'cores memory width height dpr rtt downlink ms dns tcp tls ttfb dcl load count bytes cache p50 p95 fps frameP95 longFrames calls triangles geometries textures chunks heap total status'.split(' ')
+const labels = {source:/^probe$/,node:/^(cn-gz-tencent-02|cn-sh-tencent-01)$/,target:/^(home|manifest|chunk[1-5]|health)$/,cfCache:/^(|HIT|MISS|BYPASS|EXPIRED|STALE|UPDATING|REVALIDATED|DYNAMIC)$/,device:/^(desktop|mobile)$/,os:/^(Android|iPhone|iPad|Windows|Mac OS X|Linux|other)$/i,browser:/^(Edg|Firefox|Chrome|Safari|other)$/,
   mode:/^(menu|walk|fly|map|drive)$/,grid:/^(|-?\d{1,6},-?\d{1,6})$/,category:/^(manifest|landmark|chunk|basis|other)$/,
   api:/^(feedback|login|other)$/,effectiveType:/^(slow-2g|2g|3g|4g)$/,quality:/^default$/,build:/^[a-f0-9]{40}$/,world:/^[a-f0-9]{64}$/,
-  gpu:/^[\p{L}\p{N} (),.:_+/@\[\]-]{1,160}$/u,kind:/^(firstFrame|playable|navigation|window|chunk|teleport|switch|mapOpen|resource|api|contextLost|error)$/}
-const contextKeys = new Set('device os browser cores memory width height dpr effectiveType rtt downlink quality build world gpu'.split(' '))
+  gpu:/^[\p{L}\p{N} (),.:_+/@\[\]-]{1,160}$/u,kind:/^(firstFrame|playable|navigation|window|chunk|teleport|switch|mapOpen|resource|api|contextLost|error|probe)$/}
+const contextKeys = new Set('source node device os browser cores memory width height dpr effectiveType rtt downlink quality build world gpu'.split(' '))
 function valid(fields,context) {
   return fields && typeof fields==='object' && !Array.isArray(fields) && Object.entries(fields).every(([k,v])=>
     contextKeys.has(k)===context && (numeric.includes(k)?Number.isFinite(v)&&v>=0&&v<=1e15:
       Object.hasOwn(labels,k)&&typeof v==='string'&&labels[k].test(v)))
 }
 const eventFields = {
+  probe:['target','dns','tcp','tls','ttfb','total','status'],
   navigation:['dns','tcp','tls','ttfb','dcl','load'],resource:['category','count','bytes','cache','p50','p95','cfCache'],
   window:['fps','frameP95','longFrames','calls','triangles','geometries','textures','chunks','heap'],
   api:['ms','api'],error:['count'],contextLost:['count']
@@ -25,8 +26,14 @@ function validRow(row) {
     && (row.cache===undefined || row.cache<=1)
 }
 export function validate({sid,context,rows}) {
+  const probe=context?.source==='probe'
   return typeof sid==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(sid)
-    &&valid(context,true)&&Array.isArray(rows)&&rows.length>0&&rows.length<=100&&rows.every(validRow)
+    &&valid(context,true)&&Array.isArray(rows)&&rows.length>0&&rows.length<=100&&rows.every(row=>{
+      if(!validRow(row))return false
+      if(!probe)return !context.node && row.kind!=='probe'
+      return row.kind==='probe' && !!context.node && eventFields.probe.every(key=>Object.hasOwn(row,key))
+        && Number.isInteger(row.status) && (row.status===0 || row.status>=100 && row.status<600)
+    })
 }
 const salt=randomBytes(32), limits=new Map()
 let expires=0
@@ -66,6 +73,7 @@ const metrics={fps:['window','fps'],frameP95:['window','frameP95'],chunk:['chunk
 for(const k of ['dns','tcp','tls','ttfb','dcl','load'])metrics[k]=['navigation',k]
 for(const k of ['calls','triangles','geometries','textures','heap','chunks','longFrames'])metrics[k]=['window',k]
 for(const k of ['p50','p95','cache','bytes','count'])metrics['resource.'+k]=['resource',k]
+for(const k of ['dns','tcp','tls','ttfb','total'])metrics['probe.'+k]=['probe',k]
 for(const k of ['login','feedback','other'])metrics['api.'+k]=['api','ms',k]
 for(const k of ['error','contextLost'])metrics[k]=[k,'count']
 export async function queryPerf(pool,path,params) {
@@ -84,13 +92,15 @@ export async function queryPerf(pool,path,params) {
       FROM perf_event WHERE received >= $1 AND received < $2 AND grid IS NOT NULL AND ($3::text IS NULL OR world=$3) GROUP BY grid ORDER BY grid`
   }else{
     const group=params.get('group')??'device',metric=params.get('metric')??'fps'
-    if(!['region','isp','device','gpu','build','world','mode'].includes(group)||!Object.hasOwn(metrics,metric))return invalid()
+    const dimensions={region:'region',isp:'isp',device:'device',gpu:'gpu',build:'build',world:'world',mode:'mode'}
+    if(metric.startsWith('probe.'))Object.assign(dimensions,{node:"context->>'node'",target:"fields->>'target'"})
+    if(!Object.hasOwn(dimensions,group)||!Object.hasOwn(metrics,metric))return invalid()
     const [kind,key,api]=metrics[metric]
     args.push(kind,key,api??null)
-    sql=`SELECT coalesce(${group},'unknown') AS label,count(v) AS samples,
+    sql=`SELECT coalesce(dimension,'unknown') AS label,count(v) AS samples,
       percentile_cont(.5) within group(order by v) AS p50,percentile_cont(.75) within group(order by v) AS p75,
       percentile_cont(.95) within group(order by v) AS p95 FROM (
-      SELECT ${group},(fields->>$4)::float AS v FROM perf_event WHERE received >= $1 AND received < $2 AND kind=$3 AND ($5::text IS NULL OR fields->>'api'=$5)
+      SELECT ${dimensions[group]} AS dimension,(fields->>$4)::float AS v FROM perf_event WHERE received >= $1 AND received < $2 AND kind=$3 AND ($5::text IS NULL OR fields->>'api'=$5)
       ) s WHERE v IS NOT NULL GROUP BY 1 ORDER BY 1`
   }
   return Response.json({items:(await pool.query(sql,args)).rows},{headers:{'Cache-Control':'private, no-store'}})
