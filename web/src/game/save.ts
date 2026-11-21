@@ -714,6 +714,27 @@ export function loadLocalSave(storageOverride?: StorageLike | null, nowMs = Date
   }
 }
 
+export function reloadSaveFromStorage(storageOverride?: StorageLike | null): LocalSaveV1 {
+  return loadLocalSave(storageOverride).save
+}
+
+export function resetSaveForTesting(money = DEFAULT_START_MONEY, storageOverride?: StorageLike | null): LocalSaveV1 {
+  const safeMoney = Math.max(0, Math.min(MAX_SAFE_MONEY, Math.trunc(Number.isFinite(money) ? money : DEFAULT_START_MONEY)))
+  const fresh = createDefaultSave()
+  fresh.money = safeMoney
+  fresh.saveMeta.migratedLegacyStamps = true
+  persistSaveSync(fresh, storageOverride)
+  _commitPersistedSlice({
+    money: activeSave.money,
+    wardrobe: activeSave.wardrobe,
+    garage: {activeVehicleId: activeSave.garage.activeVehicleId, vehicles: activeSave.garage.vehicles},
+    spotsFound: activeSave.spotsFound,
+    missionsDone: activeSave.missionsDone,
+    bumpWalletSeq: true,
+  })
+  return cloneSave(activeSave)
+}
+
 /**
  * Validates payload size (<= 64 KiB) and integer money constraints for `PUT /api/save`.
  */

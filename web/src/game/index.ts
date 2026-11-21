@@ -8,10 +8,11 @@ import * as commerce from './commerce'
 import * as quietZones from './quiet-zones'
 import * as save from './save'
 import * as shops from './shops'
-import {emit, getState, onEvent, onState} from './state'
+import {emit, getState, onEvent, onState, setActiveShop} from './state'
 
 export * from './catalog'
 export * from './commerce'
+export * from './missions'
 export * from './quiet-zones'
 export * from './save'
 export * from './shops'
@@ -31,7 +32,7 @@ export function initGame(): save.LoadSaveResult {
   return save.loadLocalSave()
 }
 
-export function createGameDebugProbe() {
+export function createGameDebugProbe(extra?: {missions?: Record<string, unknown>}) {
   return Object.freeze({
     getState,
     onState,
@@ -48,10 +49,23 @@ export function createGameDebugProbe() {
       selectActivePersonalVehicle: commerce.selectActivePersonalVehicle,
       updatePersonalVehicleTelemetry: commerce.updatePersonalVehicleTelemetry,
       recordSpotFound: commerce.recordSpotFound,
+      SPOT_BOUNTY_YUAN: commerce.SPOT_BOUNTY_YUAN,
+      SHARED_EBIKE_FEE_YUAN: commerce.SHARED_EBIKE_FEE_YUAN,
+      SHARED_EBIKE_FREE_SECONDS: commerce.SHARED_EBIKE_FREE_SECONDS,
+      hasClaimedSpotBounty: commerce.hasClaimedSpotBounty,
+      hasClaimedMissionFirstClear: commerce.hasClaimedMissionFirstClear,
+      claimSpotBounty: commerce.claimSpotBounty,
+      computeMissionPayout: commerce.computeMissionPayout,
+      settleMissionReward: commerce.settleMissionReward,
+      chargeSharedRideFee: commerce.chargeSharedRideFee,
+      getActiveDeliverySoupSpillMultiplier: commerce.getActiveDeliverySoupSpillMultiplier,
     }),
     save: Object.freeze({
       getSnapshot: save.getActiveSaveSnapshot,
       loadLocalSave: save.loadLocalSave,
+      reload: save.reloadSaveFromStorage,
+      reset: save.resetSaveForTesting,
+      setActiveShop,
       flushThrottledSave: save.flushThrottledSave,
       mergeCloudAndLocalSave: save.mergeCloudAndLocalSave,
       validateCloudPayload: save.validateCloudPayload,
@@ -76,6 +90,13 @@ export function createGameDebugProbe() {
       zones: quietZones.QUIET_ZONES,
       isPointInQuietZone: quietZones.isPointInQuietZone,
       getQuietZoneAt: quietZones.getQuietZoneAt,
+      findQuietZoneAt: quietZones.findQuietZoneAt,
+      isPointInQuietZones: quietZones.isPointInQuietZones,
     }),
+    quiet: Object.freeze({
+      findQuietZoneAt: quietZones.findQuietZoneAt,
+      isPointInQuietZones: quietZones.isPointInQuietZones,
+    }),
+    ...(extra?.missions ? {missions: Object.freeze({...extra.missions})} : {}),
   })
 }

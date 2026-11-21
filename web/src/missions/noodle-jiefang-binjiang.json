@@ -1,0 +1,39 @@
+{
+  "id": "noodle-01",
+  "line": "noodle",
+  "title": "米粉外卖 · 解放东→滨江码头",
+  "summary": "解放东路粉店取汤粉限时送往解放桥滨江码头，沿主路避开漓滨校区安静区，急刹与摔车会洒汤。",
+  "recommendedVehicle": "ebike",
+  "giver": [-511, -70],
+  "steps": [
+    {
+      "kind": "pickup",
+      "at": [-511, -70],
+      "radius": 9,
+      "timer": 60,
+      "text": "在解放东路粉店取两碗热卤汤粉",
+      "npc": {
+        "who": "粉店阿姨",
+        "text": "“汤满的！走解放东路去滨江码头，急刹车或摔车会洒汤，别拐进南边学校！”"
+      }
+    },
+    {
+      "kind": "deliver",
+      "at": [-156, 156],
+      "radius": 12,
+      "timer": 140,
+      "text": "稳稳送到 解放桥滨江码头",
+      "npc": {
+        "who": "码头船工",
+        "text": "“这碗二两卤粉热气腾腾的，赏金立刻给你算上！”"
+      }
+    }
+  ],
+  "reward": 240,
+  "fullSoupBonus": 60,
+  "repeatReward": 140,
+  "repeatFullSoupBonus": 40,
+  "minReward": 120,
+  "repeatMinReward": 70,
+  "failOn": ["timeout", "spill"]
+}

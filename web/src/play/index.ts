@@ -5,7 +5,8 @@ import type {Host} from './host'
 import {photoMode} from './photo'
 import {mapView} from './map'
 import {isGlobalHotkeyBlocked, shouldPhotoYieldKeyPFromDom} from '../walk/input-guard'
-import {recordSpotFound} from '../game/commerce'
+import {SPOT_BOUNTY_YUAN, claimSpotBounty, hasClaimedSpotBounty, recordSpotFound} from '../game/commerce'
+import {getState, onState} from '../game/state'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
 const ease = (t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2
@@ -23,6 +24,7 @@ function sealTexture(text:string, done:boolean) {
 
 export function play(host:Host) {
   const stamps = new Set<string>(JSON.parse(localStorage.getItem(KEY)??'[]'))
+  for(const foundId of getState().spotsFound) stamps.add(foundId)
   const save = ()=>localStorage.setItem(KEY,JSON.stringify([...stamps]))
   host.camera.layers.enable(MARK_LAYER)
 
@@ -87,9 +89,17 @@ export function play(host:Host) {
         host.walker()?.face(yaw,.14)}})
   }
   // Stamp + card. Walking into the ring does it; so does travelling there (the spawn search may land a few metres off).
+  function awardSpot(spot:Spot) {
+    const bounty = claimSpotBounty(spot.id)
+    if(bounty.ok && bounty.code==='OK' && bounty.credited>0) {
+      window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:`首次打卡「${spot.name}」+¥${bounty.credited}`,ms:2600}}))
+    }
+    return bounty
+  }
   function arrive(m:typeof marks[number]) {
     m.armed = false; const fresh = !stamps.has(m.spot.id)
     if(fresh){stamps.add(m.spot.id); save(); recordSpotFound(m.spot.id); restamp(m.spot.id); refreshCount()}
+    awardSpot(m.spot)
     showCard(m.spot,fresh)
   }
 
@@ -170,20 +180,45 @@ export function play(host:Host) {
   const sheet = document.createElement('section'); sheet.className = 'book'; sheet.hidden = true; document.body.append(sheet)
   function openBook() {
     closeCard()
-    sheet.innerHTML = `<header><h2>景册</h2><p>已盖 <b>${stamps.size}</b> / ${spots.length} 枚印 · 走到地上的朱红圆圈处即可盖印</p><button class="card-close" aria-label="关闭">×</button></header>
-      <ol>${spots.map(s=>`<li class="${stamps.has(s.id)?'done':''}"><div class="card-seal${stamps.has(s.id)?' done':''}">${s.seal}</div>
-        <div><h3>${s.name}</h3><p>${s.sub}</p></div><button data-id="${s.id}">前往</button></li>`).join('')}</ol>
+    sheet.innerHTML = `<header><h2>景册</h2><p>已盖 <b>${stamps.size}</b> / ${spots.length} 枚印 · 走到地上的朱红圆圈处即可盖印（首打卡/拍照 +¥${SPOT_BOUNTY_YUAN}）</p><button class="card-close" aria-label="关闭">×</button></header>
+      <ol>${spots.map(s=>{
+        const stamped = stamps.has(s.id)
+        const claimed = hasClaimedSpotBounty(s.id)
+        const claimBtn = stamped && !claimed ? `<button data-claim="${s.id}">领¥${SPOT_BOUNTY_YUAN}</button>` : ''
+        const badge = claimed ? ` · 已领¥${SPOT_BOUNTY_YUAN}` : stamped ? ' · 待领赏金' : ` · +¥${SPOT_BOUNTY_YUAN}`
+        return `<li class="${stamped?'done':''}"><div class="card-seal${stamped?' done':''}">${s.seal}</div>
+        <div><h3>${s.name}</h3><p>${s.sub}${badge}</p></div>${claimBtn}<button data-id="${s.id}">前往</button></li>`
+      }).join('')}</ol>
       <div class="book-docks"><span>水边开船直达</span><div>${waterDocks.map(d=>`<button data-dock="${d.id}">${d.name} · ${d.badge}</button>`).join('')}</div></div>`
     sheet.hidden = false; requestAnimationFrame(()=>sheet.classList.add('show'))
     sheet.querySelector<HTMLButtonElement>('.card-close')!.onclick = closeBook
+    for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-claim]'))) b.onclick = ()=>{
+      const sp = spots.find(s=>s.id===b.dataset.claim)
+      if(sp){awardSpot(sp); openBook()}
+    }
     for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-id]'))) b.onclick = ()=>void goTo(spots.find(s=>s.id===b.dataset.id)!)
     for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-dock]'))) b.onclick = ()=>void goDock(waterDocks.find(d=>d.id===b.dataset.dock)!)
   }
   function closeBook(){sheet.classList.remove('show'); setTimeout(()=>{if(!sheet.classList.contains('show')) sheet.hidden = true},260)}
   function closeAll(){closeCard(); closeBook()}
   book.onclick = ()=>sheet.hidden?openBook():closeBook()
+  onState(s=>{
+    let changed = false
+    for(const id of s.spotsFound) if(!stamps.has(id)){stamps.add(id); restamp(id); changed = true}
+    if(changed){save(); refreshCount()}
+  })
 
-  const photo = photoMode(host,()=>nearestName())
+  const photo = photoMode(host,()=>nearestName(),()=>{
+    const w = host.walker()
+    if(!w?.active) return
+    const p = w.position
+    for(const m of marks) {
+      if(Math.hypot(m.spot.x-p.x, m.spot.z-p.z)<=24) {
+        if(!stamps.has(m.spot.id)){stamps.add(m.spot.id); save(); recordSpotFound(m.spot.id); restamp(m.spot.id); refreshCount()}
+        awardSpot(m.spot)
+      }
+    }
+  })
   shutter.onclick = ()=>photo.open()
   window.addEventListener('keydown',event=>{
     if(event.repeat) return

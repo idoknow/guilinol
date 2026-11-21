@@ -64,3 +64,8 @@ export function getQuietZoneAt(x: number, z: number, bufferM = QUIET_ZONE_BUFFER
 export function isPointInQuietZone(x: number, z: number, bufferM = QUIET_ZONE_BUFFER_M): boolean {
   return getQuietZoneAt(x, z, bufferM) !== null
 }
+
+// Stage 1B compatibility aliases (IDOK-123)
+export const QUIET_BUFFER_METERS = QUIET_ZONE_BUFFER_M
+export const findQuietZoneAt = getQuietZoneAt
+export const isPointInQuietZones = isPointInQuietZone
