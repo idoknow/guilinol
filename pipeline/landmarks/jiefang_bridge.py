@@ -257,19 +257,26 @@ def bridge(model):
     for left,right,depth in ((-140.5,-136,1.22),(-136,-103,.36),(-103,140.5,1.22)):
         model.box((left+right)/2,-depth,0,right-left,depth,width,'stone',True)
     model.box(0,-.03,0,length,.08,32.2,'road')
+    def deck_line(z):
+        # Paint is a surface, following the curved deck without box walls or
+        # long triangles crossing every grading station in the bridge export.
+        for a,b in zip(deck_stations,deck_stations[1:]):
+            model.mesh([(a,.085,z-.09),(a,.085,z+.09),(b,.085,z+.09),(b,.085,z-.09)],
+                       [[0,1,2],[0,2,3]],'paint_white')
+    deck_stations=np.r_[-length/2,np.arange(16,134,4),134.6286,length/2]
     for side in (-1,1):
         walk_inner = 16.175
         walk_outer = width/2
         model.box(0,0,side*(walk_inner+walk_outer)/2,length,.18,walk_outer-walk_inner,'pave',True)
         model.box(0,.05,side*16.16,length,.15,.3,'curb_granite',True)
-        model.box(0,.055,side*12,length,.018,.18,'paint_white')
-        model.box(0,.055,side*.18,length,.015,.18,'paint_yellow')
+        deck_line(side*12)
+        deck_line(side*.18)
         model.box(0,.182,side*16.93,length,.018,.46,'granite')
         if model.detail:
             for offset in (-.13,0,.13):
                 model.box(0,.20,side*16.93+offset,length,.014,.036,'white')
             for lane in (3.7,7.4):
-                model.box(0,.055,side*lane,length,.02,.18,'paint_white')
+                deck_line(side*lane)
         for east in np.arange(-126,127,21 if model.detail else 42):
             lamp_post(model,east,side)
     springings=(-92,-46,0,46,92,140.5)

@@ -38,6 +38,13 @@
     "peizhi_special": [{"material": "peizhi_special_atlas", "role": "road", "box": [0.625, 0, 0.75, 0.09375]}, {"material": "peizhi_special_atlas", "role": "plaza", "box": [0.5, 0, 0.625, 0.09375]}],
     "yixian_high": [{"material": "yixian_high_atlas", "role": "road", "box": [0.625, 0, 0.75, 0.09375]}, {"material": "yixian_high_atlas", "role": "plaza", "box": [0.5078125, 0.0078125, 0.6084375, 0.0796875]}]
   },
+  "heightBoundaries": {
+    "shizijie":["B_plaza_pave"], "nikoniko":["B_plaza_pave"],
+    "dongxixiang":["pave"], "wangcheng_market":["pave","ruinGlass","streetLip","edgeStone"],
+    "central_square":["B_plaza_pave"], "jiefang_bridge":["pave"],
+    "jingjiang":["pave"], "zhongshan_road":["B_plaza_pave"],
+    "libin_middle":["sidewalk","road"], "ronghu":["landmark"]
+  },
   "exceptions": [
     {"id": "wangcheng_market", "material": "pave", "kind": "material", "name": "市场内部青石板"},
     {"id": "wangcheng_market", "material": "ruinGlass", "kind": "material", "name": "入口遗址玻璃"},

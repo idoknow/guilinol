@@ -15,7 +15,7 @@ from common import RAW, load_osm
 from features import area, overture_geometry, polygons
 from landmark_layout import polygon
 from landmarks.world_surface import Surface
-from seam_inventory import inventory
+from seam_inventory import inventory, material_names
 from seam_streets import Streets
 from seam_crossings import crossings, nearby_features
 
@@ -159,11 +159,19 @@ def main():
             plaque = shapely.box(-3,-.12,3,.12)
             rotated = shapely.affinity.rotate(plaque,-entry['rotation'],origin=(0,0))
             rings.append(('plaqueFootprint',shapely.affinity.translate(rotated,entry['position'][0],entry['position'][2])))
-        for material in roles:
+        # A draw material can cover a whole campus or elevated bridge deck.
+        # Physical height probes use their surveyed join, independently of
+        # the inventory of every surface that shares GL04 shading.
+        boundaries = config['heightBoundaries'].get(name,[])
+        present=material_names(args.public/entry['file']) if entry and boundaries else []
+        for material in list(roles):
+            if material not in boundaries or material not in present:continue
             shape, meshes[material] = declared_mesh(world.entries[name],material,args.public)
             rings.append((material,shape))
         atlas_rules = atlas if isinstance(atlas,list) else [atlas] if atlas else []
         for rule in atlas_rules:
+            fallback=rule['role'] in boundaries and rule['role'] not in present
+            if rule['material'] not in boundaries and not fallback:continue
             label = rule.get('label',rule['material'] if len(atlas_rules)==1 else rule['material']+':'+rule['role'])
             shape,meshes[label] = declared_mesh(entry,rule['material'],args.public,rule['box'])
             roles[label] = rule['role']
@@ -205,7 +213,7 @@ def main():
                                 if right is not None: outside = max(outside,right)
                         if mesh:
                             inside = mesh(shapely.Point(point))
-                            if len(atlas_rules)>1 or 'edgeStone' in roles:
+                            if name=='libin_middle' or 'edgeStone' in roles:
                                 for other,neighbor in meshes.items():
                                     if other!=label:
                                         peer = neighbor(shapely.Point(sides[1]))

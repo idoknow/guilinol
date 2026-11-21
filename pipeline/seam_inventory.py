@@ -41,13 +41,17 @@ def street_contacts(faces, triangles, normals, streets):
     return kinds
 
 
-def inventory(entry, public, config, streets):
-    path=public/entry['file']
+def material_names(path):
     with path.open('rb') as source:
         source.seek(12)
         size=int.from_bytes(source.read(4),'little')
         source.seek(20)
-        materials=[m.get('name','') for m in json.loads(source.read(size)).get('materials',[])]
+        return [m.get('name','') for m in json.loads(source.read(size)).get('materials',[])]
+
+
+def inventory(entry, public, config, streets):
+    path=public/entry['file']
+    materials=material_names(path)
     output=subprocess.check_output(['node',Path(__file__).with_name('glb-triangles.mjs'),path,'--inventory'])
     data=np.frombuffer(output,'<f4').reshape(-1,16)
     vertices=data[:,1:].reshape(-1,3,5)
