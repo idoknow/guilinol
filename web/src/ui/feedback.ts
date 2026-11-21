@@ -1,3 +1,4 @@
+import {record} from '../telemetry'
 import type { Host } from '../play/host'
 import type { mapView } from '../play/map'
 import { kinds, labels, type FeedbackView } from '../../../lib/feedback-contract'
@@ -211,6 +212,7 @@ function locationPicker(
 }
 
 export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi | undefined>,initialId?:string) {
+  record('funnel',{step:'feedbackOpen'})
   if (document.querySelector('.fb-panel,.fb-aim-bar')) return
   const dialog = el('dialog', '', 'about-panel fb-panel')
   dialog.setAttribute('aria-label', '反馈')
@@ -681,7 +683,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
             if (!response.ok) throw Error((await response.json()).error.message)
           }
           await picker.upload(id)
-          await api(`feedback/${id}/${supplement ? 'supplement' : 'submit'}`, { body: text })
+          await api(`feedback/${id}/${supplement ? 'supplement' : 'submit'}`, { body: text });if(!supplement)record('funnel',{step:'feedbackSuccess'})
         } finally {
           send.textContent = supplement ? '提交补充' : '提交反馈'
         }

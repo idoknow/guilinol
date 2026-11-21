@@ -1,3 +1,4 @@
+import {record} from './telemetry'
 import * as THREE from 'three'
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
 import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js'
@@ -106,6 +107,7 @@ export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,en
     }
     candidates.sort((first,second)=>first.range-second.range)
     for(const {entry} of candidates.slice(0,priority?1:Math.max(0,2-pending.size))){
+      if(retry.has(entry))record('retry',{category:'landmark'})
       pending.add(entry)
       loaderReady.then(loader=>loader.loadAsync('./'+entry.file)).then(({scene:group,parser})=>{
         group.position.fromArray(entry.position);group.rotation.y=THREE.MathUtils.degToRad(entry.rotation)
@@ -149,8 +151,8 @@ export function landmarkStream(scene:THREE.Scene,renderer:THREE.WebGLRenderer,en
           if(asset instanceof THREE.Material)fadeMaterial(asset,coverage)
         }
         batchRepeatedMeshes(group)
-        scene.add(group);group.updateMatrixWorld(true);loaded.set(entry,group)
-      }).catch(error=>{console.warn(entry.id,error);retry.set(entry,performance.now()+30000)}).finally(()=>pending.delete(entry))
+        scene.add(group);group.updateMatrixWorld(true);loaded.set(entry,group);retry.delete(entry)
+      }).catch(error=>{record('failure',{category:'landmark'});console.warn(entry.id,error);retry.set(entry,performance.now()+30000)}).finally(()=>pending.delete(entry))
     }
   }
 }

@@ -24,7 +24,8 @@ try {
     proxy:browserOnly?{}:{'/api':'http://127.0.0.1:'+port}}})
   const origin='http://127.0.0.1:'+site.httpServer.address().port
   if(storage){
-    await storage.sql(await readFile('deploy/postgres/002-telemetry.sql','utf8'))
+    await storage.sql(await readFile('deploy/postgres/003-admin.sql','utf8'))
+    await (await import('./summary-test.mjs')).verifySummaries(storage.env.DATABASE_URL)
     api=spawn(process.execPath,['--import','tsx','server/index.mjs'],{env:{...process.env,...storage.env,PORT:String(port),PUBLIC_ORIGIN:origin},stdio:'inherit'})
     for(let i=0;;i++){
       if(await fetch(origin+'/api/me').then(r=>r.status===401).catch(()=>false))break
@@ -83,9 +84,9 @@ try {
   }
   assert.deepEqual(foreign,[])
   assert.ok(batches.length>=6)
-  for(const {body,gzip} of batches){assert.ok(validate(body),JSON.stringify(body.context));assert.ok(gzip<=4096)}
+  for(const {body,bytes,gzip} of batches){assert.ok(bytes<=3900);assert.ok(validate(body),JSON.stringify(body.context));assert.ok(gzip<=4096)}
   const rows=batches.flatMap(b=>b.body.rows),kinds=new Set(rows.map(r=>r.kind))
-  for(const kind of ['navigation','resource','firstFrame','playable','window','chunk','switch','api','mapOpen','teleport','error','contextLost'])assert.ok(kinds.has(kind),kind)
+  for(const kind of ['navigation','resource','firstFrame','playable','window','chunk','switch','api','mapOpen','teleport','error','contextLost','session','vitals'])assert.ok(kinds.has(kind),kind)
   for(const mode of ['walk','fly'])assert.ok(rows.some(r=>r.kind==='window'&&r.mode===mode),mode)
   const fields={navigation:['dns','tcp','tls','ttfb','dcl','load'],window:['fps','frameP95','longFrames','calls','triangles','geometries','textures','chunks','grid','mode'],
     resource:['category','count','bytes','p50','p95','cache'],chunk:['ms','grid']}
@@ -94,7 +95,7 @@ try {
     for(const key of keys)assert.ok(key in row,kind+'.'+key)
   }
   const ctx=batches.at(-1).body.context
-  for(const key of ['device','os','browser','width','height','dpr','cores','build','world','quality'])assert.ok(key in ctx,key)
+  for(const key of ['device','os','browser','width','height','dpr','cores','build','world','quality','vid','firstDay','returnVisit','language','referrer','maxTextureSize','webgl2'])assert.ok(key in ctx,key)
   console.log('Browser batches',batches.length,'max raw bytes',Math.max(...batches.map(b=>b.bytes)),'max gzip bytes',Math.max(...batches.map(b=>b.gzip)))
   if(storage){
     const token=randomBytes(32).toString('hex'),digest=createHash('sha256').update(token).digest('hex')
@@ -102,6 +103,14 @@ try {
     const [saved]=await storage.sql("SELECT count(distinct batch) n FROM perf_event WHERE session='"+batches[0].body.sid+"'")
     assert.ok(saved.results[0].n>=6)
     console.log('PostgreSQL batches',saved.results[0].n)
+    for(const endpoint of ['overview','timeseries','breakdown','funnel','errors','live','audit']){
+      const response=await fetch(origin+'/api/admin/'+endpoint,{headers:{Cookie:'glol_session='+token}})
+      assert.equal(response.status,200)
+      const result=await response.json()
+      if(endpoint==='overview'){assert.ok(result.visitors.current>=1);assert.ok(result.durationAvg.current>0)}
+      if(endpoint==='funnel')assert.ok(result.find(r=>r.step==='playable').sessions>=1)
+      if(endpoint==='errors')assert.ok(result.some(r=>r.kind==='webgl'&&r.signature))
+    }
     for(const path of ['?group=device','/grid','/server']){
       const response=await fetch(origin+'/api/admin/perf'+path,{headers:{Cookie:'glol_session='+token}})
       assert.equal(response.status,200);const {items}=await response.json();assert.ok(items.length,path)

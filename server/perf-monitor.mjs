@@ -1,3 +1,4 @@
+import {summarizeDays} from './day-summary.mjs'
 import {monitorEventLoopDelay} from 'node:perf_hooks'
 import {readFile} from 'node:fs/promises'
 
@@ -17,7 +18,8 @@ export class Histogram {
   }
 }
 export function route(path){
-  if(/^\/api\/(?:me|unsubscribe|health|t|auth\/(?:register|resend|verify|reset|login|logout)|admin\/(?:stats|users|feedback|perf(?:\/grid|\/server)?)|bridge\/pending|feedback)$/.test(path))return path
+  if(/^\/api\/(?:me|unsubscribe|health|t|auth\/(?:register|resend|verify|reset|login|logout)|admin\/(?:stats|users|feedback|overview|timeseries|breakdown|funnel|errors|live|audit|perf(?:\/grid|\/server)?)|bridge\/pending|feedback)$/.test(path))return path
+  if(/^\/api\/admin\/users\/[\w-]+\/role$/.test(path))return '/api/admin/users/:id/role'
   const detail=/^(\/api\/(?:admin\/|bridge\/)?feedback)\/[\w-]+(?:\/(submit|supplement|status|messages|relayed|bind|view-shot|photos\/\d+))?$/.exec(path)
   if(detail)return detail[1]+'/:id'+(detail[2]?'/'+detail[2].replace(/\d+$/,':n'):'')
   if(/^\/api\/(bridge|feedback)\/comparisons\/[a-f0-9]{64}$/.test(path))return path.split('/').slice(0,-1).join('/')+'/:sha'
@@ -60,8 +62,8 @@ export function monitor(pool){
       Object.assign(sample,{load:load?.trim().split(/\s+/).slice(0,3).map(Number),cgroupMemory:memoryCurrent?Number(memoryCurrent):null,
         cgroupCpuUsec:cpuStat?Number(/^usage_usec (\d+)/m.exec(cpuStat)?.[1]):null,nginx:web})
       await pool.query("INSERT INTO perf_server VALUES(date_trunc('minute',$1::timestamptz),$2)",[stamp,sample])
-      const today=stamp.toISOString().slice(0,10)
-      if(today!==day){await rollup(pool);day=today}
+      const today=new Date(stamp.getTime()-300000).toISOString().slice(0,10)
+      if(today!==day){await summarizeDays(pool);await rollup(pool);day=today}
     }catch(error){console.error('telemetry minute write failed',error.code??error.name)}finally{busy=false}
   },60000)
   timer.unref()

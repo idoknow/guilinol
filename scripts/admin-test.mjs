@@ -8,6 +8,8 @@ export async function apiTest({ api, sql, id, second, photo,origin,cookie }) {
   const detail = 'feedback/' + id,
     transition = { status: 'rejected', message: '不在范围内' }
   for (const [path, data] of [
+    ...['overview','timeseries','breakdown','funnel','errors','live','audit'].map(path=>[path,null]),
+    ['users/other/role',{role:'admin'}],
     ['stats', null],
     ['users', null],
     ['feedback', null],
@@ -22,6 +24,14 @@ export async function apiTest({ api, sql, id, second, photo,origin,cookie }) {
   const users = await admin('users?q=WALKER')
   assert.equal(users.items.length, 1)
   assert.equal(users.items[0].feedback_count, 1)
+  const rolePath='users/'+users.items[0].id+'/role'
+  assert.equal((await admin('users/other/role',{role:'user'},409)).error.code,'last_admin')
+  await admin(rolePath,{role:'admin'})
+  assert.equal((await admin('users/other/role',{role:'user'},409)).error.code,'self_demotion')
+  await admin(rolePath,{role:'user'})
+  assert.equal((await admin('users?role=admin')).items.length,1)
+  assert.equal((await admin('audit?target_type=user&target_id='+users.items[0].id)).items.length,2)
+  for(const path of ['overview','timeseries','breakdown','funnel','errors','live']) await admin(path)
   const result = await admin(
     'feedback?status=live&q=' + encodeURIComponent('入口') + '&user=' + users.items[0].id,
   )
@@ -37,6 +47,9 @@ export async function apiTest({ api, sql, id, second, photo,origin,cookie }) {
   await uploadShot(origin,cookie,manual)
   await api(`feedback/${manual}/submit`, {})
   const change = `feedback/${manual}/status`
+  assert.deepEqual((await admin('feedback/'+manual)).allowed_transitions.map(t=>t.status),['approved','need_info','rejected','duplicate'])
+  await admin(change,{status:'live'},409)
+  await admin('feedback/'+manual+'/messages',{body:'收到'})
   await admin(change, {status:'rejected'}, 400)
   await admin(change, { status: 'queued' }, 403, { Origin: 'https://example.test' })
   await admin(change, { status: 'approved' });await api('bridge/'+change,{status:'queued'},200,null,{headers:{Authorization:'Bearer local-test'}})
@@ -47,9 +60,11 @@ export async function apiTest({ api, sql, id, second, photo,origin,cookie }) {
     ['submitted','approved', 'queued', 'rejected'],
   )
   assert.equal(events.at(-1).message, transition.message)
+  assert.deepEqual((await admin('audit?target_type=feedback&target_id='+manual)).items.map(row=>row.action),['status','start_ai','reply'])
   await sql(
     `UPDATE feedback SET submitted_at=unixepoch()-86401 WHERE id='${manual}'; WITH RECURSIVE numbers(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM numbers WHERE n<51) INSERT INTO users(id,email,nickname,salt,digest) SELECT 'seed'||n,'seed'||n||'@example.test','分页','','' FROM numbers;`,
   )
+  assert.equal((await admin('users/seed1/role',{role:'admin'},409)).error.code,'unverified')
   const first = await admin('users?q=seed'),
     last = await admin('users?q=seed&cursor=' + first.next_cursor)
   assert.equal(first.items.length, 50)
