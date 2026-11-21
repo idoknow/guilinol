@@ -145,6 +145,7 @@ async function start() {
     dome.update(); drops.update()
   }
 
+  let openingStream:Stream|undefined
   if(terrain){
     scene.add(terrain.mesh)
     bootLoaded()
@@ -162,6 +163,7 @@ async function start() {
         previous=now
         controls(elapsed/1000)
         updateAtmosphere(now,elapsed)
+        openingStream?.updateBatches(camera.position)
         renderer.render(scene,camera)
         rendered=true
       })
@@ -169,6 +171,10 @@ async function start() {
   }
   async function loadFullScene(){
     const manifest=previousWorld??await readManifest()
+    if(terrain){
+      openingStream=new Stream(scene,manifest,terrain,rangeStore,camera)
+      await openingStream.loadOpeningRing(camera.position)
+    }
     const overview=startOverview(manifest), mountains=startPeaks(manifest.peaks)
     await Promise.all([overview.dispatched,mountains.dispatched])
     bootLoaded()
@@ -180,7 +186,8 @@ async function start() {
   })
   scene.add(base.mesh,peaks)
   bootProgress('载入街区', 78)
-  const stream = new Stream(scene,manifest,base,rangeStore,camera)
+  const stream = openingStream??new Stream(scene,manifest,base,rangeStore,camera)
+  if(openingStream)openingStream.setTerrainLayer(base)
   const output = document.querySelector('output')!
   let cullLandmarks:ReturnType<typeof import('./landmarks').landmarkCulling>|undefined
   let landmarksPromise:Promise<void>|undefined
@@ -418,7 +425,7 @@ async function start() {
     const metrics=stream.metrics
     const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
     cullLandmarks?.update(stream.landmarks.values(),camera,mirror,metrics.cullHorizon)
-    peaks.update(camera,mirror,metrics)
+    peaks.update(camera,mirror,metrics,!stream.isInnerBusy())
     if(Number.isFinite(mirror))cullLandmarks?.pass(true)
     // Reuse the last reflection while tiles are still streaming: pending work is exactly when the
     // mirror costs the most, and a frame-old reflection is invisible under the ripple distortion.
@@ -453,8 +460,8 @@ async function start() {
     }
     if(frame>0&&!switching) {
       const target=walker?.destination??(walker?.active?walker.position:camera.position)
-      stream.updateLandmarks?.(target)
       stream.tick(target)
+      stream.updateLandmarks?.(target)
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
     }
     updateAtmosphere(now,elapsed)

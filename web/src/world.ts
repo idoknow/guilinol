@@ -66,7 +66,22 @@ export async function openingTerrain(){
   const material=await surfaceMaterial(data.slice(56+heights.byteLength),true)
   const mesh=new THREE.Mesh(ground(width,depth,step,(x,z)=>heights[z*cols+x]/10),material)
   mesh.position.set(left,0,top)
-  return {bbox,extent,mesh,dispose(){
+  const index=mesh.geometry.index!
+  function toggle(tile:Tile,show:boolean){
+    const tx=(tile.x-left)/step,tz=(tile.z-top)/step,side=256/step
+    for(let row=tz;row<tz+side;row++){
+      const start=6*(row*(cols-1)+tx)
+      if(show){
+        for(let col=0;col<side;col++){
+          const a=row*cols+tx+col,b=a+cols
+          index.array.set([a,b,a+1,b,b+1,a+1],start+6*col)
+        }
+      }else index.array.fill(0,start,start+6*side)
+      index.addUpdateRange(start,6*side)
+    }
+    index.needsUpdate=true
+  }
+  return {bbox,extent,mesh,toggle,dispose(){
     mesh.removeFromParent()
     mesh.geometry.dispose()
     material.map?.source.data.close()

@@ -14,7 +14,7 @@ import {
   type RenderRangeListener,
   type RenderRangeMetrics,
 } from './render-range'
-import {detail, type Manifest, type Tile, overview} from './world'
+import {detail, type Manifest, type Tile} from './world'
 
 import {TileGrid, streamBudget, frameSlots} from './tile-grid'
 export function tileCenterDistance(tile:Tile, position:THREE.Vector3){
@@ -24,6 +24,8 @@ export function tileCenterDistance(tile:Tile, position:THREE.Vector3){
 export function tileEdgeDistance(tile:Tile, x:number, z:number){
   return Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))
 }
+
+type TerrainLayer = {mesh:THREE.Object3D; toggle(tile:Tile, show:boolean):void}
 
 export class Stream {
   private distant?:DistantBuildings
@@ -51,7 +53,7 @@ export class Stream {
   constructor(
     private scene:THREE.Scene,
     manifest:Manifest,
-    private base:Awaited<ReturnType<typeof overview>>,
+    private base:TerrainLayer,
     rangeOrRadius:number|RenderRangeStore|RenderRangeConfig = RENDER_RADIUS_DEFAULT,
     private camera:THREE.PerspectiveCamera,
   ) {
@@ -113,9 +115,34 @@ export class Stream {
     }
   }
 
+  private *innerTiles(x:number,z:number,metrics:RenderRangeMetrics){
+    const radius=streamBudget.priorityRadius
+    for(const tile of this.grid.near(x,z,Math.max(radius,metrics.spawnRingEdge+128))){
+      if(Math.hypot(tile.x+128-x,tile.z+128-z)<=radius || tileEdgeDistance(tile,x,z)<=metrics.spawnRingEdge)yield tile
+    }
+  }
+
+  // During opening, attach real chunks against the first terrain LOD. Keep
+  // these same objects when the full overview and its water layer arrive.
+  async loadOpeningRing(position:THREE.Vector3){
+    this.lastPosition.copy(position)
+    const tiles=Array.from(this.innerTiles(position.x,position.z,this.metrics))
+      .sort((a,b)=>tileCenterDistance(a,position)-tileCenterDistance(b,position))
+    for(let i=0;i<tiles.length;i+=streamBudget.innerRequests){
+      const batch=tiles.slice(i,i+streamBudget.innerRequests)
+      await Promise.all(batch.map(tile=>this.enqueue(tile,true)))
+    }
+    this.updateBatches(position)
+  }
+
+  setTerrainLayer(layer:TerrainLayer){
+    this.base=layer
+    for(const tile of this.loaded.keys())layer.toggle(tile,false)
+  }
+
   private hasUnloadedInner(x:number, z:number, metrics:RenderRangeMetrics, now:number){
-    for(const tile of this.grid.near(x,z,metrics.spawnRingEdge+128)){
-      if(tileEdgeDistance(tile,x,z)<=metrics.spawnRingEdge && !this.loaded.has(tile) && (this.failures.get(tile)??0)<=now) return true
+    for(const tile of this.innerTiles(x,z,metrics)){
+      if(!this.loaded.has(tile) && (this.failures.get(tile)??0)<=now) return true
     }
     return false
   }
@@ -135,8 +162,12 @@ export class Stream {
     this.pending.set(tile,controller)
     if(inner) this.innerPending.add(tile)
     const start=performance.now()
-    detail(tile,controller.signal,this.parseSlot).then(async item=>{
-      await this.attachSlot()
+    // The inner ring is bounded in space and request count. Its decode and
+    // attachment continuations run as data arrives, even on multi-second frames.
+    const urgent=()=>inner || tileCenterDistance(tile,this.priorityTarget??this.lastPosition)<=streamBudget.priorityRadius
+    const parseSlot=()=>urgent()?Promise.resolve():this.parseSlot()
+    return detail(tile,controller.signal,parseSlot).then(async item=>{
+      if(!urgent())await this.attachSlot()
       if(controller.signal.aborted){item.dispose();return}
       this.scene.add(item.group);this.batches.add(item.batch);this.base.toggle(tile,false)
       this.revision++;this.loaded.set(tile,item);this.visited.add(tile);this.failures.delete(tile)
@@ -159,7 +190,6 @@ export class Stream {
   }
 
   tick(position:THREE.Vector3) {
-    this.distant?.tick(this.camera,this.loaded,this.revision)
     this.lastPosition.copy(position)
     const metrics = this.rangeStore.getMetrics()
     const now = performance.now()
@@ -173,15 +203,14 @@ export class Stream {
     const focus = this.priorityTarget ?? position
     const innerEdge = metrics.spawnRingEdge
 
+    let waitingForInner=false
     const innerTiles:Tile[] = []
-    for(const tile of this.grid.near(focus.x,focus.z,innerEdge+128)){
-      if(tileEdgeDistance(tile,focus.x,focus.z)<=innerEdge && !this.loaded.has(tile) && !this.pending.has(tile) && (this.failures.get(tile)??0)<=now){
-        innerTiles.push(tile)
-      }
+    for(const tile of this.innerTiles(focus.x,focus.z,metrics)){
+      if(this.loaded.has(tile) || (this.failures.get(tile)??0)>now)continue
+      waitingForInner=true
+      if(!this.pending.has(tile))innerTiles.push(tile)
     }
-    const innerBusy = innerTiles.length>0 || this.innerPending.size>0 || (this.updateLandmarks?.busyPriorityCount?.()??0)>0
-
-    this.forest.tick(position,innerBusy)
+    const innerBusy = waitingForInner || (this.updateLandmarks?.busyPriorityCount?.()??0)>0
 
     for(const [tile,item] of this.loaded){
       const keepInner = tileEdgeDistance(tile,focus.x,focus.z)<=innerEdge || tileEdgeDistance(tile,position.x,position.z)<=innerEdge
@@ -190,11 +219,7 @@ export class Stream {
       }
     }
 
-    this.batches.update(position,this.camera,isWaterInView(this.camera)?currentMirrorLevel(this.camera):-Infinity,{
-      cullHorizon:metrics.cullHorizon,
-      buildingFarLod:metrics.buildingFarLod,
-      streetRadius:metrics.streetRadius,
-    })
+    this.updateBatches(position)
 
     for(const [tile,controller] of this.pending){
       const keepInner = tileEdgeDistance(tile,focus.x,focus.z)<=innerEdge || tileEdgeDistance(tile,position.x,position.z)<=innerEdge
@@ -210,5 +235,16 @@ export class Stream {
         .sort((a,b)=>tileCenterDistance(b,position)-tileCenterDistance(a,position))
     }
     this.fillRequests()
+    if(!innerBusy)this.distant?.tick(this.camera,this.loaded,this.revision)
+    this.forest.tick(position,innerBusy)
+  }
+
+  updateBatches(position:THREE.Vector3){
+    const metrics=this.metrics
+    this.batches.update(position,this.camera,isWaterInView(this.camera)?currentMirrorLevel(this.camera):-Infinity,{
+      cullHorizon:metrics.cullHorizon,
+      buildingFarLod:metrics.buildingFarLod,
+      streetRadius:metrics.streetRadius,
+    })
   }
 }

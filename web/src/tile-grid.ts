@@ -31,7 +31,7 @@ export class TileGrid {
 
 export const streamBudget = {
   residentTiles: 180, detailRequests: 8, innerRequests: 6, treeRequests: 6,
-  parseMs: 5, attachMs: 4,
+  parseMs: 5, attachMs: 4, priorityRadius: 300,
 }
 
 // Each resolution resumes the awaiting parser/attachment before the next

@@ -110,7 +110,7 @@ export class Forest{
     }
     for(const [tile,control] of this.pending)if(distance(tile)>this.range.treeUnloadRadius)control.abort()
     const limit=deferOuter?Math.min(this.range.treeLoadRadius,280):this.range.treeLoadRadius
-    this.requestLimit=deferOuter?1:streamBudget.treeRequests
+    this.requestLimit=deferOuter?0:streamBudget.treeRequests
     const now=performance.now()
     this.queue=Array.from(this.grid.near(position.x,position.z,limit))
       .filter(tile=>distance(tile)<=limit&&!this.loaded.has(tile)&&!this.pending.has(tile)&&(this.retry.get(tile)??0)<=now)

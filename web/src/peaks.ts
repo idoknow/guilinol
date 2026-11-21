@@ -20,7 +20,7 @@ export interface PeaksGroup extends THREE.Group {
   modelPeaks:THREE.Object3D[]
   stats:{calls:number; lod0Peaks:number; lod1Peaks:number}
   loadModels(renderer:THREE.WebGLRenderer):void
-  update(camera:THREE.PerspectiveCamera, mirrorLevel?:number, range?:{cullHorizon?:number; peakLodSplit?:number}):void
+  update(camera:THREE.PerspectiveCamera, mirrorLevel?:number, range?:{cullHorizon?:number; peakLodSplit?:number},loadSectors?:boolean):void
 }
 
 function inFrustum(frustum:THREE.Frustum, pt:THREE.Vector3, radius:number) {
@@ -102,7 +102,7 @@ export function startPeaks(asset:Peaks) {
     const group:PeaksGroup = Object.assign(scene,{
       colliders:coarseColliders, modelPeaks:base.modelPeaks, stats:{...base.stats},
       loadModels:(renderer:THREE.WebGLRenderer)=>base.loadModels(renderer),
-      update(camera:THREE.PerspectiveCamera,level?:number,range?:Parameters<PeaksGroup['update']>[2]) {
+      update(camera:THREE.PerspectiveCamera,level?:number,range?:Parameters<PeaksGroup['update']>[2],loadSectors=true) {
         const {x,z} = camera.position
         const near = new Map<string,number>()
         const demand=Math.max(800,(range?.peakLodSplit??800)*camera.zoom+256)
@@ -124,7 +124,7 @@ export function startPeaks(asset:Peaks) {
           })
           loaded.delete(key);changed=true
         }
-        if(!pending) {
+        if(loadSectors && !pending) {
           const next = [...near].filter(([key])=>!loaded.has(key)&&(retry.get(key)??0)<=performance.now())
             .sort((a,b)=>a[1]-b[1])[0]
           if(next) {
