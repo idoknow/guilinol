@@ -234,7 +234,8 @@ def grade_banks(terrain,original,wet,left,top,step,anchor,angle,datum,finish=Fal
 
 def lower_junction_weight(x,z):
     taper=np.clip((101-abs(z))/23,0,1)
-    return bank_blend(x,z,14)*taper*taper*(3-2*taper)
+    approach=np.clip((-128-x)/7,0,1)*np.clip((29-abs(z))/7,0,1)
+    return bank_blend(x,z,14)*taper*taper*(3-2*taper)*(1-approach)
 
 
 def lower_subgrade(x,z,datum):
