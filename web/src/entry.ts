@@ -40,6 +40,11 @@ function hud(main: typeof import('./main')) {
   menu.innerHTML = '<span>菜单</span>'; menu.setAttribute('aria-label', '主菜单'); menu.title = '主菜单（Esc）'
   menu.onclick = () => { main.setPaused(true); title.open(true) }
   box.append(menu); accountEntry(box); document.body.append(box)
+  // Phase 2 street HUD preview (IDOK-109): demo state until web/src/game/state.ts lands in G1.
+  const street = params.get('hud') === 'street'
+  if (street) void Promise.all([import('./ui/street-hud'), import('./play/map')]).then(([hudModule, map]) => {
+    map.setMapPalette('street'); hudModule.mountStreetHud(hudModule.demoSource(params.get('hudDemo')), {phone: params.has('phone')})
+  })
   addEventListener('keydown', event => {
     if (event.code !== 'Escape' || title.shown || document.querySelector('dialog[open],.about-mask:not([hidden]),.atlas:not([hidden]),.book:not([hidden]),.spot-card:not([hidden]),.photo-bar:not([hidden]),.render-pop:not([hidden])')) return
     menu.click()

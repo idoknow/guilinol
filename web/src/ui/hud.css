@@ -1,5 +1,5 @@
 /* In-game HUD on the 山水印 tokens (theme.css). Left column = 你自己（菜单、账号、时辰天气）, right column = 游戏工具. */
-body{margin:0;background:var(--ui-ink-900)}canvas{display:block;touch-action:none}
+html,body{overflow:hidden}body{margin:0;background:var(--ui-ink-900)}canvas{display:block;touch-action:none}
 
 /* 一套玻璃按钮：所有浮在画面上的控件共用同一材质、同一按下态 */
 .walk-ui button,.btn-mode,.btn-menu,.account-entry,.vehicle-action,.dock-buttons>button,.photo-exit{font-family:var(--ui-serif);color:var(--ui-paper);background:var(--ui-glass);
@@ -83,3 +83,5 @@ body[data-aboard] .btn-jump{display:none}
   output{top:calc(140px + env(safe-area-inset-top));max-width:126px;box-sizing:border-box}
 }
 @media (max-width:520px){.about-cols{grid-template-columns:1fr}.account-entry{max-width:7.5em}}
+/* Keyboard hint is meaningless on narrow screens and its nowrap line widened the mobile layout viewport (IDOK-109). */
+@media (max-width:560px){.hint{display:none}}
