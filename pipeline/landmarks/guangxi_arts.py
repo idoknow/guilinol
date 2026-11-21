@@ -280,14 +280,6 @@ def hall(model):
     model.box(18.6, gy + 0.45, -18.8, 4.9, 0.65, 0.62, 'leaf')
 
     model.box(8.5, gy - 0.35, -23.0, 32.0, 0.38, 13.5, 'pave', True)
-    mcx, mcz = 12.6, -21.6
-    segs = 48 if model.detail else 16
-    for idx in range(segs):
-        a0, a1 = math.tau * idx / segs, math.tau * (idx + 1) / segs
-        pts_in = [(mcx + r * math.cos(a), gy + 0.045, mcz + r * math.sin(a)) for r, a in [(3.1, a0), (3.1, a1), (3.8, a1), (3.8, a0)]]
-        model.mesh([(mcx, gy + 0.045, mcz), pts_in[0], pts_in[1]], [[0, 1, 2]], 'wood')
-        model.mesh(pts_in, [[0, 1, 2], [0, 2, 3]], 'stone' if idx % 2 == 0 else 'brick')
-
     # =========================================================================
     # 3. WEST 2-STOREY RED-BRICK ANNEX & SOLID PERFORATED COURTYARD WALL (IMG_1367, IMG_1368!)
     # =========================================================================
