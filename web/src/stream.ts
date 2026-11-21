@@ -16,13 +16,9 @@ import {
 } from './render-range'
 import {detail, type Manifest, type Tile} from './world'
 
-import {TileGrid, streamBudget, frameSlots} from './tile-grid'
+import {TileGrid, streamBudget, frameSlots, tileEdgeDistance} from './tile-grid'
 export function tileCenterDistance(tile:Tile, position:THREE.Vector3){
   return Math.hypot(tile.x+128-position.x,tile.z+128-position.z)
-}
-
-export function tileEdgeDistance(tile:Tile, x:number, z:number){
-  return Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))
 }
 
 type TerrainLayer = {mesh:THREE.Object3D; toggle(tile:Tile, show:boolean):void}

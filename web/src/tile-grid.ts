@@ -29,9 +29,13 @@ export class TileGrid {
   }
 }
 
+export function tileEdgeDistance(tile:Tile, x:number, z:number){
+  return Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))
+}
+
 export const streamBudget = {
   residentTiles: 180, detailRequests: 8, innerRequests: 6, treeRequests: 6,
-  parseMs: 5, attachMs: 4, priorityRadius: 300,
+  parseMs: 5, attachMs: 4, priorityRadius: 300, priorityTreeRadius: 128,
 }
 
 // Each resolution resumes the awaiting parser/attachment before the next

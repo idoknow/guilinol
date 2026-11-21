@@ -1,4 +1,4 @@
-import {TileGrid, streamBudget} from './tile-grid'
+import {TileGrid, streamBudget, tileEdgeDistance} from './tile-grid'
 import * as THREE from 'three'
 import {applyTreeVariant, setTreeFar, sharedProxyAssets, TREE_SPECIES_COUNT, treeFar, treeNearAsset} from './look/trees'
 import {look} from './look/config'
@@ -109,11 +109,12 @@ export class Forest{
       if(distance(tile)>this.range.treeUnloadRadius){this.loaded.delete(tile);this.dirty=true}
     }
     for(const [tile,control] of this.pending)if(distance(tile)>this.range.treeUnloadRadius)control.abort()
-    const limit=deferOuter?Math.min(this.range.treeLoadRadius,280):this.range.treeLoadRadius
-    this.requestLimit=deferOuter?0:streamBudget.treeRequests
+    const limit=deferOuter?Math.min(this.range.treeLoadRadius,streamBudget.priorityTreeRadius+128):this.range.treeLoadRadius
+    this.requestLimit=deferOuter?1:streamBudget.treeRequests
     const now=performance.now()
     this.queue=Array.from(this.grid.near(position.x,position.z,limit))
-      .filter(tile=>distance(tile)<=limit&&!this.loaded.has(tile)&&!this.pending.has(tile)&&(this.retry.get(tile)??0)<=now)
+      .filter(tile=>!deferOuter || tileEdgeDistance(tile,position.x,position.z)<=streamBudget.priorityTreeRadius)
+      .filter(tile=>(deferOuter || distance(tile)<=limit)&&!this.loaded.has(tile)&&!this.pending.has(tile)&&(this.retry.get(tile)??0)<=now)
       .sort((a,b)=>distance(b)-distance(a))
     this.pump()
     if(!this.loaded.size)return
