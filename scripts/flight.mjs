@@ -3,8 +3,10 @@ import {chromium} from 'playwright'
 import {preview} from 'vite'
 import {mkdir} from 'node:fs/promises'
 import assert from 'node:assert/strict'
+import {resolve} from 'node:path'
 
-const server = await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
+const dist=process.env.QA_FLIGHT_DIST
+const server = await preview({...(dist?{configFile:false,build:{outDir:resolve(dist)}}:{root:'web',configFile:'web/vite.config.ts'}),preview:{host:'127.0.0.1',port:0}})
 let browser
 try {
   browser = await chromium.launch(browserOptions())
@@ -13,6 +15,7 @@ try {
   page.on('pageerror',error=>errors.push(error.message))
   const out = process.env.CAPTURES??'captures'
   await mkdir(out,{recursive:true})
+  if(dist)await page.route('https://stats.rcpd.cc/**',route=>route.fulfill({status:204}))
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
   await recordFrames(page)
@@ -25,6 +28,11 @@ try {
     const {stats,stream,camera,manifest}=window.viewer
     return stats.frame>prev && !stats.pending && manifest.chunks.every(tile=>Math.hypot(tile.x+128-camera.position.x,tile.z+128-camera.position.z)>stream.radius||stream.loaded.has(tile))
   },after)
+  let playable
+  if(dist){
+    await settled()
+    playable=await page.evaluate(()=>performance.now())
+  }
   for(const name of ['lijiang','elephant','overview','south','foot','palace']) {
     const mark = await page.evaluate(preset=>window.viewer.setPreset(preset),name)
     await settled(mark)
@@ -68,6 +76,7 @@ try {
     return {frames:samples.length,meanMs:mean(samples),p95Ms:samples.sort((a,b)=>a-b)[Math.floor(samples.length*.95)],meanCalls:mean(calls),maxResident,
       visited:stream.visited.size,total:manifest.chunks.length,failures:stats.failures}
   })
+  if(dist)console.log('FLIGHT_AB',JSON.stringify({playable,p95:metrics.p95Ms,normalP95:normalFlight.p95Ms}))
   console.log(JSON.stringify({...first,normalFlight,...metrics,errors},null,2))
   assert.equal(metrics.visited,metrics.total);assert.equal(metrics.failures,0);assert.equal(errors.length,0);assert.ok(first.firstMs<2000)
 } finally {await browser?.close(); await server.close()}

@@ -1,3 +1,4 @@
+import './telemetry'
 import './ui/theme.css'
 import './ui/hud.css'
 import {home} from './ui/home'

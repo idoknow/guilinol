@@ -13,7 +13,7 @@ function password(value:unknown) {
   if(typeof value!=='string'||value.length<8||value.length>256) invalid()
   return value
 }
-const methods:Record<string,string[]>={me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout'].map(name=>[`auth/${name}`,['POST']]))}
+const methods:Record<string,string[]>={health:['GET'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout'].map(name=>[`auth/${name}`,['POST']]))}
 
 async function handle(request:Request,env:Env) {
   const url=new URL(request.url), path=url.pathname.slice(5), method=request.method, db=env.DB
@@ -22,6 +22,7 @@ async function handle(request:Request,env:Env) {
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(!Object.hasOwn(methods,path)) throw new Problem(404,'not_found','接口不存在')
   if(!methods[path].includes(method)) throw new Problem(405,'method','不支持的请求方式')
+  if(path==='health')return json({ok:true})
   if(method!=='GET'&&request.headers.get('Origin')!==url.origin) throw new Problem(403,'origin','请求来源不符')
   let body:Record<string,unknown>={}
   if(method!=='GET'&&path!=='auth/logout') {

@@ -77,12 +77,13 @@ async function steerTowardPoint(page, tx, tz, stopAfter = true, maxSteps = 90) {
     if (snap.obstacle && Math.abs(snap.speed) < 0.25) {
       await page.keyboard.up('KeyW')
       await page.keyboard.down('KeyS')
-      await page.keyboard[err >= 0 ? 'down' : 'up']('KeyD')
-      await page.keyboard[err < 0 ? 'down' : 'up']('KeyA')
-      await stepTicks(page, 16, 0.05)
+      await page.keyboard[err >= 0 ? 'down' : 'up']('KeyA')
+      await page.keyboard[err < 0 ? 'down' : 'up']('KeyD')
+      await stepTicks(page, 22, 0.05)
       await page.keyboard.up('KeyS')
       await page.keyboard.up('KeyA')
       await page.keyboard.up('KeyD')
+      await stepTicks(page, 4, 0.05)
       continue
     }
     if (!snap.obstacle && Math.abs(err) < 0.08 && (!stopAfter || snap.speed < 0.25)) break
@@ -103,6 +104,7 @@ async function steerTowardPoint(page, tx, tz, stopAfter = true, maxSteps = 90) {
       if (Math.abs(snap.speed) < 0.15) break
     }
     await page.keyboard.up('KeyS')
+    await stepTicks(page, 6, 0.05)
   }
 }
 
@@ -394,10 +396,11 @@ try {
   await page.keyboard.up('KeyW')
   if (d2NonTuckCrashed) await finishCrashStandAndPickup(page, '扶起电动车')
 
-  // High-speed D3 non-tuck turn check (facing west along open Jiefang East Rd junction so KeyA turns toward south plaza, clear of bridge parapet)
+  // High-speed D3 non-tuck turn check (re-center on Jiefang East Rd first so post-D2 turn never clips curbside props)
   await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(false))
-  await steerTowardPoint(page, -539, -95, true, 180)
-  await steerTowardPoint(page, -610, -110, true, 40)
+  await steerTowardPoint(page, -445, -48, false, 90)
+  await steerTowardPoint(page, -539, -95, true, 160)
+  await steerTowardPoint(page, -610, -110, true, 60)
   await page.click('.ride-gear-btn[data-gear="3"]')
   await stepTicks(page, 1, 0.05)
   await page.evaluate(() => window.viewer.walk.ebike.setAutoCrash(true))
