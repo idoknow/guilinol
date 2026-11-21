@@ -49,7 +49,7 @@ def ground_features(bounds, school_grounds=()):
     widths = {'primary': 14, 'secondary': 12, 'tertiary': 10, 'trunk': 18, 'residential': 6}
     for element in load_osm():
         tags = element.get('tags', {})
-        if tags.get('leisure') == 'pitch' and f"{element['type']}/{element['id']}" in replaced_pitches:
+        if tags.get('leisure') in ('pitch', 'track') and f"{element['type']}/{element['id']}" in replaced_pitches:
             continue
         if element['type'] != 'node' and tags.get('leisure') in ('track','pitch'):
             shape = area(element)

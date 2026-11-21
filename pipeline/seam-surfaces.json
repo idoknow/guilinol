@@ -1,21 +1,21 @@
 {
   "surfaces": {
-    "gunanmen": {"sidewalk":"sidewalk"},
-    "ronghu": {"sidewalk":"sidewalk"},
-    "guilin_book_market": {"road":"road","sidewalk":"sidewalk","curb":"curb"},
-    "libin_middle": {"road":"road","sidewalk":"sidewalk","curb":"curb"},
+    "gunanmen": {"sidewalk": "sidewalk"},
+    "ronghu": {"sidewalk": "sidewalk"},
+    "guilin_book_market": {"road": "road", "sidewalk": "sidewalk", "curb": "curb"},
+    "libin_middle": {"campus_paving": "plaza", "road": "road", "sidewalk": "sidewalk", "curb": "curb"},
     "shizijie": {"B_plaza_pave": "sidewalk"},
     "nikoniko": {"B_plaza_pave": "sidewalk"},
     "dongxixiang": {"pave": "plaza"},
     "wangcheng_market": {"pave": "plaza", "ruinGlass": "plaza", "streetLip": "sidewalk", "edgeStone": "plaza"},
     "central_square": {"B_plaza_pave": "sidewalk"},
-    "guilin_middle": {"pave": "sidewalk", "curb":"curb"},
-    "kuiguang_school": {"pave": "sidewalk", "curb":"curb"},
+    "guilin_middle": {"campus_paving": "plaza", "pave": "sidewalk", "curb": "curb"},
+    "kuiguang_school": {"campus_paving": "plaza", "pave": "sidewalk", "curb": "curb"},
     "guangxi_arts": {"pave": "sidewalk"},
     "xiaoyao_tower": {"pave": "sidewalk"},
     "zhuangyuan_gallery": {"pave": "sidewalk"},
     "guanyi_bridge": {"pave": "sidewalk", "curb": "curb"},
-    "yiwu_street": {"pave": "sidewalk", "curb":"curb"},
+    "yiwu_street": {"pave": "sidewalk", "curb": "curb"},
     "lize_bridge": {"pave": "sidewalk"},
     "jiefang_bridge": {"pave": "sidewalk", "road": "road", "road_paint": "marking", "curb_face": "curb"},
     "jingjiang": {"pave": "plaza"},
@@ -23,12 +23,15 @@
     "huaqiao": {"pave": "sidewalk"},
     "zhengyang": {"pave": "sidewalk"},
     "xinyi_arcade": {"pave": "sidewalk"},
-    "yiwu_office": {"pave": "sidewalk"}
+    "yiwu_office": {"pave": "sidewalk"},
+    "ronghu_primary": {"campus_paving": "plaza"},
+    "minzhu_primary": {"campus_paving": "plaza"},
+    "zhonghua_primary": {"campus_paving": "plaza"}
   },
   "atlas": {
-    "guilin_theater": {"material":"guilin_theater_atlas","role":"sidewalk","box":[0,0.5,0.25,0.75]},
-    "glmu_dongcheng": {"material":"g3_atlas","role":"sidewalk","box":[0.125,0.1875,0.375,0.28125]},
-    "gunanmen": {"material":"landmark","role":"plaza","box":[0.875,0.875,1,1]},
+    "guilin_theater": {"material": "guilin_theater_atlas", "role": "sidewalk", "box": [0, 0.5, 0.25, 0.75]},
+    "glmu_dongcheng": {"material": "g3_atlas", "role": "sidewalk", "box": [0.125, 0.1875, 0.375, 0.28125]},
+    "gunanmen": {"material": "landmark", "role": "plaza", "box": [0.875, 0.875, 1, 1]},
     "libin_middle": [{"material": "libin_middle_atlas", "role": "sidewalk", "box": [0, 0.25, 0.25, 0.46875]}, {"label": "innerDrive", "material": "libin_middle_atlas", "role": "road", "box": [0.75, 0.09375, 0.875, 0.1875]}],
     "ronghu": {"material": "landmark", "role": "plaza", "box": [0.5, 0.75, 0.625, 0.875]},
     "guilin_book_market": [{"material": "guilin_book_market_atlas", "role": "road", "box": [0.84375, 0.625, 1, 0.78125]}, {"material": "guilin_book_market_atlas", "role": "sidewalk", "box": [0.15625, 0.59375, 0.34375, 0.78125]}],
@@ -41,25 +44,17 @@
     "yixian_high": [{"material": "yixian_high_atlas", "role": "road", "box": [0.625, 0, 0.75, 0.09375]}, {"material": "yixian_high_atlas", "role": "plaza", "box": [0.5078125, 0.0078125, 0.6084375, 0.0796875]}]
   },
   "heightBoundaries": {
-    "shizijie":["B_plaza_pave"], "nikoniko":["B_plaza_pave"],
-    "dongxixiang":["pave"], "wangcheng_market":["pave","ruinGlass","streetLip","edgeStone"],
-    "central_square":["B_plaza_pave"], "jiefang_bridge":["pave"],
-    "jingjiang":["pave"], "zhongshan_road":["B_plaza_pave"],
-    "libin_middle":["sidewalk","road"], "ronghu":["landmark"]
+    "shizijie": ["B_plaza_pave"],
+    "nikoniko": ["B_plaza_pave"],
+    "dongxixiang": ["pave"],
+    "wangcheng_market": ["pave", "ruinGlass", "streetLip", "edgeStone"],
+    "central_square": ["B_plaza_pave"],
+    "jiefang_bridge": ["pave"],
+    "jingjiang": ["pave"],
+    "zhongshan_road": ["B_plaza_pave"],
+    "libin_middle": ["sidewalk", "road"],
+    "ronghu": ["landmark"]
   },
-  "notStreet": [
-    {"id":"jiefang_bridge","material":"handrail","part":"jiefang_roads.street / stairs","reason":"引道和踏步侧高 1 m 的金属扶手"},
-    {"id":"jiefang_bridge","material":"step_stone","part":"west_bank.landing","reason":"滨江门户高出步道 0.15、0.30、0.45 m 的台阶及柱台"},
-    {"id":"jiefang_bridge","material":"tactile","part":"bridge","reason":"桥上共享人行道上的 0.46 m 宽盲道及防滑凸条"},
-    {"id":"ronghu","material":"steel","part":"steel_bridge","reason":"钢人行桥桥腹、桁架及护栏，桥面顶面已独立为 sidewalk"},
-    {"id":"yiwu_old_house","material":"planter","part":"house","reason":"沿建筑立面布置的花池框及土床"}
-  ],
-  "exceptions": [
-    {"id": "wangcheng_market", "material": "pave", "kind": "material", "name": "市场内部青石板"},
-    {"id": "wangcheng_market", "material": "ruinGlass", "kind": "material", "name": "入口遗址玻璃"},
-    {"id": "dongxixiang", "material": "pave", "kind": "material", "name": "江南巷青石板"},
-    {"id": "wangcheng_market", "material": "edgeStone", "kind": "material", "name": "临街条石"},
-    {"id": "ronghu", "material": "landmark", "kind": "retainingWall", "name": "亲水平台驳岸", "worldXZ": [[-1395.78, 140.89], [-1387.87, 139.13], [-1383.14, 139.92]], "designRise": "sidewalk minus lower paving; 5.01 m at (-1392.27,140.08) before IDOK-59"},
-    {"id": "ronghu", "material": "landmark", "kind": "retainingWall", "name": "桥头入口石阶", "worldXZ": [[-1424.57, 166.06], [-1422.48, 167.3]], "designRise": "sidewalk minus lower forecourt paving"}
-  ]
+  "notStreet": [{"id": "jiefang_bridge", "material": "handrail", "part": "jiefang_roads.street / stairs", "reason": "引道和踏步侧高 1 m 的金属扶手"}, {"id": "jiefang_bridge", "material": "step_stone", "part": "west_bank.landing", "reason": "滨江门户高出步道 0.15、0.30、0.45 m 的台阶及柱台"}, {"id": "jiefang_bridge", "material": "tactile", "part": "bridge", "reason": "桥上共享人行道上的 0.46 m 宽盲道及防滑凸条"}, {"id": "ronghu", "material": "steel", "part": "steel_bridge", "reason": "钢人行桥桥腹、桁架及护栏，桥面顶面已独立为 sidewalk"}, {"id": "yiwu_old_house", "material": "planter", "part": "house", "reason": "沿建筑立面布置的花池框及土床"}],
+  "exceptions": [{"id": "wangcheng_market", "material": "pave", "kind": "material", "name": "市场内部青石板"}, {"id": "wangcheng_market", "material": "ruinGlass", "kind": "material", "name": "入口遗址玻璃"}, {"id": "dongxixiang", "material": "pave", "kind": "material", "name": "江南巷青石板"}, {"id": "wangcheng_market", "material": "edgeStone", "kind": "material", "name": "临街条石"}, {"id": "ronghu", "material": "landmark", "kind": "retainingWall", "name": "亲水平台驳岸", "worldXZ": [[-1395.78, 140.89], [-1387.87, 139.13], [-1383.14, 139.92]], "designRise": "sidewalk minus lower paving; 5.01 m at (-1392.27,140.08) before IDOK-59"}, {"id": "ronghu", "material": "landmark", "kind": "retainingWall", "name": "桥头入口石阶", "worldXZ": [[-1424.57, 166.06], [-1422.48, 167.3]], "designRise": "sidewalk minus lower forecourt paving"}]
 }

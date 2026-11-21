@@ -62,6 +62,7 @@ class Layout:
         self.entries = []
         self.ids = set()
         self.flatten = []
+        self.flatten_transitions = []
         self.school_grounds = []
         self.allow_unmapped_court = []
         self.street_foundations = []
@@ -107,7 +108,9 @@ class Layout:
                 region = polygon(patch['polygon'])
                 if entry.get('allowUnmappedCourt'):
                     self.allow_unmapped_court.append(region)
-                self.flatten.append((region,patch['elevation']))
+                if width := patch.get('transitionMeters'):
+                    self.flatten_transitions.append((region, width))
+                self.flatten.append((region, patch['elevation']))
                 (self.school_grounds if entry.get('schoolGround') else tree_free).append(region)
             model = root.parent/'public'/entry['model']
             if 'schematicCampus' in entry:
