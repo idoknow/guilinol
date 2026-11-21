@@ -3,6 +3,8 @@ import gzip
 import json
 import math
 import random
+import subprocess
+from pathlib import Path
 
 import numpy as np
 from scipy.ndimage import distance_transform_edt
@@ -77,8 +79,8 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
     # Guaranteed starter e-bike & pedal bicycle in the open plaza ahead of default walk spawn (-588, -212),
     # clear of the south wall and west aisle and angled east-southeast toward the exit corridor.
     for target_list, (sx, sz, s_yaw, s_paint) in (
-        (bikes, (-584.5, -204.5, -1.64, 0)),
-        (bicycles, (-591.5, -204.5, -1.64, 2)),
+        (bikes, (-585, -226, -1.64, 0)),
+        (bicycles, (-592, -226, -1.64, 2)),
     ):
         pt = Point(sx, sz)
         if bounds.contains(pt):
@@ -148,6 +150,11 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
 
 
 def write_vehicles(output,data,triangles):
+    root = Path(__file__).resolve().parents[1]
+    spawns = {key: data[key] for key in ('bikes','sharedBikes','bicycles','cars') if key in data}
+    filtered = subprocess.run([root/'node_modules/.bin/tsx', root/'scripts/filter-parked.ts'],
+                              input=json.dumps(spawns), capture_output=True, text=True, check=True)
+    data.update(json.loads(filtered.stdout))
     checked = audit_routes(data['routes'], triangles, select=True)
     if len(checked) != len(data['routes']):
         raise ValueError('航道核查失败，有航段净空不足')

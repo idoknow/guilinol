@@ -126,6 +126,9 @@ batcher.remove(initial.tile);batcher.add(bikeTile())
 check('no duplicate after tile reload',batcher.nearestBike(515,260,150,2),null)
 batcher.returnBike(candidate.id)
 check('restored same instance',batcher.nearestBike(515,260,150,2).id,candidate.id)
+batcher.add({...tile(-768,-256),parked:Float32Array.from(new THREE.Matrix4().makeTranslation(180,150,44).elements)})
+check('decor in pedestrian district has no boarding candidate',batcher.nearestBike(-588,-212,150,2),null)
+check('decor in pedestrian district cannot be checked out by id',batcher.takeBike('-768:-256:0'),false)
 
 await rm(dir, {recursive: true, force: true})
 

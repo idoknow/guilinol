@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {vehicleForbiddenAt} from './game/car-free'
 import {buildingMaterial} from './look/buildings'
 import {bridgeMaterial} from './look/bridge'
 import {WATER_LAYER, waterMaterial} from './look/water'
@@ -260,7 +261,7 @@ export class ChunkBatcher {
         const distance=(east-x)**2+(south-z)**2
         if(distance>=best||footY!==undefined&&Math.abs(footY-height)>1.5)continue
         const id=`${tile.x}:${tile.z}:${offset/16}`
-        if(this.takenBikes.has(id))continue
+        if(this.takenBikes.has(id)||vehicleForbiddenAt(east,south))continue
         nearest={id,x:east,y:height,z:south,yaw:Math.atan2(parked[offset+8],parked[offset+10])};best=distance
       }
     }
@@ -269,7 +270,14 @@ export class ChunkBatcher {
 
   takeBike(id:string){
     if(this.takenBikes.has(id))return false
-    this.takenBikes.add(id);this.furnitureStale=true;return true
+    const [east,south,index]=id.split(':').map(Number)
+    if(!Number.isInteger(index)||index<0||id!==`${east}:${south}:${index}`)return false
+    for(const {tile,parked} of this.items.values()){
+      if(tile.x!==east||tile.z!==south||index>=parked.length/16)continue
+      if(vehicleForbiddenAt(parked[16*index+12],parked[16*index+14]))return false
+      this.takenBikes.add(id);this.furnitureStale=true;return true
+    }
+    return false
   }
 
   returnBike(id:string){if(this.takenBikes.delete(id))this.furnitureStale=true}

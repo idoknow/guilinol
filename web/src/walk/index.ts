@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {getCarFreeAt, vehicleForbiddenAt} from '../game/car-free'
 import R from '@dimforge/rapier3d-compat'
 import {GLTFLoader, type GLTF} from 'three/addons/loaders/GLTFLoader.js'
 import type {PeaksGroup} from '../peaks'
@@ -869,7 +870,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       vehicleState={kind:'boat',id:rides.freeKind??'tour_boat',speedKmh:Math.round(Math.abs(rides.speed)*3.6),damage:0}
     }
     outfitController.setRidingEbike(Boolean(rides?.bike&&rides.rideKind!=='bicycle'))
-    updateTravel(mode,vehicleState,{quiet:!!quietZone,name:quietZone?.name})
+    updateTravel(mode,vehicleState,{quiet:!!quietZone,name:quietZone?.name,carFree:!!getCarFreeAt(pos.x,pos.z)})
   }
 
   function updateShopHintRings(x:number,z:number,footY:number){
@@ -2069,6 +2070,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
             if(moveInto>stepInto*.5){vx-=dot*ux;vz-=dot*uz}
           }
         }
+      }
+      if((rides?.bike||rides?.car)&&vehicleForbiddenAt(next.x,next.z)){
+        next.x=pos.x;next.y=pos.y;next.z=pos.z;rides.stop();bikeSpeed=vx=vz=0;bikeObstacle='restricted'
       }
       traveled+=Math.hypot(next.x-pos.x,next.z-pos.z);sim.body.setNextKinematicTranslation(next);sim.world.step();if(grounded&&!blockedWater)safe.set(next.x,next.y,next.z)
     }
