@@ -15,7 +15,20 @@ import {createDriverPose} from './car'
 import {createRiderPose,notifyDismountBlocked} from './ride'
 import {createEbikeAudioEngine} from './ebike-audio'
 import {clearAvatarPose, ensureAvatarRig, getAvatarJoint, getAvatarJoints} from './avatar-rig'
-import {isGlobalHotkeyBlocked} from './input-guard'
+import {isGlobalHotkeyBlocked, isModalOrOverlayOpen} from './input-guard'
+import {createInteractArbiter} from './interact-arbiter'
+import {mountShopOverlay, type ShopCloseReason} from '../ui/shop-overlay'
+import {
+  findNearbyServiceBay,
+  findNearbyShopTrigger,
+  getQuietZoneAt,
+  getShop,
+  listShops,
+  setPrompt,
+  updateTravel,
+  type ActiveVehicleState,
+  type PlayerMode,
+} from '../game'
 import {
   computeParkedRoll,
   computePickupRoll,
@@ -351,6 +364,265 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let twoWheelOp:TwoWheelOperationalState=createInitialTwoWheelOpState()
   let carHeadlight:TwoWheelHeadlightMode='off'
   let carHeadlightManual=false
+
+  // Unified `.vehicle-action` button shared with `vehicles.ts` and owned by `interact-arbiter.ts`.
+  const actionButton=document.querySelector<HTMLButtonElement>('.vehicle-action')??(()=>{
+    const b=document.createElement('button')
+    b.className='vehicle-action'
+    b.setAttribute('aria-keyshortcuts','F')
+    b.hidden=true
+    document.body.append(b)
+    return b
+  })()
+
+  // Subtle zero-light ground hint rings for registered commercial venues (docs/commerce-shops-spec.md §2.1).
+  const shopHintGroup=new THREE.Group()
+  const shopRingGeo=new THREE.RingGeometry(1.15,1.45,32).rotateX(-Math.PI/2)
+  const shopRings=listShops().map(shop=>{
+    const mat=new THREE.MeshBasicMaterial({
+      color:shop.kind==='clothing'?0xffc53d:0x20d6c1,
+      transparent:true,
+      opacity:.48,
+      depthWrite:false,
+      side:THREE.DoubleSide,
+      fog:false,
+    })
+    const ring=new THREE.Mesh(shopRingGeo,mat)
+    ring.renderOrder=4
+    ring.visible=false
+    shopHintGroup.add(ring)
+    return {shop,ring,mat}
+  })
+  shopHintGroup.visible=false
+  scene.add(shopHintGroup)
+
+  interface SavedStreetPose {
+    yaw:number
+    pitch:number
+    arm:number
+    figurePos:THREE.Vector3
+    figureYaw:number
+    camPos:THREE.Vector3
+    camQuat:THREE.Quaternion
+    fov:number
+  }
+  interface ActiveShopCamera {
+    stagePos:THREE.Vector3
+    orbitYaw:number
+    orbitPitch:number
+    orbitRadius:number
+    minRadius:number
+    maxRadius:number
+    targetHeightOffset:number
+    fovDeg:number
+  }
+  let savedStreetPose:SavedStreetPose|null=null
+  let shopCam:ActiveShopCamera|null=null
+  const shopLookTarget=new THREE.Vector3()
+
+  function updateShopShowcaseCamera(){
+    if(!shopCam)return
+    const focusY=shopCam.stagePos.y+shopCam.targetHeightOffset
+    shopLookTarget.set(shopCam.stagePos.x,focusY,shopCam.stagePos.z)
+    const cosP=Math.cos(shopCam.orbitPitch)
+    camera.position.set(
+      shopLookTarget.x+Math.sin(shopCam.orbitYaw)*cosP*shopCam.orbitRadius,
+      shopLookTarget.y+Math.sin(shopCam.orbitPitch)*shopCam.orbitRadius,
+      shopLookTarget.z+Math.cos(shopCam.orbitYaw)*cosP*shopCam.orbitRadius,
+    )
+    camera.lookAt(shopLookTarget)
+  }
+
+  const shopOverlay=mountShopOverlay({
+    onBeforeOpen(shop){
+      input.clearTransientInput(true)
+      held=true;external=null;rides?.stop();vx=vz=0
+      savedStreetPose={
+        yaw,pitch,arm,
+        figurePos:figure.position.clone(),
+        figureYaw:figure.rotation.y,
+        camPos:camera.position.clone(),
+        camQuat:camera.quaternion.clone(),
+        fov:camera.fov,
+      }
+      if(shop){
+        const sx=shop.cameraRig.stagePos[0], sz=shop.cameraRig.stagePos[2]
+        const sy=supportAt(sx,sz,shop.cameraRig.stagePos[1])?.y??figure.position.y
+        shopCam={
+          stagePos:new THREE.Vector3(sx,sy,sz),
+          orbitYaw:shop.cameraRig.stageYaw,
+          orbitPitch:shop.cameraRig.pitchRad,
+          orbitRadius:shop.cameraRig.orbitRadius,
+          minRadius:shop.cameraRig.minRadius,
+          maxRadius:shop.cameraRig.maxRadius,
+          targetHeightOffset:shop.cameraRig.targetHeightOffset,
+          fovDeg:shop.cameraRig.fovDeg,
+        }
+        if(shop.kind==='clothing'){
+          figure.position.set(sx,sy+soleOffset,sz)
+          figure.rotation.y=shop.cameraRig.stageYaw+avatar.yaw
+          figure.visible=true
+        }
+        camera.fov=shopCam.fovDeg
+        camera.updateProjectionMatrix()
+        updateShopShowcaseCamera()
+      }else{
+        shopCam={
+          stagePos:figure.position.clone(),
+          orbitYaw:yaw+Math.PI,
+          orbitPitch:.16,
+          orbitRadius:3.1,
+          minRadius:2.0,
+          maxRadius:4.6,
+          targetHeightOffset:1.05,
+          fovDeg:44,
+        }
+        camera.fov=shopCam.fovDeg
+        camera.updateProjectionMatrix()
+        updateShopShowcaseCamera()
+      }
+    },
+    onOrbitDrag(dx,dy){
+      if(!shopCam)return
+      shopCam.orbitYaw-=dx*.008
+      shopCam.orbitPitch=THREE.MathUtils.clamp(shopCam.orbitPitch+dy*.005,.04,.65)
+      updateShopShowcaseCamera()
+    },
+    onOrbitZoom(delta){
+      if(!shopCam)return
+      shopCam.orbitRadius=THREE.MathUtils.clamp(shopCam.orbitRadius+delta*.003,shopCam.minRadius,shopCam.maxRadius)
+      updateShopShowcaseCamera()
+    },
+    onAfterClose(_shopId,reason:ShopCloseReason){
+      const restored=savedStreetPose
+      savedStreetPose=null
+      shopCam=null
+      if(restored){
+        camera.fov=restored.fov
+        camera.updateProjectionMatrix()
+        if(reason!=='fly'&&reason!=='teleport'&&reason!=='testride'){
+          yaw=restored.yaw;pitch=restored.pitch;arm=restored.arm
+          figure.position.copy(restored.figurePos)
+          figure.rotation.y=restored.figureYaw
+          camera.position.copy(restored.camPos)
+          camera.quaternion.copy(restored.camQuat)
+          if(active)follow(0,true)
+        }
+      }
+      held=false
+      input.clearTransientInput(true)
+    },
+  })
+
+  function buildInteractionContext(){
+    const pos=rides?.boat?.position??sim.body.translation()
+    const footY=rides?.boat?pos.y:pos.y-cfg.height/2
+    const quietZone=getQuietZoneAt(pos.x,pos.z)
+    const vSnap=rides?.getInteractSnapshot()??{
+      aboardKind:null,tourDisembarkQueued:false,nearDownedVehicle:null,nearVehicle:null,nearBoat:null,
+    }
+    const shopHit=findNearbyShopTrigger(pos.x,pos.z,footY,{playerInQuietZone:!!quietZone})
+    const serviceHit=findNearbyServiceBay(pos.x,pos.z,footY,{playerInQuietZone:!!quietZone})
+    return {
+      active,
+      modalOrOverlayBlocked:isModalOrOverlayOpen()||document.body.dataset.photo==='on'||shopOverlay.isOpen(),
+      crashed:!!crashSession||document.body.dataset.rideCrash==='1',
+      standingUp:!!standUpSession,
+      pickingUpKind:pickupSession?pickupSession.rec.kind:null,
+      aboardKind:vSnap.aboardKind,
+      tourDisembarkQueued:vSnap.tourDisembarkQueued,
+      inQuietZone:!!quietZone,
+      nearDownedVehicle:vSnap.nearDownedVehicle,
+      nearShop:shopHit?{shopId:shopHit.shop.shopId,brandName:shopHit.shop.brandName,displayName:shopHit.shop.displayName,distance:shopHit.distance}:null,
+      nearServiceBay:serviceHit?{shopId:serviceHit.shop.shopId,displayName:serviceHit.shop.displayName,distance:serviceHit.distance}:null,
+      nearVehicle:vSnap.nearVehicle,
+      nearBoat:vSnap.nearBoat,
+    }
+  }
+
+  const interactArbiter=createInteractArbiter({
+    getContext:buildInteractionContext,
+    onOpenShop(shopId){
+      const shop=getShop(shopId)
+      if(!shop)return
+      shopOverlay.openShop(shop.shopId)
+    },
+    onOpenService(shopId){
+      shopOverlay.openServiceBay(shopId)
+    },
+    onVehicleOrBoatInteract(){
+      rides?.interact()
+    },
+    onSoftHint(text){
+      window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text,ms:2200}}))
+    },
+    onDecisionChange(decision){
+      if(decision.label&&!decision.disabled){
+        const kind=decision.action==='open_shop'?'shop':decision.action==='open_service'?'service':decision.action==='dismount'?'dismount':decision.action==='pickup_downed'?'pickup':decision.action==='board_boat'?'boat':'vehicle'
+        setPrompt({key:'F',text:decision.label,kind})
+      }else{
+        setPrompt(null)
+      }
+    },
+  })
+  actionButton.onclick=()=>interactArbiter.trigger()
+
+  function syncGameTravelState(){
+    const pos=rides?.boat?.position??sim.body.translation()
+    const quietZone=getQuietZoneAt(pos.x,pos.z)
+    let mode:PlayerMode='foot'
+    let vehicleState:ActiveVehicleState|null=null
+    if(rides?.car){
+      mode='car'
+      const tel=rides.carTelemetry
+      vehicleState={
+        kind:'car',
+        id:'car_world',
+        speedKmh:tel?.kmh??Math.round(Math.abs(rides.speed)*3.6),
+        gear:tel?.gearLabel==='R'?'R':tel?.gearLabel==='N'?'N':'D',
+        damage:0,
+      }
+    }else if(rides?.bike){
+      const isBicycle=rides.rideKind==='bicycle'
+      mode=isBicycle?'bike':'ebike'
+      const tel=rides.ebikeTelemetry
+      const ownership=(rides.bike.userData.ownership as ActiveVehicleState['ownership']|undefined)??(rides.isShared?'shared':'personal')
+      const gearLabel=(tel?.parkLocked?'P':tel?.gearLabel) as ActiveVehicleState['gearLabel']|undefined
+      vehicleState={
+        kind:isBicycle?'bike':'ebike',
+        id:(rides.bike.userData.instanceId as string|undefined)??(rides.isShared?'shared_ebike':'world_ebike'),
+        speedKmh:tel?.kmh??Math.round(Math.abs(rides.speed)*3.6),
+        gear:tel?.parkLocked?'N':'D',
+        damage:0,
+        ownership,
+        gearLabel,
+        batteryPct:tel?.batteryPct??rides.ebikeBattery,
+        durabilityPct:100,
+        parkLocked:tel?.parkLocked??false,
+      }
+    }else if(rides?.boat){
+      mode='boat'
+      vehicleState={kind:'boat',id:rides.freeKind??'tour_boat',speedKmh:Math.round(Math.abs(rides.speed)*3.6),damage:0}
+    }
+    updateTravel(mode,vehicleState,{quiet:!!quietZone,name:quietZone?.name})
+  }
+
+  function updateShopHintRings(x:number,z:number,footY:number){
+    const onFoot=active&&!rides?.car&&!rides?.bike&&!rides?.boat&&!shopOverlay.isOpen()
+    shopHintGroup.visible=onFoot
+    if(!onFoot)return
+    const wave=.5+.5*Math.sin(performance.now()*.0045)
+    for(const item of shopRings){
+      const dist=Math.hypot(item.shop.triggerPos[0]-x,item.shop.triggerPos[2]-z)
+      if(dist>item.shop.hintRadius){item.ring.visible=false;continue}
+      const gy=supportAt(item.shop.triggerPos[0],item.shop.triggerPos[2],footY)?.y??item.shop.triggerPos[1]
+      const inReach=dist<=item.shop.triggerRadius
+      item.ring.visible=true
+      item.ring.position.set(item.shop.triggerPos[0],gy+.08,item.shop.triggerPos[2])
+      item.ring.scale.setScalar(inReach?1+.06*wave:1.05+.08*wave)
+      item.mat.opacity=inReach?.72+.18*wave:.28+.15*wave
+    }
+  }
   window.addEventListener('keydown',event=>{
     if(active)ebikeAudio.unlock()
     if(!active||!crashSession||event.repeat)return
@@ -595,12 +867,12 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const check=sim.findLocalMount(cur.x,cur.y-cfg.height/2,cur.z,bx,by,bz)
       if(!check.ok){notifyDismountBlocked(check.reason==='blocked'?'中间有遮挡，绕过去再骑':'这里太窄了，挪一挪再骑');return null}
       return check
-    },{sim,stream,landFree:spot=>{sim.sync(spot.x,spot.z)
+    },{sim,stream,actionButton,externalArbiter:true,landFree:spot=>{sim.sync(spot.x,spot.z)
       const prevBoatPos=figure.position.clone(),prevBoatYaw=figure.rotation.y
       if(sim.insideHouse(spot.x,spot.z)||!sim.freeCapsule(spot.x,spot.y,spot.z)||!place(spot.x,spot.z,spot.rule,true,spot))return false
       rides?.clearBoatPose(figure);boatLandFrom.copy(prevBoatPos);boatLandYaw=prevBoatYaw;boatLandElapsed=0;boatBoardElapsed=BOAT_BOARD_DUR
-      facing=spot.heading+avatar.yaw;figure.rotation.y=facing;wasBoat=false;input.clearRun();follow(0,false);return true}})).then(loaded=>{rides=loaded;rides.show(active)
-      if(active){const p=sim.body.translation();sim.sync(p.x,p.z);loaded.nearby(p.x,p.z,p.y-cfg.height/2)}})
+      facing=spot.heading+avatar.yaw;figure.rotation.y=facing;wasBoat=false;input.clearRun();follow(0,false);return true}})).then(loaded=>{rides=loaded;rides.setExternalArbiter(true);rides.show(active)
+      if(active){const p=sim.body.translation();sim.sync(p.x,p.z);loaded.nearby(p.x,p.z,p.y-cfg.height/2);interactArbiter.sync(actionButton)}})
       .catch(error=>console.warn('Vehicles unavailable:',error)).finally(()=>{loading=false})}
   const BOAT_BOARD_DUR=.24, BOAT_LAND_DUR=.20
   const boatBoardFrom=new THREE.Vector3(), boatLandFrom=new THREE.Vector3()
@@ -615,6 +887,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const bridgeCenter=bridge&&new THREE.Vector3(...bridge.sphere.slice(0,3)).applyAxisAngle(new THREE.Vector3(0,1,0),THREE.MathUtils.degToRad(bridge.rotation)).add(new THREE.Vector3(...bridge.position))
   const bridgeDistance=(x:number,z:number)=>bridge&&bridgeCenter?Math.hypot(x-bridgeCenter.x,z-bridgeCenter.z)-bridge.sphere[3]:Infinity
   async function enter(x:number,z:number,heading:number,reason:string,override=false){
+    if(shopOverlay.isOpen())shopOverlay.close('teleport')
     const target=new THREE.Vector3(x,0,z);destination=target
     stream.prioritize(x,z)
     const needed=manifest.chunks.filter(tile=>Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))<=cfg.search)
@@ -644,7 +917,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true);return true
   }
-  function leave(){destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function leave(){if(shopOverlay.isOpen())shopOverlay.close('fly');shopHintGroup.visible=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number){
     const dryBridge=!!sim.surface(x,z,'deck',refY+.4,1.5)||!!sim.surface(x,z,'landmark',refY+.4,1.5)
     return !sim.insideHouse(x,z)&&(!sim.wet(x,z)||dryBridge)&&!sim.isBlockedAt(x,refY,z)
@@ -1121,7 +1394,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       downedBikes:Array.from(downedBikes).map(r=>({kind:r.kind,x:r.x,z:r.z,roll:r.roll,dist:Math.hypot(r.x-pos.x,r.z-pos.z)})),
       camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z,camera.position.y),
       boat:rides?.boatProbe()??null}}
-  function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);rides?.nearby(start.x,start.z,rides?.boat?start.y:start.y-cfg.height/2)
+  function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
+    if(shopOverlay.isOpen()){updateShopShowcaseCamera();return}
     if(rides?.freeBoat){
       releaseDynamicBike();input.syncRideHud(null,'boat')
       const read=held?still:input.read(), firstFrame=!wasBoat
@@ -1812,6 +2086,16 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       setGtaPhysics(on:boolean|undefined){carGtaOverride=on;if(on!==undefined)rides?.setCarGtaPhysics(on)},
       cycleLight(){carHeadlight=nextHeadlightMode(carHeadlight);carHeadlightManual=true;return carHeadlight},
       setHeadlight(mode:TwoWheelHeadlightMode){carHeadlight=mode;carHeadlightManual=true;return carHeadlight},
+    },
+    shop:{
+      open:(shopId:string,tab?:string)=>shopOverlay.openShop(shopId,tab),
+      openService:(shopId:string)=>shopOverlay.openServiceBay(shopId),
+      openWardrobe:()=>shopOverlay.openWardrobe(),
+      openGarage:()=>shopOverlay.openGarage(),
+      close:(reason?:ShopCloseReason)=>shopOverlay.close(reason),
+      isOpen:()=>shopOverlay.isOpen(),
+      triggerInteract:()=>interactArbiter.trigger(),
+      getInteractDecision:()=>interactArbiter.getLastDecision(),
     },
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}
