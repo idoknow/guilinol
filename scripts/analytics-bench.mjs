@@ -55,7 +55,7 @@ try {
     const [endpoint,search]=path.split('?'),params=new URLSearchParams(search)
     params.set('from',start.toISOString());params.set('to',end.toISOString())
     const times=[]
-    for(let run=0;run<5;run++){
+    for(let run=0;run<25;run++){
       trace=run===0?[]:undefined
       const before=performance.now()
       const options={headers:{Cookie:'glol_session='+token,Origin:origin,'Content-Type':'application/json'}}
@@ -69,8 +69,9 @@ try {
         for(const {sql,args} of trace)plans.push([path,(await pool.query('EXPLAIN '+sql,args)).rows.map(r=>r['QUERY PLAN']).join('\n')])
       }
     }
-    const p95=Math.ceil(Math.max(...times))
-    console.log(path,p95,times);results.push({path,p95})
+    const sorted=[...times].sort((a,b)=>a-b)
+    const p95=Math.ceil(sorted[Math.ceil(sorted.length*.95)-1])
+    console.log(path,p95,times);results.push({path,p95,first:Math.ceil(times[0]),max:Math.ceil(sorted.at(-1))})
   }
   if(process.argv[2])await writeFile(process.argv[2],JSON.stringify({results,plans},null,2))
 }finally{if(server)await new Promise(resolve=>server.close(resolve));await pool.end();await db.close()}
