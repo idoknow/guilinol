@@ -3,6 +3,8 @@ import {glHookScript} from './gl-perf.mjs'
 import {mkdir, writeFile} from 'node:fs/promises'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
+import {resolve} from 'node:path'
+import assert from 'node:assert/strict'
 
 const CAMERAS = [
   {id: 'overview', label: 'overview', query: 'verify&cam=overview&flow=0', mode: 'fly'},
@@ -10,6 +12,7 @@ const CAMERAS = [
   {id: 'palace', label: 'palace', query: 'verify&cam=palace&flow=0', mode: 'fly'},
   {id: 'south', label: 'south', query: 'verify&cam=south&flow=0', mode: 'fly'},
   {id: 'walk-palace', label: '步行王城', query: 'verify&mode=walk&flow=0', mode: 'walk'},
+  {id: 'street-jiefang', label: '解放桥街头', query: 'verify&solo=1&flow=0&time=17', mode: 'walk'},
 ]
 
 const expansion = process.argv.includes('--expansion')
@@ -25,7 +28,12 @@ const FIRST_RUNS = Number(process.env.PERF_FIRST_RUNS ?? 5)
 const trafficQuery = process.argv.includes('--traffic') ? '&traffic=1' : ''
 const OUT_FILE = process.env.PERF_OUT ?? 'captures/perf.json'
 
-const cpuRate = Number(process.env.PERF_CPU_RATE ?? 1)
+const native=process.platform==='darwin' && process.env.QA_NATIVE_GPU!=='0'
+const mobile=process.env.PERF_MOBILE==='1'
+const viewport=mobile?{width:390,height:844}:native?{width:1920,height:1080}:{width:960,height:540}
+const launch={headless:!native,executablePath:process.env.CHROMIUM,args:[...(native?['--enable-gpu','--use-angle=metal']:['--use-angle=swiftshader','--enable-unsafe-swiftshader']),'--enable-precise-memory-info']}
+const cpuRate = Number(process.env.PERF_CPU_RATE ?? (mobile?4:1))
+const sampleMs=Number(process.env.PERF_MS??(native?10000:0))
 async function throttle(page) {
   const cdp = await page.context().newCDPSession(page)
   await cdp.send('Emulation.setCPUThrottlingRate', {rate:cpuRate})
@@ -35,7 +43,7 @@ function round(n, digits = 2) {
   return +n.toFixed(digits)
 }
 
-const server = await preview({plugins:[telemetryPreview],root: 'web', configFile: 'web/vite.config.ts', preview: {host: '127.0.0.1', port: 0}})
+const server = await preview({plugins:[telemetryPreview],root: 'web', configFile: 'web/vite.config.ts',build:{outDir:resolve(process.env.PERF_DIST??'dist')}, preview: {host: '127.0.0.1', port: 0}})
 const baseUrl = `http://127.0.0.1:${server.httpServer.address().port}`
 let browser
 
@@ -45,10 +53,7 @@ try {
   const firstWorldBytes = []
   const firstWorldRequests = []
   for (let i = 0; i < FIRST_RUNS; i++) {
-    const coldBrowser = await chromium.launch({
-      executablePath: process.env.CHROMIUM,
-      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader','--enable-precise-memory-info'],
-    })
+    const coldBrowser = await chromium.launch(launch)
     try {
       const page = await coldBrowser.newPage({viewport: {width: 960, height: 540}})
       await throttle(page)
@@ -69,13 +74,10 @@ try {
     }
   }
 
-  browser = await chromium.launch({
-    executablePath: process.env.CHROMIUM,
-    args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader','--enable-precise-memory-info'],
-  })
+  browser = await chromium.launch(launch)
 
   // 2. Measure the 5 fixed viewpoints.
-  const context = await browser.newContext({viewport: {width: 960, height: 540}})
+  const context = await browser.newContext({viewport,deviceScaleFactor:mobile?3:1,isMobile:mobile,hasTouch:mobile})
   await context.addInitScript(glHookScript)
   const page = await context.newPage()
   await throttle(page)
@@ -86,13 +88,16 @@ try {
   })
 
   const viewpoints = {}
+  const build=await (await fetch(`${baseUrl}/version.json`)).json()
+  const renderer=await page.evaluate(()=>{const gl=document.createElement('canvas').getContext('webgl2'), ext=gl.getExtension('WEBGL_debug_renderer_info');return ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):'unknown'})
+  if(native)assert.match(renderer,/Metal/i,'Hardware run requires Metal')
   const outDir = OUT_FILE.includes('/') ? OUT_FILE.slice(0, OUT_FILE.lastIndexOf('/')) : '.'
   await mkdir(outDir, {recursive: true})
   async function saveReport() {
     const count = firstFrameRuns.length
     const summary = {
       timestamp: new Date().toISOString(),
-      viewport: {width: 960, height: 540, renderer: 'SwiftShader'},
+      viewport: {...viewport, renderer, dpr:mobile?3:1}, build, browser:browser.version(), sampleMs,
       cpuRate, sampleFrames: SAMPLE_FRAMES,
       firstFrame: {
         runsMs: firstFrameRuns, worldBytes: firstWorldBytes, requests:firstWorldRequests,
@@ -109,6 +114,16 @@ try {
     if(process.env.PERF_CAMERA && process.env.PERF_CAMERA!==cam.id)continue
     const started = performance.now()
     await page.goto(`${baseUrl}/?${cam.query}${trafficQuery}`)
+    if(cam.id==='street-jiefang'){
+      await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:120000})
+      await page.evaluate(async()=>{
+        const viewer=window.viewer
+        if(!await viewer.walkTo(-265,15,0,'perf-jiefang'))throw Error('Could not place walker at bridge')
+        const tick=viewer.walk.tick.bind(viewer.walk)
+        viewer.walk.tick=elapsed=>{tick(elapsed);viewer.camera.position.set(-265,168,15);viewer.camera.lookAt(-145,153,45);viewer.camera.updateMatrixWorld()}
+      })
+      if(process.env.PERF_BASELINE!=='1')await page.waitForFunction(()=>window.viewer.trafficProbe?.motors>=30,null,{timeout:180000})
+    }
     await page.waitForFunction(mode => {
       const viewer = window.viewer
       if (!viewer?.stats.firstMs || viewer.stats.pending) return false
@@ -124,7 +139,7 @@ try {
     }, cam.mode, {timeout: 120000})
 
     const loadMs = Math.round(performance.now()-started)
-    const metrics = await page.evaluate(async sampleCount => {
+    const metrics = await page.evaluate(async ([sampleCount,minMs]) => {
       function nextRaf() {
         return new Promise(resolve => requestAnimationFrame(resolve))
       }
@@ -134,11 +149,11 @@ try {
       const frameTimes = []
       let heapPeakBytes = 0
       let lastDraw = null
-      for (let i = 0; i < sampleCount; i++) {
-        const t0 = performance.now()
+      const start=await nextRaf(); let last=start
+      for (let i = 0; i < sampleCount || last-start<minMs; i++) {
         window.__glPerf.resetFrame()
-        await nextRaf()
-        const dt = performance.now() - t0
+        const now=await nextRaf()
+        const dt=now-last;last=now
         lastDraw = window.__glPerf.readFrame()
         frameTimes.push(dt)
         heapPeakBytes = Math.max(heapPeakBytes, performance.memory?.usedJSHeapSize ?? 0)
@@ -150,6 +165,8 @@ try {
       const mem = window.__glPerf.memory()
       const peakDraws = window.viewer.peaksStats?.calls ?? null
       return {
+        fps:+(1000/mean).toFixed(2), frameTimes, motors:window.viewer.trafficProbe?.motors??0,
+        camera:window.viewer.camera.position.toArray(),
         heapPeakBytes,
         meanMs: +mean.toFixed(2),
         medianMs: +median.toFixed(2),
@@ -165,12 +182,12 @@ try {
         bufferMB: mem.bufferMB,
         textureMB: mem.textureMB,
       }
-    }, SAMPLE_FRAMES)
+    }, [SAMPLE_FRAMES,sampleMs])
 
     if (expansion) {
       const dir = 'captures/expansion'
       await mkdir(dir, {recursive:true})
-      if (cam.mode==='walk' && cam.id!=='walk-palace') {
+      if (cam.mode==='walk' && cam.id!=='walk-palace' && cam.id!=='street-jiefang') {
         const last = await page.evaluate(()=>window.viewer.walk.spawns.at(-1))
         if (!last?.to || last.reason==='fallback') throw Error('Unexpected fallback spawn: '+cam.id)
       }

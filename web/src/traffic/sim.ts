@@ -3,9 +3,10 @@ type Lane = {id:number,from:number,to:number,offset:number,kind:'motor'|'bus'|'n
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?][],signals:Signal[]}
-export type Track = Lane & {start:Node,end:Node,dx:number,dz:number,length:number,walk:boolean}
+export type Track = Lane & {start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean}
 type Actor = {track:Track,dist:number,speed:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean}
 type Position = {x:number,z:number,y:number}
+const distanceSq=(left:Position,right:Position)=>(left.x-right.x)**2+(left.y-right.y)**2+(left.z-right.z)**2
 
 export class Traffic {
   *allTracks(){for(const list of this.exits.values())yield* list}
@@ -29,7 +30,7 @@ export class Traffic {
       const start=nodes.get(lane.from)!,end=nodes.get(lane.to)!
       const length=Math.hypot(end.x-start.x,end.z-start.z)
       if(length<.5)return
-      const track={...lane,start,end,length,dx:(end.x-start.x)/length,dz:(end.z-start.z)/length,walk}
+      const track={...lane,start,end,length,dx:(end.x-start.x)/length,dz:(end.z-start.z)/length,yaw:Math.atan2(end.x-start.x,end.z-start.z),walk}
       const exits=this.exits.get(start.id)??[];exits.push(track);this.exits.set(start.id,exits)
       const key=`${Math.floor((start.x+end.x)/2/128)},${Math.floor((start.z+end.z)/2/128)}`
       const cell=this.cells.get(key)??[];cell.push(track);this.cells.set(key,cell)
@@ -59,7 +60,7 @@ export class Traffic {
     actor.x=track.start.x+track.dx*dist-track.dz*(track.offset+actor.dodge)
     actor.z=track.start.z+track.dz*dist+track.dx*(track.offset+actor.dodge)
     actor.y=track.start.y+(track.end.y-track.start.y)*dist/track.length
-    actor.yaw=Math.atan2(track.dx,track.dz)
+    actor.yaw=track.yaw
   }
   phase(track:Lane,time=this.time):'green'|'red'|'yellow'{
     const signal=this.signal.get(track.to)
@@ -77,7 +78,7 @@ export class Traffic {
   }
   step(dt:number,camera:Position,vehicle?:Position,visible?:(point:Position)=>boolean){
     this.time+=dt
-    this.actors=this.actors.filter(actor=>(!actor.leaving||actor.scale>0)&&Math.hypot(actor.x-camera.x,actor.y-camera.y,actor.z-camera.z)<210)
+    this.actors=this.actors.filter(actor=>(!actor.leaving||actor.scale>0)&&distanceSq(actor,camera)<210**2)
     if(visible&&this.time>=this.nextCull){
       this.nextCull=this.time+.35
       const behind=this.actors.filter(actor=>actor.kind!=='person'&&!visible(actor))
@@ -97,7 +98,7 @@ export class Traffic {
       const actor:Actor={track,dist:this.random()*track.length,speed:0,kind:walk?'person':scooter?'scooter':'car',down:0,dodge:0,x:0,y:0,z:0,yaw:0,scale:0,leaving:false}
       this.position(actor)
       if(visible&&!visible(actor)&&this.random()>.035)continue
-      if(Math.hypot(actor.x-camera.x,actor.y-camera.y,actor.z-camera.z)>185 || this.actors.some(other=>(other.x-actor.x)**2+(other.z-actor.z)**2<(other.track.id===track.id?36:5)))continue
+      if(distanceSq(actor,camera)>185**2 || this.actors.some(other=>(other.x-actor.x)**2+(other.z-actor.z)**2<(other.track.id===track.id?36:5)))continue
       this.actors.push(actor)
       if(walk)persons++;else {motors++;scooters+=Number(scooter)}
     }
