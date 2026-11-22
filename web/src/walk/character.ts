@@ -93,7 +93,7 @@ export function hairstyle(a: Avatar, library: T.Object3D) {
 export function styleCharacter(scene: T.Group, rig: AvatarRig, a: Avatar) {
   const head = rig.attachments.head!
   scene.userData.characterSkin = skinTones[a.skin]
-  addOutline(rig.skinnedMesh!, 0.011)
+  addOutline(rig.skinnedMesh!, 0.015)
   addOutline(scene.userData.creatorHair, 0.005)
   head.add(scene.userData.creatorHair)
   delete scene.userData.creatorHair

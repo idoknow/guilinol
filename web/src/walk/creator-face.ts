@@ -31,30 +31,21 @@ export function facialFeatures(geometry: T.BufferGeometry, a: Avatar) {
   const group = new T.Group(),
     front = frontOfFace(geometry)
   group.name = 'creator-face'
+  const positions: number[] = [],
+    colors: number[] = [],
+    indices: number[] = []
   // Taper each contour to its corners and curve the surface around the cheeks.
-  function ribbon(
-    color: T.ColorRepresentation,
-    point: (t: number, v: number) => [number, number, number],
-  ) {
-    const p: number[] = [],
-      indices: number[] = []
+  function ribbon(color: T.ColorRepresentation, point: (t: number, v: number) => [number, number, number]) {
+    const pigment = new T.Color(color)
+    const start = positions.length / 3
     for (let i = 0; i <= 18; i++)
       for (let j = 0; j < 3; j++) {
         const [x, y, lift] = point(i / 18, j / 2)
-        p.push(x, y, front(x, y) - lift)
-        const k = i * 3 + j
+        colors.push(pigment.r, pigment.g, pigment.b)
+        positions.push(x, y, front(x, y) - lift)
+        const k = start + i * 3 + j
         if (i && j) indices.push(k - 4, k - 1, k, k - 4, k, k - 3)
       }
-    const g = new T.BufferGeometry()
-    g.setAttribute('position', new T.Float32BufferAttribute(p, 3))
-    g.setIndex(indices)
-    g.computeVertexNormals()
-    group.add(
-      new T.Mesh(
-        g,
-        new T.MeshStandardMaterial({color, roughness: 0.85, side: T.DoubleSide}),
-      ),
-    )
   }
   for (const side of [-1, 1]) {
     ribbon('#382e2b', (t, v) => [
@@ -85,5 +76,10 @@ export function facialFeatures(geometry: T.BufferGeometry, a: Avatar) {
       0.0018,
     ]
   })
+  const g = new T.BufferGeometry()
+  g.setAttribute('position', new T.Float32BufferAttribute(positions, 3))
+  g.setAttribute('color', new T.Float32BufferAttribute(colors, 3))
+  g.setIndex(indices)
+  group.add(new T.Mesh(g, new T.MeshBasicMaterial({vertexColors: true, side: T.DoubleSide})))
   return group
 }
