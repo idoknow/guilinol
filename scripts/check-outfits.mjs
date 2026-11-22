@@ -84,6 +84,8 @@ try {
   const basePosCount = skinned.geometry.getAttribute('position').count
   const origColors = Float32Array.from(skinned.geometry.getAttribute('color').array)
 
+  // Partition the pristine glb colours before the controller paints the default outfit over them.
+  const part = outfitMod.partitionCityWalkerGeometry(skinned)
   const controller = outfitMod.createAvatarOutfitController(figure, rig)
   const snap0 = controller.getSnapshot()
   const zoneTotal = Object.values(snap0.zoneCounts).reduce((a, b) => a + b, 0)
@@ -100,7 +102,6 @@ try {
 
   // Track exact vertex indices for LOCKED_SKIN & LOCKED_HAIR
   const colAttr = skinned.geometry.getAttribute('color')
-  const part = outfitMod.partitionCityWalkerGeometry(skinned)
   const lockedIndices = []
   for (let i = 0; i < part.zones.length; i++) {
     if (part.zones[i] === outfitMod.OUTFIT_ZONE.LOCKED_SKIN || part.zones[i] === outfitMod.OUTFIT_ZONE.LOCKED_HAIR) {

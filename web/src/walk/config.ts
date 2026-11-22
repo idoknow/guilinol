@@ -36,7 +36,7 @@ export type EbikeHeadlightMode = 'off' | 'low' | 'high'
 export type EbikeTurnSignal = 'off' | 'left' | 'right'
 
 export const walkConfig = {
-  height:1.7, radius:.29, walk:4, run:9, crouch:2.2, jump:1.2, gravity:-20, fallGravity:-28,
+  height:1.7, radius:.29, walk:1.65, run:9, crouch:1.2, jump:1.2, gravity:-20, fallGravity:-28,
   accel:50, decel:135, grip:220, airAccel:18, pivotBoost:2.2, turnRate:20, coyote:.1, jumpBuffer:.12,
   slope:52*Math.PI/180, step:.62, stepWidth:.08, snap:.65, skin:.025, collisionRadius:384, peakRadius:600, search:64,
   // Camera (M2 look): figure stays small, scenery fills the frame (docs/style.md 原则 6).

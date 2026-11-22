@@ -83,7 +83,8 @@ interface ShoesRecipe {
 }
 
 const TOP_RECIPES: Record<string, TopRecipe> = {
-  top_default_tee: {primary: '#f09a4a', sleeve: '#f09a4a', trim: '#c06a2c', inner: '#f2efe8'},
+  // IDOK-133 default look: ink-navy short jacket over a white tee, oat chinos, white court shoes, brick-red daypack.
+  top_default_tee: {primary: '#33425a', sleeve: '#33425a', trim: '#222c3d', inner: '#efece4'},
   top_guilin_hoodie: {primary: '#465460', sleeve: '#465460', trim: '#ffc53d', inner: '#d8d4cb'},
   top_linen_shirt: {primary: '#ece5d4', sleeve: '#ece5d4', trim: '#8d9b87', inner: '#f7f4ec'},
   top_rider_vest: {primary: '#d98a2b', sleeve: '#1c2329', trim: '#ffd257', inner: '#1c2329'},
@@ -93,7 +94,7 @@ const TOP_RECIPES: Record<string, TopRecipe> = {
 }
 
 const BOTTOM_RECIPES: Record<string, BottomRecipe> = {
-  bottom_default_pants: {main: '#55708f', belt: '#343b40'},
+  bottom_default_pants: {main: '#c4b9a3', belt: '#3a2f28'},
   bottom_guilin_cargo: {main: '#2d3238', belt: '#1b1f24'},
   bottom_linen_shorts: {main: '#a9977b', belt: '#6f5c43'},
   bottom_rider_pants: {main: '#252a30', belt: '#ffc53d'},
@@ -103,7 +104,7 @@ const BOTTOM_RECIPES: Record<string, BottomRecipe> = {
 }
 
 const SHOES_RECIPES: Record<string, ShoesRecipe> = {
-  shoes_default_sneaker: {upper: '#eeeae2', accent: '#343b40', sole: '#c49a6c'},
+  shoes_default_sneaker: {upper: '#f2f0ea', accent: '#c4553f', sole: '#f6f4ef'},
   shoes_guilin_canvas: {upper: '#d8d4c8', accent: '#35424a', sole: '#8a5b36'},
   shoes_linen_loafer: {upper: '#c8b28e', accent: '#694b36', sole: '#dfd3bd'},
   shoes_rider_boots: {upper: '#1f2326', accent: '#7d858c', sole: '#14171a'},
@@ -111,6 +112,9 @@ const SHOES_RECIPES: Record<string, ShoesRecipe> = {
   shoes_guochao_sneaker: {upper: '#2a2d31', accent: '#d8b46a', sole: '#4a3121'},
   shoes_night_moto: {upper: '#171a1f', accent: '#20d6c1', sole: '#ffc53d'},
 }
+
+/** The daypack modelled into figure.glb (shown while `bag_none` is equipped). */
+const BUILTIN_PACK_COLORS = {body: '#b9533d', strap: '#2a2220'} as const
 
 function resolveTopRecipe(topId: string): TopRecipe {
   const known = TOP_RECIPES[topId]
@@ -725,47 +729,29 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
     const cShoe = new THREE.Color(shoes.upper)
     const cShoeAcc = new THREE.Color(shoes.accent)
     const cSole = new THREE.Color(shoes.sole)
-
-    const isDefaultTop = outfit.top === 'top_default_tee'
-    const isDefaultBottom = outfit.bottom === 'bottom_default_pants'
-    const isDefaultShoes = outfit.shoes === 'shoes_default_sneaker'
+    const cPackBody = new THREE.Color(BUILTIN_PACK_COLORS.body)
+    const cPackStrap = new THREE.Color(BUILTIN_PACK_COLORS.strap)
 
     const zones = partition.zones
     const orig = partition.originalColors
     for (let i = 0; i < zones.length; i++) {
       const z = zones[i]
-      if (z === OUTFIT_ZONE.LOCKED_SKIN || z === OUTFIT_ZONE.LOCKED_HAIR || z === OUTFIT_ZONE.BUILTIN_PACK) {
+      if (z === OUTFIT_ZONE.LOCKED_SKIN || z === OUTFIT_ZONE.LOCKED_HAIR) {
         colAttr.setXYZ(i, orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
         continue
       }
-      if (z === OUTFIT_ZONE.TOP_PRIMARY) {
-        if (isDefaultTop) _tmpColor.setRGB(orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
-        else _tmpColor.copy(cPrimary)
-      } else if (z === OUTFIT_ZONE.TOP_SLEEVE) {
-        if (isDefaultTop) _tmpColor.setRGB(orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
-        else _tmpColor.copy(cSleeve)
-      } else if (z === OUTFIT_ZONE.TOP_TRIM) {
-        if (isDefaultTop) _tmpColor.setRGB(orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
-        else _tmpColor.copy(cTrim)
-      } else if (z === OUTFIT_ZONE.TOP_INNER) {
-        if (isDefaultTop) _tmpColor.setRGB(orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
-        else _tmpColor.copy(cInner)
-      } else if (z === OUTFIT_ZONE.BOTTOM_MAIN) {
-        if (isDefaultBottom) _tmpColor.setRGB(orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
-        else _tmpColor.copy(cBottom)
-      } else if (z === OUTFIT_ZONE.BOTTOM_BELT) {
-        if (isDefaultBottom) _tmpColor.setRGB(orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
-        else _tmpColor.copy(cBelt)
-      } else if (z === OUTFIT_ZONE.SHOES_UPPER) {
-        if (isDefaultShoes) _tmpColor.setRGB(orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
-        else _tmpColor.copy(cShoe)
-      } else if (z === OUTFIT_ZONE.SHOES_ACCENT) {
-        if (isDefaultShoes) _tmpColor.setRGB(orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
-        else _tmpColor.copy(cShoeAcc)
-      } else {
-        if (isDefaultShoes) _tmpColor.setRGB(orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
-        else _tmpColor.copy(cSole)
-      }
+      // Every zone, the default outfit included, takes its colour from the recipes (the glb palette is only
+      // the zone key). Built-in daypack: body vs. the darker straps/handle by source luminance.
+      if (z === OUTFIT_ZONE.BUILTIN_PACK) _tmpColor.copy(orig[i * 3] > 0.07 ? cPackBody : cPackStrap)
+      else if (z === OUTFIT_ZONE.TOP_PRIMARY) _tmpColor.copy(cPrimary)
+      else if (z === OUTFIT_ZONE.TOP_SLEEVE) _tmpColor.copy(cSleeve)
+      else if (z === OUTFIT_ZONE.TOP_TRIM) _tmpColor.copy(cTrim)
+      else if (z === OUTFIT_ZONE.TOP_INNER) _tmpColor.copy(cInner)
+      else if (z === OUTFIT_ZONE.BOTTOM_MAIN) _tmpColor.copy(cBottom)
+      else if (z === OUTFIT_ZONE.BOTTOM_BELT) _tmpColor.copy(cBelt)
+      else if (z === OUTFIT_ZONE.SHOES_UPPER) _tmpColor.copy(cShoe)
+      else if (z === OUTFIT_ZONE.SHOES_ACCENT) _tmpColor.copy(cShoeAcc)
+      else _tmpColor.copy(cSole)
       colAttr.setXYZ(i, _tmpColor.r, _tmpColor.g, _tmpColor.b)
     }
     colAttr.needsUpdate = true
