@@ -133,7 +133,7 @@ def verify(output=Path(OUT)):
                 overlaps.append((way, overlap))
         total = shapely.union_all([p for _, p in overlaps]).area
         details = ', '.join(f"{e['id']} {e['tags'].get('name',e['tags']['highway'])} ({p.area:.2f})"
-                            for e,p in overlaps if p.area)
+                            for e,p in overlaps if p.area) or "-"
         print(f"{peak['name']}\t{total:.2f}\t{details}")
         if peak['name'] == '伏波山':
             fubo_area = total

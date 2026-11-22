@@ -70,5 +70,3 @@ class TrailAreas:
         if kind not in ('steps','path','track','footway') or tags.get('footway') == 'sidewalk':
             return False
         return any(region.covers(LineString(points(way))) for region in regions)
-
-
