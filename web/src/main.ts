@@ -470,7 +470,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
         trafficRequested=true
         void import('./traffic').then(mod=>mod.traffic(scene,camera,params.has('verify'))).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
       }
-      trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined)
+      trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
+        walker?.active?walker.position:undefined,getPlayMode()==='solo')
       const target=walker?.destination??(walker?.active?walker.position:camera.position)
       stream.tick(target)
       stream.updateLandmarks?.(target)

@@ -22,6 +22,7 @@ if (expansion) {
 
 const SAMPLE_FRAMES = Number(process.env.PERF_FRAMES ?? 60)
 const FIRST_RUNS = Number(process.env.PERF_FIRST_RUNS ?? 5)
+const trafficQuery = process.argv.includes('--traffic') ? '&traffic=1' : ''
 const OUT_FILE = process.env.PERF_OUT ?? 'captures/perf.json'
 
 const cpuRate = Number(process.env.PERF_CPU_RATE ?? 1)
@@ -51,7 +52,7 @@ try {
     try {
       const page = await coldBrowser.newPage({viewport: {width: 960, height: 540}})
       await throttle(page)
-      await page.goto(`${baseUrl}/?verify&slot=N&flow=0`)
+      await page.goto(`${baseUrl}/?verify&slot=N&flow=0${trafficQuery}`)
       await page.waitForFunction(() => window.viewer?.stats.firstMs > 0, null, {timeout: 30000})
       const firstMs = await page.evaluate(() => +window.viewer.stats.firstMs.toFixed(1))
       firstFrameRuns.push(firstMs)
@@ -107,7 +108,7 @@ try {
   for (const cam of CAMERAS) {
     if(process.env.PERF_CAMERA && process.env.PERF_CAMERA!==cam.id)continue
     const started = performance.now()
-    await page.goto(`${baseUrl}/?${cam.query}`)
+    await page.goto(`${baseUrl}/?${cam.query}${trafficQuery}`)
     await page.waitForFunction(mode => {
       const viewer = window.viewer
       if (!viewer?.stats.firstMs || viewer.stats.pending) return false

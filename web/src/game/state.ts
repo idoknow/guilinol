@@ -144,6 +144,8 @@ export type GameEvent =
   | {type: 'mission:fail'; id: string; reason: string}
   | {type: 'mission:abandon'; id: string}
   | {type: 'fine'; amount: number; reason: string}
+  | {type: 'traffic:violation'; reason: 'red'|'wrong-way'|'collision'|'sidewalk'; points:number}
+  | {type: 'pursuit:end'; reason:'lost'|'switch'|'clear'|'fine'|'tour'}
   | {type: 'crash'; severity: number; vehicleId?: string}
   // ---- Stage 1 incremental events ----
   | {type: 'money:change'; delta: number; balance: number; reason: string; txId: string}
@@ -301,6 +303,9 @@ export function setMission(mission: ActiveMissionState | null): void {
   notifyState(new Set<keyof GameState>(['mission']))
 }
 export const setMissionState = setMission
+
+export let policeStop = false
+export function setPoliceStop(stop:boolean){ policeStop=stop }
 
 export function setWanted(wanted: 0 | 1 | 2 | 3 | 4 | 5): void {
   if (state.wanted === wanted) return

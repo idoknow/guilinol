@@ -1,5 +1,8 @@
 import * as THREE from 'three'
 import {Traffic,type Graph} from './sim'
+import {getState} from '../game/state'
+import {onPlayMode} from '../game/play-mode'
+import type {Pursuit} from './pursuit'
 
 async function loadGraph(key:string){
   const start=performance.now()
@@ -26,8 +29,12 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   mesh.userData.loads=[]
   if(verify)mesh.userData.motorIds=[]
   mesh.name='G2 traffic';mesh.count=0;mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(mesh)
-  let accumulator=0
-  return (dt:number,vehicle?:THREE.Vector3)=>{
+  let pursuit:Pursuit|undefined,loadingPursuit=false
+  const police=new THREE.InstancedMesh(mesh.geometry,mesh.material,5)
+  police.name='G4 patrol';police.count=0;police.visible=false;police.frustumCulled=false;scene.add(police)
+  onPlayMode(mode=>{if(mode==='tour'){pursuit?.end('tour');police.count=0;police.visible=false}})
+  let accumulator=0,pursuitDt=0
+  return (dt:number,vehicle?:THREE.Vector3,player?:THREE.Vector3,solo=false)=>{
     const target=`${Math.floor(camera.position.x/512)}_${Math.floor(camera.position.z/512)}`
     if(target!==key){
       key=target
@@ -37,6 +44,25 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
         if(sim)next.inherit(sim);sim=next
       }).catch(error=>console.warn('Traffic cell unavailable',error))
       else {sim=undefined;mesh.count=0}
+    }
+    if(solo&&vehicle&&!pursuit&&!loadingPursuit){
+      loadingPursuit=true
+      void import('./pursuit').then(({Pursuit})=>{pursuit=new Pursuit()}).catch(error=>console.warn('Pursuit unavailable',error))
+    }
+    if(solo&&player&&pursuit){
+      pursuitDt+=Math.min(dt,.2)
+      if(pursuitDt>=.05){
+        const state=getState()
+        pursuit.step(pursuitDt,sim,player,vehicle&&state.mode!=='boat'?state.vehicle?.id:undefined)
+        police.count=pursuit.officers.length
+        police.visible=police.count>0
+        pursuit.officers.forEach((officer,index)=>{
+          object.position.set(officer.x,officer.y+.65,officer.z);object.rotation.y=officer.yaw
+          object.scale.set(1.75,1.3,4);object.updateMatrix();police.setMatrixAt(index,object.matrix)
+        })
+        if(police.count)police.instanceMatrix.needsUpdate=true
+        pursuitDt=0
+      }
     }
     if(!sim)return
     accumulator+=Math.min(dt,.2)

@@ -26,7 +26,7 @@ import {PERSONAL_EBIKE_MODELS} from '../game/catalog'
 import {findNearbyServiceBay, findNearbyShopTrigger, getShop, listShops} from '../game/shops'
 import {getQuietZoneAt} from '../game/quiet-zones'
 import {emit as emitGameEvent, getState as getGameState, onEvent as onGameEvent, onState,
-  setPrompt, updateTravel, type ActiveVehicleState, type EquippedOutfit, type PersistedEbikeVisual,
+  policeStop, setPrompt, updateTravel, type ActiveVehicleState, type EquippedOutfit, type PersistedEbikeVisual,
   type PersonalEbikeModelId, type PlayerMode} from '../game/state'
 import {
   KICKSTAND_REST_ROLL_RAD,
@@ -874,7 +874,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const tel=rides.carTelemetry
       vehicleState={
         kind:'car',
-        id:'car_world',
+        id:`car_world:${rides.car.uuid}`,
         speedKmh:tel?.kmh??Math.round(Math.abs(rides.speed)*3.6),
         gear:tel?.gearLabel==='R'?'R':tel?.gearLabel==='N'?'N':'D',
         damage:0,
@@ -890,7 +890,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const durabilityPct=ownedDur??rides.bikeDurabilityPct
       vehicleState={
         kind:isBicycle?'bike':'ebike',
-        id:instanceId??(rides.isShared?'shared_ebike':'world_ebike'),
+        id:instanceId??`${rides.isShared?'shared_ebike':'world_ebike'}:${rides.bike.uuid}`,
         speedKmh:tel?.kmh??Math.round(Math.abs(rides.speed)*3.6),
         gear:tel?.parkLocked?'N':'D',
         damage:THREE.MathUtils.clamp(1-durabilityPct/100,0,1),
@@ -1953,7 +1953,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(wasCar&&rides?.car){
         const previous=rides.heading
         driverPose.advanceMount(step)
-        bikeSpeed=rides.steerCar(keys.forward,keys.right,step,driverPose.mounted,{handbrake:rideCtrl.wheelie})
+        if(policeStop)rides.stop()
+        bikeSpeed=rides.steerCar(policeStop?0:keys.forward,keys.right,step,driverPose.mounted,{handbrake:rideCtrl.wheelie||policeStop})
         wish.set(-Math.sin(rides.heading),-Math.cos(rides.heading))
         vx=rides.carVelX;vz=rides.carVelZ
         const carTel=rides.carTelemetry
@@ -1980,7 +1981,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         const previous=rides.heading
         ridePose.advanceMount(step)
         // Only lock steering input while actively crashed; ride.ts natively handles P-gear/kickstand interlock and brake-hold unlock!
-        const crashLocked=!!crashSession||(rides.rideKind==='bike'&&ebikeFx.crashPhase!=='none')
+        const crashLocked=policeStop||!!crashSession||(rides.rideKind==='bike'&&ebikeFx.crashPhase!=='none')
         if(crashLocked)rides.stop()
         const stepCtrl=!crashLocked&&(rides.rideKind==='bike'||rides.rideKind==='bicycle')
           ?{wheelie:rideCtrl.wheelie?1:0,tuck:rideCtrl.tuck,horn:rideCtrl.horn}
