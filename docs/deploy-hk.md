@@ -1,6 +1,6 @@
 ## 切流前（不改 DNS）
 
-目标只限香港节点 `cn-hk-fxy-01`、`idoknow/glol-*`。保留原 Pages/D1/R2 作为回滚源。部署前后分别在 hk01 执行 `kubectl top node cn-hk-fxy-01`。容器内存 limits：nginx 64 Mi、API 384 Mi、PG 384 Mi、MinIO 512 Mi，常驻共 1344 Mi；反馈桥运行时再加 192 Mi，总上限 1536 Mi。使用 Recreate 和 CronJob Forbid 避免滚动或定时任务重叠。local-path PVC 不是跨节点备份。
+目标只限香港节点 `cn-hk-fxy-01`、`idoknow/glol-*`。保留原 Pages/D1/R2 作为回滚源。部署前后分别在 hk01 执行 `kubectl top node cn-hk-fxy-01`。容器内存 limits：nginx 64 Mi、API 384 Mi、PG 384 Mi、MinIO 512 Mi，常驻共 1344 Mi；反馈桥运行时再加 128 Mi，总上限 1472 Mi。使用 Recreate 和 CronJob Forbid 避免滚动或定时任务重叠。local-path PVC 不是跨节点备份。
 
 1. 准备与发布版本匹配的 `public/world/`，确保清单引用的文件齐全。sg 保持工作树干净，安装 Docker、Node 22、kubectl，SSH 到 hk01 无需 sudo。`test:api`、`test:bridge`、`verify:auth`、`verify:feedback`、`verify:admin` 使用临时 Docker PG 和 MinIO，不复用线上数据库。浏览器验证需要先构建 `dist`。
 2. 在 `idoknow` 安全预置 `glol-env`。后者含 `POSTGRES_PASSWORD`（随机十六进制）、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`（glol 专用 MinIO）、原有 `RESEND_API_KEY` 和 `BRIDGE_TOKEN`。不复制共享 Docker 登录文件、不通过 issue 或 Git 传值。Ingress 须覆盖客户端自报的 `X-Real-IP`，并传递受信任的客户端地址，以保持原 IP 限流行为。 镜像按 SHA 匿名拉取。
