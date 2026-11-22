@@ -5,8 +5,19 @@ const key = 'glol.playMode'
 export function lastPlayMode(): PlayMode {
   try {
     const saved = localStorage.getItem(key)
-    return saved === 'solo' || saved === 'story' ? 'solo' : 'tour'
-  } catch { return 'tour' }
+    if (saved === 'story') localStorage.setItem(key, 'solo')
+    return saved === 'tour' ? 'tour' : 'solo'
+  } catch { return 'solo' }
+}
+export function linkedPlayMode(params: URLSearchParams): PlayMode {
+  const play = params.get('play')
+  if (play === 'solo' || play === 'tour') return play
+  if (params.has('solo')) return params.get('solo') === '1' ? 'solo' : 'tour'
+  return params.has('play') ? lastPlayMode() : 'tour'
+}
+
+export function trafficEnabled(mode: PlayMode, override: string | null) {
+  return override === '1' || (override !== '0' && mode === 'solo')
 }
 export function getPlayMode() { return current }
 let transition = 0

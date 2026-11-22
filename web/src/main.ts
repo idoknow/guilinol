@@ -23,7 +23,7 @@ import {flags} from './debug'
 import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRangeConfig} from './render-range'
 import {renderRangeControl} from './ui/render-range'
 import type {FeedbackView} from '../../lib/feedback-contract'
-import {getPlayMode, onPlayMode, soloServices} from './game/play-mode'
+import {getPlayMode, onPlayMode, soloServices, trafficEnabled} from './game/play-mode'
 import {getState} from './game/state'
 import {loadLocalSave} from './game/save'
 import {isGlobalHotkeyBlocked} from './walk/input-guard'
@@ -462,6 +462,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   let playable=false
   let trafficTick:Awaited<ReturnType<typeof import('./traffic').traffic>>|undefined
   let trafficRequested=false
+  const trafficOverride=params.get('traffic')
   function animate(now:number){
     if(getPlayMode()==='solo'&&!walker?.active)return
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
@@ -477,12 +478,13 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))
     }
     if(frame>0&&!switching) {
-      if(params.get('traffic')==='1'&&!trafficRequested && camera.position.y<250 && !stream.pending.size){
+      const showTraffic=trafficEnabled(getPlayMode(),trafficOverride)
+      if(showTraffic&&!trafficRequested && camera.position.y<250 && !stream.pending.size){
         trafficRequested=true
         void import('./traffic').then(mod=>mod.traffic(scene,camera,params.has('verify'))).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
       }
       trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
-        walker?.active?walker.position:undefined,getPlayMode()==='solo')
+        walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
       const target=walker?.destination??(walker?.active?walker.position:camera.position)
       stream.tick(target)
       stream.updateLandmarks?.(target)
