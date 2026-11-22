@@ -46,7 +46,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     while(accumulator>=.05){sim.step(.05,camera.position,vehicle,visible);accumulator-=.05}
     mesh.count=sim.actors.length
     let motors=0,queued=0,redStops=0
-    if(verify)mesh.userData.motorIds.length=0
+    if(verify){mesh.userData.motorIds.length=0;mesh.userData.approaches=[]}
     sim.actors.forEach((actor,index)=>{
       if(actor.kind==='car')object.scale.set(1.75,1.3,4)
       else if(actor.kind==='scooter')object.scale.set(.6,1,1.65)
@@ -54,6 +54,8 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       object.scale.multiplyScalar(actor.scale)
       if(verify&&actor.kind!=='person'&&visible(actor)&&actor.scale>=.99){
         motors++;mesh.userData.motorIds.push(index)
+        mesh.userData.approaches.push({index,x:actor.x,z:actor.z,yaw:actor.yaw,speed:actor.speed,
+          gap:actor.track.length-actor.dist,green:sim!.green(actor.track)})
         if(actor.speed<.1){queued++;if(actor.track.length-actor.dist<5&&!sim!.green(actor.track))redStops++}
       }
       object.position.set(actor.x,actor.y+object.scale.y/2,actor.z);object.rotation.y=actor.yaw

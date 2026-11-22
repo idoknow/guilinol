@@ -11,7 +11,8 @@ const nodes=new Map(graph.nodes.map(node=>[node.id,node]))
 const signals=new Map(graph.signals.map(signal=>[signal.node,signal]))
 const approach=lane=>{
   const start=nodes.get(lane.from),end=nodes.get(lane.to)
-  return Math.abs(end.x-start.x)>Math.abs(end.z-start.z)?'EW':'NS'
+  const length=Math.hypot(end.x-start.x,end.z-start.z)
+  return [(end.x-start.x)/length,(end.z-start.z)/length]
 }
 const groups=Map.groupBy(graph.signals,signal=>signal.group)
 for(const signal of graph.signals){
@@ -21,6 +22,7 @@ for(const signal of graph.signals){
     if(Math.hypot(end.x-start.x,end.z-start.z)<=45)assert.equal(signal.group,other.group)
   }
 }
+const conflicts=new Map()
 for(const members of groups.values()){
   const ids=new Set(members.map(signal=>signal.node))
   const lanes=graph.lanes.filter(lane=>ids.has(lane.to))
@@ -28,12 +30,16 @@ for(const members of groups.values()){
   for(const signal of members){assert.deepEqual(signal.phases,members[0].phases);assert.equal(signal.offset,members[0].offset)}
   const period=members[0].phases.reduce((sum,phase)=>sum+phase.green+phase.yellow,0)
   for(let time=0;time<period;time+=.25){
-    const directions=new Set()
-    for(const lane of lanes)if(sim.green(lane,time)){directions.add(approach(lane));served.add(lane.id)}
-    assert.ok(directions.size<=1,`cross traffic green at junction ${members[0].group}, t=${time}`)
+    const directions=[]
+    for(const lane of lanes)if(sim.green(lane,time)){
+      const [dx,dz]=approach(lane)
+      if(directions.some(([vx,vz])=>Math.abs(dx*vx+dz*vz)<=Math.SQRT1_2+1e-12))conflicts.set(members[0].group,time)
+      directions.push([dx,dz]);served.add(lane.id)
+    }
   }
   assert.equal(served.size,lanes.length,'unserved inbound lane')
 }
+assert.equal(conflicts.size,0,`simultaneous crossing greens (junction, time): ${JSON.stringify([...conflicts])}`)
 let red=0,quiet=0,scooters=0,motorFrames=0,people=0
 sim.onCross=(lane,time)=>{
   const {phases,offset}=signals.get(lane.to)

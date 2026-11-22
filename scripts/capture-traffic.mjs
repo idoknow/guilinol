@@ -24,12 +24,33 @@ try {
   console.log('Jiefang',JSON.stringify(snapshot))
   await mkdir('captures',{recursive:true})
   if(!baseline){
-    const pixelVisible=await page.evaluate(()=>window.viewer.trafficPixels());console.log('Pixel-visible motors',pixelVisible);assert.ok(pixelVisible>=20)
+    const pixelVisible=await page.evaluate(async()=>(await window.viewer.trafficPixels()).length);console.log('Pixel-visible motors',pixelVisible);assert.ok(pixelVisible>=20)
     await page.screenshot({path:'captures/jiefang-traffic.png'})
     await page.evaluate(()=>window.viewer.resume())
-    await page.evaluate(()=>{const camera=window.viewer.camera;camera.position.set(60,172,95);camera.lookAt(160,153,147);camera.updateMatrixWorld()})
-    await page.waitForFunction(()=>window.viewer.trafficProbe?.loads.at(-1)?.key==='0_0'&&window.viewer.trafficProbe.redStops>0&&window.viewer.trafficProbe.queued>=3&&!window.viewer.stats.pending,null,{timeout:180000})
-    await page.evaluate(()=>window.viewer.freeze());console.log('East queue',JSON.stringify(await page.evaluate(()=>window.viewer.trafficProbe)))
+    await page.evaluate(()=>{const camera=window.viewer.camera;camera.position.set(135,207,138);camera.lookAt(162,153,149);camera.updateMatrixWorld()})
+    const queue=await page.evaluate(async()=>{
+      const viewer=window.viewer
+      const evidence=async(checkPixels)=>{
+        const visible=checkPixels?await viewer.trafficPixels():null
+        const cars=viewer.trafficProbe.approaches.filter(car=>(!visible||visible.includes(car.index))&&Math.hypot(car.x-162,car.z-149)<32)
+        for(const lead of cars.filter(car=>!car.green&&car.speed<.1&&car.gap<5)){
+          const stopped=cars.filter(car=>!car.green&&car.speed<.1&&Math.cos(car.yaw-lead.yaw)>.85)
+          const crossing=cars.filter(car=>car.green&&car.speed>1&&Math.abs(Math.cos(car.yaw-lead.yaw))<.7)
+          if(stopped.length>=2&&crossing.length)return {stopped:stopped.length,crossing:crossing.length}
+        }
+      }
+      const deadline=performance.now()+240000
+      while(performance.now()<deadline){
+        await new Promise(requestAnimationFrame)
+        if(viewer.trafficProbe?.loads.at(-1)?.key!=='0_0'||!viewer.trafficProbe.redStops||viewer.stats.pending||!await evidence(false))continue
+        await viewer.freeze()
+        const frame=await evidence(true)
+        if(frame)return frame
+        viewer.resume()
+      }
+      throw Error('No unobscured east bridge queue and crossing flow')
+    })
+    console.log('East queue',queue)
     await page.screenshot({path:'captures/jiefang-queue.png'})
     await page.evaluate(()=>{window.viewer.resume();window.viewer.camera.position.z=-9})
     for(const x of [40,-600,-265]){

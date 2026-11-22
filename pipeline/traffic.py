@@ -24,6 +24,26 @@ def number(value, fallback):
     return float(match[1]) * (1.609344 if match[2] == 'mph' else 1) if match else fallback
 
 
+def signal_schedule(lanes, nodes):
+    headings = []
+    for lane in lanes:
+        src, dst = nodes[lane['from']], nodes[lane['to']]
+        angle = math.atan2(dst['z']-src['z'], dst['x']-src['x']) % math.pi
+        headings.append((angle, lane['id']))
+    headings.sort()
+    def partition(first):
+        wrapped = headings[first:] + [(angle+math.pi, ref) for angle, ref in headings[:first]]
+        families = []
+        for angle, ref in wrapped:
+            if not families or angle-start >= math.pi/4-1e-10:
+                families.append([])
+                start = angle
+            families[-1].append(ref)
+        return families
+    families = min((partition(first) for first in range(len(headings))), key=len)
+    return [dict(lanes=sorted(family),green=18,yellow=3) for family in families]
+
+
 def bake(output, manifest):
     left, top, width, depth = manifest['extent']
     chunks = {(tile['x'], tile['z']): tile['file'] for tile in manifest['chunks']}
@@ -110,12 +130,7 @@ def bake(output, manifest):
                             math.hypot(nodes[ref]['x']-nodes[other]['x'],nodes[ref]['z']-nodes[other]['z'])<=45)
             remaining.difference_update(nearby)
             group.extend(nearby)
-        phases = defaultdict(list)
-        for ref in group:
-            for lane in incoming[ref]:
-                src, dst = nodes[lane['from']], nodes[ref]
-                phases[abs(dst['x']-src['x']) > abs(dst['z']-src['z'])].append(lane['id'])
-        schedule = [dict(lanes=phases[axis],green=18,yellow=3) for axis in sorted(phases)]
+        schedule = signal_schedule((lane for ref in group for lane in incoming[ref]), nodes)
         signals.extend(dict(node=ref,group=group[0],offset=group[0]%31,phases=schedule) for ref in group)
     result = dict(nodes=[node for node in nodes.values() if node['y'] is not None],lanes=lanes,signals=signals,quiet=quiet,walks=walks)
     dest = output/'roads'/'graph.json.gz'

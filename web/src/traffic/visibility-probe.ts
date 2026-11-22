@@ -13,6 +13,6 @@ export function pixelVisible(renderer:THREE.WebGLRenderer,scene:THREE.Scene,came
     const pixels=new Uint8Array(size.x*size.y*4),counts=new Uint32Array(mesh.count+1)
     renderer.readRenderTargetPixels(target,0,0,size.x,size.y,pixels)
     for(let offset=0;offset<pixels.length;offset+=4)if(pixels[offset]===255&&pixels[offset+1]===0&&pixels[offset+2]<=mesh.count)counts[pixels[offset+2]]++
-    return (mesh.userData.motorIds as number[]).filter(index=>counts[index+1]>=6).length
+    return (mesh.userData.motorIds as number[]).filter(index=>counts[index+1]>=6)
   }finally{mesh.material=original;renderer.setRenderTarget(previousTarget);target.dispose();ids.dispose()}
 }
