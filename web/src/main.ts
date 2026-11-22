@@ -35,6 +35,7 @@ let modeReady = Promise.resolve()
 export const waitForMode = () => modeReady
 export function setPaused(on:boolean){paused=on}
 import {mountDevHud} from './ui/hud-dev'
+import {armOrientationGate} from './ui/orientation'
 
 export let spawnCreatedCharacter:()=>Promise<void>=async()=>{}
 let titleTransition:{signal:AbortSignal;cancel:()=>void;view?:Veil}|undefined
@@ -42,6 +43,7 @@ export function setTitleTransition(value:typeof titleTransition){titleTransition
 async function start(loader:FullLoader,creatorSpawn=false) {
   const entrySignal=titleTransition?.signal
   mountDevHud()
+  armOrientationGate()
   loadLocalSave(undefined, Date.now(), getPlayMode() === 'solo')
   const params = new URLSearchParams(location.search)
   const rangeStore = new RenderRangeStore(loadRenderConfig(params))
