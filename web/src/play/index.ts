@@ -5,7 +5,7 @@ import type {Host} from './host'
 import {photoMode} from './photo'
 import {mapView} from './map'
 import {isGlobalHotkeyBlocked, shouldPhotoYieldKeyPFromDom} from '../walk/input-guard'
-import {SPOT_BOUNTY_YUAN, claimSpotBounty, hasClaimedSpotBounty, recordSpotFound} from '../game/commerce'
+import {getPlayMode,soloServices,onPlayMode} from '../game/play-mode'
 import {type ShopTriggerDef} from '../game/shops'
 import {getState, onState} from '../game/state'
 
@@ -73,8 +73,9 @@ export function play(host:Host) {
   const veil = document.createElement('div'); veil.className = 'veil'; veil.innerHTML = '<span></span>'; document.body.append(veil)
   const wait = (ms:number)=>new Promise(resolve=>setTimeout(resolve,ms))
   async function travel(name:string, go:()=>Promise<unknown>) {
+    if(getPlayMode()==='solo')return
     veil.querySelector('span')!.textContent = name; veil.classList.add('show'); await wait(520)
-    try {await go()} finally {await wait(200); veil.classList.remove('show')}
+    try {if(getPlayMode()==='tour')await go()} finally {await wait(200); veil.classList.remove('show')}
   }
   async function goTo(spot:Spot) {
     closeAll()
@@ -99,7 +100,9 @@ export function play(host:Host) {
   }
   // Stamp + card. Walking into the ring does it; so does travelling there (the spawn search may land a few metres off).
   function awardSpot(spot:Spot) {
-    const bounty = claimSpotBounty(spot.id)
+    const commerce = soloServices()?.commerce
+    if(!commerce)return
+    const bounty = commerce.claimSpotBounty(spot.id)
     if(bounty.ok && bounty.code==='OK' && bounty.credited>0) {
       window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:`首次打卡「${spot.name}」+¥${bounty.credited}`,ms:2600}}))
     }
@@ -107,7 +110,7 @@ export function play(host:Host) {
   }
   function arrive(m:typeof marks[number]) {
     m.armed = false; const fresh = !stamps.has(m.spot.id)
-    if(fresh){stamps.add(m.spot.id); save(); recordSpotFound(m.spot.id); restamp(m.spot.id); refreshCount()}
+    if(fresh){stamps.add(m.spot.id); save(); soloServices()?.commerce.recordSpotFound(m.spot.id); restamp(m.spot.id); refreshCount()}
     awardSpot(m.spot)
     showCard(m.spot,fresh)
   }
@@ -145,7 +148,7 @@ export function play(host:Host) {
       <div class="card-seal${done?' done':''}${fresh?' fresh':''}">${spot.seal}</div>
       <h2>${spot.name}</h2><p class="card-sub">${spot.sub}</p><p class="card-intro">${spot.intro}</p>
       <p class="card-best"><span>最佳时段</span><b>${spot.best.label}</b><button data-act="hour">换到此时</button></p>
-      <div class="card-actions"><button data-act="aim">取景</button>${spot.summit?'<button data-act="summit">登顶</button>':''}<button data-act="photo">拍照</button></div>`
+      <div class="card-actions"><button data-act="aim">取景</button>${getPlayMode()==='tour'&&spot.summit?'<button data-act="summit">登顶</button>':''}<button data-act="photo">拍照</button></div>`
     card.hidden = false; requestAnimationFrame(()=>card.classList.add('show'))
     card.querySelector<HTMLButtonElement>('.card-close')!.onclick = closeCard
     for(const b of Array.from(card.querySelectorAll<HTMLButtonElement>('[data-act]'))) b.onclick = ()=>act(spot,b.dataset.act!)
@@ -165,13 +168,14 @@ export function play(host:Host) {
     const camera = host.camera, from = camera.position.clone(), q0 = camera.quaternion.clone()
     const probe = camera.clone(); probe.position.copy(eye); probe.lookAt(target); const q1 = probe.quaternion.clone()
     host.cinema = true; const start = performance.now()
-    await new Promise<void>(resolve=>{const step = ()=>{const t = Math.min(1,(performance.now()-start)/ms), k = ease(t)
+    await new Promise<void>(resolve=>{const step = ()=>{if(getPlayMode()==='solo'){resolve();return}const t = Math.min(1,(performance.now()-start)/ms), k = ease(t)
       camera.position.lerpVectors(from,eye,k); camera.position.y += Math.sin(Math.PI*k)*Math.min(160,from.distanceTo(eye)*.25)
       camera.quaternion.slerpQuaternions(q0,q1,k)
       if(t<1) requestAnimationFrame(step); else resolve()}; step()})
     camera.rotation.setFromQuaternion(camera.quaternion,'YXZ'); host.cinema = false
   }
   async function climb(spot:Spot) {
+    if(getPlayMode()==='solo')return
     const s = spot.summit!, top = summitAt(s.x,s.z)
     if(!Number.isFinite(top)) return
     const dir = new THREE.Vector2(s.at[0]-s.x,s.at[1]-s.z).normalize()
@@ -179,6 +183,7 @@ export function play(host:Host) {
     const target = new THREE.Vector3(s.at[0],Math.max(150,top-120),s.at[1])
     host.fly(); host.refreshMode()
     await flyCamera(eye,target,2600)
+    if(getPlayMode()==='solo')return
     summit = {spot,eye}; pill.hidden = false
     pill.innerHTML = `<span>${s.label}</span><button>下山</button>`
     pill.querySelector('button')!.onclick = ()=>void goTo(spot)
@@ -189,16 +194,18 @@ export function play(host:Host) {
   const sheet = document.createElement('section'); sheet.className = 'book'; sheet.hidden = true; document.body.append(sheet)
   function openBook() {
     closeCard()
-    sheet.innerHTML = `<header><h2>景册</h2><p>已盖 <b>${stamps.size}</b> / ${spots.length} 枚印 · 走到地上的朱红圆圈处即可盖印（首打卡/拍照 +¥${SPOT_BOUNTY_YUAN}）</p><button class="card-close" aria-label="关闭">×</button></header>
+    const commerce = soloServices()?.commerce
+    const reward = commerce?.SPOT_BOUNTY_YUAN
+    sheet.innerHTML = `<header><h2>景册</h2><p>已盖 <b>${stamps.size}</b> / ${spots.length} 枚印 · 走到地上的朱红圆圈处即可盖印${commerce ? `（首打卡/拍照 +¥${reward}）` : ''}</p><button class="card-close" aria-label="关闭">×</button></header>
       <ol>${spots.map(s=>{
         const stamped = stamps.has(s.id)
-        const claimed = hasClaimedSpotBounty(s.id)
-        const claimBtn = stamped && !claimed ? `<button data-claim="${s.id}">领¥${SPOT_BOUNTY_YUAN}</button>` : ''
-        const badge = claimed ? ` · 已领¥${SPOT_BOUNTY_YUAN}` : stamped ? ' · 待领赏金' : ` · +¥${SPOT_BOUNTY_YUAN}`
+        const claimed = commerce?.hasClaimedSpotBounty(s.id)
+        const claimBtn = commerce && stamped && !claimed ? `<button data-claim="${s.id}">领¥${reward}</button>` : ''
+        const badge = !commerce ? '' : claimed ? ` · 已领¥${reward}` : stamped ? ' · 待领赏金' : ` · +¥${reward}`
         return `<li class="${stamped?'done':''}"><div class="card-seal${stamped?' done':''}">${s.seal}</div>
-        <div><h3>${s.name}</h3><p>${s.sub}${badge}</p></div>${claimBtn}<button data-id="${s.id}">前往</button></li>`
+        <div><h3>${s.name}</h3><p>${s.sub}${badge}</p></div>${claimBtn}${commerce?'':`<button data-id="${s.id}">前往</button>`}</li>`
       }).join('')}</ol>
-      <div class="book-docks"><span>水边开船直达</span><div>${waterDocks.map(d=>`<button data-dock="${d.id}">${d.name} · ${d.badge}</button>`).join('')}</div></div>`
+      <div class="book-docks" ${commerce?'hidden':''}><span>水边开船直达</span><div>${waterDocks.map(d=>`<button data-dock="${d.id}">${d.name} · ${d.badge}</button>`).join('')}</div></div>`
     sheet.hidden = false; requestAnimationFrame(()=>sheet.classList.add('show'))
     sheet.querySelector<HTMLButtonElement>('.card-close')!.onclick = closeBook
     for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-claim]'))) b.onclick = ()=>{
@@ -210,6 +217,7 @@ export function play(host:Host) {
   }
   function closeBook(){sheet.classList.remove('show'); setTimeout(()=>{if(!sheet.classList.contains('show')) sheet.hidden = true},260)}
   function closeAll(){closeCard(); closeBook()}
+  onPlayMode(()=>{leaveSummit();closeCard();if(!sheet.hidden)openBook()})
   book.onclick = ()=>sheet.hidden?openBook():closeBook()
   onState(s=>{
     let changed = false
@@ -223,7 +231,7 @@ export function play(host:Host) {
     const p = w.position
     for(const m of marks) {
       if(Math.hypot(m.spot.x-p.x, m.spot.z-p.z)<=24) {
-        if(!stamps.has(m.spot.id)){stamps.add(m.spot.id); save(); recordSpotFound(m.spot.id); restamp(m.spot.id); refreshCount()}
+        if(!stamps.has(m.spot.id)){stamps.add(m.spot.id); save(); soloServices()?.commerce.recordSpotFound(m.spot.id); restamp(m.spot.id); refreshCount()}
         awardSpot(m.spot)
       }
     }

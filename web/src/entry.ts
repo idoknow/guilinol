@@ -1,3 +1,4 @@
+import {getPlayMode, setPlayMode, type PlayMode} from './game/play-mode'
 import './telemetry'
 import './ui/theme.css'
 import './ui/hud.css'
@@ -18,21 +19,29 @@ let engine: Promise<typeof import('./main')> | undefined
 const loadEngine = () => engine ??= import('./main')
 let started = false
 
-const title = home(() => void enter())
+const title = home(mode => void enter(mode))
 let entering = false
-async function enter() {
+async function enter(mode: PlayMode, remember = true) {
   if (entering) return
-  if (!harness) {
-    entering = true
-    const user = await requireUser().finally(() => { entering = false })
-    if (!user) { cancelRestore(); if (!title.shown) title.open(started); return }
-  }
-  title.close()
-  const main = await loadEngine()
-  if (started) { main.setPaused(false); return }
-  started = true
-  hud(main)
-  void main.boot()
+  entering = true
+  try {
+    if (!harness) {
+      const user = await requireUser()
+      if (!user) { cancelRestore(); if (!title.shown) title.open(started); return }
+    }
+    await setPlayMode(mode, remember)
+    const main = await loadEngine()
+    if(started)await main.waitForMode()
+    title.close()
+    if (started) { main.setPaused(false); return }
+    started = true
+    hud(main)
+    await main.boot()
+  } catch(error) {
+    if(started)await setPlayMode('tour', false)
+    title.open(started)
+    window.alert(error instanceof Error ? error.message : '无法进入模式')
+  } finally { entering = false }
 }
 
 function hud(main: typeof import('./main')) {
@@ -51,6 +60,7 @@ function hud(main: typeof import('./main')) {
     hudModule.mountStreetHud(source, {
       phone: params.has('phone'),
       onApp: id => {
+        if (getPlayMode() !== 'solo') return
         if (id === 'jobs') window.dispatchEvent(new CustomEvent('game:open-missions'))
         else if (id === 'wardrobe') window.dispatchEvent(new CustomEvent('game:open-wardrobe'))
         else if (id === 'garage') window.dispatchEvent(new CustomEvent('game:open-garage'))
@@ -63,7 +73,7 @@ function hud(main: typeof import('./main')) {
   })
 }
 
-if (deepLink) void enter()
+if (deepLink) void enter(params.get('solo') === '1' ? 'solo' : 'tour', false)
 else {
   title.open(false)
   // Warm the engine module while the player reads the menu; the world data is already preloaded by index.html.

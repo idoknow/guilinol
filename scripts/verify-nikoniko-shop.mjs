@@ -190,6 +190,9 @@ async function run() {
       })),
     )
 
+    await page.click('.btn-menu')
+    await page.click('[data-umami-event=home-solo]')
+    await page.waitForSelector('.gl-mission-entry')
     // Verify [F] enter prompt appears cleanly in game state + HUD button
     await page.waitForFunction(
       () => {
