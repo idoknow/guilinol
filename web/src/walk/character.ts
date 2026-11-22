@@ -5,6 +5,7 @@ import {AVATAR_KEY, hairColors, sanitizeAvatar, skinTones, type Avatar} from '..
 import {ensureAvatarRig, type AvatarRig} from './avatar-rig'
 import {createAvatarOutfitController} from './outfits'
 import {facialFeatures} from './creator-face'
+import {addOutline, streetShading} from './creator-ink'
 import {starterDetails} from './starter-details'
 import {starterOutfit} from '../game/catalog'
 
@@ -32,27 +33,16 @@ export async function characterModel(a: Avatar) {
       const p = node.geometry.getAttribute('position')
       for (let i = 0; i < p.count; i++) {
         const y = p.getY(i)
-        if (y > 1.535 && y < 1.75 && Math.abs(p.getX(i)) < 0.13) {
-          const jaw = Math.max(0, 1 - Math.abs(y - 1.565) / 0.065)
-          p.setX(i, p.getX(i) * (a.face === 1 ? 0.94 - 0.1 * jaw : a.face === 2 ? 1 + 0.13 * jaw : 1))
+        if (node.skeleton.bones[node.geometry.attributes.skinIndex.getX(i)]?.name === 'head' && y < 1.7) {
+          const jaw = Math.max(0, 1 - Math.abs(y - 1.56) / 0.078)
+          const width = a.face === 0 ? 1 + 0.23 * jaw : a.face === 1 ? 0.98 - 0.11 * jaw : 1 + 0.55 * jaw ** 2
+          p.setX(i, p.getX(i) * width)
+          if (a.face !== 1 && y < 1.61) p.setY(i, y + (1.61 - y) * (a.face === 0 ? 0.12 : -0.1))
         }
       }
       node.geometry.computeVertexNormals()
-      node.material.flatShading = false
-      node.material.onBeforeCompile = (shader: T.WebGLProgramParametersWithUniforms) => {
-        shader.vertexShader =
-          'varying float smoothHead;\n' +
-          shader.vertexShader.replace(
-            '#include <begin_vertex>',
-            '#include <begin_vertex>\nsmoothHead = step(1.521,position.y)*step(abs(position.x),0.115);',
-          )
-        shader.fragmentShader =
-          'varying float smoothHead;\n' +
-          shader.fragmentShader.replace(
-            '#include <normal_fragment_begin>',
-            '#include <normal_fragment_begin>\nif(smoothHead<0.5) normal=normalize(cross(dFdx(vViewPosition),dFdy(vViewPosition)));',
-          )
-      }
+      node.material = node.material.clone()
+      streetShading(node.material, true)
     }
   })
   return {...model, scene}
@@ -77,7 +67,7 @@ export function hairstyle(a: Avatar, library: T.Object3D) {
   mat.vertexColors = true
   mat.roughness = 0.68
   mat.side = T.FrontSide
-  mat.flatShading = false
+  streetShading(mat)
   hair.traverse((n) => {
     if (n instanceof T.Mesh) {
       n.material = mat
@@ -103,8 +93,11 @@ export function hairstyle(a: Avatar, library: T.Object3D) {
 export function styleCharacter(scene: T.Group, rig: AvatarRig, a: Avatar) {
   const head = rig.attachments.head!
   scene.userData.characterSkin = skinTones[a.skin]
+  addOutline(rig.skinnedMesh!, 0.011)
+  addOutline(scene.userData.creatorHair, 0.005)
   head.add(scene.userData.creatorHair)
   delete scene.userData.creatorHair
+  scene.userData.creatorBody = a.body
   head.add(facialFeatures(rig.skinnedMesh!.geometry, a))
   if (a.body === 'f') {
     const base = rig.skinnedMesh!,
@@ -120,18 +113,17 @@ export function styleCharacter(scene: T.Group, rig: AvatarRig, a: Avatar) {
       joints: number[] = [],
       weights: number[] = []
     const rings = [
-      [0.993, 0.145],
-      [0.965, 0.16],
+      [0.95, 0.165],
+      [0.925, 0.173],
       [0.896, 0.18],
       [0.55, 0.205],
-      [0.2, 0.239],
+      [0.51, 0.205],
     ]
     for (const [row, [height, radius]] of rings.entries())
       for (let i = 0; i < 48; i++) {
-        const angle = (i * Math.PI) / 24,
-          pleat = Math.abs(Math.sin(angle)) > 0.45 && i % 2 ? 0.016 : 0
-        const x = Math.sin(angle) * (radius - pleat),
-          z = Math.cos(angle) * (radius - pleat) * 0.78 - 0.022
+        const angle = (i * Math.PI) / 24
+        const x = Math.sin(angle) * radius,
+          z = Math.cos(angle) * radius * 0.78 - 0.022
         positions.push(x, height, z)
         const left = T.MathUtils.smoothstep(x, -0.09, 0.09)
         if (height >= 0.55) {
@@ -154,7 +146,8 @@ export function styleCharacter(scene: T.Group, rig: AvatarRig, a: Avatar) {
     g.setAttribute('skinWeight', new T.Float32BufferAttribute(weights, 4))
     g.setIndex(indices)
     g.computeVertexNormals()
-    const cloth = material('#586967')
+    const cloth = material('#72776d')
+    streetShading(cloth)
     cloth.side = T.DoubleSide
     const skirt = new T.SkinnedMesh(g, cloth)
     skirt.name = 'creator-skirt'
@@ -170,7 +163,11 @@ export function disposeCharacterParts(root: T.Object3D) {
   root.traverse((node) => {
     if (!(node instanceof T.Mesh)) return
     node.geometry.dispose()
-    if (!(node instanceof T.SkinnedMesh) || node.name === 'creator-skirt')
+    if (
+      !(node instanceof T.SkinnedMesh) ||
+      node.material.userData?.clothing ||
+      ['creator-skirt', 'creator-body-outline'].includes(node.name)
+    )
       for (const mat of Array.isArray(node.material) ? node.material : [node.material]) mat.dispose()
   })
 }

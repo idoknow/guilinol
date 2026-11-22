@@ -316,11 +316,14 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(version!==appearanceVersion){disposeCharacterParts(fresh.scene);disposeCharacterParts(fresh.scene.userData.creatorHair);return}
     const mesh=fresh.scene.getObjectByProperty('isSkinnedMesh',true) as THREE.SkinnedMesh
     outfitController.dispose()
-    for(const name of ['creator-face','creator-hair','creator-skirt']){
+    for(const name of ['creator-body-outline','creator-face','creator-hair','creator-skirt']){
       const part=figure.getObjectByName(name)
       if(part){part.removeFromParent();disposeCharacterParts(part)}
     }
     avatarRig.skinnedMesh.geometry.dispose();avatarRig.skinnedMesh.geometry=mesh.geometry
+    const oldMaterial=avatarRig.skinnedMesh.material
+    for(const mat of Array.isArray(oldMaterial)?oldMaterial:[oldMaterial])mat.dispose()
+    avatarRig.skinnedMesh.material=mesh.material
     figure.getObjectByName('CreatorProportions')!.scale.copy(fresh.scene.getObjectByName('CreatorProportions')!.scale)
     figure.userData.creatorHair=fresh.scene.userData.creatorHair
     outfitController=styleCharacter(figure,avatarRig,a)

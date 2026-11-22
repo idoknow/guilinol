@@ -295,7 +295,7 @@ try {
       assert.equal(h.parent,characterRig.attachments.head)
       assert.equal(h.visible,preset.items.hat==='hat_none')
       const skirt=model.scene.getObjectByName('creator-skirt')
-      if(body==='f')assert.equal(skirt.visible,preset.items.bottom==='bottom_starter_chinese')
+      if(body==='f')assert.equal(skirt.visible,preset.items.bottom==='bottom_starter_outdoor')
     }
     for(const style of styles[body]){
       const h=hairstyle({...appearance,hair:body+'_'+style},library);let count=0
@@ -314,14 +314,14 @@ try {
         assert([...edges.values()].every(incidence => incidence === 2), style + ' open hair surface')
       })
       maxHairVertices = Math.max(count, maxHairVertices)
-      assert(count>0 && count<=1500,style+' '+count)
+      assert(count>=300 && count<=600,style+' '+count)
     }
     wardrobe.dispose()
     check(body+' rig, wave, six hairstyles and all wardrobe presets',true)
   }
   check('female to male shoulder width', Math.abs(shoulders[1]/shoulders[0] - .88) < .02, (shoulders[1]/shoulders[0]).toFixed(3))
-  check('largest closed hairstyle', maxHairVertices <= 1500, maxHairVertices + ' vertices')
-  check('creator assets at most 700 KB',addedBytes<=700000,addedBytes+' bytes')
+  check('largest closed hairstyle', maxHairVertices <= 600, maxHairVertices + ' vertices')
+  check('creator assets at most 450 KB',addedBytes<=450000,addedBytes+' bytes')
   controller.dispose()
   console.log(`\nALL ${passed} NODE OUTFIT CHECKS PASSED`)
 } finally {

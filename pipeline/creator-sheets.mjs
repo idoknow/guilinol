@@ -40,8 +40,8 @@ try {
         ctx.fillRect(0, 0, sheet.width, sheet.height)
         return {
           canvas: sheet,
-          put(x, y, label = '') {
-            ctx.drawImage(canvas, x * w, y * (h + caption), w, h)
+          put(x, y, label = '', source = canvas) {
+            ctx.drawImage(source, x * w, y * (h + caption), w, h)
             if (caption) {
               ctx.fillStyle = '#34544a'
               ctx.textAlign = 'center'
@@ -62,14 +62,49 @@ try {
         await raf()
         await raf()
       }
-      const bodies = sheet(2, 1, 420, 420, 24),
+      const hairLight = sheet(6, 8, 160, 160, 24),
+        faces = sheet(3, 4, 180, 180, 24)
+      // Subtract the empty studio so the turntable stays out of the silhouette plate.
+      const matte = document.createElement('canvas')
+      matte.width = matte.height = 600
+      const painter = matte.getContext('2d', {willReadFrequently: true})
+      await raf()
+      await raf()
+      painter.drawImage(canvas, 0, 0)
+      const empty = painter.getImageData(0, 0, 600, 600).data
+      function silhouette() {
+        painter.clearRect(0, 0, 600, 600)
+        painter.drawImage(canvas, 0, 0)
+        const pixels = painter.getImageData(0, 0, 600, 600),
+          rgba = pixels.data
+        for (let k = 0; k < rgba.length; k += 4) {
+          const diff = Math.max(...[0, 1, 2, 3].map((channel) => Math.abs(empty[k + channel] - rgba[k + channel])))
+          rgba[k] = 31
+          rgba[k + 1] = 35
+          rgba[k + 2] = 38
+          rgba[k + 3] = diff > 4 ? 255 : 0
+        }
+        painter.putImageData(pixels, 0, 0)
+        return matte
+      }
+      const silhouettes = sheet(2, 2, 420, 420, 24)
+      const bodies = sheet(2, 2, 420, 420, 24),
         portraits = []
       for (const [index, body] of ['m', 'f'].entries()) {
         const a = {...defaultAvatar(), body, hair: hairStyles[body][0]}
         await render(a, false)
         sprite.put(index, 0)
         await render({...a, hair: body === 'm' ? 'm_buzz' : 'f_bun'}, false)
+        silhouettes.put(index, 0, body === 'm' ? '男 · 正' : '女 · 正', silhouette())
         bodies.put(index, 0, body === 'm' ? '男' : '女')
+        await render({...a, hair: body === 'm' ? 'm_buzz' : 'f_bun'}, false, Math.PI / 2)
+        silhouettes.put(index, 1, body === 'm' ? '男 · 侧' : '女 · 侧', silhouette())
+        bodies.put(index, 1, body === 'm' ? '男 · 侧' : '女 · 侧')
+        for (const [row, skin] of [0, 4].entries())
+          for (let face = 0; face < 3; face++) {
+            await render({...a, face, skin}, true)
+            faces.put(face, index * 2 + row, ['圆脸', '鹅蛋脸', '方下颌'][face])
+          }
         const cuts = body === 'm' ? ['m_part', 'm_crop', 'm_mullet'] : ['f_bun', 'f_lob', 'f_pony']
         for (const [j, cut] of cuts.entries()) {
           await render({...a, hair: cut}, true, (j * Math.PI) / 4)
@@ -89,11 +124,14 @@ try {
         for (const [i, id] of hairStyles[body].entries()) {
           await render({...a, hair: id}, true)
           sprite.put(i, 4 + index * 5)
-          for (let j = 0; j < 4; j++) {
-            stage.angle((j * Math.PI) / 2)
-            await raf()
-            await raf()
-            hair.put(i, index * 4 + j, hairNames[body][i])
+          for (const hairColor of [0, 3]) {
+            await render({...a, hair: id, hairColor}, true)
+            for (let j = 0; j < 4; j++) {
+              stage.angle((j * Math.PI) / 2)
+              await raf()
+              await raf()
+              ;(hairColor ? hairLight : hair).put(i, index * 4 + j, hairNames[body][i])
+            }
           }
         }
         for (const [i, look] of looks.entries()) {
@@ -106,18 +144,24 @@ try {
           outfits.put(i, index * 2 + 1, lookNames[i])
         }
       }
+      await render({...defaultAvatar(), look: 'sport', hair: 'm_crop'}, false)
+      const street = sheet(1, 1, 600, 600)
+      street.put(0, 0)
       stage.dispose()
       return [
         sprite.canvas.toDataURL('image/webp', 0.79),
-        ...[skin, hair, outfits, bodies].map((s) => s.canvas.toDataURL()),
+        ...[skin, hair, outfits, bodies, hairLight, faces, silhouettes].map((s) => s.canvas.toDataURL()),
         ...portraits,
+        street.canvas.toDataURL(),
       ]
     },
     '/@fs/' + resolve('lib/avatar.ts'),
   )
   for (const [i, path] of [
     'public/avatar/creator-options.webp',
-    ...['skin', 'hair', 'outfits', 'bodies', ...portraitNames].map((s) => dir + '/' + s + '.png'),
+    ...['skin', 'hair', 'outfits', 'bodies', 'hair-light', 'faces', 'silhouettes', ...portraitNames, 'street'].map(
+      (s) => dir + '/' + s + '.png',
+    ),
   ].entries())
     await writeFile(path, Buffer.from(images[i].split(',')[1], 'base64'))
 } finally {

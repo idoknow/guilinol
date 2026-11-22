@@ -36,6 +36,13 @@ const DB = {
 }
 crypto.subtle.timingSafeEqual = (a, b) => a.byteLength === b.byteLength && timingSafeEqual(a, b)
 const server = await preview({root: 'web', configFile: 'web/vite.config.ts', preview: {host: '127.0.0.1', port: 0}})
+const baseline = process.env.CREATOR_BASELINE_DIST
+  ? await preview({
+      configFile: false,
+      build: {outDir: process.env.CREATOR_BASELINE_DIST},
+      preview: {host: '127.0.0.1', port: 0},
+    })
+  : null
 const origin = 'http://127.0.0.1:' + server.httpServer.address().port
 let browser
 try {
@@ -68,13 +75,14 @@ try {
           .digest('hex')
         sql.prepare('UPDATE email_codes SET digest=? WHERE email=?').run(digest, user.email)
       }
+      if (path === '/api/auth/register') assert.equal(response.status, 200, await response.clone().text())
       return route.fulfill({
         status: response.status,
         headers: Object.fromEntries(response.headers),
         body: await response.text(),
       })
     })
-    await page.goto(origin)
+    await page.goto(origin + '/?time=10&weather=clear&flow=0')
     await page.click('[data-umami-event=home-solo]')
     await page.click('button[data-to=register]')
     await page.fill('input[name=email]', user.email)
@@ -85,10 +93,26 @@ try {
     await page.click('.acc-submit')
     const creator = page.locator('dialog.creator'),
       click = (name) => creator.getByRole('button', {name, exact: true}).click()
-    for (const [index, choice] of ['女', '小麦', '高马尾', '新中式', null].entries()) {
+    for (const [index, choice] of ['女', '小麦', '高马尾', '防晒衣', null].entries()) {
       if (choice) await click(choice)
       if (index === 2) await click('栗棕')
       await page.waitForTimeout(650)
+      if (width === 390 && index === 1) {
+        const options = creator.locator('.creator-options')
+        const bounds = await options.boundingBox()
+        for (const name of ['圆脸', '鹅蛋脸', '方下颌']) {
+          const box = await creator.getByRole('button', {name, exact: true}).boundingBox()
+          assert(box.y >= bounds.y && box.y + box.height <= bounds.y + bounds.height, 'first face-shape row fits')
+        }
+        assert(
+          await options.evaluate((el) => {
+            el.scrollTop = el.scrollHeight
+            const moved = el.scrollTop > 0
+            el.scrollTop = 0
+            return moved
+          }),
+        )
+      }
       await page.screenshot({path: output + '/' + width + '-step-' + (index + 1) + '.png'})
       await click(index === 4 ? '进入桂林' : '下一步')
     }
@@ -105,6 +129,19 @@ try {
     assert.equal(saved.look, 'chinese')
     await page.locator('.creator-arrival').waitFor({state: 'detached'})
     await page.screenshot({path: output + '/' + width + '-spawn.png'})
+    if (baseline) {
+      const control = await browser.newPage({viewport: {width, height}, hasTouch: width < 400})
+      // Both builds use walkConfig.gate (-588,-212, yaw PI) and the same frozen sky.
+      await control.goto(
+        'http://127.0.0.1:' +
+          baseline.httpServer.address().port +
+          '/?solo=1&mode=walk&time=10&weather=clear&flow=0',
+      )
+      await control.waitForSelector('body[data-mode=walk]', {timeout: 90000})
+      await control.waitForTimeout(1000)
+      await control.screenshot({path: output + '/' + width + '-main-spawn.png'})
+      await control.close()
+    }
     // Clear browser data to prove the second session restores from the cloud avatar.
     await page.evaluate(() => localStorage.clear())
     await page.reload()
@@ -127,16 +164,26 @@ try {
     assert.equal(edited.body, 'm')
     assert.equal(edited.hair, 'm_buzz')
     assert.equal(edited.createdAt, saved.createdAt)
-    if(width===390){
+    if (width === 390) {
       // A returning player with a legacy save must see creation even if this browser has a cached avatar.
-      sql.prepare('UPDATE player_saves SET payload_json=? WHERE user_id=(SELECT id FROM users WHERE email=?)')
-        .run(JSON.stringify({money:784,wardrobe:{ownedItemIds:['hat_karst_cap']}}),user.email)
-      await page.emulateMedia({reducedMotion:'reduce'});await page.reload();await page.click('[data-umami-event=home-solo]')
-      await creator.locator('[data-random]').click();await click('重置');await click('跳过')
-      await page.waitForSelector('body[data-mode=walk]',{timeout:90000})
-      const legacy=JSON.parse(sql.prepare('SELECT payload_json FROM player_saves JOIN users ON users.id=user_id WHERE email=?').get(user.email).payload_json)
-      assert.equal(legacy.money,784);assert(legacy.wardrobe.ownedItemIds.includes('hat_karst_cap'))
-      assert.equal(legacy['glol.avatar.v1'].look,'basic')
+      sql
+        .prepare('UPDATE player_saves SET payload_json=? WHERE user_id=(SELECT id FROM users WHERE email=?)')
+        .run(JSON.stringify({money: 784, wardrobe: {ownedItemIds: ['hat_karst_cap']}}), user.email)
+      await page.emulateMedia({reducedMotion: 'reduce'})
+      await page.reload()
+      await page.click('[data-umami-event=home-solo]')
+      await creator.locator('[data-random]').click()
+      await click('重置')
+      await click('跳过')
+      await page.waitForSelector('body[data-mode=walk]', {timeout: 90000})
+      const legacy = JSON.parse(
+        sql
+          .prepare('SELECT payload_json FROM player_saves JOIN users ON users.id=user_id WHERE email=?')
+          .get(user.email).payload_json,
+      )
+      assert.equal(legacy.money, 784)
+      assert(legacy.wardrobe.ownedItemIds.includes('hat_karst_cap'))
+      assert.equal(legacy['glol.avatar.v1'].look, 'basic')
     }
     assert.deepEqual(errors, [])
     await context.close()
@@ -145,5 +192,6 @@ try {
 } finally {
   await browser?.close()
   await server.close()
+  await baseline?.close()
   sql.close()
 }

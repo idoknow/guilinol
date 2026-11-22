@@ -28,7 +28,7 @@ def surface(rings, bottom, top):
 
 
 def face(body):
-    angles = np.arange(48)*TAU/48
+    angles = np.arange(20)*TAU/20
     s,c = np.sin(angles),np.cos(angles)
     rings = []
     female = body=='f'
@@ -38,7 +38,7 @@ def face(body):
     jaw_width=[.008,.029,.048,.065,.077,.085,.088,.089] if female else [.014,.037,.058,.074,.082,.086,.088,.089]
     front_profile=[-.045,-.062,-.075,-.081,-.084,-.087,-.089,-.092]
     rear_profile=[-.042,-.023,.016,.044,.075,.111,.126,.130]
-    for y in np.r_[np.linspace(-.045,.086,20,endpoint=False),.086+.105*np.sin(np.linspace(0,1.54,15))]:
+    for y in np.r_[np.linspace(-.045,.086,10,endpoint=False),.086+.105*np.sin(np.linspace(0,1.54,6))]:
         if y>=.086:
             radius=np.sqrt(max(0,1-((y-.086)/.105)**2))
             width=.089*radius;center=.019;depth=.111*radius
@@ -80,12 +80,12 @@ def lock(path,width,depth,across,sides=9):
 
 def curtain(style):
     """A curved, solid mantle. Both surfaces turn around the temple and the hem."""
-    n=27; u=np.linspace(-1,1,n)
-    span={'m_mullet':1.18,'f_wolf':2.02,'f_bangs':2.09,'f_lob':2.00,'f_long':2.06}[style]
+    n=14; u=np.linspace(-1,1,n)
+    span={'m_mullet':1.18,'f_wolf':2.02,'f_bangs':2.09,'f_lob':1.84,'f_long':1.86}[style]
     a=u*span;sn,cs=np.sin(a),np.cos(a)
     lo={'f_long':-.276,'f_lob':-.134,'f_wolf':-.098,'f_bangs':-.076,'m_mullet':-.076}[style]
     ends=lo+.018*u**2+.006*np.cos(5*a+.3)
-    if style=='m_mullet':ends+=.060*abs(u)**1.6
+    if style=='m_mullet':ends+=.060*abs(u)**1.6+.018*np.cos(12*a)
     if style=='f_wolf':ends+=.018*np.cos(9*a)+.052*abs(u)**3
     ys=[.175,.156,.128,.090,.048,.016]
     outer=[];inner=[]
@@ -127,7 +127,7 @@ def curtain(style):
 
 
 def hair(style):
-    sides=30
+    sides=18
     angles=np.arange(sides)*TAU/sides
     s,c=np.sin(angles),np.cos(angles)
     front=np.maximum(c,0)
@@ -135,13 +135,19 @@ def hair(style):
     # Keep the temples open around the ears; a rounded nape drops behind them.
     edge=1.88-.62*front**2+.62*back**2+.18*np.exp(-((abs(c)-.37)/.15)**2)*front
     short=style in ['m_buzz','m_fade']
-    if short:edge-=.08
+    if short:edge-=.15
+    edge-=.16*abs(s)**6 # clear the ears
+    if style=='f_pony':edge-=.16*front
+    if style=='f_bun':edge+=front*(.15*s-.10)
+    if style=='f_lob':edge+=front*(.18+.26*s)
+    if style=='f_long':edge+=front*(.25*abs(s)-.10*np.exp(-(s/.22)**2))
+    if style=='f_wolf':edge+=front*(.18+.10*np.cos(9*angles+.6))
     if style=='f_bangs': edge+=(1.62-edge)*np.clip(2.7*front,0,1)+.025*np.cos(13*angles)*front
     if style=='m_part':edge+=front*(.21+.24*np.exp(-((abs(s)-.53)/.25)**2)-.19*np.exp(-(s/.20)**2))
     if style=='m_perm':edge+=front*(.20+.06*np.cos(7*angles))
     if style=='m_mullet':edge-=.16*abs(s)**3
     rings=[]; tones=[]
-    for t in np.linspace(.08,1,10):
+    for t in np.linspace(.10,1,8):
         theta=t*edge
         unit=np.column_stack([np.sin(theta)*s,np.cos(theta),-np.sin(theta)*c])
         crown=np.maximum(0,unit[:,1])
@@ -178,7 +184,7 @@ def hair(style):
     for k,offset in [(1,.009),(2,.024)]:
         rings.append(pos-edge_dir*offset+[0,-.003 if k==1 else 0,0])
         tones.append(tones[-1])
-    for ring,tone in zip(rings[:9][::-2],tones[:9][::-2]):
+    for ring,tone in zip(rings[:7][::-2],tones[:7][::-2]):
         direction=ring-CENTER
         rings.append(ring-.024*direction/np.linalg.norm(direction,axis=1)[:,None]);tones.append(tone)
     top=rings[0][:,1].max()+.001
@@ -195,8 +201,29 @@ def hair(style):
     if style in ['f_long','f_lob','f_wolf','f_bangs','m_mullet']:
         pts,tris,shades=curtain(style)
         indices.extend(tris+len(points));points.extend(pts);colors.extend(shades)
+    if style in ['f_long','f_lob','f_wolf','f_bangs']:
+        for sign in [-1,1]:
+            # Temple locks sweep outward along the cheek and end beside the ear.
+            # Offset the part on the lob and shorten the upper layer on the shag.
+            offset=.025 if style=='f_lob' else 0
+            end={'f_long':-.024,'f_lob':.008,'f_wolf':.044,'f_bangs':.019}[style]
+            path=[[offset+sign*.024,.181,-.012],[sign*.059,.157,-.054],
+                  [sign*.086,.105,-.044],[sign*.088,end,-.022]]
+            strand(path,[.011,.020,.017,.003],[.012,.014,.011,.004],shade=.51+sign*.09)
+    if style=='m_mullet':
+        for sign in [-1,1]:
+            strand([[sign*.037,.091,.118],[sign*.043,.040,.136],
+                    [sign*.050,-.018,.143],[sign*.061,-.077,.132]],
+                   [.020,.024,.021,.004],[.009,.014,.015,.005],shade=.50+.15*sign)
+    if style in ['m_buzz','m_fade','m_perm','m_part','f_pony','f_bun']:
+        # Overlapping tapered locks follow the crown, with a separate sweep on each side of the part.
+        for sign in [-1,1]:
+            size={'m_buzz':.003,'m_fade':.012,'m_perm':.018,'m_part':.017}.get(style,.009)
+            path=np.array([[.008,.184,.028],[.030,.182,-.003],[.053,.164,-.033],[.066,.137,-.041]])
+            path[:,0]*=sign
+            strand(path,[size,size*1.4,size,size*.4],[size*.55]*4,shade=.44+.12*sign)
     if style=='f_pony':
-        strand([[0,.149,.104],[0,.157,.132],[.008,.111,.151],[.016,.002,.155],[.013,-.116,.132]],
+        strand([[0,.164,.090],[.013,.180,.137],[.025,.140,.174],[.033,.025,.195],[.047,-.098,.184]],
                [.028,.036,.040,.033,.013],[.026,.031,.033,.028,.012])
     if style=='f_bun':
         strand([[-.032,.052,.127],[-.020,.069,.145],[.007,.072,.154],[.032,.053,.139],[.015,.040,.130]],

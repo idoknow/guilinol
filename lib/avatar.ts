@@ -23,7 +23,7 @@ export function defaultAvatar(createdAt = Date.now()): Avatar {
   return {
     v: 1,
     body: 'm',
-    skin: 1,
+    skin: 2,
     face: 0,
     brows: 0,
     eyes: 0,
@@ -45,7 +45,7 @@ export function sanitizeAvatar(raw: unknown): Avatar | undefined {
     v: 1,
     body: a.body,
     createdAt: a.createdAt!,
-    skin: index(a.skin, 5, 1),
+    skin: index(a.skin, 5, 2),
     face: index(a.face, 3),
     brows: index(a.brows, 3),
     eyes: index(a.eyes, 3),
@@ -55,14 +55,14 @@ export function sanitizeAvatar(raw: unknown): Avatar | undefined {
   }
 }
 
-export const lookNames = ['基础', '运动休闲', '城市户外', '新中式', '通勤知识风', '校园']
+export const lookNames = ['基础', '夏天街头', '短袖 T 恤', '防晒衣', '通勤', '校服']
 export const lookPalette = [
   ['#e9e7e1', '#2a2c30', '#f2f1ed', '#d8d5cd'],
-  ['#a7a8a5', '#34363a', '#ecebe5', '#e4e2d9'],
-  ['#738370', '#938771', '#625c50', '#b3b39b'],
-  ['#e0d7c5', '#586967', '#f5f0e6', '#887963'],
-  ['#777265', '#5c5c59', '#74675b', '#e9e6dc'],
-  ['#e8e8df', '#97afc0', '#faf6e9', '#a4b2bc'],
+  ['#eeeae0', '#50545a', '#696961', '#c7bda7'],
+  ['#728795', '#a89a7d', '#deded7', '#697b81'],
+  ['#a5bfce', '#44484c', '#f5f0e6', '#cbd4d4'],
+  ['#acb8a7', '#575859', '#393936', '#818d7d'],
+  ['#e6e6df', '#536e90', '#faf6e9', '#546f93'],
 ]
 export const hairNames = {
   m: ['寸头', '微分碎盖', '纹理烫', '渐变短发', '狼尾', '中分'],

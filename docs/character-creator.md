@@ -4,38 +4,23 @@ Rock 2026-11-22: the default look should be simple. After registering, players e
 customise their character. Make the people look Chinese and dress them in what young people in China
 actually wear today.
 
-### 1. 外观方向（调研结论）
+### 1. 外观方向
 
-The current figure reads as Japanese mainly because of its anime-style bowl cut, its bangs and its
-long, narrow face. New rules for the look:
+参考广西街头日常穿着。角色采用原创低多边形几何、两到三档平涂明暗和深色外轮廓（`#1f2326`）。四肢略壮，肩线圆润，头身比约 1:6.5。男、女约 1.72 m 和 1.62 m，女性略收腰、胯略宽、肩窄约一成。
 
-- **Head and face**: a slightly rounder, flatter face; a low nose bridge; small, narrow eyes (single or
-  inner double eyelids, no big anime eyes); straight brows. Hair has to be shaped like real
-  hairstyles, not an anime helmet.
-- **Skin, 5 tones** (warm, light-yellow to wheat): `#f3d7bf` `#e9c3a1` `#dcb08a` `#c99772` `#a97b58`.
-  The default is the second tone.
-- **Hair colour, 4 options**: black `#1b1a1a` (default), dark brown `#2e2219`, chestnut `#4a3022`,
-  greyish brown `#5a4b44`.
-- **Men's hairstyles (6)**: buzz cut, textured side-parted crop (微分碎盖), textured perm, short faded
-  sides, wolf-cut mullet, middle part. These follow the 2025 men's hairstyle ranking: wolf-cut mullet,
-  side-parted crop, textured perm, buzz cut.
-- **Women's hairstyles (6)**: long straight black hair, high ponytail, low bun, collarbone-length hair,
-  short wolf cut, short hair with blunt bangs.
-- **Starter outfits (6)**. They follow the 2024–25 trends: city outdoor / shell jackets, athleisure,
-  new Chinese style (新中式) and intellectual chic. No real brand logos.
-  1. **基础** (default): plain off-white long-sleeve top, black straight trousers, white trainers. Nothing else.
-  2. **运动休闲**: grey hoodie, black track pants with side stripes, running shoes.
-  3. **城市户外**: shell jacket (muted green / khaki), cargo trousers, hiking shoes.
-  4. **新中式**: men wear a stand-collar shirt with frog buttons plus straight trousers; women wear a
-     cardigan with frog buttons plus a horse-face skirt (马面裙, a pleated skirt) and white trainers.
-  5. **通勤知识风**: shirt with a knit vest and slacks; women may wear a long skirt.
-  6. **校园**: white shirt or hoodie, light-blue jeans, canvas shoes.
+- 脸部用短线表现眼眉，嘴唇保留一小块唇色，鼻子用一小块阴影。圆脸、鹅蛋脸和方下颌通过面宽、下颌轮廓区分。
+- 五档肤色为 `#f3d7bf`、`#e9c3a1`、`#dcb08a`（默认）、`#c99772`、`#a97b58`。发色为黑、深棕、栗棕和灰棕。
+- 发型露出额头，侧面让开脸颊。男款为寸头、微分碎盖、纹理烫、渐变短发、狼尾和中分。女款为长直发、高马尾、低丸子头、锁骨发、短狼尾和齐刘海短发。每款用 300–600 个顶点组成闭合的低多边形发簇。
+- 首套穿搭都不背包，颜色中低饱和，无品牌标识。
 
-  Colours stay mid-to-low saturation so the figure blends with the 青绿山水 (green-and-blue landscape)
-  scenery and doesn't look like a cosplay outfit.
-
-Sources: Xinhua and Beijing Youth Daily on new Chinese style and shell jackets (2025); Jing Daily, Gen Z
-core trends 2025; the Maigoo 2025 men's hairstyle ranking.
+| 穿搭 | 男款 | 女款 |
+| --- | --- | --- |
+| 基础（默认） | 米白长袖、黑直筒裤、小白鞋 | 同男款 |
+| 夏天街头 | 白背心、深灰短裤、人字拖 | 白 T 恤、牛仔短裤、凉鞋 |
+| 短袖 T 恤 | 灰蓝素 T、卡其短裤、运动鞋 | 素 T、及膝半身裙、运动鞋 |
+| 防晒衣 | 浅蓝连帽防晒衣、黑运动裤、运动鞋 | 浅粉防晒衣、阔腿裤、运动鞋 |
+| 通勤 | POLO 衫、西裤、黑皮鞋 | 衬衫、西装裤、平底鞋 |
+| 校服 | 蓝白运动校服 | 同男款 |
 
 ### 2. 流程
 
@@ -94,9 +79,9 @@ Global actions: 「随机」 (a random combination; the button spins once like a
   the 66-bone skeleton**, so walk/idle/vehicle poses and `pipeline/avatar_walk.py` are reused directly.
   Hair is a separate rigid mesh attached to `attach_head`, the same mechanism as hats; it is hidden
   while a hat is worn. Neither body has a built-in backpack. All starter outfits leave the bag slot empty.
-  The 1.72 m and 1.62 m bodies have smooth head normals and flat-shaded clothing. Face contours
+  The 1.72 m and 1.62 m bodies use flat colours and a back-face outline. Face contours
   follow the selected jaw, with eyes, brows and lips fitted to its surface.
   Clothes keep the zone-recolour approach of `outfits.ts`; the women's skirt is its own mesh.
-- Budget: each body ≤ 7k vertices, each hairstyle ≤ 1,500 vertices, all assets ≤ 700 KB added in total.
+- Budget: each body ≤ 7k vertices, each hairstyle ≤ 600 vertices, all assets ≤ 450 KB added in total.
   The creation page is its own lazy-loaded chunk, so first-frame time on the tour home page stays
   ≤ 1.05× the current main branch.

@@ -214,7 +214,7 @@
 @media (max-width: 680px) {
   .creator[open] {
     grid-template-columns: 1fr;
-    grid-template-rows: var(--stage-height, 52%) 1fr;
+    grid-template-rows: var(--stage-height, 47%) 1fr;
   }
   .creator-panel {
     padding: 0 16px max(12px, env(safe-area-inset-bottom));
@@ -242,7 +242,7 @@
     margin: auto;
   }
   .creator-grid i {
-    max-height: 84px;
+    max-height: 68px;
     margin: auto;
   }
   .creator h2 {

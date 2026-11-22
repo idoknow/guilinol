@@ -27,19 +27,23 @@ def generate(body):
     if body == 'f':
         torso = (abs(p[:, 0]) < .24) & (p[:, 1] < 1.51)
         p[torso, 0] *= np.interp(p[torso, 1], [.72, .95, 1.06, 1.42], [1, 1.10, .89, .93])
+    # Tuck the original separate pelvis volume behind the waistband and trouser fronts.
+    hip=(dominant=='pelvis') & (p[:,1]<1.015)
+    p[hip,2]=-.018+(p[hip,2]+.018)*.82
+    p[hip,1]+=.025*np.clip((1.002-p[hip,1])/.150,0,1)
     data = np.column_stack([p, color, g.J, g.W])
     # A closed crew-neck torso. Skin each ring to the neighbouring spine joints.
-    rings = [( .938,.171,.124,-.021,'pelvis'),(1.004,.169,.120,-.021,'spine_01'),
+    rings = [( .927,.182,.137,-.021,'pelvis'),(1.004,.169,.120,-.021,'spine_01'),
              (1.118,.151,.111,-.021,'spine_02'),(1.29,.17,.122,-.018,'spine_03'),
              (1.41,.194,.117,-.031,'spine_03'),(1.448,.184,.103,-.033,'spine_03'),
              (1.478,.062,.059,-.035,'spine_03'),(1.485,.055,.052,-.035,'spine_03')]
     extra, faces = [], []
-    sides=24
+    sides=16
     for k,(height,width,depth,center,bone) in enumerate(rings):
         joint=g.joints.index(g.idx[bone])
         for n in range(sides):
             t=n*2*np.pi/sides
-            scale=np.interp(height,[.958,1.118,1.448],[1.05,.89,.94]) if body=='f' else 1
+            scale=np.interp(height,[.958,1.118,1.448],[1.08,.84,.92]) if body=='f' else 1
             extra.append([width*scale*np.sin(t),height,center+depth*np.cos(t),
                           *color[np.where(hexes==0xf09a4a)[0][0]],joint,0,0,0,1,0,0,0])
             if k:
@@ -61,7 +65,7 @@ def generate(body):
             blend=np.interp(x,[.112,.222],[0,1]) if x<.23 else np.interp(x,[.438,.49],[0,1])
             for n in range(sides):
                 angle=n*2*np.pi/sides
-                extra.append([sign*x,np.interp(x,[.09,.145,.205],[1.405,1.426,1.44])+ry*np.cos(angle),-.059+rz_*np.sin(angle),
+                extra.append([sign*x,np.interp(x,[.09,.145,.205],[1.405,1.426,1.44])+1.16*ry*np.cos(angle),-.059+1.13*rz_*np.sin(angle),
                               *color[np.where(hexes==0xf09a4a)[0][0]],j1,j2,0,0,1-blend,blend,0,0])
                 if k:
                     a=first+(k-1)*sides+n;b=first+(k-1)*sides+(n+1)%sides
@@ -89,11 +93,14 @@ def generate(body):
         ear_center=HEAD+[side*.085,.050,-.015]
         angles=np.arange(12)*np.pi/6
         rings=[np.column_stack([.014*np.sin(t)*np.sin(angles),np.full(12,-.024*np.cos(t)),
-                                .015*np.sin(t)*np.cos(angles)])+ear_center for t in np.linspace(.2,np.pi-.2,7)]
+                                .015*np.sin(t)*np.cos(angles)])+ear_center for t in np.linspace(.3,np.pi-.3,3)]
         add_head(*surface(rings,ear_center-[0,.024,0],ear_center+[0,.024,0]))
     # Scale the entire articulated assembly, including attachment anchors, around the soles.
     data=np.vstack([data,extra]);triangles=np.vstack([triangles,faces])
-    vertices, indices = np.unique(data[triangles.flatten()], axis=0, return_inverse=True)
+    vertices, first, indices = np.unique(data[triangles.flatten()], axis=0, return_index=True, return_inverse=True)
+    order=np.argsort(first)
+    vertices=vertices[order]
+    indices=np.argsort(order)[indices]
     g.P = np.column_stack([vertices[:, :3], np.ones(len(vertices))])
     g.J, g.W = vertices[:, 6:10].astype(int), vertices[:, 10:14]
     def attr(values, typ, component, normalized=False):
@@ -113,7 +120,7 @@ def generate(body):
     g.j['animations'].append(dict(old, name='walk_src'))
     clips = []
     for name, pose, cycle, keys, toes in [('walk',walk_pose,WALK_CYCLE,WALK_KEYS,True),('idle',idle_pose,IDLE_CYCLE,IDLE_KEYS,False)]:
-        clip, report = bake(g,name,pose,cycle,keys,toes)
+        clip, report = bake(g,name,pose,cycle,keys,toes,finger_curl=.48 if name=="idle" else 1.)
         print(body,name,report)
         assert report['ground_err_cm'] < 1
         channels, samplers = [], []
@@ -144,7 +151,10 @@ def generate(body):
         wave['channels'].append(dict(target=dict(node=node,path='rotation'),sampler=len(wave['samplers'])))
         wave['samplers'].append(dict(input=times,output=g.add_float(values,'VEC4',True)))
     roots=g.j['scenes'][0]['nodes']
-    scale=(1.62 if body=='f' else 1.72)/(HEAD[1]+.191)
+    head_scale=1.14
+    head_node=g.j['nodes'][g.idx['head']]
+    head_node['scale']=(np.array(head_node.get('scale',[1.,1.,1.]))*head_scale).tolist()
+    scale=(1.62 if body=='f' else 1.72)/(HEAD[1]+.191*head_scale)
     g.j['nodes'].append(dict(name='CreatorProportions',children=roots,scale=[scale*(.94 if body=='f' else 1),scale,scale]))
     g.j['scenes'][0]['nodes']=[len(g.j['nodes'])-1]
     g.save(GLB.with_name(f'figure_{body}.glb'),clips+[wave])
@@ -170,7 +180,8 @@ def hairstyles():
         return len(accessors)-1
     for style in ['m_buzz','m_crop','m_perm','m_fade','m_mullet','m_part','f_long','f_pony','f_bun','f_lob','f_wolf','f_bangs']:
         pos,tri,tones=hair(style)
-        assert len(pos)<=1500
+        print(style,len(pos),'vertices')
+        assert len(pos)<=600
         attr=dict(POSITION=attribute(pos,'<f4','VEC3'))
         # Two material controls (strand lightness and shaven-side fade), padded to a four-byte stride.
         color=np.round(255*np.column_stack([tones,np.zeros(len(pos)),np.ones(len(pos))])).astype('u1')

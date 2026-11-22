@@ -128,7 +128,7 @@ export function creatorStage(host: HTMLElement, reduced: boolean, capture = fals
     zoomTime = Math.min(1, zoomTime + dt / 0.45)
     zoom = T.MathUtils.lerp(zoomStart, close ? 1 : 0, reduced ? 1 : 1 - (1 - zoomTime) ** 3)
     if (finishing && !reduced) pullback = Math.min(1, pullback + dt / 0.6)
-    const target = T.MathUtils.lerp(0.87, crownHeight - 0.23 * portraitScale, zoom),
+    const target = T.MathUtils.lerp(0.87, crownHeight - 0.244 * portraitScale, zoom),
       dist = T.MathUtils.lerp(4.25, 1.1 * portraitScale, zoom) * Math.max(1, 0.79 / camera.aspect)
     camera.position.set(0, target + 0.075, -dist - (1 - entrance) * 0.52 - pullback * 0.38)
     camera.lookAt(0, target, 0)
