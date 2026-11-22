@@ -23,7 +23,6 @@ export function home(play:(mode:PlayMode)=>void):Home {
   <div class="home-bg" aria-hidden="true">${slides.map(([file],i)=>`<img alt="" decoding="async" ${i?'data-src':'src'}="./home/${file}.webp"${i?'':' class="on"'}>`).join('')}</div>
   <div class="home-shade" aria-hidden="true"></div>
   <header class="home-top">
-    <a class="home-src" href="${SOURCE_URL}" target="_blank" rel="noopener" data-umami-event="home-source"><i aria-hidden="true"></i><span>开源 · 免费</span></a>
     <button type="button" class="ui-btn home-account" data-umami-event="home-account"></button>
   </header>
   <div class="home-main">
@@ -57,7 +56,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
       <a class="ui-btn ui-btn--ghost" href="${SOURCE_URL}" target="_blank" rel="noopener" data-umami-event="home-source-link">源代码 ↗</a>
     </nav>
   </div>
-  <footer class="home-foot"><span class="home-caption" aria-live="off"></span><span class="home-credit">地图数据 © OpenStreetMap 贡献者 · v${__APP_VERSION__}</span></footer>`
+  <div class="home-foot"><span class="home-caption" aria-live="off"></span><span class="home-credit">受 <a href="https://nanningol.com" target="_blank" rel="noopener" data-umami-event="home-thanks-nanning">网上南宁</a> 启发 · 地图数据 © OpenStreetMap 贡献者 · v${__APP_VERSION__}</span></div>`
   const progress = root.querySelector('.home-progress')!
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
   const go = root.querySelector<HTMLElement>('.home-go')!, tour = root.querySelector<HTMLButtonElement>('.home-mode--tour')!
