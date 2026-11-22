@@ -80,12 +80,17 @@ function hud(main: typeof import('./main')) {
   box.append(menu); accountEntry(box); document.body.append(box)
   // Phase 2 street HUD (IDOK-109 / IDOK-123): live game state by default, demoSource when ?hudDemo= is passed.
   const street = params.get('hud') === 'street'
+  const radio = () => void import('./radio/panel').then(module=>module.openRadio())
+  if (!street) {
+    const button=document.createElement('button'); button.type='button'; button.textContent='电台'; button.onclick=radio; box.append(button)
+  }
   if (street) {const done=inlineBusy(menu,'载入街道界面');void Promise.all([import('./ui/street-hud'), import('./play/map')]).then(([hudModule, map]) => {
     map.setMapPalette('street')
     const source = params.has('hudDemo') ? hudModule.demoSource(params.get('hudDemo')) : hudModule.gameStateHudSource()
     hudModule.mountStreetHud(source, {
       phone: params.has('phone'),
       onApp: id => {
+        if (id === 'radio') {radio(); return}
         if (getPlayMode() !== 'solo') return
         if (id === 'jobs') window.dispatchEvent(new CustomEvent('game:open-missions'))
         else if (id === 'wardrobe') window.dispatchEvent(new CustomEvent('game:open-wardrobe'))
