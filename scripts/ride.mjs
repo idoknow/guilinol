@@ -262,9 +262,12 @@ try{
       })
       console.log('wall-blocked mount',parkedWall,wallMountBlocked);assert(wallMountBlocked.vehicle==='foot'&&/^骑(电动车|单车)$/.test(wallMountBlocked.label)&&wallMountBlocked.toast,`should not mount across building wall: ${JSON.stringify(wallMountBlocked)}`)
       await fixtureNear(-324.4,94.2);await interact('骑');await steer([-316,94],false,1.5)
+      await interact('下车')
       const bikeSpotRenderY=await page.evaluate(()=>{
-        const {walk,stream,manifest}=window.viewer,p=walk.probe()
-        let surfY=p.renderY
+        const {walk,stream,manifest}=window.viewer,foot=walk.position
+        const [x,,z]=walk.parked('bike').sort((first,second)=>Math.hypot(first[0]-foot.x,first[2]-foot.z)-Math.hypot(second[0]-foot.x,second[2]-foot.z))[0]
+        const p={x,z}
+        let surfY=null
         const tile=manifest.chunks.find(c=>p.x>=c.x&&p.x<c.x+256&&p.z>=c.z&&p.z<c.z+256)
         const sw=tile&&stream.loaded.get(tile)?.streets.sidewalk
         if(sw&&tile){
@@ -276,9 +279,8 @@ try{
             if(w1>=-1e-3&&w2>=-1e-3&&w1+w2<=1+1e-3){surfY=Math.max(surfY??-Infinity,ay+w1*(by-ay)+w2*(cy-ay));break}
           }
         }
-        return surfY
+        return surfY ?? walk.photoSupport(x,z).y
       })
-      await interact('下车')
       const slopePark=await page.evaluate(bikeRenderY=>{const w=window.viewer.walk;w.tick(1/60);const p=w.probe();return {vehicle:w.vehicle,pitch:p.bikePitch,bikeY:p.bikeY,bikeRenderY,renderY:p.renderY,inHouse:p.inHouse}},bikeSpotRenderY)
       console.log('slope park',slopePark);assert(slopePark.vehicle==='foot'&&Math.abs(slopePark.pitch)>.025&&Math.abs(slopePark.bikeY-slopePark.bikeRenderY)<.05&&!slopePark.inHouse,`slope bike pitch/height bad: ${JSON.stringify(slopePark)}`)
       await fixture(-743.45,-1833.01);await page.evaluate(()=>window.viewer.walk.tick(1/60))
