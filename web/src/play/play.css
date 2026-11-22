@@ -155,3 +155,14 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 }
 @media (pointer:coarse) and (max-width:520px){.dock .minimap{width:108px;height:108px}}
 @media (max-width:520px){.book ol{grid-template-columns:1fr}.spot-card{width:calc(100vw - 20px)}}
+/* Short landscape phones (IDOK-146: 770x265 with browser bars, 844x390 iPhone): a column of five dock buttons
+   ran into the thumb cluster (跃/远近/跑). Lay the buttons out as one row along the top edge, shrink the minimap so it
+   ends above 跃/远近, and float the road name over the map's lower rim. */
+@media (pointer:coarse) and (max-height:430px){
+  .dock{flex-direction:row-reverse;align-items:flex-start;gap:8px}
+  .dock-buttons{flex-direction:row;align-items:center;gap:6px}
+  .dock-buttons>button,.dock .btn-mode{height:32px;padding:0 11px;font-size:12.5px}
+  body:not([data-hud=street]) .dock-mini{position:relative}
+  body:not([data-hud=street]) .dock .minimap{width:72px;height:72px;border-width:2px}
+  body:not([data-hud=street]) .dock .road-name{position:absolute;left:50%;top:58px;transform:translateX(-50%);max-width:96px;padding:3px 7px;font-size:10.5px;letter-spacing:.06em}
+}
