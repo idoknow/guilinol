@@ -29,26 +29,27 @@ export function home(play:(mode:PlayMode)=>void):Home {
     <div class="home-title">
       <span class="home-seal" aria-hidden="true"><img src="./brand/emblem.webp" width="371" height="144" alt=""></span>
       <h1>网上桂林</h1>
-      <p class="home-tag">一座按真实地图搭起来的 3D 桂林。<br>飞上天看山水，落地逛街巷，走到哪儿算哪儿。</p>
+      <p class="home-tag">一座按真实地图搭起来的 3D 桂林。<br>穿街走巷接单赚钱，也能飞上天看山水。</p>
       <p class="home-meta"><span>登录就能玩</span><span>电脑 · 手机都行</span><span>不用下载</span></p>
     </div>
     <div class="home-modes" role="list">
+      <button type="button" class="home-mode home-mode--solo" role="listitem" data-umami-event="home-solo">
+        <span class="home-mode-seal" aria-hidden="true">街</span>
+        <span class="home-mode-text"><b>单人模式</b><span>骑电驴、开车穿街走巷，接单送米粉、拉客、跑夜赛，赚了钱换车换装。</span>
+          <small class="home-wallet"></small></span>
+        <span class="home-go home-go--solo">开始</span>
+      </button>
       <button type="button" class="home-mode home-mode--tour" role="listitem" data-umami-event="home-tour">
         <span class="home-mode-seal" aria-hidden="true">游</span>
-        <span class="home-mode-text"><b>游览模式</b><span>自由飞行、落地步行，走遍 ${spots.length} 处名胜，在景册里集齐印章。</span>
+        <span class="home-mode-text"><b>游览模式</b><span>自由飞行看山水，走遍 ${spots.length} 处名胜集印章。</span>
           <small class="home-progress"></small></span>
-        <span class="ui-btn ui-btn--seal ui-btn--lg home-go">开始游览</span>
+        <span class="home-go home-go--tour">开始游览</span>
       </button>
       <div class="home-resume-row" role="listitem" hidden>
         <button type="button" class="home-resume" data-umami-event="home-resume">
           <i aria-hidden="true"></i><span>回到上次离开的地方</span><small class="home-resume-ago"></small>
         </button>
       </div>
-      <button type="button" class="home-mode" role="listitem" data-umami-event="home-solo">
-        <span class="home-mode-seal" aria-hidden="true">单</span>
-        <span class="home-mode-text"><b>单人模式</b><span>在桂林街头接单送米粉，赚取报酬。</span></span>
-        <span class="ui-btn ui-btn--lg home-go">开始</span>
-      </button>
     </div>
     <nav class="home-links">
       <button type="button" class="ui-btn ui-btn--ghost" data-act="guide" data-umami-event="home-guide">玩法说明</button>
@@ -59,8 +60,8 @@ export function home(play:(mode:PlayMode)=>void):Home {
   <div class="home-foot"><span class="home-caption" aria-live="off"></span><span class="home-credit">受 <a href="https://nanningol.com" target="_blank" rel="noopener" data-umami-event="home-thanks-nanning">网上南宁</a> 启发 · 地图数据 © OpenStreetMap 贡献者 · v${__APP_VERSION__}</span></div>`
   const progress = root.querySelector('.home-progress')!
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
-  const go = root.querySelector<HTMLElement>('.home-go')!, tour = root.querySelector<HTMLButtonElement>('.home-mode--tour')!
-  const solo = root.querySelector<HTMLButtonElement>('[data-umami-event=home-solo]')!
+  const go = root.querySelector<HTMLElement>('.home-go--tour')!, tour = root.querySelector<HTMLButtonElement>('.home-mode--tour')!
+  const solo = root.querySelector<HTMLButtonElement>('[data-umami-event=home-solo]')!, wallet = root.querySelector('.home-wallet')!
   solo.onclick = ()=>play('solo')
   tour.onclick = ()=>play('tour')
   // IDOK-105: a slim strip under the tour card, shown only when a usable last view is stored.
@@ -96,9 +97,11 @@ export function home(play:(mode:PlayMode)=>void):Home {
     open(resume){
       shown = true; root.hidden = false; root.classList.toggle('resume',resume)
       playedSolo ||= resume && getPlayMode() === 'solo'
-      let hasProgress = false
-      try { hasProgress = localStorage.getItem('glol.save.v1') !== null } catch {}
+      let hasProgress = false, money:number|null = null
+      try { const raw = localStorage.getItem('glol.save.v1'); hasProgress = raw !== null
+        const value = raw ? (JSON.parse(raw) as {money?:unknown}).money : null; if(typeof value==='number'&&Number.isFinite(value)) money = Math.round(value) } catch {}
       solo.querySelector('.home-go')!.textContent = playedSolo || hasProgress ? '继续' : '开始'
+      wallet.textContent = hasProgress && money!==null ? `钱包 ¥${money.toLocaleString('zh-CN')}` : ''
       go.textContent = resume?'继续游览':'开始游览'
       // IDOK-105: only on a fresh entry (not the mid-game 继续游览 menu) and only with a usable record.
       const saved = resume ? null : lastViewSavedAt()
@@ -127,10 +130,10 @@ function guide() {
     guideMask.innerHTML = `<div class="about-panel guide" role="dialog" aria-modal="true" aria-labelledby="guide-title">
       <header><h2 id="guide-title">怎么玩</h2><button type="button" class="about-close">关闭</button></header>
       <ol class="guide-steps">
-        <li><span class="ui-seal">飞</span><div><b>飞上天看全城</b><p>一进来你在空中。像无人机一样四处飞，看两江四湖、看远处一层层的山。</p></div></li>
-        <li><span class="ui-seal">走</span><div><b>落地去逛街</b><p>点右上角「落地步行」，就变成一个小人站在街上。走累了可以骑路边的单车，江边还能坐船。</p></div></li>
-        <li><span class="ui-seal">印</span><div><b>集印章</b><p>名胜附近地上有朱红色的圆圈，走进去就盖一枚印，还会弹出景点介绍。打开「景册」看看还差哪几处。</p></div></li>
-        <li><span class="ui-seal">拍</span><div><b>拍一张</b><p>按「拍照」可以换时辰和天气，晨雾、黄昏、夜景都能拍，拍好直接保存。</p></div></li>
+        <li><span class="ui-seal">街</span><div><b>单人模式：上街</b><p>你站在桂林的街头。路边停着的电驴、单车和汽车走过去按 <kbd>F</kbd> 就能骑走，开车别闯红灯，不然交警会追。</p></div></li>
+        <li><span class="ui-seal">单</span><div><b>接单赚钱</b><p>打开接单，送米粉、跑腿、拉客、跑环城夜赛。赚到的钱可以去店里买衣服、买电驴、改装。</p></div></li>
+        <li><span class="ui-seal">飞</span><div><b>游览模式：飞上天</b><p>想看山水就选游览模式，像无人机一样四处飞，按 <kbd>V</kbd> 可以落地步行。</p></div></li>
+        <li><span class="ui-seal">印</span><div><b>集印章、拍照</b><p>名胜附近地上有朱红色的圆圈，走进去就盖一枚印。按「拍照」能换时辰和天气。</p></div></li>
       </ol>
       <div class="guide-keys">
         <section><h3>电脑</h3><ul>
