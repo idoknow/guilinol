@@ -50,10 +50,11 @@ if k get deployment glol-postgres >/dev/null 2>&1; then
   migrated=1
 fi
 
+# k() 走 ssh，参数会被远端 shell 重新解析：jsonpath 必须再包一层单引号，否则 [?(...)] 被 zsh 当 glob。
 # 集群侧兜底：另一台机器发起的发版可能正在滚动，这时覆盖镜像会让两边都报成功
-current=$(k get deployment glol-web -o jsonpath='{.spec.template.spec.containers[?(@.name=="glol-api")].image}' 2>/dev/null || true)
+current=$(k get deployment glol-web -o "jsonpath='{.spec.template.spec.containers[?(@.name==\"glol-api\")].image}'" 2>/dev/null || true)
 if [[ -n "$current" && "$current" != *":$tag" ]]; then
-  reason=$(k get deployment glol-web -o jsonpath='{.status.conditions[?(@.type=="Progressing")].reason}' 2>/dev/null || true)
+  reason=$(k get deployment glol-web -o "jsonpath='{.status.conditions[?(@.type==\"Progressing\")].reason}'" 2>/dev/null || true)
   if [[ "$reason" == "ReplicaSetUpdated" ]]; then
     echo "集群正在滚动到 ${current##*:}，另一个发版在进行，退出" >&2
     exit 1
@@ -67,7 +68,7 @@ for name in postgres minio; do k rollout status "deployment/glol-$name" --timeou
 [[ $migrated == 1 ]] || migrate
 k rollout status deployment/glol-web --timeout=300s
 # 确认最终跑的就是本次要发的镜像（防止并发发版把镜像改回去）
-applied=$(k get deployment/glol-web -o jsonpath='{.spec.template.spec.containers[?(@.name=="glol-api")].image}')
+applied=$(k get deployment/glol-web -o "jsonpath='{.spec.template.spec.containers[?(@.name==\"glol-api\")].image}'")
 [[ $applied == *":$tag" ]] || { echo "镜像与本次发版不一致：$applied ≠ :$tag" >&2; exit 1; }
 
 k exec -i deploy/glol-web -c glol-api -- node --input-type=module <<'JS'
