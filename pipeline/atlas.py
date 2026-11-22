@@ -159,7 +159,10 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
     for layer in ('water','green'):
         data[layer] = [path for poly in layers[layer] if (path := rings(poly.simplify(1)))]
     buildings = [part for poly in footprints if poly.area >= 40 for part in polygons(poly.intersection(bounds)) if part.area >= 40]
-    for min_area, tolerance in ((40,1),(70,1),(100,1),(100,2),(100,3)):
+    # Keep roads and search destinations at full fidelity. On a city-sized
+    # atlas, progressively omit small building symbols to fit the wire budget.
+    for min_area, tolerance in ((40,1),(70,1),(100,1),(100,2),(100,3),
+                                (200,3),(400,3),(800,3),(1600,3),(3200,3)):
         data['buildings'] = [path for poly in buildings if poly.area >= min_area and len(path := flat(poly.simplify(tolerance).exterior)) >= 8]
         payload = gzip.compress(json.dumps(data,ensure_ascii=False,separators=(',',':')).encode(),mtime=0)
         if len(payload) <= 400_000:

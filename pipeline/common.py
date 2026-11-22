@@ -41,10 +41,14 @@ def load_dem(gx=None, gz=None):
     px = (lon + 180) / 360 * n * 256 - xs[0] * 256 - 0.5
     py = (1 - np.arcsinh(np.tan(np.radians(lat))) / math.pi) / 2 * n * 256 - ys[0] * 256 - 0.5
     from scipy.ndimage import map_coordinates
-    PY, PX = np.meshgrid(py, px, indexing='ij')
-    result = map_coordinates(mos, [PY, PX], order=1, mode='constant', cval=np.nan)
-    if not np.isfinite(result).all():
-        raise ValueError('Aligned bbox is outside supplied DEM coverage or has missing tiles')
+    # Limit interpolation coordinates to one strip even on the full city grid.
+    result = np.empty((len(py), len(px)), dtype=np.float32)
+    for start in range(0, len(py), 128):
+        rows = slice(start, start + 128)
+        coords = np.meshgrid(py[rows], px, indexing='ij')
+        map_coordinates(mos, coords, output=result[rows], order=1, mode='constant', cval=np.nan)
+        if not np.isfinite(result[rows]).all():
+            raise ValueError('Aligned bbox is outside supplied DEM coverage or has missing tiles')
     return result
 
 def load_osm():

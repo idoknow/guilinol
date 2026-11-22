@@ -8,3 +8,4 @@ __pycache__/
 captures/
 .wrangler/
 .dev.vars*
+.world-cache/

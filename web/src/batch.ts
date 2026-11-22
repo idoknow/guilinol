@@ -28,7 +28,9 @@ export interface TileBatchInput {
 interface IndexedSlice {
   tile:Tile
   farCount:number
-  indices:Uint32Array
+  indices:THREE.TypedArray|null
+  vertexStart:number
+  count:number
 }
 
 export type ParkedBike={id:string;x:number;y:number;z:number;yaw:number}
@@ -82,7 +84,13 @@ class StaticLayerBatch {
       this.geom.setDrawRange(0,0)
       return
     }
+    // A single tile can bind its source buffers directly. Rebuilding a
+    // neighbouring bucket must never translate or mutate those buffers.
     for(const def of this.attrDefs) {
+      if(entries.length===1){
+        this.geom.setAttribute(def.name,entries[0].geom.getAttribute(def.name))
+        continue
+      }
       const merged = def.ctor==='u8' ? new Uint8Array(totalVerts*def.size) : new Float32Array(totalVerts*def.size)
       let offset = 0
       for(const {geom} of entries) {
@@ -93,23 +101,14 @@ class StaticLayerBatch {
       this.geom.setAttribute(def.name,new THREE.BufferAttribute(merged,def.size))
     }
 
-    const slices:IndexedSlice[] = []
-    let vStart = 0
-    for(const {tile, geom} of entries) {
-      const vCount = geom.getAttribute('position').count
-      let idx:Uint32Array
-      if(geom.index) {
-        const src = geom.index.array
-        idx = new Uint32Array(src.length)
-        for(let i=0;i<src.length;i++) idx[i] = src[i]+vStart
-      } else {
-        idx = new Uint32Array(vCount)
-        for(let i=0;i<vCount;i++) idx[i] = vStart+i
-      }
-      slices.push({tile, indices:idx,farCount:geom.userData.farIndexCount??idx.length})
-      vStart += vCount
-    }
-    this.slices = slices
+    let vertexStart=0
+    this.slices=entries.map(({tile,geom})=>{
+      const vertices=geom.getAttribute('position').count
+      const count=geom.index?.count??vertices
+      const slice={tile,vertexStart,count,indices:geom.index?.array??null,farCount:geom.userData.farIndexCount??count}
+      vertexStart+=vertices
+      return slice
+    })
     if(totalIdx>this.idxArray.length) this.idxArray = new Uint32Array(Math.max(totalIdx,1024))
     this.idxAttr = new THREE.BufferAttribute(this.idxArray,1)
     this.idxAttr.setUsage(THREE.DynamicDrawUsage)
@@ -126,9 +125,14 @@ class StaticLayerBatch {
     let cursor = 0
     for(const slice of this.slices) {
       if(!visibleTiles.has(slice.tile)) continue
-      const indices=farTiles?.has(slice.tile)?slice.indices.subarray(0,slice.farCount):slice.indices
-      this.idxArray.set(indices,cursor)
-      cursor += indices.length
+      const count=farTiles?.has(slice.tile)?slice.farCount:slice.count
+      const indices=slice.indices
+      if(indices && !slice.vertexStart){
+        this.idxArray.set(indices.subarray(0,count),cursor)
+      }else{
+        for(let i=0;i<count;i++)this.idxArray[cursor+i]=slice.vertexStart+(indices?indices[i]:i)
+      }
+      cursor+=count
     }
     this.idxAttr.clearUpdateRanges()
     if(cursor>0) this.idxAttr.addUpdateRange(0,cursor)

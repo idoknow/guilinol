@@ -1,3 +1,6 @@
+import struct
+import zlib
+
 import numpy as np
 from scipy.ndimage import (distance_transform_edt, gaussian_filter, label,
                            map_coordinates, maximum_filter, percentile_filter)
@@ -28,20 +31,33 @@ def detect(terrain,wet,left,top,centers):
             continue
         occupied.append((east,south))
         lat,lon = xz2ll(east,south)
-        seed = (int(row)*coarse.shape[1]+int(col))
+        # Preserve the published downtown release's 32 m sample numbering.
+        # Outside that extent use world coordinates so later expansions are stable.
+        if -2304 <= east <= 1280 and -2560 <= south <= 3328:
+            seed = ((south + 2560)//32)*113 + (east + 2304)//32
+        else:
+            seed = zlib.crc32(struct.pack('<ii', east, south))
         rng = np.random.default_rng(seed)
         peaks.append(dict(name=f'auto-{len(peaks)+1:03}',lat=lat,lon=lon,seed=seed,
                           baseHeight=round(float(ground[row,col]),1),target=float(land[row,col]),
                           shoulder=round(rng.uniform(.51,.64),3),taper=round(rng.uniform(.12,.21),3),
                           source='DEM 自动补峰'))
-    rows,cols = np.indices(terrain.shape,dtype=np.float32)/stride
-    return peaks,map_coordinates(ground,[rows,cols],order=1,mode='nearest')
+    return peaks,ground
 
 
 def suppress(terrain,wet,ground):
     if ground is None:
         return
-    excess = np.maximum(terrain/10-ground,0)
-    blend = np.clip((excess-3)/12,0,1)
-    lowered = np.rint(terrain-10*excess*blend**2*(3-2*blend))
-    terrain[~wet] = lowered[~wet]
+    stride = 32//GRID
+    cols = np.arange(terrain.shape[1],dtype=np.float32)/stride
+    for start in range(0,terrain.shape[0],128):
+        stop = min(start+128,terrain.shape[0])
+        rows = np.arange(start,stop,dtype=np.float32)/stride
+        coords = np.meshgrid(rows,cols,indexing='ij')
+        baseline = map_coordinates(ground,coords,order=1,mode='nearest')
+        strip = terrain[start:stop]
+        excess = np.maximum(strip/10-baseline,0)
+        blend = np.clip((excess-3)/12,0,1)
+        lowered = np.rint(strip-10*excess*blend**2*(3-2*blend))
+        dry = ~wet[start:stop]
+        strip[dry] = lowered[dry]

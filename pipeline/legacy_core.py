@@ -1,0 +1,144 @@
+"""Preserve the published downtown tiles and blend their outer 256 m ring."""
+import gzip
+import hashlib
+import io
+import json
+import os
+import struct
+import subprocess
+import tarfile
+import tempfile
+from pathlib import Path
+
+import numpy as np
+
+from common import CHUNK, GRID, ll2xz
+
+DIGEST = 'd604950786524c6c0b805cab104934c155c67ca57b85939503ff83d536a9be1a'
+RELEASE = 'world-' + DIGEST[:12]
+EXTENT = (-2304, -2560, 3584, 5888)
+
+
+def snapshot():
+    cache = Path(__file__).resolve().parents[1]/'.world-cache'
+    cache.mkdir(exist_ok=True)
+    path = cache/(RELEASE+'.tar.gz')
+    if not path.exists():
+        with tempfile.TemporaryDirectory(dir=cache) as staging:
+            incoming = Path(staging)/'world.tar.gz'
+            subprocess.run(['gh','release','download',RELEASE,'-R','idoknow/guilinol',
+                            '-p','world.tar.gz','-D',staging],check=True)
+            if hashlib.sha256(incoming.read_bytes()).hexdigest()!=DIGEST:
+                raise ValueError('Incorrect downtown world release checksum')
+            os.replace(incoming,path)
+    packed = path.read_bytes()
+    if hashlib.sha256(packed).hexdigest()!=DIGEST:
+        raise ValueError(f'Invalid cached world release: {path}')
+    with tarfile.open(fileobj=io.BytesIO(packed),mode='r:gz') as archive:
+        return {f.name.removeprefix('world/'):archive.extractfile(f).read()
+                for f in archive if f.isfile() and f.name.startswith('world/')}
+
+
+class Downtown:
+    def __init__(self):
+        self.files = snapshot()
+        self.manifest = json.loads(self.files['manifest.json'])
+        if tuple(self.manifest['extent'])!=EXTENT:
+            raise ValueError('Unexpected downtown extent')
+        self.tiles = {(t['x'],t['z']):t['file'] for t in self.manifest['chunks']}
+
+    @staticmethod
+    def depth(x,z):
+        west,north,width,height = EXTENT
+        return min(x-west,west+width-x,z-north,north+height-z)
+
+    def frozen_tile(self,x,z):
+        return self.depth(x+CHUNK/2,z+CHUNK/2) >= CHUNK*1.5
+
+    def blend(self, terrain, water, original, ctrl, left, top):
+        # Merge into a single grid first so a shared border is blended once.
+        west,north,w,h = EXTENT
+        shape = (h//GRID+1,w//GRID+1)
+        fields = [np.empty(shape,dtype='<i2') for _ in range(3)]
+        controls = np.full((h//8+3,w//8+3),np.nan)
+        for (x,z),file in self.tiles.items():
+            raw = gzip.decompress(self.files[file])
+            nv,ni,collision,image,deck = struct.unpack_from('<5I',raw,4)
+            tile_slice = np.s_[(z-north)//GRID:(z-north)//GRID+65,(x-west)//GRID:(x-west)//GRID+65]
+            at = 24+16900+nv*9+ni*4
+            tail = at+collision+image+deck*18
+            for field,offset in zip(fields,(24,8474,tail if len(raw)==tail+8450 else 24)):
+                field[tile_slice] = np.frombuffer(raw,'<i2',4225,offset).reshape(65,65)
+            streets = json.loads(raw[at:at+collision])[1]
+            if len(streets)>5 and streets[5]:
+                base,deltas = streets[5]
+                r,c = (z-north)//8,(x-west)//8
+                controls[r:r+35,c:c+35] = (base+np.array(deltas).reshape(35,35))/1000
+
+        def weight(xs,zs):
+            # The south side abuts surveyed school foundations. The north,
+            # west and east have room for a full tile of road-grade transition.
+            horizontal = np.minimum(xs,w-xs)[None,:]/CHUNK
+            vertical = np.minimum(zs/CHUNK,(h-zs)/64)[:,None]
+            t = np.clip(np.minimum(horizontal,vertical),0,1)
+            return t*t*(3-2*t)
+        r,c = (north-top)//GRID,(west-left)//GRID
+        window = np.s_[r:r+shape[0],c:c+shape[1]]
+        alpha = weight(np.arange(shape[1])*GRID,np.arange(shape[0])*GRID)
+        for dest,src in zip((terrain,water,original),fields):
+            patch = dest[window]
+            matched = (src!=-32768)&(patch!=-32768)
+            patch[matched] = np.rint(patch[matched]*(1-alpha[matched])+src[matched]*alpha[matched])
+            copy = ~matched & (alpha>=.5)
+            patch[copy] = src[copy]
+        r,c = (north-top)//8,(west-left)//8
+        patch = ctrl[r:r+controls.shape[0],c:c+controls.shape[1]]
+        alpha = weight((np.arange(controls.shape[1])-1)*8,(np.arange(controls.shape[0])-1)*8)
+        valid = np.isfinite(controls)
+        patch[valid] += (controls[valid]-patch[valid])*alpha[valid]
+
+    def landmarks(self, entries):
+        previous = {entry['id']:entry for entry in self.manifest['landmarks']}
+        for entry in entries:
+            x,_,z = entry['position']
+            if self.depth(x,z)>=CHUNK and entry['id'] in previous:
+                entry['position'] = list(previous[entry['id']]['position'])
+                if entry['id']=='zhengyang':
+                    # Published paving spans -0.142..+0.363 m about the
+                    # rendered ground. Centre it within the 0.30 m tolerance.
+                    entry['position'][1] -= .07
+
+    def peaks(self, output, peaks):
+        old = self.manifest['peaks']
+        target = output/peaks['file']
+        selected = []
+        data = bytearray(b'PK02')
+        for catalog,source,inside in [(old,self.files[old['file']],True),(peaks,target.read_bytes(),False)]:
+            raw = gzip.decompress(source)
+            offsets = {}
+            for e in catalog['entries']:
+                x,_,z = e['center']
+                if (self.depth(x,z)>=CHUNK)!=inside:
+                    continue
+                if not inside and e['name'].startswith('auto-'):
+                    e['name'] = 'auto-ext-'+e['name'][5:]
+                for section in e['lods']:
+                    for key,n in [('indexOffset',2*section['indices']),('offset',11*section['vertices'])]:
+                        pos = section[key]
+                        if pos not in offsets:
+                            offsets[pos]=len(data)
+                            data.extend(raw[pos:pos+n])
+                        section[key]=offsets[pos]
+                selected.append(e)
+        packed = gzip.compress(data,compresslevel=6,mtime=0)
+        target.write_bytes(packed)
+        peaks.update(entries=selected, bytes=len(packed))
+        auto = []
+        path = output/peaks['autoCatalog']
+        for rows,inside in [(json.loads(self.files[old['autoCatalog']]),True),(json.loads(path.read_bytes()),False)]:
+            for row in rows:
+                if (self.depth(*ll2xz(row['lat'],row['lon']))>=CHUNK)==inside:
+                    if not inside:
+                        row['name']='auto-ext-'+row['name'][5:]
+                    auto.append(row)
+        path.write_text(json.dumps(auto,ensure_ascii=False,separators=(',',':'))+'\n')

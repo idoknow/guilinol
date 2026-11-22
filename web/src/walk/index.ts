@@ -1228,6 +1228,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return ready
   }
   async function enter(x:number,z:number,heading:number,reason:string,override=false){
+    if(!sim.withinBounds(x,z))return false
     if(shopOverlay?.isOpen())shopOverlay?.close('teleport')
     const target=new THREE.Vector3(x,0,z);destination=target
     stream.prioritize(x,z)

@@ -15,6 +15,9 @@ async function currentBuild(): Promise<string> {
 export function setView(host: Host, view: unknown) {
   if (getPlayMode()==='solo')throw Error('FLIGHT_DISABLED_IN_SOLO')
   if (!validView(view)) throw Error('无效的反馈视角')
+  const {lat,lon} = xz2ll(view.x,view.z)
+  const [south,west,north,east] = host.manifest.bbox
+  if(lat<south || lat>north || lon<west || lon>east) throw Error('反馈视角位于开放区域外')
   host.fly()
   const camera = host.camera
   camera.position.set(view.x, view.y, view.z)
@@ -24,12 +27,11 @@ export function setView(host: Host, view: unknown) {
   camera.updateMatrixWorld()
 }
 
-// Camera pose + the ray-cast target it is looking at, as a FeedbackView. `includeTarget` is false
-// for the IDOK-105 "回到上次离开的地方" saver, which stores the pose every 15 s and must not do a
-// full-scene raycast each time.
-export async function currentView(host: Host, includeTarget = true): Promise<FeedbackView> {
+// Saved positions use the current world's coordinates and only need a pose.
+// Feedback captures also describe the object at the centre of the frame.
+export async function currentView(host: Host, area: 'feedback' | 'saved' = 'feedback'): Promise<FeedbackView> {
   const camera = host.camera
-  if (includeTarget) host.draw()
+  if (area === 'feedback') host.draw()
   const { x, y, z } = camera.position,
     angle = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'),
     yaw = THREE.MathUtils.radToDeg(angle.y)
@@ -48,7 +50,7 @@ export async function currentView(host: Host, includeTarget = true): Promise<Fee
     landmark_id: null,
     build: await currentBuild(),
   }
-  if (includeTarget) {
+  if (area === 'feedback') {
     const ray = new THREE.Raycaster(),
       meshes: THREE.Object3D[] = [],
       ids = new Map<THREE.Object3D, string>()
@@ -72,7 +74,7 @@ export async function currentView(host: Host, includeTarget = true): Promise<Fee
       view.landmark_id = ids.get(hit.object) ?? null
     }
   }
-  if (!validView(view)) throw Error('视角不在反馈范围内')
+  if (!validView(view,area)) throw Error('视角不在反馈范围内')
   return view
 }
 

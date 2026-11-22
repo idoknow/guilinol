@@ -1,0 +1,227 @@
+{
+  "bbox": [
+    25.25,
+    110.278,
+    25.302,
+    110.312
+  ],
+  "grid": 4,
+  "features": [
+    {
+      "osm": "relation/2339020",
+      "name": "",
+      "samples": 6300,
+      "above2": 3359,
+      "atLeast632": 104,
+      "maximum": 63.965
+    },
+    {
+      "osm": "relation/3466539",
+      "name": "",
+      "samples": 119,
+      "above2": 72,
+      "atLeast632": 0,
+      "maximum": 4.749
+    },
+    {
+      "osm": "relation/6047718",
+      "name": "月牙池",
+      "samples": 141,
+      "above2": 77,
+      "atLeast632": 2,
+      "maximum": 7.136
+    },
+    {
+      "osm": "relation/9373634",
+      "name": "杉湖",
+      "samples": 482,
+      "above2": 256,
+      "atLeast632": 2,
+      "maximum": 8.636
+    },
+    {
+      "osm": "relation/9373836",
+      "name": "榕湖",
+      "samples": 683,
+      "above2": 359,
+      "atLeast632": 13,
+      "maximum": 13.708
+    },
+    {
+      "osm": "relation/9383030",
+      "name": "烟雨湖",
+      "samples": 300,
+      "above2": 146,
+      "atLeast632": 0,
+      "maximum": 5.633
+    },
+    {
+      "osm": "relation/9385430",
+      "name": "",
+      "samples": 3018,
+      "above2": 1509,
+      "atLeast632": 26,
+      "maximum": 44.101
+    },
+    {
+      "osm": "relation/13888814",
+      "name": "",
+      "samples": 1074,
+      "above2": 568,
+      "atLeast632": 67,
+      "maximum": 64.32
+    },
+    {
+      "osm": "relation/14531791",
+      "name": "西湖",
+      "samples": 96,
+      "above2": 58,
+      "atLeast632": 0,
+      "maximum": 5.038
+    },
+    {
+      "osm": "way/258268271",
+      "name": "",
+      "samples": 48,
+      "above2": 23,
+      "atLeast632": 0,
+      "maximum": 4.617
+    },
+    {
+      "osm": "way/258268272",
+      "name": "",
+      "samples": 43,
+      "above2": 25,
+      "atLeast632": 0,
+      "maximum": 3.844
+    },
+    {
+      "osm": "way/459580370",
+      "name": "",
+      "samples": 61,
+      "above2": 31,
+      "atLeast632": 0,
+      "maximum": 3.766
+    },
+    {
+      "osm": "way/674477603",
+      "name": "",
+      "samples": 97,
+      "above2": 51,
+      "atLeast632": 0,
+      "maximum": 3.923
+    },
+    {
+      "osm": "way/674616142",
+      "name": "桂湖",
+      "samples": 1367,
+      "above2": 720,
+      "atLeast632": 16,
+      "maximum": 15.64
+    },
+    {
+      "osm": "way/674638582",
+      "name": "木龙湖",
+      "samples": 404,
+      "above2": 213,
+      "atLeast632": 7,
+      "maximum": 18.847
+    },
+    {
+      "osm": "way/674644577",
+      "name": "",
+      "samples": 68,
+      "above2": 48,
+      "atLeast632": 23,
+      "maximum": 35.123
+    },
+    {
+      "osm": "way/674644578",
+      "name": "",
+      "samples": 1039,
+      "above2": 535,
+      "atLeast632": 62,
+      "maximum": 46.812
+    },
+    {
+      "osm": "way/684971828",
+      "name": "八角塘",
+      "samples": 122,
+      "above2": 50,
+      "atLeast632": 0,
+      "maximum": 3.862
+    },
+    {
+      "osm": "way/701741810",
+      "name": "",
+      "samples": 21,
+      "above2": 6,
+      "atLeast632": 0,
+      "maximum": 3.74
+    },
+    {
+      "osm": "way/709050160",
+      "name": "铁佛塘",
+      "samples": 206,
+      "above2": 109,
+      "atLeast632": 12,
+      "maximum": 18.847
+    },
+    {
+      "osm": "way/713216005",
+      "name": "春天湖",
+      "samples": 176,
+      "above2": 99,
+      "atLeast632": 6,
+      "maximum": 12.281
+    },
+    {
+      "osm": "way/727932644",
+      "name": "清塘",
+      "samples": 286,
+      "above2": 130,
+      "atLeast632": 8,
+      "maximum": 19.329
+    },
+    {
+      "osm": "way/976719778",
+      "name": "",
+      "samples": 442,
+      "above2": 239,
+      "atLeast632": 11,
+      "maximum": 19.329
+    },
+    {
+      "osm": "way/1026675602",
+      "name": "",
+      "samples": 60,
+      "above2": 34,
+      "atLeast632": 0,
+      "maximum": 3.991
+    },
+    {
+      "osm": "way/1026675603",
+      "name": "",
+      "samples": 47,
+      "above2": 26,
+      "atLeast632": 0,
+      "maximum": 3.632
+    },
+    {
+      "osm": "way/1026675607",
+      "name": "",
+      "samples": 37,
+      "above2": 16,
+      "atLeast632": 0,
+      "maximum": 3.713
+    },
+    {
+      "osm": "way/1486780824",
+      "name": "",
+      "samples": 59,
+      "above2": 25,
+      "atLeast632": 0,
+      "maximum": 3.602
+    }
+  ]
+}

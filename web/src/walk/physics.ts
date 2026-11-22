@@ -1,3 +1,4 @@
+import {playableBounds} from '../../../lib/projection'
 import R from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import type {PeakColliderData, PeaksGroup} from '../peaks'
@@ -247,13 +248,18 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     }
     for(const [root,colliders] of landmarks)if(!nearLandmarks.has(root)){colliders.forEach(remove);landmarks.delete(root);changed=true}
     for(const [tree,collider] of trunks)if(Math.hypot(east-tree.x,south-tree.z)>48){remove(collider);trunks.delete(tree);changed=true}
-    for(const tile of manifest.chunks){
-      const near=Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))<=collisionRadius
+    const inRange=(tile:Tile)=>Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))<=collisionRadius
+    for(const [tile,region] of regions){
+      if(inRange(tile))continue
+      region.colliders.forEach(remove);regions.delete(tile);changed=true
+    }
+    for(const tile of stream.grid.near(east,south,collisionRadius+128)){
+      const near=inRange(tile)
       const data=stream.loaded.get(tile), region=regions.get(tile)
       const trees=stream.forest.loaded.get(tile)
       if(trees&&Math.max(Math.abs(east-tile.x-128),Math.abs(south-tile.z-128))<168)for(const tree of trees){
         if(tree.kind!==5&&!trunks.has(tree)&&Math.hypot(east-tree.x,south-tree.z)<40){trunks.set(tree,add(R.ColliderDesc.cylinder(1.8,.42*tree.scale).setTranslation(tree.x,tree.y+1.8,tree.z),'tree'));changed=true}}
-      if(region&&(!near||region.fine!==!!data)){region.colliders.forEach(remove);regions.delete(tile);changed=true}
+      if(region&&region.fine!==!!data){region.colliders.forEach(remove);regions.delete(tile);changed=true}
       if(!near||regions.has(tile))continue
       const stride=width/32+1,start=(tile.z-top)/32*stride+(tile.x-left)/32
       const ground=data?fineField(data):field(8,(col,row)=>overview[start+row*stride+col]/10)
@@ -286,6 +292,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       }
       regions.set(tile,{colliders,rings,fine:!!data});changed=true
     }
+    for(const [peak,collider] of mountains)if(!peaks.colliders.includes(peak)){remove(collider);mountains.delete(peak);changed=true}
     for(const peak of peaks.colliders){
       const near=Math.hypot(east-peak.center[0],south-peak.center[2])<=cfg.peakRadius
       if(!near&&mountains.has(peak)){remove(mountains.get(peak)!);mountains.delete(peak);changed=true}
@@ -405,9 +412,13 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     }
     return false
   }
+  const {min,max} = playableBounds(manifest.bbox)
+  function withinBounds(x:number,z:number){
+    return x>=min.x && x<=max.x && z>=min.z && z<=max.z
+  }
   function findWalkableSpawn(east:number,south:number,override=false){
     for(const {dx,dz} of override?[candidates[0]]:candidates){const x=east+dx,z=south+dz,tile=tileAt(x,z)
-      if(!tile||!stream.loaded.has(tile)||insideHouse(x,z))continue
+      if(!withinBounds(x,z)||!tile||!stream.loaded.has(tile)||insideHouse(x,z))continue
       const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'road')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
       const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05)continue
       const tread=surface(x,z,'landmark',support.y+cfg.step+.02,cfg.step+.04)
@@ -459,5 +470,5 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,pathBlocked,freeCapsule,wet,insideHouse,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
+  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
 }

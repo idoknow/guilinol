@@ -1,6 +1,7 @@
+import {playableBounds} from '../../lib/projection'
 import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
-import {bytes, fetchAsset, startOverview, type Manifest} from './world'
+import {bytes, fetchAsset, measureFirstWorldBytes, openingTerrain, startOverview, type Manifest} from './world'
 import {Stream} from './stream'
 import {flight} from './flight'
 import {look} from './look/config'
@@ -45,18 +46,22 @@ async function start(creatorSpawn=false) {
   setFogMetrics(initialMetrics)
 
   bootProgress('载入地形', 12)
-  const manifestBytes = await fetchAsset('manifest.json').catch(()=>{
-    record('failure',{category:'manifest'})
-    record('retry',{category:'manifest'})
-    return fetchAsset('manifest.json').catch(error=>{record('failure',{category:'manifest'});throw error})
-  })
-  identifyWorld(manifestBytes)
-  const manifest:Manifest = JSON.parse(new TextDecoder().decode(manifestBytes))
-  if(manifest.version!==4 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
-  const ovTask = startOverview(manifest), pkTask = startPeaks(manifest.peaks)
-  await Promise.all([ovTask.dispatched, pkTask.dispatched])
-  bootLoaded()
-  const basePromise = Promise.all([ovTask.finish, pkTask.finish])
+  async function readManifest(){
+    const manifestBytes = await fetchAsset('manifest.json').catch(()=>{
+      record('failure',{category:'manifest'})
+      record('retry',{category:'manifest'})
+      return fetchAsset('manifest.json').catch(error=>{record('failure',{category:'manifest'});throw error})
+    })
+    identifyWorld(manifestBytes)
+    const manifest:Manifest = JSON.parse(new TextDecoder().decode(manifestBytes))
+    if(manifest.version!==4 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
+    return manifest
+  }
+  const terrain=document.getElementById('opening-terrain')
+    ? await openingTerrain().catch(error=>{console.warn('Opening terrain unavailable',error);return null})
+    : null
+  const previousWorld=terrain?null:await readManifest()
+  const bounds=terrain??previousWorld!
   const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
   renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure
   document.body.prepend(renderer.domElement)
@@ -68,8 +73,8 @@ async function start(creatorSpawn=false) {
   const light = new THREE.DirectionalLight(look.sunColor,look.sunPower)
   light.position.set(...look.sunDirection); scene.add(light)
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
-  const [left,top,width,depth] = manifest.extent
-  scene.add(outerGround(manifest.extent))
+  const [left,top,width,depth] = bounds.extent
+  scene.add(outerGround(bounds.extent))
   // IDOK-105: choose the opening camera pose. The camera is NOT touched here — `flight()` below sets
   // `rotation.order = 'YXZ'` and lookAt()/rotation.set() must run after it, or three.js recomputes the
   // quaternion with the wrong order and every slot gains a roll.
@@ -84,6 +89,9 @@ async function start(creatorSpawn=false) {
   const opening = soloStart ? (!isDeepLink(openParams) ? readLastView() : null) : forcedSlot !== null
     ? spawnPool.find(slot => slot.id === forcedSlot) ?? spawnPool[0]
     : isDeepLink(openParams) ? null : consumeRestore() ? readLastView() ?? pickSpawn() : pickSpawn()
+  const hasDowntown = left<=-2304 && top<=-2560 && left+width>=1280 && top+depth>=3328
+  const framing = hasDowntown ? [-2304,-2560,3584,5888] : bounds.extent
+  const [viewX,viewZ,viewWidth,viewDepth] = framing
   let walker:Awaited<ReturnType<typeof import('./walk').walk>>|undefined, switching=false
   let cinema=false
   let walkModPromise:Promise<typeof import('./walk')>|undefined
@@ -92,32 +100,94 @@ async function start(creatorSpawn=false) {
     return walkModPromise
   }
   if(soloStart||params.get('mode')==='walk'||params.has('spawn')) void prefetchWalk()
-  const controls = flight(camera,renderer.domElement,manifest.extent,()=>getPlayMode()==='tour'&&!paused&&!walker?.active&&!switching&&!cinema)
+  const controls = flight(camera,renderer.domElement,bounds.extent,()=>getPlayMode()==='tour'&&!paused&&!walker?.active&&!switching&&!cinema)
   // Apply the opening pose here, after flight() has set rotation.order='YXZ'. lookAt()/rotation.set()
   // before that line would be recomputed in the wrong Euler order and leave a permanent roll.
+  const {min,max} = playableBounds(bounds.bbox)
+  function clampOpening() {
+    camera.position.x = THREE.MathUtils.clamp(camera.position.x,min.x,max.x)
+    camera.position.z = THREE.MathUtils.clamp(camera.position.z,min.z,max.z)
+  }
+  function restoreOpening(view:FeedbackView) {
+    applyLastView(camera,view)
+    clampOpening()
+  }
   if(opening) {
-    if('eye' in opening) { camera.position.set(...opening.eye); camera.lookAt(...opening.look) }
-    else applyLastView(camera, opening)
+    if('eye' in opening) { camera.position.set(...opening.eye); camera.lookAt(...opening.look); clampOpening() }
+    else restoreOpening(opening)
   } else {
-    camera.position.set(left+width*.55,420,top+depth*.62)
-    camera.lookAt(left+width*.47,150,top+depth*.45)
+    camera.position.set(viewX+viewWidth*.55,420,viewZ+viewDepth*.62)
+    camera.lookAt(viewX+viewWidth*.47,150,viewZ+viewDepth*.45)
   }
   function resize() {
     renderer.setPixelRatio(Math.min(devicePixelRatio,1.5)); renderer.setSize(innerWidth,innerHeight)
     camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix()
   }
   resize(); window.addEventListener('resize',resize)
-  bootProgress('载入山体', 45)
-  const [base,peaks] = await basePromise
-  scene.add(base.mesh,peaks)
-  bootProgress('载入街区', 78)
   const clock = skyClock(params)
-  if(!soloStart)setPreset(camera,params.get('cam'))
-  const stream = new Stream(scene,manifest,base,rangeStore,camera)
-  const output = document.querySelector('output')!
+  if(!soloStart)setPreset(camera,params.get('cam')??params.get('spawn'),bounds.bbox)
   let previous=0, first=0, frame=0, sum=0, samples=0
   const stats = {firstMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
     geometries:0,textures:0}
+  function markFirstFrame(){
+    first=performance.now()
+    stats.firstMs=first
+    measureFirstWorldBytes(first,total=>{stats.firstWorldBytes=total})
+    bootDismiss()
+  }
+  function updateAtmosphere(now:number,elapsed:number){
+    clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/1200))
+    atmo.uTime.value = now/1000
+    light.position.copy(env.sunDir); light.color.copy(env.sunColor); light.intensity = env.sunPower
+    hemi.color.copy(env.hemiSky); hemi.groundColor.copy(env.hemiGround); hemi.intensity = env.hemiPower
+    renderer.toneMappingExposure = env.exposure; windowLight.value = env.night
+    dome.update(); drops.update()
+  }
+
+  let openingStream:Stream|undefined
+  if(terrain){
+    scene.add(terrain.mesh)
+    bootLoaded()
+    // Draw the real terrain with the active flight camera. The second
+    // animation callback marks the first presented frame on both paths.
+    await new Promise<void>(resolve=>{
+      let rendered=false
+      renderer.setAnimationLoop(now=>{
+        if(rendered && !first){
+          markFirstFrame()
+          document.querySelector('output')!.value='正在载入街区…'
+          resolve()
+        }
+        const elapsed=previous?now-previous:0
+        previous=now
+        controls(elapsed/1000)
+        updateAtmosphere(now,elapsed)
+        openingStream?.updateBatches(camera.position)
+        renderer.render(scene,camera)
+        rendered=true
+      })
+    })
+  }
+  async function loadFullScene(){
+    const manifest=previousWorld??await readManifest()
+    if(terrain){
+      openingStream=new Stream(scene,manifest,terrain,rangeStore,camera)
+      await openingStream.loadOpeningRing(camera.position)
+    }
+    const overview=startOverview(manifest), mountains=startPeaks(manifest.peaks)
+    await Promise.all([overview.dispatched,mountains.dispatched])
+    bootLoaded()
+    const [base,peaks]=await Promise.all([overview.finish,mountains.finish])
+    return {manifest,base,peaks}
+  }
+  const {manifest,base,peaks}=await loadFullScene().finally(()=>{
+    if(terrain){renderer.setAnimationLoop(null);terrain.dispose()}
+  })
+  scene.add(base.mesh,peaks)
+  bootProgress('载入街区', 78)
+  const stream = openingStream??new Stream(scene,manifest,base,rangeStore,camera)
+  if(openingStream)openingStream.setTerrainLayer(base)
+  const output = document.querySelector('output')!
   let cullLandmarks:ReturnType<typeof import('./landmarks').landmarkCulling>|undefined
   let landmarksPromise:Promise<void>|undefined
   function ensureLandmarks(){
@@ -188,11 +258,11 @@ async function start(creatorSpawn=false) {
     switching=true
     try{
       const name=params.get('spawn'),preset=initial&&name&&Object.hasOwn(presets,name)?presets[name]:null
-      const original=camera.clone();if(preset)setPreset(original,name)
+      const original=camera.clone();if(preset)setPreset(original,name,manifest.bbox)
       const gate=walkConfig.gate,point=preset?.walk??(initial&&!preset?gate:{x:original.position.x,z:original.position.z,yaw:original.rotation.y})
       primeLanding(point.x,point.z)
       const walking=await loadWalker()
-      if(!await walking.enter(point.x,point.z,point.yaw,initial?name??'default':'flight',!!preset?.walk)&&initial){
+      if(!await walking.enter(point.x,point.z,point.yaw,initial?name??'default':'flight')&&initial){
         primeLanding(gate.x,gate.z)
         await walking.enter(gate.x,gate.z,gate.yaw,'fallback')
       }
@@ -295,7 +365,7 @@ async function start(creatorSpawn=false) {
     peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},
     flight: takeFlight,
     setPreset(name:string){if(getPlayMode()==='solo')return {ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}
-      setPreset(camera,name);camera.updateMatrixWorld();return stats.frame},
+      setPreset(camera,name,manifest.bbox);camera.updateMatrixWorld();return stats.frame},
     freeze(){return new Promise<void>(resolve=>requestAnimationFrame(()=>{
       renderer.setAnimationLoop(null)
       const gl=renderer.getContext()
@@ -327,12 +397,13 @@ async function start(creatorSpawn=false) {
     spawnPool,
     saveLastViewNow:()=>host.lastView().then(saveLastView),
     readLastViewNow:()=>readLastView(),
-    applyLastViewNow:(view:FeedbackView)=>getPlayMode()==='solo'?{ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}:applyLastView(camera,view)}})
+    applyLastViewNow:(view:FeedbackView)=>getPlayMode()==='solo'?{ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}:restoreOpening(view)}})
   function draw(){
+    base.update(camera)
     const metrics=stream.metrics
     const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
     cullLandmarks?.update(stream.landmarks.values(),camera,mirror,metrics.cullHorizon)
-    peaks.update(camera,mirror,metrics)
+    peaks.update(camera,mirror,metrics,!stream.isInnerBusy())
     if(Number.isFinite(mirror))cullLandmarks?.pass(true)
     // Reuse the last reflection while tiles are still streaming: pending work is exactly when the
     // mirror costs the most, and a frame-old reflection is invisible under the ripple distortion.
@@ -343,7 +414,7 @@ async function start(creatorSpawn=false) {
   }
   const host:Host={scene,camera,renderer,manifest,stream,peaks,clock,walker:()=>walker,walkTo,draw,refreshMode:showMode,
     captureView:async()=>(await import('./play/feedback-view')).capture(host),
-    lastView:async()=>(await import('./play/feedback-view')).currentView(host,false),
+    lastView:async()=>(await import('./play/feedback-view')).currentView(host,'saved'),
     setView:async(view)=>(await import('./play/feedback-view')).setView(host,view),
     fly:takeFlight,get cinema(){return cinema},set cinema(on){cinema=on}}
   const sampleFrame=instrument(renderer,()=>{
@@ -358,7 +429,7 @@ async function start(creatorSpawn=false) {
     const elapsed = previous?now-previous:0;previous=now
     if(walker?.active)walker.tick(elapsed/1000);else if(!switching)controls(elapsed/1000)
     if(frame===1) {
-      first=performance.now();stats.firstMs=first;stats.firstWorldBytes=bytes;bootProgress('载入街区', 100);bootDismiss()
+      if(!first)markFirstFrame()
       void import('./play').then(mod=>{tour=mod.play(host)})
     }
     if(frame===2) void ensureLandmarks()
@@ -366,24 +437,19 @@ async function start(creatorSpawn=false) {
       peaks.loadModels(renderer)
       void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))
     }
-    if(first&&!switching) {
+    if(frame>0&&!switching) {
       const target=walker?.destination??(walker?.active?walker.position:camera.position)
-      stream.updateLandmarks?.(target)
       stream.tick(target)
+      stream.updateLandmarks?.(target)
       if(!walkModPromise && !stream.pending.size && camera.position.y<260) void prefetchWalk()
     }
-    clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/1200))
-    atmo.uTime.value = now/1000
-    light.position.copy(env.sunDir); light.color.copy(env.sunColor); light.intensity = env.sunPower
-    hemi.color.copy(env.hemiSky); hemi.groundColor.copy(env.hemiGround); hemi.intensity = env.hemiPower
-    renderer.toneMappingExposure = env.exposure; windowLight.value = env.night
-    dome.update(); drops.update()
+    updateAtmosphere(now,elapsed)
     tour?.tick(elapsed/1000)
     solo?.step(Math.min(0.1, elapsed/1000))
     persistView?.()
     draw()
     sampleFrame(elapsed)
-    if(!frame)record('firstFrame',{ms:performance.now()})
+    if(!frame)record('firstFrame',{ms:first||performance.now()})
     if(!playable && first && !paused && !switching && !stream.pending.size && stream.loaded.size){
       const p=walker?.active?walker.position:camera.position
       if(manifest.chunks.every(t=>Math.hypot(t.x+128-p.x,t.z+128-p.z)>stream.radius||stream.loaded.has(t))){
