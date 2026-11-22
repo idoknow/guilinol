@@ -17,6 +17,8 @@
   --ui-ink:#2a302c;--ui-ink-soft:#5d655f;--ui-paper-line:rgba(60,60,50,.14);
   /* 朱砂 */
   --ui-seal:#a9503c;--ui-seal-hi:#bd5e48;--ui-seal-light:#d0694c;--ui-seal-wash:rgba(169,80,60,.12);
+  /* 赭石：只用于「关于」页的反馈类标记，与朱砂（设计/主动作）、青玉（代码）区分 */
+  --ui-ochre:#c49a4a;--ui-ochre-wash:rgba(196,154,74,.16);
   /* 状态 */
   --ui-ok:#8fc1b5;--ui-warn:#e2b878;--ui-error:#f0b9a6;--ui-disabled:rgba(244,239,226,.38);
   /* 形状 */

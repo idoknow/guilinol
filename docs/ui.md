@@ -42,3 +42,9 @@
 3. 忘记密码：输入邮箱 → 收验证码 → 设新密码 → 回到登录。
 4. 重新发送验证码有 60 秒冷却。
 5. 我的账号：头像字、昵称、邮箱、反馈邮件提醒开关、退出登录。
+
+## Logo 与「关于」页（IDOK-148）
+
+- Logo 是成员设计的像素画，原图 `docs/brand/logo-source.jpg`。`python3 scripts/brand-logo.py` 生成全部派生图：`public/brand/logo.webp`（关于页、进城加载卡）、`emblem.webp`（主界面标题左上的宣纸小卡、关于页 Logo 设计者卡）、`favicon-32.png` / `brand/favicon-64.png`、`apple-touch-icon.png`、`brand/icon-*.png`（manifest）。
+- Logo 底是白的：放在浅色/宣纸底上时给 `<img>` 加 `mix-blend-mode:multiply`，白底就透出底色；不要直接放在深色玻璃上。
+- 「关于」页的贡献者名单在 `web/src/ui/contributors.ts`，按人列、写清做了什么（写代码 / 设计 / 实拍 / 反馈），不贴仓库 contributors。玩家反馈处理完后，把反馈者的游戏昵称和反馈内容加进去（页面上写了「被采纳的反馈会署上你的昵称」）。只写昵称与公开主页。

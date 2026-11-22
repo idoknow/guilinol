@@ -27,7 +27,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
   </header>
   <div class="home-main">
     <div class="home-title">
-      <span class="home-seal" aria-hidden="true">桂</span>
+      <span class="home-seal" aria-hidden="true"><img src="./brand/emblem.webp" width="371" height="144" alt=""></span>
       <h1>网上桂林</h1>
       <p class="home-tag">一座按真实地图搭起来的 3D 桂林。<br>飞上天看山水，落地逛街巷，走到哪儿算哪儿。</p>
       <p class="home-meta"><span>登录就能玩</span><span>电脑 · 手机都行</span><span>不用下载</span></p>
