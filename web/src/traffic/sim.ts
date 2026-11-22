@@ -1,7 +1,7 @@
 type Node = {id:number,x:number,y:number,z:number}
 type Lane = {id:number,from:number,to:number,offset:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number}
 type Phase = {lanes:number[],green:number,yellow:number}
-export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number][],signals:{node:number,phases:Phase[]}[]}
+export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?][],signals:{node:number,phases:Phase[]}[]}
 type Track = Lane & {start:Node,end:Node,dx:number,dz:number,length:number,walk:boolean}
 type Actor = {track:Track,dist:number,speed:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number}
 type Position = {x:number,z:number,y:number}
@@ -30,9 +30,15 @@ export class Traffic {
       const cell=this.cells.get(key)??[];cell.push(track);this.cells.set(key,cell)
     }
     for(const lane of graph.lanes)add(lane,false)
-    let id=-1
-    for(const [from,to,offset] of graph.walks)for(const reverse of [false,true])add({from:reverse?to:from,to:reverse?from:to,offset:reverse?-offset:offset,id:id--,kind:'nonmotor',speedKmh:5},true)
+    graph.walks.forEach(([from,to,offset,stable],index)=>{for(const reverse of [false,true])add({from:reverse?to:from,to:reverse?from:to,offset:reverse?-offset:offset,id:-1-2*(stable??index)-Number(reverse),kind:'nonmotor',speedKmh:5},true)})
     for(const signal of graph.signals)this.signal.set(signal.node,signal.phases)
+  }
+  inherit(previous:Traffic){
+    this.time=previous.time
+    for(const actor of previous.actors){
+      const track=this.exits.get(actor.track.from)?.find(candidate=>candidate.id===actor.track.id)
+      if(track)this.actors.push({...actor,track})
+    }
   }
   private position(actor:Actor){
     const {track,dist}=actor

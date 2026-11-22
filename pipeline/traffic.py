@@ -111,6 +111,21 @@ def bake(output, manifest):
     dest = output/'roads'/'graph.json.gz'
     dest.parent.mkdir(exist_ok=True)
     dest.write_bytes(gzip.compress(json.dumps(result, ensure_ascii=False, separators=(',',':')).encode(),mtime=0))
+    # A halo contains all spawn and retention candidates until the next cell loads.
+    cells = defaultdict(lambda: dict(lanes=[],walks=[],refs=set()))
+    for collection in ('lanes','walks'):
+        for index, item in enumerate(result[collection]):
+            refs = (item['from'],item['to']) if collection=='lanes' else item[:2]
+            center = [(nodes[refs[0]][axis]+nodes[refs[1]][axis])/2 for axis in ('x','z')]
+            for col in range(math.floor((center[0]-260)/512),math.floor((center[0]+260)/512)+1):
+                for row in range(math.floor((center[1]-260)/512),math.floor((center[1]+260)/512)+1):
+                    cell=cells[col,row]
+                    cell[collection].append(item if collection=='lanes' else [*item,index]);cell['refs'].update(refs)
+    for (col,row),cell in cells.items():
+        refs=cell.pop('refs');cell['nodes']=[nodes[ref] for ref in sorted(refs)]
+        cell['signals']=[signal for signal in signals if signal['node'] in refs]
+        (dest.parent/f'{col}_{row}.json.gz').write_bytes(gzip.compress(json.dumps(cell,separators=(',',':')).encode(),mtime=0))
+    (dest.parent/'cells.json').write_text(json.dumps([f'{col}_{row}' for col,row in sorted(cells)]))
     print('Traffic:', {key:len(value) for key,value in result.items()}, dest.stat().st_size, 'bytes')
 
 

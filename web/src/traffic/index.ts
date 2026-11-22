@@ -1,18 +1,35 @@
 import * as THREE from 'three'
 import {Traffic,type Graph} from './sim'
 
-export async function traffic(scene:THREE.Scene){
-  const response=await fetch('/world/roads/graph.json.gz')
+async function loadGraph(key:string){
+  const response=await fetch(`/world/roads/${key}.json.gz`)
   if(!response.ok||!response.body)throw Error(`traffic graph: ${response.status}`)
   const bytes=await response.arrayBuffer()
   const signature=new Uint8Array(bytes,0,2)
   const body=signature[0]===31&&signature[1]===139?new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')):bytes
   const graph:Graph=await new Response(body).json()
-  const sim=new Traffic(graph),object=new THREE.Object3D()
+  return new Traffic(graph)
+}
+
+export async function traffic(scene:THREE.Scene){
+  const index=await fetch('/world/roads/cells.json')
+  if(!index.ok)throw Error(`traffic cells: ${index.status}`)
+  const cells=new Set<string>(await index.json()),object=new THREE.Object3D()
+  let sim:Traffic|undefined,key=''
   const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(),new THREE.MeshLambertMaterial({color:0x999999}),38)
   mesh.name='G2 traffic';mesh.count=0;mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(mesh)
   let accumulator=0
   return (dt:number,camera:THREE.Vector3,vehicle?:THREE.Vector3)=>{
+    const target=`${Math.floor(camera.x/512)}_${Math.floor(camera.z/512)}`
+    if(target!==key){
+      key=target
+      if(cells.has(key))void loadGraph(key).then(next=>{
+        if(key!==target)return
+        if(sim)next.inherit(sim);sim=next
+      }).catch(error=>console.warn('Traffic cell unavailable',error))
+      else {sim=undefined;mesh.count=0}
+    }
+    if(!sim)return
     accumulator+=Math.min(dt,.2)
     if(accumulator<.05)return
     while(accumulator>=.05){sim.step(.05,camera,vehicle);accumulator-=.05}
