@@ -231,11 +231,14 @@ function sanitizeWardrobe(raw: unknown): WardrobeState {
 
   if (isPlainObject(raw)) {
     for (const id of uniqueStrings(raw.ownedItemIds)) {
-      if (OUTFIT_ITEMS_BY_ID[id]) ownedItemSet.add(id)
+      if (/^[a-z][a-z0-9_]{0,79}$/.test(id)) ownedItemSet.add(id)
     }
     for (const pid of uniqueStrings(raw.ownedPresetIds)) {
       const preset = OUTFIT_PRESETS_BY_ID[pid]
-      if (!preset) continue
+      if (!preset) {
+        if (/^[a-z][a-z0-9_]{0,79}$/.test(pid)) ownedPresetSet.add(pid)
+        continue
+      }
       ownedPresetSet.add(pid)
       for (const itemId of Object.values(preset.items)) {
         if (OUTFIT_ITEMS_BY_ID[itemId]) ownedItemSet.add(itemId)
@@ -572,6 +575,7 @@ export function persistSaveSync(candidate: LocalSaveV1, storageOverride?: Storag
   try {
     storage.setItem(SAVE_STORAGE_KEY, JSON.stringify(toWrite))
     activeSave = toWrite
+    if(typeof window!=='undefined')window.dispatchEvent(new Event('glol:save-written'))
     return true
   } catch (err) {
     if (isQuotaError(err)) {
@@ -582,6 +586,7 @@ export function persistSaveSync(candidate: LocalSaveV1, storageOverride?: Storag
       try {
         storage.setItem(SAVE_STORAGE_KEY, JSON.stringify(trimmed))
         activeSave = trimmed
+        if(typeof window!=='undefined')window.dispatchEvent(new Event('glol:save-written'))
         return true
       } catch {
         dispatchSaveToast('浏览器本地存储空间不足，保存失败，请清理缓存后重试')

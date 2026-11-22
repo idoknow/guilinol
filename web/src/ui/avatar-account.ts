@@ -26,7 +26,8 @@ export async function accountCharacter(nickname: string, edit = false) {
   const previous = await request()
   if (previous && !edit) {
     const cached = sanitizeAvatar(loadLocalSave().save[AVATAR_KEY])
-    mirror(previous, cached?.createdAt !== previous.createdAt || cached.look !== previous.look)
+    if(JSON.stringify(cached)!==JSON.stringify(previous))mirror(previous, cached?.createdAt !== previous.createdAt || cached.look !== previous.look)
+    else localStorage.setItem(AVATAR_KEY,JSON.stringify(previous))
     if (JSON.stringify(cached) !== JSON.stringify(previous))
       window.dispatchEvent(new CustomEvent('glol:avatar-change', {detail: previous}))
     return false
