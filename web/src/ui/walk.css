@@ -1,18 +1,48 @@
 .walk-ui{position:fixed;inset:0;z-index:2;pointer-events:none}
 .walk-ui>*{pointer-events:auto}
-.walk-ui .joystick{left:calc(18px + env(safe-area-inset-left));bottom:calc(28px + env(safe-area-inset-bottom));width:112px;height:112px}
+/* Thumb layout (IDOK-93): move stick bottom-left, look stick bottom-right, action buttons wrap the look stick's
+   top and left edge on a box grid (no two hit boxes intersect, which walk-quick asserts). Slots: A primary (跃/翘头), B (跑/+挡), C (蹲/-挡), D (压弯), E (远近).
+   Portrait numbers first; landscape phones (max-height:500px) override below. All distances include the safe-area insets. */
+.walk-ui{--sr:env(safe-area-inset-right);--sb:env(safe-area-inset-bottom)}
+.walk-ui .joystick{left:calc(18px + env(safe-area-inset-left));bottom:calc(28px + var(--sb));width:112px;height:112px}
 .walk-ui .joystick-knob{width:46px;height:46px}
-.walk-ui .btn-run,.walk-ui .btn-crouch,.walk-ui .btn-jump,.walk-ui .btn-view{position:fixed;border-radius:50%;display:grid;place-items:center;padding:0;box-sizing:border-box}
-.walk-ui .btn-jump{right:calc(18px + env(safe-area-inset-right));bottom:calc(30px + env(safe-area-inset-bottom));width:68px;height:68px;font-size:21px}
-.walk-ui .btn-run{right:calc(98px + env(safe-area-inset-right));bottom:calc(26px + env(safe-area-inset-bottom));width:56px;height:56px;font-size:17px;letter-spacing:.04em}
-.walk-ui .btn-crouch{right:calc(98px + env(safe-area-inset-right));bottom:calc(96px + env(safe-area-inset-bottom));width:48px;height:48px;font-size:15px;letter-spacing:.04em}
+.walk-ui .look-stick{position:fixed;right:calc(18px + var(--sr));bottom:calc(28px + var(--sb));width:112px;height:112px;border-radius:50%;display:grid;place-items:center;touch-action:none;
+  background:radial-gradient(circle,rgba(24,40,37,.14) 0 30%,rgba(24,40,37,.22) 31% 55%,rgba(24,40,37,.36) 56% 100%);border:1px solid var(--ui-glass-line);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+/* Four faint chevrons mark it as a look pad, not a second move stick. */
+.walk-ui .look-stick::before{content:"";position:absolute;inset:9px;border-radius:50%;pointer-events:none;opacity:.55;
+  background:conic-gradient(from -8deg,rgba(244,239,226,.75) 0 16deg,transparent 16deg 90deg,rgba(244,239,226,.75) 90deg 106deg,transparent 106deg 180deg,rgba(244,239,226,.75) 180deg 196deg,transparent 196deg 270deg,rgba(244,239,226,.75) 270deg 286deg,transparent 286deg);
+  -webkit-mask:radial-gradient(circle,transparent 0 calc(50% - 4px),#000 calc(50% - 3px) 50%,transparent calc(50% + 1px));mask:radial-gradient(circle,transparent 0 calc(50% - 4px),#000 calc(50% - 3px) 50%,transparent calc(50% + 1px))}
+.walk-ui .look-stick::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid rgba(98,150,160,0);transition:border-color .2s}
+.walk-ui .look-stick.on::after{border-color:rgba(122,172,178,.78)}
+.walk-ui .look-stick-knob{width:42px;height:42px;border-radius:50%;background:rgba(244,239,226,.62);border:2px solid rgba(244,239,226,.9);box-sizing:border-box;box-shadow:0 2px 10px rgba(20,30,28,.3);pointer-events:none;transition:transform .06s,background-color .2s}
+.walk-ui .look-stick.on .look-stick-knob{background:rgba(244,239,226,.86)}
+.walk-ui :is(.btn-run,.btn-crouch,.btn-jump,.btn-view,.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck){position:fixed;border-radius:50%;place-items:center;padding:0;box-sizing:border-box}
+.walk-ui :is(.btn-run,.btn-crouch,.btn-jump,.btn-view){display:grid}
+.walk-ui :is(.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck){display:none}
+/* A */ .walk-ui :is(.btn-jump,.btn-wheelie){right:calc(70px + var(--sr));bottom:calc(152px + var(--sb));width:64px;height:64px}
+.walk-ui .btn-jump{font-size:21px}
+.walk-ui .btn-wheelie{font-size:15px;letter-spacing:.06em;border-color:rgba(214,120,92,.78)}
+/* B */ .walk-ui :is(.btn-run,.btn-gear-up){right:calc(142px + var(--sr));bottom:calc(98px + var(--sb));width:54px;height:54px}
+.walk-ui .btn-run{font-size:17px;letter-spacing:.04em}
+/* C */ .walk-ui :is(.btn-crouch,.btn-gear-down){right:calc(146px + var(--sr));bottom:calc(40px + var(--sb));width:46px;height:46px}
+.walk-ui .btn-crouch{font-size:15px;letter-spacing:.04em}
+.walk-ui :is(.btn-gear-up,.btn-gear-down){font-size:13px;letter-spacing:.02em}
+/* D */ .walk-ui .btn-tuck{right:calc(204px + var(--sr));bottom:calc(41px + var(--sb));width:44px;height:44px;font-size:12px;letter-spacing:.02em}
+/* E */ .walk-ui .btn-view{right:calc(18px + var(--sr));bottom:calc(162px + var(--sb));width:44px;height:44px;font-size:12px;letter-spacing:.04em}
 .walk-ui .btn-run.on,.walk-ui .btn-crouch.on{background:rgba(169,80,60,.68);border-color:rgba(244,239,226,.72);box-shadow:0 0 0 2px rgba(214,120,92,.32)}
-.walk-ui .btn-view{right:calc(22px + env(safe-area-inset-right));bottom:calc(112px + env(safe-area-inset-bottom));width:48px;height:48px;font-size:12px;letter-spacing:.04em}
-.walk-ui .btn-wheelie,.walk-ui .btn-gear-up,.walk-ui .btn-gear-down,.walk-ui .btn-tuck{position:fixed;border-radius:50%;display:none;place-items:center;padding:0;box-sizing:border-box}
-.walk-ui .btn-wheelie{right:calc(18px + env(safe-area-inset-right));bottom:calc(30px + env(safe-area-inset-bottom));width:66px;height:66px;font-size:15px;letter-spacing:.06em;border-color:rgba(214,120,92,.78)}
-.walk-ui .btn-gear-up{right:calc(96px + env(safe-area-inset-right));bottom:calc(84px + env(safe-area-inset-bottom));width:46px;height:46px;font-size:13px;letter-spacing:.02em}
-.walk-ui .btn-gear-down{right:calc(96px + env(safe-area-inset-right));bottom:calc(28px + env(safe-area-inset-bottom));width:46px;height:46px;font-size:13px;letter-spacing:.02em}
-.walk-ui .btn-tuck{right:calc(150px + env(safe-area-inset-right));bottom:calc(34px + env(safe-area-inset-bottom));width:44px;height:44px;font-size:12px;letter-spacing:.02em}
+@media (pointer:coarse) and (max-height:500px){
+  .walk-ui .joystick{left:calc(22px + env(safe-area-inset-left));bottom:calc(16px + var(--sb));width:96px;height:96px}
+  .walk-ui .joystick-knob{width:40px;height:40px}
+  .walk-ui .look-stick{right:calc(22px + var(--sr));bottom:calc(16px + var(--sb));width:96px;height:96px}
+  .walk-ui .look-stick-knob{width:36px;height:36px}
+  .walk-ui :is(.btn-jump,.btn-wheelie){right:calc(66px + var(--sr));bottom:calc(122px + var(--sb));width:56px;height:56px}
+  .walk-ui .btn-jump{font-size:19px}
+  .walk-ui :is(.btn-run,.btn-gear-up){right:calc(126px + var(--sr));bottom:calc(74px + var(--sb));width:48px;height:48px}
+  .walk-ui .btn-run{font-size:16px}
+  .walk-ui :is(.btn-crouch,.btn-gear-down){right:calc(129px + var(--sr));bottom:calc(22px + var(--sb));width:42px;height:42px}
+  .walk-ui .btn-tuck{right:calc(181px + var(--sr));bottom:calc(23px + var(--sb));width:40px;height:40px}
+  .walk-ui .btn-view{right:calc(22px + var(--sr));bottom:calc(130px + var(--sb));width:40px;height:40px}
+}
 .walk-ui :is(.btn-wheelie,.btn-tuck).on{background:rgba(169,80,60,.74);border-color:rgba(244,239,226,.78);box-shadow:0 0 0 2px rgba(214,120,92,.34)}
 body[data-aboard]:is([data-ride="bike"],[data-ride="bicycle"]) .walk-ui :is(.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck){display:grid}
 body[data-aboard][data-ride="car"] .walk-ui :is(.btn-wheelie,.btn-gear-up,.btn-gear-down){display:grid}
@@ -71,9 +101,9 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   .vehicle-action::before{content:attr(aria-keyshortcuts);display:inline-grid;place-items:center;min-width:1.45em;height:1.45em;margin-right:.55em;padding:0 .24em;border-radius:5px;border:1px solid rgba(244,239,226,.72);background:linear-gradient(180deg,rgba(244,239,226,.26),rgba(244,239,226,.12));box-shadow:0 2px 0 rgba(244,239,226,.38),inset 0 1px 0 rgba(255,255,255,.28);font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:0;vertical-align:1px}
 }
 @media (pointer:coarse){
-  .vehicle-action{bottom:calc(168px + env(safe-area-inset-bottom));max-width:calc(100vw - 168px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .vehicle-action{bottom:calc(230px + env(safe-area-inset-bottom));max-width:calc(100vw - 168px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .toast{max-width:calc(100vw - 32px);font-size:13.5px;padding:8px 16px}
-  .ride-hud{bottom:calc(214px + env(safe-area-inset-bottom));max-width:calc(100vw - 16px);padding:4px 7px;gap:3px 4px;font-size:10.5px;border-radius:14px}
+  .ride-hud{bottom:calc(280px + env(safe-area-inset-bottom));max-width:calc(100vw - 16px);padding:4px 7px;gap:3px 4px;font-size:10.5px;border-radius:14px}
   .ride-type,.ride-gear,.ride-mod,.ride-state{padding:2px 5px;font-size:10px}
   .ride-speed{font-size:11px;min-width:4.2em}
   .ride-bat{gap:4px}
@@ -82,12 +112,13 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   .ride-lean-bar{width:24px;height:6px}
   .ride-gear-btn{padding:2px 4px;font-size:10px}
   .ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise{padding:2px 4px;font-size:10px}
-  output{top:auto;bottom:calc(312px + env(safe-area-inset-bottom));left:calc(12px + env(safe-area-inset-left));max-width:calc(100vw - 24px);box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  output{top:auto;bottom:calc(344px + env(safe-area-inset-bottom));left:calc(12px + env(safe-area-inset-left));max-width:calc(100vw - 24px);box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
 @media (pointer:coarse) and (max-height:500px){
-  .vehicle-action{bottom:calc(82px + env(safe-area-inset-bottom));left:calc(50% - 32px);transform:translateX(-50%);max-width:calc(100vw - 360px - env(safe-area-inset-left) - env(safe-area-inset-right));padding:5px 13px;font-size:12.5px}
-  .ride-hud{bottom:calc(26px + env(safe-area-inset-bottom));top:auto;left:calc(50% - 32px);max-width:calc(100vw - 348px - env(safe-area-inset-left) - env(safe-area-inset-right));padding:3px 6px;gap:2px 4px;font-size:10px}
+  .vehicle-action{bottom:calc(82px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);max-width:calc(100vw - 480px - env(safe-area-inset-left) - env(safe-area-inset-right));padding:5px 13px;font-size:12.5px}
+  .ride-hud{bottom:calc(26px + env(safe-area-inset-bottom));top:auto;left:50%;max-width:calc(100vw - 480px - env(safe-area-inset-left) - env(safe-area-inset-right));padding:3px 6px;gap:2px 4px;font-size:10px}
   .ride-gears{gap:2px}
+  footer{max-width:calc(100vw - 450px - env(safe-area-inset-left) - env(safe-area-inset-right));font-size:8px;overflow:hidden;text-overflow:ellipsis}
   .ride-gear-btn,.ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise{padding:2px 4px;font-size:9.5px}
   output{top:calc(142px + env(safe-area-inset-top));bottom:auto;left:calc(12px + env(safe-area-inset-left));max-width:124px}
 }

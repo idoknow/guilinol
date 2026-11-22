@@ -14,6 +14,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   const keys=new Set<string>(), stick={x:0,y:0,mag:0}, panel=document.createElement('div')
   panel.className='walk-ui'
   panel.innerHTML='<div class="joystick" role="group" aria-label="移动"><span class="joystick-knob"></span></div>'
+    +'<div class="look-stick" role="group" aria-label="转动视角"><span class="look-stick-knob"></span></div>'
     +'<button class="btn-run" type="button" aria-label="奔跑" aria-pressed="false">跑</button>'
     +'<button class="btn-crouch" type="button" aria-label="蹲伏" aria-pressed="false">蹲</button>'
     +'<button class="btn-jump" type="button" aria-label="跳">跃</button>'
@@ -54,6 +55,9 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   const btnGearUp=panel.querySelector<HTMLButtonElement>('.btn-gear-up')!
   const btnGearDown=panel.querySelector<HTMLButtonElement>('.btn-gear-down')!
   const btnTuck=panel.querySelector<HTMLButtonElement>('.btn-tuck')!
+  const lookStick=panel.querySelector<HTMLElement>('.look-stick')!, lookKnob=panel.querySelector<HTMLElement>('.look-stick-knob')!
+  const look={x:0,y:0,mag:0}
+  let lookPointer=-1, lookAt=0
   let jump=false, crouch=false, runHold=false, runLock=false, runDownAt=0, stickPointer=-1, runPointer=-1
   function syncCrouch(){
     btnCrouch.classList.toggle('on',crouch)
@@ -80,7 +84,7 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     jump=false;crouch=false;syncCrouch();runHold=false;runLock=false;runPointer=-1
     resetRideTouchControls()
     touches.clear();mouseDown=false;pinchDist=0
-    resetStick()
+    resetStick();resetLook()
   }
 
   function syncRun(){
@@ -102,22 +106,48 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     knob.style.transform=`translate(${(rx*travel*half*.54).toFixed(1)}px,${(ry*travel*half*.54).toFixed(1)}px)`
     syncRun()
   }
+  // Right-hand look stick: deflection is an angular *rate*, fed through the same rotate() path as drag-to-look,
+  // so pitch clamps, camera guards and vehicle cameras behave exactly as with a finger drag.
+  function resetLook(){look.x=look.y=look.mag=0;lookPointer=-1;lookKnob.style.transform='';lookStick.classList.remove('on')}
+  function dragLook(event:PointerEvent){
+    const rect=lookStick.getBoundingClientRect(), half=Math.max(1,rect.width/2)
+    const rx=(event.clientX-rect.left-half)/half, ry=(event.clientY-rect.top-half)/half
+    const raw=Math.hypot(rx,ry), clamped=Math.min(1,raw), dead=cfg.lookDead
+    const eff=clamped<=dead?0:(clamped-dead)/(1-dead), curve=eff**1.5
+    if(raw>1e-4){look.x=rx/raw*curve;look.y=ry/raw*curve}else{look.x=look.y=0}
+    look.mag=eff
+    const travel=raw>1e-4?clamped/raw:0
+    lookKnob.style.transform=`translate(${(rx*travel*half*.54).toFixed(1)}px,${(ry*travel*half*.54).toFixed(1)}px)`
+    lookStick.classList.toggle('on',eff>0)
+  }
+  lookStick.onpointerdown=event=>{event.preventDefault();event.stopPropagation();lookPointer=event.pointerId;lookAt=performance.now();safeCapture(lookStick,event.pointerId);dragLook(event)}
+  lookStick.onpointermove=event=>{if(event.pointerId===lookPointer)dragLook(event)}
+  const endLook=(event:PointerEvent)=>{if(event.pointerId===lookPointer)resetLook()}
+  lookStick.onpointerup=endLook
+  lookStick.onpointercancel=endLook
+  lookStick.onlostpointercapture=endLook
+  function applyLook(frameDt?:number){
+    const now=performance.now(), dt=Math.min(.1,Math.max(0,frameDt??(now-lookAt)/1000));lookAt=now
+    if(!look.mag||document.body.dataset.photo==='on')return
+    rotate(look.x*cfg.lookYaw*dt/cfg.sensitivity,look.y*cfg.lookPitch*dt/cfg.sensitivity)
+  }
+
   joystick.onpointerdown=event=>{event.preventDefault();event.stopPropagation();stickPointer=event.pointerId;safeCapture(joystick,event.pointerId);drag(event)}
   joystick.onpointermove=event=>{if(event.pointerId===stickPointer)drag(event)}
   const endStick=(event:PointerEvent)=>{if(event.pointerId===stickPointer)resetStick()}
   joystick.onpointerup=endStick
   joystick.onpointercancel=endStick
   joystick.onlostpointercapture=endStick
-  window.addEventListener('pointermove',event=>{if(event.pointerId===stickPointer)drag(event)})
+  window.addEventListener('pointermove',event=>{if(event.pointerId===stickPointer)drag(event);else if(event.pointerId===lookPointer)dragLook(event)})
   window.addEventListener('pointerup',event=>{
-    endStick(event)
+    endStick(event);endLook(event)
     if(event.pointerId===runPointer)endRun(true,event.pointerId)
     if(event.pointerId===wheeliePointer){wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')}
     if(event.pointerId===tuckPointer){tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')}
     if(event.pointerId===hornPointer){hornTouch=false;hornPointer=-1;hornBtn.classList.remove('on')}
   })
   window.addEventListener('pointercancel',event=>{
-    endStick(event)
+    endStick(event);endLook(event)
     if(event.pointerId===runPointer)endRun(false,event.pointerId)
     if(event.pointerId===wheeliePointer){wheelieTouch=false;wheeliePointer=-1;btnWheelie.classList.remove('on')}
     if(event.pointerId===tuckPointer){tuckTouch=false;tuckPointer=-1;btnTuck.classList.remove('on');btnTuck.setAttribute('aria-pressed','false')}
@@ -284,11 +314,13 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     clearRun(){
       runHold=false;runLock=false;runPointer=-1;syncRun()
     },
-    read(){
+    /** Movement intent for this frame; `dt` (s) also advances the look stick, else wall-clock time is used. */
+    read(dt?:number){
       if(isModalOrOverlayOpen()){
-        if(keys.size||jump||crouch||runHold||runLock||stick.mag>0)clearTransientInput(true)
+        if(keys.size||jump||crouch||runHold||runLock||stick.mag>0||look.mag>0)clearTransientInput(true)
         return {right:0,forward:0,run:false,crouch:false,jump:false}
       }
+      applyLook(dt)
       if(document.body.hasAttribute('data-aboard')&&(runHold||runLock)){runHold=false;runLock=false;runPointer=-1;syncRun()}
       if(document.body.hasAttribute('data-aboard')&&crouch){crouch=false;syncCrouch()}
       const right=Math.max(-1,Math.min(1,+keys.has('KeyD')-+keys.has('KeyA')+stick.x))

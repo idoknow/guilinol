@@ -370,7 +370,7 @@ try {
   await mobile.evaluate(async()=>{for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
 
   const hud=await mobile.evaluate(()=>{
-    const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.dock','.sky-ui','output','.hud-me']
+    const selectors=['.walk-ui .joystick','.walk-ui .look-stick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.dock','.sky-ui','output','.hud-me']
     const boxes=selectors.map(sel=>{
       const el=document.querySelector(sel)
       if(!el)return {sel,missing:true}
@@ -430,6 +430,21 @@ try {
   })
   assert(touchTest.yawTurn>.2&&touchTest.pinchDrift<.01&&touchTest.dist>3.5&&touchTest.along>.9&&touchTest.peakSpeed>6&&touchTest.jumped,`touchTest: ${JSON.stringify(touchTest)}`)
 
+  // IDOK-93 look stick: full right deflection turns the view right (same sign as a rightward drag) at cfg.lookYaw rad/s,
+  // and stops dead on release.
+  const lookTest=await mobile.evaluate(()=>{
+    const {walk}=window.viewer, pad=document.querySelector('.walk-ui .look-stick'), r=pad.getBoundingClientRect()
+    const yaw0=walk.yaw
+    pad.dispatchEvent(new PointerEvent('pointerdown',{pointerId:20,pointerType:'touch',clientX:r.right+8,clientY:r.top+r.height/2,bubbles:true}))
+    for(let i=0;i<30;i++)walk.tick(1/60)
+    const yawRight=walk.yaw-yaw0
+    pad.dispatchEvent(new PointerEvent('lostpointercapture',{pointerId:20,pointerType:'touch',bubbles:true}))
+    const yaw1=walk.yaw
+    for(let i=0;i<10;i++)walk.tick(1/60)
+    return {yawRight,settle:Math.abs(walk.yaw-yaw1),knobReset:pad.querySelector('.look-stick-knob').style.transform===''}
+  })
+  assert(lookTest.yawRight<-.85&&lookTest.yawRight>-1.35&&lookTest.settle<1e-6&&lookTest.knobReset,`lookTest: ${JSON.stringify(lookTest)}`)
+
   // Also verify 390x844 coexistence when standing next to a parked e-bike AND next to a boat dock (.vehicle-action visible).
   const bikeCoexist=await mobile.evaluate(async()=>{
     const {walk,manifest}=window.viewer
@@ -444,7 +459,7 @@ try {
       const close=document.querySelector('.spot-card.show .card-close')
       if(close)close.click()
       await new Promise(r=>setTimeout(r,280))
-      const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
+      const selectors=['.walk-ui .joystick','.walk-ui .look-stick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
       const boxes=selectors.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
         return st.display==='none'||st.visibility==='hidden'||el.hasAttribute('hidden')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
       const overlaps=[]
@@ -477,7 +492,25 @@ try {
     assert.equal(await mobile.evaluate(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on')),false,'runLock should clear after boarding e-bike')
     assert.equal(await mobile.evaluate(()=>document.querySelector('.walk-ui .btn-run')?.getAttribute('aria-pressed')),'false')
   }
-  console.log('mobile 390x844 HUD & touch OK',JSON.stringify({run:+touchTest.dist.toFixed(2),along:+touchTest.along.toFixed(3),peak:touchTest.peakSpeed}),mobileShot)
+  // IDOK-93 landscape phone: same controls, no hit-box overlaps, all inside the viewport.
+  await mobile.setViewportSize({width:844,height:390})
+  await mobile.evaluate(async()=>{document.querySelector('.spot-card.show .card-close')?.click();for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
+  const land=await mobile.evaluate(()=>{
+    const selectors=['.walk-ui .joystick','.walk-ui .look-stick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
+    const boxes=selectors.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
+      return st.display==='none'||st.visibility==='hidden'||el.closest('[hidden]')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
+    const overlaps=[]
+    for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){
+      const a=boxes[i],b=boxes[j]
+      const ox=Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left)), oy=Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top))
+      if(ox*oy>0)overlaps.push({a:a.sel,b:b.sel,area:+(ox*oy).toFixed(1)})
+    }
+    return {sticks:boxes.filter(b=>b.sel.includes('stick')).length,overlaps,outOfBounds:boxes.filter(b=>b.left<0||b.top<0||b.right>844.5||b.bottom>390.5).map(b=>b.sel)}
+  })
+  assert(land.sticks===2&&!land.overlaps.length&&!land.outOfBounds.length,`landscape HUD: ${JSON.stringify(land)}`)
+  await mobile.screenshot({path:`${outDir}/mobile-844x390.png`})
+
+  console.log('mobile 390x844 HUD & touch OK',JSON.stringify({run:+touchTest.dist.toFixed(2),along:+touchTest.along.toFixed(3),peak:touchTest.peakSpeed,lookYaw:+lookTest.yawRight.toFixed(3)}),mobileShot)
   await mobileCtx.close()
 
   assert.deepEqual(errors,[]);console.log('seconds',(performance.now()-start)/1000);assert(performance.now()-start<180000)

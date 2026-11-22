@@ -96,8 +96,9 @@ export function isTouchInControlZone(ctx: TouchZoneContext): boolean {
   // Bottom-left virtual joystick zone
   if (ctx.clientX < ctx.innerWidth * .45 && ctx.clientY > ctx.innerHeight * .55) return true
   // Bottom-right jump/run/view or wheelie/gear/tuck thumb gutter
-  const rightGuard = ctx.aboard ? 215 : 175
-  const bottomGuard = 185
+  // IDOK-93: covers the look stick plus its button arc (slot D reaches ~245 px in from the right while riding).
+  const rightGuard = ctx.aboard ? 250 : 215
+  const bottomGuard = Math.min(280, ctx.innerHeight * .5)
   if (ctx.clientX > ctx.innerWidth - rightGuard && ctx.clientY > ctx.innerHeight - bottomGuard) return true
   return false
 }
