@@ -4,7 +4,8 @@ import type {Stream} from '../stream'
 import {walkConfig as cfg} from './config'
 import type {createPhysics} from './physics'
 import {vehicleModel} from './vehicle-model'
-import {clearAvatarPose, getAvatarJoints} from './avatar-rig'
+import {AVATAR_JOINT_NAMES, clearAvatarPose, getAvatarJoints} from './avatar-rig'
+import {computeBoatSeatedTargets} from './avatar-motion'
 
 type Physics = Awaited<ReturnType<typeof createPhysics>>
 type Position = [number, number, number]
@@ -947,36 +948,22 @@ export function createFreeBoats(env: BoatEnv) {
     const inRight = deadzone(THREE.MathUtils.clamp(right, -1, 1), 0.10)
     const effort = Math.min(1, Math.hypot(inFwd, inRight))
 
+    if (slot.kind === 'rowboat' && effort > 0.05) {
+      strokePhase += Math.min(0.12, dt) * 4.4
+    }
     const joints = getAvatarJoints(figure)
-    if (slot.kind === 'rowboat') {
-      if (effort > 0.05) strokePhase += Math.min(0.12, dt) * 4.4
-      const leftDrive = THREE.MathUtils.clamp(inFwd + inRight * 0.8, -1, 1)
-      const rightDrive = THREE.MathUtils.clamp(inFwd - inRight * 0.8, -1, 1)
-      const swing = Math.sin(strokePhase), bend = Math.cos(strokePhase)
-      for (const side of ['L', 'R'] as const) {
-        const drive = side === 'L' ? leftDrive : rightDrive
-        const thigh = joints[`Thigh${side}`]
-        const shin = joints[`Shin${side}`]
-        const arm = joints[`Arm${side}`]
-        const forearm = joints[`Forearm${side}`]
-        if (thigh) thigh.rotation.x = 1.45
-        if (shin) shin.rotation.x = -0.35
-        if (arm) arm.rotation.x = 0.72 + swing * 0.38 * drive
-        if (forearm) forearm.rotation.x = 0.35 + bend * 0.22 * Math.abs(drive)
-      }
-      if (joints.Torso) joints.Torso.rotation.x = 0.06 + Math.max(0, swing) * 0.08 * effort
-    } else {
-      for (const side of ['L', 'R'] as const) {
-        const thigh = joints[`Thigh${side}`]
-        const shin = joints[`Shin${side}`]
-        const arm = joints[`Arm${side}`]
-        const forearm = joints[`Forearm${side}`]
-        if (thigh) thigh.rotation.x = 1.25
-        if (shin) shin.rotation.x = -1.40
-        if (arm) arm.rotation.x = 0.90
-        if (forearm) forearm.rotation.x = 0.35
-      }
-      if (joints.Torso) joints.Torso.rotation.x = 0
+    const targets = computeBoatSeatedTargets({
+      kind: slot.kind === 'rowboat' ? 'rowboat' : 'motorboat',
+      forward: inFwd,
+      right: inRight,
+      strokePhase,
+      waveTime,
+      roll,
+    })
+    for (const name of AVATAR_JOINT_NAMES) {
+      const joint = joints[name]
+      const t = targets[name]
+      if (joint && t) joint.rotation.set(t[0], t[1], t[2])
     }
   }
 

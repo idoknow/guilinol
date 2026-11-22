@@ -17,7 +17,13 @@ import {env} from '../look/time'
 import {createDriverPose} from './car'
 import {createRiderPose,notifyDismountBlocked} from './ride'
 import {createEbikeAudioEngine} from './ebike-audio'
-import {clearAvatarPose, ensureAvatarRig, getAvatarJoint, getAvatarJoints} from './avatar-rig'
+import {AVATAR_JOINT_NAMES, clearAvatarPose, ensureAvatarRig, getAvatarJoint, getAvatarJoints} from './avatar-rig'
+import {
+  computeBoatSeatedTargets,
+  computeTwoWheelRiderTargets,
+  createAvatarMotionController,
+  type LocomotionClipKey,
+} from './avatar-motion'
 import {isGlobalHotkeyBlocked, isModalOrOverlayOpen} from './input-guard'
 import {createInteractArbiter} from './interact-arbiter'
 import type {ShopCloseReason, ShopOverlayHandle} from '../ui/shop-overlay'
@@ -180,17 +186,6 @@ function shortestAngle(from:number, to:number) {
   return Math.atan2(Math.sin(to-from),Math.cos(to-from))
 }
 
-function solveBicyclePedalIK(phase:number):[number,number]{
-  const dy=(.33+.15*Math.cos(phase))-.88
-  const dz=(.05-.15*Math.sin(phase))-.23
-  const d=THREE.MathUtils.clamp(Math.hypot(dy,dz),.24,.88)
-  const alpha=Math.atan2(-dz,-dy)
-  const L1=.45, L2=.45
-  const cosKnee=THREE.MathUtils.clamp((L1*L1+L2*L2-d*d)/(2*L1*L2),-1,1)
-  const beta=Math.acos(THREE.MathUtils.clamp((L1*L1+d*d-L2*L2)/(2*L1*d),-1,1))
-  return [alpha+beta,-(Math.PI-Math.acos(cosKnee))]
-}
-
 type DownedBikeEntry={
   mesh:THREE.Mesh
   kind:'bike'|'bicycle'
@@ -329,6 +324,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     outfitController=styleCharacter(figure,avatarRig,a)
     outfitController.applyEquipped(getGameState().wardrobe.equipped,{autoHelmetOnRide:getGameState().wardrobe.autoHelmetOnRide,ridingEbike:Boolean(rides?.bike&&rides.rideKind!=='bicycle')})
   })
+  const motionCtrl=createAvatarMotionController()
+  let motionTime=0, lastLocomotionClip:LocomotionClipKey='idle', lastTurnDiff=0
+  function getRiderLookBias(baseYaw:number){
+    const raw=shortestAngle(baseYaw,yaw), mag=Math.abs(raw)
+    const u=THREE.MathUtils.clamp((mag-1.28)/.80,0,1)
+    const fade=1-u*u*(3-2*u)
+    return {
+      lookYaw:THREE.MathUtils.clamp(raw*fade,-.56,.56),
+      lookPitch:THREE.MathUtils.clamp((cfg.pitch-pitch)*fade,-.24,.28),
+    }
+  }
   {
     const initialWardrobe=getGameState().wardrobe
     outfitController.applyEquipped(initialWardrobe.equipped,{ridingEbike:false,autoHelmetOnRide:initialWardrobe.autoHelmetOnRide})
@@ -651,7 +657,15 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           }
           activeClipName=avatar.clips.idle
         }
+        avatarRig.clearAdditive()
         mixer.update(0)
+        avatarRig.applyAdditive(motionCtrl.step({
+          dt:0,actualSpeed:0,inputMag:0,walkSpeed:cfg.walk,runSpeed:cfg.run,
+          grounded:true,wasGrounded:true,crouching:false,jumpStage:'none',
+          facing:figure.rotation.y,camYaw:figure.rotation.y,camPitch:cfg.pitch,
+          neutralPitch:cfg.pitch,turnDiff:0,clipKey:'idle',
+          stride:avatarRig.measureGaitStrides(),inShowcase:true,
+        }))
       }
       const isEbikeShowcase=shop?.kind==='ebike'||overlayMode==='garage'||overlayMode==='service'
       if(shop){
@@ -1132,7 +1146,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let external:{x:number,z:number,run:boolean}|null=null,blockedWater=false,held=false
   const still={right:0,forward:0,run:false,crouch:false,jump:false}
   function setSnap(on:boolean){if(snapEnabled===on)return;snapEnabled=on;if(on)sim.controller.enableSnapToGround(cfg.snap);else sim.controller.disableSnapToGround()}
-  function resetMotion(){vx=vz=velocity=coyoteTimer=jumpTimer=bankLean=strideLean=prevSpeed=jumpStageTimer=0;grounded=false;wasGroundedFoot=true;crouching=false;wasLandmarkHit=false;jumpStage='none';setSnap(true);figure.rotation.x=figure.rotation.z=0;if(traveller)traveller.rotation.set(0,0,0)}
+  function resetMotion(){vx=vz=velocity=coyoteTimer=jumpTimer=bankLean=strideLean=prevSpeed=jumpStageTimer=lastTurnDiff=0;lastLocomotionClip='idle';motionCtrl.reset();avatarRig.clearAdditive();grounded=false;wasGroundedFoot=true;crouching=false;wasLandmarkHit=false;jumpStage='none';setSnap(true);figure.rotation.x=figure.rotation.z=0;if(traveller)traveller.rotation.set(0,0,0)}
   function supportAt(x:number,z:number,refY:number){
     const deck=sim.surface(x,z,'deck',refY+.35,1.4)
     const validDeck=deck&&deck.y<=refY+.35?deck:null
@@ -1256,7 +1270,24 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))return false
     sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true
+    clearAvatarPose(figure)
+    const enterIdle=actions.get(avatar.clips.idle)
+    if(enterIdle){
+      mixer.stopAllAction()
+      enterIdle.reset().setLoop(THREE.LoopRepeat,Infinity).play()
+      action=enterIdle
+      activeClipName=avatar.clips.idle
+      mixer.update(0)
+    }
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
+    if(enterIdle){
+      avatarRig.applyAdditive(motionCtrl.step({
+        dt:0,actualSpeed:0,inputMag:0,walkSpeed:cfg.walk,runSpeed:cfg.run,
+        grounded:true,wasGrounded:true,crouching:false,jumpStage:'none',
+        facing,camYaw:yaw,camPitch:pitch,neutralPitch:cfg.pitch,
+        turnDiff:0,clipKey:'idle',stride:avatarRig.measureGaitStrides(),
+      }))
+    }
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true);return true
   }
   function leave(){if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
@@ -1533,6 +1564,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         ebikeState ??= ebikeFx.step(0,{speed:rides.speed,heading:rides.heading,lean:rides.lean,steerInput:rides.steerInput,braking:false,obstacle:'',allowAutoCrash:false},ZERO_RIDE_INPUT)
         if(dt>0&&ebikeMountElapsed<bikeConfig.mountDuration)ebikeMountElapsed=Math.min(bikeConfig.mountDuration,ebikeMountElapsed+Math.min(.12,dt))
         const u=THREE.MathUtils.clamp(ebikeMountElapsed/bikeConfig.mountDuration,0,1), mountBlend=u*u*(3-2*u)
+        const ebikeLook=getRiderLookBias(rides.heading)
         applyEbikeVisualAndRider({
           figure,
           joints:riderJoints,
@@ -1549,6 +1581,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           dt,
           night:env.night,
           supportY:(sx,sz,refY)=>supportAt(sx,sz,refY)?.y??refY,
+          lookYaw:ebikeLook.lookYaw,
+          lookPitch:ebikeLook.lookPitch,
         })
         input.syncRideHud(ebikeState,'bike')
       }else{
@@ -1592,27 +1626,22 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         const idleRaw=(.35-Math.abs(rides.speed))/.35
         const idleT=bcTel?.kickstandDown?1:THREE.MathUtils.clamp(idleRaw,0,1)
         bicycleFootWeight=THREE.MathUtils.damp(bicycleFootWeight,idleT*idleT*(3-2*idleT),10,cdt)
-        const [tlPedal,slPedal]=solveBicyclePedalIK(bicyclePedalPhase)
-        const [trPedal,srPedal]=solveBicyclePedalIK(bicyclePedalPhase+Math.PI)
-        const wheelieFactor=THREE.MathUtils.clamp(totalWheelie/.62,0,1.25)
-        const leanRatio=THREE.MathUtils.clamp(totalLean/.56,-1.2,1.2)
-        const cadenceSway=(1-bicycleFootWeight)*Math.sin(bicyclePedalPhase)*.035*THREE.MathUtils.clamp(Math.abs(rides.speed)/2.5,0,1)
-        const kneeFlareL=leanRatio>.25?-(leanRatio-.25)*.34*(1-bicycleFootWeight):0
-        const kneeFlareR=leanRatio<-.25?(-leanRatio-.25)*.34*(1-bicycleFootWeight):0
-        const spdRatio=Math.max(0,rides.speed)/5.0
-        const bTargets:Record<RiderJointName,[number,number,number]>={
-          Hips:[0,0,0],
-          Torso:[-.14-spdRatio*.08+wheelieFactor*.22,cadenceSway*.5-rides.steerInput*.06,cadenceSway+leanRatio*.22],
-          Head:[.05-wheelieFactor*.26,-rides.steerInput*.20,-leanRatio*.48],
-          ArmL:[.86+rides.steerInput*.14+wheelieFactor*.18,-rides.steerInput*.12,-.03],
-          ArmR:[.86-rides.steerInput*.14+wheelieFactor*.18,-rides.steerInput*.12,.03],
-          ForearmL:[.32+wheelieFactor*.32,0,0],
-          ForearmR:[.32+wheelieFactor*.32,0,0],
-          ThighL:[THREE.MathUtils.lerp(tlPedal,.52,bicycleFootWeight)-wheelieFactor*.12,0,THREE.MathUtils.lerp(kneeFlareL,-.20,bicycleFootWeight)],
-          ThighR:[trPedal-wheelieFactor*.12,0,kneeFlareR],
-          ShinL:[THREE.MathUtils.lerp(slPedal,-.50,bicycleFootWeight)+wheelieFactor*.10,0,0],
-          ShinR:[srPedal+wheelieFactor*.10,0,0],
-        }
+        const bikeLook=getRiderLookBias(rides.heading)
+        const bTargets=computeTwoWheelRiderTargets({
+          kind:'bicycle',
+          speed:rides.speed,
+          maxSpeed:5.0,
+          steerInput:rides.steerInput,
+          lean:totalLean,
+          wheelie:totalWheelie,
+          tucking:!!bcTel?.tucking,
+          idleFoot:bicycleFootWeight,
+          pedalPhase:bicyclePedalPhase,
+          cadenceWeight:1-bicycleFootWeight,
+          time:motionTime,
+          lookYaw:bikeLook.lookYaw,
+          lookPitch:bikeLook.lookPitch,
+        })
         for(const name of RIDER_JOINT_NAMES){
           const j=riderJoints[name]; if(!j)continue
           const [tx,ty,tz]=bTargets[name]
@@ -1690,9 +1719,19 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     let underside=Infinity
     for(const along of [-2.3,-1,0,1,2.3])for(const across of [-1,0,1]){const point=boat.localToWorld(new THREE.Vector3(across,0,along)),deck=sim.surface(point.x,point.z,'deck');if(deck)underside=Math.min(underside,deck.y-(deck.thin?.6:look.bridgeDepth))}
     return {kind:boat.name,head,roof,underside,clearance:underside-Math.max(head,roof)}}
-  function sit(){mixer.stopAllAction();action=undefined;bankLean=strideLean=0;wasBike=false;if(traveller)traveller.rotation.set(0,0,0);ridePose.reset()
-    for(const side of ['L','R'] as const)for(const [part,value] of Object.entries({Thigh:1.25,Shin:-1.4,Arm:.9,Forearm:.35})){
-      const joint=riderJoints[(part+side) as keyof RiderJoints];if(joint)joint.rotation.x=value}}
+  function sit(waveRoll=0){
+    mixer.stopAllAction();action=undefined;bankLean=strideLean=0;wasBike=false;if(traveller)traveller.rotation.set(0,0,0);ridePose.reset()
+    const baseYaw=rides?.boat?rides.heading:facing
+    const boatLook=getRiderLookBias(baseYaw)
+    const targets=computeBoatSeatedTargets({
+      kind:'tour',forward:0,right:0,strokePhase:0,waveTime:motionTime,roll:waveRoll,
+      lookYaw:boatLook.lookYaw,lookPitch:boatLook.lookPitch,
+    })
+    for(const name of AVATAR_JOINT_NAMES){
+      const j=getAvatarJoint(figure,name), tgt=targets[name]
+      if(j&&tgt)j.rotation.set(tgt[0],tgt[1],tgt[2])
+    }
+  }
   function probe(){const pos=sim.body.translation(),foot=pos.y-cfg.height/2,peak=sim.surface(pos.x,pos.z,'peak')
     const tile=sim.tileAt(pos.x,pos.z),mesh=tile&&stream.loaded.get(tile)?.groundMesh
     terrainRay.ray.origin.set(pos.x,4000,pos.z);mesh?.updateWorldMatrix(true,false)
@@ -1744,8 +1783,23 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z,camera.position.y),
       outfit:outfitController.getSnapshot(),
       boat:rides?.boatProbe()??null}}
-  function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
-    if(shopOverlay?.isOpen()){updateShopShowcaseCamera();return}
+  function tick(dt:number){if(!active)return;motionTime+=Math.min(.12,Math.max(0,dt));const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
+    if(shopOverlay?.isOpen()){
+      if(figure.visible&&!shopEbikeShowcaseRig.root.visible){
+        const sDt=Math.min(.12,Math.max(0,dt))
+        avatarRig.clearAdditive()
+        mixer.update(sDt)
+        avatarRig.applyAdditive(motionCtrl.step({
+          dt:sDt,actualSpeed:0,inputMag:0,walkSpeed:cfg.walk,runSpeed:cfg.run,
+          grounded:true,wasGrounded:true,crouching:false,jumpStage:'none',
+          facing:figure.rotation.y,camYaw:figure.rotation.y,camPitch:cfg.pitch,
+          neutralPitch:cfg.pitch,turnDiff:0,clipKey:'idle',
+          stride:avatarRig.measureGaitStrides(),inShowcase:true,
+        }))
+      }
+      updateShopShowcaseCamera()
+      return
+    }
     // Test-ride 90s timer & 350m / quiet-zone boundary watchdog (with 1.5s gentle decel when >15 km/h)
     const activeTr=getGameState().garage.activeTestRide
     if(activeTr){
@@ -1789,12 +1843,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(boatBoardElapsed<BOAT_BOARD_DUR)yaw+=shortestAngle(yaw,rides.heading)*(1-Math.exp(-12*Math.min(.12,Math.max(1/60,dt))))
       else yaw+=rides.heading-prevHeading
       rides.poseBoat(figure,read.forward,read.right,Math.min(.12,dt))
+      const boatLook=getRiderLookBias(rides.heading)
+      if(riderJoints.Head){
+        riderJoints.Head.rotation.y=THREE.MathUtils.clamp(riderJoints.Head.rotation.y+boatLook.lookYaw*.42,-.50,.50)
+        riderJoints.Head.rotation.x=THREE.MathUtils.clamp(riderJoints.Head.rotation.x+boatLook.lookPitch*.35,-.20,.18)
+      }
       const bpos=rides.freeBoat.position, bp=rides.boatProbe(), wy=bp?bp.y:bpos.y
       sim.body.setTranslation({x:bpos.x,y:wy+cfg.height/2,z:bpos.z},true)
       sim.body.setNextKinematicTranslation({x:bpos.x,y:wy+cfg.height/2,z:bpos.z})
       wasBoat=true;follow(dt,false);return
     }
-    if(rides?.boat){releaseDynamicBike();input.syncRideHud(null,'boat');if(!held)rides.advance(Math.min(.25,dt));if(!wasBoat){if(wasCar||wasBike){applyFootController();wasCar=wasBike=false;driverPose.reset(active)}yaw=rides.heading+.95;sit()}wasBoat=!!rides.boat;follow(dt);return}wasBoat=false
+    if(rides?.boat){releaseDynamicBike();input.syncRideHud(null,'boat');if(!held)rides.advance(Math.min(.25,dt));if(!wasBoat){if(wasCar||wasBike){applyFootController();wasCar=wasBike=false;driverPose.reset(active)}yaw=rides.heading+.95}if(rides.boat){sit(rides.boat.rotation.z)}else{clearAvatarPose(figure)}wasBoat=!!rides.boat;follow(dt);return}wasBoat=false
     if((rides?.car||rides?.bike)&&!vehicleCollisionReady(start.x,start.y,start.z)){
       rides.stop();vx=vz=accumulator=0;bikeObstacle='streaming';return
     }
@@ -2330,6 +2389,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     const actualSpeed=simSteps>0?traveled/(simSteps*step):Math.hypot(vx,vz)
     let turnDiff=0
+    const footWasGroundedBefore=wasGroundedFoot
     if(!aboardGround&&!standUpSession&&!pickupSession){
       const velLen=Math.hypot(vx,vz)
       const dirX=velLen>.08?vx/velLen:inputMag>.05?wish.x:0, dirZ=velLen>.08?vz/velLen:inputMag>.05?wish.y:0
@@ -2338,17 +2398,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         turnDiff=shortestAngle(facing,goal)
         facing+=turnDiff*Math.min(1,cfg.turnRate*Math.min(.12,dt))
       }
+      lastTurnDiff=turnDiff
       figure.rotation.y=facing
       if(traveller){
-        const clampedDt=Math.min(.12,Math.max(1e-4,dt))
-        const accelPulse=(actualSpeed-prevSpeed)/clampedDt
-        prevSpeed=actualSpeed
-        const goalBank=grounded?THREE.MathUtils.clamp(-turnDiff*(actualSpeed/cfg.run)*.22,-.14,.14):0
-        const goalStride=grounded?THREE.MathUtils.clamp(-accelPulse*.0018,-.06,.05):0
-        bankLean=THREE.MathUtils.damp(bankLean,goalBank,12,clampedDt)
-        strideLean=THREE.MathUtils.damp(strideLean,goalStride,14,clampedDt)
-        traveller.rotation.z=bankLean
-        traveller.rotation.x=strideLean
+        // Reset whole-body rigid pivot tilt; natural bank/accel/stop lean is articulated via spine/hips in avatar-motion.
+        bankLean=0
+        strideLean=0
+        traveller.rotation.set(0,0,0)
       }
       const moving=actualSpeed>.14||inputMag>.06
       const running=actualSpeed>5.8||(inputMag>.4&&maxSpeed===cfg.run&&actualSpeed>3.2)
@@ -2359,7 +2415,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }
       wasGroundedFoot=grounded
 
-      let clipKey:keyof typeof avatar.clips='idle'
+      let clipKey:LocomotionClipKey='idle'
       if(!grounded){
         jumpStageTimer+=clampedFrameDt
         if(jumpStage==='start'&&jumpStageTimer<.16&&velocity>1.2)clipKey='jumpStart'
@@ -2372,6 +2428,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(grounded&&jumpStage!=='land'){
         clipKey=crouching?(!moving?'crouchIdle':'crouchWalk'):!moving?'idle':sprinting?'sprint':running?'run':'walk'
       }
+      lastLocomotionClip=clipKey
       const resolvedName=(actions.has(avatar.clips[clipKey])?avatar.clips[clipKey]:undefined)
         ??(!grounded?avatar.clips.jump:crouching?avatar.clips.walk:moving&&sprinting?avatar.clips.run:avatar.clips[clipKey])
         ??avatar.clips.idle
@@ -2392,7 +2449,31 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           :clipKey==='sprint'?THREE.MathUtils.clamp(actualSpeed/cfg.run,.72,1.25):1
       }
     }
-    if(!standUpSession&&!pickupSession)mixer.update(dt)
+    if(!standUpSession&&!pickupSession){
+      if(!aboardGround)avatarRig.clearAdditive()
+      mixer.update(dt)
+      if(!aboardGround&&!rides?.boat){
+        const stride=avatarRig.measureGaitStrides()
+        avatarRig.applyAdditive(motionCtrl.step({
+          dt:clampedFrameDt,
+          actualSpeed,
+          inputMag,
+          walkSpeed:cfg.walk,
+          runSpeed:cfg.run,
+          grounded,
+          wasGrounded:footWasGroundedBefore,
+          crouching,
+          jumpStage,
+          facing,
+          camYaw:yaw,
+          camPitch:pitch,
+          neutralPitch:cfg.pitch,
+          turnDiff:lastTurnDiff,
+          clipKey:lastLocomotionClip,
+          stride,
+        }))
+      }
+    }
     follow(dt)
   }
   function photoSupport(x:number,z:number,bridgeRadius?:number){
@@ -2510,6 +2591,35 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       refreshVisual:(vehicleId:string)=>rides?.refreshPersonalBikeVisual(vehicleId)??false,
       startTestRide:(shopId:string,modelId:PersonalEbikeModelId)=>rides?.startTestRide(shopId,modelId)??{ok:false,code:'INVALID_SHOP'},
       endTestRide:(reason:'timeout'|'out_of_bounds'|'user'|'dismount_far'|'mode_switch'|'purchase'='user')=>{finishActiveTestRide(reason)},
+    },
+    avatarMetrics(){
+      figure.updateMatrixWorld(true)
+      const figQuat=figure.getWorldQuaternion(new THREE.Quaternion()), figInv=figQuat.clone().invert()
+      const readLocalFwd=(node?:THREE.Object3D)=>{
+        if(!node)return {yaw:0,pitch:0,pos:[0,0,0] as [number,number,number]}
+        const wq=node.getWorldQuaternion(new THREE.Quaternion())
+        const localQ=figInv.clone().multiply(wq)
+        const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(localQ)
+        const wp=node.getWorldPosition(new THREE.Vector3()).sub(figure.position)
+        return {yaw:Math.atan2(-fwd.x,-fwd.z),pitch:Math.asin(THREE.MathUtils.clamp(fwd.y,-1,1)),pos:wp.toArray() as [number,number,number]}
+      }
+      const head=readLocalFwd(avatarRig.attachments.head)
+      const torso=readLocalFwd(avatarRig.attachments.torso)
+      const pelvis=figure.getObjectByName('pelvis')
+      const hipsPos=pelvis?pelvis.getWorldPosition(new THREE.Vector3()).sub(figure.position).toArray():[0,0,0]
+      const armL=figure.getObjectByName('upperarm_l')?.getWorldPosition(new THREE.Vector3())
+      const handL=figure.getObjectByName('hand_l')?.getWorldPosition(new THREE.Vector3())
+      const armR=figure.getObjectByName('upperarm_r')?.getWorldPosition(new THREE.Vector3())
+      const handR=figure.getObjectByName('hand_r')?.getWorldPosition(new THREE.Vector3())
+      return {
+        headYaw:head.yaw,
+        headPitch:head.pitch,
+        torsoYaw:torso.yaw,
+        torsoPitch:torso.pitch,
+        hipsLocalPos:hipsPos,
+        armSpread:armL&&armR&&handL&&handR?handL.distanceTo(handR)-armL.distanceTo(armR):0,
+        travellerTilt:traveller?Math.hypot(traveller.rotation.x,traveller.rotation.z):0,
+      }
     },
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}

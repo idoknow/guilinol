@@ -2,6 +2,7 @@ import * as T from 'three'
 import type {EbikeModConfig, EbikeModPreset, EbikeVehicleKind, EbikeVisualRig} from './vehicle-model'
 import type {TwoWheelHeadlightMode} from './ebike-state-coupling'
 import type {EbikeTurnSignal} from './config'
+import {computeTwoWheelRiderTargets} from './avatar-motion'
 
 export type EbikeCrashPhase = 'none' | 'crashed' | 'recovering'
 export type EbikeCrashReason = '' | 'impact' | 'lowside' | 'loopout'
@@ -588,6 +589,7 @@ export function createEbikeFxController() {
 
 const _seatPos = new T.Vector3()
 const _gripL = new T.Vector3()
+const _fxPoseClocks = new WeakMap<object, number>()
 
 /**
  * Drives full articulated rider + e-bike rig synchronization:
@@ -612,13 +614,17 @@ export function applyEbikeVisualAndRider(params: {
   dt: number
   night?: number
   supportY?: (x: number, z: number, refY: number) => number
+  lookYaw?: number
+  lookPitch?: number
 }) {
   const {
     figure, joints, rig, basePos, heading, groundPitch,
     snapMountBlend, mountStartPos, mountStartYaw, mountStartRot,
-    fx, state, dt, night = 0, supportY,
+    fx, state, dt, night = 0, supportY, lookYaw = 0, lookPitch = 0,
   } = params
   const cdt = Math.min(.12, Math.max(0, dt))
+  const nextTime = (_fxPoseClocks.get(fx) ?? 0) + cdt
+  _fxPoseClocks.set(fx, nextTime)
   const crash = fx.getCrashVisualOffsets()
 
   const bikeX = basePos.x + crash.bikeOffset.x
@@ -715,11 +721,6 @@ export function applyEbikeVisualAndRider(params: {
   }
 
   // Normal riding / wheelie / aggressive lean
-  const wheelieFactor = T.MathUtils.clamp(state.wheelie / .62, 0, 1.25)
-  const spdRatio = T.MathUtils.clamp(Math.abs(state.speed) / 14, 0, 1)
-  const leanRatio = T.MathUtils.clamp(state.lean / .56, -1.2, 1.2)
-  const accelShift = T.MathUtils.clamp(fx.longAccel * .018, -.12, .14)
-
   if (snapMountBlend < 1) {
     figure.position.set(
       T.MathUtils.lerp(mountStartPos.x, _seatPos.x, snapMountBlend),
@@ -733,33 +734,20 @@ export function applyEbikeVisualAndRider(params: {
     figure.rotation.set(groundPitch * .45 + state.wheelie * .78, heading, state.lean * .92, 'YXZ')
   }
 
-  // Inside knee flare on deep cornering lean (right lean < 0 flares right knee +Z; left lean > 0 flares left knee -Z).
-  const kneeFlareL = leanRatio > .25 ? -(leanRatio - .25) * .38 * (1 - idleFoot) : 0
-  const kneeFlareR = leanRatio < -.25 ? (-leanRatio - .25) * .38 * (1 - idleFoot) : 0
-
-  const targets: Record<RiderJointName, [number, number, number]> = {
-    Hips: [0, 0, 0],
-    // Lean forward slightly against wheelie rise to hold balance, lean inward into turns, react to accel/braking.
-    Torso: [
-      -.09 - spdRatio * .08 - accelShift + wheelieFactor * .22 - (state.tucking ? .16 : 0),
-      -state.steerInput * .08,
-      leanRatio * .24,
-    ],
-    // Keep head level with horizon when cornering and looking into the turn / over handlebars when wheelieing.
-    Head: [
-      -.04 - wheelieFactor * .28 + (state.tucking ? .12 : 0),
-      -state.steerInput * .24,
-      -leanRatio * .52,
-    ],
-    ArmL: [.92 + state.steerInput * .15 + wheelieFactor * .18, -state.steerInput * .12, -.04],
-    ArmR: [.92 - state.steerInput * .15 + wheelieFactor * .18, -state.steerInput * .12, .04],
-    ForearmL: [.36 + wheelieFactor * .34, 0, 0],
-    ForearmR: [.36 + wheelieFactor * .34, 0, 0],
-    ThighL: [T.MathUtils.lerp(1.25 - wheelieFactor * .18, .56, idleFoot), 0, T.MathUtils.lerp(kneeFlareL, -.22, idleFoot)],
-    ThighR: [T.MathUtils.lerp(1.25 - wheelieFactor * .18, .56, idleFoot), 0, kneeFlareR],
-    ShinL: [T.MathUtils.lerp(-1.4 + wheelieFactor * .14, -.55, idleFoot), 0, 0],
-    ShinR: [T.MathUtils.lerp(-1.4 + wheelieFactor * .14, -.55, idleFoot), 0, 0],
-  }
+  const targets = computeTwoWheelRiderTargets({
+    kind: 'bike',
+    speed: state.speed,
+    maxSpeed: 14,
+    steerInput: state.steerInput,
+    lean: state.lean,
+    wheelie: state.wheelie,
+    tucking: state.tucking,
+    longAccel: fx.longAccel,
+    idleFoot,
+    time: _fxPoseClocks.get(fx) ?? 0,
+    lookYaw,
+    lookPitch,
+  })
 
   for (const name of RIDER_JOINT_NAMES) {
     const joint = joints[name]
