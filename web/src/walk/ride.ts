@@ -150,6 +150,8 @@ export interface EbikeDynamicTelemetry {
   effectiveFallDeg: number
   leanDangerRatio: number
   crashRisk: number
+  /** 0..1 wheelie side-balance (hard/fast turn on the back wheel); 1 = tip over. */
+  wheelieTip: number
   wheelie: number
   wheelieVel: number
   tucking: boolean
@@ -222,9 +224,23 @@ export type MountCheckResult =
 
 const IDENTITY = {x:0, y:0, z:0, w:1}
 const OFF_ROAD_CAP = 4.2
-/** IDOK-153: wheelie lift-rate multiplier (lower = less twitchy) and how long the bike must sit at max angle before it loops out. */
+/**
+ * IDOK-153 wheelie model (Rock 11-22): lift-rate multiplier, hard max angle 52°, and no "held too long" loop-out.
+ * The only way to fall out of a wheelie is turning too hard / too fast on the back wheel: the front tyre is in the
+ * air, so all cornering load sits on the rear contact patch and the rider's balance. Lateral acceleration
+ * (speed × yaw rate) above a limit that shrinks as the front rises, plus yanking the bars, fills a tip meter;
+ * calm riding drains it. Meter 1 → the bike tips over toward the turn.
+ */
 const WHEELIE_SENSITIVITY = .5
-const WHEELIE_LOOPOUT_HOLD_S = 1.8
+const WHEELIE_MAX_RAD = 52 * Math.PI / 180
+/** Lateral acceleration (m/s²) a wheelie tolerates at a low front lift → at the 52° max. */
+const WHEELIE_TURN_LAT_LOW = 4.2
+const WHEELIE_TURN_LAT_MAX = 2.2
+/** Steering-input change rate (full-lock per second) tolerated at max lift before a bar yank starts to count. */
+const WHEELIE_STEER_JERK_SAFE = 2.6
+/** Tip meter fill gain (per second, per unit of overload) and calm-riding drain (per second). */
+const WHEELIE_TIP_GAIN = 2.4
+const WHEELIE_TIP_DRAIN = 1.2
 const MOUNT_OFFSETS: readonly [number, number][] = [
   [.45, 0], [-.45, 0], [0, .45], [0, -.45],
   [.35, .35], [-.35, .35], [.35, -.35], [-.35, -.35],
@@ -439,8 +455,9 @@ export function createBikeControl() {
   let wheelie = 0
   let wheelieVel = 0
   let wheelieLoad = 0
-  /** Seconds the wheelie has been pinned at its max angle; loop-out only after WHEELIE_LOOPOUT_HOLD_S (IDOK-153). */
-  let wheelieMaxHold = 0
+  /** 0..1 wheelie side-balance meter: fills when turning too hard / too fast on the back wheel; 1 = tip over (IDOK-153). */
+  let wheelieTip = 0
+  let wheelieSteerPrev = 0
   let tucking = false
   let braking = false
   let brakeInLeanHold = 0
@@ -505,10 +522,9 @@ export function createBikeControl() {
     return list[T.MathUtils.clamp(gear - 1, 0, list.length - 1)]
   }
 
-  /** 0..1 — reaching the max angle reads as .8; the last .2 is the loop-out hold timer. */
+  /** 0..1 — the wheelie tip meter; holding a wheelie straight is never risky by itself. */
   function wheelieRisk(): number {
-    const angle = T.MathUtils.clamp(wheelie / Math.max(1e-3, spec().crash.wheelieCrashRad), 0, 1)
-    return angle * .8 + T.MathUtils.clamp(wheelieMaxHold / WHEELIE_LOOPOUT_HOLD_S, 0, 1) * .2
+    return T.MathUtils.clamp(wheelieTip, 0, 1)
   }
 
   function canAutoCrash(): boolean {
@@ -595,7 +611,7 @@ export function createBikeControl() {
 
   function reset() {
     speed = lean = pitch = steerInput = revHold = 0
-    drainPerSec = wheelie = wheelieVel = wheelieLoad = wheelieMaxHold = 0
+    drainPerSec = wheelie = wheelieVel = wheelieLoad = wheelieTip = wheelieSteerPrev = 0
     tucking = braking = false
     brakeInLeanHold = 0
     onPavement = wetSurface = offRoadSurface = false
@@ -912,7 +928,7 @@ export function createBikeControl() {
     speed = 0
     wheelie = 0
     wheelieVel = 0
-    wheelieMaxHold = 0
+    wheelieTip = 0
     braking = false
     cruiseControl = false
     cruiseTargetSpeed = 0
@@ -1150,6 +1166,7 @@ export function createBikeControl() {
       effectiveFallDeg: +(effectiveRad * 180 / Math.PI).toFixed(1),
       leanDangerRatio: +leanDanger.toFixed(3),
       crashRisk: +Math.max(leanDanger, wheelieDanger).toFixed(3),
+      wheelieTip: +wheelieDanger.toFixed(3),
       wheelie,
       wheelieVel,
       tucking,
@@ -1481,22 +1498,33 @@ export function createBikeControl() {
         // IDOK-153: half the old lift rate and a softer ramp, so the front comes up gradually.
         const liftAccel = s.crash.wheelieRaiseRate * wheelieLoad * torqueBias * speedEase * WHEELIE_SENSITIVITY
         wheelieVel = T.MathUtils.damp(wheelieVel, Math.max(0, liftAccel * .32), 3.5, cdt)
-        const maxWheelie = canAutoCrash() ? s.crash.wheelieCrashRad : s.crash.wheelieCrashRad * .86
-        wheelie = T.MathUtils.clamp(wheelie + wheelieVel * cdt, 0, maxWheelie)
-        if (wheelie >= maxWheelie - 1e-3) wheelieVel = 0
+        wheelie = T.MathUtils.clamp(wheelie + wheelieVel * cdt, 0, WHEELIE_MAX_RAD)
+        if (wheelie >= WHEELIE_MAX_RAD - 1e-3) wheelieVel = 0
       } else {
         wheelieVel = T.MathUtils.damp(wheelieVel, -s.crash.wheelieFallRate * (wheelie > 0 ? .38 : 0), 10, cdt)
         wheelie = Math.max(0, T.MathUtils.damp(wheelie, 0, s.crash.wheelieFallRate, cdt))
       }
-      // Pinned at the max angle (still holding wheelie) → count up; otherwise bleed the timer off quickly.
-      if (wheelieLoad > .05 && wheelie >= s.crash.wheelieCrashRad * .985) wheelieMaxHold += cdt
-      else wheelieMaxHold = Math.max(0, wheelieMaxHold - cdt * 2)
 
       const prevHeading = heading
       const omega = turnRate(speed, s, Math.max(s.maxSpeed, capMs * .85))
       const dirSign = speed < -.05 ? -1 : 1
       const frontGripFactor = wheelie > .18 ? T.MathUtils.lerp(1, .52, T.MathUtils.clamp((wheelie - .18) / .35, 0, 1)) : 1
       heading -= steerInput * omega * dirSign * frontGripFactor * cdt
+
+      // Wheelie side balance: too much cornering load or a yanked bar while on the back wheel fills the tip meter.
+      const lift = T.MathUtils.clamp((wheelie - .1) / (WHEELIE_MAX_RAD - .1), 0, 1)
+      if (lift > 0 && Math.abs(speed) > .8 && cdt > 1e-5) {
+        const lateral = Math.abs(speed * shortestAngle(prevHeading, heading)) / cdt
+        const latLimit = T.MathUtils.lerp(WHEELIE_TURN_LAT_LOW, WHEELIE_TURN_LAT_MAX, lift)
+        const steerJerk = Math.abs(steerInput - wheelieSteerPrev) / cdt
+        const overload = Math.max(0, lateral / latLimit - 1) + Math.max(0, steerJerk * lift - WHEELIE_STEER_JERK_SAFE) * .3
+        wheelieTip = overload > 0
+          ? wheelieTip + overload * WHEELIE_TIP_GAIN * (.5 + lift * .5) * cdt
+          : Math.max(0, wheelieTip - WHEELIE_TIP_DRAIN * cdt)
+      } else {
+        wheelieTip = Math.max(0, wheelieTip - WHEELIE_TIP_DRAIN * 1.5 * cdt)
+      }
+      wheelieSteerPrev = steerInput
 
       // Turn signal auto-cancels after completing a matching turn and straightening handlebars.
       if (turnSignal !== 'off' && !hazard) {
@@ -1553,8 +1581,8 @@ export function createBikeControl() {
       crashRisk = T.MathUtils.clamp(Math.max(leanRatio, wheelieRatio), 0, 1)
 
       if (canAutoCrash()) {
-        if (wheelieMaxHold >= WHEELIE_LOOPOUT_HOLD_S) {
-          triggerCrash('loopout', steerInput >= 0 ? 1 : -1)
+        if (wheelieTip >= 1) {
+          triggerCrash('lowside', steerInput >= 0 ? 1 : -1)
           return speed
         }
         if (Math.abs(lean) >= gripLimitRad && absSpd >= 2.2) {
