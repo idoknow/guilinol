@@ -272,16 +272,20 @@ spec:
         - name: PUBLIC_ORIGIN
           value: https://glol.rcpd.cc
         # 聚合登录：appid/appkey 只来自 secret，平台开关与回调地址是明文配置
+        # optional: true —— secret 没配时 pod 照常启动，只是聚合登录自己报未配置，
+        # 不会像必需 key 那样把整个站点拖成 CreateContainerConfigError
         - name: SOCIAL_APPID
           valueFrom:
             secretKeyRef:
               name: glol-env
               key: SOCIAL_APPID
+              optional: true
         - name: SOCIAL_APPKEY
           valueFrom:
             secretKeyRef:
               name: glol-env
               key: SOCIAL_APPKEY
+              optional: true
         - name: SOCIAL_HOST
           value: https://login.mapay.cn
         - name: SOCIAL_REDIRECT
