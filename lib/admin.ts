@@ -1,4 +1,4 @@
-import { invalid, Problem } from './auth'
+import { invalid, passwordHash, Problem, random } from './auth'
 import { labels } from './feedback-contract'
 import { userSocialIdentities } from './social'
 
@@ -38,7 +38,7 @@ export async function adminUserDetail(db: D1Database, id: string) {
   if (!/^[A-Za-z0-9-]{8,64}$/.test(id)) invalid()
   const user = await db
     .prepare(
-      `SELECT u.id,u.email,u.nickname,u.verified,u.role,u.created_at,
+      `SELECT u.id,u.email,u.nickname,u.verified,u.role,u.created_at,u.email_placeholder,
       (SELECT count(*) FROM feedback WHERE user_id=u.id) feedback_count,
       (SELECT max(submitted_at) FROM feedback WHERE user_id=u.id) last_submitted_at FROM users u WHERE u.id=?`,
     )
@@ -230,4 +230,50 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
     adopted_email: adoptedEmail,
     took_saves: tookSaves,
   })
+}
+
+/**
+ * 后台重置密码：不传就生成一个随机密码，返回给管理员转交用户。
+ * 占位邮箱账号（第三方专用）也能用这个办法拿到可用的密码登录方式。
+ */
+export async function adminSetPassword(db: D1Database, actor: string, id: string, body: Record<string, unknown>) {
+  const json = (value: unknown, status = 200) =>
+    Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(id)) invalid()
+  const user = await db.prepare('SELECT id,email FROM users WHERE id=?').bind(id).first<{ id: string; email: string }>()
+  if (!user) return json({ error: { code: 'not_found', message: '未找到用户' } }, 404)
+
+  const provided = typeof body.password === 'string' ? body.password : ''
+  if (provided && (provided.length < 8 || provided.length > 256))
+    return json({ error: { code: 'invalid_input', message: '密码长度需 8–256 位' } }, 400)
+  const password = provided || random(6) + random(2).toUpperCase()
+  const salt = random(16)
+  await db.batch([
+    db
+      .prepare('UPDATE users SET salt=?,digest=?,failures=0,locked_until=0 WHERE id=?')
+      .bind(salt, await passwordHash(password, salt), id),
+    // 旧会话全部失效：改密码等于把人踢下线
+    db.prepare('DELETE FROM sessions WHERE user_id=?').bind(id),
+    audit(db, actor, 'reset_password', 'user', id, { generated: !provided }),
+  ])
+  return json({ ok: true, email: user.email, password })
+}
+
+/** 后台改邮箱：直接写，打掉占位标记；邮箱被占用时 409。 */
+export async function adminSetEmail(db: D1Database, actor: string, id: string, body: Record<string, unknown>) {
+  const json = (value: unknown, status = 200) =>
+    Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(id)) invalid()
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+  if (email.length > 254 || email.split('@').length !== 2 || !/^\S+@[^\s@]+\.[^\s@]+$/.test(email))
+    return json({ error: { code: 'invalid_input', message: '邮箱格式不对' } }, 400)
+  const user = await db.prepare('SELECT id,email FROM users WHERE id=?').bind(id).first<{ id: string; email: string }>()
+  if (!user) return json({ error: { code: 'not_found', message: '未找到用户' } }, 404)
+  const owner = await db.prepare('SELECT id FROM users WHERE email=?').bind(email).first<{ id: string }>()
+  if (owner && owner.id !== id) return json({ error: { code: 'email_taken', message: '该邮箱已被其他账号使用' } }, 409)
+  await db.batch([
+    db.prepare('UPDATE users SET email=?,email_placeholder=0 WHERE id=?').bind(email, id),
+    audit(db, actor, 'change_email', 'user', id, { from: user.email, to: email }),
+  ])
+  return json({ ok: true, email })
 }

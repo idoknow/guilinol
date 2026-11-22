@@ -1474,7 +1474,7 @@ function userDetail(id: string) {
       h('div', { class: 'adm-user-head' },
         h('h2', null, user.nickname || '（未设置昵称）'),
         h('p', { class: 'adm-sub' },
-          `${user.email} · ${user.role === 'admin' ? '管理员' : '普通用户'} · ${user.verified ? '邮箱已验证' : '邮箱未验证'}`)),
+          `${user.email_placeholder ? '（占位邮箱，未真正绑定）' : user.email} · ${user.role === 'admin' ? '管理员' : '普通用户'} · ${user.verified ? '邮箱已验证' : '邮箱未验证'}`)),
       h('dl', { class: 'adm-kv' },
         h('dt', null, '注册时间'), h('dd', null, when(unix(user.created_at), true)),
         h('dt', null, '反馈数'), h('dd', null, num(user.feedback_count)
@@ -1486,6 +1486,7 @@ function userDetail(id: string) {
         ? h('div', { class: 'adm-binds' }, ...social.map(bindingCard))
         : emptyState('尚未绑定任何第三方平台', '用户在账号面板完成绑定后会出现在这里'),
       mergeCard({ id: user.id, email: user.email }),
+      securityCard({ id: user.id, email: user.email }),
     ]
   }, skeleton(3))
 }
@@ -1632,3 +1633,37 @@ async function boot() {
   refreshPending()
 }
 boot()
+
+function securityCard(user: { id: string; email: string }) {
+  const output = h('p', { class: 'adm-sub' })
+  const reset = h('button', { type: 'button', class: 'adm-btn' }, '重置密码') as HTMLButtonElement
+  reset.onclick = () => void act(reset, async () => {
+    const answer = await confirmDialog({
+      title: '重置密码',
+      tone: 'seal',
+      confirm: '生成新密码',
+      body: h('p', null, `给「${user.email || user.id}」生成一个新密码？旧密码和所有登录会话都会立即失效。`),
+    })
+    if (answer === null) return
+    const result = await api<{ password: string }>(`admin/users/${encodeURIComponent(user.id)}/password`, {})
+    const code = h('code', null, result.password)
+    output.replaceChildren(document.createTextNode('新密码：'), code, document.createTextNode('（复制后转交用户，只显示这一次）'))
+  })
+
+  const emailInput = h('input', { class: 'adm-merge-input', placeholder: '新的邮箱地址' }) as HTMLInputElement
+  const emailButton = h('button', { type: 'button', class: 'adm-btn' }, '改邮箱') as HTMLButtonElement
+  emailButton.onclick = () => void act(emailButton, async () => {
+    const email = emailInput.value.trim()
+    if (!email) throw new Error('请填写新的邮箱')
+    const result = await api<{ email: string }>(`admin/users/${encodeURIComponent(user.id)}/email`, { email })
+    toast(`邮箱已改为 ${result.email}`)
+    location.reload()
+  })
+
+  return h('div', { class: 'adm-merge' },
+    h('h3', { class: 'adm-section-title' }, '账号安全'),
+    h('p', { class: 'adm-sub' }, '占位邮箱（第三方专用）账号没有可用密码，只能用这里重置或补邮箱。'),
+    h('div', { class: 'adm-merge-row' }, reset),
+    h('div', { class: 'adm-merge-row' }, emailInput, emailButton),
+    output)
+}
