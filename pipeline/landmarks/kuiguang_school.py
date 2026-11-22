@@ -211,16 +211,39 @@ def street_buildings(model):
 def build_kuiguang(builder):
     boundary, buildings, sports = layout(sys.modules[__name__])
     ring = list(boundary.exterior.coords)
-    paint(builder, courtyard(boundary, builder.surface), "pave_grey", 0.009, builder.paving)
+
+    # 1. Compute geometry for basketball courts envelope & running track along 德艺楼 Edge 3
+    b_courts = [shape for key, sport, shape in sports if sport == 'basketball']
+    courts_envelope = union_all(b_courts).minimum_rotated_rectangle if b_courts else None
+
+    # B2 Edge 3: (-122.9606, 4.8722) -> (-89.8941, 17.0022), len = 35.22m, normal towards court = (0.3444, -0.9388)
+    p1 = np.array([-122.9606, 4.8722])
+    p2 = np.array([-89.8941, 17.0022])
+    dp = p2 - p1
+    normal = np.array([0.3444, -0.9388])
+
+    # 3-lane red surface: 3.6m width, 0.2m setback from facade
+    c1 = p1 + 0.2 * normal
+    c2 = p2 + 0.2 * normal
+    c3 = p2 + 3.8 * normal
+    c4 = p1 + 3.8 * normal
+    track_poly = Polygon([c1, c2, c3, c4])
+
+    # 2. Subtract all sports surfaces from campus courtyard paving to eliminate occlusion / Z-fighting
+    sports_areas = [shape for _, _, shape in sports] + [track_poly]
+    if courts_envelope is not None:
+        sports_areas.append(courts_envelope)
+    sports_envelope = union_all(sports_areas).buffer(0.3)
+    courtyard_geom = courtyard(boundary, builder.surface).difference(sports_envelope)
+    paint(builder, courtyard_geom, "pave_grey", 0.009, builder.paving)
+
     for shape, style in buildings:
         if style['source_id'] not in CUSTOM_BUILDINGS:
             builder.footprint_building(list(shape.exterior.coords), **style)
 
-    # 1. Basketball courts: paint continuous red envelope/isolation bands, green courts, red keys/center circle, white lines, 3D hoops
-    b_courts = [shape for key, sport, shape in sports if sport == 'basketball']
-    if b_courts:
-        courts_envelope = union_all(b_courts).minimum_rotated_rectangle
-        paint(builder, courts_envelope, 'track_red', 0.065)
+    # 3. Basketball courts: paint continuous red envelope/isolation bands, green courts, red keys/center circle, white lines, 3D hoops
+    if courts_envelope is not None:
+        paint(builder, courts_envelope, 'track_red', 0.070)
 
     for key, sport, shape in sports:
         if sport == 'basketball':
@@ -229,11 +252,11 @@ def build_kuiguang(builder):
             cos_a, sin_a = math.cos(rad), math.sin(rad)
 
             # Green playing court surface
-            paint(builder, shape, 'court_a', 0.075)
+            paint(builder, shape, 'court_a', 0.085)
 
             # Red center circle
             center = Point(cx, cz)
-            paint(builder, center.buffer(1.8).intersection(shape), 'track_red', 0.082)
+            paint(builder, center.buffer(1.8).intersection(shape), 'track_red', 0.095)
 
             # Red keys (restricted area) & key border lines at both ends
             for sgn in (-1.0, 1.0):
@@ -249,14 +272,14 @@ def build_kuiguang(builder):
                 pts.append((u_ft, -kw))
                 w_pts = [(cx + u * cos_a + v * sin_a, cz - u * sin_a + v * cos_a) for u, v in pts]
                 key_poly = Polygon(w_pts).intersection(shape)
-                paint(builder, key_poly, 'track_red', 0.082)
+                paint(builder, key_poly, 'track_red', 0.095)
                 if builder.lod < 2:
-                    paint(builder, key_poly.boundary.buffer(0.08).intersection(shape), 'white', 0.095)
+                    paint(builder, key_poly.boundary.buffer(0.08).intersection(shape), 'white', 0.115)
 
             # Court markings (boundary line, mid line, center circle line)
             if builder.lod < 2:
                 for stripe in markings(shape, sport):
-                    paint(builder, stripe, 'white', 0.095)
+                    paint(builder, stripe, 'white', 0.115)
 
             # 3D Hoops strictly inside court polygon (px_h = sgn * (pl*0.5 - 0.55))
             if builder.lod < 2:
@@ -286,30 +309,18 @@ def build_kuiguang(builder):
                 builder.pose = old_p
 
         elif sport == 'volleyball':
-            paint(builder, shape, 'court_a', 0.075)
+            paint(builder, shape, 'court_a', 0.085)
             if builder.lod < 2:
                 for stripe in markings(shape, sport):
-                    paint(builder, stripe, 'white', 0.095)
+                    paint(builder, stripe, 'white', 0.115)
         elif sport in ('running', 'athletics'):
-            paint(builder, shape, 'track_red', 0.065)
+            paint(builder, shape, 'track_red', 0.070)
             if builder.lod < 2:
                 for stripe in markings(shape, sport):
-                    paint(builder, stripe, 'white', 0.095)
+                    paint(builder, stripe, 'white', 0.115)
 
-    # 2. Running track along 德艺楼 (B2: way/683033672) Edge 3, strictly aligned to OSM building footprint
-    # B2 Edge 3: (-122.9606, 4.8722) -> (-89.8941, 17.0022), len = 35.22m, normal towards court = (0.3444, -0.9388)
-    p1 = np.array([-122.9606, 4.8722])
-    p2 = np.array([-89.8941, 17.0022])
-    dp = p2 - p1
-    normal = np.array([0.3444, -0.9388])
-
-    # 3-lane red surface: 3.6m width, 0.2m setback from facade
-    c1 = p1 + 0.2 * normal
-    c2 = p2 + 0.2 * normal
-    c3 = p2 + 3.8 * normal
-    c4 = p1 + 3.8 * normal
-    track_poly = Polygon([c1, c2, c3, c4])
-    paint(builder, track_poly, 'track_red', 0.075)
+    # 4. Running track along 德艺楼 (B2: way/683033672) Edge 3, strictly aligned to OSM building footprint
+    paint(builder, track_poly, 'track_red', 0.085)
 
     # Lane dividing lines (4 lines for 3 lanes)
     if builder.lod < 2:
@@ -317,7 +328,7 @@ def build_kuiguang(builder):
             d = 0.2 + k * 1.2
             l_start = p1 + d * normal
             l_end = p2 + d * normal
-            paint(builder, LineString([l_start, l_end]).buffer(0.04), 'white', 0.095)
+            paint(builder, LineString([l_start, l_end]).buffer(0.04), 'white', 0.115)
 
     # 3. Trees in white raised tree pits along the strip between track and courts (photo-6, offset 4.7m from B2)
     for t_frac in (0.12, 0.38, 0.64, 0.90):
