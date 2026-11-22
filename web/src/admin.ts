@@ -275,7 +275,7 @@ let params = new URLSearchParams(location.search)
 let pendingCount: number | null = null
 let refreshTimer = 0
 function currentView() {
-  if (params.has('id')) return 'feedback'
+  if (params.has('id')) return params.get('view') === 'users' ? 'users' : 'feedback'
   const view = params.get('view') ?? 'overview'
   return views.some((v) => v.key === view) ? view : 'overview'
 }
@@ -1199,6 +1199,8 @@ const pages: Record<string, (view: View) => void> = {
   },
 
   users() {
+    const detailId = params.get('id')
+    if (detailId) return userDetail(detailId)
     const role = params.get('role') ?? '',
       query = params.get('q') ?? ''
     const statsSlot = h('div', { class: 'adm-kpis adm-kpis--small' })
@@ -1258,7 +1260,7 @@ const pages: Record<string, (view: View) => void> = {
       }))
       let current = h('tr', null,
         h('td', null, h('span', { class: 'adm-who' },
-          h('b', null, user.nickname || '（未设置昵称）', self ? h('em', { class: 'adm-you' }, '你') : null),
+          h('b', null, navLink(user.nickname || '（未设置昵称）', { view: 'users', id: user.id }, { class: 'adm-link' }), self ? h('em', { class: 'adm-you' }, '你') : null),
           h('small', null, user.email))),
         h('td', null, h('span', { class: `adm-pill ${user.verified ? 'adm-ok' : 'adm-muted'}` }, user.verified ? '已验证' : '未验证')),
         h('td', null, h('span', { class: `adm-pill ${admin ? 'adm-role--admin' : 'adm-muted'}` }, admin ? '管理员' : '用户')),
@@ -1400,6 +1402,63 @@ function paintLive(live: any) {
       { sub: server ? `采样时间 ${when(iso(server.minute))}` : undefined }))
 }
 
+const socialBrand: Record<string, string> = {
+  qq: '#12b7f5', wx: '#07c160', alipay: '#1677ff', douyin: '#111111',
+  google: '#4285f4', twitter: '#1d9bf0', feishu: '#3370ff',
+}
+type SocialIdentity = {
+  type: string; label: string; nickname: string; avatar: string; uid: string
+  created_at: number; last_login_at: number
+}
+/** 一个已绑定平台：平台名、平台上的用户名、平台头像。头像只来自后端白名单域名。 */
+function bindingCard(identity: SocialIdentity) {
+  const initial = String(identity.label || '?').slice(0, 1)
+  const avatar = h('span', { class: 'adm-bind-avatar' }, initial)
+  if (identity.avatar) {
+    const image = h('img', {
+      src: identity.avatar,
+      alt: `${identity.label} 头像`,
+      loading: 'lazy',
+      referrerpolicy: 'no-referrer',
+      onerror: () => avatar.replaceChildren(initial),
+    })
+    avatar.replaceChildren(image)
+  }
+  return h('div', { class: 'adm-bind' },
+    h('span', { class: 'adm-bind-badge', style: `background:${socialBrand[identity.type] ?? '#5d655f'}` }, identity.label),
+    h('div', { class: 'adm-bind-body' },
+      h('b', null, identity.nickname || '（无昵称）'),
+      h('span', { class: 'adm-bind-sub' },
+        `${identity.label} · UID ${identity.uid} · 绑定 ${when(unix(identity.created_at), true)} · 最近登录 ${ago(unix(identity.last_login_at))}`)),
+    avatar)
+}
+/** 用户详情：账号信息 + 已绑定的第三方平台（只读）。 */
+function userDetail(id: string) {
+  const slot = h('div')
+  main.append(
+    h('div', { class: 'adm-toolbar' }, navLink('← 返回用户列表', { view: 'users', id: null }, { class: 'adm-btn adm-btn--ghost' })),
+    card(null, slot))
+  async(slot, () => api<{ user: any; social: SocialIdentity[] }>(`admin/users/${encodeURIComponent(id)}`), (data) => {
+    const user = data.user,
+      social = data.social ?? []
+    return [
+      h('div', { class: 'adm-user-head' },
+        h('h2', null, user.nickname || '（未设置昵称）'),
+        h('p', { class: 'adm-sub' },
+          `${user.email} · ${user.role === 'admin' ? '管理员' : '普通用户'} · ${user.verified ? '邮箱已验证' : '邮箱未验证'}`)),
+      h('dl', { class: 'adm-kv' },
+        h('dt', null, '注册时间'), h('dd', null, when(unix(user.created_at), true)),
+        h('dt', null, '反馈数'), h('dd', null, num(user.feedback_count)
+          ? navLink(fmt.int(num(user.feedback_count)), { view: 'feedback', status: '', user: user.id }, { class: 'adm-link' })
+          : '0'),
+        h('dt', null, '最近提交'), h('dd', null, ago(unix(user.last_submitted_at)))),
+      h('h3', { class: 'adm-section-title' }, `绑定的平台（${social.length}）`),
+      social.length
+        ? h('div', { class: 'adm-binds' }, ...social.map(bindingCard))
+        : emptyState('尚未绑定任何第三方平台', '用户在账号面板完成绑定后会出现在这里'),
+    ]
+  }, skeleton(3))
+}
 function feedbackDetail(id: string) {
   const path = 'admin/feedback/' + encodeURIComponent(id)
   paintTop(views.find((v) => v.key === 'feedback')!, navLink('← 返回列表', { view: 'feedback' }, { class: 'adm-link adm-back' }))
