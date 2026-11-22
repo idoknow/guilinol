@@ -1,7 +1,7 @@
 import { type Env, Problem, equal, hash, invalid, limited, now, sessionHash, unauthorized } from './auth'
 import { ll2xz } from './projection'
 import { edges, kinds, labels, views, validView } from './feedback-contract'
-import { adminList, audit, setRole } from './admin'
+import { adminList, adminUserDetail, audit, setRole } from './admin'
 import {flushMail} from './feedback-mail'
 
 const json = (value: unknown) => Response.json(value, { headers: { 'Cache-Control': 'private, no-store' } })
@@ -93,6 +93,9 @@ export async function feedback(request: Request, env: Env, path: string) {
       return env.perfQuery(path,new URL(request.url).searchParams)
     if (admin && method === 'GET' && ['admin/stats', 'admin/audit','admin/users', 'admin/feedback'].includes(path))
       return adminList(env.DB, path, new URL(request.url).searchParams)
+    // 用户详情：与 admin/users/:id/role 走同一个 admin 鉴权分支（role 已是 'admin' 才走到这里）
+    const userDetail = /^admin\/users\/([A-Za-z0-9-]{8,64})$/.exec(path)
+    if (userDetail && method === 'GET') return adminUserDetail(env.DB, userDetail[1]!)
     if (
       admin &&
       !(method === 'GET' && /^admin\/feedback\/[\w-]+$/.test(path)) &&
