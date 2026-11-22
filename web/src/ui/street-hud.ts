@@ -25,7 +25,7 @@ const VEHICLE: Record<string,string> = {ebike:'电驴', bike:'单车', car:'汽�
 const APPS = [
   {id:'map', glyph:'图', name:'地图', tint:'#20d6c1'}, {id:'jobs', glyph:'活', name:'接活', tint:'#ffc53d'},
   {id:'wardrobe', glyph:'衣', name:'衣橱', tint:'#ff5d8f'}, {id:'garage', glyph:'车', name:'车库', tint:'#ff8a3d'},
-  {id:'radio', glyph:'台', name:'电台', tint:'#7b8cff'}, {id:'settings', glyph:'设', name:'设置', tint:'#9aa3ad'},
+  {id:'settings', glyph:'设', name:'设置', tint:'#9aa3ad'},
 ]
 const money = (n:number)=>n.toLocaleString('zh-CN')
 const clockText = (s:number)=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`
@@ -46,7 +46,6 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean; onApp?:(i
       <header><span class="st-phone-time"></span><span>桂林通 5G</span></header>
       <div class="st-phone-cash"><small>余额</small><b></b></div>
       <ol class="st-apps">${APPS.map(a=>`<li><button type="button" data-app="${a.id}"><i style="--tint:${a.tint}">${a.glyph}</i><span>${a.name}</span></button></li>`).join('')}</ol>
-      <div class="st-radio"><i></i><p><b>漓江夜航</b><span>原创电台 · 已关闭</span></p></div>
       <footer><kbd>Tab</kbd> 收起</footer></div></aside>`
   document.body.append(root)
   const $ = <T extends HTMLElement>(sel:string)=>root.querySelector<T>(sel)!

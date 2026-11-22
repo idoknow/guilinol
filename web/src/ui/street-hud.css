@@ -96,11 +96,7 @@ body[data-hud=street] .road-name{position:fixed;left:calc(226px + env(safe-area-
 .st-apps button{width:100%;display:flex;flex-direction:column;align-items:center;gap:7px;background:none;border:0;color:var(--st-white);font-size:12px;font-weight:600;cursor:pointer}
 .st-apps i{width:58px;height:58px;border-radius:17px;display:grid;place-items:center;font-style:normal;font-size:24px;font-weight:800;color:#101216;
   background:linear-gradient(155deg,color-mix(in srgb,var(--tint) 100%,#fff 25%),var(--tint));box-shadow:0 6px 14px rgba(0,0,0,.35),inset 0 -2px 0 rgba(0,0,0,.18)}
-.st-radio{margin-top:auto;display:flex;gap:10px;align-items:center;padding:10px;border-radius:16px;background:rgba(255,255,255,.07)}
-.st-radio i{flex:none;width:40px;height:40px;border-radius:10px;background:conic-gradient(from 200deg,#ff5d8f,#ffc53d,#20d6c1,#ff5d8f)}
-.st-radio p{margin:0;display:flex;flex-direction:column;gap:3px;min-width:0}
-.st-radio b{font-size:13px}.st-radio span{font-size:11px;color:var(--st-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.st-phone footer{text-align:center;font-size:11px;color:var(--st-dim)}
+.st-phone footer{margin-top:auto;text-align:center;font-size:11px;color:var(--st-dim)}
 
 /* 手机端：摇杆、按钮换沥青；地图挪到左上菜单下面 */
 body[data-hud=street] .joystick{background:radial-gradient(circle,rgba(14,17,21,.2) 0 55%,rgba(14,17,21,.5) 56% 100%);border:2px solid rgba(246,244,239,.4)}

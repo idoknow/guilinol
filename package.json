@@ -5,8 +5,6 @@
   "type": "module",
   "scripts": {
     "verify:cloud-save": "tsx scripts/verify-cloud-save.mjs",
-    "check:audio": "node scripts/check-audio.mjs",
-    "verify:radio": "npm run check:audio && node scripts/verify-radio.mjs",
     "verify:loading": "node scripts/verify-loading.mjs",
     "verify:admin": "node scripts/auth-test.mjs --admin-ui",
     "test:bridge": "node scripts/auth-test.mjs --bridge",
