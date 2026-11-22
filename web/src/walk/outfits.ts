@@ -113,7 +113,7 @@ const SHOES_RECIPES: Record<string, ShoesRecipe> = {
   shoes_night_moto: {upper: '#171a1f', accent: '#20d6c1', sole: '#ffc53d'},
 }
 
-/** The daypack modelled into figure.glb (shown while `bag_none` is equipped). */
+/** The daypack modelled into figure.glb (hidden since IDOK-133; colours kept for the recolour pass). */
 const BUILTIN_PACK_COLORS = {body: '#2c2e32', strap: '#1b1c1f'} as const
 
 function resolveTopRecipe(topId: string): TopRecipe {
@@ -699,7 +699,7 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
   let autoHelmetOnRide = true
   let currentHatId: string | null = null
   let currentBagId: string | null = null
-  let builtinPackVisible = true
+  let builtinPackVisible = false
 
   function getOrBuildHat(hatId: string): THREE.Mesh | null {
     if (!hatCache.has(hatId)) hatCache.set(hatId, buildHatMesh(hatId))
@@ -758,7 +758,8 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
   }
 
   function syncAccessories(outfit: Readonly<EquippedOutfit>): void {
-    const showBuiltin = outfit.bag === 'bag_none'
+    // IDOK-133 (Rock): no backpack by default — the pack modelled into figure.glb is never shown.
+    const showBuiltin = false
     builtinPackVisible = showBuiltin
     if (skinned && partition) {
       skinned.geometry.setDrawRange(0, showBuiltin ? partition.totalIndexCount : partition.bodyIndexCount)
