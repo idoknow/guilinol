@@ -341,3 +341,7 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
 
 .adm-bind-badge .social-icon{width:14px;height:14px;margin-right:-2px}
 .adm-bind-badge{display:inline-flex;align-items:center;gap:6px}
+
+.adm-merge{margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08)}
+.adm-merge-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.adm-merge-input{flex:1;min-width:220px;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:inherit;font-size:13px}

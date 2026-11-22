@@ -53,7 +53,7 @@ export function newCode() {
 }
 export async function deliver(env:Env,email:string,purpose:string,code:string) {
   if (env.EMAIL_DEV_LOG==='1') { console.log(`DEV_EMAIL ${email} ${purpose} ${code}`); return }
-  const subject=purpose==='verify'?'验证邮箱':'重置密码'
+  const subject=purpose==='reset'?'重置密码':'验证邮箱'
   await sendMail(env,email,subject,`${subject}的验证码：${code}，10 分钟内有效。如果不是本人操作，请忽略。`)
 }
 export async function sendMail(env:Env,email:string,subject:string,message:string){

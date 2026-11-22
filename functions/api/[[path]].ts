@@ -2,11 +2,11 @@ import {type Env,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCod
 
 import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar'
 import {feedback} from '../../lib/feedback'
-import {isSocialType,socialCallback,socialConfig,socialConfirm,socialPending,socialRegister,socialStates,startSocial,userSocialIdentities} from '../../lib/social'
+import {bindEmail,isSocialType,socialCallback,socialConfig,socialConfirm,socialPending,socialRegister,socialStates,startSocial,userSocialIdentities} from '../../lib/social'
 import {unsubscribe} from '../../lib/feedback-mail'
 import {cloudSave} from '../../lib/cloud-save'
 type User={id:string;email:string;nickname:string;verified:number;role:string;salt:string;digest:string;locked_until:number;notify_email:number}
-const profile=(user:User)=>({id:user.id,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email})
+const profile=(user:User)=>({id:user.id,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email,email_placeholder:!!(user as User&{email_placeholder?:number}).email_placeholder})
 const json=(data:unknown,status=200,session?:string)=>Response.json(data,{status,headers:{'Cache-Control':'no-store',...(session?{'Set-Cookie':session}:{})}})
 function nickname(value:unknown) {
   if(typeof value!=='string'||!value.trim()||value.trim().length>32) invalid()
@@ -16,7 +16,7 @@ function password(value:unknown) {
   if(typeof value!=='string'||value.length<8||value.length>256) invalid()
   return value
 }
-const methods:Record<string,string[]>={health:['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST'],'auth/social/config':['GET'],'auth/social/register':['POST']}
+const methods:Record<string,string[]>={health:['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST'],'auth/social/config':['GET'],'auth/social/register':['POST'],'auth/email/bind':['POST']}
 
 async function handle(request:Request,env:Env) {
   const url=new URL(request.url), path=url.pathname.slice(5), method=request.method, db=env.DB
@@ -38,6 +38,7 @@ async function handle(request:Request,env:Env) {
   if(path==='auth/social/pending') return socialPending(env,db,request)
   if(path==='auth/social/register') return socialRegister(env,db,request,body)
   if(path==='auth/social/confirm') return socialConfirm(env,db,request)
+  if(path==='auth/email/bind') return bindEmail(env,db,request,body)
   if(path==='auth/social/start') {
     const type=body.type
     if(!isSocialType(type)) invalid()

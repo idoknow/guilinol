@@ -135,3 +135,99 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
     next_cursor: results.length > 50 ? String(results[49].page_key) : null,
   })
 }
+
+type MergeUserRow = {
+  id: string
+  email: string
+  email_placeholder: number
+  nickname: string
+  verified: number
+  salt: string
+  digest: string
+}
+
+/**
+ * 合并账号：把 from 并入 target（target 保留），用于「同一个人先用第三方注册、
+ * 后来又用邮箱注册」这类重复账号。
+ *
+ * - 第三方绑定：target 没有的平台搬过去；两边都有的平台保留 target 的（列进 conflicts）
+ * - 邮箱：target 是占位邮箱而 from 有真实邮箱时，把邮箱/密码/验证状态继承过来
+ * - 存档：target 没有存档才接管 from 的；流水/反馈一律搬过去
+ * - from 的会话、待确认授权直接清掉，最后删掉 from 这行（连带清掉冲突的绑定）
+ */
+export async function adminMergeUsers(db: D1Database, actor: string, targetId: string, body: Record<string, unknown>) {
+  const json = (value: unknown, status = 200) =>
+    Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
+  const pattern = /^[A-Za-z0-9-]{8,64}$/
+  let fromId = typeof body.from === 'string' ? body.from.trim() : ''
+  // 允许直接填被合并账号的邮箱
+  if (fromId.includes('@')) {
+    const found = await db.prepare('SELECT id FROM users WHERE email=?').bind(fromId.toLowerCase()).first<{ id: string }>()
+    if (!found) return json({ error: { code: 'not_found', message: '被合并账号不存在' } }, 404)
+    fromId = found.id
+  }
+  if (!pattern.test(targetId) || !pattern.test(fromId) || fromId === targetId)
+    return json({ error: { code: 'invalid_input', message: '请选择两个不同的账号' } }, 400)
+
+  const cols = 'id,email,email_placeholder,nickname,verified,salt,digest'
+  const target = await db.prepare(`SELECT ${cols} FROM users WHERE id=?`).bind(targetId).first<MergeUserRow>()
+  const source = await db.prepare(`SELECT ${cols} FROM users WHERE id=?`).bind(fromId).first<MergeUserRow>()
+  if (!target || !source) return json({ error: { code: 'not_found', message: '账号不存在' } }, 404)
+
+  const sourceTypes = (
+    await db.prepare('SELECT type FROM social_identities WHERE user_id=? ORDER BY type').bind(fromId).all<{ type: string }>()
+  ).results.map((row) => row.type)
+  const targetTypes = new Set(
+    (await db.prepare('SELECT type FROM social_identities WHERE user_id=?').bind(targetId).all<{ type: string }>()).results.map(
+      (row) => row.type,
+    ),
+  )
+  const movable = sourceTypes.filter((type) => !targetTypes.has(type))
+  const conflicts = sourceTypes.filter((type) => targetTypes.has(type))
+
+  const statements: D1PreparedStatement[] = []
+  const adoptedEmail = target.email_placeholder && !source.email_placeholder ? source.email : ''
+  // 邮箱唯一约束：必须在来源账号被删除之后才能把邮箱改到目标账号上（见语句最后一步）
+  for (const type of movable)
+    statements.push(db.prepare('UPDATE social_identities SET user_id=? WHERE user_id=? AND type=?').bind(targetId, fromId, type))
+
+  const saves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(targetId).first<{ n: number }>()
+  const tookSaves = !saves?.n
+  if (tookSaves) statements.push(db.prepare('UPDATE OR IGNORE player_saves SET user_id=? WHERE user_id=?').bind(targetId, fromId))
+
+  statements.push(
+    db.prepare('UPDATE OR IGNORE player_ledger_txns SET user_id=? WHERE user_id=?').bind(targetId, fromId),
+    db.prepare('UPDATE feedback SET user_id=? WHERE user_id=?').bind(targetId, fromId),
+    db.prepare('UPDATE feedback_upload_usage SET user_id=? WHERE user_id=?').bind(targetId, fromId),
+    db.prepare('DELETE FROM sessions WHERE user_id=?').bind(fromId),
+    db.prepare('DELETE FROM social_pending WHERE user_id=?').bind(fromId),
+    db.prepare('DELETE FROM social_states WHERE user_id=?').bind(fromId),
+    db.prepare('DELETE FROM users WHERE id=?').bind(fromId),
+  )
+  if (adoptedEmail)
+    statements.push(
+      db
+        .prepare('UPDATE users SET email=?,salt=?,digest=?,verified=?,email_placeholder=0 WHERE id=?')
+        .bind(source.email, source.salt, source.digest, source.verified, targetId),
+    )
+  statements.push(
+    audit(db, actor, 'merge_users', 'user', targetId, {
+      from: fromId,
+      from_email: source.email,
+      adopted_email: adoptedEmail,
+      moved: movable,
+      conflicts,
+      took_saves: tookSaves,
+    }),
+  )
+  await db.batch(statements)
+  return json({
+    ok: true,
+    target: { id: targetId, email: adoptedEmail || target.email },
+    merged: { id: fromId, email: source.email, nickname: source.nickname },
+    moved: movable,
+    conflicts,
+    adopted_email: adoptedEmail,
+    took_saves: tookSaves,
+  })
+}
