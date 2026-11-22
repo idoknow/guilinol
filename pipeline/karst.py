@@ -1,5 +1,6 @@
 import gzip
 import json
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -22,6 +23,19 @@ def profile(sample, east, south, angles):
     return np.clip(radii/radii.mean(),.55,1.65),floor
 
 
+@lru_cache(maxsize=None)
+def ring_faces(segments, levels):
+    faces = []
+    for level in range(levels-1):
+        for i in range(segments):
+            a = level*segments+i
+            b = level*segments+(i+1)%segments
+            faces.extend(((a,a+segments,b),(b,a+segments,b+segments)))
+    cap = levels*segments
+    faces.extend((cap-segments+i,cap,cap-segments+(i+1)%segments) for i in range(segments))
+    return np.asarray(faces,dtype='<u2')
+
+
 def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, far):
     summit = peak['target']
     shoulder,taper = peak['shoulder'],peak['taper']
@@ -42,7 +56,7 @@ def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, f
         rings.append(((1-taper)*np.cos(latitude),shoulder+(1-shoulder)*np.sin(latitude)))
     if far:
         rings = [rings[index] for index in [0,1,4,6,8,10]]
-    vertices, faces = [], []
+    vertices = []
     for level,(scale, fraction) in enumerate(rings):
         radius = radii*scale*(1+(ridge if level else 0))
         height = np.full_like(angles,floor+relief*fraction)
@@ -65,26 +79,24 @@ def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, f
                 radius+=mouth*2
         vertices.extend(zip(east+radius*np.cos(angles)+lean_x*fraction**2, height,
                             south+radius*np.sin(angles)+lean_z*fraction**2))
-        if level:
-            for col in range(count):
-                outer = (level-1)*count + col
-                adjacent = (level-1)*count + (col+1)%count
-                faces.extend([(outer,outer+count,adjacent),(adjacent,outer+count,adjacent+count)])
-    cap = len(vertices)
-    faces.extend((cap-count+col,cap,cap-count+(col+1)%count) for col in range(count))
     vertices = np.asarray([*vertices,(east+lean_x,summit,south+lean_z)],dtype='<f4')
     vertices[:,[0,2]] = np.rint(vertices[:,[0,2]]*256)/256
-    faces = np.asarray(faces,dtype='<u2')
+    faces = ring_faces(count,len(rings))
+    return vertex_data(vertices,faces,summit,phases),faces
+
+
+def vertex_data(vertices,faces,summit,phases):
     tris = vertices[faces]
     normals = np.zeros_like(vertices)
     cross = np.cross(tris[:,1]-tris[:,0],tris[:,2]-tris[:,0])
     for corner in faces.T:
         np.add.at(normals,corner,cross)
+    normals[np.linalg.norm(normals,axis=1)<1e-10] = (0,1,0)
     normals /= np.linalg.norm(normals,axis=1)[:,None]
     rock = np.clip(1.35*(1-normals[:,1])+.12*np.sin(vertices[:,0]*.17+phases[1]),0,1)
     normalized = (vertices[:,1]-vertices[:,1].min())/(summit-vertices[:,1].min())
     data = np.column_stack((vertices,normals,np.rint(rock*4096)/4096,np.rint(normalized*4096)/4096)).astype('<f4')
-    return data,faces
+    return data
 
 
 def imprint(terrain, left, top, triangles):
@@ -118,6 +130,7 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
     index_offsets = {}
     angles = np.arange(128)*2*np.pi/128
     shapes, footprints = [], []
+    peak_sites = {}
     dem = original.copy()
     centers = {peak['name']:ll2xz(peak['lat'],peak['lon']) for peak in catalog}
     saddles = [('仙鹤峰','四望山'),('四望山','于越山'),('于越山','明月峰'),
@@ -168,6 +181,13 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
         blend = np.clip((1.8-fraction)/.65,0,1)
         weight = np.where(wet[window],0,blend*blend*(3-2*blend))
         original[window] = np.minimum(original[window],np.rint(dem[window]*(1-weight)+floor*10*weight))
+        if peak['name'] == '伏波山':
+            from fubo_site import fubo_site
+            site = fubo_site(peak['eastLimit'])
+            peak_sites[entry['name']] = site
+            cx,cz = site.center
+            entry["outlineVertices"] = len(site.outline.exterior.coords)-1
+            entry['center'] = [cx,peak['target'],cz]
         if 'model' in peak:
             entry['model'] = peak['model']
             footprints.append(Polygon(np.column_stack((cx+radii*np.cos(angles), cz+radii*np.sin(angles)))))
@@ -191,8 +211,13 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
     for entry,peak,cx,cz,radii,floor in shapes:
         phases = np.random.default_rng(peak.get('seed',peak.get('osm'))).uniform(0,2*np.pi,3)
         for far in [False,True]:
-            data,faces = mesh(cx,cz,peak,ground_at,skirt_at,angles,radii,floor,phases,far)
-            segments = len(angles)//(4 if far else 1)
+            site = peak_sites.get(entry['name'])
+            if site is not None:
+                vertices,faces,segments = site.geometry(far)
+                data = vertex_data(vertices,faces,peak['target'],phases)
+            else:
+                data,faces = mesh(cx,cz,peak,ground_at,skirt_at,angles,radii,floor,phases,far)
+                segments = len(angles)//(4 if far else 1)
             footprints.append(Polygon(data[:segments][:,[0,2]]))
             if not far:
                 imprint(terrain,left,top,data[faces,:3])
@@ -200,6 +225,7 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
                     rows,cols=np.ogrid[:terrain.shape[0],:terrain.shape[1]]
                     shore=(left+cols*GRID>cx+12)&(left+cols*GRID<cx+65)&(abs(top+rows*GRID-cz)<22)
                     terrain[shore]=original[shore]
+
                 if entry['name']=='明月峰':
                     faces=wind_cave.cut(data,faces,terrain,left,top,GRID)
                     path=wind_cave.trail(data[:-1,:3].reshape(12,128,3),data[-1,:3])
@@ -217,7 +243,7 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
                             weights = rng.dirichlet([1,1,1])
                             if weights@tri[:,6]<.5:
                                 mountain_trees.append((weights@tri[:,:3]-.3*normal,normal))
-            template = 'wind_cave' if not far and entry['name']=='明月峰' else far
+            template = ('site',entry['name'],far) if site is not None else 'wind_cave' if not far and entry['name']=='明月峰' else far
             if template not in index_offsets:
                 index_offsets[template] = len(payload)
                 payload.extend(faces.tobytes())

@@ -99,6 +99,12 @@ def verify():
             assert vertices[:,6:].min()>=0 and vertices[:,6:].max()<=1
             summit = vertices[:,1].max()
             assert abs(summit-target)<.001
+            if edge_count := entry.get('outlineVertices'):
+                outline = Polygon(positions[:edge_count,::2])
+                assert outline.is_valid and outline.area>=5000
+                assert outline.area/outline.convex_hull.area>=.85
+                assert not house_index.query(outline.buffer(-.01),predicate='intersects').size
+                continue
             segments = 128 if level==0 else 32
             rings = vertices[:-1].reshape(-1,segments,8)
             outline = rings[0][:,[0,2]]
@@ -123,6 +129,9 @@ def verify():
                 tip = np.linalg.norm(rings[-1][:,[0,2]]-[cx,cz]-offset,axis=1).mean()/radius
                 assert .13<=tip<=.17 and radius/relief<=peak.get('aspect',.8)+.0001,name
         assert counts[0]>counts[1]
+        if entry.get('outlineVertices'):
+            print(f"|{name}|{target:g}|{summit:g}|按场地边界和步道定形；详见 --roads|{counts[0]}/{counts[1]}|")
+            continue
         grid_height = field[round((cz-top)/4),round((cx-left)/4)]/10
         if name in ('独秀峰','穿山','塔山'):
             assert abs(grid_height-target)<=3
@@ -130,4 +139,10 @@ def verify():
 
 
 if __name__=='__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--roads', action='store_true', help='audit highway buffers and park walking ways')
+    if parser.parse_args().roads:
+        from check_peak_roads import verify as check_roads
+        raise SystemExit(0 if check_roads() else 1)
     verify()

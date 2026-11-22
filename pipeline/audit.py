@@ -4,6 +4,7 @@ import argparse
 from collections import defaultdict
 from functools import lru_cache
 import gzip
+import io
 import json
 import math
 import os
@@ -12,6 +13,7 @@ import re
 import struct
 
 import numpy as np
+from PIL import Image, ImageColor
 from shapely import box as box_array, prepare, STRtree, build_area, contains_xy, union_all
 from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import nearest_points, polygonize, unary_union
@@ -374,7 +376,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         p_idx = np.frombuffer(pk_blob, '<u2', lod0['indices'], lod0['indexOffset']).reshape(-1, 3)
         ptris = p_pos[p_idx]
         peak_tris_list.append(ptris)
-        ring0 = p_pos[:128, [0, 2]]
+        ring0 = p_pos[:pentry.get('outlineVertices',128), [0, 2]]
         peak_polys_list.append(Polygon(ring0).buffer(0))
     all_peak_tris = np.concatenate(peak_tris_list, axis=0) if peak_tris_list else np.zeros((0, 3, 3))
     if len(all_peak_tris):
@@ -473,6 +475,37 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     u_surface_check = unary_union([u_all_road_surface, u_lm_walk])
     prepare(u_surface_check)
 
+    # A pedestrian plaza can also be paved directly on the walkable GL04
+    # terrain. Verify the emitted texels across its interior if vector
+    # coverage is missing. Grass or bare ground still fails the audit.
+    tile_files = {(t['x'],t['z']): t['file'] for t in manifest['chunks']}
+    road_color = ImageColor.getrgb(json.loads((root/'pipeline/palette.json').read_text())['road'])
+
+    @lru_cache(maxsize=8)
+    def ground_texture(origin):
+        raw = gzip.decompress((world_dir/tile_files[origin]).read_bytes())
+        vertices,indices,collision,size = struct.unpack_from('<4I',raw,4)
+        start = 24+16900+vertices*9+indices*4+collision
+        return Image.open(io.BytesIO(raw[start:start+size])).convert('RGB')
+
+    def has_ground_paving(plaza):
+        # One texel is one metre. At edges the raster contains mixed coverage.
+        interior = plaza.buffer(-.75)
+        if interior.is_empty:
+            return False
+        xmin,zmin,xmax,zmax = interior.bounds
+        count = 0
+        for z in range(math.floor(zmin),math.ceil(zmax)):
+            for x in range(math.floor(xmin),math.ceil(xmax)):
+                point = Point(x+.5,z+.5)
+                if not interior.covers(point) or u_surface_check.covers(point):
+                    continue
+                origin = (x//CHUNK*CHUNK,z//CHUNK*CHUNK)
+                if ground_texture(origin).getpixel((x-origin[0],z-origin[1])) != road_color:
+                    return False
+                count += 1
+        return count>0
+
     uneven_issues = []
     gap_issues = []
     road_Elements = []
@@ -487,7 +520,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             poly_a = area(el).intersection(bounds.buffer(-2.0))
             if not poly_a.is_empty and not u_lm_replace_poly.contains(poly_a.representative_point()):
                 rp = poly_a.representative_point()
-                if not u_surface_check.intersects(rp.buffer(1.0)):
+                if not u_surface_check.intersects(rp.buffer(1.0)) and not has_ground_paving(poly_a):
                     gap_issues.append(make_issue('roadGap', rp.x, rp.y, 1.0,
                                                  f'way/{el["id"]} pedestrian plaza missing surface', way=el['id']))
             continue
@@ -818,12 +851,18 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             pname = peak_lm_map[lid]
             if pname in peak_summits:
                 summit_y = peak_summits[pname][1]
-                # Summit pavilion / top features should align near peak summit, and base must not be >5m below river/ground
-                gm_foot = ground_mesh_y(px, pz)
-                if ymin < gm_foot - 15.0 or (lid in ('fubo', 'diecai') and ymax < summit_y - 10.0):
-                    err = max(gm_foot - ymin, summit_y - ymax)
-                    other_issues.append(make_issue('floatingOrBuried', px, pz, err,
-                                                   f'Peak landmark {lid} y=[{ymin:.1f},{ymax:.1f}] misaligned with {pname} summit={summit_y:.1f}m', landmark=lid))
+                # A peak landmark spans the pavilion, stair and shoreline.
+                # Measure its lowest bearings against the ground directly
+                # beneath them, even when the OSM anchor is on a high terrace.
+                vertices = vtris.reshape(-1,3)
+                bearings = np.unique(vertices[vertices[:,1] <= ymin+.01],axis=0)
+                burial,bx,bz = max((ground_mesh_y(x,z)-y,x,z) for x,y,z in bearings)
+                if burial>15.0:
+                    other_issues.append(make_issue('floatingOrBuried',bx,bz,burial,
+                                                   f'{lid} lowest bearing below local ground',landmark=lid))
+                if lid in ('fubo','diecai') and ymax<summit_y-10.0:
+                    other_issues.append(make_issue('floatingOrBuried',px,pz,summit_y-ymax,
+                                                   f'{lid} pavilion below {pname} summit',landmark=lid))
         elif lid in ('jiefang_bridge', 'huaqiao'):
             # Bridge piers should reach down to water/ground and not float above deck approach
             gm = ground_mesh_y(px, pz)

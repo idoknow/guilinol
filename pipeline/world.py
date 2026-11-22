@@ -271,10 +271,18 @@ def build(bbox, output, palette, workers=4):
             local = field[window].astype(float)
             smooth = gaussian_filter(local, sigma=span/(3*GRID), mode='nearest')
             field[window] = np.rint(local + blend*(smooth-local))
+    fubo = None
+    if any(p['name']=='伏波山' for p in peaks['entries']):
+        from fubo_site import fubo_site
+        spec = next(p for p in json.loads(Path(__file__).with_name('peaks.json').read_bytes()) if p['name']=='伏波山')
+        fubo = fubo_site(spec['eastLimit'])
     if downtown:
-        downtown.blend(terrain,surface,original,road_ctrl,left,top)
+        downtown.blend(terrain,surface,original,road_ctrl,left,top,fubo)
         wet[:] = surface != DRY
         downtown.peaks(output,peaks)
+    if fubo is not None:
+        fubo.grade_bank(terrain,original,surface,left,top)
+        fubo.native_grade(terrain,original,surface,left,top)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 
@@ -289,6 +297,8 @@ def build(bbox, output, palette, workers=4):
     peak_centers = {p['name']: p['center'] for p in peaks['entries']}
     peak_lm_names = {'fubo': '伏波山', 'diecai': '明月峰', 'duxiu': '独秀峰'}
     def lm_elevation(x, z, entry):
+        if entry['id']=='fubo' and '伏波山' in peak_centers:
+            return peak_centers['伏波山'][1]
         if entry['id'] in peak_lm_names and peak_lm_names[entry['id']] in peak_centers:
             px_c, _, pz_c = peak_centers[peak_lm_names[entry['id']]]
             return sample(px_c, pz_c)[0]
@@ -349,6 +359,14 @@ def build(bbox, output, palette, workers=4):
             mask,corner = stencil(part,left,top,1)
             texture.paste('#484b4d' if road.name=='翊武路' else palette['road'],corner,mask)
             layers['road'].append(part)
+    if fubo is not None:
+        # The trails meet small pedestrian plazas. Bake their full outlines
+        # onto the native grade, including the junction beneath the walker.
+        for plaza in ped_areas:
+            if fubo.park.covers(plaza) and fubo.trails.intersects(plaza):
+                for part in polygons(plaza):
+                    mask,corner = stencil(part,left,top,1)
+                    texture.paste(palette['road'],corner,mask)
     if bank_pavement is not None:
         # Replace the baked flat road colour underneath the elevated strips.
         for part in polygons(bank_pavement.intersection(bounds)):
@@ -370,6 +388,10 @@ def build(bbox, output, palette, workers=4):
     vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange)
     decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal)
     modeled_paving = unary_union([*layout.street_foundations, *rong_pavement, modeled_paving if modeled_paving is not None else ShapelyPolygon()])
+    if fubo is not None:
+        # The park paths are painted on the graded ground. An additional
+        # spline-height street mesh would bridge across the switchbacks.
+        modeled_paving = modeled_paving.union(fubo.trails.buffer(4).intersection(fubo.park).difference(fubo.platform))
     gate_plaza = next((ShapelyPolygon(np.asarray(GATE_PLAZA)+[x,z]) for x,z,entry in layout.entries
                        if entry['id']=='gunanmen'),None)
     if gate_plaza is not None:
@@ -427,6 +449,8 @@ def build(bbox, output, palette, workers=4):
                         st_data[slot]=rows[origin]
                 collision = json.dumps([rings, st_data, thin, asphalt], separators=(',', ':')).encode()
                 tbuf = trees[origin]
+                if tbuf and fubo is not None and tile.intersects(fubo.park):
+                    tbuf = fubo.walkway_trees(tbuf,origin)
                 if tbuf:
                     sw_tile_polys, rd_tile_polys, cycle_tile_polys = [], [], []
                     for s_item in st_data[0]:

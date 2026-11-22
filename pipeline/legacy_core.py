@@ -53,9 +53,14 @@ class Downtown:
         return min(x-west,west+width-x,z-north,north+height-z)
 
     def frozen_tile(self,x,z):
-        return self.depth(x+CHUNK/2,z+CHUNK/2) >= CHUNK*1.5
+        return self.depth(x+CHUNK/2,z+CHUNK/2) >= CHUNK*1.5 and not self.fubo_tile(x,z)
 
-    def blend(self, terrain, water, original, ctrl, left, top):
+    @staticmethod
+    def fubo_tile(x,z):
+        # Both the released outcrop and the new park footprint are in these two tiles.
+        return x == -256 and z in (-1024,-768)
+
+    def blend(self, terrain, water, original, ctrl, left, top, fubo=None):
         # Merge into a single grid first so a shared border is blended once.
         west,north,w,h = EXTENT
         shape = (h//GRID+1,w//GRID+1)
@@ -85,12 +90,20 @@ class Downtown:
         r,c = (north-top)//GRID,(west-left)//GRID
         window = np.s_[r:r+shape[0],c:c+shape[1]]
         alpha = weight(np.arange(shape[1])*GRID,np.arange(shape[0])*GRID)
+        # Keep published road grades outside the old skirt and surveyed park,
+        # including the approaches along Fengbei and northern Longzhu Road.
+        xx = west+np.arange(shape[1])[None,:]*GRID
+        zz = north+np.arange(shape[0])[:,None]*GRID
+        edge = np.minimum(np.minimum(xx+190,-6-xx),np.minimum(zz+844,-586-zz))
+        alpha *= 1-np.clip(edge/12,0,1)
         for dest,src in zip((terrain,water,original),fields):
             patch = dest[window]
             matched = (src!=-32768)&(patch!=-32768)
             patch[matched] = np.rint(patch[matched]*(1-alpha[matched])+src[matched]*alpha[matched])
             copy = ~matched & (alpha>=.5)
             patch[copy] = src[copy]
+        if fubo is not None:
+            fubo.retain_street_grade(terrain[window],original[window],water[window],fields[2],west,north)
         r,c = (north-top)//8,(west-left)//8
         patch = ctrl[r:r+controls.shape[0],c:c+controls.shape[1]]
         alpha = weight((np.arange(controls.shape[1])-1)*8,(np.arange(controls.shape[0])-1)*8)
@@ -101,7 +114,7 @@ class Downtown:
         previous = {entry['id']:entry for entry in self.manifest['landmarks']}
         for entry in entries:
             x,_,z = entry['position']
-            if self.depth(x,z)>=CHUNK and entry['id'] in previous:
+            if self.depth(x,z)>=CHUNK and entry['id'] in previous and entry['id']!='fubo':
                 entry['position'] = list(previous[entry['id']]['position'])
                 if entry['id']=='zhengyang':
                     # Published paving spans -0.142..+0.363 m about the
@@ -118,7 +131,7 @@ class Downtown:
             offsets = {}
             for e in catalog['entries']:
                 x,_,z = e['center']
-                if (self.depth(x,z)>=CHUNK)!=inside:
+                if (self.depth(x,z)>=CHUNK and e['name']!='伏波山')!=inside:
                     continue
                 if not inside and e['name'].startswith('auto-'):
                     e['name'] = 'auto-ext-'+e['name'][5:]
