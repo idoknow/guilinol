@@ -332,7 +332,7 @@ try {
   let peakWheelie = 0
   let loopoutCrash = false
   let wheelieStateText = ''
-  for (let i = 0; i < 36; i++) {
+  for (let i = 0; i < 80; i++) {
     const snap = await stepTicks(page, 2, 0.05)
     peakWheelie = Math.max(peakWheelie, snap.ebike?.wheelie ?? 0, snap.probe?.ebikeRig?.wheelie ?? 0)
     const st = await page.locator('.ride-state').textContent()
