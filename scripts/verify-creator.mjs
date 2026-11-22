@@ -85,9 +85,12 @@ try {
     await page.goto(origin + '/?time=10&weather=clear&flow=0')
     await page.click('[data-umami-event=home-solo]')
     await page.click('button[data-to=register]')
+    // The dialog focuses its first field on the next animation frame.
+    await page.waitForFunction(() => document.activeElement === document.querySelector('input[name=email]'))
     await page.fill('input[name=email]', user.email)
     await page.fill('input[name=password]', 'test-password-123')
     await page.fill('input[name=nickname]', user.nickname)
+    assert(await page.locator('input[name=nickname]').evaluate(el => el.form.checkValidity()))
     await page.click('.acc-submit')
     await page.fill('input[name=code]', '123456')
     await page.click('.acc-submit')
