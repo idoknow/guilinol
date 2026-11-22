@@ -31,6 +31,19 @@ export interface AvatarAttachments {
   torso?: THREE.Object3D
 }
 
+export interface AvatarAdditivePose {
+  joints?: Partial<Record<AvatarJointName, [number, number, number]>>
+  headLook?: [number, number, number]
+  pelvisShift?: [number, number, number]
+}
+
+export interface AvatarGaitStrides {
+  leftLegFwd: number
+  rightLegFwd: number
+  legAdvance: number
+  stepOpen: number
+}
+
 export interface AvatarRig {
   isSkinned: boolean
   skinnedMesh?: THREE.SkinnedMesh
@@ -42,6 +55,9 @@ export interface AvatarRig {
   footProbes: FootProbe[]
   clearPose(): void
   syncPose(): void
+  applyAdditive(pose: AvatarAdditivePose): void
+  clearAdditive(): void
+  measureGaitStrides(): AvatarGaitStrides
 }
 
 interface BoneRest {
@@ -185,6 +201,24 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
         for (const name of AVATAR_JOINT_NAMES) legacyJoints[name]?.rotation.set(0, 0, 0)
       },
       syncPose() {},
+      applyAdditive(pose) {
+        if (!pose.joints) return
+        for (const [name, angles] of Object.entries(pose.joints)) {
+          const j = legacyJoints[name as AvatarJointName]
+          if (j && angles) j.rotation.set(angles[0], angles[1], angles[2])
+        }
+        if (pose.headLook && legacyJoints.Head) {
+          legacyJoints.Head.rotation.set(pose.headLook[0], pose.headLook[1], pose.headLook[2])
+        }
+      },
+      clearAdditive() {
+        for (const name of AVATAR_JOINT_NAMES) legacyJoints[name]?.rotation.set(0, 0, 0)
+      },
+      measureGaitStrides() {
+        const tl = legacyJoints.ThighL?.rotation.x ?? 0
+        const tr = legacyJoints.ThighR?.rotation.x ?? 0
+        return {leftLegFwd: tl, rightLegFwd: tr, legAdvance: THREE.MathUtils.clamp((tl - tr) * 1.4, -1, 1), stepOpen: Math.abs(tl - tr)}
+      },
     }
     root.userData.avatarRig = legacyRig
     return legacyRig
@@ -275,6 +309,8 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
   const qNeck = new THREE.Quaternion()
   const qHeadFull = new THREE.Quaternion()
   const qHeadDelta = new THREE.Quaternion()
+  const qClavL = new THREE.Quaternion()
+  const qClavR = new THREE.Quaternion()
   const qArmL = new THREE.Quaternion()
   const qArmR = new THREE.Quaternion()
   const qForearmL = new THREE.Quaternion()
@@ -283,15 +319,93 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
   const qThighR = new THREE.Quaternion()
   const qShinL = new THREE.Quaternion()
   const qShinR = new THREE.Quaternion()
+  const qCharUpperL = new THREE.Quaternion()
+  const qCharLowerL = new THREE.Quaternion()
+  const qCharUpperR = new THREE.Quaternion()
+  const qCharLowerR = new THREE.Quaternion()
+  const qCharThighL = new THREE.Quaternion()
+  const qCharCalfL = new THREE.Quaternion()
+  const qCharThighR = new THREE.Quaternion()
+  const qCharCalfR = new THREE.Quaternion()
 
   const worldQuats = new Map<THREE.Object3D, THREE.Quaternion>()
+  const worldQuatsValid = new Set<THREE.Object3D>()
+  const additivePool = new Map<THREE.Object3D, {bone: THREE.Object3D; pos: THREE.Vector3; quat: THREE.Quaternion; active: boolean}>()
+  const additiveActiveList: Array<{bone: THREE.Object3D; pos: THREE.Vector3; quat: THREE.Quaternion; active: boolean}> = []
+  const addOrigCharQ = new Map<THREE.Object3D, THREE.Quaternion>()
+  const addNewCharQ = new Map<THREE.Object3D, THREE.Quaternion>()
+  const addOrigCharValid = new Set<THREE.Object3D>()
+  const addNewCharValid = new Set<THREE.Object3D>()
+  const _qArmChar = new THREE.Quaternion()
+  const _qTargetChar = new THREE.Quaternion()
+  const _addPos = new THREE.Vector3()
+  const _addDelta = new THREE.Quaternion()
+  const _addStabilize = new THREE.Quaternion()
+  const _addNeckDelta = new THREE.Quaternion()
+  const _addHeadRem = new THREE.Quaternion()
+  const strideOut: AvatarGaitStrides = {leftLegFwd: 0, rightLegFwd: 0, legAdvance: 0, stepOpen: 0}
+
+  function poolCopyQuat(
+    pool: Map<THREE.Object3D, THREE.Quaternion>,
+    valid: Set<THREE.Object3D>,
+    key: THREE.Object3D,
+    src: THREE.Quaternion,
+  ): THREE.Quaternion {
+    let q = pool.get(key)
+    if (!q) {
+      q = new THREE.Quaternion()
+      pool.set(key, q)
+    }
+    q.copy(src)
+    valid.add(key)
+    return q
+  }
+
+  function poolMulQuat(
+    pool: Map<THREE.Object3D, THREE.Quaternion>,
+    valid: Set<THREE.Object3D>,
+    key: THREE.Object3D,
+    a: THREE.Quaternion,
+    b: THREE.Quaternion,
+  ): THREE.Quaternion {
+    let q = pool.get(key)
+    if (!q) {
+      q = new THREE.Quaternion()
+      pool.set(key, q)
+    }
+    q.copy(a).multiply(b)
+    valid.add(key)
+    return q
+  }
+
+  function getArmatureCharQuat(): THREE.Quaternion {
+    if (!armature) return Q_IDENTITY
+    const q = _qArmChar.set(0, 0, 0, 1)
+    let cur: THREE.Object3D | null = armature
+    while (cur && cur !== root) {
+      q.premultiply(cur.quaternion)
+      cur = cur.parent
+    }
+    return q
+  }
+
+  function clearAdditiveLayer() {
+    if (additiveActiveList.length === 0) return
+    for (let i = 0; i < additiveActiveList.length; i++) {
+      const saved = additiveActiveList[i]
+      saved.bone.position.copy(saved.pos)
+      saved.bone.quaternion.copy(saved.quat)
+      saved.active = false
+    }
+    additiveActiveList.length = 0
+  }
 
   function setBoneFromCharDelta(name: string, charDelta: THREE.Quaternion, preDrop: THREE.Quaternion | null) {
     const rest = boneRestMap.get(name)
     if (!rest) return
     const bone = rest.bone
     const parent = bone.parent
-    let parentCharWorld = parent ? worldQuats.get(parent) : undefined
+    let parentCharWorld = parent && worldQuatsValid.has(parent) ? worldQuats.get(parent) : undefined
     if (!parentCharWorld && parent) {
       if (armature && parent === armature) {
         parentCharWorld = armature.quaternion
@@ -307,20 +421,21 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
 
     _qParentInv.copy(baseParentQ).invert()
     bone.quaternion.copy(_qParentInv).multiply(targetWorld)
-    worldQuats.set(bone, targetWorld.clone())
+    poolCopyQuat(worldQuats, worldQuatsValid, bone, targetWorld)
   }
 
   function applyBones() {
     if (!proceduralActive) return
-    worldQuats.clear()
+    clearAdditiveLayer()
+    worldQuatsValid.clear()
     for (const r of allRestBones) {
       r.bone.position.copy(r.position)
       r.bone.quaternion.copy(r.quaternion)
       r.bone.scale.copy(r.scale)
     }
-    if (armature) worldQuats.set(armature, armature.quaternion)
+    if (armature) poolCopyQuat(worldQuats, worldQuatsValid, armature, armature.quaternion)
     const rootBone = boneRestMap.get('root')
-    if (rootBone) worldQuats.set(rootBone.bone, rootBone.worldRestQuat)
+    if (rootBone) poolCopyQuat(worldQuats, worldQuatsValid, rootBone.bone, rootBone.worldRestQuat)
 
     eulerToQuat(state.Hips[0], state.Hips[1], state.Hips[2], qHips)
     eulerToQuat(state.Torso[0], state.Torso[1], state.Torso[2], qTorso)
@@ -351,36 +466,43 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
     setBoneFromCharDelta('neck_01', qNeck, null)
     setBoneFromCharDelta('head', qHeadFull, null)
 
-    setBoneFromCharDelta('clavicle_l', qSpine3, null)
-    const charUpperL = new THREE.Quaternion().copy(qSpine3).multiply(qArmL)
-    setBoneFromCharDelta('upperarm_l', charUpperL, Q_DROP_L)
-    const charLowerL = new THREE.Quaternion().copy(charUpperL).multiply(qForearmL)
-    setBoneFromCharDelta('lowerarm_l', charLowerL, Q_DROP_L)
-    setBoneFromCharDelta('hand_l', charLowerL, Q_DROP_L)
+    // Couple subtle collarbone reach & shoulder lift to upper-arm elevation/spread (verified -Y/-Z left, +Y/+Z right).
+    const clavLShrug = Math.max(0, state.ArmL[0]) * 0.08 + Math.max(0, -state.ArmL[2]) * 0.14
+    const clavRShrug = Math.max(0, state.ArmR[0]) * 0.08 + Math.max(0, state.ArmR[2]) * 0.14
+    eulerToQuat(0, -state.ArmL[0] * 0.12, -clavLShrug, qClavL)
+    eulerToQuat(0, state.ArmR[0] * 0.12, clavRShrug, qClavR)
 
-    setBoneFromCharDelta('clavicle_r', qSpine3, null)
-    const charUpperR = new THREE.Quaternion().copy(qSpine3).multiply(qArmR)
-    setBoneFromCharDelta('upperarm_r', charUpperR, Q_DROP_R)
-    const charLowerR = new THREE.Quaternion().copy(charUpperR).multiply(qForearmR)
-    setBoneFromCharDelta('lowerarm_r', charLowerR, Q_DROP_R)
-    setBoneFromCharDelta('hand_r', charLowerR, Q_DROP_R)
+    setBoneFromCharDelta('clavicle_l', _qTmp.copy(qSpine3).multiply(qClavL), null)
+    qCharUpperL.copy(qSpine3).multiply(qArmL)
+    setBoneFromCharDelta('upperarm_l', qCharUpperL, Q_DROP_L)
+    qCharLowerL.copy(qCharUpperL).multiply(qForearmL)
+    setBoneFromCharDelta('lowerarm_l', qCharLowerL, Q_DROP_L)
+    setBoneFromCharDelta('hand_l', qCharLowerL, Q_DROP_L)
 
-    const charThighL = new THREE.Quaternion().copy(qHips).multiply(qThighL)
-    setBoneFromCharDelta('thigh_l', charThighL, null)
-    const charCalfL = new THREE.Quaternion().copy(charThighL).multiply(qShinL)
-    setBoneFromCharDelta('calf_l', charCalfL, null)
-    setBoneFromCharDelta('foot_l', charCalfL, null)
-    setBoneFromCharDelta('ball_l', charCalfL, null)
+    setBoneFromCharDelta('clavicle_r', _qTmp.copy(qSpine3).multiply(qClavR), null)
+    qCharUpperR.copy(qSpine3).multiply(qArmR)
+    setBoneFromCharDelta('upperarm_r', qCharUpperR, Q_DROP_R)
+    qCharLowerR.copy(qCharUpperR).multiply(qForearmR)
+    setBoneFromCharDelta('lowerarm_r', qCharLowerR, Q_DROP_R)
+    setBoneFromCharDelta('hand_r', qCharLowerR, Q_DROP_R)
 
-    const charThighR = new THREE.Quaternion().copy(qHips).multiply(qThighR)
-    setBoneFromCharDelta('thigh_r', charThighR, null)
-    const charCalfR = new THREE.Quaternion().copy(charThighR).multiply(qShinR)
-    setBoneFromCharDelta('calf_r', charCalfR, null)
-    setBoneFromCharDelta('foot_r', charCalfR, null)
-    setBoneFromCharDelta('ball_r', charCalfR, null)
+    qCharThighL.copy(qHips).multiply(qThighL)
+    setBoneFromCharDelta('thigh_l', qCharThighL, null)
+    qCharCalfL.copy(qCharThighL).multiply(qShinL)
+    setBoneFromCharDelta('calf_l', qCharCalfL, null)
+    setBoneFromCharDelta('foot_l', qCharCalfL, null)
+    setBoneFromCharDelta('ball_l', qCharCalfL, null)
+
+    qCharThighR.copy(qHips).multiply(qThighR)
+    setBoneFromCharDelta('thigh_r', qCharThighR, null)
+    qCharCalfR.copy(qCharThighR).multiply(qShinR)
+    setBoneFromCharDelta('calf_r', qCharCalfR, null)
+    setBoneFromCharDelta('foot_r', qCharCalfR, null)
+    setBoneFromCharDelta('ball_r', qCharCalfR, null)
   }
 
   function restoreRestPose() {
+    clearAdditiveLayer()
     proceduralActive = false
     for (const r of allRestBones) {
       r.bone.position.copy(r.position)
@@ -392,6 +514,186 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
       state[name][1] = 0
       state[name][2] = 0
     }
+  }
+
+  const ADDITIVE_CHAIN = [
+    'root', 'pelvis', 'spine_01', 'spine_02', 'spine_03',
+    'clavicle_l', 'upperarm_l', 'lowerarm_l', 'hand_l',
+    'clavicle_r', 'upperarm_r', 'lowerarm_r', 'hand_r',
+    'neck_01', 'head',
+    'thigh_l', 'calf_l', 'foot_l',
+    'thigh_r', 'calf_r', 'foot_r',
+  ] as const
+  const ZERO_EULER: [number, number, number] = [0, 0, 0]
+
+  function buildCharQuatMap() {
+    addOrigCharValid.clear()
+    addNewCharValid.clear()
+    const armQ = getArmatureCharQuat()
+    if (armature) {
+      poolCopyQuat(addOrigCharQ, addOrigCharValid, armature, armQ)
+      poolCopyQuat(addNewCharQ, addNewCharValid, armature, armQ)
+    }
+    for (const name of ADDITIVE_CHAIN) {
+      const b = boneRestMap.get(name)?.bone
+      if (!b) continue
+      const pQ = (b.parent && addOrigCharValid.has(b.parent) ? addOrigCharQ.get(b.parent) : undefined) ?? Q_IDENTITY
+      const cq = poolMulQuat(addOrigCharQ, addOrigCharValid, b, pQ, b.quaternion)
+      poolCopyQuat(addNewCharQ, addNewCharValid, b, cq)
+    }
+  }
+
+  function applyCharDeltaBone(name: string, charDelta: THREE.Quaternion, posShiftChar?: THREE.Vector3) {
+    const b = boneRestMap.get(name)?.bone
+    if (!b || !b.parent) return
+    let saved = additivePool.get(b)
+    if (!saved) {
+      saved = {bone: b, pos: b.position.clone(), quat: b.quaternion.clone(), active: false}
+      additivePool.set(b, saved)
+    }
+    if (!saved.active) {
+      saved.pos.copy(b.position)
+      saved.quat.copy(b.quaternion)
+      saved.active = true
+      additiveActiveList.push(saved)
+    }
+    const origLocalQ = saved.quat
+    const parentNewQ = (addNewCharValid.has(b.parent) ? addNewCharQ.get(b.parent) : undefined) ?? Q_IDENTITY
+    _qTargetChar.copy(charDelta).multiply(parentNewQ).multiply(origLocalQ)
+    _qParentInv.copy(parentNewQ).invert()
+    b.quaternion.copy(_qParentInv).multiply(_qTargetChar)
+    poolCopyQuat(addNewCharQ, addNewCharValid, b, _qTargetChar)
+
+    if (posShiftChar) {
+      const shiftLocal = _vA.copy(posShiftChar).applyQuaternion(_qParentInv)
+      b.position.copy(saved.pos).add(shiftLocal)
+    }
+
+    // Re-sync immediate descendants along chain even if they have identity delta.
+    for (const child of b.children) {
+      if (addOrigCharValid.has(child)) {
+        poolMulQuat(addNewCharQ, addNewCharValid, child, _qTargetChar, child.quaternion)
+      }
+    }
+  }
+
+  function applyAdditivePose(pose: AvatarAdditivePose) {
+    if (proceduralActive) return
+    clearAdditiveLayer()
+    buildCharQuatMap()
+
+    const j = pose.joints ?? {}
+    const hipsE = j.Hips ?? ZERO_EULER
+    const torsoE = j.Torso ?? ZERO_EULER
+    const armLE = j.ArmL ?? ZERO_EULER
+    const armRE = j.ArmR ?? ZERO_EULER
+    const foreLE = j.ForearmL ?? ZERO_EULER
+    const foreRE = j.ForearmR ?? ZERO_EULER
+    const thighLE = j.ThighL ?? ZERO_EULER
+    const thighRE = j.ThighR ?? ZERO_EULER
+    const shinLE = j.ShinL ?? ZERO_EULER
+    const shinRE = j.ShinR ?? ZERO_EULER
+
+    eulerToQuat(hipsE[0], hipsE[1], hipsE[2], qHips)
+    const pShift = pose.pelvisShift ? _addPos.set(pose.pelvisShift[0], pose.pelvisShift[1], pose.pelvisShift[2]) : undefined
+    applyCharDeltaBone('pelvis', qHips, pShift)
+
+    eulerToQuat(torsoE[0], torsoE[1], torsoE[2], qTorso)
+    eulerToQuat(torsoE[0] * 0.22, torsoE[1] * 0.22, torsoE[2] * 0.22, qS1)
+    eulerToQuat(torsoE[0] * 0.38, torsoE[1] * 0.38, torsoE[2] * 0.38, qS2)
+    eulerToQuat(torsoE[0] * 0.40, torsoE[1] * 0.40, torsoE[2] * 0.40, qS3)
+    applyCharDeltaBone('spine_01', qS1)
+    applyCharDeltaBone('spine_02', qS2)
+    applyCharDeltaBone('spine_03', qS3)
+
+    // Clavicles lift/pull subtly with breath and arm swing.
+    const breathRise = Math.max(0, torsoE[0]) * 0.35
+    eulerToQuat(0, -armLE[0] * 0.14, -(breathRise + Math.max(0, armLE[0]) * 0.08 + Math.max(0, -armLE[2]) * 0.14), qClavL)
+    eulerToQuat(0, armRE[0] * 0.14, breathRise + Math.max(0, armRE[0]) * 0.08 + Math.max(0, armRE[2]) * 0.14, qClavR)
+    applyCharDeltaBone('clavicle_l', qClavL)
+    eulerToQuat(armLE[0], armLE[1], armLE[2], qArmL)
+    applyCharDeltaBone('upperarm_l', qArmL)
+    eulerToQuat(foreLE[0], foreLE[1], foreLE[2], qForearmL)
+    applyCharDeltaBone('lowerarm_l', qForearmL)
+
+    applyCharDeltaBone('clavicle_r', qClavR)
+    eulerToQuat(armRE[0], armRE[1], armRE[2], qArmR)
+    applyCharDeltaBone('upperarm_r', qArmR)
+    eulerToQuat(foreRE[0], foreRE[1], foreRE[2], qForearmR)
+    applyCharDeltaBone('lowerarm_r', qForearmR)
+
+    // Stabilize part of spine additive roll/yaw when turning head toward look target.
+    const spine3 = boneRestMap.get('spine_03')?.bone
+    const spineOrig = spine3 && addOrigCharValid.has(spine3) ? addOrigCharQ.get(spine3) : undefined
+    const spineNew = spine3 && addNewCharValid.has(spine3) ? addNewCharQ.get(spine3) : undefined
+    _addStabilize.copy(Q_IDENTITY)
+    if (spineOrig && spineNew) {
+      _addDelta.copy(spineNew).multiply(_qTmp.copy(spineOrig).invert())
+      _addStabilize.copy(Q_IDENTITY).slerp(_addDelta.invert(), 0.52)
+    }
+
+    const hl = pose.headLook ?? ZERO_EULER
+    const hd = j.Head ?? ZERO_EULER
+    const headBone = boneRestMap.get('head')?.bone
+    const headAnchor = attachments.head
+    let clipFixPitch = 0, clipFixYaw = 0
+    if (headBone && headAnchor && headAnchor.parent === headBone) {
+      const headOrig = addOrigCharValid.has(headBone) ? addOrigCharQ.get(headBone) : undefined
+      const qRawHeadAnchor = _qTmp.copy(headOrig ?? Q_IDENTITY).multiply(headAnchor.quaternion)
+      const fwdRaw = _vA.set(0, 0, -1).applyQuaternion(qRawHeadAnchor)
+      const rawClipPitch = Math.asin(THREE.MathUtils.clamp(fwdRaw.y, -1, 1))
+      const rawClipYaw = Math.atan2(-fwdRaw.x, -fwdRaw.z)
+      clipFixPitch = rawClipPitch < -0.7 ? THREE.MathUtils.clamp(-rawClipPitch * 0.25, 0, 0.22) : THREE.MathUtils.clamp(-rawClipPitch * 0.62, -0.06, 0.24)
+      clipFixYaw = THREE.MathUtils.clamp(-rawClipYaw * 0.65, -0.18, 0.18)
+    }
+    eulerToQuat(hl[0] + hd[0] + clipFixPitch, hl[1] + hd[1] + clipFixYaw, hl[2] + hd[2], qHeadDelta)
+    qHeadFull.copy(qHeadDelta).multiply(_addStabilize)
+    _addNeckDelta.copy(Q_IDENTITY).slerp(qHeadFull, 0.40)
+    _addHeadRem.copy(qHeadFull).multiply(_qTmp.copy(_addNeckDelta).invert())
+    applyCharDeltaBone('neck_01', _addNeckDelta)
+    applyCharDeltaBone('head', _addHeadRem)
+
+    eulerToQuat(thighLE[0], thighLE[1], thighLE[2], qThighL)
+    applyCharDeltaBone('thigh_l', qThighL)
+    eulerToQuat(shinLE[0], shinLE[1], shinLE[2], qShinL)
+    applyCharDeltaBone('calf_l', qShinL)
+
+    eulerToQuat(thighRE[0], thighRE[1], thighRE[2], qThighR)
+    applyCharDeltaBone('thigh_r', qThighR)
+    eulerToQuat(shinRE[0], shinRE[1], shinRE[2], qShinR)
+    applyCharDeltaBone('calf_r', qShinR)
+  }
+
+  function measureGaitStrides(): AvatarGaitStrides {
+    const thighL = boneRestMap.get('thigh_l')?.bone
+    const calfL = boneRestMap.get('calf_l')?.bone
+    const footL = boneRestMap.get('foot_l')?.bone
+    const thighR = boneRestMap.get('thigh_r')?.bone
+    const calfR = boneRestMap.get('calf_r')?.bone
+    const footR = boneRestMap.get('foot_r')?.bone
+    if (!thighL || !calfL || !footL || !thighR || !calfR || !footR) {
+      strideOut.leftLegFwd = 0
+      strideOut.rightLegFwd = 0
+      strideOut.legAdvance = 0
+      strideOut.stepOpen = 0
+      return strideOut
+    }
+    buildCharQuatMap()
+    const legFwd = (th: THREE.Object3D, cf: THREE.Object3D, ft: THREE.Object3D) => {
+      const qTh = (addOrigCharValid.has(th) ? addOrigCharQ.get(th) : undefined) ?? Q_IDENTITY
+      const qCf = (addOrigCharValid.has(cf) ? addOrigCharQ.get(cf) : undefined) ?? Q_IDENTITY
+      const seg1 = _vA.copy(cf.position).applyQuaternion(qTh).z
+      const seg2 = _addPos.copy(ft.position).applyQuaternion(qCf).z
+      return -(seg1 + seg2)
+    }
+    const leftLegFwd = legFwd(thighL, calfL, footL)
+    const rightLegFwd = legFwd(thighR, calfR, footR)
+    const diff = leftLegFwd - rightLegFwd
+    strideOut.leftLegFwd = leftLegFwd
+    strideOut.rightLegFwd = rightLegFwd
+    strideOut.legAdvance = THREE.MathUtils.clamp(diff / 0.48, -1, 1)
+    strideOut.stepOpen = Math.abs(diff)
+    return strideOut
   }
 
   function makeJointHandle(name: AvatarJointName): AvatarJointHandle {
@@ -446,6 +748,9 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
     footProbes,
     clearPose: restoreRestPose,
     syncPose: applyBones,
+    applyAdditive: applyAdditivePose,
+    clearAdditive: clearAdditiveLayer,
+    measureGaitStrides,
   }
   root.userData.avatarRig = rig
   return rig

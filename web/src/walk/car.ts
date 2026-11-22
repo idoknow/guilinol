@@ -1,6 +1,7 @@
 import R from '@dimforge/rapier3d-compat'
 import * as T from 'three'
-import {clearAvatarPose, getAvatarJoints} from './avatar-rig'
+import {AVATAR_JOINT_NAMES, clearAvatarPose, getAvatarJoints} from './avatar-rig'
+import {computeCarEntryTargets} from './avatar-motion'
 import {
   CAR_DRIVE_MODE_ORDER,
   carConfig as ccfg,
@@ -635,14 +636,12 @@ export function createDriverPose(figure: T.Group) {
     clearAvatarPose(figure)
   }
   const applyDuck = (weight: number) => {
-    if (joints.Torso) joints.Torso.rotation.set(-0.34 * weight, 0, 0)
-    if (joints.Head) joints.Head.rotation.set(0.18 * weight, 0, 0)
-    if (joints.ThighL) joints.ThighL.rotation.set(0.62 * weight, 0, 0)
-    if (joints.ThighR) joints.ThighR.rotation.set(0.55 * weight, 0, 0)
-    if (joints.ShinL) joints.ShinL.rotation.set(-0.72 * weight, 0, 0)
-    if (joints.ShinR) joints.ShinR.rotation.set(-0.65 * weight, 0, 0)
-    if (joints.ArmL) joints.ArmL.rotation.set(0.42 * weight, 0, 0)
-    if (joints.ArmR) joints.ArmR.rotation.set(0.42 * weight, 0, 0)
+    const targets = computeCarEntryTargets(weight)
+    for (const name of AVATAR_JOINT_NAMES) {
+      const joint = joints[name]
+      const t = targets[name]
+      if (joint && t) joint.rotation.set(t[0], t[1], t[2])
+    }
   }
   let startYaw = 0, dismountFromYaw = 0
   let mountElapsed = ccfg.mountDuration, dismountElapsed = ccfg.dismountDuration, camArmOffset = 0
