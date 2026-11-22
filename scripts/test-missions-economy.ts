@@ -376,7 +376,7 @@ for (const line of ['taxi', 'race']) {
   assert.equal(orders.length, 3)
   for (const def of orders) {
     const runner = new MissionRunnerEngine()
-    const frame = {dt: 0.1, speedMs: 20, braking: false, parkLocked: false, crashPhase: 'none', mode: 'car'} as const
+    const frame = {dt: 0.1, speedMs: 10, braking: false, parkLocked: false, crashPhase: 'none', mode: 'car'} as const
     const balance = stateMod.getState().money
     assert.equal(runner.start(def.id, {x: def.giver[0], z: def.giver[1]}).ok, true)
     for (const [index, step] of def.steps.entries()) {
@@ -394,8 +394,8 @@ for (const line of ['taxi', 'race']) {
     }
     const result = runner.getSnapshot().lastOutcome
     assert.equal(result?.outcome, 'completed')
-    // Ten seconds at 20 m/s add ¥16 in distance and ¥1 in time.
-    const payout = def.reward + (line === 'taxi' ? 17 : 0)
+    // Ten seconds at 10 m/s add ¥8 in distance and ¥1 in time.
+    const payout = def.reward + (line === 'taxi' ? 9 : 0)
     assert.equal(result?.payout, payout)
     saveMod.reloadSaveFromStorage()
     assert.equal(stateMod.getState().money, balance + payout)

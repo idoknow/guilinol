@@ -2,7 +2,7 @@
   "id": "race-03",
   "line": "race",
   "title": "象山长环",
-  "summary": "从滨江路起跑，过解放桥后折返，经榕杉湖回到起点。全程限时 400 秒。",
+  "summary": "从滨江路起跑，过解放桥后折返，经榕杉湖回到起点。全程限时 1080 秒。",
   "recommendedVehicle": "car",
   "giver": [
     -869,
@@ -26,7 +26,7 @@
       ],
       "radius": 14,
       "text": "通过解放桥东段",
-      "timer": 400
+      "timer": 1080
     },
     {
       "kind": "checkpoint",

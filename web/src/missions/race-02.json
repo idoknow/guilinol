@@ -2,7 +2,7 @@
   "id": "race-02",
   "line": "race",
   "title": "双湖折返",
-  "summary": "从滨江路起跑，过解放桥后折返，经榕杉湖回到起点。全程限时 320 秒。",
+  "summary": "从滨江路起跑，过解放桥后折返，经榕杉湖回到起点。全程限时 840 秒。",
   "recommendedVehicle": "car",
   "giver": [
     -602,
@@ -26,7 +26,7 @@
       ],
       "radius": 14,
       "text": "通过解放桥东段",
-      "timer": 320
+      "timer": 840
     },
     {
       "kind": "checkpoint",
