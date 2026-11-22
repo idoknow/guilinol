@@ -150,11 +150,13 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
 
 
 def write_vehicles(output,data,triangles):
+    from pickup_curbs import align_jiefang_pickups
     root = Path(__file__).resolve().parents[1]
     spawns = {key: data[key] for key in ('bikes','sharedBikes','bicycles','cars') if key in data}
     filtered = subprocess.run([root/'node_modules/.bin/tsx', root/'scripts/filter-parked.ts'],
                               input=json.dumps(spawns), capture_output=True, text=True, check=True)
     data.update(json.loads(filtered.stdout))
+    align_jiefang_pickups(data['cars'])
     checked = audit_routes(data['routes'], triangles, select=True)
     if len(checked) != len(data['routes']):
         raise ValueError('航道核查失败，有航段净空不足')

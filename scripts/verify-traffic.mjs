@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {gunzipSync} from 'node:zlib'
 import {Traffic} from '../web/src/traffic/sim.ts'
+import {pickups,resolveContact,useTrafficSolids} from '../web/src/traffic/contact.ts'
 import {isPointInQuietZone} from '../web/src/game/quiet-zones.ts'
 
 const graph=JSON.parse(gunzipSync(readFileSync('public/world/roads/graph.json.gz')))
@@ -95,3 +96,57 @@ for(let frame=0;frame<280;frame++){
 assert.ok(held&&released,'first arrival owns the junction until the exit clears')
 assert.equal(fadeTicks,7);assert.equal(fixture.actors.length,0)
 console.log('FIFO / occupied exit / 400 ms dead-end fade: pass')
+
+for(const mode of ['walk','car']){
+  const solid={x:0,y:0,z:0,yaw:.87,halfWidth:.9,halfLength:2.1,height:1.5}
+  useTrafficSolids((_x,_z,visit)=>visit(solid))
+  const driving=mode==='car',radius=driving?2.12:.29
+  const forward={x:Math.sin(solid.yaw),z:Math.cos(solid.yaw)}
+  const point={x:-forward.x*6,y:0,z:-forward.z*6}
+  let maxDepth=0,contacts=0;const durations=[]
+  for(let frame=0;frame<180;frame++){
+    const travel=(driving?15:1.65)/60
+    point.x+=forward.x*travel;point.z+=forward.z*travel
+    const start=performance.now()
+    contacts+=Number(resolveContact(point,0,solid.yaw,driving?.86:radius,driving?radius:0))
+    durations.push(performance.now()-start)
+    maxDepth=Math.max(maxDepth,2.1+radius+point.x*forward.x+point.z*forward.z)
+  }
+  const {p95}=percentiles(durations);console.log({mode,contacts,maxDepth,p95})
+  assert.ok(contacts>0&&maxDepth<=.05&&p95<=.2)
+}
+useTrafficSolids()
+
+const classes=['primary','secondary','tertiary','residential']
+const parallel={nodes:[],lanes:[],walks:[],signals:[]}
+for(const [row,cls] of classes.entries())for(let side=0;side<2;side++){
+  const id=2*row+side,z=8*(id-4)
+  parallel.nodes.push({id:id*2,x:-124,y:0,z},{id:id*2+1,x:124,y:0,z})
+  parallel.lanes.push({id,from:id*2,to:id*2+1,kind:'motor',cls,offset:0,speedKmh:20})
+}
+const densityRun=new Traffic(parallel,()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32))
+const counts=[0,0,0,0]
+for(let tick=0;tick<1600;tick++){
+  densityRun.step(.05,{x:0,y:0,z:0})
+  if(tick>=400)for(const actor of densityRun.actors)counts[classes.indexOf(actor.track.cls)]++
+}
+for(const [index,target] of [1,.6,.35,.12].entries()){
+  const ratio=counts[index]/counts[0];console.log(classes[index],{perLaneKm:counts[index]/1200/.496,ratio})
+  assert.ok(Math.abs(ratio-target)<=.3*target)
+}
+
+const vehicleData=JSON.parse(gunzipSync(readFileSync('public/world/vehicles.bin')))
+for(const east of [-1415.4,-432.7,-984,-1001.5,-572]){
+  const [x,y,z,yaw]=vehicleData.cars.find(row=>row[0]===east)
+  const remove=pickups.add({x,y,z,yaw,halfWidth:.9,halfLength:2.12,height:1.5})
+  try{
+    const flow=new Traffic(graph,()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32))
+    let waiting=0,longest=0,peak=0
+    for(let tick=0;tick<2400;tick++){
+      flow.step(.05,{x,y,z});const stopped=flow.actors.filter(actor=>actor.kind!=='person'&&actor.speed<.1&&Math.hypot(actor.x-x,actor.z-z)<12).length
+      waiting=stopped?waiting+1:0;longest=Math.max(longest,waiting);peak=Math.max(peak,stopped)
+    }
+    console.log('Jiefang pickup',{x,z,peakStoppedWithin12m:peak,longestStoppedSeconds:longest*.05})
+    assert.ok(longest*.05<=30,`queue persisted at ${x},${z}`)
+  }finally{remove()}
+}

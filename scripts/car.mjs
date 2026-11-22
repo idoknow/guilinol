@@ -292,11 +292,11 @@ try {
   assert.equal(await page.evaluate(() => window.viewer.walk.vehicle), 'foot')
 
   // Case B: Drive across Jiefang Bridge carriageway, capture scenic driving shot, and verify bridge sidewalk exclusion.
-  const jfCar = data.cars.find(c => Math.hypot(c[0] - -455.4, c[2] - -47.4) < 5)
+  const jfCar = data.cars.find(c => Math.hypot(c[0] + 572, c[2] + 92) < 5)
   assert(jfCar, 'expected Jiefang East Rd car fixture')
   await settleAt(jfCar[0], jfCar[2], jfCar[3])
   await interactExact('开车')
-  const bridgeDrive = await steerCarTo([-185, 34], 2200, 5.0)
+  const bridgeDrive = await steerCarTo([-185, 34], 2600, 5.0)
   console.log('Jiefang bridge drive:', bridgeDrive)
   assert(bridgeDrive.traveled > 250 && bridgeDrive.targetDist <= 6.0 && bridgeDrive.maxSpeed > 9.5, `failed to reach Jiefang Bridge carriageway: ${JSON.stringify(bridgeDrive)}`)
   await page.evaluate(() => {
@@ -370,13 +370,18 @@ try {
   assert(elevCheck, 'expected mount button visible on next tick after door dismount')
   await page.close()
 
-  // Mobile 390x844 touch HUD & joystick driving check (stand beside driver door before mounting).
+  // Landscape touch HUD & joystick driving check (stand beside driver door before mounting).
   const mCar = paintSamples[0]
   const mDoorX = mCar[0] - Math.cos(mCar[3]) * 1.38, mDoorZ = mCar[2] + Math.sin(mCar[3]) * 1.38
-  const mPage = await browser.newPage({viewport: {width: 390, height: 844}, hasTouch: true, isMobile: true})
+  for(const portrait of [false,true]){
+  const mPage = await browser.newPage({viewport: portrait?{width:390,height:844}:{width:844,height:390}, hasTouch: true, isMobile: true})
   mPage.on('pageerror', err => errors.push(err.message))
   await mPage.goto(`http://127.0.0.1:${server.httpServer.address().port}/?mode=walk&verify&radius=480&hour=9.5`)
   await mPage.waitForFunction(() => window.viewer?.walk?.active, null, {timeout: 90000})
+  const gate=mPage.getByRole('dialog',{name:'请横屏游玩',includeHidden:true})
+  await gate.waitFor({state:'attached'})
+  assert.equal(await gate.isVisible(),portrait)
+  if(portrait){await gate.getByRole('button',{name:'竖屏继续'}).tap();await gate.waitFor({state:'detached'})}
   await mPage.evaluate(async ([x, z, yaw]) => {
     const {walk, stream} = window.viewer
     walk.leave()
@@ -432,6 +437,7 @@ try {
   assert(mobileCarCheck.dist > 1.2 && mobileCarCheck.spd > 2.5 && mobileCarCheck.dh > .04, `mobile stick car drive failed: ${JSON.stringify(mobileCarCheck)}`)
   await saveShot(mPage, 'car-mobile-driving')
   await mPage.close()
+  }
 
   assert.deepEqual(errors, [])
   console.log('ALL CAR CHECKS PASSED')

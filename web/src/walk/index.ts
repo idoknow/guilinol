@@ -11,6 +11,7 @@ import {currentAvatar,characterModel,disposeCharacterParts,styleCharacter} from 
 import {avatar} from '../look/avatar'
 import {bikeConfig, carConfig, walkConfig as cfg, type CarDriveMode, type EbikeHeadlightMode, type EbikeTurnSignal, type EbikeUpgradeMods} from './config'
 import {createPhysics} from './physics'
+import {resolveContact} from '../traffic/contact'
 import {createCameraRig} from './camera'
 import {look} from '../look/config'
 import {env} from '../look/time'
@@ -2136,6 +2137,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
             if(moveInto>stepInto*.5){vx-=dot*ux;vz-=dot*uz}
           }
         }
+      }
+      if(resolveContact(next,next.y-cfg.height/2,rides?.heading??0,rides?.car?.86:rides?.bike?.32:cfg.radius,rides?.car?2.12:rides?.bike?.85:0)){
+        vx=vz=bikeSpeed=0;if(rides?.bike||rides?.car){rides.stop();bikeObstacle='collision'}
       }
       if((rides?.bike||rides?.car)&&vehicleForbiddenAt(next.x,next.z)){
         next.x=pos.x;next.y=pos.y;next.z=pos.z;rides.stop();bikeSpeed=vx=vz=0;bikeObstacle='restricted'
