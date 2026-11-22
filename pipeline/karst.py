@@ -88,17 +88,20 @@ def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, f
 
 
 def imprint(terrain, left, top, triangles):
-    for triangle in triangles:
-        cols = (triangle[:,0]-left)/GRID
-        rows = (triangle[:,2]-top)/GRID
-        first = np.maximum(np.ceil([min(rows),min(cols)]).astype(int),0)
-        last = np.minimum(np.floor([max(rows),max(cols)]).astype(int),np.array(terrain.shape)-1)
-        if np.any(last < first):
-            continue
-        window = np.s_[first[0]:last[0]+1,first[1]:last[1]+1]
+    cols_all = (triangles[:,:,0]-left)/GRID
+    rows_all = (triangles[:,:,2]-top)/GRID
+    r0 = np.maximum(np.ceil(rows_all.min(axis=1)).astype(int),0)
+    c0 = np.maximum(np.ceil(cols_all.min(axis=1)).astype(int),0)
+    r1 = np.minimum(np.floor(rows_all.max(axis=1)).astype(int),terrain.shape[0]-1)
+    c1 = np.minimum(np.floor(cols_all.max(axis=1)).astype(int),terrain.shape[1]-1)
+    dc_all = cols_all[:,1:]-cols_all[:,:1]
+    dr_all = rows_all[:,1:]-rows_all[:,:1]
+    det_all = dc_all[:,0]*dr_all[:,1]-dc_all[:,1]*dr_all[:,0]
+    for i in np.flatnonzero((r1>=r0) & (c1>=c0) & (det_all!=0)):
+        window = np.s_[r0[i]:r1[i]+1,c0[i]:c1[i]+1]
         row,col = np.ogrid[window]
-        dc,dr = cols[1:]-cols[0],rows[1:]-rows[0]
-        det = dc[0]*dr[1]-dc[1]*dr[0]
+        triangle, cols, rows = triangles[i], cols_all[i], rows_all[i]
+        dc, dr, det = dc_all[i], dr_all[i], det_all[i]
         first_weight = ((col-cols[0])*dr[1]-(row-rows[0])*dc[1])/det
         second_weight = ((row-rows[0])*dc[0]-(col-cols[0])*dr[0])/det
         inside = (first_weight>=0)&(second_weight>=0)&(first_weight+second_weight<=1)

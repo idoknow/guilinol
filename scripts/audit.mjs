@@ -1,3 +1,4 @@
+import {telemetryPreview} from './telemetry-preview.mjs'
 import {execFileSync} from 'node:child_process'
 import {cp, mkdir, readFile, rm, stat, writeFile} from 'node:fs/promises'
 import {existsSync} from 'node:fs'
@@ -50,7 +51,7 @@ if (existsSync('dist/index.html')) {
 }
 
 // 2. Run browser-level audit in Playwright headless (SwiftShader)
-const server = await preview({root: 'web', configFile: 'web/vite.config.ts', preview: {host: '127.0.0.1', port: 0}})
+const server = await preview({plugins:[telemetryPreview],root: 'web', configFile: 'web/vite.config.ts', preview: {host: '127.0.0.1', port: 0}})
 const port = server.httpServer.address().port
 let browser
 let browserReport

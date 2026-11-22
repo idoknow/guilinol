@@ -1,6 +1,7 @@
 import {fault,record} from './telemetry'
 import * as THREE from 'three'
 import {ChunkBatcher} from './batch'
+import {DistantBuildings} from './distant-buildings'
 import {Forest} from './forest'
 import {setTreeFar} from './look/trees'
 import {setFogMetrics} from './look/time'
@@ -13,17 +14,21 @@ import {
   type RenderRangeListener,
   type RenderRangeMetrics,
 } from './render-range'
-import {detail, type Manifest, type Tile, overview} from './world'
+import {detail, type Manifest, type Tile} from './world'
 
+import {TileGrid, streamBudget, frameSlots, tileEdgeDistance} from './tile-grid'
 export function tileCenterDistance(tile:Tile, position:THREE.Vector3){
   return Math.hypot(tile.x+128-position.x,tile.z+128-position.z)
 }
 
-export function tileEdgeDistance(tile:Tile, x:number, z:number){
-  return Math.hypot(Math.max(0,Math.abs(x-tile.x-128)-128),Math.max(0,Math.abs(z-tile.z-128)-128))
-}
+type TerrainLayer = {mesh:THREE.Object3D; toggle(tile:Tile, show:boolean):void}
 
 export class Stream {
+  private distant?:DistantBuildings
+  private revision=0
+  readonly grid: TileGrid
+  private parseSlot = frameSlots(streamBudget.parseMs)
+  private attachSlot = frameSlots(streamBudget.attachMs)
   overviewMesh(){return this.base.mesh}
   landmarks:import('./landmarks').LoadedLandmarks=new Map()
   updateLandmarks?:ReturnType<typeof import('./landmarks').landmarkStream>
@@ -37,18 +42,22 @@ export class Stream {
   private priorityTarget:THREE.Vector3|null = null
   private priorityUntil = 0
   private lastPosition = new THREE.Vector3(Infinity,0,0)
+  private queue:Tile[]=[]
+  private queueIsInner=false
   private innerPending = new Set<Tile>()
 
   constructor(
     private scene:THREE.Scene,
-    private manifest:Manifest,
-    private base:Awaited<ReturnType<typeof overview>>,
+    manifest:Manifest,
+    private base:TerrainLayer,
     rangeOrRadius:number|RenderRangeStore|RenderRangeConfig = RENDER_RADIUS_DEFAULT,
     private camera:THREE.PerspectiveCamera,
   ) {
     this.rangeStore = rangeOrRadius instanceof RenderRangeStore ? rangeOrRadius : new RenderRangeStore(rangeOrRadius)
     const initialMetrics = this.rangeStore.getMetrics()
-    this.forest = new Forest(scene,manifest.chunks,camera,initialMetrics)
+    this.grid = new TileGrid(manifest)
+    if(manifest.distantBuildings)this.distant=new DistantBuildings(scene,manifest.distantBuildings.file,manifest.chunks)
+    this.forest = new Forest(scene,this.grid,camera,initialMetrics)
     this.batches = new ChunkBatcher(scene)
     this.syncMetrics(initialMetrics)
     this.rangeStore.subscribe((_cfg, metrics)=>{
@@ -102,9 +111,34 @@ export class Stream {
     }
   }
 
+  private *innerTiles(x:number,z:number,metrics:RenderRangeMetrics){
+    const radius=streamBudget.priorityRadius
+    for(const tile of this.grid.near(x,z,Math.max(radius,metrics.spawnRingEdge+128))){
+      if(Math.hypot(tile.x+128-x,tile.z+128-z)<=radius || tileEdgeDistance(tile,x,z)<=metrics.spawnRingEdge)yield tile
+    }
+  }
+
+  // During opening, attach real chunks against the first terrain LOD. Keep
+  // these same objects when the full overview and its water layer arrive.
+  async loadOpeningRing(position:THREE.Vector3){
+    this.lastPosition.copy(position)
+    const tiles=Array.from(this.innerTiles(position.x,position.z,this.metrics))
+      .sort((a,b)=>tileCenterDistance(a,position)-tileCenterDistance(b,position))
+    for(let i=0;i<tiles.length;i+=streamBudget.innerRequests){
+      const batch=tiles.slice(i,i+streamBudget.innerRequests)
+      await Promise.all(batch.map(tile=>this.enqueue(tile,true)))
+    }
+    this.updateBatches(position)
+  }
+
+  setTerrainLayer(layer:TerrainLayer){
+    this.base=layer
+    for(const tile of this.loaded.keys())layer.toggle(tile,false)
+  }
+
   private hasUnloadedInner(x:number, z:number, metrics:RenderRangeMetrics, now:number){
-    for(const tile of this.manifest.chunks){
-      if(tileEdgeDistance(tile,x,z)<=metrics.spawnRingEdge && !this.loaded.has(tile) && (this.failures.get(tile)??0)<=now) return true
+    for(const tile of this.innerTiles(x,z,metrics)){
+      if(!this.loaded.has(tile) && (this.failures.get(tile)??0)<=now) return true
     }
     return false
   }
@@ -124,17 +158,31 @@ export class Stream {
     this.pending.set(tile,controller)
     if(inner) this.innerPending.add(tile)
     const start=performance.now()
-    detail(tile,controller.signal).then(item=>{
+    // The inner ring is bounded in space and request count. Its decode and
+    // attachment continuations run as data arrives, even on multi-second frames.
+    const urgent=()=>inner || tileCenterDistance(tile,this.priorityTarget??this.lastPosition)<=streamBudget.priorityRadius
+    const parseSlot=()=>urgent()?Promise.resolve():this.parseSlot()
+    return detail(tile,controller.signal,parseSlot).then(async item=>{
+      if(!urgent())await this.attachSlot()
       if(controller.signal.aborted){item.dispose();return}
       this.scene.add(item.group);this.batches.add(item.batch);this.base.toggle(tile,false)
-      this.loaded.set(tile,item);this.visited.add(tile);this.failures.delete(tile)
+      this.revision++;this.loaded.set(tile,item);this.visited.add(tile);this.failures.delete(tile)
       record('chunk',{ms:performance.now()-start,grid:Math.floor(tile.x/250)+','+Math.floor(tile.z/250)})
     }).catch(error=>{
       if(!controller.signal.aborted){record('failure',{category:'chunk'});fault('chunk','',0,error);console.error(tile.file,error);this.failures.set(tile,performance.now()+10000)}
     }).finally(()=>{
       this.pending.delete(tile)
       this.innerPending.delete(tile)
+      this.fillRequests()
     })
+  }
+
+  private fillRequests(){
+    while(this.queue.length && this.pending.size<streamBudget.detailRequests){
+      if(this.loaded.size+this.pending.size>=streamBudget.residentTiles)break
+      if(this.queueIsInner && this.innerPending.size>=streamBudget.innerRequests)break
+      this.enqueue(this.queue.pop()!,this.queueIsInner)
+    }
   }
 
   tick(position:THREE.Vector3) {
@@ -151,58 +199,48 @@ export class Stream {
     const focus = this.priorityTarget ?? position
     const innerEdge = metrics.spawnRingEdge
 
+    let waitingForInner=false
     const innerTiles:Tile[] = []
-    for(const tile of this.manifest.chunks){
-      if(tileEdgeDistance(tile,focus.x,focus.z)<=innerEdge && !this.loaded.has(tile) && !this.pending.has(tile) && (this.failures.get(tile)??0)<=now){
-        innerTiles.push(tile)
-      }
+    for(const tile of this.innerTiles(focus.x,focus.z,metrics)){
+      if(this.loaded.has(tile) || (this.failures.get(tile)??0)>now)continue
+      waitingForInner=true
+      if(!this.pending.has(tile))innerTiles.push(tile)
     }
-    const innerBusy = innerTiles.length>0 || this.innerPending.size>0 || (this.updateLandmarks?.busyPriorityCount?.()??0)>0
-
-    this.forest.tick(position,innerBusy)
+    const innerBusy = waitingForInner || (this.updateLandmarks?.busyPriorityCount?.()??0)>0
 
     for(const [tile,item] of this.loaded){
       const keepInner = tileEdgeDistance(tile,focus.x,focus.z)<=innerEdge || tileEdgeDistance(tile,position.x,position.z)<=innerEdge
       if(!keepInner && tileCenterDistance(tile,position)>metrics.unloadRadius){
-        this.batches.remove(tile);this.base.toggle(tile,true);this.scene.remove(item.group);item.dispose();this.loaded.delete(tile)
+        this.batches.remove(tile);this.base.toggle(tile,true);this.scene.remove(item.group);item.dispose();this.loaded.delete(tile);this.revision++
       }
     }
 
-    this.batches.update(position,this.camera,isWaterInView(this.camera)?currentMirrorLevel(this.camera):-Infinity,{
-      cullHorizon:metrics.cullHorizon,
-      buildingFarLod:metrics.buildingFarLod,
-      streetRadius:metrics.streetRadius,
-    })
+    this.updateBatches(position)
 
     for(const [tile,controller] of this.pending){
       const keepInner = tileEdgeDistance(tile,focus.x,focus.z)<=innerEdge || tileEdgeDistance(tile,position.x,position.z)<=innerEdge
       if(!keepInner && tileCenterDistance(tile,position)>metrics.unloadRadius) controller.abort()
     }
 
-    if(innerTiles.length){
-      innerTiles.sort((a,b)=>tileEdgeDistance(a,focus.x,focus.z)-tileEdgeDistance(b,focus.x,focus.z))
-      for(const tile of innerTiles){
-        if(this.innerPending.size>=4 || this.pending.size>=6) break
-        this.enqueue(tile,true)
-      }
-      return
+    this.queueIsInner=innerBusy
+    if(innerBusy){
+      this.queue=innerTiles.sort((a,b)=>tileEdgeDistance(b,focus.x,focus.z)-tileEdgeDistance(a,focus.x,focus.z))
+    }else{
+      this.queue=Array.from(this.grid.near(position.x,position.z,metrics.radius))
+        .filter(tile=>!this.loaded.has(tile)&&!this.pending.has(tile)&&(this.failures.get(tile)??0)<=now && tileCenterDistance(tile,position)<=metrics.radius)
+        .sort((a,b)=>tileCenterDistance(b,position)-tileCenterDistance(a,position))
     }
-    if(innerBusy) return
+    this.fillRequests()
+    if(!innerBusy)this.distant?.tick(this.camera,this.loaded,this.revision)
+    this.forest.tick(position,innerBusy)
+  }
 
-    const outerTiles:{tile:Tile; dist:number}[] = []
-    for(const tile of this.manifest.chunks){
-      if(this.loaded.has(tile)||this.pending.has(tile)||(this.failures.get(tile)??0)>now) continue
-      const dist = tileCenterDistance(tile,position)
-      if(dist<=metrics.radius) outerTiles.push({tile,dist})
-    }
-    if(!outerTiles.length) return
-    outerTiles.sort((a,b)=>a.dist-b.dist)
-    const maxAllowed = outerTiles[0].dist<=metrics.nearLoadRadius ? metrics.nearConcurrency : metrics.outerConcurrency
-    let launched = 0
-    for(const {tile} of outerTiles){
-      if(this.pending.size>=maxAllowed || launched>=2) break
-      this.enqueue(tile,false)
-      launched++
-    }
+  updateBatches(position:THREE.Vector3){
+    const metrics=this.metrics
+    this.batches.update(position,this.camera,isWaterInView(this.camera)?currentMirrorLevel(this.camera):-Infinity,{
+      cullHorizon:metrics.cullHorizon,
+      buildingFarLod:metrics.buildingFarLod,
+      streetRadius:metrics.streetRadius,
+    })
   }
 }

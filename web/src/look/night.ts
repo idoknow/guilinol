@@ -83,10 +83,10 @@ totalEmissiveRadiance += uLamp * uNight * vLamp * 4.;`)
 // Overview / chunk ground textures: baked road colour lights up faintly so the far city reads as a
 // grid of streets at night.
 const road = c(0xd8d2c1)
-export function nightGround(material:THREE.Material) {
+export function nightGround(material:THREE.Material, bakedWater=false) {
   material.onBeforeCompile = (shader:Shader)=>{
     shareAtmosphere(shader); Object.assign(shader.uniforms,{uRoad:{value:road},uLamp:{value:c(look.roadLight)},
-      uBaked:{value:c(look.waterBaked)},uBank:{value:c(look.waterBank)}})
+      uBaked:{value:c(look.waterBaked)},uBank:{value:c(bakedWater?look.waterBaked:look.waterBank)}})
     shader.fragmentShader = shader.fragmentShader.replace('#include <common>',`#include <common>
 uniform float uNight; uniform vec3 uRoad; uniform vec3 uLamp; uniform vec3 uBaked; uniform vec3 uBank;`).replace('#include <map_fragment>',`#include <map_fragment>
 // The real water surface (look/water.ts) covers the river; baked water texels that still show are on

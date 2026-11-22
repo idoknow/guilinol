@@ -1,5 +1,5 @@
 import {defineConfig, type Plugin} from 'vite'
-import {readFileSync} from 'node:fs'
+import {existsSync, readFileSync} from 'node:fs'
 import {execFileSync} from 'node:child_process'
 import {dirname, join} from 'node:path'
 import {fileURLToPath} from 'node:url'
@@ -26,7 +26,18 @@ function rapierExternalWasm(): Plugin {
 
 export default defineConfig({
   publicDir: '../public',
-  plugins: [rapierExternalWasm(), {name:'deploy-version',configureServer(server){
+  plugins: [rapierExternalWasm(), {name:'world-preloads',transformIndexHtml(_,ctx){
+    if(ctx.filename!==join(root,'web/index.html'))return []
+    if(existsSync(join(root,'public/world/opening.bin')))return [
+      {tag:'link',attrs:{rel:'preload',as:'fetch',crossorigin:'',href:'./world/opening.bin',id:'opening-terrain'}},
+    ]
+    const file=join(root,'public/world/manifest.json')
+    if(!existsSync(file))return []
+    const world=JSON.parse(readFileSync(file,'utf8'))
+    const files=['manifest.json',world.overview.texture.file,world.overview.packedUnderlay?.file??world.overview.underlay.file,
+      world.peaks.sectorSize?'peaks-far.bin':world.peaks.file]
+    return files.map(asset=>({tag:'link',attrs:{rel:'preload',as:'fetch',crossorigin:'',href:'./world/'+asset}}))
+  }}, {name:'deploy-version',configureServer(server){
     server.middlewares.use('/version.json',(_request,response)=>{response.setHeader('Content-Type','application/json');response.end(JSON.stringify({sha:buildSha()}))})
   }, generateBundle(){
     const sha = buildSha()

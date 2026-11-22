@@ -1,7 +1,16 @@
+import {telemetryPreview} from './telemetry-preview.mjs'
 import assert from 'node:assert/strict'
 import {mkdir} from 'node:fs/promises'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
+
+const cpuRate=Number(process.env.PERF_CPU_RATE??1)
+assert(Number.isFinite(cpuRate)&&cpuRate>=1,'PERF_CPU_RATE must be at least 1')
+async function applyCpuRate(page){
+  if(cpuRate===1)return
+  const session=await page.context().newCDPSession(page)
+  await session.send('Emulation.setCPUThrottlingRate',{rate:cpuRate})
+}
 
 const start=performance.now()
 // Walk-only distance probes were tuned for the old 4 m/s walk; IDOK-133 walks at a natural 1.65 m/s, so the same
@@ -9,13 +18,14 @@ const start=performance.now()
 const WALK_TIME=4/1.65
 const outDir=process.env.WALK_CAPTURE_DIR??'captures/walk'
 await mkdir(outDir,{recursive:true})
-const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
+const server=await preview({plugins:[telemetryPreview],root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 const baseUrl=`http://127.0.0.1:${server.httpServer.address().port}`
 const walkUrl = baseUrl+'/?verify&mode=walk&flow=0'+(process.argv.includes('--solo')?'&solo=1':'')
 let browser
 try {
   browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
   const page=await browser.newPage({viewport:{width:480,height:270}}),errors=[]
+  await applyCpuRate(page)
   let releaseBridge
   const coldBridge=new Promise(resolve=>{releaseBridge=resolve})
   await page.route('**/jiefang_bridge.glb',async route=>{await coldBridge;await route.continue()})
@@ -39,7 +49,17 @@ try {
         }
       }
       if(target==='tree'){
-        const tree=[...stream.forest.loaded.values()].flat().filter(tree=>tree.kind!==5).sort((one,two)=>Math.hypot(one.x-origin[0],one.z-origin[1])-Math.hypot(two.x-origin[0],two.z-origin[1]))[0]
+        const {forest}=stream
+        const tile=window.viewer.manifest.chunks.find(t=>origin[0]>=t.x && origin[0]<t.x+256 && origin[1]>=t.z && origin[1]<t.z+256)
+        if(!tile)throw Error('Tree fixture is outside the world')
+        const deadline=performance.now()+45000
+        while(!forest.loaded.has(tile)){
+          if(performance.now()>deadline)throw Error('Tree fixture timed out waiting for '+tile.file)
+          await new Promise(requestAnimationFrame)
+        }
+        const distance=tree=>Math.hypot(tree.x-origin[0],tree.z-origin[1])
+        const tree=forest.loaded.get(tile).filter(tree=>tree.kind!==5 && distance(tree)<=128).sort((a,b)=>distance(a)-distance(b))[0]
+        if(!tree)throw Error('No collidable tree near the fixture in '+tile.file)
         walk.leave();if(!await walk.enter(tree.x-2,tree.z,0,'tree'))throw Error('No tree approach')
       }
       const spawn=walk.probe();if(target==='shore')direction=[-740-spawn.x,868-spawn.z]
@@ -362,6 +382,7 @@ try {
   // M6-1: Mobile 390x844 HUD layout non-overlap, touch joystick + sprint/jump buttons + touch camera drag, and screenshot.
   const mobileCtx=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,isMobile:true,hasTouch:true})
   const mobile=await mobileCtx.newPage()
+  await applyCpuRate(mobile)
   mobile.on('pageerror',error=>errors.push('mobile: '+error.message))
   await mobile.route('**/favicon.ico',route=>route.fulfill({status:204}))
   await mobile.route('**/api/t',route=>route.fulfill({status:204}))
