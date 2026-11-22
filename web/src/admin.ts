@@ -1474,7 +1474,7 @@ function userDetail(id: string) {
       h('div', { class: 'adm-user-head' },
         h('h2', null, user.nickname || '（未设置昵称）'),
         h('p', { class: 'adm-sub' },
-          `${user.email_placeholder ? '（占位邮箱，未真正绑定）' : user.email} · ${user.role === 'admin' ? '管理员' : '普通用户'} · ${user.verified ? '邮箱已验证' : '邮箱未验证'}`)),
+          `${user.email_placeholder ? '未绑定邮箱（仅第三方登录）' : user.email} · ${user.role === 'admin' ? '管理员' : '普通用户'}${user.email_placeholder ? '' : ` · ${user.verified ? '邮箱已验证' : '邮箱未验证'}`}`)),
       h('dl', { class: 'adm-kv' },
         h('dt', null, '注册时间'), h('dd', null, when(unix(user.created_at), true)),
         h('dt', null, '反馈数'), h('dd', null, num(user.feedback_count)

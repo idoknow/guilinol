@@ -40,6 +40,32 @@ async function configuredTest({sql,env}) {
     const again=await call('auth/social/start',{method:'POST',cookie:`glol_session=${sa}`,body:{type:'wx',intent:'bind'}});assert.equal(again.status,409);assert.equal((await again.json()).error.code,'already_bound')
     const mine=await (await call('me',{cookie:`glol_session=${sa}`})).json();assert.deepEqual(mine.social.map(x=>[x.type,x.uid]),[['wx','…F60718']])
 
+    // login（平台账号未绑定）：直接建 uuid 账号，占位邮箱
+    const tn=await pending('login','C0FFEE0123456789ABCDEF',' ')
+    const created=await call('auth/social/confirm',{method:'POST',cookie:`glol_social_pending=${tn}`,body:{}});assert.equal(created.status,200,await created.clone().text());assert.equal((await created.json()).created,true)
+    const ns=created.headers.getSetCookie();assert.equal(ns.length,2)
+    const nme=await (await call('me',{cookie:ns.find(c=>c.startsWith('glol_session=')).split(';')[0]})).json()
+    assert.equal(nme.email_placeholder,true);
+    const rz=await call('auth/resend',{method:'POST',body:{email:nme.email,purpose:'reset'}});assert.equal(rz.status,400);assert.equal((await rz.json()).error.code,'no_email')
+assert.match(nme.email,/^wx\.c0ffee0123456789abcdef@social\.invalid$/)
+
+    // merge：target=刚建的占位账号，source=真实邮箱账号（含绑定 qq、存档、流水含一条同 key）
+    const src='socialtest-src-0001'
+    await sql(`INSERT INTO users(id,email,nickname,salt,digest,verified) VALUES('${src}','merge-src@example.test','S','s1','d1',1)`)
+    await sql(`INSERT INTO social_identities(type,social_uid,user_id,nickname,faceimg,created_at,last_login_at) VALUES('qq','AAAA0000BBBB1111CCCC','${src}','',' ',1,1),('wx','DDDD0000EEEE1111FFFF','${src}','','',1,1)`)
+    await sql(`INSERT INTO player_saves(user_id,payload_json,client_updated_at,updated_at) VALUES('${src}','{}',1,1)`)
+    await sql(`INSERT INTO player_ledger_txns(tx_id,user_id,idempotency_key,kind,delta,balance_after,created_at) VALUES('t1','${src}','k1','x',1,1,1),('t2','${src}','k2','x',1,2,1),('t3','${nme.id}','k1','x',5,5,1)`)
+    await sql(`UPDATE users SET role='admin' WHERE id='${a}'`)
+    const merged=await call(`admin/users/${nme.id}/merge`,{method:'POST',cookie:`glol_session=${sa}`,body:{from:'merge-src@example.test'}})
+    assert.equal(merged.status,200,await merged.clone().text());const mj=await merged.json()
+    assert.deepEqual([mj.moved,mj.conflicts,mj.adopted_email,mj.took_saves],[['qq'],['wx'],'merge-src@example.test',true])
+    const tu=(await sql(`SELECT email,email_placeholder,digest FROM users WHERE id='${nme.id}'`))[0].results[0];assert.deepEqual([tu.email,Number(tu.email_placeholder),tu.digest],['merge-src@example.test',0,'d1'])
+    assert.equal(Number((await sql(`SELECT count(*) n FROM users WHERE id='${src}'`))[0].results[0].n),0)
+    assert.deepEqual((await sql(`SELECT tx_id FROM player_ledger_txns WHERE user_id='${nme.id}' ORDER BY tx_id`))[0].results.map(r=>r.tx_id),['t2','t3'])
+    assert.equal(Number((await sql(`SELECT count(*) n FROM player_saves WHERE user_id='${nme.id}'`))[0].results[0].n),1)
+    assert.equal(Number((await sql(`SELECT count(*) n FROM admin_audit WHERE action='merge_users'`))[0].results[0].n),1)
+    await sql(`DELETE FROM player_ledger_txns`);await sql(`DELETE FROM player_saves`);await sql(`DELETE FROM sessions WHERE user_id='${nme.id}'`);await sql(`DELETE FROM social_identities WHERE user_id='${nme.id}'`);await sql(`DELETE FROM users WHERE id='${nme.id}'`);await sql(`UPDATE users SET role='user' WHERE id='${a}'`)
+
     // login：无会话确认 → 两条独立 Set-Cookie，新会话可用
     const tl=await pending('login','0123456789ABCDEFF60718',a)
     const ok=await call('auth/social/confirm',{method:'POST',cookie:`glol_social_pending=${tl}`,body:{}});assert.equal(ok.status,200)
@@ -65,7 +91,7 @@ async function configuredTest({sql,env}) {
     const tr2=await pending2('register','FEDCBA9876543210AAAAAA')
     assert.equal((await call('auth/social/register',{method:'POST',cookie:`glol_social_pending=${tr2}`,body:{email:'x2@example.test',password:'social-password-1'}})).status,409)
     await sql(`DELETE FROM social_identities`);await sql(`DELETE FROM social_pending`);await sql(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email='${reg.email}')`);await sql(`DELETE FROM users WHERE email='${reg.email}'`);await sql(`DELETE FROM mail_events WHERE email='${reg.email}'`);await sql(`DELETE FROM sessions WHERE user_id='${b}'`);await sql(`DELETE FROM users WHERE id='${b}'`)
-    console.log('Social configured: start 502 w/o orphan state, cross-site callback→expired, bind confirm 403 (not consumed)/200/404 replay, re-bind start 409 already_bound, /api/me social list, login confirm sets 2 cookies + working session; register 2-phase (409 email_taken/conflict, password mismatch 400, 2 cookies, verified+bound, code deleted)')
+    console.log('Social configured: start 502 w/o orphan state, cross-site callback→expired, bind confirm 403 (not consumed)/200/404 replay, re-bind start 409 already_bound, /api/me social list, social-only auto-create (placeholder email), admin merge on Postgres (moved/conflicts/adopted email/saves/ledger key-skip/audit), login confirm sets 2 cookies + working session; register 2-phase (409 email_taken/conflict, password mismatch 400, 2 cookies, verified+bound, code deleted)')
   }catch(error){console.error(logs.slice(-3000));throw error}
   finally{if(child.exitCode===null){process.kill(-child.pid,'SIGTERM');await closed}}
 }

@@ -193,10 +193,16 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
 
   const saves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(targetId).first<{ n: number }>()
   const tookSaves = !saves?.n
-  if (tookSaves) statements.push(db.prepare('UPDATE OR IGNORE player_saves SET user_id=? WHERE user_id=?').bind(targetId, fromId))
+  // 目标没有存档才接管，不会撞 user_id 主键；不用 UPDATE OR IGNORE（SQLite 专有，生产 Postgres 会语法错误）
+  if (tookSaves) statements.push(db.prepare('UPDATE player_saves SET user_id=? WHERE user_id=?').bind(targetId, fromId))
 
   statements.push(
-    db.prepare('UPDATE OR IGNORE player_ledger_txns SET user_id=? WHERE user_id=?').bind(targetId, fromId),
+    // UNIQUE(user_id, idempotency_key)：目标已有同 key 的流水就跳过，剩下的随来源账号级联删除
+    db
+      .prepare(
+        'UPDATE player_ledger_txns SET user_id=? WHERE user_id=? AND idempotency_key NOT IN (SELECT idempotency_key FROM player_ledger_txns WHERE user_id=?)',
+      )
+      .bind(targetId, fromId, targetId),
     db.prepare('UPDATE feedback SET user_id=? WHERE user_id=?').bind(targetId, fromId),
     db.prepare('UPDATE feedback_upload_usage SET user_id=? WHERE user_id=?').bind(targetId, fromId),
     db.prepare('DELETE FROM sessions WHERE user_id=?').bind(fromId),
@@ -252,9 +258,11 @@ export async function adminSetPassword(db: D1Database, actor: string, id: string
     db
       .prepare('UPDATE users SET salt=?,digest=?,failures=0,locked_until=0 WHERE id=?')
       .bind(salt, await passwordHash(password, salt), id),
+    // audit 用 changes()=1 判断上一条是否生效，必须紧跟 UPDATE users；放在 DELETE sessions 后面时，
+    // 用户没有恰好 1 个会话就不会留审计
+    audit(db, actor, 'reset_password', 'user', id, { generated: !provided }),
     // 旧会话全部失效：改密码等于把人踢下线
     db.prepare('DELETE FROM sessions WHERE user_id=?').bind(id),
-    audit(db, actor, 'reset_password', 'user', id, { generated: !provided }),
   ])
   return json({ ok: true, email: user.email, password })
 }
