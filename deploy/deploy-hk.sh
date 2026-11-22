@@ -4,6 +4,11 @@ cd "$(dirname "$0")/.."
 host=rock@cn-hk-fxy-01.rockchin.top
 k() { ssh -T -o BatchMode=yes "$host" kubectl -n idoknow "$@"; }
 tag=$(git rev-parse HEAD)
+# 同一个仓库不允许两个发版重叠：否则两边各 apply 一次镜像，谁最后写谁生效，
+# 而 rollout status 可能看到的是对方的滚动（Sourcery #4）。
+lock=${TMPDIR:-/tmp}/glol-deploy-hk.lock
+exec 9>"$lock"
+if ! flock -w 10 9; then echo "另一个发版正在进行（锁 $lock），退出" >&2; exit 1; fi
 k get secret glol-env -o name >/dev/null
 anonymous=$(mktemp -d)
 trap 'rm -rf "$anonymous"' EXIT
@@ -40,8 +45,13 @@ fi
 
 # RollingUpdate(maxUnavailable=0) + /api/ready 就绪探针：新 pod 的 DB 通了才摘老 pod
 kubectl kustomize deploy/k8s | sed "s/:RELEASE$/:$tag/g" | k apply -f -
-for name in postgres minio web; do k rollout status "deployment/glol-$name" --timeout=300s; done
+for name in postgres minio; do k rollout status "deployment/glol-$name" --timeout=300s; done
+# 首次装库：/api/ready 要求 public.users 存在，所以迁移必须早于 web 就绪
 [[ $migrated == 1 ]] || migrate
+k rollout status deployment/glol-web --timeout=300s
+# 确认最终跑的就是本次要发的镜像（防止并发发版把镜像改回去）
+applied=$(k get deployment/glol-web -o jsonpath='{.spec.template.spec.containers[?(@.name=="glol-api")].image}')
+[[ $applied == *":$tag" ]] || { echo "镜像与本次发版不一致：$applied ≠ :$tag" >&2; exit 1; }
 
 k exec -i deploy/glol-web -c glol-api -- node --input-type=module <<'JS'
 import {S3Client,HeadBucketCommand,CreateBucketCommand} from '@aws-sdk/client-s3'
