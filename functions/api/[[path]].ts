@@ -2,7 +2,7 @@ import {type Env,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCod
 
 import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar'
 import {feedback} from '../../lib/feedback'
-import {isSocialType,socialCallback,socialConfig,socialConfirm,socialPending,socialRegister,socialStates,startSocial} from '../../lib/social'
+import {isSocialType,socialCallback,socialConfig,socialConfirm,socialPending,socialRegister,socialStates,startSocial,userSocialIdentities} from '../../lib/social'
 import {unsubscribe} from '../../lib/feedback-mail'
 type User={id:string;email:string;nickname:string;verified:number;role:string;salt:string;digest:string;locked_until:number;notify_email:number}
 const profile=(user:User)=>({id:user.id,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email})
@@ -91,7 +91,9 @@ async function handle(request:Request,env:Env) {
       writes.push(stmt('UPDATE users SET nickname=? WHERE id=? AND EXISTS (SELECT 1 FROM sessions WHERE digest=?)',user.nickname,user.id,digest))
     }
     if(!(await db.batch(writes))[0].meta.changes) unauthorized()
-    return json(profile(user),200,cookie(request.headers.get('Cookie')!.match(/(?:^|;\s*)glol_session=([a-f0-9]{64})(?:;|$)/)![1]))
+    // 带上已绑定的第三方平台，账号面板据此显示「已绑定」而不是还让用户去绑
+    const social=await userSocialIdentities(db,user.id)
+    return json({...profile(user),social},200,cookie(request.headers.get('Cookie')!.match(/(?:^|;\s*)glol_session=([a-f0-9]{64})(?:;|$)/)![1]))
   }
   const email=typeof body.email==='string'?body.email.trim().toLowerCase():''
   if(email.length>254||!/^\S+@[^\s@]+\.[^\s@]+$/.test(email)||email.split('@').length!==2) invalid()

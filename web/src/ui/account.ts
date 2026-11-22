@@ -5,7 +5,8 @@ import './account.css'
 // 账号：登录 / 注册（填写 → 邮箱验证 → 完成）/ 忘记密码 / 我的账号。
 // Playing requires an account (IDOK-99): the title screen asks for a login before the city boots, see requireUser().
 type Screen='login'|'register'|'verify'|'forgot'|'reset'|'profile'|'social'
-export type User={email:string,nickname:string,notify_email:boolean}
+export type SocialBinding={type:string;label:string;nickname:string;avatar:string;uid:string}
+export type User={email:string,nickname:string,notify_email:boolean;social?:SocialBinding[]}
 const titles:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'忘记密码',reset:'重置密码',profile:'我的账号',social:'第三方账号'}
 const submits:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'发送重置验证码',reset:'重置密码',profile:'保存设置',social:'确认'}
 async function api(path:string,method='GET',data?:object) {
@@ -29,10 +30,40 @@ async function loadSocialOptions(){
   try{socialOptions=(await api('auth/social/config') as {enabled?:SocialOption[]}).enabled??[]}catch{socialOptions=[]}
   return socialOptions
 }
+type SocialTicket={url:string;at:number}
+const tickets=new Map<string,SocialTicket>()
+const TICKET_TTL=90_000
+const ticketKey=(type:string,intent:SocialIntentForUi)=>`${intent}:${type}`
+/** 面板一渲染就先把授权地址取回来，用户点按钮时可以直接跳，不必再等上游 1–3 秒。 */
+async function prefetchSocial(type:string,intent:SocialIntentForUi){
+  const existing=tickets.get(ticketKey(type,intent))
+  if(existing&&Date.now()-existing.at<TICKET_TTL)return
+  try{
+    const result=await api('auth/social/start','POST',{type,intent}) as {url?:string}
+    if(result?.url)tickets.set(ticketKey(type,intent),{url:result.url,at:Date.now()})
+  }catch{/* 预取失败就算了，点按钮时再走一次 */}
+}
 async function startSocial(type:string,intent:'login'|'bind'|'register'){
+  const key=ticketKey(type,intent),cached=tickets.get(key)
+  if(cached&&Date.now()-cached.at<TICKET_TTL){
+    tickets.delete(key)
+    location.assign(cached.url)
+    return
+  }
   const result=await api('auth/social/start','POST',{type,intent}) as {url?:string}
-  if(!result?.url)throw new Error('没有拿到第三方跳转地址，请稍后再试')
-  location.href=result.url
+  const target=result?.url
+  if(!target)throw new Error('没有拿到第三方跳转地址，请稍后再试')
+  // 授权页有时加载很慢，看起来像卡死：4 秒后给一个可点的兜底链接
+  window.setTimeout(()=>{
+    const message=dialog?.querySelector<HTMLElement>('.acc-msg')
+    if(!dialog?.open||!message)return
+    const anchor=document.createElement('a')
+    anchor.href=target;anchor.target='_blank';anchor.rel='noopener noreferrer'
+    anchor.textContent='点这里打开授权页'
+    message.replaceChildren(document.createTextNode('页面没有自动跳转？'),anchor)
+    message.dataset.kind='info'
+  },4000)
+  location.assign(target)
 }
 async function loadPendingSocial(){
   pendingSocial=await api('auth/social/pending') as SocialPending
@@ -161,15 +192,21 @@ function build(){
     const options=await loadSocialOptions()
     if(!options.length||!d.open)return
     const intent:SocialIntentForUi=next==='profile'?'bind':next==='register'?'register':'login',
+      bound=new Set((user?.social??[]).map(item=>item.type)),
+      visible=options.filter(option=>intent!=='bind'||!bound.has(option.type)),
       row=document.createElement('div')
     row.className='acc-social'
-    for(const option of options){
+    if(intent==='bind'&&!visible.length)return
+    for(const option of visible){
       const button=document.createElement('button')
       button.type='button';button.className='ui-btn ui-btn--ghost acc-social-btn'
       const icon=socialIcon(option.type)
       if(icon)button.append(icon)
       button.append(document.createTextNode(`用${option.label}${intent==='bind'?'绑定':intent==='register'?'注册':'登录'}`))
       button.onclick=()=>{if(!busy)void submit(async()=>{await startSocial(option.type,intent)})}
+      button.onpointerenter=()=>void prefetchSocial(option.type,intent)
+      button.onfocus=()=>void prefetchSocial(option.type,intent)
+      void prefetchSocial(option.type,intent)
       row.append(button)
     }
     if(nav.isConnected)nav.append(row)
@@ -218,7 +255,19 @@ function build(){
     if(next==='register'||next==='login'||next==='reset')field('password',next==='login'?'密码':'密码（至少 8 位）','password',next==='login'?'current-password':'new-password')
     if(next==='register'||next==='profile')field('nickname','昵称','text','nickname',user?.nickname,next==='register'?'以后可以在「我的账号」里修改':'')
     if(next==='profile'){const label=document.createElement('label'),toggle=document.createElement('input');label.className='acc-check';toggle.type='checkbox';toggle.name='notify_email';toggle.checked=!!user?.notify_email
-      label.append(toggle,'反馈有回复时发邮件提醒我');fields.append(label)}
+      label.append(toggle,'反馈有回复时发邮件提醒我');fields.append(label)
+      const bound=user?.social??[],list=document.createElement('div');list.className='acc-bindings'
+      if(!bound.length){const empty=document.createElement('small');empty.className='acc-bind-empty'
+        empty.textContent='还没有绑定第三方账号';list.append(empty)}
+      for(const item of bound){
+        const row=document.createElement('div'),name=document.createElement('span'),state=document.createElement('span')
+        row.className='acc-bind-row';name.className='acc-bind-name'
+        name.textContent=`${item.label} · ${item.nickname||'（无昵称）'}`
+        state.className='acc-bind-state';state.textContent='已绑定'
+        const icon=socialIcon(item.type,20)
+        row.append(...(icon?[icon]:[]),name,state);list.append(row)
+      }
+      fields.append(list)}
     if(next==='profile')link('修改外形',()=>submit(async()=>{await editCharacter()}))
     if(next==='login'||next==='register'||next==='profile')void socialButtons(next)
     if(next==='social')link('取消',()=>{pendingSocial=null;render!(user?'profile':'login')})
@@ -257,6 +306,7 @@ function build(){
         render!('profile','已通过第三方账号登录')
         return
       }
+      setUser(await api('me') as User)
       render!('profile','第三方账号已绑定')
       return
     }
@@ -266,6 +316,8 @@ function build(){
     if(previous==='verify') data.password=verificationPassword
     let result
     try {result=await api(`auth/${screen}`,'POST',data);if(screen==='login')record('funnel',{step:'loginSuccess'})} catch(error){if((error as {code?:string}).code==='unverified'){render!('verify','请先验证邮箱再登录',data.password);return}throw error}
+    // 登录/验证的响应里没有第三方绑定信息，补一次 me 让「我的账号」直接显示已绑定平台
+    if(previous==='login'||previous==='verify'){try{result=await api('me')}catch{}}
     if(previous==='register')render!('verify','',data.password)
     else if(previous==='reset')render!('login','密码已重置，请重新登录')
     else {setUser(result);if(gate){const resolve=gate;gate=undefined;d.close();resolve(result);return}
