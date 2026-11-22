@@ -54,6 +54,7 @@
     "verify:telemetry": "node scripts/verify-telemetry.mjs",
     "test": "python3 scripts/test-perf-region.py && node --test scripts/telemetry-test.mjs && npm run test:api",
     "verify:modes": "node scripts/verify-modes.mjs",
+    "verify:qq": "node scripts/verify-qq-entry.mjs",
     "verify:creator": "tsx scripts/verify-creator.mjs"
   },
   "dependencies": {
