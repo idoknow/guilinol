@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "verify:loading": "node scripts/verify-loading.mjs",
     "verify:admin": "node scripts/auth-test.mjs --admin-ui",
     "test:bridge": "node scripts/auth-test.mjs --bridge",
     "dev:full": "npm run build && wrangler d1 migrations apply glol --local && wrangler pages dev dist --binding EMAIL_DEV_LOG=1",

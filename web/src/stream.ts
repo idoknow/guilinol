@@ -120,13 +120,18 @@ export class Stream {
 
   // During opening, attach real chunks against the first terrain LOD. Keep
   // these same objects when the full overview and its water layer arrive.
-  async loadOpeningRing(position:THREE.Vector3){
+  async loadOpeningRing(position:THREE.Vector3,progress?:(done:number,total:number)=>void){
     this.lastPosition.copy(position)
     const tiles=Array.from(this.innerTiles(position.x,position.z,this.metrics))
       .sort((a,b)=>tileCenterDistance(a,position)-tileCenterDistance(b,position))
+    let done=0
+    progress?.(0,tiles.length)
     for(let i=0;i<tiles.length;i+=streamBudget.innerRequests){
       const batch=tiles.slice(i,i+streamBudget.innerRequests)
-      await Promise.all(batch.map(tile=>this.enqueue(tile,true)))
+      await Promise.all(batch.map(async tile=>{await this.enqueue(tile,true)
+        if(!this.loaded.has(tile))throw Error('网络中断：街区数据下载失败')
+        progress?.(++done,tiles.length)
+      }))
     }
     this.updateBatches(position)
   }

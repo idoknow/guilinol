@@ -41,6 +41,5 @@ export async function accountCharacter(nickname: string, edit = false) {
       mirror(saved, equipStarter || !previous || previous.look !== saved.look)
       window.dispatchEvent(new CustomEvent('glol:avatar-change', {detail: saved}))
     },
-    !edit,
   )
 }

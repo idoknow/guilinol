@@ -10,10 +10,11 @@ export function lastPlayMode(): PlayMode {
 }
 export function getPlayMode() { return current }
 let transition = 0
-export async function setPlayMode(mode: PlayMode, remember = true) {
+export async function setPlayMode(mode: PlayMode, remember = true,signal?:AbortSignal) {
   const request = ++transition
   if (mode === 'solo' && !solo) solo = await import('./solo-layer')
   if (request !== transition) return
+  signal?.throwIfAborted()
   const prev = current
   current = mode
   if (remember) { try { localStorage.setItem(key, mode) } catch {} }

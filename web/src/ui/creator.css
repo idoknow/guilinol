@@ -271,12 +271,6 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.creator-arrival {
-  position: fixed;
-  inset: 0;
-  background: white;
-  z-index: 2147483647;
-}
 @media (max-width: 680px) {
   .creator nav svg {
     display: block;

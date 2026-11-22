@@ -20,11 +20,20 @@ export interface Manifest {
   peaks:Peaks; atlas:Asset; vehicles?:Asset; overview:{step:number; heights:Asset; underlay:Asset; packedUnderlay?:Asset; texture:Asset; waterMask?:string}
 }
 export let bytes = 0
-export async function fetchAsset(file:string, signal?:AbortSignal) {
+type ByteProgress=(done:number,total:number)=>void
+export async function fetchAsset(file:string, signal?:AbortSignal,progress?:ByteProgress) {
   const response = await fetch(`./world/${file}`, {signal})
   cacheResponse(response)
   if (!response.ok) throw Error(`${file}: HTTP ${response.status}`)
-  const data = await response.arrayBuffer()
+  let data:ArrayBuffer
+  const total=Number(response.headers.get('content-length'))
+  if(progress&&total>0&&response.body){
+    const reader=response.body.getReader(),parts:Uint8Array<ArrayBuffer>[]=[];let done=0
+    while(true){const part=await reader.read();if(part.done)break
+      parts.push(part.value as Uint8Array<ArrayBuffer>);done+=part.value.length;progress(done,Math.max(done,total))}
+    data=await new Blob(parts).arrayBuffer()
+  }else data=await response.arrayBuffer()
+  progress?.(data.byteLength,data.byteLength)
   bytes += data.byteLength
   return data
 }
@@ -54,8 +63,8 @@ function ground(width:number, depth:number, step:number, height:(col:number,row:
 }
 
 // GLF1 is independent of the chunk table and the peak-sector catalogue.
-export async function openingTerrain(){
-  const data=await fetchAsset('opening.bin')
+export async function openingTerrain(progress?:ByteProgress){
+  const data=await fetchAsset('opening.bin',undefined,progress)
   const view=new DataView(data)
   if(view.getUint32(0)!==0x474c4631)throw Error('Invalid opening terrain')
   const bbox=Array.from({length:4},(_,i)=>view.getFloat64(4+i*8,true)) as Manifest['bbox']

@@ -54,6 +54,7 @@ try {
     const context = await browser.newContext({viewport: {width, height}, hasTouch: width < 400})
     const page = await context.newPage(),
       errors = []
+    page.setDefaultTimeout(90000)
     page.on('pageerror', (e) => errors.push(e.message))
     const user = {email: 'creator-' + width + '@example.invalid', nickname: '桂林漫游者'}
     await page.route('**/api/**', async (route) => {
@@ -130,7 +131,7 @@ try {
     assert.equal(saved.hair, 'f_pony')
     assert.equal(saved.skin, 3)
     assert.equal(saved.look, 'chinese')
-    await page.locator('.creator-arrival').waitFor({state: 'detached'})
+    await page.waitForFunction(()=>!document.querySelector('.ld-veil,#boot:not([hidden])'))
     await page.screenshot({path: output + '/' + width + '-spawn.png'})
     if (baseline) {
       const control = await browser.newPage({viewport: {width, height}, hasTouch: width < 400})
@@ -150,6 +151,7 @@ try {
     await page.reload()
     await page.click('[data-umami-event=home-solo]')
     await page.waitForSelector('body[data-mode=walk]', {timeout: 90000})
+    await page.waitForFunction(()=>!document.querySelector('.ld-veil,#boot:not([hidden])'))
     assert.equal(await creator.count(), 0)
     assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('glol.avatar.v1'))), saved)
     if (width === 390) {

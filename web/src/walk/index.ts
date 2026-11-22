@@ -1227,7 +1227,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     return ready
   }
-  async function enter(x:number,z:number,heading:number,reason:string,override=false){
+  async function enter(x:number,z:number,heading:number,reason:string,override=false,signal?:AbortSignal,progress?:(fraction:number,detail:string)=>void){
     if(!sim.withinBounds(x,z))return false
     if(shopOverlay?.isOpen())shopOverlay?.close('teleport')
     const target=new THREE.Vector3(x,0,z);destination=target
@@ -1242,9 +1242,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const ez=entry.position[2]-cx*Math.sin(a)+cz*Math.cos(a)
       return Math.hypot(ex-x,ez-z)<=r+cfg.search
     })
-    const deadline=performance.now()+15000
+    const deadline=performance.now()+(signal?60000:15000)
+    let reported=''
     while((needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))&&performance.now()<deadline){
+      if(signal?.aborted){if(destination===target)destination=null;return false}
       if(destination!==target)return false
+      if(progress){const tiles=needed.filter(tile=>stream.loaded.has(tile)).length,landmarks=supports.filter(entry=>stream.landmarks.has(entry)).length
+        const key=`${tiles}:${landmarks}`;if(key!==reported){reported=key;progress(.3+.6*tiles/Math.max(1,needed.length)+.1*landmarks/Math.max(1,supports.length),`街区 ${tiles} / ${needed.length}`)}}
       target.y=0;stream.tick(target)
       for(const entry of supports)if(!stream.landmarks.has(entry)){
         target.y=entry.position[1];stream.updateLandmarks?.(target,entry)
@@ -1253,7 +1257,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     if(destination!==target)return false
     destination=null
+    if(signal?.aborted)return false
     if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))return false
+    if(active)leave()
     sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
