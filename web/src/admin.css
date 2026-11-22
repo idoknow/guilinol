@@ -322,3 +322,19 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
 .adm-heat-legend{display:flex;align-items:center;gap:8px;margin-top:10px;color:var(--ui-ink-soft);font-size:12px}
 .adm-heat-legend i{display:block;width:160px;height:10px;border-radius:var(--ui-r-pill)}
 .adm-heat-legend small{margin-left:auto}
+
+/* 用户详情 · 绑定的第三方平台 */
+.adm-user-head h2{margin:0 0 4px}
+.adm-user-head .adm-sub{margin:0 0 14px}
+.adm-section-title{margin:20px 0 10px;font-size:14px;font-weight:600}
+.adm-kv{display:grid;grid-template-columns:88px 1fr;gap:7px 14px;margin:0 0 6px;padding:14px 16px;background:var(--paper);border:1px solid var(--line);border-radius:12px}
+.adm-kv dt{color:var(--ink-soft);font-size:13px}
+.adm-kv dd{margin:0;font-size:13px}
+.adm-binds{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));margin:0 0 8px}
+.adm-bind{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.adm-bind-badge{flex:none;display:inline-flex;align-items:center;justify-content:center;min-width:52px;padding:4px 9px;border-radius:8px;color:#fff;font-size:12px;font-weight:600;letter-spacing:.04em}
+.adm-bind-body{flex:1;min-width:0;display:grid;gap:2px}
+.adm-bind-body b{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm-bind-sub{color:var(--ink-soft);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm-bind-avatar{flex:none;width:44px;height:44px;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#ece6d8;color:var(--ink-soft);font-size:15px;font-weight:600}
+.adm-bind-avatar img{width:100%;height:100%;object-fit:cover;display:block}
