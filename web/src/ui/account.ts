@@ -238,7 +238,9 @@ function build(){
       who.append(badge,info)}
     if(next==='profile'&&user){const badge=document.createElement('span'),info=document.createElement('div')
       badge.className='acc-avatar';badge.textContent=initial(user.nickname);info.innerHTML='<b></b><small></small>'
-      info.querySelector('b')!.textContent=user.nickname;info.querySelector('small')!.textContent=user.email;who.append(badge,info)}
+      info.querySelector('b')!.textContent=user.nickname
+      info.querySelector('small')!.textContent=`主账号：${user.email}`
+      who.append(badge,info)}
     if(next==='social'){
       submitButton.textContent=pendingSocial?.intent==='register'
         ? (socialPhase==='code'?'完成注册':'发送验证码')
@@ -257,8 +259,10 @@ function build(){
     if(next==='profile'){const label=document.createElement('label'),toggle=document.createElement('input');label.className='acc-check';toggle.type='checkbox';toggle.name='notify_email';toggle.checked=!!user?.notify_email
       label.append(toggle,'反馈有回复时发邮件提醒我');fields.append(label)
       const bound=user?.social??[],list=document.createElement('div');list.className='acc-bindings'
+      const heading=document.createElement('small');heading.className='acc-bind-title'
+      heading.textContent='第三方登录方式（主账号仍是上面的邮箱）';list.append(heading)
       if(!bound.length){const empty=document.createElement('small');empty.className='acc-bind-empty'
-        empty.textContent='还没有绑定第三方账号';list.append(empty)}
+        empty.textContent='还没有绑定，绑定后可以用 QQ / 微信 直接登录这个账号';list.append(empty)}
       for(const item of bound){
         const row=document.createElement('div'),name=document.createElement('span'),state=document.createElement('span')
         row.className='acc-bind-row';name.className='acc-bind-name'
