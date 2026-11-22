@@ -17,6 +17,7 @@ export function skyClock(params:URLSearchParams) {
   const panel = document.createElement('div'); panel.className = 'sky-ui'
   const time = document.createElement('span'); time.className = 'sky-time'
   const flow = document.createElement('button'); flow.className = 'sky-flow'
+  const fold = document.createElement('button'); fold.className = 'sky-fold'
   const row = (items:[string,unknown][], pick:(value:never)=>void, active:(value:never)=>boolean)=>{
     const group = document.createElement('span'); group.className = 'sky-group'
     const buttons = items.map(([text,value])=>{const b = document.createElement('button'); b.textContent = text
@@ -26,10 +27,23 @@ export function skyClock(params:URLSearchParams) {
   const hours = row(moods,(h:number)=>{clock.goal = h},(h:number)=>{const d=Math.abs(clock.hour-h)%24;return Math.min(d,24-d)<1.25})
   const weathers = row(skies,(w:Weather)=>{clock.weather = w},(w:Weather)=>clock.weather===w)
   flow.onclick = ()=>{clock.flowing = !clock.flowing; refresh()}
-  panel.append(time,hours.group,weathers.group,flow); document.body.append(panel)
+  panel.append(time,hours.group,weathers.group,flow,fold); document.body.append(panel)
   function refresh(){hours.refresh(); weathers.refresh(); flow.textContent = clock.flowing?'❚❚':'▶'
     flow.setAttribute('aria-label',clock.flowing?'暂停时间':'时间流转'); time.textContent = label(clock.hour)}
   refresh()
+  // IDOK-158: on a phone the panel eats a third of the top edge, which matters most in landscape
+  // where the view is the point. Fold it down to just the clock; remember the choice so rotating
+  // back and forth doesn't undo it (stored per device, ignored when storage is blocked).
+  const FOLD_KEY = 'glol.skyFolded'
+  let folded = false
+  function setFolded(on:boolean) {
+    folded = on; panel.classList.toggle('folded', on); fold.textContent = on?'›':'‹'
+    fold.setAttribute('aria-expanded', String(!on))
+    fold.setAttribute('aria-label', on?'展开时辰天气':'收起时辰天气'); fold.title = on?'展开时辰天气':'收起时辰天气'
+    try { localStorage.setItem(FOLD_KEY, on?'1':'0') } catch {}
+  }
+  fold.onclick = ()=>setFolded(!folded)
+  try { setFolded(localStorage.getItem(FOLD_KEY)==='1') } catch { setFolded(false) }
   // Next weather: mostly clear, morning mist, the odd shower; never the same weather twice in a row.
   function nextWeather(hour:number):Weather {
     const w:[Weather,number][] = [['clear',.62],['mist',hour>=4.5&&hour<9.5?.45:.12],['rain',.22]]
