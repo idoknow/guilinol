@@ -486,6 +486,8 @@ def build(bbox, output, palette, workers=4):
     print('Terrain SHA-256:', digest.hexdigest())
     manifest['landmarks'] = landmarks
     write_city_lods(output, manifest)
+    from traffic import bake as bake_traffic
+    bake_traffic(output, manifest)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
