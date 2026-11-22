@@ -36,15 +36,18 @@ class Streets {
     }
   }
   nearest(pos:Point, motion:Point){
-    let road:Track|undefined,walkDistance=Infinity,roadDistance=Infinity,score=Infinity
+    let road:Track|undefined,walkDistance=Infinity,roadDistance=Infinity,forwardDistance=Infinity,score=Infinity
+    const stride=Math.hypot(motion.x,motion.z)
     for(const track of this.bins.get(`${Math.floor(pos.x/32)},${Math.floor(pos.z/32)}`)??[]){
       const along=Math.min(track.length,Math.max(0,longitudinal(track,pos)))
       const gap=distance(pos,pose(track,along,track.offset))
       if(track.walk){walkDistance=Math.min(walkDistance,gap);continue}
-      const rank=gap+(motion.x*track.dx+motion.z*track.dz<0?.25:0)
+      const progress=motion.x*track.dx+motion.z*track.dz
+      if(progress>.7*stride)forwardDistance=Math.min(forwardDistance,gap)
+      const rank=gap+(progress<0?.25:0)
       if(rank<score){score=rank;roadDistance=gap;road=track}
     }
-    return {road,roadDistance,walkDistance}
+    return {road,roadDistance,walkDistance,forwardDistance}
   }
   allowed(track:Track){
     if(track.walk||track.kind!=='motor')return false
@@ -107,6 +110,15 @@ export class Pursuit {
   private stopped=0
   private cooldown=new Map<Reason,number>()
   private caseId=''
+  private sidewalkTime=0
+  private wrongTime=0
+  private wrongMeters=0
+  private approachMeters=0
+
+  private resetEvidence(){
+    this.sidewalkTime=this.wrongTime=this.wrongMeters=this.approachMeters=0
+    this.lane=undefined
+  }
 
   private violation(reason:Reason,points:number){
     if(this.time<(this.cooldown.get(reason)??0))return
@@ -118,25 +130,33 @@ export class Pursuit {
   end(reason:End){
     const active=getState().wanted>0
     setPoliceStop(false);setWanted(0);this.officers.length=0;this.lost=0;this.stopped=0
-    this.previous=undefined;this.lane=undefined;this.vehicle=undefined;this.cooldown.clear()
+    this.previous=undefined;this.resetEvidence();this.vehicle=undefined;this.cooldown.clear()
     if(active)emit({type:'pursuit:end',reason})
   }
   step(dt:number,sim:Traffic|undefined,pos:Point,vehicleId?:string){
     this.time+=dt
     if(vehicleId&&this.vehicle&&this.vehicle!==vehicleId)this.end('switch')
     if(vehicleId)this.vehicle=vehicleId
-    if(this.sim!==sim){this.sim=sim;this.streets=undefined;this.lane=undefined}
-    if(!vehicleId&&!getState().wanted){this.previous=undefined;this.lane=undefined;return}
+    if(this.sim!==sim){this.sim=sim;this.streets=undefined;this.resetEvidence()}
+    if(!vehicleId&&!getState().wanted){this.previous=undefined;this.resetEvidence();return}
     if(sim&&!this.streets)this.streets=new Streets(sim)
     const prev=this.previous,motion={x:prev?pos.x-prev.x:0,z:prev?pos.z-prev.z:0,y:0}
     const speed=Math.hypot(motion.x,motion.z)/dt
     const match=this.streets?.nearest(pos,motion),road=match?.road
     if(vehicleId&&prev&&speed>1.5&&speed<90&&sim&&match){
-      if(this.lane&&longitudinal(this.lane,prev)<this.lane.length&&longitudinal(this.lane,pos)>=this.lane.length&&sim.phase(this.lane)==='red')this.violation('red',2)
-      if(match.walkDistance<1.6&&match.walkDistance+.35<match.roadDistance)this.violation('sidewalk',1)
-      else if(road&&match.roadDistance<2.5&&(road.dx*motion.x+road.dz*motion.z)<-.7*speed*dt)this.violation('wrong-way',1)
+      if(this.lane&&this.approachMeters>=Math.min(4,this.lane.length*.5)&&longitudinal(this.lane,prev)<this.lane.length&&longitudinal(this.lane,pos)>=this.lane.length&&sim.phase(this.lane)==='red'&&
+        this.lane.dx*motion.x+this.lane.dz*motion.z>.8*speed*dt)this.violation('red',2)
+      const sidewalk=match.walkDistance<1.6&&match.walkDistance+.35<match.roadDistance&&match.roadDistance>1.6
+      this.sidewalkTime=sidewalk?this.sidewalkTime+dt:0
+      if(this.sidewalkTime>=1)this.violation('sidewalk',1)
+      const wrong=!sidewalk&&road&&match.roadDistance<2.5&&match.forwardDistance>match.roadDistance+1.1&&
+        (road.dx*motion.x+road.dz*motion.z)<-.7*speed*dt&&
+        !(sim.isJunction(road.from)&&distance(pos,road.start)<=10||sim.isJunction(road.to)&&distance(pos,road.end)<=10)
+      this.wrongTime=wrong?this.wrongTime+dt:0;this.wrongMeters=wrong?this.wrongMeters+speed*dt:0
+      if(this.wrongTime>=1.5&&this.wrongMeters>=10)this.violation('wrong-way',1)
       if(sim.actors.some(actor=>actor.kind!=='person'&&actor.scale>.6&&distance(actor,pos)<2.3))this.violation('collision',speed>8?3:2)
-    }
+    }else this.sidewalkTime=this.wrongTime=this.wrongMeters=0
+    this.approachMeters=road&&road===this.lane&&prev&&speed<90?Math.max(0,this.approachMeters+road.dx*motion.x+road.dz*motion.z):0
     this.lane=vehicleId&&match&&match.roadDistance<3.5?road:undefined
     this.previous={...pos}
     const level=getState().wanted

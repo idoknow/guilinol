@@ -874,7 +874,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const tel=rides.carTelemetry
       vehicleState={
         kind:'car',
-        id:rides.car.uuid,
+        id:`car_world:${rides.car.uuid}`,
         speedKmh:tel?.kmh??Math.round(Math.abs(rides.speed)*3.6),
         gear:tel?.gearLabel==='R'?'R':tel?.gearLabel==='N'?'N':'D',
         damage:0,
@@ -890,7 +890,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const durabilityPct=ownedDur??rides.bikeDurabilityPct
       vehicleState={
         kind:isBicycle?'bike':'ebike',
-        id:instanceId??rides.bike.uuid,
+        id:instanceId??`${rides.isShared?'shared_ebike':'world_ebike'}:${rides.bike.uuid}`,
         speedKmh:tel?.kmh??Math.round(Math.abs(rides.speed)*3.6),
         gear:tel?.parkLocked?'N':'D',
         damage:THREE.MathUtils.clamp(1-durabilityPct/100,0,1),

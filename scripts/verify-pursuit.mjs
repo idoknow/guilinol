@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {chromium} from 'playwright'
 import {createServer} from 'vite'
 import {browserOptions} from './qa-browser.mjs'
+import {checkRoads} from './pursuit-road-check.mjs'
 
 const server=await createServer({root:'web',configFile:'web/vite.config.ts',server:{port:0,host:'127.0.0.1'}})
 await server.listen()
@@ -29,20 +30,21 @@ try {
       return getState().wanted
     }
     setMission({id:'taxi',title:'taxi',step:'drive'})
-    drive(10030,4);levels.push(drive(10031,4));drive(10032);levels.push(drive(10031))
-    for(let step=0;step<54;step++)drive(10032+step)
-    levels.push(drive(10086,4));drive(10087);levels.push(drive(10086));drive(10092);drive(10099)
+    const leg=(start,length,dir,z,id,sim)=>{for(let index=0;index<length;index++)drive(start+dir*index,z,id,sim);return getState().wanted}
+    levels.push(leg(10010,13,1,4));levels.push(leg(10023,18,-1,0))
+    leg(10006,56,1,0)
+    levels.push(leg(10062,13,1,4));levels.push(leg(10075,18,-1,0));leg(10059,41,1,0)
     levels.push(drive(10100));graph.actors.push({kind:'car',x:10102,z:0,y:0,scale:1});drive(10102)
     const maxCars=chase.officers.length
     for(let step=0;step<82;step++)drive(10300+step,0)
     const escaped=getState().wanted
     setMission({id:'race',title:'race',step:'drive'})
-    drive(10060,4);drive(10061,4);drive(10062,0)
+    leg(10049,13,1,4);drive(10062,0)
     for(let step=0;step<90;step++)drive(10062)
     const fined=JSON.parse(localStorage.getItem('glol.save.v1')).money
-    drive(10063,4);drive(10064,4);drive(10064,4,'second-car')
+    leg(10063,13,1,4);drive(10075,4,'second-car')
     const crossing=new Traffic({nodes:[node(1,-750,-600),node(2,-550,-600)],lanes:[lane(1,2)],walks:[[1,2,4]],signals:[]})
-    drive(-747,-596,'second-car',crossing);drive(-746,-596,'second-car',crossing)
+    leg(-747,13,1,-596,'second-car',crossing)
     return {levels,maxCars,escaped,fined,events,unsafeLaneWanted:getState().wanted,unsafeLaneOfficers:chase.officers.length}
   })
   assert.deepEqual(result.levels,[1,2,3,4,5]);assert.equal(result.maxCars,5);assert.equal(result.escaped,0)
@@ -50,4 +52,12 @@ try {
   assert.deepEqual(result.events.filter(event=>event.type==='pursuit:end').map(event=>event.reason),['lost','fine','switch'])
   assert.equal(result.unsafeLaneWanted,1);assert.equal(result.unsafeLaneOfficers,0)
   console.log(JSON.stringify(result))
+  const roads=await page.evaluate(checkRoads)
+  console.log(JSON.stringify(roads))
+  for(const row of roads.results){
+    assert.ok(row.meters>=100000&&row.junctions>=2000&&row.signalPasses>0)
+    assert.equal(row.counts['wrong-way'],0);assert.equal(row.counts.red,0)
+    assert.ok(row.counts.sidewalk<=(Math.abs(row.lateral)===1?2*row.meters/100000:0))
+  }
+  assert.equal(roads.red.wanted,2);assert.deepEqual(roads.red.reasons,['red'])
 } finally {await browser?.close();await server.close()}

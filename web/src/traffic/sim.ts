@@ -45,6 +45,7 @@ export class Traffic {
     graph.walks.forEach(([from,to,offset,stable],index)=>{for(const reverse of [false,true])add({from:reverse?to:from,to:reverse?from:to,offset:reverse?-offset:offset,id:-1-2*(stable??index)-Number(reverse),kind:'nonmotor',speedKmh:5},true)})
     for(const signal of graph.signals){this.signal.set(signal.node,signal);this.junctions.delete(signal.node)}
   }
+  isJunction(node:number){return this.junctions.has(node)||this.signal.has(node)}
   inherit(previous:Traffic){
     this.time=previous.time
     for(const actor of previous.actors){
