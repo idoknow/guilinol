@@ -181,7 +181,7 @@ async function verifyViewportLayout(browser, baseUrl, label, viewport, hasTouch)
 }
 
 const server = await preview({
-  ...(mainDist && {build: {outDir: resolve(mainDist)}}),
+  ...((mainDist || process.env.QA_DIST) && {build: {outDir: resolve(mainDist || process.env.QA_DIST)}}),
   root: resolve(ROOT, 'web'),
   configFile: resolve(ROOT, 'web/vite.config.ts'),
   preview: {host: '127.0.0.1', port: 0},
