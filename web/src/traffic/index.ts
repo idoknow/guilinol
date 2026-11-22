@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import {MAX_ACTORS,Traffic,type Graph} from './sim'
+import {MAX_ACTORS,MOBILE_ACTORS,Traffic,type Graph} from './sim'
 import {curbside,staticSolids,useTrafficSolids,type Solid,contactSamples,sampleContacts} from './contact'
 import {trafficModels,trafficMaterial,type Variant} from './models'
 
@@ -12,7 +12,7 @@ async function loadGraph(key:string){
   const signature=new Uint8Array(bytes,0,2)
   const body=signature[0]===31&&signature[1]===139?new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')):bytes
   const decoded=await new Response(body).arrayBuffer()
-  const graph:Graph=JSON.parse(new TextDecoder().decode(decoded)),sim=new Traffic(graph)
+  const graph:Graph=JSON.parse(new TextDecoder().decode(decoded)),sim=new Traffic(graph,Math.random,matchMedia('(pointer:coarse)').matches?MOBILE_ACTORS:MAX_ACTORS)
   const timing=performance.getEntriesByName(response.url).at(-1) as PerformanceResourceTiming|undefined
   return {sim,sample:{key,encodedBytes:timing?.encodedBodySize||bytes.byteLength,decodedBytes:decoded.byteLength,downloadMs:downloaded-start,parseAndIndexMs:performance.now()-downloaded}}
 }
@@ -20,7 +20,7 @@ async function loadGraph(key:string){
 export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boolean){
   const index=await fetch('/world/roads/cells.json')
   if(!index.ok)throw Error(`traffic cells: ${index.status}`)
-  const cells=new Set<string>(await index.json()),object=new THREE.Object3D()
+  const cells=new Set<string>(await index.json())
   let sim:Traffic|undefined,key=''
   const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(),new THREE.MeshLambertMaterial({color:0x999999}),MAX_ACTORS)
   const frustum=new THREE.Frustum(),projection=new THREE.Matrix4(),point=new THREE.Vector3()
@@ -40,10 +40,14 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   for(let slot=0;slot<SLOTS;slot++){batch.addInstance(geometryIds[0]);batch.setVisibleAt(slot,false)}
   const variants=new WeakMap<object,Variant>()
   const pose=new THREE.Object3D();pose.rotation.order='YXZ'
+  const transforms=new Float64Array(SLOTS*6).fill(NaN)
   const show=(slot:number,variant:Variant,x:number,y:number,z:number,yaw:number,scale:number,down=false)=>{
     if(slotGeometry[slot]!==variant.geometry){batch.setGeometryIdAt(slot,geometryIds[variant.geometry]);slotGeometry[slot]=variant.geometry}
     if(slotPaint[slot]!==variant.paint){batch.setColorAt(slot,variant.paint);slotPaint[slot]=variant.paint}
     if(!slotShown[slot]){batch.setVisibleAt(slot,true);slotShown[slot]=1}
+    const offset=slot*6
+    if(transforms[offset]===x&&transforms[offset+1]===y&&transforms[offset+2]===z&&transforms[offset+3]===yaw&&transforms[offset+4]===scale&&transforms[offset+5]===Number(down))return
+    transforms[offset]=x;transforms[offset+1]=y;transforms[offset+2]=z;transforms[offset+3]=yaw;transforms[offset+4]=scale;transforms[offset+5]=Number(down)
     pose.position.set(x,y+(down?.16:0),z);pose.rotation.set(down?-Math.PI/2:0,yaw,0);pose.scale.setScalar(Math.max(scale,.001))
     pose.updateMatrix();batch.setMatrixAt(slot,pose.matrix)
   }
@@ -107,10 +111,6 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     let motors=0,queued=0,redStops=0
     if(verify){mesh.userData.motorIds.length=0;mesh.userData.approaches=[];mesh.userData.allMotors=[]}
     sim.actors.forEach((actor,index)=>{
-      if(actor.kind==='car')object.scale.set(1.75,1.3,4)
-      else if(actor.kind==='scooter')object.scale.set(.6,1,1.65)
-      else object.scale.set(.5,actor.down>0?.35:1.6,actor.down>0?1.6:.5)
-      object.scale.multiplyScalar(actor.scale)
       if(verify&&actor.kind!=='person'&&actor.scale>=.99)mesh.userData.allMotors.push(index)
       if(verify&&actor.kind!=='person'&&visible(actor)&&actor.scale>=.99){
         motors++;mesh.userData.motorIds.push(index)
@@ -118,8 +118,6 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
           gap:actor.track.length-actor.dist,green:sim!.green(actor.track)})
         if(actor.speed<.1){queued++;if(actor.track.length-actor.dist<5&&!sim!.green(actor.track))redStops++}
       }
-      object.position.set(actor.x,actor.y+object.scale.y/2,actor.z);object.rotation.y=actor.yaw
-      object.updateMatrix();mesh.setMatrixAt(index,object.matrix)
       let variant=variants.get(actor)
       if(!variant){variant=models.variant(actor.kind,Math.random(),Math.random());variants.set(actor,variant)
         const geometry=models.geometries[variant.geometry];if(!geometry.boundingBox)geometry.computeBoundingBox()
@@ -128,7 +126,6 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       show(index,variant,actor.x,actor.y,actor.z,actor.yaw,actor.scale,actor.kind==='person'&&actor.down>0)
     })
     hide(sim.actors.length,STATIC)
-    mesh.instanceMatrix.needsUpdate=true
     if(verify)Object.assign(mesh.userData,{motors,queued,redStops})
   }
 }

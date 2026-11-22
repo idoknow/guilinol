@@ -30,7 +30,7 @@ const OUT_FILE = process.env.PERF_OUT ?? 'captures/perf.json'
 
 const native=process.platform==='darwin' && process.env.QA_NATIVE_GPU!=='0'
 const mobile=process.env.PERF_MOBILE==='1'
-const viewport=mobile?{width:390,height:844}:native?{width:1920,height:1080}:{width:960,height:540}
+const viewport=mobile?{width:844,height:390}:native?{width:1920,height:1080}:{width:960,height:540}
 const launch={headless:!native,executablePath:process.env.CHROMIUM,args:[...(native?['--enable-gpu','--use-angle=metal']:['--use-angle=swiftshader','--enable-unsafe-swiftshader']),'--enable-precise-memory-info']}
 const cpuRate = Number(process.env.PERF_CPU_RATE ?? (mobile?4:1))
 const sampleMs=Number(process.env.PERF_MS??(native?10000:0))
@@ -122,7 +122,7 @@ try {
         const tick=viewer.walk.tick.bind(viewer.walk)
         viewer.walk.tick=elapsed=>{tick(elapsed);viewer.camera.position.set(-265,168,15);viewer.camera.lookAt(-145,153,45);viewer.camera.updateMatrixWorld()}
       })
-      if(process.env.PERF_BASELINE!=='1')await page.waitForFunction(()=>window.viewer.trafficProbe?.motors>=30,null,{timeout:180000})
+      if(trafficQuery)await page.waitForFunction(()=>window.viewer.trafficProbe?.motors>=30,null,{timeout:180000})
     }
     await page.waitForFunction(mode => {
       const viewer = window.viewer
@@ -139,6 +139,7 @@ try {
     }, cam.mode, {timeout: 120000})
 
     const loadMs = Math.round(performance.now()-started)
+    if(process.env.PERF_TRACE)await browser.startTracing(page,{path:`${process.env.PERF_TRACE}-${cam.id}.json`,categories:['devtools.timeline','blink.user_timing','disabled-by-default-v8.cpu_profiler']})
     const metrics = await page.evaluate(async ([sampleCount,minMs]) => {
       function nextRaf() {
         return new Promise(resolve => requestAnimationFrame(resolve))
@@ -186,6 +187,7 @@ try {
         textureMB: mem.textureMB,
       }
     }, [SAMPLE_FRAMES,sampleMs])
+    if(process.env.PERF_TRACE)await browser.stopTracing()
 
     if (expansion) {
       const dir = 'captures/expansion'

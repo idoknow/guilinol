@@ -19,6 +19,7 @@ export type Track = Lane & {start:Node,end:Node,dx:number,dz:number,yaw:number,l
 type Actor = {track:Track,dist:number,speed:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,holdUntil?:number}
 type Position = {x:number,z:number,y:number}
 export const MAX_ACTORS=100
+export const MOBILE_ACTORS=80
 const distanceSq=(left:Position,right:Position)=>(left.x-right.x)**2+(left.y-right.y)**2+(left.z-right.z)**2
 
 export class Traffic {
@@ -76,7 +77,7 @@ export class Traffic {
         }
       }
     }
-    const budget=street?MAX_ACTORS-(quota[0]>=60?12:20):60
+    const budget=street?this.actorLimit-(quota[0]>=60?12:20):60
     const primary=street?Math.min(quota[0],budget):0
     if(street)quota[0]=0
     const factor=Math.min(1,(budget-primary)/Math.max(1,quota.reduce((a,b)=>a+b,0)))
@@ -84,7 +85,9 @@ export class Traffic {
     this.limits=quota.map(value=>{const before=Math.round(sum);sum+=value*factor;return Math.round(sum)-before})
     this.limits[0]+=Math.round(primary)
   }
-  constructor(graph:Graph,random=Math.random){
+  private actorLimit:number
+  constructor(graph:Graph,random=Math.random,actorLimit=MAX_ACTORS){
+    this.actorLimit=actorLimit
     this.random=random
     const nodes=new Map(graph.nodes.map(node=>[node.id,node]))
     const add=(lane:Lane,walk:boolean)=>{
@@ -145,7 +148,7 @@ export class Traffic {
     this.updateLimits(camera,!!visible)
     const counts=[0,0,0,0]
     let outside=0
-    const cap=visible?MAX_ACTORS:80,canSpawn=this.actors.length<cap
+    const cap=visible?this.actorLimit:80,canSpawn=this.actors.length<cap
     const rebalance=visible&&this.time>=this.rebalanceAt
     const nearbySectors=(canSpawn||rebalance)&&visible?new Uint8Array(8):null
     const sectorPopulation=nearbySectors?new Uint8Array(8):null

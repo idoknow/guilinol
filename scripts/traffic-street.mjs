@@ -21,7 +21,9 @@ const server=await preview({root:'web',configFile:'web/vite.config.ts',build:{ou
 let browser
 try{
   browser=await chromium.launch(browserOptions())
-  const page=await browser.newPage({viewport:{width:800,height:450}})
+  const mobile=process.env.PERF_MOBILE==='1'
+  const page=await browser.newPage(mobile?{viewport:{width:844,height:390},deviceScaleFactor:3,isMobile:true,hasTouch:true}:{viewport:{width:800,height:450}})
+  if(mobile)await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate',{rate:4})
   page.on('pageerror',error=>console.error(error));page.on('console',msg=>{if(msg.type()==='error')console.error(msg.text().slice(-1500))})
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&traffic=1&flow=0&time=16&radius=480`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
