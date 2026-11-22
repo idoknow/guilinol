@@ -45,6 +45,7 @@
     "verify:tour": "node scripts/tour.mjs",
     "test:missions": "python3 scripts/test-mission-roads.py && tsx scripts/test-missions-economy.ts",
     "verify:missions": "node scripts/verify-missions.mjs",
+    "verify:pursuit": "node scripts/verify-pursuit.mjs",
     "check:flags": "node scripts/check-flags.mjs",
     "check:batcher": "node scripts/check-batcher.mjs",
     "check:commerce": "node scripts/check-commerce-foundation.mjs",

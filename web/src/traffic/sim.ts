@@ -3,11 +3,12 @@ type Lane = {id:number,from:number,to:number,offset:number,kind:'motor'|'bus'|'n
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?][],signals:Signal[]}
-type Track = Lane & {start:Node,end:Node,dx:number,dz:number,length:number,walk:boolean}
+export type Track = Lane & {start:Node,end:Node,dx:number,dz:number,length:number,walk:boolean}
 type Actor = {track:Track,dist:number,speed:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean}
 type Position = {x:number,z:number,y:number}
 
 export class Traffic {
+  *allTracks(){for(const list of this.exits.values())yield* list}
   actors:Actor[]=[]
   time=0
   private nextCull=0
@@ -59,16 +60,19 @@ export class Traffic {
     actor.y=track.start.y+(track.end.y-track.start.y)*dist/track.length
     actor.yaw=Math.atan2(track.dx,track.dz)
   }
-  green(track:Lane,time=this.time){
+  phase(track:Lane,time=this.time):'green'|'red'|'yellow'{
     const signal=this.signal.get(track.to)
-    if(!signal)return true
+    if(!signal)return 'green'
     const {phases,offset}=signal
     let local=(time+offset)%phases.reduce((sum,p)=>sum+p.green+p.yellow,0)
     for(const phase of phases){
-      if(local<phase.green+phase.yellow)return local<phase.green && phase.lanes.includes(track.id)
+      if(local<phase.green+phase.yellow)return !phase.lanes.includes(track.id)?'red':local<phase.green?'green':'yellow'
       local-=phase.green+phase.yellow
     }
-    return false
+    return 'red'
+  }
+  green(track:Lane,time=this.time){
+    return this.phase(track,time)==='green'
   }
   step(dt:number,camera:Position,vehicle?:Position,visible?:(point:Position)=>boolean){
     this.time+=dt
