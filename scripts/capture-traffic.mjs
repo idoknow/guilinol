@@ -8,13 +8,15 @@ const browser=await chromium.launch(browserOptions())
 try {
   const page=await browser.newPage({viewport:{width:960,height:540}})
   page.on('pageerror',console.error)
+  page.on('console',message=>{if(message.text().includes('Traffic unavailable'))console.error(message.text())})
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&flow=0&time=17`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
   await page.evaluate(()=>{
     const camera=window.viewer.camera
     camera.position.set(-265,168,15);camera.lookAt(-145,153,45);camera.updateMatrixWorld()
   })
-  await page.waitForFunction(()=>window.viewer.trafficCount>=22&&!window.viewer.stats.pending,null,{timeout:180000})
+  try {await page.waitForFunction(()=>window.viewer.trafficCount>=22&&!window.viewer.stats.pending,null,{timeout:180000})}
+  catch(error){console.error(await page.evaluate(()=>({count:window.viewer.trafficCount,camera:window.viewer.camera.position.toArray(),stats:window.viewer.stats})));throw error}
   await page.evaluate(()=>window.viewer.freeze())
   const count=await page.evaluate(()=>window.viewer.trafficCount)
   await mkdir('captures',{recursive:true})

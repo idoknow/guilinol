@@ -4,7 +4,10 @@ import {Traffic,type Graph} from './sim'
 export async function traffic(scene:THREE.Scene){
   const response=await fetch('/world/roads/graph.json.gz')
   if(!response.ok||!response.body)throw Error(`traffic graph: ${response.status}`)
-  const graph:Graph=await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).json()
+  const bytes=await response.arrayBuffer()
+  const signature=new Uint8Array(bytes,0,2)
+  const body=signature[0]===31&&signature[1]===139?new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')):bytes
+  const graph:Graph=await new Response(body).json()
   const sim=new Traffic(graph),object=new THREE.Object3D()
   const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(),new THREE.MeshLambertMaterial({color:0x999999}),38)
   mesh.name='G2 traffic';mesh.count=0;mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(mesh)
