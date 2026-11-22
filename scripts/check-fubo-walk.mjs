@@ -70,7 +70,9 @@ try{
         const stairCount=route.length
         if(name==='steps')route=[...route,...circuit]
         walk.leave()
-        if(!await walk.enter(...route[0],0,name))throw Error('Cannot enter '+name)
+        // Follow the upper flight from behind for the ascent photograph.
+        const heading=name==='steps'?Math.atan2(route[42][0]-route[44][0],route[42][1]-route[44][1]):0
+        if(!await walk.enter(...route[0],heading,name))throw Error('Cannot enter '+name)
         const until=performance.now()+60000
         while(![...stream.landmarks.keys()].some(e=>e.id==='fubo')){
           if(performance.now()>until)throw Error('Fubo collision mesh unavailable')

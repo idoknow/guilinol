@@ -37,6 +37,29 @@ def footprint(peak, data):
     return shapely.union_all(parts)
 
 
+def upper_contours(peak,data):
+    lod = peak['lods'][0]
+    xyz = np.frombuffer(data,'<i2',lod['vertices']*3,lod['offset']).reshape(-1,3)/100+peak['center']
+    faces = np.frombuffer(data,'<u2',lod['indices'],lod['indexOffset']).reshape(-1,3)
+    result = []
+    for level in (165,180,190,200):
+        pieces = []
+        for tri in xyz[faces]:
+            if tri[:,1].max()<=level:
+                continue
+            outline = []
+            for a,b in zip(tri,np.roll(tri,-1,axis=0)):
+                if a[1]>=level:
+                    outline.append(a[::2])
+                if (a[1]>level>b[1]) or (a[1]<level<b[1]):
+                    outline.append((a+(b-a)*(level-a[1])/(b[1]-a[1]))[::2])
+            if len(outline)>=3:
+                pieces.append(Polygon(outline))
+        section = shapely.union_all(pieces,grid_size=.001)
+        result.append((level,section.area,sum(p.area>1 for p in shapely.get_parts(section))))
+    return result
+
+
 def support_sampler(surface):
     """Compare textured trail triangles with the 4 m walk collider and PK02."""
     entry = surface.entries['fubo']
@@ -220,8 +243,9 @@ def verify(output=Path(OUT)):
             clearance = min(shape.distance(line) for line in footways)
             solidity = shape.area/shape.convex_hull.area
             inside = shape.intersection(stair).length
+            contours = upper_contours(peak,data)
             summary = (shape.area,solidity,width,center_offset,osm_offset,clearance,inside,rise,span,width_relief)
-            fubo_valid = (len(platforms)>0 and shape.geom_type=='Polygon' and shape.area>=5000 and solidity>=.85
+            fubo_valid = (all(n==1 for _,_,n in contours) and len(platforms)>0 and shape.geom_type=='Polygon' and shape.area>=5000 and solidity>=.85
                           and width>=45 and width_relief>=1.6 and max(center_offset,osm_offset)<=40 and clearance>=1 and inside>=stair.length/2
                           and rise>0 and shape.bounds[2]<=-50.9142 and river_area>0)
     if river_area is not None:
@@ -239,6 +263,9 @@ def verify(output=Path(OUT)):
     if fubo_area is not None:
         print('伏波山形态\tarea_m2\tsolidity\tmin_width_m\tcenter_offset_m\tOSM_node_offset_m\tfootway_gap_m\tstairs_inside_m\tstairs_rise_m\tmax_span_m\tspan/relief')
         print('伏波山\t'+'\t'.join(f'{v:.3f}' for v in summary))
+        print('伏波山等高截面\televation_m\tarea_m2\tcomponents_over_1m2')
+        for level,area_m2,count in contours:
+            print(f'伏波山\t{level}\t{area_m2:.2f}\t{count}')
     return (fubo_area is None or (fubo_area == 0 and fubo_valid)) and all(
         m is None or (m[1]>=-.3 and m[2]<=.3 and m[3]<=8 and m[4]<=.001 and m[6]<1e-6) for _,_,_,m in platforms_report) and all(
         low>=-.3 and high<=.3 for _,_,low,high in fubo_trails)
