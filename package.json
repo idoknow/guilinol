@@ -6,6 +6,7 @@
   "scripts": {
     "verify:cloud-save": "tsx scripts/verify-cloud-save.mjs",
     "verify:loading": "node scripts/verify-loading.mjs",
+    "verify:qq": "node scripts/verify-qq-entry.mjs",
     "verify:admin": "node scripts/auth-test.mjs --admin-ui",
     "test:bridge": "node scripts/auth-test.mjs --bridge",
     "dev:full": "npm run build && wrangler d1 migrations apply glol --local && wrangler pages dev dist --binding EMAIL_DEV_LOG=1",

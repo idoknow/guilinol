@@ -107,6 +107,18 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .guide-keys ul{margin:0;padding:0;list-style:none;display:grid;gap:6px;font-size:13px;line-height:1.6;color:rgba(244,239,226,.9)}
 kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-radius:5px;text-align:center;font:600 11.5px/1.5 ui-monospace,monospace;color:var(--ui-ink-800);background:var(--ui-paper);box-shadow:0 2px 0 rgba(244,239,226,.35)}
 
+/* QQ 群（IDOK-156）：群分享卡本身是深色圆角卡，直接嵌进玻璃面板；群号一行可复制。 */
+.about-mask>.about-panel.qq{width:min(400px,100%);max-height:min(92vh,760px)}
+.qq-body{display:grid;justify-items:center;gap:12px;padding:16px 18px 20px}
+.qq-code{display:block;width:100%;max-width:min(320px,100%);height:auto;max-height:min(58vh,500px);object-fit:contain;border-radius:18px;
+  box-shadow:0 10px 30px rgba(6,10,10,.4),0 0 0 1px var(--ui-glass-line-soft)}
+.qq-note{margin:0;font-size:13px;line-height:1.7;letter-spacing:.04em;text-align:center;color:var(--ui-paper-dim)}
+.qq-row{display:flex;align-items:center;gap:10px;width:100%;max-width:320px;box-sizing:border-box;padding:6px 6px 6px 14px;border-radius:var(--ui-r-pill);
+  background:rgba(244,239,226,.06);border:1px solid var(--ui-glass-line-soft)}
+.qq-label{flex:none;font-size:12px;letter-spacing:.2em;color:var(--ui-jade-300)}
+.qq-num{flex:1;min-width:0;font:700 18px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;color:var(--ui-paper);user-select:all;-webkit-user-select:all}
+.qq-copy{flex:none;min-width:96px}
+
 @media (max-width:760px){
   .home-shade{background:linear-gradient(0deg,rgba(20,33,30,.92) 0,rgba(20,33,30,.7) 46%,rgba(20,33,30,.15) 74%,rgba(20,33,30,.35) 100%)}
   .home-main{justify-content:flex-end;min-height:calc(100dvh - 110px);padding-top:40px;gap:20px;width:100%}
