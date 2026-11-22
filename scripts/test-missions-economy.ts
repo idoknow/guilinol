@@ -14,6 +14,7 @@ const memStorage = new MemoryStorage()
 Object.defineProperty(globalThis, 'localStorage', {value: memStorage, configurable: true})
 
 const {QUIET_ZONES, findQuietZoneAt, isPointInQuietZones} = await import('../web/src/game/quiet-zones')
+const {getCarFreeAt,vehicleForbiddenAt} = await import('../web/src/game/car-free')
 const {MISSIONS, auditMissionsAgainstQuietZones} = await import('../web/src/missions')
 const catalog = await import('../web/src/game/catalog')
 const saveMod = await import('../web/src/game/save')
@@ -177,7 +178,7 @@ const runMissionToEnd = (missionId: string, opts?: {freezeMidway?: boolean}) => 
       dt: 0.05,
       x: st.at[0],
       z: st.at[1],
-      mode: 'ebike',
+      mode: missionId === 'errand-01' ? 'foot' : 'ebike',
       speedMs: 5,
       braking: false,
       parkLocked: false,
@@ -186,6 +187,10 @@ const runMissionToEnd = (missionId: string, opts?: {freezeMidway?: boolean}) => 
   }
 }
 
+for(const [x,z] of [[-588,-212],[-578,-206]]){
+  assert.equal(getCarFreeAt(x,z),'东西巷');assert.ok(vehicleForbiddenAt(x,z));assert.equal(findQuietZoneAt(x,z),null)
+}
+assert.equal(getCarFreeAt(-632.2,46.9),'正阳步行街')
 runMissionToEnd('errand-01')
 assert.equal(stateMod.getState().money, 380, '200 + 180 first clear')
 runMissionToEnd('noodle-01', {freezeMidway: true})

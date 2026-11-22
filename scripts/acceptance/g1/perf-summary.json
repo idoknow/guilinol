@@ -1,0 +1,367 @@
+[
+  {
+    "view": "overview",
+    "metric": "calls",
+    "main": 12,
+    "PR": 12,
+    "pass": true
+  },
+  {
+    "view": "overview",
+    "metric": "mirrorCalls",
+    "main": 11,
+    "PR": 11,
+    "pass": true
+  },
+  {
+    "view": "overview",
+    "metric": "triangles",
+    "main": 68902,
+    "PR": 68902,
+    "pass": true
+  },
+  {
+    "view": "overview",
+    "metric": "mirrorTriangles",
+    "main": 60402,
+    "PR": 60402,
+    "pass": true
+  },
+  {
+    "view": "overview",
+    "metric": "geometries",
+    "main": 12,
+    "PR": 12,
+    "pass": true
+  },
+  {
+    "view": "overview",
+    "metric": "textures",
+    "main": 11,
+    "PR": 11,
+    "pass": true
+  },
+  {
+    "view": "overview",
+    "metric": "heap",
+    "main": 17565800,
+    "PR": 17610160,
+    "pass": true
+  },
+  {
+    "view": "lijiang",
+    "metric": "calls",
+    "main": 29,
+    "PR": 29,
+    "pass": true
+  },
+  {
+    "view": "lijiang",
+    "metric": "mirrorCalls",
+    "main": 26,
+    "PR": 26,
+    "pass": true
+  },
+  {
+    "view": "lijiang",
+    "metric": "triangles",
+    "main": 328451,
+    "PR": 328451,
+    "pass": true
+  },
+  {
+    "view": "lijiang",
+    "metric": "mirrorTriangles",
+    "main": 314305,
+    "PR": 314305,
+    "pass": true
+  },
+  {
+    "view": "lijiang",
+    "metric": "geometries",
+    "main": 30,
+    "PR": 30,
+    "pass": true
+  },
+  {
+    "view": "lijiang",
+    "metric": "textures",
+    "main": 25,
+    "PR": 25,
+    "pass": true
+  },
+  {
+    "view": "lijiang",
+    "metric": "heap",
+    "main": 32543732,
+    "PR": 32505404,
+    "pass": true
+  },
+  {
+    "view": "palace",
+    "metric": "calls",
+    "main": 47,
+    "PR": 47,
+    "pass": true
+  },
+  {
+    "view": "palace",
+    "metric": "mirrorCalls",
+    "main": 42,
+    "PR": 42,
+    "pass": true
+  },
+  {
+    "view": "palace",
+    "metric": "triangles",
+    "main": 330127,
+    "PR": 330127,
+    "pass": true
+  },
+  {
+    "view": "palace",
+    "metric": "mirrorTriangles",
+    "main": 319969,
+    "PR": 319969,
+    "pass": true
+  },
+  {
+    "view": "palace",
+    "metric": "geometries",
+    "main": 47,
+    "PR": 47,
+    "pass": true
+  },
+  {
+    "view": "palace",
+    "metric": "textures",
+    "main": 31,
+    "PR": 31,
+    "pass": true
+  },
+  {
+    "view": "palace",
+    "metric": "heap",
+    "main": 59658932,
+    "PR": 59670716,
+    "pass": true
+  },
+  {
+    "view": "south",
+    "metric": "calls",
+    "main": 28,
+    "PR": 28,
+    "pass": true
+  },
+  {
+    "view": "south",
+    "metric": "mirrorCalls",
+    "main": 25,
+    "PR": 25,
+    "pass": true
+  },
+  {
+    "view": "south",
+    "metric": "triangles",
+    "main": 189141,
+    "PR": 189141,
+    "pass": true
+  },
+  {
+    "view": "south",
+    "metric": "mirrorTriangles",
+    "main": 173633,
+    "PR": 173633,
+    "pass": true
+  },
+  {
+    "view": "south",
+    "metric": "geometries",
+    "main": 28,
+    "PR": 28,
+    "pass": true
+  },
+  {
+    "view": "south",
+    "metric": "textures",
+    "main": 21,
+    "PR": 21,
+    "pass": true
+  },
+  {
+    "view": "south",
+    "metric": "heap",
+    "main": 31720712,
+    "PR": 31733456,
+    "pass": true
+  },
+  {
+    "view": "walk-palace",
+    "metric": "calls",
+    "main": 60,
+    "PR": 55,
+    "pass": true
+  },
+  {
+    "view": "walk-palace",
+    "metric": "mirrorCalls",
+    "main": 51,
+    "PR": 51,
+    "pass": true
+  },
+  {
+    "view": "walk-palace",
+    "metric": "triangles",
+    "main": 411963,
+    "PR": 409435,
+    "pass": true
+  },
+  {
+    "view": "walk-palace",
+    "metric": "mirrorTriangles",
+    "main": 398939,
+    "PR": 398939,
+    "pass": true
+  },
+  {
+    "view": "walk-palace",
+    "metric": "geometries",
+    "main": 59,
+    "PR": 55,
+    "pass": true
+  },
+  {
+    "view": "walk-palace",
+    "metric": "textures",
+    "main": 37,
+    "PR": 37,
+    "pass": true
+  },
+  {
+    "view": "walk-palace",
+    "metric": "heap",
+    "main": 112980488,
+    "PR": 113082460,
+    "pass": true
+  },
+  {
+    "view": "overview",
+    "metric": "p95 ms",
+    "main": 316.6000000000022,
+    "PR": 350,
+    "noise": 133.39999999999782,
+    "p95s": [
+      [
+        316.6000000000022,
+        400,
+        316.59999999999854,
+        266.7000000000007,
+        400.09999999999854
+      ],
+      [
+        366.7000000000007,
+        349.90000000000146,
+        350,
+        350,
+        383.3999999999978
+      ]
+    ],
+    "pass": true
+  },
+  {
+    "view": "lijiang",
+    "metric": "p95 ms",
+    "main": 1149.9000000000015,
+    "PR": 1166.5999999999985,
+    "noise": 383.4999999999927,
+    "p95s": [
+      [
+        1149.9000000000015,
+        1366.6000000000058,
+        999.9000000000015,
+        1116.699999999997,
+        1383.3999999999942
+      ],
+      [
+        1050,
+        1166.5999999999985,
+        1316.699999999997,
+        1300,
+        516.5999999999985
+      ]
+    ],
+    "pass": true
+  },
+  {
+    "view": "palace",
+    "metric": "p95 ms",
+    "main": 783.2999999999956,
+    "PR": 783.3000000000029,
+    "noise": 116.80000000000291,
+    "p95s": [
+      [
+        783.2999999999956,
+        783.4000000000015,
+        666.5999999999985,
+        783.3000000000029,
+        766.7000000000044
+      ],
+      [
+        816.5999999999985,
+        800,
+        583.2999999999956,
+        783.3000000000029,
+        783.2000000000044
+      ]
+    ],
+    "pass": true
+  },
+  {
+    "view": "south",
+    "metric": "p95 ms",
+    "main": 383.40000000000146,
+    "PR": 450,
+    "noise": 83.20000000000073,
+    "p95s": [
+      [
+        433.2999999999993,
+        399.8999999999978,
+        383.40000000000146,
+        350.09999999999854,
+        383.40000000000146
+      ],
+      [
+        466.7000000000007,
+        383.3000000000029,
+        450,
+        450,
+        399.90000000000146
+      ]
+    ],
+    "pass": true
+  },
+  {
+    "view": "walk-palace",
+    "metric": "p95 ms",
+    "main": 833.1999999999971,
+    "PR": 816.7000000000044,
+    "noise": 983.2000000000044,
+    "p95s": [
+      [
+        833.1999999999971,
+        1766.5,
+        816.5999999999985,
+        849.9000000000015,
+        783.2999999999956
+      ],
+      [
+        849.9000000000015,
+        1400,
+        583.4000000000015,
+        816.7000000000044,
+        800
+      ]
+    ],
+    "pass": true
+  }
+]

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {vehicleForbiddenAt} from './game/car-free'
 import {buildingMaterial} from './look/buildings'
 import {bridgeMaterial} from './look/bridge'
 import {WATER_LAYER, waterMaterial} from './look/water'
@@ -31,6 +32,8 @@ interface IndexedSlice {
   vertexStart:number
   count:number
 }
+
+export type ParkedBike={id:string;x:number;y:number;z:number;yaw:number}
 
 const WORLD_SPHERE = new THREE.Sphere(new THREE.Vector3(0,200,0),25000)
 
@@ -251,6 +254,37 @@ export class ChunkBatcher {
 
   private furniture:THREE.InstancedMesh|null = null
   private parked:THREE.InstancedMesh|null = null
+  private takenBikes=new Set<string>()
+
+  nearestBike(x:number,z:number,footY:number|undefined,reach:number):ParkedBike|null {
+    let nearest:ParkedBike|null=null, best=reach*reach
+    for(const {tile,parked} of this.items.values()){
+      if(x<tile.x-reach||x>tile.x+256+reach||z<tile.z-reach||z>tile.z+256+reach)continue
+      for(let offset=0;offset<parked.length;offset+=16){
+        const east=parked[offset+12],height=parked[offset+13],south=parked[offset+14]
+        const distance=(east-x)**2+(south-z)**2
+        if(distance>=best||footY!==undefined&&Math.abs(footY-height)>1.5)continue
+        const id=`${tile.x}:${tile.z}:${offset/16}`
+        if(this.takenBikes.has(id)||vehicleForbiddenAt(east,south))continue
+        nearest={id,x:east,y:height,z:south,yaw:Math.atan2(parked[offset+8],parked[offset+10])};best=distance
+      }
+    }
+    return nearest
+  }
+
+  takeBike(id:string){
+    if(this.takenBikes.has(id))return false
+    const [east,south,index]=id.split(':').map(Number)
+    if(!Number.isInteger(index)||index<0||id!==`${east}:${south}:${index}`)return false
+    for(const {tile,parked} of this.items.values()){
+      if(tile.x!==east||tile.z!==south||index>=parked.length/16)continue
+      if(vehicleForbiddenAt(parked[16*index+12],parked[16*index+14]))return false
+      this.takenBikes.add(id);this.furnitureStale=true;return true
+    }
+    return false
+  }
+
+  returnBike(id:string){if(this.takenBikes.delete(id))this.furnitureStale=true}
   private lastFurnitureMask = ''
   private furnitureStale = false
   private lastFurniturePos = new THREE.Vector3(Infinity,Infinity,Infinity)
@@ -378,7 +412,7 @@ export class ChunkBatcher {
           for(let index=0;index<item.railLodCount;index++)if(near(item.furnitureMatrices,index,120))boxes.push(index)
         }
         if(tileDistance<=32){
-          for(let index=0;index<item.parked.length/16;index++)if(near(item.parked,index))bikes.push(index)
+          for(let index=0;index<item.parked.length/16;index++)if(near(item.parked,index)&&(!this.takenBikes.size||!this.takenBikes.has(`${tile.x}:${tile.z}:${index}`)))bikes.push(index)
           for(let index=item.railLodCount;index<item.detailCount;index++)if(near(item.furnitureMatrices,index))boxes.push(index)
         }
         return {item,bikes,boxes}

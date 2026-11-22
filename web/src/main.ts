@@ -34,7 +34,10 @@ let paused=false
 let modeReady = Promise.resolve()
 export const waitForMode = () => modeReady
 export function setPaused(on:boolean){paused=on}
+import {mountDevHud} from './ui/hud-dev'
+
 async function start() {
+  mountDevHud()
   loadLocalSave(undefined, Date.now(), getPlayMode() === 'solo')
   const params = new URLSearchParams(location.search)
   const rangeStore = new RenderRangeStore(loadRenderConfig(params))

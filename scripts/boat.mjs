@@ -116,7 +116,7 @@ try {
     assert(ok, `无法在 (${x}, ${z}) 落脚 [${reason}]`)
   }
 
-  async function triggerAction(page, expectedText, mobile = false) {
+  async function triggerAction(page, expectedText, mobile = false, offshore = false) {
     await closeSpotCard(page)
     await page.waitForFunction(
       text => {
@@ -126,10 +126,40 @@ try {
       expectedText,
       {timeout: 15000},
     )
+    if (offshore) await page.evaluate(isTouch => {
+      window.__offshoreReading = new Promise(resolve => {
+        window.addEventListener(isTouch ? 'click' : 'keydown', () => {
+          const start = performance.now()
+          let shown = null
+          function sample() {
+            const now = performance.now()
+            const toast = document.querySelector('.toast.show')
+            const visible = toast?.textContent.includes('离岸太远') && toast.checkVisibility({opacityProperty: true, visibilityProperty: true})
+            if (visible && shown === null) shown = now
+            if (shown === null ? now - start < 2000 : visible && now - shown < 1500) return
+            clearInterval(timer)
+            observer.disconnect()
+            resolve({delay: shown === null ? null : shown - start, duration: shown === null || !visible ? 0 : now - shown,
+              events: window.__boatToasts.map(({text, at}) => ({text, afterInput: at - start})),
+              toast: document.querySelector('.toast')?.outerHTML})
+          }
+          const observer = new MutationObserver(sample)
+          observer.observe(document.querySelector('.toast'), {subtree: true, attributes: true, childList: true, characterData: true})
+          const timer = setInterval(sample, 16)
+        }, {capture: true, once: true})
+      })
+    }, mobile)
     if (mobile) {
       await page.locator('.vehicle-action').tap()
     } else {
       await page.keyboard.press('f')
+    }
+    if (offshore) {
+      await page.evaluate(() => window.viewer.walk.tick(1 / 60))
+      const reading = await page.evaluate(() => window.__offshoreReading)
+      assert(reading.delay !== null && reading.delay <= 2000 && reading.duration >= 1500, `离岸提示显示异常: ${JSON.stringify(reading)}`)
+      console.log('离岸提示 (ms):', reading)
+      return
     }
     await page.evaluate(async () => {
       const {walk} = window.viewer
@@ -662,15 +692,8 @@ try {
     await steerTo([[-1260, 298], [-1300, 304]], {arriveDist: 3})
   })
   await clearToasts(page)
-  await triggerAction(page, '靠岸下船')
-  const midLakeDismount = await page.evaluate(() => ({
-    vehicle: window.viewer.walk.vehicle,
-    toastVisible: document.querySelector('.toast')?.classList.contains('show') ?? false,
-    toastText: document.querySelector('.toast')?.textContent ?? '',
-    events: [...window.__boatToasts],
-  }))
-  assert.equal(midLakeDismount.vehicle, 'boat', `湖心深水不应允许下船: ${JSON.stringify(midLakeDismount)}`)
-  assert(midLakeDismount.toastVisible && /岸|码头|太远/.test(midLakeDismount.toastText), `湖心拒下缺少提示: ${JSON.stringify(midLakeDismount)}`)
+  await triggerAction(page, '靠岸下船', false, true)
+  assert.equal(await page.evaluate(() => window.viewer.walk.vehicle), 'boat', '湖心深水不应允许下船')
 
   await runInPage(page, async ({steerTo, arg}) => {
     await steerTo([arg], {arriveDist: 2.8})
@@ -1111,8 +1134,7 @@ try {
   await runInPage(mobile, async ({steerTo}) => {
     await steerTo([[-1340, 304]], {arriveDist: 2.0})
   })
-  await triggerAction(mobile, '靠岸下船', true)
-  await mobile.waitForSelector('.toast.show', {state: 'visible', timeout: 5000})
+  await triggerAction(mobile, '靠岸下船', true, true)
   const toastHud = await measureHud(mobile, [
     '.toast.show', '.walk-ui .joystick', '.walk-ui .btn-view', '.vehicle-action',
     '.dock', '.sky-ui', 'output', '.hud-me',

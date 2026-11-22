@@ -201,7 +201,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const regions=new Map<Tile,Region>(), mountains=new Map<PeakColliderData,R.Collider>(), modelMountains=new Map<THREE.Object3D,R.Collider[]>(), kinds=new Map<number,Kind>()
   function add(desc:R.ColliderDesc,kind:Kind){const coll=world.createCollider(desc);kinds.set(coll.handle,kind);return coll}
   const thinDecks=new Set<number>()
-  function remove(coll:R.Collider){thinDecks.delete(coll.handle);kinds.delete(coll.handle);world.removeCollider(coll,false)}
+  const sources=new Map<number,string>()
+  function remove(coll:R.Collider){sources.delete(coll.handle);thinDecks.delete(coll.handle);kinds.delete(coll.handle);world.removeCollider(coll,false)}
   const trunks=new Map<import('../forest').Tree,R.Collider>()
   const landmarks=new Map<THREE.Group,R.Collider[]>()
   function sync(east:number,south:number){
@@ -239,7 +240,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
           filtered.push(i0,i1,i2)
         }
         const solidDesc=filtered.length?weldedIndexed(vertices,filtered):null
-        if(solidDesc)colliders.push(add(solidDesc,'landmark'))
+        if(solidDesc){const collider=add(solidDesc,'landmark');sources.set(collider.handle,`${entry.id}/${parent.name}/${node.name}`);colliders.push(collider)}
         const slabDesc=lowSlabs.length?weldedIndexed(vertices,lowSlabs):null
         if(slabDesc)colliders.push(add(slabDesc,'sidewalk'))
       })
@@ -269,7 +270,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         if(swDesc)colliders.push(add(swDesc.setTranslation(tile.x,0,tile.z),'sidewalk'))
         const filteredRoad=filterBridgeOverRoad(road,data.deck)
         const rdDesc=filteredRoad.length?weldedSurface(filteredRoad,null,data,.65,.8,1.8,4):null
-        if(rdDesc)colliders.push(add(rdDesc.setTranslation(tile.x,0,tile.z),'road'))
+        if(rdDesc){const collider=add(rdDesc.setTranslation(tile.x,0,tile.z),'road');sources.set(collider.handle,tile.file);colliders.push(collider)}
         for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=((top+endTop)/2-bottom)/10+1.25
           colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
       if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
@@ -469,5 +470,5 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
+  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
 }
