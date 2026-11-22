@@ -1,3 +1,4 @@
+import {getPlayMode} from '../game/play-mode'
 import R from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import {look} from '../look/config'
@@ -43,6 +44,7 @@ export function createCameraRig(sim:Physics) {
 
     focus.set(figurePos.x,focusY,figurePos.z)
     dir.set(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch))
+    if(getPlayMode()==='solo' && dir.y>0)desiredDist=Math.min(desiredDist,5/dir.y)
     goal.copy(focus).addScaledVector(dir,desiredDist)
 
     const anyDeck = hasStartDeck||sim.hasDeck(goal.x,goal.z)||sim.hasDeck((focus.x+goal.x)*.5,(focus.z+goal.z)*.5)

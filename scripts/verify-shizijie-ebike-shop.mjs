@@ -70,7 +70,7 @@ try {
   await page.route('**/favicon.ico', r => r.fulfill({status: 204}))
 
   // 1. Boot daytime walk mode and walk to Jiefang East Rd sidewalk facing「漓行电驴行 · 十字街总店」
-  await page.goto(`${baseUrl}/?verify&mode=walk&flow=0&time=10.5&radius=480`)
+  await page.goto(`${baseUrl}/?verify&solo=1&mode=walk&flow=0&time=10.5&radius=480`)
   await page.waitForFunction(() => window.viewer?.walk?.active && window.viewer?.game, null, {timeout: 90000})
 
   await page.evaluate(async () => {
@@ -156,12 +156,12 @@ try {
   await setHour(page, 11.0)
   await page.evaluate(() => window.viewer.walk.showFigure(true))
 
-  // 3. Full Map (`M`) shop marker + search + quick-nav teleport
+  // 3. Locate the shop on the solo map, then approach its ground trigger.
   await page.waitForSelector('.dock-map', {timeout: 30000})
   await page.click('.dock-map')
   await page.waitForSelector('.atlas.show', {timeout: 15000})
   const shopQuickBtn = page.locator('.atlas-shop-btn[data-shop="shop_shizijie_ebike"]')
-  assert.equal(await shopQuickBtn.count(), 1, 'full map must show quick-nav button for shop_shizijie_ebike')
+  assert.equal(await shopQuickBtn.isVisible(), false, 'solo map must hide shop teleport shortcuts')
   await page.fill('.atlas-search input', '电动车')
   await page.waitForSelector('.atlas-search ol li', {timeout: 5000})
   const searchResultText = await page.locator('.atlas-search ol li').first().textContent()
@@ -171,13 +171,10 @@ try {
   await page.waitForTimeout(250)
   await page.screenshot({path: join(outDir, '05-map-shop-marker.png')})
 
-  // Click「前往」in map popup -> verify teleport lands at storefront triggerPos facing sign
-  await page.click('.atlas-pop button')
-  await page.waitForFunction(() => {
-    const p = window.viewer?.walk?.position
-    const open = window.viewer?.tour?.map?.active
-    return !open && p && Math.hypot(p.x - (-780.05), p.z - (-160.08)) < 3.5
-  }, null, {timeout: 15000})
+  assert.equal(await page.locator('.atlas-pop [data-act=go]').isVisible(), false)
+  await page.click('.atlas-close')
+  await page.waitForSelector('.atlas', {state:'hidden'})
+  await page.evaluate(()=>window.viewer.walkTo(-780.05,-160.08,-0.2317,'shop-approach'))
   await settleFrames(page, 12)
 
   // 4. Verify [F] interact arbiter at storefront & open shop -> 360° live e-bike showcase

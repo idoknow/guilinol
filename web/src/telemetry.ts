@@ -1,3 +1,4 @@
+import {getPlayMode} from './game/play-mode'
 import {sessionMetrics, visitor, vitals} from './session-metrics'
 import type {WebGLRenderer} from 'three'
 
@@ -106,7 +107,7 @@ if (enabled) {
   else addEventListener('load',navigation,{once:true})
   Object.assign(context,visitor())
   const getVitals=vitals()
-  const checkpoint=()=>{record('session',session!.snapshot());const values=getVitals();if(Object.keys(values).length)record('vitals',values);report()}
+  const checkpoint=()=>{record('session',{...session!.snapshot(),playMode:getPlayMode()});const values=getVitals();if(Object.keys(values).length)record('vitals',values);report()}
   addEventListener('error',e=>fault('error',e.filename,e.lineno))
   addEventListener('unhandledrejection',e=>fault('rejection','',0,e.reason))
   setInterval(report,30000)

@@ -1,3 +1,4 @@
+import {getPlayMode} from '../game/play-mode'
 import {record} from '../telemetry'
 import type { Host } from '../play/host'
 import type { mapView } from '../play/map'
@@ -394,11 +395,12 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     }
     const refresh=async()=>{if(document.hidden||!timeline.isConnected)return;try{const latest=await api<Item>('feedback/'+id);if(timeline.isConnected)paintChat(latest)}catch{}}
     const timer=setInterval(refresh,15000);document.addEventListener('visibilitychange',refresh);const previous=dispose;dispose=()=>{clearInterval(timer);document.removeEventListener('visibilitychange',refresh);previous()}
-    if (item.view || item.status === 'live')
+    if (getPlayMode()==='tour' && (item.view || item.status === 'live'))
       button(
         actions,
         '飞过去看看',
         async () => {
+          if (getPlayMode()==='solo')return
           if (item.view) {
             await host.setView(item.view)
             dialog.close()

@@ -1,3 +1,4 @@
+import {getPlayMode,onPlayMode} from '../game/play-mode'
 import './street-hud.css'
 import {isGlobalHotkeyBlocked} from '../walk/input-guard'
 import {getState, onState} from '../game/state'
@@ -69,7 +70,7 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean; onApp?:(i
     wanted.querySelectorAll('i').forEach((pip,i)=>pip.classList.toggle('on', i < s.wanted))
     $('.st-clock').textContent = s.clock ? `${s.clock.time} · ${s.clock.weather}` : ''
     $('.st-phone-time').textContent = s.clock?.time ?? ''
-    const m = s.mission, box = $('.st-mission'); box.hidden = !m
+    const m = getPlayMode()==='solo' && s.mission, box = $('.st-mission'); box.hidden = !m
     if(m) {
       $('.st-line').textContent = m.title; $('.st-step').textContent = m.step
       const timer = $('.st-timer'); timer.hidden = m.timer===undefined; timer.textContent = m.timer!==undefined ? clockText(m.timer) : ''
@@ -90,9 +91,17 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean; onApp?:(i
     $('.st-quiet').hidden = !s.zone.quiet
     document.body.dataset.ride = s.vehicle ? s.vehicle.kind : 'foot'
   }
-  render(source.get())
+  function renderMode() {
+    const solo = getPlayMode()==='solo'
+    $('.st-money').hidden = !solo
+    $('.st-phone-cash').hidden = !solo
+    for(const id of ['jobs','wardrobe','garage']) $(`[data-app="${id}"]`).parentElement!.hidden = !solo
+    render(source.get())
+  }
+  renderMode()
+  const offMode = onPlayMode(renderMode)
   const off = source.on(render)
-  return {root, togglePhone, dispose(){off(); removeEventListener('keydown', onKeyDown); removeEventListener('game:event', onGameEvent); root.remove(); delete document.body.dataset.hud}}
+  return {root, togglePhone, dispose(){offMode(); off(); removeEventListener('keydown', onKeyDown); removeEventListener('game:event', onGameEvent); root.remove(); delete document.body.dataset.hud}}
 }
 
 export function gameStateHudSource():HudSource {
