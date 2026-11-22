@@ -33,9 +33,6 @@ export const KIND_LABEL:Record<ContribKind,{seal:string,label:string}> = {
   feedback:{seal:'言',label:'反馈'},
 }
 
-/** Logo 设计者。名字待确认前保持空串：卡片照常显示，名字处写「网上桂林成员」。 */
-export const LOGO_DESIGNER:string = ''
-
 const DEFAULT = defaultAvatar(1)
 const m = (a:Partial<Avatar>):Avatar => ({...DEFAULT, ...a})
 
@@ -45,6 +42,9 @@ export const contributors:Contributor[] = [
     {kind:'code', text:'城市与界面'},
     {kind:'photo', text:'实拍参考'},
     {kind:'feedback', text:'江边灯柱'},
+  ]},
+  {name:'唐援朝', github:'yxwyxw520', role:'Logo 设计', portrait:'tangyuanchao', avatar:m({eyes:1, face:2, skin:4}), items:[
+    {kind:'design', text:'像素 Logo'},
   ]},
   {name:'py Xie', github:'CheatAndei', role:'玩法与地标', portrait:'pyxie', avatar:DEFAULT, items:[
     {kind:'code', text:'人物与载具'},
@@ -72,6 +72,3 @@ export const contributors:Contributor[] = [
     {kind:'feedback', text:'按键错位'},
   ]},
 ]
-
-/** Logo 设计者没有对应账号时的头像 */
-export const LOGO_PORTRAIT = {portrait:'logo-designer', avatar:DEFAULT}
