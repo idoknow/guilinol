@@ -1,5 +1,9 @@
 import * as THREE from 'three'
 import {Traffic,type Graph} from './sim'
+import {getState} from '../game/state'
+import {useTrafficSolids} from './contact'
+import {onPlayMode} from '../game/play-mode'
+import type {Pursuit} from './pursuit'
 import {trafficModels,trafficMaterial,type Variant} from './models'
 
 async function loadGraph(key:string){
@@ -46,8 +50,11 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     pose.updateMatrix();batch.setMatrixAt(slot,pose.matrix)
   }
   const hide=(from:number,to:number)=>{for(let slot=from;slot<to;slot++)if(slotShown[slot]){batch.setVisibleAt(slot,false);slotShown[slot]=0}}
-  let accumulator=0
-  return (dt:number,vehicle?:THREE.Vector3,_player?:THREE.Vector3,_solo=false,enabled=true)=>{
+  const patrolVariant:Variant={geometry:models.police,paint:new THREE.Color(1,1,1)}
+  onPlayMode(mode=>{if(mode==='tour'){pursuit?.end('tour');police.count=0;police.visible=false;hide(PATROL,SLOTS)}})
+  let accumulator=0,pursuitDt=0
+  return (dt:number,vehicle?:THREE.Vector3,player?:THREE.Vector3,solo=false,enabled=true)=>{
+    useTrafficSolids(enabled?sim?.nearSolids:undefined)
     if(!enabled){mesh.count=0;hide(0,SLOTS);return}
     const target=`${Math.floor(camera.position.x/512)}_${Math.floor(camera.position.z/512)}`
     if(target!==key){
@@ -82,7 +89,10 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       object.position.set(actor.x,actor.y+object.scale.y/2,actor.z);object.rotation.y=actor.yaw
       object.updateMatrix();mesh.setMatrixAt(index,object.matrix)
       let variant=variants.get(actor)
-      if(!variant){variant=models.variant(actor.kind,Math.random(),Math.random());variants.set(actor,variant)}
+      if(!variant){variant=models.variant(actor.kind,Math.random(),Math.random());variants.set(actor,variant)
+        const geometry=models.geometries[variant.geometry];if(!geometry.boundingBox)geometry.computeBoundingBox()
+        const {min,max}=geometry.boundingBox!;actor.halfWidth=Math.max(-min.x,max.x);actor.halfLength=Math.max(-min.z,max.z);actor.height=max.y
+      }
       show(index,variant,actor.x,actor.y,actor.z,actor.yaw,actor.scale,actor.kind==='person'&&actor.down>0)
     })
     hide(sim.actors.length,SLOTS)

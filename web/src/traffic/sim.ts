@@ -4,7 +4,7 @@ type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?][],signals:Signal[]}
 export type Track = Lane & {start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean}
-type Actor = {track:Track,dist:number,speed:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean}
+type Actor = {track:Track,dist:number,speed:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,holdUntil?:number}
 type Position = {x:number,z:number,y:number}
 const distanceSq=(left:Position,right:Position)=>(left.x-right.x)**2+(left.y-right.y)**2+(left.z-right.z)**2
 
@@ -21,6 +21,14 @@ export class Traffic {
   private queues=new Map<number,Actor[]>()
   private exits=new Map<number,Track[]>()
   private cells=new Map<string,Track[]>()
+  private obstacles=new Map<number,(Position|Actor)[]>()
+  nearSolids=(x:number,z:number,visit:(actor:Actor)=>void)=>{
+    const col=Math.floor(x/16),row=Math.floor(z/16)
+    for(let east=col-1;east<=col+1;east++)for(let south=row-1;south<=row+1;south++){
+      const bin=this.obstacles.get(east*65536+south)
+      if(bin)for(const item of bin)if('kind' in item&&item.kind!=='person'&&Math.abs(item.x-x)<10&&Math.abs(item.z-z)<10)visit(item)
+    }
+  }
   private random:()=>number
   constructor(graph:Graph,random=Math.random){
     this.random=random
@@ -89,7 +97,7 @@ export class Traffic {
       const track=cell[Math.floor(this.random()*cell.length)]
       const scooter=scooters<Math.round((motors+1)*.36)
       if(track.walk!==walk || (!walk&&(track.kind==='bus'||(!scooter&&track.kind==='nonmotor'))))continue
-      const actor:Actor={track,dist:this.random()*track.length,speed:0,kind:walk?'person':scooter?'scooter':'car',down:0,dodge:0,x:0,y:0,z:0,yaw:0,scale:0,leaving:false}
+      const actor:Actor={track,dist:this.random()*track.length,speed:0,kind:walk?'person':scooter?'scooter':'car',down:0,dodge:0,x:0,y:0,z:0,yaw:0,scale:0,leaving:false,halfWidth:scooter?.3:.9,halfLength:scooter?.85:2.1,height:1.5}
       this.position(actor)
       if(distanceSq(actor,camera)>185**2 || this.actors.some(other=>(other.x-actor.x)**2+(other.z-actor.z)**2<(other.track.id===track.id?36:5)))continue
       this.actors.push(actor)
@@ -99,7 +107,7 @@ export class Traffic {
       const retained=queue.filter(actor=>this.actors.includes(actor)&&!actor.leaving&&(actor.track.to===node||actor.track.from===node&&actor.dist<6))
       if(retained.length)this.queues.set(node,retained);else this.queues.delete(node)
     }
-    const obstacles:Map<number,(Position|Actor)[]>=new Map()
+    const obstacles=this.obstacles;obstacles.clear()
     for(const obstacle of vehicle?[...this.actors,vehicle]:this.actors){
       const key=Math.floor(obstacle.x/16)*65536+Math.floor(obstacle.z/16)
       const bin=obstacles.get(key)
@@ -109,6 +117,7 @@ export class Traffic {
       const {track}=actor,person=actor.kind==='person'
       if(actor.leaving){actor.scale=Math.max(0,actor.scale-dt/.4);continue}
       actor.scale=Math.min(1,actor.scale+dt/.4)
+      if(actor.holdUntil&&actor.holdUntil>performance.now()){actor.speed=0;continue}
       const maxSpeed=(person?1.4:Math.min(track.speedKmh/3.6,actor.kind==='car'?12:7))
       let advance=Math.min(maxSpeed,actor.speed+dt*2)*dt
       if(actor.down>0){actor.down-=dt;continue}

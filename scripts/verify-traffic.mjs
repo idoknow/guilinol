@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {gunzipSync} from 'node:zlib'
 import {Traffic} from '../web/src/traffic/sim.ts'
+import {resolveContact,useTrafficSolids} from '../web/src/traffic/contact.ts'
 import {isPointInQuietZone} from '../web/src/game/quiet-zones.ts'
 
 const graph=JSON.parse(gunzipSync(readFileSync('public/world/roads/graph.json.gz')))
@@ -95,3 +96,23 @@ for(let frame=0;frame<280;frame++){
 assert.ok(held&&released,'first arrival owns the junction until the exit clears')
 assert.equal(fadeTicks,7);assert.equal(fixture.actors.length,0)
 console.log('FIFO / occupied exit / 400 ms dead-end fade: pass')
+
+for(const mode of ['walk','car']){
+  const solid={x:0,y:0,z:0,yaw:.87,halfWidth:.9,halfLength:2.1,height:1.5}
+  useTrafficSolids((_x,_z,visit)=>visit(solid))
+  const driving=mode==='car',radius=driving?2.12:.29
+  const forward={x:Math.sin(solid.yaw),z:Math.cos(solid.yaw)}
+  const point={x:-forward.x*6,y:0,z:-forward.z*6}
+  let maxDepth=0,contacts=0;const durations=[]
+  for(let frame=0;frame<180;frame++){
+    const travel=(driving?15:1.65)/60
+    point.x+=forward.x*travel;point.z+=forward.z*travel
+    const start=performance.now()
+    contacts+=Number(resolveContact(point,0,solid.yaw,driving?.86:radius,driving?radius:0))
+    durations.push(performance.now()-start)
+    maxDepth=Math.max(maxDepth,2.1+radius+point.x*forward.x+point.z*forward.z)
+  }
+  const {p95}=percentiles(durations);console.log({mode,contacts,maxDepth,p95})
+  assert.ok(contacts>0&&maxDepth<=.05&&p95<=.2)
+}
+useTrafficSolids()
