@@ -1,5 +1,6 @@
 import { invalid, Problem } from './auth'
 import { labels } from './feedback-contract'
+import { userSocialIdentities } from './social'
 
 export function audit(db: D1Database, actor: string, action: string, type: string, id: string, detail: object) {
   return db.prepare('INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail) SELECT ?,?,?,?,? WHERE changes()=1')
@@ -29,6 +30,23 @@ export async function setRole(db: D1Database, actor: string, id: string, role: u
 
 
 const pendingFilter = "(f.status='submitted' OR (f.status='need_info' AND EXISTS(SELECT 1 FROM feedback_messages m WHERE m.feedback_id=f.id AND m.author_kind='user' AND m.id>f.admin_read_id)))"
+
+/** 后台用户详情：账号信息 + 已绑定的第三方平台（不含 salt/digest，social_uid 只回后 6 位）。 */
+export async function adminUserDetail(db: D1Database, id: string) {
+  const json = (value: unknown, status = 200) =>
+    Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(id)) invalid()
+  const user = await db
+    .prepare(
+      `SELECT u.id,u.email,u.nickname,u.verified,u.role,u.created_at,
+      (SELECT count(*) FROM feedback WHERE user_id=u.id) feedback_count,
+      (SELECT max(submitted_at) FROM feedback WHERE user_id=u.id) last_submitted_at FROM users u WHERE u.id=?`,
+    )
+    .bind(id)
+    .first<Record<string, unknown>>()
+  if (!user) return json({ error: { code: 'not_found', message: '未找到用户' } }, 404)
+  return json({ user: { ...user, verified: !!user.verified }, social: await userSocialIdentities(db, id) })
+}
 
 export async function adminList(db: D1Database, path: string, params: URLSearchParams) {
   const json = (value: unknown) => Response.json(value, { headers: { 'Cache-Control': 'private, no-store' } })
