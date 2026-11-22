@@ -164,9 +164,11 @@ try {
       const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))]
       const mem = window.__glPerf.memory()
       const peakDraws = window.viewer.peaksStats?.calls ?? null
+      const percentile95=values=>{const sorted=[...(values??[])].sort((a,b)=>a-b);return sorted[Math.floor(sorted.length*.95)]??null}
       return {
         fps:+(1000/mean).toFixed(2), frameTimes, motors:window.viewer.trafficProbe?.motors??0,
         camera:window.viewer.camera.position.toArray(),
+        trafficStepP95:percentile95(window.viewer.trafficProbe?.stepMs),trafficContactP95:percentile95(window.viewer.trafficProbe?.contactMs),
         heapPeakBytes,
         meanMs: +mean.toFixed(2),
         medianMs: +median.toFixed(2),

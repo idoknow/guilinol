@@ -12,6 +12,7 @@ from shapely.ops import unary_union
 from shapely.prepared import prep
 
 from common import OUT, ll2xz, load_osm
+from traffic_parking import allowed, bake_parking
 from landmarks.jiefang_layout import SPAN_WAYS, deck_level
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -73,6 +74,8 @@ def bake(output, manifest):
     forbidden = prep(unary_union(banned))
     nodes, lanes, walks, incoming = {}, [], [], defaultdict(list)
     elements = load_osm()
+    parking_segments = []
+    sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
     for way in elements:
         tags = way.get('tags', {})
         kind = tags.get('highway', '').removesuffix('_link')
@@ -86,6 +89,13 @@ def bake(output, manifest):
         fallback = 3 if bridge_motor else 1 if single or kind in WALK else 2
         count = max(1, min(12, int(number(tags.get('lanes'), fallback))))
         size = min(4, max(2, number(tags.get('width'), count*(3.7 if bridge_motor else 3))/count))
+        paved = sections.get(way['id'], number(tags.get('width'), {'tertiary':10,'residential':6}.get(kind, 3)))
+        curb = 0
+        curb_sign = -1 if direction == '-1' else 1
+        if (kind == 'residential' and 1 <= count <= 2 and paved >= 3*count+2.1 and
+                allowed(tags, 'right' if curb_sign > 0 else 'left', kind)):
+            curb = min(2.4, paved-3*count)
+            size = (paved-curb)/count
         for idx, (start, end) in enumerate(zip(coords, coords[1:])):
             if not start or not end or not all(left <= x < left+width and top <= z < top+depth for x,z in (start,end)):
                 continue
@@ -112,8 +122,12 @@ def bake(output, manifest):
             for sign in ([-1] if direction=='-1' else [1] if single else [1,-1]):
                 head, tail = (start_id,end_id) if sign==1 else (end_id,start_id)
                 n = count if single else max(1, count//2 if sign==-1 else (count+1)//2)
+                shift = -curb_sign*sign*curb/2
+                outer = ((n-.5-(count/2 if single else 0))*size if count>1 else 0) + size/2 + shift
+                parking_segments.append((head, tail, way['id'], tags, kind, sign, outer, paved/2))
                 for slot in range(n):
                     offset = (slot+.5-(count/2 if single else 0))*size if count>1 else 0
+                    offset += shift
                     lane = dict(id=len(lanes), to=tail, width=size, offset=round(offset,2), kind='nonmotor' if kind=='cycleway' else 'bus' if kind=='busway' else 'motor',speedKmh=number(tags.get('maxspeed'),20 if kind in ('cycleway','service') else 40),oneway=single)
                     lane['from'] = head
                     lane['cls'] = kind
@@ -153,6 +167,7 @@ def bake(output, manifest):
         (dest.parent/f'{col}_{row}.json.gz').write_bytes(gzip.compress(json.dumps(cell,separators=(',',':')).encode(),mtime=0))
     (dest.parent/'cells.json').write_text(json.dumps([f'{col}_{row}' for col,row in sorted(cells)]))
     print('Traffic:', {key:len(value) for key,value in result.items()}, dest.stat().st_size, 'bytes')
+    bake_parking(output, parking_segments, elements, nodes, forbidden)
 
 
 if __name__ == '__main__':

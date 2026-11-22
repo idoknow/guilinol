@@ -1,3 +1,4 @@
+import {resolveContact,staticSolids} from './contact.ts'
 type Node = {id:number,x:number,y:number,z:number}
 type Lane = {id:number,from:number,to:number,offset:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string}
 const tier=(cls?:string)=>cls==='primary'||cls==='trunk'?0:cls==='secondary'?1:cls==='tertiary'?2:3
@@ -106,7 +107,7 @@ export class Traffic {
   green(track:Lane,time=this.time){
     return this.phase(track,time)==='green'
   }
-  step(dt:number,camera:Position,vehicle?:Position){
+  step(dt:number,camera:Position,vehicle?:Position,visible?:(point:Position)=>boolean){
     this.time+=dt
     this.actors=this.actors.filter(actor=>(!actor.leaving||actor.scale>0)&&distanceSq(actor,camera)<210**2)
     let persons=0,scooters=0
@@ -115,6 +116,7 @@ export class Traffic {
     for(const actor of this.actors)if(actor.kind!=='person')counts[tier(actor.track.cls)]++
     for(const actor of this.actors){persons+=Number(actor.kind==='person');scooters+=Number(actor.kind==='scooter')}
     let motors=this.actors.length-persons
+    let outside=visible?this.actors.reduce((count,actor)=>count+Number(actor.kind!=='person'&&!visible(actor)),0):0
     for(let attempt=0;attempt<48 && this.actors.length<80;attempt++){
       const walk=persons<20 && (motors>=60||attempt%3===0)
       if(!walk&&motors>=60)continue
@@ -127,9 +129,12 @@ export class Traffic {
       if(track.walk!==walk || (!walk&&(track.kind==='bus'||(!scooter&&track.kind==='nonmotor'))))continue
       const actor:Actor={track,dist:this.random()*track.length,speed:0,kind:walk?'person':scooter?'scooter':'car',down:0,dodge:0,x:0,y:0,z:0,yaw:0,scale:0,leaving:false,halfWidth:scooter?.3:.9,halfLength:scooter?.85:2.1,height:1.5}
       this.position(actor)
+      const offscreen=!walk&&visible&&!visible(actor)
+      if(offscreen&&outside>=27&&this.limits[0]>=30&&this.random()>.04)continue
+      if(!walk&&resolveContact(actor,actor.y,actor.yaw,actor.halfWidth,actor.halfLength,staticSolids))continue
       if(distanceSq(actor,camera)>185**2 || this.actors.some(other=>(other.x-actor.x)**2+(other.z-actor.z)**2<(other.track.id===track.id?36:5)))continue
       this.actors.push(actor)
-      if(walk)persons++;else {counts[group]++;motors++;scooters+=Number(scooter)}
+      if(walk)persons++;else {counts[group]++;motors++;scooters+=Number(scooter);outside+=Number(!!offscreen)}
     }
     for(const [node,queue] of this.queues){
       const retained=queue.filter(actor=>this.actors.includes(actor)&&!actor.leaving&&(actor.track.to===node||actor.track.from===node&&actor.dist<6))
@@ -179,6 +184,10 @@ export class Traffic {
         advance=Math.min(advance,gap)
       }
       actor.speed=advance/dt;actor.dist+=advance
+      if(!person&&advance>0){
+        const next={x:actor.x+track.dx*advance,y:actor.y,z:actor.z+track.dz*advance}
+        if(resolveContact(next,next.y,track.yaw,actor.halfWidth,actor.halfLength,staticSolids)){actor.speed=0;actor.dist-=advance;continue}
+      }
       if(actor.dist>=track.length){
         if(!person&&this.signal.has(track.to)){this.crossed++;this.onCross?.(track,this.time)}
         const choices=(this.exits.get(track.to)??[]).filter(next=>next.walk===person && (person||next.to!==track.from) && (person||next.kind==='motor'||(actor.kind==='scooter'&&next.kind==='nonmotor')))

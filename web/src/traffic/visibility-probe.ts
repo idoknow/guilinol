@@ -1,20 +1,21 @@
 import * as THREE from 'three'
 
 export function pixelVisible(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera:THREE.Camera){
-  const mesh=scene.getObjectByName('G2 traffic') as THREE.InstancedMesh
-  const size=renderer.getDrawingBufferSize(new THREE.Vector2())
-  const target=new THREE.WebGLRenderTarget(size.x,size.y)
-  const original=mesh.material,previousTarget=renderer.getRenderTarget()
-  // The proxy boxes are hidden in normal play; draw them (and only them, not the car models) for the id pass.
-  const visuals=scene.getObjectByName('G2 traffic visuals'),visualsShown=visuals?.visible??false
-  const ids=new THREE.RawShaderMaterial({glslVersion:THREE.GLSL3,
-    vertexShader:`uniform mat4 modelViewMatrix,projectionMatrix;in vec3 position;in mat4 instanceMatrix;flat out int actor;void main(){actor=gl_InstanceID+1;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.);}`,
-    fragmentShader:`precision highp float;flat in int actor;out vec4 color;void main(){color=vec4(1.,0.,float(actor)/255.,1.);}`})
+  const proxy=scene.getObjectByName('G2 traffic') as THREE.InstancedMesh
+  const visuals=scene.getObjectByName('G2 traffic visuals') as THREE.BatchedMesh
+  const size=renderer.getDrawingBufferSize(new THREE.Vector2()),target=new THREE.WebGLRenderTarget(size.x,size.y)
+  const original=visuals.material,previousTarget=renderer.getRenderTarget()
+  const ids=new THREE.MeshBasicMaterial({toneMapped:false,fog:false})
+  ids.onBeforeCompile=shader=>{
+    shader.vertexShader='flat varying int actorSlot;\n'+shader.vertexShader.replace('#include <batching_vertex>',`#include <batching_vertex>
+      actorSlot=int(getIndirectIndex(gl_DrawID))+1;`)
+    shader.fragmentShader='flat varying int actorSlot;\n'+shader.fragmentShader.replace('#include <dithering_fragment>',`gl_FragColor=vec4(1.,0.,float(min(actorSlot,255))/255.,1.);`)
+  }
   try{
-    mesh.material=ids;mesh.visible=true;if(visuals)visuals.visible=false;renderer.setRenderTarget(target);renderer.render(scene,camera)
-    const pixels=new Uint8Array(size.x*size.y*4),counts=new Uint32Array(mesh.count+1)
+    visuals.material=ids;renderer.setRenderTarget(target);renderer.render(scene,camera)
+    const pixels=new Uint8Array(size.x*size.y*4),counts=new Uint32Array(proxy.count+1)
     renderer.readRenderTargetPixels(target,0,0,size.x,size.y,pixels)
-    for(let offset=0;offset<pixels.length;offset+=4)if(pixels[offset]===255&&pixels[offset+1]===0&&pixels[offset+2]<=mesh.count)counts[pixels[offset+2]]++
-    return (mesh.userData.motorIds as number[]).filter(index=>counts[index+1]>=6)
-  }finally{mesh.material=original;mesh.visible=false;if(visuals)visuals.visible=visualsShown;renderer.setRenderTarget(previousTarget);target.dispose();ids.dispose()}
+    for(let offset=0;offset<pixels.length;offset+=4)if(pixels[offset]===255&&pixels[offset+1]===0&&pixels[offset+2]<=proxy.count)counts[pixels[offset+2]]++
+    return (proxy.userData.allMotors as number[]).filter(index=>counts[index+1]>=6)
+  }finally{visuals.material=original;renderer.setRenderTarget(previousTarget);target.dispose();ids.dispose()}
 }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {gunzipSync} from 'node:zlib'
 import {Traffic} from '../web/src/traffic/sim.ts'
-import {resolveContact,useTrafficSolids} from '../web/src/traffic/contact.ts'
+import {pickups,resolveContact,useTrafficSolids} from '../web/src/traffic/contact.ts'
 import {isPointInQuietZone} from '../web/src/game/quiet-zones.ts'
 
 const graph=JSON.parse(gunzipSync(readFileSync('public/world/roads/graph.json.gz')))
@@ -133,4 +133,19 @@ for(let tick=0;tick<1600;tick++){
 for(const [index,target] of [1,.6,.35,.12].entries()){
   const ratio=counts[index]/counts[0];console.log(classes[index],{perLaneKm:counts[index]/1200/.496,ratio})
   assert.ok(Math.abs(ratio-target)<=.3*target)
+}
+
+const vehicleData=JSON.parse(gunzipSync(readFileSync('public/world/vehicles.bin')))
+for(const east of [-1415.4,-455.4,-984,-989.7,-572]){
+  const [x,y,z,yaw]=vehicleData.cars.find(row=>row[0]===east)
+  const remove=pickups.add({x,y,z,yaw,halfWidth:.9,halfLength:2.12,height:1.5})
+  try{
+    const flow=new Traffic(graph,()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32))
+    let waiting=0,longest=0,peak=0
+    for(let tick=0;tick<2400;tick++){
+      flow.step(.05,{x,y,z});const stopped=flow.actors.filter(actor=>actor.kind!=='person'&&actor.speed<.1&&Math.hypot(actor.x-x,actor.z-z)<12).length
+      waiting=stopped?waiting+1:0;longest=Math.max(longest,waiting);peak=Math.max(peak,stopped)
+    }
+    console.log('Jiefang pickup',{x,z,peakStoppedWithin12m:peak,longestStoppedSeconds:longest*.05})
+  }finally{remove()}
 }

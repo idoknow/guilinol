@@ -1,4 +1,5 @@
 import * as T from 'three'
+import {pickups} from '../traffic/contact'
 import type {Stream} from '../stream'
 import type {ParkedBike} from '../batch'
 import {vehicleForbiddenAt} from '../game/car-free'
@@ -138,6 +139,7 @@ export async function vehicles(
   let sharedRideSessionId = 0
 
   const parkedCells = new WeakMap<T.Group, ParkedBatches>()
+  const pickupHandles=new WeakMap<T.Object3D,()=>void>()
   const models = new Map<string, ReturnType<typeof parkedParts>>()
 
   function marker(kind: string, paint: number, shared = false) {
@@ -150,6 +152,7 @@ export async function vehicles(
   }
 
   function takeRecord(record: T.Object3D) {
+    pickupHandles.get(record)?.()
     if (record instanceof T.Mesh) return record
     const mesh = makeVehicleMesh(record.name, record.userData.paint, {shared: record.userData.shared})
     mesh.position.copy(record.position)
@@ -176,6 +179,7 @@ export async function vehicles(
   }
 
   function store(mesh: T.Object3D) {
+    if(mesh.name==='car')pickupHandles.set(mesh,pickups.add({...mesh.position,yaw:mesh.rotation.y,halfWidth:.9,halfLength:2.12,height:1.5}))
     const key = `${Math.floor(mesh.position.x / cellSize)},${Math.floor(mesh.position.z / cellSize)}`
     let cell = cells.get(key)
     if (!cell) {
