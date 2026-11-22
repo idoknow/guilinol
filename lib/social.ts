@@ -164,8 +164,8 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
     })
   if (!socialConfigured(env)) return back('disabled')
 
-  const site = request.headers.get('Sec-Fetch-Site')
-  if (site && site !== 'same-origin' && site !== 'none') throw new Problem(403, 'origin', '请求来源不符')
+  // 回调是第三方平台 302 回来的顶层导航，浏览器会带 Sec-Fetch-Site: cross-site，不能据此拒绝；
+  // 防伪靠 HttpOnly state cookie + 一次性消费。
 
   const type = url.searchParams.get('type'),
     code = url.searchParams.get('code') ?? ''
