@@ -34,7 +34,7 @@ spec:
             image: ghcr.io/idoknow/glol-feedback-bridge:RELEASE
             resources:
               requests: {memory: 48Mi, cpu: 20m}
-              limits: {memory: 192Mi, cpu: '1'}
+              limits: {memory: 128Mi, cpu: '1'}
             securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
             volumeMounts:
             - {name: state, mountPath: /state}
