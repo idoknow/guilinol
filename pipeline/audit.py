@@ -120,6 +120,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     by_bldg = defaultdict(list)
     bldg_chunk_parts = []
     roads0_polys, roads1_polys, roads2_polys, cycle_polys = [], [], [], []
+    street_topology_issues = []
     chunk_streets = {}
     lamps, signals, stops, banks, stone_rails = [], [], [], [], []
     deck_tris_by_chunk = {}
@@ -189,20 +190,26 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                     by_bldg[(seed, base, roof)].append(poly)
                     bldg_chunk_parts.append((tx, tz, base / 10.0, roof / 10.0, kind, floors, loops, poly))
 
-        for skind, *loops in streets[0]:
+        for path_index, (skind, *loops) in enumerate(streets[0]):
+            if any(len(loop) < 3 for loop in loops) or not loops:
+                street_topology_issues.append(make_issue('invalidStreetPolygon', tx, tz, 1,
+                                                        f'chunk({tx},{tz}).paths[{path_index}] short ring'))
+                continue
             pts = [np.asarray(lp, dtype=float) / 100.0 + [tx, tz] for lp in loops]
-            if len(pts[0]) >= 3:
-                poly = Polygon(pts[0], pts[1:]).buffer(0)
-                if poly.is_empty:
-                    continue
-                if skind == 0:
-                    roads0_polys.append(poly)
-                elif skind in (1, 4, 6):
-                    roads1_polys.append(poly)
-                elif skind == 5:
-                    cycle_polys.append(poly)
-                elif skind == 2:
-                    roads2_polys.append(poly)
+            if not Polygon(loops[0], loops[1:]).is_valid:
+                street_topology_issues.append(make_issue('invalidStreetPolygon', *pts[0][0], 1,
+                                                        f'chunk({tx},{tz}).paths[{path_index}] kind {skind}'))
+            poly = Polygon(pts[0], pts[1:]).buffer(0)
+            if poly.is_empty:
+                continue
+            if skind == 0:
+                roads0_polys.append(poly)
+            elif skind in (1, 4, 6):
+                roads1_polys.append(poly)
+            elif skind == 5:
+                cycle_polys.append(poly)
+            elif skind == 2:
+                roads2_polys.append(poly)
 
         for lx, lz in streets[1]:
             lamps.append((tx + lx / 10.0, tz + lz / 10.0))
@@ -731,7 +738,8 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     # =========================================================================
     # 4. 其他基本问题 (otherBasic)
     # =========================================================================
-    other_issues = []
+
+    other_issues = street_topology_issues
 
     # 4a. Props on carriageway (trees, lamps, railings, traffic_signals, bus_stops, stone_rails)
     if trees:

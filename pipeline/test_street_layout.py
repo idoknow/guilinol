@@ -1,3 +1,4 @@
+import gzip
 import json
 import struct
 import unittest
@@ -11,12 +12,35 @@ from common import LAT0,LON0
 from road_profile import profile
 from dongxi_streets import street_surface
 from streets import chunks
+from street_rings import repaired_paths, repair_frozen_tile
 
 
 class LayoutTests(unittest.TestCase):
     def setUp(self):
         self.line=LineString([(-40,0),(0,0),(40,0)])
         self.facades=STRtree([box(-50,-20,50,-10),box(-50,10,50,20)])
+
+    def test_frozen_street_split_preserves_lower_index_and_holes(self):
+        crossed = [1, [[0, 0], [10, 10], [0, 10], [10, 0]]]
+        lower = [6, [[0, 0], [20, 0], [20, 20], [0, 20]],
+                 [[2, 2], [2, 4], [4, 4], [4, 2]]]
+        paths = [crossed, lower]
+        streets = [paths, *[[] for _ in range(10)], [1, [], []]]
+        collision = json.dumps([[], streets, [], []]).encode()
+        header = struct.pack('<4s5I', b'GL04', 0, 0, len(collision), 4, 0)
+        raw = header + bytes(16900) + collision + b'tail'
+        packed = repair_frozen_tile(gzip.compress(raw))
+        fixed = gzip.decompress(packed)
+        length = struct.unpack_from('<I', fixed, 12)[0]
+        result = json.loads(fixed[16924:16924+length])[1]
+        self.assertEqual(result[11][0], 2)
+        self.assertEqual(result[0][2:], [lower])
+        parts = [Polygon(shell, holes) for _, shell, *holes in result[0][:2]]
+        self.assertTrue(all(poly.is_valid for poly in parts))
+        self.assertEqual(sum(poly.area for poly in parts), 50)
+        self.assertEqual(fixed[16924+length:], b'tail')
+        self.assertEqual(repair_frozen_tile(packed), packed)
+        self.assertEqual(repaired_paths([1, [[0, 0], [5, 5], [5, 5]]]), [])
 
     def test_frontage(self):
         road=profile(self.line,{'highway':'pedestrian'},self.facades)
