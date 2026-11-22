@@ -172,6 +172,16 @@ CREATE INDEX social_states_expires ON social_states(expires);
 
 边界：该平台账号已绑定别人 → 409 `conflict`；`intent!=='register'` 的 pending 调本接口 → 400 `invalid_intent`；`intent='register'` 的 pending 调 `/confirm` → 400 `register_incomplete`。
 
+### 3.2.5 账号模型：邮箱是主账号，第三方只是登录方式
+
+- **账号主键是 `users.id`，账号的人类标识是 `users.email`（`UNIQUE NOT NULL`）**。邮箱注册（邮箱 + 密码 + 验证码）是唯一的建号入口。
+- 第三方（QQ / 微信 …）永远不创建「没有邮箱的账号」，只做两件事：
+  1. 给**已登录、邮箱已验证**的账号增加一条登录方式（`social_identities`）
+  2. 在第三方注册流程里，先走完邮箱 + 密码 + 验证码，再把第三方作为登录方式挂上去
+- 第三方登录时按 `(type, social_uid)` 找到 `user_id`，**不看邮箱**；账号未验证邮箱则拒绝登录（`?social=unverified`）。
+- 唯一约束：`PRIMARY KEY(type, social_uid)`（一个第三方号只能挂一个账号）、`UNIQUE(user_id, type)`（一个账号每个平台只挂一个）。
+- 因此同一邮箱只会有一个账号；不同邮箱注册出来的就是两个账号，系统**不做自动合并**（没有可信信号，自动合并等于开后门）。合并只能人工或后续做后台工具。
+
 ### 3.3 账号策略
 
 | 方案 | 做法 | 评价 |
