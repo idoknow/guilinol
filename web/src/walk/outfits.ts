@@ -17,6 +17,16 @@ import {
   OUTFIT_ITEMS_BY_ID,
   type EquippedOutfit,
 } from '../game/catalog'
+import {applyAvatarStyleMaterial, AVATAR_SURFACE} from '../look/avatar-look'
+import {
+  isArmBone,
+  isFootBone,
+  isHandOrFingerBone,
+  isHeadOrFaceBone,
+  isLegBone,
+  resolveCanonicalBoneRole,
+  type OutfitCompatStrategy,
+} from './avatar-compat'
 import type {AvatarRig} from './avatar-rig'
 
 export const OUTFIT_ZONE = {
@@ -155,7 +165,7 @@ function linearToSrgbByte(lin: number): number {
   return Math.max(0, Math.min(255, Math.round(s * 255)))
 }
 
-function matchPaletteHex(rLin: number, gLin: number, bLin: number): string {
+function matchPaletteWithDist(rLin: number, gLin: number, bLin: number): {hex: string; distSq: number} {
   const r = linearToSrgbByte(rLin)
   const g = linearToSrgbByte(gLin)
   const b = linearToSrgbByte(bLin)
@@ -171,7 +181,193 @@ function matchPaletteHex(rLin: number, gLin: number, bLin: number): string {
       bestHex = entry.hex
     }
   }
-  return bestHex
+  return {hex: bestHex, distSq: bestDist}
+}
+
+function matchPaletteHex(rLin: number, gLin: number, bLin: number): string {
+  return matchPaletteWithDist(rLin, gLin, bLin).hex
+}
+
+function computeLegacyPaletteMatchRatio(colAttr: THREE.BufferAttribute): number {
+  const count = colAttr.count
+  if (!count) return 0
+  const maxDistSq = 18 * 18
+  let matched = 0
+  for (let i = 0; i < count; i++) {
+    if (matchPaletteWithDist(colAttr.getX(i), colAttr.getY(i), colAttr.getZ(i)).distSq <= maxDistSq) {
+      matched++
+    }
+  }
+  return matched / count
+}
+
+/**
+ * Bone- and height-driven `COLOR_0` fallback partition for refined single-mesh models
+ * that author a new natural color palette instead of the legacy 10 `CityWalker` hexes.
+ * Strictly locks head/face/eyes/hair and hands/bare forearms as `LOCKED_SKIN`/`LOCKED_HAIR`.
+ */
+export function partitionBoneDrivenColor0(skinned: THREE.SkinnedMesh): PartitionResult | null {
+  const geom = skinned.geometry
+  const posAttr = geom.getAttribute('position') as THREE.BufferAttribute | undefined
+  const colAttr = geom.getAttribute('color') as THREE.BufferAttribute | undefined
+  if (!posAttr || !colAttr) return null
+
+  const skinIdxAttr = geom.getAttribute('skinIndex') as THREE.BufferAttribute | undefined
+  const skinWgtAttr = geom.getAttribute('skinWeight') as THREE.BufferAttribute | undefined
+  const bones = skinned.skeleton?.bones ?? []
+  const count = posAttr.count
+  const zones = new Uint8Array(count)
+  const originalColors = new Float32Array(count * 3)
+
+  let minY = Infinity
+  let maxY = -Infinity
+  for (let i = 0; i < count; i++) {
+    const y = posAttr.getY(i)
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+    originalColors[i * 3] = colAttr.getX(i)
+    originalColors[i * 3 + 1] = colAttr.getY(i)
+    originalColors[i * 3 + 2] = colAttr.getZ(i)
+  }
+  const spanY = Math.max(0.5, maxY - minY)
+
+  for (let i = 0; i < count; i++) {
+    const y = posAttr.getY(i)
+    const relY = (y - minY) / spanY
+    const r = originalColors[i * 3]
+    const g = originalColors[i * 3 + 1]
+    const b = originalColors[i * 3 + 2]
+    const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    const bone = skinIdxAttr && skinWgtAttr ? dominantBoneName(skinIdxAttr, skinWgtAttr, bones, i) : ''
+    const role = resolveCanonicalBoneRole(bone)
+
+    if (isHeadOrFaceBone(bone) || relY >= 0.865) {
+      zones[i] = luma < 0.14 || relY >= 0.935 ? OUTFIT_ZONE.LOCKED_HAIR : OUTFIT_ZONE.LOCKED_SKIN
+    } else if (isHandOrFingerBone(bone)) {
+      zones[i] = OUTFIT_ZONE.LOCKED_SKIN
+    } else if (isFootBone(bone) || relY <= 0.085) {
+      zones[i] = relY <= 0.022 ? OUTFIT_ZONE.SHOES_SOLE : OUTFIT_ZONE.SHOES_UPPER
+    } else if (isLegBone(bone) || relY < 0.54) {
+      zones[i] = relY >= 0.50 && relY <= 0.545 ? OUTFIT_ZONE.BOTTOM_BELT : OUTFIT_ZONE.BOTTOM_MAIN
+    } else if (isArmBone(bone)) {
+      const isBareForearm =
+        (role === 'lowerarm_l' || role === 'lowerarm_r') && r > g && g > b && r - b > 0.08 && luma > 0.22
+      zones[i] = isBareForearm ? OUTFIT_ZONE.LOCKED_SKIN : OUTFIT_ZONE.TOP_SLEEVE
+    } else {
+      zones[i] = relY >= 0.78 && posAttr.getZ(i) < 0 ? OUTFIT_ZONE.TOP_INNER : OUTFIT_ZONE.TOP_PRIMARY
+    }
+  }
+
+  const totalIdx = geom.getIndex()?.count ?? count
+  const names = Object.entries(OUTFIT_ZONE).reduce<Record<number, string>>((acc, [k, v]) => {
+    acc[v] = k
+    return acc
+  }, {})
+  const zoneCounts: Record<string, number> = {}
+  for (let i = 0; i < zones.length; i++) {
+    const name = names[zones[i]] ?? String(zones[i])
+    zoneCounts[name] = (zoneCounts[name] ?? 0) + 1
+  }
+
+  return {
+    zones,
+    originalColors,
+    bodyIndexCount: totalIdx,
+    totalIndexCount: totalIdx,
+    zoneCounts,
+  }
+}
+
+type SemanticMaterialSlot =
+  | 'top_primary'
+  | 'top_sleeve'
+  | 'top_trim'
+  | 'top_inner'
+  | 'bottom_main'
+  | 'bottom_belt'
+  | 'shoes_upper'
+  | 'shoes_sole'
+  | 'pack'
+  | 'locked'
+
+interface NamedOutfitTarget {
+  slot: Exclude<SemanticMaterialSlot, 'pack' | 'locked'>
+  material: THREE.MeshStandardMaterial
+  originalColor: THREE.Color
+  hasMap: boolean
+}
+
+function classifySemanticName(rawName: string): SemanticMaterialSlot | null {
+  const n = rawName.toLowerCase()
+  if (!n) return null
+  if (/(skin|face|head|eye|brow|lip|mouth|ear|hair|hand|neck|teeth|tongue)/.test(n) && !/(hat|helmet|headgear)/.test(n)) {
+    return 'locked'
+  }
+  if (/(^|[._-])(pack|backpack|daypack|rucksack|builtin_bag)/.test(n)) return 'pack'
+  if (/(sole|outsole)/.test(n)) return 'shoes_sole'
+  if (/(shoe|boot|sneaker|footwear|loafer)/.test(n)) return 'shoes_upper'
+  if (/(belt|waistband)/.test(n)) return 'bottom_belt'
+  if (/(bottom|pant|jean|trouser|short|skirt|cargo|legging)/.test(n)) return 'bottom_main'
+  if (/(sleeve|cuff)/.test(n)) return 'top_sleeve'
+  if (/(collar|inner|undershirt|tee_inner)/.test(n)) return 'top_inner'
+  if (/(trim|zipper|lapel|accent|stripe)/.test(n)) return 'top_trim'
+  if (/(top|shirt|tee|jacket|coat|hoodie|vest|sweater|shell|torso|cloth)/.test(n)) return 'top_primary'
+  return null
+}
+
+function collectNamedOutfitTargets(figure: THREE.Group): {
+  strategy: 'named_parts' | 'material_slots' | null
+  targets: NamedOutfitTarget[]
+  packMeshes: THREE.Mesh[]
+} {
+  const targets: NamedOutfitTarget[] = []
+  const packMeshes: THREE.Mesh[] = []
+  const seenMats = new Set<THREE.Material>()
+  const matchedMeshes = new Set<THREE.Mesh>()
+  const majorGroups = new Set<'top' | 'bottom' | 'shoes'>()
+
+  figure.traverse(node => {
+    if (!(node instanceof THREE.Mesh)) return
+    if (node.userData?.isAttachmentAnchor || node.name.startsWith('outfit_')) return
+
+    const meshSlot = classifySemanticName(node.name)
+    if (meshSlot === 'pack') {
+      packMeshes.push(node)
+      return
+    }
+    if (meshSlot === 'locked') return
+
+    const mats = Array.isArray(node.material) ? node.material : [node.material]
+    for (const mat of mats) {
+      if (!(mat instanceof THREE.MeshStandardMaterial) || seenMats.has(mat)) continue
+      const matSlot = classifySemanticName(mat.name) ?? meshSlot
+      if (!matSlot || matSlot === 'locked') continue
+      if (matSlot === 'pack') {
+        packMeshes.push(node)
+        continue
+      }
+      seenMats.add(mat)
+      matchedMeshes.add(node)
+      targets.push({
+        slot: matSlot,
+        material: mat,
+        originalColor: mat.color.clone(),
+        hasMap: Boolean(mat.map),
+      })
+      if (matSlot.startsWith('top_')) majorGroups.add('top')
+      else if (matSlot.startsWith('bottom_')) majorGroups.add('bottom')
+      else if (matSlot.startsWith('shoes_')) majorGroups.add('shoes')
+    }
+  })
+
+  if (majorGroups.size < 2) {
+    return {strategy: null, targets: [], packMeshes: []}
+  }
+  return {
+    strategy: matchedMeshes.size > 1 ? 'named_parts' : 'material_slots',
+    targets,
+    packMeshes,
+  }
 }
 
 function dominantBoneName(
@@ -435,6 +631,12 @@ function mergeColoredParts(parts: readonly ColoredGeomPart[], name: string, doub
     metalness: 0.05,
     side: doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   })
+  applyAvatarStyleMaterial(mat, {
+    defaultSurface: AVATAR_SURFACE.ACCESSORY,
+    glossyShell: /(helmet|visor)/.test(name),
+    minY: -0.1,
+    heightSpan: 0.55,
+  })
   const mesh = new THREE.Mesh(merged, mat)
   mesh.name = name
   mesh.castShadow = false
@@ -664,6 +866,7 @@ export interface OutfitControllerSnapshot {
   attachedBag: string | null
   drawCallDelta: number
   zoneCounts: Record<string, number>
+  strategy: OutfitCompatStrategy
 }
 
 export interface AvatarOutfitController {
@@ -672,6 +875,8 @@ export interface AvatarOutfitController {
   setAutoHelmet(enabled: boolean): void
   setPreview(preview: Readonly<EquippedOutfit> | null): void
   clearPreview(): void
+  getVertexZones(): Uint8Array | null
+  getStrategy(): OutfitCompatStrategy
   getSnapshot(): OutfitControllerSnapshot
   dispose(): void
 }
@@ -680,11 +885,32 @@ const _tmpColor = new THREE.Color()
 
 /**
  * Runtime avatar wardrobe applier attached to `figure` + `AvatarRig`.
- * Handles `+0` Draw Call `COLOR_0` updates, `BUILTIN_PACK` toggling, and cached `head`/`torso` accessories.
+ * Supports all 3 avatar authoring pipelines with zero extra draw calls for body recolor:
+ *  - `legacy_color0`: bit-identical `CityWalker` single-mesh `COLOR_0` + `BUILTIN_PACK` drawRange hiding
+ *  - `bone_color0`: bone- & height-driven `COLOR_0` fallback for single-mesh models with new palettes
+ *  - `named_parts` / `material_slots`: named multi-mesh or multi-material models (tints cloth slots only)
  */
 export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig): AvatarOutfitController {
   const skinned = rig.skinnedMesh
-  const partition = skinned && rig.isSkinned ? partitionCityWalkerGeometry(skinned) : null
+  const named = collectNamedOutfitTargets(figure)
+  let strategy: OutfitCompatStrategy = 'none'
+  let partition: PartitionResult | null = null
+
+  if (named.strategy) {
+    strategy = named.strategy
+  } else if (skinned && rig.isSkinned) {
+    const colAttr = skinned.geometry.getAttribute('color') as THREE.BufferAttribute | undefined
+    if (colAttr) {
+      const legacyMatch = computeLegacyPaletteMatchRatio(colAttr)
+      if (legacyMatch >= 0.72) {
+        partition = partitionCityWalkerGeometry(skinned)
+        if (partition) strategy = 'legacy_color0'
+      } else {
+        partition = partitionBoneDrivenColor0(skinned)
+        if (partition) strategy = 'bone_color0'
+      }
+    }
+  }
   const hatCache = new Map<string, THREE.Mesh | null>()
   const bagCache = new Map<string, THREE.Mesh | null>()
 
@@ -708,13 +934,39 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
   }
 
   function applyColorZones(outfit: Readonly<EquippedOutfit>): void {
-    if (!skinned || !partition) return
-    const colAttr = skinned.geometry.getAttribute('color') as THREE.BufferAttribute | undefined
-    if (!colAttr) return
-
     const top = resolveTopRecipe(outfit.top)
     const bottom = resolveBottomRecipe(outfit.bottom)
     const shoes = resolveShoesRecipe(outfit.shoes)
+    const isDefaultTop = outfit.top === 'top_default_tee'
+    const isDefaultBottom = outfit.bottom === 'bottom_default_pants'
+    const isDefaultShoes = outfit.shoes === 'shoes_default_sneaker'
+
+    if ((strategy === 'named_parts' || strategy === 'material_slots') && named.targets.length) {
+      for (const target of named.targets) {
+        let hex: string | null = null
+        if (target.slot === 'top_primary') hex = isDefaultTop ? null : top.primary
+        else if (target.slot === 'top_sleeve') hex = isDefaultTop ? null : top.sleeve
+        else if (target.slot === 'top_trim') hex = isDefaultTop ? null : top.trim
+        else if (target.slot === 'top_inner') hex = isDefaultTop ? null : top.inner
+        else if (target.slot === 'bottom_main') hex = isDefaultBottom ? null : bottom.main
+        else if (target.slot === 'bottom_belt') hex = isDefaultBottom ? null : bottom.belt
+        else if (target.slot === 'shoes_upper') hex = isDefaultShoes ? null : shoes.upper
+        else if (target.slot === 'shoes_sole') hex = isDefaultShoes ? null : shoes.sole
+
+        if (!hex) {
+          target.material.color.copy(target.originalColor)
+        } else {
+          _tmpColor.set(hex)
+          if (target.hasMap) target.material.color.copy(target.originalColor).lerp(_tmpColor, 0.85)
+          else target.material.color.copy(_tmpColor)
+        }
+      }
+      return
+    }
+
+    if (!skinned || !partition) return
+    const colAttr = skinned.geometry.getAttribute('color') as THREE.BufferAttribute | undefined
+    if (!colAttr) return
 
     const cPrimary = new THREE.Color(top.primary)
     const cSleeve = new THREE.Color(top.sleeve)
@@ -725,10 +977,6 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
     const cShoe = new THREE.Color(shoes.upper)
     const cShoeAcc = new THREE.Color(shoes.accent)
     const cSole = new THREE.Color(shoes.sole)
-
-    const isDefaultTop = outfit.top === 'top_default_tee'
-    const isDefaultBottom = outfit.bottom === 'bottom_default_pants'
-    const isDefaultShoes = outfit.shoes === 'shoes_default_sneaker'
 
     const zones = partition.zones
     const orig = partition.originalColors
@@ -774,6 +1022,9 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
   function syncAccessories(outfit: Readonly<EquippedOutfit>): void {
     const showBuiltin = outfit.bag === 'bag_none'
     builtinPackVisible = showBuiltin
+    if (named.packMeshes.length) {
+      for (const packMesh of named.packMeshes) packMesh.visible = showBuiltin
+    }
     if (skinned && partition) {
       skinned.geometry.setDrawRange(0, showBuiltin ? partition.totalIndexCount : partition.bodyIndexCount)
     }
@@ -851,6 +1102,12 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
       previewOutfit = null
       render()
     },
+    getVertexZones() {
+      return partition ? partition.zones : null
+    },
+    getStrategy() {
+      return strategy
+    },
     getSnapshot(): OutfitControllerSnapshot {
       const drawCallDelta = (currentHatId ? 1 : 0) + (currentBagId ? 1 : 0)
       return {
@@ -864,6 +1121,7 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
         attachedBag: currentBagId,
         drawCallDelta,
         zoneCounts: partition ? {...partition.zoneCounts} : {},
+        strategy,
       }
     },
     dispose() {

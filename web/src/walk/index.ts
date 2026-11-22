@@ -12,10 +12,19 @@ import {createPhysics} from './physics'
 import {createCameraRig} from './camera'
 import {look} from '../look/config'
 import {env} from '../look/time'
+import {createAvatarContactShadow, syncAvatarLookUniforms} from '../look/avatar-look'
 import {createDriverPose} from './car'
 import {createRiderPose,notifyDismountBlocked} from './ride'
 import {createEbikeAudioEngine} from './ebike-audio'
 import {clearAvatarPose, ensureAvatarRig, getAvatarJoint, getAvatarJoints} from './avatar-rig'
+import {
+  buildAvatarCompatReport,
+  buildRobustFootProbes,
+  installAvatarStyleShading,
+  measureAvatarAsset,
+  normalizeAvatarSkeletonForRig,
+  updateAllAvatarSkeletons,
+} from './avatar-compat'
 import {createAvatarOutfitController} from './outfits'
 import {isGlobalHotkeyBlocked, isModalOrOverlayOpen} from './input-guard'
 import {createInteractArbiter} from './interact-arbiter'
@@ -303,8 +312,26 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   avatarReady ??= new GLTFLoader().loadAsync(avatar.path)
   const [sim,model]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady])
   const rig=createCameraRig(sim)
-  const figure=model.scene,legacySkinned=mergeAvatar(figure,avatar.color),avatarRig=ensureAvatarRig(figure,avatar.color),skinned=legacySkinned??avatarRig.skinnedMesh,traveller=figure.getObjectByName('Traveller')??avatarRig.traveller,ridePose=createRiderPose(figure),driverPose=createDriverPose(figure)
+  const figure=model.scene,legacySkinned=mergeAvatar(figure,avatar.color)
+  normalizeAvatarSkeletonForRig(figure,model.animations)
+  const avatarRig=ensureAvatarRig(figure,avatar.color),skinned=legacySkinned??avatarRig.skinnedMesh,traveller=figure.getObjectByName('Traveller')??avatarRig.traveller,ridePose=createRiderPose(figure),driverPose=createDriverPose(figure)
   const outfitController=createAvatarOutfitController(figure,avatarRig)
+  const avatarMetrics=measureAvatarAsset(figure,avatar.scale)
+  const effectiveAvatarScale=avatarMetrics.recommendedScale
+  const robustFoot=buildRobustFootProbes(figure,avatarRig)
+  const avatarStyleRes=installAvatarStyleShading(figure,avatarMetrics,outfitController.getVertexZones(),skinned)
+  const contactShadow=createAvatarContactShadow(scene)
+  const avatarCompatReport=buildAvatarCompatReport({
+    figure,
+    rig:avatarRig,
+    metrics:avatarMetrics,
+    appliedScale:effectiveAvatarScale,
+    soleOffset:robustFoot.soleOffset,
+    footProbes:robustFoot.footProbes,
+    styledMaterials:avatarStyleRes.styledMaterials,
+    surfaceAttrApplied:avatarStyleRes.surfaceAttrApplied,
+    outfitStrategy:outfitController.getStrategy(),
+  })
   {
     const initialWardrobe=getGameState().wardrobe
     outfitController.applyEquipped(initialWardrobe.equipped,{ridingEbike:false,autoHelmetOnRide:initialWardrobe.autoHelmetOnRide})
@@ -583,7 +610,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const shopWallFilter=(coll:R.Collider)=>{const kind=sim.kinds.get(coll.handle);return kind!==undefined&&kind!=='tree'}
   function updateShopShowcaseCamera(){
     if(!shopCam)return
+    syncAvatarLookUniforms()
     syncShopShowcaseBike()
+    contactShadow.update({
+      visible:active&&figure.visible&&!shopEbikeShowcaseRig.root.visible,
+      x:figure.position.x,
+      z:figure.position.z,
+      groundY:shopCam.stagePos.y,
+      footY:figure.position.y-soleOffset,
+      crouching:false,
+      yaw:figure.rotation.y,
+    })
     const focusY=shopCam.stagePos.y+shopCam.targetHeightOffset
     shopLookTarget.set(shopCam.stagePos.x,focusY,shopCam.stagePos.z)
     const cosP=Math.cos(shopCam.orbitPitch)
@@ -997,9 +1034,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     bicyclePedalPhase=0;bicycleFootWeight=1
     prevAudioPark=false;prevAudioGear=2;prevAudioLight='off';prevAudioBlink=false;prevAudioHorn=false
   }
-  const footMetrics={soleOffset:avatarRig.soleOffset,footProbes:avatarRig.footProbes}
-  scene.add(figure);figure.visible=false;figure.scale.setScalar(avatar.scale)
-  const soleOffset=footMetrics.soleOffset*avatar.scale, footTmp=new THREE.Vector3()
+  const footMetrics=robustFoot
+  scene.add(figure);figure.visible=false;figure.scale.setScalar(effectiveAvatarScale)
+  const soleOffset=footMetrics.soleOffset*effectiveAvatarScale, footTmp=new THREE.Vector3()
   const lmFloorCache=new WeakMap<THREE.Group,{grid:Map<string,number[]>;large:number[]}>()
   const _va=new THREE.Vector3(), _vb=new THREE.Vector3(), _vc=new THREE.Vector3(), _im=new THREE.Matrix4(), _inst=new THREE.Matrix4()
   function getLandmarkFloorGrid(root:THREE.Group){
@@ -1232,9 +1269,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
-    camera.near=.08;camera.updateProjectionMatrix();follow(0,true);return true
+    camera.near=.08;camera.updateProjectionMatrix();syncAvatarLookUniforms();follow(0,true);return true
   }
-  function leave(){if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function leave(){if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');contactShadow.update({visible:false,x:0,z:0,groundY:0,footY:0,crouching:false,yaw:0});shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number){
     const dryBridge=!!sim.surface(x,z,'deck',refY+.4,1.5)||!!sim.surface(x,z,'landmark',refY+.4,1.5)
     return !sim.insideHouse(x,z)&&(!sim.wet(x,z)||dryBridge)&&!sim.isBlockedAt(x,refY,z)
@@ -1377,6 +1414,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return true
   }
   function follow(dt=0,snap=false){const pos=sim.body.translation(),footY=pos.y-cfg.height/2
+    let showContactShadow=false, shadowGroundY=footY, shadowFootY=footY
     figure.position.set(pos.x,footY,pos.z)
     if(downedBikes.size>0)syncAllDownedPoses()
     if(rides?.boat){
@@ -1623,11 +1661,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(standUpSession){
         const gy=supportAt(standUpSession.x,standUpSession.z,standUpSession.y)?.y??standUpSession.y
         applyStandUpAnimation(figure,riderJoints,standUpSession.elapsed/standUpSession.duration,standUpSession.side,standUpSession.x,gy,standUpSession.z,standUpSession.startYaw,standUpSession.targetYaw)
+        showContactShadow=active&&figure.visible; shadowGroundY=gy; shadowFootY=figure.position.y
         actionButtonEl ??= document.querySelector<HTMLButtonElement>('.vehicle-action')
         if(actionButtonEl)actionButtonEl.hidden=true
       }else if(pickupSession){
         const gy=supportAt(pos.x,pos.z,footY)?.y??footY
         applyPickupBikeAnimation(figure,riderJoints,pickupSession.elapsed/pickupSession.duration,{x:pos.x,y:gy,z:pos.z},facing,pickupSession.rec)
+        showContactShadow=active&&figure.visible; shadowGroundY=gy; shadowFootY=gy
         actionButtonEl ??= document.querySelector<HTMLButtonElement>('.vehicle-action')
         if(actionButtonEl){
           actionButtonEl.hidden=false
@@ -1650,8 +1690,21 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           figure.position.y+=Math.sin(t*Math.PI)*.10
           figure.rotation.y=boatLandYaw+shortestAngle(boatLandYaw,facing)*t
         }
+        const airSupportY=grounded?baseY:visualFloorAt(pos.x,pos.z,supportAt(pos.x,pos.z,footY)?.y??baseY)
+        showContactShadow=active&&figure.visible
+        shadowGroundY=airSupportY
+        shadowFootY=grounded?baseY:Math.max(airSupportY,figure.position.y-soleOffset)
       }
     }
+    contactShadow.update({
+      visible:showContactShadow,
+      x:figure.position.x,
+      z:figure.position.z,
+      groundY:shadowGroundY,
+      footY:shadowFootY,
+      crouching:crouching||!!pickupSession,
+      yaw:facing,
+    })
     const shakeYaw=rides?.car&&carShake>.01?Math.sin(carShakePhase)*carShake*.018:0
     const shakePitch=rides?.car&&carShake>.01?Math.cos(carShakePhase*1.3)*carShake*.012:0
     rig.update(camera,figure.position,yaw+shakeYaw,pitch+shakePitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0),dt,snap,!!rides?.car)
@@ -1660,7 +1713,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function boatClearance(){
     const freeClear=rides?.boatClearance(figure,skinned);if(freeClear)return freeClear
     const boat=rides?.boat;if(!boat)return null
-    figure.updateMatrixWorld(true);skinned?.skeleton.update()
+    figure.updateMatrixWorld(true);updateAllAvatarSkeletons(figure)
     const roof=new THREE.Box3().setFromObject(boat,true).max.y,head=new THREE.Box3().setFromObject(figure,true).max.y
     let underside=Infinity
     for(const along of [-2.3,-1,0,1,2.3])for(const across of [-1,0,1]){const point=boat.localToWorld(new THREE.Vector3(across,0,along)),deck=sim.surface(point.x,point.z,'deck');if(deck)underside=Math.min(underside,deck.y-(deck.thin?.6:look.bridgeDepth))}
@@ -1718,8 +1771,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       downedBikes:Array.from(downedBikes).map(r=>({kind:r.kind,x:r.x,z:r.z,roll:r.roll,dist:Math.hypot(r.x-pos.x,r.z-pos.z)})),
       camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z,camera.position.y),
       outfit:outfitController.getSnapshot(),
+      avatarLook:{contactShadow:contactShadow.getState(),styledMaterials:avatarStyleRes.styledMaterials,surfaceAttrApplied:avatarStyleRes.surfaceAttrApplied,night:env.night,rain:env.rain},
+      avatarCompat:avatarCompatReport,
       boat:rides?.boatProbe()??null}}
-  function tick(dt:number){if(!active)return;const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
+  function tick(dt:number){if(!active)return;syncAvatarLookUniforms();const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
     if(shopOverlay?.isOpen()){updateShopShowcaseCamera();return}
     // Test-ride 90s timer & 350m / quiet-zone boundary watchdog (with 1.5s gentle decel when >15 km/h)
     const activeTr=getGameState().garage.activeTestRide
@@ -2478,6 +2533,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       getSnapshot:()=>outfitController.getSnapshot(),
       setPreview:(equipped:EquippedOutfit|null)=>outfitController.setPreview(equipped),
       setRidingEbike:(riding:boolean)=>outfitController.setRidingEbike(riding),
+    },
+    avatarCompat:avatarCompatReport,
+    avatarLook:{
+      getContactShadow:()=>contactShadow.getState(),
     },
     garage:{
       summon:(vehicleId?:string)=>summonPersonalWithToast(vehicleId),
