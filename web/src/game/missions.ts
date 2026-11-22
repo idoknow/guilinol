@@ -60,6 +60,7 @@ export interface MissionStatusSnapshot {
     missionId: string
     outcome: 'completed' | 'failed' | 'abandoned'
     reason?: string
+    elapsedSeconds?: number
     payout?: number
     isFirstClear?: boolean
   } | null
@@ -86,6 +87,10 @@ export class MissionRunnerEngine {
   private mission: MissionDef | null = null
   private stepIndex = 0
   private timerRemaining: number | null = null
+  private previousLegFares = 0
+  private legMeters = 0
+  private legSeconds = 0
+  private elapsedSeconds = 0
   private soup = 1.0
   private attemptNonce = ''
   private settled = false
@@ -132,6 +137,10 @@ export class MissionRunnerEngine {
     this.status = 'active'
     this.stepIndex = 0
     this.soup = 1.0
+    this.previousLegFares = 0
+    this.legMeters = 0
+    this.legSeconds = 0
+    this.elapsedSeconds = 0
     this.settled = false
     this.attemptNonce = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
     this.timerRemaining = def.steps[0]?.timer ?? null
@@ -254,12 +263,28 @@ export class MissionRunnerEngine {
       }
     }
 
+    const drivingMission = isRace || def.line === 'taxi'
+    if (drivingMission && this.stepIndex > 0 && !isFrozen) {
+      this.elapsedSeconds += dt
+      if (def.line === 'taxi' && frame.mode === 'car' && frame.speedMs > 0) {
+        const maxMeters = 1.3 * (def.steps[this.stepIndex].meterM ?? 0)
+        const maxSeconds = maxMeters / (40 / 3.6)
+        this.legMeters = Math.min(maxMeters, this.legMeters + dt * frame.speedMs)
+        this.legSeconds = Math.min(maxSeconds, this.legSeconds + dt)
+      }
+    }
+
     // 3. Step arrival check
     const curStep = def.steps[this.stepIndex]
-    if (curStep) {
+    if (curStep && (!drivingMission || (!isFrozen && frame.mode === 'car'))) {
       const dist = Math.hypot(frame.x - curStep.at[0], frame.z - curStep.at[1])
       if (dist <= curStep.radius) {
         if (this.stepIndex + 1 < def.steps.length) {
+          if (def.line === 'taxi') {
+            this.previousLegFares = this.taxiFare
+            this.legMeters = 0
+            this.legSeconds = 0
+          }
           this.stepIndex += 1
           const nextStep = def.steps[this.stepIndex]
           this.timerRemaining = nextStep.timer ?? this.timerRemaining
@@ -273,6 +298,10 @@ export class MissionRunnerEngine {
     }
 
     this.syncState()
+  }
+
+  private get taxiFare(): number {
+    return this.previousLegFares + this.legMeters * 80 / 1000 + this.legSeconds * 6 / 60
   }
 
   private conclude(outcome: 'completed' | 'failed' | 'abandoned', reason?: string): void {
@@ -298,12 +327,14 @@ export class MissionRunnerEngine {
       const rewardRes = settleMissionReward({
         mission: def,
         soupRatio: finalSoup,
+        taxiFare: this.taxiFare,
         attemptNonce: nonce,
       })
       this.lastOutcome = {
         missionId: def.id,
         outcome: 'completed',
         payout: rewardRes.credited,
+        elapsedSeconds: def.line === 'race' ? this.elapsedSeconds : undefined,
         isFirstClear: rewardRes.isFirstClear,
       }
       emit({
@@ -313,7 +344,8 @@ export class MissionRunnerEngine {
         firstClear: rewardRes.isFirstClear,
       })
       const tag = rewardRes.isFirstClear ? '首通赏金' : '日常赏金'
-      notifyToast(`任务完成！${tag} +¥${rewardRes.credited}`, 3400)
+      const raceTime = def.line === 'race' ? `完赛用时 ${this.elapsedSeconds.toFixed(1)} 秒！` : '任务完成！'
+      notifyToast(`${raceTime}${tag} +¥${rewardRes.credited}`, 3400)
     } else if (outcome === 'failed') {
       this.lastOutcome = {missionId: def.id, outcome: 'failed', reason}
       emit({type: 'mission:fail', id: def.id, reason: reason ?? 'failed'})
@@ -334,7 +366,7 @@ export class MissionRunnerEngine {
     }
     const step = def.steps[this.stepIndex]
     const isFirst = !hasClaimedMissionFirstClear(def.id)
-    const rewardPreview = computeMissionPayout(def, this.soup, isFirst)
+    const rewardPreview = computeMissionPayout(def, this.soup, isFirst, this.taxiFare)
     setMissionState({
       id: def.id,
       title: def.title,

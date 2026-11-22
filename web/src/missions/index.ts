@@ -5,6 +5,13 @@ import noodle01 from './noodle-jiefang-binjiang.json'
 import noodle02 from './noodle-zhengyang-shanhu.json'
 import noodle03 from './noodle-shizijie-elephant.json'
 
+import taxi01 from './taxi-01.json'
+import taxi02 from './taxi-02.json'
+import taxi03 from './taxi-03.json'
+import race01 from './race-01.json'
+import race02 from './race-02.json'
+import race03 from './race-03.json'
+
 export type MissionLine = 'noodle' | 'errand' | 'taxi' | 'race'
 export type MissionStepKind = 'goto' | 'pickup' | 'deliver' | 'checkpoint'
 export type MissionFailCondition = 'timeout' | 'spill' | 'wanted'
@@ -14,6 +21,8 @@ export interface MissionStepDef {
   at: [number, number]
   radius: number
   timer?: number
+  /** Undirected motor-road distance from the previous taxi stop, rounded down in metres. */
+  meterM?: number
   text: string
   npc?: {
     who: string
@@ -44,6 +53,12 @@ export const MISSIONS: readonly MissionDef[] = [
   noodle01 as MissionDef,
   noodle02 as MissionDef,
   noodle03 as MissionDef,
+  taxi01 as MissionDef,
+  taxi02 as MissionDef,
+  taxi03 as MissionDef,
+  race01 as MissionDef,
+  race02 as MissionDef,
+  race03 as MissionDef,
 ]
 
 export function getMissionById(id: string): MissionDef | undefined {

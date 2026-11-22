@@ -233,9 +233,13 @@ try {
   const posBeforeKeys = await page.evaluate(() => ({
     x: window.viewer.walk.position.x,
     z: window.viewer.walk.position.z,
-    cardCount: document.querySelectorAll('dialog.mission-board .mb-card').length,
+    orderIds: [...document.querySelectorAll('dialog.mission-board [data-start]')].map(button => button.dataset.start),
   }))
-  assert.equal(posBeforeKeys.cardCount, 5, 'mission board must list all 5 missions')
+  for (const [line, count] of [['errand', 2], ['noodle', 3], ['taxi', 3], ['race', 3]]) {
+    for (let order = 1; order <= count; order++) {
+      assert.ok(posBeforeKeys.orderIds.includes(`${line}-0${order}`), `missing ${line} order ${order}`)
+    }
+  }
   await page.keyboard.down('KeyW')
   await page.waitForTimeout(250)
   await page.keyboard.up('KeyW')

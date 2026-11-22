@@ -1,0 +1,48 @@
+{
+  "id": "taxi-03",
+  "line": "taxi",
+  "title": "两江四湖散场拼车",
+  "summary": "上车后按里程和用时计价。",
+  "recommendedVehicle": "car",
+  "giver": [
+    -885,
+    497
+  ],
+  "steps": [
+    {
+      "kind": "pickup",
+      "at": [
+        -885,
+        497
+      ],
+      "radius": 14,
+      "text": "开车到杉湖北路接客"
+    },
+    {
+      "kind": "deliver",
+      "at": [
+        -647,
+        590
+      ],
+      "radius": 14,
+      "text": "送客到两江四湖渔人码头",
+      "timer": 360,
+      "meterM": 2049
+    },
+    {
+      "kind": "deliver",
+      "at": [
+        215,
+        169
+      ],
+      "radius": 14,
+      "text": "送客到七星公园西门",
+      "timer": 300,
+      "meterM": 1327
+    }
+  ],
+  "reward": 100,
+  "failOn": [
+    "timeout"
+  ]
+}

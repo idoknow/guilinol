@@ -370,4 +370,59 @@ assert.equal(feeRes.charged, 0)
 assert.equal(stateMod.getState().money, 2)
 
 console.log('[OK] 4. MissionRunnerEngine state machine, soup protection, timer freeze & cleanup')
+// Exercise the full catalog through the production runner and wallet.
+for (const line of ['taxi', 'race']) {
+  const orders = MISSIONS.filter(def => def.line === line)
+  assert.equal(orders.length, 3)
+  for (const def of orders) {
+    const runner = new MissionRunnerEngine()
+    const frame = {dt: 0.1, speedMs: 10, braking: false, parkLocked: false, crashPhase: 'none', mode: 'car'} as const
+    const balance = stateMod.getState().money
+    assert.equal(runner.start(def.id, {x: def.giver[0], z: def.giver[1]}).ok, true)
+    for (const [index, step] of def.steps.entries()) {
+      const [x, z] = step.at
+      assert.equal(vehicleForbiddenAt(x, z), false, `${def.id} step ${index} must allow cars`)
+      runner.step({...frame, x, z, mode: 'foot'})
+      runner.step({...frame, x, z, frozen: true})
+      assert.equal(runner.getSnapshot().stepIndex, index)
+      if (index === 1) {
+        const [lastX, lastZ] = def.steps.length > 2 ? def.steps[def.steps.length - 1].at : def.giver
+        for (let tick = 0; tick < 100; tick++) runner.step({...frame, x: lastX, z: lastZ})
+        assert.equal(runner.getSnapshot().stepIndex, index, 'later stop cannot skip current target')
+      }
+      runner.step({...frame, x, z})
+    }
+    const result = runner.getSnapshot().lastOutcome
+    assert.equal(result?.outcome, 'completed')
+    // Ten seconds at 10 m/s add ¥8 in distance and ¥1 in time.
+    const payout = def.reward + (line === 'taxi' ? 9 : 0)
+    assert.equal(result?.payout, payout)
+    saveMod.reloadSaveFromStorage()
+    assert.equal(stateMod.getState().money, balance + payout)
+    if (line === 'race') assert.ok(result!.elapsedSeconds! > 10)
+  }
+}
+console.log('[OK] 5. All six driving orders, vehicle access, ordered gates, taximeter, race time & saved payouts')
+// Re-run the two-stop taxi. Both a long detour and crawling at low speed must
+// stop earning time fare at the leg limit, with a fresh allowance after drop-off.
+const sharedTaxi = MISSIONS.find(order => order.id === 'taxi-03')!
+for (const speedMs of [40 / 3.6, 1]) {
+  const runner = new MissionRunnerEngine()
+  const frame = {mode: 'car', dt: 0.1, speedMs, parkLocked: false, braking: false, crashPhase: 'none'} as const
+  assert.ok(runner.start(sharedTaxi.id).ok)
+  const [x, z] = sharedTaxi.giver
+  runner.step({...frame, x, z})
+  let fare = 0
+  for (const stop of sharedTaxi.steps.slice(1)) {
+    const maxMeters = stop.meterM! * 1.3
+    const maxSeconds = maxMeters / (40 / 3.6)
+    const ticks = Math.ceil(maxSeconds / frame.dt) + 100
+    for (let tick = 0; tick < ticks; tick++) runner.step({...frame, x, z})
+    runner.step({...frame, x: stop.at[0], z: stop.at[1]})
+    fare += Math.min((ticks + 1) * frame.dt * speedMs, maxMeters) * 0.08 + maxSeconds * 0.1
+  }
+  const repeatBase = sharedTaxi.repeatReward ?? Math.round(sharedTaxi.reward * 0.45)
+  assert.equal(runner.getSnapshot().lastOutcome?.payout, repeatBase + Math.floor(fare))
+}
+console.log('[OK] 6. Per-leg taxi distance and time caps on repeat fares')
 console.log('ALL MISSION & ECONOMY TESTS PASSED')

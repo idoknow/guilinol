@@ -87,7 +87,7 @@ export interface PurchaseResult {
 }
 
 export interface RewardRequest {
-  source: 'mission_delivery' | 'mission_errand' | 'spot_bounty' | 'mission_first_clear'
+  source: 'mission_delivery' | 'mission_errand' | 'mission_taxi' | 'mission_race' | 'spot_bounty' | 'mission_first_clear'
   refId: string
   amount: number
   firstClearOnly?: boolean
@@ -752,10 +752,10 @@ export function claimSpotBounty(spotId: string, idempotencyKey = `spot_bounty:${
   })
 }
 
-export function computeMissionPayout(mission: MissionPayoutShape, soupRatio: number, isFirstClear: boolean): number {
+export function computeMissionPayout(mission: MissionPayoutShape, soupRatio: number, isFirstClear: boolean, taxiFare = 0): number {
   if (mission.line !== 'noodle') {
-    if (isFirstClear) return mission.reward
-    return mission.repeatReward ?? Math.round(mission.reward * 0.45)
+    const base = isFirstClear ? mission.reward : (mission.repeatReward ?? Math.round(mission.reward * 0.45))
+    return base + (mission.line === 'taxi' ? Math.floor(taxiFare) : 0)
   }
   const clampedSoup = Math.max(0, Math.min(1, soupRatio))
   const spilledPct = Math.max(0, 1 - clampedSoup) * 100
@@ -774,17 +774,18 @@ export function computeMissionPayout(mission: MissionPayoutShape, soupRatio: num
 
 export function settleMissionReward(params: {
   mission: MissionPayoutShape
+  taxiFare?: number
   soupRatio: number
   attemptNonce: string
 }): RewardResult & {isFirstClear: boolean} {
   const {mission, soupRatio, attemptNonce} = params
   const isFirstClear = !hasClaimedMissionFirstClear(mission.id)
-  const payout = computeMissionPayout(mission, soupRatio, isFirstClear)
+  const payout = computeMissionPayout(mission, soupRatio, isFirstClear, params.taxiFare)
   const source: RewardRequest['source'] = isFirstClear
     ? 'mission_first_clear'
     : mission.line === 'noodle'
       ? 'mission_delivery'
-      : 'mission_errand'
+      : `mission_${mission.line}`
   const res = creditReward({
     source,
     refId: mission.id,

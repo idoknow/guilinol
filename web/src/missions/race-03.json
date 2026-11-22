@@ -1,0 +1,81 @@
+{
+  "id": "race-03",
+  "line": "race",
+  "title": "象山长环",
+  "summary": "从象山沿江向北，经解放桥、阳桥和榕湖北路西段，过双塔北岸后返回。",
+  "recommendedVehicle": "car",
+  "giver": [
+    -869,
+    881
+  ],
+  "steps": [
+    {
+      "kind": "checkpoint",
+      "at": [
+        -869,
+        881
+      ],
+      "radius": 14,
+      "text": "开车通过滨江路起点"
+    },
+    {
+      "kind": "checkpoint",
+      "at": [
+        -75,
+        78
+      ],
+      "radius": 14,
+      "text": "通过解放桥东段",
+      "timer": 1380
+    },
+    {
+      "kind": "checkpoint",
+      "at": [
+        -826,
+        -158
+      ],
+      "radius": 14,
+      "text": "通过十字街"
+    },
+    {
+      "kind": "checkpoint",
+      "at": [
+        -1066,
+        337
+      ],
+      "radius": 14,
+      "text": "通过中山中路阳桥桥面"
+    },
+    {
+      "kind": "checkpoint",
+      "at": [
+        -1561,
+        69
+      ],
+      "radius": 14,
+      "text": "通过榕湖北路与翊武路交口"
+    },
+    {
+      "kind": "checkpoint",
+      "at": [
+        -885,
+        497
+      ],
+      "radius": 14,
+      "text": "通过双塔北岸"
+    },
+    {
+      "kind": "checkpoint",
+      "at": [
+        -869,
+        881
+      ],
+      "radius": 14,
+      "text": "通过滨江路终点"
+    }
+  ],
+  "reward": 420,
+  "failOn": [
+    "timeout"
+  ]
+}

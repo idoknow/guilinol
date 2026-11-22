@@ -1,0 +1,37 @@
+{
+  "id": "taxi-02",
+  "line": "taxi",
+  "title": "七星公园到日月双塔",
+  "summary": "上车后按里程和用时计价。",
+  "recommendedVehicle": "car",
+  "giver": [
+    215,
+    169
+  ],
+  "steps": [
+    {
+      "kind": "pickup",
+      "at": [
+        215,
+        169
+      ],
+      "radius": 14,
+      "text": "开车到七星公园接客"
+    },
+    {
+      "kind": "deliver",
+      "at": [
+        -885,
+        497
+      ],
+      "radius": 14,
+      "text": "送客到日月双塔北岸",
+      "timer": 540,
+      "meterM": 3376
+    }
+  ],
+  "reward": 100,
+  "failOn": [
+    "timeout"
+  ]
+}
