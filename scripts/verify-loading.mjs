@@ -11,7 +11,7 @@ let browser
 try {
   browser=await chromium.launch(browserOptions())
   for(const viewport of [{width:1440,height:900},{width:390,height:844}]){
-    const mobile=viewport.width<500,dir=`out/loading/${mobile?'mobile':'desktop'}`
+    const mobile=viewport.width<500,dir=`${process.env.LOADING_CAPTURE_DIR??'out/loading'}/${mobile?'mobile':'desktop'}`
     await mkdir(dir,{recursive:true})
     const context=await browser.newContext({viewport,hasTouch:mobile}),page=await context.newPage()
     page.setDefaultTimeout(90000)
@@ -45,7 +45,10 @@ try {
     const pose=()=>page.evaluate(()=>[...window.viewer.camera.position.toArray(),...window.viewer.camera.quaternion.toArray()])
     tileDelay=20000;holdLanding=true
     const before=await page.evaluate(()=>{window.viewer.camera.position.set(-924,200,2990);const camera=window.viewer.camera;const start=[...camera.position.toArray(),...camera.quaternion.toArray()];window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyV'}));return start})
-    const cancelButton=page.locator('.ld-veil button');await cancelButton.waitFor();await shot('veil');await cancelButton.click();landing.resolve();holdLanding=false;console.log('flight cancelled');await page.locator('.ld-veil').waitFor({state:'detached'})
+    const cancelButton=page.locator('.ld-veil button');await cancelButton.waitFor();await shot('veil')
+    const pendingSamples=await page.evaluate(()=>window.samples.filter(sample=>sample.level===2&&sample.stage==='正在落地'))
+    assert(pendingSamples.length>0&&pendingSamples.every((sample,index)=>!index||sample.fraction>=pendingSamples[index-1].fraction))
+    await cancelButton.click();landing.resolve();holdLanding=false;console.log('flight cancelled');await page.locator('.ld-veil').waitFor({state:'detached'})
     await wait(6000);assert.deepEqual(await pose(),before);assert.equal(await page.locator('body').getAttribute('data-mode'),'fly')
     tileDelay=1000;await page.evaluate(()=>window.viewer.camera.position.set(-924.31,200,-104.93));await page.keyboard.press('KeyV')
     await page.waitForFunction(()=>window.viewer.walk?.active&&!document.querySelector('.ld-veil'))
