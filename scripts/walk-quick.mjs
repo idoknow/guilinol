@@ -382,6 +382,8 @@ try {
   // M6-1: Mobile 390x844 HUD layout non-overlap, touch joystick + sprint/jump buttons + touch camera drag, and screenshot.
   const mobileCtx=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,isMobile:true,hasTouch:true})
   // Also run the mobile gait and vehicle checks with the second body and a longer hairstyle.
+  // Portrait phones get the IDOK-144 rotate gate; this pass checks the portrait HUD, so take its 竖屏继续 escape.
+  await mobileCtx.addInitScript(()=>sessionStorage.setItem('glol.portraitOk','1'))
   await mobileCtx.addInitScript(()=>localStorage.setItem('glol.avatar.v1',JSON.stringify({
     v:1,body:'f',skin:2,face:1,brows:1,eyes:1,hair:'f_long',hairColor:0,look:'basic',createdAt:1,
   })))
