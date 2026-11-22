@@ -20,10 +20,10 @@ try {
   const shots = await page.evaluate(async () => {
     document.body.innerHTML = ''
     const {creatorStage} = await import('/src/ui/creator-stage.ts')
-    const {contributors, LOGO_PORTRAIT} = await import('/src/ui/contributors.ts')
+    const {contributors} = await import('/src/ui/contributors.ts')
     const wait = ms => new Promise(r => setTimeout(r, ms))
     const result = {}
-    for (const person of [...contributors, LOGO_PORTRAIT]) {
+    for (const person of contributors) {
       const host = document.createElement('div')
       host.style.cssText = 'width:192px;height:192px'
       document.body.append(host)
