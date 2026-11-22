@@ -68,3 +68,24 @@ console.log({seconds:300,crossings:sim.crossed,transitions:sim.transitions,stopT
 assert.ok(sim.crossed>0&&sim.stopped>0&&sim.transitions>0&&people>0)
 assert.equal(red,0);assert.equal(quiet,0);assert.ok(share>=.3&&share<=.4)
 sim.step(.05,{x:1e6,y:0,z:1e6});assert.equal(sim.actors.length,0)
+
+const crossroads={nodes:[[1,-20,0],[2,0,-20],[3,0,0],[4,20,0]].map(([id,x,z])=>({id,x,z,y:0})),
+  lanes:[[1,3],[2,3],[3,4]].map(([from,to],id)=>({id,from,to,kind:'motor',offset:0,speedKmh:36})),walks:[],signals:[]}
+const fixture=new Traffic(crossroads,()=>.99)
+function fixtureCar(lane,dist){
+  const start=crossroads.nodes.find(node=>node.id===lane.from),end=crossroads.nodes.find(node=>node.id===lane.to)
+  const length=Math.hypot(end.x-start.x,end.z-start.z),dx=(end.x-start.x)/length,dz=(end.z-start.z)/length
+  return {track:{...lane,start,end,length,dx,dz,walk:false},dist,kind:'car',scale:1,speed:6,down:0,dodge:0,leaving:false,x:start.x+dist*dx,y:0,z:start.z+dist*dz,yaw:Math.atan2(dx,dz)}
+}
+const first=fixtureCar(crossroads.lanes[0],13),second=fixtureCar(crossroads.lanes[1],10)
+fixture.actors.push(second,first)
+let held=false,released=false,fadeTicks=0
+for(let frame=0;frame<280;frame++){
+  fixture.step(.05,{x:100,y:0,z:100})
+  if(first.track.from===3&&first.dist<6){held=true;assert.equal(second.track.to,3)}
+  if(second.track.from===3){released=true;assert.ok(first.track.from===3&&first.dist>=6)}
+  if(first.leaving&&fixture.actors.includes(first)&&first.scale>0&&first.scale<1)fadeTicks++
+}
+assert.ok(held&&released,'first arrival owns the junction until the exit clears')
+assert.equal(fadeTicks,7);assert.equal(fixture.actors.length,0)
+console.log('FIFO / occupied exit / 400 ms dead-end fade: pass')
