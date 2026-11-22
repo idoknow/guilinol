@@ -26,7 +26,7 @@ import {PERSONAL_EBIKE_MODELS} from '../game/catalog'
 import {findNearbyServiceBay, findNearbyShopTrigger, getShop, listShops} from '../game/shops'
 import {getQuietZoneAt} from '../game/quiet-zones'
 import {emit as emitGameEvent, getState as getGameState, onEvent as onGameEvent, onState,
-  policeStop, setPrompt, updateTravel, type ActiveVehicleState, type EquippedOutfit, type PersistedEbikeVisual,
+  setPrompt, updateTravel, type ActiveVehicleState, type EquippedOutfit, type PersistedEbikeVisual,
   type PersonalEbikeModelId, type PlayerMode} from '../game/state'
 import {
   KICKSTAND_REST_ROLL_RAD,
@@ -1953,8 +1953,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(wasCar&&rides?.car){
         const previous=rides.heading
         driverPose.advanceMount(step)
-        if(policeStop)rides.stop()
-        bikeSpeed=rides.steerCar(policeStop?0:keys.forward,keys.right,step,driverPose.mounted,{handbrake:rideCtrl.wheelie||policeStop})
+        bikeSpeed=rides.steerCar(keys.forward,keys.right,step,driverPose.mounted,{handbrake:rideCtrl.wheelie})
         wish.set(-Math.sin(rides.heading),-Math.cos(rides.heading))
         vx=rides.carVelX;vz=rides.carVelZ
         const carTel=rides.carTelemetry
@@ -1981,7 +1980,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         const previous=rides.heading
         ridePose.advanceMount(step)
         // Only lock steering input while actively crashed; ride.ts natively handles P-gear/kickstand interlock and brake-hold unlock!
-        const crashLocked=policeStop||!!crashSession||(rides.rideKind==='bike'&&ebikeFx.crashPhase!=='none')
+        const crashLocked=!!crashSession||(rides.rideKind==='bike'&&ebikeFx.crashPhase!=='none')
         if(crashLocked)rides.stop()
         const stepCtrl=!crashLocked&&(rides.rideKind==='bike'||rides.rideKind==='bicycle')
           ?{wheelie:rideCtrl.wheelie?1:0,tuck:rideCtrl.tuck,horn:rideCtrl.horn}

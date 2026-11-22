@@ -46,11 +46,11 @@ Rock 11-20 定：Claude 额度不够，**方案设计、派单、验收、lead �
 5. 逐张看交付的三联图、斜俯视图和叠加图，并且**自己抽查 2–3 项**：对着卫星图或 POI 核对，从低空斜视角自己截图。
 6. 通过：squash 合并 → 部署（见 §4）→ 状态改 done → 在 IDOK-2 用中文回复 Rock，附对比图和线上地址。不通过：写清楚哪张图、哪个数字不过，**@ 执行者**。
 
-## 4. 合并与部署（需要 sg 机器上的凭据）
-- 部署命令（只能在 sg-ovhcloud-01 上跑，token 在 `~/.credentials/`）：
-  `CLOUDFLARE_API_TOKEN=$(cat ~/.credentials/cloudflare-langbot-app-token) CLOUDFLARE_ACCOUNT_ID=1387087a999ab906634a7529b0c0684a npx -y wrangler@4 pages deploy dist --project-name guilinol --branch main`
-- 过渡期：lead 验收通过后，在 issue 里写“验收通过，可合并部署”，并 @ sg claude 或 sg codex 执行合并和部署。以后如果 lead 所在机器有 gh 写权限和 CF token，就由 lead 自己做。
-- 部署后用 `curl --resolve glol.rcpd.cc:443:104.21.48.80 https://glol.rcpd.cc/version.json` 核对线上版本（本地 DNS 可能有缓存）。
+## 4. 合并与部署（定时发版，IDOK-155）
+- **合并和上线分开**：验收通过就 squash 合并到 main，**不要手动部署**。线上每 4 小时统一更新一次（Rock 2026-11-22 定）。
+- sg 上的 `glol-release-window.timer` 在 UTC 00/04/08/12/16/20 点（北京时间 08/12/16/20/00/04 点）运行 `deploy/release-window.sh`：取 main 上最新一个镜像构建成功的提交，与线上 `/version.json` 不同才发版。日志：`journalctl --user -u glol-release-window -n 100`。
+- 唯一例外：线上故障修复（报错、白屏、无法登录等），可以合并后立即 `npm run deploy:hk`，并在 issue 里写明原因。
+- 合并后 issue 写“已合并，随下一个发版窗口（北京时间 X 点）上线”；状态照常流转，不用等上线。核对线上版本：`curl -s https://glol.rcpd.cc/version.json`。
 
 ## 5. 各执行者的已知问题
 - **py antigravity**：读网上下载的 png 后，会话报 400 INVALID_ARGUMENT，之后每次重试都会立刻失败。处理办法：新开一个 issue（新会话），并在说明里写“图片先转 JPEG、最长边 ≤1600 px、每次最多 3 张”。单次 401 属于偶发，重试即可。

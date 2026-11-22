@@ -290,19 +290,44 @@ try {
   ensureDrivable(eb)
   eb.setGear(3)
   for (let i = 0; i < 30; i++) eb.steer(1, 0, 0.05, true)
-  let ebikeLoopout = false
-  for (let i = 0; i < 30; i++) {
+  // IDOK-153: wheelie rises gently and only loops out after sitting at the max angle for 1.8 s.
+  let ebikeLoopout = false, ebikeAtMax = -1, ebikeCrashAt = -1, ebikeEarlyRisk = 0
+  for (let i = 0; i < 200; i++) {
     eb.steer(1, 0, 0.05, true, {wheelie: true})
-    if (eb.crashState.reason === 'loopout') { ebikeLoopout = true; break }
+    if (i === 9) ebikeEarlyRisk = eb.wheelie
+    if (ebikeAtMax < 0 && eb.wheelie >= 0.67) ebikeAtMax = i
+    if (eb.crashState.reason === 'loopout') { ebikeLoopout = true; ebikeCrashAt = i; break }
   }
   check('ebike wheelie hold hits loopout', ebikeLoopout)
+  check('ebike wheelie is gentle: < 0.4 rad after 0.5 s of holding (D3)', ebikeEarlyRisk < 0.4, `wheelie@0.5s=${ebikeEarlyRisk.toFixed(3)}`)
+  check('ebike loopout only after >= 1.75 s pinned at max angle', ebikeAtMax >= 0 && (ebikeCrashAt - ebikeAtMax) * 0.05 >= 1.75,
+    `atMax=${ebikeAtMax * 0.05}s crash=${ebikeCrashAt * 0.05}s`)
+
+  // Releasing before the hold timer runs out never crashes, even when repeated.
+  eb.mount(0, 0, 'bike', {vehicleType: 'normal', autoCrash: true, drainEnabled: false})
+  ensureDrivable(eb)
+  eb.setGear(4)
+  for (let i = 0; i < 30; i++) eb.steer(1, 0, 0.05, true)
+  let shortHoldCrash = false, shortPeak = 0
+  for (let round = 0; round < 4 && !shortHoldCrash; round++) {
+    let pinned = 0
+    for (let i = 0; i < 120 && pinned < 1.3; i++) {
+      eb.steer(1, 0, 0.05, true, {wheelie: true})
+      shortPeak = Math.max(shortPeak, eb.wheelie)
+      if (eb.wheelie >= 0.67) pinned += 0.05
+      if (eb.crashState.reason) { shortHoldCrash = true; break }
+    }
+    for (let i = 0; i < 30; i++) eb.steer(1, 0, 0.05, true)
+    if (eb.crashState.reason) shortHoldCrash = true
+  }
+  check('ebike S-gear wheelie held 1.3 s at max then released (x4) never crashes', !shortHoldCrash && shortPeak >= 0.67, `peak=${shortPeak.toFixed(3)}`)
 
   ped.mount(0, 0, 'bicycle', {autoCrash: true})
   ensureDrivable(ped)
   ped.setGear(1)
   for (let i = 0; i < 20; i++) ped.steer(1, 0, 0.05, true)
   let pedLoopout = false
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 200; i++) {
     ped.steer(1, 0, 0.05, true, {wheelie: true})
     if (ped.crashState.reason === 'loopout') { pedLoopout = true; break }
   }

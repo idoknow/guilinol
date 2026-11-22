@@ -1,7 +1,7 @@
 import './about.css'
 import {photoCredits} from './photo-credits'
 import {SOURCE_URL} from './source'
-import {contributors, KIND_LABEL, LOGO_DESIGNER, LOGO_PORTRAIT, type ContribKind, type Contributor} from './contributors'
+import {contributors, KIND_LABEL, type ContribKind, type Contributor} from './contributors'
 
 const dataLines = [
   '© OpenStreetMap contributors（ODbL）',
@@ -16,7 +16,7 @@ let mask:HTMLDivElement|undefined
 /** 关于：Logo 与一句话介绍、贡献者（按人、按做了什么）、致谢、数据与照片署名、版本。由主界面打开。 */
 export function openAbout() {
   if (!mask) {
-    const people = roster()
+    const people = contributors
     const count = (kind:ContribKind) => people.filter(p => p.items.some(i => i.kind === kind)).length
     mask = document.createElement('div')
     mask.className = 'about-mask'
@@ -87,16 +87,6 @@ export function openAbout() {
   const grid = mask.querySelector<HTMLElement>('.ab-grid')!
   grid.classList.remove('ab-replay'); void grid.offsetWidth; grid.classList.add('ab-replay')
   mask.querySelector<HTMLButtonElement>('.about-close')!.focus()
-}
-
-/** 名单加上 Logo 设计者：已在名单里就并进那个人，否则单列一张卡（排在发起人之后）。 */
-function roster():Contributor[] {
-  const people = contributors.map(p => ({...p, items:[...p.items]}))
-  const logo = {kind:'design' as const, text:'像素 Logo'}
-  const known = LOGO_DESIGNER && people.find(p => p.name === LOGO_DESIGNER)
-  if (known) known.items.unshift(logo)
-  else people.splice(1, 0, {name:LOGO_DESIGNER || '网上桂林成员', role:'Logo 设计', ...LOGO_PORTRAIT, items:[logo]})
-  return people
 }
 
 function card(person:Contributor, index:number) {
