@@ -87,7 +87,9 @@ export class MissionRunnerEngine {
   private mission: MissionDef | null = null
   private stepIndex = 0
   private timerRemaining: number | null = null
-  private taxiFare = 0
+  private previousLegFares = 0
+  private legMeters = 0
+  private legSeconds = 0
   private elapsedSeconds = 0
   private soup = 1.0
   private attemptNonce = ''
@@ -135,7 +137,9 @@ export class MissionRunnerEngine {
     this.status = 'active'
     this.stepIndex = 0
     this.soup = 1.0
-    this.taxiFare = 0
+    this.previousLegFares = 0
+    this.legMeters = 0
+    this.legSeconds = 0
     this.elapsedSeconds = 0
     this.settled = false
     this.attemptNonce = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
@@ -263,7 +267,10 @@ export class MissionRunnerEngine {
     if (drivingMission && this.stepIndex > 0 && !isFrozen) {
       this.elapsedSeconds += dt
       if (def.line === 'taxi' && frame.mode === 'car' && frame.speedMs > 0) {
-        this.taxiFare += dt * (frame.speedMs * 80 / 1000 + 6 / 60)
+        const maxMeters = 1.3 * (def.steps[this.stepIndex].meterM ?? 0)
+        const maxSeconds = maxMeters / (40 / 3.6)
+        this.legMeters = Math.min(maxMeters, this.legMeters + dt * frame.speedMs)
+        this.legSeconds = Math.min(maxSeconds, this.legSeconds + dt)
       }
     }
 
@@ -273,6 +280,11 @@ export class MissionRunnerEngine {
       const dist = Math.hypot(frame.x - curStep.at[0], frame.z - curStep.at[1])
       if (dist <= curStep.radius) {
         if (this.stepIndex + 1 < def.steps.length) {
+          if (def.line === 'taxi') {
+            this.previousLegFares = this.taxiFare
+            this.legMeters = 0
+            this.legSeconds = 0
+          }
           this.stepIndex += 1
           const nextStep = def.steps[this.stepIndex]
           this.timerRemaining = nextStep.timer ?? this.timerRemaining
@@ -286,6 +298,10 @@ export class MissionRunnerEngine {
     }
 
     this.syncState()
+  }
+
+  private get taxiFare(): number {
+    return this.previousLegFares + this.legMeters * 80 / 1000 + this.legSeconds * 6 / 60
   }
 
   private conclude(outcome: 'completed' | 'failed' | 'abandoned', reason?: string): void {

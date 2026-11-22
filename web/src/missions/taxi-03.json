@@ -2,7 +2,7 @@
   "id": "taxi-03",
   "line": "taxi",
   "title": "两江四湖散场拼车",
-  "summary": "接客后按行车里程和行驶时间计费，每公里 80 元，每分钟 6 元。",
+  "summary": "上车后按里程和用时计价。",
   "recommendedVehicle": "car",
   "giver": [
     -885,
@@ -26,7 +26,8 @@
       ],
       "radius": 14,
       "text": "送客到两江四湖渔人码头",
-      "timer": 300
+      "timer": 360,
+      "meterM": 2049
     },
     {
       "kind": "deliver",
@@ -36,7 +37,8 @@
       ],
       "radius": 14,
       "text": "送客到七星公园西门",
-      "timer": 300
+      "timer": 300,
+      "meterM": 1327
     }
   ],
   "reward": 100,

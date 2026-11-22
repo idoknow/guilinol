@@ -2,7 +2,7 @@
   "id": "race-03",
   "line": "race",
   "title": "象山长环",
-  "summary": "从滨江路起跑，过解放桥后折返，经榕杉湖回到起点。全程限时 1080 秒。",
+  "summary": "从象山沿江向北，经解放桥、阳桥和榕湖北路西段，过双塔北岸后返回。",
   "recommendedVehicle": "car",
   "giver": [
     -869,
@@ -26,7 +26,7 @@
       ],
       "radius": 14,
       "text": "通过解放桥东段",
-      "timer": 1080
+      "timer": 1380
     },
     {
       "kind": "checkpoint",
@@ -40,11 +40,11 @@
     {
       "kind": "checkpoint",
       "at": [
-        -1105,
-        283
+        -1066,
+        337
       ],
       "radius": 14,
-      "text": "通过榕杉湖阳桥西侧"
+      "text": "通过中山中路阳桥桥面"
     },
     {
       "kind": "checkpoint",
@@ -53,7 +53,7 @@
         69
       ],
       "radius": 14,
-      "text": "通过榕湖北路西段"
+      "text": "通过榕湖北路与翊武路交口"
     },
     {
       "kind": "checkpoint",

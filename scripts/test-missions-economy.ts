@@ -403,4 +403,26 @@ for (const line of ['taxi', 'race']) {
   }
 }
 console.log('[OK] 5. All six driving orders, vehicle access, ordered gates, taximeter, race time & saved payouts')
+// Re-run the two-stop taxi. Both a long detour and crawling at low speed must
+// stop earning time fare at the leg limit, with a fresh allowance after drop-off.
+const sharedTaxi = MISSIONS.find(order => order.id === 'taxi-03')!
+for (const speedMs of [40 / 3.6, 1]) {
+  const runner = new MissionRunnerEngine()
+  const frame = {mode: 'car', dt: 0.1, speedMs, parkLocked: false, braking: false, crashPhase: 'none'} as const
+  assert.ok(runner.start(sharedTaxi.id).ok)
+  const [x, z] = sharedTaxi.giver
+  runner.step({...frame, x, z})
+  let fare = 0
+  for (const stop of sharedTaxi.steps.slice(1)) {
+    const maxMeters = stop.meterM! * 1.3
+    const maxSeconds = maxMeters / (40 / 3.6)
+    const ticks = Math.ceil(maxSeconds / frame.dt) + 100
+    for (let tick = 0; tick < ticks; tick++) runner.step({...frame, x, z})
+    runner.step({...frame, x: stop.at[0], z: stop.at[1]})
+    fare += Math.min((ticks + 1) * frame.dt * speedMs, maxMeters) * 0.08 + maxSeconds * 0.1
+  }
+  const repeatBase = sharedTaxi.repeatReward ?? Math.round(sharedTaxi.reward * 0.45)
+  assert.equal(runner.getSnapshot().lastOutcome?.payout, repeatBase + Math.floor(fare))
+}
+console.log('[OK] 6. Per-leg taxi distance and time caps on repeat fares')
 console.log('ALL MISSION & ECONOMY TESTS PASSED')

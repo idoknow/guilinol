@@ -21,6 +21,8 @@ export interface MissionStepDef {
   at: [number, number]
   radius: number
   timer?: number
+  /** Undirected motor-road distance from the previous taxi stop, rounded down in metres. */
+  meterM?: number
   text: string
   npc?: {
     who: string

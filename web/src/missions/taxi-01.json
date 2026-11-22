@@ -2,7 +2,7 @@
   "id": "taxi-01",
   "line": "taxi",
   "title": "十字街到象鼻山",
-  "summary": "接客后按行车里程和行驶时间计费，每公里 80 元，每分钟 6 元。",
+  "summary": "上车后按里程和用时计价。",
   "recommendedVehicle": "car",
   "giver": [
     -826,
@@ -26,7 +26,8 @@
       ],
       "radius": 14,
       "text": "送客到象鼻山北门",
-      "timer": 300
+      "timer": 300,
+      "meterM": 1767
     }
   ],
   "reward": 100,
