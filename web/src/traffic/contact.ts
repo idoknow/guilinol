@@ -5,19 +5,21 @@ type Visit=(x:number,z:number,callback:(solid:Solid)=>void)=>void
 export class SolidGrid {
   private bins=new Map<number,Set<Solid>>()
   add(solid:Solid){
-    const key=cellKey(Math.floor(solid.x/16),Math.floor(solid.z/16));let bin=this.bins.get(key)
-    if(!bin){bin=new Set();this.bins.set(key,bin)}bin.add(solid)
-    return ()=>{bin.delete(solid);if(!bin.size)this.bins.delete(key)}
+    const keys:number[]=[]
+    for(let east=Math.floor((solid.x-7)/16);east<=Math.floor((solid.x+7)/16);east++)for(let south=Math.floor((solid.z-7)/16);south<=Math.floor((solid.z+7)/16);south++){
+      const key=cellKey(east,south);let bin=this.bins.get(key)
+      if(!bin){bin=new Set();this.bins.set(key,bin)}bin.add(solid);keys.push(key)
+    }
+    return ()=>{for(const key of keys){const bin=this.bins.get(key);if(bin?.delete(solid)&&!bin.size)this.bins.delete(key)}}
   }
   clear(){this.bins.clear()}
   near:Visit=(x,z,callback)=>{
-    if(!this.bins.size)return
-    for(let east=Math.floor((x-7)/16);east<=Math.floor((x+7)/16);east++)for(let south=Math.floor((z-7)/16);south<=Math.floor((z+7)/16);south++){
-      const bin=this.bins.get(cellKey(east,south));if(bin)for(const solid of bin)callback(solid)
-    }
+    const bin=this.bins.get(cellKey(Math.floor(x/16),Math.floor(z/16)));if(bin)for(const solid of bin)callback(solid)
   }
+  hasNearby(x:number,z:number){return this.bins.size!==0&&this.bins.has(cellKey(Math.floor(x/16),Math.floor(z/16)))}
 }
 export const pickups=new SolidGrid(),curbside=new SolidGrid()
+export const nearStatic=(x:number,z:number)=>pickups.hasNearby(x,z)||curbside.hasNearby(x,z)
 export const staticSolids:Visit=(x,z,callback)=>{pickups.near(x,z,callback);curbside.near(x,z,callback)}
 let visit:Visit|undefined
 export function useTrafficSolids(source?:Visit){visit=source}

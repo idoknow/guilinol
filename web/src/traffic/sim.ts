@@ -1,8 +1,9 @@
-import {resolveContact,staticSolids} from './contact.ts'
+import {nearStatic,resolveContact,staticSolids} from './contact.ts'
 type Node = {id:number,x:number,y:number,z:number}
 type Lane = {id:number,from:number,to:number,offset:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string}
 const tier=(cls?:string)=>cls==='primary'||cls==='trunk'?0:cls==='secondary'?1:cls==='tertiary'?2:3
 const density=[1,.6,.35,.12]
+const sector=(point:Position,center:Position)=>(Math.floor(Math.atan2(point.x-center.x,point.z-center.z)*4/Math.PI+.5)+8)%8
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?][],signals:Signal[]}
@@ -113,10 +114,17 @@ export class Traffic {
     let persons=0,scooters=0
     this.updateLimits(camera)
     const counts=[0,0,0,0]
-    for(const actor of this.actors)if(actor.kind!=='person')counts[tier(actor.track.cls)]++
-    for(const actor of this.actors){persons+=Number(actor.kind==='person');scooters+=Number(actor.kind==='scooter')}
+    let outside=0
+    const canSpawn=this.actors.length<80
+    const nearbySectors=canSpawn&&visible?new Uint8Array(8):null
+    const sectorPopulation=nearbySectors?new Uint8Array(8):null
+    for(const actor of this.actors){
+      if(actor.kind==='person'){persons++;continue}
+      counts[tier(actor.track.cls)]++;scooters+=Number(actor.kind==='scooter')
+      if(canSpawn&&visible&&!visible(actor))outside++
+      if(nearbySectors&&sectorPopulation){const octant=sector(actor,camera);sectorPopulation[octant]++;if(distanceSq(actor,camera)<65**2)nearbySectors[octant]++}
+    }
     let motors=this.actors.length-persons
-    let outside=visible?this.actors.reduce((count,actor)=>count+Number(actor.kind!=='person'&&!visible(actor)),0):0
     for(let attempt=0;attempt<48 && this.actors.length<80;attempt++){
       const walk=persons<20 && (motors>=60||attempt%3===0)
       if(!walk&&motors>=60)continue
@@ -130,10 +138,14 @@ export class Traffic {
       const actor:Actor={track,dist:this.random()*track.length,speed:0,kind:walk?'person':scooter?'scooter':'car',down:0,dodge:0,x:0,y:0,z:0,yaw:0,scale:0,leaving:false,halfWidth:scooter?.3:.9,halfLength:scooter?.85:2.1,height:1.5}
       this.position(actor)
       const offscreen=!walk&&visible&&!visible(actor)
+      const radial=distanceSq(actor,camera),octant=nearbySectors&&!walk?sector(actor,camera):-1
+      if(octant>=0&&offscreen&&sectorPopulation![octant]>=5&&sectorPopulation!.some(count=>count<4)&&this.random()>.04)continue
+      if(octant>=0&&motors>12&&nearbySectors![octant]<3&&radial>=65**2&&this.random()>.25)continue
       if(offscreen&&outside>=27&&this.limits[0]>=30&&this.random()>.04)continue
-      if(!walk&&resolveContact(actor,actor.y,actor.yaw,actor.halfWidth,actor.halfLength,staticSolids))continue
-      if(distanceSq(actor,camera)>185**2 || this.actors.some(other=>(other.x-actor.x)**2+(other.z-actor.z)**2<(other.track.id===track.id?36:5)))continue
+      if(!walk&&nearStatic(actor.x,actor.z)&&resolveContact(actor,actor.y,actor.yaw,actor.halfWidth,actor.halfLength,staticSolids))continue
+      if(radial>185**2 || this.actors.some(other=>(other.x-actor.x)**2+(other.z-actor.z)**2<(other.track.id===track.id?36:5)))continue
       this.actors.push(actor)
+      if(octant>=0){sectorPopulation![octant]++;if(radial<65**2)nearbySectors![octant]++}
       if(walk)persons++;else {counts[group]++;motors++;scooters+=Number(scooter);outside+=Number(!!offscreen)}
     }
     for(const [node,queue] of this.queues){
@@ -184,7 +196,7 @@ export class Traffic {
         advance=Math.min(advance,gap)
       }
       actor.speed=advance/dt;actor.dist+=advance
-      if(!person&&advance>0){
+      if(!person&&advance>0&&nearStatic(actor.x+track.dx*advance,actor.z+track.dz*advance)){
         const next={x:actor.x+track.dx*advance,y:actor.y,z:actor.z+track.dz*advance}
         if(resolveContact(next,next.y,track.yaw,actor.halfWidth,actor.halfLength,staticSolids)){actor.speed=0;actor.dist-=advance;continue}
       }

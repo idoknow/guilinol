@@ -53,9 +53,10 @@ def bake_parking(output, segments, elements, nodes, forbidden):
             lateral = extent-.95
             x = head['x']+east*along-south/length*lateral
             z = head['z']+south*along+east/length*lateral
+            x, z = round(x, 1), round(z, 1)
             point = Point(x, z)
             if (forbidden.intersects(point.buffer(2.6)) or junctions.query(point, predicate='dwithin', distance=18).size or
-                    legacy.query(point, predicate='dwithin', distance=5.5).size):
+                    legacy.query(point, predicate='dwithin', distance=8.0).size):
                 continue
             y = head['y']+(tail['y']-head['y'])*along
             key = f'{math.floor(x/256)}_{math.floor(z/256)}'

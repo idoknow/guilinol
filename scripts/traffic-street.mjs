@@ -10,6 +10,13 @@ const dir='public/world/roads/parking',index=JSON.parse(await readFile(`${dir}/i
 const rows=(await Promise.all(Object.keys(index).map(async key=>JSON.parse(gunzipSync(await readFile(`${dir}/${key}.json.gz`)))))).flat()
 assert.equal(rows.length,Object.values(index).reduce((sum,count)=>sum+count,0))
 assert.ok(rows.every(row=>row[5]!=='primary'&&row[5]!=='trunk'))
+const pickups=JSON.parse(gunzipSync(await readFile('public/world/vehicles.bin'))).cars
+let minSquared=Infinity
+for(const [east,,south] of rows)for(const [pickupEast,,pickupSouth] of pickups){
+  minSquared=Math.min(minSquared,(pickupEast-east)**2+(pickupSouth-south)**2)
+}
+console.log('Pickup clearance',{parked:rows.length,pickups:pickups.length,minMetres:Math.sqrt(minSquared)})
+assert.ok(minSquared>64,'G2 parked car inside the pickup exclusion radius')
 const server=await preview({root:'web',configFile:'web/vite.config.ts',build:{outDir:resolve(process.env.PERF_DIST??'dist')},preview:{host:'127.0.0.1',port:0}})
 let browser
 try{
@@ -30,8 +37,13 @@ try{
     await page.screenshot({path:`captures/traffic/${shot.name}.jpg`})
     if(!shot.min)continue
     const visible=await page.evaluate(async({x,y,z,yaw})=>{
-      const viewer=window.viewer;await viewer.freeze();const counts=[]
-      try{for(let i=0;i<8;i++){const angle=yaw+i*Math.PI/4;viewer.camera.lookAt(x+20*Math.sin(angle),y-4,z+20*Math.cos(angle));viewer.camera.updateMatrixWorld();counts.push((await viewer.trafficPixels()).length)}}finally{viewer.resume()}
+      const viewer=window.viewer,counts=[]
+      for(let heading=0;heading<8;heading++){
+        const angle=yaw+heading*Math.PI/4
+        viewer.camera.lookAt(x+20*Math.sin(angle),y-6,z+20*Math.cos(angle));viewer.camera.updateMatrixWorld()
+        await new Promise(resolve=>requestAnimationFrame(resolve))
+        counts.push((await viewer.trafficPixels()).length)
+      }
       return counts
     },shot)
     console.log(shot.name,visible);results.push([visible,shot.min])
