@@ -41,6 +41,8 @@ export const walkConfig = {
   slope:52*Math.PI/180, step:.62, stepWidth:.08, snap:.65, skin:.025, collisionRadius:384, peakRadius:600, search:64,
   // Camera (M2 look): figure stays small, scenery fills the frame (docs/style.md 原则 6).
   near:4.5, far:11, zoomMin:2.5, zoomMax:22, sensitivity:.003, touchSensitivity:.0046,
+  // Phone look stick (IDOK-93): full deflection turns this many rad/s; deadzone as a fraction of the stick radius.
+  lookYaw:2.2, lookPitch:1.2, lookDead:.12,
   pitch:.3, camRadius:.22, camRecover:9,
   gate:{x:-588,z:-212,yaw:Math.PI},
 }
