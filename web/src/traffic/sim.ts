@@ -10,6 +10,7 @@ type Position = {x:number,z:number,y:number}
 export class Traffic {
   actors:Actor[]=[]
   time=0
+  private nextCull=0
   crossed=0
   stopped=0
   transitions=0
@@ -72,6 +73,11 @@ export class Traffic {
   step(dt:number,camera:Position,vehicle?:Position,visible?:(point:Position)=>boolean){
     this.time+=dt
     this.actors=this.actors.filter(actor=>(!actor.leaving||actor.scale>0)&&Math.hypot(actor.x-camera.x,actor.y-camera.y,actor.z-camera.z)<210)
+    if(visible&&this.time>=this.nextCull){
+      this.nextCull=this.time+.35
+      const behind=this.actors.filter(actor=>actor.kind!=='person'&&!visible(actor))
+      if(behind.length>14)this.actors.splice(this.actors.indexOf(behind[0]),1)
+    }
     let persons=0,scooters=0
     for(const actor of this.actors){persons+=Number(actor.kind==='person');scooters+=Number(actor.kind==='scooter')}
     let motors=this.actors.length-persons
@@ -94,7 +100,12 @@ export class Traffic {
       const retained=queue.filter(actor=>this.actors.includes(actor)&&!actor.leaving&&(actor.track.to===node||actor.track.from===node&&actor.dist<6))
       if(retained.length)this.queues.set(node,retained);else this.queues.delete(node)
     }
-    const obstacles=vehicle?[...this.actors,vehicle]:this.actors
+    const obstacles:Map<number,(Position|Actor)[]>=new Map()
+    for(const obstacle of vehicle?[...this.actors,vehicle]:this.actors){
+      const key=Math.floor(obstacle.x/16)*65536+Math.floor(obstacle.z/16)
+      const bin=obstacles.get(key)
+      if(bin)bin.push(obstacle);else obstacles.set(key,[obstacle])
+    }
     for(const actor of this.actors){
       const {track}=actor,person=actor.kind==='person'
       if(actor.leaving){actor.scale=Math.max(0,actor.scale-dt/.4);continue}
@@ -103,17 +114,19 @@ export class Traffic {
       let advance=Math.min(maxSpeed,actor.speed+dt*2)*dt
       if(actor.down>0){actor.down-=dt;continue}
       actor.dodge*=Math.exp(-dt*1.2)
-      for(const other of obstacles){
+      const left=Math.floor((actor.x-7)/16),right=Math.floor((actor.x+7)/16),top=Math.floor((actor.z-7)/16),bottom=Math.floor((actor.z+7)/16)
+      nearby:for(let col=left;col<=right;col++)for(let row=top;row<=bottom;row++)for(const other of obstacles.get(col*65536+row)??[]){
         if(other===actor||Math.abs(other.y-actor.y)>2)continue
         const dx=other.x-actor.x,dz=other.z-actor.z
         if(Math.abs(dx)>7||Math.abs(dz)>7)continue
         const ahead=dx*track.dx+dz*track.dz,lateral=Math.abs(dx*track.dz-dz*track.dx)
         if(person){
           if('kind' in other && other.kind==='person')continue
-          if(Math.hypot(dx,dz)<1.2){actor.down=2;advance=0;break}
-          if(Math.hypot(dx,dz)<4){
+          const distanceSq=dx*dx+dz*dz
+          if(distanceSq<1.44){actor.down=2;advance=0;break nearby}
+          if(distanceSq<16){
             const away=dx*track.dz-dz*track.dx>=0?1:-1
-            actor.dodge=Math.max(-.9,Math.min(.9,actor.dodge+away*dt*3));advance=0;break
+            actor.dodge=Math.max(-.9,Math.min(.9,actor.dodge+away*dt*3));advance=0;break nearby
           }
         }else if(ahead>0&&lateral<1.8){advance=Math.min(advance,Math.max(0,ahead-5))}
       }
