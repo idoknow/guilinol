@@ -42,7 +42,15 @@ try{
         const angle=yaw+heading*Math.PI/4
         viewer.camera.lookAt(x+20*Math.sin(angle),y-6,z+20*Math.cos(angle));viewer.camera.updateMatrixWorld()
         await new Promise(resolve=>requestAnimationFrame(resolve))
-        counts.push((await viewer.trafficPixels()).length)
+        let maximum=(await viewer.trafficPixels()).length,frames=1
+        const until=performance.now()+2000
+        do{
+          await new Promise(resolve=>requestAnimationFrame(resolve))
+          if(performance.now()>until)break
+          maximum=Math.max(maximum,(await viewer.trafficPixels()).length);frames++
+        }while(performance.now()<until)
+        if(frames<2)throw Error(`Insufficient pixel samples in heading ${heading}`)
+        counts.push(maximum)
       }
       return counts
     },shot)

@@ -48,19 +48,25 @@ export class Traffic {
   private limits=[0,0,0,0]
   private rebalanceAt=0
   private samples:{track:Track,dist:number}[][]=[]
+  private primarySites:{track:Track,dist:number,x:number,y:number,z:number}[]=[]
   private updateLimits(camera:Position,street:boolean){
     if(Math.hypot(this.anchorX-camera.x,this.anchorZ-camera.z)<16)return
     this.anchorX=camera.x;this.anchorZ=camera.z
     this.samples=Array.from({length:8},()=>[])
+    this.primarySites=[]
     const quota=[0,0,0,0],col=Math.floor(camera.x/128),row=Math.floor(camera.z/128)
     for(let east=col-2;east<=col+2;east++)for(let south=row-2;south<=row+2;south++){
       for(const track of this.cells.get(`${east},${south}`)??[]){
         if(track.walk||track.kind!=='motor')continue
         const dx=camera.x-track.start.x,dz=camera.z-track.start.z
         const center=dx*track.dx+dz*track.dz,lateral=dx*track.dz-dz*track.dx
-        if(Math.abs(lateral)>=185)continue
-        const span=Math.sqrt(185**2-lateral**2),group=tier(track.cls)
+        const group=tier(track.cls),radius=street&&group===0?150:185
+        if(Math.abs(lateral)>=radius)continue
+        const span=Math.sqrt(radius**2-lateral**2)
         quota[group]+=Math.max(0,Math.min(track.length,center+span)-Math.max(0,center-span))*.095*density[group]
+        if(street&&group===0)for(let dist=Math.max(2,center-span);dist<Math.min(track.length,center+span);dist+=7){
+          this.primarySites.push({track,dist,x:track.start.x+track.dx*dist-track.dz*track.offset,y:track.start.y+(track.end.y-track.start.y)*dist/track.length,z:track.start.z+track.dz*dist+track.dx*track.offset})
+        }
         if(street&&Math.abs(lateral+track.offset)<60){
           for(let dist=Math.max(2,center-60);dist<Math.min(track.length,center+60);dist+=6){
             const x=track.start.x+track.dx*dist-track.dz*track.offset,z=track.start.z+track.dz*dist+track.dx*track.offset
@@ -140,7 +146,8 @@ export class Traffic {
     const counts=[0,0,0,0]
     let outside=0
     const cap=visible?MAX_ACTORS:80,canSpawn=this.actors.length<cap
-    const nearbySectors=canSpawn&&visible?new Uint8Array(8):null
+    const rebalance=visible&&this.time>=this.rebalanceAt
+    const nearbySectors=(canSpawn||rebalance)&&visible?new Uint8Array(8):null
     const sectorPopulation=nearbySectors?new Uint8Array(8):null
     const countNearby=(actor:Actor)=>{const mask=coverage(actor.x,actor.z,actor.y,camera);for(let i=0;i<8;i++)if(mask&(1<<i))nearbySectors![i]++}
     for(const actor of this.actors){
@@ -151,22 +158,38 @@ export class Traffic {
     }
     let motors=this.actors.length-persons
     const walkers=visible&&this.limits[0]>=60?12:20
-    if(visible&&walkers===12&&this.time>=this.rebalanceAt){
+    if(visible&&rebalance&&sectorPopulation&&nearbySectors){
       this.rebalanceAt=this.time+.25
-      let distant:Actor|undefined,inView=0
+      let distant:Actor|undefined,donor:Actor|undefined,inView=0
+      const crowded=sectorPopulation.indexOf(Math.max(...sectorPopulation))
+      const deficit=nearbySectors.some((count,index)=>this.samples[index].length>0&&count<(walkers===12?4:2))
       for(const actor of this.actors){
         if(actor.kind==='person'||actor.leaving)continue
+        if(deficit&&sector(actor,camera)===crowded&&sectorPopulation[crowded]>8&&(!donor||distanceSq(actor,camera)>distanceSq(donor,camera)))donor=actor
         if(visible(actor)){inView++;continue}
-        if(distanceSq(actor,camera)>60**2&&(!distant||distanceSq(actor,camera)>distanceSq(distant,camera)))distant=actor
+        if((distanceSq(actor,camera)>60**2||sectorPopulation[sector(actor,camera)]>8)&&(!distant||distanceSq(actor,camera)>distanceSq(distant,camera)))distant=actor
       }
-      if(inView<52&&distant)distant.leaving=true
+      if(walkers===12&&inView<52&&distant)distant.leaving=true
+      else if(!canSpawn&&deficit&&donor)donor.leaving=true
     }
     for(let attempt=0;attempt<48 && this.actors.length<cap;attempt++){
       const walk=persons<walkers && (motors>=cap-walkers||attempt%3===0)
       if(!walk&&motors>=cap-walkers)continue
-      const bucket=attempt%8
-      const samples=!walk&&nearbySectors&&nearbySectors[bucket]<8?this.samples[bucket]:null
-      const target=samples?.length?samples[Math.floor(this.random()*samples.length)]:null
+      let bucket=attempt%8
+      if(nearbySectors&&!walk&&attempt%2===0){
+        for(let offset=1;offset<=8;offset++){
+          const candidate=(attempt+offset)%8
+          if(this.samples[candidate].length&&(!this.samples[bucket].length||nearbySectors[candidate]<nearbySectors[bucket]))bucket=candidate
+        }
+      }
+      const samples=!walk&&nearbySectors&&nearbySectors[bucket]<6?this.samples[bucket]:null
+      let target=samples?.length?samples[Math.floor(this.random()*samples.length)]:null
+      if(!walk&&visible&&this.primarySites.length&&counts[0]<this.limits[0]&&motors-outside<52&&(!target||attempt%3!==0)){
+        for(let retry=0;retry<4;retry++){
+          const site=this.primarySites[Math.floor(this.random()*this.primarySites.length)]
+          if(visible(site)){target=site;break}
+        }
+      }
       const cell=this.cells.get(`${Math.floor(camera.x/128)+Math.floor(this.random()*3)-1},${Math.floor(camera.z/128)+Math.floor(this.random()*3)-1}`)
       if(!cell?.length&&!target)continue
       const track=target?.track??cell![Math.floor(this.random()*cell!.length)]

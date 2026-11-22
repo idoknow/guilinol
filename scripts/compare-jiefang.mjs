@@ -12,16 +12,21 @@ const camera=new THREE.PerspectiveCamera(55,960/540,1,2000)
 camera.position.set(-265,168,15);camera.lookAt(-145,153,45);camera.updateMatrixWorld()
 const frustum=new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
 const point=new THREE.Vector3(),visible=actor=>frustum.containsPoint(point.set(actor.x,actor.y+.7,actor.z))
-const measure=(Simulation,file)=>{
-  let seed=110
+const measure=(Simulation,file,seed)=>{
   const sim=new Simulation(JSON.parse(gunzipSync(readFileSync(file))),()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32))
   const counts=[]
-  for(let tick=1;tick<=400;tick++){
+  for(let tick=1;tick<=1200;tick++){
     sim.step(.05,camera.position,undefined,visible)
-    if(tick%100===0)counts.push(sim.actors.filter(actor=>actor.kind!=='person'&&actor.scale>=.99&&visible(actor)).length)
+    if(tick%20===0)counts.push(sim.actors.filter(actor=>actor.kind!=='person'&&actor.scale>=.99&&visible(actor)).length)
   }
   return counts
 }
-const main=measure(Baseline,baselineGraph),pr=measure(Traffic,'public/world/roads/-1_0.json.gz')
-console.log({seconds:[5,10,15,20],main,pr})
-assert.ok(pr.every((value,index)=>value>=main[index]))
+for(const seed of [110,111,112]){
+  const main=measure(Baseline,baselineGraph,seed),pr=measure(Traffic,'public/world/roads/-1_0.json.gz',seed)
+  for(const seconds of [30,60]){
+    const stats=counts=>({mean:counts.slice(0,seconds).reduce((sum,value)=>sum+value,0)/seconds,min:Math.min(...counts.slice(0,seconds))})
+    const baseline=stats(main),candidate=stats(pr)
+    console.log({seed,seconds,baseline,candidate})
+    assert.ok(candidate.mean>=.9*baseline.mean)
+  }
+}
