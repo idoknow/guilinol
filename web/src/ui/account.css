@@ -44,3 +44,9 @@ input.acc-code{font-size:24px!important;letter-spacing:.6em;text-align:center;pa
 .acc-social .ui-btn{justify-content:center}
 .acc-avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
 .acc-tabs[hidden]{display:none}
+
+/* 平台图标（QQ / 微信 官方品牌图，public/icons 自托管） */
+.acc-social-btn{display:flex;align-items:center;justify-content:center;gap:8px}
+.social-icon{width:18px;height:18px;flex:none;border-radius:50%;display:block}
+.acc-avatar--brand{background:transparent;padding:0;overflow:visible}
+.acc-avatar--brand .social-icon{width:100%;height:100%}
