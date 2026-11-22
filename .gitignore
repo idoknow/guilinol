@@ -6,6 +6,7 @@ dist/
 __pycache__/
 .venv/
 captures/
+out/
 .wrangler/
 .dev.vars*
 .world-cache/

@@ -19,6 +19,7 @@ export interface Landmark {
 export type LoadedLandmarks = Map<Landmark,THREE.Group>
 
 export interface LandmarkStreamOptions {
+  onPendingChange?:()=>void
   getMetrics?: () => RenderRangeMetrics
   isInnerBusy?: () => boolean
 }
@@ -110,6 +111,7 @@ export function landmarkStream(
   function loadEntry(entry:Landmark, isPriority:boolean){
     if(loaded.has(entry)||pending.has(entry))return
     pending.add(entry)
+    options?.onPendingChange?.()
     if(isPriority)priorityPending.add(entry)
     if(retry.has(entry))record('retry',{category:'landmark'})
     loaderReady.then(loader=>loader.loadAsync('./'+entry.file)).then(({scene:group,parser})=>{
@@ -157,6 +159,7 @@ export function landmarkStream(
       scene.add(group);group.updateMatrixWorld(true);loaded.set(entry,group);retry.delete(entry)
     }).catch(error=>{record('failure',{category:'landmark'});console.warn(entry.id,error);retry.set(entry,performance.now()+30000)}).finally(()=>{
       pending.delete(entry);priorityPending.delete(entry)
+      options?.onPendingChange?.()
     })
   }
   function entryCutoffs(entry:Landmark,metrics:RenderRangeMetrics,guardDist:number){
@@ -217,5 +220,6 @@ export function landmarkStream(
   return Object.assign(tick,{
     busyPriorityCount:()=>priorityPending.size,
     pendingCount:()=>pending.size,
+    pendingFiles:()=>Array.from(pending,entry=>entry.file),
   })
 }

@@ -17,7 +17,7 @@ try {
     page.setDefaultTimeout(90000)
     const shot=async name=>{await page.screenshot({path:`${dir}/${name}.png`});console.log(`${dir}/${name}`)}
     const atlas=Promise.withResolvers(),landing=Promise.withResolvers();let holdLanding=false
-    let tileDelay=300,fail=false,failures=0
+    let tileDelay=300,failLimit=0,failedPath='',attempts=[],noOpening=false
     await page.route('**/*',async route=>{
       const url=new URL(route.request().url()),path=url.pathname
       if(url.origin!==origin)return route.abort()
@@ -26,7 +26,11 @@ try {
       if(path.startsWith('/api/'))return route.fulfill({json:{}})
       if(/\/main-[^/]+\.js$/.test(path))await wait(700)
       if(path.endsWith('atlas.bin'))await atlas.promise
-      if(path.endsWith('.glc')){if(fail&&!failures++){return route.fulfill({status:500})}await Promise.all([wait(tileDelay),holdLanding?landing.promise:Promise.resolve()])}
+      if(noOpening&&path.endsWith('opening.bin'))return route.fulfill({status:500})
+      if(path.endsWith('.glc')){
+        if(failLimit){failedPath||=path;if(path===failedPath){attempts.push(Date.now());if(attempts.length<=failLimit)return route.fulfill({status:500})}}
+        await Promise.all([wait(tileDelay),holdLanding?landing.promise:Promise.resolve()])
+      }
       if(path.endsWith('manifest.json')||path.endsWith('overview.png')||path.endsWith('atlas.bin'))await wait(1600)
       await route.continue().catch(()=>{})
     })
@@ -53,12 +57,27 @@ try {
     tileDelay=1000;await page.evaluate(()=>window.viewer.camera.position.set(-924.31,200,-104.93));await page.keyboard.press('KeyV')
     await page.waitForFunction(()=>window.viewer.walk?.active&&!document.querySelector('.ld-veil'))
     const progress=await page.evaluate(()=>window.samples.filter(sample=>sample.level===2&&sample.stage==='正在落地').map(sample=>sample.fraction));assert(progress.length>0)
-    await page.evaluate(()=>window.viewer.walkTo(-450.81,-729.05,0,'verify-loading'))
+    await page.evaluate(()=>{
+      const stream=window.viewer.stream,notify=stream.onPendingChange
+      stream.onPendingChange=()=>{notify();const files=[...Array.from(stream.pending.keys(),tile=>tile.file),...(stream.updateLandmarks?.pendingFiles()??[])]
+        if(files.length===1)window.lastPending=files[0];if(!files.length)window.drained=performance.now()}
+      return window.viewer.walkTo(-450.81,-729.05,0,'verify-loading')
+    })
     await page.locator('.ld-corner').waitFor();await shot('corner')
     await page.waitForFunction(()=>!window.viewer.stream.pending.size&&!window.viewer.stream.updateLandmarks?.pendingCount())
-    await page.locator('.ld-corner').waitFor({state:'hidden',timeout:1200})
-    fail=true;await page.goto(`${origin}/?verify`,{waitUntil:'domcontentloaded'});await page.locator('#boot.failed').waitFor();await shot('full-fail')
-    fail=false;await page.getByRole('button',{name:'重试'}).click();await page.waitForFunction(()=>window.viewer?.stats.readyMs>0)
+    await page.waitForFunction(()=>document.querySelector('.ld-corner')?.hidden,null,{timeout:1200,polling:30})
+    console.log('corner drained',await page.evaluate(()=>window.lastPending));await shot('corner-hidden')
+    failLimit=3;await page.goto(`${origin}/?verify`,{waitUntil:'domcontentloaded'});await page.locator('#boot.failed').waitFor();await shot('full-fail')
+    assert.equal(attempts.length,3);assert(attempts.slice(1).every((time,index)=>time-attempts[index]>=9900))
+    await page.getByRole('button',{name:'重试'}).click();await page.waitForFunction(()=>window.viewer?.stats.readyMs>0);assert(attempts.length>=4)
+    failLimit=1;failedPath='';attempts=[];noOpening=true
+    await page.goto(`${origin}/?verify`,{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.viewer?.stats.readyMs>0)
+    assert(attempts.length>=2&&attempts[1]-attempts[0]>=9900)
+    const fallback=await page.evaluate(()=>({stats:window.viewer.stats,firstTile:Math.min(...performance.getEntriesByType('resource').filter(entry=>entry.name.endsWith('.glc')).map(entry=>entry.startTime)),progress:window.samples.filter(item=>item.level===1).map(item=>item.fraction)}))
+    assert(Number.isFinite(fallback.firstTile)&&fallback.stats.firstMs>0&&fallback.stats.firstMs<=fallback.firstTile)
+    assert(fallback.stats.openingRingMs>=fallback.firstTile+9900&&fallback.stats.readyMs>=fallback.stats.openingRingMs)
+    assert(fallback.progress.length&&fallback.progress.every((value,index)=>!index||value>=fallback.progress[index-1]))
+    noOpening=false;failLimit=0
     await page.goto(origin,{waitUntil:'domcontentloaded'});const saved=await page.evaluate(()=>localStorage.getItem('glol.playMode'));tileDelay=20000
     await page.locator('[data-umami-event=home-solo]').click();await page.getByRole('button',{name:'取消',exact:true}).click()
     await page.waitForFunction(()=>document.body.hasAttribute('data-home'));await wait(6000)
