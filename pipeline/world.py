@@ -382,7 +382,7 @@ def build(bbox, output, palette, workers=4):
     if fubo is not None:
         # The park paths are painted on the graded ground. An additional
         # spline-height street mesh would bridge across the switchbacks.
-        modeled_paving = modeled_paving.union(fubo.trails.buffer(4).intersection(fubo.dry_allowed))
+        modeled_paving = modeled_paving.union(fubo.trails.buffer(4).intersection(fubo.park))
     gate_plaza = next((ShapelyPolygon(np.asarray(GATE_PLAZA)+[x,z]) for x,z,entry in layout.entries
                        if entry['id']=='gunanmen'),None)
     if gate_plaza is not None:
