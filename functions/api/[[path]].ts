@@ -99,7 +99,8 @@ async function handle(request:Request,env:Env) {
     return json({...profile(user),social},200,cookie(request.headers.get('Cookie')!.match(/(?:^|;\s*)glol_session=([a-f0-9]{64})(?:;|$)/)![1]))
   }
   const email=typeof body.email==='string'?body.email.trim().toLowerCase():''
-  if(email.length>254||!/^\S+@[^\s@]+\.[^\s@]+$/.test(email)||email.split('@').length!==2) invalid()
+  // @social.invalid 是第三方专用账号的占位域名，不允许被当成真实邮箱注册
+  if(email.length>254||!/^\S+@[^\s@]+\.[^\s@]+$/.test(email)||email.split('@').length!==2||/@social\.invalid$/i.test(email)) invalid()
   const ip=request.headers.get('CF-Connecting-IP')||'local'
   const getUser=()=>stmt('SELECT * FROM users WHERE email=?',email).first<User>()
   if(path==='auth/register'||path==='auth/resend') {
