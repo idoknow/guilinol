@@ -54,6 +54,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
     <nav class="home-links">
       <button type="button" class="ui-btn ui-btn--ghost" data-act="guide" data-umami-event="home-guide">玩法说明</button>
       <button type="button" class="ui-btn ui-btn--ghost" data-act="about" data-umami-event="home-about">关于游戏</button>
+      <button type="button" class="ui-btn ui-btn--ghost" data-act="qq" data-umami-event="home-qq">QQ 群</button>
       <a class="ui-btn ui-btn--ghost" href="${SOURCE_URL}" target="_blank" rel="noopener" data-umami-event="home-source-link">源代码 ↗</a>
     </nav>
   </div>
@@ -70,6 +71,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
   root.querySelector<HTMLButtonElement>('.home-resume')!.onclick = ()=>{requestRestore(); play('tour')}
   root.querySelector<HTMLButtonElement>('[data-act=guide]')!.onclick = ()=>guide()
   root.querySelector<HTMLButtonElement>('[data-act=about]')!.onclick = ()=>void import('./about').then(m=>m.openAbout())
+  root.querySelector<HTMLButtonElement>('[data-act=qq]')!.onclick = ()=>qqGroup()
   const account = root.querySelector<HTMLButtonElement>('.home-account')!
   account.onclick = ()=>void openAccount()
   onUser(user=>{account.innerHTML = user?`<i class="home-avatar"></i><span></span>`:'<span>登录 / 注册</span>'
@@ -159,4 +161,43 @@ function guide() {
   }
   guideMask.hidden = false
   guideMask.querySelector<HTMLButtonElement>('.about-close')!.focus()
+}
+
+// QQ 群：一张群二维码卡片（public/icons/qq-group.webp 自托管）+ 群号一键复制。
+// 手机上没法扫自己的屏幕，所以群号必须能复制出来；复制失败（非 https / 老浏览器）就把群号选中，让玩家自己按。
+const QQ_GROUP = '1137384288'
+let qqMask:HTMLDivElement|undefined
+function qqGroup() {
+  if (!qqMask) {
+    qqMask = document.createElement('div')
+    qqMask.className = 'about-mask'
+    qqMask.hidden = true
+    qqMask.innerHTML = `<div class="about-panel qq" role="dialog" aria-modal="true" aria-labelledby="qq-title">
+      <header><h2 id="qq-title">QQ 群</h2><button type="button" class="about-close" aria-label="关闭">关闭</button></header>
+      <div class="qq-body">
+        <img class="qq-code" src="./icons/qq-group.webp" width="881" height="1101" decoding="async" alt="网上桂林 QQ 群二维码，群号 ${QQ_GROUP}">
+        <p class="qq-note">用 QQ 扫一扫，或在 QQ 里搜群号加入。</p>
+        <div class="qq-row"><b class="qq-num">${QQ_GROUP}</b><button type="button" class="ui-btn ui-btn--ghost qq-copy">复制群号</button></div>
+      </div>
+    </div>`
+    const close = () => { qqMask!.hidden = true }
+    qqMask.querySelector('.about-close')!.addEventListener('click', close)
+    qqMask.addEventListener('click', event => { if (event.target === qqMask) close() })
+    addEventListener('keydown', event => { if (event.code === 'Escape' && !qqMask!.hidden) close() })
+    const copy = qqMask.querySelector<HTMLButtonElement>('.qq-copy')!, num = qqMask.querySelector<HTMLElement>('.qq-num')!
+    copy.addEventListener('click', () => {
+      const done = () => { copy.textContent = '已复制' }
+      const manual = () => {
+        copy.textContent = '请手动复制'
+        const range = document.createRange(); range.selectNodeContents(num)
+        const selection = getSelection(); selection?.removeAllRanges(); selection?.addRange(range)
+      }
+      const later = () => { setTimeout(() => { copy.textContent = '复制群号' }, 1800) }
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(QQ_GROUP).then(done, manual).finally(later)
+      else { manual(); later() }
+    })
+    document.body.append(qqMask)
+  }
+  qqMask.hidden = false
+  qqMask.querySelector<HTMLButtonElement>('.about-close')!.focus()
 }

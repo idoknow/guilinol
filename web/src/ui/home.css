@@ -107,6 +107,15 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .guide-keys ul{margin:0;padding:0;list-style:none;display:grid;gap:6px;font-size:13px;line-height:1.6;color:rgba(244,239,226,.9)}
 kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-radius:5px;text-align:center;font:600 11.5px/1.5 ui-monospace,monospace;color:var(--ui-ink-800);background:var(--ui-paper);box-shadow:0 2px 0 rgba(244,239,226,.35)}
 
+/* QQ 群：一张群二维码卡片 + 群号（手机上扫不了自己的屏，群号要能一键复制）。 */
+.about-panel.qq{width:min(400px,100%)}
+.qq-body{display:grid;justify-items:center;gap:12px;padding:14px 18px 20px;text-align:center}
+.qq-code{display:block;width:auto;height:auto;max-width:min(320px,100%);max-height:min(58vh,500px);border-radius:14px}
+.qq-note{margin:0;font-size:12.5px;line-height:1.7;letter-spacing:.06em;color:var(--ui-paper-dim)}
+.qq-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px}
+.qq-num{font:600 19px/1.2 ui-monospace,SFMono-Regular,monospace;letter-spacing:.14em;color:var(--ui-paper);-webkit-user-select:all;user-select:all}
+.qq-copy{font-size:13px}
+
 @media (max-width:760px){
   .home-shade{background:linear-gradient(0deg,rgba(20,33,30,.92) 0,rgba(20,33,30,.7) 46%,rgba(20,33,30,.15) 74%,rgba(20,33,30,.35) 100%)}
   .home-main{justify-content:flex-end;min-height:calc(100dvh - 110px);padding-top:40px;gap:20px;width:100%}
