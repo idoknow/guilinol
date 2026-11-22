@@ -23,6 +23,7 @@ if [[ $schema == 0 ]]; then
 fi
 k exec -i deploy/glol-postgres -- psql -X -v ON_ERROR_STOP=1 -U postgres -d glol <deploy/postgres/002-telemetry.sql
 k exec -i deploy/glol-postgres -- psql -X -v ON_ERROR_STOP=1 -U postgres -d glol <deploy/postgres/003-admin.sql
+k exec -i deploy/glol-postgres -- psql -X -v ON_ERROR_STOP=1 -U postgres -d glol <deploy/postgres/003-player-saves.sql
 k exec -i deploy/glol-web -c glol-api -- node --input-type=module <<'JS'
 import {S3Client,HeadBucketCommand,CreateBucketCommand} from '@aws-sdk/client-s3'
 const client=new S3Client({region:'us-east-1',endpoint:process.env.S3_ENDPOINT,forcePathStyle:true}),params={Bucket:'glol-feedback'}

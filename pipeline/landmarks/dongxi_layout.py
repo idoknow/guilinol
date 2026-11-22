@@ -84,6 +84,22 @@ def envelope(model, feature):
     height = attributes['eave_m']
     model.grade_reference=offset
     model.pose = (0, offset, 0, 0)
+    if attributes['name'] in ('R10','R10-west'):
+        canopy=trimesh.creation.extrude_polygon(polygon,.20,engine='earcut')
+        model.mesh(canopy.vertices[:,[0,2,1]]+[0,height,0],canopy.faces[:,::-1],'tile')
+        if attributes['name']=='R10':
+            frontage=corners+ORIGIN
+            recessed=corners.copy()
+            recessed[(frontage[:,0]>-674)&(frontage[:,1]>-139.1),1]-=1.85
+            polygon=Polygon(recessed,holes)
+        for start,end in zip(corners,np.roll(corners,-1,axis=0)):
+            edge=end-start
+            outward=np.array([-edge[1],edge[0]])/np.linalg.norm(edge)
+            if outward[1]>.8 and np.linalg.norm(edge)>8:
+                setback=3.2*outward
+                polygon=polygon.difference(Polygon([start+outward,end+outward,end-setback,start-setback]))
+        polygon=orient(polygon,sign=-1)
+        corners=np.asarray(polygon.exterior.coords)[:-1]
     volume = trimesh.creation.extrude_polygon(polygon, height, engine='earcut')
     vertices = volume.vertices[:, [0, 2, 1]].copy()
     name=attributes['name']
@@ -135,6 +151,13 @@ def envelope(model, feature):
                 depth=1.55+.95*math.sin(math.pi*(index+.5)/steps)
                 model.box((index+.5)*pitch-length/2,3.25,depth/2,pitch+.02,.42,depth,'white')
             model.box(0,.06,1.45,length,.12,2.9,'pave')
+            if model.detail:
+                bays=max(2,round(length/3.3))
+                for bay in range(bays):
+                    along=((bay+.5)/bays-.5)*length
+                    model.box(along,.32,.54,length/bays*.87,1.88,.84,'glass')
+                    model.box(along,.14,.80,length/bays*.90,.28,.90,'granite')
+                    model.box(along,2.32,.50,length/bays*.93,.52,.65,'wood')
             for along in np.arange(-length/2+3,length/2-1,7.2):
                 model.beam([along,0,3.1],[along,3.7,3.1],.16,'wood',8,True)
                 crown=trimesh.creation.icosphere(subdivisions=1)
@@ -276,6 +299,8 @@ def registered_market(model, slabs):
             model.grade_reference=attrs['ground_m']-157.7
             east,south = point(feature['geometry']['coordinates'])
             normal = math.radians(attrs['bearing'])
+            if attrs['roof']=='R10' and math.cos(normal)<-.8:
+                south-=1.85
             model.pose = (east,0,south,normal-math.pi)
             title = 'STARBUCKS COFFEE' if attrs['name']=='星巴克' else attrs['name']
             width = 8.6 if attrs['name']=='星巴克' else min(5.5,max(2.6,len(title)*.72))

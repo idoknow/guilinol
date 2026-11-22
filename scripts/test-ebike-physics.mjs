@@ -251,6 +251,8 @@ try {
       pos: [window.viewer.walk.probe().x, window.viewer.walk.probe().foot, window.viewer.walk.probe().z],
     }))
     assert(remountInfo.vehicle === 'bike' || remountInfo.vehicle === 'bicycle', `Expected remount, got ${JSON.stringify(remountInfo)}`)
+    await releaseParkIfLocked(page)
+    await stepTicks(page, 2, 0.05)
   }
 
   const gearResults = {}

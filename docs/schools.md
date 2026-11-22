@@ -44,35 +44,27 @@ Rock 第八批 `IMG_1373–1375` 校正临街门楼：平白门楣和红字下�
 
 ## 桂林市第十三中学
 
-底图缺楼处留空，不再补建。
+IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 [layout/schools/guilin_thirteen.md](layout/schools/guilin_thirteen.md)。
 
-补查词：「桂林市第十三中学 校园文化」。本次网页检索未取得可核验校名的临街配图，新增可用 0 张。
+地标包：`guilin_thirteen.glb`（OSM `way/669069474`，含楼栋、围墙、校门、运动场地和绿化）。
 
-`facade: "schematic"`。未确认临街图片；不从同名的外地十三中移用校舍外观。保留世界分块建筑，并补充未匹配的公开轮廓；OSM 校园地址为四会路，仅在该街一侧放围墙名牌，不建门。
-
-地标包：`guilin_thirteen.glb`。校园分块建筑另计。
-
-![示意立面](schools/guilin_thirteen-front.jpg) ![示意布局](schools/guilin_thirteen-overview.jpg)
+![游戏俯视](schools/guilin_thirteen-overview.jpg)
 
 ## 乐群小学
 
-补查词：「乐群小学 校园 桂林」。本次网页检索未取得能确认本校的临街配图，新增可用 0 张。
+IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 [layout/schools/lequn_primary.md](layout/schools/lequn_primary.md)。
 
-`facade: "schematic"`。未取得可核实的现状街面图；不使用医科大学乐群校区资料代替。保留世界分块建筑，并补充未匹配的公开轮廓；OSM 校园面没有街道地址，不放校门或名牌。
+地标包：`lequn_primary.glb`（OSM `way/684946203`，含楼栋、围墙、校门、运动场地和绿化）。
 
-地标包：`lequn_primary.glb`。校园分块建筑另计。
-
-![示意立面](schools/lequn_primary-front.jpg) ![示意布局](schools/lequn_primary-overview.jpg)
+![游戏俯视](schools/lequn_primary-overview.jpg)
 
 ## 宝贤中学
 
-补查词：「桂林 宝贤中学 校园风采」。本次网页检索未取得可核对校名与拍摄时期的临街配图，新增可用 0 张。
+IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 [layout/schools/baoxian_school.md](layout/schools/baoxian_school.md)。
 
-`facade: "schematic"`。沿用任务的学校名称；不以简称推断校名题字、校色或楼名。保留世界分块建筑，并补充未匹配的公开轮廓；OSM 校园地址为中山北路，仅在该街一侧放围墙名牌，不建门。
+地标包：`baoxian_school.glb`（OSM `way/669065609`，含楼栋、围墙、校门、运动场地和绿化）。
 
-地标包：`baoxian_school.glb`。校园分块建筑另计。
-
-![示意立面](schools/baoxian_school-front.jpg) ![示意布局](schools/baoxian_school-overview.jpg)
+![游戏俯视](schools/baoxian_school-overview.jpg)
 
 ## 桂林市中华小学
 
@@ -88,35 +80,19 @@ Rock 第八批 `IMG_1373–1375` 校正临街门楼：平白门楣和红字下�
 
 ## 桂林市第五中学
 
-补查词：「桂林日报 桂林市第五中学 鸟瞰图 2024」。已登记 1 张有图注的报道配图；它不是临街视角，不能据此绘制门额。
+IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 [layout/schools/guilin_fifth.md](layout/schools/guilin_fifth.md)。
 
-`facade: "schematic"`。日报鸟瞰图用于校区身份和整体量感，不是校门或楼层数的证据。保留世界分块建筑，并补充未匹配的公开轮廓；OSM 校园面没有街道地址，不放校门或名牌。
+地标包：`guilin_fifth.glb`（OSM `way/683286832`，含楼栋、围墙、校门、运动场地和绿化）。
 
-地标包：`guilin_fifth.glb`。校园分块建筑另计。
-
-![示意立面](schools/guilin_fifth-front.jpg) ![示意布局](schools/guilin_fifth-overview.jpg)
+![游戏俯视](schools/guilin_fifth-overview.jpg)
 
 ## 桂林医科大学（乐群校区）
 
-**待 Rock 补拍**：乐群校区校门正面、综合楼正面。本 PR 按示意交付，不计入实拍验收；取得现状照片后另开 issue。
+IDOK-80（2026-11-21）按口径 A 做成 OSM 级概化校园：楼栋只用 OSM/Overture 已有轮廓，运动场地只做 OSM 已标注的，一处临街概化校门常闭，不做门卫、闸机、监控，不标楼栋用途，不做室内。逐项来源和推断说明见 [layout/schools/lequn_medical.md](layout/schools/lequn_medical.md)。
 
-此校未录得公开 `pitch/track` 面；场地按可容纳的空地生成，仅作游戏用途。尚缺能确认是乐群综合楼的现状外观照，不能用历史校门照代替三张教学楼对比。
+地标包：`lequn_medical.glb`（OSM `way/627527309`，含楼栋、围墙、校门、运动场地和绿化）。
 
-补查词：「乐群校区 校园风光 校庆 site:glmu.edu.cn」。已有官网校庆通知（见上表）；本轮未确认新的临街立面照，可用于门额的照片 0 张。
-
-| 检索词 | 来源与核对结果 |
-| --- | --- |
-| 乐群校区 校园环境 老照片 | 官网《历史回眸——校园环境》（`glmu.edu.cn/info/1356/48224.htm`）有 1 张明确标为升本后乐群校门的历史图；不能当作现状。 |
-| 乐群校区 综合楼 校园风光 | 官网《校园风光》（`glmu.edu.cn/info/1355/48219.htm`）；页脚同时列三校区，不能以页脚代替图片图注。 |
-| 乐群校区 老洋房 | 《桂林日报》2024-01-11《老洋房的前世今生》配图明确为本校历史建筑，不是综合楼。 |
-| 桂林医学院 乐群校区 历史沿革 | 官网 `glmu.edu.cn/gygk/lsyg.htm` 能核对迁校年代，不是现状立面证据。 |
-| 乐群校区 校庆 作品征集 | 校方 90 周年专题的通知能核校区名，不能核现状门额。 |
-
-`facade: "schematic"`。校方校庆通知核实校区名称，不提供乐群临街建筑现状；未借用临桂、东城校区照片。保留世界分块建筑，并补充未匹配的公开轮廓；校名牌为游戏示意，不据此判定实际楼名。
-
-地标 GLB：近景 1,608、中景 154 三角形；两级分别 1/1 个可见绘制批次。GLB 71,816 B，内嵌贴图 19,036 B。校园分块建筑另计。
-
-![示意立面](schools/lequn_medical-front.jpg) ![示意布局](schools/lequn_medical-overview.jpg)
+![游戏俯视](schools/lequn_medical-overview.jpg)
 
 ## 广西师范大学（王城校区）
 

@@ -40,7 +40,7 @@ def boulevard(model):
         offset = end-station+direction*.04
         road,_ = streets.at(frame.x+x-sine*offset,frame.z+z+cosine*offset)
         # Fit the native grade while keeping the 14 cm slab within 30 cm of terrain.
-        correction=np.clip(road-frame.y-.14-ground,-.29,.155)
+        correction=np.clip(road-frame.y-.14-ground,-.29,.10)
         return ground + weight*correction
     for block in range(4):
         center=block*25

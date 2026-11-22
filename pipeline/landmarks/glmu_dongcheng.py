@@ -12,10 +12,7 @@ from g3_kit import Builder, export_school
 
 SIGNS = [
     dict(key='glmu_gate',  title='桂 林 医 科 大 学', sub='GUILIN MEDICAL UNIVERSITY', fg=(232, 194, 88), bg=(136, 44, 38), sans=False),
-    dict(key='bld_lib',    title='图 书 馆', sub='LIBRARY', fg=(44, 52, 60), bg=(236, 234, 226), sans=True, raised=True),
-    dict(key='bld_hongde', title='弘 德 楼', sub='', fg=(234, 196, 86), bg=(128, 44, 38), sans=False),
     dict(key='glmu_motto', title='弘 德 善 医', sub='', fg=(172, 38, 34), bg=(184, 182, 174), sans=False),
-    dict(key='bld_kejiao', title='科 教 楼', sub='', fg=(168, 40, 36), bg=(236, 234, 226), sans=True),
 ]
 
 PAVE_PTS = [
@@ -116,17 +113,19 @@ def _build_main_gate(b: Builder):
     From street NE looking SW: left (-X) has white cantilevered V-canopy portal,
     right (+X) has long dark-red granite '桂林医科大学' monument wall & low hedge."""
     prev = b.pose
-    b.pose = (-27.5, 0.0, -291.5, 3.0 * math.pi / 4.0)
+    gate_gy = b.surface.ground(-27.5, -291.5) if b.surface else 0.0
+    b.pose = (-27.5, gate_gy, -291.5, 3.0 * math.pi / 4.0)
     # Entrance apron
-    b.box(0.0, 0.02, 0.0, 34.0, 0.04, 14.0, 'pave_plaza', tile=3.0)
+    b.box(0.0, -0.15, 0.0, 34.0, 0.19, 14.0, 'pave_plaza', tile=3.0, bottom=True)
     # Left (-X): white cantilevered modern canopy & twin piers (no guardhouse/turnstiles)
-    b.box(-10.8, 0.0, -0.5, 2.2, 5.4, 2.4, 'white', tile=2.0, collide=True)
-    b.box(-2.2, 0.0, -0.5, 1.4, 4.8, 1.8, 'white', tile=2.0, collide=True)
+    b.box(-10.8, -0.20, -0.5, 2.2, 5.6, 2.4, 'white', tile=2.0, collide=True, bottom=True)
+    b.box(-2.2, -0.20, -0.5, 1.4, 5.0, 1.8, 'white', tile=2.0, collide=True, bottom=True)
+    b.box(-6.4, -0.15, -0.5, 7.15, 1.75, 0.16, 'steel', tile=1.4, collide=True, bottom=True)
     # Upward-tilted white cantilevered V-wing canopy on left
     b.box(-8.2, 4.8, 0.2, 11.6, 0.52, 4.6, 'white', cap_region='silver_roof', tile=2.0)
     b.box(-12.6, 5.1, 0.5, 4.8, 0.45, 4.8, 'silver_roof', tile=2.0)
     # Right (+X): long crimson granite monument wall ('桂林医科大学 / GUILIN MEDICAL UNIVERSITY')
-    b.box(7.8, 0.0, 0.4, 15.6, 0.58, 2.2, 'dark_stone', tile=1.8, collide=True)
+    b.box(7.8, -0.20, 0.4, 15.6, 0.78, 2.2, 'dark_stone', tile=1.8, collide=True, bottom=True)
     b.box(7.8, 0.58, 0.4, 14.8, 2.35, 1.15, 'brick_red', tile=2.0, collide=True)
     b.box(7.8, 2.93, 0.4, 15.2, 0.18, 1.35, 'granite', tile=1.6,bottom=True)
     b.sign_board(7.8, 1.78, 1.02, 12.6, 1.62, 'glmu_gate', backing=None, depth=0)
@@ -147,7 +146,7 @@ def _build_library_portal(b: Builder):
             for frac in (0.0, 0.33, 0.67):
                 px = p0[0] + (p1[0] - p0[0]) * frac
                 pz = p0[1] + (p1[1] - p0[1]) * frac
-                b.box(px - 0.25, 0.0, pz + 0.25, 0.55, 22.2, 0.55, 'white', tile=2.0)
+                b.box(px - 0.25, -0.20, pz + 0.25, 0.55, 22.4, 0.55, 'white', tile=2.0, bottom=True)
         # Top white cornice ribbon along concave arc
         for i in range(len(inner_arc) - 1):
             p0, p1 = inner_arc[i], inner_arc[i + 1]
@@ -159,15 +158,15 @@ def _build_library_portal(b: Builder):
 
     # Central 7-storey white portal tower at middle of SW concave arc, facing SW (yaw = -0.76 rad)
     prev = b.pose
-    b.pose = (10.5, 0.0, -193.5, -0.76)
-    b.box(0, 0.0, 1.6, 13.8, 25.8, 5.2, 'white', cap_region='silver_roof', tile=2.2, collide=True)
+    portal_gy = b.surface.ground(10.5, -193.5) if b.surface else 0.0
+    b.pose = (10.5, portal_gy, -193.5, -0.76)
+    b.box(0, -0.20, 1.6, 13.8, 26.0, 5.2, 'white', cap_region='silver_roof', tile=2.2, collide=True, bottom=True)
     # Recessed full-height blue-teal glass curtain wall inside white frame
     b.box(0, 4.4, 4.28, 8.6, 17.6, 0.16, 'glass', tile=2.2, lit=True)
     # Sculptural curved roof wave crown above '图书馆'
     if b.detail:
         b.box(0, 25.8, 1.2, 10.6, 1.35, 3.6, 'white', tile=2.0)
         b.box(0, 27.15, 1.4, 12.2, 0.35, 4.4, 'silver_roof', tile=2.0,bottom=True)
-    b.sign_board(0, 23.6, 4.30, 7.6, 1.75, 'bld_lib', backing=None, depth=0)
     # Grand entrance steps + silver-framed glass canopy (matching ref #03)
     for st in range(4):
         b.box(0, st * 0.22, 6.8 - st * 0.7, 11.4, 0.24, 1.4, 'pave_plaza', tile=2.0)
@@ -180,10 +179,6 @@ def _build_library_portal(b: Builder):
 def build_glmu(b: Builder):
     # 1. Campus-wide light grey paving + main plazas & greenbelts (zero bare dirt)
     b.pave_polygon(PAVE_PTS, y=0.03, region='pave')
-    b.walkway((-28.0, -290.0), (-8.0, -180.0), width=8.5, y=0.045)
-    b.walkway((-8.0, -180.0), (24.0, -145.0), width=7.5, y=0.045)
-    b.walkway((-36.0, -175.0), (-36.0, 120.0), width=7.0, y=0.045)
-    b.walkway((-36.0, 138.0), (140.0, 152.0), width=6.5, y=0.045)
 
     # Greenbelts & landscape lawns
     b.lawn_patch(-62.0, -276.0, 0.0, 42.0, 18.0, curb=True)
@@ -207,10 +202,6 @@ def build_glmu(b: Builder):
     # 3. Library (way/459580291) + Hongde Building (way/671760495) + Motto Boulder (ref #04)
     _build_library_portal(b)
     b.footprint_building(HONGDE_671760495, floors=7, floor_h=3.6, wall='white', accent='terracotta', roof_kind='flat', roof_tile='silver_roof')
-    prev = b.pose
-    b.pose = (30.29, 0.0, -144.5, -math.pi / 2 - .0101)
-    b.sign_board(0, 23.2, 0.08, 6.4, 1.45, 'bld_hongde', backing='terracotta', depth=0.15)
-    b.pose = prev
     # '弘德善医' natural boulder in circular flowerbed in front of Hongde Building west plaza
     b.motto_stone(17.5, -153.5, -1.35, 'glmu_motto', w=4.8, h=2.55)
 
@@ -222,9 +213,6 @@ def build_glmu(b: Builder):
     b.footprint_building(OV_WEST_QUAD, floors=5, floor_h=3.50, wall='cream', accent='terracotta', roof_kind='flat', roof_tile='gray_tile', holes=[WEST_COURTYARD])
     b.cylinder_y(-45.0, 0.0, 8.6, -92.0, 10.2, 'terracotta', sections=8, collide=True)
     b.cylinder_y(-45.0, 8.6, 0.55, -92.0, 10.7, 'white', sections=8)
-    b.pose = (-34.0, 0.0, -141.22, math.pi-.0021)
-    b.sign_board(0, 19.6, 0.08, 6.2, 1.35, 'bld_kejiao', backing='terracotta', depth=0.14)
-    b.pose = (0.0, 0.0, 0.0, 0.0)
 
     # 6. All 7 West Dormitory & University OSM buildings (exact polygons)
     b.footprint_building(DORM_672633244, floors=6, floor_h=3.25, wall='white', accent='terracotta', roof_kind='pitched', roof_tile='red_tile')

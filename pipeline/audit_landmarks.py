@@ -404,6 +404,13 @@ def main():
         element=osm.get(ref) if isinstance(ref,str) else None
         if not element:continue
         tags=element.get('tags',{})
+        if spec.get('schoolGround') and not spec.get('auditBuildings'):
+            target = area(element)
+            campus_footprint = footprint(ROOT/'public'/spec['model'], entry)
+            contained = not campus_footprint.is_empty and campus_footprint.intersection(target).area >= campus_footprint.area * 0.98
+            row.update(reference=ref, measurement='school boundary containment',
+                       status='pass' if contained else 'fail')
+            continue
         if key not in BRIDGES and not tags.get('building'):continue
         # The east footing of Wangcheng Mall reaches +3.81 m on the finished slope.
         # Slice the continuous ground-floor walls two metres above that corner.
