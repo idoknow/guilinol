@@ -502,7 +502,9 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
       .run()
     const code = newCode()
     await db
-      .prepare('INSERT OR REPLACE INTO email_codes VALUES(?,?,?,?,0)')
+      .prepare(
+        'INSERT INTO email_codes VALUES(?,?,?,?,0) ON CONFLICT(email,purpose) DO UPDATE SET digest=excluded.digest,expires=excluded.expires,attempts=0',
+      )
       .bind(email, 'verify', await hash(`${email}:verify:${code}`), now() + 600)
       .run()
     await deliver(env, email, 'verify', code)
@@ -541,11 +543,13 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
   const sessionToken = random(32)
   await db.batch([
     db.prepare('UPDATE social_pending SET used=1 WHERE token=?').bind(digest),
+    db.prepare('DELETE FROM email_codes WHERE email=? AND purpose=?').bind(email, 'verify'),
     db.prepare('INSERT INTO sessions(digest,user_id,expires) VALUES(?,?,?)').bind(await hash(sessionToken), user.id, now() + lifetime),
   ])
   return Response.json(
     { ok: true, redirect: '/?social=registered', email, nickname },
-    { headers: { ...headers, 'Set-Cookie': `${cookie(sessionToken)}; ${clearPending()}` } },
+    // 两条独立 Set-Cookie：拼成一条时 Max-Age=0 会把新会话删掉
+    { headers: [['Cache-Control', 'no-store'], ['Set-Cookie', cookie(sessionToken)], ['Set-Cookie', clearPending()]] },
   )
 }
 
