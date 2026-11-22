@@ -12,7 +12,7 @@ export function measurePath([, ...rings]) {
     const [nextX,nextZ] = ring[(i+1)%ring.length]
     return sum + x*nextZ - z*nextX
   }, 0))
-  const ringArea = (twiceArea(rings[0]) - rings.slice(1).reduce((sum, h) => sum + twiceArea(h), 0))/20000
+  const ringTwiceArea = twiceArea(rings[0]) - rings.slice(1).reduce((sum, h) => sum + twiceArea(h), 0)
   const triangles = ShapeUtils.triangulateShape(shell, holes)
   // ShapeUtils removes duplicate closing vertices in place.
   const points = rings.flatMap((ring, i) => ring.slice(0, loops[i].length))
@@ -21,7 +21,11 @@ export function measurePath([, ...rings]) {
     const p = points[a], q = points[b], r = points[c]
     triangleTwiceArea += Math.abs((q[0]-p[0])*(r[1]-p[1]) - (q[1]-p[1])*(r[0]-p[0]))
   }
-  return {ringArea, triangleArea: triangleTwiceArea/20000}
+  return {
+    ringArea: ringTwiceArea/20000,
+    triangleArea: triangleTwiceArea/20000,
+    exceedsTolerance: triangleTwiceArea*200 > ringTwiceArea*201,
+  }
 }
 
 export function streetAreaFindings(directory) {
@@ -34,8 +38,8 @@ export function streetAreaFindings(directory) {
     for (const [index,path] of streets[0].entries()) {
       // The pipeline topology audit reports malformed rings separately.
       if (path.length < 2 || path.slice(1).some(ring => ring.length < 3)) continue
-      const {ringArea, triangleArea} = measurePath(path)
-      if (triangleArea > ringArea*1.005) findings.push({x,z,index,kind:path[0],ringArea,triangleArea})
+      const {ringArea, triangleArea, exceedsTolerance} = measurePath(path)
+      if (exceedsTolerance) findings.push({x,z,index,kind:path[0],ringArea,triangleArea})
     }
   }
   return findings
