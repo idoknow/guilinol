@@ -79,6 +79,7 @@ export interface ExternalEbikeTelemetry {
   effectiveFallLeanRad?: number
   leanDangerRatio?: number
   crashRisk?: number
+  wheelieTip?: number
   tucking?: boolean
   braking?: boolean
   parkLocked?: boolean
@@ -126,6 +127,7 @@ export interface EbikeTelemetrySnapshot {
   effectiveFallLeanRad?: number
   leanDangerRatio?: number
   crashRisk?: number
+  wheelieTip?: number
   wheelie: number
   steerInput: number
   tucking: boolean
@@ -200,7 +202,6 @@ export function createEbikeFxController() {
   let modPreset: EbikeModPreset = 'stock'
   let customMods: Partial<EbikeModConfig> | null = null
   let wheelie = 0
-  let wheelieOverHold = 0
   let leanExtra = 0
   let prevSpeed = 0
   let longAccel = 0
@@ -227,7 +228,6 @@ export function createEbikeFxController() {
 
   function resetPoseOnly() {
     wheelie = 0
-    wheelieOverHold = 0
     leanExtra = 0
     prevSpeed = 0
     longAccel = 0
@@ -281,7 +281,6 @@ export function createEbikeFxController() {
     const sideX = Math.cos(heading) * side, sideZ = -Math.sin(heading) * side
     riderEjectX = -sideX * .55
     riderEjectZ = -sideZ * .55
-    wheelieOverHold = 0
     window.dispatchEvent(new CustomEvent('walk:toast', {
       detail: {
         text: reason === 'lowside'
@@ -387,18 +386,12 @@ export function createEbikeFxController() {
       // Local presentation state machine when Hy2 physics telemetry isn't attached yet.
       if (crashPhase === 'none') {
         if (input.wheelie && base.speed > 1.2) {
-          // IDOK-153: slower rise; loop-out only after sitting at the max angle for 1.8 s.
-          const cap = base.allowAutoCrash ? .68 : .58
-          const targetWheelie = T.MathUtils.clamp(.6 * gearSpec.wheelieEase * T.MathUtils.clamp(base.speed / 4.5, .4, 1.15), .22, cap)
+          // IDOK-153: presentation-only fallback — slow rise to the 52° max, never crashes by itself
+          // (the physics path in ride.ts owns the hard-turn-in-wheelie tip-over).
+          const cap = 52 * Math.PI / 180
+          const targetWheelie = T.MathUtils.clamp(.8 * gearSpec.wheelieEase * T.MathUtils.clamp(base.speed / 4.5, .4, 1.15), .22, cap)
           wheelie = T.MathUtils.damp(wheelie, targetWheelie, 2.5, cdt)
-          if (base.allowAutoCrash && wheelie >= cap * .97) {
-            wheelieOverHold += cdt
-            if (wheelieOverHold > 1.8) triggerCrash('loopout', base.lean >= 0 ? 1 : -1, base.heading, base.speed)
-          } else {
-            wheelieOverHold = Math.max(0, wheelieOverHold - cdt * 2)
-          }
         } else {
-          wheelieOverHold = 0
           wheelie = T.MathUtils.damp(wheelie, 0, 11, cdt)
         }
 
@@ -495,6 +488,7 @@ export function createEbikeFxController() {
       effectiveFallLeanRad: external?.effectiveFallLeanRad,
       leanDangerRatio: external?.leanDangerRatio,
       crashRisk: external?.crashRisk,
+      wheelieTip: external?.wheelieTip,
       wheelie: finalWheelie,
       steerInput: base.steerInput,
       tucking: external?.tucking ?? (input.tuck && Math.abs(finalLean) > .08),

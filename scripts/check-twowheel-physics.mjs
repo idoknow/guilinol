@@ -285,53 +285,45 @@ try {
     `low=${pedLow.crashed}, mid=${pedMid.crashed}, 3noTuck=${pedHighNoTuck.crashed}@${pedHighNoTuck.survivedSec}s, fatal=${pedFatal.crashReason}@${pedFatal.crashLean}`,
   )
 
-  // 3. Wheelie Loopout & Moderate Wall Impact (must still trigger reliably)
-  eb.mount(0, 0, 'bike', {vehicleType: 'normal', autoCrash: true, drainEnabled: false})
-  ensureDrivable(eb)
-  eb.setGear(3)
-  for (let i = 0; i < 30; i++) eb.steer(1, 0, 0.05, true)
-  // IDOK-153: wheelie rises gently and only loops out after sitting at the max angle for 1.8 s.
-  let ebikeLoopout = false, ebikeAtMax = -1, ebikeCrashAt = -1, ebikeEarlyRisk = 0
-  for (let i = 0; i < 200; i++) {
-    eb.steer(1, 0, 0.05, true, {wheelie: true})
-    if (i === 9) ebikeEarlyRisk = eb.wheelie
-    if (ebikeAtMax < 0 && eb.wheelie >= 0.67) ebikeAtMax = i
-    if (eb.crashState.reason === 'loopout') { ebikeLoopout = true; ebikeCrashAt = i; break }
-  }
-  check('ebike wheelie hold hits loopout', ebikeLoopout)
-  check('ebike wheelie is gentle: < 0.4 rad after 0.5 s of holding (D3)', ebikeEarlyRisk < 0.4, `wheelie@0.5s=${ebikeEarlyRisk.toFixed(3)}`)
-  check('ebike loopout only after >= 1.75 s pinned at max angle', ebikeAtMax >= 0 && (ebikeCrashAt - ebikeAtMax) * 0.05 >= 1.75,
-    `atMax=${ebikeAtMax * 0.05}s crash=${ebikeCrashAt * 0.05}s`)
-
-  // Releasing before the hold timer runs out never crashes, even when repeated.
-  eb.mount(0, 0, 'bike', {vehicleType: 'normal', autoCrash: true, drainEnabled: false})
-  ensureDrivable(eb)
-  eb.setGear(4)
-  for (let i = 0; i < 30; i++) eb.steer(1, 0, 0.05, true)
-  let shortHoldCrash = false, shortPeak = 0
-  for (let round = 0; round < 4 && !shortHoldCrash; round++) {
-    let pinned = 0
-    for (let i = 0; i < 120 && pinned < 1.3; i++) {
-      eb.steer(1, 0, 0.05, true, {wheelie: true})
-      shortPeak = Math.max(shortPeak, eb.wheelie)
-      if (eb.wheelie >= 0.67) pinned += 0.05
-      if (eb.crashState.reason) { shortHoldCrash = true; break }
+  // 3. Wheelie (IDOK-153: max 52°, never falls from holding it straight, tips over only on hard / fast turns) & wall impact
+  const MAX_WHEELIE = 52 * Math.PI / 180
+  const wheelieRun = (ctrl, kind, gear, accelTicks, steer, {rampTicks = 0, holdTicks = 80} = {}) => {
+    ctrl.mount(0, 0, kind, {vehicleType: 'normal', autoCrash: true, drainEnabled: false, parkStart: false})
+    ensureDrivable(ctrl)
+    ctrl.setGear(gear)
+    for (let i = 0; i < accelTicks; i++) ctrl.steer(1, 0, 0.05, true)
+    let early = 0, peak = 0
+    for (let i = 0; i < 40; i++) {
+      ctrl.steer(1, 0, 0.05, true, {wheelie: true})
+      if (i === 9) early = ctrl.wheelie
+      peak = Math.max(peak, ctrl.wheelie)
     }
-    for (let i = 0; i < 30; i++) eb.steer(1, 0, 0.05, true)
-    if (eb.crashState.reason) shortHoldCrash = true
+    let reason = '', at = -1
+    for (let i = 0; i < holdTicks; i++) {
+      const st = rampTicks ? steer * Math.min(1, (i + 1) / rampTicks) : steer
+      ctrl.steer(1, st, 0.05, true, {wheelie: true})
+      peak = Math.max(peak, ctrl.wheelie)
+      if (ctrl.crashState.reason) { reason = ctrl.crashState.reason; at = i * 0.05; break }
+    }
+    return {early, peak, reason, at, kmh: ctrl.speed * 3.6}
   }
-  check('ebike S-gear wheelie held 1.3 s at max then released (x4) never crashes', !shortHoldCrash && shortPeak >= 0.67, `peak=${shortPeak.toFixed(3)}`)
-
-  ped.mount(0, 0, 'bicycle', {autoCrash: true})
-  ensureDrivable(ped)
-  ped.setGear(1)
-  for (let i = 0; i < 20; i++) ped.steer(1, 0, 0.05, true)
-  let pedLoopout = false
-  for (let i = 0; i < 200; i++) {
-    ped.steer(1, 0, 0.05, true, {wheelie: true})
-    if (ped.crashState.reason === 'loopout') { pedLoopout = true; break }
-  }
-  check('bicycle wheelie hold hits loopout', pedLoopout)
+  const straightS = wheelieRun(eb, 'bike', 4, 60, 0, {holdTicks: 200})
+  check('ebike S-gear wheelie held straight 12 s never crashes and caps at 52°',
+    !straightS.reason && straightS.peak <= MAX_WHEELIE + 1e-6 && straightS.peak >= MAX_WHEELIE - 0.01, JSON.stringify(straightS))
+  const gentleD3 = wheelieRun(eb, 'bike', 3, 30, 0, {holdTicks: 1})
+  check('ebike wheelie is gentle: < 0.4 rad after 0.5 s of holding (D3)', gentleD3.early < 0.4, `wheelie@0.5s=${gentleD3.early.toFixed(3)}`)
+  const halfD2 = wheelieRun(eb, 'bike', 2, 60, 0.5)
+  check('ebike D2 wheelie + half-lock turn (25 km/h) stays up', !halfD2.reason, JSON.stringify(halfD2))
+  const fullD2 = wheelieRun(eb, 'bike', 2, 60, 1)
+  check('ebike D2 wheelie + sudden full-lock turn tips over (lowside)', fullD2.reason === 'lowside' && fullD2.at >= 0.2, JSON.stringify(fullD2))
+  const fastHalf = wheelieRun(eb, 'bike', 4, 80, 0.5)
+  check('ebike S-gear 50 km/h wheelie + half-lock turn tips over', fastHalf.reason === 'lowside', JSON.stringify(fastHalf))
+  const slowFull = wheelieRun(eb, 'bike', 1, 30, 0.7, {rampTicks: 20})
+  check('ebike D1 slow wheelie + 70% lock eased in over 1 s, held 4 s, survives', !slowFull.reason, JSON.stringify(slowFull))
+  const pedStraight = wheelieRun(ped, 'bicycle', 2, 60, 0, {holdTicks: 200})
+  check('bicycle wheelie held straight never crashes, max 52°', !pedStraight.reason && pedStraight.peak <= MAX_WHEELIE + 1e-6, JSON.stringify(pedStraight))
+  const pedFull = wheelieRun(ped, 'bicycle', 2, 60, 1)
+  check('bicycle wheelie + sudden full-lock turn tips over', pedFull.reason === 'lowside', JSON.stringify(pedFull))
 
   eb.mount(0, 0, 'bike', {vehicleType: 'normal', autoCrash: true, drainEnabled: false, parkStart: false})
   ensureDrivable(eb)

@@ -469,8 +469,10 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
           stateEl.hidden=false;stateEl.dataset.warn='1'
           stateEl.textContent=`极低电 · 限速 ${Math.round(state.maxKmh)}`
         }else if(wheelieDeg>=4){
-          stateEl.hidden=false;stateEl.dataset.warn=wheelieDeg>=26?'1':'0'
-          stateEl.textContent=wheelieDeg>=26?`翘头 ${wheelieDeg}° 易翻`:`翘头 ${wheelieDeg}°`
+          // IDOK-153: holding a wheelie is safe; only a hard / fast turn on the back wheel tips it over.
+          const tipping=(state.wheelieTip??0)>=.35
+          stateEl.hidden=false;stateEl.dataset.warn=tipping?'1':'0'
+          stateEl.textContent=tipping?`翘头 ${wheelieDeg}° 别急转`:`翘头 ${wheelieDeg}°`
         }else if(leanDeg>=8){
           const risky=Math.abs(state.lean)>=state.leanLimit*.82||(state.crashRisk??0)>=.72
           stateEl.hidden=false;stateEl.dataset.warn=risky?'1':'0'
