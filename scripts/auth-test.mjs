@@ -69,7 +69,7 @@ try {
     console.log('Verification requires the latest registration password: missing and stale passwords rejected; current password accepted')
     assert.equal((await api('me',{nickname:'江岸' },200,null,{method:'PATCH'})).nickname,'江岸');const sessionRows=(await sql('SELECT digest FROM sessions'))[0].results;assert.equal(sessionRows.length,1);assert.notEqual(sessionRows[0].digest,cookie.split('=')[1]);assert.notEqual((await sql('SELECT digest FROM users'))[0].results[0].digest,password)
     await api('auth/logout',{});await api('me',null,401,'unauthorized');await api('auth/login',login)
-    await (await import('./social-test.mjs')).socialTest({api,origin,sql});await api('auth/login',login)
+    await (await import('./social-test.mjs')).socialTest({api,origin,sql,env:storage.env});await api('auth/login',login)
     if(process.argv.includes('--bridge')) await (await import('./feedback-bridge-test.mjs')).bridgeTest({api,origin,cookie,state,staticDir,sql,mailLog:()=>logs})
     else await (await import('./feedback-test.mjs')).apiTest({api,origin,cookie,sql})
     for(let attempt=1;attempt<=5;attempt++)await api('auth/login',{email,password:'incorrect'},attempt===5?429:401,attempt===5?'locked':'credentials');await api('auth/login',login,429,'locked')

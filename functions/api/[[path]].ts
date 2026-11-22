@@ -2,7 +2,7 @@ import {type Env,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCod
 
 import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar'
 import {feedback} from '../../lib/feedback'
-import {isSocialType,socialCallback,socialCookie,startSocial} from '../../lib/social'
+import {isSocialType,socialCallback,socialConfirm,socialPending,socialStates,startSocial} from '../../lib/social'
 import {unsubscribe} from '../../lib/feedback-mail'
 type User={id:string;email:string;nickname:string;verified:number;role:string;salt:string;digest:string;locked_until:number;notify_email:number}
 const profile=(user:User)=>({id:user.id,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email})
@@ -15,7 +15,7 @@ function password(value:unknown) {
   if(typeof value!=='string'||value.length<8||value.length>256) invalid()
   return value
 }
-const methods:Record<string,string[]>={health:['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET']}
+const methods:Record<string,string[]>={health:['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST']}
 
 async function handle(request:Request,env:Env) {
   const url=new URL(request.url), path=url.pathname.slice(5), method=request.method, db=env.DB
@@ -32,6 +32,8 @@ async function handle(request:Request,env:Env) {
     if(!body||typeof body!=='object'||Array.isArray(body)) invalid()
   }
   if(path==='auth/social/callback') return socialCallback(env,db,request)
+  if(path==='auth/social/pending') return socialPending(env,db,request)
+  if(path==='auth/social/confirm') return socialConfirm(env,db,request)
   if(path==='auth/social/start') {
     const type=body.type
     if(!isSocialType(type)) invalid()
@@ -43,8 +45,8 @@ async function handle(request:Request,env:Env) {
       if(!account) unauthorized()
       userId=account.id
     }
-    const {state,url:target,qrcode}=await startSocial(env,db,type,request.headers.get('CF-Connecting-IP')||'local',intent,userId)
-    return json({url:target,qrcode},200,socialCookie(state))
+    const {cookie:stateCookie,url:target,qrcode}=await startSocial(env,db,type,request.headers.get('CF-Connecting-IP')||'local',intent,userId,socialStates(request))
+    return json({url:target,qrcode},200,stateCookie)
   }
   if(path==='auth/logout') {
     await stmt('DELETE FROM sessions WHERE digest=?',await sessionHash(request)).run()
