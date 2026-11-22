@@ -21,6 +21,7 @@ html,body{overflow:hidden}body{margin:0;background:var(--ui-ink-900)}canvas{disp
 .btn-mode{position:fixed;right:calc(14px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));padding:8px 16px;border-radius:var(--ui-r-pill);font-size:14px;letter-spacing:var(--ui-track)}
 
 /* 时辰 / 天气 */
+.sky-ui[hidden]{display:none!important}
 .sky-ui{position:fixed;left:calc(12px + env(safe-area-inset-left));top:calc(60px + env(safe-area-inset-top));display:flex;align-items:center;gap:6px;padding:4px 6px 4px 12px;border-radius:var(--ui-r-pill);
   background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);color:var(--ui-paper);font-size:13px;letter-spacing:.06em;user-select:none;-webkit-user-select:none}
 .sky-time{min-width:7.6em;opacity:.92}.sky-group{display:flex;gap:2px;padding-left:6px;border-left:1px solid var(--ui-glass-line-soft)}

@@ -147,7 +147,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   }
   async function finishLoading(){loader.stage('frame',1,1);await loader.finish();stats.readyMs=performance.now()}
   function updateAtmosphere(now:number,elapsed:number){
-    clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/1200))
+    clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/clock.blendMs))
     atmo.uTime.value = now/1000
     light.position.copy(env.sunDir); light.color.copy(env.sunColor); light.intensity = env.sunPower
     hemi.color.copy(env.hemiSky); hemi.groundColor.copy(env.hemiGround); hemi.intensity = env.hemiPower
