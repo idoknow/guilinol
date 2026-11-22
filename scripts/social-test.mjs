@@ -25,6 +25,8 @@ async function configuredTest({sql,env}) {
     // start：上游不可达 → 502，且不留孤儿 state
     assert.equal((await call('auth/social/start',{method:'POST',body:{type:'wx'}})).status,502)
     assert.equal(Number((await sql(`SELECT count(*) n FROM social_states`))[0].results[0].n),0)
+    // 注册意图也要能写 state：上游不可达应是 502，而不是撞 CHECK 的 500
+    assert.equal((await call('auth/social/start',{method:'POST',body:{type:'qq',intent:'register'}})).status,502)
     // callback：跨站导航不被拒，没有 state cookie → expired
     const cb=await fetch(origin+'/api/auth/social/callback?type=wx&code=abcdefgh1234',{redirect:'manual',headers:{'Sec-Fetch-Site':'cross-site'}})
     assert.equal(cb.status,302);assert.equal(new URL(cb.headers.get('location')).search,'?social=expired')
@@ -100,7 +102,7 @@ assert.match(nme.email,/^wx\.c0ffee0123456789abcdef@social\.invalid$/)
     const tr2=await pending2('register','FEDCBA9876543210AAAAAA')
     assert.equal((await call('auth/social/register',{method:'POST',cookie:`glol_social_pending=${tr2}`,body:{email:'x2@example.test',password:'social-password-1'}})).status,409)
     await sql(`DELETE FROM social_identities`);await sql(`DELETE FROM social_pending`);await sql(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email='${reg.email}')`);await sql(`DELETE FROM users WHERE email='${reg.email}'`);await sql(`DELETE FROM mail_events WHERE email='${reg.email}'`);await sql(`DELETE FROM sessions WHERE user_id='${b}'`);await sql(`DELETE FROM users WHERE id='${b}'`)
-    console.log('Social configured: start 502 w/o orphan state, cross-site callback→expired, bind confirm 403 (not consumed)/200/404 replay, re-bind start 409 already_bound, /api/me social list, social-only auto-create (placeholder email), admin merge on Postgres (moved/conflicts/adopted email/saves/ledger key-skip/audit) + reset password (audit w/o sessions, login works) + change email (409/200/audit), login confirm sets 2 cookies + working session; register 2-phase (409 email_taken/conflict, password mismatch 400, 2 cookies, verified+bound, code deleted)')
+    console.log('Social configured: start 502 w/o orphan state (login + register intent), cross-site callback→expired, bind confirm 403 (not consumed)/200/404 replay, re-bind start 409 already_bound, /api/me social list, social-only auto-create (placeholder email), admin merge on Postgres (moved/conflicts/adopted email/saves/ledger key-skip/audit) + reset password (audit w/o sessions, login works) + change email (409/200/audit), login confirm sets 2 cookies + working session; register 2-phase (409 email_taken/conflict, password mismatch 400, 2 cookies, verified+bound, code deleted)')
   }catch(error){console.error(logs.slice(-3000));throw error}
   finally{if(child.exitCode===null){process.kill(-child.pid,'SIGTERM');await closed}}
 }
