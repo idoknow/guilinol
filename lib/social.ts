@@ -1,7 +1,7 @@
 import { type Env, Problem, cookie, deliver, equal, hash, invalid, lifetime, limit, newCode, now, passwordHash, random, reserveMail, sessionHash } from './auth'
 
 /**
- * 佛系云聚合登录（https://a.idcfx.net/doc.php）接入层。
+ * 聚合登录（https://login.mapay.cn/doc.php）接入层。
  *
  * 三条硬约束决定了这里的写法：
  * 1. appkey 只能出现在服务端请求里（上游把 appkey 放在 query 上），前端与日志都拿不到。
@@ -25,7 +25,7 @@ export const SOCIAL_LABELS: Record<SocialType, string> = {
   feishu: '飞书',
 }
 
-const DEFAULT_HOST = 'https://a.idcfx.net'
+const DEFAULT_HOST = 'https://login.mapay.cn'
 const STATE_TTL = 600
 const PENDING_TTL = 300
 const MAX_STATES_PER_BROWSER = 3
