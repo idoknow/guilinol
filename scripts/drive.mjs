@@ -28,6 +28,8 @@ try{
     if(width===1440){
       const result=await page.evaluate(async ({route,parking})=>{
         const {walk,stream}=window.viewer,pressed=new Set(),path=[],start=performance.now()
+        await window.viewer.freeze()
+        const checkpoints=[[-329.2,100.5],[-1140.5,1007.9]].map(([x,z])=>({x,z,distance:Infinity}))
         function key(code,on){if(pressed.has(code)===on)return;window.dispatchEvent(new KeyboardEvent(on?'keydown':'keyup',{code}));if(on)pressed.add(code);else pressed.delete(code)}
         for(const [east,south] of route){
           let reached=false
@@ -38,16 +40,19 @@ try{
             const delta=Math.atan2(-dx,-dz)-walk.heading,error=Math.atan2(Math.sin(delta),Math.cos(delta))
             key('KeyA',error>.04);key('KeyD',error<-.04);key('KeyW',Math.abs(walk.speed)<(Math.abs(error)>.35?2.8:8))
             walk.tick(1/60)
+            stream.updateLandmarks?.(walk.position);stream.tick(walk.position)
             const probe=walk.probe()
+            for(const point of checkpoints){const distance=Math.hypot(point.x-probe.x,point.z-probe.z);if(distance<8&&distance<point.distance)Object.assign(point,{distance,sources:probe.contactSources,speed:walk.speed,heading:walk.heading})}
             if(probe.inHouse||probe.renderClearance<-.6||Math.abs(walk.speed)>40/3.6+.001)throw Error(`unsafe position ${JSON.stringify(probe)}`)
             const {zone}=window.viewer.game.getState()
             if(zone.quiet||zone.carFree)throw Error(`entered forbidden zone at ${walk.position.toArray()}`)
-            if(frame%20===0){stream.tick(walk.position);await new Promise(resolve=>setTimeout(resolve,0))}
+            if(frame%20===0||walk.obstacle==='streaming')await new Promise(resolve=>setTimeout(resolve,0))
           }
-          if(!reached){const {hits,carContact}=walk.probe();throw Error(`stalled at ${walk.position.toArray()} heading for ${east},${south}: ${walk.obstacle} ${JSON.stringify({hits,carContact})}`)}
+          if(!reached){const {hits,contactSources}=walk.probe();throw Error(`stalled at ${walk.position.toArray()} heading for ${east},${south}: ${walk.obstacle} ${JSON.stringify({hits,contactSources,heading:walk.heading,speed:walk.speed})}`)}
         }
         for(const code of pressed)key(code,false)
-        return {path,elapsedMs:Math.round(performance.now()-start),distance:Math.hypot(walk.position.x-parking[0],walk.position.z-parking[1])}
+        window.viewer.resume()
+        return {path,contacts:JSON.stringify(checkpoints),elapsedMs:Math.round(performance.now()-start),distance:Math.hypot(walk.position.x-parking[0],walk.position.z-parking[1])}
       },{route,parking})
       console.log(result);assert(result.distance<=40,'missed parking radius')
       await page.screenshot({path:'captures/drive/parking.png',timeout:120000})

@@ -1175,6 +1175,22 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const bridge=manifest.landmarks?.find(entry=>entry.id==='jiefang_bridge'),bridgeEye=new THREE.Vector3()
   const bridgeCenter=bridge&&new THREE.Vector3(...bridge.sphere.slice(0,3)).applyAxisAngle(new THREE.Vector3(0,1,0),THREE.MathUtils.degToRad(bridge.rotation)).add(new THREE.Vector3(...bridge.position))
   const bridgeDistance=(x:number,z:number)=>bridge&&bridgeCenter?Math.hypot(x-bridgeCenter.x,z-bridgeCenter.z)-bridge.sphere[3]:Infinity
+  const collisionBounds=(manifest.landmarks??[]).filter(entry=>entry.collision!=='none').map(entry=>{
+    const [cx,,cz,r]=entry.sphere, angle=THREE.MathUtils.degToRad(entry.rotation)
+    return {entry,x:entry.position[0]+cx*Math.cos(angle)+cz*Math.sin(angle),z:entry.position[2]-cx*Math.sin(angle)+cz*Math.cos(angle),r}
+  })
+  function vehicleCollisionReady(x:number,y:number,z:number){
+    let ready=true
+    for(const dx of [-16,16])for(const dz of [-16,16]){
+      const tile=sim.tileAt(x+dx,z+dz)
+      if(tile&&!stream.loaded.has(tile)){stream.prioritize(x,z);ready=false}
+    }
+    for(const bound of collisionBounds){
+      if(Math.hypot(x-bound.x,z-bound.z)>bound.r+16||stream.landmarks.has(bound.entry))continue
+      stream.updateLandmarks?.(bridgeEye.set(x,y,z),bound.entry);ready=false
+    }
+    return ready
+  }
   async function enter(x:number,z:number,heading:number,reason:string,override=false){
     if(shopOverlay.isOpen())shopOverlay.close('teleport')
     const target=new THREE.Vector3(x,0,z);destination=target
@@ -1648,6 +1664,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const surfaceY=surf?visualFloorAt(pos.x,pos.z,surf.y):undefined, footSink=surfaceY!==undefined?surfaceY-soleY:0
     return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),soleY,surfaceY,surfaceKind:surf?.kind,footSink,inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
       inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits,
+      contactSources:verify?Array.from({length:sim.controller.numComputedCollisions()},(_,index)=>{
+        const contact=sim.controller.computedCollision(index),handle=contact?.collider?.handle
+        return handle===undefined?null:{source:sim.sources.get(handle)??sim.kinds.get(handle),point:contact!.witness1,normal:contact!.normal1}
+      }):[],
       planarSpeed:Math.hypot(vx,vz),grounded,verticalVelocity:velocity,crouching,animClip:activeClipName,facing,figPos:figure.position.toArray(),figYaw:figure.rotation.y,bikePitch:rides?.bikePitch??0,bikeY:rides?.bikeY??0,carPitch:rides?.carPitch??0,carY:rides?.carY??0,
       pedalPhase:rides?.rideKind==='bicycle'?bicyclePedalPhase:ridePose.pedalPhase,thighL:getAvatarJoint(figure,'ThighL')?.rotation.x??0,thighR:getAvatarJoint(figure,'ThighR')?.rotation.x??0,
       ebike:ebikeState,
@@ -1738,6 +1758,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       wasBoat=true;follow(dt,false);return
     }
     if(rides?.boat){releaseDynamicBike();input.syncRideHud(null,'boat');if(!held)rides.advance(Math.min(.25,dt));if(!wasBoat){if(wasCar||wasBike){applyFootController();wasCar=wasBike=false;driverPose.reset(active)}yaw=rides.heading+.95;sit()}wasBoat=!!rides.boat;follow(dt);return}wasBoat=false
+    if((rides?.car||rides?.bike)&&!vehicleCollisionReady(start.x,start.y,start.z)){
+      rides.stop();vx=vz=accumulator=0;bikeObstacle='streaming';return
+    }
     const read=input.read(),keys=held?still:read
     const rideCtrl=held?ZERO_RIDE_INPUT:input.readRideControls()
     const busyFootAnim=!!(standUpSession||pickupSession)
