@@ -4,6 +4,9 @@ import {chromium} from 'playwright'
 import {preview} from 'vite'
 
 const start=performance.now()
+// Walk-only distance probes were tuned for the old 4 m/s walk; IDOK-133 walks at a natural 1.65 m/s, so the same
+// distances need proportionally more simulated time.
+const WALK_TIME=4/1.65
 const outDir=process.env.WALK_CAPTURE_DIR??'captures/walk'
 await mkdir(outDir,{recursive:true})
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
@@ -24,6 +27,7 @@ try {
   await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
 
   async function fixture(origin,direction,seconds,target){
+    seconds=Math.ceil(seconds*WALK_TIME)
     const result=await page.evaluate(async({origin,direction,seconds,target})=>{
       const {walk,stream}=window.viewer;walk.leave()
       if(!await walk.enter(...origin,0,'quick'))throw Error('Spawn failed: '+target)
@@ -81,7 +85,7 @@ try {
     const slabStart=walk.probe()
     walk.drive(0,-1,false)
     let slabMaxSink=-Infinity, slabGroundedFrames=0
-    for(let i=0;i<120;i++){
+    for(let i=0;i<120*4/1.65;i++){
       walk.tick(1/60)
       const p=walk.probe()
       if(p.grounded){slabGroundedFrames++;slabMaxSink=Math.max(slabMaxSink,p.footSink)}
@@ -96,7 +100,7 @@ try {
     const curbStart=walk.probe()
     walk.drive(1,0,false)
     let curbHitSidewalk=false, curbMaxSink=-Infinity, curbMaxY=-Infinity
-    for(let i=0;i<90;i++){
+    for(let i=0;i<90*4/1.65;i++){
       walk.tick(1/60)
       const p=walk.probe()
       if(p.hits.includes('sidewalk')||p.surfaceKind==='sidewalk')curbHitSidewalk=true
@@ -112,7 +116,7 @@ try {
     const diagStart=walk.probe(), diagLen=Math.hypot(-.5,.85)
     walk.drive(-.5/diagLen,.85/diagLen,false)
     let diagAirborne=0, diagMaxSink=-Infinity, diagHitSidewalk=false
-    for(let i=0;i<120;i++){
+    for(let i=0;i<120*4/1.65;i++){
       walk.tick(1/60)
       const p=walk.probe()
       if(p.hits.includes('sidewalk')||p.surfaceKind==='sidewalk')diagHitSidewalk=true
@@ -142,7 +146,7 @@ try {
     const {walk}=window.viewer;walk.leave()
     if(!await walk.enter(-588,-212,0,'gate-cam'))throw Error('Spawn failed: gate-cam')
     walk.drive(.145,-.989,false)
-    for(let i=0;i<36;i++)walk.tick(.05)
+    for(let i=0;i<36*4/1.65;i++)walk.tick(.05)
     walk.drive(0,0,false)
     let blocked=false, houseClip=false, minDist=Infinity
     for(let step=0;step<12;step++){
@@ -223,7 +227,7 @@ try {
     return {walkSpeed,runSpeed,stopSpeed:stopped.planarSpeed,stopSlip,reversed:along>0,facingTurn,lateralSkid,
       cutForwardDrift,cutNewGain,cutFacingErr,airborne,maxLift,bufferedJump,groundedEnd:finalJump.grounded,resets:finalJump.resets}
   })
-  assert(feel.walkSpeed>3.85&&feel.walkSpeed<4.1,`walkSpeed: ${JSON.stringify(feel)}`)
+  assert(feel.walkSpeed>1.55&&feel.walkSpeed<1.72,`walkSpeed: ${JSON.stringify(feel)}`)
   assert(feel.runSpeed>8.85&&feel.runSpeed<9.1,`runSpeed: ${JSON.stringify(feel)}`)
   assert(feel.stopSpeed===0&&feel.stopSlip<=.35,`stop: ${JSON.stringify(feel)}`)
   assert(feel.reversed&&feel.facingTurn>2.6&&feel.lateralSkid<.06,`pivot: ${JSON.stringify(feel)}`)
