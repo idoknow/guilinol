@@ -36,7 +36,7 @@ def ring_faces(segments, levels):
     return np.asarray(faces,dtype='<u2')
 
 
-def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, far, site=None):
+def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, far):
     summit = peak['target']
     shoulder,taper = peak['shoulder'],peak['taper']
     lean = radii.mean()*(.08+.045*np.cos(phases[1]))
@@ -82,18 +82,21 @@ def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, f
     vertices = np.asarray([*vertices,(east+lean_x,summit,south+lean_z)],dtype='<f4')
     vertices[:,[0,2]] = np.rint(vertices[:,[0,2]]*256)/256
     faces = ring_faces(count,len(rings))
-    if site is not None:
-        site.finish_mesh(vertices,faces,floor,ring_faces(32,6))
+    return vertex_data(vertices,faces,summit,phases),faces
+
+
+def vertex_data(vertices,faces,summit,phases):
     tris = vertices[faces]
     normals = np.zeros_like(vertices)
     cross = np.cross(tris[:,1]-tris[:,0],tris[:,2]-tris[:,0])
     for corner in faces.T:
         np.add.at(normals,corner,cross)
+    normals[np.linalg.norm(normals,axis=1)<1e-10] = (0,1,0)
     normals /= np.linalg.norm(normals,axis=1)[:,None]
     rock = np.clip(1.35*(1-normals[:,1])+.12*np.sin(vertices[:,0]*.17+phases[1]),0,1)
     normalized = (vertices[:,1]-vertices[:,1].min())/(summit-vertices[:,1].min())
     data = np.column_stack((vertices,normals,np.rint(rock*4096)/4096,np.rint(normalized*4096)/4096)).astype('<f4')
-    return data,faces
+    return data
 
 
 def imprint(terrain, left, top, triangles):
@@ -183,7 +186,7 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
             site = fubo_site(peak['eastLimit'])
             peak_sites[entry['name']] = site
             cx,cz = site.center
-            radii = site.fit(angles,radii)
+            entry["outlineVertices"] = len(site.outline.exterior.coords)-1
             entry['center'] = [cx,peak['target'],cz]
         if 'model' in peak:
             entry['model'] = peak['model']
@@ -201,9 +204,6 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
     auto_file = 'auto-peaks.json'
     (output/auto_file).write_text(json.dumps(auto,ensure_ascii=False,separators=(',',':'))+'\n')
     suppress(original,wet,ground)
-    for entry,peak,cx,cz,radii,floor in shapes:
-        if site := peak_sites.get(entry['name']):
-            site.grade_trail(original,wet,left,top,floor)
     terrain[:] = original
     ground_at = sampler(original)
     skirt_at = sampler(minimum_filter(original,size=17,mode='nearest'))
@@ -212,11 +212,12 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
         phases = np.random.default_rng(peak.get('seed',peak.get('osm'))).uniform(0,2*np.pi,3)
         for far in [False,True]:
             site = peak_sites.get(entry['name'])
-            if far and site is not None:
-                data,faces = data[site.far_vertices], site.far_faces
+            if site is not None:
+                vertices,faces,segments = site.geometry(far)
+                data = vertex_data(vertices,faces,peak['target'],phases)
             else:
-                data,faces = mesh(cx,cz,peak,ground_at,skirt_at,angles,radii,floor,phases,far,site)
-            segments = len(angles)//(4 if far else 1)
+                data,faces = mesh(cx,cz,peak,ground_at,skirt_at,angles,radii,floor,phases,far)
+                segments = len(angles)//(4 if far else 1)
             footprints.append(Polygon(data[:segments][:,[0,2]]))
             if not far:
                 imprint(terrain,left,top,data[faces,:3])
@@ -224,7 +225,7 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
                     rows,cols=np.ogrid[:terrain.shape[0],:terrain.shape[1]]
                     shore=(left+cols*GRID>cx+12)&(left+cols*GRID<cx+65)&(abs(top+rows*GRID-cz)<22)
                     terrain[shore]=original[shore]
-                    peak_sites[entry['name']].clear_trail_imprint(terrain,original,left,top)
+
                 if entry['name']=='明月峰':
                     faces=wind_cave.cut(data,faces,terrain,left,top,GRID)
                     path=wind_cave.trail(data[:-1,:3].reshape(12,128,3),data[-1,:3])
@@ -242,7 +243,7 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
                             weights = rng.dirichlet([1,1,1])
                             if weights@tri[:,6]<.5:
                                 mountain_trees.append((weights@tri[:,:3]-.3*normal,normal))
-            template = 'wind_cave' if not far and entry['name']=='明月峰' else far
+            template = ('site',entry['name'],far) if site is not None else 'wind_cave' if not far and entry['name']=='明月峰' else far
             if template not in index_offsets:
                 index_offsets[template] = len(payload)
                 payload.extend(faces.tobytes())

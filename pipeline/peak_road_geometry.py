@@ -47,7 +47,7 @@ def road_buffers(bounds):
 class TrailAreas:
     """Only whole walking ways in a peak's containing land polygon are trails."""
     def __init__(self, elements):
-        areas = []
+        areas, parks = [], []
         self.summits = {}
         for e in elements:
             tags = e.get('tags', {})
@@ -58,7 +58,10 @@ class TrailAreas:
                 region = area(e)
                 if not region.is_empty:
                     areas.append(region)
+                    if tags.get("leisure") == "park":
+                        parks.append(region)
         self.index = shapely.STRtree(areas)
+        self.parks = shapely.STRtree(parks)
 
     def regions(self, summit):
         return self.index.geometries[self.index.query(summit, predicate='covered_by')]
@@ -70,3 +73,16 @@ class TrailAreas:
         if kind not in ('steps','path','track','footway') or tags.get('footway') == 'sidewalk':
             return False
         return any(region.covers(LineString(points(way))) for region in regions)
+
+    def platforms(self, summit, ways, uphill):
+        """Classify mapped highway areas at an uphill route endpoint in its park."""
+        parks = self.parks.geometries[self.parks.query(summit,predicate='covered_by')]
+        endpoints = [Point(p) for way in uphill for p in (points(way)[0],points(way)[-1])]
+        result = {}
+        for way in ways:
+            if way.get('tags',{}).get('area')!='yes':
+                continue
+            polygon = area(way)
+            if any(park.covers(polygon) for park in parks) and any(polygon.covers(end) for end in endpoints):
+                result[way['id']] = polygon
+        return result

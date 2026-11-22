@@ -282,6 +282,7 @@ def build(bbox, output, palette, workers=4):
         downtown.peaks(output,peaks)
     if fubo is not None:
         fubo.grade_bank(terrain,original,surface,left,top)
+        fubo.native_grade(terrain,original,surface,left,top)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 
@@ -390,7 +391,7 @@ def build(bbox, output, palette, workers=4):
     if fubo is not None:
         # The park paths are painted on the graded ground. An additional
         # spline-height street mesh would bridge across the switchbacks.
-        modeled_paving = modeled_paving.union(fubo.trails.buffer(4).intersection(fubo.park))
+        modeled_paving = modeled_paving.union(fubo.trails.buffer(4).intersection(fubo.park).difference(fubo.platform))
     gate_plaza = next((ShapelyPolygon(np.asarray(GATE_PLAZA)+[x,z]) for x,z,entry in layout.entries
                        if entry['id']=='gunanmen'),None)
     if gate_plaza is not None:

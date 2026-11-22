@@ -29,6 +29,8 @@ def mountain(name):
     lod=peak['lods'][0];payload=gzip.decompress((root/manifest['peaks']['file']).read_bytes())
     vertices=np.frombuffer(payload,'<i2',lod['vertices']*3,lod['offset']).reshape(-1,3)/100
     vertices += np.subtract(peak['center'],[surface.x,surface.y,surface.z])
+    if 'outlineVertices' in peak:
+        return vertices[:peak['outlineVertices']],vertices[vertices[:,1].argmax()]
     return vertices[:-1].reshape(12,-1,3),vertices[-1]
 
 
@@ -67,10 +69,43 @@ def grotto(model,half,height,depth):
     model.box(0,-.3,depth*.5,half*2+.5,.3,depth+2,'pave',True)
 
 
+def stair_flight(model,surface):
+    """Stone treads on the climbing section, with risers bearing on GL04."""
+    from fubo_site import fubo_site
+    site = fubo_site(-50.92)
+    line = site.steps
+    model.pose = (0,0,0,0)
+    pairs = []
+    # Keep joints at OSM corners and share vertices between neighbouring treads.
+    cumulative = 0.
+    for a,b in zip(line.coords,list(line.coords)[1:]):
+        length = np.linalg.norm(np.subtract(b,a))
+        count = int(np.ceil(length/.47))
+        for station in cumulative+np.arange(count)*length/count:
+            p = line.interpolate(station)
+            tangent = np.subtract(line.interpolate(min(line.length,station+.28)).coords[0],
+                                  line.interpolate(max(0,station-.28)).coords[0])
+            normal = np.array([-tangent[1],tangent[0]])/np.linalg.norm(tangent)
+            strip = np.array(p.coords[0])+np.array([-1.,1.])[:,None]*normal
+            strip -= [surface.x,surface.z]
+            pairs.append([(x,surface.ground(x,z),z) for x,z in strip])
+        cumulative += length
+    for a,b in zip(pairs,pairs[1:]):
+        ground = np.array([a[0],a[1],b[1],b[0]])
+        top = ground.copy()
+        for i,j in ((0,3),(1,2)):
+            top[[i,j],1] = (ground[i,1]+ground[j,1])*.5+.045
+        ground[:,1] -= .04
+        model.mesh(np.vstack([top,ground]),
+                   [[0,1,2],[0,2,3],[0,5,1],[0,4,5],[1,6,2],[1,5,6],
+                    [2,7,3],[2,6,7],[3,4,0],[3,7,4]],'granite',False)
+
+
 def build(model):
     surface=landmark_surface('fubo')
+    stair_flight(model,surface)
     rings,tip=mountain('伏波山');model.pose=(*tip,0);pavilion(model,5.2,3.6,surface)
-    base=rings[1,0].copy();base[0]=rings[2,0,0]
+    base=rings[rings[:,0].argmax()] if rings.ndim==2 else rings[1,0]
     elements = load_osm()
     river = area(next(e for e in elements if e['id']==2339020 and e['type']=='relation'))
     park = area(next(e for e in elements if e['id']==485320268))

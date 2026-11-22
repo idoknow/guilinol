@@ -376,7 +376,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         p_idx = np.frombuffer(pk_blob, '<u2', lod0['indices'], lod0['indexOffset']).reshape(-1, 3)
         ptris = p_pos[p_idx]
         peak_tris_list.append(ptris)
-        ring0 = p_pos[:128, [0, 2]]
+        ring0 = p_pos[:pentry.get('outlineVertices',128), [0, 2]]
         peak_polys_list.append(Polygon(ring0).buffer(0))
     all_peak_tris = np.concatenate(peak_tris_list, axis=0) if peak_tris_list else np.zeros((0, 3, 3))
     if len(all_peak_tris):
@@ -851,12 +851,18 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             pname = peak_lm_map[lid]
             if pname in peak_summits:
                 summit_y = peak_summits[pname][1]
-                # Summit pavilion / top features should align near peak summit, and base must not be >5m below river/ground
-                gm_foot = ground_mesh_y(px, pz)
-                if ymin < gm_foot - 15.0 or (lid in ('fubo', 'diecai') and ymax < summit_y - 10.0):
-                    err = max(gm_foot - ymin, summit_y - ymax)
-                    other_issues.append(make_issue('floatingOrBuried', px, pz, err,
-                                                   f'Peak landmark {lid} y=[{ymin:.1f},{ymax:.1f}] misaligned with {pname} summit={summit_y:.1f}m', landmark=lid))
+                # A peak landmark spans the pavilion, stair and shoreline.
+                # Measure its lowest bearings against the ground directly
+                # beneath them, even when the OSM anchor is on a high terrace.
+                vertices = vtris.reshape(-1,3)
+                bearings = np.unique(vertices[vertices[:,1] <= ymin+.01],axis=0)
+                burial,bx,bz = max((ground_mesh_y(x,z)-y,x,z) for x,y,z in bearings)
+                if burial>15.0:
+                    other_issues.append(make_issue('floatingOrBuried',bx,bz,burial,
+                                                   f'{lid} lowest bearing below local ground',landmark=lid))
+                if lid in ('fubo','diecai') and ymax<summit_y-10.0:
+                    other_issues.append(make_issue('floatingOrBuried',px,pz,summit_y-ymax,
+                                                   f'{lid} pavilion below {pname} summit',landmark=lid))
         elif lid in ('jiefang_bridge', 'huaqiao'):
             # Bridge piers should reach down to water/ground and not float above deck approach
             gm = ground_mesh_y(px, pz)

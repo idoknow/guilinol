@@ -4,7 +4,7 @@ from functools import lru_cache
 import numpy as np
 import shapely
 from shapely.geometry import LineString, Point, box
-from shapely.ops import nearest_points
+from shapely.affinity import rotate
 
 from common import GRID, load_osm
 from features import area, points
@@ -33,40 +33,129 @@ class FuboSite:
         summit = areas.summits[1618571712]
         regions = areas.regions(summit)
         ways, index = road_buffers(park.buffer(150))
-        trails, strict, water_paths = [], [], []
+        nearby = [ways[i] for i in index.query(park.buffer(100))]
+        walking = [w for w in nearby if areas.trail(w,regions)]
+        uphill = [w for w in walking if w['tags']['highway']!='footway']
+        platforms = areas.platforms(summit,nearby,uphill)
+        self.platform = shapely.union_all(list(platforms.values()))
+        self.steps = max((LineString(points(w)) for w in uphill if w['tags']['highway']=='steps'),key=lambda line:line.length)
+        if Point(self.steps.coords[0]).distance(self.platform)<Point(self.steps.coords[-1]).distance(self.platform):
+            self.steps = self.steps.reverse()
+        self.feet = shapely.union_all([LineString(points(w)) for w in walking if w not in uphill])
+        self.trails = self.feet.union(self.steps)
+        strict, wet_buffers = [], []
         for i in index.query(park.buffer(100)):
-            if areas.trail(ways[i], regions):
-                trails.append(LineString(points(ways[i])))
-                water_paths.append(index.geometries[i].intersection(river))
+            if areas.trail(ways[i],regions) or ways[i]['id'] in platforms:
+                wet_buffers.append(index.geometries[i].intersection(river))
             else:
                 strict.append(index.geometries[i])
-        self.trails = shapely.union_all(trails)
-        self.steps = LineString(points(next(e for e in elements if e['id']==485320266)))
-        self.safe = park.union(river).intersection(box(park.bounds[0],park.bounds[1],
-                                                        east_limit,park.bounds[3])).difference(
-            shapely.union_all(strict + water_paths)).buffer(-.10)
-        self.river = river
-        self.park = park
-        # Place the summit on the dry riverside strip, at the nearest feasible
-        # location to the mapped summit with room for the pavilion foundations.
-        land = park.intersection(self.safe).buffer(-2).intersection(river.buffer(16))
-        interior = land.difference(self.trails.buffer(10)).difference(shapely.union_all(strict).buffer(10))
-        self.center = np.array(nearest_points(summit, interior)[1].coords[0])
-        self.corridor = self.trails.buffer(2)
-        self.dry_allowed = park.difference(shapely.union_all(strict))
-
-    def grade_trail(self, field, wet, left, top, floor):
-        # OSM walking ways are textured directly on GL04. Grade the lower
-        # hillside itself, rising from the southern entrance to the lookout.
-        window,x,z = grid_window(field.shape,left,top,self.park)
+        blocked = shapely.union_all(strict)
+        self.river, self.park = river,park
+        self.dry_allowed = park.difference(blocked)
+        allowed = park.union(river).intersection(box(park.bounds[0],park.bounds[1],
+                                                east_limit,park.bounds[3]))
+        allowed = allowed.difference(shapely.union_all([blocked,self.feet.buffer(1),*wet_buffers]))
+        # A 15 m opening removes narrow spurs. Choose the connected component
+        # carrying the stair and trim the southwest corner along the road.
+        cores = shapely.get_parts(allowed.buffer(-7.55,quad_segs=40))
+        shoulder = max((p.buffer(7.5,quad_segs=40) for p in cores),
+                       key=lambda p:p.intersection(self.steps).length)
+        diagonal = rotate(shoulder,45,origin=(0,0))
+        x0,z0,x1,z1 = diagonal.bounds
+        self.outline = rotate(diagonal.intersection(box(x0-1,z0-1,x1-20,z1+1)),-45,origin=(0,0))
+        self.outline = self.outline.simplify(.035,preserve_topology=True)
+        # Grid-aligned apex on the broad shoulder near the surveyed summit.
+        west,north,east,south = self.outline.bounds
+        self.west,self.north = int(west//8)*8-16,int(north//8)*8-16
+        self.xs = np.arange(self.west,int(east//8)*8+33,GRID)
+        self.zs = np.arange(self.north,int(south//8)*8+33,GRID)
+        x,z = np.meshgrid(self.xs,self.zs)
         pts = shapely.points(x,z)
-        inside = shapely.contains(self.dry_allowed,pts)
-        edge = shapely.distance(pts,self.dry_allowed.boundary)
-        entrance = self.steps.coords[-1][1]
-        rise = np.clip((entrance-z)*.16,0,8)
-        target = floor + np.minimum(rise,edge*.30)
-        weight = np.where(inside & ~wet[window],np.clip(edge/6,0,1),0)
-        field[window] = np.rint((1-weight)*field[window]+weight*target*10)
+        edge = shapely.distance(pts,self.outline.boundary)
+        stair_dist = shapely.distance(pts,self.steps)
+        inside = shapely.contains(self.outline,pts)
+        score = np.where(inside & (x%8==0) & (z%8==0) & (shapely.distance(pts,summit)<=40),
+                         np.minimum(edge,stair_dist*.95),-1)
+        row,col = np.unravel_index(np.argmax(score),score.shape)
+        self.center = np.array([x[row,col],z[row,col]],dtype=float)
+        self._prepare_heights(x,z,pts,edge,stair_dist,inside)
+
+    def _prepare_heights(self,x,z,pts,edge,stair_dist,inside):
+        # A continuous rock surface with a round crown and a graded lower
+        # shoulder. A harmonic interpolation blends the surveyed walking
+        # route into the slopes on both sides of each switchback.
+        from scipy.ndimage import convolve, maximum_filter
+        cx,cz = self.center
+        rad = np.hypot((x-cx)*1.1,(z-cz)*.8)
+        # The west/south shoulder rises across the breadth of the park.
+        # Flatten the crown gently in both axes, with a steeper river face.
+        floor = 147.
+        radius = ((x-cx)/52)**2+((z-cz)/76)**2
+        dome = np.maximum(0,1-radius)**.7
+        rim = np.sin(np.minimum(edge/18,1)*np.pi/2)**.92
+        east = np.clip((x-cx-4)/35,0,1)
+        north = np.clip((cz-15-z)/47,0,1)
+        flank = (1-.72*east**1.3)*(1-.60*north**1.3)
+        prior = np.where(inside,floor+(213-floor)*dome*rim*flank,floor)
+        station = shapely.line_locate_point(self.steps,pts)
+        foot_dist = shapely.distance(pts,self.feet)
+        # The stair crosses a level footway mid-route. Its upper flight
+        # climbs from that crossing to the lookout plaza.
+        top = 159.
+        targets = 148.+np.clip(station*.022,0,1.4)+np.clip((station-68)*.29,0,top-149.4)
+        targets = np.where(station>104,top,targets)
+        plaza_dist = shapely.distance(pts,self.platform)
+        route = stair_dist<=5.8
+        platform = plaza_dist<=5.8
+        base = np.where(inside,prior,floor)
+        fixed = ~inside | route | platform | (rad<4.5)
+        base[route] = targets[route]
+        base[platform] = top
+        base[rad<4.5] = 213.-.035*rad[rad<4.5]**2
+        h = base.copy()
+        kernel = np.array([[0,.25,0],[.25,0,.25],[0,.25,0]])
+        for _ in range(180):
+            h = np.where(fixed,base,.63*convolve(h,kernel,mode='nearest')+.37*prior)
+        # Bound each shoulder by its highest continuous connection back to
+        # the crown. A concave parcel must not produce a detached rock knob.
+        connected = np.full_like(h,floor)
+        connected[z==cz] = np.where(x[z==cz]==cx,213.,floor)
+        for _ in range(h.size):
+            raised = np.minimum(h,maximum_filter(connected,size=3))
+            if np.array_equal(raised,connected):
+                break
+            connected = raised
+        self.heights = np.round(np.where(route|platform,h,connected),1)
+        # Blend to the published road underlay outside the rock. The plaza
+        # apron includes all native triangles under its boundary.
+        self.apply_weight = np.maximum(np.where(inside,np.clip(edge/6,0,1),0),
+                                       np.clip((10-plaza_dist)/4,0,1))
+        self.apply_weight = np.where((foot_dist<2)&~platform,0,self.apply_weight)
+        self.apply_weight[route | platform] = 1
+        self.route_dist = np.minimum(stair_dist,plaza_dist)
+
+    def level(self,x,z):
+        u,v = (x-self.west)/GRID,(z-self.north)/GRID
+        i,j = np.clip(np.floor(u).astype(int),0,len(self.xs)-2),np.clip(np.floor(v).astype(int),0,len(self.zs)-2)
+        u,v = np.clip(u-i,0,1),np.clip(v-j,0,1)
+        a,b,c,d = self.heights[j,i],self.heights[j,i+1],self.heights[j+1,i],self.heights[j+1,i+1]
+        return np.where(u+v<=1,a+(b-a)*u+(c-a)*v,d+(c-d)*(1-u)+(b-d)*(1-v))
+
+    def native_grade(self,terrain,original,water,left,top):
+        for j,z in enumerate(self.zs):
+            for i,x in enumerate(self.xs):
+                row,col = (z-top)//GRID,(x-left)//GRID
+                if not (0<=row<water.shape[0] and 0<=col<water.shape[1]) or water[row,col]!=-32768:
+                    continue
+                weight = self.apply_weight[j,i]
+                if weight==0:
+                    continue
+                # Expose limestone on the flanks and keep the ground texture
+                # on the trail. Both have the same 4 m triangulation.
+                drop = np.clip((self.route_dist[j,i]-5.8)/5,0,1)*2
+                target = self.heights[j,i]-drop
+                h = round((1-weight)*original[row,col]+weight*10*target)
+                original[row,col] = terrain[row,col] = h
 
     def retain_street_grade(self, terrain, original, water, published, left, top):
         # The expanded city uses frozen street splines here. Keep their
@@ -91,79 +180,48 @@ class FuboSite:
         for field in (terrain,original):
             field[window] = np.where(near,levels.astype(int)-2,field[window])
 
-    def clear_trail_imprint(self, terrain, original, left, top):
-        # Rapier interpolates 4 m grid cells. Clear all three corners of every
-        # cell a walker on the trail can touch, including at switchbacks.
-        zone = self.trails.buffer(GRID*2)
-        window,x,z = grid_window(terrain.shape,left,top,zone)
-        mask = shapely.intersects_xy(zone,x,z)
-        terrain[window] = np.where(mask,original[window],terrain[window])
 
-    def finish_mesh(self, vertices, faces, floor, far_faces):
-        # Recheck the actual faces: far LOD chords can cut across a concave
-        # plaza corner even when their endpoints satisfy a radial limit.
-        segments = 128
-        rings = np.arange(len(vertices)-1).reshape(-1,segments)
-        self.far_vertices = np.r_[rings[[0,1,4,6,8,11],::4].ravel(),len(vertices)-1]
-        self.far_faces = far_faces
-        coarse = self.far_vertices[self.far_faces]
-        both = np.vstack([faces,coarse])
-        original = vertices[:,[0,2]].copy()
-        scale = np.ones(segments)
-        for _ in range(80):
-            coords = vertices[:,[0,2]]
-            triangles = shapely.polygons(coords[both])
-            outside = ~shapely.covers(self.safe,triangles)
-            cap = np.any(both==len(vertices)-1,axis=1)
-            outside[cap] |= shapely.intersects(triangles[cap],self.corridor)
-            if not outside.any():
-                break
-            bad = np.unique(both[outside])
-            scale[bad[bad<len(vertices)-1]%segments] *= .94
-            # Limit changes in radius between adjoining azimuths.
-            scale = np.minimum(scale,np.minimum(np.roll(scale,1),np.roll(scale,-1))+.035)
-            vertices[:-1,[0,2]] = self.center+(original[:-1]-self.center)*np.tile(scale,len(rings))[:,None]
-        else:
-            raise ValueError('Cannot fit Fubo mesh inside its OSM site')
-        # Carry the low rock toe a few metres across the shared riverbank
-        # wherever a continuous road-free radial segment reaches the water.
-        # The mouth, folds and summit retain their original relative relief.
-        shore_coords = coords.copy()
-        origin = Point(self.center)
-        for i,foot in enumerate(coords[:segments]):
-            delta = foot-self.center
-            radius = np.linalg.norm(delta)
-            if delta[0]<=0 or radius<1:
-                continue
-            direction = delta/radius
-            ray = LineString([self.center,self.center+100*direction])
-            river_distance = origin.distance(ray.intersection(self.river))
-            if not np.isfinite(river_distance) or river_distance>35:
-                continue
-            reach = min(river_distance+3,origin.distance(ray.intersection(self.safe.boundary))-1)
-            if reach<=max(radius,river_distance+.5):
-                continue
-            for level,weight in enumerate((1,.96,.8,.6,.4,.2)):
-                shore_coords[rings[level,i]] += weight*(reach-radius)*direction
-        # Coarse chords across a bend must satisfy the same parcel clearance.
-        for weight in (1,.75,.5,.25,0):
-            fitted = coords+weight*(shore_coords-coords)
-            triangles = shapely.polygons(fitted[both])
-            if shapely.covers(self.safe,triangles).all():
-                vertices[:,[0,2]] = fitted
-                break
-        # Leave a continuous walkable native terrain surface under each mapped
-        # trail. Keep both LODs below it across every intersected triangle.
-        touched = shapely.intersects(triangles,self.corridor)
-        ids = np.unique(both[touched])
-        vertices[ids,1] = np.minimum(vertices[ids,1],floor-3)
-
-    def fit(self, angles, radii):
-        center = Point(self.center)
-        limits = []
-        for angle in angles:
-            end = self.center + 200*np.array([np.cos(angle), np.sin(angle)])
-            ray = LineString([self.center,end])
-            limits.append(center.distance(ray.intersection(self.safe.boundary)))
-        # Allow for the skirt folds, ridge modulation, the summit lean and LOD chords.
-        return np.maximum(1, np.minimum(radii, (np.asarray(limits)-3)/1.22))
+    def geometry(self,far):
+        from shapely.geometry.polygon import orient
+        from features import polygons
+        spacing = GRID*2 if far else GRID
+        # Clip the actual terrain triangles, retaining concavities and the
+        # park footprint in both LODs. Shared centimetre vertices are welded.
+        outline = orient(self.outline,sign=-1)
+        boundary = np.asarray(outline.exterior.coords)[:-1]
+        coords = list(map(tuple,np.round(boundary,2)))
+        lookup = {pt:i for i,pt in enumerate(coords)}
+        faces = []
+        def index(pt):
+            key = tuple(np.round(pt,2))
+            if key not in lookup:
+                lookup[key] = len(coords)
+                coords.append(key)
+            return lookup[key]
+        for z in self.zs[::spacing//GRID]:
+            for x in self.xs[::spacing//GRID]:
+                if not outline.intersects(box(x,z,x+spacing,z+spacing)):
+                    continue
+                tl,tr,bl,br = (x,z),(x+spacing,z),(x,z+spacing),(x+spacing,z+spacing)
+                for tri in ((tl,bl,tr),(br,tr,bl)):
+                    clip = shapely.Polygon(tri).intersection(outline)
+                    for part in polygons(clip):
+                        for face in shapely.get_parts(shapely.constrained_delaunay_triangles(part)):
+                            ring = list(orient(face,sign=-1).exterior.coords)[:3]
+                            ids = [index(pt) for pt in ring]
+                            if len(set(ids))==3:
+                                faces.append(ids)
+        coords = np.array(coords)
+        x,z = coords.T
+        pts = shapely.points(x,z)
+        edge = shapely.distance(pts,outline.boundary)
+        route = np.minimum(shapely.distance(pts,self.steps),shapely.distance(pts,self.platform))
+        height = self.level(x,z)
+        # Recess the rock only a few centimetres beneath the paved surface.
+        height -= .18*np.clip((9-route)/3,0,1)
+        height -= np.clip((4-edge)/4,0,1)*3*np.clip(route/7,0,1)
+        # Small folds and a recessed mouth on the north-east riverside face.
+        river = shapely.distance(pts,self.river)
+        mouth = np.exp(-((z+740)/4)**2)*np.exp(-((river-3)/3)**2)
+        height += (.5*np.sin(z*.7)*np.exp(-river/5)-1.2*mouth)*np.clip(route/8,0,1)
+        return np.column_stack((x,height,z)).astype('<f4'),np.array(faces,dtype='<u2'),len(boundary)
