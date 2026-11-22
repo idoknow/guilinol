@@ -58,3 +58,5 @@ input.acc-code{font-size:24px!important;letter-spacing:.6em;text-align:center;pa
 .acc-bind-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .acc-bind-state{flex:none;font-size:11px;padding:1px 8px;border-radius:999px;background:rgba(120,180,140,.22);color:inherit;opacity:.85}
 .acc-msg a{text-decoration:underline;margin-left:4px}
+
+.acc-bind-title{display:block;font-size:12px;opacity:.6;margin:2px 0 2px}
