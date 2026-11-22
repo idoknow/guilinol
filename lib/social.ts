@@ -113,21 +113,40 @@ async function createSocialOnlyUser(
   nickname: string,
   avatar: string,
 ): Promise<string> {
-  const id = crypto.randomUUID()
   const salt = random(16)
   // 随机密码的哈希：这个账号不能走邮箱密码登录
   const digest = await passwordHash(random(32), salt)
-  await db.batch([
-    db
-      .prepare('INSERT INTO users(id,email,nickname,salt,digest,verified,email_placeholder) VALUES(?,?,?,?,?,1,1)')
-      .bind(id, placeholderEmail(type, socialUid), nickname || '新用户', salt, digest),
-    db
-      .prepare(
-        'INSERT INTO social_identities(type,social_uid,user_id,nickname,faceimg,created_at,last_login_at) VALUES(?,?,?,?,?,?,?)',
-      )
-      .bind(type, socialUid, id, nickname, avatar, now(), now()),
-  ])
-  return id
+  const base = placeholderEmail(type, socialUid)
+  for (const suffix of ['', `.${random(4)}`]) {
+    const id = crypto.randomUUID()
+    const email = suffix ? base.replace('@', `${suffix}@`) : base
+    try {
+      await db.batch([
+        db
+          .prepare('INSERT INTO users(id,email,nickname,salt,digest,verified,email_placeholder) VALUES(?,?,?,?,?,1,1)')
+          .bind(id, email, nickname || '新用户', salt, digest),
+        db
+          .prepare(
+            'INSERT INTO social_identities(type,social_uid,user_id,nickname,faceimg,created_at,last_login_at) VALUES(?,?,?,?,?,?,?)',
+          )
+          .bind(type, socialUid, id, nickname, avatar, now(), now()),
+      ])
+      return id
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      if (!/UNIQUE|PRIMARY KEY/i.test(message)) throw error
+      // 并发时另一个请求已经建好这个平台的绑定：直接登录到它
+      const raced = await db
+        .prepare('SELECT user_id FROM social_identities WHERE type=? AND social_uid=?')
+        .bind(type, socialUid)
+        .first<{ user_id: string }>()
+      if (raced) return raced.user_id
+      // 否则是占位邮箱撞车，加随机后缀再试一次
+      if (!suffix) continue
+      throw new Problem(500, 'social_failed', '账号创建失败，请稍后重试')
+    }
+  }
+  throw new Problem(500, 'social_failed', '账号创建失败，请稍后重试')
 }
 
 type Upstream = {
@@ -344,11 +363,15 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
     if (identity) return back('conflict')
     target = current.id
   } else {
-    if (!identity) return back('unbound')
-    const owner = await db.prepare('SELECT verified FROM users WHERE id=?').bind(identity.user_id).first<{ verified: number }>()
-    if (!owner) return back('failed')
-    if (!owner.verified) return back('unverified')
-    target = identity.user_id
+    if (!identity) {
+      // 这个平台账号还没绑过任何用户：不再挡回去，交给 confirm 直接建号（不强制邮箱）
+      target = ''
+    } else {
+      const owner = await db.prepare('SELECT verified FROM users WHERE id=?').bind(identity.user_id).first<{ verified: number }>()
+      if (!owner) return back('failed')
+      if (!owner.verified) return back('unverified')
+      target = identity.user_id
+    }
   }
 
   const token = random(32)
@@ -462,7 +485,14 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
       .bind(digest)
       .first<{ token: string }>()
     if (!createdPending) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
-    const newUserId = await createSocialOnlyUser(db, type, row.social_uid!, nickname, faceimg)
+    let newUserId: string
+    try {
+      newUserId = await createSocialOnlyUser(db, type, row.social_uid!, nickname, faceimg)
+    } catch (error) {
+      // 建号失败就把授权还回去，别让用户因为一次偶发错误重走整条授权链
+      await db.prepare('UPDATE social_pending SET used=0 WHERE token=?').bind(digest).run()
+      throw error
+    }
     const newToken = random(32)
     await db
       .prepare('INSERT INTO sessions(digest,user_id,expires) VALUES(?,?,?)')
@@ -554,7 +584,13 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
       .bind(digest)
       .first<{ token: string }>()
     if (!createdPending) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
-    const newUserId = await createSocialOnlyUser(db, type, row.social_uid, nickname, safeAvatar(row.faceimg))
+    let newUserId: string
+    try {
+      newUserId = await createSocialOnlyUser(db, type, row.social_uid, nickname, safeAvatar(row.faceimg))
+    } catch (error) {
+      await db.prepare('UPDATE social_pending SET used=0 WHERE token=?').bind(digest).run()
+      throw error
+    }
     const newToken = random(32)
     await db
       .prepare('INSERT INTO sessions(digest,user_id,expires) VALUES(?,?,?)')

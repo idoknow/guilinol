@@ -142,6 +142,7 @@ type MergeUserRow = {
   email_placeholder: number
   nickname: string
   verified: number
+  role: string
   salt: string
   digest: string
 }
@@ -169,7 +170,7 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
   if (!pattern.test(targetId) || !pattern.test(fromId) || fromId === targetId)
     return json({ error: { code: 'invalid_input', message: '请选择两个不同的账号' } }, 400)
 
-  const cols = 'id,email,email_placeholder,nickname,verified,salt,digest'
+  const cols = 'id,email,email_placeholder,nickname,verified,role,salt,digest'
   const target = await db.prepare(`SELECT ${cols} FROM users WHERE id=?`).bind(targetId).first<MergeUserRow>()
   const source = await db.prepare(`SELECT ${cols} FROM users WHERE id=?`).bind(fromId).first<MergeUserRow>()
   if (!target || !source) return json({ error: { code: 'not_found', message: '账号不存在' } }, 404)
@@ -186,23 +187,31 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
   const conflicts = sourceTypes.filter((type) => targetTypes.has(type))
 
   const statements: D1PreparedStatement[] = []
-  const adoptedEmail = target.email_placeholder && !source.email_placeholder ? source.email : ''
+  // 只在来源邮箱已验证时继承：未验证的邮箱继承过来会把目标账号降成 verified=0，
+  // 之后 socialConfirm 的 verified 检查会把这个人的第三方登录也挡掉。
+  const adoptedEmail = target.email_placeholder && !source.email_placeholder && source.verified ? source.email : ''
   // 邮箱唯一约束：必须在来源账号被删除之后才能把邮箱改到目标账号上（见语句最后一步）
   for (const type of movable)
     statements.push(db.prepare('UPDATE social_identities SET user_id=? WHERE user_id=? AND type=?').bind(targetId, fromId, type))
 
   const saves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(targetId).first<{ n: number }>()
   const tookSaves = !saves?.n
-  // 目标没有存档才接管，不会撞 user_id 主键；不用 UPDATE OR IGNORE（SQLite 专有，生产 Postgres 会语法错误）
+  // 目标没有存档才接管，不会撞 user_id 主键。不要写 UPDATE OR IGNORE：SQLite 专有，生产 Postgres 直接语法错误（#146 已修过一次）
   if (tookSaves) statements.push(db.prepare('UPDATE player_saves SET user_id=? WHERE user_id=?').bind(targetId, fromId))
+  // 来源是管理员而目标不是：把角色转过去，否则合并完就没人能进后台了
+  if (source.role === 'admin' && target.role !== 'admin')
+    statements.push(db.prepare("UPDATE users SET role='admin' WHERE id=?").bind(targetId))
 
   statements.push(
-    // UNIQUE(user_id, idempotency_key)：目标已有同 key 的流水就跳过，剩下的随来源账号级联删除
+    // 幂等键 (user_id,idempotency_key) 是唯一索引：先给与目标冲突的行加后缀，再整批搬过去，
+    // 否则跳过冲突行会把这些行留在源账号上，随后 source 被删 → 流水凭空消失
     db
       .prepare(
-        'UPDATE player_ledger_txns SET user_id=? WHERE user_id=? AND idempotency_key NOT IN (SELECT idempotency_key FROM player_ledger_txns WHERE user_id=?)',
+        `UPDATE player_ledger_txns SET idempotency_key = idempotency_key || '#' || tx_id
+         WHERE user_id=? AND idempotency_key IN (SELECT idempotency_key FROM player_ledger_txns WHERE user_id=?)`,
       )
-      .bind(targetId, fromId, targetId),
+      .bind(fromId, targetId),
+    db.prepare('UPDATE player_ledger_txns SET user_id=? WHERE user_id=?').bind(targetId, fromId),
     db.prepare('UPDATE feedback SET user_id=? WHERE user_id=?').bind(targetId, fromId),
     db.prepare('UPDATE feedback_upload_usage SET user_id=? WHERE user_id=?').bind(targetId, fromId),
     db.prepare('DELETE FROM sessions WHERE user_id=?').bind(fromId),
@@ -258,8 +267,8 @@ export async function adminSetPassword(db: D1Database, actor: string, id: string
     db
       .prepare('UPDATE users SET salt=?,digest=?,failures=0,locked_until=0 WHERE id=?')
       .bind(salt, await passwordHash(password, salt), id),
-    // audit 用 changes()=1 判断上一条是否生效，必须紧跟 UPDATE users；放在 DELETE sessions 后面时，
-    // 用户没有恰好 1 个会话就不会留审计
+    // audit() 用 changes()=1 判断上一条是否生效，必须紧跟 UPDATE users；
+    // 放在 DELETE sessions 后面，用户不是恰好 1 个会话就不会留审计（#146 已修过一次）
     audit(db, actor, 'reset_password', 'user', id, { generated: !provided }),
     // 旧会话全部失效：改密码等于把人踢下线
     db.prepare('DELETE FROM sessions WHERE user_id=?').bind(id),
