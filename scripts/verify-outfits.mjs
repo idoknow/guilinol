@@ -596,7 +596,7 @@ try {
       const resetSnap = await page.evaluate(() => window.__outfitHarness.getMetrics().snapshot)
       assert.equal(resetSnap.equipped.top, 'top_default_tee')
       assert.equal(resetSnap.equipped.bag, 'bag_none')
-      assert.equal(resetSnap.builtinPackVisible, true)
+      assert.equal(resetSnap.builtinPackVisible, false)
       assert.equal(resetSnap.autoHelmetOnRide, true)
     }
 
