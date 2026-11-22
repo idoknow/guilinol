@@ -1,5 +1,6 @@
 import {type Env,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCode,now,passwordHash,random,reserveMail,sessionHash,unauthorized} from '../../lib/auth'
 
+import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar'
 import {feedback} from '../../lib/feedback'
 import {isSocialType,socialCallback,socialConfirm,socialPending,socialStates,startSocial} from '../../lib/social'
 import {unsubscribe} from '../../lib/feedback-mail'
@@ -14,7 +15,7 @@ function password(value:unknown) {
   if(typeof value!=='string'||value.length<8||value.length>256) invalid()
   return value
 }
-const methods:Record<string,string[]>={health:['GET'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST']}
+const methods:Record<string,string[]>={health:['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST']}
 
 async function handle(request:Request,env:Env) {
   const url=new URL(request.url), path=url.pathname.slice(5), method=request.method, db=env.DB
@@ -51,11 +52,36 @@ async function handle(request:Request,env:Env) {
     await stmt('DELETE FROM sessions WHERE digest=?',await sessionHash(request)).run()
     return json({ok:true},200,cookie('',0))
   }
-  if(path==='me') {
+  if(path==='me' || path==='me/avatar') {
     const digest=await sessionHash(request)
     const user=await stmt(`SELECT users.* FROM users JOIN sessions ON users.id=sessions.user_id
       WHERE sessions.digest=? AND expires>?`,digest,now()).first<User>()
     if(!user) unauthorized()
+    if(path==='me/avatar') {
+      const row=await stmt('SELECT payload_json,revision FROM player_saves WHERE user_id=?',user.id)
+        .first<{payload_json:string;revision:number}>()
+      const payload=row ? JSON.parse(row.payload_json) : {}
+      if(method==='GET') return json({avatar:sanitizeAvatar(payload[AVATAR_KEY]) ?? null})
+      const avatar=sanitizeAvatar(body.avatar)
+      if(!avatar) invalid()
+      const timestamp=now()
+      if(body.equipStarter===true || sanitizeAvatar(payload[AVATAR_KEY])?.look!==avatar.look) {
+        const wardrobe=payload.wardrobe??{}
+        const items=looks.flatMap(look=>Object.values(starterOutfit(look)))
+        payload.wardrobe={...wardrobe,equipped:starterOutfit(avatar.look),
+          ownedItemIds:[...new Set([...(wardrobe.ownedItemIds??[]),...items])],
+          ownedPresetIds:[...new Set([...(wardrobe.ownedPresetIds??[]),...looks.map(l=>l==='basic'?'outfit_default':'starter_'+l)])]}
+      }
+      payload.schemaVersion=2
+      payload.updatedAt=Date.now()
+      payload[AVATAR_KEY]=avatar
+      const saved=await stmt(`INSERT INTO player_saves(user_id,schema_version,revision,payload_json,client_updated_at,updated_at)
+        VALUES(?,2,1,?,?,?) ON CONFLICT(user_id) DO UPDATE SET payload_json=excluded.payload_json,
+        revision=player_saves.revision+1,client_updated_at=excluded.client_updated_at,updated_at=excluded.updated_at
+        WHERE player_saves.revision=?`,user.id,JSON.stringify(payload),timestamp,timestamp,row?.revision ?? 0).run()
+      if(!saved.meta.changes) throw new Problem(409,'conflict','存档已更新，请重试')
+      return json({avatar})
+    }
     const writes=[stmt('UPDATE sessions SET expires=? WHERE digest=? AND expires>?',now()+lifetime,digest,now())]
     if(method==='PATCH') {
       if('notify_email' in body){if(typeof body.notify_email!=='boolean')invalid();user.notify_email=Number(body.notify_email);writes.push(stmt('UPDATE users SET notify_email=? WHERE id=?',user.notify_email,user.id))}

@@ -13,6 +13,7 @@
  *  - Deterministic offline-guest <-> cloud save merger (`mergeCloudAndLocalSave`) + 64 KiB payload guard.
  */
 
+import {AVATAR_KEY, sanitizeAvatar, type Avatar} from '../../../lib/avatar'
 import {
   DEFAULT_EQUIPPED_OUTFIT,
   DEFAULT_OWNED_OUTFIT_ITEMS,
@@ -88,6 +89,7 @@ export interface SaveMetaBlock {
 }
 
 export interface LocalSaveV1 {
+  [AVATAR_KEY]?: Avatar
   schemaVersion: 2
   money: number
   owned: string[]
@@ -327,6 +329,7 @@ export function cloneSave(save: LocalSaveV1): LocalSaveV1 {
   }
   return {
     schemaVersion: SAVE_SCHEMA_VERSION,
+    [AVATAR_KEY]: sanitizeAvatar(save[AVATAR_KEY]),
     money: save.money,
     owned: [...save.owned],
     spotsFound: [...save.spotsFound],
@@ -476,6 +479,7 @@ export function sanitizeSave(raw: unknown, nowMs = Date.now()): {save: LocalSave
     spotsFound,
     missionsDone,
     updatedAt,
+    [AVATAR_KEY]: sanitizeAvatar(raw[AVATAR_KEY]),
     wardrobe,
     garage: {activeVehicleId, vehicles},
     economy: {
@@ -825,6 +829,7 @@ export function mergeCloudAndLocalSave(localRaw: LocalSaveV1, cloudRaw: LocalSav
 
   const merged: LocalSaveV1 = {
     schemaVersion: SAVE_SCHEMA_VERSION,
+    [AVATAR_KEY]: newer[AVATAR_KEY] ?? older[AVATAR_KEY],
     money: mergedMoney,
     owned: mirrorOwnedModels(vehicles, [...cloud.owned, ...local.owned]),
     spotsFound,

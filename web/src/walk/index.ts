@@ -6,6 +6,8 @@ import type {PeaksGroup} from '../peaks'
 import type {Manifest} from '../world'
 import type {Stream} from '../stream'
 import {walkInput} from '../ui/walk'
+import {defaultAvatar} from '../../../lib/avatar'
+import {currentAvatar,characterModel,disposeCharacterParts,styleCharacter} from './character'
 import {avatar} from '../look/avatar'
 import {bikeConfig, carConfig, walkConfig as cfg, type CarDriveMode, type EbikeHeadlightMode, type EbikeTurnSignal, type EbikeUpgradeMods} from './config'
 import {createPhysics} from './physics'
@@ -16,7 +18,6 @@ import {createDriverPose} from './car'
 import {createRiderPose,notifyDismountBlocked} from './ride'
 import {createEbikeAudioEngine} from './ebike-audio'
 import {clearAvatarPose, ensureAvatarRig, getAvatarJoint, getAvatarJoints} from './avatar-rig'
-import {createAvatarOutfitController} from './outfits'
 import {isGlobalHotkeyBlocked, isModalOrOverlayOpen} from './input-guard'
 import {createInteractArbiter} from './interact-arbiter'
 import type {ShopCloseReason, ShopOverlayHandle} from '../ui/shop-overlay'
@@ -301,10 +302,33 @@ function applyPickupBikeAnimation(
 export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canvas:HTMLCanvasElement,manifest:Manifest,stream:Stream,peaks:PeaksGroup,verify:boolean){
   rapierReady ??= R.init()
   avatarReady ??= new GLTFLoader().loadAsync(avatar.path)
-  const [sim,model]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady])
+  const profile=currentAvatar()??defaultAvatar()
+  const [sim,source,model]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady,characterModel(profile)])
+  model.animations.push(...source.animations.filter(c=>!model.animations.some(other=>other.name===c.name)))
   const rig=createCameraRig(sim)
   const figure=model.scene,legacySkinned=mergeAvatar(figure,avatar.color),avatarRig=ensureAvatarRig(figure,avatar.color),skinned=legacySkinned??avatarRig.skinnedMesh,traveller=figure.getObjectByName('Traveller')??avatarRig.traveller,ridePose=createRiderPose(figure),driverPose=createDriverPose(figure)
-  const outfitController=createAvatarOutfitController(figure,avatarRig)
+  let outfitController=styleCharacter(figure,avatarRig,profile)
+  let appearanceVersion=0
+  window.addEventListener('glol:avatar-change',async()=>{
+    const a=currentAvatar(),version=++appearanceVersion
+    if(!a||!avatarRig.skinnedMesh)return
+    const fresh=await characterModel(a)
+    if(version!==appearanceVersion){disposeCharacterParts(fresh.scene);disposeCharacterParts(fresh.scene.userData.creatorHair);return}
+    const mesh=fresh.scene.getObjectByProperty('isSkinnedMesh',true) as THREE.SkinnedMesh
+    outfitController.dispose()
+    for(const name of ['creator-body-outline','creator-face','creator-hair','creator-skirt']){
+      const part=figure.getObjectByName(name)
+      if(part){part.removeFromParent();disposeCharacterParts(part)}
+    }
+    avatarRig.skinnedMesh.geometry.dispose();avatarRig.skinnedMesh.geometry=mesh.geometry
+    const oldMaterial=avatarRig.skinnedMesh.material
+    for(const mat of Array.isArray(oldMaterial)?oldMaterial:[oldMaterial])mat.dispose()
+    avatarRig.skinnedMesh.material=mesh.material
+    figure.getObjectByName('CreatorProportions')!.scale.copy(fresh.scene.getObjectByName('CreatorProportions')!.scale)
+    figure.userData.creatorHair=fresh.scene.userData.creatorHair
+    outfitController=styleCharacter(figure,avatarRig,a)
+    outfitController.applyEquipped(getGameState().wardrobe.equipped,{autoHelmetOnRide:getGameState().wardrobe.autoHelmetOnRide,ridingEbike:Boolean(rides?.bike&&rides.rideKind!=='bicycle')})
+  })
   {
     const initialWardrobe=getGameState().wardrobe
     outfitController.applyEquipped(initialWardrobe.equipped,{ridingEbike:false,autoHelmetOnRide:initialWardrobe.autoHelmetOnRide})
@@ -998,8 +1022,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     prevAudioPark=false;prevAudioGear=2;prevAudioLight='off';prevAudioBlink=false;prevAudioHorn=false
   }
   const footMetrics={soleOffset:avatarRig.soleOffset,footProbes:avatarRig.footProbes}
-  scene.add(figure);figure.visible=false;figure.scale.setScalar(avatar.scale)
-  const soleOffset=footMetrics.soleOffset*avatar.scale, footTmp=new THREE.Vector3()
+  scene.add(figure);figure.visible=false;figure.scale.setScalar(1)
+  const soleOffset=footMetrics.soleOffset, footTmp=new THREE.Vector3()
   const lmFloorCache=new WeakMap<THREE.Group,{grid:Map<string,number[]>;large:number[]}>()
   const _va=new THREE.Vector3(), _vb=new THREE.Vector3(), _vc=new THREE.Vector3(), _im=new THREE.Matrix4(), _inst=new THREE.Matrix4()
   function getLandmarkFloorGrid(root:THREE.Group){

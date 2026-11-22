@@ -334,12 +334,13 @@ def idle_pose(phase):
     return D, sway
 
 
-def bake(g, name, pose_fn, cycle, keys, toes):
+def bake(g, name, pose_fn, cycle, keys, toes, finger_curl=1.):
     """Pose every key, solve the pelvis height from the skinned mesh, return (animation, report)."""
     rest_q = g.worldq(g.R)               # bind world rotations (glb frame: +Y up, +Z forward, +X = character's left)
     old = next(a for a in g.j['animations'] if a['name'] == name)
     old_walk = next(a for a in g.j['animations'] if a['name'] == 'walk_src')
     blend = 1. if g.j['asset'].get('extras', {}).get('walkRig') == MARK else .55   # re-runs keep the relaxed hand
+    blend *= finger_curl
     finger_q = {}
     for c in old_walk['channels']:      # fingers: halfway between the flat bind hand and the source clip's fist
         n = g.names[c['target']['node']]

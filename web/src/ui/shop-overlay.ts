@@ -115,7 +115,7 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
       </div>
       <div class="shop-tabs" role="tablist"></div>
       <div class="shop-wardrobe-opts" hidden>
-        <span class="shop-wardrobe-summary"></span>
+        <button type="button" class="shop-edit-character">修改外形</button><span class="shop-wardrobe-summary"></span>
         <button type="button" class="shop-helmet-toggle" aria-pressed="true">骑行自动头盔：开</button>
       </div>
       <div class="shop-status-msg" hidden></div>
@@ -135,6 +135,7 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
   const titleEl = root.querySelector<HTMLElement>('.shop-title')!
   const walletValEl = root.querySelector<HTMLElement>('.shop-wallet-val')!
   const tabsEl = root.querySelector<HTMLElement>('.shop-tabs')!
+  root.querySelector<HTMLButtonElement>('.shop-edit-character')!.onclick=async()=>{close();await (await import('./account')).editCharacter()}
   const wardrobeOptsEl = root.querySelector<HTMLElement>('.shop-wardrobe-opts')!
   const wardrobeSummaryEl = root.querySelector<HTMLElement>('.shop-wardrobe-summary')!
   const helmetToggleBtn = root.querySelector<HTMLButtonElement>('.shop-helmet-toggle')!

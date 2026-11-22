@@ -117,6 +117,10 @@ const SHOES_RECIPES: Record<string, ShoesRecipe> = {
 const BUILTIN_PACK_COLORS = {body: '#2c2e32', strap: '#1b1c1f'} as const
 
 function resolveTopRecipe(topId: string): TopRecipe {
+  if(topId.startsWith('top_starter_')){
+    const item=OUTFIT_ITEMS_BY_ID[topId]
+    if(item)return {primary:item.colorHex,sleeve:topId==='top_starter_office'?'#e6e1d5':item.colorHex,trim:item.accentHex!,inner:item.colorHex}
+  }
   const known = TOP_RECIPES[topId]
   if (known) return known
   const item = OUTFIT_ITEMS_BY_ID[topId]
@@ -133,6 +137,7 @@ function resolveBottomRecipe(bottomId: string): BottomRecipe {
 }
 
 function resolveShoesRecipe(shoesId: string): ShoesRecipe {
+  if(shoesId==='shoes_starter_chinese')return SHOES_RECIPES.shoes_default_sneaker
   const known = SHOES_RECIPES[shoesId]
   if (known) return known
   const item = OUTFIT_ITEMS_BY_ID[shoesId]
@@ -689,6 +694,18 @@ const _tmpColor = new THREE.Color()
 export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig): AvatarOutfitController {
   const skinned = rig.skinnedMesh
   const partition = skinned && rig.isSkinned ? partitionCityWalkerGeometry(skinned) : null
+  const skirt=figure.getObjectByName('creator-skirt')
+  const fullIndex=skinned?.geometry.index
+  let skirtIndex:THREE.BufferAttribute|undefined
+  if(skirt && partition && fullIndex){
+    const visible:number[]=[]
+    for(let t=0;t<partition.bodyIndexCount;t+=3){
+      const tri=[fullIndex.getX(t),fullIndex.getX(t+1),fullIndex.getX(t+2)]
+      if(!tri.every(i=>skinned!.geometry.attributes.position.getY(i)>.50 && (partition.zones[i]===OUTFIT_ZONE.BOTTOM_MAIN || partition.zones[i]===OUTFIT_ZONE.BOTTOM_BELT)))visible.push(...tri)
+    }
+    skirtIndex=new THREE.Uint16BufferAttribute(visible,1)
+  }
+  const garmentRest = figure.userData.creatorBody && skinned ? skinned.geometry.attributes.position.clone() : null
   const hatCache = new Map<string, THREE.Mesh | null>()
   const bagCache = new Map<string, THREE.Mesh | null>()
 
@@ -732,12 +749,50 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
     const cPackBody = new THREE.Color(BUILTIN_PACK_COLORS.body)
     const cPackStrap = new THREE.Color(BUILTIN_PACK_COLORS.strap)
 
+    const skin = figure.userData.characterSkin ? new THREE.Color(figure.userData.characterSkin) : null
     const zones = partition.zones
     const orig = partition.originalColors
+    const female = figure.userData.creatorBody === 'f'
+    const position = skinned.geometry.attributes.position
+    if (female && outfit.top === 'top_starter_chinese') cPrimary.set('#dbc8cc')
+    if (female && outfit.bottom === 'bottom_starter_sport') cBottom.set('#62778a')
+    if (female && outfit.top === 'top_starter_office') cPrimary.set('#e4e1d6')
+    // Stored starter IDs predate the street wardrobe. Preserve them for existing saves.
+    const summerTop = outfit.top === 'top_starter_sport'
+    const shortSleeve = summerTop || outfit.top === 'top_starter_outdoor' || (!female && outfit.top === 'top_starter_office')
+    const shorts = outfit.bottom === 'bottom_starter_sport' || outfit.bottom === 'bottom_starter_outdoor'
+    const wideLeg = female && outfit.bottom === 'bottom_starter_chinese'
+    const starterTop = outfit.top.startsWith('top_starter_') || outfit.top === 'top_default_tee'
+    const starterBottom = outfit.bottom.startsWith('bottom_starter_') || outfit.bottom === 'bottom_default_pants'
+    const uniforms = (skinned.material as THREE.Material).userData?.clothing
+    if (uniforms && skin) {
+      if (!skinned.geometry.hasAttribute('clothZone')) {
+        const ids = Float32Array.from(zones, z => [OUTFIT_ZONE.TOP_PRIMARY,OUTFIT_ZONE.TOP_SLEEVE,OUTFIT_ZONE.TOP_TRIM,OUTFIT_ZONE.TOP_INNER].some(v=>v===z) ? 1 :
+          z===OUTFIT_ZONE.BOTTOM_MAIN || z===OUTFIT_ZONE.BOTTOM_BELT ? 2 : z===OUTFIT_ZONE.SHOES_UPPER ? 3 : 0)
+        skinned.geometry.setAttribute('clothZone',new THREE.BufferAttribute(ids,1))
+      }
+      uniforms.schoolTop.value = Number(outfit.top === 'top_starter_campus')
+      uniforms.skinTone.value.copy(skin)
+      uniforms.sleeve.value = summerTop && !female ? .145 : shortSleeve ? .36 : 1
+      uniforms.shortHem.value = shorts ? .56 : 0
+      uniforms.sandal.value = Number(outfit.shoes==='shoes_starter_sport')
+    }
     for (let i = 0; i < zones.length; i++) {
       const z = zones[i]
+      if (garmentRest && (z === OUTFIT_ZONE.TOP_SLEEVE || z === OUTFIT_ZONE.TOP_PRIMARY) && Math.abs(garmentRest.getX(i)) > .37) {
+        const x = garmentRest.getX(i), y = garmentRest.getY(i), depth = garmentRest.getZ(i)
+        const scale = shortSleeve ? 1 - .39*THREE.MathUtils.smoothstep(Math.abs(x),.40,.747) : 1
+        position.setXYZ(i,x,1.44 + (y-1.44)*scale,-.059+(depth+.059)*scale)
+      }
+      if (garmentRest && z === OUTFIT_ZONE.BOTTOM_MAIN) {
+        const x = garmentRest.getX(i), y = garmentRest.getY(i), depth = garmentRest.getZ(i)
+        const scale = y < .85 ? (shorts && y < .55 ? .79 : wideLeg ? 1.16 : 1) : 1
+        const mid = Math.sign(x) * .092
+        position.setXYZ(i, mid + (x-mid)*scale, y, -.014+(depth+.014)*scale)
+      }
       if (z === OUTFIT_ZONE.LOCKED_SKIN || z === OUTFIT_ZONE.LOCKED_HAIR) {
-        colAttr.setXYZ(i, orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
+        if (skin && z === OUTFIT_ZONE.LOCKED_SKIN) colAttr.setXYZ(i,skin.r,skin.g,skin.b)
+        else colAttr.setXYZ(i, orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
         continue
       }
       // Every zone, the default outfit included, takes its colour from the recipes (the glb palette is only
@@ -752,8 +807,14 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
       else if (z === OUTFIT_ZONE.SHOES_UPPER) _tmpColor.copy(cShoe)
       else if (z === OUTFIT_ZONE.SHOES_ACCENT) _tmpColor.copy(cShoeAcc)
       else _tmpColor.copy(cSole)
+      if (skin && figure.userData.creatorBody) {
+        const shirt = z === OUTFIT_ZONE.TOP_PRIMARY || z === OUTFIT_ZONE.TOP_SLEEVE || z === OUTFIT_ZONE.TOP_TRIM || z === OUTFIT_ZONE.TOP_INNER
+        if (shirt && starterTop) _tmpColor.copy(cPrimary)
+        if (z === OUTFIT_ZONE.BOTTOM_BELT && starterBottom) _tmpColor.copy(cBottom)
+      }
       colAttr.setXYZ(i, _tmpColor.r, _tmpColor.g, _tmpColor.b)
     }
+    if (garmentRest) position.needsUpdate = true
     colAttr.needsUpdate = true
   }
 
@@ -765,6 +826,13 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
       skinned.geometry.setDrawRange(0, showBuiltin ? partition.totalIndexCount : partition.bodyIndexCount)
     }
 
+    const hair = rig.attachments.head?.getObjectByName('creator-hair')
+    if (hair) hair.visible = outfit.hat === 'hat_none'
+    if(skirt && skirtIndex && fullIndex && skinned){
+      skirt.visible=outfit.bottom==='bottom_starter_outdoor'
+      skinned.geometry.setIndex(skirt.visible?skirtIndex:fullIndex)
+      if(skirt.visible)skinned.geometry.setDrawRange(0,skirtIndex.count)
+    }
     const headAnchor = rig.attachments.head
     if (headAnchor) {
       for (const mesh of hatCache.values()) {
@@ -805,6 +873,7 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
       ? {...previewOutfit}
       : resolveVisualOutfit(savedEquipped, {ridingEbike, autoHelmetOnRide})
     appliedOutfit = effective
+    figure.userData.starterDetails?.apply(effective)
     applyColorZones(effective)
     syncAccessories(effective)
     figure.userData.appliedOutfit = {...effective}
