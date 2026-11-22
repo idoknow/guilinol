@@ -10,16 +10,16 @@ import trimesh
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from school_exteriors import append_exterior, prism
 from legacy_gate_parts import camphor_tree, closed_grille, text_mesh
-from mapped_school import build
-from school_kit import export_school_glb
+from mapped_school import build, courtyard, layout, markings, paint
+from school_kit import export_school_glb, mrr_stats
 
 PALETTE = {
-    'wall_main':   '#eeede7',
+    'wall_main':   '#f4f3ef',
     'wall_sub':    '#4c6a58',
     'wall_accent': '#1e4d8c',
-    'wall_base':   '#9e4d3c',
+    'wall_base':   '#8b8f92',
     'win_frame':   '#36454f',
-    'win_trim':    '#f3eee4',
+    'win_trim':    '#f4f3ef',
     'base_frame':  '#8b8f92',
     'base_trim':   '#5b3e31',
     'pave_grey':   '#c9c4ba',
@@ -36,7 +36,8 @@ PALETTE = {
     'court_b':     '#3b6da4',
     'cinnabar':    '#c85845',
     'yellow':      '#dfb648',
-    'cream':       '#d4998f',
+    'cream':       '#f0eee9',
+    'white':       '#f4f3ef',
     'has_ac':      True,
 }
 
@@ -56,7 +57,7 @@ SIGNS = {
 SCHOOL = 'kuiguang_school'
 BOUNDARY = 'way/253811717'
 FRONTAGE = (-13, 25, -65)
-SKIP_EDGES = {0, 13, 14}
+SKIP_EDGES = {0, 6, 7, 8, 9, 10, 11, 12, 13, 14}
 # The detailed Rongyin Road gate block (live before IDOK-84) replaces the generic gate.
 LEGACY_GATE = True
 # Boundary trimmed to keep the model off the public street.
@@ -68,13 +69,13 @@ STREET_SETBACK = [
 ]
 CUSTOM_BUILDINGS = {'way/701820464', 'way/683033673'}
 BUILDINGS = [
-    dict(bid='B1', source_id='way/683033673', floors=5, floor_h=3.55, roof='flat_rail', wall_reg='wall_main', base_reg='wall_base', parapet_reg='wall_accent'),
+    dict(bid='B1', source_id='way/683033673', floors=5, floor_h=3.55, roof='flat_rail', wall_reg='white', base_reg='wall_base', parapet_reg='wall_accent'),
     dict(bid='B2', source_id='way/683033672', floors=4, floor_h=3.45, roof='flat_rail', wall_reg='white', base_reg='wall_base', parapet_reg='wall_accent'),
     dict(bid='B3', source_id='way/683033678', floors=4, floor_h=3.45, roof='flat_rail', wall_reg='white', base_reg='wall_base', parapet_reg='wall_accent'),
     dict(bid='B4', source_id='way/692355780', floors=4, floor_h=3.45, roof='flat_rail', wall_reg='white', base_reg='wall_base', parapet_reg='wall_accent'),
     dict(bid='B5', source_id='way/683033675', floors=3, floor_h=3.35, roof='flat_rail', wall_reg='white', base_reg='wall_base'),
-    dict(bid='B6', source_id='way/701820464', floors=5, floor_h=3.45, roof='flat_rail', wall_reg='cream', base_reg='wall_base', parapet_reg='wall_accent'),
-    dict(bid='B7', source_id='way/683033677', floors=2, floor_h=3.35, roof='flat_rail', wall_reg='wall_base', base_reg='wall_base')
+    dict(bid='B6', source_id='way/701820464', floors=5, floor_h=3.45, roof='flat_rail', wall_reg='white', base_reg='wall_base', parapet_reg='wall_accent'),
+    dict(bid='B7', source_id='way/683033677', floors=2, floor_h=3.35, roof='flat_rail', wall_reg='white', base_reg='wall_base')
 ]
 
 
@@ -154,31 +155,119 @@ def street_buildings(model):
     prism(model, ring, cy - 1.2, 18.4, 'white', 'white', True)
     bx_cx, bx_cz = -157.32, -38.89
     model.pose = (bx_cx, cy, bx_cz, -1.147)
+
+    # 5 stories with open-air corridors, white square columns, safety rails
     for fl in range(5):
         fy = 0.2 + fl * 3.35
+        # Setback back wall and classroom windows
+        model.box(0, fy + 1.675, 4.9, 26.8, 3.35, 2.2, 'white')
+        for wx in np.linspace(-9.58, 9.58, 6):
+            model.box(wx, fy + 1.0, 4.92, 2.8, 1.6, 0.1, 'glass')
+
+        # Outdoor corridor balcony on upper floors
         if fl > 0:
-            model.box(0, fy, 6.02, 26.8, 0.98, 0.22, 'white')
-            model.box(0, fy + 0.98, 6.06, 26.8, 0.12, 0.26, 'clock')
+            model.box(0, fy, 5.4, 26.8, 0.25, 1.2, 'white')
+            model.box(0, fy + 0.25, 6.02, 26.8, 0.82, 0.18, 'white')
+            model.box(0, fy + 1.07, 6.02, 26.8, 0.08, 0.22, 'granite')
+
+        # White square columns along the corridor front
         for col_x in np.linspace(-11.5, 11.5, 7):
-            model.box(col_x, fy, 5.95, 0.42, 3.35, 0.35, 'white')
-            model.box(col_x, fy + 1.1, 5.71, 2.8, 1.55, 0.24, 'glass')
-    for gable_x in (-8.5, -2.8, 2.8, 8.5):
-        gp = [
-            (gable_x - 2.8, 17.0, 6.12),
-            (gable_x + 2.8, 17.0, 6.12),
-            (gable_x, 18.05, 6.12),
-        ]
-        model.mesh(gp, [[0, 1, 2], [0, 2, 1]], 'white')
-        model.beam([gable_x - 2.8, 17.02, 6.16], [gable_x, 18.08, 6.16], 0.09, 'clock', 5)
-        model.beam([gable_x, 18.08, 6.16], [gable_x + 2.8, 17.02, 6.16], 0.09, 'clock', 5)
-    model.box(0.0, 5.8, 6.18, 6.4, 3.1, 0.16, 'sign')
-    model.box(0.0, 5.65, 6.14, 6.8, 3.4, 0.10, 'white')
-    model.box(0.0, 0.25, 6.12, 6.8, 2.85, 0.12, 'red')
+            model.box(col_x, fy, 5.95, 0.48, 3.35, 0.48, 'white')
+
+    # Roof parapet (fy = 16.95)
+    model.box(0, 16.95, 6.02, 27.2, 0.85, 0.24, 'white')
+    model.box(0, 17.8, 6.02, 27.2, 0.12, 0.28, 'clock')
+
+    # Central wave pediment arch on top center (photo-5)
+    gp = [(-5.2, 17.8, 6.08), (5.2, 17.8, 6.08), (0.0, 19.3, 6.08)]
+    model.mesh(gp, [[0, 1, 2], [0, 2, 1]], 'white')
+    model.beam([-5.2, 17.8, 6.12], [0.0, 19.3, 6.12], 0.14, 'clock', 5)
+    model.beam([0.0, 19.3, 6.12], [5.2, 17.8, 6.12], 0.14, 'clock', 5)
+    # Center flagpole
+    model.beam([0.0, 19.3, 6.12], [0.0, 22.5, 6.12], 0.04, 'granite', 5)
+    model.box(0.5, 21.6, 6.12, 0.9, 0.55, 0.02, 'red')
+
+    # School motto on 5th floor: "志 存 高 远   忧 乐 天 下" in gold
+    text_mesh(model, '志 存 高 远   忧 乐 天 下', 13.5, 0.85, 'gold', 15.3, 6.02, font_px=34)
+
+    # Central large outdoor LED display screen on 3rd & 4th floors (center bay x = -3.8..3.8)
+    model.box(0.0, 9.8, 6.10, 7.6, 5.0, 0.12, 'white')
+    model.box(0.0, 9.8, 6.16, 7.2, 4.6, 0.18, 'sign')
+    model.box(0.0, 9.8, 6.25, 6.8, 4.2, 0.05, 'sign')
+
+    # Gold building plaque "培 华 楼" centered on 2nd floor under the LED screen
+    text_mesh(model, '培 华 楼', 4.8, 1.1, 'gold', 5.2, 6.16, font_px=42)
+
+    # Ground floor entrance: red celebratory backdrop banner
+    model.box(0.0, 1.8, 6.14, 7.2, 3.2, 0.12, 'red')
+    text_mesh(model, '奋 发 图 强   筑 梦 奎 光', 5.6, 0.55, 'yellow', 2.8, 6.22, font_px=24)
+    model.box(0.0, 0.1, 6.3, 7.6, 0.25, 0.8, 'granite')
+
     model.pose = (0, 0, 0, 0)
+
+
+def build_kuiguang(builder):
+    boundary, buildings, sports = layout(sys.modules[__name__])
+    ring = list(boundary.exterior.coords)
+    paint(builder, courtyard(boundary, builder.surface), "pave_grey", 0.009, builder.paving)
+    for shape, style in buildings:
+        if style['source_id'] not in CUSTOM_BUILDINGS:
+            builder.footprint_building(list(shape.exterior.coords), **style)
+
+    for key, sport, shape in sports:
+        cx, cz, pl, pw, ang = mrr_stats(list(shape.exterior.coords)[:-1])
+        if sport == 'basketball':
+            builder.basketball_court(
+                cx, cz,
+                yaw=math.radians(ang),
+                w=28.0, d=14.0,
+                surface='court_a', apron='track_red', key_reg='cinnabar',
+                lift=0.03, hoops=True,
+            )
+        elif sport == 'volleyball':
+            old_p = builder.pose
+            y0 = builder.ground(cx, cz) + 0.04
+            builder.pose = (cx, 0.0, cz, math.radians(ang))
+            builder.box(0, y0 - 0.01, 0, 20.0, 0.02, 11.0, 'track_red', cap_region='track_red')
+            builder.box(0, y0, 0, 18.0, 0.03, 9.0, 'court_a', cap_region='court_a')
+            if builder.detail:
+                lw = 0.12
+                builder.box(0, y0 + 0.03, -4.5, 18.0, 0.015, lw, 'white')
+                builder.box(0, y0 + 0.03, 4.5, 18.0, 0.015, lw, 'white')
+                builder.box(-9.0, y0 + 0.03, 0, lw, 0.015, 9.0, 'white')
+                builder.box(9.0, y0 + 0.03, 0, lw, 0.015, 9.0, 'white')
+                builder.box(0, y0 + 0.03, 0, lw, 0.015, 9.0, 'white')
+                builder.box(-3.0, y0 + 0.03, 0, lw, 0.015, 9.0, 'white')
+                builder.box(3.0, y0 + 0.03, 0, lw, 0.015, 9.0, 'white')
+                for pz in (-4.8, 4.8):
+                    builder.cylinder_y(0, y0, 2.45, pz, 0.06, 'yellow', collide=True)
+                builder.box(0, y0 + 2.35, 0, 0.03, 0.04, 9.6, 'white')
+            builder.pose = old_p
+        elif sport in ('running', 'athletics'):
+            paint(builder, shape, 'track_red', 0.06)
+            if builder.lod < 2:
+                for stripe in markings(shape, sport):
+                    paint(builder, stripe, 'white', 0.08)
+
+    # South 3-lane running track strip along 德艺楼 (as seen in photo-6)
+    old_p = builder.pose
+    builder.pose = (-110.0, 0.0, 3.5, math.radians(68.5))
+    y0_track = builder.ground(-110.0, 3.5) + 0.03
+    builder.box(0, y0_track, 0, 42.0, 0.025, 3.8, 'track_red', cap_region='track_red')
+    for ly in (-1.2, 0.0, 1.2):
+        builder.box(0, y0_track + 0.025, ly, 42.0, 0.015, 0.08, 'white')
+    builder.pose = old_p
+
+    # Camphor tree row along the north edge of the basketball courts (photo-3, photo-7)
+    for tx, tz in ((-139.0, -32.6), (-124.0, -26.6), (-109.0, -20.9), (-94.0, -15.3), (-79.0, -9.8), (-64.0, -4.3)):
+        builder.tree(tx, tz, species='camphor', scale=0.92)
+
+    builder.perimeter_fence(ring, gate_edge=-1, skip_edges=SKIP_EDGES)
+
 
 if __name__ == '__main__':
     from xiaoyao_tower import generate
-    export_school_glb(SCHOOL, PALETTE, SIGNS, lambda builder: build(builder, sys.modules[__name__]))
+    export_school_glb(SCHOOL, PALETTE, SIGNS, build_kuiguang)
     generate(
         'exterior', street_buildings,
         lettering=dict(text=' ', foreground='#1e4d8c', background='#1e4d8c'),
