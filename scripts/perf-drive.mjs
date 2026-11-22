@@ -23,7 +23,7 @@ try {
       const page = await context.newPage()
       const cdp = await context.newCDPSession(page)
       const url = `http://127.0.0.1:${servers[side].httpServer.address().port}`
-      await page.goto(`${url}/?verify&flow=0&time=10&${view==='walk-palace'?'mode=walk':`cam=${view}`}`)
+      await page.goto(`${url}/?verify&flow=0&time=10&${process.env.PERF_TRAFFIC==='1'?'traffic=1&':''}${view==='walk-palace'?'mode=walk':`cam=${view}`}`)
       await page.waitForFunction(walking => {
         const viewer = window.viewer
         if (!viewer?.stats.firstMs || viewer.stats.pending || viewer.stream.forest.pending.size || (walking && !viewer.walk?.active)) return false
@@ -49,7 +49,8 @@ try {
         return frames
       }, count)
       const sha = (await (await fetch(`${url}/version.json`)).json()).sha
-      const row = {view,side:side?'PR':'main',round,sha,heap,frames}
+      const traffic=await page.evaluate(()=>({cameraY:window.viewer.camera.position.y,assets:performance.getEntriesByType('resource').filter(entry=>/\/roads\/|\/assets\/traffic-/.test(entry.name)).map(entry=>new URL(entry.name).pathname)}))
+      const row = {view,side:side?'PR':'main',round,sha,heap,frames,traffic}
       raw.push(row)
       await writeFile(`${output}/raw.json`,JSON.stringify(raw))
       return row

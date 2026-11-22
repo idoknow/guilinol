@@ -62,8 +62,10 @@ def bake(output, manifest):
         coords = [ll2xz(pt['lat'], pt['lon']) if pt else None for pt in way['geometry']]
         direction = tags.get('oneway', 'yes' if tags.get('junction') == 'roundabout' else 'no')
         single = direction in ('yes', '1', 'true', '-1')
-        count = max(1, min(12, int(number(tags.get('lanes'), 1 if single or kind in WALK else 2))))
-        size = min(4, max(2, number(tags.get('width'), count*3)/count))
+        bridge_motor = way['id'] in SPAN_WAYS and kind in MOTOR
+        fallback = 3 if bridge_motor else 1 if single or kind in WALK else 2
+        count = max(1, min(12, int(number(tags.get('lanes'), fallback))))
+        size = min(4, max(2, number(tags.get('width'), count*(3.7 if bridge_motor else 3))/count))
         for idx, (start, end) in enumerate(zip(coords, coords[1:])):
             if not start or not end or not all(left <= x < left+width and top <= z < top+depth for x,z in (start,end)):
                 continue
@@ -98,15 +100,23 @@ def bake(output, manifest):
                     incoming[tail].append(lane)
 
     signals = []
-    for element in elements:
-        ref = element['id']
-        if element['type'] != 'node' or element.get('tags',{}).get('highway') != 'traffic_signals' or ref not in incoming:
-            continue
+    remaining = {element['id'] for element in elements if element['type']=='node'
+                 and element.get('tags',{}).get('highway')=='traffic_signals' and element['id'] in incoming}
+    while remaining:
+        group = [min(remaining)]
+        remaining.remove(group[0])
+        for ref in group:
+            nearby = sorted(other for other in remaining if
+                            math.hypot(nodes[ref]['x']-nodes[other]['x'],nodes[ref]['z']-nodes[other]['z'])<=45)
+            remaining.difference_update(nearby)
+            group.extend(nearby)
         phases = defaultdict(list)
-        for lane in incoming[ref]:
-            src, dst = nodes[lane['from']], nodes[ref]
-            phases[abs(dst['x']-src['x']) > abs(dst['z']-src['z'])].append(lane['id'])
-        signals.append(dict(node=ref,phases=[dict(lanes=ids,green=18,yellow=3) for ids in phases.values()] + ([dict(lanes=[],green=18,yellow=3)] if len(phases)==1 else [])))
+        for ref in group:
+            for lane in incoming[ref]:
+                src, dst = nodes[lane['from']], nodes[ref]
+                phases[abs(dst['x']-src['x']) > abs(dst['z']-src['z'])].append(lane['id'])
+        schedule = [dict(lanes=phases[axis],green=18,yellow=3) for axis in sorted(phases)]
+        signals.extend(dict(node=ref,group=group[0],offset=group[0]%31,phases=schedule) for ref in group)
     result = dict(nodes=[node for node in nodes.values() if node['y'] is not None],lanes=lanes,signals=signals,quiet=quiet,walks=walks)
     dest = output/'roads'/'graph.json.gz'
     dest.parent.mkdir(exist_ok=True)

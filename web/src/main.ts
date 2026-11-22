@@ -357,6 +357,8 @@ async function start(creatorSpawn=false) {
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,get game(){return solo?.probe ?? tourProbe},
     get trafficCount(){return (scene.getObjectByName('G2 traffic') as THREE.InstancedMesh|undefined)?.count??0},
+    get trafficProbe(){return scene.getObjectByName('G2 traffic')?.userData},
+    async trafficPixels(){return (await import('./traffic/visibility-probe')).pixelVisible(renderer,scene,camera)},
     get renderRange(){return rangeStore.getConfig()},
     get rangeMetrics(){return rangeStore.getMetrics()},
     setRenderRange(next:unknown, persist=false){return stream.setRenderRange(next as number|string,{persist})},
@@ -441,11 +443,11 @@ async function start(creatorSpawn=false) {
       void loadTiles(renderer).catch(error=>console.warn('City textures unavailable',error))
     }
     if(frame>0&&!switching) {
-      if(!trafficRequested && camera.position.y<250 && !stream.pending.size){
+      if(params.get('traffic')==='1'&&!trafficRequested && camera.position.y<250 && !stream.pending.size){
         trafficRequested=true
-        void import('./traffic').then(mod=>mod.traffic(scene)).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
+        void import('./traffic').then(mod=>mod.traffic(scene,camera,params.has('verify'))).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
       }
-      trafficTick?.(elapsed/1000,camera.position,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined)
+      trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined)
       const target=walker?.destination??(walker?.active?walker.position:camera.position)
       stream.tick(target)
       stream.updateLandmarks?.(target)
