@@ -45,8 +45,25 @@ async function configuredTest({sql,env}) {
     const session=set.find(c=>c.startsWith('glol_session='));assert.match(session,/Max-Age=2592000/);assert.doesNotMatch(session,/Max-Age=0/)
     assert.equal((await (await call('me',{cookie:session.split(';')[0]})).json()).id,a)
 
-    await sql(`DELETE FROM social_identities`);await sql(`DELETE FROM social_pending`);await sql(`DELETE FROM sessions WHERE user_id='${b}'`);await sql(`DELETE FROM users WHERE id='${b}'`)
-    console.log('Social configured: start 502 w/o orphan state, cross-site callback→expired, bind confirm 403 (not consumed)/200/404 replay, login confirm sets 2 cookies + working session')
+    // register：pending → confirm 400 → 发码 → 已注册邮箱 409 → 填码 200（两条 cookie、已验证、已绑定、码已删）→ 平台已绑定 409
+    const pending2=(intent,uid)=>{const t=token();return sql(`INSERT INTO social_pending(token,intent,type,social_uid,nickname,faceimg,user_id,expires,used) VALUES('${sha(t)}','${intent}','qq','${uid}','象山','',' ',${far},0)`).then(()=>t)}
+    const tr=await pending2('register','FEDCBA9876543210AAAAAA'),rc=`glol_social_pending=${tr}`,reg={email:'social-new@example.test',password:'social-password-1'}
+    const bad=await call('auth/social/confirm',{method:'POST',cookie:rc,body:{}});assert.equal(bad.status,400);assert.equal((await bad.json()).error.code,'register_incomplete')
+    const taken=(await sql(`SELECT email FROM users WHERE id='${a}'`))[0].results[0].email
+    assert.equal((await call('auth/social/register',{method:'POST',cookie:rc,body:{...reg,email:taken}})).status,409)
+    const p1=await call('auth/social/register',{method:'POST',cookie:rc,body:reg});assert.equal(p1.status,200,await p1.clone().text());assert.equal((await p1.json()).needs_code,true)
+    let mailed;for(let i=0;i<50&&!mailed;i++){mailed=logs.match(/DEV_EMAIL social-new@example\.test verify (\d{6})/)?.[1];if(!mailed)await delay(100)}
+    assert.ok(mailed,'register code mailed')
+    const wrong=await call('auth/social/register',{method:'POST',cookie:rc,body:{...reg,password:'other-password-9',code:mailed}});assert.equal(wrong.status,400)
+    const p2=await call('auth/social/register',{method:'POST',cookie:rc,body:{...reg,code:mailed}});assert.equal(p2.status,200,await p2.clone().text())
+    const set2=p2.headers.getSetCookie();assert.equal(set2.length,2,JSON.stringify(set2))
+    const me=await (await call('me',{cookie:set2.find(c=>c.startsWith('glol_session=')).split(';')[0]})).json();assert.equal(me.email,reg.email);assert.equal(me.verified,true)
+    assert.equal((await sql(`SELECT u.email FROM social_identities s JOIN users u ON u.id=s.user_id WHERE s.social_uid='FEDCBA9876543210AAAAAA'`))[0].results[0].email,reg.email)
+    assert.equal(Number((await sql(`SELECT count(*) n FROM email_codes WHERE email='${reg.email}'`))[0].results[0].n),0)
+    const tr2=await pending2('register','FEDCBA9876543210AAAAAA')
+    assert.equal((await call('auth/social/register',{method:'POST',cookie:`glol_social_pending=${tr2}`,body:{email:'x2@example.test',password:'social-password-1'}})).status,409)
+    await sql(`DELETE FROM social_identities`);await sql(`DELETE FROM social_pending`);await sql(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email='${reg.email}')`);await sql(`DELETE FROM users WHERE email='${reg.email}'`);await sql(`DELETE FROM mail_events WHERE email='${reg.email}'`);await sql(`DELETE FROM sessions WHERE user_id='${b}'`);await sql(`DELETE FROM users WHERE id='${b}'`)
+    console.log('Social configured: start 502 w/o orphan state, cross-site callback→expired, bind confirm 403 (not consumed)/200/404 replay, login confirm sets 2 cookies + working session; register 2-phase (409 email_taken/conflict, password mismatch 400, 2 cookies, verified+bound, code deleted)')
   }catch(error){console.error(logs.slice(-3000));throw error}
   finally{if(child.exitCode===null){process.kill(-child.pid,'SIGTERM');await closed}}
 }

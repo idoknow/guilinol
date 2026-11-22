@@ -3,15 +3,55 @@ import './account.css'
 
 // 账号：登录 / 注册（填写 → 邮箱验证 → 完成）/ 忘记密码 / 我的账号。
 // Playing requires an account (IDOK-99): the title screen asks for a login before the city boots, see requireUser().
-type Screen='login'|'register'|'verify'|'forgot'|'reset'|'profile'
+type Screen='login'|'register'|'verify'|'forgot'|'reset'|'profile'|'social'
 export type User={email:string,nickname:string,notify_email:boolean}
-const titles:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'忘记密码',reset:'重置密码',profile:'我的账号'}
-const submits:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'发送重置验证码',reset:'重置密码',profile:'保存设置'}
+const titles:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'忘记密码',reset:'重置密码',profile:'我的账号',social:'第三方账号'}
+const submits:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'发送重置验证码',reset:'重置密码',profile:'保存设置',social:'确认'}
 async function api(path:string,method='GET',data?:object) {
   const response=await fetch(`/api/${path}`,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
   const result=await response.json().catch(()=>{throw new Error('网络不太顺畅，请稍后再试')})
   if(!response.ok) throw Object.assign(new Error(result.error?.message??'请求失败，请重试'),{code:result.error?.code})
   return result
+}
+
+
+/* ── 第三方（聚合登录）────────────────────────────────────────────
+   站点不自动建号：第三方注册也必须填邮箱、设密码、过验证码，才真正创建账号。 */
+type SocialIntentForUi='login'|'bind'|'register'
+type SocialOption={type:string;label:string}
+type SocialPending={intent:'login'|'bind'|'register';type:string;label:string;nickname:string;avatar:string}
+let socialOptions:SocialOption[]|null=null
+let pendingSocial:SocialPending|null=null
+let socialPhase:'send'|'code'='send'
+async function loadSocialOptions(){
+  if(socialOptions)return socialOptions
+  try{socialOptions=(await api('auth/social/config') as {enabled?:SocialOption[]}).enabled??[]}catch{socialOptions=[]}
+  return socialOptions
+}
+async function startSocial(type:string,intent:'login'|'bind'|'register'){
+  const result=await api('auth/social/start','POST',{type,intent}) as {url?:string}
+  if(!result?.url)throw new Error('没有拿到第三方跳转地址，请稍后再试')
+  location.href=result.url
+}
+async function loadPendingSocial(){
+  pendingSocial=await api('auth/social/pending') as SocialPending
+  socialPhase='send'
+  return pendingSocial
+}
+const socialNotes:Record<string,{screen:Screen;text:string;ok?:boolean}>={
+  login:{screen:'profile',text:'已通过第三方账号登录',ok:true},
+  bound:{screen:'profile',text:'第三方账号已绑定',ok:true},
+  registered:{screen:'profile',text:'注册成功，第三方账号已绑定',ok:true},
+  unbound:{screen:'login',text:'该第三方账号还没有绑定账号：请先登录，再到「我的账号」里绑定'},
+  unverified:{screen:'login',text:'该账号还没有验证邮箱，请先用邮箱登录完成验证'},
+  conflict:{screen:'login',text:'该第三方账号已经绑定过其它账号了'},
+  pending:{screen:'login',text:'授权还没完成，请重新发起一次'},
+  busy:{screen:'login',text:'操作太频繁了，请稍后再试'},
+  unavailable:{screen:'login',text:'第三方登录服务暂时不可用，请稍后再试'},
+  expired:{screen:'login',text:'授权已过期，请重新发起'},
+  invalid:{screen:'login',text:'授权参数不合法，请重新发起'},
+  failed:{screen:'login',text:'第三方授权失败，请重新发起'},
+  disabled:{screen:'login',text:'第三方登录暂未开放'},
 }
 
 let user:User|null=null
@@ -55,6 +95,29 @@ export function accountEntry(parent:HTMLElement){
   parent.append(entry);return entry
 }
 
+
+/* 从第三方回调回来（?social=...）：直接在账号面板里把结果展示出来。 */
+const bootSocial=new URLSearchParams(location.search).get('social')
+if(bootSocial){
+  const clean=new URL(location.href)
+  clean.searchParams.delete('social')
+  history.replaceState(null,'',clean.pathname+clean.search+clean.hash)
+  void (async()=>{
+    await ready
+    build()
+    dialog!.showModal()
+    if(bootSocial==='confirm'){
+      try{await loadPendingSocial();render!('social')}
+      catch(error){render!('login',error instanceof Error?error.message:'授权已过期，请重新发起')}
+      return
+    }
+    if(bootSocial==='login'){try{setUser(await api('me') as User)}catch{}}
+    const notice=socialNotes[bootSocial]
+    render!(notice?.screen??'login',notice?.text??'第三方登录未完成，请重新发起')
+    record('funnel',{step:'loginOpen'})
+  })()
+}
+
 function build(){
   if(dialog)return
   dialog=document.createElement('dialog');const d=dialog
@@ -93,26 +156,65 @@ function build(){
   function resendLabel(button:HTMLButtonElement){button.textContent=cooldown>0?`重新发送（${cooldown}s）`:'重新发送';button.disabled=cooldown>0}
   function startCooldown(button:HTMLButtonElement){cooldown=60;resendLabel(button);clearInterval(cooldownTimer)
     cooldownTimer=window.setInterval(()=>{cooldown--;if(button.isConnected)resendLabel(button);if(cooldown<=0)clearInterval(cooldownTimer)},1000)}
+  async function socialButtons(next:Screen){
+    const options=await loadSocialOptions()
+    if(!options.length||!d.open)return
+    const intent:SocialIntentForUi=next==='profile'?'bind':next==='register'?'register':'login',
+      row=document.createElement('div')
+    row.className='acc-social'
+    for(const option of options){
+      const button=document.createElement('button')
+      button.type='button';button.className='ui-btn ui-btn--ghost'
+      button.textContent=`用${option.label}${intent==='bind'?'绑定':intent==='register'?'注册':'登录'}`
+      button.onclick=()=>{if(!busy)void submit(async()=>{await startSocial(option.type,intent)})}
+      row.append(button)
+    }
+    if(nav.isConnected)nav.append(row)
+  }
   render=(next:Screen,text='',pass='')=>{
     verificationPassword=next==='verify'&&d.open?pass:''
     screen=next;fields.replaceChildren();nav.replaceChildren();who.replaceChildren();note(text,/成功|已登录|已保存|已重置|已退出/.test(text)?'ok':'info')
     d.dataset.screen=next;d.querySelector('h2')!.textContent=titles[next];submitButton.textContent=submits[next]
     for(const tab of tabs)tab.setAttribute('aria-selected',String(tab.dataset.to===next))
+    d.querySelector('.acc-tabs')?.toggleAttribute('hidden',next==='social')
     const step=next==='register'?0:next==='verify'?1:-1
     steps.forEach((li,i)=>{li.classList.toggle('on',i===step);li.classList.toggle('done',i<step)})
     lead.textContent={login:'登录后即可进入游玩。提交的反馈有回复时，也会发邮件告诉你。',register:'只需要邮箱和一个昵称，一分钟就好。',
       verify:`六位验证码已发到 ${email||'你的邮箱'}，10 分钟内有效。没收到可以看看垃圾邮件。`,forgot:'输入注册时用的邮箱，我们会发一个六位验证码给你。',
-      reset:'输入邮箱里的验证码，再设一个新密码。',profile:''}[next]
+      reset:'输入邮箱里的验证码，再设一个新密码。',profile:'',
+      social:pendingSocial?.intent==='register'?(socialPhase==='code'?`验证码已发到 ${email}，10 分钟内有效。`:'填写邮箱和密码，验证通过后才会创建账号并绑定这个第三方账号。'):''}[next]
+    if(next==='social'&&pendingSocial){const badge=document.createElement('span'),info=document.createElement('div')
+      badge.className='acc-avatar';badge.textContent=initial(pendingSocial.nickname)
+      if(pendingSocial.avatar){const image=document.createElement('img');image.alt=`${pendingSocial.label} 头像`;image.referrerPolicy='no-referrer';image.loading='lazy'
+        image.src=pendingSocial.avatar;image.onerror=()=>image.remove();badge.replaceChildren(image)}
+      info.innerHTML='<b></b><small></small>'
+      info.querySelector('b')!.textContent=`${pendingSocial.label} · ${pendingSocial.nickname||'（无昵称）'}`
+      info.querySelector('small')!.textContent={login:'确认后即可登录已绑定的账号',bind:'确认后把它绑定到当前账号',
+        register:'还需要绑定邮箱并设置密码，才完成注册'}[pendingSocial.intent]
+      who.append(badge,info)}
     if(next==='profile'&&user){const badge=document.createElement('span'),info=document.createElement('div')
       badge.className='acc-avatar';badge.textContent=initial(user.nickname);info.innerHTML='<b></b><small></small>'
       info.querySelector('b')!.textContent=user.nickname;info.querySelector('small')!.textContent=user.email;who.append(badge,info)}
-    if(next!=='profile')field('email','邮箱','email','email',email).readOnly=next==='verify'&&!!email
+    if(next==='social'){
+      submitButton.textContent=pendingSocial?.intent==='register'
+        ? (socialPhase==='code'?'完成注册':'发送验证码')
+        : pendingSocial?.intent==='bind'?'确认绑定':'确认登录'
+    }
+    if(next==='social'&&pendingSocial?.intent==='register'&&socialPhase==='code')field('code','六位验证码','text','one-time-code')
+    else if(next==='social'&&pendingSocial?.intent==='register'){
+      field('email','邮箱','email','email',email)
+      field('password','密码（至少 8 位）','password','new-password')
+      field('nickname','昵称','text','nickname',pendingSocial.nickname)
+    }
+    if(next!=='profile'&&next!=='social')field('email','邮箱','email','email',email).readOnly=next==='verify'&&!!email
     if(next==='verify'||next==='reset')field('code','六位验证码','text','one-time-code')
     if(next==='register'||next==='login'||next==='reset')field('password',next==='login'?'密码':'密码（至少 8 位）','password',next==='login'?'current-password':'new-password')
     if(next==='register'||next==='profile')field('nickname','昵称','text','nickname',user?.nickname,next==='register'?'以后可以在「我的账号」里修改':'')
     if(next==='profile'){const label=document.createElement('label'),toggle=document.createElement('input');label.className='acc-check';toggle.type='checkbox';toggle.name='notify_email';toggle.checked=!!user?.notify_email
       label.append(toggle,'反馈有回复时发邮件提醒我');fields.append(label)}
     if(next==='profile')link('修改外形',()=>submit(async()=>{await editCharacter()}))
+    if(next==='login'||next==='register'||next==='profile')void socialButtons(next)
+    if(next==='social')link('取消',()=>{pendingSocial=null;render!(user?'profile':'login')})
     if(next==='login')link('忘记密码？',()=>render!('forgot'))
     else if(next==='profile')link('退出登录',()=>submit(async()=>{await api('auth/logout','POST');setUser(null);render!('login','已退出登录')}))
     else if(next!=='register')link('返回登录',()=>render!('login'))
@@ -127,6 +229,30 @@ function build(){
     if(invalid){const label=invalid.closest('label')?.firstChild?.textContent??'';note(invalid.value?`${label}格式不对，请检查一下`:`请填写${label.replace(/（.*）/,'')}`,'error');invalid.focus();return}
     void submit(async()=>{
     const data:Record<string,string>={};new FormData(form).forEach((value,key)=>{data[key]=String(value)});if(data.email)email=data.email
+    if(screen==='social'){
+      if(!pendingSocial)throw new Error('授权已过期，请重新发起')
+      if(pendingSocial.intent==='register'){
+        const payload:Record<string,string>={email:data.email??'',password:data.password??'',nickname:data.nickname??pendingSocial.nickname}
+        if(socialPhase==='code')payload.code=data.code??''
+        const result=await api('auth/social/register','POST',payload) as {needs_code?:boolean;email?:string;nickname?:string}
+        if(result.needs_code){
+          email=payload.email;socialPhase='code'
+          render!('social',`验证码已发到 ${email}，10 分钟内有效`)
+          return
+        }
+        setUser({email:result.email??payload.email,nickname:result.nickname??payload.nickname,notify_email:true})
+        d.close();window.dispatchEvent(new Event('glol:registered'))
+        return
+      }
+      const result=await api('auth/social/confirm','POST',{}) as {intent?:string}
+      if(result.intent==='login'){
+        setUser(await api('me') as User)
+        render!('profile','已通过第三方账号登录')
+        return
+      }
+      render!('profile','第三方账号已绑定')
+      return
+    }
     if(screen==='profile'){setUser(await api('me','PATCH',{...data,notify_email:!!data.notify_email}));render!('profile','账号设置已保存');return}
     if(screen==='forgot'){await api('auth/resend','POST',{email,purpose:'reset'});render!('reset','如邮箱已注册，请查收验证码');return}
     const previous=screen
