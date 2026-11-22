@@ -9,6 +9,7 @@ import {isGlobalHotkeyBlocked, shouldPhotoYieldKeyPFromDom} from '../walk/input-
 import {getPlayMode,soloServices,onPlayMode} from '../game/play-mode'
 import {type ShopTriggerDef} from '../game/shops'
 import {getState, onState} from '../game/state'
+import {mountLandscapeEntry} from '../ui/orientation'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
 const ease = (t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2
@@ -133,6 +134,8 @@ export function play(host:Host) {
   const feedbackEntry=button('反馈','反馈','dock-feedback');buttons.append(feedbackEntry)
   feedbackEntry.onclick=()=>void import('../ui/feedback').then(module=>module.openFeedback(host,()=>{mapRequested = true; return ensureMap()}))
   const feedbackId=new URLSearchParams(location.search).get('feedback');if(feedbackId&&/^[\w-]{1,128}$/.test(feedbackId))void import('../ui/feedback').then(module=>module.openFeedback(host,()=>{mapRequested=true;return ensureMap()},feedbackId))
+  // IDOK-144: portrait phones can tap back into landscape after dismissing the gate (see ui/orientation.ts).
+  mountLandscapeEntry(buttons)
 
   // --- Card
   const card = document.createElement('aside'); card.className = 'spot-card'; card.hidden = true; card.setAttribute('role','dialog')
