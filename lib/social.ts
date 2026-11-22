@@ -1,4 +1,4 @@
-import { type Env, Problem, cookie, hash, lifetime, limit, now, random, sessionHash } from './auth'
+import { type Env, Problem, cookie, deliver, equal, hash, invalid, lifetime, limit, newCode, now, passwordHash, random, reserveMail, sessionHash } from './auth'
 
 /**
  * 佛系云聚合登录（https://a.idcfx.net/doc.php）接入层。
@@ -13,7 +13,7 @@ import { type Env, Problem, cookie, hash, lifetime, limit, now, random, sessionH
 
 export const SOCIAL_TYPES = ['qq', 'wx', 'alipay', 'douyin', 'google', 'twitter', 'feishu'] as const
 export type SocialType = (typeof SOCIAL_TYPES)[number]
-export type SocialIntent = 'login' | 'bind'
+export type SocialIntent = 'login' | 'bind' | 'register'
 
 export const SOCIAL_LABELS: Record<SocialType, string> = {
   qq: 'QQ',
@@ -172,6 +172,7 @@ export async function startSocial(
   if (!socialConfigured(env)) throw new Problem(503, 'social_unconfigured', '第三方登录尚未启用')
   if (!enabledTypes(env).includes(type)) throw new Problem(400, 'social_disabled', '该登录方式未启用')
   if (intent === 'bind' && !userId) throw new Problem(401, 'unauthorized', '请先登录')
+  if (intent === 'register' && userId) throw new Problem(400, 'invalid_input', '注册流程不需要登录')
   await limit(db, `social:start:${ip}`, 20, 60)
 
   const state = random(32)
@@ -252,7 +253,7 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
     }
   }
   if (!matched) return back('expired')
-  const intent: SocialIntent = matched.intent === 'bind' ? 'bind' : 'login'
+  const intent: SocialIntent = matched.intent === 'bind' ? 'bind' : matched.intent === 'register' ? 'register' : 'login'
 
   let profile: Upstream
   try {
@@ -287,7 +288,11 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
     .first<Identity>()
 
   let target: string
-  if (intent === 'bind') {
+  if (intent === 'register') {
+    // 注册流程：此时还不能建号，等用户填完邮箱+密码并通过验证码
+    if (identity) return back('conflict')
+    target = ''
+  } else if (intent === 'bind') {
     if (!current) return back('unbound')
     if (!current.verified) return back('unverified')
     // state 记录的就是「谁发起了绑定」，当前会话必须是同一个人
@@ -331,7 +336,7 @@ export async function socialPending(env: Env, db: D1Database, request: Request):
   const type = isSocialType(row.type) ? row.type : null
   return Response.json(
     {
-      intent: row.intent === 'bind' ? 'bind' : 'login',
+      intent: row.intent === 'bind' ? 'bind' : row.intent === 'register' ? 'register' : 'login',
       type: type ?? row.type,
       label: type ? SOCIAL_LABELS[type] : row.type,
       nickname: row.nickname,
@@ -360,9 +365,10 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
     .bind(digest, now())
     .first<PendingRow>()
   if (!row) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
-  const intent: SocialIntent = row.intent === 'bind' ? 'bind' : 'login'
+  const intent: SocialIntent = row.intent === 'bind' ? 'bind' : row.intent === 'register' ? 'register' : 'login'
   const type = isSocialType(row.type) ? row.type : null
   if (!type) throw new Problem(400, 'invalid_input', '不受支持的登录方式')
+  if (intent === 'register') throw new Problem(400, 'register_incomplete', '请填写邮箱和密码完成注册')
   const nickname = (row.nickname ?? '').slice(0, 32),
     faceimg = safeAvatar(row.faceimg)
 
@@ -430,6 +436,116 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
     { ok: true, intent, redirect: '/?social=login' },
     // 两个 cookie 必须分两条 Set-Cookie；拼成一条时后面的 Max-Age=0 会把新会话立刻删掉
     { headers: [['Cache-Control', 'no-store'], ['Set-Cookie', cookie(sessionToken)], ['Set-Cookie', clearPending()]] },
+  )
+}
+
+
+/** 前端用：哪些平台开着（未配置时返回空数组，按钮就不显示）。 */
+export function socialConfig(env: Env): Response {
+  const headers = { 'Cache-Control': 'no-store' }
+  const enabled = socialConfigured(env) ? enabledTypes(env).map((type) => ({ type, label: SOCIAL_LABELS[type] })) : []
+  return Response.json({ enabled }, { headers })
+}
+
+type PendingRegisterRow = { intent: string; type: string; social_uid: string; nickname: string; faceimg: string }
+
+/**
+ * 第三方注册：账号只有在「邮箱通过验证码 + 密码已设置」之后才创建。
+ *
+ * 第一阶段（无 code）：校验邮箱/密码 → 建（或覆盖未验证的）用户 → 发验证码
+ * 第二阶段（带 code）：校验验证码 → 置 verified → 写 social_identities → 建 session
+ *
+ * 这样第三方注册不会绕过邮箱验证，也不会出现没有密码的账号。
+ */
+export async function socialRegister(env: Env, db: D1Database, request: Request, body: Record<string, unknown>): Promise<Response> {
+  const headers = { 'Cache-Control': 'no-store' }
+  if (!socialConfigured(env))
+    return Response.json({ error: { code: 'social_unconfigured', message: '第三方登录尚未启用' } }, { status: 503, headers })
+
+  const token = pendingToken(request)
+  if (!token) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
+  const digest = await hash(token)
+  const row = await db
+    .prepare('SELECT intent,type,social_uid,nickname,faceimg FROM social_pending WHERE token=? AND used=0 AND expires>?')
+    .bind(digest, now())
+    .first<PendingRegisterRow>()
+  if (!row) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
+  if (row.intent !== 'register') throw new Problem(400, 'invalid_intent', '请从注册入口重新发起')
+  const type = isSocialType(row.type) ? row.type : null
+  if (!type) throw new Problem(400, 'invalid_input', '不受支持的登录方式')
+
+  const taken = await db
+    .prepare('SELECT user_id FROM social_identities WHERE type=? AND social_uid=?')
+    .bind(type, row.social_uid)
+    .first<{ user_id: string }>()
+  if (taken) throw new Problem(409, 'conflict', '该平台账号已经绑定过其它用户，请直接登录')
+
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+  if (email.length > 254 || email.split('@').length !== 2 || !/^\S+@[^\s@]+\.[^\s@]+$/.test(email)) invalid()
+  const password = typeof body.password === 'string' ? body.password : ''
+  if (password.length < 8 || password.length > 256) invalid()
+  const nickname = ((typeof body.nickname === 'string' ? body.nickname : '') || row.nickname || '新用户').trim().slice(0, 32)
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'local'
+
+  const existing = await db.prepare('SELECT id,verified FROM users WHERE email=?').bind(email).first<{ id: string; verified: number }>()
+  if (existing?.verified) throw new Problem(409, 'email_taken', '该邮箱已注册，请直接登录后在账号设置里绑定')
+
+  if (typeof body.code !== 'string' || !/^\d{6}$/.test(body.code)) {
+    await reserveMail(db, email, ip)
+    const salt = random(16)
+    await db
+      .prepare(
+        `INSERT INTO users(id,email,nickname,salt,digest) VALUES(?,?,?,?,?) ON CONFLICT(email)
+         DO UPDATE SET nickname=excluded.nickname,salt=excluded.salt,digest=excluded.digest WHERE users.verified=0`,
+      )
+      .bind(crypto.randomUUID(), email, nickname, salt, await passwordHash(password, salt))
+      .run()
+    const code = newCode()
+    await db
+      .prepare('INSERT OR REPLACE INTO email_codes VALUES(?,?,?,?,0)')
+      .bind(email, 'verify', await hash(`${email}:verify:${code}`), now() + 600)
+      .run()
+    await deliver(env, email, 'verify', code)
+    // 给用户填码的时间，pending 顺延
+    await db.prepare('UPDATE social_pending SET expires=? WHERE token=?').bind(now() + 900, digest).run()
+    return Response.json({ ok: true, needs_code: true, email }, { headers })
+  }
+
+  const code = String(body.code)
+  const record = await db
+    .prepare('UPDATE email_codes SET attempts=attempts+1 WHERE email=? AND purpose=? AND expires>? AND attempts<5 RETURNING digest')
+    .bind(email, 'verify', now())
+    .first<{ digest: string }>()
+  if (!record) throw new Problem(400, 'invalid_code', '验证码无效或已过期')
+  if (!equal(record.digest, await hash(`${email}:verify:${code}`))) throw new Problem(400, 'invalid_code', '验证码无效或已过期')
+
+  const user = await db.prepare('SELECT id,salt,digest FROM users WHERE email=? AND verified=0').bind(email).first<{ id: string; salt: string; digest: string }>()
+  if (!user) throw new Problem(400, 'invalid_code', '验证码无效或已过期')
+  if (!equal(user.digest, await passwordHash(password, user.salt)))
+    throw new Problem(400, 'password_mismatch', '两次填写的密码不一致，请重新填写')
+
+  const verified = await db.prepare('UPDATE users SET verified=1, failures=0, locked_until=0 WHERE id=? AND verified=0').bind(user.id).run()
+  if (!verified.meta.changes) throw new Problem(409, 'email_taken', '该邮箱已被激活，请直接登录')
+
+  try {
+    await db
+      .prepare('INSERT INTO social_identities(type,social_uid,user_id,nickname,faceimg,created_at,last_login_at) VALUES(?,?,?,?,?,?,?)')
+      .bind(type, row.social_uid, user.id, (row.nickname ?? '').slice(0, 32), safeAvatar(row.faceimg), now(), now())
+      .run()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : ''
+    if (/UNIQUE|PRIMARY KEY/i.test(message)) throw new Problem(409, 'conflict', '该平台账号已经绑定过其它用户')
+    throw error
+  }
+
+  const sessionToken = random(32)
+  await db.batch([
+    db.prepare('UPDATE social_pending SET used=1 WHERE token=?').bind(digest),
+    db.prepare('INSERT INTO sessions(digest,user_id,expires) VALUES(?,?,?)').bind(await hash(sessionToken), user.id, now() + lifetime),
+  ])
+  return Response.json(
+    { ok: true, redirect: '/?social=registered', email, nickname },
+    { headers: { ...headers, 'Set-Cookie': `${cookie(sessionToken)}; ${clearPending()}` } },
   )
 }
 

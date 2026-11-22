@@ -159,11 +159,24 @@ CREATE INDEX social_states_expires ON social_states(expires);
 3. `intent='login'`：消费 pending，建新 session（`random(32)`+`hash`），**只删除同一个人的旧 session**（避免把别人或没拿到 Set-Cookie 的访客踢下线），更新 `nickname`/`faceimg`/`last_login_at`
 4. 清 `glol_social_pending`，返回 `{ ok, intent, redirect }`（前端跳 `/?social=bound` 或 `/?social=login`）
 
+### 3.2.3 `GET /api/auth/social/config`
+
+返回当前启用的平台 `{ enabled: [{type,label}] }`（`SOCIAL_ENABLED` 未配置时返回空数组），前端据此决定是否显示「用微信登录」这类按钮。
+
+### 3.2.4 第三方注册：`POST /api/auth/social/register`
+
+本站允许用第三方账号**注册**，但账号只在「邮箱通过验证码 + 密码已设置」之后才创建，不存在无邮箱或无密码的账号。整个流程拿的是 pending（`intent='register'`），两阶段提交：
+
+1. 阶段一（不带 `code`）：校验邮箱/密码 → 该邮箱若已注册且已验证则 409 `email_taken` → 建（或覆盖未验证的）用户 → 发验证码 → 返回 `{ needs_code: true, email }`，pending TTL 顺延
+2. 阶段二（带 `code`）：校验验证码 → 二次核对密码与库里一致（防两次填不同密码）→ `verified=1` → 写 `social_identities` → 建 session → 清 pending → 返回 `{ redirect: '/?social=registered' }`
+
+边界：该平台账号已绑定别人 → 409 `conflict`；`intent!=='register'` 的 pending 调本接口 → 400 `invalid_intent`；`intent='register'` 的 pending 调 `/confirm` → 400 `register_incomplete`。
+
 ### 3.3 账号策略
 
 | 方案 | 做法 | 评价 |
 |---|---|---|
-| **A（推荐）** | 第三方只做「登录已绑定账号」+「已登录用户绑定」，永不自动建号 | 不绕过邮箱验证，不改 `users` 表结构，最省事 |
+| **A（当前实现）** | 第三方可登录已绑定账号、可给已登录用户绑定、可注册新账号——**但注册必须先填邮箱、设密码、过验证码**，账号只在验证通过后创建 | 不绕过邮箱验证，也没有无密码账号；`users` 表结构不用改 |
 | B | 给第三方登录用户建 `email = social+<hash>@social.invalid` 的占位账号，后续引导补邮箱 | 要改 `users.email` 语义、注册流程、邮件通知逻辑，且占位邮箱容易污染通知与后台统计 |
 
 除非明确要「零邮箱注册」，走 A。
@@ -292,6 +305,10 @@ if (path === 'auth/social/callback' && method === 'GET') {
 |---|---|---|
 | 正常绑定 | 登录 → 点「绑定 QQ」→ 授权 → 确认框点确认 | 200 `{ok,intent:'bind'}`，`social_identities` 多一行，pending `used=1` |
 | 正常登录 | 点「QQ 登录」→ 授权 → 确认框点确认 | 200 + 新 `glol_session`，`/api/me` 返回该账号 |
+| **第三方注册** | 点「用微信注册」→ 授权 → 填邮箱/密码 → 收码并提交 | 200，账号 `verified=1`、密码可登录、`social_identities` 已绑定、pending `used=1` |
+| 注册用已注册邮箱 | 第三方注册填一个已验证邮箱 | 409 `email_taken`，提示直接登录后绑定 |
+| 注册密码不一致 | 两阶段填了不同密码 | 400 `password_mismatch`，不建号 |
+| 平台账号已被绑 | 该微信已属于别的账号还来注册 | 409 `conflict` |
 | **不点确认** | 只走完授权、不确认 | 不登录不绑定，`social_identities` 无变化（这是防 code 串号的关键） |
 | **别人的会话确认** | pending 属于 A，用 B 的会话 POST confirm | 403 `forbidden`，且 pending **不被消费**（A 仍可确认） |
 | 跨站发起 | 第三方页面 `fetch` POST `/api/auth/social/start` | 403 `origin` |
@@ -325,6 +342,6 @@ if (path === 'auth/social/callback' && method === 'GET') {
 3. `[[path]].ts` 接 `auth/social/start`、`auth/social/callback`、`auth/social/pending`、`auth/social/confirm`，`methods` 白名单同步
 4. 前端登录页加「QQ / 微信 / 支付宝」按钮（只调本项目 API，不直接连上游）
 5. 账号设置页加「绑定/解绑第三方账号」，未设置密码的账号禁用解绑
-6. 前端：首页读 `?social=confirm` 时拉 `GET auth/social/pending` 弹确认框，点确认调 `POST auth/social/confirm`
+2. 前端：账号面板已实现——登录/注册屏有「用微信登录/注册」按钮（`GET auth/social/config` 决定显示哪些），`?social=confirm` 时拉 `GET auth/social/pending` 弹确认框；注册意图在面板里填邮箱+密码+验证码，调 `POST auth/social/register`
 7. `scripts/auth-test.mjs --social` 跑第 6 节用例
 8. 生产配置 `SOCIAL_*` secret，先在预览环境验证一次真实授权，再打开入口
