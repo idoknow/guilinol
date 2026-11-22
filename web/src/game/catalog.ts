@@ -124,11 +124,11 @@ export const SHARED_BIKE_ORIGINAL_PALETTE = {
 
 export const OUTFIT_ITEMS: readonly OutfitItemDef[] = [
   // Default starter pieces (free)
-  {id: 'top_default_tee', slot: 'top', name: '桂城橘风防风外套', tier: 0, price: 0, colorHex: '#f09a4a', accentHex: '#f2efe8', description: '经典初见常服外套配白 T', defaultOwned: true},
-  {id: 'bottom_default_pants', slot: 'bottom', name: '石板蓝修身牛仔裤', tier: 0, price: 0, colorHex: '#55708f', description: '耐穿百搭桂林街拍直筒牛仔', defaultOwned: true},
-  {id: 'shoes_default_sneaker', slot: 'shoes', name: '米白低帮慢跑鞋', tier: 0, price: 0, colorHex: '#eeeae2', accentHex: '#c49a6c', description: '轻便防滑石板路慢跑鞋', defaultOwned: true},
+  {id: 'top_default_tee', slot: 'top', name: '米白基础长袖', tier: 0, price: 0, colorHex: '#e9e7e1', description: '干净的米白长袖，什么都好搭', defaultOwned: true},
+  {id: 'bottom_default_pants', slot: 'bottom', name: '黑色直筒裤', tier: 0, price: 0, colorHex: '#2a2c30', description: '基础黑色直筒裤', defaultOwned: true},
+  {id: 'shoes_default_sneaker', slot: 'shoes', name: '小白鞋', tier: 0, price: 0, colorHex: '#f2f1ed', description: '百搭白色低帮鞋', defaultOwned: true},
   {id: 'hat_none', slot: 'hat', name: '不戴头饰', tier: 0, price: 0, colorHex: '#2b3036', description: '自然短发造型', defaultOwned: true},
-  {id: 'bag_none', slot: 'bag', name: '随行轻装', tier: 0, price: 0, colorHex: '#66737b', description: '轻装出行默认背负', defaultOwned: true},
+  {id: 'bag_none', slot: 'bag', name: '不背包', tier: 0, price: 0, colorHex: '#2c2e32', description: '空手轻装出行', defaultOwned: true},
 
   // T1: outfit_guilin_hoodie (¥480 set)
   {id: 'top_guilin_hoodie', slot: 'top', name: '烟雨灰落肩卫衣', tier: 1, price: 220, colorHex: '#465460', accentHex: '#ffc53d', description: '重磅纯棉卫衣，胸口桂花金绣标'},

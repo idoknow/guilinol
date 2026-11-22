@@ -84,6 +84,8 @@ try {
   const basePosCount = skinned.geometry.getAttribute('position').count
   const origColors = Float32Array.from(skinned.geometry.getAttribute('color').array)
 
+  // Partition the pristine glb colours before the controller paints the default outfit over them.
+  const part = outfitMod.partitionCityWalkerGeometry(skinned)
   const controller = outfitMod.createAvatarOutfitController(figure, rig)
   const snap0 = controller.getSnapshot()
   const zoneTotal = Object.values(snap0.zoneCounts).reduce((a, b) => a + b, 0)
@@ -94,13 +96,12 @@ try {
   )
   check(
     'BUILTIN_PACK identified and sorted cleanly for drawRange hiding',
-    snap0.zoneCounts.BUILTIN_PACK === 623 && snap0.builtinPackVisible === true && snap0.drawCallDelta === 0,
+    snap0.zoneCounts.BUILTIN_PACK === 623 && snap0.builtinPackVisible === false && snap0.drawCallDelta === 0,
     `packVerts=${snap0.zoneCounts.BUILTIN_PACK}`,
   )
 
   // Track exact vertex indices for LOCKED_SKIN & LOCKED_HAIR
   const colAttr = skinned.geometry.getAttribute('color')
-  const part = outfitMod.partitionCityWalkerGeometry(skinned)
   const lockedIndices = []
   for (let i = 0; i < part.zones.length; i++) {
     if (part.zones[i] === outfitMod.OUTFIT_ZONE.LOCKED_SKIN || part.zones[i] === outfitMod.OUTFIT_ZONE.LOCKED_HAIR) {
@@ -111,7 +112,7 @@ try {
   // Test all 7 outfits (default + 6 presets)
   const totalIndexCount = skinned.geometry.index.count
   const hiddenCount = skinned.geometry.drawRange.count
-  check('initial drawRange renders full mesh (with built-in pack)', hiddenCount === totalIndexCount)
+  check('initial drawRange hides the built-in pack', hiddenCount < totalIndexCount)
 
   const vesselBoundsRaw = JSON.parse(await readFile(path.join(root, 'pipeline/vessel-bounds.json'), 'utf8'))
   figure.scale.setScalar(0.955)
@@ -139,7 +140,7 @@ try {
     const hasHat = preset.items.hat !== 'hat_none'
     const hasBag = preset.items.bag !== 'bag_none'
     const expectedDelta = (hasHat ? 1 : 0) + (hasBag ? 1 : 0)
-    assert.equal(snap.builtinPackVisible, !hasBag, `${preset.id}: builtinPackVisible mismatch`)
+    assert.equal(snap.builtinPackVisible, false, `${preset.id}: built-in pack must stay hidden`)
     assert.equal(
       snap.drawCallDelta,
       expectedDelta,
@@ -184,7 +185,7 @@ try {
   const mixSnap = controller.getSnapshot()
   check(
     'recolor-only mix-and-match adds +0 draw calls',
-    mixSnap.drawCallDelta === 0 && mixSnap.builtinPackVisible === true && mixSnap.attachedHat === null && mixSnap.attachedBag === null,
+    mixSnap.drawCallDelta === 0 && mixSnap.builtinPackVisible === false && mixSnap.attachedHat === null && mixSnap.attachedBag === null,
   )
 
   // Verify attachment tracks spine/head joint animation cleanly across postures (-x leans forward toward -Z)

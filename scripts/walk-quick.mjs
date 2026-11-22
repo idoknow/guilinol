@@ -13,6 +13,9 @@ async function applyCpuRate(page){
 }
 
 const start=performance.now()
+// Walk-only distance probes were tuned for the old 4 m/s walk; IDOK-133 walks at a natural 1.65 m/s, so the same
+// distances need proportionally more simulated time.
+const WALK_TIME=4/1.65
 const outDir=process.env.WALK_CAPTURE_DIR??'captures/walk'
 await mkdir(outDir,{recursive:true})
 const server=await preview({plugins:[telemetryPreview],root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
@@ -34,6 +37,7 @@ try {
   await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
 
   async function fixture(origin,direction,seconds,target){
+    seconds=Math.ceil(seconds*WALK_TIME)
     const result=await page.evaluate(async({origin,direction,seconds,target})=>{
       const {walk,stream}=window.viewer;walk.leave()
       if(!await walk.enter(...origin,0,'quick'))throw Error('Spawn failed: '+target)
@@ -101,7 +105,7 @@ try {
     const slabStart=walk.probe()
     walk.drive(0,-1,false)
     let slabMaxSink=-Infinity, slabGroundedFrames=0
-    for(let i=0;i<120;i++){
+    for(let i=0;i<120*4/1.65;i++){
       walk.tick(1/60)
       const p=walk.probe()
       if(p.grounded){slabGroundedFrames++;slabMaxSink=Math.max(slabMaxSink,p.footSink)}
@@ -116,7 +120,7 @@ try {
     const curbStart=walk.probe()
     walk.drive(1,0,false)
     let curbHitSidewalk=false, curbMaxSink=-Infinity, curbMaxY=-Infinity
-    for(let i=0;i<90;i++){
+    for(let i=0;i<90*4/1.65;i++){
       walk.tick(1/60)
       const p=walk.probe()
       if(p.hits.includes('sidewalk')||p.surfaceKind==='sidewalk')curbHitSidewalk=true
@@ -132,7 +136,7 @@ try {
     const diagStart=walk.probe(), diagLen=Math.hypot(-.5,.85)
     walk.drive(-.5/diagLen,.85/diagLen,false)
     let diagAirborne=0, diagMaxSink=-Infinity, diagHitSidewalk=false
-    for(let i=0;i<120;i++){
+    for(let i=0;i<120*4/1.65;i++){
       walk.tick(1/60)
       const p=walk.probe()
       if(p.hits.includes('sidewalk')||p.surfaceKind==='sidewalk')diagHitSidewalk=true
@@ -162,7 +166,7 @@ try {
     const {walk}=window.viewer;walk.leave()
     if(!await walk.enter(-588,-212,0,'gate-cam'))throw Error('Spawn failed: gate-cam')
     walk.drive(.145,-.989,false)
-    for(let i=0;i<36;i++)walk.tick(.05)
+    for(let i=0;i<36*4/1.65;i++)walk.tick(.05)
     walk.drive(0,0,false)
     let blocked=false, houseClip=false, minDist=Infinity
     for(let step=0;step<12;step++){
@@ -243,7 +247,7 @@ try {
     return {walkSpeed,runSpeed,stopSpeed:stopped.planarSpeed,stopSlip,reversed:along>0,facingTurn,lateralSkid,
       cutForwardDrift,cutNewGain,cutFacingErr,airborne,maxLift,bufferedJump,groundedEnd:finalJump.grounded,resets:finalJump.resets}
   })
-  assert(feel.walkSpeed>3.85&&feel.walkSpeed<4.1,`walkSpeed: ${JSON.stringify(feel)}`)
+  assert(feel.walkSpeed>1.55&&feel.walkSpeed<1.72,`walkSpeed: ${JSON.stringify(feel)}`)
   assert(feel.runSpeed>8.85&&feel.runSpeed<9.1,`runSpeed: ${JSON.stringify(feel)}`)
   assert(feel.stopSpeed===0&&feel.stopSlip<=.35,`stop: ${JSON.stringify(feel)}`)
   assert(feel.reversed&&feel.facingTurn>2.6&&feel.lateralSkid<.06,`pivot: ${JSON.stringify(feel)}`)
@@ -387,7 +391,7 @@ try {
   await mobile.evaluate(async()=>{for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
 
   const hud=await mobile.evaluate(()=>{
-    const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.dock','.sky-ui','output','.hud-me']
+    const selectors=['.walk-ui .joystick','.walk-ui .look-stick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.dock','.sky-ui','output','.hud-me']
     const boxes=selectors.map(sel=>{
       const el=document.querySelector(sel)
       if(!el)return {sel,missing:true}
@@ -447,6 +451,21 @@ try {
   })
   assert(touchTest.yawTurn>.2&&touchTest.pinchDrift<.01&&touchTest.dist>3.5&&touchTest.along>.9&&touchTest.peakSpeed>6&&touchTest.jumped,`touchTest: ${JSON.stringify(touchTest)}`)
 
+  // IDOK-93 look stick: full right deflection turns the view right (same sign as a rightward drag) at cfg.lookYaw rad/s,
+  // and stops dead on release.
+  const lookTest=await mobile.evaluate(()=>{
+    const {walk}=window.viewer, pad=document.querySelector('.walk-ui .look-stick'), r=pad.getBoundingClientRect()
+    const yaw0=walk.yaw
+    pad.dispatchEvent(new PointerEvent('pointerdown',{pointerId:20,pointerType:'touch',clientX:r.right+8,clientY:r.top+r.height/2,bubbles:true}))
+    for(let i=0;i<30;i++)walk.tick(1/60)
+    const yawRight=walk.yaw-yaw0
+    pad.dispatchEvent(new PointerEvent('lostpointercapture',{pointerId:20,pointerType:'touch',bubbles:true}))
+    const yaw1=walk.yaw
+    for(let i=0;i<10;i++)walk.tick(1/60)
+    return {yawRight,settle:Math.abs(walk.yaw-yaw1),knobReset:pad.querySelector('.look-stick-knob').style.transform===''}
+  })
+  assert(lookTest.yawRight<-.85&&lookTest.yawRight>-1.35&&lookTest.settle<1e-6&&lookTest.knobReset,`lookTest: ${JSON.stringify(lookTest)}`)
+
   // Also verify 390x844 coexistence when standing next to a parked e-bike AND next to a boat dock (.vehicle-action visible).
   const bikeCoexist=await mobile.evaluate(async()=>{
     const {walk,manifest}=window.viewer
@@ -461,7 +480,7 @@ try {
       const close=document.querySelector('.spot-card.show .card-close')
       if(close)close.click()
       await new Promise(r=>setTimeout(r,280))
-      const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
+      const selectors=['.walk-ui .joystick','.walk-ui .look-stick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
       const boxes=selectors.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
         return st.display==='none'||st.visibility==='hidden'||el.hasAttribute('hidden')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
       const overlaps=[]
@@ -494,7 +513,25 @@ try {
     assert.equal(await mobile.evaluate(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on')),false,'runLock should clear after boarding e-bike')
     assert.equal(await mobile.evaluate(()=>document.querySelector('.walk-ui .btn-run')?.getAttribute('aria-pressed')),'false')
   }
-  console.log('mobile 390x844 HUD & touch OK',JSON.stringify({run:+touchTest.dist.toFixed(2),along:+touchTest.along.toFixed(3),peak:touchTest.peakSpeed}),mobileShot)
+  // IDOK-93 landscape phone: same controls, no hit-box overlaps, all inside the viewport.
+  await mobile.setViewportSize({width:844,height:390})
+  await mobile.evaluate(async()=>{document.querySelector('.spot-card.show .card-close')?.click();for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
+  const land=await mobile.evaluate(()=>{
+    const selectors=['.walk-ui .joystick','.walk-ui .look-stick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
+    const boxes=selectors.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
+      return st.display==='none'||st.visibility==='hidden'||el.closest('[hidden]')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
+    const overlaps=[]
+    for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){
+      const a=boxes[i],b=boxes[j]
+      const ox=Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left)), oy=Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top))
+      if(ox*oy>0)overlaps.push({a:a.sel,b:b.sel,area:+(ox*oy).toFixed(1)})
+    }
+    return {sticks:boxes.filter(b=>b.sel.includes('stick')).length,overlaps,outOfBounds:boxes.filter(b=>b.left<0||b.top<0||b.right>844.5||b.bottom>390.5).map(b=>b.sel)}
+  })
+  assert(land.sticks===2&&!land.overlaps.length&&!land.outOfBounds.length,`landscape HUD: ${JSON.stringify(land)}`)
+  await mobile.screenshot({path:`${outDir}/mobile-844x390.png`})
+
+  console.log('mobile 390x844 HUD & touch OK',JSON.stringify({run:+touchTest.dist.toFixed(2),along:+touchTest.along.toFixed(3),peak:touchTest.peakSpeed,lookYaw:+lookTest.yawRight.toFixed(3)}),mobileShot)
   await mobileCtx.close()
 
   assert.deepEqual(errors,[]);console.log('seconds',(performance.now()-start)/1000);assert(performance.now()-start<180000)

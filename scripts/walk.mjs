@@ -69,7 +69,8 @@ try{
       window.checkedProbe(`spawn:${x},${z}`)
     },[x,z])
   }
-  async function press(x,z,seconds,label){return page.evaluate(async({x,z,seconds,label})=>{const walk=window.viewer.walk,start=window.checkedProbe(label),hits=new Set();let shore=false,last=start
+  // Walk-speed probes were budgeted for the old 4 m/s walk; IDOK-133 walks at 1.65 m/s → same distance, more time.
+  async function press(x,z,seconds,label){seconds*=4/1.65;return page.evaluate(async({x,z,seconds,label})=>{const walk=window.viewer.walk,start=window.checkedProbe(label),hits=new Set();let shore=false,last=start
     walk.drive(x,z);while(last.elapsed-start.elapsed<seconds){await new Promise(requestAnimationFrame);last=window.checkedProbe(label);for(const hit of last.hits)hits.add(hit);shore||=last.blockedWater;if(last.inHouse||last.inPeak||last.resets||last.clearance<-.3)throw Error(JSON.stringify(last))
       if(label==='tree'&&Math.hypot(last.x-window.trunkFixture.x,last.z-window.trunkFixture.z)<window.trunkFixture.radius)throw Error(`trunk penetration: ${JSON.stringify(last)}`)}
     walk.drive(0,0);return {last,hits:[...hits],shore,distance:Math.hypot(last.x-start.x,last.z-start.z)}},{x,z,seconds,label})}

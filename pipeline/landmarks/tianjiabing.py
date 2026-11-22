@@ -72,7 +72,7 @@ def _build_pingfeng_gate_and_main(b: Builder):
     # 2. Curved Crimson Gate Wall + Closed Retractable Gate facing SSW along Pingfeng Rd
     gate_gy = b.surface.ground(14.5, 83.5) if b.surface else 0.0
     b.pose = (14.5, gate_gy, 83.5, -0.46)
-    b.box(2.0, -0.15, 0.0, 36.0, 0.19, 8.0, 'pave_plaza', tile=3.0, bottom=True)
+    b.box(2.0, -0.18, 0.0, 36.0, 0.20, 8.0, 'pave_plaza', tile=3.0, bottom=True)
     arc_segs = 8
     for i in range(arc_segs):
         t0, t1 = i / arc_segs, (i + 1) / arc_segs
@@ -94,7 +94,7 @@ def _build_pingfeng_gate_and_main(b: Builder):
     b.box(10.2, -0.20, -1.2, 0.85, 2.75, 0.90, 'brick_red', cap_region='white', tile=1.6, collide=True, bottom=True)
     for k in range(8):
         wx = 11.4 + k * 1.45
-        b.box(wx, -0.20, -1.2, 1.42, 2.55, 0.42, 'cream' if k % 2 == 0 else 'brick_red', tile=1.5, collide=(k == 0), bottom=True)
+        b.box(wx, -0.20, -1.2, 1.42, 2.55, 0.42, 'white', cap_region='gray_tile', tile=1.5, collide=(k == 0), bottom=True)
     b.solid_box(16.5, -0.20, -1.2, 11.8, 2.55, 0.45)
     b.pose = prev
 
