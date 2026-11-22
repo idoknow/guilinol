@@ -7,3 +7,7 @@
 !deploy/**
 !rt/**
 !dist/**
+!scripts/feedback-bridge.mjs
+!docs/feedback-modelling-task.md
+!pipeline/landmarks.json
+!pipeline/landmark-refs.json

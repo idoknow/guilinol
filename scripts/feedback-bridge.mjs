@@ -203,15 +203,38 @@ const PR_URL = /https:\/\/github\.com\/idoknow\/guilinol\/pull\/(\d+)/g
  * idoknow/guilinol 没接 Multica 的 GitHub 集成，`issue pull-requests` 恒为空（IDOK-186），
  * 所以同时从协调人 / 审核人的评论里收 PR 链接。还有没合并的 PR（open）就不算上线。
  */
+// Public repo: read via the REST API (no gh/GH_TOKEN needed; GH_TOKEN only raises the rate limit).
+// Any failure (rate limit, network) → undefined, treated as "not live yet" and retried next run.
+async function github(path) {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/${path}`, {
+      redirect: 'error',
+      signal: AbortSignal.timeout(15000),
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'glol-feedback-bridge',
+        ...(env.GH_TOKEN ? { Authorization: `Bearer ${env.GH_TOKEN}` } : {}),
+      },
+    })
+    return res.ok ? await res.json() : undefined
+  } catch {
+    return undefined
+  }
+}
 async function deployment(urls) {
-  const prs = [...new Set(urls)].map((url) => {
+  const prs = []
+  for (const url of new Set(urls)) {
     const number = /\/pull\/(\d+)$/.exec(url)[1]
-    return {
+    const pr = await github(`pulls/${number}`)
+    if (!pr) return { live: false, merged: [] }
+    prs.push({
       url,
       number,
-      ...JSON.parse(run('gh', ['pr', 'view', number, '-R', repo, '--json', 'state,mergeCommit,baseRefName'])),
-    }
-  })
+      state: pr.merged ? 'MERGED' : pr.state === 'open' ? 'OPEN' : 'CLOSED',
+      baseRefName: pr.base?.ref,
+      mergeCommit: { oid: pr.merge_commit_sha },
+    })
+  }
   const merged = prs.filter((pr) => pr.state === 'MERGED' && pr.baseRefName === 'main')
   if (!merged.length || prs.some((pr) => pr.state === 'OPEN')) return { live: false, merged }
   const version = await fetch(origin + '/version.json', {
@@ -222,13 +245,14 @@ async function deployment(urls) {
   if (!version.ok) return { live: false, merged }
   const sha = (await version.json()).sha
   if (!/^[a-f0-9]{40}$/.test(sha)) return { live: false, merged }
-  const contained = (merge) =>
-    /^[a-f0-9]{40}$/.test(merge ?? '') &&
-    (sha === merge ||
-      ['ahead', 'identical'].includes(
-        run('gh', ['api', `repos/${repo}/compare/${merge}...${sha}`, '--jq', '.status']).trim(),
-      ))
-  return { live: merged.every((pr) => contained(pr.mergeCommit?.oid)), merged, sha }
+  let live = true
+  for (const pr of merged) {
+    const merge = pr.mergeCommit.oid
+    if (!/^[a-f0-9]{40}$/.test(merge ?? '')) live = false
+    else if (sha !== merge && !['ahead', 'identical'].includes((await github(`compare/${merge}...${sha}`))?.status)) live = false
+    if (!live) break
+  }
+  return { live, merged, sha }
 }
 async function screenshot(comment) {
   const target = /!\[可公开对比图\]\(([^)]+)\)/.exec(comment.content)?.[1]

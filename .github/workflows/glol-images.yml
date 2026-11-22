@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: [api, web, probe, rt]
+        image: [api, web, probe, rt, bridge]
     env:
       IMAGE: ghcr.io/idoknow/glol-${{ matrix.image }}:${{ github.sha }}
     steps:
