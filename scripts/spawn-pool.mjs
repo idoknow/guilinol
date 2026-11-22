@@ -125,6 +125,7 @@ try {
     const clickedAt = Date.now()
     await restore.locator('.home-resume').click()
     const landed = await awaitedView(restore, Math.max(before, clickedAt - 1000))
+    assert.equal(landed.mode, 'fly', 'resumed tour must start in flight')
     const distance = Math.hypot(landed.x - fixture.x, landed.y - fixture.y, landed.z - fixture.z)
     const angleOff = Math.max(Math.abs(landed.yaw - fixture.yaw), Math.abs(landed.pitch - fixture.pitch))
     assert(distance < 1, `restore drifted ${distance.toFixed(2)} m`)
@@ -145,6 +146,7 @@ try {
       await play.locator('.home-mode--tour').click()
       const view = await awaitedView(play, since)
       const stored = await play.evaluate(() => localStorage.getItem('glol.spawn'))
+      assert.equal(view.mode, 'fly', 'random tour opening must start in flight')
       let best = null
       for (const slot of spawnPool) {
         const d = Math.hypot(slot.eye[0] - view.x, slot.eye[1] - view.y, slot.eye[2] - view.z)

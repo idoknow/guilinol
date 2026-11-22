@@ -8,6 +8,7 @@ const outDir=process.env.WALK_CAPTURE_DIR??'captures/walk'
 await mkdir(outDir,{recursive:true})
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 const baseUrl=`http://127.0.0.1:${server.httpServer.address().port}`
+const walkUrl = baseUrl+'/?verify&mode=walk&flow=0'+(process.argv.includes('--solo')?'&solo=1':'')
 let browser
 try {
   browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']})
@@ -19,7 +20,7 @@ try {
   await page.route('**/favicon.ico',route=>route.fulfill({status:204}))
   await page.route('**/api/t',route=>route.fulfill({status:204}))
   page.on('console',message=>{if(message.type()==='error')errors.push(message.location().url+': '+message.text())})
-  await page.goto(`${baseUrl}/?verify&mode=walk&flow=0`)
+  await page.goto(walkUrl)
   await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
 
   async function fixture(origin,direction,seconds,target){
@@ -360,7 +361,7 @@ try {
   mobile.on('pageerror',error=>errors.push('mobile: '+error.message))
   await mobile.route('**/favicon.ico',route=>route.fulfill({status:204}))
   await mobile.route('**/api/t',route=>route.fulfill({status:204}))
-  await mobile.goto(`${baseUrl}/?verify&mode=walk&flow=0&time=10.5`)
+  await mobile.goto(walkUrl+'&time=10.5')
   await mobile.waitForFunction(()=>window.viewer?.walk?.active&&window.viewer?.tour?.map&&document.querySelector('.vehicle-action'),null,{timeout:90000})
   await mobile.evaluate(async()=>{for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
 

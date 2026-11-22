@@ -3,7 +3,10 @@ let current: PlayMode = 'tour'
 const key = 'glol.playMode'
 
 export function lastPlayMode(): PlayMode {
-  try { return localStorage.getItem(key) === 'solo' ? 'solo' : 'tour' } catch { return 'tour' }
+  try {
+    const saved = localStorage.getItem(key)
+    return saved === 'solo' || saved === 'story' ? 'solo' : 'tour'
+  } catch { return 'tour' }
 }
 export function getPlayMode() { return current }
 let transition = 0

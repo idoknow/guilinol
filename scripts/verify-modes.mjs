@@ -24,7 +24,12 @@ try {
     await mkdir(process.env.MODE_CAPTURES,{recursive:true})
     await page.screenshot({path:`${process.env.MODE_CAPTURES}/${mode}.png`})
   }
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&flow=0&time=10.5&radius=480`)
+  const originUrl = `http://127.0.0.1:${server.httpServer.address().port}`
+  await page.goto(originUrl)
+  await page.evaluate(()=>localStorage.setItem('glol.playMode','story'))
+  await page.reload()
+  await page.waitForFunction(()=>document.activeElement?.getAttribute('data-umami-event')==='home-solo')
+  await page.goto(`${originUrl}/?verify&flow=0&time=10.5&radius=480`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0 && window.viewer?.tour,null,{timeout:90000})
   assert.equal(await page.evaluate(()=>document.body.dataset.mode),'fly')
   const soloDom = '.gl-mission-entry,.mission-board,.gl-mission-hud,.shop-overlay'
@@ -97,7 +102,7 @@ try {
   const after = await position()
   assert.ok(Math.hypot(before[0]-after[0],before[2]-after[2]) < 0.05)
   assert.equal(await page.evaluate(()=>performance.timeOrigin),origin)
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&hud=street&phone=1`)
+  await page.goto(`${originUrl}/?verify&hud=street&phone=1`)
   const jobs = page.locator('[data-app=jobs]')
   await jobs.waitFor({state:'attached'})
   assert.equal(await jobs.isVisible(),false)
@@ -106,7 +111,7 @@ try {
   assert.equal(await jobs.isVisible(),true)
   await jobs.click()
   await page.waitForSelector('dialog.mission-board[open]')
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&solo=1&cam=overview`)
+  await page.goto(`${originUrl}/?verify&solo=1&cam=overview`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0)
   assert.equal(await page.evaluate(()=>window.viewer.walk.active),true)
   assert.equal(await page.evaluate(()=>document.body.dataset.mode),'walk')
