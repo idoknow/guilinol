@@ -12,6 +12,7 @@ url=${URL:-https://glol.rcpd.cc}
 duration=${DURATION:-180}
 interval=${INTERVAL:-0.2}
 expect_sha=${EXPECT_SHA:-}
+expect_sha=${expect_sha:0:7}          # 版本接口只给 7 位前缀，传完整 sha 也要能比
 allow_no_change=${ALLOW_NO_CHANGE:-0}
 paths=("/api/health" "/version.json" "/" "/api/auth/social/config")
 
@@ -23,7 +24,13 @@ first_fail=""
 last_version=""
 first_version=""
 switch_at=""
-start_ms=$(($(date +%s%N)/1000000))
+# 毫秒时钟：Linux 用 %N；macOS 的 BSD date 不支持 %N，退回秒级
+now_ms() {
+  local ns
+  ns=$(date +%s%N 2>/dev/null)
+  if [[ "$ns" =~ ^[0-9]{16,}$ ]]; then echo $((ns / 1000000)); else echo $(( $(date +%s) * 1000 )); fi
+}
+start_ms=$(now_ms)
 interval_ms=$(awk -v s="$interval" 'BEGIN{printf "%d", (s+0)*1000}')
 (( interval_ms > 0 )) || interval_ms=200
 tick=0
@@ -37,8 +44,8 @@ probe() {
 }
 
 while :; do
-  now_ms=$(($(date +%s%N)/1000000))
-  (( now_ms - start_ms >= duration * 1000 )) && break
+  current_ms=$(now_ms)
+  (( current_ms - start_ms >= duration * 1000 )) && break
   tick=$((tick + 1))
   round_failed=0
   for path in "${paths[@]}"; do
@@ -87,10 +94,10 @@ if [[ -n "$expect_sha" ]]; then
     status=1
   fi
 elif (( allow_no_change == 0 )); then
-  if [[ -n "$switch_at" ]]; then
+  if [[ -n "$switch_at" && -n "$last_version" && "$last_version" != "$first_version" ]]; then
     echo "版本校验：观测到切换 $switch_at"
   else
-    echo "结论：全程版本未变化（${first_version:-?}），无法证明发生了滚动更新；"
+    echo "结论：结束版本 ${last_version:-?} 与起始版本 ${first_version:-?} 相同，发版没留住或没生效；"
     echo "      确认已发版，或加 EXPECT_SHA=<sha>，或压测时用 ALLOW_NO_CHANGE=1"
     status=1
   fi

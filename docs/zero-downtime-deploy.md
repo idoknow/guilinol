@@ -31,7 +31,9 @@ terminationGracePeriodSeconds: 45
 
 - `/api/ready`（`server/index.mjs` + `server/readiness.mjs`）**只读缓存**，后台按 5s TTL 刷新，最多一个在途探测：
   - 探针不打库 → kubelet 3s 一次 + 公网可访问的端点，不会把 5 连接的池子抢光
-  - 查 `to_regclass('public.users')` 而不是 `select 1` → 新装库时不会"能连上但没表"就绪了
+  - 查**整批迁移表**（`REQUIRED_TABLES` 23 张，含 `users`/`sessions`/`social_*`/`perf_*`/`feedback*`）
+    是否都存在 → 只建了 `users` 不会就绪，002~006 没跑完也挡住
+  - 查询超时（2s）只是"不再等结果"，底层查询仍挂在单在途槽里，不会因为超时反复叠加查询
   - **一旦就绪保持就绪** → DB 抖动不会把还能出静态页面的 pod 从端点里摘掉
   - 查询带 2s 超时，卡住的探测不会堆积
 - `readinessProbe` 打 `/api/ready`（3s 一次，失败 2 次判定未就绪）
@@ -50,15 +52,20 @@ terminationGracePeriodSeconds: 45
 
 `minAvailable: 1` —— 节点 drain/升级时不会把唯一副本一次性带走。
 
-**注意**：`kubectl drain --force` **不会**绕过 PDB（`--force` 只管"没有控制器管理的 pod"）。单副本 + `minAvailable: 1` 时正确做法是：
+**注意 1**：`kubectl drain --force` **不绕过** PDB（`--force` 只管"没有控制器管理的 pod"）。
+**注意 2**：`glol-web` 用 `nodeSelector: kubernetes.io/hostname: cn-hk-fxy-01` 钉在这台节点上，
+所以"先 scale 到 2 再 drain"在这套部署里**行不通**——两个副本都会落在同一台机器上，
+evict 一个之后 PDB 仍然挡着第二个。
 
-```bash
-kubectl -n idoknow scale deploy/glol-web --replicas=2   # 先扩容，让 PDB 有腾挪空间
-kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
-kubectl -n idoknow scale deploy/glol-web --replicas=1
-```
+现状下能做的只有三种：
 
-真的急用可以 `--disable-eviction`（直接删 pod，绕过驱逐 API，也就是绕过 PDB——**不推荐**，会停机）。
+| 做法 | 影响 |
+|---|---|
+| 先给 `glol-web` 加一台可选节点（去掉 nodeSelector/加第二台 worker），再 scale 2 → drain | 真正不停机，但要先有第二台机器 |
+| `kubectl -n idoknow scale deploy/glol-web --replicas=0` → 维护完再拉起 | 明确停机，几分钟 |
+| `kubectl drain <node> --disable-eviction --ignore-daemonsets` | 直接删 pod，绕过 PDB——**会停机**，只在紧急维护时用 |
+
+维护窗口要提前公告，别指望 PDB 能变出第二台机器。
 
 ### 5. 迁移前置（`deploy/deploy-hk.sh`）
 
@@ -117,7 +124,9 @@ kubectl -n idoknow rollout status deploy/glol-web
 
 ### 7. 并发发版互斥
 
-`deploy-hk.sh` 用 `flock` 锁住 `${TMPDIR:-/tmp}/glol-deploy-hk.lock`，并在 rollout 结束后校验 `glol-api` 容器的镜像 tag 是否等于本次 `git rev-parse HEAD`，不一致直接失败。避免两个发版交叉时"谁最后 apply 谁生效"却各自都报成功。
+`deploy-hk.sh` 用 `mkdir`（原子，macOS 也有）在 `${TMPDIR:-/tmp}/glol-deploy-hk.lock.d` 上做互斥，残留超过 30 分钟的锁会自动清理。
+
+这只是**同一台机器**的锁。跨机器并发由两层兜底：apply 前若发现 Deployment 正在滚动到别的 tag（`Progressing=ReplicaSetUpdated`）就直接退出；rollout 结束后再校验 `glol-api` 镜像 tag 是否等于本次 `HEAD`，不一致也失败。
 
 ## 仍然会断的组件（本次未覆盖）
 

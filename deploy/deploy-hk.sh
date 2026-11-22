@@ -4,14 +4,21 @@ cd "$(dirname "$0")/.."
 host=rock@cn-hk-fxy-01.rockchin.top
 k() { ssh -T -o BatchMode=yes "$host" kubectl -n idoknow "$@"; }
 tag=$(git rev-parse HEAD)
-# 同一个仓库不允许两个发版重叠：否则两边各 apply 一次镜像，谁最后写谁生效，
-# 而 rollout status 可能看到的是对方的滚动（Sourcery #4）。
-lock=${TMPDIR:-/tmp}/glol-deploy-hk.lock
-exec 9>"$lock"
-if ! flock -w 10 9; then echo "另一个发版正在进行（锁 $lock），退出" >&2; exit 1; fi
+# 同一台机器上不允许两个发版重叠（mkdir 是原子的，macOS 也有；不用 flock）。
+# 注意：这只能锁住"同一台机器"，跨机器并发由下面的集群侧检查兜底。
+lock=${TMPDIR:-/tmp}/glol-deploy-hk.lock.d
+if ! mkdir "$lock" 2>/dev/null; then
+  if [[ -n "$(find "$lock" -maxdepth 0 -mmin +30 2>/dev/null)" ]]; then
+    echo "清理 30 分钟前的残留锁 $lock" >&2
+    rm -rf "$lock"
+    mkdir "$lock" 2>/dev/null || { echo "另一个发版正在进行（锁 $lock）" >&2; exit 1; }
+  else
+    echo "另一个发版正在进行（锁 $lock）；确认无人发版可手动 rm -rf $lock" >&2; exit 1
+  fi
+fi
 k get secret glol-env -o name >/dev/null
 anonymous=$(mktemp -d)
-trap 'rm -rf "$anonymous"' EXIT
+trap 'rm -rf "$anonymous" "$lock"' EXIT
 for image in api web; do
   ref="ghcr.io/idoknow/glol-$image:$tag"
   for attempt in {1..30}; do
@@ -43,7 +50,17 @@ if k get deployment glol-postgres >/dev/null 2>&1; then
   migrated=1
 fi
 
-# RollingUpdate(maxUnavailable=0) + /api/ready 就绪探针：新 pod 的 DB 通了才摘老 pod
+# 集群侧兜底：另一台机器发起的发版可能正在滚动，这时覆盖镜像会让两边都报成功
+current=$(k get deployment glol-web -o jsonpath='{.spec.template.spec.containers[?(@.name=="glol-api")].image}' 2>/dev/null || true)
+if [[ -n "$current" && "$current" != *":$tag" ]]; then
+  reason=$(k get deployment glol-web -o jsonpath='{.status.conditions[?(@.type=="Progressing")].reason}' 2>/dev/null || true)
+  if [[ "$reason" == "ReplicaSetUpdated" ]]; then
+    echo "集群正在滚动到 ${current##*:}，另一个发版在进行，退出" >&2
+    exit 1
+  fi
+fi
+
+# RollingUpdate(maxUnavailable=0) + /api/ready 就绪探针：新 pod 就绪后才摘老 pod
 kubectl kustomize deploy/k8s | sed "s/:RELEASE$/:$tag/g" | k apply -f -
 for name in postgres minio; do k rollout status "deployment/glol-$name" --timeout=300s; done
 # 首次装库：/api/ready 要求 public.users 存在，所以迁移必须早于 web 就绪

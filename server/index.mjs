@@ -12,6 +12,8 @@ import {createReadiness} from './readiness.mjs'
 crypto.subtle.timingSafeEqual = (left,right) => left.byteLength===right.byteLength && timingSafeEqual(left,right)
 // 连接/查询都有上限：卡住的查询不能长期占着 5 连接的池子
 const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:5,connectionTimeoutMillis:3000,query_timeout:15000,idleTimeoutMillis:30000})
+// 空闲连接被服务端断开（postgres 重启/维护）时 pg.Pool 会 emit 'error'，不监听就整个进程崩溃
+pool.on('error',error=>console.error('postgres idle client error',error.code??error.message))
 const readiness=createReadiness({query:sql=>pool.query(sql)})
 const metrics=monitor(pool)
 const connections=measuredConnections(pool,metrics)
@@ -35,11 +37,11 @@ const server=serve({port:Number(process.env.PORT || 3000),fetch: async request =
     const response=url.pathname==='/api/t'?await receive(request,connections,origin):await onRequest({env,request:new Request(origin+url.pathname+url.search,request)})
     status=response.status
     return response
-  }finally{metrics.request(url.pathname,status,performance.now()-start)}
+  }finally{if(!request.headers.get('user-agent')?.startsWith('kube-probe/'))metrics.request(url.pathname,status,performance.now()-start)}
 }})
 
 // 启动后立刻探一次，别让第一个探针等到 TTL 到期
-void readiness.probe()
+void readiness.kick()
 
 // 优雅退出：k8s 删 pod 时先 SIGTERM（配合 preStop 已先摘流量），等在途请求跑完再退出；
 // 20 秒兜底，避免卡住的连接把滚动更新拖成超时。

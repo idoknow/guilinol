@@ -1,12 +1,22 @@
-// 就绪判定：探针只读缓存，真正的 DB 检查在后台按 TTL 刷新，最多一个在途。
+// 就绪判定：探针只读缓存，真正的体检在后台按 TTL 刷新，同一时刻最多一个在途。
 //
-// 设计要点（对应 Sourcery 的两条意见）：
-// - 探针不打库：kubelet 3 秒一次 + 公网可访问的 /api/ready，如果每次都查库，
-//   5 连接的小池子会被探针和爬虫抢光，正常 API 反而变慢。这里改成读缓存。
-// - 查表存在而不是 select 1：新装库时 select 1 能过但业务表还没建，
-//   新 pod 会被判定"就绪"然后对外 500。查 public.users 才真正说明能干活。
-// - 一旦就绪就保持就绪：DB 抖动不该把一个还能出静态页面的 pod 从端点里摘掉。
-export const SCHEMA_SQL = "select to_regclass('public.users') as users"
+// 设计要点（对应两轮审查意见）：
+// - 探针不打库：kubelet 3 秒一次 + 公网可访问，每次查库会把 5 连接的池子抢光。
+// - 查的是"迁移有没有全部跑完"，不是 select 1：只建了 users 就放行，会让新 pod
+//   在 002/003/004… 还没建表时对外 500。
+// - 一旦就绪保持就绪：DB 抖动不该把还能出静态页面的 pod 从端点里摘掉。
+// - 超时只是不再等结果，底层查询仍挂在 inflight 上，避免超时后反复叠加查询。
+export const REQUIRED_TABLES = [
+  'users', 'sessions', 'email_codes', 'rate_limits',
+  'social_identities', 'social_states', 'social_pending',
+  'player_saves', 'player_ledger_txns',
+  'admin_audit',
+  'feedback', 'feedback_events', 'feedback_mail', 'feedback_messages', 'feedback_photos', 'feedback_upload_usage', 'mail_events',
+  'perf_event', 'perf_session_day', 'perf_value_day', 'perf_summary_day', 'perf_network', 'perf_server',
+]
+
+const TABLE_LIST = REQUIRED_TABLES.map(name => `'${name}'`).join(',')
+export const SCHEMA_SQL = `select count(*)::int as missing from unnest(array[${TABLE_LIST}]) as name where to_regclass('public.'||name) is null`
 
 export function createReadiness({ query, ttlMs = 5000, timeoutMs = 2000 }) {
   let ready = false
@@ -14,37 +24,47 @@ export function createReadiness({ query, ttlMs = 5000, timeoutMs = 2000 }) {
   let checkedAt = 0
   let inflight = null
 
-  const withTimeout = promise => {
-    let timer
-    const timeout = new Promise((_, reject) => {
-      // 不能用 unref：没有别的句柄时事件循环会直接退出，await 永远不返回
-      timer = setTimeout(() => reject(new Error('timeout')), timeoutMs)
-    })
-    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+  function refresh() {
+    if (inflight) return inflight
+    const pending = Promise.resolve().then(() => query(SCHEMA_SQL))
+    pending.catch(() => {})            // 挂着的查询不能变成 unhandledRejection
+    inflight = pending
+      .then(result => {
+        const missing = Number(result?.rows?.[0]?.missing ?? 1)
+        if (missing === 0) ready = true
+        reason = missing === 0 ? 'ok' : 'schema_incomplete'
+      })
+      .catch(error => {
+        reason = error instanceof Error && error.message === 'timeout' ? 'timeout' : 'database'
+      })
+      .finally(() => {
+        checkedAt = Date.now()
+        inflight = null
+      })
+    return inflight
   }
 
-  async function probe() {
-    try {
-      const result = await withTimeout(query(SCHEMA_SQL))
-      const present = Boolean(result?.rows?.[0]?.users)
-      if (present) ready = true
-      reason = present ? 'ok' : 'schema_missing'
-    } catch (error) {
-      reason = error instanceof Error && error.message === 'timeout' ? 'timeout' : 'database'
-    }
-    checkedAt = Date.now()
-    return { ready, reason, checkedAt }
-  }
+  const snapshot = () => ({ ready, reason, checkedAt })
 
   return {
-    /** 探针入口：永不阻塞在 DB 上，最多触发一次后台刷新。 */
+    /** 探针入口：永不阻塞在 DB 上；缓存过期就触发一次后台刷新。 */
     status() {
-      if (Date.now() - checkedAt > ttlMs && !inflight) {
-        inflight = probe().finally(() => { inflight = null })
-      }
-      return { ready, reason, checkedAt }
+      if (Date.now() - checkedAt > ttlMs && !inflight) void refresh()
+      return snapshot()
     },
-    /** 显式检查一次（部署脚本/测试用）。 */
-    probe,
+    /** 启动时立刻体检一次（同样走单在途保护）。 */
+    kick() {
+      return refresh()
+    },
+    /** 显式体检一次，最多等 timeoutMs；超时不再等，但查询仍记在 inflight 上。 */
+    async probe() {
+      const work = refresh()
+      let timer
+      const timeout = new Promise(resolve => { timer = setTimeout(resolve, timeoutMs) })
+      const settled = await Promise.race([work.then(() => true), timeout.then(() => false)])
+      clearTimeout(timer)
+      if (!settled) reason = 'timeout'
+      return snapshot()
+    },
   }
 }
