@@ -83,8 +83,8 @@ interface ShoesRecipe {
 }
 
 const TOP_RECIPES: Record<string, TopRecipe> = {
-  // IDOK-133 default look: ink-navy short jacket over a white tee, oat chinos, white court shoes, brick-red daypack.
-  top_default_tee: {primary: '#33425a', sleeve: '#33425a', trim: '#222c3d', inner: '#efece4'},
+  // IDOK-133 r2 default look (Rock: keep it simple): plain off-white top, black trousers, white trainers, black pack.
+  top_default_tee: {primary: '#e9e7e1', sleeve: '#e9e7e1', trim: '#d8d5cd', inner: '#e9e7e1'},
   top_guilin_hoodie: {primary: '#465460', sleeve: '#465460', trim: '#ffc53d', inner: '#d8d4cb'},
   top_linen_shirt: {primary: '#ece5d4', sleeve: '#ece5d4', trim: '#8d9b87', inner: '#f7f4ec'},
   top_rider_vest: {primary: '#d98a2b', sleeve: '#1c2329', trim: '#ffd257', inner: '#1c2329'},
@@ -94,7 +94,7 @@ const TOP_RECIPES: Record<string, TopRecipe> = {
 }
 
 const BOTTOM_RECIPES: Record<string, BottomRecipe> = {
-  bottom_default_pants: {main: '#c4b9a3', belt: '#3a2f28'},
+  bottom_default_pants: {main: '#2a2c30', belt: '#1d1e21'},
   bottom_guilin_cargo: {main: '#2d3238', belt: '#1b1f24'},
   bottom_linen_shorts: {main: '#a9977b', belt: '#6f5c43'},
   bottom_rider_pants: {main: '#252a30', belt: '#ffc53d'},
@@ -104,7 +104,7 @@ const BOTTOM_RECIPES: Record<string, BottomRecipe> = {
 }
 
 const SHOES_RECIPES: Record<string, ShoesRecipe> = {
-  shoes_default_sneaker: {upper: '#f2f0ea', accent: '#c4553f', sole: '#f6f4ef'},
+  shoes_default_sneaker: {upper: '#f2f1ed', accent: '#d9d8d3', sole: '#f6f5f1'},
   shoes_guilin_canvas: {upper: '#d8d4c8', accent: '#35424a', sole: '#8a5b36'},
   shoes_linen_loafer: {upper: '#c8b28e', accent: '#694b36', sole: '#dfd3bd'},
   shoes_rider_boots: {upper: '#1f2326', accent: '#7d858c', sole: '#14171a'},
@@ -114,7 +114,7 @@ const SHOES_RECIPES: Record<string, ShoesRecipe> = {
 }
 
 /** The daypack modelled into figure.glb (shown while `bag_none` is equipped). */
-const BUILTIN_PACK_COLORS = {body: '#b9533d', strap: '#2a2220'} as const
+const BUILTIN_PACK_COLORS = {body: '#2c2e32', strap: '#1b1c1f'} as const
 
 function resolveTopRecipe(topId: string): TopRecipe {
   const known = TOP_RECIPES[topId]
