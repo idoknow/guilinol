@@ -83,7 +83,7 @@ SOCIAL_REDIRECT   = "https://<正式域名>/api/auth/social/callback"
 - `SOCIAL_REDIRECT` 写死常量值参与比对，**不要**用请求里的 `Host`/`Referer` 拼，否则等于开放重定向。
 - `SOCIAL_ENABLED` 只列启用的平台（`qq,wx,alipay`），未配置时聚合登录整体返回 503 `social_unconfigured`，等于关闭入口。
 
-### 2.3 迁移 `migrations/0007_social.sql`
+### 2.3 迁移 `migrations/0007_social.sql` + `0008_social_pending.sql`
 
 ```sql
 CREATE TABLE social_identities (
@@ -113,6 +113,7 @@ CREATE TABLE social_states (
 CREATE INDEX social_states_expires ON social_states(expires);
 ```
 
+- `0008_social_pending.sql` 建 `social_pending`：回调换到的身份先落这里，用户点确认才写 `social_identities`。
 - 主键 `(type, social_uid)` 保证同一个第三方账号不会被绑到两个人；重复回调靠唯一约束天然幂等。
 - `social_states.used` 做一次性消费；过期行随用随删，不需要定时任务。
 - 不存 `access_token`：本项目不需要代表用户调用第三方接口，存了只是多一份泄露面。要展示头像就存 `faceimg` 的**域名白名单校验后**的 URL。
@@ -130,17 +131,33 @@ CREATE INDEX social_states_expires ON social_states(expires);
 
 ### 3.2 `GET /api/auth/social/callback?type=&code=`
 
-1. 校验 `type` 白名单、`code` 正则 `^[A-Za-z0-9_-]{8,128}$`（上游 code 是十六进制串，别放进任何拼接场景）
-2. 读 `glol_social` cookie，用 `UPDATE … SET used=1 … RETURNING intent,user_id` 一次性消费：必须存在、未 `used`、未过期、`type` 一致；并发重放只有一次能改到行，其余直接拒绝
-3. `intent='bind'` 时核对 `user_id` 等于当前会话用户，否则拒绝（防止 code 被串到别人账号）
-4. 服务端调上游 `act=callback`，`code===0` 才算成功；`code===2` 返回「尚未完成授权，请重试」；其它值统一「登录失败，请稍后再试」，不把上游原文透给用户
-5. 校验 `type` 与请求一致、`social_uid` 非空且 `^[A-Fa-f0-9]{16,64}$`
-6. 查 `social_identities(type, social_uid)`：
-   - **有绑定** → 建新 session（`random(32)` + `hash`，与现有 `sessions` 表一致），删掉该请求原来那条 session（防会话固定）
-   - **无绑定且当前未登录** → 302 到 `/?social=unbound`（站点没有 `/login` 路由，账号面板在首页里，前端读这个参数给提示）
-   - **无绑定且当前已登录** → 绑定到当前用户；若该用户此 `type` 已有绑定 → 400「每个平台只能绑定一个账号」
-7. 更新 `nickname`/`faceimg`/`last_login_at`
-8. 全程 `Cache-Control: no-store`（现有 `json()` 已带）
+**这一步只做「换用户信息 + 落 pending」，不直接登录、不直接绑定。** 原因见 1.5：上游回调不带 `state`，协议无法证明这个 `code` 属于本次流程；直接落库就等于允许攻击者把自己的 `code` 塞进受害者的流程。
+
+1. 校验 `type` 白名单、`code` 正则 `^[A-Za-z0-9_-]{8,128}$`
+2. 读 `glol_social` cookie（可含最多 3 个 state，`.` 分隔），逐个查未 `used`、未过期、`type` 一致的行；一个都没有 → 302 `expired`
+3. 调上游 `act=callback` 换用户信息：失败 → 302 `unavailable`（**此时不消费 state**，用户重来仍可继续）；`code===2` → 302 `pending`
+4. 换取成功后 `UPDATE … SET used=1 WHERE state=? AND used=0 RETURNING state` 一次性消费；改不到行 → 302 `expired`
+5. 校验 `social_uid` 非空且 `^[A-Fa-f0-9]{16,64}$`
+6. 决定归属：`intent='bind'` 要求当前会话存在、已验证、且等于 state 记录的用户（否则 302 `expired`）；`intent='login'` 要求存在绑定（否则 302 `unbound`），账号必须已验证
+7. 写 `social_pending`（`token = sha256(随机值)`、`intent`、`social_uid`、平台昵称、头像、目标 `user_id`、5 分钟 TTL），并下发 `glol_social_pending` cookie（HttpOnly/Secure/SameSite=Lax）
+8. 302 到 `/?social=confirm`，前端据此弹出「确认以『微信 · 昵称』登录/绑定」
+
+### 3.2.1 `GET /api/auth/social/pending`
+
+返回当前浏览器的待确认授权（`intent`、平台名、平台昵称、头像），供确认框展示；不消费，404 `no_pending` 表示没有待确认项。
+
+### 3.2.2 `POST /api/auth/social/confirm`
+
+用户点「确认」后才真正生效，顺序是**先校验、后消费**（校验不过的请求不能把别人的授权烧掉）：
+
+1. 读 pending（不消费），没有 → 404 `no_pending`
+2. `intent='bind'`：
+   - 当前会话必须存在（否则 401），且与 `pending.user_id` 一致（否则 403 `forbidden`）
+   - `UPDATE social_pending SET used=1 WHERE token=? AND user_id=?` 消费
+   - `INSERT INTO social_identities … SELECT … WHERE EXISTS(SELECT 1 FROM sessions WHERE digest=? AND user_id=? AND expires>?)`——会话在写入这一刻仍然存在才落库（防登出竞态），`changes===0` → 409 `expired`
+   - 唯一约束冲突 → 409 `conflict`；其它数据库错误照常抛出
+3. `intent='login'`：消费 pending，建新 session（`random(32)`+`hash`），**只删除同一个人的旧 session**（避免把别人或没拿到 Set-Cookie 的访客踢下线），更新 `nickname`/`faceimg`/`last_login_at`
+4. 清 `glol_social_pending`，返回 `{ ok, intent, redirect }`（前端跳 `/?social=bound` 或 `/?social=login`）
 
 ### 3.3 账号策略
 
@@ -241,6 +258,7 @@ if (path === 'auth/social/callback' && method === 'GET') {
 
 | # | 防护 | 做法 | 防的是什么 |
 |---|---|---|---|
+| 0 | **登录/绑定必须二次确认** | 回调只落 `social_pending`，用户点确认（POST，Origin 校验，绑定还要会话一致）才生效 | 上游无 state 导致的 code 串号 / 登录绑定 CSRF |
 | 1 | 密钥不出服务端 | 前端只收 `url`/`qrcode`；`SOCIAL_APPKEY` 用 secret | appkey 从地址栏/CDN 日志泄露 |
 | 2 | 回调必须有同浏览器凭据 | `glol_social` cookie（HttpOnly、Secure、SameSite=Lax、600s）+ `social_states` 一次性消费 | 上游无 state 导致的登录 CSRF |
 | 3 | state 一次性 | `UPDATE … WHERE used=0` 看 `changes` | code/回调重放 |
@@ -252,7 +270,8 @@ if (path === 'auth/social/callback' && method === 'GET') {
 | 9 | 限流 | `limit(db,'social:start:'+ip,20,60)`，callback 同 IP 20 次/分钟；全站已用 `rate_limits` 表 | 刷接口、探测绑定关系 |
 | 10 | 错误不泄露 | 上游 `msg`/`errcode` 只进日志，用户侧统一文案 | 枚举「该 QQ 是否已注册」 |
 | 11 | 不存 token | `access_token` 不落库 | 少一份可被盗的凭据 |
-| 12 | `Cache-Control: no-store` | 复用现有 `json()` | 代理缓存带 Set-Cookie 的响应 |
+| 12 | 配置只认 https | `SOCIAL_HOST`/`SOCIAL_REDIRECT` 非 https 一律视为未配置 | appkey 与 code 走明文 |
+| 12b | `Cache-Control: no-store` | 复用现有 `json()` | 代理缓存带 Set-Cookie 的响应 |
 | 13 | 日志脱敏 | 只记 `type`、`code`、`errcode`、`social_uid` 后 6 位；不记 `code`、`appkey` | 日志变成凭据仓库 |
 
 ### 建议（下一轮做）
@@ -271,17 +290,21 @@ if (path === 'auth/social/callback' && method === 'GET') {
 
 | 场景 | 操作 | 期望 |
 |---|---|---|
-| 正常绑定 | 登录 → 设置里点「绑定 QQ」→ 完成授权 | 200，`social_identities` 多一行，`used=1` |
-| 正常登录 | 退出 → 点「QQ 登录」→ 授权 | 200 + 新 `glol_session`，旧 token 失效 |
+| 正常绑定 | 登录 → 点「绑定 QQ」→ 授权 → 确认框点确认 | 200 `{ok,intent:'bind'}`，`social_identities` 多一行，pending `used=1` |
+| 正常登录 | 点「QQ 登录」→ 授权 → 确认框点确认 | 200 + 新 `glol_session`，`/api/me` 返回该账号 |
+| **不点确认** | 只走完授权、不确认 | 不登录不绑定，`social_identities` 无变化（这是防 code 串号的关键） |
+| **别人的会话确认** | pending 属于 A，用 B 的会话 POST confirm | 403 `forbidden`，且 pending **不被消费**（A 仍可确认） |
 | 跨站发起 | 第三方页面 `fetch` POST `/api/auth/social/start` | 403 `origin` |
-| 缺 cookie 回调 | 直接 `GET /api/auth/social/callback?type=qq&code=xxx` | 403 `state` |
-| 重放回调 | 同一个 code 连发两次 | 第二次 403 `state` |
-| 未绑定登录 | 未绑定账号点「QQ 登录」 | 302 `/login?social=unbound`，不建号 |
-| 重复绑定 | 同一 QQ 再绑另一个用户 | 400，唯一约束生效 |
-| 一人两号 | 同一用户绑第二个 QQ | 400「每个平台只能绑定一个账号」 |
-| 上游宕机 | 断网或 `SOCIAL_HOST` 指向黑洞 | 502 `social_unavailable`，不抛 500 堆栈 |
-| 未完成授权 | 授权页挂着不点 | `code=2` → 409 `social_pending`，可重试 |
-| 超频 | 1 分钟打 30 次 start | 429 `rate_limited` |
+| 缺 cookie 回调 | 直接 `GET …/social/callback?type=qq&code=xxx` | 302 `/?social=expired` |
+| 重放回调 | 同一 code 连发两次 | 第二次 302 `/?social=expired` |
+| 重放确认 | 同一 pending 连点两次 | 第二次 404 `no_pending` |
+| 未绑定登录 | 未绑定账号走登录流程 | 302 `/?social=unbound`，不建号 |
+| 重复绑定 | 同一 QQ 再绑另一个用户 | 409 `conflict` |
+| 一人两号 | 同一用户绑第二个 QQ | 409 `conflict`（唯一索引 `(user_id,type)`） |
+| 上游宕机 | 断网或 `SOCIAL_HOST` 指向黑洞 | 502 `social_unavailable`；回调侧 302 `/?social=unavailable` 且 state 未消费 |
+| 未完成授权 | 授权页挂着不点 | `code=2` → 302 `/?social=pending`，可重试 |
+| 配置成 http | `SOCIAL_HOST`/`SOCIAL_REDIRECT` 用 http | 视为未配置：start 503，callback 302 `/?social=disabled` |
+| 超频 | 1 分钟打 30 次 start | 429 `rate_limited`；回调侧 302 `/?social=busy` |
 
 本地验证：`npm run check:api` 必须过；`scripts/auth-test.mjs` 增加一条 `--social` 分支，按上表演进（该脚本已有 `--ui`/`--bridge`/`--admin-ui` 的写法可照抄）。
 
@@ -299,8 +322,9 @@ if (path === 'auth/social/callback' && method === 'GET') {
 
 1. `migrations/0007_social.sql` + 本地 `wrangler d1 migrations apply glol --local` 验证
 2. `lib/social.ts`（上面的骨架）
-3. `[[path]].ts` 接 `auth/social/start`、`auth/social/callback`，`methods` 白名单同步
+3. `[[path]].ts` 接 `auth/social/start`、`auth/social/callback`、`auth/social/pending`、`auth/social/confirm`，`methods` 白名单同步
 4. 前端登录页加「QQ / 微信 / 支付宝」按钮（只调本项目 API，不直接连上游）
 5. 账号设置页加「绑定/解绑第三方账号」，未设置密码的账号禁用解绑
-6. `scripts/auth-test.mjs --social` 跑第 6 节用例
-7. 生产配置 `SOCIAL_*` secret，先在预览环境验证一次真实授权，再打开入口
+6. 前端：首页读 `?social=confirm` 时拉 `GET auth/social/pending` 弹确认框，点确认调 `POST auth/social/confirm`
+7. `scripts/auth-test.mjs --social` 跑第 6 节用例
+8. 生产配置 `SOCIAL_*` secret，先在预览环境验证一次真实授权，再打开入口
