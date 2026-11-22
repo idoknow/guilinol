@@ -90,7 +90,7 @@ export function mountMissionUi(
       .map(({def, firstClearDone, completions, firstClearReward, repeatReward}) => {
         const isCurrent = s.mission?.id === def.id
         const tagClass = def.line === 'errand' ? 'errand' : 'noodle'
-        const tagText = def.line === 'errand' ? '商圈跑腿' : '米粉外卖'
+        const tagText = ({errand: '商圈跑腿', noodle: '米粉外卖', taxi: '出租', race: '环城夜赛'})[def.line]
         const rewardText = firstClearDone
           ? `日常 ¥${repeatReward}（已首通）`
           : `首通 ¥${firstClearReward} · 复刷 ¥${repeatReward}`
@@ -102,7 +102,7 @@ export function mountMissionUi(
           <article class="mb-card">
             <div class="mb-card-top">
               <div class="mb-card-title"><span class="mb-tag ${tagClass}">${tagText}</span><span>${def.title}</span></div>
-              <span class="mb-reward">${rewardText}</span>
+              <span class="mb-reward">${rewardText}${def.line === 'taxi' ? ' + 计价器' : ''}</span>
             </div>
             <p class="mb-desc">${def.summary ?? ''}</p>
             <div class="mb-card-foot">

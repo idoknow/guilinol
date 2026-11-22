@@ -1,0 +1,36 @@
+{
+  "id": "taxi-02",
+  "line": "taxi",
+  "title": "七星公园到日月双塔",
+  "summary": "接客后按行车里程和行驶时间计费，每公里 80 元，每分钟 6 元。",
+  "recommendedVehicle": "car",
+  "giver": [
+    215,
+    169
+  ],
+  "steps": [
+    {
+      "kind": "pickup",
+      "at": [
+        215,
+        169
+      ],
+      "radius": 14,
+      "text": "开车到七星公园接客"
+    },
+    {
+      "kind": "deliver",
+      "at": [
+        -885,
+        497
+      ],
+      "radius": 14,
+      "text": "送客到日月双塔北岸",
+      "timer": 300
+    }
+  ],
+  "reward": 100,
+  "failOn": [
+    "timeout"
+  ]
+}

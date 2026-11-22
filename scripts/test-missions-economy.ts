@@ -370,4 +370,37 @@ assert.equal(feeRes.charged, 0)
 assert.equal(stateMod.getState().money, 2)
 
 console.log('[OK] 4. MissionRunnerEngine state machine, soup protection, timer freeze & cleanup')
+// Exercise the full catalog through the production runner and wallet.
+for (const line of ['taxi', 'race']) {
+  const orders = MISSIONS.filter(def => def.line === line)
+  assert.equal(orders.length, 3)
+  for (const def of orders) {
+    const runner = new MissionRunnerEngine()
+    const frame = {dt: 0.1, speedMs: 20, braking: false, parkLocked: false, crashPhase: 'none', mode: 'car'} as const
+    const balance = stateMod.getState().money
+    assert.equal(runner.start(def.id, {x: def.giver[0], z: def.giver[1]}).ok, true)
+    for (const [index, step] of def.steps.entries()) {
+      const [x, z] = step.at
+      assert.equal(vehicleForbiddenAt(x, z), false, `${def.id} step ${index} must allow cars`)
+      runner.step({...frame, x, z, mode: 'foot'})
+      runner.step({...frame, x, z, frozen: true})
+      assert.equal(runner.getSnapshot().stepIndex, index)
+      if (index === 1) {
+        const [lastX, lastZ] = def.steps.length > 2 ? def.steps[def.steps.length - 1].at : def.giver
+        for (let tick = 0; tick < 100; tick++) runner.step({...frame, x: lastX, z: lastZ})
+        assert.equal(runner.getSnapshot().stepIndex, index, 'later stop cannot skip current target')
+      }
+      runner.step({...frame, x, z})
+    }
+    const result = runner.getSnapshot().lastOutcome
+    assert.equal(result?.outcome, 'completed')
+    // Ten seconds at 20 m/s add ¥16 in distance and ¥1 in time.
+    const payout = def.reward + (line === 'taxi' ? 17 : 0)
+    assert.equal(result?.payout, payout)
+    saveMod.reloadSaveFromStorage()
+    assert.equal(stateMod.getState().money, balance + payout)
+    if (line === 'race') assert.ok(result!.elapsedSeconds! > 10)
+  }
+}
+console.log('[OK] 5. All six driving orders, vehicle access, ordered gates, taximeter, race time & saved payouts')
 console.log('ALL MISSION & ECONOMY TESTS PASSED')

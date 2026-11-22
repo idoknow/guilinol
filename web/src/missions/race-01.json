@@ -1,0 +1,63 @@
+{
+  "id": "race-01",
+  "line": "race",
+  "title": "滨江短环",
+  "summary": "从滨江路起跑，过解放桥后折返，经榕杉湖回到起点。全程限时 240 秒。",
+  "recommendedVehicle": "car",
+  "giver": [
+    -434,
+    271
+  ],
+  "steps": [
+    {
+      "kind": "checkpoint",
+      "at": [
+        -434,
+        271
+      ],
+      "radius": 14,
+      "text": "开车通过滨江路起点"
+    },
+    {
+      "kind": "checkpoint",
+      "at": [
+        -75,
+        78
+      ],
+      "radius": 14,
+      "text": "通过解放桥东段",
+      "timer": 240
+    },
+    {
+      "kind": "checkpoint",
+      "at": [
+        -826,
+        -158
+      ],
+      "radius": 14,
+      "text": "通过十字街"
+    },
+    {
+      "kind": "checkpoint",
+      "at": [
+        -1105,
+        283
+      ],
+      "radius": 14,
+      "text": "通过榕杉湖阳桥西侧"
+    },
+    {
+      "kind": "checkpoint",
+      "at": [
+        -434,
+        271
+      ],
+      "radius": 14,
+      "text": "通过滨江路终点"
+    }
+  ],
+  "reward": 260,
+  "failOn": [
+    "timeout"
+  ]
+}
