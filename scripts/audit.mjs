@@ -1,3 +1,4 @@
+import {streetAreaFindings} from './street-triangulation.mjs'
 import {telemetryPreview} from './telemetry-preview.mjs'
 import {execFileSync} from 'node:child_process'
 import {cp, mkdir, readFile, rm, stat, writeFile} from 'node:fs/promises'
@@ -30,6 +31,9 @@ execFileSync('uv', ['run', '--locked', 'python', 'pipeline/audit.py', '--out', p
   stdio: 'inherit',
   timeout: Number(process.env.AUDIT_TIMEOUT_MS ?? 900000),
 })
+const streetOverflow = streetAreaFindings('public/world')
+await writeFile(join(outDir, 'street-overflow.json'), JSON.stringify(streetOverflow, null, 2))
+console.log('Street triangulation over 100.5%:', streetOverflow.length)
 const pipelineReport = JSON.parse(await readFile(pipelineOut, 'utf8'))
 
 // Ensure dist/ has fresh public/world & public/textures & public/landmarks if dist exists
@@ -446,6 +450,7 @@ try {
   }
 
   const finalCounts = {
+    streetOverflow: streetOverflow.length,
     buildingOnRoad: mergedCategories.buildingOnRoad.count,
     unevenRoad: mergedCategories.unevenRoad.count,
     textureIssue: mergedCategories.textureIssue.count,
@@ -466,6 +471,7 @@ try {
       consoleErrors,
     },
     categories: {
+      streetOverflow: {count: streetOverflow.length, top20: streetOverflow.slice(0, 20)},
       buildingOnRoad: {
         count: mergedCategories.buildingOnRoad.count,
         bySubtype: mergedCategories.buildingOnRoad.bySubtype,
@@ -498,7 +504,7 @@ try {
   console.log('\n=== Scene Audit Summary ===')
   console.log(JSON.stringify(finalCounts, null, 2))
   for (const [k, v] of Object.entries(finalAudit.categories)) {
-    console.log(`  ${k}: ${v.count}`, v.bySubtype)
+    console.log(`  ${k}: ${v.count}`, v.bySubtype ?? {})
   }
   console.log(`Wrote ${auditJsonPath}`)
 

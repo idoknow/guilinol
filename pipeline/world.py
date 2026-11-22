@@ -19,6 +19,7 @@ from shapely.geometry import box, Point
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem, load_osm
 from features import building_mesh, buildings, game_court, ground_features, points, polygons, raw_overture_footprints, rongyin_sidewalk
+from street_rings import repair_frozen_tile
 from legacy_core import Downtown, EXTENT as DOWNTOWN
 from karst import generate
 from peak_sectors import write_city_lods
@@ -407,7 +408,7 @@ def build(bbox, output, palette, workers=4):
                 if downtown and downtown.frozen_tile(*origin):
                     old = downtown.tiles[origin]
                     name = f'{east//CHUNK}_{south//CHUNK}.glc'
-                    (output/name).write_bytes(downtown.files[old])
+                    (output/name).write_bytes(repair_frozen_tile(downtown.files[old]))
                     (output/name.replace('.glc','.trees')).write_bytes(downtown.files[old.replace('.glc','.trees')])
                     while pending:
                         chunks.append(pending.popleft().result())

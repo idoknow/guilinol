@@ -6,6 +6,7 @@ from shapely import STRtree
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import nearest_points, unary_union, substring
 
+from street_rings import repaired_paths
 from markings import junction_cores, violations
 from common import CHUNK, ll2xz, load_osm
 from features import points, polygons, rongyin_photo, rongyin_sidewalk
@@ -478,7 +479,9 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
             for poly in polygons(shape):
                 if poly.area<.005:
                     continue
-                items.append([kind,*[np.rint((np.asarray(r.coords)[:-1]-origin)*100).astype(int).tolist() for r in [poly.exterior,*poly.interiors]]])
+                rings = [np.rint((np.asarray(r.coords)[:-1]-origin)*100).astype(int).tolist()
+                         for r in [poly.exterior, *poly.interiors]]
+                items.extend(repaired_paths([kind, *rings]))
         for kind,shape in surfaces_here:
             append(kind,shape.difference(under[kind]) if kind in under else shape)
         first_lower = len(items)
