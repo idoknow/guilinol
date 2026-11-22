@@ -22,6 +22,7 @@ export function creatorStage(host: HTMLElement, reduced: boolean, capture = fals
   let rotation = 0,
     velocity = 0,
     close = false,
+    closeAmount = 1,
     zoom = 0,
     entrance = reduced ? 1 : 0,
     finishing = false,
@@ -126,7 +127,7 @@ export function creatorStage(host: HTMLElement, reduced: boolean, capture = fals
     pop = Math.min(1, pop + dt / 0.18)
     glance = Math.min(1, glance + dt / 0.8)
     zoomTime = Math.min(1, zoomTime + dt / 0.45)
-    zoom = T.MathUtils.lerp(zoomStart, close ? 1 : 0, reduced ? 1 : 1 - (1 - zoomTime) ** 3)
+    zoom = T.MathUtils.lerp(zoomStart, close ? closeAmount : 0, reduced ? 1 : 1 - (1 - zoomTime) ** 3)
     if (finishing && !reduced) pullback = Math.min(1, pullback + dt / 0.6)
     const target = T.MathUtils.lerp(0.87, crownHeight - 0.244 * portraitScale, zoom),
       dist = T.MathUtils.lerp(4.25, 1.1 * portraitScale, zoom) * Math.max(1, 0.79 / camera.aspect)
@@ -166,7 +167,9 @@ export function creatorStage(host: HTMLElement, reduced: boolean, capture = fals
   }
   return {
     apply,
-    frameHead(value: boolean) {
+    /** amount < 1 frames a little looser than the creator's face close-up (about-page portraits use it). */
+    frameHead(value: boolean, amount = 1) {
+      closeAmount = amount
       if (close !== value) {
         zoomStart = zoom
         zoomTime = 0

@@ -1,7 +1,7 @@
 import './about.css'
 import {photoCredits} from './photo-credits'
 import {SOURCE_URL} from './source'
-import {contributors, KIND_LABEL, LOGO_DESIGNER, type ContribKind, type Contributor} from './contributors'
+import {contributors, KIND_LABEL, LOGO_DESIGNER, LOGO_PORTRAIT, type ContribKind, type Contributor} from './contributors'
 
 const dataLines = [
   '© OpenStreetMap contributors（ODbL）',
@@ -92,10 +92,10 @@ export function openAbout() {
 /** 名单加上 Logo 设计者：已在名单里就并进那个人，否则单列一张卡（排在发起人之后）。 */
 function roster():Contributor[] {
   const people = contributors.map(p => ({...p, items:[...p.items]}))
-  const logo = {kind:'design' as const, text:'设计了网上桂林的像素 Logo：象鼻山、城市和漓江'}
+  const logo = {kind:'design' as const, text:'像素 Logo'}
   const known = LOGO_DESIGNER && people.find(p => p.name === LOGO_DESIGNER)
   if (known) known.items.unshift(logo)
-  else people.splice(1, 0, {name:LOGO_DESIGNER || '网上桂林成员', role:'Logo 设计', items:[logo]})
+  else people.splice(1, 0, {name:LOGO_DESIGNER || '网上桂林成员', role:'Logo 设计', ...LOGO_PORTRAIT, items:[logo]})
   return people
 }
 
@@ -108,18 +108,12 @@ function card(person:Contributor, index:number) {
     : escape(person.name)
   return `<li class="ab-card ab-card--${main}" data-kinds="${kinds.join(' ')}" style="--i:${index}">
     <div class="ab-card-top">
-      <span class="ab-avatar" aria-hidden="true">${escape(initial(person.name))}</span>
+      <span class="ab-avatar" aria-hidden="true"><img src="./contributors/${encodeURIComponent(person.portrait)}.webp" alt="" width="96" height="96" loading="lazy" decoding="async"></span>
       <div class="ab-who"><b>${name}</b><small>${escape(person.role)}</small></div>
-      <span class="ab-seals" aria-label="${kinds.map(k => KIND_LABEL[k].label).join('、')}">${kinds.map((k,j) => `<i class="ab-seal ab-seal--${k}" style="--j:${j}" title="${KIND_LABEL[k].label}">${KIND_LABEL[k].seal}</i>`).join('')}</span>
     </div>
     ${hasLogo ? '<div class="ab-card-logo"><img src="./brand/emblem.webp" alt="" width="371" height="144" loading="lazy"></div>' : ''}
-    <ul class="ab-items">${person.items.map(item => `<li data-kind="${item.kind}"><i aria-hidden="true">${KIND_LABEL[item.kind].seal}</i><span>${escape(item.text)}</span></li>`).join('')}</ul>
+    <ul class="ab-items">${person.items.map((item,j) => `<li data-kind="${item.kind}" title="${KIND_LABEL[item.kind].label}" style="--j:${j}"><i aria-hidden="true">${KIND_LABEL[item.kind].seal}</i>${escape(item.text)}</li>`).join('')}</ul>
   </li>`
-}
-
-function initial(name:string) {
-  const ch = Array.from(name.trim())[0] ?? '·'
-  return /[a-z]/i.test(ch) ? ch.toUpperCase() : ch
 }
 
 function photoHtml() {
