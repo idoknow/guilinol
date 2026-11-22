@@ -1,4 +1,4 @@
-# 聚合登录接入参考（佛系云 a.idcfx.net）
+# 聚合登录接入参考（login.mapay.cn）
 
 > 上游文档：<https://a.idcfx.net/doc.php> · 本文对照 2026-11-22 抓取的页面内容整理，并针对本项目（Cloudflare Pages Functions + D1）给出落地方式与防护要求。
 > 本文是参考实现说明，不是已上线的功能；按第 8 节的顺序落地。
@@ -75,7 +75,7 @@ const methods: Record<string, string[]> = {
 ```
 SOCIAL_APPID      = "…"
 SOCIAL_APPKEY     = "…"   # 用 secret，不要写进 wrangler.toml 的明文 vars
-SOCIAL_HOST       = "https://a.idcfx.net"
+SOCIAL_HOST       = "https://login.mapay.cn"
 SOCIAL_REDIRECT   = "https://<正式域名>/api/auth/social/callback"
 ```
 
@@ -331,7 +331,7 @@ if (path === 'auth/social/callback' && method === 'GET') {
 - **`code=2` 不是错误**：微信/支付宝扫码场景经常出现，要允许用户重试，不要清掉 state 记录就完事（应让用户重新 `start`）。
 - **`qrcode` 只有微信/支付宝有**，QQ/飞书等只能跳转，前端不要写死「显示二维码」。
 - **`location` 只有支付宝/微信返回**，别当必填字段建表。
-- **额度**：该服务商单应用约 1000 个账号，超了报 `errcode 301`，表现为所有登录突然失败。上线前确认 appid 的余量。
+- **额度**：当前服务商（login.mapay.cn，appid 见 secret）**账号数不限**；`errcode 301` 是别家/旧信息，排障时不用先怀疑额度。
 - **不要用上游返回的 `ip` 做风控依据**：它是第三方侧的出口 IP，不是用户真实 IP；风控用 `CF-Connecting-IP`。
 - **`social_uid` 是十六进制串不是数字**，别用 `parseInt`，也别当整数主键。
 

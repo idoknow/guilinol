@@ -271,6 +271,23 @@ spec:
           value: http://$(GLOL_MINIO_SERVICE_HOST):9000
         - name: PUBLIC_ORIGIN
           value: https://glol.rcpd.cc
+        # 聚合登录：appid/appkey 只来自 secret，平台开关与回调地址是明文配置
+        - name: SOCIAL_APPID
+          valueFrom:
+            secretKeyRef:
+              name: glol-env
+              key: SOCIAL_APPID
+        - name: SOCIAL_APPKEY
+          valueFrom:
+            secretKeyRef:
+              name: glol-env
+              key: SOCIAL_APPKEY
+        - name: SOCIAL_HOST
+          value: https://login.mapay.cn
+        - name: SOCIAL_REDIRECT
+          value: https://glol.rcpd.cc/api/auth/social/callback
+        - name: SOCIAL_ENABLED
+          value: qq,wx
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
