@@ -254,6 +254,16 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   window.addEventListener('blur',()=>clearTransientInput(true))
   document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTransientInput(true)})
 
+  /** Hand the cursor back whenever a menu, dialog or photo mode needs it. */
+  function releaseLockIfBlocked(){
+    if(document.pointerLockElement===canvas&&(isModalOrOverlayOpen()||document.body.dataset.photo==='on'))document.exitPointerLock?.()
+  }
+  // Watch on a timer while locked (rAF can stall when the walker is held, e.g. photo mode).
+  let lockWatch=0
+  document.addEventListener('pointerlockchange',()=>{
+    clearInterval(lockWatch);lockWatch=0
+    if(document.pointerLockElement===canvas)lockWatch=window.setInterval(releaseLockIfBlocked,150)
+  })
   function touchDistance(){
     const [a,b]=[...touches.values()]
     return a&&b?Math.hypot(a.x-b.x,a.y-b.y):0
@@ -261,6 +271,11 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
   canvas.addEventListener('pointerdown',event=>{
     if(!active())return
     if(event.pointerType==='mouse'){
+      // IDOK-150: desktop mouse-look. Solo mode starts straight in walk, so the lock that the tour
+      // flight controls used to grab never happens — request it here. Photo mode keeps drag-to-look
+      // (its shutter/filters need a free cursor); drag stays as the fallback if the lock is refused.
+      if(event.button===0&&document.body.dataset.photo!=='on'&&!isModalOrOverlayOpen()&&document.pointerLockElement!==canvas)
+        (canvas.requestPointerLock() as unknown as Promise<void>|undefined)?.catch?.(()=>{})
       mouseDown=true;lastMouse={x:event.clientX,y:event.clientY};safeCapture(canvas,event.pointerId)
     }else{
       if(isTouchInControlZone({
