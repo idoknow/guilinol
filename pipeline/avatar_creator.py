@@ -184,7 +184,7 @@ def hairstyles():
                 width=.097+volume*.4+ridge
                 pos.append([width*radius*sin(a),
                             .091+(.103+volume)*cos(theta)+lift-drop,
-                            .025-(.119+ridge)*radius*cos(a)])
+                            .025-(.119+ridge)*radius*cos(a)+.28*drop])
         root=node(name=style,mesh=mesh(pos,cap_index))
         roots.append(root)
         children=[]

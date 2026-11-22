@@ -286,3 +286,5 @@
     font-size: 13px;
   }
 }
+
+.creator [data-random] span { display: inline-block; }

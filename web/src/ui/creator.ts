@@ -28,7 +28,7 @@ export async function createCharacter(
   dialog.setAttribute('aria-label', initial ? '修改外形' : '创建角色')
   dialog.innerHTML = `<div class="creator-stage"><h1></h1><div class="creator-hills"></div></div><section class="creator-panel">
     <button type="button" class="creator-handle" aria-label="调整选项面板高度"></button><nav aria-label="创建步骤"></nav>
-    <div class="creator-options"></div><div class="creator-actions"><div><button data-random>⚄ 随机</button><button data-reset>重置</button><button data-skip></button></div>
+    <div class="creator-options"></div><div class="creator-actions"><div><button data-random><span aria-hidden="true">⚄</span> 随机</button><button data-reset>重置</button><button data-skip></button></div>
     <p role="status"></p><button class="creator-next"></button></div></section>`
   document.body.append(dialog)
   dialog.showModal()
@@ -105,6 +105,7 @@ export async function createCharacter(
           if (busy) return
           roll++
           if (key === 'body' || key === 'look') equipStarter = true
+          if (key !== 'look' && draft[key] === v) return
           draft[key] = v
           if (key === 'body') {
             draft.hair = hairStyles[draft.body][0]
@@ -217,7 +218,7 @@ export async function createCharacter(
     equipStarter = true
     const id = ++roll,
       r = (n: number) => Math.floor(Math.random() * n)
-    if (!reduced) el('[data-random]').animate([{rotate: '0deg'}, {rotate: '360deg'}], 300)
+    if (!reduced) el('[data-random] span').animate([{rotate: '0deg'}, {rotate: '360deg'}], 300)
     const body = r(2) ? 'm' : 'f'
     const target: Avatar = {
       ...draft,

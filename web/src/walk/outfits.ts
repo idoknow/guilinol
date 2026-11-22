@@ -137,6 +137,7 @@ function resolveBottomRecipe(bottomId: string): BottomRecipe {
 }
 
 function resolveShoesRecipe(shoesId: string): ShoesRecipe {
+  if(shoesId==='shoes_starter_chinese')return SHOES_RECIPES.shoes_default_sneaker
   const known = SHOES_RECIPES[shoesId]
   if (known) return known
   const item = OUTFIT_ITEMS_BY_ID[shoesId]
@@ -693,6 +694,17 @@ const _tmpColor = new THREE.Color()
 export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig): AvatarOutfitController {
   const skinned = rig.skinnedMesh
   const partition = skinned && rig.isSkinned ? partitionCityWalkerGeometry(skinned) : null
+  const skirt=figure.getObjectByName('creator-skirt')
+  const fullIndex=skinned?.geometry.index
+  let skirtIndex:THREE.BufferAttribute|undefined
+  if(skirt && partition && fullIndex){
+    const visible:number[]=[]
+    for(let t=0;t<partition.bodyIndexCount;t+=3){
+      const tri=[fullIndex.getX(t),fullIndex.getX(t+1),fullIndex.getX(t+2)]
+      if(!tri.every(i=>partition.zones[i]===OUTFIT_ZONE.BOTTOM_MAIN || partition.zones[i]===OUTFIT_ZONE.BOTTOM_BELT))visible.push(...tri)
+    }
+    skirtIndex=new THREE.Uint16BufferAttribute(visible,1)
+  }
   const hatCache = new Map<string, THREE.Mesh | null>()
   const bagCache = new Map<string, THREE.Mesh | null>()
 
@@ -773,8 +785,11 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
 
     const hair = rig.attachments.head?.getObjectByName('creator-hair')
     if (hair) hair.visible = outfit.hat === 'hat_none'
-    const skirt = figure.getObjectByName('creator-skirt')
-    if (skirt) skirt.visible = outfit.bottom === 'bottom_starter_chinese'
+    if(skirt && skirtIndex && fullIndex && skinned){
+      skirt.visible=outfit.bottom==='bottom_starter_chinese'
+      skinned.geometry.setIndex(skirt.visible?skirtIndex:fullIndex)
+      if(skirt.visible)skinned.geometry.setDrawRange(0,skirtIndex.count)
+    }
     const headAnchor = rig.attachments.head
     if (headAnchor) {
       for (const mesh of hatCache.values()) {

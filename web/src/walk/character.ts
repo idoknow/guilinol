@@ -128,43 +128,71 @@ export function styleCharacter(scene: T.Group, rig: AvatarRig, a: Avatar) {
   }
   oval(face, lips, 0, 0.017, -0.076, 0.021, 0.0027, 0.005)
   head.add(face)
-  const skirt = new T.Group()
-  skirt.name = 'creator-skirt'
   if (a.body === 'f') {
+    const base = rig.skinnedMesh!,
+      skeleton = base.skeleton
+    const bone = (name: string) => skeleton.bones.findIndex((b) => b.name === name)
+    const pelvis = bone('pelvis'),
+      thighL = bone('thigh_l'),
+      thighR = bone('thigh_r'),
+      calfL = bone('calf_l'),
+      calfR = bone('calf_r')
     const positions: number[] = [],
-      idx: number[] = []
-    for (const [y, r] of [
-      [0.005, 0.133],
-      [-0.048, 0.152],
-      [-0.57, 0.224],
-    ])
+      indices: number[] = [],
+      joints: number[] = [],
+      weights: number[] = []
+    const rings = [
+      [0.993, 0.145],
+      [0.965, 0.16],
+      [0.896, 0.18],
+      [0.55, 0.205],
+      [0.2, 0.239],
+    ]
+    for (const [row, [height, radius]] of rings.entries())
       for (let i = 0; i < 48; i++) {
         const angle = (i * Math.PI) / 24,
-          pleat = Math.abs(Math.sin(angle)) > 0.45 && i % 2 ? 0.015 : 0
-        positions.push(Math.sin(angle) * (r - pleat), y, Math.cos(angle) * (r - pleat) * 0.83)
+          pleat = Math.abs(Math.sin(angle)) > 0.45 && i % 2 ? 0.016 : 0
+        const x = Math.sin(angle) * (radius - pleat),
+          z = Math.cos(angle) * (radius - pleat) * 0.78 - 0.022
+        positions.push(x, height, z)
+        const left = T.MathUtils.smoothstep(x, -0.09, 0.09)
+        if (height >= 0.55) {
+          const drop = 1 - T.MathUtils.smoothstep(height, 0.55, 0.965)
+          joints.push(pelvis, thighL, thighR, 0)
+          weights.push(1 - drop, drop * left, drop * (1 - left), 0)
+        } else {
+          joints.push(thighL, thighR, calfL, calfR)
+          weights.push(0.42 * left, 0.42 * (1 - left), 0.58 * left, 0.58 * (1 - left))
+        }
+        if (row) {
+          const k = row * 48 + i,
+            n = row * 48 + ((i + 1) % 48)
+          indices.push(k - 48, k, n - 48, n - 48, k, n)
+        }
       }
-    for (let i = 0; i < 96; i++) {
-      const j = i - (i % 48) + ((i + 1) % 48)
-      idx.push(i, i + 48, j, j, i + 48, j + 48)
-    }
     const g = new T.BufferGeometry()
     g.setAttribute('position', new T.Float32BufferAttribute(positions, 3))
-    g.setIndex(idx)
+    g.setAttribute('skinIndex', new T.Uint16BufferAttribute(joints, 4))
+    g.setAttribute('skinWeight', new T.Float32BufferAttribute(weights, 4))
+    g.setIndex(indices)
     g.computeVertexNormals()
-    const m = material('#586967')
-    m.side = T.DoubleSide
-    skirt.add(new T.Mesh(g, m))
-    rig.attachmentAt!('pelvis')!.add(skirt)
+    const cloth = material('#586967')
+    cloth.side = T.DoubleSide
+    const skirt = new T.SkinnedMesh(g, cloth)
+    skirt.name = 'creator-skirt'
+    skirt.frustumCulled = false
+    base.parent!.add(skirt)
+    skirt.bind(skeleton, base.bindMatrix)
   }
   scene.userData.starterDetails?.dispose()
-  scene.userData.starterDetails = starterDetails(rig)
+  scene.userData.starterDetails = starterDetails(rig, a)
   return createAvatarOutfitController(scene, rig)
 }
 export function disposeCharacterParts(root: T.Object3D) {
   root.traverse((node) => {
     if (!(node instanceof T.Mesh)) return
     node.geometry.dispose()
-    if (!(node instanceof T.SkinnedMesh))
+    if (!(node instanceof T.SkinnedMesh) || node.name === 'creator-skirt')
       for (const mat of Array.isArray(node.material) ? node.material : [node.material]) mat.dispose()
   })
 }

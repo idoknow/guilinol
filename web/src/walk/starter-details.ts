@@ -1,9 +1,10 @@
 import * as T from 'three'
+import {skinTones, type Avatar} from '../../../lib/avatar'
 import type {AvatarRig} from './avatar-rig'
 import type {EquippedOutfit} from '../game/catalog'
 
 /** Small pieces are rigid in the rest frame of the bone they follow. */
-export function starterDetails(rig: AvatarRig) {
+export function starterDetails(rig: AvatarRig, avatar: Avatar) {
   const chest = rig.attachments.torso!
   const pieces: {mesh: T.Mesh; slot: 'top' | 'bottom'; id: string}[] = []
   function part(
@@ -51,6 +52,17 @@ export function starterDetails(rig: AvatarRig) {
   for (const side of [-1, 1]) {
     part('top', 'sport', 'chest', new T.CapsuleGeometry(0.003, 0.079, 2, 5), '#e3dfd5', side * 0.03, 0.25, -0.098)
     const leg = side === 1 ? 'r' : 'l'
+    if (avatar.body === 'f')
+      part(
+        'bottom',
+        'chinese',
+        'calf_' + leg,
+        new T.CylinderGeometry(0.045, 0.028, 0.43, 12),
+        skinTones[avatar.skin],
+        0,
+        -0.216,
+        0.018,
+      )
     for (const [bone, y, len, x] of [
       ['thigh', -0.19, 0.35, 0.075],
       ['calf', -0.18, 0.34, 0.055],
