@@ -70,7 +70,7 @@ try {
   await page.route('**/favicon.ico', r => r.fulfill({status: 204}))
 
   // 1. Boot daytime walk mode and walk to Jiefang East Rd sidewalk facing「漓行电驴行 · 十字街总店」
-  await page.goto(`${baseUrl}/?verify&mode=walk&flow=0&time=10.5&radius=480`)
+  await page.goto(`${baseUrl}/?verify&story=1&mode=walk&flow=0&time=10.5&radius=480`)
   await page.waitForFunction(() => window.viewer?.walk?.active && window.viewer?.game, null, {timeout: 90000})
 
   await page.evaluate(async () => {

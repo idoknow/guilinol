@@ -5,7 +5,7 @@ import type {Host} from './host'
 import {photoMode} from './photo'
 import {mapView} from './map'
 import {isGlobalHotkeyBlocked, shouldPhotoYieldKeyPFromDom} from '../walk/input-guard'
-import {SPOT_BOUNTY_YUAN, claimSpotBounty, hasClaimedSpotBounty, recordSpotFound} from '../game/commerce'
+import {storyServices,onPlayMode} from '../game/play-mode'
 import {type ShopTriggerDef} from '../game/shops'
 import {getState, onState} from '../game/state'
 
@@ -99,7 +99,9 @@ export function play(host:Host) {
   }
   // Stamp + card. Walking into the ring does it; so does travelling there (the spawn search may land a few metres off).
   function awardSpot(spot:Spot) {
-    const bounty = claimSpotBounty(spot.id)
+    const commerce = storyServices()?.commerce
+    if(!commerce)return
+    const bounty = commerce.claimSpotBounty(spot.id)
     if(bounty.ok && bounty.code==='OK' && bounty.credited>0) {
       window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:`首次打卡「${spot.name}」+¥${bounty.credited}`,ms:2600}}))
     }
@@ -107,7 +109,7 @@ export function play(host:Host) {
   }
   function arrive(m:typeof marks[number]) {
     m.armed = false; const fresh = !stamps.has(m.spot.id)
-    if(fresh){stamps.add(m.spot.id); save(); recordSpotFound(m.spot.id); restamp(m.spot.id); refreshCount()}
+    if(fresh){stamps.add(m.spot.id); save(); storyServices()?.commerce.recordSpotFound(m.spot.id); restamp(m.spot.id); refreshCount()}
     awardSpot(m.spot)
     showCard(m.spot,fresh)
   }
@@ -189,12 +191,14 @@ export function play(host:Host) {
   const sheet = document.createElement('section'); sheet.className = 'book'; sheet.hidden = true; document.body.append(sheet)
   function openBook() {
     closeCard()
-    sheet.innerHTML = `<header><h2>景册</h2><p>已盖 <b>${stamps.size}</b> / ${spots.length} 枚印 · 走到地上的朱红圆圈处即可盖印（首打卡/拍照 +¥${SPOT_BOUNTY_YUAN}）</p><button class="card-close" aria-label="关闭">×</button></header>
+    const commerce = storyServices()?.commerce
+    const reward = commerce?.SPOT_BOUNTY_YUAN
+    sheet.innerHTML = `<header><h2>景册</h2><p>已盖 <b>${stamps.size}</b> / ${spots.length} 枚印 · 走到地上的朱红圆圈处即可盖印${commerce ? `（首打卡/拍照 +¥${reward}）` : ''}</p><button class="card-close" aria-label="关闭">×</button></header>
       <ol>${spots.map(s=>{
         const stamped = stamps.has(s.id)
-        const claimed = hasClaimedSpotBounty(s.id)
-        const claimBtn = stamped && !claimed ? `<button data-claim="${s.id}">领¥${SPOT_BOUNTY_YUAN}</button>` : ''
-        const badge = claimed ? ` · 已领¥${SPOT_BOUNTY_YUAN}` : stamped ? ' · 待领赏金' : ` · +¥${SPOT_BOUNTY_YUAN}`
+        const claimed = commerce?.hasClaimedSpotBounty(s.id)
+        const claimBtn = commerce && stamped && !claimed ? `<button data-claim="${s.id}">领¥${reward}</button>` : ''
+        const badge = !commerce ? '' : claimed ? ` · 已领¥${reward}` : stamped ? ' · 待领赏金' : ` · +¥${reward}`
         return `<li class="${stamped?'done':''}"><div class="card-seal${stamped?' done':''}">${s.seal}</div>
         <div><h3>${s.name}</h3><p>${s.sub}${badge}</p></div>${claimBtn}<button data-id="${s.id}">前往</button></li>`
       }).join('')}</ol>
@@ -210,6 +214,7 @@ export function play(host:Host) {
   }
   function closeBook(){sheet.classList.remove('show'); setTimeout(()=>{if(!sheet.classList.contains('show')) sheet.hidden = true},260)}
   function closeAll(){closeCard(); closeBook()}
+  onPlayMode(()=>{if(!sheet.hidden)openBook()})
   book.onclick = ()=>sheet.hidden?openBook():closeBook()
   onState(s=>{
     let changed = false
@@ -223,7 +228,7 @@ export function play(host:Host) {
     const p = w.position
     for(const m of marks) {
       if(Math.hypot(m.spot.x-p.x, m.spot.z-p.z)<=24) {
-        if(!stamps.has(m.spot.id)){stamps.add(m.spot.id); save(); recordSpotFound(m.spot.id); restamp(m.spot.id); refreshCount()}
+        if(!stamps.has(m.spot.id)){stamps.add(m.spot.id); save(); storyServices()?.commerce.recordSpotFound(m.spot.id); restamp(m.spot.id); refreshCount()}
         awardSpot(m.spot)
       }
     }

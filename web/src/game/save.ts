@@ -631,7 +631,7 @@ function bindLifecycleFlush(): void {
 /**
  * Hydrates `GameState` from `localStorage['glol.save.v1']`, migrating legacy `glol.stamps` and v1 schemas safely.
  */
-export function loadLocalSave(storageOverride?: StorageLike | null, nowMs = Date.now()): LoadSaveResult {
+export function loadLocalSave(storageOverride?: StorageLike | null, nowMs = Date.now(), persist = true): LoadSaveResult {
   bindLifecycleFlush()
   const storage = resolveStorage(storageOverride)
   let rawText: string | null = null
@@ -657,7 +657,7 @@ export function loadLocalSave(storageOverride?: StorageLike | null, nowMs = Date
     }
     if (!parseOk) {
       try {
-        storage?.setItem(SAVE_CORRUPT_BACKUP_KEY, rawText)
+        if (persist) storage?.setItem(SAVE_CORRUPT_BACKUP_KEY, rawText)
         corruptBackedUp = true
       } catch {}
       save = createDefaultSave(nowMs)
@@ -685,7 +685,7 @@ export function loadLocalSave(storageOverride?: StorageLike | null, nowMs = Date
   }
 
   activeSave = cloneSave(save)
-  if (corruptBackedUp || migratedFrom || source === 'default') {
+  if (persist && (corruptBackedUp || migratedFrom || source === 'default')) {
     persistSaveSync(activeSave, storage)
   }
 

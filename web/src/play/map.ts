@@ -1,3 +1,4 @@
+import {getPlayMode} from '../game/play-mode'
 import {operation} from '../telemetry'
 import * as THREE from 'three'
 import type {Host} from './host'
@@ -188,7 +189,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       }
       g.restore()
     }
-    const missionTarget = getState().mission?.target
+    const missionTarget = getPlayMode()==='story' && getState().mission?.target
     if(missionTarget) {
       const tx = sx(missionTarget[0]), ty = sz(missionTarget[1])
       g.save()

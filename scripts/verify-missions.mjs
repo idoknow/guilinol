@@ -87,7 +87,7 @@ async function verifyViewportLayout(browser, baseUrl, label, viewport, hasTouch)
     if (msg.type() === 'error') errors.push(`console.error(${label}): ${msg.text()}`)
   })
   await page.route('**/favicon.ico', r => r.fulfill({status: 204}))
-  await page.goto(`${baseUrl}/?verify&mode=walk&flow=0`)
+  await page.goto(`${baseUrl}/?verify&story=1&mode=walk&flow=0`)
   await waitForWalkReady(page)
   await page.waitForTimeout(300)
 
@@ -133,7 +133,7 @@ try {
     if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`)
   })
   await page.route('**/favicon.ico', r => r.fulfill({status: 204}))
-  await page.goto(`${baseUrl}/?verify&mode=walk&flow=0`)
+  await page.goto(`${baseUrl}/?verify&story=1&mode=walk&flow=0`)
   await waitForWalkReady(page)
 
   // 1. Fresh save starts with ¥200

@@ -22,17 +22,9 @@ import {flags} from './debug'
 import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRangeConfig} from './render-range'
 import {renderRangeControl} from './ui/render-range'
 import type {FeedbackView} from '../../lib/feedback-contract'
-import {
-  createGameDebugProbe,
-  createMissionBeacon,
-  getState,
-  initGame,
-  listMissionsForUi,
-  MissionRunnerEngine,
-  onState,
-  type PlayerMode,
-} from './game'
-import {mountMissionUi} from './game/mission-ui'
+import {getPlayMode, onPlayMode, storyServices} from './game/play-mode'
+import {getState} from './game/state'
+import {loadLocalSave} from './game/save'
 import {isGlobalHotkeyBlocked} from './walk/input-guard'
 
 installAtmosphere()
@@ -40,7 +32,7 @@ installAtmosphere()
 let paused=false
 export function setPaused(on:boolean){paused=on}
 async function start() {
-  initGame()
+  loadLocalSave(undefined, Date.now(), getPlayMode() === 'story')
   const params = new URLSearchParams(location.search)
   const rangeStore = new RenderRangeStore(loadRenderConfig(params))
   const initialMetrics = rangeStore.getMetrics()
@@ -217,52 +209,32 @@ async function start() {
     if(text)showToast(text,typeof detail==='object'&&detail?.ms?detail.ms:2600)})
   modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton);void touch
   showMode()
-  const missionGroundRay = new THREE.Raycaster(undefined, new THREE.Vector3(0, -1, 0))
+  let missionGroundRay: THREE.Raycaster | undefined
   const sampleMissionGroundY = (x: number, z: number): number => {
     const tile = manifest.chunks.find(t => x >= t.x && x < t.x + 256 && z >= t.z && z < t.z + 256)
     const mesh = tile && stream.loaded.get(tile)?.groundMesh
     if (!mesh) return NaN
+    missionGroundRay ??= new THREE.Raycaster(undefined, new THREE.Vector3(0,-1,0))
     missionGroundRay.ray.origin.set(x, 3000, z)
     mesh.updateWorldMatrix(true, false)
     return missionGroundRay.intersectObject(mesh, false)[0]?.point.y ?? NaN
   }
   let tour:Awaited<ReturnType<typeof import('./play').play>>|undefined
-  const missionRunner = new MissionRunnerEngine()
-  const missionBeacon = createMissionBeacon(scene, sampleMissionGroundY)
-  const missionUi = mountMissionUi(missionRunner, () => walker?.active ? {x: walker.position.x, z: walker.position.z} : undefined)
-  onState((s, changed) => {
-    if (changed.has('mission')) {
-      const pos = walker?.active ? walker.position : camera.position
-      missionBeacon.sync(s.mission?.target, pos, !!tour?.photo?.active || paused, 0)
+  let story: Awaited<ReturnType<typeof import('./game/story-layer').mountStoryLayer>> | undefined
+  async function syncStory() {
+    story?.dispose()
+    story = undefined
+    const services = storyServices()
+    if (services) {
+      const mounted = await services.mountStoryLayer({
+        scene, camera, sampleMissionGroundY, walker: () => walker, tour: () => tour, paused: () => paused,
+      })
+      if (storyServices() === services) story = mounted
+      else mounted.dispose()
     }
-  })
-  window.addEventListener('game:open-missions', () => missionUi.openBoard())
-  const syncMissionLoop = (dt: number) => {
-    const walking = !!walker?.active
-    const activePos = walking ? walker!.position : camera.position
-    const mode: PlayerMode = !walking
-      ? 'fly'
-      : walker!.vehicle === 'bike'
-        ? 'ebike'
-        : walker!.vehicle === 'bicycle'
-          ? 'bike'
-          : walker!.vehicle
-    const eb = walking ? walker!.ebike?.state : null
-    const speedMs = walking ? Math.abs(walker!.speed) : 0
-    missionRunner.step({
-      dt,
-      x: activePos.x,
-      y: activePos.y,
-      z: activePos.z,
-      mode,
-      speedMs,
-      braking: Boolean(eb?.braking),
-      parkLocked: Boolean(eb?.parkLocked),
-      crashPhase: eb?.crashPhase ?? 'none',
-      frozen: paused || !!tour?.map?.active || !!tour?.photo?.active || missionUi.boardOpen || getState().activeShop !== null,
-    })
-    missionBeacon.sync(getState().mission?.target, activePos, !!tour?.photo?.active || paused, dt)
   }
+  onPlayMode(() => void syncStory())
+  await syncStory()
   const renderUi = renderRangeControl({
     initial:rangeStore.getConfig(),
     onPreview:(next:RenderRangeConfig)=>{stream.setRenderRange(next,{persist:false,source:next.source})},
@@ -276,40 +248,8 @@ async function start() {
     },
   })
   rangeStore.subscribe(nextCfg=>{renderUi.setConfig(nextCfg)})
-  const gameProbe = createGameDebugProbe({
-    missions: {
-      list: listMissionsForUi,
-      start: (id: string) => missionRunner.start(id, walker?.active ? {x: walker.position.x, z: walker.position.z} : undefined),
-      abandon: () => missionRunner.abandon(),
-      status: () => missionRunner.getSnapshot(),
-      forceSpill: (drop: number) => missionRunner.forceSpillDrop(drop),
-      advanceTimerForTest: (seconds: number) => {
-        const steps = Math.max(1, Math.ceil(seconds / 0.1))
-        const stepDt = seconds / steps
-        const pos = walker?.active ? walker.position : camera.position
-        const mode: PlayerMode = !walker?.active ? 'fly' : walker.vehicle === 'bike' ? 'ebike' : walker.vehicle === 'bicycle' ? 'bike' : walker.vehicle
-        const eb = walker?.ebike?.state ?? null
-        for (let i = 0; i < steps; i++) {
-          missionRunner.step({
-            dt: stepDt,
-            x: pos.x,
-            y: pos.y,
-            z: pos.z,
-            mode,
-            speedMs: Math.abs(walker?.speed ?? 0),
-            braking: Boolean(eb?.braking),
-            parkLocked: Boolean(eb?.parkLocked),
-            crashPhase: eb?.crashPhase ?? 'none',
-          })
-        }
-      },
-      beaconVisible: () => missionBeacon.isVisible(),
-      beaconTarget: () => missionBeacon.getTarget(),
-      openBoard: () => missionUi.openBoard(),
-      closeBoard: () => missionUi.closeBoard(),
-    },
-  })
-  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,game:gameProbe,
+  const tourProbe = {getState, missions: {start: () => ({ok:false, code:'STORY_MODE_REQUIRED'})}}
+  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,get game(){return story?.probe ?? tourProbe},
     get renderRange(){return rangeStore.getConfig()},
     get rangeMetrics(){return rangeStore.getMetrics()},
     setRenderRange(next:unknown, persist=false){return stream.setRenderRange(next as number|string,{persist})},
@@ -400,7 +340,7 @@ async function start() {
     renderer.toneMappingExposure = env.exposure; windowLight.value = env.night
     dome.update(); drops.update()
     tour?.tick(elapsed/1000)
-    syncMissionLoop(Math.min(0.1, elapsed/1000))
+    story?.step(Math.min(0.1, elapsed/1000))
     persistView?.()
     draw()
     sampleFrame(elapsed)

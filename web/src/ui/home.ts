@@ -1,3 +1,4 @@
+import {getPlayMode, lastPlayMode, type PlayMode} from '../game/play-mode'
 import './home.css'
 import {spots} from '../play/spots'
 import {SOURCE_URL} from './source'
@@ -14,7 +15,7 @@ const SLIDE_MS = 7000
 
 export interface Home {open(resume:boolean):void; close():void; readonly shown:boolean}
 
-export function home(play:()=>void):Home {
+export function home(play:(mode:PlayMode)=>void):Home {
   const root = document.createElement('section')
   root.className = 'home'; root.setAttribute('aria-label','网上桂林 · 主界面')
   const stamps = (()=>{try{return (JSON.parse(localStorage.getItem('glol.stamps')??'[]') as unknown[]).length}catch{return 0}})()
@@ -44,11 +45,11 @@ export function home(play:()=>void):Home {
           <i aria-hidden="true"></i><span>回到上次离开的地方</span><small class="home-resume-ago"></small>
         </button>
       </div>
-      <div class="home-mode home-mode--soon" role="listitem" aria-disabled="true">
+      <button type="button" class="home-mode" role="listitem" data-umami-event="home-story">
         <span class="home-mode-seal" aria-hidden="true">事</span>
-        <span class="home-mode-text"><b>故事模式 <em class="ui-tag">即将推出</em></b><span>跟着一段桂林故事，走进老城的街巷与山水。</span></span>
-        <span class="ui-btn ui-btn--lg home-go" aria-disabled="true">敬请期待</span>
-      </div>
+        <span class="home-mode-text"><b>单人故事模式</b><span>在桂林街头接单送米粉，赚取报酬。</span></span>
+        <span class="ui-btn ui-btn--lg home-go" >开始故事</span>
+      </button>
     </div>
     <nav class="home-links">
       <button type="button" class="ui-btn ui-btn--ghost" data-act="guide" data-umami-event="home-guide">玩法说明</button>
@@ -60,11 +61,13 @@ export function home(play:()=>void):Home {
   const progress = root.querySelector('.home-progress')!
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
   const go = root.querySelector<HTMLElement>('.home-go')!, tour = root.querySelector<HTMLButtonElement>('.home-mode--tour')!
-  tour.onclick = ()=>play()
+  const story = root.querySelector<HTMLButtonElement>('[data-umami-event=home-story]')!
+  story.onclick = ()=>play('story')
+  tour.onclick = ()=>play('tour')
   // IDOK-105: a slim strip under the tour card, shown only when a usable last view is stored.
   // 开始游览 still opens on a random frame; this is the opt-in way back.
   const resumeRow = root.querySelector<HTMLElement>('.home-resume-row')!, resumeAgo = root.querySelector('.home-resume-ago')!
-  root.querySelector<HTMLButtonElement>('.home-resume')!.onclick = ()=>{requestRestore(); play()}
+  root.querySelector<HTMLButtonElement>('.home-resume')!.onclick = ()=>{requestRestore(); play('tour')}
   root.querySelector<HTMLButtonElement>('[data-act=guide]')!.onclick = ()=>guide()
   root.querySelector<HTMLButtonElement>('[data-act=about]')!.onclick = ()=>void import('./about').then(m=>m.openAbout())
   const account = root.querySelector<HTMLButtonElement>('.home-account')!
@@ -85,18 +88,23 @@ export function home(play:()=>void):Home {
   let shown = false
   // Keys must not reach the paused game underneath (V/J/P/M toggle things).
   addEventListener('keydown',event=>{if(shown&&!(event.target as Element)?.closest?.('dialog,.about-mask')) {event.stopImmediatePropagation()
-    if(event.code==='Enter'&&document.activeElement===document.body){event.preventDefault(); play()}
-    else if(event.code==='Escape'&&!event.repeat&&root.classList.contains('resume')) play()}},{capture:true})
+    if(event.code==='Enter'&&document.activeElement===document.body){event.preventDefault(); play(lastPlayMode())}
+    else if(event.code==='Escape'&&!event.repeat&&root.classList.contains('resume')) play(getPlayMode())}},{capture:true})
   document.body.append(root)
+  let playedStory = false
   const api:Home = {
     get shown(){return shown},
     open(resume){
       shown = true; root.hidden = false; root.classList.toggle('resume',resume)
+      playedStory ||= resume && getPlayMode() === 'story'
+      let hasProgress = false
+      try { hasProgress = localStorage.getItem('glol.save.v1') !== null } catch {}
+      story.querySelector('.home-go')!.textContent = playedStory || hasProgress ? '继续故事' : '开始故事'
       go.textContent = resume?'继续游览':'开始游览'
       // IDOK-105: only on a fresh entry (not the mid-game 继续游览 menu) and only with a usable record.
       const saved = resume ? null : lastViewSavedAt()
       resumeRow.hidden = saved===null; if(saved!==null) resumeAgo.textContent = ago(saved)
-      requestAnimationFrame(()=>{root.classList.add('show'); tour.focus({preventScroll:true})})
+      requestAnimationFrame(()=>{root.classList.add('show'); ((resume?getPlayMode():lastPlayMode())==='story'?story:tour).focus({preventScroll:true})})
       if(!reduce&&!timer) timer = window.setInterval(step,SLIDE_MS)
       document.body.dataset.home = ''
     },

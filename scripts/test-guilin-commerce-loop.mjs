@@ -379,7 +379,7 @@ try {
   await page.route('**/favicon.ico', r => r.fulfill({status: 204}))
   await page.route('**/api/t', r => r.fulfill({status: 204}))
 
-  await page.goto(`${baseUrl}/?verify&mode=walk&flow=0&time=10.5&radius=480`, {waitUntil: 'domcontentloaded'})
+  await page.goto(`${baseUrl}/?verify&story=1&mode=walk&flow=0&time=10.5&radius=480`, {waitUntil: 'domcontentloaded'})
   await waitForWalkReady(page)
 
   // --------------------------------------------------------------------------
@@ -1157,7 +1157,7 @@ try {
     await vpPage.route('**/favicon.ico', r => r.fulfill({status: 204}))
     await vpPage.route('**/api/t', r => r.fulfill({status: 204}))
 
-    await vpPage.goto(`${baseUrl}/?verify&mode=walk&flow=0&time=10.5&radius=420`, {waitUntil: 'domcontentloaded'})
+    await vpPage.goto(`${baseUrl}/?verify&story=1&mode=walk&flow=0&time=10.5&radius=420`, {waitUntil: 'domcontentloaded'})
     await waitForWalkReady(vpPage)
     await settleFrames(vpPage, 10)
 
