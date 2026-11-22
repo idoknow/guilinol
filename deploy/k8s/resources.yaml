@@ -191,8 +191,16 @@ metadata:
   namespace: idoknow
 spec:
   replicas: 1
+  revisionHistoryLimit: 5
+  # 新 pod 稳定 10 秒才算 Ready，避免启动即抖动的 pod 立刻接流量
+  minReadySeconds: 10
+  progressDeadlineSeconds: 300
+  # maxUnavailable: 0 —— 新 pod 就绪前不摘老 pod，发版期间始终有可用端点
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: glol-web
@@ -202,6 +210,8 @@ spec:
         app.kubernetes.io/name: glol-web
     spec:
       automountServiceAccountToken: false
+      # 给 preStop 摘流量 + 在途请求跑完留时间（API 侧 SIGTERM 兜底 20s）
+      terminationGracePeriodSeconds: 45
       nodeSelector:
         kubernetes.io/hostname: cn-hk-fxy-01
       dnsPolicy: None
@@ -224,6 +234,12 @@ spec:
           tcpSocket:
             port: 8080
           periodSeconds: 5
+          failureThreshold: 2
+        lifecycle:
+          # 先让 Ingress 把流量从本 pod 摘掉，再退出
+          preStop:
+            exec:
+              command: ['sh','-c','sleep 5']
       - name: glol-api
         image: ghcr.io/idoknow/glol-api:RELEASE
         ports:
@@ -235,10 +251,34 @@ spec:
           limits:
             memory: 384Mi
             cpu: '1'
-        readinessProbe:
-          tcpSocket:
+        # 启动期不判死（tsx 冷启动 + 连接池建立可能要十几秒）
+        startupProbe:
+          httpGet:
+            path: /api/health
             port: 3000
-          periodSeconds: 5
+          periodSeconds: 2
+          timeoutSeconds: 2
+          failureThreshold: 30
+        # 就绪 = DB 真的通（/api/ready 会 select 1），滚动更新据此决定能否接流量
+        readinessProbe:
+          httpGet:
+            path: /api/ready
+            port: 3000
+          periodSeconds: 3
+          timeoutSeconds: 2
+          failureThreshold: 2
+          successThreshold: 1
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ['sh','-c','sleep 5']
         env:
         - name: POSTGRES_PASSWORD
           valueFrom:
@@ -324,3 +364,16 @@ spec:
             name: glol-web
             port:
               number: 8080
+
+---
+# 单节点也要有：节点 drain/升级时不允许把唯一副本一次性带走
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: glol-web
+  namespace: idoknow
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: glol-web
