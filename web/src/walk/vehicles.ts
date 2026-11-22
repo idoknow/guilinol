@@ -23,7 +23,7 @@ import {
 import {vehicleModel} from './vehicle-model'
 import {KICKSTAND_REST_ROLL_RAD} from './ebike-state-coupling'
 import type {BoatCandidateSnapshot, VehicleCandidateSnapshot} from './interact-arbiter'
-import {storyServices} from '../game/play-mode'
+import {soloServices} from '../game/play-mode'
 import {PERSONAL_EBIKE_MODELS} from '../game/catalog'
 import {getShop} from '../game/shops'
 import {isPointInQuietZone} from '../game/quiet-zones'
@@ -358,7 +358,7 @@ export async function vehicles(
     bikeCoordStates.set(newKey, state)
 
     if (ownership === 'personal' && instanceId) {
-      storyServices()?.commerce.updatePersonalVehicleTelemetry(instanceId, {batteryPct: state.batteryPct, durabilityPct}, true)
+      soloServices()?.commerce.updatePersonalVehicleTelemetry(instanceId, {batteryPct: state.batteryPct, durabilityPct}, true)
     }
   }
 
@@ -424,7 +424,7 @@ export async function vehicles(
     const id = activePersonalMesh.userData.instanceId as string | undefined
     const saved = bikeStates.get(activePersonalMesh)
     if (id && saved) {
-      storyServices()?.commerce.updatePersonalVehicleTelemetry(id, {batteryPct: saved.batteryPct, durabilityPct: saved.durabilityPct}, true)
+      soloServices()?.commerce.updatePersonalVehicleTelemetry(id, {batteryPct: saved.batteryPct, durabilityPct: saved.durabilityPct}, true)
     }
     if (bike === activePersonalMesh) bike = null
     if (lastBike === activePersonalMesh) lastBike = null
@@ -867,7 +867,7 @@ export async function vehicles(
   }
 
   function spawnPersonalBikeAtBay(shopId: string, vehicleId: string): boolean {
-    if (!storyServices()) return false
+    if (!soloServices()) return false
     const shop = getShop(shopId)
     const ownedBike = getState().garage.vehicles[vehicleId]
     if (!shop?.deliveryBay || !ownedBike) return false
@@ -921,7 +921,7 @@ export async function vehicles(
   }
 
   function startTestRide(shopId: string, modelId: PersonalEbikeModelId): StartTestRideResult {
-    if (!storyServices()) return {ok:false, code:'INVALID_SHOP'}
+    if (!soloServices()) return {ok:false, code:'INVALID_SHOP'}
     const shop = getShop(shopId)
     if (!shop?.testRideSpawn) return {ok: false, code: 'INVALID_SHOP'}
     const def = PERSONAL_EBIKE_MODELS[modelId]
@@ -994,7 +994,7 @@ export async function vehicles(
     if (saved) saved.durabilityPct = nextDur
     const modelId = bike.userData.modelId as PersonalEbikeTierId | undefined
     if (modelId) bikeCtrl.setPersonalModel(modelId, nextDur)
-    storyServices()?.commerce.updatePersonalVehicleTelemetry(id, {durabilityPct: nextDur}, true)
+    soloServices()?.commerce.updatePersonalVehicleTelemetry(id, {durabilityPct: nextDur}, true)
   }
 
   function advance(dt: number) {
@@ -1164,13 +1164,13 @@ export async function vehicles(
           const id = bike.userData.instanceId as string | undefined
           if (id) {
             const deltaOdometerKm = (Math.abs(spd) * dt) / 1000
-            storyServices()?.commerce.updatePersonalVehicleTelemetry(id, {batteryPct: bikeCtrl.batteryPct, deltaOdometerKm}, false)
+            soloServices()?.commerce.updatePersonalVehicleTelemetry(id, {batteryPct: bikeCtrl.batteryPct, deltaOdometerKm}, false)
           }
-        } else if (storyServices() && ownership === 'shared' && bikeCtrl.vehicleType === 'shared' && Math.abs(spd) > 0.4 && !isVerifyMode()) {
+        } else if (soloServices() && ownership === 'shared' && bikeCtrl.vehicleType === 'shared' && Math.abs(spd) > 0.4 && !isVerifyMode()) {
           sharedRideElapsedSec += dt
-          if (!sharedRideBilled && sharedRideElapsedSec >= storyServices()!.commerce.SHARED_EBIKE_FREE_SECONDS) {
+          if (!sharedRideBilled && sharedRideElapsedSec >= soloServices()!.commerce.SHARED_EBIKE_FREE_SECONDS) {
             sharedRideBilled = true
-            const fee = storyServices()!.commerce.chargeSharedRideFee(`shared_ride_${sharedRideSessionId}_${Date.now()}`)
+            const fee = soloServices()!.commerce.chargeSharedRideFee(`shared_ride_${sharedRideSessionId}_${Date.now()}`)
             if (fee.fallbackFree) {
               window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: '余额不足 ¥3，可改骑免费人力单车或步行接单赚钱', ms: 2600}}))
             } else if (fee.charged > 0) {

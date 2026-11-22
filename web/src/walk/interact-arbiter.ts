@@ -52,7 +52,7 @@ export interface ServiceBayCandidateSnapshot {
 }
 
 export interface InteractionContext {
-  storyEnabled: boolean
+  soloEnabled: boolean
   active: boolean
   modalOrOverlayBlocked: boolean
   crashed: boolean
@@ -109,7 +109,7 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
           : '下车'
     const softHint =
       (ctx.aboardKind === 'bike' || ctx.aboardKind === 'bicycle' || ctx.aboardKind === 'car') &&
-      ctx.storyEnabled && !ctx.inQuietZone &&
+      ctx.soloEnabled && !ctx.inQuietZone &&
       (ctx.nearShop || ctx.nearServiceBay)
         ? '先按 F 下车再进店'
         : undefined
@@ -133,7 +133,7 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
   }
 
   // Priority 4: On foot in shop trigger or service bay (outside quiet zone) -> suppresses vehicle mount within 4.2m
-  if (ctx.storyEnabled && !ctx.inQuietZone && ctx.nearShop) {
+  if (ctx.soloEnabled && !ctx.inQuietZone && ctx.nearShop) {
     return {
       priority: 4,
       action: 'open_shop',
@@ -142,7 +142,7 @@ export function resolveInteraction(ctx: InteractionContext): InteractionDecision
       shopId: ctx.nearShop.shopId,
     }
   }
-  if (ctx.storyEnabled && !ctx.inQuietZone && ctx.nearServiceBay) {
+  if (ctx.soloEnabled && !ctx.inQuietZone && ctx.nearServiceBay) {
     return {
       priority: 4,
       action: 'open_service',

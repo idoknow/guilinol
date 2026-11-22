@@ -70,7 +70,7 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean; onApp?:(i
     wanted.querySelectorAll('i').forEach((pip,i)=>pip.classList.toggle('on', i < s.wanted))
     $('.st-clock').textContent = s.clock ? `${s.clock.time} · ${s.clock.weather}` : ''
     $('.st-phone-time').textContent = s.clock?.time ?? ''
-    const m = getPlayMode()==='story' && s.mission, box = $('.st-mission'); box.hidden = !m
+    const m = getPlayMode()==='solo' && s.mission, box = $('.st-mission'); box.hidden = !m
     if(m) {
       $('.st-line').textContent = m.title; $('.st-step').textContent = m.step
       const timer = $('.st-timer'); timer.hidden = m.timer===undefined; timer.textContent = m.timer!==undefined ? clockText(m.timer) : ''
@@ -92,10 +92,10 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean; onApp?:(i
     document.body.dataset.ride = s.vehicle ? s.vehicle.kind : 'foot'
   }
   function renderMode() {
-    const story = getPlayMode()==='story'
-    $('.st-money').hidden = !story
-    $('.st-phone-cash').hidden = !story
-    for(const id of ['jobs','wardrobe','garage']) $(`[data-app="${id}"]`).parentElement!.hidden = !story
+    const solo = getPlayMode()==='solo'
+    $('.st-money').hidden = !solo
+    $('.st-phone-cash').hidden = !solo
+    for(const id of ['jobs','wardrobe','garage']) $(`[data-app="${id}"]`).parentElement!.hidden = !solo
     render(source.get())
   }
   renderMode()

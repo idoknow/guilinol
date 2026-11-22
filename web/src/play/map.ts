@@ -189,7 +189,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       }
       g.restore()
     }
-    const missionTarget = getPlayMode()==='story' && getState().mission?.target
+    const missionTarget = getPlayMode()==='solo' && getState().mission?.target
     if(missionTarget) {
       const tx = sx(missionTarget[0]), ty = sz(missionTarget[1])
       g.save()
@@ -235,7 +235,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   const sheet = document.createElement('section'); sheet.className = 'atlas'; sheet.hidden = true
   sheet.innerHTML = `<canvas></canvas><div class="atlas-search"><input type="search" placeholder="搜地名、商铺、路名、码头、山名" aria-label="搜索地点" enterkeyhint="search"><div class="atlas-docks">${shops.map(sh=>`<button type="button" class="atlas-shop-btn" data-shop="${sh.shopId}">${sh.mapMarker.label} · ${sh.mapMarker.badge}</button>`).join('')}${waterDocks.map(d=>`<button type="button" data-dock="${d.id}">${d.name} · ${d.badge}</button>`).join('')}</div><ol></ol></div>
     <button class="atlas-close" aria-label="关闭地图">×</button><button class="atlas-here" aria-label="回到我的位置">◎</button>
-    <div class="atlas-pop" hidden></div><p class="atlas-legend">朱印＝观景点 · 霓标＝商圈商铺 · 已开放区域可传送 · © OpenStreetMap contributors</p>`
+    <div class="atlas-pop" hidden></div><p class="atlas-legend">朱印＝观景点 · 霓标＝商圈商铺 · <span class="atlas-travel-legend">已开放区域可传送 · </span> © OpenStreetMap contributors</p>`
   document.body.append(sheet)
   const canvas = sheet.querySelector('canvas')!, input = sheet.querySelector('input')!, results = sheet.querySelector('ol')!, pop = sheet.querySelector<HTMLElement>('.atlas-pop')!
   for(const b of Array.from(sheet.querySelectorAll<HTMLButtonElement>('.atlas-docks button[data-shop]'))) b.onclick = ()=>{const sh = listShops().find(x=>x.shopId===b.dataset.shop); if(sh){close(); if(ui.goShop) ui.goShop(sh); else ui.goPoint(sh.triggerPos[0],sh.triggerPos[2],sh.displayName)}}
@@ -260,6 +260,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       return half*2>=max-min?(min+max)/2:Math.min(max-half,Math.max(min+half,value))}
     view.x=axis(view.x,northwest.x,southeast.x,sheet.clientWidth);view.z=axis(view.z,northwest.z,southeast.z,sheet.clientHeight)}
   function open() {
+    sheet.querySelectorAll<HTMLElement>('.atlas-docks,.atlas-travel-legend').forEach(el=>{el.hidden=getPlayMode()==='solo'})
     const start=performance.now()
     requestMap('overview.bin')
     const p = here(); view.x = p.x; view.z = p.z; view.scale = innerWidth<700?.45:.6
@@ -274,7 +275,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       if(!built.contains(pin.x,pin.z)){pop.textContent='未开放'; redraw(); return}
       const sub = pin.shop?pin.shop.displayName:pin.spot?pin.spot.sub:pin.dock?pin.dock.sub:atlas.roadAt(pin.x,pin.z,40)?.name ?? ''
       const isNav = !!navTarget && Math.hypot(navTarget.x-pin.x,navTarget.z-pin.z)<1
-      pop.innerHTML = `<b>${pin.name}</b>${sub&&sub!==pin.name?`<span>${sub}</span>`:''}<button type="button" data-act="go">前往</button><button type="button" class="atlas-nav-btn" data-act="nav">${isNav?'取消导航':'标记导航'}</button>`
+      pop.innerHTML = `<b>${pin.name}</b>${sub&&sub!==pin.name?`<span>${sub}</span>`:''}<button type="button" data-act="go" ${getPlayMode()==='solo'?'hidden disabled':''}>前往</button><button type="button" class="atlas-nav-btn" data-act="nav">${isNav?'取消导航':'标记导航'}</button>`
       pop.querySelector<HTMLButtonElement>('[data-act="nav"]')!.onclick = ()=>{
         const target = pin!
         navTarget = isNav ? null : {x:target.x,z:target.z,name:target.name}

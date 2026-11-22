@@ -19,7 +19,7 @@ import {createAvatarOutfitController} from './outfits'
 import {isGlobalHotkeyBlocked, isModalOrOverlayOpen} from './input-guard'
 import {createInteractArbiter} from './interact-arbiter'
 import type {ShopCloseReason, ShopOverlayHandle} from '../ui/shop-overlay'
-import {getPlayMode, onPlayMode, storyServices} from '../game/play-mode'
+import {getPlayMode, onPlayMode, soloServices} from '../game/play-mode'
 import {PERSONAL_EBIKE_MODELS} from '../game/catalog'
 import {findNearbyServiceBay, findNearbyShopTrigger, getShop, listShops} from '../game/shops'
 import {getQuietZoneAt} from '../game/quiet-zones'
@@ -486,7 +486,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
 
   function summonPersonalWithToast(vehicleId?:string){
-    if(!storyServices()||!rides)return {ok:false as const,code:'NOT_ON_FOOT' as const}
+    if(!soloServices()||!rides)return {ok:false as const,code:'NOT_ON_FOOT' as const}
     const p=sim.body.translation()
     const res=rides.summonPersonalBike({x:p.x,y:p.y-cfg.height/2,z:p.z},yaw,vehicleId)
     if(!verify||stuntMode){
@@ -509,7 +509,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
 
   onGameEvent(ev=>{
-    if(!storyServices())return
+    if(!soloServices())return
     if(ev.type==='shop:buy'){
       ebikeAudio.unlock()
       ebikeAudio.playShopBuySuccess()
@@ -763,7 +763,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
   function syncShopOverlay(){
     shopOverlay?.dispose()
-    const services=storyServices()
+    const services=soloServices()
     if (services) {
       shopOverlay=mountOverlay(services.mountShopOverlay)
       scene.add(shopHintGroup, shopEbikeShowcaseRig.root)
@@ -792,11 +792,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const vSnap=rides?.getInteractSnapshot()??{
       aboardKind:null,tourDisembarkQueued:false,nearDownedVehicle:null,nearVehicle:null,nearBoat:null,
     }
-    const storyEnabled=getPlayMode()==='story'
-    const shopHit=storyEnabled && findNearbyShopTrigger(pos.x,pos.z,footY,{playerInQuietZone:!!quietZone})
-    const serviceHit=storyEnabled && findNearbyServiceBay(pos.x,pos.z,footY,{playerInQuietZone:!!quietZone})
+    const soloEnabled=getPlayMode()==='solo'
+    const shopHit=soloEnabled && findNearbyShopTrigger(pos.x,pos.z,footY,{playerInQuietZone:!!quietZone})
+    const serviceHit=soloEnabled && findNearbyServiceBay(pos.x,pos.z,footY,{playerInQuietZone:!!quietZone})
     return {
-      active, storyEnabled,
+      active, soloEnabled,
       modalOrOverlayBlocked:isModalOrOverlayOpen()||document.body.dataset.photo==='on'||!!shopOverlay?.isOpen(),
       crashed:!!crashSession||document.body.dataset.rideCrash==='1',
       standingUp:!!standUpSession,
@@ -905,7 +905,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }
     }
     ebikeShowroomGroup.visible=anyShowroomVisible
-    const onFoot=getPlayMode()==='story'&&active&&!rides?.car&&!rides?.bike&&!rides?.boat&&!shopOverlay?.isOpen()
+    const onFoot=getPlayMode()==='solo'&&active&&!rides?.car&&!rides?.bike&&!rides?.boat&&!shopOverlay?.isOpen()
     shopHintGroup.visible=onFoot
     if(!onFoot)return
     const wave=.5+.5*Math.sin(performance.now()*.0045)

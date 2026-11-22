@@ -528,7 +528,7 @@ try {
       aboardKind: null,
       inQuietZone: false,
       nearDownedVehicle: null,
-      storyEnabled: true,
+      soloEnabled: true,
       nearShop: {shopId: 'shop_nikoniko_apparel', brandName: '漓尚服饰', displayName: '漓尚服饰 · 微笑堂店', distance: 1.8},
       nearServiceBay: null,
       nearVehicle: {kind: 'bike', downed: false, distance: 2.0, ownership: 'shared', ebikeTier: 'shared'},

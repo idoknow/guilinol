@@ -9,7 +9,7 @@ export {mountShopOverlay} from '../ui/shop-overlay'
 
 // The active order belongs to this engine session. Only mounted layers advance its clock.
 const missionRunner = new MissionRunnerEngine()
-interface StoryContext {
+interface SoloContext {
   scene: Scene
   camera: Camera
   sampleMissionGroundY(x:number, z:number): number
@@ -17,7 +17,7 @@ interface StoryContext {
   tour(): Awaited<ReturnType<typeof import('../play').play>> | undefined
   paused(): boolean
 }
-export async function mountStoryLayer(ctx: StoryContext) {
+export async function mountSoloLayer(ctx: SoloContext) {
   const {scene, camera, sampleMissionGroundY} = ctx
   const missionBeacon = createMissionBeacon(scene, sampleMissionGroundY)
   const playerPos = () => {

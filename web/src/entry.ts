@@ -30,12 +30,17 @@ async function enter(mode: PlayMode, remember = true) {
       if (!user) { cancelRestore(); if (!title.shown) title.open(started); return }
     }
     await setPlayMode(mode, remember)
-    title.close()
     const main = await loadEngine()
+    if(started)await main.waitForMode()
+    title.close()
     if (started) { main.setPaused(false); return }
     started = true
     hud(main)
     await main.boot()
+  } catch(error) {
+    if(started)await setPlayMode('tour', false)
+    title.open(started)
+    window.alert(error instanceof Error ? error.message : '无法进入模式')
   } finally { entering = false }
 }
 
@@ -55,7 +60,7 @@ function hud(main: typeof import('./main')) {
     hudModule.mountStreetHud(source, {
       phone: params.has('phone'),
       onApp: id => {
-        if (getPlayMode() !== 'story') return
+        if (getPlayMode() !== 'solo') return
         if (id === 'jobs') window.dispatchEvent(new CustomEvent('game:open-missions'))
         else if (id === 'wardrobe') window.dispatchEvent(new CustomEvent('game:open-wardrobe'))
         else if (id === 'garage') window.dispatchEvent(new CustomEvent('game:open-garage'))
@@ -68,7 +73,7 @@ function hud(main: typeof import('./main')) {
   })
 }
 
-if (deepLink) void enter(params.get('story') === '1' ? 'story' : 'tour', false)
+if (deepLink) void enter(params.get('solo') === '1' ? 'solo' : 'tour', false)
 else {
   title.open(false)
   // Warm the engine module while the player reads the menu; the world data is already preloaded by index.html.

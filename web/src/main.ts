@@ -22,7 +22,7 @@ import {flags} from './debug'
 import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRangeConfig} from './render-range'
 import {renderRangeControl} from './ui/render-range'
 import type {FeedbackView} from '../../lib/feedback-contract'
-import {getPlayMode, onPlayMode, storyServices} from './game/play-mode'
+import {getPlayMode, onPlayMode, soloServices} from './game/play-mode'
 import {getState} from './game/state'
 import {loadLocalSave} from './game/save'
 import {isGlobalHotkeyBlocked} from './walk/input-guard'
@@ -30,9 +30,11 @@ import {isGlobalHotkeyBlocked} from './walk/input-guard'
 installAtmosphere()
 // The title screen (ui/home.ts) pauses the scene while it covers it: no simulation, no draws.
 let paused=false
+let modeReady = Promise.resolve()
+export const waitForMode = () => modeReady
 export function setPaused(on:boolean){paused=on}
 async function start() {
-  loadLocalSave(undefined, Date.now(), getPlayMode() === 'story')
+  loadLocalSave(undefined, Date.now(), getPlayMode() === 'solo')
   const params = new URLSearchParams(location.search)
   const rangeStore = new RenderRangeStore(loadRenderConfig(params))
   const initialMetrics = rangeStore.getMetrics()
@@ -74,7 +76,8 @@ async function start() {
   const forcedSlot = openParams.get('slot')
   // `restoring` is a FeedbackView only when the player picked "回到上次离开的地方" AND a usable view
   // is stored; a stale/cleared record must fall back to pickSpawn(), not the fixed camera.
-  const opening = forcedSlot !== null
+  const soloStart = getPlayMode() === 'solo'
+  const opening = soloStart ? (!isDeepLink(openParams) ? readLastView() : null) : forcedSlot !== null
     ? spawnPool.find(slot => slot.id === forcedSlot) ?? spawnPool[0]
     : isDeepLink(openParams) ? null : consumeRestore() ? readLastView() ?? pickSpawn() : pickSpawn()
   let walker:Awaited<ReturnType<typeof import('./walk').walk>>|undefined, switching=false
@@ -84,8 +87,8 @@ async function start() {
     walkModPromise ??= import('./walk').then(mod=>{void mod.preloadWalk();return mod})
     return walkModPromise
   }
-  if(params.get('mode')==='walk'||params.has('spawn')) void prefetchWalk()
-  const controls = flight(camera,renderer.domElement,manifest.extent,()=>!walker?.active&&!switching&&!cinema)
+  if(soloStart||params.get('mode')==='walk'||params.has('spawn')) void prefetchWalk()
+  const controls = flight(camera,renderer.domElement,manifest.extent,()=>getPlayMode()==='tour'&&!paused&&!walker?.active&&!switching&&!cinema)
   // Apply the opening pose here, after flight() has set rotation.order='YXZ'. lookAt()/rotation.set()
   // before that line would be recomputed in the wrong Euler order and leave a permanent roll.
   if(opening) {
@@ -105,7 +108,7 @@ async function start() {
   scene.add(base.mesh,peaks)
   bootProgress('载入街区', 78)
   const clock = skyClock(params)
-  setPreset(camera,params.get('cam'))
+  if(!soloStart)setPreset(camera,params.get('cam'))
   const stream = new Stream(scene,manifest,base,rangeStore,camera)
   const output = document.querySelector('output')!
   let previous=0, first=0, frame=0, sum=0, samples=0
@@ -159,7 +162,22 @@ async function start() {
       return completed
     }finally{operation('teleport',start,completed);switching=false;showMode()}
   }
+  async function landSolo(initial:boolean) {
+    if(walker?.active)return
+    const gate = walkConfig.gate
+    const point = initial && !opening ? gate : {x:camera.position.x,z:camera.position.z,yaw:camera.rotation.y}
+    if(await walkTo(point.x,point.z,point.yaw,'solo'))return
+    if(await walkTo(gate.x,gate.z,gate.yaw,'solo-fallback'))return
+    throw Error('单人模式未找到可落脚的位置')
+  }
+  function takeFlight() {
+    if(getPlayMode()==='solo')return {ok:false,code:'FLIGHT_DISABLED_IN_SOLO'} as const
+    walker?.leave()
+    showMode()
+    return {ok:true} as const
+  }
   async function toggle(initial=false){
+    if(getPlayMode()==='solo')return
     if(switching)return
     const start=performance.now()
     if(walker?.active){walker.leave();operation('switch',start);return}
@@ -185,6 +203,7 @@ async function start() {
   modeButton.addEventListener('pointerenter',()=>void prefetchWalk())
   modeButton.addEventListener('touchstart',()=>void prefetchWalk(),{passive:true})
   function showMode(){const walking=!!walker?.active;document.body.dataset.mode=walking?'walk':'fly'
+    modeButton.hidden=modeButton.disabled=getPlayMode()==='solo'
     modeButton.textContent=walking?'起飞':'落地步行';modeButton.setAttribute('aria-label',walking?'切换到飞行':'切换到步行')
     const ride=document.body.dataset.ride
     if(walking&&document.body.hasAttribute('data-aboard')&&ride==='car'){
@@ -198,6 +217,7 @@ async function start() {
     }else{
       hint.textContent=walking?'WASD 走 · Shift 跑 · X 蹲 · 空格 跳 · C 视距 · 滚轮远近 · V 起飞 · M 地图 · J 景册 · P 拍照':'WASD 飞 · Q/E 升降 · Shift 加速 · V 落地步行 · M 地图 · J 景册 · P 拍照 · Esc 菜单'
     }
+    if(getPlayMode()==='solo')hint.textContent=hint.textContent?.replace(/ · V (起飞|飞)/g,'') ?? ''
   }
   new MutationObserver(()=>showMode()).observe(document.body,{attributes:true,attributeFilter:['data-aboard','data-ride']})
   let toastTimer=0
@@ -220,21 +240,33 @@ async function start() {
     return missionGroundRay.intersectObject(mesh, false)[0]?.point.y ?? NaN
   }
   let tour:Awaited<ReturnType<typeof import('./play').play>>|undefined
-  let story: Awaited<ReturnType<typeof import('./game/story-layer').mountStoryLayer>> | undefined
-  async function syncStory() {
-    story?.dispose()
-    story = undefined
-    const services = storyServices()
+  let solo: Awaited<ReturnType<typeof import('./game/solo-layer').mountSoloLayer>> | undefined
+  async function syncSolo() {
+    solo?.dispose()
+    solo = undefined
+    const services = soloServices()
     if (services) {
-      const mounted = await services.mountStoryLayer({
+      const mounted = await services.mountSoloLayer({
         scene, camera, sampleMissionGroundY, walker: () => walker, tour: () => tour, paused: () => paused,
       })
-      if (storyServices() === services) story = mounted
+      if (soloServices() === services) solo = mounted
       else mounted.dispose()
     }
   }
-  onPlayMode(() => void syncStory())
-  await syncStory()
+  onPlayMode((mode,prev)=>{
+    modeReady=(async()=>{
+      if(mode==='solo')await landSolo(false)
+      else if(prev==='solo' && walker?.active){
+        const {x,z}=walker.position
+        takeFlight()
+        camera.position.x=x
+        camera.position.z=z
+      }
+      await syncSolo()
+      showMode()
+    })()
+  })
+  await syncSolo()
   const renderUi = renderRangeControl({
     initial:rangeStore.getConfig(),
     onPreview:(next:RenderRangeConfig)=>{stream.setRenderRange(next,{persist:false,source:next.source})},
@@ -248,8 +280,8 @@ async function start() {
     },
   })
   rangeStore.subscribe(nextCfg=>{renderUi.setConfig(nextCfg)})
-  const tourProbe = {getState, missions: {start: () => ({ok:false, code:'STORY_MODE_REQUIRED'})}}
-  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,get game(){return story?.probe ?? tourProbe},
+  const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
+  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,get game(){return solo?.probe ?? tourProbe},
     get renderRange(){return rangeStore.getConfig()},
     get rangeMetrics(){return rangeStore.getMetrics()},
     setRenderRange(next:unknown, persist=false){return stream.setRenderRange(next as number|string,{persist})},
@@ -257,7 +289,9 @@ async function start() {
     setView:(view:unknown)=>host.setView(view),
     async photoSupport(x:number,z:number,bridgeRadius?:number){return (await loadWalker()).photoSupport(x,z,bridgeRadius)},
     peaksStats:peaks.stats,clock,env,get tour(){return tour},get walk(){return walker},
-    setPreset(name:string){setPreset(camera,name);camera.updateMatrixWorld();return stats.frame},
+    flight: takeFlight,
+    setPreset(name:string){if(getPlayMode()==='solo')return {ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}
+      setPreset(camera,name);camera.updateMatrixWorld();return stats.frame},
     freeze(){return new Promise<void>(resolve=>requestAnimationFrame(()=>{
       renderer.setAnimationLoop(null)
       const gl=renderer.getContext()
@@ -289,7 +323,7 @@ async function start() {
     spawnPool,
     saveLastViewNow:()=>host.lastView().then(saveLastView),
     readLastViewNow:()=>readLastView(),
-    applyLastViewNow:(view:FeedbackView)=>applyLastView(camera,view)}})
+    applyLastViewNow:(view:FeedbackView)=>getPlayMode()==='solo'?{ok:false,code:'FLIGHT_DISABLED_IN_SOLO'}:applyLastView(camera,view)}})
   function draw(){
     const metrics=stream.metrics
     const mirror = frame>=2 && isWaterInView(camera) ? currentMirrorLevel(camera) : -Infinity
@@ -307,7 +341,7 @@ async function start() {
     captureView:async()=>(await import('./play/feedback-view')).capture(host),
     lastView:async()=>(await import('./play/feedback-view')).currentView(host,false),
     setView:async(view)=>(await import('./play/feedback-view')).setView(host,view),
-    fly(){if(walker?.active)walker.leave();showMode()},get cinema(){return cinema},set cinema(on){cinema=on}}
+    fly:takeFlight,get cinema(){return cinema},set cinema(on){cinema=on}}
   const sampleFrame=instrument(renderer,()=>{
     const mode=tour?.map?.active?'map':paused?'menu':walker?.active?(walker.vehicle==='foot'?'walk':'drive'):'fly'
     const position=walker && (mode==='walk'||mode==='drive')?walker.position:camera.position
@@ -315,6 +349,7 @@ async function start() {
   })
   let playable=false
   function animate(now:number){
+    if(getPlayMode()==='solo'&&!walker?.active)return
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now
     if(walker?.active)walker.tick(elapsed/1000);else if(!switching)controls(elapsed/1000)
@@ -340,7 +375,7 @@ async function start() {
     renderer.toneMappingExposure = env.exposure; windowLight.value = env.night
     dome.update(); drops.update()
     tour?.tick(elapsed/1000)
-    story?.step(Math.min(0.1, elapsed/1000))
+    solo?.step(Math.min(0.1, elapsed/1000))
     persistView?.()
     draw()
     sampleFrame(elapsed)
@@ -360,6 +395,7 @@ async function start() {
       sum=0;samples=0
     }
   }
+  if(soloStart){await landSolo(true);showMode()}
   renderer.setAnimationLoop(animate)
   // IDOK-105: keep the last view fresh so "回到上次离开的地方" can restore it. Deep-linked
   // sessions (`?verify`, `?slot`, shares…) never write it — tests and shared links must not pollute.
@@ -375,6 +411,7 @@ async function start() {
     return write
   })()
   const token=params.get('view')
+  if(soloStart)return
   if(token){try{if(token.length>4096)throw Error();await host.setView(JSON.parse(atob(token.replace(/-/g,'+').replace(/_/g,'/'))))}catch{console.warn('Invalid feedback view')}}
   else if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }

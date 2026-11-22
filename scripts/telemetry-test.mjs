@@ -78,7 +78,7 @@ test('anonymous session context and event schemas',()=>{
   const rows=[{kind:'vitals',cls:0},{kind:'session',total:42,walkMeters:10,walkSeconds:4},{kind:'error',count:1,errorKind:'error',signature:'deadbeef'},
     {kind:'retry',category:'landmark'},{kind:'failure',category:'chunk'},{kind:'funnel',step:'feedbackSuccess'}]
   assert.ok(validate({...batch(),context,rows}))
-  for(const playMode of ['tour','story']) assert.ok(validate({...batch(),context,rows:[{kind:'session',total:42,playMode}]}))
+  for(const playMode of ['tour','solo']) assert.ok(validate({...batch(),context,rows:[{kind:'session',total:42,playMode}]}))
   for(const row of [{kind:'session',total:42,playMode:'other'},{kind:'error',count:1,signature:'main.js:42'},{kind:'funnel',step:'admin@example.test'}])
     assert.equal(validate({...batch(),context,rows:[row]}),false)
 })

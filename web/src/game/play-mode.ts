@@ -1,15 +1,15 @@
-export type PlayMode = 'tour' | 'story'
+export type PlayMode = 'tour' | 'solo'
 let current: PlayMode = 'tour'
 const key = 'glol.playMode'
 
 export function lastPlayMode(): PlayMode {
-  try { return localStorage.getItem(key) === 'story' ? 'story' : 'tour' } catch { return 'tour' }
+  try { return localStorage.getItem(key) === 'solo' ? 'solo' : 'tour' } catch { return 'tour' }
 }
 export function getPlayMode() { return current }
 let transition = 0
 export async function setPlayMode(mode: PlayMode, remember = true) {
   const request = ++transition
-  if (mode === 'story' && !story) story = await import('./story-layer')
+  if (mode === 'solo' && !solo) solo = await import('./solo-layer')
   if (request !== transition) return
   const prev = current
   current = mode
@@ -25,5 +25,5 @@ export function onPlayMode(fn: (mode: PlayMode, prev: PlayMode) => void) {
   return () => window.removeEventListener('glol:play-mode', handle)
 }
 
-let story: typeof import('./story-layer') | undefined
-export function storyServices() { return current === 'story' ? story : undefined }
+let solo: typeof import('./solo-layer') | undefined
+export function soloServices() { return current === 'solo' ? solo : undefined }

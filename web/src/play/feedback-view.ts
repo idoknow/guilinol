@@ -1,3 +1,4 @@
+import {getPlayMode} from '../game/play-mode'
 import * as THREE from 'three'
 import { validView, type FeedbackView } from '../../../lib/feedback-contract'
 import { xz2ll } from '../../../lib/projection'
@@ -12,6 +13,7 @@ async function currentBuild(): Promise<string> {
 }
 
 export function setView(host: Host, view: unknown) {
+  if (getPlayMode()==='solo')throw Error('FLIGHT_DISABLED_IN_SOLO')
   if (!validView(view)) throw Error('无效的反馈视角')
   host.fly()
   const camera = host.camera

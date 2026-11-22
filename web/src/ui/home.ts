@@ -45,10 +45,10 @@ export function home(play:(mode:PlayMode)=>void):Home {
           <i aria-hidden="true"></i><span>回到上次离开的地方</span><small class="home-resume-ago"></small>
         </button>
       </div>
-      <button type="button" class="home-mode" role="listitem" data-umami-event="home-story">
-        <span class="home-mode-seal" aria-hidden="true">事</span>
-        <span class="home-mode-text"><b>单人故事模式</b><span>在桂林街头接单送米粉，赚取报酬。</span></span>
-        <span class="ui-btn ui-btn--lg home-go" >开始故事</span>
+      <button type="button" class="home-mode" role="listitem" data-umami-event="home-solo">
+        <span class="home-mode-seal" aria-hidden="true">单</span>
+        <span class="home-mode-text"><b>单人模式</b><span>在桂林街头接单送米粉，赚取报酬。</span></span>
+        <span class="ui-btn ui-btn--lg home-go">开始</span>
       </button>
     </div>
     <nav class="home-links">
@@ -61,8 +61,8 @@ export function home(play:(mode:PlayMode)=>void):Home {
   const progress = root.querySelector('.home-progress')!
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
   const go = root.querySelector<HTMLElement>('.home-go')!, tour = root.querySelector<HTMLButtonElement>('.home-mode--tour')!
-  const story = root.querySelector<HTMLButtonElement>('[data-umami-event=home-story]')!
-  story.onclick = ()=>play('story')
+  const solo = root.querySelector<HTMLButtonElement>('[data-umami-event=home-solo]')!
+  solo.onclick = ()=>play('solo')
   tour.onclick = ()=>play('tour')
   // IDOK-105: a slim strip under the tour card, shown only when a usable last view is stored.
   // 开始游览 still opens on a random frame; this is the opt-in way back.
@@ -91,20 +91,20 @@ export function home(play:(mode:PlayMode)=>void):Home {
     if(event.code==='Enter'&&document.activeElement===document.body){event.preventDefault(); play(lastPlayMode())}
     else if(event.code==='Escape'&&!event.repeat&&root.classList.contains('resume')) play(getPlayMode())}},{capture:true})
   document.body.append(root)
-  let playedStory = false
+  let playedSolo = false
   const api:Home = {
     get shown(){return shown},
     open(resume){
       shown = true; root.hidden = false; root.classList.toggle('resume',resume)
-      playedStory ||= resume && getPlayMode() === 'story'
+      playedSolo ||= resume && getPlayMode() === 'solo'
       let hasProgress = false
       try { hasProgress = localStorage.getItem('glol.save.v1') !== null } catch {}
-      story.querySelector('.home-go')!.textContent = playedStory || hasProgress ? '继续故事' : '开始故事'
+      solo.querySelector('.home-go')!.textContent = playedSolo || hasProgress ? '继续' : '开始'
       go.textContent = resume?'继续游览':'开始游览'
       // IDOK-105: only on a fresh entry (not the mid-game 继续游览 menu) and only with a usable record.
       const saved = resume ? null : lastViewSavedAt()
       resumeRow.hidden = saved===null; if(saved!==null) resumeAgo.textContent = ago(saved)
-      requestAnimationFrame(()=>{root.classList.add('show'); ((resume?getPlayMode():lastPlayMode())==='story'?story:tour).focus({preventScroll:true})})
+      requestAnimationFrame(()=>{root.classList.add('show'); ((resume?getPlayMode():lastPlayMode())==='solo'?solo:tour).focus({preventScroll:true})})
       if(!reduce&&!timer) timer = window.setInterval(step,SLIDE_MS)
       document.body.dataset.home = ''
     },

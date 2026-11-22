@@ -379,7 +379,7 @@ try {
   await page.route('**/favicon.ico', r => r.fulfill({status: 204}))
   await page.route('**/api/t', r => r.fulfill({status: 204}))
 
-  await page.goto(`${baseUrl}/?verify&story=1&mode=walk&flow=0&time=10.5&radius=480`, {waitUntil: 'domcontentloaded'})
+  await page.goto(`${baseUrl}/?verify&solo=1&mode=walk&flow=0&time=10.5&radius=480`, {waitUntil: 'domcontentloaded'})
   await waitForWalkReady(page)
 
   // --------------------------------------------------------------------------
@@ -540,7 +540,7 @@ try {
   // Scenic spot first checkin (+¥120 -> ¥880) + idempotent repeat check (0 extra)
   await page.evaluate(async () => {
     const lanesSpot = window.viewer.tour.spots.find(s => s.id === 'lanes')
-    await window.viewer.tour.goTo(lanesSpot)
+    await window.viewer.walkTo(lanesSpot.x,lanesSpot.z,0,'e2e-walk-to-stamp')
   })
   await page.waitForFunction(() => window.viewer.game.getState().money === 880, null, {timeout: 15000})
   // Close spot card & trigger same spot bounty again -> must stay ¥880
@@ -1157,7 +1157,7 @@ try {
     await vpPage.route('**/favicon.ico', r => r.fulfill({status: 204}))
     await vpPage.route('**/api/t', r => r.fulfill({status: 204}))
 
-    await vpPage.goto(`${baseUrl}/?verify&story=1&mode=walk&flow=0&time=10.5&radius=420`, {waitUntil: 'domcontentloaded'})
+    await vpPage.goto(`${baseUrl}/?verify&solo=1&mode=walk&flow=0&time=10.5&radius=420`, {waitUntil: 'domcontentloaded'})
     await waitForWalkReady(vpPage)
     await settleFrames(vpPage, 10)
 
