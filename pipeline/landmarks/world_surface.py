@@ -105,7 +105,7 @@ class Surface:
         ids=tree.query(shapely.Point(x,z),predicate='intersects')
         return float(levels[ids].max()) if len(ids) else None
 
-    def sample(self, x, z):
+    def sample(self, x, z, *, include_peaks=True):
         if not (self.left <= x <= self.left+self.width and self.top <= z <= self.top+self.depth):
             raise ValueError(f'Outside world extent at {(x, z)}')
         ox = min(self.left+self.width-self.size, self.left + math.floor((x-self.left)/self.size)*self.size)
@@ -118,7 +118,8 @@ class Surface:
         i, j, u, v = cell(step)
         (a, b), (c, d) = ground[j:j+2, i:i+2]
         y = a+(b-a)*u+(c-a)*v if u+v <= 1 else d+(c-d)*(1-u)+(b-d)*(1-v)
-        y = self.peaks.height(x,z,y)
+        if include_peaks:
+            y = self.peaks.height(x,z,y)
         i, j, _, _ = cell(self.grid)
         level = water[j:j+2, i:i+2].max()
         return float(y), None if level == DRY else float(level)/10

@@ -1,5 +1,6 @@
 import gzip
 import json
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -22,7 +23,20 @@ def profile(sample, east, south, angles):
     return np.clip(radii/radii.mean(),.55,1.65),floor
 
 
-def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, far):
+@lru_cache(maxsize=None)
+def ring_faces(segments, levels):
+    faces = []
+    for level in range(levels-1):
+        for i in range(segments):
+            a = level*segments+i
+            b = level*segments+(i+1)%segments
+            faces.extend(((a,a+segments,b),(b,a+segments,b+segments)))
+    cap = levels*segments
+    faces.extend((cap-segments+i,cap,cap-segments+(i+1)%segments) for i in range(segments))
+    return np.asarray(faces,dtype='<u2')
+
+
+def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, far, site=None):
     summit = peak['target']
     shoulder,taper = peak['shoulder'],peak['taper']
     lean = radii.mean()*(.08+.045*np.cos(phases[1]))
@@ -42,7 +56,7 @@ def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, f
         rings.append(((1-taper)*np.cos(latitude),shoulder+(1-shoulder)*np.sin(latitude)))
     if far:
         rings = [rings[index] for index in [0,1,4,6,8,10]]
-    vertices, faces = [], []
+    vertices = []
     for level,(scale, fraction) in enumerate(rings):
         radius = radii*scale*(1+(ridge if level else 0))
         height = np.full_like(angles,floor+relief*fraction)
@@ -65,16 +79,11 @@ def mesh(east, south, peak, ground_at, skirt_at, angles, radii, floor, phases, f
                 radius+=mouth*2
         vertices.extend(zip(east+radius*np.cos(angles)+lean_x*fraction**2, height,
                             south+radius*np.sin(angles)+lean_z*fraction**2))
-        if level:
-            for col in range(count):
-                outer = (level-1)*count + col
-                adjacent = (level-1)*count + (col+1)%count
-                faces.extend([(outer,outer+count,adjacent),(adjacent,outer+count,adjacent+count)])
-    cap = len(vertices)
-    faces.extend((cap-count+col,cap,cap-count+(col+1)%count) for col in range(count))
     vertices = np.asarray([*vertices,(east+lean_x,summit,south+lean_z)],dtype='<f4')
     vertices[:,[0,2]] = np.rint(vertices[:,[0,2]]*256)/256
-    faces = np.asarray(faces,dtype='<u2')
+    faces = ring_faces(count,len(rings))
+    if site is not None:
+        site.finish_mesh(vertices,faces,floor,ring_faces(32,6))
     tris = vertices[faces]
     normals = np.zeros_like(vertices)
     cross = np.cross(tris[:,1]-tris[:,0],tris[:,2]-tris[:,0])
@@ -118,6 +127,7 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
     index_offsets = {}
     angles = np.arange(128)*2*np.pi/128
     shapes, footprints = [], []
+    peak_sites = {}
     dem = original.copy()
     centers = {peak['name']:ll2xz(peak['lat'],peak['lon']) for peak in catalog}
     saddles = [('仙鹤峰','四望山'),('四望山','于越山'),('于越山','明月峰'),
@@ -168,6 +178,13 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
         blend = np.clip((1.8-fraction)/.65,0,1)
         weight = np.where(wet[window],0,blend*blend*(3-2*blend))
         original[window] = np.minimum(original[window],np.rint(dem[window]*(1-weight)+floor*10*weight))
+        if peak['name'] == '伏波山':
+            from fubo_site import fubo_site
+            site = fubo_site(peak['eastLimit'])
+            peak_sites[entry['name']] = site
+            cx,cz = site.center
+            radii = site.fit(angles,radii)
+            entry['center'] = [cx,peak['target'],cz]
         if 'model' in peak:
             entry['model'] = peak['model']
             footprints.append(Polygon(np.column_stack((cx+radii*np.cos(angles), cz+radii*np.sin(angles)))))
@@ -184,6 +201,9 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
     auto_file = 'auto-peaks.json'
     (output/auto_file).write_text(json.dumps(auto,ensure_ascii=False,separators=(',',':'))+'\n')
     suppress(original,wet,ground)
+    for entry,peak,cx,cz,radii,floor in shapes:
+        if site := peak_sites.get(entry['name']):
+            site.grade_trail(original,wet,left,top,floor)
     terrain[:] = original
     ground_at = sampler(original)
     skirt_at = sampler(minimum_filter(original,size=17,mode='nearest'))
@@ -191,7 +211,11 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
     for entry,peak,cx,cz,radii,floor in shapes:
         phases = np.random.default_rng(peak.get('seed',peak.get('osm'))).uniform(0,2*np.pi,3)
         for far in [False,True]:
-            data,faces = mesh(cx,cz,peak,ground_at,skirt_at,angles,radii,floor,phases,far)
+            site = peak_sites.get(entry['name'])
+            if far and site is not None:
+                data,faces = data[site.far_vertices], site.far_faces
+            else:
+                data,faces = mesh(cx,cz,peak,ground_at,skirt_at,angles,radii,floor,phases,far,site)
             segments = len(angles)//(4 if far else 1)
             footprints.append(Polygon(data[:segments][:,[0,2]]))
             if not far:
@@ -200,6 +224,7 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
                     rows,cols=np.ogrid[:terrain.shape[0],:terrain.shape[1]]
                     shore=(left+cols*GRID>cx+12)&(left+cols*GRID<cx+65)&(abs(top+rows*GRID-cz)<22)
                     terrain[shore]=original[shore]
+                    peak_sites[entry['name']].clear_trail_imprint(terrain,original,left,top)
                 if entry['name']=='明月峰':
                     faces=wind_cave.cut(data,faces,terrain,left,top,GRID)
                     path=wind_cave.trail(data[:-1,:3].reshape(12,128,3),data[-1,:3])

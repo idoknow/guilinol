@@ -130,4 +130,10 @@ def verify():
 
 
 if __name__=='__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--roads', action='store_true', help='audit highway buffers and park walking ways')
+    if parser.parse_args().roads:
+        from check_peak_roads import verify as check_roads
+        raise SystemExit(0 if check_roads() else 1)
     verify()

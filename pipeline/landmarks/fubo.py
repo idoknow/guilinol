@@ -5,9 +5,16 @@ the pearl cave are approximations from visitor-scale references (~3 m clear).
 import gzip
 import json
 import math
+import sys
 from pathlib import Path
 
 import numpy as np
+from shapely.geometry import LineString, Point
+from shapely.ops import nearest_points
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from common import load_osm
+from features import area, points
+
 from xiaoyao_tower import generate
 from c_kit import landmark_surface
 
@@ -64,29 +71,64 @@ def build(model):
     surface=landmark_surface('fubo')
     rings,tip=mountain('伏波山');model.pose=(*tip,0);pavilion(model,5.2,3.6,surface)
     base=rings[1,0].copy();base[0]=rings[2,0,0]
-    model.pose=(base[0]+10,surface.ground(base[0]+4,base[2]+1),base[2],math.pi/2)
-    model.beam([1,-.08,6],[.8,3.5,6.4],.72,'granite',7,True)
-    model.pose=(base[0]+4.5,surface.ground(base[0]+4.5,base[2]+15),base[2]+15,0);pavilion(model,6.4,4,surface)
-    model.pose=(base[0]-1,surface.ground(base[0]-1,base[2]+31),base[2]+31,0)
-    model.arcade(0,0,14,2.7,4.3,[0],2.3,'brick');model.box(0,4.25,0,16,.22,5,'wood');model.swept_roof(0,4.45,0,16,5,2.1)
+    elements = load_osm()
+    river = area(next(e for e in elements if e['id']==2339020 and e['type']=='relation'))
+    park = area(next(e for e in elements if e['id']==485320268))
+    shore = park.boundary.intersection(river.boundary)
+    mouth = Point(surface.x+base[0],surface.z+base[2])
+    bank = nearest_points(mouth,shore)[1]
+    # Use a straight run along the bank tangent, set on piles outside the
+    # rock and the mapped stairway. A single deck level joins all spans.
+    bankline = max((LineString([a,b]) for a,b in zip(park.exterior.coords, list(park.exterior.coords)[1:])
+                    if shore.covers(LineString([a,b]))),
+                   key=lambda edge: -edge.distance(bank))
+    forward = np.diff(np.array(bankline.coords),axis=0)[0]
+    forward /= np.linalg.norm(forward)
+    if forward[1]<0:
+        forward *= -1
+    normal = np.array([forward[1],-forward[0]])
+    center = np.array(bank.coords[0])+normal*4
+    dry_paths = [LineString(points(e)) for e in elements if e['type']=='way'
+                 and e.get('tags',{}).get('highway') and len(points(e))>1
+                 and park.distance(LineString(points(e)))<5]
+    def local(along,across):
+        return center+forward*along+normal*across-[surface.x,surface.z]
+    # Include both pile lines and the overhanging deck in the clearance.
+    for shift in range(25):
+        deck = LineString([center-19*forward,center+19*forward]).buffer(2)
+        if river.covers(deck) and all(deck.distance(path)>2 for path in dry_paths):
+            break
+        center += normal
+    else:
+        raise ValueError('No clear riverside boardwalk alignment')
+    def platform(along,across):
+        x,z=local(along,across)
+        ground,water=surface.sample(x,z)
+        return x,max(ground,water if water is not None else ground)+.2,z
+    x,y,z=platform(0,-1)
+    model.pose=(x,y,z,0)
+    model.foundation(surface,0,0,0,1.2,3.5,1.2,'granite')
+    x,y,z=platform(14,-7)
+    model.pose=(x,y,z,0);pavilion(model,6.4,4,surface)
+    x,y,z=platform(30,-8)
+    model.pose=(x,y,z,0)
+    model.arcade(0,0,14,2.7,4.3,[0],2.3,'brick',surface)
+    model.box(0,4.25,0,16,.22,5,'wood');model.swept_roof(0,4.45,0,16,5,2.1)
     model.box(0,3.35,1.45,2.6,.68,.14,'sign')
-    model.pose=(0,0,0,0)
-    for index in range(19):
-        south=base[2]-19+index*2
-        shore=base[0]+7.1-.006*(south-base[2])**2
-        ground,water=surface.sample(shore,south)
-        deck=max(ground+.45,water+.75 if water is not None else ground+.45)
-        model.box(shore,deck-.34,south,3.25,.34,2.04,'wood',True)
-        model.box(shore+1.49,deck,south,.14,1.08,.14,'red',True)
-        model.box(shore+1.49,deck+.98,south,.14,.14,2.14,'wood',True)
+    level = max(platform(station,edge)[1] for station in range(-19,20) for edge in (-1.7,1.7))+.65
+    yaw = math.atan2(-forward[0],forward[1])
+    for station in range(-18,19,2):
+        x,z=local(station,0)
+        model.pose=(x,level,z,yaw)
+        model.box(0,-.34,0,3.25,.34,2.01,'wood',True)
+        model.box(1.49,0,0,.14,1.08,.14,'red',True)
+        model.box(1.49,.98,0,.14,.14,2.05,'wood',True)
         for side in (-1,1):
-            px=shore+side*1.25
-            bed=surface.ground(px,south)-.10
-            model.beam([px,bed,south],[px,deck-.29,south],.21,'wood',8)
+            model.foundation(surface,side*1.25,-.40,0,.42,.12,.42,'wood')
         if model.detail:
             for offset in np.linspace(-.88,.88,8):
-                model.box(shore,deck,south+offset,3.28,.06,.22,'wood')
-                model.box(shore+1.49,deck+.12,south+offset,.065,.82,.065,'red')
+                model.box(0,0,offset,3.25,.06,.22,'wood')
+                model.box(1.49,.12,offset,.065,.82,.065,'red')
 
 
 if __name__=='__main__':generate('fubo',build,'F')

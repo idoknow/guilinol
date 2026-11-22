@@ -275,6 +275,10 @@ def build(bbox, output, palette, workers=4):
         downtown.blend(terrain,surface,original,road_ctrl,left,top)
         wet[:] = surface != DRY
         downtown.peaks(output,peaks)
+    if any(p['name']=='伏波山' for p in peaks['entries']):
+        from fubo_site import fubo_site
+        fubo = next(p for p in json.loads(Path(__file__).with_name('peaks.json').read_bytes()) if p['name']=='伏波山')
+        fubo_site(fubo['eastLimit']).grade_bank(terrain,original,surface,left,top)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 
@@ -289,6 +293,8 @@ def build(bbox, output, palette, workers=4):
     peak_centers = {p['name']: p['center'] for p in peaks['entries']}
     peak_lm_names = {'fubo': '伏波山', 'diecai': '明月峰', 'duxiu': '独秀峰'}
     def lm_elevation(x, z, entry):
+        if entry['id']=='fubo' and '伏波山' in peak_centers:
+            return peak_centers['伏波山'][1]
         if entry['id'] in peak_lm_names and peak_lm_names[entry['id']] in peak_centers:
             px_c, _, pz_c = peak_centers[peak_lm_names[entry['id']]]
             return sample(px_c, pz_c)[0]
