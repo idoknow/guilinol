@@ -87,6 +87,9 @@ try{
             const dx=point[0]-probe.x,dz=point[1]-probe.z,remaining=Math.hypot(dx,dz)
             if(remaining<.38)break
             walk.drive(dx/remaining,dz/remaining,false);walk.tick(.1);probe=walk.probe()
+            if(name==='steps' && records.length>=stairCount &&
+               (probe.wet||Math.abs(probe.renderClearance)>.30||probe.resets!==initialResets))
+              throw Error('Lost plaza support at '+[probe.x,probe.z])
           }
           if(Math.hypot(probe.x-point[0],probe.z-point[1])>.4||probe.resets!==initialResets||probe.inHouse)
             throw Error(name+' at '+JSON.stringify({point,probe}))
