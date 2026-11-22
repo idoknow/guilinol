@@ -31,7 +31,7 @@ export function skyClock(params:URLSearchParams) {
   function refresh(){hours.refresh(); weathers.refresh(); flow.textContent = clock.flowing?'❚❚':'▶'
     flow.setAttribute('aria-label',clock.flowing?'暂停时间':'时间流转'); time.textContent = label(clock.hour)}
   refresh()
-  // IDOK-157: on a phone the panel eats a third of the top edge, which matters most in landscape
+  // IDOK-158: on a phone the panel eats a third of the top edge, which matters most in landscape
   // where the view is the point. Fold it down to just the clock; remember the choice so rotating
   // back and forth doesn't undo it (stored per device, ignored when storage is blocked).
   const FOLD_KEY = 'glol.skyFolded'
