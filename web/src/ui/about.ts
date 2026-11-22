@@ -9,7 +9,7 @@ const dataLines = [
 
 let mask:HTMLDivElement|undefined
 
-/** 关于：作品介绍、开源地址、数据与照片署名、版本。由主界面打开。 */
+/** 关于：作品介绍、开源地址、致谢、数据与照片署名、版本。由主界面打开。 */
 export function openAbout() {
   if (!mask) {
     mask = document.createElement('div')
@@ -21,8 +21,9 @@ export function openAbout() {
     </div>`
     const close = () => { mask!.hidden = true }
     mask.querySelector('.about-body')!.append(
-      section('这是什么', '<p>一款免费的 3D 漫游游戏。整座桂林城按真实地图搭建：山在哪、江怎么弯、街道怎么走，都和现实一一对应。你可以飞上天看两江四湖，也可以落地沿着街巷慢慢逛。</p>'),
-      section('开源', `<p>游戏完全免费，代码公开在 GitHub，欢迎任何人查看、提建议或参与制作：<br><a href="${SOURCE_URL}" target="_blank" rel="noopener">${SOURCE_URL.replace('https://', '')}</a></p>`),
+      section('这是什么', '<p>一款 3D 漫游游戏。整座桂林城按真实地图搭建：山在哪、江怎么弯、街道怎么走，都和现实一一对应。你可以飞上天看两江四湖，也可以落地沿着街巷慢慢逛。</p>'),
+      section('开源', `<p>代码公开在 GitHub，欢迎任何人查看、提建议或参与制作：<br><a href="${SOURCE_URL}" target="_blank" rel="noopener">${SOURCE_URL.replace('https://', '')}</a></p>`),
+      section('致谢', '<p>网上桂林受 <a href="https://nanningol.com" target="_blank" rel="noopener">网上南宁</a>（nanningol.com）启发而做。是他们先把一座真实的城市搬进浏览器，让我们想到也给桂林做一个——谢谢网上南宁。</p>'),
       section('地图数据', `<ul>${dataLines.map(line => `<li>${line}</li>`).join('')}</ul>`),
       section('参考照片', photoHtml()),
       section('角色', '<p>城市漫游者模型与动画为原创，以 CC0 1.0 提供。</p>'),
