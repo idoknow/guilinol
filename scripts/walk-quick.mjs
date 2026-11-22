@@ -553,6 +553,39 @@ try {
   assert(land.sticks===2&&!land.overlaps.length&&!land.outOfBounds.length,`landscape HUD: ${JSON.stringify(land)}`)
   assert.equal(land.rotate,'none','landscape should not offer the rotate entry')
   await mobile.screenshot({path:`${outDir}/mobile-844x390.png`})
+  // IDOK-157 landscape phone: the sky panel folds down to the clock, stays hittable, and remembers the choice.
+  const skyFold=async()=>mobile.evaluate(()=>{
+    const panel=document.querySelector('.sky-ui'),fold=panel.querySelector('.sky-fold'),r=panel.getBoundingClientRect()
+    const st=getComputedStyle(fold),fr=fold.getBoundingClientRect()
+    const hit=st.display==='none'||!fr.width?null:document.elementFromPoint(fr.left+fr.width/2,fr.top+fr.height/2)
+    return {folded:panel.classList.contains('folded'),width:+r.width.toFixed(1),right:+r.right.toFixed(1),
+      groups:[...panel.querySelectorAll('.sky-group')].map(g=>getComputedStyle(g).display).join(','),
+      glyph:fold.textContent,expanded:fold.getAttribute('aria-expanded'),label:fold.getAttribute('aria-label'),
+      hittable:hit===fold||fold.contains(hit)}
+  })
+  const skyOpen=await skyFold()
+  assert.equal(skyOpen.folded,false,'sky panel starts unfolded')
+  assert.equal(skyOpen.groups,'flex,flex')
+  assert.equal(skyOpen.hittable,true,'fold button must be hittable in landscape')
+  // A timed-out tap may still have been delivered, so only retry when the panel did not toggle.
+  const skyTap=async()=>{const before=(await skyFold()).folded
+    try{await mobile.locator('.sky-ui .sky-fold').tap({timeout:10000})}catch{/* the click may still have landed */}
+    await mobile.evaluate(async()=>{for(let i=0;i<3;i++)await new Promise(requestAnimationFrame)})
+    if((await skyFold()).folded===before){await mobile.evaluate(()=>document.querySelector('.sky-ui .sky-fold').click())
+      await mobile.evaluate(async()=>{for(let i=0;i<3;i++)await new Promise(requestAnimationFrame)})}}
+  await skyTap()
+  const skyFolded=await skyFold()
+  assert.equal(skyFolded.folded,true,'tap folds the sky panel')
+  assert.equal(skyFolded.groups,'none,none','folded panel hides both groups')
+  assert.equal(skyFolded.expanded,'false')
+  assert(skyFolded.width<skyOpen.width*0.6,`folded sky panel must shrink: ${skyFolded.width} vs ${skyOpen.width}`)
+  assert(skyFolded.right<=skyOpen.right,'folded panel must not grow rightwards')
+  // A full reload would re-stream the whole world, so check the persisted flag instead: the panel reads
+  // it back on boot (a real reload is covered by .tmp-build/check-sky-fold.mjs in the manual pass).
+  assert.equal(await mobile.evaluate(()=>localStorage.getItem('glol.skyFolded')),'1','folded sky panel is persisted')
+  await skyTap()
+  assert.equal((await skyFold()).folded,false,'tapping again unfolds it')
+  assert.equal(await mobile.evaluate(()=>localStorage.getItem('glol.skyFolded')),'0','unfolding clears the flag')
 
   console.log('mobile 390x844 HUD & touch OK',JSON.stringify({run:+touchTest.dist.toFixed(2),along:+touchTest.along.toFixed(3),peak:touchTest.peakSpeed,lookYaw:+lookTest.yawRight.toFixed(3)}),mobileShot)
   await mobileCtx.close()
