@@ -2,6 +2,7 @@
 import { labels, viewToken } from '../../lib/feedback-contract'
 import './ui/theme.css'
 import './admin.css'
+import {socialIcon} from './ui/social-icon'
 
 /* ───────────── DOM helpers ───────────── */
 type Child = Node | string | number | null | undefined | false | Child[]
@@ -1425,7 +1426,8 @@ function bindingCard(identity: SocialIdentity) {
     avatar.replaceChildren(image)
   }
   return h('div', { class: 'adm-bind' },
-    h('span', { class: 'adm-bind-badge', style: `background:${socialBrand[identity.type] ?? '#5d655f'}` }, identity.label),
+    h('span', { class: 'adm-bind-badge', style: `background:${socialBrand[identity.type] ?? '#5d655f'}` },
+      socialIcon(identity.type) ?? '', identity.label),
     h('div', { class: 'adm-bind-body' },
       h('b', null, identity.nickname || '（无昵称）'),
       h('span', { class: 'adm-bind-sub' },
