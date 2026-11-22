@@ -28,7 +28,9 @@ export const SOCIAL_LABELS: Record<SocialType, string> = {
 const DEFAULT_HOST = 'https://login.mapay.cn'
 const STATE_TTL = 600
 const PENDING_TTL = 300
-const MAX_STATES_PER_BROWSER = 3
+// 面板会为每个 (平台, 意图) 预取一次授权地址：最多 2 平台 × 3 意图 = 6 个并存，留余量到 8，
+// 否则早先预取的 state 被挤出 cookie，用缓存地址跳过去回调会变成 expired
+const MAX_STATES_PER_BROWSER = 8
 
 export function isSocialType(value: unknown): value is SocialType {
   return typeof value === 'string' && (SOCIAL_TYPES as readonly string[]).includes(value)
@@ -172,8 +174,16 @@ export async function startSocial(
   if (!socialConfigured(env)) throw new Problem(503, 'social_unconfigured', '第三方登录尚未启用')
   if (!enabledTypes(env).includes(type)) throw new Problem(400, 'social_disabled', '该登录方式未启用')
   if (intent === 'bind' && !userId) throw new Problem(401, 'unauthorized', '请先登录')
+  if (intent === 'bind' && userId) {
+    // 已经绑过就别再走一遍授权：之前只在回调里判冲突，用户会白跑一次授权页
+    const bound = await db
+      .prepare('SELECT 1 AS hit FROM social_identities WHERE user_id=? AND type=?')
+      .bind(userId, type)
+      .first<{ hit: number }>()
+    if (bound) throw new Problem(409, 'already_bound', '这个平台已经绑定过账号了')
+  }
   if (intent === 'register' && userId) throw new Problem(400, 'invalid_input', '注册流程不需要登录')
-  await limit(db, `social:start:${ip}`, 20, 60)
+  await limit(db, `social:start:${ip}`, 60, 60)
 
   const state = random(32)
   await db.batch([
