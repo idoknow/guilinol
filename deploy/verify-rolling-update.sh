@@ -72,7 +72,7 @@ while :; do
   fi
   # 固定节奏：按 tick 计算下一次起点，请求耗时不会把采样频率越拖越低
   next_ms=$(( start_ms + (tick + 1) * interval_ms ))
-  sleep_ms=$(( next_ms - $(($(date +%s%N)/1000000)) ))
+  sleep_ms=$(( next_ms - $(now_ms) ))
   (( sleep_ms > 0 )) && sleep "$(awk -v ms="$sleep_ms" 'BEGIN{printf "%.3f", ms/1000}')"
 done
 
