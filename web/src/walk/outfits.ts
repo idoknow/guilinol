@@ -771,6 +771,7 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
           z===OUTFIT_ZONE.BOTTOM_MAIN || z===OUTFIT_ZONE.BOTTOM_BELT ? 2 : z===OUTFIT_ZONE.SHOES_UPPER ? 3 : 0)
         skinned.geometry.setAttribute('clothZone',new THREE.BufferAttribute(ids,1))
       }
+      uniforms.schoolTop.value = Number(outfit.top === 'top_starter_campus')
       uniforms.skinTone.value.copy(skin)
       uniforms.sleeve.value = summerTop && !female ? .145 : shortSleeve ? .36 : 1
       uniforms.shortHem.value = shorts ? .56 : 0
@@ -807,12 +808,8 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
       else if (z === OUTFIT_ZONE.SHOES_ACCENT) _tmpColor.copy(cShoeAcc)
       else _tmpColor.copy(cSole)
       if (skin && figure.userData.creatorBody) {
-        const x = Math.abs(position.getX(i)), y = position.getY(i)
         const shirt = z === OUTFIT_ZONE.TOP_PRIMARY || z === OUTFIT_ZONE.TOP_SLEEVE || z === OUTFIT_ZONE.TOP_TRIM || z === OUTFIT_ZONE.TOP_INNER
-        if (shirt && starterTop) {
-          _tmpColor.copy(cPrimary)
-          if (outfit.top === 'top_starter_campus' && (x > .19 || y > 1.37)) _tmpColor.set('#536e90')
-        }
+        if (shirt && starterTop) _tmpColor.copy(cPrimary)
         if (z === OUTFIT_ZONE.BOTTOM_BELT && starterBottom) _tmpColor.copy(cBottom)
       }
       colAttr.setXYZ(i, _tmpColor.r, _tmpColor.g, _tmpColor.b)

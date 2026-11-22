@@ -15,7 +15,7 @@ const server = await createServer({
 let browser
 try {
   await server.listen()
-  browser = await chromium.launch(browserOptions(true))
+  browser = await chromium.launch(browserOptions(process.env.QA_SWIFTSHADER !== '1'))
   const page = await browser.newPage({viewport: {width: 600, height: 600}})
   await page.route('**/studio.html', (r) =>
     r.fulfill({

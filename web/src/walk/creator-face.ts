@@ -48,9 +48,19 @@ export function facialFeatures(geometry: T.BufferGeometry, a: Avatar) {
       }
   }
   for (const side of [-1, 1]) {
-    ribbon('#382e2b', (t, v) => [
-      side * (0.02 + 0.028 * t),
-      0.065 + 0.002 * t + (0.004 + 0.001 * a.eyes) * (v - 0.5) * Math.sin(Math.PI * t) ** 0.45,
+    const eyeY = 0.065,
+      halfWidth = 0.0075 + 0.001 * a.eyes
+    ribbon('#302622', (t, v) => {
+      const angle = Math.PI * t
+      return [
+        side * (0.034 - halfWidth * Math.cos(angle)),
+        eyeY + (v - 0.5) * (0.011 + 0.001 * a.eyes) * Math.sin(angle),
+        0.0018,
+      ]
+    })
+    ribbon('#4a352b', (t, v) => [
+      side * (0.034 + (2 * t - 1) * (halfWidth + 0.002)),
+      eyeY + 0.005 + (0.003 + 0.0016 * v) * Math.sin(Math.PI * t),
       0.0015,
     ])
     ribbon(new T.Color(hairColors[a.hairColor]), (t, v) => [

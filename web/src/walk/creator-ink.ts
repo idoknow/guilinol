@@ -6,6 +6,8 @@ export function streetShading(material: T.MeshStandardMaterial, garment = false)
     sleeve: {value: 1.0},
     shortHem: {value: 0},
     sandal: {value: 0},
+    schoolTop: {value: 0},
+    schoolBlue: {value: new T.Color('#536e90')},
     skinTone: {value: new T.Color()},
   }
   if (garment) material.userData.clothing = clothing
@@ -17,18 +19,21 @@ export function streetShading(material: T.MeshStandardMaterial, garment = false)
     T.Material.prototype.onBeforeCompile.call(material, shader, renderer)
     if (garment) {
       Object.assign(shader.uniforms, clothing)
+      // A zone is a per-face ID. Interpolating it can turn e.g. 1 into 0.99999994
+      // between vertices and make fragments switch between cloth and skin.
       shader.vertexShader =
-        'attribute float clothZone; varying float zone; varying vec3 rest;\n' +
+        'attribute float clothZone; flat out float zone; varying vec3 rest;\n' +
         shader.vertexShader.replace(
           '#include <begin_vertex>',
           '#include <begin_vertex>\nzone = clothZone; rest = position;',
         )
       shader.fragmentShader =
-        'varying float zone; varying vec3 rest; uniform float sleeve, shortHem, sandal; uniform vec3 skinTone;\n' +
+        'flat in float zone; varying vec3 rest; uniform float sleeve, shortHem, sandal, schoolTop; uniform vec3 skinTone, schoolBlue;\n' +
         shader.fragmentShader.replace(
           '#include <color_fragment>',
           `#include <color_fragment>
         float x = abs(rest.x);
+        if (schoolTop > 0.5 && zone == 1.0 && (x > 0.19 || rest.y > 1.37)) diffuseColor.rgb = schoolBlue;
         bool neck = sleeve < 0.2 && rest.z > -0.015 && rest.y > 1.365 + 0.102 * pow(min(1.0,x / 0.074),2.0);
         if ((zone == 1.0 && (x > sleeve || neck)) || (zone == 2.0 && rest.y < shortHem)) diffuseColor.rgb = skinTone;
         if (zone == 3.0 && sandal > 0.5 && rest.y > 0.026) {
