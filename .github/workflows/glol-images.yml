@@ -34,6 +34,7 @@ jobs:
           tar -xzf world.tar.gz -C public
           test -s public/world/manifest.json
           npm ci
+          npm run check:audio
           npx --no-install playwright install --with-deps chromium
           npm run build
       - name: Build image

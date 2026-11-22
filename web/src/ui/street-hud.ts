@@ -46,7 +46,7 @@ export function mountStreetHud(source:HudSource, opts:{phone?:boolean; onApp?:(i
       <header><span class="st-phone-time"></span><span>桂林通 5G</span></header>
       <div class="st-phone-cash"><small>余额</small><b></b></div>
       <ol class="st-apps">${APPS.map(a=>`<li><button type="button" data-app="${a.id}"><i style="--tint:${a.tint}">${a.glyph}</i><span>${a.name}</span></button></li>`).join('')}</ol>
-      <div class="st-radio"><i></i><p><b>漓江夜航 FM 97.3</b><span>原创电台 · 正在播放《解放桥上的风》</span></p></div>
+      <div class="st-radio"><i></i><p><b>漓江夜航</b><span>原创电台 · 已关闭</span></p></div>
       <footer><kbd>Tab</kbd> 收起</footer></div></aside>`
   document.body.append(root)
   const $ = <T extends HTMLElement>(sel:string)=>root.querySelector<T>(sel)!
