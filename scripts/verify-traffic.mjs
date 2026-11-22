@@ -116,3 +116,21 @@ for(const mode of ['walk','car']){
   assert.ok(contacts>0&&maxDepth<=.05&&p95<=.2)
 }
 useTrafficSolids()
+
+const classes=['primary','secondary','tertiary','residential']
+const parallel={nodes:[],lanes:[],walks:[],signals:[]}
+for(const [row,cls] of classes.entries())for(let side=0;side<2;side++){
+  const id=2*row+side,z=8*(id-4)
+  parallel.nodes.push({id:id*2,x:-124,y:0,z},{id:id*2+1,x:124,y:0,z})
+  parallel.lanes.push({id,from:id*2,to:id*2+1,kind:'motor',cls,offset:0,speedKmh:20})
+}
+const densityRun=new Traffic(parallel,()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32))
+const counts=[0,0,0,0]
+for(let tick=0;tick<1600;tick++){
+  densityRun.step(.05,{x:0,y:0,z:0})
+  if(tick>=400)for(const actor of densityRun.actors)counts[classes.indexOf(actor.track.cls)]++
+}
+for(const [index,target] of [1,.6,.35,.12].entries()){
+  const ratio=counts[index]/counts[0];console.log(classes[index],{perLaneKm:counts[index]/1200/.496,ratio})
+  assert.ok(Math.abs(ratio-target)<=.3*target)
+}

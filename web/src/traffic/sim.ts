@@ -1,5 +1,7 @@
 type Node = {id:number,x:number,y:number,z:number}
-type Lane = {id:number,from:number,to:number,offset:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number}
+type Lane = {id:number,from:number,to:number,offset:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string}
+const tier=(cls?:string)=>cls==='primary'||cls==='trunk'?0:cls==='secondary'?1:cls==='tertiary'?2:3
+const density=[1,.6,.35,.12]
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?][],signals:Signal[]}
@@ -30,6 +32,27 @@ export class Traffic {
     }
   }
   private random:()=>number
+  private anchorX=Infinity
+  private anchorZ=Infinity
+  private limits=[0,0,0,0]
+  private updateLimits(camera:Position){
+    if(Math.hypot(this.anchorX-camera.x,this.anchorZ-camera.z)<16)return
+    this.anchorX=camera.x;this.anchorZ=camera.z
+    const quota=[0,0,0,0],col=Math.floor(camera.x/128),row=Math.floor(camera.z/128)
+    for(let east=col-2;east<=col+2;east++)for(let south=row-2;south<=row+2;south++){
+      for(const track of this.cells.get(`${east},${south}`)??[]){
+        if(track.walk||track.kind!=='motor')continue
+        const dx=camera.x-track.start.x,dz=camera.z-track.start.z
+        const center=dx*track.dx+dz*track.dz,lateral=dx*track.dz-dz*track.dx
+        if(Math.abs(lateral)>=185)continue
+        const span=Math.sqrt(185**2-lateral**2),group=tier(track.cls)
+        quota[group]+=Math.max(0,Math.min(track.length,center+span)-Math.max(0,center-span))*.095*density[group]
+      }
+    }
+    const factor=Math.min(1,60/Math.max(1,quota.reduce((a,b)=>a+b,0)))
+    let sum=0
+    this.limits=quota.map(value=>{const before=Math.round(sum);sum+=value*factor;return Math.round(sum)-before})
+  }
   constructor(graph:Graph,random=Math.random){
     this.random=random
     const nodes=new Map(graph.nodes.map(node=>[node.id,node]))
@@ -87,6 +110,9 @@ export class Traffic {
     this.time+=dt
     this.actors=this.actors.filter(actor=>(!actor.leaving||actor.scale>0)&&distanceSq(actor,camera)<210**2)
     let persons=0,scooters=0
+    this.updateLimits(camera)
+    const counts=[0,0,0,0]
+    for(const actor of this.actors)if(actor.kind!=='person')counts[tier(actor.track.cls)]++
     for(const actor of this.actors){persons+=Number(actor.kind==='person');scooters+=Number(actor.kind==='scooter')}
     let motors=this.actors.length-persons
     for(let attempt=0;attempt<48 && this.actors.length<80;attempt++){
@@ -96,12 +122,14 @@ export class Traffic {
       if(!cell?.length)continue
       const track=cell[Math.floor(this.random()*cell.length)]
       const scooter=scooters<Math.round((motors+1)*.36)
+      const group=tier(track.cls)
+      if(!walk&&counts[group]>=this.limits[group])continue
       if(track.walk!==walk || (!walk&&(track.kind==='bus'||(!scooter&&track.kind==='nonmotor'))))continue
       const actor:Actor={track,dist:this.random()*track.length,speed:0,kind:walk?'person':scooter?'scooter':'car',down:0,dodge:0,x:0,y:0,z:0,yaw:0,scale:0,leaving:false,halfWidth:scooter?.3:.9,halfLength:scooter?.85:2.1,height:1.5}
       this.position(actor)
       if(distanceSq(actor,camera)>185**2 || this.actors.some(other=>(other.x-actor.x)**2+(other.z-actor.z)**2<(other.track.id===track.id?36:5)))continue
       this.actors.push(actor)
-      if(walk)persons++;else {motors++;scooters+=Number(scooter)}
+      if(walk)persons++;else {counts[group]++;motors++;scooters+=Number(scooter)}
     }
     for(const [node,queue] of this.queues){
       const retained=queue.filter(actor=>this.actors.includes(actor)&&!actor.leaving&&(actor.track.to===node||actor.track.from===node&&actor.dist<6))

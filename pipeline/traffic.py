@@ -116,6 +116,7 @@ def bake(output, manifest):
                     offset = (slot+.5-(count/2 if single else 0))*size if count>1 else 0
                     lane = dict(id=len(lanes), to=tail, width=size, offset=round(offset,2), kind='nonmotor' if kind=='cycleway' else 'bus' if kind=='busway' else 'motor',speedKmh=number(tags.get('maxspeed'),20 if kind in ('cycleway','service') else 40),oneway=single)
                     lane['from'] = head
+                    lane['cls'] = kind
                     lanes.append(lane)
                     incoming[tail].append(lane)
 
