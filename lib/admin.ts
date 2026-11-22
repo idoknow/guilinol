@@ -244,20 +244,29 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
   for (const type of movable)
     statements.push(db.prepare('UPDATE social_identities SET user_id=? WHERE user_id=? AND type=?').bind(targetId, fromId, type))
 
-  const saves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(targetId).first<{ n: number }>()
-  const tookSaves = !saves?.n
-  // 目标没有存档才接管，不会撞 user_id 主键。不要写 UPDATE OR IGNORE：SQLite 专有，生产 Postgres 直接语法错误（#146 已修过一次）
+  const targetSaves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(targetId).first<{ n: number }>()
+  const sourceSaves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(fromId).first<{ n: number }>()
+  const force = body.force === true
+  // 两边都有存档时合并只能留一份（user_id 是主键），默认拒绝，由管理员决定；
+  // 不要用 UPDATE OR IGNORE：SQLite 专有，生产 Postgres 直接语法错误
+  if (targetSaves?.n && sourceSaves?.n && !force)
+    return json({ error: { code: 'save_conflict', message: '两个账号都有存档；确认丢弃被合并账号的存档请带 force:true 重试' } }, 409)
+  const tookSaves = !targetSaves?.n && !!sourceSaves?.n
   if (tookSaves) statements.push(db.prepare('UPDATE player_saves SET user_id=? WHERE user_id=?').bind(targetId, fromId))
   // 来源是管理员而目标不是：把角色转过去，否则合并完就没人能进后台了
-  if (source.role === 'admin' && target.role !== 'admin')
+  if (source.role === 'admin' && target.role !== 'admin') {
+    // 管理员要求 verified=1：目标没验证就把角色转过去，等于谁也别想进后台
+    if (!target.verified)
+      return json({ error: { code: 'target_unverified', message: '被保留的账号未验证邮箱，先把它的邮箱验证了再合并' } }, 400)
     statements.push(db.prepare("UPDATE users SET role='admin' WHERE id=?").bind(targetId))
+  }
 
   statements.push(
     // 幂等键 (user_id,idempotency_key) 是唯一索引：先给与目标冲突的行加后缀，再整批搬过去，
     // 否则跳过冲突行会把这些行留在源账号上，随后 source 被删 → 流水凭空消失
     db
       .prepare(
-        `UPDATE player_ledger_txns SET idempotency_key = idempotency_key || '#' || tx_id
+        `UPDATE player_ledger_txns SET idempotency_key = 'merged-' || tx_id
          WHERE user_id=? AND idempotency_key IN (SELECT idempotency_key FROM player_ledger_txns WHERE user_id=?)`,
       )
       .bind(fromId, targetId),
