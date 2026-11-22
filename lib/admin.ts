@@ -196,14 +196,15 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
 
   const saves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(targetId).first<{ n: number }>()
   const tookSaves = !saves?.n
-  if (tookSaves) statements.push(db.prepare('UPDATE OR IGNORE player_saves SET user_id=? WHERE user_id=?').bind(targetId, fromId))
+  // 目标没有存档才接管，不会撞 user_id 主键。不要写 UPDATE OR IGNORE：SQLite 专有，生产 Postgres 直接语法错误（#146 已修过一次）
+  if (tookSaves) statements.push(db.prepare('UPDATE player_saves SET user_id=? WHERE user_id=?').bind(targetId, fromId))
   // 来源是管理员而目标不是：把角色转过去，否则合并完就没人能进后台了
   if (source.role === 'admin' && target.role !== 'admin')
     statements.push(db.prepare("UPDATE users SET role='admin' WHERE id=?").bind(targetId))
 
   statements.push(
     // 幂等键 (user_id,idempotency_key) 是唯一索引：先给与目标冲突的行加后缀，再整批搬过去，
-    // 否则 UPDATE OR IGNORE 会把这些行留在源账号上，随后 source 被删 → 流水凭空消失
+    // 否则跳过冲突行会把这些行留在源账号上，随后 source 被删 → 流水凭空消失
     db
       .prepare(
         `UPDATE player_ledger_txns SET idempotency_key = idempotency_key || '#' || tx_id
@@ -266,9 +267,11 @@ export async function adminSetPassword(db: D1Database, actor: string, id: string
     db
       .prepare('UPDATE users SET salt=?,digest=?,failures=0,locked_until=0 WHERE id=?')
       .bind(salt, await passwordHash(password, salt), id),
+    // audit() 用 changes()=1 判断上一条是否生效，必须紧跟 UPDATE users；
+    // 放在 DELETE sessions 后面，用户不是恰好 1 个会话就不会留审计（#146 已修过一次）
+    audit(db, actor, 'reset_password', 'user', id, { generated: !provided }),
     // 旧会话全部失效：改密码等于把人踢下线
     db.prepare('DELETE FROM sessions WHERE user_id=?').bind(id),
-    audit(db, actor, 'reset_password', 'user', id, { generated: !provided }),
   ])
   return json({ ok: true, email: user.email, password })
 }
