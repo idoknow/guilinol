@@ -86,19 +86,22 @@ def stair_flight(model,surface):
             tangent = np.subtract(line.interpolate(min(line.length,station+.28)).coords[0],
                                   line.interpolate(max(0,station-.28)).coords[0])
             normal = np.array([-tangent[1],tangent[0]])/np.linalg.norm(tangent)
-            strip = np.array(p.coords[0])+np.array([-1.,1.])[:,None]*normal
+            strip = np.array(p.coords[0])+np.array([-1.,0.,1.])[:,None]*normal
             strip -= [surface.x,surface.z]
             pairs.append([(x,surface.ground(x,z),z) for x,z in strip])
         cumulative += length
     for a,b in zip(pairs,pairs[1:]):
-        ground = np.array([a[0],a[1],b[1],b[0]])
-        top = ground.copy()
-        for i,j in ((0,3),(1,2)):
-            top[[i,j],1] = (ground[i,1]+ground[j,1])*.5+.045
-        ground[:,1] -= .04
-        model.mesh(np.vstack([top,ground]),
-                   [[0,1,2],[0,2,3],[0,5,1],[0,4,5],[1,6,2],[1,5,6],
-                    [2,7,3],[2,6,7],[3,4,0],[3,7,4]],'granite',False)
+        for side in (0,1):
+            ground = np.array([a[side],a[side+1],b[side+1],b[side]])
+            top = ground.copy()
+            top[:,1] += .035
+            for i,j in ((0,3),(1,2)):
+                lower,upper = (i,j) if top[i,1]<top[j,1] else (j,i)
+                top[lower,1] += min(.10,top[upper,1]-top[lower,1])
+            ground[:,1] -= .04
+            model.mesh(np.vstack([top,ground]),
+                       [[0,1,2],[0,2,3],[0,5,1],[0,4,5],[1,6,2],[1,5,6],
+                        [2,7,3],[2,6,7],[3,4,0],[3,7,4]],'granite',False)
 
 
 def build(model):

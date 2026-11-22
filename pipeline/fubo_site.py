@@ -78,6 +78,9 @@ class FuboSite:
                          np.minimum(edge,stair_dist*.95),-1)
         row,col = np.unravel_index(np.argmax(score),score.shape)
         self.center = np.array([x[row,col],z[row,col]],dtype=float)
+        cx,cz = self.center
+        pavilion = box(cx-3.6,cz-3.6,cx+3.6,cz+3.6)
+        self.clear_crowns = shapely.union_all([self.steps.buffer(1),self.platform,pavilion])
         self._prepare_heights(x,z,pts,edge,stair_dist,inside)
 
     def _prepare_heights(self,x,z,pts,edge,stair_dist,inside):
@@ -133,6 +136,15 @@ class FuboSite:
         self.apply_weight = np.where((foot_dist<2)&~platform,0,self.apply_weight)
         self.apply_weight[route | platform] = 1
         self.route_dist = np.minimum(stair_dist,plaza_dist)
+
+    def walkway_trees(self,packed,origin):
+        # Test the canopy, not just the trunk. Trees on the downslope side
+        # can otherwise emerge through the stone tread at eye level.
+        records = np.frombuffer(packed,dtype=np.dtype([('x','<u2'),('z','<u2'),('y','<i2'),
+                                    ('kind','u1'),('scale','u1'),('attributes','V4')]))
+        centers = shapely.points(origin[0]+records['x']/100,origin[1]+records['z']/100)
+        clearance = shapely.distance(centers,self.clear_crowns)
+        return bytearray(records[clearance>records['scale']*.05].tobytes())
 
     def level(self,x,z):
         u,v = (x-self.west)/GRID,(z-self.north)/GRID

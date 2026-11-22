@@ -449,6 +449,8 @@ def build(bbox, output, palette, workers=4):
                         st_data[slot]=rows[origin]
                 collision = json.dumps([rings, st_data, thin, asphalt], separators=(',', ':')).encode()
                 tbuf = trees[origin]
+                if tbuf and fubo is not None and tile.intersects(fubo.park):
+                    tbuf = fubo.walkway_trees(tbuf,origin)
                 if tbuf:
                     sw_tile_polys, rd_tile_polys, cycle_tile_polys = [], [], []
                     for s_item in st_data[0]:
