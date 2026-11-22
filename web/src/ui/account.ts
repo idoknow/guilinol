@@ -1,4 +1,5 @@
 import {record} from '../telemetry'
+import {socialIcon} from './social-icon'
 import './account.css'
 
 // 账号：登录 / 注册（填写 → 邮箱验证 → 完成）/ 忘记密码 / 我的账号。
@@ -164,8 +165,10 @@ function build(){
     row.className='acc-social'
     for(const option of options){
       const button=document.createElement('button')
-      button.type='button';button.className='ui-btn ui-btn--ghost'
-      button.textContent=`用${option.label}${intent==='bind'?'绑定':intent==='register'?'注册':'登录'}`
+      button.type='button';button.className='ui-btn ui-btn--ghost acc-social-btn'
+      const icon=socialIcon(option.type)
+      if(icon)button.append(icon)
+      button.append(document.createTextNode(`用${option.label}${intent==='bind'?'绑定':intent==='register'?'注册':'登录'}`))
       button.onclick=()=>{if(!busy)void submit(async()=>{await startSocial(option.type,intent)})}
       row.append(button)
     }
@@ -183,10 +186,14 @@ function build(){
       verify:`六位验证码已发到 ${email||'你的邮箱'}，10 分钟内有效。没收到可以看看垃圾邮件。`,forgot:'输入注册时用的邮箱，我们会发一个六位验证码给你。',
       reset:'输入邮箱里的验证码，再设一个新密码。',profile:'',
       social:pendingSocial?.intent==='register'?(socialPhase==='code'?`验证码已发到 ${email}，10 分钟内有效。`:'填写邮箱和密码，验证通过后才会创建账号并绑定这个第三方账号。'):''}[next]
-    if(next==='social'&&pendingSocial){const badge=document.createElement('span'),info=document.createElement('div')
-      badge.className='acc-avatar';badge.textContent=initial(pendingSocial.nickname)
-      if(pendingSocial.avatar){const image=document.createElement('img');image.alt=`${pendingSocial.label} 头像`;image.referrerPolicy='no-referrer';image.loading='lazy'
-        image.src=pendingSocial.avatar;image.onerror=()=>image.remove();badge.replaceChildren(image)}
+    if(next==='social'&&pendingSocial){const social=pendingSocial,badge=document.createElement('span'),info=document.createElement('div')
+      const letter=initial(social.nickname),platformIcon=socialIcon(social.type,28)
+      badge.className='acc-avatar';badge.textContent=letter
+      if(platformIcon){badge.classList.add('acc-avatar--brand');badge.replaceChildren(platformIcon)}
+      if(social.avatar){const image=document.createElement('img');image.alt=`${social.label} 头像`;image.referrerPolicy='no-referrer';image.loading='lazy'
+        image.src=social.avatar
+        image.onerror=()=>badge.replaceChildren(...(platformIcon?[platformIcon]:[document.createTextNode(letter)]))
+        badge.replaceChildren(image)}
       info.innerHTML='<b></b><small></small>'
       info.querySelector('b')!.textContent=`${pendingSocial.label} · ${pendingSocial.nickname||'（无昵称）'}`
       info.querySelector('small')!.textContent={login:'确认后即可登录已绑定的账号',bind:'确认后把它绑定到当前账号',

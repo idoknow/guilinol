@@ -272,8 +272,7 @@ spec:
         - name: PUBLIC_ORIGIN
           value: https://glol.rcpd.cc
         # 聚合登录：appid/appkey 只来自 secret，平台开关与回调地址是明文配置
-        # optional: true —— secret 没配时 pod 照常启动，只是聚合登录自己报未配置，
-        # 不会像必需 key 那样把整个站点拖成 CreateContainerConfigError
+        # optional: true —— secret 缺 key 时 pod 照常启动，聚合登录自己返回 social_unconfigured，不拖垮整站
         - name: SOCIAL_APPID
           valueFrom:
             secretKeyRef:
