@@ -13,6 +13,13 @@
 .rotate-go{min-width:180px;min-height:var(--ui-h-lg);font-size:16px}
 .rotate-skip{margin-top:2px;padding:10px 16px;border:0;background:none;color:var(--ui-paper-dim);font:400 13px/1 var(--ui-serif);letter-spacing:.1em;text-decoration:underline;text-underline-offset:4px;text-decoration-color:var(--ui-glass-line);cursor:pointer;-webkit-tap-highlight-color:transparent}
 .rotate-phone{width:116px;height:116px}
+/* IDOK-144 follow-up: the dock's landscape entry. Portrait phones only — the whole dock hides in landscape photo mode,
+   and desktop/landscape keeps the one column it already had. Beats `.dock-buttons>button{display:flex}` on specificity. */
+.dock-buttons>.dock-rotate{display:none}
+@media (orientation:portrait) and (pointer:coarse) and (max-width:600px){
+  .dock-buttons>.dock-rotate{display:flex}
+  body[data-home] .dock-buttons>.dock-rotate{display:none}
+}
 .rotate-device rect:first-child{fill:var(--ui-ink-800);stroke:var(--ui-paper);stroke-width:2.5}
 .rotate-screen{fill:var(--ui-jade-500)}
 .rotate-peaks{fill:var(--ui-jade-300)}

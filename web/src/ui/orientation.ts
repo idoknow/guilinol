@@ -7,6 +7,7 @@ import './orientation.css'
 // CSS decides visibility (portrait + coarse pointer + narrow), so rotating back hides it with no JS involved.
 
 const SKIP_KEY='glol.portraitOk'
+const HINT='请把手机横过来。若画面不转，先在控制中心关闭「竖排方向锁定」。'
 let armed=false
 
 export function armOrientationGate(){
@@ -34,13 +35,28 @@ export function armOrientationGate(){
   go.addEventListener('click',async()=>{
     if(await lockLandscape())return
     go.hidden=true
-    msg.textContent='请把手机横过来。若画面不转，先在控制中心关闭「竖排方向锁定」。'
+    msg.textContent=HINT
   })
   gate.querySelector('.rotate-skip')!.addEventListener('click',()=>{
     sessionStorage.setItem(SKIP_KEY,'1')
     gate.remove()
   })
   document.body.append(gate)
+}
+
+// The gate above can be dismissed ("竖屏继续"), and that escape sticks for the session, so the in-game dock keeps a
+// one-tap way back to landscape: same fullscreen+lock attempt, same fallback sentence, no card in the way. CSS shows it
+// only on narrow portrait coarse screens, so landscape and desktop never see it.
+export function mountLandscapeEntry(host:HTMLElement){
+  if(host.querySelector('.dock-rotate'))return
+  const entry=document.createElement('button')
+  entry.type='button'; entry.className='dock-rotate'; entry.textContent='横屏'
+  entry.setAttribute('aria-label','横屏游玩'); entry.title='横屏游玩（横过手机）'
+  entry.addEventListener('click',async()=>{
+    if(await lockLandscape())return
+    window.dispatchEvent(new CustomEvent('walk:toast',{detail:{text:HINT,ms:3600}}))
+  })
+  host.append(entry)
 }
 
 async function lockLandscape():Promise<boolean>{

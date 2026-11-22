@@ -422,6 +422,20 @@ try {
   assert.deepEqual(hud.overlaps,[],`HUD overlap: ${JSON.stringify(hud)}`)
   assert.deepEqual(hud.outOfBounds,[],`HUD out of bounds: ${JSON.stringify(hud)}`)
 
+  // IDOK-144: 竖屏继续 silences the rotate gate for the session, so the dock keeps its own one-tap landscape entry.
+  const rotateEntry=await mobile.evaluate(()=>{
+    const btn=document.querySelector('.dock-buttons>.dock-rotate')
+    if(!btn)return {missing:true}
+    const st=getComputedStyle(btn), r=btn.getBoundingClientRect(), host=document.querySelector('.dock-buttons').getBoundingClientRect()
+    return {missing:false,visible:st.display!=='none'&&!btn.hidden,text:btn.textContent.trim(),label:btn.getAttribute('aria-label'),
+      inside:r.left>=-.5&&r.top>=-.5&&r.right<=390.5&&r.bottom<=844.5,
+      aligned:Math.abs(host.right-r.right)<=1.5&&r.height>=30,
+      gate:(()=>{const gate=document.querySelector('.rotate-gate');return gate?getComputedStyle(gate).display:'absent'})()}
+  })
+  assert(!rotateEntry.missing&&rotateEntry.visible&&rotateEntry.text==='横屏'&&rotateEntry.label==='横屏游玩'&&rotateEntry.inside&&rotateEntry.aligned,
+    `portrait landscape entry: ${JSON.stringify(rotateEntry)}`)
+  assert(rotateEntry.gate!=='grid','portrait gate should stay dismissed after 竖屏继续')
+
   // Tap sprint toggle so screenshot also shows active HUD harmony, then verify touch look + joystick + jump.
   await mobile.locator('.walk-ui .btn-run').tap()
   await mobile.waitForFunction(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on'))
@@ -532,9 +546,12 @@ try {
       const ox=Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left)), oy=Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top))
       if(ox*oy>0)overlaps.push({a:a.sel,b:b.sel,area:+(ox*oy).toFixed(1)})
     }
-    return {sticks:boxes.filter(b=>b.sel.includes('stick')).length,overlaps,outOfBounds:boxes.filter(b=>b.left<0||b.top<0||b.right>844.5||b.bottom>390.5).map(b=>b.sel)}
+    return {sticks:boxes.filter(b=>b.sel.includes('stick')).length,overlaps,
+      outOfBounds:boxes.filter(b=>b.left<0||b.top<0||b.right>844.5||b.bottom>390.5).map(b=>b.sel),
+      rotate:getComputedStyle(document.querySelector('.dock-buttons>.dock-rotate')).display}
   })
   assert(land.sticks===2&&!land.overlaps.length&&!land.outOfBounds.length,`landscape HUD: ${JSON.stringify(land)}`)
+  assert.equal(land.rotate,'none','landscape should not offer the rotate entry')
   await mobile.screenshot({path:`${outDir}/mobile-844x390.png`})
 
   console.log('mobile 390x844 HUD & touch OK',JSON.stringify({run:+touchTest.dist.toFixed(2),along:+touchTest.along.toFixed(3),peak:touchTest.peakSpeed,lookYaw:+lookTest.yawRight.toFixed(3)}),mobileShot)
