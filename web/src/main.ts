@@ -258,10 +258,12 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     let completed=false
     const controller=new AbortController(),signal=titleTransition?.signal??controller.signal
     const parent=titleTransition?.view
-    const cover=parent??veil(reason==='flight'||reason.startsWith('solo')?'正在落地':reason==='creator'?'正在进入桂林':`正在前往${name?' '+name:'目的地'}`,{onCancel:titleTransition?.cancel??(()=>controller.abort())})
+    const cover=parent??veil(reason==='flight'||reason.startsWith('solo')?'正在落地':reason==='creator'?'正在进入桂林':`正在前往${name?' '+name:'目的地'}`,{onCancel:titleTransition?.cancel??(()=>controller.abort()),destination:name})
     try{
       signal.throwIfAborted();primeLanding(x,z,signal)
       const player=await loadWalker()
+      // Travel: let the haze close fully before the camera jumps, so the cut is never seen.
+      if(name&&!parent&&!matchMedia('(prefers-reduced-motion: reduce)').matches)await new Promise(resolve=>setTimeout(resolve,450))
       if(signal.aborted)return false
       cover.progress(.3,'步行模块已就绪')
       completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)

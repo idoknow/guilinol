@@ -1,8 +1,120 @@
-#boot.ld-full{z-index:110;transition:opacity 420ms}.ld-full .boot-card{width:min(360px,80vw)}
-.ld-full .boot-bar{height:4px;overflow:visible;margin:20px 0 12px}.ld-full .boot-bar i{position:relative;width:calc(100% * var(--fraction,0));height:100%}.ld-full .boot-bar i:after{content:'';position:absolute;right:-3px;top:-1px;width:6px;height:6px;border-radius:50%;background:inherit}
-.ld-full.failed .boot-bar i{background:var(--ui-error)}.boot-bar.idle i{animation:ld-breathe 2.4s ease-in-out}.ld-full #boot-msg{margin:0}.ld-full .ld-detail,.ld-full .ld-tip{font-size:11px;opacity:.6;min-height:1.4em}.ld-percent{float:right;font-variant-numeric:tabular-nums}.ld-tip{transition:opacity 400ms}.ld-tip.dim{opacity:0}.ld-actions>*{margin:6px}
-.ld-veil{position:fixed;inset:0;z-index:111;display:grid;place-items:center;background:var(--ui-glass-strong);backdrop-filter:var(--ui-blur);color:var(--ui-paper)}.ld-veil section{text-align:center;width:240px;padding:24px;background:var(--ui-glass);border-radius:var(--ui-r-lg)}.ld-veil svg{width:40px;fill:none;stroke:var(--ui-glass-line-soft);stroke-width:3}.ld-veil .arc{stroke:var(--ui-seal-light);transform:rotate(-90deg);transform-origin:center}.ld-veil button{display:block;margin:12px auto 0}
-.ld-corner,.ld-skeleton{position:fixed;z-index:60;background:var(--ui-glass);color:var(--ui-paper);border-radius:var(--ui-r-pill);padding:8px 12px}.ld-corner{right:16px;bottom:110px;pointer-events:none;font-size:11px;animation:ld-in 200ms}.ld-corner:before,.ld-inline[aria-busy=true]:after{content:'';display:inline-block;width:16px;height:16px;border:1px solid var(--ui-glass-line);border-top-color:currentColor;border-radius:50%;animation:ld-spin 1s linear infinite;vertical-align:middle;margin-inline:5px}.ld-inline[aria-busy=true]:after{width:12px;height:12px}.ld-inline progress{display:block;height:4px;accent-color:var(--ui-seal)}.ld-skeleton{left:50%;top:50%;transform:translate(-50%,-50%);width:200px;border-radius:var(--ui-r-lg)}.ld-skeleton i{display:block;height:10px;margin:10px;background:var(--ui-paper-2);border-radius:var(--ui-r-sm);animation:ld-in 1s alternate infinite}.ld-skeleton i:last-child{width:60%}
-@keyframes ld-spin{to{transform:rotate(360deg)}}@keyframes ld-in{from{opacity:.25}to{opacity:1}}@keyframes ld-breathe{0%,100%{filter:brightness(1)}25%{filter:brightness(.92)}75%{filter:brightness(1.08)}}
-@media(max-width:600px){.ld-corner{right:auto;bottom:auto;left:50%;top:calc(env(safe-area-inset-top) + 12px);transform:translateX(-50%)}}
-@media(prefers-reduced-motion:reduce){#boot.ld-full{transition:opacity 120ms!important}.ld-skeleton i,.ld-corner,.ld-corner:before,.ld-inline:after,.boot-bar.idle i{animation:none!important}}
+/* 载入（IDOK-140）——三级：进城全屏卡 / 场景雾幕 / 角落街区胶囊。只用 theme.css 的 --ui-* 变量。 */
+
+/* ── 一级 · 进城 ─────────────────────────────────────────── */
+#boot.ld-full{z-index:110;transition:opacity 420ms var(--ui-ease)}
+.ld-full .boot-card{width:min(360px,80vw)}
+.ld-full .boot-card h1{margin-bottom:22px}
+
+/* 填充和圆点都用 transform 推进：合成线程上跑，主线程忙着解码街区时也不会和百分比脱节 */
+.ld-full .boot-bar{position:relative;height:4px;overflow:visible;border-radius:2px;background:rgba(42,61,60,.14)}
+.ld-full .boot-bar i,.ld-full .boot-bar b{position:absolute;inset:0;transition:transform .35s var(--ui-ease)}
+.ld-full .boot-bar i{width:auto;border-radius:2px;background:linear-gradient(90deg,var(--ui-seal),var(--ui-seal-hi));
+  transform-origin:left center;transform:scaleX(var(--fraction,0))}
+.ld-full .boot-bar b{transform:translateX(calc((var(--fraction,0) - 1) * 100%));pointer-events:none}
+.ld-full .boot-bar b:after{content:'';position:absolute;right:-4px;top:-2px;width:8px;height:8px;border-radius:50%;
+  background:var(--ui-seal);box-shadow:0 0 0 3px var(--ui-seal-wash)}
+.ld-full .boot-bar.idle i{animation:ld-breathe 2.4s ease-in-out infinite}
+
+.ld-row{display:flex;justify-content:space-between;align-items:baseline;margin-top:14px}
+.ld-full .boot-card .ld-row p{margin:0;font-size:13px;letter-spacing:.14em;opacity:.86}
+.ld-percent{font:600 15px/1 var(--ui-serif);color:var(--ui-seal);font-variant-numeric:tabular-nums}
+.ld-percent:not(:empty):after{content:'%';margin-left:1px;font-size:10px;opacity:.7}
+.ld-full .boot-card .ld-detail{margin:5px 0 0;min-height:1.4em;text-align:left;font-size:11px;letter-spacing:.06em;
+  font-variant-numeric:tabular-nums;opacity:.55}
+
+.ld-tipbox{margin-top:30px;padding-top:16px;border-top:1px solid rgba(42,61,60,.12)}
+.ld-tipbox small{display:inline-block;margin-bottom:8px;padding:1px 6px 1px 8px;border:1px solid var(--ui-seal);border-radius:3px;
+  color:var(--ui-seal);font-size:10px;letter-spacing:.3em}
+.ld-full .boot-card .ld-tip{margin:0;min-height:3.4em;font-size:12px;line-height:1.7;letter-spacing:.08em;opacity:.7;
+  transition:opacity .4s var(--ui-ease)}
+.ld-full .boot-card .ld-tip.dim{opacity:0}
+
+.ld-full.failed .boot-bar i{background:rgba(169,80,60,.32);animation:none}
+.ld-full.failed .boot-bar b{display:none}
+.ld-full.failed #boot-msg{color:var(--ui-seal);opacity:1}
+.ld-full.failed .ld-percent{display:none}
+.ld-full.failed .ld-detail{opacity:.78}
+
+/* 按钮：实心印章红 + 描边次按钮 */
+.ld-actions{display:flex;justify-content:center;gap:10px;margin-top:20px}
+.ld-actions[hidden]{display:none}
+.ld-btn{display:inline-flex;align-items:center;justify-content:center;height:34px;padding:0 20px;border:1px solid var(--ui-seal);
+  border-radius:var(--ui-r-pill);background:var(--ui-seal);color:var(--ui-paper);font-family:inherit;font-size:13px;font-weight:500;line-height:1;letter-spacing:.14em;
+  text-decoration:none;cursor:pointer;transition:background var(--ui-fast),border-color var(--ui-fast),color var(--ui-fast)}
+.ld-btn:hover{background:var(--ui-seal-hi);border-color:var(--ui-seal-hi)}
+.ld-btn:focus-visible{outline:2px solid var(--ui-seal-light);outline-offset:2px}
+.ld-btn.ghost{background:transparent;border-color:rgba(42,61,60,.28);color:var(--ui-ink-800)}
+.ld-btn.ghost:hover{border-color:var(--ui-ink-800);background:rgba(42,61,60,.05)}
+.ld-btn:disabled{opacity:.5;cursor:default}
+.ld-cancel{margin-top:18px}
+.ld-cancel[hidden]{display:none}
+
+/* ── 二级 · 场景雾幕 ─────────────────────────────────────── */
+.ld-veil{position:fixed;inset:0;z-index:111;display:grid;place-items:center;color:var(--ui-paper);opacity:0;
+  background:radial-gradient(ellipse at 50% 45%,rgba(214,226,224,.42),rgba(20,33,30,.66));
+  -webkit-backdrop-filter:blur(6px) saturate(.9);backdrop-filter:blur(6px) saturate(.9);transition:opacity .28s var(--ui-ease)}
+.ld-veil.in{opacity:1}
+.ld-veil section{min-width:220px;padding:22px 28px 20px;text-align:center;border:1px solid var(--ui-glass-line-soft);
+  border-radius:var(--ui-r-lg);background:var(--ui-glass-strong);box-shadow:var(--ui-shadow-2)}
+.ld-veil svg{display:block;width:44px;height:44px;margin:0 auto;fill:none;stroke:var(--ui-glass-line-soft);stroke-width:3}
+.ld-veil .arc{stroke:var(--ui-seal-light);stroke-linecap:round;transform:rotate(-90deg);transform-origin:center;
+  transition:stroke-dasharray .3s var(--ui-ease)}
+.ld-veil p{margin:14px 0 4px;font:500 14px/1.4 var(--ui-serif);letter-spacing:.2em}
+.ld-veil small{display:block;min-height:1.4em;font-size:11px;letter-spacing:.06em;font-variant-numeric:tabular-nums;opacity:.7}
+.ld-veil .ld-btn{margin:14px auto 0}
+.ld-veil .ld-btn.ghost{border-color:var(--ui-glass-line);color:var(--ui-paper)}
+.ld-veil .ld-btn.ghost:hover{border-color:var(--ui-paper);background:rgba(244,239,226,.08)}
+.ld-veil .ld-btn[hidden]{display:none}
+.ld-place{display:none}
+
+/* 去某处：雾立刻起，地名居中；300 ms 后还没到才出现进度环 */
+.ld-veil.travel{background:radial-gradient(ellipse at 50% 55%,rgba(232,236,230,.97),rgba(205,218,214,.98));color:#3b4a45;
+  -webkit-backdrop-filter:none;backdrop-filter:none;transition-duration:.45s}
+.ld-veil.travel section{border-color:transparent;background:none;box-shadow:none}
+.ld-veil.travel svg{stroke:rgba(42,61,60,.16)}
+.ld-veil.travel .arc{stroke:var(--ui-seal)}
+.ld-veil.travel .ld-btn.ghost{border-color:rgba(42,61,60,.28);color:var(--ui-ink-800)}
+.ld-veil.travel .ld-place{display:block;font:600 36px/1.2 var(--ui-serif);letter-spacing:.42em;padding-left:.42em;
+  transform:translateY(8px);transition:transform .6s var(--ui-ease)}
+.ld-veil.travel.in .ld-place{transform:none}
+.ld-veil.travel:not(.busy) svg,.ld-veil.travel:not(.busy) p,.ld-veil.travel:not(.busy) small{visibility:hidden}
+.ld-veil.travel svg{width:28px;height:28px;margin-top:18px}
+.ld-veil.travel p{font-size:12px;letter-spacing:.16em;opacity:.8}
+
+/* ── 三级 · 角落 ─────────────────────────────────────────── */
+.ld-corner{position:fixed;right:16px;bottom:110px;z-index:55;display:flex;align-items:center;gap:7px;padding:6px 12px 6px 9px;
+  border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-pill);background:var(--ui-glass);
+  -webkit-backdrop-filter:var(--ui-blur);backdrop-filter:var(--ui-blur);color:var(--ui-paper);font-size:11px;letter-spacing:.08em;
+  font-variant-numeric:tabular-nums;pointer-events:none;animation:ld-in .2s var(--ui-ease)}
+.ld-corner[hidden]{display:none}
+.ld-corner i,.ld-inline[aria-busy=true]:after{content:'';display:inline-block;width:12px;height:12px;box-sizing:border-box;
+  border:1.5px solid var(--ui-glass-line);border-top-color:var(--ui-seal-light);border-radius:50%;animation:ld-spin .9s linear infinite}
+.ld-inline[aria-busy=true]:after{margin-left:6px;vertical-align:-2px}
+.ld-inline progress{display:block;width:100%;height:3px;margin-top:6px;accent-color:var(--ui-seal)}
+
+.ld-skeleton{position:fixed;left:50%;top:50%;z-index:60;width:220px;padding:12px 14px;transform:translate(-50%,-50%);
+  border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-lg);background:var(--ui-glass-solid);box-shadow:var(--ui-shadow-1)}
+.ld-skeleton i{display:block;height:9px;margin:9px 0;border-radius:var(--ui-r-sm);
+  background:linear-gradient(90deg,rgba(244,239,226,.12) 30%,rgba(244,239,226,.26) 50%,rgba(244,239,226,.12) 70%) 0 0/300% 100%;
+  animation:ld-shimmer 1.4s linear infinite}
+.ld-skeleton i:nth-child(2){width:82%}
+.ld-skeleton i:last-child{width:56%}
+
+@keyframes ld-spin{to{transform:rotate(360deg)}}
+@keyframes ld-in{from{opacity:0}to{opacity:1}}
+@keyframes ld-shimmer{from{background-position:100% 0}to{background-position:0 0}}
+@keyframes ld-breathe{0%,100%{filter:brightness(1)}50%{filter:brightness(1.14)}}
+
+/* 触屏：右下是摇杆和动作键，顶部被账号/天气/小地图占满——放到左侧「视野」下面 */
+@media (pointer:coarse){
+  .ld-corner{right:auto;bottom:auto;left:calc(12px + env(safe-area-inset-left));top:calc(192px + env(safe-area-inset-top))}
+}
+@media (max-width:600px){
+  .ld-veil.travel .ld-place{font-size:26px}
+}
+@media (prefers-reduced-motion:reduce){
+  #boot.ld-full{transition:opacity 120ms!important}
+  .ld-veil{transition:none}
+  .ld-full .boot-bar i,.ld-full .boot-bar b,.ld-veil .arc,.ld-veil.travel .ld-place{transition:none}
+  .ld-skeleton i,.ld-corner,.ld-corner i,.ld-inline:after,.ld-full .boot-bar.idle i{animation:none!important}
+}

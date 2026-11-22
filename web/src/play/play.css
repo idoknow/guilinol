@@ -51,12 +51,6 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 .atlas-legend{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);margin:0;font:12px var(--serif);color:var(--ink-soft);
   background:rgba(252,250,243,.85);padding:4px 12px;border-radius:12px;white-space:nowrap;pointer-events:none}
 
-/* Teleport veil: fades to the horizon haze colour with the destination written large. */
-.veil{position:fixed;inset:0;z-index:20;display:grid;place-items:center;pointer-events:none;opacity:0;transition:opacity .5s ease;
-  background:radial-gradient(ellipse at 50% 55%,rgba(232,236,230,.97),rgba(205,218,214,.98))}
-.veil.show{opacity:1;pointer-events:auto}
-.veil span{font:600 44px/1 var(--serif);letter-spacing:.5em;padding-left:.5em;color:#3b4a45;opacity:.85;transform:translateY(8px);transition:transform .9s ease}
-.veil.show span{transform:none}
 
 /* Spot card: rice paper sheet sliding in from the right; bottom sheet on phones. */
 .spot-card{position:fixed;right:calc(16px + env(safe-area-inset-right));top:50%;width:300px;box-sizing:border-box;z-index:6;
