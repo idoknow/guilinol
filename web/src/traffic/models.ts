@@ -212,13 +212,14 @@ export function trafficModels(){
   const scooters=[add(scooter(0xeeece6,0xf0f0ea)),add(scooter(0x8fb4c4,0xd8423a)),add(scooter(0x2d3135,0x3e74c4)),
     add(scooter(0x3a3e42,0xe6b23a,0xe6b23a)),add(scooter(0x3a3e42,0x2f7fd0,0x2f7fd0))]
   const people=[add(person(0x22262e,'short')),add(person(0x6b5a48,'long')),add(person(0x3a4250,'hat')),add(person(0x2b2d33,'bag')),add(person(0x8f8a80,'short'))]
-  const pools:Record<'car'|'scooter'|'person',Pool>={
+  const pools:Record<'car'|'scooter'|'person'|'parked',Pool>={
+    parked:{ids:[sedan,hatch,suv,cab],weights:[42,19,29,10],paints:carPaints},
     car:{ids:[sedan,hatch,suv,van,lorry,cab],weights:[34,17,24,8,5,10],paints:carPaints},
     scooter:{ids:scooters,weights:[3,3,2,2,2],paints:shirtPaints},
     person:{ids:people,weights:[3,3,1,2,2],paints:shirtPaints},
   }
   const plain=new T.Color(1,1,1)
-  const variant=(kind:'car'|'scooter'|'person',u:number,v:number):Variant=>{
+  const variant=(kind:keyof typeof pools,u:number,v:number):Variant=>{
     const pool=pools[kind],geometry=pick(pool.ids.map((id,i)=>({id,w:pool.weights[i]})),u).id
     return {geometry,paint:geometry===cab||geometry===patrol?plain:new T.Color(pick(pool.paints,v).hex)}
   }

@@ -1,9 +1,6 @@
 import * as THREE from 'three'
 import {MAX_ACTORS,Traffic,type Graph} from './sim'
-import {getState} from '../game/state'
 import {curbside,staticSolids,useTrafficSolids,type Solid,contactSamples,sampleContacts} from './contact'
-import {onPlayMode} from '../game/play-mode'
-import type {Pursuit} from './pursuit'
 import {trafficModels,trafficMaterial,type Variant} from './models'
 
 async function loadGraph(key:string){
@@ -33,13 +30,9 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   const parts={spawn:[] as number[],grid:[] as number[],motion:[] as number[]};mesh.userData.stepParts=parts
   const profile=verify?(spawn:number,grid:number,motion:number)=>{const index=sampleIndex%256;parts.spawn[index]=spawn;parts.grid[index]=grid;parts.motion[index]=motion}:undefined
   if(verify)mesh.userData.motorIds=[]
-  // 'G2 traffic' / 'G4 patrol' stay as invisible box proxies: verify probes (counts, pixel ids) read them.
   mesh.name='G2 traffic';mesh.count=0;mesh.visible=false;mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(mesh)
-  let pursuit:Pursuit|undefined,loadingPursuit=false
-  const police=new THREE.InstancedMesh(mesh.geometry,mesh.material,5)
-  police.name='G4 patrol';police.count=0;police.visible=false;police.frustumCulled=false;scene.add(police)
   const parkingIndex:Record<string,number>=await fetch('/world/roads/parking/index.json').then(r=>r.ok?r.json():{}).catch(()=>({}))
-  const models=trafficModels(),PATROL=MAX_ACTORS,STATIC=PATROL+5,SLOTS=STATIC+9*Math.max(0,...Object.values(parkingIndex))
+  const models=trafficModels(),STATIC=MAX_ACTORS,SLOTS=STATIC+9*Math.max(0,...Object.values(parkingIndex))
   const batch=new THREE.BatchedMesh(SLOTS,models.geometries.reduce((sum,g)=>sum+g.attributes.position.count,0),0,trafficMaterial())
   batch.name='G2 traffic visuals';batch.frustumCulled=false;batch.perObjectFrustumCulled=true;scene.add(batch)
   const geometryIds=models.geometries.map(g=>batch.addGeometry(g))
@@ -55,8 +48,6 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     pose.updateMatrix();batch.setMatrixAt(slot,pose.matrix)
   }
   const hide=(from:number,to:number)=>{for(let slot=from;slot<to;slot++)if(slotShown[slot]){batch.setVisibleAt(slot,false);slotShown[slot]=0}}
-  const patrolVariant:Variant={geometry:models.police,paint:new THREE.Color(1,1,1)}
-  onPlayMode(mode=>{if(mode==='tour'){pursuit?.end('tour');police.count=0;police.visible=false;hide(PATROL,STATIC)}})
   type Row=[number,number,number,number,number,string]
   let parkKey='',parkCount=0
   const cache=new Map<string,Promise<Row[]>>()
@@ -78,7 +69,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       if(target!==parkKey)return
       curbside.clear();let count=0
       for(const rows of groups)for(const [x,y,z,yaw,seed] of rows){
-        const variant=models.variant('car',(seed%256)/256,(seed>>>8)/256),geometry=models.geometries[variant.geometry]
+        const variant=models.variant('parked',(seed%256)/256,(seed>>>8)/256),geometry=models.geometries[variant.geometry]
         if(!geometry.boundingBox)geometry.computeBoundingBox();const {min,max}=geometry.boundingBox!
         curbside.add({x,y,z,yaw,halfWidth:Math.max(-min.x,max.x),halfLength:Math.max(-min.z,max.z),height:max.y})
         show(STATIC+count++,variant,x,y,z,yaw,1)
@@ -87,11 +78,12 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     }).catch(error=>{if(target===parkKey){parkKey='';cache.clear()}console.warn('Parking cell unavailable',error)})
   }
   const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);staticSolids(x,z,visit)}
-  let accumulator=0,pursuitDt=0
-  return (dt:number,vehicle?:THREE.Vector3,player?:THREE.Vector3,solo=false,enabled=true)=>{
+  let accumulator=0
+  return (dt:number,vehicle?:THREE.Vector3,_player?:THREE.Vector3,_solo=false,enabled=true)=>{
     useTrafficSolids(enabled?near:undefined)
     if(!enabled){mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();return}
     updateParking(camera.position.x,camera.position.z)
+    if(verify&&mesh.userData.staticOnly){hide(0,STATIC);mesh.count=0;mesh.userData.allMotors=[];return}
     const target=`${Math.floor(camera.position.x/512)}_${Math.floor(camera.position.z/512)}`
     if(target!==key){
       key=target
@@ -100,27 +92,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
         if(verify){mesh.userData.loads.push(sample);if(mesh.userData.loads.length>64)mesh.userData.loads.shift()}
         if(sim)next.inherit(sim);sim=next
       }).catch(error=>console.warn('Traffic cell unavailable',error))
-      else {sim=undefined;mesh.count=0;hide(0,PATROL)}
-    }
-    if(solo&&vehicle&&!pursuit&&!loadingPursuit){
-      loadingPursuit=true
-      void import('./pursuit').then(({Pursuit})=>{pursuit=new Pursuit()}).catch(error=>console.warn('Pursuit unavailable',error))
-    }
-    if(solo&&player&&pursuit){
-      pursuitDt+=Math.min(dt,.2)
-      if(pursuitDt>=.05){
-        const state=getState()
-        pursuit.step(pursuitDt,sim,player,vehicle&&state.mode!=='boat'?state.vehicle?.id:undefined)
-        police.count=pursuit.officers.length
-        pursuit.officers.forEach((officer,index)=>{
-          object.position.set(officer.x,officer.y+.65,officer.z);object.rotation.y=officer.yaw
-          object.scale.set(1.75,1.3,4);object.updateMatrix();police.setMatrixAt(index,object.matrix)
-          show(PATROL+index,patrolVariant,officer.x,officer.y,officer.z,officer.yaw,1)
-        })
-        hide(PATROL+police.count,STATIC)
-        if(police.count)police.instanceMatrix.needsUpdate=true
-        pursuitDt=0
-      }
+      else {sim=undefined;mesh.count=0;hide(0,STATIC)}
     }
     if(!sim)return
     accumulator+=Math.min(dt,.2)
@@ -155,7 +127,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       }
       show(index,variant,actor.x,actor.y,actor.z,actor.yaw,actor.scale,actor.kind==='person'&&actor.down>0)
     })
-    hide(sim.actors.length,SLOTS)
+    hide(sim.actors.length,STATIC)
     mesh.instanceMatrix.needsUpdate=true
     if(verify)Object.assign(mesh.userData,{motors,queued,redStops})
   }

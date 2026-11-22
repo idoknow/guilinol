@@ -34,6 +34,13 @@ try{
     await page.evaluate(({x,y,z,yaw})=>{const camera=window.viewer.camera;camera.position.set(x,y,z);camera.lookAt(x+20*Math.sin(yaw),y-4,z+20*Math.cos(yaw));camera.updateMatrixWorld()},shot)
     await page.waitForFunction(({x,z})=>{const viewer=window.viewer;return viewer.trafficProbe?.loads.at(-1)?.key===`${Math.floor(x/512)}_${Math.floor(z/512)}`&&!viewer.stats.pending&&viewer.trafficProbe.allMotors?.length>=1},shot,{timeout:120000})
     await page.waitForFunction(frame=>window.viewer.stats.frame>=frame+15,await page.evaluate(()=>window.viewer.stats.frame),{timeout:120000})
+    if(shot.name==='residential'){
+      await page.evaluate(()=>{window.viewer.trafficProbe.staticOnly=true})
+      await page.waitForFunction(()=>window.viewer.trafficProbe.allMotors.length===0&&window.viewer.trafficProbe.parked>0)
+      console.log('Static-only residential',await page.evaluate(()=>({parked:window.viewer.trafficProbe.parked,moving:window.viewer.trafficProbe.allMotors.length})))
+      await page.screenshot({path:'captures/traffic/residential-static.jpg'})
+      await page.evaluate(()=>{window.viewer.trafficProbe.staticOnly=false})
+    }
     await page.screenshot({path:`captures/traffic/${shot.name}.jpg`})
     if(!shot.min)continue
     const visible=await page.evaluate(async({x,y,z,yaw})=>{
