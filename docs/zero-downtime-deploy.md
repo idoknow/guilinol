@@ -29,14 +29,15 @@ terminationGracePeriodSeconds: 45
 
 ### 2. 就绪 = 真能干活
 
-- `/api/ready`（新增，`server/index.mjs`）：`select 1` 打 Postgres，通才 200，否则 503
+- `/api/ready`（新增，`server/index.mjs`）：进程启动后第一次 `select 1` 打通 Postgres 才 200，之前 503；**打通过一次后锁存为 200**（DB 之后抖动不再摘端点——就绪是整 pod 级别，摘了会把 nginx 静态站一起 503）；收到 SIGTERM 后 503
+- 探针请求（UA `kube-probe/`）不计入 perf_server 路由统计
 - `readinessProbe` 打 `/api/ready`（3s 一次，失败 2 次判定未就绪）
 - `livenessProbe` 仍打轻量的 `/api/health`（20s 一次）
 - `startupProbe` 打 `/api/health`（2s 一次 ×30）——tsx 冷启动慢时不会被 liveness 误杀
 
 ### 3. 优雅退出
 
-两个容器都有 `preStop: sleep 5`（先让 Ingress 摘掉本 pod 的端点），API 进程收到 SIGTERM 后：
+两个容器都有 `preStop`，先 `sleep 5` 让 Ingress 摘掉本 pod 的端点；nginx 随后 `nginx -s quit` 优雅退出并等在途请求（nginx 对 SIGTERM 是 fast shutdown，不能直接吃）。API 进程收到 SIGTERM 后：
 
 1. `server.close()` 停止接受新连接、等在途请求完成
 2. `pool.end()` 关闭连接池
@@ -94,6 +95,6 @@ kubectl -n idoknow rollout status deploy/glol-web
 
 ## 仍然会断的组件（本次未覆盖）
 
-- `glol-postgres`、`glol-minio` 仍是单副本 + 有状态卷，重启/升级会短暂不可用（DB 断 → `/api/ready` 503 → 但 web pod 不重启）
+- `glol-postgres`、`glol-minio` 仍是单副本 + 有状态卷，重启/升级会短暂不可用（DB 断期间 API 返回 500，静态站照常；`pool.on('error')` 保证空闲连接被断时 API 进程不崩，DB 回来自动重连）
 - 单节点 `cn-hk-fxy-01`：节点维护期间没有第二台机器承接，PDB 只能保证「不被悄悄带走」，不能保证「不停机迁移」
 - 要让整站真正抗单节点故障，需要第二台 worker + 副本数 2 + Postgres 主从/MinIO 纠删码，属于另一期工程

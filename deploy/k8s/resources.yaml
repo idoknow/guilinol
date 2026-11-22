@@ -236,10 +236,11 @@ spec:
           periodSeconds: 5
           failureThreshold: 2
         lifecycle:
-          # 先让 Ingress 把流量从本 pod 摘掉，再退出
+          # 先让 Ingress 把流量从本 pod 摘掉，再 nginx -s quit 优雅退出（等在途请求/上传跑完），
+          # 不直接吃 SIGTERM（nginx 对 SIGTERM 是 fast shutdown，会掐断在途连接）
           preStop:
             exec:
-              command: ['sh','-c','sleep 5']
+              command: ['sh','-c','sleep 5; nginx -s quit; while pgrep -x nginx >/dev/null; do sleep 0.5; done']
       - name: glol-api
         image: ghcr.io/idoknow/glol-api:RELEASE
         ports:
