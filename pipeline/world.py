@@ -379,6 +379,10 @@ def build(bbox, output, palette, workers=4):
     vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange)
     decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal)
     modeled_paving = unary_union([*layout.street_foundations, *rong_pavement, modeled_paving if modeled_paving is not None else ShapelyPolygon()])
+    if fubo is not None:
+        # The park paths are painted on the graded ground. An additional
+        # spline-height street mesh would bridge across the switchbacks.
+        modeled_paving = modeled_paving.union(fubo.trails.buffer(4).intersection(fubo.dry_allowed))
     gate_plaza = next((ShapelyPolygon(np.asarray(GATE_PLAZA)+[x,z]) for x,z,entry in layout.entries
                        if entry['id']=='gunanmen'),None)
     if gate_plaza is not None:
