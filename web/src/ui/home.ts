@@ -130,7 +130,7 @@ function guide() {
     guideMask.innerHTML = `<div class="about-panel guide" role="dialog" aria-modal="true" aria-labelledby="guide-title">
       <header><h2 id="guide-title">怎么玩</h2><button type="button" class="about-close">关闭</button></header>
       <ol class="guide-steps">
-        <li><span class="ui-seal">街</span><div><b>单人模式：上街</b><p>你站在桂林的街头。路边停着的电驴、单车和汽车走过去按 <kbd>F</kbd> 就能骑走，开车别闯红灯，不然交警会追。</p></div></li>
+        <li><span class="ui-seal">街</span><div><b>单人模式：上街</b><p>你站在桂林的街头。路边停着的电驴、单车和汽车走过去按 <kbd>F</kbd> 就能骑走。</p></div></li>
         <li><span class="ui-seal">单</span><div><b>接单赚钱</b><p>打开接单，送米粉、跑腿、拉客、跑环城夜赛。赚到的钱可以去店里买衣服、买电驴、改装。</p></div></li>
         <li><span class="ui-seal">飞</span><div><b>游览模式：飞上天</b><p>想看山水就选游览模式，像无人机一样四处飞，按 <kbd>V</kbd> 可以落地步行。</p></div></li>
         <li><span class="ui-seal">印</span><div><b>集印章、拍照</b><p>名胜附近地上有朱红色的圆圈，走进去就盖一枚印。按「拍照」能换时辰和天气。</p></div></li>

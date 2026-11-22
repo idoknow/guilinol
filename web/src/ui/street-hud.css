@@ -27,12 +27,6 @@ body[data-hud=street] .account-entry::before{background:var(--st-jade);color:var
 .st-cash{position:absolute;right:calc(22px + env(safe-area-inset-right));top:calc(14px + env(safe-area-inset-top));display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .st-money{font:700 36px/1 var(--st-num);font-variant-numeric:tabular-nums;letter-spacing:.01em;color:var(--st-gold);
   -webkit-text-stroke:1.5px rgba(10,10,10,.85);paint-order:stroke fill;text-shadow:var(--st-shadow)}
-.st-wanted{display:flex;gap:5px}
-.st-wanted i{width:24px;height:11px;border-radius:3px;background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28),0 1px 0 rgba(0,0,0,.5)}
-.st-wanted i.on:nth-child(odd){background:var(--st-red);box-shadow:0 0 10px var(--st-red),inset 0 0 0 1px rgba(255,255,255,.5);animation:st-siren .9s steps(1) infinite}
-.st-wanted i.on:nth-child(even){background:var(--st-blue);box-shadow:0 0 10px var(--st-blue),inset 0 0 0 1px rgba(255,255,255,.5);animation:st-siren .9s steps(1) infinite .45s}
-.st-wanted[data-level="0"]{opacity:.55}
-@keyframes st-siren{50%{filter:brightness(.55)}}
 .st-phone-btn{position:absolute;right:calc(22px + env(safe-area-inset-right));top:calc(84px + env(safe-area-inset-top));display:flex;align-items:center;gap:7px;height:34px;padding:0 8px 0 10px;
   border-radius:10px;border:1px solid var(--st-line);background:var(--st-asphalt);color:var(--st-white);font-size:13px;font-weight:600;cursor:pointer;
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -107,7 +101,7 @@ body[data-hud=street] .btn-jump{font-size:0}body[data-hud=street] .btn-jump::aft
 body[data-hud=street] .btn-view{font-size:0}body[data-hud=street] .btn-view::after{content:"视角";font-size:13px}
 @media (pointer:coarse),(max-width:560px){
   .st-cash{right:calc(12px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));gap:5px}
-  .st-money{font-size:28px}.st-wanted i{width:18px;height:9px}.st-wanted{gap:4px}
+  .st-money{font-size:28px}
   .st-phone-btn{right:calc(12px + env(safe-area-inset-right));top:calc(66px + env(safe-area-inset-top));height:32px}
   .st-phone-btn kbd{display:none}
   body[data-hud=street] .minimap{left:calc(12px + env(safe-area-inset-left));top:calc(58px + env(safe-area-inset-top));bottom:auto;width:112px;height:112px;border-width:3px}

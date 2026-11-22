@@ -222,6 +222,9 @@ export type MountCheckResult =
 
 const IDENTITY = {x:0, y:0, z:0, w:1}
 const OFF_ROAD_CAP = 4.2
+/** IDOK-153: wheelie lift-rate multiplier (lower = less twitchy) and how long the bike must sit at max angle before it loops out. */
+const WHEELIE_SENSITIVITY = .5
+const WHEELIE_LOOPOUT_HOLD_S = 1.8
 const MOUNT_OFFSETS: readonly [number, number][] = [
   [.45, 0], [-.45, 0], [0, .45], [0, -.45],
   [.35, .35], [-.35, .35], [.35, -.35], [-.35, -.35],
@@ -436,6 +439,8 @@ export function createBikeControl() {
   let wheelie = 0
   let wheelieVel = 0
   let wheelieLoad = 0
+  /** Seconds the wheelie has been pinned at its max angle; loop-out only after WHEELIE_LOOPOUT_HOLD_S (IDOK-153). */
+  let wheelieMaxHold = 0
   let tucking = false
   let braking = false
   let brakeInLeanHold = 0
@@ -498,6 +503,12 @@ export function createBikeControl() {
   function currentGearSpec(): EbikeGearProfile {
     const list = activeGears()
     return list[T.MathUtils.clamp(gear - 1, 0, list.length - 1)]
+  }
+
+  /** 0..1 — reaching the max angle reads as .8; the last .2 is the loop-out hold timer. */
+  function wheelieRisk(): number {
+    const angle = T.MathUtils.clamp(wheelie / Math.max(1e-3, spec().crash.wheelieCrashRad), 0, 1)
+    return angle * .8 + T.MathUtils.clamp(wheelieMaxHold / WHEELIE_LOOPOUT_HOLD_S, 0, 1) * .2
   }
 
   function canAutoCrash(): boolean {
@@ -584,7 +595,7 @@ export function createBikeControl() {
 
   function reset() {
     speed = lean = pitch = steerInput = revHold = 0
-    drainPerSec = wheelie = wheelieVel = wheelieLoad = 0
+    drainPerSec = wheelie = wheelieVel = wheelieLoad = wheelieMaxHold = 0
     tucking = braking = false
     brakeInLeanHold = 0
     onPavement = wetSurface = offRoadSurface = false
@@ -901,6 +912,7 @@ export function createBikeControl() {
     speed = 0
     wheelie = 0
     wheelieVel = 0
+    wheelieMaxHold = 0
     braking = false
     cruiseControl = false
     cruiseTargetSpeed = 0
@@ -1099,7 +1111,7 @@ export function createBikeControl() {
     const mandatoryRad = s.crash.mandatoryFallLeanRad
     const effectiveRad = gripLimitRad
     const leanDanger = T.MathUtils.clamp(Math.abs(lean) / Math.max(1e-3, effectiveRad), 0, 1)
-    const wheelieDanger = wheelie / Math.max(1e-3, s.crash.wheelieCrashRad)
+    const wheelieDanger = wheelieRisk()
     const leftLit = blinkOn && (hazard || turnSignal === 'left')
     const rightLit = blinkOn && (hazard || turnSignal === 'right')
     return {
@@ -1466,14 +1478,19 @@ export function createBikeControl() {
       const torqueBias = gSpec.wheelieGain * (kind === 'bike' ? profile.wheelieTorqueMul : 1)
       if (wheelieLoad > .05 && speed >= s.crash.wheelieMinSpeedMs && !braking) {
         const speedEase = T.MathUtils.clamp(speed / 3.8, .48, 1.25)
-        const liftAccel = s.crash.wheelieRaiseRate * wheelieLoad * torqueBias * speedEase
-        wheelieVel = T.MathUtils.damp(wheelieVel, Math.max(0, liftAccel * .32), 6, cdt)
-        const maxSafeWheelie = canAutoCrash() ? s.crash.wheelieCrashRad + .08 : s.crash.wheelieCrashRad * .86
-        wheelie = T.MathUtils.clamp(wheelie + wheelieVel * cdt, 0, maxSafeWheelie)
+        // IDOK-153: half the old lift rate and a softer ramp, so the front comes up gradually.
+        const liftAccel = s.crash.wheelieRaiseRate * wheelieLoad * torqueBias * speedEase * WHEELIE_SENSITIVITY
+        wheelieVel = T.MathUtils.damp(wheelieVel, Math.max(0, liftAccel * .32), 3.5, cdt)
+        const maxWheelie = canAutoCrash() ? s.crash.wheelieCrashRad : s.crash.wheelieCrashRad * .86
+        wheelie = T.MathUtils.clamp(wheelie + wheelieVel * cdt, 0, maxWheelie)
+        if (wheelie >= maxWheelie - 1e-3) wheelieVel = 0
       } else {
         wheelieVel = T.MathUtils.damp(wheelieVel, -s.crash.wheelieFallRate * (wheelie > 0 ? .38 : 0), 10, cdt)
         wheelie = Math.max(0, T.MathUtils.damp(wheelie, 0, s.crash.wheelieFallRate, cdt))
       }
+      // Pinned at the max angle (still holding wheelie) → count up; otherwise bleed the timer off quickly.
+      if (wheelieLoad > .05 && wheelie >= s.crash.wheelieCrashRad * .985) wheelieMaxHold += cdt
+      else wheelieMaxHold = Math.max(0, wheelieMaxHold - cdt * 2)
 
       const prevHeading = heading
       const omega = turnRate(speed, s, Math.max(s.maxSpeed, capMs * .85))
@@ -1532,11 +1549,11 @@ export function createBikeControl() {
       gripLimitRad = Math.max(s.crash.minEffectiveFallRad, fallAngle)
 
       const leanRatio = Math.abs(lean) / gripLimitRad
-      const wheelieRatio = wheelie / s.crash.wheelieCrashRad
+      const wheelieRatio = wheelieRisk()
       crashRisk = T.MathUtils.clamp(Math.max(leanRatio, wheelieRatio), 0, 1)
 
       if (canAutoCrash()) {
-        if (wheelie >= s.crash.wheelieCrashRad) {
+        if (wheelieMaxHold >= WHEELIE_LOOPOUT_HOLD_S) {
           triggerCrash('loopout', steerInput >= 0 ? 1 : -1)
           return speed
         }

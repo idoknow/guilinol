@@ -387,12 +387,13 @@ export function createEbikeFxController() {
       // Local presentation state machine when Hy2 physics telemetry isn't attached yet.
       if (crashPhase === 'none') {
         if (input.wheelie && base.speed > 1.2) {
-          const cap = input.wheelie && base.allowAutoCrash ? .84 : .58
-          const targetWheelie = T.MathUtils.clamp(.44 * gearSpec.wheelieEase * T.MathUtils.clamp(base.speed / 4.5, .4, 1.15), .22, cap)
-          wheelie = T.MathUtils.damp(wheelie, targetWheelie, 7.5, cdt)
-          if (base.allowAutoCrash && wheelie > .72) {
+          // IDOK-153: slower rise; loop-out only after sitting at the max angle for 1.8 s.
+          const cap = base.allowAutoCrash ? .68 : .58
+          const targetWheelie = T.MathUtils.clamp(.6 * gearSpec.wheelieEase * T.MathUtils.clamp(base.speed / 4.5, .4, 1.15), .22, cap)
+          wheelie = T.MathUtils.damp(wheelie, targetWheelie, 2.5, cdt)
+          if (base.allowAutoCrash && wheelie >= cap * .97) {
             wheelieOverHold += cdt
-            if (wheelieOverHold > .55) triggerCrash('loopout', base.lean >= 0 ? 1 : -1, base.heading, base.speed)
+            if (wheelieOverHold > 1.8) triggerCrash('loopout', base.lean >= 0 ? 1 : -1, base.heading, base.speed)
           } else {
             wheelieOverHold = Math.max(0, wheelieOverHold - cdt * 2)
           }
