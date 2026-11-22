@@ -358,6 +358,14 @@ def build(bbox, output, palette, workers=4):
             mask,corner = stencil(part,left,top,1)
             texture.paste('#484b4d' if road.name=='翊武路' else palette['road'],corner,mask)
             layers['road'].append(part)
+    if fubo is not None:
+        # The trails meet small pedestrian plazas. Bake their full outlines
+        # onto the native grade, including the junction beneath the walker.
+        for plaza in ped_areas:
+            if fubo.park.covers(plaza) and fubo.trails.intersects(plaza):
+                for part in polygons(plaza):
+                    mask,corner = stencil(part,left,top,1)
+                    texture.paste(palette['road'],corner,mask)
     if bank_pavement is not None:
         # Replace the baked flat road colour underneath the elevated strips.
         for part in polygons(bank_pavement.intersection(bounds)):

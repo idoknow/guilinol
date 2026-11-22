@@ -4,6 +4,7 @@ import argparse
 from collections import defaultdict
 from functools import lru_cache
 import gzip
+import io
 import json
 import math
 import os
@@ -12,6 +13,7 @@ import re
 import struct
 
 import numpy as np
+from PIL import Image, ImageColor
 from shapely import box as box_array, prepare, STRtree, build_area, contains_xy, union_all
 from shapely.geometry import LineString, Point, Polygon, box
 from shapely.ops import nearest_points, polygonize, unary_union
@@ -473,6 +475,37 @@ def run_audit(world_dir: Path, root: Path) -> dict:
     u_surface_check = unary_union([u_all_road_surface, u_lm_walk])
     prepare(u_surface_check)
 
+    # A pedestrian plaza can also be paved directly on the walkable GL04
+    # terrain. Verify the emitted texels across its interior if vector
+    # coverage is missing. Grass or bare ground still fails the audit.
+    tile_files = {(t['x'],t['z']): t['file'] for t in manifest['chunks']}
+    road_color = ImageColor.getrgb(json.loads((root/'pipeline/palette.json').read_text())['road'])
+
+    @lru_cache(maxsize=8)
+    def ground_texture(origin):
+        raw = gzip.decompress((world_dir/tile_files[origin]).read_bytes())
+        vertices,indices,collision,size = struct.unpack_from('<4I',raw,4)
+        start = 24+16900+vertices*9+indices*4+collision
+        return Image.open(io.BytesIO(raw[start:start+size])).convert('RGB')
+
+    def has_ground_paving(plaza):
+        # One texel is one metre. At edges the raster contains mixed coverage.
+        interior = plaza.buffer(-.75)
+        if interior.is_empty:
+            return False
+        xmin,zmin,xmax,zmax = interior.bounds
+        count = 0
+        for z in range(math.floor(zmin),math.ceil(zmax)):
+            for x in range(math.floor(xmin),math.ceil(xmax)):
+                point = Point(x+.5,z+.5)
+                if not interior.covers(point) or u_surface_check.covers(point):
+                    continue
+                origin = (x//CHUNK*CHUNK,z//CHUNK*CHUNK)
+                if ground_texture(origin).getpixel((x-origin[0],z-origin[1])) != road_color:
+                    return False
+                count += 1
+        return count>0
+
     uneven_issues = []
     gap_issues = []
     road_Elements = []
@@ -487,7 +520,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             poly_a = area(el).intersection(bounds.buffer(-2.0))
             if not poly_a.is_empty and not u_lm_replace_poly.contains(poly_a.representative_point()):
                 rp = poly_a.representative_point()
-                if not u_surface_check.intersects(rp.buffer(1.0)):
+                if not u_surface_check.intersects(rp.buffer(1.0)) and not has_ground_paving(poly_a):
                     gap_issues.append(make_issue('roadGap', rp.x, rp.y, 1.0,
                                                  f'way/{el["id"]} pedestrian plaza missing surface', way=el['id']))
             continue
