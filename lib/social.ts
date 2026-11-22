@@ -428,7 +428,8 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
   ])
   return Response.json(
     { ok: true, intent, redirect: '/?social=login' },
-    { headers: { ...headers, 'Set-Cookie': `${cookie(sessionToken)}; ${clearPending()}` } },
+    // 两个 cookie 必须分两条 Set-Cookie；拼成一条时后面的 Max-Age=0 会把新会话立刻删掉
+    { headers: [['Cache-Control', 'no-store'], ['Set-Cookie', cookie(sessionToken)], ['Set-Cookie', clearPending()]] },
   )
 }
 

@@ -71,7 +71,7 @@ export async function fixture({postgresOnly=false}={}) {
       if(attempt>=100||minio?.exitCode!=null)throw Error('Test services not ready')
       await delay(300)
     }
-    for(const migration of ['001-schema','002-telemetry','003-admin','004-social'])
+    for(const migration of ['001-schema','002-telemetry','003-admin','004-social','005-social-pending'])
       await pool.query(await readFile('deploy/postgres/'+migration+'.sql','utf8'))
     if(!postgresOnly){
       const s3=new S3Client({endpoint:S3_ENDPOINT,region:'us-east-1',forcePathStyle:true,credentials})
