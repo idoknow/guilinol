@@ -1,5 +1,6 @@
 import * as T from 'three'
 import {hairColors, skinTones, type Avatar} from '../../../lib/avatar'
+import {streetShading} from './creator-ink'
 
 // Match the contours of the selected face, including the square/oval jaw morph.
 function frontOfFace(geometry: T.BufferGeometry) {
@@ -34,62 +35,141 @@ export function facialFeatures(geometry: T.BufferGeometry, a: Avatar) {
   const positions: number[] = [],
     colors: number[] = [],
     indices: number[] = []
-  // Taper each contour to its corners and curve the surface around the cheeks.
-  function ribbon(color: T.ColorRepresentation, point: (t: number, v: number) => [number, number, number]) {
+  const female = a.body === 'f'
+
+  // Taper each contour to its corners and curve the surface smoothly around the cheeks.
+  function ribbon(color: T.ColorRepresentation, point: (t: number, v: number) => [number, number, number], segs = 16) {
     const pigment = new T.Color(color)
     const start = positions.length / 3
-    for (let i = 0; i <= 18; i++)
+    for (let i = 0; i <= segs; i++)
       for (let j = 0; j < 3; j++) {
-        const [x, y, lift] = point(i / 18, j / 2)
+        const [x, y, lift] = point(i / segs, j / 2)
         colors.push(pigment.r, pigment.g, pigment.b)
         positions.push(x, y, front(x, y) - lift)
         const k = start + i * 3 + j
         if (i && j) indices.push(k - 4, k - 1, k, k - 4, k, k - 3)
       }
   }
+
+  const skinBase = new T.Color(skinTones[a.skin])
+  const browCol = new T.Color(hairColors[a.hairColor]).lerp(new T.Color('#2a201b'), 0.25)
+
   for (const side of [-1, 1]) {
-    const eyeY = 0.065,
-      halfWidth = 0.0075 + 0.001 * a.eyes
-    ribbon('#302622', (t, v) => {
-      const angle = Math.PI * t
+    const eyeX = side * 0.0325
+    const eyeY = 0.064
+    const eyeHalfW = (female ? 0.0138 : 0.0128) + 0.0012 * a.eyes
+    const eyeHalfH = (female ? 0.0068 : 0.0058) + 0.0008 * a.eyes
+
+    // 1) Soft warm sclera (gives natural almond eye shape instead of pinpoint cartoon dots)
+    ribbon('#ece6dc', (t, v) => {
+      const ang = Math.PI * t
+      const arch = Math.sin(ang)
+      const tilt = (t - 0.5) * 0.0016 * side
       return [
-        side * (0.034 - halfWidth * Math.cos(angle)),
-        eyeY + (v - 0.5) * (0.011 + 0.001 * a.eyes) * Math.sin(angle),
-        0.0018,
+        eyeX + side * (t * 2 - 1) * eyeHalfW,
+        eyeY + tilt + (v - 0.5) * 2 * eyeHalfH * Math.pow(arch, 0.72),
+        0.0014,
       ]
-    })
-    ribbon('#4a352b', (t, v) => [
-      side * (0.034 + (2 * t - 1) * (halfWidth + 0.002)),
-      eyeY + 0.005 + (0.003 + 0.0016 * v) * Math.sin(Math.PI * t),
-      0.0015,
-    ])
-    ribbon(new T.Color(hairColors[a.hairColor]), (t, v) => [
-      side * (0.018 + 0.041 * t),
-      0.082 +
-        [0.001, 0.01, 0.003][a.brows] * Math.sin(Math.PI * t) +
-        [0, -0.002, -0.012][a.brows] * t +
-        (0.003 + 0.001 * a.brows) * v * Math.sin(Math.PI * t) ** 0.4,
-      0.0016,
-    ])
+    }, 14)
+
+    // 2) Rich warm-dark iris centered inside sclera
+    const irisR = (female ? 0.0062 : 0.0057) + 0.0005 * a.eyes
+    ribbon('#261b16', (t, v) => {
+      const ang = Math.PI * t
+      return [
+        eyeX - side * irisR * Math.cos(ang),
+        eyeY - 0.0004 + (v - 0.5) * 2 * irisR * 0.96 * Math.sin(ang),
+        0.0020,
+      ]
+    }, 12)
+
+    // 3) Tiny specular eye catchlight (upper-left of iris -> instantly adds human life)
+    const catchR = 0.0020
+    ribbon('#ffffff', (t, v) => {
+      const ang = Math.PI * t
+      return [
+        eyeX - 0.0020 - catchR * Math.cos(ang),
+        eyeY + 0.0019 + (v - 0.5) * 2 * catchR * Math.sin(ang),
+        0.0025,
+      ]
+    }, 8)
+
+    // 4) Natural curved upper lash / eyelid line framing the eye
+    ribbon('#2d201a', (t, v) => {
+      const arch = Math.sin(Math.PI * t)
+      const tilt = (t - 0.5) * 0.0018 * side
+      const thick = (female ? 0.0024 : 0.0019) * (0.45 + 0.55 * arch)
+      return [
+        eyeX + side * (t * 2 - 1) * (eyeHalfW + 0.0015),
+        eyeY + tilt + eyeHalfH * Math.pow(arch, 0.72) + (v - 0.2) * thick,
+        0.0023,
+      ]
+    }, 14)
+
+    // 5) Tapered expressive eyebrows matching selected brow style & hair color
+    ribbon(browCol, (t, v) => {
+      const arch = Math.sin(Math.PI * t)
+      const taper = 0.35 + 0.65 * Math.pow(arch, 0.55)
+      const thick = (female ? 0.0026 : 0.0036) + 0.0008 * a.brows
+      return [
+        side * (0.0155 + 0.038 * t),
+        0.080 +
+          [0.0015, 0.0075, 0.0025][a.brows] * arch +
+          [0.000, -0.0015, -0.0085][a.brows] * t +
+          (v - 0.5) * thick * taper,
+        0.0019,
+      ]
+    }, 14)
   }
-  ribbon(new T.Color(skinTones[a.skin]).lerp(new T.Color('#885d49'), 0.45), (t, v) => [
-    (t - 0.5) * 0.019,
-    0.03 + 0.005 * (1 - t) * v,
-    0.0014,
-  ])
-  const lip = new T.Color(skinTones[a.skin]).lerp(new T.Color('#994e48'), 0.52)
-  ribbon(lip, (t, v) => {
+
+  // 6) Subtle nose-underside shadow (softly anchors sculpted nose tip without harsh cartoon line)
+  const noseShade = skinBase.clone().lerp(new T.Color('#7a513e'), 0.38)
+  ribbon(noseShade, (t, v) => {
     const arc = Math.sin(Math.PI * t)
     return [
-      (0.5 - t) * 0.041,
-      0.002 + 0.0015 * (2 * t - 1) ** 2 + arc * (v - 0.5) * (0.009 + 0.002 * Math.sin(2 * Math.PI * t) ** 2),
+      (t - 0.5) * 0.017,
+      0.0295 + (v - 0.5) * 0.0042 * arc - 0.0012 * (1 - arc),
+      0.0013,
+    ]
+  }, 10)
+
+  // 7) Natural lips (muted warm terracotta/rose, fuller upper/lower taper, slight gentle smile curve)
+  const lipTarget = female ? '#b05652' : '#96544b'
+  const lipUpper = skinBase.clone().lerp(new T.Color(lipTarget), female ? 0.56 : 0.40)
+  const lipLower = skinBase.clone().lerp(new T.Color(lipTarget), female ? 0.44 : 0.32)
+  const mouthW = female ? 0.036 : 0.039
+  ribbon(lipUpper, (t, v) => {
+    const arc = Math.sin(Math.PI * t)
+    const bow = 0.0014 * Math.sin(2 * Math.PI * t) ** 2
+    const smile = 0.0022 * (2 * t - 1) ** 2
+    return [
+      (0.5 - t) * mouthW,
+      0.0042 + smile + v * (0.0042 * arc + bow),
       0.0018,
     ]
-  })
+  }, 14)
+  ribbon(lipLower, (t, v) => {
+    const arc = Math.sin(Math.PI * t)
+    const smile = 0.0022 * (2 * t - 1) ** 2
+    return [
+      (0.5 - t) * (mouthW * 0.92),
+      0.0042 + smile - (1 - v) * (female ? 0.0052 : 0.0044) * arc,
+      0.0017,
+    ]
+  }, 14)
+
   const g = new T.BufferGeometry()
   g.setAttribute('position', new T.Float32BufferAttribute(positions, 3))
   g.setAttribute('color', new T.Float32BufferAttribute(colors, 3))
   g.setIndex(indices)
-  group.add(new T.Mesh(g, new T.MeshBasicMaterial({vertexColors: true, side: T.DoubleSide})))
+  g.computeVertexNormals()
+  const mat = new T.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.62,
+    metalness: 0.0,
+    side: T.DoubleSide,
+  })
+  streetShading(mat, false, 'face')
+  group.add(new T.Mesh(g, mat))
   return group
 }

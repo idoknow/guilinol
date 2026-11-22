@@ -35,7 +35,7 @@ def face(body):
     # Cross-sections follow the mandibular angle into the neck. The chin is anterior
     # to the cranial centre; the occiput rounds back above the nape.
     levels=[-.046,-.039,-.024,-.004,.023,.051,.070,.086]
-    jaw_width=[.008,.029,.048,.065,.077,.085,.088,.089] if female else [.014,.037,.058,.074,.082,.086,.088,.089]
+    jaw_width=[.008,.027,.045,.061,.073,.083,.087,.089] if female else [.013,.034,.053,.068,.078,.084,.087,.089]
     front_profile=[-.045,-.062,-.075,-.081,-.084,-.087,-.089,-.092]
     rear_profile=[-.042,-.023,.016,.044,.075,.111,.126,.130]
     for y in np.r_[np.linspace(-.045,.086,10,endpoint=False),.086+.105*np.sin(np.linspace(0,1.54,6))]:
@@ -48,14 +48,14 @@ def face(body):
             center=(near+far)/2;depth=(far-near)/2
         x=width*s
         z=center-depth*c
-        # Broad cheekbones, shallow sockets, a continuous low bridge, tip and alae.
+        # Natural cheekbones, shallow eye sockets, clean nose bridge & tip.
         front = np.maximum(0,c)**2
-        bridge = .012*np.exp(-(x/.016)**2-((y-.049)/.039)**2)
-        tip = .011*np.exp(-(x/.016)**2-((y-.033)/.015)**2)
+        bridge = .014*np.exp(-(x/.015)**2-((y-.050)/.038)**2)
+        tip = .012*np.exp(-(x/.015)**2-((y-.033)/.014)**2)
         wings = .006*np.exp(-((abs(x)-.012)/.006)**2-((y-.031)/.006)**2)
-        cheek = .006*np.exp(-((abs(x)-.048)/.026)**2-((y-.041)/.025)**2)
-        socket = .005*np.exp(-((abs(x)-.034)/.021)**2-((y-.068)/.012)**2)
-        mouth = .009*np.exp(-(x/.032)**2-((y-.007)/.017)**2)
+        cheek = .005*np.exp(-((abs(x)-.048)/.025)**2-((y-.043)/.024)**2)
+        socket = .0055*np.exp(-((abs(x)-.033)/.020)**2-((y-.066)/.012)**2)
+        mouth = .008*np.exp(-(x/.030)**2-((y-.006)/.016)**2)
         z -= front*(bridge+tip+wings+cheek+mouth-socket)
         rings.append(np.column_stack([x,np.full_like(x,y),z]))
     p,f=surface(rings,[0,-.046,-.044],[0,.191,.017])
@@ -152,15 +152,15 @@ def hair(style):
         unit=np.column_stack([np.sin(theta)*s,np.cos(theta),-np.sin(theta)*c])
         crown=np.maximum(0,unit[:,1])
         ripple=.0015*np.cos(10*angles+theta*2)*np.sin(theta)
-        puff={'m_buzz':.004,'m_fade':.004,'m_perm':.013,'m_crop':.009,'m_part':.010}.get(style,.008)
+        puff={'m_buzz':.0085,'m_fade':.008,'m_perm':.014,'m_crop':.010,'m_part':.011}.get(style,.009)
         skull=CENTER+unit*CRANIUM
-        # Below the brow plane, trace the occiput back into the nape rather than
-        # extrapolating the ellipsoid into space behind the neck.
+        # Below the brow plane, trace the occiput back into the nape with safe outer clearance
+        # so cranial facets never poke through close-cropped hair behind the ears.
         y=skull[:,1];low=y<.086
         levels=[-.004,.023,.051,.070,.086]
-        width=np.interp(y,levels,[.071,.080,.087,.088,.089])
+        width=np.interp(y,levels,[.076,.084,.090,.091,.092])
         near=np.interp(y,levels,[-.081,-.084,-.087,-.089,-.092])
-        far=np.interp(y,levels,[.044,.075,.111,.126,.130])
+        far=np.interp(y,levels,[.050,.081,.117,.131,.134])
         skull[low,0]=(width*s)[low]
         skull[low,2]=((near+far)/2-(far-near)*c/2)[low]
         extra=puff+(0 if short else ripple)

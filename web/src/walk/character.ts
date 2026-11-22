@@ -35,9 +35,9 @@ export async function characterModel(a: Avatar) {
         const y = p.getY(i)
         if (node.skeleton.bones[node.geometry.attributes.skinIndex.getX(i)]?.name === 'head' && y < 1.7) {
           const jaw = Math.max(0, 1 - Math.abs(y - 1.56) / 0.078)
-          const width = a.face === 0 ? 1 + 0.23 * jaw : a.face === 1 ? 0.98 - 0.11 * jaw : 1 + 0.55 * jaw ** 2
+          const width = a.face === 0 ? 1 + 0.06 * jaw : a.face === 1 ? 0.97 - 0.09 * jaw : 1 + 0.17 * jaw ** 2
           p.setX(i, p.getX(i) * width)
-          if (a.face !== 1 && y < 1.61) p.setY(i, y + (1.61 - y) * (a.face === 0 ? 0.12 : -0.1))
+          if (a.face !== 1 && y < 1.61) p.setY(i, y + (1.61 - y) * (a.face === 0 ? 0.05 : -0.06))
         }
       }
       node.geometry.computeVertexNormals()
@@ -65,9 +65,9 @@ export function hairstyle(a: Avatar, library: T.Object3D) {
     mat = material(hairColors[a.hairColor])
   hair.name = 'creator-hair'
   mat.vertexColors = true
-  mat.roughness = 0.68
+  mat.roughness = 0.58
   mat.side = T.FrontSide
-  streetShading(mat)
+  streetShading(mat, false, 'hair')
   hair.traverse((n) => {
     if (n instanceof T.Mesh) {
       n.material = mat
@@ -93,8 +93,6 @@ export function hairstyle(a: Avatar, library: T.Object3D) {
 export function styleCharacter(scene: T.Group, rig: AvatarRig, a: Avatar) {
   const head = rig.attachments.head!
   scene.userData.characterSkin = skinTones[a.skin]
-  addOutline(rig.skinnedMesh!, 0.015)
-  addOutline(scene.userData.creatorHair, 0.005)
   head.add(scene.userData.creatorHair)
   delete scene.userData.creatorHair
   scene.userData.creatorBody = a.body

@@ -2,6 +2,7 @@ import * as T from 'three'
 import {type Avatar} from '../../../lib/avatar'
 import type {AvatarRig} from './avatar-rig'
 import type {EquippedOutfit} from '../game/catalog'
+import {streetShading} from './creator-ink'
 
 /** Small pieces are rigid in the rest frame of the bone they follow. */
 export function starterDetails(rig: AvatarRig, avatar: Avatar) {
@@ -17,7 +18,8 @@ export function starterDetails(rig: AvatarRig, avatar: Avatar) {
     y: number,
     z: number,
   ) {
-    const mat = new T.MeshStandardMaterial({color, roughness: 1, side: T.DoubleSide})
+    const mat = new T.MeshStandardMaterial({color, roughness: 0.9, side: T.DoubleSide})
+    streetShading(mat, false, 'cloth')
     const mesh = new T.Mesh(geo, mat)
     mesh.position.set(x, y, z)
     mesh.visible = false

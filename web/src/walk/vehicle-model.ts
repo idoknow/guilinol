@@ -945,10 +945,10 @@ export function createDynamicEbike(paint = 0, initialMods?: Partial<EbikeModConf
   kickstandPivot.rotation.set(1.42, 0, 0)
   chassis.add(kickstandPivot)
 
-  // Rider seat anchor aligned to vehicle-space (0, 0, +0.23) -> wheeliePivot (0, 0, -0.30)
+  // Rider seat anchor centered on saddle pad (z=+0.14) so rider sits naturally & hands grip handlebars cleanly
   const seatAnchor = new T.Object3D()
   seatAnchor.name = 'rider-seat-anchor'
-  seatAnchor.position.set(0, 0, .23 - REAR_Z)
+  seatAnchor.position.set(0, 0, .14 - REAR_Z)
   wheeliePivot.add(seatAnchor)
 
   // Shared e-bike distinguishing parts: front wire basket (steers with handlebar) + rear scan lock/battery trim.

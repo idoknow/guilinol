@@ -18,6 +18,7 @@ import {
   type EquippedOutfit,
 } from '../game/catalog'
 import type {AvatarRig} from './avatar-rig'
+import {applyAvatarStyleMaterial, AVATAR_SURFACE} from '../look/avatar-look'
 
 export const OUTFIT_ZONE = {
   LOCKED_SKIN: 0,
@@ -440,10 +441,12 @@ function mergeColoredParts(parts: readonly ColoredGeomPart[], name: string, doub
 
   const mat = new THREE.MeshStandardMaterial({
     vertexColors: true,
-    roughness: 0.9,
+    roughness: 0.85,
     metalness: 0.05,
     side: doubleSide ? THREE.DoubleSide : THREE.FrontSide,
   })
+  const glossyShell = name.includes('helmet') || name.includes('visor')
+  applyAvatarStyleMaterial(mat, {defaultSurface: AVATAR_SURFACE.ACCESSORY, glossyShell})
   const mesh = new THREE.Mesh(merged, mat)
   mesh.name = name
   mesh.castShadow = false
@@ -455,22 +458,21 @@ function buildHatMesh(hatId: string): THREE.Mesh | null {
   if (hatId === 'hat_none') return null
 
   if (hatId === 'hat_guilin_cap') {
-    // Head-relative coords (origin at head bone ~(0, 1.5685, -0.0114), -Z forward, hair top +0.2065):
-    // Crown clears hair cleanly without piercing boat/raft/rowboat vessel-bounds.
-    const crown = new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.54)
-    crown.scale(0.119, 0.112, 0.138)
-    crown.translate(0, 0.112, 0.014)
+    // Snug low-profile cap sitting comfortably onto brow (clears hair/vessel bounds cleanly).
+    const crown = new THREE.SphereGeometry(1, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.56)
+    crown.scale(0.118, 0.110, 0.136)
+    crown.translate(0, 0.100, 0.014)
 
-    const band = new THREE.CylinderGeometry(0.120, 0.121, 0.022, 16)
+    const band = new THREE.CylinderGeometry(0.119, 0.120, 0.024, 16)
     band.scale(1, 1, 1.15)
-    band.translate(0, 0.110, 0.014)
+    band.translate(0, 0.098, 0.014)
 
-    const brim = new THREE.BoxGeometry(0.158, 0.011, 0.095)
-    brim.rotateX(-0.08)
-    brim.translate(0, 0.104, -0.145)
+    const brim = new THREE.BoxGeometry(0.156, 0.011, 0.092)
+    brim.rotateX(-0.10)
+    brim.translate(0, 0.094, -0.142)
 
     const button = new THREE.SphereGeometry(0.011, 8, 6)
-    button.translate(0, 0.224, 0.014)
+    button.translate(0, 0.210, 0.014)
 
     return mergeColoredParts(
       [
@@ -484,32 +486,34 @@ function buildHatMesh(hatId: string): THREE.Mesh | null {
   }
 
   if (hatId === 'hat_rider_helmet') {
-    // Open-ended arcs (openEnded=true) avoid flat horizontal cap discs slicing through the head.
-    const shell = new THREE.SphereGeometry(1, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.58)
-    shell.scale(0.124, 0.116, 0.142)
-    shell.translate(0, 0.110, 0.012)
+    // Open-face commuter half-helmet: sleek brow sun-peak sits cleanly above eyes (y > 0.095)
+    // so facial features & gaze remain clearly visible while crown stays within bridge/vessel clearance.
+    const shell = new THREE.SphereGeometry(1, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.54)
+    shell.scale(0.122, 0.112, 0.140)
+    shell.translate(0, 0.114, 0.012)
 
-    const backGuard = new THREE.CylinderGeometry(0.127, 0.118, 0.052, 18, 1, true, -Math.PI * 0.62, Math.PI * 1.24)
+    const backGuard = new THREE.CylinderGeometry(0.125, 0.116, 0.048, 18, 1, true, -Math.PI * 0.58, Math.PI * 1.16)
     backGuard.scale(1, 1, 1.14)
-    backGuard.translate(0, 0.064, 0.014)
+    backGuard.translate(0, 0.070, 0.014)
 
-    // Curved crest arc hugging the dome surface smoothly instead of a flat overhanging box
-    const crest = new THREE.TorusGeometry(0.125, 0.009, 6, 16, Math.PI * 0.66)
-    crest.rotateZ(Math.PI * 0.17)
+    // Curved crest arc hugging the dome surface smoothly
+    const crest = new THREE.TorusGeometry(0.123, 0.008, 6, 16, Math.PI * 0.64)
+    crest.rotateZ(Math.PI * 0.18)
     crest.rotateY(Math.PI / 2)
-    crest.scale(1, 0.94, 1.13)
-    crest.translate(0, 0.112, 0.012)
+    crest.scale(1, 0.93, 1.12)
+    crest.translate(0, 0.115, 0.012)
 
-    const visor = new THREE.CylinderGeometry(0.129, 0.129, 0.048, 16, 1, true, Math.PI * 0.68, Math.PI * 0.64)
-    visor.scale(1, 1, 1.12)
-    visor.translate(0, 0.090, -0.008)
+    // Raised short sun-peak shield above brow (never blocks eyeY = 0.064)
+    const visor = new THREE.CylinderGeometry(0.127, 0.132, 0.024, 16, 1, true, Math.PI * 0.72, Math.PI * 0.56)
+    visor.scale(1, 1, 1.16)
+    visor.translate(0, 0.114, -0.014)
 
     return mergeColoredParts(
       [
         {geom: shell, hex: '#e6b235'},
         {geom: backGuard, hex: '#1d2228'},
         {geom: crest, hex: '#1d2228'},
-        {geom: visor, hex: '#222b33'},
+        {geom: visor, hex: '#28323c'},
       ],
       'outfit_hat_rider_helmet',
       true,

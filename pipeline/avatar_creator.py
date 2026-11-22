@@ -32,29 +32,29 @@ def generate(body):
     p[hip,2]=-.018+(p[hip,2]+.018)*.82
     p[hip,1]+=.025*np.clip((1.002-p[hip,1])/.150,0,1)
     data = np.column_stack([p, color, g.J, g.W])
-    # A closed crew-neck torso. Skin each ring to the neighbouring spine joints.
-    rings = [( .927,.182,.137,-.021,'pelvis'),(1.004,.169,.120,-.021,'spine_01'),
-             (1.118,.151,.111,-.021,'spine_02'),(1.29,.17,.122,-.018,'spine_03'),
-             (1.41,.194,.117,-.031,'spine_03'),(1.448,.184,.103,-.033,'spine_03'),
-             (1.478,.062,.059,-.035,'spine_03'),(1.485,.055,.052,-.035,'spine_03')]
+    # A closed crew-neck torso with smooth anatomical deltoid-trapezius slope enveloping the shoulder sockets.
+    rings = [( .927,.178,.133,-.021,'pelvis'),(1.004,.164,.118,-.021,'spine_01'),
+             (1.118,.150,.110,-.021,'spine_02'),(1.285,.172,.122,-.018,'spine_03'),
+             (1.388,.190,.115,-.027,'spine_03'),(1.430,.174,.103,-.031,'spine_03'),
+             (1.460,.122,.082,-.033,'spine_03'),(1.484,.058,.054,-.035,'spine_03')]
     extra, faces = [], []
     sides=16
     for k,(height,width,depth,center,bone) in enumerate(rings):
         joint=g.joints.index(g.idx[bone])
         for n in range(sides):
             t=n*2*np.pi/sides
-            scale=np.interp(height,[.958,1.118,1.448],[1.08,.84,.92]) if body=='f' else 1
+            scale=np.interp(height,[.958,1.118,1.430,1.484],[1.07,.84,.90,.94]) if body=='f' else 1
             extra.append([width*scale*np.sin(t),height,center+depth*np.cos(t),
                           *color[np.where(hexes==0xf09a4a)[0][0]],joint,0,0,0,1,0,0,0])
             if k:
                 a=len(data)+(k-1)*sides+n
                 b=len(data)+(k-1)*sides+(n+1)%sides
                 faces.extend([[a,b,a+sides],[b,b+sides,a+sides]])
-    # Sleeves share shoulder movement between the clavicle and upper arm.
+    # Sleeves tuck cleanly inside the deltoid slope (no protruding shoulder balls).
     # The cuffs end at the original wrist. The 66-bone bind transforms stay exact.
-    sleeve_rings=[(.09,.024,.040),(.145,.042,.064),(.184,.052,.075),(.222,.055,.070),
-                  (.30,.052,.060),(.438,.048,.051),(.49,.048,.050),(.61,.044,.047),
-                  (.72,.038,.044),(.747,.038,.043)]
+    sleeve_rings=[(.09,.020,.034),(.142,.034,.054),(.182,.042,.064),(.222,.046,.062),
+                  (.30,.045,.055),(.438,.043,.047),(.49,.042,.046),(.61,.039,.043),
+                  (.72,.035,.040),(.747,.035,.039)]
     for side,sign in [('l',1),('r',-1)]:
         first=len(data)+len(extra)
         for k,(x,ry,rz_) in enumerate(sleeve_rings):
@@ -65,7 +65,9 @@ def generate(body):
             blend=np.interp(x,[.112,.222],[0,1]) if x<.23 else np.interp(x,[.438,.49],[0,1])
             for n in range(sides):
                 angle=n*2*np.pi/sides
-                extra.append([sign*x,np.interp(x,[.09,.145,.205],[1.405,1.426,1.44])+1.16*ry*np.cos(angle),-.059+1.13*rz_*np.sin(angle),
+                s_x=x*(np.interp(x,[.09,.222,.30],[.91,.95,1.0]) if body=='f' else 1.0)
+                s_ry=ry*(.92 if body=='f' and x<.24 else 1.0)
+                extra.append([sign*s_x,np.interp(x,[.09,.142,.205,.30],[1.380,1.388,1.394,1.398])+1.04*s_ry*np.cos(angle),-.058+1.04*rz_*np.sin(angle),
                               *color[np.where(hexes==0xf09a4a)[0][0]],j1,j2,0,0,1-blend,blend,0,0])
                 if k:
                     a=first+(k-1)*sides+n;b=first+(k-1)*sides+(n+1)%sides
@@ -151,7 +153,7 @@ def generate(body):
         wave['channels'].append(dict(target=dict(node=node,path='rotation'),sampler=len(wave['samplers'])))
         wave['samplers'].append(dict(input=times,output=g.add_float(values,'VEC4',True)))
     roots=g.j['scenes'][0]['nodes']
-    head_scale=1.14
+    head_scale=1.07
     head_node=g.j['nodes'][g.idx['head']]
     head_node['scale']=(np.array(head_node.get('scale',[1.,1.,1.]))*head_scale).tolist()
     scale=(1.62 if body=='f' else 1.72)/(HEAD[1]+.191*head_scale)

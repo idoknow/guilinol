@@ -673,16 +673,16 @@ export function applyEbikeVisualAndRider(params: {
     figure.rotation.set(fallPitch, heading + state.crashSide * .42 * b, fallRoll, 'YXZ')
     applyJointBlend(joints, {
       Hips: [0, 0, 0],
-      Torso: [.18 * b, state.crashSide * .18 * b, 0],
-      Head: [-.42 * b, -state.crashSide * .28 * b, 0],
-      ArmL: [1.35 * b, .28 * b, -.42 * b],
-      ArmR: [1.35 * b, -.28 * b, .42 * b],
-      ForearmL: [1.15 * b, 0, 0],
-      ForearmR: [1.15 * b, 0, 0],
-      ThighL: [.65 * b, 0, -.18 * b],
-      ThighR: [.85 * b, 0, .18 * b],
-      ShinL: [-.95 * b, 0, 0],
-      ShinR: [-1.15 * b, 0, 0],
+      Torso: [.14 * b, state.crashSide * .18 * b, 0],
+      Head: [-.36 * b, -state.crashSide * .28 * b, 0],
+      ArmL: [.46 * b, .22 * b, -.76 * b],
+      ArmR: [.62 * b, -.26 * b, .62 * b],
+      ForearmL: [.72 * b, 0, 0],
+      ForearmR: [.96 * b, 0, 0],
+      ThighL: [.55 * b, 0, -.18 * b],
+      ThighR: [.82 * b, 0, .20 * b],
+      ShinL: [-.85 * b, 0, 0],
+      ShinR: [-1.10 * b, 0, 0],
     })
     return
   }

@@ -14,6 +14,7 @@ import {createPhysics} from './physics'
 import {createCameraRig} from './camera'
 import {look} from '../look/config'
 import {env} from '../look/time'
+import {createAvatarContactShadow, syncAvatarLookUniforms} from '../look/avatar-look'
 import {createDriverPose} from './car'
 import {createRiderPose,notifyDismountBlocked} from './ride'
 import {createEbikeAudioEngine} from './ebike-audio'
@@ -224,16 +225,16 @@ function applySprawledCrashPose(
   figure.rotation.set(1.36*fallT,heading+side*.45*fallT,side*.28*fallT,'YXZ')
   setRiderJoints(joints,{
     Hips:[0,0,0],
-    Torso:[.18*fallT,side*.20*fallT,0],
-    Head:[-.44*fallT,-side*.30*fallT,0],
-    ArmL:[1.38*fallT,.32*fallT,-.46*fallT],
-    ArmR:[1.38*fallT,-.32*fallT,.46*fallT],
-    ForearmL:[1.12*fallT,0,0],
-    ForearmR:[1.12*fallT,0,0],
-    ThighL:[.68*fallT,0,-.22*fallT],
-    ThighR:[.90*fallT,0,.22*fallT],
-    ShinL:[-.98*fallT,0,0],
-    ShinR:[-1.20*fallT,0,0],
+    Torso:[.14*fallT,side*.18*fallT,0],
+    Head:[-.36*fallT,-side*.28*fallT,0],
+    ArmL:[.46*fallT,.22*fallT,-.76*fallT],
+    ArmR:[.62*fallT,-.26*fallT,.62*fallT],
+    ForearmL:[.72*fallT,0,0],
+    ForearmR:[.96*fallT,0,0],
+    ThighL:[.55*fallT,0,-.18*fallT],
+    ThighR:[.82*fallT,0,.20*fallT],
+    ShinL:[-.85*fallT,0,0],
+    ShinR:[-1.10*fallT,0,0],
   })
 }
 
@@ -325,6 +326,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     outfitController.applyEquipped(getGameState().wardrobe.equipped,{autoHelmetOnRide:getGameState().wardrobe.autoHelmetOnRide,ridingEbike:Boolean(rides?.bike&&rides.rideKind!=='bicycle')})
   })
   const motionCtrl=createAvatarMotionController()
+  const contactShadow=createAvatarContactShadow(scene)
   let motionTime=0, lastLocomotionClip:LocomotionClipKey='idle', lastTurnDiff=0
   function getRiderLookBias(baseYaw:number){
     const raw=shortestAngle(baseYaw,yaw), mag=Math.abs(raw)
@@ -1290,7 +1292,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true);return true
   }
-  function leave(){if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function leave(){contactShadow.update({visible:false,x:0,z:0,groundY:0,footY:0,crouching:false,yaw:0});if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number){
     const dryBridge=!!sim.surface(x,z,'deck',refY+.4,1.5)||!!sim.surface(x,z,'landmark',refY+.4,1.5)
     return !sim.insideHouse(x,z)&&(!sim.wet(x,z)||dryBridge)&&!sim.isBlockedAt(x,refY,z)
@@ -1706,6 +1708,16 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         }
       }
     }
+    syncAvatarLookUniforms()
+    const onFootShadow=active&&figure.visible&&!rides?.bike&&!rides?.car&&!rides?.boat&&!crashSession
+    if(onFootShadow){
+      const sx=figure.position.x, sz=figure.position.z
+      const sSurf=sim.groundSurface(sx,sz,figure.position.y+0.15)
+      const sGroundY=sSurf?visualFloorAt(sx,sz,sSurf.y):figure.position.y-soleOffset
+      contactShadow.update({visible:true,x:sx,z:sz,groundY:sGroundY,footY:figure.position.y-soleOffset,crouching,yaw:figure.rotation.y})
+    }else{
+      contactShadow.update({visible:false,x:0,z:0,groundY:0,footY:0,crouching:false,yaw:0})
+    }
     const shakeYaw=rides?.car&&carShake>.01?Math.sin(carShakePhase)*carShake*.018:0
     const shakePitch=rides?.car&&carShake>.01?Math.cos(carShakePhase*1.3)*carShake*.012:0
     rig.update(camera,figure.position,yaw+shakeYaw,pitch+shakePitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0),dt,snap,!!rides?.car)
@@ -1782,6 +1794,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       downedBikes:Array.from(downedBikes).map(r=>({kind:r.kind,x:r.x,z:r.z,roll:r.roll,dist:Math.hypot(r.x-pos.x,r.z-pos.z)})),
       camDist:rig.distance,camClipped:rig.clipped,camBlocked:rig.blocked,camCeiling:rig.ceilingClearance,camInHouse:sim.insideHouse(camera.position.x,camera.position.z,camera.position.y),
       outfit:outfitController.getSnapshot(),
+      avatarLook:{contactShadow:contactShadow.getState(),night:env.night,rain:env.rain},
       boat:rides?.boatProbe()??null}}
   function tick(dt:number){if(!active)return;motionTime+=Math.min(.12,Math.max(0,dt));const before=performance.now(),start=rides?.boat?.position??sim.body.translation();sim.sync(start.x,start.z);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
     if(shopOverlay?.isOpen()){

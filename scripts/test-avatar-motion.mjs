@@ -8,6 +8,7 @@ import path from 'node:path'
 import {pathToFileURL} from 'node:url'
 import {build} from 'esbuild'
 import {chromium} from 'playwright'
+import {browserOptions} from './qa-browser.mjs'
 import * as THREE from 'three'
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js'
 import {preview} from 'vite'
@@ -200,15 +201,11 @@ async function runNodeKinematicsSuite() {
 }
 
 async function runBrowserSuite() {
-  const execPath = process.env.CHROMIUM || '/Users/macbook/Library/Caches/ms-playwright/chromium-1255/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'
   const server = await preview({root: 'web', configFile: 'web/vite.config.ts', preview: {host: '127.0.0.1', port: 0}})
   const baseUrl = `http://127.0.0.1:${server.httpServer.address().port}`
   let browser
   try {
-    browser = await chromium.launch({
-      executablePath: execPath,
-      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
-    })
+    browser = await chromium.launch(browserOptions(true))
     const page = await browser.newPage({viewport: {width: 960, height: 600}})
     const errors = []
     page.on('pageerror', err => errors.push(err.message))
@@ -216,7 +213,7 @@ async function runBrowserSuite() {
     await page.route('**/api/t', route => route.fulfill({status: 204}))
     await page.route('**/api/me', route => route.fulfill({status: 200, contentType: 'application/json', body: '{"user":null}'}))
 
-    await page.goto(`${baseUrl}/?verify&mode=walk&flow=0`)
+    await page.goto(`${baseUrl}/?verify&mode=walk&flow=0&solo=1`)
     await page.waitForFunction(() => window.viewer?.walk?.active, null, {timeout: 90000})
     await page.waitForFunction(() => [...window.viewer.stream.landmarks.keys()].some(e => e.id === 'jingjiang'), null, {timeout: 90000})
 

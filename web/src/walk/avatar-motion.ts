@@ -382,10 +382,10 @@ export function computeTwoWheelRiderTargets(input: TwoWheelRiderPoseInput): Reco
 
   // Asymmetric handlebar grip reach: positive steer turns left bar back/bent, right arm reaches slightly forward.
   const reachDiff = steerInput * 0.16
-  const elbowFlexBase = (kind === 'bicycle' ? 0.34 : 0.38) + wheelieFactor * 0.32 + (tucking ? 0.14 : 0)
+  const elbowFlexBase = (kind === 'bicycle' ? 0.34 : 0.19) + wheelieFactor * 0.30 + (tucking ? 0.12 : 0)
   const elbowBendL = elbowFlexBase - steerInput * 0.10
   const elbowBendR = elbowFlexBase + steerInput * 0.10
-  const shoulderOut = 0.095 + 0.015 * idleFoot
+  const shoulderOut = (kind === 'bicycle' ? 0.095 : 0.135) + 0.015 * idleFoot
 
   const headGazeYaw = T.MathUtils.clamp(-steerInput * .24 + lookYaw * 0.55 + idleScan, -0.52, 0.52)
   const headGazePitch = T.MathUtils.clamp(
@@ -420,18 +420,19 @@ export function computeTwoWheelRiderTargets(input: TwoWheelRiderPoseInput): Reco
   }
 
   // E-bike: keep right thigh steady (1.22 - wheelieFactor*0.18) across moving tests so `thighRRange < 0.02`.
+  // Combined with centered seatAnchor (z=+0.14), torso lean -0.21 + Arm 0.87 + Forearm 0.19 puts hands onto grips.
   return {
     Hips: [0, 0, 0.040 * idleFoot],
     Torso: [
-      -.08 - spdRatio * .08 - accelShift + wheelieFactor * .22 - (tucking ? .16 : 0) + breathChest + 0.04 * idleFoot,
+      -.21 - spdRatio * .07 - accelShift + wheelieFactor * .22 - (tucking ? .14 : 0) + breathChest + 0.05 * idleFoot,
       -steerInput * .09 + lookYaw * 0.14,
       leanRatio * .24 - 0.05 * idleFoot,
     ],
-    Head: [headGazePitch, headGazeYaw, -leanRatio * .52],
-    ArmL: [.90 + reachDiff + wheelieFactor * .18 - 0.04 * idleFoot, -steerInput * .14, -shoulderOut],
-    ArmR: [.90 - reachDiff + wheelieFactor * .18 - 0.04 * idleFoot, -steerInput * .14, shoulderOut],
-    ForearmL: [elbowBendL + 0.05 * idleFoot, 0, 0],
-    ForearmR: [elbowBendR + 0.05 * idleFoot, 0, 0],
+    Head: [headGazePitch + .09, headGazeYaw, -leanRatio * .52],
+    ArmL: [.92 + reachDiff + wheelieFactor * .18 - 0.01 * idleFoot, -steerInput * .14, -shoulderOut],
+    ArmR: [.92 - reachDiff + wheelieFactor * .18 - 0.01 * idleFoot, -steerInput * .14, shoulderOut],
+    ForearmL: [elbowBendL + 0.02 * idleFoot, 0, 0],
+    ForearmR: [elbowBendR + 0.02 * idleFoot, 0, 0],
     ThighL: [T.MathUtils.lerp(1.22 - wheelieFactor * .18, .56, idleFoot), 0, T.MathUtils.lerp(kneeFlareL, -.22, idleFoot)],
     ThighR: [1.22 - wheelieFactor * .18, 0, kneeFlareR],
     ShinL: [T.MathUtils.lerp(-1.38 + wheelieFactor * .14, -.56, idleFoot), 0, 0],
