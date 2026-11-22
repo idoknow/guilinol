@@ -3,6 +3,7 @@ import {Traffic,type Graph} from './sim'
 import {getState} from '../game/state'
 import {onPlayMode} from '../game/play-mode'
 import type {Pursuit} from './pursuit'
+import {trafficModels,trafficMaterial,type Variant} from './models'
 
 async function loadGraph(key:string){
   const start=performance.now()
@@ -28,14 +29,33 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   const visible=(actor:{x:number,y:number,z:number})=>frustum.containsPoint(point.set(actor.x,actor.y+.7,actor.z))
   mesh.userData.loads=[]
   if(verify)mesh.userData.motorIds=[]
-  mesh.name='G2 traffic';mesh.count=0;mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(mesh)
+  // 'G2 traffic' / 'G4 patrol' stay as invisible box proxies: verify probes (counts, pixel ids) read them.
+  // What players see is the BatchedMesh below: slots 0..79 = sim actors, 80..84 = patrol cars.
+  mesh.name='G2 traffic';mesh.count=0;mesh.visible=false;mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(mesh)
   let pursuit:Pursuit|undefined,loadingPursuit=false
   const police=new THREE.InstancedMesh(mesh.geometry,mesh.material,5)
   police.name='G4 patrol';police.count=0;police.visible=false;police.frustumCulled=false;scene.add(police)
-  onPlayMode(mode=>{if(mode==='tour'){pursuit?.end('tour');police.count=0;police.visible=false}})
+  const models=trafficModels(),SLOTS=85,PATROL=80
+  const batch=new THREE.BatchedMesh(SLOTS,models.geometries.reduce((sum,g)=>sum+g.attributes.position.count,0),0,trafficMaterial())
+  batch.name='G2 traffic visuals';scene.add(batch)
+  const geometryIds=models.geometries.map(g=>batch.addGeometry(g))
+  const slotGeometry=new Int16Array(SLOTS).fill(-1),slotPaint:(THREE.Color|undefined)[]=[],slotShown=new Uint8Array(SLOTS)
+  for(let slot=0;slot<SLOTS;slot++){batch.addInstance(geometryIds[0]);batch.setVisibleAt(slot,false)}
+  const variants=new WeakMap<object,Variant>()
+  const pose=new THREE.Object3D();pose.rotation.order='YXZ'
+  const show=(slot:number,variant:Variant,x:number,y:number,z:number,yaw:number,scale:number,down=false)=>{
+    if(slotGeometry[slot]!==variant.geometry){batch.setGeometryIdAt(slot,geometryIds[variant.geometry]);slotGeometry[slot]=variant.geometry}
+    if(slotPaint[slot]!==variant.paint){batch.setColorAt(slot,variant.paint);slotPaint[slot]=variant.paint}
+    if(!slotShown[slot]){batch.setVisibleAt(slot,true);slotShown[slot]=1}
+    pose.position.set(x,y+(down?.16:0),z);pose.rotation.set(down?-Math.PI/2:0,yaw,0);pose.scale.setScalar(Math.max(scale,.001))
+    pose.updateMatrix();batch.setMatrixAt(slot,pose.matrix)
+  }
+  const hide=(from:number,to:number)=>{for(let slot=from;slot<to;slot++)if(slotShown[slot]){batch.setVisibleAt(slot,false);slotShown[slot]=0}}
+  const patrolVariant:Variant={geometry:models.police,paint:new THREE.Color(1,1,1)}
+  onPlayMode(mode=>{if(mode==='tour'){pursuit?.end('tour');police.count=0;police.visible=false;hide(PATROL,SLOTS)}})
   let accumulator=0,pursuitDt=0
   return (dt:number,vehicle?:THREE.Vector3,player?:THREE.Vector3,solo=false,enabled=true)=>{
-    if(!enabled){mesh.count=0;return}
+    if(!enabled){mesh.count=0;hide(0,SLOTS);return}
     const target=`${Math.floor(camera.position.x/512)}_${Math.floor(camera.position.z/512)}`
     if(target!==key){
       key=target
@@ -44,7 +64,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
         if(verify){mesh.userData.loads.push(sample);if(mesh.userData.loads.length>64)mesh.userData.loads.shift()}
         if(sim)next.inherit(sim);sim=next
       }).catch(error=>console.warn('Traffic cell unavailable',error))
-      else {sim=undefined;mesh.count=0}
+      else {sim=undefined;mesh.count=0;hide(0,PATROL)}
     }
     if(solo&&vehicle&&!pursuit&&!loadingPursuit){
       loadingPursuit=true
@@ -56,11 +76,12 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
         const state=getState()
         pursuit.step(pursuitDt,sim,player,vehicle&&state.mode!=='boat'?state.vehicle?.id:undefined)
         police.count=pursuit.officers.length
-        police.visible=police.count>0
         pursuit.officers.forEach((officer,index)=>{
           object.position.set(officer.x,officer.y+.65,officer.z);object.rotation.y=officer.yaw
           object.scale.set(1.75,1.3,4);object.updateMatrix();police.setMatrixAt(index,object.matrix)
+          show(PATROL+index,patrolVariant,officer.x,officer.y,officer.z,officer.yaw,1)
         })
+        hide(PATROL+police.count,SLOTS)
         if(police.count)police.instanceMatrix.needsUpdate=true
         pursuitDt=0
       }
@@ -87,7 +108,11 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       }
       object.position.set(actor.x,actor.y+object.scale.y/2,actor.z);object.rotation.y=actor.yaw
       object.updateMatrix();mesh.setMatrixAt(index,object.matrix)
+      let variant=variants.get(actor)
+      if(!variant){variant=models.variant(actor.kind,Math.random(),Math.random());variants.set(actor,variant)}
+      show(index,variant,actor.x,actor.y,actor.z,actor.yaw,actor.scale,actor.kind==='person'&&actor.down>0)
     })
+    hide(sim.actors.length,PATROL)
     mesh.instanceMatrix.needsUpdate=true
     if(verify)Object.assign(mesh.userData,{motors,queued,redStops})
   }
