@@ -50,7 +50,7 @@ async function configuredTest({sql,env}) {
 assert.match(nme.email,/^wx\.c0ffee0123456789abcdef@social\.invalid$/)
 
     // merge：target=刚建的占位账号，source=真实邮箱账号（含绑定 qq、存档、流水含一条同 key）
-    const src='socialtest-src-0001'
+    const src='socialtest-src-0001',taken0=(await sql(`SELECT email FROM users WHERE id='${a}'`))[0].results[0].email
     await sql(`INSERT INTO users(id,email,nickname,salt,digest,verified) VALUES('${src}','merge-src@example.test','S','s1','d1',1)`)
     await sql(`INSERT INTO social_identities(type,social_uid,user_id,nickname,faceimg,created_at,last_login_at) VALUES('qq','AAAA0000BBBB1111CCCC','${src}','',' ',1,1),('wx','DDDD0000EEEE1111FFFF','${src}','','',1,1)`)
     await sql(`INSERT INTO player_saves(user_id,payload_json,client_updated_at,updated_at) VALUES('${src}','{}',1,1)`)
@@ -64,6 +64,15 @@ assert.match(nme.email,/^wx\.c0ffee0123456789abcdef@social\.invalid$/)
     assert.deepEqual((await sql(`SELECT tx_id FROM player_ledger_txns WHERE user_id='${nme.id}' ORDER BY tx_id`))[0].results.map(r=>r.tx_id),['t2','t3'])
     assert.equal(Number((await sql(`SELECT count(*) n FROM player_saves WHERE user_id='${nme.id}'`))[0].results[0].n),1)
     assert.equal(Number((await sql(`SELECT count(*) n FROM admin_audit WHERE action='merge_users'`))[0].results[0].n),1)
+    // 运营：重置密码（无会话也要留审计）+ 改邮箱（占用 409）
+    await sql(`DELETE FROM sessions WHERE user_id='${nme.id}'`)
+    const pw=await call(`admin/users/${nme.id}/password`,{method:'POST',cookie:`glol_session=${sa}`,body:{}});assert.equal(pw.status,200,await pw.clone().text())
+    const newPass=(await pw.json()).password;assert.ok(newPass.length>=8)
+    assert.equal(Number((await sql(`SELECT count(*) n FROM admin_audit WHERE action='reset_password'`))[0].results[0].n),1)
+    assert.equal((await call('auth/login',{method:'POST',body:{email:'merge-src@example.test',password:newPass}})).status,200)
+    assert.equal((await call(`admin/users/${nme.id}/email`,{method:'POST',cookie:`glol_session=${sa}`,body:{email:taken0}})).status,409)
+    const em=await call(`admin/users/${nme.id}/email`,{method:'POST',cookie:`glol_session=${sa}`,body:{email:'renamed@example.test'}});assert.equal(em.status,200)
+    assert.equal(Number((await sql(`SELECT count(*) n FROM admin_audit WHERE action='change_email'`))[0].results[0].n),1)
     await sql(`DELETE FROM player_ledger_txns`);await sql(`DELETE FROM player_saves`);await sql(`DELETE FROM sessions WHERE user_id='${nme.id}'`);await sql(`DELETE FROM social_identities WHERE user_id='${nme.id}'`);await sql(`DELETE FROM users WHERE id='${nme.id}'`);await sql(`UPDATE users SET role='user' WHERE id='${a}'`)
 
     // login：无会话确认 → 两条独立 Set-Cookie，新会话可用
@@ -91,7 +100,7 @@ assert.match(nme.email,/^wx\.c0ffee0123456789abcdef@social\.invalid$/)
     const tr2=await pending2('register','FEDCBA9876543210AAAAAA')
     assert.equal((await call('auth/social/register',{method:'POST',cookie:`glol_social_pending=${tr2}`,body:{email:'x2@example.test',password:'social-password-1'}})).status,409)
     await sql(`DELETE FROM social_identities`);await sql(`DELETE FROM social_pending`);await sql(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email='${reg.email}')`);await sql(`DELETE FROM users WHERE email='${reg.email}'`);await sql(`DELETE FROM mail_events WHERE email='${reg.email}'`);await sql(`DELETE FROM sessions WHERE user_id='${b}'`);await sql(`DELETE FROM users WHERE id='${b}'`)
-    console.log('Social configured: start 502 w/o orphan state, cross-site callback→expired, bind confirm 403 (not consumed)/200/404 replay, re-bind start 409 already_bound, /api/me social list, social-only auto-create (placeholder email), admin merge on Postgres (moved/conflicts/adopted email/saves/ledger key-skip/audit), login confirm sets 2 cookies + working session; register 2-phase (409 email_taken/conflict, password mismatch 400, 2 cookies, verified+bound, code deleted)')
+    console.log('Social configured: start 502 w/o orphan state, cross-site callback→expired, bind confirm 403 (not consumed)/200/404 replay, re-bind start 409 already_bound, /api/me social list, social-only auto-create (placeholder email), admin merge on Postgres (moved/conflicts/adopted email/saves/ledger key-skip/audit) + reset password (audit w/o sessions, login works) + change email (409/200/audit), login confirm sets 2 cookies + working session; register 2-phase (409 email_taken/conflict, password mismatch 400, 2 cookies, verified+bound, code deleted)')
   }catch(error){console.error(logs.slice(-3000));throw error}
   finally{if(child.exitCode===null){process.kill(-child.pid,'SIGTERM');await closed}}
 }
