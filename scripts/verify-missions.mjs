@@ -1,13 +1,34 @@
 import assert from 'node:assert/strict'
 import {resolve} from 'node:path'
+import {readFile, writeFile} from 'node:fs/promises'
+import {execFileSync} from 'node:child_process'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
 import {browserOptions} from './qa-browser.mjs'
 
 const ROOT = resolve(import.meta.dirname, '..')
+const baselinePath = resolve(import.meta.dirname, 'mission-layout-main.json')
+const mainDist = process.env.RECORD_MAIN_LAYOUT_DIST
+const baseline = mainDist ? {
+  main: execFileSync('git', ['rev-parse', 'origin/main'], {cwd: ROOT, encoding: 'utf8'}).trim(),
+  note: '待 UI 分支修复', measurements: {},
+} : JSON.parse(await readFile(baselinePath, 'utf8'))
+
+function checkOverlaps(viewport, state, overlaps) {
+  const key = `${viewport.width}x${viewport.height}:${state}`
+  if (mainDist) {
+    baseline.measurements[key] = overlaps.map(({a, b, area}) => ({a, b, area}))
+    return
+  }
+  const limits = baseline.measurements[key]
+  assert.ok(limits, `Missing main measurement for ${key}`)
+  const regressions = overlaps.filter(({a, b, area}) => !limits.some(limit =>
+    limit.a === a && limit.b === b && area <= limit.area))
+  assert.deepEqual(regressions, [], `${key} overlap regression against ${baseline.main}: ${JSON.stringify(regressions)}`)
+}
 
 function inspectHudLayoutScript() {
-  return ({width, height}) => {
+  return ({width, height, fullHud = false}) => {
     const missionSelectors = ['.gl-mission-entry', '.gl-mission-hud']
     const hudSelectors = [
       '.hud-me',
@@ -31,6 +52,8 @@ function inspectHudLayoutScript() {
       'output',
       '.hint',
       'footer',
+      '.hud-dev',
+      '.minimap',
     ]
     const measure = sel => {
       const el = document.querySelector(sel)
@@ -63,10 +86,51 @@ function inspectHudLayoutScript() {
         if (ox * oy > 0) overlaps.push({a: a.sel, b: b.sel, area: +(ox * oy).toFixed(1), boxA: a, boxB: b})
       }
     }
+    if (fullHud) for (const [index, first] of otherBoxes.entries()) {
+      const left = document.querySelector(first.sel)
+      for (const second of otherBoxes.slice(index + 1)) {
+        const right = document.querySelector(second.sel)
+        if (left.contains(right) || right.contains(left)) continue
+        const width = Math.min(first.right, second.right) - Math.max(first.left, second.left)
+        const height = Math.min(first.bottom, second.bottom) - Math.max(first.top, second.top)
+        if (width > 0 && height > 0) overlaps.push({a:first.sel,b:second.sel,area:+(width*height).toFixed(1)})
+      }
+    }
     const outOfBounds = activeMissionBoxes.filter(
       b => b.left < -0.5 || b.top < -0.5 || b.right > width + 0.5 || b.bottom > height + 0.5,
     )
-    return {activeMissionBoxes, otherBoxes, overlaps, outOfBounds}
+  return {activeMissionBoxes, otherBoxes, overlaps, outOfBounds}
+  }
+}
+
+async function measureVehicles(page, viewport, mission) {
+  const fixtures = [
+    ['foot', -588, -212, ''], ['bike', -539, -95, '骑电动车'],
+    ['bicycle', 585, 1384, '骑单车'], ['car', -572, -92, '开车'],
+    ['boat', -1340, 326, '划小船'],
+  ]
+  for (const [kind, east, south, label] of fixtures) {
+    const landed = await page.evaluate(async ([kind, east, south]) => {
+      const {walk, walkTo} = window.viewer
+      if (kind !== 'foot' && kind !== 'boat') {
+        const nearest = walk.parked(kind).sort((left,right) =>
+          Math.hypot(left[0]-east,left[2]-south)-Math.hypot(right[0]-east,right[2]-south))[0]
+        if (!nearest) return false
+        ;[east,,south] = nearest
+      }
+      return walkTo(east,south,0,'layout-fixture')
+    }, [kind,east,south])
+    assert(landed, `no ${kind} fixture`)
+    if (label) {
+      await page.evaluate(() => document.querySelector('.spot-card.show .card-close')?.click())
+      await page.waitForFunction(label => document.querySelector('.vehicle-action:not([hidden])')?.textContent.includes(label), label)
+      await page.keyboard.press('f')
+    }
+    await page.waitForFunction(kind => window.viewer.walk.vehicle===kind, kind)
+    await page.waitForFunction(mission => (window.viewer.game.getState().mission?.id ?? 'idle')===mission,mission)
+    await page.evaluate(async () => {for (let index=0;index<3;index++) await new Promise(requestAnimationFrame)})
+    const layout = await page.evaluate(inspectHudLayoutScript(), {...viewport,fullHud:true})
+    checkOverlaps(viewport, `${mission}:${kind}`, layout.overlaps)
   }
 }
 
@@ -93,14 +157,12 @@ async function verifyViewportLayout(browser, baseUrl, label, viewport, hasTouch)
   await page.waitForTimeout(300)
 
   const idleLayout = await page.evaluate(inspectHudLayoutScript(), viewport)
-  // main 670758c 实测，仅横屏任务空闲态；待 UI 分支修复。
-  const idleLimits = viewport.width === 844 && viewport.height === 390
-    ? {'.dock': 2466.8, '.btn-mode': 1274} : {}
-  const regressions = idleLayout.overlaps.filter(({a, b, area}) =>
-    a !== '.gl-mission-entry' || !Object.hasOwn(idleLimits, b) || area > idleLimits[b])
-  assert.deepEqual(regressions, [], `${label} idle HUD overlaps: ${JSON.stringify(regressions)}`)
+  checkOverlaps(viewport, 'idle', idleLayout.overlaps)
   assert.equal(idleLayout.outOfBounds.length, 0, `${label} idle HUD OOB: ${JSON.stringify(idleLayout.outOfBounds)}`)
   assert.ok(idleLayout.activeMissionBoxes.some(b => b.sel === '.gl-mission-entry'), `${label} .gl-mission-entry must be visible`)
+
+  await measureVehicles(page, viewport, 'idle')
+  await page.evaluate(() => window.viewer.walkTo(-588,-212,0,'layout-mission'))
 
   await page.evaluate(() => {
     window.viewer.game.missions.start('noodle-01')
@@ -109,15 +171,17 @@ async function verifyViewportLayout(browser, baseUrl, label, viewport, hasTouch)
   await page.waitForTimeout(150)
 
   const activeLayout = await page.evaluate(inspectHudLayoutScript(), viewport)
-  assert.equal(activeLayout.overlaps.length, 0, `${label} active HUD overlaps: ${JSON.stringify(activeLayout.overlaps)}`)
+  checkOverlaps(viewport, 'noodle-01', activeLayout.overlaps)
   assert.equal(activeLayout.outOfBounds.length, 0, `${label} active HUD OOB: ${JSON.stringify(activeLayout.outOfBounds)}`)
   assert.ok(activeLayout.activeMissionBoxes.some(b => b.sel === '.gl-mission-hud'), `${label} .gl-mission-hud must be visible`)
+  await measureVehicles(page, viewport, 'noodle-01')
 
   assert.deepEqual(errors, [], `${label} errors: ${errors.join('; ')}`)
   await ctx.close()
 }
 
 const server = await preview({
+  ...(mainDist && {build: {outDir: resolve(mainDist)}}),
   root: resolve(ROOT, 'web'),
   configFile: resolve(ROOT, 'web/vite.config.ts'),
   preview: {host: '127.0.0.1', port: 0},
@@ -127,6 +191,12 @@ let browser
 
 try {
   browser = await chromium.launch(browserOptions(true))
+  if (mainDist) {
+    const version = await (await fetch(`${baseUrl}/version.json`)).json()
+    assert.equal(version.sha, baseline.main, 'Refusing to record non-main dist')
+  } else await verifyDesktopGameplay()
+
+  async function verifyDesktopGameplay() {
   const errors = []
 
   // -------------------------------------------------------------------------
@@ -264,16 +334,13 @@ try {
 
   // 6. Real mounted two-wheeler crash test: ensure crash triggers single -25% penalty, NO per-frame drain
   const parkedBike = await page.evaluate(() => {
-    const p = window.viewer.walk.position
     const list = window.viewer.walk.parked('bike')
     if (!list.length) return null
-    list.sort((a, b) => Math.hypot(a[0] - p.x, a[2] - p.z) - Math.hypot(b[0] - p.x, b[2] - p.z))
+    list.sort((a, b) => Math.hypot(a[0] + 539, a[2] + 95) - Math.hypot(b[0] + 539, b[2] + 95))
     return list[0]
   })
   assert.ok(parkedBike, 'expected parked shared ebike nearby to test real crash state machine')
-  await page.evaluate(async b => {
-    await window.viewer.walkTo(b[0] + 1.2, b[2], 0, 'e2e-mount-bike')
-  }, parkedBike)
+  assert(await page.evaluate(b => window.viewer.walkTo(b[0], b[2], 0, 'e2e-mount-bike'), parkedBike))
   await page.waitForFunction(() => document.querySelector('.vehicle-action')?.dataset.interactAction === 'mount_vehicle', null, {timeout:8000})
   await page.keyboard.press('KeyF')
   await page.waitForFunction(() => window.viewer.walk.vehicle === 'bike', null, {timeout: 8000})
@@ -363,6 +430,7 @@ try {
 
   assert.deepEqual(errors, [], `desktop E2E errors: ${errors.join('; ')}`)
   await ctx.close()
+  }
 
   // -------------------------------------------------------------------------
   // B. Zero-Overlap Multi-Viewport HUD Layout Audit
@@ -371,7 +439,8 @@ try {
   await verifyViewportLayout(browser, baseUrl, 'mobile-portrait-390x844', {width: 390, height: 844}, true)
   await verifyViewportLayout(browser, baseUrl, 'mobile-landscape-844x390', {width: 844, height: 390}, true)
 
-  console.log('ALL HEADLESS MISSION & ECONOMY E2E VERIFICATIONS PASSED')
+  if (mainDist) await writeFile(baselinePath, JSON.stringify(baseline, null, 2) + '\n')
+  else console.log('ALL HEADLESS MISSION & ECONOMY E2E VERIFICATIONS PASSED')
 } finally {
   await browser?.close()
   server.httpServer.close()

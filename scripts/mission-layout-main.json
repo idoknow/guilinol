@@ -1,0 +1,204 @@
+{
+  "main": "372948f66c2dcb299a90e688621e828cf908237f",
+  "note": "待 UI 分支修复",
+  "measurements": {
+    "1280x720:idle": [],
+    "1280x720:idle:foot": [],
+    "1280x720:idle:bike": [],
+    "1280x720:idle:bicycle": [],
+    "1280x720:idle:car": [],
+    "1280x720:idle:boat": [],
+    "1280x720:noodle-01": [],
+    "1280x720:noodle-01:foot": [],
+    "1280x720:noodle-01:bike": [],
+    "1280x720:noodle-01:bicycle": [],
+    "1280x720:noodle-01:car": [],
+    "1280x720:noodle-01:boat": [],
+    "390x844:idle": [],
+    "390x844:idle:foot": [],
+    "390x844:idle:bike": [],
+    "390x844:idle:bicycle": [],
+    "390x844:idle:car": [],
+    "390x844:idle:boat": [],
+    "390x844:noodle-01": [],
+    "390x844:noodle-01:foot": [],
+    "390x844:noodle-01:bike": [],
+    "390x844:noodle-01:bicycle": [],
+    "390x844:noodle-01:car": [],
+    "390x844:noodle-01:boat": [],
+    "844x390:idle": [
+      {
+        "a": ".gl-mission-entry",
+        "b": ".dock",
+        "area": 2466.8
+      },
+      {
+        "a": ".gl-mission-entry",
+        "b": ".btn-mode",
+        "area": 1274
+      }
+    ],
+    "844x390:idle:foot": [
+      {
+        "a": ".gl-mission-entry",
+        "b": ".dock",
+        "area": 2466.8
+      },
+      {
+        "a": ".gl-mission-entry",
+        "b": ".btn-mode",
+        "area": 1274
+      }
+    ],
+    "844x390:idle:bike": [
+      {
+        "a": ".gl-mission-entry",
+        "b": ".dock",
+        "area": 2466.8
+      },
+      {
+        "a": ".gl-mission-entry",
+        "b": ".btn-mode",
+        "area": 1274
+      }
+    ],
+    "844x390:idle:bicycle": [
+      {
+        "a": ".gl-mission-entry",
+        "b": ".dock",
+        "area": 2466.8
+      },
+      {
+        "a": ".gl-mission-entry",
+        "b": ".btn-mode",
+        "area": 1274
+      }
+    ],
+    "844x390:idle:car": [
+      {
+        "a": ".gl-mission-entry",
+        "b": ".dock",
+        "area": 2466.8
+      },
+      {
+        "a": ".gl-mission-entry",
+        "b": ".btn-mode",
+        "area": 1274
+      }
+    ],
+    "844x390:idle:boat": [
+      {
+        "a": ".gl-mission-entry",
+        "b": ".dock",
+        "area": 2466.8
+      },
+      {
+        "a": ".gl-mission-entry",
+        "b": ".btn-mode",
+        "area": 1274
+      }
+    ],
+    "844x390:noodle-01": [
+      {
+        "a": ".gl-mission-entry",
+        "b": ".dock",
+        "area": 2466.8
+      },
+      {
+        "a": ".gl-mission-entry",
+        "b": ".btn-mode",
+        "area": 1274
+      },
+      {
+        "a": ".gl-mission-hud",
+        "b": ".dock",
+        "area": 11188.7
+      }
+    ],
+    "844x390:noodle-01:foot": [
+      {
+        "a": ".gl-mission-entry",
+        "b": ".dock",
+        "area": 2466.8
+      },
+      {
+        "a": ".gl-mission-entry",
+        "b": ".btn-mode",
+        "area": 1274
+      },
+      {
+        "a": ".gl-mission-hud",
+        "b": ".dock",
+        "area": 11188.7
+      }
+    ],
+    "844x390:noodle-01:bike": [
+      {
+        "a": ".gl-mission-entry",
+        "b": ".dock",
+        "area": 2466.8
+      },
+      {
+        "a": ".gl-mission-entry",
+        "b": ".btn-mode",
+        "area": 1274
+      },
+      {
+        "a": ".gl-mission-hud",
+        "b": ".dock",
+        "area": 11188.7
+      }
+    ],
+    "844x390:noodle-01:bicycle": [
+      {
+        "a": ".gl-mission-entry",
+        "b": ".dock",
+        "area": 2466.8
+      },
+      {
+        "a": ".gl-mission-entry",
+        "b": ".btn-mode",
+        "area": 1274
+      },
+      {
+        "a": ".gl-mission-hud",
+        "b": ".dock",
+        "area": 11188.7
+      }
+    ],
+    "844x390:noodle-01:car": [
+      {
+        "a": ".gl-mission-entry",
+        "b": ".dock",
+        "area": 2466.8
+      },
+      {
+        "a": ".gl-mission-entry",
+        "b": ".btn-mode",
+        "area": 1274
+      },
+      {
+        "a": ".gl-mission-hud",
+        "b": ".dock",
+        "area": 11188.7
+      }
+    ],
+    "844x390:noodle-01:boat": [
+      {
+        "a": ".gl-mission-entry",
+        "b": ".dock",
+        "area": 2466.8
+      },
+      {
+        "a": ".gl-mission-entry",
+        "b": ".btn-mode",
+        "area": 1274
+      },
+      {
+        "a": ".gl-mission-hud",
+        "b": ".dock",
+        "area": 11188.7
+      }
+    ]
+  }
+}

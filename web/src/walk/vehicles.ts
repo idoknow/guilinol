@@ -2,6 +2,7 @@ import * as T from 'three'
 import type {Stream} from '../stream'
 import type {ParkedBike} from '../batch'
 import {vehicleForbiddenAt} from '../game/car-free'
+import {ParkedBatches, parkedParts} from './parked-batches'
 import {fetchAsset} from '../world'
 import {createFreeBoats, type MooringSlot} from './boat'
 import type {createPhysics} from './physics'
@@ -146,13 +147,53 @@ export async function vehicles(
   let sharedRideBilled = false
   let sharedRideSessionId = 0
 
-  function store(mesh: T.Mesh) {
+  const parkedCells = new WeakMap<T.Group, ParkedBatches>()
+  const models = new Map<string, ReturnType<typeof parkedParts>>()
+
+  function marker(kind: string, paint: number, shared = false) {
+    const key = `${kind}:${paint}:${shared}`
+    if (!models.has(key)) models.set(key, parkedParts(makeVehicleMesh(kind, paint, {shared})))
+    const record = new T.Object3D()
+    record.name = kind
+    record.userData = {parkedModel: key, paint, shared}
+    return record
+  }
+
+  function takeRecord(record: T.Object3D) {
+    if (record instanceof T.Mesh) return record
+    const mesh = makeVehicleMesh(record.name, record.userData.paint, {shared: record.userData.shared})
+    mesh.position.copy(record.position)
+    mesh.quaternion.copy(record.quaternion)
+    Object.assign(mesh.userData, record.userData)
+    const saved = bikeStates.get(record)
+    if (saved) bikeStates.set(mesh, saved)
+    const cell = record.parent as T.Group
+    cell.remove(record)
+    refreshBatch(cell)
+    return mesh
+  }
+
+  function refreshBatch(cell: T.Group) {
+    const visible = new Map<string, T.Object3D[]>()
+    for (const record of cell.children) {
+      const key = record.userData.parkedModel
+      if (!record.visible || !key || record instanceof T.Mesh) continue
+      const records = visible.get(key)
+      if (records) records.push(record)
+      else visible.set(key, [record])
+    }
+    parkedCells.get(cell)!.sync(visible, models)
+  }
+
+  function store(mesh: T.Object3D) {
     const key = `${Math.floor(mesh.position.x / cellSize)},${Math.floor(mesh.position.z / cellSize)}`
     let cell = cells.get(key)
     if (!cell) {
       cell = new T.Group()
       cells.set(key, cell)
+      parkedCells.set(cell, new ParkedBatches())
     }
+    mesh.updateMatrix()
     cell.add(mesh)
   }
 
@@ -171,7 +212,7 @@ export async function vehicles(
   function addBike(x: number, y: number, z: number, angle: number, paint: number, explicitType?: EbikeVehicleType) {
     const vehicleType = resolveEbikeKind(paint, explicitType)
     const isShared = vehicleType === 'shared'
-    const mesh = makeVehicleMesh('bike', paint, isShared ? {shared: true} : undefined)
+    const mesh = marker('bike', paint, isShared)
     mesh.position.set(x, y, z)
     mesh.rotation.y = angle
     mesh.userData.paint = paint
@@ -198,13 +239,13 @@ export async function vehicles(
   for (const [x, y, z, angle, paint] of data.bikes) addBike(x, y, z, angle, paint)
   for (const [x, y, z, angle, paint] of data.sharedBikes ?? []) addBike(x, y, z, angle, paint, 'shared')
   for (const [x, y, z, angle, paint] of data.bicycles ?? []) {
-    const mesh = vehicleModel('bicycle', paint)
+    const mesh = marker('bicycle', paint)
     mesh.position.set(x, y, z)
     mesh.rotation.y = angle
     store(mesh)
   }
   for (const [x, y, z, angle, paint] of data.cars ?? []) {
-    const mesh = vehicleModel('car', paint)
+    const mesh = marker('car', paint)
     mesh.position.set(x, y, z)
     mesh.rotation.y = angle
     store(mesh)
@@ -268,11 +309,11 @@ export async function vehicles(
   let car: T.Mesh | null = null
   let lastCar: T.Mesh | null = null
   let route = -1
-  let nearBike: T.Mesh | null = null
+  let nearBike: T.Object3D | null = null
   let nearBikeDist = Infinity
   let nearDecor: ParkedBike | null = null
   let decorDistance = Infinity
-  let nearDownedBike: T.Mesh | null = null
+  let nearDownedBike: T.Object3D | null = null
   let nearDownedDist = Infinity
   let nearRoute = -1
   let nearRouteDist = Infinity
@@ -377,11 +418,23 @@ export async function vehicles(
   }
 
   function attachMeshToCell(mesh: T.Mesh) {
-    store(mesh)
-    if (active && mesh.parent && !visibleCells.has(mesh.parent as T.Group)) {
-      visibleCells.add(mesh.parent as T.Group)
-      group.add(mesh.parent)
+    let record: T.Object3D = mesh
+    if (mesh.userData.parkedModel && !mesh.userData.downed) {
+      record = marker(mesh.name, mesh.userData.paint, mesh.userData.shared)
+      record.position.copy(mesh.position)
+      record.quaternion.copy(mesh.quaternion)
+      Object.assign(record.userData, mesh.userData)
+      const saved = bikeStates.get(mesh)
+      if (saved) bikeStates.set(record, saved)
+      mesh.removeFromParent()
     }
+    store(record)
+    const cell = record.parent as T.Group
+    if (active && !visibleCells.has(cell)) {
+      visibleCells.add(cell)
+      group.add(cell, parkedCells.get(cell)!.view)
+    }
+    refreshBatch(cell)
   }
 
   function buildPersonalOrTestMesh(
@@ -553,13 +606,14 @@ export async function vehicles(
     syncHud()
   }
 
-  function mountBikeMesh(targetMesh: T.Mesh, forceBoard = false): boolean {
-    const prevKey = (targetMesh.userData.coordKey as string | undefined) ?? bikeCoordKey(targetMesh.position.x, targetMesh.position.z)
+  function mountBikeMesh(target: T.Object3D, forceBoard = false): boolean {
+    const prevKey = (target.userData.coordKey as string | undefined) ?? bikeCoordKey(target.position.x, target.position.z)
     const safePos =
       !forceBoard && board
-        ? board(targetMesh.position.x, targetMesh.position.y, targetMesh.position.z)
-        : {x: targetMesh.position.x, y: targetMesh.position.y, z: targetMesh.position.z, bikeY: targetMesh.position.y}
+        ? board(target.position.x, target.position.y, target.position.z)
+        : {x: target.position.x, y: target.position.y, z: target.position.z, bikeY: target.position.y}
     if (!safePos || vehicleForbiddenAt(safePos.x,safePos.z)) return false
+    const targetMesh = takeRecord(target)
     targetMesh.position.set(safePos.x, safePos.bikeY, safePos.z)
     const rideKind: RideKind = targetMesh.name === 'bicycle' ? 'bicycle' : 'bike'
     const saved = bikeStates.get(targetMesh) ?? bikeCoordStates.get(prevKey)
@@ -633,8 +687,8 @@ export async function vehicles(
         ? board(nearBike.position.x, nearBike.position.y, nearBike.position.z, 'car')
         : {x: nearBike.position.x, y: nearBike.position.y, z: nearBike.position.z, bikeY: nearBike.position.y}
       if (!safePos || vehicleForbiddenAt(safePos.x,safePos.z)) return
-      nearBike.position.set(safePos.x, safePos.bikeY, safePos.z)
-      car = lastCar = nearBike
+      car = lastCar = takeRecord(nearBike)
+      car.position.set(safePos.x, safePos.bikeY, safePos.z)
       group.add(car)
       carCtrl.mount(car.rotation.y, car.rotation.x)
       syncHud()
@@ -663,7 +717,7 @@ export async function vehicles(
           : route >= 0
             ? 'tour_boat'
             : null
-    const toVehicleSnap = (mesh: T.Mesh | null, distance: number): VehicleCandidateSnapshot | null => {
+    const toVehicleSnap = (mesh: T.Object3D | null, distance: number): VehicleCandidateSnapshot | null => {
       if (!mesh) return null
       const kind: VehicleCandidateSnapshot['kind'] = mesh.name === 'car' ? 'car' : mesh.name === 'bicycle' ? 'bicycle' : 'bike'
       const tier =
@@ -706,15 +760,18 @@ export async function vehicles(
         nextCells.add(cell)
         if (!visibleCells.has(cell)) {
           visibleCells.add(cell)
-          group.add(cell)
+          group.add(cell, parkedCells.get(cell)!.view)
         }
+        let visibilityChanged = false
         for (const child of cell.children) {
-          const mesh = child as T.Mesh
+          const mesh = child
           const distance = Math.hypot(mesh.position.x - x, mesh.position.z - z)
           const isCar = mesh.name === 'car'
           const downed = !!mesh.userData.downed
           const reach = downed ? 4.4 : isCar ? 4.6 : 4.2
-          mesh.visible = distance < 110
+          const visible = distance < 110
+          if (visible !== mesh.visible && mesh.userData.parkedModel) visibilityChanged = true
+          mesh.visible = visible
           const vertOk = footY === undefined || Math.abs(mesh.position.y - footY) <= 1.5
           if (downed && distance < reach && distance < nearDownedDist && vertOk) {
             nearDownedBike = mesh
@@ -733,11 +790,15 @@ export async function vehicles(
             bestHint = {x: mesh.position.x, y: mesh.position.y, z: mesh.position.z, dist: distance, reach, radius: isCar ? 2.35 : 1.15}
           }
         }
+        if (visibilityChanged || !cell.userData.batchReady) {
+          refreshBatch(cell)
+          cell.userData.batchReady = true
+        }
       }
     }
     for (const cell of visibleCells) {
       if (!nextCells.has(cell)) {
-        group.remove(cell)
+        group.remove(cell, parkedCells.get(cell)!.view)
         visibleCells.delete(cell)
       }
     }
