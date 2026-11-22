@@ -37,6 +37,8 @@ async function configuredTest({sql,env}) {
     assert.equal((await call('auth/social/confirm',{method:'POST',cookie:`${pc}; glol_session=${sa}`,body:{}})).status,200)
     assert.equal((await sql(`SELECT user_id FROM social_identities WHERE social_uid='0123456789ABCDEFF60718'`))[0].results[0].user_id,a)
     assert.equal((await call('auth/social/confirm',{method:'POST',cookie:`${pc}; glol_session=${sa}`,body:{}})).status,404)
+    const again=await call('auth/social/start',{method:'POST',cookie:`glol_session=${sa}`,body:{type:'wx',intent:'bind'}});assert.equal(again.status,409);assert.equal((await again.json()).error.code,'already_bound')
+    const mine=await (await call('me',{cookie:`glol_session=${sa}`})).json();assert.deepEqual(mine.social.map(x=>[x.type,x.uid]),[['wx','…F60718']])
 
     // login：无会话确认 → 两条独立 Set-Cookie，新会话可用
     const tl=await pending('login','0123456789ABCDEFF60718',a)
@@ -63,7 +65,7 @@ async function configuredTest({sql,env}) {
     const tr2=await pending2('register','FEDCBA9876543210AAAAAA')
     assert.equal((await call('auth/social/register',{method:'POST',cookie:`glol_social_pending=${tr2}`,body:{email:'x2@example.test',password:'social-password-1'}})).status,409)
     await sql(`DELETE FROM social_identities`);await sql(`DELETE FROM social_pending`);await sql(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email='${reg.email}')`);await sql(`DELETE FROM users WHERE email='${reg.email}'`);await sql(`DELETE FROM mail_events WHERE email='${reg.email}'`);await sql(`DELETE FROM sessions WHERE user_id='${b}'`);await sql(`DELETE FROM users WHERE id='${b}'`)
-    console.log('Social configured: start 502 w/o orphan state, cross-site callback→expired, bind confirm 403 (not consumed)/200/404 replay, login confirm sets 2 cookies + working session; register 2-phase (409 email_taken/conflict, password mismatch 400, 2 cookies, verified+bound, code deleted)')
+    console.log('Social configured: start 502 w/o orphan state, cross-site callback→expired, bind confirm 403 (not consumed)/200/404 replay, re-bind start 409 already_bound, /api/me social list, login confirm sets 2 cookies + working session; register 2-phase (409 email_taken/conflict, password mismatch 400, 2 cookies, verified+bound, code deleted)')
   }catch(error){console.error(logs.slice(-3000));throw error}
   finally{if(child.exitCode===null){process.kill(-child.pid,'SIGTERM');await closed}}
 }

@@ -28,7 +28,9 @@ export const SOCIAL_LABELS: Record<SocialType, string> = {
 const DEFAULT_HOST = 'https://login.mapay.cn'
 const STATE_TTL = 600
 const PENDING_TTL = 300
-const MAX_STATES_PER_BROWSER = 3
+// 面板会为每个 (平台, 意图) 预取一次授权地址：最多 2 平台 × 3 意图 = 6 个并存，留余量到 8，
+// 否则早先预取的 state 被挤出 cookie，用缓存地址跳过去回调会变成 expired
+const MAX_STATES_PER_BROWSER = 8
 
 export function isSocialType(value: unknown): value is SocialType {
   return typeof value === 'string' && (SOCIAL_TYPES as readonly string[]).includes(value)
@@ -181,7 +183,7 @@ export async function startSocial(
     if (bound) throw new Problem(409, 'already_bound', '这个平台已经绑定过账号了')
   }
   if (intent === 'register' && userId) throw new Problem(400, 'invalid_input', '注册流程不需要登录')
-  await limit(db, `social:start:${ip}`, 20, 60)
+  await limit(db, `social:start:${ip}`, 60, 60)
 
   const state = random(32)
   await db.batch([
