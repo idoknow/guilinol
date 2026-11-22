@@ -32,7 +32,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   mesh.name='G2 traffic';mesh.count=0;mesh.visible=false;mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(mesh)
   const models=trafficModels(),SLOTS=80
   const batch=new THREE.BatchedMesh(SLOTS,models.geometries.reduce((sum,g)=>sum+g.attributes.position.count,0),0,trafficMaterial())
-  batch.name='G2 traffic visuals';scene.add(batch)
+  batch.name='G2 traffic visuals';batch.frustumCulled=false;batch.perObjectFrustumCulled=true;scene.add(batch)
   const geometryIds=models.geometries.map(g=>batch.addGeometry(g))
   const slotGeometry=new Int16Array(SLOTS).fill(-1),slotPaint:(THREE.Color|undefined)[]=[],slotShown=new Uint8Array(SLOTS)
   for(let slot=0;slot<SLOTS;slot++){batch.addInstance(geometryIds[0]);batch.setVisibleAt(slot,false)}
@@ -64,7 +64,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     if(accumulator<.05)return
     camera.updateMatrixWorld()
     frustum.setFromProjectionMatrix(projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
-    while(accumulator>=.05){sim.step(.05,camera.position,vehicle,visible);accumulator-=.05}
+    while(accumulator>=.05){sim.step(.05,camera.position,vehicle);accumulator-=.05}
     mesh.count=sim.actors.length
     let motors=0,queued=0,redStops=0
     if(verify){mesh.userData.motorIds.length=0;mesh.userData.approaches=[]}

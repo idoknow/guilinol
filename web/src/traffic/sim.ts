@@ -12,7 +12,6 @@ export class Traffic {
   *allTracks(){for(const list of this.exits.values())yield* list}
   actors:Actor[]=[]
   time=0
-  private nextCull=0
   crossed=0
   stopped=0
   transitions=0
@@ -76,14 +75,9 @@ export class Traffic {
   green(track:Lane,time=this.time){
     return this.phase(track,time)==='green'
   }
-  step(dt:number,camera:Position,vehicle?:Position,visible?:(point:Position)=>boolean){
+  step(dt:number,camera:Position,vehicle?:Position){
     this.time+=dt
     this.actors=this.actors.filter(actor=>(!actor.leaving||actor.scale>0)&&distanceSq(actor,camera)<210**2)
-    if(visible&&this.time>=this.nextCull){
-      this.nextCull=this.time+.35
-      const behind=this.actors.filter(actor=>actor.kind!=='person'&&!visible(actor))
-      if(behind.length>14)this.actors.splice(this.actors.indexOf(behind[0]),1)
-    }
     let persons=0,scooters=0
     for(const actor of this.actors){persons+=Number(actor.kind==='person');scooters+=Number(actor.kind==='scooter')}
     let motors=this.actors.length-persons
@@ -97,7 +91,6 @@ export class Traffic {
       if(track.walk!==walk || (!walk&&(track.kind==='bus'||(!scooter&&track.kind==='nonmotor'))))continue
       const actor:Actor={track,dist:this.random()*track.length,speed:0,kind:walk?'person':scooter?'scooter':'car',down:0,dodge:0,x:0,y:0,z:0,yaw:0,scale:0,leaving:false}
       this.position(actor)
-      if(visible&&!visible(actor)&&this.random()>.035)continue
       if(distanceSq(actor,camera)>185**2 || this.actors.some(other=>(other.x-actor.x)**2+(other.z-actor.z)**2<(other.track.id===track.id?36:5)))continue
       this.actors.push(actor)
       if(walk)persons++;else {motors++;scooters+=Number(scooter)}
