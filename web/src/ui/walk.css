@@ -9,11 +9,14 @@
 .walk-ui .btn-view{right:calc(22px + env(safe-area-inset-right));bottom:calc(112px + env(safe-area-inset-bottom));width:48px;height:48px;font-size:12px;letter-spacing:.04em}
 body[data-aboard] :is(.btn-jump,.btn-run){display:none}
 body[data-aboard] .joystick.running::after{border-color:rgba(169,80,60,0)}
+.toast{z-index:6;box-sizing:border-box;width:max-content;max-width:min(520px,calc(100vw - 32px));text-align:center;line-height:1.45;border:1px solid rgba(244,239,226,.34)}
 @media (pointer:coarse){
   .vehicle-action{bottom:calc(170px + env(safe-area-inset-bottom));max-width:calc(100vw - 168px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .toast{max-width:calc(100vw - 32px);font-size:13.5px;padding:8px 16px}
 }
 @media (pointer:coarse) and (max-width:520px){
   html,body{overflow:hidden;max-width:100vw}
+  .toast{top:calc(336px + env(safe-area-inset-top))}
   output{max-width:calc(100vw - 156px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   footer{max-width:calc(100vw - 16px);font-size:8px;overflow:hidden;text-overflow:ellipsis}
   .sky-ui{max-width:calc(100vw - 156px);flex-wrap:wrap;row-gap:2px;padding:4px 8px}

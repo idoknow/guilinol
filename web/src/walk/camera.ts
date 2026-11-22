@@ -38,7 +38,7 @@ export function createCameraRig(sim:Physics) {
     if(Number.isFinite(headCeil)) focusY = Math.max(footY+.85,Math.min(focusY,headCeil-.04))
     ray.origin.x = figurePos.x; ray.origin.y = footY+.55; ray.origin.z = figurePos.z
     ray.dir.x = 0; ray.dir.y = 1; ray.dir.z = 0
-    const overhead = sim.world.castRay(ray,.95,false,undefined,undefined,sim.capsule,undefined,filter)
+    const overhead = sim.world.castRay(ray,document.body.hasAttribute('data-aboard')?1.15:.95,false,undefined,undefined,sim.capsule,undefined,filter)
     if(overhead) focusY = Math.max(footY+.85,Math.min(focusY,footY+.55+overhead.timeOfImpact-cfg.camRadius))
 
     focus.set(figurePos.x,focusY,figurePos.z)
