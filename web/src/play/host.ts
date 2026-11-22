@@ -18,7 +18,7 @@ export interface Host {
   manifest:Manifest; stream:Stream; peaks:THREE.Group; clock:Clock
   walker():Walker|undefined
   /** Walk mode at x/z (searches nearby for footing). Loads the walker on first use. */
-  walkTo(x:number,z:number,yaw:number,reason:string):Promise<boolean>
+  walkTo(x:number,z:number,yaw:number,reason:string,name?:string):Promise<boolean>
   /** Leave walk mode; flight controls are suspended while `cinema` is on. */
   fly():void
   cinema:boolean

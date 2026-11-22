@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {inlineBusy} from '../ui/loading'
 import './play.css'
 import {spots, waterDocks, yawToward, type Spot, type WaterDock} from './spots'
 import type {Host} from './host'
@@ -69,33 +70,28 @@ export function play(host:Host) {
   const refreshCount = ()=>{count.textContent = `${stamps.size}/${spots.length}`}
   refreshCount()
 
-  // --- Veil: a haze-coloured fade with the destination name, used for every teleport.
-  const veil = document.createElement('div'); veil.className = 'veil'; veil.innerHTML = '<span></span>'; document.body.append(veil)
-  const wait = (ms:number)=>new Promise(resolve=>setTimeout(resolve,ms))
-  async function travel(name:string, go:()=>Promise<unknown>) {
-    if(getPlayMode()==='solo')return
-    veil.querySelector('span')!.textContent = name; veil.classList.add('show'); await wait(520)
-    try {if(getPlayMode()==='tour')await go()} finally {await wait(200); veil.classList.remove('show')}
+  async function travel(go:()=>Promise<unknown>) {
+    if(getPlayMode()==='tour')await go()
   }
   async function goTo(spot:Spot) {
     closeAll()
-    await travel(spot.name,async()=>{leaveSummit(false)
-      if(await host.walkTo(spot.x,spot.z,yawToward(spot.x,spot.z,spot.at),'spot:'+spot.id)) {
+    await travel(async()=>{leaveSummit(false)
+      if(await host.walkTo(spot.x,spot.z,yawToward(spot.x,spot.z,spot.at),'spot:'+spot.id,spot.name)) {
         host.walker()?.face(yawToward(spot.x,spot.z,spot.at),.16); arrive(marks.find(m=>m.spot===spot)!)}})
   }
   async function goDock(dock:WaterDock) {
     closeAll()
     const yaw = yawToward(dock.x,dock.z,dock.at)
-    await travel(dock.name,async()=>{leaveSummit(false)
-      if(await host.walkTo(dock.x,dock.z,yaw,'dock:'+dock.id)) {
+    await travel(async()=>{leaveSummit(false)
+      if(await host.walkTo(dock.x,dock.z,yaw,'dock:'+dock.id,dock.name)) {
         host.walker()?.face(yaw,.14)}})
   }
   async function goShop(shop:ShopTriggerDef) {
     closeAll()
     // Face directly toward the storefront sign and display showcase upon arrival.
     const yaw = Math.atan2(Math.sin(shop.facingYaw + Math.PI), Math.cos(shop.facingYaw + Math.PI))
-    await travel(shop.displayName,async()=>{leaveSummit(false)
-      if(await host.walkTo(shop.triggerPos[0],shop.triggerPos[2],yaw,'shop:'+shop.shopId)) {
+    await travel(async()=>{leaveSummit(false)
+      if(await host.walkTo(shop.triggerPos[0],shop.triggerPos[2],yaw,'shop:'+shop.shopId,shop.displayName)) {
         host.walker()?.face(yaw,.10)}})
   }
   // Stamp + card. Walking into the ring does it; so does travelling there (the spawn search may land a few metres off).
@@ -124,14 +120,14 @@ export function play(host:Host) {
     if(atlas&&!atlas.roadAt(x,z,30)) {let best = 320
       for(const r of atlas.roads) if(r.c<=2) for(let i=0;i<r.p.length;i+=2){const d = Math.hypot(r.p[i]-x,r.p[i+1]-z); if(d<best&&(!map||map.contains(r.p[i],r.p[i+1]))){best = d; tx = r.p[i]; tz = r.p[i+1]}}}
     const yaw = Math.atan2(-(x-tx),-(z-tz))
-    await travel(name,async()=>{leaveSummit(); await host.walkTo(tx,tz,tx===x&&tz===z?(host.walker()?.yaw??0):yaw,'map')})
+    await travel(async()=>{leaveSummit(); await host.walkTo(tx,tz,tx===x&&tz===z?(host.walker()?.yaw??0):yaw,'map',name)})
   }
   let atlas:import('../map/atlas').Atlas|undefined, map:ReturnType<typeof mapView>|undefined
   // Atlas loads only after the scene has been running a couple of seconds, never inside the first-frame budget.
   let mapLoading:Promise<ReturnType<typeof mapView>|undefined>|undefined
-  const ensureMap = ()=>mapLoading ??= import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
+  const ensureMap = ()=>{if(mapLoading)return mapLoading;const done=inlineBusy(slot,'载入地图');return mapLoading = import('../map/atlas').then(m=>m.loadAtlas(host.manifest)).then(loaded=>{
     atlas = loaded; return map = mapView(host,loaded,{slot,buttons,stamps,goPoint:(x,z,n)=>void goPoint(x,z,n),goSpot:s=>void goTo(s),goDock:d=>void goDock(d),goShop:sh=>void goShop(sh)})
-  }).catch(error=>{console.warn('atlas',error); mapLoading = undefined; return undefined})
+  }).catch(error=>{console.warn('atlas',error); mapLoading = undefined; return undefined}).finally(done)}
   const loadMap = ()=>void ensureMap()
   let mapRequested = !(host.manifest as {atlas?:unknown}).atlas
   const feedbackEntry=button('反馈','反馈','dock-feedback');buttons.append(feedbackEntry)

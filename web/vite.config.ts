@@ -28,7 +28,14 @@ export default defineConfig({
   publicDir: '../public',
   plugins: [rapierExternalWasm(), {name:'world-preloads',transformIndexHtml(_,ctx){
     if(ctx.filename!==join(root,'web/index.html'))return []
-    if(existsSync(join(root,'public/world/opening.bin')))return [
+    const chunks=Object.values(ctx.bundle??{}).filter(chunk=>chunk.type==='chunk')
+    const main=chunks.find(chunk=>chunk.facadeModuleId?.endsWith('/src/main.ts'))
+    const sizes:Record<string,number>={}
+    function collect(file:string){const chunk=chunks.find(item=>item.fileName===file);if(!chunk||sizes[file])return
+      sizes[file]=Buffer.byteLength(chunk.code);chunk.imports.forEach(collect)}
+    if(main)collect(main.fileName)
+    const engine={tag:'meta',attrs:{name:'engine-chunks',content:JSON.stringify(sizes)}}
+    if(existsSync(join(root,'public/world/opening.bin')))return [engine,
       {tag:'link',attrs:{rel:'preload',as:'fetch',crossorigin:'',href:'./world/opening.bin',id:'opening-terrain'}},
     ]
     const file=join(root,'public/world/manifest.json')
@@ -36,7 +43,7 @@ export default defineConfig({
     const world=JSON.parse(readFileSync(file,'utf8'))
     const files=['manifest.json',world.overview.texture.file,world.overview.packedUnderlay?.file??world.overview.underlay.file,
       world.peaks.sectorSize?'peaks-far.bin':world.peaks.file]
-    return files.map(asset=>({tag:'link',attrs:{rel:'preload',as:'fetch',crossorigin:'',href:'./world/'+asset}}))
+    return [engine,...files.map(asset=>({tag:'link',attrs:{rel:'preload',as:'fetch',crossorigin:'',href:'./world/'+asset}}))]
   }}, {name:'deploy-version',configureServer(server){
     server.middlewares.use('/version.json',(_request,response)=>{response.setHeader('Content-Type','application/json');response.end(JSON.stringify({sha:buildSha()}))})
   }, generateBundle(){

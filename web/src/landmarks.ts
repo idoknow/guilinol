@@ -216,5 +216,6 @@ export function landmarkStream(
   }
   return Object.assign(tick,{
     busyPriorityCount:()=>priorityPending.size,
+    pendingCount:()=>pending.size,
   })
 }

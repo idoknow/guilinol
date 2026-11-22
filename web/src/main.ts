@@ -17,7 +17,7 @@ import {rain} from './look/rain'
 import {windowLight} from './look/buildings'
 import {skyClock} from './ui/sky'
 import type {Host} from './play/host'
-import {bootDismiss, bootLoaded, bootProgress} from './ui/boot'
+import {streamIndicator,veil,type FullLoader,type Veil} from './ui/loading'
 import {loadTiles} from './look/tiles'
 import {flags} from './debug'
 import {deriveRangeMetrics, loadRenderConfig, RenderRangeStore, type RenderRangeConfig} from './render-range'
@@ -37,7 +37,10 @@ export function setPaused(on:boolean){paused=on}
 import {mountDevHud} from './ui/hud-dev'
 
 export let spawnCreatedCharacter:()=>Promise<void>=async()=>{}
-async function start(creatorSpawn=false) {
+let titleTransition:{signal:AbortSignal;cancel:()=>void;view?:Veil}|undefined
+export function setTitleTransition(value:typeof titleTransition){titleTransition=value}
+async function start(loader:FullLoader,creatorSpawn=false) {
+  const entrySignal=titleTransition?.signal
   mountDevHud()
   loadLocalSave(undefined, Date.now(), getPlayMode() === 'solo')
   const params = new URLSearchParams(location.search)
@@ -45,12 +48,16 @@ async function start(creatorSpawn=false) {
   const initialMetrics = rangeStore.getMetrics()
   setFogMetrics(initialMetrics)
 
-  bootProgress('载入地形', 12)
+  const hasOpening=!!document.getElementById('opening-terrain')
+  loader.stage('terrain',0,1)
+  const byteStage=(isManifest:boolean)=>(done:number,total:number)=>loader.stage('terrain',
+    (isManifest&&hasOpening ? .5 : 0)+(hasOpening ? .5 : 1)*done/Math.max(1,total),1,
+    `${(done/1048576).toFixed(1)} / ${(total/1048576).toFixed(1)} MB`)
   async function readManifest(){
-    const manifestBytes = await fetchAsset('manifest.json').catch(()=>{
+    const manifestBytes = await fetchAsset('manifest.json',undefined,byteStage(true)).catch(()=>{
       record('failure',{category:'manifest'})
       record('retry',{category:'manifest'})
-      return fetchAsset('manifest.json').catch(error=>{record('failure',{category:'manifest'});throw error})
+      return fetchAsset('manifest.json',undefined,byteStage(true)).catch(error=>{record('failure',{category:'manifest'});throw error})
     })
     identifyWorld(manifestBytes)
     const manifest:Manifest = JSON.parse(new TextDecoder().decode(manifestBytes))
@@ -58,9 +65,10 @@ async function start(creatorSpawn=false) {
     return manifest
   }
   const terrain=document.getElementById('opening-terrain')
-    ? await openingTerrain().catch(error=>{console.warn('Opening terrain unavailable',error);return null})
+    ? await openingTerrain(byteStage(false))
     : null
   const previousWorld=terrain?null:await readManifest()
+  entrySignal?.throwIfAborted()
   const bounds=terrain??previousWorld!
   const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
   renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure
@@ -127,14 +135,15 @@ async function start(creatorSpawn=false) {
   const clock = skyClock(params)
   if(!soloStart)setPreset(camera,params.get('cam')??params.get('spawn'),bounds.bbox)
   let previous=0, first=0, frame=0, sum=0, samples=0
-  const stats = {firstMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
+  const stats = {firstMs:0,readyMs:0,openingRingMs:0,firstWorldBytes:0,ms:0,calls:0,frame:0,loaded:0,pending:0,visited:0,failures:0,
     geometries:0,textures:0}
   function markFirstFrame(){
     first=performance.now()
     stats.firstMs=first
     measureFirstWorldBytes(first,total=>{stats.firstWorldBytes=total})
-    bootDismiss()
+    if(stats.openingRingMs)void finishLoading()
   }
+  async function finishLoading(){loader.stage('frame',1,1);await loader.finish();stats.readyMs=performance.now()}
   function updateAtmosphere(now:number,elapsed:number){
     clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/1200))
     atmo.uTime.value = now/1000
@@ -147,7 +156,6 @@ async function start(creatorSpawn=false) {
   let openingStream:Stream|undefined
   if(terrain){
     scene.add(terrain.mesh)
-    bootLoaded()
     // Draw the real terrain with the active flight camera. The second
     // animation callback marks the first presented frame on both paths.
     await new Promise<void>(resolve=>{
@@ -170,22 +178,30 @@ async function start(creatorSpawn=false) {
   }
   async function loadFullScene(){
     const manifest=previousWorld??await readManifest()
+    entrySignal?.throwIfAborted()
     if(terrain){
       openingStream=new Stream(scene,manifest,terrain,rangeStore,camera)
-      await openingStream.loadOpeningRing(camera.position)
+      await openingStream.loadOpeningRing(camera.position,ringProgress)
+      entrySignal?.throwIfAborted()
     }
+    let tasks=0
+    loader.stage('overview',0,2)
     const overview=startOverview(manifest), mountains=startPeaks(manifest.peaks)
-    await Promise.all([overview.dispatched,mountains.dispatched])
-    bootLoaded()
-    const [base,peaks]=await Promise.all([overview.finish,mountains.finish])
+    const report=<T>(result:T)=>{loader.stage('overview',++tasks,2,`山水 ${tasks} / 2`);return result}
+    const [base,peaks]=await Promise.all([overview.finish.then(report),mountains.finish.then(report)])
     return {manifest,base,peaks}
   }
+  function ringProgress(done:number,total:number){loader.stage('ring',total?done:1,total||1,`街区 ${done} / ${total}`)}
   const {manifest,base,peaks}=await loadFullScene().finally(()=>{
     if(terrain){renderer.setAnimationLoop(null);terrain.dispose()}
   })
+  entrySignal?.throwIfAborted()
   scene.add(base.mesh,peaks)
-  bootProgress('载入街区', 78)
   const stream = openingStream??new Stream(scene,manifest,base,rangeStore,camera)
+  if(!openingStream)await stream.loadOpeningRing(camera.position,ringProgress)
+  stats.openingRingMs=performance.now()
+  if(first)void finishLoading()
+  streamIndicator(()=>({pending:stream.pending.size+(stream.updateLandmarks?.pendingCount()??0)}))
   if(openingStream)openingStream.setTerrainLayer(base)
   const output = document.querySelector('output')!
   let cullLandmarks:ReturnType<typeof import('./landmarks').landmarkCulling>|undefined
@@ -201,7 +217,7 @@ async function start(creatorSpawn=false) {
     })
     return landmarksPromise
   }
-  function primeLanding(x:number, z:number){
+  function primeLanding(x:number, z:number,signal:AbortSignal){
     stream.prioritize(x,z)
     const target=new THREE.Vector3(x,0,z)
     stream.tick(target)
@@ -214,6 +230,7 @@ async function start(creatorSpawn=false) {
       return Math.hypot(ex-x,ez-z)<=r+walkConfig.search
     })
     void ensureLandmarks().then(()=>{
+      if(signal.aborted)return
       for(const entry of supports){
         target.y=entry.position[1]
         stream.updateLandmarks?.(target,entry)
@@ -223,24 +240,30 @@ async function start(creatorSpawn=false) {
   }
   type Walker=Awaited<ReturnType<typeof import('./walk').walk>>
   async function loadWalker():Promise<Walker>{return walker??=await (await prefetchWalk()).walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))}
-  async function walkTo(x:number,z:number,yaw:number,reason:string){
+  async function walkTo(x:number,z:number,yaw:number,reason:string,name?:string){
     if(switching)return false
     switching=true
     const start=performance.now()
     let completed=false
+    const controller=new AbortController(),signal=titleTransition?.signal??controller.signal
+    const parent=titleTransition?.view
+    const cover=parent??veil(reason==='flight'||reason.startsWith('solo')?'正在落地':reason==='creator'?'正在进入桂林':`正在前往${name?' '+name:'目的地'}`,{onCancel:titleTransition?.cancel??(()=>controller.abort())})
     try{
-      primeLanding(x,z)
+      signal.throwIfAborted();primeLanding(x,z,signal)
       const player=await loadWalker()
-      if(player.active)player.leave()
-      completed=await player.enter(x,z,yaw,reason)
+      if(signal.aborted)return false
+      cover.progress(.3,'步行模块已就绪')
+      completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)
+      if(completed)cover.progress(1)
       return completed
-    }finally{operation('teleport',start,completed);switching=false;showMode()}
+    }finally{controller.abort();if(!parent)await cover.done();operation('teleport',start,completed);switching=false;showMode()}
   }
   async function landSolo(initial:boolean) {
     if(walker?.active)return
     const gate = walkConfig.gate
     const point = initial && !opening ? gate : {x:camera.position.x,z:camera.position.z,yaw:camera.rotation.y}
     if(await walkTo(point.x,point.z,point.yaw,'solo'))return
+    titleTransition?.signal.throwIfAborted()
     if(await walkTo(gate.x,gate.z,gate.yaw,'solo-fallback'))return
     throw Error('单人模式未找到可落脚的位置')
   }
@@ -255,18 +278,14 @@ async function start(creatorSpawn=false) {
     if(switching)return
     const start=performance.now()
     if(walker?.active){walker.leave();operation('switch',start);return}
-    switching=true
     try{
       const name=params.get('spawn'),preset=initial&&name&&Object.hasOwn(presets,name)?presets[name]:null
       const original=camera.clone();if(preset)setPreset(original,name,manifest.bbox)
       const gate=walkConfig.gate,point=preset?.walk??(initial&&!preset?gate:{x:original.position.x,z:original.position.z,yaw:original.rotation.y})
-      primeLanding(point.x,point.z)
-      const walking=await loadWalker()
-      if(!await walking.enter(point.x,point.z,point.yaw,initial?name??'default':'flight')&&initial){
-        primeLanding(gate.x,gate.z)
-        await walking.enter(gate.x,gate.z,gate.yaw,'fallback')
+      if(!await walkTo(point.x,point.z,point.yaw,initial?name??'default':'flight')&&initial){
+        await walkTo(gate.x,gate.z,gate.yaw,'fallback')
       }
-    }finally{operation('switch',start);switching=false}
+    }finally{operation('switch',start)}
   }
   window.addEventListener('keydown',event=>{
     if(isGlobalHotkeyBlocked(event.target))return
@@ -276,7 +295,9 @@ async function start(creatorSpawn=false) {
   const modeButton=document.createElement('button');modeButton.className='btn-mode'
   modeButton.addEventListener('pointerenter',()=>void prefetchWalk())
   modeButton.addEventListener('touchstart',()=>void prefetchWalk(),{passive:true})
-  function showMode(){const walking=!!walker?.active;document.body.dataset.mode=walking?'walk':'fly'
+  function showMode(){const walking=!!walker?.active
+    if(!walking&&getPlayMode()==='solo')delete document.body.dataset.mode
+    else document.body.dataset.mode=walking?'walk':'fly'
     modeButton.hidden=modeButton.disabled=getPlayMode()==='solo'
     modeButton.textContent=walking?'起飞':'落地步行';modeButton.setAttribute('aria-label',walking?'切换到飞行':'切换到步行')
     const ride=document.body.dataset.ride
@@ -355,7 +376,7 @@ async function start(creatorSpawn=false) {
   })
   rangeStore.subscribe(nextCfg=>{renderUi.setConfig(nextCfg)})
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
-  if(params.has('verify')) Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,get game(){return solo?.probe ?? tourProbe},
+  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,get game(){return solo?.probe ?? tourProbe},
     get trafficCount(){return (scene.getObjectByName('G2 traffic') as THREE.InstancedMesh|undefined)?.count??0},
     get trafficProbe(){return scene.getObjectByName('G2 traffic')?.userData},
     async trafficPixels(){return (await import('./traffic/visibility-probe')).pixelVisible(renderer,scene,camera)},
@@ -432,7 +453,7 @@ async function start(creatorSpawn=false) {
     if(getPlayMode()==='solo'&&!walker?.active)return
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now
-    if(walker?.active)walker.tick(elapsed/1000);else if(!switching)controls(elapsed/1000)
+    if(!switching){if(walker?.active)walker.tick(elapsed/1000);else controls(elapsed/1000)}
     if(frame===1) {
       if(!first)markFirstFrame()
       void import('./play').then(mod=>{tour=mod.play(host)})
@@ -480,6 +501,7 @@ async function start(creatorSpawn=false) {
     showMode()}
   if(creatorSpawn)await spawnCreatedCharacter()
   else if(soloStart){await landSolo(true);showMode()}
+  if(params.has('verify'))publishViewer()
   renderer.setAnimationLoop(animate)
   // IDOK-105: keep the last view fresh so "回到上次离开的地方" can restore it. Deep-linked
   // sessions (`?verify`, `?slot`, shares…) never write it — tests and shared links must not pollute.
@@ -499,4 +521,4 @@ async function start(creatorSpawn=false) {
   if(token){try{if(token.length>4096)throw Error();await host.setView(JSON.parse(atob(token.replace(/-/g,'+').replace(/_/g,'/'))))}catch{console.warn('Invalid feedback view')}}
   else if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }
-export const boot=(creatorSpawn=false)=>start(creatorSpawn).catch(error=>{document.querySelector('output')!.value=`无法加载：${error.message}`;bootProgress(`无法加载：${error.message}`,0);console.error(error)})
+export const boot=start

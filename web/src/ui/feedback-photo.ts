@@ -1,4 +1,5 @@
 import { parse } from 'exifr'
+import {inline} from './loading'
 import { views } from '../../../lib/feedback-contract'
 
 async function prepare(file: File, report: (stage: string) => void) {
@@ -108,22 +109,18 @@ export function photoPicker(
       const cell = document.createElement('div'),
         image = document.createElement('img'),
         view = document.createElement('select'),
-        progress = document.createElement('progress'),
         remove = document.createElement('button'),
         note = document.createElement('small')
       cell.className = 'fb-photo fb-photo--new'
-      progress.className = 'fb-progress'
       note.className = 'fb-photo-note'
       view.setAttribute('aria-label', '拍摄视角')
       view.add(new Option('视角', ''))
       views.forEach((label) => view.add(new Option(label)))
-      progress.max = 100
-      progress.value = 0
       image.alt = file.name
       image.src = URL.createObjectURL(file)
       urls.push(image.src)
       wireRemove(remove, slot, cell)
-      cell.append(image, view, progress, note, remove)
+      cell.append(image, view, note, remove)
       grid.append(cell)
       const entry = {
         done: false,
@@ -134,7 +131,7 @@ export function photoPicker(
             const { jpeg, meta } = await prepare(file, (stage) => {
               note.textContent = stage
             })
-            note.textContent = '正在上传'
+            inline(note,{label:'正在上传'})
             await new Promise<void>((resolve, reject) => {
               const xhr = new XMLHttpRequest()
               xhr.open('PUT', `/api/feedback/${id}/photos/${slot}`)
@@ -144,7 +141,7 @@ export function photoPicker(
                 encodeURIComponent(JSON.stringify({ ...meta, view_label: view.value })),
               )
               xhr.upload.onprogress = (event) => {
-                progress.value = event.total ? (100 * event.loaded) / event.total : 0
+                inline(note,{label:'正在上传',progress:event.lengthComputable?event.loaded/event.total:undefined})
               }
               xhr.responseType = 'json'
               xhr.onload = () =>
@@ -153,7 +150,6 @@ export function photoPicker(
               xhr.send(jpeg)
             })
             entry.done = true
-            progress.value = 100
             note.textContent = '已上传'
             cell.classList.add('fb-photo--done')
             view.disabled = true

@@ -15,7 +15,6 @@ export async function createCharacter(
   nickname: string,
   initial: Avatar | undefined,
   save: (a: Avatar, equipStarter: boolean) => Promise<void>,
-  enterWorld = true,
 ) {
   let draft = {...(initial ?? defaultAvatar())},
     step = 0,
@@ -179,13 +178,6 @@ export async function createCharacter(
       await save(draft,equipStarter)
       stage.frameHead(false)
       await stage.finish()
-      if (enterWorld) {
-        const cover = document.createElement('div')
-        cover.className = 'creator-arrival'
-        cover.setAttribute('role', 'status')
-        cover.setAttribute('aria-label', '正在进入桂林')
-        document.body.append(cover)
-      }
       await dialog.animate([{opacity: 1}, {opacity: 0, backgroundColor: 'white'}], {
         duration: reduced ? 120 : 600,
         fill: 'forwards',

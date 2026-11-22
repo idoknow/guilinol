@@ -535,7 +535,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       const addr = el('p', '', 'fb-addr')
       where.append(rule, modes)
       const slot = el('div', '', 'fb-map fb-map--loading')
-      slot.append(el('p', '地图加载中…', 'fb-map-hint'))
+      const hint=el('p','','fb-map-hint');inline(hint,{label:'地图加载中…'});slot.append(hint)
       where.append(slot, addr)
       const describe = (x: number, z: number) => {
         location = xz2ll(x, z)
@@ -722,3 +722,4 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     if(initialId)await detail(initialId);else await form()
   })
 }
+import {inline} from './loading'
