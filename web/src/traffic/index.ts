@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import {Traffic,type Graph} from './sim'
+import {MAX_ACTORS,Traffic,type Graph} from './sim'
 import {getState} from '../game/state'
 import {curbside,staticSolids,useTrafficSolids,type Solid,contactSamples,sampleContacts} from './contact'
 import {onPlayMode} from '../game/play-mode'
@@ -25,21 +25,21 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   if(!index.ok)throw Error(`traffic cells: ${index.status}`)
   const cells=new Set<string>(await index.json()),object=new THREE.Object3D()
   let sim:Traffic|undefined,key=''
-  const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(),new THREE.MeshLambertMaterial({color:0x999999}),80)
+  const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(),new THREE.MeshLambertMaterial({color:0x999999}),MAX_ACTORS)
   const frustum=new THREE.Frustum(),projection=new THREE.Matrix4(),point=new THREE.Vector3()
   const visible=(actor:{x:number,y:number,z:number})=>frustum.containsPoint(point.set(actor.x,actor.y+.7,actor.z))
   mesh.userData.loads=[]
   sampleContacts(verify);mesh.userData.contactMs=contactSamples;mesh.userData.stepMs=[];let sampleIndex=0
+  const parts={spawn:[] as number[],grid:[] as number[],motion:[] as number[]};mesh.userData.stepParts=parts
+  const profile=verify?(spawn:number,grid:number,motion:number)=>{const index=sampleIndex%256;parts.spawn[index]=spawn;parts.grid[index]=grid;parts.motion[index]=motion}:undefined
   if(verify)mesh.userData.motorIds=[]
-  // 'G2 traffic' stays as an invisible box proxy: verify probes (counts, pixel ids) read it.
-  // What players see is the BatchedMesh below: slots 0..79 = sim actors.
-  // IDOK-153: the traffic-violation / police pursuit mechanic was removed at Rock's request.
+  // 'G2 traffic' / 'G4 patrol' stay as invisible box proxies: verify probes (counts, pixel ids) read them.
   mesh.name='G2 traffic';mesh.count=0;mesh.visible=false;mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(mesh)
   let pursuit:Pursuit|undefined,loadingPursuit=false
   const police=new THREE.InstancedMesh(mesh.geometry,mesh.material,5)
   police.name='G4 patrol';police.count=0;police.visible=false;police.frustumCulled=false;scene.add(police)
   const parkingIndex:Record<string,number>=await fetch('/world/roads/parking/index.json').then(r=>r.ok?r.json():{}).catch(()=>({}))
-  const models=trafficModels(),STATIC=85,SLOTS=STATIC+9*Math.max(0,...Object.values(parkingIndex)),PATROL=80
+  const models=trafficModels(),PATROL=MAX_ACTORS,STATIC=PATROL+5,SLOTS=STATIC+9*Math.max(0,...Object.values(parkingIndex))
   const batch=new THREE.BatchedMesh(SLOTS,models.geometries.reduce((sum,g)=>sum+g.attributes.position.count,0),0,trafficMaterial())
   batch.name='G2 traffic visuals';batch.frustumCulled=false;batch.perObjectFrustumCulled=true;scene.add(batch)
   const geometryIds=models.geometries.map(g=>batch.addGeometry(g))
@@ -128,7 +128,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     camera.updateMatrixWorld()
     frustum.setFromProjectionMatrix(projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
     while(accumulator>=.05){
-      const start=verify?performance.now():0;sim.step(.05,camera.position,vehicle,visible);accumulator-=.05
+      const start=verify?performance.now():0;sim.step(.05,camera.position,vehicle,visible,profile);accumulator-=.05
       if(verify)mesh.userData.stepMs[sampleIndex++%256]=performance.now()-start
     }
     mesh.count=sim.actors.length

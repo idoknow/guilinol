@@ -37,6 +37,7 @@ def bake_parking(output, segments, elements, nodes, forbidden):
     legacy = STRtree([Point(east, south) for east, _, south, *_ in pickups])
     cells = defaultdict(list)
     counts = Counter()
+    eligible = Counter()
     for start, end, way, tags, cls, sign, offset, extent in segments:
         if not allowed(tags, 'right' if sign > 0 else 'left', cls) or extent-offset < 1.95:
             continue
@@ -48,8 +49,7 @@ def bake_parking(output, segments, elements, nodes, forbidden):
         while distance < length-3.5:
             along = distance/length
             distance += rng.uniform(6, 7.5)
-            if rng.random() >= .5:
-                continue
+            occupied = rng.random() < (.41 if cls == 'tertiary' else .59)
             lateral = extent-.95
             x = head['x']+east*along-south/length*lateral
             z = head['z']+south*along+east/length*lateral
@@ -57,6 +57,9 @@ def bake_parking(output, segments, elements, nodes, forbidden):
             point = Point(x, z)
             if (forbidden.intersects(point.buffer(2.6)) or junctions.query(point, predicate='dwithin', distance=18).size or
                     legacy.query(point, predicate='dwithin', distance=8.0).size):
+                continue
+            eligible[cls] += 1
+            if not occupied:
                 continue
             y = head['y']+(tail['y']-head['y'])*along
             key = f'{math.floor(x/256)}_{math.floor(z/256)}'
@@ -67,4 +70,4 @@ def bake_parking(output, segments, elements, nodes, forbidden):
     for key, rows in cells.items():
         (dest/f'{key}.json.gz').write_bytes(gzip.compress(json.dumps(rows, separators=(',', ':')).encode(), mtime=0))
     (dest/'index.json').write_text(json.dumps({key:len(rows) for key,rows in sorted(cells.items())}, separators=(',', ':')))
-    print('G2 parking:', dict(counts), 'cells:', len(cells))
+    print('G2 parking:', dict(counts), 'eligible:', dict(eligible), 'cells:', len(cells))

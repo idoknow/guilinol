@@ -136,7 +136,7 @@ for(const [index,target] of [1,.6,.35,.12].entries()){
 }
 
 const vehicleData=JSON.parse(gunzipSync(readFileSync('public/world/vehicles.bin')))
-for(const east of [-1415.4,-455.4,-984,-989.7,-572]){
+for(const east of [-1415.4,-432.7,-984,-1001.5,-572]){
   const [x,y,z,yaw]=vehicleData.cars.find(row=>row[0]===east)
   const remove=pickups.add({x,y,z,yaw,halfWidth:.9,halfLength:2.12,height:1.5})
   try{
@@ -147,5 +147,6 @@ for(const east of [-1415.4,-455.4,-984,-989.7,-572]){
       waiting=stopped?waiting+1:0;longest=Math.max(longest,waiting);peak=Math.max(peak,stopped)
     }
     console.log('Jiefang pickup',{x,z,peakStoppedWithin12m:peak,longestStoppedSeconds:longest*.05})
+    assert.ok(longest*.05<=30,`queue persisted at ${x},${z}`)
   }finally{remove()}
 }

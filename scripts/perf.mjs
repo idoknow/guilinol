@@ -169,6 +169,7 @@ try {
         fps:+(1000/mean).toFixed(2), frameTimes, motors:window.viewer.trafficProbe?.motors??0,
         camera:window.viewer.camera.position.toArray(),
         trafficStepP95:percentile95(window.viewer.trafficProbe?.stepMs),trafficContactP95:percentile95(window.viewer.trafficProbe?.contactMs),
+        trafficStepPartsP95:Object.fromEntries(Object.entries(window.viewer.trafficProbe?.stepParts??{}).map(([key,values])=>[key,percentile95(values)])),
         heapPeakBytes,
         meanMs: +mean.toFixed(2),
         medianMs: +median.toFixed(2),

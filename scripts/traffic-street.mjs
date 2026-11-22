@@ -46,6 +46,10 @@ try{
       }
       return counts
     },shot)
+    if(shot.name==='fengbei'){
+      await page.evaluate(({x,y,z})=>{const camera=window.viewer.camera;camera.lookAt(x+Math.SQRT2*10,y-6,z+Math.SQRT2*10);camera.updateMatrixWorld()},shot)
+      await page.screenshot({path:'captures/traffic/fengbei-45.jpg'})
+    }
     console.log(shot.name,visible);results.push([visible,shot.min])
   }
   assert.ok(results.every(([counts,min])=>counts.every(count=>count>=min)),'eight-heading motor pixel minimum')

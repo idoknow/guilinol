@@ -86,10 +86,12 @@ def bake(output, manifest):
         direction = tags.get('oneway', 'yes' if tags.get('junction') == 'roundabout' else 'no')
         single = direction in ('yes', '1', 'true', '-1')
         bridge_motor = way['id'] in SPAN_WAYS and kind in MOTOR
-        fallback = 3 if bridge_motor else 1 if single or kind in WALK else 2
+        fallback = 3 if bridge_motor else 1 if single or kind in WALK or kind == 'residential' else 2
         count = max(1, min(12, int(number(tags.get('lanes'), fallback))))
         size = min(4, max(2, number(tags.get('width'), count*(3.7 if bridge_motor else 3))/count))
         paved = sections.get(way['id'], number(tags.get('width'), {'tertiary':10,'residential':6}.get(kind, 3)))
+        if kind == 'residential' and 'lanes' not in tags:
+            paved = number(tags.get('width'), 6.5)
         curb = 0
         curb_sign = -1 if direction == '-1' else 1
         if (kind == 'residential' and 1 <= count <= 2 and paved >= 3*count+2.1 and

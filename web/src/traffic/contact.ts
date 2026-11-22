@@ -33,6 +33,8 @@ export function resolveContact(point:Point,footY:number,yaw:number,width:number,
   source?.(point.x,point.z,solid=>{
     if(footY>=solid.y+solid.height||footY+1.5<=solid.y)return
     const dx=point.x-solid.x,dz=point.z-solid.z
+    const reach=width+length+solid.halfWidth+solid.halfLength
+    if(dx*dx+dz*dz>reach*reach)return
     const cs=Math.cos(solid.yaw),sn=Math.sin(solid.yaw)
     let pushX=0,pushZ=0
     if(!length){
