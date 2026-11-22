@@ -2,6 +2,7 @@
 import json
 import struct
 import numpy as np
+from creator_head import face, hair, surface, HEAD
 from avatar_walk import Glb, GLB, bake, walk_pose, idle_pose, WALK_KEYS, WALK_CYCLE, IDLE_KEYS, IDLE_CYCLE, rz, qmul
 
 
@@ -20,12 +21,9 @@ def generate(body):
     dominant = np.array([g.names[g.joints[j]] for j in g.J[np.arange(len(p)), np.argmax(g.W,axis=1)]])
     shirt_colors = np.isin(hexes,[0xf09a4a,0xc06a2c,0xf2efe8])
     remove |= shirt_colors & (p[:,1] > .94) & ((abs(p[:,0])>.17) | np.isin(dominant,['pelvis','spine_01','spine_02','spine_03','neck_01','clavicle_l','clavicle_r','upperarm_l','upperarm_r']))
+    remove |= (dominant == 'head') | ((p[:,1] > 1.531) & (abs(p[:,0])<.13))
+    remove |= (hexes==0xdcb48e) & (abs(p[:,0])<.080) & (p[:,1]>1.42)
     triangles = triangles[~remove[triangles].any(axis=1)]
-    head = (p[:, 1] > 1.535) & (abs(p[:, 0]) < .13)
-    p[head, 0] *= 1.10 if body == 'm' else 1.04
-    p[head, 2] *= .95
-    bump = head & (p[:, 2] > .08)
-    p[bump, 2] = .08 + .66*(p[bump,2]-.08)
     if body == 'f':
         torso = (abs(p[:, 0]) < .24) & (p[:, 1] < 1.51)
         p[torso, 0] *= np.interp(p[torso, 1], [.72, .95, 1.06, 1.42], [1, 1.10, .89, .93])
@@ -69,6 +67,31 @@ def generate(body):
                     a=first+(k-1)*sides+n;b=first+(k-1)*sides+(n+1)%sides
                     tris=[[a,b,a+sides],[b,b+sides,a+sides]]
                     faces.extend(tris if sign==1 else [tri[::-1] for tri in tris])
+    face_points,face_tris=face(body)
+    head_joint=g.joints.index(g.idx['head'])
+    skin_rgb=color[np.where(hexes==0xdcb48e)[0][0]]
+    def add_head(points,tris):
+        faces.extend(tris+len(data)+len(extra))
+        extra.extend([[*point,*skin_rgb,head_joint,0,0,0,1,0,0,0] for point in points])
+    add_head(face_points,face_tris)
+    # Connect the jaw to the collar across the animated neck joint.
+    neck_joint=g.joints.index(g.idx['neck_01'])
+    angles=np.arange(20)*np.pi/10
+    nr=.040 if body=='f' else .046
+    neck_rings=[np.column_stack([nr*r*np.sin(angles),np.full(20,y),z+.86*nr*r*np.cos(angles)])
+                for y,r,z in [(1.447,1.18,-.033),(1.482,1.04,-.029),(1.522,.94,-.012),(1.560,.95,-.005)]]
+    points,tris=surface(neck_rings,[0,1.445,-.033],[0,1.561,-.005])
+    faces.extend(tris+len(data)+len(extra))
+    for point in points:
+        w=np.clip((point[1]-1.50)/.055,0,1)
+        extra.append([*point,*skin_rgb,neck_joint,head_joint,0,0,1-w,w,0,0])
+    for side in [-1,1]:
+        ear_center=HEAD+[side*.085,.050,-.015]
+        angles=np.arange(12)*np.pi/6
+        rings=[np.column_stack([.014*np.sin(t)*np.sin(angles),np.full(12,-.024*np.cos(t)),
+                                .015*np.sin(t)*np.cos(angles)])+ear_center for t in np.linspace(.2,np.pi-.2,7)]
+        add_head(*surface(rings,ear_center-[0,.024,0],ear_center+[0,.024,0]))
+    # Scale the entire articulated assembly, including attachment anchors, around the soles.
     data=np.vstack([data,extra]);triangles=np.vstack([triangles,faces])
     vertices, indices = np.unique(data[triangles.flatten()], axis=0, return_inverse=True)
     g.P = np.column_stack([vertices[:, :3], np.ones(len(vertices))])
@@ -99,6 +122,13 @@ def generate(body):
             if target['path'] != 'rotation' and not (target['path']=='translation' and g.names[target['node']]=='pelvis'):
                 continue
             sampler = clip['samplers'][channel['sampler']]
+            if target['path']=='rotation':
+                quats=np.frombuffer(g.new_raw[sampler['output']],dtype='<i2').reshape(-1,4)/32767
+                if np.max(abs(quats-quats[0]))<.0001:
+                    if abs(np.dot(quats[0],g.R[target['node']]))>1-1e-8:
+                        continue
+                    sampler=dict(input=g.add_float(np.array([0.,cycle])[:,None],'SCALAR'),
+                                 output=g.add_float(quats[[0,-1]],'VEC4',True))
             channels.append(dict(target=target,sampler=len(samplers)))
             samplers.append(sampler)
         clips.append(dict(name=name,channels=channels,samplers=samplers))
@@ -113,6 +143,10 @@ def generate(body):
         values=[qmul(qinv(parent),qmul(rz(np.deg2rad(a)),world[node])) for a in angles]
         wave['channels'].append(dict(target=dict(node=node,path='rotation'),sampler=len(wave['samplers'])))
         wave['samplers'].append(dict(input=times,output=g.add_float(values,'VEC4',True)))
+    roots=g.j['scenes'][0]['nodes']
+    scale=(1.62 if body=='f' else 1.72)/(HEAD[1]+.191)
+    g.j['nodes'].append(dict(name='CreatorProportions',children=roots,scale=[scale*(.94 if body=='f' else 1),scale,scale]))
+    g.j['scenes'][0]['nodes']=[len(g.j['nodes'])-1]
     g.save(GLB.with_name(f'figure_{body}.glb'),clips+[wave])
     print(body,len(vertices),'vertices')
 
@@ -121,8 +155,12 @@ def hairstyles():
     """Each root is a rigid hair piece in attach_head coordinates. Share index and curl geometry."""
     nodes, meshes, accessors, views, roots = [], [], [], [], []
     data=bytearray()
+    identical={}
     def attribute(values,dtype,kind):
         arr=np.asarray(values,dtype)
+        key=(kind,arr.tobytes())
+        if key in identical:return identical[key]
+        identical[key]=len(accessors)
         data.extend(bytes(-len(data)%4))
         views.append(dict(buffer=0,byteOffset=len(data),byteLength=arr.nbytes))
         data.extend(arr.tobytes())
@@ -130,69 +168,17 @@ def hairstyles():
         if kind=='VEC3':a.update(min=arr.min(axis=0).tolist(),max=arr.max(axis=0).tolist())
         accessors.append(a)
         return len(accessors)-1
-    def grid(sides,rows):
-        faces=[]
-        for k in range(1,rows+1):
-            for i in range(sides):
-                a=k*sides+i;b=k*sides+(i+1)%sides
-                faces.extend([a-sides,b-sides,a,b-sides,b,a])
-        return attribute(faces,'<u2','SCALAR')
-    def mesh(pos,idx):
-        meshes.append(dict(primitives=[dict(attributes=dict(POSITION=attribute(pos,'<f4','VEC3')),indices=idx)]))
-        return len(meshes)-1
-    def node(**kwargs):
-        nodes.append(kwargs)
-        return len(nodes)-1
-    sin,cos,pi=np.sin,np.cos,np.pi
-    cap_index=grid(24,8)
-    sphere=mesh([(sin(row*pi/7)*sin(i*pi/5),cos(row*pi/7),-sin(row*pi/7)*cos(i*pi/5))
-                 for row in range(8) for i in range(10)],grid(10,7))
     for style in ['m_buzz','m_crop','m_perm','m_fade','m_mullet','m_part','f_long','f_pony','f_bun','f_lob','f_wolf','f_bangs']:
-        length={'f_long':.33,'f_lob':.18,'f_wolf':.12,'m_mullet':.12,'f_bangs':.12}.get(style,0)
-        volume=.024 if style=='m_perm' else 0 if style=='m_buzz' else .012
-        pos=[]
-        for row in range(9):
-            t=row/8
-            for i in range(24):
-                a=i*pi/12
-                front=(1+cos(a))/2
-                fringe=.033 if style=='f_bangs' else .027*(.5+.5*sin(a*2+1)) if style=='m_crop' else 0
-                part=.018*abs(sin(a*2)) if style=='m_part' else 0
-                # Different crown profiles and hairlines, with continuous waves flowing from the part.
-                hairline=2.25-.93*front**3+(fringe+part)*9
-                if style=='m_fade':hairline-=.31*(1-front**4)
-                if style=='m_mullet':hairline-=.35*abs(sin(a))**3
-                if style=='f_bangs':hairline=2.34-.84*front**2
-                if style=='m_crop':hairline+=.14*front*sin(a+.5)
-                theta=t*hairline
-                crown=np.exp(-((theta-.80)/.65)**2)
-                sweep=cos(a*6+theta*3)
-                ridge=.0008*cos(a*10+t*2)*sin(pi*t)
-                lift=0
-                if style in ['m_crop','m_fade','m_part']:
-                    lift=crown*(.012+.017*(1+sin(a+.7))/2+.006*sweep)
-                    if style=='m_part':lift=crown*(.030*abs(sin(a))-.008*cos(a*4))
-                if style=='m_perm':
-                    lift=.013*crown*(1+cos(a*7+theta*3)*cos(theta*6))
-                    ridge+=.005*crown*sin(a*7+theta*4)
-                if style=='f_wolf' or style=='m_mullet':
-                    ridge+=.005*sin(7*a+2*t)*t
-                drop=length*(1-front**1.8)**2*t**4
-                if style=='f_wolf':drop*=.65+.5*abs(sin(3*a))
-                radius=sin(theta)
-                if length:radius=max(radius,.94*t**4*(1-front**5))
-                width=.097+volume*.4+ridge
-                pos.append([width*radius*sin(a),
-                            .091+(.103+volume)*cos(theta)+lift-drop,
-                            .025-(.119+ridge)*radius*cos(a)+.28*drop])
-        root=node(name=style,mesh=mesh(pos,cap_index))
-        roots.append(root)
-        children=[]
-        def oval(x,y,z,w,h,d,tilt=0):
-            children.append(node(mesh=sphere,translation=[x,y,z],scale=[w,h,d],rotation=[0,0,sin(tilt/2),cos(tilt/2)]))
-        if style=='f_pony':oval(0,.05,.146,.039,.14,.05,-.15)
-        if style=='f_bun':oval(0,.06,.142,.058,.052,.055)
-        if children:nodes[root]['children']=children
+        pos,tri,tones=hair(style)
+        assert len(pos)<=1500
+        attr=dict(POSITION=attribute(pos,'<f4','VEC3'))
+        # Two material controls (strand lightness and shaven-side fade), padded to a four-byte stride.
+        color=np.round(255*np.column_stack([tones,np.zeros(len(pos)),np.ones(len(pos))])).astype('u1')
+        attr['COLOR_0']=attribute(color,'u1','VEC4')
+        accessors[attr['COLOR_0']].update(componentType=5121,normalized=True)
+        meshes.append(dict(primitives=[dict(attributes=attr,indices=attribute(tri.flatten(),'<u2','SCALAR'))]))
+        nodes.append(dict(name=style,mesh=len(meshes)-1))
+        roots.append(len(nodes)-1)
     data.extend(bytes(-len(data)%4))
     doc=dict(asset=dict(version='2.0',copyright='CC0-1.0'),scene=0,scenes=[dict(nodes=roots)],
              meshes=meshes,nodes=nodes,accessors=accessors,bufferViews=views,buffers=[dict(byteLength=len(data))])

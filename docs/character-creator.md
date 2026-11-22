@@ -93,8 +93,10 @@ Global actions: 「随机」 (a random combination; the button spins once like a
 - Rendering: the man and the woman are two base meshes (`figure_m.glb` / `figure_f.glb`) that **share
   the 66-bone skeleton**, so walk/idle/vehicle poses and `pipeline/avatar_walk.py` are reused directly.
   Hair is a separate rigid mesh attached to `attach_head`, the same mechanism as hats; it is hidden
-  while a hat is worn. Face features are recoloured through vertex colours or swapped head meshes.
+  while a hat is worn. Neither body has a built-in backpack. All starter outfits leave the bag slot empty.
+  The 1.72 m and 1.62 m bodies have smooth head normals and flat-shaded clothing. Face contours
+  follow the selected jaw, with eyes, brows and lips fitted to its surface.
   Clothes keep the zone-recolour approach of `outfits.ts`; the women's skirt is its own mesh.
-- Budget: each body ≤ 7k vertices, each hairstyle ≤ 900 vertices, all assets ≤ 450 KB added in total.
+- Budget: each body ≤ 7k vertices, each hairstyle ≤ 1,500 vertices, all assets ≤ 700 KB added in total.
   The creation page is its own lazy-loaded chunk, so first-frame time on the tour home page stays
   ≤ 1.05× the current main branch.

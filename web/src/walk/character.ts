@@ -4,6 +4,7 @@ import {clone} from 'three/addons/utils/SkeletonUtils.js'
 import {AVATAR_KEY, hairColors, sanitizeAvatar, skinTones, type Avatar} from '../../../lib/avatar'
 import {ensureAvatarRig, type AvatarRig} from './avatar-rig'
 import {createAvatarOutfitController} from './outfits'
+import {facialFeatures} from './creator-face'
 import {starterDetails} from './starter-details'
 import {starterOutfit} from '../game/catalog'
 
@@ -38,6 +39,20 @@ export async function characterModel(a: Avatar) {
       }
       node.geometry.computeVertexNormals()
       node.material.flatShading = false
+      node.material.onBeforeCompile = (shader: T.WebGLProgramParametersWithUniforms) => {
+        shader.vertexShader =
+          'varying float smoothHead;\n' +
+          shader.vertexShader.replace(
+            '#include <begin_vertex>',
+            '#include <begin_vertex>\nsmoothHead = step(1.521,position.y)*step(abs(position.x),0.115);',
+          )
+        shader.fragmentShader =
+          'varying float smoothHead;\n' +
+          shader.fragmentShader.replace(
+            '#include <normal_fragment_begin>',
+            '#include <normal_fragment_begin>\nif(smoothHead<0.5) normal=normalize(cross(dFdx(vViewPosition),dFdy(vViewPosition)));',
+          )
+      }
     }
   })
   return {...model, scene}
@@ -46,25 +61,6 @@ export async function characterModel(a: Avatar) {
 function material(color: string) {
   return new T.MeshStandardMaterial({color, roughness: 0.91, flatShading: true})
 }
-function oval(
-  group: T.Object3D,
-  mat: T.Material,
-  x: number,
-  y: number,
-  z: number,
-  w: number,
-  h: number,
-  d: number,
-  tilt = 0,
-) {
-  const part = new T.Mesh(new T.SphereGeometry(1, 10, 7), mat)
-  part.position.set(x, y, z)
-  part.scale.set(w, h, d)
-  part.rotation.z = tilt
-  group.add(part)
-  return part
-}
-
 function hairLibrary() {
   let p = models.get('hair')
   if (!p) {
@@ -78,12 +74,27 @@ export function hairstyle(a: Avatar, library: T.Object3D) {
   const hair = library.getObjectByName(a.hair)!.clone(),
     mat = material(hairColors[a.hairColor])
   hair.name = 'creator-hair'
-  mat.side = T.DoubleSide
+  mat.vertexColors = true
+  mat.roughness = 0.68
+  mat.side = T.FrontSide
   mat.flatShading = false
   hair.traverse((n) => {
     if (n instanceof T.Mesh) {
       n.material = mat
       n.geometry = n.geometry.clone()
+      const tone = n.geometry.getAttribute('color'),
+        colors: number[] = []
+      const base = new T.Color(hairColors[a.hairColor]),
+        scalp = new T.Color(skinTones[a.skin])
+      for (let i = 0; i < tone.count; i++) {
+        const shade = 0.68 + tone.getX(i) * 1.35
+        const c = base
+          .clone()
+          .multiplyScalar(shade)
+          .lerp(scalp, 0.21 * tone.getY(i))
+        colors.push(c.r / base.r, c.g / base.g, c.b / base.b)
+      }
+      n.geometry.setAttribute('color', new T.Float32BufferAttribute(colors, 3))
       n.geometry.computeVertexNormals()
     }
   })
@@ -94,40 +105,7 @@ export function styleCharacter(scene: T.Group, rig: AvatarRig, a: Avatar) {
   scene.userData.characterSkin = skinTones[a.skin]
   head.add(scene.userData.creatorHair)
   delete scene.userData.creatorHair
-  const face = new T.Group(),
-    ink = material('#372e2a'),
-    lips = material('#aa7967')
-  face.name = 'creator-face'
-  for (const side of [-1, 1]) {
-    const eye = oval(
-      face,
-      material('#eee2d1'),
-      side * 0.036,
-      0.068,
-      -0.075,
-      0.016 + a.eyes * 0.001,
-      0.0042 + a.eyes * 0.0009,
-      0.004,
-      side * [0, 0.04, -0.045][a.eyes],
-    )
-    oval(face, ink, side * 0.036, 0.069, -0.079, 0.0063, 0.0049, 0.002)
-    oval(face, ink, side * 0.036, 0.072, -0.076, 0.015, 0.0015, 0.003, side * [0, 0.04, -0.045][a.eyes])
-    eye.rotation.y = side * 0.32
-    const brow = oval(
-      face,
-      material(hairColors[a.hairColor]),
-      side * 0.037,
-      0.083,
-      -0.073,
-      0.022,
-      0.003 + a.brows * 0.0005,
-      0.004,
-      side * [0, -0.05, 0.12][a.brows],
-    )
-    brow.rotation.y = side * 0.3
-  }
-  oval(face, lips, 0, 0.017, -0.076, 0.021, 0.0027, 0.005)
-  head.add(face)
+  head.add(facialFeatures(rig.skinnedMesh!.geometry, a))
   if (a.body === 'f') {
     const base = rig.skinnedMesh!,
       skeleton = base.skeleton

@@ -247,6 +247,8 @@ try {
   const library=(await loader.parseAsync(hairBytes.buffer.slice(hairBytes.byteOffset,hairBytes.byteOffset+hairBytes.byteLength),'')).scene
   const styles={m:['buzz','crop','perm','fade','mullet','part'],f:['long','pony','bun','lob','wolf','bangs']}
   let addedBytes=hairBytes.length+shared.length+(await readFile('public/avatar/creator-options.webp')).length
+  const shoulders = []
+  let maxHairVertices = 0
   for(const body of ['m','f']){
     const bytes=await readFile('public/avatar/figure_'+body+'.glb');addedBytes+=bytes.length
     const model=await creatorLoader.parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'')
@@ -255,6 +257,35 @@ try {
     assert.deepEqual(mesh.skeleton.boneInverses,skinned.skeleton.boneInverses)
     assert(mesh.geometry.getAttribute('position').count<=7000)
     assert(Math.abs(model.animations.find(c=>c.name==='wave').duration-1.2)<.001)
+    model.scene.updateMatrixWorld(true)
+    const vertex = new THREE.Vector3()
+    const soles = []
+    let minY = Infinity, maxY = -Infinity
+    for (let i = 0; i < mesh.geometry.attributes.position.count; i++) {
+      const y = mesh.getVertexPosition(i, vertex).applyMatrix4(mesh.matrixWorld).y
+      minY = Math.min(minY, y)
+      maxY = Math.max(maxY, y)
+      if (y < .06) soles.push(i)
+    }
+    const height = maxY - minY
+    assert(Math.abs(height - (body === 'm' ? 1.72 : 1.62)) < .01, 'height ' + height)
+    const shoulder = side => mesh.skeleton.getBoneByName('upperarm_' + side).getWorldPosition(new THREE.Vector3())
+    shoulders.push(shoulder('l').distanceTo(shoulder('r')))
+    const mixer = new THREE.AnimationMixer(model.scene)
+    for (const name of ['walk', 'idle']) {
+      const clip = model.animations.find(c => c.name === name)
+      mixer.clipAction(clip).reset().play()
+      let worst = 0
+      for (let frame = 0; frame < 96; frame++) {
+        mixer.setTime(frame * clip.duration / 96)
+        model.scene.updateMatrixWorld(true)
+        let floor = Infinity
+        for (const i of soles) floor = Math.min(floor, mesh.getVertexPosition(i, vertex).applyMatrix4(mesh.matrixWorld).y)
+        worst = Math.max(worst, Math.abs(floor))
+      }
+      check(body + ' ' + name + ' sole distance', worst < .01, (worst * 100).toFixed(2) + ' cm')
+      mixer.stopAllAction()
+    }
     const appearance={v:1,body,skin:1,face:0,eyes:0,brows:0,hair:body+'_'+styles[body][0],hairColor:0,look:'basic',createdAt:1}
     model.scene.userData.creatorHair=hairstyle(appearance,library)
     const wardrobe=styleCharacter(model.scene,characterRig,appearance)
@@ -268,13 +299,29 @@ try {
     }
     for(const style of styles[body]){
       const h=hairstyle({...appearance,hair:body+'_'+style},library);let count=0
-      h.traverse(n=>{if(n.isMesh)count+=n.geometry.getAttribute('position').count})
-      assert(count>0 && count<=900,style+' '+count)
+      h.traverse(n => {
+        if (!n.isMesh) return
+        count += n.geometry.attributes.position.count
+        const indices = n.geometry.index.array
+        const edges = new Map()
+        for (let i = 0; i < indices.length; i += 3) {
+          for (let j = 0; j < 3; j++) {
+            const a = indices[i + j], b = indices[i + (j + 1) % 3]
+            const key = Math.min(a,b) + '/' + Math.max(a,b)
+            edges.set(key, (edges.get(key) ?? 0) + 1)
+          }
+        }
+        assert([...edges.values()].every(incidence => incidence === 2), style + ' open hair surface')
+      })
+      maxHairVertices = Math.max(count, maxHairVertices)
+      assert(count>0 && count<=1500,style+' '+count)
     }
     wardrobe.dispose()
     check(body+' rig, wave, six hairstyles and all wardrobe presets',true)
   }
-  check('creator assets at most 450 KB',addedBytes<=450000,addedBytes+' bytes')
+  check('female to male shoulder width', Math.abs(shoulders[1]/shoulders[0] - .88) < .02, (shoulders[1]/shoulders[0]).toFixed(3))
+  check('largest closed hairstyle', maxHairVertices <= 1500, maxHairVertices + ' vertices')
+  check('creator assets at most 700 KB',addedBytes<=700000,addedBytes+' bytes')
   controller.dispose()
   console.log(`\nALL ${passed} NODE OUTFIT CHECKS PASSED`)
 } finally {

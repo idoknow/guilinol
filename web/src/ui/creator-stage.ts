@@ -27,6 +27,8 @@ export function creatorStage(host: HTMLElement, reduced: boolean, capture = fals
     finishing = false,
     pop = 1,
     glance = 1
+  let crownHeight = 1.72,
+    portraitScale = 1
   let pullback = 0,
     zoomStart = 0,
     zoomTime = 1,
@@ -96,6 +98,10 @@ export function creatorStage(host: HTMLElement, reduced: boolean, capture = fals
     scene.add(next.scene)
     mixer = new T.AnimationMixer(next.scene)
     mixer.clipAction(next.animations.find((c) => c.name === 'idle')!).play()
+    mixer.update(0)
+    next.scene.updateMatrixWorld(true)
+    portraitScale = next.scene.getObjectByName('CreatorProportions')!.scale.y
+    crownHeight = new T.Box3().setFromObject(next.scene.getObjectByName('creator-hair')!, true).max.y
     if (!reduced && ['hair', 'look'].includes(change)) {
       popTarget = change === 'hair' ? next.scene.getObjectByName('creator-hair') : next.scene
       pop = 0
@@ -122,8 +128,8 @@ export function creatorStage(host: HTMLElement, reduced: boolean, capture = fals
     zoomTime = Math.min(1, zoomTime + dt / 0.45)
     zoom = T.MathUtils.lerp(zoomStart, close ? 1 : 0, reduced ? 1 : 1 - (1 - zoomTime) ** 3)
     if (finishing && !reduced) pullback = Math.min(1, pullback + dt / 0.6)
-    const target = 0.87 + zoom * 0.7,
-      dist = (4.25 - zoom * 3.32) * Math.max(1, 0.79 / camera.aspect)
+    const target = T.MathUtils.lerp(0.87, crownHeight - 0.23 * portraitScale, zoom),
+      dist = T.MathUtils.lerp(4.25, 1.1 * portraitScale, zoom) * Math.max(1, 0.79 / camera.aspect)
     camera.position.set(0, target + 0.075, -dist - (1 - entrance) * 0.52 - pullback * 0.38)
     camera.lookAt(0, target, 0)
     if (model) {

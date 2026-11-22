@@ -5,6 +5,7 @@ import {chromium} from 'playwright'
 import {mkdir, writeFile} from 'node:fs/promises'
 import {browserOptions} from '../scripts/qa-browser.mjs'
 const dir = 'captures/creator'
+const portraitNames = ['m-front', 'm-three-quarter', 'm-profile', 'f-front', 'f-three-quarter', 'f-profile']
 await mkdir(dir, {recursive: true})
 const server = await createServer({
   root: 'web',
@@ -15,11 +16,11 @@ let browser
 try {
   await server.listen()
   browser = await chromium.launch(browserOptions(true))
-  const page = await browser.newPage({viewport: {width: 320, height: 320}})
+  const page = await browser.newPage({viewport: {width: 600, height: 600}})
   await page.route('**/studio.html', (r) =>
     r.fulfill({
       contentType: 'text/html',
-      body: '<style>*{margin:0}#studio,canvas{width:320px;height:320px}</style><div id="studio"></div>',
+      body: '<style>*{margin:0}#studio,canvas{width:600px;height:600px}</style><div id="studio"></div>',
     }),
   )
   await page.goto('http://127.0.0.1:' + server.httpServer.address().port + '/studio.html')
@@ -61,10 +62,21 @@ try {
         await raf()
         await raf()
       }
+      const bodies = sheet(2, 1, 420, 420, 24),
+        portraits = []
       for (const [index, body] of ['m', 'f'].entries()) {
         const a = {...defaultAvatar(), body, hair: hairStyles[body][0]}
         await render(a, false)
         sprite.put(index, 0)
+        await render({...a, hair: body === 'm' ? 'm_buzz' : 'f_bun'}, false)
+        bodies.put(index, 0, body === 'm' ? '男' : '女')
+        const cuts = body === 'm' ? ['m_part', 'm_crop', 'm_mullet'] : ['f_bun', 'f_lob', 'f_pony']
+        for (const [j, cut] of cuts.entries()) {
+          await render({...a, hair: cut}, true, (j * Math.PI) / 4)
+          const portrait = sheet(1, 1, 600, 600)
+          portrait.put(0, 0)
+          portraits.push(portrait.canvas.toDataURL())
+        }
         for (let i = 0; i < 5; i++) {
           await render({...a, skin: i}, true)
           skin.put(i, index, skinTones[i])
@@ -97,14 +109,15 @@ try {
       stage.dispose()
       return [
         sprite.canvas.toDataURL('image/webp', 0.79),
-        ...[skin, hair, outfits].map((s) => s.canvas.toDataURL()),
+        ...[skin, hair, outfits, bodies].map((s) => s.canvas.toDataURL()),
+        ...portraits,
       ]
     },
     '/@fs/' + resolve('lib/avatar.ts'),
   )
   for (const [i, path] of [
     'public/avatar/creator-options.webp',
-    ...['skin', 'hair', 'outfits'].map((s) => dir + '/' + s + '.png'),
+    ...['skin', 'hair', 'outfits', 'bodies', ...portraitNames].map((s) => dir + '/' + s + '.png'),
   ].entries())
     await writeFile(path, Buffer.from(images[i].split(',')[1], 'base64'))
 } finally {

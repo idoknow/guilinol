@@ -321,6 +321,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(part){part.removeFromParent();disposeCharacterParts(part)}
     }
     avatarRig.skinnedMesh.geometry.dispose();avatarRig.skinnedMesh.geometry=mesh.geometry
+    figure.getObjectByName('CreatorProportions')!.scale.copy(fresh.scene.getObjectByName('CreatorProportions')!.scale)
     figure.userData.creatorHair=fresh.scene.userData.creatorHair
     outfitController=styleCharacter(figure,avatarRig,a)
     outfitController.applyEquipped(getGameState().wardrobe.equipped,{autoHelmetOnRide:getGameState().wardrobe.autoHelmetOnRide,ridingEbike:Boolean(rides?.bike&&rides.rideKind!=='bicycle')})
@@ -1018,8 +1019,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     prevAudioPark=false;prevAudioGear=2;prevAudioLight='off';prevAudioBlink=false;prevAudioHorn=false
   }
   const footMetrics={soleOffset:avatarRig.soleOffset,footProbes:avatarRig.footProbes}
-  scene.add(figure);figure.visible=false;figure.scale.setScalar(avatar.scale)
-  const soleOffset=footMetrics.soleOffset*avatar.scale, footTmp=new THREE.Vector3()
+  scene.add(figure);figure.visible=false;figure.scale.setScalar(1)
+  const soleOffset=footMetrics.soleOffset, footTmp=new THREE.Vector3()
   const lmFloorCache=new WeakMap<THREE.Group,{grid:Map<string,number[]>;large:number[]}>()
   const _va=new THREE.Vector3(), _vb=new THREE.Vector3(), _vc=new THREE.Vector3(), _im=new THREE.Matrix4(), _inst=new THREE.Matrix4()
   function getLandmarkFloorGrid(root:THREE.Group){
