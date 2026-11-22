@@ -117,6 +117,10 @@ const SHOES_RECIPES: Record<string, ShoesRecipe> = {
 const BUILTIN_PACK_COLORS = {body: '#2c2e32', strap: '#1b1c1f'} as const
 
 function resolveTopRecipe(topId: string): TopRecipe {
+  if(topId.startsWith('top_starter_')){
+    const item=OUTFIT_ITEMS_BY_ID[topId]
+    if(item)return {primary:item.colorHex,sleeve:topId==='top_starter_office'?'#e6e1d5':item.colorHex,trim:item.accentHex!,inner:item.colorHex}
+  }
   const known = TOP_RECIPES[topId]
   if (known) return known
   const item = OUTFIT_ITEMS_BY_ID[topId]
@@ -732,12 +736,14 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
     const cPackBody = new THREE.Color(BUILTIN_PACK_COLORS.body)
     const cPackStrap = new THREE.Color(BUILTIN_PACK_COLORS.strap)
 
+    const skin = figure.userData.characterSkin ? new THREE.Color(figure.userData.characterSkin) : null
     const zones = partition.zones
     const orig = partition.originalColors
     for (let i = 0; i < zones.length; i++) {
       const z = zones[i]
       if (z === OUTFIT_ZONE.LOCKED_SKIN || z === OUTFIT_ZONE.LOCKED_HAIR) {
-        colAttr.setXYZ(i, orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
+        if (skin && z === OUTFIT_ZONE.LOCKED_SKIN) colAttr.setXYZ(i,skin.r,skin.g,skin.b)
+        else colAttr.setXYZ(i, orig[i * 3], orig[i * 3 + 1], orig[i * 3 + 2])
         continue
       }
       // Every zone, the default outfit included, takes its colour from the recipes (the glb palette is only
@@ -765,6 +771,10 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
       skinned.geometry.setDrawRange(0, showBuiltin ? partition.totalIndexCount : partition.bodyIndexCount)
     }
 
+    const hair = rig.attachments.head?.getObjectByName('creator-hair')
+    if (hair) hair.visible = outfit.hat === 'hat_none'
+    const skirt = figure.getObjectByName('creator-skirt')
+    if (skirt) skirt.visible = outfit.bottom === 'bottom_starter_chinese'
     const headAnchor = rig.attachments.head
     if (headAnchor) {
       for (const mesh of hatCache.values()) {
@@ -805,6 +815,7 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
       ? {...previewOutfit}
       : resolveVisualOutfit(savedEquipped, {ridingEbike, autoHelmetOnRide})
     appliedOutfit = effective
+    figure.userData.starterDetails?.apply(effective)
     applyColorZones(effective)
     syncAccessories(effective)
     figure.userData.appliedOutfit = {...effective}

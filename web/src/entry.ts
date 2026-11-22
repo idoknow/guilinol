@@ -3,7 +3,7 @@ import './telemetry'
 import './ui/theme.css'
 import './ui/hud.css'
 import {home} from './ui/home'
-import {accountEntry, onUser, requireUser} from './ui/account'
+import {accountEntry, consumeCreatorSpawn, onUser, requireUser} from './ui/account'
 import {isDeepLink} from './deeplink'
 import {cancelRestore} from './lastview'
 
@@ -20,6 +20,7 @@ const loadEngine = () => engine ??= import('./main')
 let started = false
 
 const title = home(mode => void enter(mode))
+window.addEventListener('glol:registered',()=>void enter('tour'))
 let entering = false
 async function enter(mode: PlayMode, remember = true) {
   if (entering) return
@@ -33,15 +34,19 @@ async function enter(mode: PlayMode, remember = true) {
     const main = await loadEngine()
     if(started)await main.waitForMode()
     title.close()
-    if (started) { main.setPaused(false); return }
+    if (started) { main.setPaused(false); if(consumeCreatorSpawn())await main.spawnCreatedCharacter(); return }
     started = true
     hud(main)
-    await main.boot()
+    await main.boot(consumeCreatorSpawn())
   } catch(error) {
     if(started)await setPlayMode('tour', false)
     title.open(started)
     window.alert(error instanceof Error ? error.message : '无法进入模式')
-  } finally { entering = false }
+  } finally {
+    const cover=document.querySelector('.creator-arrival')
+    if(cover){await cover.animate([{opacity:1},{opacity:0}],matchMedia('(prefers-reduced-motion: reduce)').matches?120:600).finished;cover.remove()}
+    entering = false
+  }
 }
 
 function hud(main: typeof import('./main')) {

@@ -37,6 +37,7 @@ export interface AvatarRig {
   traveller?: THREE.Object3D
   joints: AvatarJointMap
   attachments: AvatarAttachments
+  attachmentAt?(boneName: string): THREE.Object3D | undefined
   soleOffset: number
   footProbes: FootProbe[]
   clearPose(): void
@@ -440,6 +441,7 @@ export function ensureAvatarRig(root: THREE.Group, tintHex: string | null = null
     traveller,
     joints,
     attachments,
+    attachmentAt: name => ensureBoneAttachmentAnchor(name, name, 'attach_' + name),
     soleOffset,
     footProbes,
     clearPose: restoreRestPose,

@@ -41,6 +41,7 @@ try {
       path.join(root, 'web/src/walk/avatar-rig.ts'),
       path.join(root, 'web/src/walk/outfits.ts'),
       path.join(root, 'web/src/game/catalog.ts'),
+      path.join(root, 'web/src/walk/character.ts'),
     ],
     outdir: tmp,
     outbase: path.join(root, 'web/src'),
@@ -237,6 +238,43 @@ try {
   const hasDynamicLight = /(PointLight|SpotLight|RectAreaLight)/.test(outfitsSrc + rigSrc)
   check('zero dynamic Three.js lights added in outfit modules', !hasDynamicLight)
 
+  const {hairstyle,styleCharacter}=await import(pathToFileURL(path.join(tmp,'walk/character.js')).href)
+  const shared=await readFile('public/avatar/creator-rig.bin')
+  const manager=new THREE.LoadingManager().setURLModifier(url=>url.endsWith('creator-rig.bin')?'data:application/octet-stream;base64,'+shared.toString('base64'):url)
+  globalThis.ProgressEvent ??= class ProgressEvent extends Event {constructor(type,init){super(type);Object.assign(this,init)}}
+  const creatorLoader=new GLTFLoader(manager)
+  const hairBytes=await readFile('public/avatar/creator-hair.glb')
+  const library=(await loader.parseAsync(hairBytes.buffer.slice(hairBytes.byteOffset,hairBytes.byteOffset+hairBytes.byteLength),'')).scene
+  const styles={m:['buzz','crop','perm','fade','mullet','part'],f:['long','pony','bun','lob','wolf','bangs']}
+  let addedBytes=hairBytes.length+shared.length+(await readFile('public/avatar/creator-options.webp')).length
+  for(const body of ['m','f']){
+    const bytes=await readFile('public/avatar/figure_'+body+'.glb');addedBytes+=bytes.length
+    const model=await creatorLoader.parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'')
+    const characterRig=rigMod.ensureAvatarRig(model.scene),mesh=characterRig.skinnedMesh
+    assert.deepEqual(mesh.skeleton.bones.map(b=>b.name),skinned.skeleton.bones.map(b=>b.name))
+    assert.deepEqual(mesh.skeleton.boneInverses,skinned.skeleton.boneInverses)
+    assert(mesh.geometry.getAttribute('position').count<=7000)
+    assert(Math.abs(model.animations.find(c=>c.name==='wave').duration-1.2)<.001)
+    const appearance={v:1,body,skin:1,face:0,eyes:0,brows:0,hair:body+'_'+styles[body][0],hairColor:0,look:'basic',createdAt:1}
+    model.scene.userData.creatorHair=hairstyle(appearance,library)
+    const wardrobe=styleCharacter(model.scene,characterRig,appearance)
+    for(const preset of catalogMod.OUTFIT_PRESETS){
+      wardrobe.applyEquipped(preset.items)
+      const h=model.scene.getObjectByName('creator-hair')
+      assert.equal(h.parent,characterRig.attachments.head)
+      assert.equal(h.visible,preset.items.hat==='hat_none')
+      const skirt=model.scene.getObjectByName('creator-skirt')
+      if(body==='f')assert.equal(skirt.visible,preset.items.bottom==='bottom_starter_chinese')
+    }
+    for(const style of styles[body]){
+      const h=hairstyle({...appearance,hair:body+'_'+style},library);let count=0
+      h.traverse(n=>{if(n.isMesh)count+=n.geometry.getAttribute('position').count})
+      assert(count>0 && count<=900,style+' '+count)
+    }
+    wardrobe.dispose()
+    check(body+' rig, wave, six hairstyles and all wardrobe presets',true)
+  }
+  check('creator assets at most 450 KB',addedBytes<=450000,addedBytes+' bytes')
   controller.dispose()
   console.log(`\nALL ${passed} NODE OUTFIT CHECKS PASSED`)
 } finally {

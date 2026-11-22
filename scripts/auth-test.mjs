@@ -46,7 +46,7 @@ try {
     await page.goto(origin+'/?verify');await page.locator('.account-entry').click();if(feedbackUI)await page.evaluate(()=>window.viewer.freeze())
     const dialog=page.getByRole('dialog'),click=name=>dialog.getByRole('button',{name,exact:true}).click(),fill=(name,value)=>dialog.getByLabel(name).fill(value)
     await page.screenshot({path:'captures/auth/login.png'});await dialog.getByRole('tab',{name:'注册'}).click();await fill('邮箱',email);await fill('密码',password);await fill('昵称',nickname);await click('注册账号');await fill('六位验证码',await code('verify'));await click('验证邮箱')
-    await dialog.getByText('注册成功，已登录').waitFor();await page.screenshot({path:'captures/auth/registered.png'});await click('退出登录');await fill('密码',password);await click('登录');await dialog.getByText('已登录',{exact:true}).waitFor();await click('关闭');assert.equal(await page.locator('.account-entry').textContent(),nickname)
+    await page.locator('.creator [data-skip]').click();await page.locator('.creator').waitFor({state:'detached'});await page.locator('.account-entry').click();await page.screenshot({path:'captures/auth/registered.png'});await click('退出登录');await fill('密码',password);await click('登录');await dialog.getByText('已登录',{exact:true}).waitFor();await click('关闭');assert.equal(await page.locator('.account-entry').textContent(),nickname)
     await page.close();if(!feedbackUI){const mobile=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});await mobile.goto(origin+'/?verify');await mobile.locator('.account-entry').tap();await mobile.getByRole('dialog').waitFor();await mobile.screenshot({path:'captures/auth/mobile.png'})}
     }
   }else{

@@ -35,7 +35,8 @@ export const waitForMode = () => modeReady
 export function setPaused(on:boolean){paused=on}
 import {mountDevHud} from './ui/hud-dev'
 
-async function start() {
+export let spawnCreatedCharacter:()=>Promise<void>=async()=>{}
+async function start(creatorSpawn=false) {
   mountDevHud()
   loadLocalSave(undefined, Date.now(), getPlayMode() === 'solo')
   const params = new URLSearchParams(location.search)
@@ -398,7 +399,11 @@ async function start() {
       sum=0;samples=0
     }
   }
-  if(soloStart){await landSolo(true);showMode()}
+  spawnCreatedCharacter=async()=>{const gate=walkConfig.gate
+    if(!await walkTo(gate.x,gate.z,gate.yaw,'creator'))throw Error('出生点暂时无法进入')
+    showMode()}
+  if(creatorSpawn)await spawnCreatedCharacter()
+  else if(soloStart){await landSolo(true);showMode()}
   renderer.setAnimationLoop(animate)
   // IDOK-105: keep the last view fresh so "回到上次离开的地方" can restore it. Deep-linked
   // sessions (`?verify`, `?slot`, shares…) never write it — tests and shared links must not pollute.
@@ -414,8 +419,8 @@ async function start() {
     return write
   })()
   const token=params.get('view')
-  if(soloStart)return
+  if(soloStart||creatorSpawn)return
   if(token){try{if(token.length>4096)throw Error();await host.setView(JSON.parse(atob(token.replace(/-/g,'+').replace(/_/g,'/'))))}catch{console.warn('Invalid feedback view')}}
   else if(params.get('mode')==='walk'||params.has('spawn')){await toggle(true);showMode()}
 }
-export const boot=()=>start().catch(error=>{document.querySelector('output')!.value=`无法加载：${error.message}`;bootProgress(`无法加载：${error.message}`,0);console.error(error)})
+export const boot=(creatorSpawn=false)=>start(creatorSpawn).catch(error=>{document.querySelector('output')!.value=`无法加载：${error.message}`;bootProgress(`无法加载：${error.message}`,0);console.error(error)})

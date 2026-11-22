@@ -361,6 +361,10 @@ try {
 
   // M6-1: Mobile 390x844 HUD layout non-overlap, touch joystick + sprint/jump buttons + touch camera drag, and screenshot.
   const mobileCtx=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,isMobile:true,hasTouch:true})
+  // Also run the mobile gait and vehicle checks with the second body and a longer hairstyle.
+  await mobileCtx.addInitScript(()=>localStorage.setItem('glol.avatar.v1',JSON.stringify({
+    v:1,body:'f',skin:2,face:1,brows:1,eyes:1,hair:'f_long',hairColor:0,look:'basic',createdAt:1,
+  })))
   const mobile=await mobileCtx.newPage()
   mobile.on('pageerror',error=>errors.push('mobile: '+error.message))
   await mobile.route('**/favicon.ico',route=>route.fulfill({status:204}))

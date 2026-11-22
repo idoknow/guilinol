@@ -6,6 +6,8 @@ import type {PeaksGroup} from '../peaks'
 import type {Manifest} from '../world'
 import type {Stream} from '../stream'
 import {walkInput} from '../ui/walk'
+import {defaultAvatar} from '../../../lib/avatar'
+import {currentAvatar,characterModel,disposeCharacterParts,styleCharacter} from './character'
 import {avatar} from '../look/avatar'
 import {bikeConfig, carConfig, walkConfig as cfg, type CarDriveMode, type EbikeHeadlightMode, type EbikeTurnSignal, type EbikeUpgradeMods} from './config'
 import {createPhysics} from './physics'
@@ -16,7 +18,6 @@ import {createDriverPose} from './car'
 import {createRiderPose,notifyDismountBlocked} from './ride'
 import {createEbikeAudioEngine} from './ebike-audio'
 import {clearAvatarPose, ensureAvatarRig, getAvatarJoint, getAvatarJoints} from './avatar-rig'
-import {createAvatarOutfitController} from './outfits'
 import {isGlobalHotkeyBlocked, isModalOrOverlayOpen} from './input-guard'
 import {createInteractArbiter} from './interact-arbiter'
 import type {ShopCloseReason, ShopOverlayHandle} from '../ui/shop-overlay'
@@ -301,10 +302,29 @@ function applyPickupBikeAnimation(
 export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canvas:HTMLCanvasElement,manifest:Manifest,stream:Stream,peaks:PeaksGroup,verify:boolean){
   rapierReady ??= R.init()
   avatarReady ??= new GLTFLoader().loadAsync(avatar.path)
-  const [sim,model]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady])
+  const profile=currentAvatar()??defaultAvatar()
+  const [sim,source,model]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady,characterModel(profile)])
+  model.animations.push(...source.animations.filter(c=>!model.animations.some(other=>other.name===c.name)))
   const rig=createCameraRig(sim)
   const figure=model.scene,legacySkinned=mergeAvatar(figure,avatar.color),avatarRig=ensureAvatarRig(figure,avatar.color),skinned=legacySkinned??avatarRig.skinnedMesh,traveller=figure.getObjectByName('Traveller')??avatarRig.traveller,ridePose=createRiderPose(figure),driverPose=createDriverPose(figure)
-  const outfitController=createAvatarOutfitController(figure,avatarRig)
+  let outfitController=styleCharacter(figure,avatarRig,profile)
+  let appearanceVersion=0
+  window.addEventListener('glol:avatar-change',async()=>{
+    const a=currentAvatar(),version=++appearanceVersion
+    if(!a||!avatarRig.skinnedMesh)return
+    const fresh=await characterModel(a)
+    if(version!==appearanceVersion){disposeCharacterParts(fresh.scene);disposeCharacterParts(fresh.scene.userData.creatorHair);return}
+    const mesh=fresh.scene.getObjectByProperty('isSkinnedMesh',true) as THREE.SkinnedMesh
+    outfitController.dispose()
+    for(const name of ['creator-face','creator-hair','creator-skirt']){
+      const part=figure.getObjectByName(name)
+      if(part){part.removeFromParent();disposeCharacterParts(part)}
+    }
+    avatarRig.skinnedMesh.geometry.dispose();avatarRig.skinnedMesh.geometry=mesh.geometry
+    figure.userData.creatorHair=fresh.scene.userData.creatorHair
+    outfitController=styleCharacter(figure,avatarRig,a)
+    outfitController.applyEquipped(getGameState().wardrobe.equipped,{autoHelmetOnRide:getGameState().wardrobe.autoHelmetOnRide,ridingEbike:Boolean(rides?.bike&&rides.rideKind!=='bicycle')})
+  })
   {
     const initialWardrobe=getGameState().wardrobe
     outfitController.applyEquipped(initialWardrobe.equipped,{ridingEbike:false,autoHelmetOnRide:initialWardrobe.autoHelmetOnRide})

@@ -1,3 +1,4 @@
+import {looks, lookNames, lookPalette, starterOutfit} from '../../../lib/avatar'
 /**
  * Single Source of Truth (SSOT) catalog for Guilin Online commerce (IDOK-121 / IDOK-122 / IDOK-123 / IDOK-124).
  *
@@ -123,6 +124,10 @@ export const SHARED_BIKE_ORIGINAL_PALETTE = {
 } as const
 
 export const OUTFIT_ITEMS: readonly OutfitItemDef[] = [
+  ...looks.slice(1).flatMap((look,i) => (['top','bottom','shoes'] as const).map((slot,j) => ({
+    id:slot+'_starter_'+look, slot, name:lookNames[i+1]+['上装','下装','鞋'][j], tier:0 as const, price:0,
+    colorHex:lookPalette[i+1][j], accentHex:lookPalette[i+1][3], description:'初始穿搭', defaultOwned:true,
+  }))),
   // Default starter pieces (free)
   {id: 'top_default_tee', slot: 'top', name: '米白基础长袖', tier: 0, price: 0, colorHex: '#e9e7e1', description: '干净的米白长袖，什么都好搭', defaultOwned: true},
   {id: 'bottom_default_pants', slot: 'bottom', name: '黑色直筒裤', tier: 0, price: 0, colorHex: '#2a2c30', description: '基础黑色直筒裤', defaultOwned: true},
@@ -168,25 +173,22 @@ export const OUTFIT_ITEMS: readonly OutfitItemDef[] = [
   {id: 'hat_night_visor', slot: 'hat', name: '夜航全覆光镜盔', tier: 3, price: 320, colorHex: '#151920', accentHex: '#20d6c1', description: '流线型防风全盔配青色镜片'},
 ] as const
 
-export const DEFAULT_EQUIPPED_OUTFIT: Readonly<EquippedOutfit> = {
-  top: 'top_default_tee',
-  bottom: 'bottom_default_pants',
-  shoes: 'shoes_default_sneaker',
-  hat: 'hat_none',
-  bag: 'bag_none',
-}
+export {starterOutfit}
+export const DEFAULT_EQUIPPED_OUTFIT: Readonly<EquippedOutfit> = starterOutfit('basic')
 
 export const DEFAULT_OWNED_OUTFIT_ITEMS: readonly string[] = OUTFIT_ITEMS
   .filter(item => item.defaultOwned)
   .map(item => item.id)
 
 export const OUTFIT_PRESETS: readonly OutfitPresetDef[] = [
+  ...looks.slice(1).map((look,i)=>({id:'starter_'+look,name:lookNames[i+1],tier:0 as const,price:0,
+    summary:'免费初始穿搭',tag:'初始',items:starterOutfit(look),defaultOwned:true})),
   {
     id: 'outfit_default',
     name: '初见桂林常服',
     tier: 0,
     price: 0,
-    summary: '橘色防风外套配牛仔裤，默认常服随时切回。',
+    summary: '米白长袖配黑色直筒裤和小白鞋。',
     tag: '默认',
     items: {...DEFAULT_EQUIPPED_OUTFIT},
     defaultOwned: true,
@@ -283,7 +285,7 @@ export const OUTFIT_PRESETS: readonly OutfitPresetDef[] = [
   },
 ] as const
 
-export const DEFAULT_OWNED_OUTFIT_PRESETS: readonly string[] = ['outfit_default']
+export const DEFAULT_OWNED_OUTFIT_PRESETS: readonly string[] = OUTFIT_PRESETS.filter(p=>p.defaultOwned).map(p=>p.id)
 
 export const PERSONAL_EBIKE_MODELS: Readonly<Record<PersonalEbikeModelId, PersonalEbikeModelDef>> = {
   lijiang_light: {

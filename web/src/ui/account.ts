@@ -28,10 +28,21 @@ export async function openAccount(){
   build();await ready;render!(user?'profile':'login');dialog!.showModal();if(!user)record('funnel',{step:'loginOpen'})
 }
 /** Resolve with the signed-in user, opening the login dialog first if needed; null if the player closes it without signing in. */
-export async function requireUser():Promise<User|null>{
+async function signIn():Promise<User|null>{
   await ready;if(user)return user
   build();gate?.(null)
   return new Promise(resolve=>{gate=resolve;render!('login');dialog!.showModal();if(!user)record('funnel',{step:'loginOpen'})})
+}
+
+let firstSpawn=false
+export function consumeCreatorSpawn(){const value=firstSpawn;firstSpawn=false;return value}
+export async function requireUser(){
+  const signedIn=await signIn()
+  if(signedIn&&!firstSpawn)firstSpawn=await (await import('./avatar-account')).accountCharacter(signedIn.nickname)
+  return signedIn
+}
+export async function editCharacter(){
+  if(user)await (await import('./avatar-account')).accountCharacter(user.nickname,true)
 }
 
 /** The in-game chip (top left): avatar initial + nickname, or 登录 for guests. */
@@ -101,6 +112,7 @@ function build(){
     if(next==='register'||next==='profile')field('nickname','昵称','text','nickname',user?.nickname,next==='register'?'以后可以在「我的账号」里修改':'')
     if(next==='profile'){const label=document.createElement('label'),toggle=document.createElement('input');label.className='acc-check';toggle.type='checkbox';toggle.name='notify_email';toggle.checked=!!user?.notify_email
       label.append(toggle,'反馈有回复时发邮件提醒我');fields.append(label)}
+    if(next==='profile')link('修改外形',()=>submit(async()=>{await editCharacter()}))
     if(next==='login')link('忘记密码？',()=>render!('forgot'))
     else if(next==='profile')link('退出登录',()=>submit(async()=>{await api('auth/logout','POST');setUser(null);render!('login','已退出登录')}))
     else if(next!=='register')link('返回登录',()=>render!('login'))
@@ -124,7 +136,12 @@ function build(){
     if(previous==='register')render!('verify','',data.password)
     else if(previous==='reset')render!('login','密码已重置，请重新登录')
     else {setUser(result);if(gate){const resolve=gate;gate=undefined;d.close();resolve(result);return}
-      render!('profile',previous==='verify'?'注册成功，已登录':'已登录')}
+      if(previous==='verify'){
+        d.close();firstSpawn=await (await import('./avatar-account')).accountCharacter(result.nickname)
+        window.dispatchEvent(new Event('glol:registered'))
+        return
+      }
+      render!('profile','已登录')}
   })}
   d.querySelector('header button')!.addEventListener('click',()=>d.close())
   d.querySelector('.acc-join')!.addEventListener('click',()=>{if(!busy)render!('register')})
