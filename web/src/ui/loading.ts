@@ -66,15 +66,24 @@ export function veil(label:string,opts:{delayMs?:number;onCancel?:()=>void}={}):
     button.disabled=true;if(shown)await wait(Math.max(0,400-performance.now()+shown));root.remove();publish(key);events.forEach(type=>window.removeEventListener(type,guard,true))
   }}
 }
-export function streamIndicator(source:()=>{pending:number;label?:string}){
+export function streamIndicator(source:()=>number){
   const root=document.createElement('aside'),key=Symbol();root.className='ld-corner';root.setAttribute('aria-live','polite');root.hidden=true
-  let since=0,empty=0,peak=0,last=''
-  const timer=setInterval(()=>{const {pending,label='载入街区'}=source(),now=performance.now()
-    if(pending){empty=0;since||=now;if(now-since<600&&root.hidden)return;peak=Math.max(peak,pending)
-      const text=`${label} · ${pending}`;if(text===last&&!root.hidden)return;last=text;root.textContent=text;root.hidden=false
-      if(!root.isConnected)document.body.append(root);const fraction=1-pending/peak;meter(root,label,fraction);publish(key,{level:3,stage:'stream',fraction})
-    }else{since=0;if(root.hidden)return;empty||=now;if(now-empty>=800){root.hidden=true;peak=0;publish(key)}}
-  },250);return ()=>{clearInterval(timer);root.remove();publish(key)}
+  let show=0,hide=0,peak=0
+  function draw(){
+    const pending=source(),label='载入街区';if(!pending)return
+    root.textContent=`${label} · ${pending}`;root.hidden=false
+    if(!root.isConnected)document.body.append(root)
+    const fraction=1-pending/peak;meter(root,label,fraction);publish(key,{level:3,stage:'stream',fraction})
+  }
+  return ()=>{
+    const pending=source()
+    if(pending){clearTimeout(hide);hide=0;peak=Math.max(peak,pending)
+      if(!root.hidden)draw();else if(!show)show=window.setTimeout(()=>{show=0;draw()},600)
+    }else{clearTimeout(show);show=0
+      if(root.hidden)peak=0
+      else if(!hide)hide=window.setTimeout(()=>{hide=0;root.hidden=true;peak=0;publish(key)},800)
+    }
+  }
 }
 export function inline(el:HTMLElement,{label,progress}:{label:string;progress?:number}){
   el.classList.add('ld-inline');el.setAttribute('aria-live','polite');el.textContent=label;meter(el,label,progress??0)

@@ -34,6 +34,7 @@ export class Stream {
   updateLandmarks?:ReturnType<typeof import('./landmarks').landmarkStream>
   loaded = new Map<Tile,Awaited<ReturnType<typeof detail>>>()
   pending = new Map<Tile,AbortController>()
+  onPendingChange?:()=>void
   failures = new Map<Tile,number>()
   visited = new Set<Tile>()
   forest:Forest
@@ -128,8 +129,14 @@ export class Stream {
     progress?.(0,tiles.length)
     for(let i=0;i<tiles.length;i+=streamBudget.innerRequests){
       const batch=tiles.slice(i,i+streamBudget.innerRequests)
-      await Promise.all(batch.map(async tile=>{await this.enqueue(tile,true)
-        if(!this.loaded.has(tile))throw Error('网络中断：街区数据下载失败')
+      await Promise.all(batch.map(async tile=>{
+        for(let attempt=1;;attempt++){
+          await this.enqueue(tile,true)
+          if(this.loaded.has(tile))break
+          const retryAt=this.failures.get(tile)
+          if(attempt===3||retryAt===undefined)throw Error('网络中断：街区数据下载失败')
+          await new Promise(resolve=>setTimeout(resolve,Math.max(0,retryAt-performance.now())))
+        }
         progress?.(++done,tiles.length)
       }))
     }
@@ -161,6 +168,7 @@ export class Stream {
     const controller = new AbortController()
     if(this.failures.has(tile))record('retry',{category:'chunk'})
     this.pending.set(tile,controller)
+    this.onPendingChange?.()
     if(inner) this.innerPending.add(tile)
     const start=performance.now()
     // The inner ring is bounded in space and request count. Its decode and
@@ -179,6 +187,7 @@ export class Stream {
       this.pending.delete(tile)
       this.innerPending.delete(tile)
       this.fillRequests()
+      this.onPendingChange?.()
     })
   }
 

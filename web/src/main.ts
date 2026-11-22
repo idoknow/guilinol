@@ -66,8 +66,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     if(manifest.version!==4 || manifest.chunkSize!==256 || manifest.grid!==4) throw Error('Unsupported world format')
     return manifest
   }
-  const terrain=document.getElementById('opening-terrain')
-    ? await openingTerrain(byteStage(false))
+  const terrain=hasOpening
+    ? await openingTerrain(byteStage(false)).catch(()=>null)
     : null
   const previousWorld=terrain?null:await readManifest()
   entrySignal?.throwIfAborted()
@@ -156,8 +156,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   }
 
   let openingStream:Stream|undefined
-  if(terrain){
-    scene.add(terrain.mesh)
+  async function presentOpening(){
     // Draw the real terrain with the active flight camera. The second
     // animation callback marks the first presented frame on both paths.
     await new Promise<void>(resolve=>{
@@ -178,6 +177,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       })
     })
   }
+  if(terrain){scene.add(terrain.mesh);await presentOpening()}
   async function loadFullScene(){
     const manifest=previousWorld??await readManifest()
     entrySignal?.throwIfAborted()
@@ -200,11 +200,19 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   entrySignal?.throwIfAborted()
   scene.add(base.mesh,peaks)
   const stream = openingStream??new Stream(scene,manifest,base,rangeStore,camera)
-  if(!openingStream)await stream.loadOpeningRing(camera.position,ringProgress)
+  if(!openingStream){
+    openingStream=stream
+    try{
+      await presentOpening()
+      entrySignal?.throwIfAborted()
+      await stream.loadOpeningRing(camera.position,ringProgress)
+      entrySignal?.throwIfAborted()
+    }finally{renderer.setAnimationLoop(null)}
+  }
   stats.openingRingMs=performance.now()
   if(first)void finishLoading()
-  streamIndicator(()=>({pending:stream.pending.size+(stream.updateLandmarks?.pendingCount()??0)}))
-  if(openingStream)openingStream.setTerrainLayer(base)
+  stream.onPendingChange=streamIndicator(()=>stream.pending.size+(stream.updateLandmarks?.pendingCount()??0))
+  if(terrain)stream.setTerrainLayer(base)
   const output = document.querySelector('output')!
   let cullLandmarks:ReturnType<typeof import('./landmarks').landmarkCulling>|undefined
   let landmarksPromise:Promise<void>|undefined
@@ -215,6 +223,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       stream.updateLandmarks=module.landmarkStream(scene,renderer,manifest.landmarks!,stream.landmarks,{
         getMetrics:()=>stream.metrics,
         isInnerBusy:()=>stream.isInnerBusy(),
+        onPendingChange:()=>stream.onPendingChange?.(),
       })
     })
     return landmarksPromise
