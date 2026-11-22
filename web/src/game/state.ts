@@ -124,7 +124,7 @@ export interface GameState {
   money: number // safe non-negative integer yuan (0..99_999_999)
   wanted: 0 | 1 | 2 | 3 | 4 | 5
   mission: ActiveMissionState | null
-  zone: {quiet: boolean; name?: string}
+  zone: {quiet: boolean; name?: string; carFree?: boolean}
 
   // ---- Stage 1 incremental state ----
   wardrobe: WardrobeState
@@ -270,19 +270,19 @@ function samePrompt(a: InteractionPromptState | null | undefined, b: Interaction
 export function updateTravel(
   mode: PlayerMode,
   vehicle: ActiveVehicleState | null,
-  zoneNameOrQuiet?: string | {quiet: boolean; name?: string},
+  zoneNameOrQuiet?: string | GameState['zone'],
 ): void {
   const changed = new Set<keyof GameState>()
   const nextZone =
     typeof zoneNameOrQuiet === 'object' && zoneNameOrQuiet !== null
-      ? {quiet: !!zoneNameOrQuiet.quiet, ...(zoneNameOrQuiet.name ? {name: zoneNameOrQuiet.name} : {})}
+      ? {...zoneNameOrQuiet, quiet: !!zoneNameOrQuiet.quiet}
       : zoneNameOrQuiet !== undefined
         ? {quiet: !!zoneNameOrQuiet, ...(zoneNameOrQuiet ? {name: zoneNameOrQuiet} : {})}
         : state.zone
 
   if (state.mode !== mode) changed.add('mode')
   if (!sameVehicle(state.vehicle, vehicle)) changed.add('vehicle')
-  if (state.zone.quiet !== nextZone.quiet || state.zone.name !== nextZone.name) changed.add('zone')
+  if (state.zone.quiet !== nextZone.quiet || state.zone.name !== nextZone.name || !!state.zone.carFree !== !!nextZone.carFree) changed.add('zone')
   if (!changed.size) return
 
   state = {...state, mode, vehicle: vehicle ? {...vehicle} : null, zone: nextZone}
