@@ -1,6 +1,7 @@
 """Report projected mountain/highway overlap, including 2 m beyond sidewalks."""
 import gzip
 import json
+import struct
 from pathlib import Path
 from functools import lru_cache
 
@@ -12,6 +13,7 @@ from common import OUT, load_osm
 from features import area, points
 from landmark_solids import load_landmark_meshes
 from landmarks.world_surface import Surface
+from road_grading import eval_bspline_grid
 from peak_road_geometry import road_buffers, TrailAreas
 
 
@@ -51,6 +53,20 @@ def trail_samples(surface, line):
         visible[1::2,1::2] = (ground[:-1,1:]+ground[1:,:-1])/2
         return np.maximum(h,visible)
 
+    @lru_cache(maxsize=8)
+    def paving(ox,oz):
+        blob = gzip.decompress((surface.directory/surface.files[ox,oz]).read_bytes())
+        vertices,indices,length = struct.unpack_from('<3I',blob,4)
+        start = 24+16900+vertices*9+indices*4
+        streets = json.loads(blob[start:start+length])[1]
+        offsets = {0:.045, 1:.195, 4:.195, 5:.060, 6:.195}
+        paths = [(Polygon(ring,holes),offsets[kind]) for kind,ring,*holes in streets[0] if kind in offsets]
+        control = None
+        if len(streets)>5 and streets[5]:
+            base,deltas = streets[5]
+            control = (base+np.array(deltas).reshape(35,35))/1000
+        return paths,control
+
     errors = []
     for station in np.r_[np.arange(0,line.length,2),line.length]:
         x,z = line.interpolate(station).coords[0]
@@ -61,6 +77,16 @@ def trail_samples(surface, line):
         u,v = u-i,v-j
         (a,b),(c,d) = grid(ox,oz)[j:j+2,i:i+2]
         collider = a+(b-a)*u+(c-a)*v if u+v<=1 else d+(c-d)*(1-u)+(b-d)*(1-v)
+        # Include any separate spline-graded street surface covering this
+        # station. A raised plaza at a stair junction can block the player
+        # even where the terrain and the peak collider agree exactly.
+        paths,control = paving(ox,oz)
+        local = Point((x-ox)*100,(z-oz)*100)
+        for polygon,offset in paths:
+            if polygon.covers(local):
+                base = height if control is None else max(height,eval_bspline_grid(
+                    control,ox,oz,np.array([x]),np.array([z]))[0])
+                collider = max(collider,base+offset)
         errors.append(surface.peaks.height(x,z,collider)-height)
     return len(errors),min(errors),max(errors)
 
