@@ -34,7 +34,8 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   police.name='G4 patrol';police.count=0;police.visible=false;police.frustumCulled=false;scene.add(police)
   onPlayMode(mode=>{if(mode==='tour'){pursuit?.end('tour');police.count=0;police.visible=false}})
   let accumulator=0,pursuitDt=0
-  return (dt:number,vehicle?:THREE.Vector3,player?:THREE.Vector3,solo=false)=>{
+  return (dt:number,vehicle?:THREE.Vector3,player?:THREE.Vector3,solo=false,enabled=true)=>{
+    if(!enabled){mesh.count=0;return}
     const target=`${Math.floor(camera.position.x/512)}_${Math.floor(camera.position.z/512)}`
     if(target!==key){
       key=target

@@ -1,4 +1,4 @@
-import {getPlayMode, setPlayMode, type PlayMode} from './game/play-mode'
+import {getPlayMode, lastPlayMode, linkedPlayMode, setPlayMode, type PlayMode} from './game/play-mode'
 import './telemetry'
 import './ui/theme.css'
 import './ui/hud.css'
@@ -21,7 +21,7 @@ const loadEngine = () => engine ??= import('./main')
 let started = false
 
 const title = home(mode => void enter(mode))
-window.addEventListener('glol:registered',()=>void enter('tour'))
+window.addEventListener('glol:registered',()=>void enter(lastPlayMode()))
 let entering = false
 async function enter(mode: PlayMode, remember = true) {
   if (entering) return
@@ -101,7 +101,7 @@ function hud(main: typeof import('./main')) {
 
 const retry=sessionStorage.getItem('glol.retryMode');sessionStorage.removeItem('glol.retryMode')
 if(retry==='solo'||retry==='tour')void enter(retry)
-else if (deepLink) void enter(params.get('solo') === '1' ? 'solo' : 'tour', false)
+else if (deepLink) void enter(linkedPlayMode(params), false)
 else {
   title.open(false)
   // Warm the engine module while the player reads the menu; the world data is already preloaded by index.html.
