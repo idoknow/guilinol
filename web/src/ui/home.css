@@ -1,4 +1,5 @@
-/* 主界面 · 山水印：实景截图做底，左侧青玉暗渐变托住文字；游览卡是宣纸，故事卡是没上色的纸。 */
+/* 主界面：实景截图做底，左侧暗渐变托住文字。品牌（桂字印、衬线大标题）保留山水印；
+   第二期主玩法“单人模式”用街头 HUD 的语言（沥青、桂花金、无衬线），游览模式退为次要的青玉玻璃卡。 */
 .home{position:fixed;inset:0;z-index:80;overflow:hidden auto;color:var(--ui-paper);font-family:var(--ui-serif);background:var(--ui-ink-900);
   opacity:0;transition:opacity .45s ease}
 .home.show{opacity:1}
@@ -35,7 +36,7 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 .home-mode-text{grid-area:text;display:grid;gap:5px;min-width:0}
 .home-mode-text b{display:flex;align-items:center;gap:8px;font-size:21px;font-weight:700;letter-spacing:.18em}
 .home-mode-text>span{font-size:13.5px;line-height:1.65;letter-spacing:.04em}
-.home-progress{font-size:12px;letter-spacing:.1em;color:var(--ui-seal)}.home-progress:empty{display:none}
+.home-progress,.home-wallet{font-size:12px;letter-spacing:.1em}.home-progress:empty,.home-wallet:empty{display:none}
 .home-go{grid-area:go;width:100%}
 /* IDOK-105 续游条：游览卡下方一条青玉玻璃窄条，像压在宣纸下的书签；只有存过位置才出现。 */
 .home-resume-row{margin-top:-4px}.home-resume-row[hidden]{display:none}
@@ -50,18 +51,39 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23f4efe2' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8a5 5 0 1 0 1.6-3.7'/%3E%3Cpath d='M3 2.5V5h2.5'/%3E%3C/svg%3E")}
 .home-resume span{flex:1;min-width:0}
 .home-resume small{flex:none;font-size:12px;letter-spacing:.08em;color:var(--ui-paper-dim)}
-.home-mode--tour{cursor:pointer;color:var(--ui-ink);background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(255,255,255,0) 50%),var(--ui-paper);
-  box-shadow:var(--ui-shadow-2),inset 0 0 0 1px rgba(90,80,60,.14);transition:transform .25s var(--ui-ease),box-shadow .25s}
-.home-mode--tour:hover{transform:translateY(-2px);box-shadow:0 24px 60px rgba(12,20,20,.4),inset 0 0 0 1px rgba(90,80,60,.14)}
+/* 单人模式：沥青卡，左侧一条桂花金，按钮是金底黑字。 */
+.home-mode--solo{--gold:var(--st-gold,#ffc53d);--asphalt:var(--st-asphalt-solid,#121519);cursor:pointer;position:relative;overflow:hidden;
+  color:var(--st-white,#f6f4ef);font-family:var(--st-sans,system-ui,sans-serif);
+  background:linear-gradient(105deg,rgba(255,197,61,.10),rgba(255,197,61,0) 42%),rgba(18,21,25,.9);
+  box-shadow:0 22px 56px rgba(6,8,10,.5),inset 0 0 0 1px rgba(255,255,255,.12),inset 4px 0 0 var(--gold);
+  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);transition:transform .25s var(--ui-ease),box-shadow .25s}
+.home-mode--solo::after{content:"";position:absolute;inset:auto 0 0 0;height:3px;pointer-events:none;
+  background:repeating-linear-gradient(90deg,rgba(246,244,239,.5) 0 18px,transparent 18px 34px);opacity:.35}
+.home-mode--solo:hover{transform:translateY(-2px);box-shadow:0 26px 64px rgba(6,8,10,.6),inset 0 0 0 1px rgba(255,197,61,.45),inset 4px 0 0 var(--gold)}
+.home-mode--solo:active{transform:scale(.985)}
+.home-mode--solo:focus-visible{outline:none;box-shadow:0 22px 56px rgba(6,8,10,.5),inset 0 0 0 2px var(--gold),inset 4px 0 0 var(--gold)}
+.home-mode--solo .home-mode-seal{border-radius:10px;transform:none;font:900 27px/1 var(--st-sans,sans-serif);color:var(--asphalt);background:var(--gold);
+  box-shadow:0 3px 0 rgba(0,0,0,.45)}
+.home-mode--solo .home-mode-text b{font-family:var(--st-sans,sans-serif);font-weight:900;letter-spacing:.14em}
+.home-mode--solo .home-mode-text>span{color:var(--st-dim,rgba(246,244,239,.72));letter-spacing:.02em}
+.home-mode--solo .home-wallet{font:700 13px/1.2 var(--st-num,sans-serif);letter-spacing:.04em;color:var(--gold)}
+.home-go{display:flex;align-items:center;justify-content:center;min-height:46px;box-sizing:border-box;border-radius:var(--ui-r-pill);pointer-events:none}
+.home-go--solo{font:900 16px/1 var(--st-sans,sans-serif);letter-spacing:.3em;text-indent:.3em;color:var(--asphalt);background:var(--gold);
+  box-shadow:0 3px 0 rgba(120,82,0,.85),0 10px 24px rgba(255,197,61,.22)}
+.home-mode--solo:hover .home-go--solo{filter:brightness(1.06)}
+/* 游览模式：次要，青玉玻璃 + 线框印章。 */
+.home-mode--tour{cursor:pointer;padding:14px 16px 13px;gap:10px 14px;color:var(--ui-paper);background:var(--ui-glass-strong);
+  border:1px solid var(--ui-glass-line-soft);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);
+  transition:transform .25s var(--ui-ease),background .25s,border-color .25s}
+.home-mode--tour:hover{transform:translateY(-2px);background:var(--ui-glass-solid);border-color:var(--ui-glass-line)}
 .home-mode--tour:active{transform:scale(.985)}
 .home-mode--tour:focus-visible{outline:3px solid var(--ui-jade-300);outline-offset:3px}
-.home-mode--tour .home-mode-seal{color:var(--ui-paper);background:var(--ui-seal);box-shadow:inset 0 0 0 2px var(--ui-seal),inset 0 0 0 4px rgba(244,239,226,.85)}
-.home-mode--tour .home-mode-text>span{color:var(--ui-ink-soft)}
-.home-mode--tour .home-go{pointer-events:none}
-.home-mode--soon{color:var(--ui-paper-dim);background:rgba(24,40,37,.5);border:1px dashed var(--ui-glass-line);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);cursor:default}
-.home-mode--soon .home-mode-seal{color:rgba(244,239,226,.5);border:2px dashed rgba(244,239,226,.35)}
-.home-mode--soon b{color:rgba(244,239,226,.8)}.home-mode--soon .ui-tag{font-size:11px}
-.home-mode--soon .home-go{display:none}
+.home-mode--tour .home-mode-seal{width:44px;height:44px;font-size:23px;color:var(--ui-seal-light);border:2px solid var(--ui-seal-light)}
+.home-mode--tour .home-mode-text b{font-size:18px}
+.home-mode--tour .home-mode-text>span{color:var(--ui-paper-dim)}
+.home-mode--tour .home-progress{color:var(--ui-seal-light)}
+.home-go--tour{min-height:40px;font:500 14.5px/1 var(--ui-serif);letter-spacing:.24em;color:var(--ui-paper);border:1px solid var(--ui-glass-line)}
+.home-mode--tour:hover .home-go--tour{background:rgba(244,239,226,.08)}
 
 .home-links{display:flex;flex-wrap:wrap;gap:4px;margin-left:-10px;animation:home-rise .8s .22s var(--ui-ease) both}
 .home-links .ui-btn{color:rgba(244,239,226,.86);font-size:14px}
@@ -91,7 +113,8 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
   .home-seal{top:-64px}.home-seal img{width:112px}
   .home-tag{font-size:14.5px}
   .home-mode{padding:14px;gap:10px 12px}.home-mode-seal{width:44px;height:44px;font-size:23px}.home-mode-text b{font-size:18px}
-  .home-mode--soon{grid-template-areas:"seal text"}
+  .home-mode--tour{grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go";padding:11px 12px}.home-mode--tour .home-mode-seal{width:36px;height:36px;font-size:19px}
+  .home-mode--tour .home-mode-text>span{display:none}.home-go--tour{min-height:36px;padding:0 14px;letter-spacing:.12em;text-indent:0}
   .home-links{justify-content:center;margin-left:0}
   .home-foot{flex-direction:column;align-items:center;gap:4px}.home-caption{display:none}.home-credit{text-align:center}
   .guide-steps,.guide-keys{grid-template-columns:1fr}
@@ -101,7 +124,8 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
   .home-main{width:100%;min-height:calc(100dvh - 90px);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);align-content:center;column-gap:28px;row-gap:8px;padding-top:12px}
   .home-title h1{font-size:40px}.home-seal{display:none}.home-tag{margin-top:8px;font-size:13.5px;line-height:1.6}.home-meta{display:none}
   .home-modes{grid-row:span 2;gap:8px}.home-mode{padding:12px 14px;gap:8px 12px}.home-mode-seal{width:40px;height:40px;font-size:22px}
-  .home-mode-text>span{font-size:12.5px;line-height:1.5}.home-mode--soon{grid-template-areas:"seal text"}.home-links{margin-left:-10px}
+  .home-mode-text>span{font-size:12.5px;line-height:1.5}.home-go{min-height:38px}
+  .home-mode--tour{grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go"}.home-mode--tour .home-mode-text>span{display:none}.home-go--tour{padding:0 14px;letter-spacing:.12em;text-indent:0}.home-links{margin-left:-10px}
   .ui-btn--lg{min-height:42px}.home-foot{padding-bottom:8px}
   .home-shade{background:linear-gradient(90deg,rgba(20,33,30,.85) 0,rgba(20,33,30,.55) 50%,rgba(20,33,30,.7) 100%)}
 }
