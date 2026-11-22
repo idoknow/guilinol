@@ -22,13 +22,15 @@ try {
     })
     const errors = []
     page.on('pageerror', (e) => errors.push(e.message))
+    // Portrait phones get the IDOK-144 rotate gate; take its 竖屏继续 escape so the tour flow is reachable.
+    await page.addInitScript(() => sessionStorage.setItem('glol.portraitOk', '1'))
     await page.goto('http://127.0.0.1:' + server.httpServer.address().port + '/?verify')
     await page.waitForFunction(() => window.viewer?.tour)
     await recordFrames(page)
     await page.locator('.dock-map').click()
     await page.getByRole('searchbox').fill('象鼻山')
     await page.locator('.atlas-search li').filter({ hasText: '观景点' }).first().click()
-    await page.locator('.atlas-pop button').click()
+    await page.locator('.atlas-pop button[data-act=go]').click()
     await page.locator('.spot-card.show [data-act="photo"]').click()
     await page.getByRole('button', { name: '按快门' }).click()
     await page.waitForFunction(() => window.lastPhoto?.bytes > 5000)
