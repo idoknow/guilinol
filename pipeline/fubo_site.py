@@ -68,6 +68,19 @@ class FuboSite:
         weight = np.where(inside & ~wet[window],np.clip(edge/6,0,1),0)
         field[window] = np.rint((1-weight)*field[window]+weight*target*10)
 
+    def retain_street_grade(self, terrain, original, water, published, left, top):
+        # The expanded city uses frozen street splines here. Keep their
+        # surveyed underlay as well, while removing the old mountain imprint.
+        window,x,z = grid_window(original.shape,left,top,box(-190,-844,-6,-586))
+        pts = shapely.points(x,z)
+        inside = shapely.contains(self.dry_allowed,pts)
+        fade = np.clip(shapely.distance(pts,self.dry_allowed.boundary)/8,0,1)
+        keep_new = np.where(inside,fade*fade*(3-2*fade),0)
+        dry = water[window]==-32768
+        correction = np.where(dry,np.rint((published[window]-original[window])*(1-keep_new)),0).astype('<i2')
+        original[window] += correction
+        terrain[window] += correction
+
     def grade_bank(self, terrain, original, water, left, top):
         # Water physics uses the water plane at wet vertices. Grade only the
         # shallow shelf whose 4 m triangles support an OSM land trail.

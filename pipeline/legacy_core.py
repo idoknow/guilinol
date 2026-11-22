@@ -60,7 +60,7 @@ class Downtown:
         # Both the released outcrop and the new park footprint are in these two tiles.
         return x == -256 and z in (-1024,-768)
 
-    def blend(self, terrain, water, original, ctrl, left, top):
+    def blend(self, terrain, water, original, ctrl, left, top, fubo=None):
         # Merge into a single grid first so a shared border is blended once.
         west,north,w,h = EXTENT
         shape = (h//GRID+1,w//GRID+1)
@@ -102,6 +102,8 @@ class Downtown:
             patch[matched] = np.rint(patch[matched]*(1-alpha[matched])+src[matched]*alpha[matched])
             copy = ~matched & (alpha>=.5)
             patch[copy] = src[copy]
+        if fubo is not None:
+            fubo.retain_street_grade(terrain[window],original[window],water[window],fields[2],west,north)
         r,c = (north-top)//8,(west-left)//8
         patch = ctrl[r:r+controls.shape[0],c:c+controls.shape[1]]
         alpha = weight((np.arange(controls.shape[1])-1)*8,(np.arange(controls.shape[0])-1)*8)

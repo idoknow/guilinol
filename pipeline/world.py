@@ -271,14 +271,17 @@ def build(bbox, output, palette, workers=4):
             local = field[window].astype(float)
             smooth = gaussian_filter(local, sigma=span/(3*GRID), mode='nearest')
             field[window] = np.rint(local + blend*(smooth-local))
-    if downtown:
-        downtown.blend(terrain,surface,original,road_ctrl,left,top)
-        wet[:] = surface != DRY
-        downtown.peaks(output,peaks)
+    fubo = None
     if any(p['name']=='伏波山' for p in peaks['entries']):
         from fubo_site import fubo_site
-        fubo = next(p for p in json.loads(Path(__file__).with_name('peaks.json').read_bytes()) if p['name']=='伏波山')
-        fubo_site(fubo['eastLimit']).grade_bank(terrain,original,surface,left,top)
+        spec = next(p for p in json.loads(Path(__file__).with_name('peaks.json').read_bytes()) if p['name']=='伏波山')
+        fubo = fubo_site(spec['eastLimit'])
+    if downtown:
+        downtown.blend(terrain,surface,original,road_ctrl,left,top,fubo)
+        wet[:] = surface != DRY
+        downtown.peaks(output,peaks)
+    if fubo is not None:
+        fubo.grade_bank(terrain,original,surface,left,top)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 
