@@ -10,6 +10,8 @@ export function streetShading(material: T.MeshStandardMaterial, garment = false)
   }
   if (garment) material.userData.clothing = clothing
   material.customProgramCacheKey = () => (garment ? 'creator-cloth' : 'creator-solid')
+  // Facet normals keep coincident garment/skin layers identical (smooth normals z-fight). Hard bands on
+  // facets read as a patchwork, so the key light is a soft ramp instead.
   material.flatShading = true
   material.onBeforeCompile = (shader, renderer) => {
     T.Material.prototype.onBeforeCompile.call(material, shader, renderer)
@@ -35,12 +37,13 @@ export function streetShading(material: T.MeshStandardMaterial, garment = false)
         }`,
         )
     }
-    shader.fragmentShader = shader.fragmentShader.replace(
+    shader.fragmentShader = 'uniform float uNight;\n' + shader.fragmentShader.replace(
       '#include <opaque_fragment>',
       `
       vec3 keyDir = normalize(mat3(viewMatrix) * vec3(-0.45, 0.86, -0.36));
       float facing = dot(normal, keyDir);
-      outgoingLight = diffuseColor.rgb * (0.76 + 0.16 * step(-0.35, facing) + 0.15 * step(0.45, facing));
+      float band = 0.80 + 0.22 * smoothstep(-0.55, 0.85, facing);
+      outgoingLight = diffuseColor.rgb * band * mix(1.0, 0.38, uNight);
       #include <opaque_fragment>`,
     )
   }
