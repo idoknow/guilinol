@@ -96,6 +96,40 @@ export function safeAvatar(value: unknown): string {
 
 export const maskUid = (value: string) => (value.length <= 6 ? '…' : `…${value.slice(-6)}`)
 
+/** 纯第三方账号没有真实邮箱时用占位地址（不投递、也不能拿来登录邮箱入口）。 */
+export const placeholderEmail = (type: string, socialUid: string) =>
+  `${type}.${socialUid.toLowerCase().replace(/[^a-z0-9]/g, '')}@social.invalid`
+
+export const isPlaceholderEmail = (email: string) => /@social\.invalid$/i.test(email)
+
+/**
+ * 直接给第三方账号建号（不要求邮箱/密码）：占位邮箱 + 不可用密码 + verified=1。
+ * 调用方负责消费 social_pending。
+ */
+async function createSocialOnlyUser(
+  db: D1Database,
+  type: SocialType,
+  socialUid: string,
+  nickname: string,
+  avatar: string,
+): Promise<string> {
+  const id = crypto.randomUUID()
+  const salt = random(16)
+  // 随机密码的哈希：这个账号不能走邮箱密码登录
+  const digest = await passwordHash(random(32), salt)
+  await db.batch([
+    db
+      .prepare('INSERT INTO users(id,email,nickname,salt,digest,verified,email_placeholder) VALUES(?,?,?,?,?,1,1)')
+      .bind(id, placeholderEmail(type, socialUid), nickname || '新用户', salt, digest),
+    db
+      .prepare(
+        'INSERT INTO social_identities(type,social_uid,user_id,nickname,faceimg,created_at,last_login_at) VALUES(?,?,?,?,?,?,?)',
+      )
+      .bind(type, socialUid, id, nickname, avatar, now(), now()),
+  ])
+  return id
+}
+
 type Upstream = {
   code?: number
   errcode?: number
@@ -421,7 +455,25 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
     .prepare('SELECT user_id FROM social_identities WHERE type=? AND social_uid=?')
     .bind(type, row.social_uid!)
     .first<{ user_id: string }>()
-  if (!identity) throw new Problem(404, 'unbound', '该平台账号尚未绑定，请先用邮箱登录后再绑定')
+  if (!identity) {
+    // 首次用第三方登录、且这个平台账号没绑过任何用户：直接建号（不再强制先绑邮箱）
+    const createdPending = await db
+      .prepare("UPDATE social_pending SET used=1 WHERE token=? AND used=0 AND intent='login' RETURNING token")
+      .bind(digest)
+      .first<{ token: string }>()
+    if (!createdPending) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
+    const newUserId = await createSocialOnlyUser(db, type, row.social_uid!, nickname, faceimg)
+    const newToken = random(32)
+    await db
+      .prepare('INSERT INTO sessions(digest,user_id,expires) VALUES(?,?,?)')
+      .bind(await hash(newToken), newUserId, now() + lifetime)
+      .run()
+    logSocial({ action: 'confirm', type, created: true })
+    return Response.json(
+      { ok: true, intent, created: true, redirect: '/?social=registered' },
+      { headers: [['Cache-Control', 'no-store'], ['Set-Cookie', cookie(newToken)], ['Set-Cookie', clearPending()]] },
+    )
+  }
   const owner = await db.prepare('SELECT verified FROM users WHERE id=?').bind(identity.user_id).first<{ verified: number }>()
   if (!owner?.verified) throw new Problem(403, 'unverified', '该账号尚未验证邮箱')
 
@@ -491,11 +543,32 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
   if (taken) throw new Problem(409, 'conflict', '该平台账号已经绑定过其它用户，请直接登录')
 
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
-  if (email.length > 254 || email.split('@').length !== 2 || !/^\S+@[^\s@]+\.[^\s@]+$/.test(email)) invalid()
   const password = typeof body.password === 'string' ? body.password : ''
-  if (password.length < 8 || password.length > 256) invalid()
   const nickname = ((typeof body.nickname === 'string' ? body.nickname : '') || row.nickname || '新用户').trim().slice(0, 32)
   const ip = request.headers.get('CF-Connecting-IP') ?? 'local'
+
+  // 邮箱/密码都不填：直接用第三方注册，不强制绑定邮箱（账号用占位邮箱，之后可再绑）
+  if (!email && !password) {
+    const createdPending = await db
+      .prepare("UPDATE social_pending SET used=1 WHERE token=? AND used=0 AND intent='register' RETURNING token")
+      .bind(digest)
+      .first<{ token: string }>()
+    if (!createdPending) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
+    const newUserId = await createSocialOnlyUser(db, type, row.social_uid, nickname, safeAvatar(row.faceimg))
+    const newToken = random(32)
+    await db
+      .prepare('INSERT INTO sessions(digest,user_id,expires) VALUES(?,?,?)')
+      .bind(await hash(newToken), newUserId, now() + lifetime)
+      .run()
+    logSocial({ action: 'register', type, created: true, email: false })
+    return Response.json(
+      { ok: true, redirect: '/?social=registered', email: '', nickname, email_placeholder: true },
+      { headers: [['Cache-Control', 'no-store'], ['Set-Cookie', cookie(newToken)], ['Set-Cookie', clearPending()]] },
+    )
+  }
+
+  if (email.length > 254 || email.split('@').length !== 2 || !/^\S+@[^\s@]+\.[^\s@]+$/.test(email)) invalid()
+  if (password.length < 8 || password.length > 256) invalid()
 
   const existing = await db.prepare('SELECT id,verified FROM users WHERE email=?').bind(email).first<{ id: string; verified: number }>()
   if (existing?.verified) throw new Problem(409, 'email_taken', '该邮箱已注册，请直接登录后在账号设置里绑定')
@@ -578,4 +651,65 @@ export async function userSocialIdentities(db: D1Database, userId: string) {
     created_at: row.created_at,
     last_login_at: row.last_login_at,
   }))
+}
+
+/**
+ * 给已有账号补绑邮箱（第三方专用账号后续想加邮箱走这里）。
+ * 两阶段：无 code → 发验证码；带 code → 校验并写入（可选同时设密码）。
+ */
+export async function bindEmail(
+  env: Env,
+  db: D1Database,
+  request: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const headers = { 'Cache-Control': 'no-store' }
+  const digest = await sessionHash(request)
+  const account = await db
+    .prepare('SELECT user_id FROM sessions WHERE digest=? AND expires>?')
+    .bind(digest, now())
+    .first<{ user_id: string }>()
+  if (!account) throw new Problem(401, 'unauthorized', '请先登录')
+
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+  if (email.length > 254 || email.split('@').length !== 2 || !/^\S+@[^\s@]+\.[^\s@]+$/.test(email)) invalid()
+  if (isPlaceholderEmail(email)) throw new Problem(400, 'invalid_input', '请填写真实邮箱')
+  const owner = await db.prepare('SELECT id FROM users WHERE email=?').bind(email).first<{ id: string }>()
+  if (owner && owner.id !== account.user_id) throw new Problem(409, 'email_taken', '该邮箱已被其他账号使用')
+
+  if (typeof body.code !== 'string' || !/^\d{6}$/.test(body.code)) {
+    await reserveMail(db, email, request.headers.get('CF-Connecting-IP') ?? 'local')
+    const code = newCode()
+    await db
+      .prepare(
+        'INSERT INTO email_codes VALUES(?,?,?,?,0) ON CONFLICT(email,purpose) DO UPDATE SET digest=excluded.digest,expires=excluded.expires,attempts=0',
+      )
+      .bind(email, 'verify', await hash(`${email}:verify:${code}`), now() + 600)
+      .run()
+    await deliver(env, email, 'verify', code)
+    return Response.json({ ok: true, needs_code: true, email }, { headers })
+  }
+
+  const record = await db
+    .prepare('UPDATE email_codes SET attempts=attempts+1 WHERE email=? AND purpose=? AND expires>? AND attempts<5 RETURNING digest')
+    .bind(email, 'verify', now())
+    .first<{ digest: string }>()
+  if (!record) throw new Problem(400, 'invalid_code', '验证码无效或已过期')
+  if (!equal(record.digest, await hash(`${email}:verify:${body.code}`)))
+    throw new Problem(400, 'invalid_code', '验证码无效或已过期')
+
+  const password = typeof body.password === 'string' ? body.password : ''
+  if (password && (password.length < 8 || password.length > 256)) invalid()
+
+  const writes = [
+    db.prepare('UPDATE users SET email=?,email_placeholder=0,verified=1 WHERE id=?').bind(email, account.user_id),
+    db.prepare('DELETE FROM email_codes WHERE email=? AND purpose=?').bind(email, 'verify'),
+  ]
+  if (password) {
+    const salt = random(16)
+    writes.push(db.prepare('UPDATE users SET salt=?,digest=? WHERE id=?').bind(salt, await passwordHash(password, salt), account.user_id))
+  }
+  await db.batch(writes)
+  logSocial({ action: 'bind_email', password: !!password })
+  return Response.json({ ok: true, email, password_set: !!password }, { headers })
 }

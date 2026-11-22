@@ -39,6 +39,8 @@ export async function limit(db:D1Database,key:string,max:number,seconds:number) 
   if (!result.meta.changes) limited()
 }
 export async function reserveMail(db:D1Database,email:string,ip:string) {
+  // 第三方专用账号的占位邮箱（*@social.invalid）收不到信：找回密码/重发验证码一律拒绝，不去打 Resend
+  if(/@social\.invalid$/i.test(email)) throw new Problem(400,'no_email','该账号还没有绑定邮箱，请用第三方登录后在「我的账号」里绑定')
   const time=now()
   const [,result]=await db.batch([db.prepare('DELETE FROM mail_events WHERE sent<=?').bind(time-3600),
     db.prepare(`INSERT INTO mail_events SELECT ?,?,? WHERE NOT EXISTS
@@ -53,7 +55,7 @@ export function newCode() {
 }
 export async function deliver(env:Env,email:string,purpose:string,code:string) {
   if (env.EMAIL_DEV_LOG==='1') { console.log(`DEV_EMAIL ${email} ${purpose} ${code}`); return }
-  const subject=purpose==='verify'?'验证邮箱':'重置密码'
+  const subject=purpose==='reset'?'重置密码':'验证邮箱'
   await sendMail(env,email,subject,`${subject}的验证码：${code}，10 分钟内有效。如果不是本人操作，请忽略。`)
 }
 export async function sendMail(env:Env,email:string,subject:string,message:string){

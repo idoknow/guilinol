@@ -1,4 +1,4 @@
-import { invalid, Problem } from './auth'
+import { invalid, passwordHash, Problem, random } from './auth'
 import { labels } from './feedback-contract'
 import { userSocialIdentities } from './social'
 
@@ -38,7 +38,7 @@ export async function adminUserDetail(db: D1Database, id: string) {
   if (!/^[A-Za-z0-9-]{8,64}$/.test(id)) invalid()
   const user = await db
     .prepare(
-      `SELECT u.id,u.email,u.nickname,u.verified,u.role,u.created_at,
+      `SELECT u.id,u.email,u.nickname,u.verified,u.role,u.created_at,u.email_placeholder,
       (SELECT count(*) FROM feedback WHERE user_id=u.id) feedback_count,
       (SELECT max(submitted_at) FROM feedback WHERE user_id=u.id) last_submitted_at FROM users u WHERE u.id=?`,
     )
@@ -134,4 +134,154 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
       .map(({ page_key, ...row }) => (users ? { ...row, verified: !!row.verified } : row)),
     next_cursor: results.length > 50 ? String(results[49].page_key) : null,
   })
+}
+
+type MergeUserRow = {
+  id: string
+  email: string
+  email_placeholder: number
+  nickname: string
+  verified: number
+  salt: string
+  digest: string
+}
+
+/**
+ * 合并账号：把 from 并入 target（target 保留），用于「同一个人先用第三方注册、
+ * 后来又用邮箱注册」这类重复账号。
+ *
+ * - 第三方绑定：target 没有的平台搬过去；两边都有的平台保留 target 的（列进 conflicts）
+ * - 邮箱：target 是占位邮箱而 from 有真实邮箱时，把邮箱/密码/验证状态继承过来
+ * - 存档：target 没有存档才接管 from 的；流水/反馈一律搬过去
+ * - from 的会话、待确认授权直接清掉，最后删掉 from 这行（连带清掉冲突的绑定）
+ */
+export async function adminMergeUsers(db: D1Database, actor: string, targetId: string, body: Record<string, unknown>) {
+  const json = (value: unknown, status = 200) =>
+    Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
+  const pattern = /^[A-Za-z0-9-]{8,64}$/
+  let fromId = typeof body.from === 'string' ? body.from.trim() : ''
+  // 允许直接填被合并账号的邮箱
+  if (fromId.includes('@')) {
+    const found = await db.prepare('SELECT id FROM users WHERE email=?').bind(fromId.toLowerCase()).first<{ id: string }>()
+    if (!found) return json({ error: { code: 'not_found', message: '被合并账号不存在' } }, 404)
+    fromId = found.id
+  }
+  if (!pattern.test(targetId) || !pattern.test(fromId) || fromId === targetId)
+    return json({ error: { code: 'invalid_input', message: '请选择两个不同的账号' } }, 400)
+
+  const cols = 'id,email,email_placeholder,nickname,verified,salt,digest'
+  const target = await db.prepare(`SELECT ${cols} FROM users WHERE id=?`).bind(targetId).first<MergeUserRow>()
+  const source = await db.prepare(`SELECT ${cols} FROM users WHERE id=?`).bind(fromId).first<MergeUserRow>()
+  if (!target || !source) return json({ error: { code: 'not_found', message: '账号不存在' } }, 404)
+
+  const sourceTypes = (
+    await db.prepare('SELECT type FROM social_identities WHERE user_id=? ORDER BY type').bind(fromId).all<{ type: string }>()
+  ).results.map((row) => row.type)
+  const targetTypes = new Set(
+    (await db.prepare('SELECT type FROM social_identities WHERE user_id=?').bind(targetId).all<{ type: string }>()).results.map(
+      (row) => row.type,
+    ),
+  )
+  const movable = sourceTypes.filter((type) => !targetTypes.has(type))
+  const conflicts = sourceTypes.filter((type) => targetTypes.has(type))
+
+  const statements: D1PreparedStatement[] = []
+  const adoptedEmail = target.email_placeholder && !source.email_placeholder ? source.email : ''
+  // 邮箱唯一约束：必须在来源账号被删除之后才能把邮箱改到目标账号上（见语句最后一步）
+  for (const type of movable)
+    statements.push(db.prepare('UPDATE social_identities SET user_id=? WHERE user_id=? AND type=?').bind(targetId, fromId, type))
+
+  const saves = await db.prepare('SELECT count(*) n FROM player_saves WHERE user_id=?').bind(targetId).first<{ n: number }>()
+  const tookSaves = !saves?.n
+  // 目标没有存档才接管，不会撞 user_id 主键；不用 UPDATE OR IGNORE（SQLite 专有，生产 Postgres 会语法错误）
+  if (tookSaves) statements.push(db.prepare('UPDATE player_saves SET user_id=? WHERE user_id=?').bind(targetId, fromId))
+
+  statements.push(
+    // UNIQUE(user_id, idempotency_key)：目标已有同 key 的流水就跳过，剩下的随来源账号级联删除
+    db
+      .prepare(
+        'UPDATE player_ledger_txns SET user_id=? WHERE user_id=? AND idempotency_key NOT IN (SELECT idempotency_key FROM player_ledger_txns WHERE user_id=?)',
+      )
+      .bind(targetId, fromId, targetId),
+    db.prepare('UPDATE feedback SET user_id=? WHERE user_id=?').bind(targetId, fromId),
+    db.prepare('UPDATE feedback_upload_usage SET user_id=? WHERE user_id=?').bind(targetId, fromId),
+    db.prepare('DELETE FROM sessions WHERE user_id=?').bind(fromId),
+    db.prepare('DELETE FROM social_pending WHERE user_id=?').bind(fromId),
+    db.prepare('DELETE FROM social_states WHERE user_id=?').bind(fromId),
+    db.prepare('DELETE FROM users WHERE id=?').bind(fromId),
+  )
+  if (adoptedEmail)
+    statements.push(
+      db
+        .prepare('UPDATE users SET email=?,salt=?,digest=?,verified=?,email_placeholder=0 WHERE id=?')
+        .bind(source.email, source.salt, source.digest, source.verified, targetId),
+    )
+  statements.push(
+    audit(db, actor, 'merge_users', 'user', targetId, {
+      from: fromId,
+      from_email: source.email,
+      adopted_email: adoptedEmail,
+      moved: movable,
+      conflicts,
+      took_saves: tookSaves,
+    }),
+  )
+  await db.batch(statements)
+  return json({
+    ok: true,
+    target: { id: targetId, email: adoptedEmail || target.email },
+    merged: { id: fromId, email: source.email, nickname: source.nickname },
+    moved: movable,
+    conflicts,
+    adopted_email: adoptedEmail,
+    took_saves: tookSaves,
+  })
+}
+
+/**
+ * 后台重置密码：不传就生成一个随机密码，返回给管理员转交用户。
+ * 占位邮箱账号（第三方专用）也能用这个办法拿到可用的密码登录方式。
+ */
+export async function adminSetPassword(db: D1Database, actor: string, id: string, body: Record<string, unknown>) {
+  const json = (value: unknown, status = 200) =>
+    Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(id)) invalid()
+  const user = await db.prepare('SELECT id,email FROM users WHERE id=?').bind(id).first<{ id: string; email: string }>()
+  if (!user) return json({ error: { code: 'not_found', message: '未找到用户' } }, 404)
+
+  const provided = typeof body.password === 'string' ? body.password : ''
+  if (provided && (provided.length < 8 || provided.length > 256))
+    return json({ error: { code: 'invalid_input', message: '密码长度需 8–256 位' } }, 400)
+  const password = provided || random(6) + random(2).toUpperCase()
+  const salt = random(16)
+  await db.batch([
+    db
+      .prepare('UPDATE users SET salt=?,digest=?,failures=0,locked_until=0 WHERE id=?')
+      .bind(salt, await passwordHash(password, salt), id),
+    // audit 用 changes()=1 判断上一条是否生效，必须紧跟 UPDATE users；放在 DELETE sessions 后面时，
+    // 用户没有恰好 1 个会话就不会留审计
+    audit(db, actor, 'reset_password', 'user', id, { generated: !provided }),
+    // 旧会话全部失效：改密码等于把人踢下线
+    db.prepare('DELETE FROM sessions WHERE user_id=?').bind(id),
+  ])
+  return json({ ok: true, email: user.email, password })
+}
+
+/** 后台改邮箱：直接写，打掉占位标记；邮箱被占用时 409。 */
+export async function adminSetEmail(db: D1Database, actor: string, id: string, body: Record<string, unknown>) {
+  const json = (value: unknown, status = 200) =>
+    Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
+  if (!/^[A-Za-z0-9-]{8,64}$/.test(id)) invalid()
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+  if (email.length > 254 || email.split('@').length !== 2 || !/^\S+@[^\s@]+\.[^\s@]+$/.test(email))
+    return json({ error: { code: 'invalid_input', message: '邮箱格式不对' } }, 400)
+  const user = await db.prepare('SELECT id,email FROM users WHERE id=?').bind(id).first<{ id: string; email: string }>()
+  if (!user) return json({ error: { code: 'not_found', message: '未找到用户' } }, 404)
+  const owner = await db.prepare('SELECT id FROM users WHERE email=?').bind(email).first<{ id: string }>()
+  if (owner && owner.id !== id) return json({ error: { code: 'email_taken', message: '该邮箱已被其他账号使用' } }, 409)
+  await db.batch([
+    db.prepare('UPDATE users SET email=?,email_placeholder=0 WHERE id=?').bind(email, id),
+    audit(db, actor, 'change_email', 'user', id, { from: user.email, to: email }),
+  ])
+  return json({ ok: true, email })
 }

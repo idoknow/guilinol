@@ -1435,6 +1435,33 @@ function bindingCard(identity: SocialIdentity) {
     avatar)
 }
 /** 用户详情：账号信息 + 已绑定的第三方平台（只读）。 */
+function mergeCard(target: { id: string; email: string }) {
+  const input = h('input', { class: 'adm-merge-input', placeholder: '被合并账号的邮箱或 ID' }) as HTMLInputElement
+  const button = h('button', { type: 'button', class: 'adm-btn' }, '合并到这个账号') as HTMLButtonElement
+  button.onclick = () => void act(button, async () => {
+    const from = input.value.trim()
+    if (!from) throw new Error('请填写被合并账号的邮箱或 ID')
+    const answer = await confirmDialog({
+      title: '确认合并账号',
+      tone: 'seal',
+      confirm: '确认合并',
+      body: h('p', null,
+        `把「${from}」并入「${target.email || target.id}」？第三方绑定、存档、流水、反馈都会搬过来，被合并的账号随后删除，操作不可撤销。`),
+    })
+    if (answer === null) return
+    const result = await api<{ moved: string[]; conflicts: string[]; adopted_email: string }>(
+      `admin/users/${encodeURIComponent(target.id)}/merge`, { from })
+    const parts = [`已合并 ${result.moved.length} 个平台绑定`]
+    if (result.adopted_email) parts.push(`继承了邮箱 ${result.adopted_email}`)
+    if (result.conflicts.length) parts.push(`跳过冲突平台 ${result.conflicts.join('/')}`)
+    toast(parts.join('，'))
+    location.reload()
+  })
+  return h('div', { class: 'adm-merge' },
+    h('h3', { class: 'adm-section-title' }, '合并账号'),
+    h('p', { class: 'adm-sub' }, '把另一个重复账号（同一人先用第三方注册、后来又用邮箱注册）并进当前账号。'),
+    h('div', { class: 'adm-merge-row' }, input, button))
+}
 function userDetail(id: string) {
   const slot = h('div')
   main.append(
@@ -1447,7 +1474,7 @@ function userDetail(id: string) {
       h('div', { class: 'adm-user-head' },
         h('h2', null, user.nickname || '（未设置昵称）'),
         h('p', { class: 'adm-sub' },
-          `${user.email} · ${user.role === 'admin' ? '管理员' : '普通用户'} · ${user.verified ? '邮箱已验证' : '邮箱未验证'}`)),
+          `${user.email_placeholder ? '未绑定邮箱（仅第三方登录）' : user.email} · ${user.role === 'admin' ? '管理员' : '普通用户'}${user.email_placeholder ? '' : ` · ${user.verified ? '邮箱已验证' : '邮箱未验证'}`}`)),
       h('dl', { class: 'adm-kv' },
         h('dt', null, '注册时间'), h('dd', null, when(unix(user.created_at), true)),
         h('dt', null, '反馈数'), h('dd', null, num(user.feedback_count)
@@ -1458,6 +1485,8 @@ function userDetail(id: string) {
       social.length
         ? h('div', { class: 'adm-binds' }, ...social.map(bindingCard))
         : emptyState('尚未绑定任何第三方平台', '用户在账号面板完成绑定后会出现在这里'),
+      mergeCard({ id: user.id, email: user.email }),
+      securityCard({ id: user.id, email: user.email }),
     ]
   }, skeleton(3))
 }
@@ -1604,3 +1633,37 @@ async function boot() {
   refreshPending()
 }
 boot()
+
+function securityCard(user: { id: string; email: string }) {
+  const output = h('p', { class: 'adm-sub' })
+  const reset = h('button', { type: 'button', class: 'adm-btn' }, '重置密码') as HTMLButtonElement
+  reset.onclick = () => void act(reset, async () => {
+    const answer = await confirmDialog({
+      title: '重置密码',
+      tone: 'seal',
+      confirm: '生成新密码',
+      body: h('p', null, `给「${user.email || user.id}」生成一个新密码？旧密码和所有登录会话都会立即失效。`),
+    })
+    if (answer === null) return
+    const result = await api<{ password: string }>(`admin/users/${encodeURIComponent(user.id)}/password`, {})
+    const code = h('code', null, result.password)
+    output.replaceChildren(document.createTextNode('新密码：'), code, document.createTextNode('（复制后转交用户，只显示这一次）'))
+  })
+
+  const emailInput = h('input', { class: 'adm-merge-input', placeholder: '新的邮箱地址' }) as HTMLInputElement
+  const emailButton = h('button', { type: 'button', class: 'adm-btn' }, '改邮箱') as HTMLButtonElement
+  emailButton.onclick = () => void act(emailButton, async () => {
+    const email = emailInput.value.trim()
+    if (!email) throw new Error('请填写新的邮箱')
+    const result = await api<{ email: string }>(`admin/users/${encodeURIComponent(user.id)}/email`, { email })
+    toast(`邮箱已改为 ${result.email}`)
+    location.reload()
+  })
+
+  return h('div', { class: 'adm-merge' },
+    h('h3', { class: 'adm-section-title' }, '账号安全'),
+    h('p', { class: 'adm-sub' }, '占位邮箱（第三方专用）账号没有可用密码，只能用这里重置或补邮箱。'),
+    h('div', { class: 'adm-merge-row' }, reset),
+    h('div', { class: 'adm-merge-row' }, emailInput, emailButton),
+    output)
+}

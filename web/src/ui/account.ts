@@ -4,11 +4,11 @@ import './account.css'
 
 // 账号：登录 / 注册（填写 → 邮箱验证 → 完成）/ 忘记密码 / 我的账号。
 // Playing requires an account (IDOK-99): the title screen asks for a login before the city boots, see requireUser().
-type Screen='login'|'register'|'verify'|'forgot'|'reset'|'profile'|'social'
+type Screen='login'|'register'|'verify'|'forgot'|'reset'|'profile'|'social'|'bindmail'
 export type SocialBinding={type:string;label:string;nickname:string;avatar:string;uid:string}
-export type User={id:string,email:string,nickname:string,notify_email:boolean;social?:SocialBinding[]}
-const titles:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'忘记密码',reset:'重置密码',profile:'我的账号',social:'第三方账号'}
-const submits:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'发送重置验证码',reset:'重置密码',profile:'保存设置',social:'确认'}
+export type User={id:string,email:string,nickname:string,notify_email:boolean;email_placeholder?:boolean;social?:SocialBinding[]}
+const titles:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'忘记密码',reset:'重置密码',profile:'我的账号',social:'第三方账号',bindmail:'绑定邮箱'}
+const submits:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'发送重置验证码',reset:'重置密码',profile:'保存设置',social:'确认',bindmail:'发送验证码'}
 async function api(path:string,method='GET',data?:object) {
   const response=await fetch(`/api/${path}`,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
   const result=await response.json().catch(()=>{throw new Error('网络不太顺畅，请稍后再试')})
@@ -18,13 +18,15 @@ async function api(path:string,method='GET',data?:object) {
 
 
 /* ── 第三方（聚合登录）────────────────────────────────────────────
-   站点不自动建号：第三方注册也必须填邮箱、设密码、过验证码，才真正创建账号。 */
+   账号一律是 uuid：第三方首次登录/注册直接建号，邮箱可选（没邮箱时用占位地址，
+   之后可在「我的账号 → 绑定邮箱」补上；重复账号在后台用户详情里合并）。 */
 type SocialIntentForUi='login'|'bind'|'register'
 type SocialOption={type:string;label:string}
 type SocialPending={intent:'login'|'bind'|'register';type:string;label:string;nickname:string;avatar:string}
 let socialOptions:SocialOption[]|null=null
 let pendingSocial:SocialPending|null=null
 let socialPhase:'send'|'code'='send'
+let bindPhase:'send'|'code'='send'
 async function loadSocialOptions(){
   if(socialOptions)return socialOptions
   try{socialOptions=(await api('auth/social/config') as {enabled?:SocialOption[]}).enabled??[]}catch{socialOptions=[]}
@@ -229,6 +231,7 @@ function build(){
     verificationPassword=next==='verify'&&d.open?pass:''
     screen=next;fields.replaceChildren();nav.replaceChildren();who.replaceChildren();note(text,/成功|已登录|已保存|已重置|已退出/.test(text)?'ok':'info')
     d.dataset.screen=next;d.querySelector('h2')!.textContent=titles[next];submitButton.textContent=submits[next]
+    if(next==='bindmail')submitButton.textContent=bindPhase==='code'?'确认绑定':'发送验证码'
     for(const tab of tabs)tab.setAttribute('aria-selected',String(tab.dataset.to===next))
     d.querySelector('.acc-tabs')?.toggleAttribute('hidden',next==='social')
     const step=next==='register'?0:next==='verify'?1:-1
@@ -236,7 +239,8 @@ function build(){
     lead.textContent={login:'登录后即可进入游玩。提交的反馈有回复时，也会发邮件告诉你。',register:'只需要邮箱和一个昵称，一分钟就好。',
       verify:`六位验证码已发到 ${email||'你的邮箱'}，10 分钟内有效。没收到可以看看垃圾邮件。`,forgot:'输入注册时用的邮箱，我们会发一个六位验证码给你。',
       reset:'输入邮箱里的验证码，再设一个新密码。',profile:'',
-      social:pendingSocial?.intent==='register'?(socialPhase==='code'?`验证码已发到 ${email}，10 分钟内有效。`:'填写邮箱和密码，验证通过后才会创建账号并绑定这个第三方账号。'):''}[next]
+      social:pendingSocial?.intent==='register'?(socialPhase==='code'?`验证码已发到 ${email}，10 分钟内有效。`:'邮箱和密码都可以留空：留空就直接用这个第三方账号注册；填了就要收验证码。'):'',
+      bindmail:bindPhase==='code'?`验证码已发到 ${email}，10 分钟内有效。`:'给这个账号补一个邮箱，之后也能用邮箱密码登录。'}[next]
     if(next==='social'&&pendingSocial){const social=pendingSocial,badge=document.createElement('span'),info=document.createElement('div')
       const letter=initial(social.nickname),platformIcon=socialIcon(social.type,28)
       badge.className='acc-avatar';badge.textContent=letter
@@ -253,7 +257,7 @@ function build(){
     if(next==='profile'&&user){const badge=document.createElement('span'),info=document.createElement('div')
       badge.className='acc-avatar';badge.textContent=initial(user.nickname);info.innerHTML='<b></b><small></small>'
       info.querySelector('b')!.textContent=user.nickname
-      info.querySelector('small')!.textContent=`主账号：${user.email}`
+      info.querySelector('small')!.textContent=user.email_placeholder?'主账号：未绑定邮箱（仅第三方登录）':`主账号：${user.email}`
       who.append(badge,info)}
     if(next==='social'){
       submitButton.textContent=pendingSocial?.intent==='register'
@@ -262,11 +266,19 @@ function build(){
     }
     if(next==='social'&&pendingSocial?.intent==='register'&&socialPhase==='code')field('code','六位验证码','text','one-time-code')
     else if(next==='social'&&pendingSocial?.intent==='register'){
-      field('email','邮箱','email','email',email)
-      field('password','密码（至少 8 位）','password','new-password')
+      // 邮箱和密码都是可选的：不填就直接用第三方注册
+      field('email','邮箱（可选）','email','email',email).required=false
+      field('password','密码（可选，至少 8 位）','password','new-password').required=false
       field('nickname','昵称','text','nickname',pendingSocial.nickname)
+      const hint=document.createElement('small');hint.className='acc-bind-empty'
+      hint.textContent='都留空 = 直接用第三方账号注册，不需要邮箱和密码；填了邮箱就要收验证码。'
+      fields.append(hint)
     }
-    if(next!=='profile'&&next!=='social')field('email','邮箱','email','email',email).readOnly=next==='verify'&&!!email
+    if(next==='bindmail'){
+      if(bindPhase==='code')field('code','六位验证码','text','one-time-code')
+      else{field('email','邮箱','email','email',email);field('password','密码（可选，至少 8 位）','password','new-password').required=false}
+    }
+    if(!['profile','social','bindmail'].includes(next))field('email','邮箱','email','email',email).readOnly=next==='verify'&&!!email
     if(next==='verify'||next==='reset')field('code','六位验证码','text','one-time-code')
     if(next==='register'||next==='login'||next==='reset')field('password',next==='login'?'密码':'密码（至少 8 位）','password',next==='login'?'current-password':'new-password')
     if(next==='register'||next==='profile')field('nickname','昵称','text','nickname',user?.nickname,next==='register'?'以后可以在「我的账号」里修改':'')
@@ -274,7 +286,7 @@ function build(){
       label.append(toggle,'反馈有回复时发邮件提醒我');fields.append(label)
       const bound=user?.social??[],list=document.createElement('div');list.className='acc-bindings'
       const heading=document.createElement('small');heading.className='acc-bind-title'
-      heading.textContent='第三方登录方式（主账号仍是上面的邮箱）';list.append(heading)
+      heading.textContent=user?.email_placeholder?'第三方登录方式（当前账号没有邮箱）':'第三方登录方式（主账号仍是上面的邮箱）';list.append(heading)
       if(!bound.length){const empty=document.createElement('small');empty.className='acc-bind-empty'
         empty.textContent='还没有绑定，绑定后可以用 QQ / 微信 直接登录这个账号';list.append(empty)}
       for(const item of bound){
@@ -287,6 +299,7 @@ function build(){
       }
       fields.append(list)}
     if(next==='profile')link('修改外形',()=>submit(async()=>{await editCharacter()}))
+    if(next==='profile'&&user?.email_placeholder)link('绑定邮箱',()=>{bindPhase='send';render!('bindmail')})
     if(next==='login'||next==='register'||next==='profile')void socialButtons(next)
     if(next==='social')link('取消',()=>{pendingSocial=null;render!(user?'profile':'login')})
     if(next==='login')link('忘记密码？',()=>render!('forgot'))
@@ -327,6 +340,13 @@ function build(){
       setUser(await api('me') as User)
       render!('profile','第三方账号已绑定')
       return
+    }
+    if(screen==='bindmail'){
+      const payload:Record<string,string>={email:data.email??'',password:data.password??''}
+      if(bindPhase==='code')payload.code=data.code??''
+      const result=await api('auth/email/bind','POST',payload) as {needs_code?:boolean;email?:string}
+      if(result.needs_code){bindPhase='code';render!('bindmail',`验证码已发到 ${result.email}，10 分钟内有效`);return}
+      setUser(await api('me') as User);render!('profile','邮箱已绑定，之后也能用邮箱登录');return
     }
     if(screen==='profile'){setUser(await api('me','PATCH',{...data,notify_email:!!data.notify_email}));render!('profile','账号设置已保存');return}
     if(screen==='forgot'){await api('auth/resend','POST',{email,purpose:'reset'});render!('reset','如邮箱已注册，请查收验证码');return}
