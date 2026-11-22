@@ -6,7 +6,7 @@ import './account.css'
 // Playing requires an account (IDOK-99): the title screen asks for a login before the city boots, see requireUser().
 type Screen='login'|'register'|'verify'|'forgot'|'reset'|'profile'|'social'
 export type SocialBinding={type:string;label:string;nickname:string;avatar:string;uid:string}
-export type User={email:string,nickname:string,notify_email:boolean;social?:SocialBinding[]}
+export type User={id:string,email:string,nickname:string,notify_email:boolean;social?:SocialBinding[]}
 const titles:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'忘记密码',reset:'重置密码',profile:'我的账号',social:'第三方账号'}
 const submits:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'发送重置验证码',reset:'重置密码',profile:'保存设置',social:'确认'}
 async function api(path:string,method='GET',data?:object) {
@@ -88,8 +88,21 @@ const socialNotes:Record<string,{screen:Screen;text:string;ok?:boolean}>={
 
 let user:User|null=null
 const listeners=new Set<(user:User|null)=>void>()
-const setUser=(value:User|null)=>{user=value;for(const listen of listeners)listen(user)}
-const ready=api('me').then(r=>setUser(r&&typeof r.nickname==='string'?r:null)).catch(()=>{})
+let cloudReady=Promise.resolve()
+const setUser=(value:User|null)=>{
+  user=value
+  if(value?.id || localStorage.getItem('glol.save.owner'))cloudReady=import('../game/cloud-session').then(module=>{
+    if(user===value)return module.setCloudAccount(value?.id??null)
+  }).catch(()=>{})
+  for(const listen of listeners)listen(user)
+}
+let sessionUnknown=false
+const refresh=()=>api('me').then(r=>{sessionUnknown=false;setUser(r&&typeof r.nickname==='string'?r:null)}).catch(error=>{
+  sessionUnknown=error.code!=='unauthorized'
+  if(!sessionUnknown)setUser(null)
+})
+const ready=refresh()
+window.addEventListener('online',()=>{if(sessionUnknown)void refresh()})
 /** Subscribe to sign-in changes; called immediately with the current value once known. */
 export function onUser(listen:(user:User|null)=>void){listeners.add(listen);void ready.then(()=>listen(user))}
 export const initial=(name='')=>[...name.trim()][0]??'客'
@@ -110,6 +123,7 @@ let firstSpawn=false
 export function consumeCreatorSpawn(){const value=firstSpawn;firstSpawn=false;return value}
 export async function requireUser(){
   const signedIn=await signIn()
+  await cloudReady
   if(signedIn&&!firstSpawn)firstSpawn=await (await import('./avatar-account')).accountCharacter(signedIn.nickname)
   return signedIn
 }
@@ -300,7 +314,7 @@ function build(){
           render!('social',`验证码已发到 ${email}，10 分钟内有效`)
           return
         }
-        setUser({email:result.email??payload.email,nickname:result.nickname??payload.nickname,notify_email:true})
+        setUser(await api('me') as User)
         d.close();window.dispatchEvent(new Event('glol:registered'))
         return
       }
@@ -326,7 +340,7 @@ function build(){
     else if(previous==='reset')render!('login','密码已重置，请重新登录')
     else {setUser(result);if(gate){const resolve=gate;gate=undefined;d.close();resolve(result);return}
       if(previous==='verify'){
-        d.close();firstSpawn=await (await import('./avatar-account')).accountCharacter(result.nickname)
+        d.close();await cloudReady;firstSpawn=await (await import('./avatar-account')).accountCharacter(result.nickname)
         window.dispatchEvent(new Event('glol:registered'))
         return
       }

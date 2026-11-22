@@ -17,6 +17,7 @@ function statement(query, args = []) {
   return {
     bind: (...values) => statement(query, values),
     first: () => prepared.get(...args) ?? null,
+    all: () => ({results: prepared.all(...args)}),
     run: () => ({meta: {changes: prepared.run(...args).changes}}),
   }
 }
@@ -155,6 +156,7 @@ try {
     assert.equal(await creator.count(), 0)
     assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('glol.avatar.v1'))), saved)
     if (width === 390) {
+      await page.setViewportSize({width:height,height:width})
       await page.evaluate(() => window.dispatchEvent(new Event('game:open-wardrobe')))
       await page.click('.shop-edit-character')
     } else {
@@ -173,7 +175,7 @@ try {
       // A returning player with a legacy save must see creation even if this browser has a cached avatar.
       sql
         .prepare('UPDATE player_saves SET payload_json=? WHERE user_id=(SELECT id FROM users WHERE email=?)')
-        .run(JSON.stringify({money: 784, wardrobe: {ownedItemIds: ['hat_karst_cap']}}), user.email)
+        .run(JSON.stringify({money: 784, updatedAt: Date.now(), wardrobe: {ownedItemIds: ['hat_karst_cap']}}), user.email)
       await page.emulateMedia({reducedMotion: 'reduce'})
       await page.reload()
       await page.click('[data-umami-event=home-solo]')

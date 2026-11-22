@@ -4,6 +4,7 @@ import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar
 import {feedback} from '../../lib/feedback'
 import {isSocialType,socialCallback,socialConfig,socialConfirm,socialPending,socialRegister,socialStates,startSocial,userSocialIdentities} from '../../lib/social'
 import {unsubscribe} from '../../lib/feedback-mail'
+import {cloudSave} from '../../lib/cloud-save'
 type User={id:string;email:string;nickname:string;verified:number;role:string;salt:string;digest:string;locked_until:number;notify_email:number}
 const profile=(user:User)=>({id:user.id,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email})
 const json=(data:unknown,status=200,session?:string)=>Response.json(data,{status,headers:{'Cache-Control':'no-store',...(session?{'Set-Cookie':session}:{})}})
@@ -22,6 +23,7 @@ async function handle(request:Request,env:Env) {
   const stmt=(sql:string,...args:(string|number)[])=>db.prepare(sql).bind(...args)
   if(method==='GET'&&path==='unsubscribe')return unsubscribe(env,url)
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
+  if(path==='me/save')return cloudSave(request,env)
   if(!Object.hasOwn(methods,path)) throw new Problem(404,'not_found','接口不存在')
   if(!methods[path].includes(method)) throw new Problem(405,'method','不支持的请求方式')
   if(path==='health')return json({ok:true})
