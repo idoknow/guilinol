@@ -3,10 +3,8 @@ import json
 import math
 import re
 from collections import defaultdict
-from functools import lru_cache
 from pathlib import Path
 
-import numpy as np
 from shapely.geometry import LineString, Polygon
 from shapely.ops import unary_union
 from shapely.prepared import prep
@@ -14,6 +12,7 @@ from shapely.prepared import prep
 from common import OUT, ll2xz, load_osm
 from traffic_parking import allowed, bake_parking
 from landmarks.jiefang_layout import SPAN_WAYS, deck_level
+from landmarks.world_surface import Surface
 
 ROOT = Path(__file__).resolve().parents[1]
 MOTOR = {'trunk', 'primary', 'secondary', 'tertiary', 'residential', 'living_street', 'unclassified', 'service', 'busway'}
@@ -23,6 +22,25 @@ WALK = {'footway', 'pedestrian', 'path'}
 def number(value, fallback):
     match = re.fullmatch(r'(\d+(?:\.\d+)?)(?:\s*(mph|km/h))?', str(value))
     return float(match[1]) * (1.609344 if match[2] == 'mph' else 1) if match else fallback
+
+
+def simplify_profile(samples):
+    keep = {0,len(samples)-1}
+    pending = [(0,len(samples)-1)]
+    while pending:
+        first,last = pending.pop()
+        start,low = samples[first]
+        stop,high = samples[last]
+        worst,split = .025,None
+        for index in range(first+1,last):
+            fraction,level = samples[index]
+            error = abs(level-(low+(high-low)*(fraction-start)/(stop-start)))
+            if error>worst:
+                worst,split = error,index
+        if split is not None:
+            keep.add(split)
+            pending.extend(((first,split),(split,last)))
+    return [value for index in sorted(keep) for value in samples[index]]
 
 
 def signal_schedule(lanes, nodes):
@@ -47,23 +65,38 @@ def signal_schedule(lanes, nodes):
 
 def bake(output, manifest):
     left, top, width, depth = manifest['extent']
-    chunks = {(tile['x'], tile['z']): tile['file'] for tile in manifest['chunks']}
+    surface = Surface(output, manifest)
     bridge = next((entry for entry in manifest['landmarks'] if entry['id'] == 'jiefang_bridge'), None)
-
-    @lru_cache(maxsize=96)
-    def terrain(key):
-        data = gzip.decompress((output / chunks[key]).read_bytes())
-        return np.frombuffer(data, '<i2', 65*65, 24).reshape(65, 65)
 
     def height(x, z, way):
         if bridge and way in SPAN_WAYS:
             bx, by, bz = bridge['position']
             angle = math.radians(-bridge['rotation'])
             return round(by + float(deck_level((x-bx)*math.cos(angle)+(z-bz)*math.sin(angle))), 2)
-        key = (math.floor(x/256)*256, math.floor(z/256)*256)
-        if key not in chunks:
-            return None
-        return float(terrain(key)[round((z-key[1])/4), round((x-key[0])/4)]) / 10
+        return surface.sample(max(left,min(left+width,x)), max(top,min(top+depth,z)), include_peaks=False)[0]
+
+    def profile(head, tail, offset, way):
+        start, end = nodes[head], nodes[tail]
+        east, south = end['x']-start['x'], end['z']-start['z']
+        length = math.hypot(east, south)
+        x = start['x']-south/length*offset
+        z = start['z']+east/length*offset
+        fractions = {0.,1.}
+        for origin, delta, axis in ((x,east,True),(z,south,True),(x+z,east+south,False)):
+            lo, hi = sorted((origin,origin+delta))
+            for line in range(math.floor(lo/4)+1,math.ceil(hi/4)):
+                fraction = round((4*line-origin)/delta,10)
+                fractions.add(fraction)
+                if axis and line%64==0:
+                    fractions.update((max(0,round(fraction-1e-9,10)),min(1,round(fraction+1e-9,10))))
+        samples = []
+        for fraction in sorted(fractions):
+            y = round(height(x+east*fraction,z+south*fraction,way),2)
+            samples.append((fraction,y))
+        return simplify_profile(samples)
+
+    def add_walk(head, tail, offset, way):
+        walks.append([head, tail, offset, len(walks), profile(head, tail, offset, way)])
 
     registry = (ROOT/'web/src/game/quiet-zones.ts').read_text().split('QuietZonePolygon[] = ', 1)[1].split(' as const', 1)[0]
     quiet = json.loads(registry)
@@ -111,12 +144,12 @@ def bake(output, manifest):
             if any(nodes[ref]['y'] is None for ref in (start_id,end_id)):
                 continue
             if kind in WALK:
-                walks.append([start_id,end_id,0])
+                add_walk(start_id,end_id,0,way['id'])
                 continue
             if kind in MOTOR and tags.get('sidewalk') in ('left','right','both'):
                 for side in (-1,1):
                     if tags['sidewalk'] in ('both','left' if side<0 else 'right'):
-                        walks.append([start_id,end_id,side*(count*size/2+1)])
+                        add_walk(start_id,end_id,side*(count*size/2+1),way['id'])
             if tags.get('motor_vehicle') in ('private','no') and kind != 'cycleway':
                 continue
             if forbidden.intersects(LineString([start,end]).buffer(count*size/2+2)):
@@ -133,6 +166,9 @@ def bake(output, manifest):
                     lane = dict(id=len(lanes), to=tail, width=size, offset=round(offset,2), kind='nonmotor' if kind=='cycleway' else 'bus' if kind=='busway' else 'motor',speedKmh=number(tags.get('maxspeed'),20 if kind in ('cycleway','service') else 40),oneway=single)
                     lane['from'] = head
                     lane['cls'] = kind
+                    lane['heights'] = profile(head,tail,lane['offset'],way['id'])
+                    if way['id'] in SPAN_WAYS or any(tags.get(key,'no')!='no' for key in ('bridge','tunnel')):
+                        lane['gradeSeparated'] = True
                     lanes.append(lane)
                     incoming[tail].append(lane)
 
@@ -156,20 +192,20 @@ def bake(output, manifest):
     # A halo contains all spawn and retention candidates until the next cell loads.
     cells = defaultdict(lambda: dict(lanes=[],walks=[],refs=set()))
     for collection in ('lanes','walks'):
-        for index, item in enumerate(result[collection]):
+        for item in result[collection]:
             refs = (item['from'],item['to']) if collection=='lanes' else item[:2]
             center = [(nodes[refs[0]][axis]+nodes[refs[1]][axis])/2 for axis in ('x','z')]
             for col in range(math.floor((center[0]-260)/512),math.floor((center[0]+260)/512)+1):
                 for row in range(math.floor((center[1]-260)/512),math.floor((center[1]+260)/512)+1):
                     cell=cells[col,row]
-                    cell[collection].append(item if collection=='lanes' else [*item,index]);cell['refs'].update(refs)
+                    cell[collection].append(item);cell['refs'].update(refs)
     for (col,row),cell in cells.items():
         refs=cell.pop('refs');cell['nodes']=[nodes[ref] for ref in sorted(refs)]
         cell['signals']=[signal for signal in signals if signal['node'] in refs]
         (dest.parent/f'{col}_{row}.json.gz').write_bytes(gzip.compress(json.dumps(cell,separators=(',',':')).encode(),mtime=0))
     (dest.parent/'cells.json').write_text(json.dumps([f'{col}_{row}' for col,row in sorted(cells)]))
     print('Traffic:', {key:len(value) for key,value in result.items()}, dest.stat().st_size, 'bytes')
-    bake_parking(output, parking_segments, elements, nodes, forbidden)
+    bake_parking(output, parking_segments, elements, nodes, forbidden, height)
 
 
 if __name__ == '__main__':

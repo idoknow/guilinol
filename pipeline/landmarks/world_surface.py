@@ -47,9 +47,10 @@ class PeakSurface:
 
 
 class Surface:
-    def __init__(self, directory=WORLD):
+    def __init__(self, directory=WORLD, manifest=None):
         self.directory = Path(directory)
-        manifest = json.loads((self.directory / 'manifest.json').read_text())
+        if manifest is None:
+            manifest = json.loads((self.directory / 'manifest.json').read_text())
         self.left, self.top, self.width, self.depth = manifest['extent']
         self.size = manifest['chunkSize']
         self.grid = manifest['grid']

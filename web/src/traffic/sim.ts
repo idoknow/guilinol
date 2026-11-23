@@ -1,6 +1,6 @@
 import {nearStatic,resolveContact,staticSolids} from './contact.ts'
 type Node = {id:number,x:number,y:number,z:number}
-type Lane = {id:number,from:number,to:number,offset:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string}
+type Lane = {id:number,from:number,to:number,offset:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,heights?:number[]}
 const tier=(cls?:string)=>cls==='primary'||cls==='trunk'?0:cls==='secondary'?1:cls==='tertiary'?2:3
 const density=[1,.6,.35,.12]
 const sector=(point:Position,center:Position)=>(Math.floor(Math.atan2(point.x-center.x,point.z-center.z)*4/Math.PI+.5)+8)%8
@@ -14,8 +14,16 @@ function coverage(x:number,z:number,y:number,center:Position){
 }
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
-export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?][],signals:Signal[]}
+export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?,number[]?][],signals:Signal[]}
 export type Track = Lane & {start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean}
+function trackHeight(track:Track,dist:number){
+  const fraction=Math.min(1,Math.max(0,dist/track.length)), heights=track.heights
+  if(!heights)return track.start.y+(track.end.y-track.start.y)*fraction
+  let lo=0,hi=heights.length/2-1
+  while(hi-lo>1){const mid=(lo+hi)>>>1;if(heights[mid*2]<=fraction)lo=mid;else hi=mid}
+  const index=lo*2
+  return heights[index+1]+(heights[index+3]-heights[index+1])*(fraction-heights[index])/(heights[index+2]-heights[index])
+}
 type Actor = {track:Track,dist:number,speed:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,holdUntil?:number}
 type Position = {x:number,z:number,y:number}
 export const MAX_ACTORS=100
@@ -72,12 +80,12 @@ export class Traffic {
         const span=Math.sqrt(radius**2-lateral**2)
         quota[group]+=Math.max(0,Math.min(track.length,center+span)-Math.max(0,center-span))*.095*density[group]
         if(street&&group===0)for(let dist=Math.max(2,center-span);dist<Math.min(track.length,center+span);dist+=7){
-          this.primarySites.push({track,dist,x:track.start.x+track.dx*dist-track.dz*track.offset,y:track.start.y+(track.end.y-track.start.y)*dist/track.length,z:track.start.z+track.dz*dist+track.dx*track.offset})
+          this.primarySites.push({track,dist,x:track.start.x+track.dx*dist-track.dz*track.offset,y:trackHeight(track,dist),z:track.start.z+track.dz*dist+track.dx*track.offset})
         }
         if(street&&Math.abs(lateral+track.offset)<60){
           for(let dist=Math.max(2,center-60);dist<Math.min(track.length,center+60);dist+=6){
             const x=track.start.x+track.dx*dist-track.dz*track.offset,z=track.start.z+track.dz*dist+track.dx*track.offset
-            const mask=coverage(x,z,track.start.y+(track.end.y-track.start.y)*dist/track.length,camera)
+            const mask=coverage(x,z,trackHeight(track,dist),camera)
             for(let i=0;i<8;i++)if(mask&(1<<i))this.samples[i].push({track,dist})
           }
         }
@@ -113,7 +121,11 @@ export class Traffic {
       }
     }
     for(const [node,neighbors] of arms)if(neighbors.size>=3)this.junctions.add(node)
-    graph.walks.forEach(([from,to,offset,stable],index)=>{for(const reverse of [false,true])add({from:reverse?to:from,to:reverse?from:to,offset:reverse?-offset:offset,id:-1-2*(stable??index)-Number(reverse),kind:'nonmotor',speedKmh:5},true)})
+    graph.walks.forEach(([from,to,offset,stable,heights],index)=>{for(const reverse of [false,true]){
+      const profile=reverse&&heights?[]:heights
+      if(reverse&&heights&&profile)for(let i=heights.length-2;i>=0;i-=2)profile.push(1-heights[i],heights[i+1])
+      add({from:reverse?to:from,to:reverse?from:to,offset:reverse?-offset:offset,heights:profile,id:-1-2*(stable??index)-Number(reverse),kind:'nonmotor',speedKmh:5},true)
+    }})
     for(const signal of graph.signals){this.signal.set(signal.node,signal);this.junctions.delete(signal.node)}
   }
   isJunction(node:number){return this.junctions.has(node)||this.signal.has(node)}
@@ -130,7 +142,7 @@ export class Traffic {
     const {track,dist}=actor
     actor.x=track.start.x+track.dx*dist-track.dz*(track.offset+actor.dodge)
     actor.z=track.start.z+track.dz*dist+track.dx*(track.offset+actor.dodge)
-    actor.y=track.start.y+(track.end.y-track.start.y)*dist/track.length
+    actor.y=trackHeight(track,dist)
     actor.yaw=track.yaw
   }
   phase(track:Lane,time=this.time):'green'|'red'|'yellow'{

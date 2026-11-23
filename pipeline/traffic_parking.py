@@ -21,7 +21,7 @@ def allowed(tags, side, cls):
         bool({'parallel', 'diagonal'}.intersection(values)))
 
 
-def bake_parking(output, segments, elements, nodes, forbidden):
+def bake_parking(output, segments, elements, nodes, forbidden, height):
     arms = defaultdict(set)
     for start, end, *_ in segments:
         arms[start].add(end)
@@ -61,7 +61,7 @@ def bake_parking(output, segments, elements, nodes, forbidden):
             eligible[cls] += 1
             if not occupied:
                 continue
-            y = head['y']+(tail['y']-head['y'])*along
+            y = height(x,z,way)
             key = f'{math.floor(x/256)}_{math.floor(z/256)}'
             cells[key].append([round(x, 1), round(y, 1), round(z, 1), round(math.atan2(east, south), 3), rng.randrange(65536), cls])
             counts[cls] += 1
