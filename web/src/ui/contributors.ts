@@ -44,8 +44,11 @@ export const contributors:Contributor[] = [
     {kind:'photo', text:'实拍参考'},
     {kind:'feedback', text:'江边灯柱'},
   ]},
-  {name:'唐援朝', github:'yxwyxw520', role:'Logo 设计', portrait:'tangyuanchao', avatar:m({eyes:1, face:2, skin:4}), items:[
+  {name:'唐援朝', github:'yxwyxw520', role:'Logo 与联机', portrait:'tangyuanchao', avatar:m({eyes:1, face:2, skin:4}), items:[
     {kind:'design', text:'像素 Logo'},
+    {kind:'code', text:'多人联机'},
+    {kind:'code', text:'青桂电动车'},
+    {kind:'code', text:'市民卡'},
   ]},
   {name:'py Xie', github:'CheatAndei', role:'玩法与地标', portrait:'pyxie', avatar:DEFAULT, items:[
     {kind:'code', text:'人物与载具'},
