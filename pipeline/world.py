@@ -282,6 +282,8 @@ def build(bbox, output, palette, workers=4):
     if fubo is not None:
         fubo.grade_bank(terrain,original,surface,left,top)
         fubo.native_grade(terrain,original,surface,left,top)
+    from road_tunnels import bake as bake_tunnels
+    tunnels = bake_tunnels(bounds,(original,terrain),left,top,GRID)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 
@@ -514,6 +516,8 @@ def build(bbox, output, palette, workers=4):
     manifest['terrainSha256'] = digest.hexdigest()
     print('Terrain SHA-256:', digest.hexdigest())
     manifest['landmarks'] = landmarks
+    if tunnels:
+        manifest['tunnels'] = tunnels
     write_city_lods(output, manifest)
     from traffic import bake as bake_traffic
     bake_traffic(output, manifest)

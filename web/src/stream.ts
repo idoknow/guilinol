@@ -49,7 +49,7 @@ export class Stream {
 
   constructor(
     private scene:THREE.Scene,
-    manifest:Manifest,
+    private manifest:Manifest,
     private base:TerrainLayer,
     rangeOrRadius:number|RenderRangeStore|RenderRangeConfig = RENDER_RADIUS_DEFAULT,
     private camera:THREE.PerspectiveCamera,
@@ -175,7 +175,7 @@ export class Stream {
     // attachment continuations run as data arrives, even on multi-second frames.
     const urgent=()=>inner || tileCenterDistance(tile,this.priorityTarget??this.lastPosition)<=streamBudget.priorityRadius
     const parseSlot=()=>urgent()?Promise.resolve():this.parseSlot()
-    return detail(tile,controller.signal,parseSlot).then(async item=>{
+    return detail(tile,controller.signal,parseSlot,this.manifest.tunnels).then(async item=>{
       if(!urgent())await this.attachSlot()
       if(controller.signal.aborted){item.dispose();return}
       this.scene.add(item.group);this.batches.add(item.batch);this.base.toggle(tile,false)

@@ -261,9 +261,19 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         if(tree.kind!==5&&!trunks.has(tree)&&Math.hypot(east-tree.x,south-tree.z)<40){trunks.set(tree,add(R.ColliderDesc.cylinder(1.8,.42*tree.scale).setTranslation(tree.x,tree.y+1.8,tree.z),'tree'));changed=true}}
       if(region&&region.fine!==!!data){region.colliders.forEach(remove);regions.delete(tile);changed=true}
       if(!near||regions.has(tile))continue
-      const stride=width/32+1,start=(tile.z-top)/32*stride+(tile.x-left)/32
-      const ground=data?fineField(data):field(8,(col,row)=>overview[start+row*stride+col]/10)
-      const colliders=[add(ground.setTranslation(tile.x+128,0,tile.z+128),data?'ground':'overview')]
+      const spacing=manifest.overview.step,stride=width/spacing+1,start=(tile.z-top)/spacing*stride+(tile.x-left)/spacing
+      const colliders:R.Collider[]=[]
+      if(data?.tunnel){
+        for(const [mesh,kind] of [[data.groundMesh,'ground'],[data.tunnel.fringe,'ground'],[data.tunnel.floor,'road'],[data.tunnel.portal,'rail'],[data.tunnel.interior,'rail']] as const){
+          const geometry=mesh.geometry,positions=geometry.getAttribute('position');if(!positions.count)continue
+          const indices=geometry.index?Array.from(geometry.index.array):Array.from({length:positions.count},(_,index)=>index)
+          const desc=weldedIndexed(Float32Array.from(positions.array),indices)
+          if(desc)colliders.push(add(desc.setTranslation(tile.x,0,tile.z),kind))
+        }
+      }else{
+        const ground=data?fineField(data):field(256/spacing,(col,row)=>overview[start+row*stride+col]/10)
+        colliders.push(add(ground.setTranslation(tile.x+128,0,tile.z+128),data?'ground':'overview'))
+      }
       const rings=data?.rings??[]
       if(data){const {sidewalk,road,banks}=data.streets
         const swDesc=sidewalk.length?weldedSurface(sidewalk,null,data,.65,.38,1.4,2.4):null

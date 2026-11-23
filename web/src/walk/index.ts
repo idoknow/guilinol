@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {tunnelFloor} from '../tunnels'
 import {getCarFreeAt, vehicleForbiddenAt} from '../game/car-free'
 import R from '@dimforge/rapier3d-compat'
 import {GLTFLoader, type GLTF} from 'three/addons/loaders/GLTFLoader.js'
@@ -1703,11 +1704,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function probe(){const pos=sim.body.translation(),foot=pos.y-cfg.height/2,peak=sim.surface(pos.x,pos.z,'peak')
     const tile=sim.tileAt(pos.x,pos.z),mesh=tile&&stream.loaded.get(tile)?.groundMesh
     terrainRay.ray.origin.set(pos.x,4000,pos.z);mesh?.updateWorldMatrix(true,false)
-    const renderY=mesh?terrainRay.intersectObject(mesh,false)[0]?.point.y:undefined
+    const inBore=tunnelFloor(manifest.tunnels,pos.x,pos.z,foot)!==undefined
+    const floorMesh=inBore&&tile?stream.loaded.get(tile)?.tunnel?.floor:undefined
+    floorMesh?.updateWorldMatrix(true,false)
+    const fringe=tile&&stream.loaded.get(tile)?.tunnel?.fringe
+    fringe?.updateWorldMatrix(true,false)
+    const surfaces=floorMesh?[floorMesh]:[...(mesh?[mesh]:[]),...(fringe?[fringe]:[])]
+    const renderY=terrainRay.intersectObjects(surfaces,false)[0]?.point.y
     const surf=sim.groundSurface(pos.x,pos.z,foot), soleY=figure.position.y+liveSoleLocalY()
     const surfaceY=surf?visualFloorAt(pos.x,pos.z,surf.y):undefined, footSink=surfaceY!==undefined?surfaceY-soleY:0
     return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),soleY,surfaceY,surfaceKind:surf?.kind,footSink,inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
-      inPeak:!!peak&&peak.y>foot+.3||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits,
+      inPeak:(!inBore&&!!peak&&peak.y>foot+.3)||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits,
       contactSources:verify?Array.from({length:sim.controller.numComputedCollisions()},(_,index)=>{
         const contact=sim.controller.computedCollision(index),handle=contact?.collider?.handle
         return handle===undefined?null:{source:sim.sources.get(handle)??sim.kinds.get(handle),point:contact!.witness1,normal:contact!.normal1}
@@ -2054,7 +2061,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       wasLandmarkHit=touchedLandmark
       const nextTile=sim.tileAt(next.x,next.z)
       if(nextTile&&!stream.loaded.has(nextTile)){next.x=pos.x;next.z=pos.z;vx=vz=0;rides?.stop();bikeSpeed=0}
-      const ground=sim.surface(next.x,next.z,'ground')
+      const inBore=tunnelFloor(manifest.tunnels,next.x,next.z,next.y-cfg.height/2)!==undefined
+      const ground=inBore?sim.surface(next.x,next.z,'road',next.y+1,5):sim.surface(next.x,next.z,'ground')
       if(!ground||next.y-cfg.height/2<ground.y-3){if(place(safe.x,safe.z,'rescue'))resets++;break}
       if(sim.wet(next.x,next.z)){
         const foot=next.y-cfg.height/2,deck=sim.surface(next.x,next.z,'deck')
@@ -2067,7 +2075,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(rides?.car){
         const res=rides.resolveCarMove({
           pos,next,move,heading:rides.heading,speed:bikeSpeed,step,
-          motorPavement:rides.motorPavement,insideHouse:sim.insideHouse,
+          motorPavement:(x,z)=>tunnelFloor(manifest.tunnels,x,z,foot)!==undefined||rides!.motorPavement(x,z),insideHouse:sim.insideHouse,
           carBlockedAt:(x,footY,z,hdg,sgn)=>sim.carOverlap(x,footY,z,hdg,sgn),
           collisionKind:(dirX,dirZ)=>{
             let hit:''|'collision'|'building'=''
