@@ -30,5 +30,7 @@ for entry in json.loads((root/'landmarks.json').read_text()):
         before, after = prune(Path(temp)/f"{entry['id']}.glb", entry['id'], ground)
         print(f"render triangles {entry['id']} {before} {after}", flush=True)
         subprocess.run([os.getenv('GLTFPACK','gltfpack'), '-i', Path(temp)/f"{entry['id']}.glb",
-                        '-o', target, '-cc','-tc','-tl','1024','-kn'],check=True)
+                        '-o', target, '-cc','-tc','-tl','1024','-kn',
+                        # campus-wide models (IDOK-165): 14-bit positions over ~1 km snap facade layers onto walls
+                        *(['-vp',str(entry['positionBits'])] if entry.get('positionBits') else [])],check=True)
         target.with_suffix('.json').write_text(json.dumps(info)+'\n')

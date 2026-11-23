@@ -41,8 +41,8 @@ def _wentian(b, pts, spec):
     b.prism([(-11, -0.2), (11, -0.2), (11, 5.0), (-11, 5.0)], y0, base + 8.5 - y0, 'brick_red',
             cap_region='white', footing=True, collide=True)
     if b.detail:
-        b.box(0, base + 0.2, 5.01, 9.0, 4.6, 0.06, 'glass', lit=True)
-        b.sign_board(0, base + 6.2, 5.015, 7.0, 1.6, 'guat_wt', backing=None, depth=0)
+        b.box(0, base + 0.2, 5.03, 9.0, 4.6, 0.06, 'glass', lit=True)
+        b.sign_board(0, base + 6.2, 5.03, 7.0, 1.6, 'guat_wt', backing=None, depth=0)
     b.pose = prev
 
 
@@ -59,12 +59,22 @@ def _gate(b, campus_l, gx, gz):
         sx = side * 7.5
         y0 = U.pose_footing(b, sx, 0, 2.6, 1.2)
         # tall slanted white panel: lean the top outward (two prisms stepping out)
-        b.prism([(sx - 1.3, -0.6), (sx + 1.3, -0.6), (sx + 1.3, 0.6), (sx - 1.3, 0.6)], y0, 9.0 - y0, 'white',
+        b.prism([(sx - 1.3, -0.6), (sx + 1.3, -0.6), (sx + 1.3, 0.6), (sx - 1.3, 0.6)], y0, 9.4, 'white',
                 cap_region='white', footing=True, collide=True)
-        b.box(sx + side * 1.6, 0.0, 0, 0.9, 7.0, 1.0, 'steel', cap_region='steel')
-        b.box(sx - side * 1.9, 0.6, 0, 1.4, 5.5, 0.08, 'green_glaze', cap_region='green_glaze')
+        px = sx + side * 1.6
+        y1 = U.pose_footing(b, px, 0, 0.9, 1.0)
+        b.prism([(px - .45, -.5), (px + .45, -.5), (px + .45, .5), (px - .45, .5)], y1, 7.0 + (y0 - y1) if y0 > y1 else 7.0, 'steel',
+                cap_region='steel', footing=True)
+        gx = sx - side * 1.9
+        y2 = U.pose_footing(b, gx, 0, 1.4, 0.08)
+        b.prism([(gx - .7, -.04), (gx + .7, -.04), (gx + .7, .04), (gx - .7, .04)], y2, 6.1, 'green_glaze',
+                cap_region='green_glaze', footing=True)
         if b.detail:
-            b.sign_board(sx, 4.8, 0.615, 1.4, 6.6, 'guat_name', backing=None, depth=0, double_sided=True)
+            b.sign_board(sx, y0 + 5.0, 0.615, 1.4, 6.6, 'guat_name', backing=None, depth=0)
+            front = b.pose
+            b.pose = (front[0], front[1], front[2], front[3] + math.pi)
+            b.sign_board(-sx, y0 + 5.0, 0.615, 1.4, 6.6, 'guat_name', backing=None, depth=0)
+            b.pose = front
     b.pose = prev
 
 

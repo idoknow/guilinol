@@ -368,7 +368,12 @@ def main():
                 for lift in (3.0,5.0,8.0,11.0,14.0):
                     shape=floor_slice(near,low+lift)
                     parts=[part for part in getattr(shape,'geoms',[shape]) if not part.is_empty]
-                    selected=max(parts,key=lambda part:part.intersection(target).area) if parts else Polygon()
+                    if target.geom_type=='MultiPolygon':
+                        # One source id covering twin blocks: compare against every slice ring that sits on it.
+                        hits=[part for part in parts if part.intersection(target).area>=.5*part.area]
+                        selected=union_all(hits) if hits else Polygon()
+                    else:
+                        selected=max(parts,key=lambda part:part.intersection(target).area) if parts else Polygon()
                     if selected.is_empty or not selected.intersects(target):continue
                     shared=selected.area>1.3*target.area
                     if shared:
