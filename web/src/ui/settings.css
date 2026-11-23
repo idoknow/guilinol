@@ -1,0 +1,168 @@
+/* 设置面板（IDOK-178）：读数开关 / 视角 / 键位 · 纸质弹层语言（复用 .about-mask + .about-panel） */
+.about-panel.settings {
+  width: min(420px, 100%);
+}
+
+.about-panel.settings .set-body {
+  display: grid;
+  gap: 16px;
+  padding: 4px 20px 20px;
+  overflow: auto;
+  max-height: min(68vh, 560px);
+}
+
+.set-block {
+  display: grid;
+  gap: 8px;
+}
+
+.set-block h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  font: 500 13px/1.2 var(--ui-serif, serif);
+  letter-spacing: .14em;
+  color: inherit;
+  opacity: .7;
+}
+
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  cursor: pointer;
+}
+
+.set-what {
+  display: grid;
+  gap: 1px;
+}
+
+.set-what b {
+  font: 500 13px/1.25 var(--ui-sans, system-ui, sans-serif);
+}
+
+.set-what small {
+  font-size: 11px;
+  opacity: .62;
+}
+
+.set-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #a9503c;
+}
+
+.set-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.set-seg button {
+  font: inherit;
+  font-size: 12.5px;
+  letter-spacing: .06em;
+  padding: 8px 6px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  color: inherit;
+  cursor: pointer;
+}
+
+.set-seg button.on {
+  background: #a9503c;
+  border-color: #a9503c;
+  color: #f4efe2;
+}
+
+.set-keys {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.set-keys li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.set-key {
+  min-width: 84px;
+  font: 600 11.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .04em;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.set-key:hover {
+  background: rgba(169, 80, 60, .14);
+}
+
+.set-key.custom {
+  border-color: rgba(169, 80, 60, .6);
+  color: #a9503c;
+}
+
+.set-key.waiting {
+  background: #a9503c;
+  border-color: #a9503c;
+  color: #f4efe2;
+}
+
+.set-reset {
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: .06em;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.set-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  opacity: .6;
+}
+
+.set-custom {
+  font-style: normal;
+}
+
+@media (pointer: coarse) {
+  .about-panel.settings .set-body {
+    padding: 4px 14px 16px;
+    gap: 14px;
+  }
+
+  .set-row {
+    padding: 9px 10px;
+  }
+
+  .set-key {
+    min-width: 76px;
+    padding: 8px 10px;
+  }
+}

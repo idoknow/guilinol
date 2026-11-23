@@ -162,6 +162,9 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
   .dock{flex-direction:row-reverse;align-items:flex-start;gap:8px}
   .dock-buttons{flex-direction:row;align-items:center;gap:6px}
   .dock-buttons>button,.dock .btn-mode{height:32px;padding:0 11px;font-size:12.5px}
+  /* IDOK-178: 读数/设置/视角三个入口进来以后，顶行在 844×390 上一行放不下、会压到左上时辰条，
+     所以允许右侧按钮折成两行（仍然右对齐，不挡住底下拇指区）。 */
+  .dock-buttons{flex-wrap:wrap;justify-content:flex-end;max-width:min(52vw,320px);row-gap:4px}
   body:not([data-hud=street]) .dock-mini{position:relative}
   body:not([data-hud=street]) .dock .minimap{width:72px;height:72px;border-width:2px}
   body:not([data-hud=street]) .dock .road-name{position:absolute;left:50%;top:58px;transform:translateX(-50%);max-width:96px;padding:3px 7px;font-size:10.5px;letter-spacing:.06em}
