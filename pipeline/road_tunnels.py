@@ -80,3 +80,25 @@ def corridor_underpasses(bounds, height):
                            portals=[[start[0],first,start[1]],[end[0],last,end[1]]],
                            halfWidth=widths[way['id']],clearance=4.5,approach=approach,stations=stations))
     return result
+
+
+def clear_cuizhu_overpass(plans, road_height):
+    """Provide motor clearance where the westbound airport ramp crosses West Ring Road."""
+    from shapely.geometry import LineString
+    from features import points
+
+    ramp = next((e for e in load_osm() if e['type']=='way' and e['id']==815082651),None)
+    if ramp is None:
+        return
+    crossing = LineString(points(ramp))
+    viaduct = [plans[way] for way in (1017592859,265411058,738018982) if way in plans]
+    targets = []
+    for line,width,stations,levels in viaduct:
+        point = line.intersection(crossing)
+        if point.geom_type=='Point' and not point.is_empty:
+            targets.append((point,road_height(point.x,point.y)+6.2))
+    for line,width,stations,levels in viaduct:
+        for i,s in enumerate(stations):
+            point = line.interpolate(float(s))
+            for center,level in targets:
+                levels[i] = max(levels[i],level-.05*max(0.,point.distance(center)-12))
