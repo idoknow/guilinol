@@ -2538,5 +2538,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       endTestRide:(reason:'timeout'|'out_of_bounds'|'user'|'dismount_far'|'mode_switch'|'purchase'='user')=>{finishActiveTestRide(reason)},
     },
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
+    // IDOK-182: 右手挂点给相机用（axis-aligned，-Z 朝前）；没有骨骼时回落到 figure 本身。
+    handAnchor(){return avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r')??figure},
     get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}
 }

@@ -57,6 +57,7 @@
     "verify:modes": "node scripts/verify-modes.mjs",
     "verify:qq": "node scripts/verify-qq-entry.mjs",
     "verify:hud": "node scripts/verify-hud-extras.mjs",
+    "verify:camera": "node scripts/verify-camera.mjs",
     "verify:creator": "tsx scripts/verify-creator.mjs"
   },
   "dependencies": {

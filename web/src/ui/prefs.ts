@@ -3,7 +3,9 @@
 
 export type StatsPrefs = {fps: boolean; net: boolean; online: boolean}
 export type ViewMode = 'third' | 'first'
-export type Prefs = {stats: StatsPrefs; view: ViewMode; keys: Record<string, string[]>}
+/** IDOK-182：相机装备。owned 是背包里的机身，equipped 是手上那台。 */
+export type GearPrefs = {equipped: import('../gear/cameras').BodyId; owned: import('../gear/cameras').BodyId[]}
+export type Prefs = {stats: StatsPrefs; view: ViewMode; keys: Record<string, string[]>; gear: GearPrefs}
 
 const STORAGE_KEY = 'glol.prefs'
 
@@ -11,15 +13,20 @@ export const DEFAULT_PREFS: Prefs = {
   stats: {fps: true, net: true, online: true},
   view: 'third',
   keys: {},
+  gear: {equipped: 'mirrorless', owned: ['mirrorless', 'action', 'pocket', 'thumb']},
 }
 
 let current: Prefs = load()
 const listeners = new Set<(next: Prefs) => void>()
 
+function defaults(): Prefs {
+  return {...DEFAULT_PREFS, stats: {...DEFAULT_PREFS.stats}, keys: {}, gear: {equipped: DEFAULT_PREFS.gear.equipped, owned: [...DEFAULT_PREFS.gear.owned]}}
+}
+
 function load(): Prefs {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<Prefs> | null
-    if (!raw || typeof raw !== 'object') return {...DEFAULT_PREFS, stats: {...DEFAULT_PREFS.stats}}
+    if (!raw || typeof raw !== 'object') return defaults()
     const stats = (raw.stats ?? {}) as Partial<StatsPrefs>
     const keys: Record<string, string[]> = {}
     if (raw.keys && typeof raw.keys === 'object') {
@@ -37,10 +44,21 @@ function load(): Prefs {
       },
       view: raw.view === 'first' ? 'first' : 'third',
       keys,
+      gear: loadGear(raw.gear),
     }
   } catch {
-    return {...DEFAULT_PREFS, stats: {...DEFAULT_PREFS.stats}}
+    return defaults()
   }
+}
+
+function loadGear(raw: unknown): GearPrefs {
+  const fallback: GearPrefs = {equipped: DEFAULT_PREFS.gear.equipped, owned: [...DEFAULT_PREFS.gear.owned]}
+  if (!raw || typeof raw !== 'object') return fallback
+  const value = raw as Partial<GearPrefs>
+  const valid = new Set<string>(DEFAULT_PREFS.gear.owned)
+  const owned = Array.isArray(value.owned) ? value.owned.filter(id => valid.has(id)) : []
+  const equipped = typeof value.equipped === 'string' && valid.has(value.equipped) ? value.equipped : fallback.equipped
+  return {equipped: owned.includes(equipped) ? equipped : owned[0] ?? fallback.equipped, owned: owned.length ? owned : fallback.owned}
 }
 
 function persist() {
