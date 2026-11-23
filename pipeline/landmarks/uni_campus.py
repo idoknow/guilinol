@@ -50,9 +50,7 @@ def footprints(sources):
     with open(Path(RAW) / 'overture_buildings.csv') as f:
         for r in csv.DictReader(f, delimiter='\t'):
             if r['id'] in want:
-                p = wkt.loads(r['wkt'])
-                if p.geom_type != 'Polygon':
-                    p = max(p.geoms, key=lambda g: g.area)
+                p = wkt.loads(r['wkt'])   # may be a MultiPolygon (twin blocks under one id)
                 t = {'building': 'yes'}
                 if r['num_floors']:
                     t['building:levels'] = r['num_floors']
@@ -111,25 +109,37 @@ def build_records(b, campus_id, heroes=None, overrides=None, skip=()):
     recs = [r for r in cat['buildings'] if r['source'] not in skip]
     geo = footprints(r['source'] for r in recs)
     built = []
+    # Catalogs list OSM ways and Overture rows side by side; when both describe the
+    # same footprint (>=90% overlap) build it once, preferring the OSM way.
+    recs.sort(key=lambda r: not r['source'].startswith('way/'))
+    taken = []
     for rec in recs:
         if rec['source'] not in geo:
             continue
-        poly, tags = geo[rec['source']]
-        pl = to_local(b, poly)
-        if not pl.is_valid or pl.area < 8:
-            continue
-        pts = U.ccw(list(pl.exterior.coords))
-        holes = [U.ccw(list(h.coords))[::-1] for h in pl.interiors]
-        spec = spec_for(rec, tags, pl.area)
-        spec.update(overrides.get(rec['source'], {}))
-        if pl.area < 120:
-            spec.update(floors=min(spec['floors'], 2), style='punched')
-        if rec['source'] in heroes:
-            heroes[rec['source']](b, pts, spec)
-        else:
-            U.building(b, pts, holes=holes, **spec)
+        whole, tags = geo[rec['source']]
+        for poly in getattr(whole, 'geoms', [whole]):
+            if any(t.intersection(poly).area >= 0.9 * min(t.area, poly.area) for t in taken if t.intersects(poly)):
+                continue
+            taken.append(poly)
+            _build_one(b, rec, poly, tags, heroes, overrides)
         built.append(rec['source'])
     return built
+
+
+def _build_one(b, rec, poly, tags, heroes, overrides):
+    pl = to_local(b, poly)
+    if not pl.is_valid or pl.area < 8:
+        return
+    pts = U.ccw(list(pl.exterior.coords))
+    holes = [U.ccw(list(h.coords))[::-1] for h in pl.interiors]
+    spec = spec_for(rec, tags, pl.area)
+    spec.update(overrides.get(rec['source'], {}))
+    if pl.area < 120:
+        spec.update(floors=min(spec['floors'], 2), style='punched')
+    if rec['source'] in heroes:
+        heroes[rec['source']](b, pts, spec)
+    else:
+        U.building(b, pts, holes=holes, **spec)
 
 
 def facing_edge(pts, direction):
