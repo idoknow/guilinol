@@ -5,7 +5,8 @@ import type {Host} from './host'
 import type {Atlas, Place} from '../map/atlas'
 import {spots, waterDocks, type Spot, type WaterDock} from './spots'
 import {isGlobalHotkeyBlocked} from '../walk/input-guard'
-import {builtBoundary,loadRegional,northwest,southeast} from '../map/regional'
+import {builtBoundary,loadRegional,northwest as regionNW,southeast as regionSE} from '../map/regional'
+import {ll2xz} from '../../../lib/projection'
 import {getState} from '../game/state'
 import {listShops, type ShopTriggerDef} from '../game/shops'
 
@@ -71,6 +72,10 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
   const peaks = host.manifest.peaks.entries.map(p=>({x:p.center[0],z:p.center[2],h:p.center[1]-((p as {baseHeight?:number}).baseHeight??150),name:/[一-鿿]/.test(p.name)&&!/^\d/.test(p.name)?p.name:''}))
   const placeLabels = atlas.places.filter(p=>p.k!=='road'&&p.k!=='peak'&&p.k!=='water')
   const built=builtBoundary(host.manifest), style=getComputedStyle(document.documentElement)
+  // Pan limit = regional sheet ∪ playable bbox (+~600 m), so an expanded world (IDOK-170 花江, 110.424E)
+  // is never clipped by the fixed regional-map frame.
+  const [bS,bW,bN,bE]=host.manifest.bbox, pad=.006, bNW=ll2xz(bN+pad,bW-pad), bSE=ll2xz(bS-pad,bE+pad)
+  const northwest={x:Math.min(regionNW.x,bNW.x),z:Math.min(regionNW.z,bNW.z)}, southeast={x:Math.max(regionSE.x,bSE.x),z:Math.max(regionSE.z,bSE.z)}
   const mask=new Path2D(built.path); mask.rect(-1e6,-1e6,2e6,2e6)
   let regional:Awaited<ReturnType<typeof loadRegional>>|undefined, edge:typeof regional
   const pending=new Set<string>()
