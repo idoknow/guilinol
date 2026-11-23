@@ -1,0 +1,430 @@
+{
+  "campus_id": "guet_liuhe",
+  "campus_osm": "way/606220177",
+  "buildings": [
+    {
+      "source": "way/646200672",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "9eee65ed-2574-4eb6-9670-6254611344b3"
+      ]
+    },
+    {
+      "source": "way/646200673",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "16b67b18-1865-499f-9982-58d522d53ce9"
+      ]
+    },
+    {
+      "source": "way/653891487",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "3bf21b17-c25b-4109-94aa-c23c15469dd1"
+      ]
+    },
+    {
+      "source": "way/653891489",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "4057fff0-ed89-4b34-9f91-d87547712731"
+      ]
+    },
+    {
+      "source": "way/653891492",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "4a68b546-1b56-4567-a3bc-5a2bd5b823a8"
+      ]
+    },
+    {
+      "source": "way/653891494",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "0c82b84b-38a5-4705-bc9d-026537bed21f"
+      ]
+    },
+    {
+      "source": "way/653891496",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "53049b6e-8963-42b1-8ebd-550bc63469a0"
+      ]
+    },
+    {
+      "source": "way/653891498",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "9ac67d91-a87c-4e6d-918f-ffc2c8400797"
+      ]
+    },
+    {
+      "source": "way/653891500",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "c8503f77-3d25-46d0-b92a-eb96d3d3726c"
+      ]
+    },
+    {
+      "source": "way/653891503",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "46f6fa68-0d90-4c19-88d5-526735fc140b"
+      ]
+    },
+    {
+      "source": "way/655605221",
+      "name": "继续教育学院所在楼",
+      "floors": 4,
+      "floors_src": "photo",
+      "facade": "浅米色墙面，白框矩形窗成排排列，檐口有细线脚。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way655605221_3.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051314368148X&heading=313&pitch=17&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051314368148X&panotype=street&heading=313",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝约313°拍摄，画面中央为米色侧翼，屋檐和四个楼层均可辨。"
+        },
+        {
+          "file": "way655605221_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051314368148X&heading=283&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051314368148X&panotype=street&heading=283",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西拍摄。右侧米色四层楼为校界内继续教育学院所在轮廓。"
+        },
+        {
+          "file": "way655605221_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051314394838X&heading=273&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051314394838X&panotype=street&heading=273",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "99a5a117-19ce-4b38-915e-def47c881de9"
+      ],
+      "floor_count_note": "临校门侧翼可见四排窗；学院地点落在此轮廓。楼号待独立证实。"
+    },
+    {
+      "source": "way/679254284",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "e105ba82-80e2-4b5b-9c2b-297965900197"
+      ]
+    },
+    {
+      "source": "052065ac-0f2b-466a-b7d4-8588edfd8fca",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "4921697a-7d92-4211-9306-a135ec37af89",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "68ed031a-8397-488b-938d-2236bb56ad34",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "8d60815b-ef50-4fe3-96aa-fb19b0b0820c",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "d8cb1d7f-dae2-45c8-9e0a-8fc24d2e9541",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "ec97ddf0-56b1-46be-9b54-210ec530fa48",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    }
+  ],
+  "gates": [
+    {
+      "name": "六合路校区校门",
+      "osm_node": null,
+      "lonlat": null,
+      "desc": "两侧灰色方柱带深色竖向铭牌。",
+      "photos": [
+        {
+          "file": "guet_liuhe_gate_1.jpg",
+          "url": "https://5b0988e595225.cdn.sohucs.com/images/20191026/67c893fda8d340c7a853afcb192a820d.jpeg",
+          "page": "https://www.sohu.com/a/349637736_100144123",
+          "date": "2019-10-25",
+          "date_basis": "报道发布日期",
+          "view": "从六合路朝校内拍摄，约向北"
+        },
+        {
+          "file": "guet_liuhe_gate_2.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_c52024da6360cb55c80f779b775c4ae0.jpg",
+          "page": "https://map.baidu.com/poi/4edf9fbf9693b997cc06a47d",
+          "date": null,
+          "date_basis": "地图地点页未列拍摄日期",
+          "view": "地图地点实拍；镜头方位未标注。"
+        }
+      ]
+    }
+  ],
+  "open_spaces": [],
+  "outside_boundary_landmarks": [
+    {
+      "name": "国家大学科技园临街楼",
+      "source": "way/678367948",
+      "desc": "六合路北侧两栋临街楼中的东栋。顶部“国家级大学科技园”字牌与西侧镂空框架可与街景对照。",
+      "photos": [
+        {
+          "file": "guet_liuhe_sciencepark_1.jpg",
+          "url": "https://5b0988e595225.cdn.sohucs.com/images/20191026/a2ea3174b26e4dfe9e876bb08c109019.jpeg",
+          "page": "https://www.sohu.com/a/349637736_100144123",
+          "date": "2019-10-25",
+          "date_basis": "报道发布日期",
+          "view": "隔六合路朝带科技园楼顶招牌的立面拍摄。"
+        },
+        {
+          "file": "way678367948_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806141026308918X&heading=3&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806141026308918X&panotype=street&heading=3",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝北拍摄。全幅右侧为带科技园招牌的东栋，左侧为另一栋。"
+        }
+      ],
+      "floors": 4,
+      "floors_src": "photo",
+      "floor_count_note": "一层商铺以上三排窗。",
+      "facade": "粉色横带，底层商铺，屋顶镂空框架与招牌。"
+    }
+  ]
+}
