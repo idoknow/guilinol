@@ -3,7 +3,7 @@
  *
  * 协议（JSON over WebSocket，路径 /ws）
  *   客户端 → 服务端
- *     {t:'join', uid, name, avatar, x,y,z,yaw}
+ *     {t:'join', ticket, avatar, x,y,z,yaw}
  *     {t:'pos', x,y,z, yaw, v, bike, bx,bz,byaw, hb,hx,hz,hyaw, mv,cr,gr,dn,pn,hp, sc,sb,sp,br}
  *     {t:'hit', id, dmg}            出拳打到 id 这个人
  *     {t:'revive', id}              扶起倒地的 id
@@ -53,7 +53,7 @@
  * 依赖：npm i ws
  */
 import {createServer} from 'node:http'
-import {randomBytes} from 'node:crypto'
+import {createHmac,timingSafeEqual} from 'node:crypto'
 import {isIP} from 'node:net'
 import {WebSocketServer} from 'ws'
 
@@ -83,9 +83,10 @@ const MAX_AVATAR_BYTES = 512
  * 协议版本。用 GET /health 就能看到线上跑的是哪一版 —— 改 `pos` / `hit` 的字段就 +1。
  *   1 = 只有位置
  *   2 = 加了 mv / cr / gr / dn / pn（蹲下、倒地、出拳、在不在动）
- *   3 = 加了 hp（血量）和 hit.byId（挨打方向）  ← 当前
+ *   3 = 加了 hp（血量）和 hit.byId（挨打方向）
+ *   4 = join 必须提供 API 签发的短期 ticket
  */
-const PROTO = 3
+const PROTO = 4
 
 /** id → {ws, uid, name, avatar, x,y,z, yaw, v, bike, bx,bz,byaw, lastChat, lastPos} */
 const players = new Map()
@@ -107,8 +108,21 @@ const clampStr = (value, max) => (typeof value === 'string' ? value.slice(0, max
 
 /** uid 的唯一归一化入口：join 和 /kick 都走这里，否则「截断后再比较」永远对不上 */
 const normalizeUid = value => String(value ?? '').trim().replace(/[^A-Za-z0-9]/g, '').slice(0, 16)
-/** 格式不合法的 uid 由服务端生成（uid 只用于展示，没有鉴权意义） */
-const genUid = () => `u${randomBytes(4).toString('hex')}`
+function identity(ticket) {
+  const secret = process.env.RT_JOIN_SECRET
+  if (!secret || typeof ticket !== 'string') return null
+  const parts = /^([\w-]{1,1024})\.([\w-]{43})$/.exec(ticket)
+  if (!parts) return null
+  const expected = createHmac('sha256', secret).update(parts[1]).digest('base64url')
+  if (!timingSafeEqual(Buffer.from(expected), Buffer.from(parts[2]))) return null
+  try {
+    const claims = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
+    const time = Math.floor(Date.now()/1000)
+    if (Number.isSafeInteger(claims.exp) && claims.exp > time && claims.exp <= time+60 &&
+        typeof claims.uid === 'string' && /^[A-Za-z0-9]{6,16}$/.test(claims.uid) && typeof claims.name === 'string') return claims
+  } catch {}
+  return null
+}
 
 /** 昵称去控制字符 + 限长；空则给默认名，避免别人客户端里被塞换行 / 伪造昵称 */
 function cleanName(value) {
@@ -372,11 +386,9 @@ wss.on('connection', (ws, req) => {
         }
         // 顺手清掉过期封禁，不起 setInterval（避免泄漏）
         sweepBans()
-        // uid 只用于展示和定位：格式不合法就服务端生成，别让脏值进广播
-        let uid = normalizeUid(msg.uid)
-        if (!/^[A-Za-z0-9]{6,16}$/.test(uid)) {
-          do { uid = genUid() } while (uidTaken(uid))
-        }
+        const claims = identity(msg.ticket)
+        if (!claims) { ws.rejected = true; ws.close(4003, 'ticket rejected'); return }
+        const uid = claims.uid
         const ban = bans.get(uid)
         if (ban && ban.until > now()) {
           ws.rejected = true
@@ -395,7 +407,7 @@ wss.on('connection', (ws, req) => {
           id,
           ws,
           uid,
-          name: cleanName(msg.name),
+          name: cleanName(claims.name),
           avatar: sanitizeAvatar(msg.avatar),
           x: clampNum(msg.x, -1e5, 1e5),
           y: clampNum(msg.y, -1000, 8000),

@@ -4,12 +4,13 @@
 `wss://<当前域名>/ws`（可用 `localStorage['guiling.ws']` 覆盖），所以只要 Ingress 把
 `/ws` 转给 `glol-rt:8790`，前端不需要任何构建期配置。
 
-> **现状**：`/ws` 已在线上跑通（101 握手 + welcome/online/chat 实测通过），但**本仓库的
-> `web/` 里还没有联机客户端**——`guiling.mp`、联机重连这些逻辑只存在于天空下起雨本地构建
-> 的 dist（`20261123-1525`）里。按本仓库现有 `web` 源码构建部署，用户点不进联机模式。
-> 要真正开起来，得先把他那份 `web`（以及 dist 里用到的 `/api/citizen/avatar`、
-> `/api/citizen/photo`、`/api/sponsors`）推上来，由 CI 一起出 `glol-web`/`glol-api` 镜像；
-> 服务端这边不用再改。
+登录后以 `?mp=1` 或 `localStorage['glol.mp']='1'` 进入步行模式。默认不加载联机客户端。
+`walk.net?.status()` 返回 `{state, online}`，`state` 为 connecting / online / offline；
+断线退避最多六次，之后可调用 `walk.net.reconnect()`。`?debug` 显示调试人数。
+
+上线前在 `glol-env` 配置同一个随机 `RT_JOIN_SECRET` 给 api 和 rt。登录会话经同源
+`POST /api/rt/ticket` 取得 60 秒 HMAC 票据，作为 `join.ticket` 发送；rt 无密钥时拒绝所有 join。
+不要把密钥放进前端或版本库；只将 `guiling.ws` 指向受信的 rt 服务。
 
 ## 组成
 
@@ -54,8 +55,7 @@ kubectl -n idoknow exec deploy/glol-rt -- \
   `{t:'banned'}` 并被断开；重启清空，多副本也不共享 —— 长期封禁得接账号系统。
 - `uid` 先归一化（去空白/非字母数字字符、截 16 位），和 join 用同一套规则；为空或
   body 不是对象时直接 400，不会误踢匿名玩家。
-- `uid` 未做鉴权，只用于展示和定位：换一个 uid 仍可重新进来。这里挡的是「同名顶号」
-  和「被踢后立刻换回来」，不是身份认证。
+- `/kick` 使用广播中账号派生的 uid。join 时 uid 和昵称只取自已验签票据，忽略客户端自报值。
 
 ## 防刷与容量
 
@@ -72,7 +72,7 @@ kubectl -n idoknow exec deploy/glol-rt -- \
 ```bash
 # 健康检查（经 Ingress 不通，只能在集群内或 8080 之外直接打服务）
 kubectl -n idoknow exec deploy/glol-rt -- wget -qO- http://127.0.0.1:8790/health
-# {"ok":true,"online":0,"proto":3,"maxPlayers":200,"banned":0,"connections":0}
+# {"ok":true,"online":0,"proto":4,"maxPlayers":200,"banned":0,"connections":0}
 
 # WebSocket 握手（公网，期望 101 Switching Protocols）
 curl -i -N -H 'Connection: Upgrade' -H 'Upgrade: websocket' \

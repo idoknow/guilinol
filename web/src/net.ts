@@ -1,0 +1,56 @@
+import type {AnimationClip,Scene} from 'three'
+import type {Avatar} from '../../lib/avatar'
+import {players,type Pose} from './net-players'
+import {onUser} from './ui/account'
+
+type State='connecting'|'online'|'offline'
+export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar) {
+  const peers=players(scene,clips)
+  let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,disposed=false
+  let state:State='offline',online=0
+  const badge=new URLSearchParams(location.search).has('debug')?document.createElement('output'):null
+  if(badge){badge.style.cssText='position:fixed;top:0;right:0;z-index:99;background:white;color:black';document.body.append(badge)}
+  function status(){return {state,online}}
+  function update(next:State,count=0){state=next;online=count;if(badge)badge.textContent=`${state} · ${online}`}
+  function send(packet:object){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify(packet))}
+  function retry(){update('offline');if(attempt<6&&!disposed)timer=window.setTimeout(connect,Math.min(1000*2**attempt++,16000))}
+  async function connect(){
+    const version=++generation;update('connecting')
+    try{
+      const response=await fetch('/api/rt/ticket',{method:'POST',credentials:'same-origin'})
+      if(version!==generation)return
+      if(response.status===401||response.status===403){update('offline');return}
+      if(!response.ok)throw Error('ticket unavailable')
+      const {ticket}=await response.json();if(version!==generation)return
+      const endpoint=localStorage.getItem('guiling.ws')||`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws`
+      const ws=new WebSocket(endpoint);socket=ws
+      ws.onopen=()=>{if(version===generation)send({t:'join',ticket,avatar:getAvatar(),...getPose()})}
+      ws.onmessage=event=>{
+        if(version!==generation)return
+        const msg=JSON.parse(event.data)
+        switch(msg.t){
+          case 'welcome': case 'players':
+            peers.clear();for(const player of msg.players)peers.add(player)
+            attempt=0;update('online',msg.online);break
+          case 'online':update('online',msg.online);break
+          case 'join':peers.add(msg.player);break
+          case 'leave':peers.remove(msg.id);break
+          case 'pos':peers.move(msg.id,msg);break
+          case 'avatar':peers.avatar(msg.id,msg.avatar);break
+        }
+      }
+      ws.onclose=event=>{if(version!==generation)return;socket=undefined;peers.clear()
+        if(event.code===4001||event.code===4003)update('offline');else retry()}
+    }catch{if(version===generation)retry()}
+  }
+  function stop(){generation++;clearTimeout(timer);socket?.close();socket=undefined;peers.clear();update('offline')}
+  function avatarChanged(){if(state==='online')send({t:'avatar',avatar:getAvatar()})}
+  function tick(dt:number){if(state!=='online')return
+    const pose=getPose(),now=performance.now();if(now-lastSent>=50){lastSent=now;send({t:'pos',...pose})}peers.tick(dt,pose)}
+  let account:string|null|undefined
+  const unsubscribe=onUser(user=>{const id=user?.id??null;if(id===account)return
+    account=id;stop();if(id){attempt=0;void connect()}})
+  window.addEventListener('glol:avatar-change',avatarChanged)
+  return {status,tick,who:()=>send({t:'who'}),probe:peers.probe,reconnect(){if(!disposed){stop();attempt=0;void connect()}},
+    dispose(){disposed=true;unsubscribe();stop();badge?.remove();window.removeEventListener('glol:avatar-change',avatarChanged)}}
+}

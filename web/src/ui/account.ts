@@ -125,7 +125,7 @@ const refresh=()=>api('me').then(r=>{sessionUnknown=false;setUser(r&&typeof r.ni
 const ready=refresh()
 window.addEventListener('online',()=>{if(sessionUnknown)void refresh()})
 /** Subscribe to sign-in changes; called immediately with the current value once known. */
-export function onUser(listen:(user:User|null)=>void){listeners.add(listen);void ready.then(()=>listen(user))}
+export function onUser(listen:(user:User|null)=>void){listeners.add(listen);void ready.then(()=>{if(listeners.has(listen))listen(user)});return ()=>listeners.delete(listen)}
 export const initial=(name='')=>[...name.trim()][0]??'客'
 
 /** 打开面板前最多等 1.2 秒把第三方配置取回来，让 QQ / 微信 按钮和面板一起出现。 */
