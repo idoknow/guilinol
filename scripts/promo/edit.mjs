@@ -108,8 +108,8 @@ await card('title',`<div style="position:absolute;inset:0;display:flex;flex-dire
   <div style="position:relative;font-family:${serif};font-weight:700;font-size:${portrait?128:120}px;letter-spacing:.3em;margin-left:.3em;text-shadow:0 0 24px rgba(255,255,255,.8)">网上桂林</div>
   <div style="position:relative;font-family:${sans};font-size:${portrait?38:34}px;letter-spacing:.6em;margin:22px 0 0 .6em;color:#2f5d4f;text-shadow:0 0 14px rgba(255,255,255,.9)">GUILIN · ONLINE</div></div>`)
 await card('logo',`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
-  <img src="${logo}" style="width:${portrait?640:540}px;image-rendering:pixelated">
-  <div style="margin-top:${portrait?40:30}px;font-family:${sans};font-size:${portrait?48:40}px;letter-spacing:.16em;color:#2f5d3a">glol.rcpd.cc</div></div>`)
+  <img src="${logo}" style="width:${portrait?440:360}px;image-rendering:pixelated">
+  <div style="margin-top:${portrait?30:24}px;font-family:${sans};font-size:${portrait?40:34}px;letter-spacing:.16em;color:#2f5d3a">glol.rcpd.cc</div></div>`)
 await browser.close()
 
 // ---- picture ---------------------------------------------------------------------------------
