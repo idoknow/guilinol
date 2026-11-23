@@ -15,6 +15,7 @@ import {
   type RenderRangeMetrics,
 } from './render-range'
 import {detail, type Manifest, type Tile} from './world'
+import {registerTunnels} from './tunnels'
 
 import {TileGrid, streamBudget, frameSlots, tileEdgeDistance} from './tile-grid'
 export function tileCenterDistance(tile:Tile, position:THREE.Vector3){
@@ -175,6 +176,7 @@ export class Stream {
     // attachment continuations run as data arrives, even on multi-second frames.
     const urgent=()=>inner || tileCenterDistance(tile,this.priorityTarget??this.lastPosition)<=streamBudget.priorityRadius
     const parseSlot=()=>urgent()?Promise.resolve():this.parseSlot()
+    registerTunnels(this.manifest.tunnels)
     return detail(tile,controller.signal,parseSlot,this.manifest.tunnels).then(async item=>{
       if(!urgent())await this.attachSlot()
       if(controller.signal.aborted){item.dispose();return}
