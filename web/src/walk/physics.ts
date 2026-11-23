@@ -8,6 +8,7 @@ import {look} from '../look/config'
 import {walkConfig as cfg} from './config'
 import {probeCarDismount, probeCarMount} from './car'
 import {probeLocalDismount, probeLocalMount} from './ride'
+import {onOldSouthSlope} from '../yueya-slope'
 
 type Outline = import('../buildings').Building
 type Kind = 'ground'|'overview'|'road'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
@@ -27,10 +28,16 @@ function field(cells:number,sample:(col:number,row:number)=>number){
 function fineField(data:Awaited<ReturnType<typeof import('../world').detail>>){
   const geometry=data.groundMesh.geometry, positions=geometry.getAttribute('position')
   const stride=geometry.parameters.widthSegments+1
+  const tile=data.group.position
+  const yueya=tile.x<=504&&tile.x+256>=167&&tile.z<=856&&tile.z+256>=536
   return field(64,(col,row)=>{
     const at=row*65+col, coarse=(row>>1)*stride+(col>>1)
     const visible=stride===65?positions.getY(at):(col%2&&row%2)?(positions.getY(coarse+1)+positions.getY(coarse+stride))/2:
       (positions.getY(coarse)+positions.getY(coarse+(col%2)+(row%2)*stride))/2
+    if(yueya&&data.water[at]===-32768){
+      const east=tile.x+col*4,south=tile.z+row*4
+      if(onOldSouthSlope(east,south))return visible
+    }
     return Math.max(visible,(data.water[at]===-32768?data.terrain[at]:data.water[at])/10)
   })
 }
