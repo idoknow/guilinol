@@ -122,3 +122,75 @@ def grade_terminal_lanes(terrain, original, left, top, grid):
         index = np.ix_(rows,cols)
         for heights in (terrain,original):
             heights[index] = np.rint(heights[index]*(1-blend)+grade*blend).astype(heights.dtype)
+
+
+def grade_airport_interchange(plans, road_height):
+    """Keep the Baomao interchange decks above both Airport Road carriageways.
+
+    OSM supplies the layer ordering but no surveyed elevation. Extend the
+    raised profile onto the mapped approach at each end so it meets the road.
+    """
+    from collections import defaultdict
+    from shapely.ops import substring
+
+    lower_ids = {882310601, 882310602}
+    lower = []
+    approaches = defaultdict(list)
+    spans = {}
+    for element in load_osm():
+        tags = element.get('tags', {})
+        if element['type'] != 'way' or tags.get('highway') not in ('motorway', 'motorway_link'):
+            continue
+        coords = points(element)
+        if len(coords) < 2:
+            continue
+        line = LineString(coords)
+        way = element['id']
+        if way in lower_ids:
+            lower.append(line)
+        if way in plans:
+            spans[way] = line
+        elif tags.get('bridge', 'no') == 'no':
+            approaches[coords[0]].append(line)
+            approaches[coords[-1]].append(line.reverse())
+
+    for way, native in spans.items():
+        line, width, old_stations, old_levels = plans[way]
+        hits = []
+        for road in lower:
+            if line.crosses(road):
+                crossing = line.intersection(road)
+                hits.extend(getattr(crossing, "geoms", [crossing]))
+        if not hits:
+            continue
+        coords = list(line.coords)
+        for end in (0, -1):
+            connected = approaches[native.coords[end]]
+            if len(connected) != 1:
+                continue
+            link = connected[0]
+            approach = list(substring(link, 0, min(120, link.length)).coords)[1:]
+            if end == 0:
+                coords = approach[::-1] + coords
+            else:
+                coords.extend(approach)
+        profile = LineString(coords)
+        stations = np.linspace(0, profile.length, int(np.ceil(profile.length/4))+1)
+        base = np.array([road_height(*profile.interpolate(s).coords[0]) for s in stations])
+        deck = base.copy()
+        start = profile.project(Point(line.coords[0]))
+        span = (stations >= start) & (stations <= start+line.length)
+        deck[span] = np.maximum(deck[span], np.interp(stations[span]-start, old_stations, old_levels))
+        for hit in hits:
+            station = profile.project(hit)
+            # 1.2 m structural slab plus 5 m vehicle clearance. Hold that
+            # height over all three lanes, then descend along the link.
+            level = road_height(hit.x, hit.y) + 6.2
+            deck = np.maximum(deck, level - .065*np.maximum(0, abs(stations-station)-12))
+        # Stop the approach slab as soon as it meets existing pavement.
+        active = np.flatnonzero(span | (deck > base+.01))
+        first = max(0, active[0]-1)
+        last = min(len(stations)-1, active[-1]+1)
+        section = slice(first, last+1)
+        plans[way] = (substring(profile, stations[first], stations[last]), width,
+                      stations[section]-stations[first], deck[section])

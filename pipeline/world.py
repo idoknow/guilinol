@@ -309,6 +309,8 @@ def build(bbox, output, palette, workers=4):
         def ramp_height(x,z):
             return max(ground_mesh_at(x,z),float(eval_bspline_grid(road_ctrl,left,top,np.array(x),np.array(z))))+.045
         clear_cuizhu_overpass(bridge_plans,ramp_height)
+        from airport import grade_airport_interchange
+        grade_airport_interchange(bridge_plans,ramp_height)
 
     sw_query_tree = STRtree(list(polygons(sidewalk_mask))) if not sidewalk_mask.is_empty else None
     def tree_support_at(east: float, south: float) -> float:
