@@ -8,7 +8,7 @@ import {look} from '../look/config'
 import {walkConfig as cfg} from './config'
 import {probeCarDismount, probeCarMount} from './car'
 import {probeLocalDismount, probeLocalMount} from './ride'
-import {onOldSouthSlope} from '../yueya-slope'
+import {onOldSouthSlope,yueyaShoulderHeight} from '../yueya-slope'
 
 type Outline = import('../buildings').Building
 type Kind = 'ground'|'overview'|'road'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
@@ -37,6 +37,7 @@ function fineField(data:Awaited<ReturnType<typeof import('../world').detail>>){
     if(yueya&&data.water[at]===-32768){
       const east=tile.x+col*4,south=tile.z+row*4
       if(onOldSouthSlope(east,south))return visible
+      return Math.max(visible,yueyaShoulderHeight(east,data.terrain[at]/10,south))
     }
     return Math.max(visible,(data.water[at]===-32768?data.terrain[at]:data.water[at])/10)
   })
