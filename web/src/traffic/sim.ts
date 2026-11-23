@@ -165,7 +165,7 @@ export class Traffic {
     if(!this.lastCamera||Math.hypot(camera.x-this.lastCamera.x,camera.z-this.lastCamera.z)>TELEPORT)this.warmUntil=this.time+WARMUP_S
     this.lastCamera={x:camera.x,y:camera.y,z:camera.z}
     const warm=this.time<this.warmUntil
-    const hiddenSpawn=(point:Position)=>warm||!visible||!visible(point)||distanceSq(point,camera)>VISIBLE_SPAWN_MIN**2
+    const hiddenSpawn=(point:Position)=>warm||!visible||!visible(point)||(point.x-camera.x)**2+(point.z-camera.z)**2>VISIBLE_SPAWN_MIN**2
     this.actors=this.actors.filter(actor=>(!actor.leaving||actor.scale>0)&&distanceSq(actor,camera)<210**2)
     let persons=0,scooters=0
     this.updateLimits(camera,!!visible)

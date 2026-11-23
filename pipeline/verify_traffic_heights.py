@@ -18,10 +18,15 @@ def verify():
     graph = read(roads/'graph.json.gz')
     nodes = {node['id']:node for node in graph['nodes']}
     errors, fuxing, parking = [], [], []
+    separated = []
     for lane in graph['lanes']:
+        start, end = nodes[lane['from']], nodes[lane['to']]
+        if lane.get('gradeSeparated') and lane['gradeSeparated']!='jiefang':
+            heights = lane.get('heights',[0,start['y'],1,end['y']])
+            separated.append(max(abs(level-((1-fraction)*start['y']+fraction*end['y']))
+                                 for fraction,level in zip(heights[::2],heights[1::2])))
         if lane['kind'] != 'motor' or lane.get('gradeSeparated'):
             continue
-        start, end = nodes[lane['from']], nodes[lane['to']]
         east, south = end['x']-start['x'], end['z']-start['z']
         length = math.hypot(east, south)
         offset = lane['offset']/length
@@ -45,6 +50,8 @@ def verify():
         for x,y,z,*_ in read(roads/'parking'/f'{key}.json.gz'):
             parking.append(abs(y-surface.sample(x,z,include_peaks=False)[0]))
     moderate = sum(delta>.3 for delta in errors)
+    print(f'Non-Jiefang bridge/tunnel lanes: {len(separated)}, max deviation from endpoint interpolation: {max(separated):.3f}m')
+    assert max(separated)==0
     severe = sum(delta>1 for delta in errors)
     print(f'Motor lanes: {len(errors)}, >0.3m: {moderate}, >1m: {severe}, max: {max(errors):.3f}m; '
           f'parking: {len(parking)}, max: {max(parking):.3f}m; Fuxing z=1127: {fuxing}')

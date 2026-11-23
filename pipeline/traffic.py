@@ -3,8 +3,10 @@ import json
 import math
 import re
 from collections import defaultdict
+from functools import lru_cache
 from pathlib import Path
 
+import numpy as np
 from shapely.geometry import LineString, Polygon
 from shapely.ops import unary_union
 from shapely.prepared import prep
@@ -68,6 +70,17 @@ def bake(output, manifest):
     surface = Surface(output, manifest)
     bridge = next((entry for entry in manifest['landmarks'] if entry['id'] == 'jiefang_bridge'), None)
 
+    @lru_cache(maxsize=96)
+    def original_grid(key):
+        data = gzip.decompress((output/surface.files[key]).read_bytes())
+        return np.frombuffer(data, '<i2', 65*65, 24).reshape(65,65)
+
+    def node_height(x,z,way):
+        if way in SPAN_WAYS:
+            return height(x,z,way)
+        key = (math.floor(x/256)*256,math.floor(z/256)*256)
+        return float(original_grid(key)[round((z-key[1])/4),round((x-key[0])/4)])/10
+
     def height(x, z, way):
         if bridge and way in SPAN_WAYS:
             bx, by, bz = bridge['position']
@@ -95,8 +108,11 @@ def bake(output, manifest):
             samples.append((fraction,y))
         return simplify_profile(samples)
 
-    def add_walk(head, tail, offset, way):
-        walks.append([head, tail, offset, len(walks), profile(head, tail, offset, way)])
+    def add_walk(head, tail, offset, way, linear):
+        walk = [head,tail,offset,len(walks)]
+        if not linear:
+            walk.append(profile(head,tail,offset,way))
+        walks.append(walk)
 
     registry = (ROOT/'web/src/game/quiet-zones.ts').read_text().split('QuietZonePolygon[] = ', 1)[1].split(' as const', 1)[0]
     quiet = json.loads(registry)
@@ -111,6 +127,7 @@ def bake(output, manifest):
     sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
     for way in elements:
         tags = way.get('tags', {})
+        linear = way['id'] not in SPAN_WAYS and any(tags.get(key,'no')!='no' for key in ('bridge','tunnel'))
         kind = tags.get('highway', '').removesuffix('_link')
         if way['type'] != 'way' or kind not in MOTOR | WALK | {'cycleway'} or tags.get('area') == 'yes' or tags.get('access') in ('no', 'private'):
             continue
@@ -140,16 +157,16 @@ def bake(output, manifest):
             start_id, end_id = refs[idx:idx+2]
             for ref, (x,z) in zip((start_id,end_id),(start,end)):
                 if ref not in nodes:
-                    nodes[ref] = dict(id=ref,x=round(x,2),z=round(z,2),y=height(x,z,way['id']))
+                    nodes[ref] = dict(id=ref,x=round(x,2),z=round(z,2),y=node_height(x,z,way['id']))
             if any(nodes[ref]['y'] is None for ref in (start_id,end_id)):
                 continue
             if kind in WALK:
-                add_walk(start_id,end_id,0,way['id'])
+                add_walk(start_id,end_id,0,way['id'],linear)
                 continue
             if kind in MOTOR and tags.get('sidewalk') in ('left','right','both'):
                 for side in (-1,1):
                     if tags['sidewalk'] in ('both','left' if side<0 else 'right'):
-                        add_walk(start_id,end_id,side*(count*size/2+1),way['id'])
+                        add_walk(start_id,end_id,side*(count*size/2+1),way['id'],linear)
             if tags.get('motor_vehicle') in ('private','no') and kind != 'cycleway':
                 continue
             if forbidden.intersects(LineString([start,end]).buffer(count*size/2+2)):
@@ -166,9 +183,10 @@ def bake(output, manifest):
                     lane = dict(id=len(lanes), to=tail, width=size, offset=round(offset,2), kind='nonmotor' if kind=='cycleway' else 'bus' if kind=='busway' else 'motor',speedKmh=number(tags.get('maxspeed'),20 if kind in ('cycleway','service') else 40),oneway=single)
                     lane['from'] = head
                     lane['cls'] = kind
-                    lane['heights'] = profile(head,tail,lane['offset'],way['id'])
-                    if way['id'] in SPAN_WAYS or any(tags.get(key,'no')!='no' for key in ('bridge','tunnel')):
-                        lane['gradeSeparated'] = True
+                    if not linear:
+                        lane['heights'] = profile(head,tail,lane['offset'],way['id'])
+                    if linear or way['id'] in SPAN_WAYS:
+                        lane['gradeSeparated'] = 'linear' if linear else 'jiefang'
                     lanes.append(lane)
                     incoming[tail].append(lane)
 
