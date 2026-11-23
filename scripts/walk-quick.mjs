@@ -440,7 +440,7 @@ try {
   await mobile.locator('.walk-ui .btn-run').tap()
   await mobile.waitForFunction(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on'))
   const mobileShot=`${outDir}/mobile-390x844.png`
-  await mobile.screenshot({path:mobileShot})
+  await mobile.screenshot({path:mobileShot,timeout:90000})
 
   const touchTest=await mobile.evaluate(async()=>{
     const {walk}=window.viewer, canvas=document.querySelector('canvas'), joy=document.querySelector('.walk-ui .joystick'), jumpBtn=document.querySelector('.walk-ui .btn-jump')
@@ -523,7 +523,7 @@ try {
   }
   if(!bikeCoexist.bikeRes?.skipped){
     assert.deepEqual(bikeCoexist.bikeRes.overlaps,[],`bike vehicle-action overlap: ${JSON.stringify(bikeCoexist.bikeRes)}`)
-    await mobile.screenshot({path:`${outDir}/mobile-390x844-bike-nearby.png`})
+    await mobile.screenshot({path:`${outDir}/mobile-390x844-bike-nearby.png`,timeout:90000})
     await mobile.locator('.walk-ui .btn-run').tap()
     await mobile.waitForFunction(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on'))
     await mobile.locator('.vehicle-action').tap()
@@ -537,8 +537,11 @@ try {
   // IDOK-93 landscape phone: same controls, no hit-box overlaps, all inside the viewport.
   await mobile.setViewportSize({width:844,height:390})
   await mobile.evaluate(async()=>{document.querySelector('.spot-card.show .card-close')?.click();for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
+  // 旋转之后先等横屏版 HUD 真正落地（dock 从竖列变横排、minimap 缩小），否则量到的是旋转中间态。
+  await mobile.waitForFunction(()=>getComputedStyle(document.querySelector('.dock')).flexDirection!=='column',null,{timeout:15000})
+  await mobile.evaluate(async()=>{for(let i=0;i<3;i++)await new Promise(requestAnimationFrame)})
   const land=await mobile.evaluate(()=>{
-    const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
+    const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','.hud-stats','output','.hud-me']
     const boxes=selectors.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
       return st.display==='none'||st.visibility==='hidden'||el.closest('[hidden]')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
     const overlaps=[]
@@ -553,7 +556,7 @@ try {
   })
   assert(land.sticks===1&&!land.overlaps.length&&!land.outOfBounds.length,`landscape HUD: ${JSON.stringify(land)}`)
   assert.equal(land.rotate,'none','landscape should not offer the rotate entry')
-  await mobile.screenshot({path:`${outDir}/mobile-844x390.png`})
+  await mobile.screenshot({path:`${outDir}/mobile-844x390.png`,timeout:90000})
   const landLook=await cornerDrag(mobile,844,390,[55,55],[40,180])
   assert(!landLook.stick&&landLook.corner.onCanvas&&landLook.corner.turn>.2&&landLook.blocked.onCanvas&&landLook.blocked.turn===0,`landscape look: ${JSON.stringify(landLook)}`)
   // IDOK-158 landscape phone: the sky panel folds down to the clock, stays hittable, remembers the

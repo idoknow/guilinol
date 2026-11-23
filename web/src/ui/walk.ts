@@ -3,6 +3,7 @@ import {walkConfig as cfg} from '../walk/config'
 import type {CarDynamicTelemetry} from '../walk/car'
 import type {EbikeRideControlInput, EbikeTelemetrySnapshot} from '../walk/ebike-fx'
 import {isGlobalHotkeyBlocked, isModalOrOverlayOpen, isTouchInControlZone} from '../walk/input-guard'
+import {hits, type Action} from '../input/keymap'
 
 const MOD_LABELS = {stock: '素车', ghostfire: '鬼火', neon: '霓虹'} as const
 
@@ -12,6 +13,8 @@ function safeCapture(el:Element, pointerId:number) {
 
 export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx:number,dy:number)=>void,zoom:(delta:number)=>void,view:()=>void){
   const keys=new Set<string>(), stick={x:0,y:0,mag:0}, panel=document.createElement('div')
+// 键位可改：keys 里存物理 code，判定时问 keymap 这个 code 现在是不是在做该动作。
+const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,action))on=true});return on}
   panel.className='walk-ui'
   panel.innerHTML='<div class="joystick" role="group" aria-label="移动"><span class="joystick-knob"></span></div>'
     +'<button class="btn-run" type="button" aria-label="奔跑" aria-pressed="false">跑</button>'
@@ -193,14 +196,14 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
     const drivingCar=document.body.dataset.ride==='car'
     const aboard=document.body.hasAttribute('data-aboard')
     const crashed=document.body.dataset.rideCrash==='1'
-    if(!event.repeat&&event.code==='Space'){
+    if(!event.repeat&&hits(event.code,'jump')){
       if(ridingTwoWheel)recoverPulse=true
       else if(!drivingCar){crouch=false;syncCrouch();jump=true}
       event.preventDefault()
     }
     if(!event.repeat&&event.code==='KeyC')view()
-    if(!event.repeat&&event.code==='KeyX'&&!aboard){crouch=!crouch;syncCrouch()}
-    if(!event.repeat&&(event.code==='ShiftLeft'||event.code==='ShiftRight')&&!aboard&&crouch){crouch=false;syncCrouch()}
+    if(!event.repeat&&hits(event.code,'crouch')&&!aboard){crouch=!crouch;syncCrouch()}
+    if(!event.repeat&&hits(event.code,'run')&&!aboard&&crouch){crouch=false;syncCrouch()}
     if((ridingTwoWheel||drivingCar)&&!event.repeat){
       if(event.code==='KeyE')gearDelta+=1
       else if(event.code==='KeyQ')gearDelta-=1
@@ -307,9 +310,9 @@ export function walkInput(canvas:HTMLCanvasElement,active:()=>boolean,rotate:(dx
       }
       if(document.body.hasAttribute('data-aboard')&&(runHold||runLock)){runHold=false;runLock=false;runPointer=-1;syncRun()}
       if(document.body.hasAttribute('data-aboard')&&crouch){crouch=false;syncCrouch()}
-      const right=Math.max(-1,Math.min(1,+keys.has('KeyD')-+keys.has('KeyA')+stick.x))
-      const forward=Math.max(-1,Math.min(1,+keys.has('KeyW')-+keys.has('KeyS')-stick.y))
-      const run=keys.has('ShiftLeft')||keys.has('ShiftRight')||runHold||runLock||stick.mag>.9
+      const right=Math.max(-1,Math.min(1,+held('right')-+held('left')+stick.x))
+      const forward=Math.max(-1,Math.min(1,+held('forward')-+held('back')-stick.y))
+      const run=held('run')||runHold||runLock||stick.mag>.9
       if(run&&crouch){crouch=false;syncCrouch()}
       const jumped=jump;jump=false
       return {right,forward,run,crouch,jump:jumped}
