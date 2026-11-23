@@ -251,7 +251,8 @@ try{
         const p1=w.probe(),endGap=Math.hypot(p1.figPos[0]-p1.x,p1.figPos[2]-p1.z)
         return {dist:Math.hypot(p0.x-bp[0],p0.z-bp[2]),cJump,maxStep,endGap,stepWalk:Math.hypot(p1.x-p0.x,p1.z-p0.z),inHouse}
       },bikePos)
-      console.log('wall dismount',dismount);assert(dismount.dist<=2.5&&dismount.cJump<.15&&dismount.maxStep<.3&&dismount.endGap<.05&&dismount.stepWalk>.3&&!dismount.inHouse,`dismount teleport/visual jump: ${JSON.stringify(dismount)}`)
+      // #110: walking at 1.65 m/s covers ~0.298 m in the first 12 frames; >0.29 catches one stalled frame.
+      console.log('wall dismount',dismount);assert(dismount.dist<=2.5&&dismount.cJump<.15&&dismount.maxStep<.3&&dismount.endGap<.05&&dismount.stepWalk>.29&&!dismount.inHouse,`dismount teleport/visual jump: ${JSON.stringify(dismount)}`)
       await fixtureNear(43.8,360.7);await interact('骑');await steer([35,358.2],false,.8);await steer([36.2,356.2],false,.6)
       const parkedWall=await page.evaluate(()=>window.viewer.walk.position.toArray())
       assert(Math.hypot(parkedWall[0]-35.8,parkedWall[2]-356)<1.2,`wall-blocked bike parked off target: ${JSON.stringify(parkedWall)}`)
