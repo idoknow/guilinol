@@ -24,7 +24,7 @@ function trackHeight(track:Track,dist:number){
   const index=lo*2
   return heights[index+1]+(heights[index+3]-heights[index+1])*(fraction-heights[index])/(heights[index+2]-heights[index])
 }
-type Actor = {track:Track,dist:number,speed:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,holdUntil?:number}
+type Actor = {track:Track,dist:number,speed:number,kind:'car'|'scooter'|'person',down:number,dodge:number,x:number,y:number,z:number,yaw:number,scale:number,leaving:boolean,halfWidth:number,halfLength:number,height:number,holdUntil?:number,waitingFor?:Actor,waitingSince?:number}
 type Position = {x:number,z:number,y:number}
 export const MAX_ACTORS=100
 export const MOBILE_ACTORS=80
@@ -60,6 +60,7 @@ export class Traffic {
   private anchorZ=Infinity
   private limits=[0,0,0,0]
   private rebalanceAt=0
+  private checkWaitsAt=0
   private warmUntil=-1
   private lastCamera?:Position
   private samples:{track:Track,dist:number}[][]=[]
@@ -256,17 +257,37 @@ export class Traffic {
   private advanceActors(dt:number){
     const decay=Math.exp(-dt*1.2)
     for(const actor of this.actors)this.advanceActor(actor,dt,decay)
+    if(this.time>=this.checkWaitsAt){
+      this.checkWaitsAt=this.time+1
+      const visited=new Set<Actor>()
+      for(const start of this.actors){
+        if(!start.waitingFor||visited.has(start))continue
+        const chain=new Set<Actor>()
+        let actor:Actor|undefined=start
+        while(actor?.waitingFor&&!actor.leaving&&this.time-(actor.waitingSince??this.time)>=8){
+          if(chain.has(actor)){actor.leaving=true;break}
+          if(visited.has(actor))break
+          visited.add(actor);chain.add(actor);actor=actor.waitingFor
+        }
+      }
+      const starved=this.actors.find(actor=>actor.kind!=='person'&&!actor.leaving&&actor.waitingFor&&
+        actor.waitingFor.waitingSince===undefined&&!actor.waitingFor.leaving&&this.green(actor.track)&&
+        this.time-(actor.waitingSince??this.time)>=60)
+      if(starved)starved.leaving=true
+    }
     this.actors=this.actors.filter(actor=>Number.isFinite(actor.y))
   }
   private advanceActor(actor:Actor,dt:number,decay:number){
       const obstacles=this.obstacles
       const {track}=actor,person=actor.kind==='person'
+      const previousBlocker=actor.waitingFor
+      actor.waitingFor=undefined
       if(actor.leaving){actor.scale=Math.max(0,actor.scale-dt/.4);return}
       actor.scale=Math.min(1,actor.scale+dt/.4)
       if(actor.holdUntil&&actor.holdUntil>performance.now()){actor.speed=0;return}
       const maxSpeed=(person?1.4:Math.min(track.speedKmh/3.6,actor.kind==='car'?12:7))
       let advance=Math.min(maxSpeed,actor.speed+dt*2)*dt
-      if(actor.down>0){actor.down-=dt;return}
+      if(actor.down>0){actor.down-=dt;actor.waitingFor=previousBlocker;return}
       actor.dodge*=decay
       const left=Math.floor((actor.x-7)/16),right=Math.floor((actor.x+7)/16),top=Math.floor((actor.z-7)/16),bottom=Math.floor((actor.z+7)/16)
       nearby:for(let col=left;col<=right;col++)for(let row=top;row<=bottom;row++){
@@ -281,26 +302,35 @@ export class Traffic {
         if(person){
           if('kind' in other && other.kind==='person')continue
           const distanceSq=dx*dx+dz*dz
-          if(distanceSq<1.44){actor.down=2;advance=0;break nearby}
+          if(distanceSq<1.44){actor.down=2;advance=0;if('kind' in other)actor.waitingFor=other;break nearby}
           if(distanceSq<16){
             const away=dx*track.dz-dz*track.dx>=0?1:-1
-            actor.dodge=Math.max(-.9,Math.min(.9,actor.dodge+away*dt*3));advance=0;break nearby
+            actor.dodge=Math.max(-.9,Math.min(.9,actor.dodge+away*dt*3));advance=0;if('kind' in other)actor.waitingFor=other;break nearby
           }
-        }else if(ahead>0&&lateral<1.8){advance=Math.min(advance,Math.max(0,ahead-5));if(!advance)break nearby}
+        }else if(ahead>0&&lateral<1.8){advance=Math.min(advance,Math.max(0,ahead-5));if(advance<1e-6&&'kind' in other)actor.waitingFor=other;if(!advance)break nearby}
         }
       }
       if(!person&&this.junctions.has(track.to)&&track.length-actor.dist<9){
         const queue=this.queues.get(track.to)??[]
-        if(!queue.includes(actor))queue.push(actor)
+        if(!queue.includes(actor)){
+          const follower=queue.findIndex(waiting=>waiting.track===track&&waiting.dist<actor.dist)
+          if(follower<0)queue.push(actor);else queue.splice(follower,0,actor)
+        }
         this.queues.set(track.to,queue)
-        const occupied=this.actors.some(other=>other!==actor&&other.kind!=='person'&&other.track.from===track.to&&other.dist<6)
-        if(occupied||queue[0]!==actor)advance=Math.min(advance,Math.max(0,track.length-actor.dist-3))
+        const occupied=this.actors.find(other=>other!==actor&&other.kind!=='person'&&other.track.from===track.to&&other.dist<6)
+        if(occupied||queue[0]!==actor){
+          const gap=Math.max(0,track.length-actor.dist-3)
+          if(gap<1e-6)actor.waitingFor=occupied??queue[0]
+          advance=Math.min(advance,gap)
+        }
       }
       if(!person&&!this.green(track)){
         const gap=Math.max(0,track.length-actor.dist-1)
         if(advance>gap)this.stopped++
         advance=Math.min(advance,gap)
       }
+      if(advance>=dt*.05)actor.waitingSince=undefined
+      else actor.waitingSince??=this.time
       actor.speed=advance/dt;actor.dist+=advance
       if(!person&&advance>0&&nearStatic(actor.x+track.dx*advance,actor.z+track.dz*advance)){
         const next={x:actor.x+track.dx*advance,y:actor.y,z:actor.z+track.dz*advance}
