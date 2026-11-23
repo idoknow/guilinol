@@ -1301,7 +1301,7 @@ def build_nikoniko(m: Builder):
     m.box(0, 0.2, 1.8, 10.6, 5.8, 0.5, 'glass', collide=True, footing=True)
     if m.detail:
         for jamb in (-5.15, -2.6, 0, 2.6, 5.15):
-            m.box(jamb, .2, 2.06, .14, 5.8, .12, 'alum')
+            m.box(jamb, .2, 2.06, .14, 5.8, .12, 'alum', footing=True)
         m.box(0, 2.75, 2.08, 10.4, .16, .14, 'alum')
     for side in (-1, 1):
         m.cylinder_y(side * 4.4, 0.0, 6.8, 5.4, 0.58, 'alum', sections=12 if m.detail else 6, collide=True)
