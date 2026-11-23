@@ -3,10 +3,12 @@
 # 由 deploy/release-window.sh 在确认上线后调用；失败不影响发版。
 # 只预热 CDN 规则会缓存的后缀（glb|ktx2|bin|js|css|字体|图片），其余请求回源也只是白跑。
 # 注意：从一台机器预热只能填满它解析到的那个 L1 节点和共享的 L2，其他 L1 首次访问仍会 L2 命中。
-#   HOST=https://glol.rcpd.cc JOBS=8 ROUNDS=2 scripts/cdn-warm.sh
+#   HOST=https://glol.rcpd.cc JOBS=2 DELAY=0.3 ROUNDS=2 scripts/cdn-warm.sh
 set -euo pipefail
 HOST=${HOST:-https://glol.rcpd.cc}
-JOBS=${JOBS:-8}
+JOBS=${JOBS:-2}
+# CDNFly CC 自动封禁：60 秒 20 次 → 封 600 秒；每个请求前停 DELAY 秒，默认 2 并发 × 0.3 秒，别把出口 IP 打进黑名单
+DELAY=${DELAY:-0.3}
 ROUNDS=${ROUNDS:-2}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -42,8 +44,7 @@ PY
 total=$(wc -l <"$work/urls")
 echo "预热 $total 个 URL（$HOST，并发 $JOBS，$ROUNDS 轮）"
 for round in $(seq 1 "$ROUNDS"); do
-  xargs -P "$JOBS" -I{} curl -sS -o /dev/null --max-time 120 \
-    -w '%{http_code} %{size_download} %header{x-cache-status} {}\n' "$HOST{}" <"$work/urls" >"$work/round$round" 2>>"$work/errors" || true
+  HOST=$HOST DELAY=$DELAY xargs -P "$JOBS" -I{} sh -c 'sleep "$DELAY"; curl -sS -o /dev/null --max-time 120 -w "%{http_code} %{size_download} %header{x-cache-status} {}\n" "$HOST{}"' <"$work/urls" >"$work/round$round" 2>>"$work/errors" || true
   ok=$(awk '$1==200||$1==304' "$work/round$round" | wc -l)
   l1=$(grep -c 'HIT from L1' "$work/round$round" || true)
   any=$(grep -c 'HIT from' "$work/round$round" || true)
