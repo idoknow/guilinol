@@ -4,7 +4,7 @@
 // `v` overrides a shot for the 9:16 cut (keys/cam/fov/dur).
 export const variants = {
   h:{width:1920,height:1080,fov:50,shots:['s01','s02','s03','s04','s05','s07','s08','s09','s10','s11','s12','s15']},
-  v:{width:1080,height:1920,fov:72,shots:['s01','s02','s03','s07','s09','s10','s11','s12','s15']},
+  v:{width:1080,height:1920,fov:72,shots:['s01','s02','s03','s07','s09','s11','s12','s15']},
 }
 // Tested e-bike route (scripts/ride-path.json): spawn plaza → Jiefang Rd E → Jiefang Bridge → east bank.
 const RIDE = [[-537,-80.7],[-511,-74.7],[-490,-67.7],[-463,-58.7],[-378,-29.7],[-347,-18.7],[-303,-3.7],[-261,10.3],[-197,32.3],[-75,78],[-36,90],[-21,95],[21,108],[157,152]]
