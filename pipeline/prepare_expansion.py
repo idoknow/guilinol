@@ -16,7 +16,7 @@ from refresh_osm import NODES, fetch_shards
 
 from PIL import Image
 
-SOUTH, WEST, NORTH, EAST = 25.21054, 110.24150, 25.36798, 110.42462
+SOUTH, WEST, NORTH, EAST = 25.188, 110.02, 25.372, 110.43
 STAMP = '2026-11-23T00:38:06Z'
 
 

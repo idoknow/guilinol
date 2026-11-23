@@ -62,6 +62,17 @@ def ground_features(bounds, school_grounds=()):
         elif (tags.get('natural') in ('wood', 'grassland', 'scrub') or tags.get('leisure') in ('park','garden','pitch')
               or tags.get('landuse') in ('forest','grass','meadow','recreation_ground','village_green')):
             key = 'green'
+        elif tags.get('aeroway') in ('runway','taxiway','apron') and element['type'] != 'node':
+            pavement = area(element)
+            coords = points(element)
+            if pavement.is_empty and len(coords) >= 2:
+                try:
+                    width = float(tags.get('width', 45 if tags['aeroway']=='runway' else 23))
+                except ValueError:
+                    width = 45 if tags['aeroway']=='runway' else 23
+                pavement = LineString(coords).buffer(width/2, cap_style='flat')
+            layers['road'].extend(polygons(pavement.intersection(bounds)))
+            continue
         elif 'highway' in tags and element['type'] == 'way':
             if tags['highway'] in RULES['defaultWidth'] and tags.get('bridge','no')=='no' and tags.get('tunnel','no')=='no':
                 continue

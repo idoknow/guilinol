@@ -21,8 +21,10 @@ from clearance import audit_routes, navigable_edges
 from cars import plan_cars
 
 
-def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), interchange=None):
+def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), interchange=None, grid_origin=None):
     left, top, right, bottom = bounds.bounds
+    if grid_origin is not None:
+        left,top = grid_origin
     wet = surface != -32768
     rows, cols = wet.shape
     xs = left + np.arange(cols)*GRID

@@ -1,3 +1,4 @@
+from play_region import PlayRegion
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 import argparse
@@ -93,6 +94,9 @@ def write_chunk(output, name, payload, trees, origin):
 def build(bbox, output, palette, workers=4):
     if workers < 1:
         raise ValueError('workers must be positive')
+    region = PlayRegion() if bbox is None else None
+    if region:
+        bbox = region.bbox
     south, west, north, east = bbox
     if not (south < north and west < east):
         raise ValueError('Expected bbox: south west north east')
@@ -103,7 +107,8 @@ def build(bbox, output, palette, workers=4):
     left, top = map(int,start)
     width, depth = map(int,end-start)
     terrain = np.rint(load_dem(np.arange(left,left+width+1,GRID),np.arange(top,top+depth+1,GRID))*10).astype('<i2')
-    bounds = box(*start,*end)
+    raster_bounds = box(*start,*end)
+    bounds = region.geometry if region else raster_bounds
     def elevation(east,south):
         row = np.clip(round((south-top)/GRID),0,depth//GRID)
         col = np.clip(round((east-left)/GRID),0,width//GRID)
@@ -143,11 +148,11 @@ def build(bbox, output, palette, workers=4):
             window = np.s_[row:end_row+1, col:end_col+1]
             mask = terrain_stencil(part, left, top, col, row, terrain[window].shape)
             terrain[window][mask] = original[window][mask] = round(level*10)
-    correct_water(surface, terrain, original, bounds, stencil)
+    correct_water(surface, terrain, original, raster_bounds, stencil)
     wet = surface != DRY
     terrain[wet] = original[wet] = np.minimum(terrain[wet], surface[wet] - 20)
 
-    contour_ronghu(surface, terrain, original, bounds)
+    contour_ronghu(surface, terrain, original, raster_bounds)
     rong_pavement = grade_landings(terrain,original,wet,left,top,GRID,layout.entries)
     interchange=None
     bank_pavement=None
@@ -222,7 +227,7 @@ def build(bbox, output, palette, workers=4):
 
     peak_tree = STRtree(peak_shapes)
     init_footprints, _ = buildings(bounds, elevation, peak_tree, layout, carriageway_mask, sidewalk_mask)
-    candidate_routes = plan_vehicles(bounds, surface, layers['road'], init_footprints, sample)['routes']
+    candidate_routes = plan_vehicles(bounds, surface, layers['road'], init_footprints, sample, grid_origin=(left,top))['routes']
 
     road_ctrl, bridge_plans, finalize_bridges = solve_road_and_bridge_elevations(
         original, terrain, surface, left, top, width, depth,
@@ -386,7 +391,7 @@ def build(bbox, output, palette, workers=4):
     (output/'street-report.json').write_text(json.dumps(report,ensure_ascii=False))
     print('Vegetation:',dict(sorted(tree_stats.items())))
     landmark_faces = list(landmark_triangles(landmarks))
-    vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange)
+    vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange, grid_origin=(left,top))
     decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal)
     modeled_paving = unary_union([*layout.street_foundations, *rong_pavement, modeled_paving if modeled_paving is not None else ShapelyPolygon()])
     if fubo is not None:
@@ -432,6 +437,8 @@ def build(bbox, output, palette, workers=4):
         for south in range(0,depth,CHUNK):
             for east in range(0,width,CHUNK):
                 origin = (left+east,top+south)
+                if region and origin not in region.tiles:
+                    continue
                 if origin in published_core:
                     ground_bytes, tree_bytes = published_core.pop(origin)
                     name = f'{east//CHUNK}_{south//CHUNK}.glc'
@@ -442,6 +449,8 @@ def build(bbox, output, palette, workers=4):
                     chunks.append(dict(x=origin[0],z=origin[1],**asset(name)))
                     continue
                 tile = box(*origin,origin[0]+CHUNK,origin[1]+CHUNK)
+                if region and not bounds.covers(tile):
+                    tile = tile.intersection(bounds)
                 parts = ((poly,heights[key]) for key in sorted(index.query(tile))
                          for poly in polygons(footprints[key].intersection(tile)) if poly.area >= .01)
                 vertices, normals, indices, rings = building_mesh(parts, origin)
@@ -515,6 +524,8 @@ def build(bbox, output, palette, workers=4):
         digest.update(field.astype('<i2', copy=False).tobytes())
     manifest['terrainSha256'] = digest.hexdigest()
     print('Terrain SHA-256:', digest.hexdigest())
+    if region:
+        manifest['region'] = region.manifest()
     manifest['landmarks'] = landmarks
     if tunnels:
         manifest['tunnels'] = tunnels
@@ -529,7 +540,7 @@ def build(bbox, output, palette, workers=4):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--bbox',type=float,nargs=4,default=[25.212,110.243,25.366,110.424])
+    parser.add_argument('--bbox',type=float,nargs=4,help="Explicit rectangular test extent; defaults to the approved play region")
     parser.add_argument('--output',type=Path,default=Path(OUT))
     parser.add_argument('--palette',type=Path,default=Path(__file__).with_name('palette.json'))
     parser.add_argument('--workers', type=int, default=4, help='Concurrent chunk compression writers')

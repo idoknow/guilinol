@@ -15,6 +15,7 @@ import {freezeStatic} from './static-freeze'
 interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number}
 export interface Manifest {
+  region?:import('../../lib/play-region').Region
   tunnels?:Tunnel[]
   builtArea?:{type:'Polygon';coordinates:[number,number][][]}
   distantBuildings?:Asset

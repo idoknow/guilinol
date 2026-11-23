@@ -1,6 +1,7 @@
 import {getPlayMode} from '../game/play-mode'
 import * as THREE from 'three'
 import { validView, type FeedbackView } from '../../../lib/feedback-contract'
+import {nearestPlayable} from '../../../lib/play-region'
 import { xz2ll } from '../../../lib/projection'
 import type { Host } from './host'
 
@@ -17,10 +18,11 @@ export function setView(host: Host, view: unknown) {
   if (!validView(view)) throw Error('无效的反馈视角')
   const {lat,lon} = xz2ll(view.x,view.z)
   const [south,west,north,east] = host.manifest.bbox
-  if(lat<south || lat>north || lon<west || lon>east) throw Error('反馈视角位于开放区域外')
+  if(!host.manifest.region && (lat<south || lat>north || lon<west || lon>east)) throw Error('反馈视角位于开放区域外')
   host.fly()
   const camera = host.camera
-  camera.position.set(view.x, view.y, view.z)
+  const point=nearestPlayable(host.manifest,view.x,view.z)
+  camera.position.set(point.x, view.y, point.z)
   camera.rotation.set(THREE.MathUtils.degToRad(view.pitch), THREE.MathUtils.degToRad(view.yaw), 0, 'YXZ')
   camera.fov = view.fov
   camera.updateProjectionMatrix()

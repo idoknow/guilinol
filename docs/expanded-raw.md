@@ -1,5 +1,18 @@
 ## 桂林扩区原始数据
 
+### 临桂与两江机场 · 2026-11-24
+
+[原料 Release](https://github.com/idoknow/guilinol/releases/tag/raw-expanded-20261124) 覆盖 25.188–25.372°N、110.02–110.43°E。压缩包 SHA-256 为 `5b7ae617d9e36706f0bc8a97b6ad9d2be2db2620c5a923d225afcb95e914cf9f`。包内有 29,550 个 OSM 元素、91,848 条 Overture 建筑记录、390 条 places 记录和 190 张 Terrarium z14 瓦片。
+
+在空目录解压，按包内 SHA256SUMS 校验。复采采用 Geofabrik 广西 PBF（2026-11-23，SHA-256 为 `45c3134fb768081677149a672a830fa0d62356c0da5230db3dd8dc6e392aa5f6`）、Overture 2026-10-21.0 及 AWS elevation-tiles-prod。以下命令从仓库根目录执行，query.txt 为此版 raw/q.txt 副本；需安装 osmium 和带 spatial 扩展的 DuckDB CLI。
+
+```sh
+overturemaps download -r 2026-10-21.0 --bbox=110.02,25.188,110.43,25.372 -t building -f geoparquet -o buildings.parquet
+overturemaps download -r 2026-10-21.0 --bbox=110.02,25.188,110.43,25.372 -t place -f geoparquet -o places.parquet
+uv run --with osmium python pipeline/prepare_expansion.py --pbf guangxi.osm.pbf --query query.txt --terrarium https://s3.amazonaws.com/elevation-tiles-prod/terrarium --buildings buildings.parquet --places places.parquet --output raw
+(cd raw && shasum -a 256 -c SHA256SUMS)
+```
+
 ### 花江校区：2026-11-23
 
 OSM 广西 PBF（复制时间 `2026-11-23T00:38:06Z`）中，`way/606118480` 是桂林电子科技大学（花江校区）边界：25.3057944–25.3229985 N，110.4022420–110.4208454 E。可玩框保持原南、西、北界，东界改为 110.424 E；校界最近的一侧是东边，按世界投影剩余 318 m。采集框为 25.21054–25.36798 N、110.24150–110.42462 E，覆盖 72 × 68 个对齐块。按建筑内部代表点落入校界统计，OSM 135 个建筑 way 和 4 个建筑 relation（无重复 outer way），Overture 169 个建筑。这是两个有重叠的来源，不应相加。

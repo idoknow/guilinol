@@ -1,3 +1,4 @@
+import {nearestPlayable} from '../../../lib/play-region'
 import * as THREE from 'three'
 import {tunnelFloor} from '../tunnels'
 import {getCarFreeAt, vehicleForbiddenAt} from '../game/car-free'
@@ -1233,7 +1234,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return ready
   }
   async function enter(x:number,z:number,heading:number,reason:string,override=false,signal?:AbortSignal,progress?:(fraction:number,detail:string)=>void){
-    if(!sim.withinBounds(x,z))return false
+    if(!sim.withinBounds(x,z)){
+      if(!manifest.region)return false
+      ;({x,z}=nearestPlayable(manifest,x,z))
+    }
     if(shopOverlay?.isOpen())shopOverlay?.close('teleport')
     const target=new THREE.Vector3(x,0,z);destination=target
     stream.prioritize(x,z)
@@ -2158,6 +2162,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }
       if((rides?.bike||rides?.car)&&vehicleForbiddenAt(next.x,next.z)){
         next.x=pos.x;next.y=pos.y;next.z=pos.z;rides.stop();bikeSpeed=vx=vz=0;bikeObstacle='restricted'
+      }
+      if(!sim.withinBounds(next.x,next.z)){
+        next.x=pos.x;next.z=pos.z;vx=vz=bikeSpeed=0
+        if(rides?.bike||rides?.car)rides.stop()
       }
       traveled+=Math.hypot(next.x-pos.x,next.z-pos.z);sim.body.setNextKinematicTranslation(next);sim.world.step();if(grounded&&!blockedWater)safe.set(next.x,next.y,next.z)
     }
