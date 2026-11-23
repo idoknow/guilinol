@@ -135,7 +135,9 @@ def _library(b, pts, spec):
     nrm = ((far[0] - cx) / math.dist(far, (cx, cz)), (far[1] - cz) / math.dist(far, (cx, cz)))
     g = b.surface.ground(cx, cz)
     h = top - base + 1.2
-    b.cylinder_y(cx, g - 0.3, base - g + 0.3, cz, r + 0.6, 'granite', sections=24)
+    gmin = min(b.surface.ground(cx + math.cos(t) * (r + 0.6), cz + math.sin(t) * (r + 0.6)) for t in [k * math.tau / 24 for k in range(24)])
+    b.prism([(cx + math.cos(k * math.tau / 24) * (r + 0.6), cz + math.sin(k * math.tau / 24) * (r + 0.6)) for k in range(24)],
+            gmin - 0.3, base - gmin + 0.3, 'granite', footing=True)
     b.cylinder_y(cx, base, h, cz, r, 'glass', sections=24, collide=True)
     b.cylinder_y(cx, base + h, 0.6, cz, r + 0.25, 'white', sections=24)
     if b.detail:
@@ -155,7 +157,8 @@ def _library(b, pts, spec):
             if abs(k - 4.5) < 1.2:
                 continue
             x, z = cx + math.cos(t) * (r + 0.9), cz + math.sin(t) * (r + 0.9)
-            b.cylinder_y(x, base - 0.2, h + 2.6, z, 0.38, 'steel', sections=8)
+            y0 = U.footing(b, [(x + 0.38, z), (x - 0.38, z), (x, z + 0.38), (x, z - 0.38)])
+            b.cylinder_y(x, y0, base + h + 2.4 - y0, z, 0.38, 'steel', sections=8)
         rr = r + 3.6
         U.ring_arc(b, cx, cz, base + h + 2.0, rr, 1.6, 0.7, ang - 1.9, ang + 1.9, 'white', n=28)
         for k in range(9):
@@ -185,7 +188,7 @@ def _gym(b, pts):
             n = max(2, int(L / 7.5))
             for k in range(n + 1):
                 p = (a[0] + u[0] * L * k / n, a[1] + u[1] * L * k / n)
-                U.fin(b, p, base, top - base, 0.5, 1.1, u, nrm, 'pink_wall')
+                U.fin(b, p, base, top - base, 0.5, 1.1, u, nrm, 'pink_wall', foot=True)
             U.slab(b, a, cc, top - 3.4, 3.4, 0.45, nrm, 'pink_wall')
             U.slab(b, a, cc, base + 4.6, 0.35, 0.6, nrm, 'steel')
     # solid pink-granite entrance block on the road (west) face carrying the name, ref 体育馆
@@ -193,17 +196,22 @@ def _gym(b, pts):
     fm = ((fa[0] + fc[0]) / 2 - fu[0] * fL * 0.12, (fa[1] + fc[1]) / 2 - fu[1] * fL * 0.12)
     prev = b.pose
     b.pose = (fm[0], 0.0, fm[1], math.atan2(fn[0], fn[1]))
-    b.box(0, base - 0.3, 0.2, fL * 0.42, top - base + 1.6, 3.2, 'pink_wall', cap_region='silver_roof', collide=True)
+    y0 = U.pose_footing(b, 0, 0.2, fL * 0.42, 3.2)
+    bw = fL * 0.21
+    b.prism([(-bw, -1.4), (bw, -1.4), (bw, 1.8), (-bw, 1.8)], y0, top + 0.3 - y0, 'pink_wall',
+            cap_region='silver_roof', footing=True, collide=True)
     if b.detail:
-        b.sign_board(0, top - 2.6, 1.82, 10.0, 2.4, 'glut_gym', backing=None, depth=0)
-        b.box(fL * 0.26, base - 0.1, 2.6, fL * 0.12, 3.6, 2.4, 'glass', cap_region='white')
+        b.sign_board(0, top - 2.6, 1.86, 10.0, 2.4, 'glut_gym', backing='pink_wall', depth=0.06)
+        y0 = U.pose_footing(b, fL * 0.26, 2.6, fL * 0.12, 2.4)
+        gx0, gx1 = fL * 0.20, fL * 0.32
+        b.prism([(gx0, 1.4), (gx1, 1.4), (gx1, 3.8), (gx0, 3.8)], y0, base + 3.5 - y0, 'glass',
+                cap_region='white', footing=True)
     b.pose = prev
     prev = b.pose
     b.pose = (c.x, 0.0, c.y, ang)
     b.pitched_roof(0, top + 0.5, 0, e0, e1, 4.2, overhang=3.2, tile_region='silver_roof', fascia_region='steel')
     if b.detail:
         b.box(0, top - 0.1, 0, e0 + 5.0, 0.7, e1 + 5.0, 'steel')
-        b.sign_board(0, top - 1.7, e1 / 2 + 0.5, 9.0, 2.2, 'glut_gym', backing=None, depth=0)
     b.pose = prev
     return base, top
 
@@ -221,7 +229,8 @@ def _science_park(b, pts, spec):
         for d in (d0, d1):
             corners.append((m[0] + u[0] * s + nrm[0] * d, m[1] + u[1] * s + nrm[1] * d))
     for x, z in corners:
-        b.box(x, base - 0.2, z, 0.5, H, 0.5, 'white', collide=True)
+        y0 = U.footing(b, [(x - .25, z - .25), (x + .25, z - .25), (x + .25, z + .25), (x - .25, z + .25)])
+        b.box(x, y0, z, 0.5, base + H - y0, 0.5, 'white', collide=True)
     if b.detail:
         lv = 6
         for k in range(lv):
@@ -246,8 +255,10 @@ def _staff_centre(b, pts, spec):
     cx, cz = corner[0] * 0.75 + poly.centroid.x * 0.25, corner[1] * 0.75 + poly.centroid.y * 0.25
     r = 8.0
     b.cylinder_y(cx, base + 4.2, top - base - 2.2, cz, r, 'glass', sections=20, collide=True)
-    b.cylinder_y(cx, base, 4.2, cz, r - 0.4, 'white', sections=20, collide=True)
-    b.cylinder_y(cx, top + 2.0, 0.9, cz, r + 0.3, 'white', sections=20)
+    gmin = min(b.surface.ground(cx + math.cos(k * math.tau / 20) * r, cz + math.sin(k * math.tau / 20) * r) for k in range(20))
+    b.prism([(cx + math.cos(k * math.tau / 20) * r, cz + math.sin(k * math.tau / 20) * r) for k in range(20)],
+            gmin - 0.3, base + 4.2 - gmin + 0.3, 'white', footing=True, collide=True)
+    b.cylinder_y(cx, top + 2.0, 0.9, cz, r, 'white', sections=20)
     if b.detail:
         f = _edge_facing(pts, (0.0, 1.0))
         fa, fc, fL, fu, fn = f
@@ -268,7 +279,8 @@ def _business(b, pts, spec):
     m = ((a[0] + c[0]) / 2, (a[1] + c[1]) / 2)
     prev = b.pose
     b.pose = (m[0] + nrm[0] * 2.0, 0.0, m[1] + nrm[1] * 2.0, math.atan2(nrm[0], nrm[1]))
-    b.box(0, base, -2.0, min(L * 0.5, 10.0), top - base + 2.5, 4.6, 'glass', cap_region='white', collide=True)
+    y0 = U.pose_footing(b, 0, -2.0, min(L * 0.5, 10.0), 4.6)
+    b.box(0, y0, -2.0, min(L * 0.5, 10.0), top + 2.5 - y0, 4.6, 'glass', cap_region='white', collide=True)
     b.box(0, base + 3.6, 1.2, 9.0, 0.45, 4.0, 'white', cap_region='silver_roof')  # entrance canopy
     if b.detail:
         b.sign_board(0, base + 4.3, 3.21, 4.2, 0.9, 'glut_biz', backing=None, depth=0)
@@ -297,7 +309,6 @@ def _gate(b, gx, gz, campus_local):
     for k in range(1, m + 1):
         a = math.radians(145 - 205 * k / m)
         pts.append((ccx + rr * math.cos(a), ccz + rr * math.sin(a)))
-    pts.append((pts[-1][0], 0.0))
     for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
         L = math.hypot(x1 - x0, y1 - y0)
         nx, ny = -(y1 - y0) / L, (x1 - x0) / L
@@ -308,20 +319,20 @@ def _gate(b, gx, gz, campus_local):
         b.face([top[0], top[1], bot[1], bot[0]], (0, 0, -1), 'white')
         b.face([top[3], top[2], bot[2], bot[3]], (0, 0, 1), 'white')
     # right shoulder pier down to the ground
-    b.box(pts[-1][0] - 0.3, -0.2, 0, 1.2, 3.2, depth, 'white', collide=True)
-    b.box(-span / 2 + 0.6, -0.2, 0, 1.4, 0.5, depth, 'white', collide=True)
-    # apron
-    b.box(0, -0.18, 0, span + 8, 0.2, 14.0, 'pave_plaza', tile=3.0, bottom=True)
+    y0 = U.pose_footing(b, pts[-1][0] - 0.3, 0, 1.2, depth)
+    b.box(pts[-1][0] - 0.3, y0, 0, 1.2, pts[-1][1] - y0, depth, 'white', collide=True)
+    y0 = U.pose_footing(b, -span / 2 + 0.5, 0, 1.2, depth)
+    b.box(-span / 2 + 0.5, y0, 0, 1.2, 0.9 - y0, depth, 'white', collide=True)
     # closed retractable gate under the arch (generalised, always closed)
-    if b.detail:
-        b.retractable_gate(-span / 2 + 1.4, span / 2 - 1.2, 0.0, h=1.4, y0=0.0)
     b.pose = prev
     # Red granite name monument in front of the science park (ref 国家大学科技园)
     m = (gx + uz * 26.0 - ux * 14.0, gz - ux * 26.0 - uz * 14.0)
     mg = b.surface.ground(*m)
     b.pose = (m[0], mg, m[1], yaw)
-    b.box(0, -0.2, 0, 12.0, 2.9, 1.6, 'brick_red', cap_region='brick_red', collide=True)
-    b.box(-6.6, -0.2, 0.3, 1.4, 1.9, 2.2, 'brick_red', collide=True)
+    y0 = U.pose_footing(b, 0, 0, 12.0, 1.6)
+    b.box(0, y0, 0, 12.0, 2.7 - y0, 1.6, 'brick_red', cap_region='brick_red', collide=True)
+    y0 = U.pose_footing(b, -6.6, 0.3, 1.4, 2.2)
+    b.box(-6.6, y0, 0.3, 1.4, 1.7 - y0, 2.2, 'brick_red', collide=True)
     if b.detail:
         b.sign_board(0, 1.55, 0.81, 9.2, 1.7, 'glut_name', backing=None, depth=0)
         b.pose = (m[0], mg, m[1], yaw + math.pi)
@@ -363,8 +374,9 @@ def build(b):
                 b.pose = (m[0], 0.0, m[1], math.atan2(nrm[0], nrm[1]))
                 b.box(0, base + 3.4, -1.0, 8.5, 0.5, 4.4, 'white', cap_region='silver_roof')
                 for sx in (-3.6, 3.6):
-                    b.box(sx, base - 0.1, 0.6, 0.6, 3.5, 0.6, 'white')
-                b.sign_board(0, base + 4.35, 1.21, 6.4, 0.9, sign, backing=None, depth=0)
+                    y0 = U.pose_footing(b, sx, 0.6, 0.6, 0.6)
+                    b.box(sx, y0, 0.6, 0.6, base + 3.4 - y0, 0.6, 'white')
+                b.sign_board(0, base + 3.9 + 0.45, 0.6, 6.4, 0.9, sign, backing=None, depth=0)
                 b.pose = prev
     gl = _local(b, *gate)
     _gate(b, gl[0], gl[1], campus_l)

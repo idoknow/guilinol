@@ -61,21 +61,39 @@ def slab(b, a, c, y0, h, depth, nrm, region, cap=None):
            (0, -1, 0), region)
 
 
-def fin(b, p, y0, h, depth, width, u, nrm, region):
-    """Proud vertical fin / pilaster centred on plan point p."""
+def footing(b, pts):
+    """Bottom height so a small element touches the lowest ground under its corners."""
+    return min(b.surface.ground(float(x), float(z)) for x, z in pts) - 0.04
+
+
+def pose_footing(b, x, z, w, d):
+    """Footing height (pose-local y) for a pose-local box centred at (x, z)."""
+    oy = b.pose[1]
+    gs = []
+    for sx in (-w / 2, w / 2):
+        for sz in (-d / 2, d / 2):
+            wx, _, wz = b._xf((x + sx, 0.0, z + sz))
+            gs.append(b.surface.ground(float(wx), float(wz)))
+    return min(gs) - oy - 0.04
+
+
+def fin(b, p, y0, h, depth, width, u, nrm, region, foot=False):
+    """Proud vertical fin / pilaster centred on plan point p.
+
+    ``foot``: every bottom corner follows the ground under it (steep campus slopes)."""
     hw = width / 2
     a = (p[0] - u[0] * hw, p[1] - u[1] * hw)
     c = (p[0] + u[0] * hw, p[1] + u[1] * hw)
     a2 = (a[0] + nrm[0] * depth, a[1] + nrm[1] * depth)
     c2 = (c[0] + nrm[0] * depth, c[1] + nrm[1] * depth)
-    quad(b, a, c, y0, y0 + h, depth, nrm, region)
-    # side cheeks
-    b.face([(a[0], y0, a[1]), (a2[0], y0, a2[1]), (a2[0], y0 + h, a2[1]), (a[0], y0 + h, a[1])],
-           (-u[0], 0, -u[1]), region)
-    b.face([(c2[0], y0, c2[1]), (c[0], y0, c[1]), (c[0], y0 + h, c[1]), (c2[0], y0 + h, c2[1])],
-           (u[0], 0, u[1]), region)
-    b.face([(a[0], y0 + h, a[1]), (a2[0], y0 + h, a2[1]), (c2[0], y0 + h, c2[1]), (c[0], y0 + h, c[1])],
-           (0, 1, 0), region)
+    y1 = y0 + h
+    g = (lambda q: b.surface.ground(float(q[0]), float(q[1])) - 0.04) if foot else (lambda q: y0)
+    A, C, A2, C2 = ((q[0], g(q), q[1]) for q in (a, c, a2, c2))
+    T = lambda q: (q[0], y1, q[2])
+    b.face([A2, C2, T(C2), T(A2)], (nrm[0], 0, nrm[1]), region)
+    b.face([A, A2, T(A2), T(A)], (-u[0], 0, -u[1]), region)
+    b.face([C2, C, T(C), T(C2)], (u[0], 0, u[1]), region)
+    b.face([T(A), T(A2), T(C2), T(C)], (0, 1, 0), region)
 
 
 def ground_range(b, pts):
@@ -128,14 +146,14 @@ def building(b, ring, *, floors, fh=3.5, style='punched', wall='white', accent='
         if style == 'curtain':
             for k in range(1, nb):
                 p = (a[0] + u[0] * k * step, a[1] + u[1] * k * step)
-                fin(b, p, base, top - base, 0.12, 0.12, u, nrm, 'steel')
+                fin(b, p, base, top - base, 0.12, 0.12, u, nrm, 'steel', foot=True)
             for f in range(1, floors):
                 slab(b, a, c, base + f * fh - 0.12, 0.24, 0.10, nrm, 'steel')
             continue
         if style == 'grid':
             for k in range(nb + 1):
                 p = (a[0] + u[0] * k * step, a[1] + u[1] * k * step)
-                fin(b, p, base, top - base, 0.75, 0.28, u, nrm, accent)
+                fin(b, p, base, top - base, 0.75, 0.28, u, nrm, accent, foot=True)
             for f in range(1, floors + 1):
                 slab(b, a, c, base + f * fh - 0.22, 0.22, 0.75, nrm, accent)
             for f in range(floors):
@@ -151,7 +169,7 @@ def building(b, ring, *, floors, fh=3.5, style='punched', wall='white', accent='
                      0.32, nrm, accent)
             for k in range(1, nb, 2):
                 p = (a[0] + u[0] * k * step, a[1] + u[1] * k * step)
-                fin(b, p, base, top - base, 0.06, 0.22, u, nrm, wall)
+                fin(b, p, base, top - base, 0.06, 0.22, u, nrm, wall, foot=True)
             continue
         # punched / pilaster
         for f in range(floors):
@@ -166,7 +184,7 @@ def building(b, ring, *, floors, fh=3.5, style='punched', wall='white', accent='
         if style == 'pilaster':
             for k in range(0, nb + 1, 2):
                 p = (a[0] + u[0] * k * step, a[1] + u[1] * k * step)
-                fin(b, p, base, top - base, 0.28, 0.7, u, nrm, accent)
+                fin(b, p, base, top - base, 0.28, 0.7, u, nrm, accent, foot=True)
         # floor band below parapet
         slab(b, a, c, top - 0.35, 0.35, 0.12, nrm, accent)
     if roof == 'hip' and b.detail is not None:
