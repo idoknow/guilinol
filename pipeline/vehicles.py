@@ -129,7 +129,7 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
         for name, location in anchors.items():
             if not bounds.covers(Point(location)):continue
             for idx in np.atleast_1d(shores.query(location,k=min(96,len(bank)))[1]):
-                east,south = bank[idx]; point = Point(east,south)
+                east,south = map(float,bank[idx]); point = Point(east,south)
                 if obstacles.query(point.buffer(1),predicate='intersects').size: continue
                 wx,wz = water[moorings.query((east,south))[1]]; row,col=int((wz-top)/GRID),int((wx-left)/GRID)
                 docks[name]=[east,sample(east,south)[0],south];nodes[name]=ids[row,col];break
