@@ -321,13 +321,21 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
   let profile: Upstream
   try {
     profile = await callUpstream(env, 'callback', { type, code })
+    // 上游「登录成功」跳回来时，它自己的记录可能还没落库，立刻换 token 会拿到
+    // errcode 102「记录不存在」。隔一会儿重试两次，别把用户直接判成授权失败。
+    for (let attempt = 0; profile.code !== 0 && profile.errcode === 102 && attempt < 2; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 400 * (attempt + 1)))
+      profile = await callUpstream(env, 'callback', { type, code })
+    }
   } catch {
     // 上游抖动不消费 state：用户重来一次仍可继续
     return back('unavailable')
   }
   if (profile.code === 2) return back('pending')
-  if (profile.code !== 0 || profile.type !== type || !/^[A-Fa-f0-9]{16,64}$/.test(profile.social_uid ?? ''))
+  if (profile.code !== 0 || profile.type !== type || !/^[A-Fa-f0-9]{16,64}$/.test(profile.social_uid ?? '')) {
+    logSocial({ action: 'callback', type, failure: 'upstream', code: profile.code, errcode: profile.errcode, msg: profile.msg })
     return back('failed')
+  }
 
   // 换取成功后才一次性消费 state
   const consumed = await db
