@@ -21,7 +21,7 @@ from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem, lo
 from features import building_mesh, buildings, game_court, ground_features, points, polygons, raw_overture_footprints, rongyin_sidewalk
 from legacy_core import CAMPUS_TILES, Downtown, EXTENT as DOWNTOWN, preserve_campus_indexes
 from karst import generate
-from peak_sectors import write_city_lods
+from peak_sectors import overview_step, write_city_lods
 from landmarks.jiefang_layout import bank_paving, grade_banks, grade_binjiang_streets
 from bridges import bridge_tiles
 from road_grading import build_ground_mesh_lookup, eval_bspline_grid, solve_road_and_bridge_elevations
@@ -414,8 +414,10 @@ def build(bbox, output, palette, workers=4):
     print('Lengths (m):',lengths)
     def asset(name):
         return {'file':name,'bytes':(output/name).stat().st_size}
-    np.where(wet,surface,terrain)[::8,::8].astype('<i2').tofile(output/'overview.i16')
-    np.where(wet,surface,original)[::8,::8].astype('<i2').tofile(output/'underlay.i16')
+    step = overview_step(width, depth)
+    stride = step//GRID
+    np.where(wet,surface,terrain)[::stride,::stride].astype('<i2').tofile(output/'overview.i16')
+    np.where(wet,surface,original)[::stride,::stride].astype('<i2').tofile(output/'underlay.i16')
     overview_image = texture.resize((width//4,depth//4), Image.Resampling.BOX).quantize(32)
     water_bits = water_mask(overview_image, palette['water'])
     overview_image.save(output/'overview.png', optimize=True)
@@ -503,7 +505,7 @@ def build(bbox, output, palette, workers=4):
     triangles.extend(landmark_faces)
     write_vehicles(output,vehicles,triangles)
     manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=extent,chunkSize=CHUNK,peaks=peaks,atlas=asset('atlas.bin'),
-                    vehicles=asset('vehicles.bin'),grid=GRID,overview=dict(step=32, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png'),waterMask=water_bits),chunks=chunks)
+                    vehicles=asset('vehicles.bin'),grid=GRID,overview=dict(step=step, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png'),waterMask=water_bits),chunks=chunks)
     # Hash the full-resolution GL04 fields in wire order, independent of gzip,
     # texture encoders, or whether a chunk elides its redundant underlay.
     digest = hashlib.sha256()
