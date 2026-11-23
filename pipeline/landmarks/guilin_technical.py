@@ -169,9 +169,11 @@ def build_technical(b: SchoolBuilder):
             c = (p0[0] + (p1[0] - p0[0]) * (j + 1) / n, p0[1] + (p1[1] - p0[1]) * (j + 1) / n)
             if not inside.contains(Point((a[0] + c[0]) / 2, (a[1] + c[1]) / 2)):
                 continue
-            gs = [b.ground(x + dx, z) for x, z in (a, c) for dx in (-3.0, 0.0, 3.0)]
-            if max(gs) - min(gs) <= 0.1:
-                b.path_strip(a, c, width=6.0, region='pave_road')
+            length = math.dist(a, c)
+            nx, nz = (a[1] - c[1]) * 3 / length, (c[0] - a[0]) * 3 / length
+            corners = [(a[0]+nx, a[1]+nz), (a[0]-nx, a[1]-nz),
+                       (c[0]-nx, c[1]-nz), (c[0]+nx, c[1]+nz)]
+            b.ground_slab(corners, region='pave_road', lift=0.04, edge_drop=0.04)
 
     keep_out = [Polygon(R[o]).buffer(4.0) for o in DORMS + [s for s, _ in SMALL]]
     keep_out += [Polygon(R['main_outer']).buffer(4.0), track_hole.buffer(2.0)]

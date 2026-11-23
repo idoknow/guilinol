@@ -166,4 +166,9 @@ def write_vehicles(output,data,triangles):
         raise ValueError('航道核查失败，有航段净空不足')
     data['routes'] = return_trips(checked)
     data['clearance'] = audit_routes(data['routes'],triangles)
+    # Keep the empty cells out of the JSON text that V8 allocates on load.
+    data['maskEncoding'] = 'gzip'
+    for key in ('mask', 'motorMask'):
+        packed = gzip.compress(base64.b64decode(data[key]), compresslevel=6, mtime=0)
+        data[key] = base64.b64encode(packed).decode()
     (output/'vehicles.bin').write_bytes(gzip.compress(json.dumps(data,ensure_ascii=False,separators=(',',':')).encode(),mtime=0))

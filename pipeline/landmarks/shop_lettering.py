@@ -6,7 +6,10 @@ from PIL import Image, ImageDraw, ImageFont
 def letters(model, text, center, width, height, material, facing=1):
     if not model.detail:
         return
-    font=ImageFont.truetype('NotoSansCJK-Bold.ttc',24)
+    try:
+        font = ImageFont.truetype('NotoSansCJK-Bold.ttc', 24)
+    except OSError:
+        font = ImageFont.truetype('/System/Library/Fonts/STHeiti Medium.ttc', 24)
     left,top,right,bottom=font.getbbox(text)
     mask=Image.new('L',(right-left,bottom-top))
     ImageDraw.Draw(mask).text((-left,-top),text,font=font,fill=255)

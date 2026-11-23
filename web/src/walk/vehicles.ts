@@ -118,7 +118,17 @@ interface Data {
   grid: number[]
   mask: string
   motorGrid?: number[]
+  maskEncoding?: 'gzip'
   motorMask?: string
+}
+
+async function roadBits(encoded: string, encoding?: 'gzip') {
+  const binary = atob(encoded)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  if (!encoding) return bytes
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))
+  return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 
 export async function vehicles(
@@ -184,11 +194,11 @@ export async function vehicles(
   }
   loadPersistedBatteries()
 
-  const mask = atob(data.mask)
+  const mask = await roadBits(data.mask, data.maskEncoding)
   const [left, top, width, height, step] = data.grid
   const group = new T.Group()
   scene.add(group)
-  const mMask = data.motorMask ? atob(data.motorMask) : mask
+  const mMask = data.motorMask ? await roadBits(data.motorMask, data.maskEncoding) : mask
   const [mLeft, mTop, mWidth, mHeight, mStep] = data.motorGrid ?? data.grid
   const cells = new Map<string, T.Group>()
   const visibleCells = new Set<T.Group>()
@@ -316,7 +326,8 @@ export async function vehicles(
     store(mesh)
   }
 
-  const vessels = data.routes.map(route => {
+  const {routes, docks} = data
+  const vessels = routes.map(route => {
     const pink = route.kind === 'boat' && [route.start, route.end].includes('桂湖')
     const mesh = vehicleModel(route.kind, pink ? 1 : 0)
     mesh.position.fromArray(route.path[0])
@@ -326,9 +337,9 @@ export async function vehicles(
   const piers = new Map<string, T.Mesh>()
   const pierShape = new T.BoxGeometry(1, 1, 1)
   const pierMaterial = new T.MeshStandardMaterial({color: 0x816a50})
-  for (const leg of data.routes) {
+  for (const leg of routes) {
     if (piers.has(leg.start)) continue
-    const [x, , z] = data.docks[leg.start]
+    const [x, , z] = docks[leg.start]
     const [waterX, waterY, waterZ] = leg.path[0]
     const dx = waterX - x
     const dz = waterZ - z
@@ -341,12 +352,12 @@ export async function vehicles(
     piers.set(leg.start, mesh)
   }
   const departures = new Set<string>()
-  const moored = data.routes.map(leg => {
+  const moored = routes.map(leg => {
     const first = !departures.has(leg.start)
     departures.add(leg.start)
     return first
   })
-  const freeBoats = env ? createFreeBoats({group, docks: data.docks, routes: data.routes, sim: env.sim, stream: env.stream}) : null
+  const freeBoats = env ? createFreeBoats({group, docks, routes, sim: env.sim, stream: env.stream}) : null
 
   const ringMat = new T.MeshBasicMaterial({color: 0xd86b4a, transparent: true, opacity: 0.45, depthWrite: false, side: T.DoubleSide, fog: false})
   const interactRing = new T.Mesh(new T.RingGeometry(0.86, 1.08, 32).rotateX(-Math.PI / 2), ringMat)
@@ -429,7 +440,7 @@ export async function vehicles(
             ? disembark
               ? '下一站下船'
               : '下站下船'
-            : ridePrompt || (preferFree ? freePrompt : nearRoute >= 0 ? '上船 · ' + data.routes[nearRoute].start : '')
+            : ridePrompt || (preferFree ? freePrompt : nearRoute >= 0 ? '上船 · ' + routes[nearRoute].start : '')
     if (activeTarget?.name === 'bike') {
       button.dataset.ebikeTier =
         (activeTarget.userData.vehicleType as EbikeVehicleType | undefined) ??
@@ -584,7 +595,7 @@ export async function vehicles(
   }
 
   function reset() {
-    if (route >= 0) vessels[route].position.fromArray(data.routes[route].path[0])
+    if (route >= 0) vessels[route].position.fromArray(routes[route].path[0])
     freeBoats?.reset()
     if (car) {
       car.rotation.set(carCtrl.pitch, carCtrl.heading, 0, 'YXZ')
@@ -730,7 +741,7 @@ export async function vehicles(
     } else if (bike) {
       if (land(bike.position.x, bike.position.z, bikeCtrl.heading, bike.position.y)) reset()
     } else if (freeBoats?.active) {
-      const spot = freeBoats.dismount(data.docks, s => !!env?.landFree(s))
+      const spot = freeBoats.dismount(docks, s => !!env?.landFree(s))
       if (spot) {
         nearFree = {slot: null, distance: Infinity, atBank: false}
         syncHud()
@@ -810,7 +821,7 @@ export async function vehicles(
       preferFree && nearFree.slot
         ? {kind: 'free_boat', label: (nearFree.slot.kind === 'freeRaft' ? '划竹筏 · ' : '划小船 · ') + nearFree.slot.name, distance: nearFree.distance}
         : nearRoute >= 0
-          ? {kind: 'tour_boat', label: '上船 · ' + data.routes[nearRoute].start, distance: nearRouteDist}
+          ? {kind: 'tour_boat', label: '上船 · ' + routes[nearRoute].start, distance: nearRouteDist}
           : null
     return {
       aboardKind,
@@ -883,8 +894,8 @@ export async function vehicles(
     nearDecor = active && !car && !bike && route < 0 && !freeBoats?.active ? env?.stream.batches.nearestBike(x,z,footY,Math.min(bestScore,4.2)) ?? null : null
     if (nearDecor) decorDistance = Math.hypot(nearDecor.x-x,nearDecor.z-z)
     let nearestDock = 9
-    data.routes.forEach((leg, index) => {
-      const [dx, , dz] = data.docks[leg.start]
+    routes.forEach((leg, index) => {
+      const [dx, , dz] = docks[leg.start]
       const distance = Math.hypot(dx - x, dz - z)
       vessels[index].visible = route === index || (moored[index] && distance < 200)
       piers.get(leg.start)!.visible = distance < 200
@@ -922,14 +933,14 @@ export async function vehicles(
     const col = Math.round((x - left) / step)
     const row = Math.round((z - top) / step)
     const index = row * width + col
-    return col >= 0 && row >= 0 && col < width && row < height && !!(mask.charCodeAt(index >> 3) & (128 >> (index & 7)))
+    return col >= 0 && row >= 0 && col < width && row < height && !!(mask[index >> 3] & (128 >> (index & 7)))
   }
 
   function motorPavement(x: number, z: number) {
     const col = Math.round((x - mLeft) / mStep)
     const row = Math.round((z - mTop) / mStep)
     const index = row * mWidth + col
-    return col >= 0 && row >= 0 && col < mWidth && row < mHeight && !!(mMask.charCodeAt(index >> 3) & (128 >> (index & 7)))
+    return col >= 0 && row >= 0 && col < mWidth && row < mHeight && !!(mMask[index >> 3] & (128 >> (index & 7)))
   }
 
   function summonPersonalBike(playerPos: {x: number; y: number; z: number}, playerYaw: number, vehicleId?: string): SummonPersonalBikeResult {
@@ -1167,7 +1178,7 @@ export async function vehicles(
   }
 
   function advance(dt: number) {
-    const leg = data.routes[route]
+    const leg = routes[route]
     const mesh = vessels[route]
     let distance = 2 * dt
     while (segment < leg.path.length) {
@@ -1185,9 +1196,9 @@ export async function vehicles(
       distance -= gap
       segment++
     }
-    const [x, , z] = data.docks[leg.end]
-    const departures2 = data.routes.filter(other => other.start === leg.end && other.kind === leg.kind)
-    const next = data.routes.indexOf(departures2.find(other => other.end !== leg.start) ?? departures2[0])
+    const [x, , z] = docks[leg.end]
+    const departures2 = routes.filter(other => other.start === leg.end && other.kind === leg.kind)
+    const next = routes.indexOf(departures2.find(other => other.end !== leg.start) ?? departures2[0])
     if (disembark || next < 0) {
       if (land(x, z)) reset()
       return

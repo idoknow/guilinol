@@ -76,18 +76,27 @@ try {
             const turn=before && after && Math.abs(Math.atan2(
               (east-before[0])*(after[1]-south)-(south-before[1])*(after[0]-east),
               (east-before[0])*(after[0]-east)+(south-before[1])*(after[1]-south)))>.48
-            let best=Infinity,stalled=0
+            let best=Infinity,stalled=0,reverse
             for(let tick=0;;tick++){
               const pos=walk.position,dx=east-pos.x,dz=south-pos.z,gap=Math.hypot(dx,dz)
-              if(gap<(mode==='drive'&&!turn?4:2))break
+              // Street centerline junctions can have a short connector inside the
+              // turning circle. Capture those at lane-width tolerance.
+              const tolerance=mode==='walk'?2:turn?2:before && Math.hypot(east-before[0],south-before[1])<6?6:4
+              if(gap<tolerance)break
               if(gap<best-.5){best=gap;stalled=0}
-              if(++stalled>900)throw Error(mode+' stalled at waypoint '+index+' from '+pos.toArray()+' obstacle '+walk.obstacle)
+              if(++stalled>900)throw Error(mode+' stalled at waypoint '+index+' from '+pos.toArray()+' target '+[east,south]+' heading '+walk.heading+' speed '+walk.speed+' obstacle '+walk.obstacle)
               if(mode==='walk')walk.drive(dx/gap,dz/gap,true)
               else{
                 const angle=Math.atan2(-dx,-dz)-walk.heading,err=Math.atan2(Math.sin(angle),Math.cos(angle))
+                // A corridor leg may end on the same street the next leg retraces.
+                // Back out along the street until the next junction permits a forward turn.
+                reverse ??= Math.abs(err)>Math.PI*.68
+                const steering=reverse?Math.atan2(Math.sin(err),-Math.cos(err)):err
                 const speed=Math.abs(walk.speed)
                 const limit=Math.abs(err)>.3?2.5:turn?Math.min(8,2.5+Math.max(0,gap-5)*.18):8
-                key('KeyA',err>.035);key('KeyD',err<-.035);key('KeyW',speed<limit);key('KeyS',speed>limit+1 && walk.speed>0)
+                key('KeyA',steering>.035);key('KeyD',steering<-.035)
+                key('KeyW',reverse?walk.speed < -3:walk.speed < limit)
+                key('KeyS',reverse?walk.speed > -2.5:walk.speed > limit+1)
               }
               stream.tick(pos);stream.updateLandmarks?.(pos)
               walk.tick(1/30)
