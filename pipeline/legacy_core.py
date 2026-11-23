@@ -15,25 +15,31 @@ import numpy as np
 from common import CHUNK, GRID, ll2xz
 
 DIGEST = 'd604950786524c6c0b805cab104934c155c67ca57b85939503ff83d536a9be1a'
-RELEASE = 'world-' + DIGEST[:12]
+EXPANDED_DIGEST = '141c5d4bc4af3ee958b0150047cefa4f2b6ec0cb173a51781b77bad824425d9c'
 EXTENT = (-2304, -2560, 3584, 5888)
 
 
-def snapshot():
+def cached_archive(digest):
+    release = 'world-' + digest[:12]
     cache = Path(__file__).resolve().parents[1]/'.world-cache'
     cache.mkdir(exist_ok=True)
-    path = cache/(RELEASE+'.tar.gz')
+    path = cache/(release+'.tar.gz')
     if not path.exists():
         with tempfile.TemporaryDirectory(dir=cache) as staging:
             incoming = Path(staging)/'world.tar.gz'
-            subprocess.run(['gh','release','download',RELEASE,'-R','idoknow/guilinol',
+            subprocess.run(['gh','release','download',release,'-R','idoknow/guilinol',
                             '-p','world.tar.gz','-D',staging],check=True)
-            if hashlib.sha256(incoming.read_bytes()).hexdigest()!=DIGEST:
+            if hashlib.sha256(incoming.read_bytes()).hexdigest()!=digest:
                 raise ValueError('Incorrect downtown world release checksum')
             os.replace(incoming,path)
-    packed = path.read_bytes()
-    if hashlib.sha256(packed).hexdigest()!=DIGEST:
-        raise ValueError(f'Invalid cached world release: {path}')
+    with path.open('rb') as source:
+        if hashlib.file_digest(source, 'sha256').hexdigest()!=digest:
+            raise ValueError(f'Invalid cached world release: {path}')
+    return path
+
+
+def snapshot():
+    packed = cached_archive(DIGEST).read_bytes()
     with tarfile.open(fileobj=io.BytesIO(packed),mode='r:gz') as archive:
         return {f.name.removeprefix('world/'):archive.extractfile(f).read()
                 for f in archive if f.isfile() and f.name.startswith('world/')}
@@ -52,8 +58,17 @@ class Downtown:
         west,north,width,height = EXTENT
         return min(x-west,west+width-x,z-north,north+height-z)
 
-    def frozen_tile(self,x,z):
-        return self.depth(x+CHUNK/2,z+CHUNK/2) >= CHUNK*1.5 and not self.fubo_tile(x,z)
+    def published_core(self):
+        with tarfile.open(cached_archive(EXPANDED_DIGEST),'r:gz') as archive:
+            manifest = json.load(archive.extractfile('world/manifest.json'))
+            names = {(tile['x'],tile['z']):tile['file'] for tile in manifest['chunks']
+                     if self.depth(tile['x']+CHUNK/2,tile['z']+CHUNK/2) >= CHUNK*1.5}
+        if len(names)!=252:
+            raise ValueError('Unexpected published downtown tile count')
+        members = {'world/'+name for filename in names.values() for name in (filename, filename.replace('.glc','.trees'))}
+        with tarfile.open(cached_archive(EXPANDED_DIGEST),'r|gz') as archive:
+            files = {item.name:archive.extractfile(item).read() for item in archive if item.name in members}
+        return {origin:(files['world/'+name],files['world/'+name.replace('.glc','.trees')]) for origin,name in names.items()}
 
     @staticmethod
     def fubo_tile(x,z):

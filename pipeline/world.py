@@ -19,7 +19,6 @@ from shapely.geometry import box, Point
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem, load_osm
 from features import building_mesh, buildings, game_court, ground_features, points, polygons, raw_overture_footprints, rongyin_sidewalk
-from street_rings import repair_frozen_tile
 from legacy_core import Downtown, EXTENT as DOWNTOWN
 from karst import generate
 from peak_sectors import write_city_lods
@@ -422,16 +421,17 @@ def build(bbox, output, palette, workers=4):
     overview_image.save(output/'overview.png', optimize=True)
     u_peaks_buf = unary_union(peak_shapes).buffer(1.0) if peak_shapes else ShapelyPolygon()
     chunks = []
+    published_core = downtown.published_core() if downtown else {}
     pending = deque()
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for south in range(0,depth,CHUNK):
             for east in range(0,width,CHUNK):
                 origin = (left+east,top+south)
-                if downtown and downtown.frozen_tile(*origin):
-                    old = downtown.tiles[origin]
+                if origin in published_core:
+                    ground_bytes, tree_bytes = published_core.pop(origin)
                     name = f'{east//CHUNK}_{south//CHUNK}.glc'
-                    (output/name).write_bytes(repair_frozen_tile(downtown.files[old]))
-                    (output/name.replace('.glc','.trees')).write_bytes(downtown.files[old.replace('.glc','.trees')])
+                    (output/name).write_bytes(ground_bytes)
+                    (output/name.replace('.glc','.trees')).write_bytes(tree_bytes)
                     while pending:
                         chunks.append(pending.popleft().result())
                     chunks.append(dict(x=origin[0],z=origin[1],**asset(name)))
