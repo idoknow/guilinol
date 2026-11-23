@@ -1786,7 +1786,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     if(rides?.freeBoat){
       releaseDynamicBike();input.syncRideHud(null,'boat')
-      const read=held?still:input.read(dt), firstFrame=!wasBoat
+      const read=held?still:input.read(), firstFrame=!wasBoat
       if(firstFrame){boatBoardFrom.copy(figure.position);boatBoardYaw=figure.rotation.y;boatBoardElapsed=0;boatLandElapsed=BOAT_LAND_DUR
         mixer.stopAllAction();action=undefined;bankLean=strideLean=0
         if(wasCar||wasBike)applyFootController()
@@ -1805,7 +1805,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if((rides?.car||rides?.bike)&&!vehicleCollisionReady(start.x,start.y,start.z)){
       rides.stop();vx=vz=accumulator=0;bikeObstacle='streaming';return
     }
-    const read=input.read(dt),keys=held?still:read
+    const read=input.read(),keys=held?still:read
     const rideCtrl=held?ZERO_RIDE_INPUT:input.readRideControls()
     const busyFootAnim=!!(standUpSession||pickupSession)
     wish.set(keys.right*Math.cos(yaw)-keys.forward*Math.sin(yaw),-keys.forward*Math.cos(yaw)-keys.right*Math.sin(yaw))

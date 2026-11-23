@@ -95,10 +95,14 @@ export function isTouchInControlZone(ctx: TouchZoneContext): boolean {
   if (!ctx.panelVisible || ctx.photoOn) return false
   // Bottom-left virtual joystick zone
   if (ctx.clientX < ctx.innerWidth * .45 && ctx.clientY > ctx.innerHeight * .55) return true
-  // Bottom-right jump/run/view or wheelie/gear/tuck thumb gutter
-  // IDOK-93: covers the look stick plus its button arc (slot D reaches ~245 px in from the right while riding).
+  // Bottom-right jump/run/view or wheelie/gear/tuck thumb gutter (slot D reaches ~245 px in from the right while riding).
   const rightGuard = ctx.aboard ? 250 : 215
   const bottomGuard = Math.min(280, ctx.innerHeight * .5)
-  if (ctx.clientX > ctx.innerWidth - rightGuard && ctx.clientY > ctx.innerHeight - bottomGuard) return true
+  if (ctx.clientX > ctx.innerWidth - rightGuard && ctx.clientY > ctx.innerHeight - bottomGuard) {
+    // IDOK-171: the right look stick is gone, so the corner pad it used to fill drags the camera again.
+    // Keep the gutter for the buttons, but hand the freed 112 px pad back to drag-to-look.
+    if (ctx.clientX > ctx.innerWidth - 118 && ctx.clientY > ctx.innerHeight - 116) return false
+    return true
+  }
   return false
 }

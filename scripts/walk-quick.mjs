@@ -397,7 +397,7 @@ try {
   await mobile.evaluate(async()=>{for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
 
   const hud=await mobile.evaluate(()=>{
-    const selectors=['.walk-ui .joystick','.walk-ui .look-stick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.dock','.sky-ui','output','.hud-me']
+    const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.dock','.sky-ui','output','.hud-me']
     const boxes=selectors.map(sel=>{
       const el=document.querySelector(sel)
       if(!el)return {sel,missing:true}
@@ -471,20 +471,20 @@ try {
   })
   assert(touchTest.yawTurn>.2&&touchTest.pinchDrift<.01&&touchTest.dist>3.5&&touchTest.along>.9&&touchTest.peakSpeed>6&&touchTest.jumped,`touchTest: ${JSON.stringify(touchTest)}`)
 
-  // IDOK-93 look stick: full right deflection turns the view right (same sign as a rightward drag) at cfg.lookYaw rad/s,
-  // and stops dead on release.
+  // IDOK-171: the right look stick is gone. The corner pad it used to fill must now drag the camera
+  // (rightward drag turns the view right, same sign as before) and no stick node may survive anywhere.
   const lookTest=await mobile.evaluate(()=>{
-    const {walk}=window.viewer, pad=document.querySelector('.walk-ui .look-stick'), r=pad.getBoundingClientRect()
+    const {walk}=window.viewer, canvas=document.querySelector('canvas')
+    const x=innerWidth-70, y=innerHeight-70
     const yaw0=walk.yaw
-    pad.dispatchEvent(new PointerEvent('pointerdown',{pointerId:20,pointerType:'touch',clientX:r.right+8,clientY:r.top+r.height/2,bubbles:true}))
-    for(let i=0;i<30;i++)walk.tick(1/60)
-    const yawRight=walk.yaw-yaw0
-    pad.dispatchEvent(new PointerEvent('lostpointercapture',{pointerId:20,pointerType:'touch',bubbles:true}))
-    const yaw1=walk.yaw
-    for(let i=0;i<10;i++)walk.tick(1/60)
-    return {yawRight,settle:Math.abs(walk.yaw-yaw1),knobReset:pad.querySelector('.look-stick-knob').style.transform===''}
+    canvas.dispatchEvent(new PointerEvent('pointerdown',{pointerId:20,pointerType:'touch',clientX:x,clientY:y,bubbles:true}))
+    canvas.dispatchEvent(new PointerEvent('pointermove',{pointerId:20,pointerType:'touch',clientX:x+80,clientY:y,bubbles:true}))
+    canvas.dispatchEvent(new PointerEvent('pointerup',{pointerId:20,pointerType:'touch',clientX:x+80,clientY:y,bubbles:true}))
+    const yawDrag=walk.yaw-yaw0
+    return {stickNodes:document.querySelectorAll('.look-stick,.look-stick-knob').length,yawDrag}
   })
-  assert(lookTest.yawRight<-.85&&lookTest.yawRight>-1.35&&lookTest.settle<1e-6&&lookTest.knobReset,`lookTest: ${JSON.stringify(lookTest)}`)
+  assert.equal(lookTest.stickNodes,0,'look stick should be removed from the HUD')
+  assert(lookTest.yawDrag<-.2&&lookTest.yawDrag>-.7,`pad drag should turn the camera: ${JSON.stringify(lookTest)}`)
 
   // Also verify 390x844 coexistence when standing next to a parked e-bike AND next to a boat dock (.vehicle-action visible).
   const bikeCoexist=await mobile.evaluate(async()=>{
@@ -500,7 +500,7 @@ try {
       const close=document.querySelector('.spot-card.show .card-close')
       if(close)close.click()
       await new Promise(r=>setTimeout(r,280))
-      const selectors=['.walk-ui .joystick','.walk-ui .look-stick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
+      const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
       const boxes=selectors.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
         return st.display==='none'||st.visibility==='hidden'||el.hasAttribute('hidden')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
       const overlaps=[]
@@ -533,11 +533,11 @@ try {
     assert.equal(await mobile.evaluate(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on')),false,'runLock should clear after boarding e-bike')
     assert.equal(await mobile.evaluate(()=>document.querySelector('.walk-ui .btn-run')?.getAttribute('aria-pressed')),'false')
   }
-  // IDOK-93 landscape phone: same controls, no hit-box overlaps, all inside the viewport.
+  // IDOK-171 landscape phone: the move stick is the only stick left; no hit-box overlaps, all inside the viewport.
   await mobile.setViewportSize({width:844,height:390})
   await mobile.evaluate(async()=>{document.querySelector('.spot-card.show .card-close')?.click();for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
   const land=await mobile.evaluate(()=>{
-    const selectors=['.walk-ui .joystick','.walk-ui .look-stick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
+    const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
     const boxes=selectors.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
       return st.display==='none'||st.visibility==='hidden'||el.closest('[hidden]')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
     const overlaps=[]
@@ -550,7 +550,7 @@ try {
       outOfBounds:boxes.filter(b=>b.left<0||b.top<0||b.right>844.5||b.bottom>390.5).map(b=>b.sel),
       rotate:getComputedStyle(document.querySelector('.dock-buttons>.dock-rotate')).display}
   })
-  assert(land.sticks===2&&!land.overlaps.length&&!land.outOfBounds.length,`landscape HUD: ${JSON.stringify(land)}`)
+  assert(land.sticks===1&&!land.overlaps.length&&!land.outOfBounds.length,`landscape HUD: ${JSON.stringify(land)}`)
   assert.equal(land.rotate,'none','landscape should not offer the rotate entry')
   await mobile.screenshot({path:`${outDir}/mobile-844x390.png`})
   // IDOK-158 landscape phone: the sky panel folds down to the clock, stays hittable, remembers the
@@ -593,7 +593,7 @@ try {
   assert.equal((await skyFold()).folded,false,'tapping again unfolds it')
   assert.equal(await mobile.evaluate(()=>localStorage.getItem('glol.skyFolded')),'0','unfolding clears the flag')
 
-  console.log('mobile 390x844 HUD & touch OK',JSON.stringify({run:+touchTest.dist.toFixed(2),along:+touchTest.along.toFixed(3),peak:touchTest.peakSpeed,lookYaw:+lookTest.yawRight.toFixed(3)}),mobileShot)
+  console.log('mobile 390x844 HUD & touch OK',JSON.stringify({run:+touchTest.dist.toFixed(2),along:+touchTest.along.toFixed(3),peak:touchTest.peakSpeed,dragYaw:+lookTest.yawDrag.toFixed(3)}),mobileShot)
   await mobileCtx.close()
 
   assert.deepEqual(errors,[]);console.log('seconds',(performance.now()-start)/1000);assert(performance.now()-start<180000)

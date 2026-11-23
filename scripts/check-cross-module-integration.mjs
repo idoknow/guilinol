@@ -55,6 +55,11 @@ try {
     assert.equal(guard.isTouchInControlZone({...base, clientX: 240, clientY: 780}), true)
     // Center/upper viewport open for 1-finger orbit & 2-finger pinch zoom
     assert.equal(guard.isTouchInControlZone({...base, clientX: 200, clientY: 360}), false)
+    // IDOK-171: the look stick is gone, so its old corner pad drags the camera again (portrait & landscape)
+    assert.equal(guard.isTouchInControlZone({...base, aboard: false, clientX: 330, clientY: 790}), false)
+    assert.equal(guard.isTouchInControlZone({innerWidth: 844, innerHeight: 390, panelVisible: true, photoOn: false, aboard: false, clientX: 790, clientY: 330}), false)
+    // ...while the button gutter just above/left of it still swallows sloppy taps
+    assert.equal(guard.isTouchInControlZone({...base, aboard: false, clientX: 250, clientY: 700}), true)
     // Photo mode opens full canvas for orbit
     assert.equal(guard.isTouchInControlZone({...base, photoOn: true, clientX: 80, clientY: 740}), false)
   })
