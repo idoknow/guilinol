@@ -1,3 +1,5 @@
+import {northCyclewayGrade,slopeStart,slopeRatio} from './yueya-slope.ts'
+
 export interface PeakWorkerInput {
   packed: ArrayBuffer
   entries: {name: string; center: [number, number, number]; lods: {offset: number; vertices: number; indices: number; indexOffset: number}[]; model?: string}[]
@@ -33,6 +35,18 @@ export interface PeakWorkerOutput {
 }
 
 const clamp = (x: number, lo: number, hi: number) => (x < lo ? lo : x > hi ? hi : x)
+function clearYueyaRoad(positions:Float32Array,normals:Int8Array,start:number,count:number) {
+  for(let vertex=start;vertex<start+count;vertex++) {
+    const at=vertex*3
+    const from=slopeStart(positions[at]), distance=positions[at+2]-from
+    if(distance<=0)continue
+    const ratio=slopeRatio(distance), derivative=ratio*ratio
+    positions[at+2]=from+distance*ratio
+    const nz=normals[at+2]/derivative, nx=normals[at]-northCyclewayGrade*(1-derivative)*nz, ny=normals[at+1]
+    const scale=127/(Math.hypot(nx,ny,nz)||1)
+    normals[at]=Math.round(nx*scale);normals[at+1]=Math.round(ny*scale);normals[at+2]=Math.round(nz*scale)
+  }
+}
 const smooth = (a: number, b: number, x: number) => {
   const t = clamp((x - a) / (b - a), 0, 1)
   return t * t * (3 - 2 * t)
@@ -198,6 +212,10 @@ self.onmessage = async (event: MessageEvent<PeakWorkerInput>) => {
     const riverCliff=entry.name==='伏波山'
     const radius = fillLevel(lod0, cx, cy, cz, pickVal, pos0, norm0, col0, height0, pick0, cursor0, true,riverCliff)
     if(!sharedLevel)fillLevel(lod1, cx, cy, cz, pickVal, pos1, norm1, col1, height1, pick1, cursor1, false,riverCliff)
+    if(entry.name==='月牙山') {
+      clearYueyaRoad(pos0,norm0,cursor0,lod0.vertices)
+      if(!sharedLevel)clearYueyaRoad(pos1,norm1,cursor1,lod1.vertices)
+    }
 
     const template0 = getShared(lod0.indexOffset, lod0.indices)
     if (!localIdx0.length) localIdx0 = Uint32Array.from(template0)
