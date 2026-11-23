@@ -27,12 +27,17 @@ fi
 [ -n "${DIST:-}" ] && [ -d "$DIST" ] || {
   echo "找不到构建产物（试过 dist、web/dist）；请用 DIST=<dir> 指定" >&2; exit 2; }
 
-# 明文 http 会把 token 泄露出去，只允许本机回环
-case "$API" in
-  https://*) ;;
-  http://127.0.0.1*|http://localhost*) ;;
-  *) echo "CDNFLY_API 必须是 https（或本机回环）：$API" >&2; exit 3 ;;
-esac
+# 明文 http 只允许真正的回环主机名（精确匹配，前缀匹配会被 127.0.0.1.evil.com 绕过）
+python3 - "$API" <<'PY' || exit 3
+import sys, urllib.parse
+u = urllib.parse.urlsplit(sys.argv[1])
+host = (u.hostname or '').lower()
+if u.scheme not in ('http', 'https') or not host:
+    print(f'错误: CDNFLY_API 不是合法 URL {sys.argv[1]}', file=sys.stderr); sys.exit(1)
+if u.scheme == 'http' and host not in ('127.0.0.1', '::1', 'localhost'):
+    print(f'错误: CDNFLY_API 用明文 http 会把 token 发到 {host}，请改 https', file=sys.stderr)
+    sys.exit(1)
+PY
 
 export API HOST DIST STATE DIRS DRY_RUN BATCH MAX_TIME
 
@@ -115,14 +120,21 @@ if STATE_ONLY:
 if not TOKEN:
     die('需要 CDNFLY_TOKEN')
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """不跟随重定向：urllib 默认会把自定义请求头（含 access-token）带到重定向目标"""
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+OPENER = urllib.request.build_opener(NoRedirect)
+
 def api(path, body=None):
     data = json.dumps(body, ensure_ascii=False).encode() if body is not None else None
     req = urllib.request.Request(API + path, data=data, method='POST' if data else 'GET')
     req.add_header('access-token', TOKEN)       # token 只在请求头，不进进程列表
     req.add_header('Content-Type', 'application/json')
-    req.add_header('User-Agent', 'cdn-sync/3')
+    req.add_header('User-Agent', 'cdn-sync/4')
     try:
-        with urllib.request.urlopen(req, timeout=MAX_T) as r:
+        with OPENER.open(req, timeout=MAX_T) as r:
             payload = json.loads(r.read().decode() or '{}')
     except urllib.error.HTTPError as e:
         die(f'HTTP {e.code}: {e.read()[:200]!r}')

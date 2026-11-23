@@ -7,14 +7,16 @@
 #
 # 安全约定：
 #   * token 通过 curl 配置文件（0600）传入，不出现在命令行/进程列表
-#   * CDNFLY_API 必须是 https；只有 127.0.0.1 / localhost 允许 http
+#   * CDNFLY_API 必须是 https；只有主机名「恰好」是 127.0.0.1 / ::1 / localhost 才允许 http
+#     （不能按前缀判断：127.0.0.1.evil.com 前缀也匹配 127.0.0.1）
+#   * 超时只能是 1..600 的整数，防止把换行塞进 curl 配置文件、注入额外 URL 偷 token
 #
 # 环境变量：
 #   CDNFLY_API       面板地址，默认 https://cdn.cdn.sn
 #   CDNFLY_TOKEN     登录后的 access_token（必填）
 #   SITE             站点域名，默认 glol.rcpd.cc
 #   DRY_RUN=1        只打印要提交的内容
-#   CONNECT_TIMEOUT / MAX_TIME  默认 10s / 60s
+#   CONNECT_TIMEOUT / MAX_TIME  默认 10s / 60s（1..600）
 #
 # 用法：
 #   ./scripts/cdn-purge.sh dir
@@ -28,13 +30,21 @@ API="${CDNFLY_API:-https://cdn.cdn.sn}"
 SITE="${SITE:-glol.rcpd.cc}"
 BASE="https://$SITE"
 DRY_RUN="${DRY_RUN:-0}"
-CONNECT_TIMEOUT="${CONNECT_TIMEOUT:-10}"
-MAX_TIME="${MAX_TIME:-60}"
+
+# 只接受 1..600 的整数，其它一律回落默认值（防 curl 配置注入）
+num() {
+  case "${1:-}" in
+    ''|*[!0-9]*) printf '%s' "$2" ;;
+    *) if [ "$1" -ge 1 ] && [ "$1" -le 600 ]; then printf '%s' "$1"; else printf '%s' "$2"; fi ;;
+  esac
+}
+CONNECT_TIMEOUT="$(num "${CONNECT_TIMEOUT:-}" 10)"
+MAX_TIME="$(num "${MAX_TIME:-}" 60)"
 
 WORK="$(mktemp -d)"
 umask 077
 RC="$WORK/curlrc"
-printf 'header = "access-token: %s"\nheader = "User-Agent: cdn-purge/3"\nconnect-timeout = %s\nmax-time = %s\n' \
+printf 'header = "access-token: %s"\nheader = "User-Agent: cdn-purge/4"\nconnect-timeout = %s\nmax-time = %s\n' \
   "${CDNFLY_TOKEN:-}" "$CONNECT_TIMEOUT" "$MAX_TIME" > "$RC"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -42,14 +52,21 @@ die() { echo "错误: $*" >&2; exit 3; }
 
 need_token() { [ -n "${CDNFLY_TOKEN:-}" ] || die "需要 CDNFLY_TOKEN 环境变量"; }
 
-# 明文 http 会把 token 发到网上，只允许本机回环
+# 明文 http 只允许真正的回环主机名（精确匹配，不做前缀匹配）
 check_api_scheme() {
-  case "$API" in
-    https://*) return 0 ;;
-    http://127.0.0.1*|http://localhost*) return 0 ;;
-    http://*) die "CDNFLY_API 是明文 http，会泄露 token：$API" ;;
-    *) die "CDNFLY_API 不是合法 URL：$API" ;;
-  esac
+  python3 - "$API" <<'PY' || exit 3
+import sys, urllib.parse
+url = sys.argv[1]
+u = urllib.parse.urlsplit(url)
+if u.scheme not in ('http', 'https'):
+    print(f'错误: CDNFLY_API 必须是 http(s):// {url}', file=sys.stderr); sys.exit(1)
+host = (u.hostname or '').lower()
+if not host:
+    print(f'错误: CDNFLY_API 解析不到主机名 {url}', file=sys.stderr); sys.exit(1)
+if u.scheme == 'http' and host not in ('127.0.0.1', '::1', 'localhost'):
+    print(f'错误: CDNFLY_API 用明文 http 会把 token 发到 {host}，请改 https', file=sys.stderr)
+    sys.exit(1)
+PY
 }
 
 absolute() {
@@ -60,17 +77,19 @@ absolute() {
   esac
 }
 
-# api METHOD PATH [BODY_FILE]：HTTP 非 2xx 直接失败（不再把错误页当成功）
+# api METHOD PATH [BODY_FILE]：成功把响应体写到 stdout 返回 0；
+# 失败把原因写进 API_ERR 返回 1。**不直接退出**，让调用方还能做「是否已入队」的恢复判断。
+API_ERR=''
 api() {
   local method="$1" path="$2" body_file="${3:-}" code
   local -a args=(-sS -K "$RC" -o "$WORK/body.out" -w '%{http_code}' -X "$method")
   [ -n "$body_file" ] && args+=(-H 'Content-Type: application/json' --data-binary "@$body_file")
-  code="$(curl "${args[@]}" "$API$path" 2>/dev/null || echo 000)"
+  # curl 失败时自己会打 000，别再用 || echo 000 叠加成 000000
+  if ! code="$(curl "${args[@]}" "$API$path" 2>/dev/null)"; then code=000; fi
   case "$code" in
-    2*) cat "$WORK/body.out" ;;
-    000) die "请求失败（连接或超时）: $method $path" ;;
-    *)   echo "HTTP $code: $(head -c 200 "$WORK/body.out" 2>/dev/null)" >&2
-         die "接口返回 HTTP $code: $method $path" ;;
+    2*) cat "$WORK/body.out"; return 0 ;;
+    000) API_ERR="连接失败或超时: $method $path"; return 1 ;;
+    *)   API_ERR="HTTP $code: $(head -c 200 "$WORK/body.out" 2>/dev/null)"; return 1 ;;
   esac
 }
 
@@ -122,14 +141,14 @@ PY
 
   need_token; check_api_scheme
   if ! api POST /v1/jobs "$body" > "$resp"; then
-    # 网络层失败不盲重试：先确认是否已入队，避免重复任务
+    # 失败先别急着报错：服务端可能已经收下，只是响应丢了
     local first
     first="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))[0]["data"]["url"])' "$body")"
-    echo "提交失败，检查是否已入队: $first" >&2
+    echo "提交失败（$API_ERR），检查是否已入队: $first" >&2
     if job_exists "$type" "$first"; then
       echo "任务已在队列中，视为成功（不重试）" >&2; return 0
     fi
-    die "提交失败且任务列表里没有，请稍后重跑"
+    die "$API_ERR；任务列表里也没有，请稍后重跑"
   fi
   parse_resp "$resp" "提交 $type"
 }
@@ -159,7 +178,7 @@ case "$cmd" in
   list)
     need_token; check_api_scheme
     t="${1:-clean_url}"
-    api GET "/v1/jobs?type=$t&key1=$SITE&page=1&limit=50" > "$WORK/list.json"
+    api GET "/v1/jobs?type=$t&key1=$SITE&page=1&limit=50" > "$WORK/list.json" || die "$API_ERR"
     python3 - "$WORK/list.json" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1], encoding='utf-8'))
@@ -170,5 +189,5 @@ for r in (d.get('data') or []):
     print(' ', r.get('create_at2'), r.get('type'), r.get('state'), r.get('key2'))
 PY
     ;;
-  *) sed -n '2,22p' "$0"; exit 2 ;;
+  *) sed -n '2,26p' "$0"; exit 2 ;;
 esac
