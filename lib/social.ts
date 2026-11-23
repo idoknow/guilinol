@@ -332,8 +332,21 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
     return back('unavailable')
   }
   if (profile.code === 2) return back('pending')
-  if (profile.code !== 0 || profile.type !== type || !/^[A-Fa-f0-9]{16,64}$/.test(profile.social_uid ?? '')) {
-    logSocial({ action: 'callback', type, failure: 'upstream', code: profile.code, errcode: profile.errcode, msg: profile.msg })
+  // uid 只做「像不像一个第三方 id」的形状校验：QQ 回来是 32 位 md5（纯十六进制），
+  // 微信 openid 是 28 位 base64url（含大小写字母、-、_），只允许十六进制会把微信全拒掉。
+  const upstreamUid = profile.social_uid ?? ''
+  if (profile.code !== 0 || profile.type !== type || !/^[A-Za-z0-9_-]{8,64}$/.test(upstreamUid)) {
+    logSocial({
+      action: 'callback',
+      type,
+      failure: 'upstream',
+      code: profile.code,
+      errcode: profile.errcode,
+      msg: profile.msg,
+      upType: profile.type,
+      uidLen: upstreamUid.length,
+      uidShape: /^[A-Fa-f0-9]+$/.test(upstreamUid) ? 'hex' : /^[A-Za-z0-9_-]+$/.test(upstreamUid) ? 'base64url' : 'other',
+    })
     return back('failed')
   }
 
