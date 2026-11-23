@@ -81,3 +81,8 @@ const client=new S3Client({region:'us-east-1',endpoint:process.env.S3_ENDPOINT,f
 try{await client.send(new HeadBucketCommand(params))}catch(error){if(error.$metadata?.httpStatusCode!==404)throw error;await client.send(new CreateBucketCommand(params))}
 JS
 k wait --for=condition=Ready certificate/glol-tls --timeout=300s
+
+# 部署完成后再触发 CDN 刷新 + 预热（workflow 自己也会等 /version.json 切到 $tag）。
+# 失败只告警，不影响发版。
+gh workflow run cdn-purge.yml -R idoknow/guilinol --ref main -f mode=sync -f sha="$tag" \
+  || echo "触发 CDN 刷新失败（不影响发版）" >&2
