@@ -10,7 +10,7 @@ from atlas import flat, rings
 from common import ll2xz
 from features import area, points, polygons
 
-BBOX = (25.09, 110.09, 25.39, 110.41)
+BBOX = (25.09, 110.00, 25.39, 110.41)
 SNAPSHOT = Path(__file__).with_name('overview-map.gz')
 
 

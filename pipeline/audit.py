@@ -107,7 +107,8 @@ def apply_landmark_exceptions(rules, *categories):
 def run_audit(world_dir: Path, root: Path) -> dict:
     manifest = json.loads((world_dir / 'manifest.json').read_text())
     left, top, width, depth = manifest['extent']
-    bounds = box(left, top, left + width, top + depth)
+    bounds = Polygon(manifest['region']['local']) if manifest.get('region') else box(left, top, left + width, top + depth)
+    road_bounds = bounds.buffer(-2.0)
     gw, gh = width // GRID + 1, depth // GRID + 1
     nx_chunks, nz_chunks = width // CHUNK, depth // CHUNK
 
@@ -517,7 +518,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         if hw not in RULES['defaultWidth']:
             continue
         if hw == 'pedestrian' and tags.get('area') == 'yes':
-            poly_a = area(el).intersection(bounds.buffer(-2.0))
+            poly_a = area(el).intersection(road_bounds)
             if not poly_a.is_empty and not u_lm_replace_poly.contains(poly_a.representative_point()):
                 rp = poly_a.representative_point()
                 if not u_surface_check.intersects(rp.buffer(1.0)) and not has_ground_paving(poly_a):
@@ -534,7 +535,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         is_bridge = tags.get('bridge', 'no') != 'no'
         m_w = re.fullmatch(r'(\d+(?:\.\d+)?)\s*(?:m)?', tags.get('width', '').strip())
         w_est = float(m_w[1]) if m_w else float(RULES['defaultWidth'].get(hw, 8.0))
-        clipped = full_line.intersection(bounds.buffer(-2.0))
+        clipped = full_line.intersection(road_bounds)
         if hw == 'pedestrian' and not u_lm_replace_poly.is_empty:
             clipped = clipped.difference(u_lm_replace_poly)
         for seg in getattr(clipped, 'geoms', [clipped]):

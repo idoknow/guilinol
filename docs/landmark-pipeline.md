@@ -4,6 +4,8 @@
 
 每个生成脚本 `pipeline/landmarks/<id>.py` 接收一个临时输出目录，把未压缩 `<id>.glb`（内嵌图片）和源 PNG 写进去。安装**原生** meshoptimizer gltfpack v1.0（含 BasisU；不是 npm 的 wasm 版），放入 PATH 或设置 `GLTFPACK` 后运行 `npm run landmarks`。生成的 GLB 和同名 JSON 包围球/LOD 元数据一起提交。命名 `lod0` / `lod1` / `lod2` 的节点分别在近、中、远距离显示；没有相应层级时隐藏。`collision: mesh` 读取 `collision*` 子树，`box` 用世界包围盒，`none` 无碰撞。
 
+招牌文字会生成几何面。构建使用 Noto Sans CJK Bold 2.004；系统没有对应版本时会从字体项目下载到 `.world-cache/fonts/` 并核对 SHA-256。离线构建可预置同版本文件。
+
 `uv run python pipeline/refresh_osm.py` 从原始交接查询扩充街道节点，可传 `--endpoint`。仅在结果完整且为 2026-11 快照时替换 `raw/osm-2026-11.json`；没有新文件时可用交接底图构建。`npm run world` 写出逐路段 `street-report.json`，标明 `width`、`lanes`、`frontage` 和估算来源。GL04 街道段追加可选的第 4 项：信号灯杆位置，单位同灯位。
 
 `web/src/look/tiles.ts` 控制近景贴图开关、距离与各类平铺米数；白色 KTX2 为乘色占位。`npm run verify:walk` 默认快速版，固定步长运行真实角色控制器。长路线、逐帧检查和原有截图改用 `npm run verify:walk:full`。`CHROMIUM=/usr/bin/chromium node scripts/street-views.mjs` 重拍街景。

@@ -7,9 +7,9 @@ import osmium
 from prepare_expansion import SOUTH as S, WEST as W, NORTH as N, EAST as E
 pbf, out = sys.argv[1], sys.argv[2]
 
-WAY_KEYS = ['building', 'highway', 'natural', 'waterway', 'water', 'leisure', 'landuse',
+WAY_KEYS = ['aeroway', 'building', 'highway', 'natural', 'waterway', 'water', 'leisure', 'landuse',
             'railway', 'bridge', 'man_made', 'tourism', 'historic', 'amenity']
-REL_KEYS = ['building', 'natural', 'waterway', 'water', 'leisure', 'landuse']
+REL_KEYS = ['aeroway', 'building', 'natural', 'waterway', 'water', 'leisure', 'landuse']
 NODE_KEYS = ['tourism', 'historic', 'place', 'amenity', 'shop', 'barrier']
 NODE_KV = {('natural', 'peak'), ('railway', 'station'), ('natural', 'tree')}
 CROSS = {'crossing', 'traffic_signals', 'bus_stop', 'street_lamp'}

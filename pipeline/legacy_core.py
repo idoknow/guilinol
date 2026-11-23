@@ -53,7 +53,7 @@ def snapshot():
                 for f in archive if f.isfile() and f.name.startswith('world/')}
 
 
-def preserve_campus_indexes(output, entries):
+def published_campus_indexes(entries):
     from shapely.geometry import Polygon, box
     from shapely.ops import unary_union
     from shapely.prepared import prep
@@ -68,14 +68,8 @@ def preserve_campus_indexes(output, entries):
     region = prep(unary_union([box(east,south,east+CHUNK,south+CHUNK) for east,south in CAMPUS_TILES]))
     def overlaps(ring):
         return region.intersects(Polygon(zip(ring[::2],ring[1::2])))
-    path = output/'atlas.bin'
-    atlas = json.loads(gzip.decompress(path.read_bytes()))
-    atlas['buildings'] = ([ring for ring in atlas['buildings'] if not overlaps(ring)] +
-                          [ring for ring in reference['buildings'] if overlaps(ring)])
-    compressed = gzip.compress(json.dumps(atlas,ensure_ascii=False,separators=(',',':')).encode(),mtime=0)
-    if len(compressed)>400_000:
-        raise ValueError('Merged campus atlas exceeds 400 KB')
-    path.write_bytes(compressed)
+    return overlaps, [ring for ring in reference['buildings'] if overlaps(ring)]
+
 
 
 class Downtown:

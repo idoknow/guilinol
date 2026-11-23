@@ -1,4 +1,4 @@
-import {playableBounds} from '../../lib/projection'
+import {nearestPlayable} from '../../lib/play-region'
 import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
 import {bytes, fetchAsset, measureFirstWorldBytes, openingTerrain, startOverview, type Manifest} from './world'
@@ -117,10 +117,11 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const controls = flight(camera,renderer.domElement,bounds.extent,()=>getPlayMode()==='tour'&&!paused&&!walker?.active&&!switching&&!cinema)
   // Apply the opening pose here, after flight() has set rotation.order='YXZ'. lookAt()/rotation.set()
   // before that line would be recomputed in the wrong Euler order and leave a permanent roll.
-  const {min,max} = playableBounds(bounds.bbox)
+  let playBounds: Pick<Manifest,'bbox'|'region'> = bounds
   function clampOpening() {
-    camera.position.x = THREE.MathUtils.clamp(camera.position.x,min.x,max.x)
-    camera.position.z = THREE.MathUtils.clamp(camera.position.z,min.z,max.z)
+    const point=nearestPlayable(playBounds,camera.position.x,camera.position.z)
+    camera.position.x=point.x
+    camera.position.z=point.z
   }
   function restoreOpening(view:FeedbackView) {
     applyLastView(camera,view)
@@ -184,6 +185,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   if(terrain){scene.add(terrain.mesh);await presentOpening()}
   async function loadFullScene(){
     const manifest=previousWorld??await readManifest()
+    playBounds=manifest
+    clampOpening()
     entrySignal?.throwIfAborted()
     if(terrain){
       openingStream=new Stream(scene,manifest,terrain,rangeStore,camera)
@@ -475,7 +478,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     if(getPlayMode()==='solo'&&!walker?.active)return
     if((paused||tour?.map?.active)&&frame>2){previous=0;return}
     const elapsed = previous?now-previous:0;previous=now
-    if(!switching){if(walker?.active)walker.tick(elapsed/1000);else controls(elapsed/1000)}
+    if(!switching){if(walker?.active)walker.tick(elapsed/1000);else {controls(elapsed/1000);clampOpening()}}
     if(frame===1) {
       if(!first)markFirstFrame()
       void import('./play').then(mod=>{tour=mod.play(host)})

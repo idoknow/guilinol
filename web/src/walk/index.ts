@@ -1,3 +1,4 @@
+import {nearestPlayable} from '../../../lib/play-region'
 import * as THREE from 'three'
 import {passengerTop} from './passenger-height'
 import {tunnelFloor} from '../tunnels'
@@ -1236,7 +1237,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     return ready
   }
   async function enter(x:number,z:number,heading:number,reason:string,override=false,signal?:AbortSignal,progress?:(fraction:number,detail:string)=>void){
-    if(!sim.withinBounds(x,z))return false
+    if(!sim.withinBounds(x,z)){
+      if(!manifest.region)return false
+      const point=nearestPlayable(manifest,x,z)
+      x=point.x;z=point.z
+    }
     if(shopOverlay?.isOpen())shopOverlay?.close('teleport')
     const target=new THREE.Vector3(x,0,z);destination=target
     stream.prioritize(x,z)
@@ -2195,7 +2200,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(sim.wet(next.x,next.z)){
         const foot=next.y-cfg.height/2,deck=sim.surface(next.x,next.z,'deck')
         if(!deck||foot<deck.y-.35){
-          const tread=sim.surface(next.x,next.z,'landmark',foot+.6,1.4),tile=sim.tileAt(next.x,next.z),water=tile&&stream.loaded.get(tile)?.water
+          // A raised carriageway can cross a wet terrain cell without a
+          // separate bridge deck. Require solid support above the waterline.
+          const tread=sim.surface(next.x,next.z,'landmark',foot+.6,1.4)
+            ?? sim.groundSurface(next.x,next.z,foot)
+          const tile=sim.tileAt(next.x,next.z),water=tile&&stream.loaded.get(tile)?.water
           const level=tile&&water?water[Math.round((next.z-tile.z)/4)*65+Math.round((next.x-tile.x)/4)]/10:Infinity
           if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;vx=vz=0;blockedWater=true;if(!rides?.bike||!substepHit){rides?.stop();bikeSpeed=0}}
         }
@@ -2275,6 +2284,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }
       if((rides?.bike||rides?.car)&&vehicleForbiddenAt(next.x,next.z)){
         next.x=pos.x;next.y=pos.y;next.z=pos.z;rides.stop();bikeSpeed=vx=vz=0;bikeObstacle='restricted'
+      }
+      if(!sim.withinBounds(next.x,next.z)){
+        next.x=pos.x;next.z=pos.z;vx=vz=bikeSpeed=0
+        if(rides?.bike||rides?.car)rides.stop()
       }
       traveled+=Math.hypot(next.x-pos.x,next.z-pos.z);sim.body.setNextKinematicTranslation(next);sim.world.step();if(grounded&&!blockedWater)safe.set(next.x,next.y,next.z)
     }

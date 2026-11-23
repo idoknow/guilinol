@@ -1,17 +1,18 @@
+import {inRegion} from '../../../lib/play-region'
 import {ll2xz} from '../../../lib/projection'
 import type {Manifest} from '../world'
 
-export const northwest = ll2xz(25.39,110.09), southeast = ll2xz(25.09,110.41)
+export const northwest = ll2xz(25.39,110.00), southeast = ll2xz(25.09,110.41)
 
 export function builtBoundary(manifest:Manifest) {
   const [south,west,north,east] = manifest.bbox
-  const rings = manifest.builtArea?.coordinates ?? [[[west,north],[east,north],[east,south],[west,south]]]
+  const rings = (manifest.region ? [manifest.region.geographic] : manifest.builtArea?.coordinates) ?? [[[west,north],[east,north],[east,south],[west,south]]]
   const path = new Path2D()
   for(const ring of rings){ring.forEach(([lon,lat],index)=>{
     const {x,z} = ll2xz(lat,lon); if(index) path.lineTo(x,z); else path.moveTo(x,z)
   }); path.closePath()}
   const context = document.createElement('canvas').getContext('2d')!
-  return {path, contains:(x:number,z:number)=>context.isPointInPath(path,x,z,'evenodd')}
+  return {path, contains:(x:number,z:number)=>manifest.region ? inRegion(manifest,x,z) : context.isPointInPath(path,x,z,'evenodd')}
 }
 
 type Label = [string,string,number,number]

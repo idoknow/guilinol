@@ -118,7 +118,17 @@ interface Data {
   grid: number[]
   mask: string
   motorGrid?: number[]
+  maskEncoding?: 'gzip'
   motorMask?: string
+}
+
+async function roadBits(encoded: string, encoding?: 'gzip') {
+  const binary = atob(encoded)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  if (!encoding) return bytes
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))
+  return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 
 export async function vehicles(
@@ -184,13 +194,15 @@ export async function vehicles(
   }
   loadPersistedBatteries()
 
-  const mask = atob(data.mask)
+  const mask = await roadBits(data.mask, data.maskEncoding)
   const [left, top, width, height, step] = data.grid
   const group = new T.Group()
   scene.add(group)
-  const mMask = data.motorMask ? atob(data.motorMask) : mask
+  const mMask = data.motorMask ? await roadBits(data.motorMask, data.maskEncoding) : mask
   const [mLeft, mTop, mWidth, mHeight, mStep] = data.motorGrid ?? data.grid
-  const cells = new Map<string, T.Group>()
+  type Spawn = {kind: 'bike' | 'bicycle' | 'car'; row: Data['bikes'][number]; shared: boolean; pickup?: () => void}
+  type ParkingCell = {pending: Spawn[]; group?: T.Group}
+  const cells = new Map<string, ParkingCell>()
   const visibleCells = new Set<T.Group>()
   const cellSize = 128
   const bikeStates = new WeakMap<T.Object3D, BikeInstanceState>()
@@ -247,17 +259,27 @@ export async function vehicles(
     parkedCells.get(cell)!.sync(visible, models)
   }
 
-  function store(mesh: T.Object3D) {
-    if(mesh.name==='car')pickupHandles.set(mesh,pickups.add({...mesh.position,yaw:mesh.rotation.y,halfWidth:.9,halfLength:2.12,height:1.5}))
-    const key = `${Math.floor(mesh.position.x / cellSize)},${Math.floor(mesh.position.z / cellSize)}`
+  function parkingCell(x: number, z: number) {
+    const key = `${Math.floor(x / cellSize)},${Math.floor(z / cellSize)}`
     let cell = cells.get(key)
     if (!cell) {
-      cell = new T.Group()
+      cell = {pending: []}
       cells.set(key, cell)
-      parkedCells.set(cell, new ParkedBatches())
+    }
+    return cell
+  }
+
+  function store(mesh: T.Object3D, pickup?: () => void) {
+    if (mesh.name === 'car') {
+      pickupHandles.set(mesh, pickup ?? pickups.add({...mesh.position, yaw: mesh.rotation.y, halfWidth: .9, halfLength: 2.12, height: 1.5}))
+    }
+    const cell = parkingCell(mesh.position.x, mesh.position.z)
+    if (!cell.group) {
+      cell.group = new T.Group()
+      parkedCells.set(cell.group, new ParkedBatches())
     }
     mesh.updateMatrix()
-    cell.add(mesh)
+    cell.group.add(mesh)
   }
 
   function detachMeshFromCells(mesh: T.Mesh | null) {
@@ -301,22 +323,40 @@ export async function vehicles(
     store(mesh)
   }
 
-  for (const [x, y, z, angle, paint] of data.bikes) addBike(x, y, z, angle, paint)
-  for (const [x, y, z, angle, paint] of data.sharedBikes ?? []) addBike(x, y, z, angle, paint, 'shared')
-  for (const [x, y, z, angle, paint] of data.bicycles ?? []) {
-    const mesh = marker('bicycle', paint)
-    mesh.position.set(x, y, z)
-    mesh.rotation.y = angle
-    store(mesh)
-  }
-  for (const [x, y, z, angle, paint] of data.cars ?? []) {
-    const mesh = marker('car', paint)
-    mesh.position.set(x, y, z)
-    mesh.rotation.y = angle
-    store(mesh)
+  function queueSpawns(kind: Spawn['kind'], rows: Data['bikes'], shared = false) {
+    for (const row of rows) {
+      const [x, y, z, yaw] = row
+      // Traffic queries these solids even when the player cannot see the parked cars.
+      const pickup = kind === 'car' ? pickups.add({x, y, z, yaw, halfWidth: .9, halfLength: 2.12, height: 1.5}) : undefined
+      parkingCell(x, z).pending.push({kind, row, shared, pickup})
+    }
   }
 
-  const vessels = data.routes.map(route => {
+  function loadParkingCell(cell: ParkingCell) {
+    if (cell.pending.length === 0) return cell.group!
+    for (const {kind, row, shared, pickup} of cell.pending) {
+      const [x, y, z, angle, paint] = row
+      if (kind === 'bike') {
+        addBike(x, y, z, angle, paint, shared ? 'shared' : undefined)
+      } else {
+        const mesh = marker(kind, paint)
+        mesh.position.set(x, y, z)
+        mesh.rotation.y = angle
+        store(mesh, pickup)
+      }
+    }
+    cell.pending.length = 0
+    cell.group!.userData.batchReady = false
+    return cell.group!
+  }
+
+  queueSpawns('bike', data.bikes)
+  queueSpawns('bike', data.sharedBikes ?? [], true)
+  queueSpawns('bicycle', data.bicycles ?? [])
+  queueSpawns('car', data.cars ?? [])
+
+  const {routes, docks} = data
+  const vessels = routes.map(route => {
     const pink = route.kind === 'boat' && [route.start, route.end].includes('桂湖')
     const mesh = vehicleModel(route.kind, pink ? 1 : 0)
     mesh.position.fromArray(route.path[0])
@@ -326,9 +366,9 @@ export async function vehicles(
   const piers = new Map<string, T.Mesh>()
   const pierShape = new T.BoxGeometry(1, 1, 1)
   const pierMaterial = new T.MeshStandardMaterial({color: 0x816a50})
-  for (const leg of data.routes) {
+  for (const leg of routes) {
     if (piers.has(leg.start)) continue
-    const [x, , z] = data.docks[leg.start]
+    const [x, , z] = docks[leg.start]
     const [waterX, waterY, waterZ] = leg.path[0]
     const dx = waterX - x
     const dz = waterZ - z
@@ -341,12 +381,12 @@ export async function vehicles(
     piers.set(leg.start, mesh)
   }
   const departures = new Set<string>()
-  const moored = data.routes.map(leg => {
+  const moored = routes.map(leg => {
     const first = !departures.has(leg.start)
     departures.add(leg.start)
     return first
   })
-  const freeBoats = env ? createFreeBoats({group, docks: data.docks, routes: data.routes, sim: env.sim, stream: env.stream}) : null
+  const freeBoats = env ? createFreeBoats({group, docks, routes, sim: env.sim, stream: env.stream}) : null
 
   const ringMat = new T.MeshBasicMaterial({color: 0xd86b4a, transparent: true, opacity: 0.45, depthWrite: false, side: T.DoubleSide, fog: false})
   const interactRing = new T.Mesh(new T.RingGeometry(0.86, 1.08, 32).rotateX(-Math.PI / 2), ringMat)
@@ -429,7 +469,7 @@ export async function vehicles(
             ? disembark
               ? '下一站下船'
               : '下站下船'
-            : ridePrompt || (preferFree ? freePrompt : nearRoute >= 0 ? '上船 · ' + data.routes[nearRoute].start : '')
+            : ridePrompt || (preferFree ? freePrompt : nearRoute >= 0 ? '上船 · ' + routes[nearRoute].start : '')
     if (activeTarget?.name === 'bike') {
       button.dataset.ebikeTier =
         (activeTarget.userData.vehicleType as EbikeVehicleType | undefined) ??
@@ -584,7 +624,7 @@ export async function vehicles(
   }
 
   function reset() {
-    if (route >= 0) vessels[route].position.fromArray(data.routes[route].path[0])
+    if (route >= 0) vessels[route].position.fromArray(routes[route].path[0])
     freeBoats?.reset()
     if (car) {
       car.rotation.set(carCtrl.pitch, carCtrl.heading, 0, 'YXZ')
@@ -730,7 +770,7 @@ export async function vehicles(
     } else if (bike) {
       if (land(bike.position.x, bike.position.z, bikeCtrl.heading, bike.position.y)) reset()
     } else if (freeBoats?.active) {
-      const spot = freeBoats.dismount(data.docks, s => !!env?.landFree(s))
+      const spot = freeBoats.dismount(docks, s => !!env?.landFree(s))
       if (spot) {
         nearFree = {slot: null, distance: Infinity, atBank: false}
         syncHud()
@@ -810,7 +850,7 @@ export async function vehicles(
       preferFree && nearFree.slot
         ? {kind: 'free_boat', label: (nearFree.slot.kind === 'freeRaft' ? '划竹筏 · ' : '划小船 · ') + nearFree.slot.name, distance: nearFree.distance}
         : nearRoute >= 0
-          ? {kind: 'tour_boat', label: '上船 · ' + data.routes[nearRoute].start, distance: nearRouteDist}
+          ? {kind: 'tour_boat', label: '上船 · ' + routes[nearRoute].start, distance: nearRouteDist}
           : null
     return {
       aboardKind,
@@ -833,8 +873,9 @@ export async function vehicles(
     const nextCells = new Set<T.Group>()
     for (let col = Math.floor((x - 110) / cellSize); col <= Math.floor((x + 110) / cellSize); col++) {
       for (let row = Math.floor((z - 110) / cellSize); row <= Math.floor((z + 110) / cellSize); row++) {
-        const cell = cells.get(`${col},${row}`)
-        if (!cell) continue
+        const parking = cells.get(`${col},${row}`)
+        if (!parking) continue
+        const cell = loadParkingCell(parking)
         nextCells.add(cell)
         if (!visibleCells.has(cell)) {
           visibleCells.add(cell)
@@ -883,8 +924,8 @@ export async function vehicles(
     nearDecor = active && !car && !bike && route < 0 && !freeBoats?.active ? env?.stream.batches.nearestBike(x,z,footY,Math.min(bestScore,4.2)) ?? null : null
     if (nearDecor) decorDistance = Math.hypot(nearDecor.x-x,nearDecor.z-z)
     let nearestDock = 9
-    data.routes.forEach((leg, index) => {
-      const [dx, , dz] = data.docks[leg.start]
+    routes.forEach((leg, index) => {
+      const [dx, , dz] = docks[leg.start]
       const distance = Math.hypot(dx - x, dz - z)
       vessels[index].visible = route === index || (moored[index] && distance < 200)
       piers.get(leg.start)!.visible = distance < 200
@@ -922,14 +963,14 @@ export async function vehicles(
     const col = Math.round((x - left) / step)
     const row = Math.round((z - top) / step)
     const index = row * width + col
-    return col >= 0 && row >= 0 && col < width && row < height && !!(mask.charCodeAt(index >> 3) & (128 >> (index & 7)))
+    return col >= 0 && row >= 0 && col < width && row < height && !!(mask[index >> 3] & (128 >> (index & 7)))
   }
 
   function motorPavement(x: number, z: number) {
     const col = Math.round((x - mLeft) / mStep)
     const row = Math.round((z - mTop) / mStep)
     const index = row * mWidth + col
-    return col >= 0 && row >= 0 && col < mWidth && row < mHeight && !!(mMask.charCodeAt(index >> 3) & (128 >> (index & 7)))
+    return col >= 0 && row >= 0 && col < mWidth && row < mHeight && !!(mMask[index >> 3] & (128 >> (index & 7)))
   }
 
   function summonPersonalBike(playerPos: {x: number; y: number; z: number}, playerYaw: number, vehicleId?: string): SummonPersonalBikeResult {
@@ -1167,7 +1208,7 @@ export async function vehicles(
   }
 
   function advance(dt: number) {
-    const leg = data.routes[route]
+    const leg = routes[route]
     const mesh = vessels[route]
     let distance = 2 * dt
     while (segment < leg.path.length) {
@@ -1185,9 +1226,9 @@ export async function vehicles(
       distance -= gap
       segment++
     }
-    const [x, , z] = data.docks[leg.end]
-    const departures2 = data.routes.filter(other => other.start === leg.end && other.kind === leg.kind)
-    const next = data.routes.indexOf(departures2.find(other => other.end !== leg.start) ?? departures2[0])
+    const [x, , z] = docks[leg.end]
+    const departures2 = routes.filter(other => other.start === leg.end && other.kind === leg.kind)
+    const next = routes.indexOf(departures2.find(other => other.end !== leg.start) ?? departures2[0])
     if (disembark || next < 0) {
       if (land(x, z)) reset()
       return
@@ -1365,7 +1406,10 @@ export async function vehicles(
     parked(kind?: RideKind | 'car'): Position[] {
       const out: Position[] = []
       for (const cell of cells.values()) {
-        for (const child of cell.children) {
+        for (const spawn of cell.pending) {
+          if (!kind || spawn.kind === kind) out.push([spawn.row[0], spawn.row[1], spawn.row[2]])
+        }
+        for (const child of cell.group?.children ?? []) {
           if (!kind || child.name === kind) out.push([child.position.x, child.position.y, child.position.z])
         }
       }
@@ -1374,7 +1418,14 @@ export async function vehicles(
     parkedBikes() {
       const out: {x: number; y: number; z: number; paint: number; vehicleType: EbikeVehicleType; tier: EbikeTier; batteryPct: number; ownership: VehicleOwnership}[] = []
       for (const cell of cells.values()) {
-        for (const child of cell.children) {
+        for (const {kind, row, shared} of cell.pending) {
+          if (kind !== 'bike') continue
+          const [x, y, z, , paint] = row
+          const vehicleType = resolveEbikeKind(paint, shared ? 'shared' : undefined)
+          out.push({x, y, z, paint, vehicleType, tier: vehicleType, ownership: 'shared',
+            batteryPct: persistedBatteries.get(bikeCoordKey(x, z)) ?? 100})
+        }
+        for (const child of cell.group?.children ?? []) {
           if (child.name !== 'bike') continue
           const paint = (child.userData.paint as number | undefined) ?? 0
           const saved = bikeStates.get(child) ?? bikeCoordStates.get(bikeCoordKey(child.position.x, child.position.z))

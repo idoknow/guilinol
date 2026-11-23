@@ -18,7 +18,8 @@ const data = JSON.parse(gunzipSync(await readFile('dist/world/vehicles.bin')))
 assert(Array.isArray(data.cars) && data.cars.length >= 200, `expected >= 200 cars, got ${data.cars?.length}`)
 assert(Array.isArray(data.motorGrid) && typeof data.motorMask === 'string', 'missing motorGrid / motorMask')
 const [mLeft, mTop, mW, mH, mStep] = data.motorGrid
-const mBytes = Buffer.from(data.motorMask, 'base64')
+const packedMask = Buffer.from(data.motorMask, 'base64')
+const mBytes = data.maskEncoding === 'gzip' ? gunzipSync(packedMask) : packedMask
 function motorAt(x, z) {
   const col = Math.round((x - mLeft) / mStep), row = Math.round((z - mTop) / mStep)
   if (col < 0 || row < 0 || col >= mW || row >= mH) return false

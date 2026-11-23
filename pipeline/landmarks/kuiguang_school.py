@@ -199,6 +199,7 @@ def street_buildings(model):
     model.box(0.0, 9.8, 6.25, 6.8, 4.2, 0.05, 'sign')
 
     # Gold building plaque "培 华 楼" centered on 2nd floor under the LED screen
+    model.box(0, 4.58, 6.05, 5.1, 1.25, 0.20, 'white')
     text_mesh(model, '培 华 楼', 4.8, 1.1, 'gold', 5.2, 6.16, font_px=42)
 
     # Ground floor entrance: red celebratory backdrop banner (no unverified banner text)

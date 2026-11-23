@@ -1,3 +1,4 @@
+import {nearestPlayable} from '../../../lib/play-region'
 import {getPlayMode} from '../game/play-mode'
 import {operation} from '../telemetry'
 import * as THREE from 'three'
@@ -29,7 +30,7 @@ const SERIF = '"Noto Serif SC","Source Han Serif SC","Songti SC",serif'
 const CELL = 256
 const ROAD_PX:[number,number][] = [[7.5,5.4],[6,4.2],[3.8,2.6],[2,1.2]] // [casing,fill] px at zoom 1 by class
 
-type Item = {path:Path2D; box:[number,number,number,number]}
+type Item = {path?:Path2D; rings:number[][]; closed:boolean; box:[number,number,number,number]}
 type Road = Item & {c:number; n:string; label?:{x:number,z:number,angle:number,len:number}}
 
 function index<T extends Item>(items:T[]) {
@@ -50,6 +51,13 @@ function index<T extends Item>(items:T[]) {
 function ring(path:Path2D, p:number[], close:boolean) {
   path.moveTo(p[0],p[1]); for(let i=2;i<p.length;i+=2) path.lineTo(p[i],p[i+1]); if(close) path.closePath()
 }
+function drawPath(item:Item) {
+  if(!item.path){
+    item.path = new Path2D()
+    for(const points of item.rings) ring(item.path,points,item.closed)
+  }
+  return item.path
+}
 function bounds(rings:number[][]):[number,number,number,number] {
   let x0=Infinity,z0=Infinity,x1=-Infinity,z1=-Infinity
   for(const p of rings) for(let i=0;i<p.length;i+=2){x0=Math.min(x0,p[i]);x1=Math.max(x1,p[i]);z0=Math.min(z0,p[i+1]);z1=Math.max(z1,p[i+1])}
@@ -58,16 +66,16 @@ function bounds(rings:number[][]):[number,number,number,number] {
 
 export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HTMLElement; stamps:Set<string>;
   goPoint(x:number,z:number,name:string):void; goSpot(spot:Spot):void; goDock(dock:WaterDock):void; goShop?:(shop:ShopTriggerDef)=>void}) {
-  // --- Prepare paths once (world units), bucketed into 256 m cells for culling.
-  const polys = (list:number[][][])=>list.map(rings=>{const path = new Path2D(); for(const p of rings) ring(path,p,true); return {path,box:bounds(rings)}})
-  const water = index(polys(atlas.water)), green = index(polys(atlas.green))
-  const buildings = index(atlas.buildings.map(p=>{const path = new Path2D(); ring(path,p,true); return {path,box:bounds([p])}}))
-  const roadItems:Road[] = atlas.roads.map(r=>{const path = new Path2D(); ring(path,r.p,false)
+  // Index the footprints citywide; create canvas paths when they enter the map viewport.
+  const polygon = (rings:number[][]):Item=>({rings,closed:true,box:bounds(rings)})
+  const water = index(atlas.water.map(polygon)), green = index(atlas.green.map(polygon))
+  const buildings = index(atlas.buildings.map(p=>polygon([p])))
+  const roadItems:Road[] = atlas.roads.map(r=>{
     let best = 0, label
     for(let i=0;i+3<r.p.length;i+=2){const dx = r.p[i+2]-r.p[i], dz = r.p[i+3]-r.p[i+1], len = Math.hypot(dx,dz)
       if(len>best){best = len; let angle = Math.atan2(dz,dx); if(angle>Math.PI/2) angle -= Math.PI; if(angle<-Math.PI/2) angle += Math.PI
         label = {x:(r.p[i]+r.p[i+2])/2, z:(r.p[i+1]+r.p[i+3])/2, angle, len}}}
-    return {path,box:bounds([r.p]),c:r.c,n:r.n,label}})
+    return {rings:[r.p],closed:false,box:bounds([r.p]),c:r.c,n:r.n,label}})
   const roads = index(roadItems)
   const peaks = host.manifest.peaks.entries.map(p=>({x:p.center[0],z:p.center[2],h:p.center[1]-((p as {baseHeight?:number}).baseHeight??150),name:/[一-鿿]/.test(p.name)&&!/^\d/.test(p.name)?p.name:''}))
   const placeLabels = atlas.places.filter(p=>p.k!=='road'&&p.k!=='peak'&&p.k!=='water')
@@ -105,11 +113,11 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     const player = here(), hx = sx(player.x), hy = sz(player.z)
     if(!far){
     g.save();g.clip(built.path,'evenodd')
-    g.fillStyle = C.green; for(const it of green(x0,z0,x1,z1)) g.fill(it.path,'evenodd')
+    g.fillStyle = C.green; for(const it of green(x0,z0,x1,z1)) g.fill(drawPath(it),'evenodd')
     g.fillStyle = C.water; g.strokeStyle = C.waterEdge; g.lineWidth = px(1.1)
-    for(const it of water(x0,z0,x1,z1)){g.fill(it.path,'evenodd'); g.stroke(it.path)}
+    for(const it of water(x0,z0,x1,z1)){g.fill(drawPath(it),'evenodd'); g.stroke(drawPath(it))}
     if(scale>.18) {g.fillStyle = C.building; g.strokeStyle = C.buildingEdge; g.lineWidth = px(.6)
-      for(const it of buildings(x0,z0,x1,z1)){g.fill(it.path); if(scale>.5) g.stroke(it.path)}}
+      for(const it of buildings(x0,z0,x1,z1)){g.fill(drawPath(it)); if(scale>.5) g.stroke(drawPath(it))}}
     const visible = [...roads(x0,z0,x1,z1)], zoom = Math.min(1.7,Math.max(.55,scale/.7))
     g.lineCap = g.lineJoin = 'round'
     for(const pass of [0,1]) for(const c of [3,2,1,0]) {
@@ -117,7 +125,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       g.strokeStyle = c===3?(pass?C.road:C.path):c<=1?(pass?C.major:C.majorCasing):(pass?C.road:C.casing)
       if(c===3&&pass===0) continue
       g.lineWidth = px(ROAD_PX[c][pass]*zoom); g.setLineDash(c===3?[px(3),px(2.5)]:[])
-      for(const r of visible) if(r.c===c) g.stroke(r.path)
+      for(const r of visible) if(r.c===c) g.stroke(drawPath(r))
     }
     g.setLineDash([])
     // Peaks: an ink mound per karst peak, darker ridge on the left; scaled by height.
@@ -302,7 +310,14 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       ...atlas.search(q,8).map((p:Place)=>({name:p.n,sub:{peak:'山',scenic:'景点',gate:'城门',bridge:'桥',water:'水面',park:'公园',museum:'博物馆',memorial:'纪念地',road:'道路',school:'学校'}[p.k],x:p.x,z:p.z}))]:[]
     const seen = new Set<string>()
     results.innerHTML = ''
-    for(const hit of hits) { if(!built.contains(hit.x,hit.z)||seen.has(hit.name)||seen.size>=8) continue; seen.add(hit.name)
+    for(const source of hits) {
+      if(seen.has(source.name)||seen.size>=8)continue
+      let hit=source
+      if(!built.contains(source.x,source.z)){
+        if(!host.manifest.region)continue
+        hit={name:source.name,sub:source.sub,...nearestPlayable(host.manifest,source.x,source.z)}
+      }
+      seen.add(hit.name)
       const li = document.createElement('li'); li.innerHTML = `<b>${hit.name}</b><span>${hit.sub}</span>`
       li.onclick = ()=>{focus(hit.x,hit.z); setPin({x:hit.x,z:hit.z,name:hit.name,spot:hit.spot,dock:hit.dock,shop:hit.shop}); results.innerHTML = ''; input.blur()}
       results.append(li)}

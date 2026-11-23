@@ -46,7 +46,7 @@ def ground_features(bounds, school_grounds=()):
     layers = dict(green=[], water=[], road=[])
     grounds = unary_union(school_grounds)
     layers.update(schoolTrack=[], schoolCourt=[])
-    widths = {'primary': 14, 'secondary': 12, 'tertiary': 10, 'trunk': 18, 'residential': 6}
+    widths = {'motorway':14, 'motorway_link':7, 'primary': 14, 'secondary': 12, 'tertiary': 10, 'trunk': 18, 'residential': 6}
     for element in load_osm():
         tags = element.get('tags', {})
         if tags.get('leisure') in ('pitch', 'track') and f"{element['type']}/{element['id']}" in replaced_pitches:
@@ -62,6 +62,17 @@ def ground_features(bounds, school_grounds=()):
         elif (tags.get('natural') in ('wood', 'grassland', 'scrub') or tags.get('leisure') in ('park','garden','pitch')
               or tags.get('landuse') in ('forest','grass','meadow','recreation_ground','village_green')):
             key = 'green'
+        elif tags.get('aeroway') in ('runway','taxiway','apron') and element['type'] != 'node':
+            pavement = area(element)
+            coords = points(element)
+            if pavement.is_empty and len(coords) >= 2:
+                try:
+                    width = float(tags.get('width', 45 if tags['aeroway']=='runway' else 23))
+                except ValueError:
+                    width = 45 if tags['aeroway']=='runway' else 23
+                pavement = LineString(coords).buffer(width/2, cap_style='flat')
+            layers['road'].extend(polygons(pavement.intersection(bounds)))
+            continue
         elif 'highway' in tags and element['type'] == 'way':
             if tags['highway'] in RULES['defaultWidth'] and tags.get('bridge','no')=='no' and tags.get('tunnel','no')=='no':
                 continue
@@ -133,7 +144,7 @@ def raw_overture_footprints(bounds):
     return out
 
 
-def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_mask=None):
+def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_mask=None, airport_buildings=()):
     footprints, heights = [], []
     grounds = unary_union(layout.school_grounds)
     rules = json.loads(Path(__file__).with_name('building-kinds.json').read_text())
@@ -203,6 +214,14 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
             floors = int(props['floors'])
             footprints.append(footprint)
             heights.append((base, base+3.2*floors, 3, floors, ident%65536, center, [], False))
+    for element, footprint, solid in airport_buildings:
+        palace.append(footprint)
+        for poly in polygons(solid.intersection(bounds)):
+            center=poly.representative_point()
+            floors=int(element['tags'].get('building:levels','2'))
+            base=elevation(center.x,center.y)
+            footprints.append(poly)
+            heights.append((base,base+3.1*floors,0,floors,element['id']%65536,center,[],False))
     palace_index = STRtree(palace)
     with (Path(RAW)/'overture_buildings.csv').open() as source:
         for row in csv.DictReader(source, delimiter='\t'):

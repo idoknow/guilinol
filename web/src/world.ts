@@ -15,6 +15,7 @@ import {freezeStatic} from './static-freeze'
 interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number}
 export interface Manifest {
+  region?:import('../../lib/play-region').Region
   tunnels?:Tunnel[]
   builtArea?:{type:'Polygon';coordinates:[number,number][][]}
   distantBuildings?:Asset
@@ -124,7 +125,7 @@ export function measureFirstWorldBytes(firstMs:number, publish:(bytes:number)=>v
 function terrainPattern(side:number,stride:number,coarse:boolean,edges:number){
   const out:number[]=[]
   const v=(x:number,z:number)=>x+z*stride
-  const n=coarse?4:1
+  const n=coarse?Math.min(4,side):1
   for(let z=0;z<side;z+=n)for(let x=0;x<side;x+=n){
     const a=v(x,z), b=v(x,z+n), c=v(x+n,z+n), d=v(x+n,z)
     const ring=[a]
@@ -231,8 +232,13 @@ export function startOverview(manifest:Manifest) {
     let low=Infinity,highY=-Infinity
     for(const dm of samples){low=Math.min(low,dm/10);highY=Math.max(highY,dm/10)}
     const floor=2*low-highY,ceiling=2*highY-low
-    const sections=manifest.chunks.map(tile=>({tile,box:new THREE.Box3(
-      new THREE.Vector3(tile.x,floor,tile.z),new THREE.Vector3(tile.x+size,ceiling,tile.z+size))}))
+    // The overview covers the whole sampled terrain, including cells outside the play boundary.
+    const tileCols = width/size, tileRows = depth/size
+    const tiles = new Array<Tile | undefined>(tileCols*tileRows)
+    for (const tile of manifest.chunks) {
+      tiles[(tile.z-top)/size*tileCols+(tile.x-left)/size] = tile
+    }
+    const box = new THREE.Box3()
     const frustum=new THREE.Frustum(), projection=new THREE.Matrix4(), lastView=new THREE.Matrix4()
     let dirty=true
     function update(camera:THREE.PerspectiveCamera){
@@ -247,13 +253,21 @@ export function startOverview(manifest:Manifest) {
       const fineRadius=7
       const high=(x:number,z:number)=>Math.max(Math.abs(x-ax),Math.abs(z-az))<=fineRadius
       let cursor=0
-      for(const {tile,box} of sections){
-        if(covered.has(tile) || !frustum.intersectsBox(box))continue
-        const x=tile.x/size,z=tile.z/size
+      const radius = Math.ceil(far/size)+2
+      const col0 = Math.max(0, Math.ceil(ax-left/size-radius)), col1 = Math.min(tileCols-1, Math.floor(ax-left/size+radius))
+      const row0 = Math.max(0, Math.ceil(az-top/size-radius)), row1 = Math.min(tileRows-1, Math.floor(az-top/size+radius))
+      for(let row=row0;row<=row1;row++)for(let col=col0;col<=col1;col++){
+        const tile=tiles[row*tileCols+col]
+        if(tile && covered.has(tile))continue
+        const west=left+col*size,north=top+row*size
+        const x=west/size,z=north/size
         if(Math.hypot(x-ax,z-az)*size>far+2*size)continue
+        box.min.set(west,floor,north)
+        box.max.set(west+size,ceiling,north+size)
+        if(!frustum.intersectsBox(box))continue
         const mask=Number(high(x-1,z))+2*Number(high(x,z+1))+4*Number(high(x+1,z))+8*Number(high(x,z-1))
-        const pattern=high(x,z)?fine:coarse[mask]
-        const offset=(tile.z-top)/step*stride+(tile.x-left)/step
+        const pattern=tile && high(x,z)?fine:coarse[mask]
+        const offset=(north-top)/step*stride+(west-left)/step
         for(const i of pattern)index.array[cursor++]=offset+i
       }
       index.clearUpdateRanges()

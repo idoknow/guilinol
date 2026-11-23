@@ -1,4 +1,4 @@
-import {playableBounds} from '../../../lib/projection'
+import {inRegion} from '../../../lib/play-region'
 import R from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import type {PeakColliderData, PeaksGroup} from '../peaks'
@@ -454,9 +454,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     }
     return false
   }
-  const {min,max} = playableBounds(manifest.bbox)
   function withinBounds(x:number,z:number){
-    return x>=min.x && x<=max.x && z>=min.z && z<=max.z
+    return inRegion(manifest,x,z)
   }
   function findWalkableSpawn(east:number,south:number,override=false){
     for(const {dx,dz} of override?[candidates[0]]:candidates){const x=east+dx,z=south+dz,tile=tileAt(x,z)

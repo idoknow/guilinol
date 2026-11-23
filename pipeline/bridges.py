@@ -12,7 +12,7 @@ from features import points, polygons
 from landmarks.jiefang_layout import SPAN_WAYS
 
 
-def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=None):
+def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=None, canopies=()):
     spans, profiles, owners, emitted = [], [], [], []
     thin_spans = []
     tracks = [
@@ -115,6 +115,15 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=N
                 thin_spans.append(any(poly.intersects(part) for part in crossings))
                 owners.append(way['id'])
                 profiles.append(np.linalg.solve(np.column_stack((pts, np.ones(3))), levels))
+    from shapely import constrained_delaunay_triangles
+    for el,roof,_ in canopies:
+        center = roof.representative_point()
+        level = sample(center.x,center.y)[0]+6.2
+        for triangle in constrained_delaunay_triangles(roof).geoms:
+            spans.append(triangle)
+            thin_spans.append(True)
+            owners.append(el['id'])
+            profiles.append(np.array([0,0,level]))
     tree = STRtree(spans)
 
     def encode(tile, origin):

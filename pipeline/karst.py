@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 from scipy.ndimage import gaussian_filter1d, map_coordinates, minimum_filter
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, Point
 
 from common import GRID, ll2xz
 from auto_peaks import detect, suppress
@@ -123,7 +123,7 @@ def imprint(terrain, left, top, triangles):
         patch[inside] = np.maximum(patch[inside],np.rint(10*surface[inside]))
 
 
-def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=None, area_per_tree=40):
+def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=None, area_per_tree=40, playable=None):
     catalog = json.loads(Path(__file__).with_name('peaks.json').read_text())
     south,west,north,east = bbox
     entries, payload = [], bytearray(b'PK02')
@@ -200,10 +200,21 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
     residual_sample = sampler(original.copy())
     centers.update({peak['name']:ll2xz(peak['lat'],peak['lon']) for peak in auto})
     for peak in auto:
-        plan(peak,residual_sample)
+        if playable is None or playable.distance(Point(*ll2xz(peak['lat'],peak['lon']))) <= 350:
+            plan(peak,residual_sample)
     auto_file = 'auto-peaks.json'
     (output/auto_file).write_text(json.dumps(auto,ensure_ascii=False,separators=(',',':'))+'\n')
     suppress(original,wet,ground)
+    if playable is not None:
+        # Preserve the original DEM silhouette where no replacement peak mesh is emitted.
+        from shapely import intersects_xy
+        xs=left+np.arange(original.shape[1])*GRID
+        envelope=playable.buffer(350)
+        for row in range(0,len(original),96):
+            sl=slice(row,min(row+96,len(original)))
+            zs=top+np.arange(sl.start,sl.stop)*GRID
+            exterior=~intersects_xy(envelope,xs[None,:],zs[:,None])
+            original[sl][exterior]=dem[sl][exterior]
     terrain[:] = original
     ground_at = sampler(original)
     skirt_at = sampler(minimum_filter(original,size=17,mode='nearest'))

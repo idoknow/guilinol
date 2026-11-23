@@ -316,7 +316,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
                                 pos_s += 3.1
 
     layers=[STRtree(values) for values in (surfaces,sidewalks,stripes,medians,gaps)]
-    obstacles = STRtree([*footprints, *water, *bridge.geometries, exclude, rep_excl, *clear.geometries])
+    obstacles = STRtree([*footprints, *water, *bridge.geometries, *polygons(exclude), *polygons(rep_excl), *clear.geometries])
     decor = defaultdict(list)
     parking_keepout = STRtree([
         *(gap.buffer(3) for gap in gaps),

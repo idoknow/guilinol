@@ -12,7 +12,7 @@ import numpy as np
 from PIL import Image, ImageColor
 from scipy.ndimage import distance_transform_edt
 from shapely import (LineString, Polygon, STRtree, box, intersects_xy, make_valid,
-                     set_precision, union_all)
+                     set_precision, union_all, points as xy_points)
 from shapely.affinity import translate
 
 from common import OUT, load_osm
@@ -26,17 +26,21 @@ def width(tags):
     return 3 if tags.get('service') in ('driveway', 'parking_aisle') else 4
 
 
-def footprints(elements):
+def footprints(elements, connector_ids=()):
+    from cars import EXTRA_WIDTHS
     result = []
     for way in elements:
         tags = way.get('tags', {})
-        if way['type'] != 'way' or tags.get('highway') not in ('service', 'track', 'living_street'):
+        highway = tags.get('highway')
+        connector = way['id'] in connector_ids and highway in EXTRA_WIDTHS
+        if way['type'] != 'way' or not (connector or highway in ('service', 'track', 'living_street')):
             continue
         if any(tags.get(key, 'no') != 'no' for key in ('bridge', 'tunnel', 'area', 'indoor')) or tags.get('layer', '0') != '0':
             continue
         coords = points(way)
         if len(coords) > 1:
-            result.append(LineString(coords).buffer(width(tags)/2, quad_segs=3))
+            lane_width = EXTRA_WIDTHS[highway] if connector and not tags.get('width') else width(tags)
+            result.append(LineString(coords).buffer(lane_width/2, quad_segs=3))
     return STRtree(result)
 
 
@@ -97,15 +101,53 @@ def patch_tile(file, footprint, color):
     return True
 
 
+def clear_carriageway_trees(output, chunks):
+    """Trees are scattered before minor streets are baked. Check the final paved paths."""
+    removed = 0
+    for tile in chunks:
+        file = output/tile['file']
+        tree_file = file.with_suffix('.trees')
+        trees = np.frombuffer(gzip.decompress(tree_file.read_bytes()),dtype='<u2').reshape(-1,6)
+        if not len(trees):
+            continue
+        raw = gzip.decompress(file.read_bytes())
+        vertices,indices,size = struct.unpack_from('<3I',raw,4)
+        start = 24+16900+9*vertices+4*indices
+        streets = json.loads(raw[start:start+size])[1]
+        paths = streets[0]
+        if len(streets)>11 and streets[11]:
+            paths = paths[:streets[11][0]]
+        roads = [Polygon(shell,holes) for kind,shell,*holes in paths if kind==0]
+        if not roads:
+            continue
+        hits,_ = STRtree(roads).query(xy_points(trees[:,:2]),predicate='within')
+        if len(hits):
+            keep = np.ones(len(trees),dtype=bool)
+            keep[hits] = False
+            removed += np.count_nonzero(~keep)
+            tree_file.write_bytes(gzip.compress(trees[keep].tobytes(),mtime=0))
+    return removed
+
+
 def bake(output, manifest, palette):
-    tree = footprints(load_osm()); changed = 0
+    connectors = set()
+    if 'region' in manifest:
+        corridors = json.loads(Path(__file__).with_name('region.json').read_bytes())['corridors']
+        connectors = {way for c in corridors if c['mode']=='drive' and c['end']=='两江机场' for way in c['ways']}
+    tree = footprints(load_osm(), connectors); changed = 0
+    region = Polygon(manifest['region']['local']) if 'region' in manifest else None
     for tile in manifest['chunks']:
         east, south = tile['x'], tile['z']
         bounds = box(east,south,east+256,south+256)
         hits = tree.query(bounds, predicate='intersects')
         if not len(hits):
             continue
-        shape = translate(union_all(tree.geometries.take(hits)).intersection(bounds), -east,-south)
+        clipped = union_all(tree.geometries.take(hits)).intersection(bounds)
+        if region is not None and not region.covers(bounds):
+            clipped = clipped.intersection(region)
+            if clipped.area == 0:
+                continue
+        shape = translate(clipped, -east,-south)
         file = output/tile['file']
         if patch_tile(file, shape, ImageColor.getrgb(palette['road'])):
             changed += 1; tile['bytes'] = file.stat().st_size
