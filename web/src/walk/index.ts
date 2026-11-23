@@ -1287,9 +1287,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function disconnect(){net?.dispose();net=undefined}
   function leave(){disconnect();resetWalk()}
   function resetWalk(){if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
-  function canPlaceCrashOffset(x:number,z:number,refY:number){
+  function canPlaceCrashOffset(x:number,z:number,refY:number,fromX?:number,fromZ?:number){
+    if(!sim.withinBounds(x,z))return false
+    if(sim.insideHouse(x,z,refY+.4))return false
+    const sup=supportAt(x,z,refY)
+    if(!sup||Math.abs(sup.y-refY)>1.25)return false
     const dryBridge=!!sim.surface(x,z,'deck',refY+.4,1.5)||!!sim.surface(x,z,'landmark',refY+.4,1.5)
-    return !sim.insideHouse(x,z)&&(!sim.wet(x,z)||dryBridge)&&!sim.isBlockedAt(x,refY,z)
+    if(sim.wet(x,z)&&!dryBridge)return false
+    const cy=sup.y+cfg.height/2+.055
+    if(sim.isBlockedAt(x,cy,z))return false
+    if(fromX!==undefined&&fromZ!==undefined&&sim.pathBlocked(fromX,fromZ,x,z,sup.y+.45))return false
+    return true
   }
   function triggerTwoWheelCrash(reason:Exclude<EbikeCrashReason,''>,side:-1|1){
     if(crashSession||!rides?.bike)return
@@ -1315,7 +1323,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     let rx=0, rz=0
     for(const [cx,cz] of candidates){
-      if(canPlaceCrashOffset(p.x+cx,p.z+cz,refY)){rx=cx;rz=cz;break}
+      if(canPlaceCrashOffset(p.x+cx,p.z+cz,refY,p.x,p.z)){rx=cx;rz=cz;break}
     }
     crashSession={
       mesh:rides.bike as THREE.Mesh,
@@ -1381,13 +1389,20 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(!crashSession||!rides?.bike)return false
     const c=crashSession
     const p=sim.body.translation(), refY=p.y-cfg.height/2
-    const bx=c.bikeOriginX+c.bikeSlideX, bz=c.bikeOriginZ+c.bikeSlideZ
+    let bx=c.bikeOriginX+c.bikeSlideX, bz=c.bikeOriginZ+c.bikeSlideZ
     const rawBy=supportAt(bx,bz,refY)?.y??refY
-    const by=Math.abs(rawBy-refY)<=1.2?rawBy:refY
+    let by=Math.abs(rawBy-refY)<=1.2?rawBy:refY
     const rx=c.bikeOriginX+c.riderOffsetX, rz=c.bikeOriginZ+c.riderOffsetZ
     const riderYaw=c.heading+c.side*.45
     const lookToBikeYaw=Math.atan2(rx-bx,rz-bz)+avatar.yaw
     const spot=resolveSafeRiderSpot(rx,rz,bx,bz,by,lookToBikeYaw)
+    if(!canPlaceCrashOffset(bx,bz,by)){
+      if(canPlaceCrashOffset(c.bikeOriginX,c.bikeOriginZ,refY)){
+        bx=c.bikeOriginX;bz=c.bikeOriginZ;by=supportAt(bx,bz,refY)?.y??refY
+      }else{
+        bx=spot.x;bz=spot.z;by=spot.y-cfg.height/2
+      }
+    }
     if(!place(spot.x,spot.z,'crash-standup',true,spot))return false
     const entry:DownedBikeEntry={
       mesh:c.mesh,
@@ -1748,6 +1763,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       ebikeAudio:ebikeAudio.probe(),
       ebikeRig:ebikeRig.root.visible?{
         wheelie:ebikeRig.wheeliePivot.rotation.x,
+        longPitch:ebikeState?.longPitch??0,
         lean:ebikeRig.leanPivot.rotation.z,
         crashRoll:ebikeRig.crashPivot.rotation.z,
         steer:ebikeRig.frontAssembly.rotation.y,
@@ -1762,6 +1778,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         rightSignalLit:ebikeRig.signalProbe().rightSignalLit,
         brakeLight:ebikeRig.signalProbe().brakeLight,
         signalDrawCalls:ebikeRig.signalProbe().signalDrawCalls,
+        drawCallStats:ebikeRig.drawCallStats(),
+        modDrawCallDelta:ebikeRig.drawCallStats().modDrawCallDelta,
+        visibleModMeshes:ebikeRig.drawCallStats().visibleModMeshes,
         seatWorld:ebikeRig.seatAnchor.getWorldPosition(new THREE.Vector3()).toArray(),
       }:null,
       bicycleRig:bicycleRig.root.visible?{
@@ -2060,8 +2079,98 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const flushRoad=!wasCar&&!surfLm&&sim.surface(pos.x,pos.z,'road',foot+.25,.45)
       const overheadRoad=!wasCar&&!surfLm&&!flushRoad&&sim.surface(pos.x,pos.z,'road',foot+2.2,1.4)
       const onLandmark=!wasCar&&(!!surfLm||(wasLandmarkHit&&(!flushRoad||Math.abs(flushRoad.y-foot)>.28))||(!!overheadRoad&&overheadRoad.y>foot+.8))
-      sim.controller.computeColliderMovement(sim.capsule,{x:stepDx,y:velocity*step,z:stepDz},undefined,undefined,onLandmark?coll=>sim.kinds.get(coll.handle)!=='road':undefined)
-      const move=sim.controller.computedMovement(),next={x:pos.x+move.x,y:pos.y+move.y,z:pos.z+move.z}
+      const filterRoad=onLandmark?(coll:import('@dimforge/rapier3d-compat').Collider)=>sim.kinds.get(coll.handle)!=='road':undefined
+      const horzDist=Math.hypot(stepDx,stepDz)
+      const spatialSubs=aboardGround&&horzDist>.14?Math.min(6,Math.ceil(horzDist/.14)):1
+      const inspectBikeCollisions=(dirX:number,dirZ:number,footY:number):{hit:''|'collision'|'building',minDot:number}=>{
+        let hit:''|'collision'|'building'='', minDot=1
+        for(let at=0;at<sim.controller.numComputedCollisions();at++){
+          const contact=sim.controller.computedCollision(at)
+          if(!contact||contact.normal1.y>=Math.cos(bikeConfig.maxSlope))continue
+          const dot=contact.normal1.x*dirX+contact.normal1.z*dirZ
+          if(dot>=-.2)continue
+          const kind=contact.collider?sim.kinds.get(contact.collider.handle):undefined
+          if(kind==='sidewalk'||kind==='road')continue
+          if((kind==='deck'||kind==='deckThin'||kind==='ground'||kind==='landmark')&&contact.witness1.y<=footY+bikeConfig.step+.05)continue
+          if(dot<minDot)minDot=dot
+          if(kind==='building')hit='building'
+          else if(!hit)hit='collision'
+        }
+        return {hit,minDot}
+      }
+      const classifyBikeCollision=(dirX:number,dirZ:number,footY:number):''|'collision'|'building'=>inspectBikeCollisions(dirX,dirZ,footY).hit
+      let move={x:0,y:0,z:0}
+      let next={x:pos.x,y:pos.y,z:pos.z}
+      let substepHit:''|'collision'|'building'=''
+      let substepBlocked=false
+      if(spatialSubs===1){
+        sim.controller.computeColliderMovement(sim.capsule,{x:stepDx,y:velocity*step,z:stepDz},undefined,undefined,filterRoad)
+        move=sim.controller.computedMovement()
+        next={x:pos.x+move.x,y:pos.y+move.y,z:pos.z+move.z}
+        if(rides?.bike&&Math.abs(bikeSpeed)>1e-4){
+          const bikeSign=bikeSpeed>=0?1:-1,dirX=wish.x*bikeSign,dirZ=wish.y*bikeSign
+          const subDist=Math.hypot(stepDx,stepDz),subFwd=move.x*dirX+move.z*dirZ
+          const col=inspectBikeCollisions(dirX,dirZ,next.y-cfg.height/2)
+          if(col.hit&&(col.minDot<=-.45||subFwd<subDist*.65)){substepHit=col.hit;substepBlocked=true}
+          const rayHit=sim.bikePathBlocked(pos.x,pos.z,next.x,next.z,Math.max(foot,next.y-cfg.height/2)+.45,bikeConfig.maxSlope)
+          if(rayHit){
+            if(rayHit==='building'||!substepHit)substepHit=rayHit
+            substepBlocked=true
+            next={x:pos.x,y:pos.y,z:pos.z};move={x:0,y:0,z:0}
+          }
+        }
+      }else{
+        const subDx=stepDx/spatialSubs, subDy=(velocity*step)/spatialSubs, subDz=stepDz/spatialSubs
+        const bikeSign=bikeSpeed>=0?1:-1
+        const dirX=wish.x*bikeSign,dirZ=wish.y*bikeSign
+        const subDist=Math.hypot(subDx,subDz)
+        for(let sub=0;sub<spatialSubs;sub++){
+          const cur=sim.body.translation()
+          sim.controller.computeColliderMovement(sim.capsule,{x:subDx,y:subDy,z:subDz},undefined,undefined,filterRoad)
+          const subMove=sim.controller.computedMovement()
+          const cand={x:cur.x+subMove.x,y:cur.y+subMove.y,z:cur.z+subMove.z}
+          const candFoot=cand.y-cfg.height/2
+          const subFwd=subMove.x*dirX+subMove.z*dirZ
+          if(rides?.bike&&sim.controller.numComputedCollisions()>0){
+            const col=inspectBikeCollisions(dirX,dirZ,candFoot)
+            if(col.hit==='building'||(!substepHit&&col.hit))substepHit=col.hit
+            if(col.hit&&(col.minDot<=-.45||subFwd<subDist*.65||Math.hypot(subMove.x,subMove.z)<subDist*.55)){
+              substepBlocked=true
+              next={x:cur.x,y:cur.y,z:cur.z}
+              move={x:next.x-pos.x,y:next.y-pos.y,z:next.z-pos.z}
+              break
+            }
+          }
+          const rayHit=rides?.bike
+            ?sim.bikePathBlocked(cur.x,cur.z,cand.x,cand.z,Math.max(cur.y-cfg.height/2,candFoot)+.45,bikeConfig.maxSlope)
+            :(sim.pathBlocked(cur.x,cur.z,cand.x,cand.z,Math.max(cur.y-cfg.height/2,candFoot)+.45)?'collision':'')
+          const houseBlocked=sim.insideHouse(cand.x,cand.z,cand.y)
+          if(rayHit||houseBlocked){
+            if(houseBlocked)substepHit='building'
+            else if(rayHit==='building'||!substepHit)substepHit=rayHit
+            substepBlocked=true
+            next={x:cur.x,y:cur.y,z:cur.z}
+            move={x:next.x-pos.x,y:next.y-pos.y,z:next.z-pos.z}
+            break
+          }
+          next=cand
+          move={x:next.x-pos.x,y:next.y-pos.y,z:next.z-pos.z}
+          if(sub<spatialSubs-1){
+            sim.body.setTranslation(next,true)
+            sim.body.setNextKinematicTranslation(next)
+            sim.world.step()
+          }
+          if(sim.controller.numComputedCollisions()>0&&Math.hypot(subMove.x,subMove.z)<subDist*.55){substepBlocked=true;break}
+        }
+      }
+      if(aboardGround&&sim.insideHouse(next.x,next.z,next.y)){
+        if(rides?.bike){
+          substepHit='building';substepBlocked=true
+          next={x:pos.x,y:pos.y,z:pos.z};move={x:0,y:0,z:0};vx=vz=0
+        }else{
+          next={x:pos.x,y:pos.y,z:pos.z};vx=vz=0;rides?.stop();bikeSpeed=0;bikeObstacle='building'
+        }
+      }
       if(bridge&&!stream.landmarks.has(bridge)){
         const distance=bridgeDistance(pos.x,pos.z)
         if(distance<cfg.collisionRadius){
@@ -2092,7 +2201,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         if(!deck||foot<deck.y-.35){
           const tread=sim.surface(next.x,next.z,'landmark',foot+.6,1.4),tile=sim.tileAt(next.x,next.z),water=tile&&stream.loaded.get(tile)?.water
           const level=tile&&water?water[Math.round((next.z-tile.z)/4)*65+Math.round((next.x-tile.x)/4)]/10:Infinity
-          if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;vx=vz=0;blockedWater=true;rides?.stop();bikeSpeed=0}
+          if(!tread||tread.y<level){next.x=pos.x;next.z=pos.z;vx=vz=0;blockedWater=true;if(!rides?.bike||!substepHit){rides?.stop();bikeSpeed=0}}
         }
       }
       if(rides?.car){
@@ -2133,21 +2242,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           pavement:rides.pavement,insideHouse:sim.insideHouse,
           blockedAt:(x,y,z)=>sim.isBlockedAt(x,y,z),
           wetSurface:sim.wet(next.x,next.z),
-          collisionKind:(dirX,dirZ)=>{
-            let hit:''|'collision'|'building'=''
-            const footY=next.y-cfg.height/2
-            for(let at=0;at<sim.controller.numComputedCollisions();at++){
-              const contact=sim.controller.computedCollision(at)
-              if(!contact||contact.normal1.y>=Math.cos(bikeConfig.maxSlope))continue
-              if(contact.normal1.x*dirX+contact.normal1.z*dirZ>=-.2)continue
-              const kind=contact.collider?sim.kinds.get(contact.collider.handle):undefined
-              if(kind==='sidewalk'||kind==='road')continue
-              if((kind==='deck'||kind==='deckThin'||kind==='ground'||kind==='landmark')&&contact.witness1.y<=footY+bikeConfig.step+.05)continue
-              if(kind==='building')return 'building'
-              hit='collision'
-            }
-            return hit
-          },
+          collisionBlocked:substepBlocked,
+          collisionKind:(dirX,dirZ)=>substepHit||classifyBikeCollision(dirX,dirZ,next.y-cfg.height/2),
           stopBike:()=>rides!.stop(),
           dampBike:s=>rides!.dampSpeed(s),
           capOffRoad:(s,lim)=>rides!.capSpeed(s,lim),
@@ -2169,8 +2265,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           }
         }
       }
+      const preContactSpeed=rides?.bike?Math.abs(bikeSpeed):0
       if(resolveContact(next,next.y-cfg.height/2,rides?.heading??0,rides?.car?.86:rides?.bike?.32:cfg.radius,rides?.car?2.12:rides?.bike?.85:0)){
-        vx=vz=bikeSpeed=0;if(rides?.bike||rides?.car){rides.stop();bikeObstacle='collision'}
+        vx=vz=bikeSpeed=0
+        if(rides?.bike){
+          rides.tryBikeImpactCrash(preContactSpeed)
+          rides.stop()
+          bikeObstacle='collision'
+        }else if(rides?.car){
+          rides.stop()
+          bikeObstacle='collision'
+        }
       }
       if((rides?.bike||rides?.car)&&vehicleForbiddenAt(next.x,next.z)){
         next.x=pos.x;next.y=pos.y;next.z=pos.z;rides.stop();bikeSpeed=vx=vz=0;bikeObstacle='restricted'
@@ -2259,15 +2364,17 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           const sideX=Math.cos(crashSession.heading)*crashSession.side, sideZ=-Math.sin(crashSession.heading)*crashSession.side
           const bStep=crashSession.slideSpeed*.34*clampedFrameDt
           const rStep=crashSession.slideSpeed*.76*clampedFrameDt
+          const curBx=crashSession.bikeOriginX+crashSession.bikeSlideX, curBz=crashSession.bikeOriginZ+crashSession.bikeSlideZ
           const nextBx=crashSession.bikeSlideX+fwdX*bStep+sideX*bStep*.42
           const nextBz=crashSession.bikeSlideZ+fwdZ*bStep+sideZ*bStep*.42
           let moved=false
-          if(canPlaceCrashOffset(crashSession.bikeOriginX+nextBx,crashSession.bikeOriginZ+nextBz,refY)){
+          if(canPlaceCrashOffset(crashSession.bikeOriginX+nextBx,crashSession.bikeOriginZ+nextBz,refY,curBx,curBz)){
             crashSession.bikeSlideX=nextBx;crashSession.bikeSlideZ=nextBz;moved=true
           }
+          const curRx=crashSession.bikeOriginX+crashSession.riderOffsetX, curRz=crashSession.bikeOriginZ+crashSession.riderOffsetZ
           const nextRx=crashSession.riderOffsetX+fwdX*rStep-sideX*rStep*.62
           const nextRz=crashSession.riderOffsetZ+fwdZ*rStep-sideZ*rStep*.62
-          if(canPlaceCrashOffset(crashSession.bikeOriginX+nextRx,crashSession.bikeOriginZ+nextRz,refY)){
+          if(canPlaceCrashOffset(crashSession.bikeOriginX+nextRx,crashSession.bikeOriginZ+nextRz,refY,curRx,curRz)){
             crashSession.riderOffsetX=nextRx;crashSession.riderOffsetZ=nextRz;moved=true
           }
           crashSession.slideSpeed=moved?Math.max(0,crashSession.slideSpeed-8.5*clampedFrameDt):0
@@ -2312,6 +2419,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           criticalBattery:rawTel.criticalBattery,
           batteryDepleted:rawTel.batteryDepleted,
           wheelie:rawTel.wheelie,
+          longPitch:rawTel.longPitch,
           lean:rawTel.lean,
           leanLimit:rawTel.leanLimit,
           leanRateDegPerSec:rawTel.leanRateDegPerSec,
@@ -2348,7 +2456,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           obstacle:bikeObstacle,
           allowAutoCrash:false,
         },rideCtrl.cycleMod?{...rideCtrl,cycleMod:false}:rideCtrl,extTel,{
-          canPlace:(ox,oz)=>!sim.insideHouse(p.x+ox,p.z+oz)&&!sim.wet(p.x+ox,p.z+oz)&&!sim.isBlockedAt(p.x+ox,refY,p.z+oz),
+          canPlace:(ox,oz)=>canPlaceCrashOffset(p.x+ox,p.z+oz,refY,p.x,p.z),
           supportY:(ox,oz,ry)=>supportAt(p.x+ox,p.z+oz,ry)?.y??ry,
         })
         if(mountedStaticBike)mountedStaticBike.userData.battery=ebikeState.battery
@@ -2561,5 +2669,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     // IDOK-182: 右手挂点给相机用（axis-aligned，-Z 朝前）；没有骨骼时回落到 figure 本身。
     handAnchor(){return avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r')??figure},
+    raycastObstacle:verify?(x:number,y:number|undefined,z:number,dx:number,dy:number,dz:number,maxDist=160)=>{
+      sim.sync(x,z)
+      const footY=sim.body.translation().y-cfg.height/2
+      const baseY=y??((supportAt(x,z,footY)?.y??footY)+.55)
+      return sim.raycastObstacle(x,baseY,z,dx,dy,dz,maxDist)
+    }:undefined,
+    pavementAt:verify?(x:number,z:number)=>Boolean(rides?.pavement(x,z)):undefined,
+    insideHouseAt:verify?(x:number,z:number,y?:number)=>sim.insideHouse(x,z,y):undefined,
     get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}
 }

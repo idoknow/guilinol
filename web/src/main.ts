@@ -277,7 +277,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)
       if(completed)cover.progress(1)
       return completed
-    }finally{controller.abort();if(!parent)await cover.done();operation('teleport',start,completed);switching=false;showMode()}
+    }finally{controller.abort();operation('teleport',start,completed);switching=false;showMode();if(!parent)await cover.done()}
   }
   async function landSolo(initial:boolean) {
     if(walker?.active)return

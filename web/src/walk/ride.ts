@@ -7,6 +7,7 @@ import {
   BICYCLE_DEFAULT_GEAR,
   EBIKE_COMPLIANT_CAP_KMH,
   EBIKE_DEFAULT_GEAR,
+  EBIKE_UPGRADE_MAX_KMH,
   bicycleConfig,
   bicycleGearConfigs,
   bikeConfig as bcfg,
@@ -154,6 +155,7 @@ export interface EbikeDynamicTelemetry {
   wheelieTip: number
   wheelie: number
   wheelieVel: number
+  longPitch: number
   tucking: boolean
   braking: boolean
   parkLocked: boolean
@@ -212,6 +214,7 @@ export interface BikeMoveContext {
   insideHouse: (x:number, z:number)=>boolean
   blockedAt: (x:number, y:number, z:number)=>boolean
   collisionKind: (dirX:number, dirZ:number)=>'building'|'collision'|''
+  collisionBlocked?: boolean
   wetSurface?: boolean
   stopBike: ()=>void
   dampBike: (step:number)=>number
@@ -455,6 +458,7 @@ export function createBikeControl() {
   let wheelie = 0
   let wheelieVel = 0
   let wheelieLoad = 0
+  let longPitch = 0
   /** 0..1 wheelie side-balance meter: fills when turning too hard / too fast on the back wheel; 1 = tip over (IDOK-153). */
   let wheelieTip = 0
   let wheelieSteerPrev = 0
@@ -611,7 +615,7 @@ export function createBikeControl() {
 
   function reset() {
     speed = lean = pitch = steerInput = revHold = 0
-    drainPerSec = wheelie = wheelieVel = wheelieLoad = wheelieTip = wheelieSteerPrev = 0
+    drainPerSec = wheelie = wheelieVel = wheelieLoad = wheelieTip = wheelieSteerPrev = longPitch = 0
     tucking = braking = false
     brakeInLeanHold = 0
     onPavement = wetSurface = offRoadSurface = false
@@ -894,6 +898,14 @@ export function createBikeControl() {
     if (state.offRoad !== undefined) offRoadSurface = state.offRoad
   }
 
+  function shouldImpactCrash(preSpeedMs: number, preLeanRad: number, preWheelieRad: number): boolean {
+    if (!canAutoCrash()) return false
+    const s = spec()
+    const spd = Math.abs(preSpeedMs)
+    return spd >= s.crash.impactCrashMs
+      || (spd >= s.crash.angledImpactCrashMs && (Math.abs(preLeanRad) >= s.crash.angledImpactLeanRad || preWheelieRad >= .12))
+  }
+
   function triggerCrash(reason: Exclude<TwoWheelCrashReason, ''>, side?: -1 | 1, probe?: TwoWheelCrashWorldProbe): TwoWheelCrashSnapshot {
     if (crashPhase !== 'none') return crashSnapshot()
     const resolvedSide: -1 | 1 = side ?? (Math.abs(lean) > .05 ? (lean > 0 ? -1 : 1) : (steerInput >= 0 ? 1 : -1))
@@ -1072,6 +1084,7 @@ export function createBikeControl() {
         speed = 0
         wheelie = 0
         wheelieVel = 0
+        longPitch = 0
         hazard = false
         turnSignal = 'off'
         turnCancelYawAccum = 0
@@ -1169,6 +1182,7 @@ export function createBikeControl() {
       wheelieTip: +wheelieDanger.toFixed(3),
       wheelie,
       wheelieVel,
+      longPitch: +longPitch.toFixed(4),
       tucking,
       braking,
       parkLocked,
@@ -1287,6 +1301,11 @@ export function createBikeControl() {
     setRiderWorldPos,
     setSurfaceCondition,
     triggerCrash,
+    tryImpactCrash(preSpeedMs: number): boolean {
+      if (crashPhase !== 'none' || !shouldImpactCrash(preSpeedMs, lean, wheelie)) return false
+      triggerCrash('impact', steerInput >= 0 ? 1 : -1)
+      return true
+    },
     standUp,
     startPickup,
     recover,
@@ -1351,6 +1370,7 @@ export function createBikeControl() {
         wheelieLoad = 0
         wheelieVel = 0
         wheelie = T.MathUtils.damp(wheelie, 0, 10, cdt)
+        longPitch = T.MathUtils.damp(longPitch, 0, 12, cdt)
         steerInput = T.MathUtils.damp(steerInput, 0, s.steerDamp, cdt)
         lean = T.MathUtils.damp(lean, 0, s.leanRecoverRate, cdt)
         leanRateNow = 0
@@ -1377,6 +1397,7 @@ export function createBikeControl() {
           wheelie = 0
           wheelieVel = 0
           wheelieLoad = 0
+          longPitch = T.MathUtils.damp(longPitch, 0, 12, cdt)
           tucking = false
           cruiseControl = false
           steerInput = T.MathUtils.damp(steerInput, 0, s.steerDamp, cdt)
@@ -1418,9 +1439,10 @@ export function createBikeControl() {
       const uphillFactor = uphillSin > .012 ? Math.max(0, uphillSin - .012) : 0
       const downhillFactor = uphillSin < -.012 ? Math.max(0, -uphillSin - .012) : 0
       const slopeMul = gSpec.uphillMul
-      const effMax = uphillFactor > 0
+      const rawEffMax = uphillFactor > 0
         ? Math.max(2.0, capMs * (1 - s.uphillCapScale * .28 * slopeMul * uphillFactor))
         : capMs
+      const effMax = kind === 'bike' ? Math.min(rawEffMax, EBIKE_UPGRADE_MAX_KMH / 3.6) : rawEffMax
 
       const torqueMul = kind === 'bike' ? profile.accelMul * batLim.accelBatteryMul : 1
       braking = (uFwd < -.05 && speed > .05) || (uFwd > .05 && speed < -.05)
@@ -1490,6 +1512,10 @@ export function createBikeControl() {
           speed = Math.min(0, speed + (s.rollDrag * 2.2 + s.aeroDrag * speed * speed) * cdt)
         }
       }
+
+      const rawLongAccel = cdt > 1e-4 ? T.MathUtils.clamp((speed - prevSpeed) / cdt, -14, 14) : 0
+      const targetLongPitch = wheelie > .12 ? 0 : T.MathUtils.clamp(rawLongAccel * .0055, -.065, .035)
+      longPitch = T.MathUtils.damp(longPitch, targetLongPitch, 11, cdt)
 
       // Active wheelie pitch physics driven by throttle torque + gear wheelie gain.
       const torqueBias = gSpec.wheelieGain * (kind === 'bike' ? profile.wheelieTorqueMul : 1)
@@ -1643,13 +1669,9 @@ export function createBikeControl() {
       const probeX = ctx.next.x + fwdX * sign * .72, probeZ = ctx.next.z + fwdZ * sign * .72
 
       const maybeCrashOnImpact = (reason: '' | 'building' | 'collision') => {
-        if (!reason || !canAutoCrash()) return false
-        if (preSpeed >= s.crash.impactCrashMs
-          || (preSpeed >= s.crash.angledImpactCrashMs && (preLean >= s.crash.angledImpactLeanRad || preWheelie >= .12))) {
-          triggerCrash('impact', steerInput >= 0 ? 1 : -1)
-          return true
-        }
-        return false
+        if (!reason || crashPhase !== 'none' || !shouldImpactCrash(preSpeed, preLean, preWheelie)) return false
+        triggerCrash('impact', steerInput >= 0 ? 1 : -1)
+        return true
       }
 
       if (Math.abs(ctx.speed) > 1e-4 && ctx.insideHouse(probeX, probeZ)) {
@@ -1657,7 +1679,7 @@ export function createBikeControl() {
         ctx.next.x = ctx.pos.x; ctx.next.z = ctx.pos.z; ctx.stopBike()
         return {blocked: true, reason: 'building', speed: 0}
       }
-      if (Math.hypot(ctx.move.x, ctx.move.z) < Math.abs(ctx.speed) * ctx.step * .35) {
+      if (ctx.collisionBlocked || Math.hypot(ctx.move.x, ctx.move.z) < Math.abs(ctx.speed) * ctx.step * .35) {
         const hit = ctx.collisionKind(fwdX * sign, fwdZ * sign)
         if (hit) {
           maybeCrashOnImpact(hit)
