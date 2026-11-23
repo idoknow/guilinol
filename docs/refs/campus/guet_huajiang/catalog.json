@@ -2717,7 +2717,10 @@
       "roof": null,
       "features": [
         "弧形体量",
-        "连续横向窗带"
+        "连续横向窗带",
+        "弧形体量局部悬挑",
+        "金色中英文馆名",
+        "大幅玻璃幕墙"
       ],
       "photos": [
         {
@@ -2727,9 +2730,25 @@
           "date": null,
           "date_basis": "图集未注明拍摄时间",
           "view": "从湖对岸平视，树冠遮住底部，屋面不可见。颜色按此图近似。"
+        },
+        {
+          "file": "huajiang-library-curve.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/Hc2cec3fdfc03924571e3ce3b8b94a4c27d1e25ab.jpg",
+          "page": "https://map.baidu.com/poi/8bd3ab189d3eb5a7f423106d",
+          "date": null,
+          "date_basis": "地点相册未核实拍摄日期",
+          "view": "从铺砖空地平视弧形外墙，能看到水平错层和局部悬挑。"
+        },
+        {
+          "file": "huajiang-library-lettering.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/B68b9643a8215b8e68.jpeg",
+          "page": "https://map.baidu.com/poi/8bd3ab189d3eb5a7f423106d",
+          "date": null,
+          "date_basis": "地点相册未核实拍摄日期",
+          "view": "仰拍书法体金色“图书馆”和 LIBRARY 字样，下方为玻璃幕墙。"
         }
       ],
-      "confidence": "low"
+      "confidence": "medium"
     },
     {
       "source": "0d9885d3-38ff-4858-a5e6-e2f37ee6b4a1",
