@@ -398,6 +398,8 @@ spec:
               name: glol-rt
               key: KICK_TOKEN
               optional: true      # 没配就禁用 /kick，不影响联机本身
+        - name: KICK_BAN_SECONDS
+          value: "600"           # 被踢后 uid 的封禁时长；只在本进程内存里生效
         resources:
           requests:
             cpu: 50m

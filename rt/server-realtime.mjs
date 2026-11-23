@@ -32,13 +32,29 @@
  *   br  = 品牌序号（0..3）
  *
  * HTTP
- *   GET  /health          → {ok:true, online, proto}（proto = 协议版本，见下面的 PROTO）
+ *   GET  /health          → {ok:true, online, proto, maxPlayers, banned, connections}
+ *                           （proto = 协议版本，见下面的 PROTO；探针只用 ok）
  *   POST /kick {uid,reason} → {ok:true, kicked}（需要 X-Kick-Token，和 KICK_TOKEN 一致）
+ *
+ * 运维语义（和协议无关，但线上排障要知道）
+ *   1) 单副本：在线玩家 / 封禁表都在进程内存里，多副本就是多个互不相通的房间，
+ *      所以 k8s 里固定 replicas: 1 + Recreate，不要 HPA。
+ *   2) 封禁只在本进程内存里生效，TTL 默认 10 分钟（KICK_BAN_SECONDS 可改），
+ *      重启即清空；要跨副本 / 跨重启就得接账号系统或外部存储，这段代码不承担。
+ *   3) 距离校验：hit / revive 由服务端用双方最近一次上报的 pos 算水平距离，
+ *      hit 超过 3.5 m、revive 超过 3 m 直接丢弃 —— 客户端坐标本身仍可伪造，
+ *      这里挡的是「站在地图另一头打人 / 救人」，不是防透视自瞄。
+ *   4) uid 未做鉴权，仅用于展示和 /kick 定位：真正的登录鉴权要接入账号系统。
+ *      当前实现只能保证同一房间内 uid 不重复、格式干净，防不了恶意客户端。
+ *   5) 连接数上限 MAX_PLAYERS（含还没 join 的 socket），另加每 IP 8 条；
+ *      慢客户端发送缓冲超过 1 MB 就跳过广播，连续 60 次断开（1013）。
  *
  * 启动：PORT=8790 node server-realtime.mjs
  * 依赖：npm i ws
  */
 import {createServer} from 'node:http'
+import {randomBytes} from 'node:crypto'
+import {isIP} from 'node:net'
 import {WebSocketServer} from 'ws'
 
 const PORT = Number(process.env.PORT || 8790)
@@ -46,6 +62,18 @@ const MAX_PLAYERS = Number(process.env.MAX_PLAYERS || 200)
 const MAX_CHAT = 80
 const TICK_MS = 1000
 const KICK_TOKEN = process.env.KICK_TOKEN || ''
+/** 被踢后的封禁时长（秒），只在本进程内存里生效 */
+const KICK_BAN_SECONDS = Number(process.env.KICK_BAN_SECONDS || 600)
+/** 单个 IP 最多几条连接（反代后按 x-forwarded-for 首个地址算） */
+const MAX_PER_IP = 8
+/** 昵称长度上限（字符）；uid 由 normalizeUid 统一裁到 16 位 */
+const MAX_NAME = 16
+/** 服务端裁决 hit / revive 的水平距离（米） */
+const HIT_RANGE = 3.5
+const REVIVE_RANGE = 3
+/** 广播前允许的发送缓冲；超了就跳过，连续跳过 60 次直接断开，别让慢客户端拖垮内存 */
+const MAX_BUFFERED = 1024 * 1024
+const MAX_SLOW_SKIPS = 60
 /** 同一个连接最快 20 Hz 上报位置，防止有人狂发把广播压垮 */
 const MIN_POS_GAP_MS = 45
 /** 外形数据上限（字节），超了直接丢弃，别让畸形包把别人的客户端搞崩 */
@@ -61,6 +89,12 @@ const PROTO = 3
 
 /** id → {ws, uid, name, avatar, x,y,z, yaw, v, bike, bx,bz,byaw, lastChat, lastPos} */
 const players = new Map()
+/** 所有已建立的 WebSocket 连接（含还没 join 的），把「握完手不 join」也算进容量 */
+const sockets = new Set()
+/** 每个 IP 的当前连接数，防止一个客户端开几百条把房间挤满 */
+const ipCounts = new Map()
+/** uid → {until, reason}，被 /kick 踢过的 uid 在 until 之前不许重新 join */
+const bans = new Map()
 let nextId = 1
 
 const now = () => Date.now()
@@ -70,6 +104,45 @@ const clampNum = (value, min, max, fallback = 0) => {
 }
 const clampInt = (value, min, max, fallback = 0) => Math.round(clampNum(value, min, max, fallback))
 const clampStr = (value, max) => (typeof value === 'string' ? value.slice(0, max) : '')
+
+/** uid 的唯一归一化入口：join 和 /kick 都走这里，否则「截断后再比较」永远对不上 */
+const normalizeUid = value => String(value ?? '').trim().replace(/[^A-Za-z0-9]/g, '').slice(0, 16)
+/** 格式不合法的 uid 由服务端生成（uid 只用于展示，没有鉴权意义） */
+const genUid = () => `u${randomBytes(4).toString('hex')}`
+
+/** 昵称去控制字符 + 限长；空则给默认名，避免别人客户端里被塞换行 / 伪造昵称 */
+function cleanName(value) {
+  const text = typeof value === 'string' ? value : ''
+  const cleaned = text
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028\u2029]/g, '')
+    .trim()
+    .slice(0, MAX_NAME)
+  return cleaned || '游客'
+}
+
+/** 反代场景取 x-forwarded-for 第一跳，但只接受合法 IP 字面量；客户端乱写头就退回 socket 地址 */
+function clientIp(req) {
+  const forwarded = req.headers['x-forwarded-for']
+  const first = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : ''
+  if (isIP(first)) return first
+  return req.socket.remoteAddress || 'unknown'
+}
+
+/** 每次 join 顺手清掉过期封禁，不起 setInterval（避免泄漏） */
+function sweepBans() {
+  const at = now()
+  for (const [uid, ban] of bans) {
+    if (!ban || ban.until <= at) bans.delete(uid)
+  }
+}
+
+/** 同一房间内 uid 唯一，重复就当「顶号」拒绝，否则后来者能冒用前者身份 */
+function uidTaken(uid) {
+  for (const p of players.values()) {
+    if (p.uid === uid) return true
+  }
+  return false
+}
 
 const HAIRS = {
   m: ['m_buzz', 'm_crop', 'm_perm', 'm_fade', 'm_mullet', 'm_part'],
@@ -110,13 +183,32 @@ function send(ws, payload) {
   }
 }
 
+/**
+ * 广播专用发送：先看发送缓冲，堆积超过 1 MB 说明对面跟不上（或故意不收），
+ * 这一条直接跳过；连续跳过 60 次基本就是死连接，close(1013) 交给 close 回调回收。
+ */
+function sendSlowAware(ws, text) {
+  if (ws.bufferedAmount > MAX_BUFFERED) {
+    ws.slowSkips = (ws.slowSkips || 0) + 1
+    if (ws.slowSkips >= MAX_SLOW_SKIPS) {
+      try { ws.close(1013, 'slow client') } catch { /* 忽略 */ }
+    }
+    return
+  }
+  ws.slowSkips = 0
+  send(ws, text)
+}
+
 function broadcast(payload, exceptId) {
   const text = JSON.stringify(payload)
   for (const [id, p] of players) {
     if (id === exceptId) continue
-    send(p.ws, text)
+    sendSlowAware(p.ws, text)
   }
 }
+
+/** 两点水平距离：用双方最近一次 pos 落库的坐标，hit / revive 由服务端裁决 */
+const flatDistance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z)
 
 function publicOf(p) {
   return {
@@ -130,208 +222,321 @@ function publicOf(p) {
 }
 
 const server = createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200, {'content-type': 'application/json'})
-    res.end(JSON.stringify({ok: true, online: players.size, proto: PROTO}))
-    return
-  }
+  try {
+    if (req.url === '/health') {
+      res.writeHead(200, {'content-type': 'application/json'})
+      // 保留 ok / online / proto 三个老字段（探针和监控在用），后面只是补容量信息
+      res.end(JSON.stringify({
+        ok: true,
+        online: players.size,
+        proto: PROTO,
+        maxPlayers: MAX_PLAYERS,
+        banned: bans.size,
+        connections: sockets.size,
+      }))
+      return
+    }
 
-  if (req.url === '/kick' && req.method === 'POST') {
-    let raw = ''
-    req.on('data', chunk => { raw += chunk; if (raw.length > 4096) req.destroy() })
-    req.on('end', () => {
-      if (KICK_TOKEN && req.headers['x-kick-token'] !== KICK_TOKEN) {
-        res.writeHead(401, {'content-type': 'application/json'})
-        res.end('{"ok":false}')
+    if (req.url === '/kick' && req.method === 'POST') {
+      // 没配 token 就直接 403，一个连接都不碰：否则 /kick 等于把踢人权公开
+      if (!KICK_TOKEN) {
+        res.writeHead(403, {'content-type': 'application/json'})
+        res.end('{"ok":false,"error":"kick disabled"}')
         return
       }
-      let body = {}
-      try { body = JSON.parse(raw || '{}') } catch { /* 忽略坏 JSON */ }
-      const uid = String(body.uid || '')
-      const reason = String(body.reason || '账号已被封禁').slice(0, 200)
-      let kicked = 0
-      for (const p of players.values()) {
-        if (p.uid !== uid) continue
-        send(p.ws, {t: 'banned', reason})
-        setTimeout(() => p.ws.close(4003, 'banned'), 60)
-        kicked++
-      }
-      res.writeHead(200, {'content-type': 'application/json'})
-      res.end(JSON.stringify({ok: true, kicked}))
-    })
-    return
-  }
+      let raw = ''
+      req.on('data', chunk => { raw += chunk; if (raw.length > 4096) req.destroy() })
+      req.on('end', () => {
+        try {
+          if (req.headers['x-kick-token'] !== KICK_TOKEN) {
+            res.writeHead(401, {'content-type': 'application/json'})
+            res.end('{"ok":false}')
+            return
+          }
+          let body
+          try {
+            body = JSON.parse(raw || '{}')
+          } catch {
+            res.writeHead(400, {'content-type': 'application/json'})
+            res.end('{"ok":false,"error":"bad json"}')
+            return
+          }
+          // null / 数组 / 标量都当坏请求，别在 body.uid 上崩掉
+          if (!body || typeof body !== 'object' || Array.isArray(body)) {
+            res.writeHead(400, {'content-type': 'application/json'})
+            res.end('{"ok":false,"error":"bad body"}')
+            return
+          }
+          // 和 join 走同一个归一化，超长 / 带脏字符的 uid 也能匹配上
+          const uid = normalizeUid(body.uid)
+          // 空 uid 会匹配「所有匿名玩家」，必须挡住，一个都不踢
+          if (!uid) {
+            res.writeHead(400, {'content-type': 'application/json'})
+            res.end('{"ok":false,"error":"uid required"}')
+            return
+          }
+          const reason = clampStr(body.reason, 200).trim() || '账号已被封禁'
+          // 只写内存封禁表（带 TTL），重启即失，够用来挡住「被踢后立刻重连」
+          bans.set(uid, {until: now() + KICK_BAN_SECONDS * 1000, reason})
+          let kicked = 0
+          for (const p of players.values()) {
+            if (p.uid !== uid) continue
+            send(p.ws, {t: 'banned', reason})
+            setTimeout(() => { try { p.ws.close(4003, 'banned') } catch { /* 忽略 */ } }, 60)
+            kicked++
+          }
+          res.writeHead(200, {'content-type': 'application/json'})
+          res.end(JSON.stringify({ok: true, kicked}))
+        } catch (err) {
+          // 异常只记日志，不能把进程带走
+          console.warn('[kick] 处理失败', err && err.message)
+          if (!res.headersSent) {
+            res.writeHead(500, {'content-type': 'application/json'})
+            res.end('{"ok":false}')
+          }
+        }
+      })
+      return
+    }
 
-  res.writeHead(426, {'content-type': 'text/plain; charset=utf-8'})
-  res.end('WebSocket only')
+    res.writeHead(426, {'content-type': 'text/plain; charset=utf-8'})
+    res.end('WebSocket only')
+  } catch (err) {
+    console.warn('[http] 处理失败', err && err.message)
+    if (!res.headersSent) {
+      res.writeHead(500, {'content-type': 'text/plain; charset=utf-8'})
+      res.end('error')
+    }
+  }
 })
 
 const wss = new WebSocketServer({server, path: '/ws', maxPayload: 4096})
 
-wss.on('connection', ws => {
-  if (players.size >= MAX_PLAYERS) {
-    send(ws, {t: 'error', message: '服务器满员'})
-    ws.close()
+wss.on('connection', (ws, req) => {
+  let ip = 'unknown'
+  try {
+    ip = clientIp(req)
+    // 容量按「所有连接」算：只数 players 的话，握完手不 join 就能无限占连接
+    if (sockets.size >= MAX_PLAYERS) {
+      send(ws, {t: 'error', message: '服务器满员'})
+      ws.close(1013, 'full')
+      return
+    }
+    const used = ipCounts.get(ip) || 0
+    if (used >= MAX_PER_IP) {
+      send(ws, {t: 'error', message: '连接数过多'})
+      ws.close(1013, 'too many connections')
+      return
+    }
+    sockets.add(ws)
+    ipCounts.set(ip, used + 1)
+  } catch (err) {
+    console.warn('[ws] 建连失败', err && err.message)
+    try { ws.close(1011, 'error') } catch { /* 忽略 */ }
     return
   }
+
   const id = String(nextId++)
   ws.isAlive = true
   ws.on('pong', () => { ws.isAlive = true })
 
-  ws.on('message', raw => {
-    let msg
-    try {
-      msg = JSON.parse(String(raw))
-    } catch {
-      return
+  // 连接回收：容量计数要减回去，ipCounts 不能只增不减
+  const release = () => {
+    if (sockets.delete(ws)) {
+      const left = (ipCounts.get(ip) || 1) - 1
+      if (left > 0) ipCounts.set(ip, left)
+      else ipCounts.delete(ip)
     }
-    const me = players.get(id)
-
-    if (msg.t === 'join' && !me) {
-      const player = {
-        id,
-        ws,
-        uid: clampStr(msg.uid, 16),
-        name: clampStr(msg.name, 24).trim() || '游客',
-        avatar: sanitizeAvatar(msg.avatar),
-        x: clampNum(msg.x, -1e5, 1e5),
-        y: clampNum(msg.y, -1000, 8000),
-        z: clampNum(msg.z, -1e5, 1e5),
-        yaw: clampNum(msg.yaw, -10, 10),
-        v: 0,
-        bike: '',
-        bx: 0,
-        bz: 0,
-        byaw: 0,
-        hb: 0,
-        hx: 0,
-        hz: 0,
-        hyaw: 0,
-        mv: 0,
-        dn: 0,
-        pn: 0,
-        wl: 0,
-        lastHit: 0,
-        cr: 0,
-        gr: 1,
-        hp: 100,
-        sc: 0,
-        sb: 0,
-        sp: 0,
-        br: 0,
-        lastChat: 0,
-        lastPos: 0,
-      }
-      players.set(id, player)
-      send(ws, {
-        t: 'welcome',
-        me: {id, uid: player.uid, name: player.name, avatar: player.avatar},
-        online: players.size,
-        players: [...players.values()].filter(p => p.id !== id).map(publicOf),
-      })
-      broadcast({t: 'join', player: publicOf(player)}, id)
+    if (players.has(id)) {
+      players.delete(id)
+      broadcast({t: 'leave', id})
       broadcast({t: 'online', online: players.size})
-      return
     }
+  }
 
-    if (!me) return
+  ws.on('message', raw => {
+    try {
+      const msg = JSON.parse(String(raw))
+      // null / 数组 / 标量都不是合法消息，直接忽略（否则读 msg.t 会抛）
+      if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return
+      const me = players.get(id)
 
-    if (msg.t === 'pos') {
-      const at = now()
-      if (at - me.lastPos < MIN_POS_GAP_MS) return
-      me.lastPos = at
-      me.x = clampNum(msg.x, -1e5, 1e5)
-      me.y = clampNum(msg.y, -1000, 8000)
-      me.z = clampNum(msg.z, -1e5, 1e5)
-      me.yaw = clampNum(msg.yaw, -10, 10)
-      me.v = clampNum(msg.v, 0, 120)
-      me.bike = clampStr(msg.bike, 32)
-      me.bx = clampNum(msg.bx, -1e5, 1e5)
-      me.bz = clampNum(msg.bz, -1e5, 1e5)
-      me.byaw = clampNum(msg.byaw, -20, 20)
-      me.mv = clampNum(msg.mv, 0, 1)
-      me.dn = clampNum(msg.dn, 0, 1)
-      me.pn = clampNum(msg.pn, 0, 1)
-      me.wl = clampNum(msg.wl, 0, 1)
-      me.hb = clampNum(msg.hb, 0, 1)
-      me.hx = clampNum(msg.hx, -1e5, 1e5)
-      me.hz = clampNum(msg.hz, -1e5, 1e5)
-      me.hyaw = clampNum(msg.hyaw, -20, 20)
-      me.cr = clampNum(msg.cr, 0, 1)
-      me.gr = clampNum(msg.gr, 0, 1, 1)
-      // 血量：出手方靠它看到自己打掉了多少，被打的人也靠它对齐屏幕上的血条
-      me.hp = clampInt(msg.hp, 0, 100, 100)
-      me.sc = clampInt(msg.sc, 0, 2)
-      me.sb = clampInt(msg.sb, 0, 1800)
-      me.sp = clampInt(msg.sp, 0, 999)
-      me.br = clampInt(msg.br, 0, 3)
-      broadcast({
-        t: 'pos', id,
-        x: me.x, y: me.y, z: me.z, yaw: me.yaw, v: me.v,
-        bike: me.bike, bx: me.bx, bz: me.bz, byaw: me.byaw,
-        hb: me.hb, hx: me.hx, hz: me.hz, hyaw: me.hyaw, mv: me.mv, cr: me.cr, gr: me.gr, dn: me.dn, pn: me.pn, wl: me.wl,
-        hp: me.hp,
-        sc: me.sc, sb: me.sb, sp: me.sp, br: me.br,
-      }, id)
-      return
-    }
+      if (msg.t === 'join' && !me) {
+        // 已经被拒（封禁 / 顶号）的连接不再给第二次机会
+        if (ws.rejected) return
+        // join 时再查一次：握手到 join 之间可能已经挤满
+        if (players.size >= MAX_PLAYERS) {
+          send(ws, {t: 'error', message: '服务器满员'})
+          ws.close(1013, 'full')
+          return
+        }
+        // 顺手清掉过期封禁，不起 setInterval（避免泄漏）
+        sweepBans()
+        // uid 只用于展示和定位：格式不合法就服务端生成，别让脏值进广播
+        let uid = normalizeUid(msg.uid)
+        if (!/^[A-Za-z0-9]{6,16}$/.test(uid)) {
+          do { uid = genUid() } while (uidTaken(uid))
+        }
+        const ban = bans.get(uid)
+        if (ban && ban.until > now()) {
+          ws.rejected = true
+          send(ws, {t: 'banned', reason: ban.reason || '账号已被封禁'})
+          setTimeout(() => { try { ws.close(4003, 'banned') } catch { /* 忽略 */ } }, 60)
+          return
+        }
+        // 同房间 uid 必须唯一，否则后来者能直接冒用前者的身份
+        if (uidTaken(uid)) {
+          ws.rejected = true
+          send(ws, {t: 'error', message: '该 uid 已在线'})
+          setTimeout(() => { try { ws.close(4001, 'uid in use') } catch { /* 忽略 */ } }, 60)
+          return
+        }
+        const player = {
+          id,
+          ws,
+          uid,
+          name: cleanName(msg.name),
+          avatar: sanitizeAvatar(msg.avatar),
+          x: clampNum(msg.x, -1e5, 1e5),
+          y: clampNum(msg.y, -1000, 8000),
+          z: clampNum(msg.z, -1e5, 1e5),
+          yaw: clampNum(msg.yaw, -10, 10),
+          v: 0,
+          bike: '',
+          bx: 0,
+          bz: 0,
+          byaw: 0,
+          hb: 0,
+          hx: 0,
+          hz: 0,
+          hyaw: 0,
+          mv: 0,
+          dn: 0,
+          pn: 0,
+          wl: 0,
+          lastHit: 0,
+          cr: 0,
+          gr: 1,
+          hp: 100,
+          sc: 0,
+          sb: 0,
+          sp: 0,
+          br: 0,
+          lastChat: 0,
+          lastPos: 0,
+        }
+        players.set(id, player)
+        send(ws, {
+          t: 'welcome',
+          me: {id, uid: player.uid, name: player.name, avatar: player.avatar},
+          online: players.size,
+          players: [...players.values()].filter(p => p.id !== id).map(publicOf),
+        })
+        broadcast({t: 'join', player: publicOf(player)}, id)
+        broadcast({t: 'online', online: players.size})
+        return
+      }
 
-    if (msg.t === 'hit') {
-      // 出拳：限频 5 次/秒，只转给被打的那个人，伤害由出手方算（夹到 1..35）
-      const at = now()
-      if (at - me.lastHit < 200) return
-      me.lastHit = at
-      const target = players.get(clampStr(msg.id, 64))
-      if (!target || target === me) return
-      const dmg = Math.max(1, Math.min(35, clampInt(msg.dmg, 1, 35, 9)))
-      // byId 让被打的一方算出「从哪个方向挨的这一下」；by 只用来显示
-      send(target.ws, {t: 'hit', dmg, by: me.name, byId: me.id})
-      return
-    }
+      if (!me) return
 
-    if (msg.t === 'revive') {
-      const target = players.get(clampStr(msg.id, 64))
-      if (!target || target === me) return
-      // 只有对方倒地时才允许扶
-      if (!target.dn) return
-      send(target.ws, {t: 'revive', by: me.name})
-      return
-    }
+      if (msg.t === 'pos') {
+        const at = now()
+        if (at - me.lastPos < MIN_POS_GAP_MS) return
+        me.lastPos = at
+        me.x = clampNum(msg.x, -1e5, 1e5)
+        me.y = clampNum(msg.y, -1000, 8000)
+        me.z = clampNum(msg.z, -1e5, 1e5)
+        me.yaw = clampNum(msg.yaw, -10, 10)
+        me.v = clampNum(msg.v, 0, 120)
+        me.bike = clampStr(msg.bike, 32)
+        me.bx = clampNum(msg.bx, -1e5, 1e5)
+        me.bz = clampNum(msg.bz, -1e5, 1e5)
+        me.byaw = clampNum(msg.byaw, -20, 20)
+        me.mv = clampNum(msg.mv, 0, 1)
+        me.dn = clampNum(msg.dn, 0, 1)
+        me.pn = clampNum(msg.pn, 0, 1)
+        me.wl = clampNum(msg.wl, 0, 1)
+        me.hb = clampNum(msg.hb, 0, 1)
+        me.hx = clampNum(msg.hx, -1e5, 1e5)
+        me.hz = clampNum(msg.hz, -1e5, 1e5)
+        me.hyaw = clampNum(msg.hyaw, -20, 20)
+        me.cr = clampNum(msg.cr, 0, 1)
+        me.gr = clampNum(msg.gr, 0, 1, 1)
+        // 血量：出手方靠它看到自己打掉了多少，被打的人也靠它对齐屏幕上的血条
+        me.hp = clampInt(msg.hp, 0, 100, 100)
+        me.sc = clampInt(msg.sc, 0, 2)
+        me.sb = clampInt(msg.sb, 0, 1800)
+        me.sp = clampInt(msg.sp, 0, 999)
+        me.br = clampInt(msg.br, 0, 3)
+        broadcast({
+          t: 'pos', id,
+          x: me.x, y: me.y, z: me.z, yaw: me.yaw, v: me.v,
+          bike: me.bike, bx: me.bx, bz: me.bz, byaw: me.byaw,
+          hb: me.hb, hx: me.hx, hz: me.hz, hyaw: me.hyaw, mv: me.mv, cr: me.cr, gr: me.gr, dn: me.dn, pn: me.pn, wl: me.wl,
+          hp: me.hp,
+          sc: me.sc, sb: me.sb, sp: me.sp, br: me.br,
+        }, id)
+        return
+      }
 
-    if (msg.t === 'avatar') {
-      const avatar = sanitizeAvatar(msg.avatar)
-      if (!avatar) return
-      me.avatar = avatar
-      broadcast({t: 'avatar', id, avatar}, id)
-      return
-    }
+      if (msg.t === 'hit') {
+        // 出拳：限频 5 次/秒，只转给被打的那个人，伤害由出手方算（夹到 1..35）
+        const at = now()
+        if (at - me.lastHit < 200) return
+        me.lastHit = at
+        const target = players.get(clampStr(msg.id, 64))
+        if (!target || target === me) return
+        // 目标已经倒地就别再打；距离用双方最近一次 pos 裁决，挡「隔空打人」
+        if (target.dn) return
+        if (flatDistance(me, target) > HIT_RANGE) return
+        const dmg = Math.max(1, Math.min(35, clampInt(msg.dmg, 1, 35, 9)))
+        // byId 让被打的一方算出「从哪个方向挨的这一下」；by 只用来显示
+        send(target.ws, {t: 'hit', dmg, by: me.name, byId: me.id})
+        return
+      }
 
-    if (msg.t === 'who') {
-      send(ws, {
-        t: 'players',
-        online: players.size,
-        players: [...players.values()].filter(p => p.id !== id).map(publicOf),
-      })
-      return
-    }
+      if (msg.t === 'revive') {
+        const target = players.get(clampStr(msg.id, 64))
+        if (!target || target === me) return
+        // 只有对方倒地时才允许扶，且得站在 3 m 内
+        if (!target.dn) return
+        if (flatDistance(me, target) > REVIVE_RANGE) return
+        send(target.ws, {t: 'revive', by: me.name})
+        return
+      }
 
-    if (msg.t === 'chat') {
-      const text = clampStr(msg.text, MAX_CHAT).trim()
-      if (!text) return
-      if (now() - me.lastChat < 1200) return // 简单防刷
-      me.lastChat = now()
-      broadcast({t: 'chat', id, name: me.name, text})
+      if (msg.t === 'avatar') {
+        const avatar = sanitizeAvatar(msg.avatar)
+        if (!avatar) return
+        me.avatar = avatar
+        broadcast({t: 'avatar', id, avatar}, id)
+        return
+      }
+
+      if (msg.t === 'who') {
+        send(ws, {
+          t: 'players',
+          online: players.size,
+          players: [...players.values()].filter(p => p.id !== id).map(publicOf),
+        })
+        return
+      }
+
+      if (msg.t === 'chat') {
+        const text = clampStr(msg.text, MAX_CHAT).trim()
+        if (!text) return
+        if (now() - me.lastChat < 1200) return // 简单防刷
+        me.lastChat = now()
+        broadcast({t: 'chat', id, name: me.name, text})
+      }
+    } catch (err) {
+      // 单条消息解析 / 处理失败不能把整个进程带走
+      console.warn('[ws] 消息处理失败', err && err.message)
     }
   })
 
-  ws.on('close', () => {
-    if (!players.has(id)) return
-    players.delete(id)
-    broadcast({t: 'leave', id})
-    broadcast({t: 'online', online: players.size})
-  })
-
-  ws.on('error', () => ws.close())
+  ws.on('close', release)
+  ws.on('error', () => { try { ws.close() } catch { /* 忽略 */ } })
 })
 
 // 在线人数心跳
