@@ -228,7 +228,7 @@ def build_glmu(b: Builder):
     _fb(b, KEJIAO_672633239, floors=6, floor_h=3.55, wall='white', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
     _fb(b, OV_WEST_QUAD, floors=5, floor_h=3.50, wall='cream', accent='terracotta', roof_kind='flat', roof_tile='gray_tile', holes=[WEST_COURTYARD])
     b.cylinder_y(-45.0, 0.0, 8.6, -92.0, 10.2, 'terracotta', sections=8, collide=True)
-    b.cylinder_y(-45.0, 8.6, 0.55, -92.0, 10.7, 'white', sections=8)
+    b.cylinder_y(-45.0, 8.6, 0.55, -92.0, 10.2, 'white', sections=8)
 
     # 6. All 7 West Dormitory & University OSM buildings (exact polygons)
     _fb(b, DORM_672633244, floors=6, floor_h=3.25, wall='white', accent='terracotta', roof_kind='pitched', roof_tile='red_tile')
