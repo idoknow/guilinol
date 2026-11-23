@@ -20,6 +20,10 @@ type Actor = {track:Track,dist:number,speed:number,kind:'car'|'scooter'|'person'
 type Position = {x:number,z:number,y:number}
 export const MAX_ACTORS=100
 export const MOBILE_ACTORS=80
+// IDOK-160: motor actors never appear inside the view frustum closer than this,
+// except right after a cold start or teleport when the street is still empty.
+export const VISIBLE_SPAWN_MIN=130
+const WARMUP_S=1.2,TELEPORT=60
 const distanceSq=(left:Position,right:Position)=>(left.x-right.x)**2+(left.y-right.y)**2+(left.z-right.z)**2
 
 export class Traffic {
@@ -48,6 +52,8 @@ export class Traffic {
   private anchorZ=Infinity
   private limits=[0,0,0,0]
   private rebalanceAt=0
+  private warmUntil=-1
+  private lastCamera?:Position
   private samples:{track:Track,dist:number}[][]=[]
   private primarySites:{track:Track,dist:number,x:number,y:number,z:number}[]=[]
   private updateLimits(camera:Position,street:boolean){
@@ -113,6 +119,7 @@ export class Traffic {
   isJunction(node:number){return this.junctions.has(node)||this.signal.has(node)}
   inherit(previous:Traffic){
     this.time=previous.time
+    this.warmUntil=previous.warmUntil;this.lastCamera=previous.lastCamera
     for(const actor of previous.actors){
       const track=this.exits.get(actor.track.from)?.find(candidate=>candidate.id===actor.track.id)
       if(track){actor.track=track;this.actors.push(actor)}
@@ -143,6 +150,10 @@ export class Traffic {
   step(dt:number,camera:Position,vehicle?:Position,visible?:(point:Position)=>boolean,profile?:(spawn:number,grid:number,motion:number)=>void){
     const start=profile?performance.now():0
     this.time+=dt
+    if(!this.lastCamera||Math.hypot(camera.x-this.lastCamera.x,camera.z-this.lastCamera.z)>TELEPORT)this.warmUntil=this.time+WARMUP_S
+    this.lastCamera={x:camera.x,y:camera.y,z:camera.z}
+    const warm=this.time<this.warmUntil
+    const hiddenSpawn=(point:Position)=>warm||!visible||!visible(point)||distanceSq(point,camera)>VISIBLE_SPAWN_MIN**2
     this.actors=this.actors.filter(actor=>(!actor.leaving||actor.scale>0)&&distanceSq(actor,camera)<210**2)
     let persons=0,scooters=0
     this.updateLimits(camera,!!visible)
@@ -168,7 +179,7 @@ export class Traffic {
       const deficit=nearbySectors.some((count,index)=>this.samples[index].length>0&&count<(walkers===12?4:2))
       for(const actor of this.actors){
         if(actor.kind==='person'||actor.leaving)continue
-        if(deficit&&sector(actor,camera)===crowded&&sectorPopulation[crowded]>8&&(!donor||distanceSq(actor,camera)>distanceSq(donor,camera)))donor=actor
+        if(deficit&&!visible(actor)&&sector(actor,camera)===crowded&&sectorPopulation[crowded]>8&&(!donor||distanceSq(actor,camera)>distanceSq(donor,camera)))donor=actor
         if(visible(actor)){inView++;continue}
         if((distanceSq(actor,camera)>60**2||sectorPopulation[sector(actor,camera)]>8)&&(!distant||distanceSq(actor,camera)>distanceSq(distant,camera)))distant=actor
       }
@@ -190,7 +201,7 @@ export class Traffic {
       if(!walk&&visible&&this.primarySites.length&&counts[0]<this.limits[0]&&motors-outside<52&&(!target||attempt%3!==0)){
         for(let retry=0;retry<4;retry++){
           const site=this.primarySites[Math.floor(this.random()*this.primarySites.length)]
-          if(visible(site)){target=site;break}
+          if(visible(site)&&hiddenSpawn(site)){target=site;break}
         }
       }
       const cell=this.cells.get(`${Math.floor(camera.x/128)+Math.floor(this.random()*3)-1},${Math.floor(camera.z/128)+Math.floor(this.random()*3)-1}`)
@@ -204,6 +215,7 @@ export class Traffic {
       if(target)actor.dist=target.dist
       this.position(actor)
       const offscreen=!walk&&visible&&!visible(actor)
+      if(!walk&&!hiddenSpawn(actor))continue
       const radial=distanceSq(actor,camera),octant=nearbySectors&&!walk?sector(actor,camera):-1
       if(!target&&octant>=0&&offscreen&&sectorPopulation![octant]>=5&&sectorPopulation!.some(count=>count<4)&&this.random()>.04)continue
       if(octant>=0&&motors>12&&nearbySectors![octant]<3&&radial>=65**2&&this.random()>.25)continue
