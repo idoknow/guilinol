@@ -320,7 +320,8 @@ async function sync(row, journal, save) {
       pr_url: pr?.html_url,
       screenshot_url: capture && (await screenshot(capture)),
       credit: credit ? shown : undefined,
-      message: `已上线：${shown}。谢谢你的反馈！你的昵称已署在「关于网上桂林」的贡献者名单里。`,
+      // 用户标题可能是一长句，只有写了署名块才拼进消息
+      message: `${credit ? `已上线：${shown}。` : '已上线。'}谢谢你的反馈！你的昵称已署在「关于网上桂林」的贡献者名单里。`,
     })
     // 409 = 服务端没接受（比如线上还是旧版状态机）：先别留言、别关单，下一轮再试
     if (!dry && written?.status !== 409) {
