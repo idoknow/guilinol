@@ -3,25 +3,28 @@
 // and film it with a rider-relative camera: offset=[behind, up, right], look=[ahead, up].
 // `v` overrides a shot for the 9:16 cut (keys/cam/fov/dur).
 export const variants = {
-  h:{width:1920,height:1080,fov:50,shots:['s01','s02','s03','s04','s05','s06','s07','s08','s09','s10','s11','s12','s13','s15']},
-  v:{width:1080,height:1920,fov:72,shots:['s01','s02','s03','s07','s09','s10','s11','s12','s13','s15']},
+  h:{width:1920,height:1080,fov:50,shots:['s01','s02','s03','s04','s05','s07','s08','s09','s10','s11','s12','s15']},
+  v:{width:1080,height:1920,fov:72,shots:['s01','s02','s03','s07','s09','s10','s11','s12','s15']},
 }
 // Tested e-bike route (scripts/ride-path.json): spawn plaza → Jiefang Rd E → Jiefang Bridge → east bank.
 const RIDE = [[-537,-80.7],[-511,-74.7],[-490,-67.7],[-463,-58.7],[-378,-29.7],[-347,-18.7],[-303,-3.7],[-261,10.3],[-197,32.3],[-75,78],[-36,90],[-21,95],[21,108],[157,152]]
 const orbit = (c,r,y,a0,a1,n=5)=>[...Array(n).keys()].map(i=>{const a=a0+(a1-a0)*i/(n-1);return {eye:[c[0]+r*Math.sin(a),y,c[2]+r*Math.cos(a)],look:c}})
 export const shots = [
   // ---- 山水 (guzheng / dizi) ----
-  {id:'s01',title:'晨雾漓江 → 象鼻山',dur:5,hour:6.6,weather:'mist',traffic:false,ease:'out',
-    keys:[{eye:[-140,250,-230],look:[-100,195,-1300]},{eye:[-125,228,-430],look:[-100,195,-1300]}]},
-  {id:'s02',title:'象鼻山 水月洞',dur:4,hour:7.6,traffic:false,ease:'linear',
-    keys:[{eye:[-690,151,1215],look:[-855,160,1105]},{eye:[-698,151,1175],look:[-855,160,1100]}]},
-  {id:'s03',title:'杉湖 日月双塔',dur:4,hour:9,ease:'linear',
-    keys:orbit([-977,165,631],190,162,3.3,3.7).map(k=>({...k,look:[-977,170,631]}))},
-  {id:'s04',title:'叠彩山顶 南望全城',dur:4,hour:10.5,traffic:false,radius:1400,ease:'linear',
-    keys:[{eye:[-111,300,-1463],look:[-560,170,200]},{eye:[-150,285,-1380],look:[-560,170,200]}]},
+  // v2 (IDOK-159 review): opening crane — from just above the Li River, rise and push north so
+  // Fubo and Diecai hills climb out of the morning haze. Title card sits on this shot.
+  {id:'s01',title:'晨·漓江升起',dur:6,hour:6.9,traffic:false,ease:'inout',
+    keys:[{eye:[-108,153,-280],look:[-80,160,-1000]},{eye:[-110,185,-360],look:[-90,175,-1100]},{eye:[-112,232,-470],look:[-100,190,-1300]}]},
+  {id:'s02',title:'象鼻山 水月洞',dur:5,hour:7.6,traffic:false,ease:'linear',
+    keys:[{eye:[-684,151,1240],look:[-855,160,1108]},{eye:[-703,151,1140],look:[-855,160,1098]}]},
+  {id:'s03',title:'杉湖 日月双塔',dur:4.5,hour:9,ease:'linear',
+    keys:orbit([-977,165,631],195,163,3.2,3.42).map(k=>({...k,look:[-977,171,631]}))},
+  // v2: glide forward over the summit so the city opens up below (was a static-feeling map view).
+  {id:'s04',title:'叠彩山顶 南望全城',dur:5,hour:10.5,traffic:false,radius:1400,ease:'out',
+    keys:[{eye:[-100,292,-1505],look:[-470,200,-100]},{eye:[-128,286,-1430],look:[-520,180,60]},{eye:[-165,278,-1340],look:[-560,165,200]}]},
   // ---- 古城 ----
-  {id:'s05',title:'靖江王城 中轴 → 独秀峰',dur:4,hour:14,
-    keys:[{eye:[-581,172,-280],look:[-535,222,-679]},{eye:[-584,180,-370],look:[-520,228,-679]}]},
+  {id:'s05',title:'靖江王城 中轴 → 独秀峰',dur:5,hour:14,ease:'out',
+    keys:[{eye:[-580,186,-250],look:[-545,205,-679]},{eye:[-582,184,-318],look:[-530,222,-679]},{eye:[-585,182,-385],look:[-516,236,-679]}]},
   {id:'s06',title:'东西巷',dur:3,hour:16,ease:'linear',
     keys:[{eye:[-575,174,-236],look:[-430,156,-240]},{eye:[-525,171,-237],look:[-400,156,-241]}]},
   // ---- 城市 骑行 (modern pop) ----
@@ -59,5 +62,5 @@ for(const shot of shots.filter(s=>s.id==='s09'||s.id==='s10')){
 }
 
 // 9:16 cut (~31 s): shorter takes of the same moves.
-const vDur = {s01:3,s02:3,s03:3,s07:3,s09:3,s10:3,s11:3,s12:3,s13:2.5,s15:5.5}
+const vDur = {s01:4.5,s02:3.5,s03:3,s07:3,s09:3,s10:3,s11:3,s12:3,s15:5.5}
 for(const s of shots) if(vDur[s.id]) s.v = {...s.v, dur:vDur[s.id]}
