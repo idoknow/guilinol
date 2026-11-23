@@ -6,6 +6,7 @@ import type {Streets} from './street-worker'
 import {bridgeGeometry} from './look/bridge'
 import {look} from './look/config'
 import {nightGround} from './look/night'
+import {countryside,setupCountryside,touchesCountryside} from './look/countryside'
 import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
@@ -185,6 +186,7 @@ async function inflateMask(encoded:string) {
 export function startOverview(manifest:Manifest) {
   const {underlay,packedUnderlay,texture,step,waterMask} = manifest.overview
   const [left,top,width,depth] = manifest.extent
+  if(manifest.region)setupCountryside(manifest.region,manifest.extent,step,manifest.chunkSize)
   const elevations = packedUnderlay
     ? fetchAsset(packedUnderlay.file).then(data=>new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer())
     : fetchAsset(underlay.file)
@@ -202,6 +204,7 @@ export function startOverview(manifest:Manifest) {
     const mesh = new THREE.Group()
     mesh.position.set(left,0,top)
     const material = bitmapMaterial(flipped)
+    countryside(material)
     const size=manifest.chunkSize, side=size/step, stride=cols+1
     const terrain=new THREE.BufferGeometry()
     const positions=new Float32Array(samples.length*3), normals=new Float32Array(samples.length*3)
@@ -339,6 +342,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   if(tunnels)joinPortalRoads(tile,tunnels,[streets.road,streets.sidewalk,...(streets.surface?[streets.surface.getAttribute('position').array as Float32Array]:[])])
   signal.throwIfAborted()
   const material = await surfaceMaterial(buffer.slice(offset,end))
+  if(touchesCountryside(tile.x,tile.z))countryside(material)
   if(parseSlot)await parseSlot()
   const group = new THREE.Group()
   group.position.set(tile.x,0,tile.z)
