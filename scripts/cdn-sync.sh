@@ -5,6 +5,7 @@
 #   CDNFLY_TOKEN=xxx ./scripts/cdn-sync.sh                 # 用 web/dist 和 .cdn-hashes.json
 #   DIST=web/dist ./scripts/cdn-sync.sh
 #   DRY_RUN=1 ./scripts/cdn-sync.sh                        # 只看要刷哪些，不真的提交
+#   STATE_ONLY=1 ./scripts/cdn-sync.sh                     # 只写基线（首次/缓存丢失时与 cdn-purge.sh dir 配合）
 #
 # CI 里要把 .cdn-hashes.json 缓存住（actions/cache），否则每次都当成全量变更：
 #
@@ -69,6 +70,13 @@ if changed:
     for p in changed[:15]:
         print('   +', p)
 PY
+
+# STATE_ONLY=1：只记录当前哈希作为基线，不提交任何任务（首次运行/缓存丢失时配合整站刷新用）
+if [ "${STATE_ONLY:-0}" = "1" ]; then
+  cp "$tmp/now.json" "$STATE"
+  echo "只写基线: $STATE"
+  exit 0
+fi
 
 mapfile -t urls < "$tmp/changed.txt"
 if [ "${#urls[@]}" -eq 0 ]; then

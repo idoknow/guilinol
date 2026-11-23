@@ -27,8 +27,8 @@ main() {
     live=$(curl -fsS --max-time 20 "https://glol.rcpd.cc/version.json?t=$(date +%s)" | sed -n 's/.*"sha" *: *"\([0-9a-f]*\)".*/\1/p' || true)
     if [[ $live == "$target" ]]; then
       echo "已上线 ${target:0:7}"
-      # 新版本上线后刷新 CDN 整站缓存（Actions 里用 secrets.CDNFLY_TOKEN 调 /v1/jobs clean_dir；失败不影响发版）
-      gh workflow run cdn-purge.yml -R idoknow/guilinol --ref main -f mode=dir \
+      # 新版本上线后只刷新变了的 CDN 区块（Actions：从 glol-web:<sha> 镜像取文件 → cdn-sync.sh 按哈希差值 clean_url+预热；失败不影响发版）
+      gh workflow run cdn-purge.yml -R idoknow/guilinol --ref main -f mode=sync -f sha="$target" \
         || echo "触发 CDN 刷新失败（不影响发版）" >&2
       # 预热（可选）：上线后用 GET 把大文件拉进 CDN（失败不影响发版）。
       # 默认关闭（CDNFly 有 CC 自动封禁，60 秒 20 次封 600 秒）；需要时在 service 里设 CDN_WARM=1。
