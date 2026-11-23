@@ -17,7 +17,10 @@ export const look = {
   fogHorizonFrom: 4200, fogHorizonTo: 7500,
   heightFogBase: 150, heightFogFalloff: 55, heightFogBoost: 1.3, airScaleHeight: 900,
   // Plain beyond the data box so the world edge sinks into haze instead of floating.
-  outerGround: 0xaeb09b, outerGroundY: 136,
+  outerGround: 0x8e9a6c, outerGroundY: 136,
+  // IDOK-200 区外郊野 (look/countryside.ts): field patchwork + wood clumps outside the play region.
+  countryside: {paddy: 0x7d9150, paddyYoung: 0x93a35e, fallow: 0xa39d78, vegetable: 0x86915a,
+    wood: 0x4a6638, woodDark: 0x2f4a2b},
   sunColor: 0xfff0d4, sunPower: 2.7,
   hemiSky: 0xc9dcea, hemiGround: 0x6f6a5e, hemiPower: 1.2,
   exposure: 1.0,
