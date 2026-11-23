@@ -13,12 +13,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5e6558"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/1106225389",
@@ -31,12 +31,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5f6559"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/1106225390",
@@ -49,12 +49,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5c6356"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/1106225391",
@@ -67,12 +67,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#61675a"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/1467762117",
@@ -85,12 +85,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#969181"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/1467763233",
@@ -103,12 +103,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5b6151"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/1467763234",
@@ -121,12 +121,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5e6353"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/1467763235",
@@ -139,12 +139,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#535a4e"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/1467763236",
@@ -157,12 +157,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#495448"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/1491801286",
@@ -193,30 +193,57 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#6c6b5d"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/448299119",
       "overture_id": "2ffc3240-36c0-4c6b-b834-fe5bde7e58bf",
-      "name": null,
+      "name": "图书馆",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "浅色分格墙面，下部两翼外伸，入口上方留有贯通开口。",
       "colors": {
-        "wall": null,
-        "accent": null,
-        "glass": null,
-        "roof": null
+        "wall": "#dedcda",
+        "accent": "#d0aba2",
+        "glass": "#8c989c",
+        "roof": "#827a67"
       },
-      "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none"
+      "roof": "flat_parapet",
+      "features": [
+        "主入口与两翼斜视",
+        "入口前有金属雕塑"
+      ],
+      "photos": [
+        {
+          "file": "way448299119_1.jpg",
+          "url": "https://jjc.gxnu.edu.cn/_upload/article/images/cd/6d/017937384114be7fe70e6a5041ed/06851fdb-0b48-4128-88c1-9e7f17ecf4f6_d.jpg",
+          "page": "https://jjc.gxnu.edu.cn/2021/0727/c9494a215837/page.htm",
+          "date": null,
+          "view": "主入口与两翼斜视，拍摄方位未注明。"
+        },
+        {
+          "file": "way448299119_2.jpg",
+          "url": "https://region-guangxi-resource.xuexi.cn/image/1006/process/6a4d1e1135044eb883fddfbae1b0fb27.jpg",
+          "page": "https://news.gxnu.edu.cn/2022/1011/c1337a248549/page.htm",
+          "date": null,
+          "view": "校方校区全景局部，斜俯视屋顶、外墙及楼前空间。"
+        },
+        {
+          "file": "way448299119_3.jpg",
+          "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=110.3177,25.2647,110.3286,25.2709&bboxSR=4326&imageSR=4326&size=1900,1081&format=jpg&f=image",
+          "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+          "date": null,
+          "view": "正射影像屋顶局部，北向上。"
+        }
+      ],
+      "confidence": "photo",
+      "name_src": "https://jjc.gxnu.edu.cn/2255/list.htm",
+      "floors_min": 4
     },
     {
       "source": "way/459580419",
@@ -229,12 +256,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#666355"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/672911629",
@@ -247,12 +274,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#64614f"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/672911630",
@@ -265,12 +292,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#675f4d"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673862476",
@@ -283,12 +310,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#6a6e62"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673869791",
@@ -319,12 +346,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5f6153"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673869794",
@@ -337,12 +364,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#7f7b64"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673869795",
@@ -355,12 +382,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#535a50"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673896837",
@@ -386,17 +413,29 @@
       "name": "后勤基建处",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "淡黄墙面与浅灰凸窗交替，白色竖框把蓝色窗带分为数跨。",
       "colors": {
-        "wall": null,
-        "accent": null,
-        "glass": null,
-        "roof": null
+        "wall": "#dbcfab",
+        "accent": "#d0d0ca",
+        "glass": "#50648c",
+        "roof": "#837b67"
       },
-      "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none"
+      "roof": "flat_parapet",
+      "features": [
+        "北门照片中后勤楼的转角和长立面",
+        "屋顶边缘设白色开敞框架"
+      ],
+      "photos": [
+        {
+          "file": "way673896838_1.jpg",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/0/08/%E5%B9%BF%E8%A5%BF%E5%B8%88%E8%8C%83%E5%A4%A7%E5%AD%A6%E8%82%B2%E6%89%8D%E6%A0%A1%E5%8C%BA%E5%8C%97%E9%97%A8.jpg?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=original",
+          "page": "https://commons.wikimedia.org/wiki/File:广西师范大学育才校区北门.jpg",
+          "date": null,
+          "view": "北门照片中后勤楼的转角和长立面，拍摄方位未注明。"
+        }
+      ],
+      "confidence": "photo",
+      "floors_min": 5
     },
     {
       "source": "way/673896839",
@@ -409,12 +448,27 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#817c69"
       },
       "roof": null,
       "features": [],
-      "photos": [],
-      "confidence": "none"
+      "photos": [
+        {
+          "file": "way673896839_1.jpg",
+          "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=110.3177,25.2647,110.3286,25.2709&bboxSR=4326&imageSR=4326&size=1900,1081&format=jpg&f=image",
+          "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+          "date": null,
+          "view": "正射影像屋顶局部，北向上。"
+        },
+        {
+          "file": "way673896839_2.jpg",
+          "url": "https://news.gxnu.edu.cn/_upload/article/images/f8/69/a67395314e24824b7e11cb765c1b/d76240d3-f63e-4df4-8f38-0b012fa23f92.jpg",
+          "page": "https://news.gxnu.edu.cn/2021/0905/c9188a217442/page.psp",
+          "date": null,
+          "view": "服务部室内，仅供核对用途。"
+        }
+      ],
+      "confidence": "aerial"
     },
     {
       "source": "way/673896840",
@@ -427,30 +481,41 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#8a826f"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673896841",
       "overture_id": "7b1b89a2-69e7-45e1-a746-ad2ca9303561",
       "name": "后勤接待培训中心",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 5,
+      "floors_src": "photo",
+      "facade": "米黄色外墙，转角以弧形窗带收边，各层窗下有深色横线。",
       "colors": {
-        "wall": null,
-        "accent": null,
-        "glass": null,
-        "roof": null
+        "wall": "#d6c6ad",
+        "accent": "#63584d",
+        "glass": "#808a95",
+        "roof": "#988e78"
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none"
+      "features": [
+        "接待楼入口与弧形转角",
+        "一层入口上方有金属色檐口"
+      ],
+      "photos": [
+        {
+          "file": "way673896841_1.jpg",
+          "url": "https://www.gxnu.edu.cn/_upload/article/files/3b/fc/ff28cc5c4bf0b4191682c6dfc216/27c532b4-0edf-4014-adc4-9edc4d1718b1.pdf",
+          "page": "https://www.gxnu.edu.cn/_upload/article/files/3b/fc/ff28cc5c4bf0b4191682c6dfc216/27c532b4-0edf-4014-adc4-9edc4d1718b1.pdf#page=7",
+          "date": null,
+          "view": "接待楼入口与弧形转角，拍摄方位未注明。"
+        }
+      ],
+      "confidence": "photo"
     },
     {
       "source": "way/673896842",
@@ -458,17 +523,37 @@
       "name": "第二文科综合楼",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "入口两层深色玻璃以竖梃分格，门厅上方由浅色方柱托起外挑楼层。",
       "colors": {
-        "wall": null,
-        "accent": null,
-        "glass": null,
-        "roof": null
+        "wall": "#e1ddd5",
+        "accent": "#aaa397",
+        "glass": "#687780",
+        "roof": "#818173"
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none"
+      "features": [
+        "入口斜视，前景为双人雕像",
+        "门厅入口内凹",
+        "北楼至少七层（MBA 教育中心公开地址列七楼，整栋总层数待核）。"
+      ],
+      "photos": [
+        {
+          "file": "way673896842_1.jpg",
+          "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=110.3177,25.2647,110.3286,25.2709&bboxSR=4326&imageSR=4326&size=1900,1081&format=jpg&f=image",
+          "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+          "date": null,
+          "view": "正射影像屋顶局部，北向上。"
+        },
+        {
+          "file": "way673896842_2.jpg",
+          "url": "https://www.gxnu.edu.cn/_upload/article/images/7a/f4/e7ec5ea54ef6ad7737dde6df14ea/2c53566c-5b04-4776-ae85-3367af03d166.jpg",
+          "page": "https://www.gxnu.edu.cn/2022/1013/c11796a249123/page.psp",
+          "date": null,
+          "view": "入口斜视，前景为双人雕像，拍摄方位未注明。"
+        }
+      ],
+      "confidence": "photo",
+      "floors_min": 7
     },
     {
       "source": "way/673896843",
@@ -499,12 +584,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#6a6b60"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673896845",
@@ -517,12 +602,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#797161"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673896846",
@@ -535,12 +620,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#7e7b6b"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673896847",
@@ -553,12 +638,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#706e5d"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673896848",
@@ -571,12 +656,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#87816f"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673896849",
@@ -589,12 +674,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#716b5a"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673896850",
@@ -607,12 +692,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#7e7966"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673896851",
@@ -661,12 +746,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#8a8775"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905861",
@@ -679,12 +764,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#8b8674"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905862",
@@ -697,12 +782,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5e5544"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905863",
@@ -715,12 +800,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#7b7767"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905864",
@@ -733,12 +818,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#83806d"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905865",
@@ -751,12 +836,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#7e7b67"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905866",
@@ -769,12 +854,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#7d7966"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905867",
@@ -787,12 +872,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5d5e4e"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905868",
@@ -805,12 +890,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5d6255"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905869",
@@ -823,12 +908,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5f645a"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905870",
@@ -841,12 +926,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#988e75"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905871",
@@ -859,12 +944,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#686956"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905872",
@@ -877,12 +962,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#8b826f"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905873",
@@ -895,12 +980,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5f6254"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905874",
@@ -913,12 +998,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#877f69"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905875",
@@ -931,12 +1016,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#847e6a"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/673905876",
@@ -949,12 +1034,20 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#6e6e5d"
       },
       "roof": null,
       "features": [],
-      "photos": [],
-      "confidence": "none"
+      "photos": [
+        {
+          "file": "way673905876_1.jpg",
+          "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=110.3177,25.2647,110.3286,25.2709&bboxSR=4326&imageSR=4326&size=1900,1081&format=jpg&f=image",
+          "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+          "date": null,
+          "view": "正射影像屋顶局部，北向上。"
+        }
+      ],
+      "confidence": "aerial"
     },
     {
       "source": "way/674021568",
@@ -967,12 +1060,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5e5b4c"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674021569",
@@ -985,12 +1078,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5b5f53"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674021570",
@@ -1016,17 +1109,35 @@
       "name": "逸夫楼",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "低层入口体块以灰白横条分格，侧接深色玻璃。",
       "colors": {
-        "wall": null,
-        "accent": null,
-        "glass": null,
-        "roof": null
+        "wall": "#b0afab",
+        "accent": "#997f50",
+        "glass": "#565f64",
+        "roof": "#616455"
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none"
+      "features": [
+        "题字墙斜视",
+        "墙上嵌菱形装饰及“逸夫教学楼”字样"
+      ],
+      "photos": [
+        {
+          "file": "way674026697_1.jpg",
+          "url": "https://jjc.gxnu.edu.cn/_upload/article/images/7d/84/c669f45d4695bcd66aa10d2ec395/e644a592-7d76-471b-9ab7-5a9ed55454f8_d.jpg",
+          "page": "https://jjc.gxnu.edu.cn/2021/0905/c9494a217262/page.htm",
+          "date": null,
+          "view": "题字墙斜视，拍摄方位未注明。"
+        },
+        {
+          "file": "way674026697_2.jpg",
+          "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=110.3177,25.2647,110.3286,25.2709&bboxSR=4326&imageSR=4326&size=1900,1081&format=jpg&f=image",
+          "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+          "date": null,
+          "view": "正射影像屋顶局部，北向上。"
+        }
+      ],
+      "confidence": "photo"
     },
     {
       "source": "way/674026698",
@@ -1039,30 +1150,55 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#89816e"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674026701",
       "overture_id": "9b3f7ecd-b57a-4196-84de-4ebbbfb6da0c",
       "name": "越南九二学校旧址",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "双层浅黄色长条楼，上层纵长绿窗，下层柱廊反复分格。",
       "colors": {
-        "wall": null,
-        "accent": null,
-        "glass": null,
-        "roof": null
+        "wall": "#e8d8a3",
+        "accent": "#42644e",
+        "glass": "#697c72",
+        "roof": "#605e4d"
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none"
+      "features": [
+        "山墙与长廊斜视",
+        "下层柱廊贯通长立面"
+      ],
+      "photos": [
+        {
+          "file": "way674026701_1.jpg",
+          "url": "https://news.gxnu.edu.cn/_upload/article/images/89/2c/f64c4ab14879b433f69d4e194431/be087ac0-e2c5-4522-b850-c634fc711068.jpg",
+          "page": "https://news.gxnu.edu.cn/2022/0509/c1337a237888/page.htm",
+          "date": null,
+          "view": "山墙与长廊斜视，拍摄方位未注明。"
+        },
+        {
+          "file": "way674026701_2.jpg",
+          "url": "https://news.gxnu.edu.cn/_upload/article/images/74/1e/0c88c3e04a049c4d943dec373d27/3f0dac00-47d0-4720-9169-ebdb9f3cb408.png",
+          "page": "https://news.gxnu.edu.cn/2024/1225/c1331a307669/page.psp",
+          "date": null,
+          "view": "入口侧近景，黄色墙面与连续柱廊。"
+        },
+        {
+          "file": "way674026701_3.jpg",
+          "url": "https://www.gxnu.edu.cn/_upload/article/images/f2/ef/d178c03841bb82a6411ad661a1f2/36403cec-1ea1-477f-a287-13fa27080c1c.png",
+          "page": "https://www.gxnu.edu.cn/2022/1111/c2a253997/page.psp",
+          "date": null,
+          "view": "从院内退后看整列柱廊与铺地。"
+        }
+      ],
+      "confidence": "photo"
     },
     {
       "source": "way/674026702",
@@ -1075,12 +1211,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#676352"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674026703",
@@ -1129,12 +1265,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#a19263"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674051971",
@@ -1165,12 +1301,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5f5f4f"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674051973",
@@ -1183,12 +1319,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#837b66"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674051974",
@@ -1201,12 +1337,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#7f735b"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674051976",
@@ -1219,12 +1355,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#6c6755"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674051977",
@@ -1237,12 +1373,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#7e7763"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674051978",
@@ -1255,12 +1391,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#676351"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674051979",
@@ -1273,12 +1409,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#676351"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674051982",
@@ -1309,12 +1445,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#8e8570"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674051985",
@@ -1331,8 +1467,16 @@
       },
       "roof": null,
       "features": [],
-      "photos": [],
-      "confidence": "none"
+      "photos": [
+        {
+          "file": "way674051985_1.jpg",
+          "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=110.3177,25.2647,110.3286,25.2709&bboxSR=4326&imageSR=4326&size=1900,1081&format=jpg&f=image",
+          "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+          "date": null,
+          "view": "正射影像屋顶局部，北向上。"
+        }
+      ],
+      "confidence": "aerial"
     },
     {
       "source": "way/674051986",
@@ -1340,17 +1484,43 @@
       "name": "职业技术师范学院",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "浅色框架划分横向暗窗与砖红色墙带，端翼向庭院折转。",
       "colors": {
-        "wall": null,
-        "accent": null,
-        "glass": null,
-        "roof": null
+        "wall": "#cfccbf",
+        "accent": "#a47e6f",
+        "glass": "#4d5352",
+        "roof": "#6d6854"
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none"
+      "features": [
+        "隔草坪看庭院立面",
+        "中央屋顶有弧形桁架"
+      ],
+      "photos": [
+        {
+          "file": "way674051986_1.jpg",
+          "url": "https://jjc.gxnu.edu.cn/_upload/article/images/d4/2b/e018fa564dec833376c86f8949a9/f51f4751-a635-430d-808d-d56a17b60b48.jpg",
+          "page": "https://jjc.gxnu.edu.cn/2021/0727/c9494a215838/page.htm",
+          "date": null,
+          "view": "隔草坪看庭院立面，拍摄方位未注明。"
+        },
+        {
+          "file": "way674051986_2.jpg",
+          "url": "https://region-guangxi-resource.xuexi.cn/image/1006/process/6a4d1e1135044eb883fddfbae1b0fb27.jpg",
+          "page": "https://news.gxnu.edu.cn/2022/1011/c1337a248549/page.htm",
+          "date": null,
+          "view": "校方校区全景局部，斜俯视屋顶、外墙及楼前空间。"
+        },
+        {
+          "file": "way674051986_3.jpg",
+          "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=110.3177,25.2647,110.3286,25.2709&bboxSR=4326&imageSR=4326&size=1900,1081&format=jpg&f=image",
+          "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+          "date": null,
+          "view": "正射影像屋顶局部，北向上。"
+        }
+      ],
+      "confidence": "photo",
+      "floors_min": 5
     },
     {
       "source": "way/674051987",
@@ -1363,12 +1533,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#948c78"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674067259",
@@ -1376,17 +1546,36 @@
       "name": "数学科学学院",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "浅米色横向窗带，端部竖向玻璃窗从顶层延伸至树冠后。",
       "colors": {
-        "wall": null,
-        "accent": null,
-        "glass": null,
-        "roof": null
+        "wall": "#e1dbcb",
+        "accent": "#9c7944",
+        "glass": "#838b88",
+        "roof": "#716c58"
       },
-      "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none"
+      "roof": "flat_parapet",
+      "features": [
+        "从树冠上方望向长立面",
+        "端墙竖排“数学科学学院”",
+        "屋顶设开敞横架"
+      ],
+      "photos": [
+        {
+          "file": "way674067259_1.jpg",
+          "url": "https://jjc.gxnu.edu.cn/_upload/article/images/61/e0/cf5240414e1596265bda2e870e07/9b418ce2-d66d-4f2e-82a3-4ade01d4bc16.jpg",
+          "page": "https://jjc.gxnu.edu.cn/2021/0727/c9494a215840/page.htm",
+          "date": null,
+          "view": "从树冠上方望向长立面，拍摄方位未注明。"
+        },
+        {
+          "file": "way674067259_2.jpg",
+          "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=110.3177,25.2647,110.3286,25.2709&bboxSR=4326&imageSR=4326&size=1900,1081&format=jpg&f=image",
+          "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+          "date": null,
+          "view": "正射影像屋顶局部，北向上。"
+        }
+      ],
+      "confidence": "photo"
     },
     {
       "source": "way/674067261",
@@ -1399,12 +1588,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#c6c0a5"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674067265",
@@ -1417,12 +1606,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#54564a"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674067271",
@@ -1471,12 +1660,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#78705d"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674067285",
@@ -1489,12 +1678,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#a59a7f"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674162957",
@@ -1507,12 +1696,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5f685b"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674162958",
@@ -1525,12 +1714,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#61685a"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674162959",
@@ -1543,12 +1732,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#636b5e"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674162964",
@@ -1561,12 +1750,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#666554"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674162965",
@@ -1579,12 +1768,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#646655"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674162966",
@@ -1597,12 +1786,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#6c6956"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674162967",
@@ -1615,12 +1804,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#6a6956"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674162968",
@@ -1633,12 +1822,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#676957"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/674162969",
@@ -1651,12 +1840,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#686858"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "way/681137533",
@@ -1715,17 +1904,50 @@
       "name": "田家炳教育学院",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "米白色外墙、横向窗带，入口上方以土黄色斜柱支撑悬挑部分。",
       "colors": {
-        "wall": null,
-        "accent": null,
-        "glass": null,
-        "roof": null
+        "wall": "#e0dcd1",
+        "accent": "#b39876",
+        "glass": "#8d9695",
+        "roof": "#5a5b4d"
       },
-      "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none"
+      "roof": "flat_parapet",
+      "features": [
+        "入口斜视",
+        "挑空门厅两侧有突出墙片"
+      ],
+      "photos": [
+        {
+          "file": "2143a1b7-a73c-4d5d-a5b4-ef278c18c735_1.jpg",
+          "url": "https://jjc.gxnu.edu.cn/_upload/article/images/18/2e/5a409da041a4bb1504913df3128b/6b325f25-860f-47a9-b89e-3ff804bd745d.jpg",
+          "page": "https://jjc.gxnu.edu.cn/2021/0727/c9494a215839/page.htm",
+          "date": null,
+          "view": "入口斜视，拍摄方位未注明。"
+        },
+        {
+          "file": "2143a1b7-a73c-4d5d-a5b4-ef278c18c735_2.jpg",
+          "url": "https://www.glc.edu.cn/virtual_attach_file.vsb?afc=YLmN4PMRCPUzvsM8NWfoRlZMRL8oRLiZLRU8MNLbLRVVLmU0gihFp2hmCIa0MSyiMYhkUSybnmNYLzvsU8Q7LRW2Ll-io7QRUzlYMzfko7VFnm9sol-bLzVFnzGbol-Jv2bjo4OeoDnAQYhXptQ0g47Poz90Lz-ZL1bw62D8c&oid=1748243187&tid=1198&nid=1282&e=.png",
+          "page": "https://www.glc.edu.cn/dag/info/1198/1282.htm",
+          "date": null,
+          "view": "正面历史照片；与基建处田家炳楼图的入口斜柱、三排带窗及墙片相符。"
+        },
+        {
+          "file": "2143a1b7-a73c-4d5d-a5b4-ef278c18c735_3.jpg",
+          "url": "https://region-guangxi-resource.xuexi.cn/image/1006/process/6a4d1e1135044eb883fddfbae1b0fb27.jpg",
+          "page": "https://news.gxnu.edu.cn/2022/1011/c1337a248549/page.htm",
+          "date": null,
+          "view": "校方校区全景局部，斜俯视屋顶、外墙及楼前空间。"
+        },
+        {
+          "file": "2143a1b7-a73c-4d5d-a5b4-ef278c18c735_4.jpg",
+          "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=110.3177,25.2647,110.3286,25.2709&bboxSR=4326&imageSR=4326&size=1900,1081&format=jpg&f=image",
+          "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+          "date": null,
+          "view": "正射影像屋顶局部，北向上。"
+        }
+      ],
+      "confidence": "photo",
+      "floors_min": 4
     },
     {
       "source": "2848602e-1909-4a7d-929e-cf879894cba6",
@@ -1771,12 +1993,20 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#7d7d68"
       },
       "roof": null,
       "features": [],
-      "photos": [],
-      "confidence": "none"
+      "photos": [
+        {
+          "file": "3911cb0a-2f6d-4a4d-bcbe-b31dbf941364_1.jpg",
+          "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=110.3177,25.2647,110.3286,25.2709&bboxSR=4326&imageSR=4326&size=1900,1081&format=jpg&f=image",
+          "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+          "date": null,
+          "view": "正射影像屋顶局部，北向上。"
+        }
+      ],
+      "confidence": "aerial"
     },
     {
       "source": "46adbbe3-7a84-4498-9a17-d0944df67a24",
@@ -1805,12 +2035,20 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#676554"
       },
       "roof": null,
       "features": [],
-      "photos": [],
-      "confidence": "none"
+      "photos": [
+        {
+          "file": "4991dbcb-806a-4d61-b4e7-bb28a00452df_1.jpg",
+          "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=110.3177,25.2647,110.3286,25.2709&bboxSR=4326&imageSR=4326&size=1900,1081&format=jpg&f=image",
+          "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+          "date": null,
+          "view": "正射影像屋顶局部，北向上。"
+        }
+      ],
+      "confidence": "aerial"
     },
     {
       "source": "4b2e6259-8888-4b11-a1cc-a9227694417e",
@@ -1907,12 +2145,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#a79785"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "736331bb-9d75-4471-a989-41315f6e0774",
@@ -1924,12 +2162,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#6e6b59"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "792f9416-59e8-4310-b2ac-a9acc5be96e0",
@@ -1975,12 +2213,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#79715e"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "814fb781-050b-4afb-8cac-01fd1505e3d9",
@@ -1992,12 +2230,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#717464"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "871f7228-32bc-4208-bc43-a349a16f61a4",
@@ -2009,12 +2247,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#616454"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "95a09490-5bee-46b4-b10e-da09d8425e6a",
@@ -2026,12 +2264,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#6b6e5d"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "95fb8936-f54c-4433-97f5-08a40c154a96",
@@ -2111,16 +2349,16 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#a7aaa4"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "bc7b04b2-8336-43e1-ade7-03af6eccbbb4",
-      "name": null,
+      "name": "体育馆",
       "floors": null,
       "floors_src": null,
       "facade": null,
@@ -2128,12 +2366,23 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#4c5142"
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none"
+      "features": [
+        "旧校图标为体育馆；现有 OSM 场地 way/674026700 标为球类馆。"
+      ],
+      "photos": [
+        {
+          "file": "bc7b04b2-8336-43e1-ade7-03af6eccbbb4_1.jpg",
+          "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=110.3177,25.2647,110.3286,25.2709&bboxSR=4326&imageSR=4326&size=1900,1081&format=jpg&f=image",
+          "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+          "date": null,
+          "view": "正射影像屋顶局部，北向上。"
+        }
+      ],
+      "confidence": "aerial",
+      "name_src": "https://jjc.gxnu.edu.cn/2255/list.htm"
     },
     {
       "source": "c88d0719-b930-4b09-9c27-fc7a3ad1f63b",
@@ -2179,12 +2428,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#5c4d41"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "eb317f4b-ecc6-441e-a8e9-093f523288d5",
@@ -2213,12 +2462,12 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#585c4e"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     },
     {
       "source": "faf28579-6865-4915-a7d9-08b121e0a788",
@@ -2247,25 +2496,80 @@
         "wall": null,
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#60675c"
       },
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "aerial"
     }
   ],
-  "gates": [],
+  "gates": [
+    {
+      "source": "gate_north",
+      "name": "北门",
+      "desc": "沿街浅褐色题名墙，深色校名，下有“育才校区”字样。",
+      "photos": [
+        {
+          "file": "gate_north_1.jpg",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/0/08/%E5%B9%BF%E8%A5%BF%E5%B8%88%E8%8C%83%E5%A4%A7%E5%AD%A6%E8%82%B2%E6%89%8D%E6%A0%A1%E5%8C%BA%E5%8C%97%E9%97%A8.jpg?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=original",
+          "page": "https://commons.wikimedia.org/wiki/File:广西师范大学育才校区北门.jpg",
+          "date": "2024-08-26",
+          "view": "从街对面看题名墙与入口。"
+        }
+      ],
+      "osm_node": null,
+      "lonlat": null
+    },
+    {
+      "source": "gate_south_historic",
+      "name": "南门（图源历史标注）",
+      "desc": "临街低矮横向题名墙，金色校名。历史照片与现校图的入口位置尚未对应。",
+      "photos": [
+        {
+          "file": "gate_south_historic_1.jpg",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/7/71/%E5%B9%BF%E8%A5%BF%E5%B8%88%E8%8C%83%E5%A4%A7%E5%AD%A6%E8%82%B2%E6%89%8D%E6%A0%A1%E5%8C%BA%E5%8D%97%E9%97%A8.jpg?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=original",
+          "page": "https://commons.wikimedia.org/wiki/File:广西师范大学育才校区南门.jpg",
+          "date": "2011-08-07",
+          "view": "从街面对入口；采用原作者历史视角。"
+        }
+      ],
+      "osm_node": null,
+      "lonlat": null
+    }
+  ],
   "open_spaces": [
     {
       "source": "way/448299114",
-      "name": null,
+      "name": "大田径场",
       "lonlat": [
         110.3223433,
         25.2667621
       ],
-      "desc": "OSM pitch / soccer",
-      "photos": []
+      "desc": "跑道环绕草地球场，一侧有遮棚看台，弯道旁为阶梯式看台。",
+      "photos": [
+        {
+          "file": "way448299114_1.jpg",
+          "url": "https://nimg.guilinlife.com/mmbiz/bX8yxb-OkCxjTfw48MWWuRmG77Dg5OHA0bA0FFRWIcahOprJ7-_bpjCOL6WcZVfetXBZIW_cKeT0jO6KfbAiCyTV9NAKCmOLfvzPtZ0VzoKeXDJpExI8BK27g7lScCREqY9JOc0C-7pD0QFcHrEELLL3pPfGWQzIqGMNqtliBd7wJAq87BTX8Cu_kVUz-q1G_03RmZq15cqiFzflsUM6AS_nlM68KnXu1db92QWxImxtelEEX_7ZuMrpF9EBi6XFiSr3s9vYp96jZiR5Rta16ndhVd5yN6_sxfMIwPe3f1Rt3tcqTB6SeltINwWuJ6iM5FWY5_JILtGskwj7x2ERetyp6QKds6u-hQkEUgjITAiRLrNhaEXieXQI-G7i44UBEdV4uljLa6Hyzui4JSNYQqwGebndyx-l97pW3wHa11iEaM2hT49Hmbe8TFeujigXSOL58APsigO5TgjmxgSceA%3D%3D/media?watermark/1/image/aHR0cHM6Ly9waWMuYXBwLnl1bmd1aWxpbi5jb20vYWRtaW5fRm9aVmwwVGw0ZWs4dUtadEtWb2hyMEFZang5Zy5wbmc=/dissolve/80/gravity/SouthEast",
+          "page": "https://bbs.guilinlife.com/forum.php?mod=viewthread&tid=9961715",
+          "date": null,
+          "view": "从弯道一侧俯看草坪和长边看台"
+        },
+        {
+          "file": "way448299114_2.jpg",
+          "url": "https://nimg.guilinlife.com/mmbiz/BCFQXbxonzpDq3BdSJUhvDRQfzLgbWVh-Q_NPpVRniNa5KmgAtIcDyTKZIrCL81--K3ZR3f1vgRAWkJySdjUhrNiMQAmPwv8xObPNamPwdXtkk1KNDJcehPGwLyZ-IYp7LCqkJbjXY7eeBmFqKDM4vBkS0ta8sBjiFT8aC8jSluw-Ij7Di1xky3ebkR0V7JLgU2fEqUanlgIU4zKHqzWUzlnXFpPFRPkcfu2RyidFrI-4WF7IUelRpkqVU_U22RDSlc_XMjWvy8BfPzEFvgcU4rVWj3yN6YJWUT3pbMKPO2uVYSo17DQfr2PtnJyecsysZOTJlq4iWOGAE5w37WNP3TiKOkrgSRvXdt4tGEAyVu2oO4b_bOjBzvQf1SS0vwzEaco9cwLhCvAChP07pVEPhGsZJVVNpt-7wb7gHAW4lbPyJU1Gq7kGVVp3rUOq2dvlq3EvMdaFSiHc6wQ2L8iwQ%3D%3D/media?watermark/1/image/aHR0cHM6Ly9waWMuYXBwLnl1bmd1aWxpbi5jb20vYWRtaW5fRm9aVmwwVGw0ZWs4dUtadEtWb2hyMEFZang5Zy5wbmc=/dissolve/80/gravity/SouthEast",
+          "page": "https://bbs.guilinlife.com/forum.php?mod=viewthread&tid=9961715",
+          "date": null,
+          "view": "反向斜视弯道与周边建筑"
+        },
+        {
+          "file": "way448299114_3.jpg",
+          "url": "https://nimg.guilinlife.com/mmbiz/aPoZOxympegKk7wjouA-Lw4REiWpU3wYKOWtay9JjlxZ6_XXO2FQ92EFIUaVfJktN6uf0MUok7MIx2Cs9hIXdUYV8ppM0JlYDCysPMRyrXfmpewqd76Ej2fjpp95RTsUhvb7khdl7R9184SscH9dDv-JyWfKzRp1S4tsmLfBy91MY7iJb9tGm9OANp3T4UHZaHXInCB-ifSiulu6od5OCZT--dfJuF1tiWLzuLj3_VBEH_l6MxrEcWoO9eBlXOQULXdwJiAf460pUtvey14TDDFA19JLyOolSqxlKiiguk8uxvlVL6oNkKbCNVrEl8F3IlCFOPGvYAT0iXMSyCAonzX5PgfTzG0g88p8XfmG3BwbsFzaUjqn0os1RBY9pWlHccGxceLZK1DRgpL-gIDT5eGo7upMf42JHdDyRTzbKRGmMaZaX_QcS2oMGsH9WDtappd_5LeypzVMeAN4ykBhbw%3D%3D/media?watermark/1/image/aHR0cHM6Ly9waWMuYXBwLnl1bmd1aWxpbi5jb20vYWRtaW5fRm9aVmwwVGw0ZWs4dUtadEtWb2hyMEFZang5Zy5wbmc=/dissolve/80/gravity/SouthEast",
+          "page": "https://bbs.guilinlife.com/forum.php?mod=viewthread&tid=9961715",
+          "date": null,
+          "view": "俯视阶梯式看台和枫树"
+        }
+      ]
     },
     {
       "source": "way/459580418",
@@ -2416,6 +2720,94 @@
       ],
       "desc": "OSM park",
       "photos": []
+    },
+    {
+      "source": "sculpture_vn",
+      "name": "中越纪念雕塑",
+      "desc": "浅色石框内嵌深色人物浮雕，底部为题铭基座。",
+      "photos": [
+        {
+          "file": "sculpture_vn_1.jpg",
+          "url": "https://jjc.gxnu.edu.cn/_upload/article/images/23/b9/1600d5f5492ab17508309221f2f1/881c8e54-4284-4b23-b161-9578013a75c1_d.jpg",
+          "page": "https://jjc.gxnu.edu.cn/2021/0905/c9494a217263/page.htm",
+          "date": null,
+          "view": "从绿地斜看浮雕与石框。"
+        }
+      ],
+      "lonlat": null
+    },
+    {
+      "source": "marx_engels",
+      "name": "马克思恩格斯雕像",
+      "desc": "第二文科综合楼前，双人铜色人物像置于浅色石台，一人站立、一人就座。",
+      "photos": [
+        {
+          "file": "marx_engels_1.jpg",
+          "url": "https://www.gxnu.edu.cn/_upload/article/images/7a/f4/e7ec5ea54ef6ad7737dde6df14ea/596d5c01-c4d5-4e76-8cc8-5de6feaca22f.jpg",
+          "page": "https://www.gxnu.edu.cn/2022/1013/c11796a249123/page.psp",
+          "date": null,
+          "view": "正面近景"
+        },
+        {
+          "file": "marx_engels_2.jpg",
+          "url": "https://www.gxnu.edu.cn/_upload/article/images/7a/f4/e7ec5ea54ef6ad7737dde6df14ea/d2b465dd-69b0-4518-92ad-a15f3e8745ea.jpg",
+          "page": "https://www.gxnu.edu.cn/2022/1013/c11796a249123/page.psp",
+          "date": null,
+          "view": "侧面仰视"
+        },
+        {
+          "file": "marx_engels_3.jpg",
+          "url": "https://www.gxnu.edu.cn/_upload/article/images/7a/f4/e7ec5ea54ef6ad7737dde6df14ea/2b85e6da-63ff-4632-8e06-54144ba10a28.jpg",
+          "page": "https://www.gxnu.edu.cn/2022/1013/c11796a249123/page.psp",
+          "date": null,
+          "view": "从广场另一侧看雕塑与楼前绿地"
+        }
+      ],
+      "lonlat": null
+    },
+    {
+      "source": "library_plaza",
+      "name": "图书馆前广场",
+      "desc": "浅色铺地与分块修剪的绿篱相间，入口前有高大的金属雕塑。",
+      "photos": [
+        {
+          "file": "library_plaza_1.jpg",
+          "url": "https://jjc.gxnu.edu.cn/_upload/article/images/cd/6d/017937384114be7fe70e6a5041ed/06851fdb-0b48-4128-88c1-9e7f17ecf4f6_d.jpg",
+          "page": "https://jjc.gxnu.edu.cn/2021/0727/c9494a215837/page.htm",
+          "date": null,
+          "view": "广场铺地、绿篱及入口的地面斜视局部。"
+        },
+        {
+          "file": "library_plaza_2.jpg",
+          "url": "https://region-guangxi-resource.xuexi.cn/image/1006/process/6a4d1e1135044eb883fddfbae1b0fb27.jpg",
+          "page": "https://news.gxnu.edu.cn/2022/1011/c1337a248549/page.htm",
+          "date": null,
+          "view": "广场铺地、绿篱及入口的斜俯视局部。"
+        }
+      ],
+      "lonlat": null
     }
-  ]
+  ],
+  "unmatched_landmarks": [
+    {
+      "source": "new_intl",
+      "name": "新国教楼",
+      "desc": "浅色高层体量与低层部分相接，两段横向窗带之间有深色玻璃。公开图注未提供唯一对应的楼栋轮廓。",
+      "photos": [
+        {
+          "file": "new_intl_1.jpg",
+          "url": "https://jjc.gxnu.edu.cn/_upload/article/images/d4/6a/c951ea6940048c1b583aa9c8917d/a38d3199-5466-4f24-9253-16f43d10f2e6_d.jpg",
+          "page": "https://jjc.gxnu.edu.cn/2021/0905/c9494a217265/page.htm",
+          "date": null,
+          "view": "从街面仰看长立面、端部及低层裙楼。"
+        }
+      ]
+    }
+  ],
+  "aerial_imagery": {
+    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=110.3177,25.2647,110.3286,25.2709&bboxSR=4326&imageSR=4326&size=1900,1081&format=jpg&f=image",
+    "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+    "credit": "Esri World Imagery",
+    "date": null
+  }
 }
