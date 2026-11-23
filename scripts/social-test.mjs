@@ -44,10 +44,11 @@ async function configuredTest({sql,env}) {
 
     // login（平台账号未绑定）：直接建 uuid 账号，占位邮箱
     const tn=await pending('login','C0FFEE0123456789ABCDEF',' ')
+    const nextUid=Number((await sql('SELECT max(uid) AS last FROM users'))[0].results[0].last)+1
     const created=await call('auth/social/confirm',{method:'POST',cookie:`glol_social_pending=${tn}`,body:{}});assert.equal(created.status,200,await created.clone().text());assert.equal((await created.json()).created,true)
     const ns=created.headers.getSetCookie();assert.equal(ns.length,2)
     const nme=await (await call('me',{cookie:ns.find(c=>c.startsWith('glol_session=')).split(';')[0]})).json()
-    assert.equal(nme.email_placeholder,true)
+    assert.equal(nme.email_placeholder,true);assert.equal(nme.uid,nextUid)
     assert.equal((await sql(`SELECT signup_method FROM users WHERE id='${nme.id}'`))[0].results[0].signup_method,'wx')
     const rz=await call('auth/resend',{method:'POST',body:{email:nme.email,purpose:'reset'}});assert.equal(rz.status,400);assert.ok(['no_email','invalid_input'].includes((await rz.json()).error.code))
 assert.match(nme.email,/^wx\.c0ffee0123456789abcdef@social\.invalid$/)

@@ -7,7 +7,7 @@ import {bindEmail,isSocialType,socialCallback,socialConfig,socialConfirm,socialP
 import {unsubscribe} from '../../lib/feedback-mail'
 import {cloudSave} from '../../lib/cloud-save'
 type User = SessionAccount & {salt:string;digest:string;locked_until:number}
-const profile=(user:SessionAccount)=>({id:user.id,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email,email_placeholder:!!user.email_placeholder})
+const profile=(user:SessionAccount)=>({id:user.id,uid:user.uid,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email,email_placeholder:!!user.email_placeholder})
 const json=(data:unknown,status=200,session?:string)=>Response.json(data,{status,headers:{'Cache-Control':'no-store',...(session?{'Set-Cookie':session}:{})}})
 function nickname(value:unknown) {
   if(typeof value!=='string'||!value.trim()||value.trim().length>32) invalid()
@@ -17,7 +17,7 @@ function password(value:unknown) {
   if(typeof value!=='string'||value.length<8||value.length>256) invalid()
   return value
 }
-const methods:Record<string,string[]>={health:['GET'],'auth/me':['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST'],'auth/social/config':['GET'],'auth/social/register':['POST'],'auth/email/bind':['POST']}
+const methods:Record<string,string[]>={'rt/ticket':['POST'],health:['GET'],'auth/me':['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST'],'auth/social/config':['GET'],'auth/social/register':['POST'],'auth/email/bind':['POST']}
 
 async function handle(request:Request,env:Env) {
   const url=new URL(request.url), path=url.pathname.slice(5), method=request.method, db=env.DB
@@ -31,7 +31,7 @@ async function handle(request:Request,env:Env) {
   if(path==='health')return json({ok:true})
   if(method!=='GET'&&request.headers.get('Origin')!==url.origin) throw new Problem(403,'origin','请求来源不符')
   let body:Record<string,unknown>={}
-  if(method!=='GET'&&path!=='auth/logout') {
+  if(method!=='GET'&&path!=='auth/logout'&&path!=='rt/ticket') {
     try { body=await request.json() } catch { invalid() }
     if(!body||typeof body!=='object'||Array.isArray(body)) invalid()
   }
@@ -58,10 +58,19 @@ async function handle(request:Request,env:Env) {
     await stmt('DELETE FROM sessions WHERE digest=?',await sessionHash(request)).run()
     return json({ok:true},200,cookie('',0))
   }
-  if(path==='me' || path==='auth/me' || path==='me/avatar') {
+  if(path==='me' || path==='auth/me' || path==='me/avatar' || path==='rt/ticket') {
     const digest=await sessionHash(request)
     const user=await sessionAccount(db,digest)
     if(!user) unauthorized()
+    if(path==='rt/ticket') {
+      if(!user.verified) unauthorized()
+      if(!env.RT_JOIN_SECRET) throw new Problem(503,'rt_disabled','联机暂不可用')
+      const encode=(bytes:Uint8Array)=>btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'')
+      const utf8=new TextEncoder()
+      const payload=encode(utf8.encode(JSON.stringify({uid:user.uid,name:user.nickname,exp:now()+60})))
+      const key=await crypto.subtle.importKey('raw',utf8.encode(env.RT_JOIN_SECRET),{name:'HMAC',hash:'SHA-256'},false,['sign'])
+      return json({ticket:payload+'.'+encode(new Uint8Array(await crypto.subtle.sign('HMAC',key,utf8.encode(payload))))})
+    }
     if(path==='me/avatar') {
       const row=await stmt('SELECT payload_json,revision FROM player_saves WHERE user_id=?',user.id)
         .first<{payload_json:string;revision:number}>()

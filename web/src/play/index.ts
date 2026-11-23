@@ -11,6 +11,8 @@ import {type ShopTriggerDef} from '../game/shops'
 import {getState, onState} from '../game/state'
 import {mountLandscapeEntry} from '../ui/orientation'
 import {mountSettingsEntry,mountViewEntry} from '../ui/settings'
+import {bindRackGuard,isRackOpen,mountRackEntry} from '../ui/gear-rack'
+import {setCameraShown} from '../gear/hand'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
 const ease = (t:number)=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2
@@ -140,6 +142,9 @@ export function play(host:Host) {
   // IDOK-178: 第一/第三人称切换与设置面板，桌面和手机共用右上角这一列。
   mountViewEntry(buttons)
   mountSettingsEntry(buttons)
+  // IDOK-182: 相机包（换机身），打开时冻住移动，跟拍照模式一样。
+  mountRackEntry(buttons)
+  bindRackGuard(on=>{const walker = host.walker(); if(!walker?.active) return; walker.hold(on); if(!on) walker.hold(false)})
 
   // --- Card
   const card = document.createElement('aside'); card.className = 'spot-card'; card.hidden = true; card.setAttribute('role','dialog')
@@ -261,10 +266,14 @@ export function play(host:Host) {
 
   // --- Per-frame: marker placement/fade, arrival, summit pill.
   let pulse = 0
+  let camShown = false
   function tick(dt:number) {
     pulse += dt
     if(!mapRequested&&pulse>2.5){mapRequested = true; loadMap()}
     const walker = host.walker(), walking = !!walker?.active, p = walking?walker!.position:host.camera.position
+    // IDOK-182: 手上的相机只在徒步取景时出现；拍照/飞行/看相机包时收起来。
+    const camOn = walking && !photo.active && !isRackOpen()
+    if(camOn!==camShown){camShown = camOn; setCameraShown(camOn, walker)}
     for(const m of marks) {
       const d = Math.hypot(m.spot.x-p.x,m.spot.z-p.z)
       if(Number.isNaN(m.ground)&&d<600) m.ground = groundAt(m.spot.x,m.spot.z)

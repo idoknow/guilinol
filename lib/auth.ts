@@ -1,4 +1,5 @@
 export interface Env {
+  RT_JOIN_SECRET?: string
   perfQuery?:(path:string,params:URLSearchParams)=>Promise<Response>
   DB: D1Database; FEEDBACK:R2Bucket; BRIDGE_TOKEN?:string; EMAIL_DEV_LOG?: string; RESEND_API_KEY?: string
   /** 聚合登录：全部来自 Pages 环境变量/secret，不进 D1、后台不暴露 */
@@ -17,11 +18,11 @@ export type BanState = { banned_at: number; ban_reason: string }
 export function checkBan(user: BanState | null) {
   if (user?.banned_at) throw new Problem(403,'banned','账号已被封禁：'+user.ban_reason)
 }
-export type SessionAccount = BanState & {id:string;email:string;nickname:string;verified:number;role:string;notify_email:number;email_placeholder:number}
+export type SessionAccount = BanState & {id:string;uid:number;email:string;nickname:string;verified:number;role:string;notify_email:number;email_placeholder:number}
 export async function sessionAccount(db:D1Database, digest:string) {
   if (!digest) return null
   const join = ' FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.digest=? AND expires>?'
-  const account = await db.prepare('SELECT users.id,email,nickname,verified,role,notify_email,email_placeholder,banned_at,ban_reason'+join+' AND banned_at=0')
+  const account = await db.prepare('SELECT users.id,users.uid,email,nickname,verified,role,notify_email,email_placeholder,banned_at,ban_reason'+join+' AND banned_at=0')
     .bind(digest,now()).first<SessionAccount>()
   if (!account) checkBan(await db.prepare('SELECT banned_at,ban_reason'+join+' AND banned_at<>0').bind(digest,now()).first<BanState>())
   return account

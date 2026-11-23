@@ -286,6 +286,9 @@ spec:
             secretKeyRef:
               name: glol-env
               key: POSTGRES_PASSWORD
+        - name: RT_JOIN_SECRET
+          valueFrom:
+            secretKeyRef: {name: glol-env, key: RT_JOIN_SECRET, optional: true}
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
@@ -390,6 +393,9 @@ spec:
         env:
         - name: PORT
           value: "8790"
+        - name: RT_JOIN_SECRET
+          valueFrom:
+            secretKeyRef: {name: glol-env, key: RT_JOIN_SECRET, optional: true}
         - name: MAX_PLAYERS
           value: "200"
         - name: KICK_TOKEN
