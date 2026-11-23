@@ -1,5 +1,5 @@
 from airport import airfield, clear_pavement_trees, level_pavement
-from play_region import PlayRegion, restore_protected_tiles
+from play_region import PlayRegion, preserve_rack_types, restore_protected_tiles
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 import argparse
@@ -538,6 +538,8 @@ def build(bbox, output, palette, workers=4):
     if play_region:
         from pickup_curbs import open_jiefang_westbound_lane
         open_jiefang_westbound_lane(output,chunks,vehicles)
+    if play_region:
+        preserve_rack_types(vehicles)
     write_vehicles(output,vehicles,triangles)
     manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=extent,chunkSize=CHUNK,peaks=peaks,atlas=asset('atlas.bin'),
                     vehicles=asset('vehicles.bin'),grid=GRID,overview=dict(step=step, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png'),waterMask=water_bits),chunks=chunks)

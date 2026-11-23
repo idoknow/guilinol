@@ -1,10 +1,16 @@
 """The approved local-metre boundary shared by world generation and clients."""
+import gzip
 import json
+import tarfile
 from pathlib import Path
 
 from shapely.geometry import shape
 
 from common import xz2ll
+from legacy_core import cached_archive
+
+
+PUBLISHED_WORLD = "822cf08b60ac44bca075f9ac93a0f6492d16f26b3e05e677cf1f0e9b513f9b4e"
 
 
 class PlayRegion:
@@ -23,15 +29,27 @@ class PlayRegion:
                     chunks=sorted(self.tiles))
 
 
+def preserve_rack_types(vehicles):
+    """Keep existing bicycle and e-bike pickup locations stable as the region grows."""
+    with tarfile.open(cached_archive(PUBLISHED_WORLD), 'r:gz') as archive:
+        previous = json.loads(gzip.decompress(archive.extractfile('world/vehicles.bin').read()))
+    kinds = ('bikes', 'bicycles')
+    published = {(x,z):kind for kind in kinds for x,_,z,_,_ in previous[kind]}
+    racks = {kind:[] for kind in kinds}
+    for kind in kinds:
+        for vehicle in vehicles[kind]:
+            x,_,z,_,_ = vehicle
+            racks[published.get((x,z), kind)].append(vehicle)
+    vehicles.update(racks)
+
+
 def restore_protected_tiles(output, chunks, entries):
     """Copy campus and inner-city assets by world origin from the published baseline."""
-    import tarfile
     from shapely.geometry import box
     from shapely import union_all
-    from legacy_core import CAMPUS_TILES, Downtown, cached_archive
+    from legacy_core import CAMPUS_TILES, Downtown
 
-    digest = '822cf08b60ac44bca075f9ac93a0f6492d16f26b3e05e677cf1f0e9b513f9b4e'
-    archive = cached_archive(digest)
+    archive = cached_archive(PUBLISHED_WORLD)
     definition = json.loads(Path(__file__).with_name('region.json').read_bytes())
     campus_zones = [f for f in definition['zones'] if any(word in f['name'] for word in
                     ('大学','学院','校区','学校','中学','小学'))]
