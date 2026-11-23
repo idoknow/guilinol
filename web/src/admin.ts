@@ -389,10 +389,10 @@ function segmented(value: string, options: [string, string][], onpick: (value: s
 }
 
 /** Modal confirm in the game's jade-glass dialog. Resolves to the message text (or '') on confirm, null on cancel. */
-function confirmDialog(opts: { title: string; body: Child | Child[]; confirm: string; tone?: 'seal' | 'jade'; message?: { label: string; required: boolean; placeholder?: string } }) {
+function confirmDialog(opts: { title: string; body: Child | Child[]; confirm: string; tone?: 'seal' | 'jade'; message?: { label: string; required: boolean; placeholder?: string; max?: number; hint?: string } }) {
   return new Promise<string | null>((resolve) => {
     const textarea = opts.message
-      ? h('textarea', { rows: 4, maxlength: 2000, placeholder: opts.message.placeholder ?? '', 'aria-label': opts.message.label })
+      ? h('textarea', { rows: 4, maxlength: opts.message.max ?? 2000, placeholder: opts.message.placeholder ?? '', 'aria-label': opts.message.label })
       : null
     const ok = h('button', { type: 'submit', class: `ui-btn ${opts.tone === 'seal' ? 'ui-btn--seal' : 'adm-dialog-ok'}` }, opts.confirm)
     const cancel = h('button', { type: 'button', class: 'ui-btn ui-btn--ghost' }, '取消')
@@ -419,7 +419,7 @@ function confirmDialog(opts: { title: string; body: Child | Child[]; confirm: st
       event.preventDefault()
       const text = textarea?.value.trim() ?? ''
       if (opts.message?.required && !text) {
-        hint.textContent = '请填写说明，提交人会看到这段话'
+        hint.textContent = opts.message?.hint ?? '请填写说明，提交人会看到这段话'
         textarea!.focus()
         return
       }
@@ -1203,7 +1203,10 @@ const pages: Record<string, (view: View) => void> = {
     const detailId = params.get('id')
     if (detailId) return userDetail(detailId)
     const role = params.get('role') ?? '',
-      query = params.get('q') ?? ''
+      query = params.get('q') ?? '',
+      signup = params.get('signup') ?? '',
+      bound = params.get('bound') ?? '',
+      state = params.get('state') ?? ''
     const statsSlot = h('div', { class: 'adm-kpis adm-kpis--small' })
     const search = h('input', { type: 'search', name: 'q', value: query, placeholder: '搜索邮箱或昵称', 'aria-label': '搜索用户' })
     const form = h('form', { class: 'adm-search', role: 'search' }, search, h('button', { class: 'adm-btn', type: 'submit' }, '搜索'))
@@ -1211,17 +1214,24 @@ const pages: Record<string, (view: View) => void> = {
       event.preventDefault()
       go({ q: search.value.trim() || null }, true)
     })
+    const channels = Object.entries(socialName) as [string, string][]
+    const filters = h('div', { class: 'adm-toolbar adm-user-filters' },
+      h('label', null, '注册方式', select('signup', signup, [['', '全部'], ['email', '邮箱'], ...channels], (value) => go({ signup: value || null }, true), '注册方式')),
+      h('label', null, '已绑定', select('bound', bound, [['', '不限'], ...channels], (value) => go({ bound: value || null }, true), '已绑定渠道')),
+      h('label', null, '状态', select('state', state, [['', '全部'], ['active', '正常'], ['banned', '已封禁']], (value) => go({ state: value || null }, true), '账号状态')))
     const slot = h('div')
     main.append(statsSlot,
       h('div', { class: 'adm-toolbar adm-toolbar--split' },
         segmented(role, [['', '全部'], ['admin', '管理员'], ['user', '普通用户']], (value) => go({ role: value || null }, true), '角色'), form),
+      filters,
       card(null, slot, { className: 'adm-card--flush' }),
-      h('p', { class: 'adm-note' }, '管理员可以查看全部数据、处理反馈和调整他人身份。只有已验证邮箱的用户才能设为管理员；系统始终保留至少一位管理员。'))
-    async(statsSlot, () => Promise.all([api('admin/stats'), api<any>('admin/users?role=admin')]), ([stats, admins]) => [
+      h('p', { class: 'adm-note' }, '管理员可以查看全部数据、处理反馈和调整他人身份。只有已验证邮箱的用户才能设为管理员；系统始终保留至少一位管理员。封禁会立即让该用户下线，并拒绝其邮箱和第三方登录；管理员需先取消身份才能封禁。'))
+    async(statsSlot, () => Promise.all([api('admin/stats'), api<any>('admin/users?role=admin'), api<any>('admin/users?status=banned')]), ([stats, admins, banned]) => [
       serverStat('用户总数', fmt.int(num(stats.total))),
       serverStat('已验证邮箱', fmt.int(num(stats.verified))),
       serverStat('24 小时新增', fmt.int(num(stats.new_24h))),
       serverStat('管理员', admins.next_cursor ? '50+' : fmt.int(list<any>(admins).length)),
+      serverStat('已封禁', banned.next_cursor ? '50+' : fmt.int(list<any>(banned).length)),
     ], skeleton(1, 'adm-skel--kpi'))
     const body = h('tbody'),
       more = h('div', { class: 'adm-more' })
@@ -1229,17 +1239,21 @@ const pages: Record<string, (view: View) => void> = {
       const q = new URLSearchParams()
       if (role) q.set('role', role)
       if (query) q.set('q', query)
+      if (signup) q.set('signup', signup)
+      if (bound) q.set('bound', bound)
+      if (state) q.set('status', state)
       if (cursor) q.set('cursor', cursor)
       return api<{ items: any[]; next_cursor: string | null }>('admin/users?' + q)
     }
     const row = (user: any): HTMLTableRowElement => {
       const self = user.id === me.id,
-        admin = user.role === 'admin'
+        admin = user.role === 'admin',
+        banned = !!num(user.banned_at)
       const button = h('button', {
         type: 'button',
         class: `adm-btn ${admin ? 'adm-btn--ghost' : 'adm-btn--jade'}`,
-        disabled: (!admin && !user.verified) || (admin && self),
-        title: !admin && !user.verified ? '该用户尚未验证邮箱' : admin && self ? '不能取消自己的管理员身份' : undefined,
+        disabled: (!admin && (!user.verified || banned)) || (admin && self),
+        title: banned && !admin ? '已封禁的账号不能设为管理员' : !admin && !user.verified ? '该用户尚未验证邮箱' : admin && self ? '不能取消自己的管理员身份' : undefined,
       }, admin ? '取消管理员' : '设为管理员')
       button.addEventListener('click', () => act(button, async () => {
         const target = admin ? 'user' : 'admin'
@@ -1248,27 +1262,35 @@ const pages: Record<string, (view: View) => void> = {
           tone: admin ? 'seal' : 'jade',
           confirm: admin ? '确认取消' : '确认设为管理员',
           body: h('div', null,
-            h('p', null, h('b', null, user.nickname || user.email), `（${user.email}）`),
+            h('p', null, h('b', null, user.nickname || user.email), `（${userContact(user)}）`),
             h('p', null, admin ? '取消后 TA 将无法再进入管理后台、处理反馈或修改他人身份。' : '设为管理员后，TA 可以查看全部遥测数据、处理反馈，并能设置或取消其他人的管理员身份。'),
             h('p', { class: 'adm-sub' }, '此操作会记录在「操作记录」中。')),
         })
         if (ok == null) return
         const result = await api<{ id: string; role: string }>(`admin/users/${encodeURIComponent(user.id)}/role`, { role: target })
         toast(result.role === 'admin' ? `已将 ${user.nickname || user.email} 设为管理员` : `已取消 ${user.nickname || user.email} 的管理员身份`)
-        const fresh = row({ ...user, role: result.role })
+        repaint({ ...user, role: result.role })
+      }))
+      const ban = banButton(user, self, (next) => repaint({ ...user, ...next }))
+      const repaint = (next: any) => {
+        const fresh = row(next)
         current.replaceWith(fresh)
         current = fresh
-      }))
-      let current = h('tr', null,
-        h('td', null, h('span', { class: 'adm-who' },
+      }
+      let current = h('tr', { class: banned ? 'is-banned' : '' },
+        h('td', { class: 'adm-cell-who' }, h('span', { class: 'adm-who' },
           h('b', null, navLink(user.nickname || '（未设置昵称）', { view: 'users', id: user.id }, { class: 'adm-link' }), self ? h('em', { class: 'adm-you' }, '你') : null),
-          h('small', null, user.email))),
-        h('td', null, h('span', { class: `adm-pill ${user.verified ? 'adm-ok' : 'adm-muted'}` }, user.verified ? '已验证' : '未验证')),
-        h('td', null, h('span', { class: `adm-pill ${admin ? 'adm-role--admin' : 'adm-muted'}` }, admin ? '管理员' : '用户')),
-        h('td', null, when(unix(user.created_at), true)),
-        h('td', { class: 'num' }, num(user.feedback_count) ? navLink(fmt.int(num(user.feedback_count)), { view: 'feedback', status: '', user: user.id }, { class: 'adm-link' }) : '0'),
-        h('td', null, ago(unix(user.last_submitted_at))),
-        h('td', { class: 'adm-actions' }, button))
+          h('small', null, userContact(user)))),
+        h('td', { 'data-label': '注册方式' }, signupTag(user.signup_method)),
+        h('td', { 'data-label': '已绑定' }, channelChips(user)),
+        h('td', { 'data-label': '状态' }, h('span', { class: 'adm-tags' },
+          banned
+            ? h('span', { class: 'adm-pill adm-banned', title: `封禁原因：${user.ban_reason || '未填写'}` }, '已封禁')
+            : h('span', { class: `adm-pill ${admin ? 'adm-role--admin' : 'adm-muted'}` }, admin ? '管理员' : '用户'),
+          !user.email_placeholder && !user.verified ? h('span', { class: 'adm-pill adm-muted' }, '邮箱未验证') : null)),
+        h('td', { 'data-label': '注册时间' }, when(unix(user.created_at), true)),
+        h('td', { class: 'num', 'data-label': '反馈' }, num(user.feedback_count) ? navLink(fmt.int(num(user.feedback_count)), { view: 'feedback', status: '', user: user.id }, { class: 'adm-link' }) : '0'),
+        h('td', { class: 'adm-actions' }, h('span', { class: 'adm-btns' }, button, ban)))
       return current
     }
     const paintMore = (next: string | null) => {
@@ -1286,8 +1308,8 @@ const pages: Record<string, (view: View) => void> = {
       if (!page.items.length) return emptyState('没有符合条件的用户')
       body.append(...page.items.map(row))
       paintMore(page.next_cursor)
-      return [h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table' },
-        h('thead', null, h('tr', null, ['用户', '邮箱', '身份', '注册时间', '反馈', '最近提交', ''].map((t, i) => h('th', { class: i === 4 ? 'num' : '' }, t)))), body)), more]
+      return [h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-users' },
+        h('thead', null, h('tr', null, ['用户', '注册方式', '已绑定', '状态', '注册时间', '反馈', ''].map((t, i) => h('th', { class: i === 5 ? 'num' : '' }, t)))), body)), more]
     }, skeleton(8))
   },
 
@@ -1407,6 +1429,71 @@ const socialBrand: Record<string, string> = {
   qq: '#12b7f5', wx: '#07c160', alipay: '#1677ff', douyin: '#111111',
   google: '#4285f4', twitter: '#1d9bf0', feishu: '#3370ff',
 }
+const socialName: Record<string, string> = {
+  qq: 'QQ', wx: '微信', alipay: '支付宝', douyin: '抖音', google: 'Google', twitter: 'X', feishu: '飞书',
+}
+const userContact = (user: any) => user.email_placeholder ? '未绑定邮箱' : user.email
+/** 渠道徽标：有官方图标用图标，否则用品牌色底 + 首字。 */
+function channelMark(type: string, size = 14) {
+  const icon = socialIcon(type, size)
+  return h('i', { class: `adm-mark${icon ? ' has-icon' : ''}`, style: icon ? '' : `background:${socialBrand[type] ?? '#5d655f'}`, 'aria-hidden': 'true' },
+    icon ?? (socialName[type] ?? type).slice(0, 1))
+}
+function signupTag(method: string) {
+  if (!method || method === 'email') return h('span', { class: 'adm-chan adm-chan--email' }, h('i', { class: 'adm-mark adm-mark--email', 'aria-hidden': 'true' }, '@'), '邮箱')
+  return h('span', { class: 'adm-chan' }, channelMark(method), socialName[method] ?? method)
+}
+/** 绑定情况：邮箱 + 每个第三方渠道一枚小徽标，悬停看昵称与最近登录。 */
+function channelChips(user: any) {
+  const social: { type: string; nickname: string; last_login_at: number }[] = user.social ?? []
+  const chips: Child[] = []
+  if (!user.email_placeholder)
+    chips.push(h('span', { class: `adm-chip${user.verified ? '' : ' is-off'}`, title: user.verified ? `邮箱 ${user.email}` : `邮箱未验证：${user.email}` },
+      h('i', { class: 'adm-mark adm-mark--email', 'aria-hidden': 'true' }, '@'), '邮箱'))
+  for (const item of social)
+    chips.push(h('span', { class: 'adm-chip', title: `${socialName[item.type] ?? item.type}：${item.nickname || '（无昵称）'} · 最近登录 ${ago(unix(item.last_login_at))}` },
+      channelMark(item.type), socialName[item.type] ?? item.type))
+  return chips.length ? h('span', { class: 'adm-chips' }, ...chips) : h('span', { class: 'adm-sub' }, '无')
+}
+/** 封禁 / 解封按钮；成功后把新的封禁状态交给 onchange 重绘。 */
+function banButton(user: any, self: boolean, onchange: (next: { banned_at: number; ban_reason: string }) => void) {
+  const banned = !!num(user.banned_at),
+    admin = user.role === 'admin'
+  const button = h('button', {
+    type: 'button',
+    class: `adm-btn ${banned ? 'adm-btn--ghost' : 'adm-btn--danger'}`,
+    disabled: !banned && (self || admin),
+    title: !banned && self ? '不能封禁自己' : !banned && admin ? '请先取消管理员身份' : undefined,
+  }, banned ? '解除封禁' : '封禁') as HTMLButtonElement
+  const who = user.nickname || userContact(user)
+  button.addEventListener('click', () => act(button, async () => {
+    const reason = await confirmDialog(banned
+      ? {
+          title: '解除封禁',
+          tone: 'jade',
+          confirm: '确认解封',
+          body: h('div', null,
+            h('p', null, h('b', null, who), `（${userContact(user)}）`),
+            h('p', null, `封禁原因：${user.ban_reason || '未填写'}`),
+            h('p', { class: 'adm-sub' }, '解封后 TA 可以重新用邮箱或第三方账号登录。此操作会记录在「操作记录」中。')),
+        }
+      : {
+          title: '封禁账号',
+          tone: 'seal',
+          confirm: '确认封禁',
+          body: h('div', null,
+            h('p', null, h('b', null, who), `（${userContact(user)}）`),
+            h('p', null, '封禁后 TA 会立即下线，邮箱和第三方登录都会被拒绝，也无法提交反馈或同步存档。登录时会看到下面填写的原因。')),
+          message: { label: '封禁原因', required: true, placeholder: '例如：多次发布骚扰内容', max: 200, hint: '请填写封禁原因，用户登录时会看到' },
+        })
+    if (reason == null) return
+    const result = await api<{ banned_at: number; ban_reason: string }>(
+      `admin/users/${encodeURIComponent(user.id)}/${banned ? 'unban' : 'ban'}`, banned ? {} : { reason })
+    toast(banned ? `已解除 ${who} 的封禁` : `已封禁 ${who}`)
+    onchange(result)
+  }))
+  return button
+}
 type SocialIdentity = {
   type: string; label: string; nickname: string; avatar: string; uid: string
   created_at: number; last_login_at: number
@@ -1462,6 +1549,18 @@ function mergeCard(target: { id: string; email: string }) {
     h('p', { class: 'adm-sub' }, '把另一个重复账号（同一人先用第三方注册、后来又用邮箱注册）并进当前账号。'),
     h('div', { class: 'adm-merge-row' }, input, button))
 }
+/** 详情页的封禁状态条：正常账号只给按钮，已封禁时说明原因、时间和操作人。 */
+function banPanel(user: any, onchange: () => void) {
+  const banned = !!num(user.banned_at)
+  const button = banButton(user, user.id === me.id, onchange)
+  if (!banned) return h('div', { class: 'adm-ban adm-ban--ok' }, h('span', null, '账号状态：', h('b', null, '正常')), button)
+  return h('div', { class: 'adm-ban', role: 'status' },
+    h('div', null,
+      h('b', null, '该账号已被封禁'),
+      h('p', null, `原因：${user.ban_reason || '未填写'}`),
+      h('small', null, `${when(unix(user.banned_at), true)} 封禁${user.banned_by ? (user.banned_by === me.id ? ' · 操作人：你' : ` · 操作人 ID ${String(user.banned_by).slice(0, 8)}`) : ''}`)),
+    button)
+}
 function userDetail(id: string) {
   const slot = h('div')
   main.append(
@@ -1475,7 +1574,9 @@ function userDetail(id: string) {
         h('h2', null, user.nickname || '（未设置昵称）'),
         h('p', { class: 'adm-sub' },
           `${user.email_placeholder ? '未绑定邮箱（仅第三方登录）' : user.email} · ${user.role === 'admin' ? '管理员' : '普通用户'}${user.email_placeholder ? '' : ` · ${user.verified ? '邮箱已验证' : '邮箱未验证'}`}`)),
+      banPanel(user, () => location.reload()),
       h('dl', { class: 'adm-kv' },
+        h('dt', null, '注册方式'), h('dd', null, signupTag(user.signup_method)),
         h('dt', null, '注册时间'), h('dd', null, when(unix(user.created_at), true)),
         h('dt', null, '反馈数'), h('dd', null, num(user.feedback_count)
           ? navLink(fmt.int(num(user.feedback_count)), { view: 'feedback', status: '', user: user.id }, { class: 'adm-link' })

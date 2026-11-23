@@ -1,4 +1,4 @@
-import {type Env,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCode,now,passwordHash,random,reserveMail,sessionHash,unauthorized} from '../../lib/auth'
+import {type SessionAccount,type Env,checkBan,sessionAccount,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCode,now,passwordHash,random,reserveMail,sessionHash,unauthorized} from '../../lib/auth'
 
 import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar'
 import {feedback} from '../../lib/feedback'
@@ -6,8 +6,8 @@ import {feedbackContributors} from '../../lib/contributors'
 import {bindEmail,isSocialType,socialCallback,socialConfig,socialConfirm,socialPending,socialRegister,socialStates,startSocial,userSocialIdentities} from '../../lib/social'
 import {unsubscribe} from '../../lib/feedback-mail'
 import {cloudSave} from '../../lib/cloud-save'
-type User={id:string;email:string;nickname:string;verified:number;role:string;salt:string;digest:string;locked_until:number;notify_email:number}
-const profile=(user:User)=>({id:user.id,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email,email_placeholder:!!(user as User&{email_placeholder?:number}).email_placeholder})
+type User = SessionAccount & {salt:string;digest:string;locked_until:number}
+const profile=(user:SessionAccount)=>({id:user.id,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email,email_placeholder:!!user.email_placeholder})
 const json=(data:unknown,status=200,session?:string)=>Response.json(data,{status,headers:{'Cache-Control':'no-store',...(session?{'Set-Cookie':session}:{})}})
 function nickname(value:unknown) {
   if(typeof value!=='string'||!value.trim()||value.trim().length>32) invalid()
@@ -17,7 +17,7 @@ function password(value:unknown) {
   if(typeof value!=='string'||value.length<8||value.length>256) invalid()
   return value
 }
-const methods:Record<string,string[]>={health:['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST'],'auth/social/config':['GET'],'auth/social/register':['POST'],'auth/email/bind':['POST']}
+const methods:Record<string,string[]>={health:['GET'],'auth/me':['GET'],'me/avatar':['GET','PUT'],me:['GET','PATCH'],...Object.fromEntries(['register','resend','verify','reset','login','logout','social/start'].map(name=>[`auth/${name}`,['POST']])),'auth/social/callback':['GET'],'auth/social/pending':['GET'],'auth/social/confirm':['POST'],'auth/social/config':['GET'],'auth/social/register':['POST'],'auth/email/bind':['POST']}
 
 async function handle(request:Request,env:Env) {
   const url=new URL(request.url), path=url.pathname.slice(5), method=request.method, db=env.DB
@@ -47,9 +47,8 @@ async function handle(request:Request,env:Env) {
     const intent=body.intent==='bind'?'bind':body.intent==='register'?'register':'login'
     let userId:string|undefined
     if(intent==='bind') {
-      const account=await db.prepare('SELECT users.id FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.digest=? AND expires>? AND verified=1')
-        .bind(await sessionHash(request),now()).first<{id:string}>()
-      if(!account) unauthorized()
+      const account=await sessionAccount(db,await sessionHash(request))
+      if(!account?.verified) unauthorized()
       userId=account.id
     }
     const {cookie:stateCookie,url:target,qrcode}=await startSocial(env,db,type,request.headers.get('CF-Connecting-IP')||'local',intent,userId,socialStates(request))
@@ -59,10 +58,9 @@ async function handle(request:Request,env:Env) {
     await stmt('DELETE FROM sessions WHERE digest=?',await sessionHash(request)).run()
     return json({ok:true},200,cookie('',0))
   }
-  if(path==='me' || path==='me/avatar') {
+  if(path==='me' || path==='auth/me' || path==='me/avatar') {
     const digest=await sessionHash(request)
-    const user=await stmt(`SELECT users.* FROM users JOIN sessions ON users.id=sessions.user_id
-      WHERE sessions.digest=? AND expires>?`,digest,now()).first<User>()
+    const user=await sessionAccount(db,digest)
     if(!user) unauthorized()
     if(path==='me/avatar') {
       const row=await stmt('SELECT payload_json,revision FROM player_saves WHERE user_id=?',user.id)
@@ -116,7 +114,7 @@ async function handle(request:Request,env:Env) {
     if(register) {
       const salt=random(16)
       writes.push(stmt(`INSERT INTO users(id,email,nickname,salt,digest) VALUES(?,?,?,?,?) ON CONFLICT(email)
-        DO UPDATE SET nickname=excluded.nickname,salt=excluded.salt,digest=excluded.digest WHERE users.verified=0`,
+        DO UPDATE SET signup_method='email',nickname=excluded.nickname,salt=excluded.salt,digest=excluded.digest WHERE users.verified=0`,
         crypto.randomUUID(),email,name,salt,await passwordHash(pass,salt)))
     }
     writes.push(stmt('INSERT INTO email_codes VALUES(?,?,?,?,0) ON CONFLICT(email,purpose) DO UPDATE SET digest=excluded.digest,expires=excluded.expires,attempts=0',email,purpose,await hash(`${email}:${purpose}:${code}`),now()+600))
@@ -139,10 +137,11 @@ async function handle(request:Request,env:Env) {
       }
       throw new Problem(401,'credentials','邮箱或密码不正确')
     }
+    checkBan(user)
     if(!user.verified) throw new Problem(403,'unverified','请先验证邮箱')
-    const [session]=await db.batch([stmt(`INSERT INTO sessions SELECT ?,id,? FROM users WHERE id=? AND digest=? AND locked_until<=?`,sessionDigest,now()+lifetime,user.id,user.digest,now()),
+    const [session]=await db.batch([stmt(`INSERT INTO sessions SELECT ?,id,? FROM users WHERE id=? AND digest=? AND locked_until<=? AND banned_at=0`,sessionDigest,now()+lifetime,user.id,user.digest,now()),
       stmt('UPDATE users SET failures=0 WHERE id=? AND EXISTS(SELECT 1 FROM sessions WHERE digest=?)',user.id,sessionDigest)])
-    if(!session.meta.changes) unauthorized()
+    if(!session.meta.changes) { checkBan(await getUser()); unauthorized() }
     return json(profile(user),200,cookie(token))
   }
   const purpose=reset?'reset':'verify', pass=reset?password(body.password):''
@@ -156,10 +155,11 @@ async function handle(request:Request,env:Env) {
       !equal(user.digest,await passwordHash(candidate,user.salt))) throw bad()
   }
   if(!equal(record.digest,await hash(`${email}:${purpose}:${body.code}`))) throw bad()
+  if(!reset) checkBan(user)
   const salt=random(16)
   const deleteCode='DELETE FROM email_codes WHERE email=? AND purpose=? AND digest=? AND expires>?'
   const consume=reset?stmt(deleteCode,email,purpose,record.digest,now()):stmt(`${deleteCode} AND EXISTS
-    (SELECT 1 FROM users WHERE id=? AND verified=0 AND salt=? AND digest=?)`,email,purpose,record.digest,now(),user.id,user.salt,user.digest)
+    (SELECT 1 FROM users WHERE id=? AND verified=0 AND banned_at=0 AND salt=? AND digest=?)`,email,purpose,record.digest,now(),user.id,user.salt,user.digest)
   const [used]=await db.batch(reset?[consume,
     stmt('UPDATE users SET salt=?,digest=?,failures=0,locked_until=0 WHERE id=? AND changes()=1',salt,await passwordHash(pass,salt),user.id),
     stmt('DELETE FROM sessions WHERE user_id=? AND changes()=1',user.id)]:[consume,

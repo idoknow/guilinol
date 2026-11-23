@@ -1,4 +1,4 @@
-import { type Env, Problem, cookie, deliver, equal, hash, invalid, lifetime, limit, newCode, now, passwordHash, random, reserveMail, sessionHash } from './auth'
+import { type Env, type BanState, checkBan, sessionAccount, Problem, cookie, deliver, equal, hash, invalid, lifetime, limit, newCode, now, passwordHash, random, reserveMail, sessionHash } from './auth'
 
 /**
  * 聚合登录（https://login.mapay.cn/doc.php）接入层。
@@ -102,6 +102,15 @@ export const placeholderEmail = (type: string, socialUid: string) =>
 
 export const isPlaceholderEmail = (email: string) => /@social\.invalid$/i.test(email)
 
+function socialSession(db:D1Database, digest:string, userId:string) {
+  return db.prepare('INSERT INTO sessions(digest,user_id,expires) SELECT ?,id,? FROM users WHERE id=? AND banned_at=0')
+    .bind(digest,now()+lifetime,userId)
+}
+async function requireSession(db:D1Database, result:D1Result, userId:string) {
+  if (result.meta.changes) return
+  checkBan(await db.prepare('SELECT banned_at,ban_reason FROM users WHERE id=?').bind(userId).first<BanState>())
+  throw new Problem(401,'unauthorized','请重新登录')
+}
 /**
  * 直接给第三方账号建号（不要求邮箱/密码）：占位邮箱 + 不可用密码 + verified=1。
  * 调用方负责消费 social_pending。
@@ -123,8 +132,8 @@ async function createSocialOnlyUser(
     try {
       await db.batch([
         db
-          .prepare('INSERT INTO users(id,email,nickname,salt,digest,verified,email_placeholder) VALUES(?,?,?,?,?,1,1)')
-          .bind(id, email, nickname || '新用户', salt, digest),
+          .prepare('INSERT INTO users(id,email,nickname,salt,digest,verified,email_placeholder,signup_method) VALUES(?,?,?,?,?,1,1,?)')
+          .bind(id, email, nickname || '新用户', salt, digest,type),
         db
           .prepare(
             'INSERT INTO social_identities(type,social_uid,user_id,nickname,faceimg,created_at,last_login_at) VALUES(?,?,?,?,?,?,?)',
@@ -362,10 +371,7 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
     avatar = safeAvatar(profile.faceimg)
 
   const digest = await sessionHash(request)
-  const current = await db
-    .prepare('SELECT users.id,users.verified FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.digest=? AND expires>?')
-    .bind(digest, now())
-    .first<{ id: string; verified: number }>()
+  const current = await sessionAccount(db,digest)
   const identity = await db
     .prepare('SELECT user_id,nickname,faceimg FROM social_identities WHERE type=? AND social_uid=?')
     .bind(type, socialUid)
@@ -388,7 +394,8 @@ export async function socialCallback(env: Env, db: D1Database, request: Request)
       // 这个平台账号还没绑过任何用户：不再挡回去，交给 confirm 直接建号（不强制邮箱）
       target = ''
     } else {
-      const owner = await db.prepare('SELECT verified FROM users WHERE id=?').bind(identity.user_id).first<{ verified: number }>()
+      const owner = await db.prepare('SELECT verified,banned_at,ban_reason FROM users WHERE id=?').bind(identity.user_id).first<BanState & { verified: number }>()
+      checkBan(owner)
       if (!owner) return back('failed')
       if (!owner.verified) return back('unverified')
       target = identity.user_id
@@ -462,17 +469,14 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
 
   if (intent === 'bind') {
     const sessionDigest = await sessionHash(request)
-    const sessionUser = await db
-      .prepare('SELECT user_id FROM sessions WHERE digest=? AND expires>?')
-      .bind(sessionDigest, now())
-      .first<{ user_id: string }>()
+    const sessionUser = await sessionAccount(db,sessionDigest)
     if (!sessionUser) throw new Problem(401, 'unauthorized', '请先登录')
-    if (sessionUser.user_id !== row.user_id) throw new Problem(403, 'forbidden', '请用发起绑定的账号确认')
+    if (sessionUser.id !== row.user_id) throw new Problem(403, 'forbidden', '请用发起绑定的账号确认')
 
     // 消费与写入放在同一次校验里：会话在这一刻仍然存在才写
     const consumed = await db
       .prepare('UPDATE social_pending SET used=1 WHERE token=? AND used=0 AND user_id=? RETURNING token')
-      .bind(digest, sessionUser.user_id)
+      .bind(digest, sessionUser.id)
       .first<{ token: string }>()
     if (!consumed) throw new Problem(404, 'no_pending', '授权已过期，请重新发起')
 
@@ -481,7 +485,7 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
       inserted = await db
         .prepare(
           `INSERT INTO social_identities(type,social_uid,user_id,nickname,faceimg,created_at,last_login_at)
-           SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM sessions WHERE digest=? AND user_id=? AND expires>?)`,
+           SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM sessions JOIN users ON users.id=user_id WHERE sessions.digest=? AND user_id=? AND expires>? AND banned_at=0)`,
         )
         .bind(type, row.social_uid!, row.user_id, nickname, faceimg, now(), now(), sessionDigest, row.user_id, now())
         .run()
@@ -515,17 +519,15 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
       throw error
     }
     const newToken = random(32)
-    await db
-      .prepare('INSERT INTO sessions(digest,user_id,expires) VALUES(?,?,?)')
-      .bind(await hash(newToken), newUserId, now() + lifetime)
-      .run()
+    await requireSession(db,await socialSession(db,await hash(newToken),newUserId).run(),newUserId)
     logSocial({ action: 'confirm', type, created: true })
     return Response.json(
       { ok: true, intent, created: true, redirect: '/?social=registered' },
       { headers: [['Cache-Control', 'no-store'], ['Set-Cookie', cookie(newToken)], ['Set-Cookie', clearPending()]] },
     )
   }
-  const owner = await db.prepare('SELECT verified FROM users WHERE id=?').bind(identity.user_id).first<{ verified: number }>()
+  const owner = await db.prepare('SELECT verified,banned_at,ban_reason FROM users WHERE id=?').bind(identity.user_id).first<BanState & { verified: number }>()
+  checkBan(owner)
   if (!owner?.verified) throw new Problem(403, 'unverified', '该账号尚未验证邮箱')
 
   const consumed = await db
@@ -537,14 +539,15 @@ export async function socialConfirm(env: Env, db: D1Database, request: Request):
   const sessionToken = random(32),
     sessionDigestNew = await hash(sessionToken),
     previous = await sessionHash(request)
-  await db.batch([
+  const [,issued] = await db.batch([
     // 只轮换同一个人的旧会话，避免把别人（或没拿到 Set-Cookie 的访客）踢下线
     db.prepare('DELETE FROM sessions WHERE digest=? AND user_id=?').bind(previous, identity.user_id),
-    db.prepare('INSERT INTO sessions(digest,user_id,expires) VALUES(?,?,?)').bind(sessionDigestNew, identity.user_id, now() + lifetime),
+    socialSession(db,sessionDigestNew,identity.user_id),
     db
-      .prepare('UPDATE social_identities SET nickname=?,faceimg=?,last_login_at=? WHERE type=? AND social_uid=?')
+      .prepare('UPDATE social_identities SET nickname=?,faceimg=?,last_login_at=? WHERE type=? AND social_uid=? AND changes()=1')
       .bind(nickname, faceimg, now(), type, row.social_uid!),
   ])
+  await requireSession(db,issued,identity.user_id)
   return Response.json(
     { ok: true, intent, redirect: '/?social=login' },
     // 两个 cookie 必须分两条 Set-Cookie；拼成一条时后面的 Max-Age=0 会把新会话立刻删掉
@@ -591,6 +594,7 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
     .prepare('SELECT user_id FROM social_identities WHERE type=? AND social_uid=?')
     .bind(type, row.social_uid)
     .first<{ user_id: string }>()
+  if (taken) checkBan(await db.prepare('SELECT banned_at,ban_reason FROM users WHERE id=?').bind(taken.user_id).first<BanState>())
   if (taken) throw new Problem(409, 'conflict', '该平台账号已经绑定过其它用户，请直接登录')
 
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
@@ -613,10 +617,7 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
       throw error
     }
     const newToken = random(32)
-    await db
-      .prepare('INSERT INTO sessions(digest,user_id,expires) VALUES(?,?,?)')
-      .bind(await hash(newToken), newUserId, now() + lifetime)
-      .run()
+    await requireSession(db,await socialSession(db,await hash(newToken),newUserId).run(),newUserId)
     logSocial({ action: 'register', type, created: true, email: false })
     return Response.json(
       { ok: true, redirect: '/?social=registered', email: '', nickname, email_placeholder: true },
@@ -635,10 +636,10 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
     const salt = random(16)
     await db
       .prepare(
-        `INSERT INTO users(id,email,nickname,salt,digest) VALUES(?,?,?,?,?) ON CONFLICT(email)
-         DO UPDATE SET nickname=excluded.nickname,salt=excluded.salt,digest=excluded.digest WHERE users.verified=0`,
+        `INSERT INTO users(id,email,nickname,salt,digest,signup_method) VALUES(?,?,?,?,?,?) ON CONFLICT(email)
+         DO UPDATE SET signup_method=excluded.signup_method,nickname=excluded.nickname,salt=excluded.salt,digest=excluded.digest WHERE users.verified=0`,
       )
-      .bind(crypto.randomUUID(), email, nickname, salt, await passwordHash(password, salt))
+      .bind(crypto.randomUUID(), email, nickname, salt, await passwordHash(password, salt),type)
       .run()
     const code = newCode()
     await db
@@ -661,12 +662,13 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
   if (!record) throw new Problem(400, 'invalid_code', '验证码无效或已过期')
   if (!equal(record.digest, await hash(`${email}:verify:${code}`))) throw new Problem(400, 'invalid_code', '验证码无效或已过期')
 
-  const user = await db.prepare('SELECT id,salt,digest FROM users WHERE email=? AND verified=0').bind(email).first<{ id: string; salt: string; digest: string }>()
+  const user = await db.prepare('SELECT id,salt,digest,banned_at,ban_reason FROM users WHERE email=? AND verified=0').bind(email).first<BanState & { id: string; salt: string; digest: string }>()
   if (!user) throw new Problem(400, 'invalid_code', '验证码无效或已过期')
   if (!equal(user.digest, await passwordHash(password, user.salt)))
     throw new Problem(400, 'password_mismatch', '两次填写的密码不一致，请重新填写')
 
-  const verified = await db.prepare('UPDATE users SET verified=1, failures=0, locked_until=0 WHERE id=? AND verified=0').bind(user.id).run()
+  checkBan(user)
+  const verified = await db.prepare('UPDATE users SET verified=1, failures=0, locked_until=0 WHERE id=? AND verified=0 AND banned_at=0').bind(user.id).run()
   if (!verified.meta.changes) throw new Problem(409, 'email_taken', '该邮箱已被激活，请直接登录')
 
   try {
@@ -681,11 +683,12 @@ export async function socialRegister(env: Env, db: D1Database, request: Request,
   }
 
   const sessionToken = random(32)
-  await db.batch([
+  const [,,issued] = await db.batch([
     db.prepare('UPDATE social_pending SET used=1 WHERE token=?').bind(digest),
     db.prepare('DELETE FROM email_codes WHERE email=? AND purpose=?').bind(email, 'verify'),
-    db.prepare('INSERT INTO sessions(digest,user_id,expires) VALUES(?,?,?)').bind(await hash(sessionToken), user.id, now() + lifetime),
+    socialSession(db,await hash(sessionToken),user.id),
   ])
+  await requireSession(db,issued,user.id)
   return Response.json(
     { ok: true, redirect: '/?social=registered', email, nickname },
     // 两条独立 Set-Cookie：拼成一条时 Max-Age=0 会把新会话删掉
@@ -722,17 +725,14 @@ export async function bindEmail(
 ): Promise<Response> {
   const headers = { 'Cache-Control': 'no-store' }
   const digest = await sessionHash(request)
-  const account = await db
-    .prepare('SELECT user_id FROM sessions WHERE digest=? AND expires>?')
-    .bind(digest, now())
-    .first<{ user_id: string }>()
+  const account = await sessionAccount(db,digest)
   if (!account) throw new Problem(401, 'unauthorized', '请先登录')
 
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
   if (email.length > 254 || email.split('@').length !== 2 || !/^\S+@[^\s@]+\.[^\s@]+$/.test(email)) invalid()
   if (isPlaceholderEmail(email)) throw new Problem(400, 'invalid_input', '请填写真实邮箱')
   const owner = await db.prepare('SELECT id FROM users WHERE email=?').bind(email).first<{ id: string }>()
-  if (owner && owner.id !== account.user_id) throw new Problem(409, 'email_taken', '该邮箱已被其他账号使用')
+  if (owner && owner.id !== account.id) throw new Problem(409, 'email_taken', '该邮箱已被其他账号使用')
 
   if (typeof body.code !== 'string' || !/^\d{6}$/.test(body.code)) {
     await reserveMail(db, email, request.headers.get('CF-Connecting-IP') ?? 'local')
@@ -759,12 +759,12 @@ export async function bindEmail(
   if (password && (password.length < 8 || password.length > 256)) invalid()
 
   const writes = [
-    db.prepare('UPDATE users SET email=?,email_placeholder=0,verified=1 WHERE id=?').bind(email, account.user_id),
+    db.prepare('UPDATE users SET email=?,email_placeholder=0,verified=1 WHERE id=?').bind(email, account.id),
     db.prepare('DELETE FROM email_codes WHERE email=? AND purpose=?').bind(email, 'verify'),
   ]
   if (password) {
     const salt = random(16)
-    writes.push(db.prepare('UPDATE users SET salt=?,digest=? WHERE id=?').bind(salt, await passwordHash(password, salt), account.user_id))
+    writes.push(db.prepare('UPDATE users SET salt=?,digest=? WHERE id=?').bind(salt, await passwordHash(password, salt), account.id))
   }
   await db.batch(writes)
   logSocial({ action: 'bind_email', password: !!password })
