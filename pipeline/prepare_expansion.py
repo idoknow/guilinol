@@ -16,9 +16,8 @@ from refresh_osm import NODES, fetch_shards
 
 from PIL import Image
 
-# Rounded outwards from the projected 44 x 68 chunk extent.
-SOUTH, WEST, NORTH, EAST = 25.21054, 110.24150, 25.36798, 110.35341
-STAMP = '2026-11-21T00:00:00Z'
+SOUTH, WEST, NORTH, EAST = 25.21054, 110.24150, 25.36798, 110.42462
+STAMP = '2026-11-23T00:38:06Z'
 
 
 def export_overture(parquet, columns, destination, extra_filter=''):
@@ -75,6 +74,7 @@ def prepare(args, raw):
 
     export_overture(args.buildings, 'id,height,num_floors,class,subtype,names.primary AS name,'
                     'roof_shape,ST_AsText(geometry) AS wkt,sources[1].dataset AS src', raw/'overture_buildings.csv')
+    export_overture(args.places, 'id,names.primary AS name,ST_AsText(geometry) AS wkt', raw/'places.tsv')
     places = raw/'longmen.tsv'
     export_overture(args.places, 'id,names.primary AS name,ST_AsText(geometry) AS wkt', places,
                     "AND contains(to_json(names)::VARCHAR, '龙门村')")

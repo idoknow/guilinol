@@ -518,7 +518,7 @@ def build(bbox, output, palette, workers=4):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--bbox',type=float,nargs=4,default=[25.212,110.243,25.366,110.352])
+    parser.add_argument('--bbox',type=float,nargs=4,default=[25.212,110.243,25.366,110.424])
     parser.add_argument('--output',type=Path,default=Path(OUT))
     parser.add_argument('--palette',type=Path,default=Path(__file__).with_name('palette.json'))
     parser.add_argument('--workers', type=int, default=4, help='Concurrent chunk compression writers')
