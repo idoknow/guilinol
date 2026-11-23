@@ -10,5 +10,5 @@
 请补一张能看清正门朝向的远景。
 ```
 
-审核交付：在同一条评论内用 `--attachment` 附可公开的 PNG 对比图，文件名 `public-comparison.png`，正文显式嵌入 `![可公开对比图](./public-comparison.png)`。另附斜视总览。未授权的图不要用这个标签。PR 必须链接到本 issue。
+审核交付：评论里写完整 PR 链接（`https://github.com/idoknow/guilinol/pull/N`，bridge 靠它判断上线），并附 4–8 个字的署名块 ```` ```feedback-credit ````（例如 `龙隐路路面`，会显示在「关于」页）。在同一条评论内用 `--attachment` 附可公开的 PNG 对比图，文件名 `public-comparison.png`，正文显式嵌入 `![可公开对比图](./public-comparison.png)`。另附斜视总览。未授权的图不要用这个标签。PR 必须链接到本 issue。
 第一步必须在本地复现用户视角并截图。结合视角截图、中心 target 和提交人的文字，先写清用户指的是哪个物体（地标 id、OSM 要素或坐标）、问题是什么，再开始建模。交付时附同一视角的建模前后对比图。旧反馈若缺视角，注明证据缺失，不得虚构。

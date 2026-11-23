@@ -99,3 +99,7 @@
   .about-mask>.about-panel--wide{max-height:94vh}
   .ab-hero{grid-template-columns:200px 1fr;gap:18px}
 }
+/* 反馈自动署名的玩家（IDOK-186）：头像现场渲染前先用昵称首字印章占位 */
+.ab-avatar--seal{display:grid;place-items:center}
+.ab-avatar--seal i{font-style:normal;font-size:22px;font-weight:700;color:var(--accent);letter-spacing:0;
+  font-family:var(--ui-serif,serif);text-shadow:0 1px 0 rgba(255,255,255,.4)}

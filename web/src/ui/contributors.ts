@@ -5,7 +5,8 @@ import {defaultAvatar, type Avatar} from '../../../lib/avatar'
  *
  * 维护：
  * - 合入代码 → 在对应的人下面加一条 `code`；新的人就新加一项。
- * - 玩家反馈被处理（docs/feedback.md 流程）→ 用游戏里的昵称加一条 `feedback`（几个字）；头像取该账号的角色外形，改完跑一次头像脚本。
+ * - 玩家反馈被处理：**不用改这里**。反馈上线后 bridge 自动写入署名，「关于」页从 /api/contributors 取并合进本名单，
+ *   头像按该账号的游戏角色现场渲染（IDOK-186）。同名的人（这里的 name = 游戏昵称）会合并成一张卡。
  * - 美术、Logo、实拍照片等 → `design` / `photo`。
  * 只写昵称和公开主页，不写邮箱、真名或其它个人信息。
  */

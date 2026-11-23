@@ -42,18 +42,33 @@ function cli(...args) {
   return JSON.parse(run(env.MULTICA_CLI_PATH, [...args, '--output', 'json']))
 }
 async function request(path, options = {}) {
-  const res = await fetch(origin + path, {
-    ...options,
-    redirect: 'error',
-    signal: AbortSignal.timeout(30000),
-    headers: { Authorization: `Bearer ${env.BRIDGE_TOKEN}`, ...options.headers },
-  })
-  if (!res.ok && !(options.method === 'POST' && res.status === 409)) throw Error(`HTTP ${res.status} ${path}`)
-  return res
+  // 网络抖动（连不上、超时、502/503/520）只重试读请求；写请求失败交给下一轮 5 分钟的定时器
+  const retries = (options.method ?? 'GET') === 'GET' ? 3 : 1
+  for (let attempt = 1; ; attempt++) {
+    let res
+    try {
+      res = await fetch(origin + path, {
+        ...options,
+        redirect: 'error',
+        signal: AbortSignal.timeout(30000),
+        headers: { Authorization: `Bearer ${env.BRIDGE_TOKEN}`, ...options.headers },
+      })
+    } catch (error) {
+      if (attempt >= retries) throw error
+      await new Promise((done) => setTimeout(done, 5000 * attempt))
+      continue
+    }
+    if (res.status >= 500 && attempt < retries) {
+      await new Promise((done) => setTimeout(done, 5000 * attempt))
+      continue
+    }
+    if (!res.ok && !(options.method === 'POST' && res.status === 409)) throw Error(`HTTP ${res.status} ${path}`)
+    return res
+  }
 }
 async function post(id, status, fields = {}) {
   if (dry) return console.log(`${id} → ${status}`)
-  await request(`/api/bridge/feedback/${id}/status`, {
+  return request(`/api/bridge/feedback/${id}/status`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status, ...fields }),
@@ -182,28 +197,38 @@ async function command(id,action,data){
   const response=await request(`/api/bridge/feedback/${id}/${action}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
   if(!response.ok)throw Error(`Conflict ${action}`)
 }
-async function deployed(url) {
-  const match = /^https:\/\/github\.com\/idoknow\/guilinol\/pull\/(\d+)$/.exec(url)
-  if (!match) return false
-  const pr = JSON.parse(
-    run('gh', ['pr', 'view', match[1], '-R', repo, '--json', 'state,mergeCommit,baseRefName']),
-  )
-  if (pr.state !== 'MERGED' || pr.baseRefName !== 'main') return false
+const PR_URL = /https:\/\/github\.com\/idoknow\/guilinol\/pull\/(\d+)/g
+/**
+ * 反馈对应的 PR 都合入 main 且线上 /version.json 已包含 → 返回 {live, merged}。
+ * idoknow/guilinol 没接 Multica 的 GitHub 集成，`issue pull-requests` 恒为空（IDOK-186），
+ * 所以同时从协调人 / 审核人的评论里收 PR 链接。还有没合并的 PR（open）就不算上线。
+ */
+async function deployment(urls) {
+  const prs = [...new Set(urls)].map((url) => {
+    const number = /\/pull\/(\d+)$/.exec(url)[1]
+    return {
+      url,
+      number,
+      ...JSON.parse(run('gh', ['pr', 'view', number, '-R', repo, '--json', 'state,mergeCommit,baseRefName'])),
+    }
+  })
+  const merged = prs.filter((pr) => pr.state === 'MERGED' && pr.baseRefName === 'main')
+  if (!merged.length || prs.some((pr) => pr.state === 'OPEN')) return { live: false, merged }
   const version = await fetch(origin + '/version.json', {
     cache: 'no-store',
     redirect: 'error',
     signal: AbortSignal.timeout(15000),
   })
-  if (!version.ok) return false
-  const sha = (await version.json()).sha,
-    merge = pr.mergeCommit?.oid
-  if (![sha, merge].every((value) => /^[a-f0-9]{40}$/.test(value))) return false
-  return (
-    sha === merge ||
-    ['ahead', 'identical'].includes(
-      run('gh', ['api', `repos/${repo}/compare/${merge}...${sha}`, '--jq', '.status']).trim(),
-    )
-  )
+  if (!version.ok) return { live: false, merged }
+  const sha = (await version.json()).sha
+  if (!/^[a-f0-9]{40}$/.test(sha)) return { live: false, merged }
+  const contained = (merge) =>
+    /^[a-f0-9]{40}$/.test(merge ?? '') &&
+    (sha === merge ||
+      ['ahead', 'identical'].includes(
+        run('gh', ['api', `repos/${repo}/compare/${merge}...${sha}`, '--jq', '.status']).trim(),
+      ))
+  return { live: merged.every((pr) => contained(pr.mergeCommit?.oid)), merged, sha }
 }
 async function screenshot(comment) {
   const target = /!\[可公开对比图\]\(([^)]+)\)/.exec(comment.content)?.[1]
@@ -221,9 +246,9 @@ async function sync(row, journal, save) {
   const issue = row.multica_issue,
     current = cli('issue', 'get', issue)
   const history=comments(issue),detail=await (await request(`/api/feedback/${row.id}`)).json()
-  async function relay(marker,body,attachments=[]){
+  async function relay(marker,body,attachments=[],mention=true){
     if(dry||history.some(comment=>comment.content.includes(marker)))return
-    const file=join(work,'relay.md');await writeFile(file,body+'\n\n'+marker+`\n[@协调人](mention://agent/${env.BRIDGE_AGENT})`)
+    const file=join(work,'relay.md');await writeFile(file,body+'\n\n'+marker+(mention?`\n[@协调人](mention://agent/${env.BRIDGE_AGENT})`:''))
     cli('issue','comment','add',issue,'--content-file',file,...attachments)
   }
   for(const msg of detail.messages.filter(msg=>msg.author_kind!=='agent'&&!msg.relayed_at)){
@@ -257,16 +282,20 @@ async function sync(row, journal, save) {
     }
     await post(row.id, decision[1], { message: decision[2].trim() });journal.lastDecision=source;await save();return
   }
-  if (['submitted','need_info'].includes(row.status)) return
-  const prs = cli('issue', 'pull-requests', issue).pull_requests.filter((pr) =>
-    /^https:\/\/github\.com\/idoknow\/guilinol\/pull\/\d+$/.test(pr.html_url),
-  )
-  const pr = prs.sort((a, b) => b.number - a.number)[0]
+  const accepted = ['in_review', 'done'].includes(current.status)
+  if (row.status === 'submitted') return
+  const urls = [
+    ...cli('issue', 'pull-requests', issue).pull_requests.map((pr) => pr.html_url),
+    ...trusted.flatMap((c) => [...c.content.matchAll(PR_URL)].map((m) => m[0])),
+  ].filter((url) => /^https:\/\/github\.com\/idoknow\/guilinol\/pull\/\d+$/.test(url))
+  const deploy = accepted && urls.length ? await deployment(urls) : { live: false, merged: [] }
+  const pr = deploy.merged.sort((a, b) => b.number - a.number)[0]
   const capture = trusted.find((c) => c.content.includes('![可公开对比图]('))
-  const status =
-    pr && (await deployed(pr.html_url))
-      ? 'live'
-      : { in_progress: 'modelling', in_review: 'reviewing', done: 'reviewing' }[current.status]
+  const status = deploy.live
+    ? 'live'
+    : { in_progress: 'modelling', in_review: 'reviewing', done: 'reviewing' }[current.status]
+  // need_info 是在等提交人回复，不能被 issue 状态覆盖；唯一例外：没等回复就修好并且已经上线（IDOK-180/181）
+  if (row.status === 'need_info' && status !== 'live') return
   const recent = ['live', 'reviewing'].includes(status)
     ? []
     : cli('issue', 'runs', issue)
@@ -281,6 +310,29 @@ async function sync(row, journal, save) {
   if (recent.length === 2 && recent.every((run) => run.status === 'failed')) {
     journal.failures = 2
     await save()
+  } else if (status === 'live' && row.status !== 'live') {
+    // 署名：协调人/审核人评论里的 ```feedback-credit``` 块（几个字），没有就用反馈标题
+    const credit = trusted
+      .map((c) => /^```feedback-credit\r?\n([\s\S]+?)\r?\n```\s*$/m.exec(c.content)?.[1].trim())
+      .find(Boolean)
+    const shown = Array.from(credit || detail.title).slice(0, 16).join('')
+    const written = await post(row.id, 'live', {
+      pr_url: pr?.html_url,
+      screenshot_url: capture && (await screenshot(capture)),
+      credit: credit ? shown : undefined,
+      message: `已上线：${shown}。谢谢你的反馈！你的昵称已署在「关于网上桂林」的贡献者名单里。`,
+    })
+    // 409 = 服务端没接受（比如线上还是旧版状态机）：先别留言、别关单，下一轮再试
+    if (!dry && written?.status !== 409) {
+      const list = deploy.merged.map((item) => `#${item.number}`).join('、')
+      await relay(
+        `<!-- fb-live:${row.id} -->`,
+        `反馈已上线：线上版本 \`${deploy.sha.slice(0, 7)}\` 已包含 PR ${list}。已通知提交人，昵称自动署在「关于」页（署名：${shown}）。`,
+        [],
+        false,
+      )
+      if (current.status !== 'done') run(env.MULTICA_CLI_PATH, ['issue', 'status', issue, 'done'])
+    }
   } else if (status && status !== row.status)
     await post(row.id, status, {
       pr_url: pr?.html_url,

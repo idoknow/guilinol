@@ -92,7 +92,7 @@ sg 主机 systemd timer：feedback-bridge（每 5 分钟）
 
 普通会话跨用户访问返回 404。创建草稿的 JSON 字段为 `kind,title,body,lat,lon`，可选 `heading,landmark_id`。照片编号 1–20，PUT 发送原始图片，`X-Photo-Meta` 为 URI 编码的 JSON（`view_label,exif_lat,exif_lon,exif_dir,exif_time`）。详情包含 `photos` 和 `events` 数组。列表、pending 均直接返回数组；pending 也包含已关联且未终结的记录供轮询。补充用 `{body}`，可先上传新编号的照片。
 
-bridge 请求均用 Bearer token。回写字段 `status,message,multica_issue,pr_url,screenshot_url`；附加信息可省略，但需补充、未采纳、重复必须填写说明。submitted 必须先进 queued，此后主线允许向前跳级，reviewing 可打回 modelling；三个工作中状态都能转 need_info/rejected/duplicate。用户补充使 need_info 回到 submitted，bridge 可将 need_info 关闭为 rejected/duplicate。非终态重复写入返回 200，不新增事件；live/rejected/duplicate 后任何回写返回 409。
+bridge 请求均用 Bearer token。回写字段 `status,message,multica_issue,pr_url,screenshot_url`，`live` 时可带 `credit`（≤16 字署名，存 feedback.credit）；附加信息可省略，但需补充、未采纳、重复必须填写说明。submitted 必须先进 queued，此后主线允许向前跳级，reviewing 可打回 modelling；三个工作中状态都能转 need_info/rejected/duplicate。用户补充使 need_info 回到 submitted，bridge 可将 need_info 关闭为 rejected/duplicate。非终态重复写入返回 200，不新增事件；live/rejected/duplicate 后任何回写返回 409。
 
 `users`、`email_codes`、`sessions`、`rate_limits`、`feedback`（id ulid, user_id, kind, title, body, lat, lon, heading, landmark_id, status, multica_issue, pr_url, created_at, updated_at）、`feedback_photos`（feedback_id, n, r2_key, bytes, mime, view_label, exif_lat, exif_lon, exif_dir, exif_time）、`feedback_events`。迁移放 `migrations/`，`wrangler d1 migrations apply`。
 
@@ -102,7 +102,9 @@ bridge 请求均用 Bearer token。回写字段 `status,message,multica_issue,pr
 - 新反馈 → 下载照片到临时目录 → `multica issue create`：项目 Guilin Online，父 issue = “用户反馈建模”汇总 issue，指派默认建模 agent（mac local codex），状态 todo，附全部照片，描述用 `docs/feedback-modelling-task.md` 模板填充（位置、OSM 附近要素、EXIF 位置、用户原文、验收要求）。
 - 建模 agent 的第一步是**判定**：信息不足 → 评论里写 ```feedback-status need_info``` 块和给用户的话；无效/重复 → `rejected`/`duplicate`。有效 → 按现有地标管线建模（证据先行、`npm run audit:landmarks --strict`、照片对比图、斜视总览图）。
 - bridge 读 issue 状态和这些结构化块回写反馈；建模 agent 交付时在评论里附一张对比截图，bridge 把它挂到时间线（复制到 R2 公共前缀）。
-- sg claude 照常验收 PR、合并、部署；部署后 bridge 发现 PR 已合并且线上版本含该提交 → `live`。
+- sg claude 照常验收 PR、合并；定时发版上线后 bridge 发现 PR 已合并且线上版本含该提交 → `live`。PR 从 Multica 关联和反馈 issue 的可信评论（协调人 / sg claude / 成员）里的 `https://github.com/idoknow/guilinol/pull/N` 链接收集——仓库没接 Multica GitHub 集成，前者恒为空；仍有 open 的 PR 不算上线；反馈 issue 须为 in_review/done。
+- 标 `live` 时 bridge 同时：带 ```` ```feedback-credit ```` 块的几个字作署名（没有就用标题）、给用户发“已上线”消息（触发邮件）、在反馈 issue 留言并关为 done。
+- 「关于」页贡献者：公开只读 `GET /api/contributors` 返回 status=live 的反馈提交人 `{name: 昵称, avatar: 游戏角色外形, items: 署名[]}`（不含邮箱 / 账号 ID，缓存 5 分钟）；前端与 web/src/ui/contributors.ts 手写名单按昵称合并，头像用角色创建舞台现场渲染（IDOK-186）。
 - 失败保护：同一反馈 Multica 侧失败 2 次 → 停止自动重派，状态保持 modelling 并通知 sg claude。`BRIDGE_ENABLED=0` 一键停。
 
 ## 前端

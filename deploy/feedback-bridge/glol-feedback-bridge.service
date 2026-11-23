@@ -5,6 +5,8 @@ Description=Synchronize Guilin feedback with Multica
 Type=oneshot
 WorkingDirectory=%h/guilinol
 EnvironmentFile=%h/.config/glol-feedback-bridge/env
+# 先把 bridge 自己的克隆快进到最新 main（IDOK-186：之前从不更新，落后 59 个提交还在用旧的任务模板）；拉不到也照常跑
+ExecStartPre=-/usr/bin/env git -c credential.helper= "-c" "credential.helper=!gh auth git-credential" pull --ff-only --quiet origin main
 ExecStart=/usr/bin/env node scripts/feedback-bridge.mjs
 UMask=0077
 NoNewPrivileges=yes
