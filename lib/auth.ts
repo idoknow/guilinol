@@ -18,11 +18,11 @@ export type BanState = { banned_at: number; ban_reason: string }
 export function checkBan(user: BanState | null) {
   if (user?.banned_at) throw new Problem(403,'banned','账号已被封禁：'+user.ban_reason)
 }
-export type SessionAccount = BanState & {id:string;email:string;nickname:string;verified:number;role:string;notify_email:number;email_placeholder:number}
+export type SessionAccount = BanState & {id:string;uid:number;email:string;nickname:string;verified:number;role:string;notify_email:number;email_placeholder:number}
 export async function sessionAccount(db:D1Database, digest:string) {
   if (!digest) return null
   const join = ' FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.digest=? AND expires>?'
-  const account = await db.prepare('SELECT users.id,email,nickname,verified,role,notify_email,email_placeholder,banned_at,ban_reason'+join+' AND banned_at=0')
+  const account = await db.prepare('SELECT users.id,users.uid,email,nickname,verified,role,notify_email,email_placeholder,banned_at,ban_reason'+join+' AND banned_at=0')
     .bind(digest,now()).first<SessionAccount>()
   if (!account) checkBan(await db.prepare('SELECT banned_at,ban_reason'+join+' AND banned_at<>0').bind(digest,now()).first<BanState>())
   return account

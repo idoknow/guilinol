@@ -7,7 +7,7 @@ import {bindEmail,isSocialType,socialCallback,socialConfig,socialConfirm,socialP
 import {unsubscribe} from '../../lib/feedback-mail'
 import {cloudSave} from '../../lib/cloud-save'
 type User = SessionAccount & {salt:string;digest:string;locked_until:number}
-const profile=(user:SessionAccount)=>({id:user.id,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email,email_placeholder:!!user.email_placeholder})
+const profile=(user:SessionAccount)=>({id:user.id,uid:user.uid,email:user.email,nickname:user.nickname,verified:!!user.verified,role:user.role,notify_email:!!user.notify_email,email_placeholder:!!user.email_placeholder})
 const json=(data:unknown,status=200,session?:string)=>Response.json(data,{status,headers:{'Cache-Control':'no-store',...(session?{'Set-Cookie':session}:{})}})
 function nickname(value:unknown) {
   if(typeof value!=='string'||!value.trim()||value.trim().length>32) invalid()
@@ -66,8 +66,8 @@ async function handle(request:Request,env:Env) {
       if(!user.verified) unauthorized()
       if(!env.RT_JOIN_SECRET) throw new Problem(503,'rt_disabled','联机暂不可用')
       const encode=(bytes:Uint8Array)=>btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'')
-      const utf8=new TextEncoder(), uid=(await hash('rt:'+user.id)).slice(0,16)
-      const payload=encode(utf8.encode(JSON.stringify({uid,name:user.nickname,exp:now()+60})))
+      const utf8=new TextEncoder()
+      const payload=encode(utf8.encode(JSON.stringify({uid:user.uid,name:user.nickname,exp:now()+60})))
       const key=await crypto.subtle.importKey('raw',utf8.encode(env.RT_JOIN_SECRET),{name:'HMAC',hash:'SHA-256'},false,['sign'])
       return json({ticket:payload+'.'+encode(new Uint8Array(await crypto.subtle.sign('HMAC',key,utf8.encode(payload))))})
     }

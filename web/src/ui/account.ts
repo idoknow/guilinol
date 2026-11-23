@@ -6,7 +6,7 @@ import './account.css'
 // Playing requires an account (IDOK-99): the title screen asks for a login before the city boots, see requireUser().
 type Screen='login'|'register'|'verify'|'forgot'|'reset'|'profile'|'social'|'bindmail'
 export type SocialBinding={type:string;label:string;nickname:string;avatar:string;uid:string}
-export type User={id:string,email:string,nickname:string,notify_email:boolean;email_placeholder?:boolean;social?:SocialBinding[]}
+export type User={id:string,uid:number,email:string,nickname:string,notify_email:boolean;email_placeholder?:boolean;social?:SocialBinding[]}
 const titles:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'忘记密码',reset:'重置密码',profile:'我的账号',social:'第三方账号',bindmail:'绑定邮箱'}
 const submits:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'发送重置验证码',reset:'重置密码',profile:'保存设置',social:'确认',bindmail:'发送验证码'}
 async function api(path:string,method='GET',data?:object) {

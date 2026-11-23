@@ -66,7 +66,7 @@ const KICK_TOKEN = process.env.KICK_TOKEN || ''
 const KICK_BAN_SECONDS = Number(process.env.KICK_BAN_SECONDS || 600)
 /** 单个 IP 最多几条连接（反代后按 x-forwarded-for 首个地址算） */
 const MAX_PER_IP = 8
-/** 昵称长度上限（字符）；uid 由 normalizeUid 统一裁到 16 位 */
+/** 昵称长度上限（字符） */
 const MAX_NAME = 16
 /** 服务端裁决 hit / revive 的水平距离（米） */
 const HIT_RANGE = 3.5
@@ -107,7 +107,10 @@ const clampInt = (value, min, max, fallback = 0) => Math.round(clampNum(value, m
 const clampStr = (value, max) => (typeof value === 'string' ? value.slice(0, max) : '')
 
 /** uid 的唯一归一化入口：join 和 /kick 都走这里，否则「截断后再比较」永远对不上 */
-const normalizeUid = value => String(value ?? '').trim().replace(/[^A-Za-z0-9]/g, '').slice(0, 16)
+const normalizeUid = value => {
+  const uid = typeof value === 'number' ? value : typeof value === 'string' && /^[1-9]\d{5,}$/.test(value) ? Number(value) : NaN
+  return Number.isSafeInteger(uid) && uid >= 100000 ? uid : null
+}
 function identity(ticket) {
   const secret = process.env.RT_JOIN_SECRET
   if (!secret || typeof ticket !== 'string') return null
@@ -119,7 +122,7 @@ function identity(ticket) {
     const claims = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
     const time = Math.floor(Date.now()/1000)
     if (Number.isSafeInteger(claims.exp) && claims.exp > time && claims.exp <= time+60 &&
-        typeof claims.uid === 'string' && /^[A-Za-z0-9]{6,16}$/.test(claims.uid) && typeof claims.name === 'string') return claims
+        normalizeUid(claims.uid) !== null && typeof claims.name === 'string') return {...claims,uid:normalizeUid(claims.uid)}
   } catch {}
   return null
 }

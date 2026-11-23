@@ -25,15 +25,15 @@ async function service(entry,env,path,status){
   }
   throw Error(`Could not start ${entry}`)
 }
-function ticket(uid,exp=Math.floor(Date.now()/1000)+60){const body=Buffer.from(JSON.stringify({uid,name:uid,exp})).toString('base64url');return body+'.'+createHmac('sha256',secret).update(body).digest('base64url')}
+function ticket(uid,exp=Math.floor(Date.now()/1000)+60){const body=Buffer.from(JSON.stringify({uid,name:String(uid),exp})).toString('base64url');return body+'.'+createHmac('sha256',secret).update(body).digest('base64url')}
 async function socket(host,options){const client=new WebSocket(`ws://${host}/ws`,options);sockets.push(client);await once(client,'open');return client}
 async function reject(host,value){const client=await socket(host),closed=once(client,'close',{signal:AbortSignal.timeout(3000)});client.send(JSON.stringify({t:'join',ticket:value}));assert.equal((await closed)[0],4003)}
 try{
   database=await fixture({postgresOnly:true})
   const rt=await service('rt/server-realtime.mjs',{RT_JOIN_SECRET:secret},'/health',200)
   assert.equal((await (await fetch(`http://${rt}/health`)).json()).proto,4)
-  const [body,signature]=ticket('tester1').split('.')
-  await reject(rt,body+'.'+(signature[0]==='A'?'B':'A')+signature.slice(1));await reject(rt,ticket('tester1',Math.floor(Date.now()/1000)-1));await reject(await service('rt/server-realtime.mjs',{RT_JOIN_SECRET:''},'/health',200),ticket('tester1'))
+  const [body,signature]=ticket(100000).split('.')
+  await reject(rt,body+'.'+(signature[0]==='A'?'B':'A')+signature.slice(1));await reject(rt,ticket(100000,Math.floor(Date.now()/1000)-1));await reject(await service('rt/server-realtime.mjs',{RT_JOIN_SECRET:''},'/health',200),ticket(100000));await reject(rt,ticket('tester1'))
   const number=await port(),origin=`http://127.0.0.1:${number}`
   const api=await service('server/index.mjs',{...database.env,PUBLIC_ORIGIN:origin,RT_JOIN_SECRET:secret},'/api/me',401)
   site=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:number,strictPort:true,proxy:{'/api':'http://'+api,'/ws':{target:'ws://'+rt,ws:true}}}})
@@ -43,10 +43,13 @@ try{
   async function pageFor(name,mp){
     const page=await browser.newPage({viewport:{width:480,height:270}});page.on('pageerror',error=>errors.push(error.message))
     if(mp){const token=randomBytes(32).toString('hex');await database.sql('INSERT INTO users(id,email,nickname,salt,digest,verified) VALUES($1,$2,$1,\'\',\'\',1)',[name,name+'@example.test']);await database.sql('INSERT INTO sessions VALUES($1,$2,unixepoch()+600)',[createHash('sha256').update(token).digest('hex'),name]);await page.context().addCookies([{name:'glol_session',value:token,url:origin,httpOnly:true}]);await page.addInitScript(avatar=>localStorage.setItem('glol.avatar.v1',JSON.stringify(avatar)),appearance)}
-    await page.goto(url+(mp?'&mp=1':''));await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000});if(mp)await page.waitForFunction(()=>window.viewer.walk.net?.status().state==='online',null,{timeout:30000});return page
+    await page.goto(url+(mp?'&mp=1':''));await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000});if(mp)await page.waitForFunction(()=>window.viewer.walk.net?.status().state==='online',null,{polling:100,timeout:60000});return page
   }
   const solo=await pageFor('solo',false);assert.equal(await solo.evaluate(()=>performance.getEntriesByType('resource').some(entry=>/\/net-[^/]+\.js|\/api\/rt\/ticket/.test(entry.name))),false);console.log('solo frame ms',await frameSample(solo));await solo.close()
-  const alice=await pageFor('alice',true),bob=await pageFor('bob',true)
+  const alice=await pageFor('alice',true);await alice.evaluate(()=>window.viewer.freeze())
+  const bob=await pageFor('bob',true);await alice.evaluate(()=>window.viewer.resume())
+  const {ticket:issued}=await (await alice.request.post(origin+'/api/rt/ticket',{headers:{origin}})).json()
+  assert.equal(JSON.parse(Buffer.from(issued.split('.')[0],'base64url')).uid,(await (await alice.request.get(origin+'/api/me')).json()).uid)
   await alice.evaluate(async()=>{const walk=window.viewer.walk;if(!await walk.enter(-309,-1,0,'mp-test'))throw Error('spawn failed')})
   await alice.waitForFunction(()=>window.viewer.walk.net?.status().state==='online')
   await bob.waitForFunction(()=>window.viewer.walk.net.probe().some(remote=>remote.name==='alice'&&remote.ready))
@@ -58,9 +61,9 @@ try{
   const left=performance.now();await alice.close();await bob.waitForFunction(()=>!window.viewer.walk.net.probe().some(item=>item.name==='alice'),null,{timeout:5000});const leaveMs=performance.now()-left;assert(leaveMs<=5000);console.log('distance / error / leave ms',end.distance,Math.hypot(...remote.position.map((value,index)=>value-end.position[index])),leaveMs)
   const center=await bob.evaluate(()=>window.viewer.walk.probe().figPos),bots=[]
   for(let index=0;index<20;index++){
-    const client=await socket(rt,{localAddress:`127.0.0.${2+index}`}),uid='bot000'+index
+    const client=await socket(rt,{localAddress:`127.0.0.${2+index}`}),uid=1000000+index
     const welcome=once(client,'message',{signal:AbortSignal.timeout(3000)}),pose={x:center[0]+index%5-2,y:center[1],z:center[2]-2-Math.floor(index/5),gr:1,v:1.6,yaw:0}
-    client.send(JSON.stringify({t:'join',ticket:ticket(uid),name:'ignored',uid:'ignored',avatar:appearance,...pose}));const message=JSON.parse((await welcome)[0]);assert.equal(message.me.name,uid);bots.push({client,pose})
+    client.send(JSON.stringify({t:'join',ticket:ticket(uid),name:'ignored',uid:'ignored',avatar:appearance,...pose}));const message=JSON.parse((await welcome)[0]);assert.equal(message.me.name,String(uid));assert.equal(message.me.uid,uid);bots.push({client,pose})
   }
   botsTimer=setInterval(()=>{for(const {client,pose} of bots)client.send(JSON.stringify({...pose,t:'pos',x:pose.x+Math.sin(performance.now()/600)}))},55)
   await bob.waitForFunction(()=>window.viewer.walk.net.probe().filter(item=>item.ready).length===20);console.log('20 bots frame ms',await frameSample(bob));assert.deepEqual(errors,[])

@@ -44,7 +44,7 @@
 kubectl -n idoknow exec deploy/glol-rt -- \
   wget -qO- --header='content-type: application/json' \
   --header="x-kick-token: $KICK_TOKEN" \
-  --post-data='{"uid":"E8A4F4E4","reason":"违规"}' \
+  --post-data='{"uid":100000,"reason":"违规"}' \
   http://127.0.0.1:8790/kick
 ```
 
@@ -53,9 +53,21 @@ kubectl -n idoknow exec deploy/glol-rt -- \
 
 - 踢人后 uid 会进内存封禁表，`KICK_BAN_SECONDS`（默认 600 秒）内重连会收到
   `{t:'banned'}` 并被断开；重启清空，多副本也不共享 —— 长期封禁得接账号系统。
-- `uid` 先归一化（去空白/非字母数字字符、截 16 位），和 join 用同一套规则；为空或
-  body 不是对象时直接 400，不会误踢匿名玩家。
-- `/kick` 使用广播中账号派生的 uid。join 时 uid 和昵称只取自已验签票据，忽略客户端自报值。
+- `/kick` 接受数字编号或其十进制字符串，范围从 100000 到 JS 最大安全整数。格式不合法直接返回 400。
+- `GET /api/me`、登录票据和 rt 广播使用同一个数字 `users.uid`。join 只取已验签票据中的编号和昵称。
+
+## 玩家编号迁移（PostgreSQL）
+
+发版前可先用只读账号逐行核对预期编号（无需新列，不写表、不取序列值）：
+
+```sql
+SELECT id, created_at, 99999 + row_number() OVER (ORDER BY created_at, id COLLATE "C") AS proposed_uid
+FROM users ORDER BY proposed_uid;
+```
+
+实际单独执行：`psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -f deploy/postgres/011-player-uid.sql`。
+该脚本在同一事务内加列、补号、约束和接续序列；会锁 `users`，请避开高峰。成功后重复执行不会重编。
+已存在账号的初始编号连续；未来 PG 序列在冲突/回滚时可能跳号，不回收已用号码。
 
 ## 防刷与容量
 

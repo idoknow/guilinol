@@ -16,6 +16,7 @@ let child,browser,logs='',closed,storage,site
 async function sql(command){return storage.sql(command)}
 try {
   storage=await fixture()
+  if(!ui)await (await import('./player-uid-test.mjs')).testPlayerUid(storage.env.DATABASE_URL)
   const probe=createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');const port=probe.address().port;await new Promise(resolve=>probe.close(resolve))
   const staticDir=ui?'dist':join(state,'empty-site');if(!ui)await mkdir(staticDir)
   site=await preview({configFile:false,build:{outDir:staticDir},preview:{host:'127.0.0.1',port:0,proxy:{'/api':`http://127.0.0.1:${port}`}}})
@@ -65,7 +66,7 @@ try {
     await api('auth/resend',{email,purpose:'verify'},429,'rate_limited');await api('auth/login',login,403,'unverified')
     const verification={email,code:await code('verify',1)}
     await api('auth/verify',verification,400,'invalid_code');await api('auth/verify',{...verification,password:firstPassword},400,'invalid_code');await api('me',null,401,'unauthorized')
-    await api('auth/verify',{...verification,password});await api('auth/verify',{...verification,password},400,'invalid_code');assert.equal((await api('me')).verified,true)
+    await api('auth/verify',{...verification,password});await api('auth/verify',{...verification,password},400,'invalid_code');const me=await api('me');assert.equal(me.verified,true);assert.equal(me.uid,100000)
     console.log('Verification requires the latest registration password: missing and stale passwords rejected; current password accepted')
     assert.equal((await api('me',{nickname:'江岸' },200,null,{method:'PATCH'})).nickname,'江岸');const sessionRows=(await sql('SELECT digest FROM sessions'))[0].results;assert.equal(sessionRows.length,1);assert.notEqual(sessionRows[0].digest,cookie.split('=')[1]);assert.notEqual((await sql('SELECT digest FROM users'))[0].results[0].digest,password)
     await api('auth/logout',{});await api('me',null,401,'unauthorized');await api('auth/login',login)
@@ -75,6 +76,8 @@ try {
     for(let attempt=1;attempt<=5;attempt++)await api('auth/login',{email,password:'incorrect'},attempt===5?429:401,attempt===5?'locked':'credentials');await api('auth/login',login,429,'locked')
     await sql('UPDATE mail_events SET sent=sent-61');await api('auth/resend',{email,purpose:'reset'});const reset={email,code:await code('reset'),password:'new-password'};await api('auth/reset',reset);await api('me',null,401,'unauthorized');await api('auth/reset',reset,400,'invalid_code');await api('auth/login',login,401,'credentials');await api('auth/login',reset)
     for(let index=0;index<7;index++)await api('auth/resend',{email:`other${index}@example.test`,purpose:'reset'});await api('auth/resend',{email:'capped@example.test',purpose:'reset'},429,'rate_limited')
+    await Promise.all(['first','second'].map(label=>api('auth/register',{...register,email:`${label}@race.test`},200,null,{headers:{'CF-Connecting-IP':'uid-race'}})))
+    const race=(await sql("SELECT uid FROM users WHERE email LIKE '%@race.test' ORDER BY uid"))[0].results.map(row=>Number(row.uid));assert.equal(race.length,2);assert.equal(race[1],race[0]+1)
   }
   console.log(adminUI?'Admin access, lists, photo viewer, status timeline and three screenshots passed':ui?'UI registration, login and mobile screenshots passed':'API lifecycle, storage, lockout, cooldown, IP limit and Origin passed')
 }catch(error){
