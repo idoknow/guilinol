@@ -20,6 +20,7 @@ case 'issue children':result={stages:[],unstaged:data.created?[data.created]:[]}
 case 'issue create':data.creates++;data.created={id:'model-1',title:val('--title')};data.args=args;data.body=fs.readFileSync(val('--description-file'),'utf8');data.sizes=args.flatMap((value,index)=>value==='--attachment'?[fs.statSync(args[index+1]).size]:[]);result=data.created;break
 case 'issue get': result={status:data.status};break
 case 'issue runs':result=data.runs||[];break
+case 'issue status':data.closed=args[3];result={};break
 case 'attachment download':fs.writeFileSync(val('--output-dir')+'/public-comparison.png',Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jD2kAAAAASUVORK5CYII=','base64'));result={};break
 case 'issue pull-requests':result={pull_requests:data.pr?[{number:1,html_url:'https://github.com/idoknow/guilinol/pull/1'}]:[]};break
 case 'issue comment':if(args[2]==='add'){data.replies.push(fs.readFileSync(val('--content-file'),'utf8'));result={}}else result=data.comments;break
@@ -155,13 +156,31 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
   await run()
   assert.ok((await load()).replies.some(reply=>reply.includes('已核对背面')))
   await writeFile(join(staticDir, 'version.json'), JSON.stringify({ sha: 'b'.repeat(40) }))
-  await set({ pr: true, status: 'done' })
+  // PR 只出现在评论里（仓库没接 Multica GitHub 集成，issue pull-requests 为空），署名取 feedback-credit 块（IDOK-186）
+  await set({
+    status: 'done',
+    comments: [
+      {
+        id: 'deliver',
+        author_id: 'agent',
+        author_type: 'agent',
+        created_at: new Date().toISOString(),
+        content: '已修复：[PR #7](https://github.com/idoknow/guilinol/pull/7)\n\n```feedback-credit\n桥头朝向\n```',
+      },
+    ],
+  })
   await run()
   assert.equal((await api(path)).status, 'reviewing')
   await writeFile(join(staticDir, 'version.json'), JSON.stringify({ sha: 'a'.repeat(40) }))
   await run()
   await run()
   detail = await api(path)
+  assert.match(detail.events.at(-1).message, /^已上线：桥头朝向。/)
+  assert.equal((await load()).replies.filter((reply) => reply.includes('<!-- fb-live:')).length, 1)
+  const people = await (await fetch(origin + '/api/contributors')).json()
+  assert.deepEqual(people.map((person) => person.items), [['桥头朝向']])
+  assert.equal(typeof people[0].name, 'string')
+  assert.ok(!JSON.stringify(people).includes('@'), 'contributors must not leak email')
   assert.deepEqual(
     detail.events.map((event) => event.status),
     [
@@ -229,6 +248,23 @@ fs.writeFileSync(process.env.FIXTURE,JSON.stringify(data));if(args[1]==='create'
     ['submitted','approved', 'queued', 'modelling'],
   )
   assert.equal((await load()).replies.filter((message) => message.includes('自动处理已暂停')).length, 1)
+  // 问了提交人（need_info），没等回复就修好并送审 → 直接已上线（IDOK-180/181）
+  const asked = { id: 'ask', author_id: 'agent', author_type: 'agent', created_at: new Date().toISOString(), content: '```feedback-status need_info\n具体是哪一段？\n```' }
+  await set({ runs: [], comments: [asked] })
+  await run()
+  assert.equal((await api('feedback/' + next)).status, 'need_info')
+  await set({ status: 'in_progress' })
+  await run()
+  assert.equal((await api('feedback/' + next)).status, 'need_info', 'need_info must wait while still in progress')
+  await set({
+    status: 'in_review',
+    comments: [asked, { id: 'fixed', author_id: 'agent', author_type: 'agent', created_at: new Date().toISOString(), content: '修好了 https://github.com/idoknow/guilinol/pull/9' }],
+  })
+  await run()
+  assert.equal((await api('feedback/' + next)).status, 'live')
+  assert.equal((await load()).closed, 'done')
+  const credited = await (await fetch(origin + '/api/contributors')).json()
+  assert.deepEqual(credited[0].items, ['桥头朝向', '新反馈'])
   console.log(
     'Bridge: dry run, ambiguous create recovery, attachments, supplement and deployment timeline passed',
   )

@@ -2,6 +2,7 @@ import './about.css'
 import {photoCredits} from './photo-credits'
 import {SOURCE_URL} from './source'
 import {contributors, KIND_LABEL, type ContribKind, type Contributor} from './contributors'
+import {defaultAvatar, type Avatar} from '../../../lib/avatar'
 
 const dataLines = [
   '© OpenStreetMap contributors（ODbL）',
@@ -16,8 +17,9 @@ let mask:HTMLDivElement|undefined
 /** 关于：Logo 与一句话介绍、贡献者（按人、按做了什么）、致谢、数据与照片署名、版本。由主界面打开。 */
 export function openAbout() {
   if (!mask) {
-    const people = contributors
+    let people = contributors
     const count = (kind:ContribKind) => people.filter(p => p.items.some(i => i.kind === kind)).length
+    const stats = () => `<b>${people.length}</b> 位伙伴 · <b>${count('code')}</b> 位写过代码 · <b>${count('feedback')}</b> 位提过反馈`
     mask = document.createElement('div')
     mask.className = 'about-mask'
     mask.hidden = true
@@ -39,7 +41,7 @@ export function openAbout() {
         <section class="ab-people" aria-labelledby="ab-people-title">
           <div class="ab-people-head">
             <h3 id="ab-people-title">一起做网上桂林的人</h3>
-            <p class="ab-stats"><b>${people.length}</b> 位伙伴 · <b>${count('code')}</b> 位写过代码 · <b>${count('feedback')}</b> 位提过反馈</p>
+            <p class="ab-stats">${stats()}</p>
           </div>
           <div class="ab-filter" role="toolbar" aria-label="按贡献筛选">
             ${FILTERS.map(([kind,label],i) => `<button type="button" class="ab-chip" data-kind="${kind}" aria-pressed="${i === 0}">${kind === 'all' ? '' : `<i>${KIND_LABEL[kind].seal}</i>`}${label}</button>`).join('')}
@@ -66,6 +68,15 @@ export function openAbout() {
     </div>`
     const close = () => { mask!.hidden = true }
     const grid = mask.querySelector<HTMLElement>('.ab-grid')!
+    // 反馈上线后自动署名（IDOK-186）：从 /api/contributors 取，合进手写名单；取不到就只显示手写名单
+    void loadFeedbackPeople().then(extra => {
+      if (!extra.length || !mask) return
+      people = merge(contributors, extra)
+      mask.querySelector('.ab-stats')!.innerHTML = stats()
+      grid.innerHTML = people.map(card).join('')
+      mask.querySelector<HTMLButtonElement>(`.ab-chip[aria-pressed="true"]`)?.click()
+      void drawPortraits(grid)
+    })
     mask.querySelectorAll<HTMLButtonElement>('.ab-chip').forEach(chip => chip.addEventListener('click', () => {
       mask!.querySelectorAll('.ab-chip').forEach(other => other.setAttribute('aria-pressed', String(other === chip)))
       const kind = chip.dataset.kind!
@@ -98,12 +109,90 @@ function card(person:Contributor, index:number) {
     : escape(person.name)
   return `<li class="ab-card ab-card--${main}" data-kinds="${kinds.join(' ')}" style="--i:${index}">
     <div class="ab-card-top">
-      <span class="ab-avatar" aria-hidden="true"><img src="./contributors/${encodeURIComponent(person.portrait)}.webp" alt="" width="96" height="96" loading="lazy" decoding="async"></span>
+      ${person.portrait
+        ? `<span class="ab-avatar" aria-hidden="true"><img src="./contributors/${encodeURIComponent(person.portrait)}.webp" alt="" width="96" height="96" loading="lazy" decoding="async"></span>`
+        : `<span class="ab-avatar ab-avatar--seal" aria-hidden="true"><i>${escape(Array.from(person.name)[0] ?? '友')}</i></span>`}
       <div class="ab-who"><b>${name}</b><small>${escape(person.role)}</small></div>
     </div>
     ${hasLogo ? '<div class="ab-card-logo"><img src="./brand/emblem.webp" alt="" width="371" height="144" loading="lazy"></div>' : ''}
     <ul class="ab-items">${person.items.map((item,j) => `<li data-kind="${item.kind}" title="${KIND_LABEL[item.kind].label}" style="--j:${j}"><i aria-hidden="true">${KIND_LABEL[item.kind].seal}</i>${escape(item.text)}</li>`).join('')}</ul>
   </li>`
+}
+
+/** 反馈被处理并上线的玩家：昵称 + 几个字 + 游戏角色外形（服务端只给这些） */
+interface FeedbackPerson {name:string; avatar:Avatar|null; items:string[]}
+
+let players:Contributor[] = []
+
+async function loadFeedbackPeople():Promise<FeedbackPerson[]> {
+  try {
+    const response = await fetch('/api/contributors', {signal: AbortSignal.timeout(8000)})
+    if (!response.ok) return []
+    const rows = await response.json()
+    return Array.isArray(rows) ? rows.filter(row => typeof row?.name === 'string' && Array.isArray(row.items)) : []
+  } catch {
+    return []
+  }
+}
+
+/** 同名的并进手写名单那一项（只补没写过的几个字），新的人排在后面，按头像实时渲染 */
+function merge(base:Contributor[], extra:FeedbackPerson[]) {
+  const list = base.map(person => ({...person, items: [...person.items]}))
+  players = []
+  for (const row of extra) {
+    const texts = row.items.filter((text):text is string => typeof text === 'string' && !!text.trim())
+    const known = list.find(person => person.name.toLowerCase() === row.name.toLowerCase())
+    if (known) {
+      for (const text of texts) if (!known.items.some(item => item.text === text)) known.items.push({kind: 'feedback', text})
+      continue
+    }
+    if (!texts.length) continue
+    const person:Contributor = {name: row.name, role: '玩家', portrait: '', avatar: {...defaultAvatar(1), ...(row.avatar ?? {})}, items: texts.map(text => ({kind: 'feedback' as const, text}))}
+    list.push(person)
+    players.push(person)
+  }
+  return list
+}
+
+/** 没有预渲染头像的玩家：用角色创建页同一套舞台现场画头像（和 scripts/contributor-portraits.mjs 一致）；画不出来就留昵称首字印章 */
+async function drawPortraits(grid:HTMLElement) {
+  const seals = Array.from(grid.querySelectorAll<HTMLElement>('.ab-avatar--seal'))
+  if (!seals.length) return
+  const host = document.createElement('div')
+  host.style.cssText = 'position:fixed;left:-400px;top:0;width:192px;height:192px;pointer-events:none'
+  document.body.append(host)
+  let stage:ReturnType<typeof import('./creator-stage').creatorStage> | undefined
+  try {
+    const {creatorStage} = await import('./creator-stage')
+    stage = creatorStage(host, true, true)
+    const canvas = host.querySelector('canvas')!
+    for (const seal of seals) {
+      const name = seal.closest('.ab-card')?.querySelector('.ab-who b')?.textContent
+      const person = players.find(item => item.name === name)
+      if (!person) continue
+      try {
+        await stage.apply(person.avatar)
+        stage.angle(0.35)
+        stage.frameHead(true, 0.955)
+        await new Promise(done => setTimeout(done, 900))
+        const square = document.createElement('canvas')
+        square.width = square.height = 192
+        square.getContext('2d')!.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, 192, 192)
+        const img = new Image(96, 96)
+        img.alt = ''
+        img.src = square.toDataURL('image/webp', 0.9)
+        seal.classList.remove('ab-avatar--seal')
+        seal.replaceChildren(img)
+      } catch {
+        // 这个人的外形画不出来：保留首字印章，继续下一个
+      }
+    }
+  } catch {
+    // WebGL 不可用：保留首字印章
+  } finally {
+    stage?.dispose()
+    host.remove()
+  }
 }
 
 function photoHtml() {

@@ -428,6 +428,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     screenshot = null,
     issue = null,
     pr = null,
+    credit = null,
     guard = ''
   if (action === 'submit') {
     if (row.status !== 'draft') conflict()
@@ -454,14 +455,17 @@ export async function feedback(request: Request, env: Env, path: string) {
           : link(data.screenshot_url)
       issue = text(data.multica_issue, 128)
       pr = link(data.pr_url)
+      // 「关于」页署名：上线时写几个字（IDOK-186）
+      if (target === 'live') credit = text(data.credit, 16)
     }
   } else missing()
   const [changed] = await env.DB.batch([
     stmt(
-      `UPDATE feedback SET status=?,updated_at=unixepoch(),submitted_at=CASE WHEN status='draft' THEN unixepoch() ELSE submitted_at END,multica_issue=coalesce(?,multica_issue),pr_url=coalesce(?,pr_url) WHERE id=? AND status=? AND NOT EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=0)${guard}`,
+      `UPDATE feedback SET status=?,updated_at=unixepoch(),submitted_at=CASE WHEN status='draft' THEN unixepoch() ELSE submitted_at END,multica_issue=coalesce(?,multica_issue),pr_url=coalesce(?,pr_url),credit=coalesce(?,credit) WHERE id=? AND status=? AND NOT EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=0)${guard}`,
       target,
       issue,
       pr,
+      credit,
       id,
       row.status,
     ),

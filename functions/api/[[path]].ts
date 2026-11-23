@@ -2,6 +2,7 @@ import {type Env,Problem,cookie,deliver,equal,hash,invalid,lifetime,limit,newCod
 
 import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar'
 import {feedback} from '../../lib/feedback'
+import {feedbackContributors} from '../../lib/contributors'
 import {bindEmail,isSocialType,socialCallback,socialConfig,socialConfirm,socialPending,socialRegister,socialStates,startSocial,userSocialIdentities} from '../../lib/social'
 import {unsubscribe} from '../../lib/feedback-mail'
 import {cloudSave} from '../../lib/cloud-save'
@@ -22,6 +23,7 @@ async function handle(request:Request,env:Env) {
   const url=new URL(request.url), path=url.pathname.slice(5), method=request.method, db=env.DB
   const stmt=(sql:string,...args:(string|number)[])=>db.prepare(sql).bind(...args)
   if(method==='GET'&&path==='unsubscribe')return unsubscribe(env,url)
+  if(method==='GET'&&path==='contributors')return feedbackContributors(env)
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(path==='me/save')return cloudSave(request,env)
   if(!Object.hasOwn(methods,path)) throw new Problem(404,'not_found','接口不存在')

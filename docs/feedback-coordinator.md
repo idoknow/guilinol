@@ -30,7 +30,8 @@ Rock 2026-11-20 定：网上桂林（glol.rcpd.cc）的用户反馈由 **py agy 
 | ```` ```feedback-reply ```` 块 | 一条“协调人”消息，同时给用户发邮件提醒 |
 | 批准后改为 in_progress | AI 建模中 |
 | in_review | 审核中 |
-| PR 合并，且线上 `/version.json` 已包含该提交 | 已上线（bridge 自动判断） |
+| 反馈 issue 为 in_review/done，评论里出现的 `https://github.com/idoknow/guilinol/pull/N` 全部合并（没有还开着的），且线上 `/version.json` 已包含 | 已上线（bridge 自动判断，给用户发“已上线”消息和邮件，在「关于」页自动署名，并把反馈 issue 关为 done） |
+| ```` ```feedback-credit ```` 块（几个字，如 `龙隐路路面`） | 上线后「关于」页贡献者名单里该用户的署名；不写就用反馈标题 |
 | ```` ```feedback-status rejected ```` / `duplicate` 块 | 未采纳 / 重复（正文展示给用户） |
 
 块的正文直接给提交人看：用中文写，口语、简短，不写内部信息，不暴露 agent 名字和内部流程。
@@ -60,8 +61,8 @@ Rock 2026-11-20 定：网上桂林（glol.rcpd.cc）的用户反馈由 **py agy 
 
    同一区域同一时间只派给一个执行者。改动会碰到别人正在做的 issue（IDOK-2 下的里程碑）时，先在那个 issue 上确认，避免冲突。
 4. **跟进**：执行者交付后，你按下面的验收标准先审一遍。不过就打回，打回评论里必须 @ 执行者，否则对方不会被唤醒。
-5. **送验收**：你审过之后，把反馈 issue 改为 in_review，在反馈 issue 上发一条评论。评论里附可公开的对比图（文件名 `public-comparison.png`，规则见模板），并 @ sg claude（`91e112ba-1989-4256-ad5f-cd92e7de57ed`）请求合并、部署。**你不要自己合并或部署**：部署需要 sg 主机上的 Cloudflare 凭据，由 sg claude 统一执行。
-6. **收尾**：合并后最多约 4 小时会随定时发版上线（IDOK-155），bridge 会自动把反馈标记为“已上线”。你确认用户侧已经显示“已上线”后，把子 issue 关闭。
+5. **送验收**：你审过之后，把反馈 issue 改为 in_review，在反馈 issue 上发一条评论。评论里**必须写完整的 PR 链接**（`https://github.com/idoknow/guilinol/pull/N`，多个 PR 都写上；仓库没接 Multica 的 GitHub 集成，bridge 只能从评论里认 PR），并附一个 ```` ```feedback-credit ```` 块，用 4–8 个字写这条反馈带来的改动（给用户看的署名，比如 `龙隐路路面`、`微笑堂细节`）。评论里附可公开的对比图（文件名 `public-comparison.png`，规则见模板），并 @ sg claude（`91e112ba-1989-4256-ad5f-cd92e7de57ed`）请求合并、部署。**你不要自己合并或部署**：部署需要 sg 主机上的 Cloudflare 凭据，由 sg claude 统一执行。
+6. **收尾**：合并后最多约 4 小时会随定时发版上线（IDOK-155）。bridge 每 5 分钟检查一次：上线后自动把反馈标记为“已上线”、通知用户、在「关于」页署名、在反馈 issue 上留言并关为 done（IDOK-186）。**不用预约复查、不用手动改 contributors.ts**；只需把你开的子 issue 关掉。
 
 ## 验收标准（你审，sg claude 复核）
 

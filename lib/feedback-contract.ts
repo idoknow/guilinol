@@ -20,7 +20,8 @@ export const edges: Record<string, string[]> = {
   queued: ['modelling', 'reviewing', 'live', 'need_info', 'rejected', 'duplicate'],
   modelling: ['reviewing', 'live', 'need_info', 'rejected', 'duplicate'],
   reviewing: ['modelling', 'live', 'need_info', 'rejected', 'duplicate'],
-  need_info: ['approved','rejected', 'duplicate'],
+  // 问了提交人但没等回复就修好并上线了（IDOK-180/181）：bridge 可直接标已上线
+  need_info: ['approved','live','rejected', 'duplicate'],
 }
 
 type Point = { x: number; y: number; z: number; lat: number; lon: number }
