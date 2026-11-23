@@ -4,7 +4,7 @@ Used on sg for IDOK-114 because public Overpass instances were returning 502/504
 import json, sys
 import osmium
 
-S, W, N, E = 25.21054, 110.24150, 25.36798, 110.35341
+from prepare_expansion import SOUTH as S, WEST as W, NORTH as N, EAST as E
 pbf, out = sys.argv[1], sys.argv[2]
 
 WAY_KEYS = ['building', 'highway', 'natural', 'waterway', 'water', 'leisure', 'landuse',

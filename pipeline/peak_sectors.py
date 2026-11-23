@@ -6,6 +6,14 @@ from collections import defaultdict
 from pathlib import Path
 
 
+def overview_step(width, depth):
+    """Bound the resident mesh to the pre-Huajiang overview's cell budget."""
+    for step in (32, 64):
+        if (width//step)*(depth//step) <= (11264//32)*(17408//32):
+            return step
+    raise ValueError('Overview exceeds budget at the coarsest supported four cells per tile')
+
+
 def write_peak_sectors(output: Path, peaks):
     source = gzip.decompress((output/peaks['file']).read_bytes())
     groups = defaultdict(list)
@@ -37,7 +45,7 @@ def write_peak_sectors(output: Path, peaks):
 
 
 def write_distant_buildings(output, chunks):
-    """Keep the largest GL04 building fragment in each 48 m cell of each tile."""
+    """Keep the largest fragment per cell; thin proxies beyond the previous east edge."""
     import json
     payload = bytearray()
     for chunk in chunks:
@@ -46,13 +54,14 @@ def write_distant_buildings(output, chunks):
         offset = 24 + 2*65*65*2 + vertices*9 + indices*4
         rings = json.loads(data[offset:offset+length])[0]
         boxes = {}
+        cell = 128 if chunk['x'] >= 5376 else 48
         for base,roof,loops,kind,*_ in rings:
             xs,zs = zip(*loops[0])
             width,depth = (max(xs)-min(xs))/100,(max(zs)-min(zs))/100
             if min(width,depth)<4 or roof-base<40:
                 continue
             x,z = (max(xs)+min(xs))/200,(max(zs)+min(zs))/200
-            key = int(x//48),int(z//48)
+            key = int(x//cell),int(z//cell)
             score = width*depth*(roof-base)
             if score>boxes.get(key,(0,))[0]:
                 boxes[key] = (score,chunk['x']+x,chunk['z']+z,base,roof,width,depth,kind)
@@ -64,7 +73,7 @@ def write_distant_buildings(output, chunks):
 
 
 def write_opening(output, manifest):
-    """Self-contained first terrain LOD: bounds, 64 m relief and baked colour."""
+    """Self-contained first terrain LOD: bounds, half-resolution relief and baked colour."""
     import numpy as np
     view = manifest['overview']
     left, top, width, depth = manifest['extent']
@@ -90,7 +99,8 @@ def write_city_lods(output, manifest):
     texture = output/manifest['overview']['texture']['file']
     width,depth = manifest['extent'][2:]
     with Image.open(texture) as image:
-        reduced = image.convert('RGB').resize((width//16,depth//16), Image.Resampling.BOX).quantize(32)
+        texel = manifest['overview']['step']//2
+        reduced = image.convert('RGB').resize((width//texel,depth//texel), Image.Resampling.BOX).quantize(32)
     reduced.save(texture,optimize=True)
     manifest['overview']['texture']['bytes'] = texture.stat().st_size
     write_opening(output, manifest)

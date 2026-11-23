@@ -9,10 +9,12 @@ import {nightGround} from './look/night'
 import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
+import {joinPortalRoads,tunnelGeometry,type Tunnel} from './tunnels'
 
 interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number}
 export interface Manifest {
+  tunnels?:Tunnel[]
   builtArea?:{type:'Polygon';coordinates:[number,number][][]}
   distantBuildings?:Asset
   landmarks?:import('./landmarks').Landmark[]
@@ -276,7 +278,7 @@ export async function overview(manifest:Manifest) {
   return startOverview(manifest).finish
 }
 
-export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>) {
+export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promise<void>, tunnels?:Tunnel[]) {
   const compressed = await fetchAsset(tile.file,signal)
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
   if(parseSlot) await parseSlot()
@@ -317,6 +319,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   for(const [,topLevel] of rings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
   const heights = geometry.getAttribute('position')
   const streets = await loadStreetGeometry(paths,step,heights)
+  if(tunnels)joinPortalRoads(tile,tunnels,[streets.road,streets.sidewalk,...(streets.surface?[streets.surface.getAttribute('position').array as Float32Array]:[])])
   signal.throwIfAborted()
   const material = await surfaceMaterial(buffer.slice(offset,end))
   if(parseSlot)await parseSlot()
@@ -324,6 +327,8 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   group.position.set(tile.x,0,tile.z)
   const groundMesh = new THREE.Mesh(geometry,material)
   group.add(groundMesh)
+  const tunnel=tunnels?tunnelGeometry(tile,geometry,tunnels):null
+  if(tunnel){tunnel.fringe.material.dispose();tunnel.fringe.material=material;group.add(...Object.values(tunnel))}
   const pond = chunkWater(water,tile.x,tile.z)
   const walls = vertices ? buildingGeometry(positions,normals,indices,rings) : null
   const bridge = deck.length ? bridgeGeometry(deck,thin,asphalt) : null
@@ -338,8 +343,9 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
     parked:streets.parked,
   }
   return {
-    group,groundMesh,terrain,water,rings,deck,thin,streets,batch,
+    group,groundMesh,terrain,water,rings,deck,thin,streets,batch,tunnel,
     dispose(){
+      if(tunnel)for(const mesh of Object.values(tunnel)){mesh.geometry.dispose();if(mesh!==tunnel.fringe)mesh.material.dispose()}
       pond?.dispose(); streets.surface?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
       material.map!.image.close(); material.map!.dispose(); material.dispose()
     },

@@ -19,10 +19,9 @@ from shapely.geometry import box, Point
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem, load_osm
 from features import building_mesh, buildings, game_court, ground_features, points, polygons, raw_overture_footprints, rongyin_sidewalk
-from street_rings import repair_frozen_tile
-from legacy_core import Downtown, EXTENT as DOWNTOWN
+from legacy_core import CAMPUS_TILES, Downtown, EXTENT as DOWNTOWN, preserve_campus_indexes
 from karst import generate
-from peak_sectors import write_city_lods
+from peak_sectors import overview_step, write_city_lods
 from landmarks.jiefang_layout import bank_paving, grade_banks, grade_binjiang_streets
 from bridges import bridge_tiles
 from road_grading import build_ground_mesh_lookup, eval_bspline_grid, solve_road_and_bridge_elevations
@@ -283,6 +282,8 @@ def build(bbox, output, palette, workers=4):
     if fubo is not None:
         fubo.grade_bank(terrain,original,surface,left,top)
         fubo.native_grade(terrain,original,surface,left,top)
+    from road_tunnels import bake as bake_tunnels
+    tunnels = bake_tunnels(bounds,(original,terrain),left,top,GRID)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 
@@ -415,23 +416,27 @@ def build(bbox, output, palette, workers=4):
     print('Lengths (m):',lengths)
     def asset(name):
         return {'file':name,'bytes':(output/name).stat().st_size}
-    np.where(wet,surface,terrain)[::8,::8].astype('<i2').tofile(output/'overview.i16')
-    np.where(wet,surface,original)[::8,::8].astype('<i2').tofile(output/'underlay.i16')
+    step = overview_step(width, depth)
+    stride = step//GRID
+    np.where(wet,surface,terrain)[::stride,::stride].astype('<i2').tofile(output/'overview.i16')
+    np.where(wet,surface,original)[::stride,::stride].astype('<i2').tofile(output/'underlay.i16')
     overview_image = texture.resize((width//4,depth//4), Image.Resampling.BOX).quantize(32)
     water_bits = water_mask(overview_image, palette['water'])
     overview_image.save(output/'overview.png', optimize=True)
     u_peaks_buf = unary_union(peak_shapes).buffer(1.0) if peak_shapes else ShapelyPolygon()
     chunks = []
+    preserve_campuses = downtown is not None and all(left <= east < left+width and top <= south < top+depth for east,south in CAMPUS_TILES)
+    published_core = downtown.published_core(preserve_campuses) if downtown else {}
     pending = deque()
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for south in range(0,depth,CHUNK):
             for east in range(0,width,CHUNK):
                 origin = (left+east,top+south)
-                if downtown and downtown.frozen_tile(*origin):
-                    old = downtown.tiles[origin]
+                if origin in published_core:
+                    ground_bytes, tree_bytes = published_core.pop(origin)
                     name = f'{east//CHUNK}_{south//CHUNK}.glc'
-                    (output/name).write_bytes(repair_frozen_tile(downtown.files[old]))
-                    (output/name.replace('.glc','.trees')).write_bytes(downtown.files[old.replace('.glc','.trees')])
+                    (output/name).write_bytes(ground_bytes)
+                    (output/name.replace('.glc','.trees')).write_bytes(tree_bytes)
                     while pending:
                         chunks.append(pending.popleft().result())
                     chunks.append(dict(x=origin[0],z=origin[1],**asset(name)))
@@ -496,11 +501,13 @@ def build(bbox, output, palette, workers=4):
         chunks.extend(job.result() for job in pending)
     extent = [left,top,width,depth]
     write_atlas(output,extent,bounds,layers,footprints,peaks)
+    if preserve_campuses:
+        preserve_campus_indexes(output,landmarks)
     write_overview_map(output,bbox)
     triangles.extend(landmark_faces)
     write_vehicles(output,vehicles,triangles)
     manifest = dict(version=4,bbox=bbox,origin=[LAT0,LON0],extent=extent,chunkSize=CHUNK,peaks=peaks,atlas=asset('atlas.bin'),
-                    vehicles=asset('vehicles.bin'),grid=GRID,overview=dict(step=32, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png'),waterMask=water_bits),chunks=chunks)
+                    vehicles=asset('vehicles.bin'),grid=GRID,overview=dict(step=step, heights=asset('overview.i16'),underlay=asset('underlay.i16'),texture=asset('overview.png'),waterMask=water_bits),chunks=chunks)
     # Hash the full-resolution GL04 fields in wire order, independent of gzip,
     # texture encoders, or whether a chunk elides its redundant underlay.
     digest = hashlib.sha256()
@@ -509,6 +516,8 @@ def build(bbox, output, palette, workers=4):
     manifest['terrainSha256'] = digest.hexdigest()
     print('Terrain SHA-256:', digest.hexdigest())
     manifest['landmarks'] = landmarks
+    if tunnels:
+        manifest['tunnels'] = tunnels
     write_city_lods(output, manifest)
     from traffic import bake as bake_traffic
     bake_traffic(output, manifest)
@@ -518,7 +527,7 @@ def build(bbox, output, palette, workers=4):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--bbox',type=float,nargs=4,default=[25.212,110.243,25.366,110.352])
+    parser.add_argument('--bbox',type=float,nargs=4,default=[25.212,110.243,25.366,110.424])
     parser.add_argument('--output',type=Path,default=Path(OUT))
     parser.add_argument('--palette',type=Path,default=Path(__file__).with_name('palette.json'))
     parser.add_argument('--workers', type=int, default=4, help='Concurrent chunk compression writers')

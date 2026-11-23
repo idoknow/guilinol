@@ -249,8 +249,13 @@ def generate(original, terrain, left, top, bbox, output, wet, mountain_trees=Non
                 payload.extend(faces.tobytes())
             entry['lods'].append(dict(offset=len(payload),vertices=len(data),indices=faces.size,indexOffset=index_offsets[template]))
             cm = np.rint((data[:,:3]-entry['center'])*100)
+            if not far and (cm.min() < -32768 or cm.max() > 32767):
+                low, high = cm.min(axis=0), cm.max(axis=0)
+                shift = np.where((low < -32768) | (high > 32767), np.rint((high+low)/2), 0)
+                entry['center'] = (np.asarray(entry['center'])+shift/100).tolist()
+                cm -= shift
             if cm.min() < -32768 or cm.max() > 32767:
-                raise ValueError(f"PK02 position out of range: {entry['name']}")
+                raise ValueError(f"PK02 position out of range: {entry['name']} {cm.min(axis=0)}..{cm.max(axis=0)} cm")
             payload.extend(cm.astype('<i2').tobytes())
             payload.extend(np.rint(data[:,3:6]*127).astype('i1').tobytes())
             payload.extend(np.rint(data[:,6:]*255).astype('u1').tobytes())

@@ -109,6 +109,7 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
                     width = default
                 road = dict(n=name, c=CLASSES[highway], w=width if math.isfinite(width) and width > 0 else default, p=path)
                 if tags.get('bridge','no') != 'no': road['b'] = 1
+                if tags.get('tunnel') == 'yes': road['tunnel'] = True
                 roads.append(road)
                 if name and highway in ('residential','living_street','tertiary','secondary','pedestrian','primary','trunk','unclassified') and tags.get('access') not in ('private','no'):
                     public_streets.append((name,highway,line))

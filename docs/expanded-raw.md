@@ -1,5 +1,21 @@
 ## 桂林扩区原始数据
 
+### 花江校区：2026-11-23
+
+OSM 广西 PBF（复制时间 `2026-11-23T00:38:06Z`）中，`way/606118480` 是桂林电子科技大学（花江校区）边界：25.3057944–25.3229985 N，110.4022420–110.4208454 E。可玩框保持原南、西、北界，东界改为 110.424 E；校界最近的一侧是东边，按世界投影剩余 318 m。采集框为 25.21054–25.36798 N、110.24150–110.42462 E，覆盖 72 × 68 个对齐块。按建筑内部代表点落入校界统计，OSM 135 个建筑 way 和 4 个建筑 relation（无重复 outer way），Overture 169 个建筑。这是两个有重叠的来源，不应相加。
+
+```sh
+gh release download raw-expanded-20261123 -R idoknow/guilinol -p 'guilinol-expanded-raw.tar.gz*'
+sha256sum -c guilinol-expanded-raw.tar.gz.sha256 && tar xzf guilinol-expanded-raw.tar.gz
+(cd raw && sha256sum -c SHA256SUMS)
+```
+
+请解到干净目录。归档 SHA-256：`e4b838b09fe498aa7d642667abc8e2331b29b2b06c209608ad8d6e9c51e25f55`。包含 13,606 个 OSM 元素，81 张 Terrarium z14 瓦片，Overture `2026-10-21.0` 的 58,830 个建筑和 354 个 places。重采时分别用 `overturemaps download -r 2026-10-21.0 --bbox=110.24150,25.21054,110.42462,25.36798 -t building -f geoparquet -o building.parquet` 和对应的 `-t place` 命令，再传给 `prepare_expansion.py`。PBF 模式还需安装 osmium。
+
+### IDOK-114 历史快照：2026-11-21
+
+花江扩区另以 `world-2e678ff382e8` 为校区及内城发布基线。#173 的 19 块和 #177 的 42 块有一块相同，按世界坐标共 60 块。复验命令：`uv run --locked python pipeline/check_campus_release.py <解包后的基线 world 目录> public/world`。除 `.glc`、`.trees` 和四校 manifest 记录外，检查还比较校园块涉及的地图建筑轮廓及远景建筑记录。全域索引包含新区，不应比较整个文件的 SHA。
+
 投影原点保持 25.280 N、110.300 E。东界定为龙门大桥东岸 110.352 E。Overture places 没有匹配，sg 查到的同名村在灵川（25.479 N、110.393 E）。对齐后，实际分块外包框比可玩 bbox 多出不足一个块；采集框向外取整至 25.21054–25.36798 N、110.24150–110.35341 E。IDOK-2 附件只用来提供原查询模板。
 
 在没有同名 raw 目录的工作区，从项目 Release 获取 sg 验收输入：

@@ -57,8 +57,10 @@ def verify():
             houses.append(Polygon(rings[0],rings[1:]))
     house_index = STRtree(houses)
     assert field.min()!=-32768
-    assert np.array_equal(display[::8,::8].ravel(),np.fromfile(output/'overview.i16','<i2'))
-    underlay = np.fromfile(output/'underlay.i16','<i2').reshape(display[::8,::8].shape)/10
+    step = manifest['overview']['step']
+    stride = step//manifest['grid']
+    assert np.array_equal(display[::stride,::stride].ravel(),np.fromfile(output/'overview.i16','<i2'))
+    underlay = np.fromfile(output/'underlay.i16','<i2').reshape(display[::stride,::stride].shape)/10
     asset = output/manifest['peaks']['file']
     assert asset.stat().st_size<=1200000
     data = gzip.decompress(asset.read_bytes())
@@ -108,7 +110,7 @@ def verify():
             segments = 128 if level==0 else 32
             rings = vertices[:-1].reshape(-1,segments,8)
             outline = rings[0][:,[0,2]]
-            coarse = map_coordinates(underlay,[(outline[:,1]-top)/32,(outline[:,0]-left)/32],order=1,mode='nearest')
+            coarse = map_coordinates(underlay,[(outline[:,1]-top)/step,(outline[:,0]-left)/step],order=1,mode='nearest')
             assert np.all(rings[0,:,1]<=coarse),name
             assert not house_index.query(Polygon(outline).buffer(-.01),predicate='intersects').size,name
             if level==0:
