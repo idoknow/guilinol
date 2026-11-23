@@ -171,7 +171,19 @@ def building(b, ring, *, floors, fh=3.5, style='punched', wall='white', accent='
                 p = (a[0] + u[0] * k * step, a[1] + u[1] * k * step)
                 fin(b, p, base, top - base, 0.06, 0.22, u, nrm, wall, foot=True)
             continue
-        # punched / pilaster
+        if style == 'balcony':
+            # dorm blocks: continuous balconies with solid parapets on the long faces
+            if L >= 14.0:
+                for f in range(1, floors):
+                    y = base + f * fh
+                    slab(b, a, c, y - 0.18, 0.18, 1.3, nrm, trim)
+                    quad(b, a, c, y, y + 1.05, 1.3, nrm, accent)
+                    quad(b, a, c, y + 1.05, y + fh - 0.25, 0.04, nrm, 'glass', lit=True)
+                for k in range(0, nb + 1, 2):
+                    p = (a[0] + u[0] * k * step, a[1] + u[1] * k * step)
+                    fin(b, p, base + fh - 0.18, top - base - fh, 1.3, 0.24, u, nrm, wall)
+                continue
+        # punched / pilaster / panel
         for f in range(floors):
             y = base + f * fh + 0.95
             for k in range(nb):
@@ -179,6 +191,14 @@ def building(b, ring, *, floors, fh=3.5, style='punched', wall='white', accent='
                 p0 = (m[0] - u[0] * ww / 2, m[1] - u[1] * ww / 2)
                 p1 = (m[0] + u[0] * ww / 2, m[1] + u[1] * ww / 2)
                 quad(b, p0, p1, y, y + win_h, 0.03, nrm, 'glass', lit=True)
+            if style == 'panel':
+                # coloured panels between the paired windows (pink tile bands, GUET teaching blocks)
+                for k in range(nb + 1):
+                    m = (a[0] + u[0] * k * step, a[1] + u[1] * k * step)
+                    pw = max(0.4, (step - ww) * 0.8)
+                    p0 = (m[0] - u[0] * pw / 2, m[1] - u[1] * pw / 2)
+                    p1 = (m[0] + u[0] * pw / 2, m[1] + u[1] * pw / 2)
+                    quad(b, p0, p1, y - 0.2, y + win_h + 0.2, 0.025, nrm, accent)
             # continuous sill line
             slab(b, a, c, y - 0.16, 0.14, 0.08, nrm, trim)
         if style == 'pilaster':
