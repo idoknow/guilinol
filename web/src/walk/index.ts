@@ -307,8 +307,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   rapierReady ??= R.init()
   avatarReady ??= new GLTFLoader().loadAsync(avatar.path)
   const profile=currentAvatar()??defaultAvatar()
-  let net:ReturnType<typeof import('../net').attachNet>|undefined,netEpoch=0
-  const [sim,source,model]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady,characterModel(profile)])
+  let net:ReturnType<typeof import('../net').attachNet>|undefined
+  const multiplayer=new URLSearchParams(location.search).get('mp')==='1'||localStorage.getItem('glol.mp')==='1'
+  const [sim,source,model,netModule]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady,characterModel(profile),multiplayer?import('../net'):undefined])
   model.animations.push(...source.animations.filter(c=>!model.animations.some(other=>other.name===c.name)))
   const rig=createCameraRig(sim)
   const figure=model.scene,legacySkinned=mergeAvatar(figure,avatar.color),avatarRig=ensureAvatarRig(figure,avatar.color),skinned=legacySkinned??avatarRig.skinnedMesh,traveller=figure.getObjectByName('Traveller')??avatarRig.traveller,ridePose=createRiderPose(figure),driverPose=createDriverPose(figure)
@@ -1265,22 +1266,22 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     destination=null
     if(signal?.aborted)return false
     if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))return false
-    if(active)leave()
-    sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
+    if(active)resetWalk()
+    sim.sync(x,z);if(!place(x,z,reason,override)){disconnect();window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;firstPersonHidden=false
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true)
-    if(new URLSearchParams(location.search).get('mp')==='1'||localStorage.getItem('glol.mp')==='1'){
-      const epoch=++netEpoch
-      void import('../net').then(({attachNet})=>{if(!active||epoch!==netEpoch)return
-        net=attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y,z:figure.position.z,
+    if(netModule){
+        net??=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y,z:figure.position.z,
           yaw:figure.rotation.y,v:rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz),gr:Number(grounded),
           bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile)
-      })
+        net.tick(0)
     }
     return true
   }
-  function leave(){netEpoch++;net?.dispose();net=undefined;if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function disconnect(){net?.dispose();net=undefined}
+  function leave(){disconnect();resetWalk()}
+  function resetWalk(){if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number){
     const dryBridge=!!sim.surface(x,z,'deck',refY+.4,1.5)||!!sim.surface(x,z,'landmark',refY+.4,1.5)
     return !sim.insideHouse(x,z)&&(!sim.wet(x,z)||dryBridge)&&!sim.isBlockedAt(x,refY,z)

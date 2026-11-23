@@ -12,7 +12,7 @@ function label(name:string) {
   const canvas=document.createElement('canvas'); canvas.width=384; canvas.height=48
   const ctx=canvas.getContext('2d')!; ctx.font='32px sans-serif'; ctx.textAlign='center'; ctx.fillStyle='white'
   ctx.strokeText(name,192,36,380); ctx.fillText(name,192,36,380)
-  const texture=new THREE.CanvasTexture(canvas), material=new THREE.SpriteMaterial({map:texture})
+  const texture=new THREE.CanvasTexture(canvas), material=new THREE.SpriteMaterial({map:texture,fog:false,depthWrite:false})
   const sprite=new THREE.Sprite(material); sprite.scale.set(3,.375,1); sprite.position.y=2.15
   return sprite
 }
@@ -77,7 +77,9 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[]) {
   function remove(id:string){hide(id);records.delete(id);nextSort=0}
   function clear(){for(const id of records.keys())remove(id)}
   return {tick,clear,remove,add(player:Player){remove(player.id);records.set(player.id,player)},
-    move(id:string,pose:Pose){const player=records.get(id);if(player)Object.assign(player,pose)},
+    move(id:string,pose:Pose){const player=records.get(id);if(!player)return
+      if(Math.hypot(pose.x-player.x,pose.z-player.z)>25)visible.get(id)?.root.position.set(pose.x,pose.y,pose.z)
+      Object.assign(player,pose)},
     avatar(id:string,avatar:Avatar){const player=records.get(id);if(player){hide(id);player.avatar=avatar;nextSort=0}},
     probe:()=>[...visible].map(([id,view])=>({id,name:records.get(id)!.name,avatar:records.get(id)!.avatar,ready:!!view.mixer,position:view.root.position.toArray()}))}
 }
