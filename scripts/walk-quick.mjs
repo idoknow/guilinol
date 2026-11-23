@@ -553,20 +553,26 @@ try {
   assert(land.sticks===2&&!land.overlaps.length&&!land.outOfBounds.length,`landscape HUD: ${JSON.stringify(land)}`)
   assert.equal(land.rotate,'none','landscape should not offer the rotate entry')
   await mobile.screenshot({path:`${outDir}/mobile-844x390.png`})
-  // IDOK-158 landscape phone: the sky panel folds down to the clock, stays hittable, and remembers the choice.
+  // IDOK-158 landscape phone: the sky panel folds down to the clock, stays hittable, remembers the
+  // choice, and the fold control looks like a control (chip background + drawn chevron).
   const skyFold=async()=>mobile.evaluate(()=>{
     const panel=document.querySelector('.sky-ui'),fold=panel.querySelector('.sky-fold'),r=panel.getBoundingClientRect()
     const st=getComputedStyle(fold),fr=fold.getBoundingClientRect()
     const hit=st.display==='none'||!fr.width?null:document.elementFromPoint(fr.left+fr.width/2,fr.top+fr.height/2)
+    const chev=getComputedStyle(fold,'::before')
     return {folded:panel.classList.contains('folded'),width:+r.width.toFixed(1),right:+r.right.toFixed(1),
       groups:[...panel.querySelectorAll('.sky-group')].map(g=>getComputedStyle(g).display).join(','),
-      glyph:fold.textContent,expanded:fold.getAttribute('aria-expanded'),label:fold.getAttribute('aria-label'),
+      expanded:fold.getAttribute('aria-expanded'),label:fold.getAttribute('aria-label'),
+      chip:st.backgroundColor,chev:chev.borderRightWidth,foldW:+fr.width.toFixed(1),foldH:+fr.height.toFixed(1),
       hittable:hit===fold||fold.contains(hit)}
   })
   const skyOpen=await skyFold()
   assert.equal(skyOpen.folded,false,'sky panel starts unfolded')
   assert.equal(skyOpen.groups,'flex,flex')
   assert.equal(skyOpen.hittable,true,'fold button must be hittable in landscape')
+  assert.notEqual(skyOpen.chip,'rgba(0, 0, 0, 0)','fold control needs a visible chip, or it reads as decoration')
+  assert.equal(skyOpen.chev,'2px','fold control draws a chevron')
+  assert(skyOpen.foldW>=24&&skyOpen.foldH>=24,`fold control tap target too small: ${skyOpen.foldW}x${skyOpen.foldH}`)
   // A timed-out tap may still have been delivered, so only retry when the panel did not toggle.
   const skyTap=async()=>{const before=(await skyFold()).folded
     try{await mobile.locator('.sky-ui .sky-fold').tap({timeout:10000})}catch{/* the click may still have landed */}
