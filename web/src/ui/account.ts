@@ -30,6 +30,7 @@ let bindPhase:'send'|'code'='send'
 async function loadSocialOptions(){
   if(socialOptions)return socialOptions
   try{socialOptions=(await api('auth/social/config') as {enabled?:SocialOption[]}).enabled??[]}catch{socialOptions=[]}
+  socialOptions=[...socialOptions].sort((a,b)=>socialRank(a.type)-socialRank(b.type))
   return socialOptions
 }
 type SocialTicket={url:string;at:number}
@@ -46,6 +47,7 @@ async function prefetchSocial(type:string,intent:SocialIntentForUi){
   }catch{/* 预取失败就算了，点按钮时再走一次 */}
 }
 async function startSocial(type:string,intent:'login'|'bind'|'register'){
+  if(intent!=='bind')store(PENDING_LOGIN_KEY,JSON.stringify({type,at:Date.now()}))
   const key=ticketKey(type,intent),cached=tickets.get(key)
   if(cached&&Date.now()-cached.at<TICKET_TTL){
     tickets.delete(key)
@@ -67,6 +69,23 @@ async function startSocial(type:string,intent:'login'|'bind'|'register'){
   },4000)
   location.assign(target)
 }
+/* ── 本浏览器上次的登录方式（只存本地，用来在按钮角标上提示）──
+   邮箱登录成功时直接记下；第三方要跳出站点，所以先记「正在用哪个」，回调成功后再转正。 */
+type LoginMethod='email'|string
+const LAST_LOGIN_KEY='glol.login.last',PENDING_LOGIN_KEY='glol.login.pending',PENDING_LOGIN_TTL=15*60_000
+const store=(key:string,value:string|null)=>{try{if(value===null)localStorage.removeItem(key);else localStorage.setItem(key,value)}catch{/* 隐私模式 */}}
+function lastLogin():LoginMethod|null{try{return localStorage.getItem(LAST_LOGIN_KEY)}catch{return null}}
+const rememberLogin=(method:LoginMethod)=>store(LAST_LOGIN_KEY,method)
+function settlePendingLogin(ok:boolean){
+  let pending:{type?:string;at?:number}|null=null
+  try{pending=JSON.parse(localStorage.getItem(PENDING_LOGIN_KEY)??'null')}catch{}
+  store(PENDING_LOGIN_KEY,null)
+  if(ok&&pending?.type&&Date.now()-(pending.at??0)<PENDING_LOGIN_TTL)rememberLogin(pending.type)
+}
+/** 第三方按钮的排序：QQ、微信永远在最前。 */
+const SOCIAL_ORDER=['qq','wx']
+const socialRank=(type:string)=>{const index=SOCIAL_ORDER.indexOf(type);return index<0?SOCIAL_ORDER.length:index}
+
 async function loadPendingSocial(){
   pendingSocial=await api('auth/social/pending') as SocialPending
   socialPhase='send'
@@ -109,15 +128,17 @@ window.addEventListener('online',()=>{if(sessionUnknown)void refresh()})
 export function onUser(listen:(user:User|null)=>void){listeners.add(listen);void ready.then(()=>listen(user))}
 export const initial=(name='')=>[...name.trim()][0]??'客'
 
+/** 打开面板前最多等 1.2 秒把第三方配置取回来，让 QQ / 微信 按钮和面板一起出现。 */
+const socialConfigSoon=()=>Promise.race([loadSocialOptions(),new Promise(resolve=>setTimeout(resolve,1200))])
 let dialog:HTMLDialogElement|undefined,render:((screen:Screen,note?:string,pass?:string)=>void)|undefined
 let gate:((user:User|null)=>void)|undefined
 export async function openAccount(){
-  build();await ready;render!(user?'profile':'login');dialog!.showModal();if(!user)record('funnel',{step:'loginOpen'})
+  build();await Promise.all([ready,socialConfigSoon()]);render!(user?'profile':'login');dialog!.showModal();if(!user)record('funnel',{step:'loginOpen'})
 }
 /** Resolve with the signed-in user, opening the login dialog first if needed; null if the player closes it without signing in. */
 async function signIn():Promise<User|null>{
   await ready;if(user)return user
-  build();gate?.(null)
+  build();gate?.(null);await socialConfigSoon()
   return new Promise(resolve=>{gate=resolve;render!('login');dialog!.showModal();if(!user)record('funnel',{step:'loginOpen'})})
 }
 
@@ -159,6 +180,8 @@ if(bootSocial){
       catch(error){render!('login',error instanceof Error?error.message:'授权已过期，请重新发起')}
       return
     }
+    if(bootSocial==='login'||bootSocial==='registered')settlePendingLogin(true)
+    else if(bootSocial!=='bound')settlePendingLogin(false)
     if(bootSocial==='login'){try{setUser(await api('me') as User)}catch{}}
     const notice=socialNotes[bootSocial]
     render!(notice?.screen??'login',notice?.text??'第三方登录未完成，请重新发起')
@@ -173,11 +196,11 @@ function build(){
   d.innerHTML=`<header><h2 id="account-title"></h2><button class="about-close" type="button">关闭</button></header>
     <div class="acc-tabs" role="tablist" aria-label="登录或注册"><button type="button" role="tab" data-to="login">登录</button><button type="button" role="tab" data-to="register">注册</button></div>
     <ol class="acc-steps" aria-label="注册进度"><li>填写信息</li><li>验证邮箱</li><li>完成</li></ol>
-    <form class="acc-body" novalidate><p class="acc-lead"></p><div class="acc-who"></div><div class="fields"></div><p class="acc-msg" role="status"></p>
+    <form class="acc-body" novalidate><p class="acc-lead"></p><div class="acc-who"></div><div class="acc-quick" hidden></div><div class="fields"></div><p class="acc-msg" role="status"></p>
       <button class="ui-btn ui-btn--seal ui-btn--block acc-submit" type="submit"></button><nav class="acc-links"></nav></form>
     <p class="acc-guest">还没有账号？ <button type="button" class="acc-join">注册一个</button>，一分钟就好</p>`
   const form=d.querySelector('form')!,fields=form.querySelector('.fields')!,nav=form.querySelector('nav')!,message=form.querySelector<HTMLElement>('.acc-msg')!,
-    lead=form.querySelector('.acc-lead')!,who=form.querySelector<HTMLElement>('.acc-who')!,submitButton=form.querySelector<HTMLButtonElement>('.acc-submit')!,
+    lead=form.querySelector('.acc-lead')!,quick=form.querySelector<HTMLElement>('.acc-quick')!,who=form.querySelector<HTMLElement>('.acc-who')!,submitButton=form.querySelector<HTMLButtonElement>('.acc-submit')!,
     tabs=Array.from(d.querySelectorAll<HTMLButtonElement>('[role=tab]')),steps=Array.from(d.querySelectorAll('.acc-steps li'))
   let screen:Screen='login',email='',busy=false,verificationPassword='',cooldown=0,cooldownTimer=0
   const note=(text:string,kind:'info'|'ok'|'error'='info')=>{message.textContent=text;message.dataset.kind=kind}
@@ -204,39 +227,70 @@ function build(){
   function resendLabel(button:HTMLButtonElement){button.textContent=cooldown>0?`重新发送（${cooldown}s）`:'重新发送';button.disabled=cooldown>0}
   function startCooldown(button:HTMLButtonElement){cooldown=60;resendLabel(button);clearInterval(cooldownTimer)
     cooldownTimer=window.setInterval(()=>{cooldown--;if(button.isConnected)resendLabel(button);if(cooldown<=0)clearInterval(cooldownTimer)},1000)}
-  async function socialButtons(next:Screen){
-    const options=await loadSocialOptions()
-    if(!options.length||!d.open)return
-    const intent:SocialIntentForUi=next==='profile'?'bind':next==='register'?'register':'login',
-      bound=new Set((user?.social??[]).map(item=>item.type)),
-      visible=options.filter(option=>intent!=='bind'||!bound.has(option.type)),
-      row=document.createElement('div')
-    row.className='acc-social'
-    if(intent==='bind'&&!visible.length)return
-    for(const option of visible){
-      const button=document.createElement('button')
-      button.type='button';button.className='ui-btn ui-btn--ghost acc-social-btn'
-      const icon=socialIcon(option.type)
-      if(icon)button.append(icon)
-      button.append(document.createTextNode(`用${option.label}${intent==='bind'?'绑定':intent==='register'?'注册':'登录'}`))
-      button.onclick=()=>{if(!busy)void submit(async()=>{await startSocial(option.type,intent)})}
-      button.onpointerenter=()=>void prefetchSocial(option.type,intent)
-      button.onfocus=()=>void prefetchSocial(option.type,intent)
-      void prefetchSocial(option.type,intent)
+  /** 上次登录角标：贴在按钮右上角的一枚小朱印。 */
+  function lastBadge(target:HTMLElement){
+    const badge=document.createElement('span');badge.className='acc-last';badge.textContent='上次登录'
+    target.classList.add('has-last');target.append(badge)
+    target.setAttribute('aria-description','本浏览器上次用的登录方式')
+  }
+  function socialButton(option:SocialOption,intent:SocialIntentForUi,quickStyle:boolean){
+    const button=document.createElement('button'),label=document.createElement('span')
+    button.type='button';button.dataset.type=option.type
+    button.className=quickStyle?'acc-sso':'ui-btn ui-btn--ghost acc-social-btn'
+    const icon=socialIcon(option.type,quickStyle?28:18)
+    if(icon)button.append(icon)
+    else if(quickStyle){const mark=document.createElement('span');mark.className='acc-sso-mark';mark.textContent=initial(option.label);button.append(mark)}
+    label.textContent=quickStyle?option.label:`用${option.label}${intent==='bind'?'绑定':intent==='register'?'注册':'登录'}`
+    button.append(label)
+    if(quickStyle)button.setAttribute('aria-label',`用${option.label}${intent==='register'?'注册':'登录'}`)
+    button.onclick=()=>{if(!busy)void submit(async()=>{await startSocial(option.type,intent)})}
+    button.onpointerenter=()=>void prefetchSocial(option.type,intent)
+    button.onfocus=()=>void prefetchSocial(option.type,intent)
+    void prefetchSocial(option.type,intent)
+    return button
+  }
+  /** 登录 / 注册：QQ、微信放在最上面，大按钮并排；下面才是邮箱表单。 */
+  function quickLogin(next:Screen,options:SocialOption[]){
+    quick.replaceChildren();quick.hidden=true
+    if(next!=='login'&&next!=='register'||!options.length)return
+    const intent:SocialIntentForUi=next==='register'?'register':'login',row=document.createElement('div'),last=lastLogin()
+    row.className='acc-sso-row';row.dataset.count=String(Math.min(options.length,3))
+    for(const option of options){
+      const button=socialButton(option,intent,true)
+      if(next==='login'&&last===option.type)lastBadge(button)
       row.append(button)
     }
+    const or=document.createElement('p');or.className='acc-or';or.textContent=next==='register'?'或用邮箱注册':'或用邮箱登录'
+    quick.append(row,or);quick.hidden=false
+  }
+  async function socialButtons(next:Screen){
+    if(next==='login'||next==='register'){
+      if(socialOptions){quickLogin(next,socialOptions);return}
+      const options=await loadSocialOptions()
+      if(d.open&&screen===next)quickLogin(next,options)
+      return
+    }
+    const options=await loadSocialOptions()
+    if(!options.length||!d.open||screen!==next)return
+    const bound=new Set((user?.social??[]).map(item=>item.type)),
+      visible=options.filter(option=>!bound.has(option.type)),
+      row=document.createElement('div')
+    row.className='acc-social'
+    if(!visible.length)return
+    for(const option of visible)row.append(socialButton(option,'bind',false))
     if(nav.isConnected)nav.append(row)
   }
   render=(next:Screen,text='',pass='')=>{
     verificationPassword=next==='verify'&&d.open?pass:''
-    screen=next;fields.replaceChildren();nav.replaceChildren();who.replaceChildren();note(text,/成功|已登录|已保存|已重置|已退出/.test(text)?'ok':'info')
+    screen=next;fields.replaceChildren();nav.replaceChildren();who.replaceChildren();quick.replaceChildren();quick.hidden=true
+    submitButton.classList.remove('has-last');submitButton.removeAttribute('aria-description');note(text,/成功|已登录|已保存|已重置|已退出/.test(text)?'ok':'info')
     d.dataset.screen=next;d.querySelector('h2')!.textContent=titles[next];submitButton.textContent=submits[next]
     if(next==='bindmail')submitButton.textContent=bindPhase==='code'?'确认绑定':'发送验证码'
     for(const tab of tabs)tab.setAttribute('aria-selected',String(tab.dataset.to===next))
     d.querySelector('.acc-tabs')?.toggleAttribute('hidden',next==='social')
     const step=next==='register'?0:next==='verify'?1:-1
     steps.forEach((li,i)=>{li.classList.toggle('on',i===step);li.classList.toggle('done',i<step)})
-    lead.textContent={login:'登录后即可进入游玩。提交的反馈有回复时，也会发邮件告诉你。',register:'只需要邮箱和一个昵称，一分钟就好。',
+    lead.textContent={login:socialOptions?.length?'登录即可进入游玩，QQ / 微信 首次登录会自动建号。':'登录后即可进入游玩。提交的反馈有回复时，也会发邮件告诉你。',register:socialOptions?.length?'QQ / 微信 一键注册；也可以只用邮箱和一个昵称。':'只需要邮箱和一个昵称，一分钟就好。',
       verify:`六位验证码已发到 ${email||'你的邮箱'}，10 分钟内有效。没收到可以看看垃圾邮件。`,forgot:'输入注册时用的邮箱，我们会发一个六位验证码给你。',
       reset:'输入邮箱里的验证码，再设一个新密码。',profile:'',
       social:pendingSocial?.intent==='register'?(socialPhase==='code'?`验证码已发到 ${email}，10 分钟内有效。`:'邮箱和密码都可以留空：留空就直接用这个第三方账号注册；填了就要收验证码。'):'',
@@ -301,6 +355,7 @@ function build(){
     if(next==='profile')link('修改外形',()=>submit(async()=>{await editCharacter()}))
     if(next==='profile'&&user?.email_placeholder)link('绑定邮箱',()=>{bindPhase='send';render!('bindmail')})
     if(next==='login'||next==='register'||next==='profile')void socialButtons(next)
+    if(next==='login'&&lastLogin()==='email')lastBadge(submitButton)
     if(next==='social')link('取消',()=>{pendingSocial=null;render!(user?'profile':'login')})
     if(next==='login')link('忘记密码？',()=>render!('forgot'))
     else if(next==='profile')link('退出登录',()=>submit(async()=>{await api('auth/logout','POST');setUser(null);render!('login','已退出登录')}))
@@ -308,7 +363,9 @@ function build(){
     if(next==='verify'||next==='reset'){const resend=link('重新发送',()=>submit(async()=>{
       const input=form.elements.namedItem('email');await api('auth/resend','POST',{email:input instanceof HTMLInputElement?input.value:email,purpose:next==='verify'?'verify':'reset'});note('验证码已重新发送，请查收','ok');startCooldown(resend)}))
       resendLabel(resend)}
-    requestAnimationFrame(()=>fields.querySelector<HTMLInputElement>('input:not([readonly])')?.focus())
+    // 有 QQ / 微信 按钮时不抢焦点到邮箱框（手机上会直接弹键盘，把首选的一键登录挤下去）
+    requestAnimationFrame(()=>quick.hidden?fields.querySelector<HTMLInputElement>('input:not([readonly])')?.focus()
+      :quick.querySelector<HTMLButtonElement>('.acc-sso')?.focus({focusVisible:false} as FocusOptions))
   }
   for(const tab of tabs)tab.onclick=()=>{if(!busy&&tab.dataset.to!==screen)render!(tab.dataset.to as Screen)}
   form.onsubmit=event=>{event.preventDefault()
@@ -327,12 +384,14 @@ function build(){
           render!('social',`验证码已发到 ${email}，10 分钟内有效`)
           return
         }
+        settlePendingLogin(true)
         setUser(await api('me') as User)
         d.close();window.dispatchEvent(new Event('glol:registered'))
         return
       }
       const result=await api('auth/social/confirm','POST',{}) as {intent?:string}
       if(result.intent==='login'){
+        settlePendingLogin(true)
         setUser(await api('me') as User)
         render!('profile','已通过第三方账号登录')
         return
@@ -353,7 +412,7 @@ function build(){
     const previous=screen
     if(previous==='verify') data.password=verificationPassword
     let result
-    try {result=await api(`auth/${screen}`,'POST',data);if(screen==='login')record('funnel',{step:'loginSuccess'})} catch(error){if((error as {code?:string}).code==='unverified'){render!('verify','请先验证邮箱再登录',data.password);return}throw error}
+    try {result=await api(`auth/${screen}`,'POST',data);if(screen==='login'||screen==='verify')rememberLogin('email');if(screen==='login')record('funnel',{step:'loginSuccess'})} catch(error){if((error as {code?:string}).code==='unverified'){render!('verify','请先验证邮箱再登录',data.password);return}throw error}
     // 登录/验证的响应里没有第三方绑定信息，补一次 me 让「我的账号」直接显示已绑定平台
     if(previous==='login'||previous==='verify'){try{result=await api('me')}catch{}}
     if(previous==='register')render!('verify','',data.password)

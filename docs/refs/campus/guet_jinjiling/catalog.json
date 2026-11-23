@@ -1,0 +1,2245 @@
+{
+  "campus_id": "guet_jinjiling",
+  "campus_osm": "way/606121236",
+  "buildings": [
+    {
+      "source": "way/258894699",
+      "name": "校医院",
+      "floors": 3,
+      "floors_src": "photo",
+      "facade": "浅黄色抹面，横排白框窗，靠墙有蓝色竖排医院名称。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way258894699_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051553225928X&heading=2&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051553225928X&panotype=street&heading=2",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way258894699_2.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_0fb6c4fc6be78cbd225d22b14e35fbd0",
+          "page": "https://map.baidu.com/poi/6deee308ca69d91428fc48b9",
+          "date": null,
+          "date_basis": "地图地点页未列拍摄日期",
+          "view": "地图地点实拍；镜头方位未标注。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "2e8343f5-656e-44c3-bae3-240666bf058a"
+      ],
+      "floor_count_note": "本部有字立面可见三排楼层窗。",
+      "floor_evidence": [
+        "way258894699_1.jpg",
+        "way258894699_2.jpg"
+      ]
+    },
+    {
+      "source": "way/621423420",
+      "name": "第十教学楼",
+      "floors": 5,
+      "floors_src": "photo",
+      "facade": "灰白外墙，粉色竖带与高窗相间，端部有竖向玻璃窗。",
+      "colors": {
+        "wall": "#d5d0c7",
+        "accent": "#bc9893",
+        "glass": null,
+        "roof": "#938780"
+      },
+      "roof": "flat_parapet",
+      "features": [
+        "端墙竖排“勤正楼”"
+      ],
+      "photos": [
+        {
+          "file": "way621423420_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=0900680012230601140843766BC&heading=283&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=0900680012230601140843766BC&panotype=street&heading=283",
+          "date": "2023-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way621423420_3.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806031124562588X&heading=27&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806031124562588X&panotype=street&heading=27",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way621423420_4.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051548056538X&heading=265&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051548056538X&panotype=street&heading=265",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way621423420_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/82cdb5b91be0586b226d2c02a4980986.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "航拍裁图，约由东北向西南看教学楼北立面与屋顶；从图书馆向南数第4排。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "fc5b90fc-5aed-4a86-b51d-5582e50d7475"
+      ],
+      "floor_count_note": "沿街主体按底层、上部窗排估读约五层，檐顶构架未计。",
+      "floor_evidence": [
+        "way621423420_1.jpg",
+        "way621423420_2.jpg",
+        "way621423420_3.jpg",
+        "way621423420_4.jpg"
+      ],
+      "alt_name": "勤正楼"
+    },
+    {
+      "source": "way/621423421",
+      "name": "第九教学楼",
+      "floors": 6,
+      "floors_src": "photo",
+      "facade": "灰白外墙夹粉色面砖，底部局部架空，上层成对长窗。",
+      "colors": {
+        "wall": "#d5d0c7",
+        "accent": "#bc9893",
+        "glass": null,
+        "roof": "#938780"
+      },
+      "roof": "flat_parapet",
+      "features": [],
+      "photos": [
+        {
+          "file": "way621423421_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051547381798X&heading=76&pitch=25&width=1000&height=850&fovy=94&quality=88",
+          "page": "https://map.baidu.com/#panoid=09006800121806051547381798X&panotype=street&heading=76",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way621423421_3.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_5382b42adf961d5edcc71f70a4968cb7.jpeg",
+          "page": "https://map.baidu.com/poi/de15d381cc47c0a88f55eceb",
+          "date": null,
+          "date_basis": "地图地点页未列拍摄日期",
+          "view": "地图地点实拍；镜头方位未标注。"
+        },
+        {
+          "file": "way621423421_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/82cdb5b91be0586b226d2c02a4980986.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "航拍裁图，约由东北向西南看教学楼北立面与屋顶；从图书馆向南数第3排。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "9814364a-f52a-4e30-8133-8fdd8d2aed50"
+      ],
+      "floor_count_note": "从低侧计入底层，以上五层窗带，合计六层。",
+      "floor_evidence": [
+        "way621423421_1.jpg",
+        "way621423421_2.jpg",
+        "way621423421_3.jpg"
+      ]
+    },
+    {
+      "source": "way/621423422",
+      "name": "第八教学楼",
+      "floors": 6,
+      "floors_src": "photo",
+      "facade": "灰白与粉红分格，底部架空，长窗中段可见两层楼板。",
+      "colors": {
+        "wall": "#d5d0c7",
+        "accent": "#bc9893",
+        "glass": null,
+        "roof": "#938780"
+      },
+      "roof": "flat_parapet",
+      "features": [],
+      "photos": [
+        {
+          "file": "way621423422_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051532422948X&heading=112&pitch=25&width=1000&height=850&fovy=94&quality=88",
+          "page": "https://map.baidu.com/#panoid=09006800121806051532422948X&panotype=street&heading=112",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way621423422_3.jpg",
+          "url": "https://taojin-his.cdn.bcebos.com/060828381f30e9246b37edb548086e061c95f7a7.jpg",
+          "page": "https://map.baidu.com/poi/8de4c3cdea189c091e1d11f6",
+          "date": null,
+          "date_basis": "地图地点页未列拍摄日期",
+          "view": "地图地点实拍；镜头方位未标注。"
+        },
+        {
+          "file": "way621423422_4.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/06-21/914114d53507b62a83b76c8e21765e01.jpg",
+          "page": "https://www.guetgjbk.com/pic/25.html",
+          "date": "2023-06-21",
+          "date_basis": "原图上传目录日期",
+          "view": "七、八教之间庭院，照片右侧；中央楼梯塔及连廊与街景对应。"
+        },
+        {
+          "file": "way621423422_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/82cdb5b91be0586b226d2c02a4980986.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "航拍裁图，约由东北向西南看教学楼北立面与屋顶；从图书馆向南数第2排。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "7f329a68-2f17-4a02-b4c7-85a29613f145"
+      ],
+      "floor_count_note": "商铺层以上有五排独立窗，跨层长窗按楼板分开计。",
+      "floor_evidence": [
+        "way621423422_1.jpg",
+        "way621423422_2.jpg",
+        "way621423422_3.jpg",
+        "way621423422_4.jpg"
+      ]
+    },
+    {
+      "source": "way/621423423",
+      "name": "第七教学楼",
+      "floors": 5,
+      "floors_src": "photo",
+      "facade": "浅灰墙面夹粉红矩形分格，窗组竖向排列，端部连通弧形廊。",
+      "colors": {
+        "wall": "#d5d0c7",
+        "accent": "#bc9893",
+        "glass": null,
+        "roof": "#938780"
+      },
+      "roof": "flat_parapet",
+      "features": [],
+      "photos": [
+        {
+          "file": "way621423423_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051532422948X&heading=51&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051532422948X&panotype=street&heading=51",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东北拍摄。图左七教，图右八教；中间为两楼之间的院落。"
+        },
+        {
+          "file": "way621423423_3.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/H4afbfbedab64034f145d74ffa9c379310b551db2.jpg",
+          "page": "https://map.baidu.com/poi/90f6d1781d2b66f74c3a59f8",
+          "date": null,
+          "date_basis": "地图地点页未列拍摄日期",
+          "view": "地图地点实拍；镜头方位未标注。"
+        },
+        {
+          "file": "way621423423_4.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/06-21/914114d53507b62a83b76c8e21765e01.jpg",
+          "page": "https://www.guetgjbk.com/pic/25.html",
+          "date": "2023-06-21",
+          "date_basis": "原图上传目录日期",
+          "view": "七、八教之间庭院，照片左侧；中央楼梯塔及连廊与街景对应。"
+        },
+        {
+          "file": "way621423423_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/82cdb5b91be0586b226d2c02a4980986.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "航拍裁图，约由东北向西南看教学楼北立面与屋顶；从图书馆向南数第1排。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "8bd75d8c-0dc0-4f04-a077-d836cc3f4cb5"
+      ],
+      "floor_count_note": "庭院侧约五层封闭窗带，屋顶敞廊另计。",
+      "floor_evidence": [
+        "way621423423_1.jpg",
+        "way621423423_2.jpg",
+        "way621423423_3.jpg",
+        "way621423423_4.jpg"
+      ]
+    },
+    {
+      "source": "way/621423424",
+      "name": "东区图书馆",
+      "floors": 5,
+      "floors_src": "photo",
+      "facade": "浅色弧形墙面围合深色竖向玻璃窗带。",
+      "colors": {
+        "wall": "#d6d2c5",
+        "accent": "#9a885a",
+        "glass": "#445c55",
+        "roof": null
+      },
+      "roof": null,
+      "features": [
+        "弧形檐口有“图书馆 LIBRARY”字样",
+        "入口前宽台阶"
+      ],
+      "photos": [
+        {
+          "file": "way621423424_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/06-21/1ce9cc4fa8ccd0a20237d57db2f56408.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-06-21",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "从馆前花园朝入口斜俯拍"
+        },
+        {
+          "file": "way621423424_2.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/82cdb5b91be0586b226d2c02a4980986.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "从东北向西南俯拍，图书馆檐口及入口位于右下角"
+        },
+        {
+          "file": "way621423424_3.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800011608151022464028V&heading=256&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800011608151022464028V&panotype=street&heading=256",
+          "date": "2016-08",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "cbfe3886-e15a-4131-ad51-0bcda1c5bd26"
+      ],
+      "floor_count_note": "入口两侧可见五排层窗。",
+      "floor_evidence": [
+        "way621423424_1.jpg",
+        "way621423424_2.jpg",
+        "way621423424_3.jpg"
+      ]
+    },
+    {
+      "source": "way/621423426",
+      "name": "16栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": "浅色墙面，小块面砖或抹面窗间墙，成组矩形窗。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way621423426_1.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_fa069278e469053fd114bea8b0e3cc4b.jpeg",
+          "page": "https://map.baidu.com/poi/27795fdd0f55d4f015b54b65",
+          "date": null,
+          "date_basis": "地图地点页未列拍摄日期",
+          "view": "地图地点实拍；镜头方位未标注。墙面有“16栋”标牌。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "65e54f9b-7f02-46b7-b440-7c4b5c0aeddc"
+      ]
+    },
+    {
+      "source": "way/621423427",
+      "name": "冠群楼",
+      "floors": 3,
+      "floors_src": "photo",
+      "facade": "暖色面砖，中段竖向玻璃，主入口与侧窗采用弧顶。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way621423427_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051525037348X&heading=100&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051525037348X&panotype=street&heading=100",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way621423427_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800011608151020265338V&heading=52&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800011608151020265338V&panotype=street&heading=52",
+          "date": "2016-08",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "b2fcbcbc-a909-4b0c-b78d-414204f6b453"
+      ],
+      "floor_count_note": "侧立面可辨三层窗；树冠遮挡处依相邻窗排对应。",
+      "floor_evidence": [
+        "way621423427_1.jpg",
+        "way621423427_2.jpg"
+      ]
+    },
+    {
+      "source": "way/621423428",
+      "name": "18栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": "浅色墙面，小块面砖或抹面窗间墙，成组矩形窗。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way621423428_1.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_138959525c3b05da0711e6c8a17c8775.jpeg",
+          "page": "https://map.baidu.com/poi/11c4352cda7659d630169bff",
+          "date": null,
+          "date_basis": "地图地点页未列拍摄日期",
+          "view": "地图地点实拍；镜头方位未标注。墙面有“18栋”标牌。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "dd6ef81e-aa8c-4a59-a354-84d70e67a834"
+      ]
+    },
+    {
+      "source": "way/621877118",
+      "name": "后勤楼",
+      "floors": 3,
+      "floors_src": "photo",
+      "facade": "浅灰墙面，三层弧形外廊夹在两侧实墙之间。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way621877118_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051549518478X&heading=83&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051549518478X&panotype=street&heading=83",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way621877118_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051547381798X&heading=234&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051547381798X&panotype=street&heading=234",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "93b13281-054a-498f-a0d5-a34d76a05144"
+      ],
+      "floor_count_note": "首层门廊上有两层带栏杆的外廊。",
+      "floor_evidence": [
+        "way621877118_1.jpg",
+        "way621877118_2.jpg"
+      ]
+    },
+    {
+      "source": "way/653727933",
+      "name": "303",
+      "floors": null,
+      "floors_src": null,
+      "facade": "浅色抹面，外挑阳台水平排列，阳台间有实墙分隔。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653727933_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051537069538X&heading=7&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051537069538X&panotype=street&heading=7",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "89fd91d4-6859-4579-bcc9-6eff15660894"
+      ]
+    },
+    {
+      "source": "way/653727934",
+      "name": "304",
+      "floors": null,
+      "floors_src": null,
+      "facade": "浅色抹面，外挑阳台水平排列，阳台间有实墙分隔。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653727934_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051537069538X&heading=195&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051537069538X&panotype=street&heading=195",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "1311f016-0dd0-4378-b75e-d73e8d105f44"
+      ]
+    },
+    {
+      "source": "way/653727935",
+      "name": "305",
+      "floors": null,
+      "floors_src": null,
+      "facade": "浅色抹面，外挑阳台水平排列，阳台间有实墙分隔。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653727935_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051536511298X&heading=172&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051536511298X&panotype=street&heading=172",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "319b319d-2d4a-4aa7-979c-065ab0e71164"
+      ]
+    },
+    {
+      "source": "way/653727936",
+      "name": "306",
+      "floors": null,
+      "floors_src": null,
+      "facade": "浅色抹面，外挑阳台水平排列，阳台间有实墙分隔。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653727936_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051534503428X&heading=17&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051534503428X&panotype=street&heading=17",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "d05d78dd-d3ee-4289-ad5c-996051dd81ff"
+      ]
+    },
+    {
+      "source": "way/653727937",
+      "name": "324",
+      "floors": null,
+      "floors_src": null,
+      "facade": "浅色抹面，外挑阳台水平排列，阳台间有实墙分隔。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653727937_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051536102418X&heading=161&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051536102418X&panotype=street&heading=161",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "814b401b-e88f-491e-b719-5f6bb879d4ba"
+      ]
+    },
+    {
+      "source": "way/653758610",
+      "name": "4",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758610_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051534565868X&heading=164&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051534565868X&panotype=street&heading=164",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "bd554976-aa4e-45f0-ba32-04616dce5fcb"
+      ]
+    },
+    {
+      "source": "way/653758611",
+      "name": "409",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758611_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051538010298X&heading=36&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051538010298X&panotype=street&heading=36",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "771511e5-2130-479c-840f-7b29e74c3ddb"
+      ]
+    },
+    {
+      "source": "way/653758612",
+      "name": "405",
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "浅色墙面，窗间有横向分层线，局部有向外凸出的阳台或窗台。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758612_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051538010298X&heading=164&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051538010298X&panotype=street&heading=164",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "8e904459-05b9-42d2-80a2-68a718ca1fe3"
+      ],
+      "floor_count_note": "图中低层翼按两层居住空间计，坡顶覆盖部分单列。",
+      "floor_evidence": [
+        "way653758612_1.jpg"
+      ]
+    },
+    {
+      "source": "way/653758613",
+      "name": "401",
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "浅色墙面，窗间有横向分层线，局部有向外凸出的阳台或窗台。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758613_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051546046478X&heading=19&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051546046478X&panotype=street&heading=19",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "27d7520c-261e-4fcb-bae0-7b97c84a4021"
+      ],
+      "floor_count_note": "图中低层翼按两层居住空间计，坡顶覆盖部分单列。",
+      "floor_evidence": [
+        "way653758613_1.jpg"
+      ]
+    },
+    {
+      "source": "way/653758614",
+      "name": "406",
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "浅色墙面，窗间有横向分层线，局部有向外凸出的阳台或窗台。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758614_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051537563318X&heading=179&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051537563318X&panotype=street&heading=179",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "e43fb915-a435-4702-afc4-a05344247aa8"
+      ],
+      "floor_count_note": "图中低层翼按两层居住空间计，坡顶覆盖部分单列。",
+      "floor_evidence": [
+        "way653758614_1.jpg"
+      ]
+    },
+    {
+      "source": "way/653758615",
+      "name": "410",
+      "floors": null,
+      "floors_src": null,
+      "facade": "浅色墙面，窗间有横向分层线，局部有向外凸出的阳台或窗台。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758615_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051538222478X&heading=193&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051538222478X&panotype=street&heading=193",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "1668615e-e1ef-4630-88f3-281499edaf84"
+      ]
+    },
+    {
+      "source": "way/653758616",
+      "name": "402",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "b4f79eb6-a3f6-4a3c-96eb-ea537ce3e523"
+      ]
+    },
+    {
+      "source": "way/653758617",
+      "name": "407",
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "浅色墙面，窗间有横向分层线，局部有向外凸出的阳台或窗台。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758617_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051538422068X&heading=206&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051538422068X&panotype=street&heading=206",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "780ffe0c-9a97-421f-b474-fb93a61c1a4a"
+      ],
+      "floor_count_note": "图中低层翼按两层居住空间计，坡顶覆盖部分单列。",
+      "floor_evidence": [
+        "way653758617_1.jpg"
+      ]
+    },
+    {
+      "source": "way/653758618",
+      "name": "403",
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "浅色墙面，窗间有横向分层线，局部有向外凸出的阳台或窗台。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758618_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051541098168X&heading=31&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051541098168X&panotype=street&heading=31",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "1ccb05e9-b5f0-4736-a321-14d3cd110d6a"
+      ],
+      "floor_count_note": "图中低层翼按两层居住空间计，坡顶覆盖部分单列。",
+      "floor_evidence": [
+        "way653758618_1.jpg"
+      ]
+    },
+    {
+      "source": "way/653758619",
+      "name": "408",
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "浅色墙面，窗间有横向分层线，局部有向外凸出的阳台或窗台。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758619_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051544450358X&heading=137&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051544450358X&panotype=street&heading=137",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝约137°拍摄轮廓对应的立面。树木遮挡部分窗列。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "6bb8f89e-3fb3-4605-9ddc-0d9ca4be1f5f"
+      ],
+      "floor_count_note": "图中低层翼按两层居住空间计，坡顶覆盖部分单列。",
+      "floor_evidence": [
+        "way653758619_1.jpg"
+      ]
+    },
+    {
+      "source": "way/653758620",
+      "name": "404",
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "浅色墙面，窗间有横向分层线，局部有向外凸出的阳台或窗台。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758620_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051541132438X&heading=355&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051541132438X&panotype=street&heading=355",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "75de71b0-8e12-45d3-86d0-0088ca425028"
+      ],
+      "floor_count_note": "图中低层翼按两层居住空间计，坡顶覆盖部分单列。",
+      "floor_evidence": [
+        "way653758620_1.jpg"
+      ]
+    },
+    {
+      "source": "way/653758621",
+      "name": "3",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758621_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051534436988X&heading=51&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051534436988X&panotype=street&heading=51",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "742215f1-c896-4ec1-a35a-3da2258988d0"
+      ]
+    },
+    {
+      "source": "way/653758622",
+      "name": "2",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758622_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051534375558X&heading=46&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051534375558X&panotype=street&heading=46",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "26c19482-0a4d-43c6-9d12-4f27352497dd"
+      ]
+    },
+    {
+      "source": "way/653758623",
+      "name": "1",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758623_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051534138738X&heading=358&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051534138738X&panotype=street&heading=358",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "cf23a656-160c-4aa0-9843-51a3d39f06c8"
+      ]
+    },
+    {
+      "source": "way/653758624",
+      "name": "327",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758624_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051542548098X&heading=166&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051542548098X&panotype=street&heading=166",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "d1fc96fd-b9ef-40b4-8c4b-1feb51589dce"
+      ]
+    },
+    {
+      "source": "way/653758933",
+      "name": "326",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758933_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051542281368X&heading=175&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051542281368X&panotype=street&heading=175",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "81b6a252-d35f-4c81-b19a-8948be8247f6"
+      ]
+    },
+    {
+      "source": "way/653758934",
+      "name": "320",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758934_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051543507548X&heading=334&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051543507548X&panotype=street&heading=334",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "d8958823-b854-4280-8a78-94dbd4de98b2"
+      ]
+    },
+    {
+      "source": "way/653758936",
+      "name": "317",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758936_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051540100908X&heading=354&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051540100908X&panotype=street&heading=354",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "dccf7e38-6976-4dee-8680-75543e4a06c5"
+      ]
+    },
+    {
+      "source": "way/653758937",
+      "name": "316",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758937_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051539484988X&heading=27&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051539484988X&panotype=street&heading=27",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "399fb21b-70a3-4038-8a71-4ec68828b3e0"
+      ]
+    },
+    {
+      "source": "way/653758938",
+      "name": "318",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758938_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051539460248X&heading=186&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051539460248X&panotype=street&heading=186",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝约186°拍摄轮廓对应的立面。树木遮挡部分窗列。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "0979f786-ed6f-4409-b46d-d3927bc4e355"
+      ]
+    },
+    {
+      "source": "way/653758939",
+      "name": "319",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758939_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051539394008X&heading=174&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051539394008X&panotype=street&heading=174",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "987576a4-d278-4656-9e9d-ef1ef7824e37"
+      ]
+    },
+    {
+      "source": "way/653758940",
+      "name": "310",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758940_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051539412208X&heading=17&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051539412208X&panotype=street&heading=17",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "009b7071-f051-46c6-9a29-b1026afaf76b"
+      ]
+    },
+    {
+      "source": "way/653758941",
+      "name": "311",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653758941_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051539257118X&heading=314&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051539257118X&panotype=street&heading=314",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "b15ef761-8a93-425b-8bea-28f5288f1c74"
+      ]
+    },
+    {
+      "source": "way/653772960",
+      "name": "322",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653772960_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051544382888X&heading=330&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051544382888X&panotype=street&heading=330",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "a2014b14-02bb-473f-b8aa-792f1418f31b"
+      ]
+    },
+    {
+      "source": "way/653772961",
+      "name": "321",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653772961_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051541226058X&heading=354&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051541226058X&panotype=street&heading=354",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "a3d73671-9320-4f1e-b2c2-8ea455114006"
+      ]
+    },
+    {
+      "source": "way/653772962",
+      "name": "312",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653772962_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051541226058X&heading=186&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051541226058X&panotype=street&heading=186",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "639d7f06-ce45-4b97-a477-1a110af87311"
+      ]
+    },
+    {
+      "source": "way/653772963",
+      "name": "314",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653772963_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051541132438X&heading=186&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051541132438X&panotype=street&heading=186",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "26704b25-9604-44c8-a65d-529debdaaf94"
+      ]
+    },
+    {
+      "source": "way/653772964",
+      "name": "313",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653772964_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051539324588X&heading=1&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051539324588X&panotype=street&heading=1",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "264c8d5a-f0d2-4b9a-b92e-eb170f36d13f"
+      ]
+    },
+    {
+      "source": "way/653772965",
+      "name": "201",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653772965_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051539290328X&heading=181&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051539290328X&panotype=street&heading=181",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "2a4e5786-3e26-477d-a691-75ae8e556612"
+      ]
+    },
+    {
+      "source": "way/653772966",
+      "name": "9",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "4ce32ade-5cc7-4b24-a212-10a2ebdc28b1"
+      ]
+    },
+    {
+      "source": "way/653772967",
+      "name": "5",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "e5c7bdae-f667-4e9f-af7c-08232c2056cb"
+      ]
+    },
+    {
+      "source": "way/653772968",
+      "name": "11",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "15512183-aa87-4863-81bd-932c528da5c1"
+      ]
+    },
+    {
+      "source": "way/653772969",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "e191989a-9b6c-4656-9ac0-131a052a8e44"
+      ]
+    },
+    {
+      "source": "way/653772970",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "0b096af9-112f-410a-a7e4-e4d93cc2cee9"
+      ]
+    },
+    {
+      "source": "way/653772971",
+      "name": "第三教学楼",
+      "floors": 6,
+      "floors_src": "photo",
+      "facade": "白色小面砖，弧形窗带间以浅蓝色横线分层，报告厅向外凸出。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653772971_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051523295018X&heading=70&pitch=25&width=1000&height=850&fovy=94&quality=88",
+          "page": "https://map.baidu.com/#panoid=09006800121806051523295018X&panotype=street&heading=70",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way653772971_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051522103698X&heading=306&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051522103698X&panotype=street&heading=306",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "d34a1f4a-a314-4fa9-9b43-baf783c14921"
+      ],
+      "floor_count_note": "圆角端部有五排弧窗与底层，主体约六层；报告厅为低翼。",
+      "floor_evidence": [
+        "way653772971_1.jpg",
+        "way653772971_2.jpg"
+      ]
+    },
+    {
+      "source": "way/653772972",
+      "name": "第二教学楼",
+      "floors": 6,
+      "floors_src": "photo",
+      "facade": "浅灰色端墙，浅褐横带与白框窗沿转角连续，入口有平顶柱廊。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653772972_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051523554138X&heading=116&pitch=25&width=1000&height=850&fovy=94&quality=88",
+          "page": "https://map.baidu.com/#panoid=09006800121806051523554138X&panotype=street&heading=116",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way653772972_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051523468458X&heading=73&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051523468458X&panotype=street&heading=73",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way653772972_3.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/H0e2442a7d933c895b10a2982d71373f0830200d6.jpg",
+          "page": "https://map.baidu.com/poi/2d2108cf7e5095723f9a5e5f",
+          "date": null,
+          "date_basis": "地图地点页未列拍摄日期",
+          "view": "地图地点实拍；镜头方位未标注。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "dbbac701-109f-4dd7-af97-d4d988b25345"
+      ],
+      "floor_count_note": "端部与入口照片交叉读取，主体约六层；下部局部被树冠遮挡。",
+      "floor_evidence": [
+        "way653772972_1.jpg",
+        "way653772972_2.jpg",
+        "way653772972_3.jpg"
+      ]
+    },
+    {
+      "source": "way/653772975",
+      "name": "第三食堂",
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "白色小面砖，粉色窗间墙，方窗与局部拱窗并列。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653772975_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800011608151021489288V&heading=308&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800011608151021489288V&panotype=street&heading=308",
+          "date": "2016-08",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way653772975_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800011608151021516418V&heading=320&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800011608151021516418V&panotype=street&heading=320",
+          "date": "2016-08",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "c0265713-14bb-40b5-972c-d87ca196e743"
+      ],
+      "floor_count_note": "主立面底层与上层两排窗可见。",
+      "floor_evidence": [
+        "way653772975_1.jpg",
+        "way653772975_2.jpg"
+      ]
+    },
+    {
+      "source": "way/653772976",
+      "name": "第二食堂",
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "低层白色面砖建筑，端墙覆藤，侧面上下两排开窗。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653772976_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800011608151022038948V&heading=309&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800011608151022038948V&panotype=street&heading=309",
+          "date": "2016-08",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西北拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way653772976_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800011608151021516418V&heading=233&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800011608151021516418V&panotype=street&heading=233",
+          "date": "2016-08",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way653772976_3.jpg",
+          "url": "https://5b0988e595225.cdn.sohucs.com/images/20200301/3e999cc7785d47a59c1ea44788dd0fe4.jpeg",
+          "page": "https://www.sohu.com/a/376883087_120509469",
+          "date": "2020-03-01",
+          "date_basis": "报道发布日期",
+          "view": "地面拍摄正门；与街景的立面、台阶和雨棚核对。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "353acca2-a455-445e-9894-aa5b6c19989f"
+      ],
+      "floor_count_note": "侧立面的两排窗与外楼梯平台相互印证。",
+      "floor_evidence": [
+        "way653772976_1.jpg",
+        "way653772976_2.jpg",
+        "way653772976_3.jpg"
+      ]
+    },
+    {
+      "source": "way/653772977",
+      "name": "13",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "9a749922-95ef-4e88-b533-0632c6b7f7be"
+      ]
+    },
+    {
+      "source": "way/653772978",
+      "name": "15",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "7dd70fbd-1002-481e-8391-6119ca3e0598"
+      ]
+    },
+    {
+      "source": "way/653772979",
+      "name": "17",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "a76aa581-4911-4764-b4e6-89e5656ca4bf"
+      ]
+    },
+    {
+      "source": "way/653772980",
+      "name": "24",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653772980_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051649228488X&heading=172&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051649228488X&panotype=street&heading=172",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝约172°拍摄轮廓对应的立面。树木遮挡部分窗列。 楼号沿用项目 OSM 记录；按建筑轮廓辨认。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "48c738f5-a9bd-4ae3-bf83-aa4edb53f73c"
+      ]
+    },
+    {
+      "source": "way/653775909",
+      "name": "19",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "38d3adaa-a268-4ae4-afbe-ba91be2bdbc7"
+      ]
+    },
+    {
+      "source": "way/653775911",
+      "name": "22",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "bf265e43-4bf8-43ab-8d5d-4f2f4bf93b5e"
+      ]
+    },
+    {
+      "source": "way/653775913",
+      "name": "20",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "8de0f7ae-af07-46bd-8312-d140fef1365c"
+      ]
+    },
+    {
+      "source": "way/653790234",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "2d8fa867-fb11-4bcb-9074-f9772206a3f1"
+      ]
+    },
+    {
+      "source": "way/653790236",
+      "name": "实习车间",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "c465fdba-3985-40c9-8641-6eb7f5dca78a"
+      ]
+    },
+    {
+      "source": "way/653790241",
+      "name": "正平科技文化馆",
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "白色墙体，深框横窗，入口侧有一对尖顶竖向装饰。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653790241_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051527029978X&heading=268&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051527029978X&panotype=street&heading=268",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way653790241_2.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/H8601a18b87d6277f3dc077782b381f30e824fca4.jpg",
+          "page": "https://map.baidu.com/poi/f2f15ffb54078689621c6792",
+          "date": null,
+          "date_basis": "地图地点页未列拍摄日期",
+          "view": "地图地点实拍；镜头方位未标注。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "a5eb6e54-588d-4db9-bda5-510b378dc0a8"
+      ],
+      "floor_count_note": "入口翼两层可见；后部高厅仅见无窗墙面，净高单列考虑。",
+      "floor_evidence": [
+        "way653790241_1.jpg",
+        "way653790241_2.jpg"
+      ]
+    },
+    {
+      "source": "way/653790242",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "e2b6b14b-5abc-474e-9b21-8f6a5f066b7a"
+      ]
+    },
+    {
+      "source": "way/653890105",
+      "name": "第一食堂",
+      "floors": 3,
+      "floors_src": "photo",
+      "facade": "米白外墙与缓弧屋顶，两侧楼梯接二层平台，圆柱托半圆雨棚。",
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [
+        {
+          "file": "way653890105_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051549518478X&heading=275&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051549518478X&panotype=street&heading=275",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西拍摄。双侧楼梯之间，正对镜头的建筑为第一食堂。"
+        },
+        {
+          "file": "way653890105_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051539221948X&heading=126&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051539221948X&panotype=street&heading=126",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝东南拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        },
+        {
+          "file": "way653890105_3.jpg",
+          "url": "https://5b0988e595225.cdn.sohucs.com/images/20200301/6f60dd11c96c492c9d50d81eaba9c99a.jpeg",
+          "page": "https://www.sohu.com/a/376883087_120509469",
+          "date": "2020-03-01",
+          "date_basis": "报道发布日期",
+          "view": "地面拍摄正门；与街景的立面、台阶和雨棚核对。"
+        }
+      ],
+      "confidence": "photo",
+      "overture_ids": [
+        "448216a6-9536-40aa-8ac5-a3a31e2c9dcd"
+      ],
+      "floor_count_note": "生乐餐厅正立面有首层入口、二层平台与顶层窗列。",
+      "alt_name": "生乐餐厅",
+      "floor_evidence": [
+        "way653890105_1.jpg",
+        "way653890105_2.jpg",
+        "way653890105_3.jpg"
+      ]
+    },
+    {
+      "source": "way/678367963",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "53e7bec4-358c-4984-bb0b-5ddbf8a478da"
+      ]
+    },
+    {
+      "source": "57ad87fc-676a-462f-8477-59d389650d88",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "730dbb55-1df5-4a45-a05c-61b333df678a",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "af824d41-0b1e-4e4d-8e32-621413f7d5a6",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "b33fa8f7-8c51-4149-8dd1-0edfc6a780ea",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "ebf7371d-0a84-4048-8d5a-f51fcddeffe6",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "ec2aa560-4573-4a0c-8115-2037cb5d4f74",
+      "name": "体育馆",
+      "floors": null,
+      "floors_src": null,
+      "facade": "浅色小方砖与淡蓝线脚，上下两条通窗带。",
+      "colors": {
+        "wall": "#d6dcdc",
+        "accent": "#83c4cd",
+        "glass": "#596d73",
+        "roof": null
+      },
+      "roof": null,
+      "features": [
+        "三角入口上方有五环与“体育馆”金色字样"
+      ],
+      "photos": [
+        {
+          "file": "ec2aa560-4573-4a0c-8115-2037cb5d4f74_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/90cd4e2ea94d8aa47592c18f3db3a2bd.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "平视主入口，方位未核实"
+        }
+      ],
+      "confidence": "photo",
+      "osm_landmark": "way/621423425"
+    }
+  ],
+  "gates": [
+    {
+      "name": "金鸡岭校区校门",
+      "osm_node": null,
+      "lonlat": null,
+      "desc": "浅色石质校名墙，镌“桂林电子科技大学”。",
+      "photos": [
+        {
+          "file": "guet_jinjiling_gate_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/06-21/191ae437355f8a47788fe06d1b96b017.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-06-21",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "校外朝校园正面平视"
+        }
+      ]
+    }
+  ],
+  "open_spaces": [
+    {
+      "name": "草坪花园",
+      "source": "way/606125809",
+      "lonlat": [
+        110.33237,
+        25.28662
+      ],
+      "desc": "图书馆前的花园，航拍可见圆形水池与环形步道。",
+      "photos": [
+        {
+          "file": "way606125809_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/82cdb5b91be0586b226d2c02a4980986.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "航拍全幅，花园在前景，图书馆在右下。"
+        }
+      ]
+    }
+  ]
+}

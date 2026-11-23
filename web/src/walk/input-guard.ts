@@ -73,6 +73,10 @@ export function shouldPhotoYieldKeyPFromDom(event: KeyboardEvent, photoActive: b
   })
 }
 
+/** Bottom-right corner (px from the right/bottom edges) left open for drag-to-look; stays inside the button arc in walk.css. */
+const LOOK_CORNER_PORTRAIT = {right: 136, bottom: 148}
+const LOOK_CORNER_LANDSCAPE = {right: 120, bottom: 118}
+
 export interface TouchZoneContext {
   clientX: number
   clientY: number
@@ -95,10 +99,14 @@ export function isTouchInControlZone(ctx: TouchZoneContext): boolean {
   if (!ctx.panelVisible || ctx.photoOn) return false
   // Bottom-left virtual joystick zone
   if (ctx.clientX < ctx.innerWidth * .45 && ctx.clientY > ctx.innerHeight * .55) return true
-  // Bottom-right jump/run/view or wheelie/gear/tuck thumb gutter
-  // IDOK-93: covers the look stick plus its button arc (slot D reaches ~245 px in from the right while riding).
+  // Bottom-right jump/run/view or wheelie/gear/tuck thumb gutter (slot D reaches ~245 px in from the right while riding).
   const rightGuard = ctx.aboard ? 250 : 215
   const bottomGuard = Math.min(280, ctx.innerHeight * .5)
-  if (ctx.clientX > ctx.innerWidth - rightGuard && ctx.clientY > ctx.innerHeight - bottomGuard) return true
+  const fromRight = ctx.innerWidth - ctx.clientX, fromBottom = ctx.innerHeight - ctx.clientY
+  if (fromRight < rightGuard && fromBottom < bottomGuard) {
+    // IDOK-171: the look stick is gone; the corner it used (inside the 跃/远近/跑/蹲 arc) is free drag-to-look canvas.
+    const corner = ctx.innerHeight <= 500 ? LOOK_CORNER_LANDSCAPE : LOOK_CORNER_PORTRAIT
+    return !(fromRight < corner.right && fromBottom < corner.bottom)
+  }
   return false
 }

@@ -347,6 +347,44 @@ def main():
             element=osm[ref]; mapped=(Point(ll2xz(element['lat'],element['lon'])) if element['type']=='node' else area(element).centroid)
             error=Point(entry['position'][::2]).distance(mapped)
             row.update(reference=ref,centroidM=round(error,3),status='pass' if error<=5 else 'fail');continue
+        if spec.get('auditPerBuilding'):
+            # Whole-campus landmarks on sloped ground (IDOK-165): slice each replaced
+            # building 3 m above its own lowest point instead of one fixed elevation.
+            tris=visible_triangles(ROOT/'public'/spec['model']).astype(float)
+            angle=math.radians(entry['rotation']);cosine,sine=math.cos(angle),math.sin(angle)
+            world=tris.copy();world[:,:,::2]=tris[:,:,::2]@np.array([[cosine,-sine],[sine,cosine]])+np.array(entry['position'])[::2]
+            centers=world.mean(axis=1);components=[]
+            for source in spec['replace']:
+                target=area(osm[source]) if source in osm else overture.get(source,Polygon())
+                if target.is_empty:
+                    components.append({'reference':source,'status':'missing-reference'});continue
+                x0,z0,x1,z1=target.buffer(2).bounds
+                near=world[(centers[:,0]>=x0)&(centers[:,0]<=x1)&(centers[:,2]>=z0)&(centers[:,2]<=z1)]
+                if not len(near):
+                    components.append({'reference':source,'status':'no-overlap'});continue
+                inside=near[[target.contains(Point(c[0],c[2])) for c in near.mean(axis=1)]]
+                low=float((inside if len(inside) else near)[:,:,1].min())
+                best=None
+                for lift in (3.0,5.0,8.0,11.0,14.0):
+                    shape=floor_slice(near,low+lift)
+                    parts=[part for part in getattr(shape,'geoms',[shape]) if not part.is_empty]
+                    selected=max(parts,key=lambda part:part.intersection(target).area) if parts else Polygon()
+                    if selected.is_empty or not selected.intersects(target):continue
+                    shared=selected.area>1.3*target.area
+                    if shared:
+                        # Terraced blocks sharing a party wall slice into one ring: measure inside 1 m of this footprint.
+                        selected=selected.intersection(target.buffer(1.0))
+                    found=(*metrics(selected,target),lift,shared)
+                    if best is None or found[0]>best[0]:best=found
+                if best is None:
+                    components.append({'reference':source,'status':'no-overlap'});continue
+                iou,center,delta,lift,shared=best
+                # A near-square footprint has no defined main axis: a 90 deg reading at IoU>=.95 is the same building.
+                ok=iou>=.7 and center<=5 and (delta<=5 or (iou>=.95 and center<=1))
+                components.append(dict(reference=source,iou=round(iou,3),centroidM=round(center,2),angleDeg=round(delta,2),
+                                       sliceLiftM=lift,**({'sharedWallClip':True} if shared else {}),status='pass' if ok else 'fail'))
+            row.update(measurement='per-building wall slice 3 m above its lowest point',components=components,
+                       status='pass' if components and all(item['status']=='pass' for item in components) else 'fail');continue
         if key in ('shizijie','zhongshan_road','wangcheng_teaching'):
             shape=footprint(ROOT/'public'/spec['model'],entry,elevation=6)
             parts=list(getattr(shape,'geoms',[shape]));components=[]

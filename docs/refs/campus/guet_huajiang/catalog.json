@@ -1,0 +1,3286 @@
+{
+  "campus_id": "guet_huajiang",
+  "campus_osm": "way/606118480",
+  "buildings": [
+    {
+      "source": "way/606398822",
+      "name": "球类馆",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "ce842498-fed5-4a34-9d68-5e20a3ecbc53"
+      ]
+    },
+    {
+      "source": "way/606398823",
+      "name": "室内网球场",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "d7a03492-fc12-4cb0-99f7-547f0e061d75"
+      ]
+    },
+    {
+      "source": "way/606411548",
+      "name": "中央食堂",
+      "floors": 6,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "888ef44f-587c-4cc8-8c81-da806e5848e3"
+      ]
+    },
+    {
+      "source": "way/606411549",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "8f999c21-b827-42fe-b09b-9f72ac021a2c"
+      ]
+    },
+    {
+      "source": "way/606411550",
+      "name": "第一教学楼",
+      "floors": 5,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "a5ac5e79-0d7c-4fea-a413-52b0fc02870f"
+      ]
+    },
+    {
+      "source": "way/606465853",
+      "name": "信息与通信学院",
+      "floors": 5,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "87c814f9-87ec-48fc-8a44-eb69d304411a"
+      ]
+    },
+    {
+      "source": "way/606478146",
+      "name": "第二教学楼",
+      "floors": 5,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "84f2514c-b007-4e61-8fe6-945ede655b4a"
+      ]
+    },
+    {
+      "source": "way/606478153",
+      "name": "第三教学楼",
+      "floors": 5,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "80c5cb6c-a061-4c9b-963d-55b0a9619231"
+      ]
+    },
+    {
+      "source": "way/606478156",
+      "name": "第四教学楼",
+      "floors": 5,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "93236626-8aa2-4cda-8ee8-d9a13ea47e00"
+      ]
+    },
+    {
+      "source": "way/606478159",
+      "name": "第五教学楼",
+      "floors": 5,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "54ec4bd3-7666-4460-ab1a-9d08ec5d76f1"
+      ]
+    },
+    {
+      "source": "way/606478162",
+      "name": "第六教学楼",
+      "floors": 5,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "f2ed6027-099d-467b-a170-74738f84a20e"
+      ]
+    },
+    {
+      "source": "way/606478183",
+      "name": "第十三教学楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "29ce16a7-fc46-4861-88ac-883169fded48"
+      ]
+    },
+    {
+      "source": "way/606478186",
+      "name": "第十四教学楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "fbf1c373-c367-4b31-a1a1-d7bf6c5e7bf6"
+      ]
+    },
+    {
+      "source": "way/606478191",
+      "name": "第十六教学楼",
+      "floors": 5,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "a0adde6a-e70e-49d5-a546-3e7fe667b1de"
+      ]
+    },
+    {
+      "source": "way/606478194",
+      "name": "第十七教学楼",
+      "floors": 5,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "4d06b5cd-a7dd-4d4a-86c6-344b2abdb8c4"
+      ]
+    },
+    {
+      "source": "way/606915477",
+      "name": "馨园餐厅",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "c7df7a50-6d63-4a10-9b7a-3181d85fe8d8"
+      ]
+    },
+    {
+      "source": "way/614473430",
+      "name": "24#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "6b4cb6b7-e010-4c57-9ef6-05f0b89b0c77"
+      ]
+    },
+    {
+      "source": "way/614473431",
+      "name": "23#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "64f5176e-c5a0-4d4e-b992-039e83566258"
+      ]
+    },
+    {
+      "source": "way/614473434",
+      "name": "12#",
+      "floors": 6,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "24d6114f-f960-4b53-8288-f3fef5c6244c"
+      ]
+    },
+    {
+      "source": "way/614473435",
+      "name": "11#",
+      "floors": 6,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "9d2c2e74-bb77-43d7-9f64-2520fde0a2ba"
+      ]
+    },
+    {
+      "source": "way/614473436",
+      "name": "10#",
+      "floors": 6,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "ee7e9c04-ebbc-40e5-b4f5-cfbcce3565d8"
+      ]
+    },
+    {
+      "source": "way/614473437",
+      "name": "9#",
+      "floors": 6,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "06363407-a06a-4aac-b95e-d3055480b95f"
+      ]
+    },
+    {
+      "source": "way/621474561",
+      "name": "21#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "3721bd88-bc5a-4cef-9ce1-8d0a8c835b2e"
+      ]
+    },
+    {
+      "source": "way/621474562",
+      "name": "22#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "3d85f0b8-c636-47ff-8497-9713700acc04"
+      ]
+    },
+    {
+      "source": "way/621474563",
+      "name": "8#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "cf7f4aa5-60da-462c-99dd-5d30037fd51e"
+      ]
+    },
+    {
+      "source": "way/621945213",
+      "name": "7#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "09daa5b2-ba74-4396-a673-50100d30177e"
+      ]
+    },
+    {
+      "source": "way/621945214",
+      "name": "6#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "7ed29d2b-d321-41c0-9bbb-b81e461fc50c"
+      ]
+    },
+    {
+      "source": "way/621945215",
+      "name": "5#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "2b88cb6f-3a94-4769-afd2-9d4ef748b63d"
+      ]
+    },
+    {
+      "source": "way/621945216",
+      "name": "4#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "256fb4c3-42b1-4b98-acff-ad89c13846bb"
+      ]
+    },
+    {
+      "source": "way/621945217",
+      "name": "3#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "e83a760e-c570-4451-b20a-309ff76e8c4e"
+      ]
+    },
+    {
+      "source": "way/621945218",
+      "name": "2#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "49185a51-c9a7-47fb-8e1b-3b96be64ad70"
+      ]
+    },
+    {
+      "source": "way/621945219",
+      "name": "1#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "a0ff1a15-ac3a-44f1-8351-b7cd9d53b675"
+      ]
+    },
+    {
+      "source": "way/621945727",
+      "name": "14#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "1e49537f-4a83-4553-815c-bc1a1da802d5"
+      ]
+    },
+    {
+      "source": "way/621945728",
+      "name": "13#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "317021c8-cf76-439a-abda-a6e4db25a7a3"
+      ]
+    },
+    {
+      "source": "way/621945729",
+      "name": "15#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "19bad98b-9ca3-4391-9d7b-0a7738894302"
+      ]
+    },
+    {
+      "source": "way/621945730",
+      "name": "16#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "08a5bf12-ffb6-42e5-b970-82182c553d7d"
+      ]
+    },
+    {
+      "source": "way/621945731",
+      "name": "17#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "d38250f0-0160-464e-8d30-f6d40f3a4160"
+      ]
+    },
+    {
+      "source": "way/621946475",
+      "name": "18#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "ae92747d-f01b-46ec-acea-d3bb8558ace0"
+      ]
+    },
+    {
+      "source": "way/621946476",
+      "name": "19#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "afada9d8-6786-4b90-9145-e58fb7d76e67"
+      ]
+    },
+    {
+      "source": "way/621946477",
+      "name": "20#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "c8fd85a0-6279-4937-b4e8-3e3034f6f011"
+      ]
+    },
+    {
+      "source": "way/621946478",
+      "name": "青工楼A#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "ebe6406d-8b63-4bcf-b117-e6158425b1cd"
+      ]
+    },
+    {
+      "source": "way/621946479",
+      "name": "青工楼B#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "8b7c331a-1327-4da1-b4d5-465ca11714d7"
+      ]
+    },
+    {
+      "source": "way/621959944",
+      "name": "办公大楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "64a9ee08-7a12-4399-b54a-617531f9b087"
+      ]
+    },
+    {
+      "source": "way/621959945",
+      "name": "会议中心",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "43cc2e43-58bd-4f78-90ed-a8b770fab485"
+      ]
+    },
+    {
+      "source": "way/621959946",
+      "name": "档案馆",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "faac641a-4903-49df-9747-1d268061e427"
+      ]
+    },
+    {
+      "source": "way/622349313",
+      "name": null,
+      "floors": 2,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "ad2cf90e-5a29-47bc-8823-8e80a90aa555"
+      ]
+    },
+    {
+      "source": "way/624033990",
+      "name": "学生活动中心",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "f2f70f1c-831f-4705-be5e-4f3336ab56d9"
+      ]
+    },
+    {
+      "source": "way/624036625",
+      "name": "材料科学与工程学院实验教学中心-美育实践中心",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "629eeaf8-3ed4-4911-8e70-b489b448faae"
+      ]
+    },
+    {
+      "source": "way/624036626",
+      "name": "33#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "18040e09-a0a9-4450-b27a-c43384136f9b"
+      ]
+    },
+    {
+      "source": "way/624036627",
+      "name": "32#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "3ba4d65b-2bfb-4452-bb1f-62df4f24b30e"
+      ]
+    },
+    {
+      "source": "way/624036628",
+      "name": "仲园餐厅",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "297df949-b5c9-48f8-b24f-798d8264d43f"
+      ]
+    },
+    {
+      "source": "way/624036629",
+      "name": "31#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "aecbe6a1-1844-40e6-8017-1a07c288d3ce"
+      ]
+    },
+    {
+      "source": "way/624036630",
+      "name": "29#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "19c088c7-012d-4b63-a6ba-e2da36c9c58a"
+      ]
+    },
+    {
+      "source": "way/624036631",
+      "name": "25#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "8cfce977-5041-4a0d-a0a2-cf5c6618f91e"
+      ]
+    },
+    {
+      "source": "way/624036632",
+      "name": "28#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "ada94fad-b64b-466f-8f24-f12625a733c5"
+      ]
+    },
+    {
+      "source": "way/624154298",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "537e10d6-49ce-42e8-bec8-8bd53822ffb1"
+      ]
+    },
+    {
+      "source": "way/624154299",
+      "name": "信科第43教学楼2区",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "23b15459-3b6f-47c6-b91f-3c9b900f0eab"
+      ]
+    },
+    {
+      "source": "way/624154300",
+      "name": "信科第43教学楼1区",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "0cb8b7b0-0e54-45a2-a5cd-b78487b05ba6"
+      ]
+    },
+    {
+      "source": "way/624154301",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "7b2bf1be-d10e-4ab6-b166-3e32fb9bfb42"
+      ]
+    },
+    {
+      "source": "way/624155184",
+      "name": "信科第41教学楼1区（艺术与设计学院）",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "1fa471d7-9b14-4bb3-a43e-2f5859137e99"
+      ]
+    },
+    {
+      "source": "way/624155188",
+      "name": "信科第41教学楼2区（艺术与设计学院）",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "cb5b4333-87e4-4e80-85b9-34bd38ac1a9c"
+      ]
+    },
+    {
+      "source": "way/625278112",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "89882aa1-4bb6-4846-ad59-87c58a838ceb"
+      ]
+    },
+    {
+      "source": "way/625278113",
+      "name": null,
+      "floors": 2,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "f6fcf179-03be-410b-958b-062b019a6e68"
+      ]
+    },
+    {
+      "source": "way/625278114",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "e255e6f7-69d9-4cd1-b602-20975506bbb3"
+      ]
+    },
+    {
+      "source": "way/627698707",
+      "name": "1号公寓-44栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "c354c350-0147-450e-8cd3-8744d32638f0"
+      ]
+    },
+    {
+      "source": "way/627698708",
+      "name": "4号公寓-47栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "fbebe23f-cc0a-4593-8ab6-aa0430c855fd"
+      ]
+    },
+    {
+      "source": "way/627698709",
+      "name": "2号公寓-45栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "172a58be-36e4-416c-b6f1-f5bb64fe6630"
+      ]
+    },
+    {
+      "source": "way/627698710",
+      "name": "3号公寓-46栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "a88779e6-f0e8-4fb6-b518-fd3d62a01a84"
+      ]
+    },
+    {
+      "source": "way/628549196",
+      "name": "后勤楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "de47a589-ccf4-4585-9bfa-8b84f7582205"
+      ]
+    },
+    {
+      "source": "way/633662027",
+      "name": "信科文体中心",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "2f5ec905-ea41-49e7-8ab3-76cfe3b6d2f9"
+      ]
+    },
+    {
+      "source": "way/633662028",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "921ecd3e-fee6-4aba-b87f-15be144cee45"
+      ]
+    },
+    {
+      "source": "way/653889126",
+      "name": "第十一教学楼B",
+      "floors": 5,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "b230216d-baf1-4916-8097-313b112392db"
+      ]
+    },
+    {
+      "source": "way/653889127",
+      "name": "第十一教学楼C",
+      "floors": 5,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "38bedba2-5f31-46b2-aa53-d04927ecf1d7"
+      ]
+    },
+    {
+      "source": "way/653889128",
+      "name": "第十一教学楼A",
+      "floors": 5,
+      "floors_src": "osm",
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "3891131b-f14b-4ca0-ae47-12b1635f8641"
+      ]
+    },
+    {
+      "source": "way/686017213",
+      "name": "南门车棚",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "21c1ac19-5975-493d-91fd-067d841ca59d"
+      ]
+    },
+    {
+      "source": "way/686017214",
+      "name": "南门车棚",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "01203e8a-13cc-49f2-8ea5-84cd3ccb209a"
+      ]
+    },
+    {
+      "source": "way/686017215",
+      "name": "南门车棚",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "e533b458-b9ca-41a7-9fa6-084f0480f6a9"
+      ]
+    },
+    {
+      "source": "way/686017216",
+      "name": "南门车棚",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "5d4e1407-291a-4cd3-9501-e0178631754d"
+      ]
+    },
+    {
+      "source": "way/686017217",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "1d8d2081-3e79-4985-895c-c12eefa1e67d"
+      ]
+    },
+    {
+      "source": "way/692519519",
+      "name": "30#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "ce03228b-4fc8-4a79-925c-fbc812fb69bc"
+      ]
+    },
+    {
+      "source": "way/724218273",
+      "name": "26#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "8612b399-2ea5-487b-9e60-fafecc85099a"
+      ]
+    },
+    {
+      "source": "way/724218274",
+      "name": "27#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "fc5dd8f5-b0d2-4d5e-b313-b8cf4f14c7ee"
+      ]
+    },
+    {
+      "source": "way/754789545",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "60c5127c-3b14-4184-bf29-218a4c25bb4e"
+      ]
+    },
+    {
+      "source": "way/941807701",
+      "name": "34#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "c3c1a2c0-9919-4636-bfbf-6f18fd176259"
+      ]
+    },
+    {
+      "source": "way/941807702",
+      "name": "35#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "b106caee-c8f2-4bda-aece-ced242ce35b5"
+      ]
+    },
+    {
+      "source": "way/941807703",
+      "name": "36#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "1d5d65a7-8c0d-4821-9394-ebba9fdd8a16"
+      ]
+    },
+    {
+      "source": "way/1243607535",
+      "name": "37#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "d8c6499b-032f-40c8-96fb-2b9a9440dd6d"
+      ]
+    },
+    {
+      "source": "way/1243607536",
+      "name": "38#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "8a474cc2-bb40-41ee-bf8d-0b1dc61d9978"
+      ]
+    },
+    {
+      "source": "way/1243607540",
+      "name": "39#",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "83823535-55ce-4baf-97f0-7a81cca3147d"
+      ]
+    },
+    {
+      "source": "way/1243607541",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "0df35679-dc5f-4bbb-a4b2-9e6386f94a19"
+      ]
+    },
+    {
+      "source": "way/1243607543",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "8d28aab1-75d9-4a6c-85a3-55b053b4bc4f"
+      ]
+    },
+    {
+      "source": "way/1243629557",
+      "name": "文科楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "50bc09d5-ea14-433d-958f-f2c5b8fd1cc6"
+      ]
+    },
+    {
+      "source": "way/1417160188",
+      "name": "花江智慧谷3号楼（电子工程与自动化学院）",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "2ec9b316-db07-4fe8-95c9-a62884f156c0"
+      ]
+    },
+    {
+      "source": "way/1417160189",
+      "name": "花江智慧谷2号楼（光电工程学院）",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "cb6554b3-5ca1-4d0b-8f11-25c7d5903c9f"
+      ]
+    },
+    {
+      "source": "way/1417160190",
+      "name": "花江智慧谷1号楼（计算机与信息安全学院）",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "e823db1e-d64f-4923-996b-e5e0430cd28b"
+      ]
+    },
+    {
+      "source": "way/1417160191",
+      "name": "花江智慧谷4号楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "01c86ca2-9bfc-4bdc-aeeb-4a34251b8f4f"
+      ]
+    },
+    {
+      "source": "way/1417160192",
+      "name": "花江智慧谷5号楼（数学与计算科学学院）",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "3668df2a-fd3f-4eb1-8a53-76f3487e370f"
+      ]
+    },
+    {
+      "source": "way/1417160193",
+      "name": "花江智慧谷6号楼（人工智能学院）",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "2b7166a9-850b-4387-b669-f25943297711"
+      ]
+    },
+    {
+      "source": "way/1417165892",
+      "name": "研究生公寓41栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "7dd675db-34a4-48cd-b5b9-5cb5a4ba5d03"
+      ]
+    },
+    {
+      "source": "way/1417165893",
+      "name": "研究生公寓41栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "058b0da7-1c19-424a-9e9b-ee576bc0db5e"
+      ]
+    },
+    {
+      "source": "way/1417165894",
+      "name": "研究生公寓41栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "e42a0c53-9830-40ee-aac6-30aba16d2d8b"
+      ]
+    },
+    {
+      "source": "way/1417165895",
+      "name": "研究生公寓41栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "3d14fa8f-76d6-4715-a671-c9ab3696b8d2"
+      ]
+    },
+    {
+      "source": "way/1417165896",
+      "name": "研究生公寓42栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "ceda5117-e54c-44e9-a119-c2daeb0881e1"
+      ]
+    },
+    {
+      "source": "way/1417165897",
+      "name": "研究生公寓42栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "669987da-9b8d-43d0-aa4e-1952ed14dc33"
+      ]
+    },
+    {
+      "source": "way/1417165898",
+      "name": "研究生公寓42栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "64e5b5b3-9868-484a-b808-431107ffd229"
+      ]
+    },
+    {
+      "source": "way/1417165899",
+      "name": "研究生公寓42栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "c40dff96-6b70-4e8c-9067-133b8a3938eb"
+      ]
+    },
+    {
+      "source": "way/1417165900",
+      "name": "研究生公寓43栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "ddf8f945-77e7-4fe9-9800-ddc0e2010f7e"
+      ]
+    },
+    {
+      "source": "way/1417165901",
+      "name": "研究生公寓43栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "ccb9cfe5-8924-4929-bf6d-4c435d8f1ed5"
+      ]
+    },
+    {
+      "source": "way/1417165902",
+      "name": "研究生公寓43栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "f036cca3-a6e7-42f5-ba5d-cd50dcc73301"
+      ]
+    },
+    {
+      "source": "way/1417165903",
+      "name": "研究生公寓43栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "4139c4ec-2c83-4816-b75e-aaa7b45b7a90"
+      ]
+    },
+    {
+      "source": "way/1417165904",
+      "name": "研究生公寓40栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "d4544570-1079-4be6-8251-808e98eb65e4"
+      ]
+    },
+    {
+      "source": "way/1417165905",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "9402f351-f681-43dc-9c9e-4867d3a7a108"
+      ]
+    },
+    {
+      "source": "way/1417165906",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "5831eef0-aebc-4067-a670-d4870f760a2f"
+      ]
+    },
+    {
+      "source": "way/1417175069",
+      "name": "5号公寓-48栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "28176daf-136d-4b04-8747-c5448a614d24"
+      ]
+    },
+    {
+      "source": "way/1417175070",
+      "name": "6号公寓-49栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "39639f6c-e33a-4fdd-b609-1709f857145b"
+      ]
+    },
+    {
+      "source": "way/1417175071",
+      "name": "雅园餐厅",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "52c8c426-32d6-4abf-bafc-b9c382edbcb1"
+      ]
+    },
+    {
+      "source": "way/1417175072",
+      "name": "信科第44教学楼2区",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "d0f65a40-6aec-4574-8ee2-42fe1bcacdcd"
+      ]
+    },
+    {
+      "source": "way/1417175073",
+      "name": "信科第44教学楼1区",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "54ab576b-c739-4ae0-bfb0-17f6a7da4c5e"
+      ]
+    },
+    {
+      "source": "way/1417175074",
+      "name": "信科第42教学楼2区（艺术与设计学院）",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "1b477393-659f-4eef-ac28-8b82ef71edd1"
+      ]
+    },
+    {
+      "source": "way/1417175075",
+      "name": "信科第42教学楼1区（艺术与设计学院）",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "7965f601-4895-4bda-8dc1-139c088030a0"
+      ]
+    },
+    {
+      "source": "way/1417175370",
+      "name": "信科第45教学楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "8c1246b3-a3c1-47bd-b8ef-e140b118578d"
+      ]
+    },
+    {
+      "source": "way/1417178990",
+      "name": "7号公寓-50栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "1f75df4f-aa03-408e-b601-8749412b0503"
+      ]
+    },
+    {
+      "source": "way/1417180485",
+      "name": "科技楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "ac3e5556-7a48-42c0-96bb-6ae061b0985f"
+      ]
+    },
+    {
+      "source": "way/1417186390",
+      "name": "D区大棚室内篮球场",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "d19ba8af-6e13-43dd-ade1-b42719d70a7b"
+      ]
+    },
+    {
+      "source": "way/1417186392",
+      "name": "D区大棚室内排球场",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "4f180abf-d1ec-4c73-8ec7-21999827dab0"
+      ]
+    },
+    {
+      "source": "way/1417187719",
+      "name": "电子信息实验楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "affc658e-f81f-4998-a3e7-4aacbdf2bbfa"
+      ]
+    },
+    {
+      "source": "way/1417187720",
+      "name": "四创1号楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "8b1efdee-e79d-4201-81e8-00394882f79b"
+      ]
+    },
+    {
+      "source": "way/1417187721",
+      "name": "四创2号楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "df58dc59-76e3-445b-aaab-af20ae8f1bba"
+      ]
+    },
+    {
+      "source": "way/1417187722",
+      "name": "四创3号楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "f74eef46-43e0-4b34-abfb-ee5c2796ca0c"
+      ]
+    },
+    {
+      "source": "way/1417190113",
+      "name": "四创4号楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "1fe6887e-5db4-453d-bd38-d56559977ae6"
+      ]
+    },
+    {
+      "source": "way/1417192550",
+      "name": "机电楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "0e6a0a09-4598-4e56-9fe4-03395f645c31"
+      ]
+    },
+    {
+      "source": "way/1417192551",
+      "name": "建交楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "59b8a84c-4760-42d1-8e4d-4316101ceb83"
+      ]
+    },
+    {
+      "source": "way/1491127080",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "15ec71ee-ed5e-4e9f-8755-468cd2674aaa"
+      ]
+    },
+    {
+      "source": "way/1491127088",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "dec89200-9f77-48f8-bfcb-4de236f251aa"
+      ]
+    },
+    {
+      "source": "way/1491144353",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "source_aliases": [
+        "a7e3939e-e823-488b-9a50-3bee1d4e2a68"
+      ]
+    },
+    {
+      "source": "05d68d98-09ab-4af4-818e-61b78b620331",
+      "name": "花江校区图书馆",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "0d9885d3-38ff-4858-a5e6-e2f37ee6b4a1",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "10f89728-482e-466f-9216-b12e5935940b",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "1dc27e26-20fa-410b-ac6b-0e718dfe9cd1",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "2fed6c4b-d0d4-41e8-85e9-6eaeea0dc2af",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "31866916-faf5-4e31-927e-8e2b4f6d5da6",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "37ed6f38-a227-4a48-b42d-7d5d151ef661",
+      "name": "行政楼/研究生院",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "45087e06-2b54-4b4b-b46e-1db2af321516",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "48cb49ac-326c-4f5f-9108-3cee3a67d27d",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "4cc5b83e-f971-4b8a-98e3-a5552c2f563b",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "4d2f3399-b947-41ef-b218-b394de6a1d86",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "5506e259-802d-4948-92b8-b3de8a1d3d0f",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "56f4b58c-38ad-4eef-8e6c-cceafa9d92e1",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "6bdb9bf7-40ed-4681-9760-15dee2cb0ba2",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "75c2b636-4b72-4246-80e1-e766fc9e2b70",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "75e6c134-61e6-48cf-b176-06bbc0534217",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "76809297-8747-4c0a-b348-1927eceef08a",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "7a6fe86c-8615-4273-8c35-e2a08e57d206",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "7dc83657-dfcb-47be-bf84-ebfae84096bb",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "83007894-5e0e-4312-af4b-c62c973c8276",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "88cdda6b-f28c-43a0-b00c-e247b59aa8ff",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "895d0f7b-2b81-43e7-ac3a-92511f229b4a",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "8f28ad76-5fbb-40dc-ac30-1ead56722226",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "930827b4-7d9c-4cfe-9260-166fcfe2dbfc",
+      "name": "工程实训中心",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "9ffc07f1-8c0a-46c8-9cc8-d5d0ba076809",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "a21fe885-632b-49fd-9b22-9fc3e2af9357",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "bc5f4ebc-5127-49cb-84d4-826825193a8c",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "c268a851-8a66-4f44-9eb2-dd144f6bab87",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "c96e9844-b4c0-45d8-94cf-aba10b28ef4d",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "ce05e950-3026-4eb0-8231-7db3c2429074",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "e27a94bc-2d27-45d6-89cc-2fb51d690c2d",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "f6acc053-bd6a-4bf1-a5f3-ee613999b90b",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "fa3e154f-156e-4e55-bcc6-21aa2f068880",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "ff3b7549-8dd6-4362-831e-4ac744887d94",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    }
+  ],
+  "gates": [],
+  "open_spaces": []
+}
