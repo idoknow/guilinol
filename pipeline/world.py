@@ -19,7 +19,7 @@ from shapely.geometry import box, Point
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem, load_osm
 from features import building_mesh, buildings, game_court, ground_features, points, polygons, raw_overture_footprints, rongyin_sidewalk
-from legacy_core import Downtown, EXTENT as DOWNTOWN
+from legacy_core import CAMPUS_TILES, Downtown, EXTENT as DOWNTOWN, preserve_campus_indexes
 from karst import generate
 from peak_sectors import write_city_lods
 from landmarks.jiefang_layout import bank_paving, grade_banks, grade_binjiang_streets
@@ -421,7 +421,8 @@ def build(bbox, output, palette, workers=4):
     overview_image.save(output/'overview.png', optimize=True)
     u_peaks_buf = unary_union(peak_shapes).buffer(1.0) if peak_shapes else ShapelyPolygon()
     chunks = []
-    published_core = downtown.published_core() if downtown else {}
+    preserve_campuses = downtown is not None and all(left <= east < left+width and top <= south < top+depth for east,south in CAMPUS_TILES)
+    published_core = downtown.published_core(preserve_campuses) if downtown else {}
     pending = deque()
     with ThreadPoolExecutor(max_workers=workers) as pool:
         for south in range(0,depth,CHUNK):
@@ -496,6 +497,8 @@ def build(bbox, output, palette, workers=4):
         chunks.extend(job.result() for job in pending)
     extent = [left,top,width,depth]
     write_atlas(output,extent,bounds,layers,footprints,peaks)
+    if preserve_campuses:
+        preserve_campus_indexes(output,landmarks)
     write_overview_map(output,bbox)
     triangles.extend(landmark_faces)
     write_vehicles(output,vehicles,triangles)
