@@ -14,6 +14,7 @@ import {bikeConfig, carConfig, walkConfig as cfg, type CarDriveMode, type EbikeH
 import {createPhysics} from './physics'
 import {resolveContact} from '../traffic/contact'
 import {createCameraRig} from './camera'
+import {isFirstPerson} from './view-mode'
 import {look} from '../look/config'
 import {env} from '../look/time'
 import {createDriverPose} from './car'
@@ -1687,7 +1688,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     const shakeYaw=rides?.car&&carShake>.01?Math.sin(carShakePhase)*carShake*.018:0
     const shakePitch=rides?.car&&carShake>.01?Math.cos(carShakePhase*1.3)*carShake*.012:0
-    rig.update(camera,figure.position,yaw+shakeYaw,pitch+shakePitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0),dt,snap,!!rides?.car)
+    // IDOK-178: 第一人称只在落地步行时生效，骑车/开车/坐船一律回到第三人称，免得镜头钻进车壳。
+    const firstPerson=isFirstPerson()&&!rides?.bike&&!rides?.car&&!rides?.boat
+    rig.update(camera,figure.position,yaw+shakeYaw,pitch+shakePitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0),dt,snap,!!rides?.car,firstPerson)
+    if(!rides?.bike&&!rides?.car&&!rides?.boat)figure.visible=active&&!firstPerson
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
   function boatClearance(){

@@ -8,6 +8,7 @@ import {onRequest} from '../functions/api/[[path]].ts'
 import {database, measuredConnections} from './postgres.mjs'
 import {bucket} from './bucket.mjs'
 import {createReadiness} from './readiness.mjs'
+import {presence} from './live.mjs'
 
 crypto.subtle.timingSafeEqual = (left,right) => left.byteLength===right.byteLength && timingSafeEqual(left,right)
 // 连接/查询都有上限：卡住的查询不能长期占着 5 连接的池子
@@ -19,6 +20,7 @@ const metrics=monitor(pool)
 const connections=measuredConnections(pool,metrics)
 const env = {...process.env, perfQuery:(path,params)=>(path.startsWith('admin/perf')?queryPerf:analytics)(connections,path,params), DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
+const online = presence(pool)
 
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json','cache-control':'no-store'}})
 
@@ -30,6 +32,16 @@ const server=serve({port:Number(process.env.PORT || 3000),fetch: async request =
   if (url.pathname === '/api/ready') {
     const status = readiness.status()
     return status.ready ? json({ok:true}) : json({ok:false,error:status.reason},503)
+  }
+  // 在线人数（IDOK-172）：公开只读，5 分钟活跃会话数，15 秒内存缓存。
+  if (url.pathname === '/api/live') {
+    if (request.method !== 'GET') return json({error:{code:'method',message:'只支持 GET'}},405)
+    try {
+      return json({online: await online()})
+    } catch (error) {
+      console.error('live presence failed', error.code ?? error.message)
+      return json({error:{code:'internal',message:'暂时拿不到在线人数'}},503)
+    }
   }
   const start=performance.now()
   let status=500

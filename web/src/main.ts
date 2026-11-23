@@ -36,6 +36,8 @@ export const waitForMode = () => modeReady
 export function setPaused(on:boolean){paused=on}
 import {mountDevHud} from './ui/hud-dev'
 import {armOrientationGate} from './ui/orientation'
+import {mountStats} from './ui/stats'
+import {mountHotkeys} from './ui/hotkeys'
 
 export let spawnCreatedCharacter:()=>Promise<void>=async()=>{}
 let titleTransition:{signal:AbortSignal;cancel:()=>void;view?:Veil}|undefined
@@ -388,6 +390,9 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     },
   })
   rangeStore.subscribe(nextCfg=>{renderUi.setConfig(nextCfg)})
+  // IDOK-178：帧率/网速/在线人数读数与设置热键（都靠 localStorage 记住上次选择）。
+  mountStats()
+  mountHotkeys()
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,get game(){return solo?.probe ?? tourProbe},
     get trafficCount(){return (scene.getObjectByName('G2 traffic') as THREE.InstancedMesh|undefined)?.count??0},
