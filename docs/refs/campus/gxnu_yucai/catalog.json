@@ -204,8 +204,8 @@
       "source": "way/448299119",
       "overture_id": "2ffc3240-36c0-4c6b-b834-fe5bde7e58bf",
       "name": "图书馆",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "photo",
       "facade": "浅色分格墙面，下部两翼外伸，入口上方留有贯通开口。",
       "colors": {
         "wall": "#dedcda",
@@ -243,7 +243,8 @@
       ],
       "confidence": "photo",
       "name_src": "https://jjc.gxnu.edu.cn/2255/list.htm",
-      "floors_min": 4
+      "floors_min": 4,
+      "floors_note": "图书馆立面与校图书馆楼层介绍交叉核对。"
     },
     {
       "source": "way/459580419",
@@ -339,11 +340,11 @@
       "source": "way/673869792",
       "overture_id": "73381764-2cf2-4bc9-a380-8a0cff9de0a7",
       "name": "学生七舍",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
-        "wall": null,
+        "wall": "#ddd8c9",
         "accent": null,
         "glass": null,
         "roof": "#5f6153"
@@ -351,7 +352,9 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "aerial"
+      "confidence": "aerial",
+      "floors_note": "与六舍相邻，屋顶轮廓和长宽比例相近；按六舍估算。",
+      "style_reference": "学生六舍；墙色和层数均为建模估值。"
     },
     {
       "source": "way/673869794",
@@ -375,19 +378,28 @@
       "source": "way/673869795",
       "overture_id": "3efc17a2-39d0-4781-b04f-818cbfd12990",
       "name": "学生六舍",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 6,
+      "floors_src": "photo",
+      "facade": "浅色长条形宿舍，各层外廊连续，浅粉色边带。",
       "colors": {
-        "wall": null,
-        "accent": null,
+        "wall": "#ddd8c9",
+        "accent": "#bfa198",
         "glass": null,
         "roof": "#535a50"
       },
       "roof": null,
       "features": [],
-      "photos": [],
-      "confidence": "aerial"
+      "photos": [
+        {
+          "file": "way673869795_1.jpg",
+          "url": "http://qcloud.dpfile.com/pc/2QEvi6taoe5VrZIuXLZMLgm0p7xopxMhsO9aKQyQD_25W3VhnGSI_cVNypvk8mxtjoJrvItByyS4HHaWdXyO_DrXIaWutJls2xCVbatkhjUNNiIYVnHvzugZCuBITtvjski7YaLlHpkrQUr5euoQrg.jpg",
+          "page": "http://www.dianping.com/review/435922879",
+          "date": null,
+          "view": "校道左侧的外廊宿舍，按校图与第二文科综合楼的位置推定为六舍，照片未拍到楼牌。"
+        }
+      ],
+      "confidence": "photo",
+      "floors_note": "外廊与底层合计约六层，楼号据校图推定。"
     },
     {
       "source": "way/673896837",
@@ -411,8 +423,8 @@
       "source": "way/673896838",
       "overture_id": "198869d3-b1c9-4efc-accb-cae5bebbd3a8",
       "name": "后勤基建处",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "photo",
       "facade": "淡黄墙面与浅灰凸窗交替，白色竖框把蓝色窗带分为数跨。",
       "colors": {
         "wall": "#dbcfab",
@@ -435,7 +447,8 @@
         }
       ],
       "confidence": "photo",
-      "floors_min": 5
+      "floors_min": 5,
+      "floors_note": "围墙上方五排窗，加局部被遮挡的底层，估读六层。"
     },
     {
       "source": "way/673896839",
@@ -459,13 +472,6 @@
           "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
           "date": null,
           "view": "正射影像屋顶局部，北向上。"
-        },
-        {
-          "file": "way673896839_2.jpg",
-          "url": "https://news.gxnu.edu.cn/_upload/article/images/f8/69/a67395314e24824b7e11cb765c1b/d76240d3-f63e-4df4-8f38-0b012fa23f92.jpg",
-          "page": "https://news.gxnu.edu.cn/2021/0905/c9188a217442/page.psp",
-          "date": null,
-          "view": "服务部室内，仅供核对用途。"
         }
       ],
       "confidence": "aerial"
@@ -521,8 +527,8 @@
       "source": "way/673896842",
       "overture_id": "5159461f-f2dd-4ee5-854a-1271db41ea38",
       "name": "第二文科综合楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 10,
+      "floors_src": "photo",
       "facade": "入口两层深色玻璃以竖梃分格，门厅上方由浅色方柱托起外挑楼层。",
       "colors": {
         "wall": "#e1ddd5",
@@ -533,8 +539,7 @@
       "roof": null,
       "features": [
         "入口斜视，前景为双人雕像",
-        "门厅入口内凹",
-        "北楼至少七层（MBA 教育中心公开地址列七楼，整栋总层数待核）。"
+        "门厅入口内凹"
       ],
       "photos": [
         {
@@ -550,10 +555,18 @@
           "page": "https://www.gxnu.edu.cn/2022/1013/c11796a249123/page.psp",
           "date": null,
           "view": "入口斜视，前景为双人雕像，拍摄方位未注明。"
+        },
+        {
+          "file": "way673896842_3.jpg",
+          "url": "https://cdn.moji002.com/images/simgs/2017/07/11/14997661920.59541700.1760_android.jpg",
+          "page": "http://tianqi.moji.com/liveview/picture/80137684",
+          "date": null,
+          "view": "从广场望向第二文科综合楼双塔；结合校图确认北楼和南楼。"
         }
       ],
       "confidence": "photo",
-      "floors_min": 7
+      "floors_min": 7,
+      "floors_note": "按北楼窗列计，北楼十层地址可交叉核对。"
     },
     {
       "source": "way/673896843",
@@ -1071,11 +1084,11 @@
       "source": "way/674021569",
       "overture_id": "47b2fa86-000d-454f-aafd-00b998820abd",
       "name": "学生五舍",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
-        "wall": null,
+        "wall": "#ddd8c9",
         "accent": null,
         "glass": null,
         "roof": "#5b5f53"
@@ -1083,7 +1096,9 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "aerial"
+      "confidence": "aerial",
+      "floors_note": "与六舍相邻，屋顶轮廓和长宽比例相近；按六舍估算。",
+      "style_reference": "学生六舍；墙色和层数均为建模估值。"
     },
     {
       "source": "way/674021570",
@@ -1137,7 +1152,9 @@
           "view": "正射影像屋顶局部，北向上。"
         }
       ],
-      "confidence": "photo"
+      "confidence": "photo",
+      "floors_min": 1,
+      "floors_note": "基建处只拍到题字墙；校方施工通知确认一楼演播厅，无法由此数出总层数。"
     },
     {
       "source": "way/674026698",
@@ -1368,17 +1385,28 @@
       "name": "化学与药学学院",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "浅绿色竖向墙带分隔数列窗间墙，窗下为灰粉色。",
       "colors": {
-        "wall": null,
-        "accent": null,
+        "wall": "#b7cbc0",
+        "accent": "#b59999",
         "glass": null,
         "roof": "#7e7763"
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "aerial"
+      "features": [
+        "山墙题字；画幅内仅见部分楼层。"
+      ],
+      "photos": [
+        {
+          "file": "way674051977_1.jpg",
+          "url": "https://i1.hdslb.com/bfs/archive/b65a3f1f61ff60141574a002626022097c48f2ba.jpg",
+          "page": "http://www.bilibili.com/video/BV1WG4y1e7U8",
+          "date": null,
+          "view": "校园视频 BV1WG4y1e7U8 封面，地面仰拍，可读墙上“化学楼”字样。"
+        }
+      ],
+      "confidence": "photo",
+      "floors_min": 4
     },
     {
       "source": "way/674051978",
@@ -1466,7 +1494,9 @@
         "roof": null
       },
       "roof": null,
-      "features": [],
+      "features": [
+        "露天硬质场地，外围多段折线形水泥阶梯。"
+      ],
       "photos": [
         {
           "file": "way674051985_1.jpg",
@@ -1474,16 +1504,30 @@
           "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
           "date": null,
           "view": "正射影像屋顶局部，北向上。"
+        },
+        {
+          "file": "way674051985_2.jpg",
+          "url": "https://b0.bdstatic.com/2afd9d6c66075d7ce5292854ac234fcf.jpg",
+          "page": "http://mbd.baidu.com/newspage/data/dtlandingsuper?nid=dt_5563661732458975343",
+          "date": null,
+          "view": "从场内看阶梯看台；以校图露天影场的阶梯轮廓核对。"
+        },
+        {
+          "file": "way674051985_3.jpg",
+          "url": "https://img1.baidu.com/it/u=384925880,3523145036&fm=253&app=138&f=JPEG?w=667&h=500",
+          "page": "http://mbd.baidu.com/newspage/data/dtlandingsuper?nid=dt_5563661732458975343",
+          "date": null,
+          "view": "沿露天场地边缘斜看台阶；以校图露天影场的阶梯轮廓核对。"
         }
       ],
-      "confidence": "aerial"
+      "confidence": "photo"
     },
     {
       "source": "way/674051986",
       "overture_id": "efbe1522-857e-4391-af43-eaccb1131d64",
       "name": "职业技术师范学院",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "photo",
       "facade": "浅色框架划分横向暗窗与砖红色墙带，端翼向庭院折转。",
       "colors": {
         "wall": "#cfccbf",
@@ -1520,7 +1564,8 @@
         }
       ],
       "confidence": "photo",
-      "floors_min": 5
+      "floors_min": 5,
+      "floors_note": "庭院侧五排窗，屋顶弧架未计层。"
     },
     {
       "source": "way/674051987",
@@ -1544,8 +1589,8 @@
       "source": "way/674067259",
       "overture_id": "56c4a291-0ad5-41da-b01d-8173f56753f2",
       "name": "数学科学学院",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "photo",
       "facade": "浅米色横向窗带，端部竖向玻璃窗从顶层延伸至树冠后。",
       "colors": {
         "wall": "#e1dbcb",
@@ -1575,7 +1620,8 @@
           "view": "正射影像屋顶局部，北向上。"
         }
       ],
-      "confidence": "photo"
+      "confidence": "photo",
+      "floors_note": "树冠遮住底层局部，上部五排窗，合计估读六层。"
     },
     {
       "source": "way/674067261",
@@ -1902,8 +1948,8 @@
     {
       "source": "2143a1b7-a73c-4d5d-a5b4-ef278c18c735",
       "name": "田家炳教育学院",
-      "floors": null,
-      "floors_src": null,
+      "floors": 8,
+      "floors_src": "photo",
       "facade": "米白色外墙、横向窗带，入口上方以土黄色斜柱支撑悬挑部分。",
       "colors": {
         "wall": "#e0dcd1",
@@ -1947,7 +1993,8 @@
         }
       ],
       "confidence": "photo",
-      "floors_min": 4
+      "floors_min": 4,
+      "floors_note": "从校区斜俯视图中数中央突出部分的窗列，局部裙楼较低。"
     },
     {
       "source": "2848602e-1909-4a7d-929e-cf879894cba6",
@@ -1988,10 +2035,10 @@
       "name": "第二理科综合楼",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "入口弧墙贴浅色小砖，门厅有灰色立柱，楼层间有赭色横带。",
       "colors": {
-        "wall": null,
-        "accent": null,
+        "wall": "#d8d5c9",
+        "accent": "#b29774",
         "glass": null,
         "roof": "#7d7d68"
       },
@@ -2004,9 +2051,16 @@
           "page": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
           "date": null,
           "view": "正射影像屋顶局部，北向上。"
+        },
+        {
+          "file": "3911cb0a-2f6d-4a4d-bcbe-b31dbf941364_2.jpg",
+          "url": "https://www.gxnu.edu.cn/_upload/article/files/c2/6b/43058608473caa34021549e4b67d/59652c82-d478-4dfe-9bb7-75363638b985.pdf",
+          "page": "https://www.gxnu.edu.cn/_upload/article/files/c2/6b/43058608473caa34021549e4b67d/59652c82-d478-4dfe-9bb7-75363638b985.pdf#page=4",
+          "date": null,
+          "view": "校方指南第 4 页组合图左部，入口弧墙上有“第二理科综合楼”金色题字。"
         }
       ],
-      "confidence": "aerial"
+      "confidence": "photo"
     },
     {
       "source": "46adbbe3-7a84-4498-9a17-d0944df67a24",
@@ -2242,17 +2296,27 @@
       "name": "国际教育交流中心",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "弧形绿色玻璃入口连接浅色两翼，横向阳台边带连续。",
       "colors": {
-        "wall": null,
-        "accent": null,
+        "wall": "#dddacb",
+        "accent": "#619993",
         "glass": null,
         "roof": "#616454"
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "aerial"
+      "features": [
+        "入口上方弧形透明雨棚"
+      ],
+      "photos": [
+        {
+          "file": "871f7228-32bc-4208-bc43-a349a16f61a4_1.jpg",
+          "url": "http://www.cice.gxnu.edu.cn/_upload/tpl/00/1b/27/template27/htmlRes/nav_about2.jpg",
+          "page": "http://www.cice.gxnu.edu.cn/1144/list.htm",
+          "date": null,
+          "view": "学院概况照片，入口白色弧形檐口可读“广西师范大学 国际教育交流中心”。"
+        }
+      ],
+      "confidence": "photo"
     },
     {
       "source": "95a09490-5bee-46b4-b10e-da09d8425e6a",
@@ -2786,22 +2850,6 @@
         }
       ],
       "lonlat": null
-    }
-  ],
-  "unmatched_landmarks": [
-    {
-      "source": "new_intl",
-      "name": "新国教楼",
-      "desc": "浅色高层体量与低层部分相接，两段横向窗带之间有深色玻璃。公开图注未提供唯一对应的楼栋轮廓。",
-      "photos": [
-        {
-          "file": "new_intl_1.jpg",
-          "url": "https://jjc.gxnu.edu.cn/_upload/article/images/d4/6a/c951ea6940048c1b583aa9c8917d/a38d3199-5466-4f24-9253-16f43d10f2e6_d.jpg",
-          "page": "https://jjc.gxnu.edu.cn/2021/0905/c9494a217265/page.htm",
-          "date": null,
-          "view": "从街面仰看长立面、端部及低层裙楼。"
-        }
-      ]
     }
   ],
   "aerial_imagery": {
