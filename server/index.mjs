@@ -12,13 +12,44 @@ import {presence} from './live.mjs'
 
 crypto.subtle.timingSafeEqual = (left,right) => left.byteLength===right.byteLength && timingSafeEqual(left,right)
 // 连接/查询都有上限：卡住的查询不能长期占着 5 连接的池子
-const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:5,connectionTimeoutMillis:3000,query_timeout:15000,idleTimeoutMillis:30000})
+// 后台首屏会同时发十几条聚合查询；pool 只给 5 条连接时它们要排队，光排队就能把首屏拖到几秒。
+// Postgres max_connections=100，这里给 12 条足够。
+const pool=new pg.Pool({connectionString:process.env.DATABASE_URL,max:Number(process.env.PG_POOL_MAX||12),connectionTimeoutMillis:3000,query_timeout:15000,idleTimeoutMillis:30000})
 // 空闲连接被服务端断开（postgres 重启/维护）时 pg.Pool 会 emit 'error'，不监听就整个进程崩溃
 pool.on('error',error=>console.error('postgres idle client error',error.code??error.message))
 const readiness=createReadiness({query:sql=>pool.query(sql)})
 const metrics=monitor(pool)
 const connections=measuredConnections(pool,metrics)
-const env = {...process.env, perfQuery:(path,params)=>(path.startsWith('admin/perf')?queryPerf:analytics)(connections,path,params), DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
+// 后台聚合查询的短期缓存：一次首屏并发十几条聚合，数据本身按分钟更新，30 秒内重复跑同一份 SQL 没意义
+// （单条网格查询 24 小时要 933ms）。只缓存只读分析类路径，admin/live 与写操作直通。
+const ADMIN_CACHE_TTL = Number(process.env.ADMIN_CACHE_TTL ?? 30000)
+const ADMIN_CACHE_MAX = 200
+const adminCache = new Map()
+const cacheableAdminPath = path => /^admin\/(perf(\/grid|\/server)?|overview|timeseries|breakdown|funnel|errors)$/.test(path)
+function withAdminCache(key, run) {
+  const now = Date.now()
+  const hit = adminCache.get(key)
+  if (hit && hit.expires > now) return Promise.resolve(hit.response.clone())
+  return run().then(response => {
+    if (response.ok) {
+      adminCache.set(key, {response: response.clone(), expires: now + ADMIN_CACHE_TTL})
+      if (adminCache.size > ADMIN_CACHE_MAX) adminCache.delete(adminCache.keys().next().value)
+    }
+    return response
+  })
+}
+const runPerfQuery = (path, params) => (path.startsWith('admin/perf') ? queryPerf : analytics)(connections, path, params)
+const cachedPerfQuery = (path, params) => {
+  const started = Date.now()
+  const done = response => {
+    const ms = Date.now() - started
+    if (ms > 300) console.log(JSON.stringify({scope: 'admin-query', path, ms, query: String(params).slice(0, 120)}))
+    return response
+  }
+  if (!cacheableAdminPath(path)) return runPerfQuery(path, params).then(done)
+  return withAdminCache(`${path}?${params}`, () => runPerfQuery(path, params)).then(done)
+}
+const env = {...process.env, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
 const online = presence(pool)
 
