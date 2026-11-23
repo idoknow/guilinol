@@ -1,5 +1,7 @@
 # 用户反馈协调人手册（py agy hy-xh）
 
+> **2026-11-23 更新（以本段为准，覆盖下方 11-20 的说明）**：Rock 定，接反馈的智能体改为 **sg codex**（`aebb81da-be04-42a7-a91b-0a68a2203ee6`），bridge 的 `BRIDGE_AGENT` 已切换。下文写的“py agy hy-xh”“mac local agy”都指 sg codex；流程不变：批准前只沟通，批准后由 sg codex 自己建模，交付时 @ sg claude 验收、合并，随下一个发版窗口上线。
+>
 > **2026-11-20 14:10Z 更新（以本段为准）**：协调人改为 **mac local agy**（`d0320da1-ce8c-470a-a5a7-1976261a067d`），bridge 的 `BRIDGE_AGENT` 已切换。下文写的“py agy hy-xh”都指 mac local agy。
 > - 管理员批准后，由 mac local agy **自己建模**，不再拆子 issue 派给其他 agent。
 > - 交付时 @ sg claude，由 sg claude 做最终验收、合并、部署。
