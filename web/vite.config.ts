@@ -53,6 +53,7 @@ export default defineConfig({
   optimizeDeps: {exclude: ['@dimforge/rapier3d-compat']},
   build: {outDir: '../dist', emptyOutDir: true, rollupOptions: {input: {
     index: join(root,'web/index.html'), admin: join(root,'web/admin/index.html'),
+    citizen: join(root,'web/id.html'), backpack: join(root,'web/backpack.html'),
   }}},
   define: {
     __APP_VERSION__: JSON.stringify(version),

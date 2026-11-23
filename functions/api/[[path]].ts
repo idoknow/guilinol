@@ -2,6 +2,7 @@ import {type SessionAccount,type Env,checkBan,sessionAccount,Problem,cookie,deli
 
 import {AVATAR_KEY, looks, sanitizeAvatar, starterOutfit} from '../../lib/avatar'
 import {feedback} from '../../lib/feedback'
+import {citizen} from '../../lib/citizen'
 import {feedbackContributors} from '../../lib/contributors'
 import {bindEmail,isSocialType,socialCallback,socialConfig,socialConfirm,socialPending,socialRegister,socialStates,startSocial,userSocialIdentities} from '../../lib/social'
 import {unsubscribe} from '../../lib/feedback-mail'
@@ -26,6 +27,7 @@ async function handle(request:Request,env:Env) {
   if(method==='GET'&&path==='contributors')return feedbackContributors(env)
   if(/^(feedback|bridge|admin)(\/|$)/.test(path)) return feedback(request,env,path)
   if(path==='me/save')return cloudSave(request,env)
+  if(path.startsWith('citizen/'))return citizen(request,env,path)
   if(!Object.hasOwn(methods,path)) throw new Problem(404,'not_found','接口不存在')
   if(!methods[path].includes(method)) throw new Problem(405,'method','不支持的请求方式')
   if(path==='health')return json({ok:true})
