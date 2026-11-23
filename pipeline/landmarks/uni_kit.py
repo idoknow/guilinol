@@ -41,7 +41,11 @@ def edges(pts, min_len=3.0):
 
 
 def quad(b, p0, p1, y0, y1, off, nrm, region, lit=False, tile=2.4):
-    """Vertical quad between plan points p0->p1 pushed ``off`` metres along nrm."""
+    """Vertical quad between plan points p0->p1 pushed ``off`` metres along nrm.
+
+    Facade layers stay a few cm off the wall so the grounding audit still reads them
+    as wall-mounted; campus GLBs are packed with 16-bit positions (landmarks.json
+    ``positionBits``) so these offsets survive quantisation (IDOK-165)."""
     ox, oz = nrm[0] * off, nrm[1] * off
     b.face([(p0[0] + ox, y0, p0[1] + oz), (p1[0] + ox, y0, p1[1] + oz),
             (p1[0] + ox, y1, p1[1] + oz), (p0[0] + ox, y1, p0[1] + oz)],
@@ -134,7 +138,7 @@ def building(b, ring, *, floors, fh=3.5, style='punched', wall='white', accent='
             p1 = (c[0] - u[0] * ins, c[1] - u[1] * ins)
             for f in range(floors):
                 y = base + f * fh + 0.95
-                quad(b, p0, p1, y, y + win_h, 0.04, nrm, 'glass', lit=True)
+                quad(b, p0, p1, y, y + win_h, 0.05, nrm, 'glass', lit=True)
         return base, top
 
     for i, a, c, L, u, nrm in edges(pts, 3.0):
@@ -158,13 +162,13 @@ def building(b, ring, *, floors, fh=3.5, style='punched', wall='white', accent='
                 slab(b, a, c, base + f * fh - 0.22, 0.22, 0.75, nrm, accent)
             for f in range(floors):
                 y = base + f * fh + 0.85
-                quad(b, a, c, y, y + fh - 1.25, 0.03, nrm, 'glass', lit=True)
+                quad(b, a, c, y, y + fh - 1.25, 0.05, nrm, 'glass', lit=True)
             continue
         if style == 'ribbon':
             for f in range(floors):
                 y = base + f * fh
                 quad(b, (a[0] + u[0] * 0.6, a[1] + u[1] * 0.6), (c[0] - u[0] * 0.6, c[1] - u[1] * 0.6),
-                     y + 1.0, y + 1.0 + win_h, 0.03, nrm, 'glass', lit=True)
+                     y + 1.0, y + 1.0 + win_h, 0.05, nrm, 'glass', lit=True)
                 slab(b, a, c, y + fh - 0.45 if f < floors - 1 else y + fh - 0.3, 0.55 if f < floors - 1 else 0.3,
                      0.32, nrm, accent)
             for k in range(1, nb, 2):
@@ -178,7 +182,7 @@ def building(b, ring, *, floors, fh=3.5, style='punched', wall='white', accent='
                     y = base + f * fh
                     slab(b, a, c, y - 0.18, 0.18, 1.3, nrm, trim)
                     quad(b, a, c, y, y + 1.05, 1.3, nrm, accent)
-                    quad(b, a, c, y + 1.05, y + fh - 0.25, 0.04, nrm, 'glass', lit=True)
+                    quad(b, a, c, y + 1.05, y + fh - 0.25, 0.05, nrm, 'glass', lit=True)
                 for k in range(0, nb + 1, 2):
                     p = (a[0] + u[0] * k * step, a[1] + u[1] * k * step)
                     fin(b, p, base + fh - 0.18, top - base - fh, 1.3, 0.24, u, nrm, wall)
@@ -190,7 +194,7 @@ def building(b, ring, *, floors, fh=3.5, style='punched', wall='white', accent='
                 m = (a[0] + u[0] * (k + 0.5) * step, a[1] + u[1] * (k + 0.5) * step)
                 p0 = (m[0] - u[0] * ww / 2, m[1] - u[1] * ww / 2)
                 p1 = (m[0] + u[0] * ww / 2, m[1] + u[1] * ww / 2)
-                quad(b, p0, p1, y, y + win_h, 0.03, nrm, 'glass', lit=True)
+                quad(b, p0, p1, y, y + win_h, 0.05, nrm, 'glass', lit=True)
             if style == 'panel':
                 # coloured panels between the paired windows (pink tile bands, GUET teaching blocks)
                 for k in range(nb + 1):
@@ -198,7 +202,7 @@ def building(b, ring, *, floors, fh=3.5, style='punched', wall='white', accent='
                     pw = max(0.4, (step - ww) * 0.8)
                     p0 = (m[0] - u[0] * pw / 2, m[1] - u[1] * pw / 2)
                     p1 = (m[0] + u[0] * pw / 2, m[1] + u[1] * pw / 2)
-                    quad(b, p0, p1, y - 0.2, y + win_h + 0.2, 0.025, nrm, accent)
+                    quad(b, p0, p1, y - 0.2, y + win_h + 0.2, 0.03, nrm, accent)
             # continuous sill line
             slab(b, a, c, y - 0.16, 0.14, 0.08, nrm, trim)
         if style == 'pilaster':

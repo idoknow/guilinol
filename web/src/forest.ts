@@ -4,6 +4,7 @@ import {applyTreeVariant, setTreeFar, sharedProxyAssets, TREE_SPECIES_COUNT, tre
 import {look} from './look/config'
 import {fetchAsset,type Tile} from './world'
 import {treeBlocked} from './tunnels'
+import {onOldSouthSlope,slopeStart,slopeRatio} from './yueya-slope'
 
 export type Tree={
   x:number; y:number; z:number; kind:number; scale:number; seed:number
@@ -33,7 +34,12 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
   const matrix=new THREE.Matrix4(),midMatrix=new THREE.Matrix4()
   const tint=new THREE.Color(),proxyTint=new THREE.Color()
   for(let i=0;i<data.byteLength;i+=12){
-    const x=tile.x+data.getUint16(i,true)/100,z=tile.z+data.getUint16(i+2,true)/100,y=data.getInt16(i+4,true)/10
+    const x=tile.x+data.getUint16(i,true)/100,y=data.getInt16(i+4,true)/10
+    let z=tile.z+data.getUint16(i+2,true)/100
+    if((data.getInt8(i+10)||data.getInt8(i+11))&&onOldSouthSlope(x,z)){
+      const start=slopeStart(x),distance=z-start
+      z=start+distance*slopeRatio(distance)
+    }
     if(treeBlocked(x,y,z))continue
     const rawKind=data.getUint8(i+6),kind=rawKind<TREE_SPECIES_COUNT?rawKind:0
     const scale=data.getUint8(i+7)/100,yaw=data.getUint8(i+8)*Math.PI/128,seed=data.getUint8(i+9)

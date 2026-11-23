@@ -67,9 +67,13 @@ for name in postgres minio; do k rollout status "deployment/glol-$name" --timeou
 # 首次装库：/api/ready 要求 public.users 存在，所以迁移必须早于 web 就绪
 [[ $migrated == 1 ]] || migrate
 k rollout status deployment/glol-web --timeout=300s
+# 联机服务是 1 副本 + Recreate，起不来就是 /ws 全挂；不能只看 web
+k rollout status deployment/glol-rt --timeout=180s
 # 确认最终跑的就是本次要发的镜像（防止并发发版把镜像改回去）
 applied=$(k get deployment/glol-web -o "jsonpath='{.spec.template.spec.containers[?(@.name==\"glol-api\")].image}'")
 [[ $applied == *":$tag" ]] || { echo "镜像与本次发版不一致：$applied ≠ :$tag" >&2; exit 1; }
+rt_image=$(k get deployment/glol-rt -o "jsonpath='{.spec.template.spec.containers[0].image}'")
+[[ $rt_image == *":$tag" ]] || { echo "联机服务镜像与本次发版不一致：$rt_image ≠ :$tag" >&2; exit 1; }
 
 k exec -i deploy/glol-web -c glol-api -- node --input-type=module <<'JS'
 import {S3Client,HeadBucketCommand,CreateBucketCommand} from '@aws-sdk/client-s3'

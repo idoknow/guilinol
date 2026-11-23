@@ -5,8 +5,8 @@
     {
       "source": "way/606398822",
       "name": "球类馆",
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -20,13 +20,14 @@
       "confidence": "none",
       "source_aliases": [
         "ce842498-fed5-4a34-9d68-5e20a3ecbc53"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "way/606398823",
       "name": "室内网球场",
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -40,24 +41,36 @@
       "confidence": "none",
       "source_aliases": [
         "d7a03492-fc12-4cb0-99f7-547f0e061d75"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "way/606411548",
       "name": "中央食堂",
       "floors": 6,
       "floors_src": "osm",
-      "facade": null,
+      "facade": "入口有成排玻璃门，门楣横向连续。",
       "colors": {
-        "wall": null,
+        "wall": "#C68879",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "玻璃门厅"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-606411548-1.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/B60e948c69b8f8faee.jpeg",
+          "page": "https://map.baidu.com/poi/5bdb927e494d8a4479dbd21f",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "入口有成排玻璃门，门楣横向连续。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "888ef44f-587c-4cc8-8c81-da806e5848e3"
       ]
@@ -65,8 +78,8 @@
     {
       "source": "way/606411549",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 3,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -80,7 +93,8 @@
       "confidence": "none",
       "source_aliases": [
         "8f999c21-b827-42fe-b09b-9f72ac021a2c"
-      ]
+      ],
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。"
     },
     {
       "source": "way/606411550",
@@ -107,17 +121,36 @@
       "name": "信息与通信学院",
       "floors": 5,
       "floors_src": "osm",
-      "facade": null,
+      "facade": "米白墙体配连续深色窗带，入口雨棚呈蓝色折面。",
       "colors": {
-        "wall": null,
+        "wall": "#DDD4C4",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "蓝色雨棚"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-606465853-1.jpg",
+          "url": "https://taojin-his.cdn.bcebos.com/5882b2b7d0a20cf4ef0b5b6975094b36adaf99e9.jpg?x-bce-process=image/crop,x_120,y_0,w_720,h_540/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/2e279cd61d494b07b13c8162",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "学院门牌与玻璃窗分格。"
+        },
+        {
+          "file": "huajiang-606465853-2.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/B6506ae9e79c0c10c5a.jpeg?x-bce-process=image/crop,x_0,y_280,w_960,h_720/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/2e279cd61d494b07b13c8162",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "浅色墙面与蓝色雨棚。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "87c814f9-87ec-48fc-8a44-eb69d304411a"
       ]
@@ -127,17 +160,28 @@
       "name": "第二教学楼",
       "floors": 5,
       "floors_src": "osm",
-      "facade": null,
+      "facade": "浅色端墙有竖排楼名，侧翼窗间墙排列规整。",
       "colors": {
-        "wall": null,
+        "wall": "#D6D5C8",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "竖排楼名"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-606478146-1.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_4eb73d183e874cba57d3b9c015111f13.jpeg?x-bce-process=image/crop,x_0,y_262,w_900,h_675/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/d36f29f1946a1d675d0d022e",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "浅色端墙有竖排楼名，侧翼窗间墙排列规整。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "84f2514c-b007-4e61-8fe6-945ede655b4a"
       ]
@@ -167,17 +211,28 @@
       "name": "第四教学楼",
       "floors": 5,
       "floors_src": "osm",
-      "facade": null,
+      "facade": "灰白小方砖覆盖端墙，楼名沿墙面竖排。",
       "colors": {
-        "wall": null,
+        "wall": "#A5ABAD",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "小方砖墙面"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-606478156-1.jpg",
+          "url": "https://taojin-his.cdn.bcebos.com/f31fbe096b63f624dfd49cb58444ebf81b4ca3ff.jpg?x-bce-process=image/crop,x_0,y_277,w_540,h_405/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/72bbc66a6432c6fee31103d4",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "灰白小方砖覆盖端墙，楼名沿墙面竖排。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "93236626-8aa2-4cda-8ee8-d9a13ea47e00"
       ]
@@ -187,17 +242,28 @@
       "name": "第五教学楼",
       "floors": 5,
       "floors_src": "osm",
-      "facade": null,
+      "facade": "浅灰色小方砖外墙有成排矩形窗，楼名用蓝绿色竖字。",
       "colors": {
-        "wall": null,
+        "wall": "#BDBDB3",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "蓝绿色楼名"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-606478159-1.jpg",
+          "url": "https://taojin-his.cdn.bcebos.com/f2deb48f8c5494eef197aaaf2ef5e0fe98257eca.jpg?x-bce-process=image/crop,x_0,y_277,w_540,h_405/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/93207755c78272072806cef3",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "浅灰色小方砖外墙有成排矩形窗，楼名用蓝绿色竖字。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "54ec4bd3-7666-4460-ab1a-9d08ec5d76f1"
       ]
@@ -225,59 +291,102 @@
     {
       "source": "way/606478183",
       "name": "第十三教学楼",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 5,
+      "floors_src": "photo",
+      "facade": "灰色砖面夹浅红色窗下墙，楼端设敞开外廊。",
       "colors": {
-        "wall": null,
+        "wall": "#9B9793",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "凹入式外廊"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-606478183-1.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/B60e94425a3998f29b.jpeg",
+          "page": "https://map.baidu.com/poi/7961fed3f7cffafaede4a5b7",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "正面楼名和外廊。"
+        },
+        {
+          "file": "huajiang-606478183-2.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_f0d36842044ee36a834c5ed35fda6ca6.jpeg?x-bce-process=image/crop,x_0,y_262,w_900,h_675/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/7961fed3f7cffafaede4a5b7",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "楼端竖匾与窗下墙。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "29ce16a7-fc46-4861-88ac-883169fded48"
-      ]
+      ],
+      "floor_count_note": "按照片可见窗排或外廊估读主体地上层数。"
     },
     {
       "source": "way/606478186",
       "name": "第十四教学楼",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 5,
+      "floors_src": "photo",
+      "facade": "灰色砖柱与浅红色窗下墙相间，竖排楼名紧邻开敞外廊。",
       "colors": {
-        "wall": null,
+        "wall": "#AAA39B",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "楼端竖匾"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-606478186-1.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_3f5152f4fe2a45f458a19820fa006bc5.jpeg?x-bce-process=image/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/797843ae3043c241b11e36fc",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "灰色砖柱与浅红色窗下墙相间，竖排楼名紧邻开敞外廊。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "fbf1c373-c367-4b31-a1a1-d7bf6c5e7bf6"
-      ]
+      ],
+      "floor_count_note": "按照片可见窗排或外廊估读主体地上层数。"
     },
     {
       "source": "way/606478191",
       "name": "第十六教学楼",
       "floors": 5,
       "floors_src": "osm",
-      "facade": null,
+      "facade": "粉灰色墙砖配浅色横带，深色矩形窗与竖排楼名相邻。",
       "colors": {
-        "wall": null,
+        "wall": "#AE9395",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "浅色腰线"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-606478191-1.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_c202c6b919f51606622ec6ac61c40dc8.jpg?x-bce-process=image/crop,x_0,y_315,w_1080,h_810/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/0542fcdf7d26deb476e5b6d5",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "粉灰色墙砖配浅色横带，深色矩形窗与竖排楼名相邻。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "a0adde6a-e70e-49d5-a546-3e7fe667b1de"
       ]
@@ -287,17 +396,28 @@
       "name": "第十七教学楼",
       "floors": 5,
       "floors_src": "osm",
-      "facade": null,
+      "facade": "浅粉色墙面有矩形玻璃窗，窗台下方一条白色水平线贯穿墙面。",
       "colors": {
-        "wall": null,
+        "wall": "#C6A598",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "白色水平腰线"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-606478194-1.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_4e54165df21047c7b3b36cfc37be9bf5.jpeg?x-bce-process=image/crop,x_0,y_262,w_900,h_675/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/c317a8db8d22ef91f4c59ca7",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "浅粉色墙面有矩形玻璃窗，窗台下方一条白色水平线贯穿墙面。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "4d06b5cd-a7dd-4d4a-86c6-344b2abdb8c4"
       ]
@@ -305,8 +425,8 @@
     {
       "source": "way/606915477",
       "name": "馨园餐厅",
-      "floors": null,
-      "floors_src": null,
+      "floors": 2,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -320,13 +440,14 @@
       "confidence": "none",
       "source_aliases": [
         "c7df7a50-6d63-4a10-9b7a-3181d85fe8d8"
-      ]
+      ],
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。"
     },
     {
       "source": "way/614473430",
       "name": "24#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -340,13 +461,14 @@
       "confidence": "none",
       "source_aliases": [
         "6b4cb6b7-e010-4c57-9ef6-05f0b89b0c77"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/614473431",
       "name": "23#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -360,7 +482,8 @@
       "confidence": "none",
       "source_aliases": [
         "64f5176e-c5a0-4d4e-b992-039e83566258"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/614473434",
@@ -445,8 +568,8 @@
     {
       "source": "way/621474561",
       "name": "21#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -460,13 +583,14 @@
       "confidence": "none",
       "source_aliases": [
         "3721bd88-bc5a-4cef-9ce1-8d0a8c835b2e"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621474562",
       "name": "22#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -480,13 +604,14 @@
       "confidence": "none",
       "source_aliases": [
         "3d85f0b8-c636-47ff-8497-9713700acc04"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621474563",
       "name": "8#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -500,13 +625,14 @@
       "confidence": "none",
       "source_aliases": [
         "cf7f4aa5-60da-462c-99dd-5d30037fd51e"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621945213",
       "name": "7#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -520,13 +646,14 @@
       "confidence": "none",
       "source_aliases": [
         "09daa5b2-ba74-4396-a673-50100d30177e"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621945214",
       "name": "6#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -540,13 +667,14 @@
       "confidence": "none",
       "source_aliases": [
         "7ed29d2b-d321-41c0-9bbb-b81e461fc50c"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621945215",
       "name": "5#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -560,13 +688,14 @@
       "confidence": "none",
       "source_aliases": [
         "2b88cb6f-3a94-4769-afd2-9d4ef748b63d"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621945216",
       "name": "4#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -580,13 +709,14 @@
       "confidence": "none",
       "source_aliases": [
         "256fb4c3-42b1-4b98-acff-ad89c13846bb"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621945217",
       "name": "3#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -600,13 +730,14 @@
       "confidence": "none",
       "source_aliases": [
         "e83a760e-c570-4451-b20a-309ff76e8c4e"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621945218",
       "name": "2#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -620,13 +751,14 @@
       "confidence": "none",
       "source_aliases": [
         "49185a51-c9a7-47fb-8e1b-3b96be64ad70"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621945219",
       "name": "1#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -640,13 +772,14 @@
       "confidence": "none",
       "source_aliases": [
         "a0ff1a15-ac3a-44f1-8351-b7cd9d53b675"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621945727",
       "name": "14#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -660,13 +793,14 @@
       "confidence": "none",
       "source_aliases": [
         "1e49537f-4a83-4553-815c-bc1a1da802d5"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621945728",
       "name": "13#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -680,13 +814,14 @@
       "confidence": "none",
       "source_aliases": [
         "317021c8-cf76-439a-abda-a6e4db25a7a3"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621945729",
       "name": "15#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -700,13 +835,14 @@
       "confidence": "none",
       "source_aliases": [
         "19bad98b-9ca3-4391-9d7b-0a7738894302"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621945730",
       "name": "16#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -720,13 +856,14 @@
       "confidence": "none",
       "source_aliases": [
         "08a5bf12-ffb6-42e5-b970-82182c553d7d"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621945731",
       "name": "17#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -740,13 +877,14 @@
       "confidence": "none",
       "source_aliases": [
         "d38250f0-0160-464e-8d30-f6d40f3a4160"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621946475",
       "name": "18#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -760,13 +898,14 @@
       "confidence": "none",
       "source_aliases": [
         "ae92747d-f01b-46ec-acea-d3bb8558ace0"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621946476",
       "name": "19#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -780,13 +919,14 @@
       "confidence": "none",
       "source_aliases": [
         "afada9d8-6786-4b90-9145-e58fb7d76e67"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621946477",
       "name": "20#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -800,13 +940,14 @@
       "confidence": "none",
       "source_aliases": [
         "c8fd85a0-6279-4937-b4e8-3e3034f6f011"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621946478",
       "name": "青工楼A#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -820,13 +961,14 @@
       "confidence": "none",
       "source_aliases": [
         "ebe6406d-8b63-4bcf-b117-e6158425b1cd"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621946479",
       "name": "青工楼B#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -840,53 +982,78 @@
       "confidence": "none",
       "source_aliases": [
         "8b7c331a-1327-4da1-b4d5-465ca11714d7"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/621959944",
       "name": "办公大楼",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 4,
+      "floors_src": "aerial",
+      "facade": "入口上方为红褐色小砖饰面，两侧柱身与深色玻璃门形成分格。",
       "colors": {
-        "wall": null,
+        "wall": "#AD7D69",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "办公大楼门牌"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-621959944-1.jpg",
+          "url": "https://taojin-his.cdn.bcebos.com/6159252dd42a28340e0b08ea55b5c9ea14cebfa5.jpg?x-bce-process=image/crop,x_0,y_555,w_1080,h_810/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/1d851e4ad9910ccecf06a4c4",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "入口上方为红褐色小砖饰面，两侧柱身与深色玻璃门形成分格。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "64a9ee08-7a12-4399-b54a-617531f9b087"
-      ]
+      ],
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。照片仅覆盖局部、跨层空间或远景，无法逐层数窗。"
     },
     {
       "source": "way/621959945",
       "name": "会议中心",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 2,
+      "floors_src": "aerial",
+      "facade": "临水立面由浅色柱廊和红褐色墙面组成，深色坡顶分段抬高。",
       "colors": {
-        "wall": null,
+        "wall": "#D1C7AE",
         "accent": null,
         "glass": null,
-        "roof": null
+        "roof": "#4D5055"
       },
-      "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "roof": "多段深色坡顶",
+      "features": [
+        "临水柱廊"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-meeting-lake.jpg",
+          "url": "https://www.guet.edu.cn/_upload/article/images/50/2a/830fb8a14a0699aa9141613d1a66/21ff8300-c63f-40e7-8aaf-b263dde63fe8.jpg",
+          "page": "https://www.guet.edu.cn/2023/0914/c6377a106598/page.htm",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "临水立面由浅色柱廊和红褐色墙面组成，深色坡顶分段抬高。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "43cc2e43-58bd-4f78-90ed-a8b770fab485"
-      ]
+      ],
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。照片仅覆盖局部、跨层空间或远景，无法逐层数窗。"
     },
     {
       "source": "way/621959946",
       "name": "档案馆",
-      "floors": null,
-      "floors_src": null,
+      "floors": 2,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -900,7 +1067,8 @@
       "confidence": "none",
       "source_aliases": [
         "faac641a-4903-49df-9747-1d268061e427"
-      ]
+      ],
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。"
     },
     {
       "source": "way/622349313",
@@ -925,8 +1093,8 @@
     {
       "source": "way/624033990",
       "name": "学生活动中心",
-      "floors": null,
-      "floors_src": null,
+      "floors": 4,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -940,13 +1108,14 @@
       "confidence": "none",
       "source_aliases": [
         "f2f70f1c-831f-4705-be5e-4f3336ab56d9"
-      ]
+      ],
+      "floor_count_note": "学校公示确认红亮学生活动中心至少四层，结合主体体量按四层估计。"
     },
     {
       "source": "way/624036625",
       "name": "材料科学与工程学院实验教学中心-美育实践中心",
-      "floors": null,
-      "floors_src": null,
+      "floors": 3,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -960,13 +1129,14 @@
       "confidence": "none",
       "source_aliases": [
         "629eeaf8-3ed4-4911-8e70-b489b448faae"
-      ]
+      ],
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。"
     },
     {
       "source": "way/624036626",
       "name": "33#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -980,13 +1150,14 @@
       "confidence": "none",
       "source_aliases": [
         "18040e09-a0a9-4450-b27a-c43384136f9b"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/624036627",
       "name": "32#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1000,33 +1171,46 @@
       "confidence": "none",
       "source_aliases": [
         "3ba4d65b-2bfb-4452-bb1f-62df4f24b30e"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/624036628",
       "name": "仲园餐厅",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "灰色横梁上有金色餐厅名称，中部蓝色玻璃与侧面开敞走廊相连。",
       "colors": {
-        "wall": null,
+        "wall": "#99969B",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "金色餐厅名"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-624036628-1.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/B5f728c31651a76682.jpeg?x-bce-process=image/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/d7bd1eae2d91280bd5b74ed4",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "灰色横梁上有金色餐厅名称，中部蓝色玻璃与侧面开敞走廊相连。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "297df949-b5c9-48f8-b24f-798d8264d43f"
-      ]
+      ],
+      "floor_count_note": "按照片可见窗排或外廊估读主体地上层数。"
     },
     {
       "source": "way/624036629",
       "name": "31#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1040,13 +1224,14 @@
       "confidence": "none",
       "source_aliases": [
         "aecbe6a1-1844-40e6-8017-1a07c288d3ce"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/624036630",
       "name": "29#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1060,13 +1245,14 @@
       "confidence": "none",
       "source_aliases": [
         "19c088c7-012d-4b63-a6ba-e2da36c9c58a"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/624036631",
       "name": "25#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1080,13 +1266,14 @@
       "confidence": "none",
       "source_aliases": [
         "8cfce977-5041-4a0d-a0a2-cf5c6618f91e"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/624036632",
       "name": "28#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1100,13 +1287,14 @@
       "confidence": "none",
       "source_aliases": [
         "ada94fad-b64b-466f-8f24-f12625a733c5"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/624154298",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1120,13 +1308,14 @@
       "confidence": "none",
       "source_aliases": [
         "537e10d6-49ce-42e8-bec8-8bd53822ffb1"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。"
     },
     {
       "source": "way/624154299",
       "name": "信科第43教学楼2区",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1140,13 +1329,14 @@
       "confidence": "none",
       "source_aliases": [
         "23b15459-3b6f-47c6-b91f-3c9b900f0eab"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。"
     },
     {
       "source": "way/624154300",
       "name": "信科第43教学楼1区",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1160,13 +1350,14 @@
       "confidence": "none",
       "source_aliases": [
         "0cb8b7b0-0e54-45a2-a5cd-b78487b05ba6"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。"
     },
     {
       "source": "way/624154301",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1180,13 +1371,14 @@
       "confidence": "none",
       "source_aliases": [
         "7b2bf1be-d10e-4ab6-b166-3e32fb9bfb42"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。"
     },
     {
       "source": "way/624155184",
       "name": "信科第41教学楼1区（艺术与设计学院）",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1200,13 +1392,14 @@
       "confidence": "none",
       "source_aliases": [
         "1fa471d7-9b14-4bb3-a43e-2f5859137e99"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。"
     },
     {
       "source": "way/624155188",
       "name": "信科第41教学楼2区（艺术与设计学院）",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1220,13 +1413,14 @@
       "confidence": "none",
       "source_aliases": [
         "cb5b4333-87e4-4e80-85b9-34bd38ac1a9c"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。"
     },
     {
       "source": "way/625278112",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 2,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1240,7 +1434,8 @@
       "confidence": "none",
       "source_aliases": [
         "89882aa1-4bb6-4846-ad59-87c58a838ceb"
-      ]
+      ],
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。"
     },
     {
       "source": "way/625278113",
@@ -1265,8 +1460,8 @@
     {
       "source": "way/625278114",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 2,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1280,13 +1475,14 @@
       "confidence": "none",
       "source_aliases": [
         "e255e6f7-69d9-4cd1-b602-20975506bbb3"
-      ]
+      ],
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。"
     },
     {
       "source": "way/627698707",
       "name": "1号公寓-44栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1300,13 +1496,14 @@
       "confidence": "none",
       "source_aliases": [
         "c354c350-0147-450e-8cd3-8744d32638f0"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/627698708",
       "name": "4号公寓-47栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1320,13 +1517,14 @@
       "confidence": "none",
       "source_aliases": [
         "fbebe23f-cc0a-4593-8ab6-aa0430c855fd"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/627698709",
       "name": "2号公寓-45栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1340,13 +1538,14 @@
       "confidence": "none",
       "source_aliases": [
         "172a58be-36e4-416c-b6f1-f5bb64fe6630"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/627698710",
       "name": "3号公寓-46栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1360,13 +1559,14 @@
       "confidence": "none",
       "source_aliases": [
         "a88779e6-f0e8-4fb6-b518-fd3d62a01a84"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/628549196",
       "name": "后勤楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 2,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1380,33 +1580,47 @@
       "confidence": "none",
       "source_aliases": [
         "de47a589-ccf4-4585-9bfa-8b84f7582205"
-      ]
+      ],
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。"
     },
     {
       "source": "way/633662027",
       "name": "信科文体中心",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 3,
+      "floors_src": "aerial",
+      "facade": "浅色墙体围合竖向蓝色玻璃幕墙，入口上方为玻璃雨棚与蓝色体育部字样。",
       "colors": {
-        "wall": null,
+        "wall": "#D8D0C6",
         "accent": null,
-        "glass": null,
+        "glass": "#4897C8",
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "竖向玻璃幕墙",
+        "玻璃雨棚"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-sports-center.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/B69d5cf3f4c3993058.jpeg",
+          "page": "https://map.baidu.com/poi/1d91fcaed2d0a2c90a1cc755",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "浅色墙体围合竖向蓝色玻璃幕墙，入口上方为玻璃雨棚与蓝色体育部字样。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "2f5ec905-ea41-49e7-8ab3-76cfe3b6d2f9"
-      ]
+      ],
+      "floor_count_note": "学校运动会通知确认原信科文体中心至少三层，按三层估计。"
     },
     {
       "source": "way/633662028",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1420,7 +1634,8 @@
       "confidence": "none",
       "source_aliases": [
         "921ecd3e-fee6-4aba-b87f-15be144cee45"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "way/653889126",
@@ -1485,8 +1700,8 @@
     {
       "source": "way/686017213",
       "name": "南门车棚",
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1500,13 +1715,14 @@
       "confidence": "none",
       "source_aliases": [
         "21c1ac19-5975-493d-91fd-067d841ca59d"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "way/686017214",
       "name": "南门车棚",
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1520,13 +1736,14 @@
       "confidence": "none",
       "source_aliases": [
         "01203e8a-13cc-49f2-8ea5-84cd3ccb209a"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "way/686017215",
       "name": "南门车棚",
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1540,13 +1757,14 @@
       "confidence": "none",
       "source_aliases": [
         "e533b458-b9ca-41a7-9fa6-084f0480f6a9"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "way/686017216",
       "name": "南门车棚",
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1560,13 +1778,14 @@
       "confidence": "none",
       "source_aliases": [
         "5d4e1407-291a-4cd3-9501-e0178631754d"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "way/686017217",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1580,13 +1799,14 @@
       "confidence": "none",
       "source_aliases": [
         "1d8d2081-3e79-4985-895c-c12eefa1e67d"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "way/692519519",
       "name": "30#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1600,13 +1820,14 @@
       "confidence": "none",
       "source_aliases": [
         "ce03228b-4fc8-4a79-925c-fbc812fb69bc"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/724218273",
       "name": "26#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1620,13 +1841,14 @@
       "confidence": "none",
       "source_aliases": [
         "8612b399-2ea5-487b-9e60-fafecc85099a"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/724218274",
       "name": "27#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1640,13 +1862,14 @@
       "confidence": "none",
       "source_aliases": [
         "fc5dd8f5-b0d2-4d5e-b313-b8cf4f14c7ee"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/754789545",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1660,13 +1883,14 @@
       "confidence": "none",
       "source_aliases": [
         "60c5127c-3b14-4184-bf29-218a4c25bb4e"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "way/941807701",
       "name": "34#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1680,13 +1904,14 @@
       "confidence": "none",
       "source_aliases": [
         "c3c1a2c0-9919-4636-bfbf-6f18fd176259"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/941807702",
       "name": "35#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1700,13 +1925,14 @@
       "confidence": "none",
       "source_aliases": [
         "b106caee-c8f2-4bda-aece-ced242ce35b5"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/941807703",
       "name": "36#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1720,13 +1946,14 @@
       "confidence": "none",
       "source_aliases": [
         "1d5d65a7-8c0d-4821-9394-ebba9fdd8a16"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1243607535",
       "name": "37#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1740,13 +1967,14 @@
       "confidence": "none",
       "source_aliases": [
         "d8c6499b-032f-40c8-96fb-2b9a9440dd6d"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1243607536",
       "name": "38#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1760,13 +1988,14 @@
       "confidence": "none",
       "source_aliases": [
         "8a474cc2-bb40-41ee-bf8d-0b1dc61d9978"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1243607540",
       "name": "39#",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1780,13 +2009,14 @@
       "confidence": "none",
       "source_aliases": [
         "83823535-55ce-4baf-97f0-7a81cca3147d"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1243607541",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1800,13 +2030,14 @@
       "confidence": "none",
       "source_aliases": [
         "0df35679-dc5f-4bbb-a4b2-9e6386f94a19"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1243607543",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1820,33 +2051,46 @@
       "confidence": "none",
       "source_aliases": [
         "8d28aab1-75d9-4a6c-85a3-55b053b4bc4f"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1243629557",
       "name": "文科楼",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 6,
+      "floors_src": "photo",
+      "facade": "粉褐色矩形墙垛分隔成排窗户，底层有连续拱廊。",
       "colors": {
-        "wall": null,
+        "wall": "#BEAAA0",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "底层拱廊"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-1243629557-1.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_aa774d79fce1ed88588c7844dbf7e02d.jpeg?x-bce-process=image/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/4388531da44bd0aa2fb17e93",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "粉褐色矩形墙垛分隔成排窗户，底层有连续拱廊。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "50bc09d5-ea14-433d-958f-f2c5b8fd1cc6"
-      ]
+      ],
+      "floor_count_note": "底层拱廊加上部五排窗，按六层读数。"
     },
     {
       "source": "way/1417160188",
       "name": "花江智慧谷3号楼（电子工程与自动化学院）",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1860,13 +2104,14 @@
       "confidence": "none",
       "source_aliases": [
         "2ec9b316-db07-4fe8-95c9-a62884f156c0"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417160189",
       "name": "花江智慧谷2号楼（光电工程学院）",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1880,13 +2125,14 @@
       "confidence": "none",
       "source_aliases": [
         "cb6554b3-5ca1-4d0b-8f11-25c7d5903c9f"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417160190",
       "name": "花江智慧谷1号楼（计算机与信息安全学院）",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1900,13 +2146,14 @@
       "confidence": "none",
       "source_aliases": [
         "e823db1e-d64f-4923-996b-e5e0430cd28b"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417160191",
       "name": "花江智慧谷4号楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1920,13 +2167,14 @@
       "confidence": "none",
       "source_aliases": [
         "01c86ca2-9bfc-4bdc-aeeb-4a34251b8f4f"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417160192",
       "name": "花江智慧谷5号楼（数学与计算科学学院）",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1940,13 +2188,14 @@
       "confidence": "none",
       "source_aliases": [
         "3668df2a-fd3f-4eb1-8a53-76f3487e370f"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417160193",
       "name": "花江智慧谷6号楼（人工智能学院）",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1960,13 +2209,14 @@
       "confidence": "none",
       "source_aliases": [
         "2b7166a9-850b-4387-b669-f25943297711"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165892",
       "name": "研究生公寓41栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1980,13 +2230,14 @@
       "confidence": "none",
       "source_aliases": [
         "7dd675db-34a4-48cd-b5b9-5cb5a4ba5d03"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165893",
       "name": "研究生公寓41栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2000,13 +2251,14 @@
       "confidence": "none",
       "source_aliases": [
         "058b0da7-1c19-424a-9e9b-ee576bc0db5e"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165894",
       "name": "研究生公寓41栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2020,13 +2272,14 @@
       "confidence": "none",
       "source_aliases": [
         "e42a0c53-9830-40ee-aac6-30aba16d2d8b"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165895",
       "name": "研究生公寓41栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2040,13 +2293,14 @@
       "confidence": "none",
       "source_aliases": [
         "3d14fa8f-76d6-4715-a671-c9ab3696b8d2"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165896",
       "name": "研究生公寓42栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2060,13 +2314,14 @@
       "confidence": "none",
       "source_aliases": [
         "ceda5117-e54c-44e9-a119-c2daeb0881e1"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165897",
       "name": "研究生公寓42栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2080,13 +2335,14 @@
       "confidence": "none",
       "source_aliases": [
         "669987da-9b8d-43d0-aa4e-1952ed14dc33"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165898",
       "name": "研究生公寓42栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2100,13 +2356,14 @@
       "confidence": "none",
       "source_aliases": [
         "64e5b5b3-9868-484a-b808-431107ffd229"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165899",
       "name": "研究生公寓42栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2120,13 +2377,14 @@
       "confidence": "none",
       "source_aliases": [
         "c40dff96-6b70-4e8c-9067-133b8a3938eb"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165900",
       "name": "研究生公寓43栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2140,13 +2398,14 @@
       "confidence": "none",
       "source_aliases": [
         "ddf8f945-77e7-4fe9-9800-ddc0e2010f7e"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165901",
       "name": "研究生公寓43栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2160,13 +2419,14 @@
       "confidence": "none",
       "source_aliases": [
         "ccb9cfe5-8924-4929-bf6d-4c435d8f1ed5"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165902",
       "name": "研究生公寓43栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2180,13 +2440,14 @@
       "confidence": "none",
       "source_aliases": [
         "f036cca3-a6e7-42f5-ba5d-cd50dcc73301"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165903",
       "name": "研究生公寓43栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2200,13 +2461,14 @@
       "confidence": "none",
       "source_aliases": [
         "4139c4ec-2c83-4816-b75e-aaa7b45b7a90"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165904",
       "name": "研究生公寓40栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2220,13 +2482,14 @@
       "confidence": "none",
       "source_aliases": [
         "d4544570-1079-4be6-8251-808e98eb65e4"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165905",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2240,13 +2503,14 @@
       "confidence": "none",
       "source_aliases": [
         "9402f351-f681-43dc-9c9e-4867d3a7a108"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417165906",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2260,13 +2524,14 @@
       "confidence": "none",
       "source_aliases": [
         "5831eef0-aebc-4067-a670-d4870f760a2f"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417175069",
       "name": "5号公寓-48栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2280,13 +2545,14 @@
       "confidence": "none",
       "source_aliases": [
         "28176daf-136d-4b04-8747-c5448a614d24"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/1417175070",
       "name": "6号公寓-49栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2300,33 +2566,46 @@
       "confidence": "none",
       "source_aliases": [
         "39639f6c-e33a-4fdd-b609-1709f857145b"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/1417175071",
       "name": "雅园餐厅",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "灰白色方柱围合两层高门廊，矩形窗和玻璃门水平排列。",
       "colors": {
-        "wall": null,
+        "wall": "#BEC0BD",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "内凹双层门廊"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-1417175071-1.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/B6a44eba27232d946f.jpeg",
+          "page": "https://map.baidu.com/poi/9c465dda09aeecb69cec2ba7",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "灰白色方柱围合两层高门廊，矩形窗和玻璃门水平排列。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "52c8c426-32d6-4abf-bafc-b9c382edbcb1"
-      ]
+      ],
+      "floor_count_note": "按照片可见窗排或外廊估读主体地上层数。"
     },
     {
       "source": "way/1417175072",
       "name": "信科第44教学楼2区",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2340,13 +2619,14 @@
       "confidence": "none",
       "source_aliases": [
         "d0f65a40-6aec-4574-8ee2-42fe1bcacdcd"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。"
     },
     {
       "source": "way/1417175073",
       "name": "信科第44教学楼1区",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2360,13 +2640,14 @@
       "confidence": "none",
       "source_aliases": [
         "54ab576b-c739-4ae0-bfb0-17f6a7da4c5e"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。"
     },
     {
       "source": "way/1417175074",
       "name": "信科第42教学楼2区（艺术与设计学院）",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2380,13 +2661,14 @@
       "confidence": "none",
       "source_aliases": [
         "1b477393-659f-4eef-ac28-8b82ef71edd1"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。"
     },
     {
       "source": "way/1417175075",
       "name": "信科第42教学楼1区（艺术与设计学院）",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2400,13 +2682,14 @@
       "confidence": "none",
       "source_aliases": [
         "7965f601-4895-4bda-8dc1-139c088030a0"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。"
     },
     {
       "source": "way/1417175370",
       "name": "信科第45教学楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2420,13 +2703,14 @@
       "confidence": "none",
       "source_aliases": [
         "8c1246b3-a3c1-47bd-b8ef-e140b118578d"
-      ]
+      ],
+      "floor_count_note": "按院落或条形教学楼轮廓，与同校区已有五层标注的楼体比较估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417178990",
       "name": "7号公寓-50栋",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2440,33 +2724,46 @@
       "confidence": "none",
       "source_aliases": [
         "1f75df4f-aa03-408e-b601-8749412b0503"
-      ]
+      ],
+      "floor_count_note": "按长条形或成组住宅轮廓，与底表中已标注六层的同类楼比较估计。"
     },
     {
       "source": "way/1417180485",
       "name": "科技楼",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 3,
+      "floors_src": "aerial",
+      "facade": "入口为浅色柱面与深色金属框玻璃，柱上有科技楼铭牌。",
       "colors": {
-        "wall": null,
+        "wall": "#D9CDAE",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "科技楼铭牌"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-1417180485-1.jpg",
+          "url": "https://taojin-his.cdn.bcebos.com/0df431adcbef7609aab73c292ddda3cc7dd99ecc.jpg?x-bce-process=image/crop,x_120,y_0,w_720,h_540/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/011eb16d104e6a1ea6c756ce",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "入口为浅色柱面与深色金属框玻璃，柱上有科技楼铭牌。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "ac3e5556-7a48-42c0-96bb-6ae061b0985f"
-      ]
+      ],
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。照片仅覆盖局部、跨层空间或远景，无法逐层数窗。"
     },
     {
       "source": "way/1417186390",
       "name": "D区大棚室内篮球场",
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2480,13 +2777,14 @@
       "confidence": "none",
       "source_aliases": [
         "d19ba8af-6e13-43dd-ade1-b42719d70a7b"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417186392",
       "name": "D区大棚室内排球场",
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2500,13 +2798,14 @@
       "confidence": "none",
       "source_aliases": [
         "4f180abf-d1ec-4c73-8ec7-21999827dab0"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417187719",
       "name": "电子信息实验楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 4,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2520,113 +2819,174 @@
       "confidence": "none",
       "source_aliases": [
         "affc658e-f81f-4998-a3e7-4aacbdf2bbfa"
-      ]
+      ],
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1417187720",
       "name": "四创1号楼",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 5,
+      "floors_src": "aerial",
+      "facade": "白色墙面以错落的狭长深色窗切分，局部穿插红褐色竖板。",
       "colors": {
-        "wall": null,
+        "wall": "#E4DFDF",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "圆圈数字 1"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-1417187720-1.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_83211fc158c724c81dbd7812b7c9d8ea.jpeg?x-bce-process=image/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/59bfacae549458c340e192eb",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "白色墙面以错落的狭长深色窗切分，局部穿插红褐色竖板。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "8b1efdee-e79d-4201-81e8-00394882f79b"
-      ]
+      ],
+      "floor_count_note": "建筑端墙窄窗跨层，无法逐窗换算；按同组四创四号楼的五排窗估计，影像较旧。"
     },
     {
       "source": "way/1417187721",
       "name": "四创2号楼",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 5,
+      "floors_src": "aerial",
+      "facade": "浅色端面间隔设置通高窄窗和红褐色竖板。",
       "colors": {
-        "wall": null,
+        "wall": "#DBDBD0",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "竖向条窗"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-1417187721-1.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_93a13af8a0391b2259bc799587dce2b5.jpeg?x-bce-process=image/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/8402c532c8a283e87adbd29b",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "浅色端面间隔设置通高窄窗和红褐色竖板。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "df58dc59-76e3-445b-aaab-af20ae8f1bba"
-      ]
+      ],
+      "floor_count_note": "建筑端墙窄窗跨层，无法逐窗换算；按同组四创四号楼的五排窗估计，影像较旧。"
     },
     {
       "source": "way/1417187722",
       "name": "四创3号楼",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 5,
+      "floors_src": "aerial",
+      "facade": "浅色端墙内嵌黑色竖窗，侧翼可见大幅玻璃墙。",
       "colors": {
-        "wall": null,
+        "wall": "#D9CDD1",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "圆圈数字 3"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-1417187722-1.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_a6c210d4c140023dab9e48394f490c6f.jpeg?x-bce-process=image/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/00552655c20d457c52e5c501",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "浅色端墙内嵌黑色竖窗，侧翼可见大幅玻璃墙。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "f74eef46-43e0-4b34-abfb-ee5c2796ca0c"
-      ]
+      ],
+      "floor_count_note": "建筑端墙窄窗跨层，无法逐窗换算；按同组四创四号楼的五排窗估计，影像较旧。"
     },
     {
       "source": "way/1417190113",
       "name": "四创4号楼",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 5,
+      "floors_src": "photo",
+      "facade": "白色外墙分成五排细长窗格，窗列之间有褐色竖条。",
       "colors": {
-        "wall": null,
+        "wall": "#DFE0D6",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "圆圈数字 4"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-1417190113-1.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_da29d6d77911e1556daa78bae89b6615.jpeg?x-bce-process=image/resize,m_fixed,w_960,h_720/quality,q_80",
+          "page": "https://map.baidu.com/poi/8866e970322a6bb02fe67b27",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "白色外墙分成五排细长窗格，窗列之间有褐色竖条。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "1fe6887e-5db4-453d-bd38-d56559977ae6"
-      ]
+      ],
+      "floor_count_note": "按照片可见窗排或外廊估读主体地上层数。"
     },
     {
       "source": "way/1417192550",
       "name": "机电楼",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 3,
+      "floors_src": "aerial",
+      "facade": "灰白色巨柱框住整幅玻璃幕墙，顶部横梁开方孔。",
       "colors": {
-        "wall": null,
+        "wall": "#C8C7C4",
         "accent": null,
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "顶部方孔"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-1417192550-1.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/H908fa0ec08fa513df80f1c31336d55fbb3fbd9bc.jpg",
+          "page": "https://map.baidu.com/poi/5ad05b09912cd23b601809ba",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "灰白色巨柱框住整幅玻璃幕墙，顶部横梁开方孔。"
+        }
+      ],
+      "confidence": "medium",
       "source_aliases": [
         "0e6a0a09-4598-4e56-9fe4-03395f645c31"
-      ]
+      ],
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。照片仅覆盖局部、跨层空间或远景，无法逐层数窗。"
     },
     {
       "source": "way/1417192551",
       "name": "建交楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 4,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2640,13 +3000,14 @@
       "confidence": "none",
       "source_aliases": [
         "59b8a84c-4760-42d1-8e4d-4316101ceb83"
-      ]
+      ],
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "way/1491127080",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2660,13 +3021,14 @@
       "confidence": "none",
       "source_aliases": [
         "15ec71ee-ed5e-4e9f-8755-468cd2674aaa"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "way/1491127088",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2680,13 +3042,14 @@
       "confidence": "none",
       "source_aliases": [
         "dec89200-9f77-48f8-bfcb-4de236f251aa"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "way/1491144353",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2700,30 +3063,63 @@
       "confidence": "none",
       "source_aliases": [
         "a7e3939e-e823-488b-9a50-3bee1d4e2a68"
-      ]
+      ],
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "05d68d98-09ab-4af4-818e-61b78b620331",
       "name": "花江校区图书馆",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 4,
+      "floors_src": "aerial",
+      "facade": "临湖一侧为浅灰色弧形外墙，多道水平窗带由细密竖框分格；远景无法分辨饰面材质。",
       "colors": {
-        "wall": null,
+        "wall": "#A9ABB1",
         "accent": null,
-        "glass": null,
+        "glass": "#505E70",
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none"
+      "features": [
+        "弧形体量",
+        "连续横向窗带",
+        "弧形体量局部悬挑",
+        "金色中英文馆名",
+        "大幅玻璃幕墙"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-library-lake.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2025/05-27/7429124656f46a42ff7287e03868f8d1.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": null,
+          "date_basis": "图集未注明拍摄时间",
+          "view": "从湖对岸平视，树冠遮住底部，屋面不可见。颜色按此图近似。"
+        },
+        {
+          "file": "huajiang-library-curve.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/Hc2cec3fdfc03924571e3ce3b8b94a4c27d1e25ab.jpg",
+          "page": "https://map.baidu.com/poi/8bd3ab189d3eb5a7f423106d",
+          "date": null,
+          "date_basis": "地点相册未核实拍摄日期",
+          "view": "从铺砖空地平视弧形外墙，能看到水平错层和局部悬挑。"
+        },
+        {
+          "file": "huajiang-library-lettering.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/B68b9643a8215b8e68.jpeg",
+          "page": "https://map.baidu.com/poi/8bd3ab189d3eb5a7f423106d",
+          "date": null,
+          "date_basis": "地点相册未核实拍摄日期",
+          "view": "仰拍书法体金色“图书馆”和 LIBRARY 字样，下方为玻璃幕墙。"
+        }
+      ],
+      "confidence": "medium",
+      "floor_count_note": "临湖照片中可见数道主要水平带，树冠和悬挑遮住部分楼板；结合体量按四层估计。"
     },
     {
       "source": "0d9885d3-38ff-4858-a5e6-e2f37ee6b4a1",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2734,13 +3130,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "10f89728-482e-466f-9216-b12e5935940b",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2751,13 +3148,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "1dc27e26-20fa-410b-ac6b-0e718dfe9cd1",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2768,13 +3166,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "2fed6c4b-d0d4-41e8-85e9-6eaeea0dc2af",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2785,13 +3184,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "31866916-faf5-4e31-927e-8e2b4f6d5da6",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2802,13 +3202,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "37ed6f38-a227-4a48-b42d-7d5d151ef661",
       "name": "行政楼/研究生院",
-      "floors": null,
-      "floors_src": null,
+      "floors": 4,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2819,13 +3220,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。"
     },
     {
       "source": "45087e06-2b54-4b4b-b46e-1db2af321516",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2836,13 +3238,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "48cb49ac-326c-4f5f-9108-3cee3a67d27d",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2853,13 +3256,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "4cc5b83e-f971-4b8a-98e3-a5552c2f563b",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2870,13 +3274,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "4d2f3399-b947-41ef-b218-b394de6a1d86",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2887,13 +3292,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "5506e259-802d-4948-92b8-b3de8a1d3d0f",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 3,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2904,13 +3310,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。"
     },
     {
       "source": "56f4b58c-38ad-4eef-8e6c-cceafa9d92e1",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2921,13 +3328,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "6bdb9bf7-40ed-4681-9760-15dee2cb0ba2",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2938,13 +3346,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "75c2b636-4b72-4246-80e1-e766fc9e2b70",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 2,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2955,13 +3364,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。"
     },
     {
       "source": "75e6c134-61e6-48cf-b176-06bbc0534217",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2972,13 +3382,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "76809297-8747-4c0a-b348-1927eceef08a",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2989,13 +3400,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "7a6fe86c-8615-4273-8c35-e2a08e57d206",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3006,13 +3418,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "7dc83657-dfcb-47be-bf84-ebfae84096bb",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3023,13 +3436,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "83007894-5e0e-4312-af4b-c62c973c8276",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3040,13 +3454,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "88cdda6b-f28c-43a0-b00c-e247b59aa8ff",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3057,13 +3472,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "895d0f7b-2b81-43e7-ac3a-92511f229b4a",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3074,13 +3490,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "8f28ad76-5fbb-40dc-ac30-1ead56722226",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3091,13 +3508,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "930827b4-7d9c-4cfe-9260-166fcfe2dbfc",
       "name": "工程实训中心",
-      "floors": null,
-      "floors_src": null,
+      "floors": 3,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3108,13 +3526,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。"
     },
     {
       "source": "9ffc07f1-8c0a-46c8-9cc8-d5d0ba076809",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3125,13 +3544,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "a21fe885-632b-49fd-9b22-9fc3e2af9357",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3142,13 +3562,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "bc5f4ebc-5127-49cb-84d4-826825193a8c",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3159,13 +3580,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "c268a851-8a66-4f44-9eb2-dd144f6bab87",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3176,13 +3598,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "c96e9844-b4c0-45d8-94cf-aba10b28ef4d",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3193,13 +3616,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "ce05e950-3026-4eb0-8231-7db3c2429074",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 3,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3210,13 +3634,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。"
     },
     {
       "source": "e27a94bc-2d27-45d6-89cc-2fb51d690c2d",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3227,13 +3652,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     },
     {
       "source": "f6acc053-bd6a-4bf1-a5f3-ee613999b90b",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3244,13 +3670,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。所用影像中目标轮廓内未见清晰成楼，主要依赖轮廓形状和同类建筑。"
     },
     {
       "source": "fa3e154f-156e-4e55-bcc6-21aa2f068880",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 3,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3261,13 +3688,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "结合主体轮廓尺度、建筑用途及邻近屋面体量作低置信估计。"
     },
     {
       "source": "ff3b7549-8dd6-4362-831e-4ac744887d94",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "aerial",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3278,9 +3706,40 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "按单跨覆盖、狭小或低矮附属轮廓估作一层。"
     }
   ],
-  "gates": [],
-  "open_spaces": []
+  "gates": [
+    {
+      "name": "南门",
+      "desc": "灰褐色不规则立石上竖刻金色校名，底部有低矮绿植。",
+      "photos": [
+        {
+          "file": "huajiang-south-gate.jpg",
+          "url": "https://lbsugc.cdn.bcebos.com/images/B66d29c1e50fcae693.jpeg",
+          "page": "https://map.baidu.com/poi/2c69221be85b05b0d7851fce",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "校名石全高及基部绿化。"
+        }
+      ]
+    }
+  ],
+  "open_spaces": [
+    {
+      "name": "正德广场",
+      "desc": "大面积平坦石材铺地，地面深浅分带。招聘会照片可见广场开阔尺度，部分铺装被展棚遮挡。",
+      "photos": [
+        {
+          "file": "huajiang-zhengde-square.jpg",
+          "url": "https://www.guet.edu.cn/_upload/article/images/f0/4d/c6cac12e4c329787d17b82975ea7/672ab307-1be2-4fef-aa50-72e697b314a9.jpg",
+          "page": "https://www.guet.edu.cn/2026/1108/c6356a162164/page.htm",
+          "date": null,
+          "date_basis": "未核实拍摄日期",
+          "view": "从地面看广场铺装与临广场建筑；棚架为招聘会临时布置。"
+        }
+      ]
+    }
+  ]
 }
