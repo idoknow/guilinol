@@ -1,0 +1,1430 @@
+{
+  "campus_id": "guet_jinjiling",
+  "campus_osm": "way/606121236",
+  "buildings": [
+    {
+      "source": "way/258894699",
+      "name": "校医院",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "2e8343f5-656e-44c3-bae3-240666bf058a"
+      ]
+    },
+    {
+      "source": "way/621423420",
+      "name": "第十教学楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "fc5b90fc-5aed-4a86-b51d-5582e50d7475"
+      ]
+    },
+    {
+      "source": "way/621423421",
+      "name": "第九教学楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "9814364a-f52a-4e30-8133-8fdd8d2aed50"
+      ]
+    },
+    {
+      "source": "way/621423422",
+      "name": "第八教学楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "7f329a68-2f17-4a02-b4c7-85a29613f145"
+      ]
+    },
+    {
+      "source": "way/621423423",
+      "name": "第七教学楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "8bd75d8c-0dc0-4f04-a077-d836cc3f4cb5"
+      ]
+    },
+    {
+      "source": "way/621423424",
+      "name": "东区图书馆",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "cbfe3886-e15a-4131-ad51-0bcda1c5bd26"
+      ]
+    },
+    {
+      "source": "way/621423426",
+      "name": "16栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "65e54f9b-7f02-46b7-b440-7c4b5c0aeddc"
+      ]
+    },
+    {
+      "source": "way/621423427",
+      "name": "冠群楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "b2fcbcbc-a909-4b0c-b78d-414204f6b453"
+      ]
+    },
+    {
+      "source": "way/621423428",
+      "name": "18栋",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "dd6ef81e-aa8c-4a59-a354-84d70e67a834"
+      ]
+    },
+    {
+      "source": "way/621877118",
+      "name": "后勤楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "93b13281-054a-498f-a0d5-a34d76a05144"
+      ]
+    },
+    {
+      "source": "way/653727933",
+      "name": "303",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "89fd91d4-6859-4579-bcc9-6eff15660894"
+      ]
+    },
+    {
+      "source": "way/653727934",
+      "name": "304",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "1311f016-0dd0-4378-b75e-d73e8d105f44"
+      ]
+    },
+    {
+      "source": "way/653727935",
+      "name": "305",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "319b319d-2d4a-4aa7-979c-065ab0e71164"
+      ]
+    },
+    {
+      "source": "way/653727936",
+      "name": "306",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "d05d78dd-d3ee-4289-ad5c-996051dd81ff"
+      ]
+    },
+    {
+      "source": "way/653727937",
+      "name": "324",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "814b401b-e88f-491e-b719-5f6bb879d4ba"
+      ]
+    },
+    {
+      "source": "way/653758610",
+      "name": "4",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "bd554976-aa4e-45f0-ba32-04616dce5fcb"
+      ]
+    },
+    {
+      "source": "way/653758611",
+      "name": "409",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "771511e5-2130-479c-840f-7b29e74c3ddb"
+      ]
+    },
+    {
+      "source": "way/653758612",
+      "name": "405",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "8e904459-05b9-42d2-80a2-68a718ca1fe3"
+      ]
+    },
+    {
+      "source": "way/653758613",
+      "name": "401",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "27d7520c-261e-4fcb-bae0-7b97c84a4021"
+      ]
+    },
+    {
+      "source": "way/653758614",
+      "name": "406",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "e43fb915-a435-4702-afc4-a05344247aa8"
+      ]
+    },
+    {
+      "source": "way/653758615",
+      "name": "410",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "1668615e-e1ef-4630-88f3-281499edaf84"
+      ]
+    },
+    {
+      "source": "way/653758616",
+      "name": "402",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "b4f79eb6-a3f6-4a3c-96eb-ea537ce3e523"
+      ]
+    },
+    {
+      "source": "way/653758617",
+      "name": "407",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "780ffe0c-9a97-421f-b474-fb93a61c1a4a"
+      ]
+    },
+    {
+      "source": "way/653758618",
+      "name": "403",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "1ccb05e9-b5f0-4736-a321-14d3cd110d6a"
+      ]
+    },
+    {
+      "source": "way/653758619",
+      "name": "408",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "6bb8f89e-3fb3-4605-9ddc-0d9ca4be1f5f"
+      ]
+    },
+    {
+      "source": "way/653758620",
+      "name": "404",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "75de71b0-8e12-45d3-86d0-0088ca425028"
+      ]
+    },
+    {
+      "source": "way/653758621",
+      "name": "3",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "742215f1-c896-4ec1-a35a-3da2258988d0"
+      ]
+    },
+    {
+      "source": "way/653758622",
+      "name": "2",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "26c19482-0a4d-43c6-9d12-4f27352497dd"
+      ]
+    },
+    {
+      "source": "way/653758623",
+      "name": "1",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "cf23a656-160c-4aa0-9843-51a3d39f06c8"
+      ]
+    },
+    {
+      "source": "way/653758624",
+      "name": "327",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "d1fc96fd-b9ef-40b4-8c4b-1feb51589dce"
+      ]
+    },
+    {
+      "source": "way/653758933",
+      "name": "326",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "81b6a252-d35f-4c81-b19a-8948be8247f6"
+      ]
+    },
+    {
+      "source": "way/653758934",
+      "name": "320",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "d8958823-b854-4280-8a78-94dbd4de98b2"
+      ]
+    },
+    {
+      "source": "way/653758936",
+      "name": "317",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "dccf7e38-6976-4dee-8680-75543e4a06c5"
+      ]
+    },
+    {
+      "source": "way/653758937",
+      "name": "316",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "399fb21b-70a3-4038-8a71-4ec68828b3e0"
+      ]
+    },
+    {
+      "source": "way/653758938",
+      "name": "318",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "0979f786-ed6f-4409-b46d-d3927bc4e355"
+      ]
+    },
+    {
+      "source": "way/653758939",
+      "name": "319",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "987576a4-d278-4656-9e9d-ef1ef7824e37"
+      ]
+    },
+    {
+      "source": "way/653758940",
+      "name": "310",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "009b7071-f051-46c6-9a29-b1026afaf76b"
+      ]
+    },
+    {
+      "source": "way/653758941",
+      "name": "311",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "b15ef761-8a93-425b-8bea-28f5288f1c74"
+      ]
+    },
+    {
+      "source": "way/653772960",
+      "name": "322",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "a2014b14-02bb-473f-b8aa-792f1418f31b"
+      ]
+    },
+    {
+      "source": "way/653772961",
+      "name": "321",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "a3d73671-9320-4f1e-b2c2-8ea455114006"
+      ]
+    },
+    {
+      "source": "way/653772962",
+      "name": "312",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "639d7f06-ce45-4b97-a477-1a110af87311"
+      ]
+    },
+    {
+      "source": "way/653772963",
+      "name": "314",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "26704b25-9604-44c8-a65d-529debdaaf94"
+      ]
+    },
+    {
+      "source": "way/653772964",
+      "name": "313",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "264c8d5a-f0d2-4b9a-b92e-eb170f36d13f"
+      ]
+    },
+    {
+      "source": "way/653772965",
+      "name": "201",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "2a4e5786-3e26-477d-a691-75ae8e556612"
+      ]
+    },
+    {
+      "source": "way/653772966",
+      "name": "9",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "4ce32ade-5cc7-4b24-a212-10a2ebdc28b1"
+      ]
+    },
+    {
+      "source": "way/653772967",
+      "name": "5",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "e5c7bdae-f667-4e9f-af7c-08232c2056cb"
+      ]
+    },
+    {
+      "source": "way/653772968",
+      "name": "11",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "15512183-aa87-4863-81bd-932c528da5c1"
+      ]
+    },
+    {
+      "source": "way/653772969",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "e191989a-9b6c-4656-9ac0-131a052a8e44"
+      ]
+    },
+    {
+      "source": "way/653772970",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "0b096af9-112f-410a-a7e4-e4d93cc2cee9"
+      ]
+    },
+    {
+      "source": "way/653772971",
+      "name": "第三教学楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "d34a1f4a-a314-4fa9-9b43-baf783c14921"
+      ]
+    },
+    {
+      "source": "way/653772972",
+      "name": "第二教学楼",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "dbbac701-109f-4dd7-af97-d4d988b25345"
+      ]
+    },
+    {
+      "source": "way/653772975",
+      "name": "第三食堂",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "c0265713-14bb-40b5-972c-d87ca196e743"
+      ]
+    },
+    {
+      "source": "way/653772976",
+      "name": "第二食堂",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "353acca2-a455-445e-9894-aa5b6c19989f"
+      ]
+    },
+    {
+      "source": "way/653772977",
+      "name": "13",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "9a749922-95ef-4e88-b533-0632c6b7f7be"
+      ]
+    },
+    {
+      "source": "way/653772978",
+      "name": "15",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "7dd70fbd-1002-481e-8391-6119ca3e0598"
+      ]
+    },
+    {
+      "source": "way/653772979",
+      "name": "17",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "a76aa581-4911-4764-b4e6-89e5656ca4bf"
+      ]
+    },
+    {
+      "source": "way/653772980",
+      "name": "24",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "48c738f5-a9bd-4ae3-bf83-aa4edb53f73c"
+      ]
+    },
+    {
+      "source": "way/653775909",
+      "name": "19",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "38d3adaa-a268-4ae4-afbe-ba91be2bdbc7"
+      ]
+    },
+    {
+      "source": "way/653775911",
+      "name": "22",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "bf265e43-4bf8-43ab-8d5d-4f2f4bf93b5e"
+      ]
+    },
+    {
+      "source": "way/653775913",
+      "name": "20",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "8de0f7ae-af07-46bd-8312-d140fef1365c"
+      ]
+    },
+    {
+      "source": "way/653790234",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "2d8fa867-fb11-4bcb-9074-f9772206a3f1"
+      ]
+    },
+    {
+      "source": "way/653790236",
+      "name": "实习车间",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "c465fdba-3985-40c9-8641-6eb7f5dca78a"
+      ]
+    },
+    {
+      "source": "way/653790241",
+      "name": "正平科技文化馆",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "a5eb6e54-588d-4db9-bda5-510b378dc0a8"
+      ]
+    },
+    {
+      "source": "way/653790242",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "e2b6b14b-5abc-474e-9b21-8f6a5f066b7a"
+      ]
+    },
+    {
+      "source": "way/653890105",
+      "name": "第一食堂",
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "448216a6-9536-40aa-8ac5-a3a31e2c9dcd"
+      ]
+    },
+    {
+      "source": "way/678367963",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none",
+      "overture_ids": [
+        "53e7bec4-358c-4984-bb0b-5ddbf8a478da"
+      ]
+    },
+    {
+      "source": "57ad87fc-676a-462f-8477-59d389650d88",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "730dbb55-1df5-4a45-a05c-61b333df678a",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "af824d41-0b1e-4e4d-8e32-621413f7d5a6",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "b33fa8f7-8c51-4149-8dd1-0edfc6a780ea",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "ebf7371d-0a84-4048-8d5a-f51fcddeffe6",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    },
+    {
+      "source": "ec2aa560-4573-4a0c-8115-2037cb5d4f74",
+      "name": null,
+      "floors": null,
+      "floors_src": null,
+      "facade": null,
+      "colors": {
+        "wall": null,
+        "accent": null,
+        "glass": null,
+        "roof": null
+      },
+      "roof": null,
+      "features": [],
+      "photos": [],
+      "confidence": "none"
+    }
+  ],
+  "gates": [],
+  "open_spaces": []
+}
