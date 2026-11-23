@@ -70,6 +70,7 @@ try {
     await sql(`UPDATE users SET banned_at=unixepoch(),ban_reason='fixture' WHERE id='${me.id}'`)
     const deniedTicket=await api('rt/ticket',{},403,'banned');assert.equal(deniedTicket.ticket,undefined)
     await sql(`UPDATE users SET banned_at=0,ban_reason='' WHERE id='${me.id}'`)
+    await (await import('./citizen-test.mjs')).citizenTest({origin,me,cookie,sql,api})
     console.log('Verification requires the latest registration password: missing and stale passwords rejected; current password accepted')
     assert.equal((await api('me',{nickname:'江岸' },200,null,{method:'PATCH'})).nickname,'江岸');const sessionRows=(await sql('SELECT digest FROM sessions'))[0].results;assert.equal(sessionRows.length,1);assert.notEqual(sessionRows[0].digest,cookie.split('=')[1]);assert.notEqual((await sql('SELECT digest FROM users'))[0].results[0].digest,password)
     await api('auth/logout',{});await api('me',null,401,'unauthorized');await api('auth/login',login)
