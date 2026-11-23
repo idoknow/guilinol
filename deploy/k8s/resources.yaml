@@ -378,6 +378,9 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+      # 集群策略要求显式指定节点（Guangzhou/Shanghai/Hong Kong 之一）
+      nodeSelector:
+        kubernetes.io/hostname: cn-hk-fxy-01
       containers:
       - name: rt
         image: ghcr.io/idoknow/glol-rt:RELEASE
