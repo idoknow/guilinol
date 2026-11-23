@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {passengerTop} from './passenger-height'
 import vesselBounds from '../../../pipeline/vessel-bounds.json'
 import type {Stream} from '../stream'
 import {walkConfig as cfg} from './config'
@@ -258,7 +259,6 @@ export function createFreeBoats(env: BoatEnv) {
   let lastToastText = ''
   const flowTmp = {vx: 0, vz: 0}
   const boxMeasure = new THREE.Box3()
-  const figMeasure = new THREE.Box3()
 
   function waterSample(px: number, pz: number): {waterY: number; lockJump: boolean} | null {
     const tile = sim.tileAt(px, pz)
@@ -991,7 +991,7 @@ export function createFreeBoats(env: BoatEnv) {
     skinned?.skeleton.update()
     slot.mesh.updateMatrixWorld(true)
     const roof = boxMeasure.setFromObject(slot.mesh, true).max.y
-    const head = figMeasure.setFromObject(figure, true).max.y
+    const head = passengerTop(figure)
 
     const hw = slot.spec.width * 0.5, hl = slot.spec.length * 0.5
     const fwdX = -Math.sin(heading), fwdZ = -Math.cos(heading)

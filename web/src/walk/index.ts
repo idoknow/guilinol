@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {passengerTop} from './passenger-height'
 import {tunnelFloor} from '../tunnels'
 import {getCarFreeAt, vehicleForbiddenAt} from '../game/car-free'
 import R from '@dimforge/rapier3d-compat'
@@ -1712,7 +1713,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const freeClear=rides?.boatClearance(figure,skinned);if(freeClear)return freeClear
     const boat=rides?.boat;if(!boat)return null
     figure.updateMatrixWorld(true);skinned?.skeleton.update()
-    const roof=new THREE.Box3().setFromObject(boat,true).max.y,head=new THREE.Box3().setFromObject(figure,true).max.y
+    const roof=new THREE.Box3().setFromObject(boat,true).max.y,head=passengerTop(figure)
     let underside=Infinity
     for(const along of [-2.3,-1,0,1,2.3])for(const across of [-1,0,1]){const point=boat.localToWorld(new THREE.Vector3(across,0,along)),deck=sim.surface(point.x,point.z,'deck');if(deck)underside=Math.min(underside,deck.y-(deck.thin?.6:look.bridgeDepth))}
     return {kind:boat.name,head,roof,underside,clearance:underside-Math.max(head,roof)}}
