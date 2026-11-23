@@ -4,6 +4,7 @@ import {nightLit, nightPeaks} from './look/night'
 import {sharedKtx2Loader} from './look/tiles'
 import {fetchAsset} from './world'
 import type {PeakWorkerInput, PeakWorkerOutput} from './peaks-worker'
+import {freezeStatic} from './static-freeze'
 
 interface Section {offset:number; vertices:number; indices:number; indexOffset:number}
 export interface Peaks {
@@ -98,6 +99,8 @@ export function startPeaks(asset:Peaks) {
     const coarseColliders = base.colliders
     let pending = false
     const scene = new THREE.Group()
+    scene.matrixAutoUpdate = false
+    scene.matrixWorldAutoUpdate = false
     scene.add(base)
     const group:PeaksGroup = Object.assign(scene,{
       colliders:coarseColliders, modelPeaks:base.modelPeaks, stats:{...base.stats},
@@ -210,8 +213,8 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
     return proxy
   })
 
-  const mesh0 = new THREE.Mesh(geom0,material)
-  const mesh1 = new THREE.Mesh(geom1,material)
+  const mesh0 = freezeStatic(new THREE.Mesh(geom0,material))
+  const mesh1 = freezeStatic(new THREE.Mesh(geom1,material))
   mesh0.frustumCulled = false; mesh0.visible = false; mesh0.name = 'peaks-lod0'
   mesh1.frustumCulled = false; mesh1.visible = false; mesh1.name = 'peaks-lod1'
   mesh0.raycast = ()=>{}
@@ -354,6 +357,8 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
   }
 
   group.add(mesh0,mesh1,...models)
+  group.matrixAutoUpdate = false
+  group.matrixWorldAutoUpdate = false
   group.loadModels = renderer => {
     const entries = group.userData.modelEntries as Peaks['entries']|undefined
     if(!entries?.length || group.userData.modelsStarted) return
@@ -379,6 +384,7 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
           })
           holder.add(scene)
           group.add(holder)
+          freezeStatic(holder)
           models.push(holder)
         }catch(error){console.warn(entry.name, error)}
       }

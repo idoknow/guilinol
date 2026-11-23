@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import {fetchAsset, type Tile} from './world'
 import {buildingColor} from './look/buildings'
+import {freezeStatic} from './static-freeze'
 
 const limit = 768
 const range = 3600
@@ -31,7 +32,7 @@ export class DistantBuildings {
     this.mesh.frustumCulled=false
     this.mesh.count=0
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
-    scene.add(this.mesh)
+    scene.add(freezeStatic(this.mesh))
   }
   private key(x:number,z:number){return Math.floor(x/256)+65536*Math.floor(z/256)}
   private index(data:ArrayBuffer){

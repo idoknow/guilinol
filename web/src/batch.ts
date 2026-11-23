@@ -8,6 +8,7 @@ import type {Tile} from './world'
 import {vehicleModel} from './walk/vehicle-model'
 import {look} from './look/config'
 import {flags} from './debug'
+import {freezeStatic} from './static-freeze'
 
 export interface TileBatchInput {
   tile:Tile
@@ -59,7 +60,7 @@ class StaticLayerBatch {
 
   constructor(material:THREE.Material, private attrDefs:{name:string; size:number; ctor:'f32'|'u8'}[], layer=0) {
     this.geom.boundingSphere = WORLD_SPHERE
-    this.mesh = new THREE.Mesh(this.geom,material)
+    this.mesh = freezeStatic(new THREE.Mesh(this.geom,material))
     this.mesh.frustumCulled = false
     this.mesh.visible = false
     if(layer) this.mesh.layers.set(layer)
@@ -425,7 +426,7 @@ export class ChunkBatcher {
         this.parked.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(this.parked.instanceMatrix.count*3),3)
         const shared=new THREE.Color(look.streets.sharedBike),privateBike=new THREE.Color(0xffffff)
         for(let index=0;index<this.parked.instanceMatrix.count;index++)this.parked.setColorAt(index,Math.floor(index/3)%3===0?shared:privateBike)
-        this.parked.frustumCulled=false;this.scene.add(this.parked)
+        this.parked.frustumCulled=false;this.scene.add(freezeStatic(this.parked))
       }
       if(this.parked){
         this.parked.visible=!!count;this.parked.count=count;let offset=0
@@ -444,7 +445,7 @@ export class ChunkBatcher {
         this.furniture = new THREE.InstancedMesh(streetFurnitureGeo,streetFurnitureMat,cap)
         this.furniture.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap*3),3)
         this.furniture.frustumCulled = false
-        this.scene.add(this.furniture)
+        this.scene.add(freezeStatic(this.furniture))
       }
       const matArr = this.furniture.instanceMatrix.array as Float32Array
       const colArr = this.furniture.instanceColor!.array as Float32Array

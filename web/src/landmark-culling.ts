@@ -1,6 +1,20 @@
 import * as THREE from 'three'
 import {look} from './look/config'
 
+const LOD_NAMES = ['lod0', 'lod1', 'lod2'] as const
+const lodCache = new WeakMap<THREE.Object3D, Partial<Record<(typeof LOD_NAMES)[number], THREE.Object3D>>>()
+
+/** Resolve and cache landmark LOD groups once per root instead of walking GLB trees each frame. */
+export function getLodNodes(root: THREE.Object3D) {
+  let cached = lodCache.get(root)
+  if (!cached) {
+    cached = {}
+    for (const name of LOD_NAMES) cached[name] = root.getObjectByName(name)
+    lodCache.set(root, cached)
+  }
+  return cached
+}
+
 type Classify=(box:THREE.Box3)=>number
 interface Draw {mesh:THREE.Mesh; main:number; mirror:number; mirrorStart:number; update:(classify:Classify)=>void}
 
@@ -92,22 +106,29 @@ export function landmarkCulling(){
           (Number.isFinite(mirror)&&box.max.y>=mirror&&reflection.intersectsBox(box)?2:0)
       }
       layers.length=0
-      for(const root of roots)for(const name of ['lod0','lod1','lod2']){
-        const lod=root.getObjectByName(name)
-        if(!lod)continue
-        if(!lod.visible){active.delete(lod);continue}
-        let list=prepared.get(lod)
-        if(!list){
-          const draws:Draw[]=[]
-          const uses=new Map<THREE.BufferGeometry,number>()
-          root.traverse(node=>{if(node instanceof THREE.Mesh)uses.set(node.geometry,1+(uses.get(node.geometry)??0))})
-          lod.traverseVisible(node=>{
-            if(node instanceof THREE.Mesh&&!node.children.length)draws.push(prepare(node,uses.get(node.geometry)===1))
-          })
-          list=draws;prepared.set(lod,list)
+      for(const root of roots){
+        const lods=getLodNodes(root)
+        if(!root.visible){
+          for(const name of LOD_NAMES){const lod=lods[name];if(lod)active.delete(lod)}
+          continue
         }
-        if(moved||!active.has(lod))for(const draw of list)draw.update(classify)
-        active.add(lod);layers.push(list)
+        for(const name of LOD_NAMES){
+          const lod=lods[name]
+          if(!lod)continue
+          if(!lod.visible){active.delete(lod);continue}
+          let list=prepared.get(lod)
+          if(!list){
+            const draws:Draw[]=[]
+            const uses=new Map<THREE.BufferGeometry,number>()
+            root.traverse(node=>{if(node instanceof THREE.Mesh)uses.set(node.geometry,1+(uses.get(node.geometry)??0))})
+            lod.traverseVisible(node=>{
+              if(node instanceof THREE.Mesh&&!node.children.length)draws.push(prepare(node,uses.get(node.geometry)===1))
+            })
+            list=draws;prepared.set(lod,list)
+          }
+          if(moved||!active.has(lod))for(const draw of list)draw.update(classify)
+          active.add(lod);layers.push(list)
+        }
       }
     },
     pass(mirror:boolean){

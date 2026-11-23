@@ -5,6 +5,10 @@ import {look} from './look/config'
 import {fetchAsset,type Tile} from './world'
 import {treeBlocked} from './tunnels'
 import {onOldSouthSlope,slopeStart,slopeRatio} from './yueya-slope'
+import {freezeStatic} from './static-freeze'
+
+type TileSphere = {cx:number; cy:number; cz:number; r:number}
+const tileBounds = new WeakMap<Tree[], TileSphere>()
 
 export type Tree={
   x:number; y:number; z:number; kind:number; scale:number; seed:number
@@ -33,6 +37,7 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
   const instances=new Float32Array(data.byteLength/12*38)
   const matrix=new THREE.Matrix4(),midMatrix=new THREE.Matrix4()
   const tint=new THREE.Color(),proxyTint=new THREE.Color()
+  let minY=Infinity, maxY=-Infinity
   for(let i=0;i<data.byteLength;i+=12){
     const x=tile.x+data.getUint16(i,true)/100,y=data.getInt16(i+4,true)/10
     let z=tile.z+data.getUint16(i+2,true)/100
@@ -41,6 +46,8 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
       z=start+distance*slopeRatio(distance)
     }
     if(treeBlocked(x,y,z))continue
+    if(y<minY)minY=y
+    if(y>maxY)maxY=y
     const rawKind=data.getUint8(i+6),kind=rawKind<TREE_SPECIES_COUNT?rawKind:0
     const scale=data.getUint8(i+7)/100,yaw=data.getUint8(i+8)*Math.PI/128,seed=data.getUint8(i+9)
     const nx=data.getInt8(i+10)/127,nz=data.getInt8(i+11)/127
@@ -53,6 +60,10 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
     matrix.toArray(instances,offset);midMatrix.toArray(instances,offset+16)
     tint.toArray(instances,offset+32);proxyTint.toArray(instances,offset+35)
     trees.push({x,y,z,kind,scale,seed,instances,offset,proxyGroup})
+  }
+  if(trees.length){
+    const cy=(minY+maxY+8)*.5, halfH=Math.max(12,(maxY-minY+20)*.5)
+    tileBounds.set(trees,{cx:tile.x+128,cy,cz:tile.z+128,r:Math.hypot(181.02,halfH)})
   }
   return trees
 }
@@ -97,8 +108,14 @@ export class Forest{
     this.range={...next}
     setTreeFar(next.treeFar)
     this.dirty=true
+    this.queueDirty=true
   }
   private queue:Tile[]=[]
+  private queueDirty=true
+  private lastQueuePos=new THREE.Vector3(Infinity,0,0)
+  private lastQueueLimit=NaN
+  private lastDeferOuter=false
+  private nextRetryAt=Infinity
   private requestLimit=1
   private pump(){
     while(this.pending.size<this.requestLimit && this.queue.length){
@@ -114,38 +131,66 @@ export class Forest{
   tick(position:THREE.Vector3, deferOuter=false){
     const distance=(tile:Tile)=>Math.hypot(tile.x+128-position.x,tile.z+128-position.z)
     for(const tile of this.loaded.keys()){
-      if(distance(tile)>this.range.treeUnloadRadius){this.loaded.delete(tile);this.dirty=true}
+      if(distance(tile)>this.range.treeUnloadRadius){this.loaded.delete(tile);this.dirty=true;this.queueDirty=true}
     }
-    for(const [tile,control] of this.pending)if(distance(tile)>this.range.treeUnloadRadius)control.abort()
+    for(const [tile,control] of this.pending)if(distance(tile)>this.range.treeUnloadRadius){control.abort();this.queueDirty=true}
     const limit=deferOuter?Math.min(this.range.treeLoadRadius,streamBudget.priorityTreeRadius+128):this.range.treeLoadRadius
     this.requestLimit=deferOuter?1:streamBudget.treeRequests
     const now=performance.now()
-    this.queue=Array.from(this.grid.near(position.x,position.z,limit))
-      .filter(tile=>!deferOuter || tileEdgeDistance(tile,position.x,position.z)<=streamBudget.priorityTreeRadius)
-      .filter(tile=>(deferOuter || distance(tile)<=limit)&&!this.loaded.has(tile)&&!this.pending.has(tile)&&(this.retry.get(tile)??0)<=now)
-      .sort((a,b)=>distance(b)-distance(a))
+    if(this.queueDirty||position.distanceToSquared(this.lastQueuePos)>=16||limit!==this.lastQueueLimit||deferOuter!==this.lastDeferOuter||now>=this.nextRetryAt){
+      this.queueDirty=false
+      this.lastQueuePos.copy(position)
+      this.lastQueueLimit=limit
+      this.lastDeferOuter=deferOuter
+      let nextRetry=Infinity
+      this.queue=Array.from(this.grid.near(position.x,position.z,limit))
+        .filter(tile=>!deferOuter || tileEdgeDistance(tile,position.x,position.z)<=streamBudget.priorityTreeRadius)
+        .filter(tile=>{
+          if(!(deferOuter || distance(tile)<=limit) || this.loaded.has(tile) || this.pending.has(tile))return false
+          const retryAt=this.retry.get(tile)??0
+          if(retryAt>now){if(retryAt<nextRetry)nextRetry=retryAt;return false}
+          return true
+        })
+        .sort((a,b)=>distance(b)-distance(a))
+      this.nextRetryAt=nextRetry
+    }
     this.pump()
     if(!this.loaded.size)return
     if(!this.dirty&&this.camera.position.distanceToSquared(this.anchor)<4&&this.rotation.angleTo(this.camera.quaternion)<.016)return
     this.anchor.copy(this.camera.position);this.dirty=false
     this.rotation.copy(this.camera.quaternion);this.camera.updateMatrixWorld();this.frustum.setFromProjectionMatrix(this.matrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse))
-    const cam=this.camera.position, farSq=this.range.treeFar**2, nearBase=this.range.treeNearLod
+    const cam=this.camera.position, far=this.range.treeFar, farSq=far*far, nearBase=this.range.treeNearLod
+    const [p0,p1,p2,p3,p4,p5]=this.frustum.planes
     const groups=this.groups
     for(let i=0;i<TOTAL_SLOTS;i++)groups[i].length=0
     this.speciesFrequency.fill(0)
     const lodScale=nearBase/defaultRange.treeNearLod
     const nearSq=(look.trees.lodNear*lodScale)**2, midSq=(look.trees.lodMid*lodScale)**2
-    for(const trees of this.loaded.values())for(const tree of trees){
-      const d=(tree.x-cam.x)**2+(tree.y-cam.y)**2+(tree.z-cam.z)**2
-      if(d>=farSq)continue
-      // Never let a crown swallow the follow camera: drop trees whose canopy the camera is inside.
-      const highCanopy=(tree.kind===0||tree.kind===1||tree.kind===6||tree.kind===7||tree.kind===9)&&cam.y-tree.y<2.9*tree.scale
-      if((tree.x-cam.x)**2+(tree.z-cam.z)**2<(highCanopy?2.2:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue
-      this.point.set(tree.x,tree.y+4,tree.z)
-      if(!this.frustum.planes.every(plane=>plane.distanceToPoint(this.point)>-40))continue
-      if(d < SPECIES_PRIORITY_RADIUS**2) this.speciesFrequency[tree.kind]++
-      const slot=d<nearSq?tree.kind:d<midSq?TREE_SPECIES_COUNT+tree.proxyGroup:TREE_SPECIES_COUNT+4+tree.proxyGroup
-      groups[slot].push(tree)
+    const pt=this.point
+    for(const trees of this.loaded.values()){
+      const sphere=tileBounds.get(trees)
+      if(!trees.length)continue
+      if(sphere){
+        const dx=sphere.cx-cam.x, dy=sphere.cy-cam.y, dz=sphere.cz-cam.z
+        if(dx*dx+dy*dy+dz*dz>=(far+sphere.r)**2)continue
+        pt.set(sphere.cx,sphere.cy,sphere.cz)
+        const margin=-40-sphere.r
+        if(p0.distanceToPoint(pt)<=margin||p1.distanceToPoint(pt)<=margin||p2.distanceToPoint(pt)<=margin||p3.distanceToPoint(pt)<=margin||p4.distanceToPoint(pt)<=margin||p5.distanceToPoint(pt)<=margin)continue
+      }
+      for(let i=0;i<trees.length;i++){
+        const tree=trees[i]
+        const dx=tree.x-cam.x, dy=tree.y-cam.y, dz=tree.z-cam.z
+        const d=dx*dx+dy*dy+dz*dz
+        if(d>=farSq)continue
+        // Never let a crown swallow the follow camera: drop trees whose canopy the camera is inside.
+        const highCanopy=(tree.kind===0||tree.kind===1||tree.kind===6||tree.kind===7||tree.kind===9)&&cam.y-tree.y<2.9*tree.scale
+        if(dx*dx+dz*dz<(highCanopy?2.2:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue
+        pt.set(tree.x,tree.y+4,tree.z)
+        if(p0.distanceToPoint(pt)<=-40||p1.distanceToPoint(pt)<=-40||p2.distanceToPoint(pt)<=-40||p3.distanceToPoint(pt)<=-40||p4.distanceToPoint(pt)<=-40||p5.distanceToPoint(pt)<=-40)continue
+        if(d < SPECIES_PRIORITY_RADIUS**2) this.speciesFrequency[tree.kind]++
+        const slot=d<nearSq?tree.kind:d<midSq?TREE_SPECIES_COUNT+tree.proxyGroup:TREE_SPECIES_COUNT+4+tree.proxyGroup
+        groups[slot].push(tree)
+      }
     }
     this.nearOrder.sort((a,b)=>this.speciesFrequency[b]-this.speciesFrequency[a])
     let activeNear=0
@@ -172,7 +217,7 @@ export class Forest{
         mesh=new THREE.InstancedMesh(geometry,material,cap)
         mesh.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(cap*3),3)
         mesh.raycast=()=>{}
-        this.scene.add(mesh);this.batches[i]=mesh;mesh.frustumCulled=false
+        this.scene.add(mesh);this.batches[i]=freezeStatic(mesh);mesh.frustumCulled=false
       }
       if(mesh){
         mesh.count=group.length;mesh.visible=!!group.length

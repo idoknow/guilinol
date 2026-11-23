@@ -27,6 +27,7 @@ import {getPlayMode, onPlayMode, soloServices, trafficEnabled} from './game/play
 import {getState} from './game/state'
 import {loadLocalSave} from './game/save'
 import {isGlobalHotkeyBlocked} from './walk/input-guard'
+import {freezeStatic} from './static-freeze'
 
 installAtmosphere()
 // The title screen (ui/home.ts) pauses the scene while it covers it: no simulation, no draws.
@@ -79,14 +80,15 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   document.body.prepend(renderer.domElement)
   const camera = new THREE.PerspectiveCamera(55,1,1,Math.max(look.fogHorizonTo,initialMetrics.fogHorizonTo)+1200)
   const scene = new THREE.Scene()
+  scene.matrixAutoUpdate = false
   scene.fog = new THREE.Fog(look.hazeNear,0,1)
-  const dome = sky(), drops = rain(); scene.add(dome,drops)
+  const dome = sky(), drops = freezeStatic(rain()); scene.add(dome,drops)
   camera.layers.enable(WATER_LAYER)
   const light = new THREE.DirectionalLight(look.sunColor,look.sunPower)
   light.position.set(...look.sunDirection); scene.add(light)
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
   const [left,top,width,depth] = bounds.extent
-  scene.add(outerGround(bounds.extent))
+  scene.add(freezeStatic(outerGround(bounds.extent)))
   // IDOK-105: choose the opening camera pose. The camera is NOT touched here — `flight()` below sets
   // `rotation.order = 'YXZ'` and lookAt()/rotation.set() must run after it, or three.js recomputes the
   // quaternion with the wrong order and every slot gains a roll.

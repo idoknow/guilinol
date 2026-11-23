@@ -268,6 +268,12 @@ body[data-hud="street"] .render-pop {
   }
 }
 
+@media (pointer: coarse) and (max-width: 560px) {
+  body:not([data-hud="street"]):has(.gl-mission-entry) .render-pop {
+    top: calc(224px + env(safe-area-inset-top));
+  }
+}
+
 @media (pointer: coarse) and (max-height: 500px) and (min-width: 521px) {
   .render-entry {
     top: calc(104px + env(safe-area-inset-top));
