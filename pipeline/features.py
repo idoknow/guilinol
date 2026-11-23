@@ -144,7 +144,7 @@ def raw_overture_footprints(bounds):
     return out
 
 
-def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_mask=None):
+def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_mask=None, airport_buildings=()):
     footprints, heights = [], []
     grounds = unary_union(layout.school_grounds)
     rules = json.loads(Path(__file__).with_name('building-kinds.json').read_text())
@@ -214,6 +214,14 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
             floors = int(props['floors'])
             footprints.append(footprint)
             heights.append((base, base+3.2*floors, 3, floors, ident%65536, center, [], False))
+    for element, footprint in airport_buildings:
+        for poly in polygons(footprint.intersection(bounds)):
+            center=poly.representative_point()
+            floors=int(element['tags'].get('building:levels','2'))
+            base=elevation(center.x,center.y)
+            footprints.append(poly)
+            heights.append((base,base+3.1*floors,0,floors,element['id']%65536,center,[],False))
+            palace.append(poly)
     palace_index = STRtree(palace)
     with (Path(RAW)/'overture_buildings.csv').open() as source:
         for row in csv.DictReader(source, delimiter='\t'):

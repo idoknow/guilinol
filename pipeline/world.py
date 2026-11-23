@@ -1,3 +1,4 @@
+from airport import airfield, level_pavement
 from play_region import PlayRegion
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
@@ -139,7 +140,7 @@ def build(bbox, output, palette, workers=4):
     output.mkdir(parents=True, exist_ok=True)
     original = previous_bed.copy()
     mountain_trees = []
-    peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet,mountain_trees,CONFIG['peakAreaPerTree'])
+    peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet,mountain_trees,CONFIG['peakAreaPerTree'],region.geometry if region else None)
     for region,level in layout.flatten:
         for part in polygons(region.intersection(bounds)):
             col, row = math.floor((part.bounds[0]-left)/GRID), math.floor((part.bounds[1]-top)/GRID)
@@ -181,6 +182,7 @@ def build(bbox, output, palette, workers=4):
         col = min(width // GRID, max(0, round((east - left) / GRID)))
         return terrain[row, col] / 10, surface[row, col]
 
+    pavement, airport_buildings = airfield() if region else (None, [])
     raw_foots = raw_overture_footprints(bounds)
     road_net = extract_road_network(raw_foots)
     _, roads, _, banks, _, ped_areas = road_net
@@ -226,7 +228,7 @@ def build(bbox, output, palette, workers=4):
     sidewalk_mask = unary_union(sw_surfs).difference(carriageway_mask).buffer(0.06)
 
     peak_tree = STRtree(peak_shapes)
-    init_footprints, _ = buildings(bounds, elevation, peak_tree, layout, carriageway_mask, sidewalk_mask)
+    init_footprints, _ = buildings(bounds, elevation, peak_tree, layout, carriageway_mask, sidewalk_mask, airport_buildings)
     candidate_routes = plan_vehicles(bounds, surface, layers['road'], init_footprints, sample, grid_origin=(left,top))['routes']
 
     road_ctrl, bridge_plans, finalize_bridges = solve_road_and_bridge_elevations(
@@ -289,6 +291,7 @@ def build(bbox, output, palette, workers=4):
         fubo.native_grade(terrain,original,surface,left,top)
     from road_tunnels import bake as bake_tunnels
     tunnels = bake_tunnels(bounds,(original,terrain),left,top,GRID)
+    level_pavement(pavement,terrain,original,left,top)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     finalize_bridges(ground_mesh_at)
 
@@ -345,7 +348,7 @@ def build(bbox, output, palette, workers=4):
     structures = load_landmark_meshes(Path(__file__).resolve().parents[1], {'landmarks': structural_entries})
     layout.model_footprints = unary_union([layout.model_footprints, *(
         structural_footprint(data,structural_ground,ShapelyPolygon()) for data in structures.values())])
-    footprints, heights = buildings(bounds, ground_mesh_at, peak_tree, layout, carriageway_mask, sidewalk_mask)
+    footprints, heights = buildings(bounds, ground_mesh_at, peak_tree, layout, carriageway_mask, sidewalk_mask, airport_buildings)
     index = STRtree(footprints)
     shop_rows = shopfronts(footprints, heights, roads)
     for campus in layout.allow_unmapped_court:

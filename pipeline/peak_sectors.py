@@ -8,10 +8,10 @@ from pathlib import Path
 
 def overview_step(width, depth):
     """Bound the resident mesh to the pre-Huajiang overview's cell budget."""
-    for step in (32, 64):
+    for step in (32, 64, 128):
         if (width//step)*(depth//step) <= (11264//32)*(17408//32):
             return step
-    raise ValueError('Overview exceeds budget at the coarsest supported four cells per tile')
+    raise ValueError('Overview exceeds budget at the coarsest supported two cells per tile')
 
 
 def write_peak_sectors(output: Path, peaks):
