@@ -1,40 +1,57 @@
 #!/usr/bin/env bash
-# 只刷新「变过的区块」：按内容 sha256 对比上一次的清单，改动过的才 clean_url + 预热
+# 只刷新「变过的区块」：按内容 sha256 与上一次清单比对；改动过的 clean_url + 预热，删除的只刷新
 #
 # 用法：
-#   CDNFLY_TOKEN=xxx ./scripts/cdn-sync.sh                 # 用 web/dist 和 .cdn-hashes.json
-#   DIST=web/dist ./scripts/cdn-sync.sh
-#   DRY_RUN=1 ./scripts/cdn-sync.sh                        # 只看要刷哪些，不真的提交
-#   STATE_ONLY=1 ./scripts/cdn-sync.sh                     # 只写基线（首次/缓存丢失时与 cdn-purge.sh dir 配合）
+#   CDNFLY_TOKEN=xxx ./scripts/cdn-sync.sh            # 自动找 dist / web/dist
+#   DIST=web/dist STATE=.cdn-hashes.json ./scripts/cdn-sync.sh
+#   DRY_RUN=1 ./scripts/cdn-sync.sh                  # 只看要刷哪些
 #
-# CI 里要把 .cdn-hashes.json 缓存住（actions/cache），否则每次都当成全量变更：
-#
-#   - uses: actions/cache@v4
-#     with:
-#       path: .cdn-hashes.json
-#       key: cdn-hashes-${{ github.ref_name }}
-#       restore-keys: cdn-hashes-
-#
-# 依赖：python3、curl；CDNFLY_TOKEN
+# CI：把 .cdn-hashes.json 缓存住（见 PR 说明），否则每次都当全量变更。
+# 依赖：python3 ≥3.8、CDNFLY_TOKEN
 set -euo pipefail
 
 API="${CDNFLY_API:-https://cdn.cdn.sn}"
 HOST="${HOST:-https://glol.rcpd.cc}"
-DIST="${DIST:-web/dist}"
 STATE="${STATE:-.cdn-hashes.json}"
-# 需要托管的静态目录（与 nginx 的 location 对应）
 DIRS="${DIRS:-assets landmarks world textures avatar brand icons contributors home basis}"
 DRY_RUN="${DRY_RUN:-0}"
+BATCH="${BATCH:-300}"
+MAX_TIME="${MAX_TIME:-60}"
 
-[ -d "$DIST" ] || { echo "找不到构建产物: $DIST" >&2; exit 2; }
+# 构建产物目录：显式给定优先，否则依次尝试 dist、web/dist
+if [ -z "${DIST:-}" ]; then
+  for d in dist web/dist; do
+    [ -d "$d" ] && DIST="$d" && break
+  done
+fi
+[ -n "${DIST:-}" ] && [ -d "$DIST" ] || {
+  echo "找不到构建产物（试过 dist、web/dist）；请用 DIST=<dir> 指定" >&2; exit 2; }
 
-tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+# 明文 http 会把 token 泄露出去，只允许本机回环
+case "$API" in
+  https://*) ;;
+  http://127.0.0.1*|http://localhost*) ;;
+  *) echo "CDNFLY_API 必须是 https（或本机回环）：$API" >&2; exit 3 ;;
+esac
 
-# 1) 计算当前构建的哈希表
-python3 - "$DIST" "$STATE" "$tmp/now.json" "$tmp/changed.txt" "$DIRS" <<'PY'
-import hashlib, json, os, sys
-dist, state_path, now_path, changed_path, dirs = sys.argv[1:6]
-dirs = dirs.split()
+export API HOST DIST STATE DIRS DRY_RUN BATCH MAX_TIME
+
+exec python3 - <<'PY'
+import hashlib, json, os, sys, time, urllib.request, urllib.error
+
+API   = os.environ['API'].rstrip('/')
+HOST  = os.environ['HOST'].rstrip('/')
+DIST  = os.environ['DIST']
+STATE = os.environ['STATE']
+DIRS  = os.environ['DIRS'].split()
+DRY   = os.environ['DRY_RUN'] == '1'
+STATE_ONLY = os.environ.get('STATE_ONLY') == '1'
+BATCH = int(os.environ['BATCH'])
+MAX_T = int(os.environ['MAX_TIME'])
+TOKEN = os.environ.get('CDNFLY_TOKEN', '')
+
+def die(msg):
+    print(f'错误: {msg}', file=sys.stderr); sys.exit(3)
 
 def sha(p):
     h = hashlib.sha256()
@@ -44,90 +61,138 @@ def sha(p):
     return h.hexdigest()
 
 now = {}
-for d in dirs:
-    base = os.path.join(dist, d)
+for d in DIRS:
+    base = os.path.join(DIST, d)
     if not os.path.isdir(base):
         continue
     for root, _, files in os.walk(base):
         for name in files:
             full = os.path.join(root, name)
-            rel = '/' + os.path.relpath(full, dist).replace(os.sep, '/')
-            now[rel] = sha(full)
+            now['/' + os.path.relpath(full, DIST).replace(os.sep, '/')] = sha(full)
 
-try:
-    old = json.load(open(state_path))
-except Exception:
-    old = {}
+old = {}
+if os.path.islink(STATE):
+    die(f'{STATE} 是符号链接，拒绝读写（可能被投毒）')
+if os.path.exists(STATE):
+    try:
+        old = json.load(open(STATE, encoding='utf-8'))
+    except Exception as e:
+        print(f'警告: 状态文件解析失败，按全量处理 ({e})', file=sys.stderr)
+        old = {}
 
 changed = sorted(p for p, h in now.items() if old.get(p) != h)
 removed = sorted(p for p in old if p not in now)
+print(f'当前文件 {len(now)}；变更 {len(changed)}；删除 {len(removed)}')
+for p in changed[:15]:
+    print('   +', p)
+if len(changed) > 15:
+    print('   ...')
+for p in removed[:10]:
+    print('   -', p)
 
-json.dump(now, open(now_path, 'w'), indent=0, sort_keys=True)
-open(changed_path, 'w').write('\n'.join(changed + removed))
-print(f'当前文件 {len(now)} 个；变更 {len(changed)} 个；删除 {len(removed)} 个')
-if changed:
-    print('  变更（最多列 15 个）:')
-    for p in changed[:15]:
-        print('   +', p)
+if not changed and not removed:
+    print('没有变更，不需要刷新')
+    sys.exit(0)
+
+if DRY:
+    print(f'DRY_RUN：将刷新 {len(changed)} 个、删除 {len(removed)} 个（删除的只刷新不预热）')
+    sys.exit(0)
+
+if STATE_ONLY:
+    # 只写基线、不提交任何任务（CI 首次运行 / 刚做过整站刷新时用）
+    def _save(paths):
+        tmp = STATE + '.tmp'
+        if os.path.islink(tmp):
+            os.unlink(tmp)
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, 'w') as f:
+            json.dump(paths, f, indent=0, sort_keys=True)
+        os.replace(tmp, STATE)
+    _save(now)
+    print(f'STATE_ONLY：只写基线 {len(now)} 条到 {STATE}，不提交任务')
+    sys.exit(0)
+
+if not TOKEN:
+    die('需要 CDNFLY_TOKEN')
+
+def api(path, body=None):
+    data = json.dumps(body, ensure_ascii=False).encode() if body is not None else None
+    req = urllib.request.Request(API + path, data=data, method='POST' if data else 'GET')
+    req.add_header('access-token', TOKEN)       # token 只在请求头，不进进程列表
+    req.add_header('Content-Type', 'application/json')
+    req.add_header('User-Agent', 'cdn-sync/3')
+    try:
+        with urllib.request.urlopen(req, timeout=MAX_T) as r:
+            payload = json.loads(r.read().decode() or '{}')
+    except urllib.error.HTTPError as e:
+        die(f'HTTP {e.code}: {e.read()[:200]!r}')
+    except Exception as e:
+        die(f'请求失败: {e}')
+    if not isinstance(payload, dict) or 'code' not in payload:
+        die(f'响应缺少 code：{str(payload)[:160]}')
+    if payload['code'] not in (0, '0'):
+        die(f'业务失败 code={payload["code"]} msg={payload.get("msg")}')
+    return payload
+
+def save_state(paths):
+    """原子写，且不跟随符号链接"""
+    tmp = STATE + '.tmp'
+    if os.path.islink(tmp):
+        os.unlink(tmp)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'w') as f:
+        json.dump(paths, f, indent=0, sort_keys=True)
+    os.replace(tmp, STATE)
+
+state = dict(old)
+
+def submit(kind, paths):
+    body = [{'type': kind, 'data': {'url': HOST + p}} for p in paths]
+    return api('/v1/jobs', body)
+
+for i in range(0, len(changed), BATCH):
+    chunk = changed[i:i + BATCH]
+    res = submit('clean_url', chunk)
+    print(f'clean_url 第 {i // BATCH + 1} 批：{res.get("msg")}，{len(res.get("data") or [])} 个任务')
+    for p in chunk:
+        state[p] = now[p]
+    save_state(state)      # 每批成功就落盘，中途失败重跑不会重复提交
+
+for i in range(0, len(removed), BATCH):
+    chunk = removed[i:i + BATCH]
+    res = submit('clean_url', chunk)
+    print(f'clean_url(已删除) 第 {i // BATCH + 1} 批：{res.get("msg")}，{len(res.get("data") or [])} 个任务')
+    for p in chunk:
+        state.pop(p, None)
+    save_state(state)
+
+for i in range(0, len(changed), BATCH):
+    chunk = changed[i:i + BATCH]
+    res = submit('pre_cache_url', chunk)
+    print(f'pre_cache_url 第 {i // BATCH + 1} 批：{res.get("msg")}，{len(res.get("data") or [])} 个任务')
+
+# 回查任务终态：失败的从状态里剔除，下次会重试
+time.sleep(5)
+failed = set()
+try:
+    domain = HOST.split('//')[-1]
+    for page in (1, 2, 3):
+        d = api(f'/v1/jobs?type=clean_url&key1={domain}&page={page}&limit=50')
+        for r in (d.get('data') or []):
+            st = (r.get('state') or '').lower()
+            if st in ('error', 'fail', 'failed'):
+                u = r.get('key2') or ''
+                failed.add(u[len(HOST):] if u.startswith(HOST) else u)
+except SystemExit:
+    raise
+except Exception as e:
+    print(f'回查任务状态失败（不影响本次结果）: {e}', file=sys.stderr)
+
+if failed:
+    for p in failed:
+        state.pop(p, None)
+    save_state(state)
+    print(f'有 {len(failed)} 个任务失败，已从状态剔除，下次会重试')
+
+print(f'完成：变更 {len(changed)}、删除 {len(removed)}；状态写入 {STATE}')
 PY
-
-# STATE_ONLY=1：只记录当前哈希作为基线，不提交任何任务（首次运行/缓存丢失时配合整站刷新用）
-if [ "${STATE_ONLY:-0}" = "1" ]; then
-  cp "$tmp/now.json" "$STATE"
-  echo "只写基线: $STATE"
-  exit 0
-fi
-
-mapfile -t urls < "$tmp/changed.txt"
-if [ "${#urls[@]}" -eq 0 ]; then
-  echo "没有变更，不需要刷新"
-  exit 0
-fi
-
-# 2) 提交刷新 + 预热（分批，避免单请求过大）
-batch=300
-if [ "$DRY_RUN" = "1" ]; then
-  echo "== DRY_RUN，将刷新 ${#urls[@]} 个 URL："
-  printf '  %s\n' "${urls[@]:0:20}"
-  [ "${#urls[@]}" -gt 20 ] && echo "  ..."
-  exit 0
-fi
-
-[ -n "${CDNFLY_TOKEN:-}" ] || { echo "需要 CDNFLY_TOKEN" >&2; exit 2; }
-
-python3 - "$tmp/changed.txt" "$HOST" "$tmp/batches" "$batch" <<'PY'
-import json, sys, os
-src, host, outdir, batch = sys.argv[1], sys.argv[2].rstrip('/'), sys.argv[3], int(sys.argv[4])
-paths = [l for l in open(src).read().splitlines() if l.strip()]
-os.makedirs(outdir, exist_ok=True)
-for i in range(0, len(paths), batch):
-    chunk = paths[i:i+batch]
-    body = [{"type": "clean_url", "data": {"url": host + p}} for p in chunk]
-    json.dump(body, open(f'{outdir}/clean_{i//batch}.json', 'w'), ensure_ascii=False)
-    body = [{"type": "pre_cache_url", "data": {"url": host + p}} for p in chunk]
-    json.dump(body, open(f'{outdir}/warm_{i//batch}.json', 'w'), ensure_ascii=False)
-PY
-
-post_jobs() { # post_jobs <file> <label>
-  local f="$1" label="$2"
-  echo -n "$label $(basename "$f"): "
-  # token 走 header，不进 URL/ps；带超时；业务 code!=0 视为失败
-  curl -sS --connect-timeout "${CONNECT_TIMEOUT:-10}" --max-time "${MAX_TIME:-60}" \
-       -X POST -H "access-token: $CDNFLY_TOKEN" -H 'Content-Type: application/json' \
-       --data-binary @"$f" "$API/v1/jobs" > "$tmp/resp.json"
-  python3 - "$tmp/resp.json" <<'PY'
-import json, sys
-d = json.load(open(sys.argv[1], encoding='utf-8'))
-code = d.get('code')
-if code not in (0, '0', None):
-    print('失败', code, d.get('msg'), file=sys.stderr); sys.exit(3)
-print(d.get('msg'), len(d.get('data') or []), '个任务')
-PY
-}
-
-for f in "$tmp"/batches/clean_*.json; do post_jobs "$f" "刷新"; done
-for f in "$tmp"/batches/warm_*.json;  do post_jobs "$f" "预热"; done
-
-# 3) 只有提交成功才更新状态文件
-cp "$tmp/now.json" "$STATE"
-echo "状态已更新: $STATE"
