@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>网上桂林 · 市民二代身份证</title>
+    <meta name="theme-color" content="#14211e" />
+    <meta name="robots" content="noindex" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: radial-gradient(120% 120% at 50% 0%, #1d3630 0%, #0b1613 55%, #070d0b 100%);
+        color: #e8f4ef;
+        font-family: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        min-height: 100%;
+      }
+      #card-stage {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 12px;
+        box-sizing: border-box;
+      }
+      #card-stage canvas {
+        display: block;
+        width: 100%;
+        max-width: min(1120px, 96vw);
+        height: auto;
+        filter: drop-shadow(0 16px 34px rgba(0, 0, 0, 0.55));
+        border: 0;
+        background: transparent;
+      }
+      /* 手机竖屏：把横版身份证转 90° 铺满屏幕 */
+      /* 竖屏：卡片整体转 90°。盒子必须按「旋转后的视觉高度」来定宽，
+         否则未旋转的宽盒子仍按原尺寸参与居中，转完就顶出屏幕、切掉上半截 */
+      /* 竖屏：不旋转（歪着看不舒服），卡片按宽度铺满，靠系统旋转/横屏看更大 */
+      body.rotate #card-stage {
+        padding: 10px;
+        align-content: center;
+      }
+      body.rotate #card-stage canvas {
+        width: 100%;
+        height: auto;
+        max-width: 100%;
+        max-height: none;
+        transform: none;
+      }
+      body.rotate .tip {
+        bottom: calc(6px + env(safe-area-inset-bottom));
+      }
+      .tip {
+        position: fixed;
+        left: 50%;
+        bottom: 10px;
+        transform: translateX(-50%);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        color: rgba(232, 244, 239, 0.45);
+        pointer-events: none;
+      }
+      .status {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+        letter-spacing: 0.1em;
+        color: rgba(232, 244, 239, 0.7);
+      }
+      .status[hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="card-stage"></div>
+    <div class="status" id="status">正在读取市民档案…</div>
+    <p class="tip">网上桂林 · 二创站 · 本证仅供站内身份识别 · 手机横过来可以看得更大</p>
+    <script type="module" src="/src/idpage.ts"></script>
+  </body>
+</html>

@@ -44,6 +44,14 @@ npm run preview
 
 生产包验收：`npm run world && npm run build && CHROMIUM=/usr/bin/chromium npm run verify:walk`。默认快速版覆盖撞楼、地标、树、栏杆、陡壁、桥和拒水。`verify:walk:full` 保留原有沿街长路线、逐帧检查、截图及帧记录（`captures/walk/`）。角色模型与材质入口在 `web/src/look/avatar.ts`；速度、跳高与相机参数在 `web/src/walk/config.ts`；授权见 `docs/credits.md`。地标构建和街道数据约定见 `docs/landmark-pipeline.md`。
 
+## 香烟与快捷栏
+
+步行模式底部有 6 格快捷栏，对应键盘 `1`–`6`（手机直接点格子）。按 `TAB`（手机上点右下「香烟背包」）打开背包：每人固定 20 包烟、每包 20 根，从背包拖到快捷栏（手机上点一下香烟再点格子）。
+
+第一次按某个格子 = 取烟点烟：左手举出烟盒、右手拿打火机擦火；点着之后按**同一格** = 吸一口。一根烟自然燃烧 3 分钟（烟头冒小烟），每吸一口立刻少 30 秒并让烟身短一截、烟头喷一大股烟；抽完烟头掉在脚下地上。第一人称另有一套跟随相机的视角模型，第三人称和其他玩家看到的是挂在人物身上的那一套。
+
+联机时抽烟状态直接塞在已有的 `pos` 包里（`sc`/`sb`/`sp`/`br` 四个整数），别人能看到你左手举烟盒、右手拿打火机点火、抬手吸烟，以及烟头冒出来的那缕烟。细节见 `docs/smoking.md` 与 `deploy/realtime/README.md`。
+
 ### 实拍同机位与完整回归
 
 在仓库根目录安装依赖（`npm ci`、`uv sync --locked`、`npx playwright install chromium`），准备 `raw/` 及 11 月 OSM 快照，按 `docs/landmark-pipeline.md` 配置原生 gltfpack。Mac 上需确保 Pillow 能打开 `NotoSansCJK-Regular.ttc`（也可把同名字体放在仓库根目录）。

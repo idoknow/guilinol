@@ -1,0 +1,15 @@
+﻿.idcard-mask{position:fixed;inset:0;z-index:150;display:grid;place-items:center;padding:18px;background:rgba(8,16,12,.62);backdrop-filter:blur(6px)}
+.idcard-mask[hidden]{display:none}
+.idcard-panel{position:relative;width:min(1120px,100%);max-height:92vh;overflow:auto;background:#f7f4ec;border:3px solid #16261e;border-radius:0;box-shadow:10px 10px 0 rgba(16,33,27,.55)}
+.idcard-canvas canvas{display:block;width:100%;height:auto}
+.idcard-close{position:absolute;top:8px;right:8px;z-index:2;width:32px;height:32px;border:3px solid #16261e;border-radius:0;background:#f7f4ec;color:#16261e;font:800 18px/1 system-ui;cursor:pointer;box-shadow:3px 3px 0 rgba(16,33,27,.5)}
+.idcard-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;justify-content:flex-start;padding:10px 16px 14px;border-top:3px solid #16261e;background:transparent}
+/* 保存图片：无背景、无边框的文字按钮（左下角） */
+.idcard-actions button{border:0;background:transparent;padding:2px 0;color:#1f6b46;font:800 14px/1.2 system-ui;letter-spacing:.06em;cursor:pointer;border-bottom:2px solid #1f6b46}
+.idcard-actions button:hover{color:#0f4d31;border-bottom-color:#0f4d31}
+
+
+.idcard-panel{border-radius:22px!important;border:0!important;box-shadow:0 18px 48px rgba(0,0,0,.42),0 0 0 2px rgba(16,33,27,.25)!important;overflow:hidden}
+.idcard-close{border-radius:10px!important;border:2px solid #16261e!important;box-shadow:none!important}
+.idcard-actions{border-top:2px solid #16261e!important;background:#f2f6f1!important}
+.idcard-actions button{border:0!important;border-bottom:0!important;border-radius:0!important;background:transparent!important;color:#1f6b46!important;font:800 14px/1.2 system-ui!important;padding:2px 0!important;text-decoration:underline;text-underline-offset:4px;text-decoration-thickness:2px}

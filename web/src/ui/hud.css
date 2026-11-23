@@ -79,3 +79,527 @@ body[data-aboard] .btn-jump{display:none}
   .btn-menu{padding:0 12px}.btn-menu span{display:none}
   .about-cols{grid-template-columns:1fr}}
 @media (max-width:520px){.about-cols{grid-template-columns:1fr}.account-entry{max-width:7.5em}}
+
+/* ── HUD 收口（对齐 nanningol 的顶/底栏 + 玻璃质感）────────────── */
+.hint{
+  left:12px!important;right:auto!important;top:calc(96px + env(safe-area-inset-top))!important;bottom:auto!important;transform:none!important;
+  display:grid;gap:2px;align-items:start;justify-items:start;
+  max-width:210px;padding:9px 12px;
+  border-radius:13px;
+  background:rgba(18,26,24,.62);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 6px 22px rgba(0,0,0,.28);
+  backdrop-filter:blur(14px) saturate(1.15);
+  color:rgba(245,250,247,.9);font-size:11px;line-height:1.45;letter-spacing:.02em;
+  text-shadow:0 1px 2px rgba(0,0,0,.5);white-space:normal;
+}
+.hint i{display:block;font-style:normal;padding-left:11px;position:relative;opacity:.92}
+.hint i::before{content:'·';position:absolute;left:0;opacity:.55}
+.hint kbd{
+  display:inline-block;min-width:20px;padding:1px 6px;margin:0 2px;
+  border-radius:5px;background:rgba(255,255,255,.14);
+  border:1px solid rgba(255,255,255,.2);border-bottom-width:2px;
+  font:600 11px/1.5 ui-monospace,Menlo,Consolas,monospace;color:#fff;
+}
+.btn-mode{
+  position:fixed;right:18px;top:150px;z-index:40;
+  padding:8px 16px;border-radius:999px;
+  background:rgba(18,26,24,.62);color:#eef6f2;
+  border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 6px 20px rgba(0,0,0,.26);
+  backdrop-filter:blur(14px) saturate(1.15);
+  font:600 13px/1 inherit;letter-spacing:.4px;cursor:pointer;
+  transition:transform .16s ease,background .16s ease;
+}
+.btn-mode:hover{transform:translateY(-1px);background:rgba(26,38,34,.72)}
+.btn-mode:active{transform:translateY(0)}
+@media (max-width:720px){
+  .hint{font-size:10px;gap:1px;padding:7px 10px;max-width:168px;left:10px!important;bottom:auto!important}
+  .btn-mode{top:120px;right:12px;padding:7px 13px}
+}
+
+/* ── 右侧工具栏统一成玻璃小格（对齐 nanningol 的 game-tools）──────── */
+
+/* ── 右侧工具栏 .dock 玻璃化（起飞/景册/拍照/反馈/地图）────────── */
+.dock{
+  display:flex;flex-direction:column;gap:8px;align-items:stretch;
+  padding:0;background:none;border:0;box-shadow:none;
+}
+.dock button,.dock a{
+  min-width:104px;padding:9px 14px;border-radius:12px;
+  background:rgba(18,26,24,.58);color:#e9f4ef;
+  border:1px solid rgba(255,255,255,.13);
+  box-shadow:0 4px 16px rgba(0,0,0,.22);
+  backdrop-filter:blur(12px) saturate(1.1);
+  font:600 13px/1.2 inherit;letter-spacing:.3px;cursor:pointer;
+  transition:transform .15s ease,background .15s ease;
+}
+.dock button:hover,.dock a:hover{background:rgba(30,44,39,.74);transform:translateX(-2px)}
+.dock button:active,.dock a:active{transform:translateX(0) scale(.985)}
+@media (max-width:720px){
+  .dock{gap:6px}
+  .dock button,.dock a{min-width:0;padding:7px 11px;font-size:12px;border-radius:10px}
+}
+
+/* ── 右侧工具栏：真实结构是 .dock > .dock-buttons > button ─────── */
+.dock-buttons{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.dock-buttons button{
+  min-width:104px;padding:9px 14px;border-radius:12px;
+  background:rgba(18,26,24,.58);color:#e9f4ef;
+  border:1px solid rgba(255,255,255,.13);
+  box-shadow:0 4px 16px rgba(0,0,0,.22);
+  backdrop-filter:blur(12px) saturate(1.1);
+  font:600 13px/1.2 inherit;letter-spacing:.3px;cursor:pointer;
+  transition:transform .15s ease,background .15s ease;
+}
+.dock-buttons button:hover{background:rgba(30,44,39,.74);transform:translateX(-2px)}
+.dock-buttons button:active{transform:translateX(0) scale(.985)}
+.dock-buttons button small{margin-left:6px;font:600 10px ui-monospace;color:#7fd8bd}
+@media (max-width:720px){
+  .dock-buttons{gap:6px}
+  .dock-buttons button{min-width:0;padding:7px 11px;font-size:12px;border-radius:10px}
+}
+
+/* ── 移动端止血：小屏隐藏键位条、缩小工具按钮 ─────────────── */
+@media (max-width:900px){
+  .hint{display:none!important}
+  .dock{transform:scale(.86);transform-origin:top right}
+  .dock-buttons button{min-width:0!important;padding:6px 10px!important;font-size:11.5px!important}
+  .dock-mini .road-name{font-size:10px!important}
+  .sky-ui{transform:scale(.9);transform-origin:top left}
+  .home .lc-stage{padding:0 16px 74px!important}
+  .home .lc-en{font-size:clamp(34px,11vw,64px)!important}
+  .home .lc-cn{letter-spacing:.34em!important}
+}
+/* 竖屏提示 */
+@media (orientation:portrait) and (max-width:900px){
+  body[data-mode="walk"]::after{
+    content:"请横屏游玩";position:fixed;left:0;right:0;bottom:52%;text-align:center;
+    font:700 15px/1 system-ui;letter-spacing:.4em;color:rgba(255,255,255,.72);
+    text-shadow:0 2px 12px rgba(0,0,0,.6);pointer-events:none;z-index:150
+  }
+}
+
+/* ── 触屏补充按钮（仅 pointer:coarse 显示）───────────────── */
+#touch-bar{position:fixed;right:12px;bottom:calc(88px + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;gap:8px;z-index:44}
+#touch-bar button{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  width:62px;height:52px;border-radius:14px;
+  background:rgba(18,26,24,.66);color:#e9f4ef;
+  border:1px solid rgba(255,255,255,.16);
+  backdrop-filter:blur(12px);box-shadow:0 6px 18px rgba(0,0,0,.3);
+  font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#touch-bar button b{font:700 13px/1 system-ui}
+#touch-bar button small{font:600 8.5px/1 ui-monospace;letter-spacing:.1em;opacity:.5}
+#touch-bar button:active{transform:scale(.94);background:rgba(47,214,166,.28)}
+@media (pointer:fine){#touch-bar{display:none}}
+@media (max-width:420px){#touch-bar button{width:56px;height:48px}}
+
+/* 触屏条：改成底部居中的一排，避免和右侧已有按钮重叠 */
+#touch-bar{
+  left:50%!important;right:auto!important;transform:translateX(-50%);
+  bottom:calc(14px + env(safe-area-inset-bottom))!important;
+  flex-direction:row!important;gap:10px!important}
+#touch-bar button{width:58px;height:50px}
+
+/* ── 手机/平板横屏专门布局 ──────────────────────────────── */
+@media (orientation:landscape) and (pointer:coarse){
+  /* 触屏条竖排到右下，避开摇杆和工具栏 */
+  #touch-bar{
+    left:auto!important;right:10px!important;transform:none!important;
+    bottom:calc(96px + env(safe-area-inset-bottom))!important;
+    flex-direction:column!important;gap:6px!important}
+  #touch-bar button{width:54px;height:46px;border-radius:12px}
+  /* 右侧工具栏上移并缩小 */
+  .dock{transform:scale(.8);transform-origin:top right;top:calc(8px + env(safe-area-inset-top))}
+  .dock-mini{display:none}
+  /* 顶部时间条压缩 */
+  .sky-ui{transform:scale(.82);transform-origin:top left;top:calc(6px + env(safe-area-inset-top))}
+  /* 底部状态条缩小到角落 */
+  body>footer,a[href*="openstreetmap"]{font-size:9px!important;opacity:.55}
+  /* 小地图缩到 96px */
+  .dock button.minimap canvas{width:96px!important;height:96px!important}
+  /* 竖屏提示不要出现 */
+  body[data-mode="walk"]::after{content:none!important}
+  /* 叫车手机面板在横屏下不要太宽 */
+  .phone-card,.tp-card{max-height:80vh}
+}
+
+/* 横屏：触屏条改回底部居中一排，右侧工具栏缩小让位 */
+@media (orientation:landscape) and (pointer:coarse){
+  #touch-bar{left:50%!important;right:auto!important;transform:translateX(-50%)!important;
+    bottom:calc(8px + env(safe-area-inset-bottom))!important;
+    flex-direction:row!important;gap:8px!important}
+  #touch-bar button{width:52px;height:44px}
+  .dock{transform:scale(.66)!important;transform-origin:top right}
+  .dock-mini{display:block!important}
+}
+
+/* 手机：把右侧工具栏和补充按钮收进汉堡菜单 */
+@media (pointer:coarse){
+  .dock{display:none!important}
+  #touch-bar{display:none!important}
+  #hud-burger{display:flex!important}
+}
+#hud-burger{
+  display:none;position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));
+  z-index:46;width:50px;height:50px;border-radius:14px;
+  align-items:center;justify-content:center;
+  background:rgba(18,26,24,.7);border:1px solid rgba(255,255,255,.18);
+  backdrop-filter:blur(12px);box-shadow:0 6px 18px rgba(0,0,0,.3);
+  color:#e9f4ef;font:700 18px/1 system-ui;cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+#hud-burger.open{background:rgba(47,214,166,.3)}
+#hud-sheet{
+  position:fixed;right:12px;bottom:calc(72px + env(safe-area-inset-bottom));z-index:46;
+  display:none;flex-direction:column;gap:6px;padding:8px;
+  border-radius:16px;background:rgba(14,24,21,.86);
+  border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(16px);
+  box-shadow:0 12px 36px rgba(0,0,0,.42)}
+#hud-sheet.open{display:flex}
+#hud-sheet button{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  min-width:132px;padding:9px 12px;border-radius:10px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  color:#e9f4ef;font:600 13px/1 system-ui;cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+#hud-sheet button:active{background:rgba(47,214,166,.24)}
+#hud-sheet button small{font:600 9px ui-monospace;opacity:.45;letter-spacing:.08em}
+
+/* 汉堡菜单在小屏上不超出可视区，可滚动 */
+#hud-sheet{max-height:calc(100vh - 96px);overflow-y:auto;overscroll-behavior:contain}
+#hud-sheet::-webkit-scrollbar{width:6px}
+#hud-sheet::-webkit-scrollbar-thumb{background:rgba(47,214,166,.35);border-radius:6px}
+
+/* 手机：摇杆/跳跃面板整体左移，给右下角汉堡留位置 */
+@media (pointer:coarse){
+  .walk-ui{right:78px!important}
+}
+
+/* 手机上把「跳」「远近」往左挪 72px，避开右下汉堡 */
+@media (pointer:coarse){
+  .walk-ui .btn-jump,.walk-ui .btn-view{transform:translateX(-72px)!important}
+  .walk-ui{right:0!important}
+}
+
+/* 手机：小地图不显示；时间/时段/天气条移到顶部正中 */
+@media (pointer:coarse){
+  .dock,.dock-mini,.mm-panel,.dock button.minimap{display:none!important}
+  .sky-ui{
+    left:50%!important;right:auto!important;
+    transform:translateX(-50%) scale(.94)!important;
+    transform-origin:top center!important;
+    top:calc(8px + env(safe-area-inset-top))!important;
+    justify-content:center!important}
+}
+
+/* 手机：右上角只保留小地图，其余按钮收进汉堡 */
+@media (pointer:coarse){
+  .dock{
+    display:block!important;
+    right:8px!important;left:auto!important;
+    top:calc(8px + env(safe-area-inset-top))!important;
+    transform:none!important}
+  .dock-mini{display:block!important}
+  .dock-buttons{display:none!important}
+  .dock button.minimap{display:block!important;width:88px!important;height:88px!important}
+  .dock button.minimap canvas{width:88px!important;height:88px!important}
+  .dock .road-name{font-size:9px!important;margin-top:2px!important;text-align:center}
+}
+/* 提示改成左侧一列（原来是底部一条长横条，挡脚下还读不过来） */
+.hint{left:12px;right:auto;top:calc(96px + env(safe-area-inset-top));bottom:auto;transform:none;
+  display:grid;gap:2px;max-width:206px;white-space:normal;padding:8px 11px;border-radius:13px;
+  font-size:11px;line-height:1.45;letter-spacing:.02em;opacity:.9}
+.hint i{display:block;font-style:normal;padding-left:11px;position:relative;opacity:.9}
+.hint i::before{content:'·';position:absolute;left:0;opacity:.55}
+body[data-mode="fly"] .hint{max-width:186px}
+
+/* 手机：蹲 / 翘头 两个按住生效的按钮（竖排在跳上面） */
+.btn-crouch,.btn-wheelie{position:fixed;right:calc(104px + env(safe-area-inset-right));border-radius:50%;display:grid;place-items:center;font-size:13px;letter-spacing:.02em}
+.btn-crouch{bottom:calc(36px + env(safe-area-inset-bottom));width:58px;height:58px}
+.btn-wheelie{bottom:calc(104px + env(safe-area-inset-bottom));width:58px;height:58px}
+.btn-crouch.on,.btn-wheelie.on{background:rgba(169,80,60,.72)!important;transform:scale(.95)}
+body[data-aboard] .btn-wheelie{background:rgba(43,207,189,.28)}
+body[data-photo] .btn-crouch,body[data-photo] .btn-wheelie{display:none}
+
+/* 蹬着车扫码提示条：原来 bottom:78px 会和状态栏/血条挤在一起，往上挪 */
+.vehicle-action{bottom:calc(150px + env(safe-area-inset-bottom))!important}
+@media (max-width:520px){.vehicle-action{bottom:calc(136px + env(safe-area-inset-bottom))!important}}
+
+/* ===== 手游布局修复（2026-11-23） =====
+   问题：血量/体力压住左手摇杆；蹲/翘头压住跳跃与远近。
+   做法：状态条挪到右上（地图上方），蹲/翘头竖排到右侧、放在触屏按钮组上方。 */
+@media (pointer: coarse) {
+  .vitals {
+    left: auto !important;
+    right: calc(12px + env(safe-area-inset-right)) !important;
+    top: calc(104px + env(safe-area-inset-top)) !important;
+    bottom: auto !important;
+    width: min(46vw, 220px) !important;
+    max-width: 220px !important;
+    z-index: 40;
+  }
+  .btn-crouch,
+  .btn-wheelie {
+    right: calc(12px + env(safe-area-inset-right)) !important;
+    width: 56px !important;
+    height: 44px !important;
+    border-radius: 12px !important;
+    font-size: 13px !important;
+  }
+  .btn-crouch { bottom: calc(196px + env(safe-area-inset-bottom)) !important; }
+  .btn-wheelie { bottom: calc(248px + env(safe-area-inset-bottom)) !important; }
+}
+
+/* 横屏手机（矮屏）：再往上收一点，别顶到标题栏 */
+@media (pointer: coarse) and (max-height: 430px) {
+  .vitals { top: calc(74px + env(safe-area-inset-top)) !important; width: min(42vw, 190px) !important; }
+  .btn-crouch { bottom: calc(164px + env(safe-area-inset-bottom)) !important; }
+  .btn-wheelie { bottom: calc(212px + env(safe-area-inset-bottom)) !important; }
+}
+
+/* ===== 2026-11-23 手游第二轮：血条位置/尺寸、蹲&翘头毛玻璃 ===== */
+@media (pointer: coarse) {
+  /* 血条/体力：移到左侧、在线玩家下方，整体缩小 */
+  .vitals {
+    left: calc(10px + env(safe-area-inset-left)) !important;
+    right: auto !important;
+    top: calc(148px + env(safe-area-inset-top)) !important;
+    bottom: auto !important;
+    width: 132px !important;
+    max-width: 40vw !important;
+    padding: 4px 6px !important;
+    border-radius: 8px !important;
+    z-index: 40;
+  }
+  .vitals .vital-row { gap: 5px !important; }
+  .vitals .vital-label { font-size: 10px !important; min-width: 12px !important; }
+  .vitals .vital-track { height: 7px !important; border-radius: 4px !important; }
+  .vitals .vital-track i { border-radius: 4px !important; }
+
+  /* 蹲 / 翘头：毛玻璃 */
+  .btn-crouch,
+  .btn-wheelie {
+    background: rgba(20, 40, 34, 0.42) !important;
+    backdrop-filter: blur(14px) saturate(1.5) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(1.5) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.16) !important;
+    color: #eafaf1 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  }
+  .btn-crouch.on,
+  .btn-wheelie.on {
+    background: rgba(169, 80, 60, 0.55) !important;
+    backdrop-filter: blur(14px) saturate(1.8) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(1.8) !important;
+    border-color: rgba(255, 190, 170, 0.5) !important;
+  }
+}
+
+@media (pointer: coarse) and (max-height: 430px) {
+  .vitals { top: calc(112px + env(safe-area-inset-top)) !important; width: 112px !important; }
+  .vitals .vital-track { height: 6px !important; }
+}
+
+/* ===== 2026-11-23 手游第三轮：小地图圆形、蹲/翘头与血条自动避让 ===== */
+@media (pointer: coarse) {
+  /* 小地图改成圆形（裁成圆的，画布本身还是方的） */
+  .dock button.minimap,
+  button.minimap {
+    border-radius: 50% !important;
+    overflow: hidden !important;
+    border: 2px solid rgba(255, 255, 255, 0.28) !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.32), inset 0 0 0 1px rgba(0, 0, 0, 0.3) !important;
+  }
+  .dock button.minimap canvas,
+  button.minimap canvas {
+    border-radius: 50% !important;
+  }
+
+  /* 蹲 / 翘头：贴着「小地图顶边」往上排，地图多高都不会压住 */
+  .btn-wheelie {
+    bottom: calc(var(--minimap-bottom, 196px) + 10px) !important;
+  }
+  .btn-crouch {
+    bottom: calc(var(--minimap-bottom, 196px) + 62px) !important;
+  }
+
+  /* 血条/体力：贴在「在线玩家列表底边」下面，不再和列表叠在一起 */
+  .vitals {
+    top: calc(var(--players-bottom, 148px) + 10px) !important;
+    left: calc(10px + env(safe-area-inset-left)) !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 128px !important;
+    max-width: 40vw !important;
+  }
+}
+@media (pointer: coarse) and (max-height: 430px) {
+  .vitals { width: 110px !important; }
+  .vitals .vital-track { height: 6px !important; }
+  .btn-crouch, .btn-wheelie { height: 40px !important; }
+  .btn-crouch { bottom: calc(var(--minimap-bottom, 176px) + 54px) !important; }
+  .btn-wheelie { bottom: calc(var(--minimap-bottom, 176px) + 8px) !important; }
+}
+
+@media (pointer: coarse) {
+  /* 小地图在上半屏时：蹲/翘头排到它下面（--minimap-top 由 calibrateHud 量） */
+  .btn-wheelie { top: calc(var(--minimap-top, 0px) + 8px) !important; bottom: auto !important; }
+  .btn-crouch  { top: calc(var(--minimap-top, 0px) + 56px) !important; bottom: auto !important; }
+}
+
+/* ===== 2026-11-23 手游第四轮：血条无背景、清屏、视角按钮 ===== */
+/* 血条/体力：无背景（只留文字与细轨道） */
+.vitals{background:none!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;padding:0!important}
+.vitals .vital-row{background:none!important}
+.vitals .vital-track{background:rgba(0,0,0,.34)!important;box-shadow:none!important;border:0!important}
+.vitals .vital-label{text-shadow:0 1px 2px rgba(0,0,0,.55)}
+
+@media (pointer: coarse) {
+  /* 清屏：除摇杆、蹲/翘头、远近外全隐藏 */
+  body[data-hud-hidden] .vitals,
+  body[data-hud-hidden] .minimap,
+  body[data-hud-hidden] .dock,
+  body[data-hud-hidden] .walk-hint,
+  body[data-hud-hidden] .walk-legend,
+  body[data-hud-hidden] .hint,
+  body[data-hud-hidden] .smoke-hotbar,
+  body[data-hud-hidden] .players,
+  body[data-hud-hidden] .online-list,
+  body[data-hud-hidden] .walk-caption { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important }
+
+  /* 清屏按钮：左下、摇杆上方 */
+  .btn-clearscreen {
+    position: fixed;
+    left: calc(10px + env(safe-area-inset-left));
+    bottom: calc(132px + env(safe-area-inset-bottom));
+    width: 52px; height: 40px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.2);
+    background: rgba(20,40,34,.42);
+    backdrop-filter: blur(14px) saturate(1.5);
+    -webkit-backdrop-filter: blur(14px) saturate(1.5);
+    color: #eafaf1; font: 700 12px/1 system-ui;
+    cursor: pointer; z-index: 45;
+  }
+  .btn-clearscreen.on { background: rgba(43,207,189,.42) }
+
+  /* 视角切换：右下角单独一个 */
+  .btn-viewmode {
+    position: fixed;
+    right: calc(10px + env(safe-area-inset-right));
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    width: 58px; height: 40px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.2);
+    background: rgba(20,40,34,.42);
+    backdrop-filter: blur(14px) saturate(1.5);
+    -webkit-backdrop-filter: blur(14px) saturate(1.5);
+    color: #eafaf1; font: 700 12px/1 system-ui;
+    cursor: pointer; z-index: 45;
+  }
+}
+@media (pointer: coarse) and (max-height: 430px) {
+  .btn-clearscreen { bottom: calc(112px + env(safe-area-inset-bottom)); width: 48px; height: 36px; }
+  .btn-viewmode { bottom: calc(64px + env(safe-area-inset-bottom)); width: 54px; height: 36px; }
+}
+
+/* ===== 2026-11-23 手游第五轮：清屏挪到视角上方；全屏隐藏地图/登录信息/在线/时间天气 ===== */
+@media (pointer: coarse) {
+  /* 清屏与视角同一列，清屏在上面 */
+  .btn-viewmode {
+    left: auto !important;
+    right: calc(10px + env(safe-area-inset-right)) !important;
+    bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+  }
+  .btn-clearscreen {
+    left: auto !important;
+    right: calc(10px + env(safe-area-inset-right)) !important;
+    bottom: calc(118px + env(safe-area-inset-bottom)) !important;
+  }
+}
+@media (pointer: coarse) and (max-height: 430px) {
+  .btn-viewmode { bottom: calc(62px + env(safe-area-inset-bottom)) !important; }
+  .btn-clearscreen { bottom: calc(104px + env(safe-area-inset-bottom)) !important; }
+}
+
+/* 全屏：隐藏小地图、左上角登录信息、在线玩家、顶部时间天气 */
+body[data-fullscreen] .minimap,
+body[data-fullscreen] .dock,
+body[data-fullscreen] .players,
+body[data-fullscreen] .online-list,
+body[data-fullscreen] .hud-player,
+body[data-fullscreen] .player-card,
+body[data-fullscreen] .account-entry,
+body[data-fullscreen] [class*='clock'],
+body[data-fullscreen] [class*='weather'],
+body[data-fullscreen] [class*='skyinfo'],
+body[data-fullscreen] [class*='daylight'] {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* ===== 手游第六轮：清屏挪到视角上方；清屏后隐藏地图/登录信息/在线/时间天气/快捷栏/水印 ===== */
+@media (pointer: coarse) {
+  .btn-viewmode {
+    left: auto !important;
+    right: calc(10px + env(safe-area-inset-right)) !important;
+    bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+  }
+  .btn-clearscreen {
+    left: auto !important;
+    right: calc(10px + env(safe-area-inset-right)) !important;
+    bottom: calc(118px + env(safe-area-inset-bottom)) !important;
+  }
+}
+@media (pointer: coarse) and (max-height: 430px) {
+  .btn-viewmode { bottom: calc(62px + env(safe-area-inset-bottom)) !important; }
+  .btn-clearscreen { bottom: calc(104px + env(safe-area-inset-bottom)) !important; }
+}
+
+/* 清屏（H 键同款 data-hud-hidden）：地图、登录信息、在线玩家、时间天气、快捷栏、水印全部隐藏 */
+body[data-hud-hidden] .minimap,
+body[data-hud-hidden] .dock,
+body[data-hud-hidden] .dock-mini,
+body[data-hud-hidden] .players,
+body[data-hud-hidden] .online-list,
+body[data-hud-hidden] [class*='online'],
+body[data-hud-hidden] .hud-player,
+body[data-hud-hidden] .player-card,
+body[data-hud-hidden] .account-entry,
+body[data-hud-hidden] [class*='clock'],
+body[data-hud-hidden] [class*='weather'],
+body[data-hud-hidden] [class*='skyinfo'],
+body[data-hud-hidden] [class*='daylight'],
+body[data-hud-hidden] .smoke-hotbar,
+body[data-hud-hidden] .smoke-bag-btn,
+body[data-hud-hidden] .lc-credit,
+body[data-hud-hidden] .lc-caption,
+body[data-hud-hidden] .walk-caption,
+body[data-hud-hidden] [class*='credit'],
+body[data-hud-hidden] [class*='watermark'] {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* 全屏时同样隐藏（两者叠加，不互相干扰） */
+body[data-fullscreen] .minimap,
+body[data-fullscreen] .dock,
+body[data-fullscreen] .players,
+body[data-fullscreen] .online-list,
+body[data-fullscreen] [class*='online'],
+body[data-fullscreen] .hud-player,
+body[data-fullscreen] .account-entry,
+body[data-fullscreen] [class*='clock'],
+body[data-fullscreen] [class*='weather'],
+body[data-fullscreen] .smoke-hotbar,
+body[data-fullscreen] .lc-credit,
+body[data-fullscreen] [class*='credit'] {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

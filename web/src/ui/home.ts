@@ -1,7 +1,10 @@
 import './home.css'
 import {spots} from '../play/spots'
 import {SOURCE_URL} from './source'
-import {initial, onUser, openAccount} from './account'
+import {initial, onUser} from './account'
+import {openCreator} from './creator'
+import {checkBan,civicUser,openCivicCard} from './civic'
+import {hairNames, hairStyles, lookNames, looks, type Avatar} from '../../../lib/avatar'
 
 // 主界面（title screen）. Shown on every plain visit before the 3D city loads; the menu button in game brings it back.
 // It owns no engine state: it calls `play()` and the entry module decides whether that boots or resumes the city.
@@ -20,48 +23,255 @@ export function home(play:()=>void):Home {
   root.innerHTML = `
   <div class="home-bg" aria-hidden="true">${slides.map(([file],i)=>`<img alt="" decoding="async" ${i?'data-src':'src'}="./home/${file}.webp"${i?'':' class="on"'}>`).join('')}</div>
   <div class="home-shade" aria-hidden="true"></div>
-  <header class="home-top">
-    <a class="home-src" href="${SOURCE_URL}" target="_blank" rel="noopener" data-umami-event="home-source"><i aria-hidden="true"></i><span>开源 · 免费</span></a>
-    <button type="button" class="ui-btn home-account" data-umami-event="home-account"></button>
+
+  <header class="lc-top">
+    <span class="lc-brandmark"><b>GUILIN</b> <i>ONLINE</i></span><span class="lc-brand-sub">网上桂林 · 二创网站</span>
+    <div class="lc-top-end">
+      <button type="button" class="lc-account home-account" data-umami-event="home-account"></button>
+      <a class="lc-src" href="${SOURCE_URL}" target="_blank" rel="noopener" data-umami-event="home-source">源地图 · OpenStreetMap</a>
+    </div>
   </header>
-  <div class="home-main">
-    <div class="home-title">
-      <span class="home-seal" aria-hidden="true">桂</span>
-      <h1>网上桂林</h1>
-      <p class="home-tag">一座按真实地图搭起来的 3D 桂林。<br>飞上天看山水，落地逛街巷，走到哪儿算哪儿。</p>
-      <p class="home-meta"><span>打开网页就能玩</span><span>电脑 · 手机都行</span><span>不用下载</span></p>
+
+  <main class="lc-stage">
+    <div class="lc-logo">
+      <span class="lc-seal home-seal" aria-hidden="true">桂</span>
+      <h1>
+        <span class="lc-en">GUILIN</span>
+        <span class="lc-en lc-en--thin">ONLINE</span>
+        <span class="lc-cn">网上桂林</span>
+      </h1>
+      <p class="lc-tag">按真实地图搭起来的 3D 桂林<br>飞上天看山水，落地走街巷</p>
     </div>
-    <div class="home-modes" role="list">
-      <button type="button" class="home-mode home-mode--tour" role="listitem" data-umami-event="home-tour">
-        <span class="home-mode-seal" aria-hidden="true">游</span>
-        <span class="home-mode-text"><b>游览模式</b><span>自由飞行、落地步行，走遍 ${spots.length} 处名胜，在景册里集齐印章。</span>
-          <small class="home-progress"></small></span>
-        <span class="ui-btn ui-btn--seal ui-btn--lg home-go">开始游览</span>
+
+    <nav class="lc-menu" aria-label="主菜单">
+      <button type="button" class="home-mode--tour lc-item lc-item--primary" data-umami-event="home-tour">
+        
+        <span class="lc-label">单人模式<small>自由飞行 · 落地步行 · ${spots.length} 处名胜</small></span>
+        <span class="lc-go home-go">进入</span>
+        <small class="home-progress lc-progress"></small>
       </button>
-      <div class="home-mode home-mode--soon" role="listitem" aria-disabled="true">
-        <span class="home-mode-seal" aria-hidden="true">事</span>
-        <span class="home-mode-text"><b>故事模式 <em class="ui-tag">即将推出</em></b><span>跟着一段桂林故事，走进老城的街巷与山水。</span></span>
-        <span class="ui-btn ui-btn--lg home-go" aria-disabled="true">敬请期待</span>
+      <button type="button" class="lc-item" id="lc-mp">
+        <span class="lc-label">多人联机<span class="lc-hint">多人联机可能导致服务器卡顿，可发电支持满 60 开新服务器</span></span>
+      </button>
+      <button type="button" class="lc-item" data-act="look" data-umami-event="home-look">
+        <span class="lc-label">我的角色<small class="home-look-sub">男 · 微分碎盖 · 校服</small></span>
+        <i class="home-look-chip" aria-hidden="true"></i>
+      </button>      <button type="button" class="lc-item" data-act="settings" data-umami-event="home-settings"><span class="lc-label">设置</span></button>
+      <button type="button" class="lc-item lc-item--sub" data-act="guide" data-umami-event="home-guide">
+        <span class="lc-label">玩法说明<small>操作 · 地图 · 景册</small></span>
+      </button>
+      <button type="button" class="lc-item lc-item--sub" data-act="about" data-umami-event="home-about">
+        <span class="lc-label">关于游戏<small>数据来源 · 制作</small></span>
+      </button>
+      <div class="lc-item lc-item--sub lc-item--off" aria-disabled="true">
+        <span class="lc-label">故事模式<small>即将推出</small></span>
       </div>
-    </div>
-    <nav class="home-links">
-      <button type="button" class="ui-btn ui-btn--ghost" data-act="guide" data-umami-event="home-guide">玩法说明</button>
-      <button type="button" class="ui-btn ui-btn--ghost" data-act="about" data-umami-event="home-about">关于游戏</button>
-      <a class="ui-btn ui-btn--ghost" href="${SOURCE_URL}" target="_blank" rel="noopener" data-umami-event="home-source-link">源代码 ↗</a>
     </nav>
-  </div>
-  <footer class="home-foot"><span class="home-caption" aria-live="off"></span><span class="home-credit">地图数据 © OpenStreetMap 贡献者 · v${__APP_VERSION__}</span></footer>`
+  </main>
+
+  <footer class="lc-foot">
+    <span class="home-caption lc-caption" aria-live="off"></span>
+    <span class="lc-credit">二创网站封闭测试版本，内容可能调整 · <button type="button" class="lc-logout">退出登录</button> · UID: <b class="civic-uid">GL------</b> · <span class="home-ver">v—</span></span>
+  </footer>
+
+  <aside class="home-group">
+    <button type="button" class="home-group-card" data-umami-event="home-group" aria-haspopup="dialog" aria-label="二创玩家群 · 微信扫码进群">
+      <span class="home-group-head">
+        <i class="home-group-dot" aria-hidden="true"></i>
+        <b class="home-group-title">二创玩家群</b>
+        <span class="home-group-badge">微信</span>
+      </span>
+      <span class="home-group-code"><img src="./home/erchuang-qr.png" alt="二创玩家群 微信群二维码" width="1008" height="1008" decoding="async"></span>
+      <span class="home-group-note">扫码进群 · 同人 / 模型 / 地图</span>
+    </button>
+  </aside>`
   const progress = root.querySelector('.home-progress')!
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
   const go = root.querySelector<HTMLElement>('.home-go')!, tour = root.querySelector<HTMLButtonElement>('.home-mode--tour')!
-  tour.onclick = ()=>play()
+  // 进游戏前先捏人：选性别 → 选角色 → 换上衣/裤子/鞋子，确认后进桂林。
+  // 必须开卡才能进游戏；每次进入前都向服务端查一次封禁状态。
+  const startSolo = () => {
+    if (localStorage.getItem('guiling.created') === '1') { play(); return }
+    openCreator(() => play())
+  }
+  tour.onclick = () => {
+    localStorage.setItem('guiling.mp', '0')
+    if (!civicUser()) {
+      openCivicCard(user => { if (user) { paintHomeAccount(); void checkBan().then(banned => { if (!banned) startSolo() }) } })
+      return
+    }
+    void checkBan().then(banned => { if (!banned) startSolo() })
+  }
+  root.querySelector<HTMLButtonElement>('#lc-mp')!.onclick = () => {
+    const enterMp = () => { localStorage.setItem('guiling.mp','1'); play() }
+    if (!civicUser()) { openCivicCard(user => { if (user) { paintHomeAccount(); collectAndPlay(enterMp) } }); return }
+    collectAndPlay(enterMp)
+  }
+  function collectAndPlay(next:()=>void){
+    void checkBan().then(banned => {
+      if (banned) return
+      if (localStorage.getItem('guiling.created') === '1') { next(); return }
+      openCreator(() => next())
+    })
+  }
+  let lookSaveToast = false
+  root.querySelector<HTMLButtonElement>('[data-act=look]')!.onclick = () => {
+    // 我的角色：只保存，保存完回到主页（不播入场白幕、也不自动进游戏）。
+    // 之后点「单人模式 / 联机模式」就直接进，不会再被逼着重新捏人。
+    lookSaveToast = true
+    if (civicUser()) { openCreator(); return }
+    openCivicCard(user => { if (user) { paintHomeAccount(); openCreator() } })
+  }
+
+  // —— 我的角色入口上的当前外形：缩略图 + 一句话，保存后立刻更新 ——
+  const lookItem = root.querySelector<HTMLButtonElement>('[data-act=look]')!
+  const lookSmall = lookItem.querySelector<HTMLElement>('.lc-label small')!
+  const lookChip = lookItem.querySelector<HTMLElement>('.home-look-chip')!
+  lookChip.style.cssText =
+    'display:none;flex:0 0 auto;width:34px;height:34px;margin-left:10px;border-radius:9px;' +
+    'background-image:url(./avatar/creator-options.webp);background-size:600% 1100%;' +
+    'border:1px solid rgba(255,255,255,.28);box-shadow:0 4px 14px rgba(0,0,0,.35)'
+  const lookFallback = lookSmall.textContent
+  function currentAvatar(): Avatar | undefined {
+    try {
+      const raw = JSON.parse(localStorage.getItem('glol.avatar.v1') ?? 'null') as Avatar | null
+      if (raw && raw.v === 1 && (raw.body === 'm' || raw.body === 'f')) return raw
+    } catch {
+      /* 坏数据就当没有 */
+    }
+    return undefined
+  }
+  function paintLook() {
+    const a = currentAvatar()
+    if (!a) {
+      lookChip.style.display = 'none'
+      lookSmall.textContent = lookFallback
+      return
+    }
+    const hairIndex = Math.max(0, (hairStyles[a.body] as readonly string[]).indexOf(a.hair))
+    const lookIndex = Math.max(0, looks.indexOf(a.look))
+    lookSmall.textContent = `${a.body === 'm' ? '男' : '女'} · ${hairNames[a.body][hairIndex]} · ${lookNames[lookIndex]}`
+    lookChip.style.display = 'block'
+    // 缩略图用角色页那张精灵图：6 列（脸型） × 11 行（体型 0 / 男 1–5 / 女 6–10）
+    lookChip.style.backgroundPosition = `${(a.face * 100) / 5}% ${(a.body === 'm' ? 1 : 6) * 10}%`
+  }
+
+  // 保存后的提示条（只在「我的角色」保存时出现，避免和「进入桂林」抢注意力）
+  const toast = document.createElement('div')
+  toast.style.cssText =
+    'position:fixed;left:50%;bottom:calc(104px + env(safe-area-inset-bottom));z-index:120;' +
+    'transform:translateX(-50%) translateY(12px);padding:10px 20px;border-radius:999px;' +
+    'background:rgba(9,17,15,.9);color:#e2f6ef;border:1px solid rgba(47,214,166,.45);' +
+    'font:600 13px/1.4 system-ui;opacity:0;pointer-events:none;' +
+    'transition:opacity .25s ease,transform .25s ease;white-space:nowrap'
+  root.append(toast)
+  let toastTimer = 0
+  function say(text: string) {
+    toast.textContent = text
+    toast.style.opacity = '1'
+    toast.style.transform = 'translateX(-50%) translateY(0)'
+    clearTimeout(toastTimer)
+    toastTimer = window.setTimeout(() => {
+      toast.style.opacity = '0'
+      toast.style.transform = 'translateX(-50%) translateY(12px)'
+    }, 3200)
+  }
+  addEventListener('glol:avatar', () => paintLook())
+  // 角色页关掉之后再提示（保存时还要播 1.2 s 挥手 + 0.6 s 淡出，提示早弹会被对话框盖住）
+  addEventListener('glol:creator-close', (event) => {
+    paintLook()
+    if (!lookSaveToast) return
+    lookSaveToast = false
+    if ((event as CustomEvent<{saved?: boolean}>).detail?.saved) say('外形已保存 · 点「单人模式」或「联机模式」进入桂林')
+  })
+  paintLook()
+  // 主页脚注显示构建号，方便确认线上跑的是哪一版
+  void fetch('./version.json')
+    .then(response => response.json())
+    .then((info: {sha?: string}) => {
+      if (info?.sha) root.querySelector('.home-ver')!.textContent = 'v' + info.sha
+    })
+    .catch(() => {})
+  // 二创玩家群：右下角那张二维码卡，点一下放大成能直接用微信扫的码（手机端长按识别）。
+  root.querySelector<HTMLButtonElement>('.home-group-card')!.onclick = ()=>openGroupSheet()
   root.querySelector<HTMLButtonElement>('[data-act=guide]')!.onclick = ()=>guide()
+  const settingsButton = root.querySelector<HTMLButtonElement>('[data-act=settings]')
+  if (settingsButton) settingsButton.onclick = () => document.querySelector<HTMLButtonElement>('.btn-menu')?.click()
   root.querySelector<HTMLButtonElement>('[data-act=about]')!.onclick = ()=>void import('./about').then(m=>m.openAbout())
   const account = root.querySelector<HTMLButtonElement>('.home-account')!
-  account.onclick = ()=>void openAccount()
-  onUser(user=>{account.innerHTML = user?`<i class="home-avatar"></i><span></span>`:'<span>登录 / 注册</span>'
-    if(user){account.querySelector('i')!.textContent = initial(user.nickname); account.querySelector('span')!.textContent = user.nickname}})
-  account.innerHTML = '<span>登录 / 注册</span>'
+  const paintHomeAccount = () => {
+    const cu = civicUser()
+    if (!cu) {
+      // 退出登录：清掉市民身份（物品、照片标记一起清），回到登录页
+  const logout = root.querySelector<HTMLButtonElement>('.lc-logout')
+  if (logout) {
+    logout.onclick = () => {
+      if (!confirm('退出登录？本机的市民卡与物品背包会一起清空')) return
+      try {
+        localStorage.removeItem('guiling.civic.v1')
+        localStorage.removeItem('guiling.items.v1')
+        for (const key of Object.keys(localStorage)) {
+          if (key.startsWith('guiling.photo.') || key.startsWith('guiling.portrait.')) localStorage.removeItem(key)
+        }
+      } catch {
+        /* 忽略 */
+      }
+      location.reload()
+    }
+  }
+  account.innerHTML = '<span>市民卡登录 / 注册</span>'
+      account.toggleAttribute('data-guest', true)
+      return
+    }
+    // 有市民身份就显示「头像 + 名字 + UID」两行；身份存在本地，刷新/退出后仍在
+    account.innerHTML = ''
+    const avatar = document.createElement('i')
+    avatar.className = 'home-avatar'
+    avatar.textContent = [...cu.name][0] ?? '客'
+    const box = document.createElement('span')
+    box.className = 'home-account-text'
+    const name = document.createElement('b')
+    name.textContent = cu.name
+    const uid = document.createElement('small')
+    uid.textContent = 'UID ' + (cu.uid ? String(cu.uid).slice(0, 8) : '------')
+    box.append(name, uid)
+    account.append(avatar, box)
+    account.removeAttribute('data-guest')
+  }
+  paintHomeAccount()
+  // 一打开首页就查封禁，被封直接红屏
+  void checkBan()
+  account.onclick = () => {
+    if (civicUser()) {
+      // 已有市民卡：点卡片看「市民二代身份证」
+      void import('./idcard').then(module => void module.openIdCard())
+      return
+    }
+    openCivicCard(() => paintHomeAccount())
+  }
+  // 邮箱账号只是「额外」信息：没登录时不要覆盖市民卡身份，否则右上角永远显示「登录 / 注册」
+  onUser(user=>{
+    if(user){
+      account.innerHTML = `<i class="home-avatar"></i><span></span>`
+      account.querySelector('i')!.textContent = initial(user.nickname)
+      account.querySelector('span')!.textContent = user.nickname
+      return
+    }
+    paintHomeAccount()
+  })
+  paintHomeAccount()
+  // 角色外形跨设备同步：本机没有就从服务器拉，本机有就推上去
+  void import('../items').then(module => module.syncAvatar())
+  // 老玩家补发二代身份证（这段在首页就会执行）
+  void import('../items').then(module => module.ensureIdCardItem())
+  // 手游：首页全屏门禁（这段在首页就会跑）
+  void import('./fullgate').then(module => module.mountFullGate())
+  // 静默把大头照传到服务器（老玩家不点身份证也能让别人扫到真人头像）
+  window.setTimeout(() => {
+    void import('../items').then(module => module.ensurePortraitUpload())
+  }, 4000)
+  // 主菜单也要方向提示（挂载点原来只在进入游戏后才会执行）
+  void import('./orient').then(module => module.mountOrientHint())
   addEventListener('account:play',()=>{if(shown)play()})
 
   // Backdrop: cross-fade with a slow push-in. Later slides load only after the first one is on screen.
@@ -84,16 +294,43 @@ export function home(play:()=>void):Home {
     open(resume){
       shown = true; root.hidden = false; root.classList.toggle('resume',resume)
       go.textContent = resume?'继续游览':'开始游览'
+      paintLook()
       requestAnimationFrame(()=>{root.classList.add('show'); tour.focus({preventScroll:true})})
       if(!reduce&&!timer) timer = window.setInterval(step,SLIDE_MS)
       document.body.dataset.home = ''
     },
     close(){
       shown = false; root.classList.remove('show'); clearInterval(timer); timer = 0; delete document.body.dataset.home
+      if(groupSheet) groupSheet.hidden = true
       setTimeout(()=>{if(!shown) root.hidden = true},450)
     },
   }
   return api
+}
+
+/** 二创玩家群：把右下角的码放大，桌面用微信扫、手机长按识别。 */
+let groupSheet:HTMLDivElement|undefined
+function openGroupSheet() {
+  if(!groupSheet){
+    groupSheet = document.createElement('div')
+    groupSheet.className = 'about-mask home-group-sheet'
+    groupSheet.hidden = true
+    groupSheet.innerHTML = `<div class="about-panel" role="dialog" aria-modal="true" aria-labelledby="group-title">
+      <header><h2 id="group-title">二创玩家群</h2><button type="button" class="about-close" aria-label="关闭">关闭</button></header>
+      <div class="home-group-sheet-body">
+        <span class="home-group-code"><img src="./home/erchuang-qr.png" alt="二创玩家群 微信群二维码" width="1008" height="1008" decoding="async"></span>
+        <p>微信扫一扫，加入「二创玩家群」</p>
+        <p class="home-group-tip">同人图 · 模型 · 地图 · 攻略，一起把桂林玩出新花样。<br>手机上可长按二维码识别。</p>
+      </div>
+    </div>`
+    const close = ()=>{groupSheet!.hidden = true}
+    groupSheet.querySelector('.about-close')!.addEventListener('click',close)
+    groupSheet.addEventListener('click',event=>{if(event.target===groupSheet) close()})
+    addEventListener('keydown',event=>{if(event.code==='Escape'&&!groupSheet!.hidden) close()})
+    document.body.append(groupSheet)
+  }
+  groupSheet.hidden = false
+  groupSheet.querySelector<HTMLButtonElement>('.about-close')!.focus()
 }
 
 let guideMask:HTMLDivElement|undefined

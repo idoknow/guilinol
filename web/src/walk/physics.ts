@@ -103,6 +103,9 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     }
     for(const [root,colliders] of landmarks)if(!nearLandmarks.has(root)){colliders.forEach(remove);landmarks.delete(root);changed=true}
     for(const [tree,collider] of trunks)if(Math.hypot(east-tree.x,south-tree.z)>48){remove(collider);trunks.delete(tree);changed=true}
+    // 先把要建的块收集起来按距离排序：传送落地时只建「脚底下这一块」，其余在后续帧补，
+    // 免得一次 sync 连着建 8-9 个地形/建筑碰撞体，直接卡出 200 ms 以上的长帧。
+    const wanted:{tile:Tile,far:number}[]=[]
     for(const tile of manifest.chunks){
       const near=Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))<=cfg.collisionRadius
       const data=stream.loaded.get(tile), region=regions.get(tile)
@@ -111,6 +114,14 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         if(tree.kind!==5&&!trunks.has(tree)&&Math.hypot(east-tree.x,south-tree.z)<40){trunks.set(tree,add(R.ColliderDesc.cylinder(1.8,.42*tree.scale).setTranslation(tree.x,tree.y+1.8,tree.z),'tree'));changed=true}}
       if(region&&(!near||region.fine!==!!data)){region.colliders.forEach(remove);regions.delete(tile);changed=true}
       if(!near||regions.has(tile))continue
+      wanted.push({tile,far:Math.hypot(Math.max(0,Math.abs(east-tile.x-128)-128),Math.max(0,Math.abs(south-tile.z-128)-128))})
+    }
+    wanted.sort((a,b)=>a.far-b.far)
+    const budgetStart=performance.now()
+    for(const {tile,far} of wanted){
+      const data=stream.loaded.get(tile)
+      // 脚底下那块（far≈0）一定建；其余每帧只花 ~7 ms，超了就留给下一帧
+      if(far>64&&performance.now()-budgetStart>7)break
       const stride=width/32+1,start=(tile.z-top)/32*stride+(tile.x-left)/32
       const ground=data?fineField(data):field(8,(col,row)=>overview[start+row*stride+col]/10)
       const colliders=[add(ground.setTranslation(tile.x+128,0,tile.z+128),data?'ground':'overview')]
@@ -137,6 +148,8 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       regions.set(tile,{colliders,rings,fine:!!data});changed=true
     }
     for(const peak of peaks.colliders){
+      // 山体碰撞体是一次性的大 trimesh，建一个就可能上百毫秒：每帧最多建一个
+      if(performance.now()-budgetStart>12)break
       const near=Math.hypot(east-peak.center[0],south-peak.center[2])<=cfg.peakRadius
       if(!near&&mountains.has(peak)){remove(mountains.get(peak)!);mountains.delete(peak);changed=true}
       if(near&&!mountains.has(peak)){
@@ -144,6 +157,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       }
     }
     for(const model of peaks.modelPeaks){
+      if(performance.now()-budgetStart>16)break
       const near=Math.hypot(east-model.position.x,south-model.position.z)<=cfg.peakRadius
       if(!near&&modelMountains.has(model)){modelMountains.get(model)!.forEach(remove);modelMountains.delete(model);changed=true}
       if(near&&!modelMountains.has(model)){

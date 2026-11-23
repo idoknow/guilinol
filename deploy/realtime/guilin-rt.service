@@ -1,0 +1,16 @@
+[Unit]
+Description=Guilin Online (WebSocket realtime)
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/guilin-rt
+Environment=PORT=8790
+Environment=MAX_PLAYERS=200
+# 后台封禁接口的令牌，换成你自己的；留空表示不校验（不推荐）
+Environment=KICK_TOKEN=change-me
+ExecStart=/usr/bin/node server-realtime.mjs
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -6,7 +6,10 @@ import {fileURLToPath} from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version as string
-const buildSha=()=>execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()
+const buildSha=()=>{
+  try { return execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim() }
+  catch { return process.env.BUILD_SHA ?? 'local' } // 本地无 git 时仍可构建（version.json 仅作标识）
+}
 
 function rapierExternalWasm(): Plugin {
   const inlineBase64 = /oC\.toByteArray\("AGFzbQE[A-Za-z0-9+/=]+"\)(?:\.buffer)?/
@@ -35,6 +38,7 @@ export default defineConfig({
   optimizeDeps: {exclude: ['@dimforge/rapier3d-compat']},
   build: {outDir: '../dist', emptyOutDir: true, rollupOptions: {input: {
     index: join(root,'web/index.html'), admin: join(root,'web/admin/index.html'),
+    id: join(root,'web/id.html'),
   }}},
   define: {
     __APP_VERSION__: JSON.stringify(version),

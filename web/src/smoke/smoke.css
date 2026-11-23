@@ -1,0 +1,395 @@
+/* 香烟：快捷栏 + 背包。材质沿用 theme.css 的「山水印」——玻璃是控件，宣纸是阅读。 */
+
+.smoke-hotbar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(60px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 38;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 16px;
+  background: rgba(18, 26, 24, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.28);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.smoke-slot {
+  position: relative;
+  box-sizing: border-box;
+  width: 56px;
+  height: 60px;
+  padding: 4px 3px 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1px;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(12, 20, 18, 0.42);
+  color: rgba(244, 239, 226, 0.86);
+  font-family: var(--ui-serif);
+  cursor: pointer;
+  transition: background var(--ui-fast), border-color var(--ui-fast), transform var(--ui-fast);
+}
+
+.smoke-slot:hover { background: rgba(30, 44, 39, 0.72) }
+.smoke-slot:active { transform: scale(0.95) }
+.smoke-slot.is-empty { opacity: 0.55 }
+.smoke-slot.is-burning {
+  border-color: rgba(240, 150, 92, 0.85);
+  background: rgba(72, 33, 20, 0.55);
+  box-shadow: 0 0 0 1px rgba(240, 150, 92, 0.28), 0 0 18px rgba(240, 130, 60, 0.28);
+}
+.smoke-slot.is-selected { border-color: var(--ui-jade-300) }
+
+.smoke-slot .ss-key {
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  font: 700 9px/1 ui-monospace, monospace;
+  color: rgba(244, 239, 226, 0.5);
+  letter-spacing: 0;
+}
+
+.smoke-slot .ss-chip {
+  width: 20px;
+  height: 26px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.smoke-slot .ss-name {
+  font-size: 10px;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.smoke-slot .ss-left {
+  font: 600 9px/1 ui-monospace, monospace;
+  color: rgba(244, 239, 226, 0.62);
+}
+
+.smoke-slot .ss-empty {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: rgba(244, 239, 226, 0.34);
+  margin-bottom: 4px;
+}
+
+.smoke-slot .ss-bar {
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+  display: none;
+}
+.smoke-slot.is-burning .ss-bar { display: block }
+.smoke-slot .ss-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #ff8a3a, #ffce7a);
+  transition: width 0.25s linear;
+}
+
+/* 手机：整条快捷栏收小一点，别顶到摇杆 */
+@media (pointer: coarse) {
+  .smoke-hotbar {
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    gap: 4px;
+    padding: 4px;
+    border-radius: 13px;
+  }
+  .smoke-slot { width: 46px; height: 52px }
+  .smoke-slot .ss-chip { width: 16px; height: 21px }
+  .smoke-slot .ss-name { font-size: 9px }
+}
+
+/* 背包入口（手游才有；端游按 TAB） */
+.smoke-bag-btn {
+  position: fixed;
+  right: calc(14px + env(safe-area-inset-right));
+  bottom: calc(196px + env(safe-area-inset-bottom));
+  z-index: 44;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 15px;
+  border-radius: 13px;
+  background: rgba(18, 26, 24, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #e9f4ef;
+  font: 700 13px/1 var(--ui-serif);
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+.smoke-bag-btn:active { transform: scale(0.94); background: rgba(47, 214, 166, 0.24) }
+@media (pointer: coarse) {
+  .smoke-bag-btn { display: flex }
+}
+
+/* 骑行速度条让开底部的快捷栏 */
+body[data-mode='walk'] .ride-hud { bottom: calc(150px + env(safe-area-inset-bottom)) }
+
+/* ── 背包面板 ─────────────────────────────────────────── */
+.smoke-bag-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: grid;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: rgba(12, 20, 20, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.smoke-bag-panel {
+  width: min(680px, 100%);
+  max-height: min(86vh, 720px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: smoke-bag-in 0.28s var(--ui-ease) both;
+}
+
+@keyframes smoke-bag-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985) }
+  to { opacity: 1; transform: none }
+}
+
+.smoke-bag-panel > header { position: sticky; top: 0; z-index: 1; background: var(--ui-glass-solid) }
+.smoke-bag-panel > header p {
+  margin: 2px 0 0;
+  font: 500 11px/1.4 var(--ui-serif);
+  letter-spacing: 0.1em;
+  color: rgba(244, 239, 226, 0.5);
+}
+.smoke-bag-panel > header .sb-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap }
+
+.smoke-bag-body {
+  padding: 14px 18px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.smoke-bag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 10px;
+}
+
+.sb-pack {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px 7px;
+  border-radius: 12px;
+  border: 1px solid rgba(244, 239, 226, 0.14);
+  background: rgba(244, 239, 226, 0.06);
+  color: var(--ui-paper);
+  font-family: var(--ui-serif);
+  cursor: grab;
+  touch-action: none;
+  transition: background var(--ui-fast), border-color var(--ui-fast), transform var(--ui-fast);
+}
+.sb-pack:hover { background: rgba(244, 239, 226, 0.12) }
+.sb-pack:active { cursor: grabbing; transform: scale(0.97) }
+.sb-pack.is-selected { border-color: var(--ui-jade-300); box-shadow: 0 0 0 1px var(--ui-jade-300) }
+.sb-pack.is-empty { opacity: 0.42 }
+.sb-pack.is-placed::after {
+  content: attr(data-slot);
+  position: absolute;
+  right: 5px;
+  top: 4px;
+  font: 700 9px/1 ui-monospace, monospace;
+  color: #06231c;
+  background: #2fd6a6;
+  border-radius: 5px;
+  padding: 2px 4px;
+}
+
+/* 一张软包烟盒的正面，用渐变和字排出来 */
+.sb-pack-face {
+  width: 44px;
+  height: 66px;
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--f, #fff);
+  background: linear-gradient(160deg, var(--a, #1f4f76) 0%, var(--b, #2f6b96) 55%, var(--a, #1f4f76) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2), inset -6px 0 10px rgba(0, 0, 0, 0.26),
+    0 3px 8px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+.sb-pack-face::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 30%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0));
+}
+.sb-pack-face b { font: 800 15px/1 var(--ui-serif); letter-spacing: 0.06em; z-index: 1 }
+.sb-pack-face small { font: 700 6px/1 ui-monospace, monospace; letter-spacing: 0.08em; opacity: 0.8; z-index: 1 }
+.sb-pack-face i {
+  display: block;
+  width: 62%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.5);
+  z-index: 1;
+}
+
+.sb-pack-count { font: 600 10px/1 ui-monospace, monospace; color: rgba(244, 239, 226, 0.66) }
+
+.smoke-bag-empty {
+  margin: 0;
+  padding: 22px 4px;
+  text-align: center;
+  font: 500 13px/1.7 var(--ui-serif);
+  letter-spacing: 0.1em;
+  color: rgba(244, 239, 226, 0.5);
+}
+
+.smoke-bag-foot {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ui-glass-line-soft);
+}
+.smoke-bag-foot h3 {
+  margin: 0 0 8px;
+  font: 600 12px/1 var(--ui-serif);
+  letter-spacing: 0.2em;
+  color: var(--ui-jade-300);
+}
+.smoke-bag-tip {
+  margin: 10px 0 0;
+  font: 400 11.5px/1.7 var(--ui-serif);
+  letter-spacing: 0.06em;
+  color: rgba(244, 239, 226, 0.55);
+}
+
+/* 面板里的快捷栏：就是游戏里那条，只是放大一点好拖 */
+.sb-hotbar {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.sb-hotbar .smoke-slot {
+  width: 74px;
+  height: 78px;
+  background: rgba(244, 239, 226, 0.06);
+  border-color: rgba(244, 239, 226, 0.16);
+}
+.sb-hotbar .smoke-slot.is-empty { opacity: 0.7 }
+.sb-hotbar .smoke-slot.is-over { border-color: #2fd6a6; background: rgba(47, 214, 166, 0.18) }
+
+/* 拖动时跟着手指/鼠标走的幽灵 */
+.smoke-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 300;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.45));
+  opacity: 0.92;
+}
+.smoke-ghost .sb-pack-face { width: 40px; height: 60px }
+
+/* H 隐藏界面时连快捷栏一起收掉 */
+body[data-hud-hidden] .smoke-hotbar,
+body[data-hud-hidden] .smoke-bag-btn { opacity: 0; visibility: hidden; pointer-events: none }
+
+/* 拍照模式里不画快捷栏（照片里只有景和画框） */
+body[data-photo] .smoke-hotbar,
+body[data-photo] .smoke-bag-btn,
+body[data-photo] .smoke-toast { display: none !important }
+
+/* 传送/进入游戏的遮罩期间不显示快捷栏 */
+body:has(#enter-screen:not(.is-out)) .smoke-hotbar,
+body:has(#enter-screen:not(.is-out)) .smoke-bag-btn { opacity: 0; pointer-events: none }
+
+/* 提示条（抽完 / 这格子是空的） */
+.smoke-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(132px + env(safe-area-inset-bottom));
+  transform: translate(-50%, 6px);
+  z-index: 42;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: rgba(18, 26, 24, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: rgba(244, 239, 226, 0.94);
+  font: 500 13px/1.2 var(--ui-serif);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+}
+.smoke-toast.show { opacity: 1; transform: translate(-50%, 0) }
+
+/* 快捷栏：往下挪一点，给血/力条留呼吸；1 号格左边放背包 */
+.smoke-hotbar{bottom:calc(32px + env(safe-area-inset-bottom))}
+.smoke-hotbar .smoke-bag-btn{position:static;right:auto;bottom:auto;display:flex;align-items:center;justify-content:center;
+  width:48px;height:48px;padding:0;border-radius:13px;font-size:11px;letter-spacing:0;
+  background:rgba(30,44,39,.72);border:1px solid rgba(255,255,255,.14);color:#e9f4ef;box-shadow:none}
+.smoke-hotbar .smoke-bag-btn[hidden]{display:none}
+.smoke-hotbar .smoke-bag-btn:hover{background:rgba(47,214,166,.22)}
+.smoke-hotbar .smoke-bag-btn:active{transform:scale(.95)}
+
+/* 物品背包：非香烟物品行 */
+.smoke-bag-items{padding:10px 14px 4px;border-top:1px solid rgba(255,255,255,.08)}
+.smoke-bag-items h3{margin:0 0 8px;font:700 11px ui-monospace;letter-spacing:.18em;color:rgba(232,244,239,.55);display:flex;gap:8px;align-items:baseline}
+.sb-items-empty{font:400 10.5px system-ui;letter-spacing:0;color:rgba(232,244,239,.35)}
+.sb-items{display:grid;gap:6px;max-height:140px;overflow:auto}
+.sb-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04)}
+.sb-item-icon{display:grid;place-items:center;width:30px;height:30px;border:1px solid #2f6b4f;background:linear-gradient(160deg,#f7f4ec,#dfeae4);color:#1f6b46;font:800 13px system-ui}
+.sb-item-text{display:grid;gap:1px;flex:1;min-width:0}
+.sb-item-text b{font:700 13px system-ui;color:#e8f4ef}
+.sb-item-text small{font:400 10.5px ui-monospace;color:rgba(232,244,239,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-item-actions{display:flex;gap:6px}
+.sb-item-actions button{border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:#e8f4ef;font:600 11.5px system-ui;padding:5px 10px;cursor:pointer}
+.sb-item-actions button[data-drop]{color:#ffb3a3;border-color:rgba(255,120,90,.4);background:rgba(255,120,90,.12)}
+
+/* 香烟丢弃角标 */
+.sb-pack{position:relative}
+.sb-pack-drop{position:absolute;top:4px;right:4px;padding:2px 6px;font:700 10px system-ui;color:#ffb3a3;border:1px solid rgba(255,120,90,.45);background:rgba(12,10,9,.72);cursor:pointer;opacity:0;transition:opacity .15s}
+.sb-pack:hover .sb-pack-drop,.sb-pack:focus-within .sb-pack-drop{opacity:1}
+.ss-drop{position:absolute;top:2px;right:4px;font:700 11px system-ui;color:#ffb3a3;cursor:pointer;opacity:.55}
+.ss-drop:hover{opacity:1}

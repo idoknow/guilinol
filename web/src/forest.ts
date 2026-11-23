@@ -58,14 +58,16 @@ export class Forest{
   private matrix=new THREE.Matrix4()
   private point=new THREE.Vector3()
   constructor(private scene:THREE.Scene,private tiles:Tile[],private camera:THREE.PerspectiveCamera){}
+  /** 树木可见距离系数（低配档压小，省 CPU 与 draw call）。 */
+  reach=1
   tick(position:THREE.Vector3){
     const distance=(tile:Tile)=>Math.hypot(tile.x+128-position.x,tile.z+128-position.z)
     for(const tile of this.tiles){
-      if(distance(tile)>1750){if(this.loaded.delete(tile))this.dirty=true;this.pending.get(tile)?.abort()}
+      if(distance(tile)>1750*this.reach){if(this.loaded.delete(tile))this.dirty=true;this.pending.get(tile)?.abort()}
     }
     const now=performance.now()
     while(this.pending.size<3){
-      let best=1682,next:Tile|undefined
+      let best=1682*this.reach,next:Tile|undefined
       for(const tile of this.tiles){
         if(this.loaded.has(tile)||this.pending.has(tile)||(this.retry.get(tile)??0)>=now)continue
         const dist=distance(tile)
@@ -84,10 +86,11 @@ export class Forest{
     const groups=this.groups
     for(let i=0;i<TOTAL_SLOTS;i++)groups[i].length=0
     this.speciesFrequency.fill(0)
-    const nearSq=look.trees.lodNear**2, midSq=look.trees.lodMid**2
+    const nearSq=(look.trees.lodNear*this.reach)**2, midSq=(look.trees.lodMid*this.reach)**2
+    const farSq=(treeFar*this.reach)**2
     for(const trees of this.loaded.values())for(const tree of trees){
       const d=(tree.x-cam.x)**2+(tree.y-cam.y)**2+(tree.z-cam.z)**2
-      if(d>=treeFar**2)continue
+      if(d>=farSq)continue
       const highCanopy=(tree.kind===0||tree.kind===1||tree.kind===6||tree.kind===7||tree.kind===9)&&cam.y-tree.y<2.9*tree.scale
       if((tree.x-cam.x)**2+(tree.z-cam.z)**2<(highCanopy?2.2:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue
       this.point.set(tree.x,tree.y+4,tree.z)

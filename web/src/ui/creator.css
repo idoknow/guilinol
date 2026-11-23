@@ -1,0 +1,290 @@
+.creator[open] {
+  inset: 0;
+  position: fixed;
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: #2b3036;
+  background: #f7f5f0;
+  font:
+    16px/1.45 system-ui,
+    sans-serif;
+  overflow: hidden;
+}
+.creator::backdrop {
+  background: white;
+}
+.creator button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.creator button:focus-visible {
+  outline: 3px solid #176d63;
+  outline-offset: 2px;
+}
+.creator-stage {
+  position: relative;
+  min-height: 0;
+  background: linear-gradient(#dfe8e3, #c9d8d2);
+  overflow: hidden;
+  animation: creator-fade 0.6s ease-out;
+}
+.creator-stage h1 {
+  position: absolute;
+  z-index: 1;
+  top: 5%;
+  left: 7%;
+  margin: 0;
+  color: #344e48;
+  font: 600 clamp(24px, 3vw, 46px) / 1.2 serif;
+  letter-spacing: 0.08em;
+}
+.creator-stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+.creator-hills {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 33%;
+  background: #4c7467;
+  opacity: 0.08;
+  clip-path: polygon(
+    0 34%,
+    8% 10%,
+    12% 43%,
+    19% 31%,
+    25% 60%,
+    33% 40%,
+    43% 67%,
+    53% 53%,
+    58% 59%,
+    65% 29%,
+    72% 45%,
+    80% 14%,
+    86% 41%,
+    94% 0,
+    100% 27%,
+    100% 100%,
+    0 100%
+  );
+}
+.creator-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(16px, 4vw, 56px);
+  gap: 16px;
+  animation: creator-panel 0.3s ease-out;
+  background: #f7f5f0;
+}
+.creator nav {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #ccd3cc;
+}
+.creator nav button,
+.creator .creator-actions button,
+.creator-handle {
+  border: 0;
+  background: transparent;
+  padding: 10px;
+}
+.creator nav button {
+  flex: 1;
+  white-space: nowrap;
+}
+.creator nav [aria-current='true'] {
+  border-bottom: 3px solid #20998d;
+  color: #11665c;
+  font-weight: bold;
+}
+.creator-options {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.creator h2 {
+  margin: 18px 0 10px;
+  font-size: 19px;
+}
+.creator-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.creator-grid button,
+.creator-swatches button {
+  position: relative;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: #e8ebe5;
+  padding: 4px 4px 6px;
+  font-size: 14px;
+}
+.creator-grid i {
+  display: block;
+  aspect-ratio: 1;
+  background-size: 600% 1100%;
+  border-radius: 7px;
+}
+.creator [aria-pressed='true'] {
+  border-color: #20998d;
+}
+.creator [aria-pressed='true']:after {
+  content: '✓';
+  position: absolute;
+  right: 3px;
+  top: 2px;
+  border-radius: 50%;
+  background: #16796e;
+  color: white;
+  font: bold 12px/18px system-ui;
+  width: 18px;
+  text-align: center;
+}
+.creator [aria-pressed='true'] {
+  animation: creator-pick 0.12s;
+}
+.creator-swatches {
+  display: flex;
+  gap: 10px;
+}
+.creator-swatches button {
+  width: 42px;
+  height: 34px;
+}
+.creator .creator-actions {
+  border-top: 1px solid #d7d9d2;
+  padding-top: 8px;
+}
+.creator .creator-actions > div {
+  display: flex;
+}
+.creator .creator-actions [data-skip] {
+  margin-left: auto;
+}
+.creator .creator-actions p:empty {
+  display: none;
+}
+.creator .creator-actions .creator-next {
+  width: 100%;
+  background: #20998d;
+  color: white;
+  border-radius: 9px;
+  font-weight: bold;
+  padding: 13px;
+}
+.creator-handle {
+  display: none;
+}
+@keyframes creator-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes creator-panel {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+}
+@keyframes creator-sheet {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+}
+@keyframes creator-pick {
+  from {
+    transform: scale(0.96);
+  }
+}
+@media (max-width: 680px) {
+  .creator[open] {
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--stage-height, 47%) 1fr;
+  }
+  .creator-panel {
+    padding: 0 16px max(12px, env(safe-area-inset-bottom));
+    gap: 4px;
+    animation-name: creator-sheet;
+  }
+  .creator nav button {
+    padding: 6px;
+  }
+  .creator-handle {
+    display: block;
+    align-self: center;
+    width: 48px;
+    height: 16px;
+    padding: 0;
+    touch-action: none;
+  }
+  .creator-handle:after {
+    content: '';
+    display: block;
+    border-radius: 8px;
+    background: #abb7af;
+    width: 32px;
+    height: 4px;
+    margin: auto;
+  }
+  .creator-grid i {
+    max-height: 68px;
+    margin: auto;
+  }
+  .creator h2 {
+    margin: 8px 0;
+  }
+  .creator .creator-actions {
+    padding: 0;
+  }
+  .creator .creator-actions button {
+    padding: 6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .creator * {
+    animation-name: creator-fade !important;
+    animation-duration: 0.12s !important;
+  }
+}
+.creator nav svg {
+  display: none;
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.creator-arrival {
+  position: fixed;
+  inset: 0;
+  background: white;
+  z-index: 2147483647;
+}
+@media (max-width: 680px) {
+  .creator nav svg {
+    display: block;
+    margin: 0 auto 2px;
+  }
+  .creator nav button {
+    font-size: 13px;
+  }
+}
+
+.creator [data-random] span { display: inline-block; }

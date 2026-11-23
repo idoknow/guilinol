@@ -15,6 +15,9 @@ let started = false
 
 const title = home(() => void enter())
 async function enter() {
+  // 角色页保存后会盖一层纯白 .creator-arrival（z-index 最大）；这里必须摘掉，
+  // 否则玩家保存完/点「进入桂林」之后只会看到白屏。
+  for (const cover of Array.from(document.querySelectorAll('.creator-arrival'))) cover.remove()
   title.close()
   const main = await loadEngine()
   if (started) { main.setPaused(false); return }

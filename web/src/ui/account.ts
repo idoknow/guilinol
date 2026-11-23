@@ -1,3 +1,4 @@
+import {civicUser,openCivicCard} from './civic'
 import './account.css'
 
 // 账号：登录 / 注册（填写 → 邮箱验证 → 完成）/ 忘记密码 / 我的账号。
@@ -7,7 +8,7 @@ export type User={email:string,nickname:string,notify_email:boolean}
 const titles:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'忘记密码',reset:'重置密码',profile:'我的账号'}
 const submits:Record<Screen,string>={login:'登录',register:'注册账号',verify:'验证邮箱',forgot:'发送重置验证码',reset:'重置密码',profile:'保存设置'}
 async function api(path:string,method='GET',data?:object) {
-  const response=await fetch(`/api/${path}`,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+  const response=await fetch(`/api/${path}`,{method,credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
   const result=await response.json().catch(()=>({error:{message:'网络不太顺畅，请稍后再试'}}))
   if(!response.ok) throw Object.assign(new Error(result.error?.message??'请求失败，请重试'),{code:result.error?.code})
   return result
@@ -15,7 +16,9 @@ async function api(path:string,method='GET',data?:object) {
 
 let user:User|null=null
 const listeners=new Set<(user:User|null)=>void>()
-const setUser=(value:User|null)=>{user=value;for(const listen of listeners)listen(user)}
+// /api/me 的返回要做形状校验：本地静态服务器（本地入口/serve.mjs）对未知路径会回退成 index.html，
+// 200 + HTML 会被 JSON 解析成乱七八糟的对象，后面 initial(user.nickname) 直接抛 TypeError。
+const setUser=(value:User|null)=>{user=value&&typeof value==='object'&&typeof (value as User).nickname==='string'?value:null;for(const listen of listeners)listen(user)}
 const ready=api('me').then(setUser).catch(()=>{})
 /** Subscribe to sign-in changes; called immediately with the current value once known. */
 export function onUser(listen:(user:User|null)=>void){listeners.add(listen);void ready.then(()=>listen(user))}
@@ -32,7 +35,13 @@ export function accountEntry(parent:HTMLElement){
   entry.type='button';entry.className='account-entry';entry.setAttribute('aria-haspopup','dialog')
   onUser(value=>{entry.textContent=value?.nickname??'登录';entry.dataset.initial=value?initial(value.nickname):'';entry.toggleAttribute('data-guest',!value)})
   entry.textContent='登录';entry.dataset.initial='';entry.toggleAttribute('data-guest',true)
-  entry.onclick=()=>void openAccount()
+  entry.onclick=()=>{
+    const user=civicUser()
+    if(user){entry.textContent=user.name;entry.dataset.initial=initial(user.name);entry.removeAttribute('data-guest');return}
+    openCivicCard(saved=>{
+      if(saved){entry.textContent=saved.name;entry.dataset.initial=initial(saved.name);entry.removeAttribute('data-guest')}
+    })
+  }
   parent.append(entry);return entry
 }
 

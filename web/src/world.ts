@@ -17,8 +17,9 @@ export interface Manifest {
   peaks:Peaks; atlas:Asset; vehicles?:Asset; overview:{step:number; heights:Asset; underlay:Asset; texture:Asset; waterMask?:string}
 }
 export let bytes = 0
-export async function fetchAsset(file:string, signal?:AbortSignal) {
-  const response = await fetch(`./world/${file}`, {signal})
+/** 拉一个 world 资源。priority 交给浏览器的网络调度：街块最高、地标和山体让路。 */
+export async function fetchAsset(file:string, signal?:AbortSignal, priority:RequestPriority='auto') {
+  const response = await fetch(`./world/${file}`, {signal, priority})
   if (!response.ok) throw Error(`${file}: HTTP ${response.status}`)
   const data = await response.arrayBuffer()
   bytes += data.byteLength
@@ -95,9 +96,15 @@ export async function overview(manifest:Manifest) {
   return startOverview(manifest).finish
 }
 
-export async function detail(tile:Tile, signal:AbortSignal) {
-  const compressed = await fetchAsset(tile.file,signal)
+export async function detail(tile:Tile, signal:AbortSignal, packed?:ArrayBuffer) {
+  // packed 是已经在内存里的压缩块（走过一次又回来），省掉一次往返。
+  const trace = (globalThis as {__detailLog?:string[]}).__detailLog ??= []
+  const mark = (where:string)=>trace.push(`${Math.round(performance.now())} ${tile.file} ${where}`)
+  mark('begin')
+  const compressed = packed ?? await fetchAsset(tile.file,signal,'high')
+  mark('bytes')
   const buffer = await new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
+  mark('inflated')
   signal.throwIfAborted()
   const view = new DataView(buffer)
   if(view.getUint32(0)!==0x474c3034) throw Error('Invalid GL04 tile')
@@ -134,9 +141,12 @@ export async function detail(tile:Tile, signal:AbortSignal) {
   })
   for(const [,topLevel] of rings) if(topLevel/10+8>maxY) maxY = topLevel/10+8
   const heights = geometry.getAttribute('position')
+  mark('terrain')
   const streets = await loadStreetGeometry(paths,step,heights)
+  mark('streets')
   signal.throwIfAborted()
   const material = await surfaceMaterial(buffer.slice(offset,end))
+  mark('texture')
   const group = new THREE.Group()
   group.position.set(tile.x,0,tile.z)
   const groundMesh = new THREE.Mesh(geometry,material)
@@ -152,13 +162,14 @@ export async function detail(tile:Tile, signal:AbortSignal) {
     railLodCount:streets.railLodCount,
     furnitureMatrices:streets.furnitureMatrices,
     furnitureColors:streets.furnitureColors,
-    parked:streets.parked,
+    // 地块自带的路边车辆不再渲染：全城统一用青桂出行的电车（见 walk/vehicles.ts）
+    parked:new Float32Array(0),
   }
   return {
     group,groundMesh,terrain,water,rings,deck,thin,streets,batch,
     dispose(){
       pond?.dispose(); streets.surface?.dispose(); bridge?.dispose(); geometry.dispose(); walls?.dispose()
-      material.map!.image.close(); material.map!.dispose(); material.dispose()
+      material.map!.dispose(); material.dispose()
     },
   }
 }

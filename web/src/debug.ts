@@ -14,4 +14,9 @@ export const flags = {
   noMirror: enabled('nomirror'),
   /** Merge every loaded tile into one batch instead of per-bucket batches. */
   noBatch: enabled('nobatch'),
+  /**
+   * 退回流式加载的旧行为：一次只排一块、同时只解两块、地标按清单顺序下、
+   * 不缓存已下载的块、加载屏期间不预热。只用于对比测量（scripts/load-audit.mjs）。
+   */
+  legacyStream: enabled('legacy'),
 }

@@ -1,0 +1,112 @@
+/* 角色页主题覆盖 —— 单独文件，最后导入，避免被前面的规则吞掉 */
+
+.creator-panel.creator-panel {
+  background: #ffffff !important;
+  background-image: none !important;
+  border: 1px solid #dde9e4 !important;
+  color: #16241f !important;
+  box-shadow: 0 26px 80px rgba(12, 58, 45, 0.14) !important;
+  border-radius: 0 !important;
+  backdrop-filter: none !important;
+}
+
+.creator-panel.creator-panel h1,
+.creator-panel.creator-panel h2 {
+  color: #0d1f19 !important;
+}
+
+.creator-panel.creator-panel p {
+  color: #6b7f78 !important;
+}
+
+.creator-head.creator-head p {
+  color: #6b7f78 !important;
+}
+
+.creator-close.creator-close {
+  color: #8ba49a !important;
+  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+.creator-stage.creator-stage {
+  background: #eef5f2 !important;
+  border: 1px solid #dde9e4 !important;
+  border-radius: 0 !important;
+}
+
+.creator-row.creator-row {
+  border-top: 1px solid #e9f1ed !important;
+}
+
+.creator-row.creator-row > small,
+.creator-row.creator-row .creator-label {
+  color: #9cb2aa !important;
+}
+
+.creator-row.creator-row button {
+  color: #556c64 !important;
+  background: none !important;
+  border: 0 !important;
+  border-bottom: 1px solid transparent !important;
+  border-radius: 0 !important;
+  font-weight: 600 !important;
+}
+
+.creator-row.creator-row button:hover {
+  color: #0f7a5c !important;
+}
+
+.creator-row.creator-row button[aria-checked='true'],
+.creator-row.creator-row button.is-active {
+  color: #0f7a5c !important;
+  background: none !important;
+  border-bottom-color: #0f7a5c !important;
+}
+
+.creator-row--spots.creator-row--spots {
+  background: #e6efea !important;
+}
+
+.creator-row--spots.creator-row--spots button {
+  background: #ffffff !important;
+  color: #4c625a !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.creator-row--spots.creator-row--spots button[aria-checked='true'] {
+  background: #e8faf2 !important;
+  color: #0b5c46 !important;
+  box-shadow: inset 0 0 0 1px #0f7a5c !important;
+}
+
+.creator-go.creator-go {
+  background: #0f7a5c !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+.creator-go.creator-go:hover {
+  background: #12906c !important;
+}
+
+.creator-foot.creator-foot {
+  border-top: 1px solid #e9f1ed !important;
+  background: none !important;
+}
+
+.creator-foot.creator-foot > button:not(.creator-go) {
+  background: #ffffff !important;
+  border: 1px solid #cfded8 !important;
+  color: #4c625a !important;
+  border-radius: 0 !important;
+}
+
+/* 外层遮罩也换成浅色，避免四周发黑 */
+.creator.creator {
+  background: rgba(244, 250, 247, 0.94) !important;
+  backdrop-filter: blur(6px) !important;
+}

@@ -346,6 +346,25 @@ export class ChunkBatcher {
       furnMask += '0'
     }
 
+    // —— draw call 预算（照 nanningol 的 DrawAdmission 思路）：
+    // 细节街区最多保留最近的 DETAIL_TILE_BUDGET 块，其余的降级成远处的合并单色体，
+    // 避免视野里同时挂十几块高细节街区导致 draw call 失控。
+    const DETAIL_TILE_BUDGET = 9
+    if(visibleChunks.size > DETAIL_TILE_BUDGET) {
+      const ranked = [...visibleChunks]
+        .map(tile => {
+          const item = this.items.get(tile)!
+          const dx = tile.x+128-camera.position.x, dz = tile.z+128-camera.position.z
+          return {tile, near: Math.hypot(dx,dz)}
+        })
+        .sort((a,b) => a.near-b.near)
+      for(let i=DETAIL_TILE_BUDGET;i<ranked.length;i++) {
+        visibleChunks.delete(ranked[i].tile)
+        farBuildings.add(ranked[i].tile)
+        visibleStreets.delete(ranked[i].tile)
+      }
+    }
+
     for(const bucket of this.buckets.values()) bucket.cull(visibleChunks,farBuildings,visibleStreets)
 
     if(this.furnitureStale || furnMask!==this.lastFurnitureMask || camera.position.distanceToSquared(this.lastFurniturePos)>=4) {

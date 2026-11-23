@@ -57,6 +57,8 @@ export function play(host:Host) {
   const slot = document.createElement('div'); slot.className = 'dock-mini'
   const buttons = document.createElement('div'); buttons.className = 'dock-buttons'
   buttons.append(book,shutter); dock.append(slot,buttons); document.body.append(dock)
+  // 爱发电按钮：排在 dock 最下方（地图之下），面板按需加载
+  void import('../ui/support').then(module=>module.mountSupportButton())
   const modeButton = document.querySelector<HTMLButtonElement>('.btn-mode')
   if(modeButton) buttons.prepend(modeButton)
   function button(text:string,label:string,cls:string){const b = document.createElement('button'); b.className = cls; b.textContent = text
@@ -176,7 +178,7 @@ export function play(host:Host) {
   window.addEventListener('keydown',event=>{
     if(event.repeat||(event.target as HTMLElement)?.tagName==='INPUT') return
     if(event.code==='KeyJ') sheet.hidden?openBook():closeBook()
-    if(event.code==='KeyP') photo.active?photo.close():photo.open()
+    if(event.code==='KeyP'||event.code==='KeyY') photo.active?photo.close():photo.open()
     if(event.code==='Escape') {if(photo.active) photo.close(); else if(!map?.active) closeAll()}
   })
 

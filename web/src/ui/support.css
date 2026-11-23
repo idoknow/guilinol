@@ -1,0 +1,219 @@
+/* 爱发电面板：白绿、方角、极简。刻意不用圆角，和游戏里其它玻璃胶囊区分开。 */
+.sponsor-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(12, 26, 20, 0.46);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.sponsor-panel {
+  position: relative;
+  width: min(920px, 100%);
+  max-height: min(88vh, 720px);
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  color: #14251c;
+  border: 1px solid #d7e8dc;
+  border-radius: 0; /* 方角 */
+  box-shadow: 0 24px 60px rgba(9, 32, 21, 0.28);
+  font: 400 13px/1.6 var(--ui-serif, system-ui, sans-serif);
+  overflow: hidden;
+}
+
+.sponsor-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #d7e8dc;
+  border-radius: 0;
+  background: #fff;
+  color: #2f6b4f;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sponsor-close:hover { background: #eef7f1 }
+
+.sponsor-head {
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid #e6f1e9;
+  background: linear-gradient(180deg, #f6fbf7, #ffffff);
+}
+.sponsor-head h2 {
+  margin: 0;
+  font-size: 19px;
+  letter-spacing: 0.14em;
+  color: #1f6b46;
+}
+.sponsor-head p {
+  margin: 6px 0 0;
+  color: #4d6b5b;
+  font-size: 12.5px;
+}
+
+.sponsor-body {
+  display: grid;
+  grid-template-columns: 268px 1fr;
+  gap: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.sponsor-qr {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 20px 18px;
+  border-right: 1px solid #e6f1e9;
+  background: #f9fdfa;
+}
+.sponsor-qr img {
+  width: 100%;
+  max-width: 232px;
+  height: auto;
+  border: 1px solid #dcecdf;
+  border-radius: 0;
+  background: #fff;
+}
+.sponsor-ask {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: #35634c;
+  letter-spacing: 0.02em;
+}
+.sponsor-ask b { color: #1f6b46 }
+
+.sponsor-list-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sponsor-list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid #eef5f0;
+}
+.sponsor-list-head h3 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  color: #1f6b46;
+}
+.sponsor-count { font-size: 11.5px; color: #6b8677 }
+
+.sponsor-list {
+  overflow: auto;
+  padding: 12px 20px 18px;
+  display: grid;
+  gap: 2px;
+  align-content: start;
+}
+.sponsor-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f6f2;
+}
+.sponsor-item header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.sponsor-item b { font-size: 13.5px; color: #173f2c }
+.sponsor-item em {
+  font-style: normal;
+  font-size: 12px;
+  color: #2f855a;
+  background: #eaf7ef;
+  padding: 1px 7px;
+}
+.sponsor-item p { margin: 4px 0 0; color: #43604f; font-size: 12.5px }
+.sponsor-item time { display: block; margin-top: 4px; font-size: 11px; color: #91a89b }
+.sponsor-empty {
+  margin: 12px 0;
+  color: #587264;
+  font-size: 12.5px;
+  line-height: 1.9;
+}
+.sponsor-empty b { color: #1f6b46 }
+
+/* —— 管理员区 —— */
+.sponsor-admin {
+  border-top: 1px solid #e6f1e9;
+  padding: 14px 20px 18px;
+  background: #f7fcf8;
+  overflow: auto;
+}
+.sponsor-admin h3 {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  color: #1f6b46;
+}
+.sponsor-form {
+  display: grid;
+  grid-template-columns: 1fr 92px 1.4fr auto;
+  gap: 6px;
+}
+.sponsor-form input,
+.sponsor-form button,
+.sponsor-actions button {
+  border: 1px solid #cfe4d6;
+  border-radius: 0;
+  background: #fff;
+  color: #173f2c;
+  font: inherit;
+  font-size: 12.5px;
+  padding: 7px 9px;
+}
+.sponsor-form button,
+.sponsor-actions button { cursor: pointer; background: #1f6b46; color: #fff; border-color: #1f6b46 }
+.sponsor-form button:hover,
+.sponsor-actions button:hover { background: #17563a }
+.sponsor-rows {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  max-height: 132px;
+  overflow: auto;
+}
+.sponsor-rows li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  color: #35513f;
+  border-bottom: 1px solid #eaf3ec;
+  padding: 4px 0;
+}
+.sponsor-rows button {
+  border: 1px solid #e2d5d5;
+  background: #fff;
+  color: #a5402c;
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 0;
+}
+.sponsor-actions { display: flex; gap: 8px }
+.sponsor-hint { margin: 8px 0 0; font-size: 11px; color: #6b8677 }
+.sponsor-hint code { background: #eaf3ec; padding: 1px 4px }
+
+@media (max-width: 720px) {
+  .sponsor-body { grid-template-columns: 1fr }
+  .sponsor-qr { border-right: 0; border-bottom: 1px solid #e6f1e9 }
+  .sponsor-form { grid-template-columns: 1fr 1fr }
+}

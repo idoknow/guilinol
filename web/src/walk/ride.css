@@ -1,0 +1,320 @@
+/* 骑行 HUD：速度 / 里程 / 电量 / 下车；以及扫码提示 */
+.ride-hud {
+  position: fixed;
+  left: 50%;
+  bottom: calc(92px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 16px;
+  background: rgba(14, 24, 22, .78);
+  border: 1px solid rgba(200, 220, 210, .18);
+  backdrop-filter: blur(8px);
+  color: #f1ece0;
+  font-family: "Noto Sans SC", system-ui, sans-serif;
+  pointer-events: auto;
+}
+.ride-hud[hidden] { display: none }
+.ride-hud .ride-speed {
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: .02em;
+  color: #7fe3cf;
+  font-variant-numeric: tabular-nums;
+}
+.ride-hud .ride-unit { font-size: 12px; opacity: .65; letter-spacing: .12em }
+.ride-hud .ride-meta {
+  font-style: normal;
+  font-size: 12px;
+  opacity: .7;
+  margin: 0 10px 0 6px;
+  letter-spacing: .04em;
+}
+.ride-hud .ride-off {
+  border: 1px solid rgba(200, 220, 210, .28);
+  background: transparent;
+  color: #f1ece0;
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.ride-hud .ride-off:hover { background: rgba(255, 255, 255, .1) }
+
+.scan-tip {
+  position: fixed;
+  left: 50%;
+  top: 54%;
+  transform: translate(-50%, -50%);
+  z-index: 45;
+  padding: 10px 20px;
+  border-radius: 12px;
+  background: rgba(10, 18, 16, .8);
+  border: 1px solid rgba(127, 227, 207, .5);
+  color: #d9f5ec;
+  font: 13px/1.5 "Noto Sans SC", system-ui, sans-serif;
+  letter-spacing: .08em;
+  pointer-events: none;
+}
+.scan-tip[hidden] { display: none }
+
+/* 步行模式下，鼠标悬在电车上显示可点击 */
+body[data-mode="walk"] .vehicle-action { letter-spacing: .1em }
+
+/* 传送落地前的提示 */
+.teleport-tip {
+  position: fixed;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  z-index: 46;
+  padding: 12px 26px;
+  border-radius: 999px;
+  background: rgba(10, 18, 16, .82);
+  border: 1px solid rgba(200, 220, 210, .22);
+  color: #e8f2ec;
+  font: 13px/1.4 "Noto Sans SC", system-ui, sans-serif;
+  letter-spacing: .18em;
+  pointer-events: none;
+}
+.teleport-tip[hidden] { display: none }
+/* 骑行时把步行提示条让出来，别和骑行 HUD 叠在一起 */
+body[data-aboard] .walk-legend,
+body[data-aboard] .walk-hint { opacity: 0; visibility: hidden }
+/* H：隐藏全部 HUD，只留画面（照 nanningol 的 hud-hide） */
+body[data-hud-hidden] .walk-hint,
+body[data-hud-hidden] .walk-legend,
+body[data-hud-hidden] .ride-hud,
+body[data-hud-hidden] .ride-hud *,
+body[data-hud-hidden] .vehicle-action { opacity: 0; visibility: hidden; pointer-events: none }
+body[data-hud-hidden] .hint,body[data-hud-hidden] .btn-mode{opacity:0;visibility:hidden;pointer-events:none}
+
+/* 传送全屏加载动画 */
+.teleport-tip{position:fixed!important;inset:0!important;z-index:200!important;
+  display:grid!important;place-items:center!important;
+  background:radial-gradient(120% 100% at 50% 30%,#123029,#060f0d 70%)!important}
+.teleport-tip[hidden]{display:none!important}
+.tp-card{display:flex;flex-direction:column;align-items:center;gap:14px;animation:tp-in .35s ease both}
+.tp-peaks{width:min(46vw,340px);height:auto;fill:#5f7d82}
+.tp-peaks .tp-far{fill:#93aaae;opacity:.55;animation:tp-drift 3.6s ease-in-out infinite}
+.tp-text{margin:0;font:600 13px/1 system-ui;letter-spacing:.34em;color:rgba(232,244,239,.78);
+  text-indent:.34em;animation:tp-pulse 1.6s ease-in-out infinite}
+.tp-bar{display:block;width:min(46vw,340px);height:2px;background:rgba(255,255,255,.12);overflow:hidden}
+.tp-bar i{display:block;height:100%;width:40%;background:#2fd6a6;
+  animation:tp-load 1.15s cubic-bezier(.4,0,.2,1) infinite}
+@keyframes tp-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes tp-drift{0%,100%{transform:translateX(-3px)}50%{transform:translateX(3px)}}
+@keyframes tp-pulse{0%,100%{opacity:.62}50%{opacity:1}}
+@keyframes tp-load{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+
+/* 旧的传送胶囊彻底停用（避免任何残留样式再画出黑块） */
+.teleport-tip, .teleport-tip * { display: none !important }
+
+/* 进入游戏的全屏加载页（独立元素，不复用旧的 teleport-tip） */
+#enter-screen{position:fixed;inset:0;z-index:260;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  background:#0b1a17 center/cover no-repeat;transition:opacity .4s ease}
+#enter-screen.is-out{opacity:0;pointer-events:none}
+#enter-screen::before{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(6,16,14,.72),rgba(6,16,14,.9))}
+#enter-screen .es-title{position:relative;font:600 13px/1 system-ui;letter-spacing:.5em;
+  text-indent:.5em;color:rgba(232,244,239,.88);text-shadow:0 2px 14px rgba(0,0,0,.6)}
+#enter-screen .es-sub{position:relative;margin-top:12px;font:400 11px/1 system-ui;
+  letter-spacing:.22em;color:rgba(232,244,239,.42)}
+#enter-screen .es-bar{position:absolute;left:0;right:0;bottom:0;height:3px;
+  background:rgba(255,255,255,.1)}
+#enter-screen .es-bar i{display:block;height:100%;width:2%;background:#2fd6a6;
+  animation:es-fill 4.6s cubic-bezier(.25,.6,.3,1) forwards}
+@keyframes es-fill{0%{width:2%}25%{width:42%}55%{width:72%}80%{width:88%}100%{width:98%}}
+
+/* 触摸时不要让浏览器把竖滑当成页面滚动 */
+canvas{touch-action:none!important}
+#enter-screen .es-bar i{animation:none!important;transition:transform .45s ease;
+  transform-origin:left center;transform:scaleX(.02);width:100%!important}
+
+/* 加载页大字号 */
+#enter-screen .es-title{font:700 clamp(28px,4.4vw,52px)/1.15 system-ui!important;
+  letter-spacing:.22em!important;text-indent:.22em!important}
+#enter-screen .es-sub{margin-top:14px;font:500 clamp(11px,1.1vw,14px)/1 ui-monospace!important;
+  letter-spacing:.34em!important;color:rgba(232,244,239,.5)!important}
+#enter-screen .es-num{position:relative;margin:26px 0 0;font:800 clamp(40px,6.4vw,84px)/1 system-ui;
+  color:#fff;letter-spacing:-.02em;text-shadow:0 6px 30px rgba(0,0,0,.5)}
+#enter-screen .es-num small{font:600 clamp(14px,1.6vw,20px)/1 system-ui;margin-left:6px;opacity:.55}
+#enter-screen .es-bar{height:4px!important}
+/* ============ 血量 / 体力 / 倒地 / 出拳反馈 ============ */
+.vitals {
+  position: fixed;
+  left: 16px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: 42;
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(16, 20, 24, 0.46);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font: 600 11px/1 var(--ui-font, system-ui, sans-serif);
+  pointer-events: none;
+}
+.vital-row { display: flex; align-items: center; gap: 7px; }
+.vital-label { opacity: 0.78; letter-spacing: 1px; }
+.vital-track {
+  width: 108px; height: 7px; border-radius: 4px;
+  background: rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+.vital-track > i {
+  display: block; height: 100%; width: 100%;
+  border-radius: 4px;
+  transition: width 0.16s linear;
+}
+.vital-track.hp > i { background: linear-gradient(90deg, #7be2a1, #3fcf7a); }
+.vital-track.hp > i.low { background: linear-gradient(90deg, #ff8a7a, #e8402c); }
+.vital-track.st > i { background: linear-gradient(90deg, #9fd0ff, #4c9bf0); }
+.vital-track.st > i.low { background: linear-gradient(90deg, #ffd479, #e8a020); }
+.vital-mute {
+  position: fixed;
+  left: 132px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: 42;
+  width: 26px; height: 26px;
+  border: 0; border-radius: 50%;
+  background: rgba(16, 20, 24, 0.46);
+  color: #fff; font-size: 13px; line-height: 26px; text-align: center;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+.vital-mute:hover { background: rgba(16, 20, 24, 0.66); }
+
+.down-panel {
+  position: fixed;
+  left: 50%; top: 22%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: grid; justify-items: center; gap: 8px;
+  padding: 18px 26px;
+  border-radius: 18px;
+  background: rgba(26, 12, 12, 0.82);
+  border: 1px solid rgba(255, 120, 110, 0.35);
+  color: #fff;
+  font: 600 14px/1.5 var(--ui-font, system-ui, sans-serif);
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+.down-panel b { font-size: 17px; letter-spacing: 1px; color: #ffb3a8; }
+.down-panel em { font-style: normal; opacity: 0.82; font-size: 12px; }
+.down-btn {
+  margin-top: 4px; padding: 8px 22px;
+  border: 0; border-radius: 999px;
+  background: #e8402c; color: #fff;
+  font: 700 13px/1 var(--ui-font, system-ui, sans-serif);
+  cursor: pointer;
+}
+.down-btn:disabled { background: rgba(255, 255, 255, 0.16); color: rgba(255, 255, 255, 0.5); cursor: default; }
+
+.hurt-flash {
+  position: fixed; inset: 0; z-index: 55;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 55%, rgba(232, 64, 44, 0) 42%, rgba(200, 30, 20, 0.55) 100%);
+  animation: hurt-fade 0.32s ease-out forwards;
+}
+@keyframes hurt-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* 静音键改成体力条右侧的内联按钮，不再绝对定位（之前和体力条重叠） */
+.vitals .vital-mute{position:static;flex:0 0 auto;width:19px;height:19px;margin-left:1px;padding:0;
+  border:0;border-radius:6px;background:rgba(255,255,255,.14);color:#fff;font-size:10px;line-height:19px;
+  text-align:center;cursor:pointer;pointer-events:auto}
+.vitals .vital-mute:hover{background:rgba(255,255,255,.26)}
+
+/* ============ 头顶名字 + 血条（别人看你、你看别人） ============ */
+/* 标签本身的行内样式只负责描边和定位，这里补布局 */
+.peer-label{display:flex;flex-direction:column;align-items:center;gap:3px}
+.peer-label .peer-name{white-space:nowrap}
+.peer-label .peer-hp{
+  display:block;width:46px;height:3px;border-radius:2px;
+  background:rgba(0,0,0,.5);box-shadow:0 0 2px rgba(0,0,0,.9);
+  overflow:hidden;opacity:.5;transition:opacity .2s ease;
+  /* 抵消父级的黑描边，血条不需要 text-shadow */
+  text-shadow:none;
+}
+.peer-label .peer-hp.hurt{opacity:1}
+.peer-label .peer-hp > i{
+  display:block;height:100%;width:100%;border-radius:2px;
+  background:linear-gradient(90deg,#7be2a1,#3fcf7a);
+  transition:width .18s linear;
+}
+.peer-label .peer-hp.low > i{background:linear-gradient(90deg,#ff8a7a,#e8402c)}
+
+/* ============ 出拳准心确认（出手方） ============ */
+.hit-marker{
+  position:fixed;left:50%;top:50%;z-index:58;
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  pointer-events:none;opacity:0;
+  transform:translate(-50%,-50%) scale(.72);
+  transition:opacity .1s ease-out,transform .12s cubic-bezier(.2,1.4,.4,1);
+}
+.hit-marker.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.hit-marker .hm-x{
+  font:800 24px/1 system-ui,sans-serif;letter-spacing:-2px;color:#fff;
+  text-shadow:0 0 7px rgba(232,64,44,.95),0 2px 6px rgba(0,0,0,.65);
+}
+.hit-marker .hm-text{
+  font:700 12px/1.2 var(--ui-serif,system-ui,sans-serif);
+  letter-spacing:.08em;white-space:nowrap;color:#ffe9e4;
+  text-shadow:0 1px 4px rgba(0,0,0,.85);
+}
+.hit-marker .hm-text b{color:#ff9a86;font-weight:800}
+.hit-marker .hm-text small{font-size:10px;opacity:.75;letter-spacing:0}
+.hit-marker.kill .hm-x{color:#ffd479;text-shadow:0 0 12px rgba(255,180,60,.95),0 2px 6px rgba(0,0,0,.65)}
+.hit-marker.kill .hm-text{color:#ffe6ae;font-size:13px}
+
+/* ============ 挨打方向提示（被打方） ============ */
+.hurt-arc{
+  position:fixed;left:50%;top:50%;z-index:56;
+  width:min(46vh,320px);height:min(46vh,320px);
+  margin-top:calc(min(46vh,320px) / -2);
+  margin-left:calc(min(46vh,320px) / -2);
+  pointer-events:none;opacity:0;
+  transform:rotate(var(--a,0rad));
+  transition:opacity .32s ease-out;
+}
+.hurt-arc.show{opacity:1;transition-duration:.06s}
+.hurt-arc::before{
+  content:"";position:absolute;left:50%;top:-6px;width:46%;height:46%;
+  transform:translateX(-50%);
+  background:radial-gradient(closest-side at 50% 100%,rgba(232,64,44,.9),rgba(232,64,44,0));
+  filter:blur(2px);
+}
+
+.hurt-text{
+  position:fixed;left:50%;top:calc(50% + min(20vh,150px));z-index:57;
+  transform:translateX(-50%) translateY(6px);
+  padding:5px 15px;border-radius:999px;
+  background:rgba(58,12,9,.66);
+  border:1px solid rgba(255,110,90,.42);
+  color:#ffe2da;font:700 12px/1.2 var(--ui-serif,system-ui,sans-serif);letter-spacing:.06em;white-space:nowrap;
+  pointer-events:none;opacity:0;
+  transition:opacity .2s ease,transform .2s ease;
+}
+.hurt-text.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.hurt-text b{color:#fff;font-weight:800}
+.hurt-text em{font-style:normal;color:#ff8f7a;font-weight:800}
+
+/* 手机：准心提示往上挪一点，别被快捷栏和摇杆挡住 */
+@media (pointer:coarse){
+  .hit-marker{top:42%}
+  .hurt-text{top:calc(50% + 60px)}
+}
+
+/* 拍照/隐藏界面时这些战斗提示也一起收掉 */
+body[data-photo] .hit-marker,body[data-photo] .hurt-arc,body[data-photo] .hurt-text,
+body[data-hud-hidden] .hurt-text{display:none!important}
+
