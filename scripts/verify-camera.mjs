@@ -104,6 +104,8 @@ try {
   assert.equal(opened.bar, true, 'photo bar should show')
   assert.equal(opened.guides, true, 'guides overlay should show')
   assert.match(opened.readout, /ISO/, 'readout should carry exposure data')
+  // 默认快门是测光基准 1/125（不是表里第一挡 1/8000）
+  assert.match(opened.readout, /1\/1[12][05] /, `default shutter should be ~1/125: ${opened.readout}`)
   assert.match(opened.grid, /grid-thirds/, 'default grid should be thirds')
   console.log('photo', JSON.stringify(opened))
 
@@ -121,6 +123,25 @@ try {
   assert.equal(thumbRows.hasMacro, true, 'thumb camera offers macro')
   assert.ok(thumbRows.sliders >= 5, `thumb should expose sliders, got ${thumbRows.sliders}`)
   console.log('thumb sheet', JSON.stringify(thumbRows))
+
+  // 4b) ISO 加档 → 取景变亮（brightness 滤镜 > 1，读数出现 +EV）；超广角 → FOV 变宽
+  const setRow = (row, value) => page.evaluate(([row, value]) => {
+    const input = document.querySelector(`.cam-sheet [data-row=${row}] input`)
+    input.value = String(value)
+    input.dispatchEvent(new Event('input', {bubbles: true}))
+  }, [row, value])
+  const filterOf = () => page.evaluate(() => document.querySelector('canvas[data-engine]').style.filter)
+  await setRow('iso', 2)
+  const brighter = await filterOf()
+  const gain = Number((/brightness\(([\d.]+)\)/.exec(brighter) ?? [0, 0])[1])
+  assert.ok(Math.abs(gain - 4) < 0.01, `ISO +2 stops should brighten the preview 4x: ${brighter}`)
+  await setRow('iso', 0)
+  const fovBefore = await page.evaluate(() => window.viewer.camera.fov)
+  await tap('.cam-sheet [data-toggle=wide]')
+  const fovWide = await page.evaluate(() => window.viewer.camera.fov)
+  assert.ok(fovWide > fovBefore + 5, `wide toggle should widen FOV: ${fovBefore} -> ${fovWide}`)
+  await tap('.cam-sheet [data-toggle=wide]')
+  console.log('exposure', JSON.stringify({brighter, fovBefore, fovWide}))
 
   // 5) 变焦出片：2× 应裁掉一半边长
   const shoot = async () => {
@@ -160,6 +181,8 @@ try {
   assert.equal(mirrorRows.rawOn, true, 'mirrorless defaults to RAW on')
   const rawShot = await shoot()
   assert.equal(rawShot.raw, true, 'RAW sidecar should be produced')
+  assert.match(rawShot.name, /\.png$/, `RAW main file should be lossless PNG: ${rawShot.name}`)
+  assert.ok(rawShot.settings.aperture > 0, 'aperture should be recorded')
   assert.match(rawShot.sidecarName, /\.raw\.json$/, 'sidecar should be named .raw.json')
   console.log('mirrorless', JSON.stringify({rows: mirrorRows.rows, raw: rawShot.raw, sidecar: rawShot.sidecarName, name: rawShot.name}))
 

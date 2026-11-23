@@ -199,6 +199,30 @@ export function bodyBox(body: CameraBody): [number, number, number] {
   return body.size
 }
 
+/** 测光基准：默认挡位（ISO 基础感光、1/125、第三挡光圈）= 场景正常曝光。 */
+export const METER_SHUTTER = 1 / 125
+export function meterAperture(body: CameraBody): number | null {
+  return body.aperture.length ? body.aperture[Math.min(2, body.aperture.length - 1)] : null
+}
+
+/** 这台机器表里最接近 1/125 的那一挡（1/120 之类），默认停在这里 = 0 档。 */
+export function meterShutter(body: CameraBody): number {
+  return nearest(body.shutter, Math.log2(METER_SHUTTER), value => Math.log2(value))
+}
+
+/**
+ * 手动曝光相对测光基准差多少档（IDOK-182）：ISO 翻倍 +1，快门慢一倍 +1，光圈大一档（f 值 ÷√2）+1。
+ * 跟真机一样三者互相抵消：ISO 加两档、快门快两档 = 亮度不变、噪点变多。
+ */
+export function meterStops(body: CameraBody, iso: number, shutter: number, aperture: number | null): number {
+  const ref = meterAperture(body)
+  const av = aperture && ref ? 2 * Math.log2(ref / aperture) : 0
+  return Math.log2(iso / body.baseIso) + Math.log2(shutter / meterShutter(body)) + av
+}
+
+/** 超广角模式：等效焦距 ×0.7（16mm → 11mm），FOV 真的变宽。 */
+export const WIDE_FACTOR = 0.7
+
 /** 传感器面积（mm²）——噪声强度按它归一 */
 export function sensorArea(body: CameraBody): number {
   return body.id === 'mirrorless' ? 36 * 24 : body.id === 'pocket' ? 13.2 * 8.8 : 6.17 * 4.55

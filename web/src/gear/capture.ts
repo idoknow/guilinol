@@ -10,9 +10,15 @@ export type ShotFormat = 'jpeg' | 'png' | 'webp'
 export type GridMode = 'none' | 'thirds' | 'golden' | 'center' | 'grid'
 
 export interface ShotSettings {
-  exposure: number   // EV，单位档
+  exposure: number   // EV 补偿，单位档
+  /** ISO/快门/光圈相对测光基准的档数（meterStops），成片亮度 = 2^(exposure + meter) */
+  meter: number
   iso: number
+  baseIso: number
+  /** 传感器面积 mm²：小底高感更脏 */
+  sensor: number
   shutter: number    // 秒
+  aperture: number | null
   wb: number         // 色温 K
   zoom: number       // 数码变焦倍率（1 = 无裁切）
   macro: boolean
@@ -40,11 +46,16 @@ function wbGain(kelvin: number): [number, number, number] {
   return [Math.pow(t, 0.42), 1, Math.pow(t, -0.5)]
 }
 
-/** ISO 噪点强度：以 100 为基准，感光度越高越脏；快门越慢越干净（简单的信噪比近似）。 */
-export function noiseAmount(iso: number, shutter: number): number {
-  const isoGain = Math.sqrt(Math.max(iso, 50) / 100)
-  const light = Math.min(1, Math.max(0.08, Math.sqrt(Math.max(shutter, 1 / 8000) * 8)))
-  return 2.4 * isoGain / light
+/** 噪点强度（0–255 幅度）：基础感光几乎干净，每升一档 ×√2；底越小越脏（全画幅 1×，1/2.3" ≈ 2.8×）。 */
+export function noiseAmount(iso: number, baseIso: number, sensorArea: number): number {
+  const stops = Math.max(0, Math.log2(Math.max(iso, baseIso) / baseIso))
+  const size = Math.sqrt(864 / Math.max(20, sensorArea))
+  return Math.min(90, 0.6 * size * Math.pow(2, stops / 2))
+}
+
+/** 成片 / 取景的亮度倍率。 */
+export function exposureGain(settings: Pick<ShotSettings, 'exposure' | 'meter'>): number {
+  return Math.pow(2, Math.max(-8, Math.min(8, settings.exposure + settings.meter)))
 }
 
 /** 裁切窗口：数码变焦只在中心取 1/zoom。 */
@@ -71,9 +82,9 @@ export function grade(source: CanvasImageSource & {width: number; height: number
   ctx.drawImage(source, x, y, w, h, 0, 0, w, h)
   ctx.filter = 'none'
 
-  const gain = Math.pow(2, settings.exposure)
+  const gain = exposureGain(settings)
   const [gr, gg, gb] = wbGain(settings.wb)
-  const noise = noiseAmount(settings.iso, settings.shutter)
+  const noise = noiseAmount(settings.iso, settings.baseIso, settings.sensor)
   const image = ctx.getImageData(0, 0, w, h)
   const data = image.data
   // 噪点用确定性序列（同一张照片重复处理结果一致，测试也好断言）。
@@ -182,8 +193,10 @@ export function rawSidecar(settings: ShotSettings, body: CameraBody, meta: ShotM
     camera: {id: body.id, name: body.name, sensor: body.sensor, lens: meta.lens},
     exposure: {
       ev: settings.exposure,
+      meterStops: Math.round(settings.meter * 100) / 100,
       iso: isoLabel(settings.iso),
       shutter: shutterLabel(settings.shutter),
+      aperture: settings.aperture ? `f/${settings.aperture}` : null,
       whiteBalance: settings.wb,
       focal: meta.lens,
       zoom: settings.zoom,
