@@ -164,7 +164,7 @@ async function drive(page,shot,dt){
     for(let k=0;k<2;k++)w.__advance(dt/2)
     pos=w.position.clone()
     return {x:pos.x,y:pos.y,z:pos.z,heading:w.heading,speed:w.speed,done:last&&gap<3}
-  },[shot.ride.route,shot.ride.speed/3.6,dt])
+  },[(opt.variant==='v'&&shot.v?.route)||shot.ride.route,shot.ride.speed/3.6,dt])
 }
 // Chase/track camera relative to the rider, smoothed so steering wobble doesn't shake the frame.
 function rideCam(shot,rider,prev,u){
