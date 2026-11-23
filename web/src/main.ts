@@ -254,7 +254,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     })
   }
   type Walker=Awaited<ReturnType<typeof import('./walk').walk>>
-  async function loadWalker():Promise<Walker>{return walker??=await (await prefetchWalk()).walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))}
+  let loadingWalker:Promise<Walker>|undefined
+  function loadWalker():Promise<Walker>{return loadingWalker??=prefetchWalk().then(module=>module.walk(scene,camera,renderer.domElement,manifest,stream,peaks,params.has('verify'))).then(player=>walker=player).catch(error=>{loadingWalker=undefined;throw error})}
   async function walkTo(x:number,z:number,yaw:number,reason:string,name?:string){
     if(switching)return false
     switching=true

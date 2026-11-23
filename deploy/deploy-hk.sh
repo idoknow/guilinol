@@ -35,7 +35,7 @@ migrate() {
   if [[ $schema == 0 ]]; then
     k exec -i deploy/glol-postgres -- psql -X -v ON_ERROR_STOP=1 -U postgres -d glol <deploy/postgres/001-schema.sql
   fi
-  for file in 002-telemetry 003-admin 003-player-saves 004-social 005-social-pending 006-social-register 007-social-only 008-social-states-register 009-feedback-credit 010-user-moderation; do
+  for file in 002-telemetry 003-admin 003-player-saves 004-social 005-social-pending 006-social-register 007-social-only 008-social-states-register 009-feedback-credit 010-user-moderation 011-player-uid; do
     k exec -i deploy/glol-postgres -- psql -X -v ON_ERROR_STOP=1 -U postgres -d glol <"deploy/postgres/$file.sql"
   done
 }
