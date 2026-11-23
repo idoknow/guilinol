@@ -295,6 +295,9 @@ def build(bbox, output, palette, workers=4):
     from road_tunnels import bake as bake_tunnels
     tunnels = bake_tunnels(bounds,(original,terrain),left,top,GRID)
     level_pavement(pavement,terrain,original,left,top)
+    if play_region:
+        from airport import grade_terminal_lanes
+        grade_terminal_lanes(terrain,original,left,top,GRID)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     if play_region:
         from road_tunnels import corridor_underpasses

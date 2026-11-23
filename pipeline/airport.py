@@ -81,3 +81,44 @@ def toll_canopies(bounds):
         posts = unary_union([Point(x,z).buffer(.55,quad_segs=1) for x,z in inset.exterior.coords[:-1]])
         canopies.append((el,roof,posts.intersection(roof)))
     return canopies
+
+
+def grade_terminal_lanes(terrain, original, left, top, grid):
+    """Interpolate the public covered roads between their two outdoor landings.
+
+    The surface DEM samples parts of the terminal roof above these lanes.
+    Use a feathered shoulder so the triangles on either side meet the road.
+    """
+    import shapely
+
+    elements = load_osm()
+    field = next((area(e) for e in elements if e['type']=='relation' and e['id']==13846706),None)
+    if field is None:
+        return
+    lanes = []
+    for e in elements:
+        tags = e.get('tags',{})
+        if e['type']!='way' or tags.get('highway') not in ('primary','secondary','tertiary'):
+            continue
+        if tags.get('covered')!='yes' and tags.get('tunnel')!='building_passage':
+            continue
+        coords = points(e)
+        if len(coords)<2:
+            continue
+        line = LineString(coords)
+        if not field.covers(line):
+            continue
+        ends = [original[round((z-top)/grid),round((x-left)/grid)] for x,z in (coords[0],coords[-1])]
+        lanes.append((line,ends))
+    for line,(first,last) in lanes:
+        x0,z0,x1,z1 = line.bounds
+        cols = np.arange(max(0,int((x0-left-20)//grid)),min(terrain.shape[1],int((x1-left+20)//grid)+1))
+        rows = np.arange(max(0,int((z0-top-20)//grid)),min(terrain.shape[0],int((z1-top+20)//grid)+1))
+        xx,zz = np.meshgrid(left+cols*grid,top+rows*grid)
+        pts = shapely.points(xx,zz)
+        distance = shapely.distance(line,pts)
+        blend = np.clip((20-distance)/10,0,1)
+        grade = first+(last-first)*shapely.line_locate_point(line,pts,normalized=True)
+        index = np.ix_(rows,cols)
+        for heights in (terrain,original):
+            heights[index] = np.rint(heights[index]*(1-blend)+grade*blend).astype(heights.dtype)
