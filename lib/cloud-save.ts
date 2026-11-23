@@ -1,4 +1,4 @@
-import {type Env,Problem,invalid,now,sessionHash,unauthorized} from './auth'
+import {type Env,Problem,invalid,now,sessionAccount,sessionHash,unauthorized} from './auth'
 import {AVATAR_KEY} from './avatar'
 
 async function readSave(request:Request) {
@@ -18,10 +18,10 @@ export async function cloudSave(request:Request,env:Env) {
   const method=request.method
   if(method!=='PUT' && method!=='GET')throw new Problem(405,'method','不支持的请求方式')
   if(method==='PUT' && request.headers.get('Origin')!==new URL(request.url).origin)throw new Problem(403,'origin','请求来源不符')
-  const user=await env.DB.prepare('SELECT user_id FROM sessions WHERE digest=? AND expires>?').bind(await sessionHash(request),now()).first<{user_id:string}>()
+  const user=await sessionAccount(env.DB,await sessionHash(request))
   if(!user)unauthorized()
-  if(request.headers.get('X-Save-Owner')!==user.user_id)throw new Problem(409,'account_changed','登录账号已变更')
-  const row=await env.DB.prepare('SELECT payload_json,revision,updated_at FROM player_saves WHERE user_id=?').bind(user.user_id).first<{payload_json:string;revision:number;updated_at:number}>()
+  if(request.headers.get('X-Save-Owner')!==user.id)throw new Problem(409,'account_changed','登录账号已变更')
+  const row=await env.DB.prepare('SELECT payload_json,revision,updated_at FROM player_saves WHERE user_id=?').bind(user.id).first<{payload_json:string;revision:number;updated_at:number}>()
   const existing=row?JSON.parse(row.payload_json):null
   const save=typeof existing?.money==='number'?{...existing,updatedAt:existing.updatedAt??row!.updated_at*1000}:null
   const reply=(data:unknown)=>Response.json(data,{headers:{'Cache-Control':'no-store'}})
@@ -39,7 +39,7 @@ export async function cloudSave(request:Request,env:Env) {
   const result=await env.DB.prepare(`INSERT INTO player_saves(user_id,schema_version,revision,payload_json,client_updated_at,updated_at)
     VALUES(?,2,1,?,?,?) ON CONFLICT(user_id) DO UPDATE SET revision=player_saves.revision+1,payload_json=excluded.payload_json,
     client_updated_at=excluded.client_updated_at,updated_at=excluded.updated_at WHERE player_saves.revision=?`)
-    .bind(user.user_id,payload,Math.floor(next.updatedAt/1000),now(),row?.revision??0).run()
+    .bind(user.id,payload,Math.floor(next.updatedAt/1000),now(),row?.revision??0).run()
   if(!result.meta.changes)throw new Problem(409,'conflict','请重新读取存档')
   return reply({save:next,revision:(row?.revision??0)+1})
 }

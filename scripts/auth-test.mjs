@@ -71,7 +71,7 @@ try {
     await api('auth/logout',{});await api('me',null,401,'unauthorized');await api('auth/login',login)
     await (await import('./social-test.mjs')).socialTest({api,origin,sql,env:storage.env});await api('auth/login',login)
     if(process.argv.includes('--bridge')) await (await import('./feedback-bridge-test.mjs')).bridgeTest({api,origin,cookie,state,staticDir,sql,mailLog:()=>logs})
-    else await (await import('./feedback-test.mjs')).apiTest({api,origin,cookie,sql})
+    else await (await import('./feedback-test.mjs')).apiTest({api,origin,cookie,sql,getCookie:()=>cookie})
     for(let attempt=1;attempt<=5;attempt++)await api('auth/login',{email,password:'incorrect'},attempt===5?429:401,attempt===5?'locked':'credentials');await api('auth/login',login,429,'locked')
     await sql('UPDATE mail_events SET sent=sent-61');await api('auth/resend',{email,purpose:'reset'});const reset={email,code:await code('reset'),password:'new-password'};await api('auth/reset',reset);await api('me',null,401,'unauthorized');await api('auth/reset',reset,400,'invalid_code');await api('auth/login',login,401,'credentials');await api('auth/login',reset)
     for(let index=0;index<7;index++)await api('auth/resend',{email:`other${index}@example.test`,purpose:'reset'});await api('auth/resend',{email:'capped@example.test',purpose:'reset'},429,'rate_limited')

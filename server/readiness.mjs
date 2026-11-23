@@ -16,7 +16,9 @@ export const REQUIRED_TABLES = [
 ]
 
 const TABLE_LIST = REQUIRED_TABLES.map(name => `'${name}'`).join(',')
-export const SCHEMA_SQL = `select count(*)::int as missing from unnest(array[${TABLE_LIST}]) as name where to_regclass('public.'||name) is null`
+export const SCHEMA_SQL = `select ((select count(*) from unnest(array[${TABLE_LIST}]) as name where to_regclass('public.'||name) is null)
+  + (select count(*) from unnest(array['signup_method','banned_at','ban_reason','banned_by']) as col
+     where not exists (select 1 from information_schema.columns where table_schema='public' and table_name='users' and column_name=col)))::int as missing`
 
 export function createReadiness({ query, ttlMs = 5000, timeoutMs = 2000 }) {
   let ready = false

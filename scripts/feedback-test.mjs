@@ -4,7 +4,7 @@ import { mkdir, readFile } from 'node:fs/promises'
 import { createHash,createHmac } from 'node:crypto'
 const bridge = { Authorization: 'Bearer local-test' },
   draft = { view,kind: '其他', title: '象鼻山入口', body: '请核对入口的朝向', lat: 25.28, lon: 110.3 }
-export async function apiTest({ api, origin, cookie, sql }) {
+export async function apiTest({ api, origin, cookie, sql, getCookie }) {
   const other = '1'.repeat(64),
     digest = createHash('sha256').update(other).digest('hex')
   await sql(
@@ -110,6 +110,7 @@ export async function apiTest({ api, origin, cookie, sql }) {
   )
   assert.equal(detail.photos.length, 4)
   await (await import('./admin-test.mjs')).apiTest({api,sql,id,second,photo,origin,cookie})
+  cookie=getCookie()
   for (let count = 1; count <= 5; count++) {
     const next = await create()
     await uploadShot(origin,cookie,next)
