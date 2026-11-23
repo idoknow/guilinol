@@ -14,7 +14,9 @@ const {values:opt} = parseArgs({options:{variant:{type:'string',default:'h'}, di
 const variant = variants[opt.variant], V = opt.variant, dir = opt.dir
 const W = variant.width, H = variant.height
 const list = variant.shots.map(id=>shots.find(s=>s.id===id))
-const dur = s=>(V==='v'&&s.v?.dur)||s.dur
+// Editorial cuts after review (IDOK-169): the daytime pagoda orbit runs into a building near its end.
+const trims = {h:{s03:2.4}, v:{s03:1.75}}
+const dur = s=>Math.min((V==='v'&&s.v?.dur)||s.dur, trims[V]?.[s.id]??Infinity)
 const X = .5                                   // dissolve length
 const cityFrom = list.findIndex(s=>s.ride)     // music switches at the first ride shot
 
@@ -64,10 +66,11 @@ inputs.push('-loop','1','-t',String(total),'-i',`${dir}/cards/end-${V}.png`)
 f.push(`[${n}:v]format=rgba,fade=t=in:st=${endAt}:d=1.2:alpha=1[e]`,`[${prev}][e]overlay=0:0,fade=t=out:st=${(total-.5).toFixed(2)}:d=0.5[vout]`)
 n++
 const pick = name=>['mp3','m4a','wav','flac'].map(e=>`${dir}/music/${name}.${e}`).find(existsSync)
+const CITY_FROM = 10                           // city cue: skip its 10 s build-up, start at the full groove
 const a = pick('shanshui'), b = pick('city'), audio = []
 if(a&&b){
   const cut = start[cityFrom]
-  inputs.push('-i',a,'-i',b)
+  inputs.push('-i',a,'-ss',String(CITY_FROM),'-i',b)
   f.push(`[${n}:a]atrim=0:${cut+1.5},afade=t=out:st=${cut-.5}:d=2,asetpts=PTS-STARTPTS[ma]`,
     `[${n+1}:a]atrim=0:${total-cut+1},adelay=${Math.round((cut-.5)*1000)}|${Math.round((cut-.5)*1000)},afade=t=in:st=${cut-.5}:d=0.8[mb]`,
     `[ma][mb]amix=inputs=2:normalize=0,atrim=0:${total},afade=t=in:st=0:d=1,afade=t=out:st=${total-2.5}:d=2.5,loudnorm=I=-16:TP=-1.5[aout]`)
@@ -75,6 +78,6 @@ if(a&&b){
 } else console.log('no music in',`${dir}/music — rendering silent`)
 const outFile = `${dir}/glol-promo-${V}.mp4`
 const r = spawnSync('ffmpeg',['-y','-loglevel','error',...inputs,'-filter_complex',f.join(';'),'-map','[vout]',...audio,
-  '-c:v','libx264','-preset','slow','-crf','18','-pix_fmt','yuv420p','-movflags','+faststart','-t',String(total),outFile],{stdio:'inherit'})
+  '-c:v','libx264','-preset','medium','-crf','18','-pix_fmt','yuv420p','-movflags','+faststart','-t',String(total),outFile],{stdio:'inherit'})
 if(r.status)throw Error('ffmpeg failed')
 console.log(outFile,`${total.toFixed(1)}s`)
