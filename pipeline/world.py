@@ -229,7 +229,7 @@ def build(bbox, output, palette, workers=4):
 
     peak_tree = STRtree(peak_shapes)
     init_footprints, _ = buildings(bounds, elevation, peak_tree, layout, carriageway_mask, sidewalk_mask, airport_buildings)
-    candidate_routes = plan_vehicles(bounds, surface, layers['road'], init_footprints, sample, grid_origin=(left,top))['routes']
+    candidate_routes = plan_vehicles(bounds, surface, layers['road'], init_footprints, sample, grid_origin=(left,top), routes_only=True)['routes']
 
     road_ctrl, bridge_plans, finalize_bridges = solve_road_and_bridge_elevations(
         original, terrain, surface, left, top, width, depth,

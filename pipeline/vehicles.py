@@ -21,7 +21,7 @@ from clearance import audit_routes, navigable_edges
 from cars import plan_cars
 
 
-def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), interchange=None, grid_origin=None):
+def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), interchange=None, grid_origin=None, routes_only=False):
     left, top, right, bottom = bounds.bounds
     if grid_origin is not None:
         left,top = grid_origin
@@ -41,7 +41,7 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
             lake = area(el).intersection(bounds)
             if not lake.is_empty:
                 anchors[name] = lake.boundary.interpolate(.25, normalized=True).coords[0]
-        if el['type'] != 'way':
+        if routes_only or el['type'] != 'way':
             continue
         road = tags.get('highway')
         if road == 'pedestrian' and tags.get('area') == 'yes':
@@ -100,8 +100,6 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
         # Lower bike stand beside the northern landing, clear of the +0.45 m west-bank portal steps.
         x,z=np.array([-117.5,-26.0])@transform+origin
         bikes.append([round(x,2),sample(x,z)[0]+.2,round(z,2),round(angle,3),1])
-    pavement = union_all(roads+extras).buffer(3)
-    mask = intersects_xy(pavement,xs[None,:],zs[:,None])
     clearance = distance_transform_edt(wet)
     cells = np.flatnonzero(wet)
     ids = np.full(wet.size,-1); ids[cells] = np.arange(len(cells)); ids = ids.reshape(wet.shape)
@@ -148,6 +146,10 @@ def plan_vehicles(bounds, surface, roads, buildings, sample, landmark_faces=(), 
                     if node==nodes[start]:break
                     node=prev[node]
                 routes.append(dict(kind=kind,start=start,end=end,path=path[::-1]))
+    if routes_only:
+        return {'routes':routes}
+    pavement = union_all(roads+extras).buffer(3).intersection(bounds)
+    mask = intersects_xy(pavement,xs[None,:],zs[:,None])
     return dict(bikes=bikes,bicycles=bicycles,docks=docks,routes=routes,grid=[left,top,cols,rows,GRID],mask=base64.b64encode(np.packbits(mask).tobytes()).decode(),**plan_cars(bounds,surface,buildings,sample,placed,docks,interchange=interchange))
 
 
