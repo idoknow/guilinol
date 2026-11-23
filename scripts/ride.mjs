@@ -1,13 +1,16 @@
 import {browserOptions, recordFrames} from './qa-browser.mjs'
 import assert from 'node:assert/strict'
 import {mkdir,readFile} from 'node:fs/promises'
-import {gunzipSync} from 'node:zlib'
+import {gunzipSync,gzipSync} from 'node:zlib'
 import {chromium} from 'playwright'
 import {preview} from 'vite'
 import {rideToCrossroads} from './ride-route.mjs'
 import {lakeChecks} from './ride-lake.mjs'
 
 const data=JSON.parse(gunzipSync(await readFile('dist/world/vehicles.bin')))
+const jiefangBike=[-539,157.1,-95,1.57,0]
+const crossroadsBike=[-539,157.1,-87,0,0]
+const rideVehicles=gzipSync(JSON.stringify({...data,bikes:[...data.bikes,jiefangBike,crossroadsBike]}))
 const atlas=JSON.parse(gunzipSync(await readFile('dist/world/atlas.bin')))
 const output='captures/ride';await mkdir(output,{recursive:true})
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
@@ -22,8 +25,10 @@ try{
     const page=await browser.newPage({viewport:mobile?{width:390,height:844}:{width:800,height:450},hasTouch:mobile,isMobile:mobile})
     page.on('pageerror',error=>errors.push(error.message))
     if(process.env.TRACE_BRIDGE)page.on('console',message=>{if(message.text().startsWith('bridge-trace'))console.log(mobile?'mobile':'desktop',message.text())})
+    await page.route('**/world/vehicles.bin',route=>route.fulfill({body:rideVehicles}))
     await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?mode=walk&verify&radius=480`)
     await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
+    if(mobile)await page.getByRole('button',{name:'竖屏继续'}).tap()
     await recordFrames(page)
     if(!mobile){const boat=await lakeChecks(page,data,output);assert(boat.roof<=bounds.boat.roof+1e-6&&boat.head<=bounds.boat.head+1e-6)}
     async function fixture(x,z){assert(await page.evaluate(([x,z])=>window.viewer.walkTo(x,z,0,'ride-fixture'),[x,z]))}
@@ -51,7 +56,8 @@ try{
       },gate)
       assert(starterCheck.ebCount>=1&&starterCheck.bcCount>=1,`missing starter vehicles near spawn plaza: ${JSON.stringify(starterCheck)}`)
     }
-    const bike=await fixtureNear(-539,-95,'bike')
+    const bike=jiefangBike
+    await fixture(bike[0],bike[2])
     const foot=mobile?0:await timings()
     await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent==='骑电动车')
     if(!mobile){
@@ -137,7 +143,7 @@ try{
       assert.deepEqual(mobileRideCheck.overlaps,[],`mobile ride HUD overlap: ${JSON.stringify(mobileRideCheck)}`)
       assert(mobileRideCheck.ringAlpha.endsWith(', 0)')||mobileRideCheck.ringAlpha==='transparent',`joystick running ring should stay hidden while riding: ${mobileRideCheck.ringAlpha}`)
       assert(mobileRideCheck.dist>.8&&mobileRideCheck.spd>2&&mobileRideCheck.dh>.08,`mobile stick drive failed: ${JSON.stringify(mobileRideCheck)}`)
-      await fixture(bike[0],bike[2]);await interact('骑电动车')
+      await fixture(crossroadsBike[0],crossroadsBike[2]);await interact('骑电动车')
     }
     async function steer(target,wall=false,arrive=3){return page.evaluate(({target,wall,arrive})=>{
       const walker=window.viewer.walk,keys=new Set(),start=walker.position.clone()
@@ -156,7 +162,7 @@ try{
         const result=await steer(target)
         assert(result.targetDistance<3,`Jiefang eastbound lane, target ${target}: ${JSON.stringify(result)}`)
       }
-      await interact('下车');await fixture(bike[0],bike[2]);await interact('骑电动车')
+      await interact('下车');await fixture(crossroadsBike[0],crossroadsBike[2]);await interact('骑电动车')
     }
     const ride=await rideToCrossroads(page,atlas);console.log('ride',ride);assert(ride.main>=500&&ride.crossed&&ride.targetDistance<=10)
     await shot(mobile?'bike-mobile':'bike-desktop');if(!mobile)console.log('median frame ms',{foot,bike:await timings()})
