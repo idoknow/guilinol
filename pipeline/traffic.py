@@ -74,6 +74,7 @@ def bake(output, manifest, rendered_roads=None):
         from shapely.geometry import box
         bounds = box(left, top, left+width, top+depth)
         rendered_roads = extract_road_network(raw_overture_footprints(bounds))[1]
+    region = prep(Polygon(manifest['region']['local'])) if 'region' in manifest else None
     carriageways = {road.way: road for road in rendered_roads if road.way in RENDERED_LANE_WAYS}
     surface = Surface(output, manifest)
     bridge = next((entry for entry in manifest['landmarks'] if entry['id'] == 'jiefang_bridge'), None)
@@ -162,6 +163,8 @@ def bake(output, manifest, rendered_roads=None):
             size = (paved-curb)/count
         for idx, (start, end) in enumerate(zip(coords, coords[1:])):
             if not start or not end or not all(left <= x < left+width and top <= z < top+depth for x,z in (start,end)):
+                continue
+            if region and not region.covers(LineString([start,end]).buffer(count*size/2+2)):
                 continue
             length = math.dist(start,end)
             if length < .5:

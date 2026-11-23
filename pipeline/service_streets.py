@@ -99,13 +99,19 @@ def patch_tile(file, footprint, color):
 
 def bake(output, manifest, palette):
     tree = footprints(load_osm()); changed = 0
+    region = Polygon(manifest['region']['local']) if 'region' in manifest else None
     for tile in manifest['chunks']:
         east, south = tile['x'], tile['z']
         bounds = box(east,south,east+256,south+256)
         hits = tree.query(bounds, predicate='intersects')
         if not len(hits):
             continue
-        shape = translate(union_all(tree.geometries.take(hits)).intersection(bounds), -east,-south)
+        clipped = union_all(tree.geometries.take(hits)).intersection(bounds)
+        if region is not None and not region.covers(bounds):
+            clipped = clipped.intersection(region)
+            if clipped.area == 0:
+                continue
+        shape = translate(clipped, -east,-south)
         file = output/tile['file']
         if patch_tile(file, shape, ImageColor.getrgb(palette['road'])):
             changed += 1; tile['bytes'] = file.stat().st_size

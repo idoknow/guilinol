@@ -515,8 +515,6 @@ def build(bbox, output, palette, workers=4):
     write_atlas(output,extent,bounds,layers,footprints,peaks)
     if preserve_campuses:
         preserve_campus_indexes(output,landmarks)
-    if play_region:
-        restore_protected_tiles(output,chunks,landmarks)
     write_overview_map(output,bbox)
     triangles.extend(landmark_faces)
     write_vehicles(output,vehicles,triangles)
@@ -534,11 +532,13 @@ def build(bbox, output, palette, workers=4):
     manifest['landmarks'] = landmarks
     if tunnels:
         manifest['tunnels'] = tunnels
+    from service_streets import bake as bake_service_streets
+    bake_service_streets(output, manifest, palette)
+    if play_region:
+        restore_protected_tiles(output,chunks,landmarks)
     write_city_lods(output, manifest)
     from traffic import bake as bake_traffic
     bake_traffic(output, manifest, roads)
-    from service_streets import bake as bake_service_streets
-    bake_service_streets(output, manifest, palette)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
