@@ -1,9 +1,8 @@
-/* 帧率 / 网速 / 在线人数读数（IDOK-178）· 顶部居中一条，玻璃底，不吃触摸 */
+/* 帧率 / 网速 / 在线人数读数（IDOK-178）· 桌面在左下角（顶部居中是「¥ 接活」入口），玻璃底，不吃触摸 */
 .hud-stats {
   position: fixed;
-  left: 50%;
-  top: calc(8px + env(safe-area-inset-top));
-  transform: translateX(-50%);
+  left: calc(12px + env(safe-area-inset-left));
+  bottom: calc(12px + env(safe-area-inset-bottom));
   z-index: 5;
   display: flex;
   align-items: center;
@@ -55,30 +54,39 @@ body[data-shop-open="1"] .hud-stats {
   display: none !important;
 }
 
-@media (pointer: coarse) {
+/* 窄桌面窗口：底部居中的操作提示会伸到左下角，读数抬到它上面 */
+@media (pointer: fine) and (max-width: 1100px) {
   .hud-stats {
-    top: calc(6px + env(safe-area-inset-top));
-    font-size: 11px;
-    padding: 4px 9px;
-    gap: 8px;
-    max-width: 54vw;
+    bottom: calc(52px + env(safe-area-inset-bottom));
   }
 }
 
-/* 竖屏手机：顶部被小地图和时辰条占满，读数挪到左下角摇杆上方 */
-@media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
-  .hud-stats {
-    left: 10px;
-    right: auto;
+/* 街头 HUD：左下角是大号小地图，读数回到顶部居中 */
+body[data-hud="street"] .hud-stats {
+  left: 50%;
+  bottom: auto;
+  top: calc(10px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+}
+
+/* 触屏（竖屏手机/平板）：左下角是摇杆，读数放在摇杆上方 */
+@media (pointer: coarse) {
+  .hud-stats,
+  body[data-hud="street"] .hud-stats {
+    left: calc(10px + env(safe-area-inset-left));
     top: auto;
     bottom: calc(150px + env(safe-area-inset-bottom));
     transform: none;
+    font-size: 11px;
+    padding: 4px 9px;
+    gap: 8px;
     max-width: min(58vw, 250px);
   }
 }
 
 @media (pointer: coarse) and (max-height: 500px) {
-  .hud-stats {
+  .hud-stats,
+  body[data-hud="street"] .hud-stats {
     /* 横屏手机：dock 在右上、时辰条在左上，顶部中段留给它们；读数挪到底部中间（拇指区之外）。 */
     left: 50%;
     top: auto;

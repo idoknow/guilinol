@@ -40,9 +40,12 @@ export function createCameraRig(sim:Physics) {
     // 把相机顶到 0.12m 的最小安全距离上，玩家会看到自己后脑勺）。
     if(first){
       focus.set(figurePos.x,figurePos.y+1.62,figurePos.z)
-      dir.set(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch))
-      camera.position.copy(focus).addScaledVector(dir,.02)
-      camera.lookAt(focus.x+dir.x,focus.y+dir.y,focus.z+dir.z)
+      // 第三人称默认俯视 cfg.pitch；第一人称把它减掉，默认平视，仰视余量也够看山顶。
+      const eyePitch=pitch-cfg.pitch
+      dir.set(Math.sin(yaw)*Math.cos(eyePitch),Math.sin(eyePitch),Math.cos(yaw)*Math.cos(eyePitch))
+      // dir 指向身后（第三人称相机在 focus+dir·dist、看向 focus），所以第一人称要朝 -dir 看。
+      camera.position.copy(focus).addScaledVector(dir,-.08)
+      camera.lookAt(focus.x-dir.x,focus.y-dir.y,focus.z-dir.z)
       currentDist=0;lastClipped=false;lastBlocked=false;lastCeiling=Infinity;initialized=false
       return
     }

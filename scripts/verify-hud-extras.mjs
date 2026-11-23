@@ -109,6 +109,17 @@ try {
   const first = await camDist()
   assert.ok(first<0.2,`first person sits on the eyes (${first.toFixed(2)}m)`)
   assert.equal(await page.evaluate(()=>window.viewer.walk.probe().camDist),first,'first person stays on the eyes')
+  // 第一人称必须朝前看：按前进走出去的方向要和镜头水平朝向一致（之前的版本镜头朝身后）。
+  const look = await page.evaluate(()=>{const c=window.viewer.camera;const d=new c.position.constructor();c.getWorldDirection(d);return {x:d.x,y:d.y,z:d.z}})
+  const from = await pos()
+  await page.keyboard.down('KeyW')
+  await page.evaluate(()=>{for(let i=0;i<10;i++)window.viewer.walk.tick(.1)})
+  await page.keyboard.up('KeyW')
+  const to = await pos()
+  const mx=to.x-from.x, mz=to.z-from.z
+  const facing=(mx*look.x+mz*look.z)/Math.max(1e-6,Math.hypot(mx,mz)*Math.hypot(look.x,look.z))
+  assert.ok(facing>0.9,`first person looks where W walks (cos ${facing.toFixed(2)})`)
+  assert.ok(Math.abs(look.y)<0.2,`first person defaults to a level gaze (dir.y ${look.y.toFixed(2)})`)
   await page.evaluate(()=>document.querySelector('.dock-view').click())
   await page.waitForFunction(()=>document.querySelector('.dock-view').textContent.trim()==='第三人称',null,{timeout:5000})
   await page.waitForFunction(()=>window.viewer.walk.probe().camDist>1,null,{timeout:15000})

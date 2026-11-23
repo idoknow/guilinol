@@ -2,11 +2,11 @@
 // 用现成的 .about-mask 弹层语言，好处是输入守卫会自动把移动/骑行热键挡住。
 import './settings.css'
 import {onPrefs, prefs, setPrefs, type StatsPrefs} from './prefs'
-import {ACTIONS, bindingLabel, isCustom, resetBindings, setBinding, type Action} from '../input/keymap'
+import {ACTIONS, bindingLabel, isCustom, keyLabel, reservedFor, resetBindings, setBinding, type Action} from '../input/keymap'
 import {setViewMode, viewModeLabel} from '../walk/view-mode'
 
 const STAT_ROWS: [keyof StatsPrefs, string, string][] = [
-  ['fps', '帧率', '左上角读数里的 FPS'],
+  ['fps', '帧率', '读数条里的每秒帧数（FPS）'],
   ['net', '网速', '当前下载速度（KB/s、MB/s）'],
   ['online', '在线人数', '此刻在城里的人数，60 秒刷新'],
 ]
@@ -40,12 +40,13 @@ function build() {
         </div>
         <p class="set-note">落地步行时生效；骑车、开车、坐船仍是第三人称。</p>
       </section>
-      <section class="set-block">
+      <section class="set-block set-block--keys">
         <h3>键位<button type="button" class="set-reset">恢复默认</button></h3>
         <ul class="set-keys">${ACTIONS.map(action => `<li>
           <span class="set-what"><b>${action.label}</b></span>
           <button type="button" class="set-key" data-action="${action.id}"></button>
         </li>`).join('')}</ul>
+        <p class="set-warn" role="alert" hidden></p>
         <p class="set-note">点键位按钮，然后按你想用的键。Esc 取消。<i class="set-custom">· 自改</i></p>
       </section>
     </div>
@@ -92,6 +93,15 @@ function build() {
         paintKeys()
         return
       }
+      const taken = reservedFor(event.code)
+      const note = mask!.querySelector<HTMLElement>('.set-warn')!
+      if (taken) {
+        // 保持抓键状态，提示换一个。
+        note.textContent = `${keyLabel(event.code)} 已用于「${taken}」，换一个键`
+        note.hidden = false
+        return
+      }
+      note.hidden = true
       setBinding(capturing, event.code)
       capturing = undefined
       paintKeys()
