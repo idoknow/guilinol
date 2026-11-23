@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 import type {Host} from './host'
 import {label, type Weather} from '../look/time'
-import {camera, focalLabel, focalToFov, isoLabel, nearest, shutterLabel, type BodyId, type CameraBody} from '../gear/cameras'
-import {drawGrid, encode, extensionFor, grade, rawSidecar, stamp, type GridMode, type ShotFormat, type ShotSettings} from '../gear/capture'
+import {camera, focalLabel, focalToFov, isoLabel, meterShutter, meterStops, nearest, sensorArea, shutterLabel, WIDE_FACTOR, type BodyId, type CameraBody} from '../gear/cameras'
+import {drawGrid, encode, exposureGain, extensionFor, grade, rawSidecar, stamp, type GridMode, type ShotFormat, type ShotSettings} from '../gear/capture'
 import {canRecord, saveRecording, startRecording, type Recording} from '../gear/video'
 import {prefs} from '../ui/prefs'
 import {openRack} from '../ui/gear-rack'
@@ -110,7 +110,8 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     state.body = next
     state.ev = 0
     state.iso = 0
-    state.shutter = b.shutter.findIndex(value => value <= 1 / 100) >= 0 ? b.shutter.findIndex(value => value <= 1 / 100) : Math.floor(b.shutter.length / 2)
+    // 默认停在最接近 1/125 的那一挡（测光基准），不是表里第一挡 1/8000。
+    state.shutter = b.shutter.indexOf(meterShutter(b))
     state.aperture = b.aperture.length ? Math.min(2, b.aperture.length - 1) : null
     state.focal = 0
     state.zoom = 1
@@ -131,17 +132,24 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     if (f.fixed) return f.min
     return Math.round((f.min + state.focal * f.step) * 10) / 10
   }
+  /** 实际成像焦距：超广角开着就 ×0.7 */
+  const lensMm = () => Math.round(focalValue() * (state.toggle.wide && body().wide ? WIDE_FACTOR : 1) * 10) / 10
+  const meter = () => meterStops(body(), isoValue(), shutterValue(), apertureValue())
 
   function settings(zoom: number): ShotSettings {
     return {
       exposure: state.ev,
+      meter: meter(),
       iso: isoValue(),
+      baseIso: body().baseIso,
+      sensor: sensorArea(body()),
       shutter: shutterValue(),
+      aperture: apertureValue(),
       wb: state.wb,
       zoom,
       macro: state.toggle.macro,
       grid: state.grid,
-      format: state.format,
+      format: state.toggle.raw && body().raw ? 'png' : state.format,
       raw: state.toggle.raw && body().raw,
       level: state.toggle.level,
     }
@@ -152,18 +160,18 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     const parts: string[] = []
     const look = filters[state.filter][1]
     if (look !== 'none') parts.push(look)
-    if (state.ev !== 0) parts.push(`brightness(${Math.pow(2, state.ev).toFixed(3)})`)
+    const gain = exposureGain({exposure: state.ev, meter: meter()})
+    if (Math.abs(gain - 1) > 0.001) parts.push(`brightness(${gain.toFixed(3)})`)
     // 白平衡近似：暖了加 sepia、冷了转蓝，只是预览提示，成片才是精确增益。
     const wbShift = (state.wb - 5500) / 5500
     if (Math.abs(wbShift) > 0.02) parts.push(wbShift > 0 ? `sepia(${Math.min(0.35, wbShift * 0.5).toFixed(3)})` : `hue-rotate(${Math.round(wbShift * 16)}deg)`)
     if (state.toggle.macro) parts.push('contrast(1.04) saturate(1.05)')
-    if (state.toggle.wide) parts.push('saturate(1.06)')
     return parts.join(' ')
   }
 
   function applyView() {
     const b = body()
-    const fov = focalToFov(focalValue()) / Math.max(1, state.zoom)
+    const fov = focalToFov(lensMm()) / Math.max(1, state.zoom)
     host.camera.fov = Math.min(110, Math.max(4, fov))
     host.camera.updateProjectionMatrix()
     host.renderer.domElement.style.filter = previewFilter()
@@ -273,12 +281,24 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
         applyGuides()
       }
     }
+    // RAW 开着时主文件固定无损 PNG：格式按钮跟着亮 PNG；点 JPEG 等于关 RAW。
+    const syncFormats = () => {
+      const rawOn = state.toggle.raw && body().raw
+      sheet.querySelector<HTMLButtonElement>('[data-toggle=raw]')?.classList.toggle('on', rawOn)
+      for (const other of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-format]'))) {
+        other.classList.toggle('on', other.dataset.format === (rawOn ? 'png' : state.format))
+      }
+    }
     for (const button of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-format]'))) {
       button.onclick = () => {
         state.format = button.dataset.format as ShotFormat
-        for (const other of Array.from(sheet.querySelectorAll<HTMLButtonElement>('[data-format]'))) other.classList.toggle('on', other === button)
+        if (state.format !== 'png') state.toggle.raw = false
+        syncFormats()
       }
     }
+    const rawButton = sheet.querySelector<HTMLButtonElement>('[data-toggle=raw]')
+    if (rawButton) rawButton.addEventListener('click', syncFormats)
+    syncFormats()
   }
 
   const handlers: Record<string, (v: number) => void> = {
@@ -318,6 +338,8 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
   }
 
   function syncSheetValues() {
+    // ISO / 快门 / 光圈也改亮度（meterStops），取景要跟着变。
+    applyView()
     const set = (row: string, text: string, value?: number) => {
       const line = sheet.querySelector<HTMLElement>(`[data-row="${row}"]`)
       if (!line) return
@@ -377,7 +399,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     renderer.setPixelRatio(hi)
     renderer.setSize(innerWidth, innerHeight, false)
     // 高分辨率 + 宽视角渲染，再由 grade() 按数码变焦裁切 —— 与预览构图逐像素一致。
-    host.camera.fov = Math.min(110, Math.max(4, focalToFov(focalValue())))
+    host.camera.fov = Math.min(110, Math.max(4, focalToFov(lensMm())))
     host.camera.updateProjectionMatrix()
     host.draw()
     const raw = document.createElement('canvas')
@@ -392,13 +414,16 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     const picture = grade(raw, settings(zoom), filters[state.filter][1] === 'none' ? '' : filters[state.filter][1])
     const context = picture.getContext('2d')!
     if (state.sign) signature(context, picture.width, picture.height)
-    const blob = await encode(picture, state.format)
+    // RAW 开着：主文件强制无损 PNG（旁车 JSON 带全部参数），JPEG/WebP 只在关 RAW 时用。
+    const rawOn = state.toggle.raw && body().raw
+    const format: ShotFormat = rawOn ? 'png' : state.format
+    const blob = await encode(picture, format)
     flash.classList.remove('go')
     void flash.offsetWidth
     flash.classList.add('go')
     onCapture?.()
 
-    const name = `${fileTitle()}.${extensionFor(state.format)}`
+    const name = `${fileTitle()}.${extensionFor(format)}`
     const file = new File([blob], name, {type: blob.type})
     const meta = {
       place: place() || '桂林',
@@ -408,17 +433,17 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
       height: picture.height,
       bodyId: body().id,
       bodyName: body().name,
-      lens: focalLabel(focalValue()),
+      lens: focalLabel(lensMm()),
       when: new Date().toISOString(),
     }
-    const sidecar = state.toggle.raw && body().raw ? rawSidecar(settings(zoom), body(), meta) : null
+    const sidecar = rawOn ? rawSidecar(settings(zoom), body(), meta) : null
 
     if (shotUrl) URL.revokeObjectURL(shotUrl)
     shotUrl = URL.createObjectURL(blob)
     const share = navigator.canShare?.({files: [file]}) && matchMedia('(pointer:coarse)').matches
     const sideName = `${fileTitle()}.raw.json`
     shot.innerHTML = `<img alt="刚拍的照片"><figcaption>
-      <span class="shot-meta">${body().short} · ${focalLabel(focalValue())} · ${shutterLabel(shutterValue())} · ISO ${isoValue()} · ${state.wb}K</span>
+      <span class="shot-meta">${body().short} · ${focalLabel(lensMm())} · ${shutterLabel(shutterValue())} · ISO ${isoValue()}${apertureValue() ? ` · f/${apertureValue()}` : ''} · ${state.wb}K</span>
       <a download="${name}">保存</a>${sidecar ? `<a download="${sideName}">RAW</a>` : ''}${share ? '<button>分享</button>' : ''}<button class="shot-close" aria-label="收起">×</button></figcaption>`
     shot.querySelector('img')!.src = shotUrl
     const links = Array.from(shot.querySelectorAll<HTMLAnchorElement>('a'))
@@ -555,7 +580,9 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     }
     if (recording) recText.textContent = `${String(Math.floor(recording.seconds / 60)).padStart(2, '0')}:${String(Math.floor(recording.seconds % 60)).padStart(2, '0')}`
     const flashText = state.toggle.raw && body().raw ? ' · RAW' : ''
-    readout.textContent = `${body().short} · ${focalLabel(focalValue())} · ${shutterLabel(shutterValue())} · ISO ${isoValue()}${apertureValue() ? ` · f/${apertureValue()}` : ''} · ${state.wb}K · ${state.zoom.toFixed(1)}×${flashText}`
+    const stops = state.ev + meter()
+    const meterText = Math.abs(stops) >= 0.05 ? ` · ${stops > 0 ? '+' : '−'}${Math.abs(stops).toFixed(1)}EV` : ''
+    readout.textContent = `${body().short} · ${focalLabel(lensMm())} · ${shutterLabel(shutterValue())} · ISO ${isoValue()}${apertureValue() ? ` · f/${apertureValue()}` : ''} · ${state.wb}K · ${state.zoom.toFixed(1)}×${meterText}${flashText}`
   }
 
   return {
