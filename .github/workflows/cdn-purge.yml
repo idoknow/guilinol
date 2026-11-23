@@ -92,11 +92,14 @@ jobs:
         if: steps.token.outputs.ok == '1' && inputs.mode != 'dir'
         run: |
           if [ ! -s .cdn-hashes.json ]; then
-            # 没有基线（首次运行、或 7 天没跑缓存被回收）：整站刷新一次，再记基线，
-            # 而不是把 1 万多个文件逐个 clean_url + 预热
-            echo "::notice::没有上次的哈希基线，改为整站刷新并记录基线"
-            bash scripts/cdn-purge.sh dir
+            # 没有基线（首次运行、或 7 天没跑缓存被回收）：只写基线 + 预热全部，
+            # 不整站 purge——线上缓存本来是好的，清掉会让用户立刻撞上冷启动那套慢路径
+            echo "::notice::没有哈希基线，记录基线并预热全部文件（不整站 purge）"
             DIST=dist-live STATE=.cdn-hashes.json STATE_ONLY=1 bash scripts/cdn-sync.sh
+            mv .cdn-hashes.json baseline.json
+            echo '{}' > .cdn-hashes.json
+            DIST=dist-live STATE=.cdn-hashes.json PREHEAT_ONLY=1 bash scripts/cdn-sync.sh
+            mv baseline.json .cdn-hashes.json
           else
             DIST=dist-live STATE=.cdn-hashes.json bash scripts/cdn-sync.sh
           fi
