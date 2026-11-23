@@ -345,6 +345,40 @@
       "confidence": "none"
     }
   ],
-  "gates": [],
-  "open_spaces": []
+  "gates": [
+    {
+      "name": "六合路校区校门",
+      "osm_node": null,
+      "lonlat": null,
+      "desc": "两侧灰色方柱带深色竖向铭牌。",
+      "photos": [
+        {
+          "file": "guet_liuhe_gate_1.jpg",
+          "url": "https://5b0988e595225.cdn.sohucs.com/images/20191026/67c893fda8d340c7a853afcb192a820d.jpeg",
+          "page": "https://www.sohu.com/a/349637736_100144123",
+          "date": "2019-10-25",
+          "date_basis": "报道发布日期",
+          "view": "从六合路朝校内拍摄，约向北"
+        }
+      ]
+    }
+  ],
+  "open_spaces": [],
+  "unmatched_landmarks": [
+    {
+      "name": "国家大学科技园临街楼",
+      "source": null,
+      "desc": "六合路侧可见粉色横向墙带与首层沿街店面；具体建筑轮廓待核实。",
+      "photos": [
+        {
+          "file": "guet_liuhe_sciencepark_1.jpg",
+          "url": "https://5b0988e595225.cdn.sohucs.com/images/20191026/a2ea3174b26e4dfe9e876bb08c109019.jpeg",
+          "page": "https://www.sohu.com/a/349637736_100144123",
+          "date": "2019-10-25",
+          "date_basis": "报道发布日期",
+          "view": "隔六合路朝带科技园楼顶招牌的立面拍摄。"
+        }
+      ]
+    }
+  ]
 }

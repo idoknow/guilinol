@@ -27,17 +27,26 @@
       "name": "第十教学楼",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "浅灰色墙面，窗间有粉红色竖向分格。",
       "colors": {
-        "wall": null,
-        "accent": null,
+        "wall": "#d5d0c7",
+        "accent": "#bc9893",
         "glass": null,
-        "roof": null
+        "roof": "#938780"
       },
-      "roof": null,
+      "roof": "flat_parapet",
       "features": [],
-      "photos": [],
-      "confidence": "none",
+      "photos": [
+        {
+          "file": "way621423420_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/82cdb5b91be0586b226d2c02a4980986.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "航拍裁图，约由东北向西南看教学楼北立面与屋顶；从图书馆向南数第4排。"
+        }
+      ],
+      "confidence": "aerial",
       "overture_ids": [
         "fc5b90fc-5aed-4a86-b51d-5582e50d7475"
       ]
@@ -47,17 +56,26 @@
       "name": "第九教学楼",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "浅灰色墙面，窗间有粉红色竖向分格。",
       "colors": {
-        "wall": null,
-        "accent": null,
+        "wall": "#d5d0c7",
+        "accent": "#bc9893",
         "glass": null,
-        "roof": null
+        "roof": "#938780"
       },
-      "roof": null,
+      "roof": "flat_parapet",
       "features": [],
-      "photos": [],
-      "confidence": "none",
+      "photos": [
+        {
+          "file": "way621423421_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/82cdb5b91be0586b226d2c02a4980986.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "航拍裁图，约由东北向西南看教学楼北立面与屋顶；从图书馆向南数第3排。"
+        }
+      ],
+      "confidence": "aerial",
       "overture_ids": [
         "9814364a-f52a-4e30-8133-8fdd8d2aed50"
       ]
@@ -67,17 +85,26 @@
       "name": "第八教学楼",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "浅灰色墙面，窗间有粉红色竖向分格。",
       "colors": {
-        "wall": null,
-        "accent": null,
+        "wall": "#d5d0c7",
+        "accent": "#bc9893",
         "glass": null,
-        "roof": null
+        "roof": "#938780"
       },
-      "roof": null,
+      "roof": "flat_parapet",
       "features": [],
-      "photos": [],
-      "confidence": "none",
+      "photos": [
+        {
+          "file": "way621423422_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/82cdb5b91be0586b226d2c02a4980986.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "航拍裁图，约由东北向西南看教学楼北立面与屋顶；从图书馆向南数第2排。"
+        }
+      ],
+      "confidence": "aerial",
       "overture_ids": [
         "7f329a68-2f17-4a02-b4c7-85a29613f145"
       ]
@@ -87,17 +114,26 @@
       "name": "第七教学楼",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "浅灰色墙面，窗间有粉红色竖向分格。",
       "colors": {
-        "wall": null,
-        "accent": null,
+        "wall": "#d5d0c7",
+        "accent": "#bc9893",
         "glass": null,
-        "roof": null
+        "roof": "#938780"
       },
-      "roof": null,
+      "roof": "flat_parapet",
       "features": [],
-      "photos": [],
-      "confidence": "none",
+      "photos": [
+        {
+          "file": "way621423423_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/82cdb5b91be0586b226d2c02a4980986.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "航拍裁图，约由东北向西南看教学楼北立面与屋顶；从图书馆向南数第1排。"
+        }
+      ],
+      "confidence": "aerial",
       "overture_ids": [
         "8bd75d8c-0dc0-4f04-a077-d836cc3f4cb5"
       ]
@@ -107,17 +143,37 @@
       "name": "东区图书馆",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "浅色弧形墙面围合深色竖向玻璃窗带。",
       "colors": {
-        "wall": null,
-        "accent": null,
-        "glass": null,
+        "wall": "#d6d2c5",
+        "accent": "#9a885a",
+        "glass": "#445c55",
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "弧形檐口有“图书馆 LIBRARY”字样",
+        "入口前宽台阶"
+      ],
+      "photos": [
+        {
+          "file": "way621423424_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/06-21/1ce9cc4fa8ccd0a20237d57db2f56408.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-06-21",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "从馆前花园朝入口斜俯拍"
+        },
+        {
+          "file": "way621423424_2.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/82cdb5b91be0586b226d2c02a4980986.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "从东北向西南俯拍，图书馆檐口及入口位于右下角"
+        }
+      ],
+      "confidence": "photo",
       "overture_ids": [
         "cbfe3886-e15a-4131-ad51-0bcda1c5bd26"
       ]
@@ -1409,22 +1465,71 @@
     },
     {
       "source": "ec2aa560-4573-4a0c-8115-2037cb5d4f74",
-      "name": null,
+      "name": "体育馆",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "浅色小方砖与淡蓝线脚，上下两条通窗带。",
       "colors": {
-        "wall": null,
-        "accent": null,
-        "glass": null,
+        "wall": "#d6dcdc",
+        "accent": "#83c4cd",
+        "glass": "#596d73",
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none"
+      "features": [
+        "三角入口上方有五环与“体育馆”金色字样"
+      ],
+      "photos": [
+        {
+          "file": "ec2aa560-4573-4a0c-8115-2037cb5d4f74_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/90cd4e2ea94d8aa47592c18f3db3a2bd.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "平视主入口，方位未核实"
+        }
+      ],
+      "confidence": "photo",
+      "osm_landmark": "way/621423425"
     }
   ],
-  "gates": [],
-  "open_spaces": []
+  "gates": [
+    {
+      "name": "金鸡岭校区校门",
+      "osm_node": null,
+      "lonlat": null,
+      "desc": "浅色石质校名墙，镌“桂林电子科技大学”。",
+      "photos": [
+        {
+          "file": "guet_jinjiling_gate_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/06-21/191ae437355f8a47788fe06d1b96b017.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-06-21",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "校外朝校园正面平视"
+        }
+      ]
+    }
+  ],
+  "open_spaces": [
+    {
+      "name": "草坪花园",
+      "source": "way/606125809",
+      "lonlat": [
+        110.33237,
+        25.28662
+      ],
+      "desc": "图书馆前的花园，航拍可见圆形水池与环形步道。",
+      "photos": [
+        {
+          "file": "way606125809_1.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2023/07-06/82cdb5b91be0586b226d2c02a4980986.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": "2023-07-06",
+          "date_basis": "原图上传目录日期，拍摄时间未知",
+          "view": "航拍全幅，花园在前景，图书馆在右下。"
+        }
+      ]
+    }
+  ]
 }
