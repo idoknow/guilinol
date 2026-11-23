@@ -45,8 +45,10 @@ export function joinPortalRoads(tile:Tile,tunnels:Tunnel[],buffers:Float32Array[
       for(const buffer of buffers)for(let index=0;index<buffer.length;index+=3){
         const x=tile.x+buffer[index],z=tile.z+buffer[index+2],s=axes.station(x,z),d=Math.abs(axes.lateral(x,z))
         const inward=portal===tunnel.portals[0]?s:tunnel.length-s
-        if(inward< -20||inward>30||d>tunnel.halfWidth+4)continue
-        const blend=THREE.MathUtils.smoothstep(inward,-20,-4)*(1-THREE.MathUtils.smoothstep(d,tunnel.halfWidth,tunnel.halfWidth+4))
+        // Only stitch the surface approach at the mouth. Vertices deeper
+        // into the bore can belong to the street crossing above it.
+        if(inward< -20||inward>4||d>tunnel.halfWidth+4)continue
+        const blend=THREE.MathUtils.smoothstep(inward,-20,-4)*(1-THREE.MathUtils.smoothstep(inward,0,4))*(1-THREE.MathUtils.smoothstep(d,tunnel.halfWidth,tunnel.halfWidth+4))
         const target=tunnelFloor([tunnel],x,z,portal[1])??portal[1]
         buffer[index+1]+=blend*(target-.02-buffer[index+1])
       }

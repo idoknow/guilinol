@@ -295,7 +295,8 @@ def build(bbox, output, palette, workers=4):
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     if play_region:
         from road_tunnels import corridor_underpasses
-        tunnels.extend(corridor_underpasses(bounds,ground_mesh_at))
+        underpasses = corridor_underpasses(bounds,ground_mesh_at)
+        tunnels.extend(underpasses)
     finalize_bridges(ground_mesh_at)
     if play_region:
         from road_tunnels import clear_cuizhu_overpass
@@ -547,6 +548,8 @@ def build(bbox, output, palette, workers=4):
     from service_streets import bake as bake_service_streets, clear_carriageway_trees
     bake_service_streets(output, manifest, palette)
     if play_region:
+        from road_tunnels import clear_approach_paving
+        clear_approach_paving(output, chunks, underpasses)
         clear_carriageway_trees(output,chunks)
         restore_protected_tiles(output,chunks,landmarks)
     write_city_lods(output, manifest)

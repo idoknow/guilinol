@@ -15,11 +15,26 @@ try {
   browser=await chromium.launch(browserOptions())
   for(const mode of ['drive','walk']){
     if(process.argv.length>2 && !process.argv.includes('--'+mode))continue
-    const path=legs.slice(1).flatMap((end,i)=>{
-      const route=config.corridors.find(c=>c.mode===mode&&c.start===legs[i]&&c.end===end)
-      assert(route,'Missing '+mode+' leg to '+end)
-      return route.geometry.coordinates.slice(i?1:0)
-    })
+    const corridor=(kind,start,end)=>{
+      const leg=config.corridors.find(c=>c.mode===kind&&c.start===start&&c.end===end)
+      assert(leg,'Missing corridor from '+start+' to '+end)
+      return leg.geometry.coordinates
+    }
+    let path
+    if(mode==='walk'){
+      // Tower and expo are modeled as shared street corridors. Join the
+      // walking polyline at actual shared vertices, with no spawn between legs.
+      const tower=corridor('drive','桂林塔',legs[1])
+      const civic=corridor('walk',legs[1],legs[2])
+      const west=corridor('walk',legs[2],legs[3])
+      const expo=corridor('drive','临桂新区·会展','临桂万达')
+      const junction=expo.findIndex(p=>west.some(q=>q[0]===p[0]&&q[1]===p[1]))
+      assert(junction>=0,'Missing expo junction')
+      const merge=west.findIndex(p=>p[0]===expo[junction][0]&&p[1]===expo[junction][1])
+      path=[...tower,...civic.slice(1),...west.slice(1,merge+1),...expo.slice(0,junction).reverse()]
+    }else{
+      path=legs.slice(1).flatMap((end,i)=>corridor(mode,legs[i],end).slice(i?1:0))
+    }
     // Use the published west approach pickup. The closest car by air is below the bridge.
     const car=vehicles.cars.find(([x,,z])=>Math.hypot(x+572,z+92)<5)
     if(mode==='drive'){
@@ -76,12 +91,13 @@ try {
             const turn=before && after && Math.abs(Math.atan2(
               (east-before[0])*(after[1]-south)-(south-before[1])*(after[0]-east),
               (east-before[0])*(after[0]-east)+(south-before[1])*(after[1]-south)))>.48
+            const shortConnector=before && Math.hypot(east-before[0],south-before[1])<6
+            const tolerance=mode==='walk' || turn?2:shortConnector?6:4
             let best=Infinity,stalled=0,reverse
             for(let tick=0;;tick++){
               const pos=walk.position,dx=east-pos.x,dz=south-pos.z,gap=Math.hypot(dx,dz)
               // Street centerline junctions can have a short connector inside the
               // turning circle. Capture those at lane-width tolerance.
-              const tolerance=mode==='walk'?2:turn?2:before && Math.hypot(east-before[0],south-before[1])<6?6:4
               if(gap<tolerance)break
               if(gap<best-.5){best=gap;stalled=0}
               if(++stalled>900)throw Error(mode+' stalled at waypoint '+index+' from '+pos.toArray()+' target '+[east,south]+' heading '+walk.heading+' speed '+walk.speed+' obstacle '+walk.obstacle)
@@ -92,7 +108,6 @@ try {
                 // Back out along the street until the next junction permits a forward turn.
                 reverse ??= Math.abs(err)>Math.PI*.68
                 const steering=reverse?Math.atan2(Math.sin(err),-Math.cos(err)):err
-                const speed=Math.abs(walk.speed)
                 const limit=Math.abs(err)>.3?2.5:turn?Math.min(8,2.5+Math.max(0,gap-5)*.18):8
                 key('KeyA',steering>.035);key('KeyD',steering<-.035)
                 key('KeyW',reverse?walk.speed < -3:walk.speed < limit)
@@ -106,7 +121,7 @@ try {
               }
             }
           }
-          if(walk.probe().resets!==initial)throw Error(mode+' reset before T2')
+          if(walk.probe().resets!==initial)throw Error(mode+' reset before arrival')
           return {waypoints:path.length,position:walk.position.toArray(),resets:walk.probe().resets-initial}
         }finally{
           for(const code of pressed)key(code,false)

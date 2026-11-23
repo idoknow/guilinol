@@ -102,3 +102,51 @@ def clear_cuizhu_overpass(plans, road_height):
             point = line.interpolate(float(s))
             for center,level in targets:
                 levels[i] = max(levels[i],level-.05*max(0.,point.distance(center)-12))
+
+
+def clear_approach_paving(output, chunks, underpasses):
+    """Cut GL04 surface streets at the same open ramps as the terrain mesh."""
+    import gzip
+    import json
+    import struct
+    from shapely import LineString, Polygon, box, make_valid, union_all
+    from shapely.affinity import translate
+    from service_streets import rings
+
+    ramps = []
+    for tunnel in underpasses:
+        line = LineString([(x,z) for x,_,z in tunnel['portals']])
+        approach = tunnel['approach']
+        for start,end in ((0,approach), (line.length-approach,line.length)):
+            segment = LineString([line.interpolate(start),line.interpolate(end)])
+            ramps.append(segment.buffer(tunnel['halfWidth'], cap_style='flat'))
+    cut = union_all(ramps)
+    for tile in chunks:
+        x,z = tile['x'],tile['z']
+        if not cut.intersects(box(x,z,x+256,z+256)):
+            continue
+        local = translate(cut, -x, -z)
+        file = output/tile['file']
+        raw = gzip.decompress(file.read_bytes())
+        vertices,indices,size = struct.unpack_from('<3I',raw,4)
+        start = 24+16900+vertices*9+indices*4
+        collision = json.loads(raw[start:start+size])
+        streets = collision[1]
+        lower = streets[11] if len(streets)>11 else None
+        paths = []
+        for i,item in enumerate(streets[0]):
+            if lower and i==lower[0]:
+                first_lower = len(paths)
+            kind,*loops = item
+            shape = make_valid(Polygon(np.asarray(loops[0])/100, [np.asarray(r)/100 for r in loops[1:]]))
+            if shape.intersects(local):
+                paths.extend(rings(kind,shape.difference(local)))
+            else:
+                paths.append(item)
+        if lower:
+            lower[0] = first_lower if lower[0]<len(streets[0]) else len(paths)
+        streets[0] = paths
+        encoded = json.dumps(collision,separators=(',',':')).encode()
+        payload = raw[:12]+struct.pack('<I',len(encoded))+raw[16:start]+encoded+raw[start+size:]
+        file.write_bytes(gzip.compress(payload,compresslevel=5,mtime=0))
+        tile['bytes'] = file.stat().st_size
