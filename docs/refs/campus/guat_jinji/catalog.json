@@ -276,8 +276,8 @@
     {
       "source": "way/680695943",
       "name": "6#办公楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -291,13 +291,14 @@
       "confidence": "none",
       "source_aliases": [
         "83b0cf7b-21d0-4eeb-980a-efd68cafcd57"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/680695944",
       "name": "5#办公楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -311,13 +312,14 @@
       "confidence": "none",
       "source_aliases": [
         "577e74ec-85d4-4eb8-83e3-d6d40fe15ebd"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/680695945",
       "name": "4#办公楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -331,13 +333,14 @@
       "confidence": "none",
       "source_aliases": [
         "2e04f0ff-8c4c-44b1-b817-bc36fbfb0b6c"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/680695946",
       "name": "莘子苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 3,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -351,13 +354,14 @@
       "confidence": "none",
       "source_aliases": [
         "ed330989-f392-4696-95b2-7ba7194ec898"
-      ]
+      ],
+      "floor_count_note": "食堂类型默认值"
     },
     {
       "source": "way/680695951",
       "name": "致远楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": "长条立面有连续水平外廊，竖柱等距分隔；树冠遮住下部。",
       "colors": {
         "wall": "#dedecf",
@@ -365,10 +369,11 @@
         "glass": null,
         "roof": null
       },
-      "roof": null,
+      "roof": "other",
       "features": [
         "中段凸出弧形竖窗",
-        "长翼连续外廊"
+        "长翼连续外廊",
+        "树冠与拍摄角度遮挡，屋面不可辨"
       ],
       "photos": [
         {
@@ -382,13 +387,14 @@
       "confidence": "photo",
       "source_aliases": [
         "b58ff20f-f8d5-4e12-9478-c73417457b53"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/680695952",
       "name": "格物楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -402,13 +408,14 @@
       "confidence": "none",
       "source_aliases": [
         "6b4ccb08-7501-41dd-a628-b107fa2f73a4"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 1047.2 m²、长宽比 2.52，按宿舍估算"
     },
     {
       "source": "way/680695953",
       "name": "1#办公楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -422,13 +429,14 @@
       "confidence": "none",
       "source_aliases": [
         "4dd81d65-1655-41fb-bf96-f863d355a74a"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/680695954",
       "name": "3#办公楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -442,13 +450,14 @@
       "confidence": "none",
       "source_aliases": [
         "4f9e20fe-6c40-49a0-8fc7-db636bc6d6ac"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/680695955",
       "name": "2#办公楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -462,22 +471,25 @@
       "confidence": "none",
       "source_aliases": [
         "95d32cd8-db29-4c26-ad7d-94803a163d06"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/680695956",
       "name": "明志楼",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 5,
+      "floors_src": "guess",
+      "facade": "浅灰色墙面，横向分层，两翼由连续窗带和竖向墙垛分隔。",
       "colors": {
-        "wall": null,
+        "wall": "#bdc2bb",
         "accent": null,
-        "glass": null,
+        "glass": "#8f9893",
         "roof": null
       },
-      "roof": null,
-      "features": [],
+      "roof": "other",
+      "features": [
+        "屋顶有外挑构架，照片不足以辨认主体屋面"
+      ],
       "photos": [
         {
           "file": "way680695956_1.jpg",
@@ -490,13 +502,14 @@
       "confidence": "photo",
       "source_aliases": [
         "dbf6806e-9f1a-4c8d-bc9d-39f7c96311fd"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/680695957",
       "name": "12#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -510,13 +523,14 @@
       "confidence": "none",
       "source_aliases": [
         "f2cf4e6b-83eb-452a-b482-17e75fd33798"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695958",
       "name": "10#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -530,13 +544,14 @@
       "confidence": "none",
       "source_aliases": [
         "d6885247-8330-4a14-95a3-bae2a8856bb1"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695959",
       "name": "14#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -550,13 +565,14 @@
       "confidence": "none",
       "source_aliases": [
         "616adf8a-cd4f-4f42-bd95-02de110ce328"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695960",
       "name": "11#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -570,13 +586,14 @@
       "confidence": "none",
       "source_aliases": [
         "bef3e9d2-6144-4a33-863c-9e5637c5e04b"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695961",
       "name": "13#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -590,13 +607,14 @@
       "confidence": "none",
       "source_aliases": [
         "725e2d33-25e7-49d3-baf3-6ec2e4c17b80"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695962",
       "name": "15#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -610,13 +628,14 @@
       "confidence": "none",
       "source_aliases": [
         "db15e398-7f97-4471-b5f1-573b5d4db1a7"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695963",
       "name": "6#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -630,13 +649,14 @@
       "confidence": "none",
       "source_aliases": [
         "69ac2bf4-5b7c-4f74-9eeb-b6f46dd642ef"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695964",
       "name": "7#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -650,13 +670,14 @@
       "confidence": "none",
       "source_aliases": [
         "113fbc72-a16b-45ea-86cd-cb54f87591ea"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695965",
       "name": "9#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -670,13 +691,14 @@
       "confidence": "none",
       "source_aliases": [
         "9285b7ca-c008-42af-bb1b-a8e109a93ebc"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695966",
       "name": "8#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -690,13 +712,14 @@
       "confidence": "none",
       "source_aliases": [
         "2a4fe23a-542e-4e0e-838c-7da19d535137"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695967",
       "name": "1#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -710,13 +733,14 @@
       "confidence": "none",
       "source_aliases": [
         "8c4c5287-433e-408a-a781-66edf0c80ce4"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695968",
       "name": "2#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -730,13 +754,14 @@
       "confidence": "none",
       "source_aliases": [
         "cbf30776-3401-41d3-bc86-66babc663de9"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695969",
       "name": "3#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -750,13 +775,14 @@
       "confidence": "none",
       "source_aliases": [
         "840cadc8-8b7e-40ed-898b-ad0b7a404b3b"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695970",
       "name": "4#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -770,13 +796,14 @@
       "confidence": "none",
       "source_aliases": [
         "2fb005be-78a7-4383-845e-4e61fa076868"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/680695971",
       "name": "5#博雅苑",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -790,13 +817,14 @@
       "confidence": "none",
       "source_aliases": [
         "c3a355b4-c5ec-4fb7-ba14-68817d8e12a6"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/692434358",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -810,13 +838,14 @@
       "confidence": "none",
       "source_aliases": [
         "0bb1f430-15a4-4af5-adbc-e37cc97e079c"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 2629.4 m²、长宽比 1.59，按教学楼估算"
     },
     {
       "source": "way/692434359",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -830,13 +859,14 @@
       "confidence": "none",
       "source_aliases": [
         "560100f9-3094-40b2-b169-984a3fa7d979"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 2070.8 m²、长宽比 1.73，按教学楼估算"
     },
     {
       "source": "way/692434363",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -850,13 +880,14 @@
       "confidence": "none",
       "source_aliases": [
         "05c2dd0a-5879-4b04-8137-59e53e75ef35"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 2007.2 m²、长宽比 1.72，按教学楼估算"
     },
     {
       "source": "way/692434364",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -870,13 +901,14 @@
       "confidence": "none",
       "source_aliases": [
         "a39fd58d-163c-4a79-bb71-125919bcb6b3"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 2006.7 m²、长宽比 1.72，按教学楼估算"
     },
     {
       "source": "way/700644326",
       "name": "天宫楼-食堂",
-      "floors": null,
-      "floors_src": null,
+      "floors": 3,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -890,13 +922,14 @@
       "confidence": "none",
       "source_aliases": [
         "01e94bf4-7fdf-4413-8d58-5241a110e98f"
-      ]
+      ],
+      "floor_count_note": "食堂类型默认值"
     },
     {
       "source": "way/724360568",
       "name": "5#实训车间",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -910,13 +943,14 @@
       "confidence": "none",
       "source_aliases": [
         "026452fc-3956-4e72-a437-3c2b0a6c263e"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/724360569",
       "name": "3#实验楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -930,13 +964,14 @@
       "confidence": "none",
       "source_aliases": [
         "35b5553c-0b2c-47ae-8c0c-5da745729411"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/724360570",
       "name": "4#实训车间",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -950,13 +985,14 @@
       "confidence": "none",
       "source_aliases": [
         "e9bcbd1d-7931-41da-bb41-349dc1779382"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/724360571",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -970,13 +1006,14 @@
       "confidence": "none",
       "source_aliases": [
         "f23bb1a4-ecaa-491f-9263-74db53bed34c"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 135.2 m²，按附属用房估算"
     },
     {
       "source": "way/724360572",
       "name": "卫生所",
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -990,13 +1027,14 @@
       "confidence": "none",
       "source_aliases": [
         "28d791f0-a7d9-4baf-ad61-232f217c5e05"
-      ]
+      ],
+      "floor_count_note": "校园附属用房类型默认值"
     },
     {
       "source": "way/724360573",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1010,13 +1048,14 @@
       "confidence": "none",
       "source_aliases": [
         "1ef300c7-432f-49cf-bf3b-01a9d7b74c70"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 143.0 m²，按附属用房估算"
     },
     {
       "source": "way/724360574",
       "name": "收发室",
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1030,13 +1069,14 @@
       "confidence": "none",
       "source_aliases": [
         "899ae124-d048-48ba-b09f-5ded903f4782"
-      ]
+      ],
+      "floor_count_note": "校园附属用房类型默认值"
     },
     {
       "source": "way/724360576",
       "name": "水电服务中心",
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1050,13 +1090,14 @@
       "confidence": "none",
       "source_aliases": [
         "6026aadb-133b-4d12-acbe-22332618ee63"
-      ]
+      ],
+      "floor_count_note": "校园附属用房类型默认值"
     },
     {
       "source": "way/724360577",
       "name": "水电服务中心",
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1070,13 +1111,14 @@
       "confidence": "none",
       "source_aliases": [
         "3da76374-3e1e-4325-8263-f0a305ef4bbc"
-      ]
+      ],
+      "floor_count_note": "校园附属用房类型默认值"
     },
     {
       "source": "way/724360578",
       "name": "2#实训车间",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1090,13 +1132,14 @@
       "confidence": "none",
       "source_aliases": [
         "16ca1a2b-4021-437a-80f3-55ce9163406d"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/724360579",
       "name": "3#实训车间",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1110,13 +1153,14 @@
       "confidence": "none",
       "source_aliases": [
         "771969d2-f694-47f3-8836-e9f8282c140d"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/724360580",
       "name": "体育活动中心",
-      "floors": null,
-      "floors_src": null,
+      "floors": 2,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1130,24 +1174,26 @@
       "confidence": "none",
       "source_aliases": [
         "f2066347-aa3c-4cd0-8b2c-ce18642adc64"
-      ]
+      ],
+      "floor_count_note": "体育场馆类型默认值"
     },
     {
       "source": "way/724360581",
       "name": "校史馆 航天博物馆",
       "floors": 2,
-      "floors_src": "photo",
-      "facade": "正立面左右对称，中部突出。",
+      "floors_src": "news",
+      "facade": "白墙配深红色窄窗框，中部高起，两侧较低。",
       "colors": {
-        "wall": null,
-        "accent": null,
+        "wall": "#e5e5e3",
+        "accent": "#552c32",
         "glass": null,
-        "roof": null
+        "roof": "#49444a"
       },
-      "roof": null,
+      "roof": "gable_tile",
       "features": [
         "中轴对称",
-        "两层历史建筑"
+        "两层历史建筑",
+        "两坡深色瓦顶、三角山墙"
       ],
       "photos": [
         {
@@ -1169,13 +1215,14 @@
       "source_aliases": [
         "927e2e4e-17bd-4cd6-bbcd-a1e65945cdb0"
       ],
-      "floor_count_note": "校方历史建筑报道明确记载为两层，与署名照片一致。"
+      "floor_count_note": "校方历史建筑报道明确记载为两层，与署名照片一致。",
+      "page": "https://www.guat.edu.cn/info/1004/13740.htm"
     },
     {
       "source": "way/724360584",
       "name": "凌志楼B",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1189,13 +1236,14 @@
       "confidence": "none",
       "source_aliases": [
         "20ea9ec0-8f3d-42bd-a0e7-6561fc0d5efe"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 464.8 m²、长宽比 5.99，按宿舍估算"
     },
     {
       "source": "way/724360585",
       "name": "凌志楼A",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1209,13 +1257,14 @@
       "confidence": "none",
       "source_aliases": [
         "4082ccc2-9e85-4d39-94fe-48f09de3fd3e"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 398.4 m²、长宽比 6.96，按宿舍估算"
     },
     {
       "source": "way/724360586",
       "name": "电教馆",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1229,13 +1278,14 @@
       "confidence": "none",
       "source_aliases": [
         "8f9df239-e7ec-4e3f-ac93-2685049f219a"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/724379833",
       "name": "凌志楼C",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1249,13 +1299,14 @@
       "confidence": "none",
       "source_aliases": [
         "0fb08627-babb-42aa-a10a-8431ac73bcbf"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 464.8 m²、长宽比 5.99，按宿舍估算"
     },
     {
       "source": "way/724379834",
       "name": "1#实训车间",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1269,13 +1320,14 @@
       "confidence": "none",
       "source_aliases": [
         "14ec9854-3992-48b9-bca8-1ab949458211"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/1472913839",
       "name": "教学实验楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1289,22 +1341,25 @@
       "confidence": "none",
       "source_aliases": [
         "a9c3016f-ede8-49d8-8b86-24126fa58fb5"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/1472913840",
       "name": "问天楼",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 5,
+      "floors_src": "guess",
+      "facade": "宽阔的矩形主立面，浅暖色边框围合灰色窗墙面。",
       "colors": {
-        "wall": null,
+        "wall": "#cdb395",
         "accent": null,
-        "glass": null,
+        "glass": "#90989f",
         "roof": null
       },
-      "roof": null,
-      "features": [],
+      "roof": "flat",
+      "features": [
+        "楼顶轮廓平直"
+      ],
       "photos": [
         {
           "file": "way1472913840_1.jpg",
@@ -1317,13 +1372,14 @@
       "confidence": "photo",
       "source_aliases": [
         "cfc1ca4d-d43f-4afb-ac7b-b0056b95965d"
-      ]
+      ],
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "way/1472913841",
       "name": "报告厅",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1337,13 +1393,14 @@
       "confidence": "none",
       "source_aliases": [
         "b335a986-0353-4124-92c6-97a4c2a53308"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 2352.4 m²、长宽比 1.16，按教学楼估算"
     },
     {
       "source": "way/1472913842",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1357,13 +1414,14 @@
       "confidence": "none",
       "source_aliases": [
         "51dbebde-6c46-4a4c-8a91-296ad1f1c449"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 1979.3 m²、长宽比 1.10，按教学楼估算"
     },
     {
       "source": "way/1472913843",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1377,13 +1435,14 @@
       "confidence": "none",
       "source_aliases": [
         "e11b7e1a-359b-487a-870f-67d8e3433923"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 1888.6 m²、长宽比 1.01，按教学楼估算"
     },
     {
       "source": "way/1472914836",
       "name": "天和苑10号公寓楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1397,13 +1456,14 @@
       "confidence": "none",
       "source_aliases": [
         "c86e2fb5-5d71-4c2a-b11b-9eb77b0e2a52"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/1472914837",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1417,13 +1477,14 @@
       "confidence": "none",
       "source_aliases": [
         "bfd489b5-2fcc-471e-b912-bfe80a92b13a"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1472915431",
       "name": "天和苑9号公寓楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1437,13 +1498,14 @@
       "confidence": "none",
       "source_aliases": [
         "6a80ddca-fe8c-4565-b3de-b3995d76715f"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/1472915432",
       "name": "天和苑9号公寓楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1457,13 +1519,14 @@
       "confidence": "none",
       "source_aliases": [
         "0bc14b1b-dd40-4ca3-9652-d6b696fb7605"
-      ]
+      ],
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "way/1472915433",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1477,13 +1540,14 @@
       "confidence": "none",
       "source_aliases": [
         "b017ef1c-d2d8-413d-bfe0-a2ddfc5d0ace"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 2656.5 m²、长宽比 1.64，按教学楼估算"
     },
     {
       "source": "way/1472917063",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1497,13 +1561,14 @@
       "confidence": "none",
       "source_aliases": [
         "be319d79-51c8-4e19-88cd-b64c0d14d166"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 2186.0 m²、长宽比 1.11，按教学楼估算"
     },
     {
       "source": "way/1472917066",
       "name": "擎天楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1517,13 +1582,14 @@
       "confidence": "none",
       "source_aliases": [
         "b1283163-e6f9-433e-822c-68c99a1ddcb8"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 3581.4 m²、长宽比 1.41，按教学楼估算"
     },
     {
       "source": "way/1472917067",
       "name": "擎天楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1537,13 +1603,14 @@
       "confidence": "none",
       "source_aliases": [
         "a0e11958-2c47-475e-bd50-e178ed91e65e"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 3390.7 m²、长宽比 1.92，按教学楼估算"
     },
     {
       "source": "way/1472917068",
       "name": "启天楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1557,13 +1624,14 @@
       "confidence": "none",
       "source_aliases": [
         "1894a6f7-7ee8-41a3-ab83-57a909278b0e"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 10709.3 m²、长宽比 2.67，按宿舍估算"
     },
     {
       "source": "way/1472917069",
       "name": "奥天楼-体育馆",
-      "floors": null,
-      "floors_src": null,
+      "floors": 2,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1577,13 +1645,14 @@
       "confidence": "none",
       "source_aliases": [
         "802cc5a3-fe34-4b1e-a307-06b8a5ab6372"
-      ]
+      ],
+      "floor_count_note": "体育场馆类型默认值"
     },
     {
       "source": "way/1472920533",
       "name": "天舟楼-食堂",
-      "floors": null,
-      "floors_src": null,
+      "floors": 3,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1597,13 +1666,14 @@
       "confidence": "none",
       "source_aliases": [
         "42f980e1-7e53-4bfa-940e-9fcb0c3421da"
-      ]
+      ],
+      "floor_count_note": "食堂类型默认值"
     },
     {
       "source": "way/1473491751",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1617,13 +1687,14 @@
       "confidence": "none",
       "source_aliases": [
         "b27c52ec-8304-426a-8b1a-9c3ec18b67b4"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 324.6 m²、长宽比 1.65，按教学楼估算"
     },
     {
       "source": "way/1487509522",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1637,13 +1708,14 @@
       "confidence": "none",
       "source_aliases": [
         "e3c816c8-a517-4f3f-b607-e3d3f596c91e"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 217.0 m²，按附属用房估算"
     },
     {
       "source": "way/1487509523",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1657,13 +1729,14 @@
       "confidence": "none",
       "source_aliases": [
         "f7ca405b-2fc9-4fdb-8d74-8fcf264aa360"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 237.7 m²，按附属用房估算"
     },
     {
       "source": "way/1487509526",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1677,13 +1750,14 @@
       "confidence": "none",
       "source_aliases": [
         "86a8a50e-560e-45c9-bac0-c9da20f16901"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 38.4 m²，按附属用房估算"
     },
     {
       "source": "way/1487509527",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1697,13 +1771,14 @@
       "confidence": "none",
       "source_aliases": [
         "42add34b-f5b5-43c5-8f65-cf7b29b265c0"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 38.3 m²，按附属用房估算"
     },
     {
       "source": "way/1487568812",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1717,13 +1792,14 @@
       "confidence": "none",
       "source_aliases": [
         "b1ab7430-98a1-46d2-bff2-53f4146be06a"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 1391.6 m²、长宽比 1.38，按教学楼估算"
     },
     {
       "source": "way/1487571513",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1737,13 +1813,14 @@
       "confidence": "none",
       "source_aliases": [
         "23f34b03-b599-49e9-9c44-13d622b521c5"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571514",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1757,13 +1834,14 @@
       "confidence": "none",
       "source_aliases": [
         "df002ee4-2b4a-4300-9ba2-9343c97a0993"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571515",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1777,13 +1855,14 @@
       "confidence": "none",
       "source_aliases": [
         "983d3b1c-d0c2-4e6a-aaf1-7545e13f8f4d"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571516",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1797,13 +1876,14 @@
       "confidence": "none",
       "source_aliases": [
         "f396cd5e-2358-4394-9cb6-143db572dd6b"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571517",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1817,13 +1897,14 @@
       "confidence": "none",
       "source_aliases": [
         "65b6df11-0f55-4cf1-9f0a-2cef061c09cc"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571518",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1837,13 +1918,14 @@
       "confidence": "none",
       "source_aliases": [
         "6e51a239-cbab-4210-b650-dac9fcaaec1a"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571519",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1857,13 +1939,14 @@
       "confidence": "none",
       "source_aliases": [
         "d6239bbb-d68f-4bff-a75f-30e1228461fb"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571520",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1877,13 +1960,14 @@
       "confidence": "none",
       "source_aliases": [
         "20ca9008-59f7-4c57-a511-666546d5a541"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571521",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1897,13 +1981,14 @@
       "confidence": "none",
       "source_aliases": [
         "8731a416-95ab-4a6b-8d44-119f3cb3fd5f"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571522",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1917,13 +2002,14 @@
       "confidence": "none",
       "source_aliases": [
         "fc93a438-5845-4252-afb7-ae10bdc7b604"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571523",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1937,13 +2023,14 @@
       "confidence": "none",
       "source_aliases": [
         "a9b6fa33-473b-4ac2-b3e2-f906542eefa3"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571524",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1957,13 +2044,14 @@
       "confidence": "none",
       "source_aliases": [
         "9a5c6290-aaa1-475f-8256-2d0ddca5e573"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571525",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1977,13 +2065,14 @@
       "confidence": "none",
       "source_aliases": [
         "4f9b6112-374a-4090-87d9-b78ea7ce29a1"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571527",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -1997,13 +2086,14 @@
       "confidence": "none",
       "source_aliases": [
         "01ed0599-fed5-4184-83ab-d6e60e45fad8"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571528",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2017,13 +2107,14 @@
       "confidence": "none",
       "source_aliases": [
         "7e087965-bbf4-4c62-873e-ea9c7dede202"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571529",
       "name": "智航楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2037,13 +2128,14 @@
       "confidence": "none",
       "source_aliases": [
         "fc8dd65f-e88a-44aa-a680-fce98785df99"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571530",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2057,13 +2149,14 @@
       "confidence": "none",
       "source_aliases": [
         "e8acf64c-307c-42fa-8fb0-c6300eb0cd9b"
-      ]
+      ],
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "way/1487571543",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2077,13 +2170,14 @@
       "confidence": "none",
       "source_aliases": [
         "9e88c279-5a0b-4158-971b-d86d23168920"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 1397.2 m²、长宽比 1.29，按教学楼估算"
     },
     {
       "source": "way/1487571546",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2097,13 +2191,14 @@
       "confidence": "none",
       "source_aliases": [
         "f775ae51-c5f7-4db1-b76f-50af0ee1021d"
-      ]
+      ],
+      "floor_count_note": "轮廓面积 201.0 m²，按附属用房估算"
     },
     {
       "source": "003b982e-6dc3-4cfc-a877-bd947f8ea951",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2114,13 +2209,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 135.1 m²，按附属用房估算"
     },
     {
       "source": "04844689-1a84-4c48-b5c9-f85f419ff280",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2131,13 +2227,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 216.0 m²，按附属用房估算"
     },
     {
       "source": "10979e5f-2ea8-49ed-9c32-c069b9423bf5",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2148,13 +2245,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 189.1 m²，按附属用房估算"
     },
     {
       "source": "118460fe-ade6-4a09-9e9c-24eab1821a6b",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2165,13 +2263,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 36.0 m²，按附属用房估算"
     },
     {
       "source": "148df495-2a84-4bec-a8a8-25a8943ef76d",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2182,13 +2281,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 135.1 m²，按附属用房估算"
     },
     {
       "source": "1a3e66a6-7aa1-49a5-89d4-c6aae19e5a77",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2199,13 +2299,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 54.1 m²，按附属用房估算"
     },
     {
       "source": "1e2e6522-8109-4d65-b091-2a2efab6545f",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2216,13 +2317,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 27.1 m²，按附属用房估算"
     },
     {
       "source": "1f374a5d-bcea-4c5d-828c-48ff8bace45d",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2233,13 +2335,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 90.0 m²，按附属用房估算"
     },
     {
       "source": "1f82cbaf-3345-40db-97e3-ab7c6fadf83d",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2250,13 +2353,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 182.2 m²，按附属用房估算"
     },
     {
       "source": "2001ad23-efa6-4d76-81b8-d16670e00f37",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2267,13 +2371,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 33.8 m²，按附属用房估算"
     },
     {
       "source": "20ce60dd-68ac-481b-8841-ccdfe2711a42",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2284,13 +2389,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 168.8 m²，按附属用房估算"
     },
     {
       "source": "28aab5b7-7ad3-4d5b-9cb5-db76f8014fb3",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2301,13 +2407,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 303.9 m²、长宽比 1.67，按教学楼估算"
     },
     {
       "source": "28bc459b-b58e-4fbf-a222-beec909a111a",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2318,13 +2425,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 4869.2 m²、长宽比 2.58，按宿舍估算"
     },
     {
       "source": "29401f32-0296-4626-b2a7-14102d767375",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2335,13 +2443,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 144.1 m²，按附属用房估算"
     },
     {
       "source": "2a50e78e-bcc3-493c-95ef-37e991bf7f57",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2352,13 +2461,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 81.0 m²，按附属用房估算"
     },
     {
       "source": "2b5525ee-7ac5-42c3-8727-cddc6538b224",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2369,13 +2479,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 263.2 m²，按附属用房估算"
     },
     {
       "source": "2b84e2b8-288b-4b4b-97a4-94d7b91c9f4e",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2386,13 +2497,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 182.3 m²，按附属用房估算"
     },
     {
       "source": "307f255b-4efd-4414-8a99-71bc17b74ce2",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2403,13 +2515,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 78.7 m²，按附属用房估算"
     },
     {
       "source": "38439d3c-20b9-4d01-8964-10bd3895295f",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2420,13 +2533,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 220.5 m²，按附属用房估算"
     },
     {
       "source": "39510f61-b611-4f32-b119-fc0b8cc7b6f3",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2437,13 +2551,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 711.0 m²、长宽比 1.11，按教学楼估算"
     },
     {
       "source": "3b09eb47-bf3a-44d5-baa0-22117fad0099",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2454,13 +2569,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 742.5 m²、长宽比 1.36，按教学楼估算"
     },
     {
       "source": "3dbfaf30-c057-4ee7-9c91-dd4ed86914ad",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2471,13 +2587,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 144.0 m²，按附属用房估算"
     },
     {
       "source": "3f3d66a9-0e29-4ad1-b3f8-36abce172671",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2488,13 +2605,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 504.1 m²、长宽比 1.75，按教学楼估算"
     },
     {
       "source": "3f5c7053-568b-4fce-8b8b-eba085ee68b7",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2505,13 +2623,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 173.2 m²，按附属用房估算"
     },
     {
       "source": "408b2964-3274-4372-8398-7598289e02ad",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2522,13 +2641,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 22.5 m²，按附属用房估算"
     },
     {
       "source": "41e0ba8f-6491-44b5-8619-981453bc268a",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2539,13 +2659,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 108.1 m²，按附属用房估算"
     },
     {
       "source": "42c06c31-f134-4a23-9210-3a31b7bc2bcb",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2556,13 +2677,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 56.3 m²，按附属用房估算"
     },
     {
       "source": "4ff1c313-0507-4706-b9f6-344906629dcc",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2573,13 +2695,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 135.0 m²，按附属用房估算"
     },
     {
       "source": "50ea9fa1-5861-4a6c-a1ee-420aabfd5c9e",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2590,13 +2713,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 135.1 m²，按附属用房估算"
     },
     {
       "source": "51d96a13-81b3-4a34-b39c-ce577bffe10e",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2607,13 +2731,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 87.7 m²，按附属用房估算"
     },
     {
       "source": "527e3d0f-297d-4da6-b219-2a489138ec24",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2624,13 +2749,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 202.6 m²，按附属用房估算"
     },
     {
       "source": "563ba9a6-d04c-4baa-8c65-556ea3b1d17f",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2641,13 +2767,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 112.6 m²，按附属用房估算"
     },
     {
       "source": "59c3ba93-9b21-4284-9734-917d47d29fc0",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2658,13 +2785,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 135.0 m²，按附属用房估算"
     },
     {
       "source": "5ad10407-52c5-4b91-a0b8-fe2adae99fb9",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2675,13 +2803,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 87.7 m²，按附属用房估算"
     },
     {
       "source": "5b56537f-3755-48a0-b0b4-0f560bd95e7f",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2692,13 +2821,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 89.9 m²，按附属用房估算"
     },
     {
       "source": "5d2222c5-2f45-4c3b-945c-be6da2f4d04e",
       "name": "桂航科技园",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2709,13 +2839,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 3323.8 m²、长宽比 2.10，按教学楼估算"
     },
     {
       "source": "5e469607-acc3-4d4a-a5b6-9592eae89280",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2726,13 +2857,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 135.0 m²，按附属用房估算"
     },
     {
       "source": "5f3338c5-9a24-400a-9ce1-dc9d0f5081f5",
       "name": "天和苑8号公寓楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2743,13 +2875,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "学生公寓类型默认值"
     },
     {
       "source": "616158a9-688b-498c-8c4a-2aeb8ea70d3c",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2760,13 +2893,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 144.0 m²，按附属用房估算"
     },
     {
       "source": "63977dea-eea1-4f0d-a717-c7ff62350978",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2777,13 +2911,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 222.8 m²，按附属用房估算"
     },
     {
       "source": "6560e91e-8ee5-4c3a-ae36-e06d9ebffe14",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2794,13 +2929,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 144.0 m²，按附属用房估算"
     },
     {
       "source": "666f2ef9-dc24-4852-b901-7929c3d74ec0",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2811,13 +2947,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 1656.2 m²、长宽比 1.41，按教学楼估算"
     },
     {
       "source": "670aae4a-0277-48e9-bb62-e7cc9e49c455",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2828,13 +2965,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 459.2 m²、长宽比 1.87，按教学楼估算"
     },
     {
       "source": "68bdd786-7e73-466b-bdcd-d05c7a740af1",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2845,13 +2983,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 388.0 m²、长宽比 2.31，按教学楼估算"
     },
     {
       "source": "6de3cc54-fc31-47ee-88bf-37470e6ec351",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2862,13 +3001,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 153.0 m²，按附属用房估算"
     },
     {
       "source": "70b058f4-1567-41a5-947d-bda7320d8020",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2879,13 +3019,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 78.7 m²，按附属用房估算"
     },
     {
       "source": "71642837-e2a7-4847-bdbf-872a8d386db4",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2896,13 +3037,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 346.6 m²、长宽比 1.57，按教学楼估算"
     },
     {
       "source": "724c1e07-febc-45e4-94f3-622af3f12151",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2913,13 +3055,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 108.0 m²，按附属用房估算"
     },
     {
       "source": "75b9f874-c2e9-4a06-b911-3d16b264488f",
       "name": "天泽楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2930,13 +3073,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "住宅类标签，按宿舍估算"
     },
     {
       "source": "770093fa-e662-4fb9-a343-ab4e9bb2853b",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2947,13 +3091,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 36.0 m²，按附属用房估算"
     },
     {
       "source": "77bb4a4e-13c6-43ae-8035-796cff233d5a",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2964,13 +3109,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 135.0 m²，按附属用房估算"
     },
     {
       "source": "7b8d8fea-14db-491c-80ad-621f9033f48f",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2981,13 +3127,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 134.9 m²，按附属用房估算"
     },
     {
       "source": "7e69a7b4-83b6-429a-b525-4e3298c57b8f",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -2998,13 +3145,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 283.4 m²，按附属用房估算"
     },
     {
       "source": "7f47bc18-68ed-4ac5-b234-a60b2c928779",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3015,13 +3163,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 320.5 m²、长宽比 1.26，按教学楼估算"
     },
     {
       "source": "8010266f-eb3d-435d-a1a2-e201d460bff5",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3032,13 +3181,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 33.7 m²，按附属用房估算"
     },
     {
       "source": "84184c80-459c-4d08-a4fd-f6e521e3b2df",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3049,13 +3199,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 72.0 m²，按附属用房估算"
     },
     {
       "source": "85e351e4-41d3-4fa8-9a73-385e5479bb64",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3066,13 +3217,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 236.4 m²，按附属用房估算"
     },
     {
       "source": "870b6761-dc60-4cee-883d-880d746dd6ca",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3083,13 +3235,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 128.1 m²，按附属用房估算"
     },
     {
       "source": "87d413ee-362b-4146-8200-a1ab714a1378",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3100,13 +3253,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 180.0 m²，按附属用房估算"
     },
     {
       "source": "8b9875ca-6a8c-4b6c-a065-bbf435a7ac9d",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3117,13 +3271,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 74.3 m²，按附属用房估算"
     },
     {
       "source": "8d4b3077-01ed-46f5-9f93-5cb9f59433e4",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3134,13 +3289,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 247.6 m²，按附属用房估算"
     },
     {
       "source": "8e1b51d4-29b8-49c2-895f-2134a157beb2",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3151,13 +3307,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 101.3 m²，按附属用房估算"
     },
     {
       "source": "90056029-147a-4ed7-9e98-21fa20946c78",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3168,13 +3325,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 144.1 m²，按附属用房估算"
     },
     {
       "source": "978d8c0f-d918-4727-bb77-f7b59415de2e",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3185,13 +3343,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 438.9 m²、长宽比 1.15，按教学楼估算"
     },
     {
       "source": "9b623abc-8e7c-44b3-9f56-660cb0aab56c",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3202,13 +3361,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 365.8 m²、长宽比 1.60，按教学楼估算"
     },
     {
       "source": "9bffd16d-60bc-46dd-903f-605ce2ceb830",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3219,13 +3379,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 135.0 m²，按附属用房估算"
     },
     {
       "source": "9e130f30-fd9a-40d3-b402-1625ad4d3403",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3236,13 +3397,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 128.2 m²，按附属用房估算"
     },
     {
       "source": "9edd504a-0886-4dd5-8420-7b4d950c7c14",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3253,13 +3415,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 110.3 m²，按附属用房估算"
     },
     {
       "source": "9f2e2790-a81b-4f78-8780-e714dcd26d6f",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3270,22 +3433,25 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 81.0 m²，按附属用房估算"
     },
     {
       "source": "a58c9bc2-83c6-4f1c-afe7-bf2f3ee41cdc",
       "name": "致知楼",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 5,
+      "floors_src": "guess",
+      "facade": "浅色带状构件沿楼体延伸，下部被树木遮挡。",
       "colors": {
-        "wall": null,
+        "wall": "#d3e1ed",
         "accent": null,
         "glass": null,
         "roof": null
       },
-      "roof": null,
-      "features": [],
+      "roof": "other",
+      "features": [
+        "远景仅可读出浅色檐线，屋面不可辨"
+      ],
       "photos": [
         {
           "file": "a58c9bc2-83c6-4f1c-afe7-bf2f3ee41cdc_1.jpg",
@@ -3295,13 +3461,14 @@
           "view": "学校校园风光署名：致知楼；未标拍摄日期及方位。"
         }
       ],
-      "confidence": "photo"
+      "confidence": "photo",
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "a607e799-a2e3-4983-b405-1789e0ef5b4c",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3312,13 +3479,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 216.0 m²，按附属用房估算"
     },
     {
       "source": "a7fc8617-b0d1-4a21-85c5-d6b37c96cf44",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3329,13 +3497,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 6293.1 m²、长宽比 1.39，按教学楼估算"
     },
     {
       "source": "aa017183-b4b2-4506-93ed-a703a03b88bd",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3346,13 +3515,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 378.1 m²、长宽比 1.71，按教学楼估算"
     },
     {
       "source": "acd48a0c-b023-4b29-803d-52c6b3577ba9",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3363,13 +3533,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 89.9 m²，按附属用房估算"
     },
     {
       "source": "ad088794-7329-4832-8c72-f3f458792433",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3380,13 +3551,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 283.6 m²，按附属用房估算"
     },
     {
       "source": "ae7d89b5-c230-4af8-a1b1-942a0b4e1848",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3397,13 +3569,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 54.0 m²，按附属用房估算"
     },
     {
       "source": "b4381a97-7e7d-4c40-96d0-1762edf6ab64",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3414,13 +3587,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 978.8 m²、长宽比 3.09，按宿舍估算"
     },
     {
       "source": "b50dd565-28fb-4b72-a23f-47e934a0e70d",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3431,13 +3605,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 67.5 m²，按附属用房估算"
     },
     {
       "source": "b7ea8f81-5609-49fd-b3b8-9de09f66b0d8",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3448,13 +3623,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 198.0 m²，按附属用房估算"
     },
     {
       "source": "b863b09c-f337-4cf8-86e9-a6b642136afe",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3465,13 +3641,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 1792.9 m²、长宽比 2.48，按教学楼估算"
     },
     {
       "source": "b8be88c0-fca5-44e1-82fd-499ad0a06ef6",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3482,13 +3659,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 18.0 m²，按附属用房估算"
     },
     {
       "source": "babd6d8f-e342-4f85-9857-7310d9c1318c",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3499,13 +3677,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 41.6 m²，按附属用房估算"
     },
     {
       "source": "beac24dc-6b43-4190-9ffd-4900da4153a9",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3516,13 +3695,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 101.3 m²，按附属用房估算"
     },
     {
       "source": "c2dc6365-28fe-406c-8085-1172c12e2511",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3533,13 +3713,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 63.1 m²，按附属用房估算"
     },
     {
       "source": "c5c02f0b-0c58-49b7-b47a-853f931388a1",
       "name": "图书馆",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3550,13 +3731,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "教学、实训或办公类类型默认值"
     },
     {
       "source": "c6e26443-cb68-4e85-9d02-be2165378499",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3567,13 +3749,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 81.0 m²，按附属用房估算"
     },
     {
       "source": "c7993b98-9d9e-4c90-a8fd-e9f551dc7775",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3584,13 +3767,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 123.9 m²，按附属用房估算"
     },
     {
       "source": "cc25b907-1be0-45a4-b151-ecd0b04aa4ef",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3601,13 +3785,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 90.0 m²，按附属用房估算"
     },
     {
       "source": "cc9608fa-092c-4d82-9b67-4d3908410e4d",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3618,13 +3803,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 220.6 m²，按附属用房估算"
     },
     {
       "source": "cfb9e695-449d-45f6-8987-e597ec53db2c",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3635,13 +3821,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 126.0 m²，按附属用房估算"
     },
     {
       "source": "d3f558be-2252-44a6-80f7-b28e4aab0a42",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3652,13 +3839,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 182.2 m²，按附属用房估算"
     },
     {
       "source": "e476fade-f2dc-41a9-94ef-fba9fb7d04d0",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3669,13 +3857,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 10.4 m²，按附属用房估算"
     },
     {
       "source": "e88333fc-dc59-4791-827c-895f9d6e3b9f",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3686,13 +3875,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 196.8 m²，按附属用房估算"
     },
     {
       "source": "e88880b2-d9ec-4227-9dfd-03d9fd62e121",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3703,13 +3893,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 81.0 m²，按附属用房估算"
     },
     {
       "source": "ea5ee052-c4d2-4427-a20d-e91e15348701",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3720,13 +3911,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 54.0 m²，按附属用房估算"
     },
     {
       "source": "eacd5453-c1c1-4d40-bcaa-5b57bd8c7e43",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3737,13 +3929,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 135.0 m²，按附属用房估算"
     },
     {
       "source": "ec15f891-01ff-4073-84ad-add6285e713f",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3754,13 +3947,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 15.8 m²，按附属用房估算"
     },
     {
       "source": "f4e6d0bc-96e1-4848-a296-769837f17c8b",
       "name": "探天楼",
-      "floors": null,
-      "floors_src": null,
+      "floors": 5,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3771,13 +3965,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 9791.4 m²、长宽比 1.96，按教学楼估算"
     },
     {
       "source": "f5adf4e7-03fe-471f-b0f2-e296c8b19b04",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3788,13 +3983,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 18.0 m²，按附属用房估算"
     },
     {
       "source": "f6ff9ce4-6ab6-4c38-89fb-6a81e0933c4f",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3805,13 +4001,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 56.2 m²，按附属用房估算"
     },
     {
       "source": "f7af662e-aa1a-4830-ae26-f8463ff2c9d6",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3822,13 +4019,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 117.0 m²，按附属用房估算"
     },
     {
       "source": "f7c57590-e93e-4e60-8296-e12699b99d4e",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 6,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3839,13 +4037,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 643.7 m²、长宽比 3.38，按宿舍估算"
     },
     {
       "source": "fa7f55b6-2259-4b60-8e92-ae57b33ea251",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3856,13 +4055,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 288.0 m²，按附属用房估算"
     },
     {
       "source": "fc275244-05d4-41d0-8cb3-9e4073e2ffef",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3873,13 +4073,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 189.1 m²，按附属用房估算"
     },
     {
       "source": "fcfed642-b6ef-4ff1-b84e-56f79e5fbe64",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3890,13 +4091,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 135.0 m²，按附属用房估算"
     },
     {
       "source": "fe9302f8-3e94-4a43-b7f3-e9ca5a9d74cd",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3907,13 +4109,14 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 182.2 m²，按附属用房估算"
     },
     {
       "source": "ff20ece0-ed77-4ae6-96b3-884a6d0200c3",
       "name": null,
-      "floors": null,
-      "floors_src": null,
+      "floors": 1,
+      "floors_src": "guess",
       "facade": null,
       "colors": {
         "wall": null,
@@ -3924,7 +4127,8 @@
       "roof": null,
       "features": [],
       "photos": [],
-      "confidence": "none"
+      "confidence": "none",
+      "floor_count_note": "轮廓面积 162.1 m²，按附属用房估算"
     }
   ],
   "gates": [
