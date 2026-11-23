@@ -521,6 +521,8 @@ def build(bbox, output, palette, workers=4):
     write_city_lods(output, manifest)
     from traffic import bake as bake_traffic
     bake_traffic(output, manifest)
+    from service_streets import bake as bake_service_streets
+    bake_service_streets(output, manifest, palette)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
