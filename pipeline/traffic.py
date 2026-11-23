@@ -19,6 +19,7 @@ from landmarks.world_surface import Surface
 ROOT = Path(__file__).resolve().parents[1]
 MOTOR = {'trunk', 'primary', 'secondary', 'tertiary', 'residential', 'living_street', 'unclassified', 'service', 'busway'}
 WALK = {'footway', 'pedestrian', 'path'}
+RENDERED_LANE_WAYS = {674460013}  # Longyin Road: OSM has no lane count; GL04 has a painted section.
 
 
 def number(value, fallback):
@@ -65,8 +66,15 @@ def signal_schedule(lanes, nodes):
     return [dict(lanes=sorted(family),green=18,yellow=3) for family in families]
 
 
-def bake(output, manifest):
+def bake(output, manifest, rendered_roads=None):
     left, top, width, depth = manifest['extent']
+    if rendered_roads is None:
+        from features import raw_overture_footprints
+        from scatter import extract_road_network
+        from shapely.geometry import box
+        bounds = box(left, top, left+width, top+depth)
+        rendered_roads = extract_road_network(raw_overture_footprints(bounds))[1]
+    carriageways = {road.way: road for road in rendered_roads if road.way in RENDERED_LANE_WAYS}
     surface = Surface(output, manifest)
     bridge = next((entry for entry in manifest['landmarks'] if entry['id'] == 'jiefang_bridge'), None)
 
@@ -140,6 +148,10 @@ def bake(output, manifest):
         count = max(1, min(12, int(number(tags.get('lanes'), fallback))))
         size = min(4, max(2, number(tags.get('width'), count*(3.7 if bridge_motor else 3))/count))
         paved = sections.get(way['id'], number(tags.get('width'), {'tertiary':10,'residential':6}.get(kind, 3)))
+        section = carriageways.get(way['id'])
+        if single and section and 'lanes' not in tags and not bridge_motor:
+            count, paved = section.lanes, section.width
+            size = paved/count
         if kind == 'residential' and 'lanes' not in tags:
             paved = number(tags.get('width'), 6.5)
         curb = 0

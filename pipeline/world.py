@@ -520,7 +520,7 @@ def build(bbox, output, palette, workers=4):
         manifest['tunnels'] = tunnels
     write_city_lods(output, manifest)
     from traffic import bake as bake_traffic
-    bake_traffic(output, manifest)
+    bake_traffic(output, manifest, roads)
     from service_streets import bake as bake_service_streets
     bake_service_streets(output, manifest, palette)
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
