@@ -25,7 +25,12 @@ main() {
   bash deploy/deploy-hk.sh
   for attempt in {1..12}; do
     live=$(curl -fsS --max-time 20 "https://glol.rcpd.cc/version.json?t=$(date +%s)" | sed -n 's/.*"sha" *: *"\([0-9a-f]*\)".*/\1/p' || true)
-    [[ $live == "$target" ]] && { echo "已上线 ${target:0:7}"; exit 0; }
+    if [[ $live == "$target" ]]; then
+      echo "已上线 ${target:0:7}"
+      # CDNFly 没有刷新/预热 API：上线后用 GET 把大文件拉进 CDN（失败不影响发版）
+      bash scripts/cdn-warm.sh || echo "CDN 预热失败（不影响发版）" >&2
+      exit 0
+    fi
     sleep 10
   done
   echo "部署脚本成功但 /version.json 仍是 ${live:0:7}" >&2
