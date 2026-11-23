@@ -14,6 +14,7 @@ let browser
 try {
   browser=await chromium.launch(browserOptions())
   for(const mode of ['drive','walk']){
+    if(process.argv.length>2 && !process.argv.includes('--'+mode))continue
     const path=legs.slice(1).flatMap((end,i)=>{
       const route=config.corridors.find(c=>c.mode===mode&&c.start===legs[i]&&c.end===end)
       assert(route,'Missing '+mode+' leg to '+end)
@@ -34,7 +35,18 @@ try {
       await page.goto(url+'/?verify&mode=walk&flow=0')
       await page.waitForFunction(()=>window.viewer?.walk?.active && window.viewer.walk.parked('car').length>0,null,{timeout:90000})
       const start=mode==='drive'?[car[0],car[2]]:path[0]
-      assert(await page.evaluate(([x,z])=>window.viewer.walkTo(x,z,0,'airport-route'),start))
+      const readyBy=Date.now()+60000
+      while(Date.now()<readyBy){
+        const placed=await page.evaluate(async ([x,z])=>{
+          const v=window.viewer
+          if(v.walk.spawns.at(-1)?.reason==='airport-route')return true
+          await v.walkTo(x,z,0,'airport-route')
+          return v.walk.spawns.at(-1)?.reason==='airport-route'
+        },start)
+        if(placed)break
+        await page.waitForTimeout(100)
+      }
+      assert.equal(await page.evaluate(()=>window.viewer.walk.spawns.at(-1)?.reason),'airport-route')
       if(mode==='drive'){
         await page.waitForFunction(()=>document.querySelector('.vehicle-action')?.textContent==='开车')
         await page.keyboard.press('f')
@@ -51,16 +63,22 @@ try {
         await window.viewer.freeze()
         try {
           for(const [index,[east,south]] of path.entries()){
+            const before=path[index-1],after=path[index+1]
+            const turn=before && after && Math.abs(Math.atan2(
+              (east-before[0])*(after[1]-south)-(south-before[1])*(after[0]-east),
+              (east-before[0])*(after[0]-east)+(south-before[1])*(after[1]-south)))>.48
             let best=Infinity,stalled=0
             for(let tick=0;;tick++){
               const pos=walk.position,dx=east-pos.x,dz=south-pos.z,gap=Math.hypot(dx,dz)
-              if(gap<(mode==='drive'?5:2))break
+              if(gap<(mode==='drive'&&!turn?4:2))break
               if(gap<best-.5){best=gap;stalled=0}
               if(++stalled>900)throw Error(mode+' stalled at waypoint '+index+' from '+pos.toArray()+' obstacle '+walk.obstacle)
               if(mode==='walk')walk.drive(dx/gap,dz/gap,true)
               else{
                 const angle=Math.atan2(-dx,-dz)-walk.heading,err=Math.atan2(Math.sin(angle),Math.cos(angle))
-                key('KeyA',err>.035);key('KeyD',err<-.035);key('KeyW',Math.abs(walk.speed)<(Math.abs(err)>.35?2.8:8))
+                const speed=Math.abs(walk.speed)
+                const limit=Math.abs(err)>.3?2.5:turn?Math.min(8,2.5+Math.max(0,gap-5)*.18):8
+                key('KeyA',err>.035);key('KeyD',err<-.035);key('KeyW',speed<limit);key('KeyS',speed>limit+1 && walk.speed>0)
               }
               stream.tick(pos);stream.updateLandmarks?.(pos)
               walk.tick(1/30)

@@ -59,3 +59,9 @@ def level_pavement(pavement, terrain, original, left, top):
     if rr.size:
         target=int(np.median(original[rows[rr],cols[cc]]))
         terrain[rows[rr],cols[cc]]=original[rows[rr],cols[cc]]=target
+
+
+def clear_pavement_trees(records, origin, pavement):
+    rows = np.frombuffer(records, dtype='<u2').reshape(-1,6)
+    keep = ~intersects_xy(pavement,origin[0]+rows[:,0]/100,origin[1]+rows[:,1]/100)
+    return bytearray(rows[keep].tobytes())

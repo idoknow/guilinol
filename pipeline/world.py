@@ -1,4 +1,4 @@
-from airport import airfield, level_pavement
+from airport import airfield, clear_pavement_trees, level_pavement
 from play_region import PlayRegion, restore_protected_tiles
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
@@ -474,6 +474,8 @@ def build(bbox, output, palette, workers=4):
                         st_data[slot]=rows[origin]
                 collision = json.dumps([rings, st_data, thin, asphalt], separators=(',', ':')).encode()
                 tbuf = trees[origin]
+                if tbuf and pavement is not None and pavement.intersects(tile):
+                    tbuf = clear_pavement_trees(tbuf,origin,pavement)
                 if tbuf and fubo is not None and tile.intersects(fubo.park):
                     tbuf = fubo.walkway_trees(tbuf,origin)
                 if tbuf:
