@@ -46,6 +46,18 @@ export function hits(code: string, action: Action): boolean {
   return binding(action).includes(code)
 }
 
+/** 这些键被别的固定功能占着（地图、景册、拍照、视距、骑行档位/灯/转向等），不让绑，免得一键两用。 */
+const RESERVED: Record<string, string> = {
+  Escape: '关闭', Tab: '街头 HUD', KeyM: '地图', KeyJ: '景册', KeyP: '拍照', KeyV: '飞行/步行', KeyC: '视距', KeyO: '骑行',
+  KeyE: '加档', KeyQ: '减档', KeyG: '改装', KeyK: '脚撑', KeyL: '车灯', KeyZ: '左转灯', KeyB: '双闪', KeyU: '定速',
+  Digit0: '骑行', Digit1: '骑行', Digit2: '骑行', Digit3: '骑行', Digit4: '骑行',
+}
+
+/** 这个键被固定功能占用时返回该功能名，可以绑就返回 undefined。 */
+export function reservedFor(code: string): string | undefined {
+  return RESERVED[code]
+}
+
 /** 改键；把同一物理键从别的动作上摘下来，避免一键两用。 */
 export function setBinding(action: Action, code: string) {
   const defaults = BY_ID.get(action)!.codes
@@ -80,5 +92,5 @@ export function keyLabel(code: string): string {
 }
 
 export function bindingLabel(action: Action): string {
-  return binding(action).map(keyLabel).join(' / ')
+  return [...new Set(binding(action).map(keyLabel))].join(' / ')
 }

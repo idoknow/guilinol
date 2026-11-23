@@ -166,3 +166,23 @@
     padding: 8px 10px;
   }
 }
+
+.set-warn {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(169, 80, 60, .16);
+  color: #e3a08f;
+  font-size: 12px;
+}
+
+.set-warn[hidden] {
+  display: none;
+}
+
+/* 纯触屏设备没有键盘，键位这一块不出现 */
+@media (hover: none) and (pointer: coarse) {
+  .set-block--keys {
+    display: none;
+  }
+}

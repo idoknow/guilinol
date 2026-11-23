@@ -15,6 +15,7 @@ import {createPhysics} from './physics'
 import {resolveContact} from '../traffic/contact'
 import {createCameraRig} from './camera'
 import {isFirstPerson} from './view-mode'
+import {hits} from '../input/keymap'
 import {look} from '../look/config'
 import {env} from '../look/time'
 import {createDriverPose} from './car'
@@ -956,7 +957,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }
     if(!active||!crashSession||event.repeat)return
     if(isGlobalHotkeyBlocked(event.target))return
-    if(event.code==='Space'||event.code==='KeyW'||event.code==='KeyA'||event.code==='KeyS'||event.code==='KeyD')crashRecoverQueued=true
+    if((['jump','forward','back','left','right'] as const).some(action=>hits(event.code,action)))crashRecoverQueued=true
   })
   let prevTwoWheelSpeed=0
   let bicyclePedalPhase=0, bicycleFootWeight=1
@@ -1025,6 +1026,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     prevAudioPark=false;prevAudioGear=2;prevAudioLight='off';prevAudioBlink=false;prevAudioHorn=false
   }
   const footMetrics={soleOffset:avatarRig.soleOffset,footProbes:avatarRig.footProbes}
+  let firstPersonHidden=false
   scene.add(figure);figure.visible=false;figure.scale.setScalar(1)
   const soleOffset=footMetrics.soleOffset, footTmp=new THREE.Vector3()
   const lmFloorCache=new WeakMap<THREE.Group,{grid:Map<string,number[]>;large:number[]}>()
@@ -1264,7 +1266,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(needed.some(tile=>!stream.loaded.has(tile))||supports.some(entry=>!stream.landmarks.has(entry)))return false
     if(active)leave()
     sim.sync(x,z);if(!place(x,z,reason,override)){window.dispatchEvent(new CustomEvent('walk:spawn-failed',{detail:{x,z,reason:'no-walkable-support'}}));return false}
-    active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true
+    active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;firstPersonHidden=false
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true);return true
   }
@@ -1691,7 +1693,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     // IDOK-178: 第一人称只在落地步行时生效，骑车/开车/坐船一律回到第三人称，免得镜头钻进车壳。
     const firstPerson=isFirstPerson()&&!rides?.bike&&!rides?.car&&!rides?.boat
     rig.update(camera,figure.position,yaw+shakeYaw,pitch+shakePitch,arm+ridePose.cameraArm(!!rides?.bike,dt,snap)+driverPose.cameraArm(!!rides?.car,dt,snap)+(rides?.car?carSpeedArm:0),dt,snap,!!rides?.car,firstPerson)
-    if(!rides?.bike&&!rides?.car&&!rides?.boat)figure.visible=active&&!firstPerson
+    // 只在切换的那一下动 figure.visible，不每帧覆盖拍照模式「隐藏人物」、商店展台等别处的设定。
+    if(firstPerson!==firstPersonHidden){firstPersonHidden=firstPerson;figure.visible=active&&!firstPerson}
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
   function boatClearance(){

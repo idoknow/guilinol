@@ -100,7 +100,7 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   .ride-lean-bar{width:24px;height:6px}
   .ride-gear-btn{padding:2px 4px;font-size:10px}
   .ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise{padding:2px 4px;font-size:10px}
-  output{top:auto;bottom:calc(344px + env(safe-area-inset-bottom));left:calc(12px + env(safe-area-inset-left));max-width:calc(100vw - 24px);box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  output{top:auto;bottom:calc(344px + env(safe-area-inset-bottom));left:calc(12px + env(safe-area-inset-left));max-width:calc(100vw - 136px - env(safe-area-inset-left) - env(safe-area-inset-right));box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
 @media (pointer:coarse) and (max-height:500px){
   .vehicle-action{bottom:calc(82px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);max-width:calc(100vw - 480px - env(safe-area-inset-left) - env(safe-area-inset-right));padding:5px 13px;font-size:12.5px}

@@ -12,6 +12,7 @@
  *   6 (Foot·Water)    : on foot near free boat dock or tour pier -> board boat
  */
 
+import {hits} from '../input/keymap'
 import {isGlobalHotkeyBlocked} from './input-guard'
 
 export type InteractionActionKind =
@@ -269,7 +270,7 @@ export function createInteractArbiter(callbacks: InteractArbiterCallbacks): Inte
   }
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.code !== 'KeyF' || event.repeat) return
+    if (!hits(event.code, 'interact') || event.repeat) return
     if (isGlobalHotkeyBlocked(event.target)) return
     const decision = trigger()
     if (decision.action !== 'none') {
