@@ -27,8 +27,11 @@ main() {
     live=$(curl -fsS --max-time 20 "https://glol.rcpd.cc/version.json?t=$(date +%s)" | sed -n 's/.*"sha" *: *"\([0-9a-f]*\)".*/\1/p' || true)
     if [[ $live == "$target" ]]; then
       echo "已上线 ${target:0:7}"
-      # CDNFly 没有刷新/预热 API：上线后用 GET 把大文件拉进 CDN（失败不影响发版）。
-      # 2026-11-23 起暂停：CDNFly 节点出现 456（CC/自动封禁），DNS 已回滚到 CF。恢复后在 service 里设 CDN_WARM=1 再启用。
+      # 新版本上线后刷新 CDN 整站缓存（Actions 里用 secrets.CDNFLY_TOKEN 调 /v1/jobs clean_dir；失败不影响发版）
+      gh workflow run cdn-purge.yml -R idoknow/guilinol --ref main -f mode=dir \
+        || echo "触发 CDN 刷新失败（不影响发版）" >&2
+      # 预热（可选）：上线后用 GET 把大文件拉进 CDN（失败不影响发版）。
+      # 默认关闭（CDNFly 有 CC 自动封禁，60 秒 20 次封 600 秒）；需要时在 service 里设 CDN_WARM=1。
       if [[ ${CDN_WARM:-0} == 1 ]]; then
         bash scripts/cdn-warm.sh || echo "CDN 预热失败（不影响发版）" >&2
       fi
