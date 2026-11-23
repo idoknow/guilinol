@@ -37,7 +37,7 @@ html,body{overflow:hidden}body{margin:0;background:var(--ui-ink-900)}canvas{disp
 .sky-ui.folded .sky-fold::before{transform:translate(-1px,0) rotate(-45deg)}
 .sky-ui.folded{gap:0;padding:4px 4px 4px 12px}
 .sky-ui.folded .sky-group,.sky-ui.folded .sky-flow{display:none}
-.sky-ui.folded .sky-time{min-width:0}
+.sky-ui.folded .sky-time{min-width:0;margin-right:6px}
 
 /* 底部提示、气泡、署名 */
 output,footer,.hint{position:fixed;left:10px;background:var(--ui-glass);color:var(--ui-paper);font:11px/1.4 var(--ui-serif);padding:3px 10px;border-radius:var(--ui-r-pill);pointer-events:none;backdrop-filter:blur(4px)}
