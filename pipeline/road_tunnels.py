@@ -45,3 +45,38 @@ def bake(bounds, fields, left, top, grid):
                 stations=[[float(distance),round(float(profile(distance,length)),5)] for distance in stations],
                 fill=dict(maxMeters=float(lift.max())/10,gridVertices=int(np.count_nonzero(lift)),
                           maxOffset=float(np.abs(offset[lift>0]).max()),stationRange=[float(station[lift>0].min()),float(station[lift>0].max())]))]
+
+
+def corridor_underpasses(bounds, height):
+    """Two straight OSM layer -1 underpasses on the approved T2 driving route."""
+    from shapely.geometry import LineString
+
+    widths = {690911289: 4.5, 1494511149: 4.0}
+    result = []
+    for way in load_osm():
+        if way['type']!='way' or way['id'] not in widths:
+            continue
+        points = [ll2xz(pt['lat'],pt['lon']) for pt in way['geometry']]
+        if not bounds.covers(LineString(points)):
+            continue
+        if len(points)!=2 or way.get('tags',{}).get('tunnel')!='yes':
+            raise ValueError(f"Recheck airport corridor underpass {way['id']}")
+        start,end = np.asarray(points)
+        length = float(np.linalg.norm(end-start))
+        approach = length*.35
+        direction = (end-start)/length
+        lateral = np.array([-direction[1],direction[0]])
+        first,last = height(*start),height(*end)
+        stations = []
+        for at in sorted({0.,length,approach,length-approach,*np.arange(4.,length,4.)}):
+            fraction = at/length
+            # Estimated invert. Meet the surveyed approach ground at each end.
+            point = start+(end-start)*fraction
+            grade = first+(last-first)*fraction
+            ground = min(height(*(point+d*lateral)) for d in (-widths[way['id']],0,widths[way['id']]))
+            cut = min(1.,at/approach,(length-at)/approach)
+            stations.append([float(at),round(float(grade+cut*(min(ground,grade)-grade-5.3)),4)])
+        result.append(dict(way=way['id'],profile_source='estimated',length=length,
+                           portals=[[start[0],first,start[1]],[end[0],last,end[1]]],
+                           halfWidth=widths[way['id']],clearance=4.5,approach=approach,stations=stations))
+    return result

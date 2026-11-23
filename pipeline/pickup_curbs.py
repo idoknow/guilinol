@@ -27,7 +27,7 @@ def open_jiefang_westbound_lane(output, chunks, vehicles):
     districts = json.loads((Path(__file__).resolve().parents[1]/'web/src/game/car-free-polygons.json').read_bytes())
     entrance = next(z['rings'] for z in districts if z['osm']=='way/221821082')
     pedestrian = Polygon(entrance[0], entrance[1:])
-    lane = LineString(points(way)).buffer(6).intersection(pedestrian.buffer(100)).difference(pedestrian)
+    lane = LineString(points(way)).buffer(6).difference(pedestrian)
     carriageway = []
     for tile in chunks:
         x,z = tile['x'],tile['z']

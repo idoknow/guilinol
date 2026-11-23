@@ -293,6 +293,9 @@ def build(bbox, output, palette, workers=4):
     tunnels = bake_tunnels(bounds,(original,terrain),left,top,GRID)
     level_pavement(pavement,terrain,original,left,top)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
+    if play_region:
+        from road_tunnels import corridor_underpasses
+        tunnels.extend(corridor_underpasses(bounds,ground_mesh_at))
     finalize_bridges(ground_mesh_at)
 
     sw_query_tree = STRtree(list(polygons(sidewalk_mask))) if not sidewalk_mask.is_empty else None
