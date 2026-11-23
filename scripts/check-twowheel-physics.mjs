@@ -369,6 +369,36 @@ try {
   check('ebike cruise wall collision (D2 ~25 km/h) triggers impact crash', cruiseHitRes.blocked && eb.crashState.reason === 'impact', `speed=${(cruiseWallSpd * 3.6).toFixed(1)} km/h, reason=${eb.crashState.reason}`)
   checkV2('ebike moderate urban wall collision (~15 km/h) triggers impact crash', modCrashed, `modSpeed=${(modWallSpd * 3.6).toFixed(1)} km/h, crashed=${modCrashed}`)
 
+  // 3b. Collision-kind obstacles (trees/rails/solids) at mid/high speed >= 35 km/h trigger impact crash even across substeps; slow nudges stop safely
+  eb.mount(0, 0, 'bike', {vehicleType: 'normal', autoCrash: true, drainEnabled: false, parkStart: false})
+  ensureDrivable(eb)
+  eb.setGear(3)
+  for (let i = 0; i < 40; i++) eb.steer(1, 0, 0.05, true)
+  const treeSpd = eb.speed
+  const treeHitRes = eb.resolveMove({
+    pos: {x: 0, y: 150, z: 0},
+    next: {x: 0, z: -0.22},
+    move: {x: 0, z: -0.22}, // > 0.35 * speed * step (substep hit on tree/rail)
+    heading: 0,
+    speed: eb.speed,
+    step: 1 / 60,
+    pavement: () => true,
+    insideHouse: () => false,
+    blockedAt: () => false,
+    collisionBlocked: true,
+    collisionKind: () => 'collision',
+    stopBike: () => eb.stop(),
+    dampBike: s => eb.dampSpeed(s),
+    capOffRoad: (s, l) => eb.capSpeed(s, l),
+  })
+  check('ebike >=35 km/h substep collision (tree/rail) triggers impact crash', treeHitRes.blocked && treeHitRes.reason === 'collision' && eb.crashState.reason === 'impact', `speed=${(treeSpd * 3.6).toFixed(1)} km/h, reason=${eb.crashState.reason}`)
+
+  eb.mount(0, 0, 'bike', {vehicleType: 'normal', autoCrash: true, drainEnabled: false, parkStart: false})
+  ensureDrivable(eb)
+  const slowNoCrash = eb.tryImpactCrash(8 / 3.6)
+  const fastSolidCrash = eb.tryImpactCrash(36 / 3.6)
+  check('tryImpactCrash ignores slow 8 km/h nudge and triggers impact at 36 km/h solid collision', !slowNoCrash && fastSolidCrash && eb.crashPhase === 'sliding' && eb.crashState.reason === 'impact', `slow=${slowNoCrash}, fast=${fastSolidCrash}, phase=${eb.crashPhase}`)
+
   // 4. Rider-First Recovery State Machine (crash -> sliding -> downed -> rider_rising -> bike_down -> pickup)
   ped.mount(0, 0, 'bicycle', {autoCrash: true})
   ensureDrivable(ped)

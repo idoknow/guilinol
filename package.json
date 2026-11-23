@@ -35,6 +35,7 @@
     "verify:walk:quick": "node scripts/walk-quick.mjs",
     "verify:walk:full": "node scripts/walk.mjs",
     "verify:ride": "node scripts/ride.mjs && node scripts/verify-zone-impact.mjs bike bicycle",
+    "verify:ride:stunt": "node scripts/ride-stunt.mjs",
     "verify:car": "node scripts/car.mjs",
     "verify:drive": "node scripts/drive.mjs && npm run verify:car && node scripts/verify-zone-impact.mjs car",
     "verify:traffic": "node --experimental-strip-types scripts/verify-traffic-recovery.mjs && node --experimental-strip-types scripts/verify-traffic.mjs && node --experimental-strip-types scripts/verify-traffic-popin.mjs && node scripts/traffic-street.mjs",

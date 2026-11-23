@@ -7,6 +7,12 @@ export type EbikeCrashPhase = 'none' | 'crashed' | 'recovering'
 export type EbikeCrashReason = '' | 'impact' | 'lowside' | 'loopout'
 export type EbikeVehicleType = EbikeVehicleKind
 
+const isVerifySilent = () =>
+  typeof location !== 'undefined' && (() => {
+    const p = new URLSearchParams(location.search)
+    return p.has('verify') && p.get('stunt') !== '1'
+  })()
+
 export interface EbikeVehicleProfile {
   type: EbikeVehicleType
   label: string
@@ -72,6 +78,7 @@ export interface ExternalEbikeTelemetry {
   criticalBattery?: boolean
   batteryDepleted?: boolean
   wheelie?: number
+  longPitch?: number
   lean?: number
   leanLimit?: number
   leanRateDegPerSec?: number
@@ -129,6 +136,7 @@ export interface EbikeTelemetrySnapshot {
   crashRisk?: number
   wheelieTip?: number
   wheelie: number
+  longPitch?: number
   steerInput: number
   tucking: boolean
   braking: boolean
@@ -281,16 +289,18 @@ export function createEbikeFxController() {
     const sideX = Math.cos(heading) * side, sideZ = -Math.sin(heading) * side
     riderEjectX = -sideX * .55
     riderEjectZ = -sideZ * .55
-    window.dispatchEvent(new CustomEvent('walk:toast', {
-      detail: {
-        text: reason === 'lowside'
-          ? '压弯过低打滑摔车！按空格或方向键人先爬起，再去扶车'
-          : reason === 'loopout'
-            ? '翘头翻车！按空格或方向键人先爬起，再去扶车'
-            : '猛烈撞击倒车！按空格或方向键人先爬起，再去扶车',
-        ms: 2600,
-      },
-    }))
+    if (!isVerifySilent()) {
+      window.dispatchEvent(new CustomEvent('walk:toast', {
+        detail: {
+          text: reason === 'lowside'
+            ? '压弯过低打滑摔车！按空格或方向键人先爬起，再去扶车'
+            : reason === 'loopout'
+              ? '翘头翻车！按空格或方向键人先爬起，再去扶车'
+              : '猛烈撞击倒车！按空格或方向键人先爬起，再去扶车',
+          ms: 2600,
+        },
+      }))
+    }
   }
 
   function startRecover() {
@@ -363,7 +373,9 @@ export function createEbikeFxController() {
     if (external?.battery === undefined) {
       if (battery <= 20 && !lowBatteryWarned) {
         lowBatteryWarned = true
-        window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: '电量低于 20%，请注意及时减挡省电', ms: 2400}}))
+        if (!isVerifySilent()) {
+          window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: '电量低于 20%，请注意及时减挡省电', ms: 2400}}))
+        }
       } else if (battery > 24) {
         lowBatteryWarned = false
       }
@@ -465,6 +477,7 @@ export function createEbikeFxController() {
     const parkLocked = external?.parkLocked ?? false
     const headlight = external?.headlight ?? 'off'
     const brakingNow = external?.braking ?? base.braking
+    const finalLongPitch = external?.longPitch ?? (crashPhase !== 'none' || parkLocked || finalWheelie > .12 ? 0 : T.MathUtils.clamp(longAccel * .0052, -.065, .035))
 
     return {
       vehicleType,
@@ -490,6 +503,7 @@ export function createEbikeFxController() {
       crashRisk: external?.crashRisk,
       wheelieTip: external?.wheelieTip,
       wheelie: finalWheelie,
+      longPitch: finalLongPitch,
       steerInput: base.steerInput,
       tucking: external?.tucking ?? (input.tuck && Math.abs(finalLean) > .08),
       braking: brakingNow,
@@ -624,6 +638,7 @@ export function applyEbikeVisualAndRider(params: {
     pos: _gripL.set(bikeX, bikeY, bikeZ),
     heading,
     groundPitch,
+    longPitch: state.crashPhase === 'none' ? (state.longPitch ?? 0) : 0,
     lean: state.crashPhase === 'none' ? state.lean : 0,
     wheelie: state.crashPhase === 'none' ? state.wheelie : 0,
     steerInput: state.steerInput,
