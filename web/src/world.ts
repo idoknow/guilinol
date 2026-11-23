@@ -233,13 +233,12 @@ export function startOverview(manifest:Manifest) {
     for(const dm of samples){low=Math.min(low,dm/10);highY=Math.max(highY,dm/10)}
     const floor=2*low-highY,ceiling=2*highY-low
     // The overview covers the whole sampled terrain, including cells outside the play boundary.
-    const tilesByOrigin=new Map(manifest.chunks.map(tile=>[tile.x+','+tile.z,tile]))
-    const sections:{x:number;z:number;tile:Tile|undefined;box:THREE.Box3}[]=[]
-    for(let z=top;z<top+depth;z+=size)for(let x=left;x<left+width;x+=size){
-      const tile=tilesByOrigin.get(x+','+z)
-      sections.push({x,z,tile,box:new THREE.Box3(
-        new THREE.Vector3(x,floor,z),new THREE.Vector3(x+size,ceiling,z+size))})
+    const tileCols = width/size, tileRows = depth/size
+    const tiles = new Array<Tile | undefined>(tileCols*tileRows)
+    for (const tile of manifest.chunks) {
+      tiles[(tile.z-top)/size*tileCols+(tile.x-left)/size] = tile
     }
+    const box = new THREE.Box3()
     const frustum=new THREE.Frustum(), projection=new THREE.Matrix4(), lastView=new THREE.Matrix4()
     let dirty=true
     function update(camera:THREE.PerspectiveCamera){
@@ -254,10 +253,18 @@ export function startOverview(manifest:Manifest) {
       const fineRadius=7
       const high=(x:number,z:number)=>Math.max(Math.abs(x-ax),Math.abs(z-az))<=fineRadius
       let cursor=0
-      for(const {tile,box,x:west,z:north} of sections){
-        if((tile && covered.has(tile)) || !frustum.intersectsBox(box))continue
+      const radius = Math.ceil(far/size)+2
+      const col0 = Math.max(0, Math.ceil(ax-left/size-radius)), col1 = Math.min(tileCols-1, Math.floor(ax-left/size+radius))
+      const row0 = Math.max(0, Math.ceil(az-top/size-radius)), row1 = Math.min(tileRows-1, Math.floor(az-top/size+radius))
+      for(let row=row0;row<=row1;row++)for(let col=col0;col<=col1;col++){
+        const tile=tiles[row*tileCols+col]
+        if(tile && covered.has(tile))continue
+        const west=left+col*size,north=top+row*size
         const x=west/size,z=north/size
         if(Math.hypot(x-ax,z-az)*size>far+2*size)continue
+        box.min.set(west,floor,north)
+        box.max.set(west+size,ceiling,north+size)
+        if(!frustum.intersectsBox(box))continue
         const mask=Number(high(x-1,z))+2*Number(high(x,z+1))+4*Number(high(x+1,z))+8*Number(high(x,z-1))
         const pattern=tile && high(x,z)?fine:coarse[mask]
         const offset=(north-top)/step*stride+(west-left)/step
