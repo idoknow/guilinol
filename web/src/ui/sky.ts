@@ -34,10 +34,12 @@ export function skyClock(params:URLSearchParams) {
   // IDOK-158: on a phone the panel eats a third of the top edge, which matters most in landscape
   // where the view is the point. Fold it down to just the clock; remember the choice so rotating
   // back and forth doesn't undo it (stored per device, ignored when storage is blocked).
+  // The chevron is drawn in CSS (hud.css .sky-fold::before) rather than set as a ‹/› glyph: at 20px and
+  // 55% opacity that glyph read as decoration and people never found the control.
   const FOLD_KEY = 'glol.skyFolded'
   let folded = false
   function setFolded(on:boolean) {
-    folded = on; panel.classList.toggle('folded', on); fold.textContent = on?'›':'‹'
+    folded = on; panel.classList.toggle('folded', on)
     fold.setAttribute('aria-expanded', String(!on))
     fold.setAttribute('aria-label', on?'展开时辰天气':'收起时辰天气'); fold.title = on?'展开时辰天气':'收起时辰天气'
     try { localStorage.setItem(FOLD_KEY, on?'1':'0') } catch {}

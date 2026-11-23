@@ -27,10 +27,15 @@ html,body{overflow:hidden}body{margin:0;background:var(--ui-ink-900)}canvas{disp
 .sky-time{min-width:7.6em;opacity:.92}.sky-group{display:flex;gap:2px;padding-left:6px;border-left:1px solid var(--ui-glass-line-soft)}
 .sky-ui button{font-family:inherit;font-size:13px;color:var(--ui-paper);background:none;border:0;border-radius:var(--ui-r-pill);width:26px;height:24px;padding:0;cursor:pointer;opacity:.72;transition:background var(--ui-fast),opacity var(--ui-fast);-webkit-tap-highlight-color:transparent}
 .sky-ui button:hover{opacity:1}.sky-ui button.on{background:rgba(169,80,60,.75);opacity:1}.sky-ui .sky-flow{font-size:10px;width:24px;border-left:1px solid var(--ui-glass-line-soft);border-radius:0 11px 11px 0}
-/* IDOK-158: fold the panel down to the clock, so a phone in landscape keeps the top edge clear. */
-.sky-ui .sky-fold{width:20px;margin-left:-2px;font-size:14px;line-height:1;opacity:.55;display:grid;place-items:center}
-.sky-ui .sky-fold:hover{opacity:1}
-.sky-ui.folded{gap:0;padding:4px 0 4px 12px}
+/* IDOK-158: fold the panel down to the clock, so a phone in landscape keeps the top edge clear.
+   The control has to read as a control: a bare ‹ at 55% opacity looked like decoration and was
+   missed, so it carries its own glass chip and a drawn chevron instead of a text glyph. */
+.sky-ui .sky-fold{width:26px;margin-left:-2px;opacity:1;display:grid;place-items:center;background:rgba(244,239,226,.14);box-shadow:inset 0 0 0 1px rgba(244,239,226,.2)}
+.sky-ui .sky-fold::before{content:"";width:6px;height:6px;border-right:1.8px solid currentColor;border-bottom:1.8px solid currentColor;transform:translate(-1px,0) rotate(135deg)}
+.sky-ui .sky-fold:hover{opacity:1;background:rgba(244,239,226,.26)}
+.sky-ui .sky-fold:active{background:rgba(244,239,226,.34)}
+.sky-ui.folded .sky-fold::before{transform:translate(-1px,0) rotate(-45deg)}
+.sky-ui.folded{gap:0;padding:4px 4px 4px 12px}
 .sky-ui.folded .sky-group,.sky-ui.folded .sky-flow{display:none}
 .sky-ui.folded .sky-time{min-width:0}
 
@@ -83,7 +88,7 @@ body[data-aboard] .btn-jump{display:none}
 @media (pointer:coarse){
   output{left:calc(12px + env(safe-area-inset-left));top:calc(123px + env(safe-area-inset-top));bottom:auto;max-width:244px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .sky-ui{top:calc(58px + env(safe-area-inset-top));font-size:12px}.sky-ui button{width:30px;height:28px}
-  .sky-ui .sky-fold{width:24px}
+  .sky-ui .sky-fold{width:30px}.sky-ui .sky-fold::before{width:7px;height:7px;border-width:2px}
   .hint{display:none}
   footer{left:50%;right:auto;transform:translateX(-50%);bottom:calc(6px + env(safe-area-inset-bottom));font-size:9px;opacity:.6;white-space:nowrap}
   .btn-menu{padding:0 12px}.btn-menu span{display:none}
@@ -92,8 +97,8 @@ body[data-aboard] .btn-jump{display:none}
   output{top:calc(140px + env(safe-area-inset-top));max-width:126px;box-sizing:border-box}
   /* Landscape phones: the top band also holds the dock on the right (~423px in), so keep the sky panel
      clear of it even when it is unfolded (IDOK-158). */
-  .sky-ui{gap:4px;padding:3px 4px 3px 10px}.sky-ui button{width:26px;height:26px}.sky-ui .sky-fold{width:22px}
-  .sky-ui .sky-time{min-width:6.4em}.sky-ui.folded{padding:3px 2px 3px 10px}
+  .sky-ui{gap:4px;padding:3px 4px 3px 10px}.sky-ui button{width:26px;height:26px}.sky-ui .sky-fold{width:26px}
+  .sky-ui .sky-time{min-width:6.4em}.sky-ui.folded{padding:3px 3px 3px 10px}
 }
 @media (max-width:520px){.about-cols{grid-template-columns:1fr}.account-entry{max-width:7.5em}}
 /* Keyboard hint is meaningless on narrow screens and its nowrap line widened the mobile layout viewport (IDOK-109). */
