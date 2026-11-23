@@ -23,12 +23,16 @@ try {
     const car=vehicles.cars.find(([x,,z])=>Math.hypot(x+572,z+92)<5)
     if(mode==='drive'){
       assert(car,'Missing Jiefang East Road pickup')
+      // Follow the north lane past the pedestrian entrance at Zhengyang Street.
+      const gate=path.findIndex(([x,z])=>Math.hypot(x+608.6,z+104.9)<1)
+      assert(gate>=0,'Missing Zhengyang junction on the westbound route')
+      path.splice(gate,1,[-582,-101],[-609,-108],[-637,-115])
       path.unshift([-511,-70],[-378,-25])
     }
     const page=await browser.newPage()
     try {
       await page.goto(url+'/?verify&mode=walk&flow=0')
-      await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
+      await page.waitForFunction(()=>window.viewer?.walk?.active && window.viewer.walk.parked('car').length>0,null,{timeout:90000})
       const start=mode==='drive'?[car[0],car[2]]:path[0]
       assert(await page.evaluate(([x,z])=>window.viewer.walkTo(x,z,0,'airport-route'),start))
       if(mode==='drive'){
