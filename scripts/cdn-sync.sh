@@ -15,6 +15,7 @@ HOST="${HOST:-https://glol.rcpd.cc}"
 STATE="${STATE:-.cdn-hashes.json}"
 DIRS="${DIRS:-assets landmarks world textures avatar brand icons contributors home basis}"
 DRY_RUN="${DRY_RUN:-0}"
+PREHEAT_ONLY="${PREHEAT_ONLY:-0}"   # 1 = 只预热，不 clean（首次建基线时用，避免把线上缓存全清）
 BATCH="${BATCH:-300}"
 MAX_TIME="${MAX_TIME:-60}"
 
@@ -39,7 +40,7 @@ if u.scheme == 'http' and host not in ('127.0.0.1', '::1', 'localhost'):
     sys.exit(1)
 PY
 
-export API HOST DIST STATE DIRS DRY_RUN BATCH MAX_TIME
+export API HOST DIST STATE DIRS DRY_RUN PREHEAT_ONLY BATCH MAX_TIME
 
 exec python3 - <<'PY'
 import hashlib, json, os, sys, time, urllib.request, urllib.error
@@ -51,6 +52,7 @@ STATE = os.environ['STATE']
 DIRS  = os.environ['DIRS'].split()
 DRY   = os.environ['DRY_RUN'] == '1'
 STATE_ONLY = os.environ.get('STATE_ONLY') == '1'
+PREHEAT_ONLY = os.environ.get('PREHEAT_ONLY') == '1'
 BATCH = int(os.environ['BATCH'])
 MAX_T = int(os.environ['MAX_TIME'])
 TOKEN = os.environ.get('CDNFLY_TOKEN', '')
@@ -162,13 +164,14 @@ def submit(kind, paths):
     body = [{'type': kind, 'data': {'url': HOST + p}} for p in paths]
     return api('/v1/jobs', body)
 
-for i in range(0, len(changed), BATCH):
-    chunk = changed[i:i + BATCH]
-    res = submit('clean_url', chunk)
-    print(f'clean_url 第 {i // BATCH + 1} 批：{res.get("msg")}，{len(res.get("data") or [])} 个任务')
-    for p in chunk:
-        state[p] = now[p]
-    save_state(state)      # 每批成功就落盘，中途失败重跑不会重复提交
+if not PREHEAT_ONLY:
+    for i in range(0, len(changed), BATCH):
+        chunk = changed[i:i + BATCH]
+        res = submit('clean_url', chunk)
+        print(f'clean_url 第 {i // BATCH + 1} 批：{res.get("msg")}，{len(res.get("data") or [])} 个任务')
+        for p in chunk:
+            state[p] = now[p]
+        save_state(state)      # 每批成功就落盘，中途失败重跑不会重复提交
 
 for i in range(0, len(removed), BATCH):
     chunk = removed[i:i + BATCH]
