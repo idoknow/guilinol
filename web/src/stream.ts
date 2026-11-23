@@ -16,6 +16,7 @@ import {
 } from './render-range'
 import {detail, type Manifest, type Tile} from './world'
 import {registerTunnels} from './tunnels'
+import {freezeStatic} from './static-freeze'
 
 import {TileGrid, streamBudget, frameSlots, tileEdgeDistance} from './tile-grid'
 export function tileCenterDistance(tile:Tile, position:THREE.Vector3){
@@ -180,7 +181,7 @@ export class Stream {
     return detail(tile,controller.signal,parseSlot,this.manifest.tunnels).then(async item=>{
       if(!urgent())await this.attachSlot()
       if(controller.signal.aborted){item.dispose();return}
-      this.scene.add(item.group);this.batches.add(item.batch);this.base.toggle(tile,false)
+      this.scene.add(freezeStatic(item.group));this.batches.add(item.batch);this.base.toggle(tile,false)
       this.revision++;this.loaded.set(tile,item);this.visited.add(tile);this.failures.delete(tile)
       record('chunk',{ms:performance.now()-start,grid:Math.floor(tile.x/250)+','+Math.floor(tile.z/250)})
     }).catch(error=>{

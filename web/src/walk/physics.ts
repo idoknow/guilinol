@@ -214,7 +214,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const landmarks=new Map<THREE.Group,R.Collider[]>()
   function sync(east:number,south:number){
     let changed=false
-    const collisionRadius=Math.min(cfg.collisionRadius,Math.max(192,stream.radius))
+    const collisionRadius=Math.min(cfg.collisionRadius,Math.max(256,stream.radius))
     const nearLandmarks=new Set<THREE.Group>()
     for(const [entry,root] of stream.landmarks){
       if(entry.collision==='none'||Math.hypot(east-root.position.x,south-root.position.z)>collisionRadius+entry.sphere[3])continue

@@ -8,8 +8,10 @@ import {bindStreetSurface,streetSurfaceMat} from './streets'
 import seamConfig from '../../pipeline/seam-surfaces.json'
 import {atlasTriangles} from '../../lib/atlas-ground.mjs'
 import {deriveRangeMetrics, RENDER_RADIUS_DEFAULT, type RenderRangeMetrics} from './render-range'
+import {getLodNodes, landmarkCulling} from './landmark-culling'
+import {freezeStatic} from './static-freeze'
 
-export {landmarkCulling} from './landmark-culling'
+export {landmarkCulling}
 
 export interface Landmark {
   id:string; name?:string; file:string; position:[number,number,number]; rotation:number; collision:'mesh'|'box'|'none'; lods:string[]
@@ -156,7 +158,7 @@ export function landmarkStream(
         if(asset instanceof THREE.Material)fadeMaterial(asset,coverage)
       }
       batchRepeatedMeshes(group)
-      scene.add(group);group.updateMatrixWorld(true);loaded.set(entry,group);retry.delete(entry)
+      scene.add(group);freezeStatic(group);loaded.set(entry,group);retry.delete(entry)
     }).catch(error=>{record('failure',{category:'landmark'});console.warn(entry.id,error);retry.set(entry,performance.now()+30000)}).finally(()=>{
       pending.delete(entry);priorityPending.delete(entry)
       options?.onPendingChange?.()
@@ -169,11 +171,19 @@ export function landmarkStream(
     return {load,fadeCutoff,unload}
   }
   function updateVisibility(entry:Landmark,root:THREE.Group,distance:number,fadeCutoff:number,metrics:RenderRangeMetrics,guardDist:number){
+    const visible=distance<fadeCutoff
+    root.visible=visible
+    if(!visible)return
     const coverage=fades.get(root)
     if(coverage)coverage.value=1-THREE.MathUtils.smoothstep(distance,fadeCutoff-60,fadeCutoff)
-    const level=distance>metrics.landmarkLod1?'lod2':distance>metrics.landmarkLod0?'lod1':'lod0'
-    if(entry.lods.length){for(const name of entry.lods){const node=root.getObjectByName(name);if(node)node.visible=name===level}}
-    else root.visible=distance<=Math.max(guardDist,metrics.landmarkLod1)
+    if(entry.lods.length){
+      const level=distance>metrics.landmarkLod1?'lod2':distance>metrics.landmarkLod0?'lod1':'lod0'
+      const lods=getLodNodes(root)
+      for(const name of entry.lods){
+        const node=lods[name as keyof typeof lods]??root.getObjectByName(name)
+        if(node)node.visible=name===level
+      }
+    }
   }
   const tick = (eye:THREE.Vector3, priority?:Landmark)=>{
     const metrics=options?.getMetrics?.()??fallbackMetrics

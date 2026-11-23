@@ -10,6 +10,7 @@ import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
 import {joinPortalRoads,tunnelGeometry,type Tunnel} from './tunnels'
+import {freezeStatic} from './static-freeze'
 
 interface Asset {file:string; bytes:number}
 export interface Tile extends Asset {x:number; z:number}
@@ -77,6 +78,7 @@ export async function openingTerrain(progress?:ByteProgress){
   const material=await surfaceMaterial(data.slice(56+heights.byteLength),true)
   const mesh=new THREE.Mesh(ground(width,depth,step,(x,z)=>heights[z*cols+x]/10),material)
   mesh.position.set(left,0,top)
+  freezeStatic(mesh)
   const index=mesh.geometry.index!
   function toggle(tile:Tile,show:boolean){
     const tx=(tile.x-left)/step,tz=(tile.z-top)/step,side=256/step
@@ -263,6 +265,7 @@ export function startOverview(manifest:Manifest) {
     const lake = await farWater(manifest,upright,samples)
     mesh.add(lake.mesh)
     lake.mesh.position.set(0,0,0)
+    freezeStatic(mesh)
     function toggle(tile:Tile, show:boolean) {
       if(show)covered.delete(tile)
       else covered.add(tile)
