@@ -29,6 +29,15 @@ try {
       assert(gate>=0,'Missing Zhengyang junction on the westbound route')
       path.splice(gate,1,[-582,-101],[-609,-108],[-637,-115])
       path.unshift([-511,-70],[-378,-25])
+      // On long OSM edges steer against a nearby point, so a small heading error
+      // cannot carry the car across a curb before the next source vertex.
+      const vertices=path.splice(0)
+      path.push(vertices[0])
+      for(let i=1;i<vertices.length;i++){
+        const [ax,az]=vertices[i-1],[bx,bz]=vertices[i]
+        const steps=Math.ceil(Math.hypot(bx-ax,bz-az)/12)
+        for(let j=1;j<=steps;j++)path.push([ax+(bx-ax)*j/steps,az+(bz-az)*j/steps])
+      }
     }
     const page=await browser.newPage()
     try {

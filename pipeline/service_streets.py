@@ -12,7 +12,7 @@ import numpy as np
 from PIL import Image, ImageColor
 from scipy.ndimage import distance_transform_edt
 from shapely import (LineString, Polygon, STRtree, box, intersects_xy, make_valid,
-                     set_precision, union_all)
+                     set_precision, union_all, points as xy_points)
 from shapely.affinity import translate
 
 from common import OUT, load_osm
@@ -95,6 +95,34 @@ def patch_tile(file, footprint, color):
     payload = raw[:12]+struct.pack('<II',len(encoded),len(image))+raw[20:start]+encoded+image+raw[image_start+png_size:]
     file.write_bytes(gzip.compress(payload, compresslevel=5, mtime=0))
     return True
+
+
+def clear_carriageway_trees(output, chunks):
+    """Trees are scattered before minor streets are baked. Check the final paved paths."""
+    removed = 0
+    for tile in chunks:
+        file = output/tile['file']
+        tree_file = file.with_suffix('.trees')
+        trees = np.frombuffer(gzip.decompress(tree_file.read_bytes()),dtype='<u2').reshape(-1,6)
+        if not len(trees):
+            continue
+        raw = gzip.decompress(file.read_bytes())
+        vertices,indices,size = struct.unpack_from('<3I',raw,4)
+        start = 24+16900+9*vertices+4*indices
+        streets = json.loads(raw[start:start+size])[1]
+        paths = streets[0]
+        if len(streets)>11 and streets[11]:
+            paths = paths[:streets[11][0]]
+        roads = [Polygon(shell,holes) for kind,shell,*holes in paths if kind==0]
+        if not roads:
+            continue
+        hits,_ = STRtree(roads).query(xy_points(trees[:,:2]),predicate='within')
+        if len(hits):
+            keep = np.ones(len(trees),dtype=bool)
+            keep[hits] = False
+            removed += np.count_nonzero(~keep)
+            tree_file.write_bytes(gzip.compress(trees[keep].tobytes(),mtime=0))
+    return removed
 
 
 def bake(output, manifest, palette):

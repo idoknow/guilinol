@@ -544,9 +544,10 @@ def build(bbox, output, palette, workers=4):
     manifest['landmarks'] = landmarks
     if tunnels:
         manifest['tunnels'] = tunnels
-    from service_streets import bake as bake_service_streets
+    from service_streets import bake as bake_service_streets, clear_carriageway_trees
     bake_service_streets(output, manifest, palette)
     if play_region:
+        clear_carriageway_trees(output,chunks)
         restore_protected_tiles(output,chunks,landmarks)
     write_city_lods(output, manifest)
     from traffic import bake as bake_traffic
