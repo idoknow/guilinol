@@ -50,8 +50,12 @@ export const shots = [
 
 // Extra clearance from queued traffic on the portrait street and bridge approaches.
 for(const shot of shots.filter(s=>s.id==='s09'||s.id==='s10')){
-  const untilX = shot.id==='s09' ? -463 : -197
-  shot.v = {...shot.v, route:RIDE.map(([x,z])=>[x,z-(x<=untilX?1:0)])}
+  const route = RIDE.map(([x,z])=>{
+    if(shot.id==='s10' && x<=-197)return [x,z+12]
+    if(x<=-463)return [x,z-1]
+    return [x,z]
+  })
+  shot.v = {...shot.v, route}
 }
 
 // 9:16 cut (~31 s): shorter takes of the same moves.
