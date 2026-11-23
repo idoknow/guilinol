@@ -1,3 +1,4 @@
+import {inRegion} from '../../../lib/play-region'
 import {ll2xz} from '../../../lib/projection'
 import type {Manifest} from '../world'
 
@@ -11,7 +12,7 @@ export function builtBoundary(manifest:Manifest) {
     const {x,z} = ll2xz(lat,lon); if(index) path.lineTo(x,z); else path.moveTo(x,z)
   }); path.closePath()}
   const context = document.createElement('canvas').getContext('2d')!
-  return {path, contains:(x:number,z:number)=>context.isPointInPath(path,x,z,'evenodd')}
+  return {path, contains:(x:number,z:number)=>manifest.region ? inRegion(manifest,x,z) : context.isPointInPath(path,x,z,'evenodd')}
 }
 
 type Label = [string,string,number,number]

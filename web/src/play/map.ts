@@ -1,3 +1,4 @@
+import {nearestPlayable} from '../../../lib/play-region'
 import {getPlayMode} from '../game/play-mode'
 import {operation} from '../telemetry'
 import * as THREE from 'three'
@@ -302,7 +303,14 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
       ...atlas.search(q,8).map((p:Place)=>({name:p.n,sub:{peak:'山',scenic:'景点',gate:'城门',bridge:'桥',water:'水面',park:'公园',museum:'博物馆',memorial:'纪念地',road:'道路',school:'学校'}[p.k],x:p.x,z:p.z}))]:[]
     const seen = new Set<string>()
     results.innerHTML = ''
-    for(const hit of hits) { if(!built.contains(hit.x,hit.z)||seen.has(hit.name)||seen.size>=8) continue; seen.add(hit.name)
+    for(const source of hits) {
+      if(seen.has(source.name)||seen.size>=8)continue
+      let hit=source
+      if(!built.contains(source.x,source.z)){
+        if(!host.manifest.region)continue
+        hit={name:source.name,sub:source.sub,...nearestPlayable(host.manifest,source.x,source.z)}
+      }
+      seen.add(hit.name)
       const li = document.createElement('li'); li.innerHTML = `<b>${hit.name}</b><span>${hit.sub}</span>`
       li.onclick = ()=>{focus(hit.x,hit.z); setPin({x:hit.x,z:hit.z,name:hit.name,spot:hit.spot,dock:hit.dock,shop:hit.shop}); results.innerHTML = ''; input.blur()}
       results.append(li)}
