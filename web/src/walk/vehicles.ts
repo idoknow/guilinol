@@ -71,8 +71,25 @@ export interface StartTestRideResult {
   expiresAt?: number
 }
 
+const ROADSIDE_BATTERY_KEY = 'glol.ebike.batteries.v1'
+const MAX_PERSISTED_BATTERIES = 50
 const bikeCoordKey = (x: number, z: number) => `${Math.round(x * 10)},${Math.round(z * 10)}`
 const isVerifyMode = () => typeof location !== 'undefined' && new URLSearchParams(location.search).has('verify')
+const isVerifySilentMode = () =>
+  typeof location !== 'undefined' && (() => {
+    const p = new URLSearchParams(location.search)
+    return p.has('verify') && p.get('stunt') !== '1'
+  })()
+
+function computeWorldVehiclesVersion(buffer: ArrayBuffer, bikesCount: number) {
+  const bytes = new Uint8Array(buffer)
+  let h = 0x811c9dc5
+  for (let i = 0; i < bytes.length; i++) {
+    h ^= bytes[i]
+    h = Math.imul(h, 0x01000193)
+  }
+  return `v1:${bytes.length}:${bikesCount}:${(h >>> 0).toString(16)}`
+}
 type Physics = Awaited<ReturnType<typeof createPhysics>>
 export type FreeDismountTarget = {x: number; y: number; z: number; rule: string; heading: number}
 export interface VehiclesEnv {
@@ -115,6 +132,58 @@ export async function vehicles(
   const data: Data = JSON.parse(
     await new Response(new Blob([buffer]).stream().pipeThrough(new DecompressionStream('gzip'))).text(),
   )
+  const worldVersion = computeWorldVehiclesVersion(buffer, data.bikes.length)
+  const persistedBatteries = new Map<string, number>()
+  function loadPersistedBatteries() {
+    persistedBatteries.clear()
+    if (isVerifySilentMode() || typeof localStorage === 'undefined') return
+    try {
+      const raw = localStorage.getItem(ROADSIDE_BATTERY_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as {worldVersion?: string; entries?: Array<{k?: string; b?: number}>}
+      if (parsed.worldVersion !== worldVersion || !Array.isArray(parsed.entries)) {
+        localStorage.removeItem(ROADSIDE_BATTERY_KEY)
+        return
+      }
+      for (const item of parsed.entries.slice(-MAX_PERSISTED_BATTERIES)) {
+        if (item && typeof item.k === 'string' && typeof item.b === 'number' && Number.isFinite(item.b)) {
+          const b = T.MathUtils.clamp(Math.round(item.b * 10) / 10, 0, 100)
+          if (b < 99.95) persistedBatteries.set(item.k, b)
+        }
+      }
+    } catch {}
+  }
+  let lastBatteryFlushAt = 0
+  function flushPersistedBatteries() {
+    if (isVerifySilentMode() || typeof localStorage === 'undefined') return
+    lastBatteryFlushAt = performance.now()
+    try {
+      const entries = Array.from(persistedBatteries.entries())
+        .slice(-MAX_PERSISTED_BATTERIES)
+        .map(([k, b]) => ({k, b: Math.round(b * 10) / 10}))
+      localStorage.setItem(ROADSIDE_BATTERY_KEY, JSON.stringify({worldVersion, entries}))
+    } catch {}
+  }
+  function persistRoadsideBattery(spawnKey: string | undefined, pct: number, immediate = true) {
+    if (!spawnKey || isVerifySilentMode()) return
+    const b = T.MathUtils.clamp(Math.round(pct * 10) / 10, 0, 100)
+    const prev = persistedBatteries.get(spawnKey)
+    if (!immediate && ((b < 99.95 && prev === b) || (b >= 99.95 && prev === undefined))) return
+    persistedBatteries.delete(spawnKey)
+    if (b < 99.95) {
+      persistedBatteries.set(spawnKey, b)
+      while (persistedBatteries.size > MAX_PERSISTED_BATTERIES) {
+        const oldest = persistedBatteries.keys().next().value
+        if (oldest === undefined) break
+        persistedBatteries.delete(oldest)
+      }
+    }
+    if (immediate || performance.now() - lastBatteryFlushAt >= 800) {
+      flushPersistedBatteries()
+    }
+  }
+  loadPersistedBatteries()
+
   const mask = atob(data.mask)
   const [left, top, width, height, step] = data.grid
   const group = new T.Group()
@@ -209,24 +278,26 @@ export async function vehicles(
     const mesh = marker('bike', paint, isShared)
     mesh.position.set(x, y, z)
     mesh.rotation.y = angle
+    const spawnCoordKey = bikeCoordKey(x, z)
+    const restoredBattery = persistedBatteries.get(spawnCoordKey) ?? 100
     mesh.userData.paint = paint
     mesh.userData.shared = isShared
     mesh.userData.vehicleType = vehicleType
     mesh.userData.ebikeTier = vehicleType
     mesh.userData.ownership = 'shared' as VehicleOwnership
-    mesh.userData.battery = 100
+    mesh.userData.battery = restoredBattery
     mesh.userData.durability = 100
-    const coordKey = bikeCoordKey(x, z)
-    mesh.userData.coordKey = coordKey
+    mesh.userData.coordKey = spawnCoordKey
+    mesh.userData.spawnCoordKey = spawnCoordKey
     const state: BikeInstanceState = {
       vehicleType,
       ownership: 'shared',
-      batteryPct: 100,
+      batteryPct: restoredBattery,
       durabilityPct: 100,
       mods: null,
     }
     bikeStates.set(mesh, state)
-    bikeCoordStates.set(coordKey, state)
+    bikeCoordStates.set(spawnCoordKey, state)
     store(mesh)
   }
 
@@ -404,10 +475,14 @@ export async function vehicles(
     const newKey = bikeCoordKey(mesh.position.x, mesh.position.z)
     if (oldKey && oldKey !== newKey) bikeCoordStates.delete(oldKey)
     mesh.userData.coordKey = newKey
+    const spawnCoordKey = (mesh.userData.spawnCoordKey as string | undefined) ?? oldKey ?? newKey
+    mesh.userData.spawnCoordKey = spawnCoordKey
     bikeCoordStates.set(newKey, state)
 
     if (ownership === 'personal' && instanceId) {
       soloServices()?.commerce.updatePersonalVehicleTelemetry(instanceId, {batteryPct: state.batteryPct, durabilityPct}, true)
+    } else if (ownership === 'shared') {
+      persistRoadsideBattery(spawnCoordKey, state.batteryPct, true)
     }
   }
 
@@ -619,7 +694,9 @@ export async function vehicles(
         ? 'normal'
         : (saved?.vehicleType ?? resolveEbikeKind((targetMesh.userData.paint as number | undefined) ?? 0, targetMesh.userData.vehicleType ?? targetMesh.userData.ebikeTier))
     const modelId = liveOwned?.modelId ?? saved?.modelId ?? (targetMesh.userData.modelId as PersonalEbikeModelId | undefined)
-    const savedBat = liveOwned?.batteryPct ?? saved?.batteryPct ?? (targetMesh.userData.battery as number | undefined) ?? 100
+    const spawnCoordKey = (targetMesh.userData.spawnCoordKey as string | undefined) ?? prevKey
+    targetMesh.userData.spawnCoordKey = spawnCoordKey
+    const savedBat = liveOwned?.batteryPct ?? saved?.batteryPct ?? (targetMesh.userData.battery as number | undefined) ?? (ownership === 'shared' ? persistedBatteries.get(spawnCoordKey) : undefined) ?? 100
     const savedDur = liveOwned?.durabilityPct ?? saved?.durabilityPct ?? (targetMesh.userData.durability as number | undefined) ?? 100
     const mods = vehicleType === 'shared' ? null : (liveOwned?.upgrades ?? saved?.mods ?? null)
     if (liveOwned) {
@@ -669,11 +746,18 @@ export async function vehicles(
     } else if (nearDecor && env) {
       const candidate = nearDecor
       if (!env.stream.batches.takeBike(candidate.id)) return
-      const mesh = makeVehicleMesh('bike',1)
-      mesh.position.set(candidate.x,candidate.y,candidate.z)
+      const mesh = makeVehicleMesh('bike', 1, {shared: true})
+      mesh.position.set(candidate.x, candidate.y, candidate.z)
       mesh.rotation.y = candidate.yaw
       mesh.userData.decorId = candidate.id
       mesh.userData.paint = 1
+      mesh.userData.shared = true
+      mesh.userData.ownership = 'shared' as VehicleOwnership
+      const spawnKey = bikeCoordKey(candidate.x, candidate.z)
+      mesh.userData.coordKey = spawnKey
+      mesh.userData.spawnCoordKey = spawnKey
+      const restored = persistedBatteries.get(spawnKey)
+      if (restored !== undefined) mesh.userData.battery = restored
       if (!mountBikeMesh(mesh)) env.stream.batches.returnBike(candidate.id)
       nearDecor = null
     } else if (nearBike?.name === 'car') {
@@ -1239,6 +1323,7 @@ export async function vehicles(
       return next
     },
     resolveMove(ctx: Parameters<typeof bikeCtrl.resolveMove>[0]) { return bikeCtrl.resolveMove(ctx) },
+    tryBikeImpactCrash(preSpeedMs: number) { return bike ? bikeCtrl.tryImpactCrash(preSpeedMs) : false },
     resolveCarMove(ctx: Parameters<typeof carCtrl.resolveMove>[0]) { return carCtrl.resolveMove(ctx) },
     steer(forward: number, right: number, dt: number, mounted = true, control?: EbikeStepControl) {
       const spd = bikeCtrl.steer(forward, right, dt, mounted, control)
@@ -1251,15 +1336,19 @@ export async function vehicles(
             const deltaOdometerKm = (Math.abs(spd) * dt) / 1000
             soloServices()?.commerce.updatePersonalVehicleTelemetry(id, {batteryPct: bikeCtrl.batteryPct, deltaOdometerKm}, false)
           }
-        } else if (soloServices() && ownership === 'shared' && bikeCtrl.vehicleType === 'shared' && Math.abs(spd) > 0.4 && !isVerifyMode()) {
-          sharedRideElapsedSec += dt
-          if (!sharedRideBilled && sharedRideElapsedSec >= soloServices()!.commerce.SHARED_EBIKE_FREE_SECONDS) {
-            sharedRideBilled = true
-            const fee = soloServices()!.commerce.chargeSharedRideFee(`shared_ride_${sharedRideSessionId}_${Date.now()}`)
-            if (fee.fallbackFree) {
-              window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: '余额不足 ¥3，可改骑免费人力单车或步行接单赚钱', ms: 2600}}))
-            } else if (fee.charged > 0) {
-              window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: `共享电车试骑满 120s，已扣费 ¥${fee.charged}`, ms: 2400}}))
+        } else if (ownership === 'shared') {
+          const spawnKey = (bike.userData.spawnCoordKey as string | undefined) ?? (bike.userData.coordKey as string | undefined)
+          persistRoadsideBattery(spawnKey, bikeCtrl.batteryPct, bikeCtrl.batteryPct <= 0)
+          if (soloServices() && bikeCtrl.vehicleType === 'shared' && Math.abs(spd) > 0.4 && !isVerifyMode()) {
+            sharedRideElapsedSec += dt
+            if (!sharedRideBilled && sharedRideElapsedSec >= soloServices()!.commerce.SHARED_EBIKE_FREE_SECONDS) {
+              sharedRideBilled = true
+              const fee = soloServices()!.commerce.chargeSharedRideFee(`shared_ride_${sharedRideSessionId}_${Date.now()}`)
+              if (fee.fallbackFree) {
+                window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: '余额不足 ¥3，可改骑免费人力单车或步行接单赚钱', ms: 2600}}))
+              } else if (fee.charged > 0) {
+                window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: `共享电车试骑满 120s，已扣费 ¥${fee.charged}`, ms: 2400}}))
+              }
             }
           }
         }
