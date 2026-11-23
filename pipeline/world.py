@@ -21,7 +21,7 @@ from shapely.geometry import box, Point
 
 from common import CHUNK, GRID, LAT0, LON0, MLON, MLAT, OUT, ll2xz, load_dem, load_osm
 from features import building_mesh, buildings, game_court, ground_features, points, polygons, raw_overture_footprints, rongyin_sidewalk
-from legacy_core import CAMPUS_TILES, Downtown, EXTENT as DOWNTOWN, preserve_campus_indexes
+from legacy_core import CAMPUS_TILES, Downtown, EXTENT as DOWNTOWN, published_campus_indexes
 from karst import generate
 from peak_sectors import overview_step, write_city_lods
 from landmarks.jiefang_layout import bank_paving, grade_banks, grade_binjiang_streets
@@ -512,9 +512,8 @@ def build(bbox, output, palette, workers=4):
                     chunks.append(pending.popleft().result())
         chunks.extend(job.result() for job in pending)
     extent = [left,top,width,depth]
-    write_atlas(output,extent,bounds,layers,footprints,peaks)
-    if preserve_campuses:
-        preserve_campus_indexes(output,landmarks)
+    campus_indexes = published_campus_indexes(landmarks) if preserve_campuses else None
+    write_atlas(output,extent,bounds,layers,footprints,peaks,campus_indexes)
     write_overview_map(output,bbox)
     triangles.extend(landmark_faces)
     write_vehicles(output,vehicles,triangles)

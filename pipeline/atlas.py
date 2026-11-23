@@ -60,7 +60,7 @@ def kind_of(tags):
     if tags.get('natural') == 'water' or 'water' in tags or tags.get('waterway') == 'riverbank': return 'water'
 
 
-def write_atlas(output, extent, bounds, layers, footprints, peaks):
+def write_atlas(output, extent, bounds, layers, footprints, peaks, campus_indexes=None):
     roads, places, longest = [], [], {}
     schools = {item['osm']:item for item in json.loads(Path(__file__).with_name('schools-g2.json').read_text())}
     schools.update({'node/2597936160': {'name':'少年宫（地块待核）'},
@@ -163,8 +163,11 @@ def write_atlas(output, extent, bounds, layers, footprints, peaks):
     # Keep roads and search destinations at full fidelity. On a city-sized
     # atlas, progressively omit small building symbols to fit the wire budget.
     for min_area, tolerance in ((40,1),(70,1),(100,1),(100,2),(100,3),
-                                (200,3),(400,3),(800,3),(1600,3),(3200,3)):
+                                (200,3),(400,3),(800,3),(1600,3),(3200,3),(6400,3),(12800,3),(25600,3),(51200,3),(math.inf,3)):
         data['buildings'] = [path for poly in buildings if poly.area >= min_area and len(path := flat(poly.simplify(tolerance).exterior)) >= 8]
+        if campus_indexes:
+            overlaps, published = campus_indexes
+            data['buildings'] = [ring for ring in data['buildings'] if not overlaps(ring)] + published
         payload = gzip.compress(json.dumps(data,ensure_ascii=False,separators=(',',':')).encode(),mtime=0)
         if len(payload) <= 400_000:
             (output/'atlas.bin').write_bytes(payload)
