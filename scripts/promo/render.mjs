@@ -59,11 +59,19 @@ const hideUi = 'body>*:not(canvas){display:none!important}canvas{display:block!i
 async function openPage(shot){
   const page = await browser.newPage({viewport:{width,height},deviceScaleFactor:1})
   page.on('pageerror',e=>console.log(`[${shot.id}] pageerror`,e.message))
-  await page.addInitScript(()=>{
+  await page.addInitScript(isRide=>{
     const get = HTMLCanvasElement.prototype.getContext
     HTMLCanvasElement.prototype.getContext = function(type,o){if(/webgl/.test(type))o={...(o||{}),preserveDrawingBuffer:true};return get.call(this,type,o)}
     localStorage.setItem('glol.stamps','[]')
-  })
+    // Repeat the traffic population when a take has to be rendered again.
+    if(isRide){
+      let seed = 159
+      Math.random = () => {
+        seed = (Math.imul(seed,1664525)+1013904223)>>>0
+        return seed/4294967296
+      }
+    }
+  },Boolean(shot.ride))
   await page.clock.install({time:new Date('2026-11-23T08:00:00+08:00')})
   const hour0 = Array.isArray(shot.hour)?shot.hour[0]:shot.hour
   const params = new URLSearchParams({verify:'',traffic:shot.traffic===false?'0':'1',flow:'0',time:String(hour0),weather:shot.weather??'clear',radius:String(shot.radius??900)})
@@ -120,14 +128,19 @@ async function mount(page,shot){
   const kind = shot.ride.vehicle
   const parked = await page.evaluate(([k,[x,z]])=>[...window.viewer.walk.parked(k)].sort((a,b)=>Math.hypot(a[0]-x,a[2]-z)-Math.hypot(b[0]-x,b[2]-z))[0],[kind,shot.ride.parkNear])
   if(!parked)throw Error(`no parked ${kind}`)
-  await page.evaluate(([x,z])=>window.viewer.walkTo(x,z,0,'promo'),[parked[0],parked[2]])
+  // The initial walk-mode transition can still hold the teleport lock after the walker appears.
+  const arrived = await pumpUntil(page, ([x,z])=>window.viewer.walkTo(x,z,0,'promo'),
+    'vehicle spawn',30000,[parked[0],parked[2]])
+  if(!arrived)throw Error(`could not reach parked ${kind}`)
   await settle(page,10)
-  const label = kind==='car'?'车':'车'
-  for(let i=0;i<40;i++){
-    await page.keyboard.press('f'); await page.clock.runFor(200)
-    if(await page.evaluate(()=>window.viewer.walk.vehicle!=='foot'))break
-  }
-  const v = await page.evaluate(()=>window.viewer.walk.vehicle); if(v==='foot')throw Error(`could not mount ${kind} (${label})`)
+  await page.evaluate(()=>document.querySelector('.spot-card.show .card-close')?.click())
+  const mounted = await pumpUntil(page, k=>{
+    const w = window.viewer.walk
+    if(w.vehicle===k)return true
+    document.querySelector('.vehicle-action')?.click()
+    return w.vehicle===k
+  },'mount '+kind,15000,kind)
+  if(!mounted)throw Error(`could not mount ${kind}`)
   await page.addStyleTag({content:hideUi})
   // From here the game no longer advances the walker; drive() does, one fixed step per frame.
   await page.evaluate(()=>{const w=window.viewer.walk;w.__advance=w.tick;w.tick=()=>{}; if(w.ebike?.setHeadlight)w.ebike.setHeadlight('on'); w.car?.setHeadlight?.('on')})
@@ -144,9 +157,10 @@ async function drive(page,shot,dt){
     s.n++; if(s.n%48===0){if(s.check&&Math.hypot(s.check[0]-pos.x,s.check[1]-pos.z)<.8){s.attempt++;s.detour=s.n+48}s.check=[pos.x,pos.z]}
     const offset=s.n<s.detour?(s.attempt%2?1:-1)*1.1:0
     const angle=Math.atan2(-dx,-dz)+offset-w.heading,err=Math.atan2(Math.sin(angle),Math.cos(angle))
+    const reverse = w.vehicle==='car' && Math.abs(err)>2.1
     press('KeyA',err>.035);press('KeyD',err<-.035)
     const last=s.i>=route.length-1, want=Math.abs(err)>.4?speed*.3:last?Math.min(speed,1.8+gap*.5):speed
-    press('KeyW',w.speed<want);press('KeyS',w.speed>want+.3)
+    press('KeyW',!reverse && w.speed<want);press('KeyS',reverse || w.speed>want+.3)
     for(let k=0;k<2;k++)w.__advance(dt/2)
     pos=w.position.clone()
     return {x:pos.x,y:pos.y,z:pos.z,heading:w.heading,speed:w.speed,done:last&&gap<3}
@@ -192,7 +206,12 @@ for(const shot of list){
     console.log('  mounted',await page.evaluate(()=>[window.viewer.walk.vehicle,...window.viewer.walk.position.toArray().map(Math.round)]),((Date.now()-t0)/1000).toFixed(0)+'s')
     // Pre-roll: ride the lead-in unfilmed so the shot starts at speed.
     let rider, cam
-    for(let i=0;i<Math.round((shot.ride.preroll??2)*fps);i++){rider=await drive(page,shot,1/fps);if(i%10===0)await page.evaluate(()=>window.viewer.stream.tick(window.viewer.walk.position))}
+    // Step traffic and stream the next tiles as the rider advances during pre-roll.
+    const leadFrames = Math.round((shot.ride.preroll??2)*fps)
+    for(let i=0;i<leadFrames;i++){
+      rider=await drive(page,shot,1/fps)
+      if(i%6===5)await page.clock.runFor(6000/fps)
+    }
     console.log('  preroll end',rider&&[rider.x,rider.z,rider.speed*3.6].map(Math.round),((Date.now()-t0)/1000).toFixed(0)+'s')
     const hour = Array.isArray(shot.hour)?shot.hour[0]:shot.hour
     const ats = new Set((stills??[]).map(u=>Math.round(u*(frames-1))))
@@ -212,7 +231,8 @@ for(const shot of list){
   await page.close()
   if(!stills){
     const r=spawnSync('ffmpeg',['-y','-loglevel','error','-framerate',String(fps),'-i',`${dir}/%04d.png`,'-c:v','libx264','-preset','slow','-crf','12','-pix_fmt','yuv420p',`${out}/${shot.id}.mp4`],{stdio:'inherit'})
-    if(r.status)throw Error(`ffmpeg failed for ${shot.id}`)
+    if(r.error)throw r.error
+    if(r.status!==0)throw Error(`ffmpeg failed for ${shot.id}`)
     if(!opt.keep)await rm(dir,{recursive:true,force:true})
   } else await rm(dir,{recursive:true,force:true})
   console.log(`  done in ${((Date.now()-t0)/1000).toFixed(0)}s`)
