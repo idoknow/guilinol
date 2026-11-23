@@ -358,17 +358,28 @@
       "name": "致远楼",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "长条立面有连续水平外廊，竖柱等距分隔；树冠遮住下部。",
       "colors": {
-        "wall": null,
-        "accent": null,
+        "wall": "#dedecf",
+        "accent": "#804c50",
         "glass": null,
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "中段凸出弧形竖窗",
+        "长翼连续外廊"
+      ],
+      "photos": [
+        {
+          "file": "way680695951_1.jpg",
+          "url": "https://www.guat.edu.cn/__local/6/D0/C0/F6890DFF8E446D247A44ED4742F_31B77CA8_281C1.jpg",
+          "page": "https://www.guat.edu.cn/ghgk/xyfg/1.htm",
+          "date": null,
+          "view": "学校校园风光署名：致远楼；未标拍摄日期及方位。"
+        }
+      ],
+      "confidence": "photo",
       "source_aliases": [
         "b58ff20f-f8d5-4e12-9478-c73417457b53"
       ]
@@ -467,8 +478,16 @@
       },
       "roof": null,
       "features": [],
-      "photos": [],
-      "confidence": "none",
+      "photos": [
+        {
+          "file": "way680695956_1.jpg",
+          "url": "https://www.guat.edu.cn/__local/F/39/C9/7817E602592E7DF5DA5F5798EDB_F86D01C6_BBB7A.jpg",
+          "page": "https://www.guat.edu.cn/ghgk/xyfg.htm",
+          "date": null,
+          "view": "学校校园风光署名：明志楼；未标拍摄日期及方位。"
+        }
+      ],
+      "confidence": "photo",
       "source_aliases": [
         "dbf6806e-9f1a-4c8d-bc9d-39f7c96311fd"
       ]
@@ -1116,9 +1135,9 @@
     {
       "source": "way/724360581",
       "name": "校史馆 航天博物馆",
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "floors": 2,
+      "floors_src": "photo",
+      "facade": "正立面左右对称，中部突出。",
       "colors": {
         "wall": null,
         "accent": null,
@@ -1126,12 +1145,31 @@
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none",
+      "features": [
+        "中轴对称",
+        "两层历史建筑"
+      ],
+      "photos": [
+        {
+          "file": "way724360581_1.jpg",
+          "url": "https://www.guat.edu.cn/__local/6/25/20/0D4B9E9C3763C18CB2A979AFE15_960B4D4A_2B356.jpg",
+          "page": "https://www.guat.edu.cn/ghgk/xyfg.htm",
+          "date": null,
+          "view": "学校校园风光署名：校史馆楼；未标拍摄日期及方位。"
+        },
+        {
+          "file": "way724360581_2.jpg",
+          "url": "https://www.guat.edu.cn/__local/9/50/F0/8B9AF7611A9A28E62408F175D5B_E133AD18_67125.jpg",
+          "page": "https://www.guat.edu.cn/info/1004/13740.htm",
+          "date": null,
+          "view": "学校历史建筑报道配图。"
+        }
+      ],
+      "confidence": "photo",
       "source_aliases": [
         "927e2e4e-17bd-4cd6-bbcd-a1e65945cdb0"
-      ]
+      ],
+      "floor_count_note": "校方历史建筑报道明确记载为两层，与署名照片一致。"
     },
     {
       "source": "way/724360584",
@@ -1267,8 +1305,16 @@
       },
       "roof": null,
       "features": [],
-      "photos": [],
-      "confidence": "none",
+      "photos": [
+        {
+          "file": "way1472913840_1.jpg",
+          "url": "https://www.guat.edu.cn/__local/B/3B/F4/C33CCD3D62CD6F4A5D62124A8DD_801CBDD0_FC660.png",
+          "page": "https://www.guat.edu.cn/info/1004/22118.htm",
+          "date": null,
+          "view": "校方年度新闻中“问天楼图书馆正式启用”段落配图。"
+        }
+      ],
+      "confidence": "photo",
       "source_aliases": [
         "cfc1ca4d-d43f-4afb-ac7b-b0056b95965d"
       ]
@@ -3240,8 +3286,16 @@
       },
       "roof": null,
       "features": [],
-      "photos": [],
-      "confidence": "none"
+      "photos": [
+        {
+          "file": "a58c9bc2-83c6-4f1c-afe7-bf2f3ee41cdc_1.jpg",
+          "url": "https://www.guat.edu.cn/__local/2/95/A4/F186A019457250515675BA4030F_D96AB38B_2036B.jpg",
+          "page": "https://www.guat.edu.cn/ghgk/xyfg/1.htm",
+          "date": null,
+          "view": "学校校园风光署名：致知楼；未标拍摄日期及方位。"
+        }
+      ],
+      "confidence": "photo"
     },
     {
       "source": "a607e799-a2e3-4983-b405-1789e0ef5b4c",
@@ -3873,6 +3927,77 @@
       "confidence": "none"
     }
   ],
-  "gates": [],
-  "open_spaces": []
+  "gates": [
+    {
+      "name": "校门（后勤管理处报道）",
+      "photos": [
+        {
+          "file": "gate_1.jpg",
+          "url": "https://hqglc.guat.edu.cn/__local/8/6A/92/B16C1BE2E0AE87B43C8D250C097_E6EDEF1E_841A3.jpg",
+          "page": "https://hqglc.guat.edu.cn/info/1058/2504.htm",
+          "date": null,
+          "view": "2018 年南北校区大门清洗报道配图，非现状测量。"
+        }
+      ]
+    }
+  ],
+  "open_spaces": [
+    {
+      "name": "南校区田径场",
+      "photos": [
+        {
+          "file": "track_1.jpg",
+          "url": "https://www.guat.edu.cn/__local/8/13/14/49C8DAE7D809840036871A67DAD_7C8192CB_DDDD.jpg",
+          "page": "https://www.guat.edu.cn/ghgk/xyfg.htm",
+          "date": null,
+          "view": "学校校园风光署名：南校区田径场；未标拍摄日期及方位。"
+        }
+      ]
+    }
+  ],
+  "unmatched_references": [
+    {
+      "name": "飞天楼",
+      "photos": [
+        {
+          "file": "飞天楼_1.jpg",
+          "url": "https://www.guat.edu.cn/__local/1/FA/EB/1500912686A1886B507094D4E62_C8547AEA_221BB.jpg",
+          "page": "https://www.guat.edu.cn/ghgk/xyfg.htm",
+          "date": null,
+          "view": "学校校园风光署名：飞天楼；未标拍摄日期及方位。"
+        },
+        {
+          "file": "飞天楼_2.jpg",
+          "url": "https://www.guat.edu.cn/__local/B/19/04/B19B6F40D03C093C79EB4B0E999_6A8DFF28_C8F61.jpg",
+          "page": "https://www.guat.edu.cn/ghgk/xyfg.htm",
+          "date": null,
+          "view": "学校校园风光署名：飞天楼；未标拍摄日期及方位。"
+        }
+      ]
+    },
+    {
+      "name": "巡天楼",
+      "photos": [
+        {
+          "file": "巡天楼_1.jpg",
+          "url": "https://www.guat.edu.cn/__local/B/7D/65/8E9F61B1A82F95B00917987D750_4003953C_1A472.jpg",
+          "page": "https://www.guat.edu.cn/ghgk/xyfg.htm",
+          "date": null,
+          "view": "学校校园风光署名：巡天楼；未标拍摄日期及方位。"
+        }
+      ]
+    },
+    {
+      "name": "天和苑",
+      "photos": [
+        {
+          "file": "天和苑_1.jpg",
+          "url": "https://www.guat.edu.cn/__local/8/88/23/26FE35A3548B98FDE2B2E058FD7_B97EDA30_1A759.jpg",
+          "page": "https://www.guat.edu.cn/ghgk/xyfg.htm",
+          "date": null,
+          "view": "学校校园风光署名：天和苑；未标拍摄日期及方位。"
+        }
+      ]
+    }
+  ]
 }
