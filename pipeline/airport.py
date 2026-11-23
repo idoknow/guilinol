@@ -15,11 +15,18 @@ def airfield():
         return None, []
     paved=[]
     buildings=[]
+    passages=[]
     for element in elements:
         if element['type']!='way':
             continue
         tags=element.get('tags',{})
         kind=tags.get('aeroway')
+        if tags.get('highway') and (tags.get('covered')=='yes' or tags.get('tunnel')=='building_passage'):
+            coords=points(element)
+            if len(coords)>=2:
+                line=LineString(coords)
+                if boundary.intersects(line):
+                    passages.append(line.buffer(6))
         if not tags.get('building') and kind not in ('runway','apron','taxiway'):
             continue
         polygon=area(element)
@@ -35,7 +42,8 @@ def airfield():
             buildings.append((element,polygon))
         else:
             paved.append(polygon)
-    return unary_union(paved), buildings
+    passages=unary_union(passages)
+    return unary_union(paved), [(element,polygon,polygon.difference(passages)) for element,polygon in buildings]
 
 
 def level_pavement(pavement, terrain, original, left, top):

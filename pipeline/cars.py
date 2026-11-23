@@ -132,7 +132,7 @@ def plan_cars(bounds, surface, buildings, sample, existing_bikes=(), docks=None,
         is_tunnel = tags.get('tunnel', 'no') != 'no'
         if is_bridge or is_tunnel:
             bridge_tunnel_lines.append(line)
-        if is_tunnel or tags.get('access') in ('no', 'private') or tags.get('motor_vehicle') == 'no':
+        if (is_tunnel and tags.get('tunnel')!='building_passage') or tags.get('access') in ('no', 'private') or tags.get('motor_vehicle') == 'no':
             continue
         if hw not in MOTOR_HIGHWAYS:
             continue

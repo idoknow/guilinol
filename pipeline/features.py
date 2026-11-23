@@ -214,14 +214,14 @@ def buildings(bounds, elevation, peaks, layout, carriageway_mask=None, sidewalk_
             floors = int(props['floors'])
             footprints.append(footprint)
             heights.append((base, base+3.2*floors, 3, floors, ident%65536, center, [], False))
-    for element, footprint in airport_buildings:
-        for poly in polygons(footprint.intersection(bounds)):
+    for element, footprint, solid in airport_buildings:
+        palace.append(footprint)
+        for poly in polygons(solid.intersection(bounds)):
             center=poly.representative_point()
             floors=int(element['tags'].get('building:levels','2'))
             base=elevation(center.x,center.y)
             footprints.append(poly)
             heights.append((base,base+3.1*floors,0,floors,element['id']%65536,center,[],False))
-            palace.append(poly)
     palace_index = STRtree(palace)
     with (Path(RAW)/'overture_buildings.csv').open() as source:
         for row in csv.DictReader(source, delimiter='\t'):

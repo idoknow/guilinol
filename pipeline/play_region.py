@@ -35,7 +35,8 @@ def restore_protected_tiles(output, chunks, entries):
     definition = json.loads(Path(__file__).with_name('region.json').read_bytes())
     campus_zones = [f for f in definition['zones'] if any(word in f['name'] for word in
                     ('大学','学院','校区','学校','中学','小学'))]
-    campuses = union_all([shape(f['geometry']).buffer(f['buffer']) for f in campus_zones])
+    campuses = union_all([shape(f['geometry']) for f in campus_zones
+                         if f['geometry']['type'] in ('Polygon','MultiPolygon')])
     campus_names = {f['name'] for f in campus_zones}
     with tarfile.open(archive, 'r:gz') as packed:
         manifest = json.load(packed.extractfile('world/manifest.json'))
