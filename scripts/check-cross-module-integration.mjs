@@ -57,6 +57,16 @@ try {
     assert.equal(guard.isTouchInControlZone({...base, clientX: 200, clientY: 360}), false)
     // Photo mode opens full canvas for orbit
     assert.equal(guard.isTouchInControlZone({...base, photoOn: true, clientX: 80, clientY: 740}), false)
+    // IDOK-171: the old look-stick corner (bottom-right, inside the button arc) is open for drag-to-look
+    assert.equal(guard.isTouchInControlZone({...base, clientX: 320, clientY: 760}), false)
+    assert.equal(guard.isTouchInControlZone({...base, aboard: false, clientX: 320, clientY: 760}), false)
+    // Landscape: same corner open
+    const land = {...base, innerWidth: 844, innerHeight: 390, aboard: false}
+    assert.equal(guard.isTouchInControlZone({...land, clientX: 780, clientY: 330}), false)
+    // Just above the corner (between 跃 and 远近) and left of it (跑/蹲 column) stay blocked
+    assert.equal(guard.isTouchInControlZone({...base, clientX: 320, clientY: 660}), true)
+    assert.equal(guard.isTouchInControlZone({...base, aboard: false, clientX: 230, clientY: 760}), true)
+    assert.equal(guard.isTouchInControlZone({...land, clientX: 780, clientY: 250}), true)
   })
 
   // --- 2. Crash/StandUp/Pickup <-> P-gear/Kickstand/Hazard State Coupling ---

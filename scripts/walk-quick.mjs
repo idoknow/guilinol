@@ -397,7 +397,7 @@ try {
   await mobile.evaluate(async()=>{for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
 
   const hud=await mobile.evaluate(()=>{
-    const selectors=['.walk-ui .joystick','.walk-ui .look-stick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.dock','.sky-ui','output','.hud-me']
+    const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.dock','.sky-ui','output','.hud-me']
     const boxes=selectors.map(sel=>{
       const el=document.querySelector(sel)
       if(!el)return {sel,missing:true}
@@ -471,20 +471,21 @@ try {
   })
   assert(touchTest.yawTurn>.2&&touchTest.pinchDrift<.01&&touchTest.dist>3.5&&touchTest.along>.9&&touchTest.peakSpeed>6&&touchTest.jumped,`touchTest: ${JSON.stringify(touchTest)}`)
 
-  // IDOK-93 look stick: full right deflection turns the view right (same sign as a rightward drag) at cfg.lookYaw rad/s,
-  // and stops dead on release.
-  const lookTest=await mobile.evaluate(()=>{
-    const {walk}=window.viewer, pad=document.querySelector('.walk-ui .look-stick'), r=pad.getBoundingClientRect()
-    const yaw0=walk.yaw
-    pad.dispatchEvent(new PointerEvent('pointerdown',{pointerId:20,pointerType:'touch',clientX:r.right+8,clientY:r.top+r.height/2,bubbles:true}))
-    for(let i=0;i<30;i++)walk.tick(1/60)
-    const yawRight=walk.yaw-yaw0
-    pad.dispatchEvent(new PointerEvent('lostpointercapture',{pointerId:20,pointerType:'touch',bubbles:true}))
-    const yaw1=walk.yaw
-    for(let i=0;i<10;i++)walk.tick(1/60)
-    return {yawRight,settle:Math.abs(walk.yaw-yaw1),knobReset:pad.querySelector('.look-stick-knob').style.transform===''}
-  })
-  assert(lookTest.yawRight<-.85&&lookTest.yawRight>-1.35&&lookTest.settle<1e-6&&lookTest.knobReset,`lookTest: ${JSON.stringify(lookTest)}`)
+  // IDOK-171: no look stick; the bottom-right corner it used is plain canvas, so a one-finger drag there turns the view,
+  // while a touch just above it (between 跃 and 远近, still inside the button gutter) is swallowed by the input guard.
+  const cornerDrag=(page,w,h,corner,blocked)=>page.evaluate(({w,h,corner,blocked})=>{
+    const {walk}=window.viewer, canvas=document.querySelector('canvas')
+    const drag=(x,y,id)=>{
+      const hit=document.elementFromPoint(x,y), yaw0=walk.yaw
+      canvas.dispatchEvent(new PointerEvent('pointerdown',{pointerId:id,pointerType:'touch',clientX:x,clientY:y,bubbles:true}))
+      canvas.dispatchEvent(new PointerEvent('pointermove',{pointerId:id,pointerType:'touch',clientX:x-60,clientY:y,bubbles:true}))
+      canvas.dispatchEvent(new PointerEvent('pointerup',{pointerId:id,pointerType:'touch',clientX:x-60,clientY:y,bubbles:true}))
+      return {onCanvas:hit===canvas,turn:+Math.abs(walk.yaw-yaw0).toFixed(3)}
+    }
+    return {stick:!!document.querySelector('.look-stick'),corner:drag(w-corner[0],h-corner[1],20),blocked:drag(w-blocked[0],h-blocked[1],21)}
+  },{w,h,corner,blocked})
+  const lookTest=await cornerDrag(mobile,390,844,[60,70],[40,230])
+  assert(!lookTest.stick&&lookTest.corner.onCanvas&&lookTest.corner.turn>.2&&lookTest.blocked.onCanvas&&lookTest.blocked.turn===0,`lookTest: ${JSON.stringify(lookTest)}`)
 
   // Also verify 390x844 coexistence when standing next to a parked e-bike AND next to a boat dock (.vehicle-action visible).
   const bikeCoexist=await mobile.evaluate(async()=>{
@@ -500,7 +501,7 @@ try {
       const close=document.querySelector('.spot-card.show .card-close')
       if(close)close.click()
       await new Promise(r=>setTimeout(r,280))
-      const selectors=['.walk-ui .joystick','.walk-ui .look-stick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
+      const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
       const boxes=selectors.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
         return st.display==='none'||st.visibility==='hidden'||el.hasAttribute('hidden')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
       const overlaps=[]
@@ -537,7 +538,7 @@ try {
   await mobile.setViewportSize({width:844,height:390})
   await mobile.evaluate(async()=>{document.querySelector('.spot-card.show .card-close')?.click();for(let i=0;i<4;i++)await new Promise(requestAnimationFrame)})
   const land=await mobile.evaluate(()=>{
-    const selectors=['.walk-ui .joystick','.walk-ui .look-stick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
+    const selectors=['.walk-ui .joystick','.walk-ui .btn-run','.walk-ui .btn-crouch','.walk-ui .btn-jump','.walk-ui .btn-view','.vehicle-action','.dock','.sky-ui','output','.hud-me']
     const boxes=selectors.map(sel=>{const el=document.querySelector(sel);if(!el)return null;const st=getComputedStyle(el),r=el.getBoundingClientRect()
       return st.display==='none'||st.visibility==='hidden'||el.closest('[hidden]')?null:{sel,left:r.left,top:r.top,right:r.right,bottom:r.bottom}}).filter(Boolean)
     const overlaps=[]
@@ -550,9 +551,11 @@ try {
       outOfBounds:boxes.filter(b=>b.left<0||b.top<0||b.right>844.5||b.bottom>390.5).map(b=>b.sel),
       rotate:getComputedStyle(document.querySelector('.dock-buttons>.dock-rotate')).display}
   })
-  assert(land.sticks===2&&!land.overlaps.length&&!land.outOfBounds.length,`landscape HUD: ${JSON.stringify(land)}`)
+  assert(land.sticks===1&&!land.overlaps.length&&!land.outOfBounds.length,`landscape HUD: ${JSON.stringify(land)}`)
   assert.equal(land.rotate,'none','landscape should not offer the rotate entry')
   await mobile.screenshot({path:`${outDir}/mobile-844x390.png`})
+  const landLook=await cornerDrag(mobile,844,390,[55,55],[40,180])
+  assert(!landLook.stick&&landLook.corner.onCanvas&&landLook.corner.turn>.2&&landLook.blocked.onCanvas&&landLook.blocked.turn===0,`landscape look: ${JSON.stringify(landLook)}`)
   // IDOK-158 landscape phone: the sky panel folds down to the clock, stays hittable, remembers the
   // choice, and the fold control looks like a control (chip background + drawn chevron).
   const skyFold=async()=>mobile.evaluate(()=>{
@@ -593,7 +596,7 @@ try {
   assert.equal((await skyFold()).folded,false,'tapping again unfolds it')
   assert.equal(await mobile.evaluate(()=>localStorage.getItem('glol.skyFolded')),'0','unfolding clears the flag')
 
-  console.log('mobile 390x844 HUD & touch OK',JSON.stringify({run:+touchTest.dist.toFixed(2),along:+touchTest.along.toFixed(3),peak:touchTest.peakSpeed,lookYaw:+lookTest.yawRight.toFixed(3)}),mobileShot)
+  console.log('mobile 390x844 HUD & touch OK',JSON.stringify({run:+touchTest.dist.toFixed(2),along:+touchTest.along.toFixed(3),peak:touchTest.peakSpeed,cornerTurn:lookTest.corner.turn,landCornerTurn:landLook.corner.turn}),mobileShot)
   await mobileCtx.close()
 
   assert.deepEqual(errors,[]);console.log('seconds',(performance.now()-start)/1000);assert(performance.now()-start<180000)

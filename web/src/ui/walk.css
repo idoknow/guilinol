@@ -1,21 +1,11 @@
 .walk-ui{position:fixed;inset:0;z-index:2;pointer-events:none}
 .walk-ui>*{pointer-events:auto}
-/* Thumb layout (IDOK-93): move stick bottom-left, look stick bottom-right, action buttons wrap the look stick's
-   top and left edge on a box grid (no two hit boxes intersect, which walk-quick asserts). Slots: A primary (跃/翘头), B (跑/+挡), C (蹲/-挡), D (压弯), E (远近).
+/* Thumb layout (IDOK-93, look stick removed in IDOK-171): move stick bottom-left, action buttons keep the arc they had
+   around the old look stick; the empty bottom-right corner is drag-to-look canvas. Box grid (no two hit boxes intersect, which walk-quick asserts). Slots: A primary (跃/翘头), B (跑/+挡), C (蹲/-挡), D (压弯), E (远近).
    Portrait numbers first; landscape phones (max-height:500px) override below. All distances include the safe-area insets. */
 .walk-ui{--sr:env(safe-area-inset-right);--sb:env(safe-area-inset-bottom)}
 .walk-ui .joystick{left:calc(18px + env(safe-area-inset-left));bottom:calc(28px + var(--sb));width:112px;height:112px}
 .walk-ui .joystick-knob{width:46px;height:46px}
-.walk-ui .look-stick{position:fixed;right:calc(18px + var(--sr));bottom:calc(28px + var(--sb));width:112px;height:112px;border-radius:50%;display:grid;place-items:center;touch-action:none;
-  background:radial-gradient(circle,rgba(24,40,37,.14) 0 30%,rgba(24,40,37,.22) 31% 55%,rgba(24,40,37,.36) 56% 100%);border:1px solid var(--ui-glass-line);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
-/* Four faint chevrons mark it as a look pad, not a second move stick. */
-.walk-ui .look-stick::before{content:"";position:absolute;inset:9px;border-radius:50%;pointer-events:none;opacity:.55;
-  background:conic-gradient(from -8deg,rgba(244,239,226,.75) 0 16deg,transparent 16deg 90deg,rgba(244,239,226,.75) 90deg 106deg,transparent 106deg 180deg,rgba(244,239,226,.75) 180deg 196deg,transparent 196deg 270deg,rgba(244,239,226,.75) 270deg 286deg,transparent 286deg);
-  -webkit-mask:radial-gradient(circle,transparent 0 calc(50% - 4px),#000 calc(50% - 3px) 50%,transparent calc(50% + 1px));mask:radial-gradient(circle,transparent 0 calc(50% - 4px),#000 calc(50% - 3px) 50%,transparent calc(50% + 1px))}
-.walk-ui .look-stick::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid rgba(98,150,160,0);transition:border-color .2s}
-.walk-ui .look-stick.on::after{border-color:rgba(122,172,178,.78)}
-.walk-ui .look-stick-knob{width:42px;height:42px;border-radius:50%;background:rgba(244,239,226,.62);border:2px solid rgba(244,239,226,.9);box-sizing:border-box;box-shadow:0 2px 10px rgba(20,30,28,.3);pointer-events:none;transition:transform .06s,background-color .2s}
-.walk-ui .look-stick.on .look-stick-knob{background:rgba(244,239,226,.86)}
 .walk-ui :is(.btn-run,.btn-crouch,.btn-jump,.btn-view,.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck){position:fixed;border-radius:50%;place-items:center;padding:0;box-sizing:border-box}
 .walk-ui :is(.btn-run,.btn-crouch,.btn-jump,.btn-view){display:grid}
 .walk-ui :is(.btn-wheelie,.btn-gear-up,.btn-gear-down,.btn-tuck){display:none}
@@ -33,8 +23,6 @@
 @media (pointer:coarse) and (max-height:500px){
   .walk-ui .joystick{left:calc(22px + env(safe-area-inset-left));bottom:calc(16px + var(--sb));width:96px;height:96px}
   .walk-ui .joystick-knob{width:40px;height:40px}
-  .walk-ui .look-stick{right:calc(22px + var(--sr));bottom:calc(16px + var(--sb));width:96px;height:96px}
-  .walk-ui .look-stick-knob{width:36px;height:36px}
   .walk-ui :is(.btn-jump,.btn-wheelie){right:calc(66px + var(--sr));bottom:calc(122px + var(--sb));width:56px;height:56px}
   .walk-ui .btn-jump{font-size:19px}
   .walk-ui :is(.btn-run,.btn-gear-up){right:calc(126px + var(--sr));bottom:calc(74px + var(--sb));width:48px;height:48px}
