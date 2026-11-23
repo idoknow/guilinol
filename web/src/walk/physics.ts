@@ -352,6 +352,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const wallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='building'}
   const hullFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='rail'||k==='building'}
   const carWallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='building'||k==='rail'||k==='peak'||k==='tree'}
+  const bikeWallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='rail'||k==='building'||k==='tree'}
   const landmarkFilter=(coll:R.Collider)=>kinds.get(coll.handle)==='landmark'
   const walkableFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='deck'||k==='deckThin'||k==='sidewalk'||k==='road'||k==='ground'||k==='overview'||k==='landmark'}
   function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
@@ -388,6 +389,29 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     if(!box){box=new R.Cuboid(halfW,halfH,halfL);hullBoxes.set(key,box)}
     const half=heading*.5
     return !!world.intersectionWithShape({x,y,z},{x:0,y:Math.sin(half),z:0,w:Math.cos(half)},box,undefined,undefined,capsule,undefined,hullFilter)
+  }
+  function raycastObstacle(x:number,y:number,z:number,dx:number,dy:number,dz:number,maxDist:number){
+    const len=Math.hypot(dx,dy,dz)
+    if(len<1e-5||maxDist<=0)return null
+    segmentRay.origin.x=x;segmentRay.origin.y=y;segmentRay.origin.z=z
+    segmentRay.dir.x=dx/len;segmentRay.dir.y=dy/len;segmentRay.dir.z=dz/len
+    const hit=world.castRayAndGetNormal(segmentRay,maxDist,true,undefined,undefined,capsule,undefined,bikeWallFilter)
+    if(!hit)return null
+    const kind=kinds.get(hit.collider.handle)
+    if(!kind)return null
+    return {
+      distance:hit.timeOfImpact,
+      kind,
+      point:[x+segmentRay.dir.x*hit.timeOfImpact,y+segmentRay.dir.y*hit.timeOfImpact,z+segmentRay.dir.z*hit.timeOfImpact] as [number,number,number],
+      normal:[hit.normal.x,hit.normal.y,hit.normal.z] as [number,number,number],
+    }
+  }
+  function bikePathBlocked(x0:number,z0:number,x1:number,z1:number,y:number,maxSlope:number){
+    const dx=x1-x0,dz=z1-z0,len=Math.hypot(dx,dz)
+    if(len<1e-3)return '' as const
+    const hit=raycastObstacle(x0,y,z0,dx,0,dz,len)
+    if(!hit||hit.normal[1]>=Math.cos(maxSlope))return '' as const
+    return hit.kind==='building'?'building' as const:'collision' as const
   }
   function pathBlocked(x0:number,z0:number,x1:number,z1:number,y:number){
     const dx=x1-x0,dz=z1-z0,len=Math.hypot(dx,dz)
@@ -487,5 +511,5 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
+  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
 }
