@@ -7,6 +7,8 @@ import type {Weather} from '../look/time'
 export interface Walker {
   active:boolean; yaw:number; position:THREE.Vector3
   hold(on:boolean):void; face(yaw:number,pitch?:number):void; showFigure(on:boolean):void
+  /** Right-hand attachment point for hand-held gear (IDOK-182). */
+  handAnchor?():THREE.Object3D
 }
 export interface Clock {hour:number; weather:Weather; flowing:boolean; goal:number|null; set(hour:number,weather?:Weather):void}
 export interface Host {
