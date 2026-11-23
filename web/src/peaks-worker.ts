@@ -1,4 +1,4 @@
-import {northCyclewayGrade,slopeStart,slopeRatio} from './yueya-slope.ts'
+import {northCyclewayGrade,slopeStart,slopeRatio,yueyaShoulderHeight} from './yueya-slope.ts'
 
 export interface PeakWorkerInput {
   packed: ArrayBuffer
@@ -38,6 +38,17 @@ const clamp = (x: number, lo: number, hi: number) => (x < lo ? lo : x > hi ? hi 
 function clearYueyaRoad(positions:Float32Array,normals:Int8Array,start:number,count:number) {
   for(let vertex=start;vertex<start+count;vertex++) {
     const at=vertex*3
+    const east=positions[at], south=positions[at+2], height=positions[at+1]
+    const adjusted=yueyaShoulderHeight(east,height,south)
+    if(adjusted!==height){
+      const gradX=yueyaShoulderHeight(east+.5,height,south)-yueyaShoulderHeight(east-.5,height,south)
+      const gradZ=yueyaShoulderHeight(east,height,south+.5)-yueyaShoulderHeight(east,height,south-.5)
+      const ny=normals[at+1]*(height-158)/(adjusted-158)
+      const nx=normals[at]-gradX*ny,nz=normals[at+2]-gradZ*ny
+      const scale=127/(Math.hypot(nx,ny,nz)||1)
+      normals.set([Math.round(nx*scale),Math.round(ny*scale),Math.round(nz*scale)],at)
+      positions[at+1]=adjusted
+    }
     const from=slopeStart(positions[at]), distance=positions[at+2]-from
     if(distance<=0)continue
     const ratio=slopeRatio(distance), derivative=ratio*ratio

@@ -4,7 +4,7 @@ import {applyTreeVariant, setTreeFar, sharedProxyAssets, TREE_SPECIES_COUNT, tre
 import {look} from './look/config'
 import {fetchAsset,type Tile} from './world'
 import {treeBlocked} from './tunnels'
-import {onOldSouthSlope,slopeStart,slopeRatio} from './yueya-slope'
+import {onOldSouthSlope,slopeStart,slopeRatio,yueyaShoulderHeight} from './yueya-slope'
 import {freezeStatic} from './static-freeze'
 
 type TileSphere = {cx:number; cy:number; cz:number; r:number}
@@ -39,9 +39,12 @@ export async function readTrees(tile:Tile,signal:AbortSignal){
   const tint=new THREE.Color(),proxyTint=new THREE.Color()
   let minY=Infinity, maxY=-Infinity
   for(let i=0;i<data.byteLength;i+=12){
-    const x=tile.x+data.getUint16(i,true)/100,y=data.getInt16(i+4,true)/10
+    const x=tile.x+data.getUint16(i,true)/100
+    let y=data.getInt16(i+4,true)/10
     let z=tile.z+data.getUint16(i+2,true)/100
-    if((data.getInt8(i+10)||data.getInt8(i+11))&&onOldSouthSlope(x,z)){
+    const slopeTree=data.getInt8(i+10)||data.getInt8(i+11)
+    if(slopeTree)y=yueyaShoulderHeight(x,y,z)
+    if(slopeTree&&onOldSouthSlope(x,z)){
       const start=slopeStart(x),distance=z-start
       z=start+distance*slopeRatio(distance)
     }
