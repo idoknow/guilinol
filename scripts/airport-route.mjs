@@ -19,8 +19,12 @@ try {
       assert(route,'Missing '+mode+' leg to '+end)
       return route.geometry.coordinates.slice(i?1:0)
     })
-    const [x,z]=path[0]
-    const car=vehicles.cars.reduce((best,c)=>Math.hypot(c[0]-x,c[2]-z)<Math.hypot(best[0]-x,best[2]-z)?c:best)
+    // Use the published west approach pickup. The closest car by air is below the bridge.
+    const car=vehicles.cars.find(([x,,z])=>Math.hypot(x+572,z+92)<5)
+    if(mode==='drive'){
+      assert(car,'Missing Jiefang East Road pickup')
+      path.unshift([-511,-70],[-378,-25])
+    }
     const page=await browser.newPage()
     try {
       await page.goto(url+'/?verify&mode=walk&flow=0')
@@ -56,10 +60,13 @@ try {
               }
               stream.tick(pos);stream.updateLandmarks?.(pos)
               walk.tick(1/30)
-              if(walk.probe().resets!==initial)throw Error(mode+' reset at waypoint '+index)
-              if(tick%15===0)await new Promise(resolve=>setTimeout(resolve,0))
+              if(tick%15===0 || walk.obstacle==='streaming'){
+                if(walk.probe().resets!==initial)throw Error(mode+' reset at waypoint '+index)
+                await new Promise(resolve=>setTimeout(resolve,0))
+              }
             }
           }
+          if(walk.probe().resets!==initial)throw Error(mode+' reset before T2')
           return {waypoints:path.length,position:walk.position.toArray(),resets:walk.probe().resets-initial}
         }finally{
           for(const code of pressed)key(code,false)
