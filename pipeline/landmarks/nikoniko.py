@@ -493,6 +493,37 @@ def build_plaza_pave():
     return _clamp_img(arr)
 
 
+def facade_finishes(textures):
+    """Embedded finishes for this facade only, not the shared Group B atlases."""
+    yy, xx = np.mgrid[:256, :256]
+    reflection = 0.5 + 0.5 * np.cos(2 * np.pi * (xx + yy) / 256)
+    sky = np.array([121, 185, 222]) + reflection[..., None] * [43, 35, 22]
+    sky[(xx % 64 < 3) | (yy % 64 < 3)] = [60, 94, 111]
+    sky[(xx % 64 == 3) | (yy % 64 == 3)] = [209, 226, 232]
+    textures['glass'] = _clamp_img(sky)
+    panels = Image.new('RGB', (128, 128), '#dae0e3')
+    drawing = ImageDraw.Draw(panels)
+    drawing.rectangle((0, 0, 127, 127), outline='#949fa6', width=2)
+    textures['silver'] = panels
+    atlas = textures['signs'].copy()
+    drawing = ImageDraw.Draw(atlas)
+    left, top, width, height = SIGN_RECTS['niko_crown']
+    drawing.rectangle((left, top, left+width-1, top+height-1), fill='#f5f5ef')
+    for row in range(top+6, top+height, 12):
+        drawing.line((left, row, left+width-1, row), fill='#abb2b4', width=2)
+    _draw_centered(drawing, (left, top, width, height), '微 笑 堂 商 厦',
+                   _font(106, bold=True), (31, 45, 50))
+    left, top, width, height = SIGN_RECTS['led_screen']
+    yy, xx = np.mgrid[:height, :width]
+    ribbon = np.cos(2*np.pi*(xx/width + .5*(yy/height)**2))**8
+    pixels = np.array([207, 22, 42]) + ribbon[..., None]*[45, 104, 38]
+    pixels[yy % 4 == 0] *= .88
+    screen = _clamp_img(pixels)
+    ImageDraw.Draw(screen).rectangle((0, 0, width-1, height-1), outline='#191d22', width=11)
+    atlas.paste(screen, (left, top))
+    textures['signs'] = atlas
+
+
 def ensure_b_textures():
     tex_dir = Path(__file__).resolve().parents[2] / 'public/textures/landmarks/B'
     tex_dir.mkdir(parents=True, exist_ok=True)
@@ -531,6 +562,8 @@ class Builder:
         self.tiled = {k: [] for k in self.TILED_SCALES}
         self.sign_tris = []
         self.sign_uv = []
+        self.screen_tris = []
+        self.screen_uv = []
         self.shop_sign_tris = []
         self.shop_sign_uv = []
         self.shop_glass_tris = []
@@ -627,8 +660,12 @@ class Builder:
                 (uu0, v_top),
             ], dtype=float)
             idx = [[0, 1, 2], [0, 2, 3]]
-            self.sign_tris.append(quad[idx])
-            self.sign_uv.append(uvs[idx])
+            if sign_key == 'led_screen':
+                self.screen_tris.append(quad[idx])
+                self.screen_uv.append(uvs[idx])
+            else:
+                self.sign_tris.append(quad[idx])
+                self.sign_uv.append(uvs[idx])
 
     def shop_sign_quad(self, x, y0, z, w, h, double_sided=False):
         """Place the dedicated independent '漓尚服饰' signboard quad facing local +Z."""
@@ -874,6 +911,8 @@ def export_landmark(name, build_fn, *, reuse_atlas=False):
             ('pave', 'plaza_pave.png'), ('signs', 'signs.png'))}
     else:
         textures = ensure_b_textures()
+    if name == 'nikoniko':
+        facade_finishes(textures)
     scene = trimesh.Scene()
 
     mat_surfaces = trimesh.visual.material.PBRMaterial(
@@ -946,6 +985,13 @@ def export_landmark(name, build_fn, *, reuse_atlas=False):
 
     for lod in (0, 1):
         builder = Builder(detail=(lod == 0))
+        if name == 'nikoniko':
+            builder.TILED_SCALES = {**builder.TILED_SCALES, 'glass': (6., 6.), 'silver': (1.55, 1.25)}
+            builder.tiled['silver'] = []
+            tiled_mats['silver'] = trimesh.visual.material.PBRMaterial(
+                name='nikoniko_silver_panels', baseColorTexture=textures['silver'],
+                roughnessFactor=.62, metallicFactor=.06)
+            tiled_mats['glass'].metallicFactor = .06
         build_fn(builder)
         layer = f'lod{lod}'
         scene.graph.update(frame_to=layer)
@@ -969,6 +1015,15 @@ def export_landmark(name, build_fn, *, reuse_atlas=False):
             uv = np.concatenate(builder.sign_uv, axis=0).reshape(-1, 2)
             mesh.visual = trimesh.visual.TextureVisuals(uv=uv, material=mat_signs)
             scene.add_geometry(mesh, node_name=f'{layer}_signs', parent_node_name=layer)
+
+        if builder.screen_tris:
+            mesh = pack_tris(builder.screen_tris)
+            uv = np.concatenate(builder.screen_uv, axis=0).reshape(-1, 2)
+            screen = trimesh.visual.material.PBRMaterial(name='nikoniko_led',
+                baseColorTexture=textures['signs'], emissiveTexture=textures['signs'],
+                emissiveFactor=[.85, .85, .85], metallicFactor=0, roughnessFactor=.78)
+            mesh.visual = trimesh.visual.TextureVisuals(uv=uv, material=screen)
+            scene.add_geometry(mesh, node_name=f'{layer}_screen', parent_node_name=layer)
 
         if builder.shop_sign_tris and mat_shop_signs is not None:
             mesh = pack_tris(builder.shop_sign_tris)
@@ -1198,17 +1253,13 @@ def _build_lishang_storefront(m: Builder, p0, p1, ground_h=4.8, bays=9):
 def _buttress_pylon(m: Builder, cx, cz, yaw):
     """Flanking chamfered silver-grey aluminum stair/elevator pylon (27.0 m)."""
     m.pose = (cx, 0.0, cz, yaw)
-    m.box(0, -2.0, 0, 10.6, 28.6, 9.2, 'alum', collide=True, footing=True)
-    m.box(0, 26.6, 0, 9.2, 0.85, 8.0, 'alum')
-    if m.detail:
-        m.box(0, 2.2, 4.48, 3.8, 22.8, 0.35, 'glass')
-        m.box(-2.05, 1.8, 4.55, 0.34, 23.4, 0.38, 'alum')
-        m.box(2.05, 1.8, 4.55, 0.34, 23.4, 0.38, 'alum')
-        for fl in range(7):
-            fy = 2.4 + fl * 3.22
-            m.box(0, fy, 4.62, 4.1, 0.26, 0.26, 'white')
-        for sx in (-4.2, -3.0, 3.0, 4.2):
-            m.box(sx, 0.5, 4.58, 0.16, 25.8, 0.14, 'white')
+    m.box(0, -2.0, 0, 10.6, 28.6, 9.2, 'silver', collide=True, footing=True)
+    m.box(0, 5.9, 3.9, 13.8, 20.7, 1.55, 'silver')
+    m.box(0, 26.6, 0, 10.5, .85, 8.8, 'silver')
+    sections = 20 if m.detail else 12
+    m.cylinder_y(-.65, 5.9, 18.9, 4.15, 2.05, 'glass', sections=sections)
+    for sill in (5.9, 9.65, 13.4, 17.15, 20.9, 24.65):
+        m.cylinder_y(-.65, sill, .2, 4.15, 2.09, 'silver', sections=sections)
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
@@ -1279,12 +1330,12 @@ def build_nikoniko(m: Builder):
     for step in range(2):
         m.box(0, step * 0.11, 6.2 - step * 0.9, 11.2, 0.12, 1.0, 'pave', collide=True, footing=True)
     m.box(0, 0.2, 1.8, 10.6, 5.8, 0.5, 'glass', collide=True, footing=True)
+    if m.detail:
+        for jamb in (-5.15, -2.6, 0, 2.6, 5.15):
+            m.box(jamb, .2, 2.06, .14, 5.8, .12, 'alum', footing=True)
+        m.box(0, 2.75, 2.08, 10.4, .16, .14, 'alum')
     for side in (-1, 1):
-        m.cylinder_y(side * 4.4, 0.0, 6.8, 5.4, 0.58, 'alum', sections=12 if m.detail else 6, collide=True)
-        if m.detail:
-            m.box(side * 4.4, 1.8, 6.02, 0.78, 4.3, 0.08, 'red')
-            m.box(side * 4.4, 1.72, 6.04, 0.84, 0.12, 0.10, 'yellow_pave')
-            m.box(side * 4.4, 6.08, 6.04, 0.84, 0.12, 0.10, 'yellow_pave')
+        m.cylinder_y(side * 4.4, 0.0, 6.8, 5.4, 0.58, 'red', sections=12 if m.detail else 6, collide=True)
 
     # Semi-circular fan-ribbed glass arch canopy over main corner entrance (IMG_1386 lower-left!)
     arch_r = 4.35
@@ -1311,21 +1362,17 @@ def build_nikoniko(m: Builder):
     m.cylinder_y(corner_cx, 25.8, 0.55, corner_cz, 10.65, 'alum', sections=24 if m.detail else 10)
     m.cylinder_y(corner_cx, 26.3, 3.9, corner_cz, 9.1, 'glass', sections=20 if m.detail else 10)
     m.cylinder_y(corner_cx, 30.1, 0.45, corner_cz, 9.3, 'alum', sections=20 if m.detail else 10)
-
-    # Giant dark glossy SMD LED billboard screen on floors 2..4 (facing NE intersection)
-    m.pose = (corner_cx, 0.0, corner_cz, corner_yaw)
-    m.box(0, 9.4, 10.25, 10.2, 8.4, 0.55, 'dark')
-    m.sign_quad(0, 9.82, 10.56, 9.6, 7.6, 'led_screen')
+    m.sign_arc(corner_cx, corner_cz, 10.65, 9.4, 8.4, corner_yaw,
+               span_rad=1.82, sign_key='led_screen', segs=20 if m.detail else 12)
 
     # White cylindrical rooftop crown signboard drum (y=30.5..35.0 m)
     m.pose = (0.0, 0.0, 0.0, 0.0)
     m.cylinder_y(corner_cx, 30.5, 4.45, corner_cz, 8.2, 'white', sections=24 if m.detail else 10)
     m.cylinder_y(corner_cx, 34.85, 0.22, corner_cz, 8.35, 'alum', sections=24 if m.detail else 10)
     m.cylinder_y(corner_cx, 30.93, .12, corner_cz, 8.34, 'white', sections=48)
-    m.sign_arc(
-        corner_cx, corner_cz, 8.30, 30.95, 3.55, corner_yaw,
-        span_rad=1.54, sign_key='niko_crown', segs=18 if m.detail else 8,
-    )
+    for side in range(3):
+        m.sign_arc(corner_cx, corner_cz, 8.32, 30.76, 3.95, corner_yaw + side*math.tau/3,
+                   span_rad=math.tau/3, sign_key='niko_crown', segs=18 if m.detail else 10)
     if m.detail:
         # Two steel-and-blue-glass underground pedestrian passage canopies on NE forecourt
         for ux, uz, uyaw in ((52.5, -18.5, corner_yaw - 0.45), (46.2, -23.8, corner_yaw)):
