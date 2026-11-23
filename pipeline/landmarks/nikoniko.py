@@ -1212,6 +1212,26 @@ def _buttress_pylon(m: Builder, cx, cz, yaw):
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
 
+def _corner_glazing(m: Builder, cx, cz):
+    """Frame the exposed quarter of each stepped glass drum on its polygon facets."""
+    for radius, sectors, base, top, transoms in (
+        (10.4, 24, 6.6, 25.8, (10.4, 14.2, 18.0, 21.8)),
+        (9.1, 20, 26.3, 30.1, (28.8,)),
+    ):
+        step = math.tau / sectors
+        half_chord = radius * math.sin(step / 2)
+        face = radius * math.cos(step / 2)
+        for panel in range(sectors // 4):
+            yaw = math.pi / 2 + (panel + .5) * step
+            m.pose = (cx, 0.0, cz, yaw)
+            m.box(0, base, face, .14, top - base, .14, 'alum')
+            m.box(-half_chord, base, face, .18, top - base, .20, 'alum')
+            for sill in transoms:
+                m.box(0, sill, face + .035, 2 * half_chord, .34, .12, 'dark')
+                m.box(0, sill + .34, face + .07, 2 * half_chord, .10, .16, 'alum')
+    m.pose = (0.0, 0.0, 0.0, 0.0)
+
+
 def build_nikoniko(m: Builder):
     from c_kit import landmark_surface
     m.surface = landmark_surface('nikoniko')
@@ -1279,6 +1299,10 @@ def build_nikoniko(m: Builder):
     for step in range(2):
         m.box(0, step * 0.11, 6.2 - step * 0.9, 11.2, 0.12, 1.0, 'pave', collide=True, footing=True)
     m.box(0, 0.2, 1.8, 10.6, 5.8, 0.5, 'glass', collide=True, footing=True)
+    if m.detail:
+        for jamb in (-5.15, -2.6, 0, 2.6, 5.15):
+            m.box(jamb, .2, 2.06, .14, 5.8, .12, 'alum')
+        m.box(0, 2.75, 2.08, 10.4, .16, .14, 'alum')
     for side in (-1, 1):
         m.cylinder_y(side * 4.4, 0.0, 6.8, 5.4, 0.58, 'alum', sections=12 if m.detail else 6, collide=True)
         if m.detail:
@@ -1311,6 +1335,8 @@ def build_nikoniko(m: Builder):
     m.cylinder_y(corner_cx, 25.8, 0.55, corner_cz, 10.65, 'alum', sections=24 if m.detail else 10)
     m.cylinder_y(corner_cx, 26.3, 3.9, corner_cz, 9.1, 'glass', sections=20 if m.detail else 10)
     m.cylinder_y(corner_cx, 30.1, 0.45, corner_cz, 9.3, 'alum', sections=20 if m.detail else 10)
+    if m.detail:
+        _corner_glazing(m, corner_cx, corner_cz)
 
     # Giant dark glossy SMD LED billboard screen on floors 2..4 (facing NE intersection)
     m.pose = (corner_cx, 0.0, corner_cz, corner_yaw)
