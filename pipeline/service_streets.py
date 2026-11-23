@@ -26,17 +26,21 @@ def width(tags):
     return 3 if tags.get('service') in ('driveway', 'parking_aisle') else 4
 
 
-def footprints(elements):
+def footprints(elements, connector_ids=()):
+    from cars import EXTRA_WIDTHS
     result = []
     for way in elements:
         tags = way.get('tags', {})
-        if way['type'] != 'way' or tags.get('highway') not in ('service', 'track', 'living_street'):
+        highway = tags.get('highway')
+        connector = way['id'] in connector_ids and highway in EXTRA_WIDTHS
+        if way['type'] != 'way' or not (connector or highway in ('service', 'track', 'living_street')):
             continue
         if any(tags.get(key, 'no') != 'no' for key in ('bridge', 'tunnel', 'area', 'indoor')) or tags.get('layer', '0') != '0':
             continue
         coords = points(way)
         if len(coords) > 1:
-            result.append(LineString(coords).buffer(width(tags)/2, quad_segs=3))
+            lane_width = EXTRA_WIDTHS[highway] if connector and not tags.get('width') else width(tags)
+            result.append(LineString(coords).buffer(lane_width/2, quad_segs=3))
     return STRtree(result)
 
 
@@ -126,7 +130,11 @@ def clear_carriageway_trees(output, chunks):
 
 
 def bake(output, manifest, palette):
-    tree = footprints(load_osm()); changed = 0
+    connectors = set()
+    if 'region' in manifest:
+        corridors = json.loads(Path(__file__).with_name('region.json').read_bytes())['corridors']
+        connectors = {way for c in corridors if c['mode']=='drive' and c['end']=='两江机场' for way in c['ways']}
+    tree = footprints(load_osm(), connectors); changed = 0
     region = Polygon(manifest['region']['local']) if 'region' in manifest else None
     for tile in manifest['chunks']:
         east, south = tile['x'], tile['z']

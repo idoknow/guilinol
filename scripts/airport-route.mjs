@@ -86,6 +86,7 @@ try {
         }
         await window.viewer.freeze()
         try {
+          let backing=false
           for(const [index,[east,south]] of path.entries()){
             const before=path[index-1],after=path[index+1]
             const turn=before && after && Math.abs(Math.atan2(
@@ -98,7 +99,7 @@ try {
               const pos=walk.position,dx=east-pos.x,dz=south-pos.z,gap=Math.hypot(dx,dz)
               // Street centerline junctions can have a short connector inside the
               // turning circle. Capture those at lane-width tolerance.
-              if(gap<tolerance)break
+              if(gap<tolerance || mode==='drive' && gap<6 && stalled>45 && !walk.obstacle)break
               if(gap<best-.5){best=gap;stalled=0}
               if(++stalled>900)throw Error(mode+' stalled at waypoint '+index+' from '+pos.toArray()+' target '+[east,south]+' heading '+walk.heading+' speed '+walk.speed+' obstacle '+walk.obstacle)
               if(mode==='walk')walk.drive(dx/gap,dz/gap,true)
@@ -106,7 +107,8 @@ try {
                 const angle=Math.atan2(-dx,-dz)-walk.heading,err=Math.atan2(Math.sin(angle),Math.cos(angle))
                 // A corridor leg may end on the same street the next leg retraces.
                 // Back out along the street until the next junction permits a forward turn.
-                reverse ??= Math.abs(err)>Math.PI*.68
+                reverse ??= Math.abs(err)>Math.PI*(backing ? .35 : .68)
+                backing=reverse
                 const steering=reverse?Math.atan2(Math.sin(err),-Math.cos(err)):err
                 const limit=Math.abs(err)>.3?2.5:turn?Math.min(8,2.5+Math.max(0,gap-5)*.18):8
                 key('KeyA',steering>.035);key('KeyD',steering<-.035)

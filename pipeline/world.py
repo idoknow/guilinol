@@ -183,6 +183,9 @@ def build(bbox, output, palette, workers=4):
         return terrain[row, col] / 10, surface[row, col]
 
     pavement, airport_buildings = airfield() if play_region else (None, [])
+    from airport import toll_canopies
+    canopies = toll_canopies(bounds) if play_region else []
+    airport_buildings.extend(canopies)
     raw_foots = raw_overture_footprints(bounds)
     road_net = extract_road_network(raw_foots)
     _, roads, _, banks, _, ped_areas = road_net
@@ -404,7 +407,7 @@ def build(bbox, output, palette, workers=4):
     print('Vegetation:',dict(sorted(tree_stats.items())))
     landmark_faces = list(landmark_triangles(landmarks))
     vehicles = plan_vehicles(bounds, surface, layers['road'], footprints, sample, landmark_faces, interchange=interchange, grid_origin=(left,top))
-    decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal)
+    decks, triangles = bridge_tiles(bounds, sample, vehicles['routes'], (), bridge_plans, west_portal=west_portal, canopies=canopies)
     modeled_paving = unary_union([*layout.street_foundations, *rong_pavement, modeled_paving if modeled_paving is not None else ShapelyPolygon()])
     if fubo is not None:
         # The park paths are painted on the graded ground. An additional

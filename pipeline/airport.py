@@ -1,5 +1,5 @@
 """OSM airfield surfaces and buildings in the Liangjiang aerodrome."""
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Point
 from shapely.ops import unary_union
 from shapely import intersects_xy
 import numpy as np
@@ -65,3 +65,19 @@ def clear_pavement_trees(records, origin, pavement):
     rows = np.frombuffer(records, dtype='<u2').reshape(-1,6)
     keep = ~intersects_xy(pavement,origin[0]+rows[:,0]/100,origin[1]+rows[:,1]/100)
     return bytearray(rows[keep].tobytes())
+
+def toll_canopies(bounds):
+    """Map elevated toll roofs separately from the ground-level corner supports."""
+    canopies = []
+    for el in load_osm():
+        tags = el.get('tags', {})
+        if el['type']!='way' or tags.get('barrier')!='toll_booth' or tags.get('layer')!='1' or not tags.get('building'):
+            continue
+        roof = area(el)
+        if roof.is_empty or not bounds.covers(roof):
+            continue
+        # Estimated supports on the perimeter leave the mapped traffic lanes open.
+        inset = roof.minimum_rotated_rectangle.buffer(-1,join_style=2)
+        posts = unary_union([Point(x,z).buffer(.55,quad_segs=1) for x,z in inset.exterior.coords[:-1]])
+        canopies.append((el,roof,posts.intersection(roof)))
+    return canopies
