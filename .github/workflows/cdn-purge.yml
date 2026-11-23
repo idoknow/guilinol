@@ -92,14 +92,11 @@ jobs:
         if: steps.token.outputs.ok == '1' && inputs.mode != 'dir'
         run: |
           if [ ! -s .cdn-hashes.json ]; then
-            # 没有基线（首次运行、或 7 天没跑缓存被回收）：只写基线 + 预热全部，
-            # 不整站 purge——线上缓存本来是好的，清掉会让用户立刻撞上冷启动那套慢路径
-            echo "::notice::没有哈希基线，记录基线并预热全部文件（不整站 purge）"
+            # 没有基线（首次运行、或 7 天没跑缓存被回收）：只写基线，不 purge 也不全量预热。
+            # 线上缓存本来是好的，purge 会让用户撞上冷启动；全量预热上万个文件会把任务队列打爆，
+            # 需要时手动跑：echo '{}' > /tmp/empty.json && DIST=dist-live STATE=/tmp/empty.json PREHEAT_ONLY=1 bash scripts/cdn-sync.sh
+            echo "::notice::没有哈希基线，只记录基线；本次不做刷新/预热（下次发版开始按变更文件预热）"
             DIST=dist-live STATE=.cdn-hashes.json STATE_ONLY=1 bash scripts/cdn-sync.sh
-            mv .cdn-hashes.json baseline.json
-            echo '{}' > .cdn-hashes.json
-            DIST=dist-live STATE=.cdn-hashes.json PREHEAT_ONLY=1 bash scripts/cdn-sync.sh
-            mv baseline.json .cdn-hashes.json
           else
             DIST=dist-live STATE=.cdn-hashes.json bash scripts/cdn-sync.sh
           fi
