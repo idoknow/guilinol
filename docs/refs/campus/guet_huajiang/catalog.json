@@ -2707,17 +2707,29 @@
       "name": "花江校区图书馆",
       "floors": null,
       "floors_src": null,
-      "facade": null,
+      "facade": "临湖一侧为浅灰色弧形外墙，多道水平窗带由细密竖框分格；远景无法分辨饰面材质。",
       "colors": {
-        "wall": null,
+        "wall": "#A9ABB1",
         "accent": null,
-        "glass": null,
+        "glass": "#505E70",
         "roof": null
       },
       "roof": null,
-      "features": [],
-      "photos": [],
-      "confidence": "none"
+      "features": [
+        "弧形体量",
+        "连续横向窗带"
+      ],
+      "photos": [
+        {
+          "file": "huajiang-library-lake.jpg",
+          "url": "https://www.guetgjbk.com/d/file/p/2025/05-27/7429124656f46a42ff7287e03868f8d1.jpg",
+          "page": "https://www.guetgjbk.com/pic/",
+          "date": null,
+          "date_basis": "图集未注明拍摄时间",
+          "view": "从湖对岸平视，树冠遮住底部，屋面不可见。颜色按此图近似。"
+        }
+      ],
+      "confidence": "low"
     },
     {
       "source": "0d9885d3-38ff-4858-a5e6-e2f37ee6b4a1",
