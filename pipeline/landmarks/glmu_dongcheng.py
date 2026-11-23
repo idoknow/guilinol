@@ -9,6 +9,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from g3_kit import Builder, export_school
+import uni_kit as U
 
 SIGNS = [
     dict(key='glmu_gate',  title='桂 林 医 科 大 学', sub='GUILIN MEDICAL UNIVERSITY', fg=(232, 194, 88), bg=(136, 44, 38), sans=False),
@@ -108,6 +109,21 @@ OV_SE_ANNEX = [(135.15, 170.18), (135.12, 192.64), (163.62, 192.68), (163.64, 17
 OV_SW_PAV = [(-17.26, 226.2), (-32.08, 226.92), (-31.68, 235.38), (-16.85, 234.67)]
 
 
+
+# IDOK-165: generic blocks use the university facade kit (photo-matched colours kept);
+# the hand-built gate, library portal, track and water tower are unchanged.
+_STYLE = {'white': 'ribbon', 'cream': 'punched'}
+
+
+def _fb(b, poly_xz, floors=4, floor_h=3.45, wall='white', accent='terracotta', plinth='dark_stone',
+        roof_kind='flat', roof_tile='gray_tile', y0=0.0, holes=(), **_):
+    pts = U.ccw(poly_xz)
+    U.building(b, pts, floors=floors, fh=floor_h, style=_STYLE.get(wall, 'punched'), wall=wall,
+               accent=accent if accent != 'blue_facade' else 'white', trim='white', plinth='granite',
+               roof='hip' if roof_kind == 'pitched' else 'flat',
+               roof_tile=roof_tile, parapet=0.0 if roof_kind == 'pitched' else 0.9,
+               holes=[U.ccw(h)[::-1] for h in holes])
+
 def _build_main_gate(b: Builder):
     """Huancheng North 2nd Rd main gate (ref #00): facing NE (+0.707, -0.707), yaw = 3*pi/4.
     From street NE looking SW: left (-X) has white cantilevered V-canopy portal,
@@ -137,7 +153,7 @@ def _build_main_gate(b: Builder):
 def _build_library_portal(b: Builder):
     """East City Library (way/459580291, ref #03): 6-storey terracotta curved wings +
     7-storey white monumental '图书馆 / LIBRARY' portal centered on concave SW arc."""
-    b.footprint_building(LIB_459580291, floors=6, floor_h=3.65, wall='terracotta', accent='white', roof_kind='flat', roof_tile='silver_roof')
+    _fb(b, LIB_459580291, floors=6, floor_h=3.65, wall='terracotta', accent='white', roof_kind='flat', roof_tile='silver_roof')
     # Vertical white colonnade ribs along the concave SW inner arc
     inner_arc = [(-19.72, -203.48), (-4.12, -201.75), (8.88, -195.7), (19.49, -186.3), (26.26, -175.82), (30.48, -162.92)]
     if b.detail:
@@ -201,27 +217,27 @@ def build_glmu(b: Builder):
 
     # 3. Library (way/459580291) + Hongde Building (way/671760495) + Motto Boulder (ref #04)
     _build_library_portal(b)
-    b.footprint_building(HONGDE_671760495, floors=7, floor_h=3.6, wall='white', accent='terracotta', roof_kind='flat', roof_tile='silver_roof')
+    _fb(b, HONGDE_671760495, floors=7, floor_h=3.6, wall='white', accent='terracotta', roof_kind='flat', roof_tile='silver_roof')
     # '弘德善医' natural boulder in circular flowerbed in front of Hongde Building west plaza
     b.motto_stone(17.5, -153.5, -1.35, 'glmu_motto', w=4.8, h=2.55)
 
     # 4. Second Teaching Building (way/671790070)
-    b.footprint_building(COLLEGE_671790070, floors=6, floor_h=3.55, wall='cream', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
+    _fb(b, COLLEGE_671790070, floors=6, floor_h=3.55, wall='cream', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
 
     # 5. Kejiao Quadrangle (way/672633239 + Overture c584f92b-490 + octagonal auditorium, ref #01)
-    b.footprint_building(KEJIAO_672633239, floors=6, floor_h=3.55, wall='white', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
-    b.footprint_building(OV_WEST_QUAD, floors=5, floor_h=3.50, wall='cream', accent='terracotta', roof_kind='flat', roof_tile='gray_tile', holes=[WEST_COURTYARD])
+    _fb(b, KEJIAO_672633239, floors=6, floor_h=3.55, wall='white', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
+    _fb(b, OV_WEST_QUAD, floors=5, floor_h=3.50, wall='cream', accent='terracotta', roof_kind='flat', roof_tile='gray_tile', holes=[WEST_COURTYARD])
     b.cylinder_y(-45.0, 0.0, 8.6, -92.0, 10.2, 'terracotta', sections=8, collide=True)
-    b.cylinder_y(-45.0, 8.6, 0.55, -92.0, 10.7, 'white', sections=8)
+    b.cylinder_y(-45.0, 8.6, 0.55, -92.0, 10.2, 'white', sections=8)
 
     # 6. All 7 West Dormitory & University OSM buildings (exact polygons)
-    b.footprint_building(DORM_672633244, floors=6, floor_h=3.25, wall='white', accent='terracotta', roof_kind='pitched', roof_tile='red_tile')
-    b.footprint_building(DORM_672633246, floors=6, floor_h=3.25, wall='white', accent='terracotta', roof_kind='pitched', roof_tile='red_tile')
-    b.footprint_building(DORM_672633248, floors=6, floor_h=3.25, wall='white', accent='ochre', roof_kind='pitched', roof_tile='gray_tile')
-    b.footprint_building(UNIV_672633249, floors=4, floor_h=3.40, wall='cream', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
-    b.footprint_building(DORM_672633251, floors=6, floor_h=3.25, wall='white', accent='ochre', roof_kind='flat', roof_tile='gray_tile')
-    b.footprint_building(UNIV_672633450, floors=5, floor_h=3.30, wall='white', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
-    b.footprint_building(UNIV_672633451, floors=5, floor_h=3.30, wall='white', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
+    _fb(b, DORM_672633244, floors=6, floor_h=3.25, wall='white', accent='terracotta', roof_kind='pitched', roof_tile='red_tile')
+    _fb(b, DORM_672633246, floors=6, floor_h=3.25, wall='white', accent='terracotta', roof_kind='pitched', roof_tile='red_tile')
+    _fb(b, DORM_672633248, floors=6, floor_h=3.25, wall='white', accent='ochre', roof_kind='pitched', roof_tile='gray_tile')
+    _fb(b, UNIV_672633249, floors=4, floor_h=3.40, wall='cream', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
+    _fb(b, DORM_672633251, floors=6, floor_h=3.25, wall='white', accent='ochre', roof_kind='flat', roof_tile='gray_tile')
+    _fb(b, UNIV_672633450, floors=5, floor_h=3.30, wall='white', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
+    _fb(b, UNIV_672633451, floors=5, floor_h=3.30, wall='white', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
 
     # 7. Standard 400m Stadium (way/672634658, ref #02) + Flagpoles + Iconic Water Tower
     b.track_field(-5.8, 46.9, 0.008, straight_len=76.0, inner_r=17.5, track_w=6.2, stand_side=-1, y0=0.05)
@@ -243,11 +259,11 @@ def build_glmu(b: Builder):
     b.basketball_court(82.0, 172.5, 0.0, surface='court_green', apron='track_red', y0=0.05)
     b.basketball_court(118.0, 174.0, 0.0, surface='court_blue', apron='track_red', y0=0.05)
 
-    b.footprint_building(SOUTH_GYM_672659167, floors=4, floor_h=4.1, wall='white', accent='blue_facade', roof_kind='flat', roof_tile='silver_roof')
-    b.footprint_building(SOUTH_LAB_672659168, floors=5, floor_h=3.6, wall='white', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
-    b.footprint_building(OV_SOUTH_LINK, floors=2, floor_h=3.6, wall='white', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
-    b.footprint_building(OV_SE_ANNEX, floors=3, floor_h=3.5, wall='cream', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
-    b.footprint_building(OV_SW_PAV, floors=2, floor_h=3.4, wall='white', accent='gray_tile', roof_kind='pitched', roof_tile='gray_tile')
+    _fb(b, SOUTH_GYM_672659167, floors=4, floor_h=4.1, wall='white', accent='blue_facade', roof_kind='flat', roof_tile='silver_roof')
+    _fb(b, SOUTH_LAB_672659168, floors=5, floor_h=3.6, wall='white', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
+    _fb(b, OV_SOUTH_LINK, floors=2, floor_h=3.6, wall='white', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
+    _fb(b, OV_SE_ANNEX, floors=3, floor_h=3.5, wall='cream', accent='terracotta', roof_kind='flat', roof_tile='gray_tile')
+    _fb(b, OV_SW_PAV, floors=2, floor_h=3.4, wall='white', accent='gray_tile', roof_kind='pitched', roof_tile='gray_tile')
 
     # 10. Campus Trees in Stone Planters (kept clear of gate & library sightlines!)
     trees = [

@@ -168,3 +168,49 @@ def name_wall(b, x, z, w, h, d, region, sign, sign_h, collide=True):
             y0, h - y0, region, cap_region=region, footing=True, collide=collide)
     if b.detail:
         b.sign_board(x, h * 0.55, z + d / 2 - 0.015, w * 0.9, sign_h, sign, backing=None, depth=0)
+
+
+def street_gate_point(campus_world):
+    """Boundary point of the campus closest to the nearest named public road (K-12 style gate)."""
+    from shapely.geometry import LineString
+    from shapely.ops import nearest_points
+    best = None
+    for e in load_osm():
+        t = e.get('tags', {})
+        if e['type'] != 'way' or 'geometry' not in e or not t.get('name'):
+            continue
+        if t.get('highway') not in ('primary', 'secondary', 'tertiary', 'residential', 'unclassified'):
+            continue
+        line = LineString([ll2xz(q['lat'], q['lon']) for q in e['geometry']])
+        d = line.distance(campus_world)
+        if d < 120 and (best is None or d < best[0]):
+            best = (d, line)
+    if best is None:
+        return None
+    return nearest_points(campus_world.exterior, best[1])[0]
+
+
+def vocational_campus(b, campus_id, sign_key):
+    """OSM-level school campus (minors on site): plain footprint blocks from the catalog,
+    one generalized closed street gate with the school name; no interior detail,
+    no guard post, turnstile or camera (IDOK-165, K-12 rule)."""
+    cat = catalog(campus_id)
+    overrides = {r['source']: dict(style='punched', wall='white', accent='granite', roof_box=False)
+                 for r in cat['buildings']}
+    build_records(b, campus_id, overrides=overrides)
+    way = int(cat['campus_osm'].split('/')[1])
+    e = next(x for x in load_osm() if x['type'] == 'way' and x['id'] == way)
+    campus_w = Polygon([ll2xz(q['lat'], q['lon']) for q in e['geometry']])
+    p = street_gate_point(campus_w)
+    if p is None:
+        return
+    campus_l = to_local(b, campus_w)
+    x, z, yaw = gate_frame(campus_l, p.x - b.surface.x, p.y - b.surface.z)
+    prev = b.pose
+    b.pose = (x, b.surface.ground(x, z), z, yaw)
+    for sx in (-4.4, 4.4):
+        y0 = U.pose_footing(b, sx, 0, 0.9, 0.9)
+        b.prism([(sx - .45, -.45), (sx + .45, -.45), (sx + .45, .45), (sx - .45, .45)], y0, 2.6 - y0, 'white',
+                cap_region='granite', footing=True, collide=True)
+    name_wall(b, -9.5, -0.2, 8.0, 2.2, 0.8, 'granite', sign_key, 1.2)
+    b.pose = prev

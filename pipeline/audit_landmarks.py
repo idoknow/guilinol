@@ -271,7 +271,12 @@ def main():
             for source,roof in spec['auditBuildings'].items():
                 reference=area(osm[source]) if source in osm else overture[source]
                 shape=footprint(model,entry,elevation=6 if roof is None else None,roof=roof)
-                selected=max(getattr(shape,'geoms',[shape]),key=lambda part:part.intersection(reference).area,default=Polygon())
+                parts=list(getattr(shape,'geoms',[shape]))
+                selected=max(parts,key=lambda part:part.intersection(reference).area,default=Polygon())
+                if roof is not None:
+                    # A hero element crossing a roof splits its cap into pieces; keep every piece that lies on this roof.
+                    inside=[part for part in parts if part.area>0 and part.intersection(reference).area>=.9*part.area]
+                    if len(inside)>1:selected=union_all(inside)
                 components.append(component_result('wall' if roof is None else 'roof',source,selected,reference))
             row.update(components=components,status='pass' if components and all(item['status']=='pass' for item in components) else 'fail');continue
         if key=='yiwu_street':
