@@ -41,6 +41,21 @@ jobs:
           else
             echo "ok=1" >> "$GITHUB_OUTPUT"
           fi
+      # token 失效要吵出来：以前没配 secret 时 workflow 一直是“成功但什么都没做”
+      - name: Verify token still works
+        if: steps.token.outputs.ok == '1'
+        run: |
+          code=$(curl -s -o /tmp/site.json -w '%{http_code}' --max-time 20 \
+            -H "access-token: $CDNFLY_TOKEN" \
+            "https://cdn.cdn.sn/v1/sites/86153" || echo 000)
+          if [ "$code" != "200" ]; then
+            echo "::error::CDNFLY_TOKEN 请求失败（HTTP $code），secret 可能已过期，请更新 CDNFLY_TOKEN"
+            head -c 200 /tmp/site.json || true
+            exit 1
+          fi
+          python3 -c "import json;d=json.load(open('/tmp/site.json'));assert str(d.get('code'))in('0',),d" \
+            || { echo "::error::CDNFLY_TOKEN 已被拒绝（业务码非 0），请更新 secret"; exit 1; }
+          echo "token 可用"
       - name: Resolve target sha
         id: target
         run: |
