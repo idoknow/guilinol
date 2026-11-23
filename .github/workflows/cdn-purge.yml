@@ -1,0 +1,30 @@
+name: Purge CDN cache
+# 由 sg 上的 deploy/release-window.sh 在新版本上线后触发（gh workflow run cdn-purge.yml），也可手动触发。
+# CDNFLY_TOKEN 只放在仓库 Actions secrets 里，不落到 sg 或仓库。
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: dir（刷新整站）或 list
+        default: dir
+permissions:
+  contents: read
+concurrency:
+  group: cdn-purge
+  cancel-in-progress: false
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Purge CDNFly
+        env:
+          CDNFLY_TOKEN: ${{ secrets.CDNFLY_TOKEN }}
+        run: |
+          if [ -z "$CDNFLY_TOKEN" ]; then
+            echo "::warning::CDNFLY_TOKEN 未配置，跳过 CDN 刷新"
+            exit 0
+          fi
+          bash scripts/cdn-purge.sh "${{ inputs.mode || 'dir' }}"
