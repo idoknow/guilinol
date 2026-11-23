@@ -59,18 +59,19 @@ try {
   await page.keyboard.up('KeyW')
   const metrics = await page.evaluate(async()=>{
     const {manifest,stats,stream,camera}=window.viewer
-    const [west,north,width,depth]=manifest.extent, samples=[], calls=[]
+    const north=manifest.extent[1], samples=[], calls=[]
     let maxResident=0
     function frame(){return new Promise(resolve=>requestAnimationFrame(resolve))}
-    for(let row=0;row<depth/256;row++) {
-      for(let col=0;col<width/256;col++) {
-        const actualCol=row%2?width/256-1-col:col
-        camera.position.x=west+128+actualCol*256;camera.position.z=north+128+row*256
+    const ordered=[...manifest.chunks].sort((a,b)=>a.z-b.z||(((a.z-north)/256)%2?b.x-a.x:a.x-b.x))
+    for(const tile of ordered){
+      camera.position.x=tile.x+128;camera.position.z=tile.z+128
+      await frame();samples.push(stats.ms);calls.push(stats.calls)
+      const deadline=performance.now()+8000
+      while(!stream.loaded.has(tile)){
+        if(performance.now()>deadline)throw Error(`Missing ${tile.file}`)
         await frame();samples.push(stats.ms);calls.push(stats.calls)
-        const tile=manifest.chunks[row*(width/256)+actualCol], deadline=performance.now()+8000
-        while(!stream.loaded.has(tile)){if(performance.now()>deadline)throw Error(`Missing ${tile.file}`);await frame();samples.push(stats.ms);calls.push(stats.calls)}
-        maxResident=Math.max(maxResident,stats.loaded)
       }
+      maxResident=Math.max(maxResident,stats.loaded)
     }
     const mean=list=>list.reduce((total,value)=>total+value,0)/list.length
     return {frames:samples.length,meanMs:mean(samples),p95Ms:samples.sort((a,b)=>a-b)[Math.floor(samples.length*.95)],meanCalls:mean(calls),maxResident,

@@ -15,7 +15,7 @@ async function currentBuild(): Promise<string> {
 
 export function setView(host: Host, view: unknown) {
   if (getPlayMode()==='solo')throw Error('FLIGHT_DISABLED_IN_SOLO')
-  if (!validView(view)) throw Error('无效的反馈视角')
+  if (!validView(view,host.manifest.region ? 'saved' : 'feedback')) throw Error('无效的反馈视角')
   const {lat,lon} = xz2ll(view.x,view.z)
   const [south,west,north,east] = host.manifest.bbox
   if(!host.manifest.region && (lat<south || lat>north || lon<west || lon>east)) throw Error('反馈视角位于开放区域外')

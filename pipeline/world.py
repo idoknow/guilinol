@@ -1,5 +1,5 @@
 from airport import airfield, level_pavement
-from play_region import PlayRegion
+from play_region import PlayRegion, restore_protected_tiles
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 import argparse
@@ -95,9 +95,9 @@ def write_chunk(output, name, payload, trees, origin):
 def build(bbox, output, palette, workers=4):
     if workers < 1:
         raise ValueError('workers must be positive')
-    region = PlayRegion() if bbox is None else None
-    if region:
-        bbox = region.bbox
+    play_region = PlayRegion() if bbox is None else None
+    if play_region:
+        bbox = play_region.bbox
     south, west, north, east = bbox
     if not (south < north and west < east):
         raise ValueError('Expected bbox: south west north east')
@@ -109,7 +109,7 @@ def build(bbox, output, palette, workers=4):
     width, depth = map(int,end-start)
     terrain = np.rint(load_dem(np.arange(left,left+width+1,GRID),np.arange(top,top+depth+1,GRID))*10).astype('<i2')
     raster_bounds = box(*start,*end)
-    bounds = region.geometry if region else raster_bounds
+    bounds = play_region.geometry if play_region else raster_bounds
     def elevation(east,south):
         row = np.clip(round((south-top)/GRID),0,depth//GRID)
         col = np.clip(round((east-left)/GRID),0,width//GRID)
@@ -140,7 +140,7 @@ def build(bbox, output, palette, workers=4):
     output.mkdir(parents=True, exist_ok=True)
     original = previous_bed.copy()
     mountain_trees = []
-    peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet,mountain_trees,CONFIG['peakAreaPerTree'],region.geometry if region else None)
+    peaks, peak_shapes = generate(original,terrain,left,top,bbox,output,wet,mountain_trees,CONFIG['peakAreaPerTree'],play_region.geometry if play_region else None)
     for region,level in layout.flatten:
         for part in polygons(region.intersection(bounds)):
             col, row = math.floor((part.bounds[0]-left)/GRID), math.floor((part.bounds[1]-top)/GRID)
@@ -182,7 +182,7 @@ def build(bbox, output, palette, workers=4):
         col = min(width // GRID, max(0, round((east - left) / GRID)))
         return terrain[row, col] / 10, surface[row, col]
 
-    pavement, airport_buildings = airfield() if region else (None, [])
+    pavement, airport_buildings = airfield() if play_region else (None, [])
     raw_foots = raw_overture_footprints(bounds)
     road_net = extract_road_network(raw_foots)
     _, roads, _, banks, _, ped_areas = road_net
@@ -440,7 +440,7 @@ def build(bbox, output, palette, workers=4):
         for south in range(0,depth,CHUNK):
             for east in range(0,width,CHUNK):
                 origin = (left+east,top+south)
-                if region and origin not in region.tiles:
+                if play_region and origin not in play_region.tiles:
                     continue
                 if origin in published_core:
                     ground_bytes, tree_bytes = published_core.pop(origin)
@@ -452,7 +452,7 @@ def build(bbox, output, palette, workers=4):
                     chunks.append(dict(x=origin[0],z=origin[1],**asset(name)))
                     continue
                 tile = box(*origin,origin[0]+CHUNK,origin[1]+CHUNK)
-                if region and not bounds.covers(tile):
+                if play_region and not bounds.covers(tile):
                     tile = tile.intersection(bounds)
                 parts = ((poly,heights[key]) for key in sorted(index.query(tile))
                          for poly in polygons(footprints[key].intersection(tile)) if poly.area >= .01)
@@ -515,6 +515,8 @@ def build(bbox, output, palette, workers=4):
     write_atlas(output,extent,bounds,layers,footprints,peaks)
     if preserve_campuses:
         preserve_campus_indexes(output,landmarks)
+    if play_region:
+        restore_protected_tiles(output,chunks,landmarks)
     write_overview_map(output,bbox)
     triangles.extend(landmark_faces)
     write_vehicles(output,vehicles,triangles)
@@ -527,8 +529,8 @@ def build(bbox, output, palette, workers=4):
         digest.update(field.astype('<i2', copy=False).tobytes())
     manifest['terrainSha256'] = digest.hexdigest()
     print('Terrain SHA-256:', digest.hexdigest())
-    if region:
-        manifest['region'] = region.manifest()
+    if play_region:
+        manifest['region'] = play_region.manifest()
     manifest['landmarks'] = landmarks
     if tunnels:
         manifest['tunnels'] = tunnels

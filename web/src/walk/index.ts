@@ -1236,7 +1236,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   async function enter(x:number,z:number,heading:number,reason:string,override=false,signal?:AbortSignal,progress?:(fraction:number,detail:string)=>void){
     if(!sim.withinBounds(x,z)){
       if(!manifest.region)return false
-      ;({x,z}=nearestPlayable(manifest,x,z))
+      const point=nearestPlayable(manifest,x,z)
+      x=point.x;z=point.z
     }
     if(shopOverlay?.isOpen())shopOverlay?.close('teleport')
     const target=new THREE.Vector3(x,0,z);destination=target
