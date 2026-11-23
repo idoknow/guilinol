@@ -1,10 +1,14 @@
 name: Refresh CDN
-# 由 sg 上的 deploy/release-window.sh 在新版本上线后触发：
+# 发版后刷新 + 预热 CDN。由 deploy/release-window.sh 在 /version.json 切到新版本后触发：
 #   gh workflow run cdn-purge.yml -f sha=<上线的提交>
-# 默认 mode=sync：从刚上线的 glol-web:<sha> 镜像里取出实际在跑的静态文件，
-# 和上次的 .cdn-hashes.json 比对，只对变了的文件 clean_url + pre_cache_url（scripts/cdn-sync.sh）。
-# 兜底：mode=dir 整站刷新（scripts/cdn-purge.sh dir）。
-# CDNFLY_TOKEN 只放在仓库 Actions secrets 里。
+# 也可以手动跑；sha 留空则取线上 /version.json。
+#
+# 流程：
+#   1. 等线上 /version.json 真的变成目标 sha（部署没完成就一直等，最多 10 分钟）
+#   2. 从 glol-web:<sha> 镜像里取出实际在跑的静态文件，和上次 .cdn-hashes.json 比对
+#   3. 只对变了的文件 clean_url + pre_cache_url（scripts/cdn-sync.sh）
+#   4. 等预热任务跑完（或超时）再结束，并汇总 done/pending/failed
+# 兜底：mode=dir 整站刷新。CDNFLY_TOKEN 放在仓库 Actions secrets。
 on:
   workflow_dispatch:
     inputs:
@@ -37,17 +41,41 @@ jobs:
           else
             echo "ok=1" >> "$GITHUB_OUTPUT"
           fi
+      - name: Resolve target sha
+        id: target
+        run: |
+          sha="${{ inputs.sha }}"
+          if [ -z "$sha" ]; then
+            sha=$(curl -fsS --max-time 20 "https://glol.rcpd.cc/version.json?t=$(date +%s)" \
+              | python3 -c 'import json,sys;print(json.load(sys.stdin)["sha"])')
+          fi
+          [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "bad sha: $sha" >&2; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "目标版本：$sha"
+      # 部署没切过来就等着：预热早于用户能访问没有意义，镜像 tag 也可能还没生效
+      - name: Wait until the new version is live
+        if: steps.token.outputs.ok == '1' && inputs.mode != 'dir'
+        run: |
+          sha="${{ steps.target.outputs.sha }}"
+          for i in $(seq 1 60); do
+            live=$(curl -fsS --max-time 10 "https://glol.rcpd.cc/version.json?t=$(date +%s)" \
+              | python3 -c 'import json,sys;print(json.load(sys.stdin)["sha"])' 2>/dev/null || true)
+            if [ "$live" = "$sha" ]; then
+              echo "线上已是 ${sha:0:7}，开始刷新"
+              exit 0
+            fi
+            echo "第 $i 次：线上 ${live:0:7} ≠ 目标 ${sha:0:7}，10 秒后再看"
+            sleep 10
+          done
+          echo "::error::等了 10 分钟线上仍未切到 ${sha:0:7}"
+          exit 1
       - name: Purge whole site
         if: steps.token.outputs.ok == '1' && inputs.mode == 'dir'
         run: bash scripts/cdn-purge.sh dir
       - name: Extract live static files from the deployed image
         if: steps.token.outputs.ok == '1' && inputs.mode != 'dir'
         run: |
-          sha="${{ inputs.sha }}"
-          if [ -z "$sha" ]; then
-            sha=$(curl -fsS --max-time 20 "https://glol.rcpd.cc/version.json?t=$(date +%s)" | python3 -c 'import json,sys;print(json.load(sys.stdin)["sha"])')
-          fi
-          [[ $sha =~ ^[0-9a-f]{40}$ ]] || { echo "bad sha: $sha" >&2; exit 1; }
+          sha="${{ steps.target.outputs.sha }}"
           echo "镜像 ghcr.io/idoknow/glol-web:$sha"
           docker pull -q "ghcr.io/idoknow/glol-web:$sha"
           id=$(docker create "ghcr.io/idoknow/glol-web:$sha")
@@ -64,11 +92,49 @@ jobs:
         if: steps.token.outputs.ok == '1' && inputs.mode != 'dir'
         run: |
           if [ ! -s .cdn-hashes.json ]; then
-            # 没有基线（首次运行，或 7 天没跑缓存被回收）：整站刷新一次（1 个任务），再记录基线，
-            # 而不是把 1.2 万个文件逐个 clean_url + 预热
+            # 没有基线（首次运行、或 7 天没跑缓存被回收）：整站刷新一次，再记基线，
+            # 而不是把 1 万多个文件逐个 clean_url + 预热
             echo "::notice::没有上次的哈希基线，改为整站刷新并记录基线"
             bash scripts/cdn-purge.sh dir
             DIST=dist-live STATE=.cdn-hashes.json STATE_ONLY=1 bash scripts/cdn-sync.sh
           else
             DIST=dist-live STATE=.cdn-hashes.json bash scripts/cdn-sync.sh
           fi
+      # 预热是异步任务：提交成功不代表大文件已经进缓存，等它跑完再收尾
+      - name: Wait for preheat jobs to finish
+        if: steps.token.outputs.ok == '1'
+        run: |
+          cat > check_jobs.py <<'PY'
+          import json, sys
+          try:
+              d = json.load(open('jobs.json'))
+          except Exception:
+              print('skip'); sys.exit(0)
+          rows = d.get('data') or []
+          if not rows:
+              print('done=0 pending=0 failed=0'); sys.exit(0)
+          def low(r):
+              return (r.get('state') or '').lower()
+          done = [r for r in rows if low(r) in ('done', 'success', '成功')]
+          bad = [r for r in rows if low(r) in ('error', 'fail', 'failed', '失败')]
+          wait = [r for r in rows if low(r) in ('pending', 'process', 'running', '等待', '处理中')]
+          print('done=%d pending=%d failed=%d' % (len(done), len(wait), len(bad)))
+          if wait:
+              print('still-waiting')
+          if bad:
+              print('has-failure')
+          PY
+          for i in $(seq 1 60); do
+            curl -fsS --max-time 20 -H "access-token: $CDNFLY_TOKEN" \
+              "https://cdn.cdn.sn/v1/jobs?type=pre_cache_url&key1=glol.rcpd.cc&page=1&limit=50" \
+              -o jobs.json || true
+            summary=$(python3 check_jobs.py)
+            echo "第 $i 次：$summary"
+            case "$summary" in
+              *still-waiting*) sleep 15 ;;
+              *) break ;;
+            esac
+          done
+          case "$(python3 check_jobs.py)" in
+            *has-failure*) echo "::warning::有预热任务失败，用 ./scripts/cdn-purge.sh list pre_cache_url 查看" ;;
+          esac
