@@ -204,10 +204,10 @@
     },
     {
       "source": "way/655605221",
-      "name": null,
-      "floors": null,
-      "floors_src": null,
-      "facade": null,
+      "name": "继续教育学院所在楼",
+      "floors": 4,
+      "floors_src": "photo",
+      "facade": "浅米色墙面，白框矩形窗成排排列，檐口有细线脚。",
       "colors": {
         "wall": null,
         "accent": null,
@@ -216,11 +216,37 @@
       },
       "roof": null,
       "features": [],
-      "photos": [],
-      "confidence": "none",
+      "photos": [
+        {
+          "file": "way655605221_3.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051314368148X&heading=313&pitch=17&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051314368148X&panotype=street&heading=313",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝约313°拍摄，画面中央为米色侧翼，屋檐和四个楼层均可辨。"
+        },
+        {
+          "file": "way655605221_1.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051314368148X&heading=283&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051314368148X&panotype=street&heading=283",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西拍摄。右侧米色四层楼为校界内继续教育学院所在轮廓。"
+        },
+        {
+          "file": "way655605221_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806051314394838X&heading=273&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806051314394838X&panotype=street&heading=273",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝西拍摄。按地点和轮廓核对外墙，树木及邻栋可能遮挡部分立面。"
+        }
+      ],
+      "confidence": "photo",
       "overture_ids": [
         "99a5a117-19ce-4b38-915e-def47c881de9"
-      ]
+      ],
+      "floor_count_note": "临校门侧翼可见四排窗；学院地点落在此轮廓。楼号待独立证实。"
     },
     {
       "source": "way/679254284",
@@ -359,16 +385,24 @@
           "date": "2019-10-25",
           "date_basis": "报道发布日期",
           "view": "从六合路朝校内拍摄，约向北"
+        },
+        {
+          "file": "guet_liuhe_gate_2.jpg",
+          "url": "https://poi-pic-gz.cdn.bcebos.com/pic_c52024da6360cb55c80f779b775c4ae0.jpg",
+          "page": "https://map.baidu.com/poi/4edf9fbf9693b997cc06a47d",
+          "date": null,
+          "date_basis": "地图地点页未列拍摄日期",
+          "view": "地图地点实拍；镜头方位未标注。"
         }
       ]
     }
   ],
   "open_spaces": [],
-  "unmatched_landmarks": [
+  "outside_boundary_landmarks": [
     {
       "name": "国家大学科技园临街楼",
-      "source": null,
-      "desc": "六合路侧可见粉色横向墙带与首层沿街店面；具体建筑轮廓待核实。",
+      "source": "way/678367948",
+      "desc": "六合路北侧两栋临街楼中的东栋。顶部“国家级大学科技园”字牌与西侧镂空框架可与街景对照。",
       "photos": [
         {
           "file": "guet_liuhe_sciencepark_1.jpg",
@@ -377,8 +411,20 @@
           "date": "2019-10-25",
           "date_basis": "报道发布日期",
           "view": "隔六合路朝带科技园楼顶招牌的立面拍摄。"
+        },
+        {
+          "file": "way678367948_2.jpg",
+          "url": "https://mapsv0.bdimg.com/?qt=pr3d&panoid=09006800121806141026308918X&heading=3&pitch=12&width=900&height=650&fovy=75&quality=86",
+          "page": "https://map.baidu.com/#panoid=09006800121806141026308918X&panotype=street&heading=3",
+          "date": "2018-06",
+          "date_basis": "百度全景拍摄月份",
+          "view": "朝北拍摄。全幅右侧为带科技园招牌的东栋，左侧为另一栋。"
         }
-      ]
+      ],
+      "floors": 4,
+      "floors_src": "photo",
+      "floor_count_note": "一层商铺以上三排窗。",
+      "facade": "粉色横带，底层商铺，屋顶镂空框架与招牌。"
     }
   ]
 }
