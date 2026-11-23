@@ -21,11 +21,13 @@ from road_profile import RULES, Road, facade_gap, pair_carriageways
 
 MOTOR_STEP = 2
 MOTOR_HIGHWAYS = {
+    'motorway', 'motorway_link',
     'trunk', 'trunk_link', 'primary', 'primary_link',
     'secondary', 'secondary_link', 'tertiary', 'tertiary_link',
     'residential', 'unclassified', 'living_street',
 }
 EXTRA_WIDTHS = {
+    'motorway': 14.0, 'motorway_link': 7.0,
     'trunk_link': 7.0, 'primary_link': 6.5, 'secondary_link': 6.0, 'tertiary_link': 5.5,
     'unclassified': 6.0, 'living_street': 6.0,
 }
@@ -48,7 +50,7 @@ def _motor_profile(line: LineString, tags: dict, facades: STRtree, way_id: int) 
     width = float(tag_width[1]) if tag_width else None
     count = tags.get('lanes', '')
     lanes = int(count) if count.isdecimal() and 0 < int(count) <= 16 else None
-    sidewalk = tags.get('sidewalk', 'none' if is_link else 'both')
+    sidewalk = tags.get('sidewalk', 'none' if is_link or kind=='motorway' else 'both')
 
     def edge(side: str) -> float:
         default = 'yes' if sidewalk in ('both', side, 'yes') else 'no'
@@ -276,7 +278,7 @@ def plan_cars(bounds, surface, buildings, sample, existing_bikes=(), docks=None,
 
     motor_geom = unary_union([*ground_polys, *bridge_polys])
     if not motor_geom.is_empty:
-        motor_geom = motor_geom.buffer(0.35, quad_segs=2)
+        motor_geom = motor_geom.buffer(0.35, quad_segs=2).intersection(bounds)
     mask_arr = intersects_xy(motor_geom, xs[None, :], zs[:, None]) if not motor_geom.is_empty else np.zeros((rows, cols), dtype=bool)
 
     def on_motor(east: float, south: float) -> bool:

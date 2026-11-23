@@ -46,7 +46,7 @@ def ground_features(bounds, school_grounds=()):
     layers = dict(green=[], water=[], road=[])
     grounds = unary_union(school_grounds)
     layers.update(schoolTrack=[], schoolCourt=[])
-    widths = {'primary': 14, 'secondary': 12, 'tertiary': 10, 'trunk': 18, 'residential': 6}
+    widths = {'motorway':14, 'motorway_link':7, 'primary': 14, 'secondary': 12, 'tertiary': 10, 'trunk': 18, 'residential': 6}
     for element in load_osm():
         tags = element.get('tags', {})
         if tags.get('leisure') in ('pitch', 'track') and f"{element['type']}/{element['id']}" in replaced_pitches:
