@@ -118,11 +118,11 @@ def building(b, ring, *, floors, fh=3.5, style='punched', wall='white', accent='
     if parapet > 0:
         b.prism(pts, top, parapet, accent if style != 'curtain' else 'white', cap_region=roof_tile, holes=holes)
     if roof_box and b.detail and floors >= 4 and Polygon(pts).area > 500:
-        c = Polygon(pts).buffer(-4.0)
+        c = Polygon(pts, [list(map(tuple, h)) for h in holes]).buffer(-4.0)
         if not c.is_empty and c.geom_type == 'Polygon' and c.area > 40:
             # stair/lift overrun on the roof
             r = c.representative_point()
-            b.box(r.x, top, r.y, 6.0, 3.2, 5.0, wall, cap_region=roof_tile)
+            b.box(r.x, top + max(parapet, 0.0), r.y, 6.0, 3.2, 5.0, wall, cap_region=roof_tile)
 
     if b.lod >= 1:
         # LOD1: one glass band per floor per long edge (cheap)
@@ -208,7 +208,7 @@ def building(b, ring, *, floors, fh=3.5, style='punched', wall='white', accent='
         # floor band below parapet
         slab(b, a, c, top - 0.35, 0.35, 0.12, nrm, accent)
     if roof == 'hip' and b.detail is not None:
-        hip_roof(b, pts, top + parapet * 0 + 0.02, roof_tile)
+        hip_roof(b, pts, top + max(parapet, 0.0) - 0.02, roof_tile)
     return base, top
 
 
@@ -221,7 +221,7 @@ def hip_roof(b, pts, y0, tile):
         cs = cs[1:] + cs[:1]
         e0, e1 = e1, e0
     (x0, z0), (x1, z1), (x2, z2), (x3, z3) = cs
-    o = 0.6
+    o = 0.0   # no overhang: an eave hanging past the wall top has no physical support (grounding audit)
     cx, cz = (x0 + x2) / 2, (z0 + z2) / 2
     ux, uz = (x1 - x0) / e0, (z1 - z0) / e0
     vx, vz = (x3 - x0) / e1, (z3 - z0) / e1

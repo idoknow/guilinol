@@ -83,14 +83,16 @@ def _gate(b, campus_l, gx, gz):
     ux, uz = (q[0] - p[0]) / math.dist(p, q), (q[1] - p[1]) / math.dist(p, q)
     yaw = math.atan2(-uz, ux)
     prev = b.pose
-    b.pose = (gx, 0.0, gz, yaw)
+    b.pose = (gx, b.surface.ground(gx, gz), gz, yaw)
     # two teal portal frames over the carriageways (photo 金鸡岭校区校门), no booths/barriers
     for cx in (-4.2, 4.2):
         for sx in (-2.6, 2.6):
-            y0 = U.pose_footing(b, cx + sx, 0, 0.5, 0.5)
-            b.box(cx + sx, y0, 0, 0.7, 4.8 - y0, 0.7, 'blue_facade', collide=True)
-        b.box(cx, 4.8, 0, 6.6, 1.7, 4.2, 'blue_facade', cap_region='steel')
-        b.box(cx, 4.75, 0, 6.8, 0.3, 4.4, 'white', cap_region='white')
+            px = cx + sx
+            y0 = U.pose_footing(b, px, 0, 0.7, 0.7)
+            b.prism([(px - .35, -.35), (px + .35, -.35), (px + .35, .35), (px - .35, .35)], y0, 4.8 - y0,
+                    'blue_facade', footing=True, collide=True)
+        b.box(cx, 4.8, 0, 6.6, 1.7, 4.2, 'blue_facade', cap_region='steel', bottom=True)
+        b.box(cx, 4.75, 0, 6.8, 0.3, 4.4, 'white', cap_region='white', bottom=True)
     # beige-granite name stone left of the gate
     y0 = U.pose_footing(b, -14.5, 2.5, 14.0, 1.6)
     b.box(-14.5, y0, 2.5, 14.0, 3.2 - y0, 1.6, 'granite', cap_region='granite', collide=True)

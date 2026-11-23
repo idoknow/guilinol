@@ -76,7 +76,7 @@ def build(b):
     gx, gz = ll2xz(g['lat'], g['lon'])
     x, z, yaw = C.gate_frame(campus_l, gx - b.surface.x, gz - b.surface.z)
     prev = b.pose
-    b.pose = (x, 0.0, z, yaw)
+    b.pose = (x, b.surface.ground(x, z), z, yaw)
     C.name_wall(b, -12.0, -1.2, 12.0, 2.6, 1.2, 'ochre', 'gxnu_name', 1.6)
     C.name_wall(b, 9.5, -1.2, 5.0, 2.2, 1.0, 'ochre', 'gxnu_name', 1.2)
     b.pose = prev

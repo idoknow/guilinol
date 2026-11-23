@@ -370,15 +370,19 @@ def main():
                     parts=[part for part in getattr(shape,'geoms',[shape]) if not part.is_empty]
                     selected=max(parts,key=lambda part:part.intersection(target).area) if parts else Polygon()
                     if selected.is_empty or not selected.intersects(target):continue
-                    found=(*metrics(selected,target),lift)
+                    shared=selected.area>1.3*target.area
+                    if shared:
+                        # Terraced blocks sharing a party wall slice into one ring: measure inside 1 m of this footprint.
+                        selected=selected.intersection(target.buffer(1.0))
+                    found=(*metrics(selected,target),lift,shared)
                     if best is None or found[0]>best[0]:best=found
                 if best is None:
                     components.append({'reference':source,'status':'no-overlap'});continue
-                iou,center,delta,lift=best
+                iou,center,delta,lift,shared=best
                 # A near-square footprint has no defined main axis: a 90 deg reading at IoU>=.95 is the same building.
                 ok=iou>=.7 and center<=5 and (delta<=5 or (iou>=.95 and center<=1))
                 components.append(dict(reference=source,iou=round(iou,3),centroidM=round(center,2),angleDeg=round(delta,2),
-                                       sliceLiftM=lift,status='pass' if ok else 'fail'))
+                                       sliceLiftM=lift,**({'sharedWallClip':True} if shared else {}),status='pass' if ok else 'fail'))
             row.update(measurement='per-building wall slice 3 m above its lowest point',components=components,
                        status='pass' if components and all(item['status']=='pass' for item in components) else 'fail');continue
         if key in ('shizijie','zhongshan_road','wangcheng_teaching'):

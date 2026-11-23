@@ -154,6 +154,7 @@ def gate_frame(campus_l, gx, gz):
 def name_wall(b, x, z, w, h, d, region, sign, sign_h, collide=True):
     """Free-standing name wall in the current pose, footed on the ground, sign on its +z face."""
     y0 = U.pose_footing(b, x, z, w, d)
-    b.box(x, y0, z, w, h - y0, d, region, cap_region=region, collide=collide)
+    b.prism([(x - w / 2, z - d / 2), (x + w / 2, z - d / 2), (x + w / 2, z + d / 2), (x - w / 2, z + d / 2)],
+            y0, h - y0, region, cap_region=region, footing=True, collide=collide)
     if b.detail:
         b.sign_board(x, h * 0.55, z + d / 2 - 0.015, w * 0.9, sign_h, sign, backing=None, depth=0)
