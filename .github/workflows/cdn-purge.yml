@@ -1,5 +1,5 @@
 name: Refresh CDN
-# 发版后刷新 + 预热 CDN。由 deploy/release-window.sh 在 /version.json 切到新版本后触发：
+# 发版后刷新 + 预热 CDN。由 deploy/deploy-hk.sh 在部署校验通过后触发：
 #   gh workflow run cdn-purge.yml -f sha=<上线的提交>
 # 也可以手动跑；sha 留空则取线上 /version.json。
 #
@@ -7,7 +7,16 @@ name: Refresh CDN
 #   1. 等线上 /version.json 真的变成目标 sha（部署没完成就一直等，最多 10 分钟）
 #   2. 从 glol-web:<sha> 镜像里取出实际在跑的静态文件，和上次 .cdn-hashes.json 比对
 #   3. 只对变了的文件 clean_url + pre_cache_url（scripts/cdn-sync.sh）
-#   4. 等预热任务跑完（或超时）再结束，并汇总 done/pending/failed
+#   4. 等预热任务跑完（翻 3 页）；失败的从基线剔除，下次发版会重试
+#
+# 首次运行（没有基线）只写基线、不刷新不预热：index.html / manifest.json 是 no-store，
+# assets 带内容哈希，都不会脏读；需要整站强刷用 mode=dir。
+#
+# 手动全量预热（dist-live 只在 CI 里存在，普通检出目录要先从镜像取文件）：
+#   id=$(docker create ghcr.io/idoknow/glol-web:<sha>); docker cp "$id:/usr/share/nginx/html" dist-live
+#   echo '{}' > /tmp/e.json
+#   DIST=dist-live STATE=/tmp/e.json PREHEAT_ONLY=1 bash scripts/cdn-sync.sh
+#
 # 兜底：mode=dir 整站刷新。CDNFLY_TOKEN 放在仓库 Actions secrets。
 on:
   workflow_dispatch:
@@ -104,28 +113,32 @@ jobs:
           key: cdn-hashes-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: cdn-hashes-${{ github.ref_name }}-
       - name: Refresh changed CDN blocks
+        id: refresh
         if: steps.token.outputs.ok == '1' && inputs.mode != 'dir'
         run: |
           if [ ! -s .cdn-hashes.json ]; then
-            # 没有基线（首次运行、或 7 天没跑缓存被回收）：只写基线，不 purge 也不全量预热。
-            # 线上缓存本来是好的，purge 会让用户撞上冷启动；全量预热上万个文件会把任务队列打爆，
-            # 需要时手动跑：echo '{}' > /tmp/empty.json && DIST=dist-live STATE=/tmp/empty.json PREHEAT_ONLY=1 bash scripts/cdn-sync.sh
-            echo "::notice::没有哈希基线，只记录基线；本次不做刷新/预热（下次发版开始按变更文件预热）"
+            # 首次运行 / 基线被回收：只记基线。不 purge（会让用户撞冷启动），
+            # 也不全量预热（上万个文件会把任务队列打爆）。
+            echo "::notice::没有哈希基线，只记录基线；本次不刷新（下次发版起按变更文件预热）"
             DIST=dist-live STATE=.cdn-hashes.json STATE_ONLY=1 bash scripts/cdn-sync.sh
+            echo "submitted=0" >> "$GITHUB_OUTPUT"
           else
             DIST=dist-live STATE=.cdn-hashes.json bash scripts/cdn-sync.sh
+            echo "submitted=1" >> "$GITHUB_OUTPUT"
           fi
-      # 预热是异步任务：提交成功不代表大文件已经进缓存，等它跑完再收尾
+      # 预热是异步任务：提交成功不代表大文件已经进缓存，等它跑完再收尾。
+      # 只扫前 3 页（150 条）覆盖一次发版的变更量；有 pending 就继续等。
       - name: Wait for preheat jobs to finish
-        if: steps.token.outputs.ok == '1'
+        if: steps.token.outputs.ok == '1' && steps.refresh.outputs.submitted == '1'
         run: |
           cat > check_jobs.py <<'PY'
-          import json, sys
-          try:
-              d = json.load(open('jobs.json'))
-          except Exception:
-              print('skip'); sys.exit(0)
-          rows = d.get('data') or []
+          import glob, json, sys
+          rows = []
+          for f in sorted(glob.glob('jobs-*.json')):
+              try:
+                  rows.extend(json.load(open(f)).get('data') or [])
+              except Exception:
+                  continue
           if not rows:
               print('done=0 pending=0 failed=0'); sys.exit(0)
           def low(r):
@@ -138,11 +151,17 @@ jobs:
               print('still-waiting')
           if bad:
               print('has-failure')
+              with open('failed.txt', 'w') as fh:
+                  for r in bad:
+                      fh.write((r.get('key2') or '') + '\n')
           PY
           for i in $(seq 1 60); do
-            curl -fsS --max-time 20 -H "access-token: $CDNFLY_TOKEN" \
-              "https://cdn.cdn.sn/v1/jobs?type=pre_cache_url&key1=glol.rcpd.cc&page=1&limit=50" \
-              -o jobs.json || true
+            rm -f jobs-*.json
+            for page in 1 2 3; do
+              curl -fsS --max-time 20 -H "access-token: $CDNFLY_TOKEN" \
+                "https://cdn.cdn.sn/v1/jobs?type=pre_cache_url&key1=glol.rcpd.cc&page=$page&limit=50" \
+                -o "jobs-$page.json" || true
+            done
             summary=$(python3 check_jobs.py)
             echo "第 $i 次：$summary"
             case "$summary" in
@@ -150,6 +169,18 @@ jobs:
               *) break ;;
             esac
           done
-          case "$(python3 check_jobs.py)" in
-            *has-failure*) echo "::warning::有预热任务失败，用 ./scripts/cdn-purge.sh list pre_cache_url 查看" ;;
-          esac
+          # 失败的从基线剔除，下次发版会重新提交（否则哈希没变就永远不会重试）
+          if [ -f failed.txt ]; then
+            python3 - <<'PY'
+          import json, os
+          failed = {l.strip().split('glol.rcpd.cc', 1)[-1] for l in open('failed.txt') if l.strip()}
+          if failed and os.path.exists('.cdn-hashes.json'):
+              state = json.load(open('.cdn-hashes.json'))
+              before = len(state)
+              for p in failed:
+                  state.pop(p, None)
+              json.dump(state, open('.cdn-hashes.json', 'w'), indent=0, sort_keys=True)
+              print('从基线剔除 %d 个预热失败的文件，下次发版重试' % (before - len(state)))
+          PY
+            echo "::warning::有预热任务失败，已从基线剔除以便下次重试（见 ./scripts/cdn-purge.sh list pre_cache_url）"
+          fi

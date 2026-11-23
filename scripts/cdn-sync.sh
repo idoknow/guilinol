@@ -15,7 +15,8 @@ HOST="${HOST:-https://glol.rcpd.cc}"
 STATE="${STATE:-.cdn-hashes.json}"
 DIRS="${DIRS:-assets landmarks world textures avatar brand icons contributors home basis}"
 DRY_RUN="${DRY_RUN:-0}"
-PREHEAT_ONLY="${PREHEAT_ONLY:-0}"   # 1 = 只预热，不 clean（首次建基线时用，避免把线上缓存全清）
+PREHEAT_ONLY="${PREHEAT_ONLY:-0}"   # 1 = 只预热，不 clean（避免把线上缓存全清）
+INIT_BASELINE="${INIT_BASELINE:-0}"  # 1 = 忽略旧状态、把当前文件当基线并预热全部（首次运行用）
 BATCH="${BATCH:-300}"
 MAX_TIME="${MAX_TIME:-60}"
 
@@ -40,7 +41,7 @@ if u.scheme == 'http' and host not in ('127.0.0.1', '::1', 'localhost'):
     sys.exit(1)
 PY
 
-export API HOST DIST STATE DIRS DRY_RUN PREHEAT_ONLY BATCH MAX_TIME
+export API HOST DIST STATE DIRS DRY_RUN PREHEAT_ONLY INIT_BASELINE BATCH MAX_TIME
 
 exec python3 - <<'PY'
 import hashlib, json, os, sys, time, urllib.request, urllib.error
@@ -53,6 +54,8 @@ DIRS  = os.environ['DIRS'].split()
 DRY   = os.environ['DRY_RUN'] == '1'
 STATE_ONLY = os.environ.get('STATE_ONLY') == '1'
 PREHEAT_ONLY = os.environ.get('PREHEAT_ONLY') == '1'
+INIT_BASELINE = os.environ.get('INIT_BASELINE') == '1'
+NO_CLEAN = PREHEAT_ONLY or INIT_BASELINE
 BATCH = int(os.environ['BATCH'])
 MAX_T = int(os.environ['MAX_TIME'])
 TOKEN = os.environ.get('CDNFLY_TOKEN', '')
@@ -86,6 +89,9 @@ if os.path.exists(STATE):
     except Exception as e:
         print(f'警告: 状态文件解析失败，按全量处理 ({e})', file=sys.stderr)
         old = {}
+
+if INIT_BASELINE:
+    old = {}          # 首次运行：不信任旧状态，全部当新文件（只预热，不 clean）
 
 changed = sorted(p for p, h in now.items() if old.get(p) != h)
 removed = sorted(p for p in old if p not in now)
@@ -164,7 +170,7 @@ def submit(kind, paths):
     body = [{'type': kind, 'data': {'url': HOST + p}} for p in paths]
     return api('/v1/jobs', body)
 
-if not PREHEAT_ONLY:
+if not NO_CLEAN:
     for i in range(0, len(changed), BATCH):
         chunk = changed[i:i + BATCH]
         res = submit('clean_url', chunk)
@@ -173,13 +179,14 @@ if not PREHEAT_ONLY:
             state[p] = now[p]
         save_state(state)      # 每批成功就落盘，中途失败重跑不会重复提交
 
-for i in range(0, len(removed), BATCH):
-    chunk = removed[i:i + BATCH]
-    res = submit('clean_url', chunk)
-    print(f'clean_url(已删除) 第 {i // BATCH + 1} 批：{res.get("msg")}，{len(res.get("data") or [])} 个任务')
-    for p in chunk:
-        state.pop(p, None)
-    save_state(state)
+if not NO_CLEAN:
+    for i in range(0, len(removed), BATCH):
+        chunk = removed[i:i + BATCH]
+        res = submit('clean_url', chunk)
+        print(f'clean_url(已删除) 第 {i // BATCH + 1} 批：{res.get("msg")}，{len(res.get("data") or [])} 个任务')
+        for p in chunk:
+            state.pop(p, None)
+        save_state(state)
 
 for i in range(0, len(changed), BATCH):
     chunk = changed[i:i + BATCH]
