@@ -1,7 +1,7 @@
-import { type Env, Problem, equal, hash, invalid, limited, now, sessionHash, unauthorized } from './auth'
+import { type Env, Problem, equal, hash, invalid, limited, now, sessionAccount, sessionHash, unauthorized } from './auth'
 import { ll2xz } from './projection'
 import { edges, kinds, labels, views, validView } from './feedback-contract'
-import { adminList, adminMergeUsers, adminSetEmail, adminSetPassword, adminUserDetail, audit, setRole } from './admin'
+import { adminList, adminMergeUsers, adminSetEmail, adminSetPassword, adminUserDetail, audit, setBan, setRole } from './admin'
 import {flushMail} from './feedback-mail'
 
 const json = (value: unknown) => Response.json(value, { headers: { 'Cache-Control': 'private, no-store' } })
@@ -76,17 +76,18 @@ export async function feedback(request: Request, env: Env, path: string) {
       return json({ ok: true })
     }
   } else {
-    const account = await stmt(
-      'SELECT users.id,role FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.digest=? AND expires>? AND verified=1',
-      await sessionHash(request),
-      now(),
-    ).first<{ id: string; role: string }>()
-    if (!account) unauthorized()
+    const account = await sessionAccount(env.DB,await sessionHash(request))
+    if (!account?.verified) unauthorized()
     user = account.id
     isAdmin = account.role === 'admin'
     if (admin && !isAdmin) throw new Problem(403, 'forbidden', '无权限')
     if (method !== 'GET' && request.headers.get('Origin') !== new URL(request.url).origin)
       throw new Problem(403, 'origin', '请求来源不符')
+    const banTarget=/^admin\/users\/([\w-]+)\/(ban|unban)$/.exec(path)
+    if (banTarget && method==='POST') {
+      const ban=banTarget[2]==='ban'
+      return setBan(env.DB,user,banTarget[1]!,ban,ban?(await fields(request)).reason:null)
+    }
     const roleTarget=/^admin\/users\/([\w-]+)\/role$/.exec(path)
     if (roleTarget && method==='POST') return setRole(env.DB,user,roleTarget[1],(await fields(request)).role)
     if (admin && method==='GET' && env.perfQuery && ['admin/perf','admin/perf/grid','admin/perf/server','admin/overview','admin/timeseries','admin/breakdown','admin/funnel','admin/errors','admin/live'].includes(path))

@@ -1,10 +1,27 @@
 import { invalid, passwordHash, Problem, random } from './auth'
 import { labels } from './feedback-contract'
-import { userSocialIdentities } from './social'
+import { isSocialType, userSocialIdentities } from './social'
 
 export function audit(db: D1Database, actor: string, action: string, type: string, id: string, detail: object) {
   return db.prepare('INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail) SELECT ?,?,?,?,? WHERE changes()=1')
     .bind(actor,action,type,id,JSON.stringify(detail))
+}
+
+export async function setBan(db: D1Database, actor: string, id: string, ban: boolean, reason: unknown) {
+  const message = typeof reason === 'string' ? reason.trim() : ''
+  if (ban && (!message || [...message].length > 200)) invalid()
+  if (ban && actor === id) throw new Problem(409,'self_ban','不能封禁自己')
+  const read = db.prepare('SELECT id,role,banned_at,ban_reason FROM users WHERE id=?').bind(id)
+  const update = ban
+    ? db.prepare("UPDATE users SET banned_at=unixepoch(),ban_reason=?,banned_by=? WHERE id=? AND banned_at=0 AND role<>'admin'").bind(message,actor,id)
+    : db.prepare("UPDATE users SET banned_at=0,ban_reason='',banned_by='' WHERE id=? AND banned_at<>0").bind(id)
+  const writes = [update, audit(db,actor,ban?'ban':'unban','user',id,ban?{reason:message}:{})]
+  if (ban) writes.push(db.prepare('DELETE FROM sessions WHERE user_id=? AND EXISTS(SELECT 1 FROM users WHERE id=? AND banned_at<>0)').bind(id,id))
+  const results = await db.batch<{role:string;banned_at:number;ban_reason:string}>([...writes,read])
+  const row = results.at(-1)?.results[0]
+  if (!row) throw new Problem(404,'not_found','找不到该用户')
+  if (ban && row.role==='admin') throw new Problem(409,'ban_admin','请先取消管理员身份')
+  return Response.json({id,banned_at:row.banned_at,ban_reason:row.ban_reason},{headers:{'Cache-Control':'private, no-store'}})
 }
 
 export async function setRole(db: D1Database, actor: string, id: string, role: unknown) {
@@ -38,7 +55,7 @@ export async function adminUserDetail(db: D1Database, id: string) {
   if (!/^[A-Za-z0-9-]{8,64}$/.test(id)) invalid()
   const user = await db
     .prepare(
-      `SELECT u.id,u.email,u.nickname,u.verified,u.role,u.created_at,u.email_placeholder,
+      `SELECT u.id,u.email,u.nickname,u.verified,u.role,u.created_at,u.email_placeholder,u.signup_method,u.banned_at,u.ban_reason,u.banned_by,
       (SELECT count(*) FROM feedback WHERE user_id=u.id) feedback_count,
       (SELECT max(submitted_at) FROM feedback WHERE user_id=u.id) last_submitted_at FROM users u WHERE u.id=?`,
     )
@@ -102,6 +119,23 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
     filters.push('u.role=?')
     args.push(role)
   }
+  if (users) {
+    const signup=params.get('signup'), bound=params.get('bound'), status=params.get('status')
+    if (signup!==null) {
+      if (signup!=='email' && !isSocialType(signup)) invalid()
+      filters.push('u.signup_method=?')
+      args.push(signup)
+    }
+    if (bound!==null) {
+      if (!isSocialType(bound)) invalid()
+      filters.push('EXISTS(SELECT 1 FROM social_identities s WHERE s.user_id=u.id AND s.type=?)')
+      args.push(bound)
+    }
+    if (status!==null) {
+      if (status!=='active' && status!=='banned') invalid()
+      filters.push(status==='active'?'u.banned_at=0':'u.banned_at<>0')
+    }
+  }
   if (!users) {
     const status = params.get('status'),
       user = params.get('user')
@@ -117,7 +151,7 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
     }
   }
   const select = users
-    ? `u.id,u.email,u.nickname,u.verified,u.role,u.created_at,
+    ? `u.id,u.email,u.nickname,u.verified,u.role,u.created_at,u.signup_method,u.email_placeholder,u.banned_at,u.ban_reason,
     (SELECT count(*) FROM feedback WHERE user_id=u.id) feedback_count,
     (SELECT max(submitted_at) FROM feedback WHERE user_id=u.id) last_submitted_at FROM users u`
     : `f.id,f.user_id,f.title,f.kind,f.status,u.email,u.nickname,f.lat,f.lon,f.multica_issue,f.pr_url,f.submitted_at,f.updated_at,
@@ -128,10 +162,21 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
     )
     .bind(...args)
     .all()
+  const page = results.slice(0,50)
+  const social = new Map<unknown, Record<string,unknown>[]>()
+  if (users && page.length) {
+    const ids = page.map(row=>row.id)
+    const identities = await db.prepare(`SELECT user_id,type,nickname,created_at,last_login_at FROM social_identities
+      WHERE user_id IN (${ids.map(()=>'?').join(',')}) ORDER BY user_id,created_at,type`).bind(...ids).all()
+    for (const {user_id,...identity} of identities.results) {
+      const group = social.get(user_id) ?? []
+      group.push(identity)
+      social.set(user_id,group)
+    }
+  }
   return json({
-    items: results
-      .slice(0, 50)
-      .map(({ page_key, ...row }) => (users ? { ...row, verified: !!row.verified } : row)),
+    items: page
+      .map(({ page_key, ...row }) => (users ? { ...row, verified: !!row.verified, email_placeholder: !!row.email_placeholder, social: social.get(row.id) ?? [] } : row)),
     next_cursor: results.length > 50 ? String(results[49].page_key) : null,
   })
 }
@@ -186,7 +231,12 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
   const movable = sourceTypes.filter((type) => !targetTypes.has(type))
   const conflicts = sourceTypes.filter((type) => targetTypes.has(type))
 
-  const statements: D1PreparedStatement[] = []
+  const statements: D1PreparedStatement[] = [
+    db.prepare(`UPDATE users SET (banned_at,ban_reason,banned_by) =
+      (SELECT banned_at,ban_reason,banned_by FROM users WHERE id=?)
+      WHERE id=? AND banned_at=0 AND EXISTS(SELECT 1 FROM users WHERE id=? AND banned_at<>0)`).bind(fromId,targetId,fromId),
+    db.prepare('DELETE FROM sessions WHERE user_id=? AND EXISTS(SELECT 1 FROM users WHERE id=? AND banned_at<>0)').bind(targetId,targetId),
+  ]
   // 只在来源邮箱已验证时继承：未验证的邮箱继承过来会把目标账号降成 verified=0，
   // 之后 socialConfirm 的 verified 检查会把这个人的第三方登录也挡掉。
   const adoptedEmail = target.email_placeholder && !source.email_placeholder && source.verified ? source.email : ''
@@ -225,16 +275,13 @@ export async function adminMergeUsers(db: D1Database, actor: string, targetId: s
         .prepare('UPDATE users SET email=?,salt=?,digest=?,verified=?,email_placeholder=0 WHERE id=?')
         .bind(source.email, source.salt, source.digest, source.verified, targetId),
     )
-  statements.push(
-    audit(db, actor, 'merge_users', 'user', targetId, {
-      from: fromId,
-      from_email: source.email,
-      adopted_email: adoptedEmail,
-      moved: movable,
-      conflicts,
-      took_saves: tookSaves,
-    }),
-  )
+  const detail = {from:fromId,from_email:source.email,adopted_email:adoptedEmail,moved:movable,conflicts,took_saves:tookSaves}
+  // Read the resulting ban state in the same batch as the merge.
+  for (const banned of [false,true]) {
+    statements.push(db.prepare(`INSERT INTO admin_audit(actor_id,action,target_type,target_id,detail)
+      SELECT ?,'merge_users','user',id,? FROM users WHERE id=? AND banned_at${banned?'<>':'='}0`)
+      .bind(actor,JSON.stringify({...detail,banned}),targetId))
+  }
   await db.batch(statements)
   return json({
     ok: true,

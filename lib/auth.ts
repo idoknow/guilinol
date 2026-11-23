@@ -13,6 +13,19 @@ export const now = () => Math.floor(Date.now()/1000)
 export class Problem extends Error {
   constructor(readonly status:number, readonly code:string, message:string) { super(message) }
 }
+export type BanState = { banned_at: number; ban_reason: string }
+export function checkBan(user: BanState | null) {
+  if (user?.banned_at) throw new Problem(403,'banned','账号已被封禁：'+user.ban_reason)
+}
+export type SessionAccount = BanState & {id:string;email:string;nickname:string;verified:number;role:string;notify_email:number;email_placeholder:number}
+export async function sessionAccount(db:D1Database, digest:string) {
+  if (!digest) return null
+  const join = ' FROM sessions JOIN users ON users.id=sessions.user_id WHERE sessions.digest=? AND expires>?'
+  const account = await db.prepare('SELECT users.id,email,nickname,verified,role,notify_email,email_placeholder,banned_at,ban_reason'+join+' AND banned_at=0')
+    .bind(digest,now()).first<SessionAccount>()
+  if (!account) checkBan(await db.prepare('SELECT banned_at,ban_reason'+join+' AND banned_at<>0').bind(digest,now()).first<BanState>())
+  return account
+}
 export function invalid(): never { throw new Problem(400,'invalid_input','请检查填写的内容') }
 export function limited(): never { throw new Problem(429,'rate_limited','请求过于频繁，请稍后再试') }
 export function unauthorized(): never { throw new Problem(401,'unauthorized','请先登录') }
