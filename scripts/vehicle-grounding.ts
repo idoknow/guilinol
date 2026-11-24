@@ -24,7 +24,7 @@ if(mode==='portal-routes'){
   const surface=vehicleSurface(world,manifest)
   for(const site of data.routes)for(const test of site.modes){
     const [x,z,way]=test.route[0]
-    test.startHeight=surface(x,z,{way,pedestrian:test.mode==='foot'})
+    test.startHeight=surface(x,z,{way,structure:test.startStructure,pedestrian:test.mode==='foot'})
   }
   fs.writeFileSync(output,JSON.stringify(data.routes))
   process.exit(0)
