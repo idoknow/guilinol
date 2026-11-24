@@ -1,7 +1,7 @@
 {
   "world": "world-a11731a5dafd",
   "main": "27dabe1",
-  "candidateRevision": "045c86c4e895c0de5ebd79284b640c219d99fef6",
+  "candidateRevision": "0e5a0bb99605d55bd806c09c8139c584a88eb2e1",
   "baseline": {
     "tunnelConstraintRecords": 0,
     "partialTunnelWays": [
@@ -169,28 +169,28 @@
     "gradedApproaches": 140,
     "partialTunnelWays": [],
     "reasons": {
-      "surface": 472,
+      "surface": 435,
       "tunnel": 0,
-      "fit": 13,
-      "hidden": 1
+      "fit": 10,
+      "hidden": 0
     },
-    "lanes": 88050,
-    "wheelSamples": 7699956,
-    "outliers": 486,
-    "sunk": 272,
-    "floating": 214,
+    "lanes": 88118,
+    "wheelSamples": 7706604,
+    "outliers": 445,
+    "sunk": 257,
+    "floating": 188,
     "p99": 0.024,
-    "nonplanarFootprints": 110,
+    "nonplanarFootprints": 104,
     "unresolvedTunnelWays": []
   },
   "byLayer": {
-    "at-grade": 317,
-    "bridge": 151,
+    "at-grade": 292,
+    "bridge": 135,
     "tunnel": 18
   },
   "station": {
     "laneAudit": {
-      "lane": 52552,
+      "lane": 52622,
       "way": 1017598912,
       "kind": "motor",
       "maximum": 0.0035615083336608677,
@@ -218,143 +218,21 @@
     "maximumRemainingDifference": 0.034962077728010854,
     "loopApproaches": [],
     "portalDrive": {
-      "requested": 375,
-      "runs": 789,
-      "completed": 649,
-      "passSites": 277,
-      "overLimit": 32,
-      "maximum": 0.5652460052832282,
-      "failures": {
-        "collision": 106,
-        "tool": 34
-      },
-      "unavailable": 10,
-      "wulingAnd385796474": [
-        {
-          "id": 628737319,
-          "way": 259013203,
-          "mode": "car",
-          "boundary": false,
-          "direction": "in",
-          "completed": true,
-          "maximum": 0.0029867193682093784,
-          "obstacle": ""
-        },
-        {
-          "id": 628737319,
-          "way": 259013203,
-          "mode": "car",
-          "boundary": false,
-          "direction": "out",
-          "completed": true,
-          "maximum": 0.0029568459885922493,
-          "obstacle": ""
-        },
-        {
-          "id": 628737325,
-          "way": 259013203,
-          "mode": "car",
-          "boundary": false,
-          "direction": "in",
-          "completed": true,
-          "maximum": 0.0029841466596280952,
-          "obstacle": ""
-        },
-        {
-          "id": 3891288739,
-          "way": 385796474,
-          "mode": "car",
-          "boundary": false,
-          "direction": "in",
-          "completed": true,
-          "maximum": 0.004926609093274692,
-          "obstacle": ""
-        },
-        {
-          "id": 628737325,
-          "way": 259013203,
-          "mode": "car",
-          "boundary": false,
-          "direction": "out",
-          "completed": true,
-          "maximum": 0.0029568543357925137,
-          "obstacle": ""
-        },
-        {
-          "id": 3891288739,
-          "way": 385796474,
-          "mode": "car",
-          "boundary": false,
-          "direction": "out",
-          "completed": true,
-          "maximum": 0.004732997687369789,
-          "obstacle": ""
-        },
-        {
-          "id": 3891288741,
-          "way": 385796474,
-          "mode": "car",
-          "boundary": false,
-          "direction": "in",
-          "completed": true,
-          "maximum": 0.012063346606396408,
-          "obstacle": ""
-        },
-        {
-          "id": 3891288741,
-          "way": 385796474,
-          "mode": "car",
-          "boundary": false,
-          "direction": "out",
-          "completed": true,
-          "maximum": 0.0226685531177111,
-          "obstacle": ""
-        }
-      ],
-      "worstCompletedRun": {
-        "id": 9457773705,
-        "way": 1539622609,
-        "mode": "car",
-        "boundary": false,
-        "direction": "in",
-        "completed": true,
-        "maximum": 0.5652460052832282,
-        "obstacle": ""
-      },
-      "failuresByMode": {
-        "collision": {
-          "car": 96,
-          "foot": 8,
-          "bicycle": 1,
-          "bike": 1
-        },
-        "tool": {
-          "car": 25,
-          "foot": 5,
-          "bicycle": 2,
-          "bike": 2
-        }
-      }
+      "sites": 144,
+      "passed": 139,
+      "runs": 298,
+      "completed": 293,
+      "collisions": 2,
+      "tool": 3,
+      "over": 2,
+      "max": 0.27813442555302004
     },
     "accessDecision": {
-      "inputEntries": 375,
-      "uniqueNodes": 375,
-      "repeatedNodeIds": [
-        9457773705,
-        9457773722
-      ],
-      "staticSubstitutes": 0,
-      "boundaryRuns": 17,
-      "privateAndOneWayWaiver": "verification only",
-      "historicalSites": 373,
-      "historicalPassed": 275,
-      "activeMouths": 144,
-      "activePassed": 137,
-      "newlyIncluded": [
-        13508566602,
-        14018965069
-      ],
-      "formerPortals": 231
+      "actualPortals": 144,
+      "surfaceCollisionSites": 239,
+      "removedGarageWay": 1493582667,
+      "historicalGarageWasAlreadySurface": true,
+      "privateAndOneWayWaiver": "verification only"
     },
     "unmatched": []
   },
@@ -366,8 +244,8 @@
     },
     "candidate": {
       "cells": 1170,
-      "total": 14685474,
-      "p99": 52284
+      "total": 14684798,
+      "p99": 52246
     }
   },
   "driving": {
@@ -377,10 +255,10 @@
   "regressions": {
     "strict": {
       "main": 2922,
-      "candidate": 2885,
+      "candidate": 2903,
       "counts": {
         "streetOverflow": 0,
-        "buildingOnRoad": 1201,
+        "buildingOnRoad": 1219,
         "unevenRoad": 38,
         "textureIssue": 65,
         "otherBasic": 1581
@@ -390,8 +268,8 @@
         "buildingOnRoad": {
           "landmarkOnCarriageway": 16,
           "landmarkOnSidewalk": 1,
-          "proceduralOnCarriageway": 1179,
-          "proceduralOnSidewalk": 5
+          "proceduralOnCarriageway": 1190,
+          "proceduralOnSidewalk": 12
         },
         "unevenRoad": {
           "gradeJump": 15,
@@ -436,18 +314,28 @@
   "performance": {
     "mobileFailed": [
       {
-        "view": "palace",
-        "metric": "heap",
-        "ratio": 1.1028656085471265
+        "view": "walk-palace",
+        "metric": "calls",
+        "ratio": 1.078125
+      },
+      {
+        "view": "walk-palace",
+        "metric": "geometries",
+        "ratio": 1.0649350649350648
+      },
+      {
+        "view": "walk-palace",
+        "metric": "textures",
+        "ratio": 1.0625
       }
     ],
     "desktopFailed": [],
     "mobileHeap": {
-      "overview": 1.0085965021622052,
-      "lijiang": 1.0040859872499168,
-      "palace": 1.1028656085471265,
-      "south": 1.008939842046236,
-      "walk-palace": 1.002141440647707
+      "overview": 1.0125735697528482,
+      "lijiang": 1.0033546130607516,
+      "palace": 1.0032219831429467,
+      "south": 1.005066659118571,
+      "walk-palace": 1.0065928752753357
     }
   },
   "railCrossings": [
@@ -1178,6 +1066,2767 @@
       "maximum": 0.03,
       "parkingMaximum": 0.05
     },
-    "unavailableRunsAreToolFailures": true
+    "unavailableRunsAreToolFailures": true,
+    "portalDenominatorAtRound7": {
+      "inputEntries": 375,
+      "uniqueNodes": 375,
+      "repeatedNodeIds": [
+        9457773705,
+        9457773722
+      ],
+      "staticSubstitutes": 0,
+      "boundaryRuns": 17,
+      "privateAndOneWayWaiver": "verification only",
+      "historicalSites": 373,
+      "historicalPassed": 275,
+      "activeMouths": 144,
+      "activePassed": 137,
+      "newlyIncluded": [
+        13508566602,
+        14018965069
+      ],
+      "formerPortals": 231
+    }
+  },
+  "round9Evidence": {
+    "openings": [
+      {
+        "index": 1,
+        "way": 1474631007,
+        "seed": 2665394803,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 24,
+        "sampleCount": 24,
+        "soffitHits": 24,
+        "minHeadroom": 3.5806522100477878
+      },
+      {
+        "index": 2,
+        "way": 1486208147,
+        "seed": 1167998779,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 33,
+        "sampleCount": 33,
+        "soffitHits": 33,
+        "minHeadroom": 3.587720006147663
+      },
+      {
+        "index": 3,
+        "way": 1486208147,
+        "seed": 3038468414,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 60,
+        "sampleCount": 60,
+        "soffitHits": 60,
+        "minHeadroom": 3.6278557425108318
+      },
+      {
+        "index": 4,
+        "way": 1492980551,
+        "seed": 2914056438,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 24,
+        "sampleCount": 24,
+        "soffitHits": 24,
+        "minHeadroom": 3.6187716410892676
+      },
+      {
+        "index": 5,
+        "way": 1490914045,
+        "seed": 3177375868,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 75,
+        "sampleCount": 75,
+        "soffitHits": 75,
+        "minHeadroom": 3.608107796531584
+      },
+      {
+        "index": 6,
+        "way": 412456970,
+        "seed": 955586079,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 30,
+        "sampleCount": 30,
+        "soffitHits": 30,
+        "minHeadroom": 3.5923414549525035
+      },
+      {
+        "index": 7,
+        "way": 1462755113,
+        "seed": 4145506797,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 62,
+        "sampleCount": 62,
+        "soffitHits": 62,
+        "minHeadroom": 3.5961433184009763
+      },
+      {
+        "index": 8,
+        "way": 1461995308,
+        "seed": 4145506797,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 75,
+        "sampleCount": 75,
+        "soffitHits": 75,
+        "minHeadroom": 3.6194290827370423
+      },
+      {
+        "index": 9,
+        "way": 1492966272,
+        "seed": 115216171,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 81,
+        "sampleCount": 81,
+        "soffitHits": 81,
+        "minHeadroom": 3.5994907736556456
+      },
+      {
+        "index": 10,
+        "way": 1493582667,
+        "seed": 2937485852,
+        "role": "garage",
+        "solids": 417,
+        "exposed": 0,
+        "sampleCount": 417,
+        "soffitHits": 0,
+        "minHeadroom": null
+      },
+      {
+        "index": 11,
+        "way": 1475440133,
+        "seed": 24355304,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 102,
+        "sampleCount": 102,
+        "soffitHits": 102,
+        "minHeadroom": 3.6428426006702637
+      },
+      {
+        "index": 12,
+        "way": 1472403496,
+        "seed": 1996702752,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 72,
+        "sampleCount": 72,
+        "soffitHits": 72,
+        "minHeadroom": 3.6099104606130936
+      },
+      {
+        "index": 13,
+        "way": 1472403495,
+        "seed": 1996702752,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 75,
+        "sampleCount": 75,
+        "soffitHits": 75,
+        "minHeadroom": 3.5937908781188526
+      },
+      {
+        "index": 14,
+        "way": 1493581776,
+        "seed": 545065662,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 60,
+        "sampleCount": 60,
+        "soffitHits": 60,
+        "minHeadroom": 3.6284044767346018
+      },
+      {
+        "index": 15,
+        "way": 1472404238,
+        "seed": 4014179843,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 152,
+        "sampleCount": 152,
+        "soffitHits": 152,
+        "minHeadroom": 3.630446559083765
+      },
+      {
+        "index": 16,
+        "way": 1568666548,
+        "seed": 2067278668,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 42,
+        "sampleCount": 42,
+        "soffitHits": 42,
+        "minHeadroom": 3.5672590232363177
+      },
+      {
+        "index": 17,
+        "way": 1568445636,
+        "seed": 3028170778,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 76,
+        "sampleCount": 76,
+        "soffitHits": 76,
+        "minHeadroom": 3.6428425878642656
+      },
+      {
+        "index": 18,
+        "way": 1568445636,
+        "seed": 2509472003,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 51,
+        "sampleCount": 51,
+        "soffitHits": 51,
+        "minHeadroom": 3.616187683073065
+      },
+      {
+        "index": 19,
+        "way": 1568666548,
+        "seed": 2067278668,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 63,
+        "sampleCount": 63,
+        "soffitHits": 63,
+        "minHeadroom": 3.5797512705040617
+      },
+      {
+        "index": 20,
+        "way": 1475440138,
+        "seed": 3469972854,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 84,
+        "sampleCount": 84,
+        "soffitHits": 84,
+        "minHeadroom": 3.628438728138633
+      },
+      {
+        "index": 21,
+        "way": 1497558425,
+        "seed": 3854272852,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 48,
+        "sampleCount": 48,
+        "soffitHits": 48,
+        "minHeadroom": 3.5690218349252802
+      },
+      {
+        "index": 22,
+        "way": 1499787826,
+        "seed": 688838479,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 21,
+        "sampleCount": 21,
+        "soffitHits": 21,
+        "minHeadroom": 3.659791135307671
+      },
+      {
+        "index": 23,
+        "way": 1499787826,
+        "seed": 688838479,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 144,
+        "sampleCount": 144,
+        "soffitHits": 144,
+        "minHeadroom": 3.628216784062886
+      },
+      {
+        "index": 24,
+        "way": 1497845499,
+        "seed": 1984329326,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 132,
+        "sampleCount": 132,
+        "soffitHits": 132,
+        "minHeadroom": 3.601288216169081
+      },
+      {
+        "index": 25,
+        "way": 1489643589,
+        "seed": 3303558350,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 42,
+        "sampleCount": 42,
+        "soffitHits": 42,
+        "minHeadroom": 3.639939005803541
+      },
+      {
+        "index": 26,
+        "way": 1489643588,
+        "seed": 3303558350,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 42,
+        "sampleCount": 42,
+        "soffitHits": 42,
+        "minHeadroom": 3.898597085263475
+      },
+      {
+        "index": 27,
+        "way": 1497561668,
+        "seed": 2321529334,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 150,
+        "sampleCount": 150,
+        "soffitHits": 150,
+        "minHeadroom": 3.6831692925726998
+      },
+      {
+        "index": 28,
+        "way": 473971012,
+        "seed": 3542261978,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 96,
+        "sampleCount": 96,
+        "soffitHits": 96,
+        "minHeadroom": 3.6258825714081127
+      },
+      {
+        "index": 29,
+        "way": 1553374718,
+        "seed": 3969410426,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 75,
+        "sampleCount": 75,
+        "soffitHits": 75,
+        "minHeadroom": 3.5848204404269666
+      },
+      {
+        "index": 30,
+        "way": 1550773915,
+        "seed": 2770424731,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 15,
+        "sampleCount": 15,
+        "soffitHits": 15,
+        "minHeadroom": 3.5614197999717874
+      },
+      {
+        "index": 31,
+        "way": 454952631,
+        "seed": 2372011066,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 51,
+        "sampleCount": 51,
+        "soffitHits": 51,
+        "minHeadroom": 5.749321805633514
+      },
+      {
+        "index": 32,
+        "way": 454952633,
+        "seed": 2372011066,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 105,
+        "sampleCount": 105,
+        "soffitHits": 105,
+        "minHeadroom": 3.6054359806674086
+      },
+      {
+        "index": 33,
+        "way": 1473494210,
+        "seed": 2916874581,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 60,
+        "sampleCount": 60,
+        "soffitHits": 60,
+        "minHeadroom": 3.5604651983203155
+      },
+      {
+        "index": 34,
+        "way": 1550948420,
+        "seed": 175909778,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 30,
+        "sampleCount": 30,
+        "soffitHits": 30,
+        "minHeadroom": 3.6236496506058984
+      },
+      {
+        "index": 35,
+        "way": 1553344902,
+        "seed": 4223432606,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 48,
+        "sampleCount": 48,
+        "soffitHits": 48,
+        "minHeadroom": 3.6243621378135913
+      },
+      {
+        "index": 36,
+        "way": 1550817778,
+        "seed": 3475521959,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 33,
+        "sampleCount": 33,
+        "soffitHits": 33,
+        "minHeadroom": 3.644780738717543
+      },
+      {
+        "index": 37,
+        "way": 1490460395,
+        "seed": 1050855858,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 27,
+        "sampleCount": 27,
+        "soffitHits": 27,
+        "minHeadroom": 3.6657869250712167
+      },
+      {
+        "index": 38,
+        "way": 1475436862,
+        "seed": 4181582634,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 21,
+        "sampleCount": 21,
+        "soffitHits": 21,
+        "minHeadroom": 3.6418316593253337
+      },
+      {
+        "index": 39,
+        "way": 1550333274,
+        "seed": 4194643402,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 26,
+        "sampleCount": 26,
+        "soffitHits": 26,
+        "minHeadroom": 3.611891529160715
+      },
+      {
+        "index": 40,
+        "way": 453854243,
+        "seed": 3741443331,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 69,
+        "sampleCount": 69,
+        "soffitHits": 69,
+        "minHeadroom": 3.58778756767299
+      },
+      {
+        "index": 41,
+        "way": 1490465015,
+        "seed": 1322814768,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 57,
+        "sampleCount": 57,
+        "soffitHits": 57,
+        "minHeadroom": 3.6079199789292034
+      },
+      {
+        "index": 42,
+        "way": 1475436867,
+        "seed": 2876753770,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 87,
+        "sampleCount": 87,
+        "soffitHits": 87,
+        "minHeadroom": 4.759667408568276
+      },
+      {
+        "index": 43,
+        "way": 1475436870,
+        "seed": 2876753770,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 111,
+        "sampleCount": 111,
+        "soffitHits": 111,
+        "minHeadroom": 3.644437780968218
+      },
+      {
+        "index": 56,
+        "way": 1474950752,
+        "seed": 3597188869,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 30,
+        "sampleCount": 30,
+        "soffitHits": 30,
+        "minHeadroom": 3.611954667852075
+      },
+      {
+        "index": 57,
+        "way": 1023360330,
+        "seed": 4293969565,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 57,
+        "sampleCount": 57,
+        "soffitHits": 57,
+        "minHeadroom": 3.6310271303788966
+      },
+      {
+        "index": 58,
+        "way": 1473757087,
+        "seed": 4236729330,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 33,
+        "sampleCount": 33,
+        "soffitHits": 33,
+        "minHeadroom": 3.6184049835479755
+      },
+      {
+        "index": 59,
+        "way": 454117718,
+        "seed": 3645437235,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 67,
+        "sampleCount": 67,
+        "soffitHits": 67,
+        "minHeadroom": 3.633180759109223
+      },
+      {
+        "index": 60,
+        "way": 1474958000,
+        "seed": 174557098,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 33,
+        "sampleCount": 33,
+        "soffitHits": 33,
+        "minHeadroom": 3.6213969072302064
+      },
+      {
+        "index": 65,
+        "way": 1474085204,
+        "seed": 2382807297,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 20,
+        "sampleCount": 20,
+        "soffitHits": 20,
+        "minHeadroom": 3.6311150709097433
+      },
+      {
+        "index": 66,
+        "way": 454117718,
+        "seed": 3645437235,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 4,
+        "sampleCount": 4,
+        "soffitHits": 4,
+        "minHeadroom": 3.610145542515852
+      },
+      {
+        "index": 67,
+        "way": 1474085204,
+        "seed": 438176064,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 34,
+        "sampleCount": 34,
+        "soffitHits": 34,
+        "minHeadroom": 3.612547739663569
+      },
+      {
+        "index": 68,
+        "way": 1492452085,
+        "seed": 4144338261,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 45,
+        "sampleCount": 45,
+        "soffitHits": 45,
+        "minHeadroom": 3.561589232474603
+      },
+      {
+        "index": 69,
+        "way": 454947557,
+        "seed": 1364689659,
+        "role": "cut",
+        "solids": 0,
+        "exposed": 9,
+        "sampleCount": 9,
+        "soffitHits": 0,
+        "minHeadroom": null
+      },
+      {
+        "index": 70,
+        "way": 1539622609,
+        "seed": 404705074,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 90,
+        "sampleCount": 90,
+        "soffitHits": 90,
+        "minHeadroom": 3.5766912775901574
+      },
+      {
+        "index": 71,
+        "way": 1025797703,
+        "seed": 404705074,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 33,
+        "sampleCount": 33,
+        "soffitHits": 33,
+        "minHeadroom": 3.614512996386736
+      },
+      {
+        "index": 72,
+        "way": 1532494232,
+        "seed": 2414791052,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 57,
+        "sampleCount": 57,
+        "soffitHits": 57,
+        "minHeadroom": 3.6674472759561922
+      },
+      {
+        "index": 73,
+        "way": 1025797703,
+        "seed": 404705074,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 54,
+        "sampleCount": 54,
+        "soffitHits": 54,
+        "minHeadroom": 3.613692503212178
+      },
+      {
+        "index": 74,
+        "way": 1532928036,
+        "seed": 1285419153,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 24,
+        "sampleCount": 24,
+        "soffitHits": 24,
+        "minHeadroom": 3.6190721404482815
+      },
+      {
+        "index": 75,
+        "way": 1468130974,
+        "seed": 3073439014,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 108,
+        "sampleCount": 108,
+        "soffitHits": 108,
+        "minHeadroom": 3.6148689124896407
+      },
+      {
+        "index": 76,
+        "way": 1468130974,
+        "seed": 1848674265,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 36,
+        "sampleCount": 36,
+        "soffitHits": 36,
+        "minHeadroom": 3.957914468628587
+      },
+      {
+        "index": 77,
+        "way": 1557629674,
+        "seed": 1848674265,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 30,
+        "sampleCount": 30,
+        "soffitHits": 30,
+        "minHeadroom": 3.584627355157153
+      },
+      {
+        "index": 78,
+        "way": 1474365105,
+        "seed": 3479003438,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 27,
+        "sampleCount": 27,
+        "soffitHits": 27,
+        "minHeadroom": 3.5520280845812806
+      },
+      {
+        "index": 79,
+        "way": 1474365105,
+        "seed": 3479003438,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 15,
+        "sampleCount": 15,
+        "soffitHits": 15,
+        "minHeadroom": 3.613915496876814
+      },
+      {
+        "index": 80,
+        "way": 1552890609,
+        "seed": 1979080386,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 138,
+        "sampleCount": 138,
+        "soffitHits": 138,
+        "minHeadroom": 3.6468943131737035
+      },
+      {
+        "index": 81,
+        "way": 1552890609,
+        "seed": 1979080386,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 72,
+        "sampleCount": 72,
+        "soffitHits": 72,
+        "minHeadroom": 3.6226364364750054
+      },
+      {
+        "index": 82,
+        "way": 1476732770,
+        "seed": 3705466778,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 24,
+        "sampleCount": 24,
+        "soffitHits": 24,
+        "minHeadroom": 3.589740319431712
+      },
+      {
+        "index": 83,
+        "way": 1473600896,
+        "seed": 2641443585,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 21,
+        "sampleCount": 21,
+        "soffitHits": 21,
+        "minHeadroom": 3.618743653447183
+      },
+      {
+        "index": 84,
+        "way": 1472133244,
+        "seed": 3622958722,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 30,
+        "sampleCount": 30,
+        "soffitHits": 30,
+        "minHeadroom": 3.5673866605992828
+      },
+      {
+        "index": 85,
+        "way": 1498950503,
+        "seed": 1112577434,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 207,
+        "sampleCount": 207,
+        "soffitHits": 207,
+        "minHeadroom": 3.5627973747589294
+      },
+      {
+        "index": 86,
+        "way": 1472132457,
+        "seed": 468022255,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 95,
+        "sampleCount": 95,
+        "soffitHits": 95,
+        "minHeadroom": 4.286917863168668
+      },
+      {
+        "index": 87,
+        "way": 1112703462,
+        "seed": 2515875700,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 372,
+        "sampleCount": 372,
+        "soffitHits": 372,
+        "minHeadroom": 3.6310948722295393
+      },
+      {
+        "index": 88,
+        "way": 1112703462,
+        "seed": 3061327632,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 234,
+        "sampleCount": 234,
+        "soffitHits": 234,
+        "minHeadroom": 3.620798980370097
+      },
+      {
+        "index": 89,
+        "way": 1013357845,
+        "seed": 3477404875,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 39,
+        "sampleCount": 39,
+        "soffitHits": 39,
+        "minHeadroom": 3.5837594716299463
+      },
+      {
+        "index": 90,
+        "way": 923425799,
+        "seed": 3858088203,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 18,
+        "sampleCount": 18,
+        "soffitHits": 18,
+        "minHeadroom": 3.6256825411547027
+      },
+      {
+        "index": 91,
+        "way": 1013355607,
+        "seed": 716660479,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 10,
+        "sampleCount": 10,
+        "soffitHits": 10,
+        "minHeadroom": 3.592298025026821
+      },
+      {
+        "index": 92,
+        "way": 1492542125,
+        "seed": 1433064336,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 66,
+        "sampleCount": 66,
+        "soffitHits": 66,
+        "minHeadroom": 4.755215625724162
+      },
+      {
+        "index": 93,
+        "way": 1492542123,
+        "seed": 1433064336,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 39,
+        "sampleCount": 39,
+        "soffitHits": 39,
+        "minHeadroom": 4.013070724289236
+      },
+      {
+        "index": 94,
+        "way": 1492542121,
+        "seed": 1433064336,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 66,
+        "sampleCount": 66,
+        "soffitHits": 66,
+        "minHeadroom": 5.034328847112306
+      },
+      {
+        "index": 95,
+        "way": 1492542120,
+        "seed": 1433064336,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 33,
+        "sampleCount": 33,
+        "soffitHits": 33,
+        "minHeadroom": 3.639361791358084
+      },
+      {
+        "index": 96,
+        "way": 1492542119,
+        "seed": 1433064336,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 63,
+        "sampleCount": 63,
+        "soffitHits": 63,
+        "minHeadroom": 4.969695833241104
+      },
+      {
+        "index": 97,
+        "way": 1492542124,
+        "seed": 1433064336,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 33,
+        "sampleCount": 33,
+        "soffitHits": 33,
+        "minHeadroom": 4.925441515568764
+      },
+      {
+        "index": 98,
+        "way": 1469987890,
+        "seed": 3659043220,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 147,
+        "sampleCount": 147,
+        "soffitHits": 147,
+        "minHeadroom": 3.583762873077916
+      },
+      {
+        "index": 99,
+        "way": 1473604678,
+        "seed": 1183723252,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 27,
+        "sampleCount": 27,
+        "soffitHits": 27,
+        "minHeadroom": 3.609323237948786
+      },
+      {
+        "index": 100,
+        "way": 1492138642,
+        "seed": 988769768,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 99,
+        "sampleCount": 99,
+        "soffitHits": 99,
+        "minHeadroom": 3.640345079333173
+      },
+      {
+        "index": 101,
+        "way": 1492040484,
+        "seed": 2462404523,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 18,
+        "sampleCount": 18,
+        "soffitHits": 18,
+        "minHeadroom": 3.6083022777904716
+      },
+      {
+        "index": 102,
+        "way": 1016581610,
+        "seed": 1705462470,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 63,
+        "sampleCount": 63,
+        "soffitHits": 63,
+        "minHeadroom": 3.6050869701345505
+      },
+      {
+        "index": 103,
+        "way": 1576931738,
+        "seed": 52495,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 132,
+        "sampleCount": 132,
+        "soffitHits": 132,
+        "minHeadroom": 3.553802604740895
+      },
+      {
+        "index": 104,
+        "way": 1576931738,
+        "seed": 52495,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 36,
+        "sampleCount": 36,
+        "soffitHits": 36,
+        "minHeadroom": 3.5870712486806156
+      },
+      {
+        "index": 105,
+        "way": 1474325108,
+        "seed": 113342553,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 48,
+        "sampleCount": 48,
+        "soffitHits": 48,
+        "minHeadroom": 3.6381427310771244
+      },
+      {
+        "index": 106,
+        "way": 1474325108,
+        "seed": 113342553,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 57,
+        "sampleCount": 57,
+        "soffitHits": 57,
+        "minHeadroom": 3.585834035070576
+      },
+      {
+        "index": 107,
+        "way": 1016734571,
+        "seed": 1335936542,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 39,
+        "sampleCount": 39,
+        "soffitHits": 39,
+        "minHeadroom": 3.5461765353532257
+      },
+      {
+        "index": 108,
+        "way": 1476098823,
+        "seed": 1861902728,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 156,
+        "sampleCount": 156,
+        "soffitHits": 156,
+        "minHeadroom": 3.6527950857183384
+      },
+      {
+        "index": 109,
+        "way": 1485632262,
+        "seed": 2026629408,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 57,
+        "sampleCount": 57,
+        "soffitHits": 57,
+        "minHeadroom": 3.5744798446551442
+      }
+    ],
+    "yardLanes": {
+      "453854241": {
+        "lanes": 6,
+        "insideGarageMetres": null,
+        "warehouseIntersections": [
+          16.485
+        ]
+      },
+      "453854242": {
+        "lanes": 2,
+        "insideGarageMetres": null,
+        "warehouseIntersections": []
+      },
+      "453854243": {
+        "lanes": 6,
+        "insideGarageMetres": null,
+        "warehouseIntersections": []
+      },
+      "453854244": {
+        "lanes": 20,
+        "insideGarageMetres": null,
+        "warehouseIntersections": [
+          23.922,
+          102.031
+        ]
+      },
+      "453854245": {
+        "lanes": 4,
+        "insideGarageMetres": null,
+        "warehouseIntersections": [
+          9.177,
+          21.551
+        ]
+      },
+      "453854246": {
+        "lanes": 6,
+        "insideGarageMetres": null,
+        "warehouseIntersections": [
+          17.863,
+          7.301
+        ]
+      },
+      "453854248": {
+        "lanes": 2,
+        "insideGarageMetres": null,
+        "warehouseIntersections": []
+      },
+      "453854249": {
+        "lanes": 2,
+        "insideGarageMetres": null,
+        "warehouseIntersections": [
+          121.664
+        ]
+      },
+      "453854250": {
+        "lanes": 22,
+        "insideGarageMetres": null,
+        "warehouseIntersections": [
+          19.75,
+          19.535,
+          23.566
+        ]
+      },
+      "1493582667": {
+        "lanes": 30,
+        "insideGarageMetres": 0.0,
+        "warehouseIntersections": []
+      }
+    },
+    "surface": {
+      "sites": 239,
+      "passed": 177,
+      "runs": 507,
+      "completed": 438,
+      "collisions": 50,
+      "tool": 19,
+      "over": 34,
+      "max": 0.4656428927070806
+    },
+    "yardRuns": {
+      "sites": 9,
+      "passed": 7,
+      "runs": 18,
+      "completed": 14,
+      "collisions": 4,
+      "tool": 0,
+      "over": 0,
+      "max": 0.07518803016193942
+    },
+    "grainYardSource": {
+      "overture": "56f66428-e070-4340-a894-4f7d04c1d044",
+      "source": "OpenStreetMap",
+      "name": "桂林粮库公司",
+      "originalSeed": 1565322396,
+      "site": 985684873,
+      "warehouseRelation": 21813141,
+      "areaSquareMetres": 68378.7,
+      "mappedBuildings": 5,
+      "warehouseHoles": 2,
+      "removedOldRecords": 16
+    },
+    "priorityLaneRemap": {
+      "52552": 52622,
+      "78739": 78809
+    },
+    "residency": {
+      "main": {
+        "tiles": [
+          {
+            "file": "103_36.glc",
+            "ground": 184352,
+            "street": 1658040,
+            "building": 170292,
+            "structure": 16080,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "102_37.glc",
+            "ground": 47136,
+            "street": 908478,
+            "building": 80148,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "102_36.glc",
+            "ground": 184352,
+            "street": 1749675,
+            "building": 147792,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "103_37.glc",
+            "ground": 47136,
+            "street": 1216962,
+            "building": 187384,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "102_38.glc",
+            "ground": 47136,
+            "street": 2632446,
+            "building": 5580,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "104_37.glc",
+            "ground": 184352,
+            "street": 5532048,
+            "building": 80892,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "103_38.glc",
+            "ground": 47136,
+            "street": 2429496,
+            "building": 115996,
+            "structure": 26760,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "104_36.glc",
+            "ground": 184352,
+            "street": 4168962,
+            "building": 174312,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "101_37.glc",
+            "ground": 47136,
+            "street": 6422199,
+            "building": 217744,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "101_36.glc",
+            "ground": 47136,
+            "street": 7085784,
+            "building": 236048,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "103_35.glc",
+            "ground": 184352,
+            "street": 3835509,
+            "building": 209756,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "102_35.glc",
+            "ground": 47136,
+            "street": 5634753,
+            "building": 218496,
+            "structure": 0,
+            "detachedTunnel": 0
+          }
+        ],
+        "cell": "-1_-1",
+        "afterMove": {
+          "tiles": [
+            "112_37.glc",
+            "111_37.glc",
+            "112_36.glc",
+            "111_36.glc",
+            "113_37.glc",
+            "112_38.glc",
+            "111_38.glc",
+            "113_36.glc",
+            "110_37.glc",
+            "110_36.glc",
+            "112_35.glc",
+            "111_35.glc"
+          ]
+        }
+      },
+      "candidate": {
+        "tiles": [
+          {
+            "file": "102_37.glc",
+            "ground": 57204,
+            "street": 918687,
+            "building": 80148,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "102_36.glc",
+            "ground": 279248,
+            "street": 1783992,
+            "building": 147792,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "103_36.glc",
+            "ground": 426224,
+            "street": 1766772,
+            "building": 170292,
+            "structure": 16080,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "103_37.glc",
+            "ground": 240516,
+            "street": 1392360,
+            "building": 187384,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "102_38.glc",
+            "ground": 47136,
+            "street": 2632446,
+            "building": 5580,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "103_38.glc",
+            "ground": 47136,
+            "street": 2429496,
+            "building": 115996,
+            "structure": 26760,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "104_37.glc",
+            "ground": 291356,
+            "street": 6168450,
+            "building": 80892,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "101_37.glc",
+            "ground": 47136,
+            "street": 6422199,
+            "building": 217744,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "104_36.glc",
+            "ground": 335372,
+            "street": 4201188,
+            "building": 174312,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "101_36.glc",
+            "ground": 47136,
+            "street": 7085784,
+            "building": 236048,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "103_35.glc",
+            "ground": 248048,
+            "street": 4109307,
+            "building": 209756,
+            "structure": 0,
+            "detachedTunnel": 0
+          },
+          {
+            "file": "102_35.glc",
+            "ground": 47136,
+            "street": 5634753,
+            "building": 218496,
+            "structure": 0,
+            "detachedTunnel": 0
+          }
+        ],
+        "profile": {
+          "cell": "-1_-1",
+          "encodedChars": 21372,
+          "decodedBytes": 3348
+        },
+        "cell": "-1_-1",
+        "afterMove": {
+          "tiles": [
+            "111_36.glc",
+            "111_37.glc",
+            "112_36.glc",
+            "112_37.glc",
+            "113_37.glc",
+            "110_37.glc",
+            "113_36.glc",
+            "112_38.glc",
+            "112_35.glc",
+            "111_38.glc",
+            "110_36.glc",
+            "111_35.glc"
+          ],
+          "profile": {
+            "cell": "3_-1",
+            "encodedChars": 11692,
+            "decodedBytes": 1740
+          }
+        }
+      }
+    },
+    "remainingPortals": [
+      {
+        "id": 10098378801,
+        "mode": "car",
+        "direction": "out",
+        "failure": "collision",
+        "maximum": 0.02763185576941396
+      },
+      {
+        "id": 13694473830,
+        "mode": "car",
+        "direction": "in",
+        "failure": null,
+        "maximum": 0.27813442555302004
+      },
+      {
+        "id": 13694473830,
+        "mode": "car",
+        "direction": "out",
+        "failure": "collision",
+        "maximum": 0.1040732786389924
+      },
+      {
+        "id": 8205272806,
+        "mode": "car",
+        "direction": "out",
+        "failure": null,
+        "maximum": 0.16219868992860142
+      },
+      {
+        "id": 9688206551,
+        "mode": "car",
+        "direction": "in",
+        "failure": "tool",
+        "maximum": null
+      },
+      {
+        "id": 3891277141,
+        "mode": "car",
+        "direction": "out",
+        "failure": "tool",
+        "maximum": 0.12859227283297514
+      },
+      {
+        "id": 9688206551,
+        "mode": "car",
+        "direction": "out",
+        "failure": "tool",
+        "maximum": 0.016579593838883966
+      }
+    ],
+    "way1112703462": [
+      {
+        "index": 87,
+        "way": 1112703462,
+        "seed": 2515875700,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 372,
+        "sampleCount": 372,
+        "soffitHits": 372,
+        "minHeadroom": 3.6310948722295393
+      },
+      {
+        "index": 88,
+        "way": 1112703462,
+        "seed": 3061327632,
+        "role": "opening",
+        "solids": 0,
+        "exposed": 234,
+        "sampleCount": 234,
+        "soffitHits": 234,
+        "minHeadroom": 3.620798980370097
+      }
+    ],
+    "previousBuildStrictBeforeElevationCheck": 2972,
+    "strictAuditRevision": "f8c40116",
+    "realWarehouseLongCrossings": {
+      "453854244": [
+        102.031
+      ],
+      "453854249": [
+        121.664
+      ]
+    },
+    "originalClassification": [
+      {
+        "序号": "1",
+        "分类": "A",
+        "OSM way": "1474631007",
+        "建筑 seed": "2665394803",
+        "GL04 分块": "110_14.glc",
+        "重叠长度 m": "4.363",
+        "最低屋顶减路面 m": "9.355",
+        "截图": ""
+      },
+      {
+        "序号": "2",
+        "分类": "A",
+        "OSM way": "1486208147",
+        "建筑 seed": "1167998779",
+        "GL04 分块": "128_32.glc",
+        "重叠长度 m": "5.9",
+        "最低屋顶减路面 m": "6.139",
+        "截图": ""
+      },
+      {
+        "序号": "3",
+        "分类": "A",
+        "OSM way": "1486208147",
+        "建筑 seed": "3038468414",
+        "GL04 分块": "128_32.glc",
+        "重叠长度 m": "10.43",
+        "最低屋顶减路面 m": "12.261",
+        "截图": ""
+      },
+      {
+        "序号": "4",
+        "分类": "A",
+        "OSM way": "1492980551",
+        "建筑 seed": "2914056438",
+        "GL04 分块": "106_39.glc",
+        "重叠长度 m": "4.074",
+        "最低屋顶减路面 m": "19.239",
+        "截图": ""
+      },
+      {
+        "序号": "5",
+        "分类": "A",
+        "OSM way": "1490914045",
+        "建筑 seed": "3177375868",
+        "GL04 分块": "87_40.glc",
+        "重叠长度 m": "12.846",
+        "最低屋顶减路面 m": "19.499",
+        "截图": ""
+      },
+      {
+        "序号": "6",
+        "分类": "A",
+        "OSM way": "412456970",
+        "建筑 seed": "955586079",
+        "GL04 分块": "99_40.glc",
+        "重叠长度 m": "5.314",
+        "最低屋顶减路面 m": "5.456",
+        "截图": ""
+      },
+      {
+        "序号": "7",
+        "分类": "A",
+        "OSM way": "1462755113",
+        "建筑 seed": "4145506797",
+        "GL04 分块": "50_41.glc",
+        "重叠长度 m": "10.895",
+        "最低屋顶减路面 m": "22.304",
+        "截图": ""
+      },
+      {
+        "序号": "8",
+        "分类": "A",
+        "OSM way": "1461995308",
+        "建筑 seed": "4145506797",
+        "GL04 分块": "51_41.glc",
+        "重叠长度 m": "12.96",
+        "最低屋顶减路面 m": "19.687",
+        "截图": ""
+      },
+      {
+        "序号": "9",
+        "分类": "A",
+        "OSM way": "1492966272",
+        "建筑 seed": "115216171",
+        "GL04 分块": "105_41.glc",
+        "重叠长度 m": "13.676",
+        "最低屋顶减路面 m": "11.709",
+        "截图": ""
+      },
+      {
+        "序号": "10",
+        "分类": "C",
+        "OSM way": "1493582667",
+        "建筑 seed": "2937485852",
+        "GL04 分块": "121_41.glc",
+        "重叠长度 m": "69.923",
+        "最低屋顶减路面 m": "18.419",
+        "截图": "010-1493582667.png"
+      },
+      {
+        "序号": "11",
+        "分类": "A",
+        "OSM way": "1475440133",
+        "建筑 seed": "24355304",
+        "GL04 分块": "51_42.glc",
+        "重叠长度 m": "17.371",
+        "最低屋顶减路面 m": "21.344",
+        "截图": ""
+      },
+      {
+        "序号": "12",
+        "分类": "A",
+        "OSM way": "1472403496",
+        "建筑 seed": "1996702752",
+        "GL04 分块": "52_42.glc",
+        "重叠长度 m": "12.157",
+        "最低屋顶减路面 m": "21.0",
+        "截图": ""
+      },
+      {
+        "序号": "13",
+        "分类": "A",
+        "OSM way": "1472403495",
+        "建筑 seed": "1996702752",
+        "GL04 分块": "53_42.glc",
+        "重叠长度 m": "12.522",
+        "最低屋顶减路面 m": "22.098",
+        "截图": ""
+      },
+      {
+        "序号": "14",
+        "分类": "A",
+        "OSM way": "1493581776",
+        "建筑 seed": "545065662",
+        "GL04 分块": "117_42.glc",
+        "重叠长度 m": "10.84",
+        "最低屋顶减路面 m": "19.128",
+        "截图": ""
+      },
+      {
+        "序号": "15",
+        "分类": "A",
+        "OSM way": "1472404238",
+        "建筑 seed": "4014179843",
+        "GL04 分块": "52_43.glc",
+        "重叠长度 m": "25.658",
+        "最低屋顶减路面 m": "21.935",
+        "截图": ""
+      },
+      {
+        "序号": "16",
+        "分类": "A",
+        "OSM way": "1568666548",
+        "建筑 seed": "2067278668",
+        "GL04 分块": "52_43.glc",
+        "重叠长度 m": "7.148",
+        "最低屋顶减路面 m": "22.742",
+        "截图": ""
+      },
+      {
+        "序号": "17",
+        "分类": "A",
+        "OSM way": "1568445636",
+        "建筑 seed": "3028170778",
+        "GL04 分块": "63_43.glc",
+        "重叠长度 m": "13.703",
+        "最低屋顶减路面 m": "8.855",
+        "截图": ""
+      },
+      {
+        "序号": "18",
+        "分类": "A",
+        "OSM way": "1568445636",
+        "建筑 seed": "2509472003",
+        "GL04 分块": "63_43.glc",
+        "重叠长度 m": "8.859",
+        "最低屋顶减路面 m": "8.694",
+        "截图": ""
+      },
+      {
+        "序号": "19",
+        "分类": "A",
+        "OSM way": "1568666548",
+        "建筑 seed": "2067278668",
+        "GL04 分块": "52_44.glc",
+        "重叠长度 m": "10.744",
+        "最低屋顶减路面 m": "22.742",
+        "截图": ""
+      },
+      {
+        "序号": "20",
+        "分类": "A",
+        "OSM way": "1475440138",
+        "建筑 seed": "3469972854",
+        "GL04 分块": "53_44.glc",
+        "重叠长度 m": "14.408",
+        "最低屋顶减路面 m": "21.715",
+        "截图": ""
+      },
+      {
+        "序号": "21",
+        "分类": "A",
+        "OSM way": "1497558425",
+        "建筑 seed": "3854272852",
+        "GL04 分块": "59_44.glc",
+        "重叠长度 m": "8.14",
+        "最低屋顶减路面 m": "15.368",
+        "截图": ""
+      },
+      {
+        "序号": "22",
+        "分类": "A",
+        "OSM way": "1499787826",
+        "建筑 seed": "688838479",
+        "GL04 分块": "59_44.glc",
+        "重叠长度 m": "3.869",
+        "最低屋顶减路面 m": "11.298",
+        "截图": ""
+      },
+      {
+        "序号": "23",
+        "分类": "A",
+        "OSM way": "1499787826",
+        "建筑 seed": "688838479",
+        "GL04 分块": "60_44.glc",
+        "重叠长度 m": "24.411",
+        "最低屋顶减路面 m": "11.146",
+        "截图": ""
+      },
+      {
+        "序号": "24",
+        "分类": "A",
+        "OSM way": "1497845499",
+        "建筑 seed": "1984329326",
+        "GL04 分块": "49_45.glc",
+        "重叠长度 m": "22.437",
+        "最低屋顶减路面 m": "17.062",
+        "截图": ""
+      },
+      {
+        "序号": "25",
+        "分类": "A",
+        "OSM way": "1489643589",
+        "建筑 seed": "3303558350",
+        "GL04 分块": "44_46.glc",
+        "重叠长度 m": "7.308",
+        "最低屋顶减路面 m": "9.902",
+        "截图": ""
+      },
+      {
+        "序号": "26",
+        "分类": "A",
+        "OSM way": "1489643588",
+        "建筑 seed": "3303558350",
+        "GL04 分块": "44_46.glc",
+        "重叠长度 m": "7.309",
+        "最低屋顶减路面 m": "10.037",
+        "截图": ""
+      },
+      {
+        "序号": "27",
+        "分类": "A",
+        "OSM way": "1497561668",
+        "建筑 seed": "2321529334",
+        "GL04 分块": "67_46.glc",
+        "重叠长度 m": "25.336",
+        "最低屋顶减路面 m": "14.585",
+        "截图": ""
+      },
+      {
+        "序号": "28",
+        "分类": "A",
+        "OSM way": "473971012",
+        "建筑 seed": "3542261978",
+        "GL04 分块": "55_48.glc",
+        "重叠长度 m": "16.381",
+        "最低屋顶减路面 m": "21.675",
+        "截图": ""
+      },
+      {
+        "序号": "29",
+        "分类": "A",
+        "OSM way": "1553374718",
+        "建筑 seed": "3969410426",
+        "GL04 分块": "66_48.glc",
+        "重叠长度 m": "12.725",
+        "最低屋顶减路面 m": "18.493",
+        "截图": ""
+      },
+      {
+        "序号": "30",
+        "分类": "A",
+        "OSM way": "1550773915",
+        "建筑 seed": "2770424731",
+        "GL04 分块": "66_49.glc",
+        "重叠长度 m": "2.792",
+        "最低屋顶减路面 m": "6.061",
+        "截图": ""
+      },
+      {
+        "序号": "31",
+        "分类": "A",
+        "OSM way": "454952631",
+        "建筑 seed": "2372011066",
+        "GL04 分块": "72_49.glc",
+        "重叠长度 m": "8.654",
+        "最低屋顶减路面 m": "21.433",
+        "截图": ""
+      },
+      {
+        "序号": "32",
+        "分类": "A",
+        "OSM way": "454952633",
+        "建筑 seed": "2372011066",
+        "GL04 分块": "72_49.glc",
+        "重叠长度 m": "17.865",
+        "最低屋顶减路面 m": "19.282",
+        "截图": ""
+      },
+      {
+        "序号": "33",
+        "分类": "A",
+        "OSM way": "1473494210",
+        "建筑 seed": "2916874581",
+        "GL04 分块": "46_51.glc",
+        "重叠长度 m": "10.074",
+        "最低屋顶减路面 m": "9.118",
+        "截图": ""
+      },
+      {
+        "序号": "34",
+        "分类": "A",
+        "OSM way": "1550948420",
+        "建筑 seed": "175909778",
+        "GL04 分块": "65_51.glc",
+        "重叠长度 m": "5.056",
+        "最低屋顶减路面 m": "8.825",
+        "截图": ""
+      },
+      {
+        "序号": "35",
+        "分类": "A",
+        "OSM way": "1553344902",
+        "建筑 seed": "4223432606",
+        "GL04 分块": "68_51.glc",
+        "重叠长度 m": "8.087",
+        "最低屋顶减路面 m": "12.275",
+        "截图": ""
+      },
+      {
+        "序号": "36",
+        "分类": "A",
+        "OSM way": "1550817778",
+        "建筑 seed": "3475521959",
+        "GL04 分块": "69_51.glc",
+        "重叠长度 m": "5.857",
+        "最低屋顶减路面 m": "21.754",
+        "截图": ""
+      },
+      {
+        "序号": "37",
+        "分类": "A",
+        "OSM way": "1490460395",
+        "建筑 seed": "1050855858",
+        "GL04 分块": "52_52.glc",
+        "重叠长度 m": "4.63",
+        "最低屋顶减路面 m": "19.246",
+        "截图": ""
+      },
+      {
+        "序号": "38",
+        "分类": "A",
+        "OSM way": "1475436862",
+        "建筑 seed": "4181582634",
+        "GL04 分块": "56_52.glc",
+        "重叠长度 m": "3.509",
+        "最低屋顶减路面 m": "17.529",
+        "截图": ""
+      },
+      {
+        "序号": "39",
+        "分类": "A",
+        "OSM way": "1550333274",
+        "建筑 seed": "4194643402",
+        "GL04 分块": "57_52.glc",
+        "重叠长度 m": "5.266",
+        "最低屋顶减路面 m": "12.815",
+        "截图": ""
+      },
+      {
+        "序号": "40",
+        "分类": "A",
+        "OSM way": "453854243",
+        "建筑 seed": "3741443331",
+        "GL04 分块": "67_52.glc",
+        "重叠长度 m": "11.62",
+        "最低屋顶减路面 m": "12.903",
+        "截图": ""
+      },
+      {
+        "序号": "41",
+        "分类": "A",
+        "OSM way": "1490465015",
+        "建筑 seed": "1322814768",
+        "GL04 分块": "52_53.glc",
+        "重叠长度 m": "9.908",
+        "最低屋顶减路面 m": "14.026",
+        "截图": ""
+      },
+      {
+        "序号": "42",
+        "分类": "A",
+        "OSM way": "1475436867",
+        "建筑 seed": "2876753770",
+        "GL04 分块": "56_53.glc",
+        "重叠长度 m": "14.956",
+        "最低屋顶减路面 m": "21.46",
+        "截图": ""
+      },
+      {
+        "序号": "43",
+        "分类": "A",
+        "OSM way": "1475436870",
+        "建筑 seed": "2876753770",
+        "GL04 分块": "56_53.glc",
+        "重叠长度 m": "18.569",
+        "最低屋顶减路面 m": "20.352",
+        "截图": ""
+      },
+      {
+        "序号": "44",
+        "分类": "C",
+        "OSM way": "453854243",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "66_53.glc",
+        "重叠长度 m": "99.78",
+        "最低屋顶减路面 m": "20.645",
+        "截图": "044-453854243.png"
+      },
+      {
+        "序号": "45",
+        "分类": "A",
+        "OSM way": "453854244",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "66_53.glc",
+        "重叠长度 m": "26.396",
+        "最低屋顶减路面 m": "19.446",
+        "截图": ""
+      },
+      {
+        "序号": "46",
+        "分类": "C",
+        "OSM way": "453854242",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "66_53.glc",
+        "重叠长度 m": "133.324",
+        "最低屋顶减路面 m": "20.62",
+        "截图": "046-453854242.png"
+      },
+      {
+        "序号": "47",
+        "分类": "C",
+        "OSM way": "453854246",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "66_53.glc",
+        "重叠长度 m": "103.859",
+        "最低屋顶减路面 m": "20.304",
+        "截图": "047-453854246.png"
+      },
+      {
+        "序号": "48",
+        "分类": "A",
+        "OSM way": "453854245",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "66_53.glc",
+        "重叠长度 m": "30.976",
+        "最低屋顶减路面 m": "19.656",
+        "截图": ""
+      },
+      {
+        "序号": "49",
+        "分类": "C",
+        "OSM way": "453854249",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "66_53.glc",
+        "重叠长度 m": "133.714",
+        "最低屋顶减路面 m": "20.505",
+        "截图": "049-453854249.png"
+      },
+      {
+        "序号": "50",
+        "分类": "C",
+        "OSM way": "453854248",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "66_53.glc",
+        "重叠长度 m": "100.118",
+        "最低屋顶减路面 m": "20.601",
+        "截图": "050-453854248.png"
+      },
+      {
+        "序号": "51",
+        "分类": "A",
+        "OSM way": "453854250",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "66_53.glc",
+        "重叠长度 m": "38.794",
+        "最低屋顶减路面 m": "20.69",
+        "截图": ""
+      },
+      {
+        "序号": "52",
+        "分类": "C",
+        "OSM way": "453854243",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "67_53.glc",
+        "重叠长度 m": "47.615",
+        "最低屋顶减路面 m": "22.568",
+        "截图": "052-453854243.png"
+      },
+      {
+        "序号": "53",
+        "分类": "C",
+        "OSM way": "453854241",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "67_53.glc",
+        "重叠长度 m": "103.576",
+        "最低屋顶减路面 m": "19.592",
+        "截图": "053-453854241.png"
+      },
+      {
+        "序号": "54",
+        "分类": "C",
+        "OSM way": "453854244",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "67_53.glc",
+        "重叠长度 m": "317.141",
+        "最低屋顶减路面 m": "19.446",
+        "截图": "054-453854244.png"
+      },
+      {
+        "序号": "55",
+        "分类": "A",
+        "OSM way": "453854242",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "67_53.glc",
+        "重叠长度 m": "6.94",
+        "最低屋顶减路面 m": "23.185",
+        "截图": ""
+      },
+      {
+        "序号": "56",
+        "分类": "A",
+        "OSM way": "1474950752",
+        "建筑 seed": "3597188869",
+        "GL04 分块": "69_53.glc",
+        "重叠长度 m": "5.004",
+        "最低屋顶减路面 m": "9.113",
+        "截图": ""
+      },
+      {
+        "序号": "57",
+        "分类": "A",
+        "OSM way": "1023360330",
+        "建筑 seed": "4293969565",
+        "GL04 分块": "70_53.glc",
+        "重叠长度 m": "9.619",
+        "最低屋顶减路面 m": "19.826",
+        "截图": ""
+      },
+      {
+        "序号": "58",
+        "分类": "A",
+        "OSM way": "1473757087",
+        "建筑 seed": "4236729330",
+        "GL04 分块": "59_54.glc",
+        "重叠长度 m": "5.633",
+        "最低屋顶减路面 m": "6.025",
+        "截图": ""
+      },
+      {
+        "序号": "59",
+        "分类": "A",
+        "OSM way": "454117718",
+        "建筑 seed": "3645437235",
+        "GL04 分块": "61_54.glc",
+        "重叠长度 m": "11.822",
+        "最低屋顶减路面 m": "10.083",
+        "截图": ""
+      },
+      {
+        "序号": "60",
+        "分类": "A",
+        "OSM way": "1474958000",
+        "建筑 seed": "174557098",
+        "GL04 分块": "65_54.glc",
+        "重叠长度 m": "5.727",
+        "最低屋顶减路面 m": "6.28",
+        "截图": ""
+      },
+      {
+        "序号": "61",
+        "分类": "A",
+        "OSM way": "453854244",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "66_54.glc",
+        "重叠长度 m": "3.75",
+        "最低屋顶减路面 m": "19.742",
+        "截图": ""
+      },
+      {
+        "序号": "62",
+        "分类": "C",
+        "OSM way": "453854245",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "66_54.glc",
+        "重叠长度 m": "90.29",
+        "最低屋顶减路面 m": "19.299",
+        "截图": "062-453854245.png"
+      },
+      {
+        "序号": "63",
+        "分类": "A",
+        "OSM way": "453854248",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "66_54.glc",
+        "重叠长度 m": "34.254",
+        "最低屋顶减路面 m": "22.417",
+        "截图": ""
+      },
+      {
+        "序号": "64",
+        "分类": "C",
+        "OSM way": "453854250",
+        "建筑 seed": "1565322396",
+        "GL04 分块": "66_54.glc",
+        "重叠长度 m": "181.399",
+        "最低屋顶减路面 m": "21.812",
+        "截图": "064-453854250.png"
+      },
+      {
+        "序号": "65",
+        "分类": "A",
+        "OSM way": "1474085204",
+        "建筑 seed": "2382807297",
+        "GL04 分块": "61_55.glc",
+        "重叠长度 m": "4.444",
+        "最低屋顶减路面 m": "8.557",
+        "截图": ""
+      },
+      {
+        "序号": "66",
+        "分类": "A",
+        "OSM way": "454117718",
+        "建筑 seed": "3645437235",
+        "GL04 分块": "61_55.glc",
+        "重叠长度 m": "1.182",
+        "最低屋顶减路面 m": "10.748",
+        "截图": ""
+      },
+      {
+        "序号": "67",
+        "分类": "A",
+        "OSM way": "1474085204",
+        "建筑 seed": "438176064",
+        "GL04 分块": "61_55.glc",
+        "重叠长度 m": "6.664",
+        "最低屋顶减路面 m": "7.938",
+        "截图": ""
+      },
+      {
+        "序号": "68",
+        "分类": "A",
+        "OSM way": "1492452085",
+        "建筑 seed": "4144338261",
+        "GL04 分块": "68_55.glc",
+        "重叠长度 m": "7.502",
+        "最低屋顶减路面 m": "7.763",
+        "截图": ""
+      },
+      {
+        "序号": "69",
+        "分类": "B",
+        "OSM way": "454947557",
+        "建筑 seed": "1364689659",
+        "GL04 分块": "70_55.glc",
+        "重叠长度 m": "1.992",
+        "最低屋顶减路面 m": "2.934",
+        "截图": ""
+      },
+      {
+        "序号": "70",
+        "分类": "A",
+        "OSM way": "1539622609",
+        "建筑 seed": "404705074",
+        "GL04 分块": "55_56.glc",
+        "重叠长度 m": "15.54",
+        "最低屋顶减路面 m": "20.612",
+        "截图": ""
+      },
+      {
+        "序号": "71",
+        "分类": "A",
+        "OSM way": "1025797703",
+        "建筑 seed": "404705074",
+        "GL04 分块": "56_56.glc",
+        "重叠长度 m": "5.541",
+        "最低屋顶减路面 m": "18.064",
+        "截图": ""
+      },
+      {
+        "序号": "72",
+        "分类": "A",
+        "OSM way": "1532494232",
+        "建筑 seed": "2414791052",
+        "GL04 分块": "53_57.glc",
+        "重叠长度 m": "9.553",
+        "最低屋顶减路面 m": "21.388",
+        "截图": ""
+      },
+      {
+        "序号": "73",
+        "分类": "A",
+        "OSM way": "1025797703",
+        "建筑 seed": "404705074",
+        "GL04 分块": "56_57.glc",
+        "重叠长度 m": "9.375",
+        "最低屋顶减路面 m": "19.696",
+        "截图": ""
+      },
+      {
+        "序号": "74",
+        "分类": "A",
+        "OSM way": "1532928036",
+        "建筑 seed": "1285419153",
+        "GL04 分块": "111_57.glc",
+        "重叠长度 m": "4.117",
+        "最低屋顶减路面 m": "5.218",
+        "截图": ""
+      },
+      {
+        "序号": "75",
+        "分类": "A",
+        "OSM way": "1468130974",
+        "建筑 seed": "3073439014",
+        "GL04 分块": "60_58.glc",
+        "重叠长度 m": "18.36",
+        "最低屋顶减路面 m": "20.284",
+        "截图": ""
+      },
+      {
+        "序号": "76",
+        "分类": "A",
+        "OSM way": "1468130974",
+        "建筑 seed": "1848674265",
+        "GL04 分块": "60_58.glc",
+        "重叠长度 m": "6.221",
+        "最低屋顶减路面 m": "5.519",
+        "截图": ""
+      },
+      {
+        "序号": "77",
+        "分类": "A",
+        "OSM way": "1557629674",
+        "建筑 seed": "1848674265",
+        "GL04 分块": "60_58.glc",
+        "重叠长度 m": "5.155",
+        "最低屋顶减路面 m": "5.324",
+        "截图": ""
+      },
+      {
+        "序号": "78",
+        "分类": "A",
+        "OSM way": "1474365105",
+        "建筑 seed": "3479003438",
+        "GL04 分块": "125_58.glc",
+        "重叠长度 m": "4.714",
+        "最低屋顶减路面 m": "18.349",
+        "截图": ""
+      },
+      {
+        "序号": "79",
+        "分类": "A",
+        "OSM way": "1474365105",
+        "建筑 seed": "3479003438",
+        "GL04 分块": "126_58.glc",
+        "重叠长度 m": "2.519",
+        "最低屋顶减路面 m": "18.415",
+        "截图": ""
+      },
+      {
+        "序号": "80",
+        "分类": "A",
+        "OSM way": "1552890609",
+        "建筑 seed": "1979080386",
+        "GL04 分块": "70_59.glc",
+        "重叠长度 m": "23.401",
+        "最低屋顶减路面 m": "20.182",
+        "截图": ""
+      },
+      {
+        "序号": "81",
+        "分类": "A",
+        "OSM way": "1552890609",
+        "建筑 seed": "1979080386",
+        "GL04 分块": "70_59.glc",
+        "重叠长度 m": "12.443",
+        "最低屋顶减路面 m": "16.575",
+        "截图": ""
+      },
+      {
+        "序号": "82",
+        "分类": "A",
+        "OSM way": "1476732770",
+        "建筑 seed": "3705466778",
+        "GL04 分块": "58_60.glc",
+        "重叠长度 m": "4.183",
+        "最低屋顶减路面 m": "23.66",
+        "截图": ""
+      },
+      {
+        "序号": "83",
+        "分类": "A",
+        "OSM way": "1473600896",
+        "建筑 seed": "2641443585",
+        "GL04 分块": "69_60.glc",
+        "重叠长度 m": "3.811",
+        "最低屋顶减路面 m": "23.398",
+        "截图": ""
+      },
+      {
+        "序号": "84",
+        "分类": "A",
+        "OSM way": "1472133244",
+        "建筑 seed": "3622958722",
+        "GL04 分块": "50_61.glc",
+        "重叠长度 m": "5.227",
+        "最低屋顶减路面 m": "9.074",
+        "截图": ""
+      },
+      {
+        "序号": "85",
+        "分类": "A",
+        "OSM way": "1498950503",
+        "建筑 seed": "1112577434",
+        "GL04 分块": "57_61.glc",
+        "重叠长度 m": "34.713",
+        "最低屋顶减路面 m": "18.186",
+        "截图": ""
+      },
+      {
+        "序号": "86",
+        "分类": "A",
+        "OSM way": "1472132457",
+        "建筑 seed": "468022255",
+        "GL04 分块": "50_62.glc",
+        "重叠长度 m": "16.365",
+        "最低屋顶减路面 m": "17.029",
+        "截图": ""
+      },
+      {
+        "序号": "87",
+        "分类": "C",
+        "OSM way": "1112703462",
+        "建筑 seed": "2515875700",
+        "GL04 分块": "95_63.glc",
+        "重叠长度 m": "62.476",
+        "最低屋顶减路面 m": "19.849",
+        "截图": "087-1112703462.png"
+      },
+      {
+        "序号": "88",
+        "分类": "A",
+        "OSM way": "1112703462",
+        "建筑 seed": "3061327632",
+        "GL04 分块": "96_63.glc",
+        "重叠长度 m": "39.219",
+        "最低屋顶减路面 m": "21.657",
+        "截图": ""
+      },
+      {
+        "序号": "89",
+        "分类": "A",
+        "OSM way": "1013357845",
+        "建筑 seed": "3477404875",
+        "GL04 分块": "124_64.glc",
+        "重叠长度 m": "6.516",
+        "最低屋顶减路面 m": "9.518",
+        "截图": ""
+      },
+      {
+        "序号": "90",
+        "分类": "A",
+        "OSM way": "923425799",
+        "建筑 seed": "3858088203",
+        "GL04 分块": "124_64.glc",
+        "重叠长度 m": "3.357",
+        "最低屋顶减路面 m": "5.544",
+        "截图": ""
+      },
+      {
+        "序号": "91",
+        "分类": "A",
+        "OSM way": "1013355607",
+        "建筑 seed": "716660479",
+        "GL04 分块": "124_64.glc",
+        "重叠长度 m": "2.13",
+        "最低屋顶减路面 m": "10.893",
+        "截图": ""
+      },
+      {
+        "序号": "92",
+        "分类": "A",
+        "OSM way": "1492542125",
+        "建筑 seed": "1433064336",
+        "GL04 分块": "134_64.glc",
+        "重叠长度 m": "11.393",
+        "最低屋顶减路面 m": "21.169",
+        "截图": ""
+      },
+      {
+        "序号": "93",
+        "分类": "A",
+        "OSM way": "1492542123",
+        "建筑 seed": "1433064336",
+        "GL04 分块": "134_64.glc",
+        "重叠长度 m": "6.69",
+        "最低屋顶减路面 m": "20.418",
+        "截图": ""
+      },
+      {
+        "序号": "94",
+        "分类": "A",
+        "OSM way": "1492542121",
+        "建筑 seed": "1433064336",
+        "GL04 分块": "134_64.glc",
+        "重叠长度 m": "11.363",
+        "最低屋顶减路面 m": "21.471",
+        "截图": ""
+      },
+      {
+        "序号": "95",
+        "分类": "A",
+        "OSM way": "1492542120",
+        "建筑 seed": "1433064336",
+        "GL04 分块": "134_64.glc",
+        "重叠长度 m": "5.644",
+        "最低屋顶减路面 m": "19.31",
+        "截图": ""
+      },
+      {
+        "序号": "96",
+        "分类": "A",
+        "OSM way": "1492542119",
+        "建筑 seed": "1433064336",
+        "GL04 分块": "134_64.glc",
+        "重叠长度 m": "10.888",
+        "最低屋顶减路面 m": "21.108",
+        "截图": ""
+      },
+      {
+        "序号": "97",
+        "分类": "A",
+        "OSM way": "1492542124",
+        "建筑 seed": "1433064336",
+        "GL04 分块": "134_64.glc",
+        "重叠长度 m": "5.577",
+        "最低屋顶减路面 m": "21.145",
+        "截图": ""
+      },
+      {
+        "序号": "98",
+        "分类": "A",
+        "OSM way": "1469987890",
+        "建筑 seed": "3659043220",
+        "GL04 分块": "49_66.glc",
+        "重叠长度 m": "24.728",
+        "最低屋顶减路面 m": "11.679",
+        "截图": ""
+      },
+      {
+        "序号": "99",
+        "分类": "A",
+        "OSM way": "1473604678",
+        "建筑 seed": "1183723252",
+        "GL04 分块": "55_67.glc",
+        "重叠长度 m": "4.94",
+        "最低屋顶减路面 m": "23.331",
+        "截图": ""
+      },
+      {
+        "序号": "100",
+        "分类": "A",
+        "OSM way": "1492138642",
+        "建筑 seed": "988769768",
+        "GL04 分块": "38_68.glc",
+        "重叠长度 m": "16.786",
+        "最低屋顶减路面 m": "20.75",
+        "截图": ""
+      },
+      {
+        "序号": "101",
+        "分类": "A",
+        "OSM way": "1492040484",
+        "建筑 seed": "2462404523",
+        "GL04 分块": "57_68.glc",
+        "重叠长度 m": "3.107",
+        "最低屋顶减路面 m": "21.505",
+        "截图": ""
+      },
+      {
+        "序号": "102",
+        "分类": "A",
+        "OSM way": "1016581610",
+        "建筑 seed": "1705462470",
+        "GL04 分块": "58_68.glc",
+        "重叠长度 m": "10.557",
+        "最低屋顶减路面 m": "9.078",
+        "截图": ""
+      },
+      {
+        "序号": "103",
+        "分类": "A",
+        "OSM way": "1576931738",
+        "建筑 seed": "52495",
+        "GL04 分块": "4_69.glc",
+        "重叠长度 m": "22.056",
+        "最低屋顶减路面 m": "5.897",
+        "截图": ""
+      },
+      {
+        "序号": "104",
+        "分类": "A",
+        "OSM way": "1576931738",
+        "建筑 seed": "52495",
+        "GL04 分块": "5_69.glc",
+        "重叠长度 m": "6.332",
+        "最低屋顶减路面 m": "6.297",
+        "截图": ""
+      },
+      {
+        "序号": "105",
+        "分类": "A",
+        "OSM way": "1474325108",
+        "建筑 seed": "113342553",
+        "GL04 分块": "38_69.glc",
+        "重叠长度 m": "8.158",
+        "最低屋顶减路面 m": "22.228",
+        "截图": ""
+      },
+      {
+        "序号": "106",
+        "分类": "A",
+        "OSM way": "1474325108",
+        "建筑 seed": "113342553",
+        "GL04 分块": "38_70.glc",
+        "重叠长度 m": "9.953",
+        "最低屋顶减路面 m": "23.315",
+        "截图": ""
+      },
+      {
+        "序号": "107",
+        "分类": "A",
+        "OSM way": "1016734571",
+        "建筑 seed": "1335936542",
+        "GL04 分块": "45_71.glc",
+        "重叠长度 m": "6.665",
+        "最低屋顶减路面 m": "12.125",
+        "截图": ""
+      },
+      {
+        "序号": "108",
+        "分类": "A",
+        "OSM way": "1476098823",
+        "建筑 seed": "1861902728",
+        "GL04 分块": "42_74.glc",
+        "重叠长度 m": "26.799",
+        "最低屋顶减路面 m": "21.609",
+        "截图": ""
+      },
+      {
+        "序号": "109",
+        "分类": "A",
+        "OSM way": "1485632262",
+        "建筑 seed": "2026629408",
+        "GL04 分块": "98_76.glc",
+        "重叠长度 m": "9.693",
+        "最低屋顶减路面 m": "12.37",
+        "截图": ""
+      }
+    ],
+    "surfaceDriveByYardWay": {
+      "453854241": [
+        {
+          "direction": "in",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.005246433896843428
+        },
+        {
+          "direction": "out",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.0050797285898909195
+        }
+      ],
+      "453854242": [
+        {
+          "direction": "in",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.0025307195366508495
+        },
+        {
+          "direction": "out",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.002492576837539673
+        }
+      ],
+      "453854243": [
+        {
+          "direction": "in",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.005304559896586625
+        },
+        {
+          "direction": "out",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.005396155591256502
+        }
+      ],
+      "453854244": [
+        {
+          "direction": "in",
+          "mode": "car",
+          "completed": false,
+          "failure": "collision",
+          "maximum": 0.0009301958219225526
+        },
+        {
+          "direction": "out",
+          "mode": "car",
+          "completed": false,
+          "failure": "collision",
+          "maximum": 0.001415415417454824
+        }
+      ],
+      "453854245": [
+        {
+          "direction": "in",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.06691885759244087
+        },
+        {
+          "direction": "out",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.007703597478126767
+        }
+      ],
+      "453854246": [
+        {
+          "direction": "out",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.001674155806597355
+        },
+        {
+          "direction": "in",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.0016756554819608027
+        }
+      ],
+      "453854248": [
+        {
+          "direction": "in",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.0025121002827006578
+        },
+        {
+          "direction": "out",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.002580790249794518
+        }
+      ],
+      "453854249": [
+        {
+          "direction": "in",
+          "mode": "car",
+          "completed": false,
+          "failure": "collision",
+          "maximum": 0.000177769166100461
+        },
+        {
+          "direction": "out",
+          "mode": "car",
+          "completed": false,
+          "failure": "collision",
+          "maximum": 9.307771358635364e-05
+        }
+      ],
+      "453854250": [
+        {
+          "direction": "in",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.07518803016193942
+        },
+        {
+          "direction": "out",
+          "mode": "car",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.0023896663818447905
+        }
+      ]
+    },
+    "canal": [
+      {
+        "way": 1025751314,
+        "bridgeNode": 9457383800,
+        "join": 4.767423405382942e-06,
+        "minimumHeadroom": 3.745650861589297,
+        "maximumGrade": 0.06676938655497067,
+        "underBuilding": 319
+      },
+      {
+        "way": 1034716138,
+        "bridgeNode": 9531714412,
+        "join": 2.841815955889615e-07,
+        "minimumHeadroom": 3.566101826830078,
+        "maximumGrade": 0.017601606157684656,
+        "underBuilding": 380
+      }
+    ],
+    "cityWorstWheel": {
+      "lane": 32456,
+      "way": 682893309,
+      "kind": "motor",
+      "reason": "surface",
+      "x": -47.34216510409253,
+      "z": 77.56382571599272,
+      "dist": 27.303625784408737,
+      "gap": -4.946062727062582,
+      "error": 4.946062727062582
+    },
+    "intermediateChecks": {
+      "5051c99a": {
+        "maximumCanalGrade": 0.22641938178754717,
+        "outliers": 445,
+        "portalPass": 139
+      },
+      "cb2dc17b": {
+        "outliers": 418,
+        "portalPass": 138
+      }
+    }
   }
 }
