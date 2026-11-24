@@ -79,7 +79,7 @@ def bake(output, manifest, rendered_roads=None, grade_changes=None):
     region = prep(Polygon(manifest['region']['local'])) if 'region' in manifest else None
     carriageways = {road.way: road for road in rendered_roads if road.way in RENDERED_LANE_WAYS}
     surface = Surface(output, manifest)
-    from station_levels import UNDERPASS
+    from station_levels import UNDERPASS, PLATFORMS
     station_tunnel = next((t for t in manifest.get('tunnels', []) if t['way']==UNDERPASS), None)
     tunnel_segments = {(t['way'],*t['nodes']): t for t in manifest.get('tunnels', []) if 'nodes' in t}
     bridge = next((entry for entry in manifest['landmarks'] if entry['id'] == 'jiefang_bridge'), None)
@@ -142,6 +142,9 @@ def bake(output, manifest, rendered_roads=None, grade_changes=None):
     from shapely import STRtree, Point
     crossings = json.loads((ROOT/'docs/railway-crossings.json').read_bytes())
     centers = STRtree([Point(ll2xz(row['lat'],row['lon'])) for row in crossings if row['type']])
+    from features import area
+    platforms = [area(w) for w in elements if w['type']=='way' and w['id'] in PLATFORMS]
+    station_approaches = prep(unary_union(platforms).buffer(500)) if platforms else None
     fitted_lanes = []
     work_file = output/'roads'/'railway-roadworks.json'
     saved_work = (set(json.loads(work_file.read_bytes())) if grade_changes is None and work_file.exists()
@@ -216,6 +219,8 @@ def bake(output, manifest, rendered_roads=None, grade_changes=None):
                     lane['cls'] = kind
                     tunnel = station_tunnel if way['id']==UNDERPASS else tunnel_segments.get((way['id'],start_id,end_id))
                     if tunnel:
+                        if tunnel.get('openCut'):
+                            lane.update(way=way['id'],structure='tunnel')
                         knots = tunnel['stations']
                         if sign<0:
                             knots = [(tunnel['length']-d,y) for d,y in reversed(knots)]
@@ -226,9 +231,11 @@ def bake(output, manifest, rendered_roads=None, grade_changes=None):
                         lane['heights'] = profile(head,tail,lane['offset'],way['id'])
                     if 'gradeSeparated' not in lane and (linear or way['id'] in SPAN_WAYS):
                         lane['gradeSeparated'] = 'linear' if linear else 'jiefang'
-                    if len(centers.query(LineString([start,end]),predicate='dwithin',distance=500)):
+                    path = LineString([start,end])
+                    at_station = station_approaches is not None and station_approaches.intersects(path)
+                    if at_station or len(centers.query(path,predicate='dwithin',distance=500)):
                         layer = next((k for k in ('bridge','tunnel') if tags.get(k,'no')!='no'), None)
-                        changed = (grade_changes is None or
+                        changed = (at_station or grade_changes is None or
                                    grade_changes.affects_carriageway(start,end,abs(offset)+1))
                         if layer=='bridge':
                             changed = way['id'] in rail_bridges or changed
@@ -237,7 +244,7 @@ def bake(output, manifest, rendered_roads=None, grade_changes=None):
                         if saved_work is not None:
                             changed = lane['id'] in saved_work
                         if changed:
-                            fitted_lanes.append(dict(lane,way=way['id'],structure=layer))
+                            fitted_lanes.append(dict(lane,way=way['id'],structure=lane.get('structure',layer)))
                     lanes.append(lane)
                     incoming[tail].append(lane)
 

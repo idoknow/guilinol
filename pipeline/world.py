@@ -583,7 +583,7 @@ def build(bbox, output, palette, workers=4):
         from railway_platforms import bake as bake_platforms
         bake_platforms(output, chunks, play_region.geometry)
         from railway_pavement import bake as bake_railway_pavement
-        new_pavement = bake_railway_pavement(output,chunks,protected_grades)
+        new_pavement = bake_railway_pavement(output,chunks,protected_grades,tunnels)
         from railway_clearance import fit_rendered_underpasses
         new_pavement.extend(fit_rendered_underpasses(output,manifest,rail_crossings))
         protected_grades.mark_pavement(new_pavement)

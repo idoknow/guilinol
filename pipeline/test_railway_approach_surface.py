@@ -31,3 +31,24 @@ class RailwayApproachSurfaceTest(unittest.TestCase):
                 2:dict(geometry=[(80,7),(0,7)],tags=tags)}
         widths = bore_widths(ways,ways)
         self.assertAlmostEqual(widths[1]+widths[2],6.2)
+
+    @patch('station_bore_approaches.points', side_effect=lambda way: way['geometry'])
+    def test_open_cut_reaches_daylight_in_reverse_way_order(self, _):
+        from station_bore_approaches import build_open_approaches
+        tags = {'highway':'trunk','oneway':'yes'}
+        ways = {1:dict(nodes=[1,2],tags={**tags,'tunnel':'yes'}),
+                2:dict(nodes=[5,4,2],geometry=[[300.,0.],[75.,0.],[0.,0.]],tags=tags)}
+        bore = dict(way=1, nodes=[1,2], mouths=[False,True], portals=[[-50.,140.,0.],[0.,140.,0.]],
+                    length=50., halfWidth=3.1, clearance=4.5)
+        tunnels = [bore]
+        build_open_approaches(ways,tunnels,{1},lambda x,z:150.)
+        self.assertEqual([s['nodes'] for s in tunnels[1:]],[[4,2],[5,4]])
+        self.assertFalse(bore['mouths'][1])
+        self.assertTrue(tunnels[-1]['mouths'][0])
+        self.assertEqual(tunnels[-1]['portals'][0][1],150.)
+        self.assertEqual(tunnels[1]['portals'][-1][1],140.)
+        for section in tunnels[1:]:
+            s,y = np.array(section['stations']).T
+            self.assertTrue(np.all(np.diff(s)>0))
+            self.assertLessEqual(max(abs(np.diff(y)/np.diff(s))),.05)
+            self.assertLess(section['halfWidth'],bore['halfWidth'])

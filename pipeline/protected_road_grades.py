@@ -13,6 +13,37 @@ class ProtectedRoadGrades:
         self.after = (terrain, underlay, control)
         self.before = tuple(grid.copy() for grid in self.after)
 
+    def retain_foundations(self, crossings):
+        """Keep surveyed landmark pads and their terrain support continuous."""
+        from pathlib import Path
+        from shapely import Point, Polygon, STRtree, distance, points
+        from common import ll2xz
+
+        rail = STRtree([Point(r['x'],r['z']) for r in crossings])
+        specs = json.loads(Path(__file__).with_name('landmarks.json').read_bytes())
+        for spec in specs:
+            coords = spec.get('flatten', {}).get('polygon', ())
+            if len(coords)<3:
+                continue
+            foundation = Polygon([ll2xz(lat,lon) for lon,lat in coords])
+            if len(rail.query(foundation,predicate='dwithin',distance=64)):
+                continue
+            xmin,zmin,xmax,zmax = foundation.buffer(60).bounds
+            for step,field,old in zip((4,4,8),self.after,self.before):
+                # The road control grid carries a one-knot halo.
+                ox = self.left-(step if step==8 else 0)
+                oz = self.top-(step if step==8 else 0)
+                x,z = np.maximum(0,np.floor([(xmin-ox)/step,(zmin-oz)/step])).astype(int)
+                xx,zz = np.minimum(field.shape[::-1],np.ceil([(xmax-ox)/step,(zmax-oz)/step])+1).astype(int)
+                patch = np.s_[z:zz,x:xx]
+                if np.array_equal(field[patch],old[patch]):
+                    continue
+                xs,zs = np.meshgrid(ox+step*np.arange(x,xx),oz+step*np.arange(z,zz))
+                gap = distance(points(xs,zs),foundation)
+                blend = np.clip((gap-16)/40,0,1)
+                y = old[patch]+blend**2*(3-2*blend)*(field[patch].astype(float)-old[patch])
+                field[patch] = np.rint(y) if step==4 else y
+
     def mark_pavement(self, patches):
         from shapely import STRtree
         self.pavement = STRtree(patches) if patches else None

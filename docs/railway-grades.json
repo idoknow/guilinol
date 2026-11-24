@@ -4941,7 +4941,8 @@
       "changeM": -4.4355
     }
   ],
-  "pendingRoadStructures": [
+  "pendingRoadStructures": [],
+  "resolvedRoadStructures": [
     {
       "roadWay": 882767812,
       "bridgeWay": 882767811,
@@ -4954,7 +4955,7 @@
       "lat": 25.2531297,
       "lon": 110.2582056,
       "baselineWorld": "f1453c2e",
-      "status": "design_solved",
+      "status": "resolved",
       "reason": "Both railheads now follow a constrained local lift above the Nanxi underpass. The road landing and the stream deck share the same grade target.",
       "nearestRailheadM": 150.0988,
       "maximumRoadAtRailM": 144.3988,
@@ -5042,6 +5043,15 @@
             "afterM": 155.12
           }
         ]
+      },
+      "asBuilt": {
+        "deckM": 149.3,
+        "soffitM": 148.1,
+        "waterM": 147.1,
+        "maximumGridBedCutM": 2.8813,
+        "bankSegments": 43,
+        "bankLengthM": 84.9,
+        "railheadM": 155.12
       }
     }
   ]

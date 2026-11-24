@@ -296,4 +296,10 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
             section.setdefault('joints',[None,None])[end] = dict(ring=ring,draw=index==0)
     from railway_approach_surface import grade_approach_surfaces
     grade_approach_surfaces(ways,crossings,panels,tunnels,plans,protected,water)
+    protected.retain_foundations(crossings)
+    from station_bore_approaches import build_open_approaches
+    side_bores = {wid for wid, rows in by_road.items() if rows and all(r['type']=='road_underpass' for r in rows)}
+    def surface_at(x,z):
+        return max(ground_at(x,z),float(eval_bspline_grid(control,left,top,np.asarray(x),np.asarray(z))))+.045
+    build_open_approaches(ways,tunnels,side_bores,surface_at)
     return fallback_floors, crossings

@@ -3,7 +3,7 @@ import type {Tile} from './world'
 import railStyle from '../../pipeline/railway-style.json'
 
 type Point=[number,number,number]
-export type Tunnel={way:number,portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],joints?:({ring:[number,number][],draw:boolean}|null)[],stations:[number,number][]}
+export type Tunnel={way:number,portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],openCut?:boolean,joints?:({ring:[number,number][],draw:boolean}|null)[],stations:[number,number][]}
 
 function frame(tunnel:Tunnel){
   const [start,end]=tunnel.portals, ux=(end[0]-start[0])/tunnel.length,uz=(end[2]-start[2])/tunnel.length
@@ -144,7 +144,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     for(const [i,joint] of (tunnel.joints??[]).entries()){
       if(!joint?.draw)continue
       const floor=tunnel.portals[i][1]
-      const covered=(i===0?first:last)===0&&!tunnel.mouths?.[i]
+      const covered=!tunnel.openCut&&(i===0?first:last)===0&&!tunnel.mouths?.[i]
       const ring=joint.ring.map(([x,z]):Point=>[x-tile.x,floor,z-tile.z])
       const edges=ring.map((a,n)=>[a,ring[(n+1)%ring.length]])
       const winding=Math.sign(edges.reduce((sum,[a,b])=>sum+a[0]*b[2]-a[2]*b[0],0))

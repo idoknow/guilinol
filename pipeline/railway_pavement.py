@@ -16,7 +16,7 @@ from road_profile import RULES
 from service_streets import rings, width
 
 
-def bake(directory, chunks, graded=None):
+def bake(directory, chunks, graded=None, tunnels=()):
     inventory = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-crossings.json').read_bytes())
     sites = defaultdict(list)
     for row in inventory:
@@ -59,21 +59,38 @@ def bake(directory, chunks, graded=None):
                     segments.append(LineString([a,b]))
         for segment in segments:
             face = segment.buffer(road_width/2,cap_style='flat')
-            # Overlap the quantized deck edge by a few centimetres, so the
-            # abutment has continuous asphalt on both sides of the seam.
-            for index,neighbor in ((0,1),(-1,-2)):
-                point = Point(center.coords[index])
-                if way['nodes'][index] in bridge_nodes and segment.distance(point)<.01:
-                    outward = np.subtract(center.coords[index],center.coords[neighbor])
-                    length = np.linalg.norm(outward)
-                    if length>.01:
-                        extended = translate(face,* (outward*.10/length))
-                        face = face.union(extended.intersection(point.buffer(road_width)))
+            # Join consecutive road sections through the wheel turning area.
+            # At a bridge, only overlap the quantized deck edge by 10 cm.
+            bridge_ends = {tuple(center.coords[k]) for k in (0,-1) if way['nodes'][k] in bridge_nodes}
+            for k,j in ((0,1),(-1,-2)):
+                point = Point(segment.coords[k])
+                if tuple(segment.coords[k]) not in bridge_ends:
+                    face = face.union(point.buffer(road_width/2))
+                    continue
+                outward = np.subtract(segment.coords[k],segment.coords[j])
+                length = np.linalg.norm(outward)
+                if length>.01:
+                    extended = translate(face,*(outward*.10/length))
+                    face = face.union(extended.intersection(point.buffer(road_width)))
             occupied = buildings.query(face,predicate='intersects')
             if len(occupied):
                 face = face.difference(union_all([make_valid(footprints[i]) for i in occupied]))
             if not face.is_empty:
                 shapes.append(face)
+    # The axle on a surface lane can enter a bore before the vehicle centre.
+    # Share a short asphalt landing across each open surface-to-tunnel seam.
+    from station_levels import UNDERPASS
+    for tunnel in tunnels:
+        if 'nodes' not in tunnel and tunnel['way']!=UNDERPASS:
+            continue
+        for end,mouth in enumerate(tunnel.get('mouths',(True,True))):
+            if not mouth:
+                continue
+            a,b = np.asarray(tunnel['portals'])[[end,1-end]][:,[0,2]]
+            tangent = b-a
+            tangent /= np.linalg.norm(tangent)
+            landing = LineString([a-3*tangent,a+3*tangent])
+            shapes.append(landing.buffer(tunnel['halfWidth'],cap_style='flat'))
     new_pavement = []
     tree = STRtree(shapes)
     for tile in chunks:

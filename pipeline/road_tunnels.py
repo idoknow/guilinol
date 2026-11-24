@@ -167,17 +167,21 @@ def clear_approach_paving(output, chunks, underpasses):
         streets = collision[1]
         lower = streets[11] if len(streets)>11 else None
         paths = []
-        for i,item in enumerate(streets[0]):
-            if lower and i==lower[0]:
-                first_lower = len(paths)
+        boundaries = []
+        for item in streets[0]:
+            boundaries.append(len(paths))
             kind,*loops = item
             shape = make_valid(Polygon(np.asarray(loops[0])/100, [np.asarray(r)/100 for r in loops[1:]]))
             if shape.intersects(local):
                 paths.extend(rings(kind,shape.difference(local)))
             else:
                 paths.append(item)
+        boundaries.append(len(paths))
         if lower:
-            lower[0] = first_lower if lower[0]<len(streets[0]) else len(paths)
+            lower[0] = boundaries[lower[0]]
+        if len(streets)>12 and streets[12]:
+            platform = streets[12]
+            platform[:2] = [boundaries[i] for i in platform[:2]]
         streets[0] = paths
         encoded = json.dumps(collision,separators=(',',':')).encode()
         payload = raw[:12]+struct.pack('<I',len(encoded))+raw[16:start]+encoded+raw[start+size:]
