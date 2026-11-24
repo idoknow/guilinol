@@ -606,6 +606,106 @@ function lineChart(series: Series[], format: Fmt, opts: { height?: number; bucke
   requestAnimationFrame(draw)
   return wrap
 }
+type Signups = { from: number; hours: number; base: number; points: { t: number; n: number }[] }
+/** 用户页注册曲线：上半区用户总数折线，下半区每小时新增柱，共用时间轴和悬停提示。 */
+function signupChart(data: Signups) {
+  const start = data.from * 1000,
+    have = new Map(data.points.map((p) => [p.t * 1000, p.n]))
+  let total = data.base
+  const rows = Array.from({ length: data.hours }, (_, i) => {
+    const t = start + i * 3600e3, n = have.get(t) ?? 0
+    total += n
+    return { t, n, total }
+  })
+  const wrap = h('div', { class: 'adm-chart adm-signups' })
+  const tip = h('div', { class: 'adm-tip', hidden: true })
+  const legend = h('div', { class: 'adm-legend' },
+    h('span', null, h('i', { style: 'background:var(--adm-c1)' }), '用户总数'),
+    h('span', null, h('i', { style: 'background:var(--adm-c3)' }), '每小时新注册'))
+  const draw = () => {
+    const width = Math.max(260, wrap.clientWidth || 600),
+      pad = { l: 56, r: 14 },
+      top = { y: 10, h: 150 }, low = { y: 186, h: 76 }, height = low.y + low.h + 26
+    wrap.querySelector('svg')?.remove()
+    const slot = (width - pad.l - pad.r) / rows.length,
+      x = (i: number) => pad.l + slot * (i + 0.5)
+    const lo = rows[0].total - rows[0].n, hi = rows[rows.length - 1].total
+    // 总数轴不从 0 起：从窗口起点的存量往下留一点空，增长才看得出来。
+    const span = Math.max(hi - lo, 4), tTicks = niceTicks(span, 3), tStep = tTicks[1] - tTicks[0]
+    const tMin = Math.max(0, Math.floor((lo - span * 0.05) / tStep) * tStep),
+      tMax = Math.max(tMin + tStep, Math.ceil(hi / tStep) * tStep)
+    const yT = (v: number) => top.y + (1 - (v - tMin) / (tMax - tMin)) * top.h
+    const nTicks = niceTicks(Math.max(...rows.map((r) => r.n)), 2), nMax = nTicks[nTicks.length - 1] || 1
+    const yN = (v: number) => low.y + (1 - v / nMax) * low.h
+    const svg = s('svg', { viewBox: `0 0 ${width} ${height}`, width, height, role: 'img', 'aria-label': `最近 ${data.hours} 小时注册：新增 ${hi - lo}，总数 ${hi}` })
+    const grid = (yy: number, text: string) => {
+      svg.append(s('line', { x1: pad.l, x2: width - pad.r, y1: yy, y2: yy, class: 'adm-grid' }))
+      svg.append(s('text', { x: pad.l - 8, y: yy + 4, 'text-anchor': 'end', class: 'adm-axis' }, text))
+    }
+    for (let v = tMin; v <= tMax + 1e-9; v += tStep) grid(yT(v), fmt.int(v))
+    for (const v of nTicks) grid(yN(v), fmt.int(v))
+    svg.append(s('text', { x: pad.l, y: low.y - 8, class: 'adm-axis adm-signups-cap' }, '每小时新注册'))
+    const bw = Math.max(1, Math.min(14, slot * 0.72))
+    for (const [i, r] of rows.entries())
+      if (r.n) svg.append(s('rect', { x: x(i) - bw / 2, y: yN(r.n), width: bw, height: Math.max(1, low.y + low.h - yN(r.n)), rx: Math.min(2, bw / 3), class: 'adm-signups-bar' }))
+    const d = rows.map((r, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${yT(r.total).toFixed(1)}`).join('')
+    svg.append(s('path', { d: `${d}L${x(rows.length - 1).toFixed(1)},${top.y + top.h}L${x(0).toFixed(1)},${top.y + top.h}Z`, class: 'adm-area' }))
+    svg.append(s('path', { d, class: 'adm-line', style: 'stroke:var(--adm-c1)' }))
+    // 时间刻度落在整点：按宽度挑 1/2/3/6/12 小时或 1/2/5/7 天一格。
+    const room = Math.max(2, Math.floor(width / (data.hours > 36 ? 110 : 70))),
+      every = [1, 2, 3, 6, 12, 24, 48, 120, 168].find((n) => rows.length / n <= room) ?? 168
+    for (const [i, r] of rows.entries()) {
+      const date = new Date(r.t), hour = date.getHours()
+      if (every < 24 ? hour % every : hour || Math.round((r.t - rows[0].t) / 86400e3) % (every / 24)) continue
+      const px = x(i)
+      if (px < pad.l + 24 || px > width - pad.r - 24) continue
+      const hh = `${String(hour).padStart(2, '0')}:00`
+      svg.append(s('text', { x: px, y: height - 6, 'text-anchor': 'middle', class: 'adm-axis' },
+        every >= 24 ? `${date.getMonth() + 1}/${date.getDate()}` : data.hours > 36 && hour === 0 ? `${date.getMonth() + 1}/${date.getDate()}` : hh))
+    }
+    const cursor = s('line', { y1: top.y, y2: low.y + low.h, class: 'adm-cursor', visibility: 'hidden' })
+    svg.append(cursor)
+    const point = (event: PointerEvent) => {
+      const box = svg.getBoundingClientRect(),
+        px = ((event.clientX - box.left) / box.width) * width,
+        i = Math.min(rows.length - 1, Math.max(0, Math.floor((px - pad.l) / slot))), r = rows[i]
+      cursor.setAttribute('x1', String(x(i)))
+      cursor.setAttribute('x2', String(x(i)))
+      cursor.setAttribute('visibility', 'visible')
+      const end = new Date(r.t + 3600e3)
+      tip.hidden = false
+      tip.replaceChildren(h('b', null, `${when(new Date(r.t))} – ${String(end.getHours()).padStart(2, '0')}:00`),
+        h('span', null, h('i', { style: 'background:var(--adm-c3)' }), `新注册 ${fmt.int(r.n)}`),
+        h('span', null, h('i', { style: 'background:var(--adm-c1)' }), `用户总数 ${fmt.int(r.total)}`))
+      tip.style.left = `${Math.min(Math.max((x(i) / width) * box.width, 80), box.width - 80)}px`
+    }
+    svg.addEventListener('pointermove', point)
+    svg.addEventListener('pointerdown', point)
+    svg.addEventListener('pointerleave', (event) => {
+      if (event.pointerType === 'touch') return
+      cursor.setAttribute('visibility', 'hidden')
+      tip.hidden = true
+    })
+    wrap.prepend(svg)
+  }
+  wrap.append(tip, legend)
+  new ResizeObserver(() => draw()).observe(wrap)
+  requestAnimationFrame(draw)
+  return wrap
+}
+const signupRanges: [string, string][] = [['24', '24 小时'], ['72', '3 天'], ['168', '7 天'], ['720', '30 天']]
+function signupCard() {
+  const pick = signupRanges.some(([k]) => k === params.get('signups')) ? params.get('signups')! : '72'
+  const slot = h('div')
+  async(slot, () => api<Signups>(`admin/signups?hours=${pick}`), (data) => {
+    const added = data.points.reduce((sum, p) => sum + p.n, 0)
+    return [h('p', { class: 'adm-sub adm-signups-sum' }, `区间内新注册 ${fmt.int(added)} 人，现有 ${fmt.int(data.base + added)} 人`), signupChart(data)]
+  }, skeleton(4))
+  return card('注册曲线', slot, {
+    sub: '按小时统计，时间为本机时区',
+    actions: segmented(pick, signupRanges, (value) => go({ signups: value === '72' ? null : value }, true, true), '注册曲线时间范围'),
+  })
+}
 function bars(rows: { label: string; value: number; note?: string }[], format: Fmt) {
   const max = Math.max(...rows.map((r) => r.value), 1)
   return h('ul', { class: 'adm-bars' },
@@ -1349,7 +1449,7 @@ const pages: Record<string, (view: View) => void> = {
       h('label', null, '已绑定', select('bound', bound, [['', '不限'], ...channels], (value) => go({ bound: value || null }, true), '已绑定渠道')),
       h('label', null, '状态', select('state', state, [['', '全部'], ['active', '正常'], ['banned', '已封禁']], (value) => go({ state: value || null }, true), '账号状态')))
     const slot = h('div')
-    main.append(statsSlot,
+    main.append(statsSlot, signupCard(),
       h('div', { class: 'adm-toolbar adm-toolbar--split' },
         segmented(role, [['', '全部'], ['admin', '管理员'], ['user', '普通用户']], (value) => go({ role: value || null }, true), '角色'), form),
       filters,
