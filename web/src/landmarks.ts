@@ -174,7 +174,7 @@ function batchRepeatedMeshes(root:THREE.Group){
 // Fade the last available LOD before its stream cutoff. Only transition states
 // (coverage < 1) bind this discard variant; steady-state coverage === 1 renders
 // with the clean opaque material so hardware Early-Z remains enabled.
-function fadeMaterial(material:THREE.Material,coverage:THREE.IUniform<number>){
+export function fadeMaterial(material:THREE.Material,coverage:THREE.IUniform<number>){
   const previous=material.onBeforeCompile, key=material.customProgramCacheKey()
   material.onBeforeCompile=function(shader,renderer){
     previous.call(this,shader,renderer)

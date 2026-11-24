@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import {nightLit} from '../look/night'
 import {bindAtmo, bindSurfaceMaster, bindVcEmissive} from './shader-binders'
 
-export async function warmShopPrograms(warm:(root:THREE.Object3D)=>Promise<void>) {
+export function shopProgramVariants() {
   const geometry = new THREE.BufferGeometry(), map = new THREE.Texture()
   const standard = (options:THREE.MeshStandardMaterialParameters) => new THREE.MeshStandardMaterial(options)
   const materials = [
@@ -17,11 +17,20 @@ export async function warmShopPrograms(warm:(root:THREE.Object3D)=>Promise<void>
     const sign = standard({map, emissiveMap:map, alphaTest:cutout?.5:0, side:cutout?THREE.DoubleSide:THREE.FrontSide})
     sign.name='arrival_signs'; nightLit(sign); materials.push(sign)
   }
-  for (const material of materials) {
-    await new Promise<void>(resolve => {
-      if ('requestIdleCallback' in window) requestIdleCallback(()=>resolve(), {timeout:100})
-      else requestAnimationFrame(()=>resolve())
-    })
-    await warm(new THREE.Mesh(geometry,material))
-  }
+  const batch = new THREE.Group()
+  const colored = {vertexColors:true}, double = {side:THREE.DoubleSide}
+  const pbr = {...colored,map,normalMap:map}
+  materials.push(
+    bindVcEmissive(standard({...pbr, roughnessMap:map, emissiveMap:map})),
+    bindVcEmissive(standard({...pbr, emissiveMap:map})),
+    bindSurfaceMaster(standard({...colored,map}), [], [0,0]),
+    bindSurfaceMaster(standard({...pbr,roughnessMap:map}), [], [0,0]),
+    bindVcEmissive(standard({...colored,...double})), standard({transparent:true}),
+  )
+  const sign = standard(colored); sign.name='vc_emissive_signs'; nightLit(sign); materials.push(sign)
+  batch.add(new THREE.SkinnedMesh(geometry,bindVcEmissive(standard({...colored,...double,map,emissiveMap:map}))))
+  const steamGeometry = new THREE.BufferGeometry().setAttribute('color',new THREE.Float32BufferAttribute([],4))
+  batch.add(new THREE.Points(steamGeometry,bindAtmo(new THREE.PointsMaterial({...colored,map,transparent:true}))))
+  for (const material of materials) batch.add(new THREE.Mesh(geometry,material))
+  return batch
 }

@@ -36,6 +36,10 @@ export function shaderLinkProbe(){
       if(!row||key==='getProgramParameter:37297'||row.calls[key])return original.call(this,program,...args)
       const start=performance.now(),result=original.call(this,program,...args)
       row.calls[key]={start,ms:performance.now()-start}
+      if(key==='getProgramParameter:35718'){
+        const entry=window.rend?.info.programs?.find(entry=>entry.program===program)
+        if(entry)row.cacheKey=entry.cacheKey
+      }
       return result
     }
   }
