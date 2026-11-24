@@ -89,6 +89,10 @@ try {
   assert.equal(placed.dock, '飞无人机', 'dock entry becomes 起飞')
   assert.equal(placed.state.mesh, 'drone-mini5pro', 'mesh added to the scene')
   assert.match(placed.hint ?? '', /Mini 5 Pro|无人机就位/)
+  // IDOK-275: the glTF replaces the procedural mesh and keeps the animated node names
+  assert.equal(placed.state.model.source, 'gltf', 'public/models/drones/mini5pro.glb is loaded')
+  assert.deepEqual(placed.state.model.props, ['prop_1','prop_2','prop_3','prop_4'])
+  assert.deepEqual([placed.state.model.gimbal, placed.state.model.lens, placed.state.model.gear], ['gimbal','lens','gear'])
 
   // 3) takeoff -> RC view
   await tap('.dock-drone')
@@ -204,6 +208,14 @@ try {
   assert.equal(pro.tapes, true)
   assert.equal(pro.gimbal, true)
   assert.equal(pro.load, 1200, 'car load is 1200 kg')
+  // IDOK-275: FlyCart glTF (eight props), winch mode hides the cargo box, the street car hangs on the sling
+  await page.waitForFunction(() => (window.droneDebug().payload?.parts ?? 0) >= 6, null, {timeout: 30000})
+  const sling = await page.evaluate(() => window.droneDebug())
+  console.log('sling', JSON.stringify({model: sling.model, payload: sling.payload}))
+  assert.equal(sling.model.source, 'gltf')
+  assert.equal(sling.model.props.length, 8, 'FlyCart spins eight props')
+  assert.equal(sling.model.cargoBox, false, 'cargo box comes off in winch mode')
+  assert.equal(sling.payload.kind, 'car')
   await tap('.rc [data-act="exit"]')
 
   assert.deepEqual(errors, [], 'no page errors')
