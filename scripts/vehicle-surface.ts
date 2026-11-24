@@ -1,5 +1,6 @@
 // Vertical intersections with the triangles used by the fine-detail renderer.
 import fs from 'node:fs'
+import {bedPositions} from '../web/src/roadbed'
 import path from 'node:path'
 import {execFileSync} from 'node:child_process'
 import {gunzipSync} from 'node:zlib'
@@ -54,7 +55,7 @@ function tileSurface(world,entry,tunnels){
   }
   const roads=streetGeometry(paths,ground).road
   joinPortalRoads(entry,tunnels,[roads])
-  const modified=bed&&new Set(bed.drop),replacement=bed&&new Triangles(Float32Array.from(bed.vertices.flat()))
+  const modified=bed&&new Set(bed.drop),replacement=bed&&new Triangles(bedPositions(bed))
   function visibleGround(x,z){
     if(!modified)return ground(x,z)
     const col=Math.min(256/step-1,Math.floor(x/step)),row=Math.min(256/step-1,Math.floor(z/step))

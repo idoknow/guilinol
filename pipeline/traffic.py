@@ -16,6 +16,8 @@ from shapely.prepared import prep
 from common import OUT, ll2xz, load_osm
 from road_tunnels import clear_approach_paving
 from station_road_corridor import bake as bake_station_corridor
+from surveyed_corridors import bake as bake_surveyed_corridors, restore as restore_corridors
+from vehicle_approaches import plan as plan_approaches, private_access
 from vehicle_tunnels import underground, sections as tunnel_sections, solve as solve_tunnels
 from service_streets import mark_drivable_services, width as minor_road_width
 from traffic_parking import allowed, bake_parking
@@ -138,19 +140,15 @@ def bake(output, manifest, rendered_roads=None):
     forbidden = prep(unary_union(banned))
     nodes, lanes, walks, incoming = {}, [], [], defaultdict(list)
     elements = load_osm()
-    bake_station_corridor(output, manifest['chunks'], elements)
     # Legacy expanded worlds carry the original continuous surface street
     # through both open Wuling cuttings, above the actual tunnel floor.
     clear_approach_paving(output,manifest['chunks'],[t for t in manifest.get('tunnels',[]) if t['way']==237985762])
     parking_segments = []
     sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
-    from dingjiang_structures import motorway_sections
-    from rail_sections import motorway_sections as graded_motorways
-    # Append the modeled motorway segments after the existing network so every
-    # pre-existing lane keeps its ID in graph.json.gz and all streaming cells.
-    existing = (way for way in elements if way.get('tags', {}).get('highway')
-                not in ('motorway', 'motorway_link'))
-    for way in chain(existing, motorway_sections(elements), graded_motorways(elements)):
+    restore_corridors(output,manifest['chunks'])
+    bake_station_corridor(output, manifest['chunks'], elements)
+    bake_surveyed_corridors(output,manifest['chunks'],elements,sections)
+    for way in elements:
         tags = way.get('tags', {})
         linear = way['id'] not in SPAN_WAYS and (tags.get('bridge','no')!='no' or underground(tags))
         kind = tags.get('highway', '').removesuffix('_link')
@@ -263,12 +261,24 @@ def bake(output, manifest, rendered_roads=None):
         survey_nodes = dict(nodes)
         network = tunnel_sections(lanes,elements,original_tunnels,survey_nodes)
         if network['edges']:
-            request.write_text(json.dumps(dict(manifest=manifest,network=network,nodes=list(survey_nodes.values()))))
+            guides=private_access(elements,network['portals'],survey_nodes)
+            request.write_text(json.dumps(dict(manifest=manifest,network=network,nodes=list(survey_nodes.values()),guideNodes=sorted({g[k] for g in guides for k in ('from','to')}))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portals',str(output.resolve()),str(request)],check=True,cwd=ROOT)
-            generated,conflicts = solve_tunnels(network,survey_nodes,json.loads(request.read_text()))
+            samples=json.loads(request.read_text())
+            generated,conflicts = solve_tunnels(network,survey_nodes,samples)
+            fixed={ref for way in elements if way['type']=='way' and way.get('tags',{}).get('railway')=='rail'
+                   and way['tags'].get('layer','0')=='0' for ref in way['nodes']}
+            access,limits=plan_approaches(conflicts,lanes+guides,survey_nodes,{int(k):v for k,v in samples['heights'].items()},fixed,sections)
+            bake_surveyed_corridors(output,manifest['chunks'],elements,sections,access,only_approaches=True)
+            for tunnel in generated:
+                tunnel['gradedAccess']=True
+            conflicts.extend(limits)
             manifest['tunnels'] = original_tunnels+generated
-            (output/'vehicle-tunnel-grades.json').write_text(json.dumps(conflicts,indent=2))
+            request.write_text(json.dumps(dict(manifest=manifest,nodes=list(survey_nodes.values()),constraints=conflicts)))
+            subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
+                            'portal-check',str(output.resolve()),str(request)],check=True,cwd=ROOT)
+            (output/'vehicle-tunnel-grades.json').write_bytes(request.read_bytes())
         request.write_text(json.dumps(dict(manifest=manifest,nodes=result['nodes'],lanes=lanes),separators=(',',':')))
         subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                         'bake',str(output.resolve()),str(request)], check=True, cwd=ROOT)

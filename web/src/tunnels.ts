@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type {Tile} from './world'
 
 type Point=[number,number,number]
-export type Tunnel={way:number,generated?:boolean,portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,mouths?:[boolean,boolean],joints?:({ring:[number,number][],draw:boolean}|null)[],stations?:[number,number][],stationHeights?:string}
+export type Tunnel={way:number,generated?:boolean,gradedAccess?:boolean,portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,openEnds?:[number,number],mouths?:[boolean,boolean],joints?:({ring:[number,number][],draw:boolean,cap?:boolean}|null)[],stations?:[number,number][],stationHeights?:string}
 
 // Generated strips use three fixed easing samples per interval. Keep distant
 // strips encoded in the manifest and unpack only a visited strip's levels.
@@ -25,6 +25,10 @@ function profile(tunnel:Tunnel):StationProfile {
   }
   profiles.set(tunnel,value)
   return value
+}
+
+function openEnd(tunnel:Tunnel,index:number){
+  return tunnel.openEnds?.[index]??(tunnel.mouths?.[index]===false?0:tunnel.approach)
 }
 
 function frame(tunnel:Tunnel){
@@ -91,7 +95,7 @@ export function treeBlocked(x:number,y:number,z:number){
   for(const tunnel of nearbyTunnels(registered,x,z)){
     const axes=frame(tunnel),at=axes.station(x,z),side=Math.abs(axes.lateral(x,z))
     if(at< -6||at>tunnel.length+6||side>tunnel.halfWidth+3)continue
-    const open=(tunnel.mouths?.[0]!==false&&at<tunnel.approach+2)||(tunnel.mouths?.[1]!==false&&at>tunnel.length-tunnel.approach-2)
+    const open=(openEnd(tunnel,0)>0&&at<openEnd(tunnel,0)+2)||(openEnd(tunnel,1)>0&&at>tunnel.length-openEnd(tunnel,1)-2)
     const values=profile(tunnel)
     let lo=0,hi=values.count-1
     while(lo<hi){const mid=(lo+hi)>>>1;if(values.at(mid)[0]<at)lo=mid+1;else hi=mid}
@@ -104,7 +108,7 @@ export function treeBlocked(x:number,y:number,z:number){
 type Plane=(point:Point)=>number
 export function joinPortalRoads(tile:Tile,tunnels:Tunnel[],buffers:Float32Array[]){
   for(const tunnel of tunnels){
-    if(tunnel.nodes)continue
+    if(tunnel.gradedAccess)continue
     const axes=frame(tunnel)
     for(const [index,portal] of tunnel.portals.entries()){
       if(tunnel.mouths?.[index]===false)continue
@@ -156,18 +160,27 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     const axes=frame(tunnel),width=tunnel.halfWidth,head=tunnel.clearance
     function local(s:number,d:number,y:number){const p=axes.point(s,d,y);p[0]-=tile.x;p[2]-=tile.z;return p}
     const station=(p:Point)=>axes.station(p[0]+tile.x,p[2]+tile.z),side=(p:Point)=>axes.lateral(p[0]+tile.x,p[2]+tile.z)
-    for(const [from,to] of [[0,tunnel.mouths?.[0]===false?0:tunnel.approach],[tunnel.mouths?.[1]===false?tunnel.length:tunnel.length-tunnel.approach,tunnel.length]])if(to>from)cuts.push([p=>station(p)-from,p=>to-station(p),p=>width-side(p),p=>width+side(p)])
+    for(const [from,to] of [[0,openEnd(tunnel,0)],[tunnel.length-openEnd(tunnel,1),tunnel.length]])if(to>from)cuts.push([p=>station(p)-from,p=>to-station(p),p=>width-side(p),p=>width+side(p)])
     const quad=(points:Point[],part:keyof typeof parts)=>fan(limits.reduce((poly,plane)=>clip(poly,plane),points),parts[part])
     for(const [i,joint] of (tunnel.joints??[]).entries()){
       if(!joint?.draw)continue
       const floor=tunnel.portals[i][1]
+      if(joint.cap&&openEnd(tunnel,i)>0){
+        const cx=joint.ring.reduce((sum,p)=>sum+p[0],0)/joint.ring.length
+        const cz=joint.ring.reduce((sum,p)=>sum+p[1],0)/joint.ring.length
+        cuts.push(joint.ring.map(([x,z],j)=>{
+          const [ex,ez]=joint.ring[(j+1)%joint.ring.length]
+          const side=Math.sign((ex-x)*(cz-z)-(ez-z)*(cx-x))
+          return p=>side*((ex-x)*(p[2]+tile.z-z)-(ez-z)*(p[0]+tile.x-x))
+        }))
+      }
       quad(joint.ring.map(([x,z])=>[x-tile.x,floor,z-tile.z]),'floor')
-      if(!tunnel.mouths?.[i])quad(joint.ring.map(([x,z])=>[x-tile.x,floor+head,z-tile.z]),'ceiling')
+      if(!tunnel.mouths?.[i]&&!openEnd(tunnel,i))quad(joint.ring.map(([x,z])=>[x-tile.x,floor+head,z-tile.z]),'ceiling')
     }
     const values=profile(tunnel)
     for(let i=1;i<values.count;i++){
       const [a,ay]=values.at(i-1),[b,by]=values.at(i)
-      const open=(tunnel.mouths?.[0]!==false&&(a+b)/2<tunnel.approach)||(tunnel.mouths?.[1]!==false&&(a+b)/2>tunnel.length-tunnel.approach)
+      const open=((a+b)/2<openEnd(tunnel,0))||((a+b)/2>tunnel.length-openEnd(tunnel,1))
       const al=local(a,-width,ay),ar=local(a,width,ay),bl=local(b,-width,by),br=local(b,width,by)
       quad([al,ar,br,bl],'floor')
       const top=(p:Point):Point=>[p[0],open?Math.max(p[1],groundY(p)):p[1]+head,p[2]]
@@ -181,7 +194,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
         for(const d of [-inset+.02,inset-.02])quad([local(a,d,ay+head-.95),local(b,d,by+head-.95),local(b,d,by+head-.8),local(a,d,ay+head-.8)],'lamp')
       }
       if(Math.floor(a/6)%2===0)quad([local(a,-.08,ay+.03),local(a,.08,ay+.03),local(b,.08,by+.03),local(b,-.08,by+.03)],'lane')
-      for(const [s,y] of [[a,ay]])if((tunnel.mouths?.[0]!==false&&Math.abs(s-tunnel.approach)<1e-6)||(tunnel.mouths?.[1]!==false&&Math.abs(s-tunnel.length+tunnel.approach)<1e-6)){
+      for(const [s,y] of [[a,ay]])if((tunnel.mouths?.[0]!==false&&Math.abs(s-openEnd(tunnel,0))<1e-6)||(tunnel.mouths?.[1]!==false&&Math.abs(s-tunnel.length+openEnd(tunnel,1))<1e-6)){
         const l=local(s,-width,y+head),r=local(s,width,y+head)
         quad([l,r,[r[0],Math.max(r[1]+.16,groundY(r)),r[2]],[l[0],Math.max(l[1]+.16,groundY(l)),l[2]]],'portal')
       }

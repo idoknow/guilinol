@@ -6,7 +6,8 @@ import math
 
 from common import ll2xz
 from service_streets import width
-from shapely.geometry import MultiPoint
+from shapely import STRtree
+from shapely.geometry import LineString, MultiPoint, Point, Polygon
 from heapq import heapify, heappop, heappush
 
 
@@ -78,10 +79,94 @@ def sections(lanes, source_ways, existing, nodes):
         tags=way.get('tags',{})
         if way['type']=='way' and tags.get('highway') and not underground(tags):
             surface_nodes.update(n for n in way['nodes'] if n in adjacent)
+    portals = surface_nodes.intersection(adjacent)
+    # The cut may extend into the bore until it reaches a fixed roof. Include
+    # the full carriageway width when locating rails, buildings and upper roads.
+    obstacles, refs, centerlines = [], [], []
+    for way in source_ways:
+        tags = way.get('tags', {})
+        if way['type'] != 'way' or not any(tags.get(k) for k in ('railway', 'highway', 'building')):
+            continue
+        if underground(tags) or not way.get('geometry') or not all(way['geometry']):
+            continue
+        coords = [ll2xz(p['lat'], p['lon']) for p in way['geometry']]
+        if len(coords) < 2:
+            continue
+        if tags.get('building') and str(tags.get('layer','')).lstrip('+').isdigit() and int(tags['layer'])>0:
+            continue  # An elevated industrial structure has no ground-level roof here.
+        if tags.get('building') and len(coords) >= 4 and coords[0] == coords[-1]:
+            shape = Polygon(coords).buffer(0)
+        else:
+            radius = width(tags)/2 if tags.get('highway') else .75
+            shape = LineString(coords).buffer(radius)
+        obstacles.append(shape)
+        centerlines.append(LineString(coords) if tags.get('highway') else None)
+        refs.append(set(way.get('nodes', ())) if tags.get('highway') else set())
+    index = STRtree(obstacles)
+    # Carry the available open cutting through internal OSM vertices. A
+    # polyline bend inside an approach is not a new underground roof.
+    clear = {}
+    links = defaultdict(list)
+    for i, edge in enumerate(edges.values()):
+        keys = (edge['a'], edge['b'])
+        coords = [(nodes[k]['x'], nodes[k]['z']) for k in keys]
+        axis = LineString(coords)
+        free = [axis.length, axis.length]
+        for hit in index.query(axis.buffer(edge['halfWidth']), predicate='intersects'):
+            if portals.intersection(keys).intersection(refs[hit]):
+                continue
+            if centerlines[hit] is not None and not axis.intersects(centerlines[hit]):
+                continue
+            contact = axis.intersection(obstacles[hit].buffer(edge['halfWidth']))
+            if not contact.is_empty:
+                free = [min(extent, Point(pt).distance(contact)) for pt,extent in zip(coords,free)]
+        clear[i] = free
+        cap = grade_limit(edge['cls'])*.94
+        for j,k in enumerate(keys):
+            links[k].append((i,j,keys[1-j],axis.length,cap,edge))
+    best = {k:0. for k in portals}
+    queue = [(0.,k) for k in portals]
+    heapify(queue)
+    while queue:
+        spent,k = heappop(queue)
+        if spent != best[k]:
+            continue
+        for i,j,other,length,cap,edge in links[k]:
+            available = (edge['clearance']+.05-spent)/cap
+            if available <= 0:
+                continue
+            extent = min(available,clear[i][j])
+            ends = edge.setdefault('openEnds',[0.,0.])
+            ends[j] = extent
+            if extent >= length-1e-6 and spent+length*cap < best.get(other,math.inf):
+                best[other] = spent+length*cap
+                heappush(queue,(best[other],other))
+    for i,edge in enumerate(edges.values()):
+        ends = edge.get('openEnds')
+        if not ends:
+            continue
+        a,b=edge['a'],edge['b']
+        length=math.hypot(nodes[a]['x']-nodes[b]['x'],nodes[a]['z']-nodes[b]['z'])
+        if ends[0]+ends[1]>=length:
+            # A through-cut can continue across bends. Keep the summit of a
+            # short two-sided descent enclosed when the rising ramps meet.
+            cost=length*grade_limit(edge['cls'])*.94
+            if abs(best.get(a,math.inf)-best.get(b,math.inf)) < cost-1e-6:
+                meet=max(0.,min(length,(length+(best[b]-best[a])*length/cost)/2))
+                edge['openEnds']=[max(0.,meet-1),max(0.,length-meet-1)]
+            elif best.get(a,math.inf)<=best.get(b,math.inf):
+                edge['openEnds']=[min(length,ends[0]),0.]
+            else:
+                edge['openEnds']=[0.,min(length,ends[1])]
     # An underground dead end without a surface connection remains an end,
     # rather than an invented interchange with a road above it.
     return dict(edges=list(edges.values()), portals=sorted(surface_nodes.intersection(adjacent)),
                 ends=sorted(n for n in adjacent if len(adjacent[n])==1))
+
+
+def grade_limit(cls):
+    return {'motorway':.04, 'trunk':.04, 'primary':.05, 'secondary':.06,
+            'tertiary':.07}.get(cls, .08)
 
 
 def solve(network, nodes, samples):
@@ -94,16 +179,15 @@ def solve(network, nodes, samples):
     for edge, roof in zip(network['edges'], samples['roofs'], strict=True):
         start, end = nodes[edge['a']], nodes[edge['b']]
         length = math.hypot(end['x']-start['x'], end['z']-start['z'])
-        approach = min(length*.4, 18.)
+        approach = edge.get('openEnds', [0., 0.])
         count = len(roof)-1
         # Distinct integer indices for interior samples; OSM IDs are positive.
         keys = [edge['a']] + [-1-len(alignments)-i*len(network['edges']) for i in range(count-1)] + [edge['b']]
-        cap = {'motorway':.04, 'trunk':.04, 'primary':.05, 'secondary':.06,
-               'tertiary':.07}.get(edge['cls'], .08)
+        cap = grade_limit(edge['cls'])
         step = length/count
         for i, (key, ceiling) in enumerate(zip(keys,roof)):
-            open_ramp = ((keys[0] in mouths and i*step < approach) or
-                         (keys[-1] in mouths and length-i*step < approach))
+            open_ramp = ((approach[0]>0 and i*step <= approach[0]+1e-8) or
+                         (approach[1]>0 and length-i*step <= approach[1]+1e-8))
             bound = ceiling-edge['clearance']-.05 if not open_ramp else math.inf
             if key in mouths:
                 bound = min(bound, heights[key])
@@ -197,7 +281,7 @@ def solve(network, nodes, samples):
                               halfWidth=edge['halfWidth'],clearance=edge['clearance'],
                               portals=[[start['x'],levels[0],start['z']],
                                        [end['x'],levels[-1],end['z']]],
-                              mouths=[a in mouths,b in mouths],approach=approach,stationHeights=pack_stations(stations)))
+                              mouths=[a in mouths,b in mouths],approach=0,openEnds=approach,stationHeights=pack_stations(stations)))
     # Fill the wedge between the two end sections on the outside of a bend.
     # All incident strips share the node elevation. Only one draws the patch.
     incident=defaultdict(list)
@@ -210,12 +294,31 @@ def solve(network, nodes, samples):
             points=[(center[0]-side*dz*w,center[2]+side*dx*w) for side in (-1,1)]
             incident[key].append((tunnel,i,points))
     for entries in incident.values():
-        if len(entries)<2:
-            continue
-        hull=MultiPoint([pt for _,_,points in entries for pt in points]).convex_hull
+        # A wheel can pass the last cross-section while its axle is still
+        # inside the circular end cap of the mapped carriageway. Include
+        # that surface on curves, at the portal, and at underground dead ends.
+        if len(entries)==1:
+            tunnel,i,_=entries[0]
+            x,_,z=tunnel['portals'][i]
+            p,q = tunnel['portals'][i], tunnel['portals'][1-i]
+            angle = math.atan2(p[2]-q[2],p[0]-q[0])
+            hull=Polygon([(x+tunnel['halfWidth']*math.cos(angle+math.pi*j/12),
+                           z+tunnel['halfWidth']*math.sin(angle+math.pi*j/12))
+                          for j in range(-6,7)])
+
+        else:
+            boundary=[pt for _,_,points in entries for pt in points]
+            center=entries[0][0]['portals'][entries[0][1]]
+            rad=min(t['halfWidth'] for t,_,_ in entries)
+            for j in range(32):
+                ux,uz=math.cos(math.tau*j/32),math.sin(math.tau*j/32)
+                if all(ux*(t['portals'][1-i][0]-center[0])+uz*(t['portals'][1-i][2]-center[2])<=0
+                       for t,i,_ in entries):
+                    boundary.append((center[0]+rad*ux,center[2]+rad*uz))
+            hull=MultiPoint(boundary).convex_hull
         if hull.area<.001:
             continue
         ring=[[round(x,4),round(z,4)] for x,z in list(hull.exterior.coords)[:-1]]
         for owner,(tunnel,i,_) in enumerate(entries):
-            tunnel.setdefault('joints',[None,None])[i]=dict(ring=ring,draw=owner==0)
+            tunnel.setdefault('joints',[None,None])[i]=dict(ring=ring,draw=owner==0,cap=len(entries)==1)
     return generated,conflicts

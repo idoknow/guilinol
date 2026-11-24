@@ -1,0 +1,276 @@
+"""Rebuild surveyed surface-road intervals against the tile's graded road spline."""
+import base64
+import zlib
+import gzip
+import json
+import math
+import struct
+from collections import defaultdict
+from scipy.spatial import Delaunay
+from pathlib import Path
+
+import numpy as np
+from shapely import (LineString, Point, Polygon, STRtree, box, constrained_delaunay_triangles,
+                     make_valid, set_precision, union_all)
+from shapely.affinity import translate
+from shapely.geometry.polygon import orient
+from shapely.ops import substring
+
+from common import ll2xz
+from features import polygons
+from road_grading import eval_bspline_grid
+from service_streets import rings, width
+
+
+def read_chunk(file):
+    raw=gzip.decompress(file.read_bytes())
+    n,k,size=struct.unpack_from('<3I',raw,4)
+    start=24+16900+9*n+4*k
+    return raw,start,size,json.loads(raw[start:start+size])
+
+
+def write_chunk(file,raw,start,size,collision):
+    data=json.dumps(collision,separators=(',',':')).encode()
+    file.write_bytes(gzip.compress(raw[:12]+struct.pack('<I',len(data))+raw[16:start]+data+raw[start+size:],compresslevel=5,mtime=0))
+
+
+def restore(output,chunks):
+    # Restore the input roads before surveying mouth heights on repeat builds.
+    # Only bake-owned road fields are restored. Other GL04 extensions can be
+    # rebaked (including railway geometry) independently.
+    for tile in chunks:
+        if not tile.pop('gradedCorridor',False):
+            continue
+        file=output/tile['file']
+        raw,start,size,collision=read_chunk(file)
+        paths=collision[1]
+        previous=paths[12]['input']
+        original=json.loads(zlib.decompress(base64.b64decode(previous)))
+        paths[0]=original['paths']
+        if len(paths)>11 and paths[11]:
+            paths[11][0]=original['lower']
+        del paths[original['length']:]
+        collision[7]=original['bed']
+        write_chunk(file,raw,start,size,collision)
+        tile['bytes']=file.stat().st_size
+
+
+def bake(output, chunks, elements, widths, approaches=(), only_approaches=False):
+    intervals = json.loads(Path(__file__).with_name('road-corridor-survey.json').read_text())
+    shapes = []
+    for way in elements:
+        spans = intervals.get(str(way['id']))
+        if way['type'] != 'way' or not spans or not all(way['geometry']):
+            continue
+        axis = LineString([ll2xz(p['lat'], p['lon']) for p in way['geometry']])
+        tags = way['tags']
+        paved = widths.get(way['id'], width(tags))
+        if tags['highway'] == 'residential' and 'width' not in tags:
+            paved = widths.get(way['id'], 6.5)
+        for start, end in spans:
+            if start < axis.length:
+                part = substring(axis, start, min(end, axis.length))
+                shapes.append(part.buffer(paved/2+.5, quad_segs=4))
+    grades=STRtree([line.buffer(half,quad_segs=4) for line,half,*_ in approaches])
+    tree = STRtree(shapes)
+    for tile in chunks:
+        x, z = tile['x'], tile['z']
+        bounds = box(x,z,x+256,z+256)
+        hits = tree.query(bounds, predicate='intersects')
+        nearby=grades.query(bounds,predicate='intersects')
+        if (only_approaches and not len(nearby)) or not (len(hits) or len(nearby)):
+            continue
+        area = union_all([shapes[i].intersection(bounds) for i in hits]+
+                         [grades.geometries[i].intersection(bounds) for i in nearby])
+        area = set_precision(translate(area, -x, -z), .01)
+        if area.area > .01:
+            local=[(translate(approaches[i][0],-x,-z),*approaches[i][1:]) for i in nearby]
+            if patch(output/tile['file'], area, local):
+                tile['gradedCorridor']=True
+            tile['bytes'] = (output/tile['file']).stat().st_size
+
+
+def patch(file, area, approaches=()):
+    raw = gzip.decompress(file.read_bytes())
+    n, k, size, image, deck = struct.unpack_from('<5I', raw, 4)
+    start = 24+16900+9*n+4*k
+    collision = json.loads(raw[start:start+size])
+    paths = collision[1]
+    old=paths[12] if len(paths)>12 else None
+    if old and isinstance(old,dict) and 'input' in old:
+        previous=old['input']
+        original=json.loads(zlib.decompress(base64.b64decode(previous)))
+    else:
+        original=dict(paths=paths[0],lower=paths[11][0] if len(paths)>11 and paths[11] else None,
+                      length=len(paths),bed=collision[7] if len(collision)>7 else None)
+        previous=base64.b64encode(zlib.compress(json.dumps(original,separators=(',',':')).encode())).decode()
+    lower = paths[11] if len(paths)>11 else None
+    boundary = lower[0] if lower else len(paths[0])
+    rebuilt = []
+    for kind, *loops in paths[0][:boundary]:
+        shape = make_valid(Polygon(np.asarray(loops[0])/100, [np.asarray(r)/100 for r in loops[1:]]))
+        if kind in (0,1,4,5,6) and area.intersects(shape):
+            rebuilt.extend(rings(kind,shape.difference(area)))
+        else:
+            rebuilt.append([kind,*loops])
+    survey_start = len(rebuilt)
+    for polygon in polygons(area):
+        xmin,zmin,xmax,zmax=polygon.bounds
+        for x in range(math.floor(xmin/16)*16,math.ceil(xmax/16)*16,16):
+            for z in range(math.floor(zmin/16)*16,math.ceil(zmax/16)*16,16):
+                rebuilt.extend(rings(0,polygon.intersection(box(x,z,x+16,z+16))))
+    survey_end = len(rebuilt)
+    if lower:
+        lower[0] = len(rebuilt)
+    paths[0] = rebuilt + paths[0][boundary:]
+    tail = start+size+image+18*deck
+    terrain = np.frombuffer(raw,'<i2',4225,tail if len(raw)>tail else 24).reshape(65,65)/10
+    wet = np.frombuffer(raw,'<i2',4225,8474).reshape(65,65) != -32768
+    step = 4 if wet.any() else 8
+    for line, water in ((terrain[0],wet[0]),(terrain[-1],wet[-1]),(terrain[:,0],wet[:,0]),(terrain[:,-1],wet[:,-1])):
+        if not water.any():
+            line[:] = np.interp(np.arange(65),np.arange(0,65,8),line[::8])
+    control = paths[5] if len(paths)>5 else None
+    ctrl = ((control[0]+np.asarray(control[1]).reshape(35,35))/1000 if control else
+            np.pad(terrain[::2,::2],1,mode='edge'))
+    old_bed=original['bed'] or {}
+    old_faces=set(old_bed.get('drop',()))
+    vertices, drop, paved, spline = [], [], [], []
+    knots=defaultdict(set)
+    for line,half,ya,yb,cap in approaches:
+        (ax,az),(bx,bz)=line.coords
+        dx,dz=(bx-ax)/line.length,(bz-az)/line.length
+        blend=max(0,min(.12,1-abs(yb-ya)/(cap*line.length)))
+        run=blend*line.length
+        distances=np.linspace(0,run,math.ceil(run/2)+1)
+        for distance in {*distances,*(line.length-distances)}:
+            for side in (-half+.02,0,half-.02):
+                x,z=ax+dx*distance-dz*side,az+dz*distance+dx*side
+                knots[int(z//step),int(x//step)].add((round(x,4),round(z,4)))
+    visited = set()
+    for piece in polygons(area):
+        xmin,zmin,xmax,zmax = piece.bounds
+        for row in range(int(zmin//step),min(256//step,math.ceil(zmax/step))):
+            for col in range(int(xmin//step),min(256//step,math.ceil(xmax/step))):
+                if (row,col) in visited:
+                    continue
+                visited.add((row,col))
+                x,z=col*step,row*step
+                a,b,c,d=(x,z),(x,z+step),(x+step,z+step),(x+step,z)
+                for face,corners in enumerate(((a,b,d),(b,c,d))):
+                    cell = Polygon(corners)
+                    inside = cell.intersection(area)
+                    if inside.area < 1e-8:
+                        continue
+                    face_id=2*(row*(256//step)+col)+face
+                    drop.append(face_id)
+                    plane=np.linalg.solve([[u,v,1] for u,v in corners],[terrain[v//4,u//4] for u,v in corners])
+                    def vertex(u,v,graded):
+                        if graded:
+                            spline.append(len(vertices))
+                        vertices.append([round(u,4),0 if graded else round(float(plane@[u,v,1]),4),round(v,4)])
+                    pieces=[(inside,True)]
+                    if face_id not in old_faces:
+                        pieces.append((cell.difference(area),False))
+                    for geom, graded in pieces:
+                        for tri in constrained_delaunay_triangles(geom).geoms:
+                            corners=list(orient(tri,sign=-1).exterior.coords)[:3]
+                            interior=[point for point in sorted(knots.get((row,col),()))
+                                      if graded and tri.contains(Point(point))]
+                            if interior:
+                                coords=np.array(corners+interior)
+                                faces=[]
+                                for ids in Delaunay(coords).simplices:
+                                    a,b,c=coords[ids]
+                                    if (b[1]-a[1])*(c[0]-a[0])<(b[0]-a[0])*(c[1]-a[1]):
+                                        b,c=c,b
+                                    faces.append((a,b,c))
+                            else:
+                                faces=[corners]
+                            for points in faces:
+                                if graded:
+                                    paved.append(len(vertices)//3)
+                                for u,v in points:
+                                    vertex(u,v,graded)
+                    edge = cell.intersection(area.boundary)
+                    for line in getattr(edge,'geoms',[edge]):
+                        if line.geom_type != 'LineString':
+                            continue
+                        for (u,v),(s,t) in zip(line.coords,list(line.coords)[1:]):
+                            if (u==s and u in (0,256)) or (v==t and v in (0,256)):
+                                continue
+                            for point in ((u,v,True),(u,v,False),(s,t,True),(s,t,True),(u,v,False),(s,t,False)):
+                                vertex(*point)
+    if not paved:
+        return
+    xy = np.asarray([vertices[i] for i in spline])
+    levels = eval_bspline_grid(ctrl,0,0,xy[:,0],xy[:,2])-.006
+    # Interpolate physical road and bed together. Select the closest axis in
+    # overlapping junction areas, with a shared constrained level at each node.
+    distance=np.full(len(levels),np.inf)
+    for line,half,ya,yb,cap in approaches:
+        (ax,az),(bx,bz)=line.coords
+        dx,dz=bx-ax,bz-az
+        length=line.length
+        t=np.clip(((xy[:,0]-ax)*dx+(xy[:,2]-az)*dz)/length**2,0,1)
+        d=np.hypot(xy[:,0]-ax-t*dx,xy[:,2]-az-t*dz)
+        select=(d<=half+.01)&(d<distance)
+        blend=max(0,min(.12,1-abs(yb-ya)/(cap*length)))
+        if blend>1e-6:
+            f=np.where(t<blend,t*t/(2*blend),np.where(t>1-blend,1-blend-(1-t)**2/(2*blend),t-blend/2))/(1-blend)
+        else:
+            f=t
+        levels[select]=ya+(yb-ya)*f[select]-.051
+        distance[select]=d[select]
+    for i,y in zip(spline,levels):
+        vertices[i][1] = round(float(y),4)
+    # Encode in millimetres. The worker draws the exact same triangles 51 mm
+    # above the bed, independent of the two meshes' tessellation.
+    tops = [[round(u*1000),round(y*1000)+51,round(v*1000)] for t in paved for u,y,v in vertices[3*t:3*t+3]]
+    while len(paths)<13:
+        paths.append(None if len(paths) in (5,11,12) else [])
+    paths[12] = dict(start=survey_start,end=survey_end,packed=base64.b64encode(np.asarray(tops,dtype="<i4").tobytes()).decode(),input=previous)
+    while len(collision)<8:
+        collision.append([])
+    if isinstance(collision[4],dict) and 'drop' in collision[4]:
+        collision[4] = []
+    if old_bed:
+        old_vertices=(np.frombuffer(base64.b64decode(old_bed['packed']),'<i4').reshape(-1,3)/10000
+                      if old_bed.get('packed') else np.asarray(old_bed['vertices']))
+        if old_faces.intersection(drop):
+            for triangle in old_vertices.reshape(-1,3,3):
+                footprint=Polygon(triangle[:,[0,2]])
+                if not footprint.intersects(area):
+                    vertices.extend(triangle.tolist())
+                elif footprint.area>1e-9:
+                    plane=np.linalg.solve(np.column_stack((triangle[:,[0,2]],np.ones(3))),triangle[:,1])
+                    for part in constrained_delaunay_triangles(footprint.difference(area)).geoms:
+                        for u,v in list(orient(part,sign=-1).exterior.coords)[:3]:
+                            vertices.append([u,float(plane@[u,v,1]),v])
+                else:
+                    # Clip a vertical retaining face in its own (distance,y) plane.
+                    xy=triangle[:,[0,2]]
+                    a,b=max(((a,b) for a in xy for b in xy),key=lambda ab:np.linalg.norm(ab[0]-ab[1]))
+                    span=np.linalg.norm(b-a)
+                    if span<1e-8:
+                        continue
+                    outside=LineString([a,b]).difference(area)
+                    axis=(b-a)/span
+                    profile=Polygon([((xz-a)@axis,h) for xz,h in zip(xy,triangle[:,1])])
+                    for line in getattr(outside,'geoms',[outside]):
+                        if line.is_empty or line.geom_type!='LineString':
+                            continue
+                        limits=sorted((np.asarray(pt)-a)@axis for pt in (line.coords[0],line.coords[-1]))
+                        clipped=profile.intersection(box(limits[0],triangle[:,1].min()-1,
+                                                         limits[-1],triangle[:,1].max()+1))
+                        for part in constrained_delaunay_triangles(clipped).geoms:
+                            for t,h in list(part.exterior.coords)[:3]:
+                                u,v=a+t*axis
+                                vertices.append([u,h,v])
+        else:
+            vertices.extend(old_vertices.tolist())
+        drop=sorted(old_faces.union(drop))
+    positions=np.rint(np.asarray(vertices)*10000).astype("<i4")
+    collision[7] = dict(drop=drop,packed=base64.b64encode(positions.tobytes()).decode())
+    write_chunk(file,raw,start,size,collision)
+    return True

@@ -168,10 +168,45 @@ try {
       const gPos = data.groundMesh.geometry.getAttribute('position')
       const segs = data.groundMesh.geometry.parameters.widthSegments || 32
       const gStep = 256 / segs, stride = segs + 1
+      // A cut grid retains its source vertices for the renderer's road spline.
+      // Only indexed triangles (including the cut fringe) are visible terrain.
+      const terrainBins = new Map()
+      if(data.roadBed || data.tunnel){
+        for(const mesh of [data.groundMesh,data.tunnel?.fringe]){
+          if(!mesh)continue
+          const geometry=mesh.geometry, position=geometry.getAttribute('position'), index=geometry.index
+          for(let i=0;i<(index?.count??position.count);i+=3){
+            const tri=[0,1,2].map(k=>{
+              const id=index?index.getX(i+k):i+k
+              return [position.getX(id),position.getY(id),position.getZ(id)]
+            })
+            const xs=tri.map(p=>p[0]),zs=tri.map(p=>p[2])
+            for(let x=Math.floor(Math.min(...xs)/gStep);x<=Math.floor(Math.max(...xs)/gStep);x++)
+              for(let z=Math.floor(Math.min(...zs)/gStep);z<=Math.floor(Math.max(...zs)/gStep);z++){
+                const key=x+','+z
+                if(!terrainBins.has(key))terrainBins.set(key,[])
+                terrainBins.get(key).push(tri)
+              }
+          }
+        }
+      }
       const groundAt = (lx, lz) => {
         const clx = Math.min(256, Math.max(0, lx)), clz = Math.min(256, Math.max(0, lz))
         const col = Math.min(segs - 1, Math.max(0, Math.floor(clx / gStep)))
         const row = Math.min(segs - 1, Math.max(0, Math.floor(clz / gStep)))
+        if(terrainBins.size){
+          let top=-Infinity
+          for(const [a,b,c] of terrainBins.get(col+','+row)??[]){
+            const ux=b[0]-a[0],uz=b[2]-a[2],vx=c[0]-a[0],vz=c[2]-a[2]
+            const det=ux*vz-uz*vx
+            if(Math.abs(det)<1e-9)continue
+            const u=((clx-a[0])*vz-(clz-a[2])*vx)/det
+            const v=(ux*(clz-a[2])-uz*(clx-a[0]))/det
+            if(u>=-1e-7&&v>=-1e-7&&u+v<=1.0000001)
+              top=Math.max(top,a[1]+u*(b[1]-a[1])+v*(c[1]-a[1]))
+          }
+          return top
+        }
         const at = row * stride + col
         const u = clx / gStep - col, v = clz / gStep - row
         const a = gPos.getY(at), b = gPos.getY(at + 1), c = gPos.getY(at + stride), d = gPos.getY(at + stride + 1)

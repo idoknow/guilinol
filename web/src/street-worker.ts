@@ -5,13 +5,14 @@ import {stationRoadSurface,type StationRoadSegment} from './station-road-surface
 import {railwayGeometry,type RailSection,type RailFace,type CrossingSign} from './railways'
 import {buildRoadBarriers} from './road-barriers'
 import * as THREE from 'three'
+import {positions as unpackPositions} from './roadbed'
 import {look} from './look/config'
 type Pair=[number,number]
 export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]}
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,([number,number,number]|null)?,unknown?,StationRoadSegment[]?,StationPavingCut[]?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,Lower?,{start:number,end:number,vertices?:[number,number,number][],packed?:string}?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const platformBrick=new THREE.Color(style.station.platformBrick)
@@ -114,7 +115,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(channel===1&&!vertical)sidewalk.push(pt.x,pt.y,pt.z);else if(channel===0&&!vertical)road.push(pt.x,pt.y,pt.z)}
   }
   for(const [index,[kind,...rings]] of paths.entries()){
-    platformPath=!!platform && index>=platform[0] && index<platform[1]
+    if(surveyed&&index>=surveyed.start&&index<surveyed.end)continue
     lowerPath=!!lower && index>=lower[0]
     const loops=rings.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
     const tris=THREE.ShapeUtils.triangulateShape(loops[0],loops.slice(1)),points=loops.flat()
@@ -156,7 +157,12 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       }
     }
   }
-  platformPath=false
+  if(surveyed){
+    const coords=surveyed.packed?unpackPositions(surveyed.packed,.001)
+      :Float32Array.from(surveyed.vertices!.flat(),v=>v*.001)
+    const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3()
+    for(let i=0;i<coords.length;i+=9)triangle(a.fromArray(coords,i),b.fromArray(coords,i+3),c.fromArray(coords,i+6),0)
+  }
   const object=new THREE.Object3D()
   function box(x:number,y:number,z:number,w:number,h:number,d:number,yaw=0,tint=tone.railing,pitch=0){
     object.position.set(x,y,z);object.scale.set(w,h,d);object.rotation.set(0,yaw,pitch,'YXZ');object.updateMatrix()
