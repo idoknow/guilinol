@@ -31,6 +31,7 @@ import {env} from '../look/time'
 import {createDriverPose} from './car'
 import {createRiderPose,notifyDismountBlocked} from './ride'
 import {createEbikeAudioEngine} from './ebike-audio'
+import {RIDE_SOUND_EVENT} from './ride-sound-pref'
 import {clearAvatarPose, ensureAvatarRig, getAvatarJoint, getAvatarJoints} from './avatar-rig'
 import {isGlobalHotkeyBlocked, isModalOrOverlayOpen} from './input-guard'
 import {createInteractArbiter} from './interact-arbiter'
@@ -374,6 +375,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   }
   const ebikeFx=createEbikeFxController()
   const ebikeAudio=createEbikeAudioEngine()
+  window.addEventListener(RIDE_SOUND_EVENT,event=>ebikeAudio.setMuted((event as CustomEvent<boolean>).detail))
   const ZERO_RIDE_INPUT:EbikeRideControlInput={gearDelta:0,gearSelect:null,wheelie:false,tuck:false,recover:false,cycleMod:false,parkToggle:false,kickstandToggle:false,headlightCycle:false,turnLeftToggle:false,turnRightToggle:false,hazardToggle:false,horn:false,hornPulse:false,cruiseToggle:false}
   const ebikeMountStartPos=new THREE.Vector3(), ebikeMountStartRot=new Map<RiderJointName,[number,number,number]>()
   let ebikeMountStartYaw=0, ebikeMountElapsed=bikeConfig.mountDuration

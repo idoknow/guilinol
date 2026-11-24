@@ -67,8 +67,8 @@ body[data-photo="on"] .ride-hud{display:none!important}
 .ride-state[data-warn="1"]{background:rgba(196,68,52,.88);color:#fff;cursor:pointer}
 .ride-mod{font:inherit;font-size:11px;color:#f4efe2;background:rgba(244,239,226,.12);border:1px solid rgba(244,239,226,.28);border-radius:10px;padding:2px 7px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .ride-mod:hover{background:rgba(244,239,226,.22)}
-.ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise{font:600 10.5px/1 ui-monospace,monospace;color:rgba(244,239,226,.82);background:rgba(244,239,226,.10);border:1px solid rgba(244,239,226,.24);border-radius:8px;padding:3px 5px;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.ride-park:focus:not(:focus-visible),.ride-light:focus:not(:focus-visible),.ride-turn-left:focus:not(:focus-visible),.ride-turn-right:focus:not(:focus-visible),.ride-hazard:focus:not(:focus-visible),.ride-horn:focus:not(:focus-visible),.ride-cruise:focus:not(:focus-visible){outline:none}
+.ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise,.ride-sound{font:600 10.5px/1 ui-monospace,monospace;color:rgba(244,239,226,.82);background:rgba(244,239,226,.10);border:1px solid rgba(244,239,226,.24);border-radius:8px;padding:3px 5px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ride-park:focus:not(:focus-visible),.ride-light:focus:not(:focus-visible),.ride-turn-left:focus:not(:focus-visible),.ride-turn-right:focus:not(:focus-visible),.ride-hazard:focus:not(:focus-visible),.ride-horn:focus:not(:focus-visible),.ride-cruise:focus:not(:focus-visible),.ride-sound:focus:not(:focus-visible){outline:none}
 .ride-park.on{background:rgba(196,68,52,.92);border-color:rgba(255,216,204,.82);color:#fff}
 .ride-light.on{background:rgba(222,174,64,.82);border-color:rgba(255,244,198,.85);color:#1f241f}
 .ride-light[data-mode="high"]{background:rgba(130,214,255,.88);border-color:#fff;color:#122430}
@@ -76,12 +76,13 @@ body[data-photo="on"] .ride-hud{display:none!important}
 .ride-turn-left.on,.ride-turn-right.on,.ride-hazard.on{background:rgba(235,152,32,.95);border-color:#fff3cf;color:#1e1608}
 .ride-horn.on{background:rgba(218,128,62,.92);border-color:#fff0d4;color:#fff}
 .ride-cruise.on{background:rgba(58,158,128,.90);border-color:rgba(176,246,222,.82);color:#fff}
+.ride-sound[aria-pressed="false"]{color:rgba(244,239,226,.5);border-style:dashed;text-decoration:line-through;text-decoration-color:rgba(244,239,226,.55)}
 .ride-lean-bar{position:relative;display:inline-flex;align-items:center;width:30px;height:7px;border-radius:4px;padding:1px;box-sizing:border-box;background:rgba(14,22,20,.55);border:1px solid rgba(244,239,226,.36);overflow:hidden}
 .ride-lean-bar i{display:block;height:100%;width:0%;border-radius:3px;background:#64c9a6;transition:width .08s,background-color .12s}
 .ride-lean-bar[data-level="warn"] i{background:#e69b3a}
 .ride-lean-bar[data-level="crit"] i{background:#e24e42}
 body[data-ride="bicycle"] :is(.ride-mod,.ride-bat,.ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-cruise){display:none}
-body[data-ride="car"] :is(.ride-mod,.ride-park,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise,.ride-lean-bar){display:none}
+body[data-ride="car"] :is(.ride-sound,.ride-mod,.ride-park,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise,.ride-lean-bar){display:none}
 body[data-ride-type="shared"] .ride-mod{display:none}
 .vehicle-action[data-ebike-tier="shared"]{border-color:rgba(168,194,204,.85)}
 .vehicle-action[data-interact="shop"]{border-color:rgba(255,197,61,.88);background:rgba(14,17,21,.82);color:#fff6dc}
@@ -102,7 +103,7 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   .ride-bat-pct{font-size:10.5px}
   .ride-lean-bar{width:24px;height:6px}
   .ride-gear-btn{padding:2px 4px;font-size:10px}
-  .ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise{padding:2px 4px;font-size:10px}
+  .ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise,.ride-sound{padding:2px 4px;font-size:10px}
   output{top:auto;bottom:calc(344px + env(safe-area-inset-bottom));left:calc(12px + env(safe-area-inset-left));max-width:calc(100vw - 136px - env(safe-area-inset-left) - env(safe-area-inset-right));box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
 @media (pointer:coarse) and (max-height:500px){
@@ -116,7 +117,7 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   .ride-bat-pct{font-size:9.5px}
   .ride-lean-bar{width:20px;height:5px}
   footer{box-sizing:border-box;left:calc(50% - 52px);max-width:calc(100vw - 364px - env(safe-area-inset-left) - env(safe-area-inset-right));font-size:8px;overflow:hidden;text-overflow:ellipsis}
-  .ride-gear-btn,.ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise{padding:1.5px 4px;font-size:9px}
+  .ride-gear-btn,.ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise,.ride-sound{padding:1.5px 4px;font-size:9px}
   output{top:calc(142px + env(safe-area-inset-top));bottom:auto;left:calc(12px + env(safe-area-inset-left));max-width:124px}
   .hud-stats,body[data-hud="street"] .hud-stats{bottom:calc(26px + env(safe-area-inset-bottom))}
   body[data-aboard] .hud-stats,body[data-hud="street"][data-aboard] .hud-stats{left:calc(12px + env(safe-area-inset-left));bottom:calc(124px + env(safe-area-inset-bottom));transform:none;max-width:min(40vw,180px)}

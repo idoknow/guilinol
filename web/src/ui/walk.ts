@@ -4,6 +4,7 @@ import type {CarDynamicTelemetry} from '../walk/car'
 import type {EbikeRideControlInput, EbikeTelemetrySnapshot} from '../walk/ebike-fx'
 import {isGlobalHotkeyBlocked, isModalOrOverlayOpen, isTouchInControlZone} from '../walk/input-guard'
 import {hits, type Action} from '../input/keymap'
+import {rideSoundMuted, setRideSoundMuted} from '../walk/ride-sound-pref'
 
 const MOD_LABELS = {stock: '素车', ghostfire: '鬼火', neon: '霓虹'} as const
 
@@ -30,7 +31,7 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
 
   const rideHud=document.createElement('div')
   rideHud.className='ride-hud'
-  rideHud.innerHTML='<span class="ride-type" data-kind="normal">电摩</span><span class="ride-gear">D2</span><span class="ride-gears" role="group" aria-label="挡位切换"><button class="ride-gear-btn" type="button" data-gear="1">D1</button><button class="ride-gear-btn on" type="button" data-gear="2">D2</button><button class="ride-gear-btn" type="button" data-gear="3">D3</button><button class="ride-gear-btn" type="button" data-gear="4">S</button></span><span class="ride-speed">0 km/h</span><span class="ride-bat" data-level="ok"><span class="ride-bat-bar"><i></i></span><span class="ride-bat-pct">100%</span></span><span class="ride-lean-bar" title="压弯倾角风险"><i></i></span><button class="ride-park" type="button" aria-label="P档驻车" title="P档驻车 / 边撑 (0/P/K)">P</button><button class="ride-light" type="button" aria-label="切换车灯" title="车灯切换 关/近/远 (L)">关灯</button><button class="ride-turn-left" type="button" aria-label="左转向灯" title="左转向灯 (Z)">◀</button><button class="ride-turn-right" type="button" aria-label="右转向灯" title="右转向灯 (X)">▶</button><button class="ride-hazard" type="button" aria-label="双闪警示灯" title="双闪警示灯 (B)">⚠</button><button class="ride-horn" type="button" aria-label="喇叭鸣笛" title="喇叭鸣笛 (H)">喇叭</button><button class="ride-cruise" type="button" aria-label="定速巡航" title="定速巡航 (U)">定速</button><button class="ride-state" type="button" hidden></button><button class="ride-mod" type="button" aria-label="切换电动车改装">素车</button><span class="ride-keys">0/P驻车 · K撑 · L灯 · Z/X/B · H喇叭 · U定速 · G改 · Shift压弯</span>'
+  rideHud.innerHTML='<span class="ride-type" data-kind="normal">电摩</span><span class="ride-gear">D2</span><span class="ride-gears" role="group" aria-label="挡位切换"><button class="ride-gear-btn" type="button" data-gear="1">D1</button><button class="ride-gear-btn on" type="button" data-gear="2">D2</button><button class="ride-gear-btn" type="button" data-gear="3">D3</button><button class="ride-gear-btn" type="button" data-gear="4">S</button></span><span class="ride-speed">0 km/h</span><span class="ride-bat" data-level="ok"><span class="ride-bat-bar"><i></i></span><span class="ride-bat-pct">100%</span></span><span class="ride-lean-bar" title="压弯倾角风险"><i></i></span><button class="ride-park" type="button" aria-label="P档驻车" title="P档驻车 / 边撑 (0/P/K)">P</button><button class="ride-light" type="button" aria-label="切换车灯" title="车灯切换 关/近/远 (L)">关灯</button><button class="ride-turn-left" type="button" aria-label="左转向灯" title="左转向灯 (Z)">◀</button><button class="ride-turn-right" type="button" aria-label="右转向灯" title="右转向灯 (X)">▶</button><button class="ride-hazard" type="button" aria-label="双闪警示灯" title="双闪警示灯 (B)">⚠</button><button class="ride-horn" type="button" aria-label="喇叭鸣笛" title="喇叭鸣笛 (H)">喇叭</button><button class="ride-cruise" type="button" aria-label="定速巡航" title="定速巡航 (U)">定速</button><button class="ride-sound" type="button" aria-label="骑行音效" aria-pressed="true" title="骑行音效 开/关">音效</button><button class="ride-state" type="button" hidden></button><button class="ride-mod" type="button" aria-label="切换电动车改装">素车</button><span class="ride-keys">0/P驻车 · K撑 · L灯 · Z/X/B · H喇叭 · U定速 · G改 · Shift压弯</span>'
   document.body.append(rideHud)
   const typeEl=rideHud.querySelector<HTMLElement>('.ride-type')!
   const gearEl=rideHud.querySelector<HTMLElement>('.ride-gear')!
@@ -48,6 +49,9 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
   const hazardBtn=rideHud.querySelector<HTMLButtonElement>('.ride-hazard')!
   const hornBtn=rideHud.querySelector<HTMLButtonElement>('.ride-horn')!
   const cruiseBtn=rideHud.querySelector<HTMLButtonElement>('.ride-cruise')!
+  const soundBtn=rideHud.querySelector<HTMLButtonElement>('.ride-sound')!
+  const syncSoundBtn=()=>{const on=!rideSoundMuted();soundBtn.setAttribute('aria-pressed',String(on));soundBtn.title=on?'骑行音效：开（点击静音）':'骑行音效：关（点击打开）'}
+  syncSoundBtn()
   const stateEl=rideHud.querySelector<HTMLButtonElement>('.ride-state')!
   const modBtn=rideHud.querySelector<HTMLButtonElement>('.ride-mod')!
   const keysEl=rideHud.querySelector<HTMLElement>('.ride-keys')!
@@ -174,6 +178,8 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
   hornBtn.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash!=='1')hornPulse=true}
   cruiseBtn.onpointerdown=event=>{event.stopPropagation()}
   cruiseBtn.onclick=event=>{event.stopPropagation();if(document.body.dataset.rideCrash!=='1')cruisePulse=true}
+  soundBtn.onpointerdown=event=>{event.stopPropagation()}
+  soundBtn.onclick=event=>{event.stopPropagation();setRideSoundMuted(!rideSoundMuted());syncSoundBtn()}
   for(const btn of gearButtons){
     btn.onpointerdown=event=>{event.stopPropagation()}
     btn.onclick=event=>{event.stopPropagation();const g=Number(btn.dataset.gear);if(g>=1)gearSelect=g}
