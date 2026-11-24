@@ -74,7 +74,7 @@ async function openPage(shot){
   },Boolean(shot.ride))
   await page.clock.install({time:new Date('2026-11-23T08:00:00+08:00')})
   const hour0 = Array.isArray(shot.hour)?shot.hour[0]:shot.hour
-  const params = new URLSearchParams({verify:'',traffic:shot.traffic===false?'0':'1',flow:'0',time:String(hour0),weather:shot.weather??'clear',radius:String(shot.radius??900)})
+  const params = new URLSearchParams({smoke:'0',verify:'',traffic:shot.traffic===false?'0':'1',flow:'0',time:String(hour0),weather:shot.weather??'clear',radius:String(shot.radius??900)})
   if(shot.ride) params.set('mode','walk')
   await page.goto(base+'?'+params.toString().replace('verify=','verify'))
   await pumpUntil(page,()=>window.viewer?.stats.firstMs>0,'first frame',180000)
