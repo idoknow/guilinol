@@ -44,13 +44,18 @@ MAX_TIME="$(num "${MAX_TIME:-}" 60)"
 WORK="$(mktemp -d)"
 umask 077
 RC="$WORK/curlrc"
-printf 'header = "access-token: %s"\nheader = "User-Agent: cdn-purge/4"\nconnect-timeout = %s\nmax-time = %s\n' \
-  "${CDNFLY_TOKEN:-}" "$CONNECT_TIMEOUT" "$MAX_TIME" > "$RC"
+# 认证二选一：CDNFLY_API_KEY + CDNFLY_API_SECRET（面板「API 密钥」，长期有效），或登录后的 CDNFLY_TOKEN
+if [ -n "${CDNFLY_API_KEY:-}" ] && [ -n "${CDNFLY_API_SECRET:-}" ]; then
+  printf 'header = "api-key: %s"\nheader = "api-secret: %s"\n' "$CDNFLY_API_KEY" "$CDNFLY_API_SECRET" > "$RC"
+else
+  printf 'header = "access-token: %s"\n' "${CDNFLY_TOKEN:-}" > "$RC"
+fi
+printf 'header = "User-Agent: cdn-purge/4"\nconnect-timeout = %s\nmax-time = %s\n' "$CONNECT_TIMEOUT" "$MAX_TIME" >> "$RC"
 trap 'rm -rf "$WORK"' EXIT
 
 die() { echo "错误: $*" >&2; exit 3; }
 
-need_token() { [ -n "${CDNFLY_TOKEN:-}" ] || die "需要 CDNFLY_TOKEN 环境变量"; }
+need_token() { [ -n "${CDNFLY_TOKEN:-}" ] || { [ -n "${CDNFLY_API_KEY:-}" ] && [ -n "${CDNFLY_API_SECRET:-}" ]; } || die "需要 CDNFLY_API_KEY+CDNFLY_API_SECRET 或 CDNFLY_TOKEN"; }
 
 # 明文 http 只允许真正的回环主机名（精确匹配，不做前缀匹配）
 check_api_scheme() {
