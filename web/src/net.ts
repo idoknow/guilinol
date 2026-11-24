@@ -94,7 +94,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
     const ws=socket;socket=undefined
     if(ws){ws.onopen=ws.onmessage=ws.onclose=ws.onerror=null;try{ws.close(1000,'pagehide')}catch{}}
   }
-  const pageShow=()=>{if(!disposed&&!socket&&account)retry(500)}
+  const pageShow=()=>{if(!disposed&&!socket&&account&&state!=='replaced')retry(500)}
   window.addEventListener('pagehide',pageHide)
   window.addEventListener('pageshow',pageShow)
   const manual=()=>{if(!disposed){stop();attempt=0;void connect()}}
