@@ -85,7 +85,7 @@ def channel_spans(elements, widths):
                     and len(water.query(axis,predicate='intersects'))])
 
 
-def bake(output, chunks, elements, widths, approaches=(), only_approaches=False):
+def bake(output, chunks, elements, widths, approaches=(), only_approaches=False, bridge_profiles=()):
     intervals = json.loads(Path(__file__).with_name('road-corridor-survey.json').read_text())
     shapes, footpaths, passage_roads = [], [], []
     for way in elements:
@@ -108,6 +108,7 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False)
                     passage_roads.append((part,corridor,way['id'],way.get('warehousePassages'),paved/2+.5))
                 if way.get('surfaceUnderlay') and tags['highway'] in ('footway','path','pedestrian'):
                     footpaths.append(corridor)
+    fixed_grades = {id(row[0]) for row in bridge_profiles}
     grades=STRtree([line.buffer(half,quad_segs=4) for line,half,*_ in approaches])
     tree = STRtree(shapes)
     pedestrian = STRtree(footpaths)
@@ -136,12 +137,13 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False)
             crossings=[(translate(passage_roads[i][0],-x,-z),translate(passage_roads[i][1],-x,-z),passage_roads[i][2],
                         translate(passage_roads[i][3],-x,-z) if passage_roads[i][3] is not None else None,passage_roads[i][4])
                        for i in passage_index.query(bounds,predicate='intersects')]
-            if patch(output/tile['file'], area, local, foot, seam,crossings):
+            fixed = {j for j,i in enumerate(nearby) if id(approaches[i][0]) in fixed_grades}
+            if patch(output/tile['file'], area, local, foot, seam,crossings,fixed):
                 tile['gradedCorridor']=True
             tile['bytes'] = (output/tile['file']).stat().st_size
 
 
-def patch(file, area, approaches=(), foot=(), seam=None, crossings=()):
+def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=()):
     raw = gzip.decompress(file.read_bytes())
     n, k, size, image, deck = struct.unpack_from('<5I', raw, 4)
     start = 24+16900+9*n+4*k
@@ -334,6 +336,11 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=()):
         distance[select]=d[select]
         data.append((d,target))
     ceiling=np.full(len(levels),np.inf)
+    # Surveyed bridge approaches must keep the abutment profile across
+    # their full width, including the end caps shared with a turning road.
+    bridge_approach=np.zeros(len(levels),dtype=bool)
+    for i in fixed:
+        bridge_approach |= data[i][0] <= approaches[i][1] + 2
     for i,((line,half,_,__,cap,kind),(d,target)) in enumerate(zip(approaches,data,strict=True)):
         neighbors=set.union(*(ends[round(x,2),round(z,2)] for x,z in line.coords))-{i}
         connected=np.isin(owner,list(neighbors))
@@ -344,6 +351,8 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=()):
         limit=np.where(connected,target+cap*d+.04*outside**2,
                        np.where(owner<0,target+cap*outside+.04*outside**2,
                                 np.where(outside<=.5,target,np.inf)))
+        original=np.where(outside<=.5,target+cap*outside,np.inf)
+        limit=np.where(bridge_approach & (owner>=0),original,limit)
         ceiling=np.minimum(ceiling,limit)
     levels=np.minimum(levels,ceiling)
     for i,y in zip(spline,levels):

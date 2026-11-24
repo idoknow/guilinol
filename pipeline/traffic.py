@@ -296,7 +296,7 @@ def bake(output, manifest, rendered_roads=None):
             access,limits=plan_approaches(conflicts,lanes+guides,survey_nodes,{int(k):v for k,v in samples['heights'].items()},fixed,sections)
             access=cycleway_grades(cycleway,conflicts)+access
             surveyed=vehicle_surface_grades.profiles(graded_sections,native_levels,access+canal_grades+terminal_grades)
-            bake_surveyed_corridors(output,manifest['chunks'],elements,sections,access+canal_grades+terminal_grades+surveyed,only_approaches=True)
+            bake_surveyed_corridors(output,manifest['chunks'],elements,sections,access+canal_grades+terminal_grades+surveyed,only_approaches=True,bridge_profiles=canal_grades)
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)
             for tunnel in generated:
                 tunnel['gradedAccess']=True
