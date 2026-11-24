@@ -1015,14 +1015,17 @@ def run_audit(world_dir: Path, root: Path) -> dict:
 
     def summarize(items):
         by_sub = defaultdict(int)
+        by_way = defaultdict(lambda: defaultdict(int))
         sub_samples = defaultdict(list)
         for it in items:
             by_sub[it['subtype']] += 1
+            by_way[str(it.get('way','unattributed'))][it['subtype']] += 1
             if len(sub_samples[it['subtype']]) < 10:
                 sub_samples[it['subtype']].append(it)
         return {
             'count': len(items),
             'bySubtype': dict(sorted(by_sub.items())),
+            'byWaySubtype': by_way,
             'bySubtypeSamples': dict(sub_samples),
             'top20': items[:20],
             'sample100': items[:100],
