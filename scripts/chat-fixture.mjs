@@ -1,4 +1,5 @@
 import {fixture} from './selfhost-test.mjs'
+import {importWords} from './chat-words-import.mjs'
 import {spawn} from 'node:child_process'
 import {once} from 'node:events'
 import {randomUUID,createHmac} from 'node:crypto'
@@ -23,5 +24,5 @@ export async function setup({providerDelay=0}={}){
     const send=packet=>ws.send(JSON.stringify(packet));clients.push({ws,events,send,uid,x});await once(ws,'open');send({t:'join',ticket,x,z:0});await until(()=>welcome);return clients.at(-1)
   }
   async function admin(path,body,params={}){const response=await fetch(base+'/admin/chat',{method:'POST',headers:{'X-Admin-Token':secret},body:JSON.stringify({method:body?'POST':'GET',actor:'fixture',path,params,body:body&&{reason:'fixture',...body}})});if(!response.ok)throw Error(path+' '+response.status+': '+await response.text());return response.json()}
-  await start();return {storage,join,admin,clients,peaks,checks,health:async()=>(await fetch(base+'/health')).json(),restart:async()=>{await stop();await start()},close:async()=>{await stop();await storage.close()}}
+  try{await importWords({query:storage.sql});await start()}catch(error){await storage.close();throw error}return {storage,join,admin,clients,peaks,checks,health:async()=>(await fetch(base+'/health')).json(),restart:async()=>{await stop();await start()},close:async()=>{await stop();await storage.close()}}
 }

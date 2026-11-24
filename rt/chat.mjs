@@ -2,6 +2,7 @@ import pg from 'pg'
 import {randomUUID} from 'node:crypto'
 import {setTimeout as delay} from 'node:timers/promises'
 import {wechat,moderate} from './chat-provider.mjs'
+import {buildMatcher} from './chat-matcher.mjs'
 import {adminRoute} from './chat-admin.mjs'
 
 export const channel=ch=>ch==='near'||ch==='world'
@@ -25,6 +26,16 @@ const activeMute=async(db,uid)=>{
 export function createChat({players,send,observed,env=process.env,provider=wechat(env)}){
   const pool=new pg.Pool({connectionString:env.DATABASE_URL,max:4,connectionTimeoutMillis:1500});pool.on('error',()=>{})
   let chain=Promise.resolve(),backlog=0
+  let match,refreshAt=0
+  async function matcher(db){
+    if(!match||Date.now()>=refreshAt){
+      const {rows:[{seeded}]}=await db.query("select exists(select 1 from chat_seed_seen where source='konsheng@68a595f') as seeded")
+      const {rows}=await db.query('select id,word,action,category,source from chat_words where enabled order by id');const compiled=buildMatcher(rows)
+      match=seeded?compiled:text=>compiled(text)??{status:'pending',provider:'local',label:'seed_missing'};refreshAt=Date.now()+25000
+    }
+    return match
+  }
+  if(env.DATABASE_URL)void serial(()=>matcher(pool)).catch(()=>{})
   let cache=null,radius=60
   const capacity={near:3000,world:30}
   async function restore(){
@@ -62,12 +73,11 @@ export function createChat({players,send,observed,env=process.env,provider=wecha
           if([...text].length>cfg.max_length)return {code:'too_long'}
           const muted=await activeMute(db,uid);if(muted)return {code:'muted',muted}
           const {rows:[last]}=await db.query('select created_at from chat_messages where uid=$1 and ch=$2 order by id desc limit 1',[uid,ch]);if(last&&ts-Number(last.created_at)<cfg[ch+'_ms'])return {code:'rate'}
-          const words=(await db.query('select * from chat_words where enabled')).rows
-          return {cfg,words}
+          return {cfg,match:await matcher(db)}
         }))
         if(pre.reply)return send(player.ws,pre.reply)
         if(pre.code){tell(uid,pre.muted);return reject(pre.code)}
-        const {cfg,words}=pre,decision=await moderate({text,openid},words,cfg.unmoderated_policy,provider)
+        const {cfg,match}=pre,decision=await moderate({text,openid},match,cfg.unmoderated_policy,provider)
         await serial(async()=>{
           let committing
           const result=await retryDb(async()=>{await restore();return transaction(async db=>{
@@ -87,6 +97,6 @@ export function createChat({players,send,observed,env=process.env,provider=wecha
     try{if(!cache)await serial(restore);send(player.ws,{t:'chat_hist',ch,msgs:cache[ch].filter(row=>ch==='world'||Math.hypot(player.x-row.x,player.z-row.z)<=radius).slice(-30).map(packet)})}catch{send(player.ws,{t:'chat_ack',ok:false,code:'error'})}finally{player.chatReading.delete(ch)}
   }
   return {submit,history,backlog:()=>backlog,async joined(player){if(env.DATABASE_URL)try{const event=await activeMute(pool,player.uid);if(event)send(player.ws,event)}catch{}},admin:args=>serial(async()=>{
-    const result=await adminRoute(args,{transaction,config,provider,deliver,tell,ack,players,send});if(args.path==='settings')radius=result.radius;if(args.path==='delete')cache=null;return result
+    const result=await adminRoute(args,{transaction,config,provider,deliver,tell,ack,players,send});if(args.method==='POST'&&['words','words/delete'].includes(args.path))refreshAt=0;if(args.path==='settings')radius=result.radius;if(args.path==='delete')cache=null;return result
   })}
 }
