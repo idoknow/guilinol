@@ -43,7 +43,9 @@ export function smokeVisual(scene:THREE.Scene,figure:THREE.Object3D,camera?:THRE
       handL.copy(VIEW_ANCHORS.restL).lerp(VIEW_ANCHORS.handL,view.carry)
       if(view.phase==='draw')handL.lerpVectors(VIEW_ANCHORS.restL,VIEW_ANCHORS.handL,view.progress)
       // Lower the box into the chest workspace; preserve visibility in the eye camera.
-      handL.y-=(fp ? .033 : .16)*view.carry
+      // 第一人称：烟盒要举到画面下 1/3 内、物品栏之上，正面看得见（手机上物品栏更占地方）
+      handL.y-=(fp ? -.045 : .16)*view.carry
+      if(fp){handL.z+=.05*view.carry;handL.x-=.035*view.carry}
       handR.copy(VIEW_ANCHORS.handR)
       if(view.light>0){
         tip.copy(mouth).addScaledVector(forward,.079).sub(flameOffset)

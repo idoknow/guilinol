@@ -46,6 +46,9 @@ export function showHotbar(on: boolean) {
 const HAND_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12.5V6.2a1.3 1.3 0 0 1 2.6 0v5.3M10.6 11V4.8a1.3 1.3 0 0 1 2.6 0V11m0-.4V5.6a1.3 1.3 0 0 1 2.6 0v6.2m0-3.4a1.3 1.3 0 0 1 2.6 0v5.4c0 4-2.6 6.7-6.3 6.7-2.6 0-4-1.1-5.5-3.3l-2.3-3.4a1.4 1.4 0 0 1 2.2-1.7L8 14.3"/></svg>'
 const CAMERA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.2h3.2l1.6-2.2h6.4l1.6 2.2H20a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.2a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.4" r="3.4"/></svg>'
 
+// 香烟格：一包翻盖烟；香烟铺：小铺面（雨棚 + 柜台）。线条与空手 / 相机图标同粗细。
+const PACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6" width="11" height="15" rx="1.2"/><path d="M6.5 10h11"/><path d="M9 6V3.6h1.6V6M11.6 6V3.2h1.6V6"/></svg>'
+const SHOP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M4 9.5c0 1.4 1.2 2.4 2.7 2.4s2.6-1 2.6-2.4c0 1.4 1.2 2.4 2.7 2.4s2.7-1 2.7-2.4c0 1.4 1.1 2.4 2.6 2.4S20 10.9 20 9.5"/><path d="M5.5 12v8h13v-8"/><path d="M10 20v-4.5h4V20"/></svg>'
 export function mountHotbar() {
   if (bar) return
   bar = document.createElement('nav')
@@ -60,9 +63,13 @@ export function mountHotbar() {
       <kbd>2</kbd>${CAMERA_ICON}<span>相机</span>
     </button>`
   if (smokeEnabled()) {
-    bar.insertAdjacentHTML('beforeend', '<button type="button" class="hotbar-slot" data-slot="smoke" aria-label="香烟"><kbd>3</kbd><b class="pack-count"></b><span>香烟</span></button><button type="button" class="hotbar-slot" data-shop="smoke">香烟铺</button>')
+    bar.insertAdjacentHTML('beforeend', `<button type="button" class="hotbar-slot" data-slot="smoke" title="香烟（3）" aria-label="香烟（3）"><kbd>3</kbd><b class="pack-count"></b>${PACK_ICON}<span>香烟</span></button><button type="button" class="hotbar-slot hotbar-shop" data-shop="smoke" title="香烟铺" aria-label="香烟铺">${SHOP_ICON}<span>香烟铺</span></button>`)
     const count = bar.querySelector('.pack-count')!
-    const refresh = () => {count.textContent = String(getActiveSaveSnapshot().packs.length)}
+    const refresh = () => {
+      const n = getActiveSaveSnapshot().packs.length
+      count.textContent = String(n)
+      count.classList.toggle('empty', n === 0)
+    }
     refresh()
     window.addEventListener('glol:save-written',refresh)
     bar.querySelector('[data-shop]')!.addEventListener('click',()=>window.dispatchEvent(new Event('smoke:shop')))
