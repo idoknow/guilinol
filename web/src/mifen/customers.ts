@@ -94,7 +94,7 @@ export interface CustomerManager {
 interface CustomerRig {
   root: THREE.Group
   bodyPivot: THREE.Group
-  head: THREE.Mesh
+  head: THREE.Object3D
   leftArm: THREE.Group
   rightArm: THREE.Group
   leftLeg: THREE.Group
@@ -104,6 +104,7 @@ interface CustomerRig {
   bubbleCanvas: HTMLCanvasElement
   bubbleTexture: THREE.CanvasTexture
   lastBubbleKey: string
+  skeleton?: THREE.Skeleton
   disposables: { geometries: THREE.BufferGeometry[]; materials: THREE.Material[] }
 }
 
@@ -273,6 +274,22 @@ function readRuntimeReputation(events: CustomerEvents): number {
   return 4.2
 }
 
+let sharedCustomerMasterMat: THREE.MeshStandardMaterial | null = null
+function getCustomerMasterMat(): THREE.MeshStandardMaterial {
+  if (!sharedCustomerMasterMat) {
+    sharedCustomerMasterMat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.82,
+      metalness: 0.04,
+      emissive: 0xffe8d0,
+      emissiveIntensity: 0.14,
+    })
+    sharedCustomerMasterMat.name = 'tianyuan_customer_shared_vc'
+    sharedCustomerMasterMat.userData.sharedCached = true
+  }
+  return sharedCustomerMasterMat
+}
+
 function disposeObject3D(obj: THREE.Object3D): void {
   obj.traverse(node => {
     const mesh = node as THREE.Mesh
@@ -280,8 +297,9 @@ function disposeObject3D(obj: THREE.Object3D): void {
     if (mesh.material) {
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
       for (const m of mats) {
+        if (m.userData?.sharedCached) continue
         const std = m as THREE.MeshStandardMaterial
-        std.map?.dispose()
+        if (std.map && !std.map.userData?.sharedCached) std.map.dispose()
         m.dispose()
       }
     }
@@ -768,6 +786,79 @@ function buildCustomerRig(shirtHex: string, roleKind: CustomerRoleKind): Custome
   rightLeg.add(rightLegMesh, rightShoe)
   bodyPivot.add(rightLeg)
 
+  // 将顾客全部 12~14 个身体/配饰块合批为 1 个共享主材的 SkinnedMesh（12 draws -> 1 draw）
+  const headPivot = new THREE.Group()
+  headPivot.position.copy(head.position)
+  head.position.set(0, 0, 0)
+  bodyPivot.remove(head)
+  headPivot.add(head)
+  bodyPivot.add(headPivot)
+
+  const boneNodes: THREE.Object3D[] = [bodyPivot, headPivot, leftArm, rightArm, leftLeg, rightLeg]
+  const boneMap = new Map<THREE.Object3D, number>(boneNodes.map((n, i) => [n, i]))
+  root.updateMatrixWorld(true)
+  const boneInverses = boneNodes.map(b => b.matrixWorld.clone().invert())
+
+  const pList: number[] = []
+  const nList: number[] = []
+  const cList: number[] = []
+  const sIdx: number[] = []
+  const sWgt: number[] = []
+  const tmpMeshes: THREE.Mesh[] = []
+  const tv = new THREE.Vector3()
+  const tn = new THREE.Vector3()
+  const tc = new THREE.Color()
+
+  bodyPivot.traverse(node => {
+    if (!(node instanceof THREE.Mesh)) return
+    tmpMeshes.push(node)
+    let cur: THREE.Object3D | null = node.parent
+    let bIdx = 0
+    while (cur) {
+      const hit = boneMap.get(cur)
+      if (hit !== undefined) {
+        bIdx = hit
+        break
+      }
+      cur = cur.parent
+    }
+    const src = node.geometry.index ? node.geometry.toNonIndexed() : node.geometry
+    const pos = src.getAttribute('position')
+    const nor = src.getAttribute('normal')
+    const col = (node.material as THREE.MeshStandardMaterial).color
+    tc.copy(col ?? new THREE.Color(0xffffff))
+    for (let i = 0; i < pos.count; i++) {
+      tv.fromBufferAttribute(pos, i).applyMatrix4(node.matrixWorld)
+      pList.push(tv.x, tv.y, tv.z)
+      if (nor) tn.fromBufferAttribute(nor, i).transformDirection(node.matrixWorld)
+      else tn.set(0, 1, 0)
+      nList.push(tn.x, tn.y, tn.z)
+      cList.push(tc.r, tc.g, tc.b)
+      sIdx.push(bIdx, 0, 0, 0)
+      sWgt.push(1, 0, 0, 0)
+    }
+    if (src !== node.geometry) src.dispose()
+  })
+  for (const m of tmpMeshes) m.removeFromParent()
+  for (const g of geometries) g.dispose()
+  for (const m of materials) m.dispose()
+  geometries.length = 0
+  materials.length = 0
+
+  const bakedGeo = trackGeo(new THREE.BufferGeometry())
+  bakedGeo.setAttribute('position', new THREE.Float32BufferAttribute(pList, 3))
+  bakedGeo.setAttribute('normal', new THREE.Float32BufferAttribute(nList, 3))
+  bakedGeo.setAttribute('color', new THREE.Float32BufferAttribute(cList, 3))
+  bakedGeo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(sIdx, 4))
+  bakedGeo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sWgt, 4))
+  bakedGeo.computeBoundingSphere()
+
+  const customerSkinned = new THREE.SkinnedMesh(bakedGeo, getCustomerMasterMat())
+  customerSkinned.frustumCulled = false
+  const skeleton = new THREE.Skeleton(boneNodes as unknown as THREE.Bone[], boneInverses)
+  customerSkinned.bind(skeleton, new THREE.Matrix4())
+  root.add(customerSkinned)
+
   // Bowl anchor in front of hands
   const bowlAnchor = new THREE.Group()
   bowlAnchor.position.set(0, 1.05, 0.36)
@@ -790,7 +881,7 @@ function buildCustomerRig(shirtHex: string, roleKind: CustomerRoleKind): Custome
   return {
     root,
     bodyPivot,
-    head,
+    head: headPivot,
     leftArm,
     rightArm,
     leftLeg,
@@ -800,6 +891,7 @@ function buildCustomerRig(shirtHex: string, roleKind: CustomerRoleKind): Custome
     bubbleCanvas,
     bubbleTexture,
     lastBubbleKey: '',
+    skeleton,
     disposables: { geometries, materials },
   }
 }
@@ -1071,9 +1163,10 @@ export function createCustomerManager(
       c.bowlMesh.removeFromParent()
       c.bowlMesh = null
     }
+    c.rig.skeleton?.dispose()
     c.rig.bubbleTexture.dispose()
     for (const g of c.rig.disposables.geometries) g.dispose()
-    for (const m of c.rig.disposables.materials) m.dispose()
+    for (const m of c.rig.disposables.materials) if (!m.userData?.sharedCached) m.dispose()
     c.rig.root.removeFromParent()
     customers.splice(index, 1)
     updateRosterUserData()

@@ -116,6 +116,20 @@ export interface TianyuanMaterialPack {
 
   steam: THREE.PointsMaterial
 
+  /** 合批主材质（shop-mesh Batch 自动按 userData.batchTarget 归并，大幅压低 draw calls） */
+  batchMasters?: {
+    vcMetal: THREE.MeshStandardMaterial
+    vcWood: THREE.MeshStandardMaterial
+    vcStone: THREE.MeshStandardMaterial
+    vcPlastic: THREE.MeshStandardMaterial
+    vcFood: THREE.MeshStandardMaterial
+    vcEmissive: THREE.MeshStandardMaterial
+    vcExterior: THREE.MeshStandardMaterial
+    vcGlass: THREE.MeshStandardMaterial
+    signAtlas: THREE.MeshStandardMaterial
+    signAtlasLit: THREE.MeshStandardMaterial
+  }
+
   /** 夜间程度 0..1、是否大火烫粉、累计时间（秒） */
   updateNight(night: number, boiling?: boolean, time?: number): void
   dispose(): void
@@ -652,6 +666,8 @@ const CONDIMENT_SPECS: Record<CondimentVariant, PbrSpec> = {
 }
 
 let texLoader: THREE.TextureLoader | null = null
+const sharedSourceTexCache = new Map<string, THREE.Texture>()
+const sharedVariantTexCache = new Map<string, THREE.Texture>()
 
 type Draw = (ctx: CanvasRenderingContext2D, w: number, h: number) => void
 
@@ -665,7 +681,7 @@ function seeded(seed: number): () => number {
 
 function configureTex(tex: THREE.Texture, periodM?: PeriodM, kind: TexKind = 'albedo', repeat?: PeriodM): THREE.Texture {
   tex.colorSpace = kind === 'albedo' ? THREE.SRGBColorSpace : THREE.NoColorSpace
-  tex.anisotropy = 8
+  tex.anisotropy = 2
   if (repeat) {
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping
     tex.repeat.set(repeat[0], repeat[1])
@@ -676,25 +692,49 @@ function configureTex(tex: THREE.Texture, periodM?: PeriodM, kind: TexKind = 'al
   return tex
 }
 
+/** 全局 URL 纹理缓存：同 URL 只上传 1 次 GPU 贴图，不同 repeat 通过 clone() 共享底层 source */
 function texAsset(pool: THREE.Texture[], url: string, periodM?: PeriodM, kind: TexKind = 'albedo', repeat?: PeriodM): THREE.Texture {
-  let tex: THREE.Texture
-  if (typeof document !== 'undefined') {
-    texLoader ??= new THREE.TextureLoader()
-    tex = texLoader.load(url)
-  } else {
-    const px =
-      kind === 'normal'
-        ? new Uint8Array([128, 128, 255, 255])
-        : kind === 'roughness'
-          ? new Uint8Array([180, 180, 180, 255])
-          : new Uint8Array([214, 204, 186, 255])
-    tex = new THREE.DataTexture(px, 1, 1)
-    tex.needsUpdate = true
+  const rx = repeat ? repeat[0] : periodM ? 1 / periodM[0] : 1
+  const ry = repeat ? repeat[1] : periodM ? 1 / periodM[1] : 1
+  const wrapKey = repeat || periodM ? 'R' : 'C'
+  const variantKey = `${url}|${kind}|${wrapKey}|${rx.toFixed(3)},${ry.toFixed(3)}`
+  const hit = sharedVariantTexCache.get(variantKey)
+  if (hit) return hit
+
+  const baseKey = `${url}|${kind}`
+  let base = sharedSourceTexCache.get(baseKey)
+  if (!base) {
+    if (typeof document !== 'undefined') {
+      texLoader ??= new THREE.TextureLoader()
+      base = texLoader.load(url)
+    } else {
+      const px =
+        kind === 'normal'
+          ? new Uint8Array([128, 128, 255, 255])
+          : kind === 'roughness'
+            ? new Uint8Array([180, 180, 180, 255])
+            : new Uint8Array([214, 204, 186, 255])
+      base = new THREE.DataTexture(px, 1, 1)
+      base.needsUpdate = true
+    }
+    base.userData.sourceUrl = url
+    base.userData.sharedCached = true
+    configureTex(base, periodM, kind, repeat)
+    sharedSourceTexCache.set(baseKey, base)
+    sharedVariantTexCache.set(variantKey, base)
+    void pool
+    return base
   }
-  tex.userData.sourceUrl = url
-  configureTex(tex, periodM, kind, repeat)
-  pool.push(tex)
-  return tex
+
+  const cloned = base.clone()
+  cloned.source = base.source
+  cloned.userData.sourceUrl = url
+  cloned.userData.sharedCached = true
+  configureTex(cloned, periodM, kind, repeat)
+  cloned.needsUpdate = true
+  sharedVariantTexCache.set(variantKey, cloned)
+  void pool
+  return cloned
 }
 
 function canvasTex(pool: THREE.Texture[], w: number, h: number, draw: Draw, periodM?: PeriodM): THREE.Texture {
@@ -1413,50 +1453,75 @@ function buildPbrMaterial(
   return applyAtmoAndName(m, opts.name ?? defaultName, isTiled)
 }
 
-/** 释放单次工厂创建材质及附带 PBR 贴图（TianyuanMaterialPack 请调用 pack.dispose()） */
+/** 释放单次工厂创建材质及非共享贴图（共享缓存贴图永不在此销毁） */
 export function disposeMifenMaterial(mat: THREE.Material): void {
+  if (mat.userData?.sharedCached) return
   if (mat instanceof THREE.MeshStandardMaterial) {
-    mat.map?.dispose()
-    mat.normalMap?.dispose()
-    mat.roughnessMap?.dispose()
-    if (mat.emissiveMap && mat.emissiveMap !== mat.map) mat.emissiveMap.dispose()
+    if (mat.map && !mat.map.userData?.sharedCached) mat.map.dispose()
+    if (mat.normalMap && !mat.normalMap.userData?.sharedCached) mat.normalMap.dispose()
+    if (mat.roughnessMap && !mat.roughnessMap.userData?.sharedCached) mat.roughnessMap.dispose()
+    if (mat.emissiveMap && mat.emissiveMap !== mat.map && !mat.emissiveMap.userData?.sharedCached) mat.emissiveMap.dispose()
   }
   mat.dispose()
 }
 
-export function createWoodMaterial(variant: WoodVariant = 'cedar', opts: TiledPbrOptions = {}): THREE.MeshStandardMaterial {
+function buildCompactPbr(
+  spec: PbrSpec,
+  defaultName: string,
+  opts: TiledPbrOptions = {},
+  useNormalRough = false,
+): THREE.MeshStandardMaterial {
+  const isTiled = opts.tiled ?? spec.tiled ?? true
+  const period = opts.periodM ?? spec.periodM
+  const repeat = opts.repeat ?? (opts.periodM ? undefined : !isTiled ? spec.repeat : undefined)
   const pool: THREE.Texture[] = []
-  return buildPbrMaterial(pool, WOOD_SPECS[variant], `tianyuan_wood_${variant}`, opts)
+  const map = texAsset(pool, spec.albedo, period, 'albedo', repeat)
+  const normalMap = useNormalRough ? texAsset(pool, spec.normal, period, 'normal', repeat) : undefined
+  const roughnessMap = useNormalRough ? texAsset(pool, spec.roughness, period, 'roughness', repeat) : undefined
+  const ns = opts.normalScale ?? spec.normalScale ?? 0.75
+  const m = new THREE.MeshStandardMaterial({
+    map,
+    ...(normalMap ? {normalMap, normalScale: new THREE.Vector2(ns, ns)} : {}),
+    ...(roughnessMap ? {roughnessMap} : {}),
+    roughness: opts.roughness ?? (roughnessMap ? 1 : 0.78),
+    metalness: Math.min(MAX_METALNESS, Math.max(0, opts.metalness ?? spec.metalness ?? 0)),
+    ...(opts.color !== undefined ? {color: opts.color} : {}),
+    ...(opts.emissive !== undefined ? {emissive: opts.emissive} : {}),
+    ...(opts.emissiveIntensity !== undefined ? {emissiveIntensity: opts.emissiveIntensity} : {}),
+    ...(opts.side !== undefined ? {side: opts.side} : spec.side !== undefined ? {side: spec.side} : {}),
+    ...(opts.transparent !== undefined ? {transparent: opts.transparent} : spec.transparent !== undefined ? {transparent: spec.transparent} : {}),
+    ...(opts.opacity !== undefined ? {opacity: opts.opacity} : spec.opacity !== undefined ? {opacity: spec.opacity} : {}),
+  })
+  m.userData.periodM = period
+  return applyAtmoAndName(m, opts.name ?? defaultName, isTiled)
+}
+
+export function createWoodMaterial(variant: WoodVariant = 'cedar', opts: TiledPbrOptions = {}): THREE.MeshStandardMaterial {
+  return buildCompactPbr(WOOD_SPECS[variant], `tianyuan_wood_${variant}`, opts, variant === 'cedar')
 }
 
 export function createTileMaterial(variant: TileVariant = 'hall_wall', opts: TiledPbrOptions = {}): THREE.MeshStandardMaterial {
-  const pool: THREE.Texture[] = []
-  return buildPbrMaterial(pool, TILE_SPECS[variant], `tianyuan_tile_${variant}`, opts)
+  return buildCompactPbr(TILE_SPECS[variant], `tianyuan_tile_${variant}`, opts, variant === 'hall_wall' || variant === 'hall_floor')
 }
 
 export function createStainlessMaterial(variant: StainlessVariant = 'brushed', opts: TiledPbrOptions = {}): THREE.MeshStandardMaterial {
-  const pool: THREE.Texture[] = []
-  return buildPbrMaterial(pool, STAINLESS_SPECS[variant], `tianyuan_steel_${variant}`, opts)
+  return buildCompactPbr(STAINLESS_SPECS[variant], `tianyuan_steel_${variant}`, opts, variant === 'brushed')
 }
 
 export function createConcreteMaterial(variant: ConcreteVariant = 'plaster', opts: TiledPbrOptions = {}): THREE.MeshStandardMaterial {
-  const pool: THREE.Texture[] = []
-  return buildPbrMaterial(pool, CONCRETE_SPECS[variant], `tianyuan_concrete_${variant}`, opts)
+  return buildCompactPbr(CONCRETE_SPECS[variant], `tianyuan_concrete_${variant}`, opts, false)
 }
 
 export function createCurtainMaterial(variant: CurtainVariant = 'stripe_vinyl', opts: TiledPbrOptions = {}): THREE.MeshStandardMaterial {
-  const pool: THREE.Texture[] = []
-  return buildPbrMaterial(pool, CURTAIN_SPECS[variant], `tianyuan_curtain_${variant}`, opts)
+  return buildCompactPbr(CURTAIN_SPECS[variant], `tianyuan_curtain_${variant}`, opts, false)
 }
 
 export function createIngredientMaterial(variant: IngredientVariant = 'noodle', opts: TiledPbrOptions = {}): THREE.MeshStandardMaterial {
-  const pool: THREE.Texture[] = []
-  return buildPbrMaterial(pool, INGREDIENT_SPECS[variant], `tianyuan_food_${variant}`, opts)
+  return buildCompactPbr(INGREDIENT_SPECS[variant], `tianyuan_food_${variant}`, opts, false)
 }
 
 export function createCondimentMaterial(variant: CondimentVariant = 'scallion', opts: TiledPbrOptions = {}): THREE.MeshStandardMaterial {
-  const pool: THREE.Texture[] = []
-  return buildPbrMaterial(pool, CONDIMENT_SPECS[variant], `tianyuan_cond_${variant}`, opts)
+  return buildCompactPbr(CONDIMENT_SPECS[variant], `tianyuan_cond_${variant}`, opts, false)
 }
 
 function createPack(): TianyuanMaterialPack {
@@ -1498,33 +1563,169 @@ function createPack(): TianyuanMaterialPack {
         : {}),
     })
 
-  // 共享微观塑料/烤漆微纹，消灭纯色道具塑料感
-  const plasticMaps = {
-    map: texAsset(tex, TEX.plasticMicroAlbedo, [0.35, 0.35], 'albedo'),
-    normalMap: texAsset(tex, TEX.plasticGrainNormal, [0.35, 0.35], 'normal'),
-    roughnessMap: texAsset(tex, TEX.plasticGrainRoughness, [0.35, 0.35], 'roughness'),
+  // 1) 共享低显存贴图与 1024×1024 统一招牌图集（16 张牌匾/菜单/冰柜/票据合并为 1 张 4MB 贴图 + 1~2 draw calls）
+  const ATLAS_W = 1024
+  const ATLAS_H = 1024
+  const atlasRects: Record<string, [number, number, number, number]> = {}
+  const atlasSlots: Array<[string, number, number, number, number, Draw]> = [
+    ['interiorPlaque', 2, 2, 508, 152, drawInteriorPlaque],
+    ['menuPosters', 514, 2, 508, 152, drawMenuPosters],
+    ['fridgeFront', 2, 162, 252, 508, drawFridgeFront],
+    ['priceBoard', 258, 162, 252, 316, drawPriceBoard],
+    ['menuScreen', 514, 162, 320, 188, drawMenuScreen],
+    ['supervisionBoard', 838, 162, 184, 132, drawSupervisionBoard],
+    ['blueprint', 838, 298, 184, 124, drawBlueprint],
+    ['mustEatPlaque', 514, 354, 156, 196, drawMustEat],
+    ['certificate', 674, 354, 160, 124, drawCertificate],
+    ['wallClock', 838, 426, 160, 160, drawClock],
+    ['ticketPink', 258, 482, 120, 180, drawTicketPad('#f4a7c7')],
+    ['ticketBlue', 382, 482, 120, 180, drawTicketPad('#a6dfe8')],
+    ['ticketWhite', 674, 482, 120, 180, drawTicketPad('#f7f7f4')],
+    ['cashierSign', 2, 674, 252, 96, badge('#1f8a4c', '#ffffff', '收银台')],
+    ['toppingsSign', 258, 674, 320, 96, badge('#b3261e', '#fff6dc', '小料自助', '#f2cf66')],
+    ['kitchenDoorSign', 582, 674, 320, 96, badge('#f4f1e8', '#b3261e', '后厨重地 闲人免进', '#b3261e')],
+    ['stepWarning', 2, 774, 420, 64, badge('#f6f3ea', '#d0281c', '注意台阶  防止跌倒')],
+    ['streetPlate', 426, 774, 220, 110, badge('#1d5aa6', '#ffffff', '三多路 28', '#ffffff')],
+    ['choppingBlock', 650, 774, 160, 160, drawChoppingBlock],
+  ]
+  const signAtlasTex = canvasTex(tex, ATLAS_W, ATLAS_H, (ctx, w, h) => {
+    ctx.fillStyle = '#e8dfd0'
+    ctx.fillRect(0, 0, w, h)
+    for (const [key, x, y, sw, sh, drawFn] of atlasSlots) {
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(x, y, sw, sh)
+      ctx.clip()
+      ctx.translate(x, y)
+      drawFn(ctx, sw, sh)
+      ctx.restore()
+      atlasRects[key] = [x / w, 1 - (y + sh) / h, (x + sw) / w, 1 - y / h]
+    }
+  })
+  // Node / headless 离线环境兜底填齐 rect
+  for (const [key, x, y, sw, sh] of atlasSlots) {
+    atlasRects[key] ??= [x / ATLAS_W, 1 - (y + sh) / ATLAS_H, (x + sw) / ATLAS_W, 1 - y / ATLAS_H]
   }
-  const powderNormal = texAsset(tex, TEX.metalPowderNormal, [0.6, 0.6], 'normal')
-  const powderRough = texAsset(tex, TEX.metalPowderRoughness, [0.6, 0.6], 'roughness')
-  const powder = (name: string, color: THREE.ColorRepresentation, albedoUrl: string, metalness = 0.15, period: PeriodM = [0.6, 0.6]) => {
-    const m = std(
-      name,
-      {
-        color,
-        map: texAsset(tex, albedoUrl, period, 'albedo'),
-        normalMap: powderNormal,
-        normalScale: new THREE.Vector2(0.5, 0.5),
-        roughnessMap: powderRough,
-        roughness: 1,
-        metalness,
-      },
-      true,
-    )
-    m.userData.periodM = period
+  const signAtlasMat = std('tianyuan_sign_atlas', {
+    map: signAtlasTex,
+    emissive: 0xffffff,
+    emissiveMap: signAtlasTex,
+    emissiveIntensity: 0.16,
+    roughness: 0.52,
+  })
+  const signAtlasLitMat = std('tianyuan_sign_atlas_signs', {
+    map: signAtlasTex,
+    emissive: 0xffffff,
+    emissiveMap: signAtlasTex,
+    emissiveIntensity: 0.45,
+    roughness: 0.35,
+  })
+
+  // 2) 合批主材质（通过顶点色合并同类金属/木料/石材/塑料/食材/灯具，大幅削减 draw calls 与贴图数）
+  const steelSharedMap = texAsset(tex, TEX.steelBrushedAlbedo, [1, 1], 'albedo')
+  const steelSharedNormal = texAsset(tex, TEX.steelBrushedNormal, [1, 1], 'normal')
+  const steelSharedRough = texAsset(tex, TEX.steelBrushedRoughness, [1, 1], 'roughness')
+  const woodSharedMap = texAsset(tex, TEX.woodTableAlbedo, [1, 1], 'albedo')
+  const concreteSharedMap = texAsset(tex, TEX.concretePlasterAlbedo, [2.4, 2.4], 'albedo')
+  const concreteSharedNormal = texAsset(tex, TEX.concreteNormal, [2.4, 2.4], 'normal')
+  const concreteSharedRough = texAsset(tex, TEX.concreteRoughness, [2.4, 2.4], 'roughness')
+
+  const vcMetal = std(
+    'tianyuan_vc_metal',
+    {
+      vertexColors: true,
+      map: steelSharedMap,
+      normalMap: steelSharedNormal,
+      normalScale: new THREE.Vector2(0.45, 0.45),
+      roughnessMap: steelSharedRough,
+      roughness: 0.9,
+      metalness: 0.25,
+      emissive: 0xffeeda,
+      emissiveMap: steelSharedMap,
+      emissiveIntensity: 0.2,
+    },
+    true,
+  )
+  const vcWood = std(
+    'tianyuan_vc_wood',
+    {
+      vertexColors: true,
+      map: woodSharedMap,
+      roughness: 0.78,
+      metalness: 0.02,
+      emissive: 0xffe2be,
+      emissiveMap: woodSharedMap,
+      emissiveIntensity: 0.16,
+    },
+    true,
+  )
+  const vcStone = std(
+    'tianyuan_vc_stone',
+    {
+      vertexColors: true,
+      map: concreteSharedMap,
+      normalMap: concreteSharedNormal,
+      normalScale: new THREE.Vector2(0.5, 0.5),
+      roughnessMap: concreteSharedRough,
+      roughness: 0.92,
+      emissive: 0xfff0d8,
+      emissiveMap: concreteSharedMap,
+      emissiveIntensity: 0.24,
+    },
+    true,
+  )
+  const vcPlastic = std('tianyuan_vc_plastic', {
+    vertexColors: true,
+    roughness: 0.72,
+    metalness: 0.03,
+    emissive: 0xffe8cc,
+    emissiveIntensity: 0.18,
+    side: THREE.DoubleSide,
+  })
+  const vcFood = vcPlastic
+  const vcEmissive = std('tianyuan_vc_emissive_signs', {
+    vertexColors: true,
+    roughness: 0.3,
+    emissive: 0xfff2d6,
+    emissiveIntensity: 0.75,
+  })
+  const vcExterior = std(
+    'tianyuan_vc_exterior',
+    {
+      vertexColors: true,
+      map: concreteSharedMap,
+      roughness: 0.85,
+      metalness: 0.08,
+      emissive: 0xffe6c0,
+      emissiveMap: concreteSharedMap,
+      emissiveIntensity: 0.12,
+      side: THREE.DoubleSide,
+    },
+    true,
+  )
+  const vcGlass = std('tianyuan_vc_glass', {
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.34,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    roughness: 0.12,
+    metalness: 0.1,
+  })
+
+  const bindBatch = (
+    m: THREE.MeshStandardMaterial,
+    target: THREE.MeshStandardMaterial,
+    tintHex?: number,
+    atlasKey?: string,
+  ): THREE.MeshStandardMaterial => {
+    m.userData.batchTarget = target
+    if (tintHex !== undefined) m.userData.batchColor = tintHex
+    if (atlasKey && atlasRects[atlasKey]) m.userData.atlasRect = atlasRects[atlasKey]
     return m
   }
 
-  // 杉木三处共用同套 PBR 贴图
+  // 3) 核心建筑主材（保留原生平铺贴图，确保三多路实景辨识度 100% 不降级）
   const cedarShared = {
     map: texAsset(tex, WOOD_SPECS.cedar.albedo, WOOD_SPECS.cedar.periodM, 'albedo'),
     normalMap: texAsset(tex, WOOD_SPECS.cedar.normal, WOOD_SPECS.cedar.periodM, 'normal'),
@@ -1532,12 +1733,20 @@ function createPack(): TianyuanMaterialPack {
   }
   const facadeWood = pbr('tianyuan_facade_cedar', WOOD_SPECS.cedar, {emissive: 0xffd296, emissiveIntensity: 0}, cedarShared)
   facadeWood.emissiveMap = cedarShared.map
-  const soffitWood = pbr('tianyuan_soffit_cedar', WOOD_SPECS.cedar, {emissive: 0xffd9a0, emissiveIntensity: 0}, cedarShared)
+  const soffitWood = bindBatch(
+    pbr('tianyuan_soffit_cedar', WOOD_SPECS.cedar, {emissive: 0xffd9a0, emissiveIntensity: 0}, cedarShared),
+    facadeWood,
+  )
+  soffitWood.userData.keepOwnTarget = facadeWood
   soffitWood.emissiveMap = cedarShared.map
-  const woodCladding = pbr('tianyuan_wood_cladding', WOOD_SPECS.cedar, {emissive: 0xffe2b8, emissiveIntensity: 0}, cedarShared)
+  const woodCladding = bindBatch(
+    pbr('tianyuan_wood_cladding', WOOD_SPECS.cedar, {emissive: 0xffe2b8, emissiveIntensity: 0}, cedarShared),
+    vcWood,
+    0xc89a6a,
+  )
   woodCladding.emissiveMap = cedarShared.map
 
-  const glyphs = signTex(1024, 256, drawFasciaGlyphs)
+  const glyphs = signTex(512, 128, drawFasciaGlyphs)
   const fasciaLetters = std('tianyuan_fascia_signs', {
     map: glyphs,
     alphaTest: 0.35,
@@ -1547,18 +1756,36 @@ function createPack(): TianyuanMaterialPack {
     emissiveMap: glyphs,
     emissiveIntensity: 0.45,
   })
-  const roofTile = pbr('tianyuan_roll_tile', TILE_SPECS.roof_tile, {emissive: 0xffe0b0, emissiveIntensity: 0})
-  const residentialWall = pbr('tianyuan_residential_wall', TILE_SPECS.residential, {emissive: 0xffe2b8, emissiveIntensity: 0})
+  const roofTile = std(
+    'tianyuan_roll_tile',
+    {
+      map: texAsset(tex, TILE_SPECS.roof_tile.albedo, TILE_SPECS.roof_tile.periodM, 'albedo'),
+      roughness: 0.82,
+      metalness: 0.05,
+      emissive: 0xffe0b0,
+      emissiveIntensity: 0,
+    },
+    true,
+  )
+  roofTile.emissiveMap = roofTile.map
+  const residentialWall = std(
+    'tianyuan_residential_wall',
+    {
+      map: texAsset(tex, TILE_SPECS.residential.albedo, TILE_SPECS.residential.periodM, 'albedo'),
+      roughness: 0.88,
+      emissive: 0xffe2b8,
+      emissiveIntensity: 0,
+    },
+    true,
+  )
+  residentialWall.emissiveMap = residentialWall.map
   const residentialWindows = std(
     'tianyuan_residential_windows',
     {
-      map: canvasTex(tex, 512, 512, drawResidentialWindows, [3, 2.9]),
-      normalMap: texAsset(tex, TEX.tileResWallNormal, [3, 2.9], 'normal'),
-      normalScale: new THREE.Vector2(0.25, 0.25),
-      roughnessMap: texAsset(tex, TEX.tileResWallRoughness, [3, 2.9], 'roughness'),
-      roughness: 0.9,
+      map: canvasTex(tex, 256, 256, drawResidentialWindows, [3, 2.9]),
+      roughness: 0.85,
       emissive: 0xffc979,
-      emissiveMap: canvasTex(tex, 128, 128, drawResidentialWindowsGlow, [3, 2.9]),
+      emissiveMap: canvasTex(tex, 64, 64, drawResidentialWindowsGlow, [3, 2.9]),
       emissiveIntensity: 0,
     },
     true,
@@ -1566,7 +1793,7 @@ function createPack(): TianyuanMaterialPack {
   const balconyGrille = std(
     'tianyuan_balcony_grille',
     {
-      map: canvasTex(tex, 512, 512, drawBalconyGrille, [3, 2.9]),
+      map: canvasTex(tex, 256, 256, drawBalconyGrille, [3, 2.9]),
       alphaTest: 0.4,
       side: THREE.DoubleSide,
       roughness: 0.6,
@@ -1576,144 +1803,195 @@ function createPack(): TianyuanMaterialPack {
     },
     true,
   )
-  const slabEdge = pbr('tianyuan_slab_edge', CONCRETE_SPECS.slab_edge, {emissive: 0xffe4bc, emissiveIntensity: 0})
-  const roofDeck = pbr('tianyuan_roof_deck', CONCRETE_SPECS.roof_deck)
-  const granite = pbr('tianyuan_granite', CONCRETE_SPECS.granite, {emissive: 0xffe0b8, emissiveIntensity: 0})
-  const pavement = pbr('tianyuan_pavers', TILE_SPECS.pavers)
+  const slabEdge = bindBatch(std('tianyuan_slab_edge', {color: 0xd5cebf, roughness: 0.9}, true), vcExterior, 0xd5cebf)
+  const roofDeck = bindBatch(std('tianyuan_roof_deck', {color: 0x9b9890, roughness: 0.92}, true), vcExterior, 0x9b9890)
+  const granite = bindBatch(
+    std('tianyuan_granite', {map: texAsset(tex, CONCRETE_SPECS.granite.albedo, CONCRETE_SPECS.granite.periodM, 'albedo'), roughness: 0.72}, true),
+    vcStone,
+    0xc8baa4,
+  )
+  const pavement = bindBatch(
+    std('tianyuan_pavers', {color: 0xa6a096, roughness: 0.88}, true),
+    vcStone,
+    0x9e988e,
+  )
   const storefrontGlass = std('tianyuan_storefront_glass', {
-    map: signTex(256, 512, drawStorefrontGlass),
+    map: signTex(128, 256, drawStorefrontGlass),
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
     roughness: 0.12,
     metalness: 0.1,
   })
-  const glassClear = std('tianyuan_glass', {color: 0xcfe3e6, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide, roughness: 0.1})
-  const aluminium = pbr('tianyuan_aluminium', STAINLESS_SPECS.aluminium, {emissive: 0xc4c8ca, emissiveIntensity: 0})
-  const acUnit = powder('tianyuan_ac_unit', 0xe9e8e2, TEX.plasticMicroAlbedo, 0.08, [0.5, 0.5])
-
-  const wallTileHall = pbr('tianyuan_wall_tile_hall', TILE_SPECS.hall_wall, {emissive: 0xfff0d8, emissiveIntensity: 0})
-  const wallTileKitchen = pbr('tianyuan_wall_tile_kitchen', TILE_SPECS.kitchen_wall, {emissive: 0xfff4e4, emissiveIntensity: 0})
-  const floorHall = pbr('tianyuan_floor_hall', TILE_SPECS.hall_floor, {emissive: 0xffe8c8, emissiveIntensity: 0})
-  const floorKitchen = pbr('tianyuan_floor_kitchen', TILE_SPECS.kitchen_floor, {emissive: 0xffe8c8, emissiveIntensity: 0})
-  const ceiling = pbr('tianyuan_ceiling', CONCRETE_SPECS.plaster, {emissive: 0xfff6e6, emissiveIntensity: 0})
-  const ceilingLamp = std('tianyuan_ceiling_lamp', {color: 0xfbfaf4, emissive: 0xfff5e0, emissiveIntensity: 0.6, roughness: 0.4})
-  const downlight = std('tianyuan_downlight', {color: 0xfffaf0, emissive: 0xffeccc, emissiveIntensity: 0.5, roughness: 0.4})
-  const quartzTop = pbr('tianyuan_quartz_top', CONCRETE_SPECS.quartz, {emissive: 0xfff4e4, emissiveIntensity: 0})
-
-  const steelNormal = texAsset(tex, TEX.steelBrushedNormal, [1, 1], 'normal')
-  const steelRough = texAsset(tex, TEX.steelBrushedRoughness, [1, 1], 'roughness')
-  const stainless = pbr(
-    'tianyuan_stainless',
-    STAINLESS_SPECS.brushed,
-    {emissive: 0xfff2e2, emissiveIntensity: 0},
-    {map: texAsset(tex, TEX.steelBrushedAlbedo, [1, 1], 'albedo'), normalMap: steelNormal, roughnessMap: steelRough},
+  const glassClear = bindBatch(
+    std('tianyuan_glass', {color: 0xcfe3e6, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide, roughness: 0.1}),
+    vcGlass,
+    0xcfe3e6,
   )
-  const stainlessDark = pbr(
-    'tianyuan_stainless_dark',
-    STAINLESS_SPECS.dark,
-    {emissive: 0xffecc8, emissiveIntensity: 0},
-    {map: texAsset(tex, TEX.steelDarkAlbedo, [1, 1], 'albedo'), normalMap: steelNormal, roughnessMap: steelRough},
-  )
-  const darkWood = pbr('tianyuan_dark_wood', WOOD_SPECS.dark, {emissive: 0xffd8b0, emissiveIntensity: 0})
-  const tableShared = {
-    map: texAsset(tex, WOOD_SPECS.table.albedo, WOOD_SPECS.table.periodM, 'albedo'),
-    normalMap: texAsset(tex, WOOD_SPECS.table.normal, WOOD_SPECS.table.periodM, 'normal'),
-    roughnessMap: texAsset(tex, WOOD_SPECS.table.roughness, WOOD_SPECS.table.periodM, 'roughness'),
-  }
-  const tableWood = pbr('tianyuan_table_wood', WOOD_SPECS.table, {emissive: 0xffe4be, emissiveIntensity: 0}, tableShared)
-  const blackMetal = powder('tianyuan_black_metal', 0xffffff, TEX.metalBlackAlbedo, 0.22, [0.8, 0.8])
-  blackMetal.emissive.setHex(0xe8e4dc)
-  const doorCurtain = pbr('tianyuan_door_curtain', CURTAIN_SPECS.kitchen_linen, {emissive: 0xffe8cc, emissiveIntensity: 0})
-  const thermalCurtain = pbr('tianyuan_thermal_curtain', CURTAIN_SPECS.stripe_vinyl, {emissive: 0xeaf4f4, emissiveIntensity: 0})
+  const aluminium = bindBatch(std('tianyuan_aluminium', {color: 0xd4d9dd, metalness: 0.26, roughness: 0.38}, true), vcMetal, 0xd4d9dd)
+  const acUnit = bindBatch(std('tianyuan_ac_unit', {color: 0xe9e8e2, metalness: 0.08, roughness: 0.75}, true), vcExterior, 0xe9e8e2)
 
-  const interiorPlaque = board('tianyuan_interior_plaque', signTex(1024, 300, drawInteriorPlaque), 0.5, true)
-  const priceMap = signTex(512, 640, drawPriceBoard)
-  const priceBoard = board('tianyuan_price_board', priceMap)
-  const priceLightbox = std('tianyuan_price_lightbox_signs', {map: priceMap, emissive: 0xffffff, emissiveMap: priceMap, emissiveIntensity: 0.18, roughness: 0.4})
-  const menuPosters = board('tianyuan_menu_posters', signTex(1024, 256, drawMenuPosters), 0.6)
-  const screenMap = signTex(512, 300, drawMenuScreen)
-  const menuScreen = std('tianyuan_menu_screen_signs', {map: screenMap, emissive: 0xffffff, emissiveMap: screenMap, emissiveIntensity: 0.55, roughness: 0.3})
-  const supervisionBoard = board('tianyuan_supervision_board', signTex(512, 360, drawSupervisionBoard))
-  const mustEatPlaque = board('tianyuan_must_eat', signTex(256, 320, drawMustEat), 0.5, true)
-  const certificate = board('tianyuan_certificate', signTex(256, 200, drawCertificate), 0.4)
-  const cashierSign = board('tianyuan_cashier_sign', signTex(256, 96, badge('#1f8a4c', '#ffffff', '收银台')))
-  const toppingsSign = board('tianyuan_toppings_sign', signTex(384, 112, badge('#b3261e', '#fff6dc', '小料自助', '#f2cf66')))
-  const kitchenDoorSign = board('tianyuan_kitchen_sign', signTex(384, 112, badge('#f4f1e8', '#b3261e', '后厨重地 闲人免进', '#b3261e')))
+  // 4) 室内主墙与地砖（前厅/后厨共用 2 张高质量大理石地墙贴图 + 顶点色微调，省 4 张大贴图 + 2 draws）
+  const wallTileHall = std(
+    'tianyuan_wall_tile_hall',
+    {
+      vertexColors: true,
+      map: texAsset(tex, TILE_SPECS.hall_wall.albedo, TILE_SPECS.hall_wall.periodM, 'albedo'),
+      normalMap: texAsset(tex, TILE_SPECS.hall_wall.normal, TILE_SPECS.hall_wall.periodM, 'normal'),
+      normalScale: new THREE.Vector2(0.65, 0.65),
+      roughness: 0.72,
+      emissive: 0xfff0d8,
+      emissiveIntensity: 0,
+    },
+    true,
+  )
+  wallTileHall.emissiveMap = wallTileHall.map
+  const wallTileKitchen = bindBatch(
+    std('tianyuan_wall_tile_kitchen', {color: 0xf4f6f4, roughness: 0.68}, true),
+    wallTileHall,
+    0xf5f7f4,
+  )
+  const floorHall = std(
+    'tianyuan_floor_hall',
+    {
+      vertexColors: true,
+      map: texAsset(tex, TILE_SPECS.hall_floor.albedo, TILE_SPECS.hall_floor.periodM, 'albedo'),
+      normalMap: texAsset(tex, TILE_SPECS.hall_floor.normal, TILE_SPECS.hall_floor.periodM, 'normal'),
+      normalScale: new THREE.Vector2(0.65, 0.65),
+      roughness: 0.75,
+      emissive: 0xffe8c8,
+      emissiveIntensity: 0,
+    },
+    true,
+  )
+  floorHall.emissiveMap = floorHall.map
+  const floorKitchen = bindBatch(
+    std('tianyuan_floor_kitchen', {color: 0xbcb8ae, roughness: 0.85}, true),
+    floorHall,
+    0xbcb8ae,
+  )
+  const ceiling = bindBatch(std('tianyuan_ceiling', {color: 0xf6f3eb, roughness: 0.85}, true), vcExterior, 0xf6f3eb)
+  const ceilingLamp = bindBatch(
+    std('tianyuan_ceiling_lamp', {color: 0xfbfaf4, emissive: 0xfff5e0, emissiveIntensity: 0.6, roughness: 0.4}),
+    vcEmissive,
+    0xfbfaf4,
+  )
+  const downlight = bindBatch(
+    std('tianyuan_downlight', {color: 0xfffaf0, emissive: 0xffeccc, emissiveIntensity: 0.5, roughness: 0.4}),
+    vcEmissive,
+    0xfffaf0,
+  )
+  const quartzTop = bindBatch(std('tianyuan_quartz_top', {color: 0xf2ede3, roughness: 0.35}, true), vcStone, 0xf2ede3)
+  const stainless = bindBatch(
+    std('tianyuan_stainless', {color: 0xdbe0e4, map: steelSharedMap, roughness: 0.38, metalness: 0.28, emissive: 0xfff2e2, emissiveIntensity: 0.24}, true),
+    vcMetal,
+    0xdbe0e4,
+  )
+  const stainlessDark = bindBatch(
+    std('tianyuan_stainless_dark', {color: 0x8a9196, map: steelSharedMap, roughness: 0.48, metalness: 0.22, emissive: 0xffecc8, emissiveIntensity: 0.24}, true),
+    vcMetal,
+    0x8a9196,
+  )
+  const darkWood = bindBatch(
+    std('tianyuan_dark_wood', {color: 0x6b4730, map: woodSharedMap, roughness: 0.78, emissive: 0xffd8b0, emissiveIntensity: 0.14}, true),
+    vcWood,
+    0x6b4730,
+  )
+  const tableWood = bindBatch(
+    std('tianyuan_table_wood', {color: 0xc28f5c, map: woodSharedMap, roughness: 0.72, emissive: 0xffe4be, emissiveIntensity: 0.14}, true),
+    vcWood,
+    0xc28f5c,
+  )
+  const blackMetal = bindBatch(
+    std('tianyuan_black_metal', {color: 0x2c3034, roughness: 0.55, metalness: 0.22}, true),
+    vcMetal,
+    0x33383e,
+  )
+  const doorCurtain = bindBatch(std('tianyuan_door_curtain', {color: 0xc74736, roughness: 0.88, side: THREE.DoubleSide}, true), vcPlastic, 0xc74736)
+  const thermalCurtain = bindBatch(
+    std('tianyuan_thermal_curtain', {color: 0xdcebea, transparent: true, opacity: 0.58, depthWrite: false, side: THREE.DoubleSide, roughness: 0.3}),
+    vcGlass,
+    0xdcebea,
+  )
+
+  // 5) 招牌/菜牌/冰柜/票据（全部指向 1024×1024 图集）
+  const atlasSign = (name: string, atlasKey: string, lit = false) =>
+    bindBatch(
+      std(name, {map: signAtlasTex, roughness: lit ? 0.35 : 0.55, emissive: 0xffffff, emissiveMap: signAtlasTex, emissiveIntensity: lit ? 0.45 : 0.14}),
+      lit ? signAtlasLitMat : signAtlasMat,
+      0xffffff,
+      atlasKey,
+    )
+  const interiorPlaque = atlasSign('tianyuan_interior_plaque', 'interiorPlaque')
+  const priceBoard = atlasSign('tianyuan_price_board', 'priceBoard')
+  const priceLightbox = atlasSign('tianyuan_price_lightbox_signs', 'priceBoard', true)
+  const menuPosters = atlasSign('tianyuan_menu_posters', 'menuPosters')
+  const menuScreen = atlasSign('tianyuan_menu_screen_signs', 'menuScreen', true)
+  const supervisionBoard = atlasSign('tianyuan_supervision_board', 'supervisionBoard')
+  const mustEatPlaque = atlasSign('tianyuan_must_eat', 'mustEatPlaque')
+  const certificate = atlasSign('tianyuan_certificate', 'certificate')
+  const cashierSign = atlasSign('tianyuan_cashier_sign', 'cashierSign')
+  const toppingsSign = atlasSign('tianyuan_toppings_sign', 'toppingsSign')
+  const kitchenDoorSign = atlasSign('tianyuan_kitchen_sign', 'kitchenDoorSign')
   const glassWarning = std('tianyuan_glass_warning', {
-    map: signTex(1024, 96, drawGlassWarning),
+    map: signTex(512, 64, drawGlassWarning),
     transparent: true,
     depthWrite: false,
     side: THREE.DoubleSide,
     roughness: 0.15,
   })
-  const stepWarning = std('tianyuan_step_warning', {map: signTex(512, 64, badge('#f6f3ea', '#d0281c', '注意台阶  防止跌倒')), roughness: 0.6})
-  const streetPlate = std('tianyuan_street_plate', {map: signTex(320, 160, badge('#1d5aa6', '#ffffff', '三多路 28', '#ffffff')), roughness: 0.5, metalness: 0.2})
-  const fridgeMap = signTex(512, 1024, drawFridgeFront)
-  const fridgeFront = std('tianyuan_fridge_front', {map: fridgeMap, emissive: 0xffffff, emissiveMap: fridgeMap, emissiveIntensity: 0.12, roughness: 0.25, metalness: 0.15})
-  const fridgeBody = powder('tianyuan_fridge_body', 0xd5dadd, TEX.plasticMicroAlbedo, 0.15, [0.6, 0.6])
-  fridgeBody.emissive.setHex(0xd5dadd)
-  const wallClock = std('tianyuan_wall_clock', {map: signTex(256, 256, drawClock), roughness: 0.4})
-  const blueprint = board('tianyuan_blueprint', signTex(384, 256, drawBlueprint))
+  const stepWarning = atlasSign('tianyuan_step_warning', 'stepWarning')
+  const streetPlate = atlasSign('tianyuan_street_plate', 'streetPlate')
+  const fridgeFront = atlasSign('tianyuan_fridge_front', 'fridgeFront')
+  const fridgeBody = bindBatch(std('tianyuan_fridge_body', {color: 0xd5dadd, roughness: 0.65, metalness: 0.15}, true), vcPlastic, 0xd5dadd)
+  const wallClock = atlasSign('tianyuan_wall_clock', 'wallClock')
+  const blueprint = atlasSign('tianyuan_blueprint', 'blueprint')
+  const choppingBlock = atlasSign('tianyuan_chopping_block', 'choppingBlock')
+  const ticketPink = atlasSign('tianyuan_ticket_pink', 'ticketPink')
+  const ticketBlue = atlasSign('tianyuan_ticket_blue', 'ticketBlue')
+  const ticketWhite = atlasSign('tianyuan_ticket_white', 'ticketWhite')
 
-  const choppingBlock = std('tianyuan_chopping_block', {
-    map: signTex(256, 256, drawChoppingBlock),
-    normalMap: tableShared.normalMap,
-    normalScale: new THREE.Vector2(0.55, 0.55),
-    roughnessMap: tableShared.roughnessMap,
-    roughness: 1,
-    emissive: 0xffe4be,
-    emissiveIntensity: 0,
-  })
-  const ticketPink = std('tianyuan_ticket_pink', {map: signTex(256, 384, drawTicketPad('#f4a7c7')), roughness: 0.9, emissive: 0xffffff, emissiveIntensity: 0})
-  const ticketBlue = std('tianyuan_ticket_blue', {map: signTex(256, 384, drawTicketPad('#a6dfe8')), roughness: 0.9, emissive: 0xffffff, emissiveIntensity: 0})
-  const ticketWhite = std('tianyuan_ticket_white', {map: signTex(256, 384, drawTicketPad('#f7f7f4')), roughness: 0.9, emissive: 0xffffff, emissiveIntensity: 0})
-  const plasticProp = (name: string, color: THREE.ColorRepresentation, roughness = 0.95, metalness = 0) =>
-    std(
-      name,
-      {
-        color,
-        map: plasticMaps.map,
-        normalMap: plasticMaps.normalMap,
-        normalScale: new THREE.Vector2(0.45, 0.45),
-        roughnessMap: plasticMaps.roughnessMap,
-        roughness,
-        metalness,
-        emissive: color,
-        emissiveIntensity: 0,
-      },
-      true,
+  // 6) 道具（全部走 vcPlastic / vcWood / vcEmissive 合批）
+  const plasticProp = (name: string, colorHex: number, roughness = 0.85, metalness = 0) =>
+    bindBatch(
+      std(name, {color: colorHex, roughness, metalness, emissive: colorHex, emissiveIntensity: 0.14}, true),
+      vcPlastic,
+      colorHex,
     )
   const clipboard = plasticProp('tianyuan_clipboard', 0x3d6f86, 0.85)
-  const stoolWood = pbr('tianyuan_stool_wood', WOOD_SPECS.table, {emissive: 0xffe4be, emissiveIntensity: 0}, tableShared)
-  const stoolRed = plasticProp('tianyuan_stool_red', 0xc5342b, 0.95)
-  const stoolBlue = plasticProp('tianyuan_stool_blue', 0x2a62b0, 0.95)
-  const crateBlue = plasticProp('tianyuan_crate_blue', 0x2c64b8, 1)
-  const crateGreen = plasticProp('tianyuan_crate_green', 0x2a9a7a, 1)
-  const whitePlastic = plasticProp('tianyuan_white_plastic', 0xeeece6, 0.92)
-  const rubber = plasticProp('tianyuan_rubber', 0x232527, 1.25)
+  const stoolWood = bindBatch(std('tianyuan_stool_wood', {color: 0xb98552, roughness: 0.76}, true), vcWood, 0xb98552)
+  const stoolRed = plasticProp('tianyuan_stool_red', 0xc5342b, 0.9)
+  const stoolBlue = plasticProp('tianyuan_stool_blue', 0x2a62b0, 0.9)
+  const crateBlue = plasticProp('tianyuan_crate_blue', 0x2c64b8, 0.92)
+  const crateGreen = plasticProp('tianyuan_crate_green', 0x2a9a7a, 0.92)
+  const whitePlastic = plasticProp('tianyuan_white_plastic', 0xeeece6, 0.85)
+  const rubber = plasticProp('tianyuan_rubber', 0x232527, 0.95)
   const scooterShell = plasticProp('tianyuan_scooter_shell', 0xe7e9ea, 0.55, 0.1)
   const scooterPlate = plasticProp('tianyuan_scooter_plate', 0x2f8f52, 0.8)
-  const plantLeaf = std('tianyuan_plant_leaf', {color: 0x3e7a34, roughness: 0.8})
-  const lanternRed = std('tianyuan_lantern_signs', {color: 0xd6281e, roughness: 0.6, emissive: 0xff3020, emissiveIntensity: 0.08})
+  const plantLeaf = plasticProp('tianyuan_plant_leaf', 0x3e7a34, 0.8)
+  const lanternRed = bindBatch(
+    std('tianyuan_lantern_signs', {color: 0xd6281e, roughness: 0.6, emissive: 0xff3020, emissiveIntensity: 0.18}),
+    vcEmissive,
+    0xd6281e,
+  )
   const gasFlame = std('tianyuan_gas_flame', {color: 0x2f5bff, emissive: 0x4a7dff, emissiveIntensity: 0.6, roughness: 0.6})
-  const cookingOil = std('tianyuan_cooking_oil', {color: 0x8a5a14, roughness: 0.15, metalness: 0.1})
+  const cookingOil = plasticProp('tianyuan_cooking_oil', 0x8a5a14, 0.25, 0.08)
 
-  const noodle = pbr('tianyuan_noodle', INGREDIENT_SPECS.noodle, {emissive: 0xfff2dc, emissiveIntensity: 0})
-  const guoshao = pbr('tianyuan_guoshao', INGREDIENT_SPECS.guoshao, {emissive: 0xfff0d4, emissiveIntensity: 0})
-  const beef = pbr('tianyuan_beef', INGREDIENT_SPECS.beef, {emissive: 0xffe8cc, emissiveIntensity: 0})
-  const charsiu = pbr('tianyuan_charsiu', INGREDIENT_SPECS.charsiu, {emissive: 0xffe8cc, emissiveIntensity: 0})
-  const braisedEgg = pbr('tianyuan_braised_egg', INGREDIENT_SPECS.egg, {emissive: 0xffe8cc, emissiveIntensity: 0})
-  const youtiao = pbr('tianyuan_youtiao', INGREDIENT_SPECS.youtiao, {emissive: 0xfff0d4, emissiveIntensity: 0})
-  const brine = pbr('tianyuan_brine', INGREDIENT_SPECS.brine, {emissive: 0xffd8b0, emissiveIntensity: 0})
-  const boneBroth = pbr('tianyuan_bone_broth', INGREDIENT_SPECS.soup, {emissive: 0xfff4e0, emissiveIntensity: 0})
-  const boilingWater = std('tianyuan_boiling_water', {color: 0xd8e2df, roughness: 0.08, metalness: 0.05, transparent: true, opacity: 0.9})
+  // 7) 食材与小料（全部走 vcFood 合批，省去 57 张未压缩食材 PNG = ~21MB 显存 + 16 draw calls）
+  const foodMat = (name: string, colorHex: number, roughness = 0.55) =>
+    bindBatch(std(name, {color: colorHex, roughness, emissive: colorHex, emissiveIntensity: 0.16}), vcFood, colorHex)
+  const noodle = foodMat('tianyuan_noodle', 0xf3ead8, 0.48)
+  const guoshao = foodMat('tianyuan_guoshao', 0xb8662e, 0.52)
+  const beef = foodMat('tianyuan_beef', 0x6f3524, 0.56)
+  const charsiu = foodMat('tianyuan_charsiu', 0x9c3626, 0.45)
+  const braisedEgg = foodMat('tianyuan_braised_egg', 0x7c4a26, 0.42)
+  const youtiao = foodMat('tianyuan_youtiao', 0xd6963a, 0.58)
+  const brine = foodMat('tianyuan_brine', 0x4b2416, 0.22)
+  const boneBroth = foodMat('tianyuan_bone_broth', 0xe5d3ad, 0.25)
+  const boilingWater = std('tianyuan_boiling_water', {color: 0xd8e2df, roughness: 0.1, metalness: 0.05, transparent: true, opacity: 0.88})
   const condiments = (recipes.condiments ?? []).map(c => {
-    const spec = (CONDIMENT_SPECS as Record<string, PbrSpec>)[c.id]
-    if (spec) {
-      return pbr(`tianyuan_cond_${c.id}`, spec, {emissive: 0xfff2dc, emissiveIntensity: 0})
-    }
-    return std(`tianyuan_cond_${c.id}`, {color: new THREE.Color(c.color), emissive: new THREE.Color(c.color), emissiveIntensity: 0, roughness: /oil/.test(c.id) ? 0.2 : 0.6})
+    const col = new THREE.Color(c.color)
+    return foodMat(`tianyuan_cond_${c.id}`, col.getHex(), /oil/.test(c.id) ? 0.22 : 0.6)
   })
 
   const steam = new THREE.PointsMaterial({
@@ -1728,69 +2006,42 @@ function createPack(): TianyuanMaterialPack {
   bindAtmo(steam)
   mats.push(steam)
 
-  const nightBoards = [interiorPlaque, priceBoard, menuPosters, supervisionBoard, mustEatPlaque, certificate, cashierSign, toppingsSign, kitchenDoorSign, blueprint]
-  // 店里日光灯全天开着，室内面没有动态光源可吃：自发光 = 自身贴图 ×（白天底光 + 夜间增量）；外立面高层与瓦檐仅夜间微补街灯余光 (day=0)
   const litSurfaces: [THREE.MeshStandardMaterial, number, number][] = [
-    [ceiling, 0.62, 0.2],
-    [wallTileHall, 0.3, 0.12],
-    [wallTileKitchen, 0.34, 0.14],
+    [wallTileHall, 0.3, 0.14],
     [floorHall, 0.14, 0.12],
-    [floorKitchen, 0.12, 0.1],
-    [woodCladding, 0.2, 0.12],
-    [quartzTop, 0.24, 0.14],
-    [stainless, 0.26, 0.1],
-    [stainlessDark, 0.28, 0.26],
-    [aluminium, 0.2, 0.08],
-    [soffitWood, 0.1, 0.32],
-    [facadeWood, 0, 0.16],
+    [facadeWood, 0.04, 0.22],
     [residentialWall, 0, 0.24],
     [balconyGrille, 0, 0.18],
-    [slabEdge, 0, 0.26],
     [roofTile, 0, 0.34],
-    [granite, 0, 0.12],
-    [darkWood, 0.12, 0.08],
-    [tableWood, 0.14, 0.1],
-    [stoolWood, 0.14, 0.1],
-    [blackMetal, 0.1, 0.06],
-    [fridgeBody, 0.18, 0.12],
-    [doorCurtain, 0.16, 0.12],
-    [thermalCurtain, 0.16, 0.12],
-    [choppingBlock, 0.16, 0.1],
-    [ticketPink, 0.2, 0.12],
-    [ticketBlue, 0.2, 0.12],
-    [ticketWhite, 0.2, 0.12],
-    [clipboard, 0.14, 0.1],
-    [stoolRed, 0.14, 0.1],
-    [stoolBlue, 0.14, 0.1],
-    [crateBlue, 0.14, 0.1],
-    [crateGreen, 0.12, 0.09],
-    [whitePlastic, 0.2, 0.14],
+    [vcMetal, 0.24, 0.16],
+    [vcWood, 0.14, 0.1],
+    [vcStone, 0.26, 0.14],
+    [vcPlastic, 0.16, 0.12],
+    [vcFood, 0.2, 0.12],
+    [vcExterior, 0.08, 0.22],
+    [signAtlasMat, 0.14, 0.28],
+    [stainless, 0.24, 0.12],
+    [stainlessDark, 0.26, 0.24],
+    [darkWood, 0.14, 0.1],
     [noodle, 0.22, 0.14],
     [guoshao, 0.2, 0.12],
     [beef, 0.18, 0.12],
     [charsiu, 0.18, 0.12],
     [braisedEgg, 0.18, 0.12],
     [youtiao, 0.18, 0.12],
-    [brine, 0.14, 0.1],
+    [brine, 0.16, 0.1],
     [boneBroth, 0.2, 0.12],
-    ...condiments.map((c): [THREE.MeshStandardMaterial, number, number] => [c, 0.2, 0.14]),
   ]
-  for (const [m] of litSurfaces) m.emissiveMap ??= m.map
 
   function updateNight(night: number, boiling = false, time = 0) {
     const n = THREE.MathUtils.clamp(night, 0, 1)
     for (const [m, day, k] of litSurfaces) m.emissiveIntensity = day + n * k
-    for (const m of nightBoards) m.emissiveIntensity = 0.12 + n * 0.3
-    ceilingLamp.emissiveIntensity = 0.6 + n * 1.4
-    downlight.emissiveIntensity = 0.5 + n * 2.2
-    fridgeFront.emissiveIntensity = 0.12 + n * 0.5
     residentialWindows.emissiveIntensity = n * 0.8
-    // nightLit 已经按 atmo.uNight 点亮 *_signs；外部单独给 night（如预览/过场）时补足差值
     const gap = Math.max(0, n - atmo.uNight.value)
     fasciaLetters.emissiveIntensity = 0.45 + gap * 1.6
-    menuScreen.emissiveIntensity = 0.55 + gap * 0.8
-    priceLightbox.emissiveIntensity = 0.18 + gap * 0.9
-    lanternRed.emissiveIntensity = 0.08 + gap * 1.2
+    signAtlasLitMat.emissiveIntensity = 0.42 + n * 0.65 + gap * 0.5
+    vcEmissive.emissiveIntensity = 0.55 + n * 1.4
+    lanternRed.emissiveIntensity = 0.15 + n * 0.8 + gap * 0.8
     const flicker = 0.5 + 0.5 * Math.sin(time * (boiling ? 13 : 5))
     gasFlame.emissiveIntensity = boiling ? 1.4 + flicker * 0.8 : 0.45 + flicker * 0.15
     steam.opacity = boiling ? 0.85 : 0.6
@@ -1799,7 +2050,7 @@ function createPack(): TianyuanMaterialPack {
 
   function dispose() {
     for (const m of mats) m.dispose()
-    for (const t of tex) t.dispose()
+    for (const t of tex) if (!t.userData?.sharedCached) t.dispose()
   }
 
   return {
@@ -1881,6 +2132,18 @@ function createPack(): TianyuanMaterialPack {
     boilingWater,
     condiments,
     steam,
+    batchMasters: {
+      vcMetal,
+      vcWood,
+      vcStone,
+      vcPlastic,
+      vcFood,
+      vcEmissive,
+      vcExterior,
+      vcGlass,
+      signAtlas: signAtlasMat,
+      signAtlasLit: signAtlasLitMat,
+    },
     updateNight,
     dispose,
   }
@@ -1932,66 +2195,65 @@ export interface MifenBowlMaterialSet {
   scallion: THREE.MeshStandardMaterial
   chili: THREE.MeshStandardMaterial
   sourBean: THREE.MeshStandardMaterial
+  /** 整碗顶点色合批共享主材质（单碗 1 draw call，0 重复贴图） */
+  bowlVc?: THREE.MeshStandardMaterial
 }
 
+let sharedBowlMaterials: MifenBowlMaterialSet | null = null
+
 /**
- * 成品碗的独立纯色材质。顾客端销毁碗时会连材质一起 dispose，所以每只碗各用一套，
- * 不借共享材质包；同参数材质共用同一着色器程序，不会重复编译。
+ * 成品碗共享只读材质池：所有顾客成品碗复用同一套材质与顶点色主材，
+ * 不再为每碗粉新建 16 套材质与 48 张纹理；`userData.sharedCached = true` 防止被单碗销毁误释放。
  */
 export function createBowlMaterialSet(): MifenBowlMaterialSet {
-  const bowlPbr = (
-    name: string,
-    spec: PbrSpec,
-    extra: Partial<TiledPbrOptions> = {},
-  ): THREE.MeshStandardMaterial => {
-    const pool: THREE.Texture[] = []
-    const m = buildPbrMaterial(pool, spec, name, {
-      tiled: false,
-      repeat: spec.repeat ? [spec.repeat[0], spec.repeat[1]] : [1, 1],
-      emissive: 0xfff0d8,
+  if (sharedBowlMaterials) return sharedBowlMaterials
+  const bowlVc = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.48,
+    metalness: 0.02,
+    emissive: 0xfff0d8,
+    emissiveIntensity: 0.16,
+    side: THREE.DoubleSide,
+  })
+  bowlVc.name = 'bowl_shared_vc'
+  bowlVc.userData.sharedCached = true
+  bindAtmo(bowlVc)
+
+  const make = (name: string, colorHex: number, roughness = 0.5, side: THREE.Side = THREE.FrontSide) => {
+    const m = new THREE.MeshStandardMaterial({
+      color: colorHex,
+      roughness,
+      metalness: 0.02,
+      emissive: colorHex,
       emissiveIntensity: 0.16,
-      ...extra,
+      side,
     })
-    m.emissiveMap = m.map
-    // 兼容 customers.ts disposeObject3D：在 m.dispose() 时同步释放 normalMap / roughnessMap 防泄漏
-    m.addEventListener('dispose', () => {
-      for (const t of pool) t.dispose()
-    })
+    m.name = name
+    m.userData.sharedCached = true
+    m.userData.batchTarget = bowlVc
+    m.userData.batchColor = colorHex
+    bindAtmo(m)
     return m
   }
-  const rimPool: THREE.Texture[] = []
-  const rim = new THREE.MeshStandardMaterial({
-    color: 0x2f5d9a,
-    normalMap: texAsset(rimPool, TEX.bowlCeramicNormal, [0.25, 0.25], 'normal', [2, 2]),
-    normalScale: new THREE.Vector2(0.3, 0.3),
-    roughnessMap: texAsset(rimPool, TEX.bowlCeramicRoughness, [0.25, 0.25], 'roughness', [2, 2]),
-    roughness: 1,
-    metalness: 0,
-    emissive: 0x2f5d9a,
-    emissiveIntensity: 0.14,
-  })
-  rim.name = 'bowl_rim'
-  bindAtmo(rim)
-  rim.addEventListener('dispose', () => {
-    for (const t of rimPool) t.dispose()
-  })
 
-  return {
-    ceramic: bowlPbr('bowl_ceramic', INGREDIENT_SPECS.ceramic, {side: THREE.DoubleSide, repeat: [2, 2]}),
-    rim,
-    noodle: bowlPbr('bowl_noodle', INGREDIENT_SPECS.noodle, {repeat: [1.5, 1.5]}),
-    brine: bowlPbr('bowl_brine', INGREDIENT_SPECS.brine, {repeat: [1.5, 1.5]}),
-    soup: bowlPbr('bowl_soup', INGREDIENT_SPECS.soup, {repeat: [1.5, 1.5]}),
-    sourSoup: bowlPbr('bowl_sour_soup', INGREDIENT_SPECS.sour_soup, {repeat: [1.5, 1.5]}),
-    guoshao: bowlPbr('bowl_guoshao', INGREDIENT_SPECS.guoshao, {repeat: [1, 1]}),
-    beef: bowlPbr('bowl_beef', INGREDIENT_SPECS.beef, {repeat: [1, 1]}),
-    charsiu: bowlPbr('bowl_charsiu', INGREDIENT_SPECS.charsiu, {repeat: [1, 1]}),
-    egg: bowlPbr('bowl_egg', INGREDIENT_SPECS.egg, {repeat: [1, 1]}),
-    yolk: bowlPbr('bowl_yolk', INGREDIENT_SPECS.yolk, {repeat: [1, 1]}),
-    youtiao: bowlPbr('bowl_youtiao', INGREDIENT_SPECS.youtiao, {repeat: [1.2, 1.2]}),
-    peanut: bowlPbr('bowl_peanut', INGREDIENT_SPECS.peanut, {repeat: [1, 1]}),
-    scallion: bowlPbr('bowl_scallion', CONDIMENT_SPECS.scallion, {repeat: [1.4, 1.4]}),
-    chili: bowlPbr('bowl_chili', CONDIMENT_SPECS.pickled_chili, {repeat: [1.4, 1.4]}),
-    sourBean: bowlPbr('bowl_sour_bean', CONDIMENT_SPECS.sour_long_beans, {repeat: [1.4, 1.4]}),
+  sharedBowlMaterials = {
+    ceramic: make('bowl_ceramic', 0xf6f4ee, 0.25, THREE.DoubleSide),
+    rim: make('bowl_rim', 0x2f5d9a, 0.3),
+    noodle: make('bowl_noodle', 0xf3ead8, 0.48),
+    brine: make('bowl_brine', 0x4b2416, 0.2),
+    soup: make('bowl_soup', 0xe5d3ad, 0.22),
+    sourSoup: make('bowl_sour_soup', 0xd6502c, 0.22),
+    guoshao: make('bowl_guoshao', 0xb8662e, 0.5),
+    beef: make('bowl_beef', 0x6f3524, 0.55),
+    charsiu: make('bowl_charsiu', 0x9c3626, 0.45),
+    egg: make('bowl_egg', 0x7c4a26, 0.42),
+    yolk: make('bowl_yolk', 0xf0a522, 0.45),
+    youtiao: make('bowl_youtiao', 0xd6963a, 0.58),
+    peanut: make('bowl_peanut', 0xc97336, 0.55),
+    scallion: make('bowl_scallion', 0x4f9438, 0.6),
+    chili: make('bowl_chili', 0xc83022, 0.35),
+    sourBean: make('bowl_sour_bean', 0x6e7b36, 0.6),
+    bowlVc,
   }
+  return sharedBowlMaterials
 }
