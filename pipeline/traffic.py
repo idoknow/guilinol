@@ -80,6 +80,40 @@ def signal_schedule(lanes, nodes):
     return [dict(lanes=sorted(family),green=18,yellow=3) for family in families]
 
 
+def align_airport_lane(nodes, lanes, node_height, profile):
+    start_ref, end_ref = 3891288847, 3891288846
+    way = 385796480
+    lane = next((r for r in lanes if (r['way'],r['from'],r['to']) ==
+                 (way,start_ref,end_ref)), None)
+    if lane is None:
+        return
+    a,b = nodes[start_ref],nodes[end_ref]
+    dx,dz = b['x']-a['x'],b['z']-a['z']
+    length = math.hypot(dx,dz)
+    dx,dz = dx/length,dz/length
+    # The centre of tunnel 385795252's crossing is in projected city metres.
+    # Keep 20 cm outside each wheel, and return to the original junction.
+    station = (-18814.81-a['x'])*dx+(3934.32-a['z'])*dz
+    shoulder = [(-22,0),(-18,.15),(-14,.5),(-10,.85),(-6,1),
+                (2,1),(4,.85),(6,.5),(8,.15),(10,0)]
+    if station <= 22 or station+10 >= length:
+        raise ValueError('Airport upper road survey no longer matches the crossing')
+    route = [start_ref]
+    for i,(dist,scale) in enumerate(shoulder):
+        ref = -4_000_000_000_000-way*100-i
+        x = round(a['x']+(station+dist)*dx+.55*scale*dz,2)
+        z = round(a['z']+(station+dist)*dz-.55*scale*dx,2)
+        nodes[ref] = dict(id=ref,x=x,z=z,y=node_height(x,z,way))
+        route.append(ref)
+    route.append(end_ref)
+    # Keep the incoming lane ID at its original downstream signal.
+    for head,tail in zip(route[:-2],route[1:-1],strict=True):
+        lanes.append({**lane,'id':len(lanes),'from':head,'to':tail,
+                      'heights':profile(head,tail,lane['offset'],way)})
+    lane['from'] = route[-2]
+    lane['heights'] = profile(route[-2],end_ref,lane['offset'],way)
+
+
 def bake(output, manifest, rendered_roads=None):
     from shapely.geometry import box
     left, top, width, depth = manifest['extent']
@@ -273,6 +307,7 @@ def bake(output, manifest, rendered_roads=None):
             group.extend(nearby)
         schedule = signal_schedule((lane for ref in group for lane in incoming[ref]), nodes)
         signals.extend(dict(node=ref,group=group[0],offset=group[0]%31,phases=schedule) for ref in group)
+    align_airport_lane(nodes, lanes, node_height, profile)
     result = dict(nodes=[node for node in nodes.values() if node['y'] is not None],lanes=lanes,signals=signals,quiet=quiet,walks=walks)
     dest = output/'roads'/'graph.json.gz'
     dest.parent.mkdir(exist_ok=True)
