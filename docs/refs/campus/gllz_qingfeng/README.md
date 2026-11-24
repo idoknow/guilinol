@@ -1,6 +1,6 @@
 # 桂林市旅游职业中等专业学校(清风校区)：建筑清单（待补临街照片）
 
-项目 Release `raw-expanded-20261121`（归档校验见 `docs/expanded-raw.md`）：
+项目 Release `raw-expanded-20261121`（用同一 Release 的 .sha256 文件校验）：
 
 - `osm-2026-11.json`：按 `way/1013732595` 定位校界，提取建筑 way 的名称和已标注层数。
 - `overture_buildings.csv`：按建筑面内部代表点是否落入上述边界（含边）筛选；OSM 建筑使用相同口径。与 OSM 建筑的最大交并面积比 ≥ 0.8 时合并，UUID 保留于 `source_aliases`。

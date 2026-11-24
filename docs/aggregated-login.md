@@ -67,7 +67,7 @@ const methods: Record<string, string[]> = {
 
 ### 2.2 环境变量（`wrangler.toml` / Pages 环境变量）
 
-> **生产部署（2026-11-20 起）**：glol.rcpd.cc 已从 Cloudflare Pages/D1 迁到 hk01 k3s（ns `idoknow`，Node `server/index.mjs` + PostgreSQL，见 `docs/deploy-hk.md`）。
+> **生产部署（2026-11-20 起）**：glol.rcpd.cc 已从 Cloudflare Pages/D1 迁到 hk01 k3s（ns `idoknow`，Node `server/index.mjs` + PostgreSQL）。
 > 生产表结构走 `deploy/postgres/004-social.sql`（`deploy/deploy-hk.sh` 自动执行），`migrations/0007_social.sql` 只用于本地 wrangler。
 > `SOCIAL_APPID` / `SOCIAL_APPKEY` / `SOCIAL_ENABLED` / `SOCIAL_REDIRECT` 放 k8s secret `glol-env`（api 容器以 `process.env` 读取），不是 Pages secret。
 

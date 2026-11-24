@@ -3,14 +3,13 @@
 真实地理布局的桂林第三人称 3D 城市漫游，目标地址 https://glol.rcpd.cc 。
 
 - 方案：three.js + 离线数据预处理 + 256 m 分块流式加载，桌面和手机都能玩。
-- 交接文档：`docs/handoff-roc14.md`（调研、数据摸底、初版计划）。
-- 原始数据（OSM / Overture / Terrarium DEM）不入库，放 `raw/`，获取方法见交接文档第 8 节。
+- 原始数据（OSM / Overture / Terrarium DEM）不入库，放 `raw/`。
 
 数据署名：© OpenStreetMap contributors (ODbL)；Overture Maps Foundation / Zenodo 8174931 建筑数据 (CC BY 4.0)；Mapzen Terrarium 高程瓦片。
 
 ## 本地生成与查看（M1a）
 
-需要 Node.js 22.12+、npm、uv、Python 3.11–3.13（uv 可安装），浏览器需要 WebGL2。花江扩区构建需要 `docs/expanded-raw.md` 中的 2026-11-23 快照；IDOK-114 的旧快照不覆盖花江。在新克隆的仓库根目录运行：
+需要 Node.js 22.12+、npm、uv、Python 3.11–3.13（uv 可安装），浏览器需要 WebGL2。花江扩区构建需要 `raw-expanded-20261123` Release 快照；IDOK-114 的旧快照不覆盖花江。在新克隆的仓库根目录运行：
 
 ```sh
 # 将扩区 OSM、Overture 和 DEM 放入 raw/

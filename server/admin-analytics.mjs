@@ -3,7 +3,7 @@ import {metrics} from './telemetry.mjs'
 
 const dimensions={region:'region',city:'city',isp:'isp',device:'device',gpu:'gpu',build:'build',mode:'mode'}
 for(const name of ['os','browser','language','referrer'])dimensions[name]=`context->>'${name}'`
-// Mainland synthetic probes (deploy/k8s/probe): which node ran it and which URL it fetched.
+// Mainland synthetic probes: which node ran it and which URL it fetched.
 dimensions.node="context->>'node'";dimensions.target="fields->>'target'"
 const visit="context->>'vid'"
 const countSession='count(distinct session)'

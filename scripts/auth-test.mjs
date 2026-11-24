@@ -75,7 +75,7 @@ try {
     assert.equal((await api('me',{nickname:'江岸' },200,null,{method:'PATCH'})).nickname,'江岸');const sessionRows=(await sql('SELECT digest FROM sessions'))[0].results;assert.equal(sessionRows.length,1);assert.notEqual(sessionRows[0].digest,cookie.split('=')[1]);assert.notEqual((await sql('SELECT digest FROM users'))[0].results[0].digest,password)
     await api('auth/logout',{});await api('me',null,401,'unauthorized');await api('auth/login',login)
     await (await import('./social-test.mjs')).socialTest({api,origin,sql,env:storage.env});await api('auth/login',login)
-    if(process.argv.includes('--bridge')) await (await import('./feedback-bridge-test.mjs')).bridgeTest({api,origin,cookie,state,staticDir,sql,mailLog:()=>logs})
+    if(process.env.GLOL_BRIDGE_TEST) await (await import(process.env.GLOL_BRIDGE_TEST)).bridgeTest({api,origin,cookie,state,staticDir,sql,mailLog:()=>logs})
     else await (await import('./feedback-test.mjs')).apiTest({api,origin,cookie,sql,getCookie:()=>cookie})
     for(let attempt=1;attempt<=5;attempt++)await api('auth/login',{email,password:'incorrect'},attempt===5?429:401,attempt===5?'locked':'credentials');await api('auth/login',login,429,'locked')
     await sql('UPDATE mail_events SET sent=sent-61');await api('auth/resend',{email,purpose:'reset'});const reset={email,code:await code('reset'),password:'new-password'};await api('auth/reset',reset);await api('me',null,401,'unauthorized');await api('auth/reset',reset,400,'invalid_code');await api('auth/login',login,401,'credentials');await api('auth/login',reset)
