@@ -159,5 +159,5 @@ if __name__ == '__main__':
     tunnels = {t['way'] for t in manifest.get('tunnels', [])}
     underpasses = missing_underpasses(rows, ways, samples_by_way, heights, tunnels)
     print(json.dumps(dict(carriagewayY=heights, source=sources, gradeConflicts=problems,
-                          tunnelSurfaceConflicts=underpasses),
+                          branchLocalGrade=manifest.get('railwayBranchGrade'), tunnelSurfaceConflicts=underpasses),
                      ensure_ascii=False, indent=2))

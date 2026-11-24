@@ -259,5 +259,37 @@
       "requiredPermille": 21.43
     }
   ],
+  "branchLocalGrade": {
+    "type": "branch_local_grade",
+    "rail": 678370321,
+    "capPermille": 25,
+    "endpointConstraints": [
+      {
+        "node": 6533456498,
+        "stationM": 1126.949,
+        "roadY": 156.4891
+      },
+      {
+        "node": 6533456500,
+        "stationM": 1920.166,
+        "roadY": 160.5147
+      }
+    ],
+    "roadBridges": [
+      1017592858,
+      213171576
+    ],
+    "minimumSoffitM": 156.77749457511425,
+    "plateauRailY": 151.26249457511426,
+    "plateauStationsM": [
+      1351.9487553934498,
+      1386.9487553934498
+    ],
+    "tangentPermille": [
+      -23.75831585412852,
+      17.528141113101757
+    ],
+    "transitionLengthM": 4
+  },
   "tunnelSurfaceConflicts": []
 }

@@ -98,6 +98,15 @@ if __name__ == '__main__':
     # shared node IDs, using versioned evidence from the OSM nodes API.
     evidence = json.loads(Path(__file__).with_name('railway-crossing-nodes.json').read_text())
     rows = inventory(load_osm(), PlayRegion().geometry, evidence)
+    review=json.loads(Path(__file__).with_name('railway-review.json').read_bytes())
+    for row in rows:
+        reason=review['baselineLevelFailures'].get(str(row['sharedNode']))
+        if reason:
+            row['baselineFailure']=reason
+            row['evidence']+='；既有穿越失败：'+reason
+        if row['sharedNode'] in review['insideBuilding']:
+            row['accessoryStatus']='inside_building'
+            row['evidence']+='；inside_building，道口附件豁免'
     if args.geometry_report:
         from shapely.geometry import Point
         from collections import defaultdict
@@ -116,6 +125,11 @@ if __name__ == '__main__':
             if distance(point) > .025:
                 raise ValueError(f"Absent geometry for {row['rail']} / {row['road']}")
             row.update(railY=point['railY'], roadY=point['roadY'], designClearanceM=point['clearanceM'])
+            row['surfaceSource']=point['surfaceSource']
+            if point['roadStructureDependency']:
+                row['status']='pending_road_structure'
+                row['deferredRoad']=point['roadStructureDependency']
+                row['evidence']+=f"；IDOK-247 待补道路 {row['deferredRoad']} 的结构后复验"
             conflict=conflicts.get((row['rail'],row['road'],row['lat'],row['lon']))
             if conflict:
                 row['clearanceConflict']={k:v for k,v in conflict.items() if k not in ('rail','road','lat','lon','type')}

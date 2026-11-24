@@ -24,6 +24,10 @@ for (const row of JSON.parse(readFileSync(inventory))) {
   nodes.set(key, ll2xz(row.lat, row.lon))
 }
 
+if(check==='--branch-deck'){
+  for(const [key,x,z] of JSON.parse(readFileSync(0,'utf8')))nodes.set(key,{x,z})
+}
+
 function request(tile) {
   const data = gunzipSync(readFileSync(join(directory, tile.file)))
   const n = manifest.chunkSize / manifest.grid + 1, fieldBytes = n*n*2
@@ -107,7 +111,7 @@ function auditContacts(tile,{rails,signs,cuts,worker}){
 }
 
 const bins=new WeakMap()
-function at(triangles,x,z) {
+function at(triangles,x,z,lowest=false) {
   let index=bins.get(triangles)
   if(!index){
     index=new Map()
@@ -131,7 +135,7 @@ function at(triangles,x,z) {
     const u=((x-ax)*(cz-az)-(z-az)*(cx-ax))/det
     const v=((z-az)*(bx-ax)-(x-ax)*(bz-az))/det
     if(u>=-1e-8 && v>=-1e-8 && u+v<=1+1e-8)
-      top=Math.max(top??-Infinity,ay+u*(by-ay)+v*(cy-ay))
+      top=lowest?Math.min(top??Infinity,ay+u*(by-ay)+v*(cy-ay)):Math.max(top??-Infinity,ay+u*(by-ay)+v*(cy-ay))
   }
   return top
 }
@@ -172,7 +176,7 @@ for(const tile of manifest.chunks){
   }
   for(const [id,{x,z}] of local) {
     const lx=x-tile.x, lz=z-tile.z
-    result[id]={road:at(triangles,lx,lz),deck:at(deck,lx,lz),soffit:at(underside,lx,lz)}
+    result[id]={road:at(triangles,lx,lz),deck:at(deck,lx,lz),soffit:at(underside,lx,lz),lowestRoad:at(triangles,lx,lz,true),sidewalk:at(mesh.sidewalk,lx,lz,true)}
   }
 }
 if(!grounding && Object.keys(result).length!==nodes.size) throw Error('Missing crossing tile')
