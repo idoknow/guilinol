@@ -297,9 +297,14 @@ try {
   assert(jfCar, 'expected Jiefang East Rd car fixture')
   await settleAt(jfCar[0], jfCar[2], jfCar[3])
   await interactExact('开车')
+  // Route east along Jiefang East Rd north carriageway, cross through the 26 m Binjiang intersection opening (-431, -48), then onto Jiefang Bridge.
+  for (const wp of [[-511, -80], [-448, -59], [-431, -48], [-414, -39], [-378, -25]]) {
+    const leg = await steerCarTo(wp, 1200, 5.0)
+    assert(leg.targetDist <= 6.0, `Jiefang East Rd approach waypoint ${JSON.stringify(wp)} stalled: ${JSON.stringify(leg)}`)
+  }
   const bridgeDrive = await steerCarTo([-185, 34], 2600, 5.0)
   console.log('Jiefang bridge drive:', bridgeDrive)
-  assert(bridgeDrive.traveled > 250 && bridgeDrive.targetDist <= 6.0 && bridgeDrive.maxSpeed > 9.5, `failed to reach Jiefang Bridge carriageway: ${JSON.stringify(bridgeDrive)}`)
+  assert(bridgeDrive.traveled > 180 && bridgeDrive.targetDist <= 6.0 && bridgeDrive.maxSpeed > 9.5, `failed to reach Jiefang Bridge carriageway: ${JSON.stringify(bridgeDrive)}`)
   await page.evaluate(() => {
     const w = window.viewer.walk
     w.face(w.heading - .22, .22)
