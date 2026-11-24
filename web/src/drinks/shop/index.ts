@@ -1,10 +1,17 @@
 export {
+  DRINKS_CANDIDATE_IDS,
+  DRINKS_SHOP_CANDIDATES,
   DRINKS_SHOP_SITE,
   DRINKS_SHOP_BLUEPRINT,
   DRINKS_SHOP_BLUEPRINT_ENTRIES,
+  getDrinksBlueprint,
   validateDrinksBlueprint,
+  validateAllDrinksBlueprints,
   type BlueprintEvidenceTag,
+  type DrinksCandidateId,
   type BlueprintDimensionEntry,
+  type DrinksShopCandidateSite,
+  type DrinksShopCandidateBlueprint,
   type DrinksBlueprintId,
   type BlueprintValidationResult,
 } from './blueprint.ts'
