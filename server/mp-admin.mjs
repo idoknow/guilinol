@@ -3,7 +3,7 @@ import {history,record,regions} from './mp-store.mjs'
 const json=(value,status=200)=>Response.json(value,{status,headers:{'cache-control':'no-store'}})
 const down=()=>json({rt:'down',error:'联机服务不可用'})
 export function multiplayer(pool,env){
-  const base=env.RT_INTERNAL_URL||'http://glol-rt:8790'
+  const base=env.RT_INTERNAL_URL||'http://glol-rt.idoknow.svc.cluster.local:8790'
   const state=async()=>{
     if(!env.RT_ADMIN_TOKEN)throw Error('disabled')
     const response=await fetch(base+'/admin/state',{headers:{'X-Admin-Token':env.RT_ADMIN_TOKEN},signal:AbortSignal.timeout(3500),redirect:'error'})

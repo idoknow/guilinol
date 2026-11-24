@@ -287,7 +287,7 @@ spec:
               name: glol-env
               key: POSTGRES_PASSWORD
         - name: RT_INTERNAL_URL
-          value: http://glol-rt:8790
+          value: http://glol-rt.idoknow.svc.cluster.local:8790
         - name: RT_ADMIN_TOKEN
           valueFrom:
             secretKeyRef: {name: glol-env, key: RT_ADMIN_TOKEN, optional: true}

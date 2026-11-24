@@ -8,7 +8,7 @@ import {onRequest} from '../functions/api/[[path]].ts'
 import {database, measuredConnections} from './postgres.mjs'
 import {bucket} from './bucket.mjs'
 import {createReadiness} from './readiness.mjs'
-import {presence} from './live.mjs'
+import {presence, mpPresence} from './live.mjs'
 import {multiplayer} from './mp-admin.mjs'
 
 crypto.subtle.timingSafeEqual = (left,right) => left.byteLength===right.byteLength && timingSafeEqual(left,right)
@@ -70,6 +70,7 @@ const mp=multiplayer(pool,process.env)
 const env = {...process.env, mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
 const online = presence(pool)
+const mpOnline = mpPresence()
 
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json','cache-control':'no-store'}})
 
@@ -83,10 +84,12 @@ const server=serve({port:Number(process.env.PORT || 3000),fetch: async request =
     return status.ready ? json({ok:true}) : json({ok:false,error:status.reason},503)
   }
   // 在线人数（IDOK-172）：公开只读，5 分钟活跃会话数，15 秒内存缓存。
+  // mp = 联机服上已 join 的玩家数（IDOK-228）；rt 不通时为 null，不影响 online。
   if (url.pathname === '/api/live') {
     if (request.method !== 'GET') return json({error:{code:'method',message:'只支持 GET'}},405)
     try {
-      return json({online: await online()})
+      const [n, mp] = await Promise.all([online(), mpOnline()])
+      return json({online: n, mp})
     } catch (error) {
       console.error('live presence failed', error.code ?? error.message)
       return json({error:{code:'internal',message:'暂时拿不到在线人数'}},503)

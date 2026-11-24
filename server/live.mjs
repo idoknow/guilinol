@@ -26,3 +26,33 @@ export function presence(pool) {
     return inflight
   }
 }
+
+// 联机人数（IDOK-228）：首页「联机模式」卡只该显示真正连在联机服上的人，
+// 不是全站 5 分钟活跃会话。读 rt 的 /health（公开字段 online = 已 join 的玩家），15 秒缓存。
+// 集群里短名 glol-rt 解析不到（pod 的 search 域问题），默认用全名。
+const RT_URL = process.env.RT_INTERNAL_URL || 'http://glol-rt.idoknow.svc.cluster.local:8790'
+
+export function mpPresence(base = RT_URL) {
+  let cachedAt = 0
+  let cached = null
+  let inflight = null
+
+  return async function mpOnline() {
+    const now = Date.now()
+    if (now - cachedAt < CACHE_MS) return cached
+    if (inflight) return inflight
+    inflight = fetch(`${base}/health`, {signal: AbortSignal.timeout(2000), redirect: 'error'})
+      .then(response => (response.ok ? response.json() : null))
+      .then(body => (typeof body?.online === 'number' && Number.isFinite(body.online) ? Math.max(0, Math.round(body.online)) : null))
+      .catch(() => null)
+      .then(value => {
+        cached = value
+        cachedAt = Date.now()
+        return value
+      })
+      .finally(() => {
+        inflight = null
+      })
+    return inflight
+  }
+}

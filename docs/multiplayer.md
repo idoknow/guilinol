@@ -96,7 +96,7 @@ curl -i -N -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
 
 ### 后台联机接口（PROTO 4）
 
-- `GET /admin/state` 只在 RT Service，精确匹配路径，`/ws` 不转发到它。`X-Admin-Token` 必须匹配 `glol-env.RT_ADMIN_TOKEN`；缺失或不匹配返回空 403。API 通过 `RT_INTERNAL_URL` 拉取（默认 `http://glol-rt:8790`）。不要让浏览器直连或分发这两个 secret；踢人仍使用独立的 `glol-rt.KICK_TOKEN`。
+- `GET /admin/state` 只在 RT Service，精确匹配路径，`/ws` 不转发到它。`X-Admin-Token` 必须匹配 `glol-env.RT_ADMIN_TOKEN`；缺失或不匹配返回空 403。API 通过 `RT_INTERNAL_URL` 拉取（默认 `http://glol-rt.idoknow.svc.cluster.local:8790`；glol-web 用 `dnsPolicy: None` 没有 search 域，短名解析不到）。不要让浏览器直连或分发这两个 secret；踢人仍使用独立的 `glol-rt.KICK_TOKEN`。
 - `GET /api/admin/mp` 走现有 admin session，成功返回 `{rt:'up',server,players,bans,events,chat}`；RT 失联或未配置时 HTTP 200 `{rt:'down',error}`，不是在线人数 0。账号原始 IP 不返回，地区来自 `perf_network`，`region` 为 `{country,region,city,isp}` 或 null。`account` 为 `{id,createdAt,signupMethod,banned}` 或 null，`id` 用于已有用户详情页，`createdAt` 为 epoch 秒。`landmark` 为 `/world/manifest.json` 中平面距离最近的地标名，目录不可用时 null。
 - `server`：`startedAt,uptimeSec,proto,maxPlayers,online,connections,peak,peakAt,rssMb,heapMb,loopP50Ms,loopP99Ms,traffic,skips,slowCloses,rejects`。峰值和拒绝、慢连接计数从启动起算；事件循环分位单位 ms。`traffic.in/out` 各为最近 60 个秒桶内按类型汇总的 `{packets,bytes}`，字节为 JSON payload，不含帧头；出包逐接收方计数。
 - `players`：`id,uid,name,x,y,z,yaw,mode,v,hp,dn,sc,em,joinedAt,lastPosAt,posHz,inBytes,outBytes,bufferedAmount,skips,rttMs,avgRttMs,chats,ua`，另加上述地区、账号、地标。`bike` 非空或 `hb` 非零视作 `bike`，否则 `walk`；现有客户端没区分车/船时不猜测。`em=0` 无表情，`posHz` 为过去 10 秒接受的位置包数除以 10；RT 每 10 秒 ping，RTT 是最近一次和本连接平均值（首次 pong 前 null）。游戏公开的玩家对象只增加 `jt` 入场时间。
