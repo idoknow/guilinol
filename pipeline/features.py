@@ -311,7 +311,7 @@ def game_court(campus, obstacles):
 
 def building_mesh(parts, origin):
     positions, normals, indices, collision = [], [], [], []
-    for polygon, (base, roof, kind, floors, seed, center, rectangle, complex_shape) in parts:
+    for polygon, (base, roof, kind, floors, seed, center, rectangle, complex_shape, *raised) in parts:
         polygon = orient(polygon, sign=1)
         rings = [np.asarray(ring.coords)[:-1] - origin for ring in [polygon.exterior, *polygon.interiors]]
         coords = np.concatenate(rings)
@@ -322,7 +322,8 @@ def building_mesh(parts, origin):
         anchor=np.rint((np.asarray(center.coords[0])-origin)*100).astype(int).tolist()
         owner=0<=center.x-origin[0]<256 and 0<=center.y-origin[1]<256 and polygon.covers(center)
         collision.append([round(base*10),round(roof*10),[np.rint(ring*100).astype(int).tolist() for ring in rings],
-                          kind,floors,seed,anchor if owner else [],rectangle if owner else [],int(complex_shape)])
+                          kind,floors,seed,anchor if owner else [],rectangle if owner else [],int(complex_shape), *raised])
+        wall_bottom = base if any(raised) else base-3
         for ring in rings:
             for start, end in zip(ring, np.roll(ring, -1, axis=0)):
                 delta = end - start
@@ -331,8 +332,8 @@ def building_mesh(parts, origin):
                     continue
                 normal = np.rint(127*delta/length).astype(int)
                 offset = len(positions)
-                positions.extend([(start[0],base-3,start[1]), (start[0],roof,start[1]),
-                                  (end[0],roof,end[1]), (end[0],base-3,end[1])])
+                positions.extend([(start[0],wall_bottom,start[1]), (start[0],roof,start[1]),
+                                  (end[0],roof,end[1]), (end[0],wall_bottom,end[1])])
                 normals.extend([(normal[1],0,-normal[0])]*4)
                 indices.extend(offset+corner for corner in (0,1,2,0,2,3))
     quantized = np.rint(np.asarray(positions).reshape(-1,3)*[100,10,100])

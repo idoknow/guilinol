@@ -562,6 +562,8 @@ def build(bbox, output, palette, workers=4):
         clear_approach_paving(output, chunks, underpasses)
         clear_carriageway_trees(output,chunks)
         restore_protected_tiles(output,chunks,landmarks)
+        from yulong_passage import open_passage
+        open_passage(output, chunks)
     write_city_lods(output, manifest)
     from traffic import bake as bake_traffic
     bake_traffic(output, manifest, roads)
