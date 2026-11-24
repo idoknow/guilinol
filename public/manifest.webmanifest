@@ -1,8 +1,9 @@
 {
   "name": "网上桂林",
   "short_name": "网上桂林",
-  "description": "真实地理布局的桂林第三人称 3D 城市漫游。飞、走、看山水。",
+  "description": "一座按真实地图搭起来的 3D 桂林城。浏览器打开就能玩，骑电驴送米粉、联机逛街，或自由飞行看山水。",
   "lang": "zh-CN",
+  "categories": ["games", "travel", "entertainment"],
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
