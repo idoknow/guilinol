@@ -2,7 +2,8 @@ import * as THREE from 'three'
 import type {Tile} from './world'
 
 type Point=[number,number,number]
-export type Tunnel={way:number,generated?:boolean,gradedAccess?:boolean,portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,openEnds?:[number,number],mouths?:[boolean,boolean],joints?:({ring:[number,number][],draw:boolean,cap?:boolean}|null)[],stations?:[number,number][],stationHeights?:string}
+type Joint={ring?:[number,number][],offsets?:string,draw:boolean,cap?:boolean}
+export type Tunnel={way:number,generated?:boolean,gradedAccess?:boolean,portals:[Point,Point],length:number,halfWidth:number,endWidths?:[number,number],clearance:number,approach:number,openEnds?:[number,number],mouths?:[boolean,boolean],joints?:(Joint|null)[],stations?:[number,number][],stationHeights?:string,knotHeights?:string}
 
 // Generated strips use three fixed easing samples per interval. Keep distant
 // strips encoded in the manifest and unpack only a visited strip's levels.
@@ -16,15 +17,38 @@ function profile(tunnel:Tunnel):StationProfile {
     const values=tunnel.stations
     value={count:values.length,at:index=>values[index]}
   }else{
-    const bytes=atob(tunnel.stationHeights!)
+    const bytes=atob(tunnel.knotHeights??tunnel.stationHeights!)
     const view=new DataView(Uint8Array.from(bytes,c=>c.charCodeAt(0)).buffer)
-    const count=view.byteLength/4,last=count-1,step=tunnel.length/(last/3)
-    value={count,at:index=>index===last
-      ?[tunnel.length,tunnel.portals[1][1]]
-      :[Math.round(step*(Math.floor(index/3)+easingFractions[index%3])*1e5)/1e5,view.getInt32(index*4,true)/1e5]}
+    const count=tunnel.knotHeights?(view.byteLength/4-1)*3+1:view.byteLength/4
+    const last=count-1,step=tunnel.length/(last/3)
+    value={count,at:index=>{
+      if(index===last)return [tunnel.length,tunnel.portals[1][1]]
+      const interval=Math.floor(index/3),phase=index%3
+      const x=Math.round(step*(interval+easingFractions[phase])*1e5)/1e5
+      if(!tunnel.knotHeights)return [x,view.getInt32(index*4,true)/1e5]
+      const a=view.getInt32(interval*4,true),b=view.getInt32((interval+1)*4,true)
+      const eased=phase===0?0:phase===1?.03/.94:.91/.94
+      return [x,Math.round(a+(b-a)*eased)/1e5]
+    }}
   }
   profiles.set(tunnel,value)
   return value
+}
+
+function jointRing(joint:Joint,center:Point){
+  if(joint.ring)return joint.ring
+  const bytes=Uint8Array.from(atob(joint.offsets!),c=>c.charCodeAt(0))
+  const view=new DataView(bytes.buffer),ring:[number,number][]=[]
+  for(let i=0;i<bytes.length;i+=8)ring.push([center[0]+view.getInt32(i,true)/10000,center[2]+view.getInt32(i+4,true)/10000])
+  joint.ring=ring
+  return ring
+}
+
+function halfWidthAt(t:Tunnel,s:number){
+  if(!t.endWidths)return t.halfWidth
+  const run=Math.min(8,t.length/2)
+  return t.halfWidth+(t.endWidths[0]-t.halfWidth)*(1-THREE.MathUtils.smoothstep(s,0,run))
+    +(t.endWidths[1]-t.halfWidth)*THREE.MathUtils.smoothstep(s,t.length-run,t.length)
 }
 
 function openEnd(tunnel:Tunnel,index:number){
@@ -59,11 +83,11 @@ export function nearbyTunnels(list:Tunnel[]|undefined,x:number,z:number){
 
 export function floorLevel(tunnel:Tunnel,x:number,z:number){
   const axes=frame(tunnel),at=axes.station(x,z)
-  if(at<0||at>tunnel.length||Math.abs(axes.lateral(x,z))>tunnel.halfWidth){
+  if(at<0||at>tunnel.length||Math.abs(axes.lateral(x,z))>halfWidthAt(tunnel,at)){
     for(const [i,joint] of (tunnel.joints??[]).entries()){
       if(!joint)continue
       let positive=false,negative=false
-      const ring=joint.ring
+      const ring=jointRing(joint,tunnel.portals[i])
       for(let j=0;j<ring.length;j++){
         const [a,b]=ring[j],[c,d]=ring[(j+1)%ring.length],cross=(c-a)*(z-b)-(d-b)*(x-a)
         positive||=cross>.00001;negative||=cross<-.00001
@@ -155,33 +179,34 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
   }
   for(const tunnel of tunnels){
-    const [start,end]=tunnel.portals,pad=tunnel.halfWidth+1
+    const [start,end]=tunnel.portals,pad=Math.max(...(tunnel.endWidths??[tunnel.halfWidth]))+1
     if(Math.max(start[0],end[0])+pad<tile.x||Math.min(start[0],end[0])-pad>tile.x+256||Math.max(start[2],end[2])+pad<tile.z||Math.min(start[2],end[2])-pad>tile.z+256)continue
     const axes=frame(tunnel),width=tunnel.halfWidth,head=tunnel.clearance
     function local(s:number,d:number,y:number){const p=axes.point(s,d,y);p[0]-=tile.x;p[2]-=tile.z;return p}
     const station=(p:Point)=>axes.station(p[0]+tile.x,p[2]+tile.z),side=(p:Point)=>axes.lateral(p[0]+tile.x,p[2]+tile.z)
-    for(const [from,to] of [[0,openEnd(tunnel,0)],[tunnel.length-openEnd(tunnel,1),tunnel.length]])if(to>from)cuts.push([p=>station(p)-from,p=>to-station(p),p=>width-side(p),p=>width+side(p)])
+    for(const [from,to] of [[0,openEnd(tunnel,0)],[tunnel.length-openEnd(tunnel,1),tunnel.length]])if(to>from)cuts.push([p=>station(p)-from,p=>to-station(p),p=>halfWidthAt(tunnel,station(p))-side(p),p=>halfWidthAt(tunnel,station(p))+side(p)])
     const quad=(points:Point[],part:keyof typeof parts)=>fan(limits.reduce((poly,plane)=>clip(poly,plane),points),parts[part])
     for(const [i,joint] of (tunnel.joints??[]).entries()){
       if(!joint?.draw)continue
-      const floor=tunnel.portals[i][1]
+      const floor=tunnel.portals[i][1],ring=jointRing(joint,tunnel.portals[i])
       if(joint.cap&&openEnd(tunnel,i)>0){
-        const cx=joint.ring.reduce((sum,p)=>sum+p[0],0)/joint.ring.length
-        const cz=joint.ring.reduce((sum,p)=>sum+p[1],0)/joint.ring.length
-        cuts.push(joint.ring.map(([x,z],j)=>{
-          const [ex,ez]=joint.ring[(j+1)%joint.ring.length]
+        const cx=ring.reduce((sum,p)=>sum+p[0],0)/ring.length
+        const cz=ring.reduce((sum,p)=>sum+p[1],0)/ring.length
+        cuts.push(ring.map(([x,z],j)=>{
+          const [ex,ez]=ring[(j+1)%ring.length]
           const side=Math.sign((ex-x)*(cz-z)-(ez-z)*(cx-x))
           return p=>side*((ex-x)*(p[2]+tile.z-z)-(ez-z)*(p[0]+tile.x-x))
         }))
       }
-      quad(joint.ring.map(([x,z])=>[x-tile.x,floor,z-tile.z]),'floor')
-      if(!tunnel.mouths?.[i]&&!openEnd(tunnel,i))quad(joint.ring.map(([x,z])=>[x-tile.x,floor+head,z-tile.z]),'ceiling')
+      quad(ring.map(([x,z])=>[x-tile.x,floor,z-tile.z]),'floor')
+      if(!tunnel.mouths?.[i]&&!openEnd(tunnel,i))quad(ring.map(([x,z])=>[x-tile.x,floor+head,z-tile.z]),'ceiling')
     }
     const values=profile(tunnel)
     for(let i=1;i<values.count;i++){
       const [a,ay]=values.at(i-1),[b,by]=values.at(i)
       const open=((a+b)/2<openEnd(tunnel,0))||((a+b)/2>tunnel.length-openEnd(tunnel,1))
-      const al=local(a,-width,ay),ar=local(a,width,ay),bl=local(b,-width,by),br=local(b,width,by)
+      const wa=halfWidthAt(tunnel,a),wb=halfWidthAt(tunnel,b)
+      const al=local(a,-wa,ay),ar=local(a,wa,ay),bl=local(b,-wb,by),br=local(b,wb,by)
       quad([al,ar,br,bl],'floor')
       const top=(p:Point):Point=>[p[0],open?Math.max(p[1],groundY(p)):p[1]+head,p[2]]
       quad([al,bl,top(bl),top(al)],open?'portal':'interior');quad([br,ar,top(ar),top(br)],open?'portal':'interior')

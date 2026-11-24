@@ -69,8 +69,8 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False)
             paved = widths.get(way['id'], 6.5)
         for start, end in spans:
             if start < axis.length:
-                part = substring(axis, start, min(end, axis.length))
-                shapes.append(part.buffer(paved/2+.5, quad_segs=4))
+                part=substring(axis,start,min(end,axis.length))
+                shapes.append(part.buffer(paved/2+.5,quad_segs=4))
     grades=STRtree([line.buffer(half,quad_segs=4) for line,half,*_ in approaches])
     tree = STRtree(shapes)
     for tile in chunks:
@@ -106,19 +106,42 @@ def patch(file, area, approaches=()):
         previous=base64.b64encode(zlib.compress(json.dumps(original,separators=(',',':')).encode())).decode()
     lower = paths[11] if len(paths)>11 else None
     boundary = lower[0] if lower else len(paths[0])
+    # Survey buffers can extend past an existing building facade at the
+    # roadside. Keep that occupied ground while preserving mapped passages.
+    solids=union_all([make_valid(Polygon(np.asarray(loops[0])/100,[np.asarray(r)/100 for r in loops[1:]]))
+                     for _,_,loops,*_ in collision[0] if loops and len(loops[0])>=3])
+    if not solids.is_empty and solids.intersects(area):
+        existing_roads=union_all([make_valid(Polygon(np.asarray(shell)/100,[np.asarray(h)/100 for h in holes]))
+                                  for kind,shell,*holes in original['paths'] if kind in (0,5)])
+        area=set_precision(area.difference(solids.difference(existing_roads)),.01)
+        if area.is_empty:
+            return False
     rebuilt = []
     for kind, *loops in paths[0][:boundary]:
         shape = make_valid(Polygon(np.asarray(loops[0])/100, [np.asarray(r)/100 for r in loops[1:]]))
         if kind in (0,1,4,5,6) and area.intersects(shape):
-            rebuilt.extend(rings(kind,shape.difference(area)))
+            remainder=shape.difference(area)
+            for poly in polygons(remainder):
+                if kind==0 and poly.interiors:
+                    for triangle in constrained_delaunay_triangles(poly).geoms:
+                        rebuilt.extend(rings(kind,triangle))
+                else:
+                    rebuilt.extend(rings(kind,poly))
         else:
             rebuilt.append([kind,*loops])
     survey_start = len(rebuilt)
-    for polygon in polygons(area):
+    # Keep a narrow exposed bed between the rim of the driving surface and
+    # the outside retaining wall. At a tile seam the road must remain joined.
+    exterior=area.boundary.difference(box(0,0,256,256).boundary)
+    top_area=area.difference(exterior.buffer(.04,quad_segs=2))
+    walk=union_all([line.buffer(half,quad_segs=4) for line,half,*_,kind in approaches if kind==1])
+    motor=union_all([line.buffer(half,quad_segs=4) for line,half,*_,kind in approaches if kind==0])
+    walk=set_precision(walk.difference(motor).intersection(area),.01)
+    for kind,polygon in [(k,p) for k,g in [(0,top_area.difference(walk)),(1,top_area.intersection(walk))] for p in polygons(g)]:
         xmin,zmin,xmax,zmax=polygon.bounds
         for x in range(math.floor(xmin/16)*16,math.ceil(xmax/16)*16,16):
             for z in range(math.floor(zmin/16)*16,math.ceil(zmax/16)*16,16):
-                rebuilt.extend(rings(0,polygon.intersection(box(x,z,x+16,z+16))))
+                rebuilt.extend(rings(kind,polygon.intersection(box(x,z,x+16,z+16))))
     survey_end = len(rebuilt)
     if lower:
         lower[0] = len(rebuilt)
@@ -137,7 +160,7 @@ def patch(file, area, approaches=()):
     old_faces=set(old_bed.get('drop',()))
     vertices, drop, paved, spline = [], [], [], []
     knots=defaultdict(set)
-    for line,half,ya,yb,cap in approaches:
+    for line,half,ya,yb,cap,_ in approaches:
         (ax,az),(bx,bz)=line.coords
         dx,dz=(bx-ax)/line.length,(bz-az)/line.length
         blend=max(0,min(.12,1-abs(yb-ya)/(cap*line.length)))
@@ -147,6 +170,9 @@ def patch(file, area, approaches=()):
             for side in (-half+.02,0,half-.02):
                 x,z=ax+dx*distance-dz*side,az+dz*distance+dx*side
                 knots[int(z//step),int(x//step)].add((round(x,4),round(z,4)))
+    top_edge=top_area.boundary
+    walked=set()
+    rim=[]
     visited = set()
     for piece in polygons(area):
         xmin,zmin,xmax,zmax = piece.bounds
@@ -169,10 +195,12 @@ def patch(file, area, approaches=()):
                         if graded:
                             spline.append(len(vertices))
                         vertices.append([round(u,4),0 if graded else round(float(plane@[u,v,1]),4),round(v,4)])
-                    pieces=[(inside,True)]
+                    top=inside.intersection(top_area)
+                    pieces=[(top.difference(walk),True,False,True),(top.intersection(walk),True,True,True)] if not walk.is_empty else [(top,True,False,True)]
+                    pieces.append((inside.difference(top_area),True,False,False))
                     if face_id not in old_faces:
-                        pieces.append((cell.difference(area),False))
-                    for geom, graded in pieces:
+                        pieces.append((cell.difference(area),False,False,False))
+                    for geom, graded, pedestrian, road_face in pieces:
                         for tri in constrained_delaunay_triangles(geom).geoms:
                             corners=list(orient(tri,sign=-1).exterior.coords)[:3]
                             interior=[point for point in sorted(knots.get((row,col),()))
@@ -188,8 +216,16 @@ def patch(file, area, approaches=()):
                             else:
                                 faces=[corners]
                             for points in faces:
-                                if graded:
+                                if road_face:
+                                    if pedestrian:
+                                        walked.add(len(vertices)//3)
                                     paved.append(len(vertices)//3)
+                                    for j,(u,v) in enumerate(points):
+                                        s,t=points[(j+1)%3]
+                                        if ((u==s and u in (0,256)) or (v==t and v in (0,256))):
+                                            continue
+                                        if top_edge.distance(Point((u+s)/2,(v+t)/2))<1e-7:
+                                            rim.append((len(vertices)+j,len(vertices)+(j+1)%3))
                                 for u,v in points:
                                     vertex(u,v,graded)
                     edge = cell.intersection(area.boundary)
@@ -208,7 +244,7 @@ def patch(file, area, approaches=()):
     # Interpolate physical road and bed together. Select the closest axis in
     # overlapping junction areas, with a shared constrained level at each node.
     distance=np.full(len(levels),np.inf)
-    for line,half,ya,yb,cap in approaches:
+    for line,half,ya,yb,cap,_ in approaches:
         (ax,az),(bx,bz)=line.coords
         dx,dz=bx-ax,bz-az
         length=line.length
@@ -227,9 +263,20 @@ def patch(file, area, approaches=()):
     # Encode in millimetres. The worker draws the exact same triangles 51 mm
     # above the bed, independent of the two meshes' tessellation.
     tops = [[round(u*1000),round(y*1000)+51,round(v*1000)] for t in paved for u,y,v in vertices[3*t:3*t+3]]
+    sidewalks=[pt for i,t in enumerate(paved) if t in walked for pt in tops[3*i:3*i+3]]
+    tops=[pt for i,t in enumerate(paved) if t not in walked for pt in tops[3*i:3*i+3]]
+    # Close the visible 51 mm rim between the asphalt and the retaining face.
+    skirts=[]
+    for i,j in rim:
+        a,b=([round(v*1000) for v in vertices[k]] for k in (i,j))
+        at=[a[0],a[1]+51,a[2]];bt=[b[0],b[1]+51,b[2]]
+        skirts.extend((at,a,bt,bt,a,b))
     while len(paths)<13:
         paths.append(None if len(paths) in (5,11,12) else [])
     paths[12] = dict(start=survey_start,end=survey_end,packed=base64.b64encode(np.asarray(tops,dtype="<i4").tobytes()).decode(),input=previous)
+    for name,points in [('sidewalk',sidewalks),('skirt',skirts)]:
+        if points:
+            paths[12][name]=base64.b64encode(np.asarray(points,dtype='<i4').tobytes()).decode()
     while len(collision)<8:
         collision.append([])
     if isinstance(collision[4],dict) and 'drop' in collision[4]:

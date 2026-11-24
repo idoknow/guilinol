@@ -175,6 +175,7 @@ def solve(network, nodes, samples):
     mouths = set(network['portals'])
     adjacency = defaultdict(list)
     limits = {}
+    roofs = {}
     alignments = []
     for edge, roof in zip(network['edges'], samples['roofs'], strict=True):
         start, end = nodes[edge['a']], nodes[edge['b']]
@@ -189,6 +190,7 @@ def solve(network, nodes, samples):
             open_ramp = ((approach[0]>0 and i*step <= approach[0]+1e-8) or
                          (approach[1]>0 and length-i*step <= approach[1]+1e-8))
             bound = ceiling-edge['clearance']-.05 if not open_ramp else math.inf
+            roofs[key] = min(roofs.get(key, math.inf), ceiling-edge['clearance']-.05)
             if key in mouths:
                 bound = min(bound, heights[key])
             limits[key] = min(limits.get(key,math.inf),bound)
@@ -214,13 +216,30 @@ def solve(network, nodes, samples):
             pending.extend(neighbor for neighbor,_,_ in adjacency[node])
         seen.update(component)
         portal_levels=[heights[n] for n in component & mouths]
-        # A lollipop-shaped bore approaches its single mouth in both directions.
-        is_loop = (len(portal_levels) == 1 and
-                   sum(len(adjacency[n]) for n in component) >= 2*len(component))
-        if len(portal_levels)<2 and not is_loop:
+        if not portal_levels:
             constraints.append(dict(reason='missingPortalAnchor',
                                     ways=sorted({edge['way'] for edge,keys,*_ in alignments if keys[0] in component}),
-                                    surfaceNodes=sorted(component & mouths)))
+                                    surfaceNodes=[]))
+        elif len(portal_levels)==1:
+            # Couple consecutive height knots at a blind end. Zero rise on
+            # these links enforces the level landing during the roof/grade solve.
+            for tip in component.intersection(network['ends'])-mouths:
+                previous=None
+                current=tip
+                distance=0.
+                while distance<4.48 and current not in mouths:
+                    exits=[entry for entry in adjacency[current] if entry[0]!=previous]
+                    if len(exits)!=1:
+                        break
+                    other,_,step=exits[0]
+                    for node,target in ((current,other),(other,current)):
+                        limits[node]=min(limits[node],roofs[node])
+                        adjacency[node]=[(n,0. if n==target else budget,length)
+                                         for n,budget,length in adjacency[node]]
+                    previous,current=current,other
+                    distance+=step
+                if distance<4.48:
+                    constraints.append(dict(reason='shortBlindLanding',node=tip,length=distance))
         # In a two-mouth bore inverse distance gives the linear endpoint
         # interpolation. At a junction use all connected mouths, weighted by
         # travel distance along this layer rather than distance through a hill.
@@ -281,7 +300,7 @@ def solve(network, nodes, samples):
                               halfWidth=edge['halfWidth'],clearance=edge['clearance'],
                               portals=[[start['x'],levels[0],start['z']],
                                        [end['x'],levels[-1],end['z']]],
-                              mouths=[a in mouths,b in mouths],approach=0,openEnds=approach,stationHeights=pack_stations(stations)))
+                              mouths=[a in mouths,b in mouths],approach=0,openEnds=approach,knotHeights=pack_stations(stations[::3])))
     # Fill the wedge between the two end sections on the outside of a bend.
     # All incident strips share the node elevation. Only one draws the patch.
     incident=defaultdict(list)
@@ -294,6 +313,15 @@ def solve(network, nodes, samples):
             points=[(center[0]-side*dz*w,center[2]+side*dx*w) for side in (-1,1)]
             incident[key].append((tunnel,i,points))
     for entries in incident.values():
+        # Keep a full wheel footprint supported where two carriageway widths
+        # meet. Taper the narrow bore towards the shared cross-section.
+        junction_width=max(t['halfWidth'] for t,_,_ in entries)
+        for t,i,points in entries:
+            if junction_width>t['halfWidth']:
+                t.setdefault('endWidths',[t['halfWidth'],t['halfWidth']])[i]=junction_width
+                center=t['portals'][i]
+                points[:]=[(center[0]+(x-center[0])*junction_width/t['halfWidth'],
+                            center[2]+(z-center[2])*junction_width/t['halfWidth']) for x,z in points]
         # A wheel can pass the last cross-section while its axle is still
         # inside the circular end cap of the mapped carriageway. Include
         # that surface on curves, at the portal, and at underground dead ends.
@@ -320,5 +348,8 @@ def solve(network, nodes, samples):
             continue
         ring=[[round(x,4),round(z,4)] for x,z in list(hull.exterior.coords)[:-1]]
         for owner,(tunnel,i,_) in enumerate(entries):
-            tunnel.setdefault('joints',[None,None])[i]=dict(ring=ring,draw=owner==0,cap=len(entries)==1)
+            x,_,z=tunnel['portals'][i]
+            offsets=[value for u,v in ring for value in (round((u-x)*10000),round((v-z)*10000))]
+            packed=base64.b64encode(struct.pack(f'<{len(offsets)}i',*offsets)).decode()
+            tunnel.setdefault('joints',[None,None])[i]=dict(offsets=packed,draw=owner==0,cap=len(entries)==1)
     return generated,conflicts

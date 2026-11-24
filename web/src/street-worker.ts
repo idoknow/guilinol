@@ -12,7 +12,7 @@ export interface StationPavingStyle {plaza?:Pair[]; platformEdges?:[Pair,Pair][]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,Lower?,{start:number,end:number,vertices?:[number,number,number][],packed?:string}?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,Lower?,{start:number,end:number,vertices?:[number,number,number][],packed?:string,sidewalk?:string,skirt?:string}?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const platformBrick=new THREE.Color(style.station.platformBrick)
@@ -158,10 +158,14 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     }
   }
   if(surveyed){
-    const coords=surveyed.packed?unpackPositions(surveyed.packed,.001)
-      :Float32Array.from(surveyed.vertices!.flat(),v=>v*.001)
     const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3()
-    for(let i=0;i<coords.length;i+=9)triangle(a.fromArray(coords,i),b.fromArray(coords,i+3),c.fromArray(coords,i+6),0)
+    const emit=(coords:Float32Array,kind:number,vertical=false)=>{
+      for(let i=0;i<coords.length;i+=9)triangle(a.fromArray(coords,i),b.fromArray(coords,i+3),c.fromArray(coords,i+6),kind,0,0,0,vertical)
+    }
+    emit(surveyed.packed!==undefined?unpackPositions(surveyed.packed,.001)
+      :Float32Array.from(surveyed.vertices!.flat(),v=>v*.001),0)
+    if(surveyed.sidewalk)emit(unpackPositions(surveyed.sidewalk,.001),1)
+    if(surveyed.skirt)emit(unpackPositions(surveyed.skirt,.001),0,true)
   }
   const object=new THREE.Object3D()
   function box(x:number,y:number,z:number,w:number,h:number,d:number,yaw=0,tint=tone.railing,pitch=0){

@@ -8,13 +8,22 @@ import {poseAt,trackHeight} from '../web/src/traffic/sim'
 
 const [mode='audit',world='public/world',output='captures/vehicle-grounding']=process.argv.slice(2)
 const bake=mode==='bake'
-const data=(bake||mode==='portals'||mode==='portal-check')?JSON.parse(fs.readFileSync(output,'utf8')):JSON.parse(gunzipSync(fs.readFileSync(path.join(world,'roads/graph.json.gz'))).toString())
+const data=(bake||mode==='portals'||mode==='portal-check'||mode==='portal-routes')?JSON.parse(fs.readFileSync(output,'utf8')):JSON.parse(gunzipSync(fs.readFileSync(path.join(world,'roads/graph.json.gz'))).toString())
 const manifest=data.manifest??JSON.parse(fs.readFileSync(path.join(world,'manifest.json'),'utf8'))
+if(mode==='portal-routes'){
+  const surface=vehicleSurface(world,manifest)
+  for(const site of data.routes)for(const test of site.modes){
+    const [x,z,way]=test.route[0]
+    test.startHeight=surface(x,z,{way,pedestrian:test.mode==='foot'})
+  }
+  fs.writeFileSync(output,JSON.stringify(data.routes))
+  process.exit(0)
+}
 if(mode==='portal-check'){
   const surface=vehicleSurface(world,manifest),nodes=new Map(data.nodes.map(n=>[n.id,n]))
   const checks=data.constraints.map(row=>{
     if(row.approachCut===undefined)return row
-    const p=nodes.get(row.node),road=surface(p.x,p.z,{})
+    const p=nodes.get(row.node),road=surface(p.x,p.z,{pedestrian:data.pedestrianNodes?.includes(row.node)})
     const difference=road-row.floor
     return {...row,finalRoad:road,difference,reason:Math.abs(difference)<=.05?'gradedApproach':'portalMismatch'}
   })
@@ -71,7 +80,7 @@ if(data.lanes.some(lane=>lane.way===undefined)){
     for(const key of ['bridge','tunnel'])if(way.tags[key]&&way.tags[key]!=='no')lane.structure=key
   }
 }
-const surface=vehicleSurface(world,manifest),nodes=new Map(data.nodes.map(n=>[n.id,n]))
+const surface=vehicleSurface(world,manifest,data),nodes=new Map(data.nodes.map(n=>[n.id,n]))
 const lanes=data.lanes.map(lane=>{
   const start=nodes.get(lane.from),end=nodes.get(lane.to)
   const length=Math.hypot(end.x-start.x,end.z-start.z)
