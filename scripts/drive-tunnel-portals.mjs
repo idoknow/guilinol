@@ -93,7 +93,8 @@ try{
                 // A vehicle rounding a sharp corner can enter the next leg
                 // without its centre passing through the vertex itself.
                 const rounded=mode==='car'&&alongNext>2&&lateralNext<cross&&lateralNext<1.5&&progress>len-4
-                if((progress>len-1.2&&cross<3.5)||rounded){part++;continue}
+                const reached=mode==='foot'?Math.hypot(p.x-x,p.z-z)<.15:progress>len-1.2&&cross<3.5
+                if(reached||rounded){part++;continue}
               }
               // Brake before a bend. A long look-ahead at driving speed
               // can send the front wheels across the inside curb.
@@ -104,6 +105,9 @@ try{
                 bend=(dx*ex+dz*ez)/Math.hypot(ex,ez)<.87
               }
               let ahead=Math.max(0,progress)+(mode==='car'?(bend?3.4:6.5):3.5)
+              // A pedestrian can turn at the vertex itself. Looking beyond a hairpin
+              // before reaching it can leave the walker at a stationary target.
+              if(mode==='foot'&&part<route.length-1)ahead=Math.min(len,ahead)
               let tx=a+ahead*dx,tz=b+ahead*dz
               // Steer through bends within the vehicle's turning radius.
               for(let leg=part;leg<route.length-1&&ahead>0;leg++){
