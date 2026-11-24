@@ -374,7 +374,7 @@ dialog.mission-board::backdrop {
 }
 
 /* Landscape phone (844x390, 640x360): park in the clear channel between .sky-ui (<=400px) and .dock (right ~113px) */
-@media (pointer: coarse) and (max-height: 500px) {
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height: 500px) {
   .gl-mission-entry {
     left: auto;
     right: calc(122px + env(safe-area-inset-right));
@@ -406,7 +406,7 @@ dialog.mission-board::backdrop {
 /* Short landscape phones (IDOK-146): the dock is a top row (play.css), the minimap is 72px wide, and the thumb cluster
    starts ~143px above the bottom edge. The entry pill and the card stack in the clear middle band below .sky-ui and
    the dock (incl. the minimap), left of 跑/跃 and clear of the left stick. */
-@media (pointer:coarse) and (max-height:430px){
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:430px){
   .gl-mission-entry{left:auto;right:calc(182px + env(safe-area-inset-right));top:calc(92px + env(safe-area-inset-top));transform:none;height:28px;padding:0 10px;font-size:12px}
   .gl-mission-hud{left:auto;right:calc(182px + env(safe-area-inset-right));top:calc(126px + env(safe-area-inset-top));transform:none;
     width:min(296px,calc(100vw - 312px - env(safe-area-inset-left) - env(safe-area-inset-right)));align-items:flex-end}

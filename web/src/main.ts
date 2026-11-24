@@ -42,6 +42,7 @@ import {armOrientationGate} from './ui/orientation'
 import {mountStats} from './ui/stats'
 import {mountHotkeys} from './ui/hotkeys'
 import {mountGuide} from './ui/guide'
+import {touchUi} from './ui/input-mode'
 
 export let spawnCreatedCharacter:()=>Promise<void>=async()=>{}
 let titleTransition:{signal:AbortSignal;cancel:()=>void;view?:Veil}|undefined
@@ -315,7 +316,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     if(isGlobalHotkeyBlocked(event.target))return
     if(event.code==='KeyV'&&!event.repeat)void toggle().then(showMode)
   })
-  const touch=matchMedia('(pointer:coarse)').matches,hint=document.querySelector<HTMLElement>('.hint')!,toast=document.querySelector<HTMLElement>('.toast')!
+  const touch=touchUi(),hint=document.querySelector<HTMLElement>('.hint')!,toast=document.querySelector<HTMLElement>('.toast')!
   const modeButton=document.createElement('button');modeButton.className='btn-mode'
   modeButton.addEventListener('pointerenter',()=>void prefetchWalk())
   modeButton.addEventListener('touchstart',()=>void prefetchWalk(),{passive:true})

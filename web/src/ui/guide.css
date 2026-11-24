@@ -32,8 +32,9 @@
 .keys-card.pulse{animation:keys-pulse 1.6s var(--ui-ease) 2}
 @keyframes keys-pulse{0%,100%{box-shadow:var(--ui-shadow-1)}40%{box-shadow:0 0 0 3px rgba(208,105,76,.75),var(--ui-shadow-1)}}
 /* 手机 / 平板 / 窄屏没有键盘提示的意义；拍照、首页、街头 HUD 也不出 */
-@media (pointer:coarse),(max-width:560px),(max-height:420px){.keys-card{display:none}}
+@media (pointer:coarse) and (not (any-pointer:fine)),(max-width:560px),(max-height:420px){.keys-card{display:none}}
 body:is([data-home],[data-photo=on],[data-hud=street]) .keys-card{display:none}
+html[data-touch] .keys-card{display:none}
 /* 旧的一行键位提示被按键卡取代 */
 .hint{display:none!important}
 
@@ -68,11 +69,11 @@ body[data-home] .btn-guide{visibility:hidden}
 .guide-note{margin:14px 0 0;font-size:12px;letter-spacing:.06em;color:var(--ui-paper-dim)}
 .guide-foot{display:flex;justify-content:flex-end;padding:10px 18px 14px;border-top:1px solid var(--ui-glass-line-soft)}
 @media (max-width:720px){.guide-keygrid{grid-template-columns:1fr 1fr}}
-@media (max-width:560px),(pointer:coarse) and (max-height:500px){
+@media (max-width:560px),(pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
   .guide-features{grid-template-columns:1fr;gap:12px}
   .guide-sheet>header{padding:10px 12px 8px}.guide-body{padding:10px 14px 12px}.guide-foot{padding:8px 14px 10px}
   .guide-sheet h2{font-size:16px;letter-spacing:.12em}.guide-tabs{margin-left:6px}.guide-tabs button{padding:0 10px}}
-@media (pointer:coarse) and (max-height:500px){.guide-features{grid-template-columns:1fr 1fr}}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){.guide-features{grid-template-columns:1fr 1fr}}
 @media (max-width:420px){.guide-keygrid{grid-template-columns:1fr}.guide-sheet h2{display:none}.guide-tabs{margin-left:0}}
 
 /* --- 新手引导：挖空的聚光 + 宣纸小卡 ------------------------------------------------------------ */

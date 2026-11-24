@@ -8,7 +8,7 @@
 .update-pill b{height:28px;display:flex;align-items:center;padding:0 14px;border-radius:var(--ui-r-pill);background:var(--ui-paper);color:var(--ui-ink);font-weight:700}
 .update-pill:active{transform:translate(-50%,0) scale(.96)}
 body[data-photo=on] .update-pill{display:none}
-@media (pointer:coarse) and (max-height:430px){
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:430px){
   .update-pill{bottom:calc(50px + env(safe-area-inset-bottom));height:34px;font-size:12.5px;gap:8px}
   .update-pill i{width:22px;height:22px;font-size:11.5px}.update-pill b{height:24px;padding:0 11px}
 }

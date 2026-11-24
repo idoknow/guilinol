@@ -9,6 +9,7 @@ import {defaultAvatar, sanitizeAvatar, type Avatar} from '../../lib/avatar'
 import {previewCharacter} from './walk/character'
 import {vehicleModel} from './walk/vehicle-model'
 import {avatar as figure} from './look/avatar'
+import {touchUi} from './ui/input-mode'
 
 export interface Pose {x:number;y:number;z:number;yaw:number;v:number;gr:number;bike:string;bx:number;bz:number;byaw:number;sc:number;sb:number;sp:number;br:number}
 export interface Player extends Pose {em?:number;es?:number;expires?:number;id:string;uid?:number;jt?:number;name:string;avatar:Avatar}
@@ -53,7 +54,7 @@ function visual(player:Player) {
 
 export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THREE.Camera) {
   const records=new Map<string,Player>(), visible=new Map<string,Visual>(), templates=new Map<string,Template>()
-  const limit=matchMedia('(pointer: coarse)').matches?12:30
+  const limit=touchUi()?12:30
   const frustum=new THREE.Frustum(), projection=new THREE.Matrix4(), bounds=new THREE.Sphere(new THREE.Vector3(),1.1)
   const enableSmoke=smokeEnabled()
   let nextSort=0
