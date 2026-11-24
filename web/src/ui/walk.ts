@@ -25,6 +25,7 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
     +'<button class="btn-gear-up" type="button" aria-label="升挡">+挡</button>'
     +'<button class="btn-gear-down" type="button" aria-label="降挡">-挡</button>'
     +'<button class="btn-tuck" type="button" aria-label="深压弯" aria-pressed="false">压弯</button>'
+    +'<button class="btn-hail" type="button" aria-label="叫一辆附近的共享电车">叫车</button>'
   document.body.append(panel);panel.hidden=true
 
   const rideHud=document.createElement('div')
@@ -130,6 +131,8 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
   btnJump.onpointerdown=event=>{event.preventDefault();event.stopPropagation();crouch=false;syncCrouch();jump=true}
   btnCrouch.onpointerdown=event=>{event.preventDefault();event.stopPropagation();crouch=!crouch;if(crouch){runHold=false;runLock=false;syncRun()}syncCrouch()}
   btnView.onpointerdown=event=>{event.preventDefault();event.stopPropagation();view()}
+  const btnHail=panel.querySelector<HTMLButtonElement>('.btn-hail')!
+  btnHail.onpointerdown=event=>{event.preventDefault();event.stopPropagation();window.dispatchEvent(new CustomEvent('walk:hail'))}
   btnGearUp.onpointerdown=event=>{event.preventDefault();event.stopPropagation();gearDelta+=1}
   btnGearDown.onpointerdown=event=>{event.preventDefault();event.stopPropagation();gearDelta-=1}
   btnWheelie.onpointerdown=event=>{
