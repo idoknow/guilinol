@@ -104,9 +104,10 @@ try{
                 const ex=nextLeg[0]-x,ez=nextLeg[1]-z
                 const cosine=(dx*ex+dz*ez)/Math.hypot(ex,ez)
                 bend=cosine<.87
-                sharp=cosine<0
+                sharp=cosine<-.5
               }
-              // Begin steering before a turn of more than 90 degrees.
+              // Anticipate hairpins. At ordinary right-angle junctions the shorter
+              // lookahead keeps the car on the paved inside corner.
               const carLookahead=sharp?7.5:bend?3.4:6.5
               let ahead=Math.max(0,progress)+(mode==='car'?carLookahead:3.5)
               // A pedestrian can turn at the vertex itself. Looking beyond a hairpin
