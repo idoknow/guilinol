@@ -1422,9 +1422,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function resolveSafeRiderSpot(rx:number,rz:number,bx:number,bz:number,refY:number,yawTarget:number){
     const trySpot=(tx:number,tz:number)=>{
       const sup=supportAt(tx,tz,refY)
-      const rawSy=sup?sup.y:refY
-      const sy=Math.abs(rawSy-refY)<=1.2?rawSy:refY
-      const cy=sy+cfg.height/2+.055
+      if(!sup||Math.abs(sup.y-refY)>1.2||sim.pathBlocked(rx,rz,tx,tz,refY+.5))return null
+      const cy=sup.y+cfg.height/2+.055
       if(sim.insideHouse(tx,tz))return null
       if(sim.wet(tx,tz)&&!sim.surface(tx,tz,'deck',refY+.6,1.8)&&!sim.surface(tx,tz,'landmark',refY+.6,1.8))return null
       if(!sim.freeCapsule(tx,cy,tz))return null
@@ -1440,9 +1439,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }
     }
     const local=sim.findLocalDismount(bx,bz,crashSession?.heading??0,refY)
-    if(local)return {...local,heading:yawTarget}
-    const cy=refY+cfg.height/2+.055
-    return {x:safe.x,y:safe.y||cy,z:safe.z,heading:yawTarget,rule:'crash-safe'}
+    if(local&&!sim.pathBlocked(rx,rz,local.x,local.z,refY+.5))return {...local,heading:yawTarget}
+    return trySpot(safe.x,safe.z)
   }
   function beginStandUpFromCrash(){
     if(!crashSession||!rides?.bike)return false
@@ -1455,6 +1453,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const riderYaw=c.heading+c.side*.45
     const lookToBikeYaw=Math.atan2(rx-bx,rz-bz)+avatar.yaw
     const spot=resolveSafeRiderSpot(rx,rz,bx,bz,by,lookToBikeYaw)
+    if(!spot){notifyDismountBlocked('这里太窄了，暂时无法起身');return false}
     if(!canPlaceCrashOffset(bx,bz,by)){
       if(canPlaceCrashOffset(c.bikeOriginX,c.bikeOriginZ,refY)){
         bx=c.bikeOriginX;bz=c.bikeOriginZ;by=supportAt(bx,bz,refY)?.y??refY
@@ -2333,7 +2332,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         }
       }
       const preContactSpeed=rides?.bike?Math.abs(bikeSpeed):0
-      if(resolveContact(next,next.y-cfg.height/2,rides?.heading??0,rides?.car?.86:rides?.bike?.32:cfg.radius,rides?.car?2.12:rides?.bike?.85:0)){
+      if(resolveContact(next,next.y-cfg.height/2,rides?.heading??0,rides?.car?.86:rides?.bike?.32:cfg.radius,rides?.car?2.12:rides?.bike?.85:0,undefined,sim.canTrafficPush)){
         vx=vz=bikeSpeed=0
         if(rides?.bike){
           rides.tryBikeImpactCrash(preContactSpeed)
@@ -2371,8 +2370,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       if(pickupSession.elapsed>=pickupSession.duration){
         const rec=pickupSession.rec
         const curFootY=p.y-cfg.height/2
-        let rx=rec.x, ry=rec.y, rz=rec.z
-        if(!sim.findLocalMount(p.x,curFootY,p.z,rx,ry,rz).ok){
+        let spot=sim.findLocalMount(p.x,curFootY,p.z,rec.x,rec.y,rec.z)
+        if(!spot.ok){
           const pullCandidates:[number,number][]=[
             [THREE.MathUtils.lerp(rec.x,p.x,.45),THREE.MathUtils.lerp(rec.z,p.z,.45)],
             [THREE.MathUtils.lerp(rec.x,p.x,.90),THREE.MathUtils.lerp(rec.z,p.z,.90)],
@@ -2383,9 +2382,16 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           for(const [cx,cz] of pullCandidates){
             const rawCy=supportAt(cx,cz,curFootY)?.y??curFootY
             const cy=Math.abs(rawCy-curFootY)<=1.2?rawCy:curFootY
-            if(sim.findLocalMount(p.x,curFootY,p.z,cx,cy,cz).ok){rx=cx;ry=cy;rz=cz;break}
+            if(sim.pathBlocked(rec.x,rec.z,cx,cz,cy+.5))continue
+            spot=sim.findLocalMount(p.x,curFootY,p.z,cx,cy,cz)
+            if(spot.ok)break
           }
         }
+        pickupSession=null
+        figure.rotation.x=figure.rotation.z=0
+        clearAvatarPose(figure)
+        if(!spot.ok){notifyDismountBlocked('这里太窄了，换个方向再扶车');return}
+        const {x:rx,bikeY:ry,z:rz}=spot
         const completed=resolveTwoWheelTransition(twoWheelOp,{type:'pickup_complete',kind:rec.kind}).state
         twoWheelOp=completed
         removeDownedHazard(rec)
@@ -2399,9 +2405,6 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           rec.mesh.rotation.set(0,rec.yaw,restRoll,'YXZ')
         }
         downedBikes.delete(rec)
-        pickupSession=null
-        figure.rotation.x=figure.rotation.z=0
-        clearAvatarPose(figure)
         if(!verify||stuntMode){
           window.dispatchEvent(new CustomEvent('walk:toast',{detail:{
             text:`${rec.kind==='bicycle'?'单车':'电动车'}已扶正立好边撑，按 F 上车`,
