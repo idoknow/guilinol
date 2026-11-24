@@ -178,7 +178,7 @@ function createDecorMats(M: Pack): DecorMats {
   const cedarLit = tag('tianyuan_facade_cedar_warm', 0xffffff, M.facadeWood, {emissive: 0xffb764, emissiveIntensity: 0})
   cedarLit.userData.tiled = true
   cedarLit.userData.keepOwnTarget = M.facadeWood
-  const graniteLit = tag('tianyuan_granite_warm', 0xc8baa4, bm?.vcExterior ?? M.granite, {emissive: 0xffc682, emissiveIntensity: 0})
+  const graniteLit = tag('tianyuan_granite_warm', 0xc8baa4, bm?.vcStone ?? M.granite, {emissive: 0xffc682, emissiveIntensity: 0})
   graniteLit.userData.tiled = true
   const wainscotTile = tag('tianyuan_wainscot_tile', 0xdccdb3, M.wallTileHall, {emissive: 0xffe4be, emissiveIntensity: 0})
   wainscotTile.userData.tiled = true
@@ -322,9 +322,11 @@ class Batch {
   private readonly p = new THREE.Vector3()
   private readonly one = new THREE.Vector3(1, 1, 1)
   private readonly overrideTarget: THREE.Material | null
+  private readonly atlasTarget: THREE.Material | null
 
-  constructor(overrideTarget: THREE.Material | null = null) {
+  constructor(overrideTarget: THREE.Material | null = null, atlasTarget: THREE.Material | null = null) {
     this.overrideTarget = overrideTarget
+    this.atlasTarget = atlasTarget
   }
 
   add(mat: THREE.Material, geo: THREE.BufferGeometry, x = 0, y = 0, z = 0, ry = 0, rx = 0, rz = 0): void {
@@ -354,7 +356,9 @@ class Batch {
     }
 
     let target: THREE.Material = (mat.userData.batchTarget as THREE.Material | undefined) ?? mat
-    if (
+    if (atlasRect && this.atlasTarget) {
+      target = this.atlasTarget
+    } else if (
       this.overrideTarget &&
       target !== mat &&
       !atlasRect &&
@@ -1280,7 +1284,7 @@ function buildHall(I: Batch, M: Pack, D: DecorMats, lv: ShopLevel, col: AddColli
   I.box(D.warmLed, IN_X - 0.03, 3.0, 3.5, 0.04, 0.035, 2.46)
   I.sign(M.menuPosters, IN_X - 0.038, 2.66, 3.5, 2.4, 0.6, -Math.PI / 2)
   I.add(M.wallClock, new THREE.CircleGeometry(0.16, 18), IN_X - 0.02, 2.62, 6.45, -Math.PI / 2)
-  I.box(M.acUnit, IN_X - 0.11, 2.52, 5.45, 0.22, 0.3, 0.92)
+  I.box(M.whitePlastic, IN_X - 0.11, 2.52, 5.45, 0.22, 0.3, 0.92)
   I.box(M.blackMetal, IN_X - 0.225, 2.56, 5.45, 0.01, 0.03, 0.8)
   wallFan(I, M, D, -IN_X + 0.02, 2.38, 2.15, 1)
   wallFan(I, M, D, IN_X - 0.02, 2.36, 4.6, -1)
@@ -1793,20 +1797,24 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
   col(-IN_X, KDOOR_X0, PART_Z0, PART_Z1, 'wall:pass-west')
   col(KDOOR_X1, IN_X, PART_Z0, PART_Z1, 'wall:pass-east')
 
-  // 外立面与吊顶统一进 EC（剖切时同步隐藏），前厅/后厨/门面/外摆统一进 ISW（消除跨组重复材质桶）
+  // 外立面与吊顶统一进 EC（剖切时同步隐藏）；门面独立进 SF（35~165m 中距和剖切态均常显，仅 4 draws）；前厅/后厨/外摆进 IW（<=35m 显示）
   const EC = new Batch(M.batchMasters?.vcExterior ?? null)
-  const ISW = new Batch()
+  const SF = new Batch(M.batchMasters?.vcExterior ?? null, M.batchMasters?.signAtlasLit ?? null)
+  const IW = new Batch()
   buildShell(EC, M, D)
   buildCeiling(EC, M, D)
-  buildStorefront(ISW, M, D, col)
-  const seats = [...buildHall(ISW, M, D, lv, col), ...buildSidewalk(ISW, M, D, lv, col)]
-  const kitchen = buildKitchen(ISW, M, D, lv, col)
+  buildStorefront(SF, M, D, col)
+  const seats = [...buildHall(IW, M, D, lv, col), ...buildSidewalk(IW, M, D, lv, col)]
+  const kitchen = buildKitchen(IW, M, D, lv, col)
   EC.flush(exterior, 'tianyuan.exterior')
-  ISW.flush(interior, 'tianyuan.interior')
-  interior.traverse(o => {
-    const mesh = o as THREE.Mesh
-    if (mesh.isMesh && (mesh.material as THREE.Material).transparent) mesh.renderOrder = 2
-  })
+  SF.flush(storefront, 'tianyuan.storefront')
+  IW.flush(interior, 'tianyuan.interior')
+  for (const grp of [storefront, interior]) {
+    grp.traverse(o => {
+      const mesh = o as THREE.Mesh
+      if (mesh.isMesh && (mesh.material as THREE.Material).transparent) mesh.renderOrder = 2
+    })
+  }
 
   // 动态件与三工位精细动画模型
   const ownGeos: THREE.BufferGeometry[] = []
@@ -2585,6 +2593,14 @@ export function buildTianyuanShopMesh(level: ShopLevel = 1): TianyuanShopBuildRe
     setDetailVisible(visible: boolean) {
       dynamic.visible = visible
       interior.visible = visible
+      if (fan) fan.visible = visible
+    },
+
+    updateNight(night: number, time = 0) {
+      if (disposed) return
+      const n = THREE.MathUtils.clamp(night, 0, 1)
+      M.updateNight(n, false, time)
+      D.nightSpill.opacity = n * 0.2
     },
 
     dispose() {

@@ -89,8 +89,10 @@ export interface TianyuanShopBuildResult {
   setCutaway?(mode: ShopCutawayMode): void
   /** 当前是否处于剖切状态 */
   isCutaway?(): boolean
-  /** 远距 LOD：距离 >35m 时隐藏室内动态件，保留完整建筑外观 */
+  /** 远距 LOD：距离 >35m 时隐藏室内动态件，保留完整建筑外观与门面 */
   setDetailVisible?(visible: boolean): void
+  /** 中距（35~165m）仅刷新建筑外立面与门面夜景自发光 */
+  updateNight?(night: number, time?: number): void
   dispose(): void
 }
 
