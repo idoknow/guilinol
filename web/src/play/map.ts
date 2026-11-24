@@ -229,9 +229,10 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
           // 小地图：视野外的人贴着圆边画一个小点，告诉你他在哪个方向
           const dx = x-w/2, dy = y-h/2, k = (w/2-r-2)/Math.hypot(dx,dy); x = w/2+dx*k; y = h/2+dy*k; edge = true
         }
-        g.globalAlpha = edge?.55:1
+        // 视野外（far）的人只有 5s 一次的大致位置、没有朝向：不画朝向线，淡一点
+        g.globalAlpha = edge?.55:p.far?.72:1
         g.fillStyle = C.peer; g.strokeStyle = C.paperText; g.lineWidth = mini?1.2:1.8
-        if(!edge) {g.beginPath(); g.moveTo(x,y); g.lineTo(x-Math.sin(p.yaw)*(r+5),y-Math.cos(p.yaw)*(r+5)); g.strokeStyle = C.peer; g.lineWidth = mini?1.4:2; g.stroke(); g.strokeStyle = C.paperText; g.lineWidth = mini?1.2:1.8}
+        if(!edge&&!p.far) {g.beginPath(); g.moveTo(x,y); g.lineTo(x-Math.sin(p.yaw)*(r+5),y-Math.cos(p.yaw)*(r+5)); g.strokeStyle = C.peer; g.lineWidth = mini?1.4:2; g.stroke(); g.strokeStyle = C.paperText; g.lineWidth = mini?1.2:1.8}
         g.beginPath(); g.arc(x,y,edge?r*.8:r,0,Math.PI*2); g.fill(); g.stroke()
         if(!mini&&!edge&&scale>.06) {g.font = `600 12px ${SERIF}`
           // 名字互相不压、也不压自己的箭头；挤在一起时只留一个，点圆点仍能看到是谁

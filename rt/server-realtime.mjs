@@ -60,7 +60,8 @@ import {WebSocketServer} from 'ws'
 import * as obs from './observability.mjs'
 
 const PORT = Number(process.env.PORT || 8790)
-const MAX_PLAYERS = Number(process.env.MAX_PLAYERS || 200)
+// 单进程 Node 只能用 1 核：AOI 压测 300 人密集场景已接近 1 核，先按 300 封顶（IDOK-224）
+const MAX_PLAYERS = Number(process.env.MAX_PLAYERS || 300)
 const MAX_CHAT = 80
 const TICK_MS = 1000
 const KICK_TOKEN = process.env.KICK_TOKEN || ''
@@ -239,6 +240,143 @@ function broadcast(payload, exceptId) {
   }
 }
 
+
+/* ───────────── AOI（兴趣范围裁剪） ───────────── */
+// 100m 网格：同格 + 邻格（3×3）20Hz；外面一圈但 ≤150m 降到 5Hz；超过 150m 才移出视野（滞回）。
+// 广播成本从 O(n²) 降到 O(n × 视野人数)。
+const CELL = Number(process.env.RT_CELL || 100)
+const AOI_HOLD = Number(process.env.RT_AOI_HOLD || 150)
+const AOI_FAR_MS = Number(process.env.RT_AOI_FAR_MS || 200)
+const ROSTER_MS = Number(process.env.RT_ROSTER_MS || 5000)
+const GRID_RADIUS = 2
+const grid = new Map()
+const cellKey = (x, z) => `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`
+
+function gridAdd(p) {
+  const key = cellKey(p.x, p.z)
+  let set = grid.get(key)
+  if (!set) grid.set(key, (set = new Set()))
+  set.add(p.id)
+  p.cell = key
+}
+function gridDel(p) {
+  if (!p.cell) return
+  const set = grid.get(p.cell)
+  if (!set) return
+  set.delete(p.id)
+  if (!set.size) grid.delete(p.cell)
+}
+/** p 现在能看到谁：near = 3×3 内（20Hz），far = 外圈但 ≤150m（5Hz，含滞回保留） */
+function aoiTargets(p) {
+  const [cx, cz] = p.cell.split(',').map(Number)
+  const near = new Set()
+  const far = new Set()
+  for (let dx = -GRID_RADIUS; dx <= GRID_RADIUS; dx++) {
+    for (let dz = -GRID_RADIUS; dz <= GRID_RADIUS; dz++) {
+      const set = grid.get(`${cx + dx},${cz + dz}`)
+      if (!set) continue
+      const inner = Math.max(Math.abs(dx), Math.abs(dz)) <= 1
+      for (const id of set) {
+        if (id === p.id) continue
+        const q = players.get(id)
+        if (!q) continue
+        if (inner) near.add(id)
+        else if (flatDistance(p, q) <= AOI_HOLD) far.add(id)
+      }
+    }
+  }
+  for (const id of p.visible) {
+    if (near.has(id) || far.has(id)) continue
+    const q = players.get(id)
+    if (q && flatDistance(p, q) <= AOI_HOLD) far.add(id)
+  }
+  return { near, far }
+}
+/** 新增可见关系：双向登记并补一帧完整状态（不等下一条 pos） */
+function aoiAttach(p, q, announceSelf = true) {
+  if (!p.visible.has(q.id)) {
+    p.visible.add(q.id)
+    send(p.ws, { t: 'join', player: publicOf(q, p) })
+  }
+  if (!q.visible.has(p.id)) {
+    q.visible.add(p.id)
+    if (announceSelf) send(q.ws, { t: 'join', player: publicOf(p, q) })
+  }
+}
+function aoiDetach(p, q) {
+  if (p.visible.delete(q.id)) send(p.ws, { t: 'leave', id: q.id })
+  if (q.visible.delete(p.id)) send(q.ws, { t: 'leave', id: p.id })
+  p.farSent.delete(q.id)
+  q.farSent.delete(p.id)
+}
+function aoiRefresh(p) {
+  const { near, far } = aoiTargets(p)
+  const next = new Set([...near, ...far])
+  for (const id of next) {
+    const q = players.get(id)
+    if (q) aoiAttach(p, q)
+  }
+  for (const id of [...p.visible]) {
+    if (next.has(id)) continue
+    const q = players.get(id)
+    if (q) aoiDetach(p, q)
+    else { p.visible.delete(id); p.farSent.delete(id) }
+  }
+  p.far = far
+  for (const id of [...p.farSent.keys()]) if (!far.has(id)) p.farSent.delete(id)
+  // 分级是双向的：对方的分级跟着更新，否则站着不动的人发给走近者的频率会是旧的
+  for (const id of near) { const q = players.get(id); if (q) q.far.delete(p.id) }
+  for (const id of far) { const q = players.get(id); if (q) q.far.add(p.id) }
+}
+/** 跨格才重算，别每帧重建网格 */
+function aoiMove(p) {
+  const key = cellKey(p.x, p.z)
+  if (key === p.cell) return
+  gridDel(p)
+  gridAdd(p)
+  aoiRefresh(p)
+}
+/** 按视野发送：远端 5Hz 节流 */
+function aoiSend(p, payload) {
+  const text = JSON.stringify(payload)
+  const size = Buffer.byteLength(text)
+  const at = now()
+  for (const id of p.visible) {
+    const q = players.get(id)
+    if (!q) continue
+    if (p.far.has(id)) {
+      const last = p.farSent.get(id) || 0
+      if (at - last < AOI_FAR_MS) continue
+      p.farSent.set(id, at)
+    }
+    sendSlowAware(q.ws, text, payload.t, size)
+  }
+}
+/**
+ * 统一的离场清理：网格、别人的 visible、leave 广播、players 表。
+ * release（连接断开）和顶号（新设备接管）都必须走这里，否则网格里会留下死 id。
+ */
+function removePlayer(p, extra = {}) {
+  if (!p || !players.has(p.id)) return false
+  gridDel(p)
+  for (const peerId of [...p.visible]) {
+    const peer = players.get(peerId)
+    if (peer) { peer.visible.delete(p.id); peer.farSent.delete(p.id); send(peer.ws, { t: 'leave', id: p.id }) }
+  }
+  p.visible.clear()
+  p.farSent.clear()
+  players.delete(p.id)
+  obs.event('leave', p, extra)
+  broadcast({ t: 'online', online: players.size })
+  return true
+}
+/** 全服用低频名册：地图/名册面板要看到整座城的人，3D 场景仍然只来自 AOI */
+function rosterPayload() {
+  const list = []
+  for (const p of players.values()) list.push([p.id, p.name, Math.round(p.x), Math.round(p.z), p.joinedAt])
+  return { t: 'roster', players: list }
+}
+
 function publicOf(p,viewer=p) {
   return {
     id: p.id, uid: p.uid, name: p.name, avatar: p.avatar, jt:p.joinedAt,
@@ -267,6 +405,7 @@ const server = createServer((req, res) => {
         maxPlayers: MAX_PLAYERS,
         banned: bans.size,
         connections: sockets.size,
+        loopP99Ms: +obs.loopP99().toFixed(1),
       }))
       return
     }
@@ -423,10 +562,8 @@ wss.on('connection', (ws, req) => {
     // 关闭原因必须留痕：线上「联机不稳定」时，没有这行就只能靠猜是超时、满员还是顶号
     if (joined) console.log(JSON.stringify({scope:'rt-close',code:code??null,reason:String(reason??''),ip,uid:players.get(id)?.uid??null,players:players.size}))
     if (joined) {
-      const player=players.get(id);obs.event('leave',player,{closeCode:code,reason:player.kickReason||String(reason??'')})
-      players.delete(id)
-      broadcast({t: 'leave', id})
-      broadcast({t: 'online', online: players.size})
+      const player=players.get(id)
+      removePlayer(player,{closeCode:code,reason:player?.kickReason||String(reason??'')})
     }
   }
 
@@ -467,9 +604,8 @@ wss.on('connection', (ws, req) => {
         const previous = [...players.values()].find(p => p.uid === uid)
         if (previous && previous.ws !== ws) {
           previous.ws.rejected = true
-          obs.event('leave',previous,{closeCode:4001,reason:'replaced'})
-          players.delete(previous.id)
-          broadcast({t: 'leave', id: previous.id})
+          // 走统一清理：网格、别人的 visible 都要摘掉，否则会留下永远不动的幽灵
+          removePlayer(previous, {closeCode:4001, reason:'replaced'})
           try { previous.ws.close(4001, 'replaced') } catch { /* 忽略 */ }
           console.log(JSON.stringify({scope: 'rt-replace', uid, oldId: previous.id, newId: id}))
         }
@@ -508,19 +644,39 @@ wss.on('connection', (ws, req) => {
           em:0, es:0, emoteTimes:[], emoteUntil:0,
           lastChat: 0,
           lastPos: 0,
+          cell: '',
+          visible: new Set(),
+          far: new Set(),
+          farSent: new Map(),
         }
         ws.joined = true
         clearTimeout(ws.joinTimer)
         unpend()
         players.set(id, player)
+        gridAdd(player)
+        // 先把可见集合算出来：新玩家这一侧靠 welcome 的列表就够了，不再逐条发 join 给自己，
+        // 对端则要一条 join（带完整状态），否则对方要等到自己下次移动才能看见新来的人。
+        const { near, far } = aoiTargets(player)
+        player.far = far
+        const visible = [...new Set([...near, ...far])]
+        for (const peerId of visible) {
+          player.visible.add(peerId)
+          const peer = players.get(peerId)
+          if (!peer) continue
+          if (!peer.visible.has(id)) {
+            peer.visible.add(id)
+            send(peer.ws, { t: 'join', player: publicOf(player, peer) })
+          }
+        }
         obs.joined(player,players.size)
         send(ws, {
           t: 'welcome',
           me: {id, uid: player.uid, name: player.name, avatar: player.avatar},
           online: players.size,
-          players: [...players.values()].filter(p => p.id !== id).map(p=>publicOf(p,player)),
+          players: visible.map(peerId => players.get(peerId)).filter(Boolean).map(p=>publicOf(p,player)),
         })
-        broadcast({t: 'join', player: publicOf(player)}, id)
+        // 全服名册立刻给一份，不用等下一个 5s 周期
+        send(ws, rosterPayload())
         broadcast({t: 'online', online: players.size})
         return
       }
@@ -530,7 +686,7 @@ wss.on('connection', (ws, req) => {
       if (msg.t === 'emote') {
         if (!acceptEmote(me,msg,now())) return
         const packet=JSON.stringify({t:'emote',from:id,id:me.em,s:me.es})
-        for(const peer of players.values())if(peer!==me&&inEmoteRange(peer,me))sendSlowAware(peer.ws,packet,'emote')
+        for(const peerId of me.visible){const peer=players.get(peerId);if(peer&&inEmoteRange(peer,me))sendSlowAware(peer.ws,packet,'emote')}
         return
       }
 
@@ -564,14 +720,15 @@ wss.on('connection', (ws, req) => {
         me.sb = clampInt(msg.sb, 0, 1800)
         me.sp = clampInt(msg.sp, 0, 999)
         me.br = clampInt(msg.br, 0, 3)
-        broadcast({
+        aoiMove(me)
+        aoiSend(me, {
           t: 'pos', id,
           x: me.x, y: me.y, z: me.z, yaw: me.yaw, v: me.v,
           bike: me.bike, bx: me.bx, bz: me.bz, byaw: me.byaw,
           hb: me.hb, hx: me.hx, hz: me.hz, hyaw: me.hyaw, mv: me.mv, cr: me.cr, gr: me.gr, dn: me.dn, pn: me.pn, wl: me.wl,
           hp: me.hp,
           sc: me.sc, sb: me.sb, sp: me.sp, br: me.br,
-        }, id)
+        })
         return
       }
 
@@ -605,15 +762,16 @@ wss.on('connection', (ws, req) => {
         const avatar = sanitizeAvatar(msg.avatar)
         if (!avatar) return
         me.avatar = avatar
-        broadcast({t: 'avatar', id, avatar}, id)
+        for (const peerId of me.visible) { const peer = players.get(peerId); if (peer) sendSlowAware(peer.ws, JSON.stringify({t:'avatar',id,avatar}), 'avatar') }
         return
       }
 
       if (msg.t === 'who') {
+        // 全服名单走 roster 通道；这里只回视野内的人，否则客户端会把视野外的人画进场景并永远停在原地
         send(ws, {
           t: 'players',
           online: players.size,
-          players: [...players.values()].filter(p => p.id !== id).map(p=>publicOf(p,me)),
+          players: [...me.visible].map(peerId => players.get(peerId)).filter(Boolean).map(p=>publicOf(p,me)),
         })
         return
       }
@@ -640,6 +798,20 @@ wss.on('connection', (ws, req) => {
 setInterval(() => {
   broadcast({t: 'online', online: players.size})
 }, TICK_MS)
+
+// 全服低频名册（地图 / 同城名册用）：只 stringify 一次，同一个字符串发给所有人
+setInterval(() => {
+  if (!players.size) return
+  const text = JSON.stringify(rosterPayload())
+  const size = Buffer.byteLength(text)
+  for (const p of players.values()) sendSlowAware(p.ws, text, 'roster', size)
+}, ROSTER_MS)
+
+// 每 30s 一条 rt-stats：线上判断「单核是否顶满」看 loopP99Ms，> 50ms 玩家就能感到卡
+const STATS_MS = Number(process.env.RT_STATS_MS || 30000)
+setInterval(() => {
+  console.log(JSON.stringify({scope: 'rt-stats', players: players.size, sockets: sockets.size, cells: grid.size, ...obs.window()}))
+}, STATS_MS)
 
 // 掉线清理：浏览器直接关掉时不会有 close 帧，用 ping/pong 兜住
 setInterval(() => {
