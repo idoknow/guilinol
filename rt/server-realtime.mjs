@@ -66,9 +66,12 @@ const KICK_TOKEN = process.env.KICK_TOKEN || ''
 /** 被踢后的封禁时长（秒），只在本进程内存里生效 */
 const KICK_BAN_SECONDS = Number(process.env.KICK_BAN_SECONDS || 600)
 /** 单个 IP 最多几条连接（反代后按 x-forwarded-for 首个地址算） */
-// 每个出口 IP 的连接上限。默认 8 对移动网络太狠：校园网、宿舍、网吧、运营商 CGNAT
-// 会让几十个真实玩家共用一个公网 IP，第 9 个人直接收「连接数过多」进不来。
-const MAX_PER_IP = Number(process.env.RT_MAX_PER_IP || 24)
+// 每个出口 IP 的连接上限。默认 0 = 不限：校园网、宿舍、网吧、运营商 CGNAT 会让几十个
+// 真实玩家共用一个公网 IP，按 IP 掐是错的（实测第 9 个人就进不来）。
+// 防滥用改由「同一 uid 只允许 1 条在线连接」+ 全局 MAX_PLAYERS + 未 join 超时 兜住；
+// 真要应急限流，把 RT_MAX_PER_IP 设成正数即可恢复按 IP 限制。
+const MAX_PER_IP = Number(process.env.RT_MAX_PER_IP || 0)
+const JOIN_TIMEOUT_MS = Number(process.env.RT_JOIN_TIMEOUT_MS || 15000)
 /** 昵称长度上限（字符） */
 const MAX_NAME = 16
 /** 服务端裁决 hit / revive 的水平距离（米） */
@@ -341,7 +344,7 @@ wss.on('connection', (ws, req) => {
       return
     }
     const used = ipCounts.get(ip) || 0
-    if (used >= MAX_PER_IP) {
+    if (MAX_PER_IP > 0 && used >= MAX_PER_IP) {
       // 排障要能看到到底是「满员」还是「同一出口 IP 挤爆」，否则线上只能靠猜
       console.warn(JSON.stringify({scope:'rt-reject',reason:'per-ip',ip,used,max:MAX_PER_IP,players:players.size,sockets:sockets.size}))
       send(ws, {t: 'error', message: '连接数过多'})
@@ -350,6 +353,10 @@ wss.on('connection', (ws, req) => {
     }
     sockets.add(ws)
     ipCounts.set(ip, used + 1)
+    // 没有按 IP 限制以后，防的是「只握手不 join」白占名额：15 秒内不 join 直接收回
+    ws.joinTimer = setTimeout(() => {
+      if (!ws.joined) { try { ws.close(1008, 'join timeout') } catch { /* 忽略 */ } }
+    }, JOIN_TIMEOUT_MS)
   } catch (err) {
     console.warn('[ws] 建连失败', err && err.message)
     try { ws.close(1011, 'error') } catch { /* 忽略 */ }
@@ -362,6 +369,7 @@ wss.on('connection', (ws, req) => {
 
   // 连接回收：容量计数要减回去，ipCounts 不能只增不减
   const release = (code, reason) => {
+    clearTimeout(ws.joinTimer)
     const joined = players.has(id)
     if (sockets.delete(ws)) {
       const left = (ipCounts.get(ip) || 1) - 1
@@ -447,6 +455,8 @@ wss.on('connection', (ws, req) => {
           lastChat: 0,
           lastPos: 0,
         }
+        ws.joined = true
+        clearTimeout(ws.joinTimer)
         players.set(id, player)
         send(ws, {
           t: 'welcome',

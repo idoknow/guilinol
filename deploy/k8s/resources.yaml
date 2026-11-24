@@ -398,10 +398,10 @@ spec:
             secretKeyRef: {name: glol-env, key: RT_JOIN_SECRET, optional: true}
         - name: MAX_PLAYERS
           value: "400"
-        # 每个出口 IP 的连接上限：校园网/宿舍/运营商 CGNAT 会让几十个真实玩家共用一个公网 IP，
-        # 8 太小（实测第 9 个就被拒），默认放到 24。
+        # 不按 IP 限制（0 = 不限）：校园网/宿舍/运营商 CGNAT 会让几十个真实玩家共用一个公网 IP。
+        # 防滥用靠「同一 uid 只能 1 条在线连接」+ MAX_PLAYERS + 未 join 15 秒超时。
         - name: RT_MAX_PER_IP
-          value: "24"
+          value: "0"
         - name: KICK_TOKEN
           valueFrom:
             secretKeyRef:
