@@ -406,6 +406,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     hat:'hat_traffic_cap',
     bag:'bag_traffic_flag',
   }
+  let rides:Awaited<ReturnType<typeof vehicles>>|null=null,loading=false
   let trafficVolunteerActive=false
   let drinksBridge:{getCandidate():DrinksInteractCandidate|null;interact():boolean}|null=null
   let trafficDutyRef:TrafficDutyController|null=null
@@ -588,7 +589,6 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let savedStreetPose:SavedStreetPose|null=null
   let shopCam:ActiveShopCamera|null=null
   const shopLookTarget=new THREE.Vector3()
-  let rides:Awaited<ReturnType<typeof vehicles>>|null=null,loading=false
   let testRideBrakeTimer=0
   let testRideOobSince=0
 
