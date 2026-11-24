@@ -1,3 +1,6 @@
+import {smokeEnabled} from './citizen/use-item'
+import {RemoteSmoke} from './smoke/session'
+import {smokeVisual} from './smoke/visual'
 import * as THREE from 'three'
 import {clone} from 'three/addons/utils/SkeletonUtils.js'
 import {defaultAvatar, sanitizeAvatar, type Avatar} from '../../lib/avatar'
@@ -5,7 +8,7 @@ import {previewCharacter} from './walk/character'
 import {vehicleModel} from './walk/vehicle-model'
 import {avatar as figure} from './look/avatar'
 
-export interface Pose {x:number;y:number;z:number;yaw:number;v:number;gr:number;bike:string;bx:number;bz:number;byaw:number}
+export interface Pose {x:number;y:number;z:number;yaw:number;v:number;gr:number;bike:string;bx:number;bz:number;byaw:number;sc:number;sb:number;sp:number;br:number}
 export interface Player extends Pose {id:string;name:string;avatar:Avatar}
 
 // 昵称牌（IDOK-192）：墨青玻璃小签 + 宣纸色宋体字，左边一颗青玉点，和 HUD 读数同一套颜色。
@@ -41,16 +44,17 @@ type Visual=ReturnType<typeof visual>
 function visual(player:Player) {
   const root=new THREE.Group(), name=label(player.name), bike=vehicleModel('bike')
   root.position.set(player.x,player.y,player.z); root.add(name); bike.visible=false
-  return {root,name,bike,mixer:undefined as THREE.AnimationMixer|undefined,action:undefined as THREE.AnimationAction|undefined,key:''}
+  return {root,name,bike,smoke:new RemoteSmoke(),kit:undefined as ReturnType<typeof smokeVisual>|undefined,mixer:undefined as THREE.AnimationMixer|undefined,action:undefined as THREE.AnimationAction|undefined,key:''}
 }
 
 export function players(scene:THREE.Scene,clips:THREE.AnimationClip[]) {
   const records=new Map<string,Player>(), visible=new Map<string,Visual>(), templates=new Map<string,Template>()
   const limit=matchMedia('(pointer: coarse)').matches?12:30
+  const enableSmoke=smokeEnabled()
   let nextSort=0
   function hide(id:string) {
     const view=visible.get(id); if(!view)return
-    visible.delete(id); view.root.removeFromParent(); view.bike.removeFromParent()
+    view.kit?.dispose();visible.delete(id); view.root.removeFromParent(); view.bike.removeFromParent()
     view.name.material.map?.dispose(); view.name.material.dispose(); view.mixer?.stopAllAction()
     view.root.traverse(node=>{if(node instanceof THREE.SkinnedMesh)node.skeleton.dispose()})
     const entry=templates.get(view.key)
@@ -82,9 +86,14 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[]) {
       const angle=player.yaw-view.root.rotation.y;view.root.rotation.y+=Math.atan2(Math.sin(angle),Math.cos(angle))*alpha
       view.bike.visible=!!player.bike
       if(player.bike){view.bike.position.set(pos.x+player.bx-player.x,pos.y,pos.z+player.bz-player.z);view.bike.rotation.y=player.byaw}
+      view.kit?.resetPose()
       const name=player.bike?'sit':!player.gr?'jump':player.v>3?'run':player.v>.12?'walk':'idle'
       const clip=clips.find(item=>item.name===figure.clips[name]);if(clip&&view.mixer){const action=view.mixer.clipAction(clip)
         if(action!==view.action){view.action?.fadeOut(.12);action.reset().fadeIn(.12).play();view.action=action} view.mixer.update(dt)}
+      if(enableSmoke&&view.mixer){
+        if(player.sc&&!view.kit)view.kit=smokeVisual(scene,view.root)
+        if(view.kit){view.smoke.update(player.sc,player.sb,player.sp,player.br,dt);view.kit.tick(dt,view.smoke.view())}
+      }
     }
   }
   function remove(id:string){hide(id);records.delete(id);nextSort=0}
@@ -94,5 +103,5 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[]) {
       if(Math.hypot(pose.x-player.x,pose.z-player.z)>25)visible.get(id)?.root.position.set(pose.x,pose.y,pose.z)
       Object.assign(player,pose)},
     avatar(id:string,avatar:Avatar){const player=records.get(id);if(player){hide(id);player.avatar=avatar;nextSort=0}},
-    probe:()=>[...visible].map(([id,view])=>({id,name:records.get(id)!.name,avatar:records.get(id)!.avatar,ready:!!view.mixer,position:view.root.position.toArray()}))}
+    probe:()=>[...visible].map(([id,view])=>({id,name:records.get(id)!.name,avatar:records.get(id)!.avatar,smoke:view.smoke.view().phase,puffs:view.smoke.view().puffs,ready:!!view.mixer,position:view.root.position.toArray()}))}
 }

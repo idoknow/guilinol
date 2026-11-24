@@ -17,7 +17,7 @@ const page = await browser.newPage({viewport:{width:1600,height:900}})
 page.on('pageerror',e=>console.log('ERR',e.message))
 for (const [name,s] of Object.entries(shots)) {
   if (pick.length && !pick.includes(name)) continue
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&play&radius=900&time=${s.time}${s.weather?'&weather='+s.weather:''}`)
+  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?smoke=0&verify&play&radius=900&time=${s.time}${s.weather?'&weather='+s.weather:''}`)
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0,null,{timeout:300000})
   await page.evaluate(s=>{const c=window.viewer.camera;c.position.set(...s.eye);c.lookAt(...s.at);c.updateMatrixWorld()},s)
   await page.waitForFunction(()=>{const {stats,stream,camera,manifest}=window.viewer;return !stats.pending && manifest.chunks.every(t=>Math.hypot(t.x+128-camera.position.x,t.z+128-camera.position.z)>stream.radius||stream.loaded.has(t))},null,{timeout:600000})
