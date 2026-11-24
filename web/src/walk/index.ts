@@ -25,6 +25,7 @@ import {createPhysics} from './physics'
 import {resolveContact} from '../traffic/contact'
 import {createCameraRig} from './camera'
 import {isFirstPerson} from './view-mode'
+import {createEbikeGripPose} from './ebike-grip'
 import {hits} from '../input/keymap'
 import {look} from '../look/config'
 import {env} from '../look/time'
@@ -353,6 +354,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     outfitController.applyEquipped(initialWardrobe.equipped,{ridingEbike:false,autoHelmetOnRide:initialWardrobe.autoHelmetOnRide})
   }
   const riderJoints=getAvatarJoints(figure) as RiderJoints
+  const applyGripPose=createEbikeGripPose(figure)
   const ebikeRig=createDynamicEbike(0)
   ebikeRig.root.visible=false
   scene.add(ebikeRig.root)
@@ -1644,6 +1646,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           night:env.night,
           supportY:(sx,sz,refY)=>supportAt(sx,sz,refY)?.y??refY,
         })
+        if(ebikeState.crashPhase==='none')applyGripPose(ebikeRig.frontAssembly,mountBlend)
         input.syncRideHud(ebikeState,'bike')
       }else{
         ebikeRig.root.visible=false
