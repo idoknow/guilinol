@@ -311,6 +311,7 @@ def bake(output, manifest, rendered_roads=None):
             group.extend(nearby)
         schedule = signal_schedule((lane for ref in group for lane in incoming[ref]), nodes)
         signals.extend(dict(node=ref,group=group[0],offset=group[0]%31,phases=schedule) for ref in group)
+    ground_passages.set_terminal_stops(nodes,lanes,node_height,profile)
     align_airport_lane(nodes, lanes, node_height, profile)
     result = dict(nodes=[node for node in nodes.values() if node['y'] is not None],lanes=lanes,signals=signals,quiet=quiet,walks=walks)
     dest = output/'roads'/'graph.json.gz'
