@@ -65,7 +65,7 @@ def close_qingtian_road(elements, widths, curbs):
         return
     protected=axis.intersection(building.buffer(half+.5))
     closures=[part for part in line_parts(protected)
-              if any(part.intersection(overlap).length>.01 for overlap in overlaps)]
+              if any(part.distance(overlap.interpolate(.5,normalized=True))<.001 for overlap in overlaps)]
     bounds=[]
     for part in closures:
         for end in (part.coords[0],part.coords[-1]):
@@ -78,10 +78,10 @@ def close_qingtian_road(elements, widths, curbs):
             curbs.append(LineString([point-half*normal,point+half*normal]).buffer(.125,cap_style='flat'))
     street['closureBounds']=bounds
     street['openStations']=[]
-    for segment in line_parts(axis.difference(union_all(closures))):
-        if segment.length>=10:
-            street['openStations'].append(tuple(sorted(axis.project(Point(p))
-                for p in (segment.coords[0],segment.coords[-1]))))
+    stations=[0.,*sorted(bounds),axis.length]
+    for lo,hi in zip(stations[::2],stations[1::2]):
+        if hi-lo>=10:
+            street['openStations'].append((lo,hi))
 
 
 def garage_boundary(output, chunks, elements):
