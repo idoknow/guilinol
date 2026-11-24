@@ -62,18 +62,28 @@ def inventory(elements, region, node_evidence):
                 r, h = level(rt), level(ht)
                 evidence = node_evidence.get(str(shared))
                 kind = None
-                if shared:
+                node_tag = (evidence or {}).get('railway')
+                structure = [int(tags.get('bridge', 'no') != 'no') -
+                             int(tags.get('tunnel', 'no') != 'no') for tags in (rt, ht)]
+                structured = any(tags.get(key, 'no') != 'no' for tags in (rt, ht)
+                                 for key in ('bridge', 'tunnel'))
+                different_layers = None not in (r, h) and r != h
+                if shared and (node_tag in ('level_crossing', 'crossing') or
+                               not (structured or different_layers)):
                     kind = 'level'
-                    tag = (evidence or {}).get('railway')
-                    reason = f'railway={tag}' if tag else '无标签，按共享节点推定'
-                elif None not in (r, h) and r != h:
+                    reason = f'railway={node_tag}' if node_tag else '无标签，按共享节点推定'
+                elif different_layers:
                     kind = 'rail_over' if r > h else 'road_over'
                     reason = f'层级（铁路 {r}，道路 {h}）'
-                elif ht.get('tunnel') == 'yes' and rt.get('tunnel', 'no') == 'no':
-                    kind = 'rail_over'
-                    reason = '道路 tunnel=yes，铁路无隧道标签'
+                elif structure[0] != structure[1]:
+                    kind = 'rail_over' if structure[0] > structure[1] else 'road_over'
+                    reason = '按桥隧标签确定上下层'
+                elif structured and shared:
+                    raise ValueError(f'上下层无法确定：节点 {shared}，铁路 {rail["id"]}，道路 {road["id"]}')
                 else:
                     reason = '未共享节点，缺少上下层证据'
+                if shared and kind in ('rail_over', 'road_over'):
+                    reason += '；共享节点无平交标签'
                 status = 'active'
                 if road['id'] == 727929887 and kind == 'rail_over':
                     status = 'pending_road_tunnel'

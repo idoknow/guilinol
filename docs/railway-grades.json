@@ -18,15 +18,14 @@
       162.11798414581642
     ]
   },
-  "levelRecords": 170,
-  "levelSites": 119,
+  "levelRecords": 169,
+  "levelSites": 118,
   "carriagewayY": {
     "4680276257": 158.8322,
     "4680276266": 160.5837,
     "4680276120": 156.822,
     "4680276121": 156.9078,
     "6533456504": 158.3853,
-    "459904752": 158.8626,
     "9112389304": 162.1,
     "4505338292": 161.396,
     "4514289414": 158.4908,
@@ -142,161 +141,7 @@
     "10287194720": 159.1756
   },
   "stationApproachExceptions": [],
-  "roadFeasibilityConflicts": [
-    {
-      "fromConstraint": {
-        "road": 687025327,
-        "type": "level_panel",
-        "fromM": 67.95909520599214,
-        "toM": 71.95909520599214,
-        "railY": 158.2424730823387
-      },
-      "toConstraint": {
-        "originalSoffitM": null,
-        "roadStructureDependency": null,
-        "surfaceSource": "terrain_proxy",
-        "rail": 991385687,
-        "road": 687025327,
-        "type": "rail_over",
-        "sharedNode": null,
-        "x": -1280.5226,
-        "z": -2264.2442,
-        "east": -0.913079,
-        "south": -0.407782,
-        "railY": 158.1017,
-        "roadY": 158.7131,
-        "clearanceM": null
-      },
-      "ways": [
-        687025327
-      ],
-      "path": [
-        {
-          "way": 687025327,
-          "fromM": 67.95909520599214,
-          "toM": 63.410799720193495,
-          "lengthM": 4.548295485798647,
-          "maxGrade": 0.05
-        }
-      ],
-      "distanceM": 4.5483,
-      "requiredFallM": 5.8408,
-      "permittedFallM": 0.2274,
-      "deficitM": 5.6134
-    },
-    {
-      "fromConstraint": {
-        "originalSoffitM": null,
-        "roadStructureDependency": null,
-        "surfaceSource": "painted_terrain",
-        "rail": 259016009,
-        "road": 687025327,
-        "type": "level",
-        "sharedNode": 459904752,
-        "x": -1286.5034,
-        "z": -2266.9107,
-        "east": -0.92311,
-        "south": -0.384536,
-        "railY": 158.2425,
-        "roadY": 158.8626,
-        "clearanceM": null
-      },
-      "toConstraint": {
-        "originalSoffitM": null,
-        "roadStructureDependency": null,
-        "surfaceSource": "terrain_proxy",
-        "rail": 991385687,
-        "road": 687025327,
-        "type": "rail_over",
-        "sharedNode": null,
-        "x": -1280.5226,
-        "z": -2264.2442,
-        "east": -0.913079,
-        "south": -0.407782,
-        "railY": 158.1017,
-        "roadY": 158.7131,
-        "clearanceM": null
-      },
-      "ways": [
-        687025327
-      ],
-      "path": [
-        {
-          "way": 687025327,
-          "fromM": 69.95914727740778,
-          "toM": 67.95909520599214,
-          "lengthM": 2.000052071415638,
-          "maxGrade": 0.05
-        },
-        {
-          "way": 687025327,
-          "fromM": 67.95909520599214,
-          "toM": 63.410799720193495,
-          "lengthM": 4.548295485798647,
-          "maxGrade": 0.05
-        }
-      ],
-      "distanceM": 6.5483,
-      "requiredFallM": 5.8408,
-      "permittedFallM": 0.3274,
-      "deficitM": 5.5134
-    },
-    {
-      "fromConstraint": {
-        "road": 687025327,
-        "type": "level_panel",
-        "fromM": 67.95909520599214,
-        "toM": 71.95909520599214,
-        "railY": 158.2424730823387
-      },
-      "toConstraint": {
-        "originalSoffitM": null,
-        "roadStructureDependency": null,
-        "surfaceSource": "terrain_proxy",
-        "rail": 991385687,
-        "road": 687025327,
-        "type": "rail_over",
-        "sharedNode": null,
-        "x": -1280.5226,
-        "z": -2264.2442,
-        "east": -0.913079,
-        "south": -0.407782,
-        "railY": 158.1017,
-        "roadY": 158.7131,
-        "clearanceM": null
-      },
-      "ways": [
-        687025327
-      ],
-      "path": [
-        {
-          "way": 687025327,
-          "fromM": 71.95909520599214,
-          "toM": 69.95914727740778,
-          "lengthM": 1.999947928584362,
-          "maxGrade": 0.05
-        },
-        {
-          "way": 687025327,
-          "fromM": 69.95914727740778,
-          "toM": 67.95909520599214,
-          "lengthM": 2.000052071415638,
-          "maxGrade": 0.05
-        },
-        {
-          "way": 687025327,
-          "fromM": 67.95909520599214,
-          "toM": 63.410799720193495,
-          "lengthM": 4.548295485798647,
-          "maxGrade": 0.05
-        }
-      ],
-      "distanceM": 8.5483,
-      "requiredFallM": 5.8408,
-      "permittedFallM": 0.4274,
-      "deficitM": 5.4134
-    }
-  ],
+  "roadFeasibilityConflicts": [],
   "roadTargets": [
     {
       "road": 49322776,
@@ -1975,11 +1820,11 @@
     {
       "road": 687025327,
       "rail": 259016009,
-      "type": "level",
+      "type": "rail_over",
       "atM": 69.959,
       "oldM": 158.8626,
-      "requiredM": 158.2425,
-      "changeM": -0.6201
+      "requiredM": 152.5425,
+      "changeM": -6.3201
     },
     {
       "road": 687025327,

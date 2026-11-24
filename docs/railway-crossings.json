@@ -1048,9 +1048,9 @@
     "lon": 110.2872192,
     "sharedNode": 459904752,
     "geometry": "Point",
-    "type": "level",
+    "type": "rail_over",
     "status": "active",
-    "evidence": "无标签，按共享节点推定",
+    "evidence": "层级（铁路 1，道路 -1）；共享节点无平交标签",
     "nodeEvidence": {
       "version": 3,
       "railway": null
@@ -1059,7 +1059,7 @@
     "railY": 158.2425,
     "roadY": 158.8626,
     "designClearanceM": null,
-    "surfaceSource": "painted_terrain"
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 259082248,
@@ -3062,7 +3062,7 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "active",
-    "evidence": "道路 tunnel=yes，铁路无隧道标签",
+    "evidence": "按桥隧标签确定上下层",
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 156.874,
@@ -3097,7 +3097,7 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "active",
-    "evidence": "道路 tunnel=yes，铁路无隧道标签",
+    "evidence": "按桥隧标签确定上下层",
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 157.0685,
@@ -3224,7 +3224,7 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "道路 tunnel=yes，铁路无隧道标签；道路 1573855551 的结构生成后复验",
+    "evidence": "按桥隧标签确定上下层；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 161.4773,
