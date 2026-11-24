@@ -11,7 +11,7 @@ import {avatar as figure} from '../look/avatar'
 type Walker = {x:number,y:number,z:number,yaw:number,speed:number,scale:number,down:number,kind:string,leaving:boolean}
 type Template = {scene:THREE.Object3D,clips:THREE.AnimationClip[]}
 type View = {root:THREE.Group,mixer?:THREE.AnimationMixer,walk?:THREE.AnimationAction,idle?:THREE.AnimationAction,
-  moving:boolean,template:number,placed:boolean}
+  moving:boolean,template:number,placed:boolean,lastGx:number,lastGz:number,lastGy:number,groundAcc:number,animAcc:number}
 
 // Street mix — present-day casual first; uniforms/office are a minority.
 const LOOK_WEIGHTS:Record<(typeof looks)[number],number>={basic:5,sport:8,outdoor:9,chinese:6,office:4,campus:3,
@@ -53,6 +53,7 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
   const LIMIT=mobile?12:28,RANGE=mobile?80:140,POOL=mobile?10:20
   const templates:(Promise<Template>|undefined)[]=new Array(POOL),ready:(Template|undefined)[]=new Array(POOL)
   const assigned=new WeakMap<object,number>(),active=new Map<Walker,View>()
+  const frustum=new THREE.Frustum(),proj=new THREE.Matrix4(),bound=new THREE.Sphere()
   let seed=0x2290
   const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/2**32}
   function template(index:number){
@@ -97,7 +98,7 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
     walk&&(walk.time=Math.random()*walk.getClip().duration)
     idle?.play();idle?.setEffectiveWeight(0)
     scene.add(root)
-    const view={root,mixer,walk,idle,moving:true,template:index,placed:false}
+    const view={root,mixer,walk,idle,moving:true,template:index,placed:false,lastGx:NaN,lastGz:NaN,lastGy:walker.y,groundAcc:0,animAcc:0}
     active.set(walker,view)
     return view
   }
@@ -115,7 +116,12 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
     },
     /** Every frame: extrapolate along the heading between 20 Hz sim steps, blend walk/idle, advance clips. */
     animate(dt:number,lag:number){
+      if(!active.size)return
       const alpha=1-Math.exp(-18*dt)
+      const cx=camera.position.x,cz=camera.position.z
+      camera.updateMatrixWorld()
+      proj.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse)
+      frustum.setFromProjectionMatrix(proj)
       for(const [walker,view] of active){
         const tx=walker.x+Math.sin(walker.yaw)*walker.speed*lag,tz=walker.z+Math.cos(walker.yaw)*walker.speed*lag
         const pos=view.root.position
@@ -125,7 +131,14 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
           const turn=walker.yaw+Math.PI-view.root.rotation.y // figure.glb faces −z (walk/index.ts uses atan2(-dx,-dz))
           view.root.rotation.y+=Math.atan2(Math.sin(turn),Math.cos(turn))*alpha
         }
-        pos.y=groundAt?.(pos.x,pos.z,walker.y,false)??walker.y
+        // Rapier 贴地射线节流：首帧、水平位移 >0.35m 或行走中满 200ms (5Hz) 重采样
+        const dgx=pos.x-view.lastGx,dgz=pos.z-view.lastGz
+        view.groundAcc+=dt
+        if(Number.isNaN(view.lastGx)||dgx*dgx+dgz*dgz>.1225||(walker.speed>.15&&view.groundAcc>=.2)){
+          view.lastGx=pos.x;view.lastGz=pos.z;view.groundAcc=0
+          view.lastGy=groundAt?.(pos.x,pos.z,walker.y,false)??walker.y
+        }
+        pos.y=view.lastGy
         view.root.scale.setScalar(Math.max(.001,walker.scale))
         const moving=walker.speed>.15
         if(moving!==view.moving&&view.walk&&view.idle){
@@ -134,7 +147,20 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
           else view.walk.crossFadeTo(view.idle.setEffectiveWeight(1),.25,false)
         }
         if(view.walk)view.walk.timeScale=THREE.MathUtils.clamp(walker.speed/STRIDE,.45,1.25)
-        view.mixer?.update(dt)
+        // 视锥外路人跳过骨骼动画更新，远距 (>45m) 降频到 25Hz，近景保持逐帧流畅
+        bound.center.set(pos.x,pos.y+.9,pos.z);bound.radius=1.8
+        if(!frustum.intersectsSphere(bound)){
+          view.animAcc=Math.min(.5,view.animAcc+dt)
+        }else{
+          const distSq=(pos.x-cx)**2+(pos.z-cz)**2
+          if(distSq>2025){
+            view.animAcc+=dt
+            if(view.animAcc>=.04){view.mixer?.update(view.animAcc);view.animAcc=0}
+          }else{
+            view.mixer?.update(dt+view.animAcc)
+            view.animAcc=0
+          }
+        }
       }
     },
     clear(){for(const [walker,view] of active)release(walker,view)},
