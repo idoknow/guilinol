@@ -37,11 +37,30 @@ try {
         applyEbikeVisualAndRider({figure,joints:avatar.joints,rig,basePos:new T.Vector3(),heading:0,groundPitch:0,snapMountBlend:1,mountStartPos:new T.Vector3(),mountStartYaw:0,mountStartRot:new Map(),fx,state:{speed:0,steerInput,wheelie,lean,crashPhase:'none'},dt:.016})
         for(const phase of ['before','after']){
           if(phase==='after')solve(rig.frontAssembly,1)
-          const distances=['l','r'].map((side,index)=>figure.getObjectByName('hand_'+side).localToWorld(new T.Vector3(0,.06,0)).distanceTo(rig.frontAssembly.localToWorld(new T.Vector3(index?.264:-.264,1.128,.168))))
-          results.push({body,steerInput,wheelie,phase,distances})
+          for(const side of ['l','r']){
+            const grip=new T.Vector3(side==='r'?.264:-.264,1.128,.168)
+            const relative=name=>rig.frontAssembly.worldToLocal(figure.getObjectByName(name+'_'+side).getWorldPosition(new T.Vector3())).sub(grip)
+            const fingers=['index','middle','ring','pinky']
+            const roots=fingers.map(name=>relative(name+'_01')),tips=fingers.map(name=>relative(name+'_04_leaf'))
+            const thumb=relative('thumb_04_leaf')
+            if(phase==='after'){
+              const mesh=avatar.skinnedMesh, positions=mesh.geometry.attributes.position
+              const contacts=new Set()
+              figure.updateMatrixWorld(true)
+              for(let vertex=0;vertex<positions.count;vertex++){
+                const bone=mesh.skeleton.bones[mesh.geometry.attributes.skinIndex.getX(vertex)].name
+                const match=/^(index|middle|ring|pinky|thumb)_\d+_([lr])$/.exec(bone)
+                if(!match || match[2]!==side || contacts.has(match[1]))continue
+                const point=rig.frontAssembly.worldToLocal(mesh.localToWorld(mesh.getVertexPosition(vertex,new T.Vector3()))).sub(grip)
+                if(Math.abs(point.x)<.058 && Math.abs(Math.hypot(point.y,point.z)-.020)<.012)contacts.add(match[1])
+              }
+              if(contacts.size!==5)throw Error(`Missing grip contact: ${body} ${side} ${steerInput} ${wheelie}: ${[...contacts]}`)
+            }
+            results.push({body,steerInput,wheelie,side,phase,rootMin:Math.min(...roots.map(v=>v.y)),tipMax:Math.max(...tips.map(v=>v.y)),front:Math.max(...roots.map(v=>v.z)),thumbY:thumb.y,thumbZ:thumb.z,tipRad:Math.max(...tips.map(v=>Math.hypot(v.y,v.z)))})
+          }
           if(body==='m'&&!steerInput&&!wheelie){
-            for(const [name,x,y,z] of [['detail',1.35,1.6,-.85],['overview',2.45,1.8,1.75]]){
-              camera.position.set(x,y,z);camera.lookAt(0,name==='detail'?1.21:.86,-.06);renderer.render(scene,camera);window.shots[phase+'-'+name]=renderer.domElement.toDataURL()
+            for(const [name,x,y,z] of [['detail',.63,1.23,-.43],['overview',2.45,1.8,1.75]]){
+              camera.position.set(x,y,z);camera.lookAt(name==='detail'?.254:0,name==='detail'?1.13:.86,name==='detail'?-.26:-.06);renderer.render(scene,camera);window.shots[phase+'-'+name]=renderer.domElement.toDataURL()
             }
           }
         }
@@ -52,5 +71,5 @@ try {
   })
   console.table(results)
   if(output){await mkdir(output,{recursive:true});const {writeFile}=await import('node:fs/promises');for(const [name,url] of Object.entries(await page.evaluate(()=>window.shots)))await writeFile(`${output}/${name}.png`,Buffer.from(url.split(',')[1],'base64'))}
-  for(const result of results.filter(row=>row.phase==='after'))assert(Math.max(...result.distances)<.035,JSON.stringify(result))
+  for(const result of results.filter(row=>row.phase==='after'))assert(result.rootMin>0 && result.tipMax<0 && result.thumbY<0 && result.thumbZ>result.front && result.tipRad<.06,JSON.stringify(result))
 } finally {await browser?.close();await server.close()}
