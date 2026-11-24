@@ -28,8 +28,8 @@ try {
       const page = await context.newPage()
       const cdp = await context.newCDPSession(page)
       const url = `http://127.0.0.1:${servers[side].httpServer.address().port}`
-      await page.goto(`${url}/?verify&flow=0&time=10&${process.env.PERF_TRAFFIC===undefined?'':'traffic='+Number(process.env.PERF_TRAFFIC==='1')+'&'}${view==='walk-palace'?'mode=walk':`cam=${view}`}`)
-      await page.waitForFunction(walking => {
+      await page.goto(`${url}/?verify&flow=0&time=10&${process.env.PERF_TRAFFIC===undefined?'':'traffic='+Number(process.env.PERF_TRAFFIC==='1')+'&'}cam=${view==='walk-palace'?'palace':view}`)
+      const settled=walking => {
         const viewer = window.viewer
         if (!viewer?.stats.firstMs || viewer.stats.pending || viewer.stream.updateLandmarks?.pendingCount?.() || viewer.stream.forest.pending.size || (walking && !viewer.walk?.active)) return false
         const pos = walking ? viewer.walk.position : viewer.camera.position
@@ -37,7 +37,15 @@ try {
           const distance = Math.hypot(tile.x+128-pos.x,tile.z+128-pos.z)
           return (distance>viewer.stream.radius || viewer.stream.loaded.has(tile)) && (distance>1682 || viewer.stream.forest.loaded.has(tile))
         })
-      }, view==='walk-palace', {timeout:120000})
+      }
+      // A cold deep link sometimes renders the initial flight scene before
+      // walking starts. Upload that same scene on both builds before landing.
+      await page.waitForFunction(settled,false,{timeout:120000})
+      if(view==='walk-palace'){
+        await page.evaluate(async()=>{for(let i=0;i<30;i++)await new Promise(requestAnimationFrame)})
+        assert(await page.evaluate(()=>window.viewer.walkTo(-588,-212,Math.PI,'benchmark')))
+        await page.waitForFunction(settled,true,{timeout:120000})
+      }
       if(view==='walk-palace'&&process.env.PERF_TRAFFIC==='1'){
         await page.waitForFunction(()=>window.viewer.trafficProbe?.allMotors?.length>0,null,{timeout:120000})
         // Let both fleets stream their visible character templates and upload
