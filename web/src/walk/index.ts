@@ -499,22 +499,32 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   let testRideOobSince=0
 
   function finishActiveTestRide(reason:'timeout'|'out_of_bounds'|'user'|'dismount_far'|'mode_switch'|'purchase'){
+    const trial=getGameState().garage.activeTestRide
+    if(!trial||!rides)return
     testRideBrakeTimer=0
     testRideOobSince=0
-    // Clear any active crash/standup/pickup state atomically before reclaiming test-ride bike (IDOK-128 safety).
-    if(crashSession){
-      crashSession=null
-      crashRecoverQueued=false
-      ebikeFx.resetForMount('normal',100)
+    const restoreFoot=rides.bikeOwnership==='test_ride'||(!rides.bike&&!rides.car&&!rides.boat)
+    if(restoreFoot){
+      crashSession=null;crashRecoverQueued=false
+      standUpSession=null;pickupSession=null
     }
-    standUpSession=null
-    pickupSession=null
-    const ended=rides?.endTestRide(reason)??false
+    for(const rec of downedBikes){
+      if(rec.mesh.userData.instanceId!==trial.instanceId)continue
+      removeDownedHazard(rec)
+      downedBikes.delete(rec)
+    }
+    const ended=rides.endTestRide(reason)
     if(ended){
-      releaseDynamicBike()
-      input.syncRideHud(null,null)
-      applyFootController()
-      wasBike=false
+      if(restoreFoot){
+        releaseDynamicBike()
+        ridePose.reset()
+        resetMotion()
+        mixer.stopAllAction();action=undefined
+        twoWheelOp=createInitialTwoWheelOpState()
+        input.clearRun();input.syncRideHud(null,null)
+        applyFootController()
+        wasBike=false
+      }
       if((!verify||stuntMode)&&reason!=='mode_switch'&&reason!=='purchase'){
         const label=reason==='timeout'?'试驾时间已到，车辆已安全归还车行'
           :reason==='out_of_bounds'?'超出试驾范围，车辆已安全归还车行'
@@ -1792,6 +1802,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }):[],
       planarSpeed:Math.hypot(vx,vz),grounded,verticalVelocity:velocity,crouching,animClip:activeClipName,facing,figPos:figure.position.toArray(),figYaw:figure.rotation.y,bikePitch:rides?.bikePitch??0,bikeY:rides?.bikeY??0,carPitch:rides?.carPitch??0,carY:rides?.carY??0,
       pedalPhase:rides?.rideKind==='bicycle'?bicyclePedalPhase:ridePose.pedalPhase,thighL:getAvatarJoint(figure,'ThighL')?.rotation.x??0,thighR:getAvatarJoint(figure,'ThighR')?.rotation.x??0,
+      figPitch:figure.rotation.x,figRoll:figure.rotation.z,
       ebike:ebikeState,
       ebikeAudio:ebikeAudio.probe(),
       ebikeRig:ebikeRig.root.visible?{
