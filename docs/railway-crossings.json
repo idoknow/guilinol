@@ -38,7 +38,7 @@
     "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.4378,
+    "railY": 153.8815,
     "roadY": 153.6441,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -81,7 +81,7 @@
     "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.5273,
+    "railY": 153.9711,
     "roadY": 153.7,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -129,10 +129,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.1847,
+    "railY": 156.5253,
     "roadY": 156.4847,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.1594,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.6594
+    }
   },
   {
     "rail": 205756895,
@@ -175,10 +178,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.1966,
+    "railY": 156.6585,
     "roadY": 156.4966,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.0381,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.5381
+    }
   },
   {
     "rail": 213171553,
@@ -208,7 +214,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.667,
+    "railY": 153.9584,
     "roadY": 153.6784,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -240,7 +246,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.8581,
+    "railY": 154.0503,
     "roadY": 153.7539,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -269,7 +275,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.8322,
+    "railY": 159.8293,
     "roadY": 158.8322,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -299,7 +305,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 160.5837,
+    "railY": 163.3005,
     "roadY": 160.5837,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -334,7 +340,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 156.822,
+    "railY": 155.3659,
     "roadY": 156.822,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -369,7 +375,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 156.9078,
+    "railY": 155.7775,
     "roadY": 156.9078,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -397,7 +403,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.3853,
+    "railY": 158.5636,
     "roadY": 158.3853,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -439,7 +445,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 150.2015,
+    "roadY": 148.7882,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -480,7 +486,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 149.9123,
+    "roadY": 148.6765,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -562,7 +568,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 150.4248,
+    "roadY": 149.1515,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -644,7 +650,7 @@
     "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.7868,
+    "railY": 152.9383,
     "roadY": 152.0395,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -687,7 +693,7 @@
     "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.6912,
+    "railY": 152.8428,
     "roadY": 152.6881,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -729,7 +735,7 @@
     "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.7678,
+    "railY": 151.3031,
     "roadY": 151.0,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -773,16 +779,12 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.1545,
+    "railY": 154.5502,
     "roadY": 155.3274,
-    "designClearanceM": 3.627,
+    "designClearanceM": -1.9772,
     "surfaceSource": "carriageway",
     "clearanceConflict": {
-      "surfaceSource": "carriageway",
-      "shortfallM": 0.873,
-      "requiredRailY": 161.0274,
-      "actualRailY": 160.1545,
-      "stationRailY": 153.8
+      "shortfallM": 6.4772
     }
   },
   {
@@ -821,16 +823,12 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.084,
+    "railY": 154.5124,
     "roadY": 155.3335,
-    "designClearanceM": 3.5504,
+    "designClearanceM": -2.0211,
     "surfaceSource": "carriageway",
     "clearanceConflict": {
-      "surfaceSource": "carriageway",
-      "shortfallM": 0.95,
-      "requiredRailY": 161.0335,
-      "actualRailY": 160.084,
-      "stationRailY": 153.8
+      "shortfallM": 6.5211
     }
   },
   {
@@ -869,16 +867,12 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.326,
+    "railY": 154.7217,
     "roadY": 155.3146,
-    "designClearanceM": 3.8114,
+    "designClearanceM": -1.7928,
     "surfaceSource": "carriageway",
     "clearanceConflict": {
-      "surfaceSource": "carriageway",
-      "shortfallM": 0.689,
-      "requiredRailY": 161.0146,
-      "actualRailY": 160.326,
-      "stationRailY": 153.8
+      "shortfallM": 6.2928
     }
   },
   {
@@ -920,16 +914,12 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.2639,
+    "railY": 154.6596,
     "roadY": 155.3189,
-    "designClearanceM": 3.745,
+    "designClearanceM": -1.8593,
     "surfaceSource": "carriageway",
     "clearanceConflict": {
-      "surfaceSource": "carriageway",
-      "shortfallM": 0.755,
-      "requiredRailY": 161.0189,
-      "actualRailY": 160.2639,
-      "stationRailY": 153.8
+      "shortfallM": 6.3593
     }
   },
   {
@@ -969,10 +959,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 157.4613,
+    "railY": 152.9309,
     "roadY": 151.7613,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.0304,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.5304
+    }
   },
   {
     "rail": 221891696,
@@ -1012,10 +1005,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 157.4132,
+    "railY": 152.9228,
     "roadY": 151.7132,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 0.0096,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.4904
+    }
   },
   {
     "rail": 259016009,
@@ -1060,7 +1056,7 @@
       "railway": null
     },
     "measuredClearance": null,
-    "railY": 158.8626,
+    "railY": 158.2425,
     "roadY": 158.8626,
     "designClearanceM": null,
     "surfaceSource": "painted_terrain"
@@ -1091,10 +1087,13 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.7897,
+    "railY": 157.7304,
     "roadY": 158.0897,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.5593,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 6.0593
+    }
   },
   {
     "rail": 259082251,
@@ -1138,26 +1137,12 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 159.3141,
+    "railY": 162.2919,
     "roadY": 160.9712,
-    "designClearanceM": 0.4571,
+    "designClearanceM": -2.5207,
     "surfaceSource": "deck",
     "clearanceConflict": {
-      "surfaceSource": "deck",
-      "shortfallM": 6.093,
-      "requiredRailY": 153.2212,
-      "boundDirection": "max",
-      "opposingGradeLimitY": 159.3141,
-      "permittedRiseFromWitnessM": 5.955,
-      "witness": {
-        "rail": 259082251,
-        "road": 815078159,
-        "sharedNode": null,
-        "type": "rail_over",
-        "surfaceSource": "carriageway",
-        "lat": 25.3643338,
-        "lon": 110.3024075
-      }
+      "shortfallM": 10.0207
     }
   },
   {
@@ -1202,26 +1187,12 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 159.459,
+    "railY": 162.2805,
     "roadY": 160.9596,
-    "designClearanceM": 0.3006,
+    "designClearanceM": -2.5209,
     "surfaceSource": "deck",
     "clearanceConflict": {
-      "surfaceSource": "deck",
-      "shortfallM": 6.249,
-      "requiredRailY": 153.2096,
-      "boundDirection": "max",
-      "opposingGradeLimitY": 159.459,
-      "permittedRiseFromWitnessM": 5.8101,
-      "witness": {
-        "rail": 259082251,
-        "road": 815078159,
-        "sharedNode": null,
-        "type": "rail_over",
-        "surfaceSource": "carriageway",
-        "lat": 25.3643338,
-        "lon": 110.3024075
-      }
+      "shortfallM": 10.0209
     }
   },
   {
@@ -1257,10 +1228,13 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 165.2691,
+    "railY": 161.9332,
     "roadY": 159.5691,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 1.1641,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 3.3359
+    }
   },
   {
     "rail": 259082274,
@@ -1301,16 +1275,12 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.0832,
+    "railY": 154.5046,
     "roadY": 155.3508,
-    "designClearanceM": 3.5324,
+    "designClearanceM": -2.0462,
     "surfaceSource": "carriageway",
     "clearanceConflict": {
-      "surfaceSource": "carriageway",
-      "shortfallM": 0.968,
-      "requiredRailY": 161.0508,
-      "actualRailY": 160.0832,
-      "stationRailY": 153.8
+      "shortfallM": 6.5462
     }
   },
   {
@@ -1349,16 +1319,12 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.0119,
+    "railY": 154.5759,
     "roadY": 155.3582,
-    "designClearanceM": 3.4538,
+    "designClearanceM": -1.9823,
     "surfaceSource": "carriageway",
     "clearanceConflict": {
-      "surfaceSource": "carriageway",
-      "shortfallM": 1.046,
-      "requiredRailY": 161.0582,
-      "actualRailY": 160.0119,
-      "stationRailY": 153.8
+      "shortfallM": 6.4823
     }
   },
   {
@@ -1397,16 +1363,12 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.2555,
+    "railY": 154.6352,
     "roadY": 155.3347,
-    "designClearanceM": 3.7207,
+    "designClearanceM": -1.8995,
     "surfaceSource": "carriageway",
     "clearanceConflict": {
-      "surfaceSource": "carriageway",
-      "shortfallM": 0.779,
-      "requiredRailY": 161.0347,
-      "actualRailY": 160.2555,
-      "stationRailY": 153.8
+      "shortfallM": 6.3995
     }
   },
   {
@@ -1448,16 +1410,12 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.1928,
+    "railY": 154.5725,
     "roadY": 155.3404,
-    "designClearanceM": 3.6524,
+    "designClearanceM": -1.9678,
     "surfaceSource": "carriageway",
     "clearanceConflict": {
-      "surfaceSource": "carriageway",
-      "shortfallM": 0.848,
-      "requiredRailY": 161.0404,
-      "actualRailY": 160.1928,
-      "stationRailY": 153.8
+      "shortfallM": 6.4678
     }
   },
   {
@@ -1497,7 +1455,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.2782,
+    "railY": 159.0837,
     "roadY": 158.0777,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -1539,7 +1497,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.1253,
+    "railY": 158.894,
     "roadY": 157.9929,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -1580,7 +1538,7 @@
     "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.0474,
+    "railY": 152.4544,
     "roadY": 151.3666,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -1627,10 +1585,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.1081,
+    "railY": 156.9244,
     "roadY": 158.4081,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -2.6836,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 7.1836
+    }
   },
   {
     "rail": 264922022,
@@ -1670,10 +1631,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.303,
+    "railY": 156.7797,
     "roadY": 155.603,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.0233,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.5233
+    }
   },
   {
     "rail": 264922022,
@@ -1717,10 +1681,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.0921,
+    "railY": 157.1184,
     "roadY": 158.3921,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -2.4737,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.9737
+    }
   },
   {
     "rail": 264922022,
@@ -1759,10 +1726,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.1143,
+    "railY": 157.7648,
     "roadY": 157.4143,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.8495,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.3495
+    }
   },
   {
     "rail": 264922022,
@@ -1801,10 +1771,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.518,
+    "railY": 157.1685,
     "roadY": 156.7263,
-    "designClearanceM": 4.5917,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.7578,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.2578
+    }
   },
   {
     "rail": 264922022,
@@ -1845,10 +1818,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.2342,
+    "railY": 159.1883,
     "roadY": 157.5342,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 0.4541,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.0459
+    }
   },
   {
     "rail": 264922022,
@@ -1889,10 +1865,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.2342,
+    "railY": 158.8488,
     "roadY": 157.5342,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 0.1145,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.3855
+    }
   },
   {
     "rail": 264922024,
@@ -1934,10 +1913,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.0041,
+    "railY": 157.7707,
     "roadY": 158.2505,
-    "designClearanceM": 4.5536,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.6797,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.1797
+    }
   },
   {
     "rail": 264922024,
@@ -1975,10 +1957,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.4908,
+    "railY": 156.9529,
     "roadY": 155.7908,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.0379,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.5379
+    }
   },
   {
     "rail": 264922024,
@@ -2020,10 +2005,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.2,
+    "railY": 157.9667,
     "roadY": 158.5,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.7333,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.2333
+    }
   },
   {
     "rail": 264922024,
@@ -2062,10 +2050,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.2085,
+    "railY": 158.3839,
     "roadY": 157.5085,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.3246,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.8246
+    }
   },
   {
     "rail": 264922024,
@@ -2104,10 +2095,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.2116,
+    "railY": 158.7139,
     "roadY": 157.5116,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 0.0024,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.4976
+    }
   },
   {
     "rail": 264922071,
@@ -2152,9 +2146,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.9356,
+    "railY": 181.409,
     "roadY": 155.2356,
-    "designClearanceM": 4.5,
+    "designClearanceM": 24.9734,
     "surfaceSource": "carriageway"
   },
   {
@@ -2199,9 +2193,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.961,
+    "railY": 181.7861,
     "roadY": 155.261,
-    "designClearanceM": 4.5,
+    "designClearanceM": 25.3251,
     "surfaceSource": "carriageway"
   },
   {
@@ -2239,9 +2233,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 159.7108,
+    "railY": 180.1843,
     "roadY": 150.5181,
-    "designClearanceM": 7.9927,
+    "designClearanceM": 28.4661,
     "surfaceSource": "terrain_proxy"
   },
   {
@@ -2279,9 +2273,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.1417,
+    "railY": 165.9084,
     "roadY": 152.4417,
-    "designClearanceM": 4.5,
+    "designClearanceM": 12.2667,
     "surfaceSource": "carriageway"
   },
   {
@@ -2314,10 +2308,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.5519,
+    "railY": 157.3866,
     "roadY": 157.5433,
-    "designClearanceM": 4.8086,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.3566,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.8566
+    }
   },
   {
     "rail": 375923385,
@@ -2349,10 +2346,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.6039,
+    "railY": 154.818,
     "roadY": 154.9039,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.2859,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.7859
+    }
   },
   {
     "rail": 375923385,
@@ -2392,10 +2392,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.7063,
+    "railY": 157.5411,
     "roadY": 158.0063,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.6653,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.1653
+    }
   },
   {
     "rail": 375923385,
@@ -2435,10 +2438,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.8943,
+    "railY": 157.7722,
     "roadY": 158.1943,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.6221,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.1221
+    }
   },
   {
     "rail": 375923385,
@@ -2470,10 +2476,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.8921,
+    "railY": 157.8155,
     "roadY": 158.1921,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.5765,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.0765
+    }
   },
   {
     "rail": 375923385,
@@ -2504,10 +2513,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.6,
+    "railY": 158.8961,
     "roadY": 158.9,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.2039,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.7039
+    }
   },
   {
     "rail": 375923389,
@@ -2539,10 +2551,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.6771,
+    "railY": 157.3873,
     "roadY": 157.3991,
-    "designClearanceM": 5.078,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.2118,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.7118
+    }
   },
   {
     "rail": 375923389,
@@ -2574,10 +2589,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.0842,
+    "railY": 154.6686,
     "roadY": 154.9283,
-    "designClearanceM": 4.9558,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.4598,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.9598
+    }
   },
   {
     "rail": 375923389,
@@ -2617,10 +2635,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.8287,
+    "railY": 157.5389,
     "roadY": 157.9557,
-    "designClearanceM": 4.673,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.6168,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.1168
+    }
   },
   {
     "rail": 375923389,
@@ -2660,10 +2681,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.0609,
+    "railY": 157.7711,
     "roadY": 158.3609,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.7898,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.2898
+    }
   },
   {
     "rail": 375923389,
@@ -2695,10 +2719,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.0729,
+    "railY": 157.8094,
     "roadY": 158.3729,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.7634,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.2634
+    }
   },
   {
     "rail": 375923389,
@@ -2729,10 +2756,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 165.9558,
+    "railY": 159.784,
     "roadY": 160.2558,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.6718,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 6.1718
+    }
   },
   {
     "rail": 375923389,
@@ -2763,10 +2793,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 165.769,
+    "railY": 159.3534,
     "roadY": 160.069,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.9156,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 6.4156
+    }
   },
   {
     "rail": 375923389,
@@ -2797,10 +2830,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.6,
+    "railY": 158.9181,
     "roadY": 158.9,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.1819,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.6819
+    }
   },
   {
     "rail": 375923389,
@@ -2831,10 +2867,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.4945,
+    "railY": 157.0789,
     "roadY": 156.4368,
-    "designClearanceM": 5.8576,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.558,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.058
+    }
   },
   {
     "rail": 454948576,
@@ -2863,7 +2902,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "出生点",
-    "railY": 162.1,
+    "railY": 162.2128,
     "roadY": 162.1,
     "designClearanceM": null,
     "surfaceSource": "painted_terrain"
@@ -2896,7 +2935,7 @@
     "measuredClearance": null,
     "baselineFailure": "出生点",
     "accessoryStatus": "inside_building",
-    "railY": 161.396,
+    "railY": 161.4114,
     "roadY": 161.396,
     "designClearanceM": null,
     "surfaceSource": "painted_terrain"
@@ -2929,7 +2968,7 @@
     "measuredClearance": null,
     "baselineFailure": "出生点",
     "accessoryStatus": "inside_building",
-    "railY": 161.396,
+    "railY": 161.4114,
     "roadY": 161.396,
     "designClearanceM": null,
     "surfaceSource": "painted_terrain"
@@ -2961,7 +3000,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "出生点",
-    "railY": 158.4908,
+    "railY": 159.1934,
     "roadY": 158.4908,
     "designClearanceM": null,
     "surfaceSource": "painted_terrain"
@@ -2991,7 +3030,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.8031,
+    "railY": 159.9637,
     "roadY": 159.8031,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -3026,7 +3065,7 @@
     "evidence": "道路 tunnel=yes，铁路无隧道标签",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.8105,
+    "railY": 156.874,
     "roadY": 155.7198,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -3061,7 +3100,7 @@
     "evidence": "道路 tunnel=yes，铁路无隧道标签",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.8038,
+    "railY": 157.0685,
     "roadY": 156.5301,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -3088,14 +3127,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 -1，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 -1，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.1811,
+    "railY": 161.0711,
     "roadY": 162.8811,
-    "designClearanceM": 5.5,
+    "designClearanceM": 0.61,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 6.89
+    }
   },
   {
     "rail": 454948576,
@@ -3120,10 +3162,13 @@
     "evidence": "层级（铁路 -1，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 152.99,
+    "railY": 160.278,
     "roadY": 159.69,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -1.788,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 9.288
+    }
   },
   {
     "rail": 454948576,
@@ -3147,14 +3192,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 -1，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 -1，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.179,
+    "railY": 160.8706,
     "roadY": 162.879,
-    "designClearanceM": 5.5,
+    "designClearanceM": 0.8085,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 6.6915
+    }
   },
   {
     "rail": 454948576,
@@ -3176,10 +3224,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "道路 tunnel=yes，铁路无隧道标签；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "道路 tunnel=yes，铁路无隧道标签；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.5873,
+    "railY": 161.4773,
     "roadY": 160.8803,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -3208,7 +3256,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 160.6686,
+    "railY": 161.7932,
     "roadY": 160.6686,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -3237,7 +3285,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 158.363,
+    "railY": 158.3738,
     "roadY": 158.363,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -3265,7 +3313,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 160.645,
+    "railY": 159.9397,
     "roadY": 160.645,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -3294,7 +3342,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.4035,
+    "railY": 158.8207,
     "roadY": 158.4035,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -3335,7 +3383,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.7302,
+    "railY": 158.6541,
     "roadY": 158.0,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -3361,10 +3409,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 149.9208,
+    "railY": 157.1846,
     "roadY": 156.6208,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -1.7638,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 9.2638
+    }
   },
   {
     "rail": 617221269,
@@ -3384,14 +3435,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 149.8709,
+    "railY": 157.1846,
     "roadY": 156.5709,
-    "designClearanceM": 5.5,
+    "designClearanceM": -1.8137,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 9.3137
+    }
   },
   {
     "rail": 617221269,
@@ -3455,10 +3509,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 150.5345,
+    "railY": 157.1846,
     "roadY": 157.2345,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -1.15,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.65
+    }
   },
   {
     "rail": 617221272,
@@ -3477,14 +3534,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 150.4866,
+    "railY": 157.1846,
     "roadY": 157.1866,
-    "designClearanceM": 5.5,
+    "designClearanceM": -1.198,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 8.698
+    }
   },
   {
     "rail": 617221272,
@@ -3547,14 +3607,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 148.2995,
+    "railY": 157.1846,
     "roadY": 156.0494,
-    "designClearanceM": 6.55,
+    "designClearanceM": -2.3351,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 9.8351
+    }
   },
   {
     "rail": 617221275,
@@ -3577,14 +3640,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 148.2518,
+    "railY": 157.1846,
     "roadY": 156.0018,
-    "designClearanceM": 6.55,
+    "designClearanceM": -2.3828,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 9.8828
+    }
   },
   {
     "rail": 617221275,
@@ -3654,10 +3720,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.3414,
+    "railY": 157.1846,
     "roadY": 158.0414,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.3431,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 7.8431
+    }
   },
   {
     "rail": 617221277,
@@ -3679,10 +3748,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.2957,
+    "railY": 157.1846,
     "roadY": 157.9957,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.3889,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 7.8889
+    }
   },
   {
     "rail": 617221277,
@@ -3766,10 +3838,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.9519,
+    "railY": 156.5564,
     "roadY": 158.2519,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -2.8955,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 7.3955
+    }
   },
   {
     "rail": 631438736,
@@ -3809,10 +3884,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.23,
+    "railY": 156.6568,
     "roadY": 155.53,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.0731,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.5731
+    }
   },
   {
     "rail": 631438736,
@@ -3856,10 +3934,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.8943,
+    "railY": 156.7496,
     "roadY": 158.1943,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -2.6447,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 7.1447
+    }
   },
   {
     "rail": 631438736,
@@ -3898,10 +3979,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.6938,
+    "railY": 157.9548,
     "roadY": 157.9938,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.239,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.739
+    }
   },
   {
     "rail": 631438736,
@@ -3940,10 +4024,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.0999,
+    "railY": 157.3609,
     "roadY": 157.2068,
-    "designClearanceM": 4.6931,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.0459,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.5459
+    }
   },
   {
     "rail": 631438736,
@@ -3984,10 +4071,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.2314,
+    "railY": 159.2073,
     "roadY": 157.5314,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 0.4759,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.0241
+    }
   },
   {
     "rail": 631438736,
@@ -4028,10 +4118,13 @@
     "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.2328,
+    "railY": 158.8651,
     "roadY": 157.5328,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 0.1322,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.3678
+    }
   },
   {
     "rail": 667874945,
@@ -4073,10 +4166,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.0113,
+    "railY": 157.9216,
     "roadY": 158.1873,
-    "designClearanceM": 4.624,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.4657,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.9657
+    }
   },
   {
     "rail": 667874945,
@@ -4114,10 +4210,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.4973,
+    "railY": 156.9186,
     "roadY": 155.7973,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.0787,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.5787
+    }
   },
   {
     "rail": 667874945,
@@ -4159,10 +4258,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.2076,
+    "railY": 158.1179,
     "roadY": 158.5076,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.5897,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.0897
+    }
   },
   {
     "rail": 667874945,
@@ -4201,10 +4303,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.2023,
+    "railY": 158.2692,
     "roadY": 157.5023,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.4331,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.9331
+    }
   },
   {
     "rail": 667874945,
@@ -4243,10 +4348,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.2052,
+    "railY": 158.5971,
     "roadY": 157.5052,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.1081,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.6081
+    }
   },
   {
     "rail": 675807124,
@@ -4273,7 +4381,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 149.6245,
+    "roadY": 149.5414,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -4360,7 +4468,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 150.1563,
+    "roadY": 149.9872,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -4429,16 +4537,12 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.3378,
+    "railY": 152.2622,
     "roadY": 154.1322,
-    "designClearanceM": 0.0056,
+    "designClearanceM": -3.07,
     "surfaceSource": "carriageway",
     "clearanceConflict": {
-      "surfaceSource": "carriageway",
-      "shortfallM": 4.494,
-      "requiredRailY": 159.8322,
-      "actualRailY": 155.3378,
-      "stationRailY": 153.8
+      "shortfallM": 7.57
     }
   },
   {
@@ -4473,7 +4577,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 154.3114,
+    "railY": 153.6531,
     "roadY": 154.3114,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -4505,10 +4609,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.2625,
+    "railY": 157.8785,
     "roadY": 158.13,
-    "designClearanceM": 5.6675,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.9485,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.4485
+    }
   },
   {
     "rail": 678370321,
@@ -4536,7 +4643,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 156.4891,
+    "railY": 157.0885,
     "roadY": 156.4891,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -4574,7 +4681,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.7189,
+    "railY": 161.3884,
     "roadY": 159.7189,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -4612,7 +4719,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.7188,
+    "railY": 161.1166,
     "roadY": 159.7188,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -4643,7 +4750,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.349,
+    "railY": 154.5153,
     "roadY": 155.349,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -4674,7 +4781,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 160.5147,
+    "railY": 162.118,
     "roadY": 160.5147,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -4706,7 +4813,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 158.3565,
+    "railY": 158.3738,
     "roadY": 158.3565,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -4739,10 +4846,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.2625,
+    "railY": 157.5333,
     "roadY": 158.0398,
-    "designClearanceM": 5.5773,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.6935,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.1935
+    }
   },
   {
     "rail": 678370321,
@@ -4776,7 +4886,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 154.3114,
+    "railY": 153.6531,
     "roadY": 154.3114,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -4808,7 +4918,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "轨迹",
-    "railY": 157.852,
+    "railY": 157.1518,
     "roadY": 157.852,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -4841,7 +4951,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.7186,
+    "railY": 160.7687,
     "roadY": 159.7186,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -4874,7 +4984,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.7188,
+    "railY": 161.5764,
     "roadY": 159.7188,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -4916,16 +5026,12 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.3785,
+    "railY": 153.1999,
     "roadY": 154.4428,
-    "designClearanceM": -0.2643,
+    "designClearanceM": -2.4429,
     "surfaceSource": "carriageway",
     "clearanceConflict": {
-      "surfaceSource": "carriageway",
-      "shortfallM": 4.764,
-      "requiredRailY": 160.1428,
-      "actualRailY": 155.3785,
-      "stationRailY": 153.8
+      "shortfallM": 6.9429
     }
   },
   {
@@ -4959,7 +5065,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 151.194,
+    "railY": 158.1575,
     "roadY": 151.194,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -4995,7 +5101,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 151.1408,
+    "railY": 158.7872,
     "roadY": 151.1408,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -5037,7 +5143,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 152.439,
+    "railY": 155.9534,
     "roadY": 152.439,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -5066,7 +5172,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 150.5765,
+    "railY": 151.3659,
     "roadY": 150.5765,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -5101,10 +5207,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.9135,
+    "railY": 156.3372,
     "roadY": 155.3909,
-    "designClearanceM": 6.3227,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -0.2536,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 4.7536
+    }
   },
   {
     "rail": 815078146,
@@ -5140,10 +5249,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.7,
+    "railY": 155.2374,
     "roadY": 155.0,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -0.9626,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.4626
+    }
   },
   {
     "rail": 815078146,
@@ -5183,10 +5295,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.5211,
+    "railY": 156.9448,
     "roadY": 156.5088,
-    "designClearanceM": 5.8123,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -0.764,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.264
+    }
   },
   {
     "rail": 815078146,
@@ -5226,10 +5341,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.6621,
+    "railY": 157.0858,
     "roadY": 157.0255,
-    "designClearanceM": 5.4366,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.1397,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.6397
+    }
   },
   {
     "rail": 815078146,
@@ -5265,10 +5383,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.3017,
+    "railY": 154.8391,
     "roadY": 154.3043,
-    "designClearanceM": 4.7974,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -0.6652,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.1652
+    }
   },
   {
     "rail": 815078146,
@@ -5300,10 +5421,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.9016,
+    "railY": 157.3252,
     "roadY": 157.8873,
-    "designClearanceM": 4.8142,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.7621,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.2621
+    }
   },
   {
     "rail": 815078146,
@@ -5336,10 +5460,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.8178,
+    "railY": 156.9837,
     "roadY": 157.1178,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.3341,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.8341
+    }
   },
   {
     "rail": 815078146,
@@ -5372,10 +5499,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.8038,
+    "railY": 156.759,
     "roadY": 157.1038,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.5449,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 6.0449
+    }
   },
   {
     "rail": 815078146,
@@ -5406,10 +5536,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.2,
+    "railY": 157.6237,
     "roadY": 158.5,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -2.0763,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.5763
+    }
   },
   {
     "rail": 815078152,
@@ -5441,10 +5574,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.8961,
+    "railY": 156.2365,
     "roadY": 155.1995,
-    "designClearanceM": 6.4966,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -0.1629,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 4.6629
+    }
   },
   {
     "rail": 815078152,
@@ -5480,10 +5616,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.6952,
+    "railY": 155.2069,
     "roadY": 154.9952,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -0.9883,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.4883
+    }
   },
   {
     "rail": 815078152,
@@ -5523,10 +5662,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.5227,
+    "railY": 156.8631,
     "roadY": 156.4471,
-    "designClearanceM": 5.8756,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -0.784,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.284
+    }
   },
   {
     "rail": 815078152,
@@ -5566,10 +5708,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.6631,
+    "railY": 157.0035,
     "roadY": 157.0141,
-    "designClearanceM": 5.449,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.2106,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.7106
+    }
   },
   {
     "rail": 815078152,
@@ -5605,10 +5750,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.2785,
+    "railY": 154.7903,
     "roadY": 154.3351,
-    "designClearanceM": 4.7434,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -0.7449,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.2449
+    }
   },
   {
     "rail": 815078152,
@@ -5640,10 +5788,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.9202,
+    "railY": 157.2607,
     "roadY": 157.9465,
-    "designClearanceM": 4.7738,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.8858,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.3858
+    }
   },
   {
     "rail": 815078152,
@@ -5676,10 +5827,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.6585,
+    "railY": 156.9773,
     "roadY": 156.9585,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.1813,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.6813
+    }
   },
   {
     "rail": 815078152,
@@ -5712,10 +5866,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.6695,
+    "railY": 156.767,
     "roadY": 156.9695,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.4025,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.9025
+    }
   },
   {
     "rail": 815078152,
@@ -5746,10 +5903,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.1939,
+    "railY": 157.5343,
     "roadY": 158.4939,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -2.1596,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.6596
+    }
   },
   {
     "rail": 815078153,
@@ -5781,10 +5941,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.776,
+    "railY": 159.0479,
     "roadY": 159.526,
-    "designClearanceM": 6.55,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.7219,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.2219
+    }
   },
   {
     "rail": 815078153,
@@ -5819,7 +5982,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.4456,
+    "railY": 154.581,
     "roadY": 154.3658,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -5857,7 +6020,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.2569,
+    "railY": 154.3922,
     "roadY": 153.7641,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -5891,7 +6054,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.33,
+    "railY": 155.7979,
     "roadY": 155.7748,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -5923,7 +6086,7 @@
     "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 159.3677,
+    "railY": 155.1793,
     "roadY": 155.0235,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -5955,7 +6118,7 @@
     "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.957,
+    "railY": 154.7686,
     "roadY": 153.4738,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -5982,10 +6145,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 166.1664,
+    "railY": 161.0788,
     "roadY": 160.4664,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.5877,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.0877
+    }
   },
   {
     "rail": 815078162,
@@ -6008,10 +6174,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.2153,
+    "railY": 156.4961,
     "roadY": 156.5153,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.2192,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.7192
+    }
   },
   {
     "rail": 815078162,
@@ -6034,10 +6203,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.0961,
+    "railY": 157.9076,
     "roadY": 156.3961,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 0.3116,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.1884
+    }
   },
   {
     "rail": 815078163,
@@ -6065,10 +6237,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.1515,
+    "railY": 159.5027,
     "roadY": 158.9015,
-    "designClearanceM": 6.55,
-    "surfaceSource": "deck"
+    "designClearanceM": -1.8013,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 9.3013
+    }
   },
   {
     "rail": 815078167,
@@ -6107,10 +6282,13 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.7966,
+    "railY": 159.1323,
     "roadY": 159.0966,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.1643,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.6643
+    }
   },
   {
     "rail": 815078167,
@@ -6149,10 +6327,13 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 164.8081,
+    "railY": 158.9417,
     "roadY": 159.1081,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.3664,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.8664
+    }
   },
   {
     "rail": 815078168,
@@ -6188,10 +6369,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 165.9993,
+    "railY": 160.5671,
     "roadY": 160.2993,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.9322,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.4322
+    }
   },
   {
     "rail": 815078169,
@@ -6227,10 +6411,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 166.0158,
+    "railY": 160.582,
     "roadY": 160.3158,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.9338,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.4338
+    }
   },
   {
     "rail": 815078170,
@@ -6274,26 +6461,12 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 159.3736,
+    "railY": 162.2659,
     "roadY": 160.9421,
-    "designClearanceM": 0.3685,
+    "designClearanceM": -2.5238,
     "surfaceSource": "deck",
     "clearanceConflict": {
-      "surfaceSource": "deck",
-      "shortfallM": 6.181,
-      "requiredRailY": 153.1921,
-      "boundDirection": "max",
-      "opposingGradeLimitY": 159.3736,
-      "permittedRiseFromWitnessM": 5.9182,
-      "witness": {
-        "rail": 815078170,
-        "road": 815078159,
-        "sharedNode": null,
-        "type": "rail_over",
-        "surfaceSource": "carriageway",
-        "lat": 25.3643513,
-        "lon": 110.3023654
-      }
+      "shortfallM": 10.0238
     }
   },
   {
@@ -6338,26 +6511,12 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 159.5171,
+    "railY": 162.2093,
     "roadY": 160.9314,
-    "designClearanceM": 0.2143,
+    "designClearanceM": -2.4779,
     "surfaceSource": "deck",
     "clearanceConflict": {
-      "surfaceSource": "deck",
-      "shortfallM": 6.336,
-      "requiredRailY": 153.1814,
-      "boundDirection": "max",
-      "opposingGradeLimitY": 159.5171,
-      "permittedRiseFromWitnessM": 5.7748,
-      "witness": {
-        "rail": 815078170,
-        "road": 815078159,
-        "sharedNode": null,
-        "type": "rail_over",
-        "surfaceSource": "carriageway",
-        "lat": 25.3643513,
-        "lon": 110.3023654
-      }
+      "shortfallM": 9.9779
     }
   },
   {
@@ -6393,10 +6552,13 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 165.2919,
+    "railY": 161.8972,
     "roadY": 159.5919,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 1.1054,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 3.3946
+    }
   },
   {
     "rail": 815078171,
@@ -6420,7 +6582,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.5288,
+    "railY": 158.8318,
     "roadY": 157.5288,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -6450,10 +6612,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.5307,
+    "railY": 158.931,
     "roadY": 157.8307,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.0997,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.5997
+    }
   },
   {
     "rail": 815078172,
@@ -6480,10 +6645,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.6135,
+    "railY": 159.3555,
     "roadY": 157.9135,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 0.2421,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.2579
+    }
   },
   {
     "rail": 815078173,
@@ -6507,10 +6675,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 152.2409,
+    "railY": 159.5032,
     "roadY": 158.9409,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -1.7623,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 9.2623
+    }
   },
   {
     "rail": 815078174,
@@ -6537,7 +6708,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.339,
+    "railY": 158.9831,
     "roadY": 158.7509,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -6567,7 +6738,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.0028,
+    "railY": 158.7956,
     "roadY": 158.3733,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -6594,7 +6765,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.5007,
+    "railY": 158.8318,
     "roadY": 157.5007,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -6621,10 +6792,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.2194,
+    "railY": 159.4704,
     "roadY": 159.9194,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.751,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.251
+    }
   },
   {
     "rail": 815078180,
@@ -6651,7 +6825,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 157.9764,
+    "railY": 159.0333,
     "roadY": 158.1723,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -6681,7 +6855,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 157.5837,
+    "railY": 158.845,
     "roadY": 156.9118,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -6708,7 +6882,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.5292,
+    "railY": 158.8318,
     "roadY": 157.5292,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -6738,7 +6912,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 150.5398,
+    "roadY": 148.5768,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -6767,7 +6941,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 150.1679,
+    "roadY": 148.3546,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -6825,7 +6999,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 150.7755,
+    "roadY": 148.7185,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -6890,14 +7064,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1028568326 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1028568326 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.55,
+    "railY": 160.6483,
     "roadY": 162.3,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.4517,
     "surfaceSource": "deck",
-    "deferredRoad": 1028568326
+    "deferredRoad": 1028568326,
+    "clearanceConflict": {
+      "shortfallM": 7.0483
+    }
   },
   {
     "rail": 824017369,
@@ -6932,14 +7109,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1028568326 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1028568326 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.5444,
+    "railY": 160.4999,
     "roadY": 162.2944,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.5945,
     "surfaceSource": "deck",
-    "deferredRoad": 1028568326
+    "deferredRoad": 1028568326,
+    "clearanceConflict": {
+      "shortfallM": 6.9055
+    }
   },
   {
     "rail": 824017369,
@@ -6973,14 +7153,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.2,
+    "railY": 161.2662,
     "roadY": 162.95,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.4838,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 7.0162
+    }
   },
   {
     "rail": 824017369,
@@ -7012,14 +7195,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.9,
+    "railY": 161.2789,
     "roadY": 159.65,
-    "designClearanceM": 6.55,
+    "designClearanceM": -2.8289,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 10.3289
+    }
   },
   {
     "rail": 824017369,
@@ -7055,7 +7241,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.6018,
+    "railY": 160.7001,
     "roadY": 158.499,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -7093,7 +7279,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.6358,
+    "railY": 160.4086,
     "roadY": 159.9638,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -7130,14 +7316,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.19,
+    "railY": 161.1619,
     "roadY": 162.94,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.5781,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 6.9219
+    }
   },
   {
     "rail": 824017369,
@@ -7172,7 +7361,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.4158,
+    "railY": 161.482,
     "roadY": 160.4137,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -7210,14 +7399,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1028568326 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1028568326 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.54,
+    "railY": 160.5934,
     "roadY": 162.29,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.4966,
     "surfaceSource": "deck",
-    "deferredRoad": 1028568326
+    "deferredRoad": 1028568326,
+    "clearanceConflict": {
+      "shortfallM": 7.0034
+    }
   },
   {
     "rail": 826539758,
@@ -7252,14 +7444,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1028568326 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1028568326 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.53,
+    "railY": 160.4449,
     "roadY": 162.28,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.6351,
     "surfaceSource": "deck",
-    "deferredRoad": 1028568326
+    "deferredRoad": 1028568326,
+    "clearanceConflict": {
+      "shortfallM": 6.8649
+    }
   },
   {
     "rail": 826539758,
@@ -7293,14 +7488,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.19,
+    "railY": 161.2693,
     "roadY": 162.94,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.4707,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 7.0293
+    }
   },
   {
     "rail": 826539758,
@@ -7332,14 +7530,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.91,
+    "railY": 161.263,
     "roadY": 159.66,
-    "designClearanceM": 6.55,
+    "designClearanceM": -2.803,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 10.303
+    }
   },
   {
     "rail": 826539758,
@@ -7375,7 +7576,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.5921,
+    "railY": 160.6455,
     "roadY": 158.7185,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -7413,7 +7614,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.6199,
+    "railY": 160.355,
     "roadY": 160.0036,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -7450,14 +7651,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.18,
+    "railY": 161.1661,
     "roadY": 162.93,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.5639,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 6.9361
+    }
   },
   {
     "rail": 826539758,
@@ -7492,7 +7696,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.4029,
+    "railY": 161.4822,
     "roadY": 160.2594,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -7532,14 +7736,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1028568326 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1028568326 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.57,
+    "railY": 160.7058,
     "roadY": 162.32,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.4142,
     "surfaceSource": "deck",
-    "deferredRoad": 1028568326
+    "deferredRoad": 1028568326,
+    "clearanceConflict": {
+      "shortfallM": 7.0858
+    }
   },
   {
     "rail": 826539760,
@@ -7576,14 +7783,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1028568326 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1028568326 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.5603,
+    "railY": 160.5573,
     "roadY": 162.3103,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.553,
     "surfaceSource": "deck",
-    "deferredRoad": 1028568326
+    "deferredRoad": 1028568326,
+    "clearanceConflict": {
+      "shortfallM": 6.947
+    }
   },
   {
     "rail": 826539760,
@@ -7627,7 +7837,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.7045,
+    "railY": 156.7424,
     "roadY": 155.559,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -7674,7 +7884,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.4809,
+    "railY": 156.5189,
     "roadY": 155.6,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -7713,14 +7923,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.21,
+    "railY": 161.2468,
     "roadY": 162.96,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.5132,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 6.9868
+    }
   },
   {
     "rail": 826539760,
@@ -7754,14 +7967,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.89,
+    "railY": 161.2959,
     "roadY": 159.64,
-    "designClearanceM": 6.55,
+    "designClearanceM": -2.8559,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 10.3559
+    }
   },
   {
     "rail": 826539760,
@@ -7799,7 +8015,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.6217,
+    "railY": 160.7575,
     "roadY": 158.2695,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -7839,7 +8055,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.6539,
+    "railY": 160.4637,
     "roadY": 159.9037,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -7878,14 +8094,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.2,
+    "railY": 161.1436,
     "roadY": 162.95,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.6064,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 6.8936
+    }
   },
   {
     "rail": 826539760,
@@ -7922,7 +8141,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.4307,
+    "railY": 161.4675,
     "roadY": 160.5891,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -7962,14 +8181,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1028568326 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1028568326 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.52,
+    "railY": 160.5832,
     "roadY": 162.27,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.4868,
     "surfaceSource": "deck",
-    "deferredRoad": 1028568326
+    "deferredRoad": 1028568326,
+    "clearanceConflict": {
+      "shortfallM": 7.0132
+    }
   },
   {
     "rail": 826539761,
@@ -8006,14 +8228,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1028568326 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1028568326 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.5157,
+    "railY": 160.4347,
     "roadY": 162.2657,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.631,
     "surfaceSource": "deck",
-    "deferredRoad": 1028568326
+    "deferredRoad": 1028568326,
+    "clearanceConflict": {
+      "shortfallM": 6.869
+    }
   },
   {
     "rail": 826539761,
@@ -8057,7 +8282,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.3514,
+    "railY": 156.6686,
     "roadY": 155.4492,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -8104,7 +8329,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.3514,
+    "railY": 156.4452,
     "roadY": 156.0304,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -8143,14 +8368,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.18,
+    "railY": 161.2923,
     "roadY": 162.93,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.4377,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 7.0623
+    }
   },
   {
     "rail": 826539761,
@@ -8184,14 +8412,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.92,
+    "railY": 161.2463,
     "roadY": 159.67,
-    "designClearanceM": 6.55,
+    "designClearanceM": -2.7763,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 10.2763
+    }
   },
   {
     "rail": 826539761,
@@ -8229,7 +8460,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.5724,
+    "railY": 160.6356,
     "roadY": 159.278,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -8269,7 +8500,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.6038,
+    "railY": 160.3467,
     "roadY": 160.1681,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -8308,14 +8539,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 1573855551 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 1573855551 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.17,
+    "railY": 161.1901,
     "roadY": 162.92,
-    "designClearanceM": 6.55,
+    "designClearanceM": 0.5299,
     "surfaceSource": "deck",
-    "deferredRoad": 1573855551
+    "deferredRoad": 1573855551,
+    "clearanceConflict": {
+      "shortfallM": 6.9701
+    }
   },
   {
     "rail": 826539761,
@@ -8352,7 +8586,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.3897,
+    "railY": 161.5019,
     "roadY": 160.2374,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -8382,14 +8616,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 147.9097,
+    "railY": 157.1846,
     "roadY": 155.6597,
-    "designClearanceM": 6.55,
+    "designClearanceM": -2.7249,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 10.2249
+    }
   },
   {
     "rail": 827587623,
@@ -8416,14 +8653,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 147.8601,
+    "railY": 157.1846,
     "roadY": 155.61,
-    "designClearanceM": 6.55,
+    "designClearanceM": -2.7745,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 10.2745
+    }
   },
   {
     "rail": 827587623,
@@ -8514,7 +8754,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.629,
+    "railY": 154.4664,
     "roadY": 154.7289,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -8552,7 +8792,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.4403,
+    "railY": 154.2777,
     "roadY": 154.9372,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -8586,7 +8826,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.7608,
+    "railY": 155.6478,
     "roadY": 155.5895,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -8616,7 +8856,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.349,
+    "railY": 154.5153,
     "roadY": 155.349,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -8659,10 +8899,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.7498,
+    "railY": 159.8369,
     "roadY": 157.0498,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 1.5871,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 2.9129
+    }
   },
   {
     "rail": 846722256,
@@ -8955,7 +9198,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 149.8865,
+    "roadY": 149.468,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -8982,7 +9225,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 149.6068,
+    "roadY": 149.1282,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -9036,7 +9279,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 150.1061,
+    "roadY": 149.9064,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -9308,7 +9551,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.5453,
+    "railY": 153.914,
     "roadY": 153.6117,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -9350,7 +9593,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.6354,
+    "railY": 154.0041,
     "roadY": 153.7,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -9387,10 +9630,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.8973,
+    "railY": 150.0988,
     "roadY": 150.1973,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.2985,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 5.7985
+    }
   },
   {
     "rail": 900211381,
@@ -9417,14 +9663,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 147.769,
+    "railY": 157.1846,
     "roadY": 155.519,
-    "designClearanceM": 6.55,
+    "designClearanceM": -2.8655,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 10.3655
+    }
   },
   {
     "rail": 900211381,
@@ -9451,14 +9700,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 147.7261,
+    "railY": 157.1846,
     "roadY": 155.4761,
-    "designClearanceM": 6.55,
+    "designClearanceM": -2.9084,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 10.4084
+    }
   },
   {
     "rail": 900211381,
@@ -9537,14 +9789,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 146.2161,
+    "railY": 157.1846,
     "roadY": 153.9661,
-    "designClearanceM": 6.55,
+    "designClearanceM": -4.4185,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 11.9185
+    }
   },
   {
     "rail": 900211382,
@@ -9567,14 +9822,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 146.1695,
+    "railY": 157.1846,
     "roadY": 153.9195,
-    "designClearanceM": 6.55,
+    "designClearanceM": -4.465,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 11.965
+    }
   },
   {
     "rail": 900211382,
@@ -9645,14 +9903,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 146.7239,
+    "railY": 157.1846,
     "roadY": 154.4739,
-    "designClearanceM": 6.55,
+    "designClearanceM": -3.9106,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 11.4106
+    }
   },
   {
     "rail": 900211383,
@@ -9675,14 +9936,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 146.6798,
+    "railY": 157.1846,
     "roadY": 154.4298,
-    "designClearanceM": 6.55,
+    "designClearanceM": -3.9548,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 11.4548
+    }
   },
   {
     "rail": 900211383,
@@ -9753,14 +10017,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 146.346,
+    "railY": 157.1846,
     "roadY": 154.096,
-    "designClearanceM": 6.55,
+    "designClearanceM": -4.2885,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 11.7885
+    }
   },
   {
     "rail": 900211385,
@@ -9783,14 +10050,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 146.3022,
+    "railY": 157.1846,
     "roadY": 154.0522,
-    "designClearanceM": 6.55,
+    "designClearanceM": -4.3323,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 11.8323
+    }
   },
   {
     "rail": 900211385,
@@ -9861,14 +10131,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 146.8611,
+    "railY": 157.1846,
     "roadY": 154.6111,
-    "designClearanceM": 6.55,
+    "designClearanceM": -3.7735,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 11.2735
+    }
   },
   {
     "rail": 900211387,
@@ -9891,14 +10164,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 146.815,
+    "railY": 157.1846,
     "roadY": 154.565,
-    "designClearanceM": 6.55,
+    "designClearanceM": -3.8195,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 11.3195
+    }
   },
   {
     "rail": 900211387,
@@ -9969,14 +10245,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 147.2434,
+    "railY": 157.1846,
     "roadY": 154.9934,
-    "designClearanceM": 6.55,
+    "designClearanceM": -3.3912,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 10.8912
+    }
   },
   {
     "rail": 900211388,
@@ -9999,14 +10278,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 147.194,
+    "railY": 157.1846,
     "roadY": 154.944,
-    "designClearanceM": 6.55,
+    "designClearanceM": -3.4405,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 10.9405
+    }
   },
   {
     "rail": 900211388,
@@ -10077,14 +10359,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 147.3757,
+    "railY": 157.1846,
     "roadY": 155.1257,
-    "designClearanceM": 6.55,
+    "designClearanceM": -3.2588,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 10.7588
+    }
   },
   {
     "rail": 900211389,
@@ -10107,14 +10392,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 147.3322,
+    "railY": 157.1846,
     "roadY": 155.0822,
-    "designClearanceM": 6.55,
+    "designClearanceM": -3.3024,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 10.8024
+    }
   },
   {
     "rail": 900211389,
@@ -10194,7 +10482,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.2883,
+    "railY": 158.3798,
     "roadY": 157.9213,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -10230,7 +10518,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.6699,
+    "railY": 156.7865,
     "roadY": 155.5238,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -10266,7 +10554,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.2127,
+    "railY": 156.3294,
     "roadY": 154.9895,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -10301,7 +10589,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.7417,
+    "railY": 156.7633,
     "roadY": 155.373,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -10336,7 +10624,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.2835,
+    "railY": 156.3052,
     "roadY": 154.9181,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -10371,10 +10659,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.6606,
+    "railY": 159.0889,
     "roadY": 159.4106,
-    "designClearanceM": 6.55,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.8783,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.3783
+    }
   },
   {
     "rail": 900211399,
@@ -10409,7 +10700,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.8308,
+    "railY": 154.5038,
     "roadY": 153.5707,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -10447,7 +10738,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.642,
+    "railY": 154.315,
     "roadY": 154.8009,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -10481,7 +10772,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.8387,
+    "railY": 155.6972,
     "roadY": 155.6507,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -10512,10 +10803,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.8632,
+    "railY": 158.995,
     "roadY": 159.6132,
-    "designClearanceM": 6.55,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.5817,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.0817
+    }
   },
   {
     "rail": 900211411,
@@ -10543,10 +10837,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.6194,
+    "railY": 159.0438,
     "roadY": 159.3694,
-    "designClearanceM": 6.55,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.8744,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.3744
+    }
   },
   {
     "rail": 900211413,
@@ -10578,10 +10875,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.7179,
+    "railY": 159.0491,
     "roadY": 159.4679,
-    "designClearanceM": 6.55,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.7811,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.2811
+    }
   },
   {
     "rail": 900211413,
@@ -10616,7 +10916,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 154.0967,
+    "railY": 154.5419,
     "roadY": 153.8572,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -10654,7 +10954,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.9078,
+    "railY": 154.353,
     "roadY": 153.5175,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -10688,7 +10988,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.0806,
+    "railY": 155.7476,
     "roadY": 155.7168,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -10728,10 +11028,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.9052,
+    "railY": 162.634,
     "roadY": 157.045,
-    "designClearanceM": 4.6602,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 4.389,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 0.111
+    }
   },
   {
     "rail": 976719928,
@@ -10768,10 +11071,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.3983,
+    "railY": 163.1271,
     "roadY": 157.6983,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 4.2288,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 0.2712
+    }
   },
   {
     "rail": 979828046,
@@ -10816,9 +11122,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.8947,
+    "railY": 174.7926,
     "roadY": 155.1947,
-    "designClearanceM": 4.5,
+    "designClearanceM": 18.398,
     "surfaceSource": "carriageway"
   },
   {
@@ -10863,9 +11169,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.9551,
+    "railY": 175.1766,
     "roadY": 155.2551,
-    "designClearanceM": 4.5,
+    "designClearanceM": 18.7215,
     "surfaceSource": "carriageway"
   },
   {
@@ -10903,9 +11209,9 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 159.7681,
+    "railY": 173.6661,
     "roadY": 150.2115,
-    "designClearanceM": 8.3566,
+    "designClearanceM": 22.2545,
     "surfaceSource": "terrain_proxy"
   },
   {
@@ -10932,7 +11238,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.8822,
+    "railY": 158.8318,
     "roadY": 161.8822,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -10961,7 +11267,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 154.7582,
+    "railY": 158.8318,
     "roadY": 154.7582,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -10986,9 +11292,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 154.402,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983755119,
@@ -11014,7 +11324,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 154.7582,
+    "railY": 158.8318,
     "roadY": 154.7582,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11043,7 +11353,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.8822,
+    "railY": 158.8318,
     "roadY": 161.8822,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11068,9 +11378,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 154.6724,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983755121,
@@ -11096,7 +11410,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.8939,
+    "railY": 158.8318,
     "roadY": 161.8939,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11125,7 +11439,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 154.8524,
+    "railY": 158.8318,
     "roadY": 154.8524,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11154,7 +11468,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.8939,
+    "railY": 158.8318,
     "roadY": 161.8939,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11179,9 +11493,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 154.8926,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983755123,
@@ -11207,7 +11525,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.7814,
+    "railY": 158.8318,
     "roadY": 161.7814,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11236,7 +11554,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 154.9719,
+    "railY": 158.8318,
     "roadY": 154.9719,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11265,7 +11583,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.7814,
+    "railY": 158.8318,
     "roadY": 161.7814,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11290,9 +11608,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 155.1021,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983755125,
@@ -11318,7 +11640,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.5818,
+    "railY": 158.8318,
     "roadY": 161.5818,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11347,7 +11669,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.0022,
+    "railY": 158.8318,
     "roadY": 155.0022,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11376,7 +11698,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.5818,
+    "railY": 158.8318,
     "roadY": 161.5818,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11401,9 +11723,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 155.3116,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983755127,
@@ -11429,7 +11755,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.3734,
+    "railY": 158.8318,
     "roadY": 161.3734,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11458,7 +11784,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.0221,
+    "railY": 158.8318,
     "roadY": 155.0221,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11487,7 +11813,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.3734,
+    "railY": 158.8318,
     "roadY": 161.3734,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11517,7 +11843,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 160.9482,
+    "railY": 158.8318,
     "roadY": 160.9482,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11546,7 +11872,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.045,
+    "railY": 158.8318,
     "roadY": 155.045,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11571,9 +11897,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 155.5658,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983755665,
@@ -11599,7 +11929,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.045,
+    "railY": 158.8318,
     "roadY": 155.045,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11629,7 +11959,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 160.9482,
+    "railY": 158.8318,
     "roadY": 160.9482,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11659,7 +11989,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 160.5244,
+    "railY": 158.8318,
     "roadY": 160.5244,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11688,7 +12018,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.045,
+    "railY": 158.8318,
     "roadY": 155.045,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11713,9 +12043,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 155.6815,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983755668,
@@ -11741,7 +12075,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.045,
+    "railY": 158.8318,
     "roadY": 155.045,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11771,7 +12105,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 160.5244,
+    "railY": 158.8318,
     "roadY": 160.5244,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11801,7 +12135,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 159.9491,
+    "railY": 158.8318,
     "roadY": 159.9491,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11830,7 +12164,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.045,
+    "railY": 158.8318,
     "roadY": 155.045,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11855,9 +12189,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 155.9507,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983755671,
@@ -11883,7 +12221,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.045,
+    "railY": 158.8318,
     "roadY": 155.045,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11913,7 +12251,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 159.9491,
+    "railY": 158.8318,
     "roadY": 159.9491,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11938,9 +12276,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 156.3848,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983756973,
@@ -11967,7 +12309,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 159.1706,
+    "railY": 158.8318,
     "roadY": 159.1706,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -11996,7 +12338,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.0455,
+    "railY": 158.8318,
     "roadY": 155.0455,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12026,7 +12368,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 159.1706,
+    "railY": 158.8318,
     "roadY": 159.1706,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12051,9 +12393,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 156.8245,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983756975,
@@ -12079,7 +12425,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.7394,
+    "railY": 158.8318,
     "roadY": 158.7394,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12108,7 +12454,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.0916,
+    "railY": 158.8318,
     "roadY": 155.0916,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12137,7 +12483,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.7394,
+    "railY": 158.8318,
     "roadY": 158.7394,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12162,9 +12508,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 157.3115,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983756977,
@@ -12190,7 +12540,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.3928,
+    "railY": 158.8318,
     "roadY": 158.3928,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12219,7 +12569,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.1935,
+    "railY": 158.8318,
     "roadY": 155.1935,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12248,7 +12598,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.3928,
+    "railY": 158.8318,
     "roadY": 158.3928,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12271,10 +12621,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 待补道路 1005454693 的结构后复验",
+    "evidence": "层级（铁路 0，道路 -1）；道路 1005454693 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.7743,
+    "railY": 158.8318,
     "roadY": 161.4243,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -12298,10 +12648,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 待补道路 1005454693 的结构后复验",
+    "evidence": "层级（铁路 0，道路 -1）；道路 1005454693 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.8569,
+    "railY": 158.8318,
     "roadY": 161.5069,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -12327,9 +12677,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 157.5153,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983756981,
@@ -12355,7 +12709,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.0433,
+    "railY": 158.8318,
     "roadY": 158.0433,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12384,7 +12738,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.299,
+    "railY": 158.8318,
     "roadY": 155.299,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12413,7 +12767,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.0433,
+    "railY": 158.8318,
     "roadY": 158.0433,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12438,9 +12792,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 157.955,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983756983,
@@ -12466,7 +12824,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.6935,
+    "railY": 158.8318,
     "roadY": 157.6935,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12495,7 +12853,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.4375,
+    "railY": 158.8318,
     "roadY": 155.4375,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12524,7 +12882,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.6935,
+    "railY": 158.8318,
     "roadY": 157.6935,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12549,9 +12907,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 158.1331,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983760082,
@@ -12577,7 +12939,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.4286,
+    "railY": 158.8318,
     "roadY": 157.4286,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12606,7 +12968,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.582,
+    "railY": 158.8318,
     "roadY": 155.582,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12635,7 +12997,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.4286,
+    "railY": 158.8318,
     "roadY": 157.4286,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12660,10 +13022,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 待补道路 1005454693 的结构后复验",
+    "evidence": "层级（铁路 0，道路 -1）；道路 1005454693 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.6396,
+    "railY": 158.8318,
     "roadY": 161.5,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -12687,10 +13049,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 待补道路 1005454693 的结构后复验",
+    "evidence": "层级（铁路 0，道路 -1）；道路 1005454693 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.85,
+    "railY": 158.8318,
     "roadY": 161.5,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -12716,10 +13078,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 待补道路 1005454693 的结构后复验",
+    "evidence": "层级（铁路 0，道路 -1）；道路 1005454693 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.85,
+    "railY": 158.8318,
     "roadY": 161.5,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -12745,10 +13107,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 待补道路 1005454693 的结构后复验",
+    "evidence": "层级（铁路 0，道路 -1）；道路 1005454693 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.85,
+    "railY": 158.8318,
     "roadY": 161.5,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -12774,10 +13136,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 149.4726,
+    "railY": 157.1846,
     "roadY": 156.1726,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -2.2119,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 9.7119
+    }
   },
   {
     "rail": 983760101,
@@ -12796,14 +13161,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 149.4202,
+    "railY": 157.1846,
     "roadY": 156.1202,
-    "designClearanceM": 5.5,
+    "designClearanceM": -2.2643,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 9.7643
+    }
   },
   {
     "rail": 983760101,
@@ -12869,7 +13237,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.2472,
+    "railY": 158.8318,
     "roadY": 157.2472,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12898,7 +13266,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.2472,
+    "railY": 158.8318,
     "roadY": 157.2472,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12927,7 +13295,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 155.7559,
+    "railY": 158.8318,
     "roadY": 155.7559,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12956,7 +13324,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.07,
+    "railY": 158.8318,
     "roadY": 157.07,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -12981,9 +13349,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 158.5912,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983846305,
@@ -13009,7 +13381,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.07,
+    "railY": 158.8318,
     "roadY": 157.07,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13038,7 +13410,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 156.2009,
+    "railY": 158.8318,
     "roadY": 156.2009,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13067,7 +13439,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.0849,
+    "railY": 158.8318,
     "roadY": 157.0849,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13092,9 +13464,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.0077,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983846307,
@@ -13120,7 +13496,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.0849,
+    "railY": 158.8318,
     "roadY": 157.0849,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13149,7 +13525,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 156.3843,
+    "railY": 158.8318,
     "roadY": 156.3843,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13179,7 +13555,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "高度跳变",
-    "railY": 157.1823,
+    "railY": 158.8318,
     "roadY": 157.1823,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13204,9 +13580,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.1668,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983846309,
@@ -13233,7 +13613,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "高度跳变",
-    "railY": 157.1823,
+    "railY": 158.8318,
     "roadY": 157.1823,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13262,7 +13642,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 156.5895,
+    "railY": 158.8318,
     "roadY": 156.5895,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13292,7 +13672,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "高度跳变",
-    "railY": 157.1895,
+    "railY": 158.8318,
     "roadY": 157.1895,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13317,9 +13697,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.3526,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983846311,
@@ -13346,7 +13730,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "高度跳变",
-    "railY": 157.1895,
+    "railY": 158.8318,
     "roadY": 157.1895,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13375,7 +13759,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 156.77,
+    "railY": 158.8318,
     "roadY": 156.77,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13403,7 +13787,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.8225,
+    "railY": 158.8318,
     "roadY": 157.8225,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13431,7 +13815,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.5288,
+    "railY": 158.8318,
     "roadY": 157.5288,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13458,7 +13842,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.8184,
+    "railY": 158.8318,
     "roadY": 157.8184,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13485,7 +13869,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.5007,
+    "railY": 158.8318,
     "roadY": 157.5007,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13513,7 +13897,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.8378,
+    "railY": 158.8318,
     "roadY": 157.8378,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13541,7 +13925,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.5292,
+    "railY": 158.8318,
     "roadY": 157.5292,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13571,7 +13955,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "高度跳变",
-    "railY": 157.1286,
+    "railY": 158.8318,
     "roadY": 157.1286,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13601,7 +13985,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "高度跳变",
-    "railY": 157.3545,
+    "railY": 158.8318,
     "roadY": 157.3545,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13626,9 +14010,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.4274,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983846322,
@@ -13655,7 +14043,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "高度跳变",
-    "railY": 157.1286,
+    "railY": 158.8318,
     "roadY": 157.1286,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13684,7 +14072,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 156.9758,
+    "railY": 158.8318,
     "roadY": 156.9758,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13713,7 +14101,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.4931,
+    "railY": 158.8318,
     "roadY": 157.4931,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13738,9 +14126,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.4719,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983846329,
@@ -13767,7 +14159,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "高度跳变",
-    "railY": 157.3545,
+    "railY": 158.8318,
     "roadY": 157.3545,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13796,7 +14188,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.1977,
+    "railY": 158.8318,
     "roadY": 157.1977,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13821,9 +14213,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.4861,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983846330,
@@ -13849,7 +14245,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.4931,
+    "railY": 158.8318,
     "roadY": 157.4931,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13878,7 +14274,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.3979,
+    "railY": 158.8318,
     "roadY": 157.3979,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13907,7 +14303,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.6281,
+    "railY": 158.8318,
     "roadY": 157.6281,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -13932,10 +14328,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 待补道路 1005454693 的结构后复验",
+    "evidence": "层级（铁路 0，道路 -1）；道路 1005454693 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.7394,
+    "railY": 158.8318,
     "roadY": 161.5633,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -13961,9 +14357,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.5443,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983846338,
@@ -13989,7 +14389,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.6281,
+    "railY": 158.8318,
     "roadY": 157.6281,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14018,7 +14418,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.753,
+    "railY": 158.8318,
     "roadY": 157.753,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14043,10 +14443,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 待补道路 1005454693 的结构后复验",
+    "evidence": "层级（铁路 0，道路 -1）；道路 1005454693 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.5977,
+    "railY": 158.8318,
     "roadY": 161.5,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -14074,7 +14474,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.8225,
+    "railY": 158.8318,
     "roadY": 157.8225,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14101,7 +14501,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.8184,
+    "railY": 158.8318,
     "roadY": 157.8184,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14124,10 +14524,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 待补道路 1005454693 的结构后复验",
+    "evidence": "层级（铁路 0，道路 -1）；道路 1005454693 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.6723,
+    "railY": 158.8318,
     "roadY": 161.5,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -14155,7 +14555,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.8378,
+    "railY": 158.8318,
     "roadY": 157.8378,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14184,7 +14584,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.6976,
+    "railY": 158.8318,
     "roadY": 157.6976,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14209,10 +14609,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 待补道路 1005454693 的结构后复验",
+    "evidence": "层级（铁路 0，道路 -1）；道路 1005454693 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.7996,
+    "railY": 158.8318,
     "roadY": 161.5713,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -14238,9 +14638,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.6351,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983846352,
@@ -14266,7 +14670,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.6976,
+    "railY": 158.8318,
     "roadY": 157.6976,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14295,7 +14699,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.9807,
+    "railY": 158.8318,
     "roadY": 157.9807,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14324,7 +14728,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.9424,
+    "railY": 158.8318,
     "roadY": 157.9424,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14349,9 +14753,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.6559,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983853057,
@@ -14377,7 +14785,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 157.9424,
+    "railY": 158.8318,
     "roadY": 157.9424,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14406,7 +14814,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.185,
+    "railY": 158.8318,
     "roadY": 158.185,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14435,7 +14843,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.1998,
+    "railY": 158.8318,
     "roadY": 158.1998,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14460,10 +14868,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 待补道路 1005454693 的结构后复验",
+    "evidence": "层级（铁路 0，道路 -1）；道路 1005454693 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.8852,
+    "railY": 158.8318,
     "roadY": 161.5351,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -14489,9 +14897,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.6569,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983853059,
@@ -14517,7 +14929,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.1998,
+    "railY": 158.8318,
     "roadY": 158.1998,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14546,7 +14958,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.469,
+    "railY": 158.8318,
     "roadY": 158.469,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14571,9 +14983,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.6961,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983853060,
@@ -14600,7 +15016,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 158.5686,
+    "railY": 158.8318,
     "roadY": 158.5686,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14629,7 +15045,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.6808,
+    "railY": 158.8318,
     "roadY": 158.6808,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14659,7 +15075,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 159.0301,
+    "railY": 158.8318,
     "roadY": 159.0301,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14684,9 +15100,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.7954,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983853062,
@@ -14713,7 +15133,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 159.0301,
+    "railY": 158.8318,
     "roadY": 159.0301,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14742,7 +15162,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 158.9722,
+    "railY": 158.8318,
     "roadY": 158.9722,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14772,7 +15192,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 159.5134,
+    "railY": 158.8318,
     "roadY": 159.5134,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14797,9 +15217,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.9214,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983853064,
@@ -14826,7 +15250,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 159.5134,
+    "railY": 158.8318,
     "roadY": 159.5134,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14855,7 +15279,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.2146,
+    "railY": 158.8318,
     "roadY": 159.2146,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14884,7 +15308,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 160.8633,
+    "railY": 158.8318,
     "roadY": 160.8633,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14909,10 +15333,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 待补道路 1005454693 的结构后复验",
+    "evidence": "层级（铁路 0，道路 -1）；道路 1005454693 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.6623,
+    "railY": 158.8318,
     "roadY": 161.3126,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -14942,7 +15366,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.2103,
+    "railY": 158.8318,
     "roadY": 161.2103,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -14971,7 +15395,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 160.8633,
+    "railY": 158.8318,
     "roadY": 160.8633,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15000,7 +15424,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.6809,
+    "railY": 158.8318,
     "roadY": 159.6809,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15025,9 +15449,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 160.0902,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983853068,
@@ -15053,7 +15481,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.6809,
+    "railY": 158.8318,
     "roadY": 159.6809,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15078,9 +15506,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 160.1879,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983853074,
@@ -15106,7 +15538,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.2103,
+    "railY": 158.8318,
     "roadY": 161.2103,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15135,7 +15567,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.869,
+    "railY": 158.8318,
     "roadY": 159.869,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15164,7 +15596,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.5374,
+    "railY": 158.8318,
     "roadY": 161.5374,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15189,9 +15621,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 160.2268,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983853076,
@@ -15217,7 +15653,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.5374,
+    "railY": 158.8318,
     "roadY": 161.5374,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15246,7 +15682,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.986,
+    "railY": 158.8318,
     "roadY": 159.986,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15275,7 +15711,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.7374,
+    "railY": 158.8318,
     "roadY": 161.7374,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15300,10 +15736,10 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 待补道路 1005454693 的结构后复验",
+    "evidence": "层级（铁路 0，道路 -1）；道路 1005454693 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 161.3733,
+    "railY": 158.8318,
     "roadY": 161.0,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy",
@@ -15333,7 +15769,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.8167,
+    "railY": 158.8318,
     "roadY": 161.8167,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15358,9 +15794,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 160.2718,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983853079,
@@ -15386,7 +15826,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.7374,
+    "railY": 158.8318,
     "roadY": 161.7374,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15415,7 +15855,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 160.0512,
+    "railY": 158.8318,
     "roadY": 160.0512,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15440,9 +15880,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 160.3481,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983853080,
@@ -15468,7 +15912,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.8167,
+    "railY": 158.8318,
     "roadY": 161.8167,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15497,7 +15941,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 160.2577,
+    "railY": 158.8318,
     "roadY": 160.2577,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15526,7 +15970,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.945,
+    "railY": 158.8318,
     "roadY": 161.945,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15551,9 +15995,16 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 160.118,
+    "designClearanceM": -2.4862,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 6.9862
+    }
   },
   {
     "rail": 983853082,
@@ -15579,7 +16030,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 161.945,
+    "railY": 158.8318,
     "roadY": 161.945,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15608,7 +16059,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 160.1233,
+    "railY": 158.8318,
     "roadY": 160.1233,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15637,7 +16088,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 162.0155,
+    "railY": 158.8318,
     "roadY": 162.0155,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15662,9 +16113,13 @@
     "geometry": "Point",
     "type": "rail_over",
     "status": "pending_road_tunnel",
-    "evidence": "层级（铁路 0，道路 -1）；IDOK-247 补建下穿道路",
+    "evidence": "层级（铁路 0，道路 -1）；下穿道路尚缺独立结构，净空待验",
     "nodeEvidence": null,
-    "measuredClearance": null
+    "measuredClearance": null,
+    "railY": 158.8318,
+    "roadY": 159.8,
+    "designClearanceM": null,
+    "surfaceSource": "terrain_proxy"
   },
   {
     "rail": 983853084,
@@ -15690,7 +16145,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 162.0155,
+    "railY": 158.8318,
     "roadY": 162.0155,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15719,7 +16174,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.9713,
+    "railY": 158.8318,
     "roadY": 159.9713,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -15756,10 +16211,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.6891,
+    "railY": 158.8318,
     "roadY": 159.4391,
-    "designClearanceM": 6.55,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.5927,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.0927
+    }
   },
   {
     "rail": 983856620,
@@ -15793,10 +16251,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.6273,
+    "railY": 158.8318,
     "roadY": 159.3773,
-    "designClearanceM": 6.55,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.6545,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.1545
+    }
   },
   {
     "rail": 983856621,
@@ -15830,10 +16291,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.6298,
+    "railY": 158.8318,
     "roadY": 159.3798,
-    "designClearanceM": 6.55,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.652,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.152
+    }
   },
   {
     "rail": 983856621,
@@ -15867,10 +16331,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.5656,
+    "railY": 158.8318,
     "roadY": 159.3156,
-    "designClearanceM": 6.55,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.7162,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.2162
+    }
   },
   {
     "rail": 983867647,
@@ -15906,10 +16373,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 152.2372,
+    "railY": 159.5268,
     "roadY": 159.9872,
-    "designClearanceM": 6.55,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.7396,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.2396
+    }
   },
   {
     "rail": 983867649,
@@ -15931,10 +16401,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.4743,
+    "railY": 157.1846,
     "roadY": 158.1743,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.2102,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 7.7102
+    }
   },
   {
     "rail": 983867649,
@@ -15956,10 +16429,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.4327,
+    "railY": 157.1846,
     "roadY": 158.1326,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.2519,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 7.7519
+    }
   },
   {
     "rail": 983867649,
@@ -16023,10 +16499,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.465,
+    "railY": 159.9756,
     "roadY": 160.165,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -1.0106,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.5106
+    }
   },
   {
     "rail": 983867651,
@@ -16050,10 +16529,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.5705,
+    "railY": 160.526,
     "roadY": 160.2705,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -1.4555,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.9555
+    }
   },
   {
     "rail": 984880151,
@@ -16080,10 +16562,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.0734,
+    "railY": 157.525,
     "roadY": 157.3734,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.0484,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.5484
+    }
   },
   {
     "rail": 984880151,
@@ -16110,10 +16595,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.0732,
+    "railY": 157.8334,
     "roadY": 157.3732,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.7398,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.2398
+    }
   },
   {
     "rail": 984880151,
@@ -16139,10 +16627,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.0736,
+    "railY": 157.2134,
     "roadY": 157.3736,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.3602,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.8602
+    }
   },
   {
     "rail": 984880151,
@@ -16168,10 +16659,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.0737,
+    "railY": 158.0848,
     "roadY": 157.3737,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.4889,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.9889
+    }
   },
   {
     "rail": 984880153,
@@ -16198,10 +16692,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.2417,
+    "railY": 156.4442,
     "roadY": 157.5417,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -2.2975,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 6.7975
+    }
   },
   {
     "rail": 984880153,
@@ -16228,10 +16725,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.2442,
+    "railY": 156.8106,
     "roadY": 157.5442,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.9336,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 6.4336
+    }
   },
   {
     "rail": 984880153,
@@ -16257,10 +16757,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.2324,
+    "railY": 156.3627,
     "roadY": 157.5324,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -2.3698,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 6.8698
+    }
   },
   {
     "rail": 984880153,
@@ -16286,10 +16789,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.2403,
+    "railY": 157.1682,
     "roadY": 157.5403,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.5721,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 6.0721
+    }
   },
   {
     "rail": 985684863,
@@ -16320,10 +16826,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.558,
+    "railY": 153.1712,
     "roadY": 154.858,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -2.8868,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 7.3868
+    }
   },
   {
     "rail": 985684863,
@@ -16354,10 +16863,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 160.6938,
+    "railY": 153.0474,
     "roadY": 154.9938,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -3.1464,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 7.6464
+    }
   },
   {
     "rail": 985684865,
@@ -16381,7 +16893,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.179,
+    "railY": 159.1793,
     "roadY": 159.179,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -16408,7 +16920,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.1061,
+    "railY": 159.1793,
     "roadY": 159.1061,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -16434,10 +16946,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 152.99,
+    "railY": 160.2803,
     "roadY": 159.69,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -1.7903,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 9.2903
+    }
   },
   {
     "rail": 985684869,
@@ -16468,7 +16983,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.4049,
+    "railY": 156.2876,
     "roadY": 155.4,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -16502,7 +17017,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.4049,
+    "railY": 156.5467,
     "roadY": 155.4,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -16536,14 +17051,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 149.6084,
+    "railY": 157.1846,
     "roadY": 157.3584,
-    "designClearanceM": 6.55,
+    "designClearanceM": -1.0261,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 8.5261
+    }
   },
   {
     "rail": 991384006,
@@ -16574,14 +17092,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 149.5688,
+    "railY": 157.1846,
     "roadY": 157.3188,
-    "designClearanceM": 6.55,
+    "designClearanceM": -1.0657,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 8.5657
+    }
   },
   {
     "rail": 991384006,
@@ -16684,7 +17205,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.2859,
+    "railY": 157.3785,
     "roadY": 155.9529,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -16726,7 +17247,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.0659,
+    "railY": 157.1586,
     "roadY": 155.3254,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -16751,10 +17272,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 150.0561,
+    "railY": 157.1846,
     "roadY": 156.7561,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -1.6284,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 9.1284
+    }
   },
   {
     "rail": 991384008,
@@ -16773,14 +17297,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 150.0085,
+    "railY": 157.1846,
     "roadY": 156.7085,
-    "designClearanceM": 5.5,
+    "designClearanceM": -1.6761,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 9.1761
+    }
   },
   {
     "rail": 991384008,
@@ -16842,10 +17369,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 150.9123,
+    "railY": 157.1846,
     "roadY": 157.6123,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.7722,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.2722
+    }
   },
   {
     "rail": 991384011,
@@ -16864,14 +17394,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 150.8728,
+    "railY": 157.1846,
     "roadY": 157.5728,
-    "designClearanceM": 5.5,
+    "designClearanceM": -0.8117,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 8.3117
+    }
   },
   {
     "rail": 991384011,
@@ -16949,7 +17482,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.9271,
+    "railY": 158.7046,
     "roadY": 158.3039,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -16991,7 +17524,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.2322,
+    "railY": 157.3317,
     "roadY": 155.8453,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -17033,7 +17566,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.0126,
+    "railY": 157.112,
     "roadY": 155.3442,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -17067,14 +17600,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 149.7428,
+    "railY": 157.1846,
     "roadY": 157.4928,
-    "designClearanceM": 6.55,
+    "designClearanceM": -0.8918,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 8.3918
+    }
   },
   {
     "rail": 991385686,
@@ -17105,14 +17641,17 @@
     "geometry": "Point",
     "type": "road_over",
     "status": "pending_road_structure",
-    "evidence": "层级（铁路 0，道路 1）；IDOK-247 待补道路 464498740 的结构后复验",
+    "evidence": "层级（铁路 0，道路 1）；道路 464498740 的结构生成后复验",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 149.6929,
+    "railY": 157.1846,
     "roadY": 157.4429,
-    "designClearanceM": 6.55,
+    "designClearanceM": -0.9417,
     "surfaceSource": "deck",
-    "deferredRoad": 464498740
+    "deferredRoad": 464498740,
+    "clearanceConflict": {
+      "shortfallM": 8.4417
+    }
   },
   {
     "rail": 991385686,
@@ -17217,7 +17756,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.6269,
+    "railY": 158.1017,
     "roadY": 158.7131,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -17265,10 +17804,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.2434,
+    "railY": 156.3352,
     "roadY": 156.5434,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.4082,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.9082
+    }
   },
   {
     "rail": 991385688,
@@ -17311,10 +17853,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.255,
+    "railY": 156.4679,
     "roadY": 156.555,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -1.2871,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.7871
+    }
   },
   {
     "rail": 991385689,
@@ -17351,10 +17896,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.8062,
+    "railY": 162.5605,
     "roadY": 157.0054,
-    "designClearanceM": 4.6009,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 4.3552,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 0.1448
+    }
   },
   {
     "rail": 991385689,
@@ -17391,10 +17939,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 163.3047,
+    "railY": 163.059,
     "roadY": 157.6047,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 4.2543,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 0.2457
+    }
   },
   {
     "rail": 991385690,
@@ -17433,7 +17984,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.8499,
+    "railY": 153.0217,
     "roadY": 152.0,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -17475,7 +18026,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.7547,
+    "railY": 152.9265,
     "roadY": 152.0,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -17516,7 +18067,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.8297,
+    "railY": 151.2264,
     "roadY": 153.2,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -17556,7 +18107,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.0494,
+    "railY": 152.501,
     "roadY": 151.6176,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -17599,10 +18150,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.7783,
+    "railY": 159.7894,
     "roadY": 157.0783,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": 1.5111,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 2.9889
+    }
   },
   {
     "rail": 991385700,
@@ -17641,10 +18195,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 157.5253,
+    "railY": 152.8104,
     "roadY": 151.8253,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.2149,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.7149
+    }
   },
   {
     "rail": 991385700,
@@ -17684,10 +18241,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 157.4651,
+    "railY": 152.8441,
     "roadY": 151.7651,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.121,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 4.621
+    }
   },
   {
     "rail": 991385702,
@@ -17721,10 +18281,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.1779,
+    "railY": 150.1464,
     "roadY": 150.4779,
-    "designClearanceM": 4.5,
-    "surfaceSource": "terrain_proxy"
+    "designClearanceM": -1.5315,
+    "surfaceSource": "terrain_proxy",
+    "clearanceConflict": {
+      "shortfallM": 6.0315
+    }
   },
   {
     "rail": 991387827,
@@ -17751,7 +18314,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.1194,
+    "railY": 158.3307,
     "roadY": 157.7391,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -17781,7 +18344,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.3792,
+    "railY": 158.429,
     "roadY": 158.0,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -17811,7 +18374,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.4497,
+    "railY": 158.4781,
     "roadY": 158.0,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -17841,7 +18404,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 158.5444,
+    "railY": 158.5268,
     "roadY": 158.0,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -17872,7 +18435,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.1201,
+    "railY": 157.271,
     "roadY": 155.756,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -17903,7 +18466,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.751,
+    "railY": 157.0493,
     "roadY": 155.4095,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -17939,10 +18502,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.1204,
+    "railY": 156.8161,
     "roadY": 156.4204,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.8043,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.3043
+    }
   },
   {
     "rail": 991388757,
@@ -17973,10 +18539,13 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 162.1357,
+    "railY": 157.0043,
     "roadY": 156.4357,
-    "designClearanceM": 4.5,
-    "surfaceSource": "carriageway"
+    "designClearanceM": -0.6313,
+    "surfaceSource": "carriageway",
+    "clearanceConflict": {
+      "shortfallM": 5.1313
+    }
   },
   {
     "rail": 994927724,
@@ -18001,10 +18570,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.4095,
+    "railY": 157.8135,
     "roadY": 158.1095,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.9041,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.4041
+    }
   },
   {
     "rail": 994927724,
@@ -18030,10 +18602,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 151.332,
+    "railY": 157.4998,
     "roadY": 158.032,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.6678,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.1678
+    }
   },
   {
     "rail": 1017576265,
@@ -18057,7 +18632,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 156.4921,
+    "railY": 157.0885,
     "roadY": 156.4921,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -18084,7 +18659,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 160.5128,
+    "railY": 162.118,
     "roadY": 160.5128,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -18111,7 +18686,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 160.5105,
+    "railY": 162.118,
     "roadY": 160.5105,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -18139,7 +18714,7 @@
     },
     "measuredClearance": null,
     "baselineFailure": "取车",
-    "railY": 158.3601,
+    "railY": 158.3738,
     "roadY": 158.3601,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -18173,7 +18748,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.7188,
+    "railY": 161.3984,
     "roadY": 159.7188,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -18207,7 +18782,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.7189,
+    "railY": 161.1229,
     "roadY": 159.7189,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -18236,7 +18811,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.7187,
+    "railY": 160.7783,
     "roadY": 159.7187,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -18265,7 +18840,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.7187,
+    "railY": 161.5764,
     "roadY": 159.7187,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -18302,7 +18877,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 154.3114,
+    "railY": 153.6531,
     "roadY": 154.3114,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -18334,7 +18909,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 154.3047,
+    "railY": 153.8575,
     "roadY": 154.3047,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -18371,7 +18946,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 154.3114,
+    "railY": 153.6531,
     "roadY": 154.3114,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -18399,16 +18974,12 @@
     "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 156.9839,
+    "railY": 152.111,
     "roadY": 154.1939,
-    "designClearanceM": 1.5899,
+    "designClearanceM": -3.2829,
     "surfaceSource": "carriageway",
     "clearanceConflict": {
-      "surfaceSource": "carriageway",
-      "shortfallM": 2.91,
-      "requiredRailY": 159.8939,
-      "actualRailY": 156.9839,
-      "stationRailY": 153.8
+      "shortfallM": 7.7829
     }
   },
   {
@@ -18432,26 +19003,12 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.5391,
+    "railY": 161.3124,
     "roadY": 159.63,
-    "designClearanceM": 2.8909,
+    "designClearanceM": -2.8824,
     "surfaceSource": "deck",
     "clearanceConflict": {
-      "surfaceSource": "deck",
-      "shortfallM": 2.609,
-      "requiredRailY": 152.93,
-      "boundDirection": "max",
-      "opposingGradeLimitY": 155.5391,
-      "permittedRiseFromWitnessM": 5.474,
-      "witness": {
-        "rail": 1023360315,
-        "road": 454949850,
-        "sharedNode": 9437426818,
-        "type": "level",
-        "surfaceSource": "carriageway",
-        "lat": 25.237198,
-        "lon": 110.1972823
-      }
+      "shortfallM": 10.3824
     }
   },
   {
@@ -18478,7 +19035,7 @@
       "railway": null
     },
     "measuredClearance": null,
-    "railY": 161.0131,
+    "railY": 161.9905,
     "roadY": 161.0131,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -18506,10 +19063,13 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 152.3172,
+    "railY": 159.4758,
     "roadY": 159.0172,
-    "designClearanceM": 5.5,
-    "surfaceSource": "deck"
+    "designClearanceM": -1.6587,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 9.1587
+    }
   },
   {
     "rail": 1124931594,
@@ -18534,7 +19094,7 @@
       "railway": "level_crossing"
     },
     "measuredClearance": null,
-    "railY": 159.1756,
+    "railY": 157.5199,
     "roadY": 159.1756,
     "designClearanceM": null,
     "surfaceSource": "carriageway"
@@ -18578,7 +19138,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.512,
+    "railY": 156.7188,
     "roadY": 155.4396,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -18622,7 +19182,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.4507,
+    "railY": 156.4955,
     "roadY": 155.6,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -18666,7 +19226,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.6589,
+    "railY": 156.7543,
     "roadY": 155.5123,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -18710,7 +19270,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 155.5098,
+    "railY": 156.5308,
     "roadY": 155.6,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -18749,26 +19309,12 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.0774,
+    "railY": 159.5704,
     "roadY": 160.0553,
-    "designClearanceM": 5.7779,
+    "designClearanceM": -0.7151,
     "surfaceSource": "deck",
     "clearanceConflict": {
-      "surfaceSource": "deck",
-      "shortfallM": 0.772,
-      "requiredRailY": 152.3053,
-      "boundDirection": "max",
-      "opposingGradeLimitY": 153.0774,
-      "permittedRiseFromWitnessM": 11.7307,
-      "witness": {
-        "rail": 815078167,
-        "road": 815078179,
-        "sharedNode": null,
-        "type": "rail_over",
-        "surfaceSource": "carriageway",
-        "lat": 25.3478295,
-        "lon": 110.299154
-      }
+      "shortfallM": 8.2151
     }
   },
   {
@@ -18794,7 +19340,7 @@
     "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 153.8071,
+    "railY": 154.0457,
     "roadY": 153.7493,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
@@ -18821,9 +19367,12 @@
     "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null,
-    "railY": 152.4074,
+    "railY": 159.0416,
     "roadY": 159.36,
-    "designClearanceM": 5.7526,
-    "surfaceSource": "deck"
+    "designClearanceM": -0.8817,
+    "surfaceSource": "deck",
+    "clearanceConflict": {
+      "shortfallM": 8.3817
+    }
   }
 ]

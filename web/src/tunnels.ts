@@ -42,16 +42,25 @@ type Plane=(point:Point)=>number
 export function joinPortalRoads(tile:Tile,tunnels:Tunnel[],buffers:Float32Array[]){
   for(const tunnel of tunnels){
     const axes=frame(tunnel)
+    const stitch=tunnel.approachEnds?40:20
+    const margin=stitch+12
     for(const portal of tunnel.portals){
-      if(portal[0]<tile.x-32||portal[0]>tile.x+288||portal[2]<tile.z-32||portal[2]>tile.z+288)continue
+      if(portal[0]<tile.x-margin||portal[0]>tile.x+256+margin||portal[2]<tile.z-margin||portal[2]>tile.z+256+margin)continue
       for(const buffer of buffers)for(let index=0;index<buffer.length;index+=3){
         const x=tile.x+buffer[index],z=tile.z+buffer[index+2],s=axes.station(x,z),d=Math.abs(axes.lateral(x,z))
         const inward=portal===tunnel.portals[0]?s:tunnel.length-s
         // Only stitch the surface approach at the mouth. Vertices deeper
         // into the bore can belong to the street crossing above it.
-        if(inward< -20||inward>4||d>tunnel.halfWidth+4)continue
-        const blend=THREE.MathUtils.smoothstep(inward,-20,-4)*(1-THREE.MathUtils.smoothstep(inward,0,4))*(1-THREE.MathUtils.smoothstep(d,tunnel.halfWidth,tunnel.halfWidth+4))
-        const target=tunnelFloor([tunnel],x,z,portal[1])??portal[1]
+        if(inward< -stitch||inward>4||d>tunnel.halfWidth+4)continue
+        const blend=THREE.MathUtils.smoothstep(inward,-stitch,-stitch/5)*(1-THREE.MathUtils.smoothstep(inward,0,4))*(1-THREE.MathUtils.smoothstep(d,tunnel.halfWidth,tunnel.halfWidth+4))
+        let target=tunnelFloor([tunnel],x,z,portal[1])??portal[1]
+        if(tunnel.approachEnds && inward<0){
+          // Continue the graded station road outside the mouth. A horizontal
+          // stitch across 20 m concentrates the whole rise at its outer edge.
+          const distance=-inward, ease=1
+          const rise=distance<ease?distance*distance/(2*ease):distance-ease/2
+          target+=.042*rise
+        }
         buffer[index+1]+=blend*(target-.02-buffer[index+1])
       }
     }

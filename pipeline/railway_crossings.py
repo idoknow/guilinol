@@ -77,7 +77,7 @@ def inventory(elements, region, node_evidence):
                 status = 'active'
                 if road['id'] == 727929887 and kind == 'rail_over':
                     status = 'pending_road_tunnel'
-                    reason += '；IDOK-247 补建下穿道路'
+                    reason += '；下穿道路尚缺独立结构，净空待验'
                 elif road['id'] in (1030067842, 1030067843) and ht['highway'] == 'construction':
                     status = 'construction_unverified'
                     reason = '施工道路，交叉形式待核'
@@ -116,7 +116,7 @@ if __name__ == '__main__':
         for point in report['crossings']:
             by_pair[point['rail'], point['road']].append(point)
         for row in rows:
-            if row['status'] != 'active':
+            if row['status'] == 'construction_unverified':
                 continue
             position = Point(ll2xz(row['lat'],row['lon']))
             def distance(point):
@@ -129,12 +129,12 @@ if __name__ == '__main__':
             if point['roadStructureDependency']:
                 row['status']='pending_road_structure'
                 row['deferredRoad']=point['roadStructureDependency']
-                row['evidence']+=f"；IDOK-247 待补道路 {row['deferredRoad']} 的结构后复验"
+                row['evidence']+=f"；道路 {row['deferredRoad']} 的结构生成后复验"
             conflict=conflicts.get((row['rail'],row['road'],row['lat'],row['lon']))
             if conflict:
                 row['clearanceConflict']={k:v for k,v in conflict.items() if k not in ('rail','road','lat','lon','type')}
     (docs / 'railway-crossings.json').write_text(json.dumps(rows, ensure_ascii=False, indent=2) + '\n')
-    lines = ['# 可玩区路铁交点', '', '来源为 raw-expanded-20261124。每行对应一对 way 的一个相交分量。同一地点可能有多条股道或道路分段。JSON 保留双方标签。设计净空取中心线交点处的轨面、路面和梁底高程（铁路梁高 1.20 m，道路薄桥 0.60 m），单位 m。JSON 的 clearanceConflict 给出约束来源、允许高差和相反约束位置。terrain_proxy 表示下层路面尚缺独立高程证据。全宽最小净空仍待实测。', '',
+    lines = ['# 可玩区路铁交点', '', '来源为 raw-expanded-20261124。每行对应一对 way 的一个相交分量。同一地点可能有多条股道或道路分段。JSON 保留双方标签。设计净空取中心线交点处的轨面、路面和梁底高程（铁路梁高 1.20 m，道路薄桥 0.60 m），单位 m。JSON 的 clearanceConflict.shortfallM 表示当前模型低于设计净空的米数。terrain_proxy 表示下层路面尚缺独立高程证据。全宽最小净空仍待实测。', '',
              '| 铁路 way | 道路 way | 纬度 | 经度 | 共享节点及版本 | type | 验收状态 | 设计净空 m | 证据 |',
              '|---:|---:|---:|---:|---:|---|---|---:|---|']
     for row in rows:
