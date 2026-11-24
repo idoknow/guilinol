@@ -92,6 +92,18 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
     const t=template(index);if(!t)return
     const root=new THREE.Group(),instance=clone(t.scene)
     root.name='G2 passer-by';root.add(instance)
+    // Cloned avatar parts include offscreen skirts and outline shells with
+    // culling disabled. A conservative walking envelope works for both cameras.
+    instance.updateMatrixWorld(true)
+    instance.traverse(part=>{
+      if(!(part instanceof THREE.SkinnedMesh)||part.frustumCulled)return
+      part.computeBoundingSphere()
+      const worldScale=part.getWorldScale(new THREE.Vector3())
+      const smallest=Math.min(Math.abs(worldScale.x),Math.abs(worldScale.y),Math.abs(worldScale.z))
+      if(!smallest||!part.boundingSphere||part.boundingSphere.isEmpty())return
+      part.boundingSphere.radius+=1/smallest
+      part.frustumCulled=true
+    })
     const mixer=new THREE.AnimationMixer(instance)
     const clip=(name:string)=>t.clips.find(item=>item.name===name)
     const walkClip=clip(figure.clips.walk),idleClip=clip(figure.clips.idle)
