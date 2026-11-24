@@ -11,15 +11,24 @@ from service_streets import width
 from vehicle_tunnels import grade_limit
 
 
-def stations(elements, widths, lanes, bounds):
+def stations(elements, widths, bounds):
     intervals = json.loads(Path(__file__).with_name('road-grade-survey.json').read_text())
     sections = []
-    active = {l['way'] for l in lanes if not l.get('gradeSeparated')}
+    abutments={}
+    for w in elements:
+        if w['type']!='way' or not w.get('tags',{}).get('highway') or w['tags'].get('bridge','no')=='no' or not all(w.get('geometry',())):
+            continue
+        xy=points(w)
+        if len(xy)<2:
+            continue
+        for end,neighbor in ((0,1),(-1,-2)):
+            abutments[w['nodes'][end]]=np.subtract(xy[neighbor],xy[end]).tolist()
+    requests=[]
     protected = {r['id'] for r in elements if r['type']=='node' and
                  r.get('tags',{}).get('railway')=='level_crossing'}
     for way in elements:
         wid=way['id']
-        if (way['type']!='way' or wid not in active or str(wid) not in intervals or
+        if (way['type']!='way' or str(wid) not in intervals or
                 protected.intersection(way['nodes'])):
             continue
         tags = way['tags']
@@ -32,13 +41,23 @@ def stations(elements, widths, lanes, bounds):
         vertex_s = np.r_[0,np.cumsum(np.linalg.norm(np.diff(coords,axis=0),axis=1))]
         half = widths.get(wid, width(tags) if tags['highway'] in ('service','living_street') else 6.5)/2+.5
         for a,b in intervals[str(wid)]:
+            if a<25 and way['nodes'][0] in abutments:
+                a,b=0,max(b,105)
+            if b>line.length-25 and way['nodes'][-1] in abutments:
+                a,b=min(a,line.length-105),line.length
             a,b=max(0,a),min(line.length,b)
             if b<=a:
                 continue
             ds=sorted({a,b,*vertex_s[(vertex_s>a)&(vertex_s<b)],*np.arange(a+6,b,6)})
             xy=[line.interpolate(d).coords[0] for d in ds]
+            refs=dict(zip(vertex_s,way['nodes'],strict=True))
+            for d,(x,z) in zip(ds,xy,strict=True):
+                sample=dict(x=x,z=z)
+                if refs.get(d) in abutments:
+                    sample['bridge']=abutments[refs[d]]
+                requests.append(sample)
             sections.append((ds,xy,half,grade_limit(tags['highway'])))
-    return sections
+    return sections,requests
 
 
 def profiles(sections, measured, portal_grades):

@@ -15,6 +15,16 @@ from features import area, building_mesh, points, polygons
 CROSSINGS = ((1025751314, 1551968228, 1025751315), (1034716138, 1568418630, 1034716139))
 
 
+def sample_road_heights(output, manifest, positions):
+    root = Path(__file__).resolve().parents[1]
+    with tempfile.TemporaryDirectory() as tmp:
+        request = Path(tmp)/'heights.json'
+        request.write_text(json.dumps(dict(manifest=manifest,positions=positions)))
+        subprocess.run([str(root/'node_modules/.bin/tsx'),'scripts/vehicle-grounding.ts',
+                        'passage-heights',str(output.resolve()),str(request)],cwd=root,check=True)
+        return json.loads(request.read_text())
+
+
 def plan(output, manifest, elements, widths):
     wanted = {ref for crossing in CROSSINGS for ref in crossing}
     ways = {w['id']: w for w in elements if w['type']=='way' and w['id'] in wanted}
@@ -38,13 +48,7 @@ def plan(output, manifest, elements, widths):
         roads.append((house,axis,half))
     if not roads:
         return []
-    root = Path(__file__).resolve().parents[1]
-    with tempfile.TemporaryDirectory() as tmp:
-        request = Path(tmp)/'heights.json'
-        request.write_text(json.dumps(dict(manifest=manifest,positions=positions)))
-        subprocess.run([str(root/'node_modules/.bin/tsx'),'scripts/vehicle-grounding.ts',
-                        'passage-heights',str(output.resolve()),str(request)],cwd=root,check=True)
-        levels = iter(json.loads(request.read_text()))
+    levels = iter(sample_road_heights(output,manifest,positions))
     grades = []
     for house,axis,half in roads:
         coords = list(axis.coords)

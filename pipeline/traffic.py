@@ -152,10 +152,12 @@ def bake(output, manifest, rendered_roads=None):
     sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
     restore_portal_paving(output,manifest['chunks'])
     restore_corridors(output,manifest['chunks'])
-    from canal_passages import plan as plan_canal_passages
+    from canal_passages import plan as plan_canal_passages, sample_road_heights
     from terminal_decks import grade as grade_terminal_decks
     terminal_grades = grade_terminal_decks(output, manifest, elements)
     canal_grades = plan_canal_passages(output, manifest, elements, sections)
+    graded_sections,grade_points=vehicle_surface_grades.stations(elements,sections,box(left,top,left+width,top+depth))
+    native_levels=sample_road_heights(output,manifest,grade_points)
     bake_station_corridor(output, manifest['chunks'], elements)
     bake_surveyed_corridors(output,manifest['chunks'],elements,sections)
     for way in elements:
@@ -277,9 +279,8 @@ def bake(output, manifest, rendered_roads=None):
         network = tunnel_sections(lanes,elements,original_tunnels,survey_nodes)
         if network['edges']:
             mountain_roofs(network,survey_nodes,surface.peaks)
-            graded_sections=vehicle_surface_grades.stations(elements,sections,lanes,box(left,top,left+width,top+depth))
             guides=surface_guides(elements,network['portals'],survey_nodes)
-            request.write_text(json.dumps(dict(manifest=manifest,network=network,gradePoints=[p for _,xy,_,_ in graded_sections for p in xy],nodes=list(survey_nodes.values()),guideNodes=sorted({g[k] for g in guides for k in ('from','to')}))))
+            request.write_text(json.dumps(dict(manifest=manifest,network=network,nodes=list(survey_nodes.values()),guideNodes=sorted({g[k] for g in guides for k in ('from','to')}))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portals',str(output.resolve()),str(request)],check=True,cwd=ROOT)
             samples=json.loads(request.read_text())
@@ -287,7 +288,7 @@ def bake(output, manifest, rendered_roads=None):
             fixed={ref for way in elements if way['type']=='way' and way.get('tags',{}).get('railway')=='rail'
                    and way['tags'].get('layer','0')=='0' for ref in way['nodes']}
             access,limits=plan_approaches(conflicts,lanes+guides,survey_nodes,{int(k):v for k,v in samples['heights'].items()},fixed,sections)
-            surveyed=vehicle_surface_grades.profiles(graded_sections,samples['roadLevels'],access+canal_grades+terminal_grades)
+            surveyed=vehicle_surface_grades.profiles(graded_sections,native_levels,access+canal_grades+terminal_grades)
             bake_surveyed_corridors(output,manifest['chunks'],elements,sections,access+canal_grades+terminal_grades+surveyed,only_approaches=True)
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)
             for tunnel in generated:

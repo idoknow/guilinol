@@ -85,7 +85,15 @@ try{
                 const rounded=mode==='car'&&alongNext>2&&lateralNext<cross&&lateralNext<1.5&&progress>len-4
                 if((progress>len-1.2&&cross<3.5)||rounded){part++;continue}
               }
-              let ahead=Math.max(0,progress)+(mode==='car'?6.5:3.5)
+              // Brake before a bend. A long look-ahead at driving speed
+              // can send the front wheels across the inside curb.
+              const nextLeg=route[part+1]
+              let bend=false
+              if(nextLeg && len-progress<11){
+                const ex=nextLeg[0]-x,ez=nextLeg[1]-z
+                bend=(dx*ex+dz*ez)/Math.hypot(ex,ez)<.87
+              }
+              let ahead=Math.max(0,progress)+(mode==='car'?(bend?3.4:6.5):3.5)
               let tx=a+ahead*dx,tz=b+ahead*dz
               // Steer through bends within the vehicle's turning radius.
               for(let leg=part;leg<route.length-1&&ahead>0;leg++){
@@ -99,7 +107,7 @@ try{
               if(mode==='foot')w.drive(tx,tz,false)
               else{
                 const turn=Math.atan2(-tx,-tz)-w.heading,delta=Math.atan2(Math.sin(turn),Math.cos(turn))
-                key('KeyW',Math.abs(w.speed)<(Math.abs(delta)>.6?2:3.5))
+                key('KeyW',Math.abs(w.speed)<(bend?1.5:Math.abs(delta)>.6?2:3.5))
                 key('KeyA',delta>.04);key('KeyD',delta<-.04)
               }
               v.stream.tick(w.position);v.stream.updateLandmarks?.(w.position);w.tick(1/60)

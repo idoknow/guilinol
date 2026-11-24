@@ -61,6 +61,27 @@ def restore(output,chunks):
         tile['bytes']=file.stat().st_size
 
 
+def channel_spans(elements, widths):
+    """Preserve the existing bed and banks between each bridge's abutments."""
+    streams=[]
+    spans=[]
+    for way in elements:
+        if way['type']!='way' or len(way.get('geometry',()))<2 or not all(way['geometry']):
+            continue
+        tags=way.get('tags',{})
+        bridge=tags.get('highway') and tags.get('bridge','no')!='no'
+        if not bridge and not tags.get('waterway'):
+            continue
+        axis=LineString([ll2xz(p['lat'],p['lon']) for p in way['geometry']])
+        if bridge:
+            spans.append((axis,widths.get(way['id'],width(tags))/2+.5))
+        else:
+            streams.append(axis)
+    water=STRtree(streams)
+    return STRtree([axis.buffer(half,cap_style='flat') for axis,half in spans
+                    if len(water.query(axis,predicate='intersects'))])
+
+
 def bake(output, chunks, elements, widths, approaches=(), only_approaches=False):
     intervals = json.loads(Path(__file__).with_name('road-corridor-survey.json').read_text())
     shapes, footpaths = [], []
@@ -85,6 +106,7 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False)
     grades=STRtree([line.buffer(half,quad_segs=4) for line,half,*_ in approaches])
     tree = STRtree(shapes)
     pedestrian = STRtree(footpaths)
+    channels = channel_spans(elements,widths)
     for tile in chunks:
         x, z = tile['x'], tile['z']
         bounds = box(x,z,x+256,z+256)
@@ -94,16 +116,23 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False)
             continue
         area = union_all([shapes[i].intersection(bounds) for i in hits]+
                          [grades.geometries[i].intersection(bounds) for i in nearby])
+        protected=channels.query(area,predicate='intersects')
+        seam=None
+        if len(protected):
+            span=union_all(channels.geometries.take(protected))
+            area=union_all(list(polygons(area.difference(span))))
+            seam=translate(span,-x,-z).boundary.buffer(.025)
         area = set_precision(translate(area, -x, -z), .01)
+        area=union_all(list(polygons(area)))
         if area.area > .01:
             local=[(translate(approaches[i][0],-x,-z),*approaches[i][1:]) for i in nearby]
             foot = [translate(footpaths[i],-x,-z) for i in pedestrian.query(bounds,predicate='intersects')]
-            if patch(output/tile['file'], area, local, foot):
+            if patch(output/tile['file'], area, local, foot, seam):
                 tile['gradedCorridor']=True
             tile['bytes'] = (output/tile['file']).stat().st_size
 
 
-def patch(file, area, approaches=(), foot=()):
+def patch(file, area, approaches=(), foot=(), seam=None):
     raw = gzip.decompress(file.read_bytes())
     n, k, size, image, deck = struct.unpack_from('<5I', raw, 4)
     start = 24+16900+9*n+4*k
@@ -130,6 +159,7 @@ def patch(file, area, approaches=(), foot=()):
         # The exposed bed stops short of its retaining edge. Carry the asphalt
         # under the facade lip so it meets the wall at street level.
         area=set_precision(area.difference(solids.buffer(-.06).difference(existing_roads)),.01)
+        area=union_all(list(polygons(area)))
         if area.is_empty:
             return False
     rebuilt = []
@@ -149,6 +179,8 @@ def patch(file, area, approaches=(), foot=()):
     # Keep a narrow exposed bed between the rim of the driving surface and
     # the outside retaining wall. At a tile seam the road must remain joined.
     exterior=area.boundary.difference(box(0,0,256,256).boundary)
+    if seam is not None:
+        exterior=exterior.difference(seam)
     top_area=area.difference(exterior.buffer(.04,quad_segs=2))
     walk=union_all([*foot, *(line.buffer(half,quad_segs=4) for line,half,*_,kind in approaches if kind==1)])
     motor=union_all([line.buffer(half,quad_segs=4) for line,half,*_,kind in approaches if kind==0])
