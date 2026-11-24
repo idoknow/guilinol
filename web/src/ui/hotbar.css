@@ -15,7 +15,11 @@
 /* 物品栏在时，把原本贴底的提示条和测试版说明往上让 */
 body[data-hotbar=on] .hint{bottom:calc(76px + env(safe-area-inset-bottom))}
 body[data-hotbar=on] .beta-note{bottom:calc(72px + env(safe-area-inset-bottom))}
-body[data-hotbar=on] .vehicle-action{bottom:calc(104px + env(safe-area-inset-bottom))}
+/* 抬起只对鼠标/触控板生效：触屏上 .vehicle-action 已由 walk.css 的 coarse 规则抬到摇杆之上
+   （230px），这里再压到 104px 会压住左摇杆和跑键（IDOK-255 回归）。 */
+@media (hover:hover) and (pointer:fine){
+  body[data-hotbar=on] .vehicle-action{bottom:calc(104px + env(safe-area-inset-bottom))}
+}
 @media (pointer:coarse) and (not (any-pointer:fine)){
   .hotbar-slot kbd{display:none}
   .hotbar-slot{width:50px;height:46px}
