@@ -4,6 +4,7 @@ import {resolve} from 'node:path'
 import {preview} from 'vite'
 import {chromium} from 'playwright'
 import {browserOptions,seedBenchmark} from './qa-browser.mjs'
+import {installDrawInventory} from './scene-draw-inventory.mjs'
 import {glHookScript} from './gl-perf.mjs'
 
 const [mainDist, prDist] = process.argv.slice(2)
@@ -45,21 +46,24 @@ try {
       }else await page.evaluate(async()=>{for(let frame=0;frame<12;frame++)await new Promise(requestAnimationFrame)})
       await cdp.send('HeapProfiler.collectGarbage')
       const heap = (await cdp.send('Runtime.getHeapUsage')).usedSize
+      if(process.env.PERF_INVENTORY==='1')await page.evaluate(installDrawInventory)
       const frames = await page.evaluate(async count => {
         const frames = []
         let last = await new Promise(requestAnimationFrame)
         for(let index=0;index<count;index++) {
+          window.__drawInventory?.start()
           window.__glPerf.resetFrame()
           const now = await new Promise(requestAnimationFrame)
           const {geometries,textures} = window.viewer.stats
-          frames.push({ms:now-last, ...window.__glPerf.readFrame(), geometries, textures})
+          frames.push({ms:now-last, ...window.__glPerf.readFrame(), meshes:window.__drawInventory?.frame(), geometries, textures})
           last = now
         }
         return frames
       }, count)
       const sha = (await (await fetch(`${url}/version.json`)).json()).sha
       const traffic=await page.evaluate(()=>({cameraY:window.viewer.camera.position.y,crowd:window.viewer.trafficProbe?.crowd?.count,motors:window.viewer.trafficProbe?.allMotors?.length,assets:performance.getEntriesByType('resource').filter(entry=>/\/roads\/|\/assets\/traffic-/.test(entry.name)).map(entry=>new URL(entry.name).pathname)}))
-      const row = {view,side:side?'PR':'main',round,sha,heap,frames,traffic}
+      const inventory=await page.evaluate(()=>window.__drawInventory?.resources())
+      const row = {inventory,view,side:side?'PR':'main',round,sha,heap,frames,traffic}
       raw.push(row)
       await writeFile(`${output}/raw.json`,JSON.stringify(raw))
       return row
