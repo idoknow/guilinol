@@ -18,7 +18,7 @@ import WebSocket from 'ws'
 const SECRET = randomBytes(24).toString('base64url')
 const PORT = 20000 + Math.floor(Math.random() * 20000)
 const server = spawn(process.execPath, [fileURLToPath(new URL('../rt/server-realtime.mjs', import.meta.url))], {
-  env: { ...process.env, PORT: String(PORT), RT_JOIN_SECRET: SECRET, RT_ROSTER_MS: '500', RT_STATS_MS: '600000' },
+  env: { ...process.env, PORT: String(PORT), RT_JOIN_SECRET: SECRET, RT_ROSTER_MS: '500', RT_STATS_MS: '600000', RT_RESUME_MS: '1500' },
   stdio: ['ignore', 'pipe', 'inherit'],
 })
 await new Promise((resolve) => server.stdout.once('data', resolve))
@@ -96,7 +96,24 @@ check('7) 顶号后旧 id 不再出现', count(A, 'pos', B.id) === 0 && count(A,
 await sleep(600)
 check('7) roster 里同 uid 只剩一条', A.roster.filter(([, name]) => name === 'B').length === 1, `n=${A.roster.filter(([, name]) => name === 'B').length}`)
 
-for (const c of [A, B2, C]) c.ws.close()
+// 8) CDN 掐断（不发 close 帧 → 1006）后同 uid 立刻续连：旁观者无 leave/join，续上的人立刻看到视野里的人
+reset(A)
+B2.ws.terminate(); await sleep(150)
+const B3 = await client(910002, 'B', 30, 2); await sleep(300)
+check('8) 续连 welcome resumed 且沿用原 id', B3.welcome.me.resumed === true && B3.id === B2.id, `id=${B3.id} was ${B2.id}`)
+check('8) 旁观者没看到 leave/join', count(A, 'leave', B2.id) === 0 && count(A, 'join', B2.id) === 0)
+check('8) 续上的人立刻看到视野里的 A', B3.welcome.players.some((p) => p.id === A.id))
+reset(A); await walk(B3, 36, 2); await sleep(150)
+check('8) 续连后位置继续送达', count(A, 'pos', B3.id) > 0, `pos=${count(A, 'pos', B3.id)}`)
+
+// 9) 断开后不回来：宽限期（测试里 1.5s）到点旁观者才收到 leave，roster 里也没有了
+reset(A)
+B3.ws.terminate(); await sleep(600)
+check('9) 宽限期内不播 leave', count(A, 'leave', B3.id) === 0)
+await sleep(2200)
+check('9) 宽限期到点播 leave、roster 清掉', count(A, 'leave', B3.id) === 1 && !A.roster.some(([id]) => id === B3.id), `leave=${count(A, 'leave', B3.id)}`)
+
+for (const c of [A, C]) c.ws.close(1000)
 server.kill('SIGKILL')
 console.log(failed ? `\n${failed} 项失败` : '\n全部通过')
 process.exit(failed ? 1 : 0)

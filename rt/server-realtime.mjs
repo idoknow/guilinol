@@ -670,6 +670,7 @@ wss.on('connection', (ws, req) => {
           // 续连：上一个连接是被 CDN/网络掐断的（dead），不是顶号。原地接管，不播 leave/join。
           if (previous.dead) {
             const p = previous
+            const gapMs = Math.max(0, Math.round(now() - (p.deadAt - RESUME_MS)))
             p.ws = ws
             // 关键：这条 socket 的连接 id 是新的，后续 pos/close 必须按原玩家 id 找，
             // 否则续连后玩家在服务端「消失了」（消息被丢弃、断开也不清理）
@@ -707,7 +708,7 @@ wss.on('connection', (ws, req) => {
             console.log(JSON.stringify({
               scope: 'rt-resume', uid, id: p.id,
               code: p.lastCloseCode ?? null,
-              gapMs: Math.max(0, Math.round(now() - (p.deadAt - RESUME_MS))),
+              gapMs,
               players: players.size,
             }))
             delete p.lastCloseCode
@@ -797,7 +798,7 @@ wss.on('connection', (ws, req) => {
 
       if (msg.t === 'emote') {
         if (!acceptEmote(me,msg,now())) return
-        const packet=JSON.stringify({t:'emote',from:id,id:me.em,s:me.es})
+        const packet=JSON.stringify({t:'emote',from:me.id,id:me.em,s:me.es})
         for(const peerId of me.visible){const peer=players.get(peerId);if(peer&&inEmoteRange(peer,me))sendSlowAware(peer.ws,packet,'emote')}
         return
       }
@@ -834,7 +835,7 @@ wss.on('connection', (ws, req) => {
         me.br = clampInt(msg.br, 0, 3)
         aoiMove(me)
         aoiSend(me, {
-          t: 'pos', id,
+          t: 'pos', id: me.id,
           x: me.x, y: me.y, z: me.z, yaw: me.yaw, v: me.v,
           bike: me.bike, bx: me.bx, bz: me.bz, byaw: me.byaw,
           hb: me.hb, hx: me.hx, hz: me.hz, hyaw: me.hyaw, mv: me.mv, cr: me.cr, gr: me.gr, dn: me.dn, pn: me.pn, wl: me.wl,
@@ -874,7 +875,7 @@ wss.on('connection', (ws, req) => {
         const avatar = sanitizeAvatar(msg.avatar)
         if (!avatar) return
         me.avatar = avatar
-        for (const peerId of me.visible) { const peer = players.get(peerId); if (peer) sendSlowAware(peer.ws, JSON.stringify({t:'avatar',id,avatar}), 'avatar') }
+        for (const peerId of me.visible) { const peer = players.get(peerId); if (peer) sendSlowAware(peer.ws, JSON.stringify({t:'avatar',id:me.id,avatar}), 'avatar') }
         return
       }
 
