@@ -282,7 +282,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
   }
   // A shallow roof can cross the occupied volume even beyond a portal cut.
   // Preserve the original indices outside the bore and texture only the new faces.
-  const clipTerrain=tunnelClearanceClipper(tile,tunnels,.055)
+  const clipTerrain=tunnelClearanceClipper(tile,tunnels,.055,true)
   const keptGround:number[]=[]
   const insideTile=clipTerrain(Float32Array.from(pos.array),keep,keptGround)
   const cutVertices=Float32Array.from(vertices)
@@ -322,7 +322,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
 
 // Clip collision triangles against the actual piecewise-linear floor and roof.
 // Preserve the floor, ceiling and exterior faces at the boundary of each prism.
-export function tunnelClearanceClipper(tile:Tile,tunnels:Tunnel[],belowFloor=0){
+export function tunnelClearanceClipper(tile:Tile,tunnels:Tunnel[],belowFloor=0,terrain=false){
   type Prism={planes:Plane[];xmin:number;xmax:number;zmin:number;zmax:number}
   const bins=new Map<number,Prism[]>()
   const cell=(v:number)=>Math.max(0,Math.min(31,Math.floor(v/8)))
@@ -356,7 +356,7 @@ export function tunnelClearanceClipper(tile:Tile,tunnels:Tunnel[],belowFloor=0){
     }
     // At an oblique mouth the terrain retaining face can stand outside the
     // axial bore prism, across the surface approach. Keep its paved profile.
-    for(const [end,dx,dz,half] of tunnel.openings??[]){
+    for(const [end,dx,dz,half] of terrain?tunnel.openings??[]:[]){
       const [px,y,pz]=tunnel.portals[end],x=px-tile.x,z=pz-tile.z
       const point=(along:number,side:number)=>[x+along*dx-side*dz,z+along*dz+side*dx]
       const reach=Math.min(half,3)

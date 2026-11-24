@@ -137,7 +137,7 @@ try{
             hit.point?.y>probe.foot+.5&&hit.point.y<probe.foot+(mode==='car'?2:2.5))
           const obstruction=contacts?.some(Boolean)||w.obstacle==='collision'||headContact||
             probe.contactSources?.some(hit=>Math.abs(hit.normal?.y)<.5)
-          const failure=completed?undefined:obstruction?'collision':'tool'
+          const failure=completed?undefined:obstruction||probe.resets>initialResets?'collision':'tool'
           return {completed,failure,maximum,frames,part,obstacle:w.obstacle,contacts,
             stopped:completed?undefined:{hits:probe.contactSources,foot:probe.foot,resets:probe.resets-initialResets,heading:w.heading}}
         },{route,mode,boundary})
