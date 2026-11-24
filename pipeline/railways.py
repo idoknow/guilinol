@@ -67,6 +67,8 @@ def envelope(graph, targets, origins=None):
 def parallel_height_audit(pieces, coords, height, ways):
     """Compare linear profiles at matching perpendicular chainages on both tracks."""
     rows = [piece for piece in pieces if not piece[3] & (BRIDGE | TUNNEL)]
+    if not rows:
+        return dict(directedSegmentPairs=0, over5cm=0, maximumM=0)
     indices = np.array([[i, j] for i, j, *_ in rows])
     endpoints = np.asarray(coords)[indices]
     delta = endpoints[:, 1] - endpoints[:, 0]
