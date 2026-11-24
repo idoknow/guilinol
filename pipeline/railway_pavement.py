@@ -35,9 +35,12 @@ def bake(directory, chunks, graded=None, tunnels=()):
         if way['type']!='way' or not way.get('tags',{}).get('highway') or len(way.get('geometry',()))<2:
             continue
         tags = way['tags']
-        minor = graded is not None and tags['highway'] in ('service','unclassified','living_street') and all(
+        # The city road layer also omits motorway carriageways and slip roads.
+        # Regraded stretches need asphalt supported by the fitted road grid.
+        missing_layer = tags['highway'] in ('service','unclassified','living_street','motorway','motorway_link')
+        graded_road = graded is not None and missing_layer and all(
             tags.get(k,'no')=='no' for k in ('bridge','tunnel')) and tags.get('access') not in ('no','private')
-        if way['id'] not in sites and not minor:
+        if way['id'] not in sites and not graded_road:
             continue
         if tags['highway'] in ('footway','cycleway','steps','path','pedestrian'):
             continue
@@ -52,7 +55,7 @@ def bake(directory, chunks, graded=None, tunnels=()):
         for site in sites.get(way['id'],()):
             at = center.project(site)
             segments.append(substring(center,max(0.,at-60),min(center.length,at+60)))
-        if minor:
+        if graded_road:
             coords = np.asarray(center.coords)
             for a,b in zip(coords,coords[1:]):
                 if graded.affects_carriageway(a,b,road_width/2):
@@ -91,6 +94,15 @@ def bake(directory, chunks, graded=None, tunnels=()):
             tangent /= np.linalg.norm(tangent)
             landing = LineString([a-3*tangent,a+3*tangent])
             shapes.append(landing.buffer(tunnel['halfWidth'],cap_style='flat'))
+    # Preserve the open approaches when a newly paved service road runs
+    # alongside a cutting. At a daylight mouth the two road edges meet.
+    cuts = []
+    for tunnel in tunnels:
+        if not tunnel.get('openCut'):
+            continue
+        axis = LineString([(x,z) for x,_,z in tunnel['portals']])
+        cuts.append(axis.buffer(tunnel['halfWidth'],cap_style='flat'))
+    cut_tree = STRtree(cuts)
     new_pavement = []
     tree = STRtree(shapes)
     for tile in chunks:
@@ -99,7 +111,11 @@ def bake(directory, chunks, graded=None, tunnels=()):
         hits = tree.query(bounds,predicate='intersects')
         if not len(hits):
             continue
-        local = translate(union_all([shapes[i] for i in hits]).intersection(bounds),-x,-z)
+        pavement = union_all([shapes[i] for i in hits]).intersection(bounds)
+        cut_hits = cut_tree.query(bounds,predicate='intersects')
+        if len(cut_hits):
+            pavement = pavement.difference(union_all([cuts[i] for i in cut_hits]))
+        local = translate(pavement,-x,-z)
         file = directory/tile['file']
         data = gzip.decompress(file.read_bytes())
         vertices,indices,size = struct.unpack_from('<3I',data,4)
