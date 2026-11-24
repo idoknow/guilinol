@@ -58,7 +58,7 @@ def station_interchange_tunnels(ways, plans, control, left, top, ground_at):
                            ceiling=road_y-STYLE['structureDepth']-STYLE['roadClearance']-.02)
 
 
-def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, top, ground_at):
+def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, top, ground_at, protected):
     from railways import bake, road_radius
     inventory = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-crossings.json').read_bytes())
     crossings, panels = bake(None, {}, inventory, {}, rail_only=True)
@@ -158,6 +158,12 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
     joints = defaultdict(list)
     fallback_floors = {}
     original_control = control.copy()
+    from railway_tunnel_widths import bore_widths, cover_crossing_streets
+    from road_profile import RULES
+    widths = bore_widths(ways,by_road)
+    upper = [(ways[wid],road[0],RULES['defaultWidth'].get(ways[wid]['tags']['highway'],4.))
+             for wid,road in roads.items() if ways[wid]['tags'].get('tunnel','no')=='no']
+    upper_index = STRtree([line for _,line,_ in upper])
     for wid,(line,stations,indices) in roads.items():
         minimum,maximum = levels[indices],limits[indices]
         if not (np.isfinite(minimum).any() or np.isfinite(maximum).any()):
@@ -186,6 +192,8 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
             if wid not in by_road:
                 continue
             cover = [line.project(Point(r['x'],r['z'])) for r in by_road[wid]]
+            bore_width = widths.get(wid,road_radius(tags)-1)
+            cover.extend(cover_crossing_streets(ways[wid],bore_width,upper,upper_index))
             first_cover = max(0.,min(cover)-4.)
             last_cover = min(line.length,max(cover)+4.)
             chain = np.r_[0,np.cumsum(np.linalg.norm(np.diff(line.coords,axis=0),axis=1))]
@@ -197,7 +205,7 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
                 mouth = [node_a in surface_nodes,node_b in surface_nodes]
                 first,last = xy[subset][[0,-1]]
                 low,high = design[subset][[0,-1]]
-                tunnels.append(dict(way=wid,length=span,halfWidth=road_radius(tags)-1,
+                tunnels.append(dict(way=wid,length=span,halfWidth=bore_width,
                                     clearance=STYLE['roadClearance'],approach=min(8.,span/3),mouths=mouth,
                                     openEnds=[float(np.clip(first_cover-a,0,span)),
                                               float(np.clip(b-last_cover,0,span))],
@@ -252,4 +260,6 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
         ring = list(hull.exterior.coords)[:-1]
         for index,(section,end,_) in enumerate(sections):
             section.setdefault('joints',[None,None])[end] = dict(ring=ring,draw=index==0)
+    from railway_approach_surface import grade_approach_surfaces
+    grade_approach_surfaces(ways,crossings,panels,tunnels,plans,protected,water)
     return fallback_floors, crossings

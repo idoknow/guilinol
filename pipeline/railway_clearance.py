@@ -62,7 +62,11 @@ def lower_approaches(directory, chunks, corrections):
                    raw[8474:start]+encoded+raw[end:tail])
         if np.any(surface!=underlay):
             payload += underlay.tobytes()
-        file.write_bytes(gzip.compress(payload,compresslevel=5,mtime=0))
+        from protected_road_grades import follow_graded_ground
+        encoded_tile = gzip.compress(payload,compresslevel=5,mtime=0)
+        trees = file.with_suffix('.trees')
+        trees.write_bytes(follow_graded_ground(trees.read_bytes(),gzip.compress(raw,mtime=0),encoded_tile))
+        file.write_bytes(encoded_tile)
         tile['bytes'] = file.stat().st_size
 
 

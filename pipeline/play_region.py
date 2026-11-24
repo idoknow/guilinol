@@ -71,6 +71,7 @@ def restore_protected_tiles(output, chunks, entries, grades=None):
         for suffix in ('.glc','.trees'):
             src = Path(ref['file']).with_suffix(suffix)
             copies['world/'+str(src)] = (output/tile['file']).with_suffix(suffix),tile
+    changed_support = {}
     with tarfile.open(archive, 'r|gz') as packed:
         for member in packed:
             target = copies.pop(member.name,None)
@@ -78,10 +79,16 @@ def restore_protected_tiles(output, chunks, entries, grades=None):
                 file,tile = target
                 data = packed.extractfile(member).read()
                 if grades is not None and file.suffix=='.glc':
+                    previous_tile = data
                     data = grades.apply(data,tile['x'],tile['z'])
+                    if data != previous_tile:
+                        changed_support[file.with_suffix('.trees')] = previous_tile,data
                     tile['bytes'] = len(data)
                 file.write_bytes(data)
     if copies:
         raise ValueError('Missing protected tiles in the baseline archive')
+    from protected_road_grades import follow_graded_ground
+    for file,(before,after) in changed_support.items():
+        file.write_bytes(follow_graded_ground(file.read_bytes(),before,after))
     campus_entries = {e['id']:e for e in manifest['landmarks'] if e['name'] in campus_names}
     entries[:] = [campus_entries.get(e['id'],e) for e in entries]
