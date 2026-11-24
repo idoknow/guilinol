@@ -239,6 +239,61 @@ export function scheduleDrinkSound(
       break
     }
 
+    case 'fruit_pour': {
+      // 浓稠果泥挂壁倾倒：低频粘稠咕嘟 + 微颗粒软碰撞
+      noiseBurst(
+        ctx,
+        dest,
+        noiseBuf,
+        { start: startTime, dur: 0.66, gain: 0.24 * lv, filterType: 'bandpass', f0: 420, f1: 760, q: 2.3, offset: 0.15 },
+        track,
+      )
+      for (const [dt, f0, f1] of [
+        [0.12, 260, 410],
+        [0.29, 310, 480],
+        [0.48, 285, 440],
+      ] as const) {
+        tone(ctx, dest, { type: 'sine', f0, f1, start: startTime + dt, dur: 0.085, gain: 0.22 * lv }, track)
+      }
+      break
+    }
+
+    case 'ice_cream_dispense': {
+      // 拉杆下压开关咔嗒 + 柔和制冷泵低频稳态挤出声 + 回弹止阀
+      tone(ctx, dest, { type: 'triangle', f0: 340, f1: 180, start: startTime, dur: 0.045, gain: 0.2 * lv }, track)
+      tone(ctx, dest, { type: 'sawtooth', f0: 145, f1: 162, start: startTime + 0.05, dur: 0.64, gain: 0.08 * lv, attack: 0.06 }, track)
+      noiseBurst(
+        ctx,
+        dest,
+        noiseBuf,
+        { start: startTime + 0.05, dur: 0.64, gain: 0.19 * lv, filterType: 'bandpass', f0: 520, f1: 920, q: 1.6, offset: 0.4 },
+        track,
+      )
+      tone(ctx, dest, { type: 'sine', f0: 460, f1: 290, start: startTime + 0.72, dur: 0.06, gain: 0.16 * lv }, track)
+      break
+    }
+
+    case 'label_apply': {
+      // 热敏打印机“滋咔”步进走纸 + 机械吸盘轻拍贴标
+      noiseBurst(
+        ctx,
+        dest,
+        noiseBuf,
+        { start: startTime, dur: 0.16, gain: 0.2 * lv, filterType: 'bandpass', f0: 2100, f1: 3100, q: 3.1 },
+        track,
+      )
+      tone(ctx, dest, { type: 'triangle', f0: 1120, f1: 880, start: startTime + 0.02, dur: 0.11, gain: 0.12 * lv }, track)
+      tone(ctx, dest, { type: 'triangle', f0: 290, f1: 150, start: startTime + 0.26, dur: 0.085, gain: 0.28 * lv, attack: 0.002 }, track)
+      noiseBurst(
+        ctx,
+        dest,
+        noiseBuf,
+        { start: startTime + 0.26, dur: 0.07, gain: 0.18 * lv, filterType: 'highpass', f0: 1800, offset: 0.3 },
+        track,
+      )
+      break
+    }
+
     case 'shaker_shake': {
       // 四拍有力雪克摇茶节奏：哒-嚓-哒-嚓
       const beats = [0, 0.17, 0.34, 0.52]

@@ -21,6 +21,23 @@ function readSharedSoundMuted(): boolean {
   }
 }
 
+export type DrinksEquipmentSoundAction =
+  | 'ice_cream_dispense'
+  | 'tea_shake'
+  | 'cup_seal'
+  | 'fruit_pour'
+  | 'ice_scoop'
+  | 'label_apply'
+
+export const EQUIPMENT_ACTION_SOUND_MAP: Readonly<Record<DrinksEquipmentSoundAction, DrinkSoundId>> = {
+  ice_cream_dispense: 'ice_cream_dispense',
+  tea_shake: 'shaker_shake',
+  cup_seal: 'cup_seal',
+  fruit_pour: 'fruit_pour',
+  ice_scoop: 'ice_scoop',
+  label_apply: 'label_apply',
+}
+
 export interface DrinksAudioStats {
   supported: boolean
   unlocked: boolean
@@ -34,6 +51,12 @@ export interface DrinksAudioStats {
 export interface DrinksAudioController {
   unlock: () => boolean
   play: (id: DrinkSoundId, opts?: { volume?: number }) => boolean
+  playEquipmentAction: (action: DrinksEquipmentSoundAction, opts?: { volume?: number }) => boolean
+  syncEquipmentProgress: (
+    action: DrinksEquipmentSoundAction,
+    progress: number,
+    prevProgress?: number,
+  ) => boolean
   playOrderConfirm: () => boolean
   playCupReady: () => boolean
   playSip: () => boolean
@@ -147,6 +170,17 @@ export function createDrinksAudio(opts?: { muted?: boolean; volume?: number; syn
   return {
     unlock: () => Boolean(ensureContext()),
     play,
+    playEquipmentAction: (action: DrinksEquipmentSoundAction, playOpts?: { volume?: number }) =>
+      play(EQUIPMENT_ACTION_SOUND_MAP[action], playOpts),
+    syncEquipmentProgress(action: DrinksEquipmentSoundAction, progress: number, prevProgress = 0): boolean {
+      const p = Number.isFinite(progress) ? progress : 0
+      const prev = Number.isFinite(prevProgress) ? prevProgress : 0
+      // 外部 0..1 进度刚启动（越过 0.04 门槛）即触发对应设备动作声效
+      if (prev < 0.04 && p >= 0.04 && p < 0.99) {
+        return play(EQUIPMENT_ACTION_SOUND_MAP[action])
+      }
+      return false
+    },
     playOrderConfirm: () => play('order_chime'),
     playCupReady: () => play('call_number'),
     playSip: () => play('drink_sip'),

@@ -1,8 +1,6 @@
 export {
   DRINK_IDS,
   DRINK_CATALOG,
-  DRINK_SIM_SKU_ALIASES,
-  resolveDrinkPropId,
   type DrinkId,
   type DrinkSpec,
   type DrinkSilhouetteKind,
@@ -13,6 +11,7 @@ export {
   resolveDrinkSkin,
   createCupSleeveTexture,
   createCaramelSwirlTexture,
+  createThermalOrderLabelTexture,
   type DrinkSkinConfig,
 } from './skins.ts'
 export {
@@ -29,3 +28,17 @@ export {
   type DrinkPropBounds,
   type DrinkPropReportItem,
 } from './builder.ts'
+export {
+  EQUIPMENT_ACTION_IDS,
+  EQUIPMENT_ACTION_CATALOG,
+  resolveEquipmentActionForStep,
+  resolveEquipmentSequenceForStation,
+  syncEquipmentFromSimOrder,
+  syncDrinksEquipmentAudio,
+  createDrinksEquipmentRig,
+  type EquipmentActionId,
+  type EquipmentActionSpec,
+  type EquipmentSyncResult,
+  type EquipmentRigController,
+  type EquipmentRigOptions,
+} from './equipment.ts'

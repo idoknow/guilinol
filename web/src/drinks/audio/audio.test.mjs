@@ -1,15 +1,24 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { DRINK_SOUND_CATALOG, DRINK_SOUND_IDS, createDrinksAudio, encodeWavMono16 } from './index.ts'
+import {
+  DRINK_SOUND_CATALOG,
+  DRINK_SOUND_IDS,
+  EQUIPMENT_ACTION_SOUND_MAP,
+  createDrinksAudio,
+  encodeWavMono16,
+} from './index.ts'
 
-test('DRINK_SOUND_CATALOG 覆盖全链路 10 种冷饮音效且元数据合法', () => {
+test('DRINK_SOUND_CATALOG 覆盖全链路 13 种冷饮与设备音效且元数据合法', () => {
   const expected = [
     'order_chime',
     'cup_drop',
     'ice_scoop',
+    'fruit_pour',
     'tea_pour',
     'shaker_shake',
+    'ice_cream_dispense',
     'cup_seal',
+    'label_apply',
     'call_number',
     'straw_poke',
     'drink_sip',
@@ -22,16 +31,25 @@ test('DRINK_SOUND_CATALOG 覆盖全链路 10 种冷饮音效且元数据合法',
     assert.ok(spec.defaultVolume > 0 && spec.defaultVolume <= 1)
     assert.ok(spec.trigger.length > 4)
   }
+  const equipActions = ['ice_cream_dispense', 'tea_shake', 'cup_seal', 'fruit_pour', 'ice_scoop', 'label_apply']
+  for (const act of equipActions) {
+    assert.ok(EQUIPMENT_ACTION_SOUND_MAP[act] in DRINK_SOUND_CATALOG, `缺少设备动作映射 ${act}`)
+  }
 })
 
-test('createDrinksAudio 在无 window 环境下安全降级并记录调用统计', () => {
+test('createDrinksAudio 在无 window 环境下安全降级并支持设备 0..1 进度沿触发', () => {
   const audio = createDrinksAudio({ syncRidePref: false })
   assert.equal(audio.isMuted(), false)
   assert.equal(audio.getStats().supported, false)
   audio.play('shaker_shake')
   audio.playOrderConfirm()
+  audio.playEquipmentAction('label_apply')
+  audio.syncEquipmentProgress('ice_cream_dispense', 0.12, 0.0)
+  audio.syncEquipmentProgress('ice_cream_dispense', 0.55, 0.12) // 中途不重复触发
   assert.equal(audio.getStats().playedCounts.shaker_shake, 1)
   assert.equal(audio.getStats().playedCounts.order_chime, 1)
+  assert.equal(audio.getStats().playedCounts.label_apply, 1)
+  assert.equal(audio.getStats().playedCounts.ice_cream_dispense, 1)
   audio.setMuted(true)
   assert.equal(audio.isMuted(), true)
   audio.dispose()
