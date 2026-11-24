@@ -305,5 +305,7 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
     def surface_at(x,z):
         return max(finished_ground(x,z),float(eval_bspline_grid(control,left,top,np.asarray(x),np.asarray(z))))+.045
     build_open_approaches(ways,tunnels,side_bores,surface_at)
-    extend_to_junctions(ways,tunnels,cut_roads,surface_at)
+    bridge_levels = {ways[wid]['nodes'][end]:levels[end] for wid,(_,_,_,levels) in plans.items()
+                     if wid in ways for end in (0,-1)}
+    extend_to_junctions(ways,tunnels,cut_roads,surface_at,bridge_levels)
     return fallback_floors, crossings

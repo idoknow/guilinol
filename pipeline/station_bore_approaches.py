@@ -112,7 +112,7 @@ def stitch(ends,joints):
             for k,(t,idx) in enumerate(sections):
                 t.setdefault('joints',[None,None])[idx] = dict(ring=list(hull.exterior.coords)[:-1],draw=k==0)
 
-def extend_to_junctions(ways,tunnels,bore_ids,surface_at):
+def extend_to_junctions(ways,tunnels,bore_ids,surface_at,bridge_levels=None):
     """Propagate the cut through surface junctions until every arm reaches grade."""
     import heapq
     from functools import lru_cache
@@ -125,6 +125,11 @@ def extend_to_junctions(ways,tunnels,bore_ids,surface_at):
     for t in tunnels:
         for end,node in enumerate(t.get('nodes',())):
             sections[node].append((t,end))
+    fixed = dict(bridge_levels or {})
+    for node,ends in sections.items():
+        for tunnel,end in ends:
+            if tunnel['way'] not in bore_ids:
+                fixed[node] = tunnel['portals'][end][1]
     coords = {}
     @lru_cache(None)
     def geometry(wid):
@@ -133,7 +138,7 @@ def extend_to_junctions(ways,tunnels,bore_ids,surface_at):
         return xy
     @lru_cache(None)
     def original(node):
-        return surface_at(*coords[node])
+        return fixed[node] if node in fixed else surface_at(*coords[node])
     queue = [(y,n) for n,y in tips.items()]
     heapq.heapify(queue)
     levels,edges = {},set()
@@ -145,6 +150,8 @@ def extend_to_junctions(ways,tunnels,bore_ids,surface_at):
             raise ValueError(f'Approach envelope would depress the fixed bore at {node}')
         y = tips[node] if node in tips else min(upper,original(node))
         levels[node] = y
+        if node in fixed and upper<fixed[node]-.005:
+            raise ValueError(f'Junction {node} requires {fixed[node]:.3f} m; approach can reach {upper:.3f} m')
         if node not in tips and original(node)-y<.005:
             continue
         for wid in adjacency[node]-bore_ids:
@@ -162,7 +169,10 @@ def extend_to_junctions(ways,tunnels,bore_ids,surface_at):
                     length = np.linalg.norm(xy[k+1]-xy[k])
                     if length<.01:
                         continue
-                    gain = .98*grade_cap(road['tags'])*(length-min(3.,length/8))
+                    # Reserve space for a short parabolic transition at the
+                    # junction. A fixed 3 m landing at every OSM vertex can
+                    # consume the usable rise on a short bridge approach.
+                    gain = .995*grade_cap(road['tags'])*(length-min(.75,length/8))
                     edges.add((wid,k))
                     other = ns[k] if j!=k else ns[k+1]
                     heapq.heappush(queue,(y+gain,other))
@@ -172,7 +182,7 @@ def extend_to_junctions(ways,tunnels,bore_ids,surface_at):
         xy = geometry(wid)
         a,b = ways[wid]['nodes'][k:k+2]
         length = np.linalg.norm(xy[k+1]-xy[k])
-        gain = grade_cap(ways[wid]['tags'])*(length-min(3.,length/8))
+        gain = grade_cap(ways[wid]['tags'])*(length-min(.75,length/8))
         graph[a].append((b,gain));graph[b].append((a,gain))
     for n,arms in graph.items():
         for v,allowed in arms:
@@ -183,7 +193,7 @@ def extend_to_junctions(ways,tunnels,bore_ids,surface_at):
         a,b = way['nodes'][k:k+2]
         p,q = geometry(wid)[k:k+2]
         length = np.linalg.norm(q-p)
-        ease = min(3.,length/8)
+        ease = min(.75,length/8)
         along = np.unique(np.r_[0.,ease,np.arange(2.,length,2.),length-ease,length])
         run = np.where(along<ease,along**2/(2*ease),along-ease/2)
         run = np.where(along>length-ease,length-ease-(length-along)**2/(2*ease),run)
