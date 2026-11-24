@@ -22,3 +22,9 @@ OSM way/819178841 呈窄长条形，其北端盖住深色低屋面，中段东�
 底图为 Esri World Imagery 的 EPSG:3857 瓦片，zoom 19，256 px 一块。拼图左上角在全球像素 (108222662,57368274)，向东 1500 px、向南 1150 px。按 Web Mercator 逆变换得到经纬度，再用项目投影读取距离。本站纬度的瓦片间距约 0.270 m/px。北向上，屋顶为青色、推定墙线为橙色、广场为品红。原 1000 px 范围图仅供总览。
 
 Esri 对本站返回的源信息为 Vantor WV03，拍摄于 2024-12-24，源分辨率 0.31 m，标称平面精度 8.47 m。2 m 指游戏几何与同一描图或 OSM 的相对偏差。影像的绝对地面位置仍受源精度限制。[Esri 影像与采集元数据](https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/identify?geometry=110.2782%2C25.2639&geometryType=esriGeometryPoint&sr=4326&layers=all&mapExtent=110.276%2C25.262%2C110.280%2C25.266&imageDisplay=1500%2C1500%2C96&tolerance=1&returnGeometry=false&f=pjson) · [© OpenStreetMap contributors](https://www.openstreetmap.org/way/819178841)
+
+## 游戏内复核
+
+`npm run landmarks -- guilin_station` 在已有 GL04 地形与街道三角面上生成模型。重建世界后再运行一次可使站台边缘与最终铺面标高一致。站名的文字、占位字体、字牌宽高及颜色在 `pipeline/railway-style.json` 的 `station` 字段。北翼和南翼按屋顶位置命名，附属楼采用 OSM way/1017598908 的外轮廓。
+
+`node scripts/station-views.mjs dist captures/station` 输出相同投影和时间的机位图，以及每张图的相机坐标、首帧、draw calls 和显存采样。东北、东、东南、西南、西、西北六个方向和俯视用于地形对照。近景用于核对实拍的朝向及构件，原照片没有相机坐标时，机位为近似匹配。

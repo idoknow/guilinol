@@ -204,15 +204,16 @@ def main(out):
     draw.text(
         (256, 319),
         STYLE["signText"],
-        font=get_font(104, bold=True, sans=True),
+        font=get_font(**STYLE["signFont"]),
         anchor="mm",
         fill=STYLE["signColor"],
     )
     world = Surface()
     east, south = CENTER
-    world.entries[NAME] = dict(
-        position=[east, world.sample(east, south)[0], south], rotation=0
-    )
+    if NAME not in world.entries:
+        world.entries[NAME] = dict(
+            position=[east, world.sample(east, south)[0], south], rotation=0
+        )
     surface = LandmarkSurface(world, NAME)
 
     streets = Streets(world)
@@ -261,8 +262,20 @@ def main(out):
         crossing = site["crossing"]
         y = max(b.grade(x, z) for x, z in crossing.exterior.coords) + 7.4
         b.prism(crossing.exterior.coords, y, 0.55, "frame", collide=True)
-        b.prism(crossing.exterior.coords, y + 0.55, 3.2, "glass", cap_region="roof")
+        b.prism(crossing.exterior.coords, y + 3.75, 0.25, "frame", cap_region="roof")
+        b.face(
+            [(x, y + 3.75, z) for x, z in crossing.exterior.coords[:-1]],
+            (0, -1, 0),
+            "wall",
+        )
         for _, a, end, length, u, n in edges(ccw(crossing.exterior.coords)):
+            pane = [
+                (a[0], y + 0.55, a[1]),
+                (end[0], y + 0.55, end[1]),
+                (end[0], y + 3.75, end[1]),
+                (a[0], y + 3.75, a[1]),
+            ]
+            b.glass.add_poly(pane, (n[0], 0, n[1]), "glass")
             if length > 20 and b.detail:
                 for t in np.arange(1.5, length, 2.5):
                     fin(
@@ -343,6 +356,7 @@ def main(out):
         build,
         NAME,
         surface=surface,
+        glass_opacity=STYLE["bridgeGlassOpacity"],
         masked_atlas=True,
     )
 

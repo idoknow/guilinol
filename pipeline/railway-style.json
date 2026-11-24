@@ -23,6 +23,8 @@
     "green": "#647757",
     "signColor": "#af342e",
     "signText": "桂林站",
+    "signFont": {"size": 104, "bold": true, "sans": true},
+    "bridgeGlassOpacity": 0.43,
     "signHeight": 3.2,
     "signWidth": 16.0,
     "canopyHeight": 5.6,
