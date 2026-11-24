@@ -4,11 +4,13 @@ import {gunzipSync} from 'node:zlib'
 import {createServer} from 'vite'
 import {chromium} from 'playwright'
 import {browserOptions} from './qa-browser.mjs'
+import {trafficModels} from '../web/src/traffic/models'
 import {contactPose} from '../web/src/traffic/lane-surface'
 import {trackHeight} from '../web/src/traffic/sim'
 
 import path from 'node:path'
 import {sites} from './vehicle-grounding-sites'
+const sedanAxles=trafficModels().axles.get(0)!
 const output='captures/vehicle-grounding/views'
 fs.mkdirSync(output,{recursive:true})
 const baseline=process.argv[2]
@@ -30,7 +32,7 @@ async function capture(side:'before'|'after',checkout:string){
     const length=Math.hypot(b.x-a.x,b.z-a.z),dx=(b.x-a.x)/length,dz=(b.z-a.z)/length
     const x=a.x+dx*length*f-dz*lane.offset,z=a.z+dz*length*f+dx*lane.offset
     const track={...lane,length,start:a,end:b}
-    const {pitch,roll,y}=side==='after'?contactPose(track,f*length):{pitch:0,roll:0,y:trackHeight(track,f*length)}
+    const {pitch,roll,y}=side==='after'?contactPose(track,f*length,...sedanAxles):{pitch:0,roll:0,y:trackHeight(track,f*length)}
     const cy=y
       await page.evaluate(async({x,y,z,dx,dz,cy,pitch,roll})=>{
         const v=window.viewer,scene=v.stream.scene
