@@ -102,9 +102,30 @@ export function landmarkStream(
   const loaderReady=sharedKtx2Loader(renderer).then(basis=>new GLTFLoader().setKTX2Loader(basis).setMeshoptDecoder(MeshoptDecoder))
   const pending=new Set<Landmark>(), priorityPending=new Set<Landmark>(), retry=new Map<Landmark,number>()
   const fades=new WeakMap<THREE.Group,THREE.IUniform<number>>()
+  // 常态使用无 discard 材质恢复 Apple Silicon / 移动端硬件 Early-Z，仅在 60m 淡出过渡带按需切淡出材质
+  const fadePairs=new WeakMap<THREE.Group,{fading:boolean; meshes:Array<{mesh:THREE.Mesh; orig:THREE.Material|THREE.Material[]; fade:THREE.Material|THREE.Material[]}>}>()
+  const attachQueue:Array<{entry:Landmark; group:THREE.Group}>=[]
+  function makeFadeVariant(orig:THREE.Material, coverage:THREE.IUniform<number>):THREE.Material{
+    const cloned=orig.clone()
+    fadeMaterial(cloned,coverage)
+    return cloned
+  }
+  function setGroupFading(root:THREE.Group, fading:boolean){
+    const rec=fadePairs.get(root)
+    if(!rec||rec.fading===fading)return
+    rec.fading=fading
+    for(const item of rec.meshes)item.mesh.material=fading?item.fade:item.orig
+  }
   function dispose(root:THREE.Group){
     const assets=new Set<THREE.BufferGeometry|THREE.Material|THREE.Texture>()
     for(const asset of root.userData.replacedAssets??[])assets.add(asset)
+    const rec=fadePairs.get(root)
+    if(rec){
+      for(const item of rec.meshes){
+        for(const m of [item.orig,item.fade].flat())if(m!==streetSurfaceMat)assets.add(m)
+      }
+      fadePairs.delete(root)
+    }
     root.traverse(node=>{if(node instanceof THREE.Mesh){if(node instanceof THREE.InstancedMesh)node.dispose();assets.add(node.geometry)
       for(const material of [node.material].flat()) {if(material===streetSurfaceMat)continue;assets.add(material);for(const value of Object.values(material))if(value instanceof THREE.Texture)assets.add(value)}
     }})
@@ -152,13 +173,31 @@ export function landmarkStream(
           node.geometry=node.geometry.clone();bindStreetSurface(node.geometry,kind);node.material=streetSurfaceMat
         }else for(const material of [original].flat())nightLit(material)
       })
+      batchRepeatedMeshes(group)
       const coverage={value:1}
       fades.set(group,coverage)
-      for(const asset of parser.associations.keys()){
-        if(asset instanceof THREE.Material)fadeMaterial(asset,coverage)
+      const matCache=new Map<THREE.Material,THREE.Material>()
+      const pairList:Array<{mesh:THREE.Mesh; orig:THREE.Material|THREE.Material[]; fade:THREE.Material|THREE.Material[]}>=[]
+      group.traverse(node=>{
+        if(!(node instanceof THREE.Mesh))return
+        const orig=node.material
+        if(orig===streetSurfaceMat)return
+        const mapOne=(m:THREE.Material)=>{
+          if(m===streetSurfaceMat)return m
+          let fm=matCache.get(m)
+          if(!fm){fm=makeFadeVariant(m,coverage);matCache.set(m,fm)}
+          return fm
+        }
+        const fade=Array.isArray(orig)?orig.map(mapOne):mapOne(orig)
+        pairList.push({mesh:node,orig,fade})
+      })
+      fadePairs.set(group,{fading:false,meshes:pairList})
+      freezeStatic(group)
+      if(isPriority){
+        scene.add(group);loaded.set(entry,group);retry.delete(entry)
+      }else{
+        attachQueue.push({entry,group});retry.delete(entry)
       }
-      batchRepeatedMeshes(group)
-      scene.add(group);freezeStatic(group);loaded.set(entry,group);retry.delete(entry)
     }).catch(error=>{record('failure',{category:'landmark'});console.warn(entry.id,error);retry.set(entry,performance.now()+30000)}).finally(()=>{
       pending.delete(entry);priorityPending.delete(entry)
       options?.onPendingChange?.()
@@ -175,7 +214,11 @@ export function landmarkStream(
     root.visible=visible
     if(!visible)return
     const coverage=fades.get(root)
-    if(coverage)coverage.value=1-THREE.MathUtils.smoothstep(distance,fadeCutoff-60,fadeCutoff)
+    if(coverage){
+      const cov=1-THREE.MathUtils.smoothstep(distance,fadeCutoff-60,fadeCutoff)
+      coverage.value=cov
+      setGroupFading(root, cov < 0.999)
+    }
     if(entry.lods.length){
       const level=distance>metrics.landmarkLod1?'lod2':distance>metrics.landmarkLod0?'lod1':'lod0'
       const lods=getLodNodes(root)
@@ -186,6 +229,14 @@ export function landmarkStream(
     }
   }
   const tick = (eye:THREE.Vector3, priority?:Landmark)=>{
+    // 每帧最多挂载 1 个非优先地标，打散转视角时的集中 shader/纹理上传尖峰
+    if(attachQueue.length){
+      const next=attachQueue.shift()!
+      if(!loaded.has(next.entry)){
+        scene.add(next.group)
+        loaded.set(next.entry,next.group)
+      }
+    }
     const metrics=options?.getMetrics?.()??fallbackMetrics
     const guardDist=metrics.spawnRingEdge+48
     if(priority){
