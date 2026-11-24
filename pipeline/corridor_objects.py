@@ -41,6 +41,14 @@ def relocate(output, manifest, elements):
            and (w['tags'].get('layer','0')=='0' or w.get('surfaceUnderlay')) and w['tags'].get('bridge','no')=='no'
            and w.get('geometry') and len(w['geometry'])>1 and all(w['geometry'])]
     axes=STRtree(lines)
+    # A paved access junction can retain an old tree from before its
+    # resurfacing. Include the travelled lane on both sides of the junction,
+    # even where the repaired asphalt overlaps the original footprint.
+    access_routes = output / 'vehicle-surface-routes.json'
+    routes = json.loads(access_routes.read_text()) if access_routes.exists() else []
+    travelled = STRtree([LineString([p[:2] for p in mode['route']]).buffer(1.6)
+                         for site in routes for mode in site['modes']
+                         if mode['mode']=='car' and len(mode['route'])>1])
     moves=defaultdict(list)
     anchors=defaultdict(dict)
     for key,tile in tiles.items():
@@ -53,6 +61,10 @@ def relocate(output, manifest, elements):
         # Otherwise objects on the former road edge survive next to the curb.
         added=footprints(paths[0][survey['start']:survey['end']],key,{0}).buffer(.041).difference(
             footprints(original['paths'],key,{0,5}))
+        access = travelled.query(box(*key,key[0]+256,key[1]+256),predicate='intersects')
+        if len(access):
+            asphalt = footprints(paths[0][survey['start']:survey['end']],key,{0})
+            added = added.union(asphalt.intersection(union_all(travelled.geometries.take(access))))
         if added.is_empty:
             continue
         trees_path=(output/tile['file']).with_suffix('.trees')
