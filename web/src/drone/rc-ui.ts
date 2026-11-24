@@ -109,9 +109,11 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
 
   function update(state:Telemetry, recording:boolean) {
     // Tapes: 60 px per 10 m, so a 120 m climb scrolls the tape twice.
-    alt.textContent = simple ? '' : tape(state.agl,6)
-    speed.textContent = simple ? '' : tape(state.speed,6)
-    compass.textContent = simple ? '' : ribbon(state.yaw)
+    if (!simple) {
+      alt.innerHTML = tape(state.agl,5,state.agl.toFixed(1))
+      speed.innerHTML = tape(state.speedKmh,10,String(state.speedKmh))
+      compass.innerHTML = ribbon(state.yaw)
+    }
     batteryBar.style.width = `${Math.max(0,Math.min(100,state.battery))}%`
     batteryBar.style.background = state.battery < 20 ? '#e0553f' : state.battery < 40 ? '#e0a63f' : '#5fd07a'
     batteryText.textContent = simple
@@ -148,23 +150,32 @@ export function createRc(spec:DroneSpec, handlers:RcHandlers):RcView {
 
 function round(value:number) { return Math.round(value * 100) / 100 }
 
-function tape(value:number, perTick:number) {
-  const lines:string[] = []
-  const base = Math.round(value / perTick) * perTick
-  for (let i = -3; i <= 3; i++) {
-    const mark = base + i * perTick
+/** Vertical tape: ticks every `step`, scrolled so the live value sits on the centre notch. */
+function tape(value:number, step:number, label:string) {
+  const base = Math.floor(value / step)
+  const offset = (value / step - base) * 18
+  const marks:string[] = []
+  for (let i = -4; i <= 5; i++) {
+    const mark = (base + i) * step
     if (mark < 0) continue
-    lines.push(`${Math.abs(i) === 1 ? '▸' : ' '} ${mark.toFixed(0)}`)
+    marks.push(`<span style="bottom:${50 + (i * 18 - offset) / 1.6}%">${mark}</span>`)
   }
-  return `${lines.join('\n')}\n\n${value.toFixed(0)}`
+  return `<span class="rc-ticks">${marks.join('')}</span><b>${label}</b>`
 }
 
-function ribbon(yaw:number) {
-  const heading = ((yaw * 180) / Math.PI % 360 + 360) % 360
-  const sector = Math.round(heading / 45) % 8
-  const neighbours = [1,2,3].map(step => CARDINALS[(sector + step) % 8]).join('  ')
-  const left = [1,2,3].map(step => CARDINALS[(sector - step + 8) % 8]).join('  ')
-  return `${left}   ${CARDINALS[sector]}( ${heading.toFixed(0)}° )   ${neighbours}`
+/** Heading ribbon: 15° ticks, cardinals labelled, centred on the aircraft heading (degrees). */
+function ribbon(yawDeg:number) {
+  // telemetry yaw is CCW-positive radians-turned-degrees with 0 = facing −Z (north); compass heading is clockwise.
+  const heading = ((-yawDeg % 360) + 360) % 360
+  const parts:string[] = []
+  const first = Math.ceil((heading - 90) / 15) * 15
+  for (let deg = first; deg <= heading + 90; deg += 15) {
+    const norm = ((deg % 360) + 360) % 360
+    const x = 50 + (deg - heading) / 180 * 100
+    const name = norm % 45 === 0 ? CARDINALS[norm / 45] : ''
+    parts.push(name ? `<i style="left:${x}%" class="major" data-n="${name}"></i>` : `<i style="left:${x}%"></i>`)
+  }
+  return `${parts.join('')}<b>${heading.toFixed(0).padStart(3,'0')}°</b>`
 }
 
 function proMarkup(spec:DroneSpec) {
@@ -179,8 +190,8 @@ function proMarkup(spec:DroneSpec) {
       <span class="rc-time"></span>
     </div>
     <div class="rc-compass"></div>
-    <pre class="rc-alt"></pre>
-    <pre class="rc-speed"></pre>
+    <div class="rc-alt"></div>
+    <div class="rc-speed"></div>
     <span class="rc-cap rc-cap-alt">高度 m</span>
     <span class="rc-cap rc-cap-speed">速度 km/h</span>
     <div class="rc-center"><div class="rc-reticle"></div></div>
@@ -208,12 +219,12 @@ function simpleMarkup(spec:DroneSpec) {
     <div class="rc-readout"></div>
     <div class="rc-sticks"><div class="rc-stick" data-side="left"><i></i></div><div class="rc-stick" data-side="right"><i></i></div></div>
     <div class="rc-actions">
+      <button data-act="exit">退出</button>
+      <button data-act="record">录像</button>
       <button data-act="takeoff" class="rc-big">起飞</button>
       <button data-act="photo">拍照</button>
-      <button data-act="record">录像</button>
-      <button data-act="exit">退出</button>
     </div>
-    <pre class="rc-alt"></pre><pre class="rc-speed"></pre><div class="rc-compass"></div>
+    <div class="rc-alt"></div><div class="rc-speed"></div><div class="rc-compass"></div>
     <span class="rc-signal"></span><span class="rc-time"></span>`
 }
 

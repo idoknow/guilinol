@@ -30,6 +30,7 @@ export interface DroneMode {
 }
 
 const PLACE_DISTANCE = 4.2
+const PLACE_SIDE = .42
 const LOAD_WEIGHT:Record<LoadKind,number> = {none:0,cargo:200000,person:80000,car:1200000}
 const LOAD_LABEL:Record<LoadKind,string> = {none:'空载',cargo:'运货 200 kg',person:'运人 80 kg',car:'运车（超载）'}
 
@@ -52,7 +53,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   mask.innerHTML = `<div class="about-panel drone-panel" role="dialog" aria-label="无人机">
       <header><h2>无人机机库</h2><button class="about-close" aria-label="关闭">×</button></header>
       <div class="drone-grid"></div>
-      <p class="drone-foot">选一台放到身前；放好后点「起飞」进遥控画面。键盘：WASD 平移，↑↓ 升降，←→ 转向，R 返航，P 拍照，V 录像。</p>
+      <p class="drone-foot">选一台放到身前；放好后点「飞无人机」进遥控画面。键盘：WASD 平移，↑↓ 升降，←→ 转向，R 返航，P 拍照，V 录像。</p>
     </div>`
   document.body.append(mask)
   const grid = mask.querySelector<HTMLElement>('.drone-grid')!
@@ -89,7 +90,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       chip.onclick = event => {
         event.stopPropagation()
         loadKind = chip.dataset.load as LoadKind
-        if (flight) flight.load = LOAD_WEIGHT[loadKind]
+        if (flight) flight.load = flight.spec.payloadG ? LOAD_WEIGHT[loadKind] : 0
         renderHangar()
       }
     }
@@ -121,15 +122,17 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     const spec = drone(id)
     const origin = host.walker()?.active ? host.walker()!.position : host.camera.position
     const yaw = host.walker()?.active ? host.walker()!.yaw : 0
-    const x = origin.x - Math.sin(yaw) * PLACE_DISTANCE
-    const z = origin.z - Math.cos(yaw) * PLACE_DISTANCE
+    // Ahead and a little to the right, so the third-person camera behind the walker can see it.
+    const aim = yaw - PLACE_SIDE
+    const x = origin.x - Math.sin(aim) * PLACE_DISTANCE
+    const z = origin.z - Math.cos(aim) * PLACE_DISTANCE
     const groundY = deps.groundAt(x,z)
     const y = (Number.isFinite(groundY) ? groundY : origin.y) + spec.height * .8
     flight = createFlight(spec,new THREE.Vector3(x,y,z),yaw)
-    flight.load = LOAD_WEIGHT[loadKind]
+    flight.load = spec.payloadG ? LOAD_WEIGHT[loadKind] : 0
     built.root.position.set(x,y,z)
     built.root.rotation.y = yaw
-    showHint(`已放置 ${spec.short} · 点右上角「起飞」`)
+    showHint(`已放置 ${spec.short} · 点「飞无人机」进遥控画面`)
     refreshDock()
   }
 
@@ -153,7 +156,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   // --- Payload (FlyCart): a crate, a passenger in a harness, or a car on the sling.
   function attachLoad() {
     detachLoad()
-    if (!mesh || loadKind === 'none') return
+    if (!mesh || !flight?.spec.payloadG || loadKind === 'none') return
     const group = new THREE.Group()
     const dark = new THREE.MeshStandardMaterial({color:'#24282a',roughness:.8,metalness:.15})
     const canvas = new THREE.MeshStandardMaterial({color:'#c96b3a',roughness:.85})
@@ -206,6 +209,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
 
   // --- RC session
   let rcActive = false
+  let ownsPhotoFlag = false
   let savedCamera:{pos:THREE.Vector3; quat:THREE.Quaternion; fov:number}|null = null
 
   function enterRc() {
@@ -217,6 +221,10 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     host.walker()?.hold(true)
     host.cinema = true
     document.body.dataset.drone = 'rc'
+    // Reuse the photo-mode contract: every HUD piece (keys card, hotbar, chat, mission pills…) already
+    // hides under data-photo=on, and global hotkeys (R 复位, J 景册…) stand down while it is set.
+    ownsPhotoFlag = document.body.dataset.photo !== 'on'
+    document.body.dataset.photo = 'on'
     hideHint()
     input.enabled = true
     input.attach()
@@ -245,6 +253,8 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     rc?.root.remove()
     rc = null
     delete document.body.dataset.drone
+    if (ownsPhotoFlag) delete document.body.dataset.photo
+    ownsPhotoFlag = false
     host.cinema = false
     host.walker()?.hold(false)
     if (savedCamera) {
@@ -338,7 +348,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
   function refreshDock() {
     if (!entry) return
     if (placed) {
-      entry.textContent = rcActive ? '遥控中' : '起飞'
+      entry.textContent = rcActive ? '遥控中' : '飞无人机'
       entry.dataset.stage = rcActive ? 'rc' : 'ready'
       entry.setAttribute('aria-label',rcActive ? '遥控中' : '起飞无人机')
     } else {
@@ -385,7 +395,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
       const d = host.walker()?.active
         ? host.walker()!.position.distanceTo(flight.pos)
         : host.camera.position.distanceTo(flight.pos)
-      showHint(`无人机就位 · ${flight.battery.toFixed(0)}% 电量 · 点右上角「起飞」${d > 60 ? '（离得有点远）' : ''}`)
+      showHint(`${flight.spec.short} 就位 · ${flight.battery.toFixed(0)}% 电量 · 点「飞无人机」起飞${d > 60 ? '（离得有点远）' : ''}`)
     }
   }
 
@@ -400,7 +410,7 @@ export function droneMode(host:Host, deps:{groundAt:(x:number,z:number)=>number;
     get active() { return rcActive },
     get placed() { return placed },
     mountEntry,
-    debugStart: async (id:DroneId) => { await place(id); if (!flight) return; liftOff(flight); enterRc() },
+    debugStart: async (id:DroneId) => { await place(id); if (flight) enterRc() },
     debugStep: (dt:number, repeats = 1) => {
       for (let i = 0; i < Math.max(1,repeats); i++) advance(dt)
       return flight ? telemetry(flight) : null

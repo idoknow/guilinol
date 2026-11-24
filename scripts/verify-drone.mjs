@@ -79,14 +79,14 @@ try {
   // 2) place the Mini 5 Pro
   await tap('[data-drone="mini5pro"]')
   await page.waitForFunction(() => !!window.droneDebug?.().flight, null, {timeout: 30000})
-  await page.waitForFunction(() => document.querySelector('.dock-drone')?.textContent.trim() === '起飞', null, {timeout: 20000})
+  await page.waitForFunction(() => document.querySelector('.dock-drone')?.textContent.trim() === '飞无人机', null, {timeout: 20000})
   const placed = await page.evaluate(() => ({
     dock: document.querySelector('.dock-drone')?.textContent.trim(),
     hint: document.querySelector('.drone-hint')?.textContent.trim() ?? null,
     state: window.droneDebug?.(),
   }))
   console.log('placed', JSON.stringify(placed))
-  assert.equal(placed.dock, '起飞', 'dock entry becomes 起飞')
+  assert.equal(placed.dock, '飞无人机', 'dock entry becomes 起飞')
   assert.equal(placed.state.mesh, 'drone-mini5pro', 'mesh added to the scene')
   assert.match(placed.hint ?? '', /Mini 5 Pro|无人机就位/)
 
@@ -187,10 +187,10 @@ try {
   await tap('[data-drone="flycart200"] [data-load="car"]')
   await tap('[data-drone="flycart200"]')
   await page.waitForFunction(() => !!window.droneDebug?.().flight, null, {timeout: 30000})
-  await page.waitForFunction(() => document.querySelector('.dock-drone')?.textContent.trim() === '起飞', null, {timeout: 20000})
+  await page.waitForFunction(() => document.querySelector('.dock-drone')?.textContent.trim() === '飞无人机', null, {timeout: 20000})
   const cart = await page.evaluate(() => ({dock: document.querySelector('.dock-drone')?.textContent.trim(), state: window.droneDebug?.()}))
   console.log('cart', JSON.stringify(cart))
-  assert.equal(cart.dock, '起飞')
+  assert.equal(cart.dock, '飞无人机')
   await tap('.dock-drone')
   await page.waitForSelector('.rc.rc-pro', {timeout: 20000})
   const pro = await page.evaluate(() => ({
