@@ -1,6 +1,6 @@
 import {Raycaster,Vector3,type Camera,type Scene} from 'three'
 import {npcDefaults} from '../../../lib/npc'
-import {rideSoundMuted,RIDE_SOUND_EVENT} from '../walk/ride-sound-pref'
+import {rideSoundMuted,RIDE_SOUND_EVENT,masterVolume,VOLUME_EVENT} from '../walk/ride-sound-pref'
 import type {Traffic} from './sim'
 
 type Actor=Traffic['actors'][number]
@@ -11,9 +11,11 @@ export function interactions(scene:Scene,camera:Camera,rules:typeof npcDefaults)
   const hotspot=new Vector3(),direction=new Vector3(),ray=new Raycaster()
   const interval=(walk:boolean)=>walk?15+Math.random()*30:10+Math.random()*20
   const pick=(lines:string[])=>lines[Math.floor(Math.random()*lines.length)]
-  function unlock(){if(!rideSoundMuted()){audio??=new AudioContext();void audio.resume().catch(()=>{})}}
+  let output:GainNode|undefined,level=masterVolume(),muted=rideSoundMuted()
+  function unlock(){if(!muted&&level>0){audio??=new AudioContext();if(!output){output=audio.createGain();output.gain.value=level;output.connect(audio.destination)}void audio.resume().catch(()=>{})}}
   window.addEventListener('pointerdown',unlock,{passive:true})
-  window.addEventListener(RIDE_SOUND_EVENT,()=>{if(rideSoundMuted()){void audio?.suspend();if(said)window.speechSynthesis?.cancel()}})
+  function sync(){level=masterVolume();muted=rideSoundMuted();if(output)output.gain.value=muted?0:level;if(said)window.speechSynthesis?.cancel();if(!muted&&level>0&&audio?.state==='suspended')void audio.resume().catch(()=>{})}
+  window.addEventListener(RIDE_SOUND_EVENT,sync);window.addEventListener(VOLUME_EVENT,sync)
   function horn(actor:Actor,geometry:number){
     if(!audio||audio.state!=='running'||activeHorns>=2)return
     const ctx=audio,osc=ctx.createOscillator(),gain=ctx.createGain(),pan=ctx.createPanner()
@@ -21,13 +23,13 @@ export function interactions(scene:Scene,camera:Camera,rules:typeof npcDefaults)
     hotspot.set(actor.x,actor.y,actor.z);camera.worldToLocal(hotspot);pan.setPosition(hotspot.x,hotspot.y,hotspot.z)
     osc.type=actor.kind==='scooter'?'sine':'triangle';osc.frequency.value=(actor.kind==='scooter'?500:210)+geometry*13
     gain.gain.setValueAtTime(.18*rules.volume,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+.38)
-    osc.connect(gain).connect(pan).connect(ctx.destination);activeHorns++
+    osc.connect(gain).connect(pan).connect(output!);activeHorns++
     osc.onended=()=>{activeHorns--;osc.disconnect();gain.disconnect();pan.disconnect()};osc.start();osc.stop(ctx.currentTime+.4)
   }
   function clear(){previous=undefined;for(const {element} of bubbles.values())element.remove();bubbles.clear();if(said)window.speechSynthesis.cancel()}
   function tick(actors:Actor[],time:number,dt:number,player:Vector3|undefined,vehicle:boolean,geometry:(actor:Actor)=>number){
     const listener=player??camera.position,dx=player&&previous?(player.x-previous.x)/dt:0,dz=player&&previous?(player.z-previous.z)/dt:0
-    const audible=rules.volume>0&&!rideSoundMuted()
+    const audible=rules.volume>0&&level>0&&!muted
     for(const actor of actors){
       const walk=actor.kind==='person',state=states.get(actor)??{id:++sequence,next:time+interval(walk),lastBump:-Infinity};states.set(actor,state)
       const distance=Math.hypot(actor.x-listener.x,actor.z-listener.z,actor.y-listener.y)
@@ -37,7 +39,7 @@ export function interactions(scene:Scene,camera:Camera,rules:typeof npcDefaults)
         const speech=window.speechSynthesis
         if(audible&&walk&&rules.mutter&&distance<25&&speech&&!speech.speaking&&!speech.pending&&!said){
           const voice=speech.getVoices().find(item=>/^zh(?:[-_]|$)/i.test(item.lang))
-          if(voice){const line=new SpeechSynthesisUtterance(pick(rules.mutterLines));line.lang='zh-CN';line.voice=voice;line.volume=rules.volume*(1-distance/25);said=line
+          if(voice){const line=new SpeechSynthesisUtterance(pick(rules.mutterLines));line.lang='zh-CN';line.voice=voice;line.volume=level*rules.volume*(1-distance/25);said=line
             line.onend=line.onerror=()=>{if(said===line)said=undefined};speech.speak(line);setTimeout(()=>{if(said===line){speech.cancel();said=undefined}},3000)}
         }
       }

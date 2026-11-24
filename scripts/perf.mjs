@@ -122,7 +122,7 @@ try {
         const tick=viewer.walk.tick.bind(viewer.walk)
         viewer.walk.tick=elapsed=>{tick(elapsed);viewer.camera.position.set(-265,168,15);viewer.camera.lookAt(-145,153,45);viewer.camera.updateMatrixWorld()}
       })
-      if(trafficQuery)await page.waitForFunction(()=>window.viewer.trafficProbe?.motors>=30,null,{timeout:180000})
+      if(trafficQuery)await page.waitForFunction(()=>window.viewer.trafficProbe?.loads.at(-1)?.key==='-1_0',null,{timeout:180000})
     }
     await page.waitForFunction(mode => {
       const viewer = window.viewer
@@ -146,16 +146,21 @@ try {
       }
       // Warmup frames so mirror target, LODs, and shader programs settle.
       for (let i = 0; i < 6; i++) await nextRaf()
+      await new Promise(done=>setTimeout(done,5000))
 
       const frameTimes = []
       let heapPeakBytes = 0
       let lastDraw = null
+      let visibleMotors=0,visiblePeople=0,drawCalls=0,triangles=0
       const start=await nextRaf(); let last=start
       for (let i = 0; i < sampleCount || last-start<minMs; i++) {
         window.__glPerf.resetFrame()
         const now=await nextRaf()
         const dt=now-last;last=now
         lastDraw = window.__glPerf.readFrame()
+        visibleMotors+=window.viewer.trafficProbe?.motors??0
+        visiblePeople+=window.viewer.trafficProbe?.pedestrians??0
+        drawCalls+=lastDraw.calls;triangles+=lastDraw.triangles
         frameTimes.push(dt)
         heapPeakBytes = Math.max(heapPeakBytes, performance.memory?.usedJSHeapSize ?? 0)
       }
@@ -168,6 +173,8 @@ try {
       const percentile95=values=>{const sorted=[...(values??[])].sort((a,b)=>a-b);return sorted[Math.floor(sorted.length*.95)]??null}
       return {
         fps:+(1000/mean).toFixed(2), frameTimes, motors:window.viewer.trafficProbe?.motors??0,
+        fpsP50:1000/median,fpsP95:1000/sorted[Math.floor((sorted.length-1)*.05)],
+        averageVisibleMotors:visibleMotors/sorted.length,averageVisiblePeople:visiblePeople/sorted.length,averageCalls:drawCalls/sorted.length,averageTriangles:triangles/sorted.length,
         camera:window.viewer.camera.position.toArray(),
         trafficStepP95:percentile95(window.viewer.trafficProbe?.stepMs),trafficContactP95:percentile95(window.viewer.trafficProbe?.contactMs),
         trafficStepPartsP95:Object.fromEntries(Object.entries(window.viewer.trafficProbe?.stepParts??{}).map(([key,values])=>[key,percentile95(values)])),

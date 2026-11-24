@@ -121,9 +121,10 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     }
     mesh.count=sim.actors.length
     walking=people.select(sim.actors)
-    let motors=0,queued=0,redStops=0
+    let motors=0,pedestrians=0,queued=0,redStops=0
     if(verify){mesh.userData.motorIds.length=0;mesh.userData.approaches=[];mesh.userData.allMotors=[]}
     sim.actors.forEach((actor,index)=>{
+      if(verify&&actor.kind==='person'&&visible(actor)&&actor.scale>=.99)pedestrians++
       if(verify&&actor.kind!=='person'&&actor.scale>=.99)mesh.userData.allMotors.push(index)
       if(verify&&actor.kind!=='person'&&visible(actor)&&actor.scale>=.99){
         motors++;mesh.userData.motorIds.push(index)
@@ -142,6 +143,6 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     people.animate(dt,accumulator)
     effects.tick(sim.actors,sim.time,elapsed,player,!!vehicle,actor=>variants.get(actor)?.geometry??0)
     hide(sim.actors.length,STATIC)
-    if(verify)Object.assign(mesh.userData,{motors,queued,redStops})
+    if(verify)Object.assign(mesh.userData,{motors,pedestrians,queued,redStops})
   }
 }
