@@ -2,6 +2,9 @@
 import gzip
 import json
 import struct
+from pathlib import Path
+
+from PIL import ImageColor
 
 import numpy as np
 from shapely import LineString, Polygon, box, constrained_delaunay_triangles
@@ -17,6 +20,7 @@ def bake(output, chunks, ways):
     way = next((w for w in ways if w['type']=='way' and w['id']==1017598912), None)
     if not way:
         return
+    palette=json.loads(Path(__file__).with_name('palette.json').read_text())
     axis = LineString([ll2xz(p['lat'],p['lon']) for p in way['geometry']])
     corridor = axis.buffer(width(way['tags'])/2+.5, quad_segs=6)
     for tile in chunks:
@@ -25,7 +29,7 @@ def bake(output, chunks, ways):
             continue
         area=translate(corridor,xoff=-x,yoff=-z).intersection(box(0,0,256,256))
         file=output/tile['file']
-        patch_tile(file,area,(76,83,91))
+        patch_tile(file,area,ImageColor.getrgb(palette['road']))
         raw=gzip.decompress(file.read_bytes())
         verts,indices,size,image,deck=struct.unpack_from('<5I',raw,4)
         offset=24+16900+9*verts+4*indices

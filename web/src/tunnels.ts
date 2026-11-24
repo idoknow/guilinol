@@ -178,7 +178,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     if(changed)pieces.forEach(poly=>fan(poly,vertices));else keep.push(...ids)
   }
   ground.setIndex(keep)
-  const looks:Record<string,THREE.Material>={
+  const looks:Record<string,THREE.MeshStandardMaterial|THREE.MeshBasicMaterial>={
     road:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0x3b3e42,roughness:.95}),
     interior:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0xcfc8b8,roughness:.9}),
     portal:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0xa39d90,roughness:.92}),
