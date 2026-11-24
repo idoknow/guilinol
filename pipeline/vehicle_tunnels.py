@@ -72,8 +72,8 @@ def solve(network, nodes, samples):
             if i:
                 # Reserve slope for the short eased transitions at each knot.
                 budget = step*cap*.94
-                adjacency[key].append((keys[i-1],budget))
-                adjacency[keys[i-1]].append((key,budget))
+                adjacency[key].append((keys[i-1],budget,step))
+                adjacency[keys[i-1]].append((key,budget,step))
         alignments.append((edge,keys,length,approach,step,roof))
 
     constraints=[]
@@ -88,16 +88,36 @@ def solve(network, nodes, samples):
             if node in component:
                 continue
             component.add(node)
-            pending.extend(neighbor for neighbor,_ in adjacency[node])
+            pending.extend(neighbor for neighbor,_,_ in adjacency[node])
         seen.update(component)
         portal_levels=[heights[n] for n in component & mouths]
         if len(portal_levels)<2:
             constraints.append(dict(reason='missingPortalAnchor',
                                     ways=sorted({edge['way'] for edge,keys,*_ in alignments if keys[0] in component}),
                                     surfaceNodes=sorted(component & mouths)))
-        if portal_levels:
-            for n in component:
-                limits[n]=min(limits[n],max(portal_levels))
+        # In a two-mouth bore inverse distance gives the linear endpoint
+        # interpolation. At a junction use all connected mouths, weighted by
+        # travel distance along this layer rather than distance through a hill.
+        weight=defaultdict(float)
+        weighted_level=defaultdict(float)
+        for source in sorted(component & mouths):
+            distances={source:0.}
+            queue=[(0.,source)]
+            while queue:
+                distance,node=heappop(queue)
+                if distance!=distances[node]:
+                    continue
+                if distance:
+                    weight[node]+=1/distance
+                    weighted_level[node]+=heights[source]/distance
+                for neighbor,_,length in adjacency[node]:
+                    d=distance+length
+                    if d<distances.get(neighbor,math.inf):
+                        distances[neighbor]=d
+                        heappush(queue,(d,neighbor))
+        for n in component-mouths:
+            if weight[n]:
+                limits[n]=min(limits[n],weighted_level[n]/weight[n])
 
     # A multi-source shortest-path envelope respects every roof and the grade
     # of every connecting edge. At a fixed mouth it gives the highest
@@ -108,7 +128,7 @@ def solve(network, nodes, samples):
         y,key = heappop(queue)
         if y != limits[key]:
             continue
-        for neighbor, budget in adjacency[key]:
+        for neighbor, budget, _ in adjacency[key]:
             candidate = y+budget
             if candidate < limits[neighbor]:
                 limits[neighbor] = candidate

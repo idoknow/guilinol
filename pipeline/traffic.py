@@ -216,6 +216,17 @@ def bake(output, manifest, rendered_roads=None):
                         # streets. Keep the outer contact 20 cm inside that strip.
                         limit = max(0, minor_road_width(tags)/2-.795-.21)
                         offset = max(-limit, min(limit, offset))
+                    if bridge and kind=='cycleway' and way['id'] in SPAN_WAYS:
+                        # On the river span the cycle stripe is between the
+                        # 12 m divider and the 16.1 m carriageway edge.
+                        angle=math.radians(bridge['rotation'])
+                        sin,cos=math.sin(angle),math.cos(angle)
+                        bx,_,bz=bridge['position']
+                        a,b=nodes[head],nodes[tail]
+                        lateral=((a['x']+b['x'])/2-bx)*sin+((a['z']+b['z'])/2-bz)*cos
+                        normal=(-(b['z']-a['z'])*sin+(b['x']-a['x'])*cos)/length
+                        if abs(normal)>.9:
+                            offset=(math.copysign(14.05,lateral)-lateral)/normal
                     lane = dict(id=len(lanes), to=tail, width=size, offset=round(offset,2), kind='nonmotor' if kind=='cycleway' else 'bus' if kind=='busway' else 'motor',speedKmh=number(tags.get('maxspeed'),20 if kind in ('cycleway','service') else 40),oneway=single)
                     lane['from'] = head
                     lane['cls'] = kind
