@@ -191,8 +191,9 @@ def bake(output, manifest, rendered_roads=None):
     restore_portal_paving(output,manifest['chunks'])
     restore_corridors(output,manifest['chunks'])
     from canal_passages import plan as plan_canal_passages, sample_road_heights
-    from terminal_decks import grade as grade_terminal_decks
+    from terminal_decks import grade as grade_terminal_decks, grade_airport_fork
     ground_passages.grain_yard(output,manifest,elements,sections)
+    grade_airport_fork(output,manifest,elements)
     terminal_grades = grade_terminal_decks(output, manifest, elements)
     canal_grades = plan_canal_passages(output, manifest, elements, sections)
     graded_sections,grade_points=vehicle_surface_grades.stations(elements,sections,box(left,top,left+width,top+depth))

@@ -115,10 +115,47 @@ def grade(output, manifest, elements):
     return approaches
 
 
-def update_slabs(output,chunks,axes,stations,ys):
+def grade_airport_fork(output, manifest, elements):
+    """Keep the branching ramp at the through deck height across their shared fork."""
+    from canal_passages import sample_road_heights
+    branch_id, through_id = 347655716, 759349526
+    ways = {w['id']: w for w in elements if w['type'] == 'way' and w['id'] in (branch_id, through_id)}
+    if len(ways) != 2:
+        return
+    branch = LineString(points(ways[branch_id]))
+    through = LineString(points(ways[through_id]))
+    x,z,w,h = manifest['extent']
+    if not box(x,z,x+w,z+h).covers(branch):
+        return
+    junction = through.project(branch.interpolate(0))
+    probes = [branch.interpolate(0), through.interpolate(junction+30),
+              branch.interpolate(80), branch.interpolate(90)]
+    heights = [deck for _,deck in sample_road_heights(output, manifest,
+               [dict(x=p.x,z=p.y,roofProbe=True) for p in probes])]
+    if all(h is None for h in heights):
+        return
+    if any(h is None for h in heights) or ways[branch_id]['nodes'][0] not in ways[through_id]['nodes']:
+        raise ValueError('Check airport ramp survey against the rendered bridge fork')
+    start, onward, end, beyond = heights
+    # The overlapping decks meet within two centimetres for the first 32 m.
+    # Tie back to the unmodified branch with the slope measured at 80–90 m.
+    stations = np.arange(0.,81.,2.)
+    t = np.clip((stations-32)/48,0,1)
+    blend = t*t*(3-2*t)
+    upper = np.array([start+(onward-start)*(through.project(branch.interpolate(s))-junction)/30-.02
+                      for s in stations])
+    lower = end+(beyond-end)*(stations-80)/10
+    levels = upper*(1-blend)+lower*blend
+    if np.max(np.abs(np.diff(levels)/np.diff(stations))) > .08:
+        raise ValueError('Airport bridge fork transition exceeds its grade budget')
+    update_slabs(output, manifest['chunks'], {branch_id:branch}, {branch_id:stations},
+                 {branch_id:levels}, spans=(branch_id,))
+
+
+def update_slabs(output,chunks,axes,stations,ys,spans=SPANS):
     # GL04 is shared with previously released worlds. Recover each continuous
     # slab across tile seams to avoid moving a nearby lower road or canopy.
-    search=shapely.union_all([axes[wid] for wid in SPANS]).buffer(12)
+    search=shapely.union_all([axes[wid] for wid in spans]).buffer(12)
     records,triangles=[],[]
     for tile in chunks:
         x,z=tile['x'],tile['z']
@@ -143,17 +180,18 @@ def update_slabs(output,chunks,axes,stations,ys):
         if len(ids)<3:
             continue
         pts=shapely.points(xyz[ids][:,[0,2]]/100)
-        for wid in SPANS:
+        for wid in spans:
             distances=shapely.distance(axes[wid],pts)
             if distances.max()>8:
                 continue
             at=shapely.line_locate_point(axes[wid],pts)
             if at.min()>8 or axes[wid].length-at.max()>8:
                 continue
-            xyz[ids,1]=np.rint(100*np.interp(at,stations[wid],ys[wid]))
+            within = (at >= stations[wid][0]) & (at <= stations[wid][-1])
+            xyz[ids[within],1]=np.rint(100*np.interp(at[within],stations[wid],ys[wid]))
             matched.add(wid)
             break
-    if matched!=set(SPANS):
+    if matched!=set(spans):
         raise ValueError(f'Cannot identify all T2 departures slabs: {matched}')
     first=0
     for tile,path,data,start,packed in records:
