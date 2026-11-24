@@ -1,6 +1,6 @@
 ## 切流前（不改 DNS）
 
-目标只限香港节点 `cn-hk-fxy-01`、`idoknow/glol-*`。保留原 Pages/D1/R2 作为回滚源。部署前后分别在 hk01 执行 `kubectl top node cn-hk-fxy-01`。容器内存 limits：nginx 64 Mi、API 384 Mi、PG 384 Mi、MinIO 512 Mi，常驻共 1344 Mi；反馈桥运行时再加 192 Mi，总上限 1536 Mi。使用 Recreate 和 CronJob Forbid 避免滚动或定时任务重叠。local-path PVC 不是跨节点备份。
+目标只限香港节点 `cn-hk-fxy-01`、`idoknow/glol-*`。保留原 Pages/D1/R2 作为回滚源。部署前后分别在 hk01 执行 `kubectl top node cn-hk-fxy-01`。容器内存 limits：nginx 64 Mi、API 384 Mi、PG 384 Mi、MinIO 512 Mi，常驻共 1344 Mi；反馈桥运行时再加 128 Mi，总上限 1472 Mi。使用 Recreate 和 CronJob Forbid 避免滚动或定时任务重叠。local-path PVC 不是跨节点备份。
 
 1. 准备与发布版本匹配的 `public/world/`，确保清单引用的文件齐全。sg 保持工作树干净，安装 Docker、Node 22、kubectl，SSH 到 hk01 无需 sudo。`test:api`、`test:bridge`、`verify:auth`、`verify:feedback`、`verify:admin` 使用临时 Docker PG 和 MinIO，不复用线上数据库。浏览器验证需要先构建 `dist`。
 2. 在 `idoknow` 安全预置 `glol-env`。后者含 `POSTGRES_PASSWORD`（随机十六进制）、`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`（glol 专用 MinIO）、原有 `RESEND_API_KEY` 和 `BRIDGE_TOKEN`。不复制共享 Docker 登录文件、不通过 issue 或 Git 传值。Ingress 须覆盖客户端自报的 `X-Real-IP`，并传递受信任的客户端地址，以保持原 IP 限流行为。 镜像按 SHA 匿名拉取。
@@ -46,6 +46,6 @@ cp "$tmp/world.sha256" deploy/world.sha256
 
 - [ ] `kubectl kustomize deploy/k8s` 中所有对象都是 `idoknow/glol-*`，无宿主机服务依赖；切流后确认旧 timer 未启用。
 - [ ] 核对 `glol-feedback-bridge` 的 schedule、Forbid、suspend 和持久化 `/state`。首次部署只验配置，不创建测试 Job，不派真实单。镜像随构建打包匹配的 Multica CLI、`gh`、`flock` 和建模模板。凭据不进入构建上下文。
-- [ ] 使用 `idoknow/glol-feedback-bridge` Secret。保留 sg 专用环境的 `BRIDGE_ENABLED`、`BRIDGE_TOKEN`、`BRIDGE_PROJECT`、`BRIDGE_PARENT`、`BRIDGE_ORIGIN`、`MULTICA_WORKSPACE_ID`；`BRIDGE_AGENT` 固定为 `d0320da1-ce8c-470a-a5a7-1976261a067d`。`GH_TOKEN` 仅授予 `idoknow/guilinol` 的 PR/提交只读权限。使用桥专用 Multica 机器身份，按 `cli-<原文件名>` 将其独立登录配置放入同一 Secret（例如 `cli-config.json`）；启动时在私有临时 HOME 重建配置。不要复制个人多工作区配置、sg 宿主机 token 或任务级 `MULTICA_*`。CLI 路径、PATH、状态路径由镜像指定，入口用 `env -i` 重建环境。
+- [ ] 使用 `idoknow/glol-feedback-bridge` Secret。保留 sg 专用环境的 `BRIDGE_ENABLED`、`BRIDGE_TOKEN`、`BRIDGE_PROJECT`、`BRIDGE_PARENT`、`BRIDGE_ORIGIN`、`MULTICA_WORKSPACE_ID`；`BRIDGE_AGENT` 固定为 `d0320da1-ce8c-470a-a5a7-1976261a067d`。`GH_TOKEN` 可省略：仓库公开，桥用匿名 GitHub REST 读取 PR 状态，限流或失败时下一轮重试；如需提高限额，再放一个只读 token。Multica 登录配置按 `cli-<原文件名>` 放入同一 Secret（`cli-config.json` 只含 `server_url`、`app_url`、`token`，不含工作区列表）；启动时在私有临时 HOME 重建配置。不要放任务级 `MULTICA_*`。镜像 `ghcr.io/idoknow/glol-bridge:<sha>` 由 `glol-images.yml` 构建；部署：`kubectl kustomize deploy/k8s/bridge | sed "s/:RELEASE$/:<sha>/" | ssh rock@cn-hk-fxy-01.rockchin.top kubectl -n idoknow apply -f -`。CLI 路径、PATH、状态路径由镜像指定，入口用 `env -i` 重建环境。
 - [ ] `glol-web` 的 API 容器从 `glol-env/RESEND_API_KEY` 读取 Resend key；验证邮件仍由 `网上桂林 <noreply@mail.idoknow.top>` 发出。不要记录验证码、key 或收件地址。
 - [ ] backup-cron 对接：`glol-postgres` 容器名固定，`POSTGRES_DB=glol`、`POSTGRES_USER=postgres`。备份方可按 namespace 和完整容器名定位后在容器内执行 `pg_dump -Fc -U "$POSTGRES_USER" "$POSTGRES_DB"`，备份文件置于容器外，验收时用 `pg_restore --list` 并在隔离库做恢复。MinIO 的 PVC `idoknow/glol-minio` 根目录直接挂载到 `/data`（无 subPath，包含 `.minio.sys`）。卷快照应停写或保持一致性，不推测宿主机动态 PV 路径。外部 backup-cron workflow 和首次实际恢复由 sg claude 接入验收。
