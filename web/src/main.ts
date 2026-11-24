@@ -443,6 +443,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     get trafficProbe(){return scene.getObjectByName('G2 traffic')?.userData},
     async trafficPixels(){return (await import('./traffic/visibility-probe')).pixelVisible(renderer,scene,camera)},
     async motorPixelCounts(){return (await import('./traffic/visibility-probe')).motorPixelCounts(renderer,scene,camera)},
+    stepStreetTraffic(){if(!params.has('verify')||walker?.active||!trafficTick)throw Error('Street traffic probe unavailable');trafficTick(.05)},
     get renderRange(){return rangeStore.getConfig()},
     get rangeMetrics(){return rangeStore.getMetrics()},
     setRenderRange(next:unknown, persist=false){return stream.setRenderRange(next as number|string,{persist})},

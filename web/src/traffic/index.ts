@@ -90,6 +90,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   }
   const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);staticSolids(x,z,visit)}
   let accumulator=0
+  const probeIds=new WeakMap<object,number>();let nextProbeId=0
   const people=crowd(scene,camera,sampleGround);mesh.userData.crowd=people
   let walking=new Set<object>()
   return (dt:number,vehicle?:THREE.Vector3,player?:THREE.Vector3,_solo=false,enabled=true)=>{
@@ -124,7 +125,10 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     let motors=0,pedestrians=0,queued=0,redStops=0
     if(verify){mesh.userData.simTime=sim.time;mesh.userData.motorIds.length=0;mesh.userData.approaches=[];mesh.userData.allMotors=[];mesh.userData.motorLanes=[]}
     sim.actors.forEach((actor,index)=>{
-      if(verify&&actor.kind!=='person')mesh.userData.motorLanes.push({lane:actor.track.id,x:actor.x,z:actor.z})
+      if(verify&&actor.kind!=='person'){
+        if(!probeIds.has(actor))probeIds.set(actor,++nextProbeId)
+        mesh.userData.motorLanes.push({id:probeIds.get(actor),street:actor.track.street,lane:actor.track.id,x:actor.x,z:actor.z,speed:actor.speed,leaving:actor.leaving})
+      }
       if(verify&&actor.kind==='person'&&visible(actor)&&actor.scale>=.99)pedestrians++
       if(verify&&actor.kind!=='person'&&actor.scale>=.99)mesh.userData.allMotors.push(index)
       if(verify&&actor.kind!=='person'&&visible(actor)&&actor.scale>=.99){

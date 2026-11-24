@@ -15,6 +15,11 @@ assert.ok(rows.every(row=>!major(row[5])))
 const graph=JSON.parse(gunzipSync(await readFile('public/world/roads/graph.json.gz')))
 const nodes=new Map(graph.nodes.map(node=>[node.id,node]))
 const lanes=graph.lanes.filter(lane=>lane.kind==='motor'&&major(lane.cls)),majorIds=new Set(lanes.map(lane=>lane.id))
+async function withDeadline(work,label){
+  let timer
+  try{return await Promise.race([work,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(`${label}: 300 s wall timeout; 30 s simulation window not verified`)),300000)})])}
+  finally{clearTimeout(timer)}
+}
 function validHeading(matrix,eye){
   const planes=new Frustum().setFromProjectionMatrix(new Matrix4().fromArray(matrix)).planes
   const origin=new Vector3(...eye)
@@ -82,27 +87,40 @@ try{
     await capture(`captures/traffic/${shot.name}.jpg`)
     if(!shot.min)continue
     const counts=[]
+    await page.evaluate(()=>window.viewer.freeze())
+    try{
       for(let heading=0;heading<8;heading++){
         const {matrix,eye}=await page.evaluate(({x,y,z,angle})=>{const camera=window.viewer.camera;camera.lookAt(x+20*Math.sin(angle),y-6,z+20*Math.cos(angle));camera.updateMatrixWorld();return {matrix:camera.projectionMatrix.clone().multiply(camera.matrixWorldInverse).toArray(),eye:camera.position.toArray()}},{...shot,angle:shot.yaw+heading*Math.PI/4})
         const lane=validHeading(matrix,eye)
-        const observation=lane===null?{maxPixels:null,firstMs:null}:await page.evaluate(async min=>{
-          const start=performance.now(),simStart=window.viewer.trafficProbe.simTime;let firstMs=null,maxPixels=0,samples=0
-          do{
-            const elapsed=performance.now()-start
-            if(elapsed>=10000)break
-            const hits=await window.viewer.motorPixelCounts();samples++;maxPixels=Math.max(maxPixels,...hits.map(hit=>hit.pixels))
-            if(firstMs===null&&hits.filter(hit=>hit.pixels>=6).length>=min)firstMs=Math.round(elapsed)
-            await new Promise(requestAnimationFrame)
-          }while(performance.now()-start<10000)
-          return {maxPixels,firstMs,samples,simSeconds:+(window.viewer.trafficProbe.simTime-simStart).toFixed(2)}
-        },shot.min)
+        const street=lanes.find(track=>track.id===lane)?.street
+        const observation=lane===null?{maxPixels:null,firstMs:null}:await withDeadline(page.evaluate(async({min,street})=>{
+          const viewer=window.viewer,probe=viewer.trafficProbe,simStart=probe.simTime,trace=[]
+          let firstMs=null,maxPixels=0,samples=0
+          for(let second=0;second<=30;second++){
+            while(probe.simTime-simStart<second-1e-6){
+              const previous=probe.simTime;viewer.stepStreetTraffic()
+              if(!(probe.simTime>previous))throw Error(`Traffic clock stalled; only ${samples} samples`)
+            }
+            const hits=await viewer.motorPixelCounts(),elapsed=probe.simTime-simStart
+            samples++;maxPixels=Math.max(maxPixels,...hits.map(hit=>hit.pixels))
+            if(firstMs===null&&hits.filter(hit=>hit.pixels>=6).length>=min)firstMs=Math.round(elapsed*1000)
+            trace.push({second,actors:probe.motorLanes.filter(actor=>actor.street===street)})
+          }
+          return {maxPixels,firstMs,samples,simSeconds:+(probe.simTime-simStart).toFixed(2),...(firstMs===null?{street,trace}:{})}
+        },{min:shot.min,street}),`${shot.name}/${heading}`)
+        if(observation.trace)console.log('No motor pixels: trajectories',JSON.stringify(observation.trace))
         counts.push({heading,valid:lane!==null,lane,...observation});console.log(shot.name,counts.at(-1))
       }
+    }finally{await page.evaluate(()=>window.viewer.resume())}
     if(shot.name==='fengbei'){
       await page.evaluate(({x,y,z})=>{const camera=window.viewer.camera;camera.lookAt(x+Math.SQRT2*10,y-6,z+Math.SQRT2*10);camera.updateMatrixWorld()},shot)
       await capture('captures/traffic/fengbei-45.jpg')
     }
     results.push(counts.filter(row=>row.valid))
   }
-  assert.ok(results.every(valid=>valid.length&&valid.every(row=>row.firstMs!==null)),'every graph-valid heading must see motor pixels within 10 s')
+  for(const valid of results){assert.ok(valid.length,'no valid headings');for(const row of valid){
+    assert.ok(row.samples>=20,`heading ${row.heading}: insufficient samples (${row.samples}/20)`)
+    assert.ok(row.simSeconds>=30,`heading ${row.heading}: incomplete simulation window`)
+    assert.notEqual(row.firstMs,null,`heading ${row.heading}: no motor with ≥6 pixels in 30 simulation seconds`)
+  }}
 }finally{await browser?.close();await server.close()}
