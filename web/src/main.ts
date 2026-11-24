@@ -449,7 +449,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       sampleGroundY: sampleMissionGroundY,
       getNightFactor: () => env.night,
     },
-    { eagerVerify: params.has('verify') },
+    { eagerVerify: params.has('mifen') },
   )
   mountChat()
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}

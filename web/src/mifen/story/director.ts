@@ -184,7 +184,10 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 function setBodyStoryFlag(active: boolean): void {
   if (typeof document === 'undefined' || !document.body) return
-  document.body.dataset.mifenStoryActive = active ? '1' : '0'
+  const next = active ? '1' : '0'
+  if (document.body.dataset.mifenStoryActive !== next) {
+    document.body.dataset.mifenStoryActive = next
+  }
 }
 
 function flushHeldWorldInput(): void {

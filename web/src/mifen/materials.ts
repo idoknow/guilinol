@@ -731,7 +731,7 @@ function texAsset(pool: THREE.Texture[], url: string, periodM?: PeriodM, kind: T
   cloned.userData.sourceUrl = url
   cloned.userData.sharedCached = true
   configureTex(cloned, periodM, kind, repeat)
-  cloned.needsUpdate = true
+  if (!base.image || base.image.complete !== false) cloned.needsUpdate = true
   sharedVariantTexCache.set(variantKey, cloned)
   void pool
   return cloned
@@ -1413,10 +1413,24 @@ function bindAtmo<T extends THREE.Material>(mat: T): T {
   return mat
 }
 
+/** 顶点色合批材质的夜间补光按 vColor 调制，避免深色发丝/黑金属/食材在夜间被统一 emissive 洗成灰白 */
+export function bindVcEmissive<T extends THREE.Material>(mat: T): T {
+  mat.onBeforeCompile = shader => {
+    shareAtmosphere(shader)
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      '#include <emissivemap_fragment>\n#ifdef USE_COLOR\ntotalEmissiveRadiance *= vColor.rgb;\n#endif',
+    )
+  }
+  mat.customProgramCacheKey = () => 'guilinol-mifen-vc-emissive'
+  return mat
+}
+
 function applyAtmoAndName<T extends THREE.Material>(mat: T, name: string, tiled: boolean): T {
   mat.name = name
   mat.userData.tiled = tiled
   if (/_signs$/.test(name)) nightLit(mat)
+  else if (mat.vertexColors) bindVcEmissive(mat)
   else bindAtmo(mat)
   return mat
 }
@@ -2016,8 +2030,7 @@ function createPack(): TianyuanMaterialPack {
     [vcMetal, 0.24, 0.16],
     [vcWood, 0.14, 0.1],
     [vcStone, 0.26, 0.14],
-    [vcPlastic, 0.16, 0.12],
-    [vcFood, 0.2, 0.12],
+    [vcPlastic, 0.18, 0.12],
     [vcExterior, 0.08, 0.22],
     [signAtlasMat, 0.14, 0.28],
     [stainless, 0.24, 0.12],
@@ -2217,7 +2230,7 @@ export function createBowlMaterialSet(): MifenBowlMaterialSet {
   })
   bowlVc.name = 'bowl_shared_vc'
   bowlVc.userData.sharedCached = true
-  bindAtmo(bowlVc)
+  bindVcEmissive(bowlVc)
 
   const make = (name: string, colorHex: number, roughness = 0.5, side: THREE.Side = THREE.FrontSide) => {
     const m = new THREE.MeshStandardMaterial({
