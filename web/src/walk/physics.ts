@@ -7,6 +7,7 @@ import {fetchAsset,type Manifest,type Tile} from '../world'
 import {look} from '../look/config'
 import {walkConfig as cfg} from './config'
 import {probeCarDismount, probeCarMount} from './car'
+import {trafficPushGuard} from './traffic-push'
 import {probeLocalDismount, probeLocalMount} from './ride'
 import {onOldSouthSlope,yueyaShoulderHeight} from '../yueya-slope'
 
@@ -354,6 +355,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const hullFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='rail'||k==='building'}
   const carWallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='building'||k==='rail'||k==='peak'||k==='tree'}
   const bikeWallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='rail'||k==='building'||k==='tree'}
+  const canTrafficPush=trafficPushGuard(world,capsule,bikeWallFilter,insideHouse)
   const landmarkFilter=(coll:R.Collider)=>kinds.get(coll.handle)==='landmark'
   const walkableFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='deck'||k==='deckThin'||k==='sidewalk'||k==='road'||k==='ground'||k==='overview'||k==='landmark'}
   function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
@@ -513,5 +515,5 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
+  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt,canTrafficPush}
 }
