@@ -262,10 +262,10 @@ function simpleMarkup(spec:DroneSpec) {
     <div class="rc-readout"></div>
     <div class="rc-sticks"><div class="rc-stick" data-side="left"><i></i></div><div class="rc-stick" data-side="right"><i></i></div></div>
     <div class="rc-actions">
+      <button data-act="exit">退出</button>
+      <button data-act="record">录像</button>
       <button data-act="takeoff" class="rc-big">起飞</button>
       <button data-act="photo">拍照</button>
-      <button data-act="record">录像</button>
-      <button data-act="exit">退出</button>
     </div>
     <pre class="rc-alt"></pre><pre class="rc-speed"></pre><div class="rc-compass"></div>
     <span class="rc-signal"></span><span class="rc-time"></span>`

@@ -108,8 +108,14 @@
 .rc.rc-simple .rc-readout{font-size:12.5px;bottom:calc(118px + env(safe-area-inset-bottom))}
 .rc.rc-simple .rc-sticks{bottom:calc(150px + env(safe-area-inset-bottom))}
 .rc.rc-simple .rc-stick{width:132px;height:132px}
-.rc .rc-rec .rc-stick,.rc-actions .rc-big{font-size:14px}
-.rc .rc-big{padding:10px 22px}
+/* 傻瓜式大按键：起飞/降落是琥珀色主键，其余 48px 触控目标 */
+.rc.rc-simple .rc-actions{bottom:calc(22px + env(safe-area-inset-bottom));gap:12px;align-items:center;max-width:94vw}
+.rc.rc-simple .rc-actions button{min-width:64px;min-height:48px;padding:0 18px;font-size:15px;letter-spacing:.08em}
+.rc.rc-simple .rc-actions .rc-big{min-width:92px;min-height:58px;font-size:18px;font-weight:600;
+  background:rgba(224,138,46,.82);border-color:rgba(255,200,140,.75);color:#1c1408;text-shadow:none}
+.rc.rc-simple:is([data-phase="flying"],[data-phase="returning"],[data-phase="takeoff"]) .rc-actions .rc-big{background:rgba(244,239,226,.9)}
+.rc.rc-simple .rc-readout{font-size:14px;bottom:calc(98px + env(safe-area-inset-bottom))}
+.rc.rc-simple .rc-sticks{bottom:calc(140px + env(safe-area-inset-bottom))}
 
 .rc .rc-toast{position:absolute;left:50%;top:calc(78px + env(safe-area-inset-top));transform:translate(-50%,-6px);
   background:rgba(24,34,32,.86);border:1px solid var(--rc-line);border-radius:10px;padding:7px 12px;font-size:11.5px;
@@ -134,8 +140,20 @@
   .rc .rc-stick{width:92px;height:92px}
   .rc .rc-sticks{bottom:calc(46px + env(safe-area-inset-bottom));padding:0 14px}
   .rc.rc-pro .rc-sticks{bottom:calc(74px + env(safe-area-inset-bottom))}
-  .rc.rc-simple .rc-sticks{bottom:calc(96px + env(safe-area-inset-bottom))}
-  .rc.rc-simple .rc-actions{bottom:calc(30px + env(safe-area-inset-bottom))}
+  .rc.rc-simple .rc-sticks{bottom:calc(28px + env(safe-area-inset-bottom));padding:0 18px}
+  .rc.rc-simple .rc-stick{width:116px;height:116px}
+  .rc.rc-simple .rc-actions{bottom:calc(10px + env(safe-area-inset-bottom));gap:8px}
+  .rc.rc-simple .rc-actions button{min-height:42px;min-width:56px;padding:0 14px;font-size:14px}
+  .rc.rc-simple .rc-actions .rc-big{min-height:50px;min-width:78px;font-size:16px}
+  .rc.rc-simple .rc-readout{bottom:calc(70px + env(safe-area-inset-bottom))}
+}
+/* 竖屏手机：遥测行移到状态行下方，云台滑杆收起，免得压住快门和右摇杆 */
+@media (max-width:520px) and (orientation:portrait){
+  .rc.rc-pro .rc-tele{position:fixed;left:50%;top:calc(66px + env(safe-area-inset-top));transform:translateX(-50%);
+    font-size:10.5px;bottom:auto}
+  .rc.rc-pro .rc-gimbal{display:none}
+  .rc.rc-pro .rc-sticks{bottom:calc(120px + env(safe-area-inset-bottom))}
+  .rc .rc-stick{width:96px;height:96px}
 }
 /* 无人机没在遥控时：场景里的小提示 */
 .drone-hint{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);
