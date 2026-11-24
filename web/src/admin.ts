@@ -282,6 +282,7 @@ const views: View[] = [
 let me: { id: string; email: string; nickname: string; role: string }
 let params = new URLSearchParams(location.search)
 let pendingCount: number | null = null
+let lastStats: any = null
 let refreshTimer = 0
 function currentView() {
   if (params.has('id')) return params.get('view') === 'users' ? 'users' : 'feedback'
@@ -296,6 +297,8 @@ function hrefFor(next: Record<string, string | null>, keep = false) {
 }
 function go(next: Record<string, string | null>, keep = false, replace = false) {
   const href = hrefFor(next, keep)
+  // 记住当前页面的滚动位置，返回时还原（列表 → 详情 → 返回不再跳回顶部）。
+  if (!replace) history.replaceState({ y: window.scrollY }, '')
   history[replace ? 'replaceState' : 'pushState'](null, '', href)
   params = new URLSearchParams(href)
   render()
@@ -312,9 +315,9 @@ function navLink(text: Child | Child[], next: Record<string, string | null>, att
     }) as EventListener,
   }, text)
 }
-window.addEventListener('popstate', () => {
+window.addEventListener('popstate', (event) => {
   params = new URLSearchParams(location.search)
-  render()
+  render({ scroll: Number(event.state?.y) || 0 })
 })
 function rangeWindow() {
   const key = Object.hasOwn(ranges, params.get('range') ?? '') ? params.get('range')! : '24h'
@@ -354,25 +357,75 @@ function card(title: Child, body: Child | Child[], opts: { actions?: Child | Chi
         opts.actions && h('div', { class: 'adm-card-actions' }, opts.actions)),
     h('div', { class: 'adm-card-body' }, body))
 }
-/** Fills `slot` with the result of `load`, showing skeleton / error+retry / content. Ignores stale renders. */
+/* 每个数据块按「页面地址 + 第几块」缓存上次结果：切换页面、筛选、返回时先立刻画出上次的内容，
+   再在后台刷新，数据没变就不重画——不再每次都闪一遍骨架屏。写操作后 staleAll() 让所有块下次重新取。 */
+const slotCache = new Map<string, { at: number; data: unknown; json: string }>()
+const FRESH_MS = 30e3
+let slotSeq = 0
+let syncing = 0
+function staleAll() {
+  for (const entry of slotCache.values()) entry.at = 0
+}
+function setSyncing(delta: number) {
+  syncing = Math.max(0, syncing + delta)
+  document.body.classList.toggle('adm-syncing', syncing > 0)
+  document.querySelector('.adm-refresh')?.classList.toggle('is-busy', syncing > 0)
+  if (!syncing) main.style.minHeight = ''
+}
+const snapshot = (data: unknown) => {
+  try {
+    return JSON.stringify(data) ?? ''
+  } catch {
+    return String(Math.random())
+  }
+}
+/** Fills `slot` with the result of `load`: cached content first (then a quiet refresh), else skeleton → content / error+retry. Ignores stale renders. */
 function async<T>(slot: HTMLElement, load: () => Promise<T>, paint: (data: T) => Child | Child[], skel: Node = skeleton()) {
   const mine = generation
-  const run = () => {
-    slot.replaceChildren(skel)
+  const key = `${params}#${slotSeq++}`
+  const show = (data: T) => {
+    slot.replaceChildren()
+    append(slot, [paint(data)])
+    labelTables(slot)
+  }
+  const run = (quiet: boolean) => {
+    if (!quiet) slot.replaceChildren(skel)
+    setSyncing(1)
     load()
       .then((data) => {
         if (mine !== generation) return
-        slot.replaceChildren()
-        append(slot, [paint(data)])
+        const json = snapshot(data)
+        const before = slotCache.get(key)
+        slotCache.delete(key)
+        slotCache.set(key, { at: Date.now(), data, json })
+        if (slotCache.size > 240) slotCache.delete(slotCache.keys().next().value!)
+        if (quiet && before?.json === json) return
+        show(data)
       })
       .catch((error) => {
         if (mine !== generation) return
         if (error instanceof ApiError && [401, 403].includes(error.status)) return denied(error.status)
-        slot.replaceChildren(errorState(error, run))
+        if (quiet) toast(`刷新失败：${error instanceof Error ? error.message : '请求失败'}`, 'error')
+        else slot.replaceChildren(errorState(error, () => run(false)))
+      })
+      .finally(() => mine === generation && setSyncing(-1))
+  }
+  const hit = slotCache.get(key)
+  if (hit) {
+    show(hit.data as T)
+    if (Date.now() - hit.at > FRESH_MS) run(true)
+  } else run(false)
+  return slot
+}
+/** 手机上表格改成卡片：给每个单元格补上列名（第一列作卡片标题，不加）。 */
+function labelTables(root: ParentNode) {
+  for (const table of Array.from(root.querySelectorAll<HTMLTableElement>('table.adm-table:not(.adm-users)'))) {
+    const heads = Array.from(table.querySelectorAll('thead th')).map((th) => th.textContent?.trim() ?? '')
+    for (const row of Array.from(table.tBodies[0]?.rows ?? []))
+      Array.from(row.cells).forEach((cell, i) => {
+        if (i && heads[i] && !cell.dataset.label) cell.dataset.label = heads[i]
       })
   }
-  run()
-  return slot
 }
 function pill(status: string) {
   return h('span', { class: `adm-pill adm-status--${status}` }, labels[status] ?? status)
@@ -520,7 +573,7 @@ function lineChart(series: Series[], format: Fmt, opts: { height?: number; bucke
       const cursor = s('line', { y1: pad.t, y2: height - pad.b, class: 'adm-cursor', visibility: 'hidden' })
       svg.append(cursor)
       const stamps = [...new Set(all.map((p) => +p.t))].sort((a, b) => a - b)
-      svg.addEventListener('pointermove', (event) => {
+      const point = (event: PointerEvent) => {
         const box = svg.getBoundingClientRect(),
           px = ((event.clientX - box.left) / box.width) * width,
           t = stamps.reduce((best, cur) => (Math.abs(x(cur) - px) < Math.abs(x(best) - px) ? cur : best), stamps[0])
@@ -535,8 +588,11 @@ function lineChart(series: Series[], format: Fmt, opts: { height?: number; bucke
           }))
         const left = (x(t) / width) * box.width
         tip.style.left = `${Math.min(Math.max(left, 70), box.width - 70)}px`
-      })
-      svg.addEventListener('pointerleave', () => {
+      }
+      svg.addEventListener('pointermove', point)
+      svg.addEventListener('pointerdown', point)
+      svg.addEventListener('pointerleave', (event) => {
+        if (event.pointerType === 'touch') return
         cursor.setAttribute('visibility', 'hidden')
         tip.hidden = true
       })
@@ -703,9 +759,10 @@ function denied(status: number) {
 function brand() {
   return h('a', { class: 'adm-brand', href: '/', title: '返回游戏' }, h('span', { class: 'adm-brand-seal' }, '桂'), h('span', null, h('b', null, '网上桂林'), h('small', null, '管理后台')))
 }
-function paintSide() {
+function paintSide(center = false) {
   const active = currentView()
   const groups = [...new Set(views.map((v) => v.group))]
+  const scrollLeft = side.scrollLeft
   side.replaceChildren(
     brand(),
     h('nav', null,
@@ -720,6 +777,11 @@ function paintSide() {
       h('span', { class: 'adm-avatar', 'aria-hidden': 'true' }, (me.nickname || me.email).slice(0, 1).toUpperCase()),
       h('span', null, h('b', null, me.nickname || '管理员'), h('small', null, me.email)),
       h('a', { href: '/', class: 'adm-me-back', title: '返回游戏' }, '↩')))
+  side.scrollLeft = scrollLeft
+  // 手机上导航是一条横向滚动条：把当前页滚到可见的中间。
+  const current = side.querySelector<HTMLElement>('.adm-nav-item.is-active')
+  if (center && current && side.scrollWidth > side.clientWidth)
+    side.scrollTo({ left: current.offsetLeft - (side.clientWidth - current.offsetWidth) / 2, behavior: 'smooth' })
 }
 function paintTop(view: View, extra?: Child | Child[]) {
   const r = rangeWindow()
@@ -728,9 +790,14 @@ function paintTop(view: View, extra?: Child | Child[]) {
     view.ranged
       ? h('div', { class: 'adm-top-tools' },
           segmented(r.key, Object.entries(ranges).map(([k, v]) => [k, v.label]), (key) => go({ range: key }, true), '时间范围'),
-          h('button', { type: 'button', class: 'adm-btn adm-btn--ghost adm-refresh', title: '刷新', onclick: (() => render()) as EventListener }, '↻ 刷新'))
-      : h('div', { class: 'adm-top-tools' },
-          h('button', { type: 'button', class: 'adm-btn adm-btn--ghost adm-refresh', title: '刷新', onclick: (() => render()) as EventListener }, '↻ 刷新')))
+          refreshButton())
+      : h('div', { class: 'adm-top-tools' }, refreshButton()))
+}
+function refreshButton() {
+  return h('button', {
+    type: 'button', class: 'adm-btn adm-btn--ghost adm-refresh', title: '刷新', 'aria-label': '刷新',
+    onclick: (() => (staleAll(), refreshPending(), render({ keepScroll: true }))) as EventListener,
+  }, h('span', { class: 'adm-refresh-icon', 'aria-hidden': 'true' }, '↻'), h('span', { class: 'adm-refresh-text' }, '刷新'))
 }
 function refreshPending() {
   api<{ pending: number }>('admin/stats')
@@ -740,20 +807,34 @@ function refreshPending() {
     })
     .catch(() => {})
 }
-function render() {
+let lastPage = ''
+/** 重画当前页。换页（或换详情）时回到顶部；同一页换筛选、刷新时保持滚动位置；后退时还原上次位置。 */
+function render(opts: { scroll?: number; keepScroll?: boolean } = {}) {
   generation++
+  slotSeq = 0
+  syncing = 0
+  setSyncing(0)
   clearInterval(refreshTimer)
   document.querySelectorAll('dialog.adm-dialog').forEach((d) => d.remove())
   const key = currentView(),
     view = views.find((v) => v.key === key)!
-  paintSide()
+  const pageKey = `${key}|${params.get('id') ?? ''}`
+  const y = window.scrollY
+  paintSide(pageKey !== lastPage)
   paintTop(view)
+  // 先固定 main 的高度再重建，避免内容短暂变矮导致页面被浏览器拉回顶部。
+  main.style.minHeight = `${main.offsetHeight}px`
   main.replaceChildren()
-  main.scrollTop = 0
-  window.scrollTo(0, 0)
   document.title = `${view.label} · 管理后台 · 网上桂林`
-  const page = pages[key]
-  page(view)
+  pages[key](view)
+  const target = opts.scroll ?? (opts.keepScroll || pageKey === lastPage ? y : 0)
+  window.scrollTo(0, target)
+  // 有数据还在路上时保留旧高度（setSyncing 归零时释放），避免页面忽长忽短来回跳。
+  requestAnimationFrame(() => {
+    if (!syncing) main.style.minHeight = ''
+    if (opts.scroll != null) window.scrollTo(0, opts.scroll)
+  })
+  lastPage = pageKey
 }
 
 /* ───────────── pages ───────────── */
@@ -787,6 +868,7 @@ const pages: Record<string, (view: View) => void> = {
       ]
     }, skeleton(2))
     async(todoSlot, () => api('admin/stats'), (stats: any) => {
+      lastStats = stats
       pendingCount = num(stats.pending) ?? 0
       paintSide()
       return [
@@ -1157,8 +1239,9 @@ const pages: Record<string, (view: View) => void> = {
           class: `adm-tab ${status === key ? 'is-on' : ''} ${key === 'pending' && n ? 'is-alert' : ''}`, role: 'tab', 'aria-selected': String(status === key),
         })))
     }
-    paintTabs()
+    paintTabs(lastStats ?? undefined)
     api('admin/stats').then((stats) => {
+      lastStats = stats
       pendingCount = num(stats.pending) ?? 0
       paintSide()
       paintTabs(stats)
@@ -1193,6 +1276,7 @@ const pages: Record<string, (view: View) => void> = {
       button.addEventListener('click', () => act(button, async () => {
         const page = await load(next)
         body.append(...rowsOf(page.items))
+        labelTables(main)
         paintMore(page.next_cursor)
       }))
       more.append(button)
@@ -1200,9 +1284,9 @@ const pages: Record<string, (view: View) => void> = {
     async(slot, () => load(), (page) => {
       if (!page.items.length)
         return emptyState(status === 'pending' ? '没有待处理的反馈' : '没有符合条件的反馈', status === 'pending' ? '新的反馈提交后会出现在这里' : undefined)
-      body.append(...rowsOf(page.items))
+      body.replaceChildren(...rowsOf(page.items))
       paintMore(page.next_cursor)
-      return [h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table' },
+      return [h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-feedback-list' },
         h('thead', null, h('tr', null, ['反馈', '状态', '提交人', '提交时间', '最近更新'].map((t) => h('th', null, t)))), body)), more]
     }, skeleton(8))
   },
@@ -1277,6 +1361,7 @@ const pages: Record<string, (view: View) => void> = {
         if (ok == null) return
         const result = await api<{ id: string; role: string }>(`admin/users/${encodeURIComponent(user.id)}/role`, { role: target })
         toast(result.role === 'admin' ? `已将 ${user.nickname || user.email} 设为管理员` : `已取消 ${user.nickname || user.email} 的管理员身份`)
+        staleAll()
         repaint({ ...user, role: result.role })
       }))
       const ban = banButton(user, self, (next) => repaint({ ...user, ...next }))
@@ -1314,7 +1399,7 @@ const pages: Record<string, (view: View) => void> = {
     }
     async(slot, () => load(), (page) => {
       if (!page.items.length) return emptyState('没有符合条件的用户')
-      body.append(...page.items.map(row))
+      body.replaceChildren(...page.items.map(row))
       paintMore(page.next_cursor)
       return [h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-users' },
         h('thead', null, h('tr', null, ['用户', '注册方式', '已绑定', '状态', '注册时间', '反馈', ''].map((t, i) => h('th', { class: i === 5 ? 'num' : '' }, t)))), body)), more]
@@ -1328,7 +1413,10 @@ const pages: Record<string, (view: View) => void> = {
       h('div', { class: 'adm-toolbar' }, segmented(type, [['', '全部'], ['user', '身份变更'], ['feedback', '反馈处理']], (value) => go({ target_type: value || null }, true), '对象类型')),
       card(null, slot, { className: 'adm-card--flush' }))
     const people = new Map<string, any>()
-    const actions: Record<string, string> = { role: '调整身份', status: '变更状态', start_ai: '发起 AI 制作', reply: '回复提交人' }
+    const actions: Record<string, string> = {
+      role: '调整身份', status: '变更状态', start_ai: '发起 AI 制作', reply: '回复提交人',
+      ban: '封禁账号', unban: '解除封禁', merge_users: '合并账号', reset_password: '重置密码', change_email: '修改邮箱', 'mp.kick': '踢出联机',
+    }
     const body = h('tbody'),
       more = h('div', { class: 'adm-more' })
     const load = (cursor?: string) => {
@@ -1337,25 +1425,33 @@ const pages: Record<string, (view: View) => void> = {
       if (cursor) q.set('cursor', cursor)
       return api<{ items: any[]; next_cursor: string | null }>('admin/audit?' + q)
     }
-    const who = (id: string) => {
+    const who = (id: string, link = false) => {
       const p = people.get(id)
-      return p ? h('span', { class: 'adm-who' }, h('b', null, p.nickname || p.email), h('small', null, p.email)) : h('code', null, String(id).slice(0, 8))
+      const name = p ? p.nickname || userContact(p) : `用户 ${String(id).slice(0, 8)}`
+      return h('span', { class: 'adm-who' },
+        h('b', null, link ? navLink(name, { view: 'users', id }, { class: 'adm-link' }) : name),
+        p && !p.email_placeholder ? h('small', null, p.email) : null)
     }
     const rowsOf = (items: any[]) => items.map((item) => {
       const detail = typeof item.detail === 'string' ? JSON.parse(item.detail || '{}') : item.detail ?? {}
-      const what =
+      const what: Child =
         item.action === 'role' ? (detail.role === 'admin' ? '设为管理员' : '取消管理员')
         : item.action === 'status' || item.action === 'start_ai' ? h('span', { class: 'adm-flow' }, detail.from ? pill(detail.from) : null, '→', detail.to ? pill(detail.to) : null)
+        : item.action === 'change_email' ? h('span', { class: 'adm-flow' }, h('span', null, detail.from || '（无）'), '→', h('span', null, detail.to || dash))
+        : item.action === 'merge_users' ? `并入 ${detail.from_email || String(detail.from ?? '').slice(0, 8) || '另一个账号'}${Array.isArray(detail.moved) && detail.moved.length ? ` · 搬来 ${detail.moved.length} 个绑定` : ''}`
+        : item.action === 'ban' ? `原因：${detail.reason || '未填写'}`
+        : item.action === 'reset_password' ? (detail.generated ? '生成了新密码' : '设置了新密码')
         : ''
       const target = item.target_type === 'feedback'
         ? navLink('查看反馈', { view: 'feedback', id: item.target_id }, { class: 'adm-link' })
-        : item.target_type === 'user' ? who(item.target_id) : h('code', null, item.target_id)
+        : item.target_type === 'user' ? who(item.target_id, true)
+        : h('code', null, String(item.target_id ?? dash))
       return h('tr', null,
-        h('td', null, when(unix(item.created_at), true)),
-        h('td', null, who(item.actor_id)),
-        h('td', null, actions[item.action] ?? item.action),
-        h('td', null, what),
-        h('td', null, target))
+        h('td', { class: 'adm-audit-time' }, when(unix(item.created_at), true)),
+        h('td', { class: 'adm-audit-actor' }, who(item.actor_id)),
+        h('td', { class: 'adm-audit-action' }, actions[item.action] ?? item.action),
+        h('td', { class: 'adm-audit-change' }, what),
+        h('td', { class: 'adm-audit-target' }, target))
     })
     const paintMore = (next: string | null) => {
       more.replaceChildren()
@@ -1364,6 +1460,7 @@ const pages: Record<string, (view: View) => void> = {
       button.addEventListener('click', () => act(button, async () => {
         const page = await load(next)
         body.append(...rowsOf(page.items))
+        labelTables(main)
         paintMore(page.next_cursor)
       }))
       more.append(button)
@@ -1377,9 +1474,9 @@ const pages: Record<string, (view: View) => void> = {
       return page
     }, (page) => {
       if (!page.items.length) return emptyState('还没有操作记录', '设置管理员、变更反馈状态、发起制作和回复都会记在这里')
-      body.append(...rowsOf(page.items))
+      body.replaceChildren(...rowsOf(page.items))
       paintMore(page.next_cursor)
-      return [h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table' },
+      return [h('div', { class: 'adm-table-wrap' }, h('table', { class: 'adm-table adm-audit' },
         h('thead', null, h('tr', null, ['时间', '操作人', '动作', '变化', '对象'].map((t) => h('th', null, t)))), body)), more]
     }, skeleton(8))
   },
@@ -1498,6 +1595,7 @@ function banButton(user: any, self: boolean, onchange: (next: { banned_at: numbe
     const result = await api<{ banned_at: number; ban_reason: string }>(
       `admin/users/${encodeURIComponent(user.id)}/${banned ? 'unban' : 'ban'}`, banned ? {} : { reason })
     toast(banned ? `已解除 ${who} 的封禁` : `已封禁 ${who}`)
+    staleAll()
     onchange(result)
   }))
   return button
@@ -1568,7 +1666,8 @@ function mergeCard(target: { id: string; email: string }) {
     if (result.adopted_email) parts.push(`继承了邮箱 ${result.adopted_email}`)
     if (result.conflicts.length) parts.push(`跳过冲突平台 ${result.conflicts.join('/')}`)
     toast(parts.join('，'))
-    location.reload()
+    staleAll()
+    render({ keepScroll: true })
   })
   return h('div', { class: 'adm-merge' },
     h('h3', { class: 'adm-section-title' }, '合并账号'),
@@ -1600,7 +1699,7 @@ function userDetail(id: string) {
         h('h2', null, user.nickname || '（未设置昵称）'),
         h('p', { class: 'adm-sub' },
           `${user.email_placeholder ? '未绑定邮箱（仅第三方登录）' : user.email} · ${user.role === 'admin' ? '管理员' : '普通用户'}${user.email_placeholder ? '' : ` · ${user.verified ? '邮箱已验证' : '邮箱未验证'}`}`)),
-      banPanel(user, () => location.reload()),
+      banPanel(user, () => (staleAll(), render({ keepScroll: true }))),
       h('dl', { class: 'adm-kv' },
         h('dt', null, '注册方式'), h('dd', null, signupTag(user.signup_method)),
         h('dt', null, '注册时间'), h('dd', null, when(unix(user.created_at), true)),
@@ -1644,8 +1743,9 @@ function feedbackDetail(id: string) {
         if (message == null) return
         await api(path + '/status', message ? { status: t.status, message } : { status: t.status })
         toast(t.status === 'approved' ? '已发起 AI 制作' : `已改为「${t.label}」`)
+        staleAll()
         refreshPending()
-        render()
+        render({ keepScroll: true })
       })
     // 左栏：内容
     const photos = (item.photos ?? []) as any[]
@@ -1739,7 +1839,8 @@ function compose(path: string) {
     act(send, async () => {
       await api(path + '/messages', { body: input.value.trim() })
       toast('回复已发送')
-      render()
+      staleAll()
+      render({ keepScroll: true })
     })
   })
   return form
@@ -1784,7 +1885,8 @@ function securityCard(user: { id: string; email: string }) {
     if (!email) throw new Error('请填写新的邮箱')
     const result = await api<{ email: string }>(`admin/users/${encodeURIComponent(user.id)}/email`, { email })
     toast(`邮箱已改为 ${result.email}`)
-    location.reload()
+    staleAll()
+    render({ keepScroll: true })
   })
 
   return h('div', { class: 'adm-merge' },
