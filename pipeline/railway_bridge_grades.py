@@ -87,6 +87,7 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
     from railways import bake, road_radius
     inventory = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-crossings.json').read_bytes())
     crossings, panels = bake(None, {}, inventory, {}, rail_only=True)
+    protected.level_panels = panels
     by_road = defaultdict(list)
     for row in crossings:
         if row['road'] not in (FOOTBRIDGE, UNDERPASS):

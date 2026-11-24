@@ -155,4 +155,44 @@ def bake(directory, chunks, graded=None, tunnels=()):
         raw = data[:12]+struct.pack('<I',len(encoded))+data[16:start]+encoded+data[start+size:]
         file.write_bytes(gzip.compress(raw,compresslevel=5,mtime=0))
         tile['bytes'] = file.stat().st_size
+    if graded is not None:
+        bake_level_panels(directory, chunks, elements, graded.level_panels)
     return new_pavement
+
+
+def bake_level_panels(directory, chunks, elements, panels):
+    """Supply the rendered road mesh with its flat plank run and both transitions."""
+    by_way = {w['id']: w for w in elements if w['type']=='way'}
+    lines, sections = [], []
+    for panel in panels:
+        w = by_way[panel['road']]
+        axis = substring(LineString(points(w)),panel['fromM'],panel['toM'])
+        if axis.geom_type != 'LineString':
+            continue
+        for a,b in zip(axis.coords,list(axis.coords)[1:]):
+            if a==b:
+                continue
+            half = max(width(w['tags']),RULES['defaultWidth'].get(w['tags']['highway'],0.))/2
+            lines.append(LineString([a,b]).buffer(half+12))
+            sections.append((*a,*b,half,panel['railY']))
+    tree = STRtree(lines)
+    for tile in chunks:
+        x,z = tile['x'],tile['z']
+        hits = tree.query(box(x,z,x+256,z+256),predicate='intersects')
+        if not len(hits):
+            continue
+        file = directory/tile['file']
+        raw = gzip.decompress(file.read_bytes())
+        v,i,size = struct.unpack_from('<3I',raw,4)
+        off = 16924+9*v+4*i
+        collision = json.loads(raw[off:off+size])
+        streets = collision[1]
+        defaults = [[],[],[],[],[],None,[],[],[],[],[],None,None]
+        streets.extend(defaults[len(streets):])
+        local = [[round(a-x,3),round(b-z,3),round(c-x,3),round(d-z,3),half,y]
+                 for idx in hits for a,b,c,d,half,y in [sections[idx]]]
+        streets[13:14] = [local]
+        payload = json.dumps(collision,separators=(',',':')).encode()
+        file.write_bytes(gzip.compress(raw[:12]+struct.pack('<I',len(payload))+raw[16:off]+
+                                       payload+raw[off+size:],compresslevel=5,mtime=0))
+        tile['bytes'] = file.stat().st_size

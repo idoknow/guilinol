@@ -5054,5 +5054,58 @@
         "railheadM": 155.12
       }
     }
-  ]
+  ],
+  "enclosedLevelCrossings": {
+    "status": "requires_layout_review",
+    "warehouse": "桂林粮库公司",
+    "footprintId": "56f66428-e070-4340-a894-4f7d04c1d044",
+    "source": "raw/overture_buildings.csv",
+    "areaM2": 68378.7,
+    "collisionFloorM": 159.9,
+    "collisionRoofM": 181.6,
+    "railWay": 454948576,
+    "tags": {
+      "road": {
+        "highway": "service",
+        "access": "private",
+        "layer": "-1"
+      },
+      "rail": {
+        "railway": "rail",
+        "service": "spur",
+        "layer": "-1"
+      }
+    },
+    "evidence": "All three crossing nodes lie inside the rendered warehouse collider. A drive-through opening would require changing its footprint or modeling its interior. They are still included in the level-crossing totals.",
+    "records": [
+      {
+        "road": 453854241,
+        "sharedNode": 9112389304,
+        "distanceInsideFootprintM": 32.2,
+        "mainRailMinusGroundM": 0.1128,
+        "candidateRailMinusGroundM": 0.3246
+      },
+      {
+        "road": 453854245,
+        "sharedNode": 4505338292,
+        "distanceInsideFootprintM": 63.9,
+        "mainRailMinusGroundM": 0.0154,
+        "candidateRailMinusGroundM": 0.2941
+      },
+      {
+        "road": 453854246,
+        "sharedNode": 4505338292,
+        "distanceInsideFootprintM": 63.9,
+        "mainRailMinusGroundM": 0.0154,
+        "candidateRailMinusGroundM": 0.2941
+      },
+      {
+        "road": 453854250,
+        "sharedNode": 4514289414,
+        "distanceInsideFootprintM": 20.3,
+        "mainRailMinusGroundM": 0.7026,
+        "candidateRailMinusGroundM": 0.3136
+      }
+    ]
+  }
 }

@@ -3,10 +3,11 @@ import {buildRoadBarriers} from './road-barriers'
 import * as THREE from 'three'
 import {look} from './look/config'
 type Pair=[number,number]
+type LevelPanel=[number,number,number,number,number,number]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,[number,number,number]?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,[number,number,number]?,LevelPanel[]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const parkingYellow=new THREE.Color(0xe7b62e)
@@ -39,7 +40,7 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
   return terrain+factor*(base-terrain)
 }
 
-export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground){
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform,panels=[]]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const baseLevel=(x:number,z:number)=>{const g=ground(x,z);return roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g}
   const curbSegments=curbCuts.flatMap(line=>line.slice(1).map(([x,z],i)=>
@@ -58,7 +59,20 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       }
       offset=.045+.15*distance/2
     }
-    const base=baseLevel(pt.x,pt.y)
+    let base=baseLevel(pt.x,pt.y)
+    if(!lowerPath&&!platformPath&&panels.length){
+      let closest=12
+      let target=base
+      for(const [ax,az,bx,bz,half,railY] of panels){
+        const dx=bx-ax,dz=bz-az,length=Math.hypot(dx,dz)
+        if(length<.001)continue
+        const along=((pt.x-ax)*dx+(pt.y-az)*dz)/length
+        const side=Math.abs((pt.y-az)*dx-(pt.x-ax)*dz)/length
+        const outside=Math.hypot(Math.max(0,-along,along-length),Math.max(0,side-half))
+        if(outside<closest){closest=outside;target=railY-.045}
+      }
+      base=THREE.MathUtils.lerp(target,base,THREE.MathUtils.smoothstep(closest,0,12))
+    }
     return new THREE.Vector3(pt.x,(lower&&lowerPath?lowerHeight(pt.x,pt.y,base,ground(pt.x,pt.y),lower):base)+offset,pt.y)
   }
   const surfaceKinds:number[]=[],alongVals:number[]=[]

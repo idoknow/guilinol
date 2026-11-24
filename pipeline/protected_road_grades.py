@@ -9,6 +9,7 @@ import numpy as np
 class ProtectedRoadGrades:
     def __init__(self, left, top, terrain, underlay, control):
         self.pavement = None
+        self.level_panels = []
         self.left, self.top = left, top
         self.after = (terrain, underlay, control)
         self.before = tuple(grid.copy() for grid in self.after)
