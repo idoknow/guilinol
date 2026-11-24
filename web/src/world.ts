@@ -13,7 +13,7 @@ import {countryside,setupCountryside,touchesCountryside} from './look/countrysid
 import {chunkWater, farWater} from './look/water'
 import type {TileBatchInput} from './batch'
 import type {Peaks} from './peaks'
-import {joinPortalRoads,tunnelGeometry,roofLevel,type Tunnel} from './tunnels'
+import {joinPortalRoads,tunnelGeometry,type Tunnel} from './tunnels'
 import {freezeStatic} from './static-freeze'
 
 interface Asset {file:string; bytes:number}
@@ -387,6 +387,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
       streets.surface?.dispose()
       streets.surface=pavement
       const geometries:THREE.BufferGeometry[]=bridge?[bridge]:[]
+      let clearanceFacesEnd=bridge?.getAttribute('position').count??0
       for(const [part,mesh] of Object.entries(tunnel)){
         if(part==='fringe'||part==='floor')continue
         const geom=mesh.geometry,count=geom.getAttribute('position').count
@@ -395,12 +396,14 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
         for(let i=0;i<count;i++)mesh.material.color.toArray(colors,i*3)
         geom.setAttribute('color',new THREE.BufferAttribute(colors,3))
         geom.setAttribute('aEdge',new THREE.BufferAttribute(new Float32Array(count),1))
+        if(part!=='lane')clearanceFacesEnd+=count
         geometries.push(geom)
       }
       if(geometries.length){
         const merged=mergeGeometries(geometries)
         if(!merged)throw Error('Incompatible transport structure geometry')
         bridge?.dispose()
+        merged.userData.clearanceFacesEnd=clearanceFacesEnd
         bridge=merged
       }
       for(const [part,mesh] of Object.entries(tunnel)){

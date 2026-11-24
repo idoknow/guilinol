@@ -103,16 +103,6 @@ export function floorLevel(tunnel:Tunnel,x:number,z:number){
   const [a,low]=values.at(lo),[b,high]=values.at(hi)
   return low+(high-low)*(at-a)/(b-a)
 }
-export function roofLevel(tunnels:Tunnel[],x:number,z:number,y:number){
-  for(const tunnel of tunnels){
-    const floor=floorLevel(tunnel,x,z)
-    if(floor===undefined||Math.abs(y-floor)>.025)continue
-    const at=frame(tunnel).station(x,z)
-    if(at>=openEnd(tunnel,0)-1e-4&&at<=tunnel.length-openEnd(tunnel,1)+1e-4)
-      return floor+tunnel.clearance
-  }
-  return Infinity
-}
 export function tunnelFloor(tunnels:Tunnel[]|undefined,x:number,z:number,foot:number){
   for(const tunnel of nearbyTunnels(tunnels,x,z)){
     const floor=floorLevel(tunnel,x,z)
@@ -179,6 +169,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
   }
   tunnels=local.filter(t=>!t.nodes)
   const parts={floor:[] as number[],interior:[] as number[],portal:[] as number[],band:[] as number[],lamp:[] as number[],lane:[] as number[],ceiling:[] as number[]}
+  const floorRanges:{end:number,tunnel:Tunnel}[]=[]
   const cuts:Plane[][]=[]
   const limits:Plane[]=[p=>p[0],p=>256-p[0],p=>p[2],p=>256-p[2]]
   const heights=ground.getAttribute('position'), cells=ground.parameters.widthSegments
@@ -260,6 +251,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
         quad([l,r,[r[0],Math.max(r[1]+.16,groundY(r)),r[2]],[l[0],Math.max(l[1]+.16,groundY(l)),l[2]]],'portal')
       }
     }
+    if(parts.floor.length/3>(floorRanges.at(-1)?.end??0))floorRanges.push({end:parts.floor.length/3,tunnel})
   }
   if(!parts.floor.length)return null
   const pos=ground.getAttribute('position'),index=ground.index!,vertices:number[]=[],keep:number[]=[]
@@ -294,7 +286,9 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     const item=new THREE.Mesh(geometry,looks[kind]);item.name=`tunnel_${kind}`;item.userData.kind=kind;return item
   }
   const fringe=mesh(vertices,'terrain');fringe.geometry.setAttribute('uv',new THREE.Float32BufferAttribute(vertices.flatMap((v,i)=>i%3===0?[v/256,1-vertices[i+2]/256]:[]),2))
-  return {fringe,floor:mesh(parts.floor,'road'),interior:mesh(parts.interior,'interior'),portal:mesh(parts.portal,'portal'),
+  const floor=mesh(parts.floor,'road')
+  floor.geometry.userData.tunnelRanges=floorRanges
+  return {fringe,floor,interior:mesh(parts.interior,'interior'),portal:mesh(parts.portal,'portal'),
     band:mesh(parts.band,'band'),ceiling:mesh(parts.ceiling,'ceiling'),lamp:mesh(parts.lamp,'lamp'),lane:mesh(parts.lane,'lane')}
 }
 

@@ -131,9 +131,23 @@ try {
   await page.waitForTimeout(400)
 
   // Inspect live WebGL / Three.js / KTX2 state in the browser
-  browserReport = await page.evaluate(async () => {
+  const snapshot=['raw/osm-2026-11.json','raw/osm.json'].find(existsSync)
+  const passages={}
+  if(snapshot){
+    for(const way of JSON.parse(await readFile(snapshot,'utf8')).elements){
+      const tags=way.tags
+      if(!tags?.highway || !(tags.tunnel==='building_passage'||tags.covered==='yes'))continue
+      const value=String(tags.maxheight??'3.5').trim()
+      const feet=value.match(/^(\d+)'\s*(\d+(?:\.\d+)?)?"?$/)
+      const meters=value.match(/^(\d+(?:\.\d+)?)\s*(m|ft)?$/)
+      if(!feet&&!meters)throw Error(`Unresolved OSM maxheight for way ${way.id}: ${value}`)
+      passages[way.id]=feet?(Number(feet[1])+Number(feet[2]??0)/12)*.3048:Number(meters[1])*(meters[2]==='ft'?.3048:1)
+    }
+  }
+  browserReport = await page.evaluate(async passages => {
     const {stream, stats} = window.viewer
     const zFight = []
+    const clearanceFindings = []
     const downNormals = []
     const uvStretch = []
     const ktx2Issues = []
@@ -170,61 +184,85 @@ try {
       const gStep = 256 / segs, stride = segs + 1
       // A cut grid retains its source vertices for the renderer's road spline.
       // Only indexed triangles (including the cut fringe) are visible terrain.
-      const terrainBins = new Map()
-      if(data.roadBed || data.tunnel){
-        for(const mesh of [data.groundMesh,data.tunnel?.fringe]){
-          if(!mesh)continue
-          const geometry=mesh.geometry, position=geometry.getAttribute('position'), index=geometry.index
-          for(let i=0;i<(index?.count??position.count);i+=3){
-            const tri=[0,1,2].map(k=>{
-              const id=index?index.getX(i+k):i+k
-              return [position.getX(id),position.getY(id),position.getZ(id)]
-            })
-            const xs=tri.map(p=>p[0]),zs=tri.map(p=>p[2])
-            for(let x=Math.floor(Math.min(...xs)/gStep);x<=Math.floor(Math.max(...xs)/gStep);x++)
-              for(let z=Math.floor(Math.min(...zs)/gStep);z<=Math.floor(Math.max(...zs)/gStep);z++){
-                const key=x+','+z
-                if(!terrainBins.has(key))terrainBins.set(key,[])
-                terrainBins.get(key).push(tri)
-              }
-          }
+      const terrainBins = new Map(), obstructionBins = new Map()
+      function indexGeometry(bins, geometry, dx=0, dz=0, limit=Infinity) {
+        const position=geometry.getAttribute('position'), index=geometry.index
+        for(let i=0;i<Math.min(limit,index?.count??position.count);i+=3){
+          const tri=[0,1,2].map(k=>{
+            const id=index?index.getX(i+k):i+k
+            return [position.getX(id)-dx,position.getY(id),position.getZ(id)-dz]
+          })
+          const xs=tri.map(p=>p[0]),zs=tri.map(p=>p[2])
+          for(let x=Math.floor(Math.min(...xs)/gStep);x<=Math.floor(Math.max(...xs)/gStep);x++)
+            for(let z=Math.floor(Math.min(...zs)/gStep);z<=Math.floor(Math.max(...zs)/gStep);z++){
+              const key=x+','+z
+              if(!bins.has(key))bins.set(key,[])
+              bins.get(key).push(tri)
+            }
         }
       }
-      const groundAt = (lx, lz, roof=Infinity) => {
+      if(data.roadBed || data.tunnel){
+        indexGeometry(terrainBins,data.groundMesh.geometry)
+        if(data.tunnel)indexGeometry(terrainBins,data.tunnel.fringe.geometry)
+      }
+      if(data.tunnel){
+        if(surf)indexGeometry(obstructionBins,surf,tile.x,tile.z,data.tunnelFloorStart)
+        if(!Number.isFinite(data.tunnelFloorStart))
+          indexGeometry(obstructionBins,data.tunnel.ceiling.geometry)
+        if(data.batch.walls)indexGeometry(obstructionBins,data.batch.walls,tile.x,tile.z)
+        if(data.deck.length){
+          const underside={getX:i=>data.deck[3*i],getZ:i=>data.deck[3*i+2],
+            getY:i=>data.deck[3*i+1]-(data.thin.has(Math.floor(i/3))?.6:data.bridgeDepth),count:data.deck.length/3}
+          indexGeometry(obstructionBins,{getAttribute:()=>underside})
+        }
+        if(data.batch.bridge)indexGeometry(obstructionBins,data.batch.bridge,tile.x,tile.z,
+          data.batch.bridge.userData.clearanceFacesEnd)
+      }
+      function heightsAt(bins,x,z){
+        const hits=[]
+        for(const [a,b,c] of bins.get(Math.floor(x/gStep)+','+Math.floor(z/gStep))??[]){
+          const ux=b[0]-a[0],uz=b[2]-a[2],vx=c[0]-a[0],vz=c[2]-a[2]
+          const det=ux*vz-uz*vx
+          if(Math.abs(det)<1e-9)continue
+          const u=((x-a[0])*vz-(z-a[2])*vx)/det
+          const v=(ux*(z-a[2])-uz*(x-a[0]))/det
+          if(u>=-1e-7&&v>=-1e-7&&u+v<=1.0000001)hits.push(a[1]+u*(b[1]-a[1])+v*(c[1]-a[1]))
+        }
+        return hits
+      }
+      const groundAt = (lx, lz) => {
         const clx = Math.min(256, Math.max(0, lx)), clz = Math.min(256, Math.max(0, lz))
         const col = Math.min(segs - 1, Math.max(0, Math.floor(clx / gStep)))
         const row = Math.min(segs - 1, Math.max(0, Math.floor(clz / gStep)))
-        if(terrainBins.size){
-          let top=-Infinity
-          for(const [a,b,c] of terrainBins.get(col+','+row)??[]){
-            const ux=b[0]-a[0],uz=b[2]-a[2],vx=c[0]-a[0],vz=c[2]-a[2]
-            const det=ux*vz-uz*vx
-            if(Math.abs(det)<1e-9)continue
-            const u=((clx-a[0])*vz-(clz-a[2])*vx)/det
-            const v=(ux*(clz-a[2])-uz*(clx-a[0]))/det
-            if(u>=-1e-7&&v>=-1e-7&&u+v<=1.0000001){
-              const y=a[1]+u*(b[1]-a[1])+v*(c[1]-a[1])
-              if(y<roof)top=Math.max(top,y)
-            }
-          }
-          return top
-        }
+        if(terrainBins.size)return Math.max(...heightsAt(terrainBins,clx,clz))
         const at = row * stride + col
         const u = clx / gStep - col, v = clz / gStep - row
         const a = gPos.getY(at), b = gPos.getY(at + 1), c = gPos.getY(at + stride), d = gPos.getY(at + stride + 1)
         return u + v <= 1 ? a + (b - a) * u + (c - a) * v : d + (c - d) * (1 - u) + (b - d) * (1 - v)
       }
 
-      if (surf) {
-        const pos = surf.getAttribute('position')
-        const kind = surf.getAttribute('aSurface')
-        const aAlong = surf.getAttribute('aAlong')
+      const ranges=data.tunnel?.floor.geometry.userData.tunnelRanges??[]
+      const mouths=[]
+      for(const {tunnel} of ranges)for(const [i,p] of tunnel.portals.entries()){
+        if(tunnel.mouths?.[i]===false)continue
+        const q=tunnel.portals[1-i],ux=(q[0]-p[0])/tunnel.length,uz=(q[2]-p[2])/tunnel.length
+        mouths.push({p,ux,uz,width:tunnel.endWidths?.[i]??tunnel.halfWidth})
+      }
+      const surfaces=surf?[{geometry:surf,offset:data.tunnelFloorStart,local:false}]:[]
+      if(data.tunnel && !Number.isFinite(data.tunnelFloorStart))
+        surfaces.push({geometry:data.tunnel.floor.geometry,offset:0,local:true})
+      for(const {geometry,offset,local} of surfaces){
+        const pos = geometry.getAttribute('position')
+        const kind = geometry.getAttribute('aSurface')
+        const aAlong = geometry.getAttribute('aAlong')
         // Note: ChunkBatcher.add shifted surf positions by (tile.x, tile.z)
         for (let i = 0; i < pos.count; i += 3) {
-          const k = kind.getX(i)
-          const ax = pos.getX(i), ay = pos.getY(i), az = pos.getZ(i)
-          const bx = pos.getX(i + 1), by = pos.getY(i + 1), bz = pos.getZ(i + 1)
-          const cx = pos.getX(i + 2), cy = pos.getY(i + 2), cz = pos.getZ(i + 2)
+          const k = kind?.getX(i)??0
+          const owner=i>=offset?ranges.find(r=>i-offset<r.end)?.tunnel:null
+          const required=owner?(passages[owner.way]??(owner.clearance<=2.5?2.5:4.5)):0
+          const ax = pos.getX(i)+(local?tile.x:0), ay = pos.getY(i), az = pos.getZ(i)+(local?tile.z:0)
+          const bx = pos.getX(i + 1)+(local?tile.x:0), by = pos.getY(i + 1), bz = pos.getZ(i + 1)+(local?tile.z:0)
+          const cx = pos.getX(i + 2)+(local?tile.x:0), cy = pos.getY(i + 2), cz = pos.getZ(i + 2)+(local?tile.z:0)
           const e1x = bx - ax, e1y = by - ay, e1z = bz - az
           const e2x = cx - ax, e2y = cy - ay, e2z = cz - az
           const nx = e1y * e2z - e1z * e2y
@@ -287,13 +325,26 @@ try {
           }
           let minDiff = Infinity
           let worstPt = samples[0]
+          let violation
           for (const s of samples) {
-            // Covered terrain belongs to the roof. Keep testing every
-            // terrain face below that roof, including any floor penetration.
-            const roof=i>=data.tunnelFloorStart?data.roofAt(s[0],s[2],s[1]):Infinity
-            const diff = s[1] - groundAt(s[0] - tile.x, s[2] - tile.z,roof)
+            const [x,y,z]=s, lx=x-tile.x, lz=z-tile.z
+            const atMouth=owner&&mouths.some(({p,ux,uz,width})=>{
+              const dx=x-p[0],dz=z-p[2]
+              return Math.abs(dx*ux+dz*uz)<=2 && Math.abs(dz*ux-dx*uz)<=width+2
+            })
+            if(owner&&!atMouth){
+              const hits=heightsAt(terrainBins,lx,lz).concat(heightsAt(obstructionBins,lx,lz))
+              // Compare at the millimetre precision of the baked road meshes.
+              const headroom=Math.min(...hits.filter(h=>h>=y).map(h=>Math.round((h-y)*1000)/1000))
+              if(headroom<required&&(!violation||headroom<violation.headroom))
+                violation={headroom,x,z}
+              continue
+            }
+            const diff = y-groundAt(lx,lz)
             if (diff < minDiff) { minDiff = diff; worstPt = s }
           }
+          if(violation)clearanceFindings.push({subtype:'tunnelClearance',x:violation.x,z:violation.z,
+            value:required-violation.headroom,detail:`Tunnel ${owner.way} headroom ${violation.headroom} m, required ${required} m`})
           if (minDiff < 0.03) {
             zFight.push({
               subtype: 'zFighting', x: +worstPt[0].toFixed(2), z: +worstPt[2].toFixed(2),
@@ -311,19 +362,21 @@ try {
       failures: stats.failures,
       hasPolygonOffset: hasPolyOffset,
       counts: {
+        tunnelClearance: clearanceFindings.length,
         zFighting: zFight.length,
         downwardNormal: downNormals.length,
         uvStretch: uvStretch.length,
         ktx2Failure: ktx2Issues.length,
       },
       samples: {
+        tunnelClearance: clearanceFindings.sort((a,b)=>b.value-a.value).slice(0,60),
         zFighting: zFight.sort((a, b) => b.value - a.value).slice(0, 60),
         downwardNormal: downNormals.slice(0, 60),
         uvStretch: uvStretch.sort((a, b) => b.value - a.value).slice(0, 60),
         ktx2Failure: ktx2Issues,
       },
     }
-  })
+  },passages)
 
   if (consoleErrors.length) {
     for (const msg of consoleErrors) {
@@ -344,6 +397,12 @@ try {
 
   // Merge pipeline + browser texture issues
   const mergedCategories = structuredClone(pipelineReport.categories)
+  if(browserReport.counts.tunnelClearance){
+    const category=mergedCategories.otherBasic
+    category.count+=browserReport.counts.tunnelClearance
+    category.bySubtype.tunnelClearance=browserReport.counts.tunnelClearance
+    category.sample100.push(...browserReport.samples.tunnelClearance)
+  }
   const extraTex = [
     ...browserReport.samples.zFighting,
     ...browserReport.samples.downwardNormal,
