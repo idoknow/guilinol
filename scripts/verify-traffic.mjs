@@ -134,7 +134,10 @@ for(const [index,count] of counts.entries())if(index<2)assert.ok(count>=1200&&co
 
 const vehicleData=JSON.parse(gunzipSync(readFileSync('public/world/vehicles.bin')))
 for(const east of [-1415.4,-432.7,-984,-1001.5,-572]){
-  const [x,y,z,yaw]=vehicleData.cars.find(row=>row[0]===east)
+  const nearest=vehicleData.cars.reduce((best,row)=>Math.abs(row[0]-east)<Math.abs(best[0]-east)?row:best)
+  const [x,y,z,yaw]=nearest
+  assert.ok(Math.abs(x-east)<=3,`no parked vehicle within 3 m of x=${east}; nearest x=${x}`)
+  console.log('Parked vehicle sample',{targetEast:east,x,z})
   const remove=pickups.add({x,y,z,yaw,halfWidth:.9,halfLength:2.12,height:1.5})
   try{
     const flow=new Traffic(graph,()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32))
@@ -143,7 +146,7 @@ for(const east of [-1415.4,-432.7,-984,-1001.5,-572]){
       flow.step(.05,{x,y,z});const stopped=flow.actors.filter(actor=>actor.kind!=='person'&&actor.speed<.1&&Math.hypot(actor.x-x,actor.z-z)<12).length
       waiting=stopped?waiting+1:0;longest=Math.max(longest,waiting);peak=Math.max(peak,stopped)
     }
-    console.log('Jiefang pickup',{x,z,peakStoppedWithin12m:peak,longestStoppedSeconds:longest*.05})
+    console.log('Pickup queue',{x,z,peakStoppedWithin12m:peak,longestStoppedSeconds:longest*.05})
     assert.ok(longest*.05<=30,`queue persisted at ${x},${z}`)
   }finally{remove()}
 }
