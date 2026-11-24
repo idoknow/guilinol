@@ -21,7 +21,7 @@ async function loadGraph(key:string,rules:typeof npcDefaults){
   return {sim,sample:{key,encodedBytes:timing?.encodedBodySize||bytes.byteLength,decodedBytes:decoded.byteLength,downloadMs:downloaded-start,parseAndIndexMs:performance.now()-downloaded}}
 }
 
-export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boolean,sampleGround?:Traffic['sampleGround']){
+export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boolean,sampleGround?:Traffic['sampleGround'],warm?:(root:THREE.Object3D)=>Promise<void>){
   const index=await fetch('/world/roads/cells.json')
   if(!index.ok)throw Error(`traffic cells: ${index.status}`)
   const cells=new Set<string>(await index.json())
@@ -95,7 +95,9 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);staticSolids(x,z,visit)}
   let accumulator=0
   const probeIds=new WeakMap<object,number>();let nextProbeId=0
-  const people=crowd(scene,camera,sampleGround);mesh.userData.crowd=people
+  batch.setColorAt(0,new THREE.Color(0xffffff))
+  await warm?.(batch)
+  const people=crowd(scene,camera,sampleGround,warm);mesh.userData.crowd=people
   let walking=new Set<object>()
   return (dt:number,vehicle?:THREE.Vector3,player?:THREE.Vector3,_solo=false,enabled=true)=>{
     useTrafficSolids(enabled?near:undefined)

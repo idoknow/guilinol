@@ -27,7 +27,9 @@ try{
       for(let frame=0;frame<7;frame++){sim.sync(128,128,true);timeline.push(count())}
       sim.clear();sim.sync(128,128,true);sim.sync(128,128,true);loaded.clear();sim.sync(128,128,true)
       const cancelled=[...sim.kinds.values()]
-      loaded.set(tile,detail);sim.sync(128,128,true);sim.sync(258,128)
+      sim.clear();loaded.set(tile,detail);sim.sync(128,128)
+      if(sim.kinds.size)throw Error('Loaded distant detail should not install temporary overview ground')
+      sim.sync(128,128,true);sim.sync(258,128,true)
       return {timeline,cancelled,urgent:count(),roadSource:[...sim.sources.values()]}
     }finally{sim.world.free()}
   })

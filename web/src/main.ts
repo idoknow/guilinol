@@ -83,6 +83,10 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   entrySignal?.throwIfAborted()
   const bounds=terrain??previousWorld!
   const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
+  renderer.debug.checkShaderErrors = import.meta.env.DEV
+  const warmPrograms=async(root:THREE.Object3D)=>{
+    try{await renderer.compileAsync(root,camera,scene)}catch(error){console.warn('Shader warmup unavailable',error)}
+  }
   renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure
   document.body.prepend(renderer.domElement)
   const camera = new THREE.PerspectiveCamera(55,1,1,Math.max(look.fogHorizonTo,initialMetrics.fogHorizonTo)+1200)
@@ -307,6 +311,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       if(signal.aborted)return false
       cover.progress(.3,'步行模块已就绪')
       completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)
+      if(completed&&!walkProgramsReady){await warmPrograms(scene);walkProgramsReady=true}
       if(completed)cover.progress(1)
       return completed
     }finally{controller.abort();operation('teleport',start,completed);switching=false;showMode();if(!parent)await cover.done()}
@@ -447,6 +452,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       showMode()
     })()
   })
+  let walkProgramsReady=false
   await syncSolo()
   const renderUi = renderRangeControl({
     initial:rangeStore.getConfig(),
@@ -575,7 +581,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       const showTraffic=trafficEnabled(getPlayMode(),trafficOverride)
       if(showTraffic&&!trafficRequested && camera.position.y<250 && !stream.pending.size){
         trafficRequested=true
-        void import('./traffic').then(mod=>mod.traffic(scene,camera,params.has('verify'),(x,z,y,car)=>(car?walker?.carSupportAt(x,z,y):walker?.supportAt(x,z,y))?.y)).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
+        void import('./traffic').then(mod=>mod.traffic(scene,camera,params.has('verify'),(x,z,y,car)=>(car?walker?.carSupportAt(x,z,y):walker?.supportAt(x,z,y))?.y,warmPrograms)).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
       }
       trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
@@ -629,6 +635,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     const {makeStaticVerifier}=await import('./verify-static')
     staticAudit=await makeStaticVerifier(host);publishViewer()
   }
+  if(!walkProgramsReady)await warmPrograms(scene)
   renderer.setAnimationLoop(animate)
   // IDOK-105: keep the last view fresh so "回到上次离开的地方" can restore it. Deep-linked
   // sessions (`?verify`, `?slot`, shares…) never write it — tests and shared links must not pollute.
