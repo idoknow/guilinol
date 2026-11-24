@@ -165,13 +165,33 @@ function packSurface(length:number,wheel:(d:number,r:number)=>number){
     samples=refined
     count*=2
   }
+  // Keep the ordinary station spacing on smooth roads. Where the finest
+  // uniform pass still crosses a sharp surface transition, bisect locally.
+  const scale=16
+  let stations=samples.map((_,i)=>i)
+  if(count===8*Math.ceil(span)){
+    const refined=[samples[0]],ticks=[0]
+    function interval(lo:number,hi:number,left:typeof samples[number],right:typeof samples[number]){
+      if(hi-lo>1){
+        const mid=(lo+hi)/2,m=measure(mid*span/(count*scale)-profilePad)
+        if(Math.abs(m.height-(left.height+right.height)/2)>2 ||
+           Math.abs(m.cross-(left.cross+right.cross)/2)>3){
+          interval(lo,mid,left,m);interval(mid,hi,m,right)
+          return
+        }
+      }
+      ticks.push(hi);refined.push(right)
+    }
+    for(let i=0;i<count;i++)interval(i*scale,(i+1)*scale,samples[i],samples[i+1])
+    if(refined.length>samples.length){samples=refined;stations=ticks;count=refined.length-1}
+  }
   const heights=samples.map(s=>s.height),cross=samples.map(s=>s.cross)
   const keep=new Set([0,count]),pending=[[0,count]]
   while(pending.length){
     const [a,b]=pending.pop()!
     let max=1,cut=0
     for(let i=a+1;i<b;i++){
-      const t=(i-a)/(b-a)
+      const t=(stations[i]-stations[a])/(stations[b]-stations[a])
       const error=Math.max(Math.abs(heights[i]-heights[a]-t*(heights[b]-heights[a]))/1.5,
         Math.abs(cross[i]-cross[a]-t*(cross[b]-cross[a]))/2)
       if(error>max){max=error;cut=i}
@@ -186,8 +206,8 @@ function packSurface(length:number,wheel:(d:number,r:number)=>number){
   let prevI=0,prevY=0
   for(const i of [...keep].sort((a,b)=>a-b)){
     const delta=heights[i]-prevY
-    write(i-prevI);write((delta<<1)^(delta>>31));bytes.push(cross[i]&255)
-    prevI=i;prevY=heights[i]
+    write(stations[i]-prevI);write((delta<<1)^(delta>>31));bytes.push(cross[i]&255)
+    prevI=stations[i];prevY=heights[i]
   }
   return Buffer.from(bytes).toString('base64')
 }
