@@ -1,4 +1,5 @@
 import districts from './car-free-polygons.json'
+import carriageways from './jiefang-junction.json'
 import {getQuietZoneAt} from './quiet-zones'
 
 function inRing(x:number,z:number,ring:number[][]){
@@ -21,3 +22,8 @@ export function getCarFreeAt(x:number,z:number){
 }
 
 export function vehicleForbiddenAt(x:number,z:number){return !!(getCarFreeAt(x,z)||getQuietZoneAt(x,z))}
+
+export function onJiefangJunction(x:number,z:number){
+  return carriageways.some(({bbox:[left,top,right,bottom],ring})=>
+    x>=left && x<=right && z>=top && z<=bottom && inRing(x,z,ring))
+}

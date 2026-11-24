@@ -2,7 +2,7 @@ import * as T from 'three'
 import {pickups} from '../traffic/contact'
 import type {Stream} from '../stream'
 import type {ParkedBike} from '../batch'
-import {vehicleForbiddenAt} from '../game/car-free'
+import {onJiefangJunction, vehicleForbiddenAt} from '../game/car-free'
 import {ParkedBatches, parkedParts} from './parked-batches'
 import {fetchAsset} from '../world'
 import {createFreeBoats, type MooringSlot} from './boat'
@@ -1499,6 +1499,6 @@ export async function vehicles(
       }
     },
     pavement,
-    motorPavement,
+    motorPavement:(x:number,z:number)=>motorPavement(x,z)||onJiefangJunction(x,z),
   }
 }

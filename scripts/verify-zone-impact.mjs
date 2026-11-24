@@ -7,7 +7,7 @@ import {browserOptions} from './qa-browser.mjs'
 import {withFixtureBays} from './ride-fixture-bays.mjs'
 
 const baked = JSON.parse(gunzipSync(await readFile('dist/world/vehicles.bin')))
-const fixtures = {quiet:[-1045.15,157.5,-498.09,1.2661,0],carFree:[-593.98,157.1,-94.94,1.7968,0]}
+const fixtures = {quiet:[-1045.15,157.5,-498.09,1.2661,0],carFree:[-597,157,-84.5,1.55,0]}
 const server = await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 const browser = await chromium.launch(browserOptions())
 try {
@@ -15,6 +15,15 @@ try {
     const page = await browser.newPage()
     try {
       const fixture = {...(kind==='bike'?withFixtureBays(baked,[start]):baked),cars:[],bikes:[],sharedBikes:[],bicycles:[],[{car:'cars',bike:'bikes',bicycle:'bicycles'}[kind]]:[start]}
+      if(zone==='carFree' && kind==='car'){
+        const [left,top,width,,step]=fixture.motorGrid
+        const bits=gunzipSync(Buffer.from(fixture.motorMask,'base64'))
+        for(let east=-610;east<=-590;east+=step)for(let south=-90;south<=-78;south+=step){
+          const cell=Math.round((south-top)/step)*width+Math.round((east-left)/step)
+          bits[cell>>3]|=128>>(cell&7)
+        }
+        fixture.motorMask=gzipSync(bits).toString('base64')
+      }
       await page.route('**/world/vehicles.bin', route => route.fulfill({body:gzipSync(JSON.stringify(fixture))}))
       await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/?verify&mode=walk&flow=0`)
       await page.waitForFunction(()=>window.viewer?.walk?.active)
