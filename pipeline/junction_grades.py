@@ -15,9 +15,12 @@ from vehicle_tunnels import grade_limit
 
 def profiles(output,manifest,elements,widths,planned):
     # Bridge and alley grades need up to 90 m to reach their fixed ends.
-    # The other three are ordinary at-grade junctions where both arms
+    # The remaining sites are at-grade junctions where the arms
     # return to existing pavement within 30 m of the shared node.
     reaches={8209536556:90.,13919458288:90.,14105001808:30.,13535714448:30.,13680845700:30.}
+    reaches.update(dict.fromkeys((4514279902,9349081123,9377773672,9936540229,9936540261,
+        13503053864,13503053871,13503091114,13509808082,13509827449,13528279951,
+        13531477590,13660692432,13677190462,14132564761),30.))
     highways = [w for w in elements if w['type']=='way' and w.get('tags',{}).get('highway')
                 and w.get('geometry') and all(w['geometry'])]
     links = defaultdict(list)

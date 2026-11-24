@@ -198,7 +198,7 @@ def bake(output, manifest, rendered_roads=None):
     terminal_grades = grade_terminal_decks(output, manifest, elements)
     canal_grades = plan_canal_passages(output, manifest, elements, sections)
     from canal_east import plan as plan_east_canal
-    east_canal=plan_east_canal(output,manifest,elements,sections,canal_grades)
+    east_canal,continuous_canal=plan_east_canal(output,manifest,elements,sections,canal_grades)
     graded_sections,grade_points=vehicle_surface_grades.stations(elements,sections,box(left,top,left+width,top+depth))
     native_levels=sample_road_heights(output,manifest,grade_points)
     bake_station_corridor(output, manifest['chunks'], elements)
@@ -366,7 +366,7 @@ def bake(output, manifest, rendered_roads=None):
             from junction_grades import profiles as junction_profiles
             pedestrian+=junction_profiles(output,manifest,elements,sections,planned)
             pedestrian+=east_canal
-            bake_surveyed_corridors(output,manifest['chunks'],elements,sections,planned+pedestrian,only_approaches=True,bridge_profiles=canal_grades,preferred=pedestrian+cycling)
+            bake_surveyed_corridors(output,manifest['chunks'],elements,sections,planned+pedestrian,only_approaches=True,bridge_profiles=canal_grades,preferred=pedestrian+cycling,continuous=continuous_canal)
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)
             for tunnel in generated:
                 tunnel['gradedAccess']=True
