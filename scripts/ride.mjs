@@ -10,7 +10,7 @@ import {withFixtureBays} from './ride-fixture-bays.mjs'
 
 const data=JSON.parse(gunzipSync(await readFile('dist/world/vehicles.bin')))
 const jiefangBike=[-539,157.1,-95,1.57,0]
-const crossroadsBike=[-539,157.1,-87,0,0]
+const crossroadsBike=[-537,156.5,-76,-1.83,0]
 const slopeBike=[-322,146.4,94,-Math.PI/2,0]
 // These three route fixtures start at exact poses. Give the synthetic bays
 // matching sidewalk cells so real-world roadside snapping does not move them.

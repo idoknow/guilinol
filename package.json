@@ -36,6 +36,7 @@
     "verify:walk": "npm run verify:walk:quick",
     "verify:walk:test-ride": "node scripts/verify-test-ride-end.mjs",
     "verify:walk:quick": "node scripts/walk-quick.mjs",
+    "verify:road-barriers": "node --experimental-strip-types --test scripts/test-road-barriers-unit.mjs && node scripts/verify-road-barriers.mjs",
     "verify:walk:full": "node scripts/walk.mjs",
     "verify:ride": "node scripts/ride.mjs && node scripts/verify-zone-impact.mjs bike bicycle",
     "verify:ride:stunt": "node scripts/ride-stunt.mjs",
