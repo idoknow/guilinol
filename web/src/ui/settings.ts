@@ -27,8 +27,8 @@ function build() {
     <header><h2 id="settings-title">设置</h2><button type="button" class="about-close" aria-label="关闭">关闭</button></header>
     <div class="set-body">
       <section class="set-block"><h3>声音</h3>
-        <label class="set-row">总音量<input data-volume type="range" min="0" max="1" step="0.01"></label>
-        <label class="set-row">静音<input data-mute type="checkbox"></label>
+        <label class="set-row set-row--range"><span class="set-what"><b>总音量</b><small>骑车、鸣笛和路人念叨</small></span><input data-volume type="range" min="0" max="1" step="0.01"><span class="set-val" data-volume-out></span></label>
+        <label class="set-row"><span class="set-what"><b>静音</b><small>关闭全部游戏音效</small></span><input data-mute type="checkbox"></label>
       </section>
       <section class="set-block">
         <h3>读数显示</h3>
@@ -65,7 +65,8 @@ function build() {
   </div>`
   const emotes=mask.querySelector<HTMLInputElement>('[data-emotes]')!
   const volume=mask.querySelector<HTMLInputElement>('[data-volume]')!,mute=mask.querySelector<HTMLInputElement>('[data-mute]')!
-  volume.value=String(masterVolume());volume.oninput=()=>setMasterVolume(volume.valueAsNumber)
+  const volumeOut=mask.querySelector<HTMLElement>('[data-volume-out]')!,showVolume=()=>{volumeOut.textContent=`${Math.round(volume.valueAsNumber*100)}%`}
+  volume.value=String(masterVolume());showVolume();volume.oninput=()=>{setMasterVolume(volume.valueAsNumber);showVolume()}
   mute.checked=rideSoundMuted();mute.onchange=()=>setRideSoundMuted(mute.checked)
   window.addEventListener(RIDE_SOUND_EVENT,()=>{mute.checked=rideSoundMuted()})
   emotes.checked=localStorage.getItem('glol.emotes')!=='0'
