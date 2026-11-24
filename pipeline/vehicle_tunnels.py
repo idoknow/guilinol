@@ -106,6 +106,27 @@ def sections(lanes, source_ways, existing, nodes):
             for ref in way['nodes']:
                 ramps[ref].append(way)
     pending = [ref for edge in edges.values() for ref in (edge['a'], edge['b']) if ref in ramps]
+    # Two private ramps can share an open-air driveway rather than a node.
+    # Continue through short surface connectors to the next actual floor.
+    connectors=defaultdict(list)
+    for way in source_ways:
+        tags=way.get('tags',{})
+        if (way['type']!='way' or tags.get('highway')!='service' or tags.get('access')!='private'
+                or underground(way) or not all(way.get('geometry',()))):
+            continue
+        xy=[ll2xz(p['lat'],p['lon']) for p in way['geometry']]
+        for a,b,p,q in zip(way['nodes'],way['nodes'][1:],xy,xy[1:]):
+            distance=math.dist(p,q)
+            connectors[a].append((b,distance));connectors[b].append((a,distance))
+    distance={ref:0. for edge in edges.values() for ref in (edge['a'],edge['b']) if ref in connectors}
+    queue=list(distance)
+    while queue:
+        ref=queue.pop()
+        if ref in ramps:pending.append(ref)
+        for neighbor,length in connectors[ref]:
+            total=distance[ref]+length
+            if total<=40 and total<distance.get(neighbor,math.inf):
+                distance[neighbor]=total;queue.append(neighbor)
     visited = set()
     while pending:
         for way in ramps.pop(pending.pop(), []):

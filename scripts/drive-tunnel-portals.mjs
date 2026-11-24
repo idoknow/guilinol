@@ -13,7 +13,7 @@ const selected=new Set(process.argv.slice(3).filter(arg=>arg!=='--surface').map(
 const sites=JSON.parse(await readFile(directory+'/world/'+(process.argv.includes('--surface')?'vehicle-surface-routes.json':'vehicle-portal-routes.json'),'utf8')).filter(s=>!selected.size||selected.has(s.id))
 if(!sites.length)throw Error('No matching portal fixtures')
 const vehicles=JSON.parse(gunzipSync(await readFile(directory+'/world/vehicles.bin')))
-const results=sites.filter(s=>!s.modes.some(m=>!m.boundary)).map(s=>({id:s.id,way:s.way,unavailable:'no permitted continuous route',links:s.links}))
+const results=sites.filter(s=>!s.modes.length).map(s=>({id:s.id,way:s.way,unavailable:'no permitted continuous route',links:s.links}))
 const groups=[]
 for(const site of sites)for(const {mode,route,startHeight,direction,boundary=false} of site.modes){
   const [[x,z]]=route

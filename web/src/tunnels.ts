@@ -354,6 +354,15 @@ export function tunnelClearanceClipper(tile:Tile,tunnels:Tunnel[],belowFloor=0){
       register([local(a,-wa),local(b,-wb),local(b,wb),local(a,wa)],
         (x,z)=>low+(high-low)*(axes.station(x+tile.x,z+tile.z)-a)/(b-a),tunnel.clearance)
     }
+    // At an oblique mouth the terrain retaining face can stand outside the
+    // axial bore prism, across the surface approach. Keep its paved profile.
+    for(const [end,dx,dz,half] of tunnel.openings??[]){
+      const [px,y,pz]=tunnel.portals[end],x=px-tile.x,z=pz-tile.z
+      const point=(along:number,side:number)=>[x+along*dx-side*dz,z+along*dz+side*dx]
+      const reach=Math.min(half,3)
+      register([point(-1,-half),point(reach,-half),point(reach,half),point(-1,half)],
+        (u,v)=>y+.09+.12*Math.abs((u-x)*dx+(v-z)*dz),tunnel.clearance)
+    }
     for(const [i,joint] of (tunnel.joints??[]).entries())if(joint?.draw&&!(joint.cap&&tunnel.gradedAccess&&tunnel.mouths?.[i])){
       const center=tunnel.portals[i]
       register(jointRing(joint,center).map(([x,z])=>[x-tile.x,z-tile.z]),()=>center[1],tunnel.clearance)
