@@ -80,36 +80,48 @@ try {
   assert.equal(await page.evaluate(() => !!document.querySelector('.gear-card.on[data-body=thumb]')), true, 'equipped card should be marked')
   await tap('.gear-close')
 
-  // 2) 手上挂机（异步 glTF→占位回落，给足时间）
-  await page.waitForFunction(() => {
-    const anchor = window.viewer?.walk?.handAnchor?.()
-    return !!anchor && anchor.children.some(child => /^camera-/.test(child.name))
-  }, null, {timeout: 60000})
-  const hand = await page.evaluate(() => {
-    const anchor = window.viewer.walk.handAnchor()
+  // 2) IDOK-238：默认空手（右臂跟走路动画），底部物品栏按 2 才拿相机，镜头朝角色前方；按 1 收起
+  const handState = () => page.evaluate(() => {
+    const walk = window.viewer.walk
+    for (let index = 0; index < 40; index++) walk.tick(1 / 60)
+    const anchor = walk.handAnchor()
     const prop = anchor.children.find(child => /^camera-/.test(child.name))
-    return {
-      name: prop?.name ?? null,
-      source: prop?.userData?.source ?? null,
-      parent: anchor.name,
-      bone: anchor.parent?.name ?? null,
-      meshes: prop ? prop.children.length : 0,
+    const fig = anchor.parent; let root = fig; while (root.parent && root.parent.type !== 'Scene') root = root.parent
+    const pos = name => { const v = {x: 0, y: 0, z: 0}; const node = root.getObjectByName(name); const w = node.getWorldPosition(node.position.clone()); return w }
+    const r = pos('upperarm_r'), l = pos('upperarm_l'), chest = pos('spine_02')
+    const right = r.clone().sub(l).setY(0).normalize()
+    const forward = right.clone().cross(chest.clone().set(0, 1, 0)).negate() // up × right
+    let lens = null, ahead = null
+    if (prop) {
+      const q = prop.getWorldQuaternion(prop.quaternion.clone())
+      const dir = prop.position.clone().set(0, 0, -1).applyQuaternion(q)
+      lens = +dir.dot(forward).toFixed(2)
+      ahead = +prop.getWorldPosition(prop.position.clone()).sub(chest).dot(forward).toFixed(2)
     }
+    const bar = document.querySelector('.hotbar')
+    return {props: anchor.children.filter(child => /^camera-/.test(child.name)).length, blend: +walk.cameraHoldPose().blend.toFixed(2), lens, ahead,
+      bar: !!bar && !bar.hidden, on: document.querySelector('.hotbar-slot.on')?.dataset.slot ?? null}
   })
-  assert.equal(hand.name, 'camera-thumb', 'hand prop should be the equipped body')
-  assert.ok(hand.parent.startsWith('attach_'), 'camera prop should hang off the hand attachment anchor')
-  console.log('hand', JSON.stringify(hand))
-
-  // 2b) 持机姿势：装备相机时右臂抬到胸前（IK 目标点误差 < 5cm）
-  await page.evaluate(() => { for (let index = 0; index < 40; index++) window.viewer.walk.tick(1 / 60) })
-  const hold = await page.evaluate(() => {
-    const pose = window.viewer.walk.cameraHoldPose()
-    const error = Math.hypot(pose.hand[0] - pose.target[0], pose.hand[1] - pose.target[1], pose.hand[2] - pose.target[2])
-    return {blend: +pose.blend.toFixed(2), error: +error.toFixed(3), aim: pose.aim}
-  })
-  assert.ok(hold.blend > 0.9, `camera hold should engage while walking, blend=${hold.blend}`)
-  assert.ok(hold.error < 0.05, `right hand should reach the hold target, error=${hold.error}`)
-  console.log('hold', JSON.stringify(hold))
+  const empty = await handState()
+  assert.equal(empty.bar, true, 'hotbar should show while walking')
+  assert.equal(empty.on, 'hand', 'hotbar should start on 空手')
+  assert.equal(empty.props, 0, 'walking hand should start empty')
+  assert.equal(empty.blend, 0, 'right arm should stay in the walk animation while empty-handed')
+  await page.screenshot({path: 'captures/hotbar-hand.png'})
+  await page.keyboard.press('Digit2')
+  await page.waitForFunction(() => window.viewer.walk.handAnchor().children.some(child => /^camera-/.test(child.name)), null, {timeout: 60000})
+  const held = await handState()
+  assert.equal(held.on, 'camera', 'pressing 2 should select the camera slot')
+  assert.ok(held.blend > 0.9, `camera hold should engage, blend=${held.blend}`)
+  assert.ok(held.lens > 0.6, `camera lens should face where the body faces, dot=${held.lens}`)
+  assert.ok(held.ahead > 0.1, `camera should sit in front of the chest, ${held.ahead} m`)
+  await page.screenshot({path: 'captures/hotbar-camera.png'})
+  await page.keyboard.press('Digit1')
+  await page.waitForFunction(() => !window.viewer.walk.handAnchor().children.some(child => /^camera-/.test(child.name)), null, {timeout: 30000})
+  const back = await handState()
+  assert.equal(back.props, 0, 'pressing 1 should put the camera away')
+  console.log('hand', JSON.stringify({empty, held, back}))
+  await page.keyboard.press('Digit2')
 
   // 3) 进拍照模式：只有普通拍照的那一排 UI，没有参数面板 / 构图辅助
   await tap('.dock-photo')
