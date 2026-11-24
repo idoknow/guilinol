@@ -2898,6 +2898,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     get yaw(){return yaw},hold(on:boolean){held=on;external=null;if(on){rides?.stop();vx=vz=0}},face(heading:number,tilt=cfg.pitch){yaw=heading;pitch=tilt;if(active)follow(0,true)},showFigure(on:boolean){figure.visible=on&&active},
     // IDOK-182: 右手挂点给相机用（axis-aligned，-Z 朝前）；没有骨骼时回落到 figure 本身。
     handAnchor(){return avatarRig.attachmentAt?.('hand_r')??figure.getObjectByName('hand_r')??figure},
+    waterSightBlocked:(eye:THREE.Vector3,water:THREE.Vector3)=>sim.pathBlocked(eye.x,eye.z,water.x,water.z,eye.y,water.y+.1),
     raycastObstacle:verify?(x:number,y:number|undefined,z:number,dx:number,dy:number,dz:number,maxDist=160)=>{
       sim.sync(x,z)
       const footY=sim.body.translation().y-cfg.height/2

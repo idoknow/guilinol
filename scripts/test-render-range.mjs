@@ -97,13 +97,17 @@ try {
     return {
       ordered: f.radius < b.radius && b.radius < r.radius
         && f.landmarkLoadRadius < b.landmarkLoadRadius && b.landmarkLoadRadius < r.landmarkLoadRadius
+        && f.landmarkLod0 < f.landmarkLod1 && f.landmarkLod1 <= f.landmarkLoadRadius && f.landmarkLoadRadius < f.landmarkUnloadRadius
+        && b.landmarkLod0 < b.landmarkLod1 && b.landmarkLod1 <= b.landmarkLoadRadius && b.landmarkLoadRadius < b.landmarkUnloadRadius
+        && r.landmarkLod0 < r.landmarkLod1 && r.landmarkLod1 <= r.landmarkLoadRadius && r.landmarkLoadRadius < r.landmarkUnloadRadius
         && f.treeLoadRadius < b.treeLoadRadius && b.treeLoadRadius < r.treeLoadRadius
         && f.fogLengthScale < b.fogLengthScale && b.fogLengthScale < r.fogLengthScale,
       balancedOk:
         b.unloadRadius === 670 &&
-        b.landmarkLoadRadius === 900 &&
-        b.landmarkLod0 === 350 &&
-        b.landmarkLod1 === 650 &&
+        b.landmarkLoadRadius === 580 &&
+        b.landmarkUnloadRadius === 720 &&
+        b.landmarkLod0 === 260 &&
+        b.landmarkLod1 === 520 &&
         b.treeFar === 1500 &&
         b.treeLoadRadius === 1682 &&
         b.treeUnloadRadius === 1750 &&

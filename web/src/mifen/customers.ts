@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import {mainDetail} from '../look/mirror-layer'
+import {shareAtmosphere} from '../look/atmosphere'
 import type {
   CustomerArchetype,
   MifenRecipe,
@@ -87,6 +89,7 @@ export interface CustomerManager {
     scaleY: number
     opacity: number
   }>
+  setVisible(visible: boolean): void
   clearAll(): void
   dispose(): void
 }
@@ -286,6 +289,14 @@ function getCustomerMasterMat(): THREE.MeshStandardMaterial {
     })
     sharedCustomerMasterMat.name = 'tianyuan_customer_shared_vc'
     sharedCustomerMasterMat.userData.sharedCached = true
+    sharedCustomerMasterMat.onBeforeCompile = shader => {
+      shareAtmosphere(shader)
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n#ifdef USE_COLOR\ntotalEmissiveRadiance *= vColor.rgb;\n#endif',
+      )
+    }
+    sharedCustomerMasterMat.customProgramCacheKey = () => 'guilinol-mifen-vc-emissive'
   }
   return sharedCustomerMasterMat
 }
@@ -1218,6 +1229,7 @@ export function createCustomerManager(
 
     rig.root.position.copy(spawnWorld)
     container.add(rig.root)
+    mainDetail(rig.root)
 
     // Queue overflow turnaway during peak rush (does not block forced test spawns)
     if (!forceRole && !immediate && currentQueue >= queueLimit) {
@@ -1718,6 +1730,10 @@ export function createCustomerManager(
           opacity: Math.round((s.material as THREE.SpriteMaterial).opacity * 100) / 100,
         }
       })
+    },
+
+    setVisible(visible: boolean) {
+      if (container.visible !== visible) container.visible = visible
     },
 
     clearAll() {
