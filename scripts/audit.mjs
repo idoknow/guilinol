@@ -218,15 +218,28 @@ try {
         if(data.batch.bridge)indexGeometry(obstructionBins,data.batch.bridge,tile.x,tile.z,
           data.batch.bridge.userData.clearanceFacesEnd)
       }
-      function heightsAt(bins,x,z){
+      // Adjacent pavement and the vertical lining share a seam. A ray exactly
+      // on that seam can hit the exterior wall, even though none of the
+      // wall's projected area lies over the floor triangle.
+      function overlapsFloor(face,footprint){
+        for(const triangle of [face,footprint])for(let i=0;i<3;i++){
+          const a=triangle[i],b=triangle[(i+1)%3],dx=b[0]-a[0],dz=b[2]-a[2]
+          const project=p=>dx*(p[2]-a[2])-dz*(p[0]-a[0])
+          const floor=footprint.map(project),solid=face.map(project)
+          if(Math.max(...floor)<=Math.min(...solid)||Math.max(...solid)<=Math.min(...floor))return false
+        }
+        return true
+      }
+      function heightsAt(bins,x,z,footprint){
         const hits=[]
-        for(const [a,b,c] of bins.get(Math.floor(x/gStep)+','+Math.floor(z/gStep))??[]){
+        for(const face of bins.get(Math.floor(x/gStep)+','+Math.floor(z/gStep))??[]){
+          const [a,b,c]=face
           const ux=b[0]-a[0],uz=b[2]-a[2],vx=c[0]-a[0],vz=c[2]-a[2]
           const det=ux*vz-uz*vx
           if(Math.abs(det)<1e-9)continue
           const u=((x-a[0])*vz-(z-a[2])*vx)/det
           const v=(ux*(z-a[2])-uz*(x-a[0]))/det
-          if(u>=-1e-7&&v>=-1e-7&&u+v<=1.0000001)hits.push(a[1]+u*(b[1]-a[1])+v*(c[1]-a[1]))
+          if(u>=-1e-7&&v>=-1e-7&&u+v<=1.0000001&&(!footprint||overlapsFloor(face,footprint)))hits.push(a[1]+u*(b[1]-a[1])+v*(c[1]-a[1]))
         }
         return hits
       }
@@ -325,6 +338,7 @@ try {
           }
           let minDiff = Infinity
           let worstPt = samples[0]
+          const footprint=owner?[[ax-tile.x,ay,az-tile.z],[bx-tile.x,by,bz-tile.z],[cx-tile.x,cy,cz-tile.z]]:null
           let violation
           for (const s of samples) {
             const [x,y,z]=s, lx=x-tile.x, lz=z-tile.z
@@ -333,7 +347,7 @@ try {
               return Math.abs(dx*ux+dz*uz)<=2 && Math.abs(dz*ux-dx*uz)<=width+2
             })
             if(owner&&!atMouth){
-              const hits=heightsAt(terrainBins,lx,lz).concat(heightsAt(obstructionBins,lx,lz))
+              const hits=heightsAt(terrainBins,lx,lz,footprint).concat(heightsAt(obstructionBins,lx,lz,footprint))
               // Compare at the millimetre precision of the baked road meshes.
               const headroom=Math.min(...hits.filter(h=>h>=y).map(h=>Math.round((h-y)*1000)/1000))
               if(headroom<required&&(!violation||headroom<violation.headroom))
