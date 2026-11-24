@@ -109,6 +109,7 @@ export function mountStats() {
     mpTile.disabled = mp.state === 'online' || mp.state === 'connecting'
     mpTile.textContent = mp.state === 'online' ? `同城 ${mp.online} 人`
       : mp.state === 'connecting' ? '联机连接中'
+      : mp.state === 'replaced' ? '已在其他设备联机 · 重连'
       : signedIn ? '联机已断开 · 重连' : '登录后联机'
     mpTile.title = mp.state === 'online' ? '同城联机：和你在同一座城里的玩家人数' : ''
     syncVisibility()
