@@ -199,14 +199,13 @@ export function worldToShopLocal(
 }
 
 export interface DrinksMountPolicyInput {
-  isDev: boolean
+  isDev?: boolean
   search?: string | null
 }
 
 /**
- * Production default NEVER mounts the drinks shop into the world.
- * Enabled only in Vite DEV (`isDev: true`, unless explicitly disabled with `?drinks=0`)
- * or when explicitly opted in via `?drinks=1` / `?drinks=true`.
+ * Default-enabled in both Vite DEV and production builds so bare URLs mount 「蜜雪林城」 directly.
+ * Pass `?drinks=0` (or `false` / `off` / `no`) to disable explicitly; `?drinks=1` / `?drinks=true` remain compatible.
  */
 export function shouldMountDrinksShop(input: DrinksMountPolicyInput): boolean {
   const rawSearch = input.search ?? ''
@@ -218,5 +217,5 @@ export function shouldMountDrinksShop(input: DrinksMountPolicyInput): boolean {
     if (norm === '0' || norm === 'false' || norm === 'off' || norm === 'no') return false
     if (norm === '' || norm === '1' || norm === 'true' || norm === 'on' || norm === 'yes') return true
   }
-  return Boolean(input.isDev)
+  return true
 }

@@ -3,6 +3,7 @@ import {clone} from 'three/addons/utils/SkeletonUtils.js'
 import {browNames, eyeNames, faceNames, hairStyles, looks, type Avatar} from '../../../lib/avatar'
 import {starterOutfit} from '../game/catalog'
 import {touchUi} from '../ui/input-mode'
+import {mainDetail} from '../look/mirror-layer'
 import {avatar as figureConfig} from '../look/avatar'
 import {ensureAvatarRig, type AvatarRig} from '../walk/avatar-rig'
 import {characterModel, styleCharacter} from '../walk/character'
@@ -565,6 +566,7 @@ export function riderPool(
       units.push({slot, root: inst, rig, pose: s.pose, baseY: s.y, scale: s.scale})
     }
     scene.add(root)
+    mainDetail(root)
     const view: RiderView = {
       root,
       frame,

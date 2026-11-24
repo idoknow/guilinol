@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type {Avatar} from '../../../lib/avatar'
 import {avatar as figureConfig} from '../look/avatar'
+import {mainDetail} from '../look/mirror-layer'
 import {ensureAvatarRig, type AvatarRig} from '../walk/avatar-rig'
 import {characterModel, styleCharacter} from '../walk/character'
 import {OUTFIT_ZONE, partitionCityWalkerGeometry} from '../walk/outfits'
@@ -784,6 +785,7 @@ export function mountJiefangOfficer(
   group.add(signGroup)
 
   scene.add(group)
+  mainDetail(group)
 
   let riggedModel: THREE.Group | null = null
   let rigged: AvatarRig | null = null
@@ -804,6 +806,7 @@ export function mountJiefangOfficer(
         fingerGrips = applyOfficerUniformColors(modelScene, avatarRig)
         fallback.root.visible = false
         officerRoot.add(modelScene)
+        mainDetail(modelScene)
         riggedModel = modelScene
         rigged = avatarRig
         applyGesturePose(clock)

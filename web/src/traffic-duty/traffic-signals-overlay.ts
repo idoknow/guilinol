@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {mainDetail} from '../look/mirror-layer'
 import {getLatestTraffic, type Traffic} from '../traffic/sim.ts'
 
 /**
@@ -198,6 +199,7 @@ export function mountShizijieSignalsOverlay(
   }
 
   scene.add(group)
+  mainDetail(group)
 
   let lastEw: SignalColor | null = null
   let lastNs: SignalColor | null = null

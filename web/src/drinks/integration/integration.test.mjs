@@ -325,10 +325,11 @@ test('drinks/site 坐标换算：默认 wangcheng_mall 且双候选（正阳路2
   assert.equal(resolveDrinksSite('?drinksSite=zhengyang_208').id, 'zhengyang_208')
 })
 
-test('生产默认不挂载：仅 DEV 或显式 ?drinks=1 启用，且 main.ts 不得静态顶层导入 ./drinks（动态懒加载由 SHARE+ 合流校验）', () => {
-  assert.equal(shouldMountDrinksShop({ isDev: false, search: '' }), false)
-  assert.equal(shouldMountDrinksShop({ isDev: false, search: '?solo=1&mode=walk' }), false)
+test('裸 URL 默认启用（生产与 DEV 均挂载），支持 ?drinks=0 关闭并兼容 ?drinks=1，且 main.ts 不得静态顶层导入 ./drinks', () => {
+  assert.equal(shouldMountDrinksShop({ isDev: false, search: '' }), true)
+  assert.equal(shouldMountDrinksShop({ isDev: false, search: '?solo=1&mode=walk' }), true)
   assert.equal(shouldMountDrinksShop({ isDev: false, search: '?drinks=0' }), false)
+  assert.equal(shouldMountDrinksShop({ isDev: false, search: '?drinks=false' }), false)
   assert.equal(shouldMountDrinksShop({ isDev: false, search: '?drinks=1' }), true)
   assert.equal(shouldMountDrinksShop({ isDev: false, search: '?drinks=true' }), true)
   assert.equal(shouldMountDrinksShop({ isDev: true, search: '' }), true)

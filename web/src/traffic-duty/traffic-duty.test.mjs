@@ -24,6 +24,7 @@ await build({
   stdin: {
     contents: `
       export * as THREE from 'three'
+      export {MAIN_DETAIL_LAYER} from './web/src/look/mirror-layer.ts'
       export {isPointInQuietZone} from './web/src/game/quiet-zones.ts'
       export {getState, _resetGameStateForTest} from './web/src/game/state.ts'
       export {getLatestTraffic, stopActor, Traffic} from './web/src/traffic/sim.ts'
@@ -90,6 +91,7 @@ if (typeof globalThis.matchMedia !== 'function') globalThis.matchMedia = () => (
 
 const {
   THREE,
+  MAIN_DETAIL_LAYER,
   isPointInQuietZone,
   getState,
   _resetGameStateForTest,
@@ -394,12 +396,20 @@ test('Shizijie 4-gantry dynamic signal overlay & dual NPC officers: synced with 
   try {
     assert.equal(SHIZIJIE_GANTRIES.length, 4)
     assert.equal(overlay.gantryGroups.length, 4)
-    // Zero PointLight / SpotLight / DirectionalLight anywhere in overlay or dual officers
+    // Zero PointLight / SpotLight / DirectionalLight anywhere in overlay or dual officers,
+    // and #318 compatibility: all street-level detail meshes sit on MAIN_DETAIL_LAYER (skipped by water reflection camera).
     let dynamicLights = 0
+    let detailMeshes = 0
     scene.traverse(obj => {
       if (obj instanceof THREE.Light) dynamicLights++
+      if (obj instanceof THREE.Mesh) {
+        assert.equal(obj.layers.test({mask: 1 << MAIN_DETAIL_LAYER}), true, `${obj.name || 'mesh'} must sit on MAIN_DETAIL_LAYER (#318)`)
+        assert.equal(obj.layers.test({mask: 1}), false, `${obj.name || 'mesh'} must skip default water-mirror layer 0 (#318)`)
+        detailMeshes++
+      }
     })
     assert.equal(dynamicLights, 0, 'traffic-signals-overlay and npc-officer must add 0 dynamic Three.js lights')
+    assert.ok(detailMeshes > 0, 'overlay and dual officers must mount detail meshes')
 
     // Near Shizijie -> visible; far (> 220 m) -> culled
     sim.time = 20 // local = (20 + 22) % 42 = 0 -> EW green, NS red
