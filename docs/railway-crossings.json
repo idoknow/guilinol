@@ -445,7 +445,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 148.7882,
+    "roadY": 148.6327,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -486,7 +486,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 148.6765,
+    "roadY": 148.5782,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -568,7 +568,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 149.1515,
+    "roadY": 148.9724,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -4381,7 +4381,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 149.5414,
+    "roadY": 149.5322,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -6912,7 +6912,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 148.5768,
+    "roadY": 148.4005,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -6941,7 +6941,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 148.3546,
+    "roadY": 148.2546,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -6999,7 +6999,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 148.7185,
+    "roadY": 148.4676,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -9198,7 +9198,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 149.468,
+    "roadY": 149.4346,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -9225,7 +9225,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 149.1282,
+    "roadY": 149.0913,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },
@@ -9279,7 +9279,7 @@
     "nodeEvidence": null,
     "measuredClearance": null,
     "railY": 153.8,
-    "roadY": 149.9064,
+    "roadY": 149.8546,
     "designClearanceM": null,
     "surfaceSource": "terrain_proxy"
   },

@@ -1833,27 +1833,27 @@
       "rail": 213171601,
       "type": "rail_over",
       "atM": 22.923,
-      "oldM": 148.7882,
+      "oldM": 148.6327,
       "requiredM": 148.1,
-      "changeM": -0.6882
+      "changeM": -0.5327
     },
     {
       "road": 680548451,
       "rail": 675807124,
       "type": "rail_over",
       "atM": 62.017,
-      "oldM": 149.5414,
+      "oldM": 149.5322,
       "requiredM": 148.1,
-      "changeM": -1.4414
+      "changeM": -1.4322
     },
     {
       "road": 680548451,
       "rail": 819178847,
       "type": "rail_over",
       "atM": 17.524,
-      "oldM": 148.5768,
+      "oldM": 148.4005,
       "requiredM": 148.1,
-      "changeM": -0.4768
+      "changeM": -0.3005
     },
     {
       "road": 680548451,
@@ -1878,9 +1878,9 @@
       "rail": 846722258,
       "type": "rail_over",
       "atM": 27.946,
-      "oldM": 149.468,
+      "oldM": 149.4346,
       "requiredM": 148.1,
-      "changeM": -1.368
+      "changeM": -1.3346
     },
     {
       "road": 680548451,
@@ -1896,9 +1896,9 @@
       "rail": 213171601,
       "type": "rail_over",
       "atM": 71.705,
-      "oldM": 148.6765,
+      "oldM": 148.5782,
       "requiredM": 148.1,
-      "changeM": -0.5765
+      "changeM": -0.4782
     },
     {
       "road": 680548455,
@@ -1914,9 +1914,9 @@
       "rail": 819178847,
       "type": "rail_over",
       "atM": 76.836,
-      "oldM": 148.3546,
+      "oldM": 148.2546,
       "requiredM": 148.1,
-      "changeM": -0.2546
+      "changeM": -0.1546
     },
     {
       "road": 680548455,
@@ -1941,9 +1941,9 @@
       "rail": 846722258,
       "type": "rail_over",
       "atM": 66.784,
-      "oldM": 149.1282,
+      "oldM": 149.0913,
       "requiredM": 148.1,
-      "changeM": -1.0282
+      "changeM": -0.9913
     },
     {
       "road": 680548455,
@@ -2076,9 +2076,9 @@
       "rail": 213171601,
       "type": "rail_over",
       "atM": 23.502,
-      "oldM": 149.1515,
+      "oldM": 148.9724,
       "requiredM": 148.1,
-      "changeM": -1.0515
+      "changeM": -0.8724
     },
     {
       "road": 691060994,
@@ -2094,9 +2094,9 @@
       "rail": 819178847,
       "type": "rail_over",
       "atM": 17.864,
-      "oldM": 148.7185,
+      "oldM": 148.4676,
       "requiredM": 148.1,
-      "changeM": -0.6185
+      "changeM": -0.3676
     },
     {
       "road": 691060994,
@@ -2121,9 +2121,9 @@
       "rail": 846722258,
       "type": "rail_over",
       "atM": 28.631,
-      "oldM": 149.9064,
+      "oldM": 149.8546,
       "requiredM": 148.1,
-      "changeM": -1.8064
+      "changeM": -1.7546
     },
     {
       "road": 691060994,
