@@ -15,6 +15,15 @@ function palm(side: number, fingers: T.Vector3, normal: T.Vector3) {
   return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(x, y, x.clone().cross(y)))
 }
 
+// In a front view the right thumb rises from its web and hooks down to the
+// centre; the left follows the opposite arc. Both tips end at the sternum line.
+function thumbArc(side: number, link: number) {
+  const angle = ([73, -5, -79][link - 1] * Math.PI) / 180
+  return V(-side * Math.cos(angle), -side * Math.sin(angle), 0)
+}
+const thumbJoint = (link: number, side: string) =>
+  'thumb_' + (link === 4 ? '04_leaf' : '0' + link) + '_' + side
+
 // Targets are authored in bind-space (+Z forward, +X character left), then
 // converted to joint-local rotations. Apply after locomotion so feet keep their gait.
 type Target = (name: string, delta: T.Quaternion, parent?: T.Quaternion) => void
@@ -35,7 +44,7 @@ function sample(poseId: number, time: number, set: Target, bind: (name: string) 
       hand = palm(s, V(0, 0, 1), V(-s, 0, 0))
     } else if (poseId === 2) {
       const up = s === -1
-      hand = palm(s, V(0, up ? 1 : -1, 0.3), V(0, 0, up ? 1 : -1))
+      hand = palm(s, V(0, up ? 1 : -1, 0), V(0, 0, up ? 1 : -1))
       // Place the thumb roots first, then solve the elbow around the shoulder–wrist line.
       // This keeps both thumbs together even though the two palms face opposite ways.
       set('clavicle_' + side, identity)
@@ -46,7 +55,11 @@ function sample(poseId: number, time: number, set: Target, bind: (name: string) 
         .clone()
         .sub(wrist)
         .applyQuaternion(hand)
-      const goal = V(s * 0.011, 1.34, 0.33).sub(thumbOffset)
+      const goal = V(0, 1.34, 0.3).sub(thumbOffset)
+      for (let link = 1; link <= 3; link++) {
+        const length = bind(thumbJoint(link + 1, side)).distanceTo(bind(thumbJoint(link, side)))
+        goal.addScaledVector(thumbArc(s, link), -length)
+      }
       const reach = goal.clone().sub(shoulder),
         distance = reach.length()
       reach.normalize()
@@ -104,23 +117,25 @@ function sample(poseId: number, time: number, set: Target, bind: (name: string) 
             V(0, 1, 0).applyQuaternion(hand.clone().invert()),
           )
         }
-        if (poseId === 2 && i === 1 && side === 'r' && !thumb && ['index', 'middle'].includes(finger))
-          turn.multiply(axis(0, 1, 0, s * (finger === 'index' ? 0.08 : -0.05)))
         const delta = parent.clone().multiply(turn)
         if (poseId === 2 && thumb) {
-          // Follow the taper to keep the facing surfaces together along the extended thumbs.
-          const next = i === 3 ? '04_leaf' : '0' + (i + 1)
-          const segment = bind('thumb_' + next + '_' + side)
+          const segment = bind(thumbJoint(i + 1, side))
             .clone()
-            .sub(bind('thumb_0' + i + '_' + side))
-          delta.setFromUnitVectors(segment.normalize(), V(s * [0.01, -0.025, -0.12][i - 1], 0, 1).normalize())
+            .sub(bind(thumbJoint(i, side)))
+          // Maintain a consistent roll around the curved links, including at the flat end caps.
+          // The two sides are point reflections at the contact, so the tip planes coincide.
+          const rightBind = V(-Math.abs(segment.x), segment.y, segment.z)
+          const from = palm(1, rightBind, V(0, -1, 0))
+          const to = palm(1, thumbArc(-1, i), V(0, 0, 1))
+          delta.copy(to).multiply(from.invert())
+          if (s === 1) delta.multiply(axis(1, 0, 0, Math.PI))
         }
-        if (poseId === 2 && side === 'l' && (finger === 'index' || finger === 'middle')) {
+        if (poseId === 2 && (finger === 'index' || finger === 'middle')) {
           const convergence = finger === 'index' ? [0.118, 0.09, 0.14] : [-0.08, -0.07, -0.1]
           delta
             .copy(hand)
-            .multiply(axis(0, 1, 0, convergence[i - 1]))
-            .multiply(axis(0, 0, 1, -0.025))
+            .multiply(axis(0, 1, 0, s * convergence[i - 1]))
+            .multiply(axis(0, 0, 1, -s * 0.025))
         }
         if (thumb && poseId === 3 && phase) {
           // Lay the closed thumb over the fingers. The blade hand keeps its thumb beside the index.
@@ -209,14 +224,17 @@ export function emotePlayback(
   )
   // Track translations separately from mixer-owned rotations, restoring the
   // locomotion pose before each frame just like the rotation layer below.
-  const handIndex = mesh.skeleton.bones.findIndex((b) => b.name === 'hand_l')
-  const leftOffset = V(0, 0, 0.0037).applyMatrix3(
-    new T.Matrix3().setFromMatrix4(mesh.skeleton.boneInverses[handIndex]),
-  )
-  const indexBase = joints.get('index_01_l')!.bone,
-    middleBase = joints.get('middle_01_l')!.bone
-  const indexPosition = new T.Vector3(),
-    middlePosition = new T.Vector3()
+  const pairedFingers = ['l', 'r'].flatMap((side) => {
+    const hand = joints.get('hand_' + side)!.bone
+    const local = new T.Matrix3().setFromMatrix4(
+      mesh.skeleton.boneInverses[mesh.skeleton.bones.indexOf(hand)],
+    )
+    return ['index', 'middle'].map((finger) => ({
+      bone: joints.get(finger + '_01_' + side)!.bone,
+      base: new T.Vector3(),
+      offset: V(0, 0, finger === 'index' ? -0.0037 : 0.0037).applyMatrix3(local),
+    }))
+  })
   const pelvis = joints.get('pelvis')!.bone,
     pelvisPosition = new T.Vector3()
   const spine = joints.get('spine_01')!.bone,
@@ -235,8 +253,7 @@ export function emotePlayback(
   let targets: Array<{bone: T.Bone; sample: T.Object3D; base: T.Quaternion; applied: boolean}> = []
   function reset() {
     if (fingersShifted) {
-      indexBase.position.copy(indexPosition)
-      middleBase.position.copy(middlePosition)
+      for (const joint of pairedFingers) joint.bone.position.copy(joint.base)
       fingersShifted = false
     }
     if (pelvisLowered) {
@@ -294,10 +311,10 @@ export function emotePlayback(
     const clip = action.getClip().name
     const finish = clip === 'emote_naiwa_laugh' ? T.MathUtils.smoothstep(action.time, 2.4, 2.75) : 0
     if (clip === 'emote_yixia_fanshang') {
-      indexPosition.copy(indexBase.position)
-      middlePosition.copy(middleBase.position)
-      indexBase.position.addScaledVector(leftOffset, -weight)
-      middleBase.position.addScaledVector(leftOffset, weight)
+      for (const joint of pairedFingers) {
+        joint.base.copy(joint.bone.position)
+        joint.bone.position.addScaledVector(joint.offset, weight)
+      }
       fingersShifted = true
     }
     if (finish && !moving) {

@@ -87,7 +87,7 @@ test('all five fingers have three weighted joints, identical hierarchy and <=220
   }
 })
 
-test('the extended thumbs meet in front of the chest on the production rig', async () => {
+test('the curved thumbs meet between separated hands in front of the chest on the production rig', async () => {
   const {readFile} = await import('node:fs/promises')
   const {Vector3} = await import('three')
   const {GLTFLoader} = await import('three/addons/loaders/GLTFLoader.js')
@@ -103,12 +103,41 @@ test('the extended thumbs meet in front of the chest on the production rig', asy
   scene.updateMatrixWorld(true)
   const point = (name) => scene.getObjectByName(name).getWorldPosition(new Vector3())
   const chest = point('spine_03')
+  const left = point('hand_l'),
+    right = point('hand_r')
+  assert(left.x - right.x >= 0.08)
   for (const side of ['l', 'r']) {
-    const base = point('thumb_01_' + side)
+    const sign = side === 'r' ? 1 : -1
+    const wrist = point('hand_' + side)
+    assert(Math.abs(wrist.y - chest.y) < 0.14 && wrist.z - chest.z > 0.18)
+    for (const finger of ['index', 'middle']) {
+      assert(sign * (point(finger + '_04_leaf_' + side).y - wrist.y) > 0.12)
+    }
     const tip = point('thumb_04_leaf_' + side)
-    assert(Math.abs(base.x - chest.x) < 0.025 && Math.abs(base.y - chest.y) < 0.12 && base.z - chest.z > 0.25)
-    assert(tip.z - base.z > 0.12 && Math.abs(tip.x - base.x) < 0.008 && Math.abs(tip.y - base.y) < 0.003)
+    assert(Math.abs(tip.x - chest.x) < 0.01)
+    assert(sign * (point('thumb_03_' + side).y - tip.y) > 0.025)
   }
   const gap = point('thumb_04_leaf_l').distanceTo(point('thumb_04_leaf_r'))
-  assert(gap > 0.009 && gap < 0.014, 'thumb tip centre spacing: ' + gap)
+  assert(gap <= 0.015, 'thumb tip centre spacing: ' + gap)
+  // The generator cuts the tip caps in a constant-X bind plane. After skinning,
+  // the distal links must occupy opposite sides of the common contact plane.
+  const mesh = scene.getObjectByProperty('isSkinnedMesh', true)
+  const geo = mesh.geometry,
+    distal = {l: [], r: []}
+  for (let i = 0; i < geo.attributes.position.count; i++) {
+    const name = mesh.skeleton.bones[geo.attributes.skinIndex.getX(i)].name
+    if (!['thumb_03_l', 'thumb_03_r'].includes(name)) continue
+    distal[name.slice(-1)].push({
+      x: Math.abs(geo.attributes.position.getX(i)),
+      p: mesh.localToWorld(mesh.getVertexPosition(i, new Vector3())),
+    })
+  }
+  const end = Math.max(...distal.r.map((v) => v.x))
+  const cap = distal.r.filter((v) => v.x === end).map((v) => v.p)
+  const corners = cap.filter((p, i) => cap.findIndex((other) => other.distanceTo(p) < 1e-5) === i)
+  const normal = corners[1].clone().sub(corners[0]).cross(corners[2].clone().sub(corners[0])).normalize()
+  const distance = (p) => normal.dot(p.clone().sub(corners[0]))
+  if (distance(point('thumb_03_r')) < 0) normal.negate()
+  assert(distal.r.every(({p}) => distance(p) >= -0.0001))
+  assert(distal.l.every(({p}) => distance(p) <= 0.0001))
 })
