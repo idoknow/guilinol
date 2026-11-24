@@ -27,6 +27,7 @@ export function equippedBody(): CameraBody {
 }
 
 function detach() {
+  lastWalker?.setCameraHold?.(false)
   if (!mount) return
   disposeCameraProp(mount.root)
   mount = null
@@ -39,6 +40,8 @@ function attach(root: T.Group, id: BodyId, anchor: T.Object3D) {
   root.position.set(0, 0.01, 0.02)
   anchor.add(root)
   mount = {id, root, source: String(root.userData.source ?? 'procedural'), anchor}
+  // IDOK-188：同时把右臂抬起来，机身才露在身侧看得见。
+  lastWalker?.setCameraHold?.(true)
 }
 
 async function rebuild() {
@@ -59,9 +62,17 @@ async function rebuild() {
   attach(root, body.id, anchor)
 }
 
-/** 让机身跟随装备状态：飞行/骑行前调用 `setCameraShown(false)`。 */
+/** 让机身跟随装备状态：飞行/骑行前调用 `setCameraShown(false)`。
+ *  每帧调用也安全：机身已在手上、walker 也没换时直接返回（IDOK-188 修正了持机姿势不生效的链路）。 */
 export function setCameraShown(on: boolean, walker?: Walker) {
+  const freshWalker = !!walker && lastWalker !== walker
   if (walker) lastWalker = walker
+  if (on && wanted && mount) {
+    // 机身已在手上，只是这时候才拿到 walker —— 补一次持机姿势。
+    if (freshWalker) lastWalker?.setCameraHold?.(true)
+    return
+  }
+  if (on === wanted) return
   wanted = on
   if (on) {
     void rebuild()

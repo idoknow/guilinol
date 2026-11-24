@@ -2604,12 +2604,78 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       }
     }
     if(!standUpSession&&!pickupSession)mixer.update(dt)
+    applyCameraHold(dt)
     follow(dt)
     if(smoking){if(rides?.bike||rides?.boat||rides?.car)cigarette.stop();if(cigarette.advance(dt))smoking.drop();smoking.tick(dt,cigarette.view(),isFirstPerson())}
     const emoteMoving=!!(keys.right||keys.forward||external?.x||external?.z)
     if(emote.id&&interrupted(emote.id,emoteMoving,!emotesEnabled()||!canEmote()||keys.jump||!grounded))emote.stop()
     emote.tick(dt,emoteMoving)
     net?.tick(dt)
+  }
+  // ---- 持机姿势（IDOK-188）----
+  // 装备了相机时把右手抬到胸前：走路动画每帧都会把骨骼写回原位，所以在 mixer.update 之后用一段
+  // 两骨 IK（肩 + 肘）把右手拉到「胸口前方」的目标点。目标点用肩宽推出来，和骨骼自身轴向无关，
+  // 换角色/换动画都不会飘。可用 setCameraHold(on, {aim:{forward,up,side}}) 现场微调。
+  let cameraHold=false
+  let camHoldBlend=0
+  let holdAim={forward:.32,up:.13,side:-.04}
+  const holdTarget=new THREE.Vector3(), holdWorldUp=new THREE.Vector3(0,1,0)
+  const holdRight=new THREE.Vector3(), holdFwd=new THREE.Vector3()
+  const holdPivot=new THREE.Vector3(), holdEffector=new THREE.Vector3(), holdV1=new THREE.Vector3(), holdV2=new THREE.Vector3()
+  const holdDelta=new THREE.Quaternion(), holdWorldQuat=new THREE.Quaternion(), holdParentQuat=new THREE.Quaternion()
+  const holdSnapshot=new Map<THREE.Object3D,THREE.Quaternion>()
+  function holdJointTowards(joint:THREE.Object3D,effector:THREE.Vector3){
+    if(!joint.parent)return
+    holdV1.subVectors(effector,holdPivot).normalize()
+    holdV2.subVectors(holdTarget,holdPivot).normalize()
+    if(holdV1.dot(holdV2)>.9999)return
+    holdDelta.setFromUnitVectors(holdV1,holdV2)
+    joint.getWorldQuaternion(holdWorldQuat).premultiply(holdDelta)
+    joint.parent.getWorldQuaternion(holdParentQuat).invert()
+    joint.quaternion.copy(holdParentQuat.multiply(holdWorldQuat))
+    figure.updateMatrixWorld(true)
+  }
+  function applyCameraHold(dt:number){
+    const target=cameraHold?1:0
+    // 稳定态也每帧重算 —— 走路动画每帧都会把骨骼写回原姿势。
+    if(camHoldBlend!==target)camHoldBlend+=Math.sign(target-camHoldBlend)*Math.min(Math.abs(target-camHoldBlend),Math.max(dt,.001)*5)
+    if(camHoldBlend<=.002)return
+    const upper=figure.getObjectByName('upperarm_r'),lower=figure.getObjectByName('lowerarm_r'),hand=figure.getObjectByName('hand_r')
+    const leftArm=figure.getObjectByName('upperarm_l'),spine=figure.getObjectByName('spine_02')
+    if(!upper||!lower||!hand||!spine)return
+    figure.updateMatrixWorld(true)
+    // 身体坐标系：右 = 双肩连线，前 = 右 × 上，上 = 前 × 右。
+    holdRight.set(0,0,0)
+    if(leftArm){
+      leftArm.getWorldPosition(holdV1);upper.getWorldPosition(holdV2)
+      holdRight.subVectors(holdV2,holdV1)
+    }
+    if(holdRight.lengthSq()<1e-8)holdRight.set(1,0,0)
+    holdRight.normalize()
+    holdFwd.crossVectors(holdRight,holdWorldUp).normalize()
+    if(holdFwd.lengthSq()<1e-8)holdFwd.set(0,0,-1)
+    spine.getWorldPosition(holdTarget)
+    holdTarget.addScaledVector(holdFwd,holdAim.forward)
+    holdTarget.addScaledVector(holdWorldUp,holdAim.up)
+    holdTarget.addScaledVector(holdRight,holdAim.side)
+    // 记录 IK 前的姿势，算完再按 blend 混入，避免「装上就硬跳」。
+    holdSnapshot.clear()
+    holdSnapshot.set(upper,upper.quaternion.clone())
+    holdSnapshot.set(lower,lower.quaternion.clone())
+    for(let iteration=0;iteration<3;iteration++){
+      for(const joint of [lower,upper]){
+        hand.getWorldPosition(holdEffector)
+        joint.getWorldPosition(holdPivot)
+        holdJointTowards(joint,holdEffector)
+      }
+    }
+    if(camHoldBlend<.999){
+      for(const [joint,rest] of holdSnapshot){
+        const posed=joint.quaternion.clone()
+        joint.quaternion.copy(rest).slerp(posed,camHoldBlend)
+      }
+      figure.updateMatrixWorld(true)
+    }
   }
   function photoSupport(x:number,z:number,bridgeRadius?:number){
     const tile=sim.tileAt(x,z), data=tile&&stream.loaded.get(tile)
@@ -2738,5 +2804,15 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }:undefined,
     pavementAt:verify?(x:number,z:number)=>Boolean(rides?.pavement(x,z)):undefined,
     insideHouseAt:verify?(x:number,z:number,y?:number)=>sim.insideHouse(x,z,y):undefined,
+    // IDOK-188: 持机时把右手抬到胸前；aim 是相对脊柱的身体坐标偏移（米），现场微调用。
+    setCameraHold(on:boolean,pose?:{aim?:{forward?:number;up?:number;side?:number}}){
+      cameraHold=on
+      if(pose?.aim)holdAim={...holdAim,...pose.aim}
+    },
+    cameraHoldPose(pose?:{aim?:{forward?:number;up?:number;side?:number}}){
+      if(pose?.aim)holdAim={...holdAim,...pose.aim}
+      figure.getObjectByName('hand_r')?.getWorldPosition(holdEffector)
+      return {aim:{...holdAim},blend:camHoldBlend,hand:[holdEffector.x,holdEffector.y,holdEffector.z],target:[holdTarget.x,holdTarget.y,holdTarget.z]}
+    },
     get position(){const pos=rides?.boat?.position??sim.body.translation();return posOut.set(pos.x,pos.y,pos.z)}}
 }
