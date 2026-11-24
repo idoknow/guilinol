@@ -1,4 +1,4 @@
-export const npcDefaults={classes:['trunk','primary','secondary'],carMin:1,carMax:3,personMin:4,personMax:8,horn:true,mutter:true,bubble:true,volume:.65,bumpSpeed:1.5,bubbleSeconds:2.5,
+export const npcDefaults={classes:['trunk','primary','secondary'],carMin:1,carMax:2,personMin:3,personMax:6,horn:true,mutter:true,bubble:true,volume:.65,bumpSpeed:1.5,bubbleSeconds:2.5,
   bumpLines:['走路不看路啊？','搞哪样哦！','你眼睛长后脑壳啦？','慢点咯，赶着去嗦粉啊？','撞到人了晓得不？','哎哟，痛死我了！','开车看着点嘛！','莫挤莫挤！'],
   mutterLines:['今天好热哦','等下去嗦碗米粉','这个天要落雨了','菜又涨价了','走快点，要迟到了','晚上去两江四湖走一圈','东西街人好多哦','油茶还没喝呢']}
 export function validNpc(input:unknown):input is typeof npcDefaults{
