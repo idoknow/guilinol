@@ -5,7 +5,7 @@ from shapely.geometry import LineString
 
 from road_profile import profile
 from scatter import CONFIG, _bank_profile, _road_weights
-from trees import build_lod_arrays, build_species_specs
+from trees import CROWN_BRANCH_POINT, build_lod_arrays, build_species_specs, crown_start, runtime_species_specs
 
 
 class TreeGeneratorTests(unittest.TestCase):
@@ -67,6 +67,24 @@ class TreeGeneratorTests(unittest.TestCase):
 
         _, cy0, _, _, _ = crown_metrics(specs['willow'])
         self.assertTrue(1.0 <= cy0 <= 2.0, f'willow strand drop={cy0:.2f}')
+
+    def test_runtime_street_crowns_raised_at_least_twice(self):
+        # IDOK-227: runtime street trees must clear walking eye height.
+        base = {s['name']: s for s in build_species_specs()}
+        runtime = {s['name']: s for s in runtime_species_specs()}
+        for name, spec in runtime.items():
+            for lod in ('near', 'mid', 'far'):
+                b0, _, _ = build_lod_arrays(base[name], lod, variant_idx=0)
+                r0, _, _ = build_lod_arrays(spec, lod, variant_idx=0)
+                self.assertAlmostEqual(float(r0[:, 1].min()), float(b0[:, 1].min()), delta=0.05, msg=f'{name} {lod} root depth')
+                if name not in CROWN_BRANCH_POINT:
+                    self.assertEqual(spec[lod], base[name][lod], f'{name} {lod} must stay unchanged')
+                else:
+                    self.assertEqual(len(r0), len(b0), f'{name} {lod} triangle count')
+            if name in CROWN_BRANCH_POINT:
+                before, after = crown_start(base[name]['near']), crown_start(spec['near'])
+                self.assertGreaterEqual(after, 2.0 * before - 1e-3, f'{name} crown start {before:.2f} -> {after:.2f}')
+                self.assertGreaterEqual(after, 2.4, name)
 
     def test_road_and_bank_species_mapping(self):
         line = LineString([(0, 0), (100, 0)])

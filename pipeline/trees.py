@@ -1015,8 +1015,74 @@ def emit_landmark_tree(
         model.box(x, y - 0.14, z, 0.30 * scale, 0.55 * scale, 0.30 * scale, wood_mat, True)
 
 
+# IDOK-227: runtime street trees read as "too low, blocking the view" at walking eye height.
+# At least double both the clear trunk (ground → first scaffold branch) and the lowest foliage
+# of the low-branching broadleaf street species: the crown is lifted rigidly by
+# max(branch, crownStart) * (factor - 1) and the trunk below the branch point is stretched to
+# meet it. 黄葛榕 (virens) already clears 6 m and stays as is. Landmark trees keep the
+# photo-matched base specs (`emit_landmark_tree`); only the scattered runtime trees are raised.
+CROWN_RAISE_FACTOR = 2.0
+CROWN_BRANCH_POINT = {
+    'camphor': 2.5, 'banyan': 2.2, 'osmanthus': 1.05,
+    'bischofia': 2.8, 'elaeocarpus': 2.2, 'ginkgo': 2.6,
+}
+FOLIAGE_OPS = ('blob', 'whorl', 'fronds', 'strands')
+
+
+def crown_start(parts: list[dict]) -> float:
+    fol = [p for p in parts if p['op'] in FOLIAGE_OPS]
+    pos, _, _ = build_lod_arrays({'near': fol, 'variants': [{'scale': [1, 1, 1], 'lean': 0, 'tint': [1, 1, 1]}]}, 'near', variant_idx=0)
+    return float(pos[:, 1].min())
+
+
+def _raise_y(y: float, branch: float, lift: float) -> float:
+    if y <= 0.0:
+        return y
+    if y < branch:
+        return y * (branch + lift) / branch
+    return y + lift
+
+
+def _raise_part(part: dict, branch: float, lift: float) -> dict:
+    out = json.loads(json.dumps(part))
+    ry = lambda y: round(_raise_y(y, branch, lift), 4)
+    op = out['op']
+    if op == 'tube':
+        out['pts'] = [[x, ry(y), z, r] for x, y, z, r in out['pts']]
+    elif op == 'blob':
+        out['p'][1] = ry(out['p'][1])
+    elif op == 'bundles':
+        for cl in out['clusters']:
+            cl['p'][1] = ry(cl['p'][1])
+    elif op == 'whorl':
+        out['y'] = ry(out['y'])
+    elif op in ('fronds', 'strands'):
+        lift = ry(out['origin'][1]) - out['origin'][1]
+        out['origin'][1] += lift
+        for key in ('topY', 'botY'):
+            if key in out:
+                out[key] += lift
+    return out
+
+
+def raise_street_crowns(specs: list[dict], factor: float = CROWN_RAISE_FACTOR) -> list[dict]:
+    out = []
+    for spec in specs:
+        branch = CROWN_BRANCH_POINT.get(spec['name'])
+        if branch is None:
+            out.append(spec)
+            continue
+        lift = max(branch, crown_start(spec['near'])) * (factor - 1.0)
+        out.append({**spec, **{lod: [_raise_part(p, branch, lift) for p in spec[lod]] for lod in ('near', 'mid', 'far')}})
+    return out
+
+
+def runtime_species_specs() -> list[dict]:
+    return raise_street_crowns(build_species_specs())
+
+
 def write_specs_json(out_path: Path = OUT_JSON) -> list[dict]:
-    specs = build_species_specs()
+    specs = runtime_species_specs()
     payload = {'version': 2, 'species': specs}
     out_path.write_text(json.dumps(payload, ensure_ascii=False, separators=(',', ':')) + '\n', encoding='utf-8')
     return specs
