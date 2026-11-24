@@ -83,14 +83,15 @@ def facade(b, polygon, height, curtain=False):
                         "wall",
                     )
         if glazing and normal[0] > 0.8:
+            floor = LEVELS["hallFloor"] - b.surface.y
             for t in (0.18, 0.50, 0.82):
                 mid = a + u * length * t
                 quad(
                     b,
                     mid - u * 5.5,
                     mid + u * 5.5,
-                    top - 15.4,
-                    top - 10.2,
+                    floor,
+                    floor + 5.2,
                     0.06,
                     normal,
                     "soffit",
@@ -102,8 +103,8 @@ def facade(b, polygon, height, curtain=False):
                             b,
                             center - u * 0.72,
                             center + u * 0.72,
-                            top - 15.3,
-                            top - 11.2,
+                            floor + 0.08,
+                            floor + 4.18,
                             0.12,
                             normal,
                             "glass",
@@ -111,7 +112,7 @@ def facade(b, polygon, height, curtain=False):
                         fin(
                             b,
                             center + u * 0.75,
-                            top - 15.3,
+                            floor + 0.08,
                             4.1,
                             0.17,
                             0.10,
@@ -123,7 +124,7 @@ def facade(b, polygon, height, curtain=False):
                         b,
                         mid - u * 5.5,
                         mid + u * 5.5,
-                        top - 11.1,
+                        floor + 4.28,
                         0.13,
                         0.20,
                         normal,
@@ -133,7 +134,7 @@ def facade(b, polygon, height, curtain=False):
                     b,
                     mid - u * 5.9,
                     mid + u * 5.9,
-                    top - 10.2,
+                    floor + 5.2,
                     0.35,
                     2.8,
                     normal,
