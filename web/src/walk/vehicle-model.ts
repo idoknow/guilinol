@@ -645,6 +645,7 @@ export interface CarVisualRig {
     braking: boolean
     reversing: boolean
     dt: number
+    groundRoll?: number
     dynRoll?: number
     dynPitch?: number
     driftIntensity?: number
@@ -1360,7 +1361,7 @@ export function createDynamicCar(paint = 0): CarVisualRig {
     update(state) {
       const cdt = Math.min(.1, Math.max(1e-4, state.dt))
       root.position.copy(state.pos)
-      root.rotation.set(state.groundPitch, state.heading, 0, 'YXZ')
+      root.rotation.set(state.groundPitch, state.heading, state.groundRoll??0, 'YXZ')
 
       const accel = T.MathUtils.clamp((state.speed - prevSpeed) / cdt, -18, 18)
       prevSpeed = state.speed

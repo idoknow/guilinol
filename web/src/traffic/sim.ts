@@ -6,21 +6,9 @@ type Lane = {id:number,from:number,to:number,offset:number,width?:number,kind:'m
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?,number[]?][],signals:Signal[]}
-export type SurfaceLookup = (x:number,z:number)=>readonly number[]|undefined
-export type Track = Lane & {
-  start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean,
-  outwardSign?:1|-1,dodgeMin?:number,dodgeMax?:number,tightEdge?:boolean,
-  surfaceState?:'pending'|'ok'|'rejected',suspectVerge?:boolean,pairTrack?:Track,
-}
-type MotorSeg = {id:number,cls?:string,street?:string,ax:number,az:number,bx:number,bz:number,dx:number,dz:number,len:number,halfW:number}
-const MOTOR_CLEARANCE=.45
-const MEDIAN_HALF_SPAN=10
-const WALK_MIN_LEN=2
-const WALK_EDGE_KEEP=.45
-const isSafeWalkSurface=(kinds:readonly number[])=>(kinds.includes(1)||kinds.includes(6))&&!kinds.includes(0)&&!kinds.includes(5)
-const isVergeSurface=(kinds:readonly number[])=>kinds.includes(4)&&!kinds.includes(1)&&!kinds.includes(6)
-function trackHeight(track:Track,dist:number){
-  if(track.floor)return axleHeight(track,dist)
+export type Track = Lane & {start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean}
+export function trackHeight(track:Track,dist:number){
+  if(track.wheelPose)return poseAt(track.wheelPose,dist/track.length,1)
   const fraction=Math.min(1,Math.max(0,dist/track.length)), heights=track.heights
   if(!heights)return track.start.y+(track.end.y-track.start.y)*fraction
   let lo=0,hi=heights.length/2-1
