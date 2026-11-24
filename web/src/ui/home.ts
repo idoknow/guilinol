@@ -15,7 +15,7 @@ const slides:[file:string,caption:string][] = [
 ]
 const SLIDE_MS = 7000
 
-export interface Home {open(resume:boolean):void; close():void; readonly shown:boolean}
+export interface Home {open(resume:boolean):void; close():void; idle():void; readonly shown:boolean}
 
 export function home(play:(mode:PlayMode)=>void):Home {
   const root = document.createElement('section')
@@ -70,23 +70,44 @@ export function home(play:(mode:PlayMode)=>void):Home {
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
   const go = root.querySelector<HTMLElement>('.home-go--tour')!, tour = root.querySelector<HTMLButtonElement>('.home-mode--tour')!
   const solo = root.querySelector<HTMLButtonElement>('[data-umami-event=home-solo]')!, wallet = root.querySelector('.home-wallet')!
-  solo.onclick = ()=>{setMpEnabled(false); play('solo')}
-  tour.onclick = ()=>{setMpEnabled(false); play('tour')}
+  // IDOK-216: entering waits on the network (login check, cloud save, avatar) before the loader can show,
+  // so the pressed card answers at once: spinner in its pill, other cards held until entry.ts calls idle().
+  let busyCard:HTMLElement|undefined, busyLabel = ''
+  const press = (card:HTMLElement, label:string, run:()=>void)=>{
+    if(busyCard) return
+    const pill = card.querySelector<HTMLElement>('.home-go'); busyCard = card; busyLabel = pill?.textContent ?? ''
+    card.setAttribute('aria-busy','true'); root.dataset.busy = ''
+    if(pill) pill.innerHTML = `<i class="home-spin" aria-hidden="true"></i><span>${label}</span>`
+    run()
+  }
+  const idle = ()=>{
+    if(!busyCard) return
+    const pill = busyCard.querySelector<HTMLElement>('.home-go'); if(pill) pill.textContent = busyLabel
+    busyCard.removeAttribute('aria-busy'); delete root.dataset.busy; busyCard = undefined
+  }
+  const pending = (button:HTMLElement, task:()=>Promise<unknown>)=>{
+    if(button.hasAttribute('aria-busy')) return
+    const timer = setTimeout(()=>button.setAttribute('aria-busy','true'),120)
+    void task().finally(()=>{clearTimeout(timer); button.removeAttribute('aria-busy')})
+  }
+  solo.onclick = ()=>press(solo,'正在进入',()=>{setMpEnabled(false); play('solo')})
+  tour.onclick = ()=>press(tour,'正在进入',()=>{setMpEnabled(false); play('tour')})
   // IDOK-105: a slim strip under the tour card, shown only when a usable last view is stored.
   // 开始游览 still opens on a random frame; this is the opt-in way back.
   const resumeRow = root.querySelector<HTMLElement>('.home-resume-row')!, resumeAgo = root.querySelector('.home-resume-ago')!
-  root.querySelector<HTMLButtonElement>('.home-resume')!.onclick = ()=>{requestRestore(); play('tour')}
+  root.querySelector<HTMLButtonElement>('.home-resume')!.onclick = ()=>press(tour,'正在进入',()=>{requestRestore(); play('tour')})
   root.querySelector<HTMLButtonElement>('[data-act=guide]')!.onclick = ()=>guide()
-  root.querySelector<HTMLButtonElement>('[data-act=about]')!.onclick = ()=>void import('./about').then(m=>m.openAbout())
+  const about = root.querySelector<HTMLButtonElement>('[data-act=about]')!
+  about.onclick = ()=>pending(about,()=>import('./about').then(m=>m.openAbout()))
   root.querySelector<HTMLButtonElement>('[data-act=qq]')!.onclick = ()=>qqGroup()
   // IDOK-192 联机模式：街头玩法 + 同城联机。单人/游览会把联机关掉，walk 那边当场连上或断开。
   const mp = root.querySelector<HTMLButtonElement>('.home-mode--mp')!, mpGo = root.querySelector('.home-go--mp')!
   const mpLive = root.querySelector<HTMLElement>('.home-mp-live')!
   startLive()
-  mp.onclick = ()=>{setMpEnabled(true); play('solo')}
+  mp.onclick = ()=>press(mp,'正在连接',()=>{setMpEnabled(true); play('solo')})
   onOnline(value=>{mpLive.hidden = !value; if(value) mpLive.textContent = String(value)})
   const account = root.querySelector<HTMLButtonElement>('.home-account')!
-  account.onclick = ()=>void openAccount()
+  account.onclick = ()=>pending(account,openAccount)
   onUser(user=>{account.innerHTML = user?`<i class="home-avatar"></i><span></span>`:'<span>登录 / 注册</span>'
     if(user){account.querySelector('i')!.textContent = initial(user.nickname); account.querySelector('span')!.textContent = user.nickname}})
   account.innerHTML = '<span>登录 / 注册</span>'
@@ -103,13 +124,15 @@ export function home(play:(mode:PlayMode)=>void):Home {
   let shown = false
   // Keys must not reach the paused game underneath (V/J/P/M toggle things).
   addEventListener('keydown',event=>{if(shown&&!(event.target as Element)?.closest?.('dialog,.about-mask')) {event.stopImmediatePropagation()
-    if(event.code==='Enter'&&document.activeElement===document.body){event.preventDefault(); play(lastPlayMode())}
+    if(event.code==='Enter'&&document.activeElement===document.body){event.preventDefault(); const mode = lastPlayMode(); press(mode==='solo'?(mpEnabled()?mp:solo):tour,'正在进入',()=>play(mode))}
     else if(event.code==='Escape'&&!event.repeat&&root.classList.contains('resume')) play(getPlayMode())}},{capture:true})
   document.body.append(root)
   let playedSolo = false
   const api:Home = {
     get shown(){return shown},
+    idle,
     open(resume){
+      idle()
       shown = true; root.hidden = false; root.classList.toggle('resume',resume)
       playedSolo ||= resume && getPlayMode() === 'solo'
       let hasProgress = false, money:number|null = null

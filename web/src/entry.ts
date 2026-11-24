@@ -68,6 +68,7 @@ async function enter(mode: PlayMode, remember = true) {
     if(!controller.signal.aborted)window.alert(error instanceof Error ? error.message : '无法进入模式')
   } finally {
     clearInterval(timer);clearTimeout(cancelTimer);main?.setTitleTransition(undefined);await cover?.done()
+    title.idle()
     entering = false
   }
 }

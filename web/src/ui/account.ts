@@ -123,6 +123,12 @@ const refresh=()=>api('me').then(r=>{sessionUnknown=false;setUser(r&&typeof r.ni
   if(!sessionUnknown)setUser(null)
 })
 const ready=refresh()
+// IDOK-216: warm what the first click needs while the player reads the title screen — the login dialog's
+// social buttons for guests, the avatar module + record for signed-in players — so entering is one wait, not four.
+void ready.then(()=>{
+  const warm=()=>{const owner=user?.id;if(owner)void import('./avatar-account').then(module=>module.prefetchAvatar(owner)).catch(()=>{});else void loadSocialOptions()}
+  if('requestIdleCallback' in window)requestIdleCallback(warm,{timeout:1500});else setTimeout(warm,600)
+})
 window.addEventListener('online',()=>{if(sessionUnknown)void refresh()})
 /** Subscribe to sign-in changes; called immediately with the current value once known. */
 export function onUser(listen:(user:User|null)=>void){listeners.add(listen);void ready.then(()=>{if(listeners.has(listen))listen(user)});return ()=>listeners.delete(listen)}
@@ -147,7 +153,7 @@ export function consumeCreatorSpawn(){const value=firstSpawn;firstSpawn=false;re
 export async function requireUser(){
   const signedIn=await signIn()
   await cloudReady
-  if(signedIn&&!firstSpawn)firstSpawn=await (await import('./avatar-account')).accountCharacter(signedIn.nickname)
+  if(signedIn&&!firstSpawn)firstSpawn=await (await import('./avatar-account')).accountCharacter(signedIn.nickname,false,signedIn.id)
   return signedIn
 }
 export async function editCharacter(){
