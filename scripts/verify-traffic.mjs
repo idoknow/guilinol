@@ -145,6 +145,7 @@ for(const east of [-1415.4,-432.7,-984,-1001.5,-572]){
     for(let tick=0;tick<2400;tick++){
       flow.step(.05,{x,y,z});const stopped=flow.actors.filter(actor=>actor.kind!=='person'&&actor.speed<.1&&Math.hypot(actor.x-x,actor.z-z)<12).length
       waiting=stopped?waiting+1:0;longest=Math.max(longest,waiting);peak=Math.max(peak,stopped)
+      if(waiting===601)console.log('Queue diagnostics',flow.actors.filter(actor=>actor.kind!=='person'&&actor.speed<.1&&Math.hypot(actor.x-x,actor.z-z)<12).map(actor=>({lane:actor.track.id,x:actor.x,z:actor.z,dist:actor.dist,remaining:actor.track.length-actor.dist,waitingFor:actor.waitingFor?.kind,green:flow.green(actor.track)})))
     }
     console.log('Pickup queue',{x,z,peakStoppedWithin12m:peak,longestStoppedSeconds:longest*.05})
     assert.ok(longest*.05<=30,`queue persisted at ${x},${z}`)

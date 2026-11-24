@@ -90,7 +90,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   }
   const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);staticSolids(x,z,visit)}
   let accumulator=0
-  const people=crowd(scene,camera);mesh.userData.crowd=people
+  const people=crowd(scene,camera,sampleGround);mesh.userData.crowd=people
   let walking=new Set<object>()
   return (dt:number,vehicle?:THREE.Vector3,player?:THREE.Vector3,_solo=false,enabled=true)=>{
     useTrafficSolids(enabled?near:undefined)

@@ -34,7 +34,7 @@ export function randomPasserby(random:()=>number):Avatar{
     hair:hairStyles[body][r(6)],hairColor:[0,0,0,1,1,2,3][r(7)],look,createdAt:1}
 }
 
-export function crowd(scene:THREE.Scene,camera:THREE.Camera){
+export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,z:number,y:number,car:boolean)=>number|undefined){
   const mobile=touchUi()
   const LIMIT=mobile?6:14,RANGE=mobile?45:70,POOL=mobile?8:16
   const templates:(Promise<Template>|undefined)[]=new Array(POOL),ready:(Template|undefined)[]=new Array(POOL)
@@ -97,10 +97,11 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera){
         const pos=view.root.position
         if(!view.placed){pos.set(tx,walker.y,tz);view.root.rotation.y=walker.yaw+Math.PI;view.placed=true}
         else{
-          pos.x+=(tx-pos.x)*Math.min(1,alpha*2);pos.z+=(tz-pos.z)*Math.min(1,alpha*2);pos.y+=(walker.y-pos.y)*alpha
+          pos.x+=(tx-pos.x)*Math.min(1,alpha*2);pos.z+=(tz-pos.z)*Math.min(1,alpha*2)
           const turn=walker.yaw+Math.PI-view.root.rotation.y // figure.glb faces −z (walk/index.ts uses atan2(-dx,-dz))
           view.root.rotation.y+=Math.atan2(Math.sin(turn),Math.cos(turn))*alpha
         }
+        pos.y=groundAt?.(pos.x,pos.z,walker.y,false)??walker.y
         view.root.scale.setScalar(Math.max(.001,walker.scale))
         const moving=walker.speed>.15
         if(moving!==view.moving&&view.walk&&view.idle){
