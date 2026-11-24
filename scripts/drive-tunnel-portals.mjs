@@ -10,7 +10,7 @@ import {withFixtureBays} from './ride-fixture-bays.mjs'
 const directory=resolve(process.env.GROUNDING_DIST??'dist')
 const output=process.argv[2]??'captures/vehicle-grounding/portals.json'
 const selected=new Set(process.argv.slice(3).filter(arg=>arg!=='--surface').map(Number))
-const sites=JSON.parse(await readFile(directory+'/world/'+(process.argv.includes('--surface')?'vehicle-surface-routes.json':'vehicle-portal-routes.json'),'utf8')).filter(s=>!selected.size||selected.has(s.id))
+const sites=JSON.parse(await readFile(process.env.GROUNDING_ROUTES_FILE??directory+'/world/'+(process.argv.includes('--surface')?'vehicle-surface-routes.json':'vehicle-portal-routes.json'),'utf8')).filter(s=>!selected.size||selected.has(s.id))
 if(!sites.length)throw Error('No matching portal fixtures')
 const vehicles=JSON.parse(gunzipSync(await readFile(directory+'/world/vehicles.bin')))
 const results=sites.filter(s=>!s.modes.length).map(s=>({id:s.id,way:s.way,unavailable:'no permitted continuous route',links:s.links}))
