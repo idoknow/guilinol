@@ -29,6 +29,7 @@ test('two players: private RT state, role gate, public-safe admin state, persist
     for(let attempt=0;attempt<150;attempt++){if(await fetch(base+probe).then(()=>true).catch(()=>false))return {base,child};await delay(100)}
     throw Error('failed to start '+entry)
   }
+  const {importWords}=await import('./chat-words-import.mjs');await importWords(pool)
   const rt=await service('rt/server-realtime.mjs',{RT_ADMIN_TOKEN:secret,RT_JOIN_SECRET:secret,KICK_TOKEN:secret},'/health')
   const raw=async()=> (await fetch(rt.base+'/admin/state',{headers:{'X-Admin-Token':secret}})).json()
   assert.equal((await fetch(rt.base+'/admin/state')).status,403)
@@ -47,7 +48,7 @@ test('two players: private RT state, role gate, public-safe admin state, persist
   const call=(suffix='',index=0,body)=>fetch(api.base+'/api/admin/mp'+suffix,{method:body?'POST':'GET',headers:{origin:api.base,cookie:'glol_session='+tokens[index]},body:body&&JSON.stringify(body)})
   for(const suffix of ['','/history','/sessions','/kick'])assert.equal((await call(suffix,1,suffix==='/kick'?{}:undefined)).status,403)
   const chatSettings=index=>fetch(api.base+'/api/admin/chat/settings',{headers:{cookie:'glol_session='+tokens[index]}})
-  assert.equal((await chatSettings(1)).status,403);assert.equal((await (await chatSettings(0)).json()).unmoderated_policy,'pending')
+  assert.equal((await chatSettings(1)).status,403);assert.equal((await (await chatSettings(0)).json()).unmoderated_policy,'local_only')
   await pool.query(`insert into perf_network values('192.0.2.0/24','CN','测试地区','测试市','测试网络')`)
   for(let attempt=0;attempt<120;attempt++){if((await raw()).players.every(player=>player.rttMs!==null))break;await delay(100)}
   for(const client of sockets)client.send(JSON.stringify({t:'pos',x:10,z:20}))

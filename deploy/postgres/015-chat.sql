@@ -1,6 +1,6 @@
 BEGIN;
 CREATE TABLE IF NOT EXISTS chat_settings (id boolean PRIMARY KEY CHECK(id), config jsonb NOT NULL);
-INSERT INTO chat_settings VALUES(true,'{"unmoderated_policy":"pending","radius":60,"max_length":100,"near_ms":1500,"world_ms":10000,"window_hours":24,"threshold":3,"steps_minutes":[60,1440,10080]}') ON CONFLICT DO NOTHING;
+INSERT INTO chat_settings VALUES(true,'{"unmoderated_policy":"local_only","radius":60,"max_length":100,"near_ms":1500,"world_ms":10000,"window_hours":24,"threshold":3,"steps_minutes":[60,1440,10080]}') ON CONFLICT DO NOTHING;
 CREATE TABLE IF NOT EXISTS chat_messages (
  id bigserial PRIMARY KEY, ch text NOT NULL CHECK(ch IN ('world','near')), uid bigint NOT NULL, peer text NOT NULL, name text NOT NULL,
  cid text NOT NULL, text text NOT NULL, x float8 NOT NULL,z float8 NOT NULL, sys text,
