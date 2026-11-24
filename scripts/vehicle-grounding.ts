@@ -260,6 +260,18 @@ for(const [bore,roads] of [
   for(const road of roads)narrowApproaches.set(road,{limit,portals})
 }
 
+// At these service bridges the approach turns at the abutment. Across the
+// axle overhang the continuous paved half-width is about 2 m, even though
+// the deck itself is wider. Continue the same offset onto adjoining lanes.
+const serviceSpans=new Set([1466385149,1540160348,989395454,1526698080,835693641,454910567,684616634])
+const serviceLandings=new Set<number>()
+if(bake)for(const lane of data.lanes){
+  if(serviceSpans.has(lane.way)){
+    serviceLandings.add(lane.from)
+    serviceLandings.add(lane.to)
+  }
+}
+
 const tunnelWays=new Set((manifest.tunnels??[]).map(t=>t.way))
 const missingFloors=new Set<number>()
 const partialFloors=new Set<number>()
@@ -276,6 +288,9 @@ let total=0,outliers=0,nonplanar=0,sunk=0,floating=0
 for(const lane of lanes){
   const {dx,dz,length,start}=lane
   let offset=lane.offset
+  if(lane.cls==='service' && offset>0 && (serviceLandings.has(lane.from)||serviceLandings.has(lane.to))){
+    offset=Math.min(offset,.98)
+  }
   const approach=narrowApproaches.get(lane.way)
   if(bake && approach && (!approach.portals.length||approach.portals.some(([x,,z])=>
       Math.min(Math.hypot(x-start.x,z-start.z),Math.hypot(x-lane.end.x,z-lane.end.z))<20))){
