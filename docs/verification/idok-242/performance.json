@@ -1,0 +1,1356 @@
+{
+  "renderer": {
+    "width": 1920,
+    "height": 1080,
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+    "dpr": 1
+  },
+  "primarySampleMs": 10000,
+  "primaryMinFrames": 60,
+  "seed": 242,
+  "order": [
+    "main",
+    "candidate",
+    "main",
+    "candidate",
+    "main",
+    "candidate"
+  ],
+  "builds": {
+    "main": "27dabe1c3608cb9597af1facfea8b9adb778b5cc",
+    "candidate": "7c9084d8a21e09ca63517fe9669c84f3771f644a"
+  },
+  "desktop": {
+    "main": [
+      {
+        "overview": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 107837029,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "lijiang": {
+          "p95Ms": 16.8,
+          "meanMs": 17.15,
+          "calls": 57,
+          "mirrorCalls": 54,
+          "heapPeakBytes": 308139592,
+          "motors": 0,
+          "loadedChunks": 11
+        },
+        "palace": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 56,
+          "mirrorCalls": 51,
+          "heapPeakBytes": 434339787,
+          "motors": 7,
+          "loadedChunks": 12
+        },
+        "south": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 41,
+          "mirrorCalls": 38,
+          "heapPeakBytes": 169535964,
+          "motors": 3,
+          "loadedChunks": 12
+        },
+        "walk-palace": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 119,
+          "mirrorCalls": 108,
+          "heapPeakBytes": 458098355,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "street-jiefang": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 80,
+          "mirrorCalls": 74,
+          "heapPeakBytes": 453713963,
+          "motors": 26,
+          "loadedChunks": 13
+        }
+      },
+      {
+        "overview": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 108431406,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "lijiang": {
+          "p95Ms": 16.7,
+          "meanMs": 16.72,
+          "calls": 52,
+          "mirrorCalls": 49,
+          "heapPeakBytes": 315081169,
+          "motors": 0,
+          "loadedChunks": 11
+        },
+        "palace": {
+          "p95Ms": 16.8,
+          "meanMs": 17.21,
+          "calls": 60,
+          "mirrorCalls": 55,
+          "heapPeakBytes": 412936830,
+          "motors": 5,
+          "loadedChunks": 12
+        },
+        "south": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 41,
+          "mirrorCalls": 38,
+          "heapPeakBytes": 178373501,
+          "motors": 2,
+          "loadedChunks": 12
+        },
+        "walk-palace": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 120,
+          "mirrorCalls": 111,
+          "heapPeakBytes": 454724157,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "street-jiefang": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 74,
+          "mirrorCalls": 68,
+          "heapPeakBytes": 447567647,
+          "motors": 26,
+          "loadedChunks": 13
+        }
+      },
+      {
+        "overview": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 107856534,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "lijiang": {
+          "p95Ms": 16.7,
+          "meanMs": 16.69,
+          "calls": 50,
+          "mirrorCalls": 47,
+          "heapPeakBytes": 323683942,
+          "motors": 0,
+          "loadedChunks": 11
+        },
+        "palace": {
+          "p95Ms": 16.8,
+          "meanMs": 17.21,
+          "calls": 60,
+          "mirrorCalls": 55,
+          "heapPeakBytes": 416598226,
+          "motors": 7,
+          "loadedChunks": 12
+        },
+        "south": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 41,
+          "mirrorCalls": 38,
+          "heapPeakBytes": 178290417,
+          "motors": 3,
+          "loadedChunks": 12
+        },
+        "walk-palace": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 141,
+          "mirrorCalls": 132,
+          "heapPeakBytes": 467264603,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "street-jiefang": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 71,
+          "mirrorCalls": 65,
+          "heapPeakBytes": 451076371,
+          "motors": 28,
+          "loadedChunks": 13
+        }
+      }
+    ],
+    "candidate": [
+      {
+        "overview": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 109066001,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "lijiang": {
+          "p95Ms": 16.8,
+          "meanMs": 16.72,
+          "calls": 60,
+          "mirrorCalls": 57,
+          "heapPeakBytes": 309166665,
+          "motors": 0,
+          "loadedChunks": 11
+        },
+        "palace": {
+          "p95Ms": 16.8,
+          "meanMs": 17.24,
+          "calls": 58,
+          "mirrorCalls": 53,
+          "heapPeakBytes": 441920414,
+          "motors": 6,
+          "loadedChunks": 12
+        },
+        "south": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 41,
+          "mirrorCalls": 38,
+          "heapPeakBytes": 185598557,
+          "motors": 4,
+          "loadedChunks": 12
+        },
+        "walk-palace": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 124,
+          "mirrorCalls": 115,
+          "heapPeakBytes": 469338042,
+          "motors": 6,
+          "loadedChunks": 12
+        },
+        "street-jiefang": {
+          "p95Ms": 16.8,
+          "meanMs": 16.89,
+          "calls": 71,
+          "mirrorCalls": 65,
+          "heapPeakBytes": 453058113,
+          "motors": 26,
+          "loadedChunks": 13
+        }
+      },
+      {
+        "overview": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 109130758,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "lijiang": {
+          "p95Ms": 16.8,
+          "meanMs": 16.75,
+          "calls": 51,
+          "mirrorCalls": 48,
+          "heapPeakBytes": 324277109,
+          "motors": 0,
+          "loadedChunks": 11
+        },
+        "palace": {
+          "p95Ms": 16.8,
+          "meanMs": 17.21,
+          "calls": 55,
+          "mirrorCalls": 50,
+          "heapPeakBytes": 418005980,
+          "motors": 6,
+          "loadedChunks": 12
+        },
+        "south": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 41,
+          "mirrorCalls": 38,
+          "heapPeakBytes": 118763330,
+          "motors": 2,
+          "loadedChunks": 12
+        },
+        "walk-palace": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 114,
+          "mirrorCalls": 105,
+          "heapPeakBytes": 469144070,
+          "motors": 4,
+          "loadedChunks": 12
+        },
+        "street-jiefang": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 74,
+          "mirrorCalls": 68,
+          "heapPeakBytes": 454879369,
+          "motors": 25,
+          "loadedChunks": 13
+        }
+      },
+      {
+        "overview": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 108750118,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "lijiang": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 51,
+          "mirrorCalls": 48,
+          "heapPeakBytes": 322958012,
+          "motors": 0,
+          "loadedChunks": 11
+        },
+        "palace": {
+          "p95Ms": 16.8,
+          "meanMs": 16.92,
+          "calls": 66,
+          "mirrorCalls": 61,
+          "heapPeakBytes": 440760567,
+          "motors": 8,
+          "loadedChunks": 12
+        },
+        "south": {
+          "p95Ms": 16.8,
+          "meanMs": 16.69,
+          "calls": 41,
+          "mirrorCalls": 38,
+          "heapPeakBytes": 177612394,
+          "motors": 3,
+          "loadedChunks": 12
+        },
+        "walk-palace": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 142,
+          "mirrorCalls": 131,
+          "heapPeakBytes": 461888599,
+          "motors": 5,
+          "loadedChunks": 12
+        },
+        "street-jiefang": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 80,
+          "mirrorCalls": 74,
+          "heapPeakBytes": 455281539,
+          "motors": 28,
+          "loadedChunks": 13
+        }
+      }
+    ]
+  },
+  "desktopMedians": {
+    "overview": {
+      "p95Ms": {
+        "main": 16.8,
+        "candidate": 16.8,
+        "ratio": 1.0
+      },
+      "meanMs": {
+        "main": 16.67,
+        "candidate": 16.67,
+        "ratio": 1.0
+      },
+      "calls": {
+        "main": 14,
+        "candidate": 14,
+        "ratio": 1.0
+      },
+      "mirrorCalls": {
+        "main": 13,
+        "candidate": 13,
+        "ratio": 1.0
+      },
+      "heapPeakBytes": {
+        "main": 107856534,
+        "candidate": 109066001,
+        "ratio": 1.0112
+      },
+      "motors": {
+        "main": 0,
+        "candidate": 0,
+        "ratio": null
+      },
+      "loadedChunks": {
+        "main": 12,
+        "candidate": 12,
+        "ratio": 1.0
+      }
+    },
+    "lijiang": {
+      "p95Ms": {
+        "main": 16.7,
+        "candidate": 16.8,
+        "ratio": 1.006
+      },
+      "meanMs": {
+        "main": 16.72,
+        "candidate": 16.72,
+        "ratio": 1.0
+      },
+      "calls": {
+        "main": 52,
+        "candidate": 51,
+        "ratio": 0.9808
+      },
+      "mirrorCalls": {
+        "main": 49,
+        "candidate": 48,
+        "ratio": 0.9796
+      },
+      "heapPeakBytes": {
+        "main": 315081169,
+        "candidate": 322958012,
+        "ratio": 1.025
+      },
+      "motors": {
+        "main": 0,
+        "candidate": 0,
+        "ratio": null
+      },
+      "loadedChunks": {
+        "main": 11,
+        "candidate": 11,
+        "ratio": 1.0
+      }
+    },
+    "palace": {
+      "p95Ms": {
+        "main": 16.8,
+        "candidate": 16.8,
+        "ratio": 1.0
+      },
+      "meanMs": {
+        "main": 17.21,
+        "candidate": 17.21,
+        "ratio": 1.0
+      },
+      "calls": {
+        "main": 60,
+        "candidate": 58,
+        "ratio": 0.9667
+      },
+      "mirrorCalls": {
+        "main": 55,
+        "candidate": 53,
+        "ratio": 0.9636
+      },
+      "heapPeakBytes": {
+        "main": 416598226,
+        "candidate": 440760567,
+        "ratio": 1.058
+      },
+      "motors": {
+        "main": 7,
+        "candidate": 6,
+        "ratio": 0.8571
+      },
+      "loadedChunks": {
+        "main": 12,
+        "candidate": 12,
+        "ratio": 1.0
+      }
+    },
+    "south": {
+      "p95Ms": {
+        "main": 16.7,
+        "candidate": 16.7,
+        "ratio": 1.0
+      },
+      "meanMs": {
+        "main": 16.67,
+        "candidate": 16.67,
+        "ratio": 1.0
+      },
+      "calls": {
+        "main": 41,
+        "candidate": 41,
+        "ratio": 1.0
+      },
+      "mirrorCalls": {
+        "main": 38,
+        "candidate": 38,
+        "ratio": 1.0
+      },
+      "heapPeakBytes": {
+        "main": 178290417,
+        "candidate": 177612394,
+        "ratio": 0.9962
+      },
+      "motors": {
+        "main": 3,
+        "candidate": 3,
+        "ratio": 1.0
+      },
+      "loadedChunks": {
+        "main": 12,
+        "candidate": 12,
+        "ratio": 1.0
+      }
+    },
+    "walk-palace": {
+      "p95Ms": {
+        "main": 16.7,
+        "candidate": 16.7,
+        "ratio": 1.0
+      },
+      "meanMs": {
+        "main": 16.67,
+        "candidate": 16.67,
+        "ratio": 1.0
+      },
+      "calls": {
+        "main": 120,
+        "candidate": 124,
+        "ratio": 1.0333
+      },
+      "mirrorCalls": {
+        "main": 111,
+        "candidate": 115,
+        "ratio": 1.036
+      },
+      "heapPeakBytes": {
+        "main": 458098355,
+        "candidate": 469144070,
+        "ratio": 1.0241
+      },
+      "motors": {
+        "main": 0,
+        "candidate": 5,
+        "ratio": null
+      },
+      "loadedChunks": {
+        "main": 12,
+        "candidate": 12,
+        "ratio": 1.0
+      }
+    },
+    "street-jiefang": {
+      "p95Ms": {
+        "main": 16.8,
+        "candidate": 16.7,
+        "ratio": 0.994
+      },
+      "meanMs": {
+        "main": 16.67,
+        "candidate": 16.67,
+        "ratio": 1.0
+      },
+      "calls": {
+        "main": 74,
+        "candidate": 74,
+        "ratio": 1.0
+      },
+      "mirrorCalls": {
+        "main": 68,
+        "candidate": 68,
+        "ratio": 1.0
+      },
+      "heapPeakBytes": {
+        "main": 451076371,
+        "candidate": 454879369,
+        "ratio": 1.0084
+      },
+      "motors": {
+        "main": 26,
+        "candidate": 26,
+        "ratio": 1.0
+      },
+      "loadedChunks": {
+        "main": 13,
+        "candidate": 13,
+        "ratio": 1.0
+      }
+    }
+  },
+  "mobile": [
+    {
+      "view": "overview",
+      "metric": "calls",
+      "main": 13,
+      "PR": 13,
+      "runs": [
+        [
+          13,
+          13,
+          13
+        ],
+        [
+          13,
+          13,
+          13
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "overview",
+      "metric": "mirrorCalls",
+      "main": 12,
+      "PR": 12,
+      "runs": [
+        [
+          12,
+          12,
+          12
+        ],
+        [
+          12,
+          12,
+          12
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "overview",
+      "metric": "triangles",
+      "main": 25732,
+      "PR": 25732,
+      "runs": [
+        [
+          25732,
+          25732,
+          25732
+        ],
+        [
+          25732,
+          25732,
+          25732
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "overview",
+      "metric": "mirrorTriangles",
+      "main": 22660,
+      "PR": 22660,
+      "runs": [
+        [
+          22660,
+          22660,
+          22660
+        ],
+        [
+          22660,
+          22660,
+          22660
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "overview",
+      "metric": "geometries",
+      "main": 14,
+      "PR": 14,
+      "runs": [
+        [
+          14,
+          14,
+          14
+        ],
+        [
+          14,
+          14,
+          14
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "overview",
+      "metric": "textures",
+      "main": 12,
+      "PR": 12,
+      "runs": [
+        [
+          12,
+          12,
+          12
+        ],
+        [
+          12,
+          12,
+          12
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "overview",
+      "metric": "heap",
+      "main": 13941012,
+      "PR": 14637132,
+      "runs": [
+        [
+          13923496,
+          13941012,
+          13944396
+        ],
+        [
+          14637372,
+          14637132,
+          14634804
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "overview",
+      "metric": "p95 ms",
+      "main": 16.700000000000273,
+      "PR": 16.700000000000273,
+      "noise": 0.09999999999990905,
+      "p95s": [
+        [
+          16.700000000000273,
+          16.800000000000182,
+          16.700000000000273
+        ],
+        [
+          16.799999999999955,
+          16.700000000000273,
+          16.700000000000273
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "lijiang",
+      "metric": "calls",
+      "main": 31,
+      "PR": 31,
+      "runs": [
+        [
+          31,
+          31,
+          31
+        ],
+        [
+          31,
+          31,
+          31
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "lijiang",
+      "metric": "mirrorCalls",
+      "main": 28,
+      "PR": 28,
+      "runs": [
+        [
+          28,
+          28,
+          28
+        ],
+        [
+          28,
+          28,
+          28
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "lijiang",
+      "metric": "triangles",
+      "main": 300146,
+      "PR": 300146,
+      "runs": [
+        [
+          300146,
+          300146,
+          300146
+        ],
+        [
+          300146,
+          300146,
+          300146
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "lijiang",
+      "metric": "mirrorTriangles",
+      "main": 293225,
+      "PR": 293225,
+      "runs": [
+        [
+          293225,
+          293225,
+          293225
+        ],
+        [
+          293225,
+          293225,
+          293225
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "lijiang",
+      "metric": "geometries",
+      "main": 33,
+      "PR": 33,
+      "runs": [
+        [
+          33,
+          33,
+          33
+        ],
+        [
+          33,
+          33,
+          33
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "lijiang",
+      "metric": "textures",
+      "main": 29,
+      "PR": 29,
+      "runs": [
+        [
+          29,
+          29,
+          29
+        ],
+        [
+          29,
+          29,
+          29
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "lijiang",
+      "metric": "heap",
+      "main": 26035400,
+      "PR": 26847596,
+      "runs": [
+        [
+          26320788,
+          26035400,
+          25946140
+        ],
+        [
+          26807000,
+          26935540,
+          26847596
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "lijiang",
+      "metric": "p95 ms",
+      "main": 16.700000000000273,
+      "PR": 16.700000000000273,
+      "noise": 0.0999999999994543,
+      "p95s": [
+        [
+          16.700000000000273,
+          16.799999999999727,
+          16.700000000000273
+        ],
+        [
+          16.700000000000273,
+          16.700000000000273,
+          16.700000000000273
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "palace",
+      "metric": "calls",
+      "main": 52,
+      "PR": 51,
+      "runs": [
+        [
+          52,
+          52,
+          49
+        ],
+        [
+          51,
+          54,
+          51
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "palace",
+      "metric": "mirrorCalls",
+      "main": 47,
+      "PR": 46,
+      "runs": [
+        [
+          47,
+          47,
+          44
+        ],
+        [
+          46,
+          49,
+          46
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "palace",
+      "metric": "triangles",
+      "main": 308142,
+      "PR": 299194,
+      "runs": [
+        [
+          308142,
+          308142,
+          298458
+        ],
+        [
+          299194,
+          308878,
+          299194
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "palace",
+      "metric": "mirrorTriangles",
+      "main": 305905,
+      "PR": 296957,
+      "runs": [
+        [
+          305905,
+          305905,
+          296221
+        ],
+        [
+          296957,
+          306641,
+          296957
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "palace",
+      "metric": "geometries",
+      "main": 52,
+      "PR": 52,
+      "runs": [
+        [
+          52,
+          52,
+          50
+        ],
+        [
+          52,
+          54,
+          52
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "palace",
+      "metric": "textures",
+      "main": 37,
+      "PR": 35,
+      "runs": [
+        [
+          37,
+          37,
+          35
+        ],
+        [
+          35,
+          37,
+          35
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "palace",
+      "metric": "heap",
+      "main": 53454728,
+      "PR": 53357004,
+      "runs": [
+        [
+          53454728,
+          53593416,
+          52106752
+        ],
+        [
+          53142096,
+          54517612,
+          53357004
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "palace",
+      "metric": "p95 ms",
+      "main": 16.700000000000273,
+      "PR": 16.700000000000273,
+      "noise": 0.0999999999994543,
+      "p95s": [
+        [
+          16.700000000000273,
+          16.700000000000273,
+          16.799999999999727
+        ],
+        [
+          16.700000000000273,
+          16.700000000000273,
+          16.700000000000273
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "south",
+      "metric": "calls",
+      "main": 29,
+      "PR": 29,
+      "runs": [
+        [
+          29,
+          29,
+          29
+        ],
+        [
+          29,
+          29,
+          29
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "south",
+      "metric": "mirrorCalls",
+      "main": 26,
+      "PR": 26,
+      "runs": [
+        [
+          26,
+          26,
+          26
+        ],
+        [
+          26,
+          26,
+          26
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "south",
+      "metric": "triangles",
+      "main": 147948,
+      "PR": 147948,
+      "runs": [
+        [
+          147948,
+          147948,
+          147948
+        ],
+        [
+          147948,
+          147948,
+          147948
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "south",
+      "metric": "mirrorTriangles",
+      "main": 136837,
+      "PR": 136837,
+      "runs": [
+        [
+          136837,
+          136837,
+          136837
+        ],
+        [
+          136837,
+          136837,
+          136837
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "south",
+      "metric": "geometries",
+      "main": 31,
+      "PR": 31,
+      "runs": [
+        [
+          31,
+          31,
+          31
+        ],
+        [
+          31,
+          31,
+          31
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "south",
+      "metric": "textures",
+      "main": 25,
+      "PR": 25,
+      "runs": [
+        [
+          25,
+          25,
+          25
+        ],
+        [
+          25,
+          25,
+          25
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "south",
+      "metric": "heap",
+      "main": 31215380,
+      "PR": 31923788,
+      "runs": [
+        [
+          31215380,
+          31223476,
+          31208508
+        ],
+        [
+          31864780,
+          31943136,
+          31923788
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "south",
+      "metric": "p95 ms",
+      "main": 16.700000000000273,
+      "PR": 16.700000000000273,
+      "noise": 0.09999999999990905,
+      "p95s": [
+        [
+          16.700000000000273,
+          16.800000000000182,
+          16.700000000000273
+        ],
+        [
+          16.700000000000273,
+          16.700000000000273,
+          16.700000000000273
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "walk-palace",
+      "metric": "calls",
+      "main": 61,
+      "PR": 68,
+      "runs": [
+        [
+          61,
+          64,
+          61
+        ],
+        [
+          78,
+          68,
+          61
+        ]
+      ],
+      "pass": false
+    },
+    {
+      "view": "walk-palace",
+      "metric": "mirrorCalls",
+      "main": 55,
+      "PR": 62,
+      "runs": [
+        [
+          55,
+          58,
+          55
+        ],
+        [
+          69,
+          62,
+          55
+        ]
+      ],
+      "pass": false
+    },
+    {
+      "view": "walk-palace",
+      "metric": "triangles",
+      "main": 375363,
+      "PR": 392995,
+      "runs": [
+        [
+          375363,
+          385047,
+          375363
+        ],
+        [
+          412321,
+          392995,
+          375441
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "walk-palace",
+      "metric": "mirrorTriangles",
+      "main": 369174,
+      "PR": 386806,
+      "runs": [
+        [
+          369174,
+          378858,
+          369174
+        ],
+        [
+          404360,
+          386806,
+          369252
+        ]
+      ],
+      "pass": true
+    },
+    {
+      "view": "walk-palace",
+      "metric": "geometries",
+      "main": 75,
+      "PR": 82,
+      "runs": [
+        [
+          75,
+          63,
+          75
+        ],
+        [
+          87,
+          82,
+          63
+        ]
+      ],
+      "pass": false
+    },
+    {
+      "view": "walk-palace",
+      "metric": "textures",
+      "main": 46,
+      "PR": 51,
+      "runs": [
+        [
+          46,
+          44,
+          46
+        ],
+        [
+          56,
+          51,
+          42
+        ]
+      ],
+      "pass": false
+    },
+    {
+      "view": "walk-palace",
+      "metric": "heap",
+      "main": 106881196,
+      "PR": 115107664,
+      "runs": [
+        [
+          106284064,
+          106881196,
+          112875040
+        ],
+        [
+          115896824,
+          115107664,
+          113912708
+        ]
+      ],
+      "pass": false
+    },
+    {
+      "view": "walk-palace",
+      "metric": "p95 ms",
+      "main": 16.700000000000728,
+      "PR": 16.700000000000728,
+      "noise": 0,
+      "p95s": [
+        [
+          16.700000000000728,
+          16.700000000000728,
+          16.700000000000728
+        ],
+        [
+          16.799999999999727,
+          16.700000000000273,
+          16.700000000000728
+        ]
+      ],
+      "pass": true
+    }
+  ]
+}
