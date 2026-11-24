@@ -22,6 +22,7 @@ from station_road_corridor import bake as bake_station_corridor
 from surveyed_corridors import bake as bake_surveyed_corridors, restore as restore_corridors
 import ground_passages
 import vehicle_surface_grades
+import portal_landings
 from vehicle_approaches import cycleway_deck_profile, cycleway_grades, plan as plan_approaches, surface_guides, portal_openings
 from vehicle_tunnels import mark_underpasses, mountain_roofs, underground, sections as tunnel_sections, solve as solve_tunnels
 from service_streets import mark_drivable_services, width as minor_road_width
@@ -283,7 +284,17 @@ def bake(output, manifest, rendered_roads=None):
         network = tunnel_sections(lanes,elements,original_tunnels,survey_nodes)
         if network['edges']:
             mountain_roofs(network,survey_nodes,surface.peaks)
-            guides=surface_guides(elements,network['portals'],survey_nodes,manifest['chunks'])
+            bridge_nodes=[];bridge_samples=[]
+            for way in elements:
+                if way['type']!='way' or way['id'] not in (1025751317,988474372,347655716,815075448):continue
+                coords=ground_passages.points(way)
+                for i,j in ((0,1),(-1,-2)):
+                    ref=way['nodes'][i]
+                    if ref not in survey_nodes:continue
+                    x,z=coords[i];u,v=coords[j]
+                    bridge_nodes.append(ref);bridge_samples.append(dict(x=x,z=z,bridge=[u-x,v-z]))
+            bridge_levels=sample_road_heights(output,manifest,bridge_samples) if bridge_samples else []
+            guides=surface_guides(elements,[*network['portals'],*bridge_nodes],survey_nodes,manifest['chunks'])
             request.write_text(json.dumps(dict(manifest=manifest,network=network,nodes=list(survey_nodes.values()),guideNodes=sorted({g[k] for g in guides for k in ('from','to')}))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portals',str(output.resolve()),str(request)],check=True,cwd=ROOT)
@@ -293,7 +304,10 @@ def bake(output, manifest, rendered_roads=None):
             generated,conflicts = solve_tunnels(network,survey_nodes,samples)
             fixed={ref for way in elements if way['type']=='way' and way.get('tags',{}).get('railway')=='rail'
                    and way['tags'].get('layer','0')=='0' for ref in way['nodes']}
-            access,limits=plan_approaches(conflicts,lanes+guides,survey_nodes,{int(k):v for k,v in samples['heights'].items()},fixed,sections)
+            # Propagate the measured bridge lip into the land-side road network
+            # when a single short OSM segment cannot absorb the height change.
+            anchors=[dict(node=n,floor=h,approachCut=True) for n,h in zip(bridge_nodes,bridge_levels,strict=True)]
+            access,limits=plan_approaches(conflicts+anchors,lanes+guides,survey_nodes,{int(k):v for k,v in samples['heights'].items()},fixed,sections)
             access=cycleway_grades(cycleway,conflicts)+access
             surveyed=vehicle_surface_grades.profiles(graded_sections,native_levels,access+canal_grades+terminal_grades)
             bake_surveyed_corridors(output,manifest['chunks'],elements,sections,access+canal_grades+terminal_grades+surveyed,only_approaches=True,bridge_profiles=canal_grades)
@@ -301,6 +315,7 @@ def bake(output, manifest, rendered_roads=None):
             for tunnel in generated:
                 tunnel['gradedAccess']=True
             portal_openings(generated,elements,sections)
+            portal_landings.bake(output,manifest,generated,elements)
             conflicts.extend(limits)
             manifest['tunnels'] = original_tunnels+generated
             request.write_text(json.dumps(dict(manifest=manifest,nodes=list(survey_nodes.values()),constraints=conflicts,pedestrianNodes=sorted({g[k] for g in guides if g['surfaceKind']==1 for k in ('from','to')}))))

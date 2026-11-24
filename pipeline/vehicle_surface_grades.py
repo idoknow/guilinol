@@ -66,10 +66,28 @@ def profiles(sections, measured, portal_grades):
     protected=STRtree([line.buffer(half+1) for line,half,*_ in portal_grades])
     grades=[]
     samples=iter(measured)
+    spans=[]
     for ds,xy,half,limit in sections:
         levels=np.array([next(samples) for _ in xy])
-        if len(protected.query(LineString(xy).buffer(half),predicate='intersects')):
+        if not len(protected.query(LineString(xy).buffer(half),predicate='intersects')):
+            spans.append((ds,xy,half,limit,levels))
             continue
+        # Retain the constrained road through a junction, then tie the
+        # adjoining ungraded stretch to the actual approach elevation.
+        pinned={}
+        for index,coords in enumerate(xy):
+            pt=Point(coords)
+            hits=protected.query(pt,predicate='intersects')
+            if not len(hits):continue
+            j=min(hits,key=lambda i:portal_grades[i][0].distance(pt))
+            line,_,ya,yb,*_=portal_grades[j]
+            pinned[index]=ya+(yb-ya)*line.project(pt,normalized=True)
+        levels[list(pinned)]=list(pinned.values())
+        boundaries=sorted({0,len(ds)-1,*pinned})
+        for a,b in zip(boundaries,boundaries[1:]):
+            if b-a>1:
+                spans.append((ds[a:b+1],xy[a:b+1],half,limit,levels[a:b+1]))
+    for ds,xy,half,limit,levels in spans:
         ds=np.array(ds)
         cap=limit*.88
         if abs(levels[-1]-levels[0])>cap*(ds[-1]-ds[0]):
