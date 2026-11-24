@@ -41,6 +41,7 @@ import {mountDevHud} from './ui/hud-dev'
 import {armOrientationGate} from './ui/orientation'
 import {mountStats} from './ui/stats'
 import {mountHotkeys} from './ui/hotkeys'
+import {mountGuide} from './ui/guide'
 
 export let spawnCreatedCharacter:()=>Promise<void>=async()=>{}
 let titleTransition:{signal:AbortSignal;cancel:()=>void;view?:Veil}|undefined
@@ -348,6 +349,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     if(text)showToast(text,typeof detail==='object'&&detail?.ms?detail.ms:2600)})
   modeButton.onclick=()=>void toggle().then(showMode);document.body.append(modeButton);void touch
   showMode()
+  // IDOK-221: 按键卡 + 玩法指南 + 首次进城的新手引导（测试和分享/反馈链接不自动弹引导，?tour 强制）。
+  mountGuide({autoTour:params.has('tour')||!(params.has('verify')||params.has('view')||params.has('debug'))})
   let missionGroundRay: THREE.Raycaster | undefined
   const sampleMissionGroundY = (x: number, z: number): number => {
     const tile = manifest.chunks.find(t => x >= t.x && x < t.x + 256 && z >= t.z && z < t.z + 256)

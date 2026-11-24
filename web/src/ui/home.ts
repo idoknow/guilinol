@@ -1,4 +1,5 @@
 import {getPlayMode, lastPlayMode, type PlayMode} from '../game/play-mode'
+import {openGuide} from './guide'
 import {mpEnabled, setMpEnabled} from './mp-pref'
 import {onOnline, startLive} from './live'
 import './home.css'
@@ -96,7 +97,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
   // 开始游览 still opens on a random frame; this is the opt-in way back.
   const resumeRow = root.querySelector<HTMLElement>('.home-resume-row')!, resumeAgo = root.querySelector('.home-resume-ago')!
   root.querySelector<HTMLButtonElement>('.home-resume')!.onclick = ()=>press(tour,'正在进入',()=>{requestRestore(); play('tour')})
-  root.querySelector<HTMLButtonElement>('[data-act=guide]')!.onclick = ()=>guide()
+  root.querySelector<HTMLButtonElement>('[data-act=guide]')!.onclick = ()=>openGuide('play')
   const about = root.querySelector<HTMLButtonElement>('[data-act=about]')!
   about.onclick = ()=>pending(about,()=>import('./about').then(m=>m.openAbout()))
   root.querySelector<HTMLButtonElement>('[data-act=qq]')!.onclick = ()=>qqGroup()
@@ -161,44 +162,6 @@ export function home(play:(mode:PlayMode)=>void):Home {
 function ago(t:number){
   const min = Math.max(0,(Date.now()-t)/60000)
   return min<2?'刚刚':min<60?`${Math.round(min)} 分钟前`:min<60*24?`${Math.round(min/60)} 小时前`:`${Math.round(min/1440)} 天前`
-}
-
-let guideMask:HTMLDivElement|undefined
-function guide() {
-  if(!guideMask){
-    guideMask = document.createElement('div'); guideMask.className = 'about-mask'
-    guideMask.innerHTML = `<div class="about-panel guide" role="dialog" aria-modal="true" aria-labelledby="guide-title">
-      <header><h2 id="guide-title">怎么玩</h2><button type="button" class="about-close">关闭</button></header>
-      <ol class="guide-steps">
-        <li><span class="ui-seal">街</span><div><b>单人模式：上街</b><p>你站在桂林的街头。路边停着的电驴、单车和汽车走过去按 <kbd>F</kbd> 就能骑走。</p></div></li>
-        <li><span class="ui-seal">单</span><div><b>接单赚钱</b><p>打开接单，送米粉、跑腿、拉客、跑环城夜赛。赚到的钱可以去店里买衣服、买电驴、改装。</p></div></li>
-        <li><span class="ui-seal">飞</span><div><b>游览模式：飞上天</b><p>想看山水就选游览模式，像无人机一样四处飞，按 <kbd>V</kbd> 可以落地步行。</p></div></li>
-        <li><span class="ui-seal">印</span><div><b>集印章、拍照</b><p>名胜附近地上有朱红色的圆圈，走进去就盖一枚印。按「拍照」能换时辰和天气。</p></div></li>
-      </ol>
-      <div class="guide-keys">
-        <section><h3>电脑</h3><ul>
-          <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 前后左右</li>
-          <li>按住鼠标拖动 转视角 · 滚轮 拉远拉近</li>
-          <li><kbd>Q</kbd>/<kbd>E</kbd> 飞高飞低 · <kbd>Shift</kbd> 加速 / 跑</li>
-          <li><kbd>空格</kbd> 跳 · <kbd>X</kbd> 蹲 · <kbd>C</kbd> 视距 · <kbd>V</kbd> 起飞或落地 · <kbd>F</kbd> 上下车船</li>
-          <li><kbd>1</kbd>-<kbd>4</kbd> / <kbd>Q</kbd><kbd>E</kbd> 电动车换挡 · <kbd>空格</kbd> 翘头或扶车</li>
-          <li><kbd>M</kbd> 地图 · <kbd>J</kbd> 景册 · <kbd>P</kbd> 拍照</li>
-        </ul></section>
-        <section><h3>手机</h3><ul>
-          <li>飞行时：一根手指转方向，两根手指拖着走</li>
-          <li>步行时：左下摇杆走路，右半边屏幕滑动转视角</li>
-          <li>右上角按钮：落地 / 起飞、地图、景册、拍照</li>
-          <li>横过来玩，视野更开阔</li>
-        </ul></section>
-      </div></div>`
-    const close = ()=>{guideMask!.hidden = true}
-    guideMask.querySelector('.about-close')!.addEventListener('click',close)
-    guideMask.addEventListener('click',event=>{if(event.target===guideMask) close()})
-    addEventListener('keydown',event=>{if(event.code==='Escape'&&!guideMask!.hidden) close()})
-    document.body.append(guideMask)
-  }
-  guideMask.hidden = false
-  guideMask.querySelector<HTMLButtonElement>('.about-close')!.focus()
 }
 
 // QQ 群：一张群二维码卡片（public/icons/qq-group.webp 自托管）+ 群号一键复制。
