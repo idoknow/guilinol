@@ -369,6 +369,28 @@ export function scheduleDrinkSound(
       tone(ctx, dest, { type: 'triangle', f0: 240, f1: 175, start: startTime + 0.09, dur: 0.15, gain: 0.24 * lv }, track)
       break
     }
+
+    case 'staff_clock_in': {
+      noiseBurst(
+        ctx,
+        dest,
+        noiseBuf,
+        { start: startTime, dur: 0.14, gain: 0.15 * lv, filterType: 'bandpass', f0: 1650, f1: 2400, q: 1.5 },
+        track,
+      )
+      const notes = [659.25, 830.61, 987.77, 1318.51]
+      notes.forEach((f, idx) => {
+        tone(ctx, dest, { type: 'triangle', f0: f, start: startTime + 0.05 + idx * 0.065, dur: 0.19, gain: 0.2 * lv, attack: 0.004 }, track)
+      })
+      break
+    }
+
+    case 'staff_step_done': {
+      tone(ctx, dest, { type: 'sine', f0: 1046.5, start: startTime, dur: 0.12, gain: 0.24 * lv, attack: 0.003 }, track)
+      tone(ctx, dest, { type: 'sine', f0: 1567.98, start: startTime + 0.07, dur: 0.22, gain: 0.28 * lv, attack: 0.003 }, track)
+      tone(ctx, dest, { type: 'triangle', f0: 2093.0, start: startTime + 0.07, dur: 0.14, gain: 0.07 * lv }, track)
+      break
+    }
   }
 
   return { stop, durationSec: spec.durationSec }

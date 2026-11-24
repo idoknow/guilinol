@@ -12,6 +12,8 @@ import {
   EQUIPMENT_ACTION_IDS,
   buildAllDrinksShowcaseGroup,
   buildDrinkProp,
+  buildRecruitStandee,
+  RECRUIT_STANDEE_LOCAL_ANCHOR,
   countObjectTriangles,
   createDrinksEquipmentRig,
   disposeDrinkProp,
@@ -164,4 +166,18 @@ test('drinks/props 源码零 mifen 内部依赖与零真实商标字样', () => 
     assert.equal(/\.\.\/mifen|\/mifen\//.test(text), false, `${file} 不应引用 mifen 内部模块`)
     assert.equal(/蜜雪|Mixue|雪王/.test(text), false, `${file} 不应提交真实商业商标`)
   }
+})
+
+test('门口招聘立牌构建符合落地尺寸、轻量化面数与高亮/释放接口', () => {
+  const standee = buildRecruitStandee()
+  const bounds = standee.getBounds()
+  const tris = standee.getTriangles()
+  assert.ok(Math.abs(bounds.minY) <= 0.02, `立牌脚垫应贴地 (minY=${bounds.minY})`)
+  assert.ok(bounds.heightM >= 1.0 && bounds.heightM <= 1.5, `立牌高度应适配门店实拍 (${bounds.heightM}m)`)
+  assert.ok(bounds.widthM >= 0.45 && bounds.widthM <= 0.85)
+  assert.ok(tris > 40 && tris <= 400, `立牌三角面过重或过简: ${tris}`)
+  assert.ok(RECRUIT_STANDEE_LOCAL_ANCHOR.z >= 3.0 && Math.abs(RECRUIT_STANDEE_LOCAL_ANCHOR.x) >= 1.2)
+  standee.setHighlighted(true, false)
+  standee.setHighlighted(false, true)
+  standee.dispose()
 })

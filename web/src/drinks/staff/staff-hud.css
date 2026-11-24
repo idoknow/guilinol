@@ -1,0 +1,160 @@
+/* 员工模式极简悬浮控制条：严格按 Linear / Apple Notes 风格，零标语、零多余标签，仅保留单一蜜雪红主按钮 */
+
+.drinks-staff-hud {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 14;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 240px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--ui-glass-solid, rgba(20, 22, 26, 0.92));
+  color: var(--ui-paper, #f8fafc);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 10px 28px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px) saturate(1.15);
+  -webkit-backdrop-filter: blur(10px) saturate(1.15);
+  font: 500 13px/1.3 -apple-system, BlinkMacSystemFont, "PingFang SC", "SF Pro Text", sans-serif;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: auto;
+}
+
+.drinks-staff-hud[hidden],
+.drinks-staff-hud [hidden] {
+  display: none !important;
+}
+
+:is(body[data-photo="on"], body[data-home], body[data-shop-open="1"], body[data-drinks-ui-open="1"], body[data-aboard]) .drinks-staff-hud {
+  display: none !important;
+}
+
+.drinks-staff-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.drinks-staff-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.drinks-staff-title {
+  font-weight: 600;
+  color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drinks-staff-count {
+  font-size: 12px;
+  color: rgba(248, 250, 252, 0.64);
+  white-space: nowrap;
+}
+
+.drinks-staff-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.drinks-staff-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.12s ease, transform 0.08s ease;
+}
+
+.drinks-staff-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.drinks-staff-btn:active {
+  transform: scale(0.97);
+}
+
+.drinks-staff-btn--primary {
+  background: #e60012;
+  color: #ffffff;
+  font-weight: 600;
+  padding: 0 15px;
+}
+
+.drinks-staff-btn--primary:hover {
+  background: #c90010;
+}
+
+.drinks-staff-btn--quiet {
+  padding: 0 9px;
+  font-size: 12px;
+  color: rgba(248, 250, 252, 0.72);
+  background: transparent;
+}
+
+.drinks-staff-btn--quiet:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #ffffff;
+}
+
+.drinks-staff-key {
+  font: 600 10.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.drinks-staff-track {
+  width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.drinks-staff-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: #e60012;
+  transition: width 0.08s linear;
+}
+
+@media (pointer: coarse) and (not (any-pointer: fine)) {
+  .drinks-staff-btn {
+    min-height: 40px;
+  }
+  .drinks-staff-key {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) and (min-height: 501px) {
+  .drinks-staff-hud {
+    bottom: calc(168px + env(safe-area-inset-bottom));
+  }
+}

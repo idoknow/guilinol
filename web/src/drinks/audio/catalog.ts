@@ -12,11 +12,13 @@ export const DRINK_SOUND_IDS = [
   'straw_poke',
   'drink_sip',
   'action_reject',
+  'staff_clock_in',
+  'staff_step_done',
 ] as const
 
 export type DrinkSoundId = (typeof DRINK_SOUND_IDS)[number]
 
-export type DrinkSoundCategory = 'counter' | 'prep' | 'handheld' | 'ui'
+export type DrinkSoundCategory = 'counter' | 'prep' | 'handheld' | 'ui' | 'staff'
 
 export interface DrinkSoundSpec {
   readonly id: DrinkSoundId
@@ -131,5 +133,21 @@ export const DRINK_SOUND_CATALOG: Readonly<Record<DrinkSoundId, DrinkSoundSpec>>
     trigger: '余额不足、未解锁或空杯时温和拒绝提示音',
     durationSec: 0.28,
     defaultVolume: 0.55,
+  },
+  staff_clock_in: {
+    id: 'staff_clock_in',
+    category: 'staff',
+    label: '打卡穿工装',
+    trigger: '应聘穿戴员工服进入工作模式（轻柔布料摩擦 + 明快三和弦提示）',
+    durationSec: 0.54,
+    defaultVolume: 0.72,
+  },
+  staff_step_done: {
+    id: 'staff_step_done',
+    category: 'staff',
+    label: '工序完成音',
+    trigger: '完成接单、加料或封口单步操作时的轻脆木琴回响',
+    durationSec: 0.34,
+    defaultVolume: 0.7,
   },
 }

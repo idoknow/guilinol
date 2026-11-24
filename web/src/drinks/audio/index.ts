@@ -8,6 +8,18 @@ export {
   encodeWavMono16,
   type OfflineDrinkAudioReport,
 } from './offline.ts'
+export {
+  DRINK_BGM_TEMPO_BPM,
+  DRINK_BGM_BEAT_SEC,
+  DRINK_BGM_BAR_SEC,
+  DRINK_BGM_LOOP_BARS,
+  scheduleDrinksBgmLoopBar,
+  computeBgmDistanceAttenuation,
+  createDrinksBgmController,
+  renderDrinksBgmBarOffline,
+  type DrinksBgmStats,
+  type DrinksBgmController,
+} from './bgm.ts'
 
 const RIDE_SOUND_STORAGE_KEY = 'glol.rideSoundMuted'
 const RIDE_SOUND_EVENT = 'glol:ride-sound'
@@ -60,6 +72,8 @@ export interface DrinksAudioController {
   playOrderConfirm: () => boolean
   playCupReady: () => boolean
   playSip: () => boolean
+  playStaffClockIn: () => boolean
+  playStaffStepDone: () => boolean
   setMuted: (muted: boolean) => void
   isMuted: () => boolean
   setVolume: (vol: number) => void
@@ -184,6 +198,8 @@ export function createDrinksAudio(opts?: { muted?: boolean; volume?: number; syn
     playOrderConfirm: () => play('order_chime'),
     playCupReady: () => play('call_number'),
     playSip: () => play('drink_sip'),
+    playStaffClockIn: () => play('staff_clock_in'),
+    playStaffStepDone: () => play('staff_step_done'),
     setMuted(nextMuted: boolean) {
       muted = Boolean(nextMuted)
     },

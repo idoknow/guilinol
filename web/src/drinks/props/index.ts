@@ -42,3 +42,12 @@ export {
   type EquipmentRigController,
   type EquipmentRigOptions,
 } from './equipment.ts'
+export {
+  DEFAULT_RECRUIT_STANDEE_SPEC,
+  RECRUIT_STANDEE_LOCAL_ANCHOR,
+  createRecruitSignTexture,
+  buildRecruitStandee,
+  type RecruitStandeeSpec,
+  type RecruitStandeeOptions,
+  type RecruitStandeeController,
+} from './recruit-sign.ts'

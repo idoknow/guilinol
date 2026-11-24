@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  DRINK_BGM_BAR_SEC,
+  DRINK_BGM_TEMPO_BPM,
   DRINK_SOUND_CATALOG,
   DRINK_SOUND_IDS,
   EQUIPMENT_ACTION_SOUND_MAP,
+  computeBgmDistanceAttenuation,
   createDrinksAudio,
+  createDrinksBgmController,
   encodeWavMono16,
 } from './index.ts'
 
-test('DRINK_SOUND_CATALOG 覆盖全链路 13 种冷饮与设备音效且元数据合法', () => {
+test('DRINK_SOUND_CATALOG 覆盖全链路 15 种冷饮/设备/员工音效且元数据合法', () => {
   const expected = [
     'order_chime',
     'cup_drop',
@@ -23,6 +27,8 @@ test('DRINK_SOUND_CATALOG 覆盖全链路 13 种冷饮与设备音效且元数�
     'straw_poke',
     'drink_sip',
     'action_reject',
+    'staff_clock_in',
+    'staff_step_done',
   ]
   assert.deepEqual([...DRINK_SOUND_IDS], expected)
   for (const id of expected) {
@@ -94,4 +100,26 @@ test('encodeWavMono16 正确写出 16-bit WAV 文件头', () => {
   assert.equal(wav.length, 44 + 8)
   assert.equal(String.fromCharCode(...wav.slice(0, 4)), 'RIFF')
   assert.equal(String.fromCharCode(...wav.slice(8, 12)), 'WAVE')
+})
+
+test('createDrinksBgmController 支持店内打卡启停、距离衰减与无 window 安全运行', () => {
+  assert.equal(DRINK_BGM_TEMPO_BPM, 116)
+  assert.equal(computeBgmDistanceAttenuation(0), 1)
+  assert.equal(computeBgmDistanceAttenuation(8), 1)
+  assert.ok(computeBgmDistanceAttenuation(17) > 0 && computeBgmDistanceAttenuation(17) < 1)
+  assert.equal(computeBgmDistanceAttenuation(30), 0)
+
+  const bgm = createDrinksBgmController({ syncRidePref: false })
+  bgm.start()
+  assert.equal(bgm.isPlaying(), true)
+  bgm.setDistance(12)
+  for (let i = 0; i < 12; i++) {
+    bgm.step(0.4)
+  }
+  assert.ok(bgm.getStats().barsScheduled >= 2)
+  bgm.setMuted(true)
+  assert.equal(bgm.isMuted(), true)
+  bgm.stop()
+  assert.equal(bgm.isPlaying(), false)
+  bgm.dispose()
 })
