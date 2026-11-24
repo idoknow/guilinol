@@ -2,7 +2,7 @@ import {sify} from 'chinese-conv'
 
 const canonical=text=>sify(text.normalize('NFKC').toLowerCase())
 const strip=text=>text.replace(/[^\p{L}\p{N}]/gu,'')
-const fold=text=>strip(canonical(text))
+export const fold=text=>strip(canonical(text))
 const node=()=>({edges:new Map(),fail:0,hits:[]})
 const contacts=[['url',/(?:https?:\/\/|www\.)[^\s]+|(?:[a-z0-9-]+\.)+(?:com|cn|net|org|io|cc|top|xyz|me|info)\b/i],['qq',/(?<!\d)[1-9]\d{4,11}(?!\d)/],['wechat',/(?:微信(?:号)?|微讯号|wechat|weixin|vx|wx)\s*[:：=号]?\s*[a-z][\w-]{5,19}/i]]
 
@@ -22,9 +22,9 @@ export function buildMatcher(rows){
       const child=nodes[index];child.fail=nodes[fallback].edges.get(char)??0;child.hits.push(...nodes[child.fail].hits);queue.push(index)}
   }
   return text=>{
-    const plain=canonical(text),chars=strip(plain),allows=[],hits=[];let state=0,end=0
-    for(const char of chars){end++;while(state&&!nodes[state].edges.has(char))state=nodes[state].fail;state=nodes[state].edges.get(char)??0
-      for(const hit of nodes[state].hits)(hit.action==='allow'?allows:hits).push({hit,start:end-hit.length,end})}
+    const plain=canonical(text),allows=[],hits=[];let state=0,end=0,lastGap=0
+    for(const char of plain){if(!strip(char)){lastGap=end;continue}end++;while(state&&!nodes[state].edges.has(char))state=nodes[state].fail;state=nodes[state].edges.get(char)??0
+      for(const hit of nodes[state].hits){const start=end-hit.length,crossed=start<lastGap&&hit.length<=2&&hit.action==='block';(hit.action==='allow'?allows:hits).push({hit:crossed?{...hit,action:'review'}:hit,start,end})}}
     const qqOffsets=new Set([...plain.matchAll(/qq(?=\s*[:：]?\s*[1-9]\d{4,11}(?!\d))/g)].map(marker=>[...strip(plain.slice(0,marker.index))].length))
     let best
     for(const item of hits){if(allows.some(span=>span.start<=item.start&&span.end>=item.end))continue

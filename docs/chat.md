@@ -21,7 +21,9 @@
 
 部署迁移 `deploy/postgres/015-chat.sql`，已加入 `deploy-hk.sh`、readiness 和 selfhost fixture。单副本 rt 通过 `DATABASE_URL` 读写 PG。只在事务提交后广播。短暂写库异常时按顺序重试，`GET /health` 的 `chatBacklog` 包含正在处理和排队的请求。每连接最多 4 条、全进程最多 1024 条在途，再多返回 `rate`。队列是内存队列，不保证在 PG 与 rt 同时故障时保留尚未确认的输入；已持久化消息可以按 `uid,cid` 去重。禁止多副本直接共享这个进程内广播模型。
 
-词库迁移 `016-chat-lexicon.sql` 后运行 `DATABASE_URL=… npm run chat:words:import`；部署脚本自动执行等价 SQL。13 类上游词表固定在 `third_party/sensitive-lexicon/`，来自 MIT 许可的 `konsheng@68a595f`。`category` 为上游文件名（不含扩展名），`source` 区分上游、项目地名和手工词条。重复导入不覆盖手工词或修改过的动作、启用状态；已删除的种子也不会复活。上游含单个字母/数字，可能使普通聊天进入复核；运营可停用具体词条，不必修改原始文件。
+词库迁移 `016-chat-lexicon.sql` 后运行 `DATABASE_URL=… npm run chat:words:import`；部署脚本执行等价 SQL。保留 13 份固定版本的上游原文，仅从 12 类导入。网易前端词库不参与匹配；其余复核词归一化后至少 3 字，纯 ASCII 词至少 4 字符。项目覆盖文件 `third_party/sensitive-lexicon/overrides.json` 为歧义词指定跳过或复核并记录原因。升级时写一次 `chat.lexicon_policy` 审计，仅清理未被运营修改的旧种子；重导不覆盖人工改动或复活已删词条。
+
+跨分隔符形成的不超过两字的拦截命中只送复核；连续命中和三字以上的命中仍按词条动作处理。导流规则并不理解数字的含义：单独的 5–12 位、非零开头数字会按 QQ 号进复核，例如「坐标 23456」。
 
 校验 Unicode 码点长度、禁言及频率后，rt 用 Aho–Corasick 同时匹配本地词与地名。文本和词条均先做 NFKC、小写、繁转简（MIT `chinese-conv`），再去除空白、标点、符号、emoji、零宽字符。只有完全包含在 `allow` 地名中的命中才豁免，同一句其他片段仍受审。URL、QQ 号、带微信标识的账号进 review；独立违规词的 block 优先级更高。启动构建索引，后台变更后下条消息重建；外部导入最多 25 秒后在下一次匹配前刷新。确认违规计入窗口；pending 仅在人工拦截时计数。
 

@@ -17,8 +17,11 @@ test('provider decisions fail closed regardless of local-only policy',async()=>{
 test('chat over signed sockets and PostgreSQL',async context=>{
   const fixture=await setup();context.after(()=>fixture.close());const {admin,join}=fixture
   const {sql}=fixture.storage;const count=async()=>(await sql('select count(*) from chat_words'))[0].results[0].count,before=await count()
+  await sql("delete from chat_seed_seen where source='policy'; delete from admin_audit where action='chat.lexicon_policy'; insert into chat_words(word,category,action,source,actor,enabled,updated_at) values('网络','广告类型','block','konsheng@68a595f','seed',true,0),('代理','广告类型','review','konsheng@68a595f','operator',true,0); update chat_words set action='block',source='konsheng@68a595f' where word='中共'")
+  await importWords({query:sql});const [upgraded]=await sql("select word,action from chat_words where word in ('网络','代理','中共') order by id");assert.deepEqual(upgraded.results.map(row=>[row.word,row.action]),[['中共','review'],['代理','review']]);await sql("delete from chat_words where word='代理'")
   await sql("update chat_words set enabled=false,action='review' where id=(select min(id) from chat_words where source='konsheng@68a595f' and action='block')")
   await importWords({query:sql});assert.equal(await count(),before);assert.equal((await sql("select count(*)::int as n from chat_words where source='konsheng@68a595f' and not enabled and action='review'"))[0].results[0].n,1)
+  assert.equal((await sql("select count(*)::int as n from admin_audit where action='chat.lexicon_policy'"))[0].results[0].n,1)
   let sender=await join(300001,0),near=await join(300002,59),far=await join(300003,61)
   const send=async(ch,text,extra={})=>{const cid=extra.cid??randomUUID();sender.send({t:'chat',ch,text,cid,...extra});return until(()=>sender.events.find(e=>e.t==='chat_ack'&&e.cid===cid))}
   const seen=(player,mid)=>player.events.some(e=>e.t==='chat'&&e.mid===mid)
