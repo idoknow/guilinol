@@ -92,6 +92,8 @@ try {
   await context.addInitScript(glHookScript)
   const page = await context.newPage()
   await throttle(page)
+  const paired=!!process.env.PERF_SEED
+  const cdp=paired?await context.newCDPSession(page):null
   const errors = []
   page.on('pageerror', err => {
     errors.push(err.message)
@@ -152,7 +154,8 @@ try {
 
     const loadMs = Math.round(performance.now()-started)
     if(process.env.PERF_TRACE)await browser.startTracing(page,{path:`${process.env.PERF_TRACE}-${cam.id}.json`,categories:['devtools.timeline','blink.user_timing','disabled-by-default-v8.cpu_profiler']})
-    const metrics = await page.evaluate(async ([sampleCount,minMs]) => {
+    if(cdp)await cdp.send('HeapProfiler.collectGarbage')
+    const metrics = await page.evaluate(async ([sampleCount,minMs,paired]) => {
       function nextRaf() {
         return new Promise(resolve => requestAnimationFrame(resolve))
       }
@@ -209,7 +212,7 @@ try {
         bufferMB: mem.bufferMB,
         textureMB: mem.textureMB,
       }
-    }, [SAMPLE_FRAMES,sampleMs])
+    }, [SAMPLE_FRAMES,sampleMs,paired])
     if(process.env.PERF_TRACE)await browser.stopTracing()
 
     if (expansion) {
