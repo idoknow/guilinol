@@ -51,7 +51,10 @@ export function interactions(scene:Scene,camera:Camera,rules:typeof npcDefaults)
     for(const [actor,{element,until}] of bubbles){
       if(time>=until||!actors.includes(actor)){element.remove();bubbles.delete(actor);continue}
       hotspot.set(actor.x,actor.y+1.95,actor.z);direction.copy(hotspot).sub(camera.position);ray.set(camera.position,direction.clone().normalize());ray.far=Math.max(0,direction.length()-.5)
-      hotspot.project(camera);element.hidden=Math.abs(hotspot.x)>1||Math.abs(hotspot.y)>1||Math.abs(hotspot.z)>1||ray.intersectObjects(scene.children.filter(object=>object.visible),true).length>0
+      hotspot.project(camera);element.hidden=Math.abs(hotspot.x)>1||Math.abs(hotspot.y)>1||Math.abs(hotspot.z)>1||ray.intersectObjects(scene.children,true).some(hit=>{
+        for(let object:typeof hit.object|null=hit.object;object;object=object.parent)if(!object.visible)return false
+        return true
+      })
       element.style.left=`${(1+hotspot.x)*50}vw`;element.style.top=`${(1-hotspot.y)*50}vh`
     }
   }
