@@ -286,7 +286,7 @@ def bake(output, manifest, rendered_roads=None):
             mountain_roofs(network,survey_nodes,surface.peaks)
             bridge_nodes=[];bridge_samples=[]
             for way in elements:
-                if way['type']!='way' or way['id'] not in (1025751317,988474372,347655716,815075448):continue
+                if way['type']!='way' or way['id'] not in (988474372,347655716,815075448):continue
                 coords=ground_passages.points(way)
                 for i,j in ((0,1),(-1,-2)):
                     ref=way['nodes'][i]
