@@ -1,4 +1,4 @@
-import {summarizeDays} from './day-summary.mjs'
+import {summarizeDays,summarizeHours} from './day-summary.mjs'
 import {monitorEventLoopDelay} from 'node:perf_hooks'
 import {readFile} from 'node:fs/promises'
 
@@ -47,7 +47,7 @@ async function rollup(pool) {
   await pool.query("DELETE FROM perf_event WHERE received < now()-interval '90 days'")
 }
 export function monitor(pool){
-  let routes=new Map(),queries=new Histogram(),wait=new Histogram(),cpu=process.cpuUsage(),last=performance.now(),day='',busy=false
+  let routes=new Map(),queries=new Histogram(),wait=new Histogram(),cpu=process.cpuUsage(),last=performance.now(),day='',busy=false,hourTick=0
   const lag=monitorEventLoopDelay({resolution:20});lag.enable()
   const timer=setInterval(async()=>{
     if(busy)return
@@ -62,6 +62,8 @@ export function monitor(pool){
       Object.assign(sample,{load:load?.trim().split(/\s+/).slice(0,3).map(Number),cgroupMemory:memoryCurrent?Number(memoryCurrent):null,
         cgroupCpuUsec:cpuStat?Number(/^usage_usec (\d+)/m.exec(cpuStat)?.[1]):null,nginx:web})
       await pool.query("INSERT INTO perf_server(minute,sample) VALUES(date_trunc('minute',$1::timestamptz),$2)",[stamp,sample])
+      // 小时汇总是后台总览快慢的关键：24h 这类滚动窗口只能靠它，否则每次都要裸扫原始事件
+      if(Date.now()-hourTick>600000){hourTick=Date.now();await summarizeHours(pool,{hours:48})}
       const today=new Date(stamp.getTime()-300000).toISOString().slice(0,10)
       if(today!==day){await summarizeDays(pool);await rollup(pool);day=today}
     }catch(error){console.error('telemetry minute write failed',error.code??error.name)}finally{busy=false}
