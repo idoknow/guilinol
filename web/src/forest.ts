@@ -6,6 +6,30 @@ import {fetchAsset,type Tile} from './world'
 import {treeBlocked} from './tunnels'
 import {onOldSouthSlope,slopeStart,slopeRatio,yueyaShoulderHeight} from './yueya-slope'
 import {freezeStatic} from './static-freeze'
+import treeSpecs from '../../pipeline/tree-specs.json'
+
+const crowns=treeSpecs.species.map(spec=>{
+  let bottom=Infinity,top=-Infinity,radius=0
+  for(const part of spec.near){
+    if(part.op==='blob' && 'p' in part && part.p && Array.isArray(part.r)){
+      bottom=Math.min(bottom,part.p[1]-part.r[1]);top=Math.max(top,part.p[1]+part.r[1])
+      radius=Math.max(radius,Math.hypot(part.p[0],part.p[2])+Math.max(part.r[0],part.r[2]))
+    }else if(part.op==='whorl' && 'y' in part && typeof part.r==='number'){
+      bottom=Math.min(bottom,part.y!-part.thick!*.28)
+      top=Math.max(top,part.y!+Math.max(part.thick!*.52,part.lift!,part.thick!*.42+part.lift!*.35));radius=Math.max(radius,part.r*1.06)
+    }else if(part.op==='fronds' && 'length' in part && part.length!==undefined){
+      bottom=Math.min(bottom,part.origin[1]-part.droop!);top=Math.max(top,part.origin[1]+part.rise!)
+      radius=Math.max(radius,Math.hypot(part.origin[0],part.origin[2])+part.length!)
+    }
+  }
+  return {bottom,top,radius}
+})
+
+function insideCrown(tree:Tree,camera:THREE.Vector3){
+  const crown=crowns[tree.kind],height=camera.y-tree.y,radius=crown.radius*tree.scale+.3
+  return height>=crown.bottom*tree.scale-.3 && height<=crown.top*tree.scale+.3 &&
+    (tree.x-camera.x)**2+(tree.z-camera.z)**2<radius*radius
+}
 
 type TileSphere = {cx:number; cy:number; cz:number; r:number}
 const tileBounds = new WeakMap<Tree[], TileSphere>()
@@ -92,6 +116,7 @@ export class Forest{
   private speciesFrequency=new Uint32Array(TREE_SPECIES_COUNT)
   private nearOrder:number[]=Array.from({length:TREE_SPECIES_COUNT},(_,i)=>i)
   private dirty=true
+  private nearbyCrowns=new Map<Tree,boolean>()
   private anchor=new THREE.Vector3(Infinity,0,0)
   private rotation=new THREE.Quaternion()
   private frustum=new THREE.Frustum()
@@ -159,7 +184,12 @@ export class Forest{
     }
     this.pump()
     if(!this.loaded.size)return
-    if(!this.dirty&&this.camera.position.distanceToSquared(this.anchor)<4&&this.rotation.angleTo(this.camera.quaternion)<.016)return
+    if(!this.dirty&&this.camera.position.distanceToSquared(this.anchor)<4&&this.rotation.angleTo(this.camera.quaternion)<.016){
+      let crossed=false
+      for(const [tree,inside] of this.nearbyCrowns)if(insideCrown(tree,this.camera.position)!==inside){crossed=true;break}
+      if(!crossed)return
+    }
+    this.nearbyCrowns.clear()
     this.anchor.copy(this.camera.position);this.dirty=false
     this.rotation.copy(this.camera.quaternion);this.camera.updateMatrixWorld();this.frustum.setFromProjectionMatrix(this.matrix.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse))
     const cam=this.camera.position, far=this.range.treeFar, farSq=far*far, nearBase=this.range.treeNearLod
@@ -185,10 +215,12 @@ export class Forest{
         const dx=tree.x-cam.x, dy=tree.y-cam.y, dz=tree.z-cam.z
         const d=dx*dx+dy*dy+dz*dz
         if(d>=farSq)continue
-        // Never let a crown swallow the follow camera: drop trees whose canopy the camera is inside.
-        // IDOK-227 runtime crowns start at >=4.4 m, so a camera below that stays under the canopy.
-        const highCanopy=(tree.kind===0||tree.kind===1||tree.kind===6||tree.kind===7||tree.kind===8||tree.kind===9)&&cam.y-tree.y<4.3*tree.scale
-        if(dx*dx+dz*dz<(highCanopy?2.2:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue
+        const crownRadius=crowns[tree.kind].radius*tree.scale+.3
+        if(dx*dx+dz*dz<(crownRadius+2)**2){
+          const inside=insideCrown(tree,cam)
+          this.nearbyCrowns.set(tree,inside)
+          if(inside)continue
+        }
         pt.set(tree.x,tree.y+4,tree.z)
         if(p0.distanceToPoint(pt)<=-40||p1.distanceToPoint(pt)<=-40||p2.distanceToPoint(pt)<=-40||p3.distanceToPoint(pt)<=-40||p4.distanceToPoint(pt)<=-40||p5.distanceToPoint(pt)<=-40)continue
         if(d < SPECIES_PRIORITY_RADIUS**2) this.speciesFrequency[tree.kind]++
