@@ -1,0 +1,100 @@
+/* 手捧饮品操作条：严格沿用 --ui-* 山水印令牌，无渐变/emoji/多余文案。 */
+
+.drinks-hold-hud {
+  position: fixed;
+  left: 50%;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  padding: 5px 6px 5px 14px;
+  border-radius: 999px;
+  background: var(--ui-glass-solid, rgba(22, 36, 33, 0.9));
+  color: var(--ui-paper, #f4efe2);
+  box-shadow: inset 0 0 0 1px rgba(244, 239, 226, 0.16);
+  backdrop-filter: var(--ui-blur, blur(8px) saturate(1.15));
+  -webkit-backdrop-filter: var(--ui-blur, blur(8px) saturate(1.15));
+  font: 500 13px/1.2 var(--ui-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: auto;
+}
+
+.drinks-hold-hud[hidden] {
+  display: none !important;
+}
+
+:is(body[data-photo="on"], body[data-home], body[data-shop-open="1"], body[data-drinks-ui-open="1"], body[data-aboard]) .drinks-hold-hud {
+  display: none !important;
+}
+
+.drinks-hold-name {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.drinks-hold-sips {
+  white-space: nowrap;
+  font-size: 12px;
+  color: rgba(244, 239, 226, 0.78);
+}
+
+.drinks-hold-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(244, 239, 226, 0.12);
+  color: var(--ui-paper, #f4efe2);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.drinks-hold-btn:hover {
+  background: rgba(244, 239, 226, 0.2);
+}
+
+.drinks-hold-btn--primary {
+  background: var(--ui-seal, #a9503c);
+  color: #fbf7ee;
+  font-weight: 600;
+}
+
+.drinks-hold-btn--primary:hover {
+  background: var(--ui-seal-hi, #bd5e48);
+}
+
+.drinks-hold-btn:disabled {
+  background: rgba(244, 239, 226, 0.08);
+  color: rgba(244, 239, 226, 0.45);
+  cursor: default;
+}
+
+@media (pointer: coarse) and (not (any-pointer: fine)) {
+  .drinks-hold-btn {
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 640px) and (min-height: 501px) {
+  .drinks-hold-hud {
+    bottom: calc(226px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-height: 480px) {
+  .drinks-hold-hud {
+    bottom: calc(74px + env(safe-area-inset-bottom));
+    padding: 4px 5px 4px 12px;
+    gap: 6px;
+  }
+}

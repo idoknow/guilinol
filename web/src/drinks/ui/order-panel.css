@@ -1,0 +1,732 @@
+/* 王城饮品店点单与叫号界面：严格遵循 docs/design-rules.md（--ui-* 令牌、单强调色朱砂、零渐变、零 emoji）。 */
+
+:root {
+  --dr-font: var(--ui-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif);
+  --dr-surface: var(--ui-glass-solid, rgba(22, 36, 33, 0.92));
+  --dr-line: rgba(244, 239, 226, 0.14);
+  --dr-fill: rgba(244, 239, 226, 0.08);
+  --dr-fill-2: rgba(244, 239, 226, 0.16);
+  --dr-text: var(--ui-paper, #f4efe2);
+  --dr-text-2: rgba(244, 239, 226, 0.78);
+  --dr-text-3: rgba(244, 239, 226, 0.66);
+  --dr-accent: var(--ui-seal, #a9503c);
+  --dr-accent-hi: var(--ui-seal-hi, #bd5e48);
+  --dr-accent-text: #e57f61;
+  --dr-radius: var(--ui-r-md, 12px);
+  --dr-h: 34px;
+  --dr-blur: var(--ui-blur, blur(8px) saturate(1.15));
+}
+
+@media (pointer: coarse) {
+  :root {
+    --dr-h: 40px;
+  }
+}
+
+.drinks-panel {
+  box-sizing: border-box;
+  pointer-events: auto;
+  background: var(--dr-surface);
+  color: var(--dr-text);
+  border-radius: var(--dr-radius);
+  box-shadow: inset 0 0 0 1px var(--dr-line);
+  backdrop-filter: var(--dr-blur);
+  -webkit-backdrop-filter: var(--dr-blur);
+  font: 400 13.5px/1.35 var(--dr-font);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.drinks-panel *,
+.drinks-panel *::before,
+.drinks-panel *::after {
+  box-sizing: border-box;
+}
+
+.drinks-panel [hidden] {
+  display: none !important;
+}
+
+.drinks-panel :where(h3, strong, p, ul, ol) {
+  margin: 0;
+  padding: 0;
+}
+
+.drinks-panel :where(ul, ol) {
+  list-style: none;
+}
+
+:where(.drinks-panel button) {
+  margin: 0;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.drinks-panel button:focus-visible {
+  outline: 2px solid var(--dr-text);
+  outline-offset: 2px;
+}
+
+:is(body[data-photo="on"], body[data-home], body[data-shop-open="1"]) :is(.drinks-order-panel, .drinks-pickup-hud) {
+  display: none !important;
+}
+
+body[data-drinks-ui-open="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud, .hotbar),
+body[data-drinks-ui-open="1"] > footer {
+  display: none !important;
+}
+
+/* ---------- 按钮 ---------- */
+
+.drinks-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--dr-h);
+  padding: 0 13px;
+  border-radius: 999px;
+  background: var(--dr-fill);
+  color: var(--dr-text);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+
+.drinks-btn:hover {
+  background: var(--dr-fill-2);
+}
+
+.drinks-btn--primary {
+  background: var(--dr-accent);
+  color: #fbf7ee;
+  font-weight: 600;
+}
+
+.drinks-btn--primary:hover {
+  background: var(--dr-accent-hi);
+}
+
+.drinks-btn:disabled {
+  background: rgba(244, 239, 226, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(244, 239, 226, 0.22);
+  color: rgba(244, 239, 226, 0.56);
+  cursor: default;
+}
+
+/* ---------- 点单抽屉 ---------- */
+
+.drinks-order-panel {
+  position: fixed;
+  right: calc(16px + env(safe-area-inset-right));
+  top: calc(60px + env(safe-area-inset-top));
+  z-index: 16;
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100dvh - 80px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.drinks-panel-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--dr-line);
+}
+
+.drinks-head-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.drinks-head-title h3 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.drinks-balance {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dr-text-2);
+  white-space: nowrap;
+}
+
+.drinks-order-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.drinks-menu-col {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px 6px;
+  gap: 8px;
+}
+
+.drinks-tabs {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.drinks-tab {
+  min-height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--dr-fill);
+  color: var(--dr-text-2);
+  font-size: 12.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.drinks-tab:hover {
+  background: var(--dr-fill-2);
+  color: var(--dr-text);
+}
+
+.drinks-tab.is-active {
+  background: var(--dr-text);
+  color: #14211e;
+  font-weight: 600;
+}
+
+.drinks-menu-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding-right: 2px;
+}
+
+.drinks-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  background: var(--dr-fill);
+  text-align: left;
+  transition: background-color 0.14s ease;
+}
+
+.drinks-item:hover {
+  background: var(--dr-fill-2);
+}
+
+.drinks-item.is-selected {
+  background: var(--dr-fill-2);
+  box-shadow: inset 0 0 0 1px var(--dr-text);
+}
+
+.drinks-item-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.drinks-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.drinks-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drinks-item-dur {
+  font-size: 11px;
+  color: var(--dr-text-3);
+  flex: none;
+}
+
+.drinks-item-price {
+  font-size: 13px;
+  font-weight: 600;
+  flex: none;
+}
+
+.drinks-detail-col {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--dr-line);
+}
+
+.drinks-detail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.drinks-detail-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.drinks-detail-meta {
+  font-size: 12px;
+  color: var(--dr-text-2);
+  white-space: nowrap;
+}
+
+.drinks-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.drinks-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: var(--dr-fill);
+  font-size: 11.5px;
+  color: var(--dr-text-2);
+}
+
+.drinks-step span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drinks-step b {
+  font-weight: 500;
+  color: var(--dr-text-3);
+  flex: none;
+}
+
+.drinks-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drinks-opt-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.drinks-chip {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--dr-fill);
+  color: var(--dr-text-2);
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.drinks-chip:hover {
+  background: var(--dr-fill-2);
+  color: var(--dr-text);
+}
+
+.drinks-chip.is-on {
+  background: var(--dr-text);
+  color: #14211e;
+  font-weight: 600;
+}
+
+.drinks-status {
+  font-size: 12px;
+  color: var(--dr-text-2);
+}
+
+.drinks-status.is-warn {
+  color: var(--dr-accent-text);
+}
+
+.drinks-order-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.drinks-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.drinks-qty-btn {
+  min-width: 34px;
+  padding: 0 10px;
+}
+
+.drinks-qty-val {
+  min-width: 18px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.drinks-pay-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- 叫号与取餐面板 ---------- */
+
+.drinks-pickup-hud {
+  position: fixed;
+  left: calc(12px + env(safe-area-inset-left));
+  top: calc(104px + env(safe-area-inset-top));
+  z-index: 12;
+  width: min(300px, calc(100vw - 32px));
+  max-height: calc(100dvh - 260px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  overflow: hidden;
+}
+
+.drinks-pickup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.drinks-pickup-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.drinks-pickup-title strong {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.drinks-pickup-count {
+  font-size: 12px;
+  color: var(--dr-text-2);
+  white-space: nowrap;
+}
+
+.drinks-open-btn {
+  min-height: 32px;
+  padding: 0 11px;
+  font-size: 12.5px;
+}
+
+.drinks-my-orders {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--dr-line);
+}
+
+.drinks-ticket-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--dr-fill);
+}
+
+.drinks-ticket-row.is-ready {
+  box-shadow: inset 0 0 0 1px var(--dr-accent);
+}
+
+.drinks-ticket-info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.drinks-ticket-no {
+  font-weight: 600;
+  font-size: 12.5px;
+  flex: none;
+}
+
+.drinks-ticket-name {
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drinks-ticket-state {
+  font-size: 12px;
+  color: var(--dr-text-2);
+  white-space: nowrap;
+  flex: none;
+}
+
+.drinks-collect-btn {
+  min-height: 30px;
+  padding: 0 11px;
+  font-size: 12.5px;
+}
+
+.drinks-call-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--dr-line);
+}
+
+.drinks-call-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.drinks-call-label {
+  font-size: 11.5px;
+  color: var(--dr-text-2);
+}
+
+.drinks-call-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.drinks-call-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--dr-text-2);
+  min-width: 0;
+}
+
+.drinks-call-list li.is-ready {
+  color: var(--dr-text);
+}
+
+.drinks-call-list li b {
+  font-weight: 600;
+  flex: none;
+}
+
+.drinks-call-list li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drinks-call-list li.is-empty {
+  color: var(--dr-text-3);
+}
+
+/* ---------- 手机竖屏 <= 640px ---------- */
+
+@media (max-width: 640px) {
+  .drinks-order-panel {
+    left: calc(10px + env(safe-area-inset-left));
+    right: calc(10px + env(safe-area-inset-right));
+    top: calc(10px + env(safe-area-inset-top));
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    width: auto;
+    max-height: none;
+  }
+
+  .drinks-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 4px;
+  }
+
+  .drinks-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .drinks-tab {
+    min-height: 28px;
+    padding: 0 9px;
+    font-size: 12px;
+  }
+
+  .drinks-menu-list {
+    grid-template-columns: 1fr;
+  }
+
+  .drinks-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .drinks-step {
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+
+  .drinks-pickup-hud {
+    left: calc(10px + env(safe-area-inset-left));
+    right: calc(10px + env(safe-area-inset-right));
+    top: calc(102px + env(safe-area-inset-top));
+    width: auto;
+    max-height: calc(100dvh - 260px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+
+  body[data-drinks-ui-open="1"] .drinks-pickup-hud {
+    display: none;
+  }
+}
+
+/* ---------- 手机横屏 max-height: 480px (844x390 零内溢、零按钮裁切) ---------- */
+
+@media (max-height: 480px) {
+  .drinks-order-panel {
+    left: calc(10px + env(safe-area-inset-left));
+    right: calc(10px + env(safe-area-inset-right));
+    top: calc(8px + env(safe-area-inset-top));
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    width: auto;
+    max-height: none;
+  }
+
+  .drinks-panel-head {
+    padding: 8px 12px;
+  }
+
+  .drinks-btn {
+    min-height: 34px;
+  }
+
+  .drinks-order-body {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    min-height: 0;
+  }
+
+  .drinks-menu-col {
+    padding: 8px 10px 8px 12px;
+    border-right: 1px solid var(--dr-line);
+    min-height: 0;
+  }
+
+  .drinks-menu-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .drinks-detail-col {
+    border-top: 0;
+    padding: 8px 12px;
+    justify-content: flex-start;
+    gap: 10px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .drinks-order-foot {
+    margin-top: auto;
+    padding-top: 4px;
+  }
+
+  .drinks-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .drinks-step {
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+
+  .drinks-pickup-hud {
+    left: calc(12px + env(safe-area-inset-left));
+    right: auto;
+    top: calc(96px + env(safe-area-inset-top));
+    width: min(320px, calc(100vw - 250px));
+    max-height: calc(100dvh - 224px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    padding: 7px 10px;
+    gap: 5px;
+  }
+
+  .drinks-pickup-hud .drinks-open-btn,
+  .drinks-pickup-hud .drinks-collect-btn {
+    min-height: 26px;
+    font-size: 12px;
+  }
+
+  .drinks-pickup-hud .drinks-my-orders,
+  .drinks-pickup-hud .drinks-call-grid {
+    padding-top: 4px;
+    gap: 4px;
+  }
+
+  .drinks-pickup-hud .drinks-call-grid {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .drinks-pickup-hud .drinks-ticket-row {
+    padding: 4px 7px;
+  }
+
+  .drinks-pickup-hud .drinks-call-list {
+    gap: 2px;
+  }
+
+  .drinks-pickup-hud .drinks-my-orders + .drinks-call-grid .drinks-call-list li:nth-child(n + 3) {
+    display: none;
+  }
+
+  body[data-drinks-ui-open="1"] .drinks-pickup-hud {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drinks-panel *,
+  .drinks-panel *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
