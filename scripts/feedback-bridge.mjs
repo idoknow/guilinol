@@ -113,7 +113,8 @@ function evidence(detail) {
   }
   const token=detail.view?Buffer.from(JSON.stringify(detail.view)).toString('base64url'):null
   const replay=token?`\n\n游戏视角：https://glol.rcpd.cc/?view=${token}\n\n本地 Playwright 复现（baseURL 指向本地预览）：\n\n\`\`\`js\nawait page.goto('/?verify&view=${token}');\nawait page.waitForFunction(() => window.viewer?.stats.loaded > 0 && !window.viewer.stream.pending.size);\nawait page.screenshot({path:'before.png'});\n\`\`\`\n`:''
-  return '**待管理员批准，批准前只沟通、不派发、不建模**。先阅读 docs/feedback-coordinator.md；以下建模步骤仅在收到管理员开工通知后执行。\n\n'+replay+template.replace('{{EVIDENCE}}', () =>
+  const bug=kind==='游戏 bug'?'**这是「游戏 bug」反馈（IDOK-219），不是建模任务**：用户可能没传照片，只有游戏视角截图和文字描述。批准后按描述在本地复现、定位并修复代码，下方建模模板里的照片、OSM 和建模要求不适用；验收给出复现步骤、修复前后对比和测试结果。\n\n':''
+  return bug+'**待管理员批准，批准前只沟通、不派发、不建模**。先阅读 docs/feedback-coordinator.md；以下建模步骤仅在收到管理员开工通知后执行。\n\n'+replay+template.replace('{{EVIDENCE}}', () =>
     JSON.stringify(data, null, 2)
       .replaceAll('mention:', 'mention：')
       .split('\n')
@@ -162,7 +163,7 @@ async function queue(row, journal, save) {
       throw error
     }
   }
-  const title = `[反馈 ${row.id}] 桂林地标建模`,
+  const title = `[反馈 ${row.id}] ${detail.kind==='游戏 bug'?'游戏 bug 修复':'桂林地标建模'}`,
     file = join(work, 'task.md')
   let issue = row.multica_issue || journal.issue || children().find((child) => child.title === title)?.id
   if (!issue) {

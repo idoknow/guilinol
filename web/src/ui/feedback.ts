@@ -2,7 +2,7 @@ import {getPlayMode} from '../game/play-mode'
 import {record} from '../telemetry'
 import type { Host } from '../play/host'
 import type { mapView } from '../play/map'
-import { kinds, labels, type FeedbackView } from '../../../lib/feedback-contract'
+import { kinds, labels, photosOptional, type FeedbackView } from '../../../lib/feedback-contract'
 import { ll2xz, xz2ll } from '../../../lib/projection'
 import { photoPicker } from './feedback-photo'
 import { cameraSupported, shootFeedbackPhoto } from './feedback-camera'
@@ -308,7 +308,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     reset('我的反馈', 'mine')
     if (!items.length) {
       const empty = el('div', '', 'fb-empty')
-      empty.append(el('p', '还没有反馈。看到哪里建得不对、缺了什么，拍几张照片告诉我们。'))
+      empty.append(el('p', '还没有反馈。看到哪里建得不对、缺了什么，拍几张照片告诉我们；遇到游戏 bug 也可以直接描述，不用传照片。'))
       button(empty, '提交第一条反馈', () => form(), 'primary')
       body.append(empty)
       return
@@ -459,7 +459,12 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       description = el('textarea'),
       route = el('textarea'),
       mode = { route: false }
-    let routeField: HTMLElement | undefined
+    let routeField: HTMLElement | undefined,
+      describeField: HTMLElement | undefined
+    // 当前类型是否允许不传照片（游戏 bug，IDOK-219）；补充/续传沿用原反馈的类型。
+    const chosenKind = () =>
+      item?.kind ?? (kind.querySelector('input:checked') as HTMLInputElement | null)?.value ?? kinds[0]
+    let applyKind = () => {}
     let pin: (x: number, z: number) => void = () => {}
     const preview = (where: HTMLElement) => {
       const box = el('div', '', 'fb-view'),
@@ -600,6 +605,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
         radio.name = 'fb-kind'
         radio.value = value
         radio.checked = i === 0
+        radio.onchange = () => applyKind()
         chip.append(radio, el('span', value))
         kind.append(chip)
       })
@@ -611,7 +617,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       description.maxLength = 1400
       description.rows = 3
       description.placeholder = '哪里和现实不一样？现实中是什么样子？'
-      field(what, '描述（可选）', description)
+      describeField = field(what, '描述（可选）', description)
     } else if (supplement) {
       const what = section('1', '补充说明')
       description.required = true
@@ -621,18 +627,40 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       field(what, '补充内容', description)
     }
     const shots = section(item ? (supplement ? '2' : '1') : '3', '照片')
-    shots.append(
-      el('p', '尽量多拍几个角度：正面、左右两侧、背面、远景和细节。可以给每张标上视角。', 'fb-step-hint'),
-    )
+    const shotsTitle = shots.querySelector('h3')!,
+      shotsHint = el('p', '', 'fb-step-hint')
+    shots.append(shotsHint)
     const footer = el('div', '', 'fb-submit'),
       count = el('span', '', 'fb-count'),
       send = el('button', supplement ? '提交补充' : '提交反馈', 'fb-btn fb-btn--primary')
     send.type = 'submit'
     footer.append(count, send)
     form.append(footer)
+    let photoCount = item?.photos.length ?? 0
     const setCount = (n: number) => {
-      count.textContent = n ? `已选 ${n} 张照片` : '至少需要 1 张照片'
+      photoCount = n
+      count.textContent = n
+        ? `已选 ${n} 张${photosOptional(chosenKind()) ? '截图' : '照片'}`
+        : photosOptional(chosenKind())
+          ? '截图可选，不传也能提交'
+          : '至少需要 1 张照片'
       count.classList.toggle('fb-count--empty', !n)
+    }
+    applyKind = () => {
+      const bug = photosOptional(chosenKind())
+      shotsTitle.lastChild!.textContent = bug ? '截图（可选）' : '照片'
+      shotsHint.textContent = bug
+        ? '上面已经自动附上了你看到的游戏画面。出错提示、卡住的界面等可以再截图补充，没有也可以直接提交。'
+        : '尽量多拍几个角度：正面、左右两侧、背面、远景和细节。可以给每张标上视角。'
+      if (!item) {
+        name.placeholder = bug ? '一句话说明，例如：骑车过桥时卡住了' : '一句话说明，例如：逍遥楼屋顶颜色不对'
+        description.placeholder = bug
+          ? '你做了什么、期望发生什么、实际发生了什么？用的是手机还是电脑、什么浏览器？'
+          : '哪里和现实不一样？现实中是什么样子？'
+        description.required = bug
+        describeField!.querySelector('span')!.textContent = bug ? '描述（必填）' : '描述（可选）'
+      }
+      setCount(photoCount)
     }
     const picker = photoPicker(
       shots,
@@ -665,6 +693,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
           }
         : undefined,
     )
+    applyKind()
     onPaste = (files) => picker.add(files)
     const prevDispose = dispose
     dispose = () => {
@@ -674,7 +703,8 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
     form.onsubmit = (event) => {
       event.preventDefault()
       void run(async () => {
-        if (!picker.count()) throw Error('请至少添加一张照片')
+        if (!picker.count() && !photosOptional(chosenKind())) throw Error('请至少添加一张照片')
+        if (!supplement && photosOptional(chosenKind()) && !description.value.trim()) throw Error('请描述一下遇到的问题')
         const text =
           mode.route && route.value.trim()
             ? `${ROUTE}${route.value.trim()}\n\n${description.value.trim()}`
@@ -689,7 +719,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
                 view: selection.view,
                 heading: selection.view.heading,
                 landmark_id: selection.view.landmark_id,
-                kind: (kind.querySelector('input:checked') as HTMLInputElement | null)?.value ?? kinds[0],
+                kind: chosenKind(),
                 title: name.value.trim(),
                 body: text,
               })

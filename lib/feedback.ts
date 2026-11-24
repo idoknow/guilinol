@@ -1,6 +1,6 @@
 import { type Env, Problem, equal, hash, invalid, limited, now, sessionAccount, sessionHash, unauthorized } from './auth'
 import { ll2xz } from './projection'
-import { edges, kinds, labels, views, validView } from './feedback-contract'
+import { BUG, edges, kinds, labels, views, validView } from './feedback-contract'
 import { adminList, adminMergeUsers, adminSetEmail, adminSetPassword, adminUserDetail, audit, setBan, setRole } from './admin'
 import {flushMail} from './feedback-mail'
 
@@ -435,7 +435,7 @@ export async function feedback(request: Request, env: Env, path: string) {
     if (row.status !== 'draft') conflict()
     target = 'submitted'
     message = '已提交，等待处理'
-    guard = ` AND view_json IS NOT NULL AND shot_state=1 AND EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1) AND (SELECT count(*) FROM feedback f WHERE f.user_id=feedback.user_id AND f.submitted_at>unixepoch()-86400)<5`
+    guard = ` AND view_json IS NOT NULL AND shot_state=1 AND (kind='${BUG}' OR EXISTS(SELECT 1 FROM feedback_photos WHERE feedback_id=feedback.id AND ready=1)) AND (SELECT count(*) FROM feedback f WHERE f.user_id=feedback.user_id AND f.submitted_at>unixepoch()-86400)<5`
   } else if (action === 'supplement') {
     if (row.status !== 'need_info') conflict()
     target = 'submitted'

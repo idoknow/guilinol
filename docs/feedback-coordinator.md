@@ -1,5 +1,7 @@
 # 用户反馈协调人手册（py agy hy-xh）
 
+> **2026-11-24 更新（IDOK-219）**：反馈类型新增「游戏 bug」，可以不传照片（只有自动截取的游戏画面和文字描述）。bridge 建的 issue 标题为 `[反馈 <uuid>] 游戏 bug 修复`，描述顶部有说明。这类反馈不建模：批准后按描述在本地复现、定位并修复，交付时给出复现步骤、修复前后对比和测试结果；OSM 对齐等建模验收项不适用。
+>
 > **2026-11-23 更新（以本段为准，覆盖下方 11-20 的说明）**：Rock 定，接反馈的智能体改为 **sg codex**（`aebb81da-be04-42a7-a91b-0a68a2203ee6`），bridge 的 `BRIDGE_AGENT` 已切换。下文写的“py agy hy-xh”“mac local agy”都指 sg codex；流程不变：批准前只沟通，批准后由 sg codex 自己建模，交付时 @ sg claude 验收、合并，随下一个发版窗口上线。
 >
 > **2026-11-20 14:10Z 更新（以本段为准）**：协调人改为 **mac local agy**（`d0320da1-ce8c-470a-a5a7-1976261a067d`），bridge 的 `BRIDGE_AGENT` 已切换。下文写的“py agy hy-xh”都指 mac local agy。
