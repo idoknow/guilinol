@@ -1,7 +1,7 @@
 {
   "world": "world-a11731a5dafd",
   "main": "27dabe1",
-  "candidateRevision": "0e5a0bb99605d55bd806c09c8139c584a88eb2e1",
+  "candidateRevision": "86a42bdff75c7234ff9d2962cfdaebac1ac4d2e1",
   "baseline": {
     "tunnelConstraintRecords": 0,
     "partialTunnelWays": [
@@ -166,26 +166,26 @@
   },
   "candidate": {
     "tunnelConstraintRecords": 0,
-    "gradedApproaches": 140,
+    "gradedApproaches": 142,
     "partialTunnelWays": [],
     "reasons": {
-      "surface": 435,
+      "surface": 372,
       "tunnel": 0,
-      "fit": 10,
+      "fit": 7,
       "hidden": 0
     },
     "lanes": 88118,
-    "wheelSamples": 7706604,
-    "outliers": 445,
-    "sunk": 257,
-    "floating": 188,
-    "p99": 0.024,
-    "nonplanarFootprints": 104,
+    "wheelSamples": 7705652,
+    "outliers": 379,
+    "sunk": 217,
+    "floating": 162,
+    "p99": 0.023,
+    "nonplanarFootprints": 92,
     "unresolvedTunnelWays": []
   },
   "byLayer": {
-    "at-grade": 292,
-    "bridge": 135,
+    "at-grade": 241,
+    "bridge": 120,
     "tunnel": 18
   },
   "station": {
@@ -210,25 +210,25 @@
     }
   },
   "tunnels": {
-    "ways": 74,
-    "generatedStrips": 90,
-    "surfaceApproachNodes": 138,
-    "surfaceApproachMatched": 138,
+    "ways": 75,
+    "generatedStrips": 91,
+    "surfaceApproachNodes": 140,
+    "surfaceApproachMatched": 140,
     "surfaceApproachUnmatched": 0,
     "maximumRemainingDifference": 0.034962077728010854,
     "loopApproaches": [],
     "portalDrive": {
-      "sites": 144,
-      "passed": 139,
-      "runs": 298,
-      "completed": 293,
-      "collisions": 2,
-      "tool": 3,
-      "over": 2,
-      "max": 0.27813442555302004
+      "sites": 146,
+      "passed": 146,
+      "runs": 302,
+      "completed": 302,
+      "collisions": 0,
+      "tool": 0,
+      "over": 0,
+      "max": 0.061603141393305805
     },
     "accessDecision": {
-      "actualPortals": 144,
+      "actualPortals": 146,
       "surfaceCollisionSites": 239,
       "removedGarageWay": 1493582667,
       "historicalGarageWasAlreadySurface": true,
@@ -244,7 +244,7 @@
     },
     "candidate": {
       "cells": 1170,
-      "total": 14684798,
+      "total": 14683267,
       "p99": 52246
     }
   },
@@ -255,13 +255,13 @@
   "regressions": {
     "strict": {
       "main": 2922,
-      "candidate": 2903,
+      "candidate": 2904,
       "counts": {
         "streetOverflow": 0,
         "buildingOnRoad": 1219,
         "unevenRoad": 38,
         "textureIssue": 65,
-        "otherBasic": 1581
+        "otherBasic": 1582
       },
       "subtypes": {
         "streetOverflow": {},
@@ -282,7 +282,7 @@
         },
         "otherBasic": {
           "bridgeJointStep": 1,
-          "floatingOrBuried": 68,
+          "floatingOrBuried": 69,
           "invisibleColliderOnRoad": 4,
           "landmarkOverlap": 1,
           "propOnCarriageway": 1507
@@ -312,30 +312,14 @@
     }
   },
   "performance": {
-    "mobileFailed": [
-      {
-        "view": "walk-palace",
-        "metric": "calls",
-        "ratio": 1.078125
-      },
-      {
-        "view": "walk-palace",
-        "metric": "geometries",
-        "ratio": 1.0649350649350648
-      },
-      {
-        "view": "walk-palace",
-        "metric": "textures",
-        "ratio": 1.0625
-      }
-    ],
+    "mobileFailed": [],
     "desktopFailed": [],
     "mobileHeap": {
-      "overview": 1.0125735697528482,
-      "lijiang": 1.0033546130607516,
-      "palace": 1.0032219831429467,
-      "south": 1.005066659118571,
-      "walk-palace": 1.0065928752753357
+      "overview": 1.0132419621367452,
+      "lijiang": 1.007875694206271,
+      "palace": 1.0019282009581425,
+      "south": 1.0068335413748501,
+      "walk-palace": 0.997245420260023
     }
   },
   "railCrossings": [
@@ -3828,5 +3812,148 @@
         "portalPass": 138
       }
     }
+  },
+  "round10Evidence": {
+    "canal": [
+      {
+        "way": 1025751314,
+        "bridgeNode": 9457383800,
+        "join": 4.767423405382942e-06,
+        "minimumHeadroom": 3.745650861589297,
+        "maximumGrade": 0.06676938655497067,
+        "underBuilding": 319
+      },
+      {
+        "way": 1034716138,
+        "bridgeNode": 9531714412,
+        "join": 2.841815955889615e-07,
+        "minimumHeadroom": 3.566101826830078,
+        "maximumGrade": 0.017601606157684656,
+        "underBuilding": 380
+      }
+    ],
+    "yardClassification": {
+      "453854244": {
+        "halfWidth": 2.5,
+        "crossings": [
+          {
+            "metres": 23.922138142297918,
+            "minimumRequiredShift": 14.460001332489414
+          },
+          {
+            "metres": 102.030548618604,
+            "minimumRequiredShift": 33.538968315519654
+          }
+        ],
+        "lanes": 18,
+        "length": 352.3545737791806,
+        "closed": 107.53947563835004,
+        "private": true,
+        "routeLengths": [
+          149.40456326186631,
+          95.41053487896424
+        ]
+      },
+      "453854249": {
+        "halfWidth": 2.5,
+        "crossings": [
+          {
+            "metres": 121.66428278045527,
+            "minimumRequiredShift": 31.684005879667097
+          }
+        ],
+        "lanes": 4,
+        "length": 133.71403461169157,
+        "closed": 127.16490495688608,
+        "private": true,
+        "routeLengths": [
+          3.88098182419164,
+          2.6681478306138633
+        ]
+      },
+      "453854250": {
+        "halfWidth": 2.5,
+        "crossings": [
+          {
+            "metres": 19.74970359637815,
+            "minimumRequiredShift": 15.196928569171433
+          },
+          {
+            "metres": 19.53521866705263,
+            "minimumRequiredShift": 12.216060538284893
+          },
+          {
+            "metres": 23.56623403869653,
+            "minimumRequiredShift": 14.266094657304407
+          }
+        ],
+        "lanes": 22,
+        "length": 220.19240361903204,
+        "closed": 0,
+        "private": true,
+        "routeLengths": [
+          220.19240361903204,
+          220.19240361903204
+        ]
+      }
+    },
+    "surface": {
+      "sites": 239,
+      "passed": 182,
+      "runs": 507,
+      "completed": 445,
+      "collisions": 44,
+      "tool": 18,
+      "over": 31,
+      "max": 0.445770263671875
+    },
+    "yardRuns": {
+      "sites": 9,
+      "passed": 9,
+      "runs": 18,
+      "completed": 18,
+      "collisions": 0,
+      "tool": 0,
+      "over": 0,
+      "max": 0.0751819047163167
+    },
+    "surfacePriority": [
+      {
+        "id": 9457773705,
+        "mode": "car",
+        "direction": "in",
+        "completed": true,
+        "failure": null,
+        "maximum": 0.03551154282857283
+      },
+      {
+        "id": 9457773705,
+        "mode": "car",
+        "direction": "out",
+        "completed": true,
+        "failure": null,
+        "maximum": 0.025905989475973
+      }
+    ],
+    "portalPriority": [
+      {
+        "id": 13694473830,
+        "mode": "car",
+        "direction": "in",
+        "completed": true,
+        "failure": null,
+        "maximum": 0.009274561900014078
+      },
+      {
+        "id": 13694473830,
+        "mode": "car",
+        "direction": "out",
+        "completed": true,
+        "failure": null,
+        "maximum": 0.008714271828807796
+      }
+    ],
+    "priorityWheelMax": 0.12726527008922517,
+    "priorityWheelOutliers": 0
   }
 }

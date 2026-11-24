@@ -16,7 +16,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0050797285898909195,
+    "maximum": 0.005094943181518374,
     "obstacle": ""
   },
   {
@@ -46,7 +46,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.005304559896586625,
+    "maximum": 0.005313689866142113,
     "obstacle": ""
   },
   {
@@ -56,118 +56,28 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.005396155591256502,
+    "maximum": 0.0054172632829363465,
     "obstacle": ""
   },
   {
     "id": 453854244,
     "way": 453854244,
     "mode": "car",
-    "boundary": false,
+    "boundary": true,
     "direction": "in",
-    "completed": false,
-    "failure": "collision",
-    "maximum": 0.0009301958219225526,
-    "obstacle": "building",
-    "contacts": [
-      {
-        "distance": 2.2041966915130615,
-        "kind": "building",
-        "point": [
-          -9641.294580003836,
-          162.68817443847658,
-          3735.5917547118456
-        ],
-        "normal": [
-          -0.6861125826835632,
-          0,
-          0.7274953126907349
-        ]
-      },
-      {
-        "distance": 2.182767152786255,
-        "kind": "building",
-        "point": [
-          -9641.913221234818,
-          162.68817443847658,
-          3735.0084518295794
-        ],
-        "normal": [
-          -0.6861125826835632,
-          0,
-          0.7274953126907349
-        ]
-      },
-      {
-        "distance": 2.161337375640869,
-        "kind": "building",
-        "point": [
-          -9642.53186263368,
-          162.68817443847658,
-          3734.425149116605
-        ],
-        "normal": [
-          -0.6861125826835632,
-          0,
-          0.7274953126907349
-        ]
-      }
-    ]
+    "completed": true,
+    "maximum": 0.000919243974493611,
+    "obstacle": ""
   },
   {
     "id": 453854244,
     "way": 453854244,
     "mode": "car",
-    "boundary": false,
+    "boundary": true,
     "direction": "out",
-    "completed": false,
-    "failure": "collision",
-    "maximum": 0.001415415417454824,
-    "obstacle": "building",
-    "contacts": [
-      {
-        "distance": 2.313039779663086,
-        "kind": "building",
-        "point": [
-          -9570.92557626976,
-          161.22461242675783,
-          3661.804419891072
-        ],
-        "normal": [
-          0.6467987298965454,
-          0,
-          -0.7626607418060303
-        ]
-      },
-      {
-        "distance": 2.237088441848755,
-        "kind": "building",
-        "point": [
-          -9570.274754064803,
-          161.22461242675783,
-          3662.3564154193614
-        ],
-        "normal": [
-          0.6467987298965454,
-          0,
-          -0.7626607418060303
-        ]
-      },
-      {
-        "distance": 2.161137580871582,
-        "kind": "building",
-        "point": [
-          -9569.623932199422,
-          161.22461242675783,
-          3662.90841128241
-        ],
-        "normal": [
-          0.6467987298965454,
-          0,
-          -0.7626607418060303
-        ]
-      }
-    ]
+    "completed": true,
+    "maximum": 0.00928051775355243,
+    "obstacle": ""
   },
   {
     "id": 453854245,
@@ -176,7 +86,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.06691885759244087,
+    "maximum": 0.0649644492932282,
     "obstacle": ""
   },
   {
@@ -186,7 +96,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.007703597478126767,
+    "maximum": 0.021049569687761505,
     "obstacle": ""
   },
   {
@@ -233,111 +143,21 @@
     "id": 453854249,
     "way": 453854249,
     "mode": "car",
-    "boundary": false,
+    "boundary": true,
     "direction": "in",
-    "completed": false,
-    "failure": "collision",
-    "maximum": 0.000177769166100461,
-    "obstacle": "building",
-    "contacts": [
-      {
-        "distance": 2.160313606262207,
-        "kind": "building",
-        "point": [
-          -9937.396070397566,
-          160.8089782714844,
-          3834.382354949167
-        ],
-        "normal": [
-          -0.7231251001358032,
-          0,
-          0.6907171607017517
-        ]
-      },
-      {
-        "distance": 2.1720316410064697,
-        "kind": "building",
-        "point": [
-          -9937.983136364279,
-          160.8089782714844,
-          3833.7675453338657
-        ],
-        "normal": [
-          -0.7231251001358032,
-          0,
-          0.6907171607017517
-        ]
-      },
-      {
-        "distance": 2.1837499141693115,
-        "kind": "building",
-        "point": [
-          -9938.570202160843,
-          160.8089782714844,
-          3833.152735551551
-        ],
-        "normal": [
-          -0.7231251001358032,
-          0,
-          0.6907171607017517
-        ]
-      }
-    ]
+    "completed": true,
+    "maximum": 0.0007938861846810141,
+    "obstacle": ""
   },
   {
     "id": 453854249,
     "way": 453854249,
     "mode": "car",
-    "boundary": false,
+    "boundary": true,
     "direction": "out",
-    "completed": false,
-    "failure": "collision",
-    "maximum": 9.307771358635364e-05,
-    "obstacle": "building",
-    "contacts": [
-      {
-        "distance": 2.187655448913574,
-        "kind": "building",
-        "point": [
-          -9851.782621750373,
-          161.68184204101564,
-          3747.9283020311736
-        ],
-        "normal": [
-          0.7022479772567749,
-          0,
-          -0.7119324803352356
-        ]
-      },
-      {
-        "distance": 2.1740634441375732,
-        "kind": "building",
-        "point": [
-          -9851.17749331614,
-          161.68184204101564,
-          3748.525381858898
-        ],
-        "normal": [
-          0.7022479772567749,
-          0,
-          -0.7119324803352356
-        ]
-      },
-      {
-        "distance": 2.1604700088500977,
-        "kind": "building",
-        "point": [
-          -9850.572363861023,
-          161.68184204101564,
-          3749.122460684543
-        ],
-        "normal": [
-          0.7022479772567749,
-          0,
-          -0.7119324803352356
-        ]
-      }
-    ]
+    "completed": true,
+    "maximum": 0.0003004451967569821,
+    "obstacle": ""
   },
   {
     "id": 453854250,
@@ -346,7 +166,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.07518803016193942,
+    "maximum": 0.0751819047163167,
     "obstacle": ""
   },
   {
@@ -356,7 +176,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0023896663818447905,
+    "maximum": 0.0024025644896141785,
     "obstacle": ""
   },
   {
@@ -425,7 +245,7 @@
     "mode": "car",
     "boundary": true,
     "completed": true,
-    "maximum": 0.0022116595844181575,
+    "maximum": 0.002196519329856983,
     "obstacle": ""
   },
   {
@@ -481,7 +301,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.005170841374479096,
+    "maximum": 0.0055414587821474015,
     "obstacle": ""
   },
   {
@@ -491,7 +311,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.007051481953226357,
+    "maximum": 0.007051362069148581,
     "obstacle": ""
   },
   {
@@ -551,7 +371,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004577142674975221,
+    "maximum": 0.0045770525932198325,
     "obstacle": ""
   },
   {
@@ -601,7 +421,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.005103976883987116,
+    "maximum": 0.00510580168580077,
     "obstacle": ""
   },
   {
@@ -611,7 +431,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.00500945212706938,
+    "maximum": 0.0049844023191667475,
     "obstacle": ""
   },
   {
@@ -621,7 +441,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.006654232178107122,
+    "maximum": 0.006666614874376364,
     "obstacle": ""
   },
   {
@@ -631,7 +451,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.006257824515387256,
+    "maximum": 0.006234500543115473,
     "obstacle": ""
   },
   {
@@ -651,7 +471,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004852431225344844,
+    "maximum": 0.004852445957794771,
     "obstacle": ""
   },
   {
@@ -661,7 +481,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.006934240854008067,
+    "maximum": 0.0068941947424150385,
     "obstacle": ""
   },
   {
@@ -681,7 +501,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.13763415262386047,
+    "maximum": 0.1376954593748394,
     "obstacle": ""
   },
   {
@@ -707,7 +527,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.033976848800250536,
+    "maximum": 0.05720841407776334,
     "obstacle": ""
   },
   {
@@ -717,7 +537,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.023610476682790704,
+    "maximum": 0.041210565364593776,
     "obstacle": ""
   },
   {
@@ -727,7 +547,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0926548875727633,
+    "maximum": 0.09262926443568631,
     "obstacle": ""
   },
   {
@@ -738,7 +558,7 @@
     "direction": "out",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.08417225783725257,
+    "maximum": 0.08383270344643279,
     "obstacle": "collision",
     "contacts": [
       null,
@@ -843,7 +663,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0013356540563052022,
+    "maximum": 0.0013416532075609666,
     "obstacle": ""
   },
   {
@@ -863,7 +683,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.003982694531401876,
+    "maximum": 0.003997938587957606,
     "obstacle": ""
   },
   {
@@ -883,7 +703,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0021161567489969,
+    "maximum": 0.0023007394007947823,
     "obstacle": ""
   },
   {
@@ -912,7 +732,7 @@
     "mode": "car",
     "boundary": true,
     "completed": true,
-    "maximum": 0.001854429717354833,
+    "maximum": 0.0018544447871988723,
     "obstacle": ""
   },
   {
@@ -1012,7 +832,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.013234389952913261,
+    "maximum": 0.013234360150590874,
     "obstacle": ""
   },
   {
@@ -1052,7 +872,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0012241561457813077,
+    "maximum": 0.0011018810407108504,
     "obstacle": ""
   },
   {
@@ -1062,7 +882,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.006002243397375651,
+    "maximum": 0.006027878230497663,
     "obstacle": ""
   },
   {
@@ -1072,7 +892,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.006524963648814719,
+    "maximum": 0.006577858160113692,
     "obstacle": ""
   },
   {
@@ -1127,7 +947,7 @@
     "mode": "car",
     "boundary": true,
     "completed": true,
-    "maximum": 0.002796725282138368,
+    "maximum": 0.0027967560965862504,
     "obstacle": ""
   },
   {
@@ -1173,7 +993,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0012837416720685724,
+    "maximum": 0.001407977545028416,
     "obstacle": ""
   },
   {
@@ -1203,7 +1023,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.004878488801551839,
+    "maximum": 0.004761283577636277,
     "obstacle": ""
   },
   {
@@ -1213,7 +1033,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004930044682510015,
+    "maximum": 0.004603660106681673,
     "obstacle": ""
   },
   {
@@ -1223,7 +1043,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.04797268802263943,
+    "maximum": 0.04797634965967745,
     "obstacle": ""
   },
   {
@@ -1249,7 +1069,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0013494306015502389,
+    "maximum": 0.0013469598203244004,
     "obstacle": ""
   },
   {
@@ -1259,7 +1079,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.001121603655377612,
+    "maximum": 0.0011122537109145014,
     "obstacle": ""
   },
   {
@@ -1335,7 +1155,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.03968754073358127,
+    "maximum": 0.04070308084757812,
     "obstacle": ""
   },
   {
@@ -1531,7 +1351,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.005201022355066698,
+    "maximum": 0.005167967530923079,
     "obstacle": ""
   },
   {
@@ -1561,7 +1381,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.2024076437725455,
+    "maximum": 0.20199212832272906,
     "obstacle": ""
   },
   {
@@ -1587,7 +1407,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.00422686405900663,
+    "maximum": 0.0042268640590350515,
     "obstacle": ""
   },
   {
@@ -1597,7 +1417,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.004022672941090377,
+    "maximum": 0.004021466678068464,
     "obstacle": ""
   },
   {
@@ -1607,7 +1427,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.08472489759606106,
+    "maximum": 0.08476322259542712,
     "obstacle": ""
   },
   {
@@ -1627,7 +1447,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.004415596656087928,
+    "maximum": 0.004416122301563519,
     "obstacle": ""
   },
   {
@@ -1648,7 +1468,7 @@
     "direction": "in",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.4054795095672432,
+    "maximum": 0.4081083085451098,
     "obstacle": "collision",
     "contacts": [
       null,
@@ -1673,7 +1493,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0010850745551920227,
+    "maximum": 0.0010083381859828933,
     "obstacle": ""
   },
   {
@@ -1787,7 +1607,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.45001220703125,
+    "maximum": 0.445770263671875,
     "obstacle": ""
   },
   {
@@ -1825,7 +1645,7 @@
     "mode": "car",
     "boundary": true,
     "completed": true,
-    "maximum": 0.0013043956936655832,
+    "maximum": 0.0012891817767695102,
     "obstacle": ""
   },
   {
@@ -1889,7 +1709,7 @@
     "mode": "car",
     "boundary": true,
     "completed": true,
-    "maximum": 0.006809673106886294,
+    "maximum": 0.006798140282882059,
     "obstacle": ""
   },
   {
@@ -1925,7 +1745,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.19141191487042875,
+    "maximum": 0.18991130957064684,
     "obstacle": ""
   },
   {
@@ -1936,7 +1756,7 @@
     "direction": "out",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.08186524639714321,
+    "maximum": 0.08188037360613976,
     "obstacle": "collision",
     "contacts": [
       null,
@@ -2031,7 +1851,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.005145262434808728,
+    "maximum": 0.005152691872609694,
     "obstacle": ""
   },
   {
@@ -2041,7 +1861,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0059726275362947945,
+    "maximum": 0.006052487526289951,
     "obstacle": ""
   },
   {
@@ -2081,7 +1901,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.030287072793498737,
+    "maximum": 0.06074317086415704,
     "obstacle": ""
   },
   {
@@ -2101,7 +1921,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0048969832231477994,
+    "maximum": 0.004896938688347063,
     "obstacle": ""
   },
   {
@@ -2111,7 +1931,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.4656428927070806,
+    "maximum": 0.03551154282857283,
     "obstacle": ""
   },
   {
@@ -2120,15 +1940,9 @@
     "mode": "car",
     "boundary": false,
     "direction": "out",
-    "completed": false,
-    "failure": "collision",
-    "maximum": 0.046028793870277696,
-    "obstacle": "collision",
-    "contacts": [
-      null,
-      null,
-      null
-    ]
+    "completed": true,
+    "maximum": 0.025905989475973,
+    "obstacle": ""
   },
   {
     "id": 9457773722,
@@ -2137,7 +1951,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.02866104380140655,
+    "maximum": 0.028601454676334015,
     "obstacle": ""
   },
   {
@@ -2147,7 +1961,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.03832996476373296,
+    "maximum": 0.02628824238507832,
     "obstacle": ""
   },
   {
@@ -2196,7 +2010,7 @@
     "mode": "car",
     "boundary": true,
     "completed": true,
-    "maximum": 0.001978424360174813,
+    "maximum": 0.0019882447314785168,
     "obstacle": ""
   },
   {
@@ -2236,7 +2050,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.12356218785609485,
+    "maximum": 0.0028883335725424786,
     "obstacle": ""
   },
   {
@@ -2256,7 +2070,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.026869049274694135,
+    "maximum": 0.02685269623430031,
     "obstacle": ""
   },
   {
@@ -2306,7 +2120,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.033093929853066584,
+    "maximum": 0.030542258496552677,
     "obstacle": ""
   },
   {
@@ -2336,7 +2150,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.23429719363397794,
+    "maximum": 0.23410722060361877,
     "obstacle": ""
   },
   {
@@ -2345,28 +2159,9 @@
     "mode": "car",
     "boundary": false,
     "direction": "in",
-    "completed": false,
-    "failure": "collision",
-    "maximum": 0.000598878905464062,
-    "obstacle": "building",
-    "contacts": [
-      null,
-      null,
-      {
-        "distance": 2.1611948013305664,
-        "kind": "building",
-        "point": [
-          -1617.172060455906,
-          155.07319946289064,
-          9551.396137073274
-        ],
-        "normal": [
-          -0.9996469616889954,
-          0,
-          -0.02656927891075611
-        ]
-      }
-    ]
+    "completed": true,
+    "maximum": 0.02793161497928054,
+    "obstacle": ""
   },
   {
     "id": 10001962659,
@@ -2375,7 +2170,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0285666833508742,
+    "maximum": 0.028754416951585426,
     "obstacle": ""
   },
   {
@@ -2385,7 +2180,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.026399185972394434,
+    "maximum": 0.02669572346613336,
     "obstacle": ""
   },
   {
@@ -2425,7 +2220,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.003563103698326131,
+    "maximum": 0.0035960263801086967,
     "obstacle": ""
   },
   {
@@ -2435,7 +2230,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.002588687977720383,
+    "maximum": 0.0030323343456757357,
     "obstacle": ""
   },
   {
@@ -2446,16 +2241,16 @@
     "direction": "in",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.013264171919729506,
+    "maximum": 0.013306942413436218,
     "obstacle": "building",
     "contacts": [
       {
-        "distance": 2.0857653617858887,
+        "distance": 2.088284969329834,
         "kind": "building",
         "point": [
-          -2164.2068399359528,
-          161.26492614746095,
-          6200.856294530618
+          -2164.1898626460675,
+          161.26457519531252,
+          6200.894528731053
         ],
         "normal": [
           0.9145033955574036,
@@ -2600,7 +2395,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.011533972227340428,
+    "maximum": 0.011482846511995604,
     "obstacle": ""
   },
   {
@@ -2610,7 +2405,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.01613622892577382,
+    "maximum": 0.016161229587964954,
     "obstacle": ""
   },
   {
@@ -2620,7 +2415,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.017469067730985444,
+    "maximum": 0.017467485733760668,
     "obstacle": ""
   },
   {
@@ -2641,7 +2436,7 @@
     "direction": "out",
     "completed": false,
     "failure": "tool",
-    "maximum": 0.04061001348046034,
+    "maximum": 0.0405994211727716,
     "obstacle": "",
     "contacts": [
       null,
@@ -2656,7 +2451,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.03005136746281778,
+    "maximum": 0.02960115390004603,
     "obstacle": ""
   },
   {
@@ -2666,7 +2461,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0451738624077791,
+    "maximum": 0.04509646712608628,
     "obstacle": ""
   },
   {
@@ -2703,16 +2498,16 @@
     "direction": "in",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.03336376626535298,
+    "maximum": 0.03350314104332597,
     "obstacle": "collision",
     "contacts": [
       {
-        "distance": 1.749646782875061,
+        "distance": 1.7487661838531494,
         "kind": "landmark",
         "point": [
-          6531.951462445371,
-          163.32332153320314,
-          -81.05859781199955
+          6531.962767701376,
+          163.3229705810547,
+          -81.05867749733167
         ],
         "normal": [
           0.006535052787512541,
@@ -2732,16 +2527,16 @@
     "direction": "out",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.0002486065873483767,
+    "maximum": 0.00024752763081892226,
     "obstacle": "collision",
     "contacts": [
       {
-        "distance": 1.8765803575515747,
+        "distance": 1.876526951789856,
         "kind": "landmark",
         "point": [
-          6528.647031152443,
-          163.1559020996094,
-          -93.98628175952423
+          6528.647032186397,
+          163.15593261718752,
+          -93.9862817495144
         ],
         "normal": [
           -0.00766301155090332,
@@ -2750,12 +2545,12 @@
         ]
       },
       {
-        "distance": 1.8536053895950317,
+        "distance": 1.8535518646240234,
         "kind": "landmark",
         "point": [
-          6529.497316641216,
-          163.1559020996094,
-          -93.9927961078907
+          6529.497317677478,
+          163.15593261718752,
+          -93.99279621706783
         ],
         "normal": [
           -0.00766301155090332,
@@ -2764,12 +2559,12 @@
         ]
       },
       {
-        "distance": 1.8306303024291992,
+        "distance": 1.8305768966674805,
         "kind": "landmark",
         "point": [
-          6530.347602132296,
-          163.1559020996094,
-          -93.99931057544413
+          6530.347603166251,
+          163.15593261718752,
+          -93.9993105654343
         ],
         "normal": [
           -0.00766301155090332,
@@ -2786,7 +2581,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.00888445770965518,
+    "maximum": 0.008860950425003011,
     "obstacle": ""
   },
   {
@@ -2826,7 +2621,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.007523379460820934,
+    "maximum": 0.007436944853594696,
     "obstacle": ""
   },
   {
@@ -2836,7 +2631,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.007699069661924796,
+    "maximum": 0.007556886605499358,
     "obstacle": ""
   },
   {
@@ -2856,7 +2651,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.01277511535951703,
+    "maximum": 0.020457374824673025,
     "obstacle": ""
   },
   {
@@ -2876,7 +2671,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.01667845215436614,
+    "maximum": 0.016263689297545625,
     "obstacle": ""
   },
   {
@@ -2926,7 +2721,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.002661454340199043,
+    "maximum": 0.0026784238950199324,
     "obstacle": ""
   },
   {
@@ -2946,7 +2741,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.002427436270806993,
+    "maximum": 0.002423761700669047,
     "obstacle": ""
   },
   {
@@ -2956,7 +2751,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.002533569875737385,
+    "maximum": 0.00221692098759263,
     "obstacle": ""
   },
   {
@@ -2999,23 +2794,23 @@
     "direction": "in",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.0006303887322189894,
+    "maximum": 0.0006304038020914504,
     "obstacle": "collision",
     "contacts": [
       null,
       null,
       {
-        "distance": 1.9467244148254395,
+        "distance": 1.945801854133606,
         "kind": "tree",
         "point": [
-          -428.21189578121624,
-          154.86998291015627,
-          -719.4661756412867
+          -428.2120908275068,
+          154.8700897216797,
+          -719.4660252957561
         ],
         "normal": [
-          -0.48910292983055115,
-          -5.865221828571521e-05,
-          -0.8722259998321533
+          -0.47897714376449585,
+          0,
+          -0.8778274059295654
         ]
       }
     ]
@@ -3028,21 +2823,21 @@
     "direction": "out",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.03410717766240623,
+    "maximum": 0.034114576960519116,
     "obstacle": "collision",
     "contacts": [
       {
-        "distance": 1.8946572542190552,
+        "distance": 1.8935483694076538,
         "kind": "tree",
         "point": [
-          -427.6837624001655,
+          -427.68356697603974,
           154.8700897216797,
-          -719.2918491500931
+          -719.2914438422071
         ],
         "normal": [
-          0.9066832065582275,
+          0.9010054469108582,
           0,
-          -0.42181211709976196
+          -0.433807909488678
         ]
       },
       null,
@@ -3082,7 +2877,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.2817578436743702,
+    "maximum": 0.282083474082782,
     "obstacle": ""
   },
   {
@@ -3093,7 +2888,7 @@
     "direction": "out",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.13920580230231394,
+    "maximum": 0.13919921511751454,
     "obstacle": "collision",
     "contacts": [
       null,
@@ -3108,7 +2903,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.16847009928721945,
+    "maximum": 0.09002998426274189,
     "obstacle": ""
   },
   {
@@ -3154,7 +2949,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0030206817501152727,
+    "maximum": 0.0030206218080763847,
     "obstacle": ""
   },
   {
@@ -3174,7 +2969,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.002848200753049923,
+    "maximum": 0.0028481411484051478,
     "obstacle": ""
   },
   {
@@ -3194,7 +2989,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.33458795288822785,
+    "maximum": 0.33456025303533465,
     "obstacle": ""
   },
   {
@@ -3260,7 +3055,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.028027611633518745,
+    "maximum": 0.028034865406311837,
     "obstacle": ""
   },
   {
@@ -3270,7 +3065,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.16390346052511973,
+    "maximum": 0.16402825904341967,
     "obstacle": ""
   },
   {
@@ -3280,7 +3075,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.02146394421470177,
+    "maximum": 0.02112252239911072,
     "obstacle": ""
   },
   {
@@ -3291,7 +3086,7 @@
     "direction": "out",
     "completed": false,
     "failure": "tool",
-    "maximum": 0.013775879257138968,
+    "maximum": 0.013775969338865934,
     "obstacle": "",
     "contacts": [
       null,
@@ -3346,7 +3141,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0023872758982292908,
+    "maximum": 0.002387230688668751,
     "obstacle": ""
   },
   {
@@ -3386,7 +3181,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.15772442689481636,
+    "maximum": 0.15753382259944715,
     "obstacle": ""
   },
   {
@@ -3443,18 +3238,18 @@
     "direction": "out",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.07473186709970037,
+    "maximum": 0.07462792182866451,
     "obstacle": "collision",
     "contacts": [
       null,
       null,
       {
-        "distance": 3.5881097316741943,
+        "distance": 3.5896637439727783,
         "kind": "building",
         "point": [
-          -13408.724284759695,
-          166.13598937988283,
-          1155.1187024005558
+          -13408.724057360534,
+          166.13592834472658,
+          1155.1190005369704
         ],
         "normal": [
           0.9999815821647644,
@@ -3521,7 +3316,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.013128202928697874,
+    "maximum": 0.013138565364897659,
     "obstacle": ""
   },
   {
@@ -3531,7 +3326,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0022619093364255605,
+    "maximum": 0.0022170170298068115,
     "obstacle": ""
   },
   {
@@ -3581,7 +3376,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.03742093230192722,
+    "maximum": 0.037308369942422814,
     "obstacle": ""
   },
   {
@@ -3591,7 +3386,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.29925783097743874,
+    "maximum": 0.29926845550536996,
     "obstacle": ""
   },
   {
@@ -3617,7 +3412,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.28622703839093333,
+    "maximum": 0.28501478468999153,
     "obstacle": ""
   },
   {
@@ -3678,7 +3473,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0025419890880584717,
+    "maximum": 0.0025442838668823242,
     "obstacle": ""
   },
   {
@@ -3698,7 +3493,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.002419043332338333,
+    "maximum": 0.0024189865216612816,
     "obstacle": ""
   },
   {
@@ -3757,7 +3552,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.001961731010993617,
+    "maximum": 0.013244928728852301,
     "obstacle": ""
   },
   {
@@ -3777,7 +3572,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.009324556364219916,
+    "maximum": 0.00934540786835214,
     "obstacle": ""
   },
   {
@@ -3788,7 +3583,7 @@
     "direction": "in",
     "completed": false,
     "failure": "tool",
-    "maximum": 0.23787338031914373,
+    "maximum": 0.23766046184414336,
     "obstacle": "",
     "contacts": [
       null,
@@ -3804,7 +3599,7 @@
     "direction": "out",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.08728363232791025,
+    "maximum": 0.08728999979089735,
     "obstacle": "collision",
     "contacts": [
       null,
@@ -3820,7 +3615,7 @@
     "direction": "in",
     "completed": false,
     "failure": "tool",
-    "maximum": 0.2892260453611186,
+    "maximum": 0.28923685916191744,
     "obstacle": "",
     "contacts": [
       null,
@@ -3835,7 +3630,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.12957562196928052,
+    "maximum": 0.1268361641550939,
     "obstacle": ""
   },
   {
@@ -3845,7 +3640,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.24033456777627293,
+    "maximum": 0.24015174661042238,
     "obstacle": ""
   },
   {
@@ -3871,7 +3666,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0014451802901476185,
+    "maximum": 0.0014349691147970134,
     "obstacle": ""
   },
   {
@@ -3881,7 +3676,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0020431447703970207,
+    "maximum": 0.0018534863894785758,
     "obstacle": ""
   },
   {
@@ -3901,7 +3696,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0030115129812600117,
+    "maximum": 0.003011542783610821,
     "obstacle": ""
   },
   {
@@ -3977,7 +3772,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0049930379075817655,
+    "maximum": 0.004961081608286122,
     "obstacle": ""
   },
   {
@@ -3998,16 +3793,16 @@
     "direction": "in",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.0041788795084301,
+    "maximum": 0.0041786856246517345,
     "obstacle": "collision",
     "contacts": [
       {
-        "distance": 1.8681995868682861,
+        "distance": 1.8686881065368652,
         "kind": "landmark",
         "point": [
-          6521.757771252299,
-          163.09402770996095,
-          -84.45318811833734
+          6521.757771464735,
+          163.0940124511719,
+          -84.4531678212016
         ],
         "normal": [
           -0.999971866607666,
@@ -4016,12 +3811,12 @@
         ]
       },
       {
-        "distance": 1.8530347347259521,
+        "distance": 1.8535233736038208,
         "kind": "landmark",
         "point": [
-          6521.751373680081,
-          163.09402770996095,
-          -85.30329931330552
+          6521.75137401172,
+          163.0940124511719,
+          -85.30327901494032
         ],
         "normal": [
           -0.999971866607666,
@@ -4030,12 +3825,12 @@
         ]
       },
       {
-        "distance": 1.8378700017929077,
+        "distance": 1.8383586406707764,
         "kind": "landmark",
         "point": [
-          6521.744976227066,
-          163.09402770996095,
-          -86.15341050704421
+          6521.744976558705,
+          163.0940124511719,
+          -86.15339020867903
         ],
         "normal": [
           -0.999971866607666,
@@ -4053,16 +3848,16 @@
     "direction": "out",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.03409691891582156,
+    "maximum": 0.03410393224572772,
     "obstacle": "collision",
     "contacts": [
       {
-        "distance": 1.7484090328216553,
+        "distance": 1.7486813068389893,
         "kind": "landmark",
         "point": [
-          6531.773764412994,
-          163.31891174316408,
-          -81.05743814669773
+          6531.772601387183,
+          163.3186981201172,
+          -81.05743641182394
         ],
         "normal": [
           0.006535052787512541,
@@ -4102,16 +3897,16 @@
     "direction": "in",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.06890962551224789,
+    "maximum": 0.06891166264156823,
     "obstacle": "collision",
     "contacts": [
       {
-        "distance": 1.748121738433838,
+        "distance": 1.7486815452575684,
         "kind": "landmark",
         "point": [
-          6530.743245555933,
-          163.17789001464845,
-          -130.27563435120007
+          6530.743250978817,
+          163.17773742675783,
+          -130.2752179862364
         ],
         "normal": [
           -0.9999774694442749,
@@ -4120,12 +3915,12 @@
         ]
       },
       {
-        "distance": 2.1940250396728516,
+        "distance": 2.1945860385894775,
         "kind": "landmark",
         "point": [
-          6530.736741853102,
-          163.17789001464845,
-          -131.23547155401383
+          6530.736744934565,
+          163.17773742675783,
+          -131.23505572698315
         ],
         "normal": [
           -0.9999774694442749,
@@ -4134,12 +3929,12 @@
         ]
       },
       {
-        "distance": 2.6399285793304443,
+        "distance": 2.6404900550842285,
         "kind": "landmark",
         "point": [
-          6530.730238360647,
-          163.17789001464845,
-          -132.19530886901313
+          6530.730238469563,
+          163.17773742675783,
+          -132.1948932433573
         ],
         "normal": [
           -0.9999774694442749,
@@ -4157,18 +3952,18 @@
     "direction": "out",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.0009199190814399572,
+    "maximum": 0.0009273860814573709,
     "obstacle": "collision",
     "contacts": [
       null,
       null,
       {
-        "distance": 1.8220794200897217,
+        "distance": 1.8239424228668213,
         "kind": "landmark",
         "point": [
-          6531.1817615401715,
-          163.24148864746095,
-          -132.97061235858328
+          6531.184521973684,
+          163.24127502441408,
+          -132.97062998365848
         ],
         "normal": [
           -0.0032464161049574614,
@@ -4296,16 +4091,16 @@
     "direction": "in",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.026446526118036218,
+    "maximum": 0.02644710338341838,
     "obstacle": "collision",
     "contacts": [
       {
-        "distance": 1.7867244482040405,
+        "distance": 1.7871202230453491,
         "kind": "landmark",
         "point": [
-          7302.354064106735,
+          7302.3538705092515,
           170.69969482421877,
-          106.20612485502839
+          106.20876455186573
         ],
         "normal": [
           0.9999120831489563,
@@ -4314,12 +4109,12 @@
         ]
       },
       {
-        "distance": 1.990375280380249,
+        "distance": 1.9923847913742065,
         "kind": "landmark",
         "point": [
-          7302.3656343651855,
+          7302.365674244941,
           170.69969482421877,
-          107.0801041400034
+          107.08311815015135
         ],
         "normal": [
           0.9999120831489563,
@@ -4328,12 +4123,12 @@
         ]
       },
       {
-        "distance": 2.194026470184326,
+        "distance": 2.1976494789123535,
         "kind": "landmark",
         "point": [
-          7302.377204276985,
+          7302.3774778651405,
           170.69969482421877,
-          107.95408351290047
+          107.95747177798184
         ],
         "normal": [
           0.9999120831489563,
@@ -4455,7 +4250,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.01442390781528502,
+    "maximum": 0.01467310651293019,
     "obstacle": ""
   },
   {
@@ -4465,7 +4260,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.00293044144251553,
+    "maximum": 0.002930367105420828,
     "obstacle": ""
   },
   {
@@ -4505,7 +4300,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0025646403150858532,
+    "maximum": 0.002663488208099807,
     "obstacle": ""
   },
   {
@@ -4515,7 +4310,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0028315961360760866,
+    "maximum": 0.0031486913842968534,
     "obstacle": ""
   },
   {
@@ -4535,7 +4330,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.008622555012976818,
+    "maximum": 0.014730089340559971,
     "obstacle": ""
   },
   {
@@ -4574,7 +4369,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.012936474129844555,
+    "maximum": 0.012944020977556647,
     "obstacle": ""
   },
   {
@@ -4604,7 +4399,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.026200473308563232,
+    "maximum": 0.026200860738754272,
     "obstacle": ""
   },
   {
@@ -4614,7 +4409,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0261995792388916,
+    "maximum": 0.026189640164375305,
     "obstacle": ""
   },
   {
@@ -4623,15 +4418,9 @@
     "mode": "bike",
     "boundary": false,
     "direction": "in",
-    "completed": false,
-    "failure": "tool",
-    "maximum": 0.05136860487982631,
-    "obstacle": "",
-    "contacts": [
-      null,
-      null,
-      null
-    ]
+    "completed": true,
+    "maximum": 0.027001751586794853,
+    "obstacle": ""
   },
   {
     "id": 13660684190,
@@ -4640,7 +4429,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.026942031923681498,
+    "maximum": 0.02687733806669712,
     "obstacle": ""
   },
   {
@@ -4676,7 +4465,7 @@
     "direction": "out",
     "completed": false,
     "failure": "tool",
-    "maximum": 0.0016021728515625,
+    "maximum": 0.0017852783203125,
     "obstacle": "",
     "contacts": [
       null,
@@ -4691,7 +4480,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.20196243025222316,
+    "maximum": 0.2036878611231714,
     "obstacle": ""
   },
   {
@@ -4767,7 +4556,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0005576177588011433,
+    "maximum": 0.0014387590705382536,
     "obstacle": ""
   },
   {
@@ -4808,7 +4597,7 @@
     "direction": "out",
     "completed": false,
     "failure": "tool",
-    "maximum": 0.014726644417038415,
+    "maximum": 0.014726688614416616,
     "obstacle": "",
     "contacts": [
       null,
@@ -4823,7 +4612,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0034838151257190475,
+    "maximum": 0.0035147298056870113,
     "obstacle": ""
   },
   {
@@ -4843,7 +4632,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.15723880585636607,
+    "maximum": 0.15759496700087539,
     "obstacle": ""
   },
   {
@@ -4923,7 +4712,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.012987215676389496,
+    "maximum": 0.012973602312911225,
     "obstacle": ""
   },
   {
@@ -4953,7 +4742,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0020676959235572667,
+    "maximum": 0.0020633522069601895,
     "obstacle": ""
   },
   {
@@ -5043,7 +4832,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0012276469536516288,
+    "maximum": 0.0015993691840208157,
     "obstacle": ""
   },
   {
@@ -5083,7 +4872,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.027177180659094802,
+    "maximum": 0.027177105647211874,
     "obstacle": ""
   },
   {
@@ -5093,7 +4882,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.026702170664407276,
+    "maximum": 0.02669604195736497,
     "obstacle": ""
   },
   {
@@ -5143,7 +4932,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.0032157106219585785,
+    "maximum": 0.0033055399948693776,
     "obstacle": ""
   },
   {
@@ -5173,7 +4962,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.0029060360395476437,
+    "maximum": 0.0027776237928662795,
     "obstacle": ""
   },
   {
@@ -5220,7 +5009,7 @@
     "direction": "out",
     "completed": false,
     "failure": "tool",
-    "maximum": 0.293811793276717,
+    "maximum": 0.29449084447801965,
     "obstacle": "",
     "contacts": [
       null,
@@ -5235,7 +5024,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.002439812106899808,
+    "maximum": 0.0024282022467048137,
     "obstacle": ""
   },
   {
@@ -5255,7 +5044,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.05478284741346329,
+    "maximum": 0.05476595197083611,
     "obstacle": ""
   },
   {
@@ -5490,7 +5279,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.06918914959115341,
+    "maximum": 0.0691861123408728,
     "obstacle": ""
   },
   {
@@ -5501,7 +5290,7 @@
     "direction": "out",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.09016878424949937,
+    "maximum": 0.08993030111744815,
     "obstacle": "collision",
     "contacts": [
       null,
@@ -5516,7 +5305,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.029731398595970404,
+    "maximum": 0.029770141277680295,
     "obstacle": ""
   },
   {
@@ -5526,7 +5315,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.014438728791361655,
+    "maximum": 0.014818092787038495,
     "obstacle": ""
   },
   {
@@ -5537,7 +5326,7 @@
     "direction": "in",
     "completed": false,
     "failure": "tool",
-    "maximum": 0.008103927801244026,
+    "maximum": 0.008103838731670976,
     "obstacle": "",
     "contacts": [
       null,
@@ -5568,7 +5357,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.270968103588757,
+    "maximum": 0.26990127311563583,
     "obstacle": ""
   },
   {
@@ -5579,7 +5368,7 @@
     "direction": "out",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.12767592994671872,
+    "maximum": 0.12771935395474543,
     "obstacle": "collision",
     "contacts": [
       null,
@@ -5634,7 +5423,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.012260960407985522,
+    "maximum": 0.012368742474961891,
     "obstacle": ""
   },
   {
@@ -5654,7 +5443,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.01979345656792475,
+    "maximum": 0.02003091101374821,
     "obstacle": ""
   },
   {
@@ -5664,7 +5453,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.05199670859101957,
+    "maximum": 0.05221448079595348,
     "obstacle": ""
   },
   {
@@ -5684,7 +5473,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.01669838462237294,
+    "maximum": 0.016717114201128425,
     "obstacle": ""
   },
   {
@@ -5694,7 +5483,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.007160830160358955,
+    "maximum": 0.006934736247330875,
     "obstacle": ""
   },
   {
@@ -5724,7 +5513,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.008081132735867413,
+    "maximum": 0.008043033221980522,
     "obstacle": ""
   },
   {
@@ -5744,7 +5533,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.009347338496525026,
+    "maximum": 0.009347353228974953,
     "obstacle": ""
   },
   {
@@ -5764,7 +5553,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.022731829476811072,
+    "maximum": 0.022720161473984035,
     "obstacle": ""
   },
   {
@@ -5774,7 +5563,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.03171797226059425,
+    "maximum": 0.031669825652841155,
     "obstacle": ""
   },
   {
@@ -5784,7 +5573,7 @@
     "boundary": false,
     "direction": "out",
     "completed": true,
-    "maximum": 0.06281666069662606,
+    "maximum": 0.06318612469817708,
     "obstacle": ""
   },
   {
@@ -5794,7 +5583,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.011825964135965705,
+    "maximum": 0.01174533749525608,
     "obstacle": ""
   },
   {
@@ -5910,18 +5699,18 @@
     "direction": "in",
     "completed": false,
     "failure": "collision",
-    "maximum": 0.0012981297834926409,
+    "maximum": 0.0012986150552478648,
     "obstacle": "building",
     "contacts": [
       null,
       null,
       {
-        "distance": 2.0768725872039795,
+        "distance": 2.078082799911499,
         "kind": "building",
         "point": [
-          -10707.939577013633,
+          -10707.938619240394,
           161.8681823730469,
-          1270.4108544605992
+          1270.4116789177763
         ],
         "normal": [
           -0.6551745533943176,
@@ -5939,7 +5728,7 @@
     "direction": "out",
     "completed": false,
     "failure": "tool",
-    "maximum": 0.036666918250745084,
+    "maximum": 0.03658556690754722,
     "obstacle": "",
     "contacts": [
       null,
@@ -5954,7 +5743,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.06111987289392573,
+    "maximum": 0.06112071230725746,
     "obstacle": ""
   },
   {
@@ -5994,7 +5783,7 @@
     "boundary": false,
     "direction": "in",
     "completed": true,
-    "maximum": 0.003222827641479853,
+    "maximum": 0.00321263828368501,
     "obstacle": ""
   },
   {
