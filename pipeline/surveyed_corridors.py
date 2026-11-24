@@ -85,7 +85,7 @@ def channel_spans(elements, widths):
                     and len(water.query(axis,predicate='intersects'))])
 
 
-def bake(output, chunks, elements, widths, approaches=(), only_approaches=False, bridge_profiles=()):
+def bake(output, chunks, elements, widths, approaches=(), only_approaches=False, bridge_profiles=(), preferred=()):
     intervals = json.loads(Path(__file__).with_name('road-corridor-survey.json').read_text())
     shapes, footpaths, passage_roads = [], [], []
     for way in elements:
@@ -108,6 +108,7 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False,
                     passage_roads.append((part,corridor,way['id'],way.get('warehousePassages'),paved/2+.5))
                 if way.get('surfaceUnderlay') and tags['highway'] in ('footway','path','pedestrian'):
                     footpaths.append(corridor)
+    preferred_lines={id(row[0]) for row in preferred}
     fixed_grades = {id(row[0]) for row in bridge_profiles}
     grades=STRtree([line.buffer(half,quad_segs=4) for line,half,*_ in approaches])
     tree = STRtree(shapes)
@@ -138,12 +139,13 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False,
                         translate(passage_roads[i][3],-x,-z) if passage_roads[i][3] is not None else None,passage_roads[i][4])
                        for i in passage_index.query(bounds,predicate='intersects')]
             fixed = {j for j,i in enumerate(nearby) if id(approaches[i][0]) in fixed_grades}
-            if patch(output/tile['file'], area, local, foot, seam,crossings,fixed):
+            overrides=[j for j,i in enumerate(nearby) if id(approaches[i][0]) in preferred_lines]
+            if patch(output/tile['file'], area, local, foot, seam,crossings,fixed,overrides):
                 tile['gradedCorridor']=True
             tile['bytes'] = (output/tile['file']).stat().st_size
 
 
-def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=()):
+def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=(), overrides=()):
     raw = gzip.decompress(file.read_bytes())
     n, k, size, image, deck = struct.unpack_from('<5I', raw, 4)
     start = 24+16900+9*n+4*k
@@ -355,6 +357,13 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=())
         limit=np.where(bridge_approach & (owner>=0),original,limit)
         ceiling=np.minimum(ceiling,limit)
     levels=np.minimum(levels,ceiling)
+    if overrides:
+        nearest=np.full(len(levels),np.inf)
+        for i in overrides:
+            distance,target=data[i]
+            select=(distance<=approaches[i][1]+.005)&(distance<nearest)
+            levels[select]=target[select]
+            nearest[select]=distance[select]
     for i,y in zip(spline,levels):
         vertices[i][1] = round(float(y),4)
     # Encode in millimetres. The worker draws the exact same triangles 51 mm
