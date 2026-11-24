@@ -1,0 +1,6030 @@
+[
+  {
+    "id": 453854241,
+    "way": 453854241,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.005246433896843428,
+    "obstacle": ""
+  },
+  {
+    "id": 453854241,
+    "way": 453854241,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0050797285898909195,
+    "obstacle": ""
+  },
+  {
+    "id": 453854242,
+    "way": 453854242,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0025307195366508495,
+    "obstacle": ""
+  },
+  {
+    "id": 453854242,
+    "way": 453854242,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.002492576837539673,
+    "obstacle": ""
+  },
+  {
+    "id": 453854243,
+    "way": 453854243,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.005304559896586625,
+    "obstacle": ""
+  },
+  {
+    "id": 453854243,
+    "way": 453854243,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.005396155591256502,
+    "obstacle": ""
+  },
+  {
+    "id": 453854244,
+    "way": 453854244,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.0009301958219225526,
+    "obstacle": "building",
+    "contacts": [
+      {
+        "distance": 2.2041966915130615,
+        "kind": "building",
+        "point": [
+          -9641.294580003836,
+          162.68817443847658,
+          3735.5917547118456
+        ],
+        "normal": [
+          -0.6861125826835632,
+          0,
+          0.7274953126907349
+        ]
+      },
+      {
+        "distance": 2.182767152786255,
+        "kind": "building",
+        "point": [
+          -9641.913221234818,
+          162.68817443847658,
+          3735.0084518295794
+        ],
+        "normal": [
+          -0.6861125826835632,
+          0,
+          0.7274953126907349
+        ]
+      },
+      {
+        "distance": 2.161337375640869,
+        "kind": "building",
+        "point": [
+          -9642.53186263368,
+          162.68817443847658,
+          3734.425149116605
+        ],
+        "normal": [
+          -0.6861125826835632,
+          0,
+          0.7274953126907349
+        ]
+      }
+    ]
+  },
+  {
+    "id": 453854244,
+    "way": 453854244,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.001415415417454824,
+    "obstacle": "building",
+    "contacts": [
+      {
+        "distance": 2.313039779663086,
+        "kind": "building",
+        "point": [
+          -9570.92557626976,
+          161.22461242675783,
+          3661.804419891072
+        ],
+        "normal": [
+          0.6467987298965454,
+          0,
+          -0.7626607418060303
+        ]
+      },
+      {
+        "distance": 2.237088441848755,
+        "kind": "building",
+        "point": [
+          -9570.274754064803,
+          161.22461242675783,
+          3662.3564154193614
+        ],
+        "normal": [
+          0.6467987298965454,
+          0,
+          -0.7626607418060303
+        ]
+      },
+      {
+        "distance": 2.161137580871582,
+        "kind": "building",
+        "point": [
+          -9569.623932199422,
+          161.22461242675783,
+          3662.90841128241
+        ],
+        "normal": [
+          0.6467987298965454,
+          0,
+          -0.7626607418060303
+        ]
+      }
+    ]
+  },
+  {
+    "id": 453854245,
+    "way": 453854245,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.06691885759244087,
+    "obstacle": ""
+  },
+  {
+    "id": 453854245,
+    "way": 453854245,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.007703597478126767,
+    "obstacle": ""
+  },
+  {
+    "id": 453854246,
+    "way": 453854246,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0016756554819608027,
+    "obstacle": ""
+  },
+  {
+    "id": 453854246,
+    "way": 453854246,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001674155806597355,
+    "obstacle": ""
+  },
+  {
+    "id": 453854248,
+    "way": 453854248,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0025121002827006578,
+    "obstacle": ""
+  },
+  {
+    "id": 453854248,
+    "way": 453854248,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.002580790249794518,
+    "obstacle": ""
+  },
+  {
+    "id": 453854249,
+    "way": 453854249,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.000177769166100461,
+    "obstacle": "building",
+    "contacts": [
+      {
+        "distance": 2.160313606262207,
+        "kind": "building",
+        "point": [
+          -9937.396070397566,
+          160.8089782714844,
+          3834.382354949167
+        ],
+        "normal": [
+          -0.7231251001358032,
+          0,
+          0.6907171607017517
+        ]
+      },
+      {
+        "distance": 2.1720316410064697,
+        "kind": "building",
+        "point": [
+          -9937.983136364279,
+          160.8089782714844,
+          3833.7675453338657
+        ],
+        "normal": [
+          -0.7231251001358032,
+          0,
+          0.6907171607017517
+        ]
+      },
+      {
+        "distance": 2.1837499141693115,
+        "kind": "building",
+        "point": [
+          -9938.570202160843,
+          160.8089782714844,
+          3833.152735551551
+        ],
+        "normal": [
+          -0.7231251001358032,
+          0,
+          0.6907171607017517
+        ]
+      }
+    ]
+  },
+  {
+    "id": 453854249,
+    "way": 453854249,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 9.307771358635364e-05,
+    "obstacle": "building",
+    "contacts": [
+      {
+        "distance": 2.187655448913574,
+        "kind": "building",
+        "point": [
+          -9851.782621750373,
+          161.68184204101564,
+          3747.9283020311736
+        ],
+        "normal": [
+          0.7022479772567749,
+          0,
+          -0.7119324803352356
+        ]
+      },
+      {
+        "distance": 2.1740634441375732,
+        "kind": "building",
+        "point": [
+          -9851.17749331614,
+          161.68184204101564,
+          3748.525381858898
+        ],
+        "normal": [
+          0.7022479772567749,
+          0,
+          -0.7119324803352356
+        ]
+      },
+      {
+        "distance": 2.1604700088500977,
+        "kind": "building",
+        "point": [
+          -9850.572363861023,
+          161.68184204101564,
+          3749.122460684543
+        ],
+        "normal": [
+          0.7022479772567749,
+          0,
+          -0.7119324803352356
+        ]
+      }
+    ]
+  },
+  {
+    "id": 453854250,
+    "way": 453854250,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.07518803016193942,
+    "obstacle": ""
+  },
+  {
+    "id": 453854250,
+    "way": 453854250,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0023896663818447905,
+    "obstacle": ""
+  },
+  {
+    "id": 2303787614,
+    "way": 221527206,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0007987086503078444,
+    "obstacle": ""
+  },
+  {
+    "id": 2303787614,
+    "way": 221527206,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.000710090263822849,
+    "obstacle": ""
+  },
+  {
+    "id": 2656179145,
+    "way": 221527206,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0039873264870493585,
+    "obstacle": ""
+  },
+  {
+    "id": 2656179145,
+    "way": 221527206,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0038646116571783296,
+    "obstacle": ""
+  },
+  {
+    "id": 2699872285,
+    "way": 1084347075,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0010317725955246715,
+    "obstacle": ""
+  },
+  {
+    "id": 2699872285,
+    "way": 1084347075,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.000752988626345541,
+    "obstacle": ""
+  },
+  {
+    "id": 4057964482,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.0022116595844181575,
+    "obstacle": ""
+  },
+  {
+    "id": 4057964482,
+    "way": 1471513684,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.171112060546875,
+    "obstacle": ""
+  },
+  {
+    "id": 4057964482,
+    "way": 1471513684,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.00506591796875,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 4117752187,
+    "way": 221527206,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0013962972838896803,
+    "obstacle": ""
+  },
+  {
+    "id": 4117752187,
+    "way": 221527206,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0014401017494947155,
+    "obstacle": ""
+  },
+  {
+    "id": 4138785722,
+    "way": 412456970,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.005170841374479096,
+    "obstacle": ""
+  },
+  {
+    "id": 4138785722,
+    "way": 412456970,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.007051481953226357,
+    "obstacle": ""
+  },
+  {
+    "id": 4505338347,
+    "way": 453854266,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0021732230231350513,
+    "obstacle": ""
+  },
+  {
+    "id": 4505338347,
+    "way": 453854266,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0009999013171864135,
+    "obstacle": ""
+  },
+  {
+    "id": 4507397586,
+    "way": 454117718,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.07443579975165449,
+    "obstacle": ""
+  },
+  {
+    "id": 4507397586,
+    "way": 454117718,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.00561562011827732,
+    "obstacle": ""
+  },
+  {
+    "id": 4509550061,
+    "way": 1497561668,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.004633502690296609,
+    "obstacle": ""
+  },
+  {
+    "id": 4509550061,
+    "way": 1497561668,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.004577142674975221,
+    "obstacle": ""
+  },
+  {
+    "id": 4514020691,
+    "way": 1550773915,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0010412364635783433,
+    "obstacle": ""
+  },
+  {
+    "id": 4514020691,
+    "way": 1550773915,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0010784461813102553,
+    "obstacle": ""
+  },
+  {
+    "id": 4514279820,
+    "way": 454947557,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.001112825128274153,
+    "obstacle": ""
+  },
+  {
+    "id": 4514279820,
+    "way": 454947557,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0009837088719848452,
+    "obstacle": ""
+  },
+  {
+    "id": 4514279837,
+    "way": 454947557,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.005103976883987116,
+    "obstacle": ""
+  },
+  {
+    "id": 4514279837,
+    "way": 454947557,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.00500945212706938,
+    "obstacle": ""
+  },
+  {
+    "id": 4514279868,
+    "way": 454947557,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.006654232178107122,
+    "obstacle": ""
+  },
+  {
+    "id": 4514279868,
+    "way": 454947557,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.006257824515387256,
+    "obstacle": ""
+  },
+  {
+    "id": 4514279880,
+    "way": 454947557,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.004916025670070212,
+    "obstacle": ""
+  },
+  {
+    "id": 4514279880,
+    "way": 454947557,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.004852431225344844,
+    "obstacle": ""
+  },
+  {
+    "id": 4514279892,
+    "way": 454947557,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.006934240854008067,
+    "obstacle": ""
+  },
+  {
+    "id": 4514279892,
+    "way": 454947557,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.006690599333552427,
+    "obstacle": ""
+  },
+  {
+    "id": 4514279902,
+    "way": 454947557,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.13763415262386047,
+    "obstacle": ""
+  },
+  {
+    "id": 4514279902,
+    "way": 454947557,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.1408736683287657,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 4514289513,
+    "way": 1474958000,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.033976848800250536,
+    "obstacle": ""
+  },
+  {
+    "id": 4514289513,
+    "way": 1474958000,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.023610476682790704,
+    "obstacle": ""
+  },
+  {
+    "id": 4514322516,
+    "way": 454952631,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0926548875727633,
+    "obstacle": ""
+  },
+  {
+    "id": 4514322516,
+    "way": 454952631,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.08417225783725257,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 4514322518,
+    "way": 454952631,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.003615797803092846,
+    "obstacle": ""
+  },
+  {
+    "id": 4514322518,
+    "way": 454952631,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0015854929978047494,
+    "obstacle": ""
+  },
+  {
+    "id": 4514322523,
+    "way": 454952633,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0014054014997668673,
+    "obstacle": ""
+  },
+  {
+    "id": 4514322523,
+    "way": 454952633,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0010329148679488753,
+    "obstacle": ""
+  },
+  {
+    "id": 5747677517,
+    "way": 606136809,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0013911107801050093,
+    "obstacle": ""
+  },
+  {
+    "id": 5747677517,
+    "way": 606136809,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0015485980600544735,
+    "obstacle": ""
+  },
+  {
+    "id": 5928177538,
+    "way": 606136809,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.001429387308519381,
+    "obstacle": ""
+  },
+  {
+    "id": 5928177538,
+    "way": 606136809,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0005815041515120356,
+    "obstacle": ""
+  },
+  {
+    "id": 6325476369,
+    "way": 412456970,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0010370461445745605,
+    "obstacle": ""
+  },
+  {
+    "id": 6325476369,
+    "way": 412456970,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0013356540563052022,
+    "obstacle": ""
+  },
+  {
+    "id": 6373490451,
+    "way": 1094792927,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.004057869258929259,
+    "obstacle": ""
+  },
+  {
+    "id": 6373490451,
+    "way": 1094792927,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.003982694531401876,
+    "obstacle": ""
+  },
+  {
+    "id": 6440281807,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.00156976276974774,
+    "obstacle": ""
+  },
+  {
+    "id": 6440281807,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0021161567489969,
+    "obstacle": ""
+  },
+  {
+    "id": 6484104242,
+    "way": 221527206,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0010580573441814067,
+    "obstacle": ""
+  },
+  {
+    "id": 6484104242,
+    "way": 221527206,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0008367544075156275,
+    "obstacle": ""
+  },
+  {
+    "id": 6501439896,
+    "way": 606136809,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.001854429717354833,
+    "obstacle": ""
+  },
+  {
+    "id": 6501439896,
+    "way": 606136809,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0129241943359375,
+    "obstacle": ""
+  },
+  {
+    "id": 6501439896,
+    "way": 606136809,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0129241943359375,
+    "obstacle": ""
+  },
+  {
+    "id": 6590351285,
+    "way": 1474365105,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0011797901594547966,
+    "obstacle": ""
+  },
+  {
+    "id": 6590351285,
+    "way": 1474365105,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0012076888444312317,
+    "obstacle": ""
+  },
+  {
+    "id": 6819105040,
+    "way": 1084347075,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0014288348971547293,
+    "obstacle": ""
+  },
+  {
+    "id": 6819105040,
+    "way": 1084347075,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001360933623203664,
+    "obstacle": ""
+  },
+  {
+    "id": 6819105045,
+    "way": 1084347075,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0020276182102634266,
+    "obstacle": ""
+  },
+  {
+    "id": 6819105045,
+    "way": 1084347075,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0011848689250086863,
+    "obstacle": ""
+  },
+  {
+    "id": 6821519239,
+    "way": 1576931738,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.08052538104777796,
+    "obstacle": ""
+  },
+  {
+    "id": 6821519239,
+    "way": 1576931738,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.013234389952913261,
+    "obstacle": ""
+  },
+  {
+    "id": 6821519251,
+    "way": 727933039,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0012643180928080255,
+    "obstacle": ""
+  },
+  {
+    "id": 6821519251,
+    "way": 727933039,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0011191219653881035,
+    "obstacle": ""
+  },
+  {
+    "id": 6821558794,
+    "way": 727933039,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0014450628802364918,
+    "obstacle": ""
+  },
+  {
+    "id": 6821558794,
+    "way": 727933039,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0012241561457813077,
+    "obstacle": ""
+  },
+  {
+    "id": 7867100053,
+    "way": 727933039,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.006002243397375651,
+    "obstacle": ""
+  },
+  {
+    "id": 7867100053,
+    "way": 727933039,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.006524963648814719,
+    "obstacle": ""
+  },
+  {
+    "id": 8572142385,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.001151342999236249,
+    "obstacle": ""
+  },
+  {
+    "id": 8572142385,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0024881826256830664,
+    "obstacle": ""
+  },
+  {
+    "id": 8572142391,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.07117324201564657,
+    "obstacle": ""
+  },
+  {
+    "id": 8572142391,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.1972897771254054,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 8572142393,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.002796725282138368,
+    "obstacle": ""
+  },
+  {
+    "id": 8572142393,
+    "way": 923425799,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.1853790283203125,
+    "obstacle": ""
+  },
+  {
+    "id": 8572142393,
+    "way": 923425799,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.04290771484375,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 8572142396,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.012899621477657774,
+    "obstacle": ""
+  },
+  {
+    "id": 8572142396,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0012837416720685724,
+    "obstacle": ""
+  },
+  {
+    "id": 8572142397,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0011497124185950724,
+    "obstacle": ""
+  },
+  {
+    "id": 8572142397,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001161525609347791,
+    "obstacle": ""
+  },
+  {
+    "id": 9105326784,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.004878488801551839,
+    "obstacle": ""
+  },
+  {
+    "id": 9105326784,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.004930044682510015,
+    "obstacle": ""
+  },
+  {
+    "id": 9136638669,
+    "way": 1086232348,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.04797268802263943,
+    "obstacle": ""
+  },
+  {
+    "id": 9136638669,
+    "way": 1086232348,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.012107553909402213,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 9136638676,
+    "way": 988474346,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0013494306015502389,
+    "obstacle": ""
+  },
+  {
+    "id": 9136638676,
+    "way": 988474346,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001121603655377612,
+    "obstacle": ""
+  },
+  {
+    "id": 9136638678,
+    "way": 988474346,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0011731417673672695,
+    "obstacle": ""
+  },
+  {
+    "id": 9136638678,
+    "way": 988474346,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.03005700752419216,
+    "obstacle": ""
+  },
+  {
+    "id": 9136638682,
+    "way": 988474347,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.001817365075055477,
+    "obstacle": ""
+  },
+  {
+    "id": 9136638682,
+    "way": 988474347,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0017075804044566212,
+    "obstacle": ""
+  },
+  {
+    "id": 9136638693,
+    "way": 988474346,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.06501561369535125,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 9136638693,
+    "way": 988474346,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.00443997101962168,
+    "obstacle": ""
+  },
+  {
+    "id": 9214629096,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.03968754073358127,
+    "obstacle": ""
+  },
+  {
+    "id": 9214629096,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.026338607860054708,
+    "obstacle": ""
+  },
+  {
+    "id": 9214629101,
+    "way": 1084347076,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.013475633904619144,
+    "obstacle": ""
+  },
+  {
+    "id": 9214629101,
+    "way": 1084347076,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0025496844975236854,
+    "obstacle": ""
+  },
+  {
+    "id": 9214629116,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0013476966687164804,
+    "obstacle": ""
+  },
+  {
+    "id": 9214629116,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0013185412254017592,
+    "obstacle": ""
+  },
+  {
+    "id": 9214629117,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0010474085808027667,
+    "obstacle": ""
+  },
+  {
+    "id": 9214629117,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0011635392341986517,
+    "obstacle": ""
+  },
+  {
+    "id": 9214629118,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0009544997845125636,
+    "obstacle": ""
+  },
+  {
+    "id": 9214629118,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0010295678984277856,
+    "obstacle": ""
+  },
+  {
+    "id": 9344231118,
+    "way": 1012824489,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0028544271891917106,
+    "obstacle": ""
+  },
+  {
+    "id": 9344231118,
+    "way": 1012824489,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0006063583886941615,
+    "obstacle": ""
+  },
+  {
+    "id": 9344231131,
+    "way": 1012824489,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.009095057563968112,
+    "obstacle": ""
+  },
+  {
+    "id": 9344231131,
+    "way": 1012824489,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.040743981554811626,
+    "obstacle": ""
+  },
+  {
+    "id": 9344231134,
+    "way": 1012824489,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0005277870961037934,
+    "obstacle": ""
+  },
+  {
+    "id": 9344231134,
+    "way": 1012824489,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.000766769557628777,
+    "obstacle": ""
+  },
+  {
+    "id": 9349081123,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.17358532352267275,
+    "obstacle": ""
+  },
+  {
+    "id": 9349081123,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.09943481340724247,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 9349081129,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.005023158383806958,
+    "obstacle": ""
+  },
+  {
+    "id": 9349081129,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.005201022355066698,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162186,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.012707163927672127,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162186,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.006204672804415168,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162208,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.2024076437725455,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162208,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.12122152408338138,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 9349162217,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.00422686405900663,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162217,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.004022672941090377,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162218,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.08472489759606106,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162218,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.09092491072306075,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162225,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.004415596656087928,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162225,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.004351928661463944,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162228,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.4054795095672432,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 9349162228,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.06193141937256996,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162236,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0010850745551920227,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162236,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0010917344183383193,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162238,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.01817756801281689,
+    "obstacle": ""
+  },
+  {
+    "id": 9349162238,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.012702331902858077,
+    "obstacle": ""
+  },
+  {
+    "id": 9349182641,
+    "way": 1013357845,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.08616169567378051,
+    "obstacle": ""
+  },
+  {
+    "id": 9349182641,
+    "way": 1013357845,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.009448110157592282,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946063,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.001018690275714107,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946063,
+    "way": 923425799,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0071258544921875,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946063,
+    "way": 923425799,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0083465576171875,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946067,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.007085853477690307,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946067,
+    "way": 923425798,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.079833984375,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 9349946067,
+    "way": 923425798,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.45001220703125,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946081,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.0012843280468359808,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946081,
+    "way": 923425799,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.00799560546875,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946081,
+    "way": 923425799,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.00921630859375,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946082,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.0013043956936655832,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946082,
+    "way": 923425799,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.1153411865234375,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946082,
+    "way": 923425799,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.0228424072265625,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 9349946087,
+    "way": 923425799,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.0009831932355837125,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946087,
+    "way": 923425799,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0069427490234375,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946087,
+    "way": 923425799,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0079498291015625,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946089,
+    "way": 923425798,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.006809673106886294,
+    "obstacle": ""
+  },
+  {
+    "id": 9349946089,
+    "way": 923425798,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.0024261474609375,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 9349946089,
+    "way": 923425798,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.116668701171875,
+    "obstacle": ""
+  },
+  {
+    "id": 9377773672,
+    "way": 1016734571,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.19141191487042875,
+    "obstacle": ""
+  },
+  {
+    "id": 9377773672,
+    "way": 1016734571,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.08186524639714321,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 9377773674,
+    "way": 1016734571,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.03729372564350797,
+    "obstacle": ""
+  },
+  {
+    "id": 9377773674,
+    "way": 1016734571,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.007094588819541059,
+    "obstacle": ""
+  },
+  {
+    "id": 9385960950,
+    "way": 1017595558,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0007958680953663588,
+    "obstacle": ""
+  },
+  {
+    "id": 9385960950,
+    "way": 1017595558,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0009059792419634505,
+    "obstacle": ""
+  },
+  {
+    "id": 9437286182,
+    "way": 454952633,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0010473849638401589,
+    "obstacle": ""
+  },
+  {
+    "id": 9437286182,
+    "way": 454952633,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0013384496265871348,
+    "obstacle": ""
+  },
+  {
+    "id": 9437286183,
+    "way": 454952631,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0015346023271831655,
+    "obstacle": ""
+  },
+  {
+    "id": 9437286183,
+    "way": 454952631,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001533845348177465,
+    "obstacle": ""
+  },
+  {
+    "id": 9457383800,
+    "way": 1025751314,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.005145262434808728,
+    "obstacle": ""
+  },
+  {
+    "id": 9457383800,
+    "way": 1025751314,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0059726275362947945,
+    "obstacle": ""
+  },
+  {
+    "id": 9457383802,
+    "way": 1025751314,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.024652303727151548,
+    "obstacle": ""
+  },
+  {
+    "id": 9457383802,
+    "way": 1025751314,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.005049171425241639,
+    "obstacle": ""
+  },
+  {
+    "id": 9457773596,
+    "way": 1025797703,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.03054647198263183,
+    "obstacle": ""
+  },
+  {
+    "id": 9457773596,
+    "way": 1025797703,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.030287072793498737,
+    "obstacle": ""
+  },
+  {
+    "id": 9457773599,
+    "way": 1539622609,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.00510795431316069,
+    "obstacle": ""
+  },
+  {
+    "id": 9457773599,
+    "way": 1539622609,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0048969832231477994,
+    "obstacle": ""
+  },
+  {
+    "id": 9457773705,
+    "way": 1539622609,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.4656428927070806,
+    "obstacle": ""
+  },
+  {
+    "id": 9457773705,
+    "way": 1539622609,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.046028793870277696,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 9457773722,
+    "way": 1025797703,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.02866104380140655,
+    "obstacle": ""
+  },
+  {
+    "id": 9457773722,
+    "way": 1025797703,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.03832996476373296,
+    "obstacle": ""
+  },
+  {
+    "id": 9460664344,
+    "way": 453854266,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0005305309340428721,
+    "obstacle": ""
+  },
+  {
+    "id": 9460664344,
+    "way": 453854266,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0017533701545744407,
+    "obstacle": ""
+  },
+  {
+    "id": 9460664362,
+    "way": 453854266,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0007671943250784352,
+    "obstacle": ""
+  },
+  {
+    "id": 9460664362,
+    "way": 453854266,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0009452734353487813,
+    "obstacle": ""
+  },
+  {
+    "id": 9468835802,
+    "way": 1492966272,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.001978424360174813,
+    "obstacle": ""
+  },
+  {
+    "id": 9468835802,
+    "way": 1492966272,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.00439453125,
+    "obstacle": ""
+  },
+  {
+    "id": 9468835802,
+    "way": 1492966272,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0068511962890625,
+    "obstacle": ""
+  },
+  {
+    "id": 9531714411,
+    "way": 1034716138,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0015582213986533588,
+    "obstacle": ""
+  },
+  {
+    "id": 9531714411,
+    "way": 1034716138,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.12356218785609485,
+    "obstacle": ""
+  },
+  {
+    "id": 9531714412,
+    "way": 1034716138,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.02972492609382016,
+    "obstacle": ""
+  },
+  {
+    "id": 9531714412,
+    "way": 1034716138,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.026869049274694135,
+    "obstacle": ""
+  },
+  {
+    "id": 9936540229,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.012850268381953356,
+    "obstacle": ""
+  },
+  {
+    "id": 9936540229,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.1640933902758377,
+    "obstacle": ""
+  },
+  {
+    "id": 9936540240,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.02959458434358453,
+    "obstacle": ""
+  },
+  {
+    "id": 9936540240,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0033571216295342765,
+    "obstacle": ""
+  },
+  {
+    "id": 9936540248,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.033093929853066584,
+    "obstacle": ""
+  },
+  {
+    "id": 9936540248,
+    "way": 727649373,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.008513237057997003,
+    "obstacle": ""
+  },
+  {
+    "id": 9936540261,
+    "way": 1084347076,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.08065077729943937,
+    "obstacle": ""
+  },
+  {
+    "id": 9936540261,
+    "way": 1084347076,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.23429719363397794,
+    "obstacle": ""
+  },
+  {
+    "id": 10001962659,
+    "way": 1485632262,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.000598878905464062,
+    "obstacle": "building",
+    "contacts": [
+      null,
+      null,
+      {
+        "distance": 2.1611948013305664,
+        "kind": "building",
+        "point": [
+          -1617.172060455906,
+          155.07319946289064,
+          9551.396137073274
+        ],
+        "normal": [
+          -0.9996469616889954,
+          0,
+          -0.02656927891075611
+        ]
+      }
+    ]
+  },
+  {
+    "id": 10001962659,
+    "way": 1485632262,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0285666833508742,
+    "obstacle": ""
+  },
+  {
+    "id": 10001962660,
+    "way": 1485632262,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.026399185972394434,
+    "obstacle": ""
+  },
+  {
+    "id": 10001962660,
+    "way": 1485632262,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001449555383516099,
+    "obstacle": ""
+  },
+  {
+    "id": 10027076374,
+    "way": 1094792927,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0010522040555827061,
+    "obstacle": ""
+  },
+  {
+    "id": 10027076374,
+    "way": 1094792927,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.00044305437015168536,
+    "obstacle": ""
+  },
+  {
+    "id": 10180689515,
+    "way": 1112703462,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.003563103698326131,
+    "obstacle": ""
+  },
+  {
+    "id": 10180689515,
+    "way": 1112703462,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.002588687977720383,
+    "obstacle": ""
+  },
+  {
+    "id": 10180689516,
+    "way": 1112703462,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.013264171919729506,
+    "obstacle": "building",
+    "contacts": [
+      {
+        "distance": 2.0857653617858887,
+        "kind": "building",
+        "point": [
+          -2164.2068399359528,
+          161.26492614746095,
+          6200.856294530618
+        ],
+        "normal": [
+          0.9145033955574036,
+          0,
+          -0.40457817912101746
+        ]
+      },
+      null,
+      null
+    ]
+  },
+  {
+    "id": 10180689516,
+    "way": 1112703462,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.013854567509781646,
+    "obstacle": ""
+  },
+  {
+    "id": 13022478440,
+    "way": 1417162020,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0006200801651345955,
+    "obstacle": ""
+  },
+  {
+    "id": 13022478440,
+    "way": 1417162020,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0008196248198544254,
+    "obstacle": ""
+  },
+  {
+    "id": 13022478441,
+    "way": 1417162020,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0020655787215844157,
+    "obstacle": ""
+  },
+  {
+    "id": 13022478441,
+    "way": 1417162020,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0012086948133855913,
+    "obstacle": ""
+  },
+  {
+    "id": 13022478448,
+    "way": 1417162024,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.01940710600817397,
+    "obstacle": ""
+  },
+  {
+    "id": 13022478448,
+    "way": 1417162024,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0022350240428465895,
+    "obstacle": ""
+  },
+  {
+    "id": 13022478453,
+    "way": 1417162020,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.025986786383498384,
+    "obstacle": ""
+  },
+  {
+    "id": 13022478453,
+    "way": 1417162020,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.02858343607974234,
+    "obstacle": ""
+  },
+  {
+    "id": 13048015659,
+    "way": 727933039,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0006125803263614671,
+    "obstacle": ""
+  },
+  {
+    "id": 13048015659,
+    "way": 727933039,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0006054111246669436,
+    "obstacle": ""
+  },
+  {
+    "id": 13409900006,
+    "way": 1492138642,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.010396187935242551,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13409900006,
+    "way": 1492138642,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.011533972227340428,
+    "obstacle": ""
+  },
+  {
+    "id": 13410029381,
+    "way": 1461995308,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.01613622892577382,
+    "obstacle": ""
+  },
+  {
+    "id": 13410029381,
+    "way": 1461995308,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.017469067730985444,
+    "obstacle": ""
+  },
+  {
+    "id": 13410029397,
+    "way": 1461995308,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.046599299165421826,
+    "obstacle": ""
+  },
+  {
+    "id": 13410029397,
+    "way": 1461995308,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.04061001348046034,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13410029399,
+    "way": 1461995308,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.03005136746281778,
+    "obstacle": ""
+  },
+  {
+    "id": 13410029399,
+    "way": 1461995308,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0451738624077791,
+    "obstacle": ""
+  },
+  {
+    "id": 13417436735,
+    "way": 1462755113,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.08077898171711695,
+    "obstacle": ""
+  },
+  {
+    "id": 13417436735,
+    "way": 1462755113,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.09854505714380934,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13459484597,
+    "way": 1487527335,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.03336376626535298,
+    "obstacle": "collision",
+    "contacts": [
+      {
+        "distance": 1.749646782875061,
+        "kind": "landmark",
+        "point": [
+          6531.951462445371,
+          163.32332153320314,
+          -81.05859781199955
+        ],
+        "normal": [
+          0.006535052787512541,
+          0,
+          0.9999787211418152
+        ]
+      },
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13459484597,
+    "way": 1487527335,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.0002486065873483767,
+    "obstacle": "collision",
+    "contacts": [
+      {
+        "distance": 1.8765803575515747,
+        "kind": "landmark",
+        "point": [
+          6528.647031152443,
+          163.1559020996094,
+          -93.98628175952423
+        ],
+        "normal": [
+          -0.00766301155090332,
+          0,
+          -0.9999706149101257
+        ]
+      },
+      {
+        "distance": 1.8536053895950317,
+        "kind": "landmark",
+        "point": [
+          6529.497316641216,
+          163.1559020996094,
+          -93.9927961078907
+        ],
+        "normal": [
+          -0.00766301155090332,
+          0,
+          -0.9999706149101257
+        ]
+      },
+      {
+        "distance": 1.8306303024291992,
+        "kind": "landmark",
+        "point": [
+          6530.347602132296,
+          163.1559020996094,
+          -93.99931057544413
+        ],
+        "normal": [
+          -0.00766301155090332,
+          0,
+          -0.9999706149101257
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13465333501,
+    "way": 1468130974,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.00888445770965518,
+    "obstacle": ""
+  },
+  {
+    "id": 13465333501,
+    "way": 1468130974,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.005139899141369142,
+    "obstacle": ""
+  },
+  {
+    "id": 13465333520,
+    "way": 1468130974,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0018913269042855063,
+    "obstacle": ""
+  },
+  {
+    "id": 13465333520,
+    "way": 1468130974,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0015130416402087121,
+    "obstacle": ""
+  },
+  {
+    "id": 13470032643,
+    "way": 1486208147,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.007523379460820934,
+    "obstacle": ""
+  },
+  {
+    "id": 13470032643,
+    "way": 1486208147,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.007699069661924796,
+    "obstacle": ""
+  },
+  {
+    "id": 13472587821,
+    "way": 1489643588,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.04257851422957515,
+    "obstacle": ""
+  },
+  {
+    "id": 13472587821,
+    "way": 1489643588,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.01277511535951703,
+    "obstacle": ""
+  },
+  {
+    "id": 13481414402,
+    "way": 1469987890,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.04418936383046912,
+    "obstacle": ""
+  },
+  {
+    "id": 13481414402,
+    "way": 1469987890,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.01667845215436614,
+    "obstacle": ""
+  },
+  {
+    "id": 13481414404,
+    "way": 1469987890,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.03373830161004321,
+    "obstacle": ""
+  },
+  {
+    "id": 13481414404,
+    "way": 1469987890,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0014741031628773271,
+    "obstacle": ""
+  },
+  {
+    "id": 13500651129,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0007046824356393699,
+    "obstacle": ""
+  },
+  {
+    "id": 13500651129,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.000602826982174065,
+    "obstacle": ""
+  },
+  {
+    "id": 13503053862,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.002661454340199043,
+    "obstacle": ""
+  },
+  {
+    "id": 13503053862,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.004104369766309901,
+    "obstacle": ""
+  },
+  {
+    "id": 13503053863,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.002427436270806993,
+    "obstacle": ""
+  },
+  {
+    "id": 13503053863,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.002533569875737385,
+    "obstacle": ""
+  },
+  {
+    "id": 13503053864,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.11347179930166362,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13503053864,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.12580686110371175,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13503053866,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.0006303887322189894,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      {
+        "distance": 1.9467244148254395,
+        "kind": "tree",
+        "point": [
+          -428.21189578121624,
+          154.86998291015627,
+          -719.4661756412867
+        ],
+        "normal": [
+          -0.48910292983055115,
+          -5.865221828571521e-05,
+          -0.8722259998321533
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13503053866,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.03410717766240623,
+    "obstacle": "collision",
+    "contacts": [
+      {
+        "distance": 1.8946572542190552,
+        "kind": "tree",
+        "point": [
+          -427.6837624001655,
+          154.8700897216797,
+          -719.2918491500931
+        ],
+        "normal": [
+          0.9066832065582275,
+          0,
+          -0.42181211709976196
+        ]
+      },
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13503053871,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.21159096389447996,
+    "obstacle": ""
+  },
+  {
+    "id": 13503053871,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.10502799338891577,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13503091110,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.2817578436743702,
+    "obstacle": ""
+  },
+  {
+    "id": 13503091110,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.13920580230231394,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13503091114,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.16847009928721945,
+    "obstacle": ""
+  },
+  {
+    "id": 13503091114,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.09344923440013986,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13503091119,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.19834658735203448,
+    "obstacle": ""
+  },
+  {
+    "id": 13503091119,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.19834658735203448,
+    "obstacle": ""
+  },
+  {
+    "id": 13503091121,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0030206817501152727,
+    "obstacle": ""
+  },
+  {
+    "id": 13503091121,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0032066283361018577,
+    "obstacle": ""
+  },
+  {
+    "id": 13503091122,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.002848200753049923,
+    "obstacle": ""
+  },
+  {
+    "id": 13503091122,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.003056493007932204,
+    "obstacle": ""
+  },
+  {
+    "id": 13503178786,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.33458795288822785,
+    "obstacle": ""
+  },
+  {
+    "id": 13503178786,
+    "way": 1471513684,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.16458810640955335,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13509808072,
+    "way": 1472403495,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0016322682488691953,
+    "obstacle": ""
+  },
+  {
+    "id": 13509808072,
+    "way": 1472403495,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.002159884515805288,
+    "obstacle": ""
+  },
+  {
+    "id": 13509808081,
+    "way": 1472403495,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.000996820544315824,
+    "obstacle": ""
+  },
+  {
+    "id": 13509808081,
+    "way": 1472403495,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0015661292480899647,
+    "obstacle": ""
+  },
+  {
+    "id": 13509808082,
+    "way": 1472403496,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.028027611633518745,
+    "obstacle": ""
+  },
+  {
+    "id": 13509808082,
+    "way": 1472403496,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.16390346052511973,
+    "obstacle": ""
+  },
+  {
+    "id": 13509808083,
+    "way": 1472403496,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.02146394421470177,
+    "obstacle": ""
+  },
+  {
+    "id": 13509808083,
+    "way": 1472403496,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.013775879257138968,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13509808084,
+    "way": 1472403496,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0012434849199394193,
+    "obstacle": ""
+  },
+  {
+    "id": 13509808084,
+    "way": 1472403496,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0015608889876546073,
+    "obstacle": ""
+  },
+  {
+    "id": 13509808086,
+    "way": 1472403496,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0014340061061659526,
+    "obstacle": ""
+  },
+  {
+    "id": 13509808086,
+    "way": 1472403496,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.017548164444150416,
+    "obstacle": ""
+  },
+  {
+    "id": 13509808091,
+    "way": 1472403495,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0023872758982292908,
+    "obstacle": ""
+  },
+  {
+    "id": 13509808091,
+    "way": 1472403495,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.03620249359113359,
+    "obstacle": ""
+  },
+  {
+    "id": 13509827448,
+    "way": 1472404238,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.001591342575153476,
+    "obstacle": ""
+  },
+  {
+    "id": 13509827448,
+    "way": 1472404238,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0014715806493086347,
+    "obstacle": ""
+  },
+  {
+    "id": 13509827449,
+    "way": 1472404238,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.15772442689481636,
+    "obstacle": ""
+  },
+  {
+    "id": 13509827449,
+    "way": 1472404238,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.09751622103294721,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13509827454,
+    "way": 1472404238,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0014211322901473977,
+    "obstacle": ""
+  },
+  {
+    "id": 13509827454,
+    "way": 1472404238,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001057128748783498,
+    "obstacle": ""
+  },
+  {
+    "id": 13509827457,
+    "way": 1472404238,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.06655572427894185,
+    "obstacle": ""
+  },
+  {
+    "id": 13509827457,
+    "way": 1472404238,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.07473186709970037,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      {
+        "distance": 3.5881097316741943,
+        "kind": "building",
+        "point": [
+          -13408.724284759695,
+          166.13598937988283,
+          1155.1187024005558
+        ],
+        "normal": [
+          0.9999815821647644,
+          0,
+          0.00606916006654501
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13520788977,
+    "way": 1473757087,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0013320006289632147,
+    "obstacle": ""
+  },
+  {
+    "id": 13520788977,
+    "way": 1473757087,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0012091483709752993,
+    "obstacle": ""
+  },
+  {
+    "id": 13520788978,
+    "way": 1473757087,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.013158031904481504,
+    "obstacle": ""
+  },
+  {
+    "id": 13520788978,
+    "way": 1473757087,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.013319337367988737,
+    "obstacle": ""
+  },
+  {
+    "id": 13525607112,
+    "way": 1474325108,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.013291319586187456,
+    "obstacle": ""
+  },
+  {
+    "id": 13525607112,
+    "way": 1474325108,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.013128202928697874,
+    "obstacle": ""
+  },
+  {
+    "id": 13525607127,
+    "way": 1474325108,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0022619093364255605,
+    "obstacle": ""
+  },
+  {
+    "id": 13525607127,
+    "way": 1474325108,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0022169462914689575,
+    "obstacle": ""
+  },
+  {
+    "id": 13525846771,
+    "way": 1474365105,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0016261260464318639,
+    "obstacle": ""
+  },
+  {
+    "id": 13525846771,
+    "way": 1474365105,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0014859570647161036,
+    "obstacle": ""
+  },
+  {
+    "id": 13528279951,
+    "way": 1474631007,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.1287959668996166,
+    "obstacle": ""
+  },
+  {
+    "id": 13528279951,
+    "way": 1474631007,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.03742093230192722,
+    "obstacle": ""
+  },
+  {
+    "id": 13528279974,
+    "way": 1474631007,
+    "mode": "bicycle",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.29925783097743874,
+    "obstacle": ""
+  },
+  {
+    "id": 13528279974,
+    "way": 1474631007,
+    "mode": "bicycle",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.0038029253482818604,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13528279974,
+    "way": 1474631007,
+    "mode": "bike",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.28622703839093333,
+    "obstacle": ""
+  },
+  {
+    "id": 13528279974,
+    "way": 1474631007,
+    "mode": "bike",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.003643129952251911,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13528279974,
+    "way": 1474631007,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.0007653122803219503,
+    "obstacle": ""
+  },
+  {
+    "id": 13528279974,
+    "way": 1474631007,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0855560302734375,
+    "obstacle": ""
+  },
+  {
+    "id": 13528279974,
+    "way": 1474631007,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.05804443359375,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13528279976,
+    "way": 1474631007,
+    "mode": "bicycle",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0025419890880584717,
+    "obstacle": ""
+  },
+  {
+    "id": 13528279976,
+    "way": 1474631007,
+    "mode": "bicycle",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0030895471572875977,
+    "obstacle": ""
+  },
+  {
+    "id": 13528279976,
+    "way": 1474631007,
+    "mode": "bike",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.002419043332338333,
+    "obstacle": ""
+  },
+  {
+    "id": 13528279976,
+    "way": 1474631007,
+    "mode": "bike",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0031995875760912895,
+    "obstacle": ""
+  },
+  {
+    "id": 13528279976,
+    "way": 1474631007,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.0007221698760986328,
+    "obstacle": ""
+  },
+  {
+    "id": 13528279976,
+    "way": 1474631007,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.00323486328125,
+    "obstacle": ""
+  },
+  {
+    "id": 13528279976,
+    "way": 1474631007,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0030670166015625,
+    "obstacle": ""
+  },
+  {
+    "id": 13528391015,
+    "way": 1468130974,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0020081011754200517,
+    "obstacle": ""
+  },
+  {
+    "id": 13528391015,
+    "way": 1468130974,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001961731010993617,
+    "obstacle": ""
+  },
+  {
+    "id": 13528513157,
+    "way": 1489643589,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.023856016487457055,
+    "obstacle": ""
+  },
+  {
+    "id": 13528513157,
+    "way": 1489643589,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.009324556364219916,
+    "obstacle": ""
+  },
+  {
+    "id": 13531477585,
+    "way": 1474958000,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.23787338031914373,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13531477585,
+    "way": 1474958000,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.08728363232791025,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13531477590,
+    "way": 1474958000,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.2892260453611186,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13531477590,
+    "way": 1474958000,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.12957562196928052,
+    "obstacle": ""
+  },
+  {
+    "id": 13535714448,
+    "way": 1475440133,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.24033456777627293,
+    "obstacle": ""
+  },
+  {
+    "id": 13535714448,
+    "way": 1475440133,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.14092715849292858,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13535714475,
+    "way": 1475440138,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0014451802901476185,
+    "obstacle": ""
+  },
+  {
+    "id": 13535714475,
+    "way": 1475440138,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0020431447703970207,
+    "obstacle": ""
+  },
+  {
+    "id": 13535714476,
+    "way": 1475440138,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0031114665966924804,
+    "obstacle": ""
+  },
+  {
+    "id": 13535714476,
+    "way": 1475440138,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0030115129812600117,
+    "obstacle": ""
+  },
+  {
+    "id": 13545236547,
+    "way": 1476732770,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.003154930753538565,
+    "obstacle": ""
+  },
+  {
+    "id": 13545236547,
+    "way": 1476732770,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.00380132119610721,
+    "obstacle": ""
+  },
+  {
+    "id": 13545236548,
+    "way": 1476732770,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.012916216985217943,
+    "obstacle": ""
+  },
+  {
+    "id": 13545236548,
+    "way": 1476732770,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.013014201735558117,
+    "obstacle": ""
+  },
+  {
+    "id": 13622135258,
+    "way": 1485919582,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.04548217710458857,
+    "obstacle": ""
+  },
+  {
+    "id": 13622135258,
+    "way": 1485919582,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.006989593100996672,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13622135259,
+    "way": 1485919582,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0049930379075817655,
+    "obstacle": ""
+  },
+  {
+    "id": 13622135259,
+    "way": 1485919582,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0057286307496724476,
+    "obstacle": ""
+  },
+  {
+    "id": 13637474084,
+    "way": 1487527335,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.0041788795084301,
+    "obstacle": "collision",
+    "contacts": [
+      {
+        "distance": 1.8681995868682861,
+        "kind": "landmark",
+        "point": [
+          6521.757771252299,
+          163.09402770996095,
+          -84.45318811833734
+        ],
+        "normal": [
+          -0.999971866607666,
+          0,
+          0.0074987635016441345
+        ]
+      },
+      {
+        "distance": 1.8530347347259521,
+        "kind": "landmark",
+        "point": [
+          6521.751373680081,
+          163.09402770996095,
+          -85.30329931330552
+        ],
+        "normal": [
+          -0.999971866607666,
+          0,
+          0.0074987635016441345
+        ]
+      },
+      {
+        "distance": 1.8378700017929077,
+        "kind": "landmark",
+        "point": [
+          6521.744976227066,
+          163.09402770996095,
+          -86.15341050704421
+        ],
+        "normal": [
+          -0.999971866607666,
+          0,
+          0.0074987635016441345
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13637474084,
+    "way": 1487527335,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.03409691891582156,
+    "obstacle": "collision",
+    "contacts": [
+      {
+        "distance": 1.7484090328216553,
+        "kind": "landmark",
+        "point": [
+          6531.773764412994,
+          163.31891174316408,
+          -81.05743814669773
+        ],
+        "normal": [
+          0.006535052787512541,
+          0,
+          0.9999787211418152
+        ]
+      },
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13637474087,
+    "way": 1487527335,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0027847295662013494,
+    "obstacle": ""
+  },
+  {
+    "id": 13637474087,
+    "way": 1487527335,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.003025068202134662,
+    "obstacle": ""
+  },
+  {
+    "id": 13637474088,
+    "way": 1487527335,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.06890962551224789,
+    "obstacle": "collision",
+    "contacts": [
+      {
+        "distance": 1.748121738433838,
+        "kind": "landmark",
+        "point": [
+          6530.743245555933,
+          163.17789001464845,
+          -130.27563435120007
+        ],
+        "normal": [
+          -0.9999774694442749,
+          0,
+          0.006716394796967506
+        ]
+      },
+      {
+        "distance": 2.1940250396728516,
+        "kind": "landmark",
+        "point": [
+          6530.736741853102,
+          163.17789001464845,
+          -131.23547155401383
+        ],
+        "normal": [
+          -0.9999774694442749,
+          0,
+          0.006716394796967506
+        ]
+      },
+      {
+        "distance": 2.6399285793304443,
+        "kind": "landmark",
+        "point": [
+          6530.730238360647,
+          163.17789001464845,
+          -132.19530886901313
+        ],
+        "normal": [
+          -0.9999774694442749,
+          0,
+          0.006716394796967506
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13637474088,
+    "way": 1487527335,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.0009199190814399572,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      {
+        "distance": 1.8220794200897217,
+        "kind": "landmark",
+        "point": [
+          6531.1817615401715,
+          163.24148864746095,
+          -132.97061235858328
+        ],
+        "normal": [
+          -0.0032464161049574614,
+          0,
+          -0.999994695186615
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13637474367,
+    "way": 1487527349,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.0007209033336437187,
+    "obstacle": "collision",
+    "contacts": [
+      {
+        "distance": 1.795477271080017,
+        "kind": "landmark",
+        "point": [
+          7288.7166059706415,
+          170.4902069091797,
+          111.85793378033493
+        ],
+        "normal": [
+          -0.9999098181724548,
+          0,
+          0.013431276194751263
+        ]
+      },
+      {
+        "distance": 1.9457459449768066,
+        "kind": "landmark",
+        "point": [
+          7288.702891773411,
+          170.4902069091797,
+          110.9948621754556
+        ],
+        "normal": [
+          -0.9998590350151062,
+          0,
+          0.016788266599178314
+        ]
+      },
+      {
+        "distance": 2.095102548599243,
+        "kind": "landmark",
+        "point": [
+          7288.688282069052,
+          170.4902069091797,
+          110.13196359996473
+        ],
+        "normal": [
+          -0.9998590350151062,
+          0,
+          0.016788266599178314
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13637474367,
+    "way": 1487527349,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.0008527716375681393,
+    "obstacle": "collision",
+    "contacts": [
+      {
+        "distance": 1.7823209762573242,
+        "kind": "landmark",
+        "point": [
+          7288.6919001084725,
+          170.51211853027345,
+          110.32904850576303
+        ],
+        "normal": [
+          0.9998590350151062,
+          0,
+          -0.016788266599178314
+        ]
+      },
+      {
+        "distance": 2.018411874771118,
+        "kind": "landmark",
+        "point": [
+          7288.706522891211,
+          170.51211853027345,
+          111.2111058092224
+        ],
+        "normal": [
+          0.9998590350151062,
+          0,
+          -0.016788266599178314
+        ]
+      },
+      {
+        "distance": 2.2562568187713623,
+        "kind": "landmark",
+        "point": [
+          7288.71946362257,
+          170.51211853027345,
+          112.09366048450228
+        ],
+        "normal": [
+          0.9999098181724548,
+          0,
+          -0.013431276194751263
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13637474368,
+    "way": 1487527349,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.026446526118036218,
+    "obstacle": "collision",
+    "contacts": [
+      {
+        "distance": 1.7867244482040405,
+        "kind": "landmark",
+        "point": [
+          7302.354064106735,
+          170.69969482421877,
+          106.20612485502839
+        ],
+        "normal": [
+          0.9999120831489563,
+          0,
+          -0.013252819888293743
+        ]
+      },
+      {
+        "distance": 1.990375280380249,
+        "kind": "landmark",
+        "point": [
+          7302.3656343651855,
+          170.69969482421877,
+          107.0801041400034
+        ],
+        "normal": [
+          0.9999120831489563,
+          0,
+          -0.013252819888293743
+        ]
+      },
+      {
+        "distance": 2.194026470184326,
+        "kind": "landmark",
+        "point": [
+          7302.377204276985,
+          170.69969482421877,
+          107.95408351290047
+        ],
+        "normal": [
+          0.9999120831489563,
+          0,
+          -0.013252819888293743
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13637474368,
+    "way": 1487527349,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.0010096168743132239,
+    "obstacle": "collision",
+    "contacts": [
+      {
+        "distance": 1.780709147453308,
+        "kind": "landmark",
+        "point": [
+          7302.378331563354,
+          170.63597412109377,
+          108.05225265573708
+        ],
+        "normal": [
+          -0.9999120831489563,
+          0,
+          0.013252819888293743
+        ]
+      },
+      {
+        "distance": 2.020040512084961,
+        "kind": "landmark",
+        "point": [
+          7302.366816243075,
+          170.63597412109377,
+          107.16927649552927
+        ],
+        "normal": [
+          -0.9999120831489563,
+          0,
+          0.013252819888293743
+        ]
+      },
+      {
+        "distance": 2.259371757507324,
+        "kind": "landmark",
+        "point": [
+          7302.35530080848,
+          170.63597412109377,
+          106.28630036912409
+        ],
+        "normal": [
+          -0.9999120831489563,
+          0,
+          0.013252819888293743
+        ]
+      }
+    ]
+  },
+  {
+    "id": 13640478507,
+    "way": 1084347075,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.004048879978796549,
+    "obstacle": ""
+  },
+  {
+    "id": 13640478507,
+    "way": 1084347075,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.00879890986206533,
+    "obstacle": ""
+  },
+  {
+    "id": 13651472304,
+    "way": 1489347719,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0017000589730571392,
+    "obstacle": ""
+  },
+  {
+    "id": 13651472304,
+    "way": 1489347719,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001667025854004578,
+    "obstacle": ""
+  },
+  {
+    "id": 13651472305,
+    "way": 1489347719,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.027133336944416442,
+    "obstacle": ""
+  },
+  {
+    "id": 13651472305,
+    "way": 1489347719,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.01442390781528502,
+    "obstacle": ""
+  },
+  {
+    "id": 13651472306,
+    "way": 1489347719,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.00293044144251553,
+    "obstacle": ""
+  },
+  {
+    "id": 13651472306,
+    "way": 1489347719,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0029048070592807562,
+    "obstacle": ""
+  },
+  {
+    "id": 13651472315,
+    "way": 1489347719,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.09372387472188848,
+    "obstacle": ""
+  },
+  {
+    "id": 13651472315,
+    "way": 1489347719,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.031317678487539524,
+    "obstacle": ""
+  },
+  {
+    "id": 13653844544,
+    "way": 1489640393,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0025646403150858532,
+    "obstacle": ""
+  },
+  {
+    "id": 13653844544,
+    "way": 1489640393,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0028315961360760866,
+    "obstacle": ""
+  },
+  {
+    "id": 13653899012,
+    "way": 1489643588,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.009445547382796349,
+    "obstacle": ""
+  },
+  {
+    "id": 13653899012,
+    "way": 1489643588,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.008622555012976818,
+    "obstacle": ""
+  },
+  {
+    "id": 13653899013,
+    "way": 1489643589,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.013031545000274036,
+    "obstacle": "building",
+    "contacts": [
+      {
+        "distance": 2.0230658054351807,
+        "kind": "building",
+        "point": [
+          -15469.734307936871,
+          165.91307373046877,
+          1903.8451292631257
+        ],
+        "normal": [
+          0.7048671841621399,
+          0,
+          0.7093393206596375
+        ]
+      },
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13653899013,
+    "way": 1489643589,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.012936474129844555,
+    "obstacle": ""
+  },
+  {
+    "id": 13660684188,
+    "way": 1490465015,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.001381132287804121,
+    "obstacle": ""
+  },
+  {
+    "id": 13660684188,
+    "way": 1490465015,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001476297738406629,
+    "obstacle": ""
+  },
+  {
+    "id": 13660684190,
+    "way": 1490465015,
+    "mode": "bicycle",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.026200473308563232,
+    "obstacle": ""
+  },
+  {
+    "id": 13660684190,
+    "way": 1490465015,
+    "mode": "bicycle",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0261995792388916,
+    "obstacle": ""
+  },
+  {
+    "id": 13660684190,
+    "way": 1490465015,
+    "mode": "bike",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.05136860487982631,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13660684190,
+    "way": 1490465015,
+    "mode": "bike",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.026942031923681498,
+    "obstacle": ""
+  },
+  {
+    "id": 13660684190,
+    "way": 1490465015,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.0011977997590975065,
+    "obstacle": ""
+  },
+  {
+    "id": 13660684190,
+    "way": 1490465015,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.003265380859375,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13660684190,
+    "way": 1490465015,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.0016021728515625,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13660692432,
+    "way": 1490460395,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.20196243025222316,
+    "obstacle": ""
+  },
+  {
+    "id": 13660692432,
+    "way": 1490460395,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.14257238805294037,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13664029032,
+    "way": 1084347076,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.037870412840049994,
+    "obstacle": ""
+  },
+  {
+    "id": 13664029032,
+    "way": 1084347076,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.03583380602441366,
+    "obstacle": ""
+  },
+  {
+    "id": 13673363596,
+    "way": 1016734571,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0017405538063997028,
+    "obstacle": ""
+  },
+  {
+    "id": 13673363596,
+    "way": 1016734571,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0028315043674354,
+    "obstacle": ""
+  },
+  {
+    "id": 13673970813,
+    "way": 1492138642,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0013941295866573,
+    "obstacle": ""
+  },
+  {
+    "id": 13673970813,
+    "way": 1492138642,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0005576177588011433,
+    "obstacle": ""
+  },
+  {
+    "id": 13677190445,
+    "way": 1492542119,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.015366628259982917,
+    "obstacle": ""
+  },
+  {
+    "id": 13677190445,
+    "way": 1492542119,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0010086463307459326,
+    "obstacle": ""
+  },
+  {
+    "id": 13677190453,
+    "way": 1492542121,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.016440835988760227,
+    "obstacle": ""
+  },
+  {
+    "id": 13677190453,
+    "way": 1492542121,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.014726644417038415,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13677190454,
+    "way": 1492542121,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0034838151257190475,
+    "obstacle": ""
+  },
+  {
+    "id": 13677190454,
+    "way": 1492542121,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0033566271359291022,
+    "obstacle": ""
+  },
+  {
+    "id": 13677190462,
+    "way": 1492542119,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.15723880585636607,
+    "obstacle": ""
+  },
+  {
+    "id": 13677190462,
+    "way": 1492542119,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.2926631716062502,
+    "obstacle": ""
+  },
+  {
+    "id": 13677190463,
+    "way": 1492542123,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.00017818279985704066,
+    "obstacle": ""
+  },
+  {
+    "id": 13677190463,
+    "way": 1492542123,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.000222766624290216,
+    "obstacle": ""
+  },
+  {
+    "id": 13677190467,
+    "way": 1492542125,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0009802318969036605,
+    "obstacle": ""
+  },
+  {
+    "id": 13677190467,
+    "way": 1492542125,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0010755636781993871,
+    "obstacle": ""
+  },
+  {
+    "id": 13680845622,
+    "way": 1492966272,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0011280990996453966,
+    "obstacle": ""
+  },
+  {
+    "id": 13680845622,
+    "way": 1492966272,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001268255598148471,
+    "obstacle": ""
+  },
+  {
+    "id": 13680845623,
+    "way": 1492966272,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.012987215676389496,
+    "obstacle": ""
+  },
+  {
+    "id": 13680845623,
+    "way": 1492966272,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.012993896569838626,
+    "obstacle": ""
+  },
+  {
+    "id": 13680845626,
+    "way": 1492966272,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.00096478136080691,
+    "obstacle": ""
+  },
+  {
+    "id": 13680845626,
+    "way": 1492966272,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0020676959235572667,
+    "obstacle": ""
+  },
+  {
+    "id": 13680845700,
+    "way": 1492966272,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.2146887180940098,
+    "obstacle": ""
+  },
+  {
+    "id": 13680845700,
+    "way": 1492966272,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0509132075984553,
+    "obstacle": ""
+  },
+  {
+    "id": 13680930298,
+    "way": 1492982639,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0008484529998895596,
+    "obstacle": ""
+  },
+  {
+    "id": 13680930298,
+    "way": 1492982639,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001317807975794949,
+    "obstacle": ""
+  },
+  {
+    "id": 13680946112,
+    "way": 1492980551,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.002308321898851773,
+    "obstacle": ""
+  },
+  {
+    "id": 13680946112,
+    "way": 1492980551,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.002700914639348184,
+    "obstacle": ""
+  },
+  {
+    "id": 13680946244,
+    "way": 1492980551,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0015172141903008196,
+    "obstacle": ""
+  },
+  {
+    "id": 13680946244,
+    "way": 1492980551,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0012725064214578197,
+    "obstacle": ""
+  },
+  {
+    "id": 13681289322,
+    "way": 1492980551,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0012276469536516288,
+    "obstacle": ""
+  },
+  {
+    "id": 13681289322,
+    "way": 1492980551,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0005634820686282183,
+    "obstacle": ""
+  },
+  {
+    "id": 13686122676,
+    "way": 1493581776,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0010919640648978657,
+    "obstacle": ""
+  },
+  {
+    "id": 13686122676,
+    "way": 1493581776,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0009030245385019953,
+    "obstacle": ""
+  },
+  {
+    "id": 13686122683,
+    "way": 1493581776,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.027177180659094802,
+    "obstacle": ""
+  },
+  {
+    "id": 13686122683,
+    "way": 1493581776,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.026702170664407276,
+    "obstacle": ""
+  },
+  {
+    "id": 13686122684,
+    "way": 1493581776,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0022915208114682173,
+    "obstacle": ""
+  },
+  {
+    "id": 13686122684,
+    "way": 1493581776,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0009899877152292902,
+    "obstacle": ""
+  },
+  {
+    "id": 13686122686,
+    "way": 1493581776,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.00023369665416339558,
+    "obstacle": ""
+  },
+  {
+    "id": 13686122686,
+    "way": 1493581776,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.013746845272351038,
+    "obstacle": ""
+  },
+  {
+    "id": 13686122688,
+    "way": 1493581776,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0032157106219585785,
+    "obstacle": ""
+  },
+  {
+    "id": 13686122688,
+    "way": 1493581776,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.004025706705078846,
+    "obstacle": ""
+  },
+  {
+    "id": 13715269931,
+    "way": 1497561668,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0019859047430941246,
+    "obstacle": ""
+  },
+  {
+    "id": 13715269931,
+    "way": 1497561668,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0029060360395476437,
+    "obstacle": ""
+  },
+  {
+    "id": 13715269941,
+    "way": 1497561668,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.4045156788826034,
+    "obstacle": ""
+  },
+  {
+    "id": 13715269941,
+    "way": 1497561668,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.1449506831169174,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13715269942,
+    "way": 1497561668,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.06010651903332587,
+    "obstacle": ""
+  },
+  {
+    "id": 13715269942,
+    "way": 1497561668,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.293811793276717,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13715292289,
+    "way": 1497558425,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.002439812106899808,
+    "obstacle": ""
+  },
+  {
+    "id": 13715292289,
+    "way": 1497558425,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0034255766643696006,
+    "obstacle": ""
+  },
+  {
+    "id": 13715292332,
+    "way": 1497558425,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.05478284741346329,
+    "obstacle": ""
+  },
+  {
+    "id": 13715292332,
+    "way": 1497558425,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.05365015571970844,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 13717816679,
+    "way": 1497845499,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0013242674323805659,
+    "obstacle": ""
+  },
+  {
+    "id": 13717816679,
+    "way": 1497845499,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0015600108875446494,
+    "obstacle": ""
+  },
+  {
+    "id": 13717816682,
+    "way": 1497845499,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.00112816421491857,
+    "obstacle": ""
+  },
+  {
+    "id": 13717816682,
+    "way": 1497845499,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0010568188046704563,
+    "obstacle": ""
+  },
+  {
+    "id": 13717816683,
+    "way": 1497845499,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.002604357139119884,
+    "obstacle": ""
+  },
+  {
+    "id": 13717816683,
+    "way": 1497845499,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0035251909831686135,
+    "obstacle": ""
+  },
+  {
+    "id": 13726846805,
+    "way": 1498950503,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0014025295680255567,
+    "obstacle": ""
+  },
+  {
+    "id": 13726846805,
+    "way": 1498950503,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001617364501043994,
+    "obstacle": ""
+  },
+  {
+    "id": 13726846808,
+    "way": 1498950503,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0014007308573127375,
+    "obstacle": ""
+  },
+  {
+    "id": 13726846808,
+    "way": 1498950503,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0013186016172710424,
+    "obstacle": ""
+  },
+  {
+    "id": 13733725666,
+    "way": 1499787826,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0007440662609212723,
+    "obstacle": ""
+  },
+  {
+    "id": 13733725666,
+    "way": 1499787826,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0008569978318178073,
+    "obstacle": ""
+  },
+  {
+    "id": 13733725669,
+    "way": 1499787826,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0014676606880072995,
+    "obstacle": ""
+  },
+  {
+    "id": 13733725669,
+    "way": 1499787826,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001092505567498847,
+    "obstacle": ""
+  },
+  {
+    "id": 13956749339,
+    "way": 1492966272,
+    "mode": "bicycle",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.05120387673377991,
+    "obstacle": ""
+  },
+  {
+    "id": 13956749339,
+    "way": 1492966272,
+    "mode": "bicycle",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.06759712100028992,
+    "obstacle": ""
+  },
+  {
+    "id": 13956749339,
+    "way": 1492966272,
+    "mode": "bike",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.049628566950559616,
+    "obstacle": ""
+  },
+  {
+    "id": 13956749339,
+    "way": 1492966272,
+    "mode": "bike",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.06644835695624352,
+    "obstacle": ""
+  },
+  {
+    "id": 13956749339,
+    "way": 1492966272,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 6.348355762497704e-05,
+    "obstacle": ""
+  },
+  {
+    "id": 13969925689,
+    "way": 1532928036,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.001313515204316218,
+    "obstacle": ""
+  },
+  {
+    "id": 13969925689,
+    "way": 1532928036,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.001159250061448347,
+    "obstacle": ""
+  },
+  {
+    "id": 14086733487,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.06918914959115341,
+    "obstacle": ""
+  },
+  {
+    "id": 14086733487,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.09016878424949937,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 14086733497,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.029731398595970404,
+    "obstacle": ""
+  },
+  {
+    "id": 14086733497,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.014438728791361655,
+    "obstacle": ""
+  },
+  {
+    "id": 14102610410,
+    "way": 1485632262,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.008103927801244026,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 14102610410,
+    "way": 1485632262,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.013167972834594366,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 14105001808,
+    "way": 1550773915,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.270968103588757,
+    "obstacle": ""
+  },
+  {
+    "id": 14105001808,
+    "way": 1550773915,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.12767592994671872,
+    "obstacle": "collision",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 14105347256,
+    "way": 1550817778,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.005149229854907844,
+    "obstacle": ""
+  },
+  {
+    "id": 14105347256,
+    "way": 1550817778,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.005015757173879365,
+    "obstacle": ""
+  },
+  {
+    "id": 14132564761,
+    "way": 1550817778,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.007614984827228,
+    "obstacle": ""
+  },
+  {
+    "id": 14132564761,
+    "way": 1550817778,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.17042386003259935,
+    "obstacle": ""
+  },
+  {
+    "id": 14132564764,
+    "way": 1550817778,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.012260960407985522,
+    "obstacle": ""
+  },
+  {
+    "id": 14132564764,
+    "way": 1550817778,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.009546320393411634,
+    "obstacle": ""
+  },
+  {
+    "id": 14132564767,
+    "way": 1550817778,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.01979345656792475,
+    "obstacle": ""
+  },
+  {
+    "id": 14132564767,
+    "way": 1550817778,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.05199670859101957,
+    "obstacle": ""
+  },
+  {
+    "id": 14132564768,
+    "way": 1550817778,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.02057920885536646,
+    "obstacle": ""
+  },
+  {
+    "id": 14132564768,
+    "way": 1550817778,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.01669838462237294,
+    "obstacle": ""
+  },
+  {
+    "id": 14132572329,
+    "way": 1553344902,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.007160830160358955,
+    "obstacle": ""
+  },
+  {
+    "id": 14132572329,
+    "way": 1553344902,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.002238381808666645,
+    "obstacle": ""
+  },
+  {
+    "id": 14132825384,
+    "way": 1553374718,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.008683945435393525,
+    "obstacle": ""
+  },
+  {
+    "id": 14132825384,
+    "way": 1553374718,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.008081132735867413,
+    "obstacle": ""
+  },
+  {
+    "id": 14132825386,
+    "way": 1553374718,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.04154711860530824,
+    "obstacle": ""
+  },
+  {
+    "id": 14132825386,
+    "way": 1553374718,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.009347338496525026,
+    "obstacle": ""
+  },
+  {
+    "id": 14141243588,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.031202371727744094,
+    "obstacle": ""
+  },
+  {
+    "id": 14141243588,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.022731829476811072,
+    "obstacle": ""
+  },
+  {
+    "id": 14141257424,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.03171797226059425,
+    "obstacle": ""
+  },
+  {
+    "id": 14141257424,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.06281666069662606,
+    "obstacle": ""
+  },
+  {
+    "id": 14141257438,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.011825964135965705,
+    "obstacle": ""
+  },
+  {
+    "id": 14141257438,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.014701835276923703,
+    "obstacle": ""
+  },
+  {
+    "id": 14141257617,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": true,
+    "completed": true,
+    "maximum": 0.005207388580970473,
+    "obstacle": ""
+  },
+  {
+    "id": 14141257617,
+    "way": 454947540,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.00811767578125,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 14141257617,
+    "way": 454947540,
+    "mode": "foot",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.10888671875,
+    "obstacle": ""
+  },
+  {
+    "id": 14141257630,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0032751475864927215,
+    "obstacle": ""
+  },
+  {
+    "id": 14141257630,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.003482665655752726,
+    "obstacle": ""
+  },
+  {
+    "id": 14141257668,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0021768908455896963,
+    "obstacle": ""
+  },
+  {
+    "id": 14141257668,
+    "way": 454947540,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.012024583794044474,
+    "obstacle": ""
+  },
+  {
+    "id": 14286127215,
+    "way": 1568445636,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0012783683695829495,
+    "obstacle": ""
+  },
+  {
+    "id": 14286127215,
+    "way": 1568445636,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0011710572917422724,
+    "obstacle": ""
+  },
+  {
+    "id": 14286127223,
+    "way": 1568445636,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": false,
+    "failure": "collision",
+    "maximum": 0.0012981297834926409,
+    "obstacle": "building",
+    "contacts": [
+      null,
+      null,
+      {
+        "distance": 2.0768725872039795,
+        "kind": "building",
+        "point": [
+          -10707.939577013633,
+          161.8681823730469,
+          1270.4108544605992
+        ],
+        "normal": [
+          -0.6551745533943176,
+          0,
+          0.7554774880409241
+        ]
+      }
+    ]
+  },
+  {
+    "id": 14286127223,
+    "way": 1568445636,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": false,
+    "failure": "tool",
+    "maximum": 0.036666918250745084,
+    "obstacle": "",
+    "contacts": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "id": 14286127243,
+    "way": 1568445636,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.06111987289392573,
+    "obstacle": ""
+  },
+  {
+    "id": 14286127243,
+    "way": 1568445636,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.042518614710502334,
+    "obstacle": ""
+  },
+  {
+    "id": 14288532039,
+    "way": 1568666548,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.03642754048672714,
+    "obstacle": ""
+  },
+  {
+    "id": 14288532039,
+    "way": 1568666548,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.00438454825922463,
+    "obstacle": ""
+  },
+  {
+    "id": 14288532040,
+    "way": 1568666548,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.003222827641479853,
+    "obstacle": ""
+  },
+  {
+    "id": 14288532040,
+    "way": 1568666548,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0034897523106280914,
+    "obstacle": ""
+  },
+  {
+    "id": 14353609653,
+    "way": 1489347719,
+    "mode": "car",
+    "boundary": false,
+    "direction": "in",
+    "completed": true,
+    "maximum": 0.0013990686749707493,
+    "obstacle": ""
+  },
+  {
+    "id": 14353609653,
+    "way": 1489347719,
+    "mode": "car",
+    "boundary": false,
+    "direction": "out",
+    "completed": true,
+    "maximum": 0.0012067169513159115,
+    "obstacle": ""
+  }
+]
