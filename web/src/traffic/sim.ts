@@ -1,7 +1,7 @@
-import {nearStatic,resolveContact,staticSolids} from './contact.ts'
+import {nearStatic,resolveContact,staticSolids,pickups,type Solid} from './contact.ts'
 import {CAR_SCALE} from '../drive/scale.ts'
 type Node = {id:number,x:number,y:number,z:number}
-type Lane = {id:number,from:number,to:number,offset:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],heights?:number[]}
+type Lane = {id:number,from:number,to:number,offset:number,width?:number,kind:'motor'|'bus'|'nonmotor',speedKmh:number,cls?:string,street?:string,npcWalks?:number[][],heights?:number[]}
 type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?,number[]?][],signals:Signal[]}
@@ -37,6 +37,30 @@ export class Traffic {
   private junctions=new Set<number>()
   private queues=new Map<number,Actor[]>()
   private exits=new Map<number,Track[]>()
+  private parked=new WeakMap<Track,{revision:number,hits:{solid:Solid,dist:number}[]}>()
+  parkingHits(track:Track){
+    const cached=this.parked.get(track)
+    if(cached?.revision===pickups.revision)return cached.hits
+    const hits:{solid:Solid,dist:number}[]=[],seen=new Set<Solid>(),half=(track.width??3)/2
+    const inspect=(solid:Solid)=>{
+      if(seen.has(solid))return;seen.add(solid)
+      const east=solid.x-track.start.x,south=solid.z-track.start.z
+      const dist=east*track.dx+south*track.dz,side=south*track.dx-east*track.dz-track.offset
+      const cosine=Math.cos(solid.yaw-track.yaw),sine=Math.sin(solid.yaw-track.yaw)
+      const middle=dist-track.length/2
+      if(Math.abs(middle)>track.length/2+solid.halfLength*Math.abs(cosine)+solid.halfWidth*Math.abs(sine)||
+        Math.abs(side)>half+solid.halfLength*Math.abs(sine)+solid.halfWidth*Math.abs(cosine)||
+        Math.abs(middle*cosine-side*sine)>solid.halfLength+track.length/2*Math.abs(cosine)+half*Math.abs(sine)||
+        Math.abs(middle*sine+side*cosine)>solid.halfWidth+track.length/2*Math.abs(sine)+half*Math.abs(cosine)||
+        Math.abs(solid.y-trackHeight(track,dist))>1.5)return
+      hits.push({solid,dist})
+    }
+    const steps=Math.ceil(track.length/6)
+    for(let step=0;step<=steps;step++){const along=track.length*step/steps;pickups.near(track.start.x+track.dx*along-track.dz*track.offset,track.start.z+track.dz*along+track.dx*track.offset,inspect)}
+    hits.sort((a,b)=>a.dist-b.dist);this.parked.set(track,{revision:pickups.revision,hits});return hits
+  }
+  private adjacent(track:Track){return (this.exits.get(track.from)??[]).filter(next=>next!==track&&!next.walk&&next.to===track.to&&next.street===track.street&&Math.abs(next.offset-track.offset)<=(next.width??3)/2+(track.width??3)/2+.1&&!this.parkingHits(next).length)}
+  private usable(track:Track){return track.walk||!this.parkingHits(track).length||!!this.adjacent(track).length}
   private cells=new Map<string,Track[]>()
   private obstacles=new Map<number,(Position|Actor)[]>()
   nearSolids=(x:number,z:number,visit:(actor:Actor)=>void)=>{
@@ -163,15 +187,18 @@ export class Traffic {
       const low=walk?this.rules.personMin:this.rules.carMin,high=walk?this.rules.personMax:this.rules.carMax
       const desired=this.actorLimit===MOBILE_ACTORS?low:Math.ceil((low+high)/2)
       if(existing>=desired||budget<=0)continue
-      const candidates:{track:Track,min:number,max:number}[]=[]
+      const candidates:{track:Track,min:number,max:number,end:number}[]=[]
+      let availableLength=0
       for(const track of group[walk?'walk':'motor']){
+        if(!this.usable(track))continue
         const dx=camera.x-track.start.x+track.dz*track.offset,dz=camera.z-track.start.z-track.dx*track.offset
         const center=dx*track.dx+dz*track.dz,span=Math.sqrt(200**2-(dx*track.dz-dz*track.dx)**2)
         const min=Math.max(0,center-span),max=Math.min(track.length,center+span)
-        if(max>min)candidates.push({track,min,max})
+        if(max>min){availableLength+=max-min;candidates.push({track,min,max,end:availableLength})}
       }
       for(let count=existing,attempt=0;candidates.length&&count<desired&&attempt<24&&budget>0&&this.actors.length<this.actorLimit;attempt++){
-        const {track,min,max}=candidates[Math.floor(this.random()*candidates.length)]
+        const metre=this.random()*availableLength
+        const {track,min,max}=candidates.find(candidate=>candidate.end>metre)??candidates[candidates.length-1]
         const scooter=!walk&&this.actors.filter(other=>other.kind==='scooter').length<Math.round((1+this.actors.filter(other=>other.kind!=='person').length)*.36)
         const actor:Actor={track,dist:min+this.random()*(max-min),speed:0,kind:walk?'person':scooter?'scooter':'car',down:0,dodge:0,x:0,y:0,z:0,yaw:0,scale:0,leaving:false,halfWidth:walk||scooter?.3:.9*CAR_SCALE,halfLength:walk?.3:scooter?.85:2.1*CAR_SCALE,height:1.5}
         this.position(actor)
@@ -192,12 +219,12 @@ export class Traffic {
       if(bin)bin.push(obstacle);else obstacles.set(key,[obstacle])
     }
     const gridded=profile?performance.now():0
-    this.advanceActors(dt)
+    this.advanceActors(dt,visible)
     profile?.(spawned-start,gridded-spawned,performance.now()-gridded)
   }
-  private advanceActors(dt:number){
+  private advanceActors(dt:number,visible?:(point:Position)=>boolean){
     const decay=Math.exp(-dt*1.2)
-    for(const actor of this.actors)this.advanceActor(actor,dt,decay)
+    for(const actor of this.actors)this.advanceActor(actor,dt,decay,visible)
     if(this.time>=this.checkWaitsAt){
       this.checkWaitsAt=this.time+1
       const visited=new Set<Actor>()
@@ -218,12 +245,17 @@ export class Traffic {
     }
     this.actors=this.actors.filter(actor=>Number.isFinite(actor.y))
   }
-  private advanceActor(actor:Actor,dt:number,decay:number){
+  private advanceActor(actor:Actor,dt:number,decay:number,visible?:(point:Position)=>boolean){
       const obstacles=this.obstacles
-      const {track}=actor,person=actor.kind==='person'
+      let {track}=actor;const person=actor.kind==='person'
       const previousBlocker=actor.waitingFor
       actor.waitingFor=undefined
       if(actor.leaving){actor.scale=Math.max(0,actor.scale-dt/.4);return}
+      if(!person&&this.parkingHits(track).some(hit=>hit.dist>=actor.dist-2&&hit.dist<actor.dist+28)){
+        const options=this.adjacent(track),next=options.find(lane=>!this.actors.some(other=>other!==actor&&other.track===lane&&Math.abs(other.dist-actor.dist)<10))
+        if(next){actor.dodge+=track.offset-next.offset;actor.track=track=next}
+        else if(!options.length&&!visible?.(actor)){actor.leaving=true;return}
+      }
       actor.scale=Math.min(1,actor.scale+dt/.4)
       if(actor.holdUntil&&actor.holdUntil>performance.now()){actor.speed=0;return}
       const maxSpeed=(person?1.4:Math.min(track.speedKmh/3.6,actor.kind==='car'?12:7))
@@ -278,7 +310,7 @@ export class Traffic {
       }
       if(actor.dist>=track.length){
         if(!person&&this.signal.has(track.to)){this.crossed++;this.onCross?.(track,this.time)}
-        const choices=(this.exits.get(track.to)??[]).filter(next=>next.walk===person && next.street===track.street && (person||next.to!==track.from) && (person||next.kind==='motor'||(actor.kind==='scooter'&&next.kind==='nonmotor')))
+        const choices=(this.exits.get(track.to)??[]).filter(next=>this.usable(next)&&next.walk===person && next.street===track.street && (person||next.to!==track.from) && (person||next.kind==='motor'||(actor.kind==='scooter'&&next.kind==='nonmotor')))
         if(!choices.length){actor.dist=track.length;actor.speed=0;actor.leaving=true;return}
         const onward=choices.filter(next=>next.to!==track.from)
         const pool=onward.length?onward:choices

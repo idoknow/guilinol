@@ -120,7 +120,8 @@ try {
         const viewer=window.viewer
         if(!await viewer.walkTo(-265,15,0,'perf-jiefang'))throw Error('Could not place walker at bridge')
         const tick=viewer.walk.tick.bind(viewer.walk)
-        viewer.walk.tick=elapsed=>{tick(elapsed);viewer.camera.position.set(-265,168,15);viewer.camera.lookAt(-145,153,45);viewer.camera.updateMatrixWorld()}
+        const target=viewer.perfTarget=[-145,153,45]
+        viewer.walk.tick=elapsed=>{tick(elapsed);viewer.camera.position.set(-265,168,15);viewer.camera.lookAt(...target);viewer.camera.updateMatrixWorld()}
       })
       if(trafficQuery)await page.waitForFunction(()=>window.viewer.trafficProbe?.loads.at(-1)?.key==='-1_0',null,{timeout:180000})
     }
@@ -214,6 +215,12 @@ try {
     }
     viewpoints[cam.id] = {label: cam.label, loadMs, ...metrics}
     await saveReport()
+    if(cam.id==='street-jiefang'&&process.env.PERF_SHOT){
+      await page.screenshot({path:process.env.PERF_SHOT+'-east.png'})
+      await page.evaluate(()=>window.viewer.perfTarget.splice(0,3,-385,149,-22))
+      await page.waitForFunction(()=>window.viewer.trafficProbe.motors>0&&window.viewer.trafficProbe.pedestrians>0,null,{timeout:90000})
+      await page.screenshot({path:process.env.PERF_SHOT+'-city.png'})
+    }
     console.log(
       `${cam.id.padEnd(12)} | ${String(metrics.meanMs).padStart(6)} ms (p95 ${String(metrics.p95Ms).padStart(6)} ms) | ` +
       `calls ${String(metrics.calls).padStart(3)} (total ${String(metrics.totalCalls).padStart(3)}) | ` +
