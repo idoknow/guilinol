@@ -1,0 +1,7 @@
+{
+  "shizijie": {
+    "query": "十字街", "lat": 25.28144732, "lon": 110.29083564,
+    "anchors": "center:0,0;jiefang_west:-160,50;jiefang_east:120,-5",
+    "keywords": ["微笑堂", "Guilin main street"], "bvid": "BV1GuW9zJEQT"
+  }
+}
