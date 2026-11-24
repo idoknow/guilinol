@@ -83,7 +83,7 @@ def corridor_underpasses(bounds, height):
                 level = TUNNEL_FLOOR
                 for distance,run,mouth in ((at,ramps[0],first),(length-at,ramps[1],last)):
                     if distance<run:
-                        ease = min(2.,run/3)
+                        ease = min(1.,run/3)
                         integral = (max(0,distance)**2-max(0,distance-ease)**2
                                     -max(0,distance-run+ease)**2)/(2*ease)
                         level = mouth + (TUNNEL_FLOOR-mouth)*integral/(run-ease)

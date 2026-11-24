@@ -5,7 +5,7 @@ import numpy as np
 from common import ll2xz
 from play_region import PlayRegion
 from road_tunnels import corridor_underpasses
-from station_levels import PLATFORM, RAIL, SOFFIT, STYLE, TUNNEL_FLOOR, UNDERPASS
+from station_levels import grade_platforms, PLATFORM, RAIL, SOFFIT, STYLE, TUNNEL_FLOOR, UNDERPASS
 from pathlib import Path
 import json
 
@@ -16,6 +16,21 @@ class GuilinStationTest(unittest.TestCase):
         self.assertAlmostEqual(PLATFORM-RAIL, STYLE['platformHeight'])
         self.assertAlmostEqual(SOFFIT-RAIL, 7.5)
         self.assertAlmostEqual(RAIL-1.2-TUNNEL_FLOOR, 4.5)
+
+    def test_station_grading_preserves_the_existing_tunnel_mouths(self):
+        # These global 4 m vertices support the ground mesh at both portals.
+        left, top = -2352, 1856
+        ground = np.full((33, 50), 1510, dtype=np.int16)
+        underlay = ground.copy()
+        water = np.full_like(ground, -32768)
+        road_grid = np.full((19, 27), 151., dtype=float)
+        grade_platforms(ground, underlay, water, road_grid, left, top)
+        for x in (-2304, -2208):
+            for z in (1920, 1928):
+                row, col = (z-top)//4, (x-left)//4
+                self.assertEqual(ground[row, col], 1510)
+                self.assertEqual(underlay[row, col], 1510)
+        self.assertTrue(np.any(underlay != 1510))
 
     def test_tunnel_floor_and_ceiling_are_level_at_every_rail(self):
         tunnels = corridor_underpasses(PlayRegion().geometry, lambda x,z: 152.5)
