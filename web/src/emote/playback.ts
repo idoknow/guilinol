@@ -15,12 +15,6 @@ function palm(side: number, fingers: T.Vector3, normal: T.Vector3) {
   return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(x, y, x.clone().cross(y)))
 }
 
-// In a front view the right thumb rises from its web and hooks down to the
-// centre; the left follows the opposite arc. Both tips end at the sternum line.
-function thumbArc(side: number, link: number) {
-  const angle = ([73, -5, -79][link - 1] * Math.PI) / 180
-  return V(-side * Math.cos(angle), -side * Math.sin(angle), 0)
-}
 const thumbJoint = (link: number, side: string) =>
   'thumb_' + (link === 4 ? '04_leaf' : '0' + link) + '_' + side
 
@@ -55,11 +49,8 @@ function sample(poseId: number, time: number, set: Target, bind: (name: string) 
         .clone()
         .sub(wrist)
         .applyQuaternion(hand)
-      const goal = V(0, 1.34, 0.3).sub(thumbOffset)
-      for (let link = 1; link <= 3; link++) {
-        const length = bind(thumbJoint(link + 1, side)).distanceTo(bind(thumbJoint(link, side)))
-        goal.addScaledVector(thumbArc(s, link), -length)
-      }
+      // Fixed thumb-root targets retain the approved palm and forearm placement.
+      const goal = V(s * 0.06723232, 1.34 + s * 0.00623384, 0.3).sub(thumbOffset)
       const reach = goal.clone().sub(shoulder),
         distance = reach.length()
       reach.normalize()
@@ -122,11 +113,11 @@ function sample(poseId: number, time: number, set: Target, bind: (name: string) 
           const segment = bind(thumbJoint(i + 1, side))
             .clone()
             .sub(bind(thumbJoint(i, side)))
-          // Maintain a consistent roll around the curved links, including at the flat end caps.
-          // The two sides are point reflections at the contact, so the tip planes coincide.
+          // Cross in the frontal projection, with the right thumb nearer the viewer.
+          // The distal links turn vertically in opposite directions.
           const rightBind = V(-Math.abs(segment.x), segment.y, segment.z)
           const from = palm(1, rightBind, V(0, -1, 0))
-          const to = palm(1, thumbArc(-1, i), V(0, 0, 1))
+          const to = palm(1, i === 3 ? V(0, 1, 0) : V(1, 0, i === 1 ? 0.41 : -0.21), V(0, 0, 1))
           delta.copy(to).multiply(from.invert())
           if (s === 1) delta.multiply(axis(1, 0, 0, Math.PI))
         }

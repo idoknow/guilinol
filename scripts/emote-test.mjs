@@ -87,57 +87,87 @@ test('all five fingers have three weighted joints, identical hierarchy and <=220
   }
 })
 
-test('the curved thumbs meet between separated hands in front of the chest on the production rig', async () => {
-  const {readFile} = await import('node:fs/promises')
-  const {Vector3} = await import('three')
-  const {GLTFLoader} = await import('three/addons/loaders/GLTFLoader.js')
-  const {emotePlayback} = await import('../web/src/emote/playback.ts')
-  const bytes = await readFile('public/avatar/figure.glb')
-  const {scene} = await new GLTFLoader().parseAsync(
-    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-    '',
-  )
-  const pose = emotePlayback(scene)
-  pose.play(2)
-  pose.tick(0.5, false)
-  scene.updateMatrixWorld(true)
-  const point = (name) => scene.getObjectByName(name).getWorldPosition(new Vector3())
-  const chest = point('spine_03')
-  const left = point('hand_l'),
-    right = point('hand_r')
-  assert(left.x - right.x >= 0.08)
-  for (const side of ['l', 'r']) {
-    const sign = side === 'r' ? 1 : -1
-    const wrist = point('hand_' + side)
-    assert(Math.abs(wrist.y - chest.y) < 0.14 && wrist.z - chest.z > 0.18)
-    for (const finger of ['index', 'middle']) {
-      assert(sign * (point(finger + '_04_leaf_' + side).y - wrist.y) > 0.12)
+for (const body of ['figure', 'figure_m', 'figure_f'])
+  test('opposing thumb hooks on ' + body, async () => {
+    const {readFile} = await import('node:fs/promises')
+    const {Vector3, Box3} = await import('three')
+    const {GLTFLoader} = await import('three/addons/loaders/GLTFLoader.js')
+    const {emotePlayback} = await import('../web/src/emote/playback.ts')
+    const bytes = await readFile('public/avatar/' + body + '.glb')
+    let data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+    if (body !== 'figure') {
+      const doc = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)))
+      const bin = await readFile('public/avatar/' + doc.buffers[0].uri)
+      // Inline the shared buffer as a GLB chunk for Node's filesystem-only loader.
+      delete doc.buffers[0].uri
+      const json = Buffer.from(JSON.stringify(doc))
+      const length = (json.length + 3) & ~3
+      const packed = Buffer.alloc(28 + length + bin.length)
+      bytes.copy(packed, 0, 0, 20)
+      packed.writeUInt32LE(packed.length, 8)
+      packed.writeUInt32LE(length, 12)
+      packed.fill(0x20, 20, 20 + length)
+      json.copy(packed, 20)
+      packed.writeUInt32LE(bin.length, 20 + length)
+      packed.write('BIN\0', 24 + length)
+      bin.copy(packed, 28 + length)
+      data = packed.buffer
     }
-    const tip = point('thumb_04_leaf_' + side)
-    assert(Math.abs(tip.x - chest.x) < 0.01)
-    assert(sign * (point('thumb_03_' + side).y - tip.y) > 0.025)
-  }
-  const gap = point('thumb_04_leaf_l').distanceTo(point('thumb_04_leaf_r'))
-  assert(gap <= 0.015, 'thumb tip centre spacing: ' + gap)
-  // The generator cuts the tip caps in a constant-X bind plane. After skinning,
-  // the distal links must occupy opposite sides of the common contact plane.
-  const mesh = scene.getObjectByProperty('isSkinnedMesh', true)
-  const geo = mesh.geometry,
-    distal = {l: [], r: []}
-  for (let i = 0; i < geo.attributes.position.count; i++) {
-    const name = mesh.skeleton.bones[geo.attributes.skinIndex.getX(i)].name
-    if (!['thumb_03_l', 'thumb_03_r'].includes(name)) continue
-    distal[name.slice(-1)].push({
-      x: Math.abs(geo.attributes.position.getX(i)),
-      p: mesh.localToWorld(mesh.getVertexPosition(i, new Vector3())),
-    })
-  }
-  const end = Math.max(...distal.r.map((v) => v.x))
-  const cap = distal.r.filter((v) => v.x === end).map((v) => v.p)
-  const corners = cap.filter((p, i) => cap.findIndex((other) => other.distanceTo(p) < 1e-5) === i)
-  const normal = corners[1].clone().sub(corners[0]).cross(corners[2].clone().sub(corners[0])).normalize()
-  const distance = (p) => normal.dot(p.clone().sub(corners[0]))
-  if (distance(point('thumb_03_r')) < 0) normal.negate()
-  assert(distal.r.every(({p}) => distance(p) >= -0.0001))
-  assert(distal.l.every(({p}) => distance(p) <= 0.0001))
-})
+    const {scene} = await new GLTFLoader().parseAsync(data, '')
+    const pose = emotePlayback(scene)
+    pose.play(2)
+    pose.tick(0.5, false)
+    scene.updateMatrixWorld(true)
+    const point = (name) => scene.getObjectByName(name).getWorldPosition(new Vector3())
+    const chest = point('spine_03')
+    const left = point('hand_l'),
+      right = point('hand_r')
+    assert(left.x - right.x >= 0.08)
+    for (const side of ['l', 'r']) {
+      const sign = side === 'r' ? 1 : -1
+      const wrist = point('hand_' + side)
+      assert(Math.abs(wrist.y - chest.y) < 0.14 && wrist.z - chest.z > 0.18)
+      for (const finger of ['index', 'middle']) {
+        assert(sign * (point(finger + '_04_leaf_' + side).y - wrist.y) > 0.12)
+      }
+      const tip = point('thumb_04_leaf_' + side)
+      assert(sign * (tip.x - chest.x) > 0.018)
+      assert(sign * (tip.y - point('thumb_02_' + side).y) >= 0.015)
+      assert(sign * (tip.y - point('thumb_03_' + side).y) > 0.03)
+    }
+    assert(point('thumb_03_r').z > point('thumb_03_l').z)
+
+    // Per-triangle boxes enclose the entire skinned surfaces. Their separation
+    // is a conservative lower bound, including edges and face interiors.
+    const mesh = scene.getObjectByProperty('isSkinnedMesh', true)
+    const geo = mesh.geometry,
+      triangles = {l: [], r: []}
+
+    for (let i = 0; i < geo.index.count; i += 3) {
+      const ids = [0, 1, 2].map((k) => geo.index.getX(i + k))
+      const joint = mesh.skeleton.bones[geo.attributes.skinIndex.getX(ids[0])].name
+      if (!joint.startsWith('thumb_')) continue
+      triangles[joint.slice(-1)].push(
+        ids.map((j) => mesh.localToWorld(mesh.getVertexPosition(j, new Vector3()))),
+      )
+    }
+    assert(triangles.l.length && triangles.r.length)
+    function apart(a, b, depth) {
+      const l = new Box3().setFromPoints(a),
+        r = new Box3().setFromPoints(b)
+      const gaps = ['x', 'y', 'z'].map((k) => Math.max(0, l.min[k] - r.max[k], r.min[k] - l.max[k]))
+      if (Math.hypot(...gaps) >= 0.003) return true
+      if (depth === 0) return false
+      const ab = a[0].clone().lerp(a[1], 0.5),
+        bc = a[1].clone().lerp(a[2], 0.5),
+        ca = a[2].clone().lerp(a[0], 0.5)
+      return [
+        [a[0], ab, ca],
+        [ab, a[1], bc],
+        [ca, bc, a[2]],
+        [ab, bc, ca],
+      ].every((sub) => apart(b, sub, depth - 1))
+    }
+    for (const l of triangles.l)
+      for (const r of triangles.r) assert(apart(l, r, 10), 'thumb surfaces within 3 mm')
+  })
