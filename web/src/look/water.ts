@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import {atmo, env} from './time'
 import {look} from './config'
+import {GroundMirrorGate} from './mirror-gate'
 
 // M3 水是镜子 (docs/style.md 原则 3): a planar mirror of the whole scene, sampled through gentle
 // ripples and mixed with a jade body colour by Fresnel. Water meshes live on layer 1 so the mirror
@@ -251,6 +252,8 @@ const lastView=new THREE.Matrix4(), lastProjection=new THREE.Matrix4()
 let lastReflection=-Infinity, lastLevel=NaN, lastWaterFrame=0
 const lastSun=new THREE.Vector3()
 const lastPosition=new THREE.Vector3(),lastRotation=new THREE.Quaternion()
+const groundGate=new GroundMirrorGate()
+let groundLevel=148
 export function isWaterInView(camera:THREE.PerspectiveCamera, blocked?:(eye:THREE.Vector3,water:THREE.Vector3)=>boolean) {
   camera.updateMatrixWorld()
   mainFrustum.setFromProjectionMatrix(mainProj.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
@@ -258,10 +261,11 @@ export function isWaterInView(camera:THREE.PerspectiveCamera, blocked?:(eye:THRE
     if(!mainFrustum.intersectsBox(patch.box))continue
     if(!blocked)return true
     const eye=camera.position, {min,max}=patch.box
-    if(Math.max(min.x-eye.x,0,eye.x-max.x)**2+Math.max(min.z-eye.z,0,eye.z-max.z)**2>120**2)continue
+    const radiusSq=groundGate.radius**2
+    if(Math.max(min.x-eye.x,0,eye.x-max.x)**2+Math.max(min.z-eye.z,0,eye.z-max.z)**2>radiusSq)continue
     for(const probe of patch.probes){
-      if((probe.x-eye.x)**2+(probe.z-eye.z)**2<=120**2 && mainFrustum.containsPoint(probe) && !blocked(eye,probe)){
-        level=probe.y
+      if((probe.x-eye.x)**2+(probe.z-eye.z)**2<=radiusSq && mainFrustum.containsPoint(probe) && !blocked(eye,probe)){
+        groundLevel=probe.y
         return true
       }
     }
@@ -270,8 +274,7 @@ export function isWaterInView(camera:THREE.PerspectiveCamera, blocked?:(eye:THRE
   for(const fp of farPatches) if(!fp.hidden && mainFrustum.intersectsBox(fp.box)) return true
   return false
 }
-export function currentMirrorLevel(camera:THREE.PerspectiveCamera, ground=false) {
-  if(ground)return level
+export function currentMirrorLevel(camera:THREE.PerspectiveCamera) {
   let best = Infinity
   for(const patch of live) {
     const d = patch.x+128-camera.position.x, e = patch.z+128-camera.position.z, dist = d*d+e*e
@@ -280,13 +283,27 @@ export function currentMirrorLevel(camera:THREE.PerspectiveCamera, ground=false)
   return level
 }
 // skip: the first frame is budgeted (≤2 s), so the mirror starts one frame later with a sky-tint fallback.
-export function renderMirror(renderer:THREE.WebGLRenderer, scene:THREE.Scene, camera:THREE.PerspectiveCamera, skip:boolean, allowReuse:boolean, ground:boolean) {
+export function prepareMirror(camera:THREE.PerspectiveCamera,skip:boolean,blocked?:(eye:THREE.Vector3,water:THREE.Vector3)=>boolean){
+  const now=performance.now()
+  const visible=!skip && camera.position.y<=4000 && isWaterInView(camera,blocked)
+  const plane=blocked?groundLevel:visible?currentMirrorLevel(camera):level
+  const hardSkip=skip||camera.position.y>4000||camera.position.y<plane+.2
+  if(!blocked||hardSkip){
+    groundGate.reset(now)
+    waterMaterial.uniforms.uMirrorReady.value=visible&&!hardSkip?1:0
+    return visible&&!hardSkip?plane:-Infinity
+  }
+  groundGate.step(now,visible)
+  waterMaterial.uniforms.uMirrorReady.value=groundGate.ready
+  return groundGate.active?plane:-Infinity
+}
+
+export function renderMirror(renderer:THREE.WebGLRenderer, scene:THREE.Scene, camera:THREE.PerspectiveCamera, level:number, allowReuse:boolean, ground:boolean) {
   body.value.copy(env.water).convertLinearToSRGB()
   sunLight.value.copy(atmo.uSunColor.value).convertLinearToSRGB()
   if(env.night>.5) sunLight.value.setRGB(.5,.55,.65).multiplyScalar(env.night*.6)
+  if(!Number.isFinite(level)){lastReflection=-Infinity;return}
   waterMaterial.uniforms.uMirrorLevel.value = level
-  if(skip||camera.position.y<level+.2||camera.position.y>4000) {waterMaterial.uniforms.uMirrorReady.value = 0; lastReflection=-Infinity; return}
-  waterMaterial.uniforms.uMirrorReady.value = 1
   renderer.getDrawingBufferSize(size)
   const scale=ground ? .375 : .5
   const w = Math.max(1,Math.round(size.x*scale)), h = Math.max(1,Math.round(size.y*scale))

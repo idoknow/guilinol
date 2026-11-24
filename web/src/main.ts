@@ -14,7 +14,7 @@ import {isDeepLink} from './deeplink'
 import {readLastView, saveLastView, consumeRestore, applyLastView} from './lastview'
 import {walkConfig} from './walk/config'
 import {atmo, env, evaluate, setFogMetrics} from './look/time'
-import {currentMirrorLevel, isWaterInView, renderMirror, WATER_LAYER} from './look/water'
+import {prepareMirror, renderMirror, WATER_LAYER} from './look/water'
 import {MAIN_DETAIL_LAYER} from './look/mirror-layer'
 import {rain} from './look/rain'
 import {windowLight} from './look/buildings'
@@ -531,14 +531,13 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     base.update(camera)
     const metrics=stream.metrics
     const ground=!!walker?.active && !cinema
-    const mirror = !flags.noMirror && frame>=2 && isWaterInView(camera,ground?walker?.waterSightBlocked:undefined) ? currentMirrorLevel(camera,ground) : -Infinity
+    const mirror=prepareMirror(camera,flags.noMirror||frame<2,ground?walker?.waterSightBlocked:undefined)
     cullLandmarks?.update(stream.landmarks.values(),camera,mirror,metrics.cullHorizon)
     peaks.update(camera,mirror,metrics,!stream.isInnerBusy())
     if(Number.isFinite(mirror))cullLandmarks?.pass(true)
     // Reuse the last reflection while tiles are still streaming: pending work is exactly when the
     // mirror costs the most, and a frame-old reflection is invisible under the ripple distortion.
-    const mirrorOff = flags.noMirror || !Number.isFinite(mirror)
-    renderMirror(renderer,scene,camera,mirrorOff,ground||(!cinema&&clock.weather==='clear'),ground)
+    renderMirror(renderer,scene,camera,mirror,ground||(!cinema&&clock.weather==='clear'),ground)
     cullLandmarks?.pass(false)
     renderer.render(scene,camera)
   }
