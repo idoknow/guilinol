@@ -113,6 +113,15 @@ const SHOES_RECIPES: Record<string, ShoesRecipe> = {
   shoes_night_moto: {upper: '#171a1f', accent: '#20d6c1', sole: '#ffc53d'},
 }
 
+const STARTER_PATTERNS: Record<string, number> = {
+  top_starter_denim: 1,
+  top_starter_knit: 1,
+  top_starter_plaid: 2,
+  top_starter_track: 3,
+  top_starter_shell: 4,
+  top_starter_hoodie: 5,
+}
+
 /** The daypack modelled into figure.glb (hidden since IDOK-133; colours kept for the recolour pass). */
 const BUILTIN_PACK_COLORS = {body: '#2c2e32', strap: '#1b1c1f'} as const
 
@@ -760,7 +769,7 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
     // Stored starter IDs predate the street wardrobe. Preserve them for existing saves.
     const summerTop = outfit.top === 'top_starter_sport'
     const shortSleeve = summerTop || outfit.top === 'top_starter_outdoor' || (!female && outfit.top === 'top_starter_office')
-    const shorts = outfit.bottom === 'bottom_starter_sport' || outfit.bottom === 'bottom_starter_outdoor'
+    const shorts = outfit.bottom === 'bottom_starter_sport' || outfit.bottom === 'bottom_starter_outdoor' || (female && outfit.bottom === 'bottom_starter_knit')
     const wideLeg = female && outfit.bottom === 'bottom_starter_chinese'
     const starterTop = outfit.top.startsWith('top_starter_') || outfit.top === 'top_default_tee'
     const starterBottom = outfit.bottom.startsWith('bottom_starter_') || outfit.bottom === 'bottom_default_pants'
@@ -776,6 +785,13 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
       uniforms.sleeve.value = summerTop && !female ? .145 : shortSleeve ? .36 : 1
       uniforms.shortHem.value = shorts ? .56 : 0
       uniforms.sandal.value = Number(outfit.shoes==='shoes_starter_sport')
+      // IDOK-229 present-day starter looks: printed detail in the clothing shader (no extra geometry/draws).
+      const pattern = STARTER_PATTERNS[outfit.top] ?? 0
+      uniforms.pattern.value = pattern
+      const accent = OUTFIT_ITEMS_BY_ID[outfit.top]?.accentHex ?? '#efece4'
+      uniforms.patA.value.set(pattern === 2 ? '#ebe8e0' : accent)
+      uniforms.patB.value.set(accent)
+      uniforms.legStripe.value = Number(outfit.bottom === 'bottom_starter_track')
     }
     for (let i = 0; i < zones.length; i++) {
       const z = zones[i]
@@ -829,7 +845,9 @@ export function createAvatarOutfitController(figure: THREE.Group, rig: AvatarRig
     const hair = rig.attachments.head?.getObjectByName('creator-hair')
     if (hair) hair.visible = outfit.hat === 'hat_none'
     if(skirt && skirtIndex && fullIndex && skinned){
-      skirt.visible=outfit.bottom==='bottom_starter_outdoor'
+      skirt.visible=outfit.bottom==='bottom_starter_outdoor'||outfit.bottom==='bottom_starter_knit'
+      // 针织开衫 (female) pairs with a brown pleated midi skirt; 短袖 T 恤 keeps the sage knee skirt.
+      ;(((skirt as THREE.Mesh).material) as THREE.MeshStandardMaterial).color.set(outfit.bottom==='bottom_starter_knit'?'#7d604c':'#72776d')
       skinned.geometry.setIndex(skirt.visible?skirtIndex:fullIndex)
       if(skirt.visible)skinned.geometry.setDrawRange(0,skirtIndex.count)
     }

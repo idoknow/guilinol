@@ -85,3 +85,9 @@ Global actions: 「随机」 (a random combination; the button spins once like a
 - Budget: each body ≤ 7k vertices, each hairstyle ≤ 600 vertices, all assets ≤ 450 KB added in total.
   The creation page is its own lazy-loaded chunk, so first-frame time on the tour home page stays
   ≤ 1.05× the current main branch.
+
+### 6. IDOK-229 扩充与路人（2026-11-24）
+
+- 脸型 6 种：圆脸 / 鹅蛋脸 / 方下颌 / 瓜子脸 / 长脸 / 宽颧脸（`web/src/walk/character.ts` `faceShape`）；眉形 +剑眉，眼型 +圆眼。
+- 首套穿搭 12 套，新增卫衣工装、城市冲锋衣、牛仔外套、叠穿衬衫、针织开衫（女款配棕色百褶中裙）、运动套装。图案由服装着色器 `pattern` 画出（`creator-ink.ts`），不加 draw call。兜帽、领口这类小件放在 `starter-details.ts`。
+- 路人（`web/src/traffic/crowd.ts`）：近处路人使用与玩家相同的骨骼角色，外形从捏人选项中随机生成，并播放走路和站立动画，步频随速度变化。桌面端 70 m 内最多 14 人，移动端 45 m 内最多 6 人。更远的路人仍由 BatchedMesh 绘制，已去掉斗笠。

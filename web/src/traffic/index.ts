@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import {MAX_ACTORS,MOBILE_ACTORS,Traffic,type Graph} from './sim'
 import {curbside,staticSolids,useTrafficSolids,type Solid,contactSamples,sampleContacts} from './contact'
 import {trafficModels,trafficMaterial,type Variant} from './models'
+import {crowd} from './crowd'
 
 async function loadGraph(key:string){
   const start=performance.now()
@@ -83,9 +84,11 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
   }
   const near=(x:number,z:number,visit:(solid:Solid)=>void)=>{sim?.nearSolids(x,z,visit);staticSolids(x,z,visit)}
   let accumulator=0
+  const people=crowd(scene,camera);mesh.userData.crowd=people
+  let walking=new Set<object>()
   return (dt:number,vehicle?:THREE.Vector3,_player?:THREE.Vector3,_solo=false,enabled=true)=>{
     useTrafficSolids(enabled?near:undefined)
-    if(!enabled){mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();return}
+    if(!enabled){people.clear();walking.clear();mesh.count=0;hide(0,SLOTS);parkKey='';parkCount=0;curbside.clear();return}
     updateParking(camera.position.x,camera.position.z)
     if(verify&&mesh.userData.staticOnly){hide(0,STATIC);mesh.count=0;mesh.userData.allMotors=[];return}
     const target=`${Math.floor(camera.position.x/512)}_${Math.floor(camera.position.z/512)}`
@@ -96,11 +99,11 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
         if(verify){mesh.userData.loads.push(sample);if(mesh.userData.loads.length>64)mesh.userData.loads.shift()}
         if(sim)next.inherit(sim);sim=next
       }).catch(error=>console.warn('Traffic cell unavailable',error))
-      else {sim=undefined;mesh.count=0;hide(0,STATIC)}
+      else {sim=undefined;people.clear();walking.clear();mesh.count=0;hide(0,STATIC)}
     }
     if(!sim)return
     accumulator+=Math.min(dt,.2)
-    if(accumulator<.05)return
+    if(accumulator<.05){people.animate(dt,accumulator);return}
     camera.updateMatrixWorld()
     frustum.setFromProjectionMatrix(projection.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse))
     while(accumulator>=.05){
@@ -108,6 +111,7 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
       if(verify)mesh.userData.stepMs[sampleIndex++%256]=performance.now()-start
     }
     mesh.count=sim.actors.length
+    walking=people.select(sim.actors)
     let motors=0,queued=0,redStops=0
     if(verify){mesh.userData.motorIds.length=0;mesh.userData.approaches=[];mesh.userData.allMotors=[]}
     sim.actors.forEach((actor,index)=>{
@@ -123,8 +127,10 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
         const geometry=models.geometries[variant.geometry];if(!geometry.boundingBox)geometry.computeBoundingBox()
         const {min,max}=geometry.boundingBox!;actor.halfWidth=Math.max(-min.x,max.x);actor.halfLength=Math.max(-min.z,max.z);actor.height=max.y
       }
+      if(walking.has(actor)){hide(index,index+1);return}
       show(index,variant,actor.x,actor.y,actor.z,actor.yaw,actor.scale,actor.kind==='person'&&actor.down>0)
     })
+    people.animate(dt,accumulator)
     hide(sim.actors.length,STATIC)
     if(verify)Object.assign(mesh.userData,{motors,queued,redStops})
   }

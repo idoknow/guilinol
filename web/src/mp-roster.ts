@@ -1,6 +1,6 @@
 // 同城联机名册（IDOK-222）：net.ts 每 300 ms 写一次，地图 / 在线玩家面板只读这里，
 // 不用碰 three 和 net-players（那两个是联机时才懒加载的大块）。
-export interface RosterPlayer {id:string;uid?:number;name:string;x:number;z:number;yaw:number;v:number;bike:boolean;joinedAt?:number}
+export interface RosterPlayer {id:string;uid?:number;name:string;x:number;z:number;yaw:number;v:number;bike:boolean;joinedAt?:number;far?:boolean}
 export interface Roster {me:{x:number;z:number;yaw:number}|null;players:RosterPlayer[];at:number}
 
 let current:Roster = {me:null,players:[],at:0}

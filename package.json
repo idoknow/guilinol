@@ -65,7 +65,9 @@
     "verify:hud": "node scripts/verify-hud-extras.mjs",
     "verify:camera": "node --experimental-strip-types --test scripts/camera-hold-test.mjs && node scripts/verify-camera.mjs",
     "verify:creator": "tsx scripts/verify-creator.mjs",
-    "test:emote": "node --experimental-strip-types --test scripts/emote-test.mjs"
+    "test:emote": "node --experimental-strip-types --test scripts/emote-test.mjs",
+    "test:rt-aoi": "node scripts/rt-aoi-check.mjs",
+    "bench:rt": "node scripts/rt-load.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1173.0",

@@ -167,7 +167,7 @@ function scooter(bodyColor:number,helmet:number,box?:number){
   return k.build()
 }
 
-function person(pants:number,style:'short'|'long'|'hat'|'bag'){
+function person(pants:number,style:'short'|'long'|'pony'|'bag'){
   const k=new Kit()
   for(const s of [-1,1]){
     k.box(.15,.8,.17,s*.1,.4,0,pants)
@@ -181,7 +181,7 @@ function person(pants:number,style:'short'|'long'|'hat'|'bag'){
   if(style==='short')k.add(new T.SphereGeometry(.14,8,4,0,Math.PI*2,0,Math.PI*.5),hair,0,1.6,-.01)
   if(style==='long'){k.add(new T.SphereGeometry(.145,8,4,0,Math.PI*2,0,Math.PI*.55),hair,0,1.6,-.01);k.box(.3,.34,.1,0,1.45,-.1,hair)}
   if(style==='bag'){k.add(new T.SphereGeometry(.14,8,4,0,Math.PI*2,0,Math.PI*.5),0x5a4232,0,1.6,-.01);k.box(.34,.4,.16,0,1.16,-.2,0x3e4a55)}
-  if(style==='hat'){k.add(new T.SphereGeometry(.14,8,4,0,Math.PI*2,0,Math.PI*.5),hair,0,1.6,-.01);k.add(new T.ConeGeometry(.36,.2,10),0xc9a764,0,1.76,0)} // 斗笠
+  if(style==='pony'){k.add(new T.SphereGeometry(.145,8,4,0,Math.PI*2,0,Math.PI*.55),hair,0,1.6,-.01);k.box(.08,.2,.08,0,1.52,-.15,hair)} // IDOK-229: no 斗笠
   return k.build()
 }
 
@@ -202,7 +202,8 @@ const pick=<V extends {w:number}>(list:V[],u:number)=>{let total=0;for(const v o
 
 // Chinese city fleet colours: mostly white / black / silver / grey, a few blues and reds.
 const carPaints=[[0xf1f0ec,30],[0x17191c,14],[0xb9bec2,13],[0x6c7276,11],[0x2c4a6e,7],[0x9b2a26,5],[0xc9b99a,5],[0x7a5a45,3],[0x4d6b5a,3],[0xa9c7d4,3],[0xe7dcc2,3],[0x3d4b8a,3]].map(([hex,w])=>({hex,w}))
-const shirtPaints=[0xe9e5dc,0x2b2f36,0x4e6c8f,0xb8463b,0x6d8f5d,0xd9b44a,0x8a6fa6,0xd8d8d8,0x2f6e74,0xc77a8b].map(hex=>({hex,w:1}))
+// Same muted present-day palette as the starter looks (lib/avatar.ts lookPalette tops).
+const shirtPaints=[0xe9e7e1,0xeeeae0,0x728795,0xa5bfce,0xacb8a7,0x9b9d99,0x3f5a4c,0x6f8fae,0x9a3f35,0xd8cab0,0x28344a,0x2b2f36].map(hex=>({hex,w:1}))
 
 export function trafficModels(){
   const geometries:T.BufferGeometry[]=[]
@@ -211,7 +212,7 @@ export function trafficModels(){
     lorry=add(truck()),cab=add(taxi()),patrol=add(police())
   const scooters=[add(scooter(0xeeece6,0xf0f0ea)),add(scooter(0x8fb4c4,0xd8423a)),add(scooter(0x2d3135,0x3e74c4)),
     add(scooter(0x3a3e42,0xe6b23a,0xe6b23a)),add(scooter(0x3a3e42,0x2f7fd0,0x2f7fd0))]
-  const people=[add(person(0x22262e,'short')),add(person(0x6b5a48,'long')),add(person(0x3a4250,'hat')),add(person(0x2b2d33,'bag')),add(person(0x8f8a80,'short'))]
+  const people=[add(person(0x22262e,'short')),add(person(0x6b5a48,'long')),add(person(0x3a4250,'pony')),add(person(0x2b2d33,'bag')),add(person(0x8f8a80,'short'))]
   const pools:Record<'car'|'scooter'|'person'|'parked',Pool>={
     parked:{ids:[sedan,hatch,suv,cab],weights:[42,19,29,10],paints:carPaints},
     car:{ids:[sedan,hatch,suv,van,lorry,cab],weights:[34,17,24,8,5,10],paints:carPaints},

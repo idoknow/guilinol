@@ -16,6 +16,20 @@ export function currentAvatar() {
     return undefined
   }
 }
+/** Head-vertex morph per face shape: [x scale, chin lift (+ = shorter, − = longer)] at rest height y. */
+function faceShape(face: number, y: number): [number, number] {
+  const jaw = Math.max(0, 1 - Math.abs(y - 1.56) / 0.078)
+  const cheek = Math.max(0, 1 - Math.abs(y - 1.615) / 0.06)
+  const low = T.MathUtils.smoothstep(1.61 - y, 0, 0.1)
+  switch (face) {
+    case 0: return [1 + 0.23 * jaw, 0.12] // 圆脸
+    case 1: return [0.98 - 0.11 * jaw, 0] // 鹅蛋脸
+    case 2: return [1 + 0.55 * jaw ** 2, -0.1] // 方下颌
+    case 3: return [1.03 - 0.3 * low, -0.07] // 瓜子脸: full cheeks tapering to a small pointed chin
+    case 4: return [0.95 - 0.06 * jaw, -0.2] // 长脸
+    default: return [1 + 0.11 * cheek - 0.15 * low, 0.02] // 宽颧脸: wide cheekbones, narrow jaw
+  }
+}
 const models = new Map<string, ReturnType<GLTFLoader['loadAsync']>>()
 export async function characterModel(a: Avatar) {
   let pending = models.get(a.body)
@@ -34,10 +48,9 @@ export async function characterModel(a: Avatar) {
       for (let i = 0; i < p.count; i++) {
         const y = p.getY(i)
         if (node.skeleton.bones[node.geometry.attributes.skinIndex.getX(i)]?.name === 'head' && y < 1.7) {
-          const jaw = Math.max(0, 1 - Math.abs(y - 1.56) / 0.078)
-          const width = a.face === 0 ? 1 + 0.23 * jaw : a.face === 1 ? 0.98 - 0.11 * jaw : 1 + 0.55 * jaw ** 2
+          const [width, chin] = faceShape(a.face, y)
           p.setX(i, p.getX(i) * width)
-          if (a.face !== 1 && y < 1.61) p.setY(i, y + (1.61 - y) * (a.face === 0 ? 0.12 : -0.1))
+          if (chin && y < 1.61) p.setY(i, y + (1.61 - y) * chin)
         }
       }
       node.geometry.computeVertexNormals()
