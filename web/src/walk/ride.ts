@@ -1648,10 +1648,10 @@ export function createBikeControl() {
 
       return speed
     },
-    setPitch(frontY: number | undefined, backY: number | undefined, dt: number) {
+    setPitch(frontY: number | undefined, backY: number | undefined, dt: number, wheelbase: number) {
       const s = spec()
       const target = frontY !== undefined && backY !== undefined && Math.abs(frontY - backY) < .45
-        ? T.MathUtils.clamp(Math.atan2(frontY - backY, 1.1), -s.pitchMax, s.pitchMax)
+        ? T.MathUtils.clamp(Math.atan2(frontY - backY, wheelbase), -s.pitchMax, s.pitchMax)
         : 0
       pitch = T.MathUtils.damp(pitch, target, s.pitchDamp, Math.min(.12, Math.max(0, dt)))
     },

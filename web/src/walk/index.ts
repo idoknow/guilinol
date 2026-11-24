@@ -1692,7 +1692,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           wheelPitch=Math.atan(slope)
           figure.position.y=b+rear*slope
         }
-        if(dt>0)rides.setPitch(f,b,dt)
+        if(dt>0)rides.setPitch(f,b,dt,front+rear)
       }
       rides.park(figure.position)
       if(mountedStaticBike!==rides.bike){
