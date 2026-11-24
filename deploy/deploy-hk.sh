@@ -82,5 +82,7 @@ try{await client.send(new HeadBucketCommand(params))}catch(error){if(error.$meta
 JS
 k wait --for=condition=Ready certificate/glol-tls --timeout=300s
 
-# 部署完成后刷新 CDN（IDOK-192：改在发版机本地跑，GitHub runner 连不上 CDNFly 面板）。失败只告警，不影响发版。
-# CDN 刷新/预热已移到 GitHub Actions（.github/workflows/cdn-refresh.yml），发版机不再执行
+# 部署完成后刷新 CDN（IDOK-192：改在发版机本地跑，GitHub runner 连不上 CDNFly 面板的 443，静默丢包）。
+# 目录级：变了的目录各提交 clean_dir + pre_cache_url，入口页逐个 clean_url，一次发版十几条任务。
+# 失败只告警，不影响发版；重跑：bash deploy/cdn-refresh.sh <sha>
+bash deploy/cdn-refresh.sh "$tag" || echo "⚠️  CDN 刷新失败：新版本资源没预热，首访会慢（不影响发版）。重跑：bash deploy/cdn-refresh.sh $tag" >&2
