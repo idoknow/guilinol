@@ -9,7 +9,6 @@ import {rules,validRules} from '../smoke/data'
 import {createSmokePrompt} from '../smoke/prompt'
 import {SmokeSession,brandIndex} from '../smoke/session'
 import {smokeVisual} from '../smoke/visual'
-import {skinTones} from '../../../lib/avatar'
 import {nearestPlayable} from '../../../lib/play-region'
 import {mpEnabled} from '../ui/mp-pref'
 import * as THREE from 'three'
@@ -376,7 +375,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       void openSmokeShop('没有香烟了，去旁边的香烟铺买')
       return
     }
-    smoking??=smokeVisual(scene,figure,{camera,skin:skinTones[(currentAvatar()??profile).skin]})
+    smoking??=smokeVisual(scene,figure,camera)
   }
   function smokeAction(){
     if(!usable()||!cigarette.prompt)return
@@ -405,6 +404,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const fresh=await characterModel(a)
     if(version!==appearanceVersion){disposeCharacterParts(fresh.scene);disposeCharacterParts(fresh.scene.userData.creatorHair);return}
     const mesh=fresh.scene.getObjectByProperty('isSkinnedMesh',true) as THREE.SkinnedMesh
+    smoking?.dispose();smoking=undefined
     outfitController.dispose()
     for(const name of ['creator-body-outline','creator-face','creator-hair','creator-skirt']){
       const part=figure.getObjectByName(name)
@@ -1846,7 +1846,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       camera.lookAt(rig.focus)
     }
     // 只在切换的那一下动 figure.visible，不每帧覆盖拍照模式「隐藏人物」、商店展台等别处的设定。
-    if(firstPerson!==firstPersonHidden){firstPersonHidden=firstPerson;figure.visible=active&&!firstPerson}
+    const hideAvatar=firstPerson&&!cigarette.active
+    if(hideAvatar!==firstPersonHidden){firstPersonHidden=hideAvatar;figure.visible=active&&!hideAvatar}
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
   function boatClearance(){
@@ -2652,8 +2653,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(!aboardGround&&!standUpSession&&!pickupSession){
       const velLen=Math.hypot(vx,vz)
       const dirX=velLen>.08?vx/velLen:inputMag>.05?wish.x:0, dirZ=velLen>.08?vz/velLen:inputMag>.05?wish.y:0
-      if(dirX||dirZ){
-        const goal=Math.atan2(-dirX,-dirZ)+avatar.yaw
+      const alignToView=cigarette.active&&isFirstPerson()
+      if(dirX||dirZ||alignToView){
+        const goal=(alignToView?yaw:Math.atan2(-dirX,-dirZ))+avatar.yaw
         turnDiff=shortestAngle(facing,goal)
         facing+=turnDiff*Math.min(1,cfg.turnRate*Math.min(.12,dt))
       }
@@ -2714,6 +2716,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(!standUpSession&&!pickupSession)mixer.update(dt)
     applyCameraHold(dt)
     follow(dt)
+    if(cigarette.active&&!smoking)smoking=smokeVisual(scene,figure,camera)
     if(smoking){
       showSmokeDiscard(cigarette.inMouth)
       const label=cigarette.prompt

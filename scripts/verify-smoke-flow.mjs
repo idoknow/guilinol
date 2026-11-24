@@ -19,6 +19,7 @@ try{
       const dir=`captures/smoke-flow/round-2/${width}-${view}`
       await mkdir(dir,{recursive:true})
       await page.addInitScript(view=>localStorage.setItem('glol.prefs',JSON.stringify({view})),view)
+      if(width===740)await page.addInitScript(()=>localStorage.setItem('glol.avatar.v1',JSON.stringify({body:'f',v:1,createdAt:123,skin:3,face:1,brows:0,eyes:0,hair:'f_bun',hairColor:1,look:'hoodie'})))
       await page.goto(base+'/?verify&mode=walk&flow=0',{waitUntil:'domcontentloaded'})
       await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:120000})
       const slot=page.locator('.hotbar [data-slot=smoke]')
@@ -89,9 +90,15 @@ try{
             assert.equal(center.visible,!touch)
             if(!touch)assert(Math.hypot(center.x,center.y)<.001,'3D text must project to the optical centre')
           }
+          const mount=await page.evaluate(phase=>{
+            const scene=window.viewer.camera.parent
+            const name=['sealed','tear','open'].includes(phase)?'smoke-pack':phase==='take'||phase==='smoking'?'smoke-cigarette':'smoke-lighter'
+            return scene.getObjectByName(name)?.parent?.name
+          },phase)
+          assert.equal(mount,phase==='take'?'smoke-grip-r':phase==='smoking'?'smoke-lips':'smoke-grip-l')
           if(view==='first' && (phase==='ready' || phase==='smoking')){
             const geometry=await page.evaluate(()=>{
-              const camera=window.viewer.camera,cig=camera.getObjectByName('smoke-cigarette')
+              const camera=window.viewer.camera,cig=camera.parent.getObjectByName('smoke-lips').getObjectByName('smoke-cigarette')
               const point=z=>cig.localToWorld(camera.position.clone().set(0,0,z))
               const filter=point(-.02).project(camera)
               const axis=camera.worldToLocal(point(.064)).sub(camera.worldToLocal(point(-.02)))
@@ -105,6 +112,15 @@ try{
           await shot(name)
         }finally{await page.evaluate(()=>window.viewer.resume())}
       }
+      if(width===1440 && view==='third'){
+        await page.waitForFunction(()=>window.viewer.walk.probe().smoke.phase==='sealed')
+        await page.evaluate(()=>{
+          const c=window.viewer.camera,lips=c.parent.getObjectByName('smoke-lips')
+          const p=lips.getWorldPosition(c.position.clone()).project(c)
+          const w=innerWidth,h=innerHeight,scale=3.2
+          c.setViewOffset(w,h,(p.x+1)*w/2-w*.37/scale,(1-p.y)*h/2-h*.42/scale,w/scale,h/scale)
+        })
+      }
       await capturePhase('02-pack','sealed')
       await press('撕开')
       await capturePhase('03-tear','tear',.25)
@@ -112,14 +128,6 @@ try{
       await press('拿取')
       await capturePhase('05-take','take',.28)
       await capturePhase('06-mouth','ready')
-      if(width===1440 && view==='third'){
-        await page.evaluate(()=>{
-          const c=window.viewer.camera,lips=c.parent.getObjectByName('smoke-lips')
-          const p=lips.getWorldPosition(c.position.clone()).project(c)
-          const w=innerWidth,h=innerHeight,scale=4
-          c.setViewOffset(w,h,(p.x+1)*w/2-w*.36/scale,(1-p.y)*h/2-h*.40/scale,w/scale,h/scale)
-        })
-      }
       await press('点燃')
       await capturePhase('07-light','light',.45)
       await capturePhase('08-lit','smoking')

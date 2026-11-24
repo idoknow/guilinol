@@ -51,7 +51,7 @@ export class SmokeKit {
   private packModel: PackModel
   private lighterModel: LighterModel
   private cigModel: CigaretteModel
-  private stubs: {group: THREE.Group; parts: Parts; born: number; origin:THREE.Vector3; floor:number; heading:number}[] = []
+  private stubs: {group: THREE.Group; parts: Parts; born: number; origin:THREE.Vector3; floor:number; heading:number; initialPitch:number}[] = []
   private scratch = new THREE.Vector3()
   private dir = new THREE.Vector3()
   private openFilter = new THREE.Vector3()
@@ -174,7 +174,7 @@ export class SmokeKit {
       return
     }
 
-    // —— 打火机：右手（只在点烟那一段出现） ——
+    // —— 打火机：左手（只在点烟那一段出现） ——
     if (this.lighterModel.group.visible) {
       this.lighterModel.group.position.copy(anchors.handL).add(LIGHTER_OFFSET)
       this.lighterModel.group.rotation.set(.72,0,-.66,'XYZ')
@@ -239,7 +239,7 @@ export class SmokeKit {
     const launch=this.dir.set(0,0,1).applyQuaternion(stub.quaternion)
     const heading=Math.atan2(-launch.x,-launch.z)
     this.scene.add(stub)
-    this.stubs.push({group: stub, parts, born: performance.now(), origin:stub.position.clone(),floor:position.y+.0075,heading})
+    this.stubs.push({group: stub, parts, born: performance.now(), origin:stub.position.clone(),floor:position.y+.0075,heading,initialPitch:stub.rotation.x})
     // 只保留最近 12 根，别让全城铺满烟屁股
     while (this.stubs.length > 12) {
       const oldest = this.stubs.shift()!
@@ -248,12 +248,12 @@ export class SmokeKit {
     }
   }
 
-  /** 每帧收尾：两分钟后旧烟蒂自己消失 */
+  /** 每帧更新丢弃物的弹道，落地后回收 */
   tick(now: number) {
     for(const stub of this.stubs){
       const t=Math.min((now-stub.born)/1000,Math.sqrt(Math.max(0,stub.origin.y-stub.floor)/4.9))
       stub.group.position.set(stub.origin.x-Math.sin(stub.heading)*t*.7,Math.max(stub.floor,stub.origin.y-4.9*t*t),stub.origin.z-Math.cos(stub.heading)*t*.7)
-      stub.group.rotation.x=stub.group.position.y>stub.floor?t*7:0
+      stub.group.rotation.x=stub.group.position.y>stub.floor?stub.initialPitch+t*7:0
     }
     while (this.stubs.length && now - this.stubs[0].born > 4500) {
       const oldest = this.stubs.shift()!

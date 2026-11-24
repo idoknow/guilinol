@@ -174,11 +174,11 @@ export function createPack(brand: BrandDef, parts = new Parts()): PackModel {
   const peek = new THREE.Group()
   peek.position.set(0.006, PACK_H / 2 - 0.004, 0)
   const peekPaper = new THREE.Mesh(
-    parts.geo(new THREE.CylinderGeometry(CIG_RADIUS, CIG_RADIUS, 0.02, 8, 1, true)),
+    parts.geo(new THREE.CylinderGeometry(CIG_RADIUS, CIG_RADIUS, 0.05, 8, 1, true)),
     parts.mat(new THREE.MeshStandardMaterial({color: 0xf2ece0, roughness: 0.94, side: THREE.DoubleSide})),
   )
   // 圆柱默认沿 +Y，往上一挪就有一截烟头从盒口探出来
-  peekPaper.position.y = 0.008
+  peekPaper.position.y = -0.007
   peek.add(peekPaper)
   peek.visible = false
   group.add(peek)
