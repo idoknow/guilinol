@@ -1,7 +1,7 @@
 {
   "world": "world-a11731a5dafd",
   "main": "27dabe1",
-  "candidateRevision": "1e79beb615aa35afd234ace8581556e31d1fe7c7",
+  "candidateRevision": "045c86c4e895c0de5ebd79284b640c219d99fef6",
   "baseline": {
     "tunnelConstraintRecords": 0,
     "partialTunnelWays": [
@@ -165,28 +165,28 @@
     ]
   },
   "candidate": {
-    "tunnelConstraintRecords": 2,
-    "gradedApproaches": 470,
+    "tunnelConstraintRecords": 0,
+    "gradedApproaches": 140,
     "partialTunnelWays": [],
     "reasons": {
-      "surface": 909,
+      "surface": 472,
       "tunnel": 0,
-      "fit": 20,
-      "hidden": 0
+      "fit": 13,
+      "hidden": 1
     },
     "lanes": 88050,
     "wheelSamples": 7699956,
-    "outliers": 929,
-    "sunk": 494,
-    "floating": 435,
+    "outliers": 486,
+    "sunk": 272,
+    "floating": 214,
     "p99": 0.024,
-    "nonplanarFootprints": 179,
+    "nonplanarFootprints": 110,
     "unresolvedTunnelWays": []
   },
   "byLayer": {
-    "at-grade": 483,
-    "bridge": 420,
-    "tunnel": 26
+    "at-grade": 317,
+    "bridge": 151,
+    "tunnel": 18
   },
   "station": {
     "laneAudit": {
@@ -210,107 +210,25 @@
     }
   },
   "tunnels": {
-    "ways": 159,
-    "generatedStrips": 624,
-    "openDeadEnds": [
-      [
-        454117718,
-        5.998,
-        false
-      ],
-      [
-        1475440133,
-        5.974,
-        false
-      ],
-      [
-        1486208147,
-        65.219,
-        false
-      ],
-      [
-        1489640393,
-        5.859,
-        false
-      ],
-      [
-        1490460395,
-        5.972,
-        false
-      ],
-      [
-        1532928036,
-        5.959,
-        false
-      ],
-      [
-        1553344902,
-        5.7,
-        false
-      ]
-    ],
-    "surfaceApproachNodes": 373,
-    "surfaceApproachMatched": 371,
-    "surfaceApproachUnmatched": 2,
-    "maximumRemainingDifference": 4.184664226252806,
-    "loopConstraints": [
-      {
-        "way": 1417162024,
-        "roof": 196.54882083210973,
-        "mouth": [
-          10429.688834710547,
-          -3116.594534400053
-        ],
-        "contact": [
-          10467.054908331067,
-          -3117.3194048553696
-        ],
-        "distance": 37.373103898273236,
-        "road": 195.85190497553563,
-        "maxDrop": 2.989848311861859,
-        "deficit": 0.8132358315640431
-      },
-      {
-        "way": 1493582667,
-        "roof": 152.800552573803,
-        "mouth": [
-          4117.298186362064,
-          575.8030475999725
-        ],
-        "contact": [
-          4117.96658190836,
-          609.2517714133529
-        ],
-        "distance": 33.47662316001477,
-        "road": 149.42665246219437,
-        "maxDrop": 2.6781298528011814,
-        "deficit": -1.5520299644098259
-      }
-    ],
-    "loopApproaches": [
-      {
-        "way": 1417162024,
-        "node": 13022478448,
-        "road": 195.85200483536536,
-        "floor": 193.7530651037867,
-        "approachCut": 2.0989397315786675,
-        "finalRoad": 193.75300617904952,
-        "difference": -5.892473717494795e-05,
-        "reason": "gradedApproach"
-      }
-    ],
+    "ways": 74,
+    "generatedStrips": 90,
+    "surfaceApproachNodes": 138,
+    "surfaceApproachMatched": 138,
+    "surfaceApproachUnmatched": 0,
+    "maximumRemainingDifference": 0.034962077728010854,
+    "loopApproaches": [],
     "portalDrive": {
-      "requested": 373,
-      "runs": 785,
-      "completed": 633,
-      "passSites": 257,
-      "overLimit": 14,
-      "maximum": 0.43897564046790194,
+      "requested": 375,
+      "runs": 789,
+      "completed": 649,
+      "passSites": 277,
+      "overLimit": 32,
+      "maximum": 0.5652460052832282,
       "failures": {
-        "collision": 132,
-        "tool": 20
+        "collision": 106,
+        "tool": 34
       },
-      "unavailable": 0,
+      "unavailable": 10,
       "wulingAnd385796474": [
         {
           "id": 628737319,
@@ -323,33 +241,13 @@
           "obstacle": ""
         },
         {
-          "id": 3891288739,
-          "way": 385796474,
-          "mode": "car",
-          "boundary": false,
-          "direction": "in",
-          "completed": true,
-          "maximum": 0.004928523976843735,
-          "obstacle": ""
-        },
-        {
           "id": 628737319,
           "way": 259013203,
           "mode": "car",
           "boundary": false,
           "direction": "out",
           "completed": true,
-          "maximum": 0.002962260625935187,
-          "obstacle": ""
-        },
-        {
-          "id": 3891288739,
-          "way": 385796474,
-          "mode": "car",
-          "boundary": false,
-          "direction": "out",
-          "completed": true,
-          "maximum": 0.004732997687369789,
+          "maximum": 0.0029568459885922493,
           "obstacle": ""
         },
         {
@@ -363,13 +261,13 @@
           "obstacle": ""
         },
         {
-          "id": 3891288741,
+          "id": 3891288739,
           "way": 385796474,
           "mode": "car",
           "boundary": false,
           "direction": "in",
           "completed": true,
-          "maximum": 0.022867072825334844,
+          "maximum": 0.004926609093274692,
           "obstacle": ""
         },
         {
@@ -379,7 +277,27 @@
           "boundary": false,
           "direction": "out",
           "completed": true,
-          "maximum": 0.0029568543358209354,
+          "maximum": 0.0029568543357925137,
+          "obstacle": ""
+        },
+        {
+          "id": 3891288739,
+          "way": 385796474,
+          "mode": "car",
+          "boundary": false,
+          "direction": "out",
+          "completed": true,
+          "maximum": 0.004732997687369789,
+          "obstacle": ""
+        },
+        {
+          "id": 3891288741,
+          "way": 385796474,
+          "mode": "car",
+          "boundary": false,
+          "direction": "in",
+          "completed": true,
+          "maximum": 0.012063346606396408,
           "obstacle": ""
         },
         {
@@ -389,66 +307,56 @@
           "boundary": false,
           "direction": "out",
           "completed": true,
-          "maximum": 0.022939743019094294,
+          "maximum": 0.0226685531177111,
           "obstacle": ""
         }
       ],
       "worstCompletedRun": {
-        "id": 628737326,
-        "way": 259013206,
+        "id": 9457773705,
+        "way": 1539622609,
         "mode": "car",
         "boundary": false,
         "direction": "in",
         "completed": true,
-        "maximum": 0.43897564046790194,
+        "maximum": 0.5652460052832282,
         "obstacle": ""
       },
       "failuresByMode": {
         "collision": {
-          "car": 127,
-          "foot": 5
+          "car": 96,
+          "foot": 8,
+          "bicycle": 1,
+          "bike": 1
         },
         "tool": {
-          "car": 11,
+          "car": 25,
+          "foot": 5,
           "bicycle": 2,
-          "bike": 2,
-          "foot": 5
+          "bike": 2
         }
       }
     },
     "accessDecision": {
       "inputEntries": 375,
-      "uniqueNodes": 373,
+      "uniqueNodes": 375,
       "repeatedNodeIds": [
         9457773705,
         9457773722
       ],
       "staticSubstitutes": 0,
       "boundaryRuns": 17,
-      "privateAndOneWayWaiver": "verification only"
+      "privateAndOneWayWaiver": "verification only",
+      "historicalSites": 373,
+      "historicalPassed": 275,
+      "activeMouths": 144,
+      "activePassed": 137,
+      "newlyIncluded": [
+        13508566602,
+        14018965069
+      ],
+      "formerPortals": 231
     },
-    "unmatched": [
-      {
-        "way": 1025751314,
-        "node": 9457383800,
-        "road": 155.5237530517578,
-        "floor": 151.339088825505,
-        "approachCut": 4.184664226252806,
-        "finalRoad": 155.5237530517578,
-        "difference": 4.184664226252806,
-        "reason": "portalMismatch"
-      },
-      {
-        "way": 1034716138,
-        "node": 9531714412,
-        "road": 155.94812463760377,
-        "floor": 152.66684769609958,
-        "approachCut": 3.2812769415041885,
-        "finalRoad": 155.94812463760377,
-        "difference": 3.2812769415041885,
-        "reason": "portalMismatch"
-      }
-    ]
+    "unmatched": []
   },
   "trafficCellBytes": {
     "main": {
@@ -458,8 +366,8 @@
     },
     "candidate": {
       "cells": 1170,
-      "total": 14755735,
-      "p99": 52895
+      "total": 14685474,
+      "p99": 52284
     }
   },
   "driving": {
@@ -469,37 +377,37 @@
   "regressions": {
     "strict": {
       "main": 2922,
-      "candidate": 2969,
+      "candidate": 2885,
       "counts": {
         "streetOverflow": 0,
-        "buildingOnRoad": 1175,
-        "unevenRoad": 77,
-        "textureIssue": 72,
-        "otherBasic": 1645
+        "buildingOnRoad": 1201,
+        "unevenRoad": 38,
+        "textureIssue": 65,
+        "otherBasic": 1581
       },
       "subtypes": {
         "streetOverflow": {},
         "buildingOnRoad": {
           "landmarkOnCarriageway": 16,
-          "landmarkOnSidewalk": 2,
-          "proceduralOnCarriageway": 1156,
-          "proceduralOnSidewalk": 1
+          "landmarkOnSidewalk": 1,
+          "proceduralOnCarriageway": 1179,
+          "proceduralOnSidewalk": 5
         },
         "unevenRoad": {
-          "gradeJump": 20,
-          "localBump": 57
+          "gradeJump": 15,
+          "localBump": 23
         },
         "textureIssue": {
           "roadGap": 4,
           "uvStretch": 12,
-          "zFighting": 56
+          "zFighting": 49
         },
         "otherBasic": {
-          "floatingOrBuried": 74,
+          "bridgeJointStep": 1,
+          "floatingOrBuried": 68,
           "invisibleColliderOnRoad": 4,
           "landmarkOverlap": 1,
-          "propOnCarriageway": 1507,
-          "tunnelClearance": 59
+          "propOnCarriageway": 1507
         }
       }
     },
@@ -526,14 +434,20 @@
     }
   },
   "performance": {
-    "mobileFailed": [],
+    "mobileFailed": [
+      {
+        "view": "palace",
+        "metric": "heap",
+        "ratio": 1.1028656085471265
+      }
+    ],
     "desktopFailed": [],
     "mobileHeap": {
-      "overview": 1.0437805723067213,
-      "lijiang": 1.025170582518713,
-      "palace": 0.9942602019792758,
-      "south": 1.0190733975334172,
-      "walk-palace": 1.0096879227697662
+      "overview": 1.0085965021622052,
+      "lijiang": 1.0040859872499168,
+      "palace": 1.1028656085471265,
+      "south": 1.008939842046236,
+      "walk-palace": 1.002141440647707
     }
   },
   "railCrossings": [
@@ -621,7 +535,7 @@
   },
   "priorityWheelSites": {
     "1024505844": 0.20123989810659282,
-    "78739": 0.008856108189689849
+    "78739": 0.0034001981995572805
   },
   "round5Evidence": {
     "inherited": [
@@ -728,6 +642,542 @@
       "errorsOver0_3m": 0,
       "maximum": 0.03,
       "parkingMaximum": 0.05
-    }
+    },
+    "openDeadEnds": [
+      [
+        454117718,
+        5.998,
+        false
+      ],
+      [
+        1475440133,
+        5.974,
+        false
+      ],
+      [
+        1486208147,
+        65.219,
+        false
+      ],
+      [
+        1489640393,
+        5.859,
+        false
+      ],
+      [
+        1490460395,
+        5.972,
+        false
+      ],
+      [
+        1532928036,
+        5.959,
+        false
+      ],
+      [
+        1553344902,
+        5.7,
+        false
+      ]
+    ],
+    "loopConstraints": [
+      {
+        "way": 1417162024,
+        "roof": 196.54882083210973,
+        "mouth": [
+          10429.688834710547,
+          -3116.594534400053
+        ],
+        "contact": [
+          10467.054908331067,
+          -3117.3194048553696
+        ],
+        "distance": 37.373103898273236,
+        "road": 195.85190497553563,
+        "maxDrop": 2.989848311861859,
+        "deficit": 0.8132358315640431
+      },
+      {
+        "way": 1493582667,
+        "roof": 152.800552573803,
+        "mouth": [
+          4117.298186362064,
+          575.8030475999725
+        ],
+        "contact": [
+          4117.96658190836,
+          609.2517714133529
+        ],
+        "distance": 33.47662316001477,
+        "road": 149.42665246219437,
+        "maxDrop": 2.6781298528011814,
+        "deficit": -1.5520299644098259
+      }
+    ]
+  },
+  "round7Evidence": {
+    "canal": [
+      {
+        "way": 1025751314,
+        "bridgeNode": 9457383800,
+        "join": 4.767423405382942e-06,
+        "minimumHeadroom": 3.745650861589297,
+        "maximumGrade": 0.06676938655497067,
+        "underBuilding": 319,
+        "wheelOutliers": 0,
+        "portalRuns": [
+          {
+            "id": 9457383800,
+            "way": 1025751314,
+            "mode": "car",
+            "boundary": false,
+            "direction": "in",
+            "completed": true,
+            "maximum": 0.005145247364936267,
+            "obstacle": ""
+          },
+          {
+            "id": 9457383800,
+            "way": 1025751314,
+            "mode": "car",
+            "boundary": false,
+            "direction": "out",
+            "completed": true,
+            "maximum": 0.006043227551117525,
+            "obstacle": ""
+          }
+        ]
+      },
+      {
+        "way": 1034716138,
+        "bridgeNode": 9531714412,
+        "join": 2.841815955889615e-07,
+        "minimumHeadroom": 3.566101826830078,
+        "maximumGrade": 0.017601606157684656,
+        "underBuilding": 380,
+        "wheelOutliers": 0,
+        "portalRuns": [
+          {
+            "id": 9531714412,
+            "way": 1034716138,
+            "mode": "car",
+            "boundary": false,
+            "direction": "in",
+            "completed": true,
+            "maximum": 0.02979307095958461,
+            "obstacle": ""
+          },
+          {
+            "id": 9531714412,
+            "way": 1034716138,
+            "mode": "car",
+            "boundary": false,
+            "direction": "out",
+            "completed": true,
+            "maximum": 0.02682781275714774,
+            "obstacle": ""
+          }
+        ]
+      }
+    ],
+    "negativeLayerGroundWays": 159,
+    "previouslyGeneratedTunnelsRemoved": 85,
+    "regressedSites": [
+      {
+        "node": 9447056794,
+        "mode": "car",
+        "direction": "out",
+        "way": 1024505826,
+        "classification": "tool",
+        "stoppedAt": [
+          -15336.4853515625,
+          155.73213375615623,
+          2604.04296875
+        ],
+        "round5ClosestM": 0.882,
+        "round5NearbyHeightDeltaM": -0.059,
+        "lastContact": [
+          {
+            "source": "45_49.glc",
+            "normal": {
+              "x": -0.4243565499782562,
+              "y": 0.9054803848266602,
+              "z": -0.005158713553100824
+            }
+          }
+        ],
+        "r5SteeringR6World": "tool",
+        "r6SteeringR6World": "tool",
+        "r6SteeringR5World": "pass",
+        "isolatedR5EngineAndWorld": "pass",
+        "current": "tool"
+      },
+      {
+        "node": 9447056795,
+        "mode": "car",
+        "direction": "in",
+        "way": 1024505826,
+        "classification": "tool",
+        "stoppedAt": [
+          -15336.4833984375,
+          155.73243040127574,
+          2604.029052734375
+        ],
+        "round5ClosestM": 0.886,
+        "round5NearbyHeightDeltaM": -0.061,
+        "lastContact": [
+          {
+            "source": "45_49.glc",
+            "normal": {
+              "x": -0.42400726675987244,
+              "y": 0.9056491851806641,
+              "z": -0.004174026194959879
+            }
+          }
+        ],
+        "r5SteeringR6World": "tool",
+        "r6SteeringR6World": "tool",
+        "r6SteeringR5World": "pass",
+        "isolatedR5EngineAndWorld": "pass",
+        "current": "tool"
+      },
+      {
+        "node": 13622135259,
+        "mode": "car",
+        "direction": "out",
+        "way": 1485919582,
+        "classification": "collision",
+        "stoppedAt": [
+          1327.5615234375,
+          150.84729229610377,
+          -7546.77294921875
+        ],
+        "round5ClosestM": 0.067,
+        "round5NearbyHeightDeltaM": -0.014,
+        "lastContact": [
+          {
+            "source": "road",
+            "normal": {
+              "x": -0.01653711125254631,
+              "y": 0.9968159794807434,
+              "z": 0.07800205051898956
+            }
+          },
+          {
+            "source": "110_9.glc",
+            "normal": {
+              "x": 0.8986980319023132,
+              "y": 0.39502665400505066,
+              "z": 0.19051460921764374
+            }
+          }
+        ],
+        "r5SteeringR6World": "collision",
+        "r6SteeringR6World": "collision",
+        "r6SteeringR5World": "collision",
+        "isolatedR5EngineAndWorld": "collision",
+        "current": "pass"
+      },
+      {
+        "node": 14286127223,
+        "mode": "car",
+        "direction": "out",
+        "way": 1568445636,
+        "classification": "tool",
+        "stoppedAt": [
+          -10703.353515625,
+          157.53422071107153,
+          1272.6435546875
+        ],
+        "round5ClosestM": 0.42,
+        "round5NearbyHeightDeltaM": 0.021,
+        "lastContact": [
+          {
+            "source": "ground",
+            "normal": {
+              "x": 0.05831994488835335,
+              "y": 0.9982178807258606,
+              "z": 0.01264258474111557
+            }
+          },
+          {
+            "source": "63_43.glc",
+            "normal": {
+              "x": 0.7147378921508789,
+              "y": 0.5791488885879517,
+              "z": -0.3920923173427582
+            }
+          },
+          {
+            "source": "ground",
+            "normal": {
+              "x": 0.05831994488835335,
+              "y": 0.9982178807258606,
+              "z": 0.01264258474111557
+            }
+          },
+          {
+            "source": "63_43.glc",
+            "normal": {
+              "x": -0.3626551032066345,
+              "y": 0.5670575499534607,
+              "z": 0.7395451664924622
+            }
+          },
+          {
+            "source": "ground",
+            "normal": {
+              "x": 0.05831994488835335,
+              "y": 0.9982178807258606,
+              "z": 0.01264258474111557
+            }
+          },
+          {
+            "source": "63_43.glc",
+            "normal": {
+              "x": 0.7147378921508789,
+              "y": 0.5791488885879517,
+              "z": -0.3920923173427582
+            }
+          },
+          {
+            "source": "ground",
+            "normal": {
+              "x": 0.05831994488835335,
+              "y": 0.9982178807258606,
+              "z": 0.01264258474111557
+            }
+          },
+          {
+            "source": "63_43.glc",
+            "normal": {
+              "x": -0.3626551032066345,
+              "y": 0.5670575499534607,
+              "z": 0.7395451664924622
+            }
+          },
+          {
+            "source": "ground",
+            "normal": {
+              "x": 0.05831994488835335,
+              "y": 0.9982178807258606,
+              "z": 0.01264258474111557
+            }
+          },
+          {
+            "source": "63_43.glc",
+            "normal": {
+              "x": 0.7147378921508789,
+              "y": 0.5791488885879517,
+              "z": -0.3920923173427582
+            }
+          },
+          {
+            "source": "ground",
+            "normal": {
+              "x": 0.05831994488835335,
+              "y": 0.9982178807258606,
+              "z": 0.01264258474111557
+            }
+          },
+          {
+            "source": "63_43.glc",
+            "normal": {
+              "x": -0.3626551032066345,
+              "y": 0.5670575499534607,
+              "z": 0.7395451664924622
+            }
+          },
+          {
+            "source": "ground",
+            "normal": {
+              "x": 0.05831994488835335,
+              "y": 0.9982178807258606,
+              "z": 0.01264258474111557
+            }
+          },
+          {
+            "source": "63_43.glc",
+            "normal": {
+              "x": 0.7147378921508789,
+              "y": 0.5791488885879517,
+              "z": -0.3920923173427582
+            }
+          },
+          {
+            "source": "ground",
+            "normal": {
+              "x": 0.05831994488835335,
+              "y": 0.9982178807258606,
+              "z": 0.01264258474111557
+            }
+          },
+          {
+            "source": "63_43.glc",
+            "normal": {
+              "x": -0.3626551032066345,
+              "y": 0.5670575499534607,
+              "z": 0.7395451664924622
+            }
+          },
+          {
+            "source": "ground",
+            "normal": {
+              "x": 0.05831994488835335,
+              "y": 0.9982178807258606,
+              "z": 0.01264258474111557
+            }
+          },
+          {
+            "source": "63_43.glc",
+            "normal": {
+              "x": 0.7147378921508789,
+              "y": 0.5791488885879517,
+              "z": -0.3920923173427582
+            }
+          },
+          {
+            "source": "ground",
+            "normal": {
+              "x": 0.05831994488835335,
+              "y": 0.9982178807258606,
+              "z": 0.01264258474111557
+            }
+          },
+          {
+            "source": "63_43.glc",
+            "normal": {
+              "x": -0.3626551032066345,
+              "y": 0.5670575499534607,
+              "z": 0.7395451664924622
+            }
+          }
+        ],
+        "r5SteeringR6World": "tool",
+        "r6SteeringR6World": "tool",
+        "r6SteeringR5World": "collision",
+        "isolatedR5EngineAndWorld": "collision",
+        "current": "tool"
+      },
+      {
+        "node": 10120782398,
+        "mode": "car",
+        "direction": "out",
+        "way": 1574710699,
+        "classification": "tool",
+        "stoppedAt": [
+          5960.3544921875,
+          156.72704304333,
+          624.3139038085938
+        ],
+        "round5ClosestM": 0.993,
+        "round5NearbyHeightDeltaM": -0.037,
+        "lastContact": [
+          {
+            "source": "128_41.glc",
+            "normal": {
+              "x": 0.060372114181518555,
+              "y": 0.8706579804420471,
+              "z": 0.48816996812820435
+            }
+          },
+          {
+            "source": "128_41.glc",
+            "normal": {
+              "x": 0.43415141105651855,
+              "y": 0.8996151089668274,
+              "z": 0.04695951193571091
+            }
+          }
+        ],
+        "r5SteeringR6World": "tool",
+        "r6SteeringR6World": "tool",
+        "r6SteeringR5World": "pass",
+        "isolatedR5EngineAndWorld": "pass",
+        "current": "tool"
+      },
+      {
+        "node": 10001962659,
+        "mode": "car",
+        "direction": "out",
+        "way": 1485632262,
+        "classification": "collision",
+        "stoppedAt": [
+          -1614.717529296875,
+          149.79913667966733,
+          9560.1728515625
+        ],
+        "round5ClosestM": 0.187,
+        "round5NearbyHeightDeltaM": -0.03,
+        "lastContact": [
+          {
+            "source": "road",
+            "normal": {
+              "x": -8.92653133632848e-07,
+              "y": 1,
+              "z": 0
+            }
+          },
+          {
+            "source": "98_76.glc",
+            "normal": {
+              "x": 0.22338241338729858,
+              "y": 0.3291046917438507,
+              "z": 0.9174913763999939
+            }
+          }
+        ],
+        "r5SteeringR6World": "collision",
+        "r6SteeringR6World": "collision",
+        "r6SteeringR5World": "collision",
+        "isolatedR5EngineAndWorld": "collision",
+        "current": "collision"
+      }
+    ],
+    "recoveredSites": [
+      9136647526,
+      13651472315,
+      11652039190
+    ],
+    "residentialBay": "House 1568418630 was absent at the crossing in the original tile. The entrance bay uses its mapped outline and the project residential facade.",
+    "buildingOverlapSurvey": {
+      "overlapsLongerThanOneMetre": 109,
+      "buildingSeeds": 74,
+      "motorWays": 88,
+      "shortestRoofClearance": 3.1,
+      "lowBuildingSeed": 1364689659,
+      "lowRoofWay": 454947557,
+      "collisionRunsOnAffectedWays": 79,
+      "outliersOnAffectedWays": 61
+    },
+    "priorityNode": [
+      {
+        "id": 628737326,
+        "way": 259013206,
+        "mode": "car",
+        "boundary": false,
+        "direction": "in",
+        "completed": true,
+        "maximum": 0.026851202969282895,
+        "obstacle": ""
+      },
+      {
+        "id": 628737326,
+        "way": 259013206,
+        "mode": "car",
+        "boundary": false,
+        "direction": "out",
+        "completed": true,
+        "maximum": 0.03518427689121495,
+        "obstacle": ""
+      }
+    ],
+    "trafficHeights": {
+      "motorLanes": 85971,
+      "errorsOver0_3m": 0,
+      "maximum": 0.03,
+      "parkingMaximum": 0.05
+    },
+    "unavailableRunsAreToolFailures": true
   }
 }
