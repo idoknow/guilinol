@@ -42,6 +42,7 @@ import {armOrientationGate} from './ui/orientation'
 import {mountStats} from './ui/stats'
 import {mountHotkeys} from './ui/hotkeys'
 import {mountTianyuanMifen} from './mifen'
+import {mountChat} from './ui/chat'
 import {mountGuide} from './ui/guide'
 import {touchUi} from './ui/input-mode'
 
@@ -447,6 +448,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     sampleGroundY: sampleMissionGroundY,
     getNightFactor: () => env.night,
   })
+  mountChat()
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   let staticAudit:ReturnType<typeof import('./verify-static').staticVerifier>|undefined
   const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},get mifen(){return mifen.getProbe()},

@@ -1,6 +1,6 @@
 import type {AnimationClip,Scene,Camera} from 'three'
 import type {Avatar} from '../../lib/avatar'
-import {bindChat,receiveChat} from './chat-store'
+import {bindChat,receiveChat,setChatSelf} from './chat-store'
 import {players,type Pose} from './net-players'
 import {onUser} from './ui/account'
 import type {MpStatus} from './ui/mp-pref'
@@ -59,7 +59,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         const msg=JSON.parse(event.data)
         switch(msg.t){
           case 'chat':case 'chat_hist':case 'chat_del':case 'chat_mute':case 'chat_ack':receiveChat(msg);break
-          case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'')
+          case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'');setChatSelf(Number(msg.me?.uid)||0)
           case 'players':
             peers.clear();for(const player of msg.players)peers.add(player)
             attempt=0;update('online',msg.online);break
