@@ -24,6 +24,7 @@ references (Ctrip 108723 aerials & ground views, 2026 Wikimedia Commons CC BY
   '桂林山水甲天下' karst boulder stele, flanking halls, and the 2-storey Central
   Square Fire Rescue Station ('中国消防救援 CHINA FIRE AND RESCUE').
 """
+import json
 import math
 from pathlib import Path
 import numpy as np
@@ -42,9 +43,8 @@ GYM_675177179 = [
     (89.71, 23.86), (93.68, 13.47),
 ]
 
-NE_HALL_1493030771 = [
-    (133.83, -40.68), (124.21, -9.46), (173.00, 7.47), (182.53, -21.01),
-]
+NE_HALL = json.loads(Path(__file__).with_name('central_square_ne_hall.json').read_text())
+NE_HALL_1493030771 = NE_HALL['footprint']
 
 SE_ANNEX_675106655 = [
     (90.51, 102.12), (125.32, 127.11), (111.90, 168.48), (51.20, 140.05), (64.88, 100.76),
@@ -335,8 +335,8 @@ def build_central_square(m: Builder):
         m.box(4.0, 22.6, 8.0, 14.0, 1.6, 0.24, 'hedge')
     m.pose = (0.0, 0.0, 0.0, 0.0)
 
-    m.prism(NE_HALL_1493030771, -2.0, 15.8, 'white', collide=True, cap_mat='roof', footing=True)
-    m.prism(NE_HALL_1493030771, 13.8, 1.9, 'terra', collide=False, cap_mat='roof')
+    m.prism(NE_HALL_1493030771, NE_HALL['base'], NE_HALL['cornice'] - NE_HALL['base'], 'white', collide=True, cap_mat='roof', footing=True)
+    m.prism(NE_HALL_1493030771, NE_HALL['cornice'], NE_HALL['roof'] - NE_HALL['cornice'], 'terra', collide=False, cap_mat='roof')
     m.prism(SE_ANNEX_675106655, -2.0, 16.4, 'white', collide=True, cap_mat='roof', footing=True)
 
     fsx, fsz = _ax_pt(52.0, -68.0)
