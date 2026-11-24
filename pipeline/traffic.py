@@ -20,6 +20,7 @@ from common import OUT, ll2xz, load_osm
 from road_tunnels import clear_approach_paving
 from station_road_corridor import bake as bake_station_corridor
 from surveyed_corridors import bake as bake_surveyed_corridors, restore as restore_corridors
+import ground_passages
 import vehicle_surface_grades
 from vehicle_approaches import plan as plan_approaches, surface_guides, portal_openings
 from vehicle_tunnels import mark_underpasses, mountain_roofs, underground, sections as tunnel_sections, solve as solve_tunnels
@@ -148,12 +149,15 @@ def bake(output, manifest, rendered_roads=None):
     # Legacy expanded worlds carry the original continuous surface street
     # through both open Wuling cuttings, above the actual tunnel floor.
     clear_approach_paving(output,manifest['chunks'],[t for t in manifest.get('tunnels',[]) if t['way']==237985762])
+    garage=ground_passages.garage_boundary(output,manifest["chunks"],elements)
+    garage_curbs=[]
     parking_segments = []
     sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
     restore_portal_paving(output,manifest['chunks'])
     restore_corridors(output,manifest['chunks'])
     from canal_passages import plan as plan_canal_passages, sample_road_heights
     from terminal_decks import grade as grade_terminal_decks
+    ground_passages.grain_yard(output,manifest,elements,sections)
     terminal_grades = grade_terminal_decks(output, manifest, elements)
     canal_grades = plan_canal_passages(output, manifest, elements, sections)
     graded_sections,grade_points=vehicle_surface_grades.stations(elements,sections,box(left,top,left+width,top+depth))
@@ -164,7 +168,7 @@ def bake(output, manifest, rendered_roads=None):
         tags = way.get('tags', {})
         linear = way['id'] not in SPAN_WAYS and (tags.get('bridge','no')!='no' or underground(way))
         kind = tags.get('highway', '').removesuffix('_link')
-        if way['type'] != 'way' or kind not in MOTOR | WALK | {'cycleway', 'motorway'} or tags.get('area') == 'yes' or tags.get('access') in ('no', 'private'):
+        if way['type'] != 'way' or kind not in MOTOR | WALK | {'cycleway'} or tags.get('area') == 'yes' or (tags.get('access') in ('no', 'private') and way['id'] not in ground_passages.YARD_ROADS):
             continue
         refs = way['nodes']
         coords = [ll2xz(pt['lat'], pt['lon']) if pt else None for pt in way['geometry']]
@@ -187,7 +191,7 @@ def bake(output, manifest, rendered_roads=None):
                 allowed(tags, 'right' if curb_sign > 0 else 'left', kind)):
             curb = min(2.4, paved-3*count)
             size = (paved-curb)/count
-        for idx, (start, end) in enumerate(zip(coords, coords[1:])):
+        for start,end,start_id,end_id in ground_passages.open_segments(way,coords,garage,garage_curbs,paved):
             if not start or not end or not all(left <= x < left+width and top <= z < top+depth for x,z in (start,end)):
                 continue
             if region and not region.covers(LineString([start,end]).buffer(count*size/2+2)):
@@ -195,7 +199,6 @@ def bake(output, manifest, rendered_roads=None):
             length = math.dist(start,end)
             if length < .5:
                 continue
-            start_id, end_id = refs[idx:idx+2]
             for ref, (x,z) in zip((start_id,end_id),(start,end)):
                 if ref not in nodes:
                     nodes[ref] = dict(id=ref,x=round(x,2),z=round(z,2),y=node_height(x,z,way['id']))
@@ -208,7 +211,7 @@ def bake(output, manifest, rendered_roads=None):
                 for side in (-1,1):
                     if tags['sidewalk'] in ('both','left' if side<0 else 'right'):
                         add_walk(start_id,end_id,side*(count*size/2+1),way['id'],linear)
-            if not permits(tags,'bicycle' if kind=='cycleway' else 'car'):
+            if way['id'] not in ground_passages.YARD_ROADS and not permits(tags,'bicycle' if kind=='cycleway' else 'car'):
                 continue
             if forbidden.intersects(LineString([start,end]).buffer(count*size/2+2)):
                 continue
@@ -217,7 +220,7 @@ def bake(output, manifest, rendered_roads=None):
                 n = count if single else max(1, count//2 if sign==-1 else (count+1)//2)
                 shift = -curb_sign*sign*curb/2
                 outer = ((n-.5-(count/2 if single else 0))*size if count>1 else 0) + size/2 + shift
-                parking_segments.append((head, tail, way['id'], tags, kind, sign, outer, paved/2))
+                if way['id'] not in ground_passages.YARD_ROADS:parking_segments.append((head, tail, way['id'], tags, kind, sign, outer, paved/2))
                 for slot in range(n):
                     offset = (slot+.5-(count/2 if single else 0))*size if count>1 else 0
                     offset += shift
@@ -243,6 +246,7 @@ def bake(output, manifest, rendered_roads=None):
                         if abs(normal)>.9:
                             offset=(math.copysign(14.05,lateral)-lateral)/normal
                     lane = dict(id=len(lanes), to=tail, width=size, offset=round(offset,2), kind='nonmotor' if kind=='cycleway' else 'bus' if kind=='busway' else 'motor',speedKmh=number(tags.get('maxspeed'),20 if kind in ('cycleway','service') else 40),oneway=single)
+                    if way['id'] in ground_passages.YARD_ROADS:lane['privateAccess']=True
                     lane['from'] = head
                     lane['cls'] = kind
                     lane['way'] = way['id']
@@ -279,7 +283,7 @@ def bake(output, manifest, rendered_roads=None):
         network = tunnel_sections(lanes,elements,original_tunnels,survey_nodes)
         if network['edges']:
             mountain_roofs(network,survey_nodes,surface.peaks)
-            guides=surface_guides(elements,network['portals'],survey_nodes)
+            guides=surface_guides(elements,network['portals'],survey_nodes,box(left,top,left+width,top+depth))
             request.write_text(json.dumps(dict(manifest=manifest,network=network,nodes=list(survey_nodes.values()),guideNodes=sorted({g[k] for g in guides for k in ('from','to')}))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portals',str(output.resolve()),str(request)],check=True,cwd=ROOT)
@@ -300,9 +304,17 @@ def bake(output, manifest, rendered_roads=None):
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portal-check',str(output.resolve()),str(request)],check=True,cwd=ROOT)
             (output/'vehicle-tunnel-grades.json').write_bytes(request.read_bytes())
+        ground_passages.bake(output,manifest,elements,sections,garage_curbs)
         if network['edges']:
             route_file=output/'vehicle-portal-routes.json'
-            route_file.write_text(json.dumps(dict(manifest=manifest,routes=portal_routes(elements,network,survey_nodes))))
+            yard_routes=[]
+            for way in elements:
+                if way['type']!='way' or way['id'] not in ground_passages.YARD_ROADS:continue
+                route=[[x,z,way['id']] for x,z in ground_passages.points(way)]
+                if not all(left<=x<left+width and top<=z<top+depth for x,z,_ in route):continue
+                modes=[dict(mode='car',direction='in',route=route),dict(mode='car',direction='out',route=route[::-1])]
+                yard_routes.append(dict(id=way['id'],way=way['id'],modes=modes))
+            route_file.write_text(json.dumps(dict(manifest=manifest,routes=portal_routes(elements,network,survey_nodes),yardRoutes=yard_routes)))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portal-routes',str(output.resolve()),str(route_file.resolve())],check=True,cwd=ROOT)
         print('Roadside relocations:',relocate(output,manifest,elements))

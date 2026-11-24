@@ -22,7 +22,8 @@ try{
   await page.goto(server.resolvedUrls!.local[0]+'?verify&flow=0&traffic=0&time=14&radius=320')
   await page.waitForFunction(()=>window.viewer?.stats.firstMs>0,null,{timeout:120000})
   await page.addStyleTag({content:'body > :not(canvas){visibility:hidden!important}'})
-  for(const [way,node,distance] of [[1025751314,9457383800,4.8],[1034716138,9531714412,20.1]]){
+  const approaches=process.argv.includes('--warehouse')?[[1112703462,10180689515,78.5]]:[[1025751314,9457383800,4.8],[1034716138,9531714412,20.1]]
+  for(const [way,node,distance] of approaches){
     const lane=graph.lanes.find(l=>l.way===way&&l.from===node)
     assert(lane && !lane.structure)
     const a=nodes.get(node),b=nodes.get(lane.to)
