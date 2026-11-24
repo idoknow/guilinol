@@ -1,7 +1,7 @@
 {
   "world": "world-a11731a5dafd",
   "main": "27dabe1",
-  "candidateRevision": "86a42bdff75c7234ff9d2962cfdaebac1ac4d2e1",
+  "candidateRevision": "fb9867570360170ae3cae3d247a10aa9045b7ce9",
   "baseline": {
     "tunnelConstraintRecords": 0,
     "partialTunnelWays": [
@@ -169,24 +169,24 @@
     "gradedApproaches": 142,
     "partialTunnelWays": [],
     "reasons": {
-      "surface": 372,
+      "surface": 316,
       "tunnel": 0,
-      "fit": 7,
+      "fit": 4,
       "hidden": 0
     },
     "lanes": 88118,
     "wheelSamples": 7705652,
-    "outliers": 379,
-    "sunk": 217,
-    "floating": 162,
-    "p99": 0.023,
-    "nonplanarFootprints": 92,
+    "outliers": 320,
+    "sunk": 177,
+    "floating": 143,
+    "p99": 0.024,
+    "nonplanarFootprints": 76,
     "unresolvedTunnelWays": []
   },
   "byLayer": {
-    "at-grade": 241,
     "bridge": 120,
-    "tunnel": 18
+    "tunnel": 18,
+    "at-grade": 182
   },
   "station": {
     "laneAudit": {
@@ -225,7 +225,7 @@
       "collisions": 0,
       "tool": 0,
       "over": 0,
-      "max": 0.061603141393305805
+      "max": 0.06179974371531216
     },
     "accessDecision": {
       "actualPortals": 146,
@@ -244,7 +244,7 @@
     },
     "candidate": {
       "cells": 1170,
-      "total": 14683267,
+      "total": 14690929,
       "p99": 52246
     }
   },
@@ -309,17 +309,21 @@
       "ride": "Mobile pre-mount HUD: btn-run / vehicle-action overlap 2322 px²",
       "walk": "Dock vehicle action overlaps joystick (1320.5 px²) and run button (2322 px²)",
       "traffic": "Missing parked-car fixture at verify-traffic.mjs:140"
+    },
+    "pairedRevisions": {
+      "candidate": "fb9867570360170ae3cae3d247a10aa9045b7ce9",
+      "main": "27dabe1"
     }
   },
   "performance": {
     "mobileFailed": [],
     "desktopFailed": [],
     "mobileHeap": {
-      "overview": 1.0132419621367452,
-      "lijiang": 1.007875694206271,
-      "palace": 1.0019282009581425,
-      "south": 1.0068335413748501,
-      "walk-palace": 0.997245420260023
+      "overview": 1.0127093531243778,
+      "lijiang": 1.0019541702915438,
+      "palace": 1.002468138598767,
+      "south": 1.0065596323632962,
+      "walk-palace": 0.998950201034059
     }
   },
   "railCrossings": [
@@ -3901,10 +3905,10 @@
       "sites": 239,
       "passed": 182,
       "runs": 507,
-      "completed": 445,
+      "completed": 447,
       "collisions": 44,
-      "tool": 18,
-      "over": 31,
+      "tool": 16,
+      "over": 32,
       "max": 0.445770263671875
     },
     "yardRuns": {
@@ -3942,7 +3946,7 @@
         "direction": "in",
         "completed": true,
         "failure": null,
-        "maximum": 0.009274561900014078
+        "maximum": 0.00927421754261104
       },
       {
         "id": 13694473830,
@@ -3950,10 +3954,79 @@
         "direction": "out",
         "completed": true,
         "failure": null,
-        "maximum": 0.008714271828807796
+        "maximum": 0.014108865553481564
       }
     ],
     "priorityWheelMax": 0.12726527008922517,
-    "priorityWheelOutliers": 0
+    "priorityWheelOutliers": 0,
+    "fixedPortalAndSurfaceDriveBySite": {
+      "9457773719": [
+        {
+          "direction": "in",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.008556197049500724
+        },
+        {
+          "direction": "out",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.010127316106036233
+        }
+      ],
+      "9457773720": [
+        {
+          "direction": "in",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.012618974054817045
+        },
+        {
+          "direction": "out",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.013150124302370614
+        }
+      ],
+      "10001962659": [
+        {
+          "direction": "in",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.02793161497928054
+        },
+        {
+          "direction": "out",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.02875219178650923
+        }
+      ],
+      "14286127223": [
+        {
+          "direction": "in",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.03857024199558623
+        },
+        {
+          "direction": "out",
+          "completed": false,
+          "failure": "tool",
+          "maximum": 0.03658556690754722
+        }
+      ]
+    },
+    "previousBuild": {
+      "revision": "86a42bdff75c7234ff9d2962cfdaebac1ac4d2e1",
+      "wheelOutliers": 379,
+      "surfacePassed": 182,
+      "strict": 2904
+    },
+    "surfacePriorityRootCause": "Private tunnel 1025797713 connects to 1025797700 through open-air driveways 1025797712 and 1539622609. Searching shared tunnel nodes alone omitted its floor and produced a 0.466 m entry drop and a reverse collision at the exposed retaining face.",
+    "warehouseComparisonImages": [
+      "grain-yard-453854244.png",
+      "grain-yard-453854249.png"
+    ]
   }
 }
