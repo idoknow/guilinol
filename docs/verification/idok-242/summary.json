@@ -1,7 +1,7 @@
 {
   "world": "world-a11731a5dafd",
   "main": "27dabe1",
-  "candidateRevision": "fb9867570360170ae3cae3d247a10aa9045b7ce9",
+  "candidateRevision": "5862af67fb2c9dec148346b7557e245ee9808273",
   "baseline": {
     "tunnelConstraintRecords": 0,
     "partialTunnelWays": [
@@ -169,31 +169,31 @@
     "gradedApproaches": 142,
     "partialTunnelWays": [],
     "reasons": {
-      "surface": 316,
+      "surface": 263,
       "tunnel": 0,
-      "fit": 4,
+      "fit": 10,
       "hidden": 0
     },
-    "lanes": 88118,
-    "wheelSamples": 7705652,
-    "outliers": 320,
-    "sunk": 177,
-    "floating": 143,
-    "p99": 0.024,
-    "nonplanarFootprints": 76,
+    "lanes": 88128,
+    "wheelSamples": 7705728,
+    "outliers": 273,
+    "sunk": 158,
+    "floating": 115,
+    "p99": 0.023,
+    "nonplanarFootprints": 62,
     "unresolvedTunnelWays": []
   },
   "byLayer": {
-    "bridge": 120,
-    "tunnel": 18,
-    "at-grade": 182
+    "at-grade": 187,
+    "bridge": 68,
+    "tunnel": 18
   },
   "station": {
     "laneAudit": {
       "lane": 52622,
       "way": 1017598912,
       "kind": "motor",
-      "maximum": 0.0035615083336608677,
+      "maximum": 0.0035246333150098508,
       "over": 0,
       "unresolvedTunnelFloor": false
     },
@@ -225,7 +225,7 @@
       "collisions": 0,
       "tool": 0,
       "over": 0,
-      "max": 0.06179974371531216
+      "max": 0.053397735064891094
     },
     "accessDecision": {
       "actualPortals": 146,
@@ -244,8 +244,8 @@
     },
     "candidate": {
       "cells": 1170,
-      "total": 14690929,
-      "p99": 52246
+      "total": 15266238,
+      "p99": 55393
     }
   },
   "driving": {
@@ -255,11 +255,11 @@
   "regressions": {
     "strict": {
       "main": 2922,
-      "candidate": 2904,
+      "candidate": 2892,
       "counts": {
         "streetOverflow": 0,
         "buildingOnRoad": 1219,
-        "unevenRoad": 38,
+        "unevenRoad": 26,
         "textureIssue": 65,
         "otherBasic": 1582
       },
@@ -272,8 +272,8 @@
           "proceduralOnSidewalk": 12
         },
         "unevenRoad": {
-          "gradeJump": 15,
-          "localBump": 23
+          "gradeJump": 13,
+          "localBump": 13
         },
         "textureIssue": {
           "roadGap": 4,
@@ -319,11 +319,11 @@
     "mobileFailed": [],
     "desktopFailed": [],
     "mobileHeap": {
-      "overview": 1.0127093531243778,
-      "lijiang": 1.0019541702915438,
-      "palace": 1.002468138598767,
-      "south": 1.0065596323632962,
-      "walk-palace": 0.998950201034059
+      "overview": 1.0118775868412397,
+      "lijiang": 1.0071224521279762,
+      "palace": 1.0029440163932482,
+      "south": 1.0068884658041093,
+      "walk-palace": 0.999442810899052
     }
   },
   "railCrossings": [
@@ -360,7 +360,7 @@
     {
       "sharedNode": 6533456479,
       "mode": "car",
-      "maxJump": 0.04510677501841087,
+      "maxJump": 0.04516177964660528,
       "ok": true
     },
     {
@@ -372,7 +372,7 @@
     {
       "sharedNode": 6533456480,
       "mode": "car",
-      "maxJump": 0.046202501261007,
+      "maxJump": 0.04673761590470349,
       "ok": true
     }
   ],
@@ -410,7 +410,7 @@
     "moved": "{'trees': 322, 'lamps': 79, 'stops': 2}"
   },
   "priorityWheelSites": {
-    "1024505844": 0.20123989810659282,
+    "1024505844": 0.14918189623159606,
     "78739": 0.0034001981995572805
   },
   "round5Evidence": {
@@ -4028,5 +4028,651 @@
       "grain-yard-453854244.png",
       "grain-yard-453854249.png"
     ]
+  },
+  "round11Evidence": {
+    "canal": [
+      {
+        "way": 1025751314,
+        "bridgeNode": 9457383800,
+        "join": 4.767423405382942e-06,
+        "minimumHeadroom": 3.745650861589297,
+        "maximumGrade": 0.06676938655497067,
+        "underBuilding": 319
+      },
+      {
+        "way": 1034716138,
+        "bridgeNode": 9531714412,
+        "join": 2.841815955889615e-07,
+        "minimumHeadroom": 3.566101826830078,
+        "maximumGrade": 0.017601606157684656,
+        "underBuilding": 380
+      }
+    ],
+    "yardClassification": {
+      "453854244": {
+        "halfWidth": 2.5,
+        "crossings": [
+          {
+            "metres": 23.922138142297918,
+            "minimumRequiredShift": 14.460001332489414
+          },
+          {
+            "metres": 102.030548618604,
+            "minimumRequiredShift": 33.538968315519654
+          }
+        ],
+        "lanes": 18,
+        "length": 352.3545737791806,
+        "closed": 107.53947563835004,
+        "private": true,
+        "routeLengths": [
+          149.40456326186631,
+          95.41053487896424
+        ]
+      },
+      "453854249": {
+        "halfWidth": 2.5,
+        "crossings": [
+          {
+            "metres": 121.66428278045527,
+            "minimumRequiredShift": 31.684005879667097
+          }
+        ],
+        "lanes": 4,
+        "length": 133.71403461169157,
+        "closed": 127.16490495688608,
+        "private": true,
+        "routeLengths": [
+          3.88098182419164,
+          2.6681478306138633
+        ]
+      },
+      "453854250": {
+        "halfWidth": 2.5,
+        "crossings": [
+          {
+            "metres": 19.74970359637815,
+            "minimumRequiredShift": 15.196928569171433
+          },
+          {
+            "metres": 19.53521866705263,
+            "minimumRequiredShift": 12.216060538284893
+          },
+          {
+            "metres": 23.56623403869653,
+            "minimumRequiredShift": 14.266094657304407
+          }
+        ],
+        "lanes": 22,
+        "length": 220.19240361903204,
+        "closed": 0,
+        "private": true,
+        "routeLengths": [
+          220.19240361903204,
+          220.19240361903204
+        ]
+      }
+    },
+    "surface": {
+      "sites": 239,
+      "passed": 188,
+      "runs": 507,
+      "completed": 454,
+      "collisions": 39,
+      "tool": 14,
+      "over": 24,
+      "max": 0.4045156788826034
+    },
+    "yardRuns": {
+      "sites": 9,
+      "passed": 9,
+      "runs": 18,
+      "completed": 18,
+      "collisions": 0,
+      "tool": 0,
+      "over": 0,
+      "max": 0.0751819047163167
+    },
+    "surfacePriority": [
+      {
+        "id": 9457773705,
+        "mode": "car",
+        "direction": "in",
+        "completed": true,
+        "failure": null,
+        "maximum": 0.03551154282857283
+      },
+      {
+        "id": 9457773705,
+        "mode": "car",
+        "direction": "out",
+        "completed": true,
+        "failure": null,
+        "maximum": 0.02556808703351976
+      }
+    ],
+    "portalPriority": [
+      {
+        "id": 13694473830,
+        "mode": "car",
+        "direction": "in",
+        "completed": true,
+        "failure": null,
+        "maximum": 0.00927421754261104
+      },
+      {
+        "id": 13694473830,
+        "mode": "car",
+        "direction": "out",
+        "completed": true,
+        "failure": null,
+        "maximum": 0.01302991291311173
+      }
+    ],
+    "priorityWheelMax": 0.12726527008922517,
+    "priorityWheelOutliers": 0,
+    "revision": "5862af67fb2c9dec148346b7557e245ee9808273",
+    "airport": {
+      "segments": 11,
+      "downstreamID": 15498,
+      "edgeSamples": 618,
+      "clearanceBeyondWheel": 0.2,
+      "ambientTraversed": true,
+      "upperDrive": {
+        "requested": 1,
+        "runs": 2,
+        "completed": 2,
+        "boundaryRuns": 0,
+        "pass": 1,
+        "overLimit": 0,
+        "stalled": 0,
+        "failures": {
+          "collision": 0,
+          "tool": 0
+        },
+        "unavailable": 0,
+        "maximum": 0.004999439783802018
+      },
+      "lowerDrive": [
+        {
+          "id": 3891277148,
+          "direction": "in",
+          "completed": true,
+          "maximum": 0.00792425882139014
+        },
+        {
+          "id": 3891277148,
+          "direction": "out",
+          "completed": true,
+          "maximum": 0.00744792560359997
+        },
+        {
+          "id": 3891277141,
+          "direction": "in",
+          "completed": true,
+          "maximum": 0.004195113124950467
+        },
+        {
+          "id": 3891277141,
+          "direction": "out",
+          "completed": true,
+          "maximum": 0.004243384293715735
+        }
+      ],
+      "upperWayLanes": [
+        {
+          "lane": 15526,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.0206454412728192,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15525,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.018501203243403097,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15524,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.015735998095038894,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15523,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.0206791424428161,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15522,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.021032575818139776,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15521,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.026816111887740135,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15520,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.01770524415931618,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15519,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.029821649057140576,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15518,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.020007105818820037,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15508,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.026881410081301738,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15507,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.02804884447124323,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15506,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.018743495273412236,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15505,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.01617424603958284,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15504,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.01708052730327836,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15503,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.017962990385512967,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15502,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.02939351741466112,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15501,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.026513725192046422,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15500,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.013983580340152457,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15499,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.03100347261533898,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15498,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.004470328097482934,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 88127,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.01695547282639609,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 88126,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.017553672848180213,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 88125,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.010406374925992168,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 88124,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.004843952639703275,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 88123,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.013744696177809601,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 88122,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.018592030918597402,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 88121,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.007127610278189422,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 88120,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.018821942674719594,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 88119,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.006689236646906238,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 88118,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.024558077171747072,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15497,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.12535725241082218,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15517,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.027894794114473598,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15516,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.026715792028511487,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15515,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.02045552862463751,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15514,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.024904477930789426,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15513,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.02047293337653855,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15512,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.02271209206679714,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15511,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.035855778106054004,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15510,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.023383279467594775,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        },
+        {
+          "lane": 15509,
+          "way": 385796480,
+          "kind": "motor",
+          "maximum": 0.025313212729912493,
+          "over": 0,
+          "unresolvedTunnelFloor": false
+        }
+      ],
+      "forkMaximum": 0.0321687395493484
+    },
+    "previousWheelAudit": {
+      "tunnelConstraintRecords": 0,
+      "gradedApproaches": 142,
+      "partialTunnelWays": [],
+      "reasons": {
+        "surface": 316,
+        "tunnel": 0,
+        "fit": 4,
+        "hidden": 0
+      },
+      "lanes": 88118,
+      "wheelSamples": 7705652,
+      "outliers": 320,
+      "sunk": 177,
+      "floating": 143,
+      "p99": 0.024,
+      "nonplanarFootprints": 76,
+      "unresolvedTunnelWays": []
+    },
+    "releaseRuns": {
+      "candidate": {
+        "tunnelConstraintRecords": 0,
+        "gradedApproaches": 142,
+        "partialTunnelWays": [],
+        "reasons": {
+          "surface": 290,
+          "tunnel": 0,
+          "fit": 4,
+          "hidden": 0
+        },
+        "lanes": 88128,
+        "wheelSamples": 7705728,
+        "outliers": 294,
+        "sunk": 162,
+        "floating": 132,
+        "p99": 0.024,
+        "nonplanarFootprints": 72,
+        "unresolvedTunnelWays": [],
+        "revision": "05295cdd"
+      },
+      "release": {
+        "tunnelConstraintRecords": 0,
+        "gradedApproaches": 142,
+        "partialTunnelWays": [],
+        "reasons": {
+          "surface": 263,
+          "tunnel": 0,
+          "fit": 10,
+          "hidden": 0
+        },
+        "lanes": 88128,
+        "wheelSamples": 7705728,
+        "outliers": 273,
+        "sunk": 158,
+        "floating": 115,
+        "p99": 0.023,
+        "nonplanarFootprints": 62,
+        "unresolvedTunnelWays": [],
+        "revision": "5862af67"
+      }
+    },
+    "coldOffWalkEarlierBuild": {
+      "geometries": [
+        60,
+        74
+      ],
+      "textures": [
+        39,
+        43
+      ]
+    },
+    "coldOffWalkEarlierRevision": "05295cdd",
+    "pairedWalkSetup": "Both builds load the palace flight camera and the same streamed assets before entering the walk gate.",
+    "fixedPortalAndSurfaceDriveBySite": {
+      "9457773719": [
+        {
+          "direction": "in",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.007894652182216078
+        },
+        {
+          "direction": "out",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.010127316106036233
+        }
+      ],
+      "9457773720": [
+        {
+          "direction": "in",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.012535873876487358
+        },
+        {
+          "direction": "out",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.013150124302370614
+        }
+      ],
+      "10001962659": [
+        {
+          "direction": "in",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.02793161497928054
+        },
+        {
+          "direction": "out",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.028758116150783053
+        }
+      ],
+      "14286127223": [
+        {
+          "direction": "in",
+          "completed": true,
+          "failure": null,
+          "maximum": 0.03824854324449234
+        },
+        {
+          "direction": "out",
+          "completed": false,
+          "failure": "tool",
+          "maximum": 0.03667411230645712
+        }
+      ]
+    }
   }
 }
