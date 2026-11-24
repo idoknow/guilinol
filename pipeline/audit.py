@@ -473,6 +473,17 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             from common import ll2xz
             landmark_polygons.append(Polygon([ll2xz(lat, lon) for lon, lat in rep['polygon']]).buffer(0))
     u_lm_replace_poly = unary_union(landmark_polygons).buffer(1.1) if landmark_polygons else Polygon()
+    # Negative-layer highways can be covered by a rendered tunnel floor.
+    # Use only that way's own strip so a nearby or overlying road cannot
+    # supply coverage for a missing segment of the underground carriageway.
+    floor_strips = defaultdict(list)
+    for tunnel in manifest.get('tunnels', []):
+        if not tunnel.get('generated'):
+            continue
+        a, b = tunnel['portals']
+        axis = LineString([(a[0], a[2]), (b[0], b[2])])
+        floor_strips[tunnel['way']].append(axis.buffer(tunnel['halfWidth'], cap_style='flat'))
+    floor_coverage = {way: unary_union(parts) for way, parts in floor_strips.items()}
     u_surface_check = unary_union([u_all_road_surface, u_lm_walk])
     prepare(u_surface_check)
 
@@ -625,6 +636,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
         return road_base_y(x, z) + 0.045
 
     for way_id, name, hw, is_bridge, width_m, seg in road_Elements:
+        coverage = floor_coverage.get(way_id, u_surface_check)
         length = seg.length
         n_pts = max(2, int(math.floor(length / 2.0)) + 1)
         dists = np.linspace(0.0, length, n_pts)
@@ -669,7 +681,7 @@ def run_audit(world_dir: Path, root: Path) -> dict:
 
             # Road gap check (1m radius around centerline must have road/bridge/landmark surface)
             if not (hw == 'pedestrian' and u_lm_replace_poly.contains(pt)):
-                if not u_surface_check.intersects(pt.buffer(1.0)):
+                if not coverage.intersects(pt.buffer(1.0)):
                     gap_issues.append(make_issue('roadGap', pt.x, pt.y, 1.0,
                                                  f'way/{way_id} {name or hw} missing road mesh within 1m', way=way_id))
 

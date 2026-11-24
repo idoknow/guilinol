@@ -3,9 +3,11 @@ import gzip
 import json
 import math
 import numpy as np
-from shapely import Polygon, STRtree, box, make_valid, set_precision, union_all
+from shapely import LineString, Polygon, STRtree, box, make_valid, set_precision, union_all
 from shapely.affinity import translate
-from service_streets import rings
+from common import ll2xz
+from vehicle_tunnels import underground
+from service_streets import rings, width
 from surveyed_corridors import read_chunk, write_chunk
 
 
@@ -47,15 +49,30 @@ def restore(output, chunks):
         tile['bytes'] = file.stat().st_size
 
 
-def trim(output,chunks,tunnels):
+def trim(output,chunks,tunnels,elements,widths):
     inputs = {}
     areas=STRtree(list(openings(tunnels)))
+    protected = []
+    for way in elements:
+        tags = way.get('tags', {})
+        if (way['type'] != 'way' or not tags.get('highway') or underground(tags)
+                or not way.get('geometry') or not all(way['geometry'])):
+            continue
+        axis = LineString([ll2xz(p['lat'], p['lon']) for p in way['geometry']])
+        radius = widths.get(way['id'], width(tags)) / 2 + .5
+        if len(areas.query(axis.buffer(radius, quad_segs=2))):
+            protected.append(axis.buffer(radius))
+    surface_roads = STRtree(protected)
     for tile in chunks:
         x,z=tile['x'],tile['z']
         bounds=box(x,z,x+256,z+256)
         hits=areas.query(bounds,predicate='intersects')
         if not len(hits):continue
-        cut=set_precision(translate(union_all(areas.geometries.take(hits)).intersection(bounds),-x,-z),.01)
+        opening = union_all(areas.geometries.take(hits)).intersection(bounds)
+        upper = surface_roads.query(opening, predicate='intersects')
+        if len(upper):
+            opening = opening.difference(union_all(surface_roads.geometries.take(upper)))
+        cut=set_precision(translate(opening,-x,-z),.01)
         if cut.area<.001:continue
         file=output/tile['file']
         raw,start,size,collision=read_chunk(file)
