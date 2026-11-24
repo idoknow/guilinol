@@ -1,9 +1,62 @@
 import * as THREE from 'three'
 import type { Walker } from '../../play/host.ts'
-import type { DrinkCatalogItem, DrinkCustomization } from '../menu/menu.ts'
+import { getDrinkById, type DrinkCatalogItem, type DrinkCustomization } from '../menu/menu.ts'
+import { DEFAULT_MASTER_DRINKS_SKIN, type DrinksMasterSkin } from '../menu/skin.ts'
 import { createDrinkCupModel, type DrinkCupVisual } from './cup-model.ts'
 
 export type DrinkHoldState = 'idle' | 'holding' | 'drinking' | 'finishing'
+
+export const DRINK_HOLD_STORAGE_KEY = 'glol.drinks.hold.v1'
+
+/**
+ * 核对最新 `origin/main` 键位占用后的默认饮品啜饮键：
+ * - `KeyY` 已被 `web/src/input/keymap.ts:21` `useItem`（使用手中物品）占用
+ * - `KeyH` 已被 `web/src/ui/walk.ts:355` `horn`（骑行铃铛 / 喇叭）占用
+ * - `KeyI` 在全仓无任何占用，作为 PC 端默认值；移动端通过悬浮「喝一口 / 收起」触屏按钮操作
+ */
+export const DRINK_SIP_HOTKEY = 'KeyI'
+export const DRINK_SIP_KEY_LABEL = 'I'
+export const ORIGIN_MAIN_KEY_AUDIT = Object.freeze({
+  KeyY: 'occupied:useItem(web/src/input/keymap.ts)',
+  KeyH: 'occupied:horn(web/src/ui/walk.ts)',
+  chosen: DRINK_SIP_HOTKEY,
+})
+
+export interface DrinkHoldStorageLike {
+  getItem(key: string): string | null
+  setItem(key: string, value: string): void
+  removeItem(key: string): void
+}
+
+export interface PersistedHoldDrinkRecord {
+  version: 1
+  drinkId: string
+  customization: DrinkCustomization
+  orderId: string | null
+  sipsTotal: number
+  sipsLeft: number
+  updatedAt: number
+}
+
+export interface DrinkHoldSessionOptions {
+  storage?: DrinkHoldStorageLike | null
+  persistKey?: string
+  resolveDrink?: (drinkId: string) => DrinkCatalogItem | undefined
+  now?: () => number
+}
+
+function resolveDefaultStorage(opt: DrinkHoldStorageLike | null | undefined): DrinkHoldStorageLike | null {
+  if (opt === null) return null
+  if (opt !== undefined) return opt
+  try {
+    if (typeof globalThis !== 'undefined' && 'localStorage' in globalThis && globalThis.localStorage) {
+      return globalThis.localStorage
+    }
+  } catch {
+    // 隐私模式禁用 storage 时静默退回纯内存
+  }
+  return null
+}
 
 export interface HeldDrinkSyncPayload {
   holding: boolean
@@ -67,7 +120,95 @@ export class DrinkHoldSession {
   private sipElapsed = 0
   private finishElapsed = 0
   private paused = false
+  private pauseReasons = new Set<string>()
   private listeners = new Set<(snap: DrinkHoldSnapshot) => void>()
+  private readonly storage: DrinkHoldStorageLike | null
+  private readonly persistKey: string
+  private readonly resolveDrink: (drinkId: string) => DrinkCatalogItem | undefined
+  private readonly now: () => number
+
+  constructor(opts: DrinkHoldSessionOptions = {}) {
+    this.storage = resolveDefaultStorage(opts.storage)
+    this.persistKey = opts.persistKey ?? DRINK_HOLD_STORAGE_KEY
+    this.resolveDrink = opts.resolveDrink ?? getDrinkById
+    this.now = opts.now ?? (() => Date.now())
+    this.restore()
+  }
+
+  private persistNow(): void {
+    if (!this.storage) return
+    try {
+      if (this.state === 'idle' || this.state === 'finishing' || !this.drink || this.sipsLeft <= 0) {
+        this.storage.removeItem(this.persistKey)
+        return
+      }
+      const record: PersistedHoldDrinkRecord = {
+        version: 1,
+        drinkId: this.drink.id,
+        customization: this.customization ?? {
+          ice: this.drink.iceOptions[0] ?? '正常冰',
+          sugar: this.drink.sugarOptions[0] ?? '全糖',
+        },
+        orderId: this.orderId,
+        sipsTotal: this.sipsTotal,
+        sipsLeft: this.sipsLeft,
+        updatedAt: this.now(),
+      }
+      this.storage.setItem(this.persistKey, JSON.stringify(record))
+    } catch {
+      // ignore storage quota errors
+    }
+  }
+
+  /** 从本地存档恢复未喝完的手捧饮品（刷新恢复）；损坏数据自动清理。 */
+  restore(): boolean {
+    if (!this.storage) return false
+    try {
+      const raw = this.storage.getItem(this.persistKey)
+      if (!raw) return false
+      const parsed = JSON.parse(raw) as Partial<PersistedHoldDrinkRecord>
+      if (!parsed || parsed.version !== 1 || typeof parsed.drinkId !== 'string') {
+        this.storage.removeItem(this.persistKey)
+        return false
+      }
+      const drink = this.resolveDrink(parsed.drinkId)
+      const sipsTotal = Number.isSafeInteger(parsed.sipsTotal) && (parsed.sipsTotal ?? 0) > 0 ? parsed.sipsTotal! : drink?.sipsCount ?? 0
+      const sipsLeft = Number.isSafeInteger(parsed.sipsLeft) ? parsed.sipsLeft! : 0
+      if (!drink || sipsTotal <= 0 || sipsLeft <= 0 || sipsLeft > sipsTotal) {
+        this.storage.removeItem(this.persistKey)
+        return false
+      }
+      this.state = 'holding'
+      this.drink = drink
+      this.customization = {
+        ice:
+          parsed.customization?.ice && drink.iceOptions.includes(parsed.customization.ice)
+            ? parsed.customization.ice
+            : drink.iceOptions[0] ?? '正常冰',
+        sugar:
+          parsed.customization?.sugar && drink.sugarOptions.includes(parsed.customization.sugar)
+            ? parsed.customization.sugar
+            : drink.sugarOptions[0] ?? '全糖',
+      }
+      this.orderId = typeof parsed.orderId === 'string' ? parsed.orderId : null
+      this.sipsTotal = sipsTotal
+      this.sipsLeft = sipsLeft
+      this.fillRatio = sipsLeft / sipsTotal
+      this.sipFromFill = this.fillRatio
+      this.sipToFill = this.fillRatio
+      this.sipElapsed = 0
+      this.finishElapsed = 0
+      this.emit()
+      return true
+    } catch {
+      try {
+        this.storage.removeItem(this.persistKey)
+      } catch {
+        // ignore
+      }
+      return false
+    }
+  }
 
   getSnapshot(): DrinkHoldSnapshot {
     const active = this.state !== 'idle'
@@ -123,14 +264,18 @@ export class DrinkHoldSession {
     this.sipToFill = 1
     this.sipElapsed = 0
     this.finishElapsed = 0
+    this.persistNow()
     this.emit()
     return this.getSnapshot()
   }
 
-  setPaused(paused: boolean): void {
+  setPaused(paused: boolean, reason = 'manual'): void {
     const next = Boolean(paused)
-    if (next === this.paused) return
-    this.paused = next
+    if (next) this.pauseReasons.add(reason)
+    else this.pauseReasons.delete(reason)
+    const computedPaused = this.pauseReasons.size > 0
+    if (computedPaused === this.paused) return
+    this.paused = computedPaused
     this.emit()
   }
 
@@ -162,6 +307,7 @@ export class DrinkHoldSession {
     this.sipToFill = this.sipsTotal > 0 ? this.sipsLeft / this.sipsTotal : 0
     this.sipElapsed = 0
     this.state = 'drinking'
+    this.persistNow()
     this.emit()
 
     return {
@@ -176,6 +322,7 @@ export class DrinkHoldSession {
   discard(): boolean {
     if (this.state === 'idle') return false
     this.clearState()
+    this.persistNow()
     this.emit()
     return true
   }
@@ -192,6 +339,7 @@ export class DrinkHoldSession {
     this.sipToFill = 0
     this.sipElapsed = 0
     this.finishElapsed = 0
+    this.persistNow()
   }
 
   /**
@@ -229,32 +377,114 @@ export class DrinkHoldSession {
   }
 }
 
+export interface HoldHostState {
+  aboard: boolean
+  photo: boolean
+  home: boolean
+  shopOpen: boolean
+  drinksUiOpen: boolean
+}
+
+export function readHoldHostState(body: { dataset?: Record<string, string | undefined>; hasAttribute?: (name: string) => boolean } | null | undefined): HoldHostState {
+  if (!body) {
+    return { aboard: false, photo: false, home: false, shopOpen: false, drinksUiOpen: false }
+  }
+  const has = (attr: string, dsKey: string) =>
+    Boolean(body.hasAttribute?.(attr) || (body.dataset && body.dataset[dsKey] !== undefined))
+  return {
+    aboard: has('data-aboard', 'aboard'),
+    photo: body.dataset?.photo === 'on',
+    home: has('data-home', 'home'),
+    shopOpen: body.dataset?.shopOpen === '1',
+    drinksUiOpen: body.dataset?.drinksUiOpen === '1',
+  }
+}
+
+export function evaluateHoldHostAction(
+  session: DrinkHoldSession,
+  hostState: HoldHostState,
+  opts?: { pauseOnAboard?: boolean; pauseInPhoto?: boolean },
+): 'stowed' | 'paused' | 'active' {
+  const pauseOnAboard = opts?.pauseOnAboard ?? true
+  const pauseInPhoto = opts?.pauseInPhoto ?? true
+  const stowedForRide = pauseOnAboard && hostState.aboard
+  const shouldPause =
+    stowedForRide ||
+    hostState.home ||
+    hostState.shopOpen ||
+    hostState.drinksUiOpen ||
+    (pauseInPhoto && hostState.photo)
+  session.setPaused(shouldPause, 'host')
+  if (stowedForRide) return 'stowed'
+  return shouldPause ? 'paused' : 'active'
+}
+
+export function attachHoldHostGuards(
+  session: DrinkHoldSession,
+  opts?: { pauseOnAboard?: boolean; pauseInPhoto?: boolean },
+): { sync: () => 'stowed' | 'paused' | 'active'; dispose: () => void } {
+  const body = typeof document !== 'undefined' ? document.body : null
+  const sync = () => evaluateHoldHostAction(session, readHoldHostState(body), opts)
+  sync()
+
+  let observer: MutationObserver | null = null
+  if (body && typeof MutationObserver !== 'undefined') {
+    observer = new MutationObserver(() => {
+      sync()
+    })
+    observer.observe(body, {
+      attributes: true,
+      attributeFilter: ['data-aboard', 'data-photo', 'data-home', 'data-shop-open', 'data-drinks-ui-open'],
+    })
+  }
+  return {
+    sync,
+    dispose() {
+      observer?.disconnect()
+      observer = null
+      session.setPaused(false, 'host')
+    },
+  }
+}
+
 export interface DrinkHoldHudOptions {
   container?: HTMLElement
   session: DrinkHoldSession
+  hotkey?: string
+  keyLabel?: string
+  pauseOnAboard?: boolean
+  pauseInPhoto?: boolean
   onSip?: () => void
   onDiscard?: () => void
 }
 
 export interface DrinkHoldHudController {
   readonly root: HTMLElement
+  readonly hotkey: string
+  syncHostState(): void
   dispose(): void
 }
 
 /**
- * 手捧饮品时的悬浮操作条：只有玩家手里真正拿着杯子（且未骑行/拍照/进店）时才出现「喝一口」按钮。
+ * 手捧饮品时的悬浮操作条：
+ * - 只有玩家手里真正拿着杯子（且未骑车/开车/拍照/回家/进店）时才显现「喝一口 / 收起」按钮
+ * - 默认使用在最新 origin/main 未被占用的 `KeyI`（避让 `KeyY` useItem 与 `KeyH` 车铃），触屏可直接点击按钮
  */
 export function mountDrinkHoldHud(opts: DrinkHoldHudOptions): DrinkHoldHudController {
   const host = opts.container ?? document.body
+  const hotkey = opts.hotkey ?? DRINK_SIP_HOTKEY
+  const keyLabel = opts.keyLabel ?? (hotkey === DRINK_SIP_HOTKEY ? DRINK_SIP_KEY_LABEL : hotkey.replace(/^Key/, ''))
+
   const root = document.createElement('div')
   root.className = 'drinks-hold-hud'
   root.hidden = true
   root.setAttribute('role', 'region')
   root.setAttribute('aria-label', '手持饮品')
+  root.dataset.hotkey = hotkey
   root.innerHTML = `
     <span class="drinks-hold-name" data-drinks-hold-name></span>
     <span class="drinks-hold-sips" data-drinks-hold-sips></span>
-    <button type="button" class="drinks-hold-btn drinks-hold-btn--primary" data-drinks-action="sip">喝一口</button>
+    <button type="button" class="drinks-hold-btn drinks-hold-btn--primary" data-drinks-action="sip" aria-keyshortcuts="${hotkey}">喝一口<kbd class="drinks-hold-key" aria-hidden="true">${keyLabel}</kbd></button>
     <button type="button" class="drinks-hold-btn" data-drinks-action="discard" aria-label="收起饮品">收起</button>
   `
   host.append(root)
@@ -280,15 +510,20 @@ export function mountDrinkHoldHud(opts: DrinkHoldHudOptions): DrinkHoldHudContro
   sipBtn.addEventListener('click', triggerSip)
   discardBtn.addEventListener('click', triggerDiscard)
 
+  const guards = attachHoldHostGuards(opts.session, {
+    pauseOnAboard: opts.pauseOnAboard,
+    pauseInPhoto: opts.pauseInPhoto,
+  })
+
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return
     const target = event.target as HTMLElement | null
     if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return
     const snap = opts.session.getSnapshot()
     if (!snap.active || snap.paused) return
-    if (document.body.dataset.photo === 'on' || document.body.dataset.shopOpen === '1') return
-    if (document.body.hasAttribute('data-aboard')) return
-    if (event.code === 'KeyH' || event.code === 'KeyY') {
+    const hostState = readHoldHostState(document.body)
+    if (hostState.aboard || hostState.photo || hostState.home || hostState.shopOpen || hostState.drinksUiOpen) return
+    if (event.code === hotkey) {
       triggerSip()
     }
   }
@@ -304,14 +539,19 @@ export function mountDrinkHoldHud(opts: DrinkHoldHudOptions): DrinkHoldHudContro
     nameEl.textContent = snap.drink.name
     sipsEl.textContent = `${snap.sipsLeft}/${snap.sipsTotal}口`
     sipBtn.disabled = !snap.canSip
-    sipBtn.textContent = snap.state === 'drinking' ? '喝着' : '喝一口'
-    sipBtn.setAttribute('aria-label', `${snap.drink.name}，剩${snap.sipsLeft}口，喝一口`)
+    sipBtn.innerHTML = `${snap.state === 'drinking' ? '喝着' : '喝一口'}<kbd class="drinks-hold-key" aria-hidden="true">${keyLabel}</kbd>`
+    sipBtn.setAttribute('aria-label', `${snap.drink.name}，剩${snap.sipsLeft}口，按${keyLabel}或点击喝一口`)
   })
 
   return {
     root,
+    hotkey,
+    syncHostState: () => {
+      guards.sync()
+    },
     dispose() {
       off()
+      guards.dispose()
       window.removeEventListener('keydown', onKeyDown)
       delete document.body.dataset.drinksHold
       root.remove()
@@ -338,7 +578,10 @@ const FINGER_NAMES = [
  * - 杯子直接挂载在 `walker.handAnchor()`（复用主线 `attach_hand_r` 与 10 指骨架）
  * - 复用 `walker.setCameraHold(true, { aim })` 抬起右臂并随喝水进度抬升倾斜杯身
  */
-export function createDrinkHoldVisual(session: DrinkHoldSession): DrinkHoldVisualAdapter {
+export function createDrinkHoldVisual(
+  session: DrinkHoldSession,
+  masterSkin: DrinksMasterSkin = DEFAULT_MASTER_DRINKS_SKIN,
+): DrinkHoldVisualAdapter {
   let cup: DrinkCupVisual | null = null
   let currentWalker: Walker | null = null
   let currentFigure: THREE.Object3D | null = null
@@ -388,6 +631,10 @@ export function createDrinkHoldVisual(session: DrinkHoldSession): DrinkHoldVisua
     },
 
     step(dtSec) {
+      // 骑车 / 开车 / 坐船时立即自动收杯，避免穿模与手柄冲突
+      if (typeof document !== 'undefined' && document.body) {
+        evaluateHoldHostAction(session, readHoldHostState(document.body))
+      }
       const finishedNow = session.step(dtSec)
       const snap = session.getSnapshot()
 
@@ -407,7 +654,7 @@ export function createDrinkHoldVisual(session: DrinkHoldSession): DrinkHoldVisua
       }
 
       if (!cup) {
-        cup = createDrinkCupModel()
+        cup = createDrinkCupModel(masterSkin)
       }
       if (lastDrinkId !== snap.drink.id) {
         cup.setDrink(snap.drink)

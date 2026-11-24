@@ -1,8 +1,18 @@
 import type { DrinkCategory, DrinkMenuItem, PrepStationKind } from '../sim/types.ts'
+import { DEFAULT_DRINKS_SKIN, type DrinksShopSkinConfig } from './skin.ts'
 
-export type { DrinkCategory, DrinkMenuItem, PrepStationKind }
+export type { DrinkCategory, DrinkMenuItem, PrepStationKind, DrinksShopSkinConfig }
+export { DEFAULT_DRINKS_SKIN }
 
 export type DrinkPriceStatus = '待核' | '已核'
+
+export interface GbotPriceBackfillEntry {
+  id: string
+  verifiedPrice: number
+  sourceUrl: string
+  verifiedAt: string
+  note?: string
+}
 
 export type DrinkIceLevel = '正常冰' | '少冰' | '去冰' | '热饮'
 export type DrinkSugarLevel = '全糖' | '七分糖' | '五分糖' | '不额外加糖'
@@ -32,30 +42,7 @@ export interface DrinkCatalogItem extends DrinkMenuItem {
   readonly sugarOptions: readonly DrinkSugarLevel[]
   readonly hasCreamCrown?: boolean
   readonly hasPearls?: boolean
-}
-
-export interface DrinksShopSkinConfig {
-  readonly skinId: string
-  readonly shopId: string
-  readonly displayName: string
-  readonly shortName: string
-  readonly cupTag: string
-  readonly brandMark: string
-  readonly isOriginalSkin: true
-}
-
-/**
- * 原创皮肤配置（遵循 docs/style.md:109 & docs/plan-2.md:82：真商标与品牌资产不入仓，
- * 后续若获授权只需替换本皮肤配置而无需改动建筑/点单/手持代码）。
- */
-export const DEFAULT_DRINKS_SKIN: DrinksShopSkinConfig = {
-  skinId: 'wangcheng_tea_original',
-  shopId: 'shop_wangcheng_drinks',
-  displayName: '王城冰茶铺',
-  shortName: '王城茶铺',
-  cupTag: '王城鲜茶',
-  brandMark: '茶',
-  isOriginalSkin: true,
+  readonly summaryTag: string
 }
 
 export const DRINK_CATEGORIES: readonly { id: 'all' | DrinkCategory; label: string }[] = [
@@ -90,6 +77,7 @@ export const DRINKS_MENU: readonly DrinkCatalogItem[] = [
     ingredients: { cup: 1, ice: 2, lemon: 2, syrup: 1 },
     volumeMl: 700,
     sipsCount: 5,
+    summaryTag: '招牌鲜果',
     iceOptions: ['正常冰', '少冰', '去冰'],
     sugarOptions: ['全糖', '七分糖', '五分糖'],
     steps: [
@@ -114,6 +102,7 @@ export const DRINKS_MENU: readonly DrinkCatalogItem[] = [
     ingredients: { cup: 1, ice: 2, fruit_pulp: 2, tea_base: 1, syrup: 1 },
     volumeMl: 700,
     sipsCount: 5,
+    summaryTag: '爽口VC',
     iceOptions: ['正常冰', '少冰', '去冰'],
     sugarOptions: ['全糖', '七分糖', '五分糖', '不额外加糖'],
     steps: [
@@ -138,6 +127,7 @@ export const DRINKS_MENU: readonly DrinkCatalogItem[] = [
     ingredients: { cup: 1, ice: 1, tea_base: 2, milk: 2, pearls: 2, syrup: 1 },
     volumeMl: 500,
     sipsCount: 5,
+    summaryTag: '现煮茶底',
     hasPearls: true,
     iceOptions: ['正常冰', '少冰', '去冰', '热饮'],
     sugarOptions: ['全糖', '七分糖', '五分糖', '不额外加糖'],
@@ -163,6 +153,7 @@ export const DRINKS_MENU: readonly DrinkCatalogItem[] = [
     ingredients: { cup: 1, ice: 1, tea_base: 2, milk: 1, syrup: 1 },
     volumeMl: 500,
     sipsCount: 5,
+    summaryTag: '清香茶乳',
     iceOptions: ['正常冰', '少冰', '去冰', '热饮'],
     sugarOptions: ['全糖', '七分糖', '五分糖', '不额外加糖'],
     steps: [
@@ -187,6 +178,7 @@ export const DRINKS_MENU: readonly DrinkCatalogItem[] = [
     ingredients: { cup: 1, ice: 2, fruit_pulp: 2, tea_base: 1, pearls: 1, syrup: 1 },
     volumeMl: 700,
     sipsCount: 5,
+    summaryTag: 'Q弹芋圆',
     hasPearls: true,
     iceOptions: ['正常冰', '少冰', '去冰'],
     sugarOptions: ['全糖', '七分糖', '五分糖'],
@@ -212,6 +204,7 @@ export const DRINKS_MENU: readonly DrinkCatalogItem[] = [
     ingredients: { cup: 1, ice: 1, fruit_pulp: 3, milk: 2, syrup: 1 },
     volumeMl: 500,
     sipsCount: 5,
+    summaryTag: '浓郁鲜芒',
     hasPearls: true,
     iceOptions: ['正常冰', '少冰', '去冰'],
     sugarOptions: ['全糖', '七分糖', '五分糖'],
@@ -237,6 +230,7 @@ export const DRINKS_MENU: readonly DrinkCatalogItem[] = [
     ingredients: { cup: 1, ice: 1, ice_cream: 2, tea_base: 1, fruit_pulp: 1 },
     volumeMl: 500,
     sipsCount: 4,
+    summaryTag: '奶昔冰饮',
     hasCreamCrown: true,
     iceOptions: ['正常冰', '少冰'],
     sugarOptions: ['全糖', '七分糖'],
@@ -262,6 +256,7 @@ export const DRINKS_MENU: readonly DrinkCatalogItem[] = [
     ingredients: { cup: 1, ice_cream: 3, pearls: 1, syrup: 1 },
     volumeMl: 280,
     sipsCount: 4,
+    summaryTag: '现打奶浆',
     hasCreamCrown: true,
     hasPearls: true,
     iceOptions: ['正常冰'],
@@ -288,6 +283,7 @@ export const DRINKS_MENU: readonly DrinkCatalogItem[] = [
     ingredients: { cup: 1, ice: 2, coffee: 2 },
     volumeMl: 450,
     sipsCount: 5,
+    summaryTag: '鲜萃浓缩',
     iceOptions: ['正常冰', '少冰', '热饮'],
     sugarOptions: ['不额外加糖', '五分糖'],
     steps: [
@@ -313,6 +309,7 @@ export const DRINKS_MENU: readonly DrinkCatalogItem[] = [
     hot: true,
     volumeMl: 500,
     sipsCount: 5,
+    summaryTag: '醇香牛乳',
     hasPearls: true,
     iceOptions: ['热饮', '少冰', '正常冰'],
     sugarOptions: ['全糖', '七分糖', '五分糖'],
@@ -360,4 +357,67 @@ export function defaultDrinkCustomization(item: Pick<DrinkCatalogItem, 'iceOptio
 export function formatDrinkDuration(durationSec: number): string {
   const safe = Math.max(0, Number.isFinite(durationSec) ? durationSec : 0)
   return safe >= 10 ? `${Math.round(safe)}s` : `${safe.toFixed(1).replace(/\.0$/, '')}s`
+}
+
+/** 导出纯逻辑 `drinks/sim` 所需的标准化菜单条目（唯一真源 -> sim） */
+export function toSimDrinkMenuItems(catalog: readonly DrinkCatalogItem[] = DRINKS_MENU): DrinkMenuItem[] {
+  return catalog.map(item => ({
+    id: item.id,
+    name: item.name,
+    category: item.category,
+    price: item.price,
+    prepSec: item.prepSec,
+    stationKind: item.stationKind,
+    cupColor: item.cupColor,
+    accentColor: item.accentColor,
+    ingredients: { ...item.ingredients },
+    ...(item.hot ? { hot: true } : {}),
+  }))
+}
+
+/** 导出供 `drinks/shop` 电子灯箱使用的价目展示行 */
+export function toShopMenuBoardRows(
+  catalog: readonly DrinkCatalogItem[] = DRINKS_MENU,
+  limit = 6,
+): Array<[string, string, string]> {
+  return catalog.slice(0, Math.max(1, limit)).map(item => [
+    item.name,
+    `¥${item.price}`,
+    item.summaryTag,
+  ])
+}
+
+/**
+ * Gbot 资料（IDOK-263）回填接口：
+ * 仅当提供了整数实价与可核验 `sourceUrl` + `verifiedAt` 后，才将价格从「待核」转为「已核」并记录来源；
+ * 缺省来源拒绝转正。
+ */
+export function applyGbotPriceBackfill(
+  entries: readonly GbotPriceBackfillEntry[],
+  catalog: readonly DrinkCatalogItem[] = DRINKS_MENU,
+): DrinkCatalogItem[] {
+  const byId = new Map<string, GbotPriceBackfillEntry>()
+  for (const e of entries) {
+    if (
+      e &&
+      Number.isSafeInteger(e.verifiedPrice) &&
+      e.verifiedPrice > 0 &&
+      /^https?:\/\/\S+/.test(e.sourceUrl?.trim() ?? '') &&
+      Boolean(e.verifiedAt?.trim())
+    ) {
+      byId.set(e.id, e)
+    }
+  }
+  return catalog.map(item => {
+    const hit = byId.get(item.id)
+    if (!hit) return { ...item }
+    const notePart = hit.note ? ` · ${hit.note.trim()}` : ''
+    return {
+      ...item,
+      price: hit.verifiedPrice,
+      priceStatus: '已核',
+      priceVerified: true,
+      priceSource: `Gbot 实价核实 (${hit.verifiedAt.trim()}): ${hit.sourceUrl.trim()}${notePart}`,
+    }
+  })
 }

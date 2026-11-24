@@ -190,17 +190,23 @@ test('drinks/ui 点单扣款 → 模拟出杯 → 叫号取杯 → 手捧喝全�
 
     panel.open('pearl_milk_tea')
     assert.equal(panel.isOpen(), true)
+    assert.equal(panel.getViewMode(), 'order')
     assert.equal(document.body.dataset.drinksUiOpen, '1')
 
-    // 下单 ¥7 珍珠奶茶，并发双击只扣 1 次
+    // 砍掉次要步骤/耗时卡片后，点单列表无多余耗时标签
+    assert.equal(panel.root.innerHTML.includes('drinks-steps'), false)
+
+    // 下单 ¥7 珍珠奶茶，并发双击只扣 1 次，并自动切入取餐号等待态（一屏无「下单」按钮竞争）
     const [r1, r2] = await Promise.all([panel.submitOrder(), panel.submitOrder()])
     assert.equal(r1.ok, true)
     assert.equal(r2.ok, false)
     assert.equal(r2.code, 'IN_FLIGHT')
     assert.equal(wallet.getBalance(), 3)
+    assert.equal(panel.getViewMode(), 'ticket')
 
-    // 再点 ¥4 冰鲜柠檬水 -> 余额只剩 ¥3，必须被拦截且不扣款
+    // 再切回点单点 ¥4 冰鲜柠檬水 -> 余额只剩 ¥3，必须被拦截且不扣款
     panel.selectDrink('ice_lemon_water')
+    assert.equal(panel.getViewMode(), 'order')
     const poor = await panel.submitOrder()
     assert.equal(poor.ok, false)
     assert.equal(poor.code, 'INSUFFICIENT_FUNDS')
@@ -227,6 +233,57 @@ test('drinks/ui 点单扣款 → 模拟出杯 → 叫号取杯 → 手捧喝全�
 
     panel.dispose()
     pickup.dispose()
+  } finally {
+    dom.cleanup()
+  }
+})
+
+test('drinks/ui 已付款未取杯订单支持页面刷新恢复且不重复扣款', async () => {
+  const dom = installMinimalDom()
+  const mem = new Map()
+  const storage = {
+    getItem: k => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => { mem.set(k, String(v)) },
+    removeItem: k => { mem.delete(k) },
+  }
+  try {
+    const sim1 = createDrinksSim({ seed: 'ui-refresh-1', now: 0, hourOf: () => 14.5 })
+    const wallet = createMockWallet(20)
+    const hold1 = new DrinkHoldSession({ storage })
+    const panel1 = mountDrinksOrderPanel({ sim: sim1, holdSession: hold1, wallet, storage })
+    panel1.open('ice_lemon_water')
+    const res = await panel1.submitOrder()
+    assert.equal(res.ok, true)
+    assert.equal(wallet.getBalance(), 16)
+    panel1.dispose()
+
+    // 模拟浏览器刷新：新建 sim 与 DrinkHoldSession + pickupHud，未重扣钱恢复待取单
+    const sim2 = createDrinksSim({ seed: 'ui-refresh-2', now: 0, hourOf: () => 14.5 })
+    const hold2 = new DrinkHoldSession({ storage })
+    const pickup2 = mountDrinksPickupHud({ sim: sim2, holdSession: hold2, storage })
+    const restoredOrd = sim2.getSnapshot().orders.find(o => o.source === 'player')
+    assert.ok(restoredOrd, 'pending paid order must be restored on reload')
+    assert.equal(restoredOrd.itemId, 'ice_lemon_water')
+    assert.equal(wallet.getBalance(), 16)
+
+    // 推进做完并取杯后，清除待取存储，再刷新不重复出杯
+    for (let i = 0; i < 400; i++) {
+      sim2.step(0.1)
+      if (sim2.getOrder(restoredOrd.id)?.status === 'ready_for_pickup') break
+    }
+    const collected = pickup2.collectOrder(restoredOrd.id)
+    assert.equal(collected.ok, true)
+    assert.equal(hold2.getSnapshot().active, true)
+
+    const sim3 = createDrinksSim({ seed: 'ui-refresh-3', now: 0, hourOf: () => 14.5 })
+    const hold3 = new DrinkHoldSession({ storage })
+    const pickup3 = mountDrinksPickupHud({ sim: sim3, holdSession: hold3, storage })
+    assert.equal(sim3.getSnapshot().orders.filter(o => o.source === 'player').length, 0)
+    assert.equal(hold3.getSnapshot().active, true)
+    assert.equal(hold3.getSnapshot().drink?.id, 'ice_lemon_water')
+
+    pickup2.dispose()
+    pickup3.dispose()
   } finally {
     dom.cleanup()
   }

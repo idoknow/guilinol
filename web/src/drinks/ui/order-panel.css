@@ -75,7 +75,26 @@
   display: none !important;
 }
 
-body[data-drinks-ui-open="1"] :is(.hint, .vehicle-action, .walk-ui, .ride-hud, .hotbar),
+body[data-drinks-ui-open="1"] .drinks-pickup-hud,
+body[data-drinks-ui-open="1"] :is(
+  .hint,
+  .vehicle-action,
+  .walk-ui,
+  .ride-hud,
+  .hotbar,
+  .dock,
+  .sky-ui,
+  .hud-me,
+  .render-entry,
+  .render-pop,
+  .gl-mission-entry,
+  .gl-mission-hud,
+  .minimap,
+  .road-name,
+  .toast,
+  .beta-note,
+  output
+),
 body[data-drinks-ui-open="1"] > footer {
   display: none !important;
 }
@@ -122,11 +141,12 @@ body[data-drinks-ui-open="1"] > footer {
 
 .drinks-order-panel {
   position: fixed;
-  right: calc(16px + env(safe-area-inset-right));
-  top: calc(60px + env(safe-area-inset-top));
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   z-index: 16;
   width: min(460px, calc(100vw - 32px));
-  max-height: calc(100dvh - 80px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  max-height: min(560px, calc(100dvh - 140px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -264,12 +284,6 @@ body[data-drinks-ui-open="1"] > footer {
   white-space: nowrap;
 }
 
-.drinks-item-dur {
-  font-size: 11px;
-  color: var(--dr-text-3);
-  flex: none;
-}
-
 .drinks-item-price {
   font-size: 13px;
   font-weight: 600;
@@ -280,8 +294,8 @@ body[data-drinks-ui-open="1"] > footer {
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 14px 12px;
+  gap: 10px;
+  padding: 12px 14px;
   border-top: 1px solid var(--dr-line);
 }
 
@@ -303,34 +317,79 @@ body[data-drinks-ui-open="1"] > footer {
   white-space: nowrap;
 }
 
-.drinks-steps {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+.drinks-ticket-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 14px 14px;
 }
 
-.drinks-step {
+.drinks-ticket-card {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: 7px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
   background: var(--dr-fill);
-  font-size: 11.5px;
+  box-shadow: inset 0 0 0 1px var(--dr-line);
+}
+
+.drinks-ticket-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.drinks-ticket-code {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.drinks-ticket-phase {
+  font-size: 12.5px;
   color: var(--dr-text-2);
 }
 
-.drinks-step span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.drinks-ticket-phase.is-ready {
+  color: var(--dr-accent-text);
+  font-weight: 600;
 }
 
-.drinks-step b {
-  font-weight: 500;
-  color: var(--dr-text-3);
-  flex: none;
+.drinks-ticket-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.drinks-ticket-spec {
+  font-size: 12px;
+  color: var(--dr-text-2);
+}
+
+.drinks-ticket-bar {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--dr-line);
+  overflow: hidden;
+}
+
+.drinks-ticket-bar i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  background: var(--dr-accent);
+  transition: transform 0.16s ease;
+}
+
+.drinks-ticket-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .drinks-options {
@@ -411,10 +470,10 @@ body[data-drinks-ui-open="1"] > footer {
 .drinks-pickup-hud {
   position: fixed;
   left: calc(12px + env(safe-area-inset-left));
-  top: calc(104px + env(safe-area-inset-top));
+  top: calc(144px + env(safe-area-inset-top));
   z-index: 12;
   width: min(300px, calc(100vw - 32px));
-  max-height: calc(100dvh - 260px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  max-height: calc(100dvh - 300px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -571,6 +630,7 @@ body[data-drinks-ui-open="1"] > footer {
     right: calc(10px + env(safe-area-inset-right));
     top: calc(10px + env(safe-area-inset-top));
     bottom: calc(10px + env(safe-area-inset-bottom));
+    transform: none;
     width: auto;
     max-height: none;
   }
@@ -596,30 +656,16 @@ body[data-drinks-ui-open="1"] > footer {
     grid-template-columns: 1fr;
   }
 
-  .drinks-steps {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
-  }
-
-  .drinks-step {
-    padding: 4px 6px;
-    font-size: 11px;
-  }
-
   .drinks-pickup-hud {
     left: calc(10px + env(safe-area-inset-left));
     right: calc(10px + env(safe-area-inset-right));
-    top: calc(102px + env(safe-area-inset-top));
+    top: calc(276px + env(safe-area-inset-top));
     width: auto;
-    max-height: calc(100dvh - 260px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-  }
-
-  body[data-drinks-ui-open="1"] .drinks-pickup-hud {
-    display: none;
+    max-height: calc(100dvh - 440px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   }
 }
 
-/* ---------- 手机横屏 max-height: 480px (844x390 零内溢、零按钮裁切) ---------- */
+/* ---------- 手机横屏 max-height: 480px (844x390 零内溢、零按钮裁切、全宿主 HUD 零重叠) ---------- */
 
 @media (max-height: 480px) {
   .drinks-order-panel {
@@ -627,6 +673,7 @@ body[data-drinks-ui-open="1"] > footer {
     right: calc(10px + env(safe-area-inset-right));
     top: calc(8px + env(safe-area-inset-top));
     bottom: calc(8px + env(safe-area-inset-bottom));
+    transform: none;
     width: auto;
     max-height: none;
   }
@@ -669,21 +716,11 @@ body[data-drinks-ui-open="1"] > footer {
     padding-top: 4px;
   }
 
-  .drinks-steps {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
-  }
-
-  .drinks-step {
-    padding: 3px 6px;
-    font-size: 11px;
-  }
-
   .drinks-pickup-hud {
-    left: calc(12px + env(safe-area-inset-left));
+    left: calc(124px + env(safe-area-inset-left));
     right: auto;
     top: calc(96px + env(safe-area-inset-top));
-    width: min(320px, calc(100vw - 250px));
+    width: min(300px, calc(100vw - 380px));
     max-height: calc(100dvh - 224px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     padding: 7px 10px;
     gap: 5px;
@@ -715,10 +752,6 @@ body[data-drinks-ui-open="1"] > footer {
   }
 
   .drinks-pickup-hud .drinks-my-orders + .drinks-call-grid .drinks-call-list li:nth-child(n + 3) {
-    display: none;
-  }
-
-  body[data-drinks-ui-open="1"] .drinks-pickup-hud {
     display: none;
   }
 }

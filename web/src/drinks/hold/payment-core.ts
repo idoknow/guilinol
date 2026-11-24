@@ -60,7 +60,14 @@ export interface DrinkRefundRequest {
 
 export interface DrinkRefundResult {
   ok: boolean
-  code: 'OK' | 'IDEMPOTENT_REPLAY' | 'INVALID_AMOUNT' | 'PERSIST_FAILED'
+  code:
+    | 'OK'
+    | 'IN_FLIGHT'
+    | 'IDEMPOTENT_REPLAY'
+    | 'INVALID_AMOUNT'
+    | 'PURCHASE_NOT_FOUND'
+    | 'AMOUNT_EXCEEDS_CHARGE'
+    | 'PERSIST_FAILED'
   refunded: number
   balanceAfter: number
   txId?: string
@@ -220,50 +227,74 @@ export function refundDrinkWithWallet<TSave extends DrinkSaveLike>(
   wallet: DrinkWalletBackend<TSave>,
   nowMs = Date.now(),
 ): DrinkRefundResult {
+  const shopId = req.shopId || DEFAULT_DRINKS_SKIN.shopId
   const baseSave = wallet.getSnapshot()
   if (!req.idempotencyKey || !Number.isSafeInteger(req.amount) || req.amount <= 0) {
     return { ok: false, code: 'INVALID_AMOUNT', refunded: 0, balanceAfter: baseSave.money }
   }
+
   const refundKey = `refund:${req.idempotencyKey}`
-  const replayed = findIdempotentTx(baseSave, refundKey)
-  if (replayed) {
+  const lockKey = createDrinkLockKey(shopId, req.menuItemId, refundKey)
+  if (inFlightLocks.has(lockKey)) {
+    return { ok: false, code: 'IN_FLIGHT', refunded: 0, balanceAfter: baseSave.money }
+  }
+  inFlightLocks.add(lockKey)
+
+  try {
+    const snap = wallet.getSnapshot()
+    const replayed = findIdempotentTx(snap, refundKey)
+    if (replayed) {
+      return {
+        ok: true,
+        code: 'IDEMPOTENT_REPLAY',
+        refunded: 0,
+        balanceAfter: snap.money,
+        txId: replayed.txId,
+      }
+    }
+
+    // 单次退款硬校验：必须对应一笔有效扣款流水，且退款总额不得超过原扣款额
+    const originalPurchase = snap.economy.txHistoryRing.find(
+      tx => tx.kind === 'purchase' && tx.idempotencyKey === req.idempotencyKey,
+    )
+    if (!originalPurchase) {
+      return { ok: false, code: 'PURCHASE_NOT_FOUND', refunded: 0, balanceAfter: snap.money }
+    }
+    const chargedAmount = Math.abs(originalPurchase.delta)
+    if (req.amount > chargedAmount) {
+      return { ok: false, code: 'AMOUNT_EXCEEDS_CHARGE', refunded: 0, balanceAfter: snap.money }
+    }
+
+    const nextSave = wallet.cloneSnapshot(snap)
+    const balanceAfter = snap.money + req.amount
+    const txId = nextDrinkTxId(nowMs)
+    nextSave.money = balanceAfter
+    nextSave.updatedAt = nowMs
+    appendTx(nextSave, {
+      txId,
+      idempotencyKey: refundKey,
+      kind: 'refund',
+      delta: req.amount,
+      balanceAfter,
+      refId: `drink:${req.menuItemId}x${req.quantity}`,
+      at: nowMs,
+    })
+
+    if (!wallet.persist(nextSave)) {
+      return { ok: false, code: 'PERSIST_FAILED', refunded: 0, balanceAfter: snap.money }
+    }
+
+    wallet.commitMoney(balanceAfter)
+    wallet.emitMoneyChange(req.amount, balanceAfter, `${shopId}:refund:${req.reason}`, txId)
+
     return {
       ok: true,
-      code: 'IDEMPOTENT_REPLAY',
-      refunded: 0,
-      balanceAfter: baseSave.money,
-      txId: replayed.txId,
+      code: 'OK',
+      refunded: req.amount,
+      balanceAfter,
+      txId,
     }
-  }
-
-  const nextSave = wallet.cloneSnapshot(baseSave)
-  const balanceAfter = baseSave.money + req.amount
-  const txId = nextDrinkTxId(nowMs)
-  nextSave.money = balanceAfter
-  nextSave.updatedAt = nowMs
-  appendTx(nextSave, {
-    txId,
-    idempotencyKey: refundKey,
-    kind: 'refund',
-    delta: req.amount,
-    balanceAfter,
-    refId: `drink:${req.menuItemId}x${req.quantity}`,
-    at: nowMs,
-  })
-
-  if (!wallet.persist(nextSave)) {
-    return { ok: false, code: 'PERSIST_FAILED', refunded: 0, balanceAfter: baseSave.money }
-  }
-
-  const shopId = req.shopId || DEFAULT_DRINKS_SKIN.shopId
-  wallet.commitMoney(balanceAfter)
-  wallet.emitMoneyChange(req.amount, balanceAfter, `${shopId}:refund:${req.reason}`, txId)
-
-  return {
-    ok: true,
-    code: 'OK',
-    refunded: req.amount,
-    balanceAfter,
-    txId,
+  } finally {
+    inFlightLocks.delete(lockKey)
   }
 }

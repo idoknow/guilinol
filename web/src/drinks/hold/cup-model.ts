@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { DrinkCatalogItem } from '../menu/menu.ts'
+import { DEFAULT_MASTER_DRINKS_SKIN, type DrinksMasterSkin } from '../menu/skin.ts'
 
 export interface DrinkCupVisual {
   readonly group: THREE.Group
@@ -19,7 +20,7 @@ const LIQUID_BASE_Y = 0.011
  * 程序化低多边形手持饮品杯（零外部二进制资产、零动态光源）：
  * 挂接于角色右手骨锚点 `attach_hand_r`（本地 +Y 朝上，-Z 朝角色前方）。
  */
-export function createDrinkCupModel(): DrinkCupVisual {
+export function createDrinkCupModel(masterSkin: DrinksMasterSkin = DEFAULT_MASTER_DRINKS_SKIN): DrinkCupVisual {
   const geometries: THREE.BufferGeometry[] = []
   const materials: THREE.Material[] = []
 
@@ -103,10 +104,10 @@ export function createDrinkCupModel(): DrinkCupVisual {
   pearlsGroup.visible = false
   pivot.add(pearlsGroup)
 
-  // 原创皮肤腰封杯套（随 accentColor 变化）
+  // 原创皮肤腰封杯套（主色来自 menu/skin.ts，随饮品 accentColor 或皮肤底色渲染）
   const sleeveMat = ownMat(
     new THREE.MeshStandardMaterial({
-      color: 0xa9503c,
+      color: masterSkin.sleeve.primaryHex,
       roughness: 0.82,
       metalness: 0.02,
     }),
@@ -119,7 +120,7 @@ export function createDrinkCupModel(): DrinkCupVisual {
   pivot.add(sleeve)
 
   // 平盖 + 吸管
-  const lidMat = ownMat(new THREE.MeshStandardMaterial({ color: 0xfaf7ef, roughness: 0.45 }))
+  const lidMat = ownMat(new THREE.MeshStandardMaterial({ color: masterSkin.sleeve.creamHex, roughness: 0.45 }))
   const flatLid = new THREE.Mesh(
     ownGeo(new THREE.CylinderGeometry(CUP_RADIUS_TOP * 1.04, CUP_RADIUS_TOP * 1.04, 0.011, 14)),
     lidMat,
@@ -136,7 +137,7 @@ export function createDrinkCupModel(): DrinkCupVisual {
   domeLid.visible = false
   pivot.add(domeLid)
 
-  const creamSwirlMat = ownMat(new THREE.MeshStandardMaterial({ color: 0xfff8ea, roughness: 0.52 }))
+  const creamSwirlMat = ownMat(new THREE.MeshStandardMaterial({ color: masterSkin.mascot.baseCreamColor, roughness: 0.52 }))
   const creamSwirl = new THREE.Mesh(
     ownGeo(new THREE.ConeGeometry(CUP_RADIUS_TOP * 0.65, 0.042, 10)),
     creamSwirlMat,
@@ -146,7 +147,7 @@ export function createDrinkCupModel(): DrinkCupVisual {
   pivot.add(creamSwirl)
 
   // 吸管（略向前上方斜出，方便啜饮动画对齐嘴边）
-  const strawMat = ownMat(new THREE.MeshStandardMaterial({ color: 0xa9503c, roughness: 0.55 }))
+  const strawMat = ownMat(new THREE.MeshStandardMaterial({ color: masterSkin.sleeve.primaryHex, roughness: 0.55 }))
   const straw = new THREE.Mesh(
     ownGeo(new THREE.CylinderGeometry(0.0045, 0.0045, 0.165, 8)),
     strawMat,

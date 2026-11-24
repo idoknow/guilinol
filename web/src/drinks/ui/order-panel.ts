@@ -3,7 +3,6 @@ import {
   DRINKS_MENU,
   DRINK_CATEGORIES,
   defaultDrinkCustomization,
-  formatDrinkDuration,
   getDrinkById,
   listDrinksByCategory,
   normalizeDrinkQuantity,
@@ -18,8 +17,19 @@ import {
   refundDrinkWithWallet,
   type DrinkWalletBackend,
 } from '../hold/payment-core.ts'
-import type { DrinkHoldSession } from '../hold/hold-controller.ts'
-import type { DrinksSim, OrderSnapshot, PlacePlayerOrderRequest, PlacePlayerOrderResult, CollectPlayerOrderResult } from '../sim/types.ts'
+import type { DrinkHoldSession, DrinkHoldStorageLike } from '../hold/hold-controller.ts'
+import type {
+  CollectPlayerOrderResult,
+  DrinksSim,
+  OrderSnapshot,
+  PlacePlayerOrderRequest,
+  PlacePlayerOrderResult,
+} from '../sim/types.ts'
+import {
+  resolveDrinksUiStorage,
+  savePendingDrinkOrder,
+  removePendingDrinkOrder,
+} from './pickup-hud.ts'
 
 export type DrinksSimLike = Pick<
   DrinksSim,
@@ -30,10 +40,12 @@ export interface DrinksOrderPanelOptions {
   sim: DrinksSimLike
   holdSession?: DrinkHoldSession
   wallet?: DrinkWalletBackend
+  storage?: DrinkHoldStorageLike | null
   skin?: DrinksShopSkinConfig
   container?: HTMLElement
   getBalance?: () => number
   onOrderPlaced?: (order: OrderSnapshot, custom: DrinkCustomization) => void
+  onCollected?: (order: OrderSnapshot, item: DrinkCatalogItem) => void
   onOpenChange?: (open: boolean) => void
   onStatus?: (text: string, warn?: boolean) => void
 }
@@ -41,6 +53,7 @@ export interface DrinksOrderPanelOptions {
 export interface DrinksOrderPanelController {
   readonly root: HTMLElement
   isOpen(): boolean
+  getViewMode(): 'order' | 'ticket'
   open(initialDrinkId?: string): void
   close(): void
   selectCategory(category: 'all' | DrinkCategory): void
@@ -48,6 +61,7 @@ export interface DrinksOrderPanelController {
   setCustomization(patch: Partial<DrinkCustomization>): void
   setQuantity(qty: number): void
   submitOrder(): Promise<{ ok: boolean; code: string; order?: OrderSnapshot }>
+  collectActiveOrder(): CollectPlayerOrderResult
   sync(): void
   dispose(): void
 }
@@ -65,13 +79,14 @@ function createAttemptKey(itemId: string, qty: number, custom: DrinkCustomizatio
 }
 
 /**
- * 王城饮品店菜单与点单面板：
- * - 遵循全组 `docs/design-rules.md`（无标语、无引导句、无渐变、无 emoji，单一朱砂主动作按钮）
- * - 扣款走主游戏钱包 `drinks/hold/payment.ts`，防重复点击、防余额不足、门店拒单自动退款
+ * 王城饮品店点单与取餐全流程抽屉：
+ * - 严格按 `docs/design-rules.md` 设计：零标语、零引导句、零次要标签、一屏至多一个朱砂主动作
+ * - 完整覆盖：选品 -> 冰糖规格 -> 杯数 -> 主钱包原子扣款 -> 取餐号与进度等待 -> 当场或叫号台取杯
  */
 export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrderPanelController {
   const skin = opts.skin ?? DEFAULT_DRINKS_SKIN
   const host = opts.container ?? document.body
+  const storage = resolveDrinksUiStorage(opts.storage)
 
   const root = document.createElement('section')
   root.className = 'drinks-panel drinks-order-panel'
@@ -87,7 +102,7 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
       </div>
       <button type="button" class="drinks-btn" data-drinks-action="close" aria-label="关闭点单">关闭</button>
     </header>
-    <div class="drinks-order-body">
+    <div class="drinks-order-body" data-drinks-order-view>
       <div class="drinks-menu-col">
         <div class="drinks-tabs" role="tablist" aria-label="饮品分类">
           ${DRINK_CATEGORIES.map(
@@ -99,16 +114,21 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
       </div>
       <div class="drinks-detail-col" data-drinks-detail></div>
     </div>
+    <div class="drinks-ticket-view" data-drinks-ticket-view hidden></div>
   `
   host.append(root)
 
   const balanceEl = root.querySelector<HTMLElement>('[data-drinks-balance]')!
+  const orderBodyEl = root.querySelector<HTMLElement>('[data-drinks-order-view]')!
+  const ticketViewEl = root.querySelector<HTMLElement>('[data-drinks-ticket-view]')!
   const listEl = root.querySelector<HTMLElement>('[data-drinks-list]')!
   const detailEl = root.querySelector<HTMLElement>('[data-drinks-detail]')!
   const closeBtn = root.querySelector<HTMLButtonElement>('[data-drinks-action="close"]')!
   const tabBtns = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-drinks-cat]'))
 
   let openState = false
+  let viewMode: 'order' | 'ticket' = 'order'
+  let activeOrderId: string | null = null
   let activeCategory: 'all' | DrinkCategory = 'all'
   let selectedId = DRINKS_MENU[0]?.id ?? 'ice_lemon_water'
   let custom: DrinkCustomization = defaultDrinkCustomization(getDrinkById(selectedId)!)
@@ -118,6 +138,7 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
   let paying = false
   let statusText = ''
   let statusWarn = false
+  const orderCustoms = new Map<string, DrinkCustomization>()
 
   let resolvedWallet: DrinkWalletBackend | null = opts.wallet ?? null
   let walletPromise: Promise<DrinkWalletBackend | null> | null = null
@@ -139,6 +160,23 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
     if (resolvedWallet) return resolvedWallet.getBalance()
     if (opts.getBalance) return opts.getBalance()
     return 0
+  }
+
+  function findActivePlayerOrder(): OrderSnapshot | null {
+    if (activeOrderId) {
+      const byId = opts.sim.getOrder(activeOrderId)
+      if (byId && (byId.status === 'queued' || byId.status === 'preparing' || byId.status === 'ready_for_pickup')) {
+        return byId
+      }
+    }
+    const snap = opts.sim.getSnapshot()
+    return (
+      snap.orders.find(
+        o =>
+          o.source === 'player' &&
+          (o.status === 'queued' || o.status === 'preparing' || o.status === 'ready_for_pickup'),
+      ) ?? null
+    )
   }
 
   function bumpAttemptKey(): void {
@@ -177,7 +215,6 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
             <span class="drinks-item-main">
               <i class="drinks-swatch" style="background:${escapeHtml(item.cupColor)}" aria-hidden="true"></i>
               <span class="drinks-item-name">${escapeHtml(item.name)}</span>
-              <span class="drinks-item-dur">${escapeHtml(formatDrinkDuration(item.durationSec))}</span>
             </span>
             <span class="drinks-item-price">¥${item.price}</span>
           </button>
@@ -207,16 +244,8 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
     detailEl.innerHTML = `
       <div class="drinks-detail-head">
         <strong class="drinks-detail-name">${escapeHtml(item.name)}</strong>
-        <span class="drinks-detail-meta">${item.volumeMl}ml · ${escapeHtml(formatDrinkDuration(item.durationSec))}</span>
+        <span class="drinks-detail-meta">${item.volumeMl}ml</span>
       </div>
-      <ol class="drinks-steps" aria-label="制作步骤">
-        ${item.steps
-          .map(
-            s =>
-              `<li class="drinks-step"><span>${escapeHtml(s.label)}</span><b>${escapeHtml(formatDrinkDuration(s.durationSec))}</b></li>`,
-          )
-          .join('')}
-      </ol>
       <div class="drinks-options">
         <div class="drinks-opt-group" role="group" aria-label="温度与冰度">
           ${item.iceOptions
@@ -253,7 +282,53 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
     `
   }
 
+  function renderTicketView(ord: OrderSnapshot): void {
+    const pct = Math.round(Math.max(0, Math.min(1, ord.progress)) * 100)
+    const ready = ord.status === 'ready_for_pickup'
+    const c = orderCustoms.get(ord.id) ?? orderCustoms.get(ord.orderKey) ?? custom
+    const stateLabel = ready ? '请取杯' : ord.status === 'preparing' ? `制作 ${pct}%` : '排队'
+    const bal = readBalance()
+    balanceEl.textContent = `¥${bal.toLocaleString('zh-CN')}`
+
+    ticketViewEl.innerHTML = `
+      <div class="drinks-ticket-card" data-ticket-order-id="${escapeHtml(ord.id)}">
+        <div class="drinks-ticket-top">
+          <strong class="drinks-ticket-code">${escapeHtml(ord.ticketNo)}</strong>
+          <span class="drinks-ticket-phase${ready ? ' is-ready' : ''}">${escapeHtml(stateLabel)}</span>
+        </div>
+        <div class="drinks-ticket-item">
+          <span>${escapeHtml(ord.itemName)}${ord.quantity > 1 ? ` ×${ord.quantity}` : ''}</span>
+          <b>¥${ord.totalPrice}</b>
+        </div>
+        <div class="drinks-ticket-spec">${escapeHtml(c.ice)} · ${escapeHtml(c.sugar)}</div>
+        <div class="drinks-ticket-bar" aria-hidden="true"><i style="transform:scaleX(${ready ? 1 : Math.max(0.06, Math.min(1, ord.progress))})"></i></div>
+      </div>
+      <div class="drinks-ticket-actions">
+        <button type="button" class="drinks-btn" data-drinks-action="new-order">再点</button>
+        ${
+          ready
+            ? `<button type="button" class="drinks-btn drinks-btn--primary drinks-pay-btn" data-drinks-collect="${escapeHtml(ord.id)}">取杯</button>`
+            : `<button type="button" class="drinks-btn drinks-pay-btn" data-drinks-action="close">候餐</button>`
+        }
+      </div>
+    `
+  }
+
   function sync(): void {
+    if (viewMode === 'ticket') {
+      const ord = findActivePlayerOrder()
+      if (ord) {
+        activeOrderId = ord.id
+        orderBodyEl.hidden = true
+        ticketViewEl.hidden = false
+        renderTicketView(ord)
+        return
+      }
+      viewMode = 'order'
+      activeOrderId = null
+    }
+    orderBodyEl.hidden = false
+    ticketViewEl.hidden = true
     renderTabs()
     renderMenu()
     renderDetail()
@@ -262,6 +337,14 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
   function open(initialDrinkId?: string): void {
     if (initialDrinkId && getDrinkById(initialDrinkId)) {
       selectDrink(initialDrinkId)
+    } else {
+      const activeOrd = findActivePlayerOrder()
+      if (activeOrd) {
+        activeOrderId = activeOrd.id
+        viewMode = 'ticket'
+      } else {
+        viewMode = 'order'
+      }
     }
     openState = true
     root.hidden = false
@@ -280,6 +363,7 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
 
   function selectCategory(category: 'all' | DrinkCategory): void {
     activeCategory = category
+    viewMode = 'order'
     const visible = listDrinksByCategory(category)
     if (visible.length > 0 && !visible.some(i => i.id === selectedId)) {
       selectDrink(visible[0]!.id)
@@ -292,6 +376,7 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
     const item = getDrinkById(drinkId)
     if (!item) return
     selectedId = item.id
+    viewMode = 'order'
     custom = defaultDrinkCustomization(item)
     quantity = 1
     statusText = ''
@@ -321,6 +406,30 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
     sync()
   }
 
+  function collectActiveOrder(orderIdOrKey?: string): CollectPlayerOrderResult {
+    const targetId = orderIdOrKey ?? activeOrderId ?? findActivePlayerOrder()?.id ?? ''
+    if (!targetId) {
+      return { ok: false, code: 'ORDER_NOT_FOUND' }
+    }
+    const res = opts.sim.collectPlayerOrder(targetId)
+    if (res.ok && res.order) {
+      const catItem = getDrinkById(res.order.itemId)
+      if (catItem) {
+        const c = orderCustoms.get(res.order.id) ?? orderCustoms.get(res.order.orderKey) ?? custom
+        opts.holdSession?.pickup(catItem, c, res.order.id)
+        opts.onCollected?.(res.order, catItem)
+      }
+      removePendingDrinkOrder(storage, res.order.id)
+      removePendingDrinkOrder(storage, res.order.orderKey)
+      activeOrderId = null
+      viewMode = 'order'
+      close()
+    } else {
+      sync()
+    }
+    return res
+  }
+
   async function submitOrder(): Promise<{ ok: boolean; code: string; order?: OrderSnapshot }> {
     const item = getDrinkById(selectedId)
     if (!item) return { ok: false, code: 'INVALID_ITEM' }
@@ -328,7 +437,7 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
 
     const snap = opts.sim.getSnapshot()
     if (!snap.isOpen) {
-      setStatus('门店已打烊', true)
+      setStatus('已打烊', true)
       sync()
       return { ok: false, code: 'SHOP_CLOSED' }
     }
@@ -338,7 +447,7 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
     try {
       const activeWallet = await ensureWallet()
       if (!activeWallet) {
-        setStatus('钱包模块未就绪', true)
+        setStatus('钱包未就绪', true)
         sync()
         return { ok: false, code: 'WALLET_UNAVAILABLE' }
       }
@@ -355,11 +464,11 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
 
       if (!payRes.ok) {
         if (payRes.code === 'INSUFFICIENT_FUNDS') {
-          setStatus(`余额不足，还差 ¥${payRes.deficit ?? 0}`, true)
+          setStatus(`余额不足，差 ¥${payRes.deficit ?? 0}`, true)
         } else if (payRes.code === 'IN_FLIGHT') {
-          setStatus('正在处理当前点单', true)
+          setStatus('处理中', true)
         } else {
-          setStatus(`点单失败（${payRes.code}）`, true)
+          setStatus(`失败（${payRes.code}）`, true)
         }
         sync()
         return { ok: false, code: payRes.code }
@@ -373,7 +482,6 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
       }
       const simRes: PlacePlayerOrderResult = opts.sim.placePlayerOrder(orderReq)
       if (!simRes.ok || !simRes.order) {
-        // 下单被门店拒绝且本次确实扣了款 -> 立即原子退款
         if (payRes.charged > 0) {
           refundDrinkWithWallet(
             {
@@ -387,14 +495,29 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
             activeWallet,
           )
         }
-        setStatus(simRes.code === 'SHOP_CLOSED' ? '门店已打烊，已退款' : `接单失败（${simRes.code}）`, true)
+        setStatus(simRes.code === 'SHOP_CLOSED' ? '已打烊，已退款' : `接单失败（${simRes.code}）`, true)
         sync()
         return { ok: false, code: simRes.code }
       }
 
-      setStatus(`已下单 ${simRes.order.ticketNo} · 制作中`, false)
       const placedOrder = simRes.order
       const placedCustom = { ...custom }
+      orderCustoms.set(placedOrder.id, placedCustom)
+      orderCustoms.set(placedOrder.orderKey, placedCustom)
+      savePendingDrinkOrder(storage, {
+        orderId: placedOrder.id,
+        orderKey: placedOrder.orderKey,
+        ticketNo: placedOrder.ticketNo,
+        itemId: placedOrder.itemId,
+        itemName: placedOrder.itemName,
+        quantity: placedOrder.quantity,
+        customization: placedCustom,
+        placedAtMs: Date.now(),
+      })
+
+      activeOrderId = placedOrder.id
+      viewMode = 'ticket'
+      setStatus(`${placedOrder.ticketNo} 制作中`, false)
       bumpAttemptKey()
       sync()
       opts.onOrderPlaced?.(placedOrder, placedCustom)
@@ -444,6 +567,26 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
     }
   })
 
+  ticketViewEl.addEventListener('click', e => {
+    const target = e.target as Element | null
+    if (!target) return
+    if (target.closest('[data-drinks-action="new-order"]')) {
+      viewMode = 'order'
+      statusText = ''
+      statusWarn = false
+      sync()
+      return
+    }
+    if (target.closest('[data-drinks-action="close"]')) {
+      close()
+      return
+    }
+    const colBtn = target.closest<HTMLButtonElement>('[data-drinks-collect]')
+    if (colBtn) {
+      collectActiveOrder(colBtn.dataset.drinksCollect)
+    }
+  })
+
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.code === 'Escape' && openState) {
       event.stopPropagation()
@@ -462,6 +605,7 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
   return {
     root,
     isOpen: () => openState,
+    getViewMode: () => viewMode,
     open,
     close,
     selectCategory,
@@ -469,6 +613,7 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
     setCustomization,
     setQuantity,
     submitOrder,
+    collectActiveOrder,
     sync,
     dispose() {
       close()
