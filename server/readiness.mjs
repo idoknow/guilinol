@@ -11,8 +11,10 @@ export const REQUIRED_TABLES = [
   'social_identities', 'social_states', 'social_pending',
   'player_saves', 'player_ledger_txns',
   'admin_audit',
+  'mp_online_minute','mp_online_hour','mp_sessions',
   'feedback', 'feedback_events', 'feedback_mail', 'feedback_messages', 'feedback_photos', 'feedback_upload_usage', 'mail_events',
   'perf_event', 'perf_session_day', 'perf_value_day', 'perf_summary_day', 'perf_network', 'perf_server',
+  'perf_summary_hour', 'perf_session_hour', 'perf_value_hour',
 ]
 
 const TABLE_LIST = REQUIRED_TABLES.map(name => `'${name}'`).join(',')

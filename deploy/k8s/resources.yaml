@@ -286,6 +286,14 @@ spec:
             secretKeyRef:
               name: glol-env
               key: POSTGRES_PASSWORD
+        - name: RT_INTERNAL_URL
+          value: http://glol-rt:8790
+        - name: RT_ADMIN_TOKEN
+          valueFrom:
+            secretKeyRef: {name: glol-env, key: RT_ADMIN_TOKEN, optional: true}
+        - name: KICK_TOKEN
+          valueFrom:
+            secretKeyRef: {name: glol-rt, key: KICK_TOKEN, optional: true}
         - name: RT_JOIN_SECRET
           valueFrom:
             secretKeyRef: {name: glol-env, key: RT_JOIN_SECRET, optional: true}
@@ -402,6 +410,9 @@ spec:
         # 防滥用靠「同一 uid 只能 1 条在线连接」+ MAX_PLAYERS + 未 join 15 秒超时。
         - name: RT_MAX_PER_IP
           value: "0"
+        - name: RT_ADMIN_TOKEN
+          valueFrom:
+            secretKeyRef: {name: glol-env, key: RT_ADMIN_TOKEN, optional: true}
         - name: KICK_TOKEN
           valueFrom:
             secretKeyRef:

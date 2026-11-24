@@ -94,6 +94,17 @@ curl -i -N -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
 
 ## CDN 注意
 
+### 后台联机接口（PROTO 4）
+
+- `GET /admin/state` 只在 RT Service，精确匹配路径，`/ws` 不转发到它。`X-Admin-Token` 必须匹配 `glol-env.RT_ADMIN_TOKEN`；缺失或不匹配返回空 403。API 通过 `RT_INTERNAL_URL` 拉取（默认 `http://glol-rt:8790`）。不要让浏览器直连或分发这两个 secret；踢人仍使用独立的 `glol-rt.KICK_TOKEN`。
+- `GET /api/admin/mp` 走现有 admin session，成功返回 `{rt:'up',server,players,bans,events,chat}`；RT 失联或未配置时 HTTP 200 `{rt:'down',error}`，不是在线人数 0。账号原始 IP 不返回，地区来自 `perf_network`，`region` 为 `{country,region,city,isp}` 或 null。`account` 为 `{id,createdAt,signupMethod,banned}` 或 null，`id` 用于已有用户详情页，`createdAt` 为 epoch 秒。`landmark` 为 `/world/manifest.json` 中平面距离最近的地标名，目录不可用时 null。
+- `server`：`startedAt,uptimeSec,proto,maxPlayers,online,connections,peak,peakAt,rssMb,heapMb,loopP50Ms,loopP99Ms,traffic,skips,slowCloses,rejects`。峰值和拒绝、慢连接计数从启动起算；事件循环分位单位 ms。`traffic.in/out` 各为最近 60 个秒桶内按类型汇总的 `{packets,bytes}`，字节为 JSON payload，不含帧头；出包逐接收方计数。
+- `players`：`id,uid,name,x,y,z,yaw,mode,v,hp,dn,sc,em,joinedAt,lastPosAt,posHz,inBytes,outBytes,bufferedAmount,skips,rttMs,avgRttMs,chats,ua`，另加上述地区、账号、地标。`bike` 非空或 `hb` 非零视作 `bike`，否则 `walk`；现有客户端没区分车/船时不猜测。`em=0` 无表情，`posHz` 为过去 10 秒接受的位置包数除以 10；RT 每 10 秒 ping，RTT 是最近一次和本连接平均值（首次 pong 前 null）。游戏公开的玩家对象只增加 `jt` 入场时间。
+- `bans` 为 `{uid,reason,until}`；最近 300 个 `events` 为 `{ts,type,id?,uid,name,joinedAt?,durationSec,reason?,closeCode?}`，最近 100 条 `chat` 为 `{ts,uid,name,text}`，均旧到新。除账号注册时间外，实时接口时间戳均为 epoch ms。
+- `POST /api/admin/mp/kick` 需要同源 `Origin`，参数 `{uid,reason,minutes?}`，1–10080 分钟；省略走现有 RT 默认 TTL。成功 `{ok:true,kicked}` 并写 `mp.kick` 审计，仅影响联机，不封账号。
+- `GET /api/admin/mp/history?range=24h|7d|30d`：`{range,grain,series:[{ts,online,peak,peakAt}],daily:[{day,dau,sessions,avgDurationSec,medianDurationSec,peak,peakAt}],peak,peakAt}`。时间用 ISO，日界为上海时间；DAU 按会话与日期重叠去重，会话数与时长按开始日（时长只算已结束）。24h 用分钟点，其他用小时均值并保留真实采样峰值时刻，缺样留空不补零。
+- `GET /api/admin/mp/sessions?uid=&limit=` 两个查询参数均可省略，默认最近 50 条，最多 200。返回 `{sessions:[{uid,name,joinedAt,leftAt,durationSec,reason,closeCode,region}]}`；在线 `leftAt=null`。每 60 秒按 RT 启动时间和连接 ID 幂等同步；进程重启或缓冲覆盖导致退出事件丢失时用最后观测时刻和 `lost observation`。两次采样间若完整短会话被 300 条缓冲覆盖，无法恢复。分钟留 7 天，小时和已结束会话留 90 天，采样、汇总和清理在同一事务内。
+
 - `/ws` 必须绕过缓存，且 CDN 节点要开启 WebSocket 透传；CDNFly 站点已开 `websocket`，
   缓存规则里没有匹配 `ws` 的后缀，`/ws` 走动态不缓存。
 - 302/456 之类的防护页会直接掐掉 WebSocket 升级请求，改 CDN 防护后要重测 101。

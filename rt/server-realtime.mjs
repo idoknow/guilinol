@@ -57,6 +57,7 @@ import {createServer} from 'node:http'
 import {createHmac,timingSafeEqual} from 'node:crypto'
 import {isIP} from 'node:net'
 import {WebSocketServer} from 'ws'
+import * as obs from './observability.mjs'
 
 const PORT = Number(process.env.PORT || 8790)
 const MAX_PLAYERS = Number(process.env.MAX_PLAYERS || 200)
@@ -200,10 +201,12 @@ function sanitizeAvatar(value) {
   return JSON.stringify(avatar).length <= MAX_AVATAR_BYTES ? avatar : null
 }
 
-function send(ws, payload) {
+function send(ws, payload, type=payload.t, size) {
   if (ws.readyState === 1) {
     try {
-      ws.send(typeof payload === 'string' ? payload : JSON.stringify(payload))
+      const text=typeof payload === 'string' ? payload : JSON.stringify(payload)
+      ws.send(text)
+      obs.packet(ws,'out',type,size??Buffer.byteLength(text))
     } catch {
       /* 单个连接写失败就忽略，别影响别人 */
     }
@@ -214,29 +217,31 @@ function send(ws, payload) {
  * 广播专用发送：先看发送缓冲，堆积超过 1 MB 说明对面跟不上（或故意不收），
  * 这一条直接跳过；连续跳过 60 次基本就是死连接，close(1013) 交给 close 回调回收。
  */
-function sendSlowAware(ws, text) {
+function sendSlowAware(ws, text, type, size) {
   if (ws.bufferedAmount > MAX_BUFFERED) {
     ws.slowSkips = (ws.slowSkips || 0) + 1
+    obs.skipped(ws,ws.slowSkips===MAX_SLOW_SKIPS)
     if (ws.slowSkips >= MAX_SLOW_SKIPS) {
       try { ws.close(1013, 'slow client') } catch { /* 忽略 */ }
     }
     return
   }
   ws.slowSkips = 0
-  send(ws, text)
+  send(ws, text,type,size)
 }
 
 function broadcast(payload, exceptId) {
   const text = JSON.stringify(payload)
+  const size=Buffer.byteLength(text)
   for (const [id, p] of players) {
     if (id === exceptId) continue
-    sendSlowAware(p.ws, text)
+    sendSlowAware(p.ws, text,payload.t,size)
   }
 }
 
 function publicOf(p,viewer=p) {
   return {
-    id: p.id, uid: p.uid, name: p.name, avatar: p.avatar,
+    id: p.id, uid: p.uid, name: p.name, avatar: p.avatar, jt:p.joinedAt,
     x: p.x, y: p.y, z: p.z, yaw: p.yaw, v: p.v,
     bike: p.bike, bx: p.bx, bz: p.bz, byaw: p.byaw,
     hb: p.hb, hx: p.hx, hz: p.hz, hyaw: p.hyaw, mv: p.mv, dn: p.dn, pn: p.pn, wl: p.wl, cr: p.cr, gr: p.gr,
@@ -247,6 +252,11 @@ function publicOf(p,viewer=p) {
 
 const server = createServer((req, res) => {
   try {
+    if(req.method==='GET'&&req.url==='/admin/state'){
+      if(!process.env.RT_ADMIN_TOKEN||req.headers['x-admin-token']!==process.env.RT_ADMIN_TOKEN){res.writeHead(403);res.end();return}
+      sweepBans();res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'})
+      res.end(JSON.stringify(obs.state(players,sockets,bans,PROTO,MAX_PLAYERS)));return
+    }
     if (req.url === '/health') {
       res.writeHead(200, {'content-type': 'application/json'})
       // 保留 ok / online / proto 三个老字段（探针和监控在用），后面只是补容量信息
@@ -301,7 +311,11 @@ const server = createServer((req, res) => {
           }
           const reason = clampStr(body.reason, 200).trim() || '账号已被封禁'
           // 只写内存封禁表（带 TTL），重启即失，够用来挡住「被踢后立刻重连」
-          bans.set(uid, {until: now() + KICK_BAN_SECONDS * 1000, reason})
+          const minutes=body.minutes
+          if(minutes!==undefined&&(!Number.isInteger(minutes)||minutes<1||minutes>10080)){res.writeHead(400);res.end('{}');return}
+          bans.set(uid, {until: now() + (minutes===undefined?KICK_BAN_SECONDS:minutes*60) * 1000, reason})
+          const target=[...players.values()].find(p=>p.uid===uid)
+          obs.event('kick',target??{uid},{reason});if(target)target.kickReason=reason
           let kicked = 0
           for (const p of players.values()) {
             if (p.uid !== uid) continue
@@ -343,6 +357,7 @@ wss.on('connection', (ws, req) => {
     // 容量按「所有连接」算：只数 players 的话，握完手不 join 就能无限占连接
     if (sockets.size >= MAX_PLAYERS) {
       console.warn(JSON.stringify({scope:'rt-reject',reason:'full',ip,players:players.size,sockets:sockets.size}))
+      obs.reject('full')
       send(ws, {t: 'error', message: '服务器满员'})
       ws.close(1013, 'full')
       return
@@ -351,12 +366,14 @@ wss.on('connection', (ws, req) => {
     if (MAX_PER_IP > 0 && used >= MAX_PER_IP) {
       // 排障要能看到到底是「满员」还是「同一出口 IP 挤爆」，否则线上只能靠猜
       console.warn(JSON.stringify({scope:'rt-reject',reason:'per-ip',ip,used,max:MAX_PER_IP,players:players.size,sockets:sockets.size}))
+      obs.reject('ipLimit')
       send(ws, {t: 'error', message: '连接数过多'})
       ws.close(1013, 'too many connections')
       return
     }
     const pending = pendingIp.get(ip) || 0
     if (MAX_PENDING_PER_IP > 0 && pending >= MAX_PENDING_PER_IP) {
+      obs.reject('ipLimit')
       console.warn(JSON.stringify({scope:'rt-reject',reason:'pending-per-ip',ip,pending,max:MAX_PENDING_PER_IP,players:players.size,sockets:sockets.size}))
       send(ws, {t: 'error', message: '连接数过多'})
       ws.close(1013, 'too many pending connections')
@@ -378,7 +395,13 @@ wss.on('connection', (ws, req) => {
 
   const id = String(nextId++)
   ws.isAlive = true
-  ws.on('pong', () => { ws.isAlive = true })
+  ws.on('pong', data => { ws.isAlive = true
+    ws.lastPongAt=now()
+    if(ws.pingStamp&&data.toString()===String(ws.pingStamp)){
+      ws.rtt=performance.now()-ws.pingStamp;ws.pingStamp=0;ws.pongs=(ws.pongs??0)+1
+      ws.meanRtt=(ws.meanRtt??0)+(ws.rtt-(ws.meanRtt??0))/ws.pongs
+    }
+  })
 
   // 连接回收：容量计数要减回去，ipCounts 不能只增不减
   const unpend = () => {
@@ -400,6 +423,7 @@ wss.on('connection', (ws, req) => {
     // 关闭原因必须留痕：线上「联机不稳定」时，没有这行就只能靠猜是超时、满员还是顶号
     if (joined) console.log(JSON.stringify({scope:'rt-close',code:code??null,reason:String(reason??''),ip,uid:players.get(id)?.uid??null,players:players.size}))
     if (joined) {
+      const player=players.get(id);obs.event('leave',player,{closeCode:code,reason:player.kickReason||String(reason??'')})
       players.delete(id)
       broadcast({t: 'leave', id})
       broadcast({t: 'online', online: players.size})
@@ -409,6 +433,7 @@ wss.on('connection', (ws, req) => {
   ws.on('message', raw => {
     try {
       const msg = JSON.parse(String(raw))
+      obs.packet(ws,'in',msg?.t,raw.length)
       // null / 数组 / 标量都不是合法消息，直接忽略（否则读 msg.t 会抛）
       if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return
       const me = players.get(id)
@@ -418,6 +443,7 @@ wss.on('connection', (ws, req) => {
         if (ws.rejected) return
         // join 时再查一次：握手到 join 之间可能已经挤满
         if (players.size >= MAX_PLAYERS) {
+          obs.reject('full')
           send(ws, {t: 'error', message: '服务器满员'})
           ws.close(1013, 'full')
           return
@@ -425,10 +451,11 @@ wss.on('connection', (ws, req) => {
         // 顺手清掉过期封禁，不起 setInterval（避免泄漏）
         sweepBans()
         const claims = identity(msg.ticket)
-        if (!claims) { ws.rejected = true; ws.close(4003, 'ticket rejected'); return }
+        if (!claims) { obs.reject('ticket');ws.rejected = true; ws.close(4003, 'ticket rejected'); return }
         const uid = claims.uid
         const ban = bans.get(uid)
         if (ban && ban.until > now()) {
+          obs.reject('banned',{uid,name:cleanName(claims.name)})
           ws.rejected = true
           send(ws, {t: 'banned', reason: ban.reason || '账号已被封禁'})
           setTimeout(() => { try { ws.close(4003, 'banned') } catch { /* 忽略 */ } }, 60)
@@ -440,12 +467,14 @@ wss.on('connection', (ws, req) => {
         const previous = [...players.values()].find(p => p.uid === uid)
         if (previous && previous.ws !== ws) {
           previous.ws.rejected = true
+          obs.event('leave',previous,{closeCode:4001,reason:'replaced'})
           players.delete(previous.id)
           broadcast({t: 'leave', id: previous.id})
           try { previous.ws.close(4001, 'replaced') } catch { /* 忽略 */ }
           console.log(JSON.stringify({scope: 'rt-replace', uid, oldId: previous.id, newId: id}))
         }
         const player = {
+          joinedAt:now(),ip,ua:clampStr(req.headers['user-agent'],200),positions:[],chats:0,
           id,
           ws,
           uid,
@@ -484,6 +513,7 @@ wss.on('connection', (ws, req) => {
         clearTimeout(ws.joinTimer)
         unpend()
         players.set(id, player)
+        obs.joined(player,players.size)
         send(ws, {
           t: 'welcome',
           me: {id, uid: player.uid, name: player.name, avatar: player.avatar},
@@ -500,7 +530,7 @@ wss.on('connection', (ws, req) => {
       if (msg.t === 'emote') {
         if (!acceptEmote(me,msg,now())) return
         const packet=JSON.stringify({t:'emote',from:id,id:me.em,s:me.es})
-        for(const peer of players.values())if(peer!==me&&inEmoteRange(peer,me))sendSlowAware(peer.ws,packet)
+        for(const peer of players.values())if(peer!==me&&inEmoteRange(peer,me))sendSlowAware(peer.ws,packet,'emote')
         return
       }
 
@@ -508,6 +538,7 @@ wss.on('connection', (ws, req) => {
         const at = now()
         if (at - me.lastPos < MIN_POS_GAP_MS) return
         me.lastPos = at
+        obs.position(me,at)
         me.x = clampNum(msg.x, -1e5, 1e5)
         me.y = clampNum(msg.y, -1000, 8000)
         me.z = clampNum(msg.z, -1e5, 1e5)
@@ -592,6 +623,7 @@ wss.on('connection', (ws, req) => {
         if (!text) return
         if (now() - me.lastChat < 1200) return // 简单防刷
         me.lastChat = now()
+        obs.chatted(me,text)
         broadcast({t: 'chat', id, name: me.name, text})
       }
     } catch (err) {
@@ -612,14 +644,14 @@ setInterval(() => {
 // 掉线清理：浏览器直接关掉时不会有 close 帧，用 ping/pong 兜住
 setInterval(() => {
   for (const p of players.values()) {
-    if (p.ws.isAlive === false) {
+    if (p.ws.isAlive === false && now()-(p.ws.lastPongAt??p.joinedAt)>=30000) {
       p.ws.terminate()
       continue
     }
     p.ws.isAlive = false
-    try { p.ws.ping() } catch { /* 忽略 */ }
+    try { p.ws.pingStamp=performance.now();p.ws.ping(String(p.ws.pingStamp)) } catch { /* 忽略 */ }
   }
-}, 30000)
+}, 10000)
 
 server.listen(PORT, () => {
   console.log(`网上桂林 · 联机服务已启动  ws://127.0.0.1:${PORT}/ws`)
