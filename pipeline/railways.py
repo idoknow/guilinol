@@ -2,7 +2,6 @@
 import argparse
 from collections import defaultdict
 import gzip
-import heapq
 import json
 import math
 from pathlib import Path
@@ -14,7 +13,7 @@ import numpy as np
 from shapely import LineString, Point, STRtree, box, get_parts, points as point_array, union_all
 from shapely.affinity import translate
 
-from common import CHUNK, load_osm, ll2xz
+from common import CHUNK, load_dem, load_osm, ll2xz
 from features import area, points
 from landmarks.world_surface import Surface
 from play_region import PlayRegion
@@ -25,51 +24,14 @@ from station_levels import FOOTBRIDGE, PLATFORMS, RAIL, UNDERPASS
 from station_approaches import approach_junctions, approach_exceptions
 
 ROOT = Path(__file__).resolve().parents[1]
-BRANCH=678370321
-BRANCH_PINS=(6533456498,6533456500)
-BRANCH_BRIDGES=(1017592858,213171576)
-MAIN_LINES=('衡柳','湘桂','贵广')
-
-
-def branch_ramp(stations, start_y, end_y, start_grade, end_grade):
-    # Integrate a continuous grade: parabolic transitions on the first and
-    # last four metres, and the least constant grade joining these endpoints.
-    length=stations[-1]-stations[0]
-    transition=min(4.,length/3)
-    grade=(end_y-start_y-transition*(start_grade+end_grade)/2)/(length-transition)
-    grades=[start_grade,grade,grade,end_grade]
-    breaks=np.array([0,transition,length-transition,length])
-    rises=np.r_[0,np.cumsum(np.diff(breaks)*(np.array(grades[:-1])+grades[1:])/2)]
-    x=stations-stations[0]
-    i=np.clip(np.searchsorted(breaks,x,side='right')-1,0,2)
-    dx=x-breaks[i]
-    y=start_y+rises[i]+dx*(np.array(grades)[i]+np.interp(x,breaks,grades))/2
-    return y,grade
-
-
 BRIDGE, TUNNEL, ELECTRIC, FENCE, LEVEL, RESERVED, PAINTED = 1, 2, 4, 8, 16, 32, 64
-
-
-def envelope(graph, targets, origins=None):
-    """Highest allowed level from all upper anchors, in one graph traversal."""
-    levels = np.array(targets, dtype=float)
-    queue = [(y, i) for i,y in enumerate(levels) if math.isfinite(y)]
-    heapq.heapify(queue)
-    while queue:
-        level, i = heapq.heappop(queue)
-        if level > levels[i]:
-            continue
-        for j, rise in graph[i]:
-            if level + rise < levels[j]:
-                levels[j] = level + rise
-                if origins is not None: origins[j] = origins[i]
-                heapq.heappush(queue, (levels[j], j))
-    return levels
 
 
 def parallel_segments(pieces, coords, ways):
     """Compare linear profiles at matching perpendicular chainages on both tracks."""
-    rows = [piece for piece in pieces if not piece[3] & (BRIDGE | TUNNEL)]
+    surface = {wid for wid,way in ways.items() if way.get('tags',{}).get('railway')=='rail'
+               and all(way['tags'].get(k,'no')=='no' for k in ('bridge','tunnel'))}
+    rows = [piece for piece in pieces if piece[4] in surface]
     if not rows:
         return None
     indices = np.array([[i, j] for i, j, *_ in rows])
@@ -182,24 +144,19 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
             if tags.get('bridge','no')=='no':
                 surface_roads.append(zone)
     protected = STRtree(road_zones)
-    nodes, coords, ground, graph = {}, [], [], []
+    nodes, coords = {}, []
     def vertex(p):
         key = tuple(round(v, 4) for v in p.coords[0])
         if key not in nodes:
             nodes[key] = len(coords)
             coords.append(key)
-            ground.append(world.sample(*p.coords[0], include_peaks=False)[0])
-            graph.append([])
         return nodes[key]
 
-    anchors = {}
-    constraints = []
     crossing_data = []
     portal_nodes = set()
     tunnels = {t['way']:t for t in manifest.get('tunnels', [])}
     review=json.loads((ROOT/'pipeline/railway-review.json').read_bytes())
     absent_structures=set()
-    branch_report={}
     sign_sites = defaultdict(list)
     signed = set()
     used_sites = []
@@ -209,9 +166,6 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
     station_area = next(yard for ids,yard in yards if PLATFORMS.intersection(ids))
     station_nodes = set()
     pieces = []
-    approved = json.loads((ROOT/'docs/railway-grades.json').read_bytes())['gradeConflicts']
-    for row in approved:
-        assert {row['start'],row['end']} in ({4514289414,6635078447},{4505338292,4514289414})
     for way in ways.values():
         tags = way.get('tags', {})
         if tags.get('railway') != 'rail':
@@ -229,7 +183,6 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
             if tags.get('electrified') in ('yes','contact_line'): base |= ELECTRIC
             service = tags.get('service')
             if not service: base |= FENCE
-            anchor_stations = {}
             if base&TUNNEL:
                 for end in (0,-1):
                     tip = Point(original.coords[end])
@@ -242,7 +195,6 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
                 at = line.project(p)
                 street = ways[row['road']]
                 zone = LineString(points(street)).buffer(road_radius(street['tags'])+1)
-                first_gap=len(gaps)
                 for overlap in lines(line.intersection(zone)):
                     lo, hi = sorted(line.project(Point(c)) for c in (overlap.coords[0],overlap.coords[-1]))
                     if lo-.02<=at<=hi+.02:
@@ -254,8 +206,6 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
                         gaps.append((lo,hi,flag))
                         stops.update((lo,hi))
                 stops.add(at)
-                if row['status'] not in ('active','pending_road_structure'):
-                    continue
                 is_level = row['type']=='level'
                 key = str(row['sharedNode']) if is_level else (row['rail'],row['road'],row['lat'],row['lon'])
                 hit = samples[key]
@@ -306,54 +256,15 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
                             missing_signs.append(dict(node=row['sharedNode'],approach=side))
                 soffit=hit['soffit'] if hit['soffit'] is not None else road-1.2
                 crossing_data.append((vertex(line.interpolate(at)),row,road,axis,soffit))
-                if row['road'] in (FOOTBRIDGE, UNDERPASS):
-                    continue
-                if is_level:
-                    anchor_stations[row['sharedNode']] = at
-                    anchors[vertex(line.interpolate(at))] = road
-                elif row['type']=='rail_over':
-                    if row['roadTags'].get('tunnel')=='yes' and surface_source=='terrain_proxy' and not tunnel:
-                        absent_structures.add((row['rail'],row['road']))
-                        gaps[first_gap:]=[(lo,hi,RESERVED) for lo,hi,_ in gaps[first_gap:]]
-                        continue
-                    clearance = 2.5 if row['roadTags']['highway'] in ('footway','cycleway','path','steps','pedestrian') else 4.5
-                    constraints.append((vertex(line.interpolate(at)),road+clearance+1.2,'min',row))
-                else:
-                    clearance = 6.55 if base&ELECTRIC else 5.5
-                    constraints.append((vertex(line.interpolate(at)),soffit-clearance,'max',row))
-            exceptions = []
-            for item in approved:
-                if {item['start'],item['end']} <= anchor_stations.keys():
-                    left,right=sorted((anchor_stations[item['start']],anchor_stations[item['end']]))
-                    exceptions.append((left,right,item['requiredPermille']/1000+.00001))
-            local_grade=None
-            if way['id']==BRANCH and all(node in anchor_stations for node in BRANCH_PINS):
-                local_grade=sorted(anchor_stations[node] for node in BRANCH_PINS)
-                stops.update(np.arange(local_grade[0],local_grade[1],1.))
-                for value in local_grade: stops.add(value)
+                if not is_level and row['type']=='rail_over' and row['roadTags'].get('tunnel')=='yes' and surface_source=='terrain_proxy' and not tunnel:
+                    absent_structures.add((row['rail'],row['road']))
             distances = sorted(stops)
             verts = [vertex(line.interpolate(s)) for s in distances]
             if surface_track:
                 station_nodes.update(i for i in verts if station_area.distance(Point(coords[i]))<.001)
-            if local_grade:
-                branch_stations=np.array(distances)
-                branch_vertices=np.array(verts)
-                branch_interval=local_grade
             for lo,hi,i,j in zip(distances,distances[1:],verts,verts[1:]):
                 if i==j: continue
                 mid=(lo+hi)/2
-                grade=.01198
-                if service in ('spur','siding','yard','crossover') or tags.get('usage')=='branch':
-                    grade=.02498
-                if any(name in tags.get('name','') for name in MAIN_LINES) or (way['id']==BRANCH and not (local_grade and local_grade[0]<=mid<=local_grade[1])):
-                    grade=.01198
-                for left,right,g in exceptions:
-                    if left<=mid<=right: grade=g
-                # Bound the rendered chord as well as the source chainage.
-                chord=math.dist(coords[i],coords[j])
-                rise=max(0,chord*grade-.000004)
-                graph[i].append((j,rise))
-                graph[j].append((i,rise))
                 flags = base
                 for left,right,flag in gaps:
                     if left<=mid<=right:
@@ -361,89 +272,15 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
                         flags &= ~FENCE
                 pieces.append((i,j,lo,flags,way['id']))
 
-    ground = np.array(ground)
-    lows=np.full(len(ground),-np.inf)
-    highs=np.full(len(ground),np.inf)
-    low_refs,high_refs={},{}
-    for i,bound,kind,row in constraints:
-        if kind=='min' and bound>lows[i]:
-            lows[i],low_refs[i]=bound,row
-        if kind=='max' and bound<highs[i]:
-            highs[i],high_refs[i]=bound,row
-    for i,row,y,_,_ in crossing_data:
-        if row['type']=='level':
-            lows[i]=highs[i]=y
-            low_refs[i]=high_refs[i]=row
-    low_origins=np.arange(len(ground))
-    high_origins=low_origins.copy()
-    floor=-envelope(graph,-lows,low_origins)
-    ceiling=envelope(graph,highs,high_origins)
-    target=ground+.35
-    smooth=(envelope(graph,target)-envelope(graph,-target))/2
-    height=np.maximum(floor,np.minimum(smooth,ceiling))
-    # Fixed road anchors always prevail. Propagate them over the same graph
-    # to preserve track continuity and enforce the grade outside exceptions.
-    pin_upper=np.full(len(ground),np.inf)
-    pin_lower=np.full(len(ground),-np.inf)
-    for i,y in anchors.items(): pin_upper[i]=pin_lower[i]=y
-    height=np.clip(height,-envelope(graph,-pin_lower),envelope(graph,pin_upper))
-    # On the Guilin–Haiyang branch keep the entire measured bridge footprint
-    # clear, including the two rail heads. Tie back to the existing tangents.
-    bs=branch_stations
-    left,right=np.searchsorted(bs,branch_interval)
-    deck=[(float(k.split(':')[1]),v['soffit']) for k,v in samples.items()
-          if isinstance(k,str) and k.startswith('branch:') and v['soffit'] is not None]
-    west=np.searchsorted(bs,min(s for s,_ in deck)-1)-1
-    east=np.searchsorted(bs,max(s for s,_ in deck)+1)
-    plateau=min(y for _,y in deck)-5.5-.015
-    g0=(height[branch_vertices[left]]-height[branch_vertices[left-1]])/(bs[left]-bs[left-1])
-    g1=(height[branch_vertices[right+1]]-height[branch_vertices[right]])/(bs[right+1]-bs[right])
-    descent,down=branch_ramp(bs[left:west+1],height[branch_vertices[left]],plateau,g0,0)
-    ascent,up=branch_ramp(bs[east:right+1],plateau,height[branch_vertices[right]],0,g1)
-    if max(abs(down),abs(up))>.025: raise ValueError('Branch vertical curve exceeds the approved local grade')
-    fixed=np.r_[height[branch_vertices[left-1]],descent,np.full(east-west-1,plateau),ascent,height[branch_vertices[right+1]]]
-    ids=branch_vertices[left-1:right+2]
-    pin_upper[ids]=fixed
-    pin_lower[ids]=fixed
-    height=np.clip(height,-envelope(graph,-pin_lower),envelope(graph,pin_upper))
-    branch_report=dict(type='branch_local_grade',rail=BRANCH,capPermille=25,
-        endpointConstraints=[dict(node=n,stationM=round(float(bs[i]),3),roadY=round(float(height[branch_vertices[i]]),4))
-                             for n,i in zip(BRANCH_PINS,[left,right])],roadBridges=BRANCH_BRIDGES,
-        minimumSoffitM=min(y for _,y in deck),plateauRailY=plateau,plateauStationsM=[bs[west],bs[east]],
-        tangentPermille=[1000*down,1000*up],transitionLengthM=4)
-    before_station = height
-    # Project the baseline onto the grade envelopes from the design station
-    # railheads. Only approaches outside the allowed rise change with the yard.
-    station_upper = np.full(len(ground), np.inf)
-    station_lower = np.full(len(ground), np.inf)
-    station_upper[list(station_nodes)] = RAIL
-    station_lower[list(station_nodes)] = -RAIL
-    height = np.clip(height, -envelope(graph,station_lower), envelope(graph,station_upper))
+    ground = load_dem(*np.asarray(coords).T, paired=True).astype(float)
+    from railway_profile import solve
+    # Dingjiang is a mapped train depot with yard tracks but no passenger
+    # platforms. Its service crossings share a single yard datum.
+    depot = ways.get(973038882)
+    if depot and depot['tags'].get('landuse') == 'railway':
+        yards.append(([depot['id']], area(depot)))
+    height, profile = solve(coords,pieces,ways,ground+.35,crossing_data,yards,parallel_segments(pieces,coords,ways))
     violations=[]
-    for i,bound,kind,row in constraints:
-        miss=bound-height[i] if kind=='min' else height[i]-bound
-        if miss>.001:
-            if abs(height[i]-before_station[i])>.0001:
-                violations.append(dict(rail=row['rail'], road=row['road'], type=row['type'],
-                                       lat=row['lat'], lon=row['lon'], surfaceSource=row['surfaceSource'],
-                                       shortfallM=round(miss,3), requiredRailY=round(bound,4),
-                                       actualRailY=round(height[i],4), stationRailY=RAIL))
-                continue
-            if kind=='min':
-                source=high_origins[i]
-                witness=high_refs[source]
-                allowed=ceiling[i]-highs[source]
-                limit=ceiling[i]
-            else:
-                source=low_origins[i]
-                witness=low_refs[source]
-                allowed=lows[source]-floor[i]
-                limit=floor[i]
-            evidence={key:witness[key] for key in ('rail','road','sharedNode','type','surfaceSource','lat','lon')}
-            violations.append(dict(rail=row['rail'],road=row['road'],type=row['type'],
-                lat=row['lat'],lon=row['lon'],surfaceSource=row['surfaceSource'],shortfallM=round(miss,3),
-                requiredRailY=round(bound,4),boundDirection=kind,opposingGradeLimitY=round(limit,4),
-                permittedRiseFromWitnessM=round(allowed,4),witness=evidence))
     dependencies={tuple([rail,road]):int(missing) for missing,records in review['missingTunnelDependencies'].items()
                   for rail,road,witness in records if (witness,int(missing)) in absent_structures}
     measured=[]
@@ -453,16 +290,21 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
         missing=dependencies.get((r['rail'],r['road']))
         if (r['rail'],r['road']) in absent_structures:
             clearance=None
-        measured.append(dict(roadStructureDependency=missing,surfaceSource=r['surfaceSource'],rail=r['rail'],road=r['road'],type=r['type'],sharedNode=r['sharedNode'],
+        if r['type'] in ('rail_over','road_over') and clearance is not None:
+            required = 4.5 if r['type']=='rail_over' else 7.5
+            if clearance < required-.001:
+                violations.append(dict(rail=r['rail'],road=r['road'],lat=r['lat'],lon=r['lon'],
+                                       type=r['type'],shortfallM=round(required-clearance,4)))
+        measured.append(dict(originalSoffitM=round(float(soffit),4) if r['type']=='road_over' else None, roadStructureDependency=missing,surfaceSource=r['surfaceSource'],rail=r['rail'],road=r['road'],type=r['type'],sharedNode=r['sharedNode'],
                              x=coords[i][0],z=coords[i][1],east=round(axis[0],6),south=round(axis[1],6),
                              railY=round(height[i],4),roadY=round(road,4),
                              clearanceM=None if clearance is None else round(clearance,4)))
     if plan_profile:
-        from railway_profile import solve
-        profile = solve(coords, pieces, ways, ground + .35, crossing_data, measured,
-                        list(station_yards(ways)), parallel_segments(pieces, coords, ways))
-        return dict(profile=profile,stationRailheadM=RAIL,stationNodes=len(station_nodes))
-
+        from railway_road_profiles import road_profile_constraints
+        profile['roads'] = road_profile_constraints(ways,measured,profile['panels'])
+        profile['crossings'] = measured
+        return dict(profile=profile,stationRailheadM=RAIL,stationNodes=len(station_nodes),
+                    parallelRailHeight=parallel_height_audit(pieces, coords, height, ways))
     tiles=defaultdict(list)
     maximum_grade=defaultdict(float)
     for i,j,station,flags,way_id in pieces:
@@ -553,23 +395,14 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
         tile['bytes']=file.stat().st_size
     return dict(stationRailheadM=RAIL,stationNodes=len(station_nodes),
                 parallelRailHeight=parallel_height_audit(pieces, coords, height, ways),
-                branchLocalGrade=branch_report,crossings=measured,maxEncodedGradePermille=maximum_grade,missingSigns=missing_signs,treesRemoved=trees_removed,signs=sum(map(len,sign_sites.values())),tiles=len(tiles), segments=sum(map(len,tiles.values())), fixedNodes=len(anchors),
-                maxPinErrorM=max(abs(height[i]-y) for i,y in anchors.items()), clearanceConflicts=violations)
+                crossings=measured,maxEncodedGradePermille=maximum_grade,missingSigns=missing_signs,treesRemoved=trees_removed,signs=sum(map(len,sign_sites.values())),tiles=len(tiles), segments=sum(map(len,tiles.values())), fixedNodes=len(station_nodes),
+                maxPinErrorM=max(abs(height[i]-RAIL) for i in station_nodes), clearanceConflicts=violations)
 
 
 def bake_world(directory,manifest,plan_profile=False):
     inventory_file=ROOT/'docs/railway-crossings.json'
     inventory=json.loads(inventory_file.read_bytes())
-    branch=next(w for w in load_osm() if w['type']=='way' and w['id']==BRANCH)
-    line=LineString(points(branch))
-    centers=[line.project(Point(ll2xz(r['lat'],r['lon']))) for r in inventory if r['rail']==BRANCH and r['road'] in BRANCH_BRIDGES]
     probes=[]
-    for at in np.arange(math.floor(min(centers))-35,math.ceil(max(centers))+35,.5):
-        point=np.asarray(line.interpolate(at).coords[0])
-        tangent=np.asarray(line.interpolate(at+.1).coords[0])-point
-        normal=np.array([-tangent[1],tangent[0]])/np.linalg.norm(tangent)
-        for offset in (-.8,0,.8):
-            probes.append([f'branch:{at}:{offset}',*(point+offset*normal)])
     ways = {w['id']:w for w in load_osm() if w['type']=='way'}
     junctions = approach_junctions(ways)
     probes.extend([[f"station-junction:{item['junctionNode']}",item['x'],item['z']] for item in junctions])
@@ -591,7 +424,7 @@ def bake_world(directory,manifest,plan_profile=False):
     for approach in report.get('stationApproachExceptions', []):
         approach['actualRailDifferenceM'] = round(max(rail_levels) - min(rail_levels), 4)
     manifest['stationApproachExceptions'] = report.get('stationApproachExceptions', [])
-    manifest['railwayBranchGrade']=report['branchLocalGrade']
+    manifest.pop('railwayBranchGrade', None)
     return report
 
 
@@ -606,5 +439,5 @@ if __name__=='__main__':
     if not args.plan_profile:
         path.write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(json.dumps(report,indent=2))
-    if args.plan_profile and not report['profile']['feasible']:
+    if args.plan_profile and (not report['profile']['feasible'] or report['profile']['roads']['conflicts']):
         raise SystemExit(2)

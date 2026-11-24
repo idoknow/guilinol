@@ -16,7 +16,7 @@ class RailProfileTest(unittest.TestCase):
 
     def profile(self, records, yards=()):
         crossings = [(node, r, r['roadY'], None, r.get('soffit')) for node, r in zip((0, 3), records)]
-        return solve(self.xy, self.pieces, self.ways, self.target, crossings, records, yards,
+        return solve(self.xy, self.pieces, self.ways, self.target, crossings, yards,
                      parallel_segments(self.pieces, self.xy, self.ways))
 
     def test_opposite_directions_match_at_the_same_chainage(self):
@@ -28,15 +28,13 @@ class RailProfileTest(unittest.TestCase):
     def test_road_levels_do_not_pin_track(self):
         records = [dict(rail=i, road=4, roadY=y, sharedNode=i, type='level', clearanceM=None)
                    for i, y in [(1, 6.), (2, 20.)]]
-        result = self.profile(records, [([123], box(-2, -2, 15, 6))])
+        h, result = self.profile(records, [([123], box(-2, -2, 15, 6))])
         self.assertTrue(result['feasible'])
-        first, second = result['crossings']
-        self.assertAlmostEqual(first['railY'], second['railY'])
-        self.assertLessEqual(result['maxGradePermille'], 12)
+        np.testing.assert_allclose(h, 12.5)
 
-    def test_incompatible_fixed_structures_have_no_profile(self):
+    def test_bridge_and_underpass_do_not_change_the_rail_profile(self):
         underpass = dict(type='rail_over', roadY=145, railY=151, clearanceM=4.8)
         bridge = dict(type='road_over', soffit=154.5, roadY=156, railY=149, clearanceM=5.8)
-        result = self.profile([underpass, bridge], [([123], box(-2, -2, 15, 6))])
-        self.assertEqual(result['status'], 2)
-        self.assertNotIn('crossings', result)
+        h, _ = self.profile([underpass, bridge])
+        reference, _ = self.profile([])
+        np.testing.assert_allclose(h, reference)

@@ -1,12 +1,12 @@
 """Solve for railheads before fitting the level-crossing roadway approaches."""
 
 import numpy as np
-from scipy.optimize import linprog
-from scipy.sparse import coo_matrix, eye, hstack, vstack
+import clarabel
+from scipy.sparse import coo_matrix, diags, eye, vstack
 from shapely import LineString, Point, intersects_xy
 from features import points
 
-from station_levels import FOOTBRIDGE, PLATFORMS, RAIL, UNDERPASS, STYLE
+from station_levels import PLATFORMS, RAIL
 
 
 def level_panels(coords, crossings, ways):
@@ -38,7 +38,7 @@ def level_panels(coords, crossings, ways):
         yield road, panel
 
 
-def solve(coords, pieces, ways, target, crossings, reference, yards, pairs):
+def solve(coords, pieces, ways, target, crossings, yards, pairs):
     xy = np.asarray(coords)
     count = len(xy)
     matrices, limits = [], []
@@ -84,75 +84,42 @@ def solve(coords, pieces, ways, target, crossings, reference, yards, pairs):
     eligible = np.unique(np.array([i for a, b, _, _, wid in pieces if wid in surface_ways
                                    for i in (a, b)], dtype=int))
     low = np.full(count, -np.inf)
-    high = np.full(count, np.inf)
     for platforms, yard in yards:
         members = eligible[intersects_xy(yard, *xy[eligible].T)]
         if PLATFORMS.intersection(platforms):
-            low[members] = high[members] = RAIL
+            low[members] = RAIL
         if len(members) > 1:
             linked = np.column_stack((members[1:], np.full(len(members)-1, members[0])))
             limit_difference(linked, np.broadcast_to([1, -1], linked.shape), 0.)
 
-    # At Guilin the tunnel and footbridge follow the station rail datum. Other
-    # structures impose the design headroom, independently of legacy rail Y.
-    bounds_by_rail = {}
-    for (i, crossing, road, _, soffit), row in zip(crossings, reference, strict=True):
-        if row['clearanceM'] is None or crossing.get('road') in (UNDERPASS, FOOTBRIDGE):
-            continue
-        if row['type'] == 'rail_over':
-            walking = crossing.get('roadTags', {}).get('highway') in ('steps','footway','path','pedestrian','cycleway')
-            limit = road + STYLE['structureDepth'] + (2.5 if walking else STYLE['roadClearance'])
-            low[i] = max(low[i], limit)
-        elif row['type'] == 'road_over':
-            electric = crossing.get('railTags', {}).get('electrified') in ('yes','contact_line')
-            limit = soffit - (STYLE['overheadClearance'] if electric else 5.5)
-            high[i] = min(high[i], limit)
-        else:
-            continue
-        if 'rail' in row:
-            bounds_by_rail.setdefault(row['rail'], []).append((i,row,limit))
-
-    # Minimise total absolute departure from the DEM-based target, subject to
-    # the hard geometry constraints. Slack belongs only to the fitting cost.
-    ident = eye(count, format='csr')
-    constraints = vstack(matrices, format='csr')
-    system = vstack((hstack((constraints, coo_matrix(constraints.shape))),
-                     hstack((ident, -ident)), hstack((-ident, -ident))), format='csr')
-    bounds = np.vstack((np.column_stack((low, high)),
-                        np.column_stack((np.zeros(count), np.full(count, np.inf)))))
-    result = linprog(np.r_[np.zeros(count), np.ones(count)], A_ub=system,
-                     b_ub=np.concatenate([*limits, target, -target]), bounds=bounds,
-                     method='highs')
-    report = dict(feasible=bool(result.success), status=int(result.status), message=result.message)
-    if result.success:
-        heights = result.x[:count]
-        report['crossings'] = [dict(rail=r['rail'], road=r['road'], node=r['sharedNode'],
-                                    railY=float(heights[i]), originalRoadY=float(road))
-                               for i, r, road, *_ in crossings if r['type'] == 'level']
-        report['panels'] = [dict(road=wid, fromM=max(0.,panel[0][1]-2),
-                                 toM=min(LineString(points(ways[wid])).length,panel[-1][1]+2),
-                                 railY=float(heights[panel[0][0]])) for wid,panel in panels]
-        report['maxGradePermille'] = float(np.max(1000 * abs(np.diff(heights[nodes]).ravel()) / lengths))
-    elif result.status == 2:
-        conflicts = []
-        for wid, records in bounds_by_rail.items():
-            line = LineString(points(ways[wid]))
-            tags = ways[wid]['tags']
-            cap = .025 if tags.get('service') or tags.get('usage')=='branch' else .012
-            if any(name in tags.get('name','') for name in ('衡柳','湘桂','贵广')):
-                cap = .012
-            for i,lower,minimum in records:
-                if lower['type'] != 'rail_over':
-                    continue
-                for j,upper,maximum in records:
-                    if upper['type'] != 'road_over':
-                        continue
-                    length = abs(line.project(Point(xy[i]))-line.project(Point(xy[j])))
-                    miss = minimum-maximum-cap*length
-                    if miss > .001:
-                        conflicts.append(dict(rail=wid, lowerRoad=lower['road'], upperRoad=upper['road'],
-                                              railMinimumM=round(minimum,4),railMaximumM=round(maximum,4),
-                                              distanceM=round(length,3),gradeCapPermille=1000*cap,
-                                              deficiencyM=round(miss,4)))
-        report['sameWayClearanceConflicts'] = conflicts
-    return report
+    fixed = np.flatnonzero(np.isfinite(low))
+    matrix = vstack([eye(count, format='csr')[fixed], *matrices], format='csc')
+    # Weight DEM residuals by represented length so inserting a tile boundary
+    # or short crossing segment does not give its location disproportionate weight.
+    weights = np.bincount(nodes.ravel(), np.repeat(lengths/2, 2), minlength=count)
+    weights = np.maximum(weights, .001)
+    # Smooth the DEM along the connected track graph on the 12 m sampling
+    # scale. Length weights keep dense junction samples from biasing this fit.
+    from scipy.sparse.linalg import spsolve
+    edge_rows = np.repeat(np.arange(len(nodes)), 2)
+    gradient = coo_matrix((np.tile([-1.,1.],len(nodes)), (edge_rows,nodes.ravel())),
+                          shape=(len(nodes),count)).tocsr()
+    target = spsolve(diags(weights) + gradient.T @ diags(144/lengths) @ gradient, weights*target)
+    # Centre the datum to keep the objective well scaled.
+    datum = np.average(target, weights=weights)
+    rhs = np.concatenate([low[fixed]-datum, *limits])
+    cones = [clarabel.ZeroConeT(len(fixed)), clarabel.NonnegativeConeT(len(rhs)-len(fixed))]
+    settings = clarabel.DefaultSettings()
+    settings.verbose = False
+    result = clarabel.DefaultSolver(diags(weights,format='csc'), -weights*(target-datum),
+                                    matrix,rhs,cones,settings).solve()
+    if result.status not in (clarabel.SolverStatus.Solved, clarabel.SolverStatus.AlmostSolved):
+        raise ValueError(f'Rail least-squares solver failed: {result.status}')
+    residual = matrix @ result.x - rhs
+    if np.max(residual,initial=0)>1e-7 or np.max(abs(residual[:len(fixed)]),initial=0)>1e-7:
+        raise ValueError('Rail least-squares solution violates a geometric constraint')
+    heights = np.asarray(result.x)+datum
+    return heights, dict(feasible=True, weightedRmsM=float(np.sqrt(np.average((heights-target)**2,weights=weights))),
+                         panels=[dict(road=wid, fromM=max(0.,panel[0][1]-2),
+                                      toM=min(LineString(points(ways[wid])).length,panel[-1][1]+2),
+                                      railY=float(heights[panel[0][0]])) for wid,panel in panels])

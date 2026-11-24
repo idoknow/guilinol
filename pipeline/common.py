@@ -20,7 +20,7 @@ def ll2xz(lat, lon):
 def xz2ll(x, z):
     return LAT0 - z / MLAT, LON0 + x / MLON
 
-def load_dem(gx=None, gz=None):
+def load_dem(gx=None, gz=None, *, paired=False):
     """Return float32 array [GH, GW] of elevation in metres sampled on the world grid."""
     z = 14
     tiles = {}
@@ -41,6 +41,11 @@ def load_dem(gx=None, gz=None):
     px = (lon + 180) / 360 * n * 256 - xs[0] * 256 - 0.5
     py = (1 - np.arcsinh(np.tan(np.radians(lat))) / math.pi) / 2 * n * 256 - ys[0] * 256 - 0.5
     from scipy.ndimage import map_coordinates
+    if paired:
+        values = map_coordinates(mos, np.stack((py,px)), order=1, mode='constant', cval=np.nan)
+        if not np.isfinite(values).all():
+            raise ValueError('Track geometry extends outside the supplied DEM')
+        return values
     # Limit interpolation coordinates to one strip even on the full city grid.
     result = np.empty((len(py), len(px)), dtype=np.float32)
     for start in range(0, len(py), 128):
