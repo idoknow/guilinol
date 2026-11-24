@@ -104,6 +104,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const light = new THREE.DirectionalLight(look.sunColor,look.sunPower)
   light.position.set(...look.sunDirection); scene.add(light)
   const hemi = new THREE.HemisphereLight(look.hemiSky,look.hemiGround,look.hemiPower); scene.add(hemi)
+  const shopProgramsReady=import('./mifen/warm-programs').then(module=>module.warmShopPrograms(warmPrograms))
   const [left,top,width,depth] = bounds.extent
   scene.add(freezeStatic(outerGround(bounds.extent)))
   // IDOK-105: choose the opening camera pose. The camera is NOT touched here — `flight()` below sets
@@ -189,7 +190,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     measureFirstWorldBytes(first,total=>{stats.firstWorldBytes=total})
     if(stats.openingRingMs)void finishLoading()
   }
-  async function finishLoading(){loader.stage('frame',1,1);await loader.finish();stats.readyMs=performance.now()}
+  async function finishLoading(){await shopProgramsReady;loader.stage('frame',1,1);await loader.finish();stats.readyMs=performance.now()}
   function updateAtmosphere(now:number,elapsed:number){
     clock.tick(elapsed/1000); evaluate(clock.hour,clock.weather,1-Math.exp(-elapsed/clock.blendMs))
     atmo.uTime.value = now/1000
@@ -498,7 +499,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       sampleGroundY: sampleMissionGroundY,
       getNightFactor: () => env.night,
     },
-    { eagerVerify: params.has('mifen'), warmPrograms },
+    { eagerVerify: params.has('mifen') },
   )
   prepareLandingContent=async()=>{
     mifen.step(0)
