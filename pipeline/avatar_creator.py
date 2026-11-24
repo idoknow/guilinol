@@ -199,6 +199,8 @@ def hairstyles():
 
 
 if __name__ == '__main__':
+    from avatar_hands import rebuild
+    rebuild()
     hairstyles()
     for body in 'mf':
         generate(body)

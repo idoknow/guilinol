@@ -1,0 +1,95 @@
+.emote-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  background: #10231c38;
+  touch-action: none;
+}
+.emote-overlay[hidden],
+.emote-toggle[hidden] {
+  display: none;
+}
+.emote-disc,
+.emote-toggle {
+  color: #f4efe2;
+  border: 1px solid #e3eee457;
+  background-color: #182825dd;
+  backdrop-filter: blur(12px);
+  font-family: inherit;
+}
+.emote-disc {
+  position: relative;
+  width: min(72vmin, 300px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background-image: repeating-conic-gradient(from -22.5deg, #e3eee452 0 0.5deg, transparent 0.5deg 45deg);
+  box-shadow: 0 8px 36px #10231c48;
+}
+.emote-slot,
+.emote-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  border-radius: 100%;
+}
+.emote-slot {
+  width: 23%;
+  height: 23%;
+  border: 0;
+  background: transparent;
+  color: #eeeadd;
+}
+.emote-slot svg {
+  width: 53%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.emote-slot:disabled:after {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border: 1px solid #93a9a0;
+  border-radius: 50%;
+}
+.emote-slot.selected {
+  background: #89bcaa50;
+  color: white;
+}
+.emote-label {
+  left: 50%;
+  top: 50%;
+  width: 32%;
+  height: 32%;
+  background: #263c36;
+  border: 1px solid #aec7bb66;
+  font-weight: bold;
+}
+.emote-toggle {
+  display: none;
+  position: fixed;
+  z-index: 12;
+  right: max(16px, env(safe-area-inset-right));
+  top: 68%;
+  margin-right: 68px;
+  border-radius: 30px;
+  padding: 10px 14px;
+}
+@media (pointer: coarse) {
+  .emote-toggle {
+    display: block;
+  }
+}
+
+@media (pointer: coarse) and (orientation: landscape) {
+  .emote-toggle {
+    right: 128px;
+    top: 31%;
+    margin-right: 0;
+  }
+}
