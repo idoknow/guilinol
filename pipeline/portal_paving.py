@@ -1,13 +1,10 @@
 """Remove upper paving from excavated ramps while retaining enclosed crossings."""
-import base64
 import gzip
 import json
 import math
 import numpy as np
 from shapely import Polygon, STRtree, box, make_valid, set_precision, union_all
 from shapely.affinity import translate
-from shapely.geometry.polygon import orient
-from shapely import constrained_delaunay_triangles
 from service_streets import rings
 from surveyed_corridors import read_chunk, write_chunk
 
@@ -30,22 +27,6 @@ def openings(tunnels):
                 for j,d in enumerate((-width,width)):
                     sides[j].append((p[0]+sign*dx*s-dz*d,p[2]+sign*dz*s+dx*d))
             yield Polygon(sides[0]+list(reversed(sides[1])))
-
-
-def clip_top(packed,cut):
-    vertices=np.frombuffer(base64.b64decode(packed),'<i4').reshape(-1,3,3)
-    kept=[]
-    for tri in vertices:
-        xyz=tri/1000
-        footprint=Polygon(xyz[:,[0,2]])
-        if not cut.intersects(footprint):
-            kept.append(tri)
-        elif footprint.area>1e-8:
-            plane=np.linalg.solve(np.column_stack((xyz[:,[0,2]],np.ones(3))),xyz[:,1])
-            for piece in constrained_delaunay_triangles(footprint.difference(cut)).geoms:
-                kept.append([[round(x*1000),round((plane@[x,z,1])*1000),round(z*1000)]
-                             for x,z in list(orient(piece,sign=-1).exterior.coords)[:3]])
-    return base64.b64encode(np.asarray(kept,dtype='<i4').tobytes()).decode()
 
 
 def restore(output, chunks):
@@ -82,10 +63,13 @@ def trim(output,chunks,tunnels):
         survey=paths[12] if len(paths)>12 else None
         lower=paths[11] if len(paths)>11 else None
         rebuilt=[];offsets=[]
-        for kind,*loops in paths[0]:
+        for index,(kind,*loops) in enumerate(paths[0]):
             offsets.append(len(rebuilt))
             poly=make_valid(Polygon(np.asarray(loops[0])/100,[np.asarray(h)/100 for h in loops[1:]]))
-            if kind in (0,1,4,5,6) and cut.intersects(poly):
+            # A surveyed approach already meets the designed floor. Keep
+            # its triangles and path labels across the portal seam.
+            surveyed = survey and survey['start'] <= index < survey['end']
+            if not surveyed and kind in (0,1,4,5,6) and cut.intersects(poly):
                 rebuilt.extend(rings(kind,poly.difference(cut)))
             else:
                 rebuilt.append([kind,*loops])
@@ -98,8 +82,6 @@ def trim(output,chunks,tunnels):
         if survey:
             survey['start']=offsets[survey['start']]
             survey['end']=offsets[survey['end']]
-            for key in ('packed','sidewalk'):
-                if survey.get(key):survey[key]=clip_top(survey[key],cut)
         paths[0]=rebuilt
         write_chunk(file,raw,start,size,collision)
         tile['bytes']=file.stat().st_size
