@@ -10,7 +10,7 @@ const east = (110.278235 - 110.3) * 111320 * Math.cos((25.28 * Math.PI) / 180)
 const south = (25.28 - 25.263846) * 110574
 // Eye and target are east, absolute elevation, south. Identical for both builds.
 const views = [
-  ['front', [70, 157, -10], [0, 161, 0], 12],
+  ['front', [79, 157, -10], [0, 161, 0], 12],
   ['square', [100, 186, 64], [-12, 154, -5], 12],
   ['eaves', [56, 155, 67], [0, 161, -6], 12],
   ['taxi', [90, 157, -50], [18, 152, 4], 12],
@@ -27,7 +27,7 @@ const views = [
   ['platform-day', [-56.5, 153.0, 45], [-68.5, 154.4, -55], 12],
   ['platform-across', [-76.4, 152.8, 45], [-100.5, 155, -37], 12],
   ['stairs', [-110, 155, -105], [-107, 159, -84], 12],
-  ['front-night', [70, 157, -10], [0, 161, 0], 21],
+  ['front-night', [79, 157, -10], [0, 161, 0], 21],
 ]
 await mkdir(output, { recursive: true })
 const server = await preview({
@@ -67,16 +67,25 @@ try {
     await page.goto(
       'http://127.0.0.1:' +
         server.httpServer.address().port +
-        '/?verify&radius=512&flow=0&time=' +
+        '/?verify&radius=' +
+        (id === 'plan' ? 1024 : 512) +
+        '&flow=0&time=' +
         hour +
         '&view=' +
         token,
+      { waitUntil: 'domcontentloaded', timeout: 90000 },
     )
     await page.waitForFunction(
       () =>
         window.viewer?.stats.readyMs > 0 &&
         window.viewer.stats.loaded &&
-        !window.viewer.stats.pending,
+        !window.viewer.stats.pending &&
+        (!window.viewer.manifest.landmarks.some(
+          (e) => e.id === 'guilin_station',
+        ) ||
+          [...window.viewer.stream.landmarks.keys()].some(
+            (e) => e.id === 'guilin_station',
+          )),
       null,
       { timeout: 90000 },
     )

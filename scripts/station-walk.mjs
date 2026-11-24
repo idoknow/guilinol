@@ -16,6 +16,7 @@ export async function stationWalk(page) {
       [-2126.4, 1780.44],
       [-2103, 1801.9],
       [-2085, 1802.79],
+      [-2079, 1802.9],
     ]
     walk.leave()
     if (!(await walk.enter(...exit, 0, 'station')))
