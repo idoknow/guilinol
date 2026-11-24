@@ -28,6 +28,9 @@ def bake(directory, chunks, graded=None):
     footprints = [area(w) for w in elements if w.get('tags',{}).get('building') and
                   w['type']=='way' and len(w.get('geometry',()))>=4]
     buildings = STRtree(footprints)
+    bridge_nodes = {node for w in elements if w['type']=='way' and w.get('tags',{}).get('highway')
+                    and w['tags'].get('bridge','no')!='no' and len(w['nodes'])>=2
+                    for node in (w['nodes'][0],w['nodes'][-1])}
     for way in elements:
         if way['type']!='way' or not way.get('tags',{}).get('highway') or len(way.get('geometry',()))<2:
             continue
@@ -56,6 +59,16 @@ def bake(directory, chunks, graded=None):
                     segments.append(LineString([a,b]))
         for segment in segments:
             face = segment.buffer(road_width/2,cap_style='flat')
+            # Overlap the quantized deck edge by a few centimetres, so the
+            # abutment has continuous asphalt on both sides of the seam.
+            for index,neighbor in ((0,1),(-1,-2)):
+                point = Point(center.coords[index])
+                if way['nodes'][index] in bridge_nodes and segment.distance(point)<.01:
+                    outward = np.subtract(center.coords[index],center.coords[neighbor])
+                    length = np.linalg.norm(outward)
+                    if length>.01:
+                        extended = translate(face,* (outward*.10/length))
+                        face = face.union(extended.intersection(point.buffer(road_width)))
             occupied = buildings.query(face,predicate='intersects')
             if len(occupied):
                 face = face.difference(union_all([make_valid(footprints[i]) for i in occupied]))
@@ -92,6 +105,18 @@ def bake(directory, chunks, graded=None):
             continue
         new_pavement.append(translate(missing,x,z))
         streets[0][end:end] = patches
+        if graded is not None and (len(streets)<6 or not streets[5]):
+            # Rural tiles may first receive drivable geometry here. Encode
+            # the fitted road spline along with the new pavement triangles.
+            from road_grading import STEP
+            row,col = int((z-graded.top)//STEP),int((x-graded.left)//STEP)
+            control = graded.after[2][row:row+35,col:col+35]
+            mm = np.rint(control*1000).astype(int)
+            knots = [int(mm.min()),(mm-mm.min()).ravel().tolist()]
+            if len(streets)==5:
+                streets.append(knots)
+            else:
+                streets[5] = knots
         if lower:
             lower[0] += len(patches)
         encoded = json.dumps(collision,separators=(',',':')).encode()
