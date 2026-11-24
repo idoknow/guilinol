@@ -112,9 +112,16 @@ export async function apiTest({ api, origin, cookie, sql, getCookie }) {
   await (await import('./admin-test.mjs')).apiTest({api,sql,id,second,photo,origin,cookie})
   cookie=getCookie()
   for (let count = 1; count <= 5; count++) {
-    const next = await create()
+    // IDOK-219: the first one is a 游戏 bug report submitted without any photo.
+    const next = count === 1 ? (await api('feedback', { ...draft, kind: '游戏 bug' })).id : await create()
     await uploadShot(origin,cookie,next)
-    await photo(next, 1, 200)
+    if (count > 1) await photo(next, 1, 200)
+    else {
+      const plain = await create()
+      await uploadShot(origin,cookie,plain)
+      await api(`feedback/${plain}/submit`, {}, 409)
+      await api(`feedback/${plain}`, null, 200, null, { method: 'DELETE' })
+    }
     await api(`feedback/${next}/submit`, {}, count === 5 ? 429 : 200)
   }
   console.log('Feedback: private photos, quota, transitions, idempotency and supplement passed')
@@ -245,5 +252,16 @@ export async function uiTest(page, origin,sql) {
   await fb.locator('.fb-map canvas').waitFor()
   await page.waitForTimeout(400)
   await shot('mobile')
+  // IDOK-219: a 游戏 bug report needs a description but no photo.
+  await fb.getByText('游戏 bug', { exact: true }).click()
+  await fb.getByText('截图可选，不传也能提交').waitFor()
+  await fb.getByLabel('标题').fill('骑电动车过解放桥时卡住不动')
+  await fb.getByLabel('描述（必填）').fill('在桥中间按方向键没反应，刷新后恢复。电脑 Chrome。')
+  await fb.locator('.fb-submit').scrollIntoViewIfNeeded()
+  await shot('bug-no-photo')
+  await click('提交反馈')
+  await fb.locator('.fb-pill.fb-status--submitted').waitFor({ timeout: 120000 })
+  assert.match(await fb.locator('.fb-facts').innerText(), /游戏 bug/)
+  await shot('bug-submitted')
   await click('关闭')
 }
