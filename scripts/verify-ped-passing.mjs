@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {readFileSync,writeFileSync} from 'node:fs'
 import {gunzipSync} from 'node:zlib'
+import {execFileSync} from 'node:child_process'
 import {Traffic} from '../web/src/traffic/sim.ts'
 import {sidewalk} from './ped-sidewalk.mjs'
 
@@ -18,7 +19,7 @@ for(const pattern of [/解放/,/中山/,/.*/])for(const track of tracks){
   if(pattern.source!=='.*')break
 }
 assert.equal(chosen.length,10)
-const reports=[]
+const reports=[],footprints=[]
 for(const [index,{track,width}] of chosen.entries()){
   const count=2+index%5,same=index%2,mid=track.length/2,dt=.05
   sim.actors=Array.from({length:count},(_,id)=>{
@@ -28,10 +29,12 @@ for(const [index,{track,width}] of chosen.entries()){
     sim.position(actor);return actor
   })
   const waits=Array(count).fill(0),encounters=new Map(),times=[]
+  const frames=[];footprints.push(frames)
   let min=Infinity,stall=0,overlap=0,outside=0
   for(let frame=0;frame<1200;frame++){
     sim.step(dt,{x:(track.start.x+track.end.x)/2,z:(track.start.z+track.end.z)/2,y:track.start.y})
     assert.equal(sim.actors.length,count)
+    frames.push(sim.actors.map(actor=>[actor.x,actor.z]))
     let close=false,off=false
     for(const [id,actor] of sim.actors.entries()){
       waits[id]=actor.speed<.1?waits[id]+1:0
@@ -51,6 +54,8 @@ for(const [index,{track,width}] of chosen.entries()){
   }
   reports.push({street:track.street,id:track.id,count,width:+width.toFixed(2),min:+min.toFixed(3),passes:times.length,meanSeconds:+(times.reduce((a,b)=>a+b,0)/times.length).toFixed(2),stall,overlap,outside})
 }
+const bodyOutside=JSON.parse(execFileSync('uv',['run','--locked','python','scripts/ped-envelope.py'],{input:JSON.stringify(footprints)}))
+reports.forEach((row,index)=>{row.bodyOutside=bodyOutside[index]})
 console.table(reports)
 if(process.argv[2])writeFileSync(process.argv[2],JSON.stringify(trace))
 assert.ok(reports.every(row=>row.passes&&!row.stall&&!row.overlap&&!row.outside))
