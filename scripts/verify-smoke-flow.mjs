@@ -16,7 +16,7 @@ try{
       const page=await browser.newPage({viewport:{width,height},hasTouch:touch,isMobile:touch})
       page.setDefaultTimeout(30000)
       page.on('pageerror',error=>console.error('page error:',error.message))
-      const dir=`captures/smoke-flow/round-2/${width}-${view}`
+      const dir=`captures/smoke-flow/round-3/${width}-${view}`
       await mkdir(dir,{recursive:true})
       await page.addInitScript(view=>localStorage.setItem('glol.prefs',JSON.stringify({view})),view)
       if(width===740)await page.addInitScript(()=>localStorage.setItem('glol.avatar.v1',JSON.stringify({body:'f',v:1,createdAt:123,skin:3,face:1,brows:0,eyes:0,hair:'f_bun',hairColor:1,look:'hoodie'})))
@@ -35,7 +35,7 @@ try{
         return slot.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))
       },null,{timeout:90000})
       if(view==='third'){
-        await page.evaluate(()=>window.viewer.walk.face(window.viewer.walk.yaw+Math.PI-.95,.08))
+        await page.evaluate(()=>window.viewer.walk.face(window.viewer.walk.yaw+Math.PI-Math.PI/4,.08))
         await page.mouse.move(width/2,height*.6)
         await page.mouse.wheel(0,-1200)
       }
@@ -107,6 +107,51 @@ try{
             assert(Math.abs(geometry.x)<.002 && geometry.y< -1 && geometry.y> -1.25,'filter must meet the lower centre edge')
             assert(geometry.forward<-.08 && geometry.down<0,'ember must point forward and slightly down')
           }
+          if(view==='third'&&puff){
+            const grip=await page.evaluate(()=>{
+              const c=window.viewer.camera,figure=c.parent.getObjectByName('smoke-kit').parent
+              const lips=figure.getObjectByName('smoke-lips'),cig=lips.getObjectByName('smoke-cigarette')
+              const world=name=>figure.getObjectByName(name).getWorldPosition(c.position.clone())
+              const filter=cig.getWorldPosition(c.position.clone())
+              return {index:world('index_04_leaf_r').distanceTo(filter),middle:world('middle_04_leaf_r').distanceTo(filter),
+                wrist:world('hand_r').distanceTo(world('smoke-lips'))}
+            })
+            console.log('filter contact',width,grip)
+            assert(grip.index<.016 && grip.middle<.016 && grip.wrist>.12,JSON.stringify(grip))
+          }
+          if(view==='first'&&puff){
+            const bounds=await page.evaluate(()=>{
+              const c=window.viewer.camera,figure=c.parent.getObjectByName('smoke-kit').parent
+              let maxEdge=0,highest=-1,visible=0
+              figure.traverseVisible(mesh=>{
+                if(!mesh.isSkinnedMesh||!mesh.layers.test(c.layers))return
+                const {index,attributes}=mesh.geometry,points=new Map()
+                const right=mesh.skeleton.bones.map(b=>/^(hand|thumb|index|middle|ring|pinky)_.*r$/.test(b.name))
+                function projected(i){
+                  if(!points.has(i)){
+                    const v=mesh.getVertexPosition(i,c.position.clone()).applyMatrix4(mesh.matrixWorld).project(c)
+                    points.set(i,v)
+                  }
+                  return points.get(i)
+                }
+                for(let t=0;t<index.count;t+=3){
+                  const ids=[index.getX(t),index.getX(t+1),index.getX(t+2)]
+                  if(!ids.every(i=>right[attributes.skinIndex.getX(i)]))continue
+                  const points=ids.map(projected)
+                  if(!points.some(v=>Math.abs(v.x)<=1&&Math.abs(v.y)<=1&&Math.abs(v.z)<=1))continue
+                  visible++
+                  for(let j=0;j<3;j++){
+                    const a=points[j],b=points[(j+1)%3]
+                    highest=Math.max(highest,a.y)
+                    maxEdge=Math.max(maxEdge,Math.hypot((a.x-b.x)*innerWidth/innerHeight,a.y-b.y)/2)
+                  }
+                }
+              })
+              return {maxEdge,highest,visible}
+            })
+            console.log('puff bounds',width,bounds)
+            assert(bounds.visible>0 && bounds.maxEdge<=1/3 && bounds.highest<-.43,JSON.stringify(bounds))
+          }
           // Let the compositor present the last WebGL frame before the screenshot.
           await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
           await shot(name)
@@ -118,7 +163,7 @@ try{
           const c=window.viewer.camera,lips=c.parent.getObjectByName('smoke-lips')
           const p=lips.getWorldPosition(c.position.clone()).project(c)
           const w=innerWidth,h=innerHeight,scale=3.2
-          c.setViewOffset(w,h,(p.x+1)*w/2-w*.37/scale,(1-p.y)*h/2-h*.42/scale,w/scale,h/scale)
+          c.setViewOffset(w,h,(p.x+1)*w/2-w*.37/scale,(1-p.y)*h/2-h*.27/scale,w/scale,h/scale)
         })
       }
       await capturePhase('02-pack','sealed')
@@ -130,15 +175,59 @@ try{
       await capturePhase('06-mouth','ready')
       await press('点燃')
       await capturePhase('07-light','light',.45)
+      if(width===1440 && view==='third'){
+        // Look across the grip from the other cheek to separate the two fingertips.
+        await page.evaluate(()=>{
+          const {camera:c,walk}=window.viewer
+          c.clearViewOffset()
+          walk.face(walk.yaw+Math.PI/2,.08)
+          c.updateMatrixWorld(true)
+          const p=c.parent.getObjectByName('smoke-lips').getWorldPosition(c.position.clone()).project(c)
+          const w=innerWidth,h=innerHeight,scale=4
+          c.setViewOffset(w,h,(p.x+1)*w/2-w*.52/scale,(1-p.y)*h/2-h*.40/scale,w/scale,h/scale)
+        })
+      }
       await capturePhase('08-lit','smoking')
       for(const name of ['09-puff','10-puff','11-puff']){
         await press('吸一口')
         await capturePhase(name,'smoking',0,true)
       }
+      await page.evaluate(()=>{
+        window.viewer.camera.clearViewOffset()
+        // Timestamp the actual scene insertion, independent of keyboard/tap latency.
+        const scene=window.viewer.camera.parent
+        function onDrop(event){
+          if(!['smoke-cigarette','smoke-stub'].includes(event.child.name))return
+          window.dropSample={stub:event.child,born:performance.now(),startY:event.child.position.y}
+          scene.removeEventListener('childadded',onDrop)
+        }
+        scene.addEventListener('childadded',onDrop)
+      })
       await select()
       await hint.waitFor({state:'hidden'})
       assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('glol.save.v1')).packs[0].remaining),19)
-      await shot('12-discard')
+      for(const [name,time] of [['12-discard',300],['13-ground',1500]]){
+        await page.waitForFunction(ms=>window.dropSample&&performance.now()-window.dropSample.born>=ms,time)
+        const sample=await page.evaluate(async({view,time})=>{
+          const {camera,walk}=window.viewer,{stub,startY}=window.dropSample
+          camera.clearViewOffset()
+          const pos=stub.position.clone()
+          if(view==='first'){
+            const d=pos.clone().sub(camera.position).normalize()
+            walk.face(Math.atan2(-d.x,-d.z),.3-Math.asin(d.y))
+          }
+          camera.updateMatrixWorld(true)
+          const p=pos.project(camera),w=innerWidth,h=innerHeight
+          const zoom=view==='third'?2.8:time===1500?2:1
+          camera.setViewOffset(w,h,(p.x+1)*w/2-w*.5/zoom,(1-p.y)*h/2-h*.53/zoom,w/zoom,h/zoom)
+          await window.viewer.freeze()
+          return {fall:startY-stub.position.y,height:stub.position.y-walk.probe().figPos[1],ndc:stub.position.clone().project(camera).toArray()}
+        },{view,time})
+        assert(sample.fall>.2 && (time===300?sample.height>.3:Math.abs(sample.height)<.03),JSON.stringify(sample))
+        assert(sample.ndc.every(n=>Math.abs(n)<=1),JSON.stringify(sample))
+        await shot(name)
+        await page.evaluate(()=>window.viewer.resume())
+      }
       assert.equal(await page.evaluate(()=>window.viewer.walk.probe().smoke.phase),'idle')
       if(!touch){
         assert.equal(await page.evaluate(()=>window.worldInteractions),0)

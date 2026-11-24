@@ -35,7 +35,19 @@ const pinch:Pose = {
     [[60,21,-16],[46,9,-18],[58,6,-10]],
   ],
 }
-const poses={box,lighter,pinch}
+// The two extended fingers straddle the filter. Keep the wrist outside and
+// forward of the cheek while the thumb and the last two fingers stay curled.
+const puff:Pose={
+  wrist:[106,-88,-91],
+  digits:[
+    pinch.digits[0],
+    [[40,-10,-32],[16,9,-23],[1,4,0]],
+    [[43,-25,-38],[19,-10,-26],[1,-4,0]],
+    pinch.digits[3],
+    [[46,-45,-48],[35,-54,-43],[45,-53,-36]],
+  ],
+}
+const poses={box,lighter,pinch,puff}
 const digits=['thumb','index','middle','ring','pinky']
 function basis(along:T.Vector3,across:T.Vector3){
   const x=along.normalize(),z=new T.Vector3().crossVectors(x,across).normalize()
@@ -95,14 +107,15 @@ export function smokingHand(figure:T.Object3D,side:'l'|'r'){
     const middle=point(pose.digits[2][0])
     const wanted=basis(middle.clone().sub(point(pose.wrist)),point(pose.digits[1][0]).sub(point(pose.digits[4][0]))).multiply(localBasis)
     goal.copy(middle).sub(middleLocal.clone().multiply(wrist!.getWorldScale(a)).applyQuaternion(wanted))
-    for(let pass=0;pass<8;pass++){
-      aim(elbow!,wrist!,goal);aim(shoulder!,wrist!,goal)
-      if(wrist!.getWorldPosition(a).distanceToSquared(goal)<1e-6)break
-    }
+    const forearm=elbow!.getWorldPosition(a).distanceTo(wrist!.getWorldPosition(b))
+    const pole=shoulder!.getWorldPosition(new T.Vector3())
+    pole.y-=.45
+    aimHinge(shoulder!,elbow!,goal,pole,forearm)
+    aim(elbow!,wrist!,goal)
     wrist!.quaternion.copy(wrist!.parent!.getWorldQuaternion(parent).invert().multiply(wanted))
     for(const {joint,rotation} of curl)joint.quaternion.copy(rotation)
     chains.forEach((chain,i)=>{
-      if(name==='pinch'&&i>1)return
+      if(name==='pinch'&&i>1 || name==='puff'&&i!==1&&i!==2)return
       const [,hinge,pad]=pose.digits[i],end=chain[3]
       const pole=point(hinge),tip=point(pad)
       const distal=chain[2].getWorldPosition(a).distanceTo(end.getWorldPosition(b))

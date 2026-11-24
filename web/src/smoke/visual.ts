@@ -42,6 +42,8 @@ export function smokeVisual(scene:THREE.Scene,figure:THREE.Object3D,camera?:THRE
       kit.root.quaternion.copy(figure.getWorldQuaternion(parent).invert().multiply(rotation))
       handL.copy(VIEW_ANCHORS.restL).lerp(VIEW_ANCHORS.handL,view.carry)
       if(view.phase==='draw')handL.lerpVectors(VIEW_ANCHORS.restL,VIEW_ANCHORS.handL,view.progress)
+      // Lower the box into the chest workspace; preserve visibility in the eye camera.
+      handL.y-=(fp ? .033 : .16)*view.carry
       handR.copy(VIEW_ANCHORS.handR)
       if(view.light>0){
         tip.copy(mouth).addScaledVector(forward,.079).sub(flameOffset)
@@ -57,12 +59,13 @@ export function smokeVisual(scene:THREE.Scene,figure:THREE.Object3D,camera?:THRE
         if(view.phase==='take'||view.lit){
           pinch.position.copy(kit.cigarette.position)
           if(view.lit){
-            pinch.position.addScaledVector(forward,.031)
+            pinch.position.addScaledVector(forward,fp ? .15 : 0)
+            if(fp){pinch.position.x+=.042;pinch.position.y-=.064}
             pinch.position.x+=(1-view.puff)*.14
             pinch.position.y-=(1-view.puff)*.10
           }
         }else kit.pinchPoint(view,pinch.position)
-        right.apply('pinch',pinch)
+        right.apply(view.lit?'puff':'pinch',pinch)
       }
       if(left && kit.pack.visible)left.attachment.attach(kit.pack)
       if(left && kit.lighter.visible)left.attachment.attach(kit.lighter)
