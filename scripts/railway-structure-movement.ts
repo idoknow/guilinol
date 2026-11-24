@@ -9,6 +9,10 @@ const surface=(world:string)=>vehicleSurface(world,JSON.parse(fs.readFileSync(pa
 const before=surface(main),after=surface(candidate)
 const inventory=JSON.parse(fs.readFileSync('docs/railway-crossings.json','utf8'))
 const ids=new Set(inventory.filter(row=>row.type).map(row=>row.road))
+const manifest=JSON.parse(fs.readFileSync(path.join(candidate,'manifest.json'),'utf8'))
+for(const tunnel of manifest.tunnels??[])if(tunnel.nodes)ids.add(tunnel.way)
+const grades=JSON.parse(fs.readFileSync('docs/railway-grades.json','utf8'))
+for(const row of grades.resolvedRoadStructures??[])for(const id of [row.roadWay,row.bridgeWay])if(id)ids.add(id)
 const ways=JSON.parse(fs.readFileSync('raw/osm-2026-11.json','utf8')).elements
 const result=[]
 for(const way of ways){

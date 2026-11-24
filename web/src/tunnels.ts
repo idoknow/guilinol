@@ -32,8 +32,10 @@ export function nearbyTunnels(list:Tunnel[]|undefined,x:number,z:number){
 }
 
 export function floorLevel(tunnel:Tunnel,x:number,z:number){
-  const axes=frame(tunnel), at=axes.station(x,z)
-  if(at<0||at>tunnel.length||Math.abs(axes.lateral(x,z))>tunnel.halfWidth){
+  const axes=frame(tunnel), station=axes.station(x,z)
+  // At a shared endpoint, projection onto the two normalized axes can
+  // round a few micrometres outside both strips.
+  if(station<-.00001||station>tunnel.length+.00001||Math.abs(axes.lateral(x,z))>tunnel.halfWidth+.00001){
     for(const [i,joint] of (tunnel.joints??[]).entries()){
       if(!joint)continue
       let positive=false,negative=false
@@ -47,6 +49,7 @@ export function floorLevel(tunnel:Tunnel,x:number,z:number){
     }
     return
   }
+  const at=Math.max(0,Math.min(tunnel.length,station))
   const index=tunnel.stations.findIndex(([s])=>s>=at)
   if(index<0)return tunnel.portals[1][1]
   const [end,high]=tunnel.stations[index],[start,low]=tunnel.stations[Math.max(0,index-1)]
