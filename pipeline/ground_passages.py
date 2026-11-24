@@ -138,7 +138,28 @@ def open_segments(way, coords, obstacle, curbs, paved):
                     ids.append(-2_000_000_000_000-i*2-side)
                     curb=LineString([(point[0]-dz*t,point[1]+dx*t) for t in (-paved/2,paved/2)])
                     curbs.append(curb.buffer(.125,cap_style='flat'))
-            yield p,q,*ids
+            # The curb is at the wall. A lane position denotes the vehicle
+            # centre, so its terminal station must leave room for its nose
+            # and the offset of the adjacent, opposite-direction lane.
+            along=np.array([dx,dz])
+            across=np.array([-dz,dx])
+            # 4.48 x 1.82 m sedan, on either lane 1 m off the axis.
+            corners=np.array([f*along+t*across for f,t in
+                              ((-2.24,-1.91),(-2.24,1.91),(2.24,1.91),(2.24,-1.91))])
+            stops=[0.,part.length]
+            for side,ref in enumerate(ids):
+                if ref>=0:continue
+                for retreat in np.arange(0,part.length,.05):
+                    d=retreat if side==0 else part.length-retreat
+                    centre=np.asarray(part.interpolate(d).coords[0])
+                    envelope=Polygon(centre+corners)
+                    if envelope.distance(obstacle)>=.2:break
+                else:
+                    retreat=part.length
+                stops[side]=retreat if side==0 else part.length-retreat
+            if stops[1]-stops[0]>=.5:
+                start,end=(part.interpolate(d).coords[0] for d in stops)
+                yield start,end,*ids
 
 
 def bake(output, manifest, elements, widths, curbs):
