@@ -3,7 +3,7 @@ import type {Tile} from './world'
 import railStyle from '../../pipeline/railway-style.json'
 
 type Point=[number,number,number]
-export type Tunnel={way:number,portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],openCut?:boolean,joints?:({ring:[number,number][],draw:boolean}|null)[],stations:[number,number][]}
+export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],openCut?:boolean,joints?:({ring:[number,number][],draw:boolean}|null)[],stations:[number,number][]}
 
 function frame(tunnel:Tunnel){
   const [start,end]=tunnel.portals, ux=(end[0]-start[0])/tunnel.length,uz=(end[2]-start[2])/tunnel.length
@@ -86,15 +86,19 @@ export function joinPortalRoads(tile:Tile,tunnels:Tunnel[],buffers:Float32Array[
     const margin=stitch+12
     for(const [end,portal] of tunnel.portals.entries()){
       if(tunnel.mouths?.[end]===false)continue
-      if(portal[0]<tile.x-margin||portal[0]>tile.x+256+margin||portal[2]<tile.z-margin||portal[2]>tile.z+256+margin)continue
+      let open=tunnel.openEnds?.[end]??0
+      if(tunnel.openCut)open=0
+      else if(tunnel.nodes)open=tunnel.length/2
+      if(portal[0]<tile.x-margin-open||portal[0]>tile.x+256+margin+open||portal[2]<tile.z-margin-open||portal[2]>tile.z+256+margin+open)continue
       for(const buffer of buffers)for(let index=0;index<buffer.length;index+=3){
         const x=tile.x+buffer[index],z=tile.z+buffer[index+2],s=axes.station(x,z),d=Math.abs(axes.lateral(x,z))
         const inward=portal===tunnel.portals[0]?s:tunnel.length-s
-        // Only stitch the surface approach at the mouth. Vertices deeper
-        // into the bore can belong to the street crossing above it.
-        if(inward< -stitch||inward>4||d>tunnel.halfWidth+4)continue
-        const blend=THREE.MathUtils.smoothstep(inward,-stitch,-stitch/5)*(1-THREE.MathUtils.smoothstep(inward,0,4))*(1-THREE.MathUtils.smoothstep(d,tunnel.halfWidth,tunnel.halfWidth+4))
+        // The graded bore supplies the driving floor through both mouths.
+        // Keep overhead streets above the clearance envelope on their own deck.
+        if(inward< -stitch||inward>open+4||d>tunnel.halfWidth+4)continue
+        const blend=THREE.MathUtils.smoothstep(inward,-stitch,-stitch/5)*(1-THREE.MathUtils.smoothstep(inward,open,open+4))*(1-THREE.MathUtils.smoothstep(d,tunnel.halfWidth,tunnel.halfWidth+4))
         const target=tunnelFloor([tunnel],x,z,portal[1])??portal[1]
+        if(inward>0&&buffer[index+1]>=target+tunnel.clearance)continue
         buffer[index+1]+=blend*(target-.02-buffer[index+1])
       }
     }
