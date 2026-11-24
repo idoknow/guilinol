@@ -41,7 +41,7 @@ import {mountDevHud} from './ui/hud-dev'
 import {armOrientationGate} from './ui/orientation'
 import {mountStats} from './ui/stats'
 import {mountHotkeys} from './ui/hotkeys'
-import {mountTianyuanMifen} from './mifen'
+import {mountLazyTianyuanMifen} from './mifen/entry'
 import {mountChat} from './ui/chat'
 import {mountGuide} from './ui/guide'
 import {touchUi} from './ui/input-mode'
@@ -438,16 +438,19 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   // IDOK-178：帧率/网速/在线人数读数与设置热键（都靠 localStorage 记住上次选择）。
   mountStats()
   mountHotkeys()
-  const mifen = mountTianyuanMifen({
-    scene,
-    camera,
-    clock,
-    getPlayerPos: () => (walker?.active ? walker.position : null),
-    walkTo,
-    showToast,
-    sampleGroundY: sampleMissionGroundY,
-    getNightFactor: () => env.night,
-  })
+  const mifen = mountLazyTianyuanMifen(
+    {
+      scene,
+      camera,
+      clock,
+      getPlayerPos: () => (walker?.active ? walker.position : null),
+      walkTo,
+      showToast,
+      sampleGroundY: sampleMissionGroundY,
+      getNightFactor: () => env.night,
+    },
+    { eagerVerify: params.has('verify') },
+  )
   mountChat()
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   let staticAudit:ReturnType<typeof import('./verify-static').staticVerifier>|undefined

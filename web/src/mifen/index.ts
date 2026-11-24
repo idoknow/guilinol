@@ -248,24 +248,20 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
   }
 
   function makeCoordAdapter(currentShop: TianyuanShopBuildResult): ShopCoordAdapter {
+    // 店铺静态落位：矩阵仅在 placeShopGroup / 对齐地面时更新，避免每帧递归 updateMatrixWorld(true) 遍历整棵子树
     return {
       toWorldPoint(p, out = new THREE.Vector3()) {
         out.set(p[0], p[1], p[2])
-        if (isLocalPoint(p)) {
-          currentShop.group.updateMatrixWorld(true)
-          currentShop.group.localToWorld(out)
-        }
+        if (isLocalPoint(p)) currentShop.group.localToWorld(out)
         return out
       },
       toLocalPoint(worldPos, out = new THREE.Vector3()) {
-        currentShop.group.updateMatrixWorld(true)
         return currentShop.group.worldToLocal(out.copy(worldPos))
       },
       toWorldYaw(yaw, refPoint) {
         return isLocalPoint(refPoint) ? yaw + currentShop.group.rotation.y : yaw
       },
       localToWorld(x, y, z, out = new THREE.Vector3()) {
-        currentShop.group.updateMatrixWorld(true)
         return currentShop.group.localToWorld(out.set(x, y, z))
       },
       sampleWalkY(wx, wz, insideShop) {
@@ -1080,18 +1076,49 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
     if (ticketRailEl.lastElementChild !== moreTicketsEl) ticketRailEl.append(moreTicketsEl)
   }
 
-  function syncHudLayoutMetrics(): void {
-    const drawerOpen = upgrade.isOpen() || economyHud.getOpenPanel() !== null
-    document.body.dataset.mifenCooking = cooking.isOpen() ? '1' : '0'
-    document.body.dataset.mifenDrawer = drawerOpen ? '1' : '0'
-    document.body.dataset.mifenNear = nearShop || isOverlayOpen() ? '1' : '0'
-    document.body.dataset.mifenStoryActive = director.isActive() ? '1' : '0'
-    if (!statusBarEl.hidden) {
-      const rect = statusBarEl.getBoundingClientRect()
-      if (rect.height > 0) {
-        hudRoot.style.setProperty('--mf-bar-bottom', `${Math.ceil(rect.bottom)}px`)
+  let lastBarBottom = ''
+  const lastBodyFlags = { cooking: '', drawer: '', near: '', story: '', barShown: false }
+  function measureStatusBarBottom(): void {
+    if (statusBarEl.hidden) return
+    const rect = statusBarEl.getBoundingClientRect()
+    if (rect.height > 0) {
+      const next = `${Math.ceil(rect.bottom)}px`
+      if (next !== lastBarBottom) {
+        lastBarBottom = next
+        hudRoot.style.setProperty('--mf-bar-bottom', next)
       }
     }
+  }
+  const statusBarObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => measureStatusBarBottom()) : null
+  statusBarObserver?.observe(statusBarEl)
+
+  function syncHudLayoutMetrics(forceMeasure = false): void {
+    const drawerOpen = upgrade.isOpen() || economyHud.getOpenPanel() !== null
+    const cVal = cooking.isOpen() ? '1' : '0'
+    const dVal = drawerOpen ? '1' : '0'
+    const nVal = nearShop || isOverlayOpen() ? '1' : '0'
+    const sVal = director.isActive() ? '1' : '0'
+    if (lastBodyFlags.cooking !== cVal) {
+      lastBodyFlags.cooking = cVal
+      document.body.dataset.mifenCooking = cVal
+    }
+    if (lastBodyFlags.drawer !== dVal) {
+      lastBodyFlags.drawer = dVal
+      document.body.dataset.mifenDrawer = dVal
+    }
+    if (lastBodyFlags.near !== nVal) {
+      lastBodyFlags.near = nVal
+      document.body.dataset.mifenNear = nVal
+    }
+    if (lastBodyFlags.story !== sVal) {
+      lastBodyFlags.story = sVal
+      document.body.dataset.mifenStoryActive = sVal
+    }
+    const barShown = !statusBarEl.hidden
+    if (barShown && (forceMeasure || !lastBodyFlags.barShown)) {
+      measureStatusBarBottom()
+    }
+    lastBodyFlags.barShown = barShown
   }
 
   function renderHud(): void {
@@ -1247,7 +1274,7 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
   }
 
   const onWindowResize = (): void => {
-    syncHudLayoutMetrics()
+    syncHudLayoutMetrics(true)
   }
   window.addEventListener('keydown', onGlobalKeyDown)
   window.addEventListener('resize', onWindowResize)
@@ -1276,6 +1303,25 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
       const refPos = playerPos ?? ctx.camera.position
       const shopCenter = shop.group.position
       lastPlayerDistance = Math.hypot(refPos.x - shopCenter.x, refPos.z - shopCenter.z)
+
+      // 距离门控 LOD：>165m 整店隐藏跳过步进；38~165m 只留建筑外观、藏室内动态件与表叔；<=38m 全量渲染
+      const showShell = lastPlayerDistance <= 165
+      const showDetail = lastPlayerDistance <= 38 || director.isActive()
+      if (shop.group.visible !== showShell) shop.group.visible = showShell
+      shop.setDetailVisible?.(showDetail)
+      if (uncle.group.visible !== showDetail) uncle.group.visible = showDetail
+      if (!showShell) {
+        if (nearShop || nearUncle || nearestStation !== null) {
+          nearShop = false
+          nearUncle = false
+          nearestStation = null
+          syncIndoorCameraMode('outside')
+          renderHud()
+          updatePromptUi()
+        }
+        return
+      }
+
       const nextNear = lastPlayerDistance < 24
       const uncleDist = playerPos
         ? Math.hypot(playerPos.x - uncleWorldPos.x, playerPos.z - uncleWorldPos.z)
@@ -1294,7 +1340,6 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
       nearShop = nextNear
       nearUncle = nextNearUncle
       nearestStation = nextStation
-      syncHudLayoutMetrics()
 
       cooking.step(safeDt)
       const cookingVisual = cooking.getVisualState()
@@ -1333,27 +1378,31 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
               : 'none'
 
       const night = ctx.getNightFactor()
-      shop.updateVisuals(safeDt, {
-        night,
-        boiling: cooking.isBoiling(),
-        queueCount: customers.getQueueCount(),
-        time: elapsedTime,
-        cooking: cookingVisual,
-        cookingStage: mappedStage,
-        stepProgress,
-        activeMeats: cookingVisual.bowl.meats,
-        holdingStage,
-      })
-
-      uncle.step(safeDt, elapsedTime, night, playerPos)
-      economyHud.step(safeDt, cooking.getActiveOrder()?.ticketId ?? null)
-      customers.step(safeDt, nearShop, ctx.camera.position)
+      if (showDetail) {
+        shop.updateVisuals(safeDt, {
+          night,
+          boiling: cooking.isBoiling(),
+          queueCount: customers.getQueueCount(),
+          time: elapsedTime,
+          cooking: cookingVisual,
+          cookingStage: mappedStage,
+          stepProgress,
+          activeMeats: cookingVisual.bowl.meats,
+          holdingStage,
+          cameraPos: ctx.camera.position,
+        })
+        uncle.step(safeDt, elapsedTime, night, playerPos)
+        economyHud.step(safeDt, cooking.getActiveOrder()?.ticketId ?? null)
+        customers.step(safeDt, nearShop, ctx.camera.position)
+      }
 
       hudRefreshTimer += safeDt
       if (nearChanged || uncleChanged || stationChanged || hudRefreshTimer >= 0.45) {
         hudRefreshTimer = 0
         renderHud()
         updatePromptUi()
+      } else {
+        syncHudLayoutMetrics(false)
       }
 
       // 剧情导演步进放在 step 末尾，确保对话镜位在 draw() 前生效
@@ -1529,6 +1578,7 @@ export function mountTianyuanMifen(ctx: MifenMountContext): MifenController {
       window.removeEventListener('keydown', onGlobalKeyDown)
       window.removeEventListener('resize', onWindowResize)
       window.removeEventListener(RIDE_SOUND_EVENT, onRideSoundEvent)
+      statusBarObserver?.disconnect()
       unsubscribeStore()
       director.dispose()
       uncle.dispose()

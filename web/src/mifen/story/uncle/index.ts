@@ -167,48 +167,96 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
     return m
   }
 
-  // 程序化质感贴图
-  const jacketTex = ownTex(makeFabricTexture('#293d58', '#1b293c', 'denim'))
-  const apronTex = ownTex(makeFabricTexture('#e8dec3', '#c8b896', 'apron'))
-  const towelTex = ownTex(makeFabricTexture('#f6f1e6', '#3d6ea3', 'towel'))
-  const bandageTex = ownTex(makeFabricTexture('#f7f4ec', '#d7cfc0', 'bandage'))
-  const watchDialTex = ownTex(makeFabricTexture('#f5f1e4', '#3c3024', 'watch'))
+  // 将 5 张衣物/绷带/表盘纹理与纯色块合并为 1 张 256×256 图集，所有身体部件合批为 1 个 SkinnedMesh（总 draws: 69 -> 3）
+  const ATLAS_S = 256
+  const atlasCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null
+  if (atlasCanvas) {
+    atlasCanvas.width = ATLAS_S
+    atlasCanvas.height = ATLAS_S
+    const actx = atlasCanvas.getContext('2d')
+    if (actx) {
+      actx.fillStyle = '#ffffff'
+      actx.fillRect(0, 0, ATLAS_S, ATLAS_S)
+      const blit = (
+        pattern: 'denim' | 'apron' | 'towel' | 'bandage' | 'watch',
+        baseHex: string,
+        accentHex: string,
+        dx: number,
+        dy: number,
+        sz: number,
+      ) => {
+        const sub = makeFabricTexture(baseHex, accentHex, pattern, sz)
+        const src = sub.image as HTMLCanvasElement | undefined
+        if (src) actx.drawImage(src, dx, dy, sz, sz)
+        sub.dispose()
+      }
+      blit('denim', '#293d58', '#1b293c', 0, 0, 128)
+      blit('apron', '#e8dec3', '#c8b896', 128, 0, 128)
+      blit('towel', '#f6f1e6', '#3d6ea3', 0, 128, 128)
+      blit('bandage', '#f7f4ec', '#d7cfc0', 128, 128, 64)
+      blit('watch', '#f5f1e4', '#3c3024', 192, 128, 64)
+      // (128..256, 192..256) 留纯白块供纯色顶点着色部件采样
+      actx.fillStyle = '#ffffff'
+      actx.fillRect(128, 192, 128, 64)
+    }
+  }
+  const atlasTex = ownTex(
+    atlasCanvas
+      ? new THREE.CanvasTexture(atlasCanvas)
+      : new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1),
+  )
+  atlasTex.colorSpace = THREE.SRGBColorSpace
+  atlasTex.needsUpdate = true
 
-  // 材质集（含夜间柔和补光自发光，绝不新建 THREE.*Light）
-  const litMats: Array<{mat: THREE.MeshStandardMaterial; base: number; nightBoost: number}> = []
-  const std = (params: THREE.MeshStandardMaterialParameters, baseEmissive = 0, nightBoost = 0.16) => {
-    const m = ownMat(
-      new THREE.MeshStandardMaterial({
-        metalness: 0.02,
-        roughness: 0.82,
-        emissive: params.color ?? 0xffe4c4,
-        emissiveIntensity: baseEmissive,
-        ...params,
-      }),
-    )
-    if (m.map && !m.emissiveMap) m.emissiveMap = m.map
-    litMats.push({mat: m, base: baseEmissive, nightBoost})
+  type AtlasUvRect = readonly [number, number, number, number]
+  const UV_WHITE: AtlasUvRect = [0.55, 0.05, 0.95, 0.2]
+  const UV_DENIM: AtlasUvRect = [0.01, 0.51, 0.49, 0.99]
+  const UV_APRON: AtlasUvRect = [0.51, 0.51, 0.99, 0.99]
+  const UV_TOWEL: AtlasUvRect = [0.01, 0.01, 0.49, 0.49]
+  const UV_BANDAGE: AtlasUvRect = [0.51, 0.26, 0.74, 0.49]
+  const UV_WATCH: AtlasUvRect = [0.76, 0.26, 0.99, 0.49]
+
+  const bodyMasterMat = ownMat(
+    new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      map: atlasTex,
+      emissive: 0xffe4c4,
+      emissiveMap: atlasTex,
+      emissiveIntensity: 0,
+      roughness: 0.82,
+      metalness: 0.04,
+      side: THREE.DoubleSide,
+    }),
+  )
+  const litMats: Array<{mat: THREE.MeshStandardMaterial; base: number; nightBoost: number}> = [
+    {mat: bodyMasterMat, base: 0.02, nightBoost: 0.2},
+  ]
+
+  // 轻量语义占位材质：建完层级后由 bakeSkinnedUncle 统一合批为 1 个 SkinnedMesh
+  const tagMat = (colorHex: number, uvRect: AtlasUvRect = UV_WHITE) => {
+    const m = new THREE.MeshBasicMaterial({color: colorHex})
+    m.userData.uvRect = uvRect
     return m
   }
 
-  const skinMat = std({color: 0xe3b187, roughness: 0.74, emissive: 0xffe0c4}, 0, 0.18)
-  const hairMat = std({color: 0x25272d, roughness: 0.88, emissive: 0x3b3f4a}, 0, 0.12)
-  const templeGreyMat = std({color: 0x9197a3, roughness: 0.86, emissive: 0xc8ced8}, 0, 0.16)
-  const teeMat = std({color: 0xd9d2c4, roughness: 0.86, emissive: 0xfff5e4}, 0, 0.16)
-  const jacketMat = std({map: jacketTex, color: 0xffffff, roughness: 0.86, emissive: 0x7694bc}, 0, 0.2)
-  const jacketTrimMat = std({color: 0x3e5676, roughness: 0.82, emissive: 0x7b96b8}, 0, 0.2)
-  const apronMat = std({map: apronTex, color: 0xffffff, roughness: 0.84, emissive: 0xfff2dc, side: THREE.DoubleSide}, 0, 0.22)
-  const pantsMat = std({color: 0x353c38, roughness: 0.9, emissive: 0x5c6660}, 0, 0.14)
-  const shoeMat = std({color: 0x241e1a, roughness: 0.9, emissive: 0x453b34}, 0, 0.1)
-  const towelMat = std({map: towelTex, color: 0xffffff, roughness: 0.9, emissive: 0xfff8ed, side: THREE.DoubleSide}, 0, 0.24)
-  const bandageMat = std({map: bandageTex, color: 0xffffff, roughness: 0.78, emissive: 0xfff7ea}, 0.04, 0.28)
-  const watchBandMat = std({color: 0x4a2f1d, roughness: 0.65, metalness: 0.08, emissive: 0x70492e}, 0, 0.15)
-  const watchMetalMat = std({color: 0xbac0c8, roughness: 0.34, metalness: 0.28, emissive: 0xdfe4ec}, 0.04, 0.22)
-  const watchDialMat = std({map: watchDialTex, color: 0xffffff, roughness: 0.4, emissive: 0xffffff}, 0.05, 0.28)
-  const scleraMat = std({color: 0xfbf8f2, roughness: 0.35, emissive: 0xffffff}, 0.05, 0.24)
-  const pupilMat = std({color: 0x1b1613, roughness: 0.3, emissive: 0x2a201a}, 0, 0.06)
-  const mouthMat = std({color: 0x7a3830, roughness: 0.6, emissive: 0x9c4c40}, 0, 0.15)
-  const ticketMat = std({color: 0xf4cf6b, roughness: 0.8, emissive: 0xffdf85}, 0, 0.2)
+  const skinMat = tagMat(0xe3b187)
+  const hairMat = tagMat(0x25272d)
+  const templeGreyMat = tagMat(0x9197a3)
+  const teeMat = tagMat(0xd9d2c4)
+  const jacketMat = tagMat(0xffffff, UV_DENIM)
+  const jacketTrimMat = tagMat(0x3e5676)
+  const apronMat = tagMat(0xffffff, UV_APRON)
+  const pantsMat = tagMat(0x353c38)
+  const shoeMat = tagMat(0x241e1a)
+  const towelMat = tagMat(0xffffff, UV_TOWEL)
+  const bandageMat = tagMat(0xffffff, UV_BANDAGE)
+  const watchBandMat = tagMat(0x4a2f1d)
+  const watchMetalMat = tagMat(0xbac0c8)
+  const watchDialMat = tagMat(0xffffff, UV_WATCH)
+  const scleraMat = tagMat(0xfbf8f2)
+  const pupilMat = tagMat(0x1b1613)
+  const mouthMat = tagMat(0x7a3830)
+  const ticketMat = tagMat(0xf4cf6b)
 
   // 黄色感叹号标识（保留 depthTest:true 以严格被实墙遮挡，fog:false 保 25m+ 远距明度）
   const markerYellowMat = ownMat(
@@ -239,23 +287,8 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
 
   const group = new THREE.Group()
   group.name = 'tianyuan.uncle-npc'
-
-  // 相机探测微粒，让 step(dt, time, night) 不传第 4 参时也能自动感知玩家视角方向
-  const probeGeo = ownGeo(new THREE.BufferGeometry())
-  probeGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0, 0, 0, 0], 3))
-  const probeMat = ownMat(
-    new THREE.MeshStandardMaterial({colorWrite: false, depthWrite: false, depthTest: false, transparent: true, opacity: 0}),
-  )
-  const probeMesh = new THREE.Mesh(probeGeo, probeMat)
-  probeMesh.frustumCulled = false
-  probeMesh.name = 'tianyuan.uncle-probe'
   const camWorld = new THREE.Vector3()
-  let camSeen = false
-  probeMesh.onBeforeRender = (_r, _s, cam) => {
-    camWorld.setFromMatrixPosition(cam.matrixWorld)
-    camSeen = true
-  }
-  group.add(probeMesh)
+  const camSeen = false
 
   // 身体根节点（呼吸律动）
   const bodyPivot = new THREE.Group()
@@ -480,26 +513,157 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
   mouth.position.set(0, -0.09, 0.15)
   headPivot.add(eyeL, eyeR, browL, browR, mouth)
 
-  // ─── 头顶黄色感叹号标识（加粗高对比立体造型 + 远距缩放补偿，25m+ 醒目、严格 depthTest 不穿墙） ───
+  // ─── 将身体全部 60+ 静态零件烘焙为 1 个骨骼 SkinnedMesh（保 100% 姿态与 5 表情动画，64 draws -> 1 draw） ───
+  const browLPivot = new THREE.Group()
+  browLPivot.position.copy(browL.position)
+  browL.position.set(0, 0, 0)
+  browLPivot.add(browL)
+  const browRPivot = new THREE.Group()
+  browRPivot.position.copy(browR.position)
+  browR.position.set(0, 0, 0)
+  browRPivot.add(browR)
+  const mouthPivot = new THREE.Group()
+  mouthPivot.position.copy(mouth.position)
+  mouth.position.set(0, 0, 0)
+  mouthPivot.add(mouth)
+  headPivot.add(browLPivot, browRPivot, mouthPivot)
+
+  const boneNodes: THREE.Object3D[] = [
+    bodyPivot,
+    torsoPivot,
+    towelGroup,
+    leftArmRig.shoulder,
+    leftArmRig.elbow,
+    rightArmRig.shoulder,
+    rightArmRig.elbow,
+    headPivot,
+    eyeL,
+    eyeR,
+    browLPivot,
+    browRPivot,
+    mouthPivot,
+  ]
+  const boneSet = new Map<THREE.Object3D, number>(boneNodes.map((n, i) => [n, i]))
+  group.updateMatrixWorld(true)
+  const boneInverses = boneNodes.map(b => b.matrixWorld.clone().invert())
+
+  const posList: number[] = []
+  const norList: number[] = []
+  const uvList: number[] = []
+  const colList: number[] = []
+  const skinIdx: number[] = []
+  const skinWgt: number[] = []
+  const bakedMeshes: THREE.Mesh[] = []
+  const tmpV = new THREE.Vector3()
+  const tmpN = new THREE.Vector3()
+  const tmpCol = new THREE.Color()
+
+  bodyPivot.traverse(node => {
+    if (!(node instanceof THREE.Mesh)) return
+    bakedMeshes.push(node)
+    let cur: THREE.Object3D | null = node.parent
+    let bIdx = 0
+    while (cur) {
+      const hit = boneSet.get(cur)
+      if (hit !== undefined) {
+        bIdx = hit
+        break
+      }
+      cur = cur.parent
+    }
+    const src = node.geometry.index ? node.geometry.toNonIndexed() : node.geometry
+    const pos = src.getAttribute('position')
+    const nor = src.getAttribute('normal')
+    const uv = src.getAttribute('uv')
+    const mat = node.material as THREE.MeshBasicMaterial
+    tmpCol.copy(mat.color)
+    const [u0, v0, u1, v1] = (mat.userData.uvRect as AtlasUvRect | undefined) ?? UV_WHITE
+    for (let i = 0; i < pos.count; i++) {
+      tmpV.fromBufferAttribute(pos, i).applyMatrix4(node.matrixWorld)
+      posList.push(tmpV.x, tmpV.y, tmpV.z)
+      if (nor) tmpN.fromBufferAttribute(nor, i).transformDirection(node.matrixWorld)
+      else tmpN.set(0, 1, 0)
+      norList.push(tmpN.x, tmpN.y, tmpN.z)
+      const u = uv ? uv.getX(i) : 0.5
+      const v = uv ? uv.getY(i) : 0.5
+      uvList.push(u0 + THREE.MathUtils.clamp(u, 0, 1) * (u1 - u0), v0 + THREE.MathUtils.clamp(v, 0, 1) * (v1 - v0))
+      colList.push(tmpCol.r, tmpCol.g, tmpCol.b)
+      skinIdx.push(bIdx, 0, 0, 0)
+      skinWgt.push(1, 0, 0, 0)
+    }
+    if (src !== node.geometry) src.dispose()
+  })
+  const tempMats = new Set<THREE.Material>()
+  for (const m of bakedMeshes) {
+    m.removeFromParent()
+    if (m.material instanceof THREE.Material) tempMats.add(m.material)
+  }
+  for (const tm of tempMats) tm.dispose()
+  for (const g of geos) g.dispose()
+  geos.length = 0
+
+  const skinnedGeo = ownGeo(new THREE.BufferGeometry())
+  skinnedGeo.setAttribute('position', new THREE.Float32BufferAttribute(posList, 3))
+  skinnedGeo.setAttribute('normal', new THREE.Float32BufferAttribute(norList, 3))
+  skinnedGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvList, 2))
+  skinnedGeo.setAttribute('color', new THREE.Float32BufferAttribute(colList, 3))
+  skinnedGeo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinIdx, 4))
+  skinnedGeo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinWgt, 4))
+  skinnedGeo.computeBoundingSphere()
+
+  const uncleSkinned = new THREE.SkinnedMesh(skinnedGeo, bodyMasterMat)
+  uncleSkinned.name = 'tianyuan.uncle-body'
+  uncleSkinned.frustumCulled = false
+  const skeleton = new THREE.Skeleton(boneNodes as unknown as THREE.Bone[], boneInverses)
+  uncleSkinned.bind(skeleton, new THREE.Matrix4())
+  group.add(uncleSkinned)
+
+  // ─── 头顶黄色感叹号标识（bar + dot 合批成 2 个 mesh：黄本体 1 draw + 描边 1 draw） ───
   const markerPivot = new THREE.Group()
   markerPivot.name = 'tianyuan.uncle-marker'
   markerPivot.position.set(0, 2.28, 0)
 
-  const markBarGeo = ownGeo(new THREE.CylinderGeometry(0.092, 0.058, 0.4, 8))
-  const markDotGeo = ownGeo(new THREE.SphereGeometry(0.072, 10, 8))
-  const markBar = new THREE.Mesh(markBarGeo, markerYellowMat)
-  markBar.position.y = 0.16
-  const markBarOutline = new THREE.Mesh(markBarGeo, markerOutlineMat)
-  markBarOutline.position.y = 0.16
-  markBarOutline.scale.setScalar(1.2)
+  const mergeMarkerGeos = (parts: Array<{geo: THREE.BufferGeometry; y: number; s: number}>): THREE.BufferGeometry => {
+    const mp: number[] = []
+    const mn: number[] = []
+    for (const part of parts) {
+      const flat = part.geo.index ? part.geo.toNonIndexed() : part.geo.clone()
+      flat.scale(part.s, part.s, part.s)
+      flat.translate(0, part.y, 0)
+      const p = flat.getAttribute('position')
+      const n = flat.getAttribute('normal')
+      for (let i = 0; i < p.count; i++) {
+        mp.push(p.getX(i), p.getY(i), p.getZ(i))
+        mn.push(n ? n.getX(i) : 0, n ? n.getY(i) : 1, n ? n.getZ(i) : 0)
+      }
+      flat.dispose()
+    }
+    const g = ownGeo(new THREE.BufferGeometry())
+    g.setAttribute('position', new THREE.Float32BufferAttribute(mp, 3))
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(mn, 3))
+    g.computeBoundingSphere()
+    return g
+  }
+  const barSrc = new THREE.CylinderGeometry(0.092, 0.058, 0.4, 8)
+  const dotSrc = new THREE.SphereGeometry(0.072, 10, 8)
+  const markFillMesh = new THREE.Mesh(
+    mergeMarkerGeos([
+      {geo: barSrc, y: 0.16, s: 1},
+      {geo: dotSrc, y: -0.16, s: 1},
+    ]),
+    markerYellowMat,
+  )
+  const markOutlineMesh = new THREE.Mesh(
+    mergeMarkerGeos([
+      {geo: barSrc, y: 0.16, s: 1.2},
+      {geo: dotSrc, y: -0.16, s: 1.22},
+    ]),
+    markerOutlineMat,
+  )
+  barSrc.dispose()
+  dotSrc.dispose()
 
-  const markDot = new THREE.Mesh(markDotGeo, markerYellowMat)
-  markDot.position.y = -0.16
-  const markDotOutline = new THREE.Mesh(markDotGeo, markerOutlineMat)
-  markDotOutline.position.y = -0.16
-  markDotOutline.scale.setScalar(1.22)
-
-  markerPivot.add(markBar, markBarOutline, markDot, markDotOutline)
+  markerPivot.add(markFillMesh, markOutlineMesh)
   group.add(markerPivot)
 
   if (opts.scene) opts.scene.add(group)
@@ -555,14 +719,14 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
       mouthScaleY = 2.0
     }
 
-    browL.position.y = browY
-    browR.position.y = browY
-    browL.rotation.z = browTiltL
-    browR.rotation.z = browTiltR
+    browLPivot.position.y = browY
+    browRPivot.position.y = browY
+    browLPivot.rotation.z = browTiltL
+    browRPivot.rotation.z = browTiltR
     eyeL.scale.y = eyeScaleY
     eyeR.scale.y = eyeScaleY
-    mouth.scale.set(mouthScaleX, mouthScaleY + talkMouth * 1.4, 1)
-    mouth.rotation.z = mouthRotZ
+    mouthPivot.scale.set(mouthScaleX, mouthScaleY + talkMouth * 1.4, 1)
+    mouthPivot.rotation.z = mouthRotZ
   }
 
   applyExpressionPose('neutral', 0)
@@ -694,6 +858,7 @@ export function createUncleNpc(opts: UncleNpcOptions = {}): UncleNpcController {
     dispose() {
       if (disposed) return
       disposed = true
+      skeleton.dispose()
       group.removeFromParent()
       for (const g of geos) g.dispose()
       for (const m of mats) m.dispose()
