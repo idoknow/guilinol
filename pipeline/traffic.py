@@ -23,7 +23,7 @@ from surveyed_corridors import bake as bake_surveyed_corridors, restore as resto
 import ground_passages
 import vehicle_surface_grades
 import portal_landings
-from vehicle_approaches import cycleway_deck_profile, cycleway_grades, plan as plan_approaches, surface_guides, portal_openings
+from vehicle_approaches import cycleway_deck_profile, cycleway_grades, cycleway_street_tie, ring_road_widths, plan as plan_approaches, surface_guides, portal_openings
 from vehicle_tunnels import mark_underpasses, mountain_roofs, underground, sections as tunnel_sections, solve as solve_tunnels
 from service_streets import mark_drivable_services, width as minor_road_width
 from traffic_parking import allowed, bake_parking
@@ -322,7 +322,7 @@ def bake(output, manifest, rendered_roads=None):
             mountain_roofs(network,survey_nodes,surface.peaks)
             bridge_nodes=[];bridge_samples=[]
             for way in elements:
-                if way['type']!='way' or way['id'] not in (988474372,347655716,815075448):continue
+                if way['type']!='way' or way['id'] not in (988474372,347655716,815075448,882767818,1025751317):continue
                 coords=ground_passages.points(way)
                 for i,j in ((0,1),(-1,-2)):
                     ref=way['nodes'][i]
@@ -330,6 +330,12 @@ def bake(output, manifest, rendered_roads=None):
                     x,z=coords[i];u,v=coords[j]
                     bridge_nodes.append(ref);bridge_samples.append(dict(x=x,z=z,bridge=[u-x,v-z]))
             bridge_levels=sample_road_heights(output,manifest,bridge_samples) if bridge_samples else []
+            alley_tie=13919458302
+            if alley_tie in survey_nodes:
+                pt=survey_nodes[alley_tie]
+                h=sample_road_heights(output,manifest,[dict(x=pt['x'],z=pt['z'],way=1527450562)])[0]
+                bridge_nodes.append(alley_tie)
+                bridge_levels.append(h)
             guides=surface_guides(elements,[*network['portals'],*bridge_nodes],survey_nodes,manifest['chunks'])
             request.write_text(json.dumps(dict(manifest=manifest,network=network,nodes=list(survey_nodes.values()),guideNodes=sorted({g[k] for g in guides for k in ('from','to')}))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
@@ -343,17 +349,19 @@ def bake(output, manifest, rendered_roads=None):
             # Propagate the measured bridge lip into the land-side road network
             # when a single short OSM segment cannot absorb the height change.
             anchors=[dict(node=n,floor=h,approachCut=True) for n,h in zip(bridge_nodes,bridge_levels,strict=True)]
-            access,limits=plan_approaches(conflicts+anchors,lanes+guides,survey_nodes,{int(k):v for k,v in samples['heights'].items()},fixed,sections)
+            approach_widths=ring_road_widths(elements,sections)
+            access,limits=plan_approaches(conflicts+anchors,lanes+guides,survey_nodes,{int(k):v for k,v in samples['heights'].items()},fixed,approach_widths)
             access=cycleway_grades(cycleway,conflicts)+access
             surveyed=vehicle_surface_grades.profiles(graded_sections,native_levels,access+canal_grades+terminal_grades)
             from pedestrian_approaches import profiles as path_profiles
             planned=access+canal_grades+terminal_grades+surveyed
             pedestrian=path_profiles(output,manifest,elements,sections,planned)
+            pedestrian+=cycleway_street_tie(output,manifest,elements,sections,cycleway)
             bake_surveyed_corridors(output,manifest['chunks'],elements,sections,planned+pedestrian,only_approaches=True,bridge_profiles=canal_grades,preferred=pedestrian)
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)
             for tunnel in generated:
                 tunnel['gradedAccess']=True
-            portal_openings(generated,elements,sections)
+            portal_openings(generated,elements,approach_widths)
             portal_landings.bake(output,manifest,generated,elements)
             conflicts.extend(limits)
             manifest['tunnels'] = original_tunnels+generated

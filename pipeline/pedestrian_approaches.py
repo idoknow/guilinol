@@ -1,4 +1,4 @@
-"""Tie the accessible path at a ground-road junction to the adjacent pavement."""
+"""Connect surveyed junction arms to the continuous street pavement."""
 import math
 
 import numpy as np
@@ -17,25 +17,43 @@ CONNECTIONS = {1013429171:9349946067,1013429174:9349946089,1013355638:9349946082
 
 
 def profiles(output, manifest, elements, widths, existing):
+    junctions = {way: {node} for way,node in CONNECTIONS.items()}
+    junctions.update({
+        1013355608:{8572142391},1013355606:{9349162208},1013355613:{9349162228},
+        1471515772:{13503053864,13503091119},1471513685:{13503053866},
+        1471515770:{13503091110},1471515771:{13503091114},1471528920:{13503178786},
+        1472404239:{13509827457},1497561675:{13715269941},
+        1497561670:{13715269941,13715269942},
+    })
     x,z,w,h=manifest['extent']
     bounds=box(x,z,x+w,z+h)
     paths,requests=[],[]
     for way in elements:
-        if way['type']!='way' or way['id'] not in CONNECTIONS:
+        if way['type']!='way' or way['id'] not in junctions:
             continue
         xy=points(way)
-        if way['nodes'][-1]==CONNECTIONS[way['id']]:
-            xy=xy[::-1]
-        elif way['nodes'][0]!=CONNECTIONS[way['id']]:
-            raise ValueError(f"Recheck the path junction on {way['id']}")
-        axis=substring(LineString(xy),0,50)
+        ends=junctions[way['id']]
+        if ends-set((way['nodes'][0],way['nodes'][-1])):
+            raise ValueError(f"Recheck the road junction on {way['id']}")
+        axis=LineString(xy)
         if not bounds.covers(axis):
             continue
         foot=way['tags']['highway'] in ('path','footway')
         half=widths.get(way['id'],2 if foot else width(way['tags']))/2+.5
-        paths.append((axis,half,int(foot)))
-        for pt in (axis.interpolate(0),axis.interpolate(axis.length)):
-            requests.append(dict(x=pt.x,z=pt.y,passageClearance=True))
+        if len(ends)==2 and axis.length<=110:
+            arms=[axis]
+        else:
+            reach=min(50,axis.length)
+            arms=[]
+            if way['nodes'][0] in ends:
+                arms.append(substring(axis,0,reach))
+            if way['nodes'][-1] in ends:
+                arms.append(substring(axis,axis.length,axis.length-reach))
+        for arm in arms:
+            paths.append((arm,half,int(foot)))
+            for pt in (arm.interpolate(0),arm.interpolate(arm.length)):
+                requests.append(dict(x=pt.x,z=pt.y,passageClearance=True) if foot or way['id'] in CONNECTIONS
+                                else dict(x=pt.x,z=pt.y,way=way['id']))
     if not paths:
         return []
     levels=iter(sample_road_heights(output,manifest,requests))

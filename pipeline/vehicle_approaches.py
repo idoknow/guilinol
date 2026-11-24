@@ -126,6 +126,19 @@ def plan(conflicts, lanes, nodes, levels, rail_nodes, widths):
     return result,failed
 
 
+def ring_road_widths(elements, widths):
+    """Use the mapped primary carriageway at both three-lane underpasses."""
+    result = dict(widths)
+    for way in elements:
+        if way['type']!='way' or way['id'] not in (464498741,464498742,420273229,692420952):
+            continue
+        tags = way['tags']
+        if tags.get('highway')!='primary':
+            raise ValueError('Recheck West Ring Road carriageway survey')
+        result.setdefault(way['id'],width(tags) if 'width' in tags else RULES['defaultWidth']['primary'])
+    return result
+
+
 def portal_openings(tunnels, elements, widths):
     """Surface branches entering a bore sideways need an opening in its wall."""
     mouths=defaultdict(list)
@@ -188,3 +201,44 @@ def cycleway_grades(profile,conflicts):
     ys[0]=min(ys[0],next((r['floor'] for r in conflicts if r.get('node')==mouth),ys[0]))
     for i in range(1,len(ds)):ys[i]=min(ys[i],ys[i-1]+cap*(ds[i]-ds[i-1]))
     return [(LineString([a,b]),half,ya,yb,.08,0) for a,b,ya,yb in zip(pts,pts[1:],ys,ys[1:]) if a.distance(b)>.005]
+
+
+def cycleway_street_tie(output, manifest, elements, widths, cycleway):
+    """Join the residential carriageway to the low cycleway at their shared node."""
+    from canal_passages import sample_road_heights
+    from features import points
+    if not cycleway:
+        return []
+    road = next(w for w in elements if w['type']=='way' and w['id']==575590550)
+    shared = 9482704296
+    xy = points(road)
+    axis = LineString(xy)
+    station = axis.project(Point(xy[road['nodes'].index(shared)]))
+    half = widths.get(road['id'],6.5)/2+.5
+    _,points_cycle,_,ys,_,_ = cycleway
+    if points_cycle[-1].distance(axis.interpolate(station))>.02:
+        raise ValueError('Recheck the cycleway to residential street junction')
+    low = ys[-1]
+    # The public service-road junction 51 m west of the crossing remains
+    # on its original grade. Both ramps terminate outside the cycleway cap.
+    start, end = station-49, station+72
+    ties = [axis.interpolate(d) for d in (start,end)]
+    left,right = sample_road_heights(output,manifest,[dict(x=p.x,z=p.y) for p in ties])
+    ds = sorted({start,end,station,*np.arange(start+2,end,2),
+                 *(d for pt in xy if start<(d:=axis.project(Point(pt)))<end)})
+    grades = []
+    for d in ds:
+        if d<station:
+            t = min(1,(station-d)/49)
+            level = low+(left-low)*t*t*(3-2*t)
+        else:
+            t = min(1,(d-station)/72)
+            level = low+(right-low)*t*t*(3-2*t)
+        pt = axis.interpolate(d)
+        if grades or d!=ds[0]:
+            if pt.distance(prev)>.01:
+                if abs(level-last)>.08*pt.distance(prev):
+                    raise ValueError('Residential approach exceeds its grade limit')
+                grades.append((LineString([prev,pt]),half,last,level,.08,0))
+        prev,last = pt,level
+    return grades
