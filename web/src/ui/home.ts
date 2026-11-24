@@ -1,7 +1,7 @@
 import {getPlayMode, lastPlayMode, type PlayMode} from '../game/play-mode'
 import {openGuide} from './guide'
 import {mpEnabled, setMpEnabled} from './mp-pref'
-import {onOnline, startLive} from './live'
+import {onMpOnline, startLive} from './live'
 import './home.css'
 import {spots} from '../play/spots'
 import {SOURCE_URL} from './source'
@@ -106,7 +106,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
   const mpLive = root.querySelector<HTMLElement>('.home-mp-live')!
   startLive()
   mp.onclick = ()=>press(mp,'正在连接',()=>{setMpEnabled(true); play('solo')})
-  onOnline(value=>{mpLive.hidden = !value; if(value) mpLive.textContent = String(value)})
+  onMpOnline(value=>{mpLive.hidden = !value; if(value) mpLive.textContent = String(value)})
   const account = root.querySelector<HTMLButtonElement>('.home-account')!
   account.onclick = ()=>pending(account,openAccount)
   onUser(user=>{account.innerHTML = user?`<i class="home-avatar"></i><span></span>`:'<span>登录 / 注册</span>'
