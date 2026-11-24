@@ -198,14 +198,23 @@ export function mountDrinksPickupHud(opts: DrinksPickupHudOptions): DrinksPickup
       o => o.status === 'queued' || o.status === 'preparing' || o.status === 'ready_for_pickup',
     )
     const myOrders = activeOrders.filter(o => o.source === 'player')
-    const makingList = activeOrders.filter(o => o.status === 'queued' || o.status === 'preparing').slice(0, 3)
-    const readyList = activeOrders.filter(o => o.status === 'ready_for_pickup').slice(0, 3)
+    const myIds = new Set(myOrders.map(o => o.id))
+    const totalMaking = activeOrders.filter(o => o.status === 'queued' || o.status === 'preparing').length
+    const totalReady = activeOrders.filter(o => o.status === 'ready_for_pickup').length
+    const makingList = activeOrders
+      .filter(o => !myIds.has(o.id) && (o.status === 'queued' || o.status === 'preparing'))
+      .slice(0, 3)
+    const readyList = activeOrders
+      .filter(o => !myIds.has(o.id) && o.status === 'ready_for_pickup')
+      .slice(0, 3)
     const holdSnap = opts.holdSession?.getSnapshot()
     const holdingDrinkNow = Boolean(holdSnap?.active && !holdSnap.paused)
 
     const renderKey = JSON.stringify({
       open: snap.isOpen,
       holding: holdingDrinkNow,
+      totalMaking,
+      totalReady,
       my: myOrders.map(o => [o.id, o.status, Math.round(o.progress * 20)]),
       making: makingList.map(o => [o.ticketNo, o.status]),
       ready: readyList.map(o => o.ticketNo),
@@ -245,7 +254,7 @@ export function mountDrinksPickupHud(opts: DrinksPickupHudOptions): DrinksPickup
       <header class="drinks-pickup-head">
         <div class="drinks-pickup-title">
           <strong>叫号</strong>
-          <span class="drinks-pickup-count">${snap.isOpen ? `${makingList.length} 制作 · ${readyList.length} 待取` : '打烊'}</span>
+          <span class="drinks-pickup-count">${snap.isOpen ? `${totalMaking} 制 · ${totalReady} 取` : '打烊'}</span>
         </div>
         <button type="button" class="drinks-btn drinks-open-btn" data-drinks-action="open-order">点单</button>
       </header>

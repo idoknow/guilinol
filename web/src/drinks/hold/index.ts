@@ -1,4 +1,5 @@
 import './drink-action.css'
 export * from './payment.ts'
 export * from './cup-model.ts'
+export * from './straw-audio.ts'
 export * from './hold-controller.ts'

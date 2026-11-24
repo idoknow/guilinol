@@ -193,8 +193,11 @@ test('drinks/ui 点单扣款 → 模拟出杯 → 叫号取杯 → 手捧喝全�
     assert.equal(panel.getViewMode(), 'order')
     assert.equal(document.body.dataset.drinksUiOpen, '1')
 
-    // 砍掉次要步骤/耗时卡片后，点单列表无多余耗时标签
+    // 砍掉次要步骤/耗时/容量标签后，界面无多余次要文案
     assert.equal(panel.root.innerHTML.includes('drinks-steps'), false)
+    assert.equal(panel.root.innerHTML.includes('drinks-detail-meta'), false)
+    assert.equal(panel.root.innerHTML.includes(['drinks', 'swatch'].join('-')), false)
+    assert.equal(panel.root.innerHTML.includes(['linear', 'gradient'].join('-')), false)
 
     // 下单 ¥7 珍珠奶茶，并发双击只扣 1 次，并自动切入取餐号等待态（一屏无「下单」按钮竞争）
     const [r1, r2] = await Promise.all([panel.submitOrder(), panel.submitOrder()])
@@ -224,6 +227,8 @@ test('drinks/ui 点单扣款 → 模拟出杯 → 叫号取杯 → 手捧喝全�
     assert.equal(panel.isOpen(), false)
     pickup.sync()
     assert.ok(pickup.root.innerHTML.includes(`data-drinks-collect="${orderId}"`))
+    // 玩家自身取餐单号仅在我的取餐单区出现一次，不与下方叫号队列重复
+    assert.equal(pickup.root.innerHTML.split(r1.order.ticketNo).length - 1, 1)
 
     // 取杯进入右手捧杯状态
     const col = pickup.collectOrder(orderId)

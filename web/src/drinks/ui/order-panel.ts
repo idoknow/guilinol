@@ -97,7 +97,7 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
   root.innerHTML = `
     <header class="drinks-panel-head">
       <div class="drinks-head-title">
-        <h3>${escapeHtml(skin.displayName)}</h3>
+        <h3>点单</h3>
         <span class="drinks-balance" data-drinks-balance>¥0</span>
       </div>
       <button type="button" class="drinks-btn" data-drinks-action="close" aria-label="关闭点单">关闭</button>
@@ -212,10 +212,7 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
             data-price-status="${escapeHtml(item.priceStatus)}"
             aria-pressed="${selected}"
           >
-            <span class="drinks-item-main">
-              <i class="drinks-swatch" style="background:${escapeHtml(item.cupColor)}" aria-hidden="true"></i>
-              <span class="drinks-item-name">${escapeHtml(item.name)}</span>
-            </span>
+            <span class="drinks-item-name">${escapeHtml(item.name)}</span>
             <span class="drinks-item-price">¥${item.price}</span>
           </button>
         `
@@ -244,7 +241,6 @@ export function mountDrinksOrderPanel(opts: DrinksOrderPanelOptions): DrinksOrde
     detailEl.innerHTML = `
       <div class="drinks-detail-head">
         <strong class="drinks-detail-name">${escapeHtml(item.name)}</strong>
-        <span class="drinks-detail-meta">${item.volumeMl}ml</span>
       </div>
       <div class="drinks-options">
         <div class="drinks-opt-group" role="group" aria-label="温度与冰度">
