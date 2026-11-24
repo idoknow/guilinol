@@ -459,9 +459,9 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function withinBounds(x:number,z:number){
     return inRegion(manifest,x,z)
   }
-  function findWalkableSpawn(east:number,south:number,override=false){
+  function findWalkableSpawn(east:number,south:number,override=false,dryOnly=false){
     for(const {dx,dz} of override?[candidates[0]]:candidates){const x=east+dx,z=south+dz,tile=tileAt(x,z)
-      if(!withinBounds(x,z)||!tile||!stream.loaded.has(tile)||insideHouse(x,z))continue
+      if(!withinBounds(x,z)||!tile||!stream.loaded.has(tile)||(dryOnly&&wet(x,z))||insideHouse(x,z))continue
       const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'road')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
       const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05)continue
       const tread=surface(x,z,'landmark',support.y+cfg.step+.02,cfg.step+.04)
@@ -475,7 +475,15 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)}
   function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear()}
   function findLocalDismount(cx:number,cz:number,heading:number,bikeY:number){
-    return probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,bikeY)
+    const local=probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,bikeY)
+    if(local||!wet(cx,cz))return local
+    const tile=tileAt(cx,cz),data=tile&&stream.loaded.get(tile)
+    if(!tile||!data)return null
+    const waterY=data.water[Math.round((cz-tile.z)/4)*65+Math.round((cx-tile.x)/4)]/10
+    const tread=surface(cx,cz,'deck',bikeY+.6,1.4)??surface(cx,cz,'landmark',bikeY+.6,1.4)??surface(cx,cz,'road',bikeY+.6,1.4)
+    if(tread&&tread.y>=waterY)return null
+    const shore=findWalkableSpawn(cx,cz,false,true)
+    return shore&&{...shore,rule:'water-rescue'}
   }
   function findLocalMount(px:number,py:number,pz:number,bx:number,by:number,bz:number){
     return probeLocalMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},px,py,pz,bx,by,bz)
