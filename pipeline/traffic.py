@@ -191,7 +191,7 @@ def bake(output, manifest, rendered_roads=None):
     restore_portal_paving(output,manifest['chunks'])
     restore_corridors(output,manifest['chunks'])
     from canal_passages import plan as plan_canal_passages, sample_road_heights
-    from terminal_decks import grade as grade_terminal_decks, grade_airport_fork
+    from terminal_decks import grade as grade_terminal_decks, grade_airport_fork, grade_service_overpass
     ground_passages.grain_yard(output,manifest,elements,sections)
     grade_airport_fork(output,manifest,elements)
     terminal_grades = grade_terminal_decks(output, manifest, elements)
@@ -346,7 +346,10 @@ def bake(output, manifest, rendered_roads=None):
             access,limits=plan_approaches(conflicts+anchors,lanes+guides,survey_nodes,{int(k):v for k,v in samples['heights'].items()},fixed,sections)
             access=cycleway_grades(cycleway,conflicts)+access
             surveyed=vehicle_surface_grades.profiles(graded_sections,native_levels,access+canal_grades+terminal_grades)
-            bake_surveyed_corridors(output,manifest['chunks'],elements,sections,access+canal_grades+terminal_grades+surveyed,only_approaches=True,bridge_profiles=canal_grades)
+            from pedestrian_approaches import profiles as path_profiles
+            planned=access+canal_grades+terminal_grades+surveyed
+            pedestrian=path_profiles(output,manifest,elements,sections,planned)
+            bake_surveyed_corridors(output,manifest['chunks'],elements,sections,planned+pedestrian,only_approaches=True,bridge_profiles=canal_grades,preferred=pedestrian)
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)
             for tunnel in generated:
                 tunnel['gradedAccess']=True
@@ -361,6 +364,7 @@ def bake(output, manifest, rendered_roads=None):
         ground_passages.bake(output,manifest,elements,sections,garage_curbs)
         ground_passages.level_soffits(output,manifest,elements,sections)
         portal_landings.carriageways(output,manifest,elements,sections)
+        grade_service_overpass(output,manifest,elements)
         if network['edges']:
             route_file=output/'vehicle-portal-routes.json'
             yard_routes=[]

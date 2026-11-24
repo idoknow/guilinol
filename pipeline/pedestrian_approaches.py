@@ -1,0 +1,67 @@
+"""Tie the accessible path at a ground-road junction to the adjacent pavement."""
+import math
+
+import numpy as np
+from shapely import LineString, Point, box
+from shapely.ops import substring
+
+from canal_passages import sample_road_heights
+from features import points
+from service_streets import width
+
+
+# Surveyed connection nodes. Orient from the motor road toward the path so
+# the road elevation is shared across the path entrance and its rounded cap.
+CONNECTIONS = {1013429171:9349946067,1013429174:9349946089,1013355638:9349946082,
+               923428686:8572142393,1474631011:13528279974,1490465016:13660684190}
+
+
+def profiles(output, manifest, elements, widths, existing):
+    x,z,w,h=manifest['extent']
+    bounds=box(x,z,x+w,z+h)
+    paths,requests=[],[]
+    for way in elements:
+        if way['type']!='way' or way['id'] not in CONNECTIONS:
+            continue
+        xy=points(way)
+        if way['nodes'][-1]==CONNECTIONS[way['id']]:
+            xy=xy[::-1]
+        elif way['nodes'][0]!=CONNECTIONS[way['id']]:
+            raise ValueError(f"Recheck the path junction on {way['id']}")
+        axis=substring(LineString(xy),0,50)
+        if not bounds.covers(axis):
+            continue
+        foot=way['tags']['highway'] in ('path','footway')
+        half=widths.get(way['id'],2 if foot else width(way['tags']))/2+.5
+        paths.append((axis,half,int(foot)))
+        for pt in (axis.interpolate(0),axis.interpolate(axis.length)):
+            requests.append(dict(x=pt.x,z=pt.y,passageClearance=True))
+    if not paths:
+        return []
+    levels=iter(sample_road_heights(output,manifest,requests))
+    grades=[]
+    for axis,half,kind in paths:
+        ends=[]
+        for p in (axis.interpolate(0),axis.interpolate(axis.length)):
+            level=next(levels)
+            hits=[row for row in existing if row[0].distance(p)<.03]
+            if hits:
+                line,_,a,b,*_=min(hits,key=lambda row:row[0].distance(p))
+                level=a+(b-a)*line.project(p,normalized=True)
+            ends.append(level)
+        a,b=ends
+        if abs(b-a)>.08*axis.length:continue
+        blend=max(0,min(.12,1-abs(b-a)/(.08*axis.length)))
+        knots=sorted({0.,axis.length,*np.arange(2,axis.length,2),
+                      *(axis.project(Point(xy)) for xy in axis.coords)})
+        previous=None
+        for s in knots:
+            t=s/axis.length
+            if blend:
+                t=(t*t/(2*blend) if t<blend else 1-blend-(1-t)**2/(2*blend)
+                   if t>1-blend else t-blend/2)/(1-blend)
+            point=axis.interpolate(s).coords[0];height=a+(b-a)*t
+            if previous and math.dist(previous[0],point)>.01:
+                grades.append((LineString([previous[0],point]),half,previous[1],height,.08,kind))
+            previous=point,height
+    return grades

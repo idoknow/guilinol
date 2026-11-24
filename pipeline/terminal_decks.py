@@ -152,6 +152,49 @@ def grade_airport_fork(output, manifest, elements):
                  {branch_id:levels}, spans=(branch_id,))
 
 
+def grade_service_overpass(output, manifest, elements):
+    """Carry the tertiary deck over the service road at its mapped layer."""
+    from canal_passages import sample_road_heights
+    from vehicle_tunnels import grade_limit
+
+    bridge_id, road_id = 815075448, 454950352
+    ways = {w['id']: w for w in elements if w['type']=='way' and w['id'] in (bridge_id,road_id)}
+    if len(ways)!=2:
+        return
+    axis, road = (LineString(points(ways[k])) for k in (bridge_id,road_id))
+    x,z,w,h = manifest['extent']
+    if not box(x,z,x+w,z+h).covers(axis):
+        return
+    crossing = axis.intersection(road)
+    if crossing.geom_type!='Point' or ways[bridge_id]['tags'].get('bridge')!='yes':
+        raise ValueError('Recheck the service-road overpass alignment')
+    centre = axis.project(crossing)
+    # Both ends are on the unmodified slab. Use a flat crest over the
+    # lower road and cubic transitions on the two approaches.
+    run, crest = 200., 20.
+    stations = centre+np.arange(-run,run+1,2)
+    if stations[0]<0 or stations[-1]>axis.length:
+        raise ValueError('Insufficient deck length for the overpass transitions')
+    cross_station = road.project(crossing)
+    lower = [road.interpolate(cross_station+d) for d in np.arange(-12,13,2)]
+    ends = [axis.interpolate(s) for s in (stations[0],stations[-1])]
+    probes = [dict(x=p.x,z=p.y,roofProbe=True) for p in ends+lower]
+    measurements = sample_road_heights(output,manifest,probes)
+    abutments = [deck for _,deck in measurements[:2]]
+    if all(y is None for y in abutments):
+        return
+    if any(y is None for y in abutments):
+        raise ValueError('Missing surveyed overpass deck')
+    top = max(native for native,_ in measurements[2:])+5.72
+    base = np.interp(stations,stations[[0,-1]],abutments)
+    t = np.clip((run-np.abs(stations-centre))/(run-crest),0,1)
+    levels = base+(top-base)*t*t*(3-2*t)
+    if np.max(np.abs(np.diff(levels)/np.diff(stations)))>grade_limit(ways[bridge_id]['tags']['highway']):
+        raise ValueError('Service-road overpass exceeds tertiary grade limit')
+    update_slabs(output,manifest['chunks'],{bridge_id:axis},{bridge_id:stations},
+                 {bridge_id:levels},spans=(bridge_id,))
+
+
 def update_slabs(output,chunks,axes,stations,ys,spans=SPANS):
     # GL04 is shared with previously released worlds. Recover each continuous
     # slab across tile seams to avoid moving a nearby lower road or canopy.
