@@ -72,6 +72,10 @@ const KICK_BAN_SECONDS = Number(process.env.KICK_BAN_SECONDS || 600)
 // 真要应急限流，把 RT_MAX_PER_IP 设成正数即可恢复按 IP 限制。
 const MAX_PER_IP = Number(process.env.RT_MAX_PER_IP || 0)
 const JOIN_TIMEOUT_MS = Number(process.env.RT_JOIN_TIMEOUT_MS || 15000)
+// 每个 IP 同时「已握手、还没 join」的连接上限。已 join 的玩家不受限（CGNAT 友好），
+// 但单个 IP 不能靠只握手不 join 在 15 秒窗口内把全局 MAX_PLAYERS 占满。0 = 不限。
+const MAX_PENDING_PER_IP = Number(process.env.RT_MAX_PENDING_PER_IP ?? 8)
+const pendingIp = new Map()
 /** 昵称长度上限（字符） */
 const MAX_NAME = 16
 /** 服务端裁决 hit / revive 的水平距离（米） */
@@ -351,8 +355,17 @@ wss.on('connection', (ws, req) => {
       ws.close(1013, 'too many connections')
       return
     }
+    const pending = pendingIp.get(ip) || 0
+    if (MAX_PENDING_PER_IP > 0 && pending >= MAX_PENDING_PER_IP) {
+      console.warn(JSON.stringify({scope:'rt-reject',reason:'pending-per-ip',ip,pending,max:MAX_PENDING_PER_IP,players:players.size,sockets:sockets.size}))
+      send(ws, {t: 'error', message: '连接数过多'})
+      ws.close(1013, 'too many pending connections')
+      return
+    }
     sockets.add(ws)
     ipCounts.set(ip, used + 1)
+    pendingIp.set(ip, pending + 1)
+    ws.pending = true
     // 没有按 IP 限制以后，防的是「只握手不 join」白占名额：15 秒内不 join 直接收回
     ws.joinTimer = setTimeout(() => {
       if (!ws.joined) { try { ws.close(1008, 'join timeout') } catch { /* 忽略 */ } }
@@ -368,8 +381,16 @@ wss.on('connection', (ws, req) => {
   ws.on('pong', () => { ws.isAlive = true })
 
   // 连接回收：容量计数要减回去，ipCounts 不能只增不减
+  const unpend = () => {
+    if (!ws.pending) return
+    ws.pending = false
+    const left = (pendingIp.get(ip) || 1) - 1
+    if (left > 0) pendingIp.set(ip, left)
+    else pendingIp.delete(ip)
+  }
   const release = (code, reason) => {
     clearTimeout(ws.joinTimer)
+    unpend()
     const joined = players.has(id)
     if (sockets.delete(ws)) {
       const left = (ipCounts.get(ip) || 1) - 1
@@ -461,6 +482,7 @@ wss.on('connection', (ws, req) => {
         }
         ws.joined = true
         clearTimeout(ws.joinTimer)
+        unpend()
         players.set(id, player)
         send(ws, {
           t: 'welcome',

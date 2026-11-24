@@ -1,0 +1,96 @@
+/* 玩法引导（IDOK-221）· 按键卡 / 玩法指南 / 新手引导。只用 theme.css 的 token。 */
+
+/* --- 键帽：宣纸底、下沿一道墨影，像真的按键 --------------------------------------------------- */
+.keys-card kbd,.guide-sheet kbd,.coach kbd{display:inline-grid;place-items:center;box-sizing:border-box;min-width:21px;height:21px;padding:0 5px;margin:0 1px;
+  font:600 11px/1 var(--ui-serif);letter-spacing:0;color:var(--ui-ink);background:var(--ui-paper);border-radius:5px;
+  box-shadow:inset 0 -2px 0 rgba(60,60,50,.22),0 1px 0 rgba(12,20,20,.35);vertical-align:1px}
+
+/* --- 按键卡：电脑端左下，读数条上方 -------------------------------------------------------------- */
+.keys-card{position:fixed;z-index:5;left:calc(12px + env(safe-area-inset-left));bottom:calc(44px + env(safe-area-inset-bottom));width:268px;box-sizing:border-box;
+  color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-md);
+  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);box-shadow:var(--ui-shadow-1);font-family:var(--ui-serif);
+  transition:width var(--ui-slow) var(--ui-ease),opacity var(--ui-fast)}
+.keys-head{display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px 6px;background:none;border:0;color:inherit;cursor:pointer;font:inherit;text-align:left}
+.keys-title{font-size:12px;font-weight:600;letter-spacing:.2em;color:var(--ui-jade-300)}
+.keys-ctx{font-size:12px;letter-spacing:.12em;color:var(--ui-paper-dim)}
+.keys-fold{margin-left:auto;width:7px;height:7px;border:solid var(--ui-paper-dim);border-width:0 1.5px 1.5px 0;transform:rotate(45deg) translate(-2px,-2px);transition:transform var(--ui-fast)}
+.keys-list{list-style:none;margin:0;padding:2px 12px 6px;display:grid;grid-template-columns:1fr 1fr;gap:5px 10px}
+.keys-list li,.guide-keygrid li{display:flex;align-items:center;gap:6px;font-size:12px;letter-spacing:.04em;line-height:1.2;white-space:nowrap;min-width:0}
+.keys-list li>span:last-child{overflow:hidden;text-overflow:ellipsis;color:rgba(244,239,226,.92)}
+.keys-caps{display:inline-flex;flex:none}
+.keys-list li:first-child{grid-column:1/-1}
+.keys-more{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:6px 12px 8px;background:none;border:0;border-top:1px solid var(--ui-glass-line-soft);
+  color:var(--ui-paper-dim);font:12px/1.2 var(--ui-serif);letter-spacing:.12em;cursor:pointer;border-radius:0 0 var(--ui-r-md) var(--ui-r-md)}
+.keys-more:hover,.keys-head:hover .keys-ctx{color:var(--ui-paper)}
+.keys-more kbd{height:18px;min-width:18px;font-size:10px}
+/* 折叠：只剩一颗小药丸「按键 · 步行 ˄」 */
+.keys-card.folded{width:auto;border-radius:var(--ui-r-pill)}
+.keys-card.folded .keys-head{padding:6px 14px}
+.keys-card.folded :is(.keys-list,.keys-more){display:none}
+.keys-card.folded .keys-fold{transform:rotate(-135deg) translate(-2px,-2px)}
+/* 第一次上某种车时闪一下 */
+.keys-card.pulse{animation:keys-pulse 1.6s var(--ui-ease) 2}
+@keyframes keys-pulse{0%,100%{box-shadow:var(--ui-shadow-1)}40%{box-shadow:0 0 0 3px rgba(208,105,76,.75),var(--ui-shadow-1)}}
+/* 手机 / 平板 / 窄屏没有键盘提示的意义；拍照、首页、街头 HUD 也不出 */
+@media (pointer:coarse),(max-width:560px),(max-height:420px){.keys-card{display:none}}
+body:is([data-home],[data-photo=on],[data-hud=street]) .keys-card{display:none}
+/* 旧的一行键位提示被按键卡取代 */
+.hint{display:none!important}
+
+/* --- 左上「?」 ---------------------------------------------------------------------------------- */
+.btn-guide{box-sizing:border-box;width:var(--ui-h);height:var(--ui-h);padding:0;border-radius:50%;cursor:pointer;font:600 17px/1 var(--ui-serif);
+  color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);
+  -webkit-tap-highlight-color:transparent;transition:background var(--ui-fast),transform var(--ui-fast)}
+.btn-guide:hover{background:var(--ui-glass-strong)}
+.btn-guide:active{transform:scale(.94);background:rgba(169,80,60,.7)}
+body[data-home] .btn-guide{visibility:hidden}
+
+/* --- 玩法指南 ----------------------------------------------------------------------------------- */
+.about-mask>.guide-sheet{display:flex;flex-direction:column;width:min(760px,100%);max-height:min(88dvh,780px);overflow:hidden}
+.guide-sheet>header{flex-wrap:nowrap}
+.guide-tabs{display:flex;gap:4px;margin-right:auto;margin-left:10px;padding:3px;border-radius:var(--ui-r-pill);background:rgba(244,239,226,.08)}
+.guide-tabs button{min-height:30px;padding:0 14px;border:0;border-radius:var(--ui-r-pill);background:none;color:var(--ui-paper-dim);font:500 13px/1 var(--ui-serif);letter-spacing:.12em;cursor:pointer}
+.guide-tabs button[aria-selected=true]{background:var(--ui-paper);color:var(--ui-ink)}
+.guide-body{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;padding:14px 18px 16px}
+.guide-features{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:16px 22px}
+.guide-features li{display:flex;gap:12px;align-items:flex-start}
+.guide-features .ui-seal{font-size:16px;margin-top:2px}
+.guide-features b{display:block;font-size:15px;letter-spacing:.12em;margin-bottom:4px}
+.guide-features p{margin:0;font-size:13px;line-height:1.75;color:var(--ui-paper-dim)}
+.guide-features p b{display:inline;font-size:inherit;letter-spacing:0;margin:0;color:var(--ui-paper)}
+.guide-keygrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 20px}
+.guide-keygrid h3{margin:0 0 8px;font-size:13px;font-weight:600;letter-spacing:.2em;color:var(--ui-jade-300)}
+.guide-keygrid ul{list-style:none;margin:0;padding:0;display:grid;gap:7px}
+.guide-keygrid li{white-space:normal}
+.guide-touch{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;margin:0;font-size:14px;line-height:1.5}
+.guide-touch dt{font-weight:600;letter-spacing:.08em;color:var(--ui-jade-300);white-space:nowrap}
+.guide-touch dd{margin:0;color:rgba(244,239,226,.9)}
+.guide-note{margin:14px 0 0;font-size:12px;letter-spacing:.06em;color:var(--ui-paper-dim)}
+.guide-foot{display:flex;justify-content:flex-end;padding:10px 18px 14px;border-top:1px solid var(--ui-glass-line-soft)}
+@media (max-width:720px){.guide-keygrid{grid-template-columns:1fr 1fr}}
+@media (max-width:560px),(pointer:coarse) and (max-height:500px){
+  .guide-features{grid-template-columns:1fr;gap:12px}
+  .guide-sheet>header{padding:10px 12px 8px}.guide-body{padding:10px 14px 12px}.guide-foot{padding:8px 14px 10px}
+  .guide-sheet h2{font-size:16px;letter-spacing:.12em}.guide-tabs{margin-left:6px}.guide-tabs button{padding:0 10px}}
+@media (pointer:coarse) and (max-height:500px){.guide-features{grid-template-columns:1fr 1fr}}
+@media (max-width:420px){.guide-keygrid{grid-template-columns:1fr}.guide-sheet h2{display:none}.guide-tabs{margin-left:0}}
+
+/* --- 新手引导：挖空的聚光 + 宣纸小卡 ------------------------------------------------------------ */
+.coach{position:fixed;inset:0;z-index:60;opacity:0;transition:opacity .22s var(--ui-ease)}
+.coach.in{opacity:1}
+.coach-hole{position:fixed;box-sizing:border-box;border:2px solid var(--ui-seal-light);border-radius:18px;pointer-events:none;
+  box-shadow:0 0 0 200vmax rgba(10,18,17,.58),0 0 0 6px rgba(208,105,76,.22);
+  transition:left .32s var(--ui-ease),top .32s var(--ui-ease),width .32s var(--ui-ease),height .32s var(--ui-ease),border-radius .32s var(--ui-ease)}
+.coach-card{position:fixed;box-sizing:border-box;padding:14px 16px 12px;color:var(--ui-ink);background:var(--ui-paper);border-radius:var(--ui-r-paper);
+  box-shadow:var(--ui-shadow-2);font-family:var(--ui-serif);transition:left .32s var(--ui-ease),top .32s var(--ui-ease)}
+.coach-card.swap{animation:coach-in .32s var(--ui-ease)}
+@keyframes coach-in{from{opacity:0;transform:translateY(6px)}}
+.coach-count{font-size:11px;letter-spacing:.12em;color:var(--ui-seal)}
+.coach-card h3{margin:2px 0 6px;font-size:16px;font-weight:600;letter-spacing:.14em}
+.coach-card p{margin:0;font-size:13px;line-height:1.75;color:var(--ui-ink-soft)}
+.coach-card p b{color:var(--ui-ink)}
+.coach-card kbd{background:#fffaf0;box-shadow:inset 0 -2px 0 rgba(60,60,50,.2),0 0 0 1px rgba(60,60,50,.18)}
+.coach-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:12px}
+.coach-actions .ui-btn{min-height:34px;padding:0 16px;font-size:13px}
+.coach-actions .ui-btn--ghost{color:var(--ui-ink-soft)}
+.coach-actions .ui-btn--ghost:hover{background:var(--ui-seal-wash);color:var(--ui-ink)}

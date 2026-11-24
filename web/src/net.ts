@@ -3,13 +3,14 @@ import type {Avatar} from '../../lib/avatar'
 import {players,type Pose} from './net-players'
 import {onUser} from './ui/account'
 import type {MpStatus} from './ui/mp-pref'
+import {setRoster,clearRoster} from './mp-roster'
 
 function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-status',{detail}))}
 
 type State='connecting'|'online'|'offline'|'replaced'
 export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera) {
   const peers=players(scene,clips,camera)
-  let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,disposed=false
+  let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,lastRoster=-Infinity,disposed=false
   let state:State='offline',online=0
   const badge=new URLSearchParams(location.search).has('debug')?document.createElement('output'):null
   if(badge){badge.style.cssText='position:fixed;top:0;right:0;z-index:99;background:white;color:black';document.body.append(badge)}
@@ -24,7 +25,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   }
   function emote(id:number){if(id===desired&&id)sent=-1;desired=id;flushEmote()}
   function status(){return {state,online}}
-  function update(next:State,count=0){state=next;online=count;if(badge)badge.textContent=`${state} · ${online}`;publish({state,online})}
+  function update(next:State,count=0){state=next;online=count;if(next!=='online')clearRoster();if(badge)badge.textContent=`${state} · ${online}`;publish({state,online})}
   function send(packet:object){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify(packet))}
   // 不能像以前那样 6 次之后永久放弃：满员、同一出口 IP 挤爆、切后台被断，都是暂时的。
   // 一旦放弃，玩家只能刷新页面，表现出来就是「联机时好时坏」。
@@ -80,7 +81,8 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   function stop(){generation++;clearTimeout(timer);socket?.close();socket=undefined;peers.clear();update('offline')}
   function avatarChanged(){if(state==='online')send({t:'avatar',avatar:getAvatar()})}
   function tick(dt:number){if(state!=='online')return
-    flushEmote();const pose=getPose(),now=performance.now();if(now-lastSent>=50){lastSent=now;send({t:'pos',...pose})}peers.tick(dt,pose)}
+    flushEmote();const pose=getPose(),now=performance.now();if(now-lastSent>=50){lastSent=now;send({t:'pos',...pose})}peers.tick(dt,pose)
+    if(now-lastRoster>=300){lastRoster=now;setRoster({me:{x:pose.x,z:pose.z,yaw:pose.yaw},at:now,players:peers.list().map(p=>({id:p.id,uid:p.uid,name:p.name,x:p.x,z:p.z,yaw:p.yaw,v:p.v,bike:!!p.bike,joinedAt:p.jt}))})}}
   let account:string|null|undefined
   const unsubscribe=onUser(user=>{const id=user?.id??null;if(id===account)return
     account=id;stop();if(id){attempt=0;void connect()}})
@@ -88,11 +90,11 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   // 切后台/关页面时干净收尾：手机浏览器经常直接冻结 WebSocket，主动关掉能立刻把服务端名额还回去，
   // 不用等心跳超时——这也是「同一账号第二次连不上」的常见来源。
   const pageHide=()=>{
-    clearTimeout(timer)
+    clearTimeout(timer);generation++
     const ws=socket;socket=undefined
     if(ws){ws.onopen=ws.onmessage=ws.onclose=ws.onerror=null;try{ws.close(1000,'pagehide')}catch{}}
   }
-  const pageShow=()=>{if(!disposed&&!socket&&(state==='offline'||state==='connecting'))retry(500)}
+  const pageShow=()=>{if(!disposed&&!socket&&account)retry(500)}
   window.addEventListener('pagehide',pageHide)
   window.addEventListener('pageshow',pageShow)
   const manual=()=>{if(!disposed){stop();attempt=0;void connect()}}

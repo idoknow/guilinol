@@ -4,6 +4,7 @@ import {onPrefs, prefs} from './prefs'
 import {onOnline, startLive} from './live'
 import {onUser, openAccount} from './account'
 import type {MpStatus} from './mp-pref'
+import {toggleRoster} from './mp-roster-panel'
 
 const FPS_WINDOW = 500
 const NET_WINDOW = 1000
@@ -106,15 +107,16 @@ export function mountStats() {
 
   function paintMp() {
     mpTile.dataset.state = mp.state === 'offline' && !signedIn ? 'login' : mp.state
-    mpTile.disabled = mp.state === 'online' || mp.state === 'connecting'
+    mpTile.disabled = mp.state === 'connecting'
     mpTile.textContent = mp.state === 'online' ? `同城 ${mp.online} 人`
       : mp.state === 'connecting' ? '联机连接中'
       : mp.state === 'replaced' ? '已在其他设备联机 · 重连'
       : signedIn ? '联机已断开 · 重连' : '登录后联机'
-    mpTile.title = mp.state === 'online' ? '同城联机：和你在同一座城里的玩家人数' : ''
+    mpTile.title = mp.state === 'online' ? '查看同城在线玩家和他们的位置' : ''
     syncVisibility()
   }
   mpTile.onclick = () => {
+    if (mp.state === 'online') { toggleRoster(); return }
     if (!signedIn) void openAccount()
     else window.dispatchEvent(new Event('glol:mp-reconnect'))
   }

@@ -11,8 +11,10 @@ import {vehicleModel} from './walk/vehicle-model'
 import {avatar as figure} from './look/avatar'
 
 export interface Pose {x:number;y:number;z:number;yaw:number;v:number;gr:number;bike:string;bx:number;bz:number;byaw:number;sc:number;sb:number;sp:number;br:number}
-export interface Player extends Pose {em?:number;es?:number;expires?:number;id:string;name:string;avatar:Avatar}
+export interface Player extends Pose {em?:number;es?:number;expires?:number;id:string;uid?:number;jt?:number;name:string;avatar:Avatar}
 
+// 名牌只在「面前」显示（IDOK-222）：40 m 内、在视野里，34 m 起淡出；远近都保持约 22 px 高（贴脸时最小 0.14 m），不会缩成一粒点也不会糊满屏。
+const NAME_H=.3, NAME_Y=2.12, NAME_NEAR=34, NAME_FAR=40, NAME_PX=22, NAME_MIN=.14
 // 昵称牌（IDOK-192）：墨青玻璃小签 + 宣纸色宋体字，左边一颗青玉点，和 HUD 读数同一套颜色。
 const TAG_FONT='600 30px "Noto Serif SC","Source Han Serif SC","Songti SC",serif'
 export function label(name:string) {
@@ -31,7 +33,7 @@ export function label(name:string) {
   ctx.fillText(text,padX+dot+gap,h/2+1,w-padX*2-dot-gap)
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=4
   const material=new THREE.SpriteMaterial({map:texture,fog:false,depthWrite:false,transparent:true})
-  const sprite=new THREE.Sprite(material),height=.3;sprite.scale.set(height*w/h,height,1);sprite.position.y=2.12;sprite.renderOrder=2
+  const sprite=new THREE.Sprite(material);sprite.userData.aspect=w/h;sprite.scale.set(NAME_H*w/h,NAME_H,1);sprite.position.y=NAME_Y;sprite.renderOrder=2
   return sprite
 }
 
@@ -92,6 +94,14 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
       const angle=player.yaw-view.root.rotation.y;view.root.rotation.y+=Math.atan2(Math.sin(angle),Math.cos(angle))*alpha
       view.bike.visible=!!player.bike
       if(player.bike){view.bike.position.set(pos.x+player.bx-player.x,pos.y,pos.z+player.bz-player.z);view.bike.rotation.y=player.byaw}
+      const away=Math.hypot(pos.x-camera.position.x,pos.z-camera.position.z,pos.y+NAME_Y-camera.position.y)
+      view.name.visible=away<NAME_FAR
+      if(view.name.visible){
+        const fov=(camera as THREE.PerspectiveCamera).fov??60
+        const height=Math.max(NAME_MIN,NAME_PX/innerHeight*2*away*Math.tan(fov*Math.PI/360))
+        view.name.scale.set(height*view.name.userData.aspect,height,1);view.name.position.y=NAME_Y+height/2-NAME_H/2
+        view.name.material.opacity=Math.min(1,(NAME_FAR-away)/(NAME_FAR-NAME_NEAR))
+      }
       view.emote?.reset()
       const inRange=Math.hypot(player.x-local.x,player.z-local.z)<80
       bounds.center.set(player.x,player.y+.9,player.z)
@@ -113,7 +123,7 @@ export function players(scene:THREE.Scene,clips:THREE.AnimationClip[],camera:THR
   }
   function remove(id:string){hide(id);records.delete(id);nextSort=0}
   function clear(){for(const id of records.keys())remove(id)}
-  return {tick,clear,remove,add(player:Player){remove(player.id);records.set(player.id,{...player,expires:performance.now()+(emoteById(player.em??0)?.duration??0)*1000})},
+  return {tick,clear,remove,list:()=>[...records.values()],add(player:Player){remove(player.id);records.set(player.id,{...player,expires:performance.now()+(emoteById(player.em??0)?.duration??0)*1000})},
     emote(id:string,em:number,es:number){const p=records.get(id);if(!p||es<=(p.es??0))return
       Object.assign(p,{em,es,expires:performance.now()+(emoteById(em)?.duration??0)*1000})},
     move(id:string,pose:Pose){const player=records.get(id);if(!player)return
