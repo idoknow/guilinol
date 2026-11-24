@@ -7,7 +7,7 @@ from pathlib import Path
 from shapely.geometry import LineString, box
 
 from atlas import flat, rings
-from common import ll2xz
+from common import ll2xz, load_osm
 from features import area, points, polygons
 
 BBOX = (25.09, 110.00, 25.39, 110.41)
@@ -49,8 +49,22 @@ def compile_map(elements, ring_ids):
     return gzip.compress(json.dumps(dict(version=1,paths=paths,labels=labels), separators=(',',':'), ensure_ascii=False).encode(), mtime=0)
 
 
-def write_overview_map(output, bbox):
+def write_overview_map(output, bbox, region=None):
     data = SNAPSHOT.read_bytes()
+    if region is not None:
+        overview = json.loads(gzip.decompress(data))
+        south, west, north, east = BBOX
+        bounds = box(*ll2xz(north, west), *ll2xz(south, east)).difference(region)
+        for way in load_osm():
+            if way['type'] != 'way' or way.get('tags', {}).get('railway') != 'rail':
+                continue
+            clipped = LineString(points(way)).intersection(bounds)
+            for line in getattr(clipped, 'geoms', [clipped]):
+                if line.geom_type == 'LineString' and not line.is_empty:
+                    coords = flat(line.simplify(1))
+                    if len(coords) >= 4:
+                        overview['paths'].append(['rail', [coords]])
+        data = gzip.compress(json.dumps(overview, separators=(',', ':'), ensure_ascii=False).encode(), mtime=0)
     if len(data) > 400 * 1024: raise ValueError('Regional map exceeds transfer budget')
     (Path(output) / 'overview.bin').write_bytes(data)
     south, west, north, east = bbox

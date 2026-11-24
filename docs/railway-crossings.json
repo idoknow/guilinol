@@ -33,7 +33,8 @@
     "lon": 110.2782549,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -70,7 +71,8 @@
     "lon": 110.278246,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -112,7 +114,8 @@
     "lon": 110.2921655,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -152,7 +155,8 @@
     "lon": 110.292203,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -179,7 +183,8 @@
     "lon": 110.2783545,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -205,7 +210,8 @@
     "lon": 110.2783458,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -225,7 +231,8 @@
     "lon": 110.2711304,
     "sharedNode": 4680276257,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 1,
       "railway": "level_crossing"
@@ -249,7 +256,8 @@
     "lon": 110.2730448,
     "sharedNode": 4680276266,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -278,7 +286,8 @@
     "lon": 110.2719265,
     "sharedNode": 4680276120,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -307,7 +316,8 @@
     "lon": 110.2719951,
     "sharedNode": 4680276121,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -329,7 +339,8 @@
     "lon": 110.2761265,
     "sharedNode": 6533456504,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 4,
       "railway": "level_crossing"
@@ -367,7 +378,8 @@
     "lon": 110.2773656,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -402,7 +414,8 @@
     "lon": 110.2773506,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -437,7 +450,8 @@
     "lon": 110.2773374,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -472,7 +486,8 @@
     "lon": 110.277378,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -506,7 +521,8 @@
     "lon": 110.277201,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -543,7 +559,8 @@
     "lon": 110.2782873,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -580,7 +597,8 @@
     "lon": 110.2782541,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -616,7 +634,8 @@
     "lon": 110.2761825,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -654,7 +673,8 @@
     "lon": 110.2764254,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -689,7 +709,8 @@
     "lon": 110.2764319,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -724,7 +745,8 @@
     "lon": 110.2764096,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -762,7 +784,8 @@
     "lon": 110.2764153,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -798,7 +821,8 @@
     "lon": 110.277195,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -835,7 +859,8 @@
     "lon": 110.2772628,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -874,7 +899,8 @@
     "lon": 110.2872192,
     "sharedNode": 459904752,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "无标签，按共享节点推定",
     "nodeEvidence": {
       "version": 3,
       "railway": null
@@ -902,7 +928,8 @@
     "lon": 110.2927729,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -943,7 +970,8 @@
     "lon": 110.3032987,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -984,7 +1012,8 @@
     "lon": 110.3032759,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1016,7 +1045,8 @@
     "lon": 110.3024075,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1054,7 +1084,8 @@
     "lon": 110.2763654,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1089,7 +1120,8 @@
     "lon": 110.2763726,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1124,7 +1156,8 @@
     "lon": 110.2763479,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1162,7 +1195,8 @@
     "lon": 110.2763543,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1198,7 +1232,8 @@
     "lon": 110.2991272,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1234,7 +1269,8 @@
     "lon": 110.299098,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1269,7 +1305,8 @@
     "lon": 110.2758556,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1310,7 +1347,8 @@
     "lon": 110.2878645,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1347,7 +1385,8 @@
     "lon": 110.29688,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1388,7 +1427,8 @@
     "lon": 110.2877125,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1424,7 +1464,8 @@
     "lon": 110.3018469,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1460,7 +1501,8 @@
     "lon": 110.30136,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1498,7 +1540,8 @@
     "lon": 110.2852885,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1536,7 +1579,8 @@
     "lon": 110.2855547,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1575,7 +1619,8 @@
     "lon": 110.2878466,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1610,7 +1655,8 @@
     "lon": 110.2966316,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1649,7 +1695,8 @@
     "lon": 110.2876931,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1685,7 +1732,8 @@
     "lon": 110.2851984,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1721,7 +1769,8 @@
     "lon": 110.2854684,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1763,7 +1812,8 @@
     "lon": 110.2305146,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1804,7 +1854,8 @@
     "lon": 110.2305896,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1838,7 +1889,8 @@
     "lon": 110.230188,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1872,7 +1924,8 @@
     "lon": 110.225618,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1901,7 +1954,8 @@
     "lon": 110.2936559,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1930,7 +1984,8 @@
     "lon": 110.2973714,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -1967,7 +2022,8 @@
     "lon": 110.2936437,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2004,7 +2060,8 @@
     "lon": 110.2936404,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2033,7 +2090,8 @@
     "lon": 110.2936398,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2061,7 +2119,8 @@
     "lon": 110.2936577,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2090,7 +2149,8 @@
     "lon": 110.2937071,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2119,7 +2179,8 @@
     "lon": 110.2977179,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2156,7 +2217,8 @@
     "lon": 110.2936912,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2193,7 +2255,8 @@
     "lon": 110.2936882,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2222,7 +2285,8 @@
     "lon": 110.2936877,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2250,7 +2314,8 @@
     "lon": 110.3017461,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2278,7 +2343,8 @@
     "lon": 110.3013951,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2306,7 +2372,8 @@
     "lon": 110.2937022,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2334,7 +2401,8 @@
     "lon": 110.2995515,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2356,7 +2424,8 @@
     "lon": 110.2038862,
     "sharedNode": 9112389304,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 1,
       "railway": "level_crossing"
@@ -2381,7 +2450,8 @@
     "lon": 110.2029088,
     "sharedNode": 4505338292,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -2406,7 +2476,8 @@
     "lon": 110.2029088,
     "sharedNode": 4505338292,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -2431,7 +2502,8 @@
     "lon": 110.2019757,
     "sharedNode": 4514289414,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -2455,7 +2527,8 @@
     "lon": 110.2017945,
     "sharedNode": 6635078447,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -2487,7 +2560,8 @@
     "lon": 110.1895876,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": "rail_over",
+    "evidence": "道路 tunnel=yes，铁路无隧道标签",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2516,7 +2590,8 @@
     "lon": 110.1896716,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": "rail_over",
+    "evidence": "道路 tunnel=yes，铁路无隧道标签",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2540,7 +2615,8 @@
     "lon": 110.2011266,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 -1，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2562,7 +2638,8 @@
     "lon": 110.1967839,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 -1，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2586,7 +2663,8 @@
     "lon": 110.2011651,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 -1，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2608,7 +2686,8 @@
     "lon": 110.201046,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": "rail_over",
+    "evidence": "道路 tunnel=yes，铁路无隧道标签",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2627,7 +2706,8 @@
     "lon": 110.278638,
     "sharedNode": 6533456508,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -2649,7 +2729,8 @@
     "lon": 110.2761858,
     "sharedNode": 9385929286,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 1,
       "railway": "level_crossing"
@@ -2671,7 +2752,8 @@
     "lon": 110.2781176,
     "sharedNode": 6533456509,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -2694,7 +2776,8 @@
     "lon": 110.2760769,
     "sharedNode": 6533456503,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -2732,7 +2815,8 @@
     "lon": 110.2933146,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2752,7 +2836,8 @@
     "lon": 110.2963122,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2772,7 +2857,8 @@
     "lon": 110.2961927,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2791,7 +2877,8 @@
     "lon": 110.2966635,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2810,7 +2897,8 @@
     "lon": 110.2966836,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2829,7 +2917,8 @@
     "lon": 110.2965425,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2848,7 +2937,8 @@
     "lon": 110.2964239,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2866,7 +2956,8 @@
     "lon": 110.2968926,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2884,7 +2975,8 @@
     "lon": 110.2969124,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2907,7 +2999,8 @@
     "lon": 110.2960984,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2930,7 +3023,8 @@
     "lon": 110.2959775,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2952,7 +3046,8 @@
     "lon": 110.296451,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2974,7 +3069,8 @@
     "lon": 110.2964715,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -2993,7 +3089,8 @@
     "lon": 110.2968463,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3012,7 +3109,8 @@
     "lon": 110.2967263,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3030,7 +3128,8 @@
     "lon": 110.297202,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3048,7 +3147,8 @@
     "lon": 110.2972215,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3089,7 +3189,8 @@
     "lon": 110.2878714,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3126,7 +3227,8 @@
     "lon": 110.2969361,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3167,7 +3269,8 @@
     "lon": 110.2877199,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3203,7 +3306,8 @@
     "lon": 110.3018408,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3239,7 +3343,8 @@
     "lon": 110.3013558,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3277,7 +3382,8 @@
     "lon": 110.2853077,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3315,7 +3421,8 @@
     "lon": 110.285576,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 2，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3354,7 +3461,8 @@
     "lon": 110.2878431,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3389,7 +3497,8 @@
     "lon": 110.2965988,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3428,7 +3537,8 @@
     "lon": 110.2876893,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3464,7 +3574,8 @@
     "lon": 110.2851864,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3500,7 +3611,8 @@
     "lon": 110.2854543,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3523,7 +3635,8 @@
     "lon": 110.277754,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3546,7 +3659,8 @@
     "lon": 110.2777459,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3569,7 +3683,8 @@
     "lon": 110.2777375,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3592,7 +3707,8 @@
     "lon": 110.2777616,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3614,7 +3730,8 @@
     "lon": 110.2776153,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3650,7 +3767,8 @@
     "lon": 110.2766697,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3678,7 +3796,8 @@
     "lon": 110.2778639,
     "sharedNode": 6112626492,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -3707,7 +3826,8 @@
     "lon": 110.2751533,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3729,7 +3849,8 @@
     "lon": 110.2756877,
     "sharedNode": 6533456498,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 6,
       "railway": "level_crossing"
@@ -3761,7 +3882,8 @@
     "lon": 110.2839104,
     "sharedNode": 596514970,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 6,
       "railway": "level_crossing"
@@ -3793,7 +3915,8 @@
     "lon": 110.2839966,
     "sharedNode": 6314352773,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -3818,7 +3941,8 @@
     "lon": 110.2879296,
     "sharedNode": 9208999667,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -3843,7 +3967,8 @@
     "lon": 110.2741096,
     "sharedNode": 6533456500,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -3868,7 +3993,8 @@
     "lon": 110.2762132,
     "sharedNode": 6533456505,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -3898,7 +4024,8 @@
     "lon": 110.275181,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -3926,7 +4053,8 @@
     "lon": 110.2778639,
     "sharedNode": 6112626492,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -3951,7 +4079,8 @@
     "lon": 110.2859364,
     "sharedNode": 9718586804,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "无标签，按共享节点推定",
     "nodeEvidence": {
       "version": 1,
       "railway": null
@@ -3978,7 +4107,8 @@
     "lon": 110.2841088,
     "sharedNode": 13619714703,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -4005,7 +4135,8 @@
     "lon": 110.2838485,
     "sharedNode": 13619846085,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 1,
       "railway": "level_crossing"
@@ -4044,7 +4175,8 @@
     "lon": 110.2769076,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4071,7 +4203,8 @@
     "lon": 110.2965386,
     "sharedNode": 2451958935,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -4101,7 +4234,8 @@
     "lon": 110.2965284,
     "sharedNode": 9391275156,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 1,
       "railway": "level_crossing"
@@ -4137,7 +4271,8 @@
     "lon": 110.2964786,
     "sharedNode": 7600136554,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -4160,7 +4295,8 @@
     "lon": 110.2937183,
     "sharedNode": 9718586751,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 1,
       "railway": "level_crossing"
@@ -4192,7 +4328,8 @@
     "lon": 110.2919125,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4225,7 +4362,8 @@
     "lon": 110.2882485,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4262,7 +4400,8 @@
     "lon": 110.2921959,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4299,7 +4438,8 @@
     "lon": 110.2922593,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4332,7 +4472,8 @@
     "lon": 110.2879362,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4361,7 +4502,8 @@
     "lon": 110.292367,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4391,7 +4533,8 @@
     "lon": 110.2854504,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4421,7 +4564,8 @@
     "lon": 110.2856354,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4449,7 +4593,8 @@
     "lon": 110.2924862,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4478,7 +4623,8 @@
     "lon": 110.2918659,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4511,7 +4657,8 @@
     "lon": 110.2882678,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4548,7 +4695,8 @@
     "lon": 110.2921585,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4585,7 +4733,8 @@
     "lon": 110.2922216,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4618,7 +4767,8 @@
     "lon": 110.2879411,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4647,7 +4797,8 @@
     "lon": 110.2923373,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4677,7 +4828,8 @@
     "lon": 110.2854533,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4707,7 +4859,8 @@
     "lon": 110.2856277,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4735,7 +4888,8 @@
     "lon": 110.2924449,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4764,7 +4918,8 @@
     "lon": 110.297245,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4796,7 +4951,8 @@
     "lon": 110.2964399,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4828,7 +4984,8 @@
     "lon": 110.2964702,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4856,7 +5013,8 @@
     "lon": 110.2962446,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4882,7 +5040,8 @@
     "lon": 110.2964773,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4908,7 +5067,8 @@
     "lon": 110.2964245,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4929,7 +5089,8 @@
     "lon": 110.3007939,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4949,7 +5110,8 @@
     "lon": 110.2970192,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4969,7 +5131,8 @@
     "lon": 110.2968314,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -4994,7 +5157,8 @@
     "lon": 110.2967373,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5030,7 +5194,8 @@
     "lon": 110.2991814,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5066,7 +5231,8 @@
     "lon": 110.299154,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5099,7 +5265,8 @@
     "lon": 110.3011169,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5132,7 +5299,8 @@
     "lon": 110.3010706,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5173,7 +5341,8 @@
     "lon": 110.3032437,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5214,7 +5383,8 @@
     "lon": 110.3032209,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5246,7 +5416,8 @@
     "lon": 110.3023654,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5264,7 +5435,8 @@
     "lon": 110.2995923,
     "sharedNode": 6635078451,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -5291,7 +5463,8 @@
     "lon": 110.2981279,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5315,7 +5488,8 @@
     "lon": 110.2982194,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5336,7 +5510,8 @@
     "lon": 110.2967664,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5360,7 +5535,8 @@
     "lon": 110.2990073,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5384,7 +5560,8 @@
     "lon": 110.2989781,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5402,7 +5579,8 @@
     "lon": 110.299638,
     "sharedNode": 6635078450,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -5426,7 +5604,8 @@
     "lon": 110.2975609,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5450,7 +5629,8 @@
     "lon": 110.2990576,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5474,7 +5654,8 @@
     "lon": 110.2990286,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5492,7 +5673,8 @@
     "lon": 110.2996887,
     "sharedNode": 6635078449,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -5518,7 +5700,8 @@
     "lon": 110.277312,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5541,7 +5724,8 @@
     "lon": 110.2772996,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5564,7 +5748,8 @@
     "lon": 110.277289,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5587,7 +5772,8 @@
     "lon": 110.277322,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5609,7 +5795,8 @@
     "lon": 110.2771624,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5644,7 +5831,8 @@
     "lon": 110.2059925,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5679,7 +5867,8 @@
     "lon": 110.205904,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5713,7 +5902,8 @@
     "lon": 110.2014683,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5745,7 +5935,8 @@
     "lon": 110.1969228,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5778,7 +5969,8 @@
     "lon": 110.2060234,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5810,7 +6002,8 @@
     "lon": 110.2058495,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5844,7 +6037,8 @@
     "lon": 110.201526,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5876,7 +6070,8 @@
     "lon": 110.201349,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5911,7 +6106,8 @@
     "lon": 110.2059551,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5946,7 +6142,8 @@
     "lon": 110.2058666,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -5980,7 +6177,8 @@
     "lon": 110.2014164,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6012,7 +6210,8 @@
     "lon": 110.1968938,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6045,7 +6244,8 @@
     "lon": 110.2059862,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6077,7 +6277,8 @@
     "lon": 110.2058129,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6111,7 +6312,8 @@
     "lon": 110.2014735,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6143,7 +6345,8 @@
     "lon": 110.2012987,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6180,7 +6383,8 @@
     "lon": 110.2060502,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6217,7 +6421,8 @@
     "lon": 110.20596,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6258,7 +6463,8 @@
     "lon": 110.1897735,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6299,7 +6505,8 @@
     "lon": 110.1898576,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6335,7 +6542,8 @@
     "lon": 110.2015199,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6369,7 +6577,8 @@
     "lon": 110.1969507,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6404,7 +6613,8 @@
     "lon": 110.2060816,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6438,7 +6648,8 @@
     "lon": 110.2059031,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6474,7 +6685,8 @@
     "lon": 110.2015769,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6508,7 +6720,8 @@
     "lon": 110.201398,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6545,7 +6758,8 @@
     "lon": 110.2059067,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6582,7 +6796,8 @@
     "lon": 110.2058187,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6623,7 +6838,8 @@
     "lon": 110.1896419,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6664,7 +6880,8 @@
     "lon": 110.1897268,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6700,7 +6917,8 @@
     "lon": 110.2013547,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6734,7 +6952,8 @@
     "lon": 110.1968656,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6769,7 +6988,8 @@
     "lon": 110.2059377,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6803,7 +7023,8 @@
     "lon": 110.2057666,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6839,7 +7060,8 @@
     "lon": 110.2014113,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6873,7 +7095,8 @@
     "lon": 110.2012384,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6900,7 +7123,8 @@
     "lon": 110.2959511,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6927,7 +7151,8 @@
     "lon": 110.2958314,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6953,7 +7178,8 @@
     "lon": 110.2963015,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -6979,7 +7205,8 @@
     "lon": 110.2963221,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7011,7 +7238,8 @@
     "lon": 110.2962862,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7043,7 +7271,8 @@
     "lon": 110.2963163,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7071,7 +7300,8 @@
     "lon": 110.2960973,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7092,7 +7322,8 @@
     "lon": 110.2879296,
     "sharedNode": 9208999667,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -7132,7 +7363,8 @@
     "lon": 110.2789004,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7153,7 +7385,8 @@
     "lon": 110.277554,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7174,7 +7407,8 @@
     "lon": 110.2775448,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7195,7 +7429,8 @@
     "lon": 110.277536,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7216,7 +7451,8 @@
     "lon": 110.2775621,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7236,7 +7472,8 @@
     "lon": 110.2774124,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7257,7 +7494,8 @@
     "lon": 110.2775236,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7278,7 +7516,8 @@
     "lon": 110.2775153,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7299,7 +7538,8 @@
     "lon": 110.2775075,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7320,7 +7560,8 @@
     "lon": 110.2775307,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7340,7 +7581,8 @@
     "lon": 110.277385,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7361,7 +7603,8 @@
     "lon": 110.2774155,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7382,7 +7625,8 @@
     "lon": 110.2773995,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7403,7 +7647,8 @@
     "lon": 110.2773851,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7424,7 +7669,8 @@
     "lon": 110.2774289,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7444,7 +7690,8 @@
     "lon": 110.2772436,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7479,7 +7726,8 @@
     "lon": 110.2777115,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7514,7 +7762,8 @@
     "lon": 110.2777034,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7549,7 +7798,8 @@
     "lon": 110.2776951,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7584,7 +7834,8 @@
     "lon": 110.277719,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7618,7 +7869,8 @@
     "lon": 110.2775734,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7655,7 +7907,8 @@
     "lon": 110.2782987,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7691,7 +7944,8 @@
     "lon": 110.2782895,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7722,7 +7976,8 @@
     "lon": 110.2582056,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7749,7 +8004,8 @@
     "lon": 110.2958986,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7776,7 +8032,8 @@
     "lon": 110.2957794,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7802,7 +8059,8 @@
     "lon": 110.2962471,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7828,7 +8086,8 @@
     "lon": 110.2962676,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7851,7 +8110,8 @@
     "lon": 110.2953137,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7874,7 +8134,8 @@
     "lon": 110.2951946,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7896,7 +8157,8 @@
     "lon": 110.2956588,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7918,7 +8180,8 @@
     "lon": 110.29568,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7941,7 +8204,8 @@
     "lon": 110.2955068,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7964,7 +8228,8 @@
     "lon": 110.2953888,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -7986,7 +8251,8 @@
     "lon": 110.29585,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8008,7 +8274,8 @@
     "lon": 110.2958708,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8031,7 +8298,8 @@
     "lon": 110.2953641,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8054,7 +8322,8 @@
     "lon": 110.2952461,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8076,7 +8345,8 @@
     "lon": 110.2957062,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8098,7 +8368,8 @@
     "lon": 110.2957272,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8121,7 +8392,8 @@
     "lon": 110.2955561,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8144,7 +8416,8 @@
     "lon": 110.2954374,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8166,7 +8439,8 @@
     "lon": 110.2959013,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8188,7 +8462,8 @@
     "lon": 110.2959221,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8211,7 +8486,8 @@
     "lon": 110.2957005,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8234,7 +8510,8 @@
     "lon": 110.2955806,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8256,7 +8533,8 @@
     "lon": 110.2960501,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8278,7 +8556,8 @@
     "lon": 110.296071,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8301,7 +8580,8 @@
     "lon": 110.2957518,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8324,7 +8604,8 @@
     "lon": 110.2956315,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8346,7 +8627,8 @@
     "lon": 110.2961028,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8368,7 +8650,8 @@
     "lon": 110.2961237,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8397,7 +8680,8 @@
     "lon": 110.2930543,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8427,7 +8711,8 @@
     "lon": 110.2950772,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8457,7 +8742,8 @@
     "lon": 110.2950973,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8486,7 +8772,8 @@
     "lon": 110.295022,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8515,7 +8802,8 @@
     "lon": 110.2950395,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8544,7 +8832,8 @@
     "lon": 110.2971509,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8576,7 +8865,8 @@
     "lon": 110.2963374,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8608,7 +8898,8 @@
     "lon": 110.2963677,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8636,7 +8927,8 @@
     "lon": 110.296146,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8661,7 +8953,8 @@
     "lon": 110.2973122,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8686,7 +8979,8 @@
     "lon": 110.2971143,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8715,7 +9009,8 @@
     "lon": 110.2971945,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8747,7 +9042,8 @@
     "lon": 110.2963913,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8779,7 +9075,8 @@
     "lon": 110.2964215,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8807,7 +9104,8 @@
     "lon": 110.2961985,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8841,7 +9139,8 @@
     "lon": 110.2828337,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8875,7 +9174,8 @@
     "lon": 110.282551,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8917,7 +9217,8 @@
     "lon": 110.2304365,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8958,7 +9259,8 @@
     "lon": 110.2305206,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -8992,7 +9294,8 @@
     "lon": 110.2301513,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -9012,7 +9315,8 @@
     "lon": 110.2990524,
     "sharedNode": 6533456497,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9035,7 +9339,8 @@
     "lon": 110.3000124,
     "sharedNode": 6533456426,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9060,7 +9365,8 @@
     "lon": 110.3003148,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -9080,7 +9386,8 @@
     "lon": 110.3000124,
     "sharedNode": 6533456426,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9103,7 +9410,8 @@
     "lon": 110.2990524,
     "sharedNode": 6533456497,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9128,7 +9436,8 @@
     "lon": 110.3003612,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -9148,7 +9457,8 @@
     "lon": 110.299104,
     "sharedNode": 6533456496,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9171,7 +9481,8 @@
     "lon": 110.3000602,
     "sharedNode": 6533456427,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9194,7 +9505,8 @@
     "lon": 110.299104,
     "sharedNode": 6533456496,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9219,7 +9531,8 @@
     "lon": 110.3004104,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -9239,7 +9552,8 @@
     "lon": 110.2991691,
     "sharedNode": 6533456495,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9262,7 +9576,8 @@
     "lon": 110.3001193,
     "sharedNode": 6533456428,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -9285,7 +9600,8 @@
     "lon": 110.2991691,
     "sharedNode": 6533456495,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9310,7 +9626,8 @@
     "lon": 110.3004454,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -9330,7 +9647,8 @@
     "lon": 110.2992178,
     "sharedNode": 6533456494,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9353,7 +9671,8 @@
     "lon": 110.3001717,
     "sharedNode": 6533456429,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9376,7 +9695,8 @@
     "lon": 110.2992178,
     "sharedNode": 6533456494,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9401,7 +9721,8 @@
     "lon": 110.3004787,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -9421,7 +9742,8 @@
     "lon": 110.2992601,
     "sharedNode": 6533456493,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9444,7 +9766,8 @@
     "lon": 110.3002204,
     "sharedNode": 6533456430,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9467,7 +9790,8 @@
     "lon": 110.2992601,
     "sharedNode": 6533456493,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9490,7 +9814,8 @@
     "lon": 110.2993142,
     "sharedNode": 6533456492,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9513,7 +9838,8 @@
     "lon": 110.3002658,
     "sharedNode": 6533456431,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -9538,7 +9864,8 @@
     "lon": 110.3005191,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -9558,7 +9885,8 @@
     "lon": 110.3002658,
     "sharedNode": 6533456431,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -9581,7 +9909,8 @@
     "lon": 110.2993142,
     "sharedNode": 6533456492,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9604,7 +9933,8 @@
     "lon": 110.2993563,
     "sharedNode": 6533456491,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9627,7 +9957,8 @@
     "lon": 110.3003139,
     "sharedNode": 6533456432,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -9652,7 +9983,8 @@
     "lon": 110.3005375,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -9672,7 +10004,8 @@
     "lon": 110.3003139,
     "sharedNode": 6533456432,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -9695,7 +10028,8 @@
     "lon": 110.2993563,
     "sharedNode": 6533456491,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9718,7 +10052,8 @@
     "lon": 110.2994036,
     "sharedNode": 6533456490,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9741,7 +10076,8 @@
     "lon": 110.3003635,
     "sharedNode": 6533456433,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -9766,7 +10102,8 @@
     "lon": 110.3005763,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -9786,7 +10123,8 @@
     "lon": 110.3003635,
     "sharedNode": 6533456433,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -9809,7 +10147,8 @@
     "lon": 110.2994036,
     "sharedNode": 6533456490,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9834,7 +10173,8 @@
     "lon": 110.3006338,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -9854,7 +10194,8 @@
     "lon": 110.2994692,
     "sharedNode": 6533456489,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9877,7 +10218,8 @@
     "lon": 110.3004208,
     "sharedNode": 6533456434,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9900,7 +10242,8 @@
     "lon": 110.2994692,
     "sharedNode": 6533456489,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9925,7 +10268,8 @@
     "lon": 110.3006733,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -9945,7 +10289,8 @@
     "lon": 110.299511,
     "sharedNode": 6533456488,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9968,7 +10313,8 @@
     "lon": 110.3004628,
     "sharedNode": 6533456435,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -9991,7 +10337,8 @@
     "lon": 110.299511,
     "sharedNode": 6533456488,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10016,7 +10363,8 @@
     "lon": 110.3007163,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10036,7 +10384,8 @@
     "lon": 110.29955,
     "sharedNode": 6533456487,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10059,7 +10408,8 @@
     "lon": 110.3005184,
     "sharedNode": 6533456436,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -10082,7 +10432,8 @@
     "lon": 110.29955,
     "sharedNode": 6533456487,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10105,7 +10456,8 @@
     "lon": 110.2993835,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10125,7 +10477,8 @@
     "lon": 110.2994331,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10147,7 +10500,8 @@
     "lon": 110.3007364,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10167,7 +10521,8 @@
     "lon": 110.2995941,
     "sharedNode": 6533456486,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10190,7 +10545,8 @@
     "lon": 110.300563,
     "sharedNode": 6533456437,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -10213,7 +10569,8 @@
     "lon": 110.2995941,
     "sharedNode": 6533456486,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10238,7 +10595,8 @@
     "lon": 110.3007898,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10258,7 +10616,8 @@
     "lon": 110.2996462,
     "sharedNode": 6533456485,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10281,7 +10640,8 @@
     "lon": 110.3006118,
     "sharedNode": 6533456439,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10304,7 +10664,8 @@
     "lon": 110.2996462,
     "sharedNode": 6533456485,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10329,7 +10690,8 @@
     "lon": 110.3008191,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10349,7 +10711,8 @@
     "lon": 110.2996982,
     "sharedNode": 6533456484,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10372,7 +10735,8 @@
     "lon": 110.3006563,
     "sharedNode": 6533456438,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10395,7 +10759,8 @@
     "lon": 110.2996982,
     "sharedNode": 6533456484,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10420,7 +10785,8 @@
     "lon": 110.2996724,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10440,7 +10806,8 @@
     "lon": 110.2995058,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10462,7 +10829,8 @@
     "lon": 110.2996093,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10484,7 +10852,8 @@
     "lon": 110.2996221,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10503,7 +10872,8 @@
     "lon": 110.2961423,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10522,7 +10892,8 @@
     "lon": 110.2960216,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10540,7 +10911,8 @@
     "lon": 110.2964963,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10558,7 +10930,8 @@
     "lon": 110.2965168,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10578,7 +10951,8 @@
     "lon": 110.2997494,
     "sharedNode": 6533456483,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10601,7 +10975,8 @@
     "lon": 110.2997494,
     "sharedNode": 6533456483,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10624,7 +10999,8 @@
     "lon": 110.3007048,
     "sharedNode": 6533456440,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10647,7 +11023,8 @@
     "lon": 110.2998398,
     "sharedNode": 6533456482,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10672,7 +11049,8 @@
     "lon": 110.3009073,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10692,7 +11070,8 @@
     "lon": 110.2998398,
     "sharedNode": 6533456482,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10715,7 +11094,8 @@
     "lon": 110.3008178,
     "sharedNode": 6533456441,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10738,7 +11118,8 @@
     "lon": 110.2998883,
     "sharedNode": 6533456481,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10763,7 +11144,8 @@
     "lon": 110.3009566,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10783,7 +11165,8 @@
     "lon": 110.2998883,
     "sharedNode": 6533456481,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10806,7 +11189,8 @@
     "lon": 110.3008647,
     "sharedNode": 6533456442,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -10829,7 +11213,8 @@
     "lon": 110.299933,
     "sharedNode": 6533456480,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10854,7 +11239,8 @@
     "lon": 110.3009927,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10874,7 +11260,8 @@
     "lon": 110.299933,
     "sharedNode": 6533456480,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10897,7 +11284,8 @@
     "lon": 110.300915,
     "sharedNode": 6533456443,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10920,7 +11308,8 @@
     "lon": 110.299976,
     "sharedNode": 6533456479,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10945,7 +11334,8 @@
     "lon": 110.3010372,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -10965,7 +11355,8 @@
     "lon": 110.299976,
     "sharedNode": 6533456479,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -10988,7 +11379,8 @@
     "lon": 110.3009584,
     "sharedNode": 6533456444,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11010,7 +11402,8 @@
     "lon": 110.2996024,
     "sharedNode": 6635078452,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11032,7 +11425,8 @@
     "lon": 110.2995923,
     "sharedNode": 6635078451,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11053,7 +11447,8 @@
     "lon": 110.2996538,
     "sharedNode": 6635078453,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11074,7 +11469,8 @@
     "lon": 110.299638,
     "sharedNode": 6635078450,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11096,7 +11492,8 @@
     "lon": 110.299697,
     "sharedNode": 6635078454,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11118,7 +11515,8 @@
     "lon": 110.2996887,
     "sharedNode": 6635078449,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11141,7 +11539,8 @@
     "lon": 110.3000251,
     "sharedNode": 6533456478,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11164,7 +11563,8 @@
     "lon": 110.3000726,
     "sharedNode": 6533456477,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11189,7 +11589,8 @@
     "lon": 110.3010815,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -11209,7 +11610,8 @@
     "lon": 110.3000251,
     "sharedNode": 6533456478,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11232,7 +11634,8 @@
     "lon": 110.3010066,
     "sharedNode": 6533456445,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11255,7 +11658,8 @@
     "lon": 110.3001293,
     "sharedNode": 6533456476,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11280,7 +11684,8 @@
     "lon": 110.3011196,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -11300,7 +11705,8 @@
     "lon": 110.3000726,
     "sharedNode": 6533456477,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11323,7 +11729,8 @@
     "lon": 110.3010546,
     "sharedNode": 6533456446,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11348,7 +11755,8 @@
     "lon": 110.301161,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -11368,7 +11776,8 @@
     "lon": 110.3001293,
     "sharedNode": 6533456476,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11391,7 +11800,8 @@
     "lon": 110.3010974,
     "sharedNode": 6533456447,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11414,7 +11824,8 @@
     "lon": 110.3001852,
     "sharedNode": 6533456475,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11439,7 +11850,8 @@
     "lon": 110.2998664,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -11461,7 +11873,8 @@
     "lon": 110.3012211,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -11481,7 +11894,8 @@
     "lon": 110.3001852,
     "sharedNode": 6533456475,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11504,7 +11918,8 @@
     "lon": 110.3011697,
     "sharedNode": 6533456448,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11529,7 +11944,8 @@
     "lon": 110.2997584,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -11547,7 +11963,8 @@
     "lon": 110.2996024,
     "sharedNode": 6635078452,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11568,7 +11985,8 @@
     "lon": 110.2996538,
     "sharedNode": 6635078453,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11591,7 +12009,8 @@
     "lon": 110.2997941,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -11609,7 +12028,8 @@
     "lon": 110.299697,
     "sharedNode": 6635078454,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11632,7 +12052,8 @@
     "lon": 110.3002304,
     "sharedNode": 6533456474,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -11657,7 +12078,8 @@
     "lon": 110.2998753,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -11679,7 +12101,8 @@
     "lon": 110.3012527,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -11699,7 +12122,8 @@
     "lon": 110.3002304,
     "sharedNode": 6533456474,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -11722,7 +12146,8 @@
     "lon": 110.3012128,
     "sharedNode": 6533456449,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11745,7 +12170,8 @@
     "lon": 110.3002757,
     "sharedNode": 6533456473,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11770,7 +12196,8 @@
     "lon": 110.3012979,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -11790,7 +12217,8 @@
     "lon": 110.3002757,
     "sharedNode": 6533456473,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11813,7 +12241,8 @@
     "lon": 110.3012516,
     "sharedNode": 6533456450,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11836,7 +12265,8 @@
     "lon": 110.3003219,
     "sharedNode": 6533456472,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -11861,7 +12291,8 @@
     "lon": 110.2999294,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -11883,7 +12314,8 @@
     "lon": 110.3013409,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -11903,7 +12335,8 @@
     "lon": 110.3003219,
     "sharedNode": 6533456472,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 3,
       "railway": "level_crossing"
@@ -11926,7 +12359,8 @@
     "lon": 110.3013043,
     "sharedNode": 6533456451,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11951,7 +12385,8 @@
     "lon": 110.3013827,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -11971,7 +12406,8 @@
     "lon": 110.3003729,
     "sharedNode": 6533456471,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -11994,7 +12430,8 @@
     "lon": 110.3013437,
     "sharedNode": 6533456452,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12017,7 +12454,8 @@
     "lon": 110.3004213,
     "sharedNode": 6533456470,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12042,7 +12480,8 @@
     "lon": 110.3014312,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -12062,7 +12501,8 @@
     "lon": 110.3004213,
     "sharedNode": 6533456470,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12085,7 +12525,8 @@
     "lon": 110.3013994,
     "sharedNode": 6533456453,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12108,7 +12549,8 @@
     "lon": 110.3004678,
     "sharedNode": 6533456469,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12133,7 +12575,8 @@
     "lon": 110.3014732,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -12153,7 +12596,8 @@
     "lon": 110.3004678,
     "sharedNode": 6533456469,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12176,7 +12620,8 @@
     "lon": 110.3014467,
     "sharedNode": 6533456454,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12199,7 +12644,8 @@
     "lon": 110.3005727,
     "sharedNode": 6533456468,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12224,7 +12670,8 @@
     "lon": 110.2999583,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -12244,7 +12691,8 @@
     "lon": 110.3006102,
     "sharedNode": 6533456467,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12267,7 +12715,8 @@
     "lon": 110.3005727,
     "sharedNode": 6533456468,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12290,7 +12739,8 @@
     "lon": 110.3015487,
     "sharedNode": 6533456455,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12315,7 +12765,8 @@
     "lon": 110.3015604,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -12335,7 +12786,8 @@
     "lon": 110.3015487,
     "sharedNode": 6533456455,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12360,7 +12812,8 @@
     "lon": 110.301609,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -12380,7 +12833,8 @@
     "lon": 110.3006102,
     "sharedNode": 6533456467,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12403,7 +12857,8 @@
     "lon": 110.3016005,
     "sharedNode": 6533456456,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12426,7 +12881,8 @@
     "lon": 110.3006538,
     "sharedNode": 6533456466,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12451,7 +12907,8 @@
     "lon": 110.3016513,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -12471,7 +12928,8 @@
     "lon": 110.3006538,
     "sharedNode": 6533456466,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12494,7 +12952,8 @@
     "lon": 110.301646,
     "sharedNode": 6533456457,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12517,7 +12976,8 @@
     "lon": 110.3007019,
     "sharedNode": 6533456465,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12542,7 +13002,8 @@
     "lon": 110.3000175,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -12562,7 +13023,8 @@
     "lon": 110.3007333,
     "sharedNode": 6533456464,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12587,7 +13049,8 @@
     "lon": 110.3017088,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -12607,7 +13070,8 @@
     "lon": 110.3007019,
     "sharedNode": 6533456465,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12630,7 +13094,8 @@
     "lon": 110.3017042,
     "sharedNode": 6533456458,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12655,7 +13120,8 @@
     "lon": 110.3017565,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -12675,7 +13141,8 @@
     "lon": 110.3007333,
     "sharedNode": 6533456464,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12698,7 +13165,8 @@
     "lon": 110.3017546,
     "sharedNode": 6533456459,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12721,7 +13189,8 @@
     "lon": 110.3008028,
     "sharedNode": 6533456463,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12746,7 +13215,8 @@
     "lon": 110.3018109,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -12766,7 +13236,8 @@
     "lon": 110.3008028,
     "sharedNode": 6533456463,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12789,7 +13260,8 @@
     "lon": 110.3018111,
     "sharedNode": 6533456460,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12812,7 +13284,8 @@
     "lon": 110.3008532,
     "sharedNode": 6533456462,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12837,7 +13310,8 @@
     "lon": 110.3018629,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -12857,7 +13331,8 @@
     "lon": 110.3008532,
     "sharedNode": 6533456462,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12880,7 +13355,8 @@
     "lon": 110.3018664,
     "sharedNode": 6533456461,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -12914,7 +13390,8 @@
     "lon": 110.301387,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -12945,7 +13422,8 @@
     "lon": 110.3013966,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -12976,7 +13454,8 @@
     "lon": 110.3014413,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13007,7 +13486,8 @@
     "lon": 110.3014534,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13040,7 +13520,8 @@
     "lon": 110.297617,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13059,7 +13540,8 @@
     "lon": 110.2968953,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13078,7 +13560,8 @@
     "lon": 110.2967767,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13096,7 +13579,8 @@
     "lon": 110.2972468,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13114,7 +13598,8 @@
     "lon": 110.2972661,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13135,7 +13620,8 @@
     "lon": 110.2977621,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13156,7 +13642,8 @@
     "lon": 110.2978497,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13180,7 +13667,8 @@
     "lon": 110.2911178,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13204,7 +13692,8 @@
     "lon": 110.2912373,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13227,7 +13716,8 @@
     "lon": 110.2909971,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13250,7 +13740,8 @@
     "lon": 110.2913347,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13274,7 +13765,8 @@
     "lon": 110.291261,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13298,7 +13790,8 @@
     "lon": 110.2914087,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13321,7 +13814,8 @@
     "lon": 110.2911442,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13344,7 +13838,8 @@
     "lon": 110.2915122,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13372,7 +13867,8 @@
     "lon": 110.1889542,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13400,7 +13896,8 @@
     "lon": 110.1891365,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13418,7 +13915,8 @@
     "lon": 110.1995947,
     "sharedNode": 9457262754,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 1,
       "railway": "level_crossing"
@@ -13439,7 +13937,8 @@
     "lon": 110.1995701,
     "sharedNode": 9457262755,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 1,
       "railway": "level_crossing"
@@ -13462,7 +13961,8 @@
     "lon": 110.1967826,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13490,7 +13990,8 @@
     "lon": 110.1894675,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13518,7 +14019,8 @@
     "lon": 110.1895519,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13549,7 +14051,8 @@
     "lon": 110.2965905,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13580,7 +14083,8 @@
     "lon": 110.2964713,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13610,7 +14114,8 @@
     "lon": 110.2969423,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13640,7 +14145,8 @@
     "lon": 110.296962,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13676,7 +14182,8 @@
     "lon": 110.295236,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13712,7 +14219,8 @@
     "lon": 110.2952788,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13731,7 +14239,8 @@
     "lon": 110.296363,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13750,7 +14259,8 @@
     "lon": 110.2962422,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13768,7 +14278,8 @@
     "lon": 110.2967185,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13786,7 +14297,8 @@
     "lon": 110.2967388,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13805,7 +14317,8 @@
     "lon": 110.2966851,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13824,7 +14337,8 @@
     "lon": 110.2965665,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13842,7 +14356,8 @@
     "lon": 110.297036,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13860,7 +14375,8 @@
     "lon": 110.2970555,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13895,7 +14411,8 @@
     "lon": 110.2933585,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13931,7 +14448,8 @@
     "lon": 110.2952822,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13967,7 +14485,8 @@
     "lon": 110.2953263,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -13998,7 +14517,8 @@
     "lon": 110.2966388,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14029,7 +14549,8 @@
     "lon": 110.2965195,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14059,7 +14580,8 @@
     "lon": 110.2969914,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14089,7 +14611,8 @@
     "lon": 110.2970111,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": null,
+    "type": null,
+    "evidence": "未共享节点，缺少上下层证据",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14127,7 +14650,8 @@
     "lon": 110.2872786,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14169,7 +14693,8 @@
     "lon": 110.2922204,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14209,7 +14734,8 @@
     "lon": 110.2922587,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14243,7 +14769,8 @@
     "lon": 110.2829126,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14277,7 +14804,8 @@
     "lon": 110.2826193,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14313,7 +14841,8 @@
     "lon": 110.2783663,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14349,7 +14878,8 @@
     "lon": 110.2783346,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14384,7 +14914,8 @@
     "lon": 110.2762392,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14418,7 +14949,8 @@
     "lon": 110.2759183,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14455,7 +14987,8 @@
     "lon": 110.2789424,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14491,7 +15024,8 @@
     "lon": 110.2772081,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14528,7 +15062,8 @@
     "lon": 110.277277,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14559,7 +15094,8 @@
     "lon": 110.2581976,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14583,7 +15119,8 @@
     "lon": 110.292994,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14607,7 +15144,8 @@
     "lon": 110.2930969,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14631,7 +15169,8 @@
     "lon": 110.2931498,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14655,7 +15194,8 @@
     "lon": 110.2932033,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14680,7 +15220,8 @@
     "lon": 110.2953476,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14705,7 +15246,8 @@
     "lon": 110.29539,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14735,7 +15277,8 @@
     "lon": 110.2921101,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14763,7 +15306,8 @@
     "lon": 110.2921501,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14785,7 +15329,8 @@
     "lon": 110.2751439,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14808,7 +15353,8 @@
     "lon": 110.2751763,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -14826,7 +15372,8 @@
     "lon": 110.2756278,
     "sharedNode": 6533456499,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 4,
       "railway": "level_crossing"
@@ -14847,7 +15394,8 @@
     "lon": 110.274038,
     "sharedNode": 6533456502,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -14868,7 +15416,8 @@
     "lon": 110.27397,
     "sharedNode": 6533456501,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -14889,7 +15438,8 @@
     "lon": 110.2761873,
     "sharedNode": 9385867899,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 1,
       "railway": "level_crossing"
@@ -14917,7 +15467,8 @@
     "lon": 110.2838611,
     "sharedNode": 9385930439,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -14945,7 +15496,8 @@
     "lon": 110.2839491,
     "sharedNode": 9385930440,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -14968,7 +15520,8 @@
     "lon": 110.2840567,
     "sharedNode": 13619754833,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 1,
       "railway": "level_crossing"
@@ -14991,7 +15544,8 @@
     "lon": 110.2838035,
     "sharedNode": 13619846089,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 1,
       "railway": "level_crossing"
@@ -15022,7 +15576,8 @@
     "lon": 110.2778639,
     "sharedNode": 6112626492,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -15048,7 +15603,8 @@
     "lon": 110.277877,
     "sharedNode": 9385908105,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 1,
       "railway": "level_crossing"
@@ -15079,7 +15635,8 @@
     "lon": 110.2778639,
     "sharedNode": 6112626492,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 2,
       "railway": "level_crossing"
@@ -15104,7 +15661,8 @@
     "lon": 110.2767226,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 1，道路 0）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -15124,7 +15682,8 @@
     "lon": 110.1969786,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -15144,7 +15703,8 @@
     "lon": 110.1972823,
     "sharedNode": 9437426818,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "无标签，按共享节点推定",
     "nodeEvidence": {
       "version": 1,
       "railway": null
@@ -15169,7 +15729,8 @@
     "lon": 110.2968307,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -15188,7 +15749,8 @@
     "lon": 110.265357,
     "sharedNode": 10287194720,
     "geometry": "Point",
-    "upper": null,
+    "type": "level",
+    "evidence": "railway=level_crossing",
     "nodeEvidence": {
       "version": 1,
       "railway": "level_crossing"
@@ -15229,7 +15791,8 @@
     "lon": 110.189689,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -15267,7 +15830,8 @@
     "lon": 110.1897734,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -15305,7 +15869,8 @@
     "lon": 110.189735,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -15343,7 +15908,8 @@
     "lon": 110.18982,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -15376,7 +15942,8 @@
     "lon": 110.2976733,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -15398,7 +15965,8 @@
     "lon": 110.2783422,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "rail",
+    "type": "rail_over",
+    "evidence": "层级（铁路 0，道路 -1）",
     "nodeEvidence": null,
     "measuredClearance": null
   },
@@ -15419,7 +15987,8 @@
     "lon": 110.2971052,
     "sharedNode": null,
     "geometry": "Point",
-    "upper": "road",
+    "type": "road_over",
+    "evidence": "层级（铁路 0，道路 1）",
     "nodeEvidence": null,
     "measuredClearance": null
   }
