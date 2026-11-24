@@ -97,3 +97,63 @@ body[data-hud="street"] .hud-stats {
     max-width: min(46vw, 300px);
   }
 }
+
+/* 同城联机（IDOK-192）：一颗状态点 + 人数。青玉 = 在线，赭黄呼吸 = 连接中，朱砂 = 断开（这一格可以点）。 */
+.hud-stat--mp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ui-paper, #f4efe2);
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: default;
+}
+
+.hud-stat--mp::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ui-ok, #8fc1b5);
+  box-shadow: 0 0 0 2px rgba(143, 193, 181, .22);
+}
+
+.hud-stat--mp[data-state="connecting"]::before {
+  background: var(--ui-warn, #e2b878);
+  box-shadow: 0 0 0 2px rgba(226, 184, 120, .22);
+  animation: hud-mp-breath 1.2s ease-in-out infinite;
+}
+
+.hud-stat--mp[data-state="offline"],
+.hud-stat--mp[data-state="login"] {
+  pointer-events: auto;
+  cursor: pointer;
+  color: var(--ui-error, #f0b9a6);
+  text-decoration: underline;
+  text-decoration-color: rgba(240, 185, 166, .45);
+  text-underline-offset: 3px;
+}
+
+.hud-stat--mp[data-state="offline"]::before,
+.hud-stat--mp[data-state="login"]::before {
+  background: var(--ui-seal-light, #d0694c);
+  box-shadow: 0 0 0 2px rgba(208, 105, 76, .25);
+}
+
+.hud-stat--mp:focus-visible {
+  outline: 2px solid var(--ui-jade-300, #8fc1b5);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+@keyframes hud-mp-breath {
+  50% { opacity: .35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-stat--mp[data-state="connecting"]::before { animation: none; }
+}

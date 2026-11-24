@@ -2,6 +2,9 @@ import type {AnimationClip,Scene} from 'three'
 import type {Avatar} from '../../lib/avatar'
 import {players,type Pose} from './net-players'
 import {onUser} from './ui/account'
+import type {MpStatus} from './ui/mp-pref'
+
+function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-status',{detail}))}
 
 type State='connecting'|'online'|'offline'
 export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar) {
@@ -11,7 +14,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   const badge=new URLSearchParams(location.search).has('debug')?document.createElement('output'):null
   if(badge){badge.style.cssText='position:fixed;top:0;right:0;z-index:99;background:white;color:black';document.body.append(badge)}
   function status(){return {state,online}}
-  function update(next:State,count=0){state=next;online=count;if(badge)badge.textContent=`${state} · ${online}`}
+  function update(next:State,count=0){state=next;online=count;if(badge)badge.textContent=`${state} · ${online}`;publish({state,online})}
   function send(packet:object){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify(packet))}
   function retry(){update('offline');if(attempt<6&&!disposed)timer=window.setTimeout(connect,Math.min(1000*2**attempt++,16000))}
   async function connect(){
@@ -51,6 +54,8 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   const unsubscribe=onUser(user=>{const id=user?.id??null;if(id===account)return
     account=id;stop();if(id){attempt=0;void connect()}})
   window.addEventListener('glol:avatar-change',avatarChanged)
-  return {status,tick,who:()=>send({t:'who'}),probe:peers.probe,reconnect(){if(!disposed){stop();attempt=0;void connect()}},
-    dispose(){disposed=true;unsubscribe();stop();badge?.remove();window.removeEventListener('glol:avatar-change',avatarChanged)}}
+  const manual=()=>{if(!disposed){stop();attempt=0;void connect()}}
+  window.addEventListener('glol:mp-reconnect',manual)
+  return {status,tick,who:()=>send({t:'who'}),probe:peers.probe,reconnect:manual,
+    dispose(){disposed=true;unsubscribe();stop();badge?.remove();window.removeEventListener('glol:avatar-change',avatarChanged);window.removeEventListener('glol:mp-reconnect',manual);publish({state:'off',online:0})}}
 }
