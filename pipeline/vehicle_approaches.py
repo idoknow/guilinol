@@ -18,7 +18,7 @@ def surface_guides(elements, portals, nodes):
         highway=tags.get('highway')
         pedestrian=highway in ('footway','pedestrian','path','steps')
         restricted=tags.get('motor_vehicle') in ('private','no') or tags.get('access')=='private'
-        if (way['type']!='way' or not (pedestrian or (highway=='service' and restricted)) or underground(tags) or
+        if (way['type']!='way' or not (pedestrian or (highway=='service' and restricted)) or underground(way) or
                 not mouths.intersection(way['nodes']) or not all(way['geometry'])):
             continue
         for ref,point in zip(way['nodes'],way['geometry'],strict=True):
@@ -109,7 +109,7 @@ def portal_openings(tunnels, elements, widths):
                 mouths[round(x,2),round(z,2)].append((t,i))
     for way in elements:
         tags=way.get('tags',{})
-        if (way['type']!='way' or not tags.get('highway') or underground(tags)
+        if (way['type']!='way' or not tags.get('highway') or underground(way)
                 or not way.get('geometry') or not all(way['geometry'])):
             continue
         coords=[ll2xz(p['lat'],p['lon']) for p in way['geometry']]

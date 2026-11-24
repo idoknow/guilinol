@@ -280,7 +280,19 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     }
     if(changed)pieces.forEach(poly=>fan(poly,vertices));else keep.push(...ids)
   }
-  ground.setIndex(keep)
+  // A shallow roof can cross the occupied volume even beyond a portal cut.
+  // Preserve the original indices outside the bore and texture only the new faces.
+  const clipTerrain=tunnelClearanceClipper(tile,tunnels,.055)
+  const keptGround:number[]=[]
+  const insideTile=clipTerrain(Float32Array.from(pos.array),keep,keptGround)
+  const cutVertices=Float32Array.from(vertices)
+  vertices.length=0
+  for(const value of insideTile)vertices.push(value)
+  if(cutVertices.length){
+    const trimmed=clipTerrain(cutVertices,Array.from({length:cutVertices.length/3},(_,i)=>i))
+    for(const value of trimmed)vertices.push(value)
+  }
+  ground.setIndex(keptGround)
   if(parts.ceiling.length && tunnels.length>1){
     // A lower ceiling at a bend may extend into the clearance of the
     // adjoining strip. The higher ceiling closes the union of the bores.
@@ -310,7 +322,7 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
 
 // Clip collision triangles against the actual piecewise-linear floor and roof.
 // Preserve the floor, ceiling and exterior faces at the boundary of each prism.
-export function tunnelClearanceClipper(tile:Tile,tunnels:Tunnel[]){
+export function tunnelClearanceClipper(tile:Tile,tunnels:Tunnel[],belowFloor=0){
   type Prism={planes:Plane[];xmin:number;xmax:number;zmin:number;zmax:number}
   const bins=new Map<number,Prism[]>()
   const cell=(v:number)=>Math.max(0,Math.min(31,Math.floor(v/8)))
@@ -324,7 +336,7 @@ export function tunnelClearanceClipper(tile:Tile,tunnels:Tunnel[]){
       const sign=Math.sign(dx*(cz-z)-dz*(cx-x))/Math.hypot(dx,dz)
       return p=>sign*(dx*(p[2]-z)-dz*(p[0]-x))
     })
-    planes.push(p=>p[1]-floor(p[0],p[2]),p=>floor(p[0],p[2])+height-p[1])
+    planes.push(p=>p[1]-floor(p[0],p[2])+belowFloor,p=>floor(p[0],p[2])+height-p[1])
     const prism={planes,xmin,xmax,zmin,zmax}
     for(let i=cell(xmin);i<=cell(xmax);i++)for(let j=cell(zmin);j<=cell(zmax);j++){
       const key=i*32+j
@@ -347,7 +359,7 @@ export function tunnelClearanceClipper(tile:Tile,tunnels:Tunnel[]){
       register(jointRing(joint,center).map(([x,z])=>[x-tile.x,z-tile.z]),()=>center[1],tunnel.clearance)
     }
   }
-  return (vertices:Float32Array,indices:number[])=>{
+  return (vertices:Float32Array,indices:number[],unchanged?:number[])=>{
     const output:number[]=[]
     for(let i=0;i<indices.length;i+=3){
       const corners=indices.slice(i,i+3).map(index=>[vertices[3*index],vertices[3*index+1],vertices[3*index+2]] as Point)
@@ -374,7 +386,9 @@ export function tunnelClearanceClipper(tile:Tile,tunnels:Tunnel[]){
         }
         pieces=outside
       }
-      for(const poly of pieces)fan(poly,output)
+      if(unchanged && pieces.length===1 && pieces[0]===corners){
+        unchanged.push(indices[i],indices[i+1],indices[i+2])
+      }else for(const poly of pieces)fan(poly,output)
     }
     return Float32Array.from(output)
   }

@@ -38,7 +38,7 @@ def relocate(output, manifest, elements):
 
     lines=[LineString([ll2xz(p['lat'],p['lon']) for p in w['geometry']])
            for w in elements if w['type']=='way' and w.get('tags',{}).get('highway')
-           and w['tags'].get('layer','0')=='0' and w['tags'].get('bridge','no')=='no'
+           and (w['tags'].get('layer','0')=='0' or w.get('surfaceUnderlay')) and w['tags'].get('bridge','no')=='no'
            and w.get('geometry') and len(w['geometry'])>1 and all(w['geometry'])]
     axes=STRtree(lines)
     moves=defaultdict(list)
@@ -67,32 +67,38 @@ def relocate(output, manifest, elements):
             if not added.covers(point):
                 continue
             if nearby is None:
-                region=box(key[0]-64,key[1]-64,key[0]+320,key[1]+320)
+                region=box(key[0]-160,key[1]-160,key[0]+416,key[1]+416)
                 blocks=[surfaces(k) for dx in (-256,0,256) for dz in (-256,0,256)
                         if (k:=(key[0]+dx,key[1]+dz)) in tiles]
                 nearby=[union_all([b[j].intersection(region) for b in blocks]) for j in (0,1)]
             road,sidewalk=nearby
-            line=lines[axes.nearest(point)]
-            t=line.project(point)
-            a,b=line.interpolate(max(0,t-.01)),line.interpolate(min(line.length,t+.01))
-            dx,dz=b.x-a.x,b.y-a.y
-            length=math.hypot(dx,dz)
-            if length<1e-6:
-                raise ValueError(f'Degenerate corridor tangent at {point}')
-            normal=np.array([-dz,dx])/length
             candidates=[]
             scale=10 if field else 100
-            for sign in (-1,1):
-                ray=LineString([(x,z),np.array([x,z])+60*sign*normal])
-                for clearance in (.55,.75,.95):
-                    edges=ray.intersection(road.buffer(clearance).boundary)
-                    for edge in getattr(edges,'geoms',[edges]):
-                        if edge.geom_type!='Point':
-                            continue
-                        nx,nz=np.rint(np.array(edge.coords[0])*scale)/scale
-                        q=Point(nx,nz)
-                        if .5<=road.distance(q)<=1 and origin(nx,nz) in tiles:
-                            candidates.append((not sidewalk.covers(q),point.distance(q),nx,nz))
+            nearest=axes.nearest(point)
+            # A junction can belong to two intersecting carriageways. Keep
+            # the station fixed on either axis and use the nearest legal curb.
+            road_axes=axes.query(point.buffer(max(3.,lines[nearest].distance(point)+.01)),
+                                predicate='intersects')
+            for index in road_axes:
+                line=lines[index]
+                t=line.project(point)
+                a,b=line.interpolate(max(0,t-.01)),line.interpolate(min(line.length,t+.01))
+                dx,dz=b.x-a.x,b.y-a.y
+                length=math.hypot(dx,dz)
+                if length<1e-6:
+                    continue
+                normal=np.array([-dz,dx])/length
+                for sign in (-1,1):
+                    ray=LineString([(x,z),np.array([x,z])+150*sign*normal])
+                    for clearance in (.55,.75,.95):
+                        edges=ray.intersection(road.buffer(clearance).boundary)
+                        for edge in getattr(edges,'geoms',[edges]):
+                            if edge.geom_type!='Point':
+                                continue
+                            nx,nz=np.rint(np.array(edge.coords[0])*scale)/scale
+                            q=Point(nx,nz)
+                            if .5<=road.distance(q)<=1 and origin(nx,nz) in tiles:
+                                candidates.append((not sidewalk.covers(q),point.distance(q),nx,nz))
             if not candidates:
                 raise ValueError(f'No legal lateral position at {point}')
             shoulder,_,nx,nz=min(candidates)

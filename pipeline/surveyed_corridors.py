@@ -63,9 +63,11 @@ def restore(output,chunks):
 
 def bake(output, chunks, elements, widths, approaches=(), only_approaches=False):
     intervals = json.loads(Path(__file__).with_name('road-corridor-survey.json').read_text())
-    shapes = []
+    shapes, footpaths = [], []
     for way in elements:
         spans = intervals.get(str(way['id']))
+        if way.get('surfaceUnderlay'):
+            spans = [(0, math.inf)]
         if way['type'] != 'way' or not spans or not all(way['geometry']):
             continue
         axis = LineString([ll2xz(p['lat'], p['lon']) for p in way['geometry']])
@@ -76,9 +78,13 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False)
         for start, end in spans:
             if start < axis.length:
                 part=substring(axis,start,min(end,axis.length))
-                shapes.append(part.buffer(paved/2+.5,quad_segs=4))
+                corridor = part.buffer(paved/2+.5,quad_segs=4)
+                shapes.append(corridor)
+                if way.get('surfaceUnderlay') and tags['highway'] in ('footway','path','pedestrian'):
+                    footpaths.append(corridor)
     grades=STRtree([line.buffer(half,quad_segs=4) for line,half,*_ in approaches])
     tree = STRtree(shapes)
+    pedestrian = STRtree(footpaths)
     for tile in chunks:
         x, z = tile['x'], tile['z']
         bounds = box(x,z,x+256,z+256)
@@ -91,12 +97,13 @@ def bake(output, chunks, elements, widths, approaches=(), only_approaches=False)
         area = set_precision(translate(area, -x, -z), .01)
         if area.area > .01:
             local=[(translate(approaches[i][0],-x,-z),*approaches[i][1:]) for i in nearby]
-            if patch(output/tile['file'], area, local):
+            foot = [translate(footpaths[i],-x,-z) for i in pedestrian.query(bounds,predicate='intersects')]
+            if patch(output/tile['file'], area, local, foot):
                 tile['gradedCorridor']=True
             tile['bytes'] = (output/tile['file']).stat().st_size
 
 
-def patch(file, area, approaches=()):
+def patch(file, area, approaches=(), foot=()):
     raw = gzip.decompress(file.read_bytes())
     n, k, size, image, deck = struct.unpack_from('<5I', raw, 4)
     start = 24+16900+9*n+4*k
@@ -115,11 +122,14 @@ def patch(file, area, approaches=()):
     # Survey buffers can extend past an existing building facade at the
     # roadside. Keep that occupied ground while preserving mapped passages.
     solids=union_all([make_valid(Polygon(np.asarray(loops[0])/100,[np.asarray(r)/100 for r in loops[1:]]))
-                     for _,_,loops,*_ in collision[0] if loops and len(loops[0])>=3])
+                     for row in collision[0] for loops in [row[2]]
+                      if loops and len(loops[0])>=3 and not any(row[9:])])
     if not solids.is_empty and solids.intersects(area):
         existing_roads=union_all([make_valid(Polygon(np.asarray(shell)/100,[np.asarray(h)/100 for h in holes]))
                                   for kind,shell,*holes in original['paths'] if kind in (0,5)])
-        area=set_precision(area.difference(solids.difference(existing_roads)),.01)
+        # The exposed bed stops short of its retaining edge. Carry the asphalt
+        # under the facade lip so it meets the wall at street level.
+        area=set_precision(area.difference(solids.buffer(-.06).difference(existing_roads)),.01)
         if area.is_empty:
             return False
     rebuilt = []
@@ -140,7 +150,7 @@ def patch(file, area, approaches=()):
     # the outside retaining wall. At a tile seam the road must remain joined.
     exterior=area.boundary.difference(box(0,0,256,256).boundary)
     top_area=area.difference(exterior.buffer(.04,quad_segs=2))
-    walk=union_all([line.buffer(half,quad_segs=4) for line,half,*_,kind in approaches if kind==1])
+    walk=union_all([*foot, *(line.buffer(half,quad_segs=4) for line,half,*_,kind in approaches if kind==1)])
     motor=union_all([line.buffer(half,quad_segs=4) for line,half,*_,kind in approaches if kind==0])
     walk=set_precision(walk.difference(motor).intersection(area),.01)
     for kind,polygon in [(k,p) for k,g in [(0,top_area.difference(walk)),(1,top_area.intersection(walk))] for p in polygons(g)]:

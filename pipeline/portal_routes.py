@@ -54,7 +54,7 @@ def routes(elements,network,nodes):
             if length<.01:continue
             coords[a],coords[b]=p,q
             for i,j in ((a,b),(b,a)):
-                graph[i].append((j,length,underground(tags),w['id'],modes))
+                graph[i].append((j,length,underground(w),w['id'],modes))
 
     def trace(root,inside,mode,way=None,direction=None):
         def walk(n,path,remaining,heading):

@@ -8,8 +8,24 @@ import {poseAt,trackHeight} from '../web/src/traffic/sim'
 
 const [mode='audit',world='public/world',output='captures/vehicle-grounding']=process.argv.slice(2)
 const bake=mode==='bake'
-const data=(bake||mode==='prop-heights'||mode==='portals'||mode==='portal-check'||mode==='portal-routes')?JSON.parse(fs.readFileSync(output,'utf8')):JSON.parse(gunzipSync(fs.readFileSync(path.join(world,'roads/graph.json.gz'))).toString())
+const data=(bake||mode==='passage-heights'||mode==='prop-heights'||mode==='portals'||mode==='portal-check'||mode==='portal-routes')?JSON.parse(fs.readFileSync(output,'utf8')):JSON.parse(gunzipSync(fs.readFileSync(path.join(world,'roads/graph.json.gz'))).toString())
 const manifest=data.manifest??JSON.parse(fs.readFileSync(path.join(world,'manifest.json'),'utf8'))
+if(mode==='passage-heights'){
+  const surface=vehicleSurface(world,manifest)
+  const heights=data.positions.map(({x,z,bridge}:{x:number,z:number,bridge?:number[]})=>{
+    if(bridge){
+      const [dx,dz]=bridge, length=Math.hypot(dx,dz)
+      for(const along of [0,.1,.25,.5,1,2]){
+        const hit={hidden:false,deck:-Infinity}
+        surface(x+dx*along/length,z+dz*along/length,{structure:'bridge'},hit)
+        if(Number.isFinite(hit.deck))return hit.deck
+      }
+    }
+    return surface(x,z,{})
+  })
+  fs.writeFileSync(output,JSON.stringify(heights))
+  process.exit(0)
+}
 if(mode==='prop-heights'){
   const surface=vehicleSurface(world,manifest)
   const heights=data.positions.map(([x,z])=>{
@@ -22,6 +38,14 @@ if(mode==='prop-heights'){
 }
 if(mode==='portal-routes'){
   const surface=vehicleSurface(world,manifest)
+  const current=new Set(data.routes.map(site=>site.id))
+  const [x,z,width,depth]=manifest.extent
+  const baseline=JSON.parse(fs.readFileSync(new URL('./fixtures/grounding-portals.json',import.meta.url),'utf8'))
+  for(const site of baseline){
+    if(current.has(site.id)||!site.modes.every(m=>m.route.every(([px,pz])=>
+      px>=x && pz>=z && px<x+width && pz<z+depth)))continue
+    data.routes.push({...site,formerPortal:true})
+  }
   for(const site of data.routes)for(const test of site.modes){
     const [x,z,way]=test.route[0]
     test.startHeight=surface(x,z,{way,structure:test.startStructure,pedestrian:test.mode==='foot'})
@@ -61,12 +85,19 @@ if(mode==='portals'){
     for(let i=0;i<=count;i++){
       const f=i/count,x=a.x+dx*f,z=a.z+dz*f
       // The lowest obstruction across the carriageway sets the clearance.
-      levels.push(Math.min(...[-edge.halfWidth,0,edge.halfWidth].map(offset=>
-        surface(x-dz/length*offset,z+dx/length*offset,{}))))
+      levels.push(Math.min(...[-edge.halfWidth,0,edge.halfWidth].map((offset,side)=>{
+        const hit={hidden:false,road:-Infinity,deck:-Infinity}
+        const ground=surface(x-dz/length*offset,z+dx/length*offset,{structure:'bridge'},hit)
+        const mountain=edge.mountainRoof?.[3*i+side]
+        if(mountain==null)return ground
+        // A mapped upper road remains a hard roof below the mountain shell.
+        const roadRoof=Math.min(...[hit.road,hit.deck].filter(Number.isFinite))
+        return Math.min(Math.max(ground,mountain),roadRoof)
+      })))
     }
     roofs.push(levels)
   }
-  fs.writeFileSync(output,JSON.stringify({heights,roofs}))
+  fs.writeFileSync(output,JSON.stringify({heights,roofs,roadLevels:data.gradePoints.map(([x,z])=>surface(x,z,{}))}))
   process.exit(0)
 }
 // Released graphs predating the way field use OSM node pairs as stable keys.

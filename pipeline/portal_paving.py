@@ -55,7 +55,7 @@ def trim(output,chunks,tunnels,elements,widths):
     protected = []
     for way in elements:
         tags = way.get('tags', {})
-        if (way['type'] != 'way' or not tags.get('highway') or underground(tags)
+        if (way['type'] != 'way' or not tags.get('highway') or underground(way)
                 or not way.get('geometry') or not all(way['geometry'])):
             continue
         axis = LineString([ll2xz(p['lat'], p['lon']) for p in way['geometry']])
