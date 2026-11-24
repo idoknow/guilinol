@@ -7,12 +7,13 @@ import sys
 
 import numpy as np
 from PIL import Image, ImageDraw
-from shapely import constrained_delaunay_triangles
+from shapely import constrained_delaunay_triangles, get_parts, union_all
+from shapely.geometry import LineString
 from shapely.affinity import translate
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common import load_osm
-from features import area
+from features import area, points
 from seam_streets import Streets
 from m26_16_kit import export_landmark_glb, get_font
 from station_site import CENTER, ROOT, footprints
@@ -179,10 +180,41 @@ def platform(b, poly, streets):
     b.restore_frame(old)
 
 
+def track_limits(ways, platforms):
+    """Pedestrian collision at the rolling-stock envelope below the bridge deck."""
+    extent = union_all(platforms).convex_hull.buffer(5)
+    beds = []
+    for way in ways.values():
+        if way.get("tags", {}).get("railway") != "rail":
+            continue
+        line = local(LineString(points(way)))
+        if extent.intersects(line):
+            beds.append(line.buffer(1.7).intersection(extent))
+    return union_all(beds)
+
+
+def block_tracks(b, envelope):
+    for polygon in get_parts(envelope):
+        for ring in [polygon.exterior, *polygon.interiors]:
+            coordinates = list(ring.segmentize(8).coords)
+            for (x, z), (xx, zz) in zip(coordinates, coordinates[1:]):
+                low, far = b.grade(x, z) - 0.08, b.grade(xx, zz) - 0.08
+                b.hit_quad(
+                    [
+                        (x, low, z),
+                        (xx, far, zz),
+                        (xx, far + 2.2, zz),
+                        (x, low + 2.2, z),
+                    ],
+                    (zz - z, 0, x - xx),
+                )
+
+
 def main(out):
     site = {k: local(v) for k, v in footprints().items()}
     ways = {e["id"]: e for e in load_osm() if e["type"] == "way"}
     platforms = [local(area(ways[i])) for i in range(376029417, 376029421)]
+    track_envelope = track_limits(ways, platforms)
     annex = local(area(ways[1017598908]))
     bus_shelter = local(area(ways[1017598916]))
     image = Image.new("RGBA", (512, 512), "#ffffff")
@@ -257,6 +289,8 @@ def main(out):
                     x, z = a + np.asarray(u) * t - np.asarray(n) * 0.35
                     g = b.grade(x, z) - 0.035
                     b.cylinder_y(x, g, canopy - g, z, 0.14, "frame", sections=6)
+        if b.collide:
+            block_tracks(b, track_envelope)
         for poly in platforms:
             platform(b, poly, streets)
         crossing = site["crossing"]

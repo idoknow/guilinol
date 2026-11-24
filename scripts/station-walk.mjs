@@ -50,6 +50,18 @@ export async function stationWalk(page) {
             'Station route stopped ' +
               JSON.stringify({ target, remaining, probe: walk.probe() }),
           )
+        if (target === platform) {
+          // Probe the simulated track boundary from the accessible platform.
+          const rail = [-2260.98, 1750.92]
+          for (let frame = 0; frame < 90; frame++) {
+            const {x, z} = walk.probe()
+            const dx = rail[0] - x, dz = rail[1] - z
+            const distance = Math.hypot(dx, dz)
+            if (distance < 1.5) throw Error('Walker entered station track bed')
+            walk.drive(dx / distance, dz / distance, true)
+            walk.tick(1 / 30)
+          }
+        }
       }
       return walk.probe()
     } finally {
