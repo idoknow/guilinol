@@ -1,27 +1,40 @@
 export {
   DRINKS_CANDIDATE_IDS,
-  DRINKS_SHOP_CANDIDATES,
-  DRINKS_SHOP_SITE,
+  DRINKS_SHOP_ANCHORS,
   DRINKS_SHOP_BLUEPRINT,
   DRINKS_SHOP_BLUEPRINT_ENTRIES,
+  DRINKS_SHOP_CANDIDATES,
+  DRINKS_SHOP_DOORWAY,
+  DRINKS_SHOP_INTERIOR,
+  DRINKS_SHOP_SITE,
+  DRINKS_STAFF_OPERATION_ZONE,
+  DRINKS_STAFF_WORKSTATIONS,
   getDrinksBlueprint,
-  validateDrinksBlueprint,
   validateAllDrinksBlueprints,
-  type BlueprintEvidenceTag,
-  type DrinksCandidateId,
+  validateDrinksBlueprint,
   type BlueprintDimensionEntry,
-  type DrinksShopCandidateSite,
-  type DrinksShopCandidateBlueprint,
-  type DrinksBlueprintId,
+  type BlueprintEvidenceTag,
   type BlueprintValidationResult,
+  type DrinksBlueprintId,
+  type DrinksCandidateId,
+  type DrinksDoorwayBounds,
+  type DrinksInteriorBounds,
+  type DrinksShopCandidateBlueprint,
+  type DrinksShopCandidateSite,
+  type DrinksWorkstationZone,
 } from './blueprint.ts'
-
-export { createDrinksShopMaterials, type DrinksShopMaterialPack } from './materials.ts'
-
+export {
+  EXTERIOR_ATLAS_RECTS,
+  INTERIOR_ATLAS_RECTS,
+  MALL_ATLAS_RECTS,
+  createDrinksShopMaterials,
+  type AtlasRect,
+  type DrinksShopMaterialPack,
+} from './materials.ts'
 export {
   buildDrinksShopMesh,
   type DrinksCollider,
   type DrinksShopBuildOptions,
-  type DrinksShopMetrics,
   type DrinksShopBuildResult,
+  type DrinksShopMetrics,
 } from './mesh.ts'

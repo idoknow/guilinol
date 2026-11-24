@@ -6,57 +6,73 @@ import * as THREE from 'three'
 import { createDefaultDrinksLayout } from '../sim/menu.ts'
 import {
   DRINKS_CANDIDATE_IDS,
+  DRINKS_SHOP_ANCHORS,
   DRINKS_SHOP_CANDIDATES,
+  DRINKS_SHOP_DOORWAY,
+  DRINKS_SHOP_INTERIOR,
+  DRINKS_STAFF_OPERATION_ZONE,
+  DRINKS_STAFF_WORKSTATIONS,
   buildDrinksShopMesh,
   validateAllDrinksBlueprints,
 } from './index.ts'
 
-test('双候选蓝图每条尺寸均含有效「实拍可见」「推算」「无资料」标签与来源且数值对齐 layout', () => {
+test('双候选蓝图证据完备、门洞 ≥ 2.4m 且室内净面积已扩展容纳员工操作区', () => {
   const reports = validateAllDrinksBlueprints()
-  const layout = createDefaultDrinksLayout()
+  const simLayout = createDefaultDrinksLayout()
 
   for (const id of DRINKS_CANDIDATE_IDS) {
     const report = reports[id]
     const bp = DRINKS_SHOP_CANDIDATES[id]
     assert.equal(report.valid, true, `${id} blueprint errors: ${report.errors.join(', ')}`)
     assert.ok(report.count >= 25, `${id} expected >= 25 blueprint entries, got ${report.count}`)
-    assert.ok(report.countsByTag['实拍可见'] >= 4, `${id} missing 实拍可见 entries`)
-    assert.ok(report.countsByTag['推算'] >= 5, `${id} missing 推算 entries`)
-    assert.ok(report.countsByTag['无资料'] >= 15, `${id} missing honest 无资料 entries`)
+    assert.ok(report.countsByTag['实拍可见'] >= 8, `${id} missing 实拍可见 entries`)
+    assert.ok(report.countsByTag['推算'] >= 6, `${id} missing 推算 entries`)
+    assert.ok(report.countsByTag['无资料'] >= 7, `${id} missing 无资料 entries`)
 
-    assert.equal(bp.map.shop_width.valueM, layout.width)
-    assert.equal(bp.map.total_depth.valueM, layout.depth)
+    assert.ok(bp.map.door_width.valueM >= 2.4, `${id} doorway width must be >= 2.4m, got ${bp.map.door_width.valueM}`)
+    assert.ok(bp.map.shop_width.valueM >= simLayout.width, `${id} width must contain sim layout`)
+    assert.ok(bp.map.total_depth.valueM >= simLayout.depth + 1.5, `${id} total depth should be enlarged beyond legacy 9.8m`)
+    assert.ok(bp.map.interior_depth.valueM >= 9.0, `${id} interior depth must be >= 9.0m to house back kitchen`)
   }
 
   assert.equal(DRINKS_SHOP_CANDIDATES.poi_zhengyang208.map.facade_podium_storeys.valueM, 1)
-  assert.equal(DRINKS_SHOP_CANDIDATES.wangcheng_mall.map.facade_podium_storeys.valueM, 3)
+  assert.equal(DRINKS_SHOP_CANDIDATES.wangcheng_mall.map.facade_podium_storeys.valueM, 5)
+  assert.ok(DRINKS_SHOP_DOORWAY.widthM >= 2.4, `doorway ${DRINKS_SHOP_DOORWAY.widthM}m < 2.4m`)
+  assert.ok(DRINKS_SHOP_INTERIOR.areaSqm >= 115, `enlarged interior ${DRINKS_SHOP_INTERIOR.areaSqm}m^2 too small`)
+  assert.ok(DRINKS_STAFF_WORKSTATIONS.length >= 10, 'must export staff workstation zones for front + prep + backroom')
 })
 
-test('双候选点位几何结构对齐营业工位/座位/门洞/候餐点，零灯光且合并后轻量', () => {
+test('双候选建筑合批后 draw calls ≤ 30、零灯光、门洞 ≥ 2.4m 且全员工与客流动线无阻塞', () => {
   for (const candidate of DRINKS_CANDIDATE_IDS) {
     const built = buildDrinksShopMesh({ candidate })
     const metrics = built.getMetrics()
 
     assert.equal(metrics.candidate, candidate)
     assert.equal(metrics.lights, 0, `${candidate} must contain zero THREE.Light nodes`)
-    assert.ok(metrics.triangles > 300 && metrics.triangles <= 12000, `${candidate} polycount ${metrics.triangles}`)
-    assert.ok(metrics.meshes <= 60, `${candidate} expected batched draw meshes <= 60, got ${metrics.meshes}`)
+    assert.ok(metrics.triangles > 600 && metrics.triangles <= 12000, `${candidate} polycount ${metrics.triangles}`)
+    assert.ok(metrics.meshes <= 30, `${candidate} expected draw calls (meshes) <= 30, got ${metrics.meshes}`)
+    assert.ok(metrics.doorwayWidthM >= 2.4, `${candidate} expected doorwayWidthM >= 2.4, got ${metrics.doorwayWidthM}`)
     assert.equal(metrics.blueprintValid, true)
 
-    const layout = built.layout
     const box = new THREE.Box3().setFromObject(built.group)
-    assert.ok(box.max.x - box.min.x >= layout.width, `${candidate} width must contain layout`)
+    assert.ok(box.max.x - box.min.x >= built.interiorBounds.widthM, `${candidate} bounding box must cover enlarged interior`)
     if (candidate === 'wangcheng_mall') {
-      assert.ok(box.max.y >= 14.5, `${candidate} expected full host podium >= 14.5m, got ${box.max.y}`)
+      assert.ok(box.max.y >= 24.5, `${candidate} expected full 8F Wangcheng host height >= 24.5m, got ${box.max.y}`)
     } else {
-      assert.ok(box.max.y >= 4.4 && box.max.y <= 5.5, `${candidate} expected 1F pavilion 4.4..5.5m, got ${box.max.y}`)
+      assert.ok(box.max.y >= 4.8 && box.max.y <= 6.0, `${candidate} expected 1F street flagship 4.8..6.0m, got ${box.max.y}`)
     }
 
     const insideCollider = (x, z) =>
       built.colliders.find(c => x >= c.minX && x <= c.maxX && z >= c.minZ && z <= c.maxZ)
 
-    assert.equal(insideCollider(layout.entrance.x, layout.entrance.z), undefined, `${candidate} entrance blocked`)
-    // 验证从西入口到正门走廊不撞到门前立像
+    // 2.80m 宽正门门洞全段畅通（从左门框内侧到右门框内侧，含前后穿行深度）
+    for (let x = built.doorway.minX + 0.12; x <= built.doorway.maxX - 0.12; x += 0.25) {
+      for (const z of [built.doorway.z - 0.4, built.doorway.z, built.doorway.z + 0.4]) {
+        assert.equal(insideCollider(x, z), undefined, `${candidate} doorway(${x.toFixed(2)},${z}) blocked`)
+      }
+    }
+
+    const layout = built.layout
     for (let t = 0; t <= 1; t += 0.1) {
       const px = layout.approachLeft.x + (layout.entrance.x - layout.approachLeft.x) * t
       const pz = layout.approachLeft.z + (layout.entrance.z - layout.approachLeft.z) * t
@@ -75,6 +91,17 @@ test('双候选点位几何结构对齐营业工位/座位/门洞/候餐点，�
     for (const s of layout.seats) {
       assert.equal(insideCollider(s.x, s.z), undefined, `${candidate} ${s.id} seat blocked`)
     }
+    assert.equal(insideCollider(layout.storagePos.x, layout.storagePos.z), undefined, `${candidate} storagePos blocked`)
+    for (const st of built.workstations) {
+      assert.equal(insideCollider(st.staffPos.x, st.staffPos.z), undefined, `${candidate} staff ${st.id} blocked`)
+    }
+    for (const pt of DRINKS_SHOP_ANCHORS.patrolPoints) {
+      assert.equal(insideCollider(pt.x, pt.z), undefined, `${candidate} patrol(${pt.x},${pt.z}) blocked`)
+    }
+    // 验证后场 1.80m 员工双向走廊全宽无遮挡
+    for (let x = -3.6; x <= 4.4; x += 0.8) {
+      assert.equal(insideCollider(x, DRINKS_STAFF_OPERATION_ZONE.backAisleZ), undefined, `${candidate} back aisle x=${x} blocked`)
+    }
 
     built.setNight(1)
     built.setCutaway(true)
@@ -83,12 +110,14 @@ test('双候选点位几何结构对齐营业工位/座位/门洞/候餐点，�
   }
 })
 
-test('drinks/shop 源码零 mifen 依赖且零真实商业商标字样', () => {
+test('drinks/shop 源码含 1:1 蜜雪品牌复刻要素、零 mifen 依赖且零 THREE.Light', () => {
   const dir = new URL('.', import.meta.url).pathname
-  for (const file of ['blueprint.ts', 'materials.ts', 'mesh.ts', 'index.ts']) {
-    const text = readFileSync(join(dir, file), 'utf8')
-    assert.equal(/\.\.\/mifen|\/mifen\//.test(text), false, `${file} 不应引用 mifen`)
-    assert.equal(/蜜雪|Mixue|雪王/.test(text), false, `${file} 不应含真实商业商标`)
-    assert.equal(/new THREE\.[A-Za-z]*Light/.test(text), false, `${file} 禁止新建 Three Light`)
+  const texts = ['blueprint.ts', 'materials.ts', 'mesh.ts', 'index.ts'].map(f => readFileSync(join(dir, f), 'utf8'))
+  const combined = texts.join('\n')
+  assert.match(combined, /蜜雪冰城/)
+  assert.match(combined, /雪王/)
+  for (const text of texts) {
+    assert.equal(/\.\.\/mifen|\/mifen\//.test(text), false, '不应引用 mifen')
+    assert.equal(/new THREE\.[A-Za-z]*Light/.test(text), false, '禁止新建 Three Light')
   }
 })
