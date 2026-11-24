@@ -270,7 +270,9 @@ def patch(file, area, approaches=()):
         # alongside a deeper cut. Continue the low road smoothly through the
         # shared pavement rather than switching planes at its painted edge.
         outside=np.maximum(0,d-half)
-        ceiling=np.minimum(ceiling,target+cap*outside+.04*outside**2)
+        within_corridor = outside <= .5
+        ceiling[within_corridor] = np.minimum(ceiling[within_corridor],
+            target[within_corridor] + cap * outside[within_corridor])
         levels[select]=target[select]
         distance[select]=d[select]
     levels=np.minimum(levels,ceiling)
