@@ -9,14 +9,14 @@
  *     {t:'revive', id}              扶起倒地的 id
  *     {t:'avatar', avatar}
  *     {t:'who'}
- *     {t:'chat', text}
+ *     {t:'chat', ch, text, cid} / {t:'chat_hist', ch} (docs/chat.md)
  *   服务端 → 客户端
  *     {t:'welcome', me, online, players:[...]}
  *     {t:'join', player} / {t:'leave', id}
  *     {t:'pos', id, x,y,z,yaw,v,bike,bx,bz,byaw, hb,hx,hz,hyaw, mv,cr,gr,dn,pn,hp, sc,sb,sp,br}
  *     {t:'hit', dmg, by, byId} / {t:'revive', by}
  *     {t:'avatar', id, avatar}
- *     {t:'chat', id, name, text}
+ *     chat / chat_ack / chat_hist / chat_del / chat_mute (docs/chat.md)
  *     {t:'online', online}
  *     {t:'banned', reason}
  *
@@ -58,11 +58,11 @@ import {createHmac,timingSafeEqual} from 'node:crypto'
 import {isIP} from 'node:net'
 import {WebSocketServer} from 'ws'
 import * as obs from './observability.mjs'
+import {createChat} from './chat.mjs'
 
 const PORT = Number(process.env.PORT || 8790)
 // 单进程 Node 只能用 1 核：AOI 压测 300 人密集场景已接近 1 核，先按 300 封顶（IDOK-224）
 const MAX_PLAYERS = Number(process.env.MAX_PLAYERS || 300)
-const MAX_CHAT = 80
 const TICK_MS = 1000
 const KICK_TOKEN = process.env.KICK_TOKEN || ''
 /** 被踢后的封禁时长（秒），只在本进程内存里生效 */
@@ -100,7 +100,7 @@ const MAX_AVATAR_BYTES = 512
  */
 const PROTO = 4
 
-/** id → {ws, uid, name, avatar, x,y,z, yaw, v, bike, bx,bz,byaw, lastChat, lastPos} */
+/** id → {ws, uid, name, avatar, x,y,z, yaw, v, bike, bx,bz,byaw, lastPos} */
 const players = new Map()
 /** 所有已建立的 WebSocket 连接（含还没 join 的），把「握完手不 join」也算进容量 */
 const sockets = new Set()
@@ -418,8 +418,14 @@ function publicOf(p,viewer=p) {
   }
 }
 
-const server = createServer((req, res) => {
+const chat=createChat({players,send,observed:obs.chatted})
+const server = createServer(async(req, res) => {
   try {
+    if(req.url==='/admin/chat'&&req.method==='POST'){
+      if(!process.env.RT_ADMIN_TOKEN||req.headers['x-admin-token']!==process.env.RT_ADMIN_TOKEN){res.writeHead(403);res.end();return}
+      let body='';for await(const chunk of req){body+=chunk;if(body.length>32768){res.writeHead(413);res.end();return}}
+      try{const data=await chat.admin(JSON.parse(body));res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(data))}catch(error){res.writeHead(error.status??503);res.end(JSON.stringify({error:error.status?error.message:'chat unavailable'}))}return
+    }
     if(req.method==='GET'&&req.url==='/admin/state'){
       if(!process.env.RT_ADMIN_TOKEN||req.headers['x-admin-token']!==process.env.RT_ADMIN_TOKEN){res.writeHead(403);res.end();return}
       sweepBans();res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'})
@@ -435,6 +441,7 @@ const server = createServer((req, res) => {
         maxPlayers: MAX_PLAYERS,
         banned: bans.size,
         connections: sockets.size,
+        chatBacklog: chat.backlog(),
         loopP99Ms: +obs.loopP99().toFixed(1),
       }))
       return
@@ -646,6 +653,7 @@ wss.on('connection', (ws, req) => {
           ws,
           uid,
           name: cleanName(claims.name),
+          openid: typeof claims.wx_openid==='string'?claims.wx_openid:undefined,
           avatar: sanitizeAvatar(msg.avatar),
           x: clampNum(msg.x, -1e5, 1e5),
           y: clampNum(msg.y, -1000, 8000),
@@ -673,7 +681,6 @@ wss.on('connection', (ws, req) => {
           sp: 0,
           br: 0,
           em:0, es:0, emoteTimes:[], emoteUntil:0,
-          lastChat: 0,
           lastPos: 0,
           cell: '',
           visible: new Set(),
@@ -684,6 +691,7 @@ wss.on('connection', (ws, req) => {
         clearTimeout(ws.joinTimer)
         unpend()
         players.set(id, player)
+        void chat.joined(player)
         gridAdd(player)
         // 先把可见集合算出来：新玩家这一侧靠 welcome 的列表就够了，不再逐条发 join 给自己，
         // 对端则要一条 join（带完整状态），否则对方要等到自己下次移动才能看见新来的人。
@@ -807,14 +815,8 @@ wss.on('connection', (ws, req) => {
         return
       }
 
-      if (msg.t === 'chat') {
-        const text = clampStr(msg.text, MAX_CHAT).trim()
-        if (!text) return
-        if (now() - me.lastChat < 1200) return // 简单防刷
-        me.lastChat = now()
-        obs.chatted(me,text)
-        broadcast({t: 'chat', id, name: me.name, text})
-      }
+      if(msg.t==='chat')chat.submit(me,msg)
+      if(msg.t==='chat_hist')void chat.history(me,msg.ch)
     } catch (err) {
       // 单条消息解析 / 处理失败不能把整个进程带走
       console.warn('[ws] 消息处理失败', err && err.message)

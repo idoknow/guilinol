@@ -46,10 +46,18 @@ test('two players: private RT state, role gate, public-safe admin state, persist
     MP_WORLD_MANIFEST_URL:`http://127.0.0.1:${manifest.address().port}/world/manifest.json`},'/api/health')
   const call=(suffix='',index=0,body)=>fetch(api.base+'/api/admin/mp'+suffix,{method:body?'POST':'GET',headers:{origin:api.base,cookie:'glol_session='+tokens[index]},body:body&&JSON.stringify(body)})
   for(const suffix of ['','/history','/sessions','/kick'])assert.equal((await call(suffix,1,suffix==='/kick'?{}:undefined)).status,403)
+  const chatSettings=index=>fetch(api.base+'/api/admin/chat/settings',{headers:{cookie:'glol_session='+tokens[index]}})
+  assert.equal((await chatSettings(1)).status,403);assert.equal((await (await chatSettings(0)).json()).unmoderated_policy,'pending')
   await pool.query(`insert into perf_network values('192.0.2.0/24','CN','测试地区','测试市','测试网络')`)
   for(let attempt=0;attempt<120;attempt++){if((await raw()).players.every(player=>player.rttMs!==null))break;await delay(100)}
   for(const client of sockets)client.send(JSON.stringify({t:'pos',x:10,z:20}))
-  sockets[0].send(JSON.stringify({t:'chat',text:'你好'}));await delay(100)
+  await pool.query(`update chat_settings set config=config||'{"unmoderated_policy":"local_only"}'::jsonb`)
+  const chatAck=new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(Error('chat ack timed out')),5000)
+    const handler=raw=>{const reply=JSON.parse(raw);if(reply.t==='chat_ack'){clearTimeout(timer);sockets[0].off('message',handler);resolve(reply)}}
+    sockets[0].on('message',handler)
+  })
+  sockets[0].send(JSON.stringify({t:'chat',text:'你好'}));assert.equal((await chatAck).ok,true)
   const snapshot=await (await call()).json();assert.equal(snapshot.rt,'up');assert.equal(snapshot.server.online,2)
   assert.equal(snapshot.chat[0].text,'你好');assert.equal(snapshot.server.traffic.in.pos.packets,2)
   assert.ok(!JSON.stringify(snapshot).includes(ip));assert.ok(!JSON.stringify(snapshot).includes('"ip":'))

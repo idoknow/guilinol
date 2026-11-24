@@ -1,5 +1,6 @@
 import type {AnimationClip,Scene,Camera} from 'three'
 import type {Avatar} from '../../lib/avatar'
+import {bindChat,receiveChat} from './chat-store'
 import {players,type Pose} from './net-players'
 import {onUser} from './ui/account'
 import type {MpStatus} from './ui/mp-pref'
@@ -27,7 +28,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   }
   function emote(id:number){if(id===desired&&id)sent=-1;desired=id;flushEmote()}
   function status(){return {state,online}}
-  function update(next:State,count=0){state=next;online=count;if(next!=='online'){far.clear();clearRoster()}if(badge)badge.textContent=`${state} · ${online}`;publish({state,online})}
+  function update(next:State,count=0){state=next;online=count;bindChat(next==='online'?send:undefined);if(next!=='online'){far.clear();clearRoster()}if(badge)badge.textContent=`${state} · ${online}`;publish({state,online})}
   function send(packet:object){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify(packet))}
   // 不能像以前那样 6 次之后永久放弃：满员、同一出口 IP 挤爆、切后台被断，都是暂时的。
   // 一旦放弃，玩家只能刷新页面，表现出来就是「联机时好时坏」。
@@ -57,6 +58,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         if(version!==generation)return
         const msg=JSON.parse(event.data)
         switch(msg.t){
+          case 'chat':case 'chat_hist':case 'chat_del':case 'chat_mute':case 'chat_ack':receiveChat(msg);break
           case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'')
           case 'players':
             peers.clear();for(const player of msg.players)peers.add(player)
@@ -95,6 +97,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   // 切后台/关页面时干净收尾：手机浏览器经常直接冻结 WebSocket，主动关掉能立刻把服务端名额还回去，
   // 不用等心跳超时——这也是「同一账号第二次连不上」的常见来源。
   const pageHide=()=>{
+    bindChat()
     clearTimeout(timer);generation++
     const ws=socket;socket=undefined
     if(ws){ws.onopen=ws.onmessage=ws.onclose=ws.onerror=null;try{ws.close(1000,'pagehide')}catch{}}

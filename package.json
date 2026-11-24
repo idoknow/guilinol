@@ -68,6 +68,8 @@
     "verify:creator": "tsx scripts/verify-creator.mjs",
     "test:emote": "node --experimental-strip-types --test scripts/emote-test.mjs",
     "test:rt-aoi": "node scripts/rt-aoi-check.mjs",
+    "test:chat": "node --test scripts/chat-test.mjs",
+    "bench:chat": "node scripts/chat-bench.mjs",
     "bench:rt": "node scripts/rt-load.mjs"
   },
   "dependencies": {

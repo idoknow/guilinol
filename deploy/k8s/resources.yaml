@@ -410,6 +410,17 @@ spec:
         # 防滥用靠「同一 uid 只能 1 条在线连接」+ MAX_PLAYERS + 未 join 15 秒超时。
         - name: RT_MAX_PER_IP
           value: "0"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef: {name: glol-env, key: POSTGRES_PASSWORD}
+        - name: DATABASE_URL
+          value: postgres://postgres:$(POSTGRES_PASSWORD)@$(GLOL_POSTGRES_SERVICE_HOST):5432/glol
+        - name: WX_APPID
+          valueFrom:
+            secretKeyRef: {name: glol-env, key: WX_APPID, optional: true}
+        - name: WX_SECRET
+          valueFrom:
+            secretKeyRef: {name: glol-env, key: WX_SECRET, optional: true}
         - name: RT_ADMIN_TOKEN
           valueFrom:
             secretKeyRef: {name: glol-env, key: RT_ADMIN_TOKEN, optional: true}

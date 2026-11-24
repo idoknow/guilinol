@@ -11,6 +11,7 @@ export const REQUIRED_TABLES = [
   'social_identities', 'social_states', 'social_pending',
   'player_saves', 'player_ledger_txns',
   'admin_audit',
+  'chat_settings','chat_messages','chat_mutes','chat_words',
   'mp_online_minute','mp_online_hour','mp_sessions',
   'feedback', 'feedback_events', 'feedback_mail', 'feedback_messages', 'feedback_photos', 'feedback_upload_usage', 'mail_events',
   'perf_event', 'perf_session_day', 'perf_value_day', 'perf_summary_day', 'perf_network', 'perf_server',
