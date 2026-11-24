@@ -32,17 +32,19 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   function send(packet:object){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify(packet))}
   // 不能像以前那样 6 次之后永久放弃：满员、同一出口 IP 挤爆、切后台被断，都是暂时的。
   // 一旦放弃，玩家只能刷新页面，表现出来就是「联机时好时坏」。
-  function retry(fixed?:number){
-    update('offline')
+  function retry(fixed?:number,quiet=false){
+    // quiet：CDN 大陆节点 40–60 秒会掐一次长连接，这种断开必须无感续连——
+    // 不切 offline、不显示「联机中」，界面上的在线人数和场景都不动
+    if(!quiet)update('offline')
     if(disposed)return
     const backoff=fixed??Math.min(1000*2**Math.min(attempt++,5),16000)
-    timer=window.setTimeout(connect,Math.round(backoff*(0.8+Math.random()*0.4)))
+    timer=window.setTimeout(()=>{void connect(quiet)},Math.round(backoff*(0.8+Math.random()*0.4)))
   }
-  async function connect(){
+  async function connect(quiet=false){
     // 复用在用的连接：切偏好、重复触发、取票竞态都不能再建第二条（一条 tab 只许一条 socket）
     if(socket&&(socket.readyState===WebSocket.OPEN||socket.readyState===WebSocket.CONNECTING))return
     clearTimeout(timer)
-    const version=++generation;update('connecting')
+    const version=++generation;if(!quiet)update('connecting')
     try{
       const response=await fetch('/api/rt/ticket',{method:'POST',credentials:'same-origin'})
       if(version!==generation)return
@@ -80,6 +82,9 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         else if(event.code===4001){attempt=Math.max(attempt,2);retry()}
         // 4003 有两种：票据过期（第一次 1.2s 后重新取票，之后指数退避，免得票据一直被拒时每秒打一次）和被封禁（停下）
         else if(event.code===4003){if(/banned/i.test(String(event.reason)))update('offline');else retry(attempt++===0?1200:undefined)}
+        // 1006/1005/1011：连接被中间层掐断（CDN 节点、切网、息屏），服务端保留了 20 秒会话。
+        // 前三次静默 250ms 直接续上；连续失败才回到正常的退避 + 显式 offline。
+        else if(event.code===1006||event.code===1005||event.code===1011){const quick=attempt<3;retry(quick?250:undefined,quick)}
         else retry()}
     }catch{if(version===generation)retry()}
   }
