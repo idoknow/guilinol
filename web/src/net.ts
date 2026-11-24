@@ -26,7 +26,14 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
   function status(){return {state,online}}
   function update(next:State,count=0){state=next;online=count;if(badge)badge.textContent=`${state} · ${online}`;publish({state,online})}
   function send(packet:object){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify(packet))}
-  function retry(){update('offline');if(attempt<6&&!disposed)timer=window.setTimeout(connect,Math.min(1000*2**attempt++,16000))}
+  // 不能像以前那样 6 次之后永久放弃：满员、同一出口 IP 挤爆、切后台被断，都是暂时的。
+  // 一旦放弃，玩家只能刷新页面，表现出来就是「联机时好时坏」。
+  function retry(fixed?:number){
+    update('offline')
+    if(disposed)return
+    const backoff=fixed??Math.min(1000*2**Math.min(attempt++,5),16000)
+    timer=window.setTimeout(connect,Math.round(backoff*(0.8+Math.random()*0.4)))
+  }
   async function connect(){
     const version=++generation;update('connecting')
     try{
@@ -55,7 +62,11 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         }
       }
       ws.onclose=event=>{if(version!==generation)return;socket=undefined;peers.clear()
-        if(event.code===4001||event.code===4003)update('offline');else retry()}
+        // 4001 = 同账号在别处在线（可能只是上次的旧连接还没被服务端回收）→ 等几秒再连
+        if(event.code===4001){update('offline');retry(4000+Math.random()*2000)}
+        // 4003 有两种：票据过期（立刻重新取票重连）和被封禁（停下）
+        else if(event.code===4003){if(/banned/i.test(String(event.reason)))update('offline');else retry(1200)}
+        else retry()}
     }catch{if(version===generation)retry()}
   }
   function stop(){generation++;clearTimeout(timer);socket?.close();socket=undefined;peers.clear();update('offline')}

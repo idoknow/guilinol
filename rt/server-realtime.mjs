@@ -66,7 +66,9 @@ const KICK_TOKEN = process.env.KICK_TOKEN || ''
 /** 被踢后的封禁时长（秒），只在本进程内存里生效 */
 const KICK_BAN_SECONDS = Number(process.env.KICK_BAN_SECONDS || 600)
 /** 单个 IP 最多几条连接（反代后按 x-forwarded-for 首个地址算） */
-const MAX_PER_IP = 8
+// 每个出口 IP 的连接上限。默认 8 对移动网络太狠：校园网、宿舍、网吧、运营商 CGNAT
+// 会让几十个真实玩家共用一个公网 IP，第 9 个人直接收「连接数过多」进不来。
+const MAX_PER_IP = Number(process.env.RT_MAX_PER_IP || 24)
 /** 昵称长度上限（字符） */
 const MAX_NAME = 16
 /** 服务端裁决 hit / revive 的水平距离（米） */
@@ -333,12 +335,15 @@ wss.on('connection', (ws, req) => {
     ip = clientIp(req)
     // 容量按「所有连接」算：只数 players 的话，握完手不 join 就能无限占连接
     if (sockets.size >= MAX_PLAYERS) {
+      console.warn(JSON.stringify({scope:'rt-reject',reason:'full',ip,players:players.size,sockets:sockets.size}))
       send(ws, {t: 'error', message: '服务器满员'})
       ws.close(1013, 'full')
       return
     }
     const used = ipCounts.get(ip) || 0
     if (used >= MAX_PER_IP) {
+      // 排障要能看到到底是「满员」还是「同一出口 IP 挤爆」，否则线上只能靠猜
+      console.warn(JSON.stringify({scope:'rt-reject',reason:'per-ip',ip,used,max:MAX_PER_IP,players:players.size,sockets:sockets.size}))
       send(ws, {t: 'error', message: '连接数过多'})
       ws.close(1013, 'too many connections')
       return
@@ -356,13 +361,16 @@ wss.on('connection', (ws, req) => {
   ws.on('pong', () => { ws.isAlive = true })
 
   // 连接回收：容量计数要减回去，ipCounts 不能只增不减
-  const release = () => {
+  const release = (code, reason) => {
+    const joined = players.has(id)
     if (sockets.delete(ws)) {
       const left = (ipCounts.get(ip) || 1) - 1
       if (left > 0) ipCounts.set(ip, left)
       else ipCounts.delete(ip)
     }
-    if (players.has(id)) {
+    // 关闭原因必须留痕：线上「联机不稳定」时，没有这行就只能靠猜是超时、满员还是顶号
+    if (joined) console.log(JSON.stringify({scope:'rt-close',code:code??null,reason:String(reason??''),ip,uid:players.get(id)?.uid??null,players:players.size}))
+    if (joined) {
       players.delete(id)
       broadcast({t: 'leave', id})
       broadcast({t: 'online', online: players.size})
@@ -556,7 +564,7 @@ wss.on('connection', (ws, req) => {
     }
   })
 
-  ws.on('close', release)
+  ws.on('close', (code, reason) => release(code, reason))
   ws.on('error', () => { try { ws.close() } catch { /* 忽略 */ } })
 })
 
