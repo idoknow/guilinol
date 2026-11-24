@@ -96,15 +96,6 @@ body[data-home] :is(.hud-me,.dock,.sky-ui,.hint,footer,.walk-ui,.vehicle-action,
 @keyframes home-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 
 /* 玩法说明 */
-.guide{width:min(680px,100%)}
-.guide-steps{list-style:none;margin:0;padding:14px 18px 4px;display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
-.guide-steps li{display:flex;gap:12px;align-items:flex-start}
-.guide-steps .ui-seal{font-size:17px;margin-top:2px}
-.guide-steps b{display:block;font-size:15px;letter-spacing:.12em;margin-bottom:3px}
-.guide-steps p{margin:0;font-size:13px;line-height:1.7;color:var(--ui-paper-dim)}
-.guide-keys{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 18px 20px;padding-top:14px;border-top:1px solid var(--ui-glass-line-soft)}
-.guide-keys h3{margin:0 0 6px;font-size:13px;font-weight:600;letter-spacing:.2em;color:var(--ui-jade-300)}
-.guide-keys ul{margin:0;padding:0;list-style:none;display:grid;gap:6px;font-size:13px;line-height:1.6;color:rgba(244,239,226,.9)}
 kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-radius:5px;text-align:center;font:600 11.5px/1.5 ui-monospace,monospace;color:var(--ui-ink-800);background:var(--ui-paper);box-shadow:0 2px 0 rgba(244,239,226,.35)}
 
 /* QQ 群：一张群二维码卡片 + 群号（手机上扫不了自己的屏，群号要能一键复制）。 */
@@ -126,7 +117,6 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
   .home-mode--tour .home-mode-text>span{display:none}.home-go--tour{min-height:36px;padding:0 14px;letter-spacing:.12em;text-indent:0}
   .home-links{justify-content:center;margin-left:0}
   .home-foot{flex-direction:column;align-items:center;gap:4px}.home-caption{display:none}.home-credit{text-align:center}
-  .guide-steps,.guide-keys{grid-template-columns:1fr}
 }
 /* 横屏手机：标题和模式左右排 */
 @media (max-height:520px) and (orientation:landscape){
