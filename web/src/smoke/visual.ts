@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import {SmokeKit, VIEW_ANCHORS} from './kit'
+import {SmokeKit, LIGHTER_ROTATION, VIEW_ANCHORS} from './kit'
 import {smokingHand} from './hands'
 import {firstPersonArms} from './first-person-arms'
 import {rules} from './data'
@@ -15,7 +15,7 @@ export function smokeVisual(scene:THREE.Scene,figure:THREE.Object3D,camera?:THRE
   kit.root.add(pinch)
   const mouth=new THREE.Vector3(),handL=new THREE.Vector3(),handR=new THREE.Vector3()
   const forward=new THREE.Vector3(0,-.08,-1).normalize(),tip=new THREE.Vector3()
-  const flameOffset=new THREE.Vector3(0,.057,-.0045).applyEuler(new THREE.Euler(.72,0,-.66))
+  const flameOffset=new THREE.Vector3(0,.057,-.0045).applyEuler(LIGHTER_ROTATION)
   const rotation=new THREE.Quaternion(),parent=new THREE.Quaternion(),eye=new THREE.Vector3()
   let mist=0,lastPuffs:number|undefined
   function resetPose(){left?.reset();right?.reset()}

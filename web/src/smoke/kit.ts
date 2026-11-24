@@ -34,6 +34,7 @@ export interface KitAnchors {
 
 /** 手持道具相对手腕的偏移（父空间，米） */
 const PACK_OFFSET = new THREE.Vector3(0, -0.004, -0.026)
+export const LIGHTER_ROTATION=new THREE.Euler(1.1,0,-1.15)
 const LIGHTER_OFFSET = new THREE.Vector3(0, -0.012, -0.016)
 /** 正常夹在手里：烟头朝上前方 */
 const SMOKE_DIR = new THREE.Vector3(0, 0.82, -0.57).normalize()
@@ -177,7 +178,7 @@ export class SmokeKit {
     // —— 打火机：左手（只在点烟那一段出现） ——
     if (this.lighterModel.group.visible) {
       this.lighterModel.group.position.copy(anchors.handL).add(LIGHTER_OFFSET)
-      this.lighterModel.group.rotation.set(.72,0,-.66,'XYZ')
+      this.lighterModel.group.rotation.copy(LIGHTER_ROTATION)
       this.lighterModel.setFlame(view.flame)
     } else {
       this.lighterModel.setFlame(0)
