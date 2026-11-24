@@ -483,3 +483,37 @@ a.adm-kpi:hover{border-color:var(--ui-jade-500);box-shadow:var(--ui-shadow-1);tr
   .adm-users tr.is-banned td{background:none}
   .adm-ban{flex-direction:column;align-items:stretch}
 }
+
+/* 联机（IDOK-222）：玩家地图沿用热力图的底图与侧栏；圆点青玉 = 步行，赭黄 = 骑车，朱砂 = 倒地 */
+.adm-mp-map{display:block;width:100%;height:auto;max-height:560px;border-radius:var(--ui-r-sm);background:var(--ui-paper-2)}
+.adm-mp-dot{cursor:pointer}
+.adm-mp-dot circle{fill:var(--ui-jade-500);stroke:var(--ui-paper)}
+.adm-mp-dot line{stroke:var(--ui-jade-700);stroke-linecap:round}
+.adm-mp-dot.is-bike circle{fill:#c49a4a}
+.adm-mp-dot.is-down circle{fill:var(--ui-bad)}
+.adm-mp-dot text{text-anchor:middle;font-family:var(--ui-serif);font-weight:600;fill:var(--ui-ink);stroke:rgba(252,250,243,.9);paint-order:stroke}
+.adm-mp-dot:hover circle{stroke:var(--ui-ink)}
+.adm-mp-legend{display:flex;align-items:center;gap:6px;margin:8px 0 0}
+.adm-mp-legend i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--ui-jade-500)}
+.adm-mp-legend i.is-bike{background:#c49a4a;margin-left:8px}
+.adm-mp-legend i.is-down{background:var(--ui-bad);margin-left:8px}
+.adm-mp-who,.adm-mp-state,.adm-mp-table td>div{display:grid;gap:2px}
+.adm-mp-who small,.adm-mp-state small{color:var(--ui-ink-soft);font-size:12px}
+.adm-mp-who .adm-pill{justify-self:start}
+.adm-pill.is-bad{background:rgba(176,71,47,.12);color:var(--ui-bad)}
+.adm-pill.is-good{background:rgba(63,122,108,.14);color:var(--ui-good)}
+.adm-table td span.is-bad{color:var(--ui-bad);font-weight:600}
+.adm-btn--sm{padding:4px 12px;font-size:12.5px}
+.adm-mp-feed{list-style:none;margin:0;padding:0;display:grid;gap:0;max-height:420px;overflow-y:auto}
+.adm-mp-feed li{display:grid;grid-template-columns:96px 40px minmax(0,1fr);column-gap:10px;row-gap:1px;align-items:baseline;padding:7px 6px;border-top:1px solid var(--ui-paper-line);font-size:13px}
+.adm-mp-feed li:first-child{border-top:0}
+.adm-mp-feed time{color:var(--ui-ink-soft);font:12px/1.4 var(--num);font-variant-numeric:tabular-nums}
+.adm-mp-feed b{font-weight:600}
+.adm-mp-feed li.is-join b{color:var(--ui-good)}
+.adm-mp-feed li.is-kick b,.adm-mp-feed li.is-reject b{color:var(--ui-bad)}
+.adm-mp-feed li.is-leave b{color:var(--ui-ink-soft)}
+.adm-mp-feed small{grid-column:3;color:var(--ui-ink-soft);font-size:12px}
+.adm-mp-chat li{grid-template-columns:96px auto minmax(0,1fr)}
+.adm-mp-chat li span{word-break:break-word}
+.adm-mp-scroll{max-height:560px;overflow-y:auto}
+@media (max-width:760px){.adm-mp-scroll{max-height:none}}
