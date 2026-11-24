@@ -26,6 +26,7 @@ test('two starts per second, immediate sequenced stops', () => {
   assert.equal(acceptEmote(p, {id: 0, s: 2}, 12), false)
   assert.equal(acceptEmote(p, {id: 0, s: 3}, 13), true)
   assert.equal(p.em, 0)
+  assert.equal(acceptEmote(p, {id: 0, s: 9}, 14), false, 'stop without an active emote is dropped')
   assert.equal(acceptEmote(p, {id: 3, s: 4}, 1009), false)
   assert.equal(acceptEmote(p, {id: 3, s: 4}, 1010), true)
 })

@@ -8,7 +8,8 @@ export function acceptEmote(player, msg, now) {
     msg.id < 0 ||
     msg.id > 255 ||
     !Number.isSafeInteger(msg.s) ||
-    msg.s <= player.es
+    msg.s <= player.es ||
+    (msg.id === 0 && !player.em)
   )
     return false
   if (msg.id !== 0) {

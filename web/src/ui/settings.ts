@@ -33,7 +33,13 @@ function build() {
         </label>`).join('')}
       </section>
       <section class="set-block">
-        <label class="set-row"><b>表情动作</b><input type="checkbox" data-emotes></label>
+        <h3>动作</h3>
+        <label class="set-row">
+          <span class="set-what"><b>表情动作</b><small>长按 G 或点「表情」打开动作盘；关掉后也不显示别人的表情</small></span>
+          <input type="checkbox" data-emotes>
+        </label>
+      </section>
+      <section class="set-block">
         <h3>视角</h3>
         <div class="set-seg" role="radiogroup" aria-label="视角">
           <button type="button" data-view="third">第三人称</button>
