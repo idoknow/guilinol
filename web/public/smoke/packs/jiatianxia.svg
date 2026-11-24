@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="384" height="576" viewBox="0 0 192 288">
+<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".10"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".12"/></linearGradient></defs>
+<rect width="192" height="288" fill="#ad654d"/>
+
+<circle cx="96" cy="88" r="30" fill="#eed99e" opacity=".9"/>
+<path d="M11 130 L34 78 L50 104 L70 62 L90 112 L110 70 L128 100 L150 58 L181 130 Z" fill="#7e3f2f"/>
+<path d="M11 130 L28 104 L44 120 L64 96 L84 130 Z M100 130 L122 106 L140 122 L160 98 L181 130Z" fill="#5c2c22"/>
+<rect x="7" y="7" width="178" height="274" fill="none" stroke="#eed99e" stroke-width="1.6"/>
+<rect x="11" y="11" width="170" height="266" fill="none" stroke="#eed99e" stroke-width=".6" opacity=".8"/>
+<text x="96" y="178" text-anchor="middle" font-family="'Songti SC','STSong','Noto Serif CJK SC','Source Han Serif SC',serif" font-weight="700" font-size="38" letter-spacing="4" fill="#eed99e">甲天霞</text>
+<line x1="56" y1="192" x2="136" y2="192" stroke="#eed99e" stroke-width=".8"/>
+<text x="96" y="206" text-anchor="middle" font-family="'Songti SC','STSong','Noto Serif CJK SC','Source Han Serif SC',serif" font-size="11" letter-spacing="3" fill="#eed99e" opacity=".9">桂林本地 · 20支</text>
+<rect x="11" y="240" width="170" height="37" fill="#f4efe2"/>
+<text x="96" y="265" text-anchor="middle" font-family="'Songti SC','STSong','Noto Serif CJK SC','Source Han Serif SC',serif" font-weight="700" font-size="15" letter-spacing="2" fill="#2b2b2b">吸烟有害健康</text>
+<rect width="192" height="288" fill="url(#g)"/>
+</svg>

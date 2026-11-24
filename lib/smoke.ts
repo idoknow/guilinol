@@ -12,7 +12,7 @@ export interface BrandDef {
 }
 export type BrandId = string
 function brand(id: string, name: string, series: string, price: number, pack: string, accent: string): BrandDef {
-  return {id, name, series, price, pack, accent, lid: accent, tip: '#c9a06a', ember: 0xff7a2a}
+  return {id, name, series, price, pack, accent, lid: accent, tip: '#c9a06a', ember: 0xff7a2a, faceTexture: `/smoke/packs/${id}.svg`}
 }
 export const BRANDS = [
   brand('zhonghua','中桦','指定流通',45,'#973e35','#edcb89'),
