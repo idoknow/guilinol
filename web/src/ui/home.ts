@@ -1,5 +1,6 @@
 import {getPlayMode, lastPlayMode, type PlayMode} from '../game/play-mode'
 import {mpEnabled, setMpEnabled} from './mp-pref'
+import {onOnline, startLive} from './live'
 import './home.css'
 import {spots} from '../play/spots'
 import {SOURCE_URL} from './source'
@@ -40,6 +41,11 @@ export function home(play:(mode:PlayMode)=>void):Home {
           <small class="home-wallet"></small></span>
         <span class="home-go home-go--solo">开始</span>
       </button>
+      <button type="button" class="home-mode home-mode--mp" role="listitem" data-umami-event="home-mp">
+        <span class="home-mode-seal" aria-hidden="true">联</span>
+        <span class="home-mode-text"><b>联机模式<i class="home-mp-live" hidden></i></b><span>和其他玩家同城逛街骑车，看得到彼此的样子和昵称。</span></span>
+        <span class="home-go home-go--mp">进入联机</span>
+      </button>
       <button type="button" class="home-mode home-mode--tour" role="listitem" data-umami-event="home-tour">
         <span class="home-mode-seal" aria-hidden="true">游</span>
         <span class="home-mode-text"><b>游览模式</b><span>自由飞行看山水，走遍 ${spots.length} 处名胜集印章。</span>
@@ -49,11 +55,6 @@ export function home(play:(mode:PlayMode)=>void):Home {
       <div class="home-resume-row" role="listitem" hidden>
         <button type="button" class="home-resume" data-umami-event="home-resume">
           <i aria-hidden="true"></i><span>回到上次离开的地方</span><small class="home-resume-ago"></small>
-        </button>
-      </div>
-      <div class="home-mp-row" role="listitem">
-        <button type="button" class="home-mp" role="switch" aria-checked="false" data-umami-event="home-mp">
-          <i aria-hidden="true"></i><span><b>同城联机</b><small>街上能遇见其他玩家，看得到对方的样子和昵称</small></span><em aria-hidden="true"></em>
         </button>
       </div>
     </div>
@@ -69,8 +70,8 @@ export function home(play:(mode:PlayMode)=>void):Home {
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
   const go = root.querySelector<HTMLElement>('.home-go--tour')!, tour = root.querySelector<HTMLButtonElement>('.home-mode--tour')!
   const solo = root.querySelector<HTMLButtonElement>('[data-umami-event=home-solo]')!, wallet = root.querySelector('.home-wallet')!
-  solo.onclick = ()=>play('solo')
-  tour.onclick = ()=>play('tour')
+  solo.onclick = ()=>{setMpEnabled(false); play('solo')}
+  tour.onclick = ()=>{setMpEnabled(false); play('tour')}
   // IDOK-105: a slim strip under the tour card, shown only when a usable last view is stored.
   // 开始游览 still opens on a random frame; this is the opt-in way back.
   const resumeRow = root.querySelector<HTMLElement>('.home-resume-row')!, resumeAgo = root.querySelector('.home-resume-ago')!
@@ -78,11 +79,12 @@ export function home(play:(mode:PlayMode)=>void):Home {
   root.querySelector<HTMLButtonElement>('[data-act=guide]')!.onclick = ()=>guide()
   root.querySelector<HTMLButtonElement>('[data-act=about]')!.onclick = ()=>void import('./about').then(m=>m.openAbout())
   root.querySelector<HTMLButtonElement>('[data-act=qq]')!.onclick = ()=>qqGroup()
-  // IDOK-192 同城联机开关：进城前后都能切，walk 那边当场连上或断开。
-  const mpSwitch = root.querySelector<HTMLButtonElement>('.home-mp')!
-  const paintMp = ()=>mpSwitch.setAttribute('aria-checked',String(mpEnabled()))
-  mpSwitch.onclick = ()=>{setMpEnabled(!mpEnabled()); paintMp()}
-  paintMp()
+  // IDOK-192 联机模式：街头玩法 + 同城联机。单人/游览会把联机关掉，walk 那边当场连上或断开。
+  const mp = root.querySelector<HTMLButtonElement>('.home-mode--mp')!, mpGo = root.querySelector('.home-go--mp')!
+  const mpLive = root.querySelector<HTMLElement>('.home-mp-live')!
+  startLive()
+  mp.onclick = ()=>{setMpEnabled(true); play('solo')}
+  onOnline(value=>{mpLive.hidden = !value; if(value) mpLive.textContent = String(value)})
   const account = root.querySelector<HTMLButtonElement>('.home-account')!
   account.onclick = ()=>void openAccount()
   onUser(user=>{account.innerHTML = user?`<i class="home-avatar"></i><span></span>`:'<span>登录 / 注册</span>'
@@ -113,13 +115,15 @@ export function home(play:(mode:PlayMode)=>void):Home {
       let hasProgress = false, money:number|null = null
       try { const raw = localStorage.getItem('glol.save.v1'); hasProgress = raw !== null
         const value = raw ? (JSON.parse(raw) as {money?:unknown}).money : null; if(typeof value==='number'&&Number.isFinite(value)) money = Math.round(value) } catch {}
-      solo.querySelector('.home-go')!.textContent = playedSolo || hasProgress ? '继续' : '开始'
+      const inMp = resume && mpEnabled()
+      solo.querySelector('.home-go')!.textContent = !inMp && (playedSolo || hasProgress) ? '继续' : '开始'
+      mpGo.textContent = inMp ? '继续联机' : '进入联机'
       wallet.textContent = hasProgress && money!==null ? `钱包 ¥${money.toLocaleString('zh-CN')}` : ''
       go.textContent = resume?'继续游览':'开始游览'
       // IDOK-105: only on a fresh entry (not the mid-game 继续游览 menu) and only with a usable record.
       const saved = resume ? null : lastViewSavedAt()
       resumeRow.hidden = saved===null; if(saved!==null) resumeAgo.textContent = ago(saved)
-      requestAnimationFrame(()=>{root.classList.add('show'); ((resume?getPlayMode():lastPlayMode())==='solo'?solo:tour).focus({preventScroll:true})})
+      requestAnimationFrame(()=>{root.classList.add('show'); ((resume?getPlayMode():lastPlayMode())==='solo'?(resume&&mpEnabled()?mp:solo):tour).focus({preventScroll:true})})
       if(!reduce&&!timer) timer = window.setInterval(step,SLIDE_MS)
       document.body.dataset.home = ''
     },

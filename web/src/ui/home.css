@@ -138,21 +138,30 @@ kbd{display:inline-block;min-width:1.5em;padding:1px 5px;margin:0 1px;border-rad
   .ui-btn--lg{min-height:42px}.home-foot{padding-bottom:8px}
   .home-shade{background:linear-gradient(90deg,rgba(20,33,30,.85) 0,rgba(20,33,30,.55) 50%,rgba(20,33,30,.7) 100%)}
 }
-/* IDOK-192 同城联机开关：和续游条同一种青玉玻璃窄条，右侧一枚小拨钮；开着时左边的印是青玉色、两个人影。 */
-.home-mp-row{margin-top:-4px}
-.home-mp{display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:10px 16px 10px 14px;border-radius:12px;cursor:pointer;
-  font:500 14.5px/1.3 var(--ui-serif);letter-spacing:.12em;color:var(--ui-paper);text-align:left;
-  background:var(--ui-glass-strong);border:1px solid var(--ui-glass-line-soft);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);
-  transition:background var(--ui-fast),border-color var(--ui-fast)}
-.home-mp:hover{background:var(--ui-glass-solid);border-color:var(--ui-glass-line)}
-.home-mp:focus-visible{outline:2px solid var(--ui-jade-300);outline-offset:2px}
-.home-mp i{flex:none;width:26px;height:26px;border-radius:50%;background:rgba(244,239,226,.14) center/16px no-repeat;transition:background-color var(--ui-fast);
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23f4efe2' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='5.5' cy='5' r='2'/%3E%3Ccircle cx='11' cy='5.5' r='1.7'/%3E%3Cpath d='M2 13c.4-2.4 1.8-3.6 3.5-3.6S8.6 10.6 9 13'/%3E%3Cpath d='M9.6 9.6c.4-.2.9-.3 1.4-.3 1.5 0 2.6 1 3 3.2'/%3E%3C/svg%3E")}
-.home-mp span{flex:1;min-width:0;display:grid;gap:2px}
-.home-mp small{font:12px/1.4 var(--ui-serif);letter-spacing:.06em;color:var(--ui-paper-dim)}
-.home-mp em{flex:none;position:relative;width:38px;height:22px;border-radius:999px;background:rgba(244,239,226,.18);box-shadow:inset 0 0 0 1px var(--ui-glass-line-soft);transition:background var(--ui-fast)}
-.home-mp em::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--ui-paper);box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s var(--ui-ease)}
-.home-mp[aria-checked="true"] i{background-color:var(--ui-jade-500)}
-.home-mp[aria-checked="true"] em{background:var(--ui-jade-500)}
-.home-mp[aria-checked="true"] em::after{transform:translateX(16px)}
-@media (max-width:520px){.home-mp small{display:none}}
+/* IDOK-192 联机模式：青玉卡，左侧一条青玉色，和单人（桂花金）、游览（朱砂印）三张卡各一种主色。 */
+.home-mode--mp{cursor:pointer;padding:14px 16px 13px;gap:10px 14px;color:var(--ui-paper);
+  background:linear-gradient(105deg,rgba(143,193,181,.16),rgba(143,193,181,0) 46%),var(--ui-glass-strong);
+  border:1px solid var(--ui-glass-line-soft);box-shadow:inset 4px 0 0 var(--ui-jade-300),var(--ui-shadow-1);
+  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);transition:transform .25s var(--ui-ease),background .2s,border-color .2s}
+.home-mode--mp:hover{transform:translateY(-2px);background:linear-gradient(105deg,rgba(143,193,181,.22),rgba(143,193,181,0) 46%),var(--ui-glass-solid);border-color:var(--ui-glass-line)}
+.home-mode--mp:active{transform:scale(.985)}
+.home-mode--mp:focus-visible{outline:3px solid var(--ui-jade-300);outline-offset:3px}
+.home-mode--mp .home-mode-seal{width:44px;height:44px;font-size:23px;color:var(--ui-ink-900);background:var(--ui-jade-300);transform:rotate(-4deg)}
+.home-mode--mp .home-mode-text b{font-size:18px}
+.home-mode--mp .home-mode-text>span{color:var(--ui-paper-dim)}
+.home-mp-live{font:500 11.5px/1 var(--ui-serif);font-style:normal;letter-spacing:.06em;padding:4px 8px 4px 18px;border-radius:999px;position:relative;
+  color:var(--ui-jade-300);background:rgba(143,193,181,.14)}
+.home-mp-live::before{content:"";position:absolute;left:7px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--ui-jade-300);box-shadow:0 0 0 3px rgba(143,193,181,.2)}
+.home-mp-live::after{content:" 人在线"}
+.home-mp-live[hidden]{display:none}
+.home-mode--mp .home-mode-text b{white-space:nowrap}.home-mp-live{white-space:nowrap}
+.home-go--mp{min-height:40px;font:600 14.5px/1 var(--ui-serif);letter-spacing:.24em;color:var(--ui-ink-900);background:var(--ui-jade-300);border:0}
+.home-mode--mp:hover .home-go--mp{background:#a3d0c5}
+@media (max-width:760px){
+  .home-mode--mp{grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go";padding:11px 12px}.home-mode--mp .home-mode-seal{width:36px;height:36px;font-size:19px}
+  .home-mode--mp .home-mode-text>span{display:none}.home-go--mp{min-height:36px;padding:0 14px;letter-spacing:.12em}
+  .home-mode--mp .home-mode-text b{letter-spacing:.1em;gap:6px}.home-mp-live{padding:3px 7px 3px 16px}.home-mp-live::after{content:" 人"}
+}
+@media (max-height:520px) and (orientation:landscape){
+  .home-mode--mp{grid-template-columns:auto 1fr auto;grid-template-areas:"seal text go"}.home-mode--mp .home-mode-text>span{display:none}.home-go--mp{padding:0 14px;letter-spacing:.12em}
+}
