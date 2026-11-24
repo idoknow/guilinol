@@ -5,7 +5,7 @@ import {preview} from 'vite'
 
 // 相机系统冒烟（IDOK-182 / IDOK-188）：
 //   相机包换机 → 手上挂机 + 持机姿势 → 进拍照模式（只有时辰/滤镜/天气/人物/落款/换机）→ 按快门出片 → 录像存 MP4 → 退出。
-// IDOK-188 把专业参数（曝光/ISO/快门/焦距/白平衡/构图线/RAW/MOV/分辨率档位）收掉了，
+// IDOK-211 把专业参数（曝光/ISO/快门/焦距/白平衡/构图线/RAW/MOV/分辨率档位）收掉了，
 // 所以这里只断言"普通拍照还能出片、录像还是 MP4、机身模型还在手上"。
 
 const start = performance.now()
@@ -21,7 +21,13 @@ try {
   page.on('console', message => {
     if (message.type() === 'error') errors.push(message.location().url + ': ' + message.text())
   })
-  page.on('download', download => void download.cancel().catch(() => {}))
+  // 录像文件留在 captures/ 里，方便抽帧检查画面不是黑的；其它下载（照片）直接丢掉。
+  const clipSaved = []
+  page.on('download', download => {
+    const name = download.suggestedFilename()
+    if (/\.(mp4|webm)$/i.test(name)) clipSaved.push(download.saveAs(`captures/camera-clip.${name.split('.').pop()}`).then(() => name))
+    else void download.cancel().catch(() => {})
+  })
   await page.route('**/favicon.ico', route => route.fulfill({status: 204}))
   await page.route('**/api/t', route => route.fulfill({status: 204}))
   await page.route('**/api/live', route => route.fulfill({status: 200, contentType: 'application/json', body: '{"online":42}'}))
@@ -179,14 +185,22 @@ try {
       fps: window.lastClip.fps,
       bytes: window.lastClip.bytes,
     }))
-    assert.match(clip.name, /\.(mp4|mov|webm)$/i, `clip should have a video extension, got ${clip.name}`)
+    assert.match(clip.name, /\.(mp4|webm)$/i, `clip should have a video extension, got ${clip.name}`)
     if (clip.container === 'mp4') {
       assert.match(clip.name, /\.mp4$/i, 'MP4 recording should land as .mp4')
     } else {
       assert.match(clip.name, /\.webm$/i, `webm fallback should land as .webm, got ${clip.name}`)
     }
     assert.ok(clip.seconds > 0.5, `clip should be at least half a second, got ${clip.seconds}`)
-    assert.ok(clip.width >= 1920, `clip should record at the body preset width, got ${clip.width}`)
+    // 输出 = 源画布原比例，长边不超过机身首档（不放大、不变形）
+    const source = await page.evaluate(() => {
+      const canvas = document.querySelector('canvas[data-engine]')
+      return {width: canvas.width, height: canvas.height}
+    })
+    assert.ok(clip.width <= source.width && clip.height <= source.height, `clip ${clip.width}x${clip.height} should not upscale ${source.width}x${source.height}`)
+    assert.ok(Math.abs(clip.width / clip.height - source.width / source.height) < 0.02, `clip aspect should match the canvas, got ${clip.width}x${clip.height}`)
+    assert.ok(clip.bytes > 0, `clip should carry encoded data, got ${clip.bytes} B`)
+    if (clipSaved.length) console.log('clip file', 'captures/camera-clip.' + (await clipSaved[0]).split('.').pop())
     console.log('clip', JSON.stringify(clip))
   } else {
     console.log('clip skipped: MediaRecorder/captureStream unavailable')

@@ -8,7 +8,7 @@ import {prefs} from '../ui/prefs'
 import {openRack} from '../ui/gear-rack'
 import {refreshCamera, setCameraShown} from '../gear/hand'
 
-// 拍照模式（IDOK-182 起接了相机装备，IDOK-188 又把专业参数收掉了）：
+// 拍照模式（IDOK-182 起接了相机装备，IDOK-211 又把专业参数收掉了）：
 //   机身只决定取景广角、画质基线和手上拿的那台；UI 回到「时辰 / 滤镜 / 天气 / 人物 / 落款」，
 //   按快门就出片，另外保留一颗录像键，固定录 MP4。
 const filters: [string, string][] = [
@@ -82,7 +82,8 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     const isoFloor = night ? (dim ? 6400 : 3200) : dim ? 400 : b.iso[Math.min(1, b.iso.length - 1)]
     const iso = b.iso[Math.max(0, b.iso.findIndex(value => value >= isoFloor))]
     const shutterFloor = night ? 1 / 30 : dim ? 1 / 60 : 1 / 125
-    const shutter = b.shutter[Math.max(0, b.shutter.findIndex(value => value <= shutterFloor))]
+    // 快门表从快到慢排列：取最接近目标的一档（findIndex(≤) 会永远拿到 1/8000）
+    const shutter = b.shutter.reduce((best, value) => (Math.abs(Math.log2(value / shutterFloor)) < Math.abs(Math.log2(best / shutterFloor)) ? value : best), b.shutter[0])
     return {iso, shutter, wb: night ? Math.max(b.wb.min, 4200) : Math.round((b.wb.min + b.wb.max) / 200) * 100}
   }
 
@@ -252,7 +253,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
       })
       return
     }
-    const started = await startRecording(host.renderer.domElement, body(), videoPreset(body(), 0), 'mp4')
+    const started = await startRecording(host.renderer.domElement, body(), videoPreset(body(), 0))
     if (!started) {
       window.dispatchEvent(new CustomEvent('walk:toast', {detail: {text: '这台设备不支持网页录像', ms: 3000}}))
       return
