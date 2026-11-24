@@ -143,8 +143,8 @@ const FEATURES = (): Feature[] => [
     pc: `按 <kbd>V</kbd> 起飞，${caps(move())} 飞，<kbd>Q</kbd> / <kbd>E</kbd> 降 / 升，<kbd>Shift</kbd> 加速；再按 <kbd>V</kbd> 落地步行。`,
     phone: '点右上「起飞」。一根手指拖动转方向，两根手指拖着走；点「落地步行」回到地面。'},
   {seal: '图', title: '地图与传送',
-    pc: '按 <kbd>M</kbd> 或点右上「地图」。可以搜地名，点地图上任意一处就直接过去；右上角小圆图随时告诉你在哪条路。',
-    phone: '点右上「地图」，搜地名或点地图上任意一处，直接传送过去。'},
+    pc: `按 <kbd>M</kbd> 或点右上「地图」。可以搜地名，点地图上任意一处就直接过去；右上角小圆图随时告诉你在哪条路。卡进墙里或掉进水里，点左上「复位」或按 <kbd>${k('unstuck')}</kbd>，回到最近的平地。`,
+    phone: '点右上「地图」，搜地名或点地图上任意一处，直接传送过去。卡进墙里或掉进水里，点左上的复位按钮回到最近的平地。'},
   {seal: '印', title: '景册集印章',
     pc: '名胜附近地上有朱红色圆圈，走进去就盖一枚印章。按 <kbd>J</kbd> 翻景册，看还差哪几处，也能从景册直接去。',
     phone: '名胜附近地上有朱红色圆圈，走进去就盖一枚印章。点「景册」看还差哪几处，也能从景册直接去。'},
@@ -163,7 +163,7 @@ const FEATURES = (): Feature[] => [
 ]
 
 const KEY_GROUPS = (): {title: string; rows: Row[]}[] => [
-  {title: '步行', rows: rows('walk').concat([{keys: ['C'], label: '视距'}, {keys: ['J'], label: '景册'}, {keys: [k('useItem')], label: '使用手中物品'}])},
+  {title: '步行', rows: rows('walk').concat([{keys: ['C'], label: '视距'}, {keys: ['J'], label: '景册'}, {keys: [k('useItem')], label: '使用手中物品'}, {keys: [k('unstuck')], label: '复位（卡住 / 落水）'}])},
   {title: '飞行', rows: rows('fly'), },
   {title: '电驴', rows: rows('bike').concat([{keys: ['1', '2', '3', '4'], label: '直接选挡'}, {keys: ['0'], label: '驻车 P 挡'}, {keys: ['B'], label: '双闪'}, {keys: ['G'], label: '改装'}])},
   {title: '单车', rows: rows('bicycle')},
