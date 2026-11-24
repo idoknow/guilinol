@@ -183,7 +183,7 @@ dialog.mission-board {
 }
 dialog.mission-board::backdrop {
   background: rgba(8, 10, 14, 0.56);
-  backdrop-filter: blur(4px);
+  backdrop-filter: var(--ui-blur-mask);
 }
 .mb-head {
   display: flex;
