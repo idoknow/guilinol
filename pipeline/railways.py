@@ -64,6 +64,59 @@ def envelope(graph, targets, origins=None):
     return levels
 
 
+def parallel_height_audit(pieces, coords, height, ways):
+    """Compare linear profiles at matching perpendicular chainages on both tracks."""
+    rows = [piece for piece in pieces if not piece[3] & (BRIDGE | TUNNEL)]
+    indices = np.array([[i, j] for i, j, *_ in rows])
+    endpoints = np.asarray(coords)[indices]
+    delta = endpoints[:, 1] - endpoints[:, 0]
+    lengths = np.linalg.norm(delta, axis=1)
+    axes = delta / lengths[:, None]
+    levels = height[indices]
+    lines = [LineString(pair) for pair in endpoints]
+    source, target = STRtree(lines).query(lines, predicate='dwithin', distance=8)
+    way_ids = np.array([row[4] for row in rows])
+    layers = np.array([ways[k]['tags'].get('layer', '0') for k in way_ids])
+    cosine = np.sum(axes[source] * axes[target], axis=1)
+    keep = ((way_ids[source] != way_ids[target]) & (layers[source] == layers[target])
+            & (abs(cosine) >= math.cos(math.radians(10))))
+    source, target = source[keep], target[keep]
+    # Clip the source segment to both the target chainage interval and its
+    # eight-metre strip. Height difference is linear between these endpoints.
+    offset = endpoints[source, 0] - endpoints[target, 0]
+    along = np.sum(offset * axes[target], axis=1)
+    normal = axes[target][:, ::-1].copy()
+    normal[:, 0] *= -1
+    across = np.sum(offset * normal, axis=1)
+    lo, hi = np.zeros(len(source)), np.ones(len(source))
+    for start, step, minimum, maximum in (
+        (along, np.sum(delta[source] * axes[target], axis=1), 0, lengths[target]),
+        (across, np.sum(delta[source] * normal, axis=1), -8, 8),
+    ):
+        moving = abs(step) > 1e-10
+        divisor = np.where(moving, step, 1)
+        a, b = (minimum - start) / divisor, (maximum - start) / divisor
+        lo = np.maximum(lo, np.where(moving, np.minimum(a, b), 0))
+        hi = np.minimum(hi, np.where(moving, np.maximum(a, b),
+                                     np.where((start >= minimum) & (start <= maximum), 1, -1)))
+    valid = hi >= lo
+    source, target = source[valid], target[valid]
+    result = dict(directedSegmentPairs=len(source), over5cm=0, maximumM=0)
+    if not len(source):
+        return result
+    fraction = np.stack((lo[valid], hi[valid]), axis=1)
+    xy = endpoints[source, :1] + fraction[:, :, None] * delta[source, None]
+    station = np.sum((xy - endpoints[target, :1]) * axes[target, None], axis=2)
+    source_y = levels[source, :1] + fraction * np.diff(levels[source], axis=1)
+    target_y = levels[target, :1] + station / lengths[target, None] * np.diff(levels[target], axis=1)
+    diff = abs(source_y - target_y)
+    pair, end = np.unravel_index(diff.argmax(), diff.shape)
+    result.update(over5cm=int(np.count_nonzero(diff.max(axis=1) > .050001)),
+                  maximumM=float(diff[pair, end]), ways=way_ids[[source[pair], target[pair]]].tolist(),
+                  xz=xy[pair, end].tolist(), railheadM=[source_y[pair, end], target_y[pair, end]])
+    return result
+
+
 def road_radius(tags):
     kind = tags['highway']
     lane_count = tags.get('lanes', '')
@@ -433,7 +486,8 @@ def bake(world_dir, manifest, inventory, samples):
                              x=coords[i][0],z=coords[i][1],east=round(axis[0],6),south=round(axis[1],6),
                              railY=round(height[i],4),roadY=round(road,4),
                              clearanceM=None if clearance is None else round(clearance,4)))
-    return dict(branchLocalGrade=branch_report,crossings=measured,maxEncodedGradePermille=maximum_grade,missingSigns=missing_signs,treesRemoved=trees_removed,signs=sum(map(len,sign_sites.values())),tiles=len(tiles), segments=sum(map(len,tiles.values())), fixedNodes=len(anchors),
+    return dict(parallelRailHeight=parallel_height_audit(pieces, coords, height, ways),
+                branchLocalGrade=branch_report,crossings=measured,maxEncodedGradePermille=maximum_grade,missingSigns=missing_signs,treesRemoved=trees_removed,signs=sum(map(len,sign_sites.values())),tiles=len(tiles), segments=sum(map(len,tiles.values())), fixedNodes=len(anchors),
                 maxPinErrorM=max(abs(height[i]-y) for i,y in anchors.items()), clearanceConflicts=violations)
 
 
