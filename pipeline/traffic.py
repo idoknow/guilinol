@@ -192,10 +192,13 @@ def bake(output, manifest, rendered_roads=None):
     restore_corridors(output,manifest['chunks'])
     from canal_passages import plan as plan_canal_passages, sample_road_heights
     from terminal_decks import grade as grade_terminal_decks, grade_airport_fork, grade_service_overpass, trim_bridge_endcaps
+    ground_passages.close_qingtian_road(elements,sections,garage_curbs)
     ground_passages.grain_yard(output,manifest,elements,sections)
     grade_airport_fork(output,manifest,elements)
     terminal_grades = grade_terminal_decks(output, manifest, elements)
     canal_grades = plan_canal_passages(output, manifest, elements, sections)
+    from canal_east import plan as plan_east_canal
+    east_canal=plan_east_canal(output,manifest,elements,sections,canal_grades)
     graded_sections,grade_points=vehicle_surface_grades.stations(elements,sections,box(left,top,left+width,top+depth))
     native_levels=sample_road_heights(output,manifest,grade_points)
     bake_station_corridor(output, manifest['chunks'], elements)
@@ -362,6 +365,7 @@ def bake(output, manifest, rendered_roads=None):
             pedestrian+=cycleway_street_tie(output,manifest,elements,sections,cycleway)
             from junction_grades import profiles as junction_profiles
             pedestrian+=junction_profiles(output,manifest,elements,sections,planned)
+            pedestrian+=east_canal
             bake_surveyed_corridors(output,manifest['chunks'],elements,sections,planned+pedestrian,only_approaches=True,bridge_profiles=canal_grades,preferred=pedestrian+cycling)
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)
             for tunnel in generated:

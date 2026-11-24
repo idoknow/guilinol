@@ -234,6 +234,7 @@ try {
       }
       await page.screenshot({path:`${dir}/${cam.id}.png`})
     }
+    if(process.env.PERF_PEDESTRIANS==='0')assert.equal(metrics.averageVisiblePeople,0,'Expected zero visible pedestrians')
     viewpoints[cam.id] = {label: cam.label, loadMs, ...metrics}
     await saveReport()
     if(cam.eye)await page.screenshot({path:`${outDir}/${cam.id}.png`})

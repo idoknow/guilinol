@@ -37,7 +37,7 @@ function tileSurface(world,entry,tunnels){
   const data=gunzipSync(fs.readFileSync(path.join(world,entry.file)))
   const [verts,indices,jsonSize,imageBytes,triangles]=[4,8,12,16,20].map(i=>data.readUInt32LE(i))
   const jsonStart=24+16900+9*verts+4*indices
-  const [,paths,,,legacy,,,savedBed]=JSON.parse(data.toString('utf8',jsonStart,jsonStart+jsonSize))
+  const [,paths,,,legacy,signs=[],railCuts=[],savedBed]=JSON.parse(data.toString('utf8',jsonStart,jsonStart+jsonSize))
   const bed=savedBed??(legacy&&!Array.isArray(legacy)?legacy:undefined)
   const deckStart=jsonStart+jsonSize+imageBytes,tail=deckStart+18*triangles
   const groundStart=data.length===tail?24:tail
@@ -48,12 +48,18 @@ function tileSurface(world,entry,tunnels){
     for(let i=0;i<64;i++){const j=base+(i&~7)*stride;grid[base+i*stride]=grid[j]+(grid[j+8*stride]-grid[j])*(i%8)/8}
   }
   const step=wet.some(Boolean)?4:8,s=step/4
-  function ground(x,z){
+  function interpolate(field,x,z){
     const col=Math.max(0,Math.min(256/step-1,Math.floor(x/step))),row=Math.max(0,Math.min(256/step-1,Math.floor(z/step)))
-    const i=(row*65+col)*s,u=x/step-col,v=z/step-row,a=grid[i],b=grid[i+s],c=grid[i+s*65],d=grid[i+s*66]
+    const i=(row*65+col)*s,u=x/step-col,v=z/step-row,a=field[i],b=field[i+s],c=field[i+s*65],d=field[i+s*66]
     return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
   }
-  const streets=streetGeometry(paths,ground),roads=streets.road
+  const cut=railCuts.length?grid.slice():grid
+  for(const [index,cm] of railCuts){
+    const stride=256/step+1
+    cut[s*(Math.floor(index/stride)*65+index%stride)]=cm/100
+  }
+  const ground=(x,z)=>interpolate(cut,x,z)
+  const streets=streetGeometry(paths,(x,z)=>interpolate(grid,x,z),Array.isArray(legacy)?legacy:[],signs,ground),roads=streets.road
   joinPortalRoads(entry,tunnels,[roads.subarray(0,streets.legacyRoadLength)])
   const modified=bed&&new Set(bed.drop),replacement=bed&&new Triangles(bedPositions(bed))
   function visibleGround(x,z){
