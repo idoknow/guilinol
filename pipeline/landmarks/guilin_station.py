@@ -20,7 +20,9 @@ from station_site import CENTER, ROOT, canopy_stations, footprints
 from uni_kit import ccw, edges, fin, quad, slab
 from world_surface import LandmarkSurface, Surface
 
-STYLE = json.loads((ROOT / "pipeline/railway-style.json").read_text())["station"]
+RAILWAY_STYLE = json.loads((ROOT / "pipeline/railway-style.json").read_text())
+STYLE = RAILWAY_STYLE["station"]
+LEVELS = RAILWAY_STYLE["stationLevels"]
 NAME = "guilin_station"
 PAVING = {
     rule["role"]: rule["color"]
@@ -371,7 +373,8 @@ def main(out):
             platform(b, poly, streets)
         platform_access(b, streets)
         crossing = site["crossing"]
-        y = max(b.grade(x, z) for x, z in crossing.exterior.coords) + 7.4
+        platform_y = LEVELS["hallFloor"] + LEVELS["platformRise"] - surface.y
+        y = platform_y - LEVELS["platformHeight"] + LEVELS["overheadClearance"]
         b.prism(crossing.exterior.coords, y, 0.55, "frame", collide=True)
         b.prism(crossing.exterior.coords, y + 3.75, 0.25, "frame", cap_region="roof")
         b.face(
@@ -400,7 +403,7 @@ def main(out):
                         n,
                         "wall",
                     )
-        for poly in platforms:
+        for way_id, poly in zip(range(376029417, 376029421), platforms, strict=True):
             overlap = crossing.intersection(poly)
             if overlap.is_empty:
                 continue
@@ -412,8 +415,9 @@ def main(out):
                 edges(ccw(poly.exterior.coords)), key=lambda edge: edge[3]
             )
             old = b.set_frame((x, 0, z), axis)
-            length = 2.1 * (y - g)
-            bottom = b.grade(0, length) - 0.02
+            # Keep the foot of the stairs at its surveyed platform position.
+            length = STYLE["bridgeStairRunByPlatform"][str(way_id)]
+            bottom = platform_y - 0.02
             steps = math.ceil((y - bottom) / 0.16)
             for k in range(steps):
                 frac = (k + 1) / steps

@@ -13,6 +13,14 @@
   "ballastSlope": 1.75,
   "sleeperSpacing": 0.6,
   "mastSpacing": 50,
+  "stationLevels": {
+    "hallFloor": 155.05,
+    "platformRise": 0,
+    "platformHeight": 1.25,
+    "structureDepth": 1.2,
+    "roadClearance": 4.5,
+    "overheadClearance": 7.5
+  },
   "station": {
     "wall": "#e5e5df",
     "roof": "#bfc3c1",
@@ -27,6 +35,7 @@
     "signHeight": 3.2,
     "signWidth": 16.0,
     "canopyHeight": 5.6,
-    "columnSpacing": 18
+    "columnSpacing": 18,
+    "bridgeStairRunByPlatform": {"376029417": 15.0756, "376029418": 16.5925, "376029419": 14.6420, "376029420": 14.6615}
   }
 }
