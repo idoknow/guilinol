@@ -324,6 +324,7 @@ def bake(output, manifest, rendered_roads=None):
             (output/'vehicle-tunnel-grades.json').write_bytes(request.read_bytes())
         ground_passages.bake(output,manifest,elements,sections,garage_curbs)
         ground_passages.level_soffits(output,manifest,elements,sections)
+        portal_landings.carriageways(output,manifest,elements,sections)
         if network['edges']:
             route_file=output/'vehicle-portal-routes.json'
             yard_routes=[]
