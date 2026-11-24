@@ -93,7 +93,7 @@ def correct_water(surface, terrain, original, bounds, stencil):
         tags = element.get('tags', {})
         coords = points(element)
         if len(coords) >= 2:
-            if (tags.get('bridge','no') != 'no' and coords[0]!=coords[-1]) or tags.get('waterway') in ('lock_gate','dam','weir') or tags.get('tunnel') == 'culvert':
+            if tags.get('waterway') in ('lock_gate','dam','weir') or tags.get('tunnel') == 'culvert':
                 draw.line([((east-left)/GRID,(south-top)/GRID) for east,south in coords], fill=1,width=3)
         if not (tags.get('natural') == 'water' or 'water' in tags or tags.get('waterway') == 'riverbank'):
             continue

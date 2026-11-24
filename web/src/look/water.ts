@@ -89,22 +89,44 @@ function finish(positions:Float32Array, level:number, x:number, z:number) {
   return mesh
 }
 
-// Per-chunk water from the GL0x 65×65 water grid (4 m): a flat quad at the water level for every cell
-// touching a wet sample. Positions are shifted into world space so Stream's ChunkBatcher draws all
-// loaded river/lake tiles in one draw call.
-export function chunkWater(water:Int16Array, x:number, z:number) {
+export function chunkWater(water:Int16Array, bed:Int16Array, x:number, z:number) {
   const positions:number[] = [], counts = new Map<number,number>()
   let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity, minZ=Infinity, maxZ=-Infinity
   for(let row=0;row<64;row++) for(let col=0;col<64;col++) {
     let level = -Infinity, wet = 0
-    for(const at of [row*65+col,row*65+col+1,(row+1)*65+col,(row+1)*65+col+1]) if(water[at]!==-32768) {wet++; level = Math.max(level,water[at]/10)}
+    const corner=row*65+col, corners=[corner,corner+65,corner+1,corner+66]
+    for(const at of corners) if(water[at]!==-32768) {wet++; level = Math.max(level,water[at]/10)}
     if(!wet) continue
     counts.set(level,(counts.get(level)??0)+1)
     const x0=x+col*4,z0=z+row*4,x1=x0+4,z1=z0+4
     if(x0<minX) minX=x0; if(x1>maxX) maxX=x1
     if(level<minY) minY=level; if(level>maxY) maxY=level
     if(z0<minZ) minZ=z0; if(z1>maxZ) maxZ=z1
-    positions.push(x0,level,z0, x0,level,z1, x1,level,z0, x1,level,z0, x0,level,z1, x1,level,z1)
+    if(wet===4&&corners.every(at=>water[at]===water[corner]&&water[at]>bed[at])){
+      positions.push(x0,level,z0, x0,level,z1, x1,level,z0, x1,level,z0, x0,level,z1, x1,level,z1)
+      continue
+    }
+    for(const triangle of [[corner,corner+65,corner+1],[corner+1,corner+65,corner+66]]){
+      const levels=triangle.map(at=>water[at]).filter(value=>value!==-32768)
+      if(!levels.length)continue
+      const shoreLevel=Math.min(...levels)
+      const vertices=triangle.map(at=>{
+        const height=water[at]===-32768?shoreLevel:water[at]
+        return {x:x+4*(at%65),z:z+4*Math.floor(at/65),y:height/10,depth:height-bed[at]}
+      })
+      const clipped=[]
+      for(let index=0;index<3;index++){
+        const start=vertices[index],end=vertices[(index+1)%3]
+        if(start.depth>0)clipped.push(start)
+        if((start.depth>0)!==(end.depth>0)){
+          const t=start.depth/(start.depth-end.depth)
+          clipped.push({x:start.x+t*(end.x-start.x),y:start.y+t*(end.y-start.y),z:start.z+t*(end.z-start.z)})
+        }
+      }
+      for(let index=2;index<clipped.length;index++)for(const vertex of [clipped[0],clipped[index-1],clipped[index]]){
+        positions.push(vertex.x,vertex.y,vertex.z);minY=Math.min(minY,vertex.y)
+      }
+    }
   }
   if(!positions.length) return null
   const dominant = [...counts].sort((a,b)=>b[1]-a[1])[0]?.[0] ?? 0

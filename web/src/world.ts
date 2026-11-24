@@ -350,7 +350,7 @@ export async function detail(tile:Tile, signal:AbortSignal, parseSlot?:()=>Promi
   group.add(groundMesh)
   const tunnel=tunnels?tunnelGeometry(tile,geometry,tunnels):null
   if(tunnel){tunnel.fringe.material.dispose();tunnel.fringe.material=material;group.add(...Object.values(tunnel))}
-  const pond = chunkWater(water,tile.x,tile.z)
+  const pond = chunkWater(water,underlay,tile.x,tile.z)
   const walls = vertices ? buildingGeometry(positions,normals,indices,rings) : null
   const bridge = deck.length ? bridgeGeometry(deck,thin,asphalt) : null
   const batch:TileBatchInput = {
