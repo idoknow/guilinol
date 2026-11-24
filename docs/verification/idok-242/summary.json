@@ -325,5 +325,69 @@
     "attempts": 36,
     "minimum": -0.051353302228733355,
     "maximum": 0.04358376776190198
+  },
+  "regressions": {
+    "strict": {
+      "main": 2922,
+      "candidate": 3388,
+      "counts": {
+        "streetOverflow": 0,
+        "buildingOnRoad": 1176,
+        "unevenRoad": 77,
+        "textureIssue": 535,
+        "otherBasic": 1600
+      }
+    },
+    "mainExitCodes": {
+      "strict": 1,
+      "ride": 1,
+      "traffic": 1,
+      "drive": 0,
+      "grounding": 0,
+      "walk": 1
+    },
+    "candidateExitCodes": {
+      "strict": 1,
+      "ride": 1,
+      "traffic": 1,
+      "drive": 0,
+      "grounding": 0,
+      "walk": 1
+    },
+    "matchingFailures": {
+      "ride": "Mobile pre-mount HUD: btn-run / vehicle-action overlap 2322 px²",
+      "walk": "Dock vehicle action overlaps joystick (1320.5 px²) and run button (2322 px²)",
+      "traffic": "Missing parked-car fixture at verify-traffic.mjs:140"
+    }
+  },
+  "performance": {
+    "desktopFailed": [
+      [
+        "palace",
+        "heapPeakBytes"
+      ]
+    ],
+    "mobileFailed": [
+      [
+        "walk-palace",
+        "calls"
+      ],
+      [
+        "walk-palace",
+        "mirrorCalls"
+      ],
+      [
+        "walk-palace",
+        "geometries"
+      ],
+      [
+        "walk-palace",
+        "textures"
+      ],
+      [
+        "walk-palace",
+        "heap"
+      ]
+    ]
   }
 }
