@@ -78,8 +78,11 @@ def channel_spans(elements, widths):
         else:
             streams.append(axis)
     water=STRtree(streams)
-    return STRtree([axis.buffer(half,cap_style='flat') for axis,half in spans
-                    if len(water.query(axis,predicate='intersects'))])
+    # The packed road and deck quantize their edges independently to cm.
+    # Overlap the lip by 3 cm at each abutment to keep the pavement closed.
+    return STRtree([substring(axis,.03,axis.length-.03).buffer(half,cap_style='flat')
+                    for axis,half in spans if axis.length>.06
+                    and len(water.query(axis,predicate='intersects'))])
 
 
 def bake(output, chunks, elements, widths, approaches=(), only_approaches=False):
