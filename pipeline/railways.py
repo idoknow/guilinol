@@ -24,7 +24,7 @@ from station_levels import FOOTBRIDGE, PLATFORMS, RAIL, UNDERPASS
 from station_approaches import approach_junctions, approach_exceptions
 
 ROOT = Path(__file__).resolve().parents[1]
-BRIDGE, TUNNEL, ELECTRIC, FENCE, LEVEL, RESERVED, PAINTED = 1, 2, 4, 8, 16, 32, 64
+BRIDGE, TUNNEL, ELECTRIC, FENCE, LEVEL, RESERVED, PAINTED, GRADED_LEVEL = 1, 2, 4, 8, 16, 32, 64, 128
 
 
 def parallel_segments(pieces, coords, ways):
@@ -338,6 +338,8 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False, rail_only=
             # or fence and its half-width, around every active road corridor.
             safe=not len(protected.query(LineString([p+origin,q+origin]), predicate='dwithin',distance=4.5))
             localflags=flags if safe else ((flags & ~FENCE)|RESERVED)
+            if flags & LEVEL:
+                localflags |= GRADED_LEVEL
             portal = int(i in portal_nodes and s==0) + 2*int(j in portal_nodes and t==1)
             # Keep sub-centimetre rise on very short pieces at tile and road edges.
             encoded=[round(float(v)*100,6) for v in (*p,levels[0],*q,levels[1])]
