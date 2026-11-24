@@ -51,7 +51,7 @@ export function hits(code: string, action: Action): boolean {
 
 /** 这些键被别的固定功能占着（地图、景册、拍照、视距、骑行档位/灯/转向等），不让绑，免得一键两用。 */
 const RESERVED: Record<string, string> = {
-  Escape: '关闭', Tab: '街头 HUD', KeyM: '地图', KeyJ: '景册', KeyP: '拍照', KeyV: '飞行/步行', KeyC: '视距', KeyO: '骑行',
+  Escape: '关闭', Enter: '聊天', Tab: '街头 HUD', KeyM: '地图', KeyJ: '景册', KeyP: '拍照', KeyV: '飞行/步行', KeyC: '视距', KeyO: '骑行',
   KeyE: '加档', KeyQ: '减档', KeyG: '改装', KeyK: '脚撑', KeyL: '车灯', KeyZ: '左转灯', KeyB: '双闪', KeyU: '定速',
   Digit0: '骑行', Digit1: '骑行', Digit2: '骑行', Digit3: '骑行', Digit4: '骑行',
 }

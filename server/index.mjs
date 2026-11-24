@@ -10,6 +10,7 @@ import {bucket} from './bucket.mjs'
 import {createReadiness} from './readiness.mjs'
 import {presence, mpPresence} from './live.mjs'
 import {multiplayer} from './mp-admin.mjs'
+import {npcDefaults,validNpc} from '../lib/npc.ts'
 
 crypto.subtle.timingSafeEqual = (left,right) => left.byteLength===right.byteLength && timingSafeEqual(left,right)
 // 连接/查询都有上限：卡住的查询不能长期占着 5 连接的池子
@@ -67,7 +68,16 @@ const cachedPerfQuery = (path, params) => {
   return withAdminCache(`${path}?${params}`, () => runPerfQuery(path, params)).then(done)
 }
 const mp=multiplayer(pool,process.env)
-const env = {...process.env, mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
+const readNpc=async()=> (await pool.query('select settings from npc_settings where singleton')).rows[0]?.settings??npcDefaults
+async function npcAdmin(request){
+  if(request.method==='GET')return json(await readNpc())
+  if(request.method!=='POST')return json({error:'method'},405)
+  const rules=await request.json().catch(()=>null)
+  if(!validNpc(rules))return json({error:'invalid NPC settings'},400)
+  await pool.query('insert into npc_settings(singleton,settings) values(true,$1) on conflict(singleton) do update set settings=excluded.settings',[rules])
+  return json({ok:true})
+}
+const env = {...process.env, npcAdmin,mpAdmin:mp.route, perfQuery:cachedPerfQuery, DB:database(connections), FEEDBACK:bucket(process.env.S3_ENDPOINT)}
 const origin = new URL(process.env.PUBLIC_ORIGIN).origin
 const online = presence(pool)
 const mpOnline = mpPresence()
@@ -77,6 +87,12 @@ const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:
 const server=serve({port:Number(process.env.PORT || 3000),fetch: async request => {
   const url = new URL(request.url)
   if (!url.pathname.startsWith('/api/')) return new Response(null,{status:404})
+  if(url.pathname==='/api/npc'){
+    if(request.method!=='GET')return json({error:'method'},405)
+    const body=JSON.stringify(await readNpc()),etag='"'+Buffer.from(await crypto.subtle.digest('SHA-256',Buffer.from(body))).toString('hex')+'"'
+    const headers={'content-type':'application/json','cache-control':'public, no-cache',etag}
+    return request.headers.get('if-none-match')===etag?new Response(null,{status:304,headers}):new Response(body,{headers})
+  }
   // 就绪探针：读缓存、不阻塞、不打库。语义 = "进程起来且表结构已就绪"；
   // DB 之后抖一下不会把 pod 从端点里摘掉（静态页还得能出）。
   if (url.pathname === '/api/ready') {

@@ -1,0 +1,16 @@
+{
+  "ballast": "#736e63",
+  "steel": "#9a9b96",
+  "sleeper": "#68665e",
+  "panel": "#929087",
+  "pole": "#747d76",
+  "wire": "#48504e",
+  "fence": "#64746b",
+  "warning": "#e2af47",
+  "headWidth": 0.067,
+  "gauge": 1.435,
+  "ballastHalfWidth": 1.7,
+  "ballastSlope": 1.75,
+  "sleeperSpacing": 0.6,
+  "mastSpacing": 50
+}

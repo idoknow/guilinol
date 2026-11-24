@@ -72,6 +72,4 @@ export const look = {
   },
   // Max lean of slope-planted trees towards the surface normal (radians); trees grow up, not out.
   treeLean: .14,
-  // Trees within this horizontal radius of the camera (and above it) are hidden so crowns never fill the screen.
-  treeCameraClear: 7,
 }

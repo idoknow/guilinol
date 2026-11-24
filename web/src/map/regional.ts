@@ -17,8 +17,8 @@ export function builtBoundary(manifest:Manifest) {
 
 type Label = [string,string,number,number]
 type Payload = {version:number; paths:[string,number[][]][];labels:Label[]}
-const layers = ['lake','pond','secondary','primary','trunk','motorway','ring']
-const distant = new Set(['lake','primary','trunk','motorway','ring'])
+const layers = ['lake','pond','secondary','primary','trunk','motorway','ring','rail']
+const distant = new Set(['lake','primary','trunk','motorway','ring','rail'])
 export async function loadRegional(file:string){
   const response = await fetch(`./world/${file}`)
   if(!response.ok || !response.body) throw Error(`Cannot load ${file}`)
@@ -40,8 +40,8 @@ export async function loadRegional(file:string){
   return {paint(g:CanvasRenderingContext2D,left:number,top:number,right:number,bottom:number,scale:number,style:CSSStyleDeclaration){
     const far=scale<.09
     layers.forEach((layer,index)=>{if(far&&!distant.has(layer))return
-      const water=index<2; g.fillStyle=css(style,'--region-water'); g.strokeStyle=css(style,layer==='ring'?'--region-ring':'--region-road')
-      g.lineWidth=(layer==='ring'?parseFloat(css(style,'--region-ring-width')):index>=4?1.3:.8)/scale
+      const water=index<2; g.fillStyle=css(style,'--region-water'); g.strokeStyle=css(style,layer==='rail'?'--region-label-soft':layer==='ring'?'--region-ring':'--region-road')
+      g.lineWidth=(layer==='rail'?.65:layer==='ring'?parseFloat(css(style,'--region-ring-width')):index>=4?1.3:.8)/scale
       for(const batch of groups[index].values()) if(batch.right>=left&&batch.bottom>=top&&batch.left<=right&&batch.top<=bottom){if(water)g.fill(batch.path);else g.stroke(batch.path)}
     })
     // Karst peaks as small ink mounds (same vocabulary as the detailed map), drawn under the mask.

@@ -1,0 +1,82 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {randomUUID} from 'node:crypto'
+import {setTimeout as delay} from 'node:timers/promises'
+import {setup,until} from './chat-fixture.mjs'
+import {moderate,wechat} from '../rt/chat-provider.mjs'
+import {importWords} from './chat-words-import.mjs'
+
+test('slow external checks overlap without queuing admin or duplicating sends',async context=>{
+  const fixture=await setup({providerDelay:1000});context.after(()=>fixture.close())
+  const {clients,admin}=fixture
+  for(let index=0;index<20;index++)await fixture.join(500000+index,0)
+  await admin('words',{word:'manual',category:'fixture',action:'review',enabled:true})
+  const first=clients[0],acks=(client,cid)=>client.events.filter(e=>e.t==='chat_ack'&&e.cid===cid)
+  first.send({t:'chat',cid:'seed',ch:'near',text:'manual'})
+  const seed=await until(()=>acks(first,'seed')[0]);assert.equal(seed.code,'pending')
+  const start=performance.now()
+  for(const [index,client] of clients.entries())client.send({t:'chat',ch:'world',cid:'batch',text:index?'pass'+index:'fixture-timeout'})
+  const duplicate={t:'chat',cid:'batch',ch:'world',text:'pass1'}
+  clients[1].send(duplicate);clients[1].send({...duplicate,cid:'limited'})
+  await until(()=>fixture.checks.length===20)
+  await admin('approve',{mid:seed.mid});assert.ok(clients.every(client=>!acks(client,'batch').length))
+  await until(()=>clients.slice(1).every(client=>acks(client,'batch')[0]?.ok));assert.equal(acks(first,'batch').length,0)
+  assert.equal((await until(()=>acks(first,'batch')[0])).code,'pending');const elapsed=performance.now()-start
+  assert.ok(elapsed<3000);context.diagnostic(`20 receipts in ${Math.round(elapsed)} ms`)
+  assert.equal(acks(clients[1],'limited')[0].code,'rate');assert.equal(acks(clients[1],'batch').length,2)
+  assert.equal(fixture.checks.length,20)
+  for(const client of clients){const broadcasts=client.events.filter(e=>e.t==='chat'&&e.ch==='world');assert.equal(broadcasts.length,19);assert.deepEqual(new Set(broadcasts.map(e=>e.text)),new Set(clients.slice(1).map((_,index)=>'pass'+(index+1))))}
+})
+
+test('provider decisions fail closed regardless of local-only policy',async()=>{
+  for(const policy of ['pending','local_only'])for(const [suggest,status] of [['pass','normal'],['risky','blocked'],['review','pending'],['timeout','pending'],['unknown','pending']]){
+    const provider={name:'mock',available:()=>true,check:async()=>{if(suggest==='timeout')throw Error('timeout');return {suggest}}}
+    assert.equal((await moderate({text:'hello'},()=>null,policy,provider)).status,status)
+  }
+  const provider=wechat({WX_APPID:'mock',WX_SECRET:'mock'},()=>assert.fail('missing openid must not call WeChat'))
+  for(const policy of ['pending','local_only'])assert.equal((await moderate({text:'hello'},()=>null,policy,provider)).status,policy==='pending'?'pending':'normal')
+})
+test('chat over signed sockets and PostgreSQL',async context=>{
+  const fixture=await setup();context.after(()=>fixture.close());const {admin,join}=fixture
+  const {sql}=fixture.storage;const count=async()=>(await sql('select count(*) from chat_words'))[0].results[0].count,before=await count()
+  await sql("delete from chat_seed_seen where source='policy'; delete from admin_audit where action='chat.lexicon_policy'; insert into chat_words(word,category,action,source,actor,enabled,updated_at) values('网络','广告类型','block','konsheng@68a595f','seed',true,0),('代理','广告类型','review','konsheng@68a595f','operator',true,0); update chat_words set action='block',source='konsheng@68a595f' where word='中共'")
+  await importWords({query:sql});const [upgraded]=await sql("select word,action from chat_words where word in ('网络','代理','中共') order by id");assert.deepEqual(upgraded.results.map(row=>[row.word,row.action]),[['中共','review'],['代理','review']]);await sql("delete from chat_words where word='代理'")
+  await sql("update chat_words set enabled=false,action='review' where id=(select min(id) from chat_words where source='konsheng@68a595f' and action='block')")
+  await importWords({query:sql});assert.equal(await count(),before);assert.equal((await sql("select count(*)::int as n from chat_words where source='konsheng@68a595f' and not enabled and action='review'"))[0].results[0].n,1)
+  assert.equal((await sql("select count(*)::int as n from admin_audit where action='chat.lexicon_policy'"))[0].results[0].n,1)
+  let sender=await join(300001,0),near=await join(300002,59),far=await join(300003,61)
+  const send=async(ch,text,extra={})=>{const cid=extra.cid??randomUUID();sender.send({t:'chat',ch,text,cid,...extra});return until(()=>sender.events.find(e=>e.t==='chat_ack'&&e.cid===cid))}
+  const seen=(player,mid)=>player.events.some(e=>e.t==='chat'&&e.mid===mid)
+  const history=async(player,ch)=>{const index=player.events.length;player.send({t:'chat_hist',ch});return (await until(()=>player.events.slice(index).find(e=>e.t==='chat_hist'))).msgs}
+  assert.equal((await admin('settings')).unmoderated_policy,'local_only')
+  await admin('settings',{patch:{near_ms:0,world_ms:0,threshold:100}})
+  await admin('words',{word:'Bad',category:'test',enabled:true,action:'block'})
+  await admin('words',{word:'maybe',category:'test',enabled:true,action:'review'})
+  for(const policy of ['pending','local_only']){
+    await admin('settings',{patch:{unmoderated_policy:policy}})
+    for(const ch of ['near','world']){
+      const ack=await send(ch,'clean');if(policy==='pending'){assert.equal(ack.code,'pending');assert.ok(!seen(sender,ack.mid)&&!seen(near,ack.mid)&&!seen(far,ack.mid));await admin('approve',{mid:ack.mid})}else assert.ok(ack.ok)
+      await until(()=>seen(sender,ack.mid)&&seen(near,ack.mid));if(ch==='world')await until(()=>seen(far,ack.mid));else{assert.ok(!seen(far,ack.mid));assert.ok(!(await history(far,ch)).some(e=>e.mid===ack.mid))}
+      for(const text of ['BAD','b A d','ＢＡＤ'])assert.equal((await send(ch,text,{sys:'notice',openid:'forged',status:'normal'})).code,'blocked')
+      assert.equal((await send(ch,'maybe')).code,'pending')
+    }
+  }
+  assert.equal((await send('WORLD','hello')).code,'error');assert.equal((await send(undefined,'BAD')).code,'blocked')
+  await fixture.storage.sql(`create function chat_fixture_failure() returns trigger language plpgsql as $$ begin raise exception 'fixture'; end $$; create trigger chat_fixture_failure before insert on chat_messages for each row execute function chat_fixture_failure()`)
+  const retryCid=randomUUID(),queued=send('world','retry after recovery',{cid:retryCid});await delay(200)
+  assert.equal((await fixture.health()).chatBacklog,1);assert.ok(!near.events.some(event=>event.text==='retry after recovery'))
+  await fixture.storage.sql('drop trigger chat_fixture_failure on chat_messages');const stored=await queued;assert.ok(stored.ok);await until(()=>seen(near,stored.mid))
+  sender.send({t:'chat',cid:retryCid,ch:'world',text:'retry after recovery'});await until(()=>sender.events.filter(event=>event.t==='chat_ack'&&event.cid===retryCid).length===2);assert.equal(near.events.filter(event=>event.t==='chat'&&event.mid===stored.mid).length,1)
+  far.send({t:'pos',x:60,z:0});await delay(100);const moved=await send('near','moved');await until(()=>seen(far,moved.mid))
+  await admin('delete',{mid:moved.mid});await until(()=>near.events.some(e=>e.t==='chat_del'&&e.mid===moved.mid));assert.ok(!(await history(far,'near')).some(e=>e.mid===moved.mid))
+  assert.equal((await send('near','😀'.repeat(101))).code,'too_long');assert.ok((await send('near','😀'.repeat(100))).ok)
+  await admin('settings',{patch:{near_ms:1500}});assert.equal((await send('near','again')).code,'rate')
+  await admin('mute',{uid:sender.uid,minutes:-1});for(const ch of ['world','near'])assert.equal((await send(ch,'quiet')).code,'muted')
+  await fixture.restart();sender=await join(300001,0);await until(()=>sender.events.find(e=>e.t==='chat_mute'&&e.until===-1));await admin('unmute',{uid:sender.uid});await until(()=>sender.events.find(e=>e.t==='chat_mute'&&e.until===0))
+  await admin('settings',{patch:{threshold:1,steps_minutes:[60,1440]}})
+  for(const minutes of [60,1440]){assert.equal((await send('world','bad')).code,'blocked');const [last]=await admin('mutes',null,{uid:sender.uid});assert.equal(last.source,'auto');assert.ok(Math.abs(Number(last.until_ms)-Date.now()-minutes*60000)<5000);await admin('unmute',{uid:sender.uid})}
+  const sample=index=>'杉'.repeat(index+1)
+  for(let index=0;index<32;index++)assert.ok((await send('world',sample(index))).ok)
+  await fixture.restart();sender=await join(300001,0);const rows=await history(sender,'world');assert.deepEqual(rows.map(row=>row.text),Array.from({length:30},(_,index)=>sample(index+2)))
+  assert.ok((await admin('audit')).some(row=>row.action==='chat.settings'))
+})

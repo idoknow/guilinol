@@ -83,6 +83,16 @@ export async function adminList(db: D1Database, path: string, params: URLSearchP
     return json({items:results.slice(0,50).map(row=>({...row,detail:typeof row.detail==='string'?JSON.parse(row.detail):row.detail})),
       next_cursor:results.length>50?String(results[49].id):null})
   }
+  if (path === 'admin/signups') {
+    // 用户管理页的注册曲线：按小时分桶的新增数 + 窗口起点之前的存量（前端累加成总数曲线）。
+    const hours = Math.min(Math.max(Math.floor(Number(params.get('hours')) || 72), 1), 24 * 90)
+    const from = (Math.floor(Date.now() / 3600e3) - hours + 1) * 3600
+    const [base, rows] = await db.batch<Record<string, string | number>>([
+      db.prepare('SELECT count(*) AS n FROM users WHERE created_at<?').bind(from),
+      db.prepare('SELECT (created_at/3600)*3600 AS t,count(*) AS n FROM users WHERE created_at>=? GROUP BY (created_at/3600)*3600 ORDER BY 1').bind(from),
+    ])
+    return json({ from, hours, base: Number(base.results[0]?.n ?? 0), points: rows.results.map((row) => ({ t: Number(row.t), n: Number(row.n) })) })
+  }
   if (path === 'admin/stats') {
     const [users, statuses, pending] = await db.batch<Record<string, string | number>>([
       db.prepare(

@@ -254,6 +254,12 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
       recBadge.hidden = true
       bar.classList.remove('rec')
       const name = saveRecording(result, '网上桂林')
+      if (!name) {
+        window.dispatchEvent(new CustomEvent('walk:toast', {
+          detail: {text: '这台机器录不出画面（浏览器编码器没有输出），换个浏览器再试', ms: 5200},
+        }))
+        return
+      }
       const fellBack = result.container === 'webm'
       window.dispatchEvent(new CustomEvent('walk:toast', {
         detail: {text: fellBack ? `已保存 ${name}（这台机器编不出 MP4，存成 WebM）` : `已保存录像 ${name}`, ms: fellBack ? 5200 : 3600},
@@ -348,7 +354,6 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     host.clock.flowing = saved.flowing
     host.walker()?.hold(false)
     host.walker()?.showFigure(true)
-    setCameraShown(true, host.walker())
     host.camera.fov = saved.fov
     host.camera.updateProjectionMatrix()
     host.renderer.domElement.style.filter = ''

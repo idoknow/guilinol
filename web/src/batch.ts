@@ -36,6 +36,36 @@ interface IndexedSlice {
 
 export type ParkedBike={id:string;x:number;y:number;z:number;yaw:number}
 
+// Clear city-generated parked e-bikes overlapping Tianyuan Mifen storefront, Lv3 outdoor apron,
+// front viewing strip (3 blue shared bikes), and west-alley shop scooters.
+const TIANYUAN_CENTER_X = -1139.2
+const TIANYUAN_CENTER_Z = -55.5
+const TIANYUAN_ROT = 2.83616 - Math.PI
+const TIANYUAN_COS = Math.cos(TIANYUAN_ROT)
+const TIANYUAN_SIN = Math.sin(TIANYUAN_ROT)
+
+export function isTianyuanExcludedParkedBike(wx:number, wz:number):boolean {
+  const dx = wx - TIANYUAN_CENTER_X, dz = wz - TIANYUAN_CENTER_Z
+  if(dx*dx + dz*dz > 225) return false
+  const lx = dx*TIANYUAN_COS - dz*TIANYUAN_SIN
+  const lz = dx*TIANYUAN_SIN + dz*TIANYUAN_COS
+  return lx>=-5.6 && lx<=4.6 && lz>=-8.5 && lz<=13.0
+}
+
+function filterExcludedParkedBikes(parked:Float32Array):Float32Array {
+  let drop = 0
+  for(let i=0;i<parked.length;i+=16) if(isTianyuanExcludedParkedBike(parked[i+12],parked[i+14])) drop++
+  if(!drop) return parked
+  const kept = new Float32Array(parked.length - drop*16)
+  let out = 0
+  for(let i=0;i<parked.length;i+=16) {
+    if(isTianyuanExcludedParkedBike(parked[i+12],parked[i+14])) continue
+    kept.set(parked.subarray(i,i+16),out)
+    out += 16
+  }
+  return kept
+}
+
 const WORLD_SPHERE = new THREE.Sphere(new THREE.Vector3(0,200,0),25000)
 
 function shiftPositions(geom:THREE.BufferGeometry, dx:number, dz:number) {
@@ -268,7 +298,7 @@ export class ChunkBatcher {
         const distance=(east-x)**2+(south-z)**2
         if(distance>=best||footY!==undefined&&Math.abs(footY-height)>1.5)continue
         const id=`${tile.x}:${tile.z}:${offset/16}`
-        if(this.takenBikes.has(id)||vehicleForbiddenAt(east,south))continue
+        if(this.takenBikes.has(id)||vehicleForbiddenAt(east,south)||isTianyuanExcludedParkedBike(east,south))continue
         nearest={id,x:east,y:height,z:south,yaw:Math.atan2(parked[offset+8],parked[offset+10])};best=distance
       }
     }
@@ -281,7 +311,7 @@ export class ChunkBatcher {
     if(!Number.isInteger(index)||index<0||id!==`${east}:${south}:${index}`)return false
     for(const {tile,parked} of this.items.values()){
       if(tile.x!==east||tile.z!==south||index>=parked.length/16)continue
-      if(vehicleForbiddenAt(parked[16*index+12],parked[16*index+14]))return false
+      if(vehicleForbiddenAt(parked[16*index+12],parked[16*index+14])||isTianyuanExcludedParkedBike(parked[16*index+12],parked[16*index+14]))return false
       this.takenBikes.add(id);this.furnitureStale=true;return true
     }
     return false
@@ -300,6 +330,7 @@ export class ChunkBatcher {
     if(input.bridge) shiftPositions(input.bridge,tile.x,tile.z)
     if(input.streetSurface) shiftPositions(input.streetSurface,tile.x,tile.z)
     for(const mats of [input.furnitureMatrices,input.parked])for(let i=0;i<mats.length;i+=16) { mats[i+12]+=tile.x; mats[i+14]+=tile.z }
+    input.parked = filterExcludedParkedBikes(input.parked)
     this.items.set(tile,input)
     const key = bucketKey(tile)
     let bucket = this.buckets.get(key)

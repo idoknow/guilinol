@@ -533,7 +533,7 @@ def build(bbox, output, palette, workers=4):
     extent = [left,top,width,depth]
     campus_indexes = published_campus_indexes(landmarks) if preserve_campuses else None
     write_atlas(output,extent,bounds,layers,footprints,peaks,campus_indexes)
-    write_overview_map(output,bbox)
+    write_overview_map(output, bbox, play_region.geometry if play_region else None)
     triangles.extend(landmark_faces)
     if play_region:
         from pickup_curbs import open_jiefang_westbound_lane
@@ -564,10 +564,20 @@ def build(bbox, output, palette, workers=4):
         restore_protected_tiles(output,chunks,landmarks)
         from yulong_passage import open_passage
         open_passage(output, chunks)
+        from railway_platforms import bake as bake_platforms
+        bake_platforms(output, chunks, play_region.geometry)
     write_city_lods(output, manifest)
     from traffic import bake as bake_traffic
     bake_traffic(output, manifest, roads)
+    from npc_network import install as install_npc
+    from npc_sidewalks import audit as audit_npc
+    install_npc(output, audit_npc(output, manifest))
     (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+    if play_region:
+        from railways import bake_world as bake_railways
+        report = bake_railways(output,manifest)
+        print('Railway tiles:',report['tiles'],'clearance conflicts:',len(report['clearanceConflicts']))
+        (output/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(f'{len(chunks)} chunks, {len(footprints)} footprints, {sum(c["bytes"] for c in chunks):,} chunk bytes')
 
 

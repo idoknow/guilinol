@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-export function pixelVisible(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera:THREE.Camera){
+export function motorPixelCounts(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera:THREE.Camera){
   const proxy=scene.getObjectByName('G2 traffic') as THREE.InstancedMesh
   const visuals=scene.getObjectByName('G2 traffic visuals') as THREE.BatchedMesh
   const size=renderer.getDrawingBufferSize(new THREE.Vector2()),target=new THREE.WebGLRenderTarget(size.x,size.y)
@@ -16,6 +16,9 @@ export function pixelVisible(renderer:THREE.WebGLRenderer,scene:THREE.Scene,came
     const pixels=new Uint8Array(size.x*size.y*4),counts=new Uint32Array(proxy.count+1)
     renderer.readRenderTargetPixels(target,0,0,size.x,size.y,pixels)
     for(let offset=0;offset<pixels.length;offset+=4)if(pixels[offset]===255&&pixels[offset+1]===0&&pixels[offset+2]<=proxy.count)counts[pixels[offset+2]]++
-    return (proxy.userData.allMotors as number[]).filter(index=>counts[index+1]>=6)
+    return (proxy.userData.allMotors as number[]).map(index=>({index,pixels:counts[index+1]}))
   }finally{visuals.material=original;renderer.setRenderTarget(previousTarget);target.dispose();ids.dispose()}
+}
+export function pixelVisible(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera:THREE.Camera){
+  return motorPixelCounts(renderer,scene,camera).filter(hit=>hit.pixels>=6).map(hit=>hit.index)
 }

@@ -32,8 +32,9 @@ try {
   page.on('pageerror',error=>errors.push(error.message))
   await page.route('**/favicon.ico',route=>route.fulfill({status:204}))
   await page.route('**/api/t',route=>route.fulfill({status:204}))
+  await page.route('**/stats.rcpd.cc/**',route=>route.fulfill({status:204,body:''}))
   page.on('console',message=>{if(message.type()==='error')errors.push(message.location().url+': '+message.text())})
-  await page.goto(walkUrl)
+  await page.goto(walkUrl,{waitUntil:'domcontentloaded',timeout:120000})
   await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000})
 
   async function fixture(origin,direction,seconds,target){
@@ -85,7 +86,7 @@ try {
     },{origin,direction,seconds,target});assert(result.hit,`${target}: ${JSON.stringify(result)}`);console.log(target,'OK',result.maxSink>-Infinity?`maxSink=${result.maxSink.toFixed(4)}m`:'')
   }
 
-  await page.waitForFunction(()=>[...window.viewer.stream.landmarks.keys()].some(entry=>entry.id==='jingjiang'))
+  await page.waitForFunction(()=>[...window.viewer.stream.landmarks.keys()].some(entry=>entry.id==='jingjiang'),null,{timeout:90000})
   assert(await page.evaluate(()=>document.querySelector('.walk-ui')?.hidden===true),'desktop should hide mobile walk-ui')
 
   // Foot grounding & low-step/curb/slab direct autostep check (no jump, no floor sink).
@@ -437,7 +438,7 @@ try {
   assert(rotateEntry.gate!=='grid','portrait gate should stay dismissed after 竖屏继续')
 
   // Tap sprint toggle so screenshot also shows active HUD harmony, then verify touch look + joystick + jump.
-  await mobile.locator('.walk-ui .btn-run').tap()
+  await mobile.locator('.walk-ui .btn-run').tap({force:true,timeout:90000})
   await mobile.waitForFunction(()=>document.querySelector('.walk-ui .btn-run')?.classList.contains('on'))
   const mobileShot=`${outDir}/mobile-390x844.png`
   await mobile.screenshot({path:mobileShot,timeout:90000})

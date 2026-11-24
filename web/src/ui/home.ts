@@ -66,6 +66,10 @@ export function home(play:(mode:PlayMode)=>void):Home {
       <a class="ui-btn ui-btn--ghost" href="${SOURCE_URL}" target="_blank" rel="noopener" data-umami-event="home-source-link">源代码 ↗</a>
     </nav>
   </div>
+  <button type="button" class="home-douyin" data-umami-event="home-douyin" aria-label="抖音官方号 ${DOUYIN_NAME}，点开看二维码">
+    <img class="home-douyin-code" src="./icons/douyin-code.webp" width="560" height="560" decoding="async" loading="lazy" alt="">
+    <span class="home-douyin-text"><img class="home-douyin-mark" src="./icons/douyin-mark.webp" width="284" height="120" alt=""><b>${DOUYIN_NAME}</b><small>官方号 · 扫码关注</small></span>
+  </button>
   <div class="home-foot"><span class="home-caption" aria-live="off"></span><span class="home-credit">受 <a href="https://nanningol.com" target="_blank" rel="noopener" data-umami-event="home-thanks-nanning">网上南宁</a> 启发 · 地图数据 © OpenStreetMap 贡献者 · v${__APP_VERSION__}</span></div>`
   const progress = root.querySelector('.home-progress')!
   progress.textContent = stamps ? `已集 ${Math.min(stamps,spots.length)} / ${spots.length} 枚印章` : ''
@@ -101,6 +105,7 @@ export function home(play:(mode:PlayMode)=>void):Home {
   const about = root.querySelector<HTMLButtonElement>('[data-act=about]')!
   about.onclick = ()=>pending(about,()=>import('./about').then(m=>m.openAbout()))
   root.querySelector<HTMLButtonElement>('[data-act=qq]')!.onclick = ()=>qqGroup()
+  root.querySelector<HTMLButtonElement>('.home-douyin')!.onclick = ()=>douyin()
   // IDOK-192 联机模式：街头玩法 + 同城联机。单人/游览会把联机关掉，walk 那边当场连上或断开。
   const mp = root.querySelector<HTMLButtonElement>('.home-mode--mp')!, mpGo = root.querySelector('.home-go--mp')!
   const mpLive = root.querySelector<HTMLElement>('.home-mp-live')!
@@ -164,28 +169,35 @@ function ago(t:number){
   return min<2?'刚刚':min<60?`${Math.round(min)} 分钟前`:min<60*24?`${Math.round(min/60)} 小时前`:`${Math.round(min/1440)} 天前`
 }
 
-// QQ 群：一张群二维码卡片（public/icons/qq-group.webp 自托管）+ 群号一键复制。
-// 手机上没法扫自己的屏幕，所以群号必须能复制出来；复制失败（非 https / 老浏览器）就把群号选中，让玩家自己按。
-const QQ_GROUP = '1137384288'
-let qqMask:HTMLDivElement|undefined
-function qqGroup() {
-  if (!qqMask) {
-    qqMask = document.createElement('div')
-    qqMask.className = 'about-mask'
-    qqMask.hidden = true
-    qqMask.innerHTML = `<div class="about-panel qq" role="dialog" aria-modal="true" aria-labelledby="qq-title">
-      <header><h2 id="qq-title">QQ 群</h2><button type="button" class="about-close" aria-label="关闭">关闭</button></header>
+// 二维码卡片（QQ 群 / 抖音官方号）：一张码（public/icons/ 自托管）+ 号码一键复制。
+// 手机上没法扫自己的屏幕，所以号码必须能复制出来；复制失败（非 https / 老浏览器）就把号码选中，让玩家自己按。
+interface CodeCard {key:string; title:string; img:string; w:number; h:number; alt:string; note:string; num:string; copyLabel:string}
+const QQ_GROUP = '1137384288', DOUYIN_ID = '65873904990', DOUYIN_NAME = '@网上桂林official'
+const QQ_CARD:CodeCard = {key:'qq',title:'QQ 群',img:'./icons/qq-group.webp',w:881,h:1101,alt:`网上桂林 QQ 群二维码，群号 ${QQ_GROUP}`,
+  note:'用 QQ 扫一扫，或在 QQ 里搜群号加入。',num:QQ_GROUP,copyLabel:'复制群号'}
+const DOUYIN_CARD:CodeCard = {key:'douyin',title:'抖音官方号',img:'./icons/douyin-code.webp',w:560,h:560,alt:`网上桂林抖音官方号 ${DOUYIN_NAME} 二维码，抖音号 ${DOUYIN_ID}`,
+  note:`<b>${DOUYIN_NAME}</b>打开抖音，在搜索页点扫一扫；或搜索抖音号关注。`,num:DOUYIN_ID,copyLabel:'复制抖音号'}
+const qqGroup = ()=>codeCard(QQ_CARD), douyin = ()=>codeCard(DOUYIN_CARD)
+const codeMasks = new Map<string,HTMLDivElement>()
+function codeCard(card:CodeCard) {
+  let mask = codeMasks.get(card.key)
+  if (!mask) {
+    const m = mask = document.createElement('div')
+    m.className = 'about-mask'
+    m.hidden = true
+    m.innerHTML = `<div class="about-panel qq qq--${card.key}" role="dialog" aria-modal="true" aria-labelledby="${card.key}-title">
+      <header><h2 id="${card.key}-title">${card.title}</h2><button type="button" class="about-close" aria-label="关闭">关闭</button></header>
       <div class="qq-body">
-        <img class="qq-code" src="./icons/qq-group.webp" width="881" height="1101" decoding="async" alt="网上桂林 QQ 群二维码，群号 ${QQ_GROUP}">
-        <p class="qq-note">用 QQ 扫一扫，或在 QQ 里搜群号加入。</p>
-        <div class="qq-row"><b class="qq-num">${QQ_GROUP}</b><button type="button" class="ui-btn ui-btn--ghost qq-copy">复制群号</button></div>
+        <img class="qq-code" src="${card.img}" width="${card.w}" height="${card.h}" decoding="async" alt="${card.alt}">
+        <p class="qq-note">${card.note}</p>
+        <div class="qq-row"><b class="qq-num">${card.num}</b><button type="button" class="ui-btn ui-btn--ghost qq-copy">${card.copyLabel}</button></div>
       </div>
     </div>`
-    const close = () => { qqMask!.hidden = true }
-    qqMask.querySelector('.about-close')!.addEventListener('click', close)
-    qqMask.addEventListener('click', event => { if (event.target === qqMask) close() })
-    addEventListener('keydown', event => { if (event.code === 'Escape' && !qqMask!.hidden) close() })
-    const copy = qqMask.querySelector<HTMLButtonElement>('.qq-copy')!, num = qqMask.querySelector<HTMLElement>('.qq-num')!
+    const close = () => { m.hidden = true }
+    m.querySelector('.about-close')!.addEventListener('click', close)
+    m.addEventListener('click', event => { if (event.target === m) close() })
+    addEventListener('keydown', event => { if (event.code === 'Escape' && !m.hidden) close() })
+    const copy = m.querySelector<HTMLButtonElement>('.qq-copy')!, num = m.querySelector<HTMLElement>('.qq-num')!
     copy.addEventListener('click', () => {
       const done = () => { copy.textContent = '已复制' }
       const manual = () => {
@@ -193,12 +205,13 @@ function qqGroup() {
         const range = document.createRange(); range.selectNodeContents(num)
         const selection = getSelection(); selection?.removeAllRanges(); selection?.addRange(range)
       }
-      const later = () => { setTimeout(() => { copy.textContent = '复制群号' }, 1800) }
-      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(QQ_GROUP).then(done, manual).finally(later)
+      const later = () => { setTimeout(() => { copy.textContent = card.copyLabel }, 1800) }
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(card.num).then(done, manual).finally(later)
       else { manual(); later() }
     })
-    document.body.append(qqMask)
+    document.body.append(m)
+    codeMasks.set(card.key, m)
   }
-  qqMask.hidden = false
-  qqMask.querySelector<HTMLButtonElement>('.about-close')!.focus()
+  mask.hidden = false
+  mask.querySelector<HTMLButtonElement>('.about-close')!.focus()
 }

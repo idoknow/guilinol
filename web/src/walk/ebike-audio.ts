@@ -9,7 +9,7 @@
  * Pure WebAudio with zero external audio files and fail-safe autoplay gating.
  */
 
-import {rideSoundMuted} from './ride-sound-pref'
+import {rideSoundMuted,masterVolume,VOLUME_EVENT} from './ride-sound-pref'
 
 export type RideSoundKind = 'bike' | 'bicycle'
 export type HeadlightSoundMode = 'off' | 'low' | 'high'
@@ -170,7 +170,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
         bus.connect(compressor)
 
         master = ctx.createGain()
-        master.gain.value = MASTER_LEVEL
+        master.gain.value = MASTER_LEVEL*masterVolume()
         compressor.connect(master)
         master.connect(ctx.destination)
         noiseBuf = createNoiseBuffer(ctx, 1.4)
@@ -388,7 +388,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
       stopContinuous()
     }
     if (master && ctx) {
-      master.gain.setTargetAtTime(muted ? 0 : MASTER_LEVEL, ctx.currentTime, 0.02)
+      master.gain.setTargetAtTime(muted ? 0 : MASTER_LEVEL*masterVolume(), ctx.currentTime, 0.02)
     }
     // Unmuting from the HUD is a user gesture: open the context now so sound resumes mid-ride.
     if (!muted) ensureContext()
@@ -615,7 +615,10 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     }
   }
 
+  const syncVolume=()=>{if(master&&ctx)master.gain.setTargetAtTime(muted?0:MASTER_LEVEL*masterVolume(),ctx.currentTime,.02)}
+  window.addEventListener(VOLUME_EVENT,syncVolume)
   function dispose() {
+    window.removeEventListener(VOLUME_EVENT,syncVolume)
     isDisposed = true
     stopContinuous()
     try { motorOscMain?.stop(); motorOscHarm?.stop(); scrubSrc?.stop() } catch {}
