@@ -230,6 +230,116 @@ function broadcast(payload, exceptId) {
   }
 }
 
+
+/* ───────────── AOI（兴趣范围裁剪） ───────────── */
+// 100m 网格：同格 + 邻格（3×3）按 20Hz 转发；外面一圈但距离 ≤150m 降到 5Hz；
+// 超过 150m 才移出视野（滞回，避免玩家在格子边界来回走时反复「出现/消失」）。
+// 广播成本从 O(n²) 降到 O(n × 视野人数)。
+const CELL = Number(process.env.RT_CELL || 100)
+const AOI_HOLD = Number(process.env.RT_AOI_HOLD || 150)
+const AOI_FAR_MS = Number(process.env.RT_AOI_FAR_MS || 200)
+const GRID_RADIUS = 2
+const grid = new Map()
+const cellKey = (x, z) => `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`
+const cellCenter = (key) => key.split(',').map((n) => Number(n) * CELL + CELL / 2)
+
+function gridAdd(p) {
+  const key = cellKey(p.x, p.z)
+  let set = grid.get(key)
+  if (!set) grid.set(key, (set = new Set()))
+  set.add(p.id)
+  p.cell = key
+}
+function gridDel(p) {
+  const set = grid.get(p.cell)
+  if (!set) return
+  set.delete(p.id)
+  if (!set.size) grid.delete(p.cell)
+}
+/** 算出 p 现在能看到谁：near = 3×3 内（20Hz），far = 外圈但 ≤150m（5Hz，含滞回保留） */
+function aoiTargets(p) {
+  const [cx, cz] = p.cell.split(',').map(Number)
+  const near = new Set()
+  const far = new Set()
+  for (let dx = -GRID_RADIUS; dx <= GRID_RADIUS; dx++) {
+    for (let dz = -GRID_RADIUS; dz <= GRID_RADIUS; dz++) {
+      const set = grid.get(`${cx + dx},${cz + dz}`)
+      if (!set) continue
+      const inner = Math.max(Math.abs(dx), Math.abs(dz)) <= 1
+      for (const id of set) {
+        if (id === p.id) continue
+        const q = players.get(id)
+        if (!q) continue
+        if (inner) near.add(id)
+        else if (flatDistance(p, q) <= AOI_HOLD) far.add(id)
+      }
+    }
+  }
+  // 滞回：原本看得见的人只要还在 150m 内就继续保留（哪怕已经走出 5×5 网格）
+  for (const id of p.visible) {
+    if (near.has(id) || far.has(id)) continue
+    const q = players.get(id)
+    if (q && flatDistance(p, q) <= AOI_HOLD) far.add(id)
+  }
+  return { near, far }
+}
+/** 新增可见关系：双向登记，并且补一帧完整状态（不能等下一条 pos，否则对方要等到下次移动才出现） */
+function aoiAttach(p, q) {
+  if (!p.visible.has(q.id)) {
+    p.visible.add(q.id)
+    send(p.ws, { t: 'join', player: publicOf(q, p) })
+  }
+  if (!q.visible.has(p.id)) {
+    q.visible.add(p.id)
+    send(q.ws, { t: 'join', player: publicOf(p, q) })
+  }
+}
+function aoiDetach(p, q) {
+  if (p.visible.delete(q.id)) send(p.ws, { t: 'leave', id: q.id })
+  if (q.visible.delete(p.id)) send(q.ws, { t: 'leave', id: p.id })
+  p.farSent.delete(q.id)
+  q.farSent.delete(p.id)
+}
+function aoiRefresh(p) {
+  const { near, far } = aoiTargets(p)
+  const next = new Set([...near, ...far])
+  for (const id of next) {
+    const q = players.get(id)
+    if (q) aoiAttach(p, q)
+  }
+  for (const id of [...p.visible]) {
+    if (next.has(id)) continue
+    const q = players.get(id)
+    if (q) aoiDetach(p, q)
+    else { p.visible.delete(id); p.farSent.delete(id) }
+  }
+  p.far = far
+  for (const id of [...p.farSent.keys()]) if (!far.has(id)) p.farSent.delete(id)
+}
+/** 跨格才重算：每帧重建网格在大厅里是纯浪费 */
+function aoiMove(p) {
+  const key = cellKey(p.x, p.z)
+  if (key === p.cell) return
+  gridDel(p)
+  gridAdd(p)
+  aoiRefresh(p)
+}
+/** 按视野发送：远端 5Hz 节流，近处每帧直发 */
+function aoiSend(p, payload) {
+  const text = JSON.stringify(payload)
+  const at = now()
+  for (const id of p.visible) {
+    const q = players.get(id)
+    if (!q) continue
+    if (p.far.has(id)) {
+      const last = p.farSent.get(id) || 0
+      if (at - last < AOI_FAR_MS) continue
+      p.farSent.set(id, at)
+    }
+    sendSlowAware(q.ws, text)
+  }
+}
+
 function publicOf(p,viewer=p) {
   return {
     id: p.id, uid: p.uid, name: p.name, avatar: p.avatar,
@@ -379,8 +489,16 @@ wss.on('connection', (ws, req) => {
     // 关闭原因必须留痕：线上「联机不稳定」时，没有这行就只能靠猜是超时、满员还是顶号
     if (joined) console.log(JSON.stringify({scope:'rt-close',code:code??null,reason:String(reason??''),ip,uid:players.get(id)?.uid??null,players:players.size}))
     if (joined) {
+      const me = players.get(id)
+      if (me) {
+        gridDel(me)
+        for (const peerId of [...me.visible]) {
+          const peer = players.get(peerId)
+          if (peer) { peer.visible.delete(id); peer.farSent.delete(id); send(peer.ws, {t: 'leave', id}) }
+        }
+        me.visible.clear()
+      }
       players.delete(id)
-      broadcast({t: 'leave', id})
       broadcast({t: 'online', online: players.size})
     }
   }
@@ -458,17 +576,24 @@ wss.on('connection', (ws, req) => {
           em:0, es:0, emoteTimes:[], emoteUntil:0,
           lastChat: 0,
           lastPos: 0,
+          cell: '',
+          visible: new Set(),
+          far: new Set(),
+          farSent: new Map(),
         }
         ws.joined = true
         clearTimeout(ws.joinTimer)
         players.set(id, player)
+        gridAdd(player)
+        aoiRefresh(player)
         send(ws, {
           t: 'welcome',
           me: {id, uid: player.uid, name: player.name, avatar: player.avatar},
           online: players.size,
-          players: [...players.values()].filter(p => p.id !== id).map(p=>publicOf(p,player)),
+          // 只发视野内的玩家：AOI 之后「全房间」不再等于「都看得见」
+          players: [...player.visible].map(peerId => players.get(peerId)).filter(Boolean).map(peer => publicOf(peer, player)),
         })
-        broadcast({t: 'join', player: publicOf(player)}, id)
+        // 其余人通过 aoiAttach 收到 join（同样只在视野内）
         broadcast({t: 'online', online: players.size})
         return
       }
@@ -478,7 +603,7 @@ wss.on('connection', (ws, req) => {
       if (msg.t === 'emote') {
         if (!acceptEmote(me,msg,now())) return
         const packet=JSON.stringify({t:'emote',from:id,id:me.em,s:me.es})
-        for(const peer of players.values())if(peer!==me&&inEmoteRange(peer,me))sendSlowAware(peer.ws,packet)
+        for(const peerId of me.visible){const peer=players.get(peerId);if(peer&&inEmoteRange(peer,me))sendSlowAware(peer.ws,packet)}
         return
       }
 
@@ -511,14 +636,16 @@ wss.on('connection', (ws, req) => {
         me.sb = clampInt(msg.sb, 0, 1800)
         me.sp = clampInt(msg.sp, 0, 999)
         me.br = clampInt(msg.br, 0, 3)
-        broadcast({
+        // 传送是瞬间跨格：aoiMove 在这一帧就把可见集合重算完，不等下一次移动
+        aoiMove(me)
+        aoiSend(me, {
           t: 'pos', id,
           x: me.x, y: me.y, z: me.z, yaw: me.yaw, v: me.v,
           bike: me.bike, bx: me.bx, bz: me.bz, byaw: me.byaw,
           hb: me.hb, hx: me.hx, hz: me.hz, hyaw: me.hyaw, mv: me.mv, cr: me.cr, gr: me.gr, dn: me.dn, pn: me.pn, wl: me.wl,
           hp: me.hp,
           sc: me.sc, sb: me.sb, sp: me.sp, br: me.br,
-        }, id)
+        })
         return
       }
 
@@ -552,7 +679,7 @@ wss.on('connection', (ws, req) => {
         const avatar = sanitizeAvatar(msg.avatar)
         if (!avatar) return
         me.avatar = avatar
-        broadcast({t: 'avatar', id, avatar}, id)
+        for(const peerId of me.visible){const peer=players.get(peerId);if(peer)sendSlowAware(peer.ws,JSON.stringify({t:'avatar',id,avatar}))}
         return
       }
 
