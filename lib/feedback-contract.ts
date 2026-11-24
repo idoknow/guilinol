@@ -28,6 +28,8 @@ export const edges: Record<string, string[]> = {
 }
 
 type Point = { x: number; y: number; z: number; lat: number; lon: number }
+export type HitDiagnostic = {layer:string;name:string;owner:string;distance:number;triangle:number[][];box:number[][]}
+export type PickDiagnostic = {static:HitDiagnostic|null;dynamic:HitDiagnostic|null}
 export type FeedbackView = Point & {
   mode: 'walk' | 'fly'
   yaw: number
@@ -38,6 +40,7 @@ export type FeedbackView = Point & {
   target: (Point & { distance: number }) | null
   landmark_id: string | null
   build: string
+  diagnostic?: PickDiagnostic
 }
 export function validView(value: unknown, area: 'feedback' | 'saved' = 'feedback'): value is FeedbackView {
   const keys = (obj: unknown, list: string): obj is Record<string, unknown> =>
@@ -61,7 +64,14 @@ export function validView(value: unknown, area: 'feedback' | 'saved' = 'feedback
     return Math.abs(projected.x - obj.x) < 1 && Math.abs(projected.z - obj.z) < 1
   }
   return (
-    keys(value, 'mode x y z lat lon yaw pitch fov alt heading target landmark_id build') &&
+    keys(value, 'mode x y z lat lon yaw pitch fov alt heading target landmark_id build diagnostic') &&
+    (value.diagnostic===undefined || (keys(value.diagnostic,'static dynamic') &&
+      ['static','dynamic'].every(key=>{
+        const hit=(value.diagnostic as Record<string,unknown>)[key]
+        const vectors=(points:unknown,count:number)=>Array.isArray(points)&&points.length===count&&points.every(vec=>Array.isArray(vec)&&vec.length===3&&vec.every(n=>range(n,-1e8,1e8)))
+        return hit===null || (keys(hit,'layer name owner distance triangle box') &&
+          ['layer','name','owner'].every(field=>typeof hit[field]==='string'&&(hit[field] as string).length<=120)&&range(hit.distance,0,1e8)&&vectors(hit.triangle,3)&&vectors(hit.box,2))
+      }))) &&
     point(value) &&
     (value.mode === 'walk' || value.mode === 'fly') &&
     range(value.yaw, -180, 180) &&
@@ -82,5 +92,6 @@ export function validView(value: unknown, area: 'feedback' | 'saved' = 'feedback
   )
 }
 export function viewToken(view: FeedbackView) {
-  return btoa(JSON.stringify(view)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  const {diagnostic:_,...pose}=view
+  return btoa(JSON.stringify(pose)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
 }

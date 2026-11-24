@@ -4,6 +4,7 @@ import { validView, type FeedbackView } from '../../../lib/feedback-contract'
 import {nearestPlayable} from '../../../lib/play-region'
 import { xz2ll } from '../../../lib/projection'
 import type { Host } from './host'
+import {describeHit,dynamicPick} from './pick-diagnostic'
 
 let build: string | undefined
 async function currentBuild(): Promise<string> {
@@ -32,7 +33,7 @@ export function setView(host: Host, view: unknown) {
 // Saved positions use the current world's coordinates and only need a pose.
 // Feedback captures also describe the object at the centre of the frame.
 export async function currentView(host: Host, area: 'feedback' | 'saved' = 'feedback'): Promise<FeedbackView> {
-  const camera = host.camera
+  const build=await currentBuild(),camera = host.camera
   if (area === 'feedback') host.draw()
   const { x, y, z } = camera.position,
     angle = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'),
@@ -50,27 +51,34 @@ export async function currentView(host: Host, area: 'feedback' | 'saved' = 'feed
     fov: camera.fov,
     target: null,
     landmark_id: null,
-    build: await currentBuild(),
+    build,
   }
   if (area === 'feedback') {
     const ray = new THREE.Raycaster(),
       meshes: THREE.Object3D[] = [],
       ids = new Map<THREE.Object3D, string>()
     ray.setFromCamera(new THREE.Vector2(), camera)
-    const add = (root: THREE.Object3D, id?: string) =>
+    const sources=new Map<THREE.Object3D,[string,string]>()
+    const add = (root: THREE.Object3D, layer:string,owner:string,id?: string) =>
       root.traverseVisible((node) => {
         if (node instanceof THREE.Mesh) {
           meshes.push(node)
+          sources.set(node,[layer,owner])
           if (id) ids.set(node, id)
         }
       })
-    for (const [entry, root] of host.stream.landmarks) add(root, entry.id)
-    for (const tile of host.stream.loaded.values()) add(tile.groundMesh)
-    for (const mesh of host.stream.batches.feedbackMeshes()) add(mesh)
-    add(host.peaks)
-    add(host.stream.overviewMesh())
-    const hit = ray.intersectObjects(meshes, false)[0],
+    for (const [entry, root] of host.stream.landmarks) add(root,'landmark',entry.id,entry.id)
+    for (const [tile,item] of host.stream.loaded) add(item.groundMesh,'terrain',tile.file)
+    for (const mesh of host.stream.batches.feedbackMeshes()) add(mesh,'chunk','batch')
+    add(host.peaks,'peak','peaks')
+    add(host.stream.overviewMesh(),'overview',host.manifest.overview.underlay.file)
+    const hits=ray.intersectObjects(meshes,false)
+    for(const mesh of meshes)if(mesh instanceof THREE.Mesh && mesh.userData.peakSource)THREE.Mesh.prototype.raycast.call(mesh,ray,hits)
+    const hit = hits.sort((left,right)=>left.distance-right.distance)[0],
       point = hit?.point
+    const [layer,owner]=sources.get(hit?.object)??['unknown','unknown']
+    const vertex=hit?.face?.a
+    view.diagnostic={static:describeHit(hit,layer,hit?.object.userData.sourceTile?.(vertex)?.file??hit?.object.userData.peakSource?.(vertex)?.name??owner),dynamic:dynamicPick(host.scene,ray)}
     if (point && Math.abs(point.x) <= 3072 && Math.abs(point.z) <= 3328) {
       view.target = { x: point.x, y: point.y, z: point.z, ...xz2ll(point.x, point.z), distance: hit.distance }
       view.landmark_id = ids.get(hit.object) ?? null

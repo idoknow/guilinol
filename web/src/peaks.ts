@@ -219,6 +219,16 @@ function assemblePeaks(data:PeakWorkerOutput, models:THREE.Object3D[]):PeaksGrou
   mesh1.frustumCulled = false; mesh1.visible = false; mesh1.name = 'peaks-lod1'
   mesh0.raycast = ()=>{}
   mesh1.raycast = ()=>{}
+  for(const [mesh,lod] of [[mesh0,0],[mesh1,1]] as const){
+    const ends:number[]=[];let end=0
+    for(const peak of data.peaks){
+      if(!lod)end=peak.vStart0+peak.vCount0
+      else for(const index of peak.idx1)end=Math.max(end,index+1)
+      ends.push(end)
+    }
+    mesh.userData.peakRanges=()=>({ends,peaks:data.peaks})
+    mesh.userData.peakSource=(vertex:number)=>data.peaks[ends.findIndex(limit=>vertex<limit)]
+  }
 
   // Initial hysteresis state matches THREE.LOD: level 1 starts visible, so switching into LOD 0 uses 0.95*split.
   const farState = new Uint8Array(data.peaks.length).fill(1)

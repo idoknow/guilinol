@@ -406,7 +406,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   mountStats()
   mountHotkeys()
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
-  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,get game(){return solo?.probe ?? tourProbe},
+  let staticAudit:ReturnType<typeof import('./verify-static').staticVerifier>|undefined
+  const publishViewer=()=>Object.assign(window,{viewer:{camera,stream,manifest,stats,walkTo,staticAudit,get game(){return solo?.probe ?? tourProbe},
     get trafficCount(){return (scene.getObjectByName('G2 traffic') as THREE.InstancedMesh|undefined)?.count??0},
     get trafficProbe(){return scene.getObjectByName('G2 traffic')?.userData},
     async trafficPixels(){return (await import('./traffic/visibility-probe')).pixelVisible(renderer,scene,camera)},
@@ -512,6 +513,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     solo?.step(Math.min(0.1, elapsed/1000))
     persistView?.()
     draw()
+    if(staticAudit && frame%30===0)staticAudit.check()
     sampleFrame(elapsed)
     if(!frame)record('firstFrame',{ms:first||performance.now()})
     if(!playable && first && !paused && !switching && !stream.pending.size && stream.loaded.size){
@@ -534,7 +536,10 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     showMode()}
   if(creatorSpawn)await spawnCreatedCharacter()
   else if(soloStart){await landSolo(true);showMode()}
-  if(params.has('verify'))publishViewer()
+  if(params.has('verify')){
+    const {makeStaticVerifier}=await import('./verify-static')
+    staticAudit=await makeStaticVerifier(host);publishViewer()
+  }
   renderer.setAnimationLoop(animate)
   // IDOK-105: keep the last view fresh so "回到上次离开的地方" can restore it. Deep-linked
   // sessions (`?verify`, `?slot`, shares…) never write it — tests and shared links must not pollute.

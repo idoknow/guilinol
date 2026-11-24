@@ -61,6 +61,8 @@ class StaticLayerBatch {
   constructor(material:THREE.Material, private attrDefs:{name:string; size:number; ctor:'f32'|'u8'}[], layer=0) {
     this.geom.boundingSphere = WORLD_SPHERE
     this.mesh = freezeStatic(new THREE.Mesh(this.geom,material))
+    this.mesh.userData.sourceTile=(vertex:number)=>{for(let index=this.slices.length-1;index>=0;index--)if(this.slices[index].vertexStart<=vertex)return this.slices[index].tile}
+    this.mesh.userData.tileSlices=()=>this.slices
     this.mesh.frustumCulled = false
     this.mesh.visible = false
     if(layer) this.mesh.layers.set(layer)
