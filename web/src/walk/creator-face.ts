@@ -67,12 +67,12 @@ export function facialFeatures(geometry: T.BufferGeometry, a: Avatar) {
   }
   for (const side of [-1, 1]) {
     const eyeY = 0.065,
-      halfWidth = 0.0075 + 0.001 * a.eyes
+      halfWidth = a.eyes === 3 ? 0.009 : 0.0075 + 0.001 * a.eyes
     ribbon('#302622', (t, v) => {
       const angle = Math.PI * t
       return [
         side * (0.034 - halfWidth * Math.cos(angle)),
-        eyeY + (v - 0.5) * (0.011 + 0.001 * a.eyes) * Math.sin(angle),
+        eyeY + (v - 0.5) * (a.eyes === 3 ? 0.0165 : 0.011 + 0.001 * a.eyes) * Math.sin(angle),
         0.0018,
       ]
     })
@@ -84,9 +84,9 @@ export function facialFeatures(geometry: T.BufferGeometry, a: Avatar) {
     ribbon(new T.Color(hairColors[a.hairColor]), (t, v) => [
       side * (0.018 + 0.041 * t),
       0.082 +
-        [0.001, 0.01, 0.003][a.brows] * Math.sin(Math.PI * t) +
-        [0, -0.002, -0.012][a.brows] * t +
-        (0.003 + 0.001 * a.brows) * v * Math.sin(Math.PI * t) ** 0.4,
+        [0.001, 0.01, 0.003, 0.001][a.brows] * Math.sin(Math.PI * t) +
+        [0, -0.002, -0.012, 0.007][a.brows] * t +
+        [0.003, 0.004, 0.005, 0.0062][a.brows] * v * Math.sin(Math.PI * t) ** (a.brows === 3 ? 0.2 : 0.4),
       0.0016,
     ])
   }

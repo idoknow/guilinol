@@ -177,7 +177,7 @@ const HAIRS = {
   m: ['m_buzz', 'm_crop', 'm_perm', 'm_fade', 'm_mullet', 'm_part'],
   f: ['f_long', 'f_pony', 'f_bun', 'f_lob', 'f_wolf', 'f_bangs'],
 }
-const LOOKS = ['basic', 'sport', 'outdoor', 'chinese', 'office', 'campus']
+const LOOKS = ['basic', 'sport', 'outdoor', 'chinese', 'office', 'campus', 'hoodie', 'shell', 'denim', 'plaid', 'knit', 'track']
 
 /** 外形白名单校验：只放行角色系统认识的字段和取值，避免脏数据传到别人客户端 */
 function sanitizeAvatar(value) {
@@ -191,9 +191,9 @@ function sanitizeAvatar(value) {
     v: 1,
     body,
     skin: clampInt(value.skin, 0, 4),
-    face: clampInt(value.face, 0, 2),
-    brows: clampInt(value.brows, 0, 2),
-    eyes: clampInt(value.eyes, 0, 2),
+    face: clampInt(value.face, 0, 5),
+    brows: clampInt(value.brows, 0, 3),
+    eyes: clampInt(value.eyes, 0, 3),
     hair: HAIRS[body].includes(hair) ? hair : HAIRS[body][0],
     hairColor: clampInt(value.hairColor, 0, 3),
     look: LOOKS.includes(look) ? look : 'basic',

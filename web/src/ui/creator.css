@@ -136,7 +136,7 @@
 .creator-grid i {
   display: block;
   aspect-ratio: 1;
-  background-size: 600% 1100%;
+  background-size: 1200% 1100%;
   border-radius: 7px;
 }
 .creator [aria-pressed='true'] {

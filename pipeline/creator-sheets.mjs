@@ -27,7 +27,7 @@ try {
   const images = await page.evaluate(
     async (shared) => {
       const {creatorStage} = await import('/src/ui/creator-stage.ts')
-      const {hairStyles, hairNames, lookNames, looks, defaultAvatar, skinTones} = await import(shared)
+      const {hairStyles, hairNames, lookNames, looks, defaultAvatar, skinTones, faceNames, browNames, eyeNames} = await import(shared)
       const stage = creatorStage(document.querySelector('#studio'), true, true),
         canvas = document.querySelector('canvas')
       const raf = () => new Promise((r) => requestAnimationFrame(r))
@@ -51,10 +51,10 @@ try {
           },
         }
       }
-      const sprite = sheet(6, 11, 88, 88),
+      const sprite = sheet(12, 11, 88, 88),
         skin = sheet(5, 2, 180, 180, 24),
         hair = sheet(6, 8, 160, 160, 24),
-        outfits = sheet(6, 4, 210, 210, 24)
+        outfits = sheet(12, 4, 210, 210, 24)
       async function render(a, head, yaw = 0) {
         await stage.apply(a)
         stage.frameHead(head)
@@ -63,7 +63,7 @@ try {
         await raf()
       }
       const hairLight = sheet(6, 8, 160, 160, 24),
-        faces = sheet(3, 4, 180, 180, 24)
+        faces = sheet(faceNames.length, 4, 180, 180, 24)
       // Subtract the empty studio so the turntable stays out of the silhouette plate.
       const matte = document.createElement('canvas')
       matte.width = matte.height = 600
@@ -101,9 +101,9 @@ try {
         silhouettes.put(index, 1, body === 'm' ? '男 · 侧' : '女 · 侧', silhouette())
         bodies.put(index, 1, body === 'm' ? '男 · 侧' : '女 · 侧')
         for (const [row, skin] of [0, 4].entries())
-          for (let face = 0; face < 3; face++) {
+          for (let face = 0; face < faceNames.length; face++) {
             await render({...a, face, skin}, true)
-            faces.put(face, index * 2 + row, ['圆脸', '鹅蛋脸', '方下颌'][face])
+            faces.put(face, index * 2 + row, faceNames[face])
           }
         const cuts = body === 'm' ? ['m_part', 'm_crop', 'm_mullet'] : ['f_bun', 'f_lob', 'f_pony']
         for (const [j, cut] of cuts.entries()) {
@@ -117,7 +117,7 @@ try {
           skin.put(i, index, skinTones[i])
         }
         for (const [k, key] of ['face', 'brows', 'eyes'].entries())
-          for (let i = 0; i < 3; i++) {
+          for (let i = 0; i < [faceNames, browNames, eyeNames][k].length; i++) {
             await render({...a, [key]: i}, true)
             sprite.put(i, 1 + index * 5 + k)
           }

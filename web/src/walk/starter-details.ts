@@ -59,6 +59,23 @@ export function starterDetails(rig: AvatarRig, avatar: Avatar) {
     )
     lapel.rotation.z = -side * 0.54
   }
+  // IDOK-229 present-day looks.
+  const hoodie = part('top', 'hoodie', 'chest', new T.SphereGeometry(0.1, 12, 8), '#8f918d', 0, 0.25, 0.088)
+  hoodie.scale.set(1.05, 0.95, 0.5)
+  hoodie.rotation.x = -0.24
+  for (const side of [-1, 1])
+    part('top', 'hoodie', 'chest', new T.BoxGeometry(0.008, 0.09, 0.008), '#e9e6de', side * 0.028, 0.255, -0.098)
+  collar('shell', '#262b2e', 0.06)
+  collar('track', '#28344a', 0.04)
+  for (const [look, color] of [
+    ['denim', '#62809d'],
+    ['plaid', '#8a382f'],
+  ] as const)
+    for (const side of [-1, 1]) {
+      const flap = part('top', look, 'chest', new T.BoxGeometry(0.05, 0.075, 0.012), color, side * 0.05, 0.3, -0.08)
+      flap.rotation.z = -side * 0.62
+      flap.rotation.x = 0.18
+    }
   return {
     apply(outfit: Readonly<EquippedOutfit>) {
       for (const p of pieces) p.mesh.visible = outfit[p.slot] === p.id

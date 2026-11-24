@@ -3,7 +3,14 @@ export const hairStyles = {
   m: ['m_buzz', 'm_crop', 'm_perm', 'm_fade', 'm_mullet', 'm_part'],
   f: ['f_long', 'f_pony', 'f_bun', 'f_lob', 'f_wolf', 'f_bangs'],
 } as const
-export const looks = ['basic', 'sport', 'outdoor', 'chinese', 'office', 'campus'] as const
+// IDOK-229: +6 present-day looks (城市户外冲锋衣、卫衣工装、牛仔外套、叠穿衬衫、针织开衫、运动套装).
+export const looks = [
+  'basic', 'sport', 'outdoor', 'chinese', 'office', 'campus',
+  'hoodie', 'shell', 'denim', 'plaid', 'knit', 'track',
+] as const
+export const faceNames = ['圆脸', '鹅蛋脸', '方下颌', '瓜子脸', '长脸', '宽颧脸']
+export const browNames = ['平直眉', '舒展眉', '微挑眉', '剑眉']
+export const eyeNames = ['细长眼', '杏仁眼', '内双眼', '圆眼']
 export const skinTones = ['#f3d7bf', '#e9c3a1', '#dcb08a', '#c99772', '#a97b58']
 export const hairColors = ['#1b1a1a', '#2e2219', '#4a3022', '#5a4b44']
 
@@ -46,16 +53,16 @@ export function sanitizeAvatar(raw: unknown): Avatar | undefined {
     body: a.body,
     createdAt: a.createdAt!,
     skin: index(a.skin, 5, 2),
-    face: index(a.face, 3),
-    brows: index(a.brows, 3),
-    eyes: index(a.eyes, 3),
+    face: index(a.face, faceNames.length),
+    brows: index(a.brows, browNames.length),
+    eyes: index(a.eyes, eyeNames.length),
     hairColor: index(a.hairColor, 4),
     hair: hairStyles[a.body].find((h) => h === a.hair) ?? hairStyles[a.body][0],
     look: looks.find((l) => l === a.look) ?? 'basic',
   }
 }
 
-export const lookNames = ['基础', '夏天街头', '短袖 T 恤', '防晒衣', '通勤', '校服']
+export const lookNames = ['基础', '夏天街头', '短袖 T 恤', '防晒衣', '通勤', '校服', '卫衣工装', '城市冲锋衣', '牛仔外套', '叠穿衬衫', '针织开衫', '运动套装']
 export const lookPalette = [
   ['#e9e7e1', '#2a2c30', '#f2f1ed', '#d8d5cd'],
   ['#eeeae0', '#50545a', '#696961', '#c7bda7'],
@@ -63,6 +70,13 @@ export const lookPalette = [
   ['#a5bfce', '#44484c', '#f5f0e6', '#cbd4d4'],
   ['#acb8a7', '#575859', '#393936', '#818d7d'],
   ['#e6e6df', '#536e90', '#faf6e9', '#546f93'],
+  // top, bottom, shoes, accent (accent = inner tee / stripe / yoke colour, see web/src/walk/outfits.ts)
+  ['#9b9d99', '#66654f', '#efece4', '#7e807c'],
+  ['#3f5a4c', '#4a4d50', '#8c8170', '#262b2e'],
+  ['#6f8fae', '#26282c', '#f2f1ed', '#f1efe9'],
+  ['#9a3f35', '#b8aa8a', '#e6e0d1', '#2b2727'],
+  ['#d8cab0', '#4d6a8c', '#3b302a', '#f3f0e8'],
+  ['#28344a', '#28344a', '#f2f1ed', '#eeede6'],
 ]
 export const hairNames = {
   m: ['寸头', '微分碎盖', '纹理烫', '渐变短发', '狼尾', '中分'],
