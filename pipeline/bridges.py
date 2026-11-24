@@ -13,7 +13,7 @@ from features import points, polygons
 from landmarks.jiefang_layout import SPAN_WAYS
 
 
-def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=None, canopies=()):
+def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=None, canopies=(), rail_floors=None):
     spans, profiles, owners, emitted = [], [], [], []
     thin_spans = []
     tracks = [
@@ -124,6 +124,12 @@ def bridge_tiles(bounds, sample, routes=(), raised=(), plans=None, west_portal=N
         if portal_deck and not (plans and way['id'] in plans):
             sections = [(left, right, height - .65 * max(0, 1 - west_portal.distance(Point((left + right) / 2)) / 18))
                         for left, right, height in sections]
+        if rail_floors and way['id'] in rail_floors:
+            from railway_bridge_grades import fit_approach
+            alignment,at,minimum = rail_floors[way['id']]
+            sections = [(left,right,float(fit_approach(y,np.interp(
+                alignment.project(Point((left+right)/2)),at,minimum),np.inf)))
+                        for left,right,y in sections]
         for first, second in zip(sections, sections[1:]):
             if station_stairs:
                 rise = deck-PLATFORM

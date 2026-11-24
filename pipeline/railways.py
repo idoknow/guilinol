@@ -127,8 +127,8 @@ def stations(line, interval):
     return set(vertices) | set(np.arange(0., line.length, interval))
 
 
-def bake(world_dir, manifest, inventory, samples, plan_profile=False):
-    world = Surface(world_dir, manifest)
+def bake(world_dir, manifest, inventory, samples, plan_profile=False, rail_only=False):
+    world = None if rail_only else Surface(world_dir, manifest)
     region = PlayRegion()
     ways = {way['id']:way for way in load_osm() if way['type']=='way'}
     by_way = defaultdict(list)
@@ -136,7 +136,7 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
         by_way[row['rail']].append(row)
     road_zones = []
     surface_roads = []
-    for way in ways.values():
+    for way in (() if rail_only else ways.values()):
         tags = way.get('tags', {})
         if 'highway' in tags and tags['highway'] != 'construction' and len(way['geometry'])>=2:
             zone=LineString(points(way)).buffer(road_radius(tags), quad_segs=2)
@@ -154,7 +154,9 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
 
     crossing_data = []
     portal_nodes = set()
-    tunnels = {t['way']:t for t in manifest.get('tunnels', [])}
+    tunnels = defaultdict(list)
+    for tunnel in manifest.get('tunnels', []):
+        tunnels[tunnel['way']].append(tunnel)
     review=json.loads((ROOT/'pipeline/railway-review.json').read_bytes())
     absent_structures=set()
     sign_sites = defaultdict(list)
@@ -198,15 +200,18 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
                 for overlap in lines(line.intersection(zone)):
                     lo, hi = sorted(line.project(Point(c)) for c in (overlap.coords[0],overlap.coords[-1]))
                     if lo-.02<=at<=hi+.02:
-                        flag = (RESERVED if row['status']=='pending_road_tunnel' else
+                        flag = (RESERVED if row['status']=='pending_road_tunnel' and not tunnels.get(row['road']) else
                                 LEVEL if row['type']=='level' else BRIDGE if row['type']=='rail_over' else 0)
-                        if flag==LEVEL:
+                        if flag==LEVEL and not rail_only:
                             surface=samples[str(row['sharedNode'])]
                             if surface['road'] is None and surface['deck'] is None: flag|=PAINTED
                         gaps.append((lo,hi,flag))
                         stops.update((lo,hi))
                 stops.add(at)
                 is_level = row['type']=='level'
+                if rail_only:
+                    crossing_data.append((vertex(line.interpolate(at)),row,None,None,None))
+                    continue
                 key = str(row['sharedNode']) if is_level else (row['rail'],row['road'],row['lat'],row['lon'])
                 hit = samples[key]
                 surface_source='carriageway'
@@ -214,15 +219,16 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
                 if (row['type']=='road_over' or is_level and road is None) and hit['deck'] is not None:
                     surface_source='deck'
                     road = hit['deck']
-                tunnel=tunnels.get(row['road'])
-                if tunnel and row['type']=='rail_over':
+                sections=tunnels.get(row['road'], ()) if row['type']=='rail_over' else ()
+                for tunnel in sections:
                     ends=np.asarray(tunnel['portals'])[:,[0,2]]
                     direction=(ends[1]-ends[0])/tunnel['length']
                     offset=np.asarray(p.coords[0])-ends[0]
                     along=offset@direction
-                    if 0<=along<=tunnel['length'] and abs(offset@[-direction[1],direction[0]])<=tunnel['halfWidth']:
+                    if -.02<=along<=tunnel['length']+.02 and abs(offset@[-direction[1],direction[0]])<=tunnel['halfWidth']:
                         surface_source='tunnel_profile'
                         road=float(np.interp(along,*np.asarray(tunnel['stations']).T))
+                        break
                 if road is None and row['roadTags']['highway'] in ('footway','cycleway','path','steps','pedestrian') and hit['sidewalk'] is not None:
                     road=hit['sidewalk']
                     surface_source='sidewalk'
@@ -256,7 +262,7 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
                             missing_signs.append(dict(node=row['sharedNode'],approach=side))
                 soffit=hit['soffit'] if hit['soffit'] is not None else road-1.2
                 crossing_data.append((vertex(line.interpolate(at)),row,road,axis,soffit))
-                if not is_level and row['type']=='rail_over' and row['roadTags'].get('tunnel')=='yes' and surface_source=='terrain_proxy' and not tunnel:
+                if not is_level and row['type']=='rail_over' and row['roadTags'].get('tunnel')=='yes' and surface_source=='terrain_proxy':
                     absent_structures.add((row['rail'],row['road']))
             distances = sorted(stops)
             verts = [vertex(line.interpolate(s)) for s in distances]
@@ -280,6 +286,10 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
     if depot and depot['tags'].get('landuse') == 'railway':
         yards.append(([depot['id']], area(depot)))
     height, profile = solve(coords,pieces,ways,ground+.35,crossing_data,yards,parallel_segments(pieces,coords,ways))
+    if rail_only:
+        return [dict(rail=row['rail'], road=row['road'], type=row['type'], railY=float(height[node]),
+                     x=coords[node][0], z=coords[node][1])
+                for node,row,*_ in crossing_data], profile['panels']
     violations=[]
     dependencies={tuple([rail,road]):int(missing) for missing,records in review['missingTunnelDependencies'].items()
                   for rail,road,witness in records if (witness,int(missing)) in absent_structures}

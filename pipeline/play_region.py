@@ -43,7 +43,7 @@ def preserve_rack_types(vehicles):
     vehicles.update(racks)
 
 
-def restore_protected_tiles(output, chunks, entries):
+def restore_protected_tiles(output, chunks, entries, grades=None):
     """Copy campus and inner-city assets by world origin from the published baseline."""
     from shapely.geometry import box
     from shapely import union_all
@@ -70,12 +70,17 @@ def restore_protected_tiles(output, chunks, entries):
         tile['bytes'] = ref['bytes']
         for suffix in ('.glc','.trees'):
             src = Path(ref['file']).with_suffix(suffix)
-            copies['world/'+str(src)] = (output/tile['file']).with_suffix(suffix)
+            copies['world/'+str(src)] = (output/tile['file']).with_suffix(suffix),tile
     with tarfile.open(archive, 'r|gz') as packed:
         for member in packed:
             target = copies.pop(member.name,None)
             if target:
-                target.write_bytes(packed.extractfile(member).read())
+                file,tile = target
+                data = packed.extractfile(member).read()
+                if grades is not None and file.suffix=='.glc':
+                    data = grades.apply(data,tile['x'],tile['z'])
+                    tile['bytes'] = len(data)
+                file.write_bytes(data)
     if copies:
         raise ValueError('Missing protected tiles in the baseline archive')
     campus_entries = {e['id']:e for e in manifest['landmarks'] if e['name'] in campus_names}

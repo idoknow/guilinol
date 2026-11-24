@@ -136,6 +136,9 @@ if __name__ == '__main__':
                 raise ValueError(f"Absent geometry for {row['rail']} / {row['road']}")
             row.update(railY=point['railY'], roadY=point['roadY'], designClearanceM=point['clearanceM'])
             row['surfaceSource']=point['surfaceSource']
+            if row['status']=='pending_road_tunnel' and point['surfaceSource']=='tunnel_profile':
+                row['status']='active'
+                row['evidence']=row['evidence'].replace('下穿道路尚缺独立结构，净空待验','下穿路面按生成的隧道纵断面实测')
             if point['roadStructureDependency']:
                 row['status']='pending_road_structure'
                 row['deferredRoad']=point['roadStructureDependency']

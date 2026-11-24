@@ -2,6 +2,8 @@ import gzip
 import json
 import math
 import re
+import subprocess
+from tempfile import NamedTemporaryFile
 from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
@@ -66,7 +68,7 @@ def signal_schedule(lanes, nodes):
     return [dict(lanes=sorted(family),green=18,yellow=3) for family in families]
 
 
-def bake(output, manifest, rendered_roads=None):
+def bake(output, manifest, rendered_roads=None, grade_changes=None):
     left, top, width, depth = manifest['extent']
     if rendered_roads is None:
         from features import raw_overture_footprints
@@ -79,6 +81,7 @@ def bake(output, manifest, rendered_roads=None):
     surface = Surface(output, manifest)
     from station_levels import UNDERPASS
     station_tunnel = next((t for t in manifest.get('tunnels', []) if t['way']==UNDERPASS), None)
+    tunnel_segments = {(t['way'],*t['nodes']): t for t in manifest.get('tunnels', []) if 'nodes' in t}
     bridge = next((entry for entry in manifest['landmarks'] if entry['id'] == 'jiefang_bridge'), None)
 
     @lru_cache(maxsize=96)
@@ -136,6 +139,17 @@ def bake(output, manifest, rendered_roads=None):
     elements = load_osm()
     parking_segments = []
     sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
+    from shapely import STRtree, Point
+    crossings = json.loads((ROOT/'docs/railway-crossings.json').read_bytes())
+    centers = STRtree([Point(ll2xz(row['lat'],row['lon'])) for row in crossings if row['type']])
+    fitted_lanes = []
+    work_file = output/'roads'/'railway-roadworks.json'
+    saved_work = (set(json.loads(work_file.read_bytes())) if grade_changes is None and work_file.exists()
+                  else None)
+    built_tunnels = {t['way'] for t in manifest.get('tunnels', [])}
+    rail_bridges = {r['road'] for r in crossings if r['type']=='road_over'}
+    rail_bridges.update((1017592859,265411058,738018982))
+
     for way in elements:
         tags = way.get('tags', {})
         linear = way['id'] not in SPAN_WAYS and any(tags.get(key,'no')!='no' for key in ('bridge','tunnel'))
@@ -200,17 +214,30 @@ def bake(output, manifest, rendered_roads=None):
                     lane = dict(id=len(lanes), to=tail, width=size, offset=round(offset,2), kind='nonmotor' if kind=='cycleway' else 'bus' if kind=='busway' else 'motor',speedKmh=number(tags.get('maxspeed'),20 if kind in ('cycleway','service') else 40),oneway=single)
                     lane['from'] = head
                     lane['cls'] = kind
-                    if station_tunnel and way['id']==UNDERPASS:
-                        knots = station_tunnel['stations']
+                    tunnel = station_tunnel if way['id']==UNDERPASS else tunnel_segments.get((way['id'],start_id,end_id))
+                    if tunnel:
+                        knots = tunnel['stations']
                         if sign<0:
-                            knots = [(station_tunnel['length']-d,y) for d,y in reversed(knots)]
-                        lane['heights'] = [v for d,y in knots for v in (d/station_tunnel['length'],y)]
+                            knots = [(tunnel['length']-d,y) for d,y in reversed(knots)]
+                        lane['heights'] = [v for d,y in knots for v in (d/tunnel['length'],y)]
                         lane['gradeSeparated'] = 'tunnelProfile'
-                        lane['tunnelWay'] = UNDERPASS
+                        lane['tunnelWay'] = way['id']
                     elif not linear:
                         lane['heights'] = profile(head,tail,lane['offset'],way['id'])
                     if 'gradeSeparated' not in lane and (linear or way['id'] in SPAN_WAYS):
                         lane['gradeSeparated'] = 'linear' if linear else 'jiefang'
+                    if len(centers.query(LineString([start,end]),predicate='dwithin',distance=500)):
+                        layer = next((k for k in ('bridge','tunnel') if tags.get(k,'no')!='no'), None)
+                        changed = (grade_changes is None or
+                                   grade_changes.affects_carriageway(start,end,abs(offset)+1))
+                        if layer=='bridge':
+                            changed = way['id'] in rail_bridges or changed
+                        elif layer=='tunnel':
+                            changed = way['id'] in built_tunnels
+                        if saved_work is not None:
+                            changed = lane['id'] in saved_work
+                        if changed:
+                            fitted_lanes.append(dict(lane,way=way['id'],structure=layer))
                     lanes.append(lane)
                     incoming[tail].append(lane)
 
@@ -228,6 +255,18 @@ def bake(output, manifest, rendered_roads=None):
         schedule = signal_schedule((lane for ref in group for lane in incoming[ref]), nodes)
         signals.extend(dict(node=ref,group=group[0],offset=group[0]%31,phases=schedule) for ref in group)
     result = dict(nodes=[node for node in nodes.values() if node['y'] is not None],lanes=lanes,signals=signals,quiet=quiet,walks=walks)
+    if grade_changes is not None:
+        work_file.parent.mkdir(exist_ok=True)
+        work_file.write_text(json.dumps([l['id'] for l in fitted_lanes]))
+    if fitted_lanes:
+        with NamedTemporaryFile(mode='w+',dir=output,suffix='.json') as payload:
+            json.dump(dict(manifest=manifest,nodes=result['nodes'],lanes=fitted_lanes),payload)
+            payload.flush()
+            subprocess.run([ROOT/'node_modules/.bin/tsx', ROOT/'scripts/railway-lane-heights.ts',
+                            output.resolve(),payload.name],cwd=ROOT,check=True)
+            payload.seek(0)
+            for lane_id,floor in json.load(payload).items():
+                lanes[int(lane_id)]['floor'] = floor
     dest = output/'roads'/'graph.json.gz'
     dest.parent.mkdir(exist_ok=True)
     dest.write_bytes(gzip.compress(json.dumps(result, ensure_ascii=False, separators=(',',':')).encode(),mtime=0))

@@ -127,7 +127,12 @@ def clear_cuizhu_overpass(plans, road_height):
         for i,s in enumerate(stations):
             point = line.interpolate(float(s))
             for center,level in targets:
-                levels[i] = max(levels[i],level-.05*max(0.,point.distance(center)-12))
+                distance = max(0.,point.distance(center)-12)
+                # Ease from the horizontal deck into the 5% approach over 12 m.
+                fall = .05*(distance**2/24 if distance<12 else distance-6)
+                floor = level-fall
+                blend = max(.6-abs(levels[i]-floor),0.)
+                levels[i] = max(levels[i],floor)+blend**2/2.4
 
 
 def clear_approach_paving(output, chunks, underpasses):
@@ -142,8 +147,10 @@ def clear_approach_paving(output, chunks, underpasses):
     ramps = []
     for tunnel in underpasses:
         line = LineString([(x,z) for x,_,z in tunnel['portals']])
-        first,last = tunnel.get('approachEnds', [tunnel['approach']]*2)
-        for start,end in ((0,first), (line.length-last,line.length)):
+        first,last = tunnel.get('openEnds',tunnel.get('approachEnds', [tunnel['approach']]*2))
+        for mouth,(start,end) in zip(tunnel.get('mouths',(True,True)),((0,first),(line.length-last,line.length))):
+            if end<=start or not mouth and 'openEnds' not in tunnel:
+                continue
             segment = LineString([line.interpolate(start),line.interpolate(end)])
             ramps.append(segment.buffer(tunnel['halfWidth'], cap_style='flat'))
     cut = union_all(ramps)

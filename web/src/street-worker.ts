@@ -38,7 +38,7 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
   return terrain+factor*(base-terrain)
 }
 
-function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[],signs:CrossingSign[],railGround:(x:number,z:number)=>number){
+export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[]=[],signs:CrossingSign[]=[],railGround:(x:number,z:number)=>number=ground){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const baseLevel=(x:number,z:number)=>{const g=ground(x,z);return roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g}
   const curbSegments=curbCuts.flatMap(line=>line.slice(1).map(([x,z],i)=>
@@ -312,7 +312,7 @@ export type StreetData=ReturnType<typeof streetGeometry>
 export interface StreetRequest {id:number; paths:Streets; rails?:RailSection[]; signs?:CrossingSign[]; railCuts?:[number,number][]; step:number; elevations:Float32Array}
 export type StreetResponse={id:number; data:StreetData}|{id:number; error:string}
 
-self.onmessage=({data:{id,paths,step,elevations,rails=[],signs=[],railCuts=[]}}:MessageEvent<StreetRequest>)=>{
+if(typeof self!=='undefined')self.onmessage=({data:{id,paths,step,elevations,rails=[],signs=[],railCuts=[]}}:MessageEvent<StreetRequest>)=>{
   try {
     const segments=256/step, stride=segments+1
     const sample=(grid:Float32Array)=>(x:number,z:number)=>{
