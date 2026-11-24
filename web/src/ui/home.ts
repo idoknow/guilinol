@@ -1,4 +1,5 @@
 import {getPlayMode, lastPlayMode, type PlayMode} from '../game/play-mode'
+import {mpEnabled, setMpEnabled} from './mp-pref'
 import './home.css'
 import {spots} from '../play/spots'
 import {SOURCE_URL} from './source'
@@ -50,6 +51,11 @@ export function home(play:(mode:PlayMode)=>void):Home {
           <i aria-hidden="true"></i><span>回到上次离开的地方</span><small class="home-resume-ago"></small>
         </button>
       </div>
+      <div class="home-mp-row" role="listitem">
+        <button type="button" class="home-mp" role="switch" aria-checked="false" data-umami-event="home-mp">
+          <i aria-hidden="true"></i><span><b>同城联机</b><small>街上能遇见其他玩家，看得到对方的样子和昵称</small></span><em aria-hidden="true"></em>
+        </button>
+      </div>
     </div>
     <nav class="home-links">
       <button type="button" class="ui-btn ui-btn--ghost" data-act="guide" data-umami-event="home-guide">玩法说明</button>
@@ -72,6 +78,11 @@ export function home(play:(mode:PlayMode)=>void):Home {
   root.querySelector<HTMLButtonElement>('[data-act=guide]')!.onclick = ()=>guide()
   root.querySelector<HTMLButtonElement>('[data-act=about]')!.onclick = ()=>void import('./about').then(m=>m.openAbout())
   root.querySelector<HTMLButtonElement>('[data-act=qq]')!.onclick = ()=>qqGroup()
+  // IDOK-192 同城联机开关：进城前后都能切，walk 那边当场连上或断开。
+  const mpSwitch = root.querySelector<HTMLButtonElement>('.home-mp')!
+  const paintMp = ()=>mpSwitch.setAttribute('aria-checked',String(mpEnabled()))
+  mpSwitch.onclick = ()=>{setMpEnabled(!mpEnabled()); paintMp()}
+  paintMp()
   const account = root.querySelector<HTMLButtonElement>('.home-account')!
   account.onclick = ()=>void openAccount()
   onUser(user=>{account.innerHTML = user?`<i class="home-avatar"></i><span></span>`:'<span>登录 / 注册</span>'

@@ -8,12 +8,25 @@ import {avatar as figure} from './look/avatar'
 export interface Pose {x:number;y:number;z:number;yaw:number;v:number;gr:number;bike:string;bx:number;bz:number;byaw:number}
 export interface Player extends Pose {id:string;name:string;avatar:Avatar}
 
-function label(name:string) {
-  const canvas=document.createElement('canvas'); canvas.width=384; canvas.height=48
-  const ctx=canvas.getContext('2d')!; ctx.font='32px sans-serif'; ctx.textAlign='center'; ctx.fillStyle='white'
-  ctx.strokeText(name,192,36,380); ctx.fillText(name,192,36,380)
-  const texture=new THREE.CanvasTexture(canvas), material=new THREE.SpriteMaterial({map:texture,fog:false,depthWrite:false})
-  const sprite=new THREE.Sprite(material); sprite.scale.set(3,.375,1); sprite.position.y=2.15
+// 昵称牌（IDOK-192）：墨青玻璃小签 + 宣纸色宋体字，左边一颗青玉点，和 HUD 读数同一套颜色。
+const TAG_FONT='600 30px "Noto Serif SC","Source Han Serif SC","Songti SC",serif'
+export function label(name:string) {
+  const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d')!
+  ctx.font=TAG_FONT
+  const text=name.length>12?`${name.slice(0,11)}…`:name
+  const h=52,padX=20,dot=10,gap=10,w=Math.ceil(Math.min(420,padX*2+dot+gap+ctx.measureText(text).width))
+  canvas.width=w;canvas.height=h
+  ctx.font=TAG_FONT
+  const r=h/2-4
+  ctx.beginPath();ctx.roundRect(2,4,w-4,h-8,r)
+  ctx.fillStyle='rgba(24,40,37,.72)';ctx.fill()
+  ctx.lineWidth=2;ctx.strokeStyle='rgba(244,239,226,.32)';ctx.stroke()
+  ctx.beginPath();ctx.arc(padX+dot/2,h/2,dot/2,0,Math.PI*2);ctx.fillStyle='#8fc1b5';ctx.fill()
+  ctx.fillStyle='#f4efe2';ctx.textBaseline='middle';ctx.textAlign='left'
+  ctx.fillText(text,padX+dot+gap,h/2+1,w-padX*2-dot-gap)
+  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=4
+  const material=new THREE.SpriteMaterial({map:texture,fog:false,depthWrite:false,transparent:true})
+  const sprite=new THREE.Sprite(material),height=.3;sprite.scale.set(height*w/h,height,1);sprite.position.y=2.12;sprite.renderOrder=2
   return sprite
 }
 

@@ -1,4 +1,5 @@
 import {nearestPlayable} from '../../../lib/play-region'
+import {mpEnabled} from '../ui/mp-pref'
 import * as THREE from 'three'
 import {passengerTop} from './passenger-height'
 import {tunnelFloor} from '../tunnels'
@@ -310,8 +311,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   avatarReady ??= new GLTFLoader().loadAsync(avatar.path)
   const profile=currentAvatar()??defaultAvatar()
   let net:ReturnType<typeof import('../net').attachNet>|undefined
-  const multiplayer=new URLSearchParams(location.search).get('mp')==='1'||localStorage.getItem('glol.mp')==='1'
-  const [sim,source,model,netModule]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady,characterModel(profile),multiplayer?import('../net'):undefined])
+  const [sim,source,model,preloadedNet]=await Promise.all([createPhysics(manifest,stream,peaks,rapierReady),avatarReady,characterModel(profile),mpEnabled()?import('../net'):undefined])
+  let netModule=preloadedNet
   model.animations.push(...source.animations.filter(c=>!model.animations.some(other=>other.name===c.name)))
   const rig=createCameraRig(sim)
   const figure=model.scene,legacySkinned=mergeAvatar(figure,avatar.color),avatarRig=ensureAvatarRig(figure,avatar.color),skinned=legacySkinned??avatarRig.skinnedMesh,traveller=figure.getObjectByName('Traveller')??avatarRig.traveller,ridePose=createRiderPose(figure),driverPose=createDriverPose(figure)
@@ -1277,14 +1278,21 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     active=true;rides?.show(true);requestAnimationFrame(()=>requestAnimationFrame(loadRides));figure.visible=true;firstPersonHidden=false
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true)
-    if(netModule){
-        net??=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y,z:figure.position.z,
+    attachMp()
+    return true
+  }
+  // 同城联机：首页开关随时生效（IDOK-192）。预载过就同步连上，没预载就先拉模块，回来时还在步行才连。
+  function attachMp(){
+    if(!mpEnabled()||!active||net)return
+    if(!netModule){void import('../net').then(module=>{netModule=module;attachMp()}).catch(error=>console.warn('multiplayer unavailable',error));return}
+    {
+        net=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y,z:figure.position.z,
           yaw:figure.rotation.y,v:rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz),gr:Number(grounded),
           bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile)
         net.tick(0)
     }
-    return true
   }
+  addEventListener('glol:mp-pref',()=>{if(mpEnabled())attachMp();else disconnect()})
   function disconnect(){net?.dispose();net=undefined}
   function leave(){disconnect();resetWalk()}
   function resetWalk(){if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
