@@ -1,0 +1,69 @@
+/* 同城在线名册（IDOK-222）：和左下读数同一块墨青玻璃，挂在读数正上方；青玉点 = 在走，赭黄 = 骑车，灰 = 驻足 */
+.mp-roster {
+  position: fixed;
+  left: calc(12px + env(safe-area-inset-left));
+  bottom: calc(46px + env(safe-area-inset-bottom));
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  width: min(300px, calc(100vw - 24px));
+  max-height: min(420px, calc(100dvh - 120px));
+  box-sizing: border-box;
+  padding: 12px 6px 8px 14px;
+  border-radius: 16px;
+  background: rgba(24, 40, 37, .78);
+  border: 1px solid rgba(244, 239, 226, .24);
+  box-shadow: 0 14px 36px rgba(8, 16, 14, .34);
+  color: var(--ui-paper, #f4efe2);
+  font: 13px/1.35 var(--ui-serif, "Noto Serif SC", serif);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity .18s ease, transform .18s ease;
+}
+.mp-roster.show { opacity: 1; transform: none; }
+.mp-roster[hidden] { display: none; }
+.mp-roster header { display: flex; align-items: baseline; gap: 8px; padding-right: 6px; }
+.mp-roster h2 { margin: 0; font: 600 15px/1 var(--ui-serif, serif); letter-spacing: .14em; }
+.mp-roster-count { font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ui-jade-300, #8fc1b5); }
+.mp-roster-close {
+  margin-left: auto; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%;
+  background: rgba(244, 239, 226, .1); color: inherit; font: 18px/1 system-ui, sans-serif; cursor: pointer;
+}
+.mp-roster-close:hover { background: rgba(244, 239, 226, .2); }
+.mp-roster ol {
+  margin: 10px 0 0; padding: 0 6px 0 0; list-style: none; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: rgba(244, 239, 226, .25) transparent;
+}
+.mp-roster-row {
+  display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 8px; row-gap: 2px;
+  align-items: center; width: 100%; padding: 7px 8px; border: 0; border-radius: 10px; background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.mp-roster-row:hover, .mp-roster-row:focus-visible { background: rgba(143, 193, 181, .16); outline: none; }
+.mp-roster-row::before {
+  content: ""; grid-row: 1 / span 2; width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(244, 239, 226, .42);
+}
+.mp-roster-row[data-state="move"]::before { background: #8fc1b5; box-shadow: 0 0 0 2px rgba(143, 193, 181, .22); }
+.mp-roster-row[data-state="bike"]::before { background: #e2b878; box-shadow: 0 0 0 2px rgba(226, 184, 120, .22); }
+.mp-roster-row b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; letter-spacing: .04em; }
+.mp-roster-row small { justify-self: end; font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: rgba(244, 239, 226, .5); }
+.mp-roster-where { grid-column: 2; font-size: 12px; color: var(--ui-jade-300, #8fc1b5); }
+.mp-roster-meta { grid-column: 3; justify-self: end; font-size: 11.5px; color: rgba(244, 239, 226, .62); white-space: nowrap; }
+.mp-roster-empty { padding: 10px 8px 6px; color: rgba(244, 239, 226, .7); font-size: 12.5px; }
+.mp-roster-foot { margin: 6px 8px 0 0; padding-top: 7px; border-top: 1px solid rgba(244, 239, 226, .12); font-size: 11px; color: rgba(244, 239, 226, .5); letter-spacing: .04em; }
+
+body[data-home] .mp-roster,
+body[data-photo="on"] .mp-roster,
+body[data-shop-open="1"] .mp-roster { display: none !important; }
+
+@media (pointer: fine) and (max-width: 1100px) {
+  .mp-roster { bottom: calc(84px + env(safe-area-inset-bottom)); max-height: min(420px, calc(100dvh - 190px)); }
+}
+/* 横屏手机：左下是摇杆，名册挪到右上角菜单下面 */
+@media (pointer: coarse) {
+  .mp-roster { left: auto; right: calc(12px + env(safe-area-inset-right)); top: calc(56px + env(safe-area-inset-top)); bottom: auto; max-height: calc(100dvh - 76px); width: min(270px, 46vw); }
+}
+@media (prefers-reduced-motion: reduce) { .mp-roster { transition: none; } }
