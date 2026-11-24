@@ -16,7 +16,7 @@ for(const way of ways){
   const structure=way.tags.tunnel&&way.tags.tunnel!=='no'?'tunnel':way.tags.bridge&&way.tags.bridge!=='no'?'bridge':'surface'
   const lane={way:way.id,structure}
   const coords=way.geometry.map(p=>ll2xz(p.lat,p.lon))
-  const row={way:way.id,structure,adjustedLengthM:0,maxRoadChangeM:0,peakGrade:0,mainPeakGrade:0,fromM:0,toM:0,worst:null}
+  const row={way:way.id,structure,adjustedLengthM:0,maxRoadChangeM:0,peakGrade:0,mainPeakGrade:0,mainGradeAtCandidatePeak:0,peakGradeStationM:0,fromM:0,toM:0,worst:null}
   let station=0,previous
   for(let i=1;i<coords.length;i++){
     const {x,z}=coords[i-1],dx=coords[i].x-x,dz=coords[i].z-z,step=Math.hypot(dx,dz)
@@ -38,7 +38,12 @@ for(const way of ways){
         const run=at-previous.at
         if(!row.adjustedLengthM)row.fromM=previous.at
         row.toM=at;row.adjustedLengthM+=run
-        row.peakGrade=Math.max(row.peakGrade,Math.abs(b-previous.b)/run)
+        const grade=Math.abs(b-previous.b)/run
+        if(grade>row.peakGrade){
+          row.peakGrade=grade
+          row.mainGradeAtCandidatePeak=Math.abs(a-previous.a)/run
+          row.peakGradeStationM=(at+previous.at)/2
+        }
         row.mainPeakGrade=Math.max(row.mainPeakGrade,Math.abs(a-previous.a)/run)
       }
       previous={at,a,b,delta}

@@ -196,21 +196,39 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     if(changed)pieces.forEach(poly=>fan(poly,vertices));else keep.push(...ids)
   }
   ground.setIndex(keep)
-  const looks:Record<string,THREE.Material>={
-    road:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0x3b3e42,roughness:.95}),
-    interior:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0xcfc8b8,roughness:.9}),
-    portal:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0xa39d90,roughness:.92}),
-    band:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0x4d7466,roughness:.6}),
-    ceiling:new THREE.MeshBasicMaterial({side:THREE.DoubleSide,color:0x9c968a}),
-    lamp:new THREE.MeshBasicMaterial({side:THREE.DoubleSide,color:0xffd9a6}),
-    lane:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0xeae3cf,roughness:.8}),
-    terrain:new THREE.MeshStandardMaterial({side:THREE.DoubleSide,color:0x888888}),
+  function mesh(values:number[],material:THREE.Material,kind:string){
+    const geometry=new THREE.BufferGeometry()
+    geometry.setAttribute('position',new THREE.Float32BufferAttribute(values,3))
+    geometry.computeVertexNormals()
+    const item=new THREE.Mesh(geometry,material)
+    item.name=`tunnel_${kind}`;item.userData.kind=kind
+    return item
   }
-  function mesh(values:number[],kind:string){
-    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(values,3));geometry.computeVertexNormals()
-    const item=new THREE.Mesh(geometry,looks[kind]);item.name=`tunnel_${kind}`;item.userData.kind=kind;return item
+  const collisionMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide})
+  function collider(values:number[],kind:string){
+    const result=mesh(values,collisionMaterial,kind)
+    result.visible=false
+    return result
   }
-  const fringe=mesh(vertices,'terrain');fringe.geometry.setAttribute('uv',new THREE.Float32BufferAttribute(vertices.flatMap((v,i)=>i%3===0?[v/256,1-vertices[i+2]/256]:[]),2))
-  return {fringe,floor:mesh(parts.floor,'road'),interior:mesh(parts.interior,'interior'),portal:mesh(parts.portal,'portal'),
-    band:mesh(parts.band,'band'),ceiling:mesh(parts.ceiling,'ceiling'),lamp:mesh(parts.lamp,'lamp'),lane:mesh(parts.lane,'lane')}
+  const palette={floor:0x3b3e42,interior:0xcfc8b8,portal:0xa39d90,band:0x4d7466,
+    lane:0xeae3cf,ceiling:0x9c968a,lamp:0xffd9a6}
+  function batch(keys:(keyof typeof parts)[],material:THREE.Material,kind:string){
+    const positions:number[]=[],colors:number[]=[]
+    for(const key of keys){
+      const color=new THREE.Color(palette[key])
+      for(let i=0;i<parts[key].length;i+=3){
+        positions.push(parts[key][i],parts[key][i+1],parts[key][i+2])
+        colors.push(color.r,color.g,color.b)
+      }
+    }
+    const result=mesh(positions,material,kind)
+    result.geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3))
+    return result
+  }
+  const fringe=mesh(vertices,new THREE.MeshStandardMaterial(),'terrain')
+  fringe.geometry.setAttribute('uv',new THREE.Float32BufferAttribute(vertices.flatMap((v,i)=>i%3===0?[v/256,1-vertices[i+2]/256]:[]),2))
+  const lining=batch(['floor','interior','portal','band','lane'],
+    new THREE.MeshStandardMaterial({side:THREE.DoubleSide,vertexColors:true,roughness:.9}),'lining')
+  const lights=batch(['ceiling','lamp'],new THREE.MeshBasicMaterial({side:THREE.DoubleSide,vertexColors:true}),'lighting')
+  return {fringe,lining,lights,floor:collider(parts.floor,'road'),interior:collider(parts.interior,'interior'),portal:collider(parts.portal,'portal')}
 }
