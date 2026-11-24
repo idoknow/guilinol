@@ -7,6 +7,7 @@ import {ll2xz} from '../lib/projection.ts'
 
 const [directory, inventory] = process.argv.slice(2)
 const manifest = JSON.parse(readFileSync(join(directory, 'manifest.json')))
+const {bridgeDepth}=JSON.parse(readFileSync(new URL('../pipeline/vessel-bounds.json',import.meta.url)))
 const nodes = new Map()
 for (const row of JSON.parse(readFileSync(inventory))) {
   const key = row.type === 'level' ? row.sharedNode : [row.rail,row.road,row.lat,row.lon].join('/')
@@ -18,7 +19,7 @@ function request(tile) {
   const n = manifest.chunkSize / manifest.grid + 1, fieldBytes = n*n*2
   const start = 24 + 2*fieldBytes + 9*data.readUInt32LE(4) + 4*data.readUInt32LE(8)
   const end = start + data.readUInt32LE(12)
-  const paths = JSON.parse(data.toString('utf8', start, end))[1]
+  const [,paths,thin=[]] = JSON.parse(data.toString('utf8', start, end))
   const tail = end + data.readUInt32LE(16) + 18*data.readUInt32LE(20)
   if (data.toString('ascii',0,4) !== 'GL04' || ![0,fieldBytes].includes(data.length-tail))
     throw Error('Unsupported tile ' + tile.file)
@@ -44,7 +45,10 @@ function request(tile) {
   const deckCount = data.readUInt32LE(20)*9
   const deckStart = tail-2*deckCount
   const deck = Float32Array.from({length:deckCount}, (_,i)=>data.readInt16LE(deckStart+2*i)/100)
-  return {deck, worker:{id:0, paths, step:stride*manifest.grid, elevations:Float32Array.from(elevations)}}
+  const underside=deck.slice()
+  const thinSet=new Set(thin)
+  for(let i=1;i<underside.length;i+=3)underside[i]-=thinSet.has(Math.floor(i/9))?.6:bridgeDepth
+  return {deck, underside, worker:{id:0, paths, step:stride*manifest.grid, elevations:Float32Array.from(elevations)}}
 }
 
 function at(triangles,x,z) {
@@ -72,11 +76,11 @@ const result={}
 for(const tile of manifest.chunks){
   const local=[...nodes].filter(([,p])=>p.x>=tile.x && p.x<tile.x+256 && p.z>=tile.z && p.z<tile.z+256)
   if(!local.length)continue
-  const {deck,worker} = request(tile)
+  const {deck,underside,worker} = request(tile)
   self.onmessage({data:worker})
   for(const [id,{x,z}] of local) {
     const lx=x-tile.x, lz=z-tile.z
-    result[id]={road:at(triangles,lx,lz),deck:at(deck,lx,lz)}
+    result[id]={road:at(triangles,lx,lz),deck:at(deck,lx,lz),soffit:at(underside,lx,lz)}
   }
 }
 if(Object.keys(result).length!==nodes.size) throw Error('Missing crossing tile')

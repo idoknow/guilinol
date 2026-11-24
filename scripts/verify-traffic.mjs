@@ -136,8 +136,14 @@ for(const [index,target] of [1,.6,.35,.12].entries()){
 }
 
 const vehicleData=JSON.parse(gunzipSync(readFileSync('public/world/vehicles.bin')))
-for(const east of [-1415.4,-432.7,-984,-1001.5,-572]){
-  const [x,y,z,yaw]=vehicleData.cars.find(row=>row[0]===east)
+// Keep the historical westbound curb as a deterministic parked-car
+// obstruction even on releases where this particular pickup was moved.
+const curbFixtures=[[-1415.4,-298.6],[-432.7,-59],[-984,-193.9],[-1001.5,-197.3],[-572,-92]]
+for(const [east,south] of curbFixtures){
+  const parked=vehicleData.cars.find(row=>row[0]===east && row[2]===south)
+  const fixture=parked ?? (east===-1001.5 ? [-1001.5,151.5,-197.3,1.393] : null)
+  assert.ok(fixture,`Missing pickup at ${east},${south}`)
+  const [x,y,z,yaw]=fixture
   const remove=pickups.add({x,y,z,yaw,halfWidth:.9,halfLength:2.12,height:1.5})
   try{
     const flow=new Traffic(graph,()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32))

@@ -1,3 +1,4 @@
+import {railwayGeometry,type RailSection,type CrossingSign} from './railways'
 import * as THREE from 'three'
 import {look} from './look/config'
 type Pair=[number,number]
@@ -37,7 +38,7 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
   return terrain+factor*(base-terrain)
 }
 
-function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower]:Streets,ground:(x:number,z:number)=>number){
+function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[],signs:CrossingSign[],railGround:(x:number,z:number)=>number){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const baseLevel=(x:number,z:number)=>{const g=ground(x,z);return roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g}
   const curbSegments=curbCuts.flatMap(line=>line.slice(1).map(([x,z],i)=>
@@ -166,6 +167,33 @@ function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRai
       for(const corner of [-.58,.58])box(x+corner*Math.cos(angle),y+.25,z-corner*Math.sin(angle),.28,.5,.28,angle,stoneLight)
     }
   }
+  // Index the existing road surface first. Railway geometry never enters the
+  // carriageway/sidewalk arrays used by walking, driving and height sampling.
+  const roadBins=new Map<number,number[]>()
+  if(rails.some(section=>section[7]&16))for(let i=0;i<road.length;i+=9){
+    const xs=[road[i],road[i+3],road[i+6]],zs=[road[i+2],road[i+5],road[i+8]]
+    for(let r=Math.floor(Math.min(...zs)/8);r<=Math.floor(Math.max(...zs)/8);r++){
+      for(let c=Math.floor(Math.min(...xs)/8);c<=Math.floor(Math.max(...xs)/8);c++){
+        const key=r*64+c,bin=roadBins.get(key)
+        if(bin)bin.push(i);else roadBins.set(key,[i])
+      }
+    }
+  }
+  function crossingHeight(x:number,z:number,fallback:number){
+    let level=-Infinity
+    for(const i of roadBins.get(Math.floor(z/8)*64+Math.floor(x/8))??[]){
+      const ax=road[i],az=road[i+2],dx=road[i+3]-ax,dz=road[i+5]-az,ex=road[i+6]-ax,ez=road[i+8]-az
+      const det=dx*ez-dz*ex
+      if(Math.abs(det)<1e-9)continue
+      const u=((x-ax)*ez-(z-az)*ex)/det,v=(dx*(z-az)-dz*(x-ax))/det
+      if(u>=-1e-6&&v>=-1e-6&&u+v<=1.000001)level=Math.max(level,road[i+1]+u*(road[i+4]-road[i+1])+v*(road[i+7]-road[i+1]))
+    }
+    return Number.isFinite(level)?level:fallback
+  }
+  const railBarriers=railwayGeometry(rails,signs,railGround,crossingHeight,(a,b,c,color,along,kind)=>{
+    for(const p of [a,b,c]){xyz.push(p.x,p.y,p.z);rgb.push(color.r,color.g,color.b)}
+    alongVals.push(...along);surfaceKinds.push(kind,kind,kind)
+  },box)
   const detailCount=mats.length/16
   for(const [x,z] of lamps){const px=x/10,pz=z/10,y=baseLevel(px,pz),yaw=(x*7+z*13)%6/6*Math.PI
     box(px,y+.3,pz,.34,.6,.34,0,tone.lampPole);box(px,y+2.9,pz,.14,5.2,.14,0,tone.lampPole);box(px,y+5.3,pz,1.6,.08,.08,yaw,tone.lampPole)
@@ -205,23 +233,26 @@ function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRai
   return {
     positions, normals:surface.getAttribute('normal').array as Float32Array,
     colors:new Float32Array(rgb), kinds:new Uint8Array(surfaceKinds), along:new Float32Array(alongVals),
-    detailCount, railLodCount, parked:Float32Array.from(parked), sidewalk:Float32Array.from(sidewalk), road:Float32Array.from(road),
+    detailCount, railLodCount, railBarriers, parked:Float32Array.from(parked), sidewalk:Float32Array.from(sidewalk), road:Float32Array.from(road),
     furnitureMatrices:Float32Array.from(mats), furnitureColors:Float32Array.from(cols),
   }
 }
 
 export type StreetData=ReturnType<typeof streetGeometry>
-export interface StreetRequest {id:number; paths:Streets; step:number; elevations:Float32Array}
+export interface StreetRequest {id:number; paths:Streets; rails?:RailSection[]; signs?:CrossingSign[]; railCuts?:[number,number][]; step:number; elevations:Float32Array}
 export type StreetResponse={id:number; data:StreetData}|{id:number; error:string}
 
-self.onmessage=({data:{id,paths,step,elevations}}:MessageEvent<StreetRequest>)=>{
+self.onmessage=({data:{id,paths,step,elevations,rails=[],signs=[],railCuts=[]}}:MessageEvent<StreetRequest>)=>{
   try {
     const segments=256/step, stride=segments+1
-    const data=streetGeometry(paths,(x,z)=>{
+    const sample=(grid:Float32Array)=>(x:number,z:number)=>{
       const col=Math.min(segments-1,Math.max(0,Math.floor(x/step))),row=Math.min(segments-1,Math.max(0,Math.floor(z/step))),at=row*stride+col
-      const u=x/step-col,v=z/step-row,a=elevations[at],b=elevations[at+1],c=elevations[at+stride],d=elevations[at+stride+1]
+      const u=x/step-col,v=z/step-row,a=grid[at],b=grid[at+1],c=grid[at+stride],d=grid[at+stride+1]
       return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
-    })
+    }
+    const cut=railCuts.length?elevations.slice():elevations
+    for(const [i,cm] of railCuts)cut[i]=cm/100
+    const data=streetGeometry(paths,sample(elevations),rails,signs,sample(cut))
     const transfer=Object.values(data).flatMap(value=>typeof value==='number'?[]:[value.buffer])
     self.postMessage({id,data} satisfies StreetResponse,{transfer})
   } catch(error) {

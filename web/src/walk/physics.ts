@@ -39,6 +39,12 @@ function fineField(data:Awaited<ReturnType<typeof import('../world').detail>>){
     const at=row*65+col, coarse=(row>>1)*stride+(col>>1)
     const visible=stride===65?positions.getY(at):(col%2&&row%2)?(positions.getY(coarse+1)+positions.getY(coarse+stride))/2:
       (positions.getY(coarse)+positions.getY(coarse+(col%2)+(row%2)*stride))/2
+    if(data.water[at]===-32768 && data.railCutVertices.size){
+      const cuts=data.railCutVertices
+      if(stride===65 ? cuts.has(at) : (col%2 && row%2)
+        ? cuts.has(coarse+1)||cuts.has(coarse+stride)
+        : cuts.has(coarse)||cuts.has(coarse+(col%2)+(row%2)*stride))return visible
+    }
     if(yueya&&data.water[at]===-32768){
       const east=tile.x+col*4,south=tile.z+row*4
       if(onOldSouthSlope(east,south))return visible
@@ -296,6 +302,15 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
         if(rdDesc){const collider=add(rdDesc.setTranslation(tile.x,0,tile.z),'road');sources.set(collider.handle,tile.file);colliders.push(collider)}
         for(const [ax,az,bx,bz,top,bottom,endTop=top] of banks){const angle=-Math.atan2(bz-az,bx-ax),height=((top+endTop)/2-bottom)/10+1.25
           colliders.push(add(R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/20+.03,height/2,.09).setRotation({x:0,y:Math.sin(angle/2),z:0,w:Math.cos(angle/2)}).setTranslation(tile.x+(ax+bx)/20,bottom/10+height/2,tile.z+(az+bz)/20),'rail'))}}
+      if(data){const bars=data.streets.railBarriers
+        for(let i=0;i<bars.length;i+=6){
+          const [ax,ay,az,bx,by,bz]=bars.subarray(i,i+6),yaw=-Math.atan2(bz-az,bx-ax)
+          const desc=R.ColliderDesc.cuboid(Math.hypot(bx-ax,bz-az)/2,.7,.04)
+            .setTranslation(tile.x+(ax+bx)/2,(ay+by)/2+.7,tile.z+(az+bz)/2)
+            .setRotation({x:0,y:Math.sin(yaw/2),z:0,w:Math.cos(yaw/2)})
+          colliders.push(add(desc,'rail'))
+        }
+      }
       if(rings.length)colliders.push(add(houses(rings).setTranslation(tile.x,0,tile.z),'building'))
       if(data?.deck.length){
         // Keep the rendered slab thickness on the collider. Rapier feature IDs

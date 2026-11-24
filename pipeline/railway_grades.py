@@ -83,7 +83,7 @@ def missing_underpasses(rows, ways, samples, heights, modeled_tunnels):
             continue
         crossings = by_rail[way['id']]
         pins = [row for row in crossings if row['sharedNode'] in heights]
-        tunnels = [row for row in crossings if row['type'] == 'rail_over'
+        tunnels = [row for row in crossings if row['status'] == 'active' and row['type'] == 'rail_over'
                    and row['roadTags'].get('tunnel') == 'yes' and row['road'] not in modeled_tunnels]
         if not pins or not tunnels:
             continue

@@ -259,15 +259,5 @@
       "requiredPermille": 21.43
     }
   ],
-  "tunnelSurfaceConflicts": [
-    {
-      "rail": 983853082,
-      "road": 727929887,
-      "fixedNode": 6533456460,
-      "distanceM": 0.112,
-      "visibleRoadY": 160.118,
-      "railTopToVisibleRoadMaxM": 0.0075,
-      "requiredUnderBeamM": 4.5
-    }
-  ]
+  "tunnelSurfaceConflicts": []
 }

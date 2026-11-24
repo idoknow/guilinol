@@ -1,4 +1,5 @@
 """Inventory rail/highway way intersections within the published play boundary."""
+import argparse
 import json
 from pathlib import Path
 
@@ -73,28 +74,54 @@ def inventory(elements, region, node_evidence):
                     reason = '道路 tunnel=yes，铁路无隧道标签'
                 else:
                     reason = '未共享节点，缺少上下层证据'
+                status = 'active'
+                if road['id'] == 727929887 and kind == 'rail_over':
+                    status = 'pending_road_tunnel'
+                    reason += '；IDOK-247 补建下穿道路'
+                elif road['id'] in (1030067842, 1030067843) and ht['highway'] == 'construction':
+                    status = 'construction_unverified'
+                    reason = '施工道路，交叉形式待核'
                 lat, lon = xz2ll(*coords)
                 rows.append(dict(rail=rail['id'], road=road['id'], railTags=rt, roadTags=ht,
                                  lat=round(lat, 7), lon=round(lon, 7), sharedNode=shared,
-                                 geometry=hit.geom_type, type=kind, evidence=reason,
+                                 geometry=hit.geom_type, type=kind, status=status, evidence=reason,
                                  nodeEvidence=evidence, measuredClearance=None))
     return sorted(rows, key=lambda row: (row['rail'], row['road'], row['lat'], row['lon']))
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--geometry-report', type=Path, help='Add baked track and road heights at each centerline intersection')
+    args = parser.parse_args()
     docs = Path(__file__).resolve().parents[1] / 'docs'
     # The source PBF export omitted railway crossing nodes. Supplement only the
     # shared node IDs, using versioned evidence from the OSM nodes API.
     evidence = json.loads(Path(__file__).with_name('railway-crossing-nodes.json').read_text())
     rows = inventory(load_osm(), PlayRegion().geometry, evidence)
+    if args.geometry_report:
+        from shapely.geometry import Point
+        from collections import defaultdict
+        by_pair = defaultdict(list)
+        for point in json.loads(args.geometry_report.read_bytes())['crossings']:
+            by_pair[point['rail'], point['road']].append(point)
+        for row in rows:
+            if row['status'] != 'active':
+                continue
+            position = Point(ll2xz(row['lat'],row['lon']))
+            def distance(point):
+                return position.distance(Point(point['x'],point['z']))
+            point = min(by_pair[row['rail'],row['road']],key=distance)
+            if distance(point) > .025:
+                raise ValueError(f"Absent geometry for {row['rail']} / {row['road']}")
+            row.update(railY=point['railY'], roadY=point['roadY'], designClearanceM=point['clearanceM'])
     (docs / 'railway-crossings.json').write_text(json.dumps(rows, ensure_ascii=False, indent=2) + '\n')
-    lines = ['# 可玩区路铁交点', '', '来源为 raw-expanded-20261124。每行对应一对 way 的一个相交分量。同一地点可能有多条股道或道路分段。JSON 保留双方标签。净空待世界几何生成后实测。', '',
-             '| 铁路 way | 道路 way | 纬度 | 经度 | 共享节点及版本 | type | 证据 |',
-             '|---:|---:|---:|---:|---:|---|---|']
+    lines = ['# 可玩区路铁交点', '', '来源为 raw-expanded-20261124。每行对应一对 way 的一个相交分量。同一地点可能有多条股道或道路分段。JSON 保留双方标签。设计净空取中心线交点处的轨面、路面和梁底高程（铁路梁高 1.20 m，道路薄桥 0.60 m），单位 m。全宽最小净空仍待实测。', '',
+             '| 铁路 way | 道路 way | 纬度 | 经度 | 共享节点及版本 | type | 验收状态 | 设计净空 m | 证据 |',
+             '|---:|---:|---:|---:|---:|---|---|---:|---|']
     for row in rows:
         node = '—'
         if row['sharedNode']:
             node = f"{row['sharedNode']} v{row['nodeEvidence']['version']}"
         lines.append(f"| {row['rail']} | {row['road']} | {row['lat']:.7f} | {row['lon']:.7f} | "
-                     f"{node} | {row['type'] or '待裁定'} | {row['evidence']} |")
+                     f"{node} | {row['type'] or '待裁定'} | {row['status']} | {row.get('designClearanceM') if row.get('designClearanceM') is not None else '—'} | {row['evidence']} |")
     (docs / 'railway-crossings.md').write_text('\n'.join(lines) + '\n')
