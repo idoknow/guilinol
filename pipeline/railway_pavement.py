@@ -236,3 +236,41 @@ def bake_level_panels(directory, chunks, elements, panels):
         file.write_bytes(gzip.compress(raw[:12]+struct.pack('<I',len(payload))+raw[16:off]+
                                        payload+raw[off+size:],compresslevel=5,mtime=0))
         tile['bytes'] = file.stat().st_size
+
+
+def relocate_daylight_lamps(directory, chunks, tunnels):
+    """Keep street lamps on the remaining sidewalk at shared cutting mouths."""
+    from shapely.ops import nearest_points
+    tips = STRtree([Point(x,z) for t in tunnels if t.get('openCut')
+                    for (x,_,z),mouth in zip(t['portals'],t['mouths']) if mouth])
+    for tile in chunks:
+        x,z = tile['x'],tile['z']
+        if not len(tips.query(box(x,z,x+256,z+256),predicate='dwithin',distance=22)):
+            continue
+        file = directory/tile['file']
+        raw = gzip.decompress(file.read_bytes())
+        v,i,size = struct.unpack_from('<3I',raw,4)
+        off = 16924+9*v+4*i
+        collision = json.loads(raw[off:off+size])
+        streets = collision[1]
+        nearby = [lamp for lamp in streets[1] if len(tips.query(
+            Point(x+lamp[0]/10,z+lamp[1]/10),predicate='dwithin',distance=22))]
+        if not nearby:
+            continue
+        surface = [(kind,make_valid(Polygon(np.asarray(shell)/100,[np.asarray(h)/100 for h in holes])))
+                   for kind,shell,*holes in streets[0] if len(shell)>=3]
+        road = union_all([p for kind,p in surface if kind in (0,5)])
+        sidewalk = union_all([p for kind,p in surface if kind in (1,4,6)]).difference(road).buffer(-.4)
+        changed = False
+        for lamp in nearby:
+            point = Point(lamp[0]/10,lamp[1]/10)
+            if sidewalk.is_empty or not road.covers(point) or sidewalk.distance(point)>8:
+                continue
+            target = nearest_points(point,sidewalk)[1]
+            lamp[:] = [round(10*target.x),round(10*target.y)]
+            changed = True
+        if changed:
+            payload = json.dumps(collision,separators=(',',':')).encode()
+            file.write_bytes(gzip.compress(raw[:12]+struct.pack('<I',len(payload))+raw[16:off]+
+                                           payload+raw[off+size:],compresslevel=5,mtime=0))
+            tile['bytes'] = file.stat().st_size

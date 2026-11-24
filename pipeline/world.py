@@ -582,10 +582,11 @@ def build(bbox, output, palette, workers=4):
         open_passage(output, chunks)
         from railway_platforms import bake as bake_platforms
         bake_platforms(output, chunks, play_region.geometry)
-        from railway_pavement import bake as bake_railway_pavement
+        from railway_pavement import bake as bake_railway_pavement, relocate_daylight_lamps
         new_pavement = bake_railway_pavement(output,chunks,protected_grades,tunnels)
         from railway_clearance import fit_rendered_underpasses
         new_pavement.extend(fit_rendered_underpasses(output,manifest,rail_crossings))
+        relocate_daylight_lamps(output,chunks,tunnels)
         protected_grades.mark_pavement(new_pavement)
         from railway_vegetation import plant_graded_approaches
         plant_graded_approaches(output,manifest,protected_grades)
