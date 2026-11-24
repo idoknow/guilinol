@@ -4,6 +4,7 @@ import './settings.css'
 import {onPrefs, prefs, setPrefs, type StatsPrefs} from './prefs'
 import {ACTIONS, bindingLabel, isCustom, keyLabel, reservedFor, resetBindings, setBinding, type Action} from '../input/keymap'
 import {setViewMode, viewModeLabel} from '../walk/view-mode'
+import {masterVolume,setMasterVolume,rideSoundMuted,setRideSoundMuted,RIDE_SOUND_EVENT} from '../walk/ride-sound-pref'
 
 const STAT_ROWS: [keyof StatsPrefs, string, string][] = [
   ['fps', '帧率', '读数条里的每秒帧数（FPS）'],
@@ -25,6 +26,10 @@ function build() {
   mask.innerHTML = `<div class="about-panel settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
     <header><h2 id="settings-title">设置</h2><button type="button" class="about-close" aria-label="关闭">关闭</button></header>
     <div class="set-body">
+      <section class="set-block"><h3>声音</h3>
+        <label class="set-row">总音量<input data-volume type="range" min="0" max="1" step="0.01"></label>
+        <label class="set-row">静音<input data-mute type="checkbox"></label>
+      </section>
       <section class="set-block">
         <h3>读数显示</h3>
         ${STAT_ROWS.map(([id, label, hint]) => `<label class="set-row">
@@ -59,6 +64,10 @@ function build() {
     </div>
   </div>`
   const emotes=mask.querySelector<HTMLInputElement>('[data-emotes]')!
+  const volume=mask.querySelector<HTMLInputElement>('[data-volume]')!,mute=mask.querySelector<HTMLInputElement>('[data-mute]')!
+  volume.value=String(masterVolume());volume.oninput=()=>setMasterVolume(volume.valueAsNumber)
+  mute.checked=rideSoundMuted();mute.onchange=()=>setRideSoundMuted(mute.checked)
+  window.addEventListener(RIDE_SOUND_EVENT,()=>{mute.checked=rideSoundMuted()})
   emotes.checked=localStorage.getItem('glol.emotes')!=='0'
   emotes.onchange=()=>localStorage.setItem('glol.emotes',emotes.checked?'1':'0')
   const close = () => {

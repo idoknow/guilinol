@@ -24,6 +24,7 @@ import {currentAvatar,characterModel,disposeCharacterParts,styleCharacter} from 
 import {avatar} from '../look/avatar'
 import {bikeConfig, carConfig, walkConfig as cfg, type CarDriveMode, type EbikeHeadlightMode, type EbikeTurnSignal, type EbikeUpgradeMods} from './config'
 import {createPhysics} from './physics'
+import {playerSupport} from './support'
 import {
   buildTianyuanObstacleVolume,
   TIANYUAN_VOLUME_ID,
@@ -1192,19 +1193,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const still={right:0,forward:0,run:false,crouch:false,jump:false}
   function setSnap(on:boolean){if(snapEnabled===on)return;snapEnabled=on;if(on)sim.controller.enableSnapToGround(cfg.snap);else sim.controller.disableSnapToGround()}
   function resetMotion(){vx=vz=velocity=coyoteTimer=jumpTimer=bankLean=strideLean=prevSpeed=jumpStageTimer=0;grounded=false;wasGroundedFoot=true;crouching=false;wasLandmarkHit=false;jumpStage='none';setSnap(true);figure.rotation.x=figure.rotation.z=0;if(traveller)traveller.rotation.set(0,0,0)}
-  function supportAt(x:number,z:number,refY:number){
-    const deck=sim.surface(x,z,'deck',refY+.35,1.4)
-    const validDeck=deck&&deck.y<=refY+.35?deck:null
-    return validDeck??sim.surface(x,z,'sidewalk')??sim.surface(x,z,'road')??sim.surface(x,z,'ground')
-  }
-  function carSupportAt(x:number,z:number,refY:number){
-    const deck=sim.surface(x,z,'deck',refY+.55,1.8)
-    const validDeck=deck&&deck.y<=refY+.55?deck:null
-    const lm=sim.surface(x,z,'landmark',refY+.55,1.8)
-    const validLm=lm&&lm.y<=refY+.55&&lm.slope<=cfg.slope?lm:null
-    const bridgeHit=validDeck&&validLm?(validLm.y>validDeck.y?validLm:validDeck):(validDeck??validLm)
-    return bridgeHit??sim.surface(x,z,'road')??sim.surface(x,z,'ground')??sim.surface(x,z,'sidewalk')
-  }
+  const {supportAt,carSupportAt}=playerSupport(sim)
   function loadRides(){if(loading||rides||!active||!manifest.vehicles)return;loading=true
     const file=manifest.vehicles.file
     void import('./vehicles').then(module=>module.vehicles(scene,file,(x,z,bikeHeading,bikeY,kind)=>{sim.sync(x,z)
@@ -2713,7 +2702,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function findUnstuck(from?:{x:number,z:number}){if(!active)return null;const p=from??rides?.boat?.position??sim.body.translation();sim.sync(p.x,p.z);const spot=sim.findFlatGround(p.x,p.z)
     if(verify)spawns.push({reason:'unstuck-probe',from:[p.x,p.z],to:spot?[spot.x,spot.z]:null,distance:spot?Math.hypot(spot.x-p.x,spot.z-p.z):null,rule:spot?.rule??'none'})
     return spot&&{x:spot.x,z:spot.z,distance:Math.hypot(spot.x-p.x,spot.z-p.z),rule:spot.rule}}
-  return {emote,get net(){return net},photoSupport,enter,leave,tick,findUnstuck,get destination(){return destination},spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
+  return {supportAt,carSupportAt,emote,get net(){return net},photoSupport,enter,leave,tick,findUnstuck,get destination(){return destination},spawns,probe,boatClearance,parked(kind?:import('./ride').RideKind|'car'){return rides?.parked(kind)??[]},get freeMoorings(){return rides?.freeMoorings()??[]},get boatKind(){return rides?.freeKind??null},get obstacle(){return bikeObstacle},get vehicle(){return rides?.car?'car':rides?.bike?(rides.rideKind==='bicycle'?'bicycle':'bike'):rides?.boat?'boat':'foot'},get heading(){return rides?.heading??0},get speed(){return rides?.speed??0},get active(){return active},drive(x:number,z:number,run=true){external={x,z,run}},
     ebike:{
       get state(){return ebikeState},
       triggerCrash(reason:Exclude<EbikeCrashReason,''>='lowside',side:-1|1=1){if(rides?.bike)triggerTwoWheelCrash(reason,side)},

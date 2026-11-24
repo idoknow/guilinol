@@ -455,6 +455,8 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     get trafficCount(){return (scene.getObjectByName('G2 traffic') as THREE.InstancedMesh|undefined)?.count??0},
     get trafficProbe(){return scene.getObjectByName('G2 traffic')?.userData},
     async trafficPixels(){return (await import('./traffic/visibility-probe')).pixelVisible(renderer,scene,camera)},
+    async motorPixelCounts(){return (await import('./traffic/visibility-probe')).motorPixelCounts(renderer,scene,camera)},
+    stepStreetTraffic(){if(!params.has('verify')||walker?.active||!trafficTick)throw Error('Street traffic probe unavailable');trafficTick(.05)},
     get renderRange(){return rangeStore.getConfig()},
     get rangeMetrics(){return rangeStore.getMetrics()},
     setRenderRange(next:unknown, persist=false){return stream.setRenderRange(next as number|string,{persist})},
@@ -543,7 +545,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       const showTraffic=trafficEnabled(getPlayMode(),trafficOverride)
       if(showTraffic&&!trafficRequested && camera.position.y<250 && !stream.pending.size){
         trafficRequested=true
-        void import('./traffic').then(mod=>mod.traffic(scene,camera,params.has('verify'))).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
+        void import('./traffic').then(mod=>mod.traffic(scene,camera,params.has('verify'),(x,z,y,car)=>(car?walker?.carSupportAt(x,z,y):walker?.supportAt(x,z,y))?.y)).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
       }
       trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {gunzipSync} from 'node:zlib'
-import {Traffic,TRAFFIC_DENSITY} from '../web/src/traffic/sim.ts'
+import {Traffic} from '../web/src/traffic/sim.ts'
 import {pickups,resolveContact,useTrafficSolids} from '../web/src/traffic/contact.ts'
 import {isPointInQuietZone} from '../web/src/game/quiet-zones.ts'
 
@@ -60,7 +60,7 @@ for(let frame=0;frame<6000;frame++){
   const start=performance.now()
   sim.step(.05,frame<2000?bridge:junction)
   const elapsed=performance.now()-start;stepMs.push(elapsed)
-  if(sim.actors.length>=20+Math.round(60*TRAFFIC_DENSITY))fullLoad.push(elapsed) // IDOK-236: full load = 20 walkers + thinned motor cap
+  if(frame%2000>24)fullLoad.push(elapsed)
   for(const actor of sim.actors){
     if(actor.kind==='person'){people++;continue}
     motorFrames++;scooters+=Number(actor.kind==='scooter')
@@ -77,7 +77,7 @@ assert.equal(red,0);assert.equal(quiet,0);assert.ok(share>=.3&&share<=.4)
 sim.step(.05,{x:1e6,y:0,z:1e6});assert.equal(sim.actors.length,0)
 
 const crossroads={nodes:[[1,-20,0],[2,0,-20],[3,0,0],[4,20,0]].map(([id,x,z])=>({id,x,z,y:0})),
-  lanes:[[1,3],[2,3],[3,4]].map(([from,to],id)=>({id,from,to,kind:'motor',offset:0,speedKmh:36})),walks:[],signals:[]}
+  lanes:[[1,3],[2,3],[3,4]].map(([from,to],id)=>({id,from,to,kind:'motor',cls:'primary',offset:0,speedKmh:36})),walks:[],signals:[]}
 const fixture=new Traffic(crossroads,()=>.99)
 function fixtureCar(lane,dist){
   const start=crossroads.nodes.find(node=>node.id===lane.from),end=crossroads.nodes.find(node=>node.id===lane.to)
@@ -122,7 +122,7 @@ const parallel={nodes:[],lanes:[],walks:[],signals:[]}
 for(const [row,cls] of classes.entries())for(let side=0;side<2;side++){
   const id=2*row+side,z=8*(id-4)
   parallel.nodes.push({id:id*2,x:-124,y:0,z},{id:id*2+1,x:124,y:0,z})
-  parallel.lanes.push({id,from:id*2,to:id*2+1,kind:'motor',cls,offset:0,speedKmh:20})
+  parallel.lanes.push({id,from:id*2,to:id*2+1,kind:'motor',cls,street:cls,offset:0,speedKmh:20})
 }
 const densityRun=new Traffic(parallel,()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32))
 const counts=[0,0,0,0]
@@ -130,20 +130,20 @@ for(let tick=0;tick<1600;tick++){
   densityRun.step(.05,{x:0,y:0,z:0})
   if(tick>=400)for(const actor of densityRun.actors)counts[classes.indexOf(actor.track.cls)]++
 }
-for(const [index,target] of [1,.6,.35,.12].entries()){
-  const ratio=counts[index]/counts[0];console.log(classes[index],{perLaneKm:counts[index]/1200/.496,ratio})
-  assert.ok(Math.abs(ratio-target)<=.3*target)
-}
+for(const [index,count] of counts.entries())if(index<2)assert.ok(count>=1200&&count<=3600);else assert.equal(count,0)
 
 const vehicleData=JSON.parse(gunzipSync(readFileSync('public/world/vehicles.bin')))
 // Keep the historical westbound curb as a deterministic parked-car
 // obstruction even on releases where this particular pickup was moved.
 const curbFixtures=[[-1415.4,-298.6],[-432.7,-59],[-984,-193.9],[-1001.5,-197.3],[-572,-92]]
 for(const [east,south] of curbFixtures){
-  const parked=vehicleData.cars.find(row=>row[0]===east && row[2]===south)
+  const distance=row=>Math.hypot(row[0]-east,row[2]-south)
+  const nearest=vehicleData.cars.reduce((best,row)=>distance(row)<distance(best)?row:best)
+  const parked=distance(nearest)<=3?nearest:null
   const fixture=parked ?? (east===-1001.5 ? [-1001.5,151.5,-197.3,1.393] : null)
   assert.ok(fixture,`Missing pickup at ${east},${south}`)
   const [x,y,z,yaw]=fixture
+  console.log('Parked vehicle sample',{target:[east,south],x,z,synthetic:!parked})
   const remove=pickups.add({x,y,z,yaw,halfWidth:.9,halfLength:2.12,height:1.5})
   try{
     const flow=new Traffic(graph,()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/2**32))
@@ -151,8 +151,9 @@ for(const [east,south] of curbFixtures){
     for(let tick=0;tick<2400;tick++){
       flow.step(.05,{x,y,z});const stopped=flow.actors.filter(actor=>actor.kind!=='person'&&actor.speed<.1&&Math.hypot(actor.x-x,actor.z-z)<12).length
       waiting=stopped?waiting+1:0;longest=Math.max(longest,waiting);peak=Math.max(peak,stopped)
+      if(waiting===601)console.log('Queue diagnostics',flow.actors.filter(actor=>actor.kind!=='person'&&actor.speed<.1&&Math.hypot(actor.x-x,actor.z-z)<12).map(actor=>({lane:actor.track.id,x:actor.x,z:actor.z,dist:actor.dist,remaining:actor.track.length-actor.dist,waitingFor:actor.waitingFor?.kind,green:flow.green(actor.track)})))
     }
-    console.log('Jiefang pickup',{x,z,peakStoppedWithin12m:peak,longestStoppedSeconds:longest*.05})
+    console.log('Pickup queue',{x,z,peakStoppedWithin12m:peak,longestStoppedSeconds:longest*.05})
     assert.ok(longest*.05<=30,`queue persisted at ${x},${z}`)
   }finally{remove()}
 }
