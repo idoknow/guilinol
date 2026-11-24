@@ -2,7 +2,30 @@ import * as THREE from 'three'
 import type {Tile} from './world'
 
 type Point=[number,number,number]
-export type Tunnel={way:number,generated?:boolean,portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,mouths?:[boolean,boolean],joints?:({ring:[number,number][],draw:boolean}|null)[],stations:[number,number][]}
+export type Tunnel={way:number,generated?:boolean,portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,mouths?:[boolean,boolean],joints?:({ring:[number,number][],draw:boolean}|null)[],stations?:[number,number][],stationHeights?:string}
+
+// Generated strips use three fixed easing samples per interval. Keep distant
+// strips encoded in the manifest and unpack only a visited strip's levels.
+type StationProfile = {count:number;at:(index:number)=>[number,number]}
+const profiles = new WeakMap<Tunnel,StationProfile>()
+const easingFractions=[0,.06,.94]
+function profile(tunnel:Tunnel):StationProfile {
+  let value=profiles.get(tunnel)
+  if(value)return value
+  if(tunnel.stations){
+    const values=tunnel.stations
+    value={count:values.length,at:index=>values[index]}
+  }else{
+    const bytes=atob(tunnel.stationHeights!)
+    const view=new DataView(Uint8Array.from(bytes,c=>c.charCodeAt(0)).buffer)
+    const count=view.byteLength/4,last=count-1,step=tunnel.length/(last/3)
+    value={count,at:index=>index===last
+      ?[tunnel.length,tunnel.portals[1][1]]
+      :[Math.round(step*(Math.floor(index/3)+easingFractions[index%3])*1e5)/1e5,view.getInt32(index*4,true)/1e5]}
+  }
+  profiles.set(tunnel,value)
+  return value
+}
 
 function frame(tunnel:Tunnel){
   const [start,end]=tunnel.portals, ux=(end[0]-start[0])/tunnel.length,uz=(end[2]-start[2])/tunnel.length
@@ -46,10 +69,10 @@ export function floorLevel(tunnel:Tunnel,x:number,z:number){
     }
     return
   }
-  const values=tunnel.stations
-  let lo=0,hi=values.length-1
-  while(hi-lo>1){const mid=(lo+hi)>>>1;if(values[mid][0]<=at)lo=mid;else hi=mid}
-  const [a,low]=values[lo],[b,high]=values[hi]
+  const values=profile(tunnel)
+  let lo=0,hi=values.count-1
+  while(hi-lo>1){const mid=(lo+hi)>>>1;if(values.at(mid)[0]<=at)lo=mid;else hi=mid}
+  const [a,low]=values.at(lo),[b,high]=values.at(hi)
   return low+(high-low)*(at-a)/(b-a)
 }
 export function tunnelFloor(tunnels:Tunnel[]|undefined,x:number,z:number,foot:number){
@@ -69,7 +92,10 @@ export function treeBlocked(x:number,y:number,z:number){
     const axes=frame(tunnel),at=axes.station(x,z),side=Math.abs(axes.lateral(x,z))
     if(at< -6||at>tunnel.length+6||side>tunnel.halfWidth+3)continue
     const open=(tunnel.mouths?.[0]!==false&&at<tunnel.approach+2)||(tunnel.mouths?.[1]!==false&&at>tunnel.length-tunnel.approach-2)
-    const index=Math.max(0,tunnel.stations.findIndex(([s])=>s>=at)),floor=tunnel.stations[Math.min(index,tunnel.stations.length-1)][1]
+    const values=profile(tunnel)
+    let lo=0,hi=values.count-1
+    while(lo<hi){const mid=(lo+hi)>>>1;if(values.at(mid)[0]<at)lo=mid+1;else hi=mid}
+    const floor=values.at(lo)[1]
     if(open||y<floor+tunnel.clearance+.6)return true
   }
   return false
@@ -138,8 +164,9 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
       quad(joint.ring.map(([x,z])=>[x-tile.x,floor,z-tile.z]),'floor')
       if(!tunnel.mouths?.[i])quad(joint.ring.map(([x,z])=>[x-tile.x,floor+head,z-tile.z]),'ceiling')
     }
-    for(let i=1;i<tunnel.stations.length;i++){
-      const [a,ay]=tunnel.stations[i-1],[b,by]=tunnel.stations[i]
+    const values=profile(tunnel)
+    for(let i=1;i<values.count;i++){
+      const [a,ay]=values.at(i-1),[b,by]=values.at(i)
       const open=(tunnel.mouths?.[0]!==false&&(a+b)/2<tunnel.approach)||(tunnel.mouths?.[1]!==false&&(a+b)/2>tunnel.length-tunnel.approach)
       const al=local(a,-width,ay),ar=local(a,width,ay),bl=local(b,-width,by),br=local(b,width,by)
       quad([al,ar,br,bl],'floor')

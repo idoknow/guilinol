@@ -1,9 +1,17 @@
 """Build the negative-layer lane network from the same OSM ways used by traffic."""
+import base64
+import struct
 from collections import defaultdict
 import math
 
 from shapely.geometry import MultiPoint
 from heapq import heapify, heappop, heappush
+
+
+def pack_stations(stations):
+    """Interior station offsets are fixed by the easing samples at 0, .06, .94."""
+    levels = [round(y * 100000) for _, y in stations]
+    return base64.b64encode(struct.pack(f'<{len(levels)}i', *levels)).decode('ascii')
 
 
 def underground(tags):
@@ -155,7 +163,7 @@ def solve(network, nodes, samples):
                               halfWidth=edge['halfWidth'],clearance=edge['clearance'],
                               portals=[[start['x'],levels[0],start['z']],
                                        [end['x'],levels[-1],end['z']]],
-                              mouths=[a in mouths,b in mouths],approach=approach,stations=stations))
+                              mouths=[a in mouths,b in mouths],approach=approach,stationHeights=pack_stations(stations)))
     # Fill the wedge between the two end sections on the outside of a bend.
     # All incident strips share the node elevation. Only one draws the patch.
     incident=defaultdict(list)

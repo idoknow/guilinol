@@ -11,7 +11,7 @@ from landmarks.world_surface import Surface
 
 def measure(world, reference=None):
     surface = Surface(world)
-    tunnel, = json.loads((world/'manifest.json').read_bytes())['tunnels']
+    tunnel, = (t for t in json.loads((world/'manifest.json').read_bytes())['tunnels'] if t['way']==237985762)
     assert tunnel['profile_source']=='estimated' and tunnel['way']==237985762
     west, east = np.array(tunnel['portals'])
     assert west[1]==266.3 and east[1]==264.1
