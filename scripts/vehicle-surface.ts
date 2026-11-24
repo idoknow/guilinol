@@ -53,7 +53,7 @@ function tileSurface(world,entry,tunnels){
     const i=(row*65+col)*s,u=x/step-col,v=z/step-row,a=grid[i],b=grid[i+s],c=grid[i+s*65],d=grid[i+s*66]
     return u+v<=1?a+(b-a)*u+(c-a)*v:d+(c-d)*(1-u)+(b-d)*(1-v)
   }
-  const roads=streetGeometry(paths,ground).road
+  const streets=streetGeometry(paths,ground),roads=streets.road
   joinPortalRoads(entry,tunnels,[roads])
   const modified=bed&&new Set(bed.drop),replacement=bed&&new Triangles(bedPositions(bed))
   function visibleGround(x,z){
@@ -64,10 +64,39 @@ function tileSurface(world,entry,tunnels){
     const hits=replacement.hits(x,z)
     return hits.length?Math.max(...hits):ground(x,z)
   }
-  return {ground:visibleGround,road:new Triangles(roads),deck:new Triangles(Float32Array.from({length:triangles*9},(_,i)=>data.readInt16LE(deckStart+2*i)/100))}
+  return {ground:visibleGround,sidewalk:new Triangles(streets.sidewalk),road:new Triangles(roads),deck:new Triangles(Float32Array.from({length:triangles*9},(_,i)=>data.readInt16LE(deckStart+2*i)/100))}
 }
 
-export function vehicleSurface(world,m){
+// Follow the connected carriageway when a wheel extends across a joint.
+// A deck crossing above an unrelated road does not share an OSM endpoint.
+function bridgeConnections(graph){
+  const nodes=new Map(graph.nodes.map(n=>[n.id,n]))
+  const links=new Map()
+  for(const lane of graph.lanes){
+    if(lane.structure!=='bridge')continue
+    for(const [a,b] of [[lane.from,lane.to],[lane.to,lane.from]]){
+      if(!links.has(a))links.set(a,new Map())
+      const spans=links.get(a),p=nodes.get(a),q=nodes.get(b),width=Math.abs(lane.offset)+lane.width/2+.5
+      if(!spans.has(b)||spans.get(b).width<width)spans.set(b,{p,q,width})
+    }
+  }
+  return (lane,x,z)=>{
+    if(lane.structure||lane.from===undefined)return false
+    for(const node of [lane.from,lane.to]){
+      const spans=links.get(node)
+      if(!spans)continue
+      for(const {p,q,width} of spans.values()){
+        const dx=q.x-p.x,dz=q.z-p.z,length=Math.hypot(dx,dz)
+        const along=((x-p.x)*dx+(z-p.z)*dz)/length
+        if(along>=0&&along<=Math.min(length,8)&&Math.abs((x-p.x)*dz-(z-p.z)*dx)<=width*length)return true
+      }
+    }
+    return false
+  }
+}
+
+export function vehicleSurface(world,m,graph?){
+  const reachesDeck=graph?bridgeConnections(graph):undefined
   const chunks=new Map(m.chunks.map(e=>[e.x+','+e.z,e])),cache=new Map()
   const tunnels=m.tunnels??[],landmarks=new Map<string,any[]>()
   const roles=JSON.parse(fs.readFileSync('pipeline/seam-surfaces.json','utf8'))
@@ -124,7 +153,7 @@ export function vehicleSurface(world,m){
         }
       }else if(diagnostic)diagnostic.missingFloor=true
     }
-    const terrain=tile.ground(lx,lz),road=Math.max(...tile.road.hits(lx,lz))
+    const terrain=tile.ground(lx,lz),road=Math.max(...tile.road.hits(lx,lz),...(lane.pedestrian?tile.sidewalk.hits(lx,lz):[]))
     let y=Math.max(terrain,road)
     for(const mesh of landmarks.get(key)??[]){
       if(mesh.bikeDeck&&lane.way!==1531308751&&lane.way!==1531308752)continue
@@ -136,7 +165,7 @@ export function vehicleSurface(world,m){
         if(lower<y+2)y=Math.max(y,lower)
       }else y=Math.max(y,...hits)
     }
-    if(lane.structure==='bridge'){
+    if(lane.structure==='bridge'||reachesDeck?.(lane,x,z)){
       const deck=Math.max(...tile.deck.hits(lx,lz))
       if(diagnostic)diagnostic.deck=deck
       y=Math.max(y,deck)

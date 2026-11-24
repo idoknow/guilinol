@@ -13,7 +13,7 @@ import {contactPose} from '../web/src/traffic/lane-surface'
 const dist=path.resolve(process.env.GROUNDING_DIST??'dist'),world=path.join(dist,'world')
 const packed=(file:string)=>JSON.parse(gunzipSync(fs.readFileSync(world+'/'+file)).toString())
 const graph=packed('roads/graph.json.gz'),vehicles=packed('vehicles.bin')
-const surface=vehicleSurface(world,JSON.parse(fs.readFileSync(world+'/manifest.json','utf8')))
+const surface=vehicleSurface(world,JSON.parse(fs.readFileSync(world+'/manifest.json','utf8')),graph)
 const nodes=new Map(graph.nodes.map(node=>[node.id,node]))
 const cases=sites.filter(([name])=>!process.env.GROUNDING_SITE||name===process.env.GROUNDING_SITE).map(([name,id,f])=>{
   const lane=graph.lanes.find(l=>l.id===id),a=nodes.get(lane.from),b=nodes.get(lane.to)

@@ -13,11 +13,14 @@ from shapely.geometry import LineString, Polygon
 from shapely.ops import unary_union
 from shapely.prepared import prep
 
+from corridor_objects import relocate
+from portal_paving import trim as trim_portal_paving, restore as restore_portal_paving
+from portal_routes import permits, routes as portal_routes
 from common import OUT, ll2xz, load_osm
 from road_tunnels import clear_approach_paving
 from station_road_corridor import bake as bake_station_corridor
 from surveyed_corridors import bake as bake_surveyed_corridors, restore as restore_corridors
-from vehicle_approaches import plan as plan_approaches, private_access
+from vehicle_approaches import plan as plan_approaches, surface_guides
 from vehicle_tunnels import underground, sections as tunnel_sections, solve as solve_tunnels
 from service_streets import mark_drivable_services, width as minor_road_width
 from traffic_parking import allowed, bake_parking
@@ -145,6 +148,7 @@ def bake(output, manifest, rendered_roads=None):
     clear_approach_paving(output,manifest['chunks'],[t for t in manifest.get('tunnels',[]) if t['way']==237985762])
     parking_segments = []
     sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
+    restore_portal_paving(output,manifest['chunks'])
     restore_corridors(output,manifest['chunks'])
     bake_station_corridor(output, manifest['chunks'], elements)
     bake_surveyed_corridors(output,manifest['chunks'],elements,sections)
@@ -196,7 +200,7 @@ def bake(output, manifest, rendered_roads=None):
                 for side in (-1,1):
                     if tags['sidewalk'] in ('both','left' if side<0 else 'right'):
                         add_walk(start_id,end_id,side*(count*size/2+1),way['id'],linear)
-            if tags.get('motor_vehicle') in ('private','no') and kind != 'cycleway':
+            if not permits(tags,'bicycle' if kind=='cycleway' else 'car'):
                 continue
             if forbidden.intersects(LineString([start,end]).buffer(count*size/2+2)):
                 continue
@@ -261,7 +265,7 @@ def bake(output, manifest, rendered_roads=None):
         survey_nodes = dict(nodes)
         network = tunnel_sections(lanes,elements,original_tunnels,survey_nodes)
         if network['edges']:
-            guides=private_access(elements,network['portals'],survey_nodes)
+            guides=surface_guides(elements,network['portals'],survey_nodes)
             request.write_text(json.dumps(dict(manifest=manifest,network=network,nodes=list(survey_nodes.values()),guideNodes=sorted({g[k] for g in guides for k in ('from','to')}))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portals',str(output.resolve()),str(request)],check=True,cwd=ROOT)
@@ -271,14 +275,21 @@ def bake(output, manifest, rendered_roads=None):
                    and way['tags'].get('layer','0')=='0' for ref in way['nodes']}
             access,limits=plan_approaches(conflicts,lanes+guides,survey_nodes,{int(k):v for k,v in samples['heights'].items()},fixed,sections)
             bake_surveyed_corridors(output,manifest['chunks'],elements,sections,access,only_approaches=True)
+            trim_portal_paving(output,manifest['chunks'],generated)
             for tunnel in generated:
                 tunnel['gradedAccess']=True
             conflicts.extend(limits)
             manifest['tunnels'] = original_tunnels+generated
-            request.write_text(json.dumps(dict(manifest=manifest,nodes=list(survey_nodes.values()),constraints=conflicts)))
+            request.write_text(json.dumps(dict(manifest=manifest,nodes=list(survey_nodes.values()),constraints=conflicts,pedestrianNodes=sorted({g[k] for g in guides if g['surfaceKind']==1 for k in ('from','to')}))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portal-check',str(output.resolve()),str(request)],check=True,cwd=ROOT)
             (output/'vehicle-tunnel-grades.json').write_bytes(request.read_bytes())
+        if network['edges']:
+            route_file=output/'vehicle-portal-routes.json'
+            route_file.write_text(json.dumps(dict(manifest=manifest,routes=portal_routes(elements,network,survey_nodes))))
+            subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
+                            'portal-routes',str(output.resolve()),str(route_file.resolve())],check=True,cwd=ROOT)
+        print('Roadside relocations:',relocate(output,manifest,elements,surface))
         request.write_text(json.dumps(dict(manifest=manifest,nodes=result['nodes'],lanes=lanes),separators=(',',':')))
         subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                         'bake',str(output.resolve()),str(request)], check=True, cwd=ROOT)

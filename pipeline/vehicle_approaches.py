@@ -10,13 +10,15 @@ from service_streets import width
 from vehicle_tunnels import grade_limit, underground
 
 
-def private_access(elements, portals, nodes):
+def surface_guides(elements, portals, nodes):
     guides=[]
     mouths=set(portals)
     for way in elements:
         tags=way.get('tags',{})
-        if (way['type']!='way' or tags.get('highway')!='service' or tags.get('access')!='private'
-                or tags.get('motor_vehicle')=='no' or underground(tags) or
+        highway=tags.get('highway')
+        pedestrian=highway in ('footway','pedestrian','path','steps')
+        restricted=tags.get('motor_vehicle') in ('private','no') or tags.get('access')=='private'
+        if (way['type']!='way' or not (pedestrian or (highway=='service' and restricted)) or underground(tags) or
                 not mouths.intersection(way['nodes']) or not all(way['geometry'])):
             continue
         for ref,point in zip(way['nodes'],way['geometry'],strict=True):
@@ -24,7 +26,8 @@ def private_access(elements, portals, nodes):
             nodes.setdefault(ref,dict(id=ref,x=round(x,2),z=round(z,2),y=None))
         for a,b in zip(way['nodes'],way['nodes'][1:]):
             if a!=b:
-                guides.append({'from':a,'to':b,'way':way['id'],'cls':'service','width':width(tags),'offset':0})
+                guides.append({'from':a,'to':b,'way':way['id'],'cls':highway,'width':width(tags),'offset':0,
+                               'surfaceKind':1 if pedestrian else 0})
     return guides
 
 
@@ -42,7 +45,7 @@ def plan(conflicts, lanes, nodes, levels, rail_nodes, widths):
         line=LineString([(p['x'],p['z']),(q['x'],q['z'])])
         cap=grade_limit(lane['cls'])
         half=widths.get(lane['way'],max(lane['width'],2*abs(lane['offset'])+lane['width']))/2+.5
-        links[key]=(line,cap,half)
+        links[key]=(line,cap,half,lane.get('surfaceKind',0))
         for i,j in [(a,b),(b,a)]:
             adjacency[i].append((j,key))
     targets={}
@@ -63,7 +66,7 @@ def plan(conflicts, lanes, nodes, levels, rail_nodes, widths):
         if y!=targets[k]:
             continue
         for j,key in adjacency[k]:
-            line,cap,half=links[key]
+            line,cap,half,kind=links[key]
             dest=levels.get(j,nodes[j].get('y'))
             # Reserve part of the slope for the vertical curves at each end.
             limit=y+line.length*cap*.85
@@ -83,7 +86,7 @@ def plan(conflicts, lanes, nodes, levels, rail_nodes, widths):
     result=[]
     for key in sorted(spans):
         a,b,way=key
-        line,cap,half=links[key]
+        line,cap,half,kind=links[key]
         ya=targets.get(a,levels.get(a,nodes[a].get('y')))
         yb=targets.get(b,levels.get(b,nodes[b].get('y')))
         if abs(yb-ya)>cap*line.length+.001:
@@ -92,5 +95,5 @@ def plan(conflicts, lanes, nodes, levels, rail_nodes, widths):
             failed.append(dict(reason='surfaceGradeLimit',way=way,start=a,end=b,
                                length=line.length,grade=abs(yb-ya)/line.length,limit=cap))
             continue
-        result.append((line,half,ya,yb,cap))
+        result.append((line,half,ya,yb,cap,kind))
     return result,failed
