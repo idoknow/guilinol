@@ -111,7 +111,8 @@ function evidence(detail) {
       .slice(1)
       .map((item) => item.message),
   }
-  const token=detail.view?Buffer.from(JSON.stringify(detail.view)).toString('base64url'):null
+  const {diagnostic:_diagnostic,...pose}=detail.view??{}
+  const token=detail.view?Buffer.from(JSON.stringify(pose)).toString('base64url'):null
   const replay=token?`\n\n游戏视角：https://glol.rcpd.cc/?view=${token}\n\n本地 Playwright 复现（baseURL 指向本地预览）：\n\n\`\`\`js\nawait page.goto('/?verify&view=${token}');\nawait page.waitForFunction(() => window.viewer?.stats.loaded > 0 && !window.viewer.stream.pending.size);\nawait page.screenshot({path:'before.png'});\n\`\`\`\n`:''
   return '**待管理员批准，批准前只沟通、不派发、不建模**。先阅读 docs/feedback-coordinator.md；以下建模步骤仅在收到管理员开工通知后执行。\n\n'+replay+template.replace('{{EVIDENCE}}', () =>
     JSON.stringify(data, null, 2)

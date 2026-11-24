@@ -700,7 +700,7 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
           if (selection) {
             const response = await fetch(`/api/feedback/${id}/view-shot`, {
               method: 'PUT',
-              headers: { 'Content-Type': 'image/jpeg', 'X-Feedback-View': JSON.stringify(selection.view) },
+              headers: { 'Content-Type': 'image/jpeg', 'X-Feedback-View': JSON.stringify(selection.view).replace(/[^\x20-\x7e]/g,char=>'\\u'+char.charCodeAt(0).toString(16).padStart(4,'0')) },
               body: selection.shot,
             })
             if (!response.ok) throw Error((await response.json()).error.message)
