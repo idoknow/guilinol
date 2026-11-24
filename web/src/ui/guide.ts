@@ -30,7 +30,7 @@ function rows(ctx: Ctx): Row[] {
       {keys: [k('interact')], label: '上车 / 交互'}, {keys: [k('emote')], label: '表情（长按）', id: 'emote'},
       {keys: ['L'], label: '叫共享电驴', solo: true}, {keys: ['O'], label: '随身衣橱', solo: true},
       {keys: [k('view')], label: '第一 / 第三人称'}, {keys: ['V'], label: '起飞', free: true},
-      {keys: ['M'], label: '地图'}, {keys: ['P'], label: '拍照'},
+      {keys: ['1', '2'], label: '空手 / 相机'}, {keys: ['M'], label: '地图'}, {keys: ['P'], label: '拍照'},
     ]
     case 'fly': return [
       {keys: move(), label: '飞'}, {keys: ['Q', 'E'], label: '降 / 升'},

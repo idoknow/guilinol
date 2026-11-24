@@ -348,7 +348,6 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
     host.clock.flowing = saved.flowing
     host.walker()?.hold(false)
     host.walker()?.showFigure(true)
-    setCameraShown(true, host.walker())
     host.camera.fov = saved.fov
     host.camera.updateProjectionMatrix()
     host.renderer.domElement.style.filter = ''

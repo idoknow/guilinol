@@ -13,6 +13,7 @@ import {getState, onState} from '../game/state'
 import {mountLandscapeEntry} from '../ui/orientation'
 import {mountSettingsEntry,mountViewEntry} from '../ui/settings'
 import {bindRackGuard,isRackOpen,mountRackEntry} from '../ui/gear-rack'
+import {hotbarSlot,mountHotbar,riding,showHotbar} from '../ui/hotbar'
 import {setCameraShown} from '../gear/hand'
 
 const KEY = 'glol.stamps', ARRIVE = 12, REARM = 40, MARK_LAYER = 2
@@ -68,6 +69,7 @@ export function play(host:Host) {
   const slot = document.createElement('div'); slot.className = 'dock-mini'
   const buttons = document.createElement('div'); buttons.className = 'dock-buttons'
   buttons.append(book,shutter); dock.append(slot,buttons); document.body.append(dock)
+  mountHotbar()
   const modeButton = document.querySelector<HTMLButtonElement>('.btn-mode')
   if(modeButton) buttons.prepend(modeButton)
   function button(text:string,label:string,cls:string){const b = document.createElement('button'); b.className = cls; b.textContent = text
@@ -275,10 +277,11 @@ export function play(host:Host) {
     pulse += dt
     if(!mapRequested&&pulse>mapRetryAt){mapRequested = true; loadMap()}
     const walker = host.walker(), walking = !!walker?.active, p = walking?walker!.position:host.camera.position
-    // IDOK-182/188: 手上的相机只在徒步取景时出现；拍照/飞行/看相机包时收起来。
+    // IDOK-238（Rock）：默认空手、手臂跟走路动画；底部物品栏切到「相机」才拿机身、抬到胸前。
     // 每帧都喂一次 setCameraShown：walker 是首帧之后才拿到的，只在状态翻转时调用会漏掉持机姿势。
-    const camOn = walking && !photo.active && !isRackOpen()
-    setCameraShown(camOn, walker)
+    const onFoot = walking && !photo.active && !isRackOpen() && !riding()
+    showHotbar(onFoot)
+    setCameraShown(onFoot && hotbarSlot() === 'camera', walker)
     for(const m of marks) {
       const d = Math.hypot(m.spot.x-p.x,m.spot.z-p.z)
       if(Number.isNaN(m.ground)&&d<600) m.ground = groundAt(m.spot.x,m.spot.z)
