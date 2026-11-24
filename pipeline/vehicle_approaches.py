@@ -5,6 +5,7 @@ import math
 
 from shapely import STRtree
 from shapely.geometry import LineString, Point
+import numpy as np
 from road_profile import RULES
 
 from common import ll2xz
@@ -32,11 +33,27 @@ def surface_guides(elements, portals, nodes, chunks):
         for a,b,p,q in zip(way['nodes'],way['nodes'][1:],coords,coords[1:]):
             if a==b or math.dist(p,q)<.05:continue
             segment=LineString([p,q])
-            if any((math.floor(x/256),math.floor(z/256)) not in loaded for x,z in (p,q)):continue
             if not len(mouths.query(segment,predicate='dwithin',distance=60)):continue
-            for ref,(x,z) in ((a,p),(b,q)):
+            ids=[a,b]; coords=[p,q]
+            inside=[(math.floor(x/256),math.floor(z/256)) in loaded for x,z in coords]
+            if inside.count(True)==1:
+                # An OSM edge can continue beyond the delivered world. Keep
+                # its physical approach up to the boundary of loaded terrain.
+                start=inside.index(True);end=1-start
+                line=LineString([coords[start],coords[end]])
+                stations=np.arange(1,min(line.length,256)+1,1.)
+                last=0.
+                for d in stations:
+                    pt=line.interpolate(d)
+                    if (math.floor(pt.x/256),math.floor(pt.y/256)) not in loaded:break
+                    last=d
+                if last<2:continue
+                coords[end]=line.interpolate(last-.1).coords[0]
+                ids[end]=-(4_000_000_000_000_000+way['id']*1000+len(guides))
+            elif not all(inside):continue
+            for ref,(x,z) in zip(ids,coords,strict=True):
                 nodes.setdefault(ref,dict(id=ref,x=round(x,2),z=round(z,2),y=None))
-            guides.append({'from':a,'to':b,'way':way['id'],'cls':highway,'width':paved,'offset':0,
+            guides.append({'from':ids[0],'to':ids[1],'way':way['id'],'cls':highway,'width':paved,'offset':0,
                            'surfaceKind':1 if pedestrian else 0})
     return guides
 
@@ -135,3 +152,39 @@ def portal_openings(tunnels, elements, widths):
                         continue
                     half=min(t['halfWidth'],widths.get(way['id'],width(tags))/2)
                     t.setdefault('openings',[]).append([end,round(dx/length,5),round(dz/length,5),round(half,2)])
+
+def cycleway_deck_profile(output,manifest,elements,network,widths):
+    """The grain-yard cycleway passes under a second deck outside its mouth."""
+    from canal_passages import sample_road_heights
+    from features import points
+    w=next((w for w in elements if w['type']=='way' and w['id']==1028568322),None)
+    mouth=9482704290
+    if not w or mouth not in network['portals']:return None
+    xy=points(w)
+    if w['nodes'][-1]==mouth:xy.reverse()
+    elif w['nodes'][0]!=mouth:return None
+    line=LineString(xy);half=widths.get(w['id'],width(w['tags']))/2+.5
+    ds=sorted({0.,line.length,*np.arange(1,line.length),*(line.project(Point(p)) for p in xy)})
+    pts=[line.interpolate(d) for d in ds];requests=[]
+    for d,pt in zip(ds,pts):
+        a=line.interpolate(max(0,d-.1));b=line.interpolate(min(line.length,d+.1))
+        direction=np.subtract(b.coords[0],a.coords[0]);direction/=np.linalg.norm(direction)
+        for off in (-half+.1,0,half-.1):
+            requests.append(dict(x=pt.x-direction[1]*off,z=pt.y+direction[0]*off,roofProbe=True))
+    hits=sample_road_heights(output,manifest,requests)
+    upper=[];native=[];cap=.08*.85
+    for i,d in enumerate(ds):
+        row=hits[3*i:3*i+3];native.append(row[1][0])
+        # GL04's thickest deck fascia extends 1.2 m below its top.
+        upper.append(min((deck-1.2-2.55 for _,deck in row if deck is not None),default=math.inf))
+    ys=np.minimum(native,upper)
+    for i in range(len(ds)-2,-1,-1):ys[i]=min(ys[i],ys[i+1]+cap*(ds[i+1]-ds[i]))
+    return mouth,pts,ds,ys,half,cap
+
+
+def cycleway_grades(profile,conflicts):
+    if not profile:return []
+    mouth,pts,ds,ys,half,cap=profile
+    ys[0]=min(ys[0],next((r['floor'] for r in conflicts if r.get('node')==mouth),ys[0]))
+    for i in range(1,len(ds)):ys[i]=min(ys[i],ys[i-1]+cap*(ds[i]-ds[i-1]))
+    return [(LineString([a,b]),half,ya,yb,.08,0) for a,b,ya,yb in zip(pts,pts[1:],ys,ys[1:]) if a.distance(b)>.005]

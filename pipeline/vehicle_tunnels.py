@@ -266,7 +266,7 @@ def solve(network, nodes, samples):
             bound = ceiling-edge['clearance']-.05 if not open_ramp else math.inf
             roofs[key] = min(roofs.get(key, math.inf), ceiling-edge['clearance']-.05)
             if key in mouths:
-                bound = min(bound, heights[key])
+                bound = min(bound, heights[key],samples.get('approachLimits',{}).get(key,math.inf))
             limits[key] = min(limits.get(key,math.inf),bound)
             if i:
                 # Reserve slope for the short eased transitions at each knot.
