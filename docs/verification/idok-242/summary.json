@@ -1,7 +1,7 @@
 {
   "world": "world-a11731a5dafd",
   "main": "27dabe1",
-  "candidateRevision": "7c9084d8a21e09ca63517fe9669c84f3771f644a",
+  "candidateRevision": "1bcea11fdecc1b734c134b714edb98f67ab37318",
   "baseline": {
     "tunnelConstraintRecords": 0,
     "partialTunnelWays": [
@@ -165,148 +165,171 @@
     ]
   },
   "candidate": {
-    "tunnelConstraintRecords": 497,
+    "tunnelConstraintRecords": 47,
+    "gradedApproaches": 431,
     "partialTunnelWays": [],
     "reasons": {
-      "surface": 7147,
+      "surface": 1477,
       "tunnel": 0,
-      "fit": 1080,
-      "hidden": 940
+      "fit": 46,
+      "hidden": 3
     },
     "lanes": 88050,
     "wheelSamples": 7699956,
-    "outliers": 9167,
-    "sunk": 4951,
-    "floating": 4216,
-    "p99": 0.029,
-    "nonplanarFootprints": 1620,
+    "outliers": 1526,
+    "sunk": 771,
+    "floating": 755,
+    "p99": 0.025,
+    "nonplanarFootprints": 300,
     "unresolvedTunnelWays": []
   },
   "byLayer": {
-    "tunnel": 2212,
-    "at-grade": 6532,
-    "bridge": 423
+    "at-grade": 1063,
+    "bridge": 460,
+    "tunnel": 3
   },
   "station": {
     "laneAudit": {
       "lane": 52552,
       "way": 1017598912,
       "kind": "motor",
-      "maximum": 0.003834412737802495,
+      "maximum": 0.0035615083336608677,
       "over": 0,
       "unresolvedTunnelFloor": false
     },
     "historicWheelOutsidePavementMeters": 0.294,
     "bedClearanceMeters": {
       "samples": 26627,
-      "min": 0.07464057891897369,
-      "max": 0.07568720767477544,
+      "min": 0.05063850372366119,
+      "max": 0.051685132479462936,
       "uncovered": 0,
       "worst": {
         "x": -2119.2614115150805,
         "z": 1809.0740761224329
-      },
-      "wheelToFinalCurbMeters": {
-        "samples": 772,
-        "minimum": 0.23772779689373474
       }
     }
   },
   "tunnels": {
-    "ways": 157,
-    "generatedStrips": 620,
-    "missingAnchorComponents": [
+    "ways": 159,
+    "generatedStrips": 624,
+    "openDeadEnds": [
       {
-        "reason": "missingPortalAnchor",
-        "ways": [
-          454117718
-        ],
-        "surfaceNodes": [
-          4507397586
-        ]
+        "way": 454117718,
+        "mouth": 4507397586,
+        "end": 4507397585,
+        "length": 105.961,
+        "endTags": null,
+        "connectingWays": []
       },
       {
-        "reason": "missingPortalAnchor",
-        "ways": [
-          1025797700
-        ],
-        "surfaceNodes": []
+        "way": 1475440133,
+        "mouth": 13535714448,
+        "end": 13535714459,
+        "length": 160.184,
+        "endTags": null,
+        "connectingWays": []
       },
       {
-        "reason": "missingPortalAnchor",
-        "ways": [
-          1417162024
-        ],
-        "surfaceNodes": [
-          13022478448
-        ]
+        "way": 1486208147,
+        "mouth": 13470032643,
+        "end": 13624320357,
+        "length": 154.155,
+        "endTags": null,
+        "connectingWays": []
       },
       {
-        "reason": "missingPortalAnchor",
-        "ways": [
-          1475440133
-        ],
-        "surfaceNodes": [
-          13535714448
-        ]
+        "way": 1489640393,
+        "mouth": 13653844544,
+        "end": 13653844545,
+        "length": 46.874,
+        "endTags": null,
+        "connectingWays": []
       },
       {
-        "reason": "missingPortalAnchor",
-        "ways": [
-          1486208147
-        ],
-        "surfaceNodes": [
-          13470032643
-        ]
+        "way": 1490460395,
+        "mouth": 13660692432,
+        "end": 13660692433,
+        "length": 67.682,
+        "endTags": null,
+        "connectingWays": []
       },
       {
-        "reason": "missingPortalAnchor",
-        "ways": [
-          1489640393
-        ],
-        "surfaceNodes": [
-          13653844544
-        ]
+        "way": 1532928036,
+        "mouth": 13969925689,
+        "end": 13969925690,
+        "length": 184.743,
+        "endTags": null,
+        "connectingWays": []
       },
       {
-        "reason": "missingPortalAnchor",
-        "ways": [
-          1490460395
-        ],
-        "surfaceNodes": [
-          13660692432
-        ]
-      },
-      {
-        "reason": "missingPortalAnchor",
-        "ways": [
-          1493582667
-        ],
-        "surfaceNodes": [
-          13686155912
-        ]
-      },
-      {
-        "reason": "missingPortalAnchor",
-        "ways": [
-          1532928036
-        ],
-        "surfaceNodes": [
-          13969925689
-        ]
-      },
-      {
-        "reason": "missingPortalAnchor",
-        "ways": [
-          1553344902
-        ],
-        "surfaceNodes": [
-          14132572329
-        ]
+        "way": 1553344902,
+        "mouth": 14132572329,
+        "end": 14132572334,
+        "length": 177.559,
+        "endTags": null,
+        "connectingWays": []
       }
     ],
-    "approachNodes": 369,
-    "maximumRequiredCut": 9.983605270218078
+    "surfaceApproachNodes": 354,
+    "surfaceApproachMatched": 331,
+    "surfaceApproachUnmatched": 23,
+    "maximumRemainingDifference": 6.54798738811175,
+    "loopConstraints": [
+      {
+        "way": 1417162024,
+        "roof": 196.54882083210973,
+        "mouth": [
+          10429.688834710547,
+          -3116.594534400053
+        ],
+        "contact": [
+          10467.054908331067,
+          -3117.3194048553696
+        ],
+        "distance": 37.373103898273236,
+        "road": 195.85190497553563,
+        "maxDrop": 2.989848311861859,
+        "deficit": 0.8132358315640431
+      },
+      {
+        "way": 1493582667,
+        "roof": 152.800552573803,
+        "mouth": [
+          4117.298186362064,
+          575.8030475999725
+        ],
+        "contact": [
+          4117.96658190836,
+          609.2517714133529
+        ],
+        "distance": 33.47662316001477,
+        "road": 149.42665246219437,
+        "maxDrop": 2.6781298528011814,
+        "deficit": -1.5520299644098259
+      }
+    ],
+    "loopApproaches": [
+      {
+        "way": 1417162024,
+        "node": 13022478448,
+        "road": 195.85200483536536,
+        "floor": 193.7530651037867,
+        "approachCut": 2.0989397315786675,
+        "finalRoad": 193.75300618079692,
+        "difference": -5.892298977983046e-05,
+        "reason": "gradedApproach"
+      }
+    ],
+    "portalDrive": {
+      "requested": 375,
+      "completed": 97,
+      "fullDistance": 95,
+      "pass": 50,
+      "overLimit": 47,
+      "stalled": 245,
+      "unavailable": 33,
+      "maximum": 3.4645332145690872
+    }
   },
   "trafficCellBytes": {
     "main": {
@@ -316,26 +339,26 @@
     },
     "candidate": {
       "cells": 1170,
-      "total": 14112035,
-      "p99": 50488
+      "total": 14666992,
+      "p99": 52422
     }
   },
   "driving": {
     "passed": 36,
     "attempts": 36,
-    "minimum": -0.051353302228733355,
-    "maximum": 0.04358376776190198
+    "minimum": -0.05135394204853583,
+    "maximum": 0.044847671696686575
   },
   "regressions": {
     "strict": {
       "main": 2922,
-      "candidate": 3388,
+      "candidate": 4132,
       "counts": {
-        "streetOverflow": 0,
-        "buildingOnRoad": 1176,
+        "streetOverflow": 1,
+        "buildingOnRoad": 1227,
         "unevenRoad": 77,
-        "textureIssue": 535,
-        "otherBasic": 1600
+        "textureIssue": 897,
+        "otherBasic": 1930
       }
     },
     "mainExitCodes": {
@@ -361,33 +384,83 @@
     }
   },
   "performance": {
-    "desktopFailed": [
-      [
-        "palace",
-        "heapPeakBytes"
-      ]
-    ],
+    "desktopFailed": [],
     "mobileFailed": [
       [
-        "walk-palace",
-        "calls"
+        "overview",
+        "heap"
       ],
       [
-        "walk-palace",
-        "mirrorCalls"
-      ],
-      [
-        "walk-palace",
-        "geometries"
-      ],
-      [
-        "walk-palace",
-        "textures"
-      ],
-      [
-        "walk-palace",
+        "palace",
         "heap"
       ]
-    ]
+    ],
+    "mobileWalkPalaceAbsolute": {
+      "calls": {
+        "candidate": 68,
+        "limit": 64,
+        "pass": false
+      },
+      "mirrorCalls": {
+        "candidate": 56,
+        "limit": 57,
+        "pass": true
+      }
+    }
+  },
+  "railCrossings": [
+    {
+      "sharedNode": 6533456477,
+      "mode": "foot",
+      "maxJump": 0.005157470703125,
+      "ok": true
+    },
+    {
+      "sharedNode": 6533456477,
+      "mode": "car",
+      "maxJump": 0.0020264225186110707,
+      "ok": true
+    },
+    {
+      "sharedNode": 6533456478,
+      "mode": "foot",
+      "maxJump": 0.0257568359375,
+      "ok": true
+    },
+    {
+      "sharedNode": 6533456478,
+      "mode": "car",
+      "maxJump": 0.047705057207139134,
+      "ok": true
+    },
+    {
+      "sharedNode": 6533456479,
+      "mode": "foot",
+      "maxJump": 0.029144287109375,
+      "ok": true
+    },
+    {
+      "sharedNode": 6533456479,
+      "mode": "car",
+      "maxJump": 0.04510677501841087,
+      "ok": true
+    },
+    {
+      "sharedNode": 6533456480,
+      "mode": "foot",
+      "maxJump": 0.007781982421875,
+      "ok": true
+    },
+    {
+      "sharedNode": 6533456480,
+      "mode": "car",
+      "maxJump": 0.04620208875186904,
+      "ok": true
+    }
+  ],
+  "corridorObjects": {
+    "tree": 255,
+    "lamp": 49,
+    "stop": 1
   }
 }
