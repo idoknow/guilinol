@@ -1536,8 +1536,26 @@ function mergeCard(target: { id: string; email: string }) {
         `把「${from}」并入「${target.email || target.id}」？第三方绑定、存档、流水、反馈都会搬过来，被合并的账号随后删除，操作不可撤销。`),
     })
     if (answer === null) return
-    const result = await api<{ moved: string[]; conflicts: string[]; adopted_email: string }>(
-      `admin/users/${encodeURIComponent(target.id)}/merge`, { from })
+    // 两个账号都有存档时后端返回 409 save_conflict（user_id 是主键，只能留一份）。
+    // 这里必须再问一次：管理员确认丢弃被合并账号的存档后，才带 force:true 重发。
+    const send = (force: boolean) =>
+      api<{ moved: string[]; conflicts: string[]; adopted_email: string }>(
+        `admin/users/${encodeURIComponent(target.id)}/merge`, force ? { from, force: true } : { from })
+    let result
+    try {
+      result = await send(false)
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.code !== 'save_conflict') throw error
+      const discard = await confirmDialog({
+        title: '两个账号都有存档',
+        tone: 'seal',
+        confirm: '丢弃它的存档并合并',
+        body: h('p', null,
+          `「${from}」和「${target.email || target.id}」都有游戏存档，合并后只能保留一份。继续会丢弃「${from}」的存档，这一步不可撤销。`),
+      })
+      if (discard === null) return
+      result = await send(true)
+    }
     const parts = [`已合并 ${result.moved.length} 个平台绑定`]
     if (result.adopted_email) parts.push(`继承了邮箱 ${result.adopted_email}`)
     if (result.conflicts.length) parts.push(`跳过冲突平台 ${result.conflicts.join('/')}`)
