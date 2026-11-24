@@ -137,6 +137,9 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   body[data-aboard] .hud-stats,body[data-hud="street"][data-aboard] .hud-stats{max-width:min(46vw,180px)}
 }
 
-.walk-ui .btn-smoke{position:fixed;right:calc(196px + var(--sr));bottom:calc(108px + var(--sb));min-width:54px;height:46px;border-radius:23px;touch-action:manipulation;font-size:15px}
+.walk-ui .btn-smoke{position:fixed;right:calc(196px + var(--sr));bottom:calc(108px + var(--sb));min-width:54px;height:46px;padding:0 14px;border-radius:23px;touch-action:manipulation;
+  font:600 15px/1 var(--ui-serif);letter-spacing:.12em;color:var(--ui-paper);background:rgba(169,80,60,.78);border:1px solid var(--ui-seal-light);box-shadow:var(--ui-shadow-1)}
+/* 抽烟的下一步：朱砂底，和普通灰绿按键区分开；按下时轻压 */
+.walk-ui .btn-smoke:active{transform:scale(.96);background:var(--ui-seal)}
 .walk-ui .btn-smoke[hidden]{display:none}
 @media(max-height:500px){.walk-ui .btn-smoke{right:calc(183px + var(--sr));bottom:calc(84px + var(--sb))}}

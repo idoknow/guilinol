@@ -23,14 +23,26 @@ export function createSmokePrompt(scene:THREE.Scene,camera:THREE.Camera){
     text.visible=!!label
     if(!label)return
     if(label!==previous){
+      // 纯文字、无底板：宣纸白字 + 墨色细描边 + 很淡的投影，任何天色下都读得清；
+      // 按键字母（F）用玉色单独标出，一眼看出要按哪个键。
       ctx.clearRect(0,0,768,96)
-      ctx.font='600 42px serif'
-      ctx.textAlign='center'
+      ctx.font='600 40px "Noto Serif SC","Source Han Serif SC","Songti SC","STSong",serif'
       ctx.textBaseline='middle'
-      ctx.shadowColor='#212622'
-      ctx.shadowBlur=5
-      ctx.fillStyle='#fff8eb'
-      ctx.fillText(label,384,48)
+      ctx.lineJoin='round'
+      const parts=label.split(/(F)/)
+      const widths=parts.map(part=>ctx.measureText(part).width)
+      let x=384-widths.reduce((a,b)=>a+b,0)/2
+      parts.forEach((part,i)=>{
+        ctx.shadowColor='rgba(10,16,14,.55)'
+        ctx.shadowBlur=8
+        ctx.lineWidth=5
+        ctx.strokeStyle='rgba(20,33,30,.82)'
+        ctx.strokeText(part,x,50)
+        ctx.shadowBlur=0
+        ctx.fillStyle=part==='F'?'#a9e0d1':'#f4efe2'
+        ctx.fillText(part,x,50)
+        x+=widths[i]
+      })
       map.needsUpdate=true
       previous=label
     }

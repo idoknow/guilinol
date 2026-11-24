@@ -554,7 +554,7 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
         thumb.classList.add('pack-thumb')
         thumb.style.background='linear-gradient('+b.lid+' 22%, '+b.pack+' 22%)'
         thumb.textContent=b.faceTexture?'':b.name
-        if(b.faceTexture){thumb.style.backgroundImage=`url("${b.faceTexture}")`;thumb.style.backgroundSize='cover'}
+        if(b.faceTexture){thumb.style.backgroundImage=`url("${b.faceTexture}")`;thumb.style.backgroundSize='100% 100%'}
       }
       el.onclick = () => {
         selectedKey = card.key
@@ -570,10 +570,12 @@ export function mountShopOverlay(hooks: ShopOverlayHooks = {}): ShopOverlayHandl
       const b = brandOf(activeCard.itemId)
       packPreview.style.setProperty('--pack', b.pack)
       packPreview.style.setProperty('--lid', b.lid)
-      const face=packPreview.firstElementChild as HTMLElement
-      face.textContent=b.faceTexture?'':b.name
-      face.style.backgroundImage=b.faceTexture?`url("${b.faceTexture}")`:''
-      face.style.backgroundSize='cover'
+      // 正反两面印同一张包装（真烟盒也是两面同图），侧面和顶底用包装主色。
+      for(const face of Array.from(packPreview.children).slice(0,2) as HTMLElement[]){
+        face.textContent=b.faceTexture?'':b.name
+        face.style.backgroundImage=b.faceTexture?`url("${b.faceTexture}")`:''
+        face.style.backgroundSize='100% 100%'
+      }
     }
     const isDefaultOutfit = (Object.keys(DEFAULT_EQUIPPED_OUTFIT) as OutfitSlot[]).every(
       slot => s.wardrobe.equipped[slot] === DEFAULT_EQUIPPED_OUTFIT[slot],
