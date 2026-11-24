@@ -29,8 +29,15 @@ def bake(output, chunks, region):
         collision = json.loads(data[start:start+size])
         streets = collision[1]
         paths = streets[0]
+        # Existing station halls and canopy proxies have solid GL04 building
+        # colliders. Only expose platform area pedestrians can actually reach.
         occupied = []
-        for kind, shell, *holes in paths:
+        building_rings = [building[2] for building in collision[0]]
+        for shell, *holes in building_rings:
+            solid = make_valid(Polygon(np.asarray(shell)/100, [np.asarray(h)/100 for h in holes]))
+            if local.intersects(solid):
+                occupied.append(solid.buffer(.015))
+        for _, shell, *holes in paths:
             polygon = make_valid(Polygon(np.asarray(shell)/100, [np.asarray(h)/100 for h in holes]))
             if local.intersects(polygon):
                 occupied.append(polygon)
