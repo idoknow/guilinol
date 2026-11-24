@@ -131,7 +131,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 .photo-shot .shot-close{flex:none;width:30px;background:none;color:var(--ink-soft);font-size:18px;letter-spacing:0}
 
 /* Phones */
-@media (pointer:coarse){
+@media (pointer:coarse) and (not (any-pointer:fine)){
   .dock{gap:6px}.dock-mini{display:flex;flex-direction:column;align-items:center;gap:6px}
 .dock-buttons{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 .dock-buttons>button{padding:6px 12px;font-size:13px}
@@ -145,7 +145,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
   .photo-shot{width:150px}
   .summit-pill{top:auto;bottom:calc(24px + env(safe-area-inset-bottom))}
 }
-@media (pointer:coarse) and (max-height:500px){
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
   .dock{flex-direction:row-reverse;align-items:flex-start}.minimap{width:96px;height:96px}
   .dock-buttons{gap:5px}.dock-buttons>button,.dock .btn-mode{height:32px;padding:0 12px;font-size:12.5px}
   .atlas-legend{display:none}
@@ -153,12 +153,12 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
   .card-intro{font-size:12.5px;line-height:1.6}
   .book ol{grid-template-columns:1fr 1fr 1fr}.book li{flex-direction:column;text-align:center;gap:6px;padding:8px}.book li p{display:none}
 }
-@media (pointer:coarse) and (max-width:520px){.dock .minimap{width:108px;height:108px}}
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-width:520px){.dock .minimap{width:108px;height:108px}}
 @media (max-width:520px){.book ol{grid-template-columns:1fr}.spot-card{width:calc(100vw - 20px)}}
 /* Short landscape phones (IDOK-146: 770x265 with browser bars, 844x390 iPhone): a column of five dock buttons
    ran into the thumb cluster (跃/远近/跑). Lay the buttons out as one row along the top edge, shrink the minimap so it
    ends above 跃/远近, and float the road name over the map's lower rim. */
-@media (pointer:coarse) and (max-height:430px){
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:430px){
   .dock{flex-direction:row-reverse;align-items:flex-start;gap:8px}
   .dock-buttons{flex-direction:row;align-items:center;gap:6px}
   .dock-buttons>button,.dock .btn-mode{height:32px;padding:0 11px;font-size:12.5px}
@@ -202,7 +202,7 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 .gear-spec i{font-style:normal;opacity:.66}
 .gear-badge{position:absolute;right:12px;bottom:10px;font:11.5px var(--serif,serif);padding:3px 9px;border-radius:999px;background:rgba(29,35,32,.08)}
 .gear-card.on .gear-badge{background:var(--seal,#a9503c);color:var(--ui-paper,#f4efe2)}
-@media (pointer:coarse) and (max-height:430px){
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:430px){
   .photo-actions{gap:8px}.photo-rec{width:40px;height:40px}
 }
-@media (pointer:coarse){.photo-bar{padding-right:132px}}
+@media (pointer:coarse) and (not (any-pointer:fine)){.photo-bar{padding-right:132px}}

@@ -99,7 +99,7 @@ body[data-hud=street] .joystick-knob{background:var(--st-white)}
 body[data-hud=street] :is(.btn-jump,.btn-view){font-family:var(--st-sans);font-weight:800;background:var(--st-asphalt);border:2px solid rgba(246,244,239,.4)}
 body[data-hud=street] .btn-jump{font-size:0}body[data-hud=street] .btn-jump::after{content:"跳";font-size:22px}
 body[data-hud=street] .btn-view{font-size:0}body[data-hud=street] .btn-view::after{content:"视角";font-size:13px}
-@media (pointer:coarse),(max-width:560px){
+@media (pointer:coarse) and (not (any-pointer:fine)),(max-width:560px){
   .st-cash{right:calc(12px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));gap:5px}
   .st-money{font-size:28px}
   .st-phone-btn{right:calc(12px + env(safe-area-inset-right));top:calc(66px + env(safe-area-inset-top));height:32px}

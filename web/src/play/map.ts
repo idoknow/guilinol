@@ -11,6 +11,7 @@ import {ll2xz} from '../../../lib/projection'
 import {getState} from '../game/state'
 import {listShops, type ShopTriggerDef} from '../game/shops'
 import {roster, bearing, type RosterPlayer} from '../mp-roster'
+import {touchUi} from '../ui/input-mode'
 
 // 地图 (M4): one canvas painter shared by the minimap and the full map. North up, world z grows south.
 // Look follows docs/style.md: rice-paper ground, jade water, pale-green parks, karst peaks as ink mounds,
@@ -304,7 +305,7 @@ export function mapView(host:Host, atlas:Atlas, ui:{slot:HTMLElement; buttons:HT
     requestMap('overview.bin')
     const p = here(); view.x = p.x; view.z = p.z; view.scale = innerWidth<700?.45:.6
     sheet.hidden = false; requestAnimationFrame(()=>{sheet.classList.add('show'); redraw();operation('mapOpen',start)})
-    if(!matchMedia('(pointer:coarse)').matches) input.focus()
+    if(!touchUi()) input.focus()
   }
   function close(){sheet.classList.remove('show'); setPin(null); input.value = ''; results.innerHTML = ''; input.blur()
     setTimeout(()=>{if(!sheet.classList.contains('show')) sheet.hidden = true},240)}

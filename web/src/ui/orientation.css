@@ -1,7 +1,7 @@
 /* Portrait phone gate (IDOK-144). Shown only on narrow coarse-pointer portrait screens while the city runs; hidden on the
    title screen (resume overlay) and whenever the phone is landscape. Same ink-glass + paper card language as the loader. */
 .rotate-gate{display:none}
-@media (orientation:portrait) and (pointer:coarse) and (max-width:600px){
+@media (orientation:portrait) and (pointer:coarse) and (not (any-pointer:fine)) and (max-width:600px){
   .rotate-gate{display:grid;position:fixed;inset:0;z-index:60;place-items:center;padding:24px calc(24px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left));
     background:radial-gradient(120% 80% at 50% 35%,rgba(47,74,69,.82),rgba(20,33,30,.94));backdrop-filter:blur(10px) saturate(1.1);-webkit-backdrop-filter:blur(10px) saturate(1.1);
     touch-action:none;overscroll-behavior:contain}
@@ -16,7 +16,7 @@
 /* IDOK-144 follow-up: the dock's landscape entry. Portrait phones only — the whole dock hides in landscape photo mode,
    and desktop/landscape keeps the one column it already had. Beats `.dock-buttons>button{display:flex}` on specificity. */
 .dock-buttons>.dock-rotate{display:none}
-@media (orientation:portrait) and (pointer:coarse) and (max-width:600px){
+@media (orientation:portrait) and (pointer:coarse) and (not (any-pointer:fine)) and (max-width:600px){
   .dock-buttons>.dock-rotate{display:flex}
   body[data-home] .dock-buttons>.dock-rotate{display:none}
 }

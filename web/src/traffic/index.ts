@@ -3,6 +3,7 @@ import {MAX_ACTORS,MOBILE_ACTORS,Traffic,type Graph} from './sim'
 import {curbside,staticSolids,useTrafficSolids,type Solid,contactSamples,sampleContacts} from './contact'
 import {trafficModels,trafficMaterial,type Variant} from './models'
 import {crowd} from './crowd'
+import {touchUi} from '../ui/input-mode'
 
 async function loadGraph(key:string){
   const start=performance.now()
@@ -13,7 +14,7 @@ async function loadGraph(key:string){
   const signature=new Uint8Array(bytes,0,2)
   const body=signature[0]===31&&signature[1]===139?new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')):bytes
   const decoded=await new Response(body).arrayBuffer()
-  const graph:Graph=JSON.parse(new TextDecoder().decode(decoded)),sim=new Traffic(graph,Math.random,matchMedia('(pointer:coarse)').matches?MOBILE_ACTORS:MAX_ACTORS)
+  const graph:Graph=JSON.parse(new TextDecoder().decode(decoded)),sim=new Traffic(graph,Math.random,touchUi()?MOBILE_ACTORS:MAX_ACTORS)
   const timing=performance.getEntriesByName(response.url).at(-1) as PerformanceResourceTiming|undefined
   return {sim,sample:{key,encodedBytes:timing?.encodedBodySize||bytes.byteLength,decodedBytes:decoded.byteLength,downloadMs:downloaded-start,parseAndIndexMs:performance.now()-downloaded}}
 }

@@ -31,7 +31,7 @@
   /* legacy aliases (play.css / feedback.css were written against these names) */
   --glass:var(--ui-glass);--glass-strong:var(--ui-glass-strong);--paper:var(--ui-paper);--paper-deep:var(--ui-paper-2);
   --ink:var(--ui-ink);--ink-soft:var(--ui-ink-soft);--seal:var(--ui-seal);--seal-light:var(--ui-seal-light);--line:var(--ui-glass-line);--serif:var(--ui-serif)}
-@media (pointer:coarse){:root{--ui-h:42px}}
+@media (pointer:coarse) and (not (any-pointer:fine)){:root{--ui-h:42px}}
 [hidden]{display:none!important}
 body{font-family:var(--ui-serif)}
 

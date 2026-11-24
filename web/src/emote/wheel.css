@@ -80,13 +80,13 @@
   border-radius: 30px;
   padding: 10px 14px;
 }
-@media (pointer: coarse) {
+@media (pointer:coarse) and (not (any-pointer:fine)) {
   .emote-toggle {
     display: block;
   }
 }
 
-@media (pointer: coarse) and (orientation: landscape) {
+@media (pointer:coarse) and (not (any-pointer:fine)) and (orientation: landscape) {
   .emote-toggle {
     right: 128px;
     top: 31%;

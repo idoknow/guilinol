@@ -5,6 +5,7 @@ import type {EbikeRideControlInput, EbikeTelemetrySnapshot} from '../walk/ebike-
 import {isGlobalHotkeyBlocked, isModalOrOverlayOpen, isTouchInControlZone} from '../walk/input-guard'
 import {hits, type Action} from '../input/keymap'
 import {rideSoundMuted, setRideSoundMuted} from '../walk/ride-sound-pref'
+import {touchUi} from './input-mode'
 
 const MOD_LABELS = {stock: '素车', ghostfire: '鬼火', neon: '霓虹'} as const
 
@@ -28,6 +29,8 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
     +'<button class="btn-tuck" type="button" aria-label="深压弯" aria-pressed="false">压弯</button>'
     +'<button class="btn-hail" type="button" aria-label="叫一辆附近的共享电车">叫车</button>'
   document.body.append(panel);panel.hidden=true
+  let shown=false
+  addEventListener('glol:input-mode',()=>{panel.hidden=!shown||!touchUi()})
 
   const rideHud=document.createElement('div')
   rideHud.className='ride-hud'
@@ -304,7 +307,7 @@ const held=(action:Action)=>{let on=false;keys.forEach(code=>{if(!on&&hits(code,
 
   return {
     show(on:boolean){
-      panel.hidden=!on||!matchMedia('(pointer:coarse)').matches
+      shown=on;panel.hidden=!on||!touchUi()
       clearTransientInput(true)
     },
     clearTransientInput,

@@ -1,3 +1,4 @@
+import {touchUi} from '../ui/input-mode'
 import * as THREE from 'three'
 import {clone} from 'three/addons/utils/SkeletonUtils.js'
 import {browNames, eyeNames, faceNames, hairStyles, looks, type Avatar} from '../../../lib/avatar'
@@ -34,7 +35,7 @@ export function randomPasserby(random:()=>number):Avatar{
 }
 
 export function crowd(scene:THREE.Scene,camera:THREE.Camera){
-  const mobile=matchMedia('(pointer: coarse)').matches
+  const mobile=touchUi()
   const LIMIT=mobile?6:14,RANGE=mobile?45:70,POOL=mobile?8:16
   const templates:(Promise<Template>|undefined)[]=new Array(POOL),ready:(Template|undefined)[]=new Array(POOL)
   const assigned=new WeakMap<object,number>(),active=new Map<Walker,View>()

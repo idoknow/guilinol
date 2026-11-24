@@ -85,7 +85,7 @@ body[data-aboard] .btn-jump{display:none}
 .boot-card p{margin:0 0 12px;font-size:13px;letter-spacing:.12em;opacity:.78}
 .boot-bar{height:3px;background:rgba(42,61,60,.16);border-radius:2px;overflow:hidden}.boot-bar i{display:block;height:100%;width:8%;background:var(--ui-seal);border-radius:2px;transition:width .25s}
 
-@media (pointer:coarse){
+@media (pointer:coarse) and (not (any-pointer:fine)){
   output{left:calc(12px + env(safe-area-inset-left));top:calc(123px + env(safe-area-inset-top));bottom:auto;max-width:244px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .sky-ui{top:calc(58px + env(safe-area-inset-top));font-size:12px}.sky-ui button{width:30px;height:28px}
   .sky-ui .sky-fold{width:30px}.sky-ui .sky-fold::before{width:7px;height:7px;border-width:2px}
@@ -93,7 +93,7 @@ body[data-aboard] .btn-jump{display:none}
   footer{left:50%;right:auto;transform:translateX(-50%);bottom:calc(6px + env(safe-area-inset-bottom));font-size:9px;opacity:.6;white-space:nowrap}
   .btn-menu{padding:0 12px}.btn-menu span{display:none}
   .about-cols{grid-template-columns:1fr}}
-@media (pointer:coarse) and (max-height:500px){
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
   output{top:calc(140px + env(safe-area-inset-top));max-width:126px;box-sizing:border-box}
   /* Landscape phones: the top band also holds the dock on the right (~423px in), so keep the sky panel
      clear of it even when it is unfolded (IDOK-158). */

@@ -1,6 +1,6 @@
 // 玩法引导（IDOK-221）：三件东西，一份数据。
 //  · 按键卡 .keys-card —— 电脑端左下角，随「步行 / 飞行 / 电驴 / 单车 / 汽车 / 船」切换，只放当下最常用的几个键；可折叠，记住状态。
-//    手机（pointer:coarse）和窄屏不显示：那边按钮本身就写着字，键盘提示没有意义。
+//    手机（触屏界面，见 input-mode.ts）和窄屏不显示：那边按钮本身就写着字，键盘提示没有意义。
 //  · 玩法指南 .guide-sheet —— 全部玩法怎么用 + 全部按键 / 触屏手势。入口：按键卡底部、左上「?」按钮、F1 或 ?、首页「怎么玩」。
 //  · 新手引导 .coach —— 第一次进城时按真实 HUD 位置点亮 4–6 步（找不到的按钮自动跳过），只出现一次，可在指南里重看。
 // 键名一律走 keymap 的 bindingLabel，玩家改键后这里跟着变。
@@ -9,11 +9,12 @@ import {bindingLabel, type Action} from '../input/keymap'
 import {onPrefs} from './prefs'
 import {getPlayMode} from '../game/play-mode'
 import {isGlobalHotkeyBlocked} from '../walk/input-guard'
+import {touchUi} from './input-mode'
 
 type Ctx = 'walk' | 'fly' | 'bike' | 'bicycle' | 'car' | 'boat'
 type Row = {keys: string[]; label: string; solo?: boolean; free?: boolean; id?: string}
 
-const touch = () => matchMedia('(pointer:coarse)').matches
+const touch = touchUi
 const solo = () => getPlayMode() === 'solo'
 const k = (action: Action) => bindingLabel(action).split(' / ')[0]
 const move = () => [k('forward'), k('left'), k('back'), k('right')]

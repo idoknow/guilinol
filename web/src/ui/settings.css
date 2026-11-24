@@ -151,7 +151,7 @@
   font-style: normal;
 }
 
-@media (pointer: coarse) {
+@media (pointer:coarse) and (not (any-pointer:fine)) {
   .about-panel.settings .set-body {
     padding: 4px 14px 16px;
     gap: 14px;
@@ -181,7 +181,7 @@
 }
 
 /* 纯触屏设备没有键盘，键位这一块不出现 */
-@media (hover: none) and (pointer: coarse) {
+@media (hover: none) and (pointer:coarse) and (not (any-pointer:fine)) {
   .set-block--keys {
     display: none;
   }
