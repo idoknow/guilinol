@@ -241,6 +241,25 @@ function encodeKnots(samples:{height:number,cross:number}[],stations:number[]){
   return Buffer.from(bytes).toString('base64')
 }
 
+// These signed approaches narrow at the measured retaining walls. Carry the
+// same wheel track through the mouth and the adjoining surface road. A tyre
+// must clear the surveyed opening, including its projection through the bend.
+const narrowApproaches=new Map<number,{limit:number,portals:number[][]}>()
+for(const [bore,roads] of [
+  [988474358,[1486205605,988474357]],
+  [385796474,[385796473,882310600]],
+  [1476028964,[1476028963]],
+] as const){
+  const strips=(manifest.tunnels??[]).filter(t=>t.way===bore)
+  const mouths=strips.flatMap(t=>(t.openings??[]).map(opening=>opening[3]))
+  if(!mouths.length)continue
+  // Preserve separation for two opposing 1.82 m cars on the paved approach.
+  const limit=Math.max(.92,Math.min(...mouths)-.795-.2-.05)
+  const portals=strips.flatMap(t=>t.portals.filter((_,i)=>t.mouths?.[i]))
+  narrowApproaches.set(bore,{limit,portals:[]})
+  for(const road of roads)narrowApproaches.set(road,{limit,portals})
+}
+
 const tunnelWays=new Set((manifest.tunnels??[]).map(t=>t.way))
 const missingFloors=new Set<number>()
 const partialFloors=new Set<number>()
@@ -257,6 +276,11 @@ let total=0,outliers=0,nonplanar=0,sunk=0,floating=0
 for(const lane of lanes){
   const {dx,dz,length,start}=lane
   let offset=lane.offset
+  const approach=narrowApproaches.get(lane.way)
+  if(bake && approach && (!approach.portals.length||approach.portals.some(([x,,z])=>
+      Math.min(Math.hypot(x-start.x,z-start.z),Math.hypot(x-lane.end.x,z-lane.end.z))<20))){
+    offset=Math.sign(offset)*Math.min(Math.abs(offset),Math.floor(100*approach.limit)/100)
+  }
   if(bake&&lane.structure==='bridge'&&offset){
     // Split OSM carriageways can have a narrower deck than their tagged
     // nominal lane width. Check the actual lateral slab edge along the span.
