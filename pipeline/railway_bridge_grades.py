@@ -252,4 +252,4 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
         ring = list(hull.exterior.coords)[:-1]
         for index,(section,end,_) in enumerate(sections):
             section.setdefault('joints',[None,None])[end] = dict(ring=ring,draw=index==0)
-    return fallback_floors
+    return fallback_floors, crossings

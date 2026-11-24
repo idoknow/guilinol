@@ -319,7 +319,7 @@ def build(bbox, output, palette, workers=4):
         from airport import grade_airport_interchange
         grade_airport_interchange(bridge_plans,ramp_height)
         from railway_bridge_grades import grade_railway_roads
-        rail_floors = grade_railway_roads(bridge_plans,tunnels,terrain,original,surface,road_ctrl,left,top,ground_mesh_at)
+        rail_floors, rail_crossings = grade_railway_roads(bridge_plans,tunnels,terrain,original,surface,road_ctrl,left,top,ground_mesh_at)
         ground_mesh_at = build_ground_mesh_lookup(original,surface,left,top,width,depth)
 
     sw_query_tree = STRtree(list(polygons(sidewalk_mask))) if not sidewalk_mask.is_empty else None
@@ -578,6 +578,8 @@ def build(bbox, output, palette, workers=4):
         bake_platforms(output, chunks, play_region.geometry)
         from railway_pavement import bake as bake_railway_pavement
         bake_railway_pavement(output,chunks)
+        from railway_clearance import fit_rendered_underpasses
+        protected_grades.mark_pavement(fit_rendered_underpasses(output,manifest,rail_crossings))
     write_city_lods(output, manifest)
     from traffic import bake as bake_traffic
     bake_traffic(output, manifest, roads,protected_grades)

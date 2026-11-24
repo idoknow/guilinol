@@ -288,7 +288,8 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False, rail_only=
     height, profile = solve(coords,pieces,ways,ground+.35,crossing_data,yards,parallel_segments(pieces,coords,ways))
     if rail_only:
         return [dict(rail=row['rail'], road=row['road'], type=row['type'], railY=float(height[node]),
-                     x=coords[node][0], z=coords[node][1])
+                     x=coords[node][0], z=coords[node][1], lat=row['lat'], lon=row['lon'],
+                     surfaceRoad=all(row['roadTags'].get(k,'no')=='no' for k in ('bridge','tunnel')))
                 for node,row,*_ in crossing_data], profile['panels']
     violations=[]
     dependencies={tuple([rail,road]):int(missing) for missing,records in review['missingTunnelDependencies'].items()

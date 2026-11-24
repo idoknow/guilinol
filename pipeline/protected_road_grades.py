@@ -8,13 +8,22 @@ import numpy as np
 
 class ProtectedRoadGrades:
     def __init__(self, left, top, terrain, underlay, control):
+        self.pavement = None
         self.left, self.top = left, top
         self.after = (terrain, underlay, control)
         self.before = tuple(grid.copy() for grid in self.after)
 
+    def mark_pavement(self, patches):
+        from shapely import STRtree
+        self.pavement = STRtree(patches) if patches else None
+
     def affects_carriageway(self, start, end, half_width):
         """Compare the two supporting fields along this lane before fitting wheels."""
         from road_grading import eval_bspline_grid
+        from shapely import LineString
+        if self.pavement is not None and len(self.pavement.query(
+                LineString([start,end]),predicate='dwithin',distance=half_width)):
+            return True
         a,b = np.asarray(start),np.asarray(end)
         length = np.linalg.norm(b-a)
         if length<.01:
