@@ -4940,5 +4940,35 @@
       "requiredM": 155.8019,
       "changeM": -4.4355
     }
+  ],
+  "pendingRoadStructures": [
+    {
+      "roadWay": 882767812,
+      "bridgeWay": 882767811,
+      "streamWay": 882767817,
+      "railWays": [
+        882767815,
+        991385702
+      ],
+      "sharedAbutmentNode": 8209536774,
+      "lat": 25.2531297,
+      "lon": 110.2582056,
+      "baselineWorld": "f1453c2e",
+      "status": "blocked",
+      "reason": "Retaining the independent Nanxi stream bridge conflicts with the approach grade and rail clearance.",
+      "nearestRailheadM": 150.0988,
+      "maximumRoadAtRailM": 144.3988,
+      "runToAbutmentM": 6.9607,
+      "mainDeckM": 149.48,
+      "mainSurfaceAtAbutmentM": 149.6763,
+      "mainSurfaceAtRailM": 150.197,
+      "mainAverageGradeOnRun": 0.07481,
+      "minimumAverageGradeToRetainedDeck": 0.73,
+      "maximumPermittedGrade": 0.08,
+      "minimumDeckLoweringAtAbutmentM": 4.5244,
+      "measuredCandidateStepM": 5.235,
+      "mainTerrainAtStreamM": 149.0594,
+      "waterSurfaceM": null
+    }
   ]
 }

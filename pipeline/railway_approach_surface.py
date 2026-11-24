@@ -28,6 +28,10 @@ def basis(shape, left, top, xy):
                              shape=(len(xy),math.prod(shape)))
 
 
+class InfeasibleApproach(ValueError):
+    pass
+
+
 def fit_patch(control, mask, left, top, roads, anchors):
     distance = distance_transform_edt(~mask)*STEP
     shape = control.shape
@@ -99,7 +103,7 @@ def fit_patch(control, mask, left, top, roads, anchors):
     solution = clarabel.DefaultSolver(sparse.triu(hessian).tocsc(),load,constraints,rhs,
                                      [clarabel.NonnegativeConeT(len(rhs))],settings).solve()
     if solution.status not in (clarabel.SolverStatus.Solved,clarabel.SolverStatus.AlmostSolved):
-        raise ValueError(f'Rail approach fit at ({left},{top}): {solution.status}')
+        raise InfeasibleApproach(f'Rail approach fit at ({left},{top}): {solution.status}')
     target[free] = solution.x
     fitted = datum+target.reshape(shape)
     blend = np.clip((136-distance)/40,0,1)
@@ -163,7 +167,13 @@ def grade_approach_surfaces(ways, crossings, panels, tunnels, plans, protected, 
         active = [a for a in anchors if region.contains(Point(*a[:2])) and
                   support[round((a[1]-top)/STEP)+1,round((a[0]-left)/STEP)+1]]
         local = control[rows,cols]
-        survey = fit_patch(local,mask,left,top,roads,active)
+        try:
+            survey = fit_patch(local,mask,left,top,roads,active)
+        except InfeasibleApproach as error:
+            rails = sorted({r['rail'] for r in crossings if region.covers(Point(r['x'],r['z']))})
+            abutments = sorted(wid for wid,(line,_,_,_) in plans.items() if line.intersects(region))
+            raise InfeasibleApproach(f'{error}; rail ways {rails}; bridge ways {abutments}; '
+                                     f'{len(active)} surface elevation bounds') from error
         if survey is None:
             continue
         xy,radii = survey
