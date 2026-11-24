@@ -23,8 +23,9 @@ const views = [
   ['west', [-430, 238, -25], [-90, 148, 0], 12],
   ['northwest', [-285, 235, -380], [-70, 148, -115], 12],
   ['plan', [0, 1080, 0], [0, 150, -0.01], 12],
-  ['platform-night', [-62, 155, 45], [-68, 155, -55], 21],
-  ['platform-day', [-62, 155, 45], [-68, 155, -55], 12],
+  ['platform-night', [-89.6, 153.6, 45], [-101.8, 154.6, -55], 21],
+  ['platform-day', [-56.5, 153.0, 45], [-68.5, 154.4, -55], 12],
+  ['platform-across', [-76.4, 152.8, 45], [-100.5, 155, -37], 12],
   ['stairs', [-110, 155, -105], [-107, 159, -84], 12],
   ['front-night', [70, 157, -10], [0, 161, 0], 21],
 ]
@@ -96,7 +97,7 @@ try {
     })
     await page.addStyleTag({
       content:
-        'body * {visibility:hidden!important} canvas {visibility:visible!important}',
+        'body * {visibility:hidden!important} canvas {visibility:visible!important} .minimap {display:none!important}',
     })
     await page.screenshot({ path: resolve(output, id + '.jpg'), quality: 88 })
     records.push({ id, ...metrics })

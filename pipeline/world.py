@@ -300,7 +300,7 @@ def build(bbox, output, palette, workers=4):
         from airport import grade_terminal_lanes
         grade_terminal_lanes(terrain,original,left,top,GRID)
     from station_site import grade_station
-    grade_station(terrain, original, surface, left, top, carriageway_mask, sidewalk_mask)
+    grade_station(terrain, original, surface, left, top, carriageway_mask, sidewalk_mask, road_ctrl)
     ground_mesh_at = build_ground_mesh_lookup(original, surface, left, top, width, depth)
     if play_region:
         from road_tunnels import corridor_underpasses
