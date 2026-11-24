@@ -85,7 +85,9 @@ def solve(coords, pieces, ways, target, crossings, yards, pairs):
                                    for i in (a, b)], dtype=int))
     low = np.full(count, -np.inf)
     for platforms, yard in yards:
-        members = eligible[intersects_xy(yard, *xy[eligible].T)]
+        # Rail vertices are snapped to 0.1 mm at tile and way intersections.
+        # Include vertices snapped just across the clipped yard boundary.
+        members = eligible[intersects_xy(yard.buffer(.001), *xy[eligible].T)]
         if PLATFORMS.intersection(platforms):
             low[members] = RAIL
         if len(members) > 1:

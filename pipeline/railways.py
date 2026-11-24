@@ -330,7 +330,7 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
             localflags=flags if safe else ((flags & ~FENCE)|RESERVED)
             portal = int(i in portal_nodes and s==0) + 2*int(j in portal_nodes and t==1)
             # Keep sub-centimetre rise on very short pieces at tile and road edges.
-            encoded=[round(float(v)*100,4) for v in (*p,levels[0],*q,levels[1])]
+            encoded=[round(float(v)*100,6) for v in (*p,levels[0],*q,levels[1])]
             span=math.hypot(encoded[3]-encoded[0],encoded[4]-encoded[1])
             tags=ways[way_id]['tags']
             category='branch' if tags.get('usage')=='branch' else 'service' if tags.get('service') else 'main'

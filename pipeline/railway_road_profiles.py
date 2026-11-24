@@ -42,7 +42,7 @@ def envelope(neighbors, anchors):
         level, node = heapq.heappop(queue)
         if level != levels[node]:
             continue
-        for other, length, cap, _ in neighbors[node]:
+        for other, length, cap, *_ in neighbors[node]:
             bound = level + length*cap
             if bound < levels[other]:
                 levels[other], origins[other], previous[other] = bound, origins[node], node
@@ -103,8 +103,8 @@ def road_profile_constraints(ways, crossings, panels):
         ordered = sorted(stations.items())
         cap = grade_cap(tags)
         for (a,i),(b,j) in zip(ordered,ordered[1:]):
-            neighbors[i].append((j,b-a,cap,wid))
-            neighbors[j].append((i,b-a,cap,wid))
+            neighbors[i].append((j,b-a,cap,wid,a,b))
+            neighbors[j].append((i,b-a,cap,wid,b,a))
 
     upper, origin, previous = envelope(neighbors,ceilings)
     conflicts = []
@@ -115,13 +115,14 @@ def road_profile_constraints(ways, crossings, panels):
         i = n
         while previous[i]!=-1:
             j = previous[i]
-            _,length,cap,wid = min((e for e in neighbors[i] if e[0]==j),key=lambda e:e[1]*e[2])
-            path.append((wid,length))
+            _,length,cap,wid,start,end = min((e for e in neighbors[i] if e[0]==j),key=lambda e:e[1]*e[2])
+            path.append(dict(way=wid, fromM=start, toM=end, lengthM=length, maxGrade=cap))
             i = j
         ceiling, other = ceilings[origin[n]]
-        length = sum(d for _,d in path)
+        length = sum(leg['lengthM'] for leg in path)
         conflicts.append(dict(fromConstraint=source,toConstraint=other,
-                              ways=list(dict.fromkeys(w for w,_ in path)),distanceM=round(length,4),
+                              ways=list(dict.fromkeys(leg['way'] for leg in path)), path=path,
+                              distanceM=round(length,4),
                               requiredFallM=round(floor-ceiling,4),permittedFallM=round(upper[n]-ceiling,4),
                               deficitM=round(floor-upper[n],4)))
     return dict(targets=adjustments,conflicts=sorted(conflicts,key=lambda r:-r['deficitM']))
