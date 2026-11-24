@@ -1,3 +1,15 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>网上桂林市民卡</title></head><body>
-<main><h1>网上桂林市民卡</h1><output id="status">读取中…</output><dl id="fields"></dl><div id="images"></div></main>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#1c2c2a"><title>网上桂林市民卡</title><link rel="icon" href="./brand/favicon-64.png"></head><body class="cz cz-id">
+<main class="cz-stage">
+  <article class="cz-card" aria-labelledby="cz-card-title" hidden>
+    <header class="cz-card-band"><img class="cz-card-emblem" src="./brand/emblem.webp" alt="" width="371" height="144"><div><h1 id="cz-card-title">网上桂林市民卡</h1><small>GUILIN ONLINE · CITIZEN CARD</small></div></header>
+    <div class="cz-card-body">
+      <div class="cz-card-photo" id="photo"><span>未上传头像</span></div>
+      <dl id="fields" class="cz-card-fields"></dl>
+      <div class="cz-card-qr" id="qr"></div>
+    </div>
+    <footer class="cz-card-foot"><span>卡号</span><b id="uid"></b><i class="cz-seal" aria-hidden="true">桂</i></footer>
+  </article>
+  <output id="status" class="cz-status">读取中…</output>
+  <p class="cz-note">网上桂林的游戏卡，只在游戏里用 · <a href="/">去网上桂林看看 ›</a></p>
+</main>
 <script type="module" src="./src/citizen/page.ts"></script></body></html>

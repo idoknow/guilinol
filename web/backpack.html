@@ -1,3 +1,8 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>我的背包</title></head><body>
-<main><h1>我的背包</h1><output id="status">读取中…</output><ul id="items"></ul><button id="portrait" hidden>用当前角色更新卡面头像</button></main>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#1c2c2a"><title>我的背包 · 网上桂林</title><link rel="icon" href="./brand/favicon-64.png"></head><body class="cz cz-bag">
+<main class="cz-sheet">
+  <header class="cz-head"><a class="cz-back" href="/">‹ 回到桂林</a><h1>我的背包</h1><p class="cz-sub">随身带着的东西</p></header>
+  <output id="status" class="cz-status">读取中…</output>
+  <ul id="items" class="cz-items"></ul>
+  <footer class="cz-foot"><button id="portrait" class="cz-btn cz-btn--ghost" hidden>用当前角色更新卡面头像</button></footer>
+</main>
 <script type="module" src="./src/citizen/backpack.ts"></script></body></html>
