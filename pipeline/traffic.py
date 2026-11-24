@@ -317,6 +317,14 @@ def bake(output, manifest, rendered_roads=None):
                 route=[[x,z,way['id']] for x,z in ground_passages.points(way)]
                 if not all(left<=x<left+width and top<=z<top+depth for x,z,_ in route):continue
                 modes=[dict(mode='car',direction='in',route=route),dict(mode='car',direction='out',route=route[::-1])]
+                if 'openStations' in way:
+                    axis=LineString(ground_passages.points(way));modes=[]
+                    for index,(lo,hi) in enumerate(way['openStations']):
+                        piece=ground_passages.substring(axis,lo,hi)
+                        xy=list(piece.coords)
+                        if index:xy.reverse()
+                        modes.append(dict(mode='car',direction=('in','out')[index],boundary=True,
+                                          route=[[x,z,way['id']] for x,z in xy]))
                 yard_routes.append(dict(id=way['id'],way=way['id'],modes=modes))
             route_file.write_text(json.dumps(dict(manifest=manifest,routes=portal_routes(elements,network,survey_nodes),yardRoutes=yard_routes)))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),

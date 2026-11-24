@@ -6,11 +6,13 @@ import struct
 from collections import defaultdict
 
 import numpy as np
+from shapely.ops import substring
 from shapely.affinity import translate
 from shapely import LineString, Point, Polygon, STRtree, box, make_valid, union_all
 
 from canal_passages import sample_road_heights
 from features import area, building_mesh, points, polygons
+from common import xz2ll
 from service_streets import rings, width
 from surveyed_corridors import read_chunk
 
@@ -58,7 +60,25 @@ def garage_boundary(output, chunks, elements):
 
 def open_segments(way, coords, obstacle, curbs, paved):
     refs=way['nodes']
+    blocked=way.get('yardClosure')
+    station=0.
     for i,(a,b) in enumerate(zip(coords,coords[1:])):
+        if blocked is not None and a and b:
+            length=math.dist(a,b)
+            allowed=[(max(lo,station),min(hi,station+length)) for lo,hi in way['openStations']]
+            line=LineString([a,b]);station+=length
+            for lo,hi in allowed:
+                if hi-lo<.01:continue
+                p,q=[line.interpolate(d-station+length).coords[0] for d in (lo,hi)]
+                ids=[refs[i],refs[i+1]]
+                for side,(point,d) in enumerate(((p,lo),(q,hi))):
+                    if min(abs(d-bound) for bound in blocked)>.001:continue
+                    ids[side]=-3_000_000_000_000-way['id']*2-side
+                    dx,dz=np.subtract(b,a)/length
+                    curb=LineString([(point[0]-dz*t,point[1]+dx*t) for t in (-paved/2,paved/2)])
+                    curbs.append(curb.buffer(.125,cap_style='flat'))
+                yield p,q,*ids
+            continue
         if way['id']!=GARAGE[1] or not a or not b or obstacle.is_empty:
             yield a,b,refs[i],refs[i+1]
             continue
@@ -160,6 +180,31 @@ def write_parts(file,tile,raw,start,size,collision,parts,origin):
 YARD_ROADS = {453854241,453854242,453854243,453854244,453854245,453854246,453854248,453854249,453854250}
 
 
+def yard_bypass(way,axis,crossing,half,site,buildings,shared):
+    """Try a smooth lateral shift, keeping mapped junctions and both tie-ins."""
+    lo,hi=sorted(axis.project(Point(p)) for p in (crossing.coords[0],crossing.coords[-1]))
+    begin,end=max(0.,lo-18),min(axis.length,hi+18)
+    old={round(axis.project(Point(pt)),6):ref for pt,ref in zip(axis.coords,way['nodes'],strict=True)}
+    stations=sorted(set(old)|set(np.linspace(begin,end,math.ceil(end-begin)+1)))
+    pts=np.asarray([axis.interpolate(d).coords[0] for d in stations])
+    vectors=np.asarray([np.subtract(axis.interpolate(min(axis.length,d+.1)).coords[0],
+                                    axis.interpolate(max(0,d-.1)).coords[0]) for d in stations])
+    normals=vectors[:,[1,0]]/np.linalg.norm(vectors,axis=1)[:,None];normals[:,0]*=-1
+    ds=np.asarray(stations)
+    t=np.clip(np.minimum((ds-begin)/max(lo-begin,.01),(end-ds)/max(end-hi,.01)),0,1)
+    blend=t**3*(10-15*t+6*t*t)
+    if any(blend[j]>.001 and old.get(d) in shared for j,d in enumerate(stations)):return False
+    for magnitude in np.arange(.25,6.01,.25):
+        for shift in (magnitude,-magnitude):
+            moved=pts+normals*(blend*shift)[:,None]
+            adjusted=LineString(moved[(ds>=begin)&(ds<=end)]).buffer(half)
+            if not site.covers(adjusted) or buildings.intersects(adjusted):continue
+            way['nodes']=[old.get(d,-4_000_000_000_000-way['id']*1000-j) for j,d in enumerate(stations)]
+            way['geometry']=[dict(zip(('lat','lon'),xz2ll(x,z))) for x,z in moved]
+            return True
+    return False
+
+
 def grain_yard(output,manifest,elements,widths):
     site_way=next((w for w in elements if w['type']=='way' and w['id']==985684873),None)
     if site_way is None:return
@@ -177,6 +222,28 @@ def grain_yard(output,manifest,elements,widths):
             if w['type']=='way' and w['id'] in YARD_ROADS:
                 crossing=LineString(points(w)).intersection(warehouse)
                 w['warehousePassages']=union_all([part for part in line_parts(crossing) if part.length<=40])
+                if w['id'] in (453854244,453854249):
+                    axis=LineString(points(w))
+                    half=widths.get(w['id'],width(w['tags']))/2+.5
+                    for crossing_part in line_parts(crossing):
+                        if crossing_part.length<=40:continue
+                        # Distance to the nearest facade is a lower bound even
+                        # when translation in *any* direction is permitted.
+                        probes=[crossing_part.interpolate(j,normalized=True) for j in np.linspace(0,1,101)]
+                        required=max(pt.distance(warehouse.boundary)+half for pt in probes)
+                        if required<=6:
+                            refs=set(w['nodes'])
+                            shared={ref for other in elements if other is not w and other.get('tags',{}).get('highway')
+                                    for ref in other.get('nodes',()) if ref in refs}
+                            if yard_bypass(w,axis,crossing_part,half,site,union_all([p for _,p in mapped]),shared):
+                                break
+                        margin=half+.25
+                        blocked=next(part for part in line_parts(axis.intersection(warehouse.buffer(margin)))
+                                     if part.distance(crossing_part.interpolate(.5,normalized=True))<.01)
+                        lo,hi=sorted(axis.project(Point(p)) for p in [blocked.coords[0],blocked.coords[-1]])
+                        w['yardClosure']=(lo,hi)
+                        w['openStations']=[(0,lo),(hi,axis.length)]
+                        w['minimumShift']=required
     levels=sample_road_heights(output,manifest,[dict(x=p.representative_point().x,z=p.representative_point().y) for _,p in mapped])
     roads=union_all([LineString(points(w)).buffer(widths.get(w['id'],width(w['tags']))/2+.5)
                      for w in elements if w['type']=='way' and w['id'] in YARD_ROADS])

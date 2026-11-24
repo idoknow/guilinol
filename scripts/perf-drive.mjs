@@ -8,13 +8,13 @@ import {glHookScript} from './gl-perf.mjs'
 
 const [mainDist, prDist] = process.argv.slice(2)
 assert(mainDist && prDist, 'Usage: node scripts/perf-drive.mjs MAIN_DIST PR_DIST')
-const views = ['overview', 'lijiang', 'palace', 'south', 'walk-palace']
+const views = process.env.PERF_VIEW ? [process.env.PERF_VIEW] : ['overview', 'lijiang', 'palace', 'south', 'walk-palace']
 const servers = [], raw = [], summary = []
 const quantile = (values, fraction) => [...values].sort((left, right) => left - right)[Math.ceil(values.length * fraction) - 1]
 const resourceLimit=(view,metric)=>metric==='textures'||(view==='overview'&&metric==='calls')?1:1.05
 const rounds=Number(process.env.PERF_ROUNDS??5)
 assert(Number.isInteger(rounds)&&rounds>0)
-const output = 'captures/drive-perf'
+const output = process.env.PERF_OUTPUT ?? 'captures/drive-perf'
 await mkdir(output, {recursive:true})
 const browser = await chromium.launch(browserOptions())
 try {
@@ -27,7 +27,7 @@ try {
       const page = await context.newPage()
       const cdp = await context.newCDPSession(page)
       const url = `http://127.0.0.1:${servers[side].httpServer.address().port}`
-      await page.goto(`${url}/?verify&flow=0&time=10&${process.env.PERF_TRAFFIC==='1'?'traffic=1&':''}${view==='walk-palace'?'mode=walk':`cam=${view}`}`)
+      await page.goto(`${url}/?verify&flow=0&time=10&${process.env.PERF_TRAFFIC===undefined?'':'traffic='+Number(process.env.PERF_TRAFFIC==='1')+'&'}${view==='walk-palace'?'mode=walk':`cam=${view}`}`)
       await page.waitForFunction(walking => {
         const viewer = window.viewer
         if (!viewer?.stats.firstMs || viewer.stats.pending || viewer.stream.updateLandmarks?.pendingCount?.() || viewer.stream.forest.pending.size || (walking && !viewer.walk?.active)) return false

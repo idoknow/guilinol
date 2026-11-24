@@ -12,7 +12,7 @@ const data=(bake||mode==='passage-heights'||mode==='prop-heights'||mode==='porta
 const manifest=data.manifest??JSON.parse(fs.readFileSync(path.join(world,'manifest.json'),'utf8'))
 if(mode==='passage-heights'){
   const surface=vehicleSurface(world,manifest)
-  const heights=data.positions.map(({x,z,bridge,pavementOnly,roofProbe,passageClearance}:{x:number,z:number,bridge?:number[],pavementOnly?:boolean,roofProbe?:boolean,passageClearance?:boolean})=>{
+  const heights=data.positions.map(({x,z,bridge,pavementOnly,roofProbe,passageClearance,way}:{way?:number,x:number,z:number,bridge?:number[],pavementOnly?:boolean,roofProbe?:boolean,passageClearance?:boolean})=>{
     if(passageClearance)return surface(x,z,{pedestrian:true,structure:'bridge'})
     if(roofProbe){
       const hit={hidden:false,deck:-Infinity}
@@ -33,7 +33,7 @@ if(mode==='passage-heights'){
       const y=surface(x,z,{},hit)
       return Number.isFinite(hit.road)?y:null
     }
-    return surface(x,z,{})
+    return surface(x,z,{way})
   })
   fs.writeFileSync(output,JSON.stringify(heights))
   process.exit(0)

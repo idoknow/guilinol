@@ -9,7 +9,7 @@ import {glHookScript} from './gl-perf.mjs'
 const [mainDist, prDist] = process.argv.slice(2)
 assert(mainDist && prDist, 'Usage: node scripts/vehicle-draw-list.mjs MAIN_DIST PR_DIST')
 const servers = []
-const output = 'captures/drive-perf'
+const output = process.env.PERF_OUTPUT ?? 'captures/drive-perf'
 await mkdir(output, {recursive:true})
 const browser = await chromium.launch(browserOptions())
 try {
@@ -31,7 +31,7 @@ try {
           return (distance>viewer.stream.radius || viewer.stream.loaded.has(tile)) && (distance>1682 || viewer.stream.forest.loaded.has(tile))
         })
       }, undefined, {timeout:120000})
-      await page.evaluate(async () => {for(let frame=0;frame<12;frame++) await new Promise(requestAnimationFrame)})
+      await page.evaluate(async () => {for(let frame=0;frame<180;frame++) await new Promise(requestAnimationFrame)})
       return await page.evaluate(async()=>{
         const {stream,camera}=window.viewer,records=[]
         let counts={}
@@ -44,8 +44,13 @@ try {
           for(let p=obj;p;p=p.parent)if(p.name)names.unshift(p.name)
           const attrs=Object.keys(obj.geometry.attributes).sort().join(',')
           const label=(names.join('/')||obj.type)+' '+attrs
+          const textureNames=new Set()
+          for(const material of [obj.material].flat())for(const [slot,t] of Object.entries(material)){
+            if(t?.isTexture)textureNames.add(slot+'='+[t.name,t.image?.currentSrc||t.image?.src].filter(Boolean).join('/')+' '+(t.image?.width??0)+'x'+(t.image?.height??0))
+          }
+          const detail=label+' '+[...textureNames].join(' ')
           obj.onBeforeRender=function(renderer,scene,cam,...rest){
-            const key=(cam===camera?'main ':'mirror ')+label
+            const key=(cam===camera?'main ':'mirror ')+detail
             counts[key]=(counts[key]??0)+1
             return original.call(this,renderer,scene,cam,...rest)
           }

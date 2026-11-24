@@ -52,7 +52,7 @@ def stations(elements, widths, bounds):
             xy=[line.interpolate(d).coords[0] for d in ds]
             refs=dict(zip(vertex_s,way['nodes'],strict=True))
             for d,(x,z) in zip(ds,xy,strict=True):
-                sample=dict(x=x,z=z)
+                sample=dict(x=x,z=z,way=wid)
                 if refs.get(d) in abutments:
                     sample['bridge']=abutments[refs[d]]
                 requests.append(sample)
