@@ -12,5 +12,20 @@
   "ballastHalfWidth": 1.7,
   "ballastSlope": 1.75,
   "sleeperSpacing": 0.6,
-  "mastSpacing": 50
+  "mastSpacing": 50,
+  "station": {
+    "wall": "#e5e5df",
+    "roof": "#bfc3c1",
+    "glass": "#59777e",
+    "frame": "#8d989a",
+    "soffit": "#484e51",
+    "brick": "#ad7262",
+    "green": "#647757",
+    "signColor": "#af342e",
+    "signText": "桂林站",
+    "signHeight": 3.2,
+    "signWidth": 16.0,
+    "canopyHeight": 5.6,
+    "columnSpacing": 18
+  }
 }

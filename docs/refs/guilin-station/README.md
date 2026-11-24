@@ -29,4 +29,4 @@
 | 23 | 沿路堤斜视。碎石道床下方有分段铺砌斜坡。 | [照片](https://upload.wikimedia.org/wikipedia/commons/8/86/China_Railways_YZ25K_345546_20120915.jpg) · [出处](https://commons.wikimedia.org/wiki/File:China_Railways_YZ25K_345546_20120915.jpg) |
 | 24 | 站端沿弯道看远处。可见外侧围护、杆列及山体背景。 | [照片](https://upload.wikimedia.org/wikipedia/commons/a/a2/%E6%A1%82%E6%9E%97%E7%AB%99%E4%B8%8B%E8%A1%8C%E7%AB%AF%E5%BC%AF%E9%81%93.JPG) · [出处](https://commons.wikimedia.org/wiki/File:%E6%A1%82%E6%9E%97%E7%AB%99%E4%B8%8B%E8%A1%8C%E7%AB%AF%E5%BC%AF%E9%81%93.JPG) |
 
-现有夜景为站台视角。站房外立面夜景、背面近景、出站口外侧和路口地面视角仍需补证；以卫星定位道路，照片只用于辨识构件。
+夜景对照采用 21 的站台纵向视角。背立面按 02 与卫星确定体量及窗带，出站口外侧和路口按卫星定位。站房夜间照明与站名字体留待美术定稿。

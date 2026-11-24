@@ -1,3 +1,4 @@
+import {stationWalk} from './station-walk.mjs'
 import {telemetryPreview} from './telemetry-preview.mjs'
 import assert from 'node:assert/strict'
 import {mkdir} from 'node:fs/promises'
@@ -256,6 +257,7 @@ try {
   assert(feel.airborne&&feel.maxLift>1.02&&feel.maxLift<1.36&&feel.bufferedJump&&feel.groundedEnd&&!feel.resets,`jump: ${JSON.stringify(feel)}`)
   console.log('feel & jump OK',JSON.stringify({walk:+feel.walkSpeed.toFixed(2),run:+feel.runSpeed.toFixed(2),stopSlip:+feel.stopSlip.toFixed(2),cutDrift:+feel.cutForwardDrift.toFixed(2),lift:+feel.maxLift.toFixed(2)}))
 
+  await stationWalk(page)
   await fixture([-730.68,-277.1],[-.166,.986],2,'building')
 
   // M6-1: wall-hugging camera 360 sweep must pull in against walls, recover on open street, and never enter buildings or lose LOS.

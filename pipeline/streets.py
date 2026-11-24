@@ -31,6 +31,10 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
         kerb = substring(rongyin.line,248,284).offset_curve(rongyin.width/2+2.02)
         parking_walk = kerb.buffer(4.5,single_sided=True,quad_segs=2)
     rep_excl = replace_exclude if replace_exclude is not None else Polygon()
+    from station_site import station_paving
+    ped_areas, station_walk, station_taxi = station_paving(ped_areas, bounds)
+    sidewalks.extend(station_walk)
+    surfaces.extend(station_taxi)
     for pa in ped_areas:
         clipped_pa = pa.difference(rep_excl) if not rep_excl.is_empty else pa
         if not clipped_pa.is_empty:

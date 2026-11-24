@@ -505,11 +505,13 @@ def export_landmark_glb(
     atlas_metallic=0.05,
     atlas_roughness=0.84,
     double_sided=False,
+    surface=None,
+    masked_atlas=False,
 ):
     atlas_size = image.width
     hi = SceneBuilder(rects, atlas_size=atlas_size, lod=0, collide=True)
     lo = SceneBuilder(rects, atlas_size=atlas_size, lod=1, collide=False)
-    hi.surface=lo.surface=landmark_surface(out_glb.stem)
+    hi.surface=lo.surface=surface or landmark_surface(out_glb.stem)
     build_fn(hi)
     build_fn(lo)
 
@@ -521,6 +523,8 @@ def export_landmark_glb(
             b.atlas, image, f'{mat_prefix}_atlas', (0, 0, 0), atlas_metallic, atlas_roughness, double_sided=double_sided
         )
         if m_atlas is not None:
+            if masked_atlas:
+                m_atlas.visual.material.alphaMode = 'MASK'
             scene.add_geometry(m_atlas, node_name=f'{lod_name}_atlas', parent_node_name=lod_name)
         for role, part in b.street_parts.items():
             mesh=bucket_to_trimesh(part,None,role,roughness=1,double_sided=True)

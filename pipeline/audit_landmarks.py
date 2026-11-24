@@ -226,6 +226,30 @@ def main():
             if peak:entry={'position':peak['center'],'rotation':0}
         if not entry:
             row['status']='missing-instance';continue
+        if key == 'guilin_station':
+            from station_site import footprints
+            survey = footprints()
+            model = ROOT/'public'/spec['model']
+            components = []
+            for elevation, references in (
+                (6, {name: survey[name] for name in ('wall', 'north-wing', 'south-wing')}),
+                (2, {'way/1017598908': area(osm['way/1017598908'])}),
+            ):
+                section = footprint(model, entry, elevation=elevation)
+                parts = list(getattr(section, 'geoms', [section]))
+                for name, target in references.items():
+                    overlaps = [p for p in parts if p.intersection(target).area > 0]
+                    if not overlaps:
+                        components.append(dict(component=name, status='no-overlap'))
+                        continue
+                    shape = max(overlaps, key=lambda p: p.intersection(target).area)
+                    iou, center, angle = metrics(shape, target)
+                    components.append(dict(component=name, iou=round(iou, 3),
+                                           centroidM=round(center, 3), angleDeg=round(angle, 2),
+                                           status='pass' if iou >= .85 and center <= 2 else 'fail'))
+            row.update(reference='docs/layout/guilin-station.geojson + OSM', components=components,
+                       status='pass' if all(c['status'] == 'pass' for c in components) else 'fail')
+            continue
         if key=='zhengyang':
             from landmarks.world_surface import LandmarkSurface, Surface
             model=ROOT/'public'/spec['model']
