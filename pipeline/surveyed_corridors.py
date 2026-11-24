@@ -49,7 +49,13 @@ def restore(output,chunks):
         paths[0]=original['paths']
         if len(paths)>11 and paths[11]:
             paths[11][0]=original['lower']
+        anchors = paths[13] if len(paths)>13 else None
         del paths[original['length']:]
+        if anchors:
+            while len(paths)<14:
+                paths.append(None if len(paths) in (5,11,12,13) else [])
+            paths[12] = None
+            paths[13] = anchors
         collision[7]=original['bed']
         write_chunk(file,raw,start,size,collision)
         tile['bytes']=file.stat().st_size

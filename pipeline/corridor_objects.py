@@ -40,6 +40,7 @@ def relocate(output, manifest, elements, surface):
            and w.get('geometry') and len(w['geometry'])>1 and all(w['geometry'])]
     axes=STRtree(lines)
     moves=defaultdict(list)
+    anchors=defaultdict(dict)
     for key,tile in tiles.items():
         if not tile.get('gradedCorridor'):
             continue
@@ -100,7 +101,9 @@ def relocate(output, manifest, elements, surface):
                     ny=max(ny,float(eval_bspline_grid(grid,0,0,np.array([nx-dest[0]]),np.array([nz-dest[1]]))[0]))
                 ny+=.195
             value=[round((nx-dest[0])*scale),round((nz-dest[1])*scale)]
-            if not field:
+            if field:
+                anchors[dest][f"{value[0]},{value[1]}"] = round(ny*1000)
+            else:
                 value.extend((round(ny*10),*trees[i][3:]))
             moves[key].append((field,i,None))
             moves[dest].append((field,None,value))
@@ -121,6 +124,11 @@ def relocate(output, manifest, elements, surface):
                 records=TREE.iter_unpack(gzip.decompress(path.read_bytes())) if path.exists() else ()
                 kept=[v for i,v in enumerate(records) if i not in removed]
                 path.write_bytes(gzip.compress(b''.join(TREE.pack(*v) for v in kept+inserted),mtime=0))
+        if key in anchors:
+            paths = collision[1]
+            while len(paths)<14:
+                paths.append(None if len(paths) in (5,11,12,13) else [])
+            paths[13] = {**(paths[13] or {}), **anchors[key]}
         write_chunk(file,raw,start,size,collision)
         tile['bytes']=file.stat().st_size
     return {name:sum(k==field and i is not None for edits in moves.values() for k,i,_ in edits)
