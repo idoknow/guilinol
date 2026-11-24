@@ -593,3 +593,5 @@ if __name__=='__main__':
     if not args.plan_profile:
         path.write_text(json.dumps(manifest,separators=(',',':'))+'\n')
     print(json.dumps(report,indent=2))
+    if args.plan_profile and not report['profile']['feasible']:
+        raise SystemExit(2)
