@@ -343,10 +343,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const updateSmokePrompt=smokeEnabled()?createSmokePrompt(scene,camera):()=>{}
   const smokeHint=document.createElement('button')
   smokeHint.type='button'
-  smokeHint.className='smoke-hint'
+  smokeHint.className='smoke-hint btn-smoke'
   smokeHint.hidden=true
   if(smokeEnabled()){
-    document.body.append(smokeHint)
     void fetch('/api/smoke').then(r=>r.json()).then(data=>{if(validRules(data))Object.assign(rules,data)}).catch(()=>{})
   }
   function usable(){return active && !rides?.bike && !rides?.car && !rides?.boat && !isModalOrOverlayOpen() && !document.body.dataset.shopOpen && document.body.dataset.photo!=='on'}
@@ -1249,6 +1248,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const input=walkInput(canvas,()=>active,(dx,dy)=>{yaw-=dx*cfg.sensitivity;pitch=THREE.MathUtils.clamp(pitch+dy*cfg.sensitivity,-.8,1.3)},
     delta=>{arm=THREE.MathUtils.clamp(arm+delta*.013,cfg.zoomMin,cfg.zoomMax);if(active)follow(0,true)},
     ()=>{arm=arm>(cfg.far+cfg.near)/2?cfg.near:cfg.far;if(active)follow(0,true)})
+  if(smokeEnabled())document.querySelector('.walk-ui')!.append(smokeHint)
+
   const safe=new THREE.Vector3(),posOut=new THREE.Vector3(),wish=new THREE.Vector2();const spawns:object[]=[]
   let external:{x:number,z:number,run:boolean}|null=null,blockedWater=false,held=false
   const still={right:0,forward:0,run:false,crouch:false,jump:false}
@@ -2718,7 +2719,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const label=cigarette.prompt
       smokeHint.hidden=!label||!usable()
       const hint=touchUi()?label:({'':'',撕开:'请按 F 键撕开烟盒封条',拿取:'请按 F 键拿取香烟',点燃:'请按 F 键点燃香烟',吸一口:'F 键吸一口'}[label]).replace('F',bindingLabel('interact'))
-      updateSmokePrompt(smokeHint.hidden?'':hint)
+      updateSmokePrompt(smokeHint.hidden||touchUi()?'':hint)
       if(smokeHint.textContent!==hint)smokeHint.textContent=hint
       if(cigarette.advance(dt))smoking.drop()
       smoking.tick(dt,cigarette.view(),isFirstPerson())

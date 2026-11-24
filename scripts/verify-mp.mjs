@@ -71,7 +71,7 @@ async function verify(){
     for(const phase of ['sealed','open','ready','smoking']){
       for(const page of pages){
         await page.waitForFunction(phase=>window.viewer.walk.net.probe().some(peer=>peer.ready&&peer.smoke===phase),phase)
-        await page.locator('.smoke-hint').waitFor()
+        await page.waitForFunction(()=>window.viewer.camera.getObjectByName('smoke-prompt')?.visible)
       }
       await Promise.all(pages.map(page=>page.keyboard.press('f')))
     }

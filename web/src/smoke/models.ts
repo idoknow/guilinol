@@ -130,6 +130,7 @@ export interface PackModel {
   lid: THREE.Group
   /** 从盒口探出来的那根烟（取烟时露头） */
   filters: THREE.Mesh[]
+  peeled: THREE.Mesh
   seal: THREE.Mesh
   peek: THREE.Object3D
   parts: Parts
@@ -185,6 +186,9 @@ export function createPack(brand: BrandDef, parts = new Parts()): PackModel {
   const seal=new THREE.Mesh(parts.geo(new THREE.BoxGeometry(.003,PACK_H,.0006)),
     parts.mat(new THREE.MeshStandardMaterial({color:0xf5ecc4,transparent:true,opacity:.65})))
   seal.position.set(.018,0,PACK_D/2+.001);group.add(seal)
+  const peeled=new THREE.Mesh(parts.geo(new THREE.BoxGeometry(1,.003,.0006)),seal.material)
+  peeled.visible=false
+  group.add(peeled)
   const filterGeo=parts.geo(new THREE.CylinderGeometry(.00325,.00325,.008,12))
   const filterMat=parts.mat(new THREE.MeshStandardMaterial({color:brand.tip}))
   const filters:THREE.Mesh[]=[]
@@ -196,7 +200,7 @@ export function createPack(brand: BrandDef, parts = new Parts()): PackModel {
   }
   const tip=new THREE.Mesh(filterGeo,filterMat)
   tip.position.y=.022;peek.add(tip)
-  return {group, lid, peek, seal, filters,parts}
+  return {group, lid, peek, seal, peeled, filters,parts}
 }
 
 /* --------------------------------------------------------------- 一根香烟 */
@@ -480,33 +484,6 @@ export function createStub(brand: BrandDef, parts = new Parts()): THREE.Group {
   group.add(charred)
   // 躺在地上，稍微歪一点才不像尺子
   group.rotation.z = 0.02
-  return group
-}
-
-/* --------------------------------------------------------- 第一人称的假手 */
-
-/** 视角里那只握着东西的手：手掌 + 拇指，够用了 */
-export function createMitt(skin: string, mirror = false, parts = new Parts()): THREE.Group {
-  const group = new THREE.Group()
-  group.name = 'smoke-mitt'
-  const material = parts.mat(new THREE.MeshStandardMaterial({color: skin, roughness: 0.86}))
-  const palm = new THREE.Mesh(parts.geo(new THREE.CapsuleGeometry(0.028, 0.052, 4, 12)), material)
-  palm.rotation.z = Math.PI / 2
-  palm.scale.set(.82,.68,.55)
-  group.add(palm)
-  const thumb = new THREE.Mesh(parts.geo(new THREE.CapsuleGeometry(0.011, 0.026, 3, 8)), material)
-  thumb.scale.set(.76,.76,.76)
-  thumb.position.set(mirror ? -.017 : .017, .021, .006)
-  thumb.rotation.z = mirror ? -0.7 : 0.7
-  group.add(thumb)
-  const digit=parts.geo(new THREE.CapsuleGeometry(.006,.021,3,8))
-  for(let i=0;i<4;i++){
-    const finger=new THREE.Mesh(digit,material)
-    finger.position.set((mirror?-1:1)*(.023-i*.012),.008,.015)
-    finger.rotation.x=-.95+i*.16
-    if(mirror&&i===0){finger.rotation.z=.76;finger.position.x=-.026}
-    group.add(finger)
-  }
   return group
 }
 

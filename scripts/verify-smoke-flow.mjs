@@ -16,7 +16,7 @@ try{
       const page=await browser.newPage({viewport:{width,height},hasTouch:touch,isMobile:touch})
       page.setDefaultTimeout(30000)
       page.on('pageerror',error=>console.error('page error:',error.message))
-      const dir=`captures/smoke-flow/${width}-${view}`
+      const dir=`captures/smoke-flow/round-2/${width}-${view}`
       await mkdir(dir,{recursive:true})
       await page.addInitScript(view=>localStorage.setItem('glol.prefs',JSON.stringify({view})),view)
       await page.goto(base+'/?verify&mode=walk&flow=0',{waitUntil:'domcontentloaded'})
@@ -34,7 +34,7 @@ try{
         return slot.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))
       },null,{timeout:90000})
       if(view==='third'){
-        await page.evaluate(()=>window.viewer.walk.face(window.viewer.walk.yaw+Math.PI-.35,.08))
+        await page.evaluate(()=>window.viewer.walk.face(window.viewer.walk.yaw+Math.PI-.95,.08))
         await page.mouse.move(width/2,height*.6)
         await page.mouse.wheel(0,-1200)
       }
@@ -51,21 +51,55 @@ try{
       })
       await select()
       async function press(label){
-        await hint.filter({hasText:label}).waitFor()
-        if(touch)await hint.tap()
-        else await page.keyboard.press('f')
+        if(touch){
+          await hint.filter({hasText:label}).waitFor()
+          const clear=await hint.evaluate(el=>{
+            const r=el.getBoundingClientRect()
+            const overlap=b=>r.left<b.right&&r.right>b.left&&r.top<b.bottom&&r.bottom>b.top
+            const controls=document.querySelectorAll('.walk-ui button,.joystick,.hotbar,.dock-buttons button,.vehicle-action')
+            return r.width>=44&&r.height>=44&&[...controls].every(c=>c===el||!c.getClientRects().length||!overlap(c.getBoundingClientRect()))
+          })
+          assert(clear,'touch action must have a free 44px hit target')
+          await hint.tap()
+        }else{
+          await page.waitForFunction(()=>window.viewer.camera.getObjectByName('smoke-prompt')?.visible)
+          await page.keyboard.press('f')
+        }
       }
       async function capturePhase(name,phase,minProgress=0,puff=false){
         await page.waitForFunction(({phase,minProgress,puff})=>{
           const v=window.viewer.walk.probe().smoke
           const waiting=['sealed','open','ready','smoking'].includes(phase)&&!puff
           if(waiting&&(v.progress<.18||document.querySelector('.smoke-hint').hidden))return false
-          if(v.phase!==phase || v.progress<minProgress || (puff && v.puff<.25))return false
+          if(v.phase!==phase || v.progress<minProgress || (puff && v.puff<.98))return false
           return true
-        },{phase,minProgress,puff},{polling:'raf'})
+        },{phase,minProgress,puff},{polling:'raf'}).catch(async error=>{
+          console.error('Missed phase',phase,await page.evaluate(()=>({smoke:window.viewer.walk.probe().smoke,focus:document.activeElement?.className,interactions:window.worldInteractions})))
+          throw error
+        })
         await page.evaluate(()=>window.viewer.freeze())
         try{
           assert.equal(await page.evaluate(()=>window.viewer.walk.probe().smoke.phase),phase)
+          if(['sealed','ready'].includes(phase)){
+            const center=await page.evaluate(()=>{
+              const camera=window.viewer.camera,prompt=camera.getObjectByName('smoke-prompt')
+              const p=prompt.getWorldPosition(camera.position.clone()).project(camera)
+              return {visible:prompt.visible,x:p.x,y:p.y}
+            })
+            assert.equal(center.visible,!touch)
+            if(!touch)assert(Math.hypot(center.x,center.y)<.001,'3D text must project to the optical centre')
+          }
+          if(view==='first' && (phase==='ready' || phase==='smoking')){
+            const geometry=await page.evaluate(()=>{
+              const camera=window.viewer.camera,cig=camera.getObjectByName('smoke-cigarette')
+              const point=z=>cig.localToWorld(camera.position.clone().set(0,0,z))
+              const filter=point(-.02).project(camera)
+              const axis=camera.worldToLocal(point(.064)).sub(camera.worldToLocal(point(-.02)))
+              return {x:filter.x,y:filter.y,forward:axis.z,down:axis.y}
+            })
+            assert(Math.abs(geometry.x)<.002 && geometry.y< -1 && geometry.y> -1.25,'filter must meet the lower centre edge')
+            assert(geometry.forward<-.08 && geometry.down<0,'ember must point forward and slightly down')
+          }
           // Let the compositor present the last WebGL frame before the screenshot.
           await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
           await shot(name)
@@ -78,6 +112,14 @@ try{
       await press('拿取')
       await capturePhase('05-take','take',.28)
       await capturePhase('06-mouth','ready')
+      if(width===1440 && view==='third'){
+        await page.evaluate(()=>{
+          const c=window.viewer.camera,lips=c.parent.getObjectByName('smoke-lips')
+          const p=lips.getWorldPosition(c.position.clone()).project(c)
+          const w=innerWidth,h=innerHeight,scale=4
+          c.setViewOffset(w,h,(p.x+1)*w/2-w*.36/scale,(1-p.y)*h/2-h*.40/scale,w/scale,h/scale)
+        })
+      }
       await press('点燃')
       await capturePhase('07-light','light',.45)
       await capturePhase('08-lit','smoking')

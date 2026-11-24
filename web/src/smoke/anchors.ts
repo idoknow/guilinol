@@ -27,8 +27,4 @@ export const VIEW_ANCHORS = {
   restL: new THREE.Vector3(-0.2, -0.44, -0.3),
   /** 右手夹烟 */
   handR: new THREE.Vector3(0.13, -0.14, -0.35),
-  /** 点烟时打火机抬到嘴边 */
-  handRLight: new THREE.Vector3(0.05, -0.06, -0.27),
-  /** 嘴的位置（就是镜头底下一点） */
-  mouth: new THREE.Vector3(0.018, -0.023, -0.094),
 } as const

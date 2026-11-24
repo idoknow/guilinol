@@ -136,3 +136,7 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   output{bottom:calc(376px + env(safe-area-inset-bottom))}
   body[data-aboard] .hud-stats,body[data-hud="street"][data-aboard] .hud-stats{max-width:min(46vw,180px)}
 }
+
+.walk-ui .btn-smoke{position:fixed;right:calc(196px + var(--sr));bottom:calc(108px + var(--sb));min-width:54px;height:46px;border-radius:23px;touch-action:manipulation;font-size:15px}
+.walk-ui .btn-smoke[hidden]{display:none}
+@media(max-height:500px){.walk-ui .btn-smoke{right:calc(183px + var(--sr));bottom:calc(84px + var(--sb))}}

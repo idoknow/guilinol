@@ -15,7 +15,9 @@ export function createSmokePrompt(scene:THREE.Scene,camera:THREE.Camera){
   text.renderOrder=100
   text.layers.set(2)
   camera.layers.enable(2)
-  scene.add(text)
+  if(!camera.parent)scene.add(camera)
+  camera.add(text)
+  text.name='smoke-prompt'
   let previous=''
   return function update(label:string){
     text.visible=!!label
@@ -32,7 +34,9 @@ export function createSmokePrompt(scene:THREE.Scene,camera:THREE.Camera){
       map.needsUpdate=true
       previous=label
     }
-    text.scale.set(1,.125,1)
-    camera.getWorldDirection(text.position).multiplyScalar(1.7).add(camera.position)
+    const height=.23/camera.projectionMatrix.elements[5]
+    text.scale.set(8*height,height,1)
+    text.position.set(0,0,-1).applyMatrix4(camera.projectionMatrixInverse)
+    text.position.multiplyScalar(-1.7/text.position.z)
   }
 }
