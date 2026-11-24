@@ -9,6 +9,8 @@ export interface Walker {
   hold(on:boolean):void; face(yaw:number,pitch?:number):void; showFigure(on:boolean):void
   /** Right-hand attachment point for hand-held gear (IDOK-182). */
   handAnchor?():THREE.Object3D
+  /** Raise/relax the right arm while a camera is equipped (IDOK-188). */
+  setCameraHold?(on:boolean,pose?:{aim?:{forward?:number;up?:number;side?:number}}):void
 }
 export interface Clock {hour:number; weather:Weather; flowing:boolean; goal:number|null; set(hour:number,weather?:Weather):void}
 export interface Host {
