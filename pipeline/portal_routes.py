@@ -34,6 +34,7 @@ def routes(elements,network,nodes):
         for i in range(math.floor((x-64)/256),math.floor((x+64)/256)+1):
             for j in range(math.floor((z-64)/256),math.floor((z+64)/256)+1):
                 bins[i,j].append((x,z))
+    bridges=set()
     graph=defaultdict(list)
     coords={}
     for w in elements:
@@ -42,6 +43,7 @@ def routes(elements,network,nodes):
             continue
         # Player verification may cross private ways in either direction.
         # Keep explicit vehicle-class exclusions and normal traffic permissions.
+        if tags.get('bridge','no')!='no':bridges.add(w['id'])
         test_tags={k:v for k,v in tags.items() if not (k=='access' and v=='private')}
         modes=tuple(m for m in ('car','foot','bicycle','bike') if permits(test_tags,m))
         points=[ll2xz(p['lat'],p['lon']) for p in w['geometry']]
@@ -100,5 +102,7 @@ def routes(elements,network,nodes):
                         break
         if not any(not m.get('boundary') for m in entry['modes']):
             entry['links']=[dict(way=w,underground=sub,permitted=modes) for _,_,sub,w,modes in graph[n]]
+        for test in entry['modes']:
+            if test['route'][0][2] in bridges:test['startStructure']='bridge'
         result.append(entry)
     return result

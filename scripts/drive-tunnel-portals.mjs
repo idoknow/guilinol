@@ -36,7 +36,7 @@ try{
     for(const {id,way,x,z,route,boundary,direction,startHeight:y,heading} of tests){
       try{
         let ready=false,setupError
-        for(const [along,side] of [[0,0],[-.9,.7],[.9,-.7],[-.8,-.65],[.8,.65]]){
+        for(const [along,side] of [[0,0],[-.9,.7],[.9,-.7],[-.8,-.65],[.8,.65],[0,1.25],[0,-1.25],[-1.8,1],[-1.8,-1]]){
           try{
             ready=await page.evaluate(async({x,z,y,heading})=>{
               const w=window.viewer.walk
@@ -73,7 +73,15 @@ try{
               if(part===route.length-1&&progress>=len-(boundary&&mode==='car'?2.12*.85:0)&&cross<2){completed=true;break}
               // Aim ahead through intermediate bends while retaining the final
               // station as a real crossing gate for the measured vehicle.
-              if(part<route.length-1&&progress>len-1.2&&cross<3.5){part++;continue}
+              if(part<route.length-1){
+                const [nx,nz]=route[part+1],nextLength=Math.hypot(nx-x,nz-z)
+                const alongNext=((p.x-x)*(nx-x)+(p.z-z)*(nz-z))/nextLength
+                const lateralNext=Math.abs((p.x-x)*(nz-z)-(p.z-z)*(nx-x))/nextLength
+                // A vehicle rounding a sharp corner can enter the next leg
+                // without its centre passing through the vertex itself.
+                const rounded=alongNext>0&&lateralNext<cross&&lateralNext<2&&progress>len-5
+                if((progress>len-1.2&&cross<3.5)||rounded){part++;continue}
+              }
               let ahead=Math.max(0,progress)+(mode==='car'?6.5:3.5)
               let tx=a+ahead*dx,tz=b+ahead*dz
               // Steer through bends within the vehicle's turning radius.
