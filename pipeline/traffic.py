@@ -380,8 +380,12 @@ def bake(output, manifest, rendered_roads=None):
             (output/'vehicle-tunnel-grades.json').write_bytes(request.read_bytes())
         ground_passages.bake(output,manifest,elements,sections,garage_curbs)
         ground_passages.level_soffits(output,manifest,elements,sections)
+        from verge_crossings import open_verges
+        open_verges(output,manifest,elements,sections)
         portal_landings.carriageways(output,manifest,elements,sections)
         grade_service_overpass(output,manifest,elements)
+        from terminal_decks import grade_zhongshan_merge
+        grade_zhongshan_merge(output,manifest,elements)
         trim_bridge_endcaps(output,manifest,elements)
         if network['edges']:
             route_file=output/'vehicle-portal-routes.json'

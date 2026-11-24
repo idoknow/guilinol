@@ -195,6 +195,55 @@ def grade_service_overpass(output, manifest, elements):
                  {bridge_id:levels},spans=(bridge_id,))
 
 
+def grade_zhongshan_merge(output, manifest, elements):
+    """Tie each bridge lane to the parallel ground carriageway at its fork."""
+    from canal_passages import sample_road_heights
+    from shapely import Point
+
+    pairs=((727687393,727682108,False),(727687399,727682113,True))
+    ids={wid for bridge,ground,_ in pairs for wid in (bridge,ground)}
+    ways={w['id']:w for w in elements if w['type']=='way' and w['id'] in ids}
+    if ways.keys()!=ids:
+        return
+    x,z,width_,depth=manifest['extent']
+    bounds=box(x,z,x+width_,z+depth)
+    axes,stations,levels={},{},{}
+    for bridge,ground,reverse in pairs:
+        axis=LineString(points(ways[bridge]))
+        if not bounds.covers(axis):
+            return
+        if reverse:
+            axis=axis.reverse()
+        adjoining=LineString(points(ways[ground]))
+        shared=axis.intersection(adjoining.buffer(5))
+        end=max(axis.project(Point(p)) for p in shared.coords)
+        ds=np.arange(0,103,2)
+        requests=[]
+        for d in ds:
+            centre=np.array(axis.interpolate(d).coords[0])
+            a,b=(np.array(axis.interpolate(v).coords[0]) for v in (max(0,d-.1),d+.1))
+            dx,dz=(b-a)/np.linalg.norm(b-a)
+            for side in (-2,-1,0,1,2):
+                px,pz=centre+side*np.array([-dz,dx])
+                requests.append(dict(x=px,z=pz,roofProbe=True))
+        hits=np.array(sample_road_heights(output,manifest,requests),dtype=float).reshape(-1,5,2)
+        deck=np.nanmedian(hits[:,:,1],axis=1)
+        if not np.isfinite(deck[1:]).all():
+            raise ValueError(f'Missing Zhongshan fork slab on {bridge}')
+        if not np.isfinite(deck[0]):
+            deck[0]=deck[1]
+        y=np.maximum(deck,hits[:,:,0].max(axis=1)+.015)
+        y[ds>end+5]=deck[ds>end+5]
+        for i in range(1,len(ds)):
+            y[i]=max(y[i],y[i-1]-.035*2)
+        for i in range(len(ds)-2,-1,-1):
+            y[i]=max(y[i],y[i+1]-.035*2)
+        if abs(y[-1]-deck[-1])>.005:
+            raise ValueError(f'Insufficient transition length on bridge {bridge}')
+        axes[bridge],stations[bridge],levels[bridge]=axis,ds,y
+    update_slabs(output,manifest['chunks'],axes,stations,levels,spans=tuple(axes))
+
+
 def update_slabs(output,chunks,axes,stations,ys,spans=SPANS):
     # GL04 is shared with previously released worlds. Recover each continuous
     # slab across tile seams to avoid moving a nearby lower road or canopy.
