@@ -1638,13 +1638,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       mountedStaticCar.visible=false
       carRig.root.visible=true
       const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading),baseY=footY
-      const center=sim.groundSurface(pos.x,pos.z,baseY,.35,.75)
-      figure.position.y=center?.y??baseY-.03
+      const center=wheelSupportY(pos.x,pos.z,baseY,.35,.75)
+      figure.position.y=center??baseY-.03
       let groundRoll=0,groundPitch=rides.pitch
-      if(center){
+      if(center!==undefined){
         const rx=-fz,rz=fx
-        const contact=(forward:number,right:number)=>sim.groundSurface(
-          pos.x+fx*forward+rx*right,pos.z+fz*forward+rz*right,center.y,.85,1.7)?.y
+        const contact=(forward:number,right:number)=>wheelSupportY(
+          pos.x+fx*forward+rx*right,pos.z+fz*forward+rz*right,center,.85,1.7)
         const fl=contact(1.34,-.795),fr=contact(1.34,.795),bl=contact(-1.31,-.795),br=contact(-1.31,.795)
         if(fl!==undefined&&fr!==undefined&&bl!==undefined&&br!==undefined){
           const front=(fl+fr)/2,back=(bl+br)/2,slope=(front-back)/2.65
@@ -1680,13 +1680,13 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     }else if(rides?.bike){
       releaseDynamicCar()
       const fx=-Math.sin(rides.heading),fz=-Math.cos(rides.heading),baseY=footY
-      const center=sim.groundSurface(pos.x,pos.z,baseY,.25,.55)
-      figure.position.y=center?.y??baseY-.03
+      const center=wheelSupportY(pos.x,pos.z,baseY,.25,.55)
+      figure.position.y=center??baseY-.03
       let wheelPitch=rides.pitch
-      if(center){
+      if(center!==undefined){
         const front=rides.rideKind==='bike'?.66:.54,rear=rides.rideKind==='bike'?.62:.54
-        const f=sim.groundSurface(pos.x+fx*front,pos.z+fz*front,center.y,.5,1)?.y
-        const b=sim.groundSurface(pos.x-fx*rear,pos.z-fz*rear,center.y,.5,1)?.y
+        const f=wheelSupportY(pos.x+fx*front,pos.z+fz*front,center,.5,1)
+        const b=wheelSupportY(pos.x-fx*rear,pos.z-fz*rear,center,.5,1)
         if(f!==undefined&&b!==undefined){
           const slope=(f-b)/(front+rear)
           wheelPitch=Math.atan(slope)
@@ -2113,7 +2113,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(rides?.bike&&!wasBike){
       const bx=rides.bike.position.x,bz=rides.bike.position.z,cur=sim.body.translation()
       sim.sync(bx,bz,true)
-      const sup=supportAt(bx,bz,rides.bike.position.y)
+      const sup=sim.groundSurface(bx,bz,rides.bike.position.y,.55,1.8)??supportAt(bx,bz,rides.bike.position.y)
       const by=sup?sup.y:rides.bike.position.y
       ridePose.startMount({x:cur.x,y:cur.y-cfg.height/2,z:cur.z},figure.rotation.y)
       ebikeMountStartPos.set(cur.x,cur.y-cfg.height/2,cur.z)

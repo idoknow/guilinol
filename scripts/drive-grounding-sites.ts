@@ -28,7 +28,7 @@ try{
   for(const [kind,field] of [['car','cars'],['bike','bikes'],['bicycle','bicycles']]){
     const page=await browser.newPage({viewport:{width:600,height:400}})
     const bays=cases.map(c=>c.row)
-    const body=gzipSync(JSON.stringify({...withFixtureBays(vehicles,bays),cars:[],bicycles:[],bikes:[],sharedBikes:[],[field]:bays}))
+    const body=gzipSync(JSON.stringify({...(kind==='bike'?withFixtureBays(vehicles,bays):vehicles),cars:[],bicycles:[],bikes:[],sharedBikes:[],[field]:bays}))
     await page.route('**/world/vehicles.bin',route=>route.fulfill({body}))
     await page.goto('http://127.0.0.1:'+server.httpServer.address().port+'/?verify&mode=walk&radius=480&flow=0')
     await page.waitForFunction(()=>window.viewer?.walk?.parked().length,null,{timeout:60000})
@@ -42,6 +42,7 @@ try{
           const v=window.viewer,w=v.walk,rig=v.stream.scene.getObjectByName('dynamic-'+(k==='bike'?'ebike':k)),trace=[]
           const points=k==='car'?[[-.795,-1.34],[.795,-1.34],[-.795,1.31],[.795,1.31]]:k==='bike'?[[0,-.66],[0,.62]]:[[0,-.54],[0,.54]]
           if(k==='bike'){w.ebike.setPark(false,true);w.ebike.setKickstand(false,true)}
+          const start=w.position.clone()
           await v.freeze()
           window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyW',bubbles:true}))
           try{
@@ -51,6 +52,7 @@ try{
               if(i%5===0){
                 rig.updateWorldMatrix(true,false)
                 trace.push(points.map(([x,z])=>rig.position.clone().set(x,0,z).applyMatrix4(rig.matrixWorld).toArray()))
+                if(Math.hypot(w.position.x-start.x,w.position.z-start.z)>=6)break
               }
             }
           }finally{window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyW',bubbles:true}));v.resume()}
