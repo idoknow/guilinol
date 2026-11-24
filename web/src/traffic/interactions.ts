@@ -1,5 +1,5 @@
 import {Raycaster,Vector3,type Camera,type Scene} from 'three'
-import {npcDefaults} from '../../../lib/npc'
+import {NPC_VOICE_PAUSED,npcDefaults} from '../../../lib/npc'
 import {rideSoundMuted,RIDE_SOUND_EVENT,masterVolume,VOLUME_EVENT} from '../walk/ride-sound-pref'
 import type {Traffic} from './sim'
 import './interactions.css'
@@ -47,11 +47,13 @@ export function interactions(scene:Scene,camera:Camera,rules:typeof npcDefaults)
       if(time>=state.next){
         state.next=time+interval(walk)
         if(audible&&!walk&&rules.horn&&distance<120)horn(actor,geometry(actor))
-        const speech=window.speechSynthesis
-        if(audible&&walk&&rules.mutter&&distance<25&&speech&&!speech.speaking&&!speech.pending&&!said){
-          const voice=speech.getVoices().find(item=>/^zh(?:[-_]|$)/i.test(item.lang))
-          if(voice){const line=new SpeechSynthesisUtterance(pick(rules.mutterLines));line.lang='zh-CN';line.voice=voice;line.volume=level*rules.volume*(1-distance/25);said=line
-            line.onend=line.onerror=()=>{if(said===line)said=undefined};speech.speak(line);setTimeout(()=>{if(said===line){speech.cancel();said=undefined}},3000)}
+        if(!NPC_VOICE_PAUSED&&audible&&walk&&rules.mutter&&distance<25){
+          const speech=window.speechSynthesis
+          if(speech&&!speech.speaking&&!speech.pending&&!said){
+            const voice=speech.getVoices().find(item=>/^zh(?:[-_]|$)/i.test(item.lang))
+            if(voice){const line=new SpeechSynthesisUtterance(pick(rules.mutterLines));line.lang='zh-CN';line.voice=voice;line.volume=level*rules.volume*(1-distance/25);said=line
+              line.onend=line.onerror=()=>{if(said===line)said=undefined};speech.speak(line);setTimeout(()=>{if(said===line){speech.cancel();said=undefined}},3000)}
+          }
         }
       }
       if(walk&&rules.bubble&&player&&previous&&time-state.lastBump>=6&&Math.abs(player.y-actor.y)<2.5&&Math.hypot(player.x-actor.x,player.z-actor.z)<(vehicle?1.4:.65)&&Math.hypot(dx-actor.speed*actor.track.dx,dz-actor.speed*actor.track.dz)>=rules.bumpSpeed){

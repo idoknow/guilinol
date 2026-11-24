@@ -1409,7 +1409,7 @@ const pages: Record<string, (view: View) => void> = {
         h('div',{class:'adm-cols adm-npc-cols'},
           card('声音',[
             toggle('horn','车辆鸣笛','每辆车 10–30 秒随机按一次，越远越轻'),
-            toggle('mutter','行人念叨','玩家 25 米内的路人 15–45 秒说一句，用浏览器的中文语音'),
+            toggle('mutter','行人念叨','玩家 25 米内的路人 15–45 秒说一句，用浏览器的中文语音（当前已在代码中统一暂停路人语音播报，配置仍保留可随时恢复）'),
             h('div',{class:'adm-npc-volume'},h('span',{class:'adm-npc-label'},'NPC 音量'),vol,volText),
             h('p',{class:'adm-sub'},'在玩家自己设置的总音量基础上再乘这个比例。'),
           ]),
