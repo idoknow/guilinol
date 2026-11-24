@@ -33,6 +33,7 @@
     "verify:spawn": "node scripts/spawn-pool.mjs --check",
     "verify:atlas": "node --experimental-strip-types scripts/atlas.mjs",
     "verify:walk": "npm run verify:walk:quick",
+    "verify:walk:test-ride": "node scripts/verify-test-ride-end.mjs",
     "verify:walk:quick": "node scripts/walk-quick.mjs",
     "verify:walk:full": "node scripts/walk.mjs",
     "verify:ride": "node scripts/ride.mjs && node scripts/verify-zone-impact.mjs bike bicycle",
