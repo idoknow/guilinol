@@ -11,7 +11,7 @@ WAY_KEYS = ['aeroway', 'building', 'highway', 'natural', 'waterway', 'water', 'l
             'railway', 'bridge', 'man_made', 'tourism', 'historic', 'amenity']
 REL_KEYS = ['aeroway', 'building', 'natural', 'waterway', 'water', 'leisure', 'landuse']
 NODE_KEYS = ['tourism', 'historic', 'place', 'amenity', 'shop', 'barrier']
-NODE_KV = {('natural', 'peak'), ('railway', 'station'), ('natural', 'tree')}
+NODE_KV = {('natural', 'peak'), ('railway', 'station'), ('railway', 'level_crossing'), ('railway', 'crossing'), ('natural', 'tree')}
 CROSS = {'crossing', 'traffic_signals', 'bus_stop', 'street_lamp'}
 
 def inside(lat, lon):
