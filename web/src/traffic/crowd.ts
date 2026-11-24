@@ -1,6 +1,7 @@
 import {touchUi} from '../ui/input-mode'
 import {mainDetail} from '../look/mirror-layer'
 import * as THREE from 'three'
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js'
 import {clone} from 'three/addons/utils/SkeletonUtils.js'
 import {browNames, eyeNames, faceNames, hairStyles, looks, type Avatar} from '../../../lib/avatar'
 import {avatar as figure} from '../look/avatar'
