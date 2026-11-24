@@ -5,6 +5,7 @@ import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
 import {warmShaders} from './shader-warmup'
 import {vehicleModel} from './walk/vehicle-model'
+import {nightLit} from './look/night'
 import {bytes, fetchAsset, measureFirstWorldBytes, openingTerrain, startOverview, type Manifest} from './world'
 import {Stream} from './stream'
 import {flight} from './flight'
@@ -322,6 +323,10 @@ async function start(loader:FullLoader,creatorSpawn=false) {
           parked.setColorAt(0,new THREE.Color(0xffffff))
           const variants=new THREE.Group(),mapped=new THREE.MeshStandardMaterial({map:new THREE.Texture(),flatShading:true})
           variants.add(parked,new THREE.Mesh(bike.geometry,mapped))
+          for(const cutout of [false,true]){
+            const sign=new THREE.MeshStandardMaterial({map:mapped.map,emissiveMap:mapped.map,alphaTest:cutout?.5:0,side:cutout?THREE.DoubleSide:THREE.FrontSide})
+            sign.name='arrival_signs';nightLit(sign);variants.add(new THREE.Mesh(bike.geometry,sign))
+          }
           try{await warmPrograms(variants)}finally{parked.dispose()}
         }
         await warmPrograms(scene);walkProgramsReady=true
