@@ -588,7 +588,24 @@
     "measuredClearance": null,
     "railY": 154.6807,
     "roadY": 152.4274,
-    "designClearanceM": -3.4533
+    "designClearanceM": -3.4533,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 10.003,
+      "requiredRailY": 144.6774,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 154.6807,
+      "permittedRiseFromWitnessM": 1.4441,
+      "witness": {
+        "rail": 213171601,
+        "road": 691060994,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2624542,
+        "lon": 110.277378
+      }
+    }
   },
   {
     "rail": 221803908,
@@ -1085,7 +1102,24 @@
     "measuredClearance": null,
     "railY": 159.3141,
     "roadY": 160.9712,
-    "designClearanceM": 0.4571
+    "designClearanceM": 0.4571,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 6.093,
+      "requiredRailY": 153.2212,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 159.3141,
+      "permittedRiseFromWitnessM": 5.955,
+      "witness": {
+        "rail": 259082251,
+        "road": 815078159,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "carriageway",
+        "lat": 25.3643338,
+        "lon": 110.3024075
+      }
+    }
   },
   {
     "rail": 259082251,
@@ -1131,7 +1165,24 @@
     "measuredClearance": null,
     "railY": 159.459,
     "roadY": 160.9596,
-    "designClearanceM": 0.3006
+    "designClearanceM": 0.3006,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 6.249,
+      "requiredRailY": 153.2096,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 159.459,
+      "permittedRiseFromWitnessM": 5.8101,
+      "witness": {
+        "rail": 259082251,
+        "road": 815078159,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "carriageway",
+        "lat": 25.3643338,
+        "lon": 110.3024075
+      }
+    }
   },
   {
     "rail": 259082251,
@@ -2922,7 +2973,24 @@
     "measuredClearance": null,
     "railY": 163.0326,
     "roadY": 162.8811,
-    "designClearanceM": -1.3514
+    "designClearanceM": -1.3514,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 6.851,
+      "requiredRailY": 156.1811,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 166.2552,
+      "permittedRiseFromWitnessM": 0.3252,
+      "witness": {
+        "rail": 454948576,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2429173,
+        "lon": 110.201046
+      }
+    }
   },
   {
     "rail": 454948576,
@@ -2978,7 +3046,24 @@
     "measuredClearance": null,
     "railY": 162.872,
     "roadY": 162.879,
-    "designClearanceM": -1.193
+    "designClearanceM": -1.193,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 6.693,
+      "requiredRailY": 156.179,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 166.0946,
+      "permittedRiseFromWitnessM": 0.4857,
+      "witness": {
+        "rail": 454948576,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2429173,
+        "lon": 110.201046
+      }
+    }
   },
   {
     "rail": 454948576,
@@ -3005,7 +3090,24 @@
     "measuredClearance": null,
     "railY": 163.3577,
     "roadY": 160.8803,
-    "designClearanceM": 1.2774
+    "designClearanceM": 1.2774,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 3.223,
+      "requiredRailY": 166.5803,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 156.5063,
+      "permittedRiseFromWitnessM": 0.3252,
+      "witness": {
+        "rail": 454948576,
+        "road": 815075443,
+        "sharedNode": null,
+        "type": "road_over",
+        "surfaceSource": "deck",
+        "lat": 25.2430447,
+        "lon": 110.2011266
+      }
+    }
   },
   {
     "rail": 459580360,
@@ -3204,7 +3306,24 @@
     "measuredClearance": null,
     "railY": 150.5702,
     "roadY": 156.5709,
-    "designClearanceM": 4.8006
+    "designClearanceM": 4.8006,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 0.699,
+      "requiredRailY": 149.8709,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 150.5702,
+      "permittedRiseFromWitnessM": 11.0826,
+      "witness": {
+        "rail": 991384007,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261294,
+        "lon": 110.295236
+      }
+    }
   },
   {
     "rail": 617221269,
@@ -3294,7 +3413,24 @@
     "measuredClearance": null,
     "railY": 150.5752,
     "roadY": 157.1866,
-    "designClearanceM": 5.4114
+    "designClearanceM": 5.4114,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 0.089,
+      "requiredRailY": 150.4866,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 150.5752,
+      "permittedRiseFromWitnessM": 11.0777,
+      "witness": {
+        "rail": 991384007,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261294,
+        "lon": 110.295236
+      }
+    }
   },
   {
     "rail": 617221272,
@@ -3362,7 +3498,24 @@
     "measuredClearance": null,
     "railY": 149.1576,
     "roadY": 156.0494,
-    "designClearanceM": 5.6919
+    "designClearanceM": 5.6919,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 0.858,
+      "requiredRailY": 148.2995,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 149.1576,
+      "permittedRiseFromWitnessM": 12.4953,
+      "witness": {
+        "rail": 991384007,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261294,
+        "lon": 110.295236
+      }
+    }
   },
   {
     "rail": 617221275,
@@ -3390,7 +3543,24 @@
     "measuredClearance": null,
     "railY": 150.5133,
     "roadY": 156.0018,
-    "designClearanceM": 4.2885
+    "designClearanceM": 4.2885,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 2.261,
+      "requiredRailY": 148.2518,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 150.5133,
+      "permittedRiseFromWitnessM": 11.1396,
+      "witness": {
+        "rail": 991384007,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261294,
+        "lon": 110.295236
+      }
+    }
   },
   {
     "rail": 617221275,
@@ -4177,7 +4347,24 @@
     "measuredClearance": null,
     "railY": 153.3573,
     "roadY": 152.6699,
-    "designClearanceM": -1.8874
+    "designClearanceM": -1.8874,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 7.387,
+      "requiredRailY": 145.9699,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 153.3573,
+      "permittedRiseFromWitnessM": 2.4991,
+      "witness": {
+        "rail": 675807124,
+        "road": 691060994,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2624522,
+        "lon": 110.2777616
+      }
+    }
   },
   {
     "rail": 675807125,
@@ -4285,7 +4472,24 @@
     "measuredClearance": null,
     "railY": 154.0025,
     "roadY": 158.13,
-    "designClearanceM": 2.9275
+    "designClearanceM": 2.9275,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 2.573,
+      "requiredRailY": 151.43,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 154.0025,
+      "permittedRiseFromWitnessM": 6.5122,
+      "witness": {
+        "rail": 678370321,
+        "road": 1017592846,
+        "sharedNode": 6533456500,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.233757,
+        "lon": 110.2741096
+      }
+    }
   },
   {
     "rail": 678370321,
@@ -4511,7 +4715,24 @@
     "measuredClearance": null,
     "railY": 153.837,
     "roadY": 158.0398,
-    "designClearanceM": 3.0028
+    "designClearanceM": 3.0028,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 2.497,
+      "requiredRailY": 151.3398,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 153.837,
+      "permittedRiseFromWitnessM": 6.6778,
+      "witness": {
+        "rail": 678370321,
+        "road": 1017592846,
+        "sharedNode": 6533456500,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.233757,
+        "lon": 110.2741096
+      }
+    }
   },
   {
     "rail": 678370321,
@@ -5996,7 +6217,24 @@
     "measuredClearance": null,
     "railY": 159.3736,
     "roadY": 160.9421,
-    "designClearanceM": 0.3685
+    "designClearanceM": 0.3685,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 6.181,
+      "requiredRailY": 153.1921,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 159.3736,
+      "permittedRiseFromWitnessM": 5.9182,
+      "witness": {
+        "rail": 815078170,
+        "road": 815078159,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "carriageway",
+        "lat": 25.3643513,
+        "lon": 110.3023654
+      }
+    }
   },
   {
     "rail": 815078170,
@@ -6042,7 +6280,24 @@
     "measuredClearance": null,
     "railY": 159.5171,
     "roadY": 160.9314,
-    "designClearanceM": 0.2143
+    "designClearanceM": 0.2143,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 6.336,
+      "requiredRailY": 153.1814,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 159.5171,
+      "permittedRiseFromWitnessM": 5.7748,
+      "witness": {
+        "rail": 815078170,
+        "road": 815078159,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "carriageway",
+        "lat": 25.3643513,
+        "lon": 110.3023654
+      }
+    }
   },
   {
     "rail": 815078170,
@@ -6522,7 +6777,24 @@
     "measuredClearance": null,
     "railY": 154.0797,
     "roadY": 152.3976,
-    "designClearanceM": -2.8821
+    "designClearanceM": -2.8821,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 8.382,
+      "requiredRailY": 145.6976,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 154.0797,
+      "permittedRiseFromWitnessM": 2.3957,
+      "witness": {
+        "rail": 819178847,
+        "road": 691060994,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2624545,
+        "lon": 110.277322
+      }
+    }
   },
   {
     "rail": 824017369,
@@ -6562,7 +6834,24 @@
     "measuredClearance": null,
     "railY": 163.4241,
     "roadY": 162.3,
-    "designClearanceM": -2.3241
+    "designClearanceM": -2.3241,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 8.874,
+      "requiredRailY": 154.55,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 163.4241,
+      "permittedRiseFromWitnessM": 0.2397,
+      "witness": {
+        "rail": 824017369,
+        "road": 1028568326,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2469722,
+        "lon": 110.2058495
+      }
+    }
   },
   {
     "rail": 824017369,
@@ -6602,7 +6891,24 @@
     "measuredClearance": null,
     "railY": 163.5724,
     "roadY": 162.2944,
-    "designClearanceM": -2.478
+    "designClearanceM": -2.478,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 9.028,
+      "requiredRailY": 154.5444,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 163.5724,
+      "permittedRiseFromWitnessM": 0.0913,
+      "witness": {
+        "rail": 824017369,
+        "road": 1028568326,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2469722,
+        "lon": 110.2058495
+      }
+    }
   },
   {
     "rail": 824017369,
@@ -6641,7 +6947,24 @@
     "measuredClearance": null,
     "railY": 165.8979,
     "roadY": 162.95,
-    "designClearanceM": -4.1479
+    "designClearanceM": -4.1479,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 10.698,
+      "requiredRailY": 155.2,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 165.8979,
+      "permittedRiseFromWitnessM": 0.2158,
+      "witness": {
+        "rail": 824017369,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.242846,
+        "lon": 110.201349
+      }
+    }
   },
   {
     "rail": 824017369,
@@ -6678,7 +7001,24 @@
     "measuredClearance": null,
     "railY": 156.8172,
     "roadY": 159.65,
-    "designClearanceM": 1.6328
+    "designClearanceM": 1.6328,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 4.917,
+      "requiredRailY": 151.9,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 156.8172,
+      "permittedRiseFromWitnessM": 9.2965,
+      "witness": {
+        "rail": 824017369,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.242846,
+        "lon": 110.201349
+      }
+    }
   },
   {
     "rail": 824017369,
@@ -6792,7 +7132,24 @@
     "measuredClearance": null,
     "railY": 165.7936,
     "roadY": 162.94,
-    "designClearanceM": -4.0536
+    "designClearanceM": -4.0536,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 10.604,
+      "requiredRailY": 155.19,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 165.7936,
+      "permittedRiseFromWitnessM": 0.3201,
+      "witness": {
+        "rail": 824017369,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.242846,
+        "lon": 110.201349
+      }
+    }
   },
   {
     "rail": 824017369,
@@ -6869,7 +7226,24 @@
     "measuredClearance": null,
     "railY": 163.4652,
     "roadY": 162.29,
-    "designClearanceM": -2.3752
+    "designClearanceM": -2.3752,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 8.925,
+      "requiredRailY": 154.54,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 163.4652,
+      "permittedRiseFromWitnessM": 0.2384,
+      "witness": {
+        "rail": 826539758,
+        "road": 1028568326,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2470027,
+        "lon": 110.2058129
+      }
+    }
   },
   {
     "rail": 826539758,
@@ -6909,7 +7283,24 @@
     "measuredClearance": null,
     "railY": 163.6136,
     "roadY": 162.28,
-    "designClearanceM": -2.5336
+    "designClearanceM": -2.5336,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 9.084,
+      "requiredRailY": 154.53,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 163.6136,
+      "permittedRiseFromWitnessM": 0.0899,
+      "witness": {
+        "rail": 826539758,
+        "road": 1028568326,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2470027,
+        "lon": 110.2058129
+      }
+    }
   },
   {
     "rail": 826539758,
@@ -6948,7 +7339,24 @@
     "measuredClearance": null,
     "railY": 165.7465,
     "roadY": 162.94,
-    "designClearanceM": -4.0065
+    "designClearanceM": -4.0065,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 10.557,
+      "requiredRailY": 155.19,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 165.7465,
+      "permittedRiseFromWitnessM": 0.2129,
+      "witness": {
+        "rail": 826539758,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2428576,
+        "lon": 110.2012987
+      }
+    }
   },
   {
     "rail": 826539758,
@@ -6985,7 +7393,24 @@
     "measuredClearance": null,
     "railY": 156.7127,
     "roadY": 159.66,
-    "designClearanceM": 1.7473
+    "designClearanceM": 1.7473,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 4.803,
+      "requiredRailY": 151.91,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 156.7127,
+      "permittedRiseFromWitnessM": 9.2467,
+      "witness": {
+        "rail": 826539758,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2428576,
+        "lon": 110.2012987
+      }
+    }
   },
   {
     "rail": 826539758,
@@ -7099,7 +7524,24 @@
     "measuredClearance": null,
     "railY": 165.6433,
     "roadY": 162.93,
-    "designClearanceM": -3.9133
+    "designClearanceM": -3.9133,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 10.463,
+      "requiredRailY": 155.18,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 165.6433,
+      "permittedRiseFromWitnessM": 0.3161,
+      "witness": {
+        "rail": 826539758,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2428576,
+        "lon": 110.2012987
+      }
+    }
   },
   {
     "rail": 826539758,
@@ -7178,7 +7620,24 @@
     "measuredClearance": null,
     "railY": 163.3616,
     "roadY": 162.32,
-    "designClearanceM": -2.2416
+    "designClearanceM": -2.2416,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 8.792,
+      "requiredRailY": 154.57,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 163.3616,
+      "permittedRiseFromWitnessM": 0.2421,
+      "witness": {
+        "rail": 826539760,
+        "road": 1028568326,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2469274,
+        "lon": 110.2059031
+      }
+    }
   },
   {
     "rail": 826539760,
@@ -7220,7 +7679,24 @@
     "measuredClearance": null,
     "railY": 163.51,
     "roadY": 162.3103,
-    "designClearanceM": -2.3998
+    "designClearanceM": -2.3998,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 8.95,
+      "requiredRailY": 154.5603,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 163.51,
+      "permittedRiseFromWitnessM": 0.0936,
+      "witness": {
+        "rail": 826539760,
+        "road": 1028568326,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2469274,
+        "lon": 110.2059031
+      }
+    }
   },
   {
     "rail": 826539760,
@@ -7353,7 +7829,24 @@
     "measuredClearance": null,
     "railY": 166.0684,
     "roadY": 162.96,
-    "designClearanceM": -4.3084
+    "designClearanceM": -4.3084,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 10.858,
+      "requiredRailY": 155.21,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 166.0684,
+      "permittedRiseFromWitnessM": 0.2207,
+      "witness": {
+        "rail": 826539760,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2428346,
+        "lon": 110.201398
+      }
+    }
   },
   {
     "rail": 826539760,
@@ -7392,7 +7885,24 @@
     "measuredClearance": null,
     "railY": 156.9448,
     "roadY": 159.64,
-    "designClearanceM": 1.4952
+    "designClearanceM": 1.4952,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 5.055,
+      "requiredRailY": 151.89,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 156.9448,
+      "permittedRiseFromWitnessM": 9.3443,
+      "witness": {
+        "rail": 826539760,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2428346,
+        "lon": 110.201398
+      }
+    }
   },
   {
     "rail": 826539760,
@@ -7512,7 +8022,24 @@
     "measuredClearance": null,
     "railY": 165.9653,
     "roadY": 162.95,
-    "designClearanceM": -4.2153
+    "designClearanceM": -4.2153,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 10.765,
+      "requiredRailY": 155.2,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 165.9653,
+      "permittedRiseFromWitnessM": 0.3239,
+      "witness": {
+        "rail": 826539760,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2428346,
+        "lon": 110.201398
+      }
+    }
   },
   {
     "rail": 826539760,
@@ -7593,7 +8120,24 @@
     "measuredClearance": null,
     "railY": 163.6315,
     "roadY": 162.27,
-    "designClearanceM": -2.5615
+    "designClearanceM": -2.5615,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 9.112,
+      "requiredRailY": 154.52,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 163.6315,
+      "permittedRiseFromWitnessM": 0.2365,
+      "witness": {
+        "rail": 826539761,
+        "road": 1028568326,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2470413,
+        "lon": 110.2057666
+      }
+    }
   },
   {
     "rail": 826539761,
@@ -7635,7 +8179,24 @@
     "measuredClearance": null,
     "railY": 163.78,
     "roadY": 162.2657,
-    "designClearanceM": -2.7143
+    "designClearanceM": -2.7143,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 9.264,
+      "requiredRailY": 154.5157,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 163.78,
+      "permittedRiseFromWitnessM": 0.0881,
+      "witness": {
+        "rail": 826539761,
+        "road": 1028568326,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2470413,
+        "lon": 110.2057666
+      }
+    }
   },
   {
     "rail": 826539761,
@@ -7768,7 +8329,24 @@
     "measuredClearance": null,
     "railY": 165.7277,
     "roadY": 162.93,
-    "designClearanceM": -3.9977
+    "designClearanceM": -3.9977,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 10.548,
+      "requiredRailY": 155.18,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 165.7277,
+      "permittedRiseFromWitnessM": 0.2097,
+      "witness": {
+        "rail": 826539761,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2428716,
+        "lon": 110.2012384
+      }
+    }
   },
   {
     "rail": 826539761,
@@ -7807,7 +8385,24 @@
     "measuredClearance": null,
     "railY": 156.7453,
     "roadY": 159.67,
-    "designClearanceM": 1.7247
+    "designClearanceM": 1.7247,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 4.825,
+      "requiredRailY": 151.92,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 156.7453,
+      "permittedRiseFromWitnessM": 9.1921,
+      "witness": {
+        "rail": 826539761,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2428716,
+        "lon": 110.2012384
+      }
+    }
   },
   {
     "rail": 826539761,
@@ -7927,7 +8522,24 @@
     "measuredClearance": null,
     "railY": 165.6256,
     "roadY": 162.92,
-    "designClearanceM": -3.9056
+    "designClearanceM": -3.9056,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 10.456,
+      "requiredRailY": 155.17,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 165.6256,
+      "permittedRiseFromWitnessM": 0.3119,
+      "witness": {
+        "rail": 826539761,
+        "road": 1573855551,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2428716,
+        "lon": 110.2012384
+      }
+    }
   },
   {
     "rail": 826539761,
@@ -7998,7 +8610,24 @@
     "measuredClearance": null,
     "railY": 152.8817,
     "roadY": 155.6597,
-    "designClearanceM": 1.578
+    "designClearanceM": 1.578,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 4.972,
+      "requiredRailY": 147.9097,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 152.8817,
+      "permittedRiseFromWitnessM": 8.3421,
+      "witness": {
+        "rail": 900211391,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261406,
+        "lon": 110.2950772
+      }
+    }
   },
   {
     "rail": 827587623,
@@ -8030,7 +8659,24 @@
     "measuredClearance": null,
     "railY": 153.6932,
     "roadY": 155.61,
-    "designClearanceM": 0.7168
+    "designClearanceM": 0.7168,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 5.833,
+      "requiredRailY": 147.8601,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 153.6932,
+      "permittedRiseFromWitnessM": 7.5306,
+      "witness": {
+        "rail": 900211391,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261406,
+        "lon": 110.2950772
+      }
+    }
   },
   {
     "rail": 827587623,
@@ -8393,7 +9039,24 @@
     "measuredClearance": null,
     "railY": 152.6086,
     "roadY": 152.5459,
-    "designClearanceM": -1.2627
+    "designClearanceM": -1.2627,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 6.763,
+      "requiredRailY": 145.8459,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 152.6086,
+      "permittedRiseFromWitnessM": 2.4512,
+      "witness": {
+        "rail": 846722256,
+        "road": 691060994,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2624533,
+        "lon": 110.2775621
+      }
+    }
   },
   {
     "rail": 846722257,
@@ -8522,7 +9185,24 @@
     "measuredClearance": null,
     "railY": 152.734,
     "roadY": 152.5318,
-    "designClearanceM": -1.4022
+    "designClearanceM": -1.4022,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 6.902,
+      "requiredRailY": 145.8318,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 152.734,
+      "permittedRiseFromWitnessM": 2.4436,
+      "witness": {
+        "rail": 846722257,
+        "road": 691060994,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2624534,
+        "lon": 110.2775307
+      }
+    }
   },
   {
     "rail": 846722258,
@@ -8651,7 +9331,24 @@
     "measuredClearance": null,
     "railY": 153.3822,
     "roadY": 152.4493,
-    "designClearanceM": -2.1329
+    "designClearanceM": -2.1329,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 7.633,
+      "requiredRailY": 145.7493,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 153.3822,
+      "permittedRiseFromWitnessM": 2.4239,
+      "witness": {
+        "rail": 846722258,
+        "road": 691060994,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2624539,
+        "lon": 110.2774289
+      }
+    }
   },
   {
     "rail": 846722263,
@@ -8850,7 +9547,24 @@
     "measuredClearance": null,
     "railY": 154.0228,
     "roadY": 152.6385,
-    "designClearanceM": -2.5844
+    "designClearanceM": -2.5844,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 9.134,
+      "requiredRailY": 144.8885,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 154.0228,
+      "permittedRiseFromWitnessM": 1.4906,
+      "witness": {
+        "rail": 846722263,
+        "road": 691060994,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.2624525,
+        "lon": 110.277719
+      }
+    }
   },
   {
     "rail": 846722263,
@@ -9001,7 +9715,24 @@
     "measuredClearance": null,
     "railY": 152.6016,
     "roadY": 155.519,
-    "designClearanceM": 1.7174
+    "designClearanceM": 1.7174,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 4.833,
+      "requiredRailY": 147.769,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 152.6016,
+      "permittedRiseFromWitnessM": 8.4714,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211381,
@@ -9033,7 +9764,24 @@
     "measuredClearance": null,
     "railY": 153.4132,
     "roadY": 155.4761,
-    "designClearanceM": 0.863
+    "designClearanceM": 0.863,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 5.687,
+      "requiredRailY": 147.7261,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 153.4132,
+      "permittedRiseFromWitnessM": 7.6598,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211381,
@@ -9117,7 +9865,24 @@
     "measuredClearance": null,
     "railY": 147.6936,
     "roadY": 153.9661,
-    "designClearanceM": 5.0725
+    "designClearanceM": 5.0725,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 1.478,
+      "requiredRailY": 146.2161,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 147.6936,
+      "permittedRiseFromWitnessM": 13.3794,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211382,
@@ -9145,7 +9910,24 @@
     "measuredClearance": null,
     "railY": 149.0454,
     "roadY": 153.9195,
-    "designClearanceM": 3.6741
+    "designClearanceM": 3.6741,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 2.876,
+      "requiredRailY": 146.1695,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 149.0454,
+      "permittedRiseFromWitnessM": 12.0275,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211382,
@@ -9221,7 +10003,24 @@
     "measuredClearance": null,
     "railY": 147.781,
     "roadY": 154.4739,
-    "designClearanceM": 5.4929
+    "designClearanceM": 5.4929,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 1.057,
+      "requiredRailY": 146.7239,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 147.781,
+      "permittedRiseFromWitnessM": 13.292,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211383,
@@ -9249,7 +10048,24 @@
     "measuredClearance": null,
     "railY": 149.1339,
     "roadY": 154.4298,
-    "designClearanceM": 4.0958
+    "designClearanceM": 4.0958,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 2.454,
+      "requiredRailY": 146.6798,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 149.1339,
+      "permittedRiseFromWitnessM": 11.939,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211383,
@@ -9325,7 +10141,24 @@
     "measuredClearance": null,
     "railY": 147.7226,
     "roadY": 154.096,
-    "designClearanceM": 5.1734
+    "designClearanceM": 5.1734,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 1.377,
+      "requiredRailY": 146.346,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 147.7226,
+      "permittedRiseFromWitnessM": 13.3504,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211385,
@@ -9353,7 +10186,24 @@
     "measuredClearance": null,
     "railY": 149.0747,
     "roadY": 154.0522,
-    "designClearanceM": 3.7775
+    "designClearanceM": 3.7775,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 2.772,
+      "requiredRailY": 146.3022,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 149.0747,
+      "permittedRiseFromWitnessM": 11.9983,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211385,
@@ -9429,7 +10279,24 @@
     "measuredClearance": null,
     "railY": 147.8007,
     "roadY": 154.6111,
-    "designClearanceM": 5.6104
+    "designClearanceM": 5.6104,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 0.94,
+      "requiredRailY": 146.8611,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 147.8007,
+      "permittedRiseFromWitnessM": 13.2723,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211387,
@@ -9457,7 +10324,24 @@
     "measuredClearance": null,
     "railY": 149.1539,
     "roadY": 154.565,
-    "designClearanceM": 4.2111
+    "designClearanceM": 4.2111,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 2.339,
+      "requiredRailY": 146.815,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 149.1539,
+      "permittedRiseFromWitnessM": 11.9191,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211387,
@@ -9533,7 +10417,24 @@
     "measuredClearance": null,
     "railY": 148.6544,
     "roadY": 154.9934,
-    "designClearanceM": 5.139
+    "designClearanceM": 5.139,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 1.411,
+      "requiredRailY": 147.2434,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 148.6544,
+      "permittedRiseFromWitnessM": 12.4186,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211388,
@@ -9561,7 +10462,24 @@
     "measuredClearance": null,
     "railY": 150.0083,
     "roadY": 154.944,
-    "designClearanceM": 3.7358
+    "designClearanceM": 3.7358,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 2.814,
+      "requiredRailY": 147.194,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 150.0083,
+      "permittedRiseFromWitnessM": 11.0647,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211388,
@@ -9637,7 +10555,24 @@
     "measuredClearance": null,
     "railY": 148.6688,
     "roadY": 155.1257,
-    "designClearanceM": 5.2569
+    "designClearanceM": 5.2569,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 1.293,
+      "requiredRailY": 147.3757,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 148.6688,
+      "permittedRiseFromWitnessM": 12.4041,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211389,
@@ -9665,7 +10600,24 @@
     "measuredClearance": null,
     "railY": 150.023,
     "roadY": 155.0822,
-    "designClearanceM": 3.8591
+    "designClearanceM": 3.8591,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 2.691,
+      "requiredRailY": 147.3322,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 150.023,
+      "permittedRiseFromWitnessM": 11.0499,
+      "witness": {
+        "rail": 900211392,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261445,
+        "lon": 110.295022
+      }
+    }
   },
   {
     "rail": 900211389,
@@ -11762,7 +12714,24 @@
     "measuredClearance": null,
     "railY": 162.2054,
     "roadY": 161.4243,
-    "designClearanceM": -0.4189
+    "designClearanceM": -0.4189,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 4.919,
+      "requiredRailY": 167.1243,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 162.2054,
+      "permittedRiseFromWitnessM": 4.3829,
+      "witness": {
+        "rail": 983846340,
+        "road": 983781244,
+        "sharedNode": 6635078452,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.3563257,
+        "lon": 110.2996024
+      }
+    }
   },
   {
     "rail": 983756980,
@@ -11787,7 +12756,24 @@
     "measuredClearance": null,
     "railY": 162.157,
     "roadY": 161.5069,
-    "designClearanceM": -0.5499
+    "designClearanceM": -0.5499,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 5.05,
+      "requiredRailY": 167.2069,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 162.157,
+      "permittedRiseFromWitnessM": 4.3345,
+      "witness": {
+        "rail": 983846340,
+        "road": 983781244,
+        "sharedNode": 6635078452,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.3563257,
+        "lon": 110.2996024
+      }
+    }
   },
   {
     "rail": 983756981,
@@ -12138,7 +13124,24 @@
     "measuredClearance": null,
     "railY": 160.9345,
     "roadY": 161.5,
-    "designClearanceM": -1.7655
+    "designClearanceM": -1.7655,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 6.265,
+      "requiredRailY": 167.2,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 160.9345,
+      "permittedRiseFromWitnessM": 3.6873,
+      "witness": {
+        "rail": 983846303,
+        "road": 983781266,
+        "sharedNode": 6533456483,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.359876,
+        "lon": 110.2997494
+      }
+    }
   },
   {
     "rail": 983760084,
@@ -12163,7 +13166,24 @@
     "measuredClearance": null,
     "railY": 162.0984,
     "roadY": 161.5,
-    "designClearanceM": -0.6016
+    "designClearanceM": -0.6016,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 5.102,
+      "requiredRailY": 167.2,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 162.0984,
+      "permittedRiseFromWitnessM": 4.2759,
+      "witness": {
+        "rail": 983846340,
+        "road": 983781244,
+        "sharedNode": 6635078452,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.3563257,
+        "lon": 110.2996024
+      }
+    }
   },
   {
     "rail": 983760085,
@@ -12190,7 +13210,24 @@
     "measuredClearance": null,
     "railY": 161.721,
     "roadY": 161.5,
-    "designClearanceM": -0.979
+    "designClearanceM": -0.979,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 5.479,
+      "requiredRailY": 167.2,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 161.721,
+      "permittedRiseFromWitnessM": 4.0275,
+      "witness": {
+        "rail": 983760081,
+        "road": 983781266,
+        "sharedNode": 6533456485,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.3598928,
+        "lon": 110.2996462
+      }
+    }
   },
   {
     "rail": 983760086,
@@ -12217,7 +13254,24 @@
     "measuredClearance": null,
     "railY": 161.3821,
     "roadY": 161.5,
-    "designClearanceM": -1.3179
+    "designClearanceM": -1.3179,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 5.818,
+      "requiredRailY": 167.2,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 161.3821,
+      "permittedRiseFromWitnessM": 3.6886,
+      "witness": {
+        "rail": 983760081,
+        "road": 983781266,
+        "sharedNode": 6533456485,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.3598928,
+        "lon": 110.2996462
+      }
+    }
   },
   {
     "rail": 983760101,
@@ -12265,7 +13319,24 @@
     "measuredClearance": null,
     "railY": 150.5338,
     "roadY": 156.1202,
-    "designClearanceM": 4.3865
+    "designClearanceM": 4.3865,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 1.114,
+      "requiredRailY": 149.4202,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 150.5338,
+      "permittedRiseFromWitnessM": 11.1191,
+      "witness": {
+        "rail": 991384007,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261294,
+        "lon": 110.295236
+      }
+    }
   },
   {
     "rail": 983760101,
@@ -13360,7 +14431,24 @@
     "measuredClearance": null,
     "railY": 161.3239,
     "roadY": 161.5633,
-    "designClearanceM": -1.4393
+    "designClearanceM": -1.4393,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 5.939,
+      "requiredRailY": 167.2633,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 161.3239,
+      "permittedRiseFromWitnessM": 3.6958,
+      "witness": {
+        "rail": 983846338,
+        "road": 983781266,
+        "sharedNode": 6533456475,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.3598062,
+        "lon": 110.3001852
+      }
+    }
   },
   {
     "rail": 983846338,
@@ -13467,7 +14555,24 @@
     "measuredClearance": null,
     "railY": 160.7787,
     "roadY": 161.5,
-    "designClearanceM": -1.9213
+    "designClearanceM": -1.9213,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 6.421,
+      "requiredRailY": 167.2,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 160.7787,
+      "permittedRiseFromWitnessM": 3.7086,
+      "witness": {
+        "rail": 983846305,
+        "road": 983781266,
+        "sharedNode": 6533456482,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.3598636,
+        "lon": 110.2998398
+      }
+    }
   },
   {
     "rail": 983846340,
@@ -13544,7 +14649,24 @@
     "measuredClearance": null,
     "railY": 160.8112,
     "roadY": 161.5,
-    "designClearanceM": -1.8888
+    "designClearanceM": -1.8888,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 6.389,
+      "requiredRailY": 167.2,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 160.8112,
+      "permittedRiseFromWitnessM": 3.6826,
+      "witness": {
+        "rail": 983846322,
+        "road": 983781266,
+        "sharedNode": 6533456478,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.3598303,
+        "lon": 110.3000251
+      }
+    }
   },
   {
     "rail": 983846349,
@@ -13625,7 +14747,24 @@
     "measuredClearance": null,
     "railY": 161.4014,
     "roadY": 161.5713,
-    "designClearanceM": -1.3699
+    "designClearanceM": -1.3699,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 5.87,
+      "requiredRailY": 167.2713,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 161.4014,
+      "permittedRiseFromWitnessM": 3.7038,
+      "witness": {
+        "rail": 983846352,
+        "road": 983781266,
+        "sharedNode": 6533456474,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.3598004,
+        "lon": 110.3002304
+      }
+    }
   },
   {
     "rail": 983846352,
@@ -13868,7 +15007,24 @@
     "measuredClearance": null,
     "railY": 161.8995,
     "roadY": 161.5351,
-    "designClearanceM": -0.8356
+    "designClearanceM": -0.8356,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 5.336,
+      "requiredRailY": 167.2351,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 161.8995,
+      "permittedRiseFromWitnessM": 4.0617,
+      "witness": {
+        "rail": 983846349,
+        "road": 983781244,
+        "sharedNode": 6635078454,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.356324,
+        "lon": 110.299697
+      }
+    }
   },
   {
     "rail": 983853059,
@@ -14299,7 +15455,24 @@
     "measuredClearance": null,
     "railY": 161.8948,
     "roadY": 161.3126,
-    "designClearanceM": -0.6177
+    "designClearanceM": -0.6177,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 5.118,
+      "requiredRailY": 167.0126,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 161.8948,
+      "permittedRiseFromWitnessM": 4.057,
+      "witness": {
+        "rail": 983846349,
+        "road": 983781244,
+        "sharedNode": 6635078454,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.356324,
+        "lon": 110.299697
+      }
+    }
   },
   {
     "rail": 983853066,
@@ -14678,7 +15851,24 @@
     "measuredClearance": null,
     "railY": 161.8844,
     "roadY": 161.0,
-    "designClearanceM": -0.3156
+    "designClearanceM": -0.3156,
+    "clearanceConflict": {
+      "surfaceSource": "terrain_proxy",
+      "shortfallM": 4.816,
+      "requiredRailY": 166.7,
+      "boundDirection": "min",
+      "opposingGradeLimitY": 161.8844,
+      "permittedRiseFromWitnessM": 4.0466,
+      "witness": {
+        "rail": 983846349,
+        "road": 983781244,
+        "sharedNode": 6635078454,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.356324,
+        "lon": 110.299697
+      }
+    }
   },
   {
     "rail": 983853078,
@@ -15190,7 +16380,24 @@
     "measuredClearance": null,
     "railY": 152.4137,
     "roadY": 159.3798,
-    "designClearanceM": 5.7661
+    "designClearanceM": 5.7661,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 0.784,
+      "requiredRailY": 151.6298,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 152.4137,
+      "permittedRiseFromWitnessM": 7.844,
+      "witness": {
+        "rail": 983853080,
+        "road": 983781267,
+        "sharedNode": 6533456459,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.3646513,
+        "lon": 110.3017546
+      }
+    }
   },
   {
     "rail": 983856621,
@@ -15226,7 +16433,24 @@
     "measuredClearance": null,
     "railY": 152.1571,
     "roadY": 159.3156,
-    "designClearanceM": 5.9585
+    "designClearanceM": 5.9585,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 0.591,
+      "requiredRailY": 151.5656,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 152.1571,
+      "permittedRiseFromWitnessM": 8.1006,
+      "witness": {
+        "rail": 983853080,
+        "road": 983781267,
+        "sharedNode": 6533456459,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.3646513,
+        "lon": 110.3017546
+      }
+    }
   },
   {
     "rail": 983867647,
@@ -15877,7 +17101,24 @@
     "measuredClearance": null,
     "railY": 153.7935,
     "roadY": 157.3584,
-    "designClearanceM": 2.3649
+    "designClearanceM": 2.3649,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 4.185,
+      "requiredRailY": 149.6084,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 153.7935,
+      "permittedRiseFromWitnessM": 7.8594,
+      "witness": {
+        "rail": 991384007,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261294,
+        "lon": 110.295236
+      }
+    }
   },
   {
     "rail": 991384006,
@@ -15913,7 +17154,24 @@
     "measuredClearance": null,
     "railY": 154.607,
     "roadY": 157.3188,
-    "designClearanceM": 1.5118
+    "designClearanceM": 1.5118,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 5.038,
+      "requiredRailY": 149.5688,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 154.607,
+      "permittedRiseFromWitnessM": 7.0459,
+      "witness": {
+        "rail": 991384007,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261294,
+        "lon": 110.295236
+      }
+    }
   },
   {
     "rail": 991384006,
@@ -16107,7 +17365,24 @@
     "measuredClearance": null,
     "railY": 150.5781,
     "roadY": 156.7085,
-    "designClearanceM": 4.9304
+    "designClearanceM": 4.9304,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 0.57,
+      "requiredRailY": 150.0085,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 150.5781,
+      "permittedRiseFromWitnessM": 11.0747,
+      "witness": {
+        "rail": 991384007,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261294,
+        "lon": 110.295236
+      }
+    }
   },
   {
     "rail": 991384008,
@@ -16195,7 +17470,24 @@
     "measuredClearance": null,
     "railY": 151.0305,
     "roadY": 157.5728,
-    "designClearanceM": 5.3424
+    "designClearanceM": 5.3424,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 0.158,
+      "requiredRailY": 150.8728,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 151.0305,
+      "permittedRiseFromWitnessM": 10.5149,
+      "witness": {
+        "rail": 991385686,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261261,
+        "lon": 110.2952822
+      }
+    }
   },
   {
     "rail": 991384011,
@@ -16393,7 +17685,24 @@
     "measuredClearance": null,
     "railY": 153.6917,
     "roadY": 157.4928,
-    "designClearanceM": 2.6011
+    "designClearanceM": 2.6011,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 3.949,
+      "requiredRailY": 149.7428,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 153.6917,
+      "permittedRiseFromWitnessM": 7.8536,
+      "witness": {
+        "rail": 991385686,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261261,
+        "lon": 110.2952822
+      }
+    }
   },
   {
     "rail": 991385686,
@@ -16429,7 +17738,24 @@
     "measuredClearance": null,
     "railY": 154.5055,
     "roadY": 157.4429,
-    "designClearanceM": 1.7374
+    "designClearanceM": 1.7374,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 4.813,
+      "requiredRailY": 149.6929,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 154.5055,
+      "permittedRiseFromWitnessM": 7.0398,
+      "witness": {
+        "rail": 991385686,
+        "road": 464498740,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "terrain_proxy",
+        "lat": 25.3261261,
+        "lon": 110.2952822
+      }
+    }
   },
   {
     "rail": 991385686,
@@ -17299,7 +18625,24 @@
     "measuredClearance": null,
     "railY": 153.3245,
     "roadY": 158.1095,
-    "designClearanceM": 3.585
+    "designClearanceM": 3.585,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 1.915,
+      "requiredRailY": 151.4095,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 153.3245,
+      "permittedRiseFromWitnessM": 3.1646,
+      "witness": {
+        "rail": 678370321,
+        "road": 459580373,
+        "sharedNode": 6533456498,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.2407838,
+        "lon": 110.2756877
+      }
+    }
   },
   {
     "rail": 994927724,
@@ -17327,7 +18670,24 @@
     "measuredClearance": null,
     "railY": 153.5757,
     "roadY": 158.032,
-    "designClearanceM": 3.2562
+    "designClearanceM": 3.2562,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 2.244,
+      "requiredRailY": 151.332,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 153.5757,
+      "permittedRiseFromWitnessM": 2.9134,
+      "witness": {
+        "rail": 678370321,
+        "road": 459580373,
+        "sharedNode": 6533456498,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.2407838,
+        "lon": 110.2756877
+      }
+    }
   },
   {
     "rail": 1017576265,
@@ -17708,7 +19068,24 @@
     "measuredClearance": null,
     "railY": 156.6304,
     "roadY": 159.63,
-    "designClearanceM": 1.7996
+    "designClearanceM": 1.7996,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 3.7,
+      "requiredRailY": 152.93,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 156.6304,
+      "permittedRiseFromWitnessM": 4.3827,
+      "witness": {
+        "rail": 1023360315,
+        "road": 454949850,
+        "sharedNode": 9437426818,
+        "type": "level",
+        "surfaceSource": "carriageway",
+        "lat": 25.237198,
+        "lon": 110.1972823
+      }
+    }
   },
   {
     "rail": 1023360315,
@@ -18000,7 +19377,24 @@
     "measuredClearance": null,
     "railY": 153.0774,
     "roadY": 160.0553,
-    "designClearanceM": 5.7779
+    "designClearanceM": 5.7779,
+    "clearanceConflict": {
+      "surfaceSource": "deck",
+      "shortfallM": 0.772,
+      "requiredRailY": 152.3053,
+      "boundDirection": "max",
+      "opposingGradeLimitY": 153.0774,
+      "permittedRiseFromWitnessM": 11.7307,
+      "witness": {
+        "rail": 815078167,
+        "road": 815078179,
+        "sharedNode": null,
+        "type": "rail_over",
+        "surfaceSource": "carriageway",
+        "lat": 25.3478295,
+        "lon": 110.299154
+      }
+    }
   },
   {
     "rail": 1350680813,

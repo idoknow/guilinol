@@ -102,7 +102,9 @@ if __name__ == '__main__':
         from shapely.geometry import Point
         from collections import defaultdict
         by_pair = defaultdict(list)
-        for point in json.loads(args.geometry_report.read_bytes())['crossings']:
+        report=json.loads(args.geometry_report.read_bytes())
+        conflicts={(c['rail'],c['road'],c['lat'],c['lon']):c for c in report['clearanceConflicts']}
+        for point in report['crossings']:
             by_pair[point['rail'], point['road']].append(point)
         for row in rows:
             if row['status'] != 'active':
@@ -114,14 +116,21 @@ if __name__ == '__main__':
             if distance(point) > .025:
                 raise ValueError(f"Absent geometry for {row['rail']} / {row['road']}")
             row.update(railY=point['railY'], roadY=point['roadY'], designClearanceM=point['clearanceM'])
+            conflict=conflicts.get((row['rail'],row['road'],row['lat'],row['lon']))
+            if conflict:
+                row['clearanceConflict']={k:v for k,v in conflict.items() if k not in ('rail','road','lat','lon','type')}
     (docs / 'railway-crossings.json').write_text(json.dumps(rows, ensure_ascii=False, indent=2) + '\n')
-    lines = ['# 可玩区路铁交点', '', '来源为 raw-expanded-20261124。每行对应一对 way 的一个相交分量。同一地点可能有多条股道或道路分段。JSON 保留双方标签。设计净空取中心线交点处的轨面、路面和梁底高程（铁路梁高 1.20 m，道路薄桥 0.60 m），单位 m。全宽最小净空仍待实测。', '',
+    lines = ['# 可玩区路铁交点', '', '来源为 raw-expanded-20261124。每行对应一对 way 的一个相交分量。同一地点可能有多条股道或道路分段。JSON 保留双方标签。设计净空取中心线交点处的轨面、路面和梁底高程（铁路梁高 1.20 m，道路薄桥 0.60 m），单位 m。JSON 的 clearanceConflict 给出约束来源、允许高差和相反约束位置。terrain_proxy 表示下层路面尚缺独立高程证据。全宽最小净空仍待实测。', '',
              '| 铁路 way | 道路 way | 纬度 | 经度 | 共享节点及版本 | type | 验收状态 | 设计净空 m | 证据 |',
              '|---:|---:|---:|---:|---:|---|---|---:|---|']
     for row in rows:
         node = '—'
         if row['sharedNode']:
             node = f"{row['sharedNode']} v{row['nodeEvidence']['version']}"
+        value=row.get('designClearanceM')
+        clearance='—' if value is None else f'{value:.3f}'
+        if 'clearanceConflict' in row:
+            clearance+=f"（缺 {row['clearanceConflict']['shortfallM']:.3f}）"
         lines.append(f"| {row['rail']} | {row['road']} | {row['lat']:.7f} | {row['lon']:.7f} | "
-                     f"{node} | {row['type'] or '待裁定'} | {row['status']} | {row.get('designClearanceM') if row.get('designClearanceM') is not None else '—'} | {row['evidence']} |")
+                     f"{node} | {row['type'] or '待裁定'} | {row['status']} | {clearance} | {row['evidence']} |")
     (docs / 'railway-crossings.md').write_text('\n'.join(lines) + '\n')
