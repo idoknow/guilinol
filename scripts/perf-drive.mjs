@@ -59,7 +59,7 @@ try {
       return row
     } finally { await context.close() }
   }
-  for(const view of views) {
+  if(!process.env.PERF_ROUNDS)for(const view of views) {
     const main = await sample(view,0,16,0), pr = await sample(view,1,16,0)
     for(const metric of ['calls','mirrorCalls','triangles','mirrorTriangles','geometries','textures','heap']) {
       const measure = row => metric==='heap'?row.heap:Math.max(...row.frames.map(frame=>frame[metric]))
@@ -76,6 +76,14 @@ try {
     for(let round=1;round<=rounds;round++) for(const side of [0,1]) {
       const row=await sample(view,side,60,round)
       p95s[side].push(quantile(row.frames.map(frame=>frame.ms),.95))
+    }
+    if(process.env.PERF_ROUNDS){
+      for(const metric of ['calls','mirrorCalls','triangles','mirrorTriangles','geometries','textures','heap']){
+        const values=['main','PR'].map(side=>raw.filter(row=>row.view===view&&row.side===side&&row.round>0)
+          .map(row=>metric==='heap'?row.heap:Math.max(...row.frames.map(frame=>frame[metric]))))
+        const [main,PR]=values.map(runs=>quantile(runs,.5))
+        summary.push({view,metric,main,PR,runs:values,pass:PR<=main*(view==='overview'&&metric==='calls'?1:1.05)})
+      }
     }
     const [base,result]=p95s.map(values=>quantile(values,.5))
     const noise=Math.max(...p95s[0])-Math.min(...p95s[0])
