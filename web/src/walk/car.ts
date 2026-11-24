@@ -53,7 +53,7 @@ export interface CarMoveContext {
   speed: number
   step: number
   motorPavement: (x:number, z:number)=>boolean
-  insideHouse: (x:number, z:number)=>boolean
+  insideHouse: (x:number, z:number, y?:number)=>boolean
   carBlockedAt: (x:number, footY:number, z:number, heading:number, dirSign:-1|0|1)=>boolean
   collisionKind: (dirX:number, dirZ:number)=>'building'|'collision'|''
   stopCar: ()=>void
@@ -131,7 +131,7 @@ export function probeCarDismount(ctx: DismountContext, cx: number, cz: number, h
     const [side, fwd] = CAR_DISMOUNT_OFFSETS[i]
     const x = cx + side * rx + fwd * fx, z = cz + side * rz + fwd * fz
     const tile = ctx.tileAt(x, z)
-    if (!tile || !ctx.stream.loaded.has(tile) || ctx.insideHouse(x, z)) continue
+    if (!tile || !ctx.stream.loaded.has(tile) || ctx.insideHouse(x, z, carY+.8)) continue
     const support = localSupport(ctx, x, z, carY)
     if (!support || Math.abs(support.y - carY) > .85) continue
     if (segmentBlocked(ctx, cx, cz, x, z, Math.max(carY, support.y))) continue
@@ -147,7 +147,7 @@ export function probeCarMount(ctx: DismountContext, px: number, py: number, pz: 
   if (Math.abs(cy - py) > 1.5) return {ok: false, reason: 'height'}
   if (segmentBlocked(ctx, px, pz, cx, cz, Math.max(py, cy))) return {ok: false, reason: 'blocked'}
   const tile = ctx.tileAt(cx, cz)
-  if (!tile || !ctx.stream.loaded.has(tile) || ctx.insideHouse(cx, cz)) return {ok: false, reason: 'narrow'}
+  if (!tile || !ctx.stream.loaded.has(tile) || ctx.insideHouse(cx, cz, cy+.8)) return {ok: false, reason: 'narrow'}
   const support = localSupport(ctx, cx, cz, cy)
   if (!support || Math.abs(support.y - cy) > .65) return {ok: false, reason: 'height'}
   return {ok: true, x: cx, y: support.y + wcfg.height / 2 + .055, z: cz, bikeY: support.y, shifted: false}

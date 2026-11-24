@@ -23,6 +23,7 @@ from landmarks.jiefang_layout import SPAN_WAYS, world_road_sections
 from common import CHUNK, GRID, OUT, load_osm, xz2ll
 from features import area, points, polygons
 from road_profile import RULES
+from survey_surface import SurveySurface
 
 
 def read_tile_metres(root: Path) -> dict[str, float]:
@@ -242,6 +243,18 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             for off in range(0, len(tblob), 12):
                 lx, lz, ly, tkind, tscale, *_ = struct.unpack_from('<HHhBBBBbb', tblob, off)
                 trees.append((tx + lx / 100.0, ly / 10.0, tz + lz / 100.0, tkind, tscale / 100.0))
+
+    @lru_cache(maxsize=24)
+    def survey_mesh(key):
+        entry = chunk_streets.get(key)
+        if entry and len(entry[2]) > 12 and entry[2][12]:
+            return SurveySurface(entry[2][12])
+        return None
+
+    def survey_hit(x, z):
+        ci, cj = math.floor((x-left)/CHUNK), math.floor((z-top)/CHUNK)
+        mesh = survey_mesh((ci, cj))
+        return mesh.hit(x-left-ci*CHUNK, z-top-cj*CHUNK) if mesh else None
 
     def ground_mesh_y(x: float, z: float) -> float:
         ci = int(np.clip(math.floor((x - left) / CHUNK), 0, nx_chunks - 1))
@@ -785,6 +798,9 @@ def run_audit(world_dir: Path, root: Path) -> dict:
                 dz_dx = (road_base_y(x0_s + step, z0_s) - y00) / step
                 dz_dy = (road_base_y(x0_s, z0_s + step) - y00) / step
                 cos_slope = 1.0 / math.sqrt(1.0 + dz_dx ** 2 + dz_dy ** 2)
+                hit = survey_hit(cx, cz)
+                if hit is not None:
+                    cos_slope = 1.0 / hit[1]
                 if cos_slope < 0.5:
                     texture_issues.append(make_issue('uvStretch', cx, cz, 1.0 / cos_slope,
                                                      f'Steep road slope foreshortens xz UV by {1.0/cos_slope:.2f}x (>2x)'))
@@ -839,6 +855,9 @@ def run_audit(world_dir: Path, root: Path) -> dict:
             gm = ground_mesh_y(tx_i, tz_i)
             offset = 0.195 if on_sw[i] else 0.045 if on_rd[i] else 0.060 if on_cycle[i] else None
             sup = road_base_y(tx_i, tz_i) + offset if offset is not None else gm
+            sampled = survey_hit(tx_i, tz_i)
+            if sampled is not None:
+                sup = sampled[0]
             if in_peak[i]:
                 py_m = nearest_peak_y(tx_i, ty_i, tz_i)
                 if py_m is not None and abs(ty_i - py_m) < abs(ty_i - sup):

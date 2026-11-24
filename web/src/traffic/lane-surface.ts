@@ -46,10 +46,23 @@ function sampleAxle(track:LaneSurface,dist:number){
 }
 
 export function contactPose(track:LaneSurface,dist:number,front=1.34,rear=-1.31,halfTrack=.795,leftOffset=0){
-  const a=sampleAxle(track,dist+front),b=sampleAxle(track,dist+rear)
-  const frontY=a.height-a.cross*leftOffset,rearY=b.height-b.cross*leftOffset
-  const incline=(frontY-rearY)/(front-rear),cross=halfTrack?(a.cross+b.cross)/2:0
-  return {y:rearY-rear*incline,pitch:-Math.atan(incline),roll:Math.atan(cross/Math.hypot(1,incline))}
+  let a=sampleAxle(track,dist+front),b=sampleAxle(track,dist+rear)
+  let frontY=a.height-a.cross*leftOffset,rearY=b.height-b.cross*leftOffset
+  const incline=(frontY-rearY)/(front-rear)
+  let pitch=-Math.atan(incline)
+  if(Math.abs(incline)>.1){
+    // Pitch shortens the horizontal wheelbase. Intersect the rotated axles
+    // with their own stations before locating the rigid body's origin.
+    const projected=Math.cos(pitch)
+    a=sampleAxle(track,dist+front*projected)
+    b=sampleAxle(track,dist+rear*projected)
+    frontY=a.height-a.cross*leftOffset
+    rearY=b.height-b.cross*leftOffset
+    pitch=-Math.atan2(frontY-rearY,(front-rear)*projected)
+  }
+  const cross=halfTrack?(a.cross+b.cross)/2:0
+  const y=Math.abs(incline)>.1?rearY+rear*Math.sin(pitch):rearY-rear*incline
+  return {y,pitch,roll:Math.atan(cross*Math.cos(pitch))}
 }
 export function axleHeight(track:LaneSurface,dist:number){
   return sampleAxle(track,dist).height

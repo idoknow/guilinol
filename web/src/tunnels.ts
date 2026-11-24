@@ -3,7 +3,7 @@ import type {Tile} from './world'
 
 type Point=[number,number,number]
 type Joint={ring?:[number,number][],offsets?:string,draw:boolean,cap?:boolean}
-export type Tunnel={way:number,generated?:boolean,gradedAccess?:boolean,portals:[Point,Point],length:number,halfWidth:number,endWidths?:[number,number],clearance:number,approach:number,openEnds?:[number,number],mouths?:[boolean,boolean],joints?:(Joint|null)[],stations?:[number,number][],stationHeights?:string,knotHeights?:string}
+export type Tunnel={way:number,generated?:boolean,openings?:[number,number,number,number][],gradedAccess?:boolean,portals:[Point,Point],length:number,halfWidth:number,endWidths?:[number,number],clearance:number,approach:number,openEnds?:[number,number],mouths?:[boolean,boolean],joints?:(Joint|null)[],stations?:[number,number][],stationHeights?:string,knotHeights?:string}
 
 // Generated strips use three fixed easing samples per interval. Keep distant
 // strips encoded in the manifest and unpack only a visited strip's levels.
@@ -85,7 +85,7 @@ export function floorLevel(tunnel:Tunnel,x:number,z:number){
   const axes=frame(tunnel),at=axes.station(x,z)
   if(at<0||at>tunnel.length||Math.abs(axes.lateral(x,z))>halfWidthAt(tunnel,at)){
     for(const [i,joint] of (tunnel.joints??[]).entries()){
-      if(!joint)continue
+      if(!joint||(joint.cap&&tunnel.gradedAccess&&tunnel.mouths?.[i]))continue
       let positive=false,negative=false
       const ring=jointRing(joint,tunnel.portals[i])
       for(let j=0;j<ring.length;j++){
@@ -102,6 +102,16 @@ export function floorLevel(tunnel:Tunnel,x:number,z:number){
   while(hi-lo>1){const mid=(lo+hi)>>>1;if(values.at(mid)[0]<=at)lo=mid;else hi=mid}
   const [a,low]=values.at(lo),[b,high]=values.at(hi)
   return low+(high-low)*(at-a)/(b-a)
+}
+export function roofLevel(tunnels:Tunnel[],x:number,z:number,y:number){
+  for(const tunnel of tunnels){
+    const floor=floorLevel(tunnel,x,z)
+    if(floor===undefined||Math.abs(y-floor)>.025)continue
+    const at=frame(tunnel).station(x,z)
+    if(at>=openEnd(tunnel,0)-1e-4&&at<=tunnel.length-openEnd(tunnel,1)+1e-4)
+      return floor+tunnel.clearance
+  }
+  return Infinity
 }
 export function tunnelFloor(tunnels:Tunnel[]|undefined,x:number,z:number,foot:number){
   for(const tunnel of nearbyTunnels(tunnels,x,z)){
@@ -185,9 +195,35 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     function local(s:number,d:number,y:number){const p=axes.point(s,d,y);p[0]-=tile.x;p[2]-=tile.z;return p}
     const station=(p:Point)=>axes.station(p[0]+tile.x,p[2]+tile.z),side=(p:Point)=>axes.lateral(p[0]+tile.x,p[2]+tile.z)
     for(const [from,to] of [[0,openEnd(tunnel,0)],[tunnel.length-openEnd(tunnel,1),tunnel.length]])if(to>from)cuts.push([p=>station(p)-from,p=>to-station(p),p=>halfWidthAt(tunnel,station(p))-side(p),p=>halfWidthAt(tunnel,station(p))+side(p)])
-    const quad=(points:Point[],part:keyof typeof parts)=>fan(limits.reduce((poly,plane)=>clip(poly,plane),points),parts[part])
+    const openings=(tunnel.openings??[]).map(([end,dx,dz,half])=>{
+      const [x,y,z]=tunnel.portals[end]
+      const along=(p:Point)=>(p[0]+tile.x-x)*dx+(p[2]+tile.z-z)*dz
+      const side=(p:Point)=>(p[2]+tile.z-z)*dx-(p[0]+tile.x-x)*dz
+      return [(p:Point)=>half+along(p),(p:Point)=>width+half+1-along(p),
+        (p:Point)=>half-side(p),(p:Point)=>half+side(p),
+        (p:Point)=>p[1]-y+1,(p:Point)=>y+head+.08*Math.max(0,along(p))-p[1]]
+    })
+    function quad(points:Point[],part:keyof typeof parts){
+      let pieces=[limits.reduce((poly,plane)=>clip(poly,plane),points)]
+      if(part==='interior'||part==='portal'||part==='band'||part==='lamp'){
+        for(const planes of openings){
+          const kept:Point[][]=[]
+          for(let piece of pieces){
+            if(planes.some(f=>piece.every(p=>f(p)<=0))){kept.push(piece);continue}
+            for(const f of planes){
+              const outside=clip(piece,p=>-f(p))
+              if(outside.length>=3)kept.push(outside)
+              piece=clip(piece,f)
+              if(piece.length<3)break
+            }
+          }
+          pieces=kept
+        }
+      }
+      for(const piece of pieces)fan(piece,parts[part])
+    }
     for(const [i,joint] of (tunnel.joints??[]).entries()){
-      if(!joint?.draw)continue
+      if(!joint?.draw||(joint.cap&&tunnel.gradedAccess&&tunnel.mouths?.[i]))continue
       const floor=tunnel.portals[i][1],ring=jointRing(joint,tunnel.portals[i])
       if(joint.cap&&openEnd(tunnel,i)>0){
         const cx=ring.reduce((sum,p)=>sum+p[0],0)/ring.length
@@ -260,4 +296,76 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
   const fringe=mesh(vertices,'terrain');fringe.geometry.setAttribute('uv',new THREE.Float32BufferAttribute(vertices.flatMap((v,i)=>i%3===0?[v/256,1-vertices[i+2]/256]:[]),2))
   return {fringe,floor:mesh(parts.floor,'road'),interior:mesh(parts.interior,'interior'),portal:mesh(parts.portal,'portal'),
     band:mesh(parts.band,'band'),ceiling:mesh(parts.ceiling,'ceiling'),lamp:mesh(parts.lamp,'lamp'),lane:mesh(parts.lane,'lane')}
+}
+
+// Clip collision triangles against the actual piecewise-linear floor and roof.
+// Preserve the floor, ceiling and exterior faces at the boundary of each prism.
+export function tunnelClearanceClipper(tile:Tile,tunnels:Tunnel[]){
+  type Prism={planes:Plane[];xmin:number;xmax:number;zmin:number;zmax:number}
+  const bins=new Map<number,Prism[]>()
+  const cell=(v:number)=>Math.max(0,Math.min(31,Math.floor(v/8)))
+  function register(ring:number[][],floor:(x:number,z:number)=>number,height:number){
+    const xs=ring.map(p=>p[0]),zs=ring.map(p=>p[1])
+    const xmin=Math.min(...xs),xmax=Math.max(...xs),zmin=Math.min(...zs),zmax=Math.max(...zs)
+    if(xmax<0||zmax<0||xmin>256||zmin>256)return
+    const cx=xs.reduce((a,b)=>a+b)/xs.length,cz=zs.reduce((a,b)=>a+b)/zs.length
+    const planes:Plane[]=ring.map(([x,z],i)=>{
+      const [bx,bz]=ring[(i+1)%ring.length],dx=bx-x,dz=bz-z
+      const sign=Math.sign(dx*(cz-z)-dz*(cx-x))/Math.hypot(dx,dz)
+      return p=>sign*(dx*(p[2]-z)-dz*(p[0]-x))
+    })
+    planes.push(p=>p[1]-floor(p[0],p[2]),p=>floor(p[0],p[2])+height-p[1])
+    const prism={planes,xmin,xmax,zmin,zmax}
+    for(let i=cell(xmin);i<=cell(xmax);i++)for(let j=cell(zmin);j<=cell(zmax);j++){
+      const key=i*32+j
+      if(!bins.has(key))bins.set(key,[])
+      bins.get(key)!.push(prism)
+    }
+  }
+  for(const tunnel of tunnels){
+    const axes=frame(tunnel),profileData=profile(tunnel)
+    const local=(s:number,d:number)=>{const [x,,z]=axes.point(s,d,0);return [x-tile.x,z-tile.z]}
+    for(let i=1;i<profileData.count;i++){
+      const [a,low]=profileData.at(i-1),[b,high]=profileData.at(i)
+      if(b<=a)continue
+      const wa=halfWidthAt(tunnel,a),wb=halfWidthAt(tunnel,b)
+      register([local(a,-wa),local(b,-wb),local(b,wb),local(a,wa)],
+        (x,z)=>low+(high-low)*(axes.station(x+tile.x,z+tile.z)-a)/(b-a),tunnel.clearance)
+    }
+    for(const [i,joint] of (tunnel.joints??[]).entries())if(joint?.draw&&!(joint.cap&&tunnel.gradedAccess&&tunnel.mouths?.[i])){
+      const center=tunnel.portals[i]
+      register(jointRing(joint,center).map(([x,z])=>[x-tile.x,z-tile.z]),()=>center[1],tunnel.clearance)
+    }
+  }
+  return (vertices:Float32Array,indices:number[])=>{
+    const output:number[]=[]
+    for(let i=0;i<indices.length;i+=3){
+      const corners=indices.slice(i,i+3).map(index=>[vertices[3*index],vertices[3*index+1],vertices[3*index+2]] as Point)
+      const xs=corners.map(p=>p[0]),zs=corners.map(p=>p[2])
+      const xmin=Math.min(...xs),xmax=Math.max(...xs),zmin=Math.min(...zs),zmax=Math.max(...zs)
+      const prisms=new Set<Prism>()
+      for(let x=cell(xmin);x<=cell(xmax);x++)for(let z=cell(zmin);z<=cell(zmax);z++)
+        for(const prism of bins.get(x*32+z)??[])prisms.add(prism)
+      let pieces=[corners]
+      for(const prism of prisms){
+        if(!pieces.length)break
+        if(xmin>prism.xmax||xmax<prism.xmin||zmin>prism.zmax||zmax<prism.zmin)continue
+        const outside:Point[][]=[]
+        for(const poly of pieces){
+          if(prism.planes.some(f=>poly.every(p=>f(p)<=.0001))){outside.push(poly);continue}
+          let inside=poly
+          for(const f of prism.planes){
+            if(inside.every(p=>f(p)>=0))continue
+            const kept=clip(inside,p=>-f(p))
+            if(kept.length>=3)outside.push(kept)
+            inside=clip(inside,f)
+            if(inside.length<3)break
+          }
+        }
+        pieces=outside
+      }
+      for(const poly of pieces)fan(poly,output)
+    }
+    return Float32Array.from(output)
+  }
 }

@@ -160,7 +160,25 @@ def sections(lanes, source_ways, existing, nodes):
                 edge['openEnds']=[0.,min(length,ends[1])]
     # An underground dead end without a surface connection remains an end,
     # rather than an invented interchange with a road above it.
-    return dict(edges=list(edges.values()), portals=sorted(surface_nodes.intersection(adjacent)),
+    # Two tunnel components can share a short surface connector. Its grade
+    # budget constrains both mouths before the surface approach is built.
+    connectors=[]
+    for way in source_ways:
+        tags=way.get('tags',{})
+        if (way['type']!='way' or not tags.get('highway') or underground(tags) or
+                len(portals.intersection(way['nodes']))<2 or not all(way['geometry'])):
+            continue
+        prior=None
+        distance=0.
+        for i,(ref,p) in enumerate(zip(way['nodes'],way['geometry'])):
+            if i:
+                q=way['geometry'][i-1]
+                distance+=math.dist(ll2xz(p['lat'],p['lon']),ll2xz(q['lat'],q['lon']))
+            if ref in portals:
+                if prior is not None and prior!=ref:
+                    connectors.append((prior,ref,distance*grade_limit(tags['highway'])*.85))
+                prior,distance=ref,0.
+    return dict(connectors=connectors,edges=list(edges.values()), portals=sorted(surface_nodes.intersection(adjacent)),
                 ends=sorted(n for n in adjacent if len(adjacent[n])==1))
 
 
@@ -267,6 +285,9 @@ def solve(network, nodes, samples):
     # A multi-source shortest-path envelope respects every roof and the grade
     # of every connecting edge. At a fixed mouth it gives the highest
     # achievable invert, even when two connected ways have different limits.
+    for a,b,budget in network.get('connectors',()):
+        adjacency[a].append((b,budget,0.))
+        adjacency[b].append((a,budget,0.))
     queue = [(y,key) for key,y in limits.items() if math.isfinite(y)]
     heapify(queue)
     while queue:

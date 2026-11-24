@@ -190,7 +190,7 @@ try {
           }
         }
       }
-      const groundAt = (lx, lz) => {
+      const groundAt = (lx, lz, roof=Infinity) => {
         const clx = Math.min(256, Math.max(0, lx)), clz = Math.min(256, Math.max(0, lz))
         const col = Math.min(segs - 1, Math.max(0, Math.floor(clx / gStep)))
         const row = Math.min(segs - 1, Math.max(0, Math.floor(clz / gStep)))
@@ -202,8 +202,10 @@ try {
             if(Math.abs(det)<1e-9)continue
             const u=((clx-a[0])*vz-(clz-a[2])*vx)/det
             const v=(ux*(clz-a[2])-uz*(clx-a[0]))/det
-            if(u>=-1e-7&&v>=-1e-7&&u+v<=1.0000001)
-              top=Math.max(top,a[1]+u*(b[1]-a[1])+v*(c[1]-a[1]))
+            if(u>=-1e-7&&v>=-1e-7&&u+v<=1.0000001){
+              const y=a[1]+u*(b[1]-a[1])+v*(c[1]-a[1])
+              if(y<roof)top=Math.max(top,y)
+            }
           }
           return top
         }
@@ -286,7 +288,10 @@ try {
           let minDiff = Infinity
           let worstPt = samples[0]
           for (const s of samples) {
-            const diff = s[1] - groundAt(s[0] - tile.x, s[2] - tile.z)
+            // Covered terrain belongs to the roof. Keep testing every
+            // terrain face below that roof, including any floor penetration.
+            const roof=i>=data.tunnelFloorStart?data.roofAt(s[0],s[2],s[1]):Infinity
+            const diff = s[1] - groundAt(s[0] - tile.x, s[2] - tile.z,roof)
             if (diff < minDiff) { minDiff = diff; worstPt = s }
           }
           if (minDiff < 0.03) {

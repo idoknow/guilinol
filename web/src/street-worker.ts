@@ -105,13 +105,17 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       void y1;void y2;void y3
     }
     const channel=kind===4||kind===6?1:kind===5?0:kind
-    const platformTop=kind===1 && platformPath && edges?.length && !vertical
-    const stone=kind===1 && paving?.plaza && inRing((p1.x+p2.x+p3.x)/3,(p1.z+p2.z+p3.z)/3,paving.plaza)
-    const textureChannel=platformTop?9:stone?10:kind===6?6:channel
-    surfaceKinds.push(textureChannel,textureChannel,textureChannel)
-    if(platformTop)alongVals.push(edgeDistance(p1),edgeDistance(p2),edgeDistance(p3))
-    else alongVals.push(a1,a2,a3)
-    const c=platformTop?platformBrick:stone?plazaStone:colors[kind]
+    // Roads and sidewalks do not use the bank-wall distance attribute.
+    // Store a constant projection axis per surveyed triangle in that slot.
+    if(projected){
+      const ux=p2.x-p1.x,uy=p2.y-p1.y,uz=p2.z-p1.z
+      const vx=p3.x-p1.x,vy=p3.y-p1.y,vz=p3.z-p1.z
+      const nx=Math.abs(uy*vz-uz*vy),ny=Math.abs(uz*vx-ux*vz),nz=Math.abs(ux*vy-uy*vx)
+      a1=a2=a3=ny>=nx&&ny>=nz?0:nx>nz?1:2
+    }
+    const textureChannel=kind===6?6:channel
+    surfaceKinds.push(textureChannel,textureChannel,textureChannel);alongVals.push(a1,a2,a3)
+    const c=colors[kind]
     for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(channel===1&&!vertical)sidewalk.push(pt.x,pt.y,pt.z);else if(channel===0&&!vertical)road.push(pt.x,pt.y,pt.z)}
   }
   for(const [index,[kind,...rings]] of paths.entries()){
@@ -157,15 +161,16 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
       }
     }
   }
+  const legacyRoadLength=road.length,legacyWalkLength=sidewalk.length,legacySurfaceLength=xyz.length
   if(surveyed){
     const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3()
     const emit=(coords:Float32Array,kind:number,vertical=false)=>{
-      for(let i=0;i<coords.length;i+=9)triangle(a.fromArray(coords,i),b.fromArray(coords,i+3),c.fromArray(coords,i+6),kind,0,0,0,vertical)
+      for(let i=0;i<coords.length;i+=9)triangle(a.fromArray(coords,i),b.fromArray(coords,i+3),c.fromArray(coords,i+6),kind,0,0,0,vertical,true)
     }
     emit(surveyed.packed!==undefined?unpackPositions(surveyed.packed,.001)
       :Float32Array.from(surveyed.vertices!.flat(),v=>v*.001),0)
     if(surveyed.sidewalk)emit(unpackPositions(surveyed.sidewalk,.001),1)
-    if(surveyed.skirt)emit(unpackPositions(surveyed.skirt,.001),0,true)
+    if(surveyed.skirt)emit(unpackPositions(surveyed.skirt,.001),1,true)
   }
   const object=new THREE.Object3D()
   function box(x:number,y:number,z:number,w:number,h:number,d:number,yaw=0,tint=tone.railing,pitch=0){
@@ -386,6 +391,7 @@ export function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,s
     fenceNormals=fenceGeo.getAttribute('normal').array as Float32Array
   }
   return {
+    legacyRoadLength,legacyWalkLength,legacySurfaceLength,
     positions, normals:surface.getAttribute('normal').array as Float32Array,
     colors:new Float32Array(rgb), kinds:new Uint8Array(surfaceKinds), along:new Float32Array(alongVals),
     fencePositions, fenceNormals, fenceColors:new Float32Array(fenceRgb), fenceAlong:new Float32Array(fenceAlong),
