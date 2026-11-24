@@ -84,6 +84,38 @@ def close_qingtian_road(elements, widths, curbs):
             street['openStations'].append((lo,hi))
 
 
+def set_terminal_stops(nodes, lanes, height, profile):
+    """Place the vehicle centre on the last usable pavement at surveyed blind alleys."""
+    # End reference, setback along the paved street, maximum lateral offset.
+    # Measured with the 4.48 x 1.82 m sedan and 20 cm to the solid facade.
+    surveys={4505299301:(0.,.49),4505299302:(2.15,1.),
+             14322505098:(2.35,1.),14104972208:(2.05,0.)}
+    ends=defaultdict(list)
+    for lane in lanes:
+        for key in ('from','to'):
+            if lane[key] in surveys:
+                ends[lane[key]].append((lane,key))
+    for ref,connected in ends.items():
+        neighbors={lane['to' if key=='from' else 'from'] for lane,key in connected}
+        if len(neighbors)!=1:
+            continue
+        end,other=nodes[ref],nodes[neighbors.pop()]
+        delta=np.array([other[k]-end[k] for k in ('x','z')])
+        retreat,lateral=surveys[ref]
+        if np.linalg.norm(delta)<=retreat+.5:
+            continue
+        x,z=np.round([end['x'],end['z']]+delta*(retreat/np.linalg.norm(delta)),2)
+        stop=ref
+        if retreat:
+            # Pedestrians can walk all the way to the original OSM endpoint.
+            stop=-3_000_000_000_000-ref
+            nodes[stop]=dict(id=stop,x=x,z=z,y=height(x,z,connected[0][0]['way']))
+        for lane,key in connected:
+            lane[key]=stop
+            lane['offset']=float(np.clip(lane['offset'],-lateral,lateral))
+            lane['heights']=profile(lane['from'],lane['to'],lane['offset'],lane['way'])
+
+
 def garage_boundary(output, chunks, elements):
     street=next((w for w in elements if w['type']=='way' and w['id']==GARAGE[1]),None)
     if street is None:
