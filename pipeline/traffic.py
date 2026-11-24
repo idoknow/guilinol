@@ -351,7 +351,8 @@ def bake(output, manifest, rendered_roads=None):
             anchors=[dict(node=n,floor=h,approachCut=True) for n,h in zip(bridge_nodes,bridge_levels,strict=True)]
             approach_widths=ring_road_widths(elements,sections)
             access,limits=plan_approaches(conflicts+anchors,lanes+guides,survey_nodes,{int(k):v for k,v in samples['heights'].items()},fixed,approach_widths)
-            access=cycleway_grades(cycleway,conflicts)+access
+            cycling=cycleway_grades(cycleway,conflicts)
+            access=cycling+access
             surveyed=vehicle_surface_grades.profiles(graded_sections,native_levels,access+canal_grades+terminal_grades)
             from pedestrian_approaches import profiles as path_profiles
             planned=access+canal_grades+terminal_grades+surveyed
@@ -359,7 +360,7 @@ def bake(output, manifest, rendered_roads=None):
             pedestrian+=cycleway_street_tie(output,manifest,elements,sections,cycleway)
             from junction_grades import profiles as junction_profiles
             pedestrian+=junction_profiles(output,manifest,elements,sections,planned)
-            bake_surveyed_corridors(output,manifest['chunks'],elements,sections,planned+pedestrian,only_approaches=True,bridge_profiles=canal_grades,preferred=pedestrian)
+            bake_surveyed_corridors(output,manifest['chunks'],elements,sections,planned+pedestrian,only_approaches=True,bridge_profiles=canal_grades,preferred=pedestrian+cycling)
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)
             for tunnel in generated:
                 tunnel['gradedAccess']=True
