@@ -59,7 +59,7 @@ export function joinPortalRoads(tile:Tile,tunnels:Tunnel[],buffers:Float32Array[
           // stitch across 20 m concentrates the whole rise at its outer edge.
           const distance=-inward, ease=1
           const rise=distance<ease?distance*distance/(2*ease):distance-ease/2
-          target+=.042*rise
+          target+=railStyle.stationLevels.approachGrade*rise
         }
         buffer[index+1]+=blend*(target-.02-buffer[index+1])
       }

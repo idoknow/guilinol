@@ -57,7 +57,7 @@ def grade_station_junctions(terrain, underlay, water, road_ctrl, left, top):
     from shapely import distance, points as probes, union_all
     from common import GRID, load_osm, ll2xz
     from road_grading import STEP
-    from station_levels import TUNNEL_FLOOR
+    from station_levels import STYLE, TUNNEL_FLOOR
 
     ways = {w['id']: w for w in load_osm() if w['type']=='way'}
     tunnel = ways[UNDERPASS]
@@ -65,8 +65,9 @@ def grade_station_junctions(terrain, underlay, water, road_ctrl, left, top):
     inventory = json.loads((Path(__file__).resolve().parents[1]/'docs/railway-crossings.json').read_bytes())
     tracks = [bore.project(Point(ll2xz(r['lat'],r['lon']))) for r in inventory
               if r['road']==UNDERPASS and r['type']=='rail_over']
-    # 4% leaves margin for the sampled ground mesh and for rounding to dm.
-    grade = .04
+    # A connected street can meet the radial approach at any angle.
+    # Keep its crossfall below 3% even when it runs across the field.
+    grade = STYLE['approachGrade']
     for node, edge in zip((tunnel['nodes'][0],tunnel['nodes'][-1]),
                                   (min(tracks)-2,max(tracks)+2)):
         anchor = bore.interpolate(edge)

@@ -16,6 +16,7 @@
   "stationLevels": {
     "hallFloor": 155.05,
     "platformRise": 0,
+    "approachGrade": 0.026,
     "platformHeight": 1.25,
     "structureDepth": 1.2,
     "roadClearance": 4.5,
