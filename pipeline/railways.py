@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BRIDGE, TUNNEL, ELECTRIC, FENCE, LEVEL, RESERVED, PAINTED = 1, 2, 4, 8, 16, 32, 64
 
 
-def envelope(graph, targets):
+def envelope(graph, targets, origins=None):
     """Highest allowed level from all upper anchors, in one graph traversal."""
     levels = np.array(targets, dtype=float)
     queue = [(y, i) for i,y in enumerate(levels) if math.isfinite(y)]
@@ -37,6 +37,7 @@ def envelope(graph, targets):
         for j, rise in graph[i]:
             if level + rise < levels[j]:
                 levels[j] = level + rise
+                if origins is not None: origins[j] = origins[i]
                 heapq.heappush(queue, (levels[j], j))
     return levels
 
@@ -138,8 +139,10 @@ def bake(world_dir, manifest, inventory, samples):
                 is_level = row['type']=='level'
                 key = str(row['sharedNode']) if is_level else (row['rail'],row['road'],row['lat'],row['lon'])
                 hit = samples[key]
+                surface_source='carriageway'
                 road = hit['road']
                 if (row['type']=='road_over' or is_level and road is None) and hit['deck'] is not None:
+                    surface_source='deck'
                     road = hit['deck']
                 tunnel=tunnels.get(row['road'])
                 if tunnel and row['type']=='rail_over':
@@ -148,9 +151,12 @@ def bake(world_dir, manifest, inventory, samples):
                     offset=np.asarray(p.coords[0])-ends[0]
                     along=offset@direction
                     if 0<=along<=tunnel['length'] and abs(offset@[-direction[1],direction[0]])<=tunnel['halfWidth']:
+                        surface_source='tunnel_profile'
                         road=float(np.interp(along,*np.asarray(tunnel['stations']).T))
                 if road is None:
+                    surface_source='painted_terrain' if is_level else 'terrain_proxy'
                     road = world.sample(*p.coords[0],include_peaks=False)[0]
+                row=dict(row,surfaceSource=surface_source)
                 street_line = LineString(points(street))
                 station = street_line.project(p)
                 before = street_line.interpolate(max(0,station-1))
@@ -214,12 +220,20 @@ def bake(world_dir, manifest, inventory, samples):
     ground = np.array(ground)
     lows=np.full(len(ground),-np.inf)
     highs=np.full(len(ground),np.inf)
-    for i,bound,kind,_ in constraints:
-        if kind=='min': lows[i]=max(lows[i],bound)
-        else: highs[i]=min(highs[i],bound)
-    for i,y in anchors.items(): lows[i]=highs[i]=y
-    floor=-envelope(graph,-lows)
-    ceiling=envelope(graph,highs)
+    low_refs,high_refs={},{}
+    for i,bound,kind,row in constraints:
+        if kind=='min' and bound>lows[i]:
+            lows[i],low_refs[i]=bound,row
+        if kind=='max' and bound<highs[i]:
+            highs[i],high_refs[i]=bound,row
+    for i,row,y,_,_ in crossing_data:
+        if row['type']=='level':
+            lows[i]=highs[i]=y
+            low_refs[i]=high_refs[i]=row
+    low_origins=np.arange(len(ground))
+    high_origins=low_origins.copy()
+    floor=-envelope(graph,-lows,low_origins)
+    ceiling=envelope(graph,highs,high_origins)
     target=ground+.35
     smooth=(envelope(graph,target)-envelope(graph,-target))/2
     height=np.maximum(floor,np.minimum(smooth,ceiling))
@@ -233,8 +247,21 @@ def bake(world_dir, manifest, inventory, samples):
     for i,bound,kind,row in constraints:
         miss=bound-height[i] if kind=='min' else height[i]-bound
         if miss>.001:
-            violations.append(dict(rail=row['rail'], road=row['road'], type=row['type'],
-                                   lat=row['lat'], lon=row['lon'], shortfallM=round(miss,3)))
+            if kind=='min':
+                source=high_origins[i]
+                witness=high_refs[source]
+                allowed=ceiling[i]-highs[source]
+                limit=ceiling[i]
+            else:
+                source=low_origins[i]
+                witness=low_refs[source]
+                allowed=lows[source]-floor[i]
+                limit=floor[i]
+            evidence={key:witness[key] for key in ('rail','road','sharedNode','type','surfaceSource','lat','lon')}
+            violations.append(dict(rail=row['rail'],road=row['road'],type=row['type'],
+                lat=row['lat'],lon=row['lon'],surfaceSource=row['surfaceSource'],shortfallM=round(miss,3),
+                requiredRailY=round(bound,4),boundDirection=kind,opposingGradeLimitY=round(limit,4),
+                permittedRiseFromWitnessM=round(allowed,4),witness=evidence))
     tiles=defaultdict(list)
     maximum_grade=defaultdict(float)
     for i,j,station,flags,way_id in pieces:
