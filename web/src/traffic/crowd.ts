@@ -87,7 +87,9 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
   }
   function release(walker:Walker,view:View){
     active.delete(walker);view.root.removeFromParent();view.mixer?.stopAllAction()
-    view.root.traverse(node=>{if(node instanceof THREE.SkinnedMesh)node.skeleton.dispose()})
+    const skeletons=new Set<THREE.Skeleton>()
+    view.root.traverse(node=>{if(node instanceof THREE.SkinnedMesh)skeletons.add(node.skeleton)})
+    for(const skeleton of skeletons)skeleton.dispose()
   }
   function build(walker:Walker):View|undefined{
     let index=assigned.get(walker)
@@ -97,6 +99,17 @@ export function crowd(scene:THREE.Scene,camera:THREE.Camera,groundAt?:(x:number,
     root.name='G2 passer-by';root.add(instance)
     // Cloned avatar parts include offscreen skirts and outline shells with
     // culling disabled. A conservative walking envelope works for both cameras.
+    // SkeletonUtils clones each mesh's palette, including outlines and
+    // clothes driven by the same bones. One GPU bone texture serves the rig.
+    const palettes:THREE.Skeleton[]=[]
+    instance.traverse(part=>{
+      if(!(part instanceof THREE.SkinnedMesh))return
+      const rig=part.skeleton
+      const shared=palettes.find(other=>other.bones.length===rig.bones.length&&
+        rig.bones.every((bone,i)=>bone===other.bones[i]&&rig.boneInverses[i].equals(other.boneInverses[i])))
+      if(shared)part.skeleton=shared
+      else palettes.push(rig)
+    })
     instance.updateMatrixWorld(true)
     instance.traverse(part=>{
       if(!(part instanceof THREE.SkinnedMesh)||part.frustumCulled)return
