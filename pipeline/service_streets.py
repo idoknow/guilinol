@@ -179,3 +179,36 @@ if __name__ == '__main__':
     compile_streets = bake_shanhu_walks if args.shanhu_walks_only else bake
     compile_streets(output, manifest, json.loads(Path(__file__).with_name('palette.json').read_text()))
     file.write_text(json.dumps(manifest,separators=(',',':'))+'\n')
+
+
+def mark_drivable_services(output, elements, lanes):
+    """Extend the player mask to the service carriageways that carry traffic."""
+    import base64
+    from shapely import intersects_xy
+    from common import ll2xz
+    file = output/'vehicles.bin'
+    data = json.loads(gzip.decompress(file.read_bytes()))
+    left,top,cols,rows,step = data['motorGrid']
+    packed = base64.b64decode(data['motorMask'])
+    compressed = data.get('maskEncoding')=='gzip'
+    mask = np.frombuffer(gzip.decompress(packed) if compressed else packed, dtype='u1').copy()
+    eligible = {(lane['way'],min(lane['from'],lane['to']),max(lane['from'],lane['to']))
+                for lane in lanes if lane['cls']=='service' and not lane.get('structure')}
+    for way in elements:
+        if way.get('tags',{}).get('highway')!='service':
+            continue
+        half_width = width(way['tags'])/2
+        for i,(a,b) in enumerate(zip(way['nodes'],way['nodes'][1:])):
+            if (way['id'],min(a,b),max(a,b)) not in eligible:
+                continue
+            ends=[ll2xz(p['lat'],p['lon']) for p in way['geometry'][i:i+2]]
+            strip=LineString(ends).buffer(half_width,quad_segs=3)
+            x0,z0,x1,z1=strip.bounds
+            c=np.arange(max(0,math.ceil((x0-left)/step)),min(cols,math.floor((x1-left)/step)+1))
+            r=np.arange(max(0,math.ceil((z0-top)/step)),min(rows,math.floor((z1-top)/step)+1))
+            j,k=np.nonzero(intersects_xy(strip,left+c[None,:]*step,top+r[:,None]*step))
+            index=r[j]*cols+c[k]
+            np.bitwise_or.at(mask,index>>3,(128>>(index&7)).astype('u1'))
+    raw=mask.tobytes()
+    data['motorMask']=base64.b64encode(gzip.compress(raw,mtime=0) if compressed else raw).decode()
+    file.write_bytes(gzip.compress(json.dumps(data,ensure_ascii=False,separators=(',',':')).encode(),mtime=0))

@@ -14,9 +14,10 @@ from shapely.ops import unary_union
 from shapely.prepared import prep
 
 from common import OUT, ll2xz, load_osm
+from road_tunnels import clear_approach_paving
 from station_road_corridor import bake as bake_station_corridor
 from vehicle_tunnels import underground, sections as tunnel_sections, solve as solve_tunnels
-from service_streets import width as minor_road_width
+from service_streets import mark_drivable_services, width as minor_road_width
 from traffic_parking import allowed, bake_parking
 from landmarks.jiefang_layout import SPAN_WAYS, deck_level
 from landmarks.world_surface import Surface
@@ -138,6 +139,9 @@ def bake(output, manifest, rendered_roads=None):
     nodes, lanes, walks, incoming = {}, [], [], defaultdict(list)
     elements = load_osm()
     bake_station_corridor(output, manifest['chunks'], elements)
+    # Legacy expanded worlds carry the original continuous surface street
+    # through both open Wuling cuttings, above the actual tunnel floor.
+    clear_approach_paving(output,manifest['chunks'],[t for t in manifest.get('tunnels',[]) if t['way']==237985762])
     parking_segments = []
     sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
     from dingjiang_structures import motorway_sections
@@ -278,6 +282,7 @@ def bake(output, manifest, rendered_roads=None):
         (dest.parent/f'{col}_{row}.json.gz').write_bytes(gzip.compress(json.dumps(cell,separators=(',',':')).encode(),mtime=0))
     (dest.parent/'cells.json').write_text(json.dumps([f'{col}_{row}' for col,row in sorted(cells)]))
     print('Traffic:', {key:len(value) for key,value in result.items()}, dest.stat().st_size, 'bytes')
+    mark_drivable_services(output,elements,lanes)
     bake_parking(output, parking_segments, elements, nodes, forbidden, height)
 
 

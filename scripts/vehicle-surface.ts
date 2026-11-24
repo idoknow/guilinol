@@ -97,7 +97,7 @@ export function vehicleSurface(world,m){
         }
     }
   }
-  return (x,z,lane,diagnostic?:{hidden:boolean,deck?:number,missingFloor?:boolean})=>{
+  return (x,z,lane,diagnostic?:{hidden:boolean,deck?:number,missingFloor?:boolean,road?:number,terrain?:number})=>{
     const ox=Math.floor(x/256)*256,oz=Math.floor(z/256)*256,key=ox+','+oz
     if(!cache.has(key)){
       if(!chunks.has(key))throw Error('No rendered chunk at '+[x,z])
@@ -139,7 +139,10 @@ export function vehicleSurface(world,m){
       if(diagnostic)diagnostic.deck=deck
       y=Math.max(y,deck)
     }
-    if(diagnostic)diagnostic.hidden=y===terrain&&Number.isFinite(road)&&terrain>road+.005
+    if(diagnostic){
+      diagnostic.road=road;diagnostic.terrain=terrain
+      diagnostic.hidden=y===terrain&&Number.isFinite(road)&&terrain>road+.005
+    }
     return y
   }
 }

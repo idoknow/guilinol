@@ -341,7 +341,7 @@ function localSupport(ctx: DismountContext, x: number, z: number, refY: number) 
   const lm = ctx.surface(x, z, 'landmark', refY + .35, 1.4)
   const validLm = lm && lm.slope <= wcfg.slope && lm.y <= refY + .35 ? lm : null
   const bridgeDeck = validDeck && validLm ? (validLm.y > validDeck.y ? validLm : validDeck) : (validDeck ?? validLm)
-  const support = bridgeDeck ?? ctx.surface(x, z, 'sidewalk') ?? ctx.surface(x, z, 'road') ?? ctx.surface(x, z, 'ground')
+  const support = bridgeDeck ?? ctx.surface(x, z, 'sidewalk', refY+.55, 1.8) ?? ctx.surface(x, z, 'road', refY+.55, 1.8) ?? ctx.surface(x, z, 'ground', refY+.55, 1.8)
   if (!support || support.slope > wcfg.slope || (!bridgeDeck && ctx.wet(x, z))) return null
   const peak = ctx.surface(x, z, 'peak')
   if (peak && peak.y > support.y + .05) return null
@@ -395,7 +395,7 @@ export function probeLocalMount(ctx: DismountContext, px: number, py: number, pz
   const tryPlace = (x: number, z: number, shifted: boolean): MountCheckResult | null => {
     const tile = ctx.tileAt(x, z)
     if (!tile || !ctx.stream.loaded.has(tile) || ctx.insideHouse(x, z)) return null
-    const support = localSupport(ctx, x, z, by)
+    const support = localSupport(ctx, x, z, Math.max(py, by))
     if (!support || Math.abs(support.y - by) > .85) return null
     if (shifted && (
       segmentBlocked(ctx, px, pz, x, z, Math.max(py, support.y))

@@ -238,6 +238,9 @@ export async function vehicles(
     if (record instanceof T.Mesh) return record
     const mesh = makeVehicleMesh(record.name, record.userData.paint, {shared: record.userData.shared})
     mesh.position.copy(record.position)
+    // Controllers read yaw and pitch after unbatching. With XYZ Euler order
+    // a heading past 90 degrees reappears as a flipped pitch and roll.
+    mesh.rotation.order='YXZ'
     mesh.quaternion.copy(record.quaternion)
     Object.assign(mesh.userData, record.userData)
     const saved = bikeStates.get(record)
