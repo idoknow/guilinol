@@ -7,7 +7,7 @@ import {browserOptions} from './qa-browser.mjs'
 import {withFixtureBays} from './ride-fixture-bays.mjs'
 import {vehicleSurface} from './vehicle-surface'
 import {sites} from './vehicle-grounding-sites'
-import {poseAt} from '../web/src/traffic/sim'
+import {contactPose} from '../web/src/traffic/lane-surface'
 
 const world='dist/world'
 const packed=(file:string)=>JSON.parse(gunzipSync(fs.readFileSync(world+'/'+file)).toString())
@@ -18,7 +18,7 @@ const cases=sites.map(([name,id,f])=>{
   const lane=graph.lanes.find(l=>l.id===id),a=nodes.get(lane.from),b=nodes.get(lane.to)
   const len=Math.hypot(b.x-a.x,b.z-a.z),dx=(b.x-a.x)/len,dz=(b.z-a.z)/len
   const x=a.x+dx*f*len-dz*lane.offset,z=a.z+dz*f*len+dx*lane.offset
-  return {name,lane,row:[x,poseAt(lane.wheelPose,f,1),z,Math.atan2(-dx,-dz),0]}
+  return {name,lane,row:[x,contactPose({...lane,length:len},f*len).y,z,Math.atan2(-dx,-dz),0]}
 })
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
 const browser=await chromium.launch(browserOptions()),results=[]
@@ -34,7 +34,7 @@ try{
     await page.waitForFunction(()=>window.viewer?.walk?.parked().length,null,{timeout:60000})
     for(const {name,lane,row} of cases){
       try{
-        if(!await page.evaluate(([x,,z])=>window.viewer.walkTo(x,z,0,'grounding-drive'),row))throw Error('Spawn unavailable')
+        if(!await page.evaluate(([x,y,z,heading])=>window.viewer.walk.enterLaneFixture(x,y,z,heading),row))throw Error('Loaded lane lacks a mountable support surface')
         await page.waitForFunction(()=>!!document.querySelector('.vehicle-action:not([hidden])')?.textContent,null,{timeout:5000})
         await page.keyboard.press('f')
         await page.waitForFunction(k=>window.viewer.walk.vehicle===k,kind,{timeout:5000})
@@ -60,8 +60,8 @@ try{
         },kind)
         const distance=Math.hypot(trace.at(-1)[0][0]-trace[0][0][0],trace.at(-1)[0][2]-trace[0][0][2])
         const gaps=trace.flat().map(([x,y,z])=>y-surface(x,z,lane))
-        results.push({name,kind,distance,min:Math.min(...gaps),max:Math.max(...gaps),pass:distance>=2&&gaps.every(g=>Math.abs(g)<=.25)})
-      }catch(error){results.push({name,kind,pass:false,error:String(error).split('\n')[0]})}
+        results.push({name,kind,status:distance<2?'no-motion':gaps.every(g=>Math.abs(g)<=.25)?'pass':'contact',distance,min:Math.min(...gaps),max:Math.max(...gaps),pass:distance>=2&&gaps.every(g=>Math.abs(g)<=.25)})
+      }catch(error){results.push({name,kind,status:'setup',pass:false,error:String(error).split('\n')[0]})}
       fs.writeFileSync(out+'/drive.json',JSON.stringify(results,null,2))
     }
     await page.close()

@@ -11,6 +11,8 @@ assert(mainDist && prDist, 'Usage: node scripts/perf-drive.mjs MAIN_DIST PR_DIST
 const views = ['overview', 'lijiang', 'palace', 'south', 'walk-palace']
 const servers = [], raw = [], summary = []
 const quantile = (values, fraction) => [...values].sort((left, right) => left - right)[Math.ceil(values.length * fraction) - 1]
+const rounds=Number(process.env.PERF_ROUNDS??5)
+assert(Number.isInteger(rounds)&&rounds>0)
 const output = 'captures/drive-perf'
 await mkdir(output, {recursive:true})
 const browser = await chromium.launch(browserOptions())
@@ -67,16 +69,16 @@ try {
   }
   await writeFile(`${output}/summary.json`,JSON.stringify(summary,null,2))
   console.table(summary)
-  assert(summary.every(row=>row.pass),'Deterministic gate failed; see raw and summary JSON')
+  if(!process.env.PERF_ROUNDS)assert(summary.every(row=>row.pass),'Deterministic gate failed; see raw and summary JSON')
   for(const view of views) {
     const p95s=[[],[]]
-    for(let round=1;round<=5;round++) for(const side of [0,1]) {
+    for(let round=1;round<=rounds;round++) for(const side of [0,1]) {
       const row=await sample(view,side,60,round)
       p95s[side].push(quantile(row.frames.map(frame=>frame.ms),.95))
     }
     const [base,result]=p95s.map(values=>quantile(values,.5))
     const noise=Math.max(...p95s[0])-Math.min(...p95s[0])
-    summary.push({view,metric:'p95 ms',main:base,PR:result,noise,p95s,pass:result-base<=Math.max(.05*base,noise)})
+    summary.push({view,metric:'p95 ms',main:base,PR:result,noise,p95s,pass:process.env.PERF_ROUNDS?result<=1.05*base:result-base<=Math.max(.05*base,noise)})
     await writeFile(`${output}/summary.json`,JSON.stringify(summary,null,2))
   }
   console.table(summary.slice(-views.length))

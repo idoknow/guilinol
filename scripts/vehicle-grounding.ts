@@ -3,12 +3,32 @@ import path from 'node:path'
 import {gunzipSync} from 'node:zlib'
 import {execFileSync} from 'node:child_process'
 import {vehicleSurface} from './vehicle-surface'
+import {contactPose,profilePad} from '../web/src/traffic/lane-surface'
 import {poseAt,trackHeight} from '../web/src/traffic/sim'
 
 const [mode='audit',world='public/world',output='captures/vehicle-grounding']=process.argv.slice(2)
 const bake=mode==='bake'
-const data=bake?JSON.parse(fs.readFileSync(output,'utf8')):JSON.parse(gunzipSync(fs.readFileSync(path.join(world,'roads/graph.json.gz'))).toString())
+const data=(bake||mode==='portals')?JSON.parse(fs.readFileSync(output,'utf8')):JSON.parse(gunzipSync(fs.readFileSync(path.join(world,'roads/graph.json.gz'))).toString())
 const manifest=data.manifest??JSON.parse(fs.readFileSync(path.join(world,'manifest.json'),'utf8'))
+if(mode==='portals'){
+  const surface=vehicleSurface(world,manifest),nodes=new Map(data.nodes.map(n=>[n.id,n]))
+  const heights={},roofs=[]
+  for(const edge of data.network.edges){
+    const a=nodes.get(edge.a),b=nodes.get(edge.b)
+    for(const node of [a,b])heights[node.id]??=surface(node.x,node.z,{})
+    const dx=b.x-a.x,dz=b.z-a.z,length=Math.hypot(dx,dz),count=Math.ceil(length/2)
+    const levels=[]
+    for(let i=0;i<=count;i++){
+      const f=i/count,x=a.x+dx*f,z=a.z+dz*f
+      // The lowest obstruction across the carriageway sets the clearance.
+      levels.push(Math.min(...[-edge.halfWidth,0,edge.halfWidth].map(offset=>
+        surface(x-dz/length*offset,z+dx/length*offset,{}))))
+    }
+    roofs.push(levels)
+  }
+  fs.writeFileSync(output,JSON.stringify({heights,roofs}))
+  process.exit(0)
+}
 // Released graphs predating the way field use OSM node pairs as stable keys.
 if(data.lanes.some(lane=>lane.way===undefined)){
   const file=['raw/osm-2026-11.json','raw/osm.json'].find(fs.existsSync)
@@ -37,12 +57,80 @@ const lanes=data.lanes.map(lane=>{
   return {...lane,start,end,length,dx:(end.x-start.x)/length,dz:(end.z-start.z)/length}
 }).sort((a,b)=>Math.floor(a.start.z/256)-Math.floor(b.start.z/256)||a.start.x-b.start.x)
 
+// Store only the knots needed to reconstruct the metre samples. Distances are
+// sample-index deltas, heights are signed centimetre deltas, crossfalls int8.
+function packSurface(length:number,wheel:(d:number,r:number)=>number){
+  const count=Math.ceil(length+2*profilePad)
+  const heights=new Int32Array(count+1),cross=new Int8Array(count+1)
+  for(let i=0;i<=count;i++){
+    const d=i*(length+2*profilePad)/count-profilePad
+    const left=wheel(d,-.795),right=wheel(d,.795)
+    heights[i]=Math.round((left+right)*50)
+    cross[i]=Math.max(-127,Math.min(127,Math.round((right-left)*128/1.59)))
+  }
+  const keep=new Set([0,count]),pending=[[0,count]]
+  while(pending.length){
+    const [a,b]=pending.pop()!
+    let max=1,cut=0
+    for(let i=a+1;i<b;i++){
+      const t=(i-a)/(b-a)
+      const error=Math.max(Math.abs(heights[i]-heights[a]-t*(heights[b]-heights[a]))/1.5,
+        Math.abs(cross[i]-cross[a]-t*(cross[b]-cross[a]))/2)
+      if(error>max){max=error;cut=i}
+    }
+    if(cut){keep.add(cut);pending.push([a,cut],[cut,b])}
+  }
+  const bytes:number[]=[]
+  function write(value:number){
+    while(value>=128){bytes.push(128|(value&127));value>>>=7}
+    bytes.push(value)
+  }
+  let prevI=0,prevY=0
+  for(const i of [...keep].sort((a,b)=>a-b)){
+    const delta=heights[i]-prevY
+    write(i-prevI);write((delta<<1)^(delta>>31));bytes.push(cross[i]&255)
+    prevI=i;prevY=heights[i]
+  }
+  return Buffer.from(bytes).toString('base64')
+}
+
 const tunnelWays=new Set((manifest.tunnels??[]).map(t=>t.way))
 const missingFloors=new Set<number>()
-const profiles=[],reports=[],worst=[],hist=new Map<number,number>(),heat=new Map<string,number>()
+const partialFloors=new Set<number>()
+const profiles=[],reports=[],hist=new Map<number,number>(),heat=new Map<string,number>()
+const reasons={surface:0,tunnel:0,fit:0,hidden:0}
+const worstByLane={tunnel:new Map(),surface:new Map()}
+let problemBuffer=''
+if(!bake){fs.mkdirSync(output,{recursive:true});fs.writeFileSync(path.join(output,'outliers.ndjson'),'')}
+function flushProblems(){
+  fs.appendFileSync(path.join(output,'outliers.ndjson'),problemBuffer)
+  problemBuffer=''
+}
 let total=0,outliers=0,nonplanar=0,sunk=0,floating=0
 for(const lane of lanes){
-  const {dx,dz,length,start,offset}=lane
+  const {dx,dz,length,start}=lane
+  let offset=lane.offset
+  if(bake&&lane.structure==='bridge'&&offset){
+    // Split OSM carriageways can have a narrower deck than their tagged
+    // nominal lane width. Check the actual lateral slab edge along the span.
+    const direction=Math.sign(offset),outer=Math.abs(offset)+1.005
+    for(const f of [.1,.3,.5,.7,.9]){
+      const cx=start.x+dx*f*length,cz=start.z+dz*f*length
+      function deckAt(distance:number){
+        const hit={hidden:false,deck:-Infinity}
+        surface(cx-dz*direction*distance,cz+dx*direction*distance,lane,hit)
+        return hit.deck
+      }
+      const center=deckAt(0)
+      if(!Number.isFinite(center))continue
+      for(let d=.1;d<=outer+.1;d+=.1){
+        if(Math.abs(deckAt(d)-center)<.5)continue
+        offset=direction*Math.min(Math.abs(offset),Math.max(0,d-.1-1.005))
+        break
+      }
+    }
+    offset=Math.round(100*offset)/100
+  }
   const unresolved=lane.structure==='tunnel'&&!tunnelWays.has(lane.way)
   if(unresolved){
     missingFloors.add(lane.way)
@@ -51,79 +139,56 @@ for(const lane of lanes){
   // Wheel centers of the 4.48 x 1.82 m reference car (mountWheel in vehicle-model.ts).
   const front=1.34,rear=-1.31,halfWidth=.795,span=front-rear
   const wheel=(along,right)=>surface(start.x+dx*along+dz*(right-offset),start.z+dz*along-dx*(right-offset),lane)
-  const active=mode==='baseline'?{...lane,wheelPose:undefined}:lane
-  const count=Math.ceil(length/(bake?1:2)),samples=[]
+  if(bake){profiles[lane.id]={floor:packSurface(length,wheel),offset};continue}
+  const active=mode==='baseline'?{...lane,wheelPose:undefined,floor:undefined}:lane
+  const count=Math.ceil(length/2)
   let maximum=0,over=0
   for(let i=0;i<=count;i++){
     const f=i/count,dist=f*length
     const fr=wheel(dist+front,halfWidth),fl=wheel(dist+front,-halfWidth)
     const br=wheel(dist+rear,halfWidth),bl=wheel(dist+rear,-halfWidth)
-    if(bake){
-      const incline=(fr+fl-br-bl)/(2*span),cross=(fr+br-fl-bl)/(4*halfWidth)
-      let y=(bl+br)/2-rear*incline,pitch=-Math.atan(incline),roll=Math.atan(cross/Math.hypot(1,incline))
-      // On grades, rotation shifts each contact horizontally. Refit the plane at
-      // the shifted wheel positions, retaining the pose with the smallest residual.
-      let best=[y,pitch,roll],minimum=Infinity
-      for(let step=0;step<5;step++){
-        const gaps=[]
-        for(const forward of [front,rear])for(const right of [halfWidth,-halfWidth]){
-          const ry=right*Math.sin(roll),rz=ry*Math.sin(pitch)+forward*Math.cos(pitch)
-          gaps.push(wheel(dist+rz,right*Math.cos(roll))-y-ry*Math.cos(pitch)+forward*Math.sin(pitch))
-        }
-        const error=Math.max(...gaps.map(Math.abs))
-        if(error>=minimum)break
-        minimum=error;best=[y,pitch,roll]
-        if(error<.015)break
-        const [a,b,c,d]=gaps
-        const u=(a+b-c-d)/(2*span),v=(a+c-b-d)/(4*halfWidth)
-        y+=(c+d)/2-rear*u
-        pitch-=Math.atan(u);roll+=Math.atan(v)
-      }
-      samples.push([f,...best])
-      continue
-    }
-    const y=trackHeight(active,dist),pitch=active.wheelPose?poseAt(lane.wheelPose,f,2):0,roll=active.wheelPose?poseAt(lane.wheelPose,f,3):0
+    const {y,pitch,roll}=active.floor?contactPose(active,dist):{
+      y:trackHeight(active,dist),pitch:active.wheelPose?poseAt(active.wheelPose,f,2):0,roll:active.wheelPose?poseAt(active.wheelPose,f,3):0}
     // Intersect under the rotated contact, including its horizontal displacement.
     for(const forward of [rear,front])for(const right of [-halfWidth,halfWidth]){
       const rx=right*Math.cos(roll),ry=right*Math.sin(roll)
       const rz=ry*Math.sin(pitch)+forward*Math.cos(pitch)
       const x=start.x+dx*(dist+rz)+dz*(rx-offset),z=start.z+dz*(dist+rz)-dx*(rx-offset)
-      const roadY=surface(x,z,lane),gap=y+ry*Math.cos(pitch)-forward*Math.sin(pitch)-roadY,error=Math.abs(gap)
+      const diagnostic={hidden:false,missingFloor:false}
+      const roadY=surface(x,z,lane,diagnostic),gap=y+ry*Math.cos(pitch)-forward*Math.sin(pitch)-roadY,error=Math.abs(gap)
+      if(diagnostic.missingFloor)partialFloors.add(lane.way)
       maximum=Math.max(maximum,error)
       const mm=Math.ceil(error*1000);hist.set(mm,(hist.get(mm)??0)+1);total++
       const key=Math.floor(x/32)+','+Math.floor(z/32)
       heat.set(key,Math.max(heat.get(key)??0,error))
-      if(error>.25){over++;outliers++;if(gap>0)floating++;else sunk++}
-      if(worst.length<50||error>worst.at(-1).error){
-        worst.push({dist,f,nominalContactHeights:[fr,fl,br,bl],lane:lane.id,way:lane.way??null,kind:lane.kind,x,z,roadY,gap,error})
-        worst.sort((a,b)=>b.error-a.error);worst.length=Math.min(50,worst.length)
+      if(error>.25){
+        over++;outliers++;if(gap>0)floating++;else sunk++
+        const reason=unresolved||diagnostic.missingFloor?'tunnel':diagnostic.hidden?'hidden':Math.abs(fr+bl-fl-br)/4>.25?'surface':'fit'
+        reasons[reason]++
+        const point={lane:lane.id,way:lane.way,kind:lane.kind,reason,x,z,dist,gap,error}
+        problemBuffer+=JSON.stringify(point)+'\n'
+        if(problemBuffer.length>=262144)flushProblems()
+        const group=worstByLane[lane.structure==='tunnel'?'tunnel':'surface']
+        if(!group.has(lane.id)||error>group.get(lane.id).error)group.set(lane.id,point)
       }
+
     }
     if(Math.abs(fr+bl-fl-br)/4>.25)nonplanar++
   }
-  if(bake){
-    // Keep midpoints wherever a 4 m chord exceeds the height/angle tolerances.
-    const kept=[0]
-    function split(a,b){
-      let cut=0
-      for(let j=a+1;j<b;j++){
-        const t=(j-a)/(b-a)
-        if([1,2,3].some(k=>Math.abs(samples[j][k]-(samples[a][k]+t*(samples[b][k]-samples[a][k])))>(k===1?.015:.008))){cut=j;break}
-      }
-      if(cut){split(a,cut);split(cut,b)}else kept.push(b)
-    }
-    for(let a=0;a<count;a+=4)split(a,Math.min(count,a+4))
-    profiles[lane.id]=kept.flatMap(i=>samples[i].map((v,k)=>Number(v.toFixed(k===0?8:4))))
-  }else reports.push({lane:lane.id,way:lane.way??null,kind:lane.kind,maximum,over,unresolvedTunnelFloor:unresolved})
+  reports.push({lane:lane.id,way:lane.way??null,kind:lane.kind,maximum,over,unresolvedTunnelFloor:unresolved})
 }
 if(bake)fs.writeFileSync(output,JSON.stringify(profiles))
 else{
   let seen=0,p99=0
   for(const [mm,n] of [...hist].sort((a,b)=>a[0]-b[0])){seen+=n;if(seen>=.99*total){p99=mm/1000;break}}
-  const summary={lanes:lanes.length,wheelSamples:total,outliers,sunk,floating,p99,nonplanarFootprints:nonplanar,unresolvedTunnelWays:[...missingFloors].sort((a,b)=>a-b)}
+  flushProblems()
+  const top50=Object.fromEntries(Object.entries(worstByLane).map(([k,v])=>[k,[...v.values()].sort((a,b)=>b.error-a.error).slice(0,50)]))
+  const constraintsFile=path.join(world,'vehicle-tunnel-grades.json')
+  const conflicts=fs.existsSync(constraintsFile)?JSON.parse(fs.readFileSync(constraintsFile,'utf8')):[]
+  const summary={tunnelConstraintRecords:conflicts.length,partialTunnelWays:[...partialFloors].sort((a,b)=>a-b),reasons,lanes:lanes.length,wheelSamples:total,outliers,sunk,floating,p99,nonplanarFootprints:nonplanar,unresolvedTunnelWays:[...missingFloors].sort((a,b)=>a-b)}
   fs.mkdirSync(output,{recursive:true})
-  fs.writeFileSync(path.join(output,'audit.json'),JSON.stringify({summary,worst,lanes:reports}))
+  fs.writeFileSync(path.join(output,'audit.json'),JSON.stringify({summary,top50,lanes:reports}))
   execFileSync('uv',['run','--locked','python','scripts/vehicle-heatmap.py',path.join(output,'heatmap.png')],{input:JSON.stringify({extent:manifest.extent,cells:[...heat]})})
   console.log(summary)
-  if(!lanes.length||outliers||p99>.1||missingFloors.size)process.exitCode=1
+  if(!lanes.length||outliers||p99>.1||missingFloors.size||partialFloors.size||conflicts.length)process.exitCode=1
 }

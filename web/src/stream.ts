@@ -15,7 +15,7 @@ import {
   type RenderRangeMetrics,
 } from './render-range'
 import {detail, type Manifest, type Tile} from './world'
-import {registerTunnels} from './tunnels'
+import {nearbyTunnels,registerTunnels} from './tunnels'
 import {freezeStatic} from './static-freeze'
 
 import {TileGrid, streamBudget, frameSlots, tileEdgeDistance} from './tile-grid'
@@ -59,6 +59,7 @@ export class Stream {
   ) {
     this.rangeStore = rangeOrRadius instanceof RenderRangeStore ? rangeOrRadius : new RenderRangeStore(rangeOrRadius)
     const initialMetrics = this.rangeStore.getMetrics()
+    registerTunnels(manifest.tunnels)
     this.grid = new TileGrid(manifest)
     if(manifest.distantBuildings)this.distant=new DistantBuildings(scene,manifest.distantBuildings.file,manifest.chunks)
     this.forest = new Forest(scene,this.grid,camera,initialMetrics)
@@ -184,8 +185,7 @@ export class Stream {
     // attachment continuations run as data arrives, even on multi-second frames.
     const urgent=()=>inner || tileCenterDistance(tile,this.priorityTarget??this.lastPosition)<=streamBudget.priorityRadius
     const parseSlot=()=>urgent()?Promise.resolve():this.parseSlot()
-    registerTunnels(this.manifest.tunnels)
-    return detail(tile,controller.signal,parseSlot,this.manifest.tunnels).then(async item=>{
+    return detail(tile,controller.signal,parseSlot,nearbyTunnels(this.manifest.tunnels,tile.x,tile.z)).then(async item=>{
       if(!urgent())await this.attachSlot()
       if(controller.signal.aborted){item.dispose();return}
       this.scene.add(freezeStatic(item.group));this.batches.add(item.batch);this.base.toggle(tile,false)

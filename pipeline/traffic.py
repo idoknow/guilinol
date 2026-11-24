@@ -14,6 +14,9 @@ from shapely.ops import unary_union
 from shapely.prepared import prep
 
 from common import OUT, ll2xz, load_osm
+from station_road_corridor import bake as bake_station_corridor
+from vehicle_tunnels import underground, sections as tunnel_sections, solve as solve_tunnels
+from service_streets import width as minor_road_width
 from traffic_parking import allowed, bake_parking
 from landmarks.jiefang_layout import SPAN_WAYS, deck_level
 from landmarks.world_surface import Surface
@@ -134,6 +137,7 @@ def bake(output, manifest, rendered_roads=None):
     forbidden = prep(unary_union(banned))
     nodes, lanes, walks, incoming = {}, [], [], defaultdict(list)
     elements = load_osm()
+    bake_station_corridor(output, manifest['chunks'], elements)
     parking_segments = []
     sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
     from dingjiang_structures import motorway_sections
@@ -144,7 +148,7 @@ def bake(output, manifest, rendered_roads=None):
                 not in ('motorway', 'motorway_link'))
     for way in chain(existing, motorway_sections(elements), graded_motorways(elements)):
         tags = way.get('tags', {})
-        linear = way['id'] not in SPAN_WAYS and any(tags.get(key,'no')!='no' for key in ('bridge','tunnel'))
+        linear = way['id'] not in SPAN_WAYS and (tags.get('bridge','no')!='no' or underground(tags))
         kind = tags.get('highway', '').removesuffix('_link')
         if way['type'] != 'way' or kind not in MOTOR | WALK | {'cycleway', 'motorway'} or tags.get('area') == 'yes' or tags.get('access') in ('no', 'private'):
             continue
@@ -203,12 +207,17 @@ def bake(output, manifest, rendered_roads=None):
                 for slot in range(n):
                     offset = (slot+.5-(count/2 if single else 0))*size if count>1 else 0
                     offset += shift
+                    if not linear and kind in ('service', 'living_street'):
+                        # The renderer uses a 3 m or 4 m strip for unsigned minor
+                        # streets. Keep the outer contact 20 cm inside that strip.
+                        limit = max(0, minor_road_width(tags)/2-.795-.21)
+                        offset = max(-limit, min(limit, offset))
                     lane = dict(id=len(lanes), to=tail, width=size, offset=round(offset,2), kind='nonmotor' if kind=='cycleway' else 'bus' if kind=='busway' else 'motor',speedKmh=number(tags.get('maxspeed'),20 if kind in ('cycleway','service') else 40),oneway=single)
                     lane['from'] = head
                     lane['cls'] = kind
                     lane['way'] = way['id']
                     if linear:
-                        lane['structure'] = 'tunnel' if tags.get('tunnel','no')!='no' else 'bridge'
+                        lane['structure'] = 'tunnel' if underground(tags) else 'bridge'
                     if not linear:
                         lane['heights'] = profile(head,tail,lane['offset'],way['id'])
                     if linear or way['id'] in SPAN_WAYS:
@@ -234,18 +243,30 @@ def bake(output, manifest, rendered_roads=None):
     dest.parent.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
         request = Path(tmp)/'request.json'
+        original_tunnels = [t for t in manifest.get('tunnels',[]) if not t.get('generated')]
+        manifest['tunnels'] = original_tunnels
+        network = tunnel_sections(lanes,elements,original_tunnels)
+        if network['edges']:
+            request.write_text(json.dumps(dict(manifest=manifest,network=network,nodes=result['nodes'])))
+            subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
+                            'portals',str(output.resolve()),str(request)],check=True,cwd=ROOT)
+            generated,conflicts = solve_tunnels(network,nodes,json.loads(request.read_text()))
+            manifest['tunnels'] = original_tunnels+generated
+            (output/'vehicle-tunnel-grades.json').write_text(json.dumps(conflicts,indent=2))
         request.write_text(json.dumps(dict(manifest=manifest,nodes=result['nodes'],lanes=lanes),separators=(',',':')))
         subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                         'bake',str(output.resolve()),str(request)], check=True, cwd=ROOT)
         for lane, pose in zip(lanes,json.loads(request.read_text()),strict=True):
             if pose is not None:
-                lane['wheelPose'] = pose
+                lane.update(pose)
     dest.write_bytes(gzip.compress(json.dumps(result, ensure_ascii=False, separators=(',',':')).encode(),mtime=0))
     # A halo contains all spawn and retention candidates until the next cell loads.
     cells = defaultdict(lambda: dict(lanes=[],walks=[],refs=set()))
     for collection in ('lanes','walks'):
         for item in result[collection]:
             refs = (item['from'],item['to']) if collection=='lanes' else item[:2]
+            if collection=='lanes' and item.get('floor'):
+                item={k:v for k,v in item.items() if k not in ('heights','way','structure','gradeSeparated')}
             center = [(nodes[refs[0]][axis]+nodes[refs[1]][axis])/2 for axis in ('x','z')]
             for col in range(math.floor((center[0]-260)/512),math.floor((center[0]+260)/512)+1):
                 for row in range(math.floor((center[1]-260)/512),math.floor((center[1]+260)/512)+1):
@@ -262,4 +283,6 @@ def bake(output, manifest, rendered_roads=None):
 
 if __name__ == '__main__':
     path = Path(OUT)
-    bake(path,json.loads((path/'manifest.json').read_text()))
+    manifest=json.loads((path/'manifest.json').read_text())
+    bake(path,manifest)
+    (path/'manifest.json').write_text(json.dumps(manifest,separators=(',',':'))+'\n')

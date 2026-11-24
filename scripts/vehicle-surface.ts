@@ -4,7 +4,7 @@ import path from 'node:path'
 import {execFileSync} from 'node:child_process'
 import {gunzipSync} from 'node:zlib'
 import {streetGeometry} from '../web/src/street-worker'
-import {joinPortalRoads} from '../web/src/tunnels'
+import {floorLevel,nearbyTunnels,joinPortalRoads} from '../web/src/tunnels'
 
 class Triangles {
   bins=new Map<string,number[]>()
@@ -36,7 +36,7 @@ function tileSurface(world,entry,tunnels){
   const data=gunzipSync(fs.readFileSync(path.join(world,entry.file)))
   const [verts,indices,jsonSize,imageBytes,triangles]=[4,8,12,16,20].map(i=>data.readUInt32LE(i))
   const jsonStart=24+16900+9*verts+4*indices
-  const [,paths]=JSON.parse(data.toString('utf8',jsonStart,jsonStart+jsonSize))
+  const [,paths,,,bed]=JSON.parse(data.toString('utf8',jsonStart,jsonStart+jsonSize))
   const deckStart=jsonStart+jsonSize+imageBytes,tail=deckStart+18*triangles
   const groundStart=data.length===tail?24:tail
   const grid=new Float32Array(4225),wet=new Uint8Array(4225)
@@ -53,7 +53,16 @@ function tileSurface(world,entry,tunnels){
   }
   const roads=streetGeometry(paths,ground).road
   joinPortalRoads(entry,tunnels,[roads])
-  return {ground,road:new Triangles(roads),deck:new Triangles(Float32Array.from({length:triangles*9},(_,i)=>data.readInt16LE(deckStart+2*i)/100))}
+  const modified=bed&&new Set(bed.drop),replacement=bed&&new Triangles(Float32Array.from(bed.vertices.flat()))
+  function visibleGround(x,z){
+    if(!modified)return ground(x,z)
+    const col=Math.min(256/step-1,Math.floor(x/step)),row=Math.min(256/step-1,Math.floor(z/step))
+    const face=2*(row*256/step+col)+Number(x/step-col+z/step-row>1)
+    if(!modified.has(face))return ground(x,z)
+    const hits=replacement.hits(x,z)
+    return hits.length?Math.max(...hits):ground(x,z)
+  }
+  return {ground:visibleGround,road:new Triangles(roads),deck:new Triangles(Float32Array.from({length:triangles*9},(_,i)=>data.readInt16LE(deckStart+2*i)/100))}
 }
 
 export function vehicleSurface(world,m){
@@ -63,6 +72,7 @@ export function vehicleSurface(world,m){
   for(const entry of m.landmarks){
     const atlas=[roles.atlas[entry.id]??[]].flat().filter(part=>part.role==='road')
     const sources=atlas.length?atlas:Object.entries(roles.surfaces[entry.id]??{}).filter(([,role])=>role==='road').map(([material])=>({material}))
+    if(entry.id==='jiefang_bridge')sources.push({material:'pave',bikeDeck:true})
     for(const source of sources){
       const args=['pipeline/glb-triangles.mjs',path.join('public',entry.file),'--visible','',source.material]
       if(source.box)args.push(JSON.stringify(source.box))
@@ -78,7 +88,7 @@ export function vehicleSurface(world,m){
         west=Math.min(west,vertices[i]);east=Math.max(east,vertices[i])
         north=Math.min(north,vertices[i+2]);south=Math.max(south,vertices[i+2])
       }
-      const mesh={id:entry.id,triangles:new Triangles(vertices)}
+      const mesh={id:entry.id,bikeDeck:source.bikeDeck,triangles:new Triangles(vertices)}
       for(let col=Math.floor(west/256);col<=Math.floor(east/256);col++)
         for(let row=Math.floor(north/256);row<=Math.floor(south/256);row++){
           const key=col*256+','+row*256
@@ -87,24 +97,35 @@ export function vehicleSurface(world,m){
         }
     }
   }
-  return (x,z,lane)=>{
+  return (x,z,lane,diagnostic?:{hidden:boolean,deck?:number,missingFloor?:boolean})=>{
     const ox=Math.floor(x/256)*256,oz=Math.floor(z/256)*256,key=ox+','+oz
     if(!cache.has(key)){
       if(!chunks.has(key))throw Error('No rendered chunk at '+[x,z])
       if(cache.size>=48)cache.delete(cache.keys().next().value)
-      cache.set(key,tileSurface(world,chunks.get(key),tunnels))
+      cache.set(key,tileSurface(world,chunks.get(key),nearbyTunnels(tunnels,x,z)))
     }
     const tile=cache.get(key),lx=x-ox,lz=z-oz
-    for(const t of tunnels){
+    const local=nearbyTunnels(tunnels,x,z)
+    for(const t of local){
       if(t.way!==lane.way)continue
-      const [a,b]=t.portals,dx=(b[0]-a[0])/t.length,dz=(b[2]-a[2])/t.length
-      const station=(x-a[0])*dx+(z-a[2])*dz,side=(z-a[2])*dx-(x-a[0])*dz
-      if(station<0||station>t.length||Math.abs(side)>t.halfWidth)continue
-      const i=t.stations.findIndex(p=>p[0]>=station),[s0,y0]=t.stations[Math.max(0,i-1)],[s1,y1]=t.stations[i]
-      return y0+(y1-y0)*(station-s0)/(s1-s0||1)
+      const floor=floorLevel(t,x,z)
+      if(floor!==undefined)return floor
     }
-    let y=Math.max(tile.ground(lx,lz),...tile.road.hits(lx,lz))
+    if(lane.structure==='tunnel'&&lane.start&&lane.end){
+      const along=(x-lane.start.x)*lane.dx+(z-lane.start.z)*lane.dz
+      const end=along<0?lane.start:along>lane.length?lane.end:null
+      if(end){
+        for(const t of local){
+          if(!t.portals.some(([px,,pz])=>Math.hypot(end.x-px,end.z-pz)<.05))continue
+          const floor=floorLevel(t,x,z)
+          if(floor!==undefined)return floor
+        }
+      }else if(diagnostic)diagnostic.missingFloor=true
+    }
+    const terrain=tile.ground(lx,lz),road=Math.max(...tile.road.hits(lx,lz))
+    let y=Math.max(terrain,road)
     for(const mesh of landmarks.get(key)??[]){
+      if(mesh.bikeDeck&&lane.way!==1531308751&&lane.way!==1531308752)continue
       const hits=mesh.triangles.hits(x,z)
       if(!hits.length)continue
       // Binjiang and the eastern riverbank street continue beneath the span.
@@ -113,6 +134,12 @@ export function vehicleSurface(world,m){
         if(lower<y+2)y=Math.max(y,lower)
       }else y=Math.max(y,...hits)
     }
-    return lane.structure==='bridge'?Math.max(y,...tile.deck.hits(lx,lz)):y
+    if(lane.structure==='bridge'){
+      const deck=Math.max(...tile.deck.hits(lx,lz))
+      if(diagnostic)diagnostic.deck=deck
+      y=Math.max(y,deck)
+    }
+    if(diagnostic)diagnostic.hidden=y===terrain&&Number.isFinite(road)&&terrain>road+.005
+    return y
   }
 }
