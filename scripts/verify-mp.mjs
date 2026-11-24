@@ -12,6 +12,7 @@ import {fixture} from './selfhost-test.mjs'
 import {frameSample} from './mp-frame.mjs'
 
 const secret=randomBytes(32).toString('hex'),children=[],sockets=[]
+const smokeCapture=process.argv.includes('--smoke')
 let failBrowser
 const browserError=new Promise((_,reject)=>{failBrowser=reject})
 const appearance={body:'f',v:1,createdAt:123,skin:2,face:1,brows:0,eyes:0,hair:'f_bun',hairColor:1,look:'sport'}
@@ -35,7 +36,7 @@ async function verify(){
   const rt=await service('rt/server-realtime.mjs',{RT_JOIN_SECRET:secret},'/health',200)
   assert.equal((await (await fetch(`http://${rt}/health`)).json()).proto,4)
   const [body,signature]=ticket(100000).split('.')
-  await reject(rt,body+'.'+(signature[0]==='A'?'B':'A')+signature.slice(1));await reject(rt,ticket(100000,Math.floor(Date.now()/1000)-1));await reject(await service('rt/server-realtime.mjs',{RT_JOIN_SECRET:''},'/health',200),ticket(100000));await reject(rt,ticket('tester1'))
+  if(!smokeCapture){await reject(rt,body+'.'+(signature[0]==='A'?'B':'A')+signature.slice(1));await reject(rt,ticket(100000,Math.floor(Date.now()/1000)-1));await reject(await service('rt/server-realtime.mjs',{RT_JOIN_SECRET:''},'/health',200),ticket(100000));await reject(rt,ticket('tester1'))}
   const number=await port(),origin=`http://127.0.0.1:${number}`
   const api=await service('server/index.mjs',{...database.env,PUBLIC_ORIGIN:origin,RT_JOIN_SECRET:secret},'/api/me',401)
   site=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:number,strictPort:true,proxy:{'/api':'http://'+api,'/ws':{target:'ws://'+rt,ws:true}}}})
@@ -46,7 +47,29 @@ async function verify(){
     const page=await browser.newPage({viewport:name==='alice'?{width:240,height:135}:{width:480,height:270}});page.on('pageerror',failBrowser)
     page.on('console',message=>{if(message.type()==='error')failBrowser(Error(`${name}: ${message.location().url}: ${message.text()}`))})
     const token=randomBytes(32).toString('hex');await database.sql('INSERT INTO users(id,email,nickname,salt,digest,verified) VALUES($1,$2,$1,\'\',\'\',1)',[name,name+'@example.test']);await database.sql('INSERT INTO sessions VALUES($1,$2,unixepoch()+600)',[createHash('sha256').update(token).digest('hex'),name]);await page.context().addCookies([{name:'glol_session',value:token,url:origin,httpOnly:true}]);await page.addInitScript(avatar=>localStorage.setItem('glol.avatar.v1',JSON.stringify(avatar)),appearance)
-    await page.goto(url+(mp?'&mp=1':''));await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000});if(mp){assert(await page.evaluate(()=>!!window.viewer.walk.net),'active before net attached');await page.waitForFunction(()=>window.viewer.walk.net.status().state==='online',null,{polling:100,timeout:30000})}return page
+    if(smokeCapture){
+      page.setDefaultTimeout(60000)
+      await page.route('**/favicon.ico',route=>route.fulfill({status:204}))
+      await page.setViewportSize({width:680,height:420})
+      await page.addInitScript(()=>localStorage.setItem('glol.prefs',JSON.stringify({view:'first'})))
+      await page.goto(origin+'/backpack.html');await page.getByRole('button',{name:'香烟'}).click();await page.waitForURL(origin+'/')
+      await page.goto(origin+'/?verify&play=tour&mp=1&time=12&flow=0');await page.waitForFunction(()=>window.viewer?.walkTo)
+      assert(await page.evaluate(name=>window.viewer.walkTo(-309,name==='alice'?-1:1,name==='alice'?Math.PI:0,'smoke-test'),name));console.log(name,'entered')
+    }else await page.goto(url+(mp?'&mp=1':''))
+    await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:90000});if(mp){assert(await page.evaluate(()=>!!window.viewer.walk.net),'active before net attached');await page.waitForFunction(()=>window.viewer.walk.net.status().state==='online',null,{polling:100,timeout:30000})}return page
+  }
+  if(smokeCapture){
+    const alice=await pageFor('alice',true);await alice.evaluate(()=>window.viewer.freeze())
+    const bob=await pageFor('bob',true);await alice.evaluate(()=>window.viewer.resume());const pages=[alice,bob]
+    for(const page of pages)console.log(await page.evaluate(()=>({peers:window.viewer.walk.net.probe(),home:document.body.hasAttribute('data-home')})))
+    for(const page of pages)await page.waitForFunction(()=>window.viewer.walk.net.probe().some(peer=>peer.ready&&peer.smoke==='light'))
+    for(const page of pages)await page.keyboard.press('y')
+    for(const page of pages)await page.waitForFunction(()=>window.viewer.walk.net.probe().some(peer=>peer.smoke==='smoking'))
+    await Promise.all(pages.map(page=>page.keyboard.press('y')))
+    await mkdir('captures/mp',{recursive:true})
+    await Promise.all(pages.map(async(page,index)=>{
+      await page.waitForFunction(()=>window.viewer.walk.net.probe().some(peer=>peer.puffs===1));await page.screenshot({path:`captures/mp/smoke-${index}.png`})
+    }));console.log('Both pages received the other player’s lit state and puff');return
   }
   const solo=await pageFor('solo',false);assert.equal(await solo.evaluate(()=>performance.getEntriesByType('resource').some(entry=>/\/net-[^/]+\.js|\/api\/rt\/ticket/.test(entry.name))),false);console.log('solo frame ms',await frameSample(solo));await solo.close()
   const alice=await pageFor('alice',true);await alice.evaluate(()=>window.viewer.freeze())
