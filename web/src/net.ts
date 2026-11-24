@@ -62,6 +62,12 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         switch(msg.t){
           case 'chat':case 'chat_hist':case 'chat_del':case 'chat_mute':case 'chat_ack':receiveChat(msg);break
           case 'welcome': sent=0;sentTimes=[];myId=String(msg.me?.id??'')
+            // 续连（CDN 掐断后原地接管）：对账而不是清空重建，否则每 44 秒所有人的模型都会销毁再克隆一遍
+            if(msg.me?.resumed){const keep=new Set((msg.players as {id:string}[]).map(p=>p.id))
+              for(const p of peers.list())if(!keep.has(p.id))peers.remove(p.id)
+              const have=new Set(peers.list().map(p=>p.id))
+              for(const player of msg.players)if(have.has(player.id))peers.move(player.id,player);else peers.add(player)
+              attempt=0;update('online',msg.online);break}
           case 'players':
             peers.clear();for(const player of msg.players)peers.add(player)
             attempt=0;update('online',msg.online);break
@@ -92,7 +98,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
         else retry()}
     }catch{if(version===generation)retry()}
   }
-  function stop(){generation++;clearTimeout(timer);socket?.close();socket=undefined;peers.clear();update('offline')}
+  function stop(){generation++;clearTimeout(timer);socket?.close(1000,'stop');socket=undefined;peers.clear();update('offline')}
   function avatarChanged(){if(state==='online')send({t:'avatar',avatar:getAvatar()})}
   function tick(dt:number){if(state!=='online')return
     flushEmote();const pose=getPose(),now=performance.now();if(now-lastSent>=50){lastSent=now;send({t:'pos',...pose})}peers.tick(dt,pose)
