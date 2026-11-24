@@ -6,6 +6,28 @@ import {setup,until} from './chat-fixture.mjs'
 import {moderate,wechat} from '../rt/chat-provider.mjs'
 import {importWords} from './chat-words-import.mjs'
 
+test('slow external checks overlap without queuing admin or duplicating sends',async context=>{
+  const fixture=await setup({providerDelay:1000});context.after(()=>fixture.close())
+  const {clients,admin}=fixture
+  for(let index=0;index<20;index++)await fixture.join(500000+index,0)
+  await admin('words',{word:'manual',category:'fixture',action:'review',enabled:true})
+  const first=clients[0],acks=(client,cid)=>client.events.filter(e=>e.t==='chat_ack'&&e.cid===cid)
+  first.send({t:'chat',cid:'seed',ch:'near',text:'manual'})
+  const seed=await until(()=>acks(first,'seed')[0]);assert.equal(seed.code,'pending')
+  const start=performance.now()
+  for(const [index,client] of clients.entries())client.send({t:'chat',ch:'world',cid:'batch',text:index?'pass'+index:'fixture-timeout'})
+  const duplicate={t:'chat',cid:'batch',ch:'world',text:'pass1'}
+  clients[1].send(duplicate);clients[1].send({...duplicate,cid:'limited'})
+  await until(()=>fixture.checks.length===20)
+  await admin('approve',{mid:seed.mid});assert.ok(clients.every(client=>!acks(client,'batch').length))
+  await until(()=>clients.slice(1).every(client=>acks(client,'batch')[0]?.ok));assert.equal(acks(first,'batch').length,0)
+  assert.equal((await until(()=>acks(first,'batch')[0])).code,'pending');const elapsed=performance.now()-start
+  assert.ok(elapsed<3000);context.diagnostic(`20 receipts in ${Math.round(elapsed)} ms`)
+  assert.equal(acks(clients[1],'limited')[0].code,'rate');assert.equal(acks(clients[1],'batch').length,2)
+  assert.equal(fixture.checks.length,20)
+  for(const client of clients){const broadcasts=client.events.filter(e=>e.t==='chat'&&e.ch==='world');assert.equal(broadcasts.length,19);assert.deepEqual(new Set(broadcasts.map(e=>e.text)),new Set(clients.slice(1).map((_,index)=>'pass'+(index+1))))}
+})
+
 test('provider decisions fail closed regardless of local-only policy',async()=>{
   for(const policy of ['pending','local_only'])for(const [suggest,status] of [['pass','normal'],['risky','blocked'],['review','pending'],['timeout','pending'],['unknown','pending']]){
     const provider={name:'mock',available:()=>true,check:async()=>{if(suggest==='timeout')throw Error('timeout');return {suggest}}}

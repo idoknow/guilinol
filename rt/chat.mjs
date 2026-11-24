@@ -53,6 +53,10 @@ export function createChat({players,send,observed,env=process.env,provider=wecha
     const sender=live(row.uid);if(sender)observed(sender,row.text)
   }
   function serial(work){const task=chain.then(work);chain=task.catch(()=>{});return task}
+  const byUid=new Map()
+  async function retryDb(work){
+    for(;;)try{return await work()}catch(error){if(error.code?.startsWith('22'))throw error;await delay(750)}
+  }
   async function transaction(work){const db=await pool.connect();try{await db.query('begin');const result=await work(db);await db.query('commit');return result}catch(error){await db.query('rollback').catch(()=>{});throw error}finally{db.release()}}
   const config=async db=>(await db.query('select config from chat_settings where id')).rows[0].config
   function submit(player,msg){
@@ -61,21 +65,31 @@ export function createChat({players,send,observed,env=process.env,provider=wecha
     if(!env.DATABASE_URL||!channel(ch)||!text||text.includes('\0')||typeof cid!=='string'||!/^[-\w:.]{1,100}$/.test(cid))return reject('error')
     if(backlog>=1024||(player.pendingChat??0)>=4)return reject('rate')
     backlog++;player.pendingChat=(player.pendingChat??0)+1
-    void serial(async()=>{let committing;try{
-      for(;;){let result
-        try{await restore();result=await transaction(async db=>{
-          const {rows:[prior]}=await db.query('select * from chat_messages where uid=$1 and cid=$2',[uid,cid]);if(prior)return committing?.row.id===prior.id?committing:{reply:ack(prior)}
+    const task=(byUid.get(uid)??Promise.resolve()).then(async()=>{
+        const priorRow=async db=>(await db.query('select * from chat_messages where uid=$1 and cid=$2',[uid,cid])).rows[0]
+        const pre=await retryDb(()=>serial(async()=>{
+          const db=pool,prior=await priorRow(db);if(prior)return {reply:ack(prior)}
           const cfg=await config(db)
           if([...text].length>cfg.max_length)return {code:'too_long'}
           const muted=await activeMute(db,uid);if(muted)return {code:'muted',muted}
           const {rows:[last]}=await db.query('select created_at from chat_messages where uid=$1 and ch=$2 order by id desc limit 1',[uid,ch]);if(last&&ts-Number(last.created_at)<cfg[ch+'_ms'])return {code:'rate'}
-          const decision=await moderate({text,openid},await matcher(db),cfg.unmoderated_policy,provider)
+          return {cfg,match:await matcher(db)}
+        }))
+        if(pre.reply)return send(player.ws,pre.reply)
+        if(pre.code){tell(uid,pre.muted);return reject(pre.code)}
+        const {cfg,match}=pre,decision=await moderate({text,openid},match,cfg.unmoderated_policy,provider)
+        await serial(async()=>{
+          let committing
+          const result=await retryDb(async()=>{await restore();return transaction(async db=>{
+          if(committing){const prior=await priorRow(db);if(prior?.id===committing.row.id)return committing}
+          const muted=await activeMute(db,uid);if(muted)return {code:'muted',muted}
           const {rows:[row]}=await db.query(`insert into chat_messages(ch,uid,peer,name,cid,text,x,z,status,provider,label,summary,created_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) returning *`,[ch,uid,peer,name,cid,text,x,z,decision.status,decision.provider,decision.label,decision.summary,ts]);committing={reply:ack(row),row,radius:cfg.radius,muted:row.status==='blocked'?await autoMute(db,uid,cfg):null};return committing
-        })}catch(error){if(error.code?.startsWith('22'))return reject('error');await delay(750);continue}
+          })})
         if(result.row?.status==='normal')deliver(result.row,result.radius)
-        tell(uid,result.muted);if(result.code)reject(result.code);else send(player.ws,result.reply);break
-      }
-    }finally{backlog--;player.pendingChat--}})
+        tell(uid,result.muted);if(result.code)reject(result.code);else send(player.ws,result.reply)
+        })
+    }).catch(()=>reject('error')).finally(()=>{backlog--;player.pendingChat--;if(byUid.get(uid)===task)byUid.delete(uid)})
+    byUid.set(uid,task)
   }
   async function history(player,ch){
     if(!channel(ch)||!env.DATABASE_URL)return
