@@ -10,7 +10,7 @@
  */
 
 import {rideSoundMuted,masterVolume,VOLUME_EVENT} from './ride-sound-pref'
-import {audioCtor,existingCityAudio,prepareCityAudio,resumeCityAudio} from '../city-audio'
+import {audioCtor,existingCityAudio,resumeCityAudio} from '../city-audio'
 
 export type RideSoundKind = 'bike' | 'bicycle'
 export type HeadlightSoundMode = 'off' | 'low' | 'high'
@@ -369,7 +369,6 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
 
   function unlock() {
     if (isDisposed || muted) return false
-    if(!existingCityAudio()){void prepareCityAudio().then(()=>ensureContext());return false}
     const ac = ensureContext()
     return !!ac
   }
@@ -409,9 +408,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     counts.powerOn++
     if(muted||isDisposed)return
     if(!ensureContext()){
-      void prepareCityAudio().then(async context=>{
-        if(context&&!muted&&!isDisposed&&await resumeCityAudio(context)&&!muted&&!isDisposed)powerOnChime(kind)
-      })
+      if(ctx)void resumeCityAudio(ctx).then(running=>{if(running&&!muted&&!isDisposed)powerOnChime(kind)})
       return
     }
     powerOnChime(kind)
@@ -640,7 +637,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
   return {
     get unlocked() { return ctx?.state === 'running' },
     get muted() { return muted },
-    prepare:async()=>{if(!muted&&!isDisposed){await prepareCityAudio();ensureContext(false)}},
+    prepare:async()=>{if(!muted&&!isDisposed){ensureContext(false)}},
     unlock,
     setMuted,
     setHorn,

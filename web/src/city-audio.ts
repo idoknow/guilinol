@@ -1,5 +1,4 @@
 let shared:AudioContext|null=null
-let pending:Promise<AudioContext|null>|undefined
 let resuming:Promise<boolean>|undefined
 
 export function audioCtor(){
@@ -14,16 +13,13 @@ export function resumeCityAudio(context:AudioContext){
   return resuming??=context.resume().then(()=>context.state==='running',()=>false).finally(()=>{resuming=undefined})
 }
 
-export function prepareCityAudio(){
-  const current=existingCityAudio()
-  if(current)return Promise.resolve(current)
-  if(!pending)pending=new Promise<AudioContext|null>(resolve=>{
-    const create=()=>{
-      try{const Ctor=audioCtor();shared=Ctor?new Ctor():null}catch{shared=null}
-      pending=undefined
-      resolve(shared)
-    }
-    setTimeout(create,0)
-  })
-  return pending
+export async function prepareCityAudioDuringLoad(){
+  if(existingCityAudio())return
+  try{
+    const Ctor=audioCtor()
+    if(!Ctor)return
+    const context=new Ctor()
+    if(context.state==='running')await context.suspend()
+    shared=context
+  }catch{shared=null}
 }

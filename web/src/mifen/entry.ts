@@ -6,6 +6,7 @@ const LOAD_RADIUS_M = 140
 
 export interface LazyMifenOptions {
   /** verify 模式下自动异步预加载（仍在独立 chunk，不进 main.js 首包） */
+  warmPrograms?: (root: import('three').Object3D) => Promise<void>
   eagerVerify?: boolean
 }
 
@@ -23,6 +24,7 @@ export function mountLazyTianyuanMifen(ctx: MifenMountContext, opts: LazyMifenOp
   let real: MifenController | null = null
   let loading: Promise<MifenController> | null = null
   let disposed = false
+  let warmStarted = false
   let lastDist = Infinity
 
   // 轻量占位传送胶囊（挂载真模块后立即销毁，避免未进店区域加载整套 mifen CSS/3D）
@@ -151,6 +153,11 @@ export function mountLazyTianyuanMifen(ctx: MifenMountContext, opts: LazyMifenOp
         const dz = ref.z - SHOP_CENTER_Z
         const distSq = dx * dx + dz * dz
         lastDist = Math.sqrt(distSq)
+        if (!warmStarted && opts.warmPrograms && distSq < 250 * 250) {
+          warmStarted = true
+          const warm = opts.warmPrograms
+          void import('./warm-programs').then(module => module.warmShopPrograms(warm)).catch(error => console.warn('Shop shader warmup unavailable', error))
+        }
         if (distSq < LOAD_RADIUS_M * LOAD_RADIUS_M) {
           void ensureLoaded()
         }
