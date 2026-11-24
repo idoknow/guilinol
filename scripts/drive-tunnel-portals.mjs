@@ -131,7 +131,11 @@ try{
           const probe=w.probe(),p=w.position,fx=-Math.sin(w.heading),fz=-Math.cos(w.heading)
           const contacts=completed?undefined:[-.85,0,.85].map(side=>w.raycastObstacle(
             p.x+fz*side,probe.foot+.8,p.z-fx*side,fx,0,fz,4))
-          const obstruction=contacts?.some(Boolean)||w.obstacle==='collision'||
+          // An overhead deck can stop a rider with no obstruction at the
+          // horizontal bumper rays. Use the actual contact and rider height.
+          const headContact=probe.contactSources?.some(hit=>hit.normal?.y<-.5&&
+            hit.point?.y>probe.foot+.5&&hit.point.y<probe.foot+(mode==='car'?2:2.5))
+          const obstruction=contacts?.some(Boolean)||w.obstacle==='collision'||headContact||
             probe.contactSources?.some(hit=>Math.abs(hit.normal?.y)<.5)
           const failure=completed?undefined:obstruction?'collision':'tool'
           return {completed,failure,maximum,frames,part,obstacle:w.obstacle,contacts,
