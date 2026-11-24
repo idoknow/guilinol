@@ -613,12 +613,18 @@ wss.on('connection', (ws, req) => {
     if (joined) console.log(JSON.stringify({scope:'rt-close',code:code??null,reason:String(reason??''),ip,uid:players.get(pid)?.uid??null,players:players.size}))
     if (joined) {
       const player=players.get(pid)
+      // 竞态：旧 socket 的 close 晚到（新 socket 已经续连上了）——绝不能把活着的会话判死
+      if (player && player.ws !== ws) {
+        console.log(JSON.stringify({scope:'rt-stale-close',uid:player.uid,pid,code:code??null}))
+        return
+      }
       // 异常断开（CDN 掐连接、切网络、手机息屏）先保留会话，等同 uid 回来续连；
       // 主动关闭（pagehide/dispose）、被踢被封、顶号都不保留，避免留下假在线。
       if (player && RESUMABLE(code) && !player.kickReason && !player.replaced) {
         player.dead = true
         player.deadAt = now() + RESUME_MS
-        console.log(JSON.stringify({scope:'rt-hold',uid:player.uid,id,code:code??null,holdMs:RESUME_MS,players:players.size}))
+        player.lastCloseCode = code ?? null
+        console.log(JSON.stringify({scope:'rt-hold',uid:player.uid,id:pid,code:code??null,holdMs:RESUME_MS,players:players.size}))
         return
       }
       removePlayer(player,{closeCode:code,reason:player?.kickReason||String(reason??'')})
@@ -698,7 +704,13 @@ wss.on('connection', (ws, req) => {
             })
             send(ws, rosterPayload())
             obs.event('resume', p)
-            console.log(JSON.stringify({ scope: 'rt-resume', uid, id: p.id, players: players.size }))
+            console.log(JSON.stringify({
+              scope: 'rt-resume', uid, id: p.id,
+              code: p.lastCloseCode ?? null,
+              gapMs: Math.max(0, Math.round(now() - (p.deadAt - RESUME_MS))),
+              players: players.size,
+            }))
+            delete p.lastCloseCode
             return
           }
           previous.ws.rejected = true

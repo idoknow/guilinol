@@ -74,7 +74,11 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
           case 'avatar':peers.avatar(msg.id,msg.avatar);break
         }
       }
-      ws.onclose=event=>{if(version!==generation)return;socket=undefined;peers.clear()
+      ws.onclose=event=>{if(version!==generation)return;socket=undefined
+        // 续连快连路径：先别清场景。welcome 会整体替换 peers，
+        // 清了反而会让所有模型空一帧、每 44 秒闪一次。
+        const quietClose=event.code===1006||event.code===1005||event.code===1011
+        if(!quietClose)peers.clear()
         // 4001 = 同账号在别处在线（可能只是上次的旧连接还没被服务端回收）→ 等几秒再连
         // 另一台设备/标签页一直在线时会持续 4001，所以从 4s 起照常指数退避，不按固定间隔轮询
         // replaced = 另一台设备接管了同一个账号：这不是故障，别自动重连（否则两台设备会互相顶）
