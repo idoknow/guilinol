@@ -349,8 +349,7 @@ def patch(file, area, approaches=(), foot=(), seam=None, crossings=(), fixed=())
         # Holding it flat across the entire round end cap creates a step at
         # the cap edge. Propagate the grade continuously through the junction.
         limit=np.where(connected,target+cap*d+.04*outside**2,
-                       np.where(owner<0,target+cap*outside+.04*outside**2,
-                                np.where(outside<=.5,target,np.inf)))
+                       target+cap*outside+.04*outside**2)
         original=np.where(outside<=.5,target+cap*outside,np.inf)
         limit=np.where(bridge_approach & (owner>=0),original,limit)
         ceiling=np.minimum(ceiling,limit)
