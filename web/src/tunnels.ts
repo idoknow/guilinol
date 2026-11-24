@@ -2,6 +2,9 @@ import * as THREE from 'three'
 import type {Tile} from './world'
 import railStyle from '../../pipeline/railway-style.json'
 
+export const tunnelLiningMaterial=new THREE.MeshStandardMaterial({side:THREE.DoubleSide,vertexColors:true,roughness:.9})
+export const tunnelLightMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide,vertexColors:true})
+
 type Point=[number,number,number]
 export type Tunnel={way:number,nodes?:[number,number],portals:[Point,Point],length:number,halfWidth:number,clearance:number,approach:number,approachEnds?:[number,number],mouths?:[boolean,boolean],openEnds?:[number,number],openCut?:boolean,joints?:({ring:[number,number][],draw:boolean}|null)[],stations:[number,number][]}
 
@@ -208,7 +211,24 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     }
     if(changed)pieces.forEach(poly=>fan(poly,vertices));else keep.push(...ids)
   }
+  // Retain the original grid vertices for height lookups and append the
+  // clipped boundary triangles to the same terrain draw and collision mesh.
+  if(vertices.length){
+    const patch=new THREE.BufferGeometry()
+    patch.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3))
+    patch.setAttribute('uv',new THREE.Float32BufferAttribute(vertices.flatMap((v,i)=>i%3===0?[v/256,1-vertices[i+2]/256]:[]),2))
+    patch.computeVertexNormals()
+    for(const name of ['position','normal','uv']){
+      const grid=ground.getAttribute(name),extra=patch.getAttribute(name)
+      const data=new Float32Array(grid.array.length+extra.array.length)
+      data.set(grid.array);data.set(extra.array,grid.array.length)
+      ground.setAttribute(name,new THREE.BufferAttribute(data,grid.itemSize))
+    }
+    for(let i=0;i<vertices.length/3;i++)keep.push(pos.count+i)
+    patch.dispose()
+  }
   ground.setIndex(keep)
+  ground.computeBoundingSphere()
   function mesh(values:number[],material:THREE.Material,kind:string){
     const geometry=new THREE.BufferGeometry()
     geometry.setAttribute('position',new THREE.Float32BufferAttribute(values,3))
@@ -238,10 +258,8 @@ export function tunnelGeometry(tile:Tile,ground:THREE.PlaneGeometry,tunnels:Tunn
     result.geometry.setAttribute('color',new THREE.Float32BufferAttribute(colors,3))
     return result
   }
-  const fringe=mesh(vertices,new THREE.MeshStandardMaterial(),'terrain')
-  fringe.geometry.setAttribute('uv',new THREE.Float32BufferAttribute(vertices.flatMap((v,i)=>i%3===0?[v/256,1-vertices[i+2]/256]:[]),2))
   const lining=batch(['floor','interior','portal','band','lane'],
-    new THREE.MeshStandardMaterial({side:THREE.DoubleSide,vertexColors:true,roughness:.9}),'lining')
-  const lights=batch(['ceiling','lamp'],new THREE.MeshBasicMaterial({side:THREE.DoubleSide,vertexColors:true}),'lighting')
-  return {fringe,lining,lights,floor:collider(parts.floor,'road'),interior:collider(parts.interior,'interior'),portal:collider(parts.portal,'portal')}
+    tunnelLiningMaterial,'lining')
+  const lights=batch(['ceiling','lamp'],tunnelLightMaterial,'lighting')
+  return {lining,lights,floor:collider(parts.floor,'road'),interior:collider(parts.interior,'interior'),portal:collider(parts.portal,'portal')}
 }
