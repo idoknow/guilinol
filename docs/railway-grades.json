@@ -291,5 +291,39 @@
     ],
     "transitionLengthM": 4
   },
-  "tunnelSurfaceConflicts": []
+  "tunnelSurfaceConflicts": [],
+  "stationApproachExceptions": [
+    {
+      "way": 690911289,
+      "approachWay": 259020519,
+      "junctionNode": 6819036874,
+      "otherWays": [
+        1017598907
+      ],
+      "reason": "approach intersects existing road junction",
+      "roadAtJunctionM": 153.923,
+      "floorM": 148.10000000000002,
+      "availableToJunctionM": 72.081,
+      "minimumRunAt5PercentM": 116.459,
+      "retainedRampM": 30.595,
+      "retainedRampPeakPercent": 14.539,
+      "actualRailDifferenceM": 0.0
+    },
+    {
+      "way": 690911289,
+      "approachWay": 815082651,
+      "junctionNode": 9385962101,
+      "otherWays": [
+        1017600145
+      ],
+      "reason": "approach intersects existing road junction",
+      "roadAtJunctionM": 153.3678,
+      "floorM": 148.10000000000002,
+      "availableToJunctionM": 45.16,
+      "minimumRunAt5PercentM": 105.355,
+      "retainedRampM": 15.515,
+      "retainedRampPeakPercent": 32.052,
+      "actualRailDifferenceM": 0.0
+    }
+  ]
 }
