@@ -12,10 +12,11 @@ from service_streets import width
 from vehicle_tunnels import grade_limit, underground
 
 
-def surface_guides(elements, portals, nodes, bounds):
+def surface_guides(elements, portals, nodes, chunks):
     # Level the physical approach even where the traffic graph omits a
     # segment for access, parking or a quiet zone further along the same way.
     mouths=STRtree([Point(nodes[n]['x'],nodes[n]['z']) for n in portals])
+    loaded={(t['x']//256,t['z']//256) for t in chunks}
     guides=[]
     for way in elements:
         tags=way.get('tags',{})
@@ -31,7 +32,8 @@ def surface_guides(elements, portals, nodes, bounds):
         for a,b,p,q in zip(way['nodes'],way['nodes'][1:],coords,coords[1:]):
             if a==b or math.dist(p,q)<.05:continue
             segment=LineString([p,q])
-            if not bounds.covers(segment) or not len(mouths.query(segment,predicate='dwithin',distance=60)):continue
+            if any((math.floor(x/256),math.floor(z/256)) not in loaded for x,z in (p,q)):continue
+            if not len(mouths.query(segment,predicate='dwithin',distance=60)):continue
             for ref,(x,z) in ((a,p),(b,q)):
                 nodes.setdefault(ref,dict(id=ref,x=round(x,2),z=round(z,2),y=None))
             guides.append({'from':a,'to':b,'way':way['id'],'cls':highway,'width':paved,'offset':0,

@@ -283,7 +283,7 @@ def bake(output, manifest, rendered_roads=None):
         network = tunnel_sections(lanes,elements,original_tunnels,survey_nodes)
         if network['edges']:
             mountain_roofs(network,survey_nodes,surface.peaks)
-            guides=surface_guides(elements,network['portals'],survey_nodes,box(left,top,left+width,top+depth))
+            guides=surface_guides(elements,network['portals'],survey_nodes,manifest['chunks'])
             request.write_text(json.dumps(dict(manifest=manifest,network=network,nodes=list(survey_nodes.values()),guideNodes=sorted({g[k] for g in guides for k in ('from','to')}))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portals',str(output.resolve()),str(request)],check=True,cwd=ROOT)
