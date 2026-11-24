@@ -54,16 +54,37 @@ def grade(output, manifest, elements):
                         str(output.resolve()),str(req)],cwd=root,check=True)
         minimum=(np.array(json.loads(req.read_text()))+clearance).reshape(-1,5).max(axis=1)
     levels,neighbors={},{}
+    native={}
     samples=iter(minimum)
     for wid,ids in refs.items():
         for i,ref in enumerate(ids):
-            levels[ref]=max(levels.get(ref,-math.inf),next(samples))
+            minimum_level=next(samples)
+            levels[ref]=max(levels.get(ref,-math.inf),minimum_level)
+            if wid in LANDINGS:
+                native[ref]=minimum_level
             neighbors.setdefault(ref,[])
             if i:
                 previous=ids[i-1]
                 budget=(stations[wid][i]-stations[wid][i-1])*.036
                 neighbors[ref].append((previous,budget))
                 neighbors[previous].append((ref,budget))
+    # The mapped departure branches share junctions. Their deck footprints
+    # overlap for several stations before the centerlines meet at a node.
+    # Keep both slabs continuous over this part of the merge.
+    for i,wid in enumerate(SPANS):
+        for other in SPANS[i+1:]:
+            if not set(ways[wid]['nodes']).intersection(ways[other]['nodes']):
+                continue
+            for station,ref in zip(stations[wid],refs[wid],strict=True):
+                point=axes[wid].interpolate(station)
+                projected=axes[other].project(point)
+                if point.distance(axes[other])>7:
+                    continue
+                j=int(np.abs(stations[other]-projected).argmin())
+                adjacent=refs[other][j]
+                delta=.036*abs(projected-stations[other][j])
+                neighbors[ref].append((adjacent,delta))
+                neighbors[adjacent].append((ref,delta))
     # Mixed OSM IDs and synthetic station keys must never be heap tie breakers.
     queue=[(-y,i,ref) for i,(ref,y) in enumerate(levels.items())];heapify(queue)
     sequence=len(queue)
@@ -79,7 +100,13 @@ def grade(output, manifest, elements):
     ys={wid:[levels[ref] for ref in ids] for wid,ids in refs.items()}
     update_slabs(output,manifest['chunks'],axes,stations,ys)
     approaches=[]
+    deck_nodes={node for wid in SPANS for node in ways[wid]['nodes']}
     for wid in LANDINGS:
+        # The existing ground road already meets an unraised end. Preserve
+        # its independently graded tunnel junctions further along the road.
+        ends=[node for node in (refs[wid][0],refs[wid][-1]) if node in deck_nodes]
+        if all(levels[node]-native[node]<.10 for node in ends):
+            continue
         ds=stations[wid]
         for i in range(1,len(ds)):
             segment=LineString([axes[wid].interpolate(v) for v in ds[i-1:i+1]])

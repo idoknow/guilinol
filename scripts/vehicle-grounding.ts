@@ -97,7 +97,7 @@ if(mode==='portals'){
     }
     roofs.push(levels)
   }
-  fs.writeFileSync(output,JSON.stringify({heights,roofs,roadLevels:data.gradePoints.map(([x,z])=>surface(x,z,{}))}))
+  fs.writeFileSync(output,JSON.stringify({heights,roofs}))
   process.exit(0)
 }
 // Released graphs predating the way field use OSM node pairs as stable keys.
