@@ -353,6 +353,7 @@ function build(){
       }
       fields.append(list)}
     if(next==='profile')link('修改外形',()=>submit(async()=>{await editCharacter()}))
+    if(next==='profile')link('我的背包',()=>location.assign('/backpack.html'))
     if(next==='profile'&&user?.email_placeholder)link('绑定邮箱',()=>{bindPhase='send';render!('bindmail')})
     if(next==='login'||next==='register'||next==='profile')void socialButtons(next)
     if(next==='login'&&lastLogin()==='email')lastBadge(submitButton)
