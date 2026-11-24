@@ -6,7 +6,7 @@ import type {MpStatus} from './ui/mp-pref'
 
 function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-status',{detail}))}
 
-type State='connecting'|'online'|'offline'
+type State='connecting'|'online'|'offline'|'replaced'
 export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera) {
   const peers=players(scene,clips,camera)
   let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,disposed=false
