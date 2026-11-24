@@ -10,6 +10,8 @@ from npc_sidewalks import audit
 def annotate(graph, elements, report):
     ways = {tuple(sorted(pair)): way['tags'] for way in elements if way['type'] == 'way'
             and 'highway' in way.get('tags', {}) for pair in zip(way['nodes'], way['nodes'][1:])}
+    way_tags = {way['id']: way['tags'] for way in elements if way['type'] == 'way'
+                and 'highway' in way.get('tags', {})}
     parents = {}
 
     def root(key):
@@ -21,7 +23,8 @@ def annotate(graph, elements, report):
     lanes = graph['lanes']
     for lane in lanes:
         pair = lane['from'], lane['to']
-        tags = ways.get(tuple(sorted(pair)), {})
+        # Surveyed lanes can introduce vertices between the original OSM nodes.
+        tags = way_tags.get(lane.get('way'), ways.get(tuple(sorted(pair)), {}))
         name = tags.get('name')
         lane['street'] = name or ''
         if not name:
