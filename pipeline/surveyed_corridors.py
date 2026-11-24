@@ -184,7 +184,8 @@ def patch(file, area, approaches=(), foot=(), seam=None):
     top_area=area.difference(exterior.buffer(.04,quad_segs=2))
     walk=union_all([*foot, *(line.buffer(half,quad_segs=4) for line,half,*_,kind in approaches if kind==1)])
     motor=union_all([line.buffer(half,quad_segs=4) for line,half,*_,kind in approaches if kind==0])
-    walk=set_precision(walk.difference(motor).intersection(area),.01)
+    walk=union_all(list(polygons(set_precision(walk.difference(motor).intersection(area),.01))))
+    top_area=union_all(list(polygons(top_area)))
     for kind,polygon in [(k,p) for k,g in [(0,top_area.difference(walk)),(1,top_area.intersection(walk))] for p in polygons(g)]:
         xmin,zmin,xmax,zmax=polygon.bounds
         for x in range(math.floor(xmin/16)*16,math.ceil(xmax/16)*16,16):
