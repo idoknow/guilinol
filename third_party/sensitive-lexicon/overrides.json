@@ -1,8 +1,9 @@
 {
   "source": "guilinol",
-  "revision": "2026-11-chat-clean-1",
+  "revision": "2026-11-chat-clean-2",
   "rules": [
     {"action":"block","words":["色情"],"reason":"保留两字内容规则；跨分隔符只送复核"},
+    {"action":"block","words":["卖淫","嫖娼","约炮","招嫖","吸毒","贩毒","赌博","强奸"],"reason":"明确违规的两字词在上游只属 review 类或缺失，≥3 字过滤会漏掉，项目补为 block"},
     {"action":"skip","words":["网络","代理","技师","集合","集会","维基百科"],"reason":"普通职业、联网、组队或资料查询用语，单独出现不能判违规"},
     {"action":"review","words":["中共"],"reason":"群中共享等连续文本可能跨语义边界命中；交人工判断"},
     {"action":"review","words":["阴部","裸露"],"reason":"树冠阴部、裸露岩壁等普通场景描述不应直接拦截"},
