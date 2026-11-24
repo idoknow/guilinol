@@ -1,0 +1,280 @@
+[
+  {
+    "name": "jiefang-span",
+    "kind": "car",
+    "distance": 6.243096482533308,
+    "min": -0.05287515122415698,
+    "max": -0.04980778177252887,
+    "pass": true
+  },
+  {
+    "name": "jiefang-lower",
+    "kind": "car",
+    "distance": 6.474973018479878,
+    "min": -0.0031490164341221316,
+    "max": 0.09108942513145735,
+    "pass": true
+  },
+  {
+    "name": "jiefang-ramp",
+    "kind": "car",
+    "distance": 6.09721589290693,
+    "min": -0.038040325088189775,
+    "max": 0.12179782260704997,
+    "pass": true
+  },
+  {
+    "name": "wuling-west",
+    "kind": "car",
+    "pass": false,
+    "error": "TimeoutError: page.waitForFunction: Timeout 5000ms exceeded."
+  },
+  {
+    "name": "wuling-east",
+    "kind": "car",
+    "pass": false,
+    "error": "TimeoutError: page.waitForFunction: Timeout 5000ms exceeded."
+  },
+  {
+    "name": "yulong-passage",
+    "kind": "car",
+    "distance": 0,
+    "min": -0.000012460957549365048,
+    "max": -0.0000011330793938668648,
+    "pass": false
+  },
+  {
+    "name": "lingui",
+    "kind": "car",
+    "distance": 6.067804529298653,
+    "min": -0.00003273590954222527,
+    "max": 0.00002653913557537635,
+    "pass": true
+  },
+  {
+    "name": "airport-road",
+    "kind": "car",
+    "distance": 6.015217842906023,
+    "min": -0.000010388147302364814,
+    "max": 0.000013161259886373955,
+    "pass": true
+  },
+  {
+    "name": "airport-underpass",
+    "kind": "car",
+    "pass": false,
+    "error": "TimeoutError: page.waitForFunction: Timeout 5000ms exceeded."
+  },
+  {
+    "name": "steep-grade",
+    "kind": "car",
+    "distance": 0,
+    "min": -0.014644931729321797,
+    "max": 1.847660864150356,
+    "pass": false
+  },
+  {
+    "name": "central-square",
+    "kind": "car",
+    "distance": 6.215026890657887,
+    "min": -0.000007532104348229041,
+    "max": 0.00000690272526071567,
+    "pass": true
+  },
+  {
+    "name": "jinshui-road",
+    "kind": "car",
+    "distance": 6.017741085090626,
+    "min": -0.00010117279393284662,
+    "max": 0.00009422655480761932,
+    "pass": true
+  },
+  {
+    "name": "jiefang-span",
+    "kind": "bike",
+    "distance": 6.445613524739053,
+    "min": -0.05135245603972294,
+    "max": -0.05133828345654479,
+    "pass": true
+  },
+  {
+    "name": "jiefang-lower",
+    "kind": "bike",
+    "distance": 6.396151450577837,
+    "min": -0.000013018946390275232,
+    "max": 0.00000753819341525741,
+    "pass": true
+  },
+  {
+    "name": "jiefang-ramp",
+    "kind": "bike",
+    "pass": false,
+    "error": "TimeoutError: page.waitForFunction: Timeout 5000ms exceeded."
+  },
+  {
+    "name": "wuling-west",
+    "kind": "bike",
+    "distance": 6.303863487883213,
+    "min": -0.0000037245608268676733,
+    "max": 0.70075223900119,
+    "pass": false
+  },
+  {
+    "name": "wuling-east",
+    "kind": "bike",
+    "distance": 6.075411561303307,
+    "min": -0.0000020018107420582965,
+    "max": 0.000015700107326210855,
+    "pass": true
+  },
+  {
+    "name": "yulong-passage",
+    "kind": "bike",
+    "distance": 6.141164943891377,
+    "min": -0.00000846060612502697,
+    "max": 0.000028907334950645236,
+    "pass": true
+  },
+  {
+    "name": "lingui",
+    "kind": "bike",
+    "distance": 6.42014719925133,
+    "min": -0.000007456172141928619,
+    "max": 0.000007755919313012782,
+    "pass": true
+  },
+  {
+    "name": "airport-road",
+    "kind": "bike",
+    "distance": 6.4556999391921845,
+    "min": -0.000005624263565096044,
+    "max": 0.000006536103143162109,
+    "pass": true
+  },
+  {
+    "name": "airport-underpass",
+    "kind": "bike",
+    "distance": 6.1181092343294825,
+    "min": 0.3052078176679913,
+    "max": 5.6037208575408215,
+    "pass": false
+  },
+  {
+    "name": "steep-grade",
+    "kind": "bike",
+    "distance": 6.411529191499667,
+    "min": -0.00000594710439827395,
+    "max": 0.000010550942533882335,
+    "pass": true
+  },
+  {
+    "name": "central-square",
+    "kind": "bike",
+    "distance": 6.026081589245278,
+    "min": -0.000006958209638696644,
+    "max": 0.000005031191562920867,
+    "pass": true
+  },
+  {
+    "name": "jinshui-road",
+    "kind": "bike",
+    "distance": 6.454771090600615,
+    "min": -0.00000622402941985456,
+    "max": 0.000008263347240244912,
+    "pass": true
+  },
+  {
+    "name": "jiefang-span",
+    "kind": "bicycle",
+    "distance": 6.091262019307206,
+    "min": -0.051353417929504985,
+    "max": -0.05133828744757807,
+    "pass": true
+  },
+  {
+    "name": "jiefang-lower",
+    "kind": "bicycle",
+    "distance": 6.014031017157363,
+    "min": -0.000011699123717789917,
+    "max": 0.000007171823511953335,
+    "pass": true
+  },
+  {
+    "name": "jiefang-ramp",
+    "kind": "bicycle",
+    "distance": 6.138362520802079,
+    "min": -0.0015518422917466523,
+    "max": 0.11627065786103685,
+    "pass": true
+  },
+  {
+    "name": "wuling-west",
+    "kind": "bicycle",
+    "distance": 6.33321670012986,
+    "min": -0.00000248583677375791,
+    "max": 0.6388434896292665,
+    "pass": false
+  },
+  {
+    "name": "wuling-east",
+    "kind": "bicycle",
+    "distance": 6.217524048369904,
+    "min": -0.000011396572290323093,
+    "max": 0.000011684972776038194,
+    "pass": true
+  },
+  {
+    "name": "yulong-passage",
+    "kind": "bicycle",
+    "distance": 6.187502361188399,
+    "min": -0.00002854907941696183,
+    "max": 0.000030991865543228414,
+    "pass": true
+  },
+  {
+    "name": "lingui",
+    "kind": "bicycle",
+    "distance": 6.013902792941102,
+    "min": -0.000007508596041816418,
+    "max": 0.0000073565802551911474,
+    "pass": true
+  },
+  {
+    "name": "airport-road",
+    "kind": "bicycle",
+    "distance": 6.35607476069803,
+    "min": -0.000007401157347430853,
+    "max": 0.000007338665795941779,
+    "pass": true
+  },
+  {
+    "name": "airport-underpass",
+    "kind": "bicycle",
+    "pass": false,
+    "error": "TimeoutError: page.waitForFunction: Timeout 5000ms exceeded."
+  },
+  {
+    "name": "steep-grade",
+    "kind": "bicycle",
+    "distance": 6.058316252732276,
+    "min": -0.000012812808222406602,
+    "max": 0.000013213577062742843,
+    "pass": true
+  },
+  {
+    "name": "central-square",
+    "kind": "bicycle",
+    "distance": 6.090903386511612,
+    "min": -0.000006357098556009078,
+    "max": 0.0000071596077191316,
+    "pass": true
+  },
+  {
+    "name": "jinshui-road",
+    "kind": "bicycle",
+    "distance": 6.023587425791873,
+    "min": -0.000008727670376629248,
+    "max": 0.000008235142786361394,
+    "pass": true
+  }
+]
