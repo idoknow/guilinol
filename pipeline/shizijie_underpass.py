@@ -527,10 +527,46 @@ def patch_roads_surgical(output: Path, underpass: dict):
     graph = json.loads(gzip.decompress(graph_path.read_bytes()))
     ug_base = 9_900_000_000_000
 
-    # Strip previous surgical nodes/walks for idempotence
+    els = load_osm()
+    by_id = {e['id']: e for e in els if e.get('type') == 'way'}
+
+    # Identify all legacy surface edges & OSM node IDs from the 15 SHIZIJIE_UNDERPASS_WAYS (d2 fix)
+    ug_edge_pairs: set[tuple[int, int]] = set()
+    ug_osm_nodes: set[int] = set()
+    for wid in SHIZIJIE_UNDERPASS_WAYS:
+        way = by_id.get(wid)
+        if not way:
+            continue
+        refs = way['nodes']
+        ug_osm_nodes.update(refs)
+        for a, b in zip(refs, refs[1:]):
+            ug_edge_pairs.add((a, b))
+            ug_edge_pairs.add((b, a))
+
+    # Strip BOTH previous synthetic underground edges/nodes (>= ug_base) AND stale surface underpass walk edges
     old_ug_ids = {n['id'] for n in graph['nodes'] if n['id'] >= ug_base}
-    graph['nodes'] = [n for n in graph['nodes'] if n['id'] < ug_base]
-    graph['walks'] = [w for w in graph['walks'] if w[0] < ug_base and w[1] < ug_base]
+    graph['walks'] = [
+        w for w in graph['walks']
+        if w[0] < ug_base and w[1] < ug_base and (w[0], w[1]) not in ug_edge_pairs
+    ]
+    used_pos_ids: set[int] = set()
+    for lane in graph.get('lanes', []):
+        used_pos_ids.add(lane['from'])
+        used_pos_ids.add(lane['to'])
+    for w in graph['walks']:
+        used_pos_ids.add(w[0])
+        used_pos_ids.add(w[1])
+    for sig in graph.get('signals', []):
+        used_pos_ids.add(sig['node'])
+
+    removed_stale_nodes = {
+        n['id'] for n in graph['nodes']
+        if n['id'] in ug_osm_nodes and n['id'] not in used_pos_ids
+    }
+    graph['nodes'] = [
+        n for n in graph['nodes']
+        if n['id'] < ug_base and n['id'] not in removed_stale_nodes
+    ]
 
     try:
         from landmarks.world_surface import Surface
@@ -540,13 +576,14 @@ def patch_roads_surgical(output: Path, underpass: dict):
     except Exception:
         sample_y = lambda wx, wz: SHIZIJIE_SURFACE_Y
 
-    els = load_osm()
-    by_id = {e['id']: e for e in els if e.get('type') == 'way'}
     added_nodes: dict[int, dict] = {}
     added_walks: list = []
+    max_walk_id = max((w[3] for w in graph['walks']), default=-1)
 
     def next_walk_id() -> int:
-        return len(graph['walks']) + len(added_walks)
+        nonlocal max_walk_id
+        max_walk_id += 1
+        return max_walk_id
 
     for wid in SHIZIJIE_UNDERPASS_WAYS:
         way = by_id.get(wid)
@@ -582,34 +619,44 @@ def patch_roads_surgical(output: Path, underpass: dict):
     graph['walks'].extend(added_walks)
     graph_path.write_bytes(gzip.compress(json.dumps(graph, ensure_ascii=False, separators=(',', ':')).encode(), mtime=0))
 
-    # Update affected 512m spatial halo cells overlapping Shizijie underpass
+    # Update all spatial cells touching stale surface underpass edges OR new -4.2m underpass edges
     affected = set()
     for n in added_nodes.values():
         for col in range(math.floor((n['x'] - 260) / 512), math.floor((n['x'] + 260) / 512) + 1):
             for row in range(math.floor((n['z'] - 260) / 512), math.floor((n['z'] + 260) / 512) + 1):
                 affected.add((col, row))
     node_map = {**added_nodes}
-    for col, row in sorted(affected):
-        cell_path = roads_dir / f'{col}_{row}.json.gz'
-        if not cell_path.exists():
-            continue
+    drop_ids = old_ug_ids | removed_stale_nodes
+    for cell_path in sorted(roads_dir.glob('*_*.json.gz')):
         cell = json.loads(gzip.decompress(cell_path.read_bytes()))
-        cell['nodes'] = [n for n in cell['nodes'] if n['id'] not in old_ug_ids and n['id'] < ug_base]
-        cell['walks'] = [w for w in cell['walks'] if w[0] < ug_base and w[1] < ug_base]
-        existing_ids = {n['id'] for n in cell['nodes']}
-        used_ids = set()
-        for w in added_walks:
-            n0, n1 = node_map[w[0]], node_map[w[1]]
-            cx = 0.5 * (n0['x'] + n1['x'])
-            cz = 0.5 * (n0['z'] + n1['z'])
-            if col * 512 - 260 <= cx <= (col + 1) * 512 + 260 and row * 512 - 260 <= cz <= (row + 1) * 512 + 260:
-                cell['walks'].append(w)
-                used_ids.update((w[0], w[1]))
-        for uid in sorted(used_ids):
-            if uid not in existing_ids:
-                cell['nodes'].append(node_map[uid])
+        orig_walks = cell.get('walks', [])
+        cleaned_walks = [
+            w for w in orig_walks
+            if w[0] < ug_base and w[1] < ug_base and (w[0], w[1]) not in ug_edge_pairs
+        ]
+        stem = cell_path.name[:-len('.json.gz')]
+        col_s, row_s = stem.split('_')
+        col, row = int(col_s), int(row_s)
+        touched = len(cleaned_walks) != len(orig_walks) or (col, row) in affected
+        if not touched:
+            continue
+        cell['walks'] = cleaned_walks
+        cell['nodes'] = [n for n in cell['nodes'] if n['id'] < ug_base and n['id'] not in drop_ids]
+        if (col, row) in affected:
+            existing_ids = {n['id'] for n in cell['nodes']}
+            used_ids = set()
+            for w in added_walks:
+                n0, n1 = node_map[w[0]], node_map[w[1]]
+                cx = 0.5 * (n0['x'] + n1['x'])
+                cz = 0.5 * (n0['z'] + n1['z'])
+                if col * 512 - 260 <= cx <= (col + 1) * 512 + 260 and row * 512 - 260 <= cz <= (row + 1) * 512 + 260:
+                    cell['walks'].append(w)
+                    used_ids.update((w[0], w[1]))
+            for uid in sorted(used_ids):
+                if uid not in existing_ids:
+                    cell['nodes'].append(node_map[uid])
         cell_path.write_bytes(gzip.compress(json.dumps(cell, separators=(',', ':')).encode(), mtime=0))
-    print(f'Surgical roads/ patch: +{len(added_nodes)} ug_nodes, +{len(added_walks)} ug_walks across cells={sorted(affected)}, total_nodes={len(graph["nodes"])}, signals={len(graph["signals"])}')
+    print(f'Surgical roads/ patch: stripped stale_surface_nodes={len(removed_stale_nodes)}, +{len(added_nodes)} ug_nodes, +{len(added_walks)} ug_walks across cells={sorted(affected)}, total_nodes={len(graph["nodes"])}, total_walks={len(graph["walks"])}, signals={len(graph["signals"])}')
 
 
 def apply_world(output: Path, rendered_roads=None, bake_roads: bool = True):
