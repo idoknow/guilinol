@@ -149,6 +149,7 @@ for(const lane of lanes){
     const br=wheel(dist+rear,halfWidth),bl=wheel(dist+rear,-halfWidth)
     const {y,pitch,roll}=active.floor?contactPose(active,dist):{
       y:trackHeight(active,dist),pitch:active.wheelPose?poseAt(active.wheelPose,f,2):0,roll:active.wheelPose?poseAt(active.wheelPose,f,3):0}
+    let uneven:boolean|undefined
     // Intersect under the rotated contact, including its horizontal displacement.
     for(const forward of [rear,front])for(const right of [-halfWidth,halfWidth]){
       const rx=right*Math.cos(roll),ry=right*Math.sin(roll)
@@ -163,7 +164,19 @@ for(const lane of lanes){
       heat.set(key,Math.max(heat.get(key)??0,error))
       if(error>.25){
         over++;outliers++;if(gap>0)floating++;else sunk++
-        const reason=unresolved||diagnostic.missingFloor?'tunnel':diagnostic.hidden?'hidden':Math.abs(fr+bl-fl-br)/4>.25?'surface':'fit'
+        // A full-width broken bridge approach can leave four coplanar
+        // corner samples while an axle crosses a vertical edge inside them.
+        // Probe the two wheel paths and both axle midpoints before blaming
+        // profile interpolation for a defect in the underlying surface.
+        if(uneven===undefined){
+          const mid=dist+(front+rear)/2
+          uneven=Math.abs(fr+bl-fl-br)/4>.25 ||
+            Math.abs(wheel(mid,halfWidth)-(fr+br)/2)>.25 ||
+            Math.abs(wheel(mid,-halfWidth)-(fl+bl)/2)>.25 ||
+            Math.abs(wheel(dist+front,0)-(fl+fr)/2)>.25 ||
+            Math.abs(wheel(dist+rear,0)-(bl+br)/2)>.25
+        }
+        const reason=unresolved||diagnostic.missingFloor?'tunnel':diagnostic.hidden?'hidden':uneven?'surface':'fit'
         reasons[reason]++
         const point={lane:lane.id,way:lane.way,kind:lane.kind,reason,x,z,dist,gap,error}
         problemBuffer+=JSON.stringify(point)+'\n'
