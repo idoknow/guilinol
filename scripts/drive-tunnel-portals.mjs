@@ -99,12 +99,16 @@ try{
               // Brake before a bend. A long look-ahead at driving speed
               // can send the front wheels across the inside curb.
               const nextLeg=route[part+1]
-              let bend=false
+              let bend=false,sharp=false
               if(nextLeg && len-progress<11){
                 const ex=nextLeg[0]-x,ez=nextLeg[1]-z
-                bend=(dx*ex+dz*ez)/Math.hypot(ex,ez)<.87
+                const cosine=(dx*ex+dz*ez)/Math.hypot(ex,ez)
+                bend=cosine<.87
+                sharp=cosine<0
               }
-              let ahead=Math.max(0,progress)+(mode==='car'?(bend?3.4:6.5):3.5)
+              // Begin steering before a turn of more than 90 degrees.
+              const carLookahead=sharp?7.5:bend?3.4:6.5
+              let ahead=Math.max(0,progress)+(mode==='car'?carLookahead:3.5)
               // A pedestrian can turn at the vertex itself. Looking beyond a hairpin
               // before reaching it can leave the walker at a stationary target.
               if(mode==='foot'&&part<route.length-1)ahead=Math.min(len,ahead)
