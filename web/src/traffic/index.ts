@@ -122,8 +122,9 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     mesh.count=sim.actors.length
     walking=people.select(sim.actors)
     let motors=0,pedestrians=0,queued=0,redStops=0
-    if(verify){mesh.userData.motorIds.length=0;mesh.userData.approaches=[];mesh.userData.allMotors=[]}
+    if(verify){mesh.userData.simTime=sim.time;mesh.userData.motorIds.length=0;mesh.userData.approaches=[];mesh.userData.allMotors=[];mesh.userData.motorLanes=[]}
     sim.actors.forEach((actor,index)=>{
+      if(verify&&actor.kind!=='person')mesh.userData.motorLanes.push({lane:actor.track.id,x:actor.x,z:actor.z})
       if(verify&&actor.kind==='person'&&visible(actor)&&actor.scale>=.99)pedestrians++
       if(verify&&actor.kind!=='person'&&actor.scale>=.99)mesh.userData.allMotors.push(index)
       if(verify&&actor.kind!=='person'&&visible(actor)&&actor.scale>=.99){
