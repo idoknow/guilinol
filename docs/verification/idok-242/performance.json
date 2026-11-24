@@ -17,6 +17,176 @@
     "candidate"
   ],
   "desktop": {
+    "candidate": [
+      {
+        "overview": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 108366370,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "lijiang": {
+          "p95Ms": 16.7,
+          "meanMs": 16.72,
+          "calls": 43,
+          "mirrorCalls": 40,
+          "heapPeakBytes": 323931290,
+          "motors": 0,
+          "loadedChunks": 11
+        },
+        "palace": {
+          "p95Ms": 16.8,
+          "meanMs": 16.75,
+          "calls": 63,
+          "mirrorCalls": 57,
+          "heapPeakBytes": 428619319,
+          "motors": 2,
+          "loadedChunks": 12
+        },
+        "south": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 41,
+          "mirrorCalls": 38,
+          "heapPeakBytes": 117770286,
+          "motors": 3,
+          "loadedChunks": 12
+        },
+        "walk-palace": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 117,
+          "mirrorCalls": 106,
+          "heapPeakBytes": 460675050,
+          "motors": 4,
+          "loadedChunks": 12
+        },
+        "street-jiefang": {
+          "p95Ms": 16.8,
+          "meanMs": 17.21,
+          "calls": 65,
+          "mirrorCalls": 59,
+          "heapPeakBytes": 471132046,
+          "motors": 24,
+          "loadedChunks": 13
+        }
+      },
+      {
+        "overview": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 108483986,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "lijiang": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 46,
+          "mirrorCalls": 43,
+          "heapPeakBytes": 348214085,
+          "motors": 0,
+          "loadedChunks": 11
+        },
+        "palace": {
+          "p95Ms": 16.7,
+          "meanMs": 16.72,
+          "calls": 61,
+          "mirrorCalls": 56,
+          "heapPeakBytes": 441233175,
+          "motors": 5,
+          "loadedChunks": 12
+        },
+        "south": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 41,
+          "mirrorCalls": 38,
+          "heapPeakBytes": 191951094,
+          "motors": 4,
+          "loadedChunks": 12
+        },
+        "walk-palace": {
+          "p95Ms": 16.8,
+          "meanMs": 17.18,
+          "calls": 126,
+          "mirrorCalls": 103,
+          "heapPeakBytes": 521736195,
+          "motors": 3,
+          "loadedChunks": 12
+        },
+        "street-jiefang": {
+          "p95Ms": 16.8,
+          "meanMs": 17.24,
+          "calls": 65,
+          "mirrorCalls": 59,
+          "heapPeakBytes": 477946472,
+          "motors": 27,
+          "loadedChunks": 13
+        }
+      },
+      {
+        "overview": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 108542791,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "lijiang": {
+          "p95Ms": 16.7,
+          "meanMs": 16.69,
+          "calls": 44,
+          "mirrorCalls": 41,
+          "heapPeakBytes": 326949655,
+          "motors": 0,
+          "loadedChunks": 11
+        },
+        "palace": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 61,
+          "mirrorCalls": 56,
+          "heapPeakBytes": 431886422,
+          "motors": 4,
+          "loadedChunks": 12
+        },
+        "south": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 41,
+          "mirrorCalls": 38,
+          "heapPeakBytes": 154983081,
+          "motors": 2,
+          "loadedChunks": 12
+        },
+        "walk-palace": {
+          "p95Ms": 16.7,
+          "meanMs": 16.72,
+          "calls": 111,
+          "mirrorCalls": 100,
+          "heapPeakBytes": 473113467,
+          "motors": 6,
+          "loadedChunks": 12
+        },
+        "street-jiefang": {
+          "p95Ms": 16.8,
+          "meanMs": 17.21,
+          "calls": 64,
+          "mirrorCalls": 58,
+          "heapPeakBytes": 506104052,
+          "motors": 26,
+          "loadedChunks": 13
+        }
+      }
+    ],
     "main": [
       {
         "overview": {
@@ -24,109 +194,53 @@
           "meanMs": 16.67,
           "calls": 14,
           "mirrorCalls": 13,
-          "heapPeakBytes": 108437713,
+          "heapPeakBytes": 108365021,
           "motors": 0,
           "loadedChunks": 12
         },
         "lijiang": {
-          "p95Ms": 16.8,
+          "p95Ms": 16.7,
           "meanMs": 16.69,
-          "calls": 53,
-          "mirrorCalls": 50,
-          "heapPeakBytes": 329240463,
+          "calls": 57,
+          "mirrorCalls": 54,
+          "heapPeakBytes": 315834539,
           "motors": 0,
           "loadedChunks": 11
         },
         "palace": {
           "p95Ms": 16.8,
-          "meanMs": 17.21,
-          "calls": 70,
-          "mirrorCalls": 64,
-          "heapPeakBytes": 438697798,
-          "motors": 6,
-          "loadedChunks": 12
-        },
-        "south": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 41,
-          "mirrorCalls": 38,
-          "heapPeakBytes": 178646541,
+          "meanMs": 16.72,
+          "calls": 56,
+          "mirrorCalls": 51,
+          "heapPeakBytes": 429221391,
           "motors": 3,
           "loadedChunks": 12
         },
-        "walk-palace": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 129,
-          "mirrorCalls": 122,
-          "heapPeakBytes": 466917919,
-          "motors": 0,
-          "loadedChunks": 12
-        },
-        "street-jiefang": {
-          "p95Ms": 16.8,
-          "meanMs": 16.69,
-          "calls": 74,
-          "mirrorCalls": 68,
-          "heapPeakBytes": 452477686,
-          "motors": 29,
-          "loadedChunks": 13
-        }
-      },
-      {
-        "overview": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 14,
-          "mirrorCalls": 13,
-          "heapPeakBytes": 107900485,
-          "motors": 0,
-          "loadedChunks": 12
-        },
-        "lijiang": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 53,
-          "mirrorCalls": 50,
-          "heapPeakBytes": 318293035,
-          "motors": 0,
-          "loadedChunks": 11
-        },
-        "palace": {
-          "p95Ms": 16.8,
-          "meanMs": 17.24,
-          "calls": 60,
-          "mirrorCalls": 55,
-          "heapPeakBytes": 429293530,
-          "motors": 5,
-          "loadedChunks": 12
-        },
         "south": {
-          "p95Ms": 16.8,
+          "p95Ms": 16.7,
           "meanMs": 16.67,
           "calls": 41,
           "mirrorCalls": 38,
-          "heapPeakBytes": 154967401,
+          "heapPeakBytes": 176442544,
           "motors": 2,
           "loadedChunks": 12
         },
         "walk-palace": {
           "p95Ms": 16.8,
           "meanMs": 16.69,
-          "calls": 135,
-          "mirrorCalls": 128,
-          "heapPeakBytes": 457553009,
+          "calls": 115,
+          "mirrorCalls": 108,
+          "heapPeakBytes": 457519815,
           "motors": 0,
           "loadedChunks": 12
         },
         "street-jiefang": {
-          "p95Ms": 16.8,
-          "meanMs": 16.69,
-          "calls": 75,
-          "mirrorCalls": 69,
-          "heapPeakBytes": 451073192,
-          "motors": 28,
+          "p95Ms": 16.7,
+          "meanMs": 16.72,
+          "calls": 72,
+          "mirrorCalls": 66,
+          "heapPeakBytes": 450534549,
+          "motors": 25,
           "loadedChunks": 13
         }
       },
@@ -136,16 +250,72 @@
           "meanMs": 16.67,
           "calls": 14,
           "mirrorCalls": 13,
-          "heapPeakBytes": 108021317,
+          "heapPeakBytes": 108383001,
           "motors": 0,
           "loadedChunks": 12
         },
         "lijiang": {
           "p95Ms": 16.8,
-          "meanMs": 17.15,
-          "calls": 49,
-          "mirrorCalls": 46,
-          "heapPeakBytes": 307695127,
+          "meanMs": 16.75,
+          "calls": 59,
+          "mirrorCalls": 56,
+          "heapPeakBytes": 319153232,
+          "motors": 0,
+          "loadedChunks": 11
+        },
+        "palace": {
+          "p95Ms": 16.8,
+          "meanMs": 17.24,
+          "calls": 69,
+          "mirrorCalls": 61,
+          "heapPeakBytes": 436581113,
+          "motors": 4,
+          "loadedChunks": 12
+        },
+        "south": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 41,
+          "mirrorCalls": 38,
+          "heapPeakBytes": 172882292,
+          "motors": 5,
+          "loadedChunks": 12
+        },
+        "walk-palace": {
+          "p95Ms": 16.7,
+          "meanMs": 16.69,
+          "calls": 114,
+          "mirrorCalls": 105,
+          "heapPeakBytes": 453156418,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "street-jiefang": {
+          "p95Ms": 16.8,
+          "meanMs": 16.67,
+          "calls": 77,
+          "mirrorCalls": 71,
+          "heapPeakBytes": 451885879,
+          "motors": 27,
+          "loadedChunks": 13
+        }
+      },
+      {
+        "overview": {
+          "p95Ms": 16.7,
+          "meanMs": 16.67,
+          "calls": 14,
+          "mirrorCalls": 13,
+          "heapPeakBytes": 107945257,
+          "motors": 0,
+          "loadedChunks": 12
+        },
+        "lijiang": {
+          "p95Ms": 16.8,
+          "meanMs": 16.72,
+          "calls": 53,
+          "mirrorCalls": 50,
+          "heapPeakBytes": 313155877,
           "motors": 0,
           "loadedChunks": 11
         },
@@ -154,8 +324,8 @@
           "meanMs": 17.18,
           "calls": 56,
           "mirrorCalls": 51,
-          "heapPeakBytes": 435448377,
-          "motors": 4,
+          "heapPeakBytes": 414333002,
+          "motors": 6,
           "loadedChunks": 12
         },
         "south": {
@@ -163,196 +333,26 @@
           "meanMs": 16.67,
           "calls": 41,
           "mirrorCalls": 38,
-          "heapPeakBytes": 118310935,
-          "motors": 1,
-          "loadedChunks": 12
-        },
-        "walk-palace": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 120,
-          "mirrorCalls": 115,
-          "heapPeakBytes": 458510158,
-          "motors": 0,
-          "loadedChunks": 12
-        },
-        "street-jiefang": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 75,
-          "mirrorCalls": 69,
-          "heapPeakBytes": 451999251,
-          "motors": 29,
-          "loadedChunks": 13
-        }
-      }
-    ],
-    "candidate": [
-      {
-        "overview": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 14,
-          "mirrorCalls": 13,
-          "heapPeakBytes": 108775083,
-          "motors": 0,
-          "loadedChunks": 12
-        },
-        "lijiang": {
-          "p95Ms": 16.7,
-          "meanMs": 16.72,
-          "calls": 45,
-          "mirrorCalls": 42,
-          "heapPeakBytes": 330353812,
-          "motors": 0,
-          "loadedChunks": 11
-        },
-        "palace": {
-          "p95Ms": 16.8,
-          "meanMs": 16.78,
-          "calls": 60,
-          "mirrorCalls": 55,
-          "heapPeakBytes": 378838519,
-          "motors": 3,
-          "loadedChunks": 12
-        },
-        "south": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 41,
-          "mirrorCalls": 38,
-          "heapPeakBytes": 170206107,
-          "motors": 3,
-          "loadedChunks": 12
-        },
-        "walk-palace": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 126,
-          "mirrorCalls": 110,
-          "heapPeakBytes": 461987377,
+          "heapPeakBytes": 148695486,
           "motors": 2,
           "loadedChunks": 12
         },
-        "street-jiefang": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 67,
-          "mirrorCalls": 61,
-          "heapPeakBytes": 458017035,
-          "motors": 28,
-          "loadedChunks": 13
-        }
-      },
-      {
-        "overview": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 14,
-          "mirrorCalls": 13,
-          "heapPeakBytes": 108299911,
-          "motors": 0,
-          "loadedChunks": 12
-        },
-        "lijiang": {
+        "walk-palace": {
           "p95Ms": 16.7,
           "meanMs": 16.69,
-          "calls": 46,
-          "mirrorCalls": 43,
-          "heapPeakBytes": 328450132,
+          "calls": 126,
+          "mirrorCalls": 121,
+          "heapPeakBytes": 462353203,
           "motors": 0,
-          "loadedChunks": 11
-        },
-        "palace": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 62,
-          "mirrorCalls": 56,
-          "heapPeakBytes": 423449876,
-          "motors": 3,
-          "loadedChunks": 12
-        },
-        "south": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 41,
-          "mirrorCalls": 38,
-          "heapPeakBytes": 117702033,
-          "motors": 4,
-          "loadedChunks": 12
-        },
-        "walk-palace": {
-          "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 124,
-          "mirrorCalls": 109,
-          "heapPeakBytes": 471370780,
-          "motors": 7,
           "loadedChunks": 12
         },
         "street-jiefang": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 64,
-          "mirrorCalls": 58,
-          "heapPeakBytes": 455465856,
-          "motors": 26,
-          "loadedChunks": 13
-        }
-      },
-      {
-        "overview": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 14,
-          "mirrorCalls": 13,
-          "heapPeakBytes": 108686015,
-          "motors": 0,
-          "loadedChunks": 12
-        },
-        "lijiang": {
           "p95Ms": 16.8,
-          "meanMs": 16.67,
-          "calls": 44,
-          "mirrorCalls": 41,
-          "heapPeakBytes": 313926095,
-          "motors": 0,
-          "loadedChunks": 11
-        },
-        "palace": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 68,
-          "mirrorCalls": 63,
-          "heapPeakBytes": 444758864,
-          "motors": 4,
-          "loadedChunks": 12
-        },
-        "south": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 41,
-          "mirrorCalls": 38,
-          "heapPeakBytes": 118129397,
-          "motors": 2,
-          "loadedChunks": 12
-        },
-        "walk-palace": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 117,
-          "mirrorCalls": 112,
-          "heapPeakBytes": 464059885,
-          "motors": 4,
-          "loadedChunks": 12
-        },
-        "street-jiefang": {
-          "p95Ms": 16.7,
-          "meanMs": 16.67,
-          "calls": 65,
-          "mirrorCalls": 59,
-          "heapPeakBytes": 455473917,
-          "motors": 27,
+          "meanMs": 16.72,
+          "calls": 71,
+          "mirrorCalls": 65,
+          "heapPeakBytes": 451153467,
+          "motors": 28,
           "loadedChunks": 13
         }
       }
@@ -362,8 +362,8 @@
     "overview": {
       "p95Ms": {
         "main": 16.7,
-        "candidate": 16.7,
-        "ratio": 1.0
+        "candidate": 16.8,
+        "ratio": 1.006
       },
       "meanMs": {
         "main": 16.67,
@@ -381,9 +381,9 @@
         "ratio": 1.0
       },
       "heapPeakBytes": {
-        "main": 108021317,
-        "candidate": 108686015,
-        "ratio": 1.0062
+        "main": 108365021,
+        "candidate": 108483986,
+        "ratio": 1.0011
       },
       "motors": {
         "main": 0,
@@ -403,24 +403,24 @@
         "ratio": 0.994
       },
       "meanMs": {
-        "main": 16.69,
+        "main": 16.72,
         "candidate": 16.69,
-        "ratio": 1.0
+        "ratio": 0.9982
       },
       "calls": {
-        "main": 53,
-        "candidate": 45,
-        "ratio": 0.8491
+        "main": 57,
+        "candidate": 44,
+        "ratio": 0.7719
       },
       "mirrorCalls": {
-        "main": 50,
-        "candidate": 42,
-        "ratio": 0.84
+        "main": 54,
+        "candidate": 41,
+        "ratio": 0.7593
       },
       "heapPeakBytes": {
-        "main": 318293035,
-        "candidate": 328450132,
-        "ratio": 1.0319
+        "main": 315834539,
+        "candidate": 326949655,
+        "ratio": 1.0352
       },
       "motors": {
         "main": 0,
@@ -436,33 +436,33 @@
     "palace": {
       "p95Ms": {
         "main": 16.8,
-        "candidate": 16.8,
-        "ratio": 1.0
+        "candidate": 16.7,
+        "ratio": 0.994
       },
       "meanMs": {
-        "main": 17.21,
-        "candidate": 16.67,
-        "ratio": 0.9686
+        "main": 17.18,
+        "candidate": 16.72,
+        "ratio": 0.9732
       },
       "calls": {
-        "main": 60,
-        "candidate": 62,
-        "ratio": 1.0333
+        "main": 56,
+        "candidate": 61,
+        "ratio": 1.0893
       },
       "mirrorCalls": {
-        "main": 55,
+        "main": 51,
         "candidate": 56,
-        "ratio": 1.0182
+        "ratio": 1.098
       },
       "heapPeakBytes": {
-        "main": 435448377,
-        "candidate": 423449876,
-        "ratio": 0.9724
+        "main": 429221391,
+        "candidate": 431886422,
+        "ratio": 1.0062
       },
       "motors": {
-        "main": 5,
-        "candidate": 3,
-        "ratio": 0.6
+        "main": 4,
+        "candidate": 4,
+        "ratio": 1.0
       },
       "loadedChunks": {
         "main": 12,
@@ -473,8 +473,8 @@
     "south": {
       "p95Ms": {
         "main": 16.8,
-        "candidate": 16.7,
-        "ratio": 0.994
+        "candidate": 16.8,
+        "ratio": 1.0
       },
       "meanMs": {
         "main": 16.67,
@@ -492,9 +492,9 @@
         "ratio": 1.0
       },
       "heapPeakBytes": {
-        "main": 154967401,
-        "candidate": 118129397,
-        "ratio": 0.7623
+        "main": 172882292,
+        "candidate": 154983081,
+        "ratio": 0.8965
       },
       "motors": {
         "main": 2,
@@ -509,29 +509,29 @@
     },
     "walk-palace": {
       "p95Ms": {
-        "main": 16.8,
-        "candidate": 16.7,
-        "ratio": 0.994
+        "main": 16.7,
+        "candidate": 16.8,
+        "ratio": 1.006
       },
       "meanMs": {
-        "main": 16.67,
-        "candidate": 16.67,
-        "ratio": 1.0
+        "main": 16.69,
+        "candidate": 16.72,
+        "ratio": 1.0018
       },
       "calls": {
-        "main": 129,
-        "candidate": 124,
-        "ratio": 0.9612
+        "main": 115,
+        "candidate": 117,
+        "ratio": 1.0174
       },
       "mirrorCalls": {
-        "main": 122,
-        "candidate": 110,
-        "ratio": 0.9016
+        "main": 108,
+        "candidate": 103,
+        "ratio": 0.9537
       },
       "heapPeakBytes": {
-        "main": 458510158,
-        "candidate": 464059885,
-        "ratio": 1.0121
+        "main": 457519815,
+        "candidate": 473113467,
+        "ratio": 1.0341
       },
       "motors": {
         "main": 0,
@@ -547,33 +547,33 @@
     "street-jiefang": {
       "p95Ms": {
         "main": 16.8,
-        "candidate": 16.7,
-        "ratio": 0.994
+        "candidate": 16.8,
+        "ratio": 1.0
       },
       "meanMs": {
-        "main": 16.69,
-        "candidate": 16.67,
-        "ratio": 0.9988
+        "main": 16.72,
+        "candidate": 17.21,
+        "ratio": 1.0293
       },
       "calls": {
-        "main": 75,
+        "main": 72,
         "candidate": 65,
-        "ratio": 0.8667
+        "ratio": 0.9028
       },
       "mirrorCalls": {
-        "main": 69,
+        "main": 66,
         "candidate": 59,
-        "ratio": 0.8551
+        "ratio": 0.8939
       },
       "heapPeakBytes": {
-        "main": 451999251,
-        "candidate": 455473917,
-        "ratio": 1.0077
+        "main": 451153467,
+        "candidate": 477946472,
+        "ratio": 1.0594
       },
       "motors": {
-        "main": 29,
-        "candidate": 27,
-        "ratio": 0.931
+        "main": 27,
+        "candidate": 26,
+        "ratio": 0.963
       },
       "loadedChunks": {
         "main": 13,
@@ -700,18 +700,18 @@
     {
       "view": "overview",
       "metric": "heap",
-      "main": 13937848,
-      "PR": 14103396,
+      "main": 13912304,
+      "PR": 14087388,
       "runs": [
         [
-          13947616,
-          13928372,
-          13937848
+          13913724,
+          13912304,
+          13903112
         ],
         [
-          14103396,
-          14101300,
-          14125144
+          14090920,
+          14087372,
+          14087388
         ]
       ],
       "pass": true
@@ -719,17 +719,17 @@
     {
       "view": "overview",
       "metric": "p95 ms",
-      "main": 16.799999999999727,
+      "main": 16.700000000000273,
       "PR": 16.700000000000273,
-      "noise": 0.09999999999990905,
+      "noise": 0.09999999999968168,
       "p95s": [
         [
-          16.800000000000182,
-          16.799999999999727,
+          16.799999999999955,
+          16.700000000000273,
           16.700000000000273
         ],
         [
-          16.799999999999727,
+          16.700000000000273,
           16.700000000000273,
           16.700000000000273
         ]
@@ -853,18 +853,18 @@
     {
       "view": "lijiang",
       "metric": "heap",
-      "main": 26006212,
-      "PR": 26191440,
+      "main": 26046808,
+      "PR": 26183544,
       "runs": [
         [
-          26006212,
-          25983776,
-          26025192
+          26016568,
+          26162908,
+          26046808
         ],
         [
-          26191440,
-          26376968,
-          26159308
+          26075888,
+          26183544,
+          26223444
         ]
       ],
       "pass": true
@@ -873,18 +873,18 @@
       "view": "lijiang",
       "metric": "p95 ms",
       "main": 16.700000000000273,
-      "PR": 16.799999999999727,
-      "noise": 0,
+      "PR": 16.700000000000273,
+      "noise": 0.0999999999994543,
       "p95s": [
         [
           16.700000000000273,
-          16.700000000000273,
+          16.799999999999727,
           16.700000000000273
         ],
         [
-          16.799999999999727,
-          16.799999999999727,
-          16.700000000000728
+          16.800000000000182,
+          16.700000000000273,
+          16.700000000000273
         ]
       ],
       "pass": true
@@ -896,7 +896,7 @@
       "PR": 49,
       "runs": [
         [
-          49,
+          52,
           49,
           49
         ],
@@ -915,13 +915,13 @@
       "PR": 44,
       "runs": [
         [
-          44,
+          47,
           44,
           44
         ],
         [
           44,
-          44,
+          45,
           44
         ]
       ],
@@ -931,39 +931,39 @@
       "view": "palace",
       "metric": "triangles",
       "main": 298458,
-      "PR": 308728,
+      "PR": 315194,
       "runs": [
         [
-          298458,
+          308142,
           298458,
           298458
         ],
         [
-          308728,
-          309912,
-          308728
+          315194,
+          316378,
+          315194
         ]
       ],
-      "pass": true
+      "pass": false
     },
     {
       "view": "palace",
       "metric": "mirrorTriangles",
       "main": 296221,
-      "PR": 306491,
+      "PR": 312957,
       "runs": [
         [
-          296221,
+          305905,
           296221,
           296221
         ],
         [
-          306491,
-          306491,
-          306491
+          312957,
+          314141,
+          312957
         ]
       ],
-      "pass": true
+      "pass": false
     },
     {
       "view": "palace",
@@ -972,7 +972,7 @@
       "PR": 50,
       "runs": [
         [
-          50,
+          52,
           50,
           50
         ],
@@ -991,7 +991,7 @@
       "PR": 35,
       "runs": [
         [
-          35,
+          37,
           35,
           35
         ],
@@ -1006,18 +1006,18 @@
     {
       "view": "palace",
       "metric": "heap",
-      "main": 52267372,
-      "PR": 52421248,
+      "main": 52448164,
+      "PR": 52417740,
       "runs": [
         [
-          52289012,
-          52267372,
-          52156188
+          53459688,
+          52310336,
+          52448164
         ],
         [
-          46932876,
-          53568032,
-          52421248
+          52383000,
+          53633212,
+          52417740
         ]
       ],
       "pass": true
@@ -1026,18 +1026,18 @@
       "view": "palace",
       "metric": "p95 ms",
       "main": 16.799999999999727,
-      "PR": 16.700000000000728,
-      "noise": 0.09999999999899956,
+      "PR": 16.799999999999727,
+      "noise": 0.0999999999994543,
       "p95s": [
         [
-          16.700000000000728,
+          16.700000000000273,
           16.799999999999727,
           16.799999999999727
         ],
         [
-          16.700000000000728,
           16.799999999999727,
-          16.700000000000273
+          16.799999999999727,
+          16.800000000000182
         ]
       ],
       "pass": true
@@ -1159,18 +1159,18 @@
     {
       "view": "south",
       "metric": "heap",
-      "main": 31172108,
-      "PR": 31386836,
+      "main": 31246472,
+      "PR": 31445260,
       "runs": [
         [
-          31194716,
-          31125016,
-          31172108
+          31231748,
+          31246472,
+          31297348
         ],
         [
-          31386836,
-          31451952,
-          31358888
+          31445260,
+          38426768,
+          31432912
         ]
       ],
       "pass": true
@@ -1180,16 +1180,16 @@
       "metric": "p95 ms",
       "main": 16.700000000000273,
       "PR": 16.700000000000273,
-      "noise": 0.09999999999990905,
+      "noise": 4.547473508864641e-13,
       "p95s": [
         [
           16.700000000000273,
           16.700000000000273,
-          16.800000000000182
+          16.700000000000728
         ],
         [
-          16.800000000000182,
           16.700000000000273,
+          16.700000000000728,
           16.700000000000273
         ]
       ],
@@ -1198,18 +1198,18 @@
     {
       "view": "walk-palace",
       "metric": "calls",
-      "main": 64,
-      "PR": 62,
+      "main": 72,
+      "PR": 65,
       "runs": [
         [
-          65,
-          64,
-          64
+          72,
+          74,
+          72
         ],
         [
-          61,
-          62,
-          69
+          65,
+          68,
+          62
         ]
       ],
       "pass": true
@@ -1217,18 +1217,18 @@
     {
       "view": "walk-palace",
       "metric": "mirrorCalls",
-      "main": 58,
+      "main": 62,
       "PR": 56,
       "runs": [
         [
-          59,
-          58,
-          58
+          62,
+          64,
+          62
         ],
         [
-          55,
+          57,
           56,
-          57
+          56
         ]
       ],
       "pass": true
@@ -1236,18 +1236,18 @@
     {
       "view": "walk-palace",
       "metric": "triangles",
-      "main": 385047,
-      "PR": 376724,
+      "main": 394701,
+      "PR": 385962,
       "runs": [
         [
-          383233,
-          385047,
-          385047
+          394701,
+          406199,
+          394701
         ],
         [
-          375540,
-          376724,
-          393832
+          385962,
+          387008,
+          376724
         ]
       ],
       "pass": true
@@ -1255,18 +1255,18 @@
     {
       "view": "walk-palace",
       "metric": "mirrorTriangles",
-      "main": 378858,
+      "main": 386728,
       "PR": 370535,
       "runs": [
         [
-          377044,
-          378858,
-          378858
+          386728,
+          398226,
+          386728
         ],
         [
-          369351,
+          371273,
           370535,
-          371273
+          370535
         ]
       ],
       "pass": true
@@ -1274,18 +1274,18 @@
     {
       "view": "walk-palace",
       "metric": "geometries",
-      "main": 94,
-      "PR": 90,
+      "main": 99,
+      "PR": 92,
       "runs": [
         [
-          94,
-          96,
-          94
+          99,
+          99,
+          99
         ],
         [
-          89,
-          90,
-          94
+          92,
+          93,
+          90
         ]
       ],
       "pass": true
@@ -1293,18 +1293,18 @@
     {
       "view": "walk-palace",
       "metric": "textures",
-      "main": 52,
-      "PR": 50,
+      "main": 55,
+      "PR": 51,
       "runs": [
         [
-          53,
-          52,
-          52
+          55,
+          56,
+          55
         ],
         [
-          50,
-          50,
-          52
+          51,
+          51,
+          50
         ]
       ],
       "pass": true
@@ -1312,18 +1312,18 @@
     {
       "view": "walk-palace",
       "metric": "heap",
-      "main": 114869440,
-      "PR": 114805436,
+      "main": 115476616,
+      "PR": 114744180,
       "runs": [
         [
-          114869440,
-          115146204,
-          114535652
+          115476616,
+          115292988,
+          115764488
         ],
         [
-          113949340,
-          114805436,
-          115209032
+          115314588,
+          114744180,
+          114639976
         ]
       ],
       "pass": true
@@ -1332,52 +1332,52 @@
       "view": "walk-palace",
       "metric": "p95 ms",
       "main": 16.799999999999272,
-      "PR": 16.800000000000182,
-      "noise": 0.0999999999994543,
+      "PR": 16.799999999999272,
+      "noise": 0,
       "p95s": [
         [
           16.799999999999272,
-          16.700000000000728,
-          16.800000000000182
+          16.799999999999272,
+          16.799999999999272
         ],
         [
-          16.700000000000728,
-          16.800000000000182,
-          16.800000000000182
+          16.799999999999272,
+          16.80000000000109,
+          16.799999999999272
         ]
       ],
       "pass": true
     }
   ],
   "desktopBuilds": {
-    "main": "27dabe1c3608cb9597af1facfea8b9adb778b5cc",
-    "candidate": "4677649fdd9fc5099f1ce2ea01dae16750b7a115"
+    "candidate": "e227a7744ebdc406ad5b2c29810b6d8967900fb7",
+    "main": "27dabe1c3608cb9597af1facfea8b9adb778b5cc"
   },
   "mobileBuilds": {
     "main": "27dabe1c3608cb9597af1facfea8b9adb778b5cc",
-    "candidate": "5862af67fb2c9dec148346b7557e245ee9808273"
+    "candidate": "e227a7744ebdc406ad5b2c29810b6d8967900fb7"
   },
   "mobileWalkPopulation": [
     {
       "side": "main",
       "round": 1,
-      "crowd": 0,
-      "motors": 3
-    },
-    {
-      "side": "PR",
-      "round": 1,
-      "crowd": 0,
-      "motors": 12
-    },
-    {
-      "side": "main",
-      "round": 2,
-      "crowd": 1,
+      "crowd": 2,
       "motors": 2
     },
     {
       "side": "PR",
+      "round": 1,
+      "crowd": 2,
+      "motors": 12
+    },
+    {
+      "side": "main",
+      "round": 2,
+      "crowd": 3,
+      "motors": 3
+    },
+    {
+      "side": "PR",
       "round": 2,
       "crowd": 1,
       "motors": 12
@@ -1385,13 +1385,13 @@
     {
       "side": "main",
       "round": 3,
-      "crowd": 1,
-      "motors": 3
+      "crowd": 2,
+      "motors": 2
     },
     {
       "side": "PR",
       "round": 3,
-      "crowd": 2,
+      "crowd": 1,
       "motors": 12
     }
   ],
@@ -1513,18 +1513,18 @@
     {
       "view": "walk-palace",
       "metric": "heap",
-      "main": 111762304,
-      "PR": 111917948,
+      "main": 111640532,
+      "PR": 111922648,
       "runs": [
         [
-          111762304,
-          111391524,
-          111786688
+          111614832,
+          111656964,
+          111640532
         ],
         [
-          111917948,
-          111880332,
-          112021016
+          112855604,
+          111922648,
+          111715484
         ]
       ],
       "pass": true
@@ -1533,18 +1533,18 @@
       "view": "walk-palace",
       "metric": "p95 ms",
       "main": 16.800000000000182,
-      "PR": 16.799999999999272,
-      "noise": 0,
+      "PR": 16.700000000000728,
+      "noise": 9.094947017729282e-13,
       "p95s": [
         [
           16.800000000000182,
-          16.800000000000182,
+          16.799999999999272,
           16.800000000000182
         ],
         [
           16.700000000000728,
           16.800000000000182,
-          16.799999999999272
+          16.700000000000728
         ]
       ],
       "pass": true
@@ -1554,18 +1554,18 @@
     {
       "view": "walk-palace",
       "metric": "calls",
-      "main": 64,
-      "PR": 63,
+      "main": 70,
+      "PR": 64,
       "runs": [
         [
+          70,
           64,
-          64,
-          67
+          72
         ],
         [
           62,
-          63,
-          67
+          67,
+          64
         ]
       ],
       "pass": true
@@ -1573,18 +1573,18 @@
     {
       "view": "walk-palace",
       "metric": "mirrorCalls",
-      "main": 58,
+      "main": 62,
       "PR": 56,
       "runs": [
         [
+          62,
           58,
-          58,
-          59
+          62
         ],
         [
           56,
-          57,
-          56
+          56,
+          58
         ]
       ],
       "pass": true
@@ -1592,18 +1592,18 @@
     {
       "view": "walk-palace",
       "metric": "triangles",
-      "main": 385047,
-      "PR": 377462,
+      "main": 394231,
+      "PR": 378646,
       "runs": [
         [
+          394231,
           385047,
-          385047,
-          384547
+          394701
         ],
         [
           376724,
-          377462,
-          384724
+          384724,
+          378646
         ]
       ],
       "pass": true
@@ -1611,18 +1611,18 @@
     {
       "view": "walk-palace",
       "metric": "mirrorTriangles",
-      "main": 378858,
+      "main": 386728,
       "PR": 370535,
       "runs": [
         [
+          386728,
           378858,
-          378858,
-          377044
+          386728
         ],
         [
           370535,
-          371273,
-          370089
+          370089,
+          372457
         ]
       ],
       "pass": true
@@ -1630,18 +1630,18 @@
     {
       "view": "walk-palace",
       "metric": "geometries",
-      "main": 91,
-      "PR": 91,
+      "main": 95,
+      "PR": 93,
       "runs": [
         [
+          95,
           91,
-          91,
-          95
+          97
         ],
         [
           90,
-          91,
-          94
+          94,
+          93
         ]
       ],
       "pass": true
@@ -1649,17 +1649,17 @@
     {
       "view": "walk-palace",
       "metric": "textures",
-      "main": 52,
-      "PR": 50,
+      "main": 55,
+      "PR": 51,
       "runs": [
         [
+          55,
           52,
-          52,
-          53
+          55
         ],
         [
           50,
-          50,
+          51,
           51
         ]
       ],
@@ -1668,18 +1668,18 @@
     {
       "view": "walk-palace",
       "metric": "heap",
-      "main": 114381368,
-      "PR": 114757832,
+      "main": 114708600,
+      "PR": 115266800,
       "runs": [
         [
-          114381368,
-          114362372,
-          114419684
+          115000460,
+          114546612,
+          114708600
         ],
         [
-          114676180,
-          116176152,
-          114757832
+          114398112,
+          115359128,
+          115266800
         ]
       ],
       "pass": true
@@ -1687,22 +1687,114 @@
     {
       "view": "walk-palace",
       "metric": "p95 ms",
-      "main": 16.799999999999272,
-      "PR": 16.800000000000182,
-      "noise": 0.0999999999994543,
+      "main": 16.80000000000109,
+      "PR": 16.799999999999272,
+      "noise": 0.1000000000003638,
       "p95s": [
         [
-          16.799999999999272,
-          16.700000000000728,
-          16.800000000000182
+          16.80000000000109,
+          16.80000000000109,
+          16.700000000000728
         ],
         [
-          16.800000000000182,
-          16.800000000000182,
-          16.800000000000182
+          16.700000000000728,
+          16.799999999999272,
+          16.799999999999272
         ]
       ],
       "pass": true
     }
-  ]
+  ],
+  "desktopPalaceDrawSources": [
+    {
+      "round": 1,
+      "calls": [
+        59,
+        56
+      ],
+      "mirrorCalls": [
+        54,
+        51
+      ],
+      "motors": [
+        6,
+        6
+      ],
+      "meshDelta": {
+        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": 3,
+        "mirror G2 traffic visuals": -1,
+        "mirror Mesh": -32,
+        "mirror lod0/lod0_brick/mesh_3": -1,
+        "mirror lod0/lod0_joinery/mesh_0": -3,
+        "mirror lod0/lod0_pave/mesh_3_instance_0": -1,
+        "mirror lod0/lod0_rock/mesh_1": -1,
+        "mirror lod0/lod0_stone/mesh_2": -2,
+        "mirror lod1": -5,
+        "mirror lod1/lod1_base/mesh_9": -1,
+        "mirror peaks-lod0": -1,
+        "mirror peaks-lod1": -1
+      }
+    },
+    {
+      "round": 2,
+      "calls": [
+        65,
+        60
+      ],
+      "mirrorCalls": [
+        60,
+        55
+      ],
+      "motors": [
+        3,
+        3
+      ],
+      "meshDelta": {
+        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker": -2,
+        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": -2,
+        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": -1,
+        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker": 1,
+        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": 1,
+        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/creator-skirt": 1,
+        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-face/rest-face": 1,
+        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair": 1,
+        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": 2,
+        "mirror G2 traffic visuals": 1,
+        "mirror Mesh": 32,
+        "mirror lod0/lod0_brick/mesh_3": 1,
+        "mirror lod0/lod0_joinery/mesh_0": 3,
+        "mirror lod0/lod0_pave/mesh_3_instance_0": 1,
+        "mirror lod0/lod0_rock/mesh_1": 1,
+        "mirror lod0/lod0_stone/mesh_2": 2,
+        "mirror lod1": 5,
+        "mirror lod1/lod1_base/mesh_9": 1,
+        "mirror peaks-lod0": 1,
+        "mirror peaks-lod1": 1
+      }
+    },
+    {
+      "round": 3,
+      "calls": [
+        56,
+        55
+      ],
+      "mirrorCalls": [
+        51,
+        50
+      ],
+      "motors": [
+        4,
+        4
+      ],
+      "meshDelta": {
+        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker": -1,
+        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": -1,
+        "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": 1,
+        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker": -1,
+        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": -1,
+        "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": 1
+      }
+    }
+  ],
+  "desktopPalaceDrawSourceSampling": "Supplementary peak-frame inventory. Reflection is not refreshed in every sampled frame. Compare the main-pass entries across all three pairs; use desktopMedians for the official mirror gate."
 }
