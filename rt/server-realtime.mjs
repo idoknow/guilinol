@@ -60,7 +60,8 @@ import {WebSocketServer} from 'ws'
 import * as obs from './observability.mjs'
 
 const PORT = Number(process.env.PORT || 8790)
-const MAX_PLAYERS = Number(process.env.MAX_PLAYERS || 200)
+// 单进程 Node 只能用 1 核：AOI 压测 300 人密集场景已接近 1 核，先按 300 封顶（IDOK-224）
+const MAX_PLAYERS = Number(process.env.MAX_PLAYERS || 300)
 const MAX_CHAT = 80
 const TICK_MS = 1000
 const KICK_TOKEN = process.env.KICK_TOKEN || ''
@@ -404,6 +405,7 @@ const server = createServer((req, res) => {
         maxPlayers: MAX_PLAYERS,
         banned: bans.size,
         connections: sockets.size,
+        loopP99Ms: +obs.loopP99().toFixed(1),
       }))
       return
     }
@@ -796,6 +798,20 @@ wss.on('connection', (ws, req) => {
 setInterval(() => {
   broadcast({t: 'online', online: players.size})
 }, TICK_MS)
+
+// 全服低频名册（地图 / 同城名册用）：只 stringify 一次，同一个字符串发给所有人
+setInterval(() => {
+  if (!players.size) return
+  const text = JSON.stringify(rosterPayload())
+  const size = Buffer.byteLength(text)
+  for (const p of players.values()) sendSlowAware(p.ws, text, 'roster', size)
+}, ROSTER_MS)
+
+// 每 30s 一条 rt-stats：线上判断「单核是否顶满」看 loopP99Ms，> 50ms 玩家就能感到卡
+const STATS_MS = Number(process.env.RT_STATS_MS || 30000)
+setInterval(() => {
+  console.log(JSON.stringify({scope: 'rt-stats', players: players.size, sockets: sockets.size, cells: grid.size, ...obs.window()}))
+}, STATS_MS)
 
 // 掉线清理：浏览器直接关掉时不会有 close 帧，用 ping/pong 兜住
 setInterval(() => {
