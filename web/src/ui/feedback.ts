@@ -5,6 +5,7 @@ import type { mapView } from '../play/map'
 import { kinds, labels, type FeedbackView } from '../../../lib/feedback-contract'
 import { ll2xz, xz2ll } from '../../../lib/projection'
 import { photoPicker } from './feedback-photo'
+import { cameraSupported, shootFeedbackPhoto } from './feedback-camera'
 import './feedback.css'
 
 type MapApi = ReturnType<typeof mapView>
@@ -643,6 +644,26 @@ export async function openFeedback(host: Host, ensureMap: () => Promise<MapApi |
       () => id,
       run,
       setCount,
+      cameraSupported()
+        ? async () => {
+            // 收起弹窗但不关闭（onclose 会销毁表单），拍完原样放回，已填内容和滚动位置都保留。
+            const scroll = body.scrollTop
+            dialog.remove()
+            dialog.removeAttribute('open')
+            document.exitPointerLock?.()
+            try {
+              return await shootFeedbackPhoto()
+            } catch (error) {
+              note.textContent = String((error as Error).message ?? error)
+              note.classList.add('fb-note--error')
+              return null
+            } finally {
+              document.body.append(dialog)
+              dialog.showModal()
+              body.scrollTop = scroll
+            }
+          }
+        : undefined,
     )
     onPaste = (files) => picker.add(files)
     const prevDispose = dispose
