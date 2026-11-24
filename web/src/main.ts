@@ -530,7 +530,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       const showTraffic=trafficEnabled(getPlayMode(),trafficOverride)
       if(showTraffic&&!trafficRequested && camera.position.y<250 && !stream.pending.size){
         trafficRequested=true
-        void import('./traffic').then(mod=>mod.traffic(scene,camera,params.has('verify'))).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
+        void import('./traffic').then(mod=>mod.traffic(scene,camera,params.has('verify'),(x,z,y,car)=>(car?walker?.carSupportAt(x,z,y):walker?.supportAt(x,z,y))?.y)).then(tick=>{trafficTick=tick}).catch(error=>console.warn('Traffic unavailable',error))
       }
       trafficTick?.(elapsed/1000,walker?.active&&walker.vehicle!=='foot'?walker.position:undefined,
         walker?.active?walker.position:undefined,getPlayMode()==='solo',showTraffic)
