@@ -7,8 +7,8 @@ type Phase = {lanes:number[],green:number,yellow:number}
 type Signal={node:number,group:number,offset:number,phases:Phase[]}
 export type Graph = {nodes:Node[],lanes:Lane[],walks:[number,number,number,number?,number[]?][],signals:Signal[]}
 export type Track = Lane & {start:Node,end:Node,dx:number,dz:number,yaw:number,length:number,walk:boolean}
-function trackHeight(track:Track,dist:number){
-  if(track.floor)return axleHeight(track,dist)
+export function trackHeight(track:Track,dist:number){
+  if(track.wheelPose)return poseAt(track.wheelPose,dist/track.length,1)
   const fraction=Math.min(1,Math.max(0,dist/track.length)), heights=track.heights
   if(!heights)return track.start.y+(track.end.y-track.start.y)*fraction
   let lo=0,hi=heights.length/2-1

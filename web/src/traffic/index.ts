@@ -56,11 +56,11 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
     if(slotGeometry[slot]!==geometry){batch.setGeometryIdAt(slot,geometryIds[geometry]);slotGeometry[slot]=geometry}
     if(slotPaint[slot]!==variant.paint){batch.setColorAt(slot,variant.paint);slotPaint[slot]=variant.paint}
     if(!slotShown[slot]){batch.setVisibleAt(slot,true);slotShown[slot]=1}
-    const offset=slot*8
-    if(transforms[offset]===x&&transforms[offset+1]===y&&transforms[offset+2]===z&&transforms[offset+3]===yaw&&transforms[offset+4]===scale&&transforms[offset+5]===Number(down)&&transforms[offset+6]===pitch&&transforms[offset+7]===roll)return
-    transforms[offset]=x;transforms[offset+1]=y;transforms[offset+2]=z;transforms[offset+3]=yaw;transforms[offset+4]=scale;transforms[offset+5]=Number(down);transforms[offset+6]=pitch;transforms[offset+7]=roll
-    pose.position.set(x,y+(down?.16:0),z);pose.rotation.set(down?-Math.PI/2:pitch,yaw,roll,'YXZ');pose.scale.setScalar(Math.max(scale,.001))
-    if(motor&&sampleGround)alignWheels(pose,models.geometries[variant.geometry].userData.wheels,sampleGround,motor==='car')
+    if(down)pitch=-Math.PI/2
+    const offset=slot*7
+    if(transforms[offset]===x&&transforms[offset+1]===y&&transforms[offset+2]===z&&transforms[offset+3]===yaw&&transforms[offset+4]===scale&&transforms[offset+5]===pitch&&transforms[offset+6]===roll)return
+    transforms[offset]=x;transforms[offset+1]=y;transforms[offset+2]=z;transforms[offset+3]=yaw;transforms[offset+4]=scale;transforms[offset+5]=pitch;transforms[offset+6]=roll
+    pose.position.set(x,y+(down?.16:0),z);pose.rotation.set(pitch,yaw,roll);pose.scale.setScalar(Math.max(scale,.001))
     pose.updateMatrix();batch.setMatrixAt(slot,pose.matrix)
   }
   const hide=(from:number,to:number)=>{for(let slot=from;slot<to;slot++)if(slotShown[slot]){batch.setVisibleAt(slot,false);slotShown[slot]=0}}
@@ -152,7 +152,8 @@ export async function traffic(scene:THREE.Scene,camera:THREE.Camera,verify:boole
         const {min,max}=geometry.boundingBox!;actor.halfWidth=Math.max(-min.x,max.x);actor.halfLength=Math.max(-min.z,max.z);actor.height=max.y
       }
       if(walking.has(actor)){hide(index,index+1);return}
-      show(index,variant,actor.x,actor.y,actor.z,actor.yaw,actor.scale,actor.kind==='person'&&actor.down>0,actor.pitch,actor.roll,actor.kind==='person'?undefined:actor.kind)
+      show(index,variant,actor.x,actor.y,actor.z,actor.yaw,actor.scale,actor.kind==='person'&&actor.down>0,
+        actor.pitch,actor.roll)
     })
     people.animate(dt,accumulator)
     effects.tick(sim.actors,sim.time,elapsed,player,!!vehicle,actor=>variants.get(actor)?.geometry??0)

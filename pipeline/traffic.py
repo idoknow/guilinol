@@ -2,7 +2,8 @@ import gzip
 import json
 import math
 import re
-from itertools import chain
+import subprocess
+import tempfile
 from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
@@ -205,6 +206,9 @@ def bake(output, manifest, rendered_roads=None):
                     lane = dict(id=len(lanes), to=tail, width=size, offset=round(offset,2), kind='nonmotor' if kind=='cycleway' else 'bus' if kind=='busway' else 'motor',speedKmh=number(tags.get('maxspeed'),20 if kind in ('cycleway','service') else 40),oneway=single)
                     lane['from'] = head
                     lane['cls'] = kind
+                    lane['way'] = way['id']
+                    if linear:
+                        lane['structure'] = 'tunnel' if tags.get('tunnel','no')!='no' else 'bridge'
                     if not linear:
                         lane['heights'] = profile(head,tail,lane['offset'],way['id'])
                     if linear or way['id'] in SPAN_WAYS:
@@ -228,6 +232,14 @@ def bake(output, manifest, rendered_roads=None):
     result = dict(nodes=[node for node in nodes.values() if node['y'] is not None],lanes=lanes,signals=signals,quiet=quiet,walks=walks)
     dest = output/'roads'/'graph.json.gz'
     dest.parent.mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        request = Path(tmp)/'request.json'
+        request.write_text(json.dumps(dict(manifest=manifest,nodes=result['nodes'],lanes=lanes),separators=(',',':')))
+        subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
+                        'bake',str(output.resolve()),str(request)], check=True, cwd=ROOT)
+        for lane, pose in zip(lanes,json.loads(request.read_text()),strict=True):
+            if pose is not None:
+                lane['wheelPose'] = pose
     dest.write_bytes(gzip.compress(json.dumps(result, ensure_ascii=False, separators=(',',':')).encode(),mtime=0))
     # A halo contains all spawn and retention candidates until the next cell loads.
     cells = defaultdict(lambda: dict(lanes=[],walks=[],refs=set()))

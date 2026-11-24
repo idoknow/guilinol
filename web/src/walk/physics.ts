@@ -554,10 +554,10 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
     const thin=!!hit&&(thinDecks.has(hit.collider.handle)||kinds.get(hit.collider.handle)==='deckThin')
     return hit?{y:origin-hit.timeOfImpact,slope:Math.acos(Math.min(1,Math.abs(hit.normal.y))),thin}:null
   }
-  function groundSurface(east:number,south:number,footY:number){
-    const origin=footY+.18
+  function groundSurface(east:number,south:number,footY:number,above=.18,reach=.5){
+    const origin=footY+above
     surfaceRay.origin.x=east;surfaceRay.origin.y=origin;surfaceRay.origin.z=south
-    const hit=world.castRayAndGetNormal(surfaceRay,.5,false,undefined,undefined,capsule,undefined,walkableFilter)
+    const hit=world.castRayAndGetNormal(surfaceRay,reach,false,undefined,undefined,capsule,undefined,walkableFilter)
     if(!hit)return null
     const slope=Math.acos(Math.min(1,Math.abs(hit.normal.y)))
     if(slope>cfg.slope+.18)return null
