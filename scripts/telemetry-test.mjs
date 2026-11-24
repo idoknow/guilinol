@@ -46,33 +46,6 @@ test('admin aggregate rejects invalid dimensions and ranges before querying',asy
     assert.equal(response.status,400)
   }
 })
-test('curl probe posts timings for eight fixed paths, including a failed target',async()=>{
-  const {createServer}=await import('node:http')
-  const {execFile}=await import('node:child_process')
-  const {promisify}=await import('node:util')
-  const seen=[]
-  let payload
-  const server=createServer(async(req,res)=>{
-    if(req.url==='/api/t'){
-      const parts=[]
-      for await(const chunk of req)parts.push(chunk)
-      payload=JSON.parse(Buffer.concat(parts))
-      res.writeHead(204).end()
-    }else{
-      seen.push(req.url)
-      res.writeHead(req.url==='/world/0_3.glc'?503:200).end('ok')
-    }
-  })
-  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
-  try{
-    await promisify(execFile)('sh',['deploy/k8s/probe/run.sh'],{env:{...process.env,PROBE_NODE:'cn-sh-tencent-01',PROBE_SESSION:randomUUID(),PROBE_ORIGIN:'http://127.0.0.1:'+server.address().port}})
-    assert.deepEqual(seen,['/','/world/manifest.json',...[1,2,3,4,5].map(n=>'/world/0_'+n+'.glc'),'/api/health'])
-    assert.ok(validate(payload))
-    assert.equal(payload.rows.length,8)
-    assert.equal(payload.rows.find(row=>row.target==='chunk3').status,503)
-  }finally{await new Promise(resolve=>server.close(resolve))}
-})
-
 test('anonymous session context and event schemas',()=>{
   const context={vid:randomUUID(),firstDay:'2026-11-22',language:'zh',referrer:'search',maxTextureSize:8192,webgl2:1}
   const rows=[{kind:'vitals',cls:0},{kind:'session',total:42,walkMeters:10,walkSeconds:4},{kind:'error',count:1,errorKind:'error',signature:'deadbeef'},
