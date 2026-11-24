@@ -9,6 +9,8 @@ export class ParkedBatches {
   private readonly previous = new Map<string, T.Object3D[]>()
   private readonly transform = new T.Matrix4()
 
+  invalidate(key: string) { this.previous.delete(key) }
+
   sync(visible: Map<string, T.Object3D[]>, models: Map<string, Part[]>) {
     for (const [key, slots] of this.slots) {
       if (visible.has(key)) continue
