@@ -47,7 +47,9 @@ def relocate(output, manifest, elements, surface):
         paths=read_chunk(output/tile['file'])[3][1]
         survey=paths[12]
         original=json.loads(zlib.decompress(base64.b64decode(survey['input'])))
-        added=footprints(paths[0][survey['start']:survey['end']],key,{0}).difference(
+        # Include the 40 mm bed exposed beneath the repaired asphalt rim.
+        # Otherwise objects on the former road edge survive next to the curb.
+        added=footprints(paths[0][survey['start']:survey['end']],key,{0}).buffer(.041).difference(
             footprints(original['paths'],key,{0,5}))
         if added.is_empty:
             continue
