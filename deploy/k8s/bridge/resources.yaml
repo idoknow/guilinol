@@ -12,7 +12,7 @@ metadata: {name: glol-feedback-bridge, namespace: idoknow}
 spec:
   schedule: '*/5 * * * *'
   concurrencyPolicy: Forbid
-  suspend: true
+  suspend: false
   startingDeadlineSeconds: 120
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
