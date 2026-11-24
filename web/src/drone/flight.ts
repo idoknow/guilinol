@@ -88,7 +88,7 @@ export function stepFlight(flight:Flight, dt:number, sticks:Sticks, groundAt:(x:
     flight.pos.y = groundY + half + Math.max(0,spec.height * .3)
     flight.vel.set(0,0,0)
     flight.agl = 0
-    flight.yaw += sticks.yaw * 40 * dt
+    flight.yaw -= THREE.MathUtils.degToRad(40) * sticks.yaw * dt
     flight.gimbal = THREE.MathUtils.clamp(flight.gimbal + sticks.pitch * -10 * dt, spec.gimbal.tiltMin, spec.gimbal.tiltMax)
     return flight
   }
@@ -123,7 +123,8 @@ export function stepFlight(flight:Flight, dt:number, sticks:Sticks, groundAt:(x:
   if (flight.phase === 'landing') climbTarget = -Math.min(spec.descent, 1.6)
   flight.vel.y += (climbTarget - flight.vel.y) * Math.min(1, 4 * dt)
 
-  flight.yaw += ctrl.yaw * 90 * dt
+  // Stick right (+1) turns clockwise seen from above, i.e. towards decreasing yaw.
+  flight.yaw -= THREE.MathUtils.degToRad(90) * ctrl.yaw * dt
 
   // Wind: published resistance is the point where the aircraft holds position, so drift is gentle.
   const wind = Math.sin(flight.elapsed * .21) * spec.wind * .06
@@ -167,7 +168,7 @@ function homeSticks(flight:Flight, groundY:number):Sticks {
   const wantYaw = Math.atan2(-toHome.x,-toHome.z)
   const delta = Math.atan2(Math.sin(wantYaw - flight.yaw),Math.cos(wantYaw - flight.yaw))
   const throttle = flight.agl > Math.max(8, (flight.pos.y - groundY) * .4) ? .35 : (flight.agl > 3 ? 0 : -.5)
-  return {throttle, yaw:THREE.MathUtils.clamp(delta * 1.6,-1,1), pitch:dist > 4 ? .6 : 0, roll:0}
+  return {throttle, yaw:THREE.MathUtils.clamp(-delta * 1.6,-1,1), pitch:dist > 4 ? .6 : 0, roll:0}
 }
 
 /** Camera pose for the RC view: lens position + gimbal attitude. */
