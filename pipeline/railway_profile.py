@@ -61,6 +61,12 @@ def solve(coords, pieces, ways, target, crossings, yards, pairs):
     grade = np.where(service & ~named_main, .02498, .01198)
     limit_difference(nodes, np.broadcast_to([1, -1], nodes.shape),
                      np.maximum(0, lengths * grade - .000004))
+    # The paved width may cross two divided or adjacent carriageways. Hold
+    # the rail across the full panel so overlapping pavement has one datum.
+    from railways import LEVEL
+    panel_nodes = nodes[np.array([bool(flags & LEVEL) for _,_,_,flags,_ in pieces])]
+    if len(panel_nodes):
+        limit_difference(panel_nodes, np.broadcast_to([1,-1],panel_nodes.shape), 0.)
     if pairs is not None:
         a, b, along_a, along_b, *_ = pairs
         for end in range(2):
