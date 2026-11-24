@@ -44,11 +44,16 @@ def ground_features(bounds, school_grounds=()):
     landmarks = json.loads(Path(__file__).with_name('landmarks.json').read_text())
     replaced_pitches = {key for landmark in landmarks for key in landmark.get('replacePitches', [])}
     layers = dict(green=[], water=[], road=[])
+    dam_areas = []
     grounds = unary_union(school_grounds)
     layers.update(schoolTrack=[], schoolCourt=[])
     widths = {'motorway':14, 'motorway_link':7, 'primary': 14, 'secondary': 12, 'tertiary': 10, 'trunk': 18, 'residential': 6}
     for element in load_osm():
         tags = element.get('tags', {})
+        if tags.get('waterway') == 'dam':
+            dam = area(element).intersection(bounds)
+            if not dam.is_empty:
+                dam_areas.append(dam)
         if tags.get('leisure') in ('pitch', 'track') and f"{element['type']}/{element['id']}" in replaced_pitches:
             continue
         if element['type'] != 'node' and tags.get('leisure') in ('track','pitch'):
@@ -88,6 +93,9 @@ def ground_features(bounds, school_grounds=()):
         if props['kind'] in ('pond','leisure'):
             layer = 'water' if props['kind'] == 'pond' else 'schoolCourt'
             layers[layer].extend(polygons(footprint.intersection(bounds)))
+    if dam_areas:
+        solid = unary_union(dam_areas)
+        layers['water'] = [part for water in layers['water'] for part in polygons(water.difference(solid))]
     return layers
 
 
