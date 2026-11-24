@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// IDOK-275 — procedural DJI fleet → public/models/drones/<id>.glb + manifest.json
+// IDOK-275 鈥?procedural DJI fleet 鈫?public/models/drones/<id>.glb + manifest.json
 //
 // Conventions (contract with web/src/drone/models.ts, IDOK-255):
 //   1 unit = 1 m, nose looks down -Z, top = +Y, right = +X, origin = fuselage centre.
 //   Animated nodes keep the procedural names: prop_1..N (spun about local +Y), gimbal (pitched about
 //   local X), lens, gear. FlyCart also exposes cargo_box (hidden in winch mode) and winch (hook point).
 //   manifest.drones[id].offset drops the model so the landing gear touches the ground at the rig's
-//   landed height (root sits at ground + 0.8 × spec.height, see web/src/drone/flight.ts).
-// Budgets: ≤ 150 KB per GLB, FlyCart ≤ 300 KB. Factors-only PBR, no textures.
+//   landed height (root sits at ground + 0.8 脳 spec.height, see web/src/drone/flight.ts).
+// Budgets: 鈮?150 KB per GLB, FlyCart 鈮?300 KB. Factors-only PBR, no textures.
 //
 // Usage: node scripts/drone-models.mjs            # build all (then: node scripts/drone-models-render.mjs for 3-view sheets)
 //        node scripts/drone-models.mjs --check    # build + print stats only (no write)
@@ -22,12 +22,12 @@ const OUT = path.resolve(import.meta.dirname, '../public/models/drones')
 const { PI, sin, cos, abs, sign, hypot } = Math
 const KB = 1000
 
-// Landed root height = 0.8 × spec.height (web/src/drone/specs.ts) and per-model file budgets.
+// Landed root height = 0.8 脳 spec.height (web/src/drone/specs.ts) and per-model file budgets.
 const SPEC = {
   mavic4pro: { height: 0.15, budget: 150 * KB },
   mini5pro: { height: 0.09, budget: 150 * KB },
   air3s: { height: 0.11, budget: 150 * KB },
-  inspire3: { height: 0.25, budget: 150 * KB },
+  air3s: { height: 0.11, budget: 150 * KB },
   flycart200: { height: 1.05, budget: 300 * KB },
 }
 
@@ -43,8 +43,8 @@ const rbox = (w, h, d, r, seg = 1) => clean(new RoundedBoxGeometry(w, h, d, seg,
 const box = (w, h, d) => clean(new THREE.BoxGeometry(w, h, d))
 const sphere = (r, ws = 10, hs = 6) => clean(new THREE.SphereGeometry(r, ws, hs))
 function axisify(g, axis) {
-  if (axis === 'z') g.rotateX(PI / 2) // +Y → +Z
-  else if (axis === '-z') g.rotateX(-PI / 2) // +Y → -Z
+  if (axis === 'z') g.rotateX(PI / 2) // +Y 鈫?+Z
+  else if (axis === '-z') g.rotateX(-PI / 2) // +Y 鈫?-Z
   else if (axis === 'x') g.rotateZ(-PI / 2)
   else if (axis === '-x') g.rotateZ(PI / 2)
   else if (axis === '-y') g.rotateX(PI)
@@ -57,7 +57,7 @@ function cyl(r, h, seg = 12, axis = 'y', rBottom = r, caps = 'both') {
   return axisify(mergeGeometries(parts, false), axis)
 }
 const disc = (r, seg = 12, axis = 'y') => axisify(clean(new THREE.CircleGeometry(r, seg).rotateX(-PI / 2)), axis)
-// Lathe around +Y; profile = [[radius, y], …] bottom → top.
+// Lathe around +Y; profile = [[radius, y], 鈥 bottom 鈫?top.
 function lathe(profile, seg = 16, axis = 'y') {
   const g = new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(Math.max(r, 1e-5), y)), seg)
   return axisify(clean(g), axis)
@@ -104,36 +104,36 @@ function loft(sections, N = 20, caps = [true, true]) {
   g.computeVertexNormals()
   return g
 }
-// Orient a geometry authored along +Z from z=0 (scaled to unit length via `along`) between a → b.
+// Orient a geometry authored along +Z from z=0 (scaled to unit length via `along`) between a 鈫?b.
 function orient(g, a, b, roll = 0) {
   const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b)
   const dir = B.clone().sub(A), len = dir.length()
   dir.normalize()
   const up = abs(dir.y) > 0.95 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0)
-  const m = new THREE.Matrix4().lookAt(B, A, up) // z axis → (B − A)
+  const m = new THREE.Matrix4().lookAt(B, A, up) // z axis 鈫?(B 鈭?A)
   if (roll) g.rotateZ(roll)
   g.scale(1, 1, len)
   g.applyMatrix4(m)
   g.translate(...A.toArray())
   return g
 }
-// Rectangular-ish tapered beam a → b (w/h at each end), superellipse section.
+// Rectangular-ish tapered beam a 鈫?b (w/h at each end), superellipse section.
 function beam(a, b, wA, hA, wB = wA, hB = hA, n = 4, N = 12) {
   const g = loft([{ z: 0, w: wA, top: hA / 2, bot: hA / 2, n }, { z: 1, w: wB, top: hB / 2, bot: hB / 2, n }], N)
   return orient(g, a, b)
 }
-// Round tube a → b.
+// Round tube a 鈫?b.
 const tube = (a, b, r, seg = 8, rB = r) => beam(a, b, 2 * r, 2 * r, 2 * rB, 2 * rB, 2, seg)
-// One propeller blade along +X from hub, chord along Z, pitched (dir = ±1 for CW / CCW).
+// One propeller blade along +X from hub, chord along Z, pitched (dir = 卤1 for CW / CCW).
 function blade(R, hub, chordRoot, chordMax, chordTip, thick, dir = 1, pitchRoot = 0.42, pitchTip = 0.14) {
   const ts = [0, 0.18, 0.45, 0.75, 0.94, 1]
   const chord = t => (t < 0.45 ? chordRoot + (chordMax - chordRoot) * (t / 0.45) : chordMax + (chordTip - chordMax) * ((t - 0.45) / 0.55)) * (t === 1 ? 0.35 : 1)
   const sec = ts.map(t => ({ z: hub + (R - hub) * t, w: chord(t), top: thick * (1 - 0.6 * t), bot: thick * 0.45 * (1 - 0.6 * t), n: 2, rot: dir * (pitchRoot + (pitchTip - pitchRoot) * t), x: dir * 0.18 * chord(t) * t }))
   const g = loft(sec, 8, [true, true])
-  g.rotateY(PI / 2) // z (radius) → +x ; ring x (chord) → -z
+  g.rotateY(PI / 2) // z (radius) 鈫?+x ; ring x (chord) 鈫?-z
   return g
 }
-// Two-blade prop + spinner. Blades lie in y ≈ 0 of the prop node.
+// Two-blade prop + spinner. Blades lie in y 鈮?0 of the prop node.
 function propeller(R, opts = {}) {
   const { dir = 1, chord = R * 0.16, thick = R * 0.025, hubR = R * 0.09 } = opts
   const parts = []
@@ -158,7 +158,7 @@ const css = s => hex(parseInt(s.slice(1), 16))
 class Model {
   constructor(id, materials) {
     this.id = id
-    this.materials = materials // key → {color:[srgb], metallic, roughness, emissive?}
+    this.materials = materials // key 鈫?{color:[srgb], metallic, roughness, emissive?}
     this.groups = new Map([[id, { parent: null, pos: [0, 0, 0], parts: new Map() }]])
   }
   group(name, pos = [0, 0, 0], parent = this.id) {
@@ -177,7 +177,7 @@ class Model {
     grp.parts.get(mat).push(g)
     return this
   }
-  // Mirror helper: add at +x and the X-mirrored copy at −x.
+  // Mirror helper: add at +x and the X-mirrored copy at 鈭抶.
   addSym(group, mat, geom, pos = [0, 0, 0]) {
     this.add(group, mat, geom, pos)
     const m = geom.clone().scale(-1, 1, 1)
@@ -202,7 +202,7 @@ class Model {
         if (!joined) throw new Error(`${this.id}/${name}/${mat}: merge failed`)
         const merged = mergeVertices(joined, 1e-5)
         const mesh = new THREE.Mesh(merged, mats[mat])
-        // Mesh names must never start with "prop" — the rig spins every node matching /^prop/.
+        // Mesh names must never start with "prop" 鈥?the rig spins every node matching /^prop/.
         mesh.name = `m-${name}-${mat}`
         o.add(mesh)
       }
@@ -248,8 +248,8 @@ function writeGLB(root, file) {
     json.nodes.push(node)
     if (obj.position.lengthSq() > 0) node.translation = obj.position.toArray().map(v => +v.toFixed(5))
     if (obj.isMesh) {
-      // KHR_mesh_quantization: positions → normalised int16 around the mesh bbox (the node carries
-      // the dequantising translation + scale), normals → normalised int8. 12 B/vertex instead of 24.
+      // KHR_mesh_quantization: positions 鈫?normalised int16 around the mesh bbox (the node carries
+      // the dequantising translation + scale), normals 鈫?normalised int8. 12 B/vertex instead of 24.
       const g = obj.geometry
       g.computeBoundingBox()
       const bb = g.boundingBox
@@ -325,7 +325,7 @@ function foldingQuad(id, o) {
     glass: GLASS, rotor: ROTOR, red: LED_RED, green: LED_GREEN,
   })
   const L = o.length, W = o.width, H = o.height, s = o.scale
-  // fuselage: tail (+z) → nose (−z)
+  // fuselage: tail (+z) 鈫?nose (鈭抸)
   m.add(id, 'shell', loft([
     { z: L * 0.5, w: W * 0.5, top: H * 0.22, bot: H * 0.2, y: H * 0.02, n: 2.6 },
     { z: L * 0.43, w: W * 0.82, top: H * 0.38, bot: H * 0.36, y: H * 0.04, n: 3 },
@@ -367,7 +367,7 @@ function foldingQuad(id, o) {
     { side: -1, front: false, root: [-W * 0.38, -H * 0.24, L * 0.3], hub: [-o.rearHub[0], o.rearHub[1], o.rearHub[2]] },
   ]
   m.group('gear')
-  // Order matches the procedural rig: [+x,+z] [+x,−z] [−x,+z] [−x,−z] → prop_1..4.
+  // Order matches the procedural rig: [+x,+z] [+x,鈭抸] [鈭抶,+z] [鈭抶,鈭抸] 鈫?prop_1..4.
   const order = [hubs[2], hubs[0], hubs[3], hubs[1]]
   order.forEach((h, i) => {
     const mr = o.motorR, mh = o.motorH
@@ -480,90 +480,6 @@ function air3s() {
   return { model: m, gearBottom: -0.058 }
 }
 
-// ---------------------------------------------------------------- Inspire 3
-
-function inspire3() {
-  const id = 'inspire3'
-  const m = new Model(id, {
-    shell: { color: css('#33373d'), metallic: 0.25, roughness: 0.38 },
-    dark: { color: css('#1b1d21'), metallic: 0.15, roughness: 0.7 },
-    carbon: { color: css('#16181b'), metallic: 0.45, roughness: 0.3 },
-    metal: { color: css('#7d858e'), metallic: 0.85, roughness: 0.3 },
-    accent: { color: css('#d1462f'), metallic: 0.2, roughness: 0.45 },
-    glass: GLASS, rotor: ROTOR, red: LED_RED, green: LED_GREEN,
-  })
-  // sleek fuselage, nose dips toward the gimbal
-  m.add(id, 'shell', loft([
-    { z: 0.25, w: 0.1, top: 0.03, bot: 0.03, y: 0.03, n: 2.6 },
-    { z: 0.21, w: 0.17, top: 0.055, bot: 0.045, y: 0.03, n: 3 },
-    { z: 0.08, w: 0.2, top: 0.07, bot: 0.05, y: 0.025, n: 3.4 },
-    { z: -0.06, w: 0.19, top: 0.068, bot: 0.05, y: 0.015, n: 3.4 },
-    { z: -0.17, w: 0.15, top: 0.05, bot: 0.045, y: -0.005, n: 3 },
-    { z: -0.24, w: 0.08, top: 0.025, bot: 0.03, y: -0.025, n: 2.6 },
-  ], 24))
-  // twin TB51 batteries on the back, red pull tabs
-  for (const sx of [-1, 1]) {
-    m.add(id, 'dark', rbox(0.062, 0.05, 0.15, 0.01, 2), [sx * 0.036, 0.1, 0.1])
-    m.add(id, 'accent', rbox(0.02, 0.008, 0.03, 0.003), [sx * 0.036, 0.128, 0.155])
-  }
-  // FPV camera on the nose crown + forward / downward vision
-  m.add(id, 'dark', rbox(0.05, 0.03, 0.04, 0.01, 2), [0, 0.07, -0.16])
-  m.add(id, 'glass', lathe([[0.011, 0], [0.008, 0.004], [0, 0.005]], 14, '-z'), [0, 0.07, -0.18])
-  for (const sx of [-1, 1]) {
-    m.add(id, 'glass', disc(0.007, 12, '-z'), [sx * 0.03, 0.0, -0.236])
-    m.add(id, 'glass', disc(0.007, 12, '-y'), [sx * 0.04, -0.034, 0.02])
-  }
-  m.add(id, 'red', rbox(0.03, 0.006, 0.004, 0.002), [0, 0.03, 0.251])
-  // DGC 2.0 quick-release plate under the nose
-  m.add(id, 'metal', rbox(0.07, 0.012, 0.06, 0.004), [0, -0.04, -0.16])
-
-  // carbon frame: shoulder hinge → elbow, arms out to the motors, legs down to the T-feet
-  m.group('gear')
-  const R = 0.2, legFoot = -0.33
-  const hubs = [] // [+x,+z] [+x,−z] [−x,+z] [−x,−z] → prop_1..4
-  for (const sx of [1, -1]) {
-    const shoulder = [sx * 0.1, 0.035, 0], elbow = [sx * 0.19, 0.055, 0]
-    m.add(id, 'metal', cyl(0.024, 0.03, 14, sx > 0 ? 'x' : '-x'), shoulder)
-    m.add(id, 'carbon', tube(shoulder, elbow, 0.014, 10))
-    m.add(id, 'accent', cyl(0.017, 0.012, 14, 'x'), [sx * 0.155, 0.05, 0])
-    m.add(id, 'dark', rbox(0.04, 0.05, 0.06, 0.012, 2), elbow)
-    for (const sz of [1, -1]) {
-      const hub = [sx * 0.255, 0.075, sz * 0.245]
-      hubs.push({ hub, front: sz < 0 })
-      m.add(id, 'carbon', tube(elbow, [hub[0], hub[1] - 0.012, hub[2]], 0.0115, 10, 0.009))
-      m.add(id, 'dark', lathe([[0.03, -0.035], [0.032, -0.01], [0.028, 0.0], [0, 0.002]], 14), hub)
-      m.add(id, 'metal', motor(0.025, 0.026), [hub[0], hub[1], hub[2]])
-      m.add(id, sz < 0 ? 'red' : 'green', sphere(0.007, 8, 4), [hub[0], hub[1] - 0.04, hub[2]])
-    }
-    // leg + foot bar (the part that swings up in flight)
-    const foot = [sx * 0.235, legFoot + 0.012, 0]
-    m.add('gear', 'carbon', tube(elbow, foot, 0.013, 10, 0.011))
-    m.add('gear', 'dark', rbox(0.026, 0.024, 0.04, 0.008), [sx * 0.233, legFoot + 0.02, 0])
-    m.add('gear', 'carbon', beam([sx * 0.235, legFoot + 0.008, -0.17], [sx * 0.235, legFoot + 0.008, 0.17], 0.018, 0.016, 0.018, 0.016, 2.4, 10))
-    for (const sz of [-1, 1]) m.add('gear', 'dark', sphere(0.011, 8, 5), [sx * 0.235, legFoot + 0.01, sz * 0.17])
-  }
-  hubs.forEach((h, i) => {
-    const p = m.group(`prop_${i + 1}`, [h.hub[0], h.hub[1] + 0.032, h.hub[2]])
-    m.add(p, 'rotor', propeller(0.19, { dir: i % 2 ? -1 : 1, chord: 0.034, hubR: 0.016 }))
-  })
-
-  // X9-8K Air gimbal: yaw motor, L-arm down the right side, camera box, big DL prime
-  m.group('gimbal', [0, -0.05, -0.16])
-  m.add('gimbal', 'metal', cyl(0.024, 0.02, 16), [0, -0.008, 0])
-  m.add('gimbal', 'dark', beam([0, -0.02, 0], [0.075, -0.03, 0], 0.03, 0.016, 0.026, 0.016, 4, 10))
-  m.add('gimbal', 'dark', beam([0.075, -0.024, 0], [0.072, -0.1, 0], 0.024, 0.016, 0.022, 0.016, 4, 10))
-  m.add('gimbal', 'metal', cyl(0.024, 0.016, 16, 'x'), [0.066, -0.105, 0])
-  m.add('gimbal', 'accent', cyl(0.025, 0.004, 16, 'x'), [0.075, -0.105, 0])
-  m.add('gimbal', 'shell', rbox(0.1, 0.09, 0.105, 0.014, 2), [0, -0.105, 0.005])
-  m.add('gimbal', 'dark', rbox(0.06, 0.02, 0.07, 0.006), [0, -0.05, 0.01])
-  m.group('lens', [0, -0.105, -0.048], 'gimbal')
-  m.add('lens', 'dark', lathe([[0.034, 0], [0.036, 0.005], [0.036, 0.05], [0.038, 0.052], [0.038, 0.068], [0.034, 0.07], [0.028, 0.072]], 20, '-z'))
-  m.add('lens', 'accent', lathe([[0.0365, 0.034], [0.0365, 0.04]], 20, '-z'))
-  m.add('lens', 'metal', lathe([[0.037, 0.012], [0.0372, 0.03]], 20, '-z'))
-  m.add('lens', 'glass', lathe([[0.028, 0.072], [0.02, 0.075], [0, 0.0765]], 16, '-z'))
-  return { model: m, gearBottom: legFoot }
-}
-
 // ---------------------------------------------------------------- FlyCart 200
 
 function flycart200() {
@@ -576,7 +492,7 @@ function flycart200() {
     accent: { color: css('#e08a2e'), metallic: 0.1, roughness: 0.5 },
     glass: GLASS, rotor: { color: hex(0x15171a), metallic: 0.2, roughness: 0.45 }, red: LED_RED, green: LED_GREEN,
   })
-  // fuselage: a stout pod, nose (−z) a little lower than the tail
+  // fuselage: a stout pod, nose (鈭抸) a little lower than the tail
   m.add(id, 'shell', loft([
     { z: 0.56, w: 0.4, top: 0.1, bot: 0.1, y: 0.02, n: 2.8 },
     { z: 0.5, w: 0.64, top: 0.17, bot: 0.15, y: 0.02, n: 3.2 },
@@ -644,7 +560,7 @@ function flycart200() {
   m.add('gear', 'carbon', tube([-sx0, footY + 0.13, 0.36], [sx0, footY + 0.13, 0.36], 0.016, 8))
   m.add('gear', 'carbon', tube([-sx0, footY + 0.13, -0.36], [sx0, footY + 0.13, -0.36], 0.016, 8))
 
-  // cargo box (box mode) — hidden by the rig when something hangs on the winch
+  // cargo box (box mode) 鈥?hidden by the rig when something hangs on the winch
   m.group('cargo_box', [0, -0.39, 0.02])
   m.add('cargo_box', 'shell', rbox(0.56, 0.34, 0.72, 0.04, 2))
   m.add('cargo_box', 'dark', rbox(0.58, 0.04, 0.74, 0.012), [0, 0.15, 0])
@@ -686,8 +602,8 @@ const check = process.argv.includes('--check')
 const manifest = { version: 1, generator: 'scripts/drone-models.mjs', drones: {} }
 let failed = false
 if (!check) fs.mkdirSync(OUT, { recursive: true })
-const PROPS = { mavic4pro: 4, mini5pro: 4, air3s: 4, inspire3: 4, flycart200: 8 }
-for (const make of [mavic4pro, mini5pro, air3s, inspire3, flycart200]) {
+const PROPS = { mavic4pro: 4, mini5pro: 4, air3s: 4, flycart200: 8 }
+for (const make of [mavic4pro, mini5pro, air3s, flycart200]) {
   const { model, gearBottom } = make()
   const root = model.build()
   const s = stats(root)
@@ -703,7 +619,7 @@ for (const make of [mavic4pro, mini5pro, air3s, inspire3, flycart200]) {
   if (bytes > budget) { console.error(`${model.id}: ${bytes} B > ${budget} B budget`); failed = true }
   const lift = +(-0.8 * height - gearBottom).toFixed(4)
   manifest.drones[model.id] = { scale: 1, rot: [0, 0, 0], offset: [0, lift, 0], tris: s.tris, materials: s.materials, bytes, size: s.size, bboxMin: s.min, bboxMax: s.max }
-  console.log(`${model.id.padEnd(11)} tris=${String(s.tris).padStart(5)} verts=${String(s.verts).padStart(5)} mats=${s.materials} ${(bytes / 1024).toFixed(1).padStart(6)} KiB  size=${s.size.join('×')} m  offsetY=${lift}`)
+  console.log(`${model.id.padEnd(11)} tris=${String(s.tris).padStart(5)} verts=${String(s.verts).padStart(5)} mats=${s.materials} ${(bytes / 1024).toFixed(1).padStart(6)} KiB  size=${s.size.join('脳')} m  offsetY=${lift}`)
 }
 if (!check) fs.writeFileSync(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
 if (failed) process.exit(1)

@@ -17,10 +17,9 @@ const FRAMES = {
   mavic4pro: {near: [1.1, 0.45, 0.5], far: [1.9, 0.75, 0.9]},
   mini5pro: {near: [0.9, 0.35, 0.4], far: [1.3, 0.5, 0.6]},
   air3s: {near: [0.95, 0.4, 0.45], far: [1.6, 0.65, 0.75]},
-  inspire3: {near: [1.6, 0.6, 0.8], far: [2.8, 1.1, 1.3]},
   flycart200: {near: [5, 2, 2.4], far: [9, 2.6, 4]},
 }
-const RUNS = [['mavic4pro'], ['mini5pro'], ['air3s'], ['inspire3'], ['flycart200', 'person'], ['flycart200', 'car']]
+const RUNS = [['mavic4pro'], ['mini5pro'], ['air3s'], ['flycart200', 'person'], ['flycart200', 'car']]
 let browser
 try {
   browser = await chromium.launch({executablePath: process.env.CHROMIUM, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']})

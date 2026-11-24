@@ -232,39 +232,6 @@ function buildAir3S(spec:DroneSpec):DroneMesh {
   return {root,props,gimbal,lens,lights:[light],gear}
 }
 
-function buildInspire3(spec:DroneSpec):DroneMesh {
-  const {root,body,props} = armature(spec,{bodyW:.30,bodyH:.12,bodyD:.46,reach:.70,motorR:.042,propR:.28})
-  // twin carbon booms read as "cinema" even in the low-poly pass
-  const carbon = mat('#1d2024',.4,.5)
-  for (const side of [-1,1]) {
-    const boom = box(.44,.03,.03,carbon,0)
-    boom.position.set(side * .34,.03,-.02)
-    boom.rotation.y = side * .18
-    body.add(boom)
-  }
-  const {gimbal,lens} = gimbalBlock(spec,{w:.11,h:.10,d:.11},1)
-  gimbal.position.set(0,-.02,-.30)
-  body.add(gimbal)
-  // big DL lens barrel out front
-  const lensBarrel = cyl(.045,.05,.13,18,mat(spec.color.dark,.35,.7))
-  lensBarrel.rotation.x = Math.PI / 2
-  lensBarrel.position.set(0,0,-.09)
-  lens.add(lensBarrel)
-  const gear = landingGear('transform',.34,.17,mat(spec.color.metal,.35,.8))
-  body.add(gear)
-  // FPV camera pod
-  const fpv = box(.05,.035,.04,mat(spec.color.dark,.5,.4),.1)
-  fpv.position.set(0,.055,-.2)
-  body.add(fpv)
-  const fpvLens = sphere(.012,mat('#0b1016',.15,.7),10)
-  fpvLens.position.set(0,.055,-.222)
-  body.add(fpvLens)
-  const light = sphere(.01,glow('#d1462f'),8)
-  light.position.set(0,-.05,.2)
-  body.add(light)
-  return {root,props,gimbal,lens,lights:[light],gear}
-}
-
 function buildFlyCart(spec:DroneSpec):DroneMesh {
   const {root,body,props} = armature(spec,{bodyW:.62,bodyH:.24,bodyD:.90,reach:1.30,motorR:.075,propR:.55})
   // eight-arm layout: the armature gives four, so mirror a second set lower for the heavy-lift look
@@ -294,7 +261,7 @@ function buildFlyCart(spec:DroneSpec):DroneMesh {
 }
 
 const builders:Record<DroneId,(spec:DroneSpec)=>DroneMesh> = {
-  mavic4pro:buildMavic4, mini5pro:buildMini5, air3s:buildAir3S, inspire3:buildInspire3, flycart200:buildFlyCart,
+  mavic4pro:buildMavic4, mini5pro:buildMini5, air3s:buildAir3S, flycart200:buildFlyCart,
 }
 
 export function buildDrone(id:DroneId):DroneMesh {

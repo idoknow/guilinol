@@ -72,8 +72,8 @@ try {
   })
   console.log('hangar', JSON.stringify(hangar))
   assert.equal(hangar.open, true, 'hangar should open')
-  assert.equal(hangar.cards, 5, 'five aircraft')
-  assert.deepEqual(hangar.names, ['DJI Mavic 4 Pro','DJI Mini 5 Pro','DJI Air 3S','DJI Inspire 3','DJI FlyCart 200'])
+  assert.equal(hangar.cards, 4, 'four aircraft')
+  assert.deepEqual(hangar.names, ['DJI Mavic 4 Pro','DJI Mini 5 Pro','DJI Air 3S','DJI FlyCart 200'])
   assert.equal(hangar.loads, 4, 'FlyCart exposes four load presets')
 
   // 2) place the Mini 5 Pro
