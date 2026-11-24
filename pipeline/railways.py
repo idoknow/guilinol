@@ -412,7 +412,7 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
         minimumSoffitM=min(y for _,y in deck),plateauRailY=plateau,plateauStationsM=[bs[west],bs[east]],
         tangentPermille=[1000*down,1000*up],transitionLengthM=4)
     before_station = height
-    # Project the baseline onto the grade envelopes from the surveyed station
+    # Project the baseline onto the grade envelopes from the design station
     # railheads. Only approaches outside the allowed rise change with the yard.
     station_upper = np.full(len(ground), np.inf)
     station_lower = np.full(len(ground), np.inf)
@@ -425,6 +425,7 @@ def bake(world_dir, manifest, inventory, samples, plan_profile=False):
         if miss>.001:
             if abs(height[i]-before_station[i])>.0001:
                 violations.append(dict(rail=row['rail'], road=row['road'], type=row['type'],
+                                       lat=row['lat'], lon=row['lon'], surfaceSource=row['surfaceSource'],
                                        shortfallM=round(miss,3), requiredRailY=round(bound,4),
                                        actualRailY=round(height[i],4), stationRailY=RAIL))
                 continue
@@ -586,6 +587,9 @@ def bake_world(directory,manifest,plan_profile=False):
         report['stationApproachExceptions'] = approach_exceptions(tunnel,junctions,samples)
     if plan_profile:
         return report
+    rail_levels = [point['railY'] for point in report['crossings'] if point['road'] == UNDERPASS]
+    for approach in report.get('stationApproachExceptions', []):
+        approach['actualRailDifferenceM'] = round(max(rail_levels) - min(rail_levels), 4)
     manifest['stationApproachExceptions'] = report.get('stationApproachExceptions', [])
     manifest['railwayBranchGrade']=report['branchLocalGrade']
     return report
