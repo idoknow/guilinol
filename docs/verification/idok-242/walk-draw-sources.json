@@ -1,0 +1,96 @@
+[
+  {
+    "round": 1,
+    "vehicles": [
+      3,
+      12
+    ],
+    "calls": [
+      64,
+      68
+    ],
+    "meshDelta": {
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/attach_torso/Passer-by torso accessories": 2,
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-face/rest-face": 1,
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair": 1,
+      "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker": -1,
+      "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": -1
+    },
+    "geometryDelta": {
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/attach_torso/Passer-by torso accessories": 1,
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-face/rest-face": 1
+    },
+    "textureDelta": {
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker | skeleton |  |  | 20 | 20": -1
+    }
+  },
+  {
+    "round": 2,
+    "vehicles": [
+      3,
+      12
+    ],
+    "calls": [
+      75,
+      64
+    ],
+    "meshDelta": {
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker": -2,
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": -2,
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/creator-skirt": -1,
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/attach_torso": -2,
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-face/rest-face": -1,
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair": -1,
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": -2,
+      "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker": -3,
+      "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": -3,
+      "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/creator-skirt": -1,
+      "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": -2
+    },
+    "geometryDelta": {
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": -2,
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/creator-skirt": -1,
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/attach_torso": -2,
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-face/rest-face": -1,
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": -2
+    },
+    "textureDelta": {
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker | skeleton |  |  | 20 | 20": -3,
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline | skeleton |  |  | 20 | 20": -2,
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/creator-skirt | skeleton |  |  | 20 | 20": -1
+    }
+  },
+  {
+    "round": 3,
+    "vehicles": [
+      3,
+      12
+    ],
+    "calls": [
+      64,
+      73
+    ],
+    "meshDelta": {
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker": 1,
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": 1,
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/creator-skirt": 1,
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-face/rest-face": 1,
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair": 1,
+      "main G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": 4,
+      "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/creator-skirt": 1,
+      "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-face/rest-face": 1,
+      "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair": 1,
+      "mirror G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": 4
+    },
+    "geometryDelta": {
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker/creator-body-outline": 1,
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/creator-skirt": 1,
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-face/rest-face": 1,
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/root/pelvis/spine_01/spine_02/spine_03/neck_01/head/attach_head/creator-hair/creator-outline": 3
+    },
+    "textureDelta": {
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/Walker | skeleton |  |  | 20 | 20": -1,
+      "G2 passer-by/Scene/Traveller/CreatorProportions/Armature/creator-skirt | skeleton |  |  | 20 | 20": 1
+    }
+  }
+]
