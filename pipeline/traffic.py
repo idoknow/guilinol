@@ -218,6 +218,11 @@ def bake(output, manifest, rendered_roads=None):
                         # streets. Keep the outer contact 20 cm inside that strip.
                         limit = max(0, minor_road_width(tags)/2-.795-.21)
                         offset = max(-limit, min(limit, offset))
+                    if kind=='cycleway' and not linear:
+                        # Both directions share the mapped strip. Keep the
+                        # outside wheel and its curb clearance on that strip.
+                        limit=max(0,paved/2-.795-.21)
+                        offset=max(-limit,min(limit,offset))
                     if bridge and kind=='cycleway' and way['id'] in SPAN_WAYS:
                         # On the river span the cycle stripe is between the
                         # 12 m divider and the 16.1 m carriageway edge.
