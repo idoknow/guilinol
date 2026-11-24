@@ -320,6 +320,10 @@ def build(bbox, output, palette, workers=4):
         grade_airport_interchange(bridge_plans,ramp_height)
         from railway_bridge_grades import grade_railway_roads
         rail_floors, rail_crossings = grade_railway_roads(bridge_plans,tunnels,terrain,original,surface,road_ctrl,left,top,ground_mesh_at,protected_grades)
+        from nanxi_crossing import grade_channel
+        nanxi_bank = grade_channel({w["id"]:w for w in load_osm() if w["type"]=="way"},terrain,original,surface,left,top)
+        layers["water"].append(nanxi_bank)
+        wet[:] = surface != DRY
         ground_mesh_at = build_ground_mesh_lookup(original,surface,left,top,width,depth)
 
     sw_query_tree = STRtree(list(polygons(sidewalk_mask))) if not sidewalk_mask.is_empty else None
@@ -446,6 +450,8 @@ def build(bbox, output, palette, workers=4):
             slab = xiaoyao_access.gallery_floor(east,south,entry['rotation'])
             for way in xiaoyao_access.GALLERY_PAVING_WAYS:
                 walkable_by_way[way] = walkable_by_way.get(way,ShapelyPolygon()).union(slab)
+    if play_region:
+        banks = [*banks,(nanxi_bank,"南溪","retainedChannel")]
     streets,lengths = street_chunks(roads,banks,bounds,layers['water'],sample,layout.exclude,ped_areas,comp_excl,road_ctrl,(left,top),ground_mesh_at,footprints,bands=bands,modeled_paving=modeled_paving,walkable_by_way=walkable_by_way,gate_plaza=gate_plaza,deck_mask=deck_mask)
     (output/'marking-audit.json').write_text(json.dumps(lengths.pop('markingOverlap')))
     print('Lengths (m):',lengths)

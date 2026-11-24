@@ -265,8 +265,8 @@ def bake(output, manifest, rendered_roads=None, grade_changes=None):
             subprocess.run([ROOT/'node_modules/.bin/tsx', ROOT/'scripts/railway-lane-heights.ts',
                             output.resolve(),payload.name],cwd=ROOT,check=True)
             payload.seek(0)
-            for lane_id,floor in json.load(payload).items():
-                lanes[int(lane_id)]['floor'] = floor
+            for lane_id,profile in json.load(payload).items():
+                lanes[int(lane_id)].update(profile)
     dest = output/'roads'/'graph.json.gz'
     dest.parent.mkdir(exist_ok=True)
     dest.write_bytes(gzip.compress(json.dumps(result, ensure_ascii=False, separators=(',',':')).encode(),mtime=0))

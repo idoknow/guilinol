@@ -11,10 +11,10 @@ const lanes=data.lanes.map(lane=>{
   return {...lane,start,end,length,dx:(end.x-start.x)/length,dz:(end.z-start.z)/length}
 }).sort((a,b)=>Math.floor(a.start.z/256)-Math.floor(b.start.z/256)||a.start.x-b.start.x)
 
-// Store only the knots needed to reconstruct the metre samples. Distances are
+// Store only the knots needed to reconstruct the quarter-metre samples. Distances are
 // sample-index deltas, heights are signed centimetre deltas, crossfalls int8.
 function packSurface(length:number,wheel:(d:number,r:number)=>number){
-  const count=Math.ceil(length+2*profilePad)
+  const count=Math.ceil((length+2*profilePad)*4)
   const heights=new Int32Array(count+1),cross=new Int8Array(count+1)
   for(let i=0;i<=count;i++){
     const d=i*(length+2*profilePad)/count-profilePad
@@ -51,9 +51,30 @@ function packSurface(length:number,wheel:(d:number,r:number)=>number){
 
 const profiles={}
 for(const lane of lanes){
-  const {start,dx,dz,length,offset}=lane
-  const wheel=(along:number,right:number)=>surface(start.x+dx*along+dz*(right-offset),
-    start.z+dz*along-dx*(right-offset),lane)
-  profiles[lane.id]=packSurface(length,wheel)
+  const {start,dx,dz,length}=lane
+  let offset=lane.offset
+  const sample=(along:number,right:number,diagnostic?)=>surface(start.x+dx*along+dz*(right-offset),
+    start.z+dz*along-dx*(right-offset),lane,diagnostic)
+  // On two-way service streets the tagged width can include the sidewalk.
+  // Keep a car on its own side and prefer the outermost supported wheel path.
+  if(lane.cls==='service'&&!lane.oneway&&!lane.structure&&offset>1){
+    const stations=Math.ceil((length+2*profilePad)/.5)
+    let best=offset,bestMissing=Infinity
+    for(let candidate=offset;candidate>=.94;candidate-=.1){
+      offset=candidate
+      let missing=0
+      for(let i=0;i<=stations;i++){
+        for(const wheel of [-.88,-.795,.795,.88]){
+          const hit={hidden:false,road:-Infinity}
+          sample((length+2*profilePad)*i/stations-profilePad,wheel,hit)
+          if(!Number.isFinite(hit.road))missing++
+        }
+      }
+      if(missing<bestMissing){best=offset;bestMissing=missing}
+      if(!missing)break
+    }
+    offset=Math.round(best*100)/100
+  }
+  profiles[lane.id]={offset,floor:packSurface(length,sample)}
 }
 fs.writeFileSync(file,JSON.stringify(profiles))

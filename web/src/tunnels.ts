@@ -79,7 +79,7 @@ type Plane=(point:Point)=>number
 export function joinPortalRoads(tile:Tile,tunnels:Tunnel[],buffers:Float32Array[]){
   for(const tunnel of tunnels){
     const axes=frame(tunnel)
-    const stitch=tunnel.approachEnds?40:20
+    const stitch=20
     const margin=stitch+12
     for(const [end,portal] of tunnel.portals.entries()){
       if(tunnel.mouths?.[end]===false)continue
@@ -91,14 +91,7 @@ export function joinPortalRoads(tile:Tile,tunnels:Tunnel[],buffers:Float32Array[
         // into the bore can belong to the street crossing above it.
         if(inward< -stitch||inward>4||d>tunnel.halfWidth+4)continue
         const blend=THREE.MathUtils.smoothstep(inward,-stitch,-stitch/5)*(1-THREE.MathUtils.smoothstep(inward,0,4))*(1-THREE.MathUtils.smoothstep(d,tunnel.halfWidth,tunnel.halfWidth+4))
-        let target=tunnelFloor([tunnel],x,z,portal[1])??portal[1]
-        if(tunnel.approachEnds && inward<0){
-          // Continue the graded station road outside the mouth. A horizontal
-          // stitch across 20 m concentrates the whole rise at its outer edge.
-          const distance=-inward, ease=1
-          const rise=distance<ease?distance*distance/(2*ease):distance-ease/2
-          target+=railStyle.stationLevels.approachGrade*rise
-        }
+        const target=tunnelFloor([tunnel],x,z,portal[1])??portal[1]
         buffer[index+1]+=blend*(target-.02-buffer[index+1])
       }
     }

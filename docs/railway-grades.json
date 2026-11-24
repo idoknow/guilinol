@@ -4954,8 +4954,8 @@
       "lat": 25.2531297,
       "lon": 110.2582056,
       "baselineWorld": "f1453c2e",
-      "status": "blocked",
-      "reason": "Lowering the road bridge at the approved rail elevation requires more than the authorized 3 m of channel excavation.",
+      "status": "design_solved",
+      "reason": "Both railheads now follow a constrained local lift above the Nanxi underpass. The road landing and the stream deck share the same grade target.",
       "nearestRailheadM": 150.0988,
       "maximumRoadAtRailM": 144.3988,
       "runToAbutmentM": 6.9607,
@@ -4988,6 +4988,60 @@
         "cutLowerBoundIncluding8PercentDeckRiseM": 5.1576,
         "authorizedCutLimitM": 3,
         "appliedCutM": 0
+      },
+      "newDesign": {
+        "roadDeckM": 149.3,
+        "waterSurfaceM": 147.1,
+        "streamBridgeSoffitM": 148.1,
+        "maximumBedExcavationM": 2.9695,
+        "railLowerBoundM": 155.12,
+        "intervalThresholdM": 0.001,
+        "chainageOrigin": "Intersection with road way 882767812 on each alignment, increasing eastwards",
+        "tracks": [
+          {
+            "railWay": 882767815,
+            "fromM": -461.397,
+            "toM": 1433.72,
+            "maxRiseM": 5.0212,
+            "ways": [
+              263688438,
+              263963258,
+              882767813,
+              882767814,
+              882767815,
+              882767816
+            ]
+          },
+          {
+            "railWay": 991385702,
+            "fromM": -461.102,
+            "toM": 1435.744,
+            "maxRiseM": 4.9736,
+            "ways": [
+              263688439,
+              991385701,
+              991385702,
+              991385703,
+              991385704
+            ]
+          }
+        ],
+        "crossings": [
+          {
+            "road": 882767812,
+            "rail": 882767815,
+            "kind": "rail_over",
+            "riseM": 5.0212,
+            "afterM": 155.12
+          },
+          {
+            "road": 882767812,
+            "rail": 991385702,
+            "kind": "rail_over",
+            "riseM": 4.9736,
+            "afterM": 155.12
+          }
+        ]
       }
     }
   ]

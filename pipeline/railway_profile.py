@@ -100,6 +100,11 @@ def solve(coords, pieces, ways, target, crossings, yards, pairs):
             linked = np.column_stack((members[1:], np.full(len(members)-1, members[0])))
             limit_difference(linked, np.broadcast_to([1, -1], linked.shape), 0.)
 
+    from nanxi_crossing import ROAD, TRACKS, design
+    nanxi = [node for node,row,*_ in crossings if row.get('road')==ROAD and row['rail'] in TRACKS]
+    if nanxi:
+        _,_,_,rail_floor = design(ways)
+        matrices.append(-eye(count,format='csr')[nanxi])
     fixed = np.flatnonzero(np.isfinite(low))
     matrix = vstack([eye(count, format='csr')[fixed], *matrices], format='csc')
     # Weight DEM residuals by represented length so inserting a tile boundary
@@ -115,6 +120,8 @@ def solve(coords, pieces, ways, target, crossings, yards, pairs):
     target = spsolve(diags(weights) + gradient.T @ diags(144/lengths) @ gradient, weights*target)
     # Centre the datum to keep the objective well scaled.
     datum = np.average(target, weights=weights)
+    if nanxi:
+        limits.append(np.full(len(nanxi),datum-rail_floor))
     rhs = np.concatenate([low[fixed]-datum, *limits])
     cones = [clarabel.ZeroConeT(len(fixed)), clarabel.NonnegativeConeT(len(rhs)-len(fixed))]
     settings = clarabel.DefaultSettings()

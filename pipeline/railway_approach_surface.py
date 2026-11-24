@@ -13,6 +13,7 @@ from railway_road_profiles import grade_cap
 from road_grading import STEP, bspline_weights_1d, eval_bspline_grid
 from road_profile import RULES
 from station_levels import UNDERPASS
+from station_approaches import approach_junctions
 
 
 def basis(shape, left, top, xy):
@@ -138,8 +139,15 @@ def grade_approach_surfaces(ways, crossings, panels, tunnels, plans, protected, 
             anchors.append((r['x'],r['z'],-np.inf,r['railY']-5.805))
     for tunnel in tunnels:
         if tunnel['way']==UNDERPASS:
-            for x,y,z in tunnel['portals']:
-                anchors.append((x,z,y-.049,y-.041))
+            for (x,y,z),junction in zip(tunnel['portals'],approach_junctions(ways)):
+                line = LineString(points(ways[junction['approachWay']]))
+                start = line.project(Point(x,z))
+                sign = 1 if start<line.length/2 else -1
+                # Bake the level mouth landing into the road itself. At its
+                # far edge the curvature and grade limits continue outwards.
+                for offset in (0,4,8,12,16,20):
+                    p = line.interpolate(np.clip(start+sign*offset,0,line.length))
+                    anchors.append((p.x,p.y,y-.049,y-.041))
     surface_nodes = {node for w in ways.values() if w.get('tags',{}).get('highway')
                      and all(w['tags'].get(k,'no')=='no' for k in ('tunnel','bridge'))
                      for node in w.get('nodes',())}
@@ -186,6 +194,23 @@ def grade_approach_surfaces(ways, crossings, panels, tunnels, plans, protected, 
         blend = np.clip((24-edge)/14,0,1)
         blend = blend**2*(3-2*blend)*(water[patch]==-32768)
         road = eval_bspline_grid(local,left,top,xx,zz)-.24
+        # A dry tile edge is rendered as 32 m chords. Keep both chord
+        # supports below the fitted carriageway wherever it crosses that edge.
+        for coords,levels,weights,wet in (
+                (xx,road,blend,water[patch]),(zz.T,road.T,blend.T,water[patch].T)):
+            orthogonal = zz if coords is xx else xx.T
+            for row in np.flatnonzero(orthogonal[:,0]%256==0):
+                for col in np.flatnonzero(coords[row]%32==0):
+                    if col+8>=levels.shape[1]:
+                        continue
+                    section = slice(col,col+9)
+                    active = weights[row,section]>.8
+                    if not np.any(active) or np.any(wet[row,section]!=-32768):
+                        continue
+                    y = np.min(levels[row,section][active])-.15
+                    for k in (col,col+8):
+                        levels[row,k] = min(levels[row,k],y)
+                        weights[row,k] = 1.
         for field in (terrain,ground):
             old = field[patch]
             target = np.where(edge<1,road*10,np.minimum(old,road*10))

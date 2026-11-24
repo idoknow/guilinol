@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 from shapely import box
@@ -31,6 +32,15 @@ class RailProfileTest(unittest.TestCase):
         h, result = self.profile(records, [([123], box(-2, -2, 15, 6))])
         self.assertTrue(result['feasible'])
         np.testing.assert_allclose(h, 12.5)
+
+    def test_nanxi_minimum_applies_to_both_tracks(self):
+        from nanxi_crossing import ROAD, TRACKS
+        ids = sorted(TRACKS)
+        records = [dict(type='rail_over',road=ROAD,rail=wid,roadY=90.) for wid in ids]
+        with patch('nanxi_crossing.design', return_value=(None,147.1,149.3,155.12)):
+            heights, _ = self.profile(records)
+        self.assertAlmostEqual(min(heights[[0,3]]),155.12,places=5)
+        self.assertLessEqual(abs(heights[0]-heights[3]),.05)
 
     def test_whole_paved_width_stays_level_on_a_sloping_track(self):
         coords = [(0, 0), (20, 0), (40, 0), (60, 0)]

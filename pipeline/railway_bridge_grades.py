@@ -67,6 +67,10 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
         if row['road'] not in (FOOTBRIDGE, UNDERPASS):
             by_road[row['road']].append(row)
     ways = {w['id']: w for w in load_osm() if w['type']=='way'}
+    from nanxi_crossing import BRIDGE, design as stream_design
+    _,_,stream_deck,_ = stream_design(ways)
+    center,span,at,old = plans[BRIDGE]
+    plans[BRIDGE] = center,span,at,np.full_like(old,stream_deck)
     for wid,row in station_interchange_tunnels(ways,plans,control,left,top,ground_at):
         by_road[wid].append(row)
     targets = STRtree([Point(r['x'], r['z']) for rows in by_road.values() for r in rows])
@@ -126,6 +130,9 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
             first,last = max(0.,at-pad),min(line.length,at+pad)
             for k in (first,last,*(s for s in samples if first<s<last)):
                 constrain(k,shoulder=True,**bounds)
+        if wid==BRIDGE:
+            for k in samples.copy():
+                constrain(k,floor=stream_deck,ceiling=stream_deck)
         for panel in panels_by_road[wid]:
             start,end,y = panel['fromM'],panel['toM'],panel['railY']
             for k in [start,end,*(s for s in samples if start<s<end)]:
@@ -175,7 +182,7 @@ def grade_railway_roads(plans, tunnels, terrain, ground, water, control, left, t
             extra = np.array([center.project(Point(coord)) for coord in xy])
             along = np.array([line.project(center.interpolate(v)) for v in original_at])
             required = np.interp(along,stations,minimum)
-            if np.any(required>original-.3):
+            if wid != BRIDGE and np.any(required>original-.3):
                 knots = np.unique(np.r_[original_at,extra])
                 before = np.interp(knots,original_at,original)
                 # Keep the native bridge plan and width while adding the

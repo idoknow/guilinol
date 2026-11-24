@@ -233,7 +233,7 @@ def chunks(roads,banks,bounds,water,sample,exclude,ped_areas=(),replace_exclude=
     streets = STRtree(surfaces)
     shore = unary_union(water).boundary
     for poly,name,kind in banks:
-        if name not in CONFIG['urbanBanks']:
+        if kind!='retainedChannel' and name not in CONFIG['urbanBanks']:
             continue
         ring = poly.exterior
         for dist in np.arange(0,ring.length,2):
