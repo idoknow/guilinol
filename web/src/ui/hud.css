@@ -3,7 +3,7 @@ html,body{overflow:hidden}body{margin:0;background:var(--ui-ink-900)}canvas{disp
 
 /* 一套玻璃按钮：所有浮在画面上的控件共用同一材质、同一按下态 */
 .walk-ui button,.btn-mode,.btn-menu,.account-entry,.vehicle-action,.dock-buttons>button,.photo-exit{font-family:var(--ui-serif);color:var(--ui-paper);background:var(--ui-glass);
-  border:1px solid var(--ui-glass-line);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);touch-action:none;user-select:none;-webkit-user-select:none;
+  border:1px solid var(--ui-glass-line);touch-action:none;user-select:none;-webkit-user-select:none;
   -webkit-tap-highlight-color:transparent;cursor:pointer;transition:background var(--ui-fast),transform var(--ui-fast),border-color var(--ui-fast)}
 .walk-ui button:hover,.btn-mode:hover,.btn-menu:hover,.account-entry:hover,.dock-buttons>button:hover{background:var(--ui-glass-strong)}
 .walk-ui button:active,.btn-mode:active,.btn-menu:active,.account-entry:active,.dock-buttons>button:active,.vehicle-action:active{background:rgba(169,80,60,.7);transform:scale(.95)}
@@ -23,7 +23,7 @@ html,body{overflow:hidden}body{margin:0;background:var(--ui-ink-900)}canvas{disp
 /* 时辰 / 天气 */
 .sky-ui[hidden]{display:none!important}
 .sky-ui{position:fixed;left:calc(12px + env(safe-area-inset-left));top:calc(60px + env(safe-area-inset-top));display:flex;align-items:center;gap:6px;padding:4px 6px 4px 12px;border-radius:var(--ui-r-pill);
-  background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);color:var(--ui-paper);font-size:13px;letter-spacing:.06em;user-select:none;-webkit-user-select:none}
+  background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);color:var(--ui-paper);font-size:13px;letter-spacing:.06em;user-select:none;-webkit-user-select:none}
 .sky-time{min-width:7.6em;opacity:.92}.sky-group{display:flex;gap:2px;padding-left:6px;border-left:1px solid var(--ui-glass-line-soft)}
 .sky-ui button{font-family:inherit;font-size:13px;color:var(--ui-paper);background:none;border:0;border-radius:var(--ui-r-pill);width:26px;height:24px;padding:0;cursor:pointer;opacity:.72;transition:background var(--ui-fast),opacity var(--ui-fast);-webkit-tap-highlight-color:transparent}
 .sky-ui button:hover{opacity:1}.sky-ui button.on{background:rgba(169,80,60,.75);opacity:1}.sky-ui .sky-flow{font-size:10px;width:24px;border-left:1px solid var(--ui-glass-line-soft);border-radius:0 11px 11px 0}
@@ -40,7 +40,7 @@ html,body{overflow:hidden}body{margin:0;background:var(--ui-ink-900)}canvas{disp
 .sky-ui.folded .sky-time{min-width:0;margin-right:6px}
 
 /* 底部提示、气泡、署名 */
-output,footer,.hint{position:fixed;left:10px;background:var(--ui-glass);color:var(--ui-paper);font:11px/1.4 var(--ui-serif);padding:3px 10px;border-radius:var(--ui-r-pill);pointer-events:none;backdrop-filter:blur(4px)}
+output,footer,.hint{position:fixed;left:10px;background:var(--ui-glass);color:var(--ui-paper);font:11px/1.4 var(--ui-serif);padding:3px 10px;border-radius:var(--ui-r-pill);pointer-events:none}
 output{top:auto;bottom:10px;font-family:ui-monospace,monospace;display:none}body[data-debug] output{display:block}
 footer{left:auto;right:10px;bottom:10px;font-size:10px;opacity:.75}
 /* IDOK-239 测试画面声明 + 访问地址：底部居中一行小字，录屏/截图里也能看到网址；不吃点击 */
@@ -49,7 +49,7 @@ footer{left:auto;right:10px;bottom:10px;font-size:10px;opacity:.75}
 body[data-home] .beta-note,body[data-photo=on] .beta-note,body[data-shop-open="1"] .beta-note{display:none}
 .hint{left:50%;bottom:36px;transform:translateX(-50%);font-size:12px;line-height:1.5;letter-spacing:.06em;padding:5px 16px;white-space:nowrap;opacity:.92}
 .toast{position:fixed;left:50%;top:18%;z-index:30;transform:translate(-50%,-8px);background:var(--ui-glass-strong);color:var(--ui-paper);font-size:15px;letter-spacing:.08em;padding:10px 20px;border-radius:var(--ui-r-md);
-  border:1px solid var(--ui-glass-line-soft);backdrop-filter:var(--ui-blur);opacity:0;pointer-events:none;transition:opacity .35s,transform .35s}
+  border:1px solid var(--ui-glass-line-soft);opacity:0;pointer-events:none;transition:opacity .35s,transform .35s}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 
 /* 载具上下车 */
@@ -61,7 +61,7 @@ body[data-aboard] .btn-jump{display:none}
 
 /* 手机：摇杆、跳、视距 */
 .joystick{position:fixed;left:calc(22px + env(safe-area-inset-left));bottom:calc(30px + env(safe-area-inset-bottom));width:124px;height:124px;border-radius:50%;display:grid;place-items:center;touch-action:none;
-  background:radial-gradient(circle,rgba(24,40,37,.18) 0 55%,rgba(24,40,37,.38) 56% 100%);border:1px solid var(--ui-glass-line);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+  background:radial-gradient(circle,rgba(22,37,34,.26) 0 55%,rgba(22,37,34,.5) 56% 100%);border:1px solid var(--ui-glass-line)}
 .joystick::after{content:"";position:absolute;inset:-7px;border-radius:50%;border:2px solid rgba(169,80,60,0);transition:border-color .2s}
 .joystick.running::after{border-color:rgba(208,105,76,.8)}
 .joystick-knob{width:50px;height:50px;border-radius:50%;background:rgba(244,239,226,.86);box-shadow:0 2px 10px rgba(20,30,28,.3);pointer-events:none;transition:transform .06s}
@@ -70,7 +70,7 @@ body[data-aboard] .btn-jump{display:none}
 .btn-view{bottom:calc(122px + env(safe-area-inset-bottom));width:52px;height:52px;font-size:13px;letter-spacing:.04em}
 
 /* 关于面板（从主界面打开） */
-.about-mask{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));background:rgba(12,20,20,.5);backdrop-filter:blur(4px)}
+.about-mask{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));background:rgba(12,20,20,.5);backdrop-filter:var(--ui-blur-mask)}
 .about-mask>.about-panel{width:min(640px,100%);max-height:min(84vh,740px);overflow:auto}
 .about-mask>.about-panel>header{position:sticky;top:0;background:var(--ui-glass-solid);z-index:1}
 .about-body{padding:12px 18px 20px}.about-body section{margin:0 0 16px}.about-body h3{margin:0 0 6px;font-size:13px;font-weight:600;letter-spacing:.18em;color:var(--ui-jade-300)}

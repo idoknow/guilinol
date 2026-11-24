@@ -28,8 +28,7 @@ body[data-hud=street] .account-entry::before{background:var(--st-jade);color:var
 .st-money{font:700 36px/1 var(--st-num);font-variant-numeric:tabular-nums;letter-spacing:.01em;color:var(--st-gold);
   -webkit-text-stroke:1.5px rgba(10,10,10,.85);paint-order:stroke fill;text-shadow:var(--st-shadow)}
 .st-phone-btn{position:absolute;right:calc(22px + env(safe-area-inset-right));top:calc(84px + env(safe-area-inset-top));display:flex;align-items:center;gap:7px;height:34px;padding:0 8px 0 10px;
-  border-radius:10px;border:1px solid var(--st-line);background:var(--st-asphalt);color:var(--st-white);font-size:13px;font-weight:600;cursor:pointer;
-  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  border-radius:10px;border:1px solid var(--st-line);background:var(--st-asphalt);color:var(--st-white);font-size:13px;font-weight:600;cursor:pointer}
 .st-phone-btn i{width:11px;height:17px;border:2px solid currentColor;border-radius:3px;box-sizing:border-box;position:relative}
 .st-phone-btn i::after{content:"";position:absolute;left:50%;bottom:1px;width:3px;height:1.5px;margin-left:-1.5px;background:currentColor}
 
@@ -39,7 +38,7 @@ body[data-hud=street] .minimap{position:fixed;left:calc(22px + env(safe-area-ins
 body[data-hud=street] .minimap::after{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 18px rgba(0,0,0,.55);pointer-events:none}
 body[data-hud=street] .minimap i{top:3px;font:800 10px/1 var(--st-sans);color:var(--st-asphalt-solid);background:var(--st-white);border-radius:4px;padding:2px 4px}
 body[data-hud=street] .road-name{position:fixed;left:calc(226px + env(safe-area-inset-left));bottom:calc(30px + env(safe-area-inset-bottom));max-width:240px;
-  font:700 15px/1 var(--st-sans);letter-spacing:.14em;color:#fff;background:var(--st-sign);backdrop-filter:none;border-radius:4px;padding:8px 12px 8px 14px;
+  font:700 15px/1 var(--st-sans);letter-spacing:.14em;color:#fff;background:var(--st-sign);border-radius:4px;padding:8px 12px 8px 14px;
   box-shadow:inset 0 0 0 2px var(--st-sign),inset 0 0 0 3.5px rgba(255,255,255,.9),0 3px 10px rgba(0,0,0,.4)}
 .st-clock{position:absolute;left:calc(226px + env(safe-area-inset-left));bottom:calc(72px + env(safe-area-inset-bottom));font:700 14px/1 var(--st-num);letter-spacing:.06em;
   text-shadow:var(--st-shadow)}
@@ -47,8 +46,7 @@ body[data-hud=street] .road-name{position:fixed;left:calc(226px + env(safe-area-
 /* 底部居中：任务条 + 字幕 */
 .st-mission{position:absolute;left:50%;bottom:calc(30px + env(safe-area-inset-bottom));transform:translateX(-50%);width:min(640px,max(420px,calc(100vw - 560px)),calc(100vw - 24px));
   display:flex;flex-direction:column;align-items:center;gap:8px}
-.st-mission header{display:flex;align-items:center;gap:10px;padding:6px 8px 6px 6px;border-radius:10px;background:var(--st-asphalt);border:1px solid var(--st-line);
-  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.st-mission header{display:flex;align-items:center;gap:10px;padding:6px 8px 6px 6px;border-radius:10px;background:var(--st-asphalt);border:1px solid var(--st-line)}
 .st-line{font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--st-asphalt-solid);background:var(--st-jade);border-radius:6px;padding:5px 8px}
 .st-step{font-size:15px;font-weight:700;letter-spacing:.04em}
 .st-timer{font:700 17px/1 var(--st-num);font-variant-numeric:tabular-nums;color:var(--st-white);padding-left:10px;border-left:1px solid var(--st-line)}

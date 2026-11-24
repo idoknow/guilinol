@@ -1,3 +1,4 @@
+import {browserOptions} from './qa-browser.mjs'
 import assert from 'node:assert/strict'
 import {randomBytes,createHash,createHmac} from 'node:crypto'
 import {spawn} from 'node:child_process'
@@ -45,7 +46,7 @@ async function verify(){
   const api=await service('server/index.mjs',{...database.env,PUBLIC_ORIGIN:origin,RT_JOIN_SECRET:secret},'/api/me',401)
   site=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:number,strictPort:true,proxy:{'/api':'http://'+api,'/ws':{target:'ws://'+rt,ws:true}}}})
   assert.equal((await fetch(origin+'/api/rt/ticket',{method:'POST',headers:{origin}})).status,401)
-  browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']})
+  browser=await chromium.launch({executablePath:process.env.CHROMIUM,args:[...browserOptions().args,'--disable-background-timer-throttling','--disable-renderer-backgrounding','--disable-backgrounding-occluded-windows']})
   const url=origin+'/?verify&mode=walk&flow=0'
   async function pageFor(name,mp){
     const page=await browser.newPage({viewport:name==='alice'?{width:240,height:135}:{width:480,height:270}});page.on('pageerror',failBrowser)
@@ -56,6 +57,7 @@ async function verify(){
       await page.route('**/favicon.ico',route=>route.fulfill({status:204}))
       await page.setViewportSize({width:680,height:420})
       await page.addInitScript(()=>localStorage.setItem('glol.prefs',JSON.stringify({view:'first'})))
+      await page.addInitScript(()=>{if(!localStorage.getItem('glol.save.v1'))localStorage.setItem('glol.save.v1',JSON.stringify({schemaVersion:2,money:200,packs:[{brand:'lijiang',remaining:20}]}))})
       await page.goto(origin+'/backpack.html');await page.getByRole('button',{name:'香烟'}).click();await page.waitForURL(origin+'/')
       await page.goto(origin+'/?verify&play=tour&mp=1&time=12&flow=0');await page.waitForFunction(()=>window.viewer?.walkTo)
       assert(await page.evaluate(name=>window.viewer.walkTo(-309,name==='alice'?-1:1,name==='alice'?Math.PI:0,'smoke-test'),name));console.log(name,'entered')
@@ -66,10 +68,13 @@ async function verify(){
     const alice=await pageFor('alice',true);await alice.evaluate(()=>window.viewer.freeze())
     const bob=await pageFor('bob',true);await alice.evaluate(()=>window.viewer.resume());const pages=[alice,bob]
     for(const page of pages)console.log(await page.evaluate(()=>({peers:window.viewer.walk.net.probe(),home:document.body.hasAttribute('data-home')})))
-    for(const page of pages)await page.waitForFunction(()=>window.viewer.walk.net.probe().some(peer=>peer.ready&&peer.smoke==='light'))
-    for(const page of pages)await page.keyboard.press('y')
-    for(const page of pages)await page.waitForFunction(()=>window.viewer.walk.net.probe().some(peer=>peer.smoke==='smoking'))
-    await Promise.all(pages.map(page=>page.keyboard.press('y')))
+    for(const phase of ['sealed','open','ready','smoking']){
+      for(const page of pages){
+        await page.waitForFunction(phase=>window.viewer.walk.net.probe().some(peer=>peer.ready&&peer.smoke===phase),phase)
+        await page.waitForFunction(()=>window.viewer.camera.getObjectByName('smoke-prompt')?.visible)
+      }
+      await Promise.all(pages.map(page=>page.keyboard.press('f')))
+    }
     await mkdir('captures/mp',{recursive:true})
     await Promise.all(pages.map(async(page,index)=>{
       await page.waitForFunction(()=>window.viewer.walk.net.probe().some(peer=>peer.puffs===1));await page.screenshot({path:`captures/mp/smoke-${index}.png`})

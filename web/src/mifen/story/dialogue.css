@@ -35,8 +35,6 @@ body[data-mifen-story-active="1"] :is(
   border-radius: var(--mf-radius, 12px);
   background: var(--mf-surface, rgba(22, 36, 33, 0.94));
   box-shadow: inset 0 0 0 1px var(--mf-line, rgba(244, 239, 226, 0.16));
-  backdrop-filter: var(--mf-blur, blur(8px) saturate(1.15));
-  -webkit-backdrop-filter: var(--mf-blur, blur(8px) saturate(1.15));
   color: var(--mf-text, #f4efe2);
   font: 400 15px/1.55 var(--mf-font, "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif);
   overflow: hidden;

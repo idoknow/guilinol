@@ -8,7 +8,7 @@
 /* --- 按键卡：电脑端左下，读数条上方 -------------------------------------------------------------- */
 .keys-card{position:fixed;z-index:5;left:calc(12px + env(safe-area-inset-left));bottom:calc(44px + env(safe-area-inset-bottom));width:268px;box-sizing:border-box;
   color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line-soft);border-radius:var(--ui-r-md);
-  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);box-shadow:var(--ui-shadow-1);font-family:var(--ui-serif);
+  box-shadow:var(--ui-shadow-1);font-family:var(--ui-serif);
   transition:width var(--ui-slow) var(--ui-ease),opacity var(--ui-fast)}
 .keys-head{display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px 6px;background:none;border:0;color:inherit;cursor:pointer;font:inherit;text-align:left}
 .keys-title{font-size:12px;font-weight:600;letter-spacing:.2em;color:var(--ui-jade-300)}
@@ -40,7 +40,7 @@ html[data-touch] .keys-card{display:none}
 
 /* --- 左上「?」 ---------------------------------------------------------------------------------- */
 .btn-guide{box-sizing:border-box;width:var(--ui-h);height:var(--ui-h);padding:0;border-radius:50%;cursor:pointer;font:600 17px/1 var(--ui-serif);
-  color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line);backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);
+  color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line);
   -webkit-tap-highlight-color:transparent;transition:background var(--ui-fast),transform var(--ui-fast)}
 .btn-guide:hover{background:var(--ui-glass-strong)}
 .btn-guide:active{transform:scale(.94);background:rgba(169,80,60,.7)}
@@ -99,7 +99,7 @@ body[data-home] .btn-guide{visibility:hidden}
 /* --- 左上「复位」（IDOK-234）：卡墙 / 落水时回到最近的平地。只在步行模式出现；车 / 船上要点两次，第二次前是朱砂描边 --- */
 .btn-unstuck{display:none;align-items:center;gap:6px;box-sizing:border-box;height:var(--ui-h);padding:0 14px 0 11px;border-radius:var(--ui-r-pill);cursor:pointer;
   font:14px/1 var(--ui-serif);letter-spacing:var(--ui-track);color:var(--ui-paper);background:var(--ui-glass);border:1px solid var(--ui-glass-line);
-  backdrop-filter:var(--ui-blur);-webkit-backdrop-filter:var(--ui-blur);-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none;
   transition:background var(--ui-fast),transform var(--ui-fast),border-color var(--ui-fast)}
 body[data-mode=walk] .btn-unstuck{display:inline-flex}
 body:is([data-home],[data-photo=on]) .btn-unstuck{display:none}

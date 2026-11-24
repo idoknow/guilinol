@@ -1,11 +1,14 @@
-import {cameraHoldLayer} from './camera-hold'
+import {cameraHoldLayer, DEFAULT_CAMERA_HOLD_AIM} from './camera-hold'
 import {emoteWheel} from '../emote/wheel'
 import {emotePlayback} from '../emote/playback'
 import {interrupted,emotesEnabled} from '../emote/emotes'
 import {takeCigaretteIntent, smokeEnabled} from '../citizen/use-item'
-import {SmokeSession} from '../smoke/session'
+import {selectSlot,hotbarSlot,showSmokeDiscard} from '../ui/hotbar'
+import {getActiveSaveSnapshot,takeFromPack} from '../game/save'
+import {rules,validRules} from '../smoke/data'
+import {createSmokePrompt} from '../smoke/prompt'
+import {SmokeSession,brandIndex} from '../smoke/session'
 import {smokeVisual} from '../smoke/visual'
-import {skinTones} from '../../../lib/avatar'
 import {nearestPlayable} from '../../../lib/play-region'
 import {mpEnabled} from '../ui/mp-pref'
 import * as THREE from 'three'
@@ -35,7 +38,8 @@ import {resolveContact} from '../traffic/contact'
 import {createCameraRig} from './camera'
 import {isFirstPerson} from './view-mode'
 import {createEbikeGripPose} from './ebike-grip'
-import {hits} from '../input/keymap'
+import {hits,bindingLabel} from '../input/keymap'
+import {touchUi} from '../ui/input-mode'
 import {look} from '../look/config'
 import {env} from '../look/time'
 import {createDriverPose} from './car'
@@ -335,7 +339,63 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const rig=createCameraRig(sim)
   const figure=model.scene,legacySkinned=mergeAvatar(figure,avatar.color),avatarRig=ensureAvatarRig(figure,avatar.color),skinned=legacySkinned??avatarRig.skinnedMesh,traveller=figure.getObjectByName('Traveller')??avatarRig.traveller,ridePose=createRiderPose(figure),driverPose=createDriverPose(figure)
   const cigarette=new SmokeSession()
-  let smoking:ReturnType<typeof smokeVisual>|undefined,puffSeq=0
+  const updateSmokePrompt=smokeEnabled()?createSmokePrompt(scene,camera):()=>{}
+  const smokeHint=document.createElement('button')
+  smokeHint.type='button'
+  smokeHint.className='smoke-hint btn-smoke'
+  smokeHint.hidden=true
+  if(smokeEnabled()){
+    void fetch('/api/smoke').then(r=>r.json()).then(data=>{if(validRules(data))Object.assign(rules,data)}).catch(()=>{})
+  }
+  function usable(){return active && !rides?.bike && !rides?.car && !rides?.boat && !isModalOrOverlayOpen() && !document.body.dataset.shopOpen && document.body.dataset.photo!=='on'}
+  function cancelSmoke(){showSmokeDiscard(false);cigarette.stop();smokeHint.hidden=true;updateSmokePrompt('')}
+  async function openSmokeShop(message?:string){
+    if(!usable()||!smokeEnabled())return
+    if(!shopOverlay){
+      const {mountShopOverlay}=await import('../ui/shop-overlay')
+      if(!usable())return
+      shopOverlay??=mountOverlay(mountShopOverlay)
+    }
+    smokeHint.hidden=true
+    updateSmokePrompt('')
+    shopOverlay.openSmoke(message)
+  }
+  function chooseSmoke(){
+    if(!usable()||!smokeEnabled())return
+    selectSlot('smoke')
+    if(cigarette.inMouth){
+      smoking?.drop(cigarette.length)
+      dropSeq=(dropSeq+1)%1000
+      cancelSmoke()
+      return
+    }
+    if(cigarette.active)return
+    const pack=getActiveSaveSnapshot().packs[0]
+    if(!cigarette.start(pack?.brand,pack?.remaining)){
+      void openSmokeShop('没有香烟了，去旁边的香烟铺买')
+      return
+    }
+    smoking??=smokeVisual(scene,figure,camera)
+  }
+  function smokeAction(){
+    if(!usable()||!cigarette.prompt)return
+    const puffs=cigarette.puffs
+    cigarette.act(()=>takeFromPack(cigarette.brand))
+    if(cigarette.puffs!==puffs)puffSeq=(puffSeq+1)%1000
+    smokeHint.hidden=true
+    updateSmokePrompt('')
+  }
+  smokeHint.onclick=smokeAction
+  window.addEventListener('smoke:slot',chooseSmoke)
+  window.addEventListener('smoke:shop',()=>{void openSmokeShop()})
+  window.addEventListener('smoke:cancel',cancelSmoke)
+  window.addEventListener('keydown',event=>{
+    if(smokeHint.hidden||!usable()||isGlobalHotkeyBlocked(event.target)||!hits(event.code,'interact'))return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    if(!event.repeat)smokeAction()
+  },true)
+  let smoking:ReturnType<typeof smokeVisual>|undefined,puffSeq=0,dropSeq=0
   let outfitController=styleCharacter(figure,avatarRig,profile)
   let appearanceVersion=0
   window.addEventListener('glol:avatar-change',async()=>{
@@ -344,6 +404,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const fresh=await characterModel(a)
     if(version!==appearanceVersion){disposeCharacterParts(fresh.scene);disposeCharacterParts(fresh.scene.userData.creatorHair);return}
     const mesh=fresh.scene.getObjectByProperty('isSkinnedMesh',true) as THREE.SkinnedMesh
+    smoking?.dispose();smoking=undefined
     outfitController.dispose()
     for(const name of ['creator-body-outline','creator-face','creator-hair','creator-skirt']){
       const part=figure.getObjectByName(name)
@@ -997,8 +1058,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   window.addEventListener('walk:hail',()=>{hailSharedBike('点「骑电动车」出发')})
   window.addEventListener('keydown',event=>{
     if(active&&cigarette.active&&!event.repeat&&!isGlobalHotkeyBlocked(event.target)&&!isModalOrOverlayOpen()){
-      if(event.code==='Escape'){cigarette.stop()}
-      else if(hits(event.code,'useItem')){if(!cigarette.light()&&cigarette.puff())puffSeq=(puffSeq+1)%1000}
+      if(event.code==='Escape'){selectSlot('hand')}
     }
     if(active)ebikeAudio.unlock()
     if(active && event.code==='KeyL' && !event.repeat && !isGlobalHotkeyBlocked(event.target) && hailSharedBike('按 F 上车'))return
@@ -1188,6 +1248,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   const input=walkInput(canvas,()=>active,(dx,dy)=>{yaw-=dx*cfg.sensitivity;pitch=THREE.MathUtils.clamp(pitch+dy*cfg.sensitivity,-.8,1.3)},
     delta=>{arm=THREE.MathUtils.clamp(arm+delta*.013,cfg.zoomMin,cfg.zoomMax);if(active)follow(0,true)},
     ()=>{arm=arm>(cfg.far+cfg.near)/2?cfg.near:cfg.far;if(active)follow(0,true)})
+  if(smokeEnabled())document.querySelector('.walk-ui')!.append(smokeHint)
+
   const safe=new THREE.Vector3(),posOut=new THREE.Vector3(),wish=new THREE.Vector2();const spawns:object[]=[]
   let external:{x:number,z:number,run:boolean}|null=null,blockedWater=false,held=false
   const still={right:0,forward:0,run:false,crouch:false,jump:false}
@@ -1322,7 +1384,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     yaw=heading;facing=yaw+avatar.yaw;figure.rotation.y=facing;input.show(true);accumulator=0;rig.reset(arm)
     camera.near=.08;camera.updateProjectionMatrix();follow(0,true)
     if(takeCigaretteIntent(sessionStorage)&&smokeEnabled()){
-      smoking=smokeVisual(scene,figure,{camera,skin:skinTones[(currentAvatar()??profile).skin]});cigarette.start('plain','cigarette')
+      chooseSmoke()
     }
     attachMp()
     return true
@@ -1334,7 +1396,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     {
         net=netModule.attachNet(scene,model.animations,()=>({x:figure.position.x,y:figure.position.y,z:figure.position.z,
           yaw:figure.rotation.y,v:rides?.bike?Math.abs(rides.speed):Math.hypot(vx,vz),gr:Number(grounded),
-          sc:cigarette.lit?2:cigarette.active?1:0,sb:Math.round(cigarette.burn*10),sp:puffSeq,br:0,
+          sc:cigarette.wire,sb:Math.round(cigarette.length*1800),sp:puffSeq,br:brandIndex(cigarette.brand),sd:dropSeq,ss:cigarette.strength,sr:cigarette.remaining,
           bike:rides?.bike?'bike':'',bx:rides?.bike?.position.x??0,bz:rides?.bike?.position.z??0,byaw:rides?.heading??0}),()=>currentAvatar()??profile,camera)
         net.emote(emote.id);net.tick(0)
     }
@@ -1342,7 +1404,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   addEventListener('glol:mp-pref',()=>{if(mpEnabled())attachMp();else disconnect()})
   function disconnect(){net?.dispose();net=undefined}
   function leave(){disconnect();resetWalk()}
-  function resetWalk(){emote.stop();emote.reset();holdLayer.reset();camHoldBlend=0;wheel.close();smoking?.dispose();smoking=undefined;cigarette.stop();if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;lastTianyuanSyncKey='';tianyuanShopRef=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
+  function resetWalk(){cancelSmoke();if(hotbarSlot()==='smoke')selectSlot('hand');emote.stop();emote.reset();holdLayer.reset();camHoldBlend=0;wheel.close();smoking?.dispose();smoking=undefined;cigarette.stop();if(shopOverlay?.isOpen())shopOverlay?.close('fly');outfitController.setRidingEbike(false);finishActiveTestRide('mode_switch');shopHintGroup.visible=false;ebikeShowroomGroup.visible=false;shopEbikeShowcaseRig.root.visible=false;for(const item of showroomBikes)item.snapped=false;destination=null;active=false;crashSession=null;standUpSession=null;pickupSession=null;crashRecoverQueued=false;twoWheelOp=createInitialTwoWheelOpState();carHeadlight='off';carHeadlightManual=false;clearAllDowned();releaseDynamicCar();releaseDynamicBike();input.syncRideHud(null,null);rides?.clearBoatPose(figure);rides?.show(false);actionButton.hidden=true;setPrompt(null);updateTravel('fly',null);if(wasCar||wasBike)applyFootController();wasBoat=wasBike=wasCar=false;bikeObstacle='';boatBoardElapsed=BOAT_BOARD_DUR;boatLandElapsed=BOAT_LAND_DUR;ridePose.reset();driverPose.reset(false);clearAvatarPose(figure);mixer.stopAllAction();action=undefined;resetMotion();figure.visible=false;input.show(false);external=null;lastTianyuanSyncKey='';tianyuanShopRef=null;sim.clear();camera.near=1;camera.updateProjectionMatrix()}
   function canPlaceCrashOffset(x:number,z:number,refY:number,fromX?:number,fromZ?:number){
     if(!sim.withinBounds(x,z))return false
     if(sim.insideHouse(x,z,refY+.4))return false
@@ -1784,7 +1846,8 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       camera.lookAt(rig.focus)
     }
     // 只在切换的那一下动 figure.visible，不每帧覆盖拍照模式「隐藏人物」、商店展台等别处的设定。
-    if(firstPerson!==firstPersonHidden){firstPersonHidden=firstPerson;figure.visible=active&&!firstPerson}
+    const hideAvatar=firstPerson&&!cigarette.active
+    if(hideAvatar!==firstPersonHidden){firstPersonHidden=hideAvatar;figure.visible=active&&!hideAvatar}
   }
   const terrainRay=new THREE.Raycaster(undefined,new THREE.Vector3(0,-1,0))
   function boatClearance(){
@@ -1810,7 +1873,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     const renderY=terrainRay.intersectObjects(surfaces,false)[0]?.point.y
     const surf=sim.groundSurface(pos.x,pos.z,foot), soleY=figure.position.y+liveSoleLocalY()
     const surfaceY=surf?visualFloorAt(pos.x,pos.z,surf.y):undefined, footSink=surfaceY!==undefined?surfaceY-soleY:0
-    return {x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),soleY,surfaceY,surfaceKind:surf?.kind,footSink,inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
+    return {...(verify?{smoke:cigarette.view()}:{}),x:pos.x,z:pos.z,foot,renderY,renderClearance:foot-(renderY??Infinity),clearance:foot-(sim.surface(pos.x,pos.z,'ground')?.y??Infinity),soleY,surfaceY,surfaceKind:surf?.kind,footSink,inHouse:sim.insideHouse(pos.x,pos.z)||sim.overlaps('building'),
       inPeak:(!inBore&&!!peak&&peak.y>foot+.3)||sim.overlaps('peak'),deck:sim.surface(pos.x,pos.z,'deck')?.y,wet:sim.wet(pos.x,pos.z),blockedWater,resets,steps,physicsMs,elapsed,hits:lastHits,
       contactSources:verify?Array.from({length:sim.controller.numComputedCollisions()},(_,index)=>{
         const contact=sim.controller.computedCollision(index),handle=contact?.collider?.handle
@@ -1879,6 +1942,11 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
   function tick(dt:number){wheel.sync();if(!active)return;emote.reset();holdLayer.reset();
     if(emote.id&&(rides?.boat||rides?.car||rides?.bike)){emote.stop();emote.tick(.24,false)}
     smoking?.resetPose();const before=performance.now(),start=rides?.boat?.position??sim.body.translation();syncSceneObstacleVolumes();sim.sync(start.x,start.z);const footYNow=rides?.boat?start.y:start.y-cfg.height/2;rides?.nearby(start.x,start.z,footYNow);interactArbiter.sync(actionButton);syncGameTravelState();updateShopHintRings(start.x,start.z,footYNow)
+    if(cigarette.active && (rides?.bike||rides?.boat||rides?.car)){
+      cancelSmoke()
+      smoking?.tick(dt,cigarette.view(),false)
+      selectSlot('hand')
+    }
     if(shopOverlay?.isOpen()){updateShopShowcaseCamera();return}
     // Test-ride 90s timer & 350m / quiet-zone boundary watchdog (with 1.5s gentle decel when >15 km/h)
     const activeTr=getGameState().garage.activeTestRide
@@ -2585,8 +2653,9 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(!aboardGround&&!standUpSession&&!pickupSession){
       const velLen=Math.hypot(vx,vz)
       const dirX=velLen>.08?vx/velLen:inputMag>.05?wish.x:0, dirZ=velLen>.08?vz/velLen:inputMag>.05?wish.y:0
-      if(dirX||dirZ){
-        const goal=Math.atan2(-dirX,-dirZ)+avatar.yaw
+      const alignToView=cigarette.active&&isFirstPerson()
+      if(dirX||dirZ||alignToView){
+        const goal=(alignToView?yaw:Math.atan2(-dirX,-dirZ))+avatar.yaw
         turnDiff=shortestAngle(facing,goal)
         facing+=turnDiff*Math.min(1,cfg.turnRate*Math.min(.12,dt))
       }
@@ -2647,14 +2716,24 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
     if(!standUpSession&&!pickupSession)mixer.update(dt)
     applyCameraHold(dt)
     follow(dt)
-    if(smoking){if(rides?.bike||rides?.boat||rides?.car)cigarette.stop();if(cigarette.advance(dt))smoking.drop();smoking.tick(dt,cigarette.view(),isFirstPerson())}
+    if(cigarette.active&&!smoking)smoking=smokeVisual(scene,figure,camera)
+    if(smoking){
+      showSmokeDiscard(cigarette.inMouth)
+      const label=cigarette.prompt
+      smokeHint.hidden=!label||!usable()
+      const hint=touchUi()?label:({'':'',撕开:'请按 F 键撕开烟盒封条',拿取:'请按 F 键拿取香烟',点燃:'请按 F 键点燃香烟',吸一口:'F 键吸一口'}[label]).replace('F',bindingLabel('interact'))
+      updateSmokePrompt(smokeHint.hidden||touchUi()?'':hint)
+      if(smokeHint.textContent!==hint)smokeHint.textContent=hint
+      if(cigarette.advance(dt))smoking.drop()
+      smoking.tick(dt,cigarette.view(),isFirstPerson())
+    }
     const emoteMoving=!!(keys.right||keys.forward||external?.x||external?.z)
     if(emote.id&&interrupted(emote.id,emoteMoving,!emotesEnabled()||!canEmote()||keys.jump||!grounded))emote.stop()
     emote.tick(dt,emoteMoving)
     net?.tick(dt)
   }
   let cameraHold=false,camHoldBlend=0
-  let holdAim={forward:.32,up:.13,side:-.04}
+  let holdAim={...DEFAULT_CAMERA_HOLD_AIM}
   const holdLayer=cameraHoldLayer(figure),holdTarget=holdLayer.target,holdEffector=new THREE.Vector3()
   function applyCameraHold(dt:number){
     const target=cameraHold?1:0

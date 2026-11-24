@@ -97,8 +97,6 @@ body[data-shop-open="1"] :is(
   border-radius: 999px;
   background: rgba(14, 17, 21, 0.72);
   border: 1px solid var(--shop-border);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   font-size: 12px;
   font-weight: 700;
   color: var(--shop-dim);
@@ -134,8 +132,6 @@ body[data-shop-open="1"] :is(
   border-radius: 18px;
   background: var(--shop-bg);
   border: 1px solid var(--shop-border);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 20px 56px rgba(0, 0, 0, 0.52);
   overflow: hidden;
 }
