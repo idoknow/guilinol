@@ -185,10 +185,6 @@ export class Forest{
         const dx=tree.x-cam.x, dy=tree.y-cam.y, dz=tree.z-cam.z
         const d=dx*dx+dy*dy+dz*dz
         if(d>=farSq)continue
-        // Never let a crown swallow the follow camera: drop trees whose canopy the camera is inside.
-        // IDOK-227 runtime crowns start at >=4.4 m, so a camera below that stays under the canopy.
-        const highCanopy=(tree.kind===0||tree.kind===1||tree.kind===6||tree.kind===7||tree.kind===8||tree.kind===9)&&cam.y-tree.y<4.3*tree.scale
-        if(dx*dx+dz*dz<(highCanopy?2.2:look.treeCameraClear)**2&&cam.y-tree.y<14*tree.scale)continue
         pt.set(tree.x,tree.y+4,tree.z)
         if(p0.distanceToPoint(pt)<=-40||p1.distanceToPoint(pt)<=-40||p2.distanceToPoint(pt)<=-40||p3.distanceToPoint(pt)<=-40||p4.distanceToPoint(pt)<=-40||p5.distanceToPoint(pt)<=-40)continue
         if(d < SPECIES_PRIORITY_RADIUS**2) this.speciesFrequency[tree.kind]++
