@@ -388,6 +388,14 @@ def bake(output, manifest, rendered_roads=None):
         from terminal_decks import grade_zhongshan_merge
         grade_zhongshan_merge(output,manifest,elements)
         trim_bridge_endcaps(output,manifest,elements)
+        road_tiles=[tile for tile in manifest['chunks'] if tile.get('gradedCorridor')]
+        request.write_text(json.dumps([tile['file'] for tile in road_tiles]))
+        packed=subprocess.run(['node',str(ROOT/'scripts/simplify-roadbeds.mjs'),str(output.resolve()),
+                               str(request.resolve())],check=True,capture_output=True,text=True,cwd=ROOT)
+        sizes=json.loads(packed.stdout)
+        for tile in road_tiles:
+            if tile['file'] in sizes:
+                tile['bytes']=sizes[tile['file']]
         if network['edges']:
             route_file=output/'vehicle-portal-routes.json'
             yard_routes=[]
