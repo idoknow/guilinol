@@ -134,7 +134,17 @@ try{
   }
 }finally{await browser.close();await server.close()}
 const completed=results.filter(r=>r.completed)
-const summary={requested:tests.length,completed:completed.length,pass:completed.filter(r=>r.maximum<=.1).length,maximum:Math.max(...completed.map(r=>r.maximum))}
+const fullDistance=completed.filter(r=>Math.min(r.outside,r.inside)>=20-.001)
+const summary={
+  requested:tests.length,
+  completed:completed.length,
+  fullDistance:fullDistance.length,
+  pass:fullDistance.filter(r=>r.maximum<=.1).length,
+  overLimit:completed.filter(r=>r.maximum>.1).length,
+  stalled:results.filter(r=>r.completed===false).length,
+  unavailable:results.filter(r=>r.unavailable).length,
+  maximum:completed.reduce((highest,r)=>Math.max(highest,r.maximum),0)
+}
 await writeFile(output,JSON.stringify(summary,null,2))
 console.log(summary)
 if(summary.pass!==tests.length)process.exitCode=1
