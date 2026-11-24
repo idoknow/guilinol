@@ -40,13 +40,42 @@ function prepare(mesh:THREE.Mesh, unique:boolean):Draw {
   const index=source.clone()
   geometry.setIndex(index)
   const original=source.array, positions=geometry.getAttribute('position')
-  const point=new THREE.Vector3(), boxes:THREE.Box3[]=[]
+  const boxes:THREE.Box3[]=[]
   const stride=3*256
-  for(let start=0;start<original.length;start+=stride){
-    const box=new THREE.Box3()
-    for(let i=start;i<Math.min(start+stride,original.length);i++)
-      box.expandByPoint(point.fromBufferAttribute(positions,original[i]))
-    boxes.push(box.applyMatrix4(mesh.matrixWorld))
+  const interleaved=positions instanceof THREE.InterleavedBufferAttribute
+  const posArr=interleaved?positions.data.array:positions.array
+  const posStride=interleaved?positions.data.stride:positions.itemSize
+  const posOffset=interleaved?positions.offset:0
+  if(!positions.normalized&&positions.itemSize===3){
+    const m=mesh.matrixWorld.elements
+    const m0=m[0],m1=m[1],m2=m[2],m4=m[4],m5=m[5],m6=m[6],m8=m[8],m9=m[9],m10=m[10],m12=m[12],m13=m[13],m14=m[14]
+    for(let start=0;start<original.length;start+=stride){
+      const end=Math.min(start+stride,original.length)
+      let minX=Infinity,minY=Infinity,minZ=Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity
+      for(let i=start;i<end;i++){
+        const o=original[i]*posStride+posOffset
+        const x=posArr[o],y=posArr[o+1],z=posArr[o+2]
+        if(x<minX)minX=x;if(x>maxX)maxX=x
+        if(y<minY)minY=y;if(y>maxY)maxY=y
+        if(z<minZ)minZ=z;if(z>maxZ)maxZ=z
+      }
+      // Transform local AABB to world AABB without per-vertex matrix multiplies.
+      const xa0=m0*minX,xb0=m0*maxX,ya0=m4*minY,yb0=m4*maxY,za0=m8*minZ,zb0=m8*maxZ
+      const xa1=m1*minX,xb1=m1*maxX,ya1=m5*minY,yb1=m5*maxY,za1=m9*minZ,zb1=m9*maxZ
+      const xa2=m2*minX,xb2=m2*maxX,ya2=m6*minY,yb2=m6*maxY,za2=m10*minZ,zb2=m10*maxZ
+      boxes.push(new THREE.Box3(
+        new THREE.Vector3(Math.min(xa0,xb0)+Math.min(ya0,yb0)+Math.min(za0,zb0)+m12,Math.min(xa1,xb1)+Math.min(ya1,yb1)+Math.min(za1,zb1)+m13,Math.min(xa2,xb2)+Math.min(ya2,yb2)+Math.min(za2,zb2)+m14),
+        new THREE.Vector3(Math.max(xa0,xb0)+Math.max(ya0,yb0)+Math.max(za0,zb0)+m12,Math.max(xa1,xb1)+Math.max(ya1,yb1)+Math.max(za1,zb1)+m13,Math.max(xa2,xb2)+Math.max(ya2,yb2)+Math.max(za2,zb2)+m14),
+      ))
+    }
+  }else{
+    const point=new THREE.Vector3()
+    for(let start=0;start<original.length;start+=stride){
+      const box=new THREE.Box3()
+      for(let i=start;i<Math.min(start+stride,original.length);i++)
+        box.expandByPoint(point.fromBufferAttribute(positions,original[i]))
+      boxes.push(box.applyMatrix4(mesh.matrixWorld))
+    }
   }
   index.setUsage(THREE.DynamicDrawUsage)
   const selected=new Uint8Array(boxes.length).fill(255)
@@ -84,7 +113,26 @@ export function landmarkCulling(){
   const projection=new THREE.Matrix4(), reflect=new THREE.Matrix4().makeScale(1,-1,1)
   let lastMirror=NaN, lastHorizon=NaN
   const layers:Draw[][]=[]
+  function prepareRootLod(root:THREE.Group, lod:THREE.Object3D){
+    let list=prepared.get(lod)
+    if(list)return list
+    const draws:Draw[]=[]
+    const uses=new Map<THREE.BufferGeometry,number>()
+    root.traverse(node=>{if(node instanceof THREE.Mesh)uses.set(node.geometry,1+(uses.get(node.geometry)??0))})
+    lod.traverse(node=>{
+      if(node instanceof THREE.Mesh&&!node.children.length&&!/^collision/i.test(node.name))draws.push(prepare(node,uses.get(node.geometry)===1))
+    })
+    prepared.set(lod,draws)
+    return draws
+  }
   return {
+    warm(root:THREE.Group){
+      const lods=getLodNodes(root)
+      for(const name of LOD_NAMES){
+        const lod=lods[name]
+        if(lod)prepareRootLod(root,lod)
+      }
+    },
     update(roots:Iterable<THREE.Group>,camera:THREE.PerspectiveCamera,mirror:number,cullHorizon=look.fogHorizonTo){
       camera.updateMatrixWorld()
       const moved=anchor.distanceToSquared(camera.position)>=margin*margin ||
@@ -116,16 +164,7 @@ export function landmarkCulling(){
           const lod=lods[name]
           if(!lod)continue
           if(!lod.visible){active.delete(lod);continue}
-          let list=prepared.get(lod)
-          if(!list){
-            const draws:Draw[]=[]
-            const uses=new Map<THREE.BufferGeometry,number>()
-            root.traverse(node=>{if(node instanceof THREE.Mesh)uses.set(node.geometry,1+(uses.get(node.geometry)??0))})
-            lod.traverseVisible(node=>{
-              if(node instanceof THREE.Mesh&&!node.children.length)draws.push(prepare(node,uses.get(node.geometry)===1))
-            })
-            list=draws;prepared.set(lod,list)
-          }
+          const list=prepareRootLod(root,lod)
           if(moved||!active.has(lod))for(const draw of list)draw.update(classify)
           active.add(lod);layers.push(list)
         }
