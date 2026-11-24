@@ -11,6 +11,14 @@ import {trafficPushGuard} from './traffic-push'
 import {probeLocalDismount, probeLocalMount} from './ride'
 import {onOldSouthSlope,yueyaShoulderHeight} from '../yueya-slope'
 import {CAR_SCALE} from '../drive/scale'
+import {
+  clampCameraToObstacleVolumes,
+  expandVolumeToCuboids,
+  resolveObstacleVolumesStep,
+  type ObstacleStepActor,
+  type ObstacleStepResult,
+  type ObstacleVolumeSpec,
+} from './obstacle-volumes'
 
 type Outline = import('../buildings').Building
 type Kind = 'ground'|'overview'|'road'|'deck'|'deckThin'|'building'|'peak'|'tree'|'rail'|'sidewalk'|'landmark'
@@ -219,8 +227,57 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function remove(coll:R.Collider){sources.delete(coll.handle);thinDecks.delete(coll.handle);kinds.delete(coll.handle);world.removeCollider(coll,false)}
   const trunks=new Map<import('../forest').Tree,R.Collider>()
   const landmarks=new Map<THREE.Group,R.Collider[]>()
+  const obstacleVolumeSpecs=new Map<string,ObstacleVolumeSpec>()
+  const obstacleColliders=new Map<string,R.Collider[]>()
+  function materializeObstacleVolume(spec:ObstacleVolumeSpec){
+    const prev=obstacleColliders.get(spec.id)
+    if(prev)prev.forEach(remove)
+    const colliders:R.Collider[]=[]
+    for(const c of expandVolumeToCuboids(spec)){
+      const halfYaw=c.yaw*.5
+      const desc=R.ColliderDesc.cuboid(c.hx,c.hy,c.hz)
+        .setTranslation(c.x,c.y,c.z)
+        .setRotation({x:0,y:Math.sin(halfYaw),z:0,w:Math.cos(halfYaw)})
+      const coll=add(desc,'building')
+      sources.set(coll.handle,`${spec.id}/${c.label}`)
+      colliders.push(coll)
+    }
+    obstacleColliders.set(spec.id,colliders)
+  }
+  function removeObstacleVolume(id:string){
+    const existing=obstacleColliders.get(id)
+    if(existing)existing.forEach(remove)
+    obstacleColliders.delete(id)
+    obstacleVolumeSpecs.delete(id)
+    if(existing)world.step()
+  }
+  function syncObstacleVolume(spec:ObstacleVolumeSpec){
+    obstacleVolumeSpecs.set(spec.id,spec)
+    materializeObstacleVolume(spec)
+    world.step()
+  }
+  function getObstacleVolumeIds(){return [...obstacleVolumeSpecs.keys()]}
+  function resolveObstacleStep(
+    prev:{x:number;y:number;z:number},
+    next:{x:number;y:number;z:number},
+    actor:ObstacleStepActor,
+  ):ObstacleStepResult{
+    if(!obstacleVolumeSpecs.size)return {blocked:false,normalX:0,normalZ:0,label:''}
+    return resolveObstacleVolumesStep(prev,next,actor,obstacleVolumeSpecs.values())
+  }
+  function clampCamera(
+    playerPos:{x:number;y:number;z:number},
+    camPos:{x:number;y:number;z:number},
+    camMargin:number,
+  ){
+    if(!obstacleVolumeSpecs.size)return false
+    return clampCameraToObstacleVolumes(playerPos,camPos,camMargin,obstacleVolumeSpecs.values())
+  }
   function sync(east:number,south:number){
     let changed=false
+    for(const [id,spec] of obstacleVolumeSpecs){
+      if(!obstacleColliders.has(id)){materializeObstacleVolume(spec);changed=true}
+    }
     const collisionRadius=Math.min(cfg.collisionRadius,Math.max(256,stream.radius))
     const nearLandmarks=new Set<THREE.Group>()
     for(const [entry,root] of stream.landmarks){
@@ -504,7 +561,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   }
   function hasDeck(east:number,south:number){const tile=tileAt(east,south);return !!(tile&&stream.loaded.get(tile)?.deck.length)}
   function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)}
-  function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear()}
+  function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear();for(const colliders of obstacleColliders.values())colliders.forEach(remove);obstacleColliders.clear()}
   function findLocalDismount(cx:number,cz:number,heading:number,bikeY:number){
     const local=probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,bikeY)
     if(local||!wet(cx,cz))return local
@@ -552,5 +609,5 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findFlatGround,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt,canTrafficPush}
+  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findFlatGround,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt,canTrafficPush,syncObstacleVolume,removeObstacleVolume,getObstacleVolumeIds,resolveObstacleStep,clampCamera}
 }
