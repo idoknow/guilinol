@@ -6,6 +6,7 @@ import {chromium} from 'playwright'
 import {preview} from 'vite'
 import {rideToCrossroads} from './ride-route.mjs'
 import {lakeChecks} from './ride-lake.mjs'
+import {withFixtureBays} from './ride-fixture-bays.mjs'
 
 const data=JSON.parse(gunzipSync(await readFile('dist/world/vehicles.bin')))
 const jiefangBike=[-539,157.1,-95,1.57,0]
@@ -13,18 +14,8 @@ const crossroadsBike=[-539,157.1,-87,0,0]
 const slopeBike=[-322,146.4,94,-Math.PI/2,0]
 // These three route fixtures start at exact poses. Give the synthetic bays
 // matching sidewalk cells so real-world roadside snapping does not move them.
-const fixtureMask = key => {
-  const grid = key==='mask'?data.grid:data.motorGrid
-  const [left,top,width,,step]=grid
-  const source=Buffer.from(data[key],'base64')
-  const bits=data.maskEncoding==='gzip'?gunzipSync(source):source
-  for(const [x,,z] of [jiefangBike,crossroadsBike,slopeBike]){
-    const index=Math.round((z-top)/step)*width+Math.round((x-left)/step),bit=128>>(index&7)
-    if(key==='mask')bits[index>>3]|=bit;else bits[index>>3]&=~bit
-  }
-  return (data.maskEncoding==='gzip'?gzipSync(bits):bits).toString('base64')
-}
-const rideVehicles=gzipSync(JSON.stringify({...data,mask:fixtureMask('mask'),motorMask:fixtureMask('motorMask'),bikes:[...data.bikes,jiefangBike,crossroadsBike,slopeBike]}))
+const bays=[jiefangBike,crossroadsBike,slopeBike]
+const rideVehicles=gzipSync(JSON.stringify({...withFixtureBays(data,bays),bikes:[...data.bikes,...bays]}))
 const atlas=JSON.parse(gunzipSync(await readFile('dist/world/atlas.bin')))
 const output='captures/ride';await mkdir(output,{recursive:true})
 const server=await preview({root:'web',configFile:'web/vite.config.ts',preview:{host:'127.0.0.1',port:0}})
