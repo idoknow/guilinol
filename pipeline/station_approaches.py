@@ -67,8 +67,8 @@ def grade_station_junctions(terrain, underlay, water, road_ctrl, left, top):
               if r['road']==UNDERPASS and r['type']=='rail_over']
     # 4% leaves margin for the sampled ground mesh and for rounding to dm.
     grade = .04
-    for node, edge, portal in zip((tunnel['nodes'][0],tunnel['nodes'][-1]),
-                                  (min(tracks)-2,max(tracks)+2),bore.coords):
+    for node, edge in zip((tunnel['nodes'][0],tunnel['nodes'][-1]),
+                                  (min(tracks)-2,max(tracks)+2)):
         anchor = bore.interpolate(edge)
         # Use the local terrain range to bound the search beyond the tie-in.
         radius = 400

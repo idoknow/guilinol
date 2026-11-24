@@ -5,6 +5,7 @@ import {join} from 'node:path'
 import {gunzipSync} from 'node:zlib'
 import {Color} from 'three'
 import {railwayGeometry} from '../web/src/railways.ts'
+import {joinPortalRoads} from '../web/src/tunnels.ts'
 import {ll2xz} from '../lib/projection.ts'
 
 const [directory, inventory,check] = process.argv.slice(2)
@@ -157,6 +158,7 @@ for(const tile of manifest.chunks){
   const {deck,underside,worker}=data
   if(audit && !worker.rails.length && !local.length)continue
   self.onmessage({data:worker})
+  joinPortalRoads(tile,manifest.tunnels ?? [],[triangles,mesh.sidewalk])
   if(audit){
     const {positions,colors,kinds}=mesh
     for(let i=0;i<positions.length;i+=9){
