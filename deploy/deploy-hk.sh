@@ -83,4 +83,4 @@ JS
 k wait --for=condition=Ready certificate/glol-tls --timeout=300s
 
 # 部署完成后刷新 CDN（IDOK-192：改在发版机本地跑，GitHub runner 连不上 CDNFly 面板）。失败只告警，不影响发版。
-bash deploy/cdn-refresh.sh "$tag" || { echo "⚠️  CDN 刷新失败：新版本资源没预热，首访会慢（不影响发版）。重跑：bash deploy/cdn-refresh.sh $tag" >&2; }
+# CDN 刷新/预热已移到 GitHub Actions（.github/workflows/cdn-refresh.yml），发版机不再执行
