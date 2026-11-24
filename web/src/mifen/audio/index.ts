@@ -1,4 +1,4 @@
-import {audioCtor, existingCityAudio, resumeCityAudio} from '../../city-audio'
+import {audioCtor, existingCityAudio, resumeCityAudio} from '../../city-audio.ts'
 import type { CookingVisualState } from '../cooking.ts'
 import { SOUND_CATALOG, SOUND_IDS, type MifenSoundId, type SoundSpec } from './catalog.ts'
 import { createPinkNoiseBuffer, createSafeMasterChain, scheduleSoundVoice } from './synth.ts'
