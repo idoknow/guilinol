@@ -43,6 +43,7 @@ export interface EbikeAudioSnapshot {
 export interface EbikeAudioEngine {
   readonly unlocked: boolean
   readonly muted: boolean
+  prepare: () => void
   unlock: () => boolean
   setMuted: (muted: boolean) => void
   setHorn: (active: boolean, kind?: RideSoundKind) => void
@@ -149,7 +150,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
     shopBuy: 0,
   }
 
-  function ensureContext(): AudioContext | null {
+  function ensureContext(resume=true): AudioContext | null {
     if (isDisposed || muted) return null
     if (!ctx) {
       const Ctor = getAudioContextCtor()
@@ -179,7 +180,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
         return null
       }
     }
-    if (ctx.state === 'suspended') {
+    if (resume && ctx.state === 'suspended') {
       try {
         void ctx.resume()
       } catch {
@@ -636,6 +637,7 @@ export function createEbikeAudioEngine(): EbikeAudioEngine {
   return {
     get unlocked() { return ctx?.state === 'running' },
     get muted() { return muted },
+    prepare:()=>{ensureContext(false)},
     unlock,
     setMuted,
     setHorn,
