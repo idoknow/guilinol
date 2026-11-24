@@ -17,12 +17,68 @@ def pack_stations(stations):
     return base64.b64encode(struct.pack(f'<{len(levels)}i', *levels)).decode('ascii')
 
 
-def underground(tags):
-    try:
-        below = float(tags.get('layer', 0)) < 0
-    except ValueError:
-        below = False
-    return tags.get('tunnel', 'no') != 'no' or below
+def mark_underpasses(elements):
+    """Identify grade-separated crossings without treating adjoining bridges as roofs."""
+    bridges = []
+    candidates = []
+    for way in elements:
+        tags = way.get('tags', {})
+        if way['type'] != 'way' or not any(tags.get(k) for k in ('highway', 'railway', 'waterway')):
+            continue
+        try:
+            layer = float(tags.get('layer', 0))
+        except ValueError:
+            layer = 0
+        bridge = tags.get('bridge', 'no') != 'no'
+        if not bridge and (layer >= 0 or not tags.get('highway')):
+            continue
+        geometry = way.get('geometry')
+        if not geometry or len(geometry) < 2 or not all(geometry):
+            continue
+        axis = LineString([ll2xz(p['lat'], p['lon']) for p in geometry])
+        if bridge:
+            bridges.append((axis, layer, set(way['nodes'])))
+        if layer < 0:
+            way['coveredBelow'] = tags.get('covered', 'no') != 'no'
+            candidates.append((axis, way, layer))
+    tree = STRtree([axis for axis, _, _ in bridges])
+    for axis, way, layer in candidates:
+        for i in tree.query(axis, predicate='intersects'):
+            span, upper, refs = bridges[i]
+            if upper <= layer:
+                continue
+            overlap = axis.intersection(span)
+            for ref, point in zip(way['nodes'],axis.coords,strict=True):
+                if ref in refs:
+                    overlap = overlap.difference(Point(point).buffer(.02))
+            if not overlap.is_empty:
+                way['underBridge'] = True
+                break
+        if way['tags'].get('highway') and not underground(way) and way['tags'].get('bridge', 'no') == 'no':
+            way['surfaceUnderlay'] = True
+
+
+def underground(way):
+    tags = way.get('tags', {})
+    return (tags.get('tunnel', 'no') != 'no' or way.get('coveredBelow', False)
+            or way.get('underBridge', False))
+
+
+def mountain_roofs(network, nodes, peaks):
+    """Sample the separate karst mesh above the coarse GL04 ground grid."""
+    for edge in network['edges']:
+        a,b = nodes[edge['a']],nodes[edge['b']]
+        dx,dz = b['x']-a['x'],b['z']-a['z']
+        length = math.hypot(dx,dz)
+        count = math.ceil(length/2)
+        samples = []
+        for i in range(count+1):
+            cx,cz = a['x']+dx*i/count,a['z']+dz*i/count
+            for offset in (-edge['halfWidth'],0,edge['halfWidth']):
+                y=peaks.height(cx-dz*offset/length,cz+dx*offset/length,-math.inf)
+                samples.append(y if math.isfinite(y) else None)
+        if any(y is not None for y in samples):
+            edge['mountainRoof']=samples
 
 
 def sections(lanes, source_ways, existing, nodes):
@@ -46,7 +102,7 @@ def sections(lanes, source_ways, existing, nodes):
     for way in source_ways:
         tags = way.get('tags', {})
         if (way['type'] == 'way' and tags.get('highway') == 'service'
-                and tags.get('access') == 'private' and underground(tags)):
+                and tags.get('access') == 'private' and underground(way)):
             for ref in way['nodes']:
                 ramps[ref].append(way)
     pending = [ref for edge in edges.values() for ref in (edge['a'], edge['b']) if ref in ramps]
@@ -77,7 +133,7 @@ def sections(lanes, source_ways, existing, nodes):
     # Private surface roads also identify mouths although they do not spawn traffic.
     for way in source_ways:
         tags=way.get('tags',{})
-        if way['type']=='way' and tags.get('highway') and not underground(tags):
+        if way['type']=='way' and tags.get('highway') and not underground(way):
             surface_nodes.update(n for n in way['nodes'] if n in adjacent)
     portals = surface_nodes.intersection(adjacent)
     # The cut may extend into the bore until it reaches a fixed roof. Include
@@ -87,7 +143,7 @@ def sections(lanes, source_ways, existing, nodes):
         tags = way.get('tags', {})
         if way['type'] != 'way' or not any(tags.get(k) for k in ('railway', 'highway', 'building')):
             continue
-        if underground(tags) or not way.get('geometry') or not all(way['geometry']):
+        if underground(way) or not way.get('geometry') or not all(way['geometry']):
             continue
         coords = [ll2xz(p['lat'], p['lon']) for p in way['geometry']]
         if len(coords) < 2:
@@ -165,7 +221,7 @@ def sections(lanes, source_ways, existing, nodes):
     connectors=[]
     for way in source_ways:
         tags=way.get('tags',{})
-        if (way['type']!='way' or not tags.get('highway') or underground(tags) or
+        if (way['type']!='way' or not tags.get('highway') or underground(way) or
                 len(portals.intersection(way['nodes']))<2 or not all(way['geometry'])):
             continue
         prior=None

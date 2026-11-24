@@ -20,8 +20,9 @@ from common import OUT, ll2xz, load_osm
 from road_tunnels import clear_approach_paving
 from station_road_corridor import bake as bake_station_corridor
 from surveyed_corridors import bake as bake_surveyed_corridors, restore as restore_corridors
+import vehicle_surface_grades
 from vehicle_approaches import plan as plan_approaches, surface_guides, portal_openings
-from vehicle_tunnels import underground, sections as tunnel_sections, solve as solve_tunnels
+from vehicle_tunnels import mark_underpasses, mountain_roofs, underground, sections as tunnel_sections, solve as solve_tunnels
 from service_streets import mark_drivable_services, width as minor_road_width
 from traffic_parking import allowed, bake_parking
 from landmarks.jiefang_layout import SPAN_WAYS, deck_level
@@ -78,11 +79,11 @@ def signal_schedule(lanes, nodes):
 
 
 def bake(output, manifest, rendered_roads=None):
+    from shapely.geometry import box
     left, top, width, depth = manifest['extent']
     if rendered_roads is None:
         from features import raw_overture_footprints
         from scatter import extract_road_network
-        from shapely.geometry import box
         bounds = box(left, top, left+width, top+depth)
         rendered_roads = extract_road_network(raw_overture_footprints(bounds))[1]
     region = prep(Polygon(manifest['region']['local'])) if 'region' in manifest else None
@@ -143,6 +144,7 @@ def bake(output, manifest, rendered_roads=None):
     forbidden = prep(unary_union(banned))
     nodes, lanes, walks, incoming = {}, [], [], defaultdict(list)
     elements = load_osm()
+    mark_underpasses(elements)
     # Legacy expanded worlds carry the original continuous surface street
     # through both open Wuling cuttings, above the actual tunnel floor.
     clear_approach_paving(output,manifest['chunks'],[t for t in manifest.get('tunnels',[]) if t['way']==237985762])
@@ -150,11 +152,15 @@ def bake(output, manifest, rendered_roads=None):
     sections = {road['way']:road['width'] for road in json.loads((output/'street-report.json').read_text())}
     restore_portal_paving(output,manifest['chunks'])
     restore_corridors(output,manifest['chunks'])
+    from canal_passages import plan as plan_canal_passages
+    from terminal_decks import grade as grade_terminal_decks
+    terminal_grades = grade_terminal_decks(output, manifest, elements)
+    canal_grades = plan_canal_passages(output, manifest, elements, sections)
     bake_station_corridor(output, manifest['chunks'], elements)
     bake_surveyed_corridors(output,manifest['chunks'],elements,sections)
     for way in elements:
         tags = way.get('tags', {})
-        linear = way['id'] not in SPAN_WAYS and (tags.get('bridge','no')!='no' or underground(tags))
+        linear = way['id'] not in SPAN_WAYS and (tags.get('bridge','no')!='no' or underground(way))
         kind = tags.get('highway', '').removesuffix('_link')
         if way['type'] != 'way' or kind not in MOTOR | WALK | {'cycleway', 'motorway'} or tags.get('area') == 'yes' or tags.get('access') in ('no', 'private'):
             continue
@@ -239,7 +245,7 @@ def bake(output, manifest, rendered_roads=None):
                     lane['cls'] = kind
                     lane['way'] = way['id']
                     if linear:
-                        lane['structure'] = 'tunnel' if underground(tags) else 'bridge'
+                        lane['structure'] = 'tunnel' if underground(way) else 'bridge'
                     if not linear:
                         lane['heights'] = profile(head,tail,lane['offset'],way['id'])
                     if linear or way['id'] in SPAN_WAYS:
@@ -270,8 +276,10 @@ def bake(output, manifest, rendered_roads=None):
         survey_nodes = dict(nodes)
         network = tunnel_sections(lanes,elements,original_tunnels,survey_nodes)
         if network['edges']:
+            mountain_roofs(network,survey_nodes,surface.peaks)
+            graded_sections=vehicle_surface_grades.stations(elements,sections,lanes,box(left,top,left+width,top+depth))
             guides=surface_guides(elements,network['portals'],survey_nodes)
-            request.write_text(json.dumps(dict(manifest=manifest,network=network,nodes=list(survey_nodes.values()),guideNodes=sorted({g[k] for g in guides for k in ('from','to')}))))
+            request.write_text(json.dumps(dict(manifest=manifest,network=network,gradePoints=[p for _,xy,_,_ in graded_sections for p in xy],nodes=list(survey_nodes.values()),guideNodes=sorted({g[k] for g in guides for k in ('from','to')}))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portals',str(output.resolve()),str(request)],check=True,cwd=ROOT)
             samples=json.loads(request.read_text())
@@ -279,7 +287,8 @@ def bake(output, manifest, rendered_roads=None):
             fixed={ref for way in elements if way['type']=='way' and way.get('tags',{}).get('railway')=='rail'
                    and way['tags'].get('layer','0')=='0' for ref in way['nodes']}
             access,limits=plan_approaches(conflicts,lanes+guides,survey_nodes,{int(k):v for k,v in samples['heights'].items()},fixed,sections)
-            bake_surveyed_corridors(output,manifest['chunks'],elements,sections,access,only_approaches=True)
+            surveyed=vehicle_surface_grades.profiles(graded_sections,samples['roadLevels'],access+canal_grades+terminal_grades)
+            bake_surveyed_corridors(output,manifest['chunks'],elements,sections,access+canal_grades+terminal_grades+surveyed,only_approaches=True)
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)
             for tunnel in generated:
                 tunnel['gradedAccess']=True
