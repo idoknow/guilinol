@@ -24,6 +24,7 @@ for(let ref=first;ref!==last;){
 assert(chain.length>1)
 if(baseline){
   const previous=load(path.join(baseline,'roads/graph.json.gz'))
+  assert.deepEqual(graph.signals,previous.signals,'A signal phase or incoming lane ID changed')
   assert.equal(chain.at(-1).id,previous.lanes.find(l=>l.way===way&&l.from===first&&l.to===last)?.id)
 }
 const cell=load(path.join(world,'roads',Math.floor(-18814.81/512)+'_'+Math.floor(3934.32/512)+'.json.gz'))
