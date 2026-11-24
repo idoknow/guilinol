@@ -106,7 +106,7 @@
 @keyframes ld-breathe{0%,100%{filter:brightness(1)}50%{filter:brightness(1.14)}}
 
 /* 触屏：右下是摇杆和动作键，顶部被账号/天气/小地图占满——放到左侧「视野」下面 */
-@media (pointer:coarse){
+@media (pointer:coarse) and (not (any-pointer:fine)){
   .ld-corner{right:auto;bottom:auto;left:calc(12px + env(safe-area-inset-left));top:calc(192px + env(safe-area-inset-top))}
 }
 @media (max-width:600px){

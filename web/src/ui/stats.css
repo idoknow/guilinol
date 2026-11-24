@@ -70,7 +70,7 @@ body[data-hud="street"] .hud-stats {
 }
 
 /* 触屏（竖屏手机/平板）：左下角是摇杆，读数放在摇杆上方 */
-@media (pointer: coarse) {
+@media (pointer:coarse) and (not (any-pointer:fine)) {
   .hud-stats,
   body[data-hud="street"] .hud-stats {
     left: calc(10px + env(safe-area-inset-left));
@@ -84,7 +84,7 @@ body[data-hud="street"] .hud-stats {
   }
 }
 
-@media (pointer: coarse) and (max-height: 500px) {
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height: 500px) {
   .hud-stats,
   body[data-hud="street"] .hud-stats {
     /* 横屏手机：dock 在右上、时辰条在左上，顶部中段留给它们；读数挪到底部中间（拇指区之外）。 */

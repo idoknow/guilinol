@@ -236,7 +236,7 @@ body[data-hud="street"] .render-pop {
   top: calc(92px + env(safe-area-inset-top));
 }
 
-@media (pointer: coarse), (max-width: 560px) {
+@media (pointer:coarse) and (not (any-pointer:fine)), (max-width: 560px) {
   body[data-hud="street"] .render-entry {
     left: calc(12px + env(safe-area-inset-left));
     top: calc(214px + env(safe-area-inset-top));
@@ -248,7 +248,7 @@ body[data-hud="street"] .render-pop {
   }
 }
 
-@media (pointer: coarse) {
+@media (pointer:coarse) and (not (any-pointer:fine)) {
   .render-entry {
     left: calc(12px + env(safe-area-inset-left));
     top: calc(150px + env(safe-area-inset-top));
@@ -268,13 +268,13 @@ body[data-hud="street"] .render-pop {
   }
 }
 
-@media (pointer: coarse) and (max-width: 560px) {
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-width: 560px) {
   body:not([data-hud="street"]):has(.gl-mission-entry) .render-pop {
     top: calc(224px + env(safe-area-inset-top));
   }
 }
 
-@media (pointer: coarse) and (max-height: 500px) and (min-width: 521px) {
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height: 500px) and (min-width: 521px) {
   .render-entry {
     top: calc(104px + env(safe-area-inset-top));
     left: calc(12px + env(safe-area-inset-left));
@@ -289,7 +289,7 @@ body[data-hud="street"] .render-pop {
   }
 }
 
-@media (pointer: coarse) and (max-height: 500px) and (max-width: 520px) {
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height: 500px) and (max-width: 520px) {
   .render-entry {
     top: calc(114px + env(safe-area-inset-top));
     left: calc(76px + env(safe-area-inset-left));

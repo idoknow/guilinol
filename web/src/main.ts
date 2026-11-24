@@ -1,5 +1,5 @@
 import {onPrefs} from './ui/prefs'
-import {bindingLabel} from './input/keymap'
+import {bindingLabel, hits} from './input/keymap'
 import {nearestPlayable} from '../../lib/play-region'
 import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
@@ -42,6 +42,7 @@ import {armOrientationGate} from './ui/orientation'
 import {mountStats} from './ui/stats'
 import {mountHotkeys} from './ui/hotkeys'
 import {mountGuide} from './ui/guide'
+import {touchUi} from './ui/input-mode'
 
 export let spawnCreatedCharacter:()=>Promise<void>=async()=>{}
 let titleTransition:{signal:AbortSignal;cancel:()=>void;view?:Veil}|undefined
@@ -315,7 +316,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     if(isGlobalHotkeyBlocked(event.target))return
     if(event.code==='KeyV'&&!event.repeat)void toggle().then(showMode)
   })
-  const touch=matchMedia('(pointer:coarse)').matches,hint=document.querySelector<HTMLElement>('.hint')!,toast=document.querySelector<HTMLElement>('.toast')!
+  const touch=touchUi(),hint=document.querySelector<HTMLElement>('.hint')!,toast=document.querySelector<HTMLElement>('.toast')!
   const modeButton=document.createElement('button');modeButton.className='btn-mode'
   modeButton.addEventListener('pointerenter',()=>void prefetchWalk())
   modeButton.addEventListener('touchstart',()=>void prefetchWalk(),{passive:true})
@@ -351,6 +352,36 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   showMode()
   // IDOK-221: 按键卡 + 玩法指南 + 首次进城的新手引导（测试和分享/反馈链接不自动弹引导，?tour 强制）。
   mountGuide({autoTour:params.has('tour')||!(params.has('verify')||params.has('view')||params.has('debug'))})
+  // IDOK-234 复位：卡进墙 / 掉进水里时，传送到最近的平地。左上「复位」按钮 + 可改键（默认 R）。
+  // 坐在车 / 船上时复位会把载具留在原地，所以要 3 秒内再按一次确认，免得骑车时误触。
+  const unstuckButton=document.createElement('button');unstuckButton.type='button';unstuckButton.className='btn-unstuck'
+  unstuckButton.innerHTML='<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.6 8.2A6 6 0 1 1 4 11.4"/><path d="M3.2 4.6l1.4 3.6 3.6-1.3"/><circle cx="10" cy="10.2" r="1.6"/></svg><span>复位</span>'
+  const unstuckText=unstuckButton.querySelector('span')!
+  let unstuckArmedUntil=0,unstuckTimer=0
+  const unstuckTitle=()=>{unstuckButton.title=`复位：卡住或掉进水里时回到最近的平地（${bindingLabel('unstuck')}）`;unstuckButton.setAttribute('aria-label',unstuckButton.title)}
+  const disarmUnstuck=()=>{unstuckArmedUntil=0;clearTimeout(unstuckTimer);unstuckButton.classList.remove('armed');unstuckText.textContent='复位'}
+  async function unstuck(){
+    const player=walker
+    if(!player?.active||switching)return
+    if(document.body.hasAttribute('data-aboard')&&performance.now()>unstuckArmedUntil){
+      const what=document.body.dataset.ride==='boat'?'船':'车'
+      unstuckArmedUntil=performance.now()+3000;unstuckButton.classList.add('armed');unstuckText.textContent=`再点一次 · 弃${what}复位`
+      clearTimeout(unstuckTimer);unstuckTimer=window.setTimeout(disarmUnstuck,3000)
+      showToast(`复位会把${what}留在原地，3 秒内再点一次「复位」或按 ${bindingLabel('unstuck')} 确认`,3000);return
+    }
+    disarmUnstuck()
+    const spot=player.findUnstuck()
+    if(!spot){showToast('附近没找到能站稳的平地，打开地图（M）换个地方');return}
+    await walkTo(spot.x,spot.z,player.yaw,'unstuck','最近的平地')
+  }
+  unstuckButton.onclick=()=>void unstuck()
+  unstuckTitle();onPrefs(unstuckTitle)
+  ;(document.querySelector('.hud-me')??document.body).append(unstuckButton)
+  window.addEventListener('keydown',event=>{
+    if(event.repeat||isGlobalHotkeyBlocked(event.target)||!hits(event.code,'unstuck'))return
+    if(!walker?.active||document.body.hasAttribute('data-home')||document.body.dataset.photo==='on')return
+    event.preventDefault();void unstuck()
+  })
   let missionGroundRay: THREE.Raycaster | undefined
   const sampleMissionGroundY = (x: number, z: number): number => {
     const tile = manifest.chunks.find(t => x >= t.x && x < t.x + 256 && z >= t.z && z < t.z + 256)

@@ -7,6 +7,7 @@ import {fetchAsset,type Manifest,type Tile} from '../world'
 import {look} from '../look/config'
 import {walkConfig as cfg} from './config'
 import {probeCarDismount, probeCarMount} from './car'
+import {trafficPushGuard} from './traffic-push'
 import {probeLocalDismount, probeLocalMount} from './ride'
 import {onOldSouthSlope,yueyaShoulderHeight} from '../yueya-slope'
 import {CAR_SCALE} from '../drive/scale'
@@ -19,6 +20,10 @@ const candidates = [{dx:0,dz:0}]
 for(let dx=-cfg.search;dx<=cfg.search;dx+=2) for(let dz=-cfg.search;dz<=cfg.search;dz+=2)
   if((dx||dz)&&Math.hypot(dx,dz)<=cfg.search)candidates.push({dx,dz})
 candidates.sort((first,second)=>Math.hypot(first.dx,first.dz)-Math.hypot(second.dx,second.dz))
+// 复位（IDOK-234）在 cfg.search 之外再用 4 m 网格搜到 200 m：漓江江心离岸可能超过 64 m。
+const unstuckCandidates=[...candidates]
+for(let dx=-200;dx<=200;dx+=4) for(let dz=-200;dz<=200;dz+=4){const d=Math.hypot(dx,dz);if(d>cfg.search&&d<=200)unstuckCandidates.push({dx,dz})}
+unstuckCandidates.sort((first,second)=>Math.hypot(first.dx,first.dz)-Math.hypot(second.dx,second.dz))
 
 function field(cells:number,sample:(col:number,row:number)=>number){
   const heights = new Float32Array((cells+1)**2)
@@ -355,6 +360,7 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   const hullFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='rail'||k==='building'}
   const carWallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='building'||k==='rail'||k==='peak'||k==='tree'}
   const bikeWallFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='landmark'||k==='peak'||k==='rail'||k==='building'||k==='tree'}
+  const canTrafficPush=trafficPushGuard(world,capsule,bikeWallFilter,insideHouse)
   const landmarkFilter=(coll:R.Collider)=>kinds.get(coll.handle)==='landmark'
   const walkableFilter=(coll:R.Collider)=>{const k=kinds.get(coll.handle);return k==='deck'||k==='deckThin'||k==='sidewalk'||k==='road'||k==='ground'||k==='overview'||k==='landmark'}
   function surface(east:number,south:number,kind:Kind,origin=4000,reach=6000){
@@ -460,9 +466,9 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
   function withinBounds(x:number,z:number){
     return inRegion(manifest,x,z)
   }
-  function findWalkableSpawn(east:number,south:number,override=false){
+  function findWalkableSpawn(east:number,south:number,override=false,dryOnly=false){
     for(const {dx,dz} of override?[candidates[0]]:candidates){const x=east+dx,z=south+dz,tile=tileAt(x,z)
-      if(!withinBounds(x,z)||!tile||!stream.loaded.has(tile)||insideHouse(x,z))continue
+      if(!withinBounds(x,z)||!tile||!stream.loaded.has(tile)||(dryOnly&&wet(x,z))||insideHouse(x,z))continue
       const deck=surface(x,z,'deck'),support=deck??surface(x,z,'sidewalk')??surface(x,z,'road')??surface(x,z,'ground');if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
       const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05)continue
       const tread=surface(x,z,'landmark',support.y+cfg.step+.02,cfg.step+.04)
@@ -472,11 +478,43 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return {x,y,z,rule:(dx||dz?'search-':'')+(deck?'bridge':'land')}
     }return null
   }
+  // IDOK-234 复位：玩家卡进墙 / 掉进水里时，找最近的一块「平地」。
+  // 不要原地（≥2 m，否则卡在死角里按了也没反应）；铺装路面 / 人行道 / 桥面优先（开阔、连通），
+  // 草地、土坡只在近得多时才选（加 PAVED_BONUS 米的距离惩罚）；坡度 ≤ FLAT，找不到再放宽到能站的坡度。
+  const FLAT=12*Math.PI/180, PAVED_BONUS=10
+  function findFlatGround(east:number,south:number){
+    type Spot={x:number,y:number,z:number,rule:string,score:number}
+    let best:Spot|null=null,steep:Spot|null=null
+    for(const {dx,dz} of unstuckCandidates){const d=Math.hypot(dx,dz);if(d<2)continue
+      if(best&&d>=best.score)break
+      const x=east+dx,z=south+dz,tile=tileAt(x,z)
+      if(!withinBounds(x,z)||!tile||!stream.loaded.has(tile)||insideHouse(x,z))continue
+      const deck=surface(x,z,'deck'),walk=deck??surface(x,z,'sidewalk'),paved=walk??surface(x,z,'road'),support=paved??surface(x,z,'ground')
+      if(!support||support.slope>cfg.slope||(!deck&&wet(x,z)))continue
+      const peak=surface(x,z,'peak');if(peak&&peak.y>support.y+.05)continue
+      const tread=surface(x,z,'landmark',support.y+cfg.step+.02,cfg.step+.04)
+      const floor=tread&&tread.slope<=cfg.slope?Math.max(tread.y,support.y):support.y
+      const y=floor+cfg.height/2+.055
+      if(world.intersectionWithShape({x,y,z},identity,shape,undefined,undefined,capsule))continue
+      const spot={x,y,z,rule:'unstuck-'+(deck?'bridge':walk?'sidewalk':paved?'road':'ground'),score:d+(paved?0:PAVED_BONUS)}
+      if(support.slope>FLAT){if(!steep||spot.score<steep.score)steep=spot;continue}
+      if(!best||spot.score<best.score)best=spot
+    }
+    return best??steep
+  }
   function hasDeck(east:number,south:number){const tile=tileAt(east,south);return !!(tile&&stream.loaded.get(tile)?.deck.length)}
   function overlaps(kind:Kind){return !!world.intersectionWithShape(body.translation(),identity,shape,undefined,undefined,capsule,undefined,kind==='deck'?deckFilter:coll=>kinds.get(coll.handle)===kind)}
   function clear(){for(const region of regions.values())region.colliders.forEach(remove);regions.clear();mountains.forEach(remove);mountains.clear();modelMountains.forEach(list=>list.forEach(remove));modelMountains.clear();trunks.forEach(remove);trunks.clear();landmarks.forEach(colliders=>colliders.forEach(remove));landmarks.clear()}
   function findLocalDismount(cx:number,cz:number,heading:number,bikeY:number){
-    return probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,bikeY)
+    const local=probeLocalDismount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},cx,cz,heading,bikeY)
+    if(local||!wet(cx,cz))return local
+    const tile=tileAt(cx,cz),data=tile&&stream.loaded.get(tile)
+    if(!tile||!data)return null
+    const waterY=data.water[Math.round((cz-tile.z)/4)*65+Math.round((cx-tile.x)/4)]/10
+    const tread=surface(cx,cz,'deck',bikeY+.6,1.4)??surface(cx,cz,'landmark',bikeY+.6,1.4)??surface(cx,cz,'road',bikeY+.6,1.4)
+    if(tread&&tread.y>=waterY)return null
+    const shore=findWalkableSpawn(cx,cz,false,true)
+    return shore&&{...shore,rule:'water-rescue'}
   }
   function findLocalMount(px:number,py:number,pz:number,bx:number,by:number,bz:number){
     return probeLocalMount({world,capsule,shape,kinds,stream,tileAt,surface,wet,insideHouse},px,py,pz,bx,by,bz)
@@ -514,5 +552,5 @@ export async function createPhysics(manifest:Manifest,stream:Stream,peaks:PeaksG
       return k==='building'||k==='rail'||k==='peak'||k==='tree'||k==='landmark'
     })
   }
-  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt}
+  return {world,body,capsule,controller,kinds,sources,sync,clear,overlaps,tileAt,hasDeck,surface,groundSurface,waterCeiling,waterOverlap,carOverlap,raycastObstacle,bikePathBlocked,pathBlocked,freeCapsule,wet,insideHouse,withinBounds,findWalkableSpawn,findFlatGround,findLocalDismount,findLocalMount,findCarDismount,findCarMount,isBlockedAt,canTrafficPush}
 }

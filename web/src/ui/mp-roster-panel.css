@@ -63,7 +63,7 @@ body[data-shop-open="1"] .mp-roster { display: none !important; }
   .mp-roster { bottom: calc(84px + env(safe-area-inset-bottom)); max-height: min(420px, calc(100dvh - 190px)); }
 }
 /* 横屏手机：左下是摇杆，名册挪到右上角菜单下面 */
-@media (pointer: coarse) {
+@media (pointer:coarse) and (not (any-pointer:fine)) {
   .mp-roster { left: auto; right: calc(12px + env(safe-area-inset-right)); top: calc(56px + env(safe-area-inset-top)); bottom: auto; max-height: calc(100dvh - 76px); width: min(270px, 46vw); }
 }
 @media (prefers-reduced-motion: reduce) { .mp-roster { transition: none; } }

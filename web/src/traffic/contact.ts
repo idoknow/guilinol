@@ -27,7 +27,7 @@ export const contactSamples:number[]=[]
 let sampling=false,sampleIndex=0
 export function sampleContacts(enabled:boolean){sampling=enabled}
 
-export function resolveContact(point:Point,footY:number,yaw:number,width:number,length:number,source=visit){
+export function resolveContact(point:Point,footY:number,yaw:number,width:number,length:number,source=visit,canPush?:(point:Point,dx:number,dz:number,yaw:number,length:number)=>boolean){
   const start=sampling?performance.now():0
   let hit=false
   source?.(point.x,point.z,solid=>{
@@ -55,7 +55,8 @@ export function resolveContact(point:Point,footY:number,yaw:number,width:number,
         if(depth<min){min=depth;pushX=ax*depth*(center<0?-1:1);pushZ=az*depth*(center<0?-1:1)}
       }
     }
-    point.x+=pushX;point.z+=pushZ;hit=true
+    if(!canPush||canPush(point,pushX,pushZ,yaw,length)){point.x+=pushX;point.z+=pushZ}
+    hit=true
     solid.holdUntil=performance.now()+250
   })
   if(sampling)contactSamples[sampleIndex++%1024]=performance.now()-start

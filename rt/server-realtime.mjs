@@ -150,11 +150,41 @@ function cleanName(value) {
 }
 
 /** 反代场景取 x-forwarded-for 第一跳，但只接受合法 IP 字面量；客户端乱写头就退回 socket 地址 */
+/**
+ * 取真实客户端 IP。
+ *
+ * 线上拓扑是 CDN 节点 → Traefik → rt，而 Traefik 不信任上游的 X-Forwarded-For，
+ * 会用「直连对端地址」（也就是 CDN 节点 IP）覆盖它。所以不能只信 XFF 第一个值：
+ * 优先级按「离客户端最近、且中间层不会伪改」的顺序来，再退回 socket 地址。
+ *
+ * 注意：这些头只在 CDN 能覆盖写入时才可信。有人绕过 CDN 直连源站时能伪造成本很低的值，
+ * 因此这里的结果只用于限流 / 统计 / 日志，不能当鉴权依据。
+ */
 function clientIp(req) {
-  const forwarded = req.headers['x-forwarded-for']
-  const first = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : ''
-  if (isIP(first)) return first
+  const header = (name) => {
+    const value = req.headers[name]
+    return typeof value === 'string' ? value.split(',')[0].trim() : ''
+  }
+  for (const name of ['cf-connecting-ip', 'x-real-ip', 'x-client-ip', 'true-client-ip']) {
+    const value = header(name)
+    if (isIP(value)) return value
+  }
+  const forwarded = header('x-forwarded-for')
+  if (isIP(forwarded)) return forwarded
   return req.socket.remoteAddress || 'unknown'
+}
+
+// 排障用：一段时间打一条「这次连接命中了哪个头」，确认 CDN 到底传了什么
+let ipDebugAt = 0
+function ipDebug(req, ip) {
+  if (!process.env.RT_IP_DEBUG) return
+  const at = now()
+  if (at - ipDebugAt < 5000) return
+  ipDebugAt = at
+  const names = ['cf-connecting-ip', 'x-real-ip', 'x-client-ip', 'true-client-ip', 'x-forwarded-for', 'forwarded']
+  const seen = {}
+  for (const name of names) if (req.headers[name] !== undefined) seen[name] = String(req.headers[name]).slice(0, 120)
+  console.log(JSON.stringify({ scope: 'rt-ip', ip, socket: req.socket.remoteAddress, headers: seen }))
 }
 
 /** 每次 join 顺手清掉过期封禁，不起 setInterval（避免泄漏） */
@@ -493,6 +523,7 @@ wss.on('connection', (ws, req) => {
   let ip = 'unknown'
   try {
     ip = clientIp(req)
+    ipDebug(req, ip)
     // 容量按「所有连接」算：只数 players 的话，握完手不 join 就能无限占连接
     if (sockets.size >= MAX_PLAYERS) {
       console.warn(JSON.stringify({scope:'rt-reject',reason:'full',ip,players:players.size,sockets:sockets.size}))

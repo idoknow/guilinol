@@ -2,7 +2,7 @@
 // 判定一律走 hits(code, action)：它只认「这个动作现在绑的键」，所以改键之后旧键立刻失效。
 import {prefs, setPrefs} from '../ui/prefs'
 
-export type Action = 'forward' | 'back' | 'left' | 'right' | 'run' | 'crouch' | 'jump' | 'interact' | 'view' | 'stats' | 'settings' | 'useItem' | 'emote'
+export type Action = 'forward' | 'back' | 'left' | 'right' | 'run' | 'crouch' | 'jump' | 'interact' | 'view' | 'stats' | 'settings' | 'useItem' | 'emote' | 'unstuck'
 
 type Definition = {id: Action; label: string; codes: string[]}
 
@@ -19,6 +19,7 @@ export const ACTIONS: Definition[] = [
   {id: 'stats', label: '显示 / 隐藏读数', codes: ['F3']},
   {id:'emote',label:'表情动作（长按选择，短按重播）',codes:['KeyG']},
   {id: 'useItem', label: '使用手中物品', codes: ['KeyY']},
+  {id: 'unstuck', label: '复位（卡住 / 落水时回到最近的平地）', codes: ['KeyR']},
   {id: 'settings', label: '设置', codes: ['KeyN']},
 ]
 

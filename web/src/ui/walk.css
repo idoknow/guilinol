@@ -20,7 +20,7 @@
 /* D (on foot: 叫车, aboard: 压弯) */ .walk-ui :is(.btn-tuck,.btn-hail){right:calc(204px + var(--sr));bottom:calc(41px + var(--sb));width:44px;height:44px;font-size:12px;letter-spacing:.02em}
 /* E */ .walk-ui .btn-view{right:calc(18px + var(--sr));bottom:calc(162px + var(--sb));width:44px;height:44px;font-size:12px;letter-spacing:.04em}
 .walk-ui .btn-run.on,.walk-ui .btn-crouch.on{background:rgba(169,80,60,.68);border-color:rgba(244,239,226,.72);box-shadow:0 0 0 2px rgba(214,120,92,.32)}
-@media (pointer:coarse) and (max-height:500px){
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
   .walk-ui .joystick{left:calc(22px + env(safe-area-inset-left));bottom:calc(16px + var(--sb));width:96px;height:96px}
   .walk-ui .joystick-knob{width:40px;height:40px}
   .walk-ui :is(.btn-jump,.btn-wheelie){right:calc(66px + var(--sr));bottom:calc(122px + var(--sb));width:56px;height:56px}
@@ -92,7 +92,7 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   .vehicle-action{box-shadow:0 4px 16px rgba(18,30,28,.28),0 0 0 1px rgba(214,120,92,.35)}
   .vehicle-action::before{content:attr(aria-keyshortcuts);display:inline-grid;place-items:center;min-width:1.45em;height:1.45em;margin-right:.55em;padding:0 .24em;border-radius:5px;border:1px solid rgba(244,239,226,.72);background:linear-gradient(180deg,rgba(244,239,226,.26),rgba(244,239,226,.12));box-shadow:0 2px 0 rgba(244,239,226,.38),inset 0 1px 0 rgba(255,255,255,.28);font:600 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:0;vertical-align:1px}
 }
-@media (pointer:coarse){
+@media (pointer:coarse) and (not (any-pointer:fine)){
   .vehicle-action{bottom:calc(230px + env(safe-area-inset-bottom));max-width:calc(100vw - 168px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .toast{max-width:calc(100vw - 32px);font-size:13.5px;padding:8px 16px}
   .ride-hud{bottom:calc(280px + env(safe-area-inset-bottom));max-width:calc(100vw - 16px);padding:4px 7px;gap:3px 4px;font-size:10.5px;border-radius:14px}
@@ -106,7 +106,7 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   .ride-park,.ride-light,.ride-turn-left,.ride-turn-right,.ride-hazard,.ride-horn,.ride-cruise,.ride-sound{padding:2px 4px;font-size:10px}
   output{top:auto;bottom:calc(344px + env(safe-area-inset-bottom));left:calc(12px + env(safe-area-inset-left));max-width:calc(100vw - 136px - env(safe-area-inset-left) - env(safe-area-inset-right));box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
-@media (pointer:coarse) and (max-height:500px){
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-height:500px){
   .vehicle-action{bottom:calc(82px + env(safe-area-inset-bottom));left:calc(50% - 32px);transform:translateX(-50%);max-width:calc(100vw - 388px - env(safe-area-inset-left) - env(safe-area-inset-right));padding:5px 13px;font-size:12.5px}
   .ride-hud{box-sizing:border-box;bottom:calc(24px + env(safe-area-inset-bottom));top:auto;left:calc(50% - 52px);max-width:calc(100vw - 358px - env(safe-area-inset-left) - env(safe-area-inset-right));padding:2px 6px;gap:2px 3px;font-size:9.5px}
   .ride-gears{gap:2px}
@@ -122,7 +122,7 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   .hud-stats,body[data-hud="street"] .hud-stats{bottom:calc(26px + env(safe-area-inset-bottom))}
   body[data-aboard] .hud-stats,body[data-hud="street"][data-aboard] .hud-stats{left:calc(12px + env(safe-area-inset-left));bottom:calc(124px + env(safe-area-inset-bottom));transform:none;max-width:min(40vw,180px)}
 }
-@media (pointer:coarse) and (max-width:520px){
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-width:520px){
   html,body{overflow:hidden;max-width:100vw}
   .toast{top:calc(384px + env(safe-area-inset-top))}
   footer{max-width:calc(100vw - 16px);font-size:8px;overflow:hidden;text-overflow:ellipsis}
@@ -131,7 +131,7 @@ body[data-home] :is(.ride-hud,.vehicle-action,.walk-ui){display:none!important}
   .sky-ui button{width:26px;height:25px}
   .dock .minimap{width:108px;height:108px}
 }
-@media (pointer:coarse) and (max-width:520px) and (min-height:501px){
+@media (pointer:coarse) and (not (any-pointer:fine)) and (max-width:520px) and (min-height:501px){
   .ride-hud{box-sizing:border-box;left:calc(12px + env(safe-area-inset-left));transform:none;max-width:calc(100vw - 148px - env(safe-area-inset-left) - env(safe-area-inset-right));justify-content:flex-start}
   output{bottom:calc(376px + env(safe-area-inset-bottom))}
   body[data-aboard] .hud-stats,body[data-hud="street"][data-aboard] .hud-stats{max-width:min(46vw,180px)}

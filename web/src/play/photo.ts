@@ -7,6 +7,7 @@ import {canRecord, saveRecording, startRecording, type Recording} from '../gear/
 import {prefs} from '../ui/prefs'
 import {openRack} from '../ui/gear-rack'
 import {refreshCamera, setCameraShown} from '../gear/hand'
+import {touchUi} from '../ui/input-mode'
 
 // 拍照模式（IDOK-182 起接了相机装备，IDOK-211 又把专业参数收掉了）：
 //   机身只决定取景广角、画质基线和手上拿的那台；UI 回到「时辰 / 滤镜 / 天气 / 人物 / 落款」，
@@ -199,7 +200,7 @@ export function photoMode(host: Host, place: () => string, onCapture?: () => voi
 
     if (shotUrl) URL.revokeObjectURL(shotUrl)
     shotUrl = URL.createObjectURL(blob)
-    const share = navigator.canShare?.({files: [file]}) && matchMedia('(pointer:coarse)').matches
+    const share = navigator.canShare?.({files: [file]}) && touchUi()
     shot.innerHTML = `<img alt="刚拍的照片"><figcaption>
       <span class="shot-meta">${body().short} · ${focalLabel(focalValue())} · ${shutterLabel(settingsNow.shutter)} · ISO ${settingsNow.iso}</span>
       <a download="${name}">保存</a>${share ? '<button>分享</button>' : ''}<button class="shot-close" aria-label="收起">×</button></figcaption>`

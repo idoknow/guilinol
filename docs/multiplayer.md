@@ -5,8 +5,25 @@
 `/ws` 转给 `glol-rt:8790`，前端不需要任何构建期配置。
 
 登录后以 `?mp=1` 或 `localStorage['glol.mp']='1'` 进入步行模式。默认不加载联机客户端。
-`walk.net?.status()` 返回 `{state, online}`，`state` 为 connecting / online / offline；
-断线退避最多六次，之后可调用 `walk.net.reconnect()`。`?debug` 显示调试人数。
+`walk.net?.status()` 返回 `{state, online}`，`state` 为 connecting / online / offline /
+replaced；断线**无限重试**，指数退避封顶 16s 加抖动，只有被封禁（4003 banned）才停；
+被别的设备顶掉（4001 replaced）时不自动重连，状态栏给「已在其他设备联机 · 重连」。
+`?debug` 显示调试人数。
+
+## 视野裁剪（AOI）
+
+作者：HelloFHZ（fhzit）
+
+- 100m 网格 `Map<cellKey, Set<id>>`，只在跨格时重算，不做每帧重建。
+- 同格 + 邻格（3×3）20Hz 直发；外圈但水平距离 ≤150m 降到 5Hz；超过 150m 才移出视野（滞回，防边界闪烁）。
+- 进入视野补一帧完整状态（`join`），离开发 `leave`；传送是瞬间跨格，`pos` 里先重算可见集合再转发。
+- `online` 人数与 `chat` 仍是全服；`join` / `avatar` / `emote` 只发视野内；`hit` / `revive` 保持服务端距离裁决。
+- 全服名册走单独的低频通道：每 5s 一条 `{t:'roster', players:[[id,name,x,z,joinedAt]]}`，
+  地图 / 名册面板用它，3D 场景仍然只来自 AOI。
+- 实测（单进程、单核=100%）：300 人城区分布约 1 核、单客户端 16 KB/s；
+  密集（±250m）会踩满事件循环，`loopP99` 应在 50ms 以下，超过即视为容量到顶。
+- 压测：`npm run bench:rt -- --bots 300 --seconds 20`（离线自起，不碰线上）；
+  行为用例：`npm run test:rt-aoi`。
 
 上线前在 `glol-env` 配置同一个随机 `RT_JOIN_SECRET` 给 api 和 rt。登录会话经同源
 `POST /api/rt/ticket` 取得 60 秒 HMAC 票据，作为 `join.ticket` 发送；rt 无密钥时拒绝所有 join。

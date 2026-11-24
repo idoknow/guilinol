@@ -1,6 +1,6 @@
 // 玩法引导（IDOK-221）：三件东西，一份数据。
 //  · 按键卡 .keys-card —— 电脑端左下角，随「步行 / 飞行 / 电驴 / 单车 / 汽车 / 船」切换，只放当下最常用的几个键；可折叠，记住状态。
-//    手机（pointer:coarse）和窄屏不显示：那边按钮本身就写着字，键盘提示没有意义。
+//    手机（触屏界面，见 input-mode.ts）和窄屏不显示：那边按钮本身就写着字，键盘提示没有意义。
 //  · 玩法指南 .guide-sheet —— 全部玩法怎么用 + 全部按键 / 触屏手势。入口：按键卡底部、左上「?」按钮、F1 或 ?、首页「怎么玩」。
 //  · 新手引导 .coach —— 第一次进城时按真实 HUD 位置点亮 4–6 步（找不到的按钮自动跳过），只出现一次，可在指南里重看。
 // 键名一律走 keymap 的 bindingLabel，玩家改键后这里跟着变。
@@ -9,11 +9,12 @@ import {bindingLabel, type Action} from '../input/keymap'
 import {onPrefs} from './prefs'
 import {getPlayMode} from '../game/play-mode'
 import {isGlobalHotkeyBlocked} from '../walk/input-guard'
+import {touchUi} from './input-mode'
 
 type Ctx = 'walk' | 'fly' | 'bike' | 'bicycle' | 'car' | 'boat'
 type Row = {keys: string[]; label: string; solo?: boolean; free?: boolean; id?: string}
 
-const touch = () => matchMedia('(pointer:coarse)').matches
+const touch = touchUi
 const solo = () => getPlayMode() === 'solo'
 const k = (action: Action) => bindingLabel(action).split(' / ')[0]
 const move = () => [k('forward'), k('left'), k('back'), k('right')]
@@ -143,8 +144,8 @@ const FEATURES = (): Feature[] => [
     pc: `按 <kbd>V</kbd> 起飞，${caps(move())} 飞，<kbd>Q</kbd> / <kbd>E</kbd> 降 / 升，<kbd>Shift</kbd> 加速；再按 <kbd>V</kbd> 落地步行。`,
     phone: '点右上「起飞」。一根手指拖动转方向，两根手指拖着走；点「落地步行」回到地面。'},
   {seal: '图', title: '地图与传送',
-    pc: '按 <kbd>M</kbd> 或点右上「地图」。可以搜地名，点地图上任意一处就直接过去；右上角小圆图随时告诉你在哪条路。',
-    phone: '点右上「地图」，搜地名或点地图上任意一处，直接传送过去。'},
+    pc: `按 <kbd>M</kbd> 或点右上「地图」。可以搜地名，点地图上任意一处就直接过去；右上角小圆图随时告诉你在哪条路。卡进墙里或掉进水里，点左上「复位」或按 <kbd>${k('unstuck')}</kbd>，回到最近的平地。`,
+    phone: '点右上「地图」，搜地名或点地图上任意一处，直接传送过去。卡进墙里或掉进水里，点左上的复位按钮回到最近的平地。'},
   {seal: '印', title: '景册集印章',
     pc: '名胜附近地上有朱红色圆圈，走进去就盖一枚印章。按 <kbd>J</kbd> 翻景册，看还差哪几处，也能从景册直接去。',
     phone: '名胜附近地上有朱红色圆圈，走进去就盖一枚印章。点「景册」看还差哪几处，也能从景册直接去。'},
@@ -163,7 +164,7 @@ const FEATURES = (): Feature[] => [
 ]
 
 const KEY_GROUPS = (): {title: string; rows: Row[]}[] => [
-  {title: '步行', rows: rows('walk').concat([{keys: ['C'], label: '视距'}, {keys: ['J'], label: '景册'}, {keys: [k('useItem')], label: '使用手中物品'}])},
+  {title: '步行', rows: rows('walk').concat([{keys: ['C'], label: '视距'}, {keys: ['J'], label: '景册'}, {keys: [k('useItem')], label: '使用手中物品'}, {keys: [k('unstuck')], label: '复位（卡住 / 落水）'}])},
   {title: '飞行', rows: rows('fly'), },
   {title: '电驴', rows: rows('bike').concat([{keys: ['1', '2', '3', '4'], label: '直接选挡'}, {keys: ['0'], label: '驻车 P 挡'}, {keys: ['B'], label: '双闪'}, {keys: ['G'], label: '改装'}])},
   {title: '单车', rows: rows('bicycle')},
