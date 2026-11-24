@@ -3,7 +3,7 @@
 
 export type BodyId = 'mirrorless' | 'action' | 'pocket' | 'thumb' | 'a7r2' | 'action6' | 'pocket4pro'
 
-/** 录制档位：分辨率 + 帧率 + 码率，容器（MP4/MOV）由 UI 另选。 */
+/** 录制档位：分辨率 + 帧率 + 码率；容器固定 MP4。 */
 export interface VideoPreset {
   label: string
   width: number
@@ -158,7 +158,7 @@ export const CAMERAS: Record<BodyId, CameraBody> = {
     id: 'a7r2',
     name: '索尼 A7R II',
     short: 'A7R II',
-    tagline: '4240 万像素 · 全画幅背照式 · 14bit RAW',
+    tagline: '4240 万像素 · 全画幅背照式',
     sensor: '全画幅 35.9×24.0mm 4240 万',
     baseIso: 100,
     iso: [50, 100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600],
@@ -233,27 +233,12 @@ export const CAMERAS: Record<BodyId, CameraBody> = {
 
 export const BODY_IDS: BodyId[] = ['mirrorless', 'action', 'pocket', 'thumb', 'a7r2', 'action6', 'pocket4pro']
 
-/** 兼容旧调用：老四台排前面，新的三台跟在后面。 */
-export const LEGACY_BODY_IDS: BodyId[] = ['mirrorless', 'action', 'pocket', 'thumb']
-
 export function camera(id: BodyId): CameraBody {
   return CAMERAS[id]
 }
 
-/** 录制容器：Real-camera 的两种常见封装，浏览器能录到 mp4 就换标成 qt，否则退回 webm。 */
-export type VideoContainer = 'mp4' | 'mov'
-
-export const VIDEO_CONTAINERS: [string, VideoContainer][] = [
-  ['MP4', 'mp4'],
-  ['MOV', 'mov'],
-]
-
-/** MediaRecorder 候选 mime：先试带 fps 提示的，再试裸的，最后 webm。 */
-export function videoMimeCandidates(container: VideoContainer): string[] {
-  if (container === 'mp4') return ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1.42E01E', 'video/mp4']
-  // MOV（QuickTime）没有浏览器原生封装；录 mp4 再把 ftyp 改成 qt 品牌，播放器仍按 ISO BMFF 解。
-  return ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1.42E01E', 'video/mp4']
-}
+/** MediaRecorder 的 MP4 候选 mime（IDOK-211：录像固定 MP4，编不出来才退 WebM）。 */
+export const MP4_MIMES = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1.42E01E', 'video/mp4']
 
 export function videoPreset(body: CameraBody, index: number): VideoPreset {
   return body.video.presets[Math.min(Math.max(index, 0), body.video.presets.length - 1)]

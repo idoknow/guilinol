@@ -1,17 +1,14 @@
-import type {CameraBody, VideoContainer, VideoPreset} from './cameras'
-import {videoMimeCandidates} from './cameras'
+import type {CameraBody, VideoPreset} from './cameras'
+import {MP4_MIMES} from './cameras'
 import {download, stamp} from './capture'
 
-// 录像（IDOK-182 / IDOK-188）：canvas.captureStream + MediaRecorder。
-// 档位（分辨率/帧率/码率）由机身 + UI 选，容器 MP4 / MOV 由 UI 选：
-// - 浏览器能录 mp4（Chrome 系）时，MP4 直接落 .mp4；MOV 走同一份码流，把 ftyp 品牌改写成 `qt  `，
-//   仍是 ISO BMFF，QuickTime / 剪映 / Premiere 都按 MOV 打开。
-// - 浏览器只支持 webm（Firefox 等）时退回 webm，并在返回值里说明真实容器。
+// 录像（IDOK-182 / IDOK-211）：canvas.captureStream + MediaRecorder，容器固定 MP4。
+// 浏览器真能编 MP4（探针为准）就落 .mp4，否则退回 WebM，并在返回值里说明真实容器。
 
 export interface RecordingResult {
   blob: Blob
   mime: string
-  container: VideoContainer | 'webm'
+  container: 'mp4' | 'webm'
   seconds: number
   width: number
   height: number
@@ -36,27 +33,8 @@ function pickMime(list: string[]): string | null {
 
 const WEBM_FALLBACK = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
 
-/** 这台浏览器支持哪些容器：mp4 能力决定 mov 是否可行。 */
-export function recordingSupport(): {mp4: boolean; mov: boolean; webm: boolean} {
-  const mp4 = !!pickMime(videoMimeCandidates('mp4'))
-  const webm = !!pickMime(WEBM_FALLBACK)
-  return {mp4, mov: mp4, webm}
-}
-
 export function canRecord(canvas: HTMLCanvasElement): boolean {
   return typeof MediaRecorder !== 'undefined' && typeof canvas.captureStream === 'function'
-}
-
-/** 把 MP4 的 ftyp 品牌改成 QuickTime（`qt  `），容器仍是 ISO BMFF。 */
-async function brandAsMov(blob: Blob): Promise<Blob> {
-  const buffer = await blob.arrayBuffer()
-  const bytes = new Uint8Array(buffer)
-  // 前 8 字节：size(4) + 'ftyp'(4)
-  if (bytes.length > 16 && String.fromCharCode(...bytes.subarray(4, 8)) === 'ftyp') {
-    bytes.set([0x71, 0x74, 0x20, 0x20], 8) // 'qt  '
-    bytes.set([0x00, 0x00, 0x02, 0x00], 12) // minor version
-  }
-  return new Blob([bytes], {type: 'video/quicktime'})
 }
 
 /**
@@ -67,7 +45,7 @@ async function brandAsMov(blob: Blob): Promise<Blob> {
 let mp4Capable: boolean | null = null
 async function probeMp4(): Promise<boolean> {
   if (mp4Capable !== null) return mp4Capable
-  const mime = pickMime(videoMimeCandidates('mp4'))
+  const mime = pickMime(MP4_MIMES)
   if (!mime) {
     mp4Capable = false
     return false
@@ -105,27 +83,30 @@ async function probeMp4(): Promise<boolean> {
 
 /**
  * 开始录制。返回 null 表示这台设备/浏览器不支持。
- * 录制时把源 canvas 按档位缩放到中间画布，保证输出就是所选分辨率（4K/1080 都能出）。
- * 想要 MP4/MOV 但探针证明编不出 MP4 时，直接退回 WebM（`container` 会说真话）。
+ * 源 canvas 按原比例拷到中间画布：长边不超过档位，也不超过源画布的实际像素（不做无意义的放大），
+ * 帧率封顶 60（画面本身按显示器刷新出帧）。探针证明编不出 MP4 时退回 WebM（`container` 说真话）。
  */
-export async function startRecording(source: HTMLCanvasElement, body: CameraBody, preset: VideoPreset, container: VideoContainer): Promise<Recording | null> {
+export async function startRecording(source: HTMLCanvasElement, body: CameraBody, preset: VideoPreset): Promise<Recording | null> {
   if (!canRecord(source)) return null
-  const wantsMp4 = await probeMp4()
-  const mp4Mime = wantsMp4 ? pickMime(videoMimeCandidates(container)) : null
+  const mp4Mime = (await probeMp4()) ? pickMime(MP4_MIMES) : null
   const mime = mp4Mime ?? pickMime(WEBM_FALLBACK)
   if (!mime) return null
-  const actual: VideoContainer | 'webm' = mp4Mime ? container : 'webm'
+  const actual: 'mp4' | 'webm' = mp4Mime ? 'mp4' : 'webm'
 
+  // 保持源画面比例（手机横屏是 2.16:1，硬拉成 16:9 会变形），长边取 min(档位长边, 源长边)。
+  const scale = Math.min(1, Math.max(preset.width, preset.height) / Math.max(source.width, source.height, 1))
+  const even = (value: number) => Math.max(2, Math.round(value * scale / 2) * 2)
+  const width = even(source.width), height = even(source.height), fps = Math.min(60, preset.fps)
   const stage = document.createElement('canvas')
-  stage.width = preset.width
-  stage.height = preset.height
+  stage.width = width
+  stage.height = height
   const scratch = stage.getContext('2d')!
 
-  const stream = stage.captureStream(preset.fps)
+  const stream = stage.captureStream(fps)
   const chunks: BlobPart[] = []
   let recorder: MediaRecorder
   try {
-    recorder = new MediaRecorder(stream, {mimeType: mime, videoBitsPerSecond: preset.bitrate})
+    recorder = new MediaRecorder(stream, {mimeType: mime, videoBitsPerSecond: Math.round(preset.bitrate * Math.max(.25, (width * height) / (preset.width * preset.height)))})
   } catch {
     stream.getTracks().forEach(track => track.stop())
     return null
@@ -138,7 +119,7 @@ export async function startRecording(source: HTMLCanvasElement, body: CameraBody
   const pump = () => {
     if (!pumping) return
     try {
-      scratch.drawImage(source, 0, 0, preset.width, preset.height)
+      scratch.drawImage(source, 0, 0, width, height)
     } catch {
       // 源 canvas 尺寸为 0 的瞬间（切场景/重建）跳过这一帧
     }
@@ -156,9 +137,9 @@ export async function startRecording(source: HTMLCanvasElement, body: CameraBody
     get started() {
       return started
     },
-    width: preset.width,
-    height: preset.height,
-    fps: preset.fps,
+    width,
+    height,
+    fps,
     async stop() {
       const seconds = (performance.now() - started) / 1000
       if (!settled) {
@@ -171,35 +152,22 @@ export async function startRecording(source: HTMLCanvasElement, body: CameraBody
         stream.getTracks().forEach(track => track.stop())
       }
       const type = recorder.mimeType || mime
-      const raw = new Blob(chunks, {type})
-      const blob = actual === 'mov' ? await brandAsMov(raw) : raw
       return {
-        blob,
-        mime: actual === 'mov' ? 'video/quicktime' : type,
+        blob: new Blob(chunks, {type}),
+        mime: type,
         container: actual,
         seconds,
-        width: preset.width,
-        height: preset.height,
-        fps: preset.fps,
+        width,
+        height,
+        fps,
         preset: preset.label,
       }
     },
   }
 }
 
-export function recordingExtension(container: RecordingResult['container']): string {
-  if (container === 'mov') return 'mov'
-  if (container === 'mp4') return 'mp4'
-  return 'webm'
-}
-
 export function saveRecording(result: RecordingResult, prefix = 'glol-clip'): string {
-  const name = `${prefix}-${stamp()}.${recordingExtension(result.container)}`
+  const name = `${prefix}-${stamp()}.${result.container}`
   download(result.blob, name)
   return name
-}
-
-export {bodyVideoLabel}
-function bodyVideoLabel(body: CameraBody): string {
-  return body.video.presets[0]?.label ?? '—'
 }

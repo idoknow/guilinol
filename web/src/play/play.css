@@ -8,7 +8,7 @@
 .dock-buttons>button{box-sizing:border-box;height:var(--ui-h);border-radius:var(--ui-r-pill);padding:0 16px;font-size:14px;letter-spacing:var(--ui-track);display:flex;align-items:center;gap:6px}
 .dock small{font:600 11px/1 var(--ui-serif);letter-spacing:0;background:var(--seal);border-radius:var(--ui-r-pill);padding:3px 7px}
 .dock .btn-mode{position:static;height:var(--ui-h);padding:0 16px}
-body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-card,.book,.summit-pill,.minimap,.road-name,.hud-me){display:none!important}
+body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-card,.book,.summit-pill,.minimap,.road-name,.hud-me,.emote-toggle,.emote-overlay){display:none!important}
 
 /* Minimap: a paper disc with a thin jade rim; north tick on top. */
 .minimap{position:relative;width:132px;height:132px;padding:0;border-radius:50%;overflow:hidden;cursor:pointer;background:#efe8d8;
@@ -173,6 +173,8 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 /* Camera gear (IDOK-182) */
 .photo-actions{position:absolute;right:14px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:10px}
 .photo-actions .photo-shutter{position:static;transform:none}
+/* 录像 + 快门两颗键并排，给它们让出右侧空间，免得压住「雨」 */
+.photo-bar{padding-right:150px}
 .photo-rec{width:44px;height:44px;border-radius:50%;border:2px solid var(--paper);background:none;padding:0;cursor:pointer;display:grid;place-items:center;opacity:.85}
 .photo-rec i{display:block;width:22px;height:22px;border-radius:50%;background:#c8402c;transition:border-radius .16s,transform .12s}
 .photo-bar.rec .photo-rec i{border-radius:3px;transform:scale(.72)}
@@ -203,3 +205,4 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
 @media (pointer:coarse) and (max-height:430px){
   .photo-actions{gap:8px}.photo-rec{width:40px;height:40px}
 }
+@media (pointer:coarse){.photo-bar{padding-right:132px}}

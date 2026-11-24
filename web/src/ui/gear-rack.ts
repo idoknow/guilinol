@@ -13,7 +13,7 @@ const SPEC_ROWS = (body: CameraBody): [string, string][] => [
   ['快门', `${body.shutter.length} 挡`],
   ['镜头', body.focal.fixed ? `${focalLabel(body.focal.min)} 定焦` : `${focalLabel(body.focal.min)}–${focalLabel(body.focal.max)}`],
   ['数码变焦', `${body.zoomMax}×`],
-  ['能力', [body.raw && 'RAW', body.wide && '超广角', body.macro && '微距', body.level && '水平仪', `录像 ${body.video.presets[0]?.label ?? '—'}`].filter(Boolean).join(' · ')],
+  ['能力', [body.wide && '超广角', body.macro && '微距', body.level && '水平仪', `录像 ${body.video.presets[0]?.label ?? '—'}`].filter(Boolean).join(' · ')],
 ]
 
 function build(): HTMLElement {
