@@ -1313,20 +1313,108 @@ const pages: Record<string, (view: View) => void> = {
   },
 
   npc() {
-    paintTop(views.find(view=>view.key==='npc')!,[])
-    const form=h('form',{class:'adm-npc'});main.append(form)
-    void api('admin/npc').then(settings=>{
-      const labels:Record<string,string>={classes:'大路类别（每行一类）',carMin:'每街最少车辆',carMax:'每街最多车辆',personMin:'每街最少行人',personMax:'每街最多行人',horn:'鸣笛',mutter:'念叨',bubble:'碰撞气泡',volume:'NPC 音量',bumpSpeed:'碰撞阈值（米/秒）',bubbleSeconds:'气泡时长（秒）',bumpLines:'碰撞台词（每行一句）',mutterLines:'念叨台词（每行一句）'}
-      const readers=new Map<string,()=>unknown>()
-      for(const [key,label] of Object.entries(labels)){
-        const value=settings[key],field=Array.isArray(value)?document.createElement('textarea'):document.createElement('input')
-        if(field instanceof HTMLInputElement){field.type=typeof value==='boolean'?'checkbox':'number';field.step='any';field.checked=value===true;field.value=String(value)}else field.value=value.join('\n')
-        readers.set(key,()=>field instanceof HTMLTextAreaElement?field.value.split('\n').map(line=>line.trim()).filter(Boolean):field.type==='checkbox'?field.checked:field.valueAsNumber)
-        form.append(h('div',null,h('label',null,label,field)))
+    paintTop(views.find(view=>view.key==='npc')!)
+    const slot=h('div',{class:'adm-stack'},skeleton(8));main.append(slot)
+    void Promise.all([api('admin/npc'),import('../../lib/npc')]).then(([settings,{npcDefaults,validNpc}])=>{
+      type Rules=typeof npcDefaults
+      const stored:Rules=structuredClone(validNpc(settings)?settings:npcDefaults)
+      let saved=JSON.stringify(stored)
+      paint(stored)
+      function paint(initial:Rules){
+      let rules:Rules=structuredClone(initial)
+      const ROADS:[string,string,string][]=[['trunk','快速路','城市快速路与过境干道'],['primary','主干道','如解放路、中山路'],['secondary','次干道','连接各片区的城市道路'],['tertiary','支路','默认不开，开启后路人会进入小街']]
+      const save=h('button',{type:'submit',class:'adm-btn',form:'adm-npc-form',disabled:''},'保存') as HTMLButtonElement
+      const reset=h('button',{type:'button',class:'adm-btn adm-btn--ghost'},'恢复默认') as HTMLButtonElement
+      const state=h('span',{class:'adm-sub adm-npc-state'},'已是最新')
+      paintTop(views.find(view=>view.key==='npc')!,[state])
+      top.querySelector('.adm-top-tools')!.prepend(reset,save)
+      const problem=h('p',{class:'adm-npc-problem',role:'alert',hidden:''})
+      const form=h('form',{class:'adm-npc',id:'adm-npc-form',novalidate:''}) as HTMLFormElement
+      const number=(key:'carMin'|'carMax'|'personMin'|'personMax'|'bumpSpeed'|'bubbleSeconds',attrs:Record<string,string>)=>{
+        const input=h('input',{type:'number',class:'adm-npc-num',inputmode:'decimal',...attrs}) as HTMLInputElement
+        input.value=String(rules[key]);input.oninput=()=>{rules={...rules,[key]:input.valueAsNumber};changed()}
+        return input
       }
-      form.append(h('button',{type:'submit'},'保存'))
-      form.onsubmit=event=>{event.preventDefault();void api('admin/npc',Object.fromEntries([...readers].map(([key,read])=>[key,read()]))).then(()=>toast('已保存，新进场生效')).catch(()=>toast('保存失败，请检查参数'))}
-    }).catch(()=>toast('配置读取失败'))
+      const toggle=(key:'horn'|'mutter'|'bubble',title:string,hint:string)=>{
+        const input=h('input',{type:'checkbox',role:'switch'}) as HTMLInputElement
+        input.checked=rules[key];input.onchange=()=>{rules={...rules,[key]:input.checked};changed()}
+        return h('label',{class:'adm-npc-switch'},h('span',{class:'adm-npc-switch-text'},h('b',null,title),h('span',null,hint)),input,h('i',{'aria-hidden':'true'}))
+      }
+      const range=(label:string,unit:string,min:HTMLInputElement,max:HTMLInputElement,hint:string)=>
+        h('div',{class:'adm-npc-range'},h('span',{class:'adm-npc-label'},label),h('span',{class:'adm-npc-pair'},min,h('span',{'aria-hidden':'true'},'—'),max,h('span',{class:'adm-npc-unit'},unit)),h('span',{class:'adm-sub'},hint))
+      const roads=h('div',{class:'adm-npc-roads',role:'group','aria-label':'生成道路类别'},ROADS.map(([key,name,hint])=>{
+        const input=h('input',{type:'checkbox',value:key}) as HTMLInputElement
+        input.checked=rules.classes.includes(key);input.onchange=()=>{rules={...rules,classes:ROADS.map(([road])=>road).filter(road=>road===key?input.checked:rules.classes.includes(road))};changed()}
+        return h('label',{class:'adm-npc-road'},input,h('span',null,h('b',null,name),h('small',null,hint)))
+      }))
+      const vol=h('input',{type:'range',min:'0',max:'1',step:'0.05',class:'adm-npc-vol','aria-label':'NPC 音量'}) as HTMLInputElement
+      const volText=h('output',{class:'adm-npc-vol-text'})
+      const showVol=()=>{volText.textContent=`${Math.round(rules.volume*100)}%`;vol.style.setProperty('--fill',`${rules.volume*100}%`)}
+      vol.value=String(rules.volume);vol.oninput=()=>{rules={...rules,volume:vol.valueAsNumber};showVol();changed()};showVol()
+      const lines=(key:'bumpLines'|'mutterLines',title:string,hint:string)=>{
+        const area=h('textarea',{rows:'9',spellcheck:'false'}) as HTMLTextAreaElement,count=h('span',{class:'adm-sub'})
+        const sync=()=>{const list=area.value.split('\n').map(line=>line.trim()).filter(Boolean);count.textContent=`${list.length} 句，随机抽取`;return list}
+        area.value=rules[key].join('\n');sync();area.oninput=()=>{rules={...rules,[key]:sync()};changed()}
+        return card(title,[area,count],{sub:hint})
+      }
+      const preview=h('span',{class:'adm-npc-bubble'},rules.bumpLines[0]??'')
+      form.append(
+        h('p',{class:'adm-note'},'保存后，新进入场景的玩家立即按新设置生效；已经在场景里的玩家要重新进入后才会更新。'),
+        problem,
+        card('生成范围与密度',[
+          h('div',{class:'adm-npc-field'},h('span',{class:'adm-npc-label'},'可以生成的道路'),roads),
+          h('div',{class:'adm-npc-ranges'},
+            range('车辆','辆 / 每条街',number('carMin',{min:'1',max:'20',step:'1','aria-label':'每街最少车辆'}),number('carMax',{min:'1',max:'20',step:'1','aria-label':'每街最多车辆'}),'一条街 = 玩家 200 m 内同名的大路'),
+            range('行人','人 / 每条街',number('personMin',{min:'1',max:'20',step:'1','aria-label':'每街最少行人'}),number('personMax',{min:'1',max:'20',step:'1','aria-label':'每街最多行人'}),'只走人行道和斑马线；没有人行道的路段不放人')),
+        ],{sub:'小路、巷子、步行街始终不生成'}),
+        h('div',{class:'adm-cols adm-npc-cols'},
+          card('声音',[
+            toggle('horn','车辆鸣笛','每辆车 10–30 秒随机按一次，越远越轻'),
+            toggle('mutter','行人念叨','玩家 25 米内的路人 15–45 秒说一句，用浏览器的中文语音'),
+            h('div',{class:'adm-npc-volume'},h('span',{class:'adm-npc-label'},'NPC 音量'),vol,volText),
+            h('p',{class:'adm-sub'},'在玩家自己设置的总音量基础上再乘这个比例。'),
+          ]),
+          card('碰撞气泡',[
+            toggle('bubble','撞到路人时冒气泡','只显示文字，不播放语音；同一个路人 6 秒内只说一次'),
+            h('div',{class:'adm-npc-inline'},
+              h('label',null,h('span',{class:'adm-npc-label'},'触发速度'),h('span',{class:'adm-npc-pair'},number('bumpSpeed',{min:'0',max:'30',step:'0.1'}),h('span',{class:'adm-npc-unit'},'米/秒'))),
+              h('label',null,h('span',{class:'adm-npc-label'},'显示时长'),h('span',{class:'adm-npc-pair'},number('bubbleSeconds',{min:'0.5',max:'15',step:'0.5'}),h('span',{class:'adm-npc-unit'},'秒')))),
+            h('div',{class:'adm-npc-preview','aria-hidden':'true'},h('span',{class:'adm-sub'},'游戏里的样子'),preview),
+          ]),
+        ),
+        h('div',{class:'adm-cols adm-npc-cols'},
+          lines('bumpLines','碰撞台词','每行一句，最多 80 字；保持市井口吻，不要脏字'),
+          lines('mutterLines','念叨台词','每行一句；会用合成语音念出来，3 秒内念完为宜')),
+      )
+      function problemText(){
+        if(!rules.classes.length)return '至少选一类道路'
+        for(const [a,b,name] of [['carMin','carMax','车辆'],['personMin','personMax','行人']] as const){
+          if(![rules[a],rules[b]].every(value=>Number.isInteger(value)&&value>=1&&value<=20))return `${name}数量要是 1–20 的整数`
+          if(rules[a]>rules[b])return `${name}的最少数量不能大于最多数量`
+        }
+        if(!(rules.bumpSpeed>=0&&rules.bumpSpeed<=30))return '触发速度要在 0–30 米/秒之间'
+        if(!(rules.bubbleSeconds>.1&&rules.bubbleSeconds<=15))return '显示时长要在 0.5–15 秒之间'
+        if(!rules.bumpLines.length||!rules.mutterLines.length)return '台词至少要有一句'
+        if([...rules.bumpLines,...rules.mutterLines].some(line=>line.length>80))return '每句台词不能超过 80 字'
+        return ''
+      }
+      function changed(){
+        const error=problemText(),dirty=JSON.stringify(rules)!==saved
+        problem.textContent=error;problem.hidden=!error
+        save.disabled=!dirty||!!error;state.textContent=dirty?'有改动未保存':'已是最新';state.classList.toggle('is-dirty',dirty)
+        preview.textContent=rules.bumpLines[0]??''
+      }
+      reset.onclick=()=>paint(npcDefaults)
+      form.onsubmit=event=>{
+        event.preventDefault();if(save.disabled)return
+        save.classList.add('is-busy');save.disabled=true
+        void api('admin/npc',rules).then(()=>{saved=JSON.stringify(rules);changed();toast('已保存，新进场的玩家生效')})
+          .catch(error=>{changed();toast(error instanceof Error?error.message:'保存失败，请检查参数','error')})
+          .finally(()=>save.classList.remove('is-busy'))
+      }
+      slot.replaceChildren(form);changed()
+      }
+    }).catch(error=>slot.replaceChildren(errorState(error,()=>render())))
   },
   mp() {
     const stamp = h('span', { class: 'adm-sub adm-live-stamp' })
