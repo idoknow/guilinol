@@ -216,10 +216,12 @@ try {
     viewpoints[cam.id] = {label: cam.label, loadMs, ...metrics}
     await saveReport()
     if(cam.id==='street-jiefang'&&process.env.PERF_SHOT){
-      await page.screenshot({path:process.env.PERF_SHOT+'-east.png'})
+      const cdp=await context.newCDPSession(page)
+      const capture=async name=>writeFile(process.env.PERF_SHOT+name,Buffer.from((await cdp.send('Page.captureScreenshot',{format:'png',fromSurface:true})).data,'base64'))
+      await capture('-east.png')
       await page.evaluate(()=>window.viewer.perfTarget.splice(0,3,-385,149,-22))
       await page.waitForFunction(()=>window.viewer.trafficProbe.motors>0&&window.viewer.trafficProbe.pedestrians>0,null,{timeout:90000})
-      await page.screenshot({path:process.env.PERF_SHOT+'-city.png'})
+      await capture('-city.png')
     }
     console.log(
       `${cam.id.padEnd(12)} | ${String(metrics.meanMs).padStart(6)} ms (p95 ${String(metrics.p95Ms).padStart(6)} ms) | ` +
