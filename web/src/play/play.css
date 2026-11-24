@@ -154,6 +154,15 @@ body[data-photo=on] :is(output,.hint,footer,.sky-ui,.walk-ui,.dock,.toast,.spot-
   .book ol{grid-template-columns:1fr 1fr 1fr}.book li{flex-direction:column;text-align:center;gap:6px;padding:8px}.book li p{display:none}
 }
 @media (pointer:coarse) and (not (any-pointer:fine)) and (max-width:520px){.dock .minimap{width:108px;height:108px}}
+/* Portrait phones (IDOK-255): the dock column grew to nine buttons (相机 + 无人机 joined 起飞/景册/拍照/反馈/设置/第三人称/地图)
+   and its last entry (地图) started landing on 跃/远近 in the thumb cluster. Same fix family as the short-landscape rule
+   below: shrink the minimap and the per-button height so the column still ends above y≈610 on a 390×844 screen. */
+@media (pointer:coarse) and (not (any-pointer:fine)) and (orientation:portrait) and (max-width:600px){
+  .dock{gap:5px}
+  .dock-buttons{gap:5px}
+  .dock-buttons>button,.dock .btn-mode{height:36px;padding:0 12px;font-size:12.5px}
+  .dock .minimap{width:96px;height:96px}
+}
 @media (max-width:520px){.book ol{grid-template-columns:1fr}.spot-card{width:calc(100vw - 20px)}}
 /* Short landscape phones (IDOK-146: 770x265 with browser bars, 844x390 iPhone): a column of five dock buttons
    ran into the thumb cluster (跃/远近/跑). Lay the buttons out as one row along the top edge, shrink the minimap so it
