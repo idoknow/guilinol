@@ -670,6 +670,8 @@ wss.on('connection', (ws, req) => {
           // 续连：上一个连接是被 CDN/网络掐断的（dead），不是顶号。原地接管，不播 leave/join。
           if (previous.dead) {
             const p = previous
+            // 先算续连耗时：下面会 delete deadAt，算晚了就是 NaN（日志里变 null）
+            const gapMs = Math.max(0, Math.round(now() - (p.deadAt - RESUME_MS)))
             p.ws = ws
             // 关键：这条 socket 的连接 id 是新的，后续 pos/close 必须按原玩家 id 找，
             // 否则续连后玩家在服务端「消失了」（消息被丢弃、断开也不清理）
@@ -707,7 +709,7 @@ wss.on('connection', (ws, req) => {
             console.log(JSON.stringify({
               scope: 'rt-resume', uid, id: p.id,
               code: p.lastCloseCode ?? null,
-              gapMs: Math.max(0, Math.round(now() - (p.deadAt - RESUME_MS))),
+              gapMs,
               players: players.size,
             }))
             delete p.lastCloseCode
