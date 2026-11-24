@@ -4,6 +4,8 @@ import struct
 from collections import defaultdict
 import math
 
+from common import ll2xz
+from service_streets import width
 from shapely.geometry import MultiPoint
 from heapq import heapify, heappop, heappush
 
@@ -22,7 +24,7 @@ def underground(tags):
     return tags.get('tunnel', 'no') != 'no' or below
 
 
-def sections(lanes, source_ways, existing):
+def sections(lanes, source_ways, existing, nodes):
     saved = {t['way'] for t in existing}
     edges, surface_nodes = {}, set()
     for lane in lanes:
@@ -37,6 +39,35 @@ def sections(lanes, source_ways, existing):
         edge['halfWidth'] = max(edge['halfWidth'], abs(lane['offset'])+lane['width']/2+.5)
         if lane['kind'] != 'nonmotor':
             edge['clearance'] = 4.5
+    # Follow connected private approach ramps to the actual surface junctions.
+    # They provide boundary conditions without becoming traffic spawn lanes.
+    ramps = defaultdict(list)
+    for way in source_ways:
+        tags = way.get('tags', {})
+        if (way['type'] == 'way' and tags.get('highway') == 'service'
+                and tags.get('access') == 'private' and underground(tags)):
+            for ref in way['nodes']:
+                ramps[ref].append(way)
+    pending = [ref for edge in edges.values() for ref in (edge['a'], edge['b']) if ref in ramps]
+    visited = set()
+    while pending:
+        for way in ramps.pop(pending.pop(), []):
+            if way['id'] in visited:
+                continue
+            visited.add(way['id'])
+            refs = way['nodes']
+            if any(not point for point in way['geometry']):
+                continue
+            for ref, point in zip(refs, way['geometry'], strict=True):
+                x, z = ll2xz(point['lat'], point['lon'])
+                nodes.setdefault(ref, dict(id=ref, x=x, z=z))
+                if ref in ramps:
+                    pending.append(ref)
+            for start, end in zip(refs, refs[1:]):
+                a, b = sorted((start, end))
+                if a != b and math.hypot(nodes[a]['x']-nodes[b]['x'], nodes[a]['z']-nodes[b]['z']) > .01:
+                    edges[way['id'], a, b] = dict(way=way['id'], a=a, b=b,
+                        halfWidth=width(way['tags'])/2+.5, clearance=4.5, cls='service')
     adjacent = defaultdict(set)
     for edge in edges.values():
         a,b = edge['a'],edge['b']
@@ -99,7 +130,10 @@ def solve(network, nodes, samples):
             pending.extend(neighbor for neighbor,_,_ in adjacency[node])
         seen.update(component)
         portal_levels=[heights[n] for n in component & mouths]
-        if len(portal_levels)<2:
+        # A lollipop-shaped bore approaches its single mouth in both directions.
+        is_loop = (len(portal_levels) == 1 and
+                   sum(len(adjacency[n]) for n in component) >= 2*len(component))
+        if len(portal_levels)<2 and not is_loop:
             constraints.append(dict(reason='missingPortalAnchor',
                                     ways=sorted({edge['way'] for edge,keys,*_ in alignments if keys[0] in component}),
                                     surfaceNodes=sorted(component & mouths)))

@@ -260,12 +260,13 @@ def bake(output, manifest, rendered_roads=None):
         request = Path(tmp)/'request.json'
         original_tunnels = [t for t in manifest.get('tunnels',[]) if not t.get('generated')]
         manifest['tunnels'] = original_tunnels
-        network = tunnel_sections(lanes,elements,original_tunnels)
+        survey_nodes = dict(nodes)
+        network = tunnel_sections(lanes,elements,original_tunnels,survey_nodes)
         if network['edges']:
-            request.write_text(json.dumps(dict(manifest=manifest,network=network,nodes=result['nodes'])))
+            request.write_text(json.dumps(dict(manifest=manifest,network=network,nodes=list(survey_nodes.values()))))
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portals',str(output.resolve()),str(request)],check=True,cwd=ROOT)
-            generated,conflicts = solve_tunnels(network,nodes,json.loads(request.read_text()))
+            generated,conflicts = solve_tunnels(network,survey_nodes,json.loads(request.read_text()))
             manifest['tunnels'] = original_tunnels+generated
             (output/'vehicle-tunnel-grades.json').write_text(json.dumps(conflicts,indent=2))
         request.write_text(json.dumps(dict(manifest=manifest,nodes=result['nodes'],lanes=lanes),separators=(',',':')))

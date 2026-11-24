@@ -54,7 +54,7 @@ def bake(output, chunks, ways):
                     drop.append((row*(256//step)+col)*2+face)
                     plane=np.linalg.solve([[u,v,1] for u,v in corners],[ground[v//4,u//4] for u,v in corners])
                     def old(u,v):return float(plane@[u,v,1])
-                    def bed(u,v):return float(eval_bspline_grid(ctrl,0,0,np.asarray(u),np.asarray(v)))-.03
+                    def bed(u,v):return float(eval_bspline_grid(ctrl,0,0,np.asarray(u),np.asarray(v)))-.006
                     for shape,level in ((poly.difference(area),old),(inside,bed)):
                         for tri in constrained_delaunay_triangles(shape).geoms:
                             emit([(u,level(u,v),v) for u,v in list(orient(tri,sign=-1).exterior.coords)[:3]])
@@ -65,8 +65,11 @@ def bake(output, chunks, ways):
                             lo=(u,bed(u,v),v);hi=(u,old(u,v),v)
                             end=(s,bed(s,t),t);rim=(s,old(s,t),t)
                             emit((lo,hi,end,end,hi,rim))
-        while len(collision)<4:collision.append([])
-        collision[4:5]=[dict(drop=drop,vertices=vertices)]
+        # GL04 slots 4–6 belong to rails, crossing signs and fence cuts.
+        while len(collision)<8:collision.append([])
+        if isinstance(collision[4],dict) and 'drop' in collision[4]:
+            collision[4]=[]  # Migrate previews written before the railway extension.
+        collision[7]=dict(drop=drop,vertices=vertices)
         data=json.dumps(collision,separators=(',',':')).encode()
         file.write_bytes(gzip.compress(raw[:12]+struct.pack('<I',len(data))+raw[16:offset]+data+raw[offset+size:],mtime=0))
         tile['bytes']=file.stat().st_size
