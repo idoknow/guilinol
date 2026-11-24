@@ -3,6 +3,8 @@ import {bindingLabel, hits} from './input/keymap'
 import {nearestPlayable} from '../../lib/play-region'
 import {identifyWorld,instrument,operation,record} from './telemetry'
 import * as THREE from 'three'
+import {warmShaders} from './shader-warmup'
+import {vehicleModel} from './walk/vehicle-model'
 import {bytes, fetchAsset, measureFirstWorldBytes, openingTerrain, startOverview, type Manifest} from './world'
 import {Stream} from './stream'
 import {flight} from './flight'
@@ -85,7 +87,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
   const renderer = new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'})
   renderer.debug.checkShaderErrors = import.meta.env.DEV
   const warmPrograms=async(root:THREE.Object3D)=>{
-    try{await renderer.compileAsync(root,camera,scene)}catch(error){console.warn('Shader warmup unavailable',error)}
+    try{await warmShaders(renderer,root,camera,scene)}catch(error){console.warn('Shader warmup unavailable',error)}
   }
   renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = look.exposure
   document.body.prepend(renderer.domElement)
@@ -311,7 +313,19 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       if(signal.aborted)return false
       cover.progress(.3,'步行模块已就绪')
       completed=await player.enter(x,z,yaw,reason,false,signal,cover.progress)
-      if(completed&&!walkProgramsReady){await warmPrograms(scene);walkProgramsReady=true}
+      if(completed){
+        await prepareLandingContent?.()
+        stream.tick(player.position)
+        stream.updateLandmarks?.(player.position)
+        if(!walkProgramsReady){
+          const bike=vehicleModel('bike',1),parked=new THREE.InstancedMesh(bike.geometry,bike.material,1)
+          parked.setColorAt(0,new THREE.Color(0xffffff))
+          const variants=new THREE.Group(),mapped=new THREE.MeshStandardMaterial({map:new THREE.Texture(),flatShading:true})
+          variants.add(parked,new THREE.Mesh(bike.geometry,mapped))
+          try{await warmPrograms(variants)}finally{parked.dispose()}
+        }
+        await warmPrograms(scene);walkProgramsReady=true
+      }
       if(completed)cover.progress(1)
       return completed
     }finally{controller.abort();operation('teleport',start,completed);switching=false;showMode();if(!parent)await cover.done()}
@@ -452,7 +466,7 @@ async function start(loader:FullLoader,creatorSpawn=false) {
       showMode()
     })()
   })
-  let walkProgramsReady=false
+  let walkProgramsReady=false,prepareLandingContent:(()=>Promise<void>)|undefined
   await syncSolo()
   const renderUi = renderRangeControl({
     initial:rangeStore.getConfig(),
@@ -483,6 +497,13 @@ async function start(loader:FullLoader,creatorSpawn=false) {
     },
     { eagerVerify: params.has('mifen') },
   )
+  prepareLandingContent=async()=>{
+    mifen.step(0)
+    const probe=mifen.getProbe() as ReturnType<typeof mifen.getProbe>&{ensureLoaded?:()=>Promise<unknown>}
+    if(probe.ensureLoaded&&probe.getState().playerDistance<140){
+      await probe.ensureLoaded().catch(error=>console.warn('Landing content unavailable',error))
+    }
+  }
   mountChat()
   const tourProbe = {getState, missions: {start: () => ({ok:false, code:'SOLO_MODE_REQUIRED'})}}
   let staticAudit:ReturnType<typeof import('./verify-static').staticVerifier>|undefined

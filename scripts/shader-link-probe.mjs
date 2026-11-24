@@ -2,6 +2,21 @@
 export function shaderLinkProbe(){
   const gl=WebGL2RenderingContext.prototype,labels=new WeakMap(),programs=new WeakMap()
   const samples=window.shaderLinkSamples=[]
+  window.captureShaderKeys=(renderer,scene)=>{
+    for(const entry of renderer.info.programs??[]){
+      const row=programs.get(entry.program)
+      if(row)row.cacheKey=entry.cacheKey
+    }
+    scene?.traverse(object=>{
+      for(const material of [object.material??[]].flat()){
+        for(const entry of renderer.properties.get(material).programs?.values()??[]){
+          const row=programs.get(entry.program)
+          if(row){const label=[object.parent?.name,object.name,material.name].filter(Boolean).join('/')
+            if(label){row.owners??=[];if(row.owners.length<5&&!row.owners.includes(label))row.owners.push(label)}}
+        }
+      }
+    })
+  }
   const shaderSource=gl.shaderSource,attachShader=gl.attachShader
   gl.shaderSource=function(shader,source){
     labels.set(shader,source.match(/^#define SHADER_TYPE (\S+)/m)?.[1]??'custom')
