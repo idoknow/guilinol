@@ -32,14 +32,13 @@ try {
         key('KeyA',error>.03);key('KeyD',error<-.03);key('KeyW',walk.speed<(Math.abs(error)>.3?2:6))
         walk.tick(1/60);distance=Math.hypot(walk.position.x-x,walk.position.z-z)
         if(walk.obstacle)obstacles.add(walk.obstacle)
-        if(game.getState().zone.carFree)throw Error('vehicle entered pedestrian area')
-        if(name!=='entrance' && distance>=48)break
+        if(distance>=48)break
       }}finally{for(const code of keys)key(code,false);window.viewer.resume()}
       return {distance,obstacles:[...obstacles],end:walk.position.toArray(),speed:walk.speed}
     },{x,z,yaw,name})
     console.log(name,result)
     await page.screenshot({path:`captures/jiefang-mouth/${name}.png`});await page.close()
-    if(name==='entrance')assert(result.distance>1&&result.distance<8&&Math.abs(result.speed)<.1&&result.obstacles.some(reason=>reason==='restricted'||reason==='off-road'))
-    else assert(result.distance>=48&&!result.obstacles.includes('restricted'))
+    // IDOK-236: the pedestrian-street entrance is drivable now, like the two road mouths.
+    assert(result.distance>=(name==='entrance'?8:48)&&!result.obstacles.some(reason=>reason==='restricted'||reason==='off-road'))
   }
 }finally{await browser?.close();await server.close()}

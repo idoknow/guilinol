@@ -11,7 +11,8 @@ import {mpEnabled} from '../ui/mp-pref'
 import * as THREE from 'three'
 import {passengerTop} from './passenger-height'
 import {tunnelFloor} from '../tunnels'
-import {getCarFreeAt, vehicleForbiddenAt} from '../game/car-free'
+import {getCarFreeAt} from '../game/car-free'
+import {CAR_SCALE} from '../drive/scale'
 import R from '@dimforge/rapier3d-compat'
 import {GLTFLoader, type GLTF} from 'three/addons/loaders/GLTFLoader.js'
 import type {PeaksGroup} from '../peaks'
@@ -2329,7 +2330,7 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
         }
       }
       const preContactSpeed=rides?.bike?Math.abs(bikeSpeed):0
-      if(resolveContact(next,next.y-cfg.height/2,rides?.heading??0,rides?.car?.86:rides?.bike?.32:cfg.radius,rides?.car?2.12:rides?.bike?.85:0)){
+      if(resolveContact(next,next.y-cfg.height/2,rides?.heading??0,rides?.car?.86*CAR_SCALE:rides?.bike?.32:cfg.radius,rides?.car?2.12*CAR_SCALE:rides?.bike?.85:0)){
         vx=vz=bikeSpeed=0
         if(rides?.bike){
           rides.tryBikeImpactCrash(preContactSpeed)
@@ -2339,9 +2340,6 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
           rides.stop()
           bikeObstacle='collision'
         }
-      }
-      if((rides?.bike||rides?.car)&&vehicleForbiddenAt(next.x,next.z)){
-        next.x=pos.x;next.y=pos.y;next.z=pos.z;rides.stop();bikeSpeed=vx=vz=0;bikeObstacle='restricted'
       }
       if(!sim.withinBounds(next.x,next.z)){
         next.x=pos.x;next.z=pos.z;vx=vz=bikeSpeed=0

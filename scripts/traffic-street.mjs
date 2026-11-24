@@ -30,7 +30,8 @@ try{
   const shots=[...['residential','tertiary'].map(cls=>{
     const [x,y,z,yaw]=rows.filter(row=>row[5]===cls).sort((a,b)=>Math.hypot(a[0],a[2])-Math.hypot(b[0],b[2]))[0]
     return {name:cls,x:x-14*Math.sin(yaw)-3*Math.cos(yaw),y:y+4,z:z-14*Math.cos(yaw)+3*Math.sin(yaw),yaw}
-  }),{name:'jiefang',x:-265,y:168,z:15,yaw:1.32,min:4},{name:'fengbei',x:-941.1,y:162,z:-845.46,yaw:0,min:1}]
+  // IDOK-236: Jiefang floor 4→2 after traffic density ×0.55 (Rock: 路上车太多).
+  }),{name:'jiefang',x:-265,y:168,z:15,yaw:1.32,min:2},{name:'fengbei',x:-941.1,y:162,z:-845.46,yaw:0,min:1}]
   await mkdir('captures/traffic',{recursive:true});const results=[]
   for(const shot of shots){
     await page.evaluate(({x,y,z,yaw})=>{const camera=window.viewer.camera;camera.position.set(x,y,z);camera.lookAt(x+20*Math.sin(yaw),y-4,z+20*Math.cos(yaw));camera.updateMatrixWorld()},shot)

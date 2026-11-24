@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {gunzipSync} from 'node:zlib'
-import {Traffic} from '../web/src/traffic/sim.ts'
+import {Traffic,TRAFFIC_DENSITY} from '../web/src/traffic/sim.ts'
 import {pickups,resolveContact,useTrafficSolids} from '../web/src/traffic/contact.ts'
 import {isPointInQuietZone} from '../web/src/game/quiet-zones.ts'
 
@@ -60,7 +60,7 @@ for(let frame=0;frame<6000;frame++){
   const start=performance.now()
   sim.step(.05,frame<2000?bridge:junction)
   const elapsed=performance.now()-start;stepMs.push(elapsed)
-  if(sim.actors.length===80)fullLoad.push(elapsed)
+  if(sim.actors.length>=20+Math.round(60*TRAFFIC_DENSITY))fullLoad.push(elapsed) // IDOK-236: full load = 20 walkers + thinned motor cap
   for(const actor of sim.actors){
     if(actor.kind==='person'){people++;continue}
     motorFrames++;scooters+=Number(actor.kind==='scooter')

@@ -322,10 +322,11 @@ try {
   await interactExact('开车')
   const pullOut = await steerCarTo([-700.0, 183.5], 900, 4.0)
   assert(pullOut.traveled > 45 && pullOut.targetDist <= 4.5, `failed to merge onto Yiren Rd centerline: ${JSON.stringify(pullOut)}`)
-  // Aim south of relocated zhengyang_clock (-655.2, 195.5) into Zhengyang Pedestrian Street so pure motorMask 'off-road' blocks entry.
+  // IDOK-236: cars are no longer held to the motor lanes — aim south of relocated zhengyang_clock (-655.2, 195.5)
+  // and the car must drive straight into Zhengyang Pedestrian Street (off the motorMask).
   const pedBlock = await steerCarTo([-656.0, 214.0], 900, 2.0)
-  console.log('Zhengyang pedestrian block:', pedBlock)
-  assert(pedBlock.traveled > 25 && pedBlock.targetDist > 10 && pedBlock.obstacle === 'off-road' && !motorAt(-640.0, 202.0) && !motorAt(-656.0, 214.0) && motorAt(pedBlock.end[0], pedBlock.end[2]), `car must not enter Zhengyang Pedestrian Street: ${JSON.stringify(pedBlock)}`)
+  console.log('Zhengyang pedestrian entry:', pedBlock)
+  assert(pedBlock.targetDist <= 2.5 && pedBlock.obstacle !== 'off-road' && !motorAt(-656.0, 214.0), `car must be able to enter Zhengyang Pedestrian Street: ${JSON.stringify(pedBlock)}`)
 
   // Steer into nearby building wall, verify clean stop + reverse escape + door dismount.
   const wallCheck = await page.evaluate(() => {
