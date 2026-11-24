@@ -1,10 +1,11 @@
 import { parse } from 'exifr'
 import {inline} from './loading'
 import { views } from '../../../lib/feedback-contract'
+import type { CameraShot } from './feedback-camera'
 
-async function prepare(file: File, report: (stage: string) => void) {
+async function prepare(file: File, report: (stage: string) => void, known?: CameraShot['meta']) {
   report('正在读取拍摄信息')
-  const tags = await parse(await file.arrayBuffer(), { gps: true }).catch(() => null)
+  const tags = known ? null : await parse(await file.arrayBuffer(), { gps: true }).catch(() => null)
   report('正在解码')
   let blob: Blob = file
   let bitmap: ImageBitmap
@@ -28,7 +29,7 @@ async function prepare(file: File, report: (stage: string) => void) {
   )
   return {
     jpeg,
-    meta: {
+    meta: known ?? {
       exif_lat: tags?.latitude,
       exif_lon: tags?.longitude,
       exif_dir: tags?.GPSImgDirection,
@@ -43,6 +44,7 @@ export function photoPicker(
   currentId: () => string | undefined,
   run: (work: () => Promise<void>) => Promise<void>,
   onChange?: (count: number) => void,
+  shoot?: () => Promise<CameraShot | null>,
 ) {
   const picker = document.createElement('input'),
     grid = document.createElement('div'),
@@ -55,7 +57,26 @@ export function photoPicker(
   zone.className = 'fb-drop'
   zone.innerHTML = `<b>拖入、粘贴或点此选择照片</b><span>最多 20 张 · 电脑可直接 Ctrl/⌘ + V 粘贴截图</span>`
   zone.prepend(picker)
-  container.append(zone, grid)
+  container.append(zone)
+  if (shoot) {
+    // IDOK-205: 网页内相机，拍完直接回到这里并上传（已有反馈编号时立即上传，新反馈随提交上传）。
+    const cam = document.createElement('button')
+    cam.type = 'button'
+    cam.className = 'fb-shoot'
+    cam.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="13.2" r="3.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><b>现场拍照</b><span>拍完自动回到这里</span>'
+    cam.onclick = async () => {
+      const shot = await shoot()
+      if (!shot) return
+      add([shot.file] as unknown as FileList, shot.meta)
+      const id = currentId()
+      if (id) void run(() => upload(id))
+    }
+    const row = document.createElement('div')
+    row.className = 'fb-pick-row'
+    zone.replaceWith(row)
+    row.append(cam, zone)
+  }
+  container.append(grid)
   const sync = () => {
     const total = used.length + entries.size
     zone.classList.toggle('fb-drop--compact', total > 0)
@@ -94,7 +115,7 @@ export function photoPicker(
     cell.append(image, remove)
     grid.append(cell)
   }
-  function add(files: FileList | null) {
+  function add(files: FileList | null, known?: CameraShot['meta']) {
     for (const file of Array.from(files ?? [])) {
       let slot = 1
       while (used.includes(slot) || entries.has(slot)) slot++
@@ -128,9 +149,13 @@ export function photoPicker(
           if (entry.done) return
           note.textContent = '正在处理'
           try {
-            const { jpeg, meta } = await prepare(file, (stage) => {
-              note.textContent = stage
-            })
+            const { jpeg, meta } = await prepare(
+              file,
+              (stage) => {
+                note.textContent = stage
+              },
+              known,
+            )
             inline(note,{label:'正在上传'})
             await new Promise<void>((resolve, reject) => {
               const xhr = new XMLHttpRequest()
@@ -163,6 +188,10 @@ export function photoPicker(
       entries.set(slot, entry)
     }
     sync()
+    grid.lastElementChild?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }
+  async function upload(id: string) {
+    for (const entry of entries.values()) await entry.upload(id)
   }
   picker.onchange = () => {
     add(picker.files)
@@ -183,9 +212,7 @@ export function photoPicker(
     add: (files: File[]) => add(files as unknown as FileList),
     pending: () => [...entries.values()].filter((entry) => !entry.done).length,
     count: () => used.length + entries.size,
-    async upload(id: string) {
-      for (const entry of entries.values()) await entry.upload(id)
-    },
+    upload,
     dispose: () => urls.forEach((url) => URL.revokeObjectURL(url)),
   }
 }
