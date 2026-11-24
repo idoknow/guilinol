@@ -191,7 +191,7 @@ def bake(output, manifest, rendered_roads=None):
     restore_portal_paving(output,manifest['chunks'])
     restore_corridors(output,manifest['chunks'])
     from canal_passages import plan as plan_canal_passages, sample_road_heights
-    from terminal_decks import grade as grade_terminal_decks, grade_airport_fork, grade_service_overpass
+    from terminal_decks import grade as grade_terminal_decks, grade_airport_fork, grade_service_overpass, trim_bridge_endcaps
     ground_passages.grain_yard(output,manifest,elements,sections)
     grade_airport_fork(output,manifest,elements)
     terminal_grades = grade_terminal_decks(output, manifest, elements)
@@ -357,6 +357,8 @@ def bake(output, manifest, rendered_roads=None):
             planned=access+canal_grades+terminal_grades+surveyed
             pedestrian=path_profiles(output,manifest,elements,sections,planned)
             pedestrian+=cycleway_street_tie(output,manifest,elements,sections,cycleway)
+            from junction_grades import profiles as junction_profiles
+            pedestrian+=junction_profiles(output,manifest,elements,sections,planned)
             bake_surveyed_corridors(output,manifest['chunks'],elements,sections,planned+pedestrian,only_approaches=True,bridge_profiles=canal_grades,preferred=pedestrian)
             trim_portal_paving(output,manifest['chunks'],generated,elements,sections)
             for tunnel in generated:
@@ -373,6 +375,7 @@ def bake(output, manifest, rendered_roads=None):
         ground_passages.level_soffits(output,manifest,elements,sections)
         portal_landings.carriageways(output,manifest,elements,sections)
         grade_service_overpass(output,manifest,elements)
+        trim_bridge_endcaps(output,manifest,elements)
         if network['edges']:
             route_file=output/'vehicle-portal-routes.json'
             yard_routes=[]
@@ -394,6 +397,8 @@ def bake(output, manifest, rendered_roads=None):
             subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                             'portal-routes',str(output.resolve()),str(route_file.resolve())],check=True,cwd=ROOT)
         print('Roadside relocations:',relocate(output,manifest,elements))
+        from junction_grades import align_service_junction
+        align_service_junction(nodes,lanes,elements,node_height,profile)
         request.write_text(json.dumps(dict(manifest=manifest,nodes=result['nodes'],lanes=lanes),separators=(',',':')))
         subprocess.run([str(ROOT/'node_modules/.bin/tsx'),str(ROOT/'scripts/vehicle-grounding.ts'),
                         'bake',str(output.resolve()),str(request)], check=True, cwd=ROOT)

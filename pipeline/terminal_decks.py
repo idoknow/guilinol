@@ -245,3 +245,61 @@ def update_slabs(output,chunks,axes,stations,ys,spans=SPANS):
         new=packed.copy();new[:,:,1]=updated
         path.write_bytes(gzip.compress(data[:start]+new.tobytes()+data[start+new.nbytes:],mtime=0))
         tile['bytes']=path.stat().st_size
+
+
+def trim_bridge_endcaps(output, manifest, elements):
+    """Clip overlapping legacy asphalt to the existing short bridge deck."""
+    from shapely import Polygon, make_valid, union_all
+    from shapely.affinity import translate
+    from service_streets import rings
+    from surveyed_corridors import read_chunk, write_chunk
+
+    road=next((w for w in elements if w['type']=='way' and w['id']==1025751317),None)
+    if not road:
+        return
+    axis=LineString(points(road))
+    for tile in manifest['chunks']:
+        x,z=tile['x'],tile['z']
+        if not axis.intersects(box(x,z,x+256,z+256)):
+            continue
+        path=output/tile['file']
+        raw,start,size,c=read_chunk(path)
+        paths=c[1]
+        survey=paths[12] if len(paths)>12 else None
+        if not survey:
+            continue
+        image,count=struct.unpack_from('<2I',raw,16)
+        triangles=np.frombuffer(raw,'<i2',count*9,start+size+image).reshape(-1,3,3)
+        local=translate(axis,-x,-z)
+        envelope=local.buffer(7)
+        slabs=[]
+        for tri in triangles:
+            poly=Polygon(tri[:,[0,2]]/100)
+            if poly.area and envelope.covers(poly) and poly.intersects(local):
+                slabs.append(poly)
+        cover=union_all(slabs)
+        if cover.is_empty:
+            continue
+        # Both landings have centimetre-scale deck vertices. Keep the bed,
+        # banks, bridge faces and surveyed road triangles byte-for-byte.
+        rebuilt=[]
+        offsets=[]
+        for i,(kind,shell,*holes) in enumerate(paths[0]):
+            offsets.append(len(rebuilt))
+            if kind not in (0,5) or survey['start']<=i<survey['end']:
+                rebuilt.append([kind,shell,*holes])
+                continue
+            poly=make_valid(Polygon(np.asarray(shell)/100,[np.asarray(h)/100 for h in holes]))
+            if poly.intersection(cover).area<.001:
+                rebuilt.append([kind,shell,*holes])
+            else:
+                rebuilt.extend(rings(kind,poly.difference(cover)))
+        offsets.append(len(rebuilt))
+        if rebuilt==paths[0]:
+            continue
+        if len(paths)>11 and paths[11]:
+            paths[11][0]=offsets[paths[11][0]]
+        survey['start'],survey['end']=offsets[survey['start']],offsets[survey['end']]
+        paths[0]=rebuilt
+        write_chunk(path,raw,start,size,c)
+        tile['bytes']=path.stat().st_size
