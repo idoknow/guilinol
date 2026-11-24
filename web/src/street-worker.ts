@@ -5,7 +5,7 @@ type Pair=[number,number]
 type Path=[number,...Pair[][]]
 type RoadCtrl=[number,number[]]
 type Lower=[number,Pair[],[number,number,number,number][]]
-export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,Lower?]
+export type Streets=[Path[],Pair[],number[][],Pair[]?,Pair[]?,(RoadCtrl|null)?,number[][]?,number[][]?,number[][]?,number[][]?,Pair[][]?,(Lower|null)?,[number,number,number]?]
 const colors=look.streets.surfaces.map(v=>new THREE.Color(v)),tone=Object.fromEntries((['railing','lampPole','lampHead'] as const).map(k=>[k,new THREE.Color(look.streets[k])]))
 const stoneLight=new THREE.Color(0xa6a39a),stoneMid=new THREE.Color(0x8c8981),stoneBase=new THREE.Color(0x74726b)
 const parkingYellow=new THREE.Color(0xe7b62e)
@@ -38,14 +38,16 @@ function lowerHeight(x:number,z:number,base:number,terrain:number,[,corners,prof
   return terrain+factor*(base-terrain)
 }
 
-function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[],signs:CrossingSign[],railGround:(x:number,z:number)=>number){
+function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRails=[],beds=[],shops=[],decor=[],curbCuts=[],lower,platform]:Streets,ground:(x:number,z:number)=>number,rails:RailSection[],signs:CrossingSign[],railGround:(x:number,z:number)=>number){
   const xyz:number[]=[],rgb:number[]=[],sidewalk:number[]=[],road:number[]=[],mats:number[]=[],cols:number[]=[]
   const baseLevel=(x:number,z:number)=>{const g=ground(x,z);return roadCtrl?Math.max(evalRoadCtrl(roadCtrl,x,z),g):g}
   const curbSegments=curbCuts.flatMap(line=>line.slice(1).map(([x,z],i)=>
     new THREE.Line3(new THREE.Vector3(line[i][0]/100,0,line[i][1]/100),new THREE.Vector3(x/100,0,z/100)))).filter(segment=>segment.distanceSq()>0)
   const testPoint=new THREE.Vector3(), closest=new THREE.Vector3()
+  let platformPath=false
   let lowerPath=false
   function vector(pt:THREE.Vector2,offset:number){
+    if(platformPath && platform)return new THREE.Vector3(pt.x,platform[2]+offset-.195,pt.y)
     if(offset===.195 && curbSegments.length){
       testPoint.set(pt.x,0,pt.y)
       let distance=2
@@ -77,6 +79,7 @@ function streetGeometry([paths,lamps,banks,signals=[],stops=[],roadCtrl,stoneRai
     for(const pt of [p1,p2,p3]){xyz.push(pt.x,pt.y,pt.z);rgb.push(c.r,c.g,c.b);if(channel===1&&!vertical)sidewalk.push(pt.x,pt.y,pt.z);else if(channel===0&&!vertical)road.push(pt.x,pt.y,pt.z)}
   }
   for(const [index,[kind,...rings]] of paths.entries()){
+    platformPath=!!platform && index>=platform[0] && index<platform[1]
     lowerPath=!!lower && index>=lower[0]
     const loops=rings.map(ring=>ring.map(([x,z])=>new THREE.Vector2(x/100,z/100)))
     const tris=THREE.ShapeUtils.triangulateShape(loops[0],loops.slice(1)),points=loops.flat()

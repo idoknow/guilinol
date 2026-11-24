@@ -11,7 +11,7 @@ from shapely.affinity import translate
 from common import load_osm
 from features import area, points
 from railways import road_radius
-from station_levels import FOOTBRIDGE, UNDERPASS
+from station_levels import FOOTBRIDGE, UNDERPASS, PLATFORMS, PLATFORM
 from service_streets import rings
 
 
@@ -26,6 +26,7 @@ def bake(output, chunks, region):
     platforms = union_all([area(way) for way in ways
                            if way['type'] == 'way' and way.get('tags', {}).get('railway') == 'platform'
                            and way['tags'].get('monorail') != 'yes']).intersection(region)
+    station = union_all([area(way) for way in ways if way['type']=='way' and way['id'] in PLATFORMS])
     for chunk in chunks:
         x, z = chunk['x'], chunk['z']
         footprint = platforms.intersection(box(x, z, x + 256, z + 256))
@@ -65,6 +66,12 @@ def bake(output, chunks, region):
         paths[index:index] = additions
         if lower:
             lower[0] += len(additions)
+        if station.intersects(footprint):
+            # Optional path range [first, end, surface Y] in this GL04 tile.
+            # The pedestrian surface has its own datum above the road grid.
+            while len(streets) < 12:
+                streets.append(None if len(streets) in (5,11) else [])
+            streets.append([index,index+len(additions),PLATFORM])
         encoded = json.dumps(collision, separators=(',', ':')).encode()
         payload = data[:12] + struct.pack('<I', len(encoded)) + data[16:start] + encoded + data[start+size:]
         file.write_bytes(gzip.compress(payload, mtime=0))

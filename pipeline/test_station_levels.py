@@ -23,8 +23,7 @@ class GuilinStationTest(unittest.TestCase):
         ground = np.full((33, 50), 1510, dtype=np.int16)
         underlay = ground.copy()
         water = np.full_like(ground, -32768)
-        road_grid = np.full((19, 27), 151., dtype=float)
-        grade_platforms(ground, underlay, water, road_grid, left, top)
+        grade_platforms(ground, underlay, water, left, top)
         for x in (-2304, -2208):
             for z in (1920, 1928):
                 row, col = (z-top)//4, (x-left)//4
