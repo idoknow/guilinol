@@ -1,5 +1,6 @@
-export function sameCell(a, b) {
-  return Math.floor(a.x / 256) === Math.floor(b.x / 256) && Math.floor(a.z / 256) === Math.floor(b.z / 256)
+export const flatDistance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z)
+export function inEmoteRange(a, b) {
+  return flatDistance(a, b) <= 256
 }
 export function acceptEmote(player, msg, now) {
   if (
@@ -10,9 +11,11 @@ export function acceptEmote(player, msg, now) {
     msg.s <= player.es
   )
     return false
-  player.emoteTimes = player.emoteTimes.filter((t) => now - t < 1000)
-  if (player.emoteTimes.length >= 2) return false
-  player.emoteTimes.push(now)
+  if (msg.id !== 0) {
+    player.emoteTimes = player.emoteTimes.filter((t) => now - t < 1000)
+    if (player.emoteTimes.length >= 2) return false
+    player.emoteTimes.push(now)
+  }
   player.em = msg.id
   player.es = msg.s
   player.emoteUntil = now + ([0, 4000, 3000, 4250][msg.id] ?? 4000)

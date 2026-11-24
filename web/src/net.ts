@@ -19,8 +19,8 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
     if(state!=='online'||desired===sent)return
     const now=performance.now()
     sentTimes=sentTimes.filter(t=>now-t<1010)
-    if(sentTimes.length===2)return
-    send({t:'emote',id:desired,s:++sequence});sent=desired;sentTimes.push(now)
+    if(desired && sentTimes.length>=2)return
+    send({t:'emote',id:desired,s:++sequence});sent=desired;if(desired)sentTimes.push(now)
   }
   function emote(id:number){if(id===desired&&id)sent=-1;desired=id;flushEmote()}
   function status(){return {state,online}}

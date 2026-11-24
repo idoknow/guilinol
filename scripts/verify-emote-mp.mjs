@@ -52,7 +52,12 @@ export async function verifyEmotes(rt, ticket) {
       assert(
         await page.evaluate(
           (uid) =>
-            window.viewer.walkTo(-309, uid === 100001 ? -3 : -1, uid === 100001 ? Math.PI : 0, 'emote-test'),
+            window.viewer.walkTo(
+              -309,
+              uid === 100001 ? -0.5 : 0.5,
+              uid === 100001 ? Math.PI : 0,
+              'emote-test',
+            ),
           uid,
         ),
       )
@@ -62,6 +67,15 @@ export async function verifyEmotes(rt, ticket) {
     const a = await join(100001),
       b = await join(100002, true)
     await b.waitForFunction(() => window.viewer.walk.net.probe().some((p) => p.ready))
+    const cdp = await b.context().newCDPSession(b)
+    await cdp.send('Network.enable')
+    const positions = await Promise.all(
+      [a, b].map((page) => page.evaluate(() => window.viewer.walk.probe().figPos)),
+    )
+    assert(
+      positions[0][2] < 0 && positions[1][2] >= 0 && Math.abs(positions[1][2] - positions[0][2]) < 2,
+      JSON.stringify(positions),
+    )
     const observe = async (clip) => {
       await b.waitForFunction((name) => window.viewer.walk.net.probe().some((p) => p.clip === name), clip, {
         timeout: 3500,
@@ -81,6 +95,20 @@ export async function verifyEmotes(rt, ticket) {
       if (i === 0) {
         await b.evaluate(() => window.viewer.walk.net.reconnect())
         await observe('emote_' + key)
+        const snapshot = new Promise((resolve) => {
+          const received = ({response}) => {
+            const msg = JSON.parse(response.payloadData)
+            if (msg.t === 'players') {
+              cdp.off('Network.webSocketFrameReceived', received)
+              resolve(msg.players)
+            }
+          }
+          cdp.on('Network.webSocketFrameReceived', received)
+        })
+        await b.evaluate(() => window.viewer.walk.net.who())
+        const players = await Promise.race([snapshot, delay(1500).then(() => [])])
+        assert(players.some((p) => p.name === '100001' && p.em === 1))
+        await observe('emote_' + key)
         await a.keyboard.down('w')
         await observe('')
         await a.keyboard.up('w')
@@ -94,6 +122,22 @@ export async function verifyEmotes(rt, ticket) {
         await b.setViewportSize({width: 390, height: 844})
       }
     }
+    // Two fresh starts consume the allowance. A movement stop must reach B immediately.
+    await delay(1100)
+    const burst = await a.evaluate(() => {
+      window.viewer.walk.emote.play(1)
+      return Date.now()
+    })
+    await observe('emote_thumbs_up')
+    await a.evaluate(() => window.viewer.walk.emote.play(2))
+    await observe('emote_yixia_fanshang')
+    const interruptedAt = Date.now()
+    await a.keyboard.down('w')
+    const stopped = await observe('')
+    await a.keyboard.up('w')
+    assert(stopped - burst < 1000 && stopped - interruptedAt <= 300, 'rate-limited stop')
+    console.log('burst movement stop', stopped - interruptedAt + 'ms')
+    await delay(1100)
     await a.setViewportSize({width: 1440, height: 900})
     await a.keyboard.down('g')
     await a.locator('.emote-overlay').waitFor()

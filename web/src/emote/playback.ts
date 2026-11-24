@@ -21,11 +21,8 @@ type Target = (name: string, delta: T.Quaternion, parent?: T.Quaternion) => void
 function sample(poseId: number, time: number, set: Target) {
   const phase = poseId === 3 ? T.MathUtils.smoothstep(time, 2.4, 2.75) : 0
   const torso =
-    poseId === 3
-      ? axis(0, 1, 0, -0.52 * phase).multiply(
-          axis(1, 0, 0, (0.14 + 0.13 * Math.sin((time * Math.PI) / 0.6)) * (1 - phase)),
-        )
-      : identity
+    poseId === 3 ? axis(1, 0, 0, (0.14 + 0.13 * Math.sin((time * Math.PI) / 0.6)) * (1 - phase)) : identity
+  if (poseId === 3) set('pelvis', axis(0, 1, 0, ((-70 * Math.PI) / 180) * phase))
   set('spine_03', torso)
   for (const [side, s] of [
     ['l', 1],
@@ -48,7 +45,13 @@ function sample(poseId: number, time: number, set: Target) {
         phase,
       )
       hand = palm(s, V(-s, 0.36 * s, 0), V(0, 0, -1)).slerp(palm(s, V(0, 0.2, 1), V(-s, 0, 0)), phase)
-      set('thigh_' + side, axis(1, 0, 0, -s * 0.19 * phase))
+      // Local pitch relative to the turned pelvis. Equal opposite stride angles
+      // balance leg extension, while the extra hip flexion offsets the bent knee.
+      const thigh = axis(1, 0, 0, (-s * 0.255 - 0.18) * phase)
+      const shin = axis(1, 0, 0, (-s * 0.255 + 0.06) * phase)
+      set('thigh_' + side, thigh)
+      set('calf_' + side, shin, thigh)
+      set('foot_' + side, identity, shin)
     }
     set('upperarm_' + side, upper, torso)
     set('lowerarm_' + side, lower, upper)
@@ -62,7 +65,9 @@ function sample(poseId: number, time: number, set: Target) {
             ? 1.16
             : poseId === 2
               ? ['ring', 'pinky'].includes(finger)
-                ? 1.17
+                ? side === 'r'
+                  ? ([88, 80, 75][i - 1] * Math.PI) / 180
+                  : 1.17
                 : 0.025
               : 0.26 + (s === -1 ? 0.86 : -0.23) * phase
         if (thumb) bend = poseId === 2 ? (s === -1 ? 0.42 : 0.12) : 0.17
@@ -74,14 +79,34 @@ function sample(poseId: number, time: number, set: Target) {
             V(0, 1, 0).applyQuaternion(hand.clone().invert()),
           )
         }
-        if (poseId === 2 && i === 1 && !thumb && ['index', 'middle'].includes(finger))
+        if (poseId === 2 && i === 1 && side === 'r' && !thumb && ['index', 'middle'].includes(finger))
           turn.multiply(axis(0, 1, 0, s * (finger === 'index' ? 0.08 : -0.05)))
         const delta = parent.clone().multiply(turn)
+        if (poseId === 2 && side === 'r' && thumb) {
+          // Cross the two folded fingers, then return the tip toward the midline.
+          const direction = [V(-0.28, -0.2, -0.94), V(-0.9, -0.28, -0.31), V(-0.49, 0.08, 0.87)][i - 1]
+          delta
+            .copy(hand)
+            .multiply(
+              new T.Quaternion().setFromUnitVectors(V(-0.76, -0.46, 0.44).normalize(), direction.normalize()),
+            )
+        }
+        if (poseId === 2 && side === 'l' && (finger === 'index' || finger === 'middle')) {
+          const convergence = finger === 'index' ? [0.118, 0.09, 0.14] : [-0.08, -0.07, -0.1]
+          delta
+            .copy(hand)
+            .multiply(axis(0, 1, 0, convergence[i - 1]))
+            .multiply(axis(0, 0, 1, -0.025))
+        }
         if (thumb && poseId === 3 && phase) {
           // Lay the closed thumb over the fingers. The blade hand keeps its thumb beside the index.
-          const target = s === 1 ? V(s, 0.22, 0.08) : [V(s, -0.42, 0.08), V(s*.7, -.43, -.58), V(0, .18, -1)][i-1]
-          const tucked = new T.Quaternion().setFromUnitVectors(V(s*.76, -.46, .44).normalize(), target.normalize())
-          delta.slerp(hand.clone().multiply(tucked),phase)
+          const target =
+            s === 1 ? V(s, 0.22, 0.08) : [V(s, -0.42, 0.08), V(s * 0.7, -0.43, -0.58), V(0, 0.18, -1)][i - 1]
+          const tucked = new T.Quaternion().setFromUnitVectors(
+            V(s * 0.76, -0.46, 0.44).normalize(),
+            target.normalize(),
+          )
+          delta.slerp(hand.clone().multiply(tucked), phase)
         }
         set(finger + '_0' + i + '_' + side, delta, parent)
         parent = delta
@@ -151,11 +176,46 @@ export function emotePlayback(
       return [bone.name, {bone, sample, base: bone.quaternion.clone(), applied: false}]
     }),
   )
+  // Track translations separately from mixer-owned rotations, restoring the
+  // locomotion pose before each frame just like the rotation layer below.
+  const handIndex = mesh.skeleton.bones.findIndex((b) => b.name === 'hand_l')
+  const leftOffset = V(0, 0, 0.0037).applyMatrix3(
+    new T.Matrix3().setFromMatrix4(mesh.skeleton.boneInverses[handIndex]),
+  )
+  const indexBase = joints.get('index_01_l')!.bone,
+    middleBase = joints.get('middle_01_l')!.bone
+  const indexPosition = new T.Vector3(),
+    middlePosition = new T.Vector3()
+  const pelvis = joints.get('pelvis')!.bone,
+    pelvisPosition = new T.Vector3()
+  const spine = joints.get('spine_01')!.bone,
+    spineRotation = new T.Quaternion()
+  const pelvisBind = mesh.skeleton.boneInverses[mesh.skeleton.bones.indexOf(pelvis)]
+  const waistUp = V(0, 1, 0).transformDirection(pelvisBind)
+  const squatOffset = new T.Vector3(),
+    toLocal = new T.Matrix3(),
+    waistTurn = new T.Quaternion()
+  let fingersShifted = false,
+    pelvisLowered = false,
+    spineTurned = false
   let active: ReturnType<typeof emoteById>,
     action: T.AnimationAction | undefined,
     weight = 0
   let targets: Array<{bone: T.Bone; sample: T.Object3D; base: T.Quaternion; applied: boolean}> = []
   function reset() {
+    if (fingersShifted) {
+      indexBase.position.copy(indexPosition)
+      middleBase.position.copy(middlePosition)
+      fingersShifted = false
+    }
+    if (pelvisLowered) {
+      pelvis.position.copy(pelvisPosition)
+      pelvisLowered = false
+    }
+    if (spineTurned) {
+      spine.quaternion.copy(spineRotation)
+      spineTurned = false
+    }
     for (const j of targets)
       if (j.applied) {
         j.bone.quaternion.copy(j.base)
@@ -200,11 +260,42 @@ export function emotePlayback(
       action = undefined
       return
     }
+    const clip = action.getClip().name
+    const finish = clip === 'emote_naiwa_laugh' ? T.MathUtils.smoothstep(action.time, 2.4, 2.75) : 0
+    if (clip === 'emote_yixia_fanshang') {
+      indexPosition.copy(indexBase.position)
+      middlePosition.copy(middleBase.position)
+      indexBase.position.addScaledVector(leftOffset, -weight)
+      middleBase.position.addScaledVector(leftOffset, weight)
+      fingersShifted = true
+    }
+    if (finish && !moving) {
+      // Convert the world-space squat depth into the pelvis parent's local frame.
+      pelvisPosition.copy(pelvis.position)
+      pelvis.position.add(
+        squatOffset
+          .set(0, -0.031 * finish * weight, 0)
+          .applyMatrix3(toLocal.setFromMatrix4(pelvis.parent!.matrixWorld).invert()),
+      )
+      pelvisLowered = true
+    }
+    if (finish && moving) {
+      // Keep the gait's hip yaw and apply the standing turn at the waist instead.
+      spineRotation.copy(spine.quaternion)
+      spine.quaternion.premultiply(
+        waistTurn.setFromAxisAngle(waistUp, ((-70 * Math.PI) / 180) * finish * weight),
+      )
+      spineTurned = true
+    }
     for (const j of targets) {
-      if (moving && j.bone.name.startsWith('thigh_')) continue
+      const lowerBody = /^(pelvis|thigh_|calf_|foot_)/.test(j.bone.name)
+      if (lowerBody && (moving || !finish)) continue
       j.base.copy(j.bone.quaternion)
       j.applied = true
-      j.bone.quaternion.slerp(j.sample.quaternion, weight)
+      j.bone.quaternion.slerp(
+        j.sample.quaternion,
+        lowerBody ? weight * T.MathUtils.smoothstep(finish, 0, 0.25) : weight,
+      )
     }
   }
   return {

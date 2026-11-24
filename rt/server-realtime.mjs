@@ -52,7 +52,7 @@
  * 启动：PORT=8790 node server-realtime.mjs
  * 依赖：npm i ws
  */
-import {sameCell,acceptEmote} from './emote.mjs'
+import {flatDistance,inEmoteRange,acceptEmote} from './emote.mjs'
 import {createServer} from 'node:http'
 import {createHmac,timingSafeEqual} from 'node:crypto'
 import {isIP} from 'node:net'
@@ -225,16 +225,13 @@ function broadcast(payload, exceptId) {
   }
 }
 
-/** 两点水平距离：用双方最近一次 pos 落库的坐标，hit / revive 由服务端裁决 */
-const flatDistance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z)
-
 function publicOf(p,viewer=p) {
   return {
     id: p.id, uid: p.uid, name: p.name, avatar: p.avatar,
     x: p.x, y: p.y, z: p.z, yaw: p.yaw, v: p.v,
     bike: p.bike, bx: p.bx, bz: p.bz, byaw: p.byaw,
     hb: p.hb, hx: p.hx, hz: p.hz, hyaw: p.hyaw, mv: p.mv, dn: p.dn, pn: p.pn, wl: p.wl, cr: p.cr, gr: p.gr,
-    hp: p.hp, em:sameCell(p,viewer)&&now()<p.emoteUntil?p.em:0, es:p.es,
+    hp: p.hp, em:inEmoteRange(p,viewer)&&now()<p.emoteUntil?p.em:0, es:p.es,
     sc: p.sc, sb: p.sb, sp: p.sp, br: p.br,
   }
 }
@@ -459,7 +456,7 @@ wss.on('connection', (ws, req) => {
       if (msg.t === 'emote') {
         if (!acceptEmote(me,msg,now())) return
         const packet=JSON.stringify({t:'emote',from:id,id:me.em,s:me.es})
-        for(const peer of players.values())if(peer!==me&&sameCell(peer,me))sendSlowAware(peer.ws,packet)
+        for(const peer of players.values())if(peer!==me&&inEmoteRange(peer,me))sendSlowAware(peer.ws,packet)
         return
       }
 

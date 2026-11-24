@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {emotes, interrupted} from '../web/src/emote/emotes.ts'
-import {acceptEmote, sameCell} from '../rt/emote.mjs'
+import {acceptEmote, inEmoteRange} from '../rt/emote.mjs'
 
 test('stable registry and interruptions', () => {
   assert.deepEqual(
@@ -18,17 +18,21 @@ test('stable registry and interruptions', () => {
     assert.equal(interrupted(id, false, true), true)
   }
 })
-test('starts and stops share a two-packet sliding window', () => {
+test('two starts per second, immediate sequenced stops', () => {
   const p = {es: 0, emoteTimes: []}
   for (const id of [-1, 256, 1.2, '2', null]) assert.equal(acceptEmote(p, {id, s: 1}, 10), false)
   assert.equal(acceptEmote(p, {id: 255, s: 1}, 10), true)
-  assert.equal(acceptEmote(p, {id: 0, s: 1}, 11), false)
-  assert.equal(acceptEmote(p, {id: 0, s: 2}, 11), true)
-  assert.equal(acceptEmote(p, {id: 3, s: 3}, 1009), false)
+  assert.equal(acceptEmote(p, {id: 2, s: 2}, 11), true)
+  assert.equal(acceptEmote(p, {id: 0, s: 2}, 12), false)
+  assert.equal(acceptEmote(p, {id: 0, s: 3}, 13), true)
   assert.equal(p.em, 0)
-  assert.equal(acceptEmote(p, {id: 3, s: 3}, 1010), true)
-  assert.equal(sameCell({x: -1, z: 0}, {x: -256, z: 255}), true)
-  assert.equal(sameCell({x: -1, z: 0}, {x: 0, z: 0}), false)
+  assert.equal(acceptEmote(p, {id: 3, s: 4}, 1009), false)
+  assert.equal(acceptEmote(p, {id: 3, s: 4}, 1010), true)
+})
+test('horizontal radius includes neighbours across a tile edge and its exact outer limit', () => {
+  assert(inEmoteRange({x: -0.5, z: 0}, {x: 0.5, z: 0}))
+  assert(inEmoteRange({x: 0, z: 0}, {x: 0, z: 256}))
+  assert(!inEmoteRange({x: 0, z: 0}, {x: 200, z: 200}))
 })
 
 test('all five fingers have three weighted joints, identical hierarchy and <=220 triangles per hand', async () => {
