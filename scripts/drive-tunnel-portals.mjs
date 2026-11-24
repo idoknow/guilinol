@@ -32,7 +32,7 @@ try{
     if(mode!=='foot')fleet[{car:'cars',bicycle:'bicycles',bike:'bikes'}[mode]]=bays
     await page.route('**/world/vehicles.bin',route=>route.fulfill({body:gzipSync(JSON.stringify(fleet))}))
     await page.goto('http://127.0.0.1:'+server.httpServer.address().port+'/?verify&mode=walk&radius=320&flow=0')
-    await page.waitForFunction(mode=>window.viewer?.walk?.active&&(mode==='foot'||window.viewer.walk.parked().length),mode,{timeout:60000})
+    await page.waitForFunction(()=>window.viewer?.walk?.active,null,{timeout:60000})
     for(const {id,way,x,z,route,boundary,direction,startHeight:y,heading} of tests){
       try{
         let ready=false,setupError
@@ -45,6 +45,8 @@ try{
             },{x:x-Math.sin(heading)*along+Math.cos(heading)*side,z:z-Math.cos(heading)*along-Math.sin(heading)*side,y,heading})
             if(!ready)continue
             if(mode!=='foot'){
+              await page.waitForFunction(({mode,x,z})=>window.viewer.walk.parked(mode)
+                .some(([px,,pz])=>Math.hypot(px-x,pz-z)<2),{mode,x,z},{timeout:5000})
               await page.waitForFunction(()=>!!document.querySelector('.vehicle-action:not([hidden])')?.textContent,null,{timeout:3000})
               await page.keyboard.press('f')
               await page.waitForFunction(k=>window.viewer.walk.vehicle===k,mode,{timeout:3000})
@@ -63,6 +65,7 @@ try{
           if(mode==='bike'){w.ebike.setPark(false,true);w.ebike.setKickstand(false,true)}
           const rig=mode==='foot'?null:v.stream.scene.getObjectByName('dynamic-'+(mode==='bike'?'ebike':mode))
           const height=()=>mode==='car'||mode==='foot'?w.fixtureHeight():rig.position.y
+          const initialResets=w.probe().resets
           let part=1,maximum=0,previous,completed=false
           await v.freeze()
           try{
@@ -114,7 +117,7 @@ try{
             probe.contactSources?.some(hit=>Math.abs(hit.normal?.y)<.5)
           const failure=completed?undefined:obstruction?'collision':'tool'
           return {completed,failure,maximum,frames,part,obstacle:w.obstacle,contacts,
-            stopped:completed?undefined:{hits:probe.contactSources,foot:probe.foot,resets:probe.resets,heading:w.heading}}
+            stopped:completed?undefined:{hits:probe.contactSources,foot:probe.foot,resets:probe.resets-initialResets,heading:w.heading}}
         },{route,mode,boundary})
         results.push({id,way,mode,boundary,direction,...run})
       }catch(e){results.push({id,way,mode,boundary,direction,failure:"tool",unavailable:e.message.split('\n')[0]})}

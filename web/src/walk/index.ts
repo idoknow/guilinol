@@ -2417,7 +2417,10 @@ export async function walk(scene:THREE.Scene,camera:THREE.PerspectiveCamera,canv
       const nextTile=sim.tileAt(next.x,next.z)
       if(nextTile&&!stream.loaded.has(nextTile)){next.x=pos.x;next.z=pos.z;vx=vz=0;rides?.stop();bikeSpeed=0}
       const inBore=tunnelFloor(manifest.tunnels,next.x,next.z,next.y-cfg.height/2)!==undefined
-      const localRoad=aboardGround?sim.groundSurface(next.x,next.z,next.y-cfg.height/2,.25,.9):null
+      // A pedestrian can stand on the paved approach over an excavated
+      // ground triangle before the centre of the capsule enters the bore.
+      const useLocalSupport=aboardGround||!!(nextTile&&stream.loaded.get(nextTile)?.tunnel)
+      const localRoad=useLocalSupport?sim.groundSurface(next.x,next.z,next.y-cfg.height/2,.25,.9):null
       const ground=localRoad??(inBore?sim.surface(next.x,next.z,'road',next.y+1,5):sim.surface(next.x,next.z,'ground'))
       if(!ground||next.y-cfg.height/2<ground.y-3){if(place(safe.x,safe.z,'rescue'))resets++;break}
       if(sim.wet(next.x,next.z)){
