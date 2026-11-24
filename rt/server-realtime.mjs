@@ -434,12 +434,16 @@ wss.on('connection', (ws, req) => {
           setTimeout(() => { try { ws.close(4003, 'banned') } catch { /* 忽略 */ } }, 60)
           return
         }
-        // 同房间 uid 必须唯一，否则后来者能直接冒用前者的身份
-        if (uidTaken(uid)) {
-          ws.rejected = true
-          send(ws, {t: 'error', message: '该 uid 已在线'})
-          setTimeout(() => { try { ws.close(4001, 'uid in use') } catch { /* 忽略 */ } }, 60)
-          return
+        // 同房间 uid 必须唯一，否则后来者能直接冒用前者的身份。
+        // 冲突时让**新连接顶掉旧连接**（旧连接收 4001 'replaced'，客户端收到后不再自动重连）：
+        // 原来「拒绝后来者」的写法会让用户换设备后一直连不上，还以为服务坏了。
+        const previous = [...players.values()].find(p => p.uid === uid)
+        if (previous && previous.ws !== ws) {
+          previous.ws.rejected = true
+          players.delete(previous.id)
+          broadcast({t: 'leave', id: previous.id})
+          try { previous.ws.close(4001, 'replaced') } catch { /* 忽略 */ }
+          console.log(JSON.stringify({scope: 'rt-replace', uid, oldId: previous.id, newId: id}))
         }
         const player = {
           id,

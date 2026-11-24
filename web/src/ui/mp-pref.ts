@@ -14,5 +14,5 @@ export function setMpEnabled(on: boolean) {
   window.dispatchEvent(new CustomEvent('glol:mp-pref', {detail: on}))
 }
 
-export type MpState = 'off' | 'connecting' | 'online' | 'offline'
+export type MpState = 'off' | 'connecting' | 'online' | 'offline' | 'replaced'
 export interface MpStatus {state: MpState; online: number}
