@@ -151,6 +151,21 @@ body[data-hud="street"] .hud-stats {
   box-shadow: 0 0 0 2px rgba(208, 105, 76, .25);
 }
 
+/* 被另一台设备接管：不是故障，用中性的纸色 + 空心点，可点击接管回来 */
+.hud-stat--mp[data-state="replaced"] {
+  pointer-events: auto;
+  cursor: pointer;
+  color: var(--ui-paper, #f4efe2);
+  text-decoration: underline;
+  text-decoration-color: rgba(244, 239, 226, .4);
+  text-underline-offset: 3px;
+}
+
+.hud-stat--mp[data-state="replaced"]::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--ui-jade-300, #8fc1b5);
+}
+
 .hud-stat--mp:focus-visible {
   outline: 2px solid var(--ui-jade-300, #8fc1b5);
   outline-offset: 3px;

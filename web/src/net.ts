@@ -7,7 +7,7 @@ import {setRoster,clearRoster} from './mp-roster'
 
 function publish(detail:MpStatus){window.dispatchEvent(new CustomEvent('glol:mp-status',{detail}))}
 
-type State='connecting'|'online'|'offline'
+type State='connecting'|'online'|'offline'|'replaced'
 export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,getAvatar:()=>Avatar,camera:Camera) {
   const peers=players(scene,clips,camera)
   let socket:WebSocket|undefined,attempt=0,generation=0,timer=0,lastSent=-Infinity,lastRoster=-Infinity,disposed=false
@@ -70,7 +70,9 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
       ws.onclose=event=>{if(version!==generation)return;socket=undefined;peers.clear()
         // 4001 = 同账号在别处在线（可能只是上次的旧连接还没被服务端回收）→ 等几秒再连
         // 另一台设备/标签页一直在线时会持续 4001，所以从 4s 起照常指数退避，不按固定间隔轮询
-        if(event.code===4001){attempt=Math.max(attempt,2);retry()}
+        // replaced = 另一台设备接管了同一个账号：这不是故障，别自动重连（否则两台设备会互相顶）
+        if(event.code===4001&&/replaced/i.test(String(event.reason)))update('replaced')
+        else if(event.code===4001){attempt=Math.max(attempt,2);retry()}
         // 4003 有两种：票据过期（第一次 1.2s 后重新取票，之后指数退避，免得票据一直被拒时每秒打一次）和被封禁（停下）
         else if(event.code===4003){if(/banned/i.test(String(event.reason)))update('offline');else retry(attempt++===0?1200:undefined)}
         else retry()}
@@ -92,7 +94,7 @@ export function attachNet(scene:Scene,clips:AnimationClip[],getPose:()=>Pose,get
     const ws=socket;socket=undefined
     if(ws){ws.onopen=ws.onmessage=ws.onclose=ws.onerror=null;try{ws.close(1000,'pagehide')}catch{}}
   }
-  const pageShow=()=>{if(!disposed&&!socket&&account)retry(500)}
+  const pageShow=()=>{if(!disposed&&!socket&&account&&state!=='replaced')retry(500)}
   window.addEventListener('pagehide',pageHide)
   window.addEventListener('pageshow',pageShow)
   const manual=()=>{if(!disposed){stop();attempt=0;void connect()}}
