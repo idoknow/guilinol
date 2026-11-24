@@ -9,7 +9,7 @@ const read=file=>JSON.parse(gunzipSync(readFileSync(`public/world/${file}`)))
 const cars=read('vehicles.bin').cars.map(([x,y,z,yaw])=>({x,y,z,yaw,halfWidth:.9*CAR_SCALE,halfLength:2.12*CAR_SCALE,height:1.5}))
 for(const solid of cars)pickups.add(solid)
 const affected=new Map(),world=new Traffic(read('roads/graph.json.gz'))
-for(const track of world.allTracks())if(!track.walk)for(const {solid} of world.parkingHits(track)){
+for(const track of world.allTracks())if(!track.walk)for(const {solid} of world.parkingHits(track,false)){
   if(!affected.has(solid))affected.set(solid,[])
   affected.get(solid).push(track.id)
 }

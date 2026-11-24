@@ -38,8 +38,9 @@ export class Traffic {
   private queues=new Map<number,Actor[]>()
   private exits=new Map<number,Track[]>()
   private parked=new WeakMap<Track,{revision:number,hits:{solid:Solid,dist:number}[]}>()
-  parkingHits(track:Track){
-    const cached=this.parked.get(track)
+  private clearance=new WeakMap<Track,{revision:number,hits:{solid:Solid,dist:number}[]}>()
+  parkingHits(track:Track,swept=true){
+    const cache=swept?this.clearance:this.parked,cached=cache.get(track)
     if(cached?.revision===pickups.revision)return cached.hits
     const hits:{solid:Solid,dist:number}[]=[],seen=new Set<Solid>(),half=(track.width??3)/2
     const inspect=(solid:Solid)=>{
@@ -48,16 +49,17 @@ export class Traffic {
       const dist=east*track.dx+south*track.dz,side=south*track.dx-east*track.dz-track.offset
       const cosine=Math.cos(solid.yaw-track.yaw),sine=Math.sin(solid.yaw-track.yaw)
       const middle=dist-track.length/2
-      if(Math.abs(middle)>track.length/2+solid.halfLength*Math.abs(cosine)+solid.halfWidth*Math.abs(sine)||
+      const reach=track.length/2+(swept?2.12*CAR_SCALE:0)
+      if(Math.abs(middle)>reach+solid.halfLength*Math.abs(cosine)+solid.halfWidth*Math.abs(sine)||
         Math.abs(side)>half+solid.halfLength*Math.abs(sine)+solid.halfWidth*Math.abs(cosine)||
-        Math.abs(middle*cosine-side*sine)>solid.halfLength+track.length/2*Math.abs(cosine)+half*Math.abs(sine)||
-        Math.abs(middle*sine+side*cosine)>solid.halfWidth+track.length/2*Math.abs(sine)+half*Math.abs(cosine)||
+        Math.abs(middle*cosine-side*sine)>solid.halfLength+reach*Math.abs(cosine)+half*Math.abs(sine)||
+        Math.abs(middle*sine+side*cosine)>solid.halfWidth+reach*Math.abs(sine)+half*Math.abs(cosine)||
         Math.abs(solid.y-trackHeight(track,dist))>1.5)return
       hits.push({solid,dist})
     }
     const steps=Math.ceil(track.length/6)
     for(let step=0;step<=steps;step++){const along=track.length*step/steps;pickups.near(track.start.x+track.dx*along-track.dz*track.offset,track.start.z+track.dz*along+track.dx*track.offset,inspect)}
-    hits.sort((a,b)=>a.dist-b.dist);this.parked.set(track,{revision:pickups.revision,hits});return hits
+    hits.sort((a,b)=>a.dist-b.dist);cache.set(track,{revision:pickups.revision,hits});return hits
   }
   private adjacent(track:Track){return (this.exits.get(track.from)??[]).filter(next=>next!==track&&!next.walk&&next.to===track.to&&next.street===track.street&&Math.abs(next.offset-track.offset)<=(next.width??3)/2+(track.width??3)/2+.1&&!this.parkingHits(next).length)}
   private usable(track:Track){return track.walk||!this.parkingHits(track).length||!!this.adjacent(track).length}
@@ -305,12 +307,13 @@ export class Traffic {
       else actor.waitingSince??=this.time
       actor.speed=advance/dt;actor.dist+=advance
       if(!person&&advance>0&&nearStatic(actor.x+track.dx*advance,actor.z+track.dz*advance)){
-        const next={x:actor.x+track.dx*advance,y:actor.y,z:actor.z+track.dz*advance}
+        const offset=track.offset+actor.dodge
+        const next={x:track.start.x+track.dx*actor.dist-track.dz*offset,y:actor.y,z:track.start.z+track.dz*actor.dist+track.dx*offset}
         if(resolveContact(next,next.y,track.yaw,actor.halfWidth,actor.halfLength,staticSolids)){actor.speed=0;actor.dist-=advance;return}
       }
       if(actor.dist>=track.length){
         if(!person&&this.signal.has(track.to)){this.crossed++;this.onCross?.(track,this.time)}
-        const choices=(this.exits.get(track.to)??[]).filter(next=>this.usable(next)&&next.walk===person && next.street===track.street && (person||next.to!==track.from) && (person||next.kind==='motor'||(actor.kind==='scooter'&&next.kind==='nonmotor')))
+        const choices=(this.exits.get(track.to)??[]).filter(next=>this.usable(next)&&(next.walk||!this.parkingHits(next).some(hit=>hit.dist<12))&&next.walk===person && next.street===track.street && (person||next.to!==track.from) && (person||next.kind==='motor'||(actor.kind==='scooter'&&next.kind==='nonmotor')))
         if(!choices.length){actor.dist=track.length;actor.speed=0;actor.leaving=true;return}
         const onward=choices.filter(next=>next.to!==track.from)
         const pool=onward.length?onward:choices
