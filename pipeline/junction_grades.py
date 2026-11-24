@@ -14,7 +14,10 @@ from vehicle_tunnels import grade_limit
 
 
 def profiles(output,manifest,elements,widths,planned):
-    hubs = {8209536556,13919458288}
+    # Bridge and alley grades need up to 90 m to reach their fixed ends.
+    # The other three are ordinary at-grade junctions where both arms
+    # return to existing pavement within 30 m of the shared node.
+    reaches={8209536556:90.,13919458288:90.,14105001808:30.,13535714448:30.,13680845700:30.}
     highways = [w for w in elements if w['type']=='way' and w.get('tags',{}).get('highway')
                 and w.get('geometry') and all(w['geometry'])]
     links = defaultdict(list)
@@ -25,7 +28,7 @@ def profiles(output,manifest,elements,widths,planned):
     bounds = box(x,z,x+w,z+h)
     constraints = STRtree([r[0] for r in planned])
     arms, requests, centres = defaultdict(list), [], {}
-    for hub in sorted(hubs):
+    for hub,reach in reaches.items():
         for road in links[hub]:
             coords,refs = points(road),road['nodes']
             start = refs.index(hub)
@@ -44,7 +47,7 @@ def profiles(output,manifest,elements,widths,planned):
                 if len(indexes)<2:
                     continue
                 axis=LineString([coords[i] for i in indexes])
-                extent=min(90.,axis.length)
+                extent=min(reach,axis.length)
                 arm=substring(axis,0,extent)
                 end=arm.interpolate(extent)
                 probe=dict(x=end.x,z=end.y,way=road['id'])
